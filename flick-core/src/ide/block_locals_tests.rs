@@ -112,3 +112,35 @@ fn a_field_a_record_pattern_puns_is_a_name_in_scope() {
             .any(|&(start, _, kind)| start == pun && kind == super::tokens::PARAMETER)
     );
 }
+
+#[test]
+fn a_refined_type_is_a_declaration_of_its_plugin_to_an_editor() {
+    let source = "module App.P exposing (..)\n\nrefined type Port = Float where fun n -> n > 0\n\nopen : Result SchemaError Port\nlet open = Port.parse 80\n\nnumber : Port -> Float\nlet number port = Port.value port\n";
+    let f = fixture_of(&[("src/App/P.fl", source)]);
+    let ide = f.ide();
+    let file = f.file("App.P");
+    let found = &ide.analysis.diagnostics;
+    assert!(found.is_empty(), "{found:?}");
+    let at = |needle: &str| u32::try_from(source.find(needle).expect("occurs")).expect("small");
+    // the head: what its plugin says of it
+    let (head, _) = ide.hover(file, at("refined") + 1).expect("the head");
+    assert!(head.contains("A type of its own over another"), "{head}");
+    // the code of the user in it: the parameter of the check
+    let (parameter, _) = ide.hover(file, at("n > 0")).expect("a parameter");
+    assert!(parameter.contains("n : Float"), "{parameter}");
+    // the companions, typed and documented by the plugin
+    let (parse, _) = ide.hover(file, at("Port.parse") + 6).expect("parse");
+    assert!(
+        parse.contains("Float -> Result SchemaError Port"),
+        "{parse}"
+    );
+    assert!(
+        parse.contains("Checks a value: the value as one"),
+        "{parse}"
+    );
+    let (value, _) = ide.hover(file, at("Port.value") + 6).expect("value");
+    assert!(value.contains("Port -> Float"), "{value}");
+    // the type is declared at its name in the block
+    let (target, _) = ide.hover(file, at("Port\nlet open")).expect("the type");
+    assert!(target.contains("Port"), "{target}");
+}

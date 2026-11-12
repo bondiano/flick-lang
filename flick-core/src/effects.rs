@@ -142,10 +142,6 @@ pub fn check(module: &ir::Module, diagnostics: &mut Vec<Diagnostic>) {
             .as_deref()
             .filter(|spec| specifier(spec).is_none())
             .map(|spec| (item.span, format!("`{spec}` runs on Effect"))),
-        ItemKind::Refined { name, .. } => Some((
-            item.span,
-            format!("the refined type `{name}` parses with Schema"),
-        )),
         _ => None,
     });
     if let Some((span, what)) = needed {
@@ -192,7 +188,6 @@ pub fn control_on_js(module: &ir::Module, diagnostics: &mut Vec<Diagnostic>) {
             ItemKind::Value { body, .. } | ItemKind::Destructure { body, .. } => {
                 walk(body, diagnostics);
             }
-            ItemKind::Refined { check, .. } => walk(check, diagnostics),
             ItemKind::Instance { methods, .. } => {
                 for (_, m) in methods {
                     walk(m, diagnostics);

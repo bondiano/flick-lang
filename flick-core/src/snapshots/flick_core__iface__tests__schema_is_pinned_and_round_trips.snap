@@ -3,7 +3,7 @@ source: flick-core/src/iface.rs
 expression: json
 ---
 {
-  "iface-version": 17,
+  "iface-version": 18,
   "compiler": "0.1.0",
   "module": "App.Shapes",
   "exports": [
@@ -21,8 +21,8 @@ expression: json
         ]
       },
       "at": [
-        152,
-        157
+        146,
+        151
       ]
     },
     {
@@ -58,8 +58,8 @@ expression: json
         }
       },
       "at": [
-        160,
-        166
+        154,
+        160
       ]
     },
     {
@@ -95,8 +95,8 @@ expression: json
         }
       },
       "at": [
-        175,
-        181
+        169,
+        175
       ]
     },
     {
@@ -109,8 +109,8 @@ expression: json
         "form": "nominal"
       },
       "at": [
-        214,
-        216
+        208,
+        210
       ]
     },
     {
@@ -130,8 +130,8 @@ expression: json
         }
       },
       "at": [
-        240,
-        244
+        234,
+        238
       ]
     },
     {
@@ -149,8 +149,8 @@ expression: json
         "form": "kind"
       },
       "at": [
-        258,
-        262
+        252,
+        256
       ]
     },
     {
@@ -169,8 +169,8 @@ expression: json
         "form": "kind-member"
       },
       "at": [
-        265,
-        270
+        259,
+        264
       ]
     },
     {
@@ -189,8 +189,8 @@ expression: json
         "form": "kind-member"
       },
       "at": [
-        273,
-        276
+        267,
+        270
       ]
     },
     {
@@ -214,8 +214,8 @@ expression: json
         ]
       },
       "at": [
-        283,
-        287
+        277,
+        281
       ]
     },
     {
@@ -263,8 +263,8 @@ expression: json
         }
       },
       "at": [
-        294,
-        298
+        288,
+        292
       ]
     },
     {
@@ -319,8 +319,8 @@ expression: json
         ]
       },
       "at": [
-        327,
-        337
+        321,
+        331
       ]
     },
     {
@@ -369,8 +369,8 @@ expression: json
         }
       },
       "at": [
-        355,
-        360
+        349,
+        354
       ]
     },
     {
@@ -395,8 +395,8 @@ expression: json
         }
       },
       "at": [
-        461,
-        465
+        455,
+        459
       ]
     },
     {
@@ -433,8 +433,8 @@ expression: json
         }
       },
       "at": [
-        502,
-        505
+        496,
+        499
       ]
     },
     {
@@ -447,8 +447,8 @@ expression: json
         "form": "nominal"
       },
       "at": [
-        534,
-        538
+        528,
+        532
       ]
     },
     {
@@ -495,8 +495,8 @@ expression: json
         ]
       },
       "at": [
-        547,
-        552
+        541,
+        546
       ]
     },
     {
@@ -509,8 +509,8 @@ expression: json
         "form": "error"
       },
       "at": [
-        591,
-        599
+        585,
+        593
       ]
     },
     {
@@ -536,22 +536,8 @@ expression: json
         }
       },
       "at": [
-        591,
-        599
-      ]
-    },
-    {
-      "module": "App.Shapes",
-      "namespace": "type",
-      "name": "Port",
-      "decl": "refined",
-      "definition": {
-        "kind": "type",
-        "form": "nominal"
-      },
-      "at": [
-        631,
-        635
+        585,
+        593
       ]
     },
     {
@@ -611,8 +597,8 @@ expression: json
         }
       },
       "at": [
-        676,
-        679
+        623,
+        626
       ]
     },
     {
@@ -682,8 +668,8 @@ expression: json
         }
       },
       "at": [
-        758,
-        762
+        705,
+        709
       ]
     },
     {
@@ -759,73 +745,9 @@ expression: json
         }
       },
       "at": [
-        876,
-        881
+        823,
+        828
       ]
-    },
-    {
-      "module": "App.Shapes",
-      "namespace": "value",
-      "name": "Port$parse",
-      "decl": "let",
-      "type": {
-        "fun": {
-          "param": {
-            "con": {
-              "module": "Prelude",
-              "name": "Float"
-            }
-          },
-          "result": {
-            "app": {
-              "head": {
-                "app": {
-                  "head": {
-                    "con": {
-                      "module": "Prelude",
-                      "name": "Result"
-                    }
-                  },
-                  "arg": {
-                    "con": {
-                      "module": "Prelude",
-                      "name": "SchemaError"
-                    }
-                  }
-                }
-              },
-              "arg": {
-                "con": {
-                  "module": "App.Shapes",
-                  "name": "Port"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "module": "App.Shapes",
-      "namespace": "value",
-      "name": "Port$value",
-      "decl": "let",
-      "type": {
-        "fun": {
-          "param": {
-            "con": {
-              "module": "App.Shapes",
-              "name": "Port"
-            }
-          },
-          "result": {
-            "con": {
-              "module": "Prelude",
-              "name": "Float"
-            }
-          }
-        }
-      }
     }
   ],
   "hidden": [

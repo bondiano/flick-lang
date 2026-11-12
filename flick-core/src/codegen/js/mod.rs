@@ -38,7 +38,6 @@ mod paths;
 mod pattern;
 pub use paths::relative;
 mod release;
-mod schema;
 mod services;
 mod tidy;
 mod view;

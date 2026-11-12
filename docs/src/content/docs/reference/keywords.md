@@ -33,7 +33,6 @@ See [modules.md](../modules/).
 | `assert` | `let assert` binds a pattern that may not match, and fails when it does not | `let assert [x, ..._] = xs as "no items"` |
 | `type` | declares an ADT, `type alias` a transparent alias | `type Shape = Circle Float \| Empty` |
 | `opaque` | hides a type's representation outside its module | `opaque type alias UserId = String` |
-| `refined` | a type whose values pass a predicate | `refined type Port = Float where fun n -> n > 0` |
 | `where` | the predicate of a `refined` type; a filter in `sql { … }` | `where user.id == params.id` |
 | `kind` | declares a kind with its type-level constructors | `kind Nullability = NonNull \| Nullable` |
 | `error` | `type error` declares an expected error with a nominal identity | `type error NotFound = NotFound UserId` |
@@ -97,6 +96,7 @@ as record labels: `{ echo = … }`.
 | Block | Meaning | Example |
 | - | - | - |
 | `ui` | a UI block: its code with the names of `Ui` in sight | `ui { … }` |
+| `refined` | a type whose values pass a check, with `parse`, `value` and `check` | `refined type Port = Float where fun n -> n > 0` |
 
 See [schema.md](../schema/) and [ui.md](../ui/). A UI block, a component,
 `component counter () = …`, a command-line interface, `cli "deploy" { … }`,

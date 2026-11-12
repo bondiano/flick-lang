@@ -294,25 +294,12 @@ impl Lower<'_> {
         }
     }
 
-    /// The constructors of a type or error and its refinement check; its
+    /// The constructors of a type or error; its
     /// witness `T$schema` is the code std's plugin derives.
     fn type_items(&mut self, decl: &Node, span: Span, items: &mut Vec<Item>) {
         let Some(ty) = self.token_text(decl, K::Con) else {
             return;
         };
-        if let Some(predicate) = decl.nodes().find(|n| n.kind == K::Refinement)
-            && let Some(check) = predicate.nodes().next()
-        {
-            self.fresh_definition();
-            let check = self.expr(check);
-            items.push(Item {
-                kind: ItemKind::Refined {
-                    name: ty.clone(),
-                    check,
-                },
-                span,
-            });
-        }
         let abi = self.typing.abis.get(&ty).cloned().unwrap_or_default();
         let mut constructors = Vec::new();
         for (i, variant) in decl.nodes().filter(|n| n.kind == K::Variant).enumerate() {

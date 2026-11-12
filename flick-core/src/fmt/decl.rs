@@ -47,12 +47,6 @@ impl<'a> Printer<'a> {
                 }
                 doc
             }
-            [base, refinement] if refinement.kind == K::Refinement => {
-                let base = self.node(base);
-                let refinement = self.node(refinement);
-                let refinement = docvec![a, a.break_("", " "), refinement].nest(a, INDENT);
-                docvec![a, head, " ", base, refinement].group(a)
-            }
             _ => {
                 let value = self.elements(n, value);
                 let value = docvec![a, a.break_("", " "), value].nest(a, INDENT);

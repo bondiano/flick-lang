@@ -19,7 +19,7 @@ impl Checker<'_> {
     fn expression_node(&self, node: &Node, out: &mut Vec<E>, parameter: Option<&str>) -> u32 {
         let children: Vec<_> = node.nodes().collect();
         let kind = match (node.kind, children.as_slice()) {
-            (K::Refinement | K::ParenExpr | K::Block, [only]) => {
+            (K::ParenExpr | K::Block, [only]) => {
                 return self.expression_node(only, out, parameter);
             }
             (K::Literal, _) => match consteval::eval(node, self.text) {

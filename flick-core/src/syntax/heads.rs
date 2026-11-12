@@ -4,13 +4,14 @@
 /// The heads of the plugins linked into the compiler and the module that
 /// exposes each. Every module has them without an import: `cli "x" { … }`
 /// is a block of std's plugin, and no other plugin may give the head.
-pub const HEADS: [(&str, &str); 6] = [
+pub const HEADS: [(&str, &str); 7] = [
     ("cli", "Cli"),
     ("server", "Server"),
     ("codec", "Codec"),
     ("sql", "Sql"),
     ("component", "Ui"),
     ("ui", "Ui"),
+    ("refined", "Checks"),
 ];
 
 /// The word of generated code before the module a body opens: `open$module
@@ -23,9 +24,14 @@ pub const BARE: [&str; 1] = ["server"];
 
 /// The declarations of the compiler's own plugins even where no import
 /// exposes their heads, by the head and the word after it: `server fn f x
-/// = …`, `sql table Users "users" { … }`, `sql migration 1 "m" { … }`.
-pub const DECLARATIONS: [(&str, &str); 3] =
-    [("server", "fn"), ("sql", "table"), ("sql", "migration")];
+/// = …`, `sql table Users "users" { … }`, `sql migration 1 "m" { … }`,
+/// `refined type Email = String where Checks.email`.
+pub const DECLARATIONS: [(&str, &str); 4] = [
+    ("server", "fn"),
+    ("sql", "table"),
+    ("sql", "migration"),
+    ("refined", "type"),
+];
 
 /// The heads that declare a name right after them, whatever word it is:
 /// `component counter (start : Float) = …`.

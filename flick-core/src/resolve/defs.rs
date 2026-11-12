@@ -90,7 +90,6 @@ fn declaration(decl: &Node, text: &str, file: FileId, defs: &mut Vec<Def>) {
             let sealed = variants.iter().any(|v| v.text(text).contains('$'));
             let form = match decl.kind {
                 K::TypeDecl if sealed || decl.has_token(K::OpaqueKw) => Decl::Opaque,
-                K::TypeDecl if decl.has_token(K::RefinedKw) => Decl::Refined,
                 K::TypeDecl if !variants.is_empty() => Decl::Adt,
                 K::TypeDecl if decl.has_token(K::Eq) => Decl::Alias,
                 K::TypeDecl => Decl::Abstract,
@@ -209,7 +208,6 @@ pub(super) fn alias_cycles(tree: &Node, text: &str, file: FileId) -> Vec<Diagnos
     for decl in tree.nodes().filter(|n| n.kind == K::TypeDecl) {
         let is_alias = decl.has_token(K::Eq)
             && !decl.has_token(K::OpaqueKw)
-            && !decl.has_token(K::RefinedKw)
             && !decl.nodes().any(|n| n.kind == K::Variant);
         let Some(name) = decl.child_tokens().find(|t| t.kind == K::Con) else {
             continue;

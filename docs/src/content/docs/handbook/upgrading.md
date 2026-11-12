@@ -49,6 +49,7 @@ change needs.
 | [Rust 1.95 builds the compiler](#rust-195-builds-the-compiler) | no | — |
 | [`mut` is a keyword](#mut-is-a-keyword) | no | `FLICK-S007`, `FLICK-S016` |
 | [Children in `ui` stand one by one](#children-in-ui-stand-one-by-one) | yes: `--only T073` | `FLICK-T073`, `FLICK-T003` |
+| [`refined type` is a declaration of std's plugin](#refined-type-is-a-declaration-of-stds-plugin) | no | `FLICK-P036`, `FLICK-R005` |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -359,6 +360,25 @@ way. What it leaves:
 
 `ui` is no longer a reserved word: it starts a block before `{` and is a
 name elsewhere. Outside `ui` nothing changes: `Ui.div props [a, b]`.
+
+## `refined type` is a declaration of std's plugin
+
+`refined type Port = Float where fun n -> n > 0` is written as before, and
+the plugin of `std` now gives its code: the type, `Port.parse`, `Port.value`
+and the predicate as `Port.check : Float -> Bool`. What changes for a
+program:
+
+- `refined` is no reserved word: a value may be named `refined`.
+- `Port.check` is a name of the module. A module that declared its own
+  `Port.check` beside the type has two.
+- A declaration that lacks a part is `FLICK-P036` at the place it stops,
+  where it was a syntax error.
+- A class in the `deriving` of a refined type takes no arguments.
+- A program with refined types no longer needs Effect for them: `parse`
+  is code of the language, not a function of the runtime.
+
+Built JavaScript and Go change for these declarations and nothing else;
+`flick expand` shows the code.
 
 ## Instances belong to one package
 

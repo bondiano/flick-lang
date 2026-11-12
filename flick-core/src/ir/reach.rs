@@ -10,7 +10,7 @@ use std::collections::HashSet;
 #[cfg(any(not(target_arch = "wasm32"), feature = "native-project"))]
 use crate::ir::Module;
 use crate::ir::{Expr, ExprKind, Item, ItemKind};
-use crate::types::{Dict, companion_name, default_method};
+use crate::types::{Dict, default_method};
 
 /// A top-level name: its module, and the value, foreign or instance name.
 pub type Key = (String, String);
@@ -19,10 +19,6 @@ pub type Key = (String, String);
 pub fn defined(item: &Item) -> Vec<String> {
     match &item.kind {
         ItemKind::Value { name, .. } | ItemKind::Service { name, .. } => vec![name.clone()],
-        ItemKind::Refined { name, .. } => ["check", "parse", "value"]
-            .iter()
-            .map(|m| companion_name(name, m))
-            .collect(),
         ItemKind::Foreign(f) => vec![f.name.clone()],
         ItemKind::Instance { info, .. } => vec![info.name.clone()],
         ItemKind::Destructure { pattern, .. } => {

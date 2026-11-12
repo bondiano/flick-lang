@@ -3,8 +3,6 @@
 //! are derived only together with `Eq`, so all of them use the same fields.
 //! A class marked `@derive` is derived by its plugin, before checking.
 
-use std::ptr;
-
 use super::declare::Declared;
 use super::solve::Outcome;
 use super::{Dict, STRUCTURAL, has_metas, split, which};
@@ -20,11 +18,7 @@ use crate::types::lang::{self, Lang};
 use crate::types::ty::{Binder, Type};
 
 impl<'n> Checker<'_> {
-    pub(super) fn derive(
-        &mut self,
-        decl: &'n Node,
-        refined: &[(&Node, Type)],
-    ) -> Vec<Declared<'n>> {
+    pub(super) fn derive(&mut self, decl: &'n Node) -> Vec<Declared<'n>> {
         let Some(clause) = decl.nodes().find(|n| n.kind == K::DerivingClause) else {
             return Vec::new();
         };
@@ -57,7 +51,7 @@ impl<'n> Checker<'_> {
                 kind,
             })
             .collect();
-        let Some(fields) = self.fields_of(decl, &name, &def.form, refined, &params) else {
+        let Some(fields) = self.fields_of(decl, &name, &def.form, &params) else {
             return Vec::new();
         };
         let mut out = Vec::new();
@@ -136,7 +130,6 @@ impl<'n> Checker<'_> {
         decl: &Node,
         name: &str,
         form: &Form,
-        refined: &[(&Node, Type)],
         params: &[Binder],
     ) -> Option<Vec<Type>> {
         let span = decl
@@ -171,12 +164,6 @@ impl<'n> Checker<'_> {
             Form::Alias {
                 body, opaque: true, ..
             } => return Some(vec![body.clone()]),
-            Form::Nominal { .. } if decl.has_token(K::RefinedKw) => {
-                let base = refined
-                    .iter()
-                    .find(|(predicate, _)| decl.nodes().any(|n| ptr::eq(n, *predicate)));
-                return Some(base.map(|(_, b)| vec![b.clone()]).unwrap_or_default());
-            }
             Form::Alias { .. } => format!(
                 "`{name}` is a transparent alias: its form already has the structural instances, so there is nothing to derive"
             ),

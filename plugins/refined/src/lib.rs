@@ -5,6 +5,7 @@
 
 use flick_plugin::{CallSite, Constant, Diagnostic, Refinement};
 
+pub mod block;
 mod predicate;
 
 /// `D006` on each `T.parse c` whose constant never passes the check of `T`.

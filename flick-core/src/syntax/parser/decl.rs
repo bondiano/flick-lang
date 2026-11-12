@@ -54,7 +54,7 @@ fn member(p: &mut Parser) {
     match p.current() {
         K::At => attribute(p),
         K::LetKw => let_decl(p),
-        K::TypeKw | K::OpaqueKw | K::RefinedKw => type_decl(p),
+        K::TypeKw | K::OpaqueKw => type_decl(p),
         // `unboxed type` and `untagged type`: the words are names elsewhere
         K::Ident if (p.at_word("unboxed") || p.at_word("untagged")) && p.nth(1) == K::TypeKw => {
             type_decl(p);
@@ -186,21 +186,18 @@ fn type_params(p: &mut Parser) {
 }
 
 /// `type Name params = variants`, `type alias Name params = T`, the nominal
-/// `opaque` and `refined` forms, or an abstract `type Name params`; a
+/// `opaque` form, or an abstract `type Name params`; a
 /// variant type may name its JS representation, `unboxed` or `untagged`.
 fn type_decl(p: &mut Parser) {
     let m = p.start();
-    let refined = p.at(K::RefinedKw);
-    if !p.eat(K::OpaqueKw) {
-        p.eat(K::RefinedKw);
-    }
+    p.eat(K::OpaqueKw);
     // `unboxed type`, `opaque unboxed type`, `untagged type`
     if p.at_word("unboxed") || p.at_word("untagged") {
         p.bump();
     }
     if p.expect(K::TypeKw) {
         // `alias` is a word only here: a type name is capitalized
-        let alias = !refined && p.at_word("alias") && p.nth(1) == K::Con;
+        let alias = p.at_word("alias") && p.nth(1) == K::Con;
         if alias {
             p.bump();
         }
@@ -211,16 +208,7 @@ fn type_decl(p: &mut Parser) {
                     types::type_(p);
                 }
             } else if p.eat(K::Eq) {
-                if refined {
-                    types::type_(p);
-                    let r = p.start();
-                    if p.expect(K::WhereKw) {
-                        expr::expr(p);
-                    }
-                    p.complete(r, K::Refinement);
-                } else {
-                    variants(p, true);
-                }
+                variants(p, true);
             }
             deriving(p);
         }

@@ -288,9 +288,6 @@ export const schemaRefinedOf = (name: string, _known: unknown, base: Witness,
   }, check, { kind: "refined", name, known: isRecord(_known) && _known["_tag"] === "Some"
     && typeof _known["value"] === "string" ? _known["value"] : undefined, base });
 };
-export const refinedParse = (name: string, check: (value: unknown) => boolean) =>
-  (value: unknown): Result<unknown, SchemaError> =>
-    check(value) ? ok(value) : err(schemaError("", `not a valid ${name}`));
 export const checkEmail = (value: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 export const checkNonEmpty = (value: string): boolean => value.length > 0;
 export const checkPositive = (value: number): boolean => value > 0;

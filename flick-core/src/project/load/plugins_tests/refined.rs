@@ -1,8 +1,9 @@
 #[cfg(feature = "ide")]
 use std::sync::Arc;
 
-use super::{check, host, library, roots};
+use super::{check, compile, host, library, report, roots};
 use crate::diagnostics::{Severity, codes};
+use crate::ir;
 use crate::source::SourceMap;
 
 #[cfg(feature = "ide")]
@@ -58,5 +59,50 @@ fn refined_predicates_keep_exact_integer_literal_operations() {
         diagnostics
             .iter()
             .all(|d| d.severity != Severity::Error || d.code == codes::D006)
+    );
+}
+
+/// `refined type` is a declaration of std's plugin: a type of its own over
+/// the base, and its check, `parse` and `value` as code of the language.
+#[test]
+fn a_refined_type_is_the_code_of_its_plugin() {
+    let source = "module App.Main exposing (..)\n\nrefined type Port = Float where fun n -> n > 0\n  deriving Eq, Show\n";
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let (diagnostics, compilation) = compile(&host(source), &mut sources, Some(&project), &roots());
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let printed = ir::print(&compilation.modules[0].ir);
+    for line in [
+        "constructor App.Main.Port.Port$Make/1",
+        "let Port$check = (fun n -> ",
+        "let Port$parse = (fun value -> ",
+        "let Port$value = (fun (Port$Make value) -> value)",
+        "instance Show Port",
+        "instance Eq Port",
+    ] {
+        assert!(printed.contains(line), "{line} is not in\n{printed}");
+    }
+}
+
+#[test]
+fn what_a_refined_declaration_lacks_is_said_where_it_is_missing() {
+    let head = "module App.Main exposing (..)\n\n";
+    let of = |decl: &str| report(&format!("{head}{decl}\n"));
+    assert_eq!(
+        of("refined type Port = Float"),
+        ["FLICK-P036 `Float`: plugin `std`: expected `where` and the check of the type"]
+    );
+    assert_eq!(
+        of("refined type Port where fun n -> n > 0"),
+        ["FLICK-P036 `where`: plugin `std`: expected `=` and the base type"]
+    );
+    assert_eq!(
+        of("refined type Port = Float where fun n -> n > 0 deriving Eq { strict = true }"),
+        ["FLICK-P036 `{`: plugin `std`: a class of a refined type takes no arguments"]
+    );
+    // the check is the user's code: its type is theirs to get right
+    assert_eq!(
+        of("refined type Port = Float where fun n -> n + 1"),
+        ["FLICK-T003 `n + 1`: expected `Bool`, found `Float`"]
     );
 }

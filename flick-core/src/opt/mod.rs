@@ -80,7 +80,6 @@ pub fn optimize(module: &mut Module, exported: &dyn Fn(&str) -> bool, generics: 
 fn bodies(item: &mut Item) -> Vec<&mut Expr> {
     match &mut item.kind {
         ItemKind::Value { body, .. } | ItemKind::Destructure { body, .. } => vec![body],
-        ItemKind::Refined { check, .. } => vec![check],
         ItemKind::Instance { methods, .. } => methods.iter_mut().map(|(_, m)| m).collect(),
         ItemKind::Foreign(_) | ItemKind::Constructor(_) | ItemKind::Service { .. } => Vec::new(),
     }

@@ -230,7 +230,7 @@ each argument where it is written, its type as `check` sees it, the constant
 it folds to, if any, and whether it is written as a `fun`. A call of the
 `parse` of a refined type also carries how its check reads that constant:
 the literals of an enum, or the syntax and resolved references of the
-module's own predicate. The plugin interprets those facts. Every span is of the
+check of the module's own type, its companion `T.check`. The plugin interprets those facts. Every span is of the
 module's own file, inside a block as well as outside one, so a diagnostic
 comes back at the code the user wrote.
 

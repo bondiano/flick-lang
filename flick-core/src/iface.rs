@@ -17,7 +17,7 @@ pub use template::{
 };
 
 /// Bumped on every change of the schema.
-pub const IFACE_VERSION: u32 = 17;
+pub const IFACE_VERSION: u32 = 18;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -52,7 +52,6 @@ pub enum Decl {
     /// transparent `type T = …`
     Alias,
     Opaque,
-    Refined,
     /// `type T` without a definition
     Abstract,
     /// `type module Sig = ...`; its body is a structural module contract.
@@ -436,7 +435,7 @@ mod tests {
     #[test]
     fn schema_is_pinned_and_round_trips() {
         let interface = interface_of(
-            "module App.Shapes exposing (Shape(..), Id, Size, Mode(..), Show(..), Collection(..), area, now, Pair, Clock, NotFound(..), Port, Box, wrap, later)\n\
+            "module App.Shapes exposing (Shape(..), Id, Size, Mode(..), Show(..), Collection(..), area, now, Pair, Clock, NotFound(..), Box, wrap, later)\n\
              type Shape = Circle Float | Square Float\n  deriving Eq\n\
              opaque type Id = Id String\n\
              type alias Size = Float\n\
@@ -449,7 +448,6 @@ mod tests {
              type Pair\n\
              service Clock =\n  tick : Unit ->{} Float\n\
              type error NotFound = NotFound String\n\
-             refined type Port = Float where fun n -> n > 0\n\
              type alias Box (f : Type -> Type) a = { value : f a; size : Size }\n\
              wrap : f a -> Box f a\nlet wrap value = { value = value; size = 1 }\n\
              /// A thunk of `h`.\n\

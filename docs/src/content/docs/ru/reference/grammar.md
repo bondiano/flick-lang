@@ -1,6 +1,6 @@
 ---
 title: "Грамматика Flick"
-source_hash: 8dfda7a1c0f06b69
+source_hash: 157fccf489a8c957
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -39,9 +39,9 @@ source_hash: 8dfda7a1c0f06b69
 
 ```text
 module exposing import as let mut rec fun match with try if then else task await
-scope provide ignore todo echo type opaque refined where kind error service class
+scope provide ignore todo echo type opaque where kind error service class
 instance deriving foreign from forall not none true false
-ui in when for yield do break continue
+in when for yield do break continue
 ```
 
 Контекстные слова считаются обычными именами, кроме следующих позиций:
@@ -287,7 +287,7 @@ let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] "=" blo
 rec_group   = "rec" "{" { signature | let } "}"
 type_decl   = ["opaque"] "type" Con { param } ["=" variants] [deriving]
             | ["opaque"] "type" "alias" Con { param } "=" type [deriving]
-            | "refined" "type" Con { param } "=" type "where" expr [deriving]
+            | "refined" "type" Con { param } "=" type "where" expr [deriving]    (объявление плагина std)
             | ["opaque"] ("unboxed" | "untagged") "type" Con { param } "=" variants [deriving]
 variants    = ["|"] variant { "|" variant }
 variant     = Con { capture } ["=" literal] [":" type]

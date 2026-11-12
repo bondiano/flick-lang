@@ -66,7 +66,6 @@ export {
   schemaJsonCodec, schemaLazyOf, schemaList, schemaLiterals, schemaNever, schemaNumber, schemaOpaque,
   schemaOption, schemaRecordOf, schemaRecursive, schemaRedacted, schemaRefinedOf, schemaResult,
   schemaString, schemaTupleOf, schemaUnboxed, schemaUnit, schemaUnknown, schemaValidate, schemaEnumTags,
-  refinedParse,
 } from "./schema.ts";
 export { schemaGenerator, schemaWithGenerator } from "./schema_gen.ts";
 export { schemaArbitrary } from "./effect/Arbitrary.ts";

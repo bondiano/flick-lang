@@ -95,8 +95,7 @@ fn arguments(p: &mut Parser) {
 /// [`DECLARATIONS`] before its word; or one of [`NAMED`] before a name.
 pub(super) fn at_declaration(p: &Parser) -> bool {
     let head = p.text_of(p.raw());
-    let own = (DECLARATIONS.iter())
-        .any(|(h, w)| *h == head && p.nth(1) == K::Ident && super::decl::word_at(p, 1, w))
+    let own = (DECLARATIONS.iter()).any(|(h, w)| *h == head && super::decl::word_at(p, 1, w))
         || NAMED.contains(&head) && p.nth(1) == K::Ident;
     (p.plugin_heads.contains(&head) || own) && p.nth(1) != K::Colon
 }

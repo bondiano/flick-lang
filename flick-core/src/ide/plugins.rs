@@ -84,13 +84,16 @@ impl Ide<'_> {
         // a `fun` has its type at its keyword, after the `(` of generated code
         let keyword = |&(start, _): &(u32, u32)| m.typing.types.get(&(start + 1, start + 4));
         let typed = |&(start, end): &(u32, u32)| m.typing.types.get(&(start, end));
+        // declarations have no one type: the head has its plugin's words alone
         let ty = (code.iter().filter(function).find_map(keyword))
-            .or_else(|| code.iter().find_map(typed))?;
-        let mut markdown = format!(
-            "```flick\n{} : {}\n```",
-            head.text(text),
-            show_signature(ty)
-        );
+            .or_else(|| code.iter().find_map(typed));
+        let mut markdown = ty.map_or_else(String::new, |ty| {
+            format!(
+                "```flick\n{} : {}\n```",
+                head.text(text),
+                show_signature(ty)
+            )
+        });
         // the plugin answers for its head at an offset past the block
         // the `{` right after a head is the compiler's, not of the block's text
         let first = (block.tokens().into_iter())
@@ -102,10 +105,11 @@ impl Ide<'_> {
                 .hover(&b.block, &b.state, past, &facts)
                 .unwrap_or_else(|why| failed(b.plugin.id(), "hover", &why));
             if let Some(said) = said {
-                markdown = format!("{markdown}\n\n{}", said.markdown);
+                let gap = if markdown.is_empty() { "" } else { "\n\n" };
+                markdown = format!("{markdown}{gap}{}", said.markdown);
             }
         }
-        Some((markdown, (head.start, head.end)))
+        (!markdown.is_empty()).then_some((markdown, (head.start, head.end)))
     }
 }
 

@@ -15,7 +15,7 @@ use crate::codegen::names as js_names;
 use crate::codegen::tail::{Callee, Target};
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Module};
 use crate::source::Span;
-use crate::types::{Constructor, Dict, InstanceInfo, Rep, companion_name, default_method};
+use crate::types::{Constructor, Dict, InstanceInfo, Rep, default_method};
 use crate::types::{STRUCTURAL, which};
 
 /// Whether the runtime derives the instances of `module.class`.
@@ -158,26 +158,6 @@ impl<'a> Gen<'a> {
             }
             // a service is its key, written where it is used
             ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
-            // `T$check`, then `T$parse` and `T$value` over it
-            ItemKind::Refined { name, check } => {
-                let check_var =
-                    a.alloc_str(&names::var(self.module, &companion_name(name, "check")));
-                let parse = a.alloc_str(&names::var(self.module, &companion_name(name, "parse")));
-                let value = a.alloc_str(&names::var(self.module, &companion_name(name, "value")));
-                for var in [check_var, parse, value] {
-                    decls.push((docvec![a, "var ", var, " flickrt.Value"], false));
-                }
-                let (mut stmts, v) = self.block(|g| g.expr(check));
-                stmts.push(statement(a, docvec![a, check_var, " = ", v]));
-                let refined = call(
-                    a,
-                    "flickrt.RefinedParse",
-                    [self.string(name), a.text(check_var)],
-                );
-                stmts.push(statement(a, docvec![a, parse, " = ", refined]));
-                stmts.push(statement(a, docvec![a, value, " = flickrt.RefinedValue"]));
-                init.push(statement(a, block(a, stmts)));
-            }
         }
     }
 

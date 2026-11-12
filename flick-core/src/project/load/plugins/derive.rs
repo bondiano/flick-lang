@@ -54,7 +54,7 @@ impl Loader<'_> {
         let mut out = Vec::new();
         for (i, m) in self.modules.iter().enumerate() {
             let tree = &m.parse.tree;
-            // the blocks whose code declares types with classes of their own
+            // the blocks whose code declares types
             let blocks: Vec<&Found> = (expanded.iter())
                 .filter(|(f, code)| f.module == i && code.is_some() && !f.declared.is_empty())
                 .map(|(f, _)| f)
@@ -73,7 +73,7 @@ impl Loader<'_> {
             let declared: Vec<&Node> = (tree.nodes())
                 .filter(|n| matches!(n.kind, K::TypeDecl | K::ErrorDecl))
                 .collect();
-            let summary: Vec<DeriveTarget> = (declared.iter())
+            let mut summary: Vec<DeriveTarget> = (declared.iter())
                 .filter_map(|d| {
                     let source = BlockSource::declaration(
                         Arc::clone(&shared),
@@ -85,6 +85,12 @@ impl Loader<'_> {
                     target(d, text, source.block(), None)
                 })
                 .collect();
+            // the types the code of its blocks declares are the module's too
+            for declared in blocks.iter().flat_map(|f| &f.declared) {
+                if let Ok(target) = &declared.target {
+                    summary.push(target.clone());
+                }
+            }
             let call = Call {
                 loader: self,
                 module: i,
