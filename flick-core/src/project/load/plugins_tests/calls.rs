@@ -80,3 +80,24 @@ fn a_function_under_an_owner_service_is_no_maker() {
     // the maker where it is named, and `plain`, which reaches it; not `under`
     assert_eq!(named, ["Pairs.fresh", "Pairs.fresh", "plain"], "{found:?}");
 }
+
+/// The code of a block says which declaration reads the constant given to a
+/// function it declares: a plugin that watches the function is told how.
+#[test]
+fn a_constant_given_to_a_function_comes_with_the_declaration_that_reads_it() {
+    let main = "module App.Main exposing (..)\n\nimport Pairs exposing (plugin gated)\n\ntype Even = Even\n\ngated Even { fun n -> n > 0.0 }\n\nthree : Float\nlet three = Even.admit 3.0\n\nlater : Float -> Float\nlet later n = Even.admit n\n";
+    let host = host(main);
+    host.write(
+        "/pairs/flick.toml",
+        "schema-version = 1\n[project]\nkind = \"lib\"\n[package]\nname = \"pairs\"\nversion = \"1.0.0\"\nplugin = \"pairs.wasm\"\nwatch = [\"*.admit\"]\n",
+    );
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let found = check(&host, &mut sources, Some(&project), &roots());
+    let found: Vec<String> = found.iter().map(|d| show(&sources, d)).collect();
+    // the application with a constant; one with a variable carries none
+    assert_eq!(
+        found,
+        ["pairs/X009 `Even.admit`: `Even.admit` is read by an expression of 4 nodes"]
+    );
+}

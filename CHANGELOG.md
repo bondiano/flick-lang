@@ -30,6 +30,11 @@ break programs.
   A type the code of a block declares names classes in `deriving` as a
   declaration of the module does, and a derive is told what such a type
   wraps (`DeriveTarget.wraps`, which was `refined`).
+- **Plugins:** the code of a block may declare a function with the value
+  that reads a constant given to it (`Decl::Checked`); a plugin that watches
+  the function is then told how that value is written. The refined plugin
+  names `T.check` for `T.parse` this way, where the compiler paired the two
+  by their names.
 - **Plugins:** a plugin is told where each value it watches is named, with
   the declaration around it (`CallSite.binding`), as it was for the
   serializable atoms alone.

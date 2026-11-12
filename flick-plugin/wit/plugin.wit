@@ -137,6 +137,8 @@ interface types {
   /// A declaration and its documentation, lines joined by newlines.
   record doc { text: string, decl: node-id }
 
+  record checked { by: string, decl: node-id }
+
   /// A declaration of the module.
   variant decl {
     %let(let-decl),
@@ -149,6 +151,8 @@ interface types {
     /// The user's declaration at this span.
     hole(span),
     doc(doc),
+    /// A function with the value that reads a constant given to it.
+    checked(checked),
   }
 
   variant kind { expr(expr), ty(ty), pat(pat), decl(decl) }

@@ -9,13 +9,15 @@ use flick_plugin::{
     Argument, CallSite, Constant, ExpressionFact, Fact, FactField, FactType, Refinement, Span,
 };
 
-use super::Checker;
 use super::env::{Abi, EnumLit, Form};
 use super::ty::Type;
 use super::typing::Ref;
+use super::{Checker, let_parts};
 use crate::consteval::Const;
 use crate::source::Span as SourceSpan;
 use crate::syntax::cst::Node;
+use crate::syntax::heads::CHECKED_BY;
+use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::Lang;
 
 impl Checker<'_> {
@@ -156,18 +158,19 @@ impl Checker<'_> {
         self.typing.call_sites.extend(sites);
     }
 
-    /// How the refined type of a companion `T$parse` checks the constant the
-    /// call gives it: enum literals, or read-only syntax of the module's
-    /// own predicate. The plugin owns interpretation of that syntax.
+    /// How the constant a call gives is checked: the literals of an enum
+    /// for its `parse`, or read-only syntax of the value the module's code
+    /// names as reading it. The plugin owns interpretation of that syntax.
     fn refinement<'n>(
         &self,
         call: &'n PendingCall,
         predicates: &mut HashMap<&'n str, ExpressionFact>,
     ) -> Option<Refinement> {
-        let ty = call.name.strip_suffix("$parse")?;
         call.args.first().and_then(|(_, _, c, _)| c.as_ref())?;
         // an enum's literals travel in its interface, an opaque one's too
-        let literals = match self.env.type_def(&call.module, ty).map(|d| &d.form) {
+        let enumeration = call.name.strip_suffix("$parse");
+        let definition = enumeration.and_then(|ty| self.env.type_def(&call.module, ty));
+        let literals = match definition.map(|d| &d.form) {
             Some(Form::Adt {
                 abi: Abi::Literal(literals),
                 ..
@@ -185,9 +188,10 @@ impl Checker<'_> {
         if call.module != self.env.module {
             return None;
         }
-        let predicate = self.predicates.get(ty).copied()?;
+        let function = call.name.as_str();
+        let predicate = self.predicates.get(function).copied()?;
         let expression = predicates
-            .entry(ty)
+            .entry(function)
             .or_insert_with(|| self.expression_fact(predicate));
         Some(Refinement::Predicate(expression.clone()))
     }
@@ -208,5 +212,39 @@ fn span_of(span: SourceSpan) -> Span {
     Span {
         start: span.start,
         end: span.end,
+    }
+}
+
+impl<'a> Checker<'a> {
+    /// The functions of this module whose constant argument a value of the
+    /// module reads, each with that value's body: generated code names the
+    /// pair with an attribute before the function.
+    pub(super) fn declare_checks(&mut self, decls: &[&'a Node]) {
+        let body = |name: &str| {
+            let named = |d: &&&'a Node| {
+                d.kind == K::LetDecl && let_parts(d, self.text).name.as_deref() == Some(name)
+            };
+            decls
+                .iter()
+                .find(named)
+                .and_then(|d| let_parts(d, self.text).body)
+        };
+        let mut pending = None;
+        for decl in decls {
+            if decl.kind == K::Attribute {
+                let mut words = (decl.child_tokens()).filter(|t| t.kind == K::Ident);
+                let attribute = words.next().map(|w| w.text(self.text));
+                if attribute.is_some_and(|a| CHECKED_BY.ends_with(a) && a.contains('$')) {
+                    pending = words.next().map(|w| w.text(self.text));
+                }
+                continue;
+            }
+            if let Some(by) = pending.take()
+                && decl.kind == K::LetDecl
+                && let (Some(function), Some(body)) = (let_parts(decl, self.text).name, body(by))
+            {
+                self.predicates.insert(function, body);
+            }
+        }
     }
 }

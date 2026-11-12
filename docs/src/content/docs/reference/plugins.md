@@ -163,7 +163,7 @@ and with the span of the block it stands for:
 | expression | name, number, text, boolean, unit, application, lambda, record, field, list, tuple, annotation, hole, concatenation (`a ++ b`), `match` with guards, `if`, a block of statements and its value, a body with a module open |
 | type | name, application, record, function, tuple, type-level text (`"name"`), `_`, `forall`, row, hole, a type of the signature |
 | pattern | variable, wildcard, constructor, record, tuple, hole |
-| declaration | `let`, signature, `type alias`, `type` with constructors and `deriving`, maybe `unboxed`, `instance` with members, a group of several or none, documentation of one, hole |
+| declaration | `let`, signature, `type alias`, `type` with constructors and `deriving`, maybe `unboxed`, `instance` with members, a group of several or none, documentation of one, a function with the value that reads a constant given to it, hole |
 
 The compiler checks the arena before it uses it: names must lex as names,
 numbers be finite, holes lie in the body and not overlap, an expression or a
@@ -230,10 +230,12 @@ watch = ["Ui.Event.queue", "*.parse"]
 them, with what the checker found there: the module and name applied, the
 span of the application, whether it stands in code a plugin wrote, and for
 each argument where it is written, its type as `check` sees it, the constant
-it folds to, if any, and whether it is written as a `fun`. A call of the
-`parse` of a refined type also carries how its check reads that constant:
-the literals of an enum, or the syntax and resolved references of the
-check of the module's own type, its companion `T.check`. The plugin interprets those facts. Every span is of the
+it folds to, if any, and whether it is written as a `fun`. A call that
+gives a constant also carries how the constant is read: for the `parse` of
+an enum, its literals; for a function the code of a block declared with the
+value that reads its constant (`Decl::Checked { by, decl }`), the syntax and
+resolved references of that value, as the check of a refined type reads the
+argument of its `parse`. The plugin interprets those facts. Every span is of the
 module's own file, inside a block as well as outside one, so a diagnostic
 comes back at the code the user wrote.
 
