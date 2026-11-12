@@ -24,6 +24,7 @@ mod devirt;
 mod fold;
 mod fuse;
 mod inline;
+mod known;
 mod specialize;
 mod sroa;
 mod walk;
@@ -48,6 +49,10 @@ use walk::{droppable, each_strict_use, each_use};
 /// Rounds of inlining: a body inlined in the first may inline again.
 const ROUNDS: usize = 2;
 
+/// How many functions in a row are inlined into each other where that
+/// spares an object, as a chain of combinators is.
+const STEPS: usize = 8;
+
 /// The values of the other modules of the build, by module and name: their
 /// dictionary parameters and body, when the body names only what its
 /// module exports.
@@ -71,6 +76,15 @@ pub fn optimize(module: &mut Module, exported: &dyn Fn(&str) -> bool, generics: 
                 inline::inline(body, &module.name, &candidates, &foreign, &mut fresh);
                 fuse::fuse(body, &mut fresh);
                 simplify(body);
+                // a value built only to be taken apart: each step may
+                // show the next one
+                for _ in 0..STEPS {
+                    let inlined = inline::shaped(body, &foreign, &mut fresh, &mut Vec::new());
+                    if !(inlined | known::branches(body, &mut fresh)) {
+                        break;
+                    }
+                    simplify(body);
+                }
             }
         }
     }
@@ -100,6 +114,7 @@ fn pass(e: &mut Expr) -> bool {
     changed |= specialize::operator(e) | fold::fold(e) | inline::beta(e) | devirt::known_match(e);
     if let ExprKind::Block(stmts, result) = &mut e.kind {
         changed |= devirt::known_lets(stmts);
+        changed |= known::scrutinees(stmts, result);
         changed |= flatten(stmts, result);
         changed |= sroa::split(stmts, result);
         changed |= propagate(stmts, result);

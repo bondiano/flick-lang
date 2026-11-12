@@ -35,3 +35,44 @@ fn a_query_of_std_folds_into_one_text() {
     assert!(!js.contains("Derive.query"), "{js}");
     assert!(!js.contains("cast_open"), "{js}");
 }
+
+const CHAIN: &str = "module App exposing (chain, kept, passed)\n\n\
+chain : Option Int -> Int\n\
+let chain value =\n  \
+value\n  |> Option.filter (fun x -> x > 0)\n  |> Option.map (fun x -> x * 2)\n  |> Option.with_default 0\n\n\
+kept : Option Int -> Option Int\nlet kept value = Option.map (fun x -> x + 1) value\n\n\
+passed : (Int -> Int) -> Option Int -> Option Int\nlet passed f value = Option.map f value\n";
+
+/// A chain of combinators over an option, each given a function written
+/// where it is passed: no function is made, and no option between them.
+#[test]
+fn a_value_built_only_to_be_taken_apart_is_not_built() {
+    let js = release(CHAIN);
+    let chain = js.split("export const chain").nth(1).expect("chain");
+    let chain = chain
+        .split("export const kept")
+        .next()
+        .expect("what follows");
+    // two tests and a product: nothing is called, made or allocated
+    assert!(
+        !chain.contains("$m_Option") && !chain.contains("some("),
+        "{js}"
+    );
+    assert_eq!(chain.matches("=>").count(), 1, "{js}");
+    assert!(
+        chain.contains("return Math.imul(x$i1, 2);") && chain.contains("return 0;"),
+        "{js}"
+    );
+}
+
+/// A combinator given a function written there is the `match` it is; one
+/// given a function it does not know stays a call, as inlining it would
+/// spare nothing.
+#[test]
+fn a_combinator_is_inlined_only_where_that_spares_an_object() {
+    let js = release(CHAIN);
+    let kept = js.split("export const kept").nth(1).expect("kept");
+    let (kept, passed) = kept.split_once("export const passed").expect("passed");
+    assert!(!kept.contains("$m_Option.map"), "{js}");
+    assert!(passed.contains("$m_Option.map"), "{js}");
+}
