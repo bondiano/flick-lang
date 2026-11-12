@@ -7,7 +7,9 @@
 
 #[cfg(feature = "native-project")]
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(feature = "native-project")]
+use std::path::PathBuf;
 #[cfg(feature = "native-project")]
 use std::slice;
 use std::{fmt, fs};
