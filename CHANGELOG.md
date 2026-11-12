@@ -104,6 +104,11 @@ break programs.
   line or brackets is one error after the `FLICK-S007`; a longer `<|` chain
   no longer wraps each operator around the one before it, which made a tree
   as deep as the chain and overflowed the checker.
+- **`ErrorReporter.layer` and `LayerRef.get`** return `(Layer …)^{s}`: the
+  layer sends reports to listeners of region `s`, or builds the services the
+  ref of `s` owns, so it cannot leave the `scope` of `s`. A layer returned
+  from that `scope` is `FLICK-G001`; before, its reports went to a closed
+  listener and were lost.
 - **Refined types:** `refined type` is a declaration of the plugin of `std`,
   which writes the type and its `parse`, `value` and check as code of the
   language; `refined` is no reserved word. The check is a companion too,
