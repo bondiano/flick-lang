@@ -18,6 +18,7 @@ mod attributes;
 mod attributes_tests;
 pub(super) mod companions;
 mod kinds;
+mod operators;
 mod types;
 mod written;
 
@@ -321,6 +322,9 @@ impl Ide<'_> {
         }
         if let Some((code, note, range)) = self.keyword(file, offset) {
             return Some((format!("```flick\n{code}\n```\n\n{note}"), range));
+        }
+        if let Some(hover) = self.operator_hover(file, offset) {
+            return Some(hover);
         }
         if let Some(hover) = self.embedded_hover(file, offset) {
             return Some(hover);

@@ -204,6 +204,10 @@ impl Checker<'_> {
         };
         let ty = self.function_typed(&[None], &mut body, expected, node);
         self.cx.locals.truncate(mark);
+        // at each operator, the function the chain makes: hover shows it
+        for op in &operators {
+            self.note_type(self.token_span(*op), &ty);
+        }
         ty
     }
 
