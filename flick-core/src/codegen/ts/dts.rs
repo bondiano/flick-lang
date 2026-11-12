@@ -6,6 +6,7 @@ use std::fmt::Write;
 use super::{Projection, Vars, generic, key};
 use crate::codegen::exports::reexports;
 use crate::codegen::names;
+use crate::effects::bindings;
 use crate::iface::{Decl, Export, Interface, Namespace};
 use crate::types::{Form, Kind, Type};
 
@@ -227,9 +228,13 @@ pub fn facade_files(
     facades: &[Facade],
     path: &dyn Fn(&str) -> String,
 ) -> (String, String) {
+    let runtime = if projection.rt {
+        bindings::NATIVE_ENTRY
+    } else {
+        super::EFFECT_RUNTIME
+    };
     let mut js = format!(
-        "import {{ promiseFacade }} from \"{}\";\nimport * as $m from {};\n\n",
-        super::EFFECT_RUNTIME,
+        "import {{ promiseFacade }} from \"{runtime}\";\nimport * as $m from {};\n\n",
         names::string(module_js)
     );
     let mut dts = projection.imports(path);

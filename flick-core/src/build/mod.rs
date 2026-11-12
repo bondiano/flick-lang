@@ -682,6 +682,7 @@ fn compiled_module(
             ctx.any_interface,
             ctx.package,
             ctx.path,
+            ctx.settings.backend == Backend::Rt,
         ));
     }
     #[cfg(feature = "native-project")]
@@ -816,10 +817,11 @@ fn facade(
     interfaces: &dyn Fn(&str) -> Option<Interface>,
     package: &dyn Fn(&str) -> Option<String>,
     path: &dyn Fn(&str) -> String,
+    rt: bool,
 ) -> Vec<Artifact> {
     // the façade module names the module's own types through an import
     let facade_module = format!("{}.promise", module.name);
-    let projection = Projection::new(&facade_module, interfaces, package);
+    let projection = Projection::for_runtime(&facade_module, interfaces, package, rt);
     let summaries = built
         .abi
         .as_ref()

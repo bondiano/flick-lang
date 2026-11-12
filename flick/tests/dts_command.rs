@@ -238,10 +238,19 @@ fn declarations_pass_tsc_and_the_facade_separates_outcomes() {
         "{}",
         String::from_utf8_lossy(&tsc.stdout)
     );
+    facade_outcomes(&dir);
+    // the same calls on Flick's own runtime
+    let out = flick_in(&dir, &["build", "--emit-dts", "--promise-facade", "--rt"]);
+    assert!(out.status.success(), "{out:?}");
+    facade_outcomes(&dir);
+}
+
+/// Runs `RUN` on the façade a build wrote: what each call settles to.
+fn facade_outcomes(dir: &Path) {
     fs::write(dir.join("run.mjs"), RUN).expect("write");
     let node = Command::new("node")
         .arg("run.mjs")
-        .current_dir(&dir)
+        .current_dir(dir)
         .output()
         .expect("node");
     let text = String::from_utf8_lossy(&node.stdout);

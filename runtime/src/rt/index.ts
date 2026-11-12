@@ -147,3 +147,4 @@ export {
   testSetTime,
   testSuite,
 } from "./testing.ts";
+export { RuntimeFailure, promiseFacade } from "./facade.ts";
