@@ -11,7 +11,7 @@ import {
   type FlickHashSet,
 } from "../collections.ts";
 import { decimalFromString, decimalToString, type Decimal } from "../decimal.ts";
-import { Duration } from "../duration.ts";
+import { Duration, exactNanos } from "../duration.ts";
 import { type Codec, type SchemaError, type Witness, schemaError, schemaList, schemaNumber, schemaString, schemaTupleOf, withWire, witness } from "../schema.ts";
 
 const durationMillis = /*#__PURE__*/ witness("duration", (input, path) => {
@@ -30,6 +30,66 @@ const durationMillis = /*#__PURE__*/ witness("duration", (input, path) => {
 /** Canonical JSON witnesses for the native runtime's value representations. */
 export const flickDuration: Witness = durationMillis;
 export const flickDurationFromMillis: Witness = durationMillis;
+
+// The text forms of `Duration.json_nanos` and `Duration.json_string`, as
+// Effect's `Duration.fromInput` reads them and its `toString` writes them.
+const got = (value: unknown): string =>
+  value === null ? "null" : Array.isArray(value) ? "an array" : typeof value === "object" ? "an object" : typeof value;
+const ofNanos = (nanos: bigint): Duration => (nanos === 0n ? new Duration(0) : new Duration(Number(nanos) / 1_000_000, nanos));
+const notDuration = (value: unknown, path: string) => err(schemaError(path, `expected Duration, got ${got(value)}`));
+const nonNegative = (value: Duration, path: string) =>
+  value.millis < 0 ? err(schemaError(path, "expected a non-negative duration, got an object")) : ok(value);
+// a decimal times `scale`, rounded half away from zero
+const scaled = (text: string, scale: bigint): bigint => {
+  const point = text.indexOf(".");
+  if (point === -1) return BigInt(text) * scale;
+  const negative = text.startsWith("-");
+  const fraction = text.slice(point + 1);
+  const unit = 10n ** BigInt(fraction.length);
+  const total = (BigInt(text.slice(negative ? 1 : 0, point)) * unit + BigInt(fraction)) * scale;
+  const rounded = total / unit + ((total % unit) * 2n >= unit ? 1n : 0n);
+  return negative ? -rounded : rounded;
+};
+const UNIT_MILLIS: Readonly<Record<string, number>> = { milli: 1, second: 1000, minute: 60_000, hour: 3_600_000, day: 86_400_000, week: 604_800_000 };
+const durationOfText = (text: string): Duration | undefined => {
+  if (text === "Infinity") return new Duration(Infinity);
+  if (text === "-Infinity") return new Duration(-Infinity);
+  const match = /^(-?\d+(?:\.\d+)?)\s+(nanos?|micros?|millis?|seconds?|minutes?|hours?|days?|weeks?)$/.exec(text);
+  if (!match) return undefined;
+  const [, number = "", unit = ""] = match;
+  const single = unit.endsWith("s") ? unit.slice(0, -1) : unit;
+  if (single === "nano" || single === "micro") return ofNanos(scaled(number, single === "nano" ? 1n : 1000n));
+  const per = UNIT_MILLIS[single] ?? 1;
+  const millis = Number(number) * per;
+  if (!Number.isFinite(millis)) return new Duration(millis);
+  const nanos = scaled(number, BigInt(per) * 1_000_000n);
+  // the milliseconds stay only where they keep the exact value
+  return Number.isInteger(millis) && BigInt(millis) * 1_000_000n === nanos ? new Duration(millis) : ofNanos(nanos);
+};
+const textOf = (value: Duration): string =>
+  !Number.isFinite(value.millis) ? (value.millis > 0 ? "Infinity" : "-Infinity")
+    : value.nanos !== undefined && value.nanos !== 0n ? `${value.nanos} nanos`
+    : Number.isInteger(value.millis) ? `${value.millis} millis` : `${exactNanos(value)} nanos`;
+
+/** `Duration.json_nanos`: a non-negative number of nanoseconds as a string of digits. */
+export const flickDurationFromNanos: Witness = /*#__PURE__*/ witness("duration-nanos", (input, path) =>
+  typeof input !== "string" ? err(schemaError(path, `expected a string, got ${got(input)}`))
+    : /^[0-9]+$/.test(input) ? ok(ofNanos(BigInt(input)))
+    : err(schemaError(path, "expected a string matching the RegExp ^[0-9]+$, got string")),
+(value, path) => !(value instanceof Duration) ? notDuration(value, path)
+  : Number.isFinite(value.millis) ? ok(String(exactNanos(value))) : err(schemaError(path, "an invalid value")),
+undefined, { kind: "opaque", reason: "the check \"a string matching the RegExp ^[0-9]+$\" has no exact JSON Schema form" });
+
+/** `Duration.json_string`: Effect's text form, `"1500 millis"`; a fallible transformation. */
+export const flickDurationFromString: Witness = /*#__PURE__*/ witness("duration-string", (input, path) => {
+  if (typeof input !== "string") return err(schemaError(path, `expected a string that will be decoded as a Duration, got ${got(input)}`));
+  const value = durationOfText(input);
+  return value === undefined ? err(schemaError(path, "an invalid value")) : nonNegative(value, path);
+}, (value, path) => {
+  if (!(value instanceof Duration)) return notDuration(value, path);
+  const checked = nonNegative(value, path);
+  return checked._tag === "Failure" ? checked : ok(textOf(value));
+}, undefined, { kind: "opaque", reason: "a fallible transformation has no JSON Schema form" });
 
 const isDecimal = (value: unknown): value is Decimal =>
   typeof value === "object" && value !== null && typeof Reflect.get(value, "value") === "bigint"

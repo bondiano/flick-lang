@@ -21,7 +21,6 @@ Effect.Concurrency.race_all_first
 Effect.Concurrency.with_execution_plan
 Effect.Core.delay
 Effect.Core.eventually
-Effect.Core.fail_cause_sync
 Effect.Core.forever
 Effect.Core.replicate
 Effect.Core.replicate_effect
