@@ -1,6 +1,6 @@
 ---
 title: "Генерация кода"
-source_hash: b9cf2d3eb21ffae9
+source_hash: 9c246005a4c1d6af
 ---
 
 `flick build` компилирует каждый модуль в ES-модуль (см. [Генерация TypeScript и граница FFI](../../spec/06-typescript-and-ffi/), [Архитектура компилятора](../../contributing/implementation-decisions/#архитектура-компилятора)).
@@ -428,7 +428,7 @@ Go-реализации: в runtime для стандартной библиот
 | `Bool`, `Unit` | `bool`, `flickrt.Unit` |
 | кортеж, `List` | `[]flickrt.Value`; `[x, ...rest]` использует общую память с исходным списком |
 | запись | `*flickrt.Record`, метки в порядке ключей JS, `{ r with … }` копирует |
-| конструктор | `*flickrt.Data` с тегом JS-target и полями |
+| конструктор | `*flickrt.Data` с тегом JS-target; `Fields()` — его поля, до двух из них лежат в самом значении |
 | функция | `func(*flickrt.Fiber, flickrt.Value) flickrt.Value` на каждую стадию; функция от двух или трёх аргументов, у которой стадии до последней чистые, — `flickrt.Fn2` или `flickrt.Fn3`, принимающая их сразу |
 | словарь | `*flickrt.Dict`; суперклассы и методы по умолчанию создаются при первом обращении |
 

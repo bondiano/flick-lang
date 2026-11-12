@@ -202,9 +202,9 @@ func promptActionToFlick(a promptAction) Value {
 func promptActionOf(v Value) promptAction {
 	switch d := v.(*Data); d.Tag {
 	case promptNextTag:
-		return promptNext(d.Fields[0])
+		return promptNext(d.Fields()[0])
 	case promptSubmitTag:
-		return promptSubmit(d.Fields[0])
+		return promptSubmit(d.Fields()[0])
 	}
 	return promptBeep
 }

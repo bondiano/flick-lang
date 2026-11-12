@@ -35,8 +35,8 @@ func fsTestFailure(t *testing.T, call func() Value, want string) *Record {
 	if !ok || errorValue.Tag != platformErrorTag {
 		t.Fatalf("expected PlatformError, got %v", cause.err)
 	}
-	reason := errorValue.Fields[0].(*Data)
-	fields := record(reason.Fields[0])
+	reason := errorValue.Fields()[0].(*Data)
+	fields := record(reason.Fields()[0])
 	if want == "Bad" {
 		if reason.Tag != Tag("PlatformError.Reason.Bad") {
 			t.Fatalf("expected BadArgument, got %v", reason)

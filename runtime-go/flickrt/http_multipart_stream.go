@@ -109,7 +109,7 @@ func MultipartToPersisted(fb *Fiber, parts Value) Value {
 	runStream(fb, streamOf(parts), func(chunk []Value) {
 		for _, part := range chunk {
 			d := part.(*Data)
-			r := record(d.Fields[0])
+			r := record(d.Fields()[0])
 			key, contentType := r.Get("key").(string), r.Get("contentType").(string)
 			if d.Tag == partFieldTag {
 				p.addField(key, r.Get("value").(string))

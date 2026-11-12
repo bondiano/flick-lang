@@ -29,11 +29,11 @@ func Equals(a, b Value) bool {
 		return true
 	case *Data:
 		y, ok := b.(*Data)
-		if !ok || x.Tag != y.Tag || len(x.Fields) != len(y.Fields) {
+		if !ok || x.Tag != y.Tag || len(x.Fields()) != len(y.Fields()) {
 			return false
 		}
-		for i := range x.Fields {
-			if !Equals(x.Fields[i], y.Fields[i]) {
+		for i := range x.Fields() {
+			if !Equals(x.Fields()[i], y.Fields()[i]) {
 				return false
 			}
 		}
@@ -237,7 +237,7 @@ func hash(a Value) int32 {
 	case *Data:
 		// the object `{ _tag, _0, … }`: its keys in any order
 		h := int32(12289) ^ effectCombine(hashOfTag, hashString(x.Tag))
-		for i, v := range x.Fields {
+		for i, v := range x.Fields() {
 			h ^= effectCombine(hashString(nativeField(x.Tag, i)), hash(v))
 		}
 		return optimize(h)

@@ -300,7 +300,7 @@ func (d *pgDatabase) transaction(fb *Fiber, body Value) Value {
 	if failed != nil {
 		hand(true)
 		if outer && failed.kind == causeFail {
-			e := record(failed.err.(*Data).Fields[0])
+			e := record(failed.err.(*Data).Fields()[0])
 			if e.Get("code") == "" {
 				panic(&Failure{&Cause{kind: causeFail, err: NewData(sqlDbErrorTag, Rec(
 					"code", "commit_unknown", "message", "the commit's outcome is unknown: "+e.Get("message").(string),

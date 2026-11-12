@@ -20,7 +20,7 @@ import (
 var requestTag = Tag("Request.Request.Request")
 
 func RequestOf(payload Value) Value           { return NewData(requestTag, payload) }
-func RequestPayload(request Value) Value      { return request.(*Data).Fields[0] }
+func RequestPayload(request Value) Value      { return request.(*Data).Fields()[0] }
 func RequestRequest(entry Value) Value        { return RequestPayload(entry.(*requestEntry).request) }
 func entryOf(v Value) *requestEntry           { return v.(*requestEntry) }
 func batchEntries(es []*requestEntry) []Value { return toValues(es) }

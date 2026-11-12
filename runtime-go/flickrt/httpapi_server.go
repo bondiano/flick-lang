@@ -51,9 +51,9 @@ func apiInternal() Value { return apiJSON(500, Rec("error", "InternalServerError
 func apiBadRequest(err Value) Value {
 	d := err.(*Data)
 	if d.Tag == multipartErrorTag {
-		return apiEmpty(multipartStatus[d.Fields[0].(*Data).Tag])
+		return apiEmpty(multipartStatus[d.Fields()[0].(*Data).Tag])
 	}
-	issues := List(d.Fields[0])
+	issues := List(d.Fields()[0])
 	out := make([]Value, len(issues))
 	for i, is := range issues {
 		r := record(is)
@@ -300,7 +300,7 @@ func apiFailed(fb *Fiber, e *apiEndpoint, err Value) Value {
 	d, _ := err.(*Data)
 	var own *Record
 	if d != nil && d.Tag == httpErrorTag {
-		own = record(d.Fields[0])
+		own = record(d.Fields()[0])
 	}
 	if found == nil {
 		switch {
@@ -407,7 +407,7 @@ func HttpApiListen(fb *Fiber, options, api, handlers Value) Value {
 	if docs {
 		spec := HttpApiOpenApi(api)
 		if !isOk(spec) {
-			return Fail(NewData(apiServeTag, value(spec).(*Data).Fields[0]))
+			return Fail(NewData(apiServeTag, value(spec).(*Data).Fields()[0]))
 		}
 		text = value(spec).(string)
 	}
@@ -428,11 +428,11 @@ func HttpApiListen(fb *Fiber, options, api, handlers Value) Value {
 	server, c := catch(func() Value { return HttpServe(fb, serve, router) })
 	if c != nil {
 		if err, ok := typedFailure(c); ok && err.(*Data).Tag == serveErrorTag {
-			return Fail(NewData(apiServeTag, err.(*Data).Fields[0]))
+			return Fail(NewData(apiServeTag, err.(*Data).Fields()[0]))
 		}
 		panic(&Failure{c})
 	}
-	return &apiServer{HttpAddress(server).(*Data).Fields[1].(float64)}
+	return &apiServer{HttpAddress(server).(*Data).Fields()[1].(float64)}
 }
 
 // HttpApiRoute is one route of every method at `path` that serves every

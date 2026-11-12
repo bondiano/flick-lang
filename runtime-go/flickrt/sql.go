@@ -283,7 +283,7 @@ func decodeKind(kind, text string) (Value, string) {
 		if r.Tag != "Success" {
 			return nil, "not JSON"
 		}
-		return r.Fields[0], ""
+		return r.Fields()[0], ""
 	}
 	return text, ""
 }
@@ -401,7 +401,7 @@ func sqlArgs(fb *Fiber, q *sqlQuery) []*string {
 				out = append(out, nil)
 				continue
 			}
-			v = o.Fields[0]
+			v = o.Fields()[0]
 		}
 		text, problem := encodeColumn(fb, columnOf(q.template, p), v)
 		if problem != "" {

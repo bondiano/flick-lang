@@ -100,9 +100,9 @@ func TxDeferredAwait(fb *Fiber, d Value) Value {
 			return t.retryNow(fb)
 		}
 		if r := done.(*Data); r.Tag == "Failure" {
-			return Fail(r.Fields[0])
+			return Fail(r.Fields()[0])
 		}
-		return done.(*Data).Fields[0]
+		return done.(*Data).Fields()[0]
 	})
 }
 

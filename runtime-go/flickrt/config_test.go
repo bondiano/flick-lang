@@ -33,7 +33,7 @@ func TestConfigStringMissingEmptyAndDefault(t *testing.T) {
 		t.Fatalf("missing configuration did not fail: %v", cause)
 	}
 	error := cause.err.(*Data)
-	if error.Tag != Tag("Config.ConfigError.ConfigError") || !strings.Contains(error.Fields[0].(string), name) {
+	if error.Tag != Tag("Config.ConfigError.ConfigError") || !strings.Contains(error.Fields()[0].(string), name) {
 		t.Fatalf("not the named ConfigError: %v", error)
 	}
 	if got := ConfigGet(rootFiber(), withDefault); got != "fallback" {

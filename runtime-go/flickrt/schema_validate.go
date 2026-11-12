@@ -101,18 +101,18 @@ func (s *Schema) validate(fb *Fiber, in Value) (Value, []issue) {
 				item = s.items[1]
 			}
 		}
-		if !ok || d.Tag != "None" && (len(d.Fields) != 1 || !(s.kind == kindOption && d.Tag == "Some" ||
+		if !ok || d.Tag != "None" && (len(d.Fields()) != 1 || !(s.kind == kindOption && d.Tag == "Some" ||
 			s.kind == kindResult && (d.Tag == "Success" || d.Tag == "Failure"))) {
 			return nil, expected(name, in)
 		}
 		if d.Tag == "None" {
 			return in, nil
 		}
-		v, issues := item.validate(fb, d.Fields[0])
+		v, issues := item.validate(fb, d.Fields()[0])
 		if issues != nil {
 			return nil, issues
 		}
-		return &Data{Tag: d.Tag, Fields: []Value{v}}, nil
+		return &Data{Tag: d.Tag, n: 1, in: [2]Value{v}}, nil
 	case kindRecord:
 		r, ok := in.(*Record)
 		if !ok {
@@ -135,11 +135,11 @@ func (s *Schema) validate(fb *Fiber, in Value) (Value, []issue) {
 		d, ok := in.(*Data)
 		if ok {
 			for at, variant := range s.variants {
-				if variant.Tag != d.Tag || len(d.Fields) != len(variant.Fields) {
+				if variant.Tag != d.Tag || len(d.Fields()) != len(variant.Fields) {
 					continue
 				}
-				fields := make([]Value, len(d.Fields))
-				for i, f := range d.Fields {
+				fields := make([]Value, len(d.Fields()))
+				for i, f := range d.Fields() {
 					v, issues := s.fields[at][i+1].validate(fb, f)
 					if issues != nil {
 						return nil, under("_"+strconv.Itoa(i), issues)

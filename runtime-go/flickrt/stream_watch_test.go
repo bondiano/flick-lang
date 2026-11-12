@@ -31,7 +31,7 @@ func watchTest(t *testing.T, path string, recursive bool) (<-chan string, func()
 						}
 						for _, e := range chunk {
 							d := e.(*Data)
-							events <- ConstructorName(d.Tag) + " " + d.Fields[0].(string)
+							events <- ConstructorName(d.Tag) + " " + d.Fields()[0].(string)
 						}
 					}
 				})

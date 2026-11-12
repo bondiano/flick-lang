@@ -58,7 +58,7 @@ func (w *wire) write(fb *Fiber, b *strings.Builder, v Value) []issue {
 			b.WriteString("null")
 			return nil
 		}
-		return s.item.jsonOf().(*wire).write(fb, b, o.Fields[0])
+		return s.item.jsonOf().(*wire).write(fb, b, o.Fields()[0])
 	case kindRecord:
 		if s.pos != nil {
 			return w.writeEncoded(fb, b, v)
@@ -89,7 +89,7 @@ func (w *wire) write(fb *Fiber, b *strings.Builder, v Value) []issue {
 				b.WriteByte(',')
 				quoteTo(b, keys[i+1])
 				b.WriteByte(':')
-				if issues := f.jsonOf().(*wire).write(fb, b, d.Fields[i]); issues != nil {
+				if issues := f.jsonOf().(*wire).write(fb, b, d.Fields()[i]); issues != nil {
 					return under(keys[i+1], issues)
 				}
 			}

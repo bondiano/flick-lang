@@ -231,7 +231,7 @@ func isTransientFailure(err Value) bool {
 		return false
 	}
 	return reason.Tag == transportErrorTag ||
-		reason.Tag == statusErrorTag && transientStatus[record(reason.Fields[0]).Get("status").(int32)]
+		reason.Tag == statusErrorTag && transientStatus[record(reason.Fields()[0]).Get("status").(int32)]
 }
 
 var retryAfterSeconds = regexp.MustCompile(`^\d+(?:\.\d+)?$`)

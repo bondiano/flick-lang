@@ -82,11 +82,11 @@ func showArb(v Value) string {
 		if n, ok := names[tag]; ok {
 			tag = n
 		}
-		if len(x.Fields) == 0 {
+		if len(x.Fields()) == 0 {
 			return tag
 		}
-		parts := make([]string, len(x.Fields))
-		for i, e := range x.Fields {
+		parts := make([]string, len(x.Fields()))
+		for i, e := range x.Fields() {
 			parts[i] = showArb(e)
 		}
 		return tag + "(" + strings.Join(parts, ",") + ")"
@@ -174,11 +174,11 @@ func arbCases() []arbCase {
 		{"record", s(SchemaRecord("a", SchemaInt, "b", SchemaString)), func(v Value) bool { return len16(record(v).Get("b")) < 2 }},
 		{"list", s(SchemaList(SchemaBool)), func(v Value) bool { return len(List(v)) < 3 }},
 		{"tuple", s(SchemaTuple(SchemaBool, SchemaInt)), func(v Value) bool { return !List(v)[0].(bool) }},
-		{"option", s(SchemaOption(SchemaString)), func(v Value) bool { return v == None || len16(v.(*Data).Fields[0]) < 2 }},
+		{"option", s(SchemaOption(SchemaString)), func(v Value) bool { return v == None || len16(v.(*Data).Fields()[0]) < 2 }},
 		{"result", s(SchemaResult(SchemaString, SchemaBool)), func(v Value) bool { return isOk(v) }},
 		{"redacted", s(SchemaRedacted(SchemaBool)), func(v Value) bool { return v.(*Redacted).value == false }},
-		{"tree", s(treeSchema(SchemaInt)), func(v Value) bool { return isTag(v, "Leaf") || len(List(v.(*Data).Fields[1])) < 2 }},
-		{"tree2", s(treeSchema(SchemaBool)), func(v Value) bool { return isTag(v, "Leaf") || len(List(v.(*Data).Fields[1])) < 2 }},
+		{"tree", s(treeSchema(SchemaInt)), func(v Value) bool { return isTag(v, "Leaf") || len(List(v.(*Data).Fields()[1])) < 2 }},
+		{"tree2", s(treeSchema(SchemaBool)), func(v Value) bool { return isTag(v, "Leaf") || len(List(v.(*Data).Fields()[1])) < 2 }},
 		{"record2", s(SchemaRecord("a", SchemaBool, "b", SchemaString)), func(v Value) bool { return len16(record(v).Get("b")) < 2 }},
 		{"tuple2", s(SchemaTuple(SchemaBool, SchemaString)), func(v Value) bool { return !List(v)[0].(bool) || len16(List(v)[1]) < 1 }},
 		{"constant", ArbitraryConstant("x"), func(Value) bool { return true }},
@@ -226,7 +226,7 @@ func arbOracleLines(fb *Fiber, cases []arbCase) []string {
 				return ArbitrarySample(fb, Rec("count", Some(int32(8)), "size", None, "maxDiscards", None, "seed", Some(seed)), c.arb)
 			})
 			if cause != nil {
-				e := record(cause.firstOf(causeFail).err.(*Data).Fields[0])
+				e := record(cause.firstOf(causeFail).err.(*Data).Fields()[0])
 				out = append(out, prefix+fmt.Sprintf("sample error %v %v", e.Get("generated"), e.Get("discards")))
 			} else {
 				out = append(out, prefix+"sample "+showArb(sampled))
@@ -235,7 +235,7 @@ func arbOracleLines(fb *Fiber, cases []arbCase) []string {
 				return Rec("runs", Some(int32(30)), "size", None, "maxDiscards", None, "maxShrinks", None, "seed", seed, "replay", replay)
 			}
 			r := ArbitraryCheck(fb, options(Some(seed), None), property, c.arb).(*Data)
-			f := record(r.Fields[0])
+			f := record(r.Fields()[0])
 			switch r.Tag {
 			case passedTag:
 				out = append(out, prefix+fmt.Sprintf("check passed %v %v", f.Get("runs"), f.Get("discards")))
@@ -244,9 +244,9 @@ func arbOracleLines(fb *Fiber, cases []arbCase) []string {
 					f.Get("shrinks"), showArb(f.Get("initialInput")), showArb(f.Get("shrunkInput")), f.Get("replay")))
 				again := ArbitraryCheck(fb, options(None, Some(f.Get("replay"))), property, c.arb).(*Data)
 				if again.Tag == falsifiedTag {
-					out = append(out, prefix+"replay Falsified "+showArb(record(again.Fields[0]).Get("shrunkInput")))
+					out = append(out, prefix+"replay Falsified "+showArb(record(again.Fields()[0]).Get("shrunkInput")))
 				} else {
-					out = append(out, prefix+"replay ReplayMismatch "+again.Fields[0].(string))
+					out = append(out, prefix+"replay ReplayMismatch "+again.Fields()[0].(string))
 				}
 			case exhaustedTag:
 				out = append(out, prefix+fmt.Sprintf("check exhausted %v %v %v", f.Get("runs"), f.Get("discards"), f.Get("seed")))

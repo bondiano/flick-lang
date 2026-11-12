@@ -46,7 +46,7 @@ func TestFindDefectGivesTheMessage(t *testing.T) {
 		"Service not found: Users\n    at App.fl:9\n":                     "Service not found: Users",
 	} {
 		exit := &Exit{cause: &Cause{kind: causeDie, defect: defect}}
-		if got := ExitFindDefect(exit).(*Data).Fields[0]; got != want {
+		if got := ExitFindDefect(exit).(*Data).Fields()[0]; got != want {
 			t.Errorf("%q: got %q, want %q", defect, got, want)
 		}
 	}
@@ -164,7 +164,7 @@ func TestTheEmptyCauseFails(t *testing.T) {
 func TestATypedErrorAsADefectIsItsValue(t *testing.T) {
 	a := func(n float64) *Cause { return &Cause{kind: causeFail, err: NewData(Tag("App.A#1"), n)} }
 	reasons := CauseReasons(failureOf(Sequential(a(1), a(2)))).([]Value)
-	if got := CauseFindDefect(CauseFromReasons(reasons[1:])).(*Data).Fields[0]; got != "A" {
+	if got := CauseFindDefect(CauseFromReasons(reasons[1:])).(*Data).Fields()[0]; got != "A" {
 		t.Errorf("the defect is told by its constructor: %v", got)
 	}
 	dies := Sequential(a(1), &Cause{kind: causeDie, defect: "d"}).failsToDies()

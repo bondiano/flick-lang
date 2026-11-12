@@ -162,7 +162,7 @@ func TestCliParityAsEffect(t *testing.T) {
 			lines, printed[stdout] = append(lines, stdout), title
 		}
 		if err != nil {
-			lines = append(lines, "error: "+cliFlickError(err).(*Data).Fields[0].(string))
+			lines = append(lines, "error: "+cliFlickError(err).(*Data).Fields()[0].(string))
 		}
 		blocks = append(blocks, strings.Join(lines, "\n"))
 	}

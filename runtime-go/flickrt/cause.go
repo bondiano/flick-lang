@@ -334,7 +334,7 @@ func report(c *Cause) string {
 	if !c.has(causeDie) {
 		for _, r := range c.reasons() {
 			if d, ok := r.err.(*Data); ok && r.kind == causeFail && d.Tag == appErrorTag {
-				return "error: " + d.Fields[0].(*Record).Get("message").(string)
+				return "error: " + d.Fields()[0].(*Record).Get("message").(string)
 			}
 		}
 	}

@@ -217,7 +217,7 @@ func cliConfigFallback(config Value) func(*Fiber, *cliError) (Value, *cliError) 
 		switch {
 		case cause != nil && cause.kind == causeFail:
 			name, kind := cliMissingName(missingErr)
-			return nil, cliInvalid(name, "config", cause.err.(*Data).Fields[0].(string), kind)
+			return nil, cliInvalid(name, "config", cause.err.(*Data).Fields()[0].(string), kind)
 		case cause != nil:
 			panic(&Failure{cause})
 		case missing != nil:

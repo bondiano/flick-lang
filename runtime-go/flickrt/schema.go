@@ -461,7 +461,7 @@ func (w *wire) encode(fb *Fiber, v Value) (Value, []issue) {
 		if o.Tag != "Some" {
 			return JsonNull, nil
 		}
-		return s.item.jsonOf().encode(fb, o.Fields[0])
+		return s.item.jsonOf().encode(fb, o.Fields()[0])
 	case kindResult:
 		key, part := "err", s.items[0]
 		if isOk(v) {
@@ -493,7 +493,7 @@ func (w *wire) encode(fb *Fiber, v Value) (Value, []issue) {
 			out := make([]Value, len(keys))
 			out[0] = variant.Name
 			for i, f := range s.fields[at][1:] {
-				e, issues := f.jsonOf().encode(fb, d.Fields[i])
+				e, issues := f.jsonOf().encode(fb, d.Fields()[i])
 				if issues != nil {
 					return nil, under(keys[i+1], issues)
 				}

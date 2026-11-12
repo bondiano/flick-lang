@@ -308,7 +308,7 @@ func ScheduleConcatResult(other, self Value) Value {
 
 func ScheduleConcat(other, self Value) Value {
 	return mapOutput(ScheduleConcatResult(other, self).(*Schedule), func(_ *Fiber, m metadata) Value {
-		return m.output.(*Data).Fields[0]
+		return m.output.(*Data).Fields()[0]
 	})
 }
 

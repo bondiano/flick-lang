@@ -171,7 +171,7 @@ func partsForm(fb *Fiber, parts Value) ([]byte, string) {
 		runStream(fb, streamOf(parts), func(chunk []Value) {
 			for _, part := range chunk {
 				d := part.(*Data)
-				r := record(d.Fields[0])
+				r := record(d.Fields()[0])
 				if d.Tag == partFieldTag {
 					f.field(r.Get("key").(string), r.Get("value").(string))
 					continue

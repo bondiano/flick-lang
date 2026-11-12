@@ -330,11 +330,11 @@ func JsonPatchApply(patch, doc Value) Value {
 		d := v.(*Data)
 		switch d.Tag {
 		case patchRemoveTag:
-			ops[i] = patchOp{"remove", d.Fields[0].(string), nil}
+			ops[i] = patchOp{"remove", d.Fields()[0].(string), nil}
 		case patchAddTag:
-			ops[i] = patchOp{"add", d.Fields[0].(string), d.Fields[1]}
+			ops[i] = patchOp{"add", d.Fields()[0].(string), d.Fields()[1]}
 		default:
-			ops[i] = patchOp{"replace", d.Fields[0].(string), d.Fields[1]}
+			ops[i] = patchOp{"replace", d.Fields()[0].(string), d.Fields()[1]}
 		}
 	}
 	out, failure := tryPatch(ops, doc)

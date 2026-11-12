@@ -134,7 +134,7 @@ func failed(a Value) (string, bool) {
 	if d.Tag == passTag {
 		return "", false
 	}
-	return d.Fields[0].(string), true
+	return d.Fields()[0].(string), true
 }
 
 type named struct {
@@ -306,21 +306,21 @@ func previewJSON(v Value) (string, bool) {
 	case *Data:
 		switch x.Tag {
 		case "Some", "None":
-			return previewObject(append([]string{"_id", "_tag"}, fieldNames(x)...), append([]Value{"Option", x.Tag}, x.Fields...)), true
+			return previewObject(append([]string{"_id", "_tag"}, fieldNames(x)...), append([]Value{"Option", x.Tag}, x.Fields()...)), true
 		case "Success":
-			return previewObject([]string{"_id", "_tag", "value"}, []Value{"Result", x.Tag, x.Fields[0]}), true
+			return previewObject([]string{"_id", "_tag", "value"}, []Value{"Result", x.Tag, x.Fields()[0]}), true
 		case "Failure":
-			return previewObject([]string{"_id", "_tag", "failure"}, []Value{"Result", x.Tag, x.Fields[0]}), true
+			return previewObject([]string{"_id", "_tag", "failure"}, []Value{"Result", x.Tag, x.Fields()[0]}), true
 		}
-		return previewObject(append([]string{"_tag"}, fieldNames(x)...), append([]Value{x.Tag}, x.Fields...)), true
+		return previewObject(append([]string{"_tag"}, fieldNames(x)...), append([]Value{x.Tag}, x.Fields()...)), true
 	}
 	return Format(v), true
 }
 
 // fieldNames is the JS property of each field of a variant value.
 func fieldNames(d *Data) []string {
-	out := make([]string, len(d.Fields))
-	for i := range d.Fields {
+	out := make([]string, len(d.Fields()))
+	for i := range d.Fields() {
 		out[i] = nativeField(d.Tag, i)
 	}
 	return out
@@ -399,7 +399,7 @@ func outcome(message string, bad bool, cause *Cause) (string, string) {
 	}
 	if r := cause.firstOf(causeFail); r != nil {
 		if d, ok := r.err.(*Data); ok && d.Tag == assertionTag {
-			return "assertion", d.Fields[0].(string)
+			return "assertion", d.Fields()[0].(string)
 		}
 	}
 	return "failure", describeReasons(cause.reasons())

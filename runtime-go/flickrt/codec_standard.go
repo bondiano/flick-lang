@@ -87,7 +87,7 @@ func (s *StandardSchema) Validate(in Value) Value {
 		return Rec("value", value(r))
 	}
 	var issues []Value
-	for _, i := range List(value(r).(*Data).Fields[0]) {
+	for _, i := range List(value(r).(*Data).Fields()[0]) {
 		path := []Value{}
 		if p := record(i).Get("path").(string); p != "(root)" {
 			for _, k := range strings.Split(p, ".") {

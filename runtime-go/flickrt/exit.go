@@ -49,7 +49,7 @@ func (e *Exit) outcome() Value {
 func interruption(id Value) *Cause {
 	var fiber int64
 	if o := id.(*Data); o.Tag == "Some" {
-		fiber = int64(o.Fields[0].(float64))
+		fiber = int64(o.Fields()[0].(float64))
 	}
 	return &Cause{kind: causeInterrupt, fiber: fiber}
 }

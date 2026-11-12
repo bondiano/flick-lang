@@ -16,7 +16,7 @@ func byConcurrency(fb *Fiber, concurrency Value, tasks []Value) []Value {
 		}
 		return out
 	case "Bounded":
-		return all(fb, tasks, max(1, int(c.Fields[0].(int32))))
+		return all(fb, tasks, max(1, int(c.Fields()[0].(int32))))
 	}
 	return all(fb, tasks, 0)
 }

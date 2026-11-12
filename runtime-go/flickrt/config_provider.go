@@ -81,7 +81,7 @@ var (
 
 func optionString(o Value) *string {
 	if d := o.(*Data); d.Tag == "Some" {
-		s := d.Fields[0].(string)
+		s := d.Fields()[0].(string)
 		return &s
 	}
 	return nil
@@ -96,7 +96,7 @@ func ConfigProviderMake(load Value) Value {
 			if cause.kind == causeFail {
 				message := "the provider failed"
 				if d, ok := cause.err.(*Data); ok && d.Tag == sourceErrorTag {
-					message = d.Fields[0].(string)
+					message = d.Fields()[0].(string)
 				}
 				return nil, &message
 			}
@@ -106,14 +106,14 @@ func ConfigProviderMake(load Value) Value {
 		if found.Tag != "Some" {
 			return nil, nil
 		}
-		n := found.Fields[0].(*Data)
+		n := found.Fields()[0].(*Data)
 		switch n.Tag {
 		case valueNodeTag:
-			return valueNode(n.Fields[0].(string)), nil
+			return valueNode(n.Fields()[0].(string)), nil
 		case recordNodeTag:
-			return &cfgNode{kind: cfgRecord, keys: stringsOf(n.Fields[0]), value: optionString(n.Fields[1])}, nil
+			return &cfgNode{kind: cfgRecord, keys: stringsOf(n.Fields()[0]), value: optionString(n.Fields()[1])}, nil
 		}
-		return &cfgNode{kind: cfgArray, length: int(n.Fields[0].(int32)), value: optionString(n.Fields[1])}, nil
+		return &cfgNode{kind: cfgArray, length: int(n.Fields()[0].(int32)), value: optionString(n.Fields()[1])}, nil
 	}}
 }
 
