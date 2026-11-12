@@ -25,8 +25,8 @@ mod solve;
 mod unfold;
 
 pub use live::{has_live, strip_live};
-pub use provided::Provide;
 pub use outlives::Outlives;
+pub use provided::Provide;
 pub(in crate::types) use unfold::{AliasKey, Unfold, leave_alias};
 
 use super::Checker;

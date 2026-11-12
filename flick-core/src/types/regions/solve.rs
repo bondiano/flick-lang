@@ -141,7 +141,11 @@ impl Checker<'_> {
                 // blocked, the first still grows, and its bound reports
                 let (unblocked, shut): (Vec<u32>, Vec<u32>) =
                     metas.partition(|m| !blocked.contains(m));
-                for m in unblocked.into_iter().chain(shut).take_while(|_| grew.is_none()) {
+                for m in unblocked
+                    .into_iter()
+                    .chain(shut)
+                    .take_while(|_| grew.is_none())
+                {
                     let rest = self.store.fresh_beside(m);
                     let row = Type::Row(Row {
                         entries: vec![(label.clone(), atom.clone())],
