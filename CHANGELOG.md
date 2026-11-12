@@ -6,6 +6,10 @@ break programs.
 
 ## Unreleased
 
+- **A closure over a generic callback in a payload:** with `k : Int -> c`,
+  `Som (fun x -> k (x + 1))` checks against `Opt (Int -> c)` as `Som k`
+  does, where it was `FLICK-T003` "region `c` differs". Such a closure that
+  returns another type variable than the payload's is now `FLICK-T008`.
 - **Children in `ui`:** inside `ui { … }` the children of an element stand
   one by one, each an argument on the line of the call or a line of its own
   under it, with no list around them; an element with none is written

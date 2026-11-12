@@ -1,0 +1,14 @@
+// A closure that applies a callback holds what the callback holds: put in
+// a payload whose type holds none of it, it is still a region mismatch, and
+// one that returns another type variable is a type mismatch.
+module App.EtaPayload exposing (..)
+
+type Opt a = Som a | Non
+
+held : (Int -> c)^d -> Opt (Int -> c)
+let held k = Som (fun x -> k (x + 1))
+
+other : (Int -> c) -> Opt (Int -> b)
+let other k = Som (fun x -> k (x + 1))
+//~ FLICK-T003 @9:14-9:38 expected `Opt (Int -> c)`, found `(Opt (Int -> c^{d}))^{_}`
+//~ FLICK-T008 @12:15-12:39 expected `Opt (Int -> b)`, found `Opt (Int -> c)`: `b` stands for any type the caller chooses, so it cannot be `c`
