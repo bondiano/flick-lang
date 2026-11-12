@@ -472,6 +472,6 @@ impl<'a> Checker<'a> {
     }
 }
 
-fn foreign_name<'t>(decl: &Node, text: &'t str) -> Option<&'t str> {
+pub(super) fn foreign_name<'t>(decl: &Node, text: &'t str) -> Option<&'t str> {
     foreign_words(decl).1.map(|t| t.text(text))
 }

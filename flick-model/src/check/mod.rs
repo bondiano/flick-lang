@@ -31,17 +31,21 @@ mod zonk;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_ffi;
 
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::fmt;
 use std::hash::BuildHasher;
 use std::mem;
 use std::rc::Rc;
 
+use flick_core::types::PURE_OVER_CAPABILITY;
+
 use crate::decls::Decls;
 use crate::eval::Program;
 use crate::syntax::{Name, Path, Term};
-use crate::types::{Caps, Fields, Row, Scheme, Stage, Type};
+use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type};
 
 pub(crate) use constants::prim_scheme;
 pub(crate) use generalize::{Inst, in_regions, substitute};
@@ -243,5 +247,56 @@ pub fn check_program<S: BuildHasher>(
             out.push((path.clone(), e));
         }
     }
+    let mut foreign: Vec<&Path> = decls
+        .foreign
+        .iter()
+        .filter(|p| modules.contains(&p.module))
+        .collect();
+    foreign.sort();
+    for path in foreign {
+        let exempt = PURE_OVER_CAPABILITY.contains(&(&*path.module, &*path.name));
+        if !exempt && decls.values.get(path).is_some_and(pure_over_capability) {
+            out.push((
+                path.clone(),
+                TypeError {
+                    rule: "G4",
+                    message: format!("`{}` reads a capability with no stage, so a call after its scope would read what it released (`FLICK-F009`)", path.name),
+                },
+            ));
+        }
+    }
     out
+}
+
+/// G4: a parameter reaches a region the result does not carry, and no arrow
+/// from it on runs a stage that would need the region live.
+pub(super) fn pure_over_capability(s: &Scheme) -> bool {
+    let names = |t: &Type| {
+        let mut out = BTreeSet::new();
+        regions::names_into(t, &mut out);
+        out
+    };
+    let (mut params, mut stages, mut t) = (Vec::new(), Vec::new(), &s.body);
+    loop {
+        match t {
+            Type::Fun(p, stage, r) => {
+                params.push(names(p));
+                stages.push(stage);
+                t = r;
+            }
+            Type::Captured(x, _) | Type::Bounded(x, _) => t = x,
+            _ => break,
+        }
+    }
+    let result = names(t);
+    let used: Vec<&Name> = s
+        .vars
+        .iter()
+        .filter(|(n, k)| *k == Kind::Region && !result.contains(n))
+        .map(|(n, _)| n)
+        .collect();
+    params
+        .iter()
+        .position(|p| used.iter().any(|u| p.contains(*u)))
+        .is_some_and(|i| stages[i..].iter().all(|s| matches!(s, Stage::Pure)))
 }

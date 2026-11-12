@@ -1,0 +1,30 @@
+---
+title: "FLICK-F009"
+---
+
+A foreign function with a parameter that reaches the region of a scope (a
+capability like `File s`, or a capture qualifier `^c`) has to run a stage.
+Elision of `Live` keeps a region live only where a stage runs: a pure foreign
+arrow over a resource could be called after its `scope` closed, through a
+helper or a stored function, and read what the scope released with nothing
+checking that the region is still open.
+
+```flick fail F009
+type File (s : Region)
+
+peek : File s -> Int
+foreign pure peek from "./file.js" "peek"
+  retention call
+```
+
+Give the function a stage, an effect row (`->{}` when it performs none), and
+declare it `foreign effect`. Each call then needs the region live, and a
+closure that calls it cannot leave its `scope`:
+
+```flick
+type File (s : Region)
+
+peek : File s ->{} Int
+foreign effect peek from "./file.js" "peek"
+  retention call
+```

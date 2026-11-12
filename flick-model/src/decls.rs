@@ -5,7 +5,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use flick_core::iface::{Interface, Namespace};
+use flick_core::iface::{Decl, Interface, Namespace};
 use flick_core::types::{self as fc, Form, default_method};
 
 use crate::syntax::{Name, Path};
@@ -44,6 +44,8 @@ pub struct Decls {
     pub opaque: HashMap<Path, (Vec<Name>, Type)>,
     /// The kinds of the parameters of each type constructor.
     pub params: HashMap<Path, Vec<Kind>>,
+    /// The values a `foreign` declaration gives.
+    pub foreign: HashSet<Path>,
 }
 
 /// The arity of a constructor's scheme: its arrows.
@@ -63,6 +65,9 @@ impl Decls {
             let path = Path::new(&export.entity.module, &export.entity.name);
             match export.entity.namespace {
                 Namespace::Value => {
+                    if export.decl == Decl::Foreign {
+                        self.foreign.insert(path.clone());
+                    }
                     if let Some(t) = &export.scheme {
                         self.values.insert(path, scheme(t));
                     }

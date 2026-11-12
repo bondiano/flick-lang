@@ -194,6 +194,7 @@ codes! {
     F006 = Ffi 6, "generated bindings are out of date";
     F007 = Ffi 7, "reviewed binding does not match its declaration";
     F008 = Ffi 8, "cannot import the declarations of a package";
+    F009 = Ffi 9, "pure foreign function over a scope's capability";
     D001 = Schema 1, "type has no Schema witness";
     D002 = Schema 2, "codec misses a field";
     D003 = Schema 3, "codec gives a field twice";

@@ -18,6 +18,8 @@ pub use retention::keeps_for_owner;
 
 mod suspends;
 
+use std::slice;
+
 use super::Checker;
 use super::env::Form;
 use super::kinds::Kind;
@@ -30,6 +32,23 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::{self, Lang};
 use flick_ir::{Copies, ForeignMode};
+
+/// Pure foreign functions over a capability whose answer does not depend on
+/// whether its region is still open (G4 in `docs/formal/regions.md`): each
+/// returns a value the capability fixed when it was acquired.
+pub const PURE_OVER_CAPABILITY: &[(&str, &str)] = &[
+    // the id the system gave the process when it started
+    ("ChildProcess", "pid"),
+    // the port fixed when the server started listening
+    ("HttpApi", "port"),
+    ("Rpc", "port"),
+    // the address fixed when the server started listening
+    ("Http.Server", "address"),
+    // shortcut: these two keep using the region through the layer they
+    // return; the next change gives their result the region and drops them
+    ("ErrorReporter", "layer"),
+    ("LayerRef", "get"),
+];
 
 /// What a foreign function keeps of its arguments.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -119,6 +138,29 @@ impl Checker<'_> {
         }
         if retention == Some(Retention::Owner) {
             self.owner_retention(scheme, &body, span);
+        }
+        // G4: a parameter that reaches a region its result does not carry is
+        // used by the call, so the call needs a stage that keeps it live; a
+        // capture row is no use of its own: a pure callback uses nothing (T4′)
+        let result = self.result_of(&body);
+        let used: Vec<String> = binders
+            .iter()
+            .filter(|b| b.kind == Kind::Region && !mentions(&result, slice::from_ref(&b.name)))
+            .map(|b| b.name.clone())
+            .collect();
+        if let Some(i) = params.iter().position(|p| mentions(p, &used))
+            && !stages.iter().skip(i).any(|runs| *runs)
+            && !PURE_OVER_CAPABILITY.contains(&(
+                self.env.module.as_str(),
+                super::toplevel::foreign_name(decl, self.text).unwrap_or_default(),
+            ))
+        {
+            let shown = self.show(&params[i]);
+            self.error(
+                codes::F009,
+                span,
+                format!("`{shown}` reaches the region of a scope, but the foreign function runs no stage, so a call after the scope closed would read what it released: give it a stage, `->{{}}` and `foreign effect`"),
+            );
         }
         self.typing.foreigns.insert(range(span), info);
     }
@@ -243,6 +285,15 @@ impl Checker<'_> {
                 "`nullable` makes the result an `Option a`".to_owned(),
             );
         }
+    }
+
+    /// What a curried function type returns after its last arrow.
+    fn result_of(&self, ty: &Type) -> Type {
+        let mut ty = ty.clone();
+        while let Type::Fun { result, .. } = self.whnf_captured(&ty).0 {
+            ty = *result;
+        }
+        ty
     }
 
     /// The parameters of a curried function type, one per arrow.
