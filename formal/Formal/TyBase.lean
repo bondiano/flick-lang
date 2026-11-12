@@ -148,8 +148,10 @@ inductive Ty
   | owner (s : Ty)
   | dict (c : Nat) (args : Ty)
   | all (k : Nat) (t : Ty)
-
-/-- An atom under `k` binders. -/
+  /-- The hidden row of data with hidden storage written bare in a signature, of kind `CRow`:
+  where it is written decides what it stands for (`Scheme.elide`), and no typing rule meets
+  it. It reaches nothing, but it is not the written `caps ∅`. -/
+  | bare
 def Atom.up (k : Nat) : Atom → Atom
   | .v n => .v (n + k)
   | .r p => .r p
@@ -235,6 +237,7 @@ def Ty.ren (ξ : Atom → Atom) : Ty → Ty
   | .owner s => .owner (s.ren ξ)
   | .dict c a => .dict c (a.ren ξ)
   | .all k t => .all k (t.ren (liftA k ξ))
+  | .bare => .bare
 
 /-- The renaming `i ↦ i + k` as a substitution; run-time regions stay. -/
 def shiftV (k : Nat) : Atom → Ty
@@ -268,6 +271,7 @@ def Ty.substT (σ : Atom → Ty) : Ty → Ty
   | .owner s => .owner (s.substT σ)
   | .dict c a => .dict c (a.substT σ)
   | .all k t => .all k (t.substT (liftT k σ))
+  | .bare => .bare
 
 /-- The identity substitution. -/
 def Ty.ident : Atom → Ty

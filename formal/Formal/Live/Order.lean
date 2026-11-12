@@ -256,7 +256,8 @@ theorem LeLive.trans : ∀ {b a c : Ty}, LeLive S a b → LeLive S b c → LeLiv
   | .tvar _, _, _, h₁, h₂ | .rnil, _, _, h₁, h₂ | .rcons _ _ _, _, _, h₁, h₂
   | .rg _, _, _, h₁, h₂ | .caps _, _, _, h₁, h₂ | .row _, _, _, h₁, h₂
   | .tapp _ _, _, _, h₁, h₂ | .hnd _, _, _, h₁, h₂ | .owner _, _, _, h₁, h₂
-  | .errors _, _, _, h₁, h₂ | .dict _ _, _, _, h₁, h₂ | .all _ _, _, _, h₁, h₂ => by
+  | .errors _, _, _, h₁, h₂ | .dict _ _, _, _, h₁, h₂ | .all _ _, _, _, h₁, h₂
+  | .bare, _, _, h₁, h₂ => by
     cases h₁ with
     | refl => exact h₂
     | hide hi hl he hr ha hb => subst ha; rw [hb] at h₂; exact LeLive.hide_trans hi hl he hr h₂

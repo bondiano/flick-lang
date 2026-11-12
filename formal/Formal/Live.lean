@@ -2,6 +2,7 @@ import Formal.Regions
 import Formal.Nest
 import Formal.T43Main
 import Formal.LiveRules
+import Formal.Live.ElideRows
 
 /-!
 # T4′: the safety a discipline of use promises
