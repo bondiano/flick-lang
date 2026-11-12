@@ -73,12 +73,31 @@ jobs:
           use-mathlib-cache: false
       - run: CERT_PROGRAMS=2000 just model-certs
 
+  # the Go runtime's tables and test data still are what Node and Effect,
+  # at their pinned versions, give (`tools/go-*`)
+  go-oracles:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just@1.59.0
+      # version comes from `packageManager` in package.json
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: just go-oracles check
+
   # What the run found, in one place: the summary says which of the jobs
   # failed, so the nightly is readable without opening each one, and a failed
   # job fails this one too, so the run itself is red. It writes to the run's
   # own summary and artifacts only: no issue, no webhook, no other write.
   report:
-    needs: [ci, fuzz, perf, certs]
+    needs: [ci, fuzz, perf, certs, go-oracles]
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-26.04
     timeout-minutes: 5
@@ -89,6 +108,7 @@ jobs:
           FUZZ: ${{ needs.fuzz.result }}
           PERF: ${{ needs.perf.result }}
           CERTS: ${{ needs.certs.result }}
+          ORACLES: ${{ needs.go-oracles.result }}
           RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           {
@@ -100,12 +120,13 @@ jobs:
             echo "| \`fuzz\` | 1 000 000 parser and formatter inputs | $FUZZ |"
             echo "| \`perf\` | the budgets of \`tools/perf/budgets.json\` | $PERF |"
             echo "| \`certs\` | the Lean certificates of 2000 generated programs | $CERTS |"
+            echo "| \`go-oracles\` | the Go runtime's files generated from Node and Effect | $ORACLES |"
             echo
             echo "Run: $RUN"
             echo
             echo "Artifacts: \`fuzz\` (\`fuzz.log\`: the count, the seed and the input), \`perf\` (\`perf.json\`, \`perf.log\`)"
             echo
-            if [ "$CI" != success ] || [ "$FUZZ" != success ] || [ "$PERF" != success ] || [ "$CERTS" != success ]; then
+            if [ "$CI" != success ] || [ "$FUZZ" != success ] || [ "$PERF" != success ] || [ "$CERTS" != success ] || [ "$ORACLES" != success ]; then
               echo "### Failed"
               echo
               echo "Open the job above at $RUN. The suites are the ones a pull request runs,"
