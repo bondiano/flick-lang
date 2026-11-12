@@ -877,6 +877,7 @@
 @flick-lang/runtime/rt routeWordsOf
 @flick-lang/runtime/rt runIn
 @flick-lang/runtime/rt runMain
+@flick-lang/runtime/rt runPromise
 @flick-lang/runtime/rt runTests
 @flick-lang/runtime/rt runtimeEquals
 @flick-lang/runtime/rt runtimeHash

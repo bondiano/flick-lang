@@ -11,8 +11,9 @@ import { reportedDefects, withOwner } from "../owner.ts";
 /** The running program, which a module replacement in development stops. */
 let current: Fiber | undefined;
 
-export const run = async (main: (input: unknown) => unknown, input?: unknown): Promise<void> => {
-  const fiber = fork(() => withOwner(() => main(input), "main"), currentCtx());
+export const run = async <I>(main: (input: I) => unknown, input?: I): Promise<void> => {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a `main` without input takes `()`, which is `undefined`
+  const fiber = fork(() => withOwner(() => main(input as I), "main"), currentCtx());
   current = fiber;
   const exit = await new Promise<Exit>((resolve) => {
     fiber.observe(resolve);

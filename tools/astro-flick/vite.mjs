@@ -60,7 +60,8 @@ export const flickVite = (options = {}) => {
           const out = path.join(outBase, hash.digest("hex").slice(0, 16));
           await compile(
             binary,
-            ["build", file, "--emit", "js", "--out-dir", out, "--profile", profile, "--color", "never"],
+            // Flick's own runtime, until a build is on it by default
+            ["build", file, "--emit", "js", "--rt", "--out-dir", out, "--profile", profile, "--color", "never"],
             { cwd: path.dirname(file), encoding: "utf8" },
           );
           if (options.declarations !== false) await declare(binary, [file]);

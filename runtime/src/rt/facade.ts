@@ -49,3 +49,20 @@ export const promiseFacade =
       });
     });
   };
+
+/**
+ * Runs the task value `task` under an owner of its own: its value, or a
+ * rejection with a `RuntimeFailure` when it fails, dies or is interrupted.
+ * What a page renders on the server awaits its view so. The editor's types of
+ * a task are still Effect's, so it takes any value and checks it is a task.
+ */
+export const runPromise = <A = unknown>(task: unknown): Promise<A> =>
+  new Promise<A>((resolve, reject) => {
+    if (typeof task !== "function") throw new TypeError("runPromise takes a task");
+    const fiber = fork(() => withOwner(() => Reflect.apply(task, undefined, []), "task"), currentCtx());
+    fiber.observe((exit) => {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the caller names the type of the task's value
+      if (exit.cause === undefined) resolve(exit.value as A);
+      else reject(new RuntimeFailure(exit.cause));
+    });
+  });

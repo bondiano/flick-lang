@@ -2,8 +2,9 @@
 import Brand from "./Brand.astro";
 import Icon from "./Icon.astro";
 import DocNavigation from "./DocNavigation.astro";
-import { Effect } from "@flick-lang/effect-ts";
-import { uiRenderStatic } from "@flick-lang/effect-ts/ui/react";
+import { runPromise } from "@flick-lang/runtime/rt";
+import { uiRenderStatic } from "@flick-lang/runtime/rt/ui/react";
+import type { Ui } from "@flick-lang/runtime/ui/react/nodes";
 import { renderToString } from "react-dom/server";
 import { shell } from "../widgets/Controls.fl";
 
@@ -24,7 +25,7 @@ const links = [
 const install = ru ? "Установить" : "Install";
 const installHref = `${prefix}/start/getting-started/#${ru ? "установка" : "install"}`;
 const sidebar = route?.hasSidebar ? route.sidebar : undefined;
-const controlsHtml = renderToString(uiRenderStatic(await Effect.runPromise(shell(ru))));
+const controlsHtml = renderToString(uiRenderStatic(await runPromise<Ui>(() => shell(ru))));
 ---
 <div class="site-header" data-pagefind-ignore>
   <Brand href={`${prefix}/`} label={ru ? "Flick — главная" : "Flick home"} />
@@ -56,7 +57,7 @@ const controlsHtml = renderToString(uiRenderStatic(await Effect.runPromise(shell
 </div>
 
 <script>
-  import { run } from "@flick-lang/effect-ts/runner/browser";
+  import { run } from "@flick-lang/runtime/rt/runner/browser";
   import { main as controls } from "../widgets/Controls.fl";
   import { main as search } from "../widgets/Search.fl";
   import { mount } from "../widgets/Copy.fl";
