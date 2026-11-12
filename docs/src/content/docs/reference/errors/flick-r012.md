@@ -16,3 +16,8 @@ let total xs = List.sum (map (fun x -> x * 2) xs)
 
 `filter` is never used. An import whose module declares instances is kept:
 importing it can matter for its instances alone.
+
+An export list may name a definition that spells a keyword, such as `none`,
+but an import cannot bring it in unqualified: in an expression the word stays
+the keyword. The warning then says so, and the module uses the name through
+its module, as `S.none`.
