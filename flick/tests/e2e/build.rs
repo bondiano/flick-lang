@@ -73,8 +73,7 @@ fn typecheck(repo: &Path, dir: &Path) -> Option<String> {
 fn passing_fixtures_compile_to_valid_js() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let root = repo.join("tests/check/pass");
-    let mut paths = Vec::new();
-    cases(&root, &mut paths);
+    let paths = fixture_files(&root, "fl");
     let out_root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("fixtures");
     let report: Vec<String> = parallel(&paths, jobs(), |case| {
         let rel = case.strip_prefix(&root).expect("case under root");

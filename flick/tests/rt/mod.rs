@@ -7,6 +7,8 @@ use std::process::{Command, Output, Stdio};
 use std::time::{Duration, Instant};
 use std::{env, thread};
 
+use flick_test_support::files as fixture_files;
+
 use super::{
     assert_go, jobs, listed_cases, parallel, portable, run_case, run_case_with, shard, trace,
 };
@@ -183,9 +185,7 @@ fn unlisted_passing(
     out_root: &Path,
 ) -> Vec<String> {
     let started = Instant::now();
-    let mut all = Vec::new();
-    super::cases(root, &mut all);
-    all.sort();
+    let all = fixture_files(root, "fl");
     let mut unlisted: Vec<PathBuf> = all
         .into_iter()
         .filter(|c| !listed.contains(c))

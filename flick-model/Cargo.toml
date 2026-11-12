@@ -16,4 +16,5 @@ flick-core = { path = "../flick-core", default-features = false, features = ["em
 serde_json = { workspace = true }
 
 [dev-dependencies]
+flick-test-support = { path = "../flick-test-support" }
 proptest = { version = "1.12.0", default-features = false, features = ["std"] }

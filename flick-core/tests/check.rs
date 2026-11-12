@@ -7,7 +7,9 @@
 
 #[cfg(feature = "native-project")]
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(feature = "native-project")]
+use std::path::PathBuf;
 #[cfg(feature = "native-project")]
 use std::slice;
 use std::{fmt, fs};
@@ -20,6 +22,7 @@ use flick_core::source;
 use flick_core::source::{FileId, SourceFile, SourceMap};
 #[cfg(feature = "native-project")]
 use flick_core::syntax::{self, cst::Node, kind::SyntaxKind};
+use flick_test_support::files as fixture_files;
 
 /// 1-based `line:col-line:col`, columns in characters, end exclusive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -186,20 +189,6 @@ fn diff(sources: &SourceMap, actual: &[&Diagnostic], expected: Vec<Expected>) ->
     missing.chain(unexpected).collect()
 }
 
-fn fixtures(dir: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries {
-        let path = entry.expect("readable fixture dir").path();
-        if path.is_dir() {
-            fixtures(&path, out);
-        } else if path.extension().is_some_and(|e| e == "fl") {
-            out.push(path);
-        }
-    }
-}
-
 fn check_fixture(path: &Path, should_fail: bool) -> Vec<String> {
     let mut sources = SourceMap::default();
     let (file, utf8) = sources.add_bytes(
@@ -254,7 +243,7 @@ fn check_fixtures() {
     let mut count = 0;
     for (kind, should_fail) in [("pass", false), ("fail", true)] {
         let mut paths = Vec::new();
-        fixtures(&root.join(kind), &mut paths);
+        paths.extend(fixture_files(&root.join(kind), "fl"));
         paths.sort();
         count += paths.len();
         for path in paths {
@@ -448,8 +437,8 @@ fn check_project(dir: &Path) -> Vec<String> {
     let diagnostics = match project::discover(&host, &mut sources, dir, Some(Path::new("."))) {
         Ok(Some(project)) => {
             let mut roots = Vec::new();
-            fixtures(&project.source_root(), &mut roots);
-            fixtures(&project.test_root(), &mut roots);
+            roots.extend(fixture_files(&project.source_root(), "fl"));
+            roots.extend(fixture_files(&project.test_root(), "fl"));
             project::check(&host, &mut sources, Some(&project), &roots)
         }
         Ok(None) => vec![],
@@ -459,8 +448,7 @@ fn check_project(dir: &Path) -> Vec<String> {
         .into_iter()
         .filter(|d| !opted_out(&sources, d))
         .collect();
-    let mut files: Vec<PathBuf> = Vec::new();
-    fixtures(dir, &mut files);
+    let mut files = fixture_files(dir, "fl");
     files.push(dir.join("flick.toml"));
     files.sort();
     let mut report = Vec::new();

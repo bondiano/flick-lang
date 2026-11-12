@@ -7,13 +7,14 @@
 
 use std::fs;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use flick_core::diagnostics::Severity;
 use flick_core::project::{self, Host, analysis_fingerprint};
 use flick_core::projection;
 use flick_core::source::SourceMap;
 use flick_core::types::builtins;
+use flick_test_support::files as fixture_files;
 
 struct Files;
 
@@ -27,24 +28,13 @@ impl Host for Files {
     }
 }
 
-fn cases(dir: &Path, out: &mut Vec<PathBuf>) {
-    for entry in fs::read_dir(dir).expect("tests/run").flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            cases(&path, out);
-        } else if path.extension().is_some_and(|e| e == "fl") {
-            out.push(path);
-        }
-    }
-}
-
 #[test]
 fn projection_and_executable_share_the_analysis() {
     let mut paths = Vec::new();
-    cases(
+    paths.extend(fixture_files(
         &Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/run"),
-        &mut paths,
-    );
+        "fl",
+    ));
     assert!(paths.len() > 10);
     for path in paths {
         let roots = [path.clone()];

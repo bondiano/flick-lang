@@ -10,6 +10,7 @@ use std::{env, fs, panic};
 
 use flick_model::eval::Outcome;
 use flick_model::run;
+use flick_test_support::entries;
 
 /// Steps a case may take: enough for every case listed, few enough that a
 /// loop in the model fails fast.
@@ -21,11 +22,7 @@ fn root() -> PathBuf {
 
 fn cases(list: &str) -> Vec<String> {
     let text = fs::read_to_string(root().join(list)).expect("readable list of cases");
-    text.lines()
-        .map(|l| l.split('#').next().unwrap_or("").trim())
-        .filter(|l| !l.is_empty())
-        .map(str::to_owned)
-        .collect()
+    entries(&text).into_iter().map(str::to_owned).collect()
 }
 
 #[test]

@@ -14,6 +14,7 @@ use flick_core::project::Compiled;
 use flick_model::check::{TypeError, check_program};
 use flick_model::run;
 use flick_model::syntax::Name;
+use flick_test_support::files as fixture_files;
 
 fn repo() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("..")
@@ -78,22 +79,6 @@ fn verdict(modules: &[Compiled]) -> Verdict {
     }
 }
 
-fn fixtures(dir: &Path, out: &mut Vec<PathBuf>) {
-    let mut entries: Vec<_> = fs::read_dir(dir)
-        .expect("readable fixtures")
-        .flatten()
-        .map(|e| e.path())
-        .collect();
-    entries.sort();
-    for path in entries {
-        if path.is_dir() {
-            fixtures(&path, out);
-        } else if path.extension().is_some_and(|e| e == "fl") {
-            out.push(path);
-        }
-    }
-}
-
 fn md_files(dir: &Path, out: &mut Vec<PathBuf>) {
     let mut entries: Vec<_> = fs::read_dir(dir)
         .expect("readable docs")
@@ -145,7 +130,7 @@ fn known() -> BTreeMap<String, String> {
 fn the_model_accepts_what_flick_core_accepts() {
     let mut cases: BTreeMap<String, Verdict> = BTreeMap::new();
     let mut paths = Vec::new();
-    fixtures(&repo().join("tests/check/pass"), &mut paths);
+    paths.extend(fixture_files(&repo().join("tests/check/pass"), "fl"));
     let fixtures = paths.len();
     for path in paths {
         let modules = run::compile(&path).unwrap_or_else(|e| {
