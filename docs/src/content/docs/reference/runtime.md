@@ -32,10 +32,12 @@ protocol of Effect's RPC server: a browser client takes no Effect, and calls
 a server built with the adapter. Serving, stream calls, `Rpc.websocket`,
 `Rpc.tcp`, the `json_rpc`, `ndjson_rpc` and `binary` serializations,
 `Rpc.connect`, `Rpc.with_headers` and in-memory calls stay in the adapter,
-as Http and server functions do for now. Http, RPC and server functions are
-one family: a build that uses a binding of it only the adapter has takes the
-whole family from the adapter, so a request, a response or a procedure
-belongs to one implementation.
+as server functions and the rest of Http do for now. `Http.Headers`,
+`Http.Cookies`, `Http.Url`, `Http.UrlParams`, `Http.Mime` and `Http.Etag` run
+on RT, with the encodings, orders and messages of Effect's modules. Http, RPC and server
+functions are one family: a build that uses a binding of it only the adapter
+has takes the whole family from the adapter, so a request, a response or a
+procedure belongs to one implementation.
 
 Reading request bodies, persisting multipart forms, serving static files and
 consuming a server-rendered stream require `Async` in the caller's effect row.

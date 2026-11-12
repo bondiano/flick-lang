@@ -32,6 +32,12 @@ break programs.
   layer provided on RT, such as `Logger.console_logfmt`, writes to that
   console too: it now sees all the evidence below the layer, the runtime's
   clock included, not only the services Effect supplied last.
+- **Http values on Flick's own runtime:** `Http.Headers`, `Http.Cookies`,
+  `Http.Url`, `Http.UrlParams`, `Http.Mime` and `Http.Etag` run on RT, with
+  the encodings, orders, parsers and error messages of Effect's modules,
+  so a program that only uses them, or them with an RPC client, loads no
+  Effect for them. A build that reaches any other Http binding still takes
+  every web binding from the adapter.
 - **`<|`, `>>` and `<<`:** `f <| x` is `f x`, the weakest operator and
   right-associative, so `say <| show <| total xs` needs no parentheses;
   `f a <| x` is the call `f a x`. `f >> g` applies `f`, then `g`, and
