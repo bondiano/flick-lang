@@ -55,3 +55,28 @@ fn a_watched_name_comes_with_the_declaration_it_stands_in() {
         ]
     );
 }
+
+/// What is made under a service marked `@owner` belongs to the handler of
+/// the service: a function that needs one is no maker to those that name it.
+#[test]
+fn a_function_under_an_owner_service_is_no_maker() {
+    let main = "module App.Main exposing (..)\n\nimport Pairs\n\nplain : Float -> Float\nlet plain n = Pairs.fresh n\n\nunder : Float ->{Pairs.Held} Float\nlet under n = Pairs.fresh n\n\nuses : Float -> Float\nlet uses n = plain n\n\ncalls : Float ->{Pairs.Held} Float\nlet calls n = under n\n";
+    let host = host(main);
+    host.write(
+        "/pairs/flick.toml",
+        "schema-version = 1\n[project]\nkind = \"lib\"\n[package]\nname = \"pairs\"\nversion = \"1.0.0\"\nplugin = \"pairs.wasm\"\nwatch = [\"@maker\"]\n",
+    );
+    host.write(
+        "/pairs/src/Pairs.fl",
+        "module Pairs exposing (..)\n\n@maker\nfresh : Float -> Float\nlet fresh n = n\n\n@owner\nservice Held =\n  hold : Float ->{} Float\n",
+    );
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let found = check(&host, &mut sources, Some(&project), &roots());
+    let named: Vec<String> = (found.iter())
+        .map(|d| show(&sources, d))
+        .filter_map(|shown| Some(shown.split('`').nth(1)?.to_owned()))
+        .collect();
+    // the maker where it is named, and `plain`, which reaches it; not `under`
+    assert_eq!(named, ["Pairs.fresh", "Pairs.fresh", "plain"], "{found:?}");
+}

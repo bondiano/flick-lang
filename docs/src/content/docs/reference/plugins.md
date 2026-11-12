@@ -264,7 +264,10 @@ it calls, is then a place with `tagged`: the tag, the name as written, the
 marked value it ends at, and in `inside` the functions around the place from
 the nearest outwards, each with the services of its arrow and whether its
 row is open. The task of a handler runs later, so the functions around a
-`task` are not around what is inside it. The UI plugin refuses
+`task` are not around what is inside it. A function that needs a service
+marked `@owner` reaches nothing to those that name it: what is made under
+such a service belongs to its handler, as what a component's setup makes
+belongs to the instance (`Setup` is marked so). The UI plugin refuses
 (`FLICK-U006`) a maker named in a render, a function whose services are
 `Atom.Read` alone.
 

@@ -55,6 +55,7 @@ mod makers;
 mod module_contract;
 mod module_signature;
 mod mutation;
+mod options;
 pub(crate) use module_signature::normalize_module_interface;
 mod static_modules;
 pub(crate) use module_contract::{
@@ -122,6 +123,7 @@ pub use gadt::scheme::{built, is_indexed, written_dicts};
 pub use generalize::without_value_captures;
 pub use interpolation::{hole_key, holes};
 pub use kinds::Kind;
+pub use options::{Limits, Options};
 pub use patterns::is_pattern;
 pub use question::Question;
 pub use ranges::range_list;
@@ -150,44 +152,6 @@ use crate::source::{FileId, Span};
 use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::Lang;
-
-/// Bounds of instance resolution for one definition; exceeding them is a
-/// diagnostic, never a success.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Limits {
-    pub steps: u32,
-    pub depth: u32,
-}
-
-impl Default for Limits {
-    fn default() -> Self {
-        Limits {
-            steps: 100_000,
-            depth: 256,
-        }
-    }
-}
-
-/// What checking a module needs beyond its imports.
-#[derive(Clone, Copy)]
-pub struct Options<'a> {
-    /// Whether a module belongs to the package being checked: only the
-    /// package of a class or of the type an instance is for may declare it.
-    pub local: &'a dyn Fn(&str) -> bool,
-    pub limits: Limits,
-    /// `[lint] no-let-assert`: every `let assert` is an error.
-    pub no_let_assert: bool,
-    pub thresholds: Thresholds,
-    /// Whether runtime code may run: `false` under `effect = "none"`.
-    pub effects: bool,
-    /// The names whose places of call the plugins of the project watch:
-    /// each one checked gives a [`Typing::call_sites`].
-    pub watched: &'a Watched,
-    /// Whether a stage comes from the classes of the operations of its row, as
-    /// on Flick's own runtime: see [`Effects::direct`]. Every module of a build
-    /// and the built-in modules it reads are checked alike.
-    pub stages_by_class: bool,
-}
 
 /// Type-checks `module` and stores the types of its exports in `interface`.
 /// `imported` gives the interfaces of its imports, `builtins` those of the
@@ -357,6 +321,7 @@ fn run_in(
         predicates: HashMap::new(),
         cells: HashMap::new(),
         labels: Vec::new(),
+        owners: Vec::new(),
         root: None,
         calls: Vec::new(),
         field_path: Vec::new(),
@@ -576,6 +541,9 @@ struct Checker<'a> {
     /// The types marked `@label`: the module, the type and its kind, this
     /// module's first. A handful, so a list.
     labels: Vec<(String, String, String)>,
+    /// The services marked `@owner`, each as a row spells it, `Module.Name`:
+    /// this module's first.
+    owners: Vec<String>,
     /// The applications of a watched name, whose types settle once the
     /// module is solved.
     calls: Vec<facts::PendingCall>,

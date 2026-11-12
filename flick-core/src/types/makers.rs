@@ -16,13 +16,28 @@ use crate::iface::{self, Namespace};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::lang::{self, Lang};
 use flick_plugin::{CallSite, Enclosing, Lacking, Tagged};
 
 impl Checker<'_> {
+    /// The services marked `@owner`: this module's, and those of the modules
+    /// whose interfaces it knows.
+    fn declare_owners(&mut self, decls: &[&Node]) {
+        let module = self.env.module.clone();
+        let own = marked(decls, self.text, iface::OWNER, K::Con);
+        let mut owners: Vec<String> = own.iter().map(|name| format!("{module}.{name}")).collect();
+        for interface in self.env.known_interfaces() {
+            for (name, _) in interface.tags.get(iface::OWNER).into_iter().flatten() {
+                owners.push(format!("{}.{name}", interface.module));
+            }
+        }
+        self.typing.owner_services = own;
+        self.owners = owners;
+    }
+
     /// The top-level functions of this module that make an atom, an action
     /// or a view, each with the maker of the library it ends at.
     pub fn makers(&mut self, decls: &[&Node]) {
+        self.declare_owners(decls);
         for name in marked(decls, self.text, iface::MAKER, K::Ident) {
             let maker = format!("{}.{name}", self.env.module);
             self.typing.makers.insert(name, maker);
@@ -34,12 +49,11 @@ impl Checker<'_> {
             let (Some(name), Some(body)) = (parts.name, parts.body) else {
                 continue;
             };
-            // what a component's setup makes, it makes once per instance
-            let setup = self
-                .env
-                .value(&self.env.entity(Namespace::Value, &name))
-                .is_some_and(needs_setup);
-            if setup {
+            // what is made under a service that owns it belongs to the
+            // handler of the service, as a component's setup makes once per
+            // instance: such a function is no maker to those that name it
+            let entity = self.env.entity(Namespace::Value, &name);
+            if (self.env.value(&entity)).is_some_and(|ty| needs_owner(ty, &self.owners)) {
                 continue;
             }
             if syntactic {
@@ -268,11 +282,8 @@ fn alias(body: &Node) -> Option<&Node> {
     matches!(node.kind, K::NameExpr | K::Path).then_some(node)
 }
 
-/// Whether a stage of `ty` needs the service `Setup` of a component.
-fn needs_setup(ty: &Type) -> bool {
-    let Some(setup) = lang::label(Lang::Setup) else {
-        return false;
-    };
+/// Whether a stage of `ty` needs one of the services `owners`.
+fn needs_owner(ty: &Type, owners: &[String]) -> bool {
     let mut found = false;
     ty.visit(&mut |t| {
         if let Type::Fun {
@@ -281,7 +292,7 @@ fn needs_setup(ty: &Type) -> bool {
         } = t
         {
             effects.services.visit(&mut |s| {
-                found |= matches!(s, Type::Row(row) if row.entries.iter().any(|(l, _)| l == setup));
+                found |= matches!(s, Type::Row(row) if row.entries.iter().any(|(l, _)| owners.iter().any(|o| l == o.as_str())));
             });
         }
     });

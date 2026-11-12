@@ -66,6 +66,13 @@ impl Checker<'_> {
         if !labels.is_empty() {
             interface.tags.insert(iface::LABEL.to_owned(), labels);
         }
+        let owners: Vec<(String, Vec<String>)> = (self.typing.owner_services.iter())
+            .filter(|name| exported(name))
+            .map(|name| (name.clone(), Vec::new()))
+            .collect();
+        if !owners.is_empty() {
+            interface.tags.insert(iface::OWNER.to_owned(), owners);
+        }
     }
 
     /// The types marked `@cell` an importer learns of: those the module

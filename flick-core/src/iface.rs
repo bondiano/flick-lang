@@ -17,7 +17,7 @@ pub use template::{
 };
 
 /// Bumped on every change of the schema.
-pub const IFACE_VERSION: u32 = 19;
+pub const IFACE_VERSION: u32 = 20;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -275,6 +275,8 @@ pub const CELL: &str = "cell";
 /// The tag of the types whose top-level values are labelled, each with
 /// its kind.
 pub const LABEL: &str = "label";
+/// The tag of the services whose handler owns what is made under them.
+pub const OWNER: &str = "owner";
 /// The tag of what reaches `Server`.
 pub const SERVER: &str = "server";
 

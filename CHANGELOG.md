@@ -47,6 +47,10 @@ break programs.
   values of that type their names where the program runs, as the atoms,
   views and actions of the standard library have them; a library marks its
   own types. `labels = "components"` keeps the kind `component`.
+- **Owner services:** `@owner` before a service declaration says that what
+  is made under the service belongs to its handler. A function that needs
+  one is no maker to those that name it, as one that needs `Setup` was by a
+  rule of the compiler; `Setup` is marked so.
 - **Comparisons by `Ord`:** `< <= > >=` order any type with an `Ord`
   instance by its `compare`, as they already did a type variable: `Bool`, a
   derived type, a record, a list. A type without one is `FLICK-C001`, where
