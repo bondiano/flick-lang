@@ -7,9 +7,3 @@ let apply_braced f = f 1.0
 
 caller : (Float -> Float)^{x} -> Float
 let caller g = apply_braced g
-
-local : (Float -> Float)^{x} -> Float
-let local f =
-  go : (Float -> Float)^{e} -> Float -> Float
-  let go g n = g n
-  go f 3
