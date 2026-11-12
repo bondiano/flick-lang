@@ -159,7 +159,7 @@ def identity : Scheme :=
   ⟨1, [],
     .arr .P (.var 0) (.var 0) .cnil, .cnil, []⟩
 
-/-- `Prelude.from_result : forall e a. Result (Errors e) a ->{none; e} a` -/
+/-- `Prelude.from_result : forall e a. Result (Errors e) a ->{; e} a` -/
 def from_result (result errors : Nat) : Scheme :=
   ⟨2, [],
     .arr (.R .cnil (.var 0)) (.app (.app (.con result) (.app (.con errors) (.var 0))) (.var 1)) (.var 1) .cnil, .cnil, []⟩
@@ -174,12 +174,12 @@ def parallel_all (detached int list eff : Nat) : Scheme :=
   ⟨4, [⟨detached, [.var 0]⟩],
     .arr .P (.con int) (.arr (.R (.run (.cun (.var 3) .cnil) (.var 0)) (.var 1)) (.app (.con list) (.app (.app (.con eff) (.var 3)) (.var 2))) (.app (.con list) (.var 2)) .cnil) .cnil, .cnil, []⟩
 
-/-- `Prelude.parallel_results : forall r e a c. Detached r => List (Eff r e a)^c ->{r; none} List (Result (Errors e) a)` -/
+/-- `Prelude.parallel_results : forall r e a c. Detached r => List (Eff r e a)^c ->{r} List (Result (Errors e) a)` -/
 def parallel_results (detached list eff result errors : Nat) : Scheme :=
   ⟨4, [⟨detached, [.var 0]⟩],
     .arr (.R (.run (.cun (.var 3) .cnil) (.var 0)) .cnil) (.app (.con list) (.app (.app (.con eff) (.var 3)) (.var 2))) (.app (.con list) (.app (.app (.con result) (.app (.con errors) (.var 1))) (.var 2))) .cnil, .cnil, []⟩
 
-/-- `Prelude.parallel_exits : forall r e a c. Detached r => List (Eff r e a)^c ->{r; none} List (Exit e a)` -/
+/-- `Prelude.parallel_exits : forall r e a c. Detached r => List (Eff r e a)^c ->{r} List (Exit e a)` -/
 def parallel_exits (detached list eff exit : Nat) : Scheme :=
   ⟨4, [⟨detached, [.var 0]⟩],
     .arr (.R (.run (.cun (.var 3) .cnil) (.var 0)) .cnil) (.app (.con list) (.app (.app (.con eff) (.var 3)) (.var 2))) (.app (.con list) (.app (.app (.con exit) (.var 1)) (.var 2))) .cnil, .cnil, []⟩
