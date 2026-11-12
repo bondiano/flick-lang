@@ -4,7 +4,7 @@ import { hoverWord, ready, replaceSource } from "./helpers.ts";
 test("hovers render Markdown and highlight signatures and documented code", async ({ page }) => {
   await page.goto("/flick-lang/play/");
   await ready(page);
-  await replaceSource(page, 'module Main exposing (main)\n\n/// A **friendly** greeting using `name`.\n///\n/// - Keeps the name.\n/// - Returns a greeting.\n///\n/// ```flick\n/// let example = greet "Flick"\n/// ```\ngreet : String -> String\nlet greet name = name\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (greet "Flick")\n');
+  await replaceSource(page, 'module Main exposing (main)\n\n/// A **friendly** greeting using `name`.\n///\n/// - Keeps the name.\n/// - Returns a greeting.\n///\n/// [Reference][reference]\n///\n/// > [reference]: https://example.com/reference\n///\n/// ```flick\n/// let example = greet "Flick"\n/// ```\ngreet : String -> String\nlet greet name = name\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (greet "Flick")\n');
   await hoverWord(page, "let greet", "greet");
   const hover = page.locator(".fp-hover");
   await expect(hover.locator("pre code").first()).toHaveText("greet : String -> String");
@@ -14,6 +14,7 @@ test("hovers render Markdown and highlight signatures and documented code", asyn
   await expect(hover.locator("li")).toHaveCount(2);
   await expect(hover.locator("pre .fp-token-string")).toHaveText('"Flick"');
   await expect(hover.locator("p code").last()).toHaveText("Main");
+  await expect(hover.getByRole("link", { name: "Reference" })).toHaveAttribute("href", "https://example.com/reference");
   await expect(hover).not.toContainText("```");
 });
 

@@ -1,16 +1,18 @@
 // CodeMirror's DOM adapter for compiler Markdown. Never interpret documentation as HTML.
 import { fromMarkdown } from "mdast-util-from-markdown";
-import type { Nodes } from "mdast";
+import type { Definition, Nodes } from "mdast";
+import { isSafeUrl } from "@flick-lang/runtime/ui/react/nodes";
 import { highlight } from "./highlight.ts";
 
 /** Render compiler documentation with the editor's existing syntax colours. */
 export const renderMarkdown = (markdown: string, document: Document): HTMLElement => {
   const tree = fromMarkdown(markdown);
-  const definitions = new Map(tree.children.filter(node => node.type === "definition").map(node => [node.identifier, node]));
-  const safeUrl = (url: string): boolean => {
-    try { return ["http:", "https:", "mailto:"].includes(new URL(url, "https://flick.invalid/").protocol); }
-    catch { return false; }
+  const definitions = new Map<string, Definition>();
+  const collect = (node: Nodes): void => {
+    if (node.type === "definition" && !definitions.has(node.identifier)) definitions.set(node.identifier, node);
+    if ("children" in node) for (const child of node.children) collect(child);
   };
+  collect(tree);
   const render = (node: Nodes): Node => {
     if (node.type === "text" || node.type === "html") return document.createTextNode(node.value);
     if (node.type === "image" || node.type === "imageReference") return document.createTextNode(node.alt ?? "");
@@ -49,7 +51,7 @@ export const renderMarkdown = (markdown: string, document: Document): HTMLElemen
     if (node.type === "list" && node.ordered && node.start !== null && node.start !== undefined) element.setAttribute("start", String(node.start));
     if (node.type === "link" || node.type === "linkReference") {
       const link = node.type === "link" ? node : definitions.get(node.identifier);
-      if (link !== undefined && safeUrl(link.url)) element.setAttribute("href", link.url);
+      if (link !== undefined && isSafeUrl(link.url)) element.setAttribute("href", link.url);
       if (link?.title) element.setAttribute("title", link.title);
     }
     if ("children" in node) for (const child of node.children) element.append(render(child));

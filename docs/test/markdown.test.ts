@@ -32,3 +32,9 @@ test("hover Markdown keeps HTML inert and refuses executable links and remote im
   assert.ok(dom.textContent?.includes("description"));
   assert.deepEqual([...dom.querySelectorAll("a")].map(a => a.getAttribute("href")), [null, null, null, "https://example.com"]);
 });
+
+test("hover references find nested definitions and keep the first definition", () => {
+  const dom = renderMarkdown('[Quote][quote] [List][list] [First][same] [Unsafe][unsafe]\n\n> [quote]: ../quote/ "Quoted"\n\n- [list]: https://example.com/list\n\n[same]: /first/\n[same]: /second/\n\n> [unsafe]: javascript:alert%281%29', document);
+  assert.deepEqual([...dom.querySelectorAll("a")].map(a => a.getAttribute("href")), ["../quote/", "https://example.com/list", "/first/", null]);
+  assert.equal(dom.querySelector("a")?.getAttribute("title"), "Quoted");
+});
