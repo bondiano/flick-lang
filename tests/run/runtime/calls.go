@@ -34,3 +34,19 @@ func underWay(_ flickrt.Context, name flickrt.Value) flickrt.Value {
 	<-latch(name).opened
 	return flickrt.Unit
 }
+
+// heldWrite ignores interruption: under way at once, it ends only when
+// releaseWrite lets it, and says so.
+func heldWrite(_ flickrt.Context, name flickrt.Value) flickrt.Value {
+	c := latch(name)
+	c.once.Do(func() { close(c.opened) })
+	<-latch(name.(string) + " released").opened
+	return flickrt.StdoutLine(name.(string) + " written")
+}
+
+// releaseWrite lets the held write named `name` end.
+func releaseWrite(_ *flickrt.Fiber, name flickrt.Value) flickrt.Value {
+	c := latch(name.(string) + " released")
+	c.once.Do(func() { close(c.opened) })
+	return flickrt.Unit
+}

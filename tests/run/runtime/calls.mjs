@@ -29,3 +29,15 @@ export const settleLater = (name, signal) =>
 
 /** Resolved when the call named `name` is under way. */
 export const underWay = (name) => latch(name).opened;
+
+/**
+ * A write that ignores interruption: under way at once, it ends only when
+ * `releaseWrite` lets it, and says so.
+ */
+export const heldWrite = (name) => {
+  latch(name).open();
+  return latch(`${name} released`).opened.then(() => void process.stdout.write(`${name} written\n`));
+};
+
+/** Lets the held write named `name` end. */
+export const releaseWrite = (name) => latch(`${name} released`).open();
