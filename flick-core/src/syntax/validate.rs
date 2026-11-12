@@ -117,7 +117,8 @@ impl Validator<'_> {
     /// class, maybe naming the package whose plugin derives it, or `@maker`
     /// before a value that makes an atom, an action or a view; `@cell`
     /// marks a type whose values hold one value each, `@label kind` one
-    /// whose top-level values carry their names where the program runs, and
+    /// whose top-level values carry their names where the program runs,
+    /// `@owner` a service whose handler owns what is made under it, and
     /// `@implicit` a conversion instance.
     fn attribute(&mut self, node: &Node, next: Option<K>) {
         let words: Vec<Token> = idents(node).collect();
@@ -145,6 +146,15 @@ impl Validator<'_> {
             [name, ..] if name.text(self.src) == "label" => {
                 "`@label` names one kind, as `@label atom`".to_owned()
             }
+            [name] if name.text(self.src) == "owner" => {
+                if matches!(next, Some(K::ServiceDecl | K::Attribute))
+                    || (next.is_none() && self.allow_trailing_attribute)
+                {
+                    return;
+                }
+                "`@owner` belongs before a service declaration".to_owned()
+            }
+            [name, ..] if name.text(self.src) == "owner" => "`@owner` takes no argument".to_owned(),
             [name] if name.text(self.src) == "implicit" => {
                 // a lone attribute is a fragment the formatter checks on its own
                 if matches!(next, Some(K::InstanceDecl))
@@ -161,7 +171,7 @@ impl Validator<'_> {
                 "`@derive` names at most the package of its plugin: `@derive std`".to_owned()
             }
             [name, ..] if name.text(self.src) != "lang" => format!(
-                "unknown attribute `@{}`: the attributes are `@lang`, `@derive`, `@maker`, `@cell`, `@label` and `@implicit`",
+                "unknown attribute `@{}`: the attributes are `@lang`, `@derive`, `@maker`, `@cell`, `@label`, `@owner` and `@implicit`",
                 name.text(self.src)
             ),
             [_, item] if Lang::from_name(item.text(self.src)).is_some() => return,
