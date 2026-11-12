@@ -1,6 +1,6 @@
 ---
 title: "Пользовательские интерфейсы"
-source_hash: a84bf3344b726920
+source_hash: a0fd557972ed7aae
 ---
 
 `Ui` описывает пользовательский интерфейс и обработчики его событий
@@ -652,7 +652,7 @@ let page n =
   provide Atom.layer {
     Atom.set count n
     let markup = Ui.Server.render (Ui.render counter_view ())
-    "<div id=\"app\" data-flick-ssr>" ++ markup ++ "</div>" ++ Ui.Server.state "app"
+    "<div id=\"app\" data-flick-ssr>\{markup}</div>\{Ui.Server.state "app"}"
   }
 ```
 
@@ -726,7 +726,7 @@ HTML. Внешний компонент, который умеет отобра�
 #
 receipt : Order -> String
 let receipt order =
-  Ui.Server.to_html (ui { div { class_name = "mail" } (paragraph (text ("Спасибо, " ++ order.customer))) })
+  Ui.Server.to_html (ui { div { class_name = "mail" } (paragraph (text "Спасибо, \{order.customer}")) })
 ```
 
 ## Другие рендереры React

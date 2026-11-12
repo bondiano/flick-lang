@@ -36,7 +36,7 @@ let send request endpoint = HttpApi.Inject.call (Server.router None) "/api" endp
 
 /// The `Authorization` header of a user, or none.
 as_user : Option User -> Credentials
-let as_user user = { authorization = Option.map (fun u -> "Token " ++ u.token) user }
+let as_user user = { authorization = Option.map (fun u -> "Token \{u.token}") user }
 
 /// A request with only headers.
 asking : Option User -> HttpApi.Request Unit Unit Credentials Unit
@@ -53,8 +53,8 @@ sign_up :
 let sign_up name =
   let user = {
     username = Some name;
-    email = Some (name ++ "@example.org");
-    password = Some (name ++ "-password");
+    email = Some "\{name}@example.org";
+    password = Some "\{name}-password";
   }
   (send (at None () { user = user }) Api.Public.endpoints.register).user
 
@@ -71,8 +71,8 @@ draft : String -> List String -> { article : NewArticle }
 let draft title tags = {
   article = {
     title = Some title;
-    description = Some ("about " ++ title);
-    body = Some ("# " ++ title);
+    description = Some "about \{title}";
+    body = Some "# \{title}";
     tagList = Some tags;
   };
 }

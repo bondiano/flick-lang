@@ -6,7 +6,7 @@ service Log =
 
 report : String ->{} String
 let report name =
-  Log.info ("reporting " ++ name)
+  Log.info "reporting \{name}"
   "done"
 
 main : Unit ->{} Unit

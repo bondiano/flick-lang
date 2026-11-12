@@ -131,8 +131,7 @@ let order = [
   ),
   Test.test "a catch does not catch its handler's rethrow" (fun () ->
     action : ExceptT String Identity Float
-    let action =
-      catch_error (fun problem -> throw_error (problem ++ ":handler")) (throw_error "bad")
+    let action = catch_error (fun problem -> throw_error "\{problem}:handler") (throw_error "bad")
     Test.equal (Err "bad:handler") (Identity.run (ExceptT.run action))
   ),
   Test.test "throw skips the continuation and retains only preceding state" (fun () ->

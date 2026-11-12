@@ -13,5 +13,5 @@ let main () =
     { title = "Emma"; pages = 474; read = true },
   ]
   let left = [for b <- shelf; if not b.read yield b.pages]
-  Platform.stdout_line ("left to read: " ++ show (List.fold_left (fun a b -> a + b) 0 left))
+  Platform.stdout_line "left to read: \{List.fold_left (fun a b -> a + b) 0 left}"
   Platform.stdout_line (show (List.map finish shelf))

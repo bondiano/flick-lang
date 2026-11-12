@@ -27,7 +27,5 @@ let main () =
     { category = "books"; cents = 800; paid = true },
     { category = "games"; cents = 9900; paid = false },
   ]
-  for (category, cents) <- totals orders do {
-    Platform.stdout_line (category ++ ": " ++ show cents ++ " cents")
-  }
-  Platform.stdout_line ("No orders: " ++ show (totals []))
+  for (category, cents) <- totals orders do { Platform.stdout_line "\{category}: \{cents} cents" }
+  Platform.stdout_line "No orders: \{show (totals [])}"

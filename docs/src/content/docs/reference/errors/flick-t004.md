@@ -11,7 +11,7 @@ of each arrow; the body is checked against it.
 ```flick
 greet : String -> String -> String
 let greet prefix name =
-  prefix ++ ", " ++ name
+  "\{prefix}, \{name}"
 
 hello : String -> String
 let hello = greet "Hello"

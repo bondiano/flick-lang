@@ -8,16 +8,16 @@ import App.Users exposing (Users, Log, NotFound(..), user_id, load_view, load_tw
 describe : String ->{Async, Users, Log} String
 let describe raw =
   try (load_view (user_id raw)).title with
-  | NotFound id -> "not found: " ++ show id
+  | NotFound id -> "not found: \{show id}"
 
 program : Unit ->{Async, Users, Log} Unit
 let program () =
   let both =
     try
       let (first, second) = load_two (user_id "u1") (user_id "u2")
-      first.title ++ " and " ++ second.title
+      "\{first.title} and \{second.title}"
     with
-    | NotFound id -> "not found: " ++ show id
+    | NotFound id -> "not found: \{show id}"
   Platform.stdout_line both
   Platform.stdout_line (describe "u3")
 

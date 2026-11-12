@@ -1,7 +1,7 @@
 ---
 title: Проектирование программы с эффектами
 description: Отделите логику предметной области от внешних вызовов, выберите реализации сервисов в точке входа и предоставьте тестовые реализации в тестах.
-source_hash: 520f701027fd0d91
+source_hash: e800f34e7820236e
 ---
 
 Поиск пользователя можно написать одной функцией: вызвать поиск из учебного
@@ -154,7 +154,7 @@ let load_view_direct id =
     | Some name -> { id = id; name = name }
     | None -> from_result (Err (NotFound id))
   let view = to_view user
-  console_log ("[log] Loaded " ++ view.title)
+  console_log "[log] Loaded \{view.title}"
   view
 ```
 
@@ -259,7 +259,7 @@ let load_view id =
   let user = Users.get id
   let view = to_view user
 
-  Log.info ("Loaded " ++ view.title)
+  Log.info "Loaded \{view.title}"
 
   view
 ```
@@ -308,7 +308,7 @@ let load_view id =
 load_name : UserId ->{Async, Users; NotFound} String
 let load_name id =
   let user = Users.get id
-  Log.info ("Loaded " ++ user.name)
+  Log.info "Loaded \{user.name}"
   user.name
 ```
 
@@ -362,7 +362,7 @@ let users_live =
   }
 
 log_live : Layer none none {Log}
-let log_live = Layer.succeed Log { info = fun line -> console_log ("[log] " ++ line) }
+let log_live = Layer.succeed Log { info = fun line -> console_log "[log] \{line}" }
 ```
 
 `Layer.succeed Users` принимает запись с реализациями операций сервиса `Users`.
@@ -422,7 +422,7 @@ let log_live = Layer.succeed Log { info = fun line -> console_log ("[log] " ++ l
 #   let user = Users.get id
 #   let view = to_view user
 #
-#   Log.info ("Loaded " ++ view.title)
+#   Log.info "Loaded \{view.title}"
 #
 #   view
 #
@@ -494,7 +494,7 @@ let load_two first_id second_id =
 #   let user = Users.get id
 #   let view = to_view user
 #
-#   Log.info ("Loaded " ++ view.title)
+#   Log.info "Loaded \{view.title}"
 #
 #   view
 #
@@ -522,21 +522,21 @@ let load_two first_id second_id =
 #   }
 #
 # log_live : Layer none none {Log}
-# let log_live = Layer.succeed Log { info = fun line -> console_log ("[log] " ++ line) }
+# let log_live = Layer.succeed Log { info = fun line -> console_log "[log] \{line}" }
 #
 describe : String ->{Async, Users, Log} String
 let describe raw =
   try (load_view (user_id raw)).title with
-  | NotFound id -> "not found: " ++ show id
+  | NotFound id -> "not found: \{show id}"
 
 program : Unit ->{Async, Users, Log} Unit
 let program () =
   let both =
     try
       let (first, second) = load_two (user_id "u1") (user_id "u2")
-      first.title ++ " and " ++ second.title
+      "\{first.title} and \{second.title}"
     with
-    | NotFound id -> "not found: " ++ show id
+    | NotFound id -> "not found: \{show id}"
   Platform.stdout_line both
   Platform.stdout_line (describe "u3")
 
@@ -666,7 +666,7 @@ let log_test lines =
 #   let user = Users.get id
 #   let view = to_view user
 #
-#   Log.info ("Loaded " ++ view.title)
+#   Log.info "Loaded \{view.title}"
 #
 #   view
 #
@@ -720,7 +720,7 @@ let tests = [
           }
           view.title
         with
-        | NotFound id -> "missing " ++ show id
+        | NotFound id -> "missing \{show id}"
       Test.expect (Test.equal "missing \"nobody\"" outcome)
       Test.expect (Test.equal [] (Ref.get lines))
     }),

@@ -1,6 +1,6 @@
 ---
 title: "TypeScript generation and the FFI boundary"
-source_hash: a0ce28e543ded32d
+source_hash: a6e8c3172426ab32
 ---
 
 The examples of generated code below are the output of the debug profile, the reference lowering; [Code generation](../../reference/codegen/) describes it in full.
@@ -12,7 +12,7 @@ identity : a -> a
 let identity value = value
 
 greet : String -> String -> String
-let greet prefix name = prefix ++ ", " ++ name
+let greet prefix name = "\{prefix}, \{name}"
 
 hello : String -> String
 let hello = greet "Hello"
@@ -299,10 +299,10 @@ foreign off from "./bindings.mjs" "off"
 
 report : Failure none ->{} Unit
 let report failure =
-  Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
+  Platform.stdout_line "supervisor: \{RawCause.describe (Failure.inspect failure)}"
 
 handle : Float -> Eff none none Unit
-let handle n = task { Platform.stdout_line ("handled " ++ show n) }
+let handle n = task { Platform.stdout_line "handled \{n}" }
 
 listen_while : Emitter -> (Unit ->{} Unit) ->{} Unit
 let listen_while source work = scope s {

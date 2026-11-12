@@ -7,7 +7,7 @@ let check n = if n < 0 then from_result (Err (Invalid n)) else n
 
 open : String -> Eff none none String
 let open name = task {
-  Platform.stdout_line ("open " ++ name)
+  Platform.stdout_line "open \{name}"
   name
 }
 
@@ -18,7 +18,7 @@ let main () =
       scope {
         let file =
           Resource.acquire_release (open "file") (fun _ -> Platform.stdout_line "close file")
-        Platform.stdout_line ("reading " ++ file)
+        Platform.stdout_line "reading \{file}"
         check (-3)
       }
     with

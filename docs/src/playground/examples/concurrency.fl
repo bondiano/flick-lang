@@ -10,5 +10,5 @@ let after millis text = task {
 main : Unit ->{Async} Unit
 let main () =
   let (a, b) = parallel (after 20 "slow") (after 1 "fast")
-  Platform.stdout_line (a ++ " " ++ b)
+  Platform.stdout_line "\{a} \{b}"
   Platform.stdout_line (race_first (after 30 "late") (after 1 "early"))

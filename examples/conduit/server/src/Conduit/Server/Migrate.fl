@@ -13,8 +13,8 @@ main : Unit ->{Async; AppError} Unit
 let main () =
   let database =
     try url () with
-    | Config.ConfigError message -> App.fail ("configuration: " ++ message)
+    | Config.ConfigError message -> App.fail "configuration: \{message}"
   provide (Database.pg (Database.config database)) {
     let applied = Effect.or_die (task { Database.Migrate.run Schema.migrations })
-    Platform.stdout_line ("migrations applied: " ++ show applied)
+    Platform.stdout_line "migrations applied: \{show applied}"
   }

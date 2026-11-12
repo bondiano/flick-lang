@@ -13,8 +13,8 @@ let main () =
     try total () with
     | Ask.ask "apples" -> 3
     | Ask.ask _ -> 4
-  Platform.stdout_line ("fruit: " ++ show counted)
+  Platform.stdout_line "fruit: \{counted}"
   let none_left =
     try total () with
     | Ask.ask _ -> 0
-  Platform.stdout_line ("after lunch: " ++ show none_left)
+  Platform.stdout_line "after lunch: \{none_left}"

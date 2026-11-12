@@ -21,7 +21,7 @@ let rec ready id tries =
   if ChildProcess.exit_code (docker probe) == 0 then
     ()
   else if tries <= 0 then
-    from_result (Err (NotReady ("the database in " ++ id ++ " did not start")))
+    from_result (Err (NotReady "the database in \{id} did not start"))
   else
     match Duration.millis 300 with
     | Ok pause ->
@@ -57,7 +57,7 @@ let layer =
           | PlatformError.PlatformError _ -> ()
         })
       ready id 200
-      let url = "postgres://postgres:conduit@" ++ address id ++ ":5432/postgres"
+      let url = "postgres://postgres:conduit@\{address id}:5432/postgres"
       let built = Layer.build_with_memo_map memo (Database.pg (Database.config url))
       provide (Layer.succeed_context built) { ignore (Database.Migrate.run Schema.migrations) }
       built

@@ -10,7 +10,7 @@ ints : Gen.Gen Float
 let ints = Gen.map Int.to_float (Gen.int (0 - 20) 20)
 
 logs : Gen.Gen (List String)
-let logs = Gen.list 3 (Gen.map (fun n -> "log:" ++ show n) ints)
+let logs = Gen.list 3 (Gen.map (fun n -> "log:\{n}") ints)
 
 writer_values : Gen.Gen (Float, List String)
 let writer_values = Gen.pair ints logs
@@ -23,7 +23,7 @@ let to_writes = Gen.function writer_values
 
 results : Gen.Gen (Result String Float)
 let results =
-  Gen.map (fun (ok, n) -> if ok then Ok n else Err ("domain:" ++ show n)) (Gen.pair Gen.bool ints)
+  Gen.map (fun (ok, n) -> if ok then Ok n else Err "domain:\{n}") (Gen.pair Gen.bool ints)
 
 to_results : Gen.Gen (Float -> Result String Float)
 let to_results = Gen.function results

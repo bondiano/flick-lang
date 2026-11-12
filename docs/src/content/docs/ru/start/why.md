@@ -1,7 +1,7 @@
 ---
 title: Зачем Flick
 description: Какие гарантии даёт Flick, каковы их ограничения и кому язык пока не подходит.
-source_hash: 1088b1d76d59f8e7
+source_hash: a8f1b694c25774bf
 ---
 
 Flick — один язык для всего приложения: браузера, сервера и командной строки. Его
@@ -26,7 +26,7 @@ load_view : UserId ->{Users, Log; NotFound} UserView
 let load_view id =
   let user = Users.get id
   let view = to_view user
-  Log.info ("Loaded " ++ view.title)
+  Log.info "Loaded \{view.title}"
   view
 ```
 

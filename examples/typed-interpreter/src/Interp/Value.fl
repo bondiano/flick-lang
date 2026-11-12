@@ -35,6 +35,6 @@ let results terms =
     (fun term ->
       match run term with
       | Ok (Showable x) -> show x
-      | Err why -> "type error: " ++ why
+      | Err why -> "type error: \{why}"
     )
     terms

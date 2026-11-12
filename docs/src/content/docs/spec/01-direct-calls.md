@@ -1,6 +1,6 @@
 ---
 title: "Direct effectful calls"
-source_hash: 8a3876683611ee27
+source_hash: 7a354933a17c4622
 ---
 
 An effectful function is called in an ordinary expression, and `let` binds its result. A sequence of operations is written with ordinary expressions and bindings.
@@ -84,7 +84,7 @@ The signature contains the constraints, the whole function type and the effect o
 ```flick
 greet : String -> String -> String
 let greet prefix name =
-  prefix ++ ", " ++ name
+  "\{prefix}, \{name}"
 
 hello : String -> String
 let hello =

@@ -22,29 +22,19 @@ let plan_command = cli "plan" {
       overhead = Option.with_default Plan.default_config.overhead (map Minutes.value overhead);
     }
     let (result, state) = Plan.plan config tasks
-    Platform.stdout_line
-      ("Budget: "
-        ++ show config.budget
-        ++ " min; overhead: "
-        ++ show config.overhead
-        ++ " min/task")
-    Platform.stdout_line
-      ("Completed: "
-        ++ (
-          match state.completed with
-          | [] -> "(none)"
-          | names -> String.join ", " names
-        ))
-    Platform.stdout_line ("Remaining: " ++ show state.remaining ++ " min")
+    Platform.stdout_line "Budget: \{config.budget} min; overhead: \{config.overhead} min/task"
+    let completed =
+      match state.completed with
+      | [] -> "(none)"
+      | names -> String.join ", " names
+    Platform.stdout_line "Completed: \{completed}"
+    Platform.stdout_line "Remaining: \{state.remaining} min"
     match result with
     | Some _ -> Platform.stdout_line "Plan complete."
     | None ->
+      let unscheduled = String.join ", " (List.drop (List.length state.completed) tasks)
       App.fail
-        ("Plan stopped. Unscheduled: "
-          ++ String.join ", " (List.drop (List.length state.completed) tasks)
-          ++ ". The first unscheduled task is unknown or does not fit the remaining time "
-          ++ "(base time + overhead). Later tasks were not scheduled; the completed prefix is kept. "
-          ++ "Use 'mtl catalog' to list task names and times.")
+        "Plan stopped. Unscheduled: \{unscheduled}. The first unscheduled task is unknown or does not fit the remaining time (base time + overhead). Later tasks were not scheduled; the completed prefix is kept. Use 'mtl catalog' to list task names and times."
 }
 
 catalog_command : Cli.Command none none
@@ -52,8 +42,7 @@ let catalog_command = cli "catalog" {
   description "List available tasks and their base time before per-task overhead"
   handle fun _ ->
     Platform.stdout_line "Available tasks (before per-task overhead):"
-    for (name, minutes) <- Plan.catalog do
-      Platform.stdout_line ("  " ++ name ++ ": " ++ show minutes ++ " min")
+    for (name, minutes) <- Plan.catalog do Platform.stdout_line "  \{name}: \{minutes} min"
 }
 
 command : Cli.Command none {AppError}

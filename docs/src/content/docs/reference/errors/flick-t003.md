@@ -16,5 +16,5 @@ explicitly through operations exposed by the two modules (for example,
 
 ```flick
 label : Float -> String
-let label n = "count: " ++ Float.to_string n
+let label n = "count: \{Float.to_string n}"
 ```

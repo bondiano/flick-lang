@@ -6,5 +6,5 @@ title = "Shout"
 title_ru = "Крикните"
 task = "shout gives the text in capitals with an exclamation mark. Call String.to_upper on the text before joining."
 task_ru = "shout возвращает текст заглавными буквами с восклицательным знаком. Вызовите String.to_upper на тексте перед соединением."
-hints = ["String.to_upper is a function: it needs its argument.", "String.to_upper text ++ \"!\""]
-hints_ru = ["String.to_upper — функция: ей нужен аргумент.", "String.to_upper text ++ \"!\""]
+hints = ["String.to_upper is a function: it needs its argument.", "\"\\{String.to_upper text}!\""]
+hints_ru = ["String.to_upper — функция: ей нужен аргумент.", "\"\\{String.to_upper text}!\""]

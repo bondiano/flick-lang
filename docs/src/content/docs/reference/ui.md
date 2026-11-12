@@ -616,7 +616,7 @@ let page n =
   provide Atom.layer {
     Atom.set count n
     let markup = Ui.Server.render (Ui.render counter_view ())
-    "<div id=\"app\" data-flick-ssr>" ++ markup ++ "</div>" ++ Ui.Server.state "app"
+    "<div id=\"app\" data-flick-ssr>\{markup}</div>\{Ui.Server.state "app"}"
   }
 ```
 
@@ -690,7 +690,7 @@ only React renders, is a defect. It comes from
 #
 receipt : Order -> String
 let receipt order =
-  Ui.Server.to_html (ui { div { class_name = "mail" } (paragraph (text ("Thanks, " ++ order.customer))) })
+  Ui.Server.to_html (ui { div { class_name = "mail" } (paragraph (text "Thanks, \{order.customer}")) })
 ```
 
 ## Other React renderers

@@ -1,6 +1,6 @@
 ---
 title: "Типизированные RPC"
-source_hash: 74cced1b9f727509
+source_hash: 41ef60d69ed6ceaa
 ---
 
 Опишите процедуру один раз и используйте это описание по обе стороны
@@ -66,16 +66,16 @@ let main () =
   try
     scope s {
       let server = Rpc.listen Rpc.defaults users handlers
-      let url = "http://127.0.0.1:" ++ show (Rpc.port server) ++ "/rpc"
+      let url = "http://127.0.0.1:\{Rpc.port server}/rpc"
       let user = Rpc.call url get_user 1
       Platform.stdout_line user.name
       let numbers = Stream.run_collect (Rpc.call_stream url count_to 3)
       Platform.stdout_line (show numbers)
     }
   with
-  | Rpc.ServeError message -> App.fail ("serve: " ++ message)
-  | Rpc.ClientError message -> App.fail ("client: " ++ message)
-  | NotFound e -> App.fail ("not found: " ++ show e.id)
+  | Rpc.ServeError message -> App.fail "serve: \{message}"
+  | Rpc.ClientError message -> App.fail "client: \{message}"
+  | NotFound e -> App.fail "not found: \{e.id}"
 ```
 
 ```sh

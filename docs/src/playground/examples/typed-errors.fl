@@ -11,8 +11,8 @@ let main () =
   let age =
     try find "ada" with
     | NotFound _ -> 0
-  Platform.stdout_line ("ada is " ++ show age)
+  Platform.stdout_line "ada is \{age}"
   let other =
     try show (find "bob") with
-    | NotFound who -> "no " ++ who
+    | NotFound who -> "no \{who}"
   Platform.stdout_line other

@@ -55,7 +55,7 @@ let date iso =
     let name = Option.bind (fun m -> List.get (m - 1) months) (Int.parse month)
     let number = Option.map Int.to_string (Int.parse day)
     match (name, number) with
-    | (Some m, Some d) -> m ++ " " ++ d ++ ", " ++ year
+    | (Some m, Some d) -> "\{m} \{d}, \{year}"
     | _ -> iso
   | _ -> iso
 
@@ -77,7 +77,7 @@ let navbar user = ui {
         "nav-link"
         (Profile me.username None)
         (avatar "user-pic" me.image)
-        (text (" " ++ me.username)),
+        (text " \{me.username}"),
     ]
   nav { class_name = "navbar navbar-light" }
     div { class_name = "container" }
@@ -103,7 +103,7 @@ problems : Problems -> Ui
 let problems found = ui {
   let lines =
     List.flat_map
-      (fun (subject, messages) -> List.map (fun m -> String.trim (subject ++ " " ++ m)) messages)
+      (fun (subject, messages) -> List.map (fun m -> String.trim "\{subject} \{m}") messages)
       found
   if lines == [] then
     empty
@@ -175,11 +175,11 @@ let favorite_button place label article = ui {
   let style =
     if article.favorited then "btn btn-sm btn-primary" else "btn btn-sm btn-outline-primary"
   classed
-    (style ++ " " ++ place)
+    "\{style} \{place}"
     (button
       { disabled = false; on_click = Action.with favorite article }
       (icon { class_name = "ion-heart" })
-      (text (" " ++ label ++ show article.favoritesCount)))
+      (text " \{label}\{article.favoritesCount}"))
 }
 
 /// An article in a feed: its meta, title, description and tags.

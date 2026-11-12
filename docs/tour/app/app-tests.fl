@@ -14,7 +14,7 @@ module Books exposing (Book, add, finish, pages_left, line) =
   let pages_left books = List.sum [for book <- books; if not book.read yield book.pages]
 
   line : Book -> String
-  let line book = (if book.read then "[x] " else "[ ] ") ++ book.title
+  let line book = "\{if book.read then "[x] " else "[ ] "}\{book.title}"
 
 service Shelf =
   add : String -> Int ->{} Unit
@@ -41,7 +41,7 @@ pages_of : String ->{; BadCommand} Int
 let pages_of text =
   match Int.parse text with
   | Some n -> n
-  | None -> from_result (Err (BadCommand ("not a number: " ++ text)))
+  | None -> from_result (Err (BadCommand "not a number: \{text}"))
 
 run : String ->{Shelf; BadCommand} Unit
 let run command =
@@ -49,7 +49,7 @@ let run command =
   | ["add", title, pages] -> Shelf.add title (pages_of pages)
   | ["finish", title] -> Shelf.finish title
   | ["report"] -> report ()
-  | _ -> from_result (Err (BadCommand ("unknown command: " ++ command)))
+  | _ -> from_result (Err (BadCommand "unknown command: \{command}"))
 
 /// Runs a script on an empty shelf and gives back the pages left.
 left_after : List String ->{} Int
@@ -62,7 +62,7 @@ let left_after script = provide (memory (Ref.make [])) {
 }
 
 check : String -> Bool ->{} Unit
-let check name passed = Platform.stdout_line ((if passed then "passed: " else "FAILED: ") ++ name)
+let check name passed = Platform.stdout_line "\{if passed then "passed: " else "FAILED: "}\{name}"
 
 main : Unit ->{} Unit
 let main () =

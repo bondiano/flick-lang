@@ -3,7 +3,7 @@
 # A new or edited example fails the test until its parse is reviewed and its line added.
 438ba443bbdcdff5  01-direct-calls:8  type UserId = UserId String
 c792a8b0fdbb4111  01-direct-calls:57  type UserId = UserId String
-0e0762aff3749216  01-direct-calls:88  greet : String -> String -> String
+207af01e1f431aba  01-direct-calls:88  greet : String -> String -> String
 70dbe54f68949e1c  01-direct-calls:106  count : Atom.Writable Float
 c07f96b57a1a65fd  02-computations:17  type UserId = UserId String
 950aba5088199a59  02-computations:47  type UserId = UserId String
@@ -36,14 +36,14 @@ e4c3a6f35bbce321  05-errors-and-concurrency:89  type UserId = UserId String
 d7add3cdb4017b53  05-errors-and-concurrency:301  import File exposing (File, Path, FileSystem, OpenError, ReadError)
 165a9ba77c667563  05-errors-and-concurrency:302  import File exposing (File, Path, FileSystem, OpenError, ReadError)
 26c0a10afc3c3254  05-errors-and-concurrency:369  type UserId = UserId String
-04a35e4e95605dd5  06-typescript-and-ffi:10  identity : a -> a
+86eec70443c62545  06-typescript-and-ffi:10  identity : a -> a
 1d4de52c15fcfbac  06-typescript-and-ffi:35  with_default : a -> Option a -> a
 01433f1e5e58aa84  06-typescript-and-ffi:65  type alias Point = { x : Float; y : Float }
 438ba443bbdcdff5  06-typescript-and-ffi:100  type UserId = UserId String
 fc0a2efdd9333217  06-typescript-and-ffi:172  import JsError exposing (JsError)
 d80e7a9e80161f46  06-typescript-and-ffi:204  import File exposing (Path)
 969c35e8a198d3e4  06-typescript-and-ffi:273  unboxed type UserId = UserId String
-04aa5db360eea5c1  06-typescript-and-ffi:297  type Emitter
+14c2e16a876fa9da  06-typescript-and-ffi:297  type Emitter
 ecfe40849e18cf97  07-schema:69  refined type Email = String where Checks.email
 0027637b2b681c4e  07-schema:112  type alias Preferences = {
 16ddba9438dc4858  07-schema:159  type Tree a =
@@ -52,4 +52,4 @@ db39cdea80dbbc7c  07-schema:280  class Eq a => Hash a =
 390af6801f184082  08-type-programming-and-edsl:33  import Sql exposing (Pg, EncodeError, DbError, DecodeError)
 248a96779deeafd3  08-type-programming-and-edsl:93  type alias SaveButtonProps c = {
 9a1a5476d5603d8b  08-type-programming-and-edsl:121  component counter (start : Float) =
-66cdf326a016e43e  08-type-programming-and-edsl:156  import Cli
+b312045395eb5882  08-type-programming-and-edsl:156  import Cli

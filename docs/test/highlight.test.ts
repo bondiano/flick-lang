@@ -4,8 +4,87 @@ import { test } from "node:test";
 import { createHighlighterCore } from "shiki/core";
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
 import type { LanguageRegistration } from "shiki/core";
+import darkPlus from "shiki/themes/dark-plus.mjs";
+import { flickDark, flickLight } from "../src/styles/code-themes.mjs";
+import { highlight, loadHighlighting } from "../src/playground/highlight.ts";
 
 const grammar = JSON.parse(readFileSync(new URL("../../editors/vscode/syntaxes/flick.tmLanguage.json", import.meta.url), "utf8")) as LanguageRegistration;
+
+test("interpolated expressions use code colours in both site themes and the playground", async () => {
+  const highlighter = await createHighlighterCore({
+    engine: createJavaScriptRegexEngine(),
+    themes: [flickLight, flickDark],
+    langs: [{ ...grammar, name: "flick" }],
+  });
+  const source = String.raw`let label = "Pokémon \{pokemon.name} (#\{if ready then 1 else 2}): \{String.join ", " { types = ["electric"] }.types}; \{"nested \{pokemon.id}"} done"`;
+  try {
+    for (const theme of [flickLight, flickDark]) {
+      const tokens = highlighter.codeToTokensBase(source, { lang: "flick", theme: theme.name }).flat();
+      const colour = (word: string): string | undefined => {
+        const at = source.indexOf(word);
+        assert.ok(at >= 0, word);
+        return tokens.find(token => token.offset <= at && at < token.offset + token.content.length)?.color;
+      };
+      assert.equal(colour("pokemon.name"), theme.fg.toUpperCase(), theme.name);
+      assert.equal(colour("ready"), theme.fg.toUpperCase(), theme.name);
+      assert.equal(colour("pokemon.id"), theme.fg.toUpperCase(), theme.name);
+      assert.notEqual(colour("if ready"), colour("Pokémon"), theme.name);
+      assert.notEqual(colour("1 else"), colour("Pokémon"), theme.name);
+      assert.equal(colour("electric"), colour("Pokémon"), theme.name);
+      assert.equal(colour("nested"), colour("Pokémon"), theme.name);
+      assert.equal(colour("done"), colour("Pokémon"), theme.name);
+      assert.notEqual(colour("\\{pokemon.name"), colour("Pokémon"), theme.name);
+    }
+  } finally {
+    highlighter.dispose();
+  }
+
+  await loadHighlighting();
+  const text = `${source}\r\n\r\n${String.raw`let raw = r"literal \{pokemon.name}"`}\r\n`;
+  const tokens = highlight(text, "flick");
+  assert.equal(tokens.map(token => token.text).join(""), text);
+  const classAt = (word: string, last = false): string | undefined => {
+    const at = last ? text.lastIndexOf(word) : text.indexOf(word);
+    let offset = 0;
+    for (const token of tokens) {
+      offset += token.text.length;
+      if (offset > at) return token.class_name;
+    }
+    return undefined;
+  };
+  assert.equal(classAt("Pokémon"), "fp-token-string");
+  assert.equal(classAt("pokemon.name"), "");
+  assert.equal(classAt("ready"), "");
+  assert.equal(classAt("pokemon.id"), "");
+  assert.equal(classAt("if ready"), "fp-token-keyword");
+  assert.equal(classAt("electric"), "fp-token-string");
+  assert.equal(classAt("done"), "fp-token-string");
+  assert.equal(classAt("pokemon.name", true), "fp-token-string");
+  assert.notEqual(classAt("\\{pokemon.name"), "fp-token-string");
+});
+
+test("interpolation uses standard embedded scopes in VS Code themes", async () => {
+  const highlighter = await createHighlighterCore({
+    engine: createJavaScriptRegexEngine(),
+    themes: [darkPlus],
+    langs: [{ ...grammar, name: "flick" }],
+  });
+  try {
+    const source = String.raw`"hello \{name} \{if ready then count else 0} done"`;
+    const tokens = highlighter.codeToTokensBase(source, { lang: "flick", theme: darkPlus.name }).flat();
+    const colour = (word: string): string | undefined => {
+      const at = source.indexOf(word);
+      return tokens.find(token => token.offset <= at && at < token.offset + token.content.length)?.color;
+    };
+    const code = highlighter.codeToTokensBase("name", { lang: "flick", theme: darkPlus.name })[0][0];
+    assert.equal(colour("name"), code.color);
+    assert.notEqual(colour("name"), colour("hello"));
+    assert.notEqual(colour("\\{"), colour("hello"));
+    assert.equal(colour("hello"), colour("done"));
+  } finally {
+    highlighter.dispose();
+  }
+});
 
 test("CLI clauses and parameter names are scoped without leaking through nested braces", async () => {
   const highlighter = await createHighlighterCore({
@@ -133,7 +212,7 @@ test("a hole of a string is code, and a brace in it does not close the hole", as
     };
     assert.ok(scopes("total").includes("string.quoted.double.flick"));
     assert.ok(!scopes("total").includes("meta.interpolation.flick"));
-    assert.ok(scopes("\\{sum").includes("punctuation.section.interpolation.begin.flick"));
+    assert.ok(scopes("\\{sum").includes("punctuation.section.embedded.begin.flick"));
     assert.ok(scopes("sum").includes("meta.interpolation.flick"));
     assert.ok(scopes(".a}").includes("meta.interpolation.flick"));
     assert.ok(scopes(" for").includes("string.quoted.double.flick"));

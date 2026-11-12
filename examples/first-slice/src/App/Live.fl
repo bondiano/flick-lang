@@ -21,4 +21,4 @@ let users_live =
   }
 
 log_live : Layer none none {Log}
-let log_live = Layer.succeed Log { info = fun line -> console_log ("[log] " ++ line) }
+let log_live = Layer.succeed Log { info = fun line -> console_log "[log] \{line}" }

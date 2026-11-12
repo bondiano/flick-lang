@@ -29,7 +29,7 @@ serve :
 let serve config =
   // without its schema the server cannot answer anything
   let applied = Effect.or_die (task { Database.Migrate.run Schema.migrations })
-  Platform.stdout_line ("migrations applied: " ++ show applied)
+  Platform.stdout_line "migrations applied: \{show applied}"
   scope {
     let options : Http.Server.ServeOptions = {
       host = "0.0.0.0";
@@ -39,9 +39,9 @@ let serve config =
     let server = Http.Server.serve options (Server.router (Some config.files))
     let url =
       match Http.Server.address server with
-      | Http.Server.TcpAddress _ port -> "http://0.0.0.0:" ++ show port
-      | Http.Server.UnixAddress path -> "unix://" ++ path
-    Platform.stdout_line ("Conduit listens on " ++ url)
+      | Http.Server.TcpAddress _ port -> "http://0.0.0.0:\{port}"
+      | Http.Server.UnixAddress path -> "unix://\{path}"
+    Platform.stdout_line "Conduit listens on \{url}"
     Effect.never ()
   }
 
@@ -50,12 +50,12 @@ main : Unit ->{Async; AppError} Unit
 let main () =
   let config =
     try settings () with
-    | Config.ConfigError message -> App.fail ("configuration: " ++ message)
+    | Config.ConfigError message -> App.fail "configuration: \{message}"
   let keys = Server.keys config.secret
   let platform = Layer.merge Http.Server.layer_services FileSystem.node
   let database = Database.pg (Database.config config.database)
   provide (Layer.merge database (Layer.merge keys (Layer.merge Crypto.system platform))) {
     try serve config with
-    | Http.ServerError.ServeError e -> App.fail ("cannot serve: " ++ show e)
-    | PlatformError.PlatformError e -> App.fail ("cannot read the client's files: " ++ show e)
+    | Http.ServerError.ServeError e -> App.fail "cannot serve: \{show e}"
+    | PlatformError.PlatformError e -> App.fail "cannot read the client's files: \{show e}"
   }

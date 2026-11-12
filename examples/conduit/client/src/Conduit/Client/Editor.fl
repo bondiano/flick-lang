@@ -158,7 +158,7 @@ let classed_tag t = ui {
       (button
         { disabled = false; on_click = Action.with remove_tag t }
         (icon { class_name = "ion-close-round" }))
-      (text (" " ++ t)))
+      (text " \{t}"))
 }
 
 /// The editor of a new article, or of the one at `slug`.
