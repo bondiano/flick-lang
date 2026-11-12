@@ -254,15 +254,20 @@ impl Checker<'_> {
 
     /// Data with hidden storage a signature writes without a qualifier
     /// (`regions.md` §1.4): a declared ADT whose values hide captures,
-    /// through the data it holds. A type without constructors gets no row:
-    /// what a foreign binding can hide is G4's business, not elision's.
+    /// through the data it holds, or a type without constructors its
+    /// interface says hides them (an opaque ADT, a foreign `@stores` type).
+    /// Another type without constructors gets no row: what a foreign
+    /// binding can hide is G4's business, not elision's.
     pub(in crate::check) fn bare_hidden(&self, t: &Type) -> bool {
         let mut head = t;
         while let Type::App(h, _) = head {
             head = h;
         }
-        matches!(head, Type::Con(p) if self.decls.variants.contains_key(p) && !self.decls.errors.contains(p))
-            && self.hidden(t, &mut Vec::new())
+        let Type::Con(p) = head else { return false };
+        self.decls.hidden.contains(p)
+            || (self.decls.variants.contains_key(p)
+                && !self.decls.errors.contains(p)
+                && self.hidden(t, &mut Vec::new()))
     }
 
     /// The fields of every constructor of the declared type `p` at `args`;

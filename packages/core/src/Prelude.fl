@@ -46,12 +46,14 @@ type Url a
 /// The form of a record type that derives `Form`: see the module `Form`.
 type Form a
 @lang pure_codec
+@stores
 type PureCodec i a
 @lang eff
 type Eff (r : ServiceRow) (e : ErrorRow) a
 @lang layer
 type Layer (ri : ServiceRow) (e : ErrorRow) (ro : ServiceRow)
 @lang codec
+@stores
 type Codec (rd : ServiceRow) (re : ServiceRow) i a
 @lang errors
 type Errors (e : ErrorRow)
@@ -228,6 +230,7 @@ type alias SchemaIssue = { message : String; path : String }
 /// Decoding or encoding failed; the issues name the paths, never the value.
 type error SchemaError = SchemaError (List SchemaIssue)
 
+@stores
 /// One field of a `codec` block: its wire name, its codec and its policy for
 /// a missing key; decoding it may need the services `rd`.
 type FieldCodec (rd : ServiceRow) a

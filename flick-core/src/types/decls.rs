@@ -12,6 +12,7 @@ use super::convert::{Free, TyVar, is_type};
 use super::env::{Abi, Form, Fundep, ModuleNominalKind, ModuleRequirement, TypeDef};
 use super::gadt::scheme::{Variant, quantify};
 use super::kinds::Kind;
+use super::makers;
 use super::services::{OpClass, Operation};
 use super::ty::{Binder, Type};
 use crate::api_diff;
@@ -37,6 +38,16 @@ impl Checker<'_> {
         for decl in decls {
             if let Some(p) = self.skeleton(decl) {
                 pending.push(p);
+            }
+        }
+        // `@stores`: foreign code puts functions in its values (hidden storage)
+        for name in makers::marked(decls, self.text, "stores", K::Con) {
+            if let Some(TypeDef {
+                form: Form::Nominal { hidden, .. },
+                ..
+            }) = self.env.type_def_mut(&name)
+            {
+                *hidden = true;
             }
         }
         let mut bodies: Vec<Body> = pending.iter().map(|_| Body::None).collect();

@@ -215,6 +215,16 @@ impl Checker<'_> {
                     body: Box::new(body),
                 }
             }
+            // a written qualifier is a field of the arrow (`Ty.elide`, `Ty.fresh`)
+            Type::Captured { ty, .. } | Type::Bounded { ty, .. }
+                if matches!(**ty, Type::Fun { .. }) =>
+            {
+                let mut out = t.clone();
+                if let Type::Captured { ty, .. } | Type::Bounded { ty, .. } = &mut out {
+                    **ty = self.rows_of_stages(ty, held, kinds, fresh, depth, quantify);
+                }
+                out
+            }
             result if depth > 0 && self.bare_hidden(result) => {
                 elided(result.clone(), held.clone().into_type())
             }

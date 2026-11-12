@@ -35,6 +35,7 @@ mod tests;
 mod tests_ffi;
 #[cfg(test)]
 mod tests_forall;
+mod tests_stores;
 
 use std::collections::{BTreeSet, HashSet};
 use std::fmt;
