@@ -126,10 +126,11 @@ impl<'a> Printer<'a> {
         docvec![self.a, before, closing]
     }
 
-    /// A statement, which starts its line: a pipeline there lines its
-    /// steps up under its first operand.
+    /// A statement, which starts its line: a pipeline there, of `|>` or of
+    /// `<|`, lines its steps up under its first operand.
     pub fn statement(&mut self, n: &'a Node) -> Doc<'a> {
-        if n.kind == K::BinExpr && token(n, K::PipeGt).is_some() {
+        let pipe = |kind| token(n, kind).is_some();
+        if n.kind == K::BinExpr && (pipe(K::PipeGt) || pipe(K::LtPipe)) {
             self.binary(n, true, &[])
         } else {
             self.node(n)

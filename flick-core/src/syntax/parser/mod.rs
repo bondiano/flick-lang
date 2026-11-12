@@ -617,6 +617,8 @@ mod branch_tests;
 #[cfg(test)]
 mod exposing_tests;
 #[cfg(test)]
+mod operator_tests;
+#[cfg(test)]
 mod plugin_tests;
 #[cfg(test)]
 mod tests;

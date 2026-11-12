@@ -208,3 +208,34 @@ component badge (render : String) = ui { text render }
     assert_eq!(kind_at("render :"), Some("parameter"));
     assert_eq!(kind_at("render }"), Some("variable"));
 }
+
+#[test]
+fn inlay_hints_show_what_each_function_of_a_left_pipe_gives() {
+    let source = "module App.Hints exposing (..)\n\
+                  leading : List Int -> String\n\
+                  let leading xs =\n  show\n    <| List.length\n    <| List.filter (fun x -> x > 1)\n    <| xs\n\
+                  trailing : List Int -> String\n\
+                  let trailing xs =\n  show <|\n    List.length <|\n      xs\n\
+                  short : List Int -> Int\n\
+                  let short xs = List.length <| xs\n";
+    let f = fixture_of(&[("src/App/Hints.fl", source)]);
+    let ide = f.ide();
+    let hints: Vec<(u32, String)> = ide.inlay_hints(f.file("App.Hints"));
+    let shown: Vec<(&str, &str)> = (hints.iter())
+        .map(|(at, label)| {
+            let line = source[..*at as usize].rsplit('\n').next().expect("a line");
+            (line.trim(), label.as_str())
+        })
+        .collect();
+    assert_eq!(
+        shown,
+        [
+            ("show", " : String"),
+            ("<| List.length", " : Int"),
+            ("<| List.filter (fun x -> x > 1)", " : List Int"),
+            ("show <|", " : String"),
+            ("List.length <|", " : Int"),
+        ],
+        "{hints:?}"
+    );
+}

@@ -4,7 +4,7 @@
 
 use std::fmt::Write;
 
-use super::{Checker, Ref, block_statements, unparen, words};
+use super::{Checker, Ref, block_statements, piped, unparen, words};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -75,11 +75,11 @@ impl Checker<'_> {
         let parts: Vec<&Node> = node.nodes().collect();
         let (f, source) = match (node.kind, &parts[..]) {
             (K::AppExpr, [head, f, source]) if self.binds(head) => (*f, *source),
-            (K::BinExpr, [source, call]) if node.has_token(K::PipeGt) => {
+            (K::BinExpr, _) if let Some((call, source)) = piped(node) => {
                 let call = unparen(call);
                 let parts: Vec<&Node> = call.nodes().collect();
                 match (call.kind, &parts[..]) {
-                    (K::AppExpr, [head, f]) if self.binds(head) => (*f, *source),
+                    (K::AppExpr, [head, f]) if self.binds(head) => (*f, source),
                     _ => return None,
                 }
             }

@@ -1,0 +1,25 @@
+---
+title: Composition
+description: "`>>` and `<<`: one function made of two."
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="composition">
+
+`f >> g` is the function that applies `f`, then `g`: `shout` trims the text,
+then turns it to upper case. `g << f` is the same function written with its
+last step first, as in `List.length << String.split " "`.
+
+A composition is a function like any other, so it can be passed to
+`List.map` as it is. Its operands are evaluated once, where it is written,
+and it costs no more than the function written by hand.
+
+`>>` binds tighter than any other operator, so `List.map f >> List.filter p`
+needs no parentheses. `>>` and `<<` do not mix in one chain.
+
+**Try:** write `words` with `>>` instead of `<<`, or add
+`>> String.to_upper` to the function given to `List.map`.
+
+</TourLesson>

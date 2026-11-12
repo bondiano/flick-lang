@@ -1,0 +1,7 @@
+module Main exposing (main, shout)
+
+shout : String -> String
+let shout text = String.to_upper <| text
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line <| "[" ++ shout "  flick  " ++ "]"

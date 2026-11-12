@@ -157,6 +157,29 @@ fn comments_keywords_and_operators() {
 }
 
 #[test]
+fn left_pipe_and_composition_operators() {
+    let shown = |src: &str| -> Vec<K> { kinds(src).0.iter().map(|t| t.0).collect() };
+    assert_eq!(
+        shown("f <| g >> h << k"),
+        [
+            K::Ident,
+            K::LtPipe,
+            K::Ident,
+            K::GtGt,
+            K::Ident,
+            K::LtLt,
+            K::Ident
+        ]
+    );
+    // the longest operator a prefix spells, then the rest
+    assert_eq!(shown(">>="), [K::GtGt, K::Eq]);
+    assert_eq!(shown("->>"), [K::Arrow, K::Gt]);
+    assert_eq!(shown("<<-"), [K::LtLt, K::Minus]);
+    assert_eq!(shown("|>>"), [K::PipeGt, K::Gt]);
+    assert_eq!(shown("< |"), [K::Lt, K::Pipe]);
+}
+
+#[test]
 fn stray_characters_and_tabs() {
     assert_eq!(kinds("a #€ b").1, ["FLICK-S003 #€"]);
     assert_eq!(kinds("\tx").1, ["FLICK-S009 \t"]);

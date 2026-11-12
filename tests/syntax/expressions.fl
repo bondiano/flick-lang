@@ -31,6 +31,18 @@ let pipeline xs =
   |> List.map (fun x -> x * 2)
   |> List.sum
 
+left_pipeline : List Float -> String
+let left_pipeline xs =
+  show
+  <| List.sum
+  <| List.map (fun x -> x * 2) xs
+
+composed : List Float -> String
+let composed = List.map (fun x -> x * 2) >> List.sum >> show
+
+backward : List Float -> String
+let backward = show << List.sum << List.map ((fun x -> x + 1) >> (fun x -> x * 2))
+
 classify : Float -> String
 let classify n =
   if n < 0 then

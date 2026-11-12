@@ -1,0 +1,22 @@
+// The lints of a call see `f <| x` as they see `f x` and `x |> f`.
+module App.LeftPipes exposing (..)
+
+first : List Float -> Option Float
+let first xs = List.head <| List.filter (fun x -> x > 1) <| xs
+
+all_naturals : List Int
+let all_naturals = Seq.to_list <| Seq.map (fun n -> n * 2) <| Seq.from 1
+
+forced : List Float -> List Float
+let forced xs = Seq.to_list <| for { x <- xs } yield x + 1
+
+piped : List Float -> List Float
+let piped xs = List.map (fun x -> x * 10) <| List.filter (fun x -> x > 1) <| xs
+
+chained : Option Float -> Option Float -> Option Float
+let chained a b = Option.bind (fun x -> Option.bind (fun y -> Some (x + y)) <| b) <| a
+//~ FLICK-T047 @5:16-5:63 `List.head` of `List.filter`: `List.find` stops at the first match
+//~ FLICK-T031 @8:20-8:73 this sequence never ends, so `Seq.to_list` never returns
+//~ FLICK-T032 @11:17-11:59 `Seq.to_list` of a `for`: `[for …]` builds the list without a generator
+//~ FLICK-T033 @14:16-14:80 `List.filter` then `List.map` walk the list twice
+//~ FLICK-T035 @17:19-17:87 a chain of `flat_map`: `do` binds each value in turn

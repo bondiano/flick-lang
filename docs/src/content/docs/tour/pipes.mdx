@@ -1,6 +1,6 @@
 ---
 title: Partial calls and pipes
-description: A function given fewer arguments, a function without a name, and `|>`.
+description: A function given fewer arguments, a function without a name, `|>` and `<|`.
 tableOfContents: false
 ---
 
@@ -16,6 +16,11 @@ another function, like `List.map`.
 
 `x |> f` means `f x`. A chain of `|>` reads from top to bottom: take the list,
 triple each number, keep those above 5, add them up.
+
+`f <| x` means `f x` too, with the function first: everything to the right of
+`<|` is its argument, so `Platform.stdout_line <| show total` needs no
+parentheses. `|>` and `<|` do not mix in one expression; parentheses say
+which goes first.
 
 **Try:** change `n > 5` to `n > 10`, or add a line `|> List.map (fun n -> n + 1)`
 before `List.sum`.

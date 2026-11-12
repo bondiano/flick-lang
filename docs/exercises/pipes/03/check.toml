@@ -1,0 +1,10 @@
+export = "long_words"
+argument_types = ["string"]
+return_type = "number"
+output = "2"
+title = "Read from the right"
+title_ru = "Читайте справа"
+task = "long_words counts the words longer than three letters, but its steps are written in the wrong order for <<. Turn the chain around."
+task_ru = "long_words считает слова длиннее трёх букв, но для << её шаги записаны в обратном порядке. Разверните цепочку."
+hints = ["g << f applies f first: with <<, the step on the right runs first.", "Split on the right, count on the left: List.length << … << String.split \" \""]
+hints_ru = ["g << f сначала применяет f: в цепочке << первым выполняется шаг справа.", "Разбиение справа, подсчёт слева: List.length << … << String.split \" \""]

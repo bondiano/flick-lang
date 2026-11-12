@@ -1,0 +1,22 @@
+// A composition holds what its operands hold, as the closure it stands for.
+module App.Composition exposing (..)
+
+type alias Path = String
+
+type File (s : Region)
+
+type error OpenError = OpenError Path
+
+type error ReadError = ReadError Path
+
+service FileSystem =
+  open_scoped : forall s. Path ->{Scope s; OpenError} File s
+  read_all : forall s. File s ->{; ReadError} String
+
+escaping : Path ->{FileSystem; OpenError} (Unit ->{FileSystem; ReadError} String)
+let escaping path = scope {
+  let file = FileSystem.open_scoped path
+  (fun () -> file) >> FileSystem.read_all
+}
+
+//~ FLICK-G002 @19:20-19:42 this uses region `s`

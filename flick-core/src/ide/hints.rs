@@ -99,18 +99,29 @@ impl Ide<'_> {
                 }
             }
             K::BinExpr => {
-                let Some(pipe) = node.child_tokens().find(|t| t.kind == K::PipeGt) else {
+                let Some(pipe) = node
+                    .child_tokens()
+                    .find(|t| matches!(t.kind, K::PipeGt | K::LtPipe))
+                else {
                     return;
+                };
+                let line_end = |at: u32| {
+                    text[at as usize..].starts_with(['\n', '\r']) || at as usize == text.len()
                 };
                 let (start, end) = node.range();
                 let multiline = text[start as usize..end as usize].contains('\n');
-                let at_line_end =
-                    text[end as usize..].starts_with(['\n', '\r']) || end as usize == text.len();
-                if multiline
-                    && at_line_end
+                // `x |> f` on its line gives the value so far after it; the
+                // function of `f <| x` gives its value on the line it is on
+                let at = if pipe.kind == K::PipeGt {
+                    Some(end).filter(|&end| multiline && line_end(end))
+                } else {
+                    let function = node.nodes().next().map_or(start, |f| f.range().1);
+                    [function, pipe.end].into_iter().find(|&at| line_end(at))
+                };
+                if let Some(at) = at
                     && let Some(ty) = m.typing.types.get(&(pipe.start, pipe.end))
                 {
-                    out.push((end, format!(" : {}", show_signature(ty))));
+                    out.push((at, format!(" : {}", show_signature(ty))));
                 }
             }
             _ => {}

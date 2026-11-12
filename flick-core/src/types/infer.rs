@@ -8,7 +8,7 @@ use std::mem;
 use super::Checker;
 use super::convert::is_type;
 use super::regions::Held;
-use super::ty::Type;
+use super::ty::{Effects, Type};
 use super::typing::Ref;
 use crate::diagnostics::{Severity, codes};
 use crate::numeric;
@@ -92,6 +92,9 @@ impl Checker<'_> {
             }
             (K::FunExpr, _) => {
                 self.lambda(node, Some(expected));
+            }
+            (K::BinExpr, _) if super::pipes::composes(node) => {
+                self.compose(node, Some(expected));
             }
             (K::LoopExpr | K::WhileExpr, _) => {
                 self.control_loop(node, Some(expected));
@@ -425,6 +428,18 @@ impl Checker<'_> {
         expected: Option<&Type>,
         node: &Node,
     ) -> Type {
+        self.function_typed(params, |c, _, rest| body(c, rest), expected, node)
+    }
+
+    /// [`Self::function_with`] whose body also gets the type and the arrow
+    /// of each stage, for a parameter it reads without binding a name.
+    pub fn function_typed(
+        &mut self,
+        params: &[Option<&Node>],
+        body: impl FnOnce(&mut Self, &[(Type, Option<Box<Effects>>)], Option<Type>) -> Type,
+        expected: Option<&Type>,
+        node: &Node,
+    ) -> Type {
         let saved = mem::take(&mut self.cx.runtime);
         let mark = self.cx.locals.len();
         let givens = self.classes.givens.len();
@@ -500,7 +515,7 @@ impl Checker<'_> {
         let returns = rest.clone().unwrap_or_else(|| self.fresh());
         stage.returns = Some(returns.clone());
         let outer = mem::replace(&mut self.cx.stage, stage);
-        let result = body(self, rest);
+        let result = body(self, &stages, rest);
         let inner = mem::replace(&mut self.cx.stage, outer);
         if inferred_result && self.unify(&returns, &result).is_err() {
             let (returns, result) = (self.show(&returns), self.show(&result));

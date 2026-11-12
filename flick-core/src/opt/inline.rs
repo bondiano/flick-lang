@@ -294,7 +294,8 @@ fn bind(pat: &Pat, value: Expr) -> Stmt {
     }
 }
 
-/// `(fun p … -> body) arg` → `let p = arg` before the rest of the function;
+/// `(fun p … -> body) arg` → `let p = arg` before the rest of the function,
+/// for a pure stage, or a last stage that its call runs;
 /// `{ stmts; f } arg` → `{ stmts; f arg }`, which evaluates in the same order.
 pub fn beta(e: &mut Expr) -> bool {
     if let ExprKind::App {
@@ -321,10 +322,7 @@ pub fn beta(e: &mut Expr) -> bool {
         return true;
     }
     let ExprKind::App {
-        func,
-        arg,
-        stage: Stage::Pure,
-        ..
+        func, arg, stage, ..
     } = &mut e.kind
     else {
         return false;
@@ -335,7 +333,10 @@ pub fn beta(e: &mut Expr) -> bool {
     };
     if params
         .first()
-        .is_none_or(|p| p.stage != Stage::Pure || !simple(&p.pat))
+        .is_none_or(|p| p.stage != *stage || !simple(&p.pat))
+        // a call of an effectful stage runs the body, which then runs here,
+        // in the stage of the call; a stage before others runs nothing
+        || (*stage != Stage::Pure && params.len() > 1)
         // an `o?` returns from the function it is in, not from the one around
         || (params.len() == 1 && exits(body))
     {

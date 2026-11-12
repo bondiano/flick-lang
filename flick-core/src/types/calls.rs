@@ -342,6 +342,12 @@ impl Checker<'_> {
                 self.note_type(self.token_span(op), &ty);
                 ty
             }
+            K::LtPipe => {
+                let ty = self.right_apply(lhs, rhs);
+                self.note_type(self.token_span(op), &ty);
+                ty
+            }
+            K::GtGt | K::LtLt => self.compose(node, None),
             K::OrOr | K::AndAnd => {
                 self.check(lhs, &bool_);
                 self.check(rhs, &bool_);
@@ -378,46 +384,6 @@ impl Checker<'_> {
                     givens: self.classes.givens.clone(),
                 });
                 if domain == Domain::Ordered { bool_ } else { ty }
-            }
-        }
-    }
-
-    /// `x |> f` applies `f` to `x`, evaluating `x` first.
-    fn pipe(&mut self, lhs: &Node, rhs: &Node) -> Type {
-        let arg = self.infer(lhs);
-        let function = self.infer(rhs);
-        let call = (lhs.range().0, rhs.range().1);
-        match self.ui_callable(&function, call, self.span(rhs)) {
-            Type::Fun {
-                param,
-                effects,
-                result,
-            } => {
-                self.expect(&arg, &param, self.span(lhs));
-                if let Some(e) = effects {
-                    let (start, _) = lhs.range();
-                    let (_, end) = rhs.range();
-                    let e = self.live_call(&function, &e);
-                    self.call_effects(&e, Span::new(self.file, start, end));
-                }
-                let span = Span::new(self.file, lhs.range().0, rhs.range().1);
-                let result = self.instantiate(&result, span);
-                self.application_result(result, &function, &arg, false)
-            }
-            Type::Error => Type::Error,
-            meta @ Type::Meta(_) => {
-                let result = self.fresh();
-                let _ = self.unify(&meta, &Type::pure_fun(arg, result.clone()));
-                result
-            }
-            other => {
-                let shown = self.show(&other);
-                self.error(
-                    codes::T003,
-                    self.span(rhs),
-                    format!("the right side of `|>` must be a function, found `{shown}`"),
-                );
-                Type::Error
             }
         }
     }

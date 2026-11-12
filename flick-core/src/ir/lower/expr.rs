@@ -2,14 +2,17 @@
 
 use super::numeric::{apply, arith_of};
 use super::{Lower, type_name};
-use crate::ir::{Arm, BinOp, Expr, ExprKind, Handler, Lit, Pat, Stage, Stmt};
+use crate::ir::{Arm, BinOp, Expr, ExprKind, Handler, Lit, Param, Pat, Stage, Stmt};
 use crate::numeric::Arith;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::handle::{arm_pattern, failed_pattern, operation_path};
 use crate::types::lang::{self, Lang};
-use crate::types::{Dict, Identity, Range, Ref, children, is_pattern, let_parts};
+use crate::types::{
+    Dict, Identity, Range, Ref, applied_order, children, composed_key, composition, is_pattern,
+    let_parts, result_key, right_application,
+};
 
 impl Lower<'_> {
     /// An expression with the lift and the dictionaries its position gives it.

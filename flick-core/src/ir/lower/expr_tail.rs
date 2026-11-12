@@ -6,6 +6,13 @@ impl Lower<'_> {
             .child_tokens()
             .find(|t| t.kind.is_binary_op())
             .map(|t| t.kind);
+        match op {
+            Some(K::LtPipe) => {
+                return self.app_expr(&right_application(children[0], children[1]), span);
+            }
+            Some(K::GtGt | K::LtLt) => return self.composition(node),
+            _ => {}
+        }
         let lhs = self.boxed(children[0]);
         let rhs = self.expr(children[1]);
         let rhs = Box::new(if op == Some(K::PipeGt) {
@@ -58,6 +65,79 @@ impl Lower<'_> {
             k => BinOp::Arith(k.and_then(arith_of).unwrap_or(Arith::Pow), self.num(key)),
         };
         Expr::new(ExprKind::Binary(op, lhs, rhs), span)
+    }
+
+    /// `f >> g` as `{ let f' = f; let g' = g; fun x -> g' (f' x) }`, and
+    /// `f << g` as the same closure applying `g'` first. An operand whose
+    /// evaluation shows nothing and reads no variable is used in place.
+    fn composition(&mut self, node: &Node) -> Expr {
+        let span = self.span(node);
+        let Some((operands, operators)) = composition(node) else {
+            return Expr::new(ExprKind::Lit(Lit::Unit), span);
+        };
+        let mut stmts = Vec::new();
+        let mut functions = Vec::new();
+        for operand in &operands {
+            let value = self.expr(operand);
+            let in_place = matches!(
+                value.kind,
+                ExprKind::Local(_)
+                    | ExprKind::Global { .. }
+                    | ExprKind::Con(_)
+                    | ExprKind::Method { .. }
+                    | ExprKind::Lambda { .. }
+            );
+            if in_place {
+                functions.push(value);
+            } else {
+                let name = self.hidden("$f");
+                let at = value.span;
+                stmts.push(Stmt::Let(Pat::Bind(name.clone()), value));
+                functions.push(Expr::new(ExprKind::Local(name), at));
+            }
+        }
+        let x = self.hidden("$x");
+        let mut value = Expr::new(ExprKind::Local(x.clone()), span);
+        for i in applied_order(&operators, operands.len()) {
+            let key = composed_key(&operands, &operators, i);
+            let at = Span::new(self.file, key.0, key.1);
+            let func = self.ui_callable(functions[i].clone(), key);
+            let app = ExprKind::App {
+                func: Box::new(func),
+                arg: Box::new(self.adapted(key, value)),
+                stage: self.call_stage(key),
+                arg_first: false,
+            };
+            let dicts = self.dictionaries(key);
+            value = with_dicts(self.within(key, Expr::new(app, at)), dicts);
+        }
+        let stage = self.typing.stages.get(&node.range()).and_then(|s| s.first());
+        let lambda = ExprKind::Lambda {
+            params: vec![Param {
+                pat: Pat::Bind(x),
+                stage: stage.copied().unwrap_or(Stage::Pure),
+                ty: None,
+            }],
+            body: Box::new(self.adapted(result_key(&operators), value)),
+        };
+        let lambda = Expr::new(lambda, span);
+        if stmts.is_empty() {
+            lambda
+        } else {
+            Expr::new(ExprKind::Block(stmts, Box::new(lambda)), span)
+        }
+    }
+
+    /// `value` with the lift and the conversion the checker placed at `key`.
+    fn adapted(&mut self, key: Range, value: Expr) -> Expr {
+        let value = match self.typing.lifts.get(&key).cloned() {
+            Some(lift) => {
+                let span = value.span;
+                Expr::new(ExprKind::Lift(Box::new(value), lift), span)
+            }
+            None => value,
+        };
+        self.apply_coercion(key, value)
     }
 
     /// `label = value` fields of a record literal or update, in order.

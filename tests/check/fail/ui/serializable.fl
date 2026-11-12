@@ -9,6 +9,9 @@ let count = Atom.serializable numbers (Atom.make 0)
 piped : Atom.Writable Float
 let piped = Atom.make 0 |> Atom.serializable numbers
 
+left_piped : Atom.Writable Float
+let left_piped = Atom.serializable numbers <| Atom.make 0
+
 drafts : String -> Atom.Writable String
 let drafts = Atom.serializable_family (Codec.json Schema.string) (fun _ -> Atom.make "")
 
@@ -20,7 +23,7 @@ inside : Atom.Writable Float
 let inside =
   mk : Float -> Atom.Writable Float
   let mk n = Atom.serializable numbers (Atom.make n)
-  //~ FLICK-U003 @22:14-22:31 `Atom.serializable` inside a function would give its key to every atom
+  //~ FLICK-U003 @25:14-25:31 `Atom.serializable` inside a function would give its key to every atom
   mk 1
 
 partial : Atom.Writable Float -> Atom.Writable Float

@@ -1,0 +1,30 @@
+// Operators of opposite directions read either way: parentheses say which.
+module App.OperatorsMix exposing (..)
+
+inc : Int -> Int
+let inc n = n + 1
+
+adder : Int -> Int -> Int
+let adder a b = a + b
+
+left : Int
+let left = 1 |> adder <| 2
+
+right : Int
+let right = inc <| 1 |> inc
+
+forward : Int -> Int
+let forward = inc >> inc << inc
+
+backward : Int -> Int
+let backward = inc << inc >> inc
+
+grouped : Int
+let grouped = (1 |> adder) <| 2
+
+nested : Int -> Int
+let nested = inc << (inc >> inc)
+//~ FLICK-S007 @11:14-11:16 `<|` and `|>` do not mix: add parentheses
+//~ FLICK-S007 @14:22-14:24 `<|` and `|>` do not mix: add parentheses
+//~ FLICK-S007 @17:19-17:21 `>>` and `<<` do not mix: add parentheses
+//~ FLICK-S007 @20:27-20:29 `>>` and `<<` do not mix: add parentheses

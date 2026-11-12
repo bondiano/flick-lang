@@ -199,6 +199,19 @@ impl Keyed {
                     self.applied.insert(head.range(), app.nodes().count());
                 }
             }
+            // `Atom.serializable codec <| state` is the application itself
+            K::BinExpr if node.has_token(K::LtPipe) => {
+                let (head, given) = match parts.first() {
+                    Some(app) if app.kind == K::AppExpr => {
+                        (app.nodes().next(), app.nodes().count())
+                    }
+                    other => (other.copied(), 1),
+                };
+                if let Some(head) = head {
+                    let known = self.applied.entry(head.range()).or_default();
+                    *known = (*known).max(given);
+                }
+            }
             _ => {}
         }
         if let Some(Ref::Value { module, name }) = names.get(&node.range())

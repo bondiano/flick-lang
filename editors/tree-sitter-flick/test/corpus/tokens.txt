@@ -337,3 +337,25 @@ n = n + 1
   (identifier)
   (operator)
   (number))
+
+==================
+Pipes and composition
+==================
+
+let h = f <| g >> k << m |> n
+
+---
+
+(source_file
+  (keyword)
+  (identifier)
+  (operator)
+  (identifier)
+  (operator)
+  (identifier)
+  (operator)
+  (identifier)
+  (operator)
+  (identifier)
+  (operator)
+  (identifier))

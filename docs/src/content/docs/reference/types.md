@@ -280,7 +280,17 @@ matching instance.
 | `< <= > >=` | both `Int`, `Float`, `BigInt` or `String`, or both of another type with `Ord` | `Bool` |
 | `== !=` | the same type | `Bool` |
 | `&& \|\|`, `not` | `Bool` | `Bool` |
-| `x \|> f` | `f x` | the result of `f` |
+| `x \|> f`, `f <\| x` | `f x` | the result of `f` |
+| `f >> g`, `g << f` | functions | the function that applies `f`, then `g` |
+
+`x |> f` evaluates `x` first, `f <| x` evaluates `f` first, as `f x` does;
+`f a <| x` is the call `f a x`. A composition is the closure `let f' = f;
+let g' = g; fun x -> g' (f' x)`: it evaluates its operands once, left to
+right, where it is written, and is typed as that closure. Its arrow has the
+rows of the calls it makes: two pure functions compose into a pure one, and
+`show >> Platform.stdout_line` is a runtime function. It holds what its
+operands hold ([regions](../regions/)). In release the closure is gone where
+it is applied: `(f >> g) x` is `g (f x)`.
 
 `1.5 + 1n` and `"a" ++ 1` are `FLICK-T003`. An operand nothing else
 determines is `Int` (`String` for `++`). Ranges `a..b`, `a..<b` and `a..`

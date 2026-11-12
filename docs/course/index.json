@@ -50,6 +50,17 @@
           ]
         },
         {
+          "id": "pipes",
+          "en": "Pipes and composition",
+          "ru": "Конвейеры и композиция",
+          "tour": "composition",
+          "exercises": [
+            "pipes/01",
+            "pipes/02",
+            "pipes/03"
+          ]
+        },
+        {
           "id": "conditions",
           "en": "Conditions and recursion",
           "ru": "Условия и рекурсия",

@@ -11,7 +11,7 @@ use flick_core::source::SourceMap;
 use flick_core::syntax::parse;
 
 /// Fragments spliced into inputs: tokens and layout that stress recovery.
-const FRAGMENTS: [&str; 43] = [
+const FRAGMENTS: [&str; 46] = [
     " a_rather_long_argument_name_for_wrapping another_quite_long_argument_name ",
     " |> List.map some_function_with_a_long_name |> List.filter another_long_predicate ",
     " -> SomeLongTypeName ->{ServiceOne, ServiceTwo; ErrorOne} ",
@@ -32,6 +32,9 @@ const FRAGMENTS: [&str; 43] = [
     "=>",
     "|",
     "|>",
+    "<|",
+    ">>",
+    "<<",
     "\n",
     "\n  ",
     "\n    ",

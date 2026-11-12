@@ -6,6 +6,19 @@ break programs.
 
 ## Unreleased
 
+- **`<|`, `>>` and `<<`:** `f <| x` is `f x`, the weakest operator and
+  right-associative, so `say <| show <| total xs` needs no parentheses;
+  `f a <| x` is the call `f a x`. `f >> g` applies `f`, then `g`, and
+  `f << g` applies `g` first; they bind tighter than any other operator,
+  right below application. A composition is typed as the closure
+  `let f' = f; let g' = g; fun x -> g' (f' x)`: its operands are evaluated
+  once, left to right, any functions compose, the effect rows join, and it
+  holds what they hold. Mixing `<|` with `|>`, or `>>` with `<<`, without
+  parentheses is `FLICK-S007`. Lints, inlay hints and the formatter treat a
+  `<|` pipeline as they treat `|>`. In release a composition applied is the
+  nested call, `x |> f` is `f x` when the order cannot be told, and a
+  partial application moves to where it completes, so `|>` pipelines now
+  get workers and inlining too.
 - **No build without a runtime:** `[build] effect = "none"` is gone
   (`FLICK-P005` in `flick.toml`); such a program builds on Flick's own
   runtime. A library no longer writes `_core/`, `.iface` loses `abi.core`

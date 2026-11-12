@@ -1,0 +1,16 @@
+// A composition with a runtime call is a function with a runtime arrow.
+module App.Composition exposing (..)
+
+say_n : Int ->{} Int
+foreign say_n from "./io.js" "sayN"
+
+inc : Int -> Int
+let inc n = n + 1
+
+pure_only : List Int -> List Int
+let pure_only xs = List.map (say_n >> inc) xs
+
+declared_pure : Int -> Int
+let declared_pure = inc >> say_n
+//~ FLICK-E001 @11:30-11:38 this is a runtime call, but this function must be pure
+//~ FLICK-E001 @14:25-14:33 this is a runtime call, but this function must be pure

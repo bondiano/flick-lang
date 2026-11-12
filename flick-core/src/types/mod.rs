@@ -65,6 +65,7 @@ pub(crate) use module_contract::{
 mod expression_fact;
 mod origin;
 mod patterns;
+mod pipes;
 mod qualified;
 mod question;
 mod ranges;
@@ -124,6 +125,7 @@ pub use interpolation::{hole_key, holes};
 pub use kinds::Kind;
 pub use options::{Limits, Options};
 pub use patterns::is_pattern;
+pub use pipes::{applied_order, composed_key, composition, result_key, right_application};
 pub use question::Question;
 pub use ranges::range_list;
 pub use schemas::companion_name;

@@ -1,0 +1,7 @@
+module Main exposing (main, long_words)
+
+long_words : String -> Int
+let long_words = List.length << List.filter (fun w -> String.length w > 3) << String.split " "
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line <| show <| long_words "pipes and composition"

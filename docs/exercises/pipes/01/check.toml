@@ -1,0 +1,10 @@
+export = "shout"
+argument_types = ["string"]
+return_type = "string"
+output = "[FLICK]"
+title = "Pass the value along"
+title_ru = "Передайте значение дальше"
+task = "String.to_upper takes String.trim itself as its argument. Make it take the trimmed text, with <| or |>."
+task_ru = "String.to_upper получает аргументом саму функцию String.trim. Передайте ему обрезанный текст с помощью <| или |>."
+hints = ["f <| g x is f (g x): everything on the right of <| is the argument.", "text |> String.trim |> String.to_upper is the same call."]
+hints_ru = ["f <| g x — это f (g x): всё справа от <| — аргумент.", "text |> String.trim |> String.to_upper — тот же вызов."]

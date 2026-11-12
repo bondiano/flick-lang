@@ -1,0 +1,56 @@
+// `<|` is application; `>>` and `<<` compose any functions. The closure has
+// the rows of the calls it makes, and pure operands give a pure function.
+module App.Composition exposing (..)
+
+say_n : Int ->{} Int
+foreign say_n from "./io.js" "sayN"
+
+inc : Int -> Int
+let inc n = n + 1
+
+twice : Int -> Int
+let twice = inc >> inc
+
+length_of : Int -> Int
+let length_of = String.length << show
+
+shown : Int -> String
+let shown = inc >> inc >> show
+
+back : Int -> String
+let back = show << inc << inc
+
+grouped : Int -> Int
+let grouped = (inc >> inc) >> (inc >> inc)
+
+mapped : List Int -> List Int
+let mapped xs = List.map (inc >> twice) xs
+
+applied : List Int -> List Int
+let applied xs = List.map inc <| xs
+
+incs : List Int -> List Int
+let incs = List.map <| fun x -> x + 1
+
+nested : Int -> String
+let nested n = show <| inc <| inc n
+
+local : Int -> String
+let local n =
+  let f = inc >> show
+  f n
+
+generic : (a -> b) -> (b -> c) -> a -> c
+let generic f g = f >> g
+
+unknown : Int -> Int
+let unknown n = (fun f g -> (f >> g) n) inc inc
+
+logged : Int ->{} Int
+let logged = say_n >> inc
+
+run : Int ->{} Int
+let run n = (say_n >> inc >> say_n) n
+
+later : List Int ->{} List (Int ->{} Int)
+let later xs = List.map (fun _ -> say_n << inc) xs

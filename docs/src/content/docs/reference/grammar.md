@@ -132,7 +132,7 @@ let examples =
 
 ```text
 ( ) [ ] { } , ; : . .. ..< = -> <- => | ^ _ ?
-|> || && == != < <= > >= ++ + - * / % ** not
+|> <| >> << || && == != < <= > >= ++ + - * / % ** not
 ```
 
 ## Operator table
@@ -141,6 +141,7 @@ There are no user-defined operators. From weakest to strongest:
 
 | Level | Operators | Associativity |
 | - | - | - |
+| 0 | `<\|` | right; does not mix with `\|>`: `x \|> f <\| y` is an error |
 | 1 | `\|>` | left |
 | 2 | `\|\|` | right |
 | 3 | `&&` | right |
@@ -151,11 +152,16 @@ There are no user-defined operators. From weakest to strongest:
 | 7 | `*` `/` `%` (`%` is the JS remainder) | left |
 | 8 | `**` | right |
 | 9 | prefix `-`, `not`, `await`, `ignore`, `echo` | — |
+| 9½ | `>>`, `<<` | `>>` left, `<<` right; they do not mix: `f >> g << h` is an error |
 | 10 | function application `f x y` | left |
 | 11 | `.field`, `Module.name`, postfix `?` | left |
 
 `-x ** 2` is `-(x ** 2)`; `-a * b` is `(-a) * b`; `await f x` is
 `await (f x)`; `0..n - 1` is `0..(n - 1)`, and `i < 0..n` compares with the range.
+`f <| g <| x + 1` is `f (g (x + 1))`, and `f a <| x` is the call `f a x`;
+`List.map f >> List.filter p` composes two applications, and `await f >> g`
+is `await (f >> g)`. What the operators mean is in [Numbers and
+operators](../types/#numbers-and-operators).
 A range is a `Seq Float`: `a..b` counts from `a` up to `b` inclusive
 (`Seq.range_to`), `a..<b` stops before `b` (`Seq.range`), and `a..` never
 ends (`Seq.from`). Alone in brackets, `[a..b]` is the `List` of the same
@@ -182,8 +188,9 @@ blocks of `task`, `scope`, `provide`, `sql`, `ui`, `rec` and plugins.
      `do` and `loop`; a record there goes in parentheses (`FLICK-T074`).
 3. A line that starts at the block column with an infix operator other than
    `-`, with `|`, `then`, `else`, `with`, or with a closing delimiter continues
-   the statement instead of starting a new one. This is what lets `|>`
-   pipelines, `match` arms and `else` branches line up with their expression.
+   the statement instead of starting a new one. This is what lets `|>` and
+   `<|` pipelines, `match` arms and `else` branches line up with their
+   expression.
 4. Inside `{ … }` of a record, record type or brace block the items align on
    the first item, which may follow `{` on the same line; items are separated
    by line breaks or `;`. `;` separates statements only inside braces.
@@ -639,8 +646,9 @@ fits; otherwise it breaks, outermost construct first:
   `Ref.modify counter (fun current ->`, the body, then `)` on its own line. A
   call in parentheses stays hugged by them;
 - an operator chain breaks before each operator of its weakest precedence,
-  continuations one level in; a pipeline breaks one step per line, its `|>`
-  under the first operand when the pipeline starts its line;
+  continuations one level in; a pipeline of `|>` or `<|` breaks one step per
+  line, its operators under the first operand when the pipeline starts its
+  line;
 - `if c then a else b` stays on one line or puts every branch on lines of its
   own; `match` and `try` put each arm on its own line, at the column of
   `match`. Before a `,`, where the parser takes no block on lines of its own,

@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 
-use crate::ir::{BinOp, Expr, ExprKind, Pat, Stage, Stmt};
+use crate::ir::{BinOp, Expr, ExprKind, Item, ItemKind, Pat, Stage, Stmt};
 use crate::numeric::{Arith, Num};
 use crate::source::Span;
 use crate::types::{Constructor, Dict};
@@ -161,6 +161,82 @@ pub fn applied(e: &Expr) -> Option<(&Constructor, Vec<&Expr>)> {
     };
     args.reverse();
     Some((c, args))
+}
+
+/// How many arguments the top-level function `name` of `module` takes
+/// before its body runs, when a call with fewer only builds a closure.
+pub type Arity<'a> = &'a dyn Fn(&str, &str) -> Option<usize>;
+
+/// The name of a top-level function and the arguments it takes before its
+/// body runs: the parameters of a function without dictionaries, or what a
+/// foreign function takes at once.
+pub fn arity(item: &Item) -> Option<(&str, usize)> {
+    match &item.kind {
+        ItemKind::Value { name, dicts, body } if dicts.is_empty() => match &body.kind {
+            ExprKind::Lambda { params, .. } => Some((name, params.len())),
+            _ => None,
+        },
+        ItemKind::Foreign(f) if f.dicts == 0 => Some((&f.name, f.taken())),
+        _ => None,
+    }
+}
+
+/// [`droppable`], or a value whose evaluation shows nothing but a closure:
+/// a function applied to fewer arguments than it takes, or a block that
+/// binds such values.
+pub fn inert(e: &Expr, arity: Arity) -> bool {
+    match &e.kind {
+        _ if droppable(e) => true,
+        ExprKind::App { .. } => partial(e, arity).is_some(),
+        ExprKind::Block(stmts, value) => {
+            let bound =
+                |s: &Stmt| matches!(s, Stmt::Let(p, v) if p.irrefutable() && inert(v, arity));
+            stmts.iter().all(bound) && inert(value, arity)
+        }
+        _ => false,
+    }
+}
+
+/// `f a b` as the arguments `f` still takes after them, when `f` is a
+/// top-level function that takes more than these, applied in pure stages to
+/// arguments that are themselves [`inert`].
+pub fn partial(e: &Expr, arity: Arity) -> Option<usize> {
+    let mut args = Vec::new();
+    let mut head = e;
+    while let ExprKind::App {
+        func,
+        arg,
+        stage: Stage::Pure,
+        arg_first: false,
+    } = &head.kind
+    {
+        args.push(&**arg);
+        head = func;
+    }
+    let ExprKind::Global { module, name } = &head.kind else {
+        return None;
+    };
+    let taken = arity(module, name)?;
+    let inert_args = args.iter().all(|a| inert(a, arity));
+    (!args.is_empty() && args.len() < taken && inert_args).then(|| taken - args.len())
+}
+
+/// `x |> f` as `f x` when one of the two shows nothing when evaluated, so
+/// the order of the two cannot be told: then it is a call as any other,
+/// which inlining, fusion and workers know.
+pub fn ordered(e: &mut Expr, arity: Arity) -> bool {
+    if let ExprKind::App {
+        func,
+        arg,
+        arg_first: arg_first @ true,
+        ..
+    } = &mut e.kind
+        && (inert(arg, arity) || inert(func, arity))
+    {
+        *arg_first = false;
+        return true;
+    }
+    false
 }
 
 /// Whether an operator never throws, whatever its well-typed operands: a

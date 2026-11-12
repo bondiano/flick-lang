@@ -505,6 +505,21 @@ fn generic_of(
     opt::names_only(ir, name, &|n| interface.exports_value(n))
 }
 
+/// How many arguments `name` of `module` takes before its body runs, for
+/// the optimizer: a module of the build, else a built-in one.
+fn arity_of(modules: &[Compiled], module: &str, name: &str, by_class: bool) -> Option<usize> {
+    let items = match modules.iter().find(|m| m.name == module) {
+        Some(m) => &m.ir.items,
+        None => {
+            &builtin_modules_of(by_class)
+                .iter()
+                .find(|m| m.name == module)?
+                .items
+        }
+    };
+    (items.iter().filter_map(opt::arity)).find_map(|(n, arity)| (n == name).then_some(arity))
+}
+
 /// What the compilation of every module shares.
 struct Context<'a> {
     layout: &'a codegen::RuntimeLayout,
@@ -797,7 +812,8 @@ pub fn optimized(modules: &[Compiled], module: &Compiled, by_class: bool) -> ir:
                 .any(|p| p.bindings.iter().any(|n| n == name))
     };
     let generics = |m: &str, name: &str| generic_of(modules, m, name, by_class);
-    opt::optimize(&mut ir, &exported, &generics);
+    let arity = |m: &str, name: &str| arity_of(modules, m, name, by_class);
+    opt::optimize(&mut ir, &exported, &generics, &arity);
     ir
 }
 

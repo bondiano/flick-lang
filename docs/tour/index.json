@@ -12,6 +12,7 @@
         { "id": "signatures", "exercise": "signatures/01" },
         { "id": "arguments", "exercise": "signatures/02" },
         { "id": "pipes", "expect": "run" },
+        { "id": "composition", "expect": "run" },
         { "id": "conditions", "expect": "run" },
         { "id": "loops", "expect": "run" },
         { "id": "fizzbuzz", "exercise": "basics/01" }

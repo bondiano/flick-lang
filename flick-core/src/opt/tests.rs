@@ -11,18 +11,26 @@ fn builtin_generic(module: &str, name: &str) -> Option<(Vec<String>, Expr)> {
     super::names_only(ir, name, &|n| interface.exports_value(n))
 }
 
+/// How many arguments a function of a built-in module takes, as a build
+/// tells the optimizer.
+pub(super) fn builtin_arity(module: &str, name: &str) -> Option<usize> {
+    let ir = builtin_modules().iter().find(|m| m.name == module)?;
+    (ir.items.iter().filter_map(super::arity)).find_map(|(n, arity)| (n == name).then_some(arity))
+}
+
 /// The JS of a self-contained module in the release profile.
 pub(super) fn release(text: &str) -> String {
     release_with(text, &|_, _| None)
 }
 
 /// `release` where `workers` names the workers modules export.
-fn release_with(text: &str, workers: &dyn Fn(&str, &str) -> Option<usize>) -> String {
+pub(super) fn release_with(text: &str, workers: &dyn Fn(&str, &str) -> Option<usize>) -> String {
     let (mut ir, interface) = check_text("App", text).expect("lowers");
     super::optimize(
         &mut ir,
         &|name: &str| interface.exports_value(name),
         &builtin_generic,
+        &builtin_arity,
     );
     let path = |m: &str| format!("{}.js", m.replace('.', "/"));
     let options = Options {
@@ -240,6 +248,7 @@ fn known_instances_and_plain_foreigns_are_called_directly() {
         &mut ir,
         &|name: &str| interface.exports_value(name),
         &builtin_generic,
+        &builtin_arity,
     );
     let options = Options {
         path: &|m| format!("{}.js", m.replace('.', "/")),

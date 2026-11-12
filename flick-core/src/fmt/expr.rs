@@ -187,7 +187,7 @@ impl<'a> Printer<'a> {
         if operands.len() != operators.len() + 1 {
             return self.generic(n);
         }
-        let pipe = op.kind == K::PipeGt;
+        let pipe = matches!(op.kind, K::PipeGt | K::LtPipe);
         let broken = pipe && operators.iter().any(|&o| starts_line(self.text, o));
         let mut forced = broken;
         let mut first = self.node(operands[0]);

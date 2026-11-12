@@ -27,6 +27,7 @@ codegen/call_site
 codegen/category_classes
 codegen/classes
 codegen/closures
+codegen/composition
 codegen/deep_recursion
 codegen/default_signatures
 codegen/defaults

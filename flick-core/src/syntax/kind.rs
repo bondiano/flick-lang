@@ -154,6 +154,11 @@ syntax_kinds! {
         LArrow,
         Pipe,
         PipeGt,
+        /// `<|`, application with the function on the left.
+        LtPipe,
+        /// `>>` and `<<`, composition of functions.
+        GtGt,
+        LtLt,
         OrOr,
         AndAnd,
         EqEq,
@@ -396,6 +401,8 @@ impl SyntaxKind {
     pub fn binding_power(self) -> Option<(u8, u8)> {
         use SyntaxKind as K;
         Some(match self {
+            // `<|` and `|>` do not mix, nor `>>` and `<<` (validate.rs)
+            K::LtPipe => (1, 1),
             K::PipeGt => (2, 3),
             K::OrOr => (4, 4),
             K::AndAnd => (6, 6),
@@ -404,6 +411,8 @@ impl SyntaxKind {
             K::Plus | K::Minus => (12, 13),
             K::Star | K::Slash | K::Percent => (14, 15),
             K::StarStar => (18, 18),
+            K::GtGt => (20, 21),
+            K::LtLt => (20, 20),
             _ => return None,
         })
     }
