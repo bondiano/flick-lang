@@ -1,4 +1,4 @@
-import FormalCert.Tactics
+import FormalCert.GenSig
 
 /-!
 # Checks of the certificate tactics
@@ -23,6 +23,22 @@ example : LeLive S (Sig.ctorTy [(.arrow (.base .unit) (.rt Row.none Row.none) (.
 /-- A record whose field widens its qualifier (`le_live` through `LeLive.rcons'`). -/
 example : LeLive S (.rcons "f" (.arrow (.base .unit) .pure (.base .unit) Caps.none) .rnil)
     (.rcons "f" (.arrow (.base .unit) .pure (.base .unit) (fun x => x = .r 0)) .rnil) := by
+  le_live
+
+/-- Covariant data of the generator: a list of pure callbacks where one of callbacks that run
+is expected (`le_live` through `LeLive.data_of`, the other variances refuted by `GenSig`). -/
+example (_ : GenSig S) :
+    LeLive S (.tapp (.adt "Prelude.List") (.arrow (.base .unit) .pure (.base .unit) Caps.none))
+      (.tapp (.adt "Prelude.List")
+        (.arrow (.base .unit) (.rt Row.none Row.none) (.base .unit) Caps.none)) := by
+  le_live
+
+/-- A tuple compares each of its two arguments. -/
+example (_ : GenSig S) :
+    LeLive S (.tapp (.tapp (.adt "Tuple") (.base .int))
+        (.arrow (.base .unit) .pure (.base .unit) Caps.none))
+      (.tapp (.tapp (.adt "Tuple") (.base .int))
+        (.arrow (.base .unit) (.rt Row.none Row.none) (.base .unit) Caps.none)) := by
   le_live
 
 /-- A fact whose capture row is empty at the instance (`outl` with `Caps.none`). -/
