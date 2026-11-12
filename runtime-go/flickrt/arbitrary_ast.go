@@ -268,7 +268,7 @@ func (b *arbASTs) build(s *Schema, wire bool) *arbAST {
 				if len(vs) == 0 {
 					return Nullary(tag)
 				}
-				return NewData(tag, vs...)
+				return Construct(tag, vs...)
 			})
 		}
 		return &arbAST{tag: astUnion, members: members}

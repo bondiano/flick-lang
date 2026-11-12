@@ -110,12 +110,23 @@ func NewData(tag string, fields ...Value) Value {
 }
 
 // IsTag tells whether `v` is a value of the constructor tagged `tag`.
+// It is for a type whose every value is a *Data; of any constructor value
+// the tag is `TagOf`.
 func IsTag(v Value, tag string) bool { return v.(*Data).Tag == tag }
 
-// TagOf is the tag of a variant value.
-func TagOf(v Value) Value { return v.(*Data).Tag }
+// IsData tells whether `v` is the *Data of the constructor tagged `tag`,
+// when `v` may be a value of another constructor of the type that has a Go
+// type of its own.
+func IsData(v Value, tag string) bool {
+	d, ok := v.(*Data)
+	return ok && d.Tag == tag
+}
 
-// Get is the field `i` of a variant value.
+// TagOf is the tag of a variant value.
+func TagOf(v Value) Value { return tagName(v) }
+
+// Get is the field `i` of a *Data: of any constructor value it is
+// `Fields()[i]`.
 func Get(v Value, i int) Value {
 	d := v.(*Data)
 	if d.more != nil {
@@ -179,7 +190,10 @@ func Bool(v Value) bool { return v.(bool) }
 // Not negates a Bool.
 func Not(v Value) bool { return !v.(bool) }
 
-// Field is the field `label` of a record, or the tag of a variant value.
+// Field is the field `label` of a record, or the tag of a *Data: compiled
+// code asks one for its tag where a type is equal by its constructor alone,
+// and every value of such a type is a *Data. Of any constructor value the
+// tag is `TagOf`.
 func Field(v Value, label string) Value {
 	if label == "_tag" {
 		if d, ok := v.(*Data); ok {

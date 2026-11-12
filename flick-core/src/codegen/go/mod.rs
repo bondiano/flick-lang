@@ -24,6 +24,7 @@ mod loops;
 mod main_file;
 mod names;
 mod once;
+mod own;
 mod pattern;
 mod runtime;
 mod shape;
@@ -192,6 +193,7 @@ fn compile<'a>(
     // the modules each module's initialization reads
     let mut deps: HashMap<String, BTreeSet<String>> = HashMap::new();
     let mut seen = HashSet::new();
+    let mut owned = own::Owned::new();
     for (m, module) in modules.iter().enumerate() {
         let items: Vec<usize> = (0..module.items.len())
             .filter(|&i| reached.contains(&(m, i)))
@@ -202,6 +204,7 @@ fn compile<'a>(
         let arena = DocumentArena::new();
         let mut g = Gen::new(&module.name, &shapes, program.package, &arena);
         g.settled = Some(&settled);
+        g.own = Some(program.own);
         g.item_initializers = item_initializers;
         if (program.own)(&module.name) {
             g.location = Some(program.location);
@@ -217,6 +220,7 @@ fn compile<'a>(
             }
         }));
         deps.insert(module.name.clone(), g.modules);
+        owned.extend(g.owned);
         sources.extend(g.sources);
         files.push((names::file(&module.name), code));
     }
@@ -227,16 +231,7 @@ fn compile<'a>(
             .map(|(m, i)| statement(a, docvec![a, names::item_init(&modules[m].name, i), "()"]))
             .collect()
     } else {
-        let mut order = Vec::new();
-        let mut visited = HashSet::new();
-        for root in roots {
-            init_order(root, &deps, &mut visited, &mut order);
-        }
-        order
-            .iter()
-            .filter(|m| deps.contains_key(*m))
-            .map(|m| statement(a, docvec![a, names::init(m), "()"]))
-            .collect()
+        module_inits(a, roots, &deps)
     };
     let run = block(a, inits.into_iter().chain([statement(a, start)]));
     let run = call(
@@ -251,6 +246,9 @@ fn compile<'a>(
         main_file::main_go(a, run, &packages, zones),
     ));
     files.extend(sources);
+    if !owned.is_empty() {
+        files.push(("own_types.go".to_owned(), own::file(&owned)));
+    }
     dedup(&mut diagnostics);
     Output {
         files,
@@ -310,6 +308,25 @@ fn initialization_order(
 
 /// The modules in an order where each one's initialization runs after
 /// that of the modules it reads.
+/// The calls initializing the modules `roots` read, each after those it
+/// reads.
+fn module_inits<'a>(
+    a: &'a DocumentArena<'a>,
+    roots: &[String],
+    deps: &HashMap<String, BTreeSet<String>>,
+) -> Vec<Document<'a>> {
+    let mut order = Vec::new();
+    let mut visited = HashSet::new();
+    for root in roots {
+        init_order(root, deps, &mut visited, &mut order);
+    }
+    order
+        .iter()
+        .filter(|m| deps.contains_key(*m))
+        .map(|m| statement(a, docvec![a, names::init(m), "()"]))
+        .collect()
+}
+
 fn init_order(
     module: &str,
     deps: &HashMap<String, BTreeSet<String>>,
@@ -415,6 +432,11 @@ struct Gen<'a> {
     settled: Option<&'a HashSet<Key>>,
     /// The Go type the function being emitted returns, when not a value.
     returns: Option<arith::Native>,
+    /// Whether a module is the program's own: its constructors with fields
+    /// have Go types of their own (`own.rs`).
+    own: Option<&'a dyn Fn(&str) -> bool>,
+    /// The Go types of constructors the module's code names.
+    owned: own::Owned,
 }
 
 impl<'a> Gen<'a> {
@@ -450,6 +472,8 @@ impl<'a> Gen<'a> {
             once: Vec::new(),
             settled: None,
             returns: None,
+            own: None,
+            owned: own::Owned::new(),
         }
     }
 
@@ -538,6 +562,8 @@ impl<'a> Gen<'a> {
 
 #[cfg(test)]
 mod compose_tests;
+#[cfg(test)]
+mod own_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

@@ -27,8 +27,8 @@ func notANumber(_ *flickrt.Fiber) flickrt.Value { return math.NaN() }
 // constructor's fields under `_0`, `_1`, … after its `_tag`.
 func plain(v flickrt.Value) flickrt.Value {
 	switch x := v.(type) {
-	case *flickrt.Data:
-		fields := []flickrt.Value{"_tag", x.Tag}
+	case flickrt.Constructed:
+		fields := []flickrt.Value{"_tag", x.TagName()}
 		for i, f := range x.Fields() {
 			fields = append(fields, "_"+strconv.Itoa(i), plain(f))
 		}

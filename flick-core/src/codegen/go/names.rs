@@ -45,6 +45,11 @@ pub fn instance(module: &str, name: &str) -> String {
     top("I", module, name)
 }
 
+/// The Go type of the values of a constructor that has one of its own.
+pub fn own_type(module: &str, constructor: &str) -> String {
+    top("T", module, constructor)
+}
+
 /// The package variable of a value a module makes once.
 pub fn once(module: &str, index: usize) -> String {
     top("K", module, &index.to_string())

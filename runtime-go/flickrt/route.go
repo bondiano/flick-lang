@@ -56,7 +56,7 @@ func RouteNested(url func() Value) Value { return &routeNested{url} }
 // route's path.
 func routeSegmentTexts(segment, field Value) []string {
 	if n, ok := segment.(*routeNested); ok {
-		parts, _ := routeParts(n.url().(*urlCodec), field.(*Data))
+		parts, _ := routeParts(n.url().(*urlCodec), field.(Constructed))
 		return parts
 	}
 	w, ok := segment.(*routeWords)
@@ -64,7 +64,7 @@ func routeSegmentTexts(segment, field Value) []string {
 		return []string{jsString(field)}
 	}
 	for i, tag := range w.tags {
-		if tag == field.(*Data).Tag {
+		if tag == field.(Constructed).TagName() {
 			return []string{w.words[i]}
 		}
 	}
@@ -117,7 +117,7 @@ func coerce(fb *Fiber, schema Value, text string) (Value, bool) {
 // RoutePrint is `Route.print url value`: the path and query of `value`. A
 // lone surrogate, which has no UTF-8 form, prints as U+FFFD.
 func RoutePrint(codec, value Value) Value {
-	d := value.(*Data)
+	d := value.(Constructed)
 	parts, route := routeParts(codec.(*urlCodec), d)
 	var b strings.Builder
 	for _, part := range parts {
@@ -150,10 +150,10 @@ func RoutePrint(codec, value Value) Value {
 }
 
 // routeParts is the path's segments of `d`, unencoded, and its route.
-func routeParts(c *urlCodec, d *Data) ([]string, *Route) {
+func routeParts(c *urlCodec, d Constructed) ([]string, *Route) {
 	var route *Route
 	for i := range c.routes {
-		if c.routes[i].Tag == d.Tag {
+		if c.routes[i].Tag == d.TagName() {
 			route = &c.routes[i]
 		}
 	}
@@ -317,5 +317,5 @@ func (route *Route) withQuery(fb *Fiber, fields []Value, param func(string) (str
 		}
 		fields = append(fields, Rec(record...))
 	}
-	return NewData(route.Tag, fields...), true
+	return Construct(route.Tag, fields...), true
 }
