@@ -1,4 +1,4 @@
-# Data structures: Chunk, Trie, ByteSize, Crypto, checks.
+# Data structures: Chunk, Crypto, checks.
 
 [flick:Crypto]
 flickRandomBytes CryptoRandomBytes
@@ -17,49 +17,6 @@ flickUtf8Encode CryptoUtf8Encode
 flickUtf8Decode CryptoUtf8Decode
 flickBase64UrlEncode CryptoBase64UrlEncode
 flickBase64UrlDecode CryptoBase64UrlDecode
-
-# the rest of ByteSize; `zero`, `flickBytes`, `flickFormat` and the codecs
-# are in effect.txt
-[flick:ByteSize]
-flickKilobytes ByteSizeKilobytes
-flickMegabytes ByteSizeMegabytes
-flickGigabytes ByteSizeGigabytes
-flickTerabytes ByteSizeTerabytes
-flickPetabytes ByteSizePetabytes
-flickExabytes ByteSizeExabytes
-flickZettabytes ByteSizeZettabytes
-flickYottabytes ByteSizeYottabytes
-flickRonnabytes ByteSizeRonnabytes
-flickQuettabytes ByteSizeQuettabytes
-flickKibibytes ByteSizeKibibytes
-flickMebibytes ByteSizeMebibytes
-flickGibibytes ByteSizeGibibytes
-flickTebibytes ByteSizeTebibytes
-flickPebibytes ByteSizePebibytes
-flickExbibytes ByteSizeExbibytes
-flickZebibytes ByteSizeZebibytes
-flickYobibytes ByteSizeYobibytes
-fromString ByteSizeFromString
-isZero ByteSizeIsZero
-toBigInt ByteSizeToBigInt
-toNumber ByteSizeToNumber
-flickToUnit ByteSizeToUnit
-equals ByteSizeEquals
-between ByteSizeBetween
-clamp ByteSizeClamp
-min ByteSizeMin
-max ByteSizeMax
-isLessThan ByteSizeIsLessThan
-isLessThanOrEqualTo ByteSizeIsLessThanOrEqualTo
-isGreaterThan ByteSizeIsGreaterThan
-isGreaterThanOrEqualTo ByteSizeIsGreaterThanOrEqualTo
-sum ByteSizeSum
-subtract ByteSizeSubtract
-times ByteSizeTimes
-divide ByteSizeDivide
-ReducerSum BigIntReducerSum
-CombinerMax BigIntCombinerMax
-CombinerMin BigIntCombinerMin
 
 [flick:rt]
 chunkAppend ChunkAppend
