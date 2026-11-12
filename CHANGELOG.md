@@ -90,6 +90,10 @@ break programs.
   line or brackets is one error after the `FLICK-S007`; a longer `<|` chain
   no longer wraps each operator around the one before it, which made a tree
   as deep as the chain and overflowed the checker.
+- **Operator chains:** the checker goes down a chain of binary operators
+  (`a + b + …`, `x |> f |> …`, `f >> g >> …`) in a loop, not a call per
+  operator, so a chain of 5000 checks on a thread's 2 MiB stack, where some
+  700 overflowed it.
 - **Refined types:** `refined type` is a declaration of the plugin of `std`,
   which writes the type and its `parse`, `value` and check as code of the
   language; `refined` is no reserved word. The check is a companion too,

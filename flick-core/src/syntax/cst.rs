@@ -139,6 +139,20 @@ impl Node {
         Nodes(self.children.iter())
     }
 
+    /// The binary operators down the left of `self`, `self` first, and the
+    /// operand below them: `a + b + c` gives `[a + b + c, a + b]` and `a`.
+    /// A walker goes down a long chain with it in a loop, not a call each.
+    pub fn left_spine(&self) -> (Vec<&Node>, &Node) {
+        let (mut spine, mut node) = (Vec::new(), self);
+        while node.kind == SyntaxKind::BinExpr
+            && let Some(left) = node.nodes().next()
+        {
+            spine.push(node);
+            node = left;
+        }
+        (spine, node)
+    }
+
     /// Indented S-expression dump without trivia, for tests and debugging.
     pub fn debug_dump(&self, src: &str) -> String {
         fn walk(node: &Node, src: &str, depth: usize, out: &mut String) {

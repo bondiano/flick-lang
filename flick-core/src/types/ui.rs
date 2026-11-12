@@ -184,7 +184,43 @@ impl Keyed {
         names: &HashMap<Range, Ref>,
         watched: &Watched,
     ) {
+        if node.kind == K::BinExpr {
+            // a chain of operators: its nodes, then its operands, in a loop
+            let (spine, left) = node.left_spine();
+            for n in &spine {
+                self.visit(
+                    n,
+                    &n.nodes().collect::<Vec<_>>(),
+                    in_function,
+                    names,
+                    watched,
+                );
+            }
+            self.walk(left, in_function, names, watched);
+            for child in spine.iter().rev().flat_map(|n| n.nodes().skip(1)) {
+                self.walk(child, in_function, names, watched);
+            }
+            return;
+        }
         let parts: Vec<&Node> = node.nodes().collect();
+        self.visit(node, &parts, in_function, names, watched);
+        let inner = in_function
+            || node.kind == K::FunExpr
+            || (node.kind == K::LetDecl && parts.iter().any(|n| n.kind == K::Params));
+        for child in parts {
+            self.walk(child, inner, names, watched);
+        }
+    }
+
+    /// What `node` itself applies and names, its children `parts`.
+    fn visit(
+        &mut self,
+        node: &Node,
+        parts: &[&Node],
+        in_function: bool,
+        names: &HashMap<Range, Ref>,
+        watched: &Watched,
+    ) {
         match node.kind {
             // a piped application already counted its piped argument
             K::AppExpr => {
@@ -219,12 +255,6 @@ impl Keyed {
             && self.found.last().is_none_or(|(r, ..)| *r != node.range())
         {
             self.found.push((node.range(), name.clone(), in_function));
-        }
-        let inner = in_function
-            || node.kind == K::FunExpr
-            || (node.kind == K::LetDecl && parts.iter().any(|n| n.kind == K::Params));
-        for child in parts {
-            self.walk(child, inner, names, watched);
         }
     }
 }

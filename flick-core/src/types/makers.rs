@@ -166,6 +166,18 @@ impl Checker<'_> {
             let fresh = &mut Vec::new();
             return (node.nodes()).for_each(|child| self.tagged_under(child, heads, fresh, out));
         }
+        if node.kind == K::BinExpr {
+            // a chain of operators enters no function: its nodes, then its operands
+            let (spine, left) = node.left_spine();
+            for n in &spine {
+                self.tagged_at(n, around, out);
+            }
+            self.tagged_under(left, heads, around, out);
+            for child in spine.iter().rev().flat_map(|n| n.nodes().skip(1)) {
+                self.tagged_under(child, heads, around, out);
+            }
+            return;
+        }
         let entered = (node.kind == K::FunExpr)
             .then(|| node.child_tokens().find(|t| t.kind == K::FunKw))
             .flatten()
@@ -173,6 +185,15 @@ impl Checker<'_> {
             .and_then(|ty| self.enclosing(ty));
         let depth = around.len();
         around.extend(entered);
+        self.tagged_at(node, around, out);
+        for child in node.nodes() {
+            self.tagged_under(child, heads, around, out);
+        }
+        around.truncate(depth);
+    }
+
+    /// The call site of a maker `node` names, inside the functions `around`.
+    fn tagged_at(&self, node: &Node, around: &[Enclosing], out: &mut Vec<CallSite>) {
         if let Some(Ref::Value { module, name }) = self.typing.names.get(&node.range())
             && let Some(reaches) = self.maker(module, name)
             && !around.is_empty()
@@ -200,10 +221,6 @@ impl Checker<'_> {
                 lacking: None,
             });
         }
-        for child in node.nodes() {
-            self.tagged_under(child, heads, around, out);
-        }
-        around.truncate(depth);
     }
 
     /// Tells the plugins that watch a service of the row of `bound`, the

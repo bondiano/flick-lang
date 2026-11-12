@@ -64,27 +64,52 @@ impl Validator<'_> {
                     self.group(&[pattern]);
                 }
             }
-            K::BinExpr => self.unmixed(node),
+            K::BinExpr => {
+                // down a chain of operators in a loop: its nodes, then its operands
+                let (spine, left) = node.left_spine();
+                for (depth, n) in spine.iter().enumerate() {
+                    self.unmixed(n);
+                    let place = if depth == 0 { place } else { Place::Plain };
+                    if let Some(first) = n.nodes().next() {
+                        self.child(n, 0, first, place);
+                    }
+                }
+                self.walk(left, Place::Plain);
+                for (depth, n) in spine.iter().enumerate().rev() {
+                    let place = if depth == 0 { place } else { Place::Plain };
+                    for (index, child) in n.nodes().enumerate().skip(1) {
+                        self.child(n, index, child, place);
+                        self.walk(child, Place::Plain);
+                    }
+                }
+                return;
+            }
             _ => {}
         }
         for (index, child) in node.nodes().enumerate() {
-            if child.kind == K::Attribute {
-                let next = node
-                    .nodes()
-                    .skip(index + 1)
-                    .find(|n| n.kind != K::Attribute)
-                    .map(|n| n.kind);
-                self.attribute(child, next);
-            }
-            if child.kind == K::LetDecl {
-                self.mutable(child, node.kind == K::Block, place);
-            }
+            self.child(node, index, child, place);
             let inner = match (node.kind, child.kind) {
                 (K::DoExpr, K::Block) => Place::Do,
                 (K::ForExpr, K::Block) if index == 0 => Place::For,
                 _ => Place::Plain,
             };
             self.walk(child, inner);
+        }
+    }
+
+    /// What `child`, at `index` among the children of `node`, is checked for
+    /// before the walk goes into it.
+    fn child(&mut self, node: &Node, index: usize, child: &Node, place: Place) {
+        if child.kind == K::Attribute {
+            let next = node
+                .nodes()
+                .skip(index + 1)
+                .find(|n| n.kind != K::Attribute)
+                .map(|n| n.kind);
+            self.attribute(child, next);
+        }
+        if child.kind == K::LetDecl {
+            self.mutable(child, node.kind == K::Block, place);
         }
     }
 
