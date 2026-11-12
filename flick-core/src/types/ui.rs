@@ -5,44 +5,79 @@ use std::collections::HashMap;
 use super::ty::Type;
 use super::typing::Ref;
 use super::{Checker, Range, Watched, let_parts};
-use crate::iface::Namespace;
+use crate::iface::{Entity, Namespace};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::lang::{self, Lang};
 
 impl Checker<'_> {
     /// The innermost module a block around the expression opens that exports
     /// `name`, as the file names the module.
     pub(super) fn opened_with(&self, namespace: Namespace, name: &str) -> Option<String> {
         let exports = |module: &&String| matches!(self.env.qualified_module(module), Some((_, Some(i))) if i.find(namespace, name).is_some());
-        let modules = self.opened.iter().rev().map(|(module, _)| module);
+        let modules = self.opened.iter().rev().map(|o| &o.module);
         modules.into_iter().find(exports).cloned()
     }
 
-    /// A foreign component takes props only inside `ui`, through `Ui.component`.
+    /// The function a block applies values through, as `written` names it,
+    /// and its type.
+    pub(super) fn through(&mut self, written: &Node) -> Option<(Ref, Type)> {
+        self.infer(written);
+        let function = self.typing.names.get(&written.range())?.clone();
+        let Ref::Value { module, name } = &function else {
+            return None;
+        };
+        let entity = Entity {
+            namespace: Namespace::Value,
+            module: module.clone(),
+            name: name.clone(),
+        };
+        let scheme = self.env.value(&entity)?.clone();
+        Some((function, scheme))
+    }
+
+    /// The type a callee of the type `ty` is applied at. Inside a block that
+    /// applies values through a function, a value of the type the function
+    /// takes first is applied through it: a foreign component takes its
+    /// props inside `ui` through `Ui.component`.
     pub fn ui_callable(&mut self, ty: &Type, call: Range, span: Span) -> Type {
         let target = self.whnf(ty);
-        if self.opened.iter().any(|(module, _)| module == "Ui")
-            && matches!(
-                &target,
-                Type::App { head, .. }
-                    if matches!(head.as_ref(), Type::Con { module, name }
-                        if lang::is(Lang::UiComponent, module, name))
-            )
+        if matches!(target, Type::Fun { .. }) {
+            return target;
+        }
+        let head = |t: &Type| match t.spine().0 {
+            Type::Con { module, name } => Some((module.clone(), name.clone())),
+            _ => None,
+        };
+        let Some(of) = head(&target) else {
+            return target;
+        };
+        // the innermost block that names one
+        let through = self.opened.iter().rev().find_map(|o| o.through.clone());
+        if let Some((function, scheme)) = through
+            && let Type::Fun {
+                param,
+                effects: None,
+                result,
+            } = self.instantiate(&scheme, span)
+            && head(&self.whnf(&param)) == Some(of)
         {
-            self.expect(ty, &target, span);
-            self.typing.ui_components.insert(call);
-            if let Type::App { arg, .. } = target {
-                return Type::Fun {
-                    param: arg,
-                    effects: None,
-                    result: Box::new(Type::lang(Lang::Ui)),
-                };
-            }
+            self.expect(ty, &param, span);
+            self.typing.through.insert(call, function);
+            return self.whnf(&result);
         }
         target
     }
+}
+
+/// A module a block opens around the expression being checked.
+pub(super) struct Opened {
+    pub module: String,
+    /// The type of a child, when calls give their last list element by
+    /// element.
+    pub child: Option<Type>,
+    /// The function values are applied through, and its type.
+    pub through: Option<(Ref, Type)>,
 }
 
 impl Checker<'_> {

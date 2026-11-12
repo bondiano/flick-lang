@@ -13,6 +13,7 @@ use super::lang::Lang;
 use super::ranges::range_list;
 use super::sugar_lints::unparen;
 use super::ty::{Norm, Type};
+use super::ui::Opened;
 use crate::diagnostics::{Diagnostic, Edit, codes};
 use crate::source::Span;
 use crate::syntax::cst::Node;
@@ -67,8 +68,20 @@ impl Checker<'_> {
         let module: Vec<&str> = path.map(|t| t.text(self.text)).collect();
         let child = node.nodes().find(|n| n.kind == K::NameType);
         let child = child.map(|written| self.annotation(written));
-        let body = node.nodes().find(|n| n.kind != K::NameType);
-        self.opened.push((module.join("."), child));
+        // the body is the last node; a name before it is the function
+        // values are applied through
+        let mut parts = node.nodes().filter(|n| n.kind != K::NameType);
+        let (first, second) = (parts.next(), parts.next());
+        let (function, body) = match second {
+            Some(body) => (first, Some(body)),
+            None => (None, first),
+        };
+        let through = function.and_then(|written| self.through(written));
+        self.opened.push(Opened {
+            module: module.join("."),
+            child,
+            through,
+        });
         let ty = body.map_or(Type::Error, |body| self.infer(body));
         self.opened.pop();
         ty
@@ -198,7 +211,7 @@ impl Checker<'_> {
         children: &[&Node],
         (at, end): (usize, u32),
     ) -> Option<Type> {
-        let child = (self.opened.iter().rev()).find_map(|(_, child)| child.clone())?;
+        let child = (self.opened.iter().rev()).find_map(|o| o.child.clone())?;
         let Type::Fun {
             param,
             effects,

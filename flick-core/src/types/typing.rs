@@ -59,8 +59,9 @@ pub struct Typing {
     /// elements of the list their function takes last, by the range of the
     /// application.
     pub gathered: HashMap<Range, usize>,
-    /// Applications inside `ui` whose function is an opaque `Ui.Component`.
-    pub ui_components: HashSet<Range>,
+    /// The applications of a value a block applies through a function, as a
+    /// foreign component inside `ui`: the function, by its module and name.
+    pub through: HashMap<Range, Ref>,
     /// The `and` groups of `do` followed only by `pure e`, whose last
     /// `map2` computes `e`.
     pub applicative: HashSet<Range>,

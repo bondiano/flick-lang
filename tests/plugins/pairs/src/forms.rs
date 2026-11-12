@@ -36,7 +36,15 @@ pub fn expand(
 ) -> Option<Result<Arena, Vec<Diagnostic>>> {
     let expression = matches!(
         block.head.as_str(),
-        "named" | "text_of" | "capture" | "typed" | "linted" | "twice" | "opens" | "forged"
+        "named"
+            | "text_of"
+            | "capture"
+            | "typed"
+            | "linted"
+            | "twice"
+            | "opens"
+            | "forged"
+            | "runs"
     );
     let declaration = matches!(
         block.head.as_str(),
@@ -64,7 +72,7 @@ pub fn expand(
         "capture" => capture(block, compiler, &mut b),
         "twice" => twice(block, compiler, &mut b),
         "typed" | "linted" => typed(block, compiler, &mut b),
-        "opens" => opens(block, compiler, &mut b),
+        "opens" | "runs" => opens(block, compiler, &mut b),
         "forged" => {
             let make = format!("{}$Make", block.text.trim());
             Ok(flick!(b, #(Name(&make)) 1.0))
@@ -352,9 +360,12 @@ fn opens(
 ) -> Result<u32, Vec<Diagnostic>> {
     let e = block.body().expr(compiler).map_err(|d| vec![d])?;
     let body = b.at(e).expr(Expr::Hole(e));
+    // `runs { e }` applies a value of the type `Pairs.run` takes through it
+    let through = (block.head == "runs").then(|| "Pairs.run".to_owned());
     Ok(b.at(block.whole()).expr(Expr::Open {
         module: "Pairs".into(),
         child: None,
+        through,
         body,
     }))
 }

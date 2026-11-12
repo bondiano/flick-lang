@@ -16,6 +16,8 @@ pub fn expand(block: &Block, compiler: &mut dyn Compiler) -> Result<Arena, Vec<D
     let root = b.at(block.whole()).expr(Expr::Open {
         module: "Ui".into(),
         child: Some("Ui".into()),
+        // a foreign component takes its props through `Ui.component`
+        through: Some("Ui.component".into()),
         body: user,
     });
     Ok(b.finish(root))
