@@ -6,6 +6,10 @@ break programs.
 
 ## Unreleased
 
+- **No build without a runtime:** `[build] effect = "none"` is gone
+  (`FLICK-P005` in `flick.toml`); such a program builds on Flick's own
+  runtime. A library no longer writes `_core/`, `.iface` loses `abi.core`
+  (version 22), and `FLICK-E008` is no longer reported.
 - **Braces after `then` and `else`:** they hold statements, as after `do` and
   `loop`, so `if a > b then { low = b; high = a }` assigns both variables. A
   record right after `then` or `else` goes in parentheses; written the old way

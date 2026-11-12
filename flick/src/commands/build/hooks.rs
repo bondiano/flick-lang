@@ -6,7 +6,7 @@
 use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 
-use flick_core::build::{Artifact, effects};
+use flick_core::build::Artifact;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::plugin::Failure;
 use flick_core::project::{self, Compilation, Project};
@@ -31,14 +31,6 @@ pub(crate) fn ir(
     };
     let hooked = project::hooked_plugins(&FsHost::new(), &mut SourceMap::default(), project, "ir");
     if hooked.is_empty() || diagnostics.iter().any(|d| d.severity == Severity::Error) {
-        return;
-    }
-    // a plugin gets only code the checks of effects pass, which then report it
-    let mut found = Vec::new();
-    for m in &compilation.modules {
-        effects::check(&m.ir, &mut found);
-    }
-    if found.iter().any(|d| d.severity == Severity::Error) {
         return;
     }
     let mut files = BTreeSet::new();

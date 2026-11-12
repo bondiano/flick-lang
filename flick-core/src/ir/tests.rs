@@ -55,7 +55,6 @@ pub(crate) fn check_text_with(
         limits: types::Limits::default(),
         no_let_assert: false,
         thresholds: types::Thresholds::default(),
-        effects: true,
         watched: Watched::none(),
         stages_by_class: false,
     };

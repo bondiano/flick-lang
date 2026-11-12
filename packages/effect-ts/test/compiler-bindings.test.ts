@@ -7,15 +7,12 @@ const read = (path: string) => readFileSync(new URL(path, root), "utf8");
 import policy from "../compiler-bindings.json" with { type: "json" };
 import familyPolicy from "../compiler-families.json" with { type: "json" };
 
-test("binding routes are unique and preserve native and pure boundaries", () => {
-  const routes = new Map(policy.routes.map(([from, core, native]) => [from, { core, native }]));
+test("binding routes are unique and name the native module of a key", () => {
+  const routes = new Map(policy.routes.map(([from, native]) => [from, native]));
   assert.equal(routes.size, policy.routes.length);
-  assert.deepEqual(routes.get("flick:Option"), {
-    core: "@flick-lang/runtime/core/Option", native: "@flick-lang/runtime/rt/effect/Option",
-  });
+  assert.equal(routes.get("flick:Option"), "@flick-lang/runtime/rt/effect/Option");
   assert.equal(routes.has("flick:Stream"), false);
-  assert.equal(routes.get("flick:ui/react")?.core, null);
-  assert.equal(routes.get("flick:ui/react")?.native, "@flick-lang/runtime/rt/ui/react");
+  assert.equal(routes.get("flick:ui/react"), "@flick-lang/runtime/rt/ui/react");
   assert.ok(familyPolicy.families.includes("@flick-lang/runtime/rt/ui uiView"));
   assert.ok(familyPolicy.families.includes("@flick-lang/runtime/rt/effect/reactivity/Atom flickRead"));
   assert.ok(!familyPolicy.families.includes("@flick-lang/runtime/rt/ui uiText"));

@@ -104,12 +104,6 @@ pub struct Settings<'a> {
     /// The module whose `run` starts an entry, by the entry's name; an entry
     /// without one starts the default way.
     pub runners: &'a [(String, String)],
-    /// The modules of a library on Effect that it also built without Effect,
-    /// under [`effects::CORE_DIR`].
-    pub core_modules: &'a [String],
-    /// Build, without Effect, only the modules that need no Effect, and no
-    /// interfaces: the part of a library under [`effects::CORE_DIR`].
-    pub core_only: bool,
 }
 
 /// The opt-in outputs of a build.
@@ -199,9 +193,7 @@ pub fn emit(
     };
     let mut out = Vec::new();
     #[cfg(feature = "native-project")]
-    if !settings.core_only {
-        out.push(package_json(settings));
-    }
+    out.push(package_json(settings));
     let layout = codegen::RuntimeLayout::new(compilation.modules.iter().map(|m| &m.ir));
     let ctx = Context {
         layout: &layout,
@@ -218,7 +210,7 @@ pub fn emit(
     // a built-in runner is written like any module the program imports
     let mut imports: Vec<String> = settings.runners.iter().map(|(_, r)| r.clone()).collect();
     imports.extend(own_modules(&ctx, compilation, &mut out, &mut diagnostics));
-    builtins(&ctx, imports, &mut out, &mut diagnostics);
+    builtins(&ctx, imports, &mut out);
     entry_runners(settings, modules, &path, &mut out, &mut diagnostics);
     (out, diagnostics)
 }
@@ -254,9 +246,6 @@ fn foreign_specifier(
         .filter(|_| settings.backend == Backend::Rt && relative)
         .filter(|rt| dir.as_ref().is_some_and(|d| d.join(rt).is_file()));
     let spec = beside.as_deref().unwrap_or(spec);
-    if settings.backend == Backend::None && !relative {
-        return effects::specifier(spec).unwrap_or_else(|| effects::effect_specifier(spec));
-    }
     if settings.backend == Backend::Rt && !relative {
         // a module neither target has is the adapter's
         return effects::rt_specifier(spec).unwrap_or_else(|| effects::effect_specifier(spec));
@@ -299,16 +288,6 @@ fn published_interfaces<'a>(
                 .root
                 .and_then(|root| module.path.strip_prefix(root).ok())
                 .map(|p| p.to_string_lossy().replace('\\', "/"));
-            if let Some(abi) = &mut published.abi {
-                abi.core = if settings.backend == Backend::None {
-                    Some(String::new())
-                } else {
-                    settings
-                        .core_modules
-                        .contains(&module.name)
-                        .then(|| effects::CORE_DIR.to_owned())
-                };
-            }
             (module.name.as_str(), published)
         })
         .collect();
@@ -397,77 +376,9 @@ fn own_modules(
     out: &mut Vec<Artifact>,
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Vec<String> {
-    if ctx.settings.core_only {
-        return core_modules(ctx, compilation, out);
-    }
     let modules = compilation.modules.iter();
     modules
         .flat_map(|module| compiled_module(ctx, module, out, diagnostics))
-        .collect()
-}
-
-/// The build without Effect of a library's modules that need no Effect, nor
-/// any module that needs it; what they import.
-fn core_modules(ctx: &Context, compilation: &Compilation, out: &mut Vec<Artifact>) -> Vec<String> {
-    let compiled: Vec<(&str, Vec<Artifact>, Vec<String>, bool)> = compilation
-        .modules
-        .iter()
-        .map(|module| {
-            let (mut artifacts, mut needs) = (Vec::new(), Vec::new());
-            let imports = compiled_module(ctx, module, &mut artifacts, &mut needs);
-            (module.name.as_str(), artifacts, imports, needs.is_empty())
-        })
-        .collect();
-    let mut core: HashSet<&str> = compiled.iter().filter(|c| c.3).map(|c| c.0).collect();
-    // a module is out with what it imports
-    loop {
-        let out_now: Vec<&str> = compiled
-            .iter()
-            .filter(|(name, _, imports, _)| {
-                core.contains(name)
-                    && !imports.iter().all(|i| {
-                        let owner = ctx.layout.owner(i);
-                        if compilation.modules.iter().any(|m| m.name == owner) {
-                            core.contains(owner)
-                        } else {
-                            effects::in_core(owner)
-                        }
-                    })
-            })
-            .map(|c| c.0)
-            .collect();
-        if out_now.is_empty() {
-            break;
-        }
-        for name in out_now {
-            core.remove(name);
-        }
-    }
-    compiled
-        .into_iter()
-        .filter(|c| core.contains(c.0))
-        .flat_map(|(_, artifacts, imports, _)| {
-            out.extend(artifacts);
-            imports
-        })
-        .collect()
-}
-
-/// The modules of a library a build with `core_only` wrote.
-pub fn core_built(
-    artifacts: &[Artifact],
-    compilation: &Compilation,
-    typescript: bool,
-) -> Vec<String> {
-    let ext = if typescript { "ts" } else { "js" };
-    compilation
-        .modules
-        .iter()
-        .filter(|m| {
-            let file = format!("{}.{ext}", m.name.replace('.', "/"));
-            artifacts.iter().any(|a| a.path == file)
-        })
-        .map(|m| m.name.clone())
         .collect()
 }
 
@@ -536,12 +447,7 @@ fn exports(
 /// The built-in modules the build's modules import, directly or through
 /// one another. `.d.ts` files of other modules may name the types of any
 /// built-in module, so with them every built-in module is written.
-fn builtins(
-    ctx: &Context,
-    imports: Vec<String>,
-    out: &mut Vec<Artifact>,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+fn builtins(ctx: &Context, imports: Vec<String>, out: &mut Vec<Artifact>) {
     let dts = ctx.settings.extras.dts;
     let mut pending = imports;
     let lowered = builtin_modules_of(ctx.settings.backend == Backend::Rt);
@@ -555,9 +461,6 @@ fn builtins(
         };
         if !written.insert(name) {
             continue;
-        }
-        if ctx.settings.backend == Backend::None {
-            effects::check_builtin(&module.name, diagnostics);
         }
         let output = codegen::js(module, ctx.options);
         pending.extend(output.imports);
@@ -630,9 +533,6 @@ fn compiled_module(
         .settings
         .release
         .then(|| optimized(ctx.modules, module, by_class));
-    if ctx.settings.backend == Backend::None {
-        effects::check(&module.ir, diagnostics);
-    }
     // Flick's own runtime has `control` arms, and takes what it lacks when it is
     // called: a module binds more than a program uses
     if ctx.settings.backend != Backend::Rt {
@@ -647,9 +547,6 @@ fn compiled_module(
         imports.extend(write_js_output(ctx, &(ctx.path)(&physical), output, out));
     }
     let file = (ctx.path)(&module.name);
-    if ctx.settings.core_only {
-        return imports;
-    }
     let built = ctx
         .published_interfaces
         .get(module.name.as_str())

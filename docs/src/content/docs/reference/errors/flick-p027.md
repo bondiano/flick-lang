@@ -3,17 +3,6 @@ title: "FLICK-P027"
 ---
 
 No longer reported: a project compiles the Flick libraries it depends on
-from their sources, and reads no other package's compiled modules. The
+from their sources, and reads no other package's compiled modules; nor is
+there a build without a runtime, `[build] effect = "none"`, any more. The
 code stays reserved.
-
-A library built with `[build] effect = "none"` has Option and Result as
-plain data, which `==` on Effect does not compare with Effect's own: an
-application on Effect cannot import it. Build the library on Effect: it then
-also writes, under `_core/`, the modules that need no Effect, which an
-application with `effect = "none"` imports.
-
-```toml
-# flick.toml of the library
-[build]
-effect = "effect"
-```

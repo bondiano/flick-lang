@@ -26,7 +26,6 @@ fn interface(text: &str) -> Interface {
         limits: types::Limits::default(),
         no_let_assert: false,
         thresholds: types::Thresholds::default(),
-        effects: true,
         watched: types::Watched::none(),
         stages_by_class: false,
     };

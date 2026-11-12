@@ -211,10 +211,9 @@ fn a_changed_interface_rechecks_its_importers() {
 #[test]
 fn changing_programmatic_config_invalidates_cached_checking() {
     use crate::diagnostics::{Severity, codes};
-    use crate::project::config::Backend;
 
     let host = host(
-        "module A.Base exposing (x)\nx : Unit -> Unit\nlet x () =\n  let _ = task { 1 }\n  ()\n",
+        "module A.Base exposing (x)\nx : List Int -> Int\nlet x items =\n  let assert [first, ..._] = items as \"no items\"\n  first\n",
     );
     let roots = [PathBuf::from("/p/src/A/Base.fl")];
     let mut cache = ModuleCache::default();
@@ -232,10 +231,10 @@ fn changing_programmatic_config_invalidates_cached_checking() {
 
     let mut sources = SourceMap::default();
     assert_eq!(sources.add("flick.toml", ""), project.config_file);
-    project.config.build.effect = Backend::None;
+    project.config.no_let_assert = true;
     let changed = analyze_with(&host, &mut sources, Some(&project), &roots, &mut cache);
     assert!(
-        changed.diagnostics.iter().any(|d| d.code == codes::E008),
+        changed.diagnostics.iter().any(|d| d.code == codes::T027),
         "{:?}",
         changed.diagnostics
     );

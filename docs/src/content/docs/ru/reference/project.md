@@ -1,6 +1,6 @@
 ---
 title: "Проект"
-source_hash: 0d0d01e4f6204813
+source_hash: c38211e51d738f25
 ---
 
 Проект — каталог с `flick.toml` (см. [CLI компилятора](../cli/)).
@@ -58,7 +58,7 @@ max-params = 5
 | `build.solver-steps` | число шагов разрешения экземпляров классов для одного определения | `100000` |
 | `build.solver-depth` | глубина вложенности ограничений классов | `256` |
 | `build.labels` | что release-сборка помечает `Module.name` для инструментов отладки: `"all"` (значения всех типов с `@label`: атомы, представления, actions), `"components"` (значения вида `component`: представления и actions) или `"none"`; debug помечает всё; `flick build --labels` переопределяет | `"all"` |
-| `build.effect` | на чём выполняются эффекты: `"rt"` на собственной среде Flick, `"effect"` через адаптер Effect или `"none"` для простого JavaScript, который импортирует только `@flick-lang/runtime/core`: тогда `main` — `Unit -> Unit`, вызов времени выполнения — `FLICK-E001`, а `task`, схема или встроенный модуль вне `Prelude`, `List`, `Option`, `Result`, `String`, `Float` и `Bool` — `FLICK-E008`. Библиотека на Effect дополнительно пишет в `_core/` своего вывода модули, которым Effect не нужен; библиотека, от которой зависит проект, компилируется с `effect` проекта | `"rt"` |
+| `build.effect` | на чём выполняются эффекты: `"rt"` на собственной среде Flick или `"effect"` через адаптер Effect; библиотека, от которой зависит проект, компилируется с `effect` проекта | `"rt"` |
 | `build.ui` | модуль, который рисует и монтирует представления вместо React: экспортирует все имена, которые `Ui` и `Action` берут из `@flick-lang/effect-ts/ui` и `@flick-lang/effect-ts/ui/react`; относительный путь — от корня проекта | React |
 | `sql.dialect` | диалект SQL для `sql table` и `sql { … }` (см. [запросы SQL](../sql/)): `"postgresql"`; `"mysql"`, `"sqlite"`, `"clickhouse"` и `"oracle"` распознаются, но пока не поддерживаются | `"postgresql"` |
 | `lint.allow` | коды предупреждений, о которых не сообщается, например `"FLICK-T021"`; ошибки отключить нельзя | `[]` |

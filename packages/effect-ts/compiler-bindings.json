@@ -3,303 +3,229 @@
     "@flick-lang/runtime",
     "@flick-lang/effect-ts"
   ],
-  "core_builtins": [
-    "Bool",
-    "Float",
-    "Instances",
-    "Int",
-    "List",
-    "List.Core",
-    "List.Search",
-    "List.Slice",
-    "List.Transform",
-    "Option",
-    "Prelude",
-    "Result",
-    "Monoids",
-    "Seq",
-    "String",
-    "Validation"
-  ],
   "routes": [
     [
       "flick:rt",
-      "@flick-lang/runtime/core",
       "@flick-lang/runtime/rt"
     ],
     [
       "flick:Arbitrary",
-      null,
       "@flick-lang/runtime/rt/effect/Arbitrary"
     ],
     [
       "flick:Array",
-      "@flick-lang/runtime/core/Array",
       "@flick-lang/runtime/rt/effect/Array"
     ],
     [
       "flick:BigDecimal",
-      null,
       "@flick-lang/runtime/rt/effect/BigDecimal"
     ],
     [
       "flick:BigInt",
-      null,
       "@flick-lang/runtime/rt/effect/BigInt"
     ],
     [
       "flick:Boolean",
-      "@flick-lang/runtime/core/Boolean",
       "@flick-lang/runtime/core/Boolean"
     ],
     [
       "flick:Cause",
-      null,
       "@flick-lang/runtime/rt/effect/Cause"
     ],
     [
       "flick:Chunk",
-      null,
       "@flick-lang/runtime/rt/effect/Chunk"
     ],
     [
       "flick:Clock",
-      null,
       "@flick-lang/runtime/rt/effect/Clock"
     ],
     [
       "flick:Combiner",
-      null,
       "@flick-lang/runtime/rt/effect/Combiner"
     ],
     [
       "flick:Crypto",
-      null,
       "@flick-lang/runtime/rt/effect/Crypto"
     ],
     [
       "flick:DateTime",
-      null,
       "@flick-lang/runtime/rt/effect/DateTime"
     ],
     [
       "flick:Deferred",
-      null,
       "@flick-lang/runtime/rt/effect/Deferred"
     ],
     [
       "flick:Differ",
-      null,
       "@flick-lang/runtime/rt/effect/Differ"
     ],
     [
       "flick:Duration",
-      null,
       "@flick-lang/runtime/rt/effect/Duration"
     ],
     [
       "flick:Effect",
-      null,
       "@flick-lang/runtime/rt/effect/Effect"
     ],
     [
       "flick:Exit",
-      null,
       "@flick-lang/runtime/rt/effect/Exit"
     ],
     [
       "flick:Fiber",
-      null,
       "@flick-lang/runtime/rt/effect/Fiber"
     ],
     [
       "flick:FiberSet",
-      null,
       "@flick-lang/runtime/rt/effect/FiberSet"
     ],
     [
       "flick:Filter",
-      null,
       "@flick-lang/runtime/rt/effect/Filter"
     ],
     [
       "flick:Formatter",
-      null,
       "@flick-lang/runtime/rt/effect/Formatter"
     ],
     [
       "flick:Function",
-      null,
       "@flick-lang/runtime/rt/effect/Function"
     ],
     [
       "flick:Hash",
-      null,
       "@flick-lang/runtime/rt/effect/Hash"
     ],
     [
       "flick:HashMap",
-      null,
       "@flick-lang/runtime/rt/effect/HashMap"
     ],
     [
       "flick:HashSet",
-      null,
       "@flick-lang/runtime/rt/effect/HashSet"
     ],
     [
       "flick:Inspectable",
-      null,
       "@flick-lang/runtime/rt/effect/Inspectable"
     ],
     [
       "flick:Iterable",
-      "@flick-lang/runtime/core/Iterable",
       "@flick-lang/runtime/core/Iterable"
     ],
     [
       "flick:JsonPatch",
-      null,
       "@flick-lang/runtime/rt/effect/JsonPatch"
     ],
     [
       "flick:JsonPointer",
-      null,
       "@flick-lang/runtime/rt/effect/JsonPointer"
     ],
     [
       "flick:JsonSchema",
-      null,
       "@flick-lang/runtime/rt/effect/JsonSchema"
     ],
     [
       "flick:Latch",
-      null,
       "@flick-lang/runtime/rt/effect/Latch"
     ],
     [
       "flick:Layer",
-      null,
       "@flick-lang/runtime/rt/effect/Layer"
     ],
     [
       "flick:Number",
-      "@flick-lang/runtime/core/Number",
       "@flick-lang/runtime/rt/effect/Number"
     ],
     [
       "flick:Option",
-      "@flick-lang/runtime/core/Option",
       "@flick-lang/runtime/rt/effect/Option"
     ],
     [
       "flick:Predicate",
-      null,
       "@flick-lang/runtime/rt/effect/Predicate"
     ],
     [
       "flick:Queue",
-      null,
       "@flick-lang/runtime/rt/effect/Queue"
     ],
     [
       "flick:Random",
-      null,
       "@flick-lang/runtime/rt/effect/Random"
     ],
     [
       "flick:Record",
-      null,
       "@flick-lang/runtime/rt/effect/Record"
     ],
     [
       "flick:Redacted",
-      null,
       "@flick-lang/runtime/rt/effect/Redacted"
     ],
     [
       "flick:Reducer",
-      null,
       "@flick-lang/runtime/rt/effect/Reducer"
     ],
     [
       "flick:RegExp",
-      null,
       "@flick-lang/runtime/rt/effect/RegExp"
     ],
     [
       "flick:Result",
-      "@flick-lang/runtime/core/Result",
       "@flick-lang/runtime/core/Result"
     ],
     [
       "flick:Schedule",
-      null,
       "@flick-lang/runtime/rt/effect/Schedule"
     ],
     [
       "flick:Schema",
-      null,
       "@flick-lang/runtime/rt/effect/Schema"
     ],
     [
       "flick:Scope",
-      null,
       "@flick-lang/runtime/rt/effect/Scope"
     ],
     [
       "flick:String",
-      "@flick-lang/runtime/core/String",
       "@flick-lang/runtime/rt/effect/String"
     ],
     [
       "flick:Struct",
-      null,
       "@flick-lang/runtime/rt/effect/Struct"
     ],
     [
       "flick:Tracer",
-      null,
       "@flick-lang/runtime/rt/effect/Tracer"
     ],
     [
       "flick:Tuple",
-      null,
       "@flick-lang/runtime/rt/effect/Tuple"
     ],
     [
       "flick:Version",
-      null,
       "@flick-lang/runtime/rt/effect/Version"
     ],
     [
       "flick:reactivity/AsyncResult",
-      null,
       "@flick-lang/runtime/rt/effect/reactivity/AsyncResult"
     ],
     [
       "flick:reactivity/Atom",
-      null,
       "@flick-lang/runtime/rt/effect/reactivity/Atom"
     ],
     [
       "flick:ui",
-      null,
       "@flick-lang/runtime/rt/ui"
     ],
     [
       "flick:ui/react",
-      null,
       "@flick-lang/runtime/rt/ui/react"
     ],
     [
       "flick:ui/html",
-      null,
       "@flick-lang/runtime/rt/ui/html"
     ],
     [
       "flick:ui/server",
-      null,
       "@flick-lang/runtime/rt/ui/server"
     ]
   ],

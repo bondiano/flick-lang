@@ -1,12 +1,12 @@
-// What compiled code names but a program built with `effect = "none"` never
-// runs: the checker rejects every effect, yet a built-in module still
-// imports its effectful bindings when it loads. Each throws when called.
+// What compiled code names but Flick's runtime does not implement: a built-in
+// module still imports such a binding when it loads, and a build sends a
+// call of one to the Effect adapter. Each throws when called.
 
 // a JS function ignores the arguments it is called with beyond its parameters
 const needsEffect =
   (name: string) =>
   (): never => {
-    throw new Error(`\`${name}\` needs Effect: the program is built with \`effect = "none"\``);
+    throw new Error(`\`${name}\` needs the Effect adapter, which this program does not load`);
   };
 
 /** The `Effect` combinators compiled effectful code calls. */

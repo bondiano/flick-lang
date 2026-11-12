@@ -17,7 +17,7 @@ pub use template::{
 };
 
 /// Bumped on every change of the schema.
-pub const IFACE_VERSION: u32 = 21;
+pub const IFACE_VERSION: u32 = 22;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -189,11 +189,6 @@ pub struct Abi {
     /// Summaries of the module's top-level values.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub values: Vec<Summary>,
-    /// Where the module's build without Effect is, relative to its interface
-    /// directory: `_core/` beside the one on Effect, or `""` when the package
-    /// is built only without Effect; absent when it needs Effect.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub core: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

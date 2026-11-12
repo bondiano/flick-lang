@@ -38,7 +38,6 @@ fn check_all(modules: &[(&str, &str)]) -> (Vec<Diagnostic>, Vec<Dict>) {
             limits: Limits::default(),
             no_let_assert: false,
             thresholds: Thresholds::default(),
-            effects: true,
             watched: Watched::none(),
             stages_by_class: false,
         };
