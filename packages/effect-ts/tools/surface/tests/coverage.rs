@@ -158,7 +158,8 @@ fn pinned() -> String {
 fn the_manifest_classifies_the_pinned_effect() {
     let dir = repo().join("packages/effect-ts/coverage");
     let snapshot: Snapshot = serde_json::from_str(
-        &fs::read_to_string(dir.join("snapshot.json")).expect("packages/effect-ts/coverage/snapshot.json"),
+        &fs::read_to_string(dir.join("snapshot.json"))
+            .expect("packages/effect-ts/coverage/snapshot.json"),
     )
     .expect("a valid snapshot");
     let mut texts = Vec::new();
