@@ -1,14 +1,18 @@
 //! The checked and lowered modules of source packages, saved in the user's
 //! cache directory: a check or build takes those of a library whose
 //! sources, dependencies, compiler and project configuration are unchanged
-//! instead of checking the library again.
+//! instead of checking the library again. The project's own modules are
+//! saved there too, each under a key of everything its checking read.
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use flick_core::diagnostics::Diagnostic;
 use flick_core::project::{
-    self, CachedModule, Compilation, Fresh, Host, ModuleCache, PackageCache, Project, store,
+    self, CachedModule, Compilation, Fresh, Host, ModuleCache, ModuleStore, PackageCache, Project,
+    SavedModule, store,
 };
 use flick_core::source::SourceMap;
 use sha2::{Digest, Sha256};
@@ -17,6 +21,12 @@ use crate::cache::files_under;
 use crate::{builtins, fetch, saved, toolchain};
 
 const PREFIX: &str = "packages-";
+
+const MODULES: &str = "modules-";
+
+/// How many of the project's modules the cache directory keeps: those
+/// written last.
+const KEPT_MODULES: usize = 1024;
 
 /// `run` with the modules of packages saved so far, if any, saving the
 /// ones it gives back.
@@ -39,11 +49,58 @@ pub fn compile(
     rt: bool,
     kept: Option<&mut ModuleCache>,
 ) -> (Vec<Diagnostic>, Compilation) {
-    with_saved(|saved| {
-        let (diagnostics, compilation, fresh) =
-            project::compile_with(host, sources, project, roots, saved, rt, kept);
-        ((diagnostics, compilation), fresh)
+    with_modules(kept, |kept| {
+        with_saved(|saved| {
+            let (diagnostics, compilation, fresh) =
+                project::compile_with(host, sources, project, roots, saved, rt, kept);
+            ((diagnostics, compilation), fresh)
+        })
     })
+}
+
+/// `run` with `kept`, the cache of a command that runs again; else with a
+/// cache of this one run, which takes the project's modules earlier runs
+/// saved and saves those it checks.
+pub fn with_modules<R>(
+    kept: Option<&mut ModuleCache>,
+    run: impl FnOnce(Option<&mut ModuleCache>) -> R,
+) -> R {
+    if kept.is_some() {
+        return run(kept);
+    }
+    let Some(saved) = Saved::new() else {
+        return run(None);
+    };
+    let dir = saved.dir.with_file_name("modules");
+    let binary = saved.binary.replacen(PREFIX, MODULES, 1);
+    let wrote = Arc::new(AtomicBool::new(false));
+    let path = {
+        let (dir, binary) = (dir.clone(), binary.clone());
+        move |key: &str| dir.join(format!("{binary}{key}.json"))
+    };
+    let (load, save) = (path.clone(), path);
+    let written = Arc::clone(&wrote);
+    let mut cache = ModuleCache::stored(ModuleStore {
+        salt: saved.salt,
+        load: Box::new(move |key| {
+            let bytes = fs::read(load(key)).ok()?;
+            serde_json::from_slice::<SavedModule>(&bytes).ok()
+        }),
+        save: Box::new(move |key, module| {
+            if let Ok(json) = serde_json::to_vec(module)
+                && saved::write(&save(key), &json).is_ok()
+            {
+                written.store(true, Ordering::Relaxed);
+            }
+        }),
+    });
+    let result = run(Some(&mut cache));
+    if wrote.load(Ordering::Relaxed) {
+        // other binaries' modules are stale once this one saves
+        saved::evict_others(&dir, MODULES, &binary);
+        saved::keep_newest(&dir, KEPT_MODULES);
+    }
+    result
 }
 
 /// Where this compiler keeps the modules of packages, and what keys them

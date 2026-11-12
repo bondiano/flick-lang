@@ -32,6 +32,8 @@ mod unknown;
 
 pub use checking::ModuleCache;
 pub(crate) use checking::check_file;
+#[cfg(feature = "native-project")]
+pub use checking::{ModuleStore, SavedModule};
 pub use entry::{MainKind, main_kind};
 pub use format_plugins::FormatPlugins;
 #[cfg(feature = "ide")]
