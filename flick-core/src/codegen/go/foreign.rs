@@ -8,14 +8,31 @@ use std::sync::OnceLock;
 
 use flick_pretty::{Document, Documentable, docvec};
 
-use super::layout::{call, closure, signature, single};
+use super::arith::Native;
+use super::layout::{call, closure, signature, single, typed_signature};
+use super::shape::Types;
 use super::{Gen, names};
 use crate::ir::{Foreign, ForeignMode};
 use crate::source::Span;
 use crate::types;
 
-fn table() -> &'static HashMap<(String, String), String> {
-    static TABLE: OnceLock<HashMap<(String, String), String>> = OnceLock::new();
+/// What a table says of a Go function written `Name(float64, int32) bool`:
+/// its name, and the Go types it takes and gives where a binding without
+/// them takes and gives values.
+fn typed(go: &str) -> (&str, Types) {
+    let Some((name, rest)) = go.split_once('(') else {
+        return (go, Types::default());
+    };
+    let (params, result) = rest
+        .split_once(')')
+        .expect("the result after the parameters");
+    let native = |ty: &str| Some(Native::named(ty.trim()).expect("a Go type of a scalar"));
+    let params: Vec<Option<Native>> = params.split(',').map(native).collect();
+    (name, Types::of(native(result), &params))
+}
+
+fn table() -> &'static HashMap<(String, String), (String, Types)> {
+    static TABLE: OnceLock<HashMap<(String, String), (String, Types)>> = OnceLock::new();
     TABLE.get_or_init(|| {
         let mut out = HashMap::new();
         // the tables of the implicit packages, by area: under `[module]` (or `[global Module]`
@@ -32,11 +49,12 @@ fn table() -> &'static HashMap<(String, String), String> {
                     continue;
                 }
                 let (export, go) = line.split_once(' ').expect("an export and a Go function");
+                let (go, types) = typed(go);
                 let go = match go.strip_prefix('*') {
                     Some(go) => format!("*flickrt.{go}"),
                     None => format!("flickrt.{go}"),
                 };
-                let earlier = out.insert((module.to_owned(), export.to_owned()), go);
+                let earlier = out.insert((module.to_owned(), export.to_owned()), (go, types));
                 assert!(earlier.is_none(), "`{export}` of `{module}` is bound twice");
             }
         }
@@ -49,21 +67,28 @@ fn table() -> &'static HashMap<(String, String), String> {
 pub(super) fn targets() -> impl Iterator<Item = &'static str> {
     table()
         .values()
-        .map(|go| go.trim_start_matches('*').trim_start_matches("flickrt."))
+        .map(|(go, _)| go.trim_start_matches('*').trim_start_matches("flickrt."))
 }
 
-/// The Go function of the binding `name` of `module` to `export` of `from`.
+/// The Go function of the binding `name` of `module` to `export` of `from`,
+/// and the Go types it takes and gives.
 pub(super) fn lookup(
     module: &str,
     name: &str,
     from: Option<&str>,
     export: &str,
-) -> Option<&'static str> {
+) -> Option<(&'static str, Types)> {
     let key = match from {
         Some(from) => (from.to_owned(), export.to_owned()),
         None => (format!("global {module}"), name.to_owned()),
     };
-    table().get(&key).map(String::as_str)
+    table().get(&key).map(|(go, types)| (go.as_str(), *types))
+}
+
+/// The Go types of the function the binding `f` of `module` is bound to.
+pub(super) fn types(module: &str, f: &Foreign) -> Types {
+    lookup(module, &f.name, f.binding.from.as_deref(), &f.binding.name)
+        .map_or_else(Types::default, |(_, types)| types)
 }
 
 /// How many parameters the Go function of a binding takes after its
@@ -82,7 +107,7 @@ impl<'a> Gen<'a> {
     /// Go form, which is reported.
     pub(super) fn foreign(&mut self, f: &Foreign, span: Span) -> Option<Document<'a>> {
         let a = self.a;
-        let Some(target) = lookup(
+        let Some((target, types)) = lookup(
             self.module,
             &f.name,
             f.binding.from.as_deref(),
@@ -124,15 +149,25 @@ impl<'a> Gen<'a> {
             args.insert(0, "fb".to_owned());
         }
         let go = call(a, target, args.into_iter().map(|arg| arg.to_doc(a)));
-        Some(self.wrapper(f, signature(&heads), go))
+        // a function of Go's own types is given and gives them as they are
+        let heads: Vec<&str> = heads.iter().map(String::as_str).collect();
+        let result = types.result().map_or("flickrt.Value", Native::go);
+        Some(self.wrapper(f, typed_signature(&heads, f.dicts, types), result, go))
     }
 
-    /// The Go function of the binding `f` taking `params` and returning `go`.
-    fn wrapper(&self, f: &Foreign, params: String, go: Document<'a>) -> Document<'a> {
+    /// The Go function of the binding `f` taking `params` and returning
+    /// `go`, a `result`.
+    fn wrapper(
+        &self,
+        f: &Foreign,
+        params: String,
+        result: &'static str,
+        go: Document<'a>,
+    ) -> Document<'a> {
         let a = self.a;
         let name = names::func(self.module, &f.name);
         let body = single(a, docvec![a, "return ", go]);
-        docvec![a, "func ", name, "(", params, ") flickrt.Value ", body]
+        docvec![a, "func ", name, "(", params, ") ", result, " ", body]
     }
 }
 
@@ -221,6 +256,6 @@ impl<'a> Gen<'a> {
             let run = closure(a, head, [docvec![a, "return ", go]]);
             go = call(a, "flickrt.ForeignAsync", [a.text("fb"), run]);
         }
-        Some(self.wrapper(f, signature(&heads), go))
+        Some(self.wrapper(f, signature(&heads), "flickrt.Value", go))
     }
 }

@@ -75,7 +75,7 @@ func NumberBetween(options, x Value) Value { return between(numberOrder, options
 func NumberClamp(options, x Value) Value   { return clamp(numberOrder, options, x) }
 func NumberRoundTo(precision, x Value) Value {
 	factor := math.Pow(10, precision.(float64))
-	return FloatRound(x.(float64)*factor).(float64) / factor
+	return FloatRound(x.(float64)*factor) / factor
 }
 
 func NumberDivide(a, self Value) Value {

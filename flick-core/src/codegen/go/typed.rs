@@ -5,8 +5,6 @@
 //! call. Where such a function is a value, a function of values around it
 //! converts them (`closures.rs`).
 
-use std::iter;
-
 use super::arith::Native;
 use super::layout::{Code, call};
 use super::shape::Types;
@@ -55,29 +53,44 @@ impl<'a> Gen<'a> {
         types.result().filter(|_| given == params)
     }
 
-    /// The call of the function `typed` with all its arguments, `all`: the
-    /// dictionaries, then the values of `exprs`, then one taken before them.
-    /// Each is in the Go type of its parameter, with no value made of one
-    /// that is of it already.
+    /// The call `e` of the function `typed` with all its arguments, `all`:
+    /// the dictionaries, then the values of `exprs`, then one taken before
+    /// them. Each is in the Go type of its parameter, with no value made of
+    /// one that is of it already.
     pub(super) fn typed_call(
-        &self,
+        &mut self,
         (f, types, params): (&'a str, Types, usize),
         all: &[Code<'a>],
         exprs: &[&Expr],
+        e: &Expr,
     ) -> Code<'a> {
         let a = self.a;
         let dicts = all.len() - params;
-        let args = all.iter().enumerate().map(|(i, arg)| {
-            let Some(native) = i.checked_sub(dicts).and_then(|p| types.param(p)) else {
-                return arg.doc;
-            };
-            match exprs.get(i - dicts) {
-                Some(e) => self.unboxed(e, *arg, native).doc,
+        // the Go types of a binding are written in a table: they must be
+        // those of the types the checker gave the call
+        let differs = |go: Option<Native>, of: &Expr| {
+            go.zip(Native::of(of.ty.as_deref()))
+                .is_some_and(|(go, flick)| go != flick)
+        };
+        let mut wrong = differs(types.result(), e);
+        let mut args = vec![self.context()];
+        for (i, arg) in all.iter().enumerate() {
+            let native = i.checked_sub(dicts).and_then(|p| types.param(p));
+            args.push(match (native, exprs.get(i.wrapping_sub(dicts))) {
+                (Some(native), Some(of)) => {
+                    wrong |= differs(Some(native), of);
+                    self.unboxed(of, *arg, native).doc
+                }
                 // the argument taken before the others is a value by now
-                None => native.unbox(a, arg.doc),
-            }
-        });
-        call(a, f, iter::once(self.context()).chain(args)).into()
+                (Some(native), None) => native.unbox(a, arg.doc),
+                (None, _) => arg.doc,
+            });
+        }
+        if wrong {
+            let message = format!("the Go types of `{f}` are not those of its Flick type");
+            self.errors.push((message, Some(e.span)));
+        }
+        call(a, f, args).into()
     }
 
     /// `v` applied to the arguments `rest` that its head did not take, each

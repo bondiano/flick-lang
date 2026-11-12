@@ -31,7 +31,7 @@ fn compile(text: &str) -> Vec<Diagnostic> {
 }
 
 /// The Go file of the module `App` of `text`.
-fn app(text: &str) -> String {
+pub(super) fn app(text: &str) -> String {
     let out = build(text);
     assert!(out.diagnostics.is_empty(), "{:?}", out.diagnostics);
     out.files

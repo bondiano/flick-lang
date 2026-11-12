@@ -36,7 +36,7 @@ pub(super) struct Types(u64);
 impl Types {
     const ALL: [Native; 4] = [Native::Int, Native::Float, Native::Bool, Native::String];
 
-    fn of(result: Option<Native>, params: &[Option<Native>]) -> Types {
+    pub(super) fn of(result: Option<Native>, params: &[Option<Native>]) -> Types {
         if params.len() > 20 {
             return Types(0);
         }
@@ -84,7 +84,7 @@ fn effects(stages: impl IntoIterator<Item = bool>) -> u64 {
         .fold(0, |mask, (i, effectful)| mask | u64::from(effectful) << i)
 }
 
-pub(super) fn shape(kind: &ItemKind) -> Shape {
+pub(super) fn shape(module: &str, kind: &ItemKind) -> Shape {
     match kind {
         ItemKind::Value { dicts, body, .. } => match &body.kind {
             ExprKind::Lambda { params, body } => {
@@ -121,7 +121,8 @@ pub(super) fn shape(kind: &ItemKind) -> Shape {
                     effects: effects(
                         (0..params).map(|i| f.stages.get(i).copied().unwrap_or(false)),
                     ),
-                    types: Types::default(),
+                    // those the table of bindings gives its Go function
+                    types: foreign::types(module, f),
                 }
             }
         }

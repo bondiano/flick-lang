@@ -104,7 +104,7 @@ pub fn go(program: &Program) -> Output {
     let mut diagnostics = Vec::new();
     let main_shape = index
         .get(&main)
-        .map(|&(m, i)| shape(&modules[m].items[i].kind));
+        .map(|&(m, i)| shape(&modules[m].name, &modules[m].items[i].kind));
     let Some(Shape::Func {
         dicts: 0,
         params: 1,
@@ -178,7 +178,8 @@ fn compile<'a>(
     for &(m, i) in &reached {
         let item = &modules[m].items[i];
         for name in reach::defined(item) {
-            shapes.insert((modules[m].name.clone(), name), shape(&item.kind));
+            let held = shape(&modules[m].name, &item.kind);
+            shapes.insert((modules[m].name.clone(), name), held);
         }
     }
     let reached_items = reached
@@ -260,7 +261,8 @@ fn compile<'a>(
 
 fn has_initializer(item: &ItemKind) -> bool {
     match item {
-        ItemKind::Value { .. } => matches!(shape(item), Shape::Var),
+        // the shape of a value does not depend on its module
+        ItemKind::Value { .. } => matches!(shape("", item), Shape::Var),
         ItemKind::Instance { info, .. } => info.context.is_empty(),
         ItemKind::Destructure { .. } | ItemKind::Refined { .. } => true,
         ItemKind::Foreign(_) | ItemKind::Constructor(_) | ItemKind::Service { .. } => false,
@@ -536,3 +538,5 @@ impl<'a> Gen<'a> {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod typed_tests;

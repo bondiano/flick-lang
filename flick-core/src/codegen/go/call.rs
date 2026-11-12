@@ -262,7 +262,7 @@ impl<'a> Gen<'a> {
             .chain(values.into_iter().map(|(v, _)| v))
             .collect();
         let v = match typed {
-            Some(typed) => self.typed_call(typed, &all, &exprs),
+            Some(typed) => self.typed_call(typed, &all, &exprs, e),
             None => make(self.context.unwrap_or("nil"), &all),
         };
         self.applied(v, rest, quiet)

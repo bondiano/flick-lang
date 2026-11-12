@@ -30,6 +30,13 @@ impl Native {
         }
     }
 
+    /// The type Go names `go`.
+    pub(super) fn named(go: &str) -> Option<Native> {
+        [Native::Int, Native::Float, Native::Bool, Native::String]
+            .into_iter()
+            .find(|native| native.go() == go)
+    }
+
     fn name(self) -> &'static str {
         match self {
             Native::Int => "Int",

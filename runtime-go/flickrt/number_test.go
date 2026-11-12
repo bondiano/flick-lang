@@ -82,7 +82,7 @@ func TestFloatsFollowJS(t *testing.T) {
 		t.Error("% keeps the sign of the dividend")
 	}
 	for x, want := range map[float64]float64{2.5: 3, -2.5: -2, 0.49999999999999994: 0, -0.4: math.Copysign(0, -1)} {
-		if got := FloatRound(x).(float64); got != want || math.Signbit(got) != math.Signbit(want) {
+		if got := FloatRound(x); got != want || math.Signbit(got) != math.Signbit(want) {
 			t.Errorf("Math.round(%v) = %v, want %v", x, got, want)
 		}
 	}

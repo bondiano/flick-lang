@@ -195,24 +195,24 @@ refModify *RefModify
 stringFromNumber StringFromNumber
 intParse IntParse
 intFromFloat IntFromFloat
-intTruncate IntTruncate
-intAbs IntAbs
+intTruncate IntTruncate(float64) int32
+intAbs IntAbs(int32) int32
 intCheckedAdd IntCheckedAdd
 intCheckedSub IntCheckedSub
 intCheckedMul IntCheckedMul
 intCheckedDiv IntCheckedDiv
 intCheckedRem IntCheckedRem
-intUnsafeDiv IntUnsafeDiv
-intUnsafeRem IntUnsafeRem
-bitAnd BitAnd
-bitOr BitOr
-bitXor BitXor
-bitNot BitNot
-shiftLeft ShiftLeft
-shiftRight ShiftRight
-shiftRightUnsignedInt ShiftRightUnsignedInt
-numberStrictEqual NumberStrictEqual
-numberSameValue NumberSameValue
+intUnsafeDiv IntUnsafeDiv(int32, int32) int32
+intUnsafeRem IntUnsafeRem(int32, int32) int32
+bitAnd BitAnd(int32, int32) int32
+bitOr BitOr(int32, int32) int32
+bitXor BitXor(int32, int32) int32
+bitNot BitNot(int32) int32
+shiftLeft ShiftLeft(int32, int32) int32
+shiftRight ShiftRight(int32, int32) int32
+shiftRightUnsignedInt ShiftRightUnsignedInt(int32, int32) int32
+numberStrictEqual NumberStrictEqual(float64, float64) bool
+numberSameValue NumberSameValue(float64, float64) bool
 listMap *ListMap
 listMapIndexed *ListMapIndexed
 listEachEffect *ListEachEffect
