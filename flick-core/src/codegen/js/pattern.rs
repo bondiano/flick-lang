@@ -271,7 +271,9 @@ impl Gen<'_> {
     ) {
         let mut t = Test::default();
         self.test(pat, subject, &mut t);
-        if exhaustive && guard.is_none() {
+        // an or-pattern gives its names their values where it is tested:
+        // its test stays, whatever reaches the arm
+        if exhaustive && guard.is_none() && t.lets.is_empty() {
             t.conds.clear();
         }
         let (inner, ()) = self.block(|g| {

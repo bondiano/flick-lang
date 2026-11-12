@@ -7,7 +7,7 @@ fn compile(text: &str) -> String {
     compile_with(text, false, Labels::default()).code
 }
 
-fn compile_with(text: &str, release: bool, labels: Labels) -> super::Output {
+pub(super) fn compile_with(text: &str, release: bool, labels: Labels) -> super::Output {
     let ir = lower_text("App", text).expect("lowers");
     let path = |m: &str| format!("{}.js", m.replace('.', "/"));
     let package = |m: &str| (m == "App.Users").then(|| "@acme/users".to_owned());
