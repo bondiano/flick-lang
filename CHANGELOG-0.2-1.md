@@ -2,7 +2,7 @@
 
 What changed after 0.1.0 up to and including plugin blocks of `std`, the
 crate `flick-ir` and handlers of effects. Later changes are in
-[CHANGELOG.md](CHANGELOG.md).
+[CHANGELOG-0.2-2.md](CHANGELOG-0.2-2.md) and [CHANGELOG.md](CHANGELOG.md).
 
 - **Build:** `flick build --emit-ir[=json|cbor]` writes the IR the backend
   gets, in the crate `flick-ir`, with its version (`0.1.0`); a reader takes
