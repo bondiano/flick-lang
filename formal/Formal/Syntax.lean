@@ -222,6 +222,12 @@ inductive Variance
   | pos | neg | inv | bi
   deriving DecidableEq
 
+/-- A type subtyping cannot move up or down: a scalar or a nominal type without
+arguments (regions.md §2.2.1, A2). -/
+def Ty.Closed : Ty → Prop
+  | .base _ | .adt _ => True
+  | _ => False
+
 /-- A parameter of variance `s` may stand at polarity `q` (`true`: covariant). -/
 def Variance.at (s : Variance) (q : Bool) : Prop :=
   (q = true ∧ s = .pos) ∨ (q = false ∧ s = .neg)
@@ -293,15 +299,17 @@ structure Sig where
     i < k ∧ (res K)[i]? = some (.tvar i) ∧
       (∀ j u, (res K)[j]? = some u → j ≠ i → u.NoV i) ∧ ∀ f ∈ ts, f.CovRow hidden i := by
     intro _ _ h; simp at h
-  /-- The variance of each parameter of data (regions.md §2.2.1). A parameter that is not
-  invariant is ordinary in every constructor, nothing else a constructor builds depends on
-  it, and the fields hold it only where its variance allows (`Ty.Pol`); an unused one is in
-  no field. -/
+  /-- The variance of each parameter of data (regions.md §2.2.1). Nothing else a
+  constructor builds depends on a parameter that is not invariant. Either it is an ordinary
+  variable of the constructor, held by the fields only where its variance allows (`Ty.Pol`;
+  an unused one is in no field), or (A2) the constructor fixes it to a type subtyping cannot
+  move (`Ty.Closed`) and does not use it at all. -/
   var : Name → Nat → Variance := fun _ _ => .inv
   var_ok : ∀ T i, var T i ≠ .inv → ∀ K k ts, ctor K = some (k, ts, T) →
-      i < k ∧ (res K)[i]? = some (.tvar i) ∧ (∀ j u, (res K)[j]? = some u → j ≠ i → u.NoV i) ∧
-      ∀ f ∈ ts, (var T i = .bi → f.NoV i) ∧
-        (var T i = .pos ∨ var T i = .neg → Ty.Pol var i (var T i) true f) := by
+      (∀ j u, (res K)[j]? = some u → j ≠ i → u.NoV i) ∧
+      ((i < k ∧ (res K)[i]? = some (.tvar i) ∧ ∀ f ∈ ts, (var T i = .bi → f.NoV i) ∧
+          (var T i = .pos ∨ var T i = .neg → Ty.Pol var i (var T i) true f)) ∨
+        (var T i ≠ .bi ∧ (∃ c, (res K)[i]? = some c ∧ c.Closed) ∧ ∀ f ∈ ts, f.NoV i)) := by
     intro _ _ h; exact absurd rfl h
 
 /-- The instance of a constant's type variables. -/
