@@ -209,16 +209,36 @@
       "@flick-lang/runtime/rt/effect/Version"
     ],
     [
+      "flick:http/Cookies",
+      "@flick-lang/runtime/rt/effect/http/Cookies"
+    ],
+    [
+      "flick:http/Etag",
+      "@flick-lang/runtime/rt/effect/http/Etag"
+    ],
+    [
+      "flick:http/Headers",
+      "@flick-lang/runtime/rt/effect/http/Headers"
+    ],
+    [
+      "flick:http/Mime",
+      "@flick-lang/runtime/rt/effect/http/Mime"
+    ],
+    [
+      "flick:http/Url",
+      "@flick-lang/runtime/rt/effect/http/Url"
+    ],
+    [
+      "flick:http/UrlParams",
+      "@flick-lang/runtime/rt/effect/http/UrlParams"
+    ],
+    [
       "flick:reactivity/AsyncResult",
       "@flick-lang/runtime/rt/effect/reactivity/AsyncResult"
     ],
     [
       "flick:reactivity/Atom",
       "@flick-lang/runtime/rt/effect/reactivity/Atom"
-    ],
-    [
-      "flick:http/Headers",
-      "@flick-lang/runtime/rt/effect/http/Headers"
     ],
     [
       "flick:rpc/Rpc",
