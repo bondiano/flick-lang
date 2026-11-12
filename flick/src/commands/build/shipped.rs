@@ -1,7 +1,9 @@
 //! The foreign modules of libraries a js build ships into its output: each
 //! `.mjs` a module of a library binds is found beside that module there, and
-//! so are the other `.mjs` and `.cjs` of the library, which it may import.
-//! They then resolve npm packages from the project, and a packed app has them.
+//! so are the other `.mjs` and `.cjs` of the library, which it may import,
+//! and the declarations beside them, which the TypeScript forms of its
+//! types may name. They then resolve npm packages from the project, and a
+//! packed app has them.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -10,7 +12,8 @@ use std::path::Path;
 use flick_core::build::Artifact;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::ir::ItemKind;
-use flick_core::project::Compilation;
+use flick_core::project::{Compilation, ships};
+use flick_core::syntax::ts_mark::{self, Origin};
 
 use crate::cache::files_under;
 
@@ -26,6 +29,18 @@ pub(super) fn foreign_files(
     let mut diagnostics = Vec::new();
     let mut libraries: BTreeMap<&str, &Path> = BTreeMap::new();
     for module in compilation.modules.iter().filter(|m| selected(&m.name)) {
+        // a file the form of a type names ships as one a binding names does
+        let forms = module.interface.tags.get(ts_mark::TAG);
+        let named = (forms.into_iter().flatten())
+            .filter_map(|(_, parts)| ts_mark::form(parts).ok())
+            .flat_map(|form| form.imports)
+            .any(|import| match &import.from {
+                Origin::Module(spec) => compilation.shipped_foreign(&module.name, spec).is_some(),
+                _ => false,
+            });
+        if named && let Some((name, dir)) = compilation.library_of(&module.name) {
+            libraries.insert(name, dir);
+        }
         for item in &module.ir.items {
             let ItemKind::Foreign(foreign) = &item.kind else {
                 continue;
@@ -73,7 +88,7 @@ fn library_files<'a>(
 ) {
     let mut found = Vec::new();
     files_under(dir, &mut found);
-    found.retain(|p| p.extension().is_some_and(|e| e == "mjs" || e == "cjs"));
+    found.retain(|p| ships(&p.to_string_lossy()));
     let inside = |path: &Path| match (fs::canonicalize(path), fs::canonicalize(dir)) {
         (Ok(path), Ok(dir)) => path.starts_with(dir),
         _ => false,

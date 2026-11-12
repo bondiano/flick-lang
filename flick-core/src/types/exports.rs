@@ -8,6 +8,7 @@ use super::regions;
 use super::services::Operation;
 use super::ty::Type;
 use crate::iface::{self, Decl, Entity, Export, Interface, Namespace};
+use crate::syntax::ts_mark;
 
 impl Checker<'_> {
     /// Stores the types and kinds of this module's exports.
@@ -64,6 +65,11 @@ impl Checker<'_> {
             .collect();
         if !labels.is_empty() {
             interface.tags.insert(iface::LABEL.to_owned(), labels);
+        }
+        let mut forms = self.ts_forms();
+        forms.retain(|(name, _)| exported(name));
+        if !forms.is_empty() {
+            interface.tags.insert(ts_mark::TAG.to_owned(), forms);
         }
         let owners: Vec<(String, Vec<String>)> = (self.typing.owner_services.iter())
             .filter(|name| exported(name))

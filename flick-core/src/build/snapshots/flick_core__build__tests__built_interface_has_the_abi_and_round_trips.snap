@@ -4,7 +4,7 @@ assertion_line: 1017
 expression: json
 ---
 {
-  "iface-version": 22,
+  "iface-version": 23,
   "compiler": "0.1.0",
   "module": "App.Shapes",
   "exports": [

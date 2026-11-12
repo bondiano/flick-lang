@@ -7,14 +7,13 @@
 use crate::effects::bindings;
 use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap};
-use std::fmt::Write;
 
 use super::names;
 use crate::iface::{Interface, Namespace};
-use crate::syntax::ts_mark::{Piece, Slot};
+use crate::syntax::ts_mark::{Form as TsForm, Import, Origin, Piece};
 use crate::types::lang::{self, Lang};
 use crate::types::{Elem, Form, Kind, ModuleRequirement, Type, TypeDef, passes_dictionary};
-use projections::{Import, Projected};
+use projections::Forms;
 
 /// The runtime package generated code imports.
 const EFFECT_RUNTIME: &str = bindings::ADAPTER_PREFIX;
@@ -28,10 +27,10 @@ const OWN: [&str; 2] = ["Effect", "Result"];
 const EFFECT_RUNTIME_UI: &str = bindings::ADAPTER_UI;
 const FLICK_RUNTIME_UI: &str = "@flick-lang/runtime/rt/types";
 
-/// The type `module.name` when a built-in module gives it a TypeScript form
-/// of its own, or says it has none: such a type is never declared.
-fn native(module: &str, name: &str) -> Option<&'static Projected> {
-    projections::find(module, name)
+/// The specifier a module writes for a file beside it, when nothing moves
+/// the file: its own.
+fn as_written(_: &str, spec: &str) -> String {
+    spec.to_owned()
 }
 
 pub struct Projection<'a> {
@@ -42,10 +41,25 @@ pub struct Projection<'a> {
     pub package: &'a dyn Fn(&str) -> Option<String>,
     /// Other modules whose types are referenced.
     pub used: RefCell<BTreeSet<String>>,
-    /// The exports of the runtime the forms referenced name.
-    imported: RefCell<BTreeSet<Import>>,
+    /// The exports the forms referenced name, each of a module's own
+    /// with that module; in order, each once.
+    imported: RefCell<Vec<(Import, String)>>,
+    /// The forms of the modules asked about so far.
+    forms: RefCell<Vec<(String, Forms)>>,
+    /// The specifier `module` itself writes for a file `spec` names beside
+    /// its source: a build may ship the file elsewhere.
+    foreign: &'a dyn Fn(&str, &str) -> String,
     /// The projection of values compiled for Flick's own runtime.
     rt: bool,
+}
+
+impl<'a> Projection<'a> {
+    /// With `foreign(module, spec)` the specifier `module` writes for a
+    /// file its source names beside it.
+    #[must_use]
+    pub fn shipping(self, foreign: &'a dyn Fn(&str, &str) -> String) -> Self {
+        Projection { foreign, ..self }
+    }
 }
 
 /// Type parameters in scope: Flick name to TypeScript name; regions have
@@ -72,7 +86,9 @@ impl Projection<'_> {
             lookup,
             package,
             used: RefCell::new(BTreeSet::new()),
-            imported: RefCell::new(BTreeSet::new()),
+            imported: RefCell::new(Vec::new()),
+            forms: RefCell::new(Vec::new()),
+            foreign: &as_written,
             rt,
         }
     }
@@ -282,8 +298,8 @@ impl Projection<'_> {
         if let Some(shown) = self.module_or_dictionary(module, name, &args, vars)? {
             return Ok(shown);
         }
-        if let Some(form) = native(module, name)
-            && let Some(projected) = self.native_applied(form, &args, vars, name)?
+        if let Some(form) = self.form(module, name)?
+            && let Some(projected) = self.native_applied(&form, module, &args, vars, name)?
         {
             return Ok(projected);
         }
@@ -432,62 +448,10 @@ impl Projection<'_> {
             .and_then(|e| e.definition.clone())
             .ok_or_else(|| format!("type `{name}` of `{module}` is not exported"))
     }
-
-    /// `import type` lines for what the projection referenced, with
-    /// `path(module)` the import specifier of a module.
-    pub fn imports(&self, path: &dyn Fn(&str) -> String) -> String {
-        let runtime = if self.rt {
-            FLICK_RUNTIME
-        } else {
-            EFFECT_RUNTIME
-        };
-        let runtime_ui = if self.rt {
-            FLICK_RUNTIME_UI
-        } else {
-            EFFECT_RUNTIME_UI
-        };
-        // what the backend writes itself: the stages of functions, the
-        // results of runners and the tags of services
-        let mut out = if self.rt {
-            format!(
-                "import type {{ EffectValue as $Effect, ResultValue as $Result, ServiceValue as $Service }} from \"{runtime}\";\n"
-            )
-        } else {
-            format!(
-                "import type {{ Effect as $Effect, Result as $Result, Context as $Context }} from \"{runtime}\";\n"
-            )
-        };
-        // and what the forms of the types named, each slot on a line
-        let imported = self.imported.borrow();
-        for (slot, from) in [(Slot::Runtime, runtime), (Slot::Ui, runtime_ui)] {
-            let names: Vec<String> = (imported.iter())
-                .filter(|i| i.slot == slot && !OWN.contains(&i.effect.as_str()))
-                .map(|i| {
-                    let export = if self.rt { &i.rt } else { &i.effect };
-                    format!("{export} as ${}", i.effect)
-                })
-                .collect();
-            if !names.is_empty() {
-                let _ = writeln!(
-                    out,
-                    "import type {{ {} }} from \"{from}\";",
-                    names.join(", ")
-                );
-            }
-        }
-        for module in self.used.borrow().iter() {
-            let _ = writeln!(
-                out,
-                "import type * as {} from {};",
-                Self::alias(module),
-                names::string(&path(module))
-            );
-        }
-        out
-    }
 }
 
 include!("ts/helpers.rs");
+mod imports;
 mod native;
 mod projections;
 #[cfg(test)]

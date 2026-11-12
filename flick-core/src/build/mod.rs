@@ -474,6 +474,7 @@ fn builtins(ctx: &Context, imports: Vec<String>, out: &mut Vec<Artifact>) {
                 ctx.any_interface,
                 ctx.package,
                 ctx.path,
+                ctx.options.foreign,
                 ctx.settings.backend == Backend::Rt,
             )
         {
@@ -572,6 +573,7 @@ fn compiled_module(
             ctx.any_interface,
             ctx.package,
             ctx.path,
+            ctx.options.foreign,
             ctx.settings.backend == Backend::Rt,
         )
     {
@@ -594,6 +596,7 @@ fn compiled_module(
             ctx.any_interface,
             ctx.package,
             ctx.path,
+            ctx.options.foreign,
             ctx.settings.backend == Backend::Rt,
         ));
     }
@@ -706,9 +709,10 @@ fn declarations(
     interfaces: &dyn Fn(&str) -> Option<Interface>,
     package: &dyn Fn(&str) -> Option<String>,
     path: &dyn Fn(&str) -> String,
+    foreign: &dyn Fn(&str, &str) -> String,
     rt: bool,
 ) -> Option<(String, Vec<(String, String)>)> {
-    let projection = Projection::for_runtime(name, interfaces, package, rt);
+    let projection = Projection::for_runtime(name, interfaces, package, rt).shipping(foreign);
     let interface = interfaces(name)?;
     let here = path(name);
     let import = |m: &str| codegen::relative(&here, &path(m));
@@ -729,11 +733,13 @@ fn facade(
     interfaces: &dyn Fn(&str) -> Option<Interface>,
     package: &dyn Fn(&str) -> Option<String>,
     path: &dyn Fn(&str) -> String,
+    foreign: &dyn Fn(&str, &str) -> String,
     rt: bool,
 ) -> Vec<Artifact> {
     // the façade module names the module's own types through an import
     let facade_module = format!("{}.promise", module.name);
-    let projection = Projection::for_runtime(&facade_module, interfaces, package, rt);
+    let projection =
+        Projection::for_runtime(&facade_module, interfaces, package, rt).shipping(foreign);
     let summaries = built
         .abi
         .as_ref()

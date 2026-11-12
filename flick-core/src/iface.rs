@@ -17,7 +17,7 @@ pub use template::{
 };
 
 /// Bumped on every change of the schema.
-pub const IFACE_VERSION: u32 = 22;
+pub const IFACE_VERSION: u32 = 23;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

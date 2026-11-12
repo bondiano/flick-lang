@@ -79,7 +79,8 @@ pub(crate) fn js_at(
     g.physical = physical;
     g.location = location;
     let projection =
-        Projection::for_runtime(physical, options.interface, options.package, options.rt);
+        Projection::for_runtime(physical, options.interface, options.package, options.rt)
+            .shipping(options.foreign);
     let mut declarations = Vec::new();
     let interface = (options.interface)(&module.name);
     if let Some(interface) = interface.as_ref().filter(|_| !options.rt) {

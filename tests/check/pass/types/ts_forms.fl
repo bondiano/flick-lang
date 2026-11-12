@@ -1,0 +1,16 @@
+module App.Forms exposing (Moment, Later, Hidden, at)
+
+@ts "$Dayjs"
+@ts import "dayjs" "Dayjs"
+type Moment
+
+@ts "Promise<readonly [{0}, $Handle]>"
+@ts import "./fs.d.mts" "Handle"
+type Later a
+
+@ts none
+service Hidden =
+  peek : Unit ->{} Float
+
+at : Moment -> Later Moment -> Moment
+let at moment _ = moment
