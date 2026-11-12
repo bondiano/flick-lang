@@ -306,12 +306,18 @@ impl Checker<'_> {
             .push((range(span), record.clone()));
     }
 
+    /// The type of a value code generation makes at `at` without a node of
+    /// its own, when it is a type constructor on its own.
+    pub fn note_value(&mut self, at: Range, ty: &Type) {
+        if let t @ (Type::Con { .. } | Type::Meta(_)) = self.store.head(ty) {
+            self.typing.pending_values.push((at, t.clone()));
+        }
+    }
+
     /// The type of an expression a keyword opens (`task`, `match`, `fun` …),
     /// recorded at the keyword so an editor can show it there.
     pub fn note_head(&mut self, node: &Node, ty: &Type) {
-        if let t @ (Type::Con { .. } | Type::Meta(_)) = self.store.head(ty) {
-            self.typing.pending_values.push((node.range(), t.clone()));
-        }
+        self.note_value(node.range(), ty);
         // a body with a module open has no keyword of the user's: its type is
         // at the whole of it, where the head of its block finds it
         if node.kind == K::OpenExpr {

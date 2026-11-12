@@ -108,15 +108,17 @@ impl Lower<'_> {
                 stage: self.call_stage(key),
                 arg_first: false,
             };
+            let mut app = Expr::new(app, at);
+            app.ty = self.typing.values.get(&key).and_then(type_name);
             let dicts = self.dictionaries(key);
-            value = with_dicts(self.within(key, Expr::new(app, at)), dicts);
+            value = with_dicts(self.within(key, app), dicts);
         }
         let stage = self.typing.stages.get(&node.range()).and_then(|s| s.first());
         let lambda = ExprKind::Lambda {
             params: vec![Param {
                 pat: Pat::Bind(x),
                 stage: stage.copied().unwrap_or(Stage::Pure),
-                ty: None,
+                ty: (self.typing.values.get(&param_key(&operators))).and_then(type_name),
             }],
             body: Box::new(self.adapted(result_key(&operators), value)),
         };

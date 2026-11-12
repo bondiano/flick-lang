@@ -86,6 +86,12 @@ pub fn result_key(operators: &[Token]) -> Range {
     (op.start, op.end)
 }
 
+/// The key of the type of the parameter of a composition's closure: its
+/// first operator.
+pub fn param_key(operators: &[Token]) -> Range {
+    (operators[0].start, operators[0].end)
+}
+
 /// The indices of a composition's operands from the function it applies
 /// first: `f >> g` applies `f` first, `f << g` applies `g` first.
 pub fn applied_order(operators: &[Token], operands: usize) -> Vec<usize> {
@@ -180,7 +186,9 @@ impl Checker<'_> {
         };
         let (start, end) = result_key(&operators);
         let at = Span::new(self.file, start, end);
+        let param = param_key(&operators);
         let body = |c: &mut Self, stages: &[(Type, Option<Box<Effects>>)], rest: Option<Type>| {
+            c.note_value(param, &stages[0].0);
             let value = c.composed(&calls, stages[0].0.clone(), op);
             match rest {
                 Some(rest) => {
@@ -259,6 +267,7 @@ impl Checker<'_> {
         };
         self.settle_defaults(defaults);
         self.settle_provided(provided);
+        self.note_value(call.key, &ty);
         ty
     }
 
