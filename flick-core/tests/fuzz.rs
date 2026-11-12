@@ -3,9 +3,10 @@
 //! diagnostic span must lie inside the input, and inputs without errors must
 //! format idempotently and type-check without panicking. `FLICK_FUZZ_ITERATIONS` sets the number of mutated
 //! inputs (default 20 000; the nightly CI job runs 1 000 000 in release).
+//! The checker runs on the stack the compiler gives it.
 
 use std::path::Path;
-use std::{env, fs, panic};
+use std::{env, fs, panic, thread};
 
 use flick_core::source::SourceMap;
 use flick_core::syntax::parse;
@@ -110,8 +111,22 @@ fn mutate(rng: &mut Rng, text: &str) -> String {
     out
 }
 
+/// The stack the compiler checks a module on (`project/load/checking/graph.rs`):
+/// the checker recurses as deep as an input nests, and as a class's instances
+/// chain up to the solver's budget.
+const CHECK_STACK: usize = 8 << 20;
+
 #[test]
 fn front_end_survives_mutated_corpus() {
+    thread::Builder::new()
+        .stack_size(CHECK_STACK)
+        .spawn(survive_mutated_corpus)
+        .expect("a thread")
+        .join()
+        .expect("the corpus survives");
+}
+
+fn survive_mutated_corpus() {
     let iterations: usize = env::var("FLICK_FUZZ_ITERATIONS")
         .ok()
         .and_then(|n| n.parse().ok())
