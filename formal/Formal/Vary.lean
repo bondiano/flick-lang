@@ -1,0 +1,202 @@
+import Formal.Widen
+
+/-!
+# Varying a parameter of data by its variance
+
+Subtyping compares the arguments of data by the variance of each parameter
+(regions.md §2.2.1, `LeLive.data`). A field holds a parameter only where its variance allows
+(`Ty.Pol`), so a field built at one argument is below the field read at the other
+(`field_vary`): at the field's own polarity, in the direction the parameter allows.
+-/
+
+namespace Flick
+
+variable {S : Sig}
+
+theorem Ty.NoV.arrow {i : Nat} {a b : Ty} {φ : Stage} {C : Caps} (ha : a.NoV i)
+    (hφ : φ.NoV i) (hb : b.NoV i) (hC : (Ty.caps C).NoV i) : (Ty.arrow a φ b C).NoV i := by
+  simp only [Ty.NoV, Ty.substT] at ha hb hC ⊢
+  simp only [Ty.caps.injEq] at hC
+  rw [ha, hφ, hb, hC]
+
+theorem Ty.NoV.eff {i : Nat} {r e : Row} {t : Ty} {C : Caps} (hr : (Ty.row r).NoV i)
+    (he : (Ty.row e).NoV i) (ht : t.NoV i) (hC : (Ty.caps C).NoV i) :
+    (Ty.eff r e t C).NoV i := by
+  simp only [Ty.NoV, Ty.substT, Ty.row.injEq, Ty.caps.injEq] at hr he ht hC ⊢
+  rw [hr, he, ht, hC]
+
+theorem Ty.NoV.rcons {i : Nat} {l : Label} {t r : Ty} (ht : t.NoV i) (hr : r.NoV i) :
+    (Ty.rcons l t r).NoV i := by
+  simp only [Ty.NoV, Ty.substT] at ht hr ⊢
+  rw [ht, hr]
+
+theorem Ty.NoV.tcon {i : Nat} {T : Name} {us : List Ty}
+    (h : ∀ (j : Nat) (u : Ty), us[j]? = some u → u.NoV i) : (Ty.tcon T us).NoV i := by
+  simp only [Ty.NoV, Ty.tcon_substT]
+  congr 1
+  apply List.ext_getElem?
+  intro j
+  simp only [List.getElem?_map]
+  cases hu : us[j]? with
+  | none => rfl
+  | some u => simp only [Option.map_some]; exact congrArg some (h j u hu)
+
+/-- A parameter that is not covariant at this polarity is not held at all. -/
+theorem Ty.Pol.noV {i : Nat} {s : Variance} {q : Bool} {f : Ty}
+    (h : Ty.Pol S.var i s q f) (hs : ¬ s.at q ∧ ¬ s.at (!q) ∨ (s = .pos ∧ q = false)) :
+    f.NoV i := by
+  induction h with
+  | none h => exact h
+  | var hq =>
+    rcases hs with ⟨h1, -⟩ | ⟨rfl, rfl⟩
+    · exact absurd hq h1
+    · simp [Variance.at] at hq
+  | arrow hpa _ hφ _ hC iha ihb =>
+    rcases hs with ⟨h1, h2⟩ | ⟨rfl, rfl⟩
+    · refine Ty.NoV.arrow (iha (.inl ⟨h2, by simpa using h1⟩)) hφ (ihb (.inl ⟨h1, h2⟩)) ?_
+      rcases hC with hC | hC
+      · exact hC
+      · exact absurd hC h1
+    · refine Ty.NoV.arrow (hpa rfl) hφ (ihb (.inr ⟨rfl, rfl⟩)) ?_
+      rcases hC with hC | hC
+      · exact hC
+      · simp [Variance.at] at hC
+  | eff hr he _ hC iht =>
+    refine Ty.NoV.eff hr he (iht hs) ?_
+    rcases hC with hC | hC
+    · exact hC
+    · rcases hs with ⟨h1, -⟩ | ⟨rfl, rfl⟩
+      · exact absurd hC h1
+      · simp [Variance.at] at hC
+  | @data q t T us _ hng _ hin hbi ht ihp ihn =>
+    subst ht
+    apply Ty.NoV.tcon
+    intro j u hu
+    cases hv : S.var T j with
+    | pos => exact ihp j u hu hv hs
+    | neg =>
+      rcases hs with ⟨h1, h2⟩ | ⟨rfl, rfl⟩
+      · exact ihn j u hu hv (.inl ⟨h2, by simpa using h1⟩)
+      · exact hng j u hu hv rfl
+    | inv => exact hin j u hu hv
+    | bi =>
+      rcases hs with ⟨h1, -⟩ | ⟨rfl, rfl⟩
+      · exact hbi j u hu hv h1
+      · exact hbi j u hu hv (by simp [Variance.at])
+
+theorem Variance.noV_cond {s : Variance} (h : s ≠ .neg) :
+    ¬ s.at false ∧ ¬ s.at (!false) ∨ (s = .pos ∧ false = false) := by
+  cases s with
+  | pos => exact .inr ⟨rfl, rfl⟩
+  | neg => exact absurd rfl h
+  | inv | bi => exact .inl ⟨by simp [Variance.at], by simp [Variance.at]⟩
+
+/-- A field built at one argument is below the field read at the other, at its own
+polarity, when the parameter changes in the direction its variance allows and keeps what
+it reaches. -/
+theorem field_vary {i : Nat} {s : Variance} {q : Bool} {f : Ty} (hf : Ty.Pol S.var i s q f)
+    {σ σ' : Atom → Ty} (hσ : ∀ a, a ≠ .v i → σ a = σ' a)
+    (hr : Caps.Sub (σ (.v i)).reach (σ' (.v i)).reach)
+    (hp : s = .pos → LeLive S (σ (.v i)) (σ' (.v i)))
+    (hn : s = .neg → LeLive S (σ' (.v i)) (σ (.v i))) :
+    (q = true → LeLive S (f.substT σ) (f.substT σ')) ∧
+    (q = false → LeLive S (f.substT σ') (f.substT σ)) := by
+  have hpw := reach_pointwise hσ hr
+  have hnw : s = .neg → ∀ b, Caps.Sub (σ' b).reach (σ b).reach := fun hs b => by
+    by_cases hb : b = .v i
+    · subst hb; exact (hn hs).reach
+    · rw [hσ b hb]; exact Caps.Sub.refl _
+  have same : ∀ {t : Ty}, t.NoV i → LeLive S (t.substT σ') (t.substT σ) := fun h => by
+    rw [h.substT_eq hσ]; exact .refl
+  induction hf with
+  | none h => exact ⟨fun _ => by rw [h.substT_eq hσ]; exact .refl, fun _ => same h⟩
+  | var hq =>
+    simp only [Ty.substT]
+    rcases hq with ⟨rfl, hs⟩ | ⟨rfl, hs⟩
+    · exact ⟨fun _ => hp hs, fun h => absurd h (by simp)⟩
+    · exact ⟨fun h => absurd h (by simp), fun _ => hn hs⟩
+  | @arrow q a φ b C hpa hPa hφ hPb hC iha ihb =>
+    simp only [Ty.substT]
+    rw [hφ.substT_eq hσ]
+    refine ⟨fun hq => ?_, fun hq => ?_⟩
+    · subst hq
+      refine .arrow (iha.2 rfl) (Stage.use_mono (Stage.le_refl _)
+        (Caps.substT_widen hpw)) (ihb.1 rfl) fun x hx => ?_
+      rcases hx with hx | hx | hx
+      · exact .inl (Ty.reach_substT_mono hpw x hx)
+      · exact .inr (.inl (Ty.reach_substT_mono hpw x hx))
+      · exact .inr (.inr (Caps.substT_widen hpw x hx))
+    · subst hq
+      by_cases hsn : s = .neg
+      · have hw := hnw hsn
+        refine .arrow (iha.1 rfl) (Stage.use_mono (Stage.le_refl _)
+          (Caps.substT_widen hw)) (ihb.2 rfl) fun x hx => ?_
+        rcases hx with hx | hx | hx
+        · exact .inl (Ty.reach_substT_mono hw x hx)
+        · exact .inr (.inl (Ty.reach_substT_mono hw x hx))
+        · exact .inr (.inr (Caps.substT_widen hw x hx))
+      · have hN := (Ty.Pol.arrow hpa hPa hφ hPb hC).noV (Variance.noV_cond hsn)
+        have := same hN
+        simpa only [Ty.substT, hφ.substT_eq hσ] using this
+  | @eff q r e t C hr' he hPt hC iht =>
+    simp only [Ty.substT]
+    have er := hr'.substT_eq hσ
+    have ee := he.substT_eq hσ
+    simp only [Ty.substT, Ty.row.injEq] at er ee
+    rw [er, ee]
+    refine ⟨fun hq => ?_, fun hq => ?_⟩
+    · subst hq
+      refine .eff (Stage.use_mono (Stage.le_refl _) (Caps.substT_widen hpw))
+        (iht.1 rfl) fun x hx => ?_
+      rcases hx with hx | hx
+      · exact .inl (Ty.reach_substT_mono hpw x hx)
+      · exact .inr (Caps.substT_widen hpw x hx)
+    · subst hq
+      by_cases hsn : s = .neg
+      · have hw := hnw hsn
+        refine .eff (Stage.use_mono (Stage.le_refl _) (Caps.substT_widen hw))
+          (iht.2 rfl) fun x hx => ?_
+        rcases hx with hx | hx
+        · exact .inl (Ty.reach_substT_mono hw x hx)
+        · exact .inr (Caps.substT_widen hw x hx)
+      · have hN := (Ty.Pol.eff hr' he hPt hC).noV (Variance.noV_cond hsn)
+        have := same hN
+        simpa only [Ty.substT, er, ee] using this
+  | @data q t T us hPp hng hPn hin hbi ht ihp ihn =>
+    subst ht
+    rw [Ty.tcon_substT, Ty.tcon_substT]
+    have get : ∀ {τ : Atom → Ty} {j : Nat} {x : Ty}, (us.map (Ty.substT τ))[j]? = some x →
+        ∃ u, us[j]? = some u ∧ x = u.substT τ := fun h => by
+      simp only [List.getElem?_map, Option.map_eq_some_iff] at h
+      obtain ⟨u, hu, rfl⟩ := h
+      exact ⟨u, hu, rfl⟩
+    refine ⟨fun hq => ?_, fun hq => ?_⟩
+    · subst hq
+      refine .data (by simp) (fun j x x' h h' => ?_) (fun j x x' h h' _ hv => ?_)
+        (fun j x x' h h' _ hv => ?_) (fun j x x' h h' _ hv => ?_) rfl rfl
+      all_goals
+        obtain ⟨u, hu, rfl⟩ := get h
+        obtain ⟨u', hu', rfl⟩ := get h'
+        rw [hu] at hu'; cases hu'
+      · exact Ty.reach_substT_mono hpw
+      · exact (ihp j u hu hv).1 rfl
+      · exact (ihn j u hu hv).2 rfl
+      · exact (hin j u hu hv).substT_eq hσ
+    · subst hq
+      by_cases hsn : s = .neg
+      · have hw := hnw hsn
+        refine .data (by simp) (fun j x x' h h' => ?_) (fun j x x' h h' _ hv => ?_)
+          (fun j x x' h h' _ hv => ?_) (fun j x x' h h' _ hv => ?_) rfl rfl
+        all_goals
+          obtain ⟨u, hu, rfl⟩ := get h
+          obtain ⟨u', hu', rfl⟩ := get h'
+          rw [hu] at hu'; cases hu'
+        · exact Ty.reach_substT_mono hw
+        · exact (ihp j u hu hv).2 rfl
+        · exact (ihn j u hu hv).1 rfl
+        · exact ((hin j u hu hv).substT_eq hσ).symm
+      · have hN := (Ty.Pol.data hPp hng hPn hin hbi rfl).noV (Variance.noV_cond hsn)
+        have := same hN
+        simpa only [Ty.tcon_substT] using this
+
+end Flick
