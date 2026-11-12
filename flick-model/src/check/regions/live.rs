@@ -21,6 +21,10 @@ use super::super::Checker;
 use crate::syntax::{Name, Path};
 use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 
+/// The prefix of a capture row the reading of a parameter's bare data
+/// quantifies: no source writes it.
+const FRESH: &str = "captures$";
+
 /// The variables of kind `Region` of `vars`, with `outer`.
 pub(in crate::check) fn regions_of(
     vars: &[(Name, Kind)],
@@ -91,16 +95,43 @@ pub(in crate::check) fn arg_caps(t: &Type) -> Caps {
 }
 
 impl Checker<'_> {
-    /// `σ` with the `Live` its runtime arrows need: the elision rule.
+    /// `σ` with the `Live` its runtime arrows need, the elision rule, and
+    /// the hidden rows of the data it writes bare (`regions.md` §1.4): a
+    /// fresh capture row quantified after its variables in each parameter,
+    /// and in each result what the parameters before it reach (`elide`), as
+    /// `Scheme.elide` of the core (`formal/Formal/Live/Elide.lean`).
     pub(in crate::check) fn live_scheme(&self, s: &Scheme) -> Scheme {
+        let mut vars = s.vars.clone();
+        let body = self.fresh_rows(&s.body, &mut vars);
         Scheme {
-            vars: s.vars.clone(),
             body: self.elide(
-                &s.body,
+                &body,
                 &Caps::default(),
-                &regions_of(&s.vars, &BTreeSet::new()),
+                &regions_of(&vars, &BTreeSet::new()),
             ),
+            vars,
             outlives: s.outlives.clone(),
+        }
+    }
+
+    /// `τ` with the hidden row of each parameter's bare data a fresh
+    /// capture row, in order, the parameters of a parameter that is a
+    /// function included, as the core's `Ty.fresh`.
+    fn fresh_rows(&self, t: &Type, vars: &mut Vec<(Name, Kind)>) -> Type {
+        match t {
+            Type::Fun(p, s, r) => {
+                let p = match &**p {
+                    p @ Type::Fun(..) => self.fresh_rows(p, vars),
+                    p if self.bare_hidden(p) => {
+                        let name = Name::from(format!("{FRESH}{}", vars.len()));
+                        vars.push((name.clone(), Kind::Captures));
+                        Type::Captured(Rc::new(p.clone()), Caps::var(Var::Named(name)))
+                    }
+                    p => p.clone(),
+                };
+                Type::Fun(Rc::new(p), s.clone(), Rc::new(self.fresh_rows(r, vars)))
+            }
+            t => t.clone(),
         }
     }
 
@@ -133,7 +164,13 @@ impl Checker<'_> {
                     Stage::Runtime(row, e) => Stage::Runtime(add_live(row, &held), e.clone()),
                     Stage::Pure => Stage::Pure,
                 };
-                let r = go(r, &held);
+                // a result's bare data hides what the parameters before it reach
+                let r = match go(r, &held) {
+                    r if !held.is_empty() && self.bare_hidden(&r) => {
+                        Type::Captured(Rc::new(r), held.clone())
+                    }
+                    r => r,
+                };
                 Type::Fun(Rc::new(p), s, Rc::new(r))
             }
             Type::Eff(r, e, a) => Type::Eff(add_live(r, held), e.clone(), Rc::new(go(a, &none))),

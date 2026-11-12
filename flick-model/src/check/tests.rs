@@ -573,3 +573,47 @@ fn never_has_no_pattern_cases_but_inhabited_types_do() {
         "Match",
     );
 }
+
+/// A signature's bare data with hidden storage (`regions.md` §1.4): each
+/// parameter, a callback's included, gets a fresh capture row, the result
+/// what the parameters before it reach, as `Scheme.elide` of the core.
+#[test]
+fn bare_data_in_a_signature_reads_its_hidden_rows() {
+    let job = || Type::con(T, "Job");
+    let callback = Type::fun(job(), Stage::Pure, ty("Int"));
+    let s = mono(Type::fun(
+        job(),
+        Stage::Pure,
+        Type::fun(callback, Stage::Pure, job()),
+    ));
+    let read = Checker::new(&decls()).live_scheme(&s);
+    let rows: Vec<_> = (read.vars.iter())
+        .map(|(n, k)| (n.to_string(), k.clone()))
+        .collect();
+    let c = |i: usize| Var::Named(format!("captures${i}").as_str().into());
+    assert_eq!(
+        rows,
+        [
+            ("captures$0".to_owned(), Kind::Captures),
+            ("captures$1".to_owned(), Kind::Captures),
+        ]
+    );
+    let held = Caps::var(c(0)).union(&Caps::var(c(1)));
+    let expected = Type::fun(
+        Type::Captured(Rc::new(job()), Caps::var(c(0))),
+        Stage::Pure,
+        Type::fun(
+            Type::fun(
+                Type::Captured(Rc::new(job()), Caps::var(c(1))),
+                Stage::Pure,
+                ty("Int"),
+            ),
+            Stage::Pure,
+            Type::Captured(Rc::new(job()), held),
+        ),
+    );
+    assert_eq!(read.body, expected);
+    // a constant and a written qualifier read no row
+    let constant = mono(job());
+    assert_eq!(Checker::new(&decls()).live_scheme(&constant).body, job());
+}

@@ -251,6 +251,19 @@ impl Checker<'_> {
         }
     }
 
+    /// Data with hidden storage a signature writes without a qualifier
+    /// (`regions.md` §1.4): a declared ADT whose values hide captures,
+    /// through the data it holds. A type without constructors gets no row:
+    /// what a foreign binding can hide is G4's business, not elision's.
+    pub(in crate::check) fn bare_hidden(&self, t: &Type) -> bool {
+        let mut head = t;
+        while let Type::App(h, _) = head {
+            head = h;
+        }
+        matches!(head, Type::Con(p) if self.decls.variants.contains_key(p) && !self.decls.errors.contains(p))
+            && self.hidden(t, &mut Vec::new())
+    }
+
     /// The fields of every constructor of the declared type `p` at `args`;
     /// `None` for a type without constructors.
     fn fields_of(&self, p: &Path, args: &[Type]) -> Option<Vec<Type>> {
