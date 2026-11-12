@@ -20,6 +20,29 @@ pub(crate) enum Inst {
     Caps(Caps),
 }
 
+/// `s` with its regions and capture rows the rigid variables `rigid` its
+/// body is checked at, by the order of `vars`: a recursive use of a signed
+/// function goes through the regions of its signature, not fresh ones.
+pub(super) fn own_regions(s: &Scheme, vars: &[(Name, Kind)], rigid: &[Name]) -> Scheme {
+    let own = |k: &Kind| matches!(k, Kind::Region | Kind::Captures);
+    let map: HashMap<Name, Inst> = (vars.iter().zip(rigid))
+        .filter(|((_, k), _)| own(k))
+        .map(|((n, k), r)| (n.clone(), rigid_inst(r, k)))
+        .collect();
+    Scheme {
+        vars: s
+            .vars
+            .iter()
+            .filter(|(n, _)| !map.contains_key(n))
+            .cloned()
+            .collect(),
+        body: substitute(&s.body, &map),
+        outlives: (s.outlives.iter())
+            .map(|(c, r)| (substitute_caps(c, &map), substitute(r, &map)))
+            .collect(),
+    }
+}
+
 /// What a variable of kind `k` becomes as the rigid variable `name`.
 pub(super) fn rigid_inst(name: &str, k: &Kind) -> Inst {
     let v = Var::Named(name.into());

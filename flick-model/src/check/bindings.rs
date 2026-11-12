@@ -68,11 +68,7 @@ impl Checker<'_> {
             body: bare,
             ..s.clone()
         };
-        self.locals.extend(rec.map(|f| (f.clone(), s.clone())));
-        let checked = self.check_qualified_forall(e, &bare, qualifier);
-        if rec.is_some() {
-            self.locals.pop();
-        }
+        let checked = self.check_qualified_forall(e, &bare, qualifier, rec.map(|f| (f, &s)));
         checked.map(|()| s)
     }
 
@@ -92,7 +88,8 @@ impl Checker<'_> {
         }
     }
 
-    /// (Let-Rec): without a signature the recursive calls are monomorphic.
+    /// (Let-Rec): without a signature the recursive calls are monomorphic;
+    /// with one they take its regions, as its body is checked at them.
     pub(super) fn let_rec(
         &mut self,
         f: &Name,
@@ -103,10 +100,7 @@ impl Checker<'_> {
     ) -> Check<Type> {
         let s = if let Some(s) = sig {
             let s = &self.in_scopes(&self.live_scheme(s));
-            self.locals.push((f.clone(), s.clone()));
-            let checked = self.check_forall(lam, s);
-            self.locals.pop();
-            checked?;
+            self.check_qualified_forall(lam, s, Caps::default(), Some((f, s)))?;
             s.clone()
         } else {
             self.level += 1;

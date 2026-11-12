@@ -427,8 +427,15 @@ impl<'a> Checker<'a> {
         }
         if let Some(rec) = self.top.items[i].rec {
             let scheme = self.env.value(&entity).cloned().unwrap_or(Type::Error);
+            // in its own body a value goes through the regions of its signature
+            let own = self.top.current == Some(i);
+            let scheme = if own {
+                self.own_regions(&scheme, &self.recs[rec].skolems)
+            } else {
+                scheme
+            };
             let ty = self.instantiate(&scheme, span);
-            self.recs[rec].uses.push((ty.clone(), span));
+            self.recs[rec].uses.push((ty.clone(), span, own));
             return ty;
         }
         if self.env.value(&entity).is_none() && self.top.items[i].state == State::Waiting {

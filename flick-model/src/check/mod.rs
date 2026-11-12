@@ -127,6 +127,10 @@ pub struct Checker<'d> {
     /// The opaque aliases subsumption is unfolding on both sides: one met
     /// again inside its own unfolding is equal by its arguments.
     unfolding: Vec<Path>,
+    /// The top-level value being checked and its scheme; once its body is
+    /// skolemized, at the regions the body is checked at, through which its
+    /// recursive uses go.
+    pub own: Option<(Path, Scheme)>,
 }
 
 /// `σ` as the model reads a signature: with the `Live` elision adds
@@ -157,6 +161,7 @@ impl<'d> Checker<'d> {
             trace: None,
             instanced: None,
             unfolding: Vec::new(),
+            own: None,
         }
     }
 
@@ -164,7 +169,11 @@ impl<'d> Checker<'d> {
     /// as (Let-Sig) checks the right side of a `let` with a signature.
     pub fn check_top(&mut self, e: &Term, scheme: &Scheme) -> Check<()> {
         self.stage = Stage::Pure;
-        let (expected, _) = self.skolemize(scheme);
+        let (expected, rigid) = self.skolemize(scheme);
+        if let Some((path, s)) = self.own.take() {
+            let own = generalize::own_regions(&self.live_scheme(&s), &s.vars, &rigid);
+            self.own = Some((path, own));
+        }
         self.check(e, &expected)?;
         self.finish()?;
         if self.stage != Stage::Pure {
@@ -225,6 +234,7 @@ pub fn check_program<S: BuildHasher>(
         let scheme = decls.values.get(path).or_else(|| decls.instances.get(path));
         let mut checker = Checker::new(decls);
         checker.module = path.module.clone();
+        checker.own = scheme.map(|s| (path.clone(), s.clone()));
         let result = match scheme {
             Some(s) => checker.check_top(term, s),
             None => checker.infer_top(term).map(|_| ()),

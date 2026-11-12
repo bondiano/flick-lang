@@ -1,0 +1,12 @@
+// A recursive use of a signed function goes through the regions of its
+// signature: a callback qualified `^{c}` or `^c` is passed on as it came.
+module App.RecursionRegions exposing (..)
+
+braced : (Float -> Float)^{c} -> Float -> Float
+let rec braced f n = if n <= 0 then 0 else f n + braced f (n - 1)
+
+bare : (Float -> Float)^c -> Float -> Float
+let rec bare f n = if n <= 0 then 0 else f n + bare f (n - 1)
+
+braced_effect : (Float ->{Async} Float)^{c} -> Float ->{Async} Float
+let rec braced_effect f n = if n <= 0 then 0 else f n + braced_effect f (n - 1)
