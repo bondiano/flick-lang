@@ -1,8 +1,9 @@
 //! The hidden row of data with hidden storage written bare in a signature
 //! (`docs/formal/regions.md` §1.4): in a parameter it is a fresh capture-row
 //! variable the scheme quantifies, in the result what the parameters before
-//! it reach. A written qualifier, a constant and data inside a type argument
-//! keep the row empty.
+//! it reach, and a parameter that is a function is read the same way, as
+//! `Ty.fresh` and `Ty.elide` read it. A written qualifier, a constant and
+//! data inside a type argument keep the row empty.
 
 use super::live::merge;
 use crate::iface::{Entity, Namespace};
@@ -97,7 +98,8 @@ impl Checker<'_> {
     }
 
     /// `scheme` with the hidden rows of the data it writes bare at the outer
-    /// level of a parameter or of its result.
+    /// level of a parameter or of a result, of its own stages and of the
+    /// stages of a parameter that is a function.
     pub fn hidden_rows(&self, scheme: &Type) -> Type {
         let (vars, constraints, body) = match scheme {
             Type::Forall {
@@ -139,17 +141,7 @@ impl Checker<'_> {
                 effects,
                 result,
             } => {
-                let param = if self.bare_hidden(param) {
-                    let name = format!("{FRESH}{}", fresh.len());
-                    kinds.push((name.clone(), Kind::CaptureRow));
-                    fresh.push(Binder {
-                        name: name.clone(),
-                        kind: Kind::CaptureRow,
-                    });
-                    elided((**param).clone(), Type::Var(name))
-                } else {
-                    (**param).clone()
-                };
+                let param = self.rows_of_param(param, kinds, fresh);
                 let mut held = held.clone();
                 let mut reached = self.captures_of(&param);
                 reached.entries.retain(|(_, atom)| {
@@ -169,6 +161,40 @@ impl Checker<'_> {
                 elided(result.clone(), held.clone().into_type())
             }
             other => other.clone(),
+        }
+    }
+
+    /// A parameter read as `Ty.fresh` and `Ty.elide` read it (#295): bare
+    /// data is a fresh row, and a parameter that is a function is read
+    /// as a signature of its own, its results reaching what its own
+    /// parameters reach.
+    fn rows_of_param(
+        &self,
+        param: &Type,
+        kinds: &mut Vec<(String, Kind)>,
+        fresh: &mut Vec<Binder>,
+    ) -> Type {
+        match param {
+            Type::Fun { .. } => self.rows_of_stages(param, &Norm::default(), kinds, fresh, 0),
+            Type::Captured { ty, .. } | Type::Bounded { ty, .. }
+                if matches!(**ty, Type::Fun { .. }) =>
+            {
+                let mut param = param.clone();
+                if let Type::Captured { ty, .. } | Type::Bounded { ty, .. } = &mut param {
+                    **ty = self.rows_of_stages(ty, &Norm::default(), kinds, fresh, 0);
+                }
+                param
+            }
+            _ if self.bare_hidden(param) => {
+                let name = format!("{FRESH}{}", fresh.len());
+                kinds.push((name.clone(), Kind::CaptureRow));
+                fresh.push(Binder {
+                    name: name.clone(),
+                    kind: Kind::CaptureRow,
+                });
+                elided(param.clone(), Type::Var(name))
+            }
+            _ => param.clone(),
         }
     }
 

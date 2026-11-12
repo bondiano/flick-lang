@@ -1,0 +1,19 @@
+// What a callback returns holds what its own parameters reach, and what
+// the outer function returns holds what its parameters reach, the callback
+// included: a closure over the file a callback builds does not leave the
+// `scope` of the file through the outer result.
+module App.HiddenRowsNestedFail exposing (..)
+
+import File exposing (File, Path, FileSystem, OpenError, ReadError)
+
+type G a = G (Unit ->{Async, FileSystem; ReadError} a)
+
+made : (File s -> G String) -> File s -> G String
+let made make file = make file
+
+leaks : Path ->{Async, FileSystem; OpenError} G String
+let leaks path = scope {
+  let file = File.open_scoped path
+  made (fun f -> G (fun _ -> File.read_all f)) file
+}
+//~ FLICK-G001 @17:3-17:52 this value holds region `s`, but the expected type `G String` holds no captures

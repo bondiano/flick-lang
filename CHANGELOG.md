@@ -59,6 +59,11 @@ break programs.
   `none`, but `import M exposing (none)` brings nothing a module can use,
   as the word stays the keyword in an expression. Its `FLICK-R012` now says
   so, and that the module reaches the name as `M.none`.
+- **The hidden row of data in a callback's signature:** a parameter that is a
+  function is read as the signature is: in `(File s -> G String) -> …` the
+  callback's result holds what its own parameter reaches, so the callback may
+  return a closure over the file (rejected before with `FLICK-G001`), and
+  what the outer function returns then holds the file's region too.
 - **The hidden row of data in signatures:** data that stores a function or a
   `task`, written bare in a signature, has its hidden row read as `Live` is:
   in a parameter any row, in the result what the parameters before it reach,

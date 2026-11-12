@@ -1,0 +1,21 @@
+// A parameter that is a function is read as a signature of its own: the
+// data with hidden storage its result writes bare holds what its own
+// parameters reach, so a callback may return a closure over the file it is
+// given while the `scope` of the file lasts.
+module App.HiddenRowsNested exposing (..)
+
+import File exposing (File, Path, FileSystem, OpenError, ReadError)
+
+type G a = G (Unit ->{Async, FileSystem; ReadError} a)
+
+run : G a ->{Async, FileSystem; ReadError} a
+let run (G f) = f ()
+
+with_file : (File s -> G String) -> File s ->{Async, FileSystem; ReadError} String
+let with_file make file = run (make file)
+
+reads : Path ->{Async, FileSystem; OpenError, ReadError} String
+let reads path = scope {
+  let file = File.open_scoped path
+  with_file (fun f -> G (fun _ -> File.read_all f)) file
+}
