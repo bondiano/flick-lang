@@ -1,6 +1,7 @@
 //! Stages and subtypes (`docs/formal/core.md` §2.1, §2.2): `φ ⊑ φ'` is
 //! `ρ ⊆ ρ'` on both rows, `≤` lets a stage and rows of an arrow or `Eff`
-//! grow and the parameter shrink. A row that is still a meta when an
+//! grow and the parameter shrink, data its arguments by their signs
+//! and a record or tuple its fields. A row that is still a meta when an
 //! inclusion needs it waits; once nothing more is known each waiting meta
 //! is the least row, `none`: the least solution of §2.1.
 
@@ -12,6 +13,7 @@ use super::regions::{add_live, arg_caps, live_arg, live_stage};
 use super::{Check, Checker, error, live_service};
 use crate::syntax::Path;
 use crate::types::{Caps, PROVIDED, Row, Stage, Type, Var};
+use crate::variance::Sign;
 
 impl Checker<'_> {
     /// `ρ ⊆ ρ'`. An element or a rigid variable `ρ'` lacks goes into its
@@ -267,7 +269,72 @@ impl Checker<'_> {
                 let t = self.instantiate(&s);
                 self.subsume(&t, &other)
             }
+            // a record and a tuple are immutable: field by field (≤-Rec)
+            (Type::Tuple(xs), Type::Tuple(ys)) if xs.len() == ys.len() => {
+                for (x, y) in xs.iter().zip(ys.iter()) {
+                    self.subsume(x, y)?;
+                }
+                Ok(())
+            }
+            (Type::Record(f), Type::Record(g))
+                if f.tail.is_none() && g.tail.is_none() && f.fields.keys().eq(g.fields.keys()) =>
+            {
+                for (x, y) in f.fields.values().zip(g.fields.values()) {
+                    self.subsume(x, y)?;
+                }
+                Ok(())
+            }
+            (a @ Type::App(..), b @ Type::App(..)) => self.subsume_data(&a, &b),
             (a, b) => self.unify(&a, &b),
+        }
+    }
+
+    /// `T ū ≤ T ū'` by the sign of each parameter (≤-Data, `regions.md`
+    /// §2.2.1): a `−` argument narrows and keeps what it reaches.
+    fn subsume_data(&mut self, a: &Type, b: &Type) -> Check<()> {
+        let (Some((p, xs)), Some((q, ys))) = (self.data_args(a), self.data_args(b)) else {
+            return self.unify(a, b);
+        };
+        let signs = (self.decls.signs.get(&p))
+            .filter(|s| p == q && s.len() == xs.len() && xs.len() == ys.len())
+            .cloned();
+        let Some(signs) = signs else {
+            return self.unify(a, b);
+        };
+        for ((x, y), s) in xs.iter().zip(&ys).zip(signs) {
+            // an argument inference has yet to solve takes the other as it
+            // is, its bound too, as `≡` of the whole type did
+            let open = |t: &Type| matches!(self.resolve(t), Type::Var(Var::Meta(_)));
+            match s {
+                _ if open(x) || open(y) => self.unify(x, y)?,
+                Sign::Pos => self.subsume(x, y)?,
+                Sign::Neg => {
+                    self.subsume(y, x)?;
+                    self.hold(
+                        slice::from_ref(x),
+                        slice::from_ref(y),
+                        &Caps::default(),
+                        "≤-Data",
+                    );
+                }
+                Sign::Inv | Sign::Bi => self.unify(x, y)?,
+            }
+        }
+        Ok(())
+    }
+
+    /// `T ū` as `T` and `ū`, metas at the heads followed.
+    fn data_args(&self, t: &Type) -> Option<(Path, Vec<Type>)> {
+        let mut args = Vec::new();
+        let mut head = self.heads(t);
+        while let Type::App(h, x) = head {
+            args.push((*x).clone());
+            head = self.heads(&h);
+        }
+        args.reverse();
+        match head {
+            Type::Con(p) => Some((p, args)),
+            _ => None,
         }
     }
 
