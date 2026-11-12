@@ -101,7 +101,7 @@ fn breaks_operators_and_pipelines() {
 /// `<|` breaks as `|>` does, one step per line; a composition as other operators.
 #[test]
 fn breaks_left_pipes_and_compositions() {
-    let src = "let shown = Platform.stdout_line <| show <| List.length <| List.filter is_active_and_verified_user <| users_of_the_system\nlet kept =\n  f\n    <| g x\nlet composed = List.map normalize_the_name >> List.filter is_active_and_verified >> List.sort_by_length >> List.take 10\nlet tight = (f>>g) 1\nlet back = f<<g<<h\n";
+    let src = "let shown = Platform.stdout_line <| show <| List.length <| List.filter is_active_and_verified_user <| users_of_the_system\nlet kept =\n  f\n    <| g x\nlet composed = List.map normalize_the_name >> List.filter is_active_and_verified >> List.sort_by_length >> List.take 10\nlet tight = (f>>g) 1\nlet back = f<<g<<h\nlet trailing =\n  f <|\n    g x\nlet piped =\n  xs |>\n    List.map f\n";
     insta::assert_snapshot!(fmt(src), @r"
     let shown =
       Platform.stdout_line
@@ -119,6 +119,12 @@ fn breaks_left_pipes_and_compositions() {
         >> List.take 10
     let tight = (f >> g) 1
     let back = f << g << h
+    let trailing =
+      f
+      <| g x
+    let piped =
+      xs
+      |> List.map f
     ");
 }
 

@@ -670,7 +670,8 @@ What the author decides, as in Gleam: a trailing `,` or `;` (`[a, b,]`,
 `{ a = 1; }`), or a blank line between items, keeps a bracket broken one item
 per line; a list of constants written several per line with a trailing `,`
 is filled, as many per line as fit; a pipeline written with a step on its own
-line keeps one step per line. Blank lines between declarations, statements,
+line, its `|>` or `<|` at the start or at the end of a line, keeps one step
+per line, each operator at the start of its line. Blank lines between declarations, statements,
 members, arms, fields and items are kept, a run of them as one. A comment on
 its own line stays on its own line before what follows it, a comment that
 ends a line stays at the end of that line, and the construct around it

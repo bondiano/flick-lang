@@ -14,8 +14,11 @@ break programs.
   `let f' = f; let g' = g; fun x -> g' (f' x)`: its operands are evaluated
   once, left to right, any functions compose, the effect rows join, and it
   holds what they hold. Mixing `<|` with `|>`, or `>>` with `<<`, without
-  parentheses is `FLICK-S007`. Lints, inlay hints and the formatter treat a
-  `<|` pipeline as they treat `|>`. In release a composition applied is the
+  parentheses is `FLICK-S007`. Lints, inlay hints, signature help and the
+  formatter treat a `<|` pipeline as they treat `|>`, and a pipeline written
+  with its operators at the ends of lines now stays one step per line too.
+  On Go a composition takes and returns numbers in their Go type, as the
+  function written out does. In release a composition applied is the
   nested call, `x |> f` is `f x` when the order cannot be told, and a
   partial application moves to where it completes, so `|>` pipelines now
   get workers and inlining too.

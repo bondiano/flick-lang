@@ -43,7 +43,8 @@
 //! What the author decides: a trailing separator (`[a, b,]`, `{ a = 1; }`)
 //! or a blank line between items keeps a bracket broken one item per line
 //! (a list of constants written several per line is then filled); a
-//! pipeline written with a step on its own line keeps one step per line;
+//! pipeline written with a step on its own line, its operator at either end
+//! of a line, keeps one step per line;
 //! blank lines between declarations, statements, members, arms, fields and
 //! items are kept, at most one. Comments stay where they are: a comment on
 //! its own line before what follows it, a comment ending a line at the end
