@@ -1,0 +1,35 @@
+// Parse untrusted text, validate nested data, update it and serialize it again.
+// Try a wrong field type below: a schema error carries the path of the field.
+module Main exposing (main)
+
+type alias Address = { city : String; postcode : String }
+  deriving Schema
+
+type alias Profile = { name : String; address : Address; tags : List String }
+  deriving Schema
+
+rewrite : String -> Result SchemaError String
+let rewrite text =
+  let json = Result.bind (Codec.decode_result (Codec.json Profile.schema)) (Json.parse text)
+  Result.bind
+    (fun profile ->
+      let updated = { profile with tags = profile.tags ++ ["verified"] }
+      Result.map Json.stringify (Codec.encode_result (Codec.json Profile.schema) updated)
+    )
+    json
+
+print_result : Result SchemaError String ->{} Unit
+let print_result result =
+  match result with
+  | Ok json -> Platform.stdout_line json
+  | Err (SchemaError issues) -> for issue <- issues do {
+    Platform.stdout_line ("Invalid field: " ++ issue.path)
+  }
+
+main : Unit ->{} Unit
+let main () =
+  print_result
+    (rewrite
+      "{\"name\":\"Ada\",\"address\":{\"city\":\"London\",\"postcode\":\"SW1\"},\"tags\":[\"admin\"]}")
+  print_result
+    (rewrite "{\"name\":\"Ada\",\"address\":{\"city\":42,\"postcode\":\"SW1\"},\"tags\":[]}")

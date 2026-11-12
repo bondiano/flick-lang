@@ -1,0 +1,33 @@
+// Filter paid orders, group their totals in an immutable map, then sort a report.
+// All amounts are integer cents, so adding prices does not round floats.
+module Main exposing (main)
+
+import HashMap
+
+type alias Order = { category : String; cents : Int; paid : Bool }
+
+totals : List Order -> List (String, Int)
+let totals orders =
+  let paid = List.filter (fun order -> order.paid) orders
+  List.fold_left
+    (fun report order ->
+      let previous = Option.with_default 0 (HashMap.get order.category report)
+      HashMap.insert order.category (previous + order.cents) report
+    )
+    HashMap.empty
+    paid
+  |> HashMap.to_list
+  |> List.sort_by (fun (a, _) (b, _) -> compare a b)
+
+main : Unit ->{} Unit
+let main () =
+  let orders = [
+    { category = "books"; cents = 1200; paid = true },
+    { category = "games"; cents = 3500; paid = true },
+    { category = "books"; cents = 800; paid = true },
+    { category = "games"; cents = 9900; paid = false },
+  ]
+  for (category, cents) <- totals orders do {
+    Platform.stdout_line (category ++ ": " ++ show cents ++ " cents")
+  }
+  Platform.stdout_line ("No orders: " ++ show (totals []))

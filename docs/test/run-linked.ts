@@ -7,6 +7,16 @@ import { link, packages } from "../src/playground/loader.ts";
 const dir = process.argv[2] ?? ".";
 const entry = process.argv[3];
 if (entry === undefined) throw new Error("Pass the compiled module's path");
+// Network examples run unchanged, against explicit fixtures rather than a live service.
+const fetchFixture = process.argv[4];
+if (fetchFixture !== undefined) {
+  const replies = JSON.parse(readFileSync(fetchFixture, "utf8")) as Record<string, unknown>;
+  globalThis.fetch = (input) => {
+    const url = input instanceof Request ? input.url : String(input);
+    if (!Object.hasOwn(replies, url)) throw new Error(`No fetch fixture for ${url}`);
+    return Promise.resolve(Response.json(replies[url]));
+  };
+}
 const files: Record<string, string> = {};
 const walk = (sub: string): void => {
   for (const name of readdirSync(path.join(dir, sub))) {

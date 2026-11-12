@@ -1,0 +1,3 @@
+pikachu (#25): electric; 4 dm, 60 hg
+bulbasaur (#1): grass, poison; 7 dm, 69 hg
+Serialized: [{"id":25,"name":"pikachu","types":["electric"]},{"id":1,"name":"bulbasaur","types":["grass","poison"]}]

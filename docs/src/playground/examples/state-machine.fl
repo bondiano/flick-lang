@@ -1,0 +1,41 @@
+// An order's state decides which events are allowed. A rejected event keeps it unchanged.
+// Add an event or a state: the compiler checks that every case is considered.
+module Main exposing (main)
+
+type State = AwaitingPayment | Paid | Shipped String | Cancelled
+  deriving Show
+
+type Event = Pay | Ship String | Cancel
+  deriving Show
+
+step : State -> Event -> Result String State
+let step state event =
+  match state with
+  | AwaitingPayment ->
+    match event with
+    | Pay -> Ok Paid
+    | Cancel -> Ok Cancelled
+    | Ship _ -> Err "payment required"
+  | Paid ->
+    match event with
+    | Ship tracking -> Ok (Shipped tracking)
+    | Cancel -> Ok Cancelled
+    | Pay -> Err "already paid"
+  | Shipped _ -> Err "already shipped"
+  | Cancelled -> Err "already cancelled"
+
+apply : State -> Event ->{} State
+let apply state event =
+  match step state event with
+  | Ok next ->
+    Platform.stdout_line (show event ++ " -> " ++ show next)
+    next
+  | Err reason ->
+    Platform.stdout_line (show event ++ " rejected: " ++ reason)
+    state
+
+main : Unit ->{} Unit
+let main () =
+  let mut state = AwaitingPayment
+  for event <- [Ship "FL-42", Pay, Pay, Ship "FL-42", Cancel] do { state = apply state event }
+  Platform.stdout_line ("Final: " ++ show state)

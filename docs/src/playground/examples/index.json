@@ -36,6 +36,15 @@
       ]
     },
     {
+      "id": "practical", "en": "Working with data", "ru": "Работа с данными",
+      "examples": [
+        { "id": "pokeapi", "en": "PokéAPI: HTTP and JSON", "ru": "PokéAPI: HTTP и JSON", "expect": "run" },
+        { "id": "json-validation", "en": "Validate and serialize JSON", "ru": "Проверка и сериализация JSON", "expect": "run" },
+        { "id": "sales-report", "en": "Group and sort orders", "ru": "Группировка и сортировка заказов", "expect": "run" },
+        { "id": "state-machine", "en": "An order state machine", "ru": "Автомат состояний заказа", "expect": "run" }
+      ]
+    },
+    {
       "id": "caught", "en": "What the compiler catches", "ru": "Что ловит компилятор",
       "examples": [
         { "id": "type-error", "en": "A type error", "ru": "Ошибка типа", "expect": "fail FLICK-T003" },

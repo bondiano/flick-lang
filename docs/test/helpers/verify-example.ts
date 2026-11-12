@@ -25,9 +25,9 @@ export const errorCodes = (stderr: string): ReadonlyArray<string> => [
 /**
  * Checks `file` as `Main.fl` in `target/tmp/<name>`: `fail CODE` reports
  * exactly that code; `run` and `ui` check clean and build in both profiles,
- * and a `run` prints `stdout`.
+ * and a `run` prints `stdout`. Network examples can supply fetch fixtures.
  */
-export const verifyExample = (name: string, file: string, expect: string, stdout?: string): void => {
+export const verifyExample = (name: string, file: string, expect: string, stdout?: string, fetchFixture?: string): void => {
   const dir = path.join(repo, "target/tmp", name);
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
@@ -43,7 +43,9 @@ export const verifyExample = (name: string, file: string, expect: string, stdout
     // as the playground builds it: for Flick's own runtime
     execFileSync(flick, ["build", "Main.fl", "--rt", "--profile", profile, "--out-dir", profile], { cwd: dir });
     if (expect !== "run") continue;
-    const out = execFileSync("node", [path.join(here, "../run-linked.ts"), path.join(dir, profile), "flick-main.js"], {
+    const args = [path.join(here, "../run-linked.ts"), path.join(dir, profile), "flick-main.js"];
+    if (fetchFixture !== undefined) args.push(fetchFixture);
+    const out = execFileSync("node", args, {
       cwd: path.join(here, ".."),
       encoding: "utf8",
     });
