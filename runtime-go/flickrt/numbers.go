@@ -34,7 +34,7 @@ func IntParse(s Value) Value {
 	return Some(int32(n))
 }
 
-func IntToFloat(n Value) Value { return float64(n.(int32)) }
+func IntToFloat(n int32) float64 { return float64(n) }
 
 // IntFromFloat is the Int equal to a Float, if any; -0 is 0.
 func IntFromFloat(n Value) Value {
@@ -47,7 +47,7 @@ func IntFromFloat(n Value) Value {
 
 // IntTruncate is JS `n | 0`: the fraction dropped, wrapped into 32 bits;
 // NaN and the infinities are 0.
-func IntTruncate(n Value) Value { return toInt32(n.(float64)) }
+func IntTruncate(n float64) int32 { return toInt32(n) }
 
 func toInt32(x float64) int32 {
 	if math.IsNaN(x) || math.IsInf(x, 0) {
@@ -56,8 +56,7 @@ func toInt32(x float64) int32 {
 	return int32(uint32(int64(math.Mod(math.Trunc(x), 4294967296))))
 }
 
-func IntAbs(n Value) Value {
-	x := n.(int32)
+func IntAbs(x int32) int32 {
 	if x < 0 {
 		return -x
 	}
@@ -94,37 +93,36 @@ func IntCheckedRem(a, b Value) Value {
 	return checked("checked_rem", a, b, func(x, y int64) int64 { return x % y })
 }
 
-func IntUnsafeDiv(a, b Value) Value {
-	if b.(int32) == 0 {
+func IntUnsafeDiv(a, b int32) int32 {
+	if b == 0 {
 		panic(Defect{"RangeError: Int.unsafe_div: division by zero"})
 	}
-	return a.(int32) / b.(int32)
+	return a / b
 }
 
-func IntUnsafeRem(a, b Value) Value {
-	if b.(int32) == 0 {
+func IntUnsafeRem(a, b int32) int32 {
+	if b == 0 {
 		panic(Defect{"RangeError: Int.unsafe_rem: division by zero"})
 	}
-	return a.(int32) % b.(int32)
+	return a % b
 }
 
-func BitAnd(a, b Value) Value { return a.(int32) & b.(int32) }
-func BitOr(a, b Value) Value  { return a.(int32) | b.(int32) }
-func BitXor(a, b Value) Value { return a.(int32) ^ b.(int32) }
-func BitNot(a Value) Value    { return ^a.(int32) }
+func BitAnd(a, b int32) int32 { return a & b }
+func BitOr(a, b int32) int32  { return a | b }
+func BitXor(a, b int32) int32 { return a ^ b }
+func BitNot(a int32) int32    { return ^a }
 
 // Shifts take the count modulo 32, as JS does.
-func ShiftLeft(a, b Value) Value  { return a.(int32) << (uint32(b.(int32)) & 31) }
-func ShiftRight(a, b Value) Value { return a.(int32) >> (uint32(b.(int32)) & 31) }
-func ShiftRightUnsignedInt(a, b Value) Value {
-	return int32(uint32(a.(int32)) >> (uint32(b.(int32)) & 31))
+func ShiftLeft(a, b int32) int32  { return a << (uint32(b) & 31) }
+func ShiftRight(a, b int32) int32 { return a >> (uint32(b) & 31) }
+func ShiftRightUnsignedInt(a, b int32) int32 {
+	return int32(uint32(a) >> (uint32(b) & 31))
 }
 
-func NumberStrictEqual(a, b Value) Value { return a.(float64) == b.(float64) }
+func NumberStrictEqual(a, b float64) bool { return a == b }
 
 // NumberSameValue is JS `Object.is`: NaN is itself, and 0 is not -0.
-func NumberSameValue(a, b Value) Value {
-	x, y := a.(float64), b.(float64)
+func NumberSameValue(x, y float64) bool {
 	if math.IsNaN(x) || math.IsNaN(y) {
 		return math.IsNaN(x) && math.IsNaN(y)
 	}
@@ -136,7 +134,7 @@ func BigIntOfInt(n Value) Value { return big.NewInt(int64(n.(int32))) }
 // BigIntOfFloat is `BigInt.from_number`: the integer a number holds
 // exactly, of any size, and None for a fraction, NaN or an infinity.
 func BigIntOfFloat(x Value) Value {
-	if FloatIsInteger(x) != true {
+	if !FloatIsInteger(x.(float64)) {
 		return None
 	}
 	n, _ := new(big.Float).SetFloat64(x.(float64)).Int(nil)
@@ -163,35 +161,32 @@ func FloatOfBigInt(n Value) Value {
 	return f
 }
 
-func FloatIsNaN(x Value) Value    { return math.IsNaN(x.(float64)) }
-func FloatIsFinite(x Value) Value { return !math.IsNaN(x.(float64)) && !math.IsInf(x.(float64), 0) }
-func FloatIsInteger(x Value) Value {
-	f := x.(float64)
+func FloatIsNaN(x float64) bool    { return math.IsNaN(x) }
+func FloatIsFinite(x float64) bool { return !math.IsNaN(x) && !math.IsInf(x, 0) }
+func FloatIsInteger(f float64) bool {
 	return !math.IsInf(f, 0) && f == math.Trunc(f)
 }
-func FloatIsSafeInteger(x Value) Value {
-	f := x.(float64)
-	return FloatIsInteger(x).(bool) && math.Abs(f) <= 1<<53-1
+func FloatIsSafeInteger(f float64) bool {
+	return FloatIsInteger(f) && math.Abs(f) <= 1<<53-1
 }
 
 // NumberSafeInteger is `Float.safe_integer`: `n` when it is a safe integer.
 func NumberSafeInteger(x Value) Value {
-	if FloatIsSafeInteger(x).(bool) {
+	if FloatIsSafeInteger(x.(float64)) {
 		return Some(x)
 	}
 	return None
 }
 
-func FloatAbs(x Value) Value   { return math.Abs(x.(float64)) }
-func FloatFloor(x Value) Value { return math.Floor(x.(float64)) }
-func FloatCeil(x Value) Value  { return math.Ceil(x.(float64)) }
-func FloatTrunc(x Value) Value { return math.Trunc(x.(float64)) }
-func FloatSqrt(x Value) Value  { return math.Sqrt(x.(float64)) }
+func FloatAbs(x float64) float64   { return math.Abs(x) }
+func FloatFloor(x float64) float64 { return math.Floor(x) }
+func FloatCeil(x float64) float64  { return math.Ceil(x) }
+func FloatTrunc(x float64) float64 { return math.Trunc(x) }
+func FloatSqrt(x float64) float64  { return math.Sqrt(x) }
 
 // FloatRound is JS `Math.round`: the nearest integer, halves up, and the
 // sign of zero kept. `x - floor(x)` is exact, so no half is misread.
-func FloatRound(x Value) Value {
-	f := x.(float64)
+func FloatRound(f float64) float64 {
 	if math.IsNaN(f) || math.IsInf(f, 0) {
 		return f
 	}

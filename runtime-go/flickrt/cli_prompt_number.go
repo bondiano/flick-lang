@@ -193,7 +193,7 @@ func (o *promptNumberOptions) process(c *promptCtx, input, state Value) promptAc
 		}
 		if o.float {
 			factor := math.Pow(10, o.precision)
-			parsed = FloatRound(parsed*factor).(float64) / factor
+			parsed = FloatRound(parsed*factor) / factor
 		}
 		value, err := o.check(c.fb, parsed)
 		if err != nil {

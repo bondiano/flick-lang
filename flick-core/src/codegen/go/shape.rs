@@ -34,14 +34,12 @@ pub(super) enum Shape {
 pub(super) struct Types(u64);
 
 impl Types {
-    const ALL: [Native; 4] = [Native::Int, Native::Float, Native::Bool, Native::String];
-
-    fn of(result: Option<Native>, params: &[Option<Native>]) -> Types {
+    pub(super) fn of(result: Option<Native>, params: &[Option<Native>]) -> Types {
         if params.len() > 20 {
             return Types(0);
         }
         let code = |n: &Option<Native>| {
-            n.and_then(|n| Self::ALL.iter().position(|&m| m == n))
+            n.and_then(|n| Native::ALL.iter().position(|&m| m == n))
                 .map_or(0, |at| at as u64 + 1)
         };
         let slots = iter::once(&result).chain(params).enumerate();
@@ -51,7 +49,7 @@ impl Types {
     fn slot(self, i: usize) -> Option<Native> {
         let shift = u32::try_from(3 * i).ok();
         let code = shift.and_then(|s| self.0.checked_shr(s)).unwrap_or(0) & 7;
-        (code > 0).then(|| Self::ALL[code as usize - 1])
+        (code > 0).then(|| Native::ALL[code as usize - 1])
     }
 
     pub(super) fn result(self) -> Option<Native> {
@@ -84,7 +82,7 @@ fn effects(stages: impl IntoIterator<Item = bool>) -> u64 {
         .fold(0, |mask, (i, effectful)| mask | u64::from(effectful) << i)
 }
 
-pub(super) fn shape(kind: &ItemKind) -> Shape {
+pub(super) fn shape(module: &str, kind: &ItemKind) -> Shape {
     match kind {
         ItemKind::Value { dicts, body, .. } => match &body.kind {
             ExprKind::Lambda { params, body } => {
@@ -121,7 +119,8 @@ pub(super) fn shape(kind: &ItemKind) -> Shape {
                     effects: effects(
                         (0..params).map(|i| f.stages.get(i).copied().unwrap_or(false)),
                     ),
-                    types: Types::default(),
+                    // those the table of bindings gives its Go function
+                    types: foreign::types(module, f),
                 }
             }
         }

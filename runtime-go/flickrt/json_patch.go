@@ -152,7 +152,7 @@ func jsonPatchGet(old, new Value, path string, out []patchOp) []patchOp {
 			return out
 		}
 	case float64:
-		if n, ok := new.(float64); ok && NumberSameValue(o, n).(bool) {
+		if n, ok := new.(float64); ok && NumberSameValue(o, n) {
 			return out
 		}
 	case string, bool:

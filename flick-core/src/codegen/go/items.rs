@@ -98,7 +98,7 @@ impl<'a> Gen<'a> {
         // whether the declaration made now holds a `//line` directive
         let lines = self.lines;
         match &item.kind {
-            ItemKind::Value { name, dicts, body } => match super::shape(&item.kind) {
+            ItemKind::Value { name, dicts, body } => match super::shape(self.module, &item.kind) {
                 Shape::Var => {
                     let var = a.alloc_str(&names::var(self.module, name));
                     decls.push((docvec![a, "var ", var, " flickrt.Value"], false));
