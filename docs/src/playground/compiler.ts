@@ -135,11 +135,9 @@ export const plain = (markdown: string): string =>
     .join("")
     .trim();
 
-/** What hovering at the UTF-16 offset `at` of `source` shows, as plain text, or null. */
-export const hover = async (source: string, at: number, signal?: AbortSignal): Promise<Hover | null> => {
-  const shown = await request<Hover | null>({ action: "hover", source, at }, signal);
-  return shown === null ? null : { ...shown, text: plain(shown.text) };
-};
+/** Compiler Markdown at the UTF-16 offset `at` of `source`, or null. */
+export const hover = (source: string, at: number, signal?: AbortSignal): Promise<Hover | null> =>
+  request<Hover | null>({ action: "hover", source, at }, signal);
 
 /** What may stand at the UTF-16 offset `at` of `source`: the start of a name, or with `dotted` a `.` whose member is cut out of `source`. */
 export const complete = (source: string, at: number, dotted: boolean, signal?: AbortSignal): Promise<Array<Completion>> =>

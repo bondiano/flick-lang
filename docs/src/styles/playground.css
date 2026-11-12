@@ -211,15 +211,17 @@ main:has(#flick-playground):not(:has(.tour-lesson)) .sl-container { max-width: n
 .fp-split { position: relative; z-index: 2; background: var(--fp-rule); cursor: col-resize; touch-action: none; }
 .fp-split::before {
   position: absolute;
-  inset: 0 -1.5px;
-  background: var(--sl-color-accent-high);
+  inset: calc(50% - 0.75rem) -1px auto;
+  height: 1.5rem;
+  background: var(--sl-color-gray-4);
   content: "";
-  opacity: 0;
-  transition: opacity 180ms ease-out;
+  transition: background-color 180ms ease-out;
 }
-.fp-split::after { position: absolute; inset: 0 -6px; content: ""; }
-.fp-split:hover::before, .fp-split:focus-visible::before { opacity: 1; }
+.fp-split::after { position: absolute; inset: 0 -11.5px; content: ""; }
+.fp-split:hover::before, .fp-split:focus-visible::before, .fp-resizing .fp-split::before { background: var(--sl-color-accent-high); }
 .fp-split:focus-visible { outline: none; }
+.fp-resizing { user-select: none; }
+.fp-resizing iframe { pointer-events: none; }
 
 .fp-pane-header {
   display: flex;
@@ -356,6 +358,23 @@ main:has(#flick-playground):not(:has(.tour-lesson)) .sl-container { max-width: n
   overflow-wrap: anywhere;
 }
 .fp-cm .cm-diagnostic { border-left: 0; }
+.fp-cm .cm-diagnostic .fp-hover { padding: 0; }
+.fp-cm .fp-hover {
+  max-height: min(32rem, 70dvh);
+  overflow: auto;
+  font-family: var(--sl-font);
+  white-space: normal;
+}
+.fp-hover :is(p, pre, ul, ol, blockquote, h1, h2, h3, h4, h5, h6) { margin: 0; }
+.fp-hover > * + * { margin-top: 0.625rem; }
+.fp-hover :is(pre, code) { font-family: var(--__sl-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: inherit; }
+.fp-hover pre { padding: 0; background: transparent; color: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fp-hover :not(pre) > code { padding: 0.08em 0.25em; background: var(--fp-surface); }
+.fp-hover :is(ul, ol) { padding-left: 1.25rem; }
+.fp-hover li + li { margin-top: 0.25rem; }
+.fp-hover blockquote { padding-left: 0.75rem; border-left: 1px solid var(--fp-rule); color: var(--sl-color-gray-2); }
+.fp-hover :is(h1, h2, h3, h4, h5, h6) { font-size: 1em; font-weight: 600; }
+.fp-hover a { color: var(--sl-color-text-accent); text-decoration: underline; text-underline-offset: 0.15em; }
 .fp-cm .cm-diagnostic + .cm-diagnostic { border-top: 1px solid var(--fp-rule); }
 .fp-cm .cm-diagnosticSource { margin-top: 0.375rem; color: var(--sl-color-gray-3); font-size: 0.75rem; opacity: 1; }
 .fp-cm .cm-diagnostic-error .cm-diagnosticSource { color: var(--flick-error); }
@@ -461,11 +480,12 @@ main:has(.tour-lesson) .sl-container { max-width: none; }
 .tour-editor .fp-workspace { height: min(44rem, calc(100dvh - var(--sl-nav-height) - 2rem)); border: 1px solid var(--fp-rule); }
 /* An exercise adds its task and buttons above the editor, which keeps its own height. */
 .tour-editor .fp-workspace:has(.fp-lesson) { height: auto; }
-.tour-editor .fp-workspace:has(.fp-lesson) .fp-panes { grid-template-rows: minmax(14rem, auto) minmax(8rem, auto); }
+.tour-editor .fp-workspace:has(.fp-lesson) .fp-panes { height: 36rem; flex: none; }
 .tour-editor .fp-toolbar { flex-shrink: 0; }
-.tour-editor .fp-panes { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 3fr) minmax(0, 2fr); }
-.tour-editor .fp-split { display: none; }
-.tour-editor .fp-result { border-top: 1px solid var(--fp-rule); }
+.tour-editor .fp-panes { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, var(--fp-split)) 1px minmax(0, 1fr); }
+.tour-editor .fp-split { cursor: row-resize; }
+.tour-editor .fp-split::before { inset: -1px auto -1px calc(50% - 0.75rem); width: 1.5rem; height: auto; }
+.tour-editor .fp-split::after { inset: -11.5px 0; }
 @media (min-width: 90rem) {
   .tour-lesson { grid-template-columns: minmax(18rem, 28rem) minmax(0, 1fr); align-items: start; }
   .tour-editor { position: sticky; top: calc(var(--sl-nav-height) + 1rem); container-type: inline-size; }
@@ -474,15 +494,18 @@ main:has(.tour-lesson) .sl-container { max-width: none; }
 @container (min-width: 64rem) {
   .tour-editor .fp-panes,
   .tour-editor .fp-workspace:has(.fp-lesson) .fp-panes {
-    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    grid-template-columns: minmax(0, var(--fp-split)) 1px minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
   }
-  .tour-editor .fp-result { border-top: 0; border-left: 1px solid var(--fp-rule); }
+  .tour-editor .fp-split { cursor: col-resize; }
+  .tour-editor .fp-split::before { inset: calc(50% - 0.75rem) -1px auto; width: auto; height: 1.5rem; }
+  .tour-editor .fp-split::after { inset: 0 -11.5px; }
 }
 
 /* A phone or a narrow window stacks the panels and lets the page scroll. */
 @media (max-width: 56rem) {
   .fp-workspace, .tour-editor .fp-workspace { height: auto; }
+  .tour-editor .fp-workspace:has(.fp-lesson) .fp-panes { height: auto; }
   .tour-editor .fp-panes,
   .tour-editor .fp-workspace:has(.fp-lesson) .fp-panes { grid-template-rows: none; }
   .fp-panes { grid-template-columns: minmax(0, 1fr); }

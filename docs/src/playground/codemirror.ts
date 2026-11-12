@@ -8,6 +8,7 @@ import { Decoration, type DecorationSet, EditorView, hoverTooltip, keymap, lineN
 import { complete, hover } from "./compiler.ts";
 import type { Diagnostic } from "./compiler.worker.ts";
 import { highlight } from "./highlight.ts";
+import { renderMarkdown } from "./markdown.ts";
 
 /** A change Flick made itself, which it does not need to hear back about. */
 const external = Annotation.define<boolean>();
@@ -56,12 +57,7 @@ const types = hoverTooltip(async (view, at) => {
     pos: shown.from,
     end: shown.to,
     above: true,
-    create: () => {
-      const dom = document.createElement("pre");
-      dom.className = "fp-hover";
-      dom.textContent = shown.text;
-      return { dom };
-    },
+    create: () => ({ dom: renderMarkdown(shown.text, view.dom.ownerDocument) }),
   };
 });
 
@@ -152,6 +148,7 @@ export const mark = (view: EditorView, source: string, diagnostics: ReadonlyArra
       severity: SEVERITIES[d.severity] ?? "info",
       source: d.code,
       message: d.message,
+      renderMessage: (view) => renderMarkdown(d.message, view.dom.ownerDocument),
       actions: d.fixes.map((fix) => ({
         name: fix.message,
         // a fix's offsets are those of `source`, the text it was found in
