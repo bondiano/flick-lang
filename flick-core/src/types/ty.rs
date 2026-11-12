@@ -181,12 +181,9 @@ impl Written {
 
 pub use flick_ir::Stage;
 
-/// Services whose operations run at once, without the Effect runtime.
-pub const SYNC_SERVICES: [Lang; 2] = [Lang::AtomRead, Lang::Setup];
-
 impl Effects {
     /// The rows of an arrow as written: Sync when its services are a closed
-    /// row of [`SYNC_SERVICES`] and its errors none.
+    /// row of services marked `@sync` and its errors none.
     pub fn new(services: Type, errors: Type) -> Effects {
         let sync = sync_rows(&services, &errors);
         Effects {
@@ -229,11 +226,8 @@ pub fn sync_rows(services: &Type, errors: &Type) -> bool {
         l.retain(|l| **l != Elem::Live);
         !l.is_empty()
             && l.iter().all(|l| {
-                SYNC_SERVICES.iter().any(|&s| {
-                    lang::table()
-                        .find(s)
-                        .is_some_and(|i| l.name() == Some(&i.label))
-                })
+                let sync = &lang::table().sync;
+                sync.iter().any(|s| l.name() == Some(&s.label))
             })
     }) && closed_labels(errors).is_some_and(|l| l.is_empty())
 }
