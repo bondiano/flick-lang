@@ -227,6 +227,14 @@
     [
       "flick:ui/server",
       "@flick-lang/runtime/rt/ui/server"
+    ],
+    [
+      "flick:runner/browser",
+      "@flick-lang/runtime/rt/runner/browser"
+    ],
+    [
+      "flick:runner/node",
+      "@flick-lang/runtime/rt/runner/node"
     ]
   ],
   "key": "flick:",

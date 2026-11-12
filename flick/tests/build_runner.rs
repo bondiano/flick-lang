@@ -57,6 +57,37 @@ fn the_node_runner_runs_main() {
     );
 }
 
+/// On Flick's own runtime the runners are the runtime's: an app without the
+/// adapter builds with either and runs `main`.
+#[test]
+#[ignore = "needs Node and pnpm install"]
+fn the_runtimes_own_runners_run_main_without_the_adapter() {
+    for runner in ["Runner.Node", "Runner.Browser"] {
+        let dir = Path::new(env!("CARGO_TARGET_TMPDIR"))
+            .join(format!("build_runner_rt_{}", runner.replace('.', "_")));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join("src/App")).expect("dir");
+        let config = format!(
+            "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\nrunner = \"{runner}\"\n"
+        );
+        fs::write(dir.join("flick.toml"), config).expect("write");
+        fs::write(dir.join("src/App/Main.fl"), NODE_MAIN).expect("write");
+        let out = flick_in(&dir, &["build"]);
+        assert!(out.status.success(), "{runner}: {out:?}");
+        let run = Command::new("node")
+            .arg(Path::new("dist").join(runner_file("main", false)))
+            .current_dir(&dir)
+            .output()
+            .expect("node");
+        assert_eq!(run.status.code(), Some(0), "{runner}: {run:?}");
+        assert_eq!(
+            String::from_utf8_lossy(&run.stdout),
+            "started by Runner.Node\n",
+            "{runner}"
+        );
+    }
+}
+
 const WORKER: &str = "module App.Worker exposing (main)
 
 import Runner.Cloudflare exposing (Fetch, Env)

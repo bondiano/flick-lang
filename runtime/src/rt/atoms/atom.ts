@@ -10,7 +10,7 @@ import { withOwner } from "../owner.ts";
 import type { Codec } from "../schema.ts";
 import { type UrlCodec, routeParse, routePrint } from "../route.ts";
 import { streamHooks } from "../ui/stream_hook.ts";
-import { type Atom, type AsyncResult, type Reading, isAtom, lastSuccess, mapped, patched, readable, state, waitingFrom } from "./registry.ts";
+import { type Atom, type AsyncResult, type Reading, type Registry, isAtom, lastSuccess, mapped, patched, readable, state, waitingFrom } from "./registry.ts";
 import { seededTask, serializableTask, withSeed } from "./serial.ts";
 import { WRITE, reading, registryHere, registryOf, toAsync } from "./services.ts";
 
@@ -59,14 +59,40 @@ export function* atomMutation(keys: ReadonlyArray<string>, f: (payload: unknown)
   return value;
 }
 
+/** The labelled states by their labels, which a module replacement reads and seeds. */
+const states = new Map<string, WeakRef<Atom>>();
+
+/** The values `registry` holds of the labelled states. */
+export const statesOf = (registry: Registry): Map<string, unknown> => {
+  const values = new Map<string, unknown>();
+  for (const node of registry.all()) {
+    const name = node.atom.label;
+    if (name !== undefined && states.get(name)?.deref() === node.atom) values.set(name, registry.valueOf(node));
+  }
+  return values;
+};
+
+/** Gives the labelled states of `values` their values in `registry`. */
+export const seedStates = (registry: Registry, values: ReadonlyMap<string, unknown>): void => {
+  for (const [name, value] of values) {
+    const atom = states.get(name)?.deref();
+    if (atom !== undefined) registry.set(atom, value);
+  }
+};
+
 /**
  * The label the compiler gives a top-level atom, view or action,
  * `Module.name`, which debugging tools show; one it has already stays.
  */
 export const label = <A extends object>(name: string, value: A): A => {
   if (Reflect.get(value, "label") !== undefined) return value;
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- an atom labelled is an atom
-  if (isAtom(value)) return patched(value, { label: name }) as unknown as A;
+  if (isAtom(value)) {
+    const labelled = patched(value, { label: name });
+    // a state, which a module replacement in development carries over
+    if (labelled.write !== undefined) states.set(name, new WeakRef(labelled));
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- an atom labelled is an atom
+    return labelled as unknown as A;
+  }
   const labelled = { ...value, label: name };
   const prototype: unknown = Object.getPrototypeOf(value);
   if (prototype === null || typeof prototype === "object" || typeof prototype === "function")
