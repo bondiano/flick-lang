@@ -35,6 +35,10 @@ break programs.
   `T.check : U -> Bool`, a refined type needs no Effect of its own, and
   another module sees it as an opaque type. A class in its `deriving` takes
   no arguments.
+- **Plugins:** a block that opens a module may name a function its values
+  are applied through (`Expr::Open.through`): inside `ui` a foreign component
+  takes its props through `Ui.component` by this, not by a rule of the
+  checker.
 - **Labels:** `@label kind` before a type declaration gives the top-level
   values of that type their names where the program runs, as the atoms,
   views and actions of the standard library have them; a library marks its

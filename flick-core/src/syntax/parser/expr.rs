@@ -357,23 +357,11 @@ fn todo(p: &mut Parser) -> K {
     K::TodoExpr
 }
 
-fn atom(p: &mut Parser) -> Option<Done> {
+pub(super) fn atom(p: &mut Parser) -> Option<Done> {
     let m = p.start();
     let kind = match p.current() {
         K::Ident if plugin::at_block(p) => plugin::block(p),
-        K::Ident if p.at_word(OPEN) => {
-            p.bump();
-            con_path(p);
-            // the type of a child, when calls of the body give their last
-            // list element by element
-            if p.at(K::Con) {
-                let child = p.start();
-                con_path(p);
-                p.complete(child, K::NameType);
-            }
-            atom(p);
-            K::OpenExpr
-        }
+        K::Ident if p.at_word(OPEN) => plugin::opened(p),
         K::Ident => {
             p.bump();
             K::NameExpr

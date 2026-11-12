@@ -541,7 +541,7 @@ struct Checker<'a> {
     /// each as the file names it: a name one of them exports is that one,
     /// before the names of the file. `ui { … }` opens `Ui`. With each, the
     /// type of a child, if its block names one.
-    opened: Vec<(String, Option<Type>)>,
+    opened: Vec<ui::Opened>,
     /// Capitalized type members visible only while checking a `type module` body.
     contract_types: Vec<(String, Type, kinds::Kind)>,
     /// Lexically opened `Module Sig` values, innermost first on lookup.

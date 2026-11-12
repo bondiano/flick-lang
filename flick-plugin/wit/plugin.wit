@@ -59,7 +59,7 @@ interface types {
   record branches { condition: node-id, then: node-id, otherwise: node-id }
   record statements { items: list<node-id>, %result: node-id }
 
-  record opened { module: string, child: option<string>, body: node-id }
+  record opened { module: string, child: option<string>, through: option<string>, body: node-id }
 
   variant expr {
     name(string),
@@ -89,7 +89,9 @@ interface types {
     block(statements),
     /// The body with a module open: its names are in sight there before
     /// the file's own. With `child`, a type, a call there gives a last
-    /// parameter that is a list of it element by element. No source writes it.
+    /// parameter that is a list of it element by element; with `through`, a
+    /// function, a value of its first parameter's type is applied through
+    /// it. No source writes it.
     open(opened),
   }
 

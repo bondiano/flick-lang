@@ -179,7 +179,10 @@ this form, which is how a block brings the names of its library into
 sight. With the type of a child, a call in that body gives a last parameter
 that is a list of the type element by element: each argument from that
 parameter on is one, none is the empty list, one argument that is a list is
-the list itself, and a list literal is refused (`FLICK-T073`). A whole number is
+the list itself, and a list literal is refused (`FLICK-T073`). With a
+function to apply values through, a value in that body whose type is that of
+the function's first parameter is applied through it: `badge props` is
+`Ui.component badge props` inside `ui`. A whole number is
 an integer literal, of any numeric type its use asks for; a declaration
 block whose group is empty declares nothing. A function in a
 plugin's code needs no signature: its type is inferred. The arena version is the version of the interface,

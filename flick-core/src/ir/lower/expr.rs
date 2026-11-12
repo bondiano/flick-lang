@@ -424,14 +424,11 @@ impl Lower<'_> {
     }
 
     fn ui_callable(&self, func: Expr, key: Range) -> Expr {
-        if !self.typing.ui_components.contains(&key) {
+        let Some(Ref::Value { module, name }) = self.typing.through.get(&key).cloned() else {
             return func;
-        }
-        let span = func.span;
-        let component = ExprKind::Global {
-            module: "Ui".to_owned(),
-            name: "component".to_owned(),
         };
+        let span = func.span;
+        let component = ExprKind::Global { module, name };
         Expr::new(
             ExprKind::App {
                 func: Box::new(Expr::new(component, span)),

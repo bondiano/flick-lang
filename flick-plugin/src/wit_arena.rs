@@ -73,10 +73,12 @@ macro_rules! wit_arena_conversions {
                             $crate::Expr::Open {
                                 module,
                                 child,
+                                through,
                                 body,
                             } => w::Expr::Open(w::Opened {
                                 module,
                                 child,
+                                through,
                                 body,
                             }),
                         }),
@@ -232,6 +234,7 @@ macro_rules! wit_arena_conversions {
                             w::Expr::Open(o) => $crate::Expr::Open {
                                 module: o.module,
                                 child: o.child,
+                                through: o.through,
                                 body: o.body,
                             },
                         }),

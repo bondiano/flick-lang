@@ -207,6 +207,7 @@ impl Printer<'_> {
             Expr::Open {
                 module,
                 child,
+                through,
                 body,
             } => {
                 // the node ends with its own `)`, so that a span of it is the
@@ -218,6 +219,18 @@ impl Printer<'_> {
                 if let Some(child) = child {
                     self.push(" ");
                     self.name(child, Names::Type)?;
+                }
+                // a function by its module: its last part is a lowercase name
+                if let Some(through) = through {
+                    let lower = |part: &str| part.starts_with(|c: char| c.is_ascii_lowercase());
+                    let function = through
+                        .rsplit_once('.')
+                        .is_some_and(|(_, last)| lower(last));
+                    if !function {
+                        return Err(format!("`{through}` is no function of a module"));
+                    }
+                    self.push(" ");
+                    self.name(through, Names::Value)?;
                 }
                 self.push(" (");
                 self.node(*body, Role::Expr, d)?;

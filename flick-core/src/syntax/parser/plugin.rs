@@ -154,3 +154,23 @@ fn raw_group(p: &mut Parser, open: SyntaxKind, close: SyntaxKind, kind: SyntaxKi
     p.complete(body, kind);
     p.expect_closer(close, opener);
 }
+
+/// `open$module M [Child] [M.through] (body)`, the form generated code
+/// opens a module with: its path, then the type of a child, when calls of
+/// the body give their last list element by element, then the function a
+/// value is applied through, a path that ends in a lowercase name.
+pub(super) fn opened(p: &mut Parser) -> SyntaxKind {
+    p.bump();
+    super::expr::con_path(p);
+    while p.at(K::Con) {
+        let named = p.start();
+        super::expr::con_path(p);
+        let function = p.toks[p.pos - 1].kind == K::Ident;
+        p.complete(named, if function { K::NameExpr } else { K::NameType });
+        if function {
+            break;
+        }
+    }
+    super::expr::atom(p);
+    K::OpenExpr
+}

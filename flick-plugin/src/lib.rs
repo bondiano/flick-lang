@@ -201,10 +201,14 @@ pub enum Expr {
     /// of its library into sight stands for it. With `child`, a type, a
     /// call there of a function whose last parameter is a list of it gives
     /// that list element by element: each argument from that parameter on
-    /// is one, and none is the empty list.
+    /// is one, and none is the empty list. With `through`, a function, a
+    /// value there of the type its first parameter has is applied through
+    /// it: `v x` is `through v x`.
     Open {
         module: String,
         child: Option<String>,
+        #[serde(default)]
+        through: Option<String>,
         body: NodeId,
     },
 }
