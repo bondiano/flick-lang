@@ -14,10 +14,11 @@
 //!   has them as the same row atoms (`scope_live`); `Live ϱ` acquires
 //!   nothing into `ϱ` (`regions.md` §6, "Scope keeps its region live").
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::rc::Rc;
 
 use super::super::Checker;
+use super::super::generalize::{rigid_inst, substitute, substitute_caps};
 use crate::syntax::{Name, Path};
 use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 
@@ -150,27 +151,38 @@ impl Checker<'_> {
     /// type variable is no use of what it stands for: a function generic in
     /// `a` cannot take a value of `a` apart (parametricity, and G4 for
     /// a foreign one).
-    fn shown(&self, c: &Caps, regions: &BTreeSet<Name>) -> Caps {
+    fn shown(&self, c: &Caps, regions: &BTreeSet<Name>, bound: &BTreeSet<Name>) -> Caps {
+        let free = |v: &&Var| !matches!(v, Var::Named(n) if bound.contains(n));
         Caps {
-            atoms: c
-                .atoms
-                .iter()
+            atoms: (c.atoms.iter().filter(free))
                 .filter(|v| self.is_region(v) || matches!(v, Var::Named(n) if regions.contains(n)))
                 .cloned()
                 .collect(),
-            vars: c.vars.clone(),
+            vars: c.vars.iter().filter(free).cloned().collect(),
         }
     }
 
     /// `τ` with `Live` of `held` and of what the parameters of each stage
     /// reach in the row of every runtime arrow and `Eff` after them.
     pub(in crate::check) fn elide(&self, t: &Type, held: &Caps, regions: &BTreeSet<Name>) -> Type {
+        self.elide_under(t, held, regions, &BTreeSet::new())
+    }
+
+    /// [`Self::elide`] under `∀`s whose binders, `bound`, count for nothing
+    /// a stage needs or a row holds, as the core's `Caps.under`.
+    fn elide_under(
+        &self,
+        t: &Type,
+        held: &Caps,
+        regions: &BTreeSet<Name>,
+        bound: &BTreeSet<Name>,
+    ) -> Type {
         let none = Caps::default();
-        let go = |t: &Type, held: &Caps| self.elide(t, held, regions);
+        let go = |t: &Type, held: &Caps| self.elide_under(t, held, regions, bound);
         match t {
             Type::Fun(p, s, r) => {
                 let p = go(p, &none);
-                let held = held.union(&self.shown(&self.reach(&p), regions));
+                let held = held.union(&self.shown(&self.reach(&p), regions, bound));
                 let s = match s {
                     Stage::Runtime(row, e) => Stage::Runtime(add_live(row, &held), e.clone()),
                     Stage::Pure => Stage::Pure,
@@ -187,11 +199,35 @@ impl Checker<'_> {
             Type::Eff(r, e, a) => Type::Eff(add_live(r, held), e.clone(), Rc::new(go(a, &none))),
             Type::Captured(x, c) => Type::Captured(Rc::new(go(x, held)), c.clone()),
             Type::Bounded(x, c) => Type::Bounded(Rc::new(go(x, held)), c.clone()),
-            Type::Forall(s) => Type::Forall(Rc::new(Scheme {
-                vars: s.vars.clone(),
-                body: self.elide(&s.body, held, &regions_of(&s.vars, regions)),
-                outlives: s.outlives.clone(),
-            })),
+            Type::Forall(s) => {
+                // a binder named as a name `held` carries is renamed, so the
+                // row keeps its meaning under it
+                let carried = |n: &Name| {
+                    (held.atoms.iter().chain(&held.vars))
+                        .any(|v| matches!(v, Var::Named(m) if m == n))
+                };
+                let mut renamed = HashMap::new();
+                let vars: Vec<(Name, Kind)> = (s.vars.iter())
+                    .map(|(n, k)| {
+                        if !carried(n) {
+                            return (n.clone(), k.clone());
+                        }
+                        let fresh = Name::from(format!("{n}${}", bound.len() + renamed.len()));
+                        renamed.insert(n.clone(), rigid_inst(&fresh, k));
+                        (fresh, k.clone())
+                    })
+                    .collect();
+                let mut inner = bound.clone();
+                inner.extend(vars.iter().map(|(n, _)| n.clone()));
+                let body = substitute(&s.body, &renamed);
+                Type::Forall(Rc::new(Scheme {
+                    body: self.elide_under(&body, held, regions, &inner),
+                    vars,
+                    outlives: (s.outlives.iter())
+                        .map(|(c, r)| (substitute_caps(c, &renamed), substitute(r, &renamed)))
+                        .collect(),
+                }))
+            }
             Type::App(a, b) => Type::App(Rc::new(go(a, &none)), Rc::new(go(b, &none))),
             Type::Ref(x) => Type::Ref(Rc::new(go(x, &none))),
             Type::Tuple(ts) => Type::Tuple(ts.iter().map(|t| go(t, &none)).collect()),
