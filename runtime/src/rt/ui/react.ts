@@ -11,7 +11,9 @@ import { eventLatest } from "../../ui/react/handlers.ts";
 import type { RenderRoot, Renderer } from "../../ui/react/tree.ts";
 import { toReact } from "../../ui/react/tree.ts";
 import type { Atom, Registry } from "../atoms/registry.ts";
+import { seedStates, statesOf } from "../atoms/atom.ts";
 import { WRITE, registryHere } from "../atoms/services.ts";
+import { hotHooks } from "../hot.ts";
 import { type UrlCodec, routePrint } from "../route.ts";
 import { type Cause, Raise, causeOf, fail, raise } from "../cause.ts";
 import { type Run, Suspend, asExit, atMask, awaitFiber, currentCtx, currentFiber, exitOf, extend, raiseOf } from "../fiber.ts";
@@ -110,6 +112,23 @@ class RenderBoundary extends Component<{ readonly broken: (cause: Cause) => void
   }
 }
 
+/** The registries of the mounted roots, which a module replacement in development reads. */
+const mounted = new Set<Registry>();
+
+/** The states the next root starts from, kept across a module replacement. */
+let carried: ReadonlyMap<string, unknown> | undefined;
+
+hotHooks(
+  () => {
+    const states = new Map<string, unknown>();
+    for (const registry of mounted) for (const [name, value] of statesOf(registry)) states.set(name, value);
+    return states;
+  },
+  (states) => {
+    carried = states;
+  },
+);
+
 /**
  * Renders `ui` through a React renderer, once: its views render again by
  * themselves when the atoms they read from `registry` change. Events run as
@@ -135,6 +154,9 @@ export function* uiRunWith(renderer: Renderer, supervisor: (failure: Failure) =>
       yield exitOf(() =>
         atMask(depth, () => {
           root = renderer();
+          if (carried !== undefined) seedStates(registry, carried);
+          carried = undefined;
+          mounted.add(registry);
           try {
             const tree = createElement(BridgeContext.Provider, {
               value: bridge,
@@ -153,6 +175,7 @@ export function* uiRunWith(renderer: Renderer, supervisor: (failure: Failure) =>
     );
     bridge.accepting = false;
     const unmounted = asExit(yield exitOf(() => root?.unmount()));
+    mounted.delete(registry);
     const tasks = [...bridge.tasks];
     for (const task of tasks) task.interrupt(fiber.id);
     for (const task of tasks) yield awaitFiber(task);

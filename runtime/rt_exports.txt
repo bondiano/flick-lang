@@ -1763,6 +1763,10 @@
 @flick-lang/runtime/rt/effect/reactivity/Atom flickWithLabel
 @flick-lang/runtime/rt/effect/reactivity/Atom keepAlive
 @flick-lang/runtime/rt/effect/reactivity/Atom readable
+@flick-lang/runtime/rt/runner/browser hotCarry
+@flick-lang/runtime/rt/runner/browser hotDispose
+@flick-lang/runtime/rt/runner/browser run
+@flick-lang/runtime/rt/runner/node run
 @flick-lang/runtime/rt/ui actionConcurrent
 @flick-lang/runtime/rt/ui actionExhaust
 @flick-lang/runtime/rt/ui actionLatest

@@ -30,6 +30,9 @@ const selected = (await files(root)).filter((path) =>
   path === join(root, "rt/index.js") ||
   path.startsWith(join(root, "rt/effect/")) ||
   path.startsWith(join(root, "rt/ui")) ||
+  // the runners, by name: a preload beside them runs when imported
+  path === join(root, "rt/runner/browser.js") ||
+  path === join(root, "rt/runner/node.js") ||
   path.startsWith(join(root, "core/"))
 );
 const lines = [];
