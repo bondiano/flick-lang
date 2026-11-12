@@ -291,6 +291,18 @@ impl Checker<'_> {
         }
         let named = (of.elems.iter()).filter(|(_, args)| args.is_empty());
         let gone: Vec<&Path> = named.map(|(n, _)| n).collect();
+        // a handler finds an instance of a service with arguments by its
+        // name: a variable that may hold another instance would get this one
+        for v in r.vars.difference(&of.vars) {
+            let instance = (of.elems.iter())
+                .find(|(n, args)| !args.is_empty() && !r.less_of(v).any(|l| l == *n));
+            if let Some((n, _)) = instance {
+                return error(
+                    "provide",
+                    format!("`{v:?}` may hold `{n}` at other arguments"),
+                );
+            }
+        }
         for v in r.vars.difference(&of.vars) {
             out.add_var(
                 v,

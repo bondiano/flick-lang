@@ -308,6 +308,17 @@ impl Checker<'_> {
                 .fold(self.cx.stage.services.clone(), |rest, t| {
                     Type::Union(Box::new(t), Box::new(rest))
                 });
+            // a service with arguments is answered by its name: the body may
+            // need no other instance of it, which only the outside could give
+            let instances: Vec<Elem> = (provided.iter())
+                .filter(|(l, t)| l.is_instance(t))
+                .map(|(l, _)| l.clone())
+                .collect();
+            let tail = if instances.is_empty() {
+                tail
+            } else {
+                super::ty::without(tail, &instances)
+            };
             let rest = Type::Row(Row {
                 entries: provided,
                 tail: Some(Box::new(tail)),

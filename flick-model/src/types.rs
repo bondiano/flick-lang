@@ -236,8 +236,11 @@ impl Row {
     /// `other` does not name itself: what `v` may hold that `other` lacks.
     /// `ρ ⊆ {S | ρ − S}`, whatever `ρ` is.
     pub fn owed<'a>(&'a self, v: &'a Var, other: &'a Row) -> impl Iterator<Item = &'a Path> {
+        // only a name without arguments is given back: `{S a | ρ - S}` does
+        // not hold `ρ`, which may hold `S b`
         (other.less_of(v)).filter(move |n| {
-            !self.less.contains(&(v.clone(), (*n).clone())) && !other.elems.contains_key(*n)
+            !self.less.contains(&(v.clone(), (*n).clone()))
+                && !other.elems.get(*n).is_some_and(|args| args.is_empty())
         })
     }
 
