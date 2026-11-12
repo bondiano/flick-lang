@@ -193,6 +193,28 @@ fn top_level_atoms_views_and_actions_are_labelled_by_their_names() {
     }
 }
 
+/// A label is a mark of the type, which any module may give its own.
+#[test]
+fn a_value_of_a_type_marked_label_is_labelled_by_its_name() {
+    let text = "module App.Gauges exposing (..)\n\
+         @label gauge\ntype Gauge = Gauge Float\n\
+         type Plain = Plain Float\n\
+         level : Gauge\nlet level = Gauge 1\n\
+         plain : Plain\nlet plain = Plain 1\n\
+         raise : Gauge -> Gauge\nlet raise g = g\n";
+    let labelled = |release, labels| {
+        let code = compile_with(text, release, labels).code;
+        ["level", "plain", "raise"]
+            .into_iter()
+            .filter(|name| code.contains(&format!("\"App.Gauges.{name}\"")))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(labelled(false, Labels::None), ["level"]);
+    assert_eq!(labelled(true, Labels::All), ["level"]);
+    // a release build that keeps the components' alone drops another kind
+    assert!(labelled(true, Labels::Components).is_empty());
+}
+
 #[test]
 fn pure_functions_are_plain_js() {
     let js = compile(

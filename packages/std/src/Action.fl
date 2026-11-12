@@ -9,6 +9,7 @@ module Action exposing (..)
 import Atom
 import Ui
 
+@label component
 @lang action
 /// A handler of events with a snapshot `s`.
 type alias Action s = Ui.Handler s

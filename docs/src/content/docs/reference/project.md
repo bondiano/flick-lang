@@ -55,7 +55,7 @@ max-params = 5
 | `build.schema-aot` | boolean | `false` |
 | `build.solver-steps` | instance resolution steps per definition | `100000` |
 | `build.solver-depth` | depth of nested class constraints | `256` |
-| `build.labels` | what a release build labels `Module.name` for debugging tools: `"all"` (atoms, views, actions), `"components"` (views and actions) or `"none"`; debug labels all; `flick build --labels` overrides it | `"all"` |
+| `build.labels` | what a release build labels `Module.name` for debugging tools: `"all"` (the values of every type marked `@label`: atoms, views, actions), `"components"` (those of the kind `component`: views and actions) or `"none"`; debug labels all; `flick build --labels` overrides it | `"all"` |
 | `build.effect` | what runs effects: `"rt"` on Flick's own runtime, `"effect"` through the Effect adapter, or `"none"` for plain JavaScript that imports only `@flick-lang/runtime/core`: then `main` is `Unit -> Unit`, a runtime call is `FLICK-E001`, and a `task`, a schema or a built-in module outside `Prelude`, `List`, `Option`, `Result`, `String`, `Float` and `Bool` is `FLICK-E008`. A library on Effect also writes, under `_core/` of its output, the modules that need no Effect; a library a project depends on is compiled with the project's `effect` | `"rt"` |
 | `build.ui` | the module that renders and mounts views in place of React: it exports every name `Ui` and `Action` bind from `@flick-lang/effect-ts/ui` and `@flick-lang/effect-ts/ui/react`; a relative path is relative to the project's root | React |
 | `sql.dialect` | the SQL dialect of `sql table` and `sql { … }` (see [sql.md](../sql/)): `"postgresql"`; `"mysql"`, `"sqlite"`, `"clickhouse"` and `"oracle"` are recognized but not supported yet | `"postgresql"` |

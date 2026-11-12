@@ -10,7 +10,6 @@ use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::{self, Lang};
-use flick_ir::Label;
 
 impl Checker<'_> {
     /// The innermost module a block around the expression opens that exports
@@ -102,44 +101,6 @@ impl Checker<'_> {
 }
 
 impl Checker<'_> {
-    /// The top-level atoms, views and actions, which the generated code
-    /// labels `Module.name` for debugging tools.
-    pub fn labelled(&mut self, decls: &[&Node]) {
-        for decl in members(decls) {
-            if decl.kind != K::LetDecl {
-                continue;
-            }
-            let parts = let_parts(decl, self.text);
-            let Some(name) = parts.name.clone().filter(|_| !parts.is_function()) else {
-                continue;
-            };
-            let entity = self.env.entity(Namespace::Value, &name);
-            let Some(ty) = self.env.value(&entity).cloned() else {
-                continue;
-            };
-            let label = match self.bare(&ty).spine().0 {
-                // a family is not an atom: its atoms are made later, by key
-                Type::Con { module, name }
-                    if !lang::is(Lang::AtomFamily, module, name) && is_atom(module, name) =>
-                {
-                    "atom"
-                }
-                Type::Con { module, name }
-                    if [Lang::UiView, Lang::UiHandler, Lang::Action]
-                        .into_iter()
-                        .any(|l| lang::is(l, module, name)) =>
-                {
-                    "component"
-                }
-                _ => continue,
-            };
-            let kind = label.to_owned();
-            self.typing.labelled.insert(name, Label { kind });
-        }
-    }
-}
-
-impl Checker<'_> {
     /// `ty` resolved, without its captures and quantifiers.
     pub(super) fn bare(&self, ty: &Type) -> Type {
         let mut ty = self.store.resolve(ty);
@@ -151,21 +112,6 @@ impl Checker<'_> {
         }
         ty
     }
-}
-
-/// The types of atoms; a signature keeps the aliases.
-const ATOMS: [Lang; 6] = [
-    Lang::ReactivityAtom,
-    Lang::ReactivityWritable,
-    Lang::Atom,
-    Lang::AtomWritable,
-    Lang::AtomBrowser,
-    Lang::AtomFamily,
-];
-
-/// Whether `module.name` is a type of atoms.
-fn is_atom(module: &str, name: &str) -> bool {
-    ATOMS.into_iter().any(|l| lang::is(l, module, name))
 }
 
 /// The makers of serializable atoms, whose key U003 checks.

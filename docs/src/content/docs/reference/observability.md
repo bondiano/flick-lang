@@ -210,6 +210,23 @@ The compiler gives each `Atom.set`, `Atom.update` and `Atom.modify` its
 place, `Module:line`. The names are labels, which release builds keep with
 `labels = "all"`. A write outside any action shows `task` as its cause.
 
+A label belongs to a type: `@label kind` before a type declaration gives
+every top-level value of that type, not a function, its name `Module.name`
+where the program runs. The atoms of the standard library are of the kind
+`atom`, its views and actions of the kind `component`, and a library marks
+its own types the same way:
+
+```flick
+@label gauge
+type Gauge = Gauge Float
+
+level : Gauge
+let level = Gauge 1
+```
+
+A release build with `labels = "components"` keeps the labels of the kind
+`component` alone.
+
 ## Server renders and server functions
 
 A request's trace goes on in what serves it. The HTTP server opens a

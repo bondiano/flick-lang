@@ -1,6 +1,6 @@
 ---
 title: "Наблюдаемость"
-source_hash: 21da7f8f00919876
+source_hash: 1a56f622c214f4cd
 ---
 
 Трасса отвечает на вопрос «где запрос потратил время?», запись журнала —
@@ -212,6 +212,23 @@ atom App.count ← action App.increment ← event click ← span 5f2c… (fiber 
 Место, `Module:line`, компилятор передаёт каждому `Atom.set`,
 `Atom.update` и `Atom.modify`. Имена — это метки, которые release-сборка
 сохраняет при `labels = "all"`. У записи вне action причина — `task`.
+
+Метка принадлежит типу: `@label kind` перед объявлением типа даёт каждому
+значению этого типа на верхнем уровне, если оно не функция, имя
+`Module.name` там, где программа выполняется. Атомы стандартной библиотеки
+имеют вид `atom`, её представления и actions — вид `component`, и библиотека
+так же помечает свои типы:
+
+```flick
+@label gauge
+type Gauge = Gauge Float
+
+level : Gauge
+let level = Gauge 1
+```
+
+Release-сборка с `labels = "components"` сохраняет только метки вида
+`component`.
 
 ## Серверный рендер и серверные функции
 

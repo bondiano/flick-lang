@@ -6,7 +6,7 @@ let main () = ()
 
 type Color = @lang crimson Red | Green
 
-//~ FLICK-S014 @3:1-3:8 unknown attribute `@inline`: the attributes are `@lang`, `@derive`, `@maker`, `@cell` and `@implicit`
+//~ FLICK-S014 @3:1-3:8 unknown attribute `@inline`: the attributes are `@lang`, `@derive`, `@maker`, `@cell`, `@label` and `@implicit`
 //~ FLICK-S014 @7:14-7:27 unknown lang item `crimson`
 
 @cell
@@ -16,3 +16,15 @@ let lone = 1
 type Twice = Twice
 //~ FLICK-S014 @12:1-12:6 `@cell` belongs before a type declaration
 //~ FLICK-S014 @15:1-15:12 `@cell` takes no argument
+
+@label gauge
+let level = 1
+
+@label
+type Bare = Bare
+
+@label one two
+type Two = Two
+//~ FLICK-S014 @20:1-20:13 `@label` belongs before a type declaration
+//~ FLICK-S014 @23:1-23:7 `@label` names one kind, as `@label atom`
+//~ FLICK-S014 @26:1-26:15 `@label` names one kind, as `@label atom`

@@ -9,11 +9,13 @@ import Duration
 import Reactivity.AsyncResult
 
 @cell
+@label atom
 @lang reactivity_atom
 /// A value a registry computes and keeps.
 type Atom a
 
 @cell
+@label atom
 @lang reactivity_writable
 /// An atom that also takes writes: a state.
 type Writable a
