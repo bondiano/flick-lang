@@ -12,7 +12,7 @@ use std::mem;
 use super::Generics;
 use super::devirt::built;
 use super::known::{chooses, ends_in_data};
-use super::walk::{rename, respan, size, uses};
+use super::walk::{rename, respan, size};
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Lit, Param, Pat, Stage, Stmt};
 use crate::types::builtins;
 
@@ -390,7 +390,7 @@ fn called_once(body: &Expr, name: &str) -> bool {
         e.each_child(&mut |c| found |= called(c, name));
         found
     }
-    uses(body, name) == 1 && called(body, name)
+    body.uses(name) == 1 && called(body, name)
 }
 
 /// Whether `body` is, under its statements, a `match` of the local `name`.

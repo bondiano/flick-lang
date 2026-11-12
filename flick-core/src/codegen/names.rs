@@ -1,8 +1,8 @@
 //! JS names of what the IR refers to, and constructor ids.
 
 use super::Known;
-use crate::syntax::lang::Lang;
-use crate::types::{Constructor, EnumLit};
+use flick_ir::Lang;
+use flick_ir::{Constructor, EnumLit};
 
 /// Words a Flick name may spell that JS reserves, and the names generated
 /// code relies on.

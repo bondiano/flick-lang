@@ -1,3 +1,6 @@
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+
+use super::test_options::resolved_by;
 use super::{EffectBridge, Known, Labels, Options, js};
 use crate::effects::effect_specifier;
 use crate::ir::lang_items;
@@ -10,59 +13,25 @@ fn compile(text: &str) -> String {
 
 pub(super) fn compile_with(text: &str, release: bool, labels: Labels) -> super::Output {
     let ir = lower_text("App", text).expect("lowers");
-    let path = |m: &str| format!("{}.js", m.replace('.', "/"));
-    let package = |m: &str| (m == "App.Users").then(|| "@acme/users".to_owned());
+    let packages = BTreeMap::from([("App.Users".to_owned(), "@acme/users".to_owned())]);
     // as a build on Effect has it: a key is the module of the adapter
-    let foreign = |_: &str, spec: &str| effect_specifier(spec);
+    let resolved = resolved_by(&ir, &effect_specifier);
     let lang = lang_items();
     let known = Known::of(&lang);
     let options = Options {
-        path: &path,
-        package: &package,
-        foreign: &foreign,
-        typescript: false,
-        interface: &|_| None,
+        builtins: &BTreeSet::new(),
+        packages: &packages,
+        resolved: &resolved,
+        typescript: None,
         release,
-        workers: &|_, _| None,
-        direct: &|_, _, _| false,
+        workers: &HashMap::new(),
+        direct: &HashSet::new(),
         labels,
         rt: false,
         effect_bridge: EffectBridge::Absent,
         lang: &known,
     };
     js(&ir, &options)
-}
-
-#[test]
-fn a_release_build_in_typescript_types_a_constructed_value_as_its_constructor_does() {
-    let text = "module App exposing (Token, start)\n\nopaque type Token = Token String Float\n\n\
-                start : Token\nlet start = Token \"a\" 1\n";
-    let ir = lower_text("App", text).expect("lowers");
-    let path = |m: &str| format!("{}.js", m.replace('.', "/"));
-    let foreign = |_: &str, spec: &str| effect_specifier(spec);
-    let emit = |typescript: bool| {
-        let lang = lang_items();
-        let known = Known::of(&lang);
-        let options = Options {
-            path: &path,
-            package: &|_| None,
-            foreign: &foreign,
-            typescript,
-            interface: &|_| None,
-            release: true,
-            workers: &|_, _| None,
-            direct: &|_, _, _| false,
-            labels: Labels::default(),
-            rt: false,
-            effect_bridge: EffectBridge::Absent,
-            lang: &known,
-        };
-        js(&ir, &options).code
-    };
-    // an opaque type is a brand in TypeScript, which the object does not have
-    let ts = emit(true);
-    assert!(ts.contains("_0: \"a\", _1: 1 } as any"), "{ts}");
-    assert!(!emit(false).contains("as any"));
 }
 
 #[test]
@@ -90,21 +59,18 @@ fn on_rt(text: &str) -> String {
 
 fn on_rt_with_bridge(text: &str, effect_bridge: EffectBridge) -> String {
     let ir = lower_text("App", text).expect("lowers");
-    let path = |m: &str| format!("{}.js", m.replace('.', "/"));
-    let package = |_: &str| None;
     // as a build on Effect has it: a key is the module of the adapter
-    let foreign = |_: &str, spec: &str| effect_specifier(spec);
+    let resolved = resolved_by(&ir, &effect_specifier);
     let lang = lang_items();
     let known = Known::of(&lang);
     let options = Options {
-        path: &path,
-        package: &package,
-        foreign: &foreign,
-        typescript: false,
-        interface: &|_| None,
+        builtins: &BTreeSet::new(),
+        packages: &BTreeMap::new(),
+        resolved: &resolved,
+        typescript: None,
         release: false,
-        workers: &|_, _| None,
-        direct: &|_, _, _| false,
+        workers: &HashMap::new(),
+        direct: &HashSet::new(),
         labels: Labels::default(),
         rt: true,
         effect_bridge,

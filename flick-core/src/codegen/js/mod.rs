@@ -44,21 +44,18 @@ mod view;
 
 pub use release::{direct_methods, exported_worker};
 
-use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::mem;
 
 use super::exports::reexports;
 use super::tail::{Callee, Target};
-use super::ts::Projection;
 use super::{Options, Output, names};
-use crate::iface::Namespace;
 use crate::ir::{Item, ItemKind, Label, Module};
 #[cfg(feature = "native-project")]
 use crate::source::Span;
-use crate::types::Dict;
-use exports::annotations;
 use exports::sync_exports;
+use flick_ir::Dict;
+use flick_ir::Namespace;
 
 const RUNTIME: &str = bindings::ADAPTER_PREFIX;
 const MARK_START: char = '\u{E000}';
@@ -78,61 +75,39 @@ pub(crate) fn js_at(
     let mut g = Gen::new(module, options);
     g.physical = physical;
     g.location = location;
-    let projection =
-        Projection::for_runtime(physical, options.interface, options.package, options.rt)
-            .shipping(options.foreign);
-    let mut declarations = Vec::new();
-    let interface = (options.interface)(&module.name);
-    if let Some(interface) = interface.as_ref().filter(|_| !options.rt) {
-        g.sync_exports = sync_exports(interface, &module.name);
+    if !options.rt {
+        g.sync_exports = sync_exports(&module.exports);
         // the wrapper of a Sync export is the runtime's
         g.runtime |= !g.sync_exports.is_empty();
     }
-    if options.typescript
-        && let Some(interface) = &interface
-    {
-        let mut interface = interface.clone();
-        if physical != module.name {
-            for export in &mut interface.exports {
-                if export.entity.module == module.name && export.entity.namespace != Namespace::Type
-                {
-                    export.entity.module = physical.into();
-                }
-            }
-        }
-        declarations = projection.declarations(&interface).0;
-        g.annotations = annotations(&projection, &interface);
+    let typed = options.typescript.map(|t| t.typed(&module.name, physical));
+    if let Some(typed) = &typed {
+        g.annotations.clone_from(&typed.annotations);
     }
     let body = g.items(&module.items);
     let mut code = String::new();
-    let typed = RefCell::new(Vec::new());
-    if options.typescript {
-        let here = (options.path)(physical);
-        let path = |m: &str| {
-            typed.borrow_mut().push(m.to_owned());
-            relative(&here, &(options.path)(m))
-        };
-        code.push_str(&projection.imports(&path));
+    if let Some(typed) = &typed {
+        code.push_str(&typed.imports);
     }
-    let here = (options.path)(physical);
+    let here = options.path(physical);
     g.write_imports(&mut code, &here);
     if !code.is_empty() {
         code.push('\n');
     }
-    for d in &declarations {
+    for d in typed.iter().flat_map(|t| &t.declarations) {
         code.push_str(d);
         code.push_str("\n\n");
     }
     code.push_str(&body);
     // a module exposing what it imports: JS consumers find it here too
     let mut barrel = Vec::new();
-    if let Some(interface) = (options.interface)(&module.name)
-        && physical == module.name
-    {
-        let path = |m: &str| relative(&here, &(options.path)(m));
-        let (lines, modules) = reexports(&module.name, &interface, &path, &|_| true, &|_| {
-            options.typescript()
-        });
+    if physical == module.name && !options.builtins.contains(module.name.as_str()) {
+        let path = |m: &str| relative(&here, &options.path(m));
+        let entities: Vec<(&str, Namespace, &str)> = (module.exports.reexports.iter())
+            .filter(|r| r.namespace != Namespace::Type || options.typescript())
+            .map(|r| (r.module.as_str(), r.namespace, r.name.as_str()))
+            .collect();
+        let (lines, modules) = reexports(&entities, &path);
         code.push_str(&lines);
         barrel = modules;
     }
@@ -151,7 +126,7 @@ pub(crate) fn js_at(
         &g.names,
     );
     let imports = g.imports.into_iter();
-    let imports = imports.chain(typed.into_inner());
+    let imports = imports.chain(typed.into_iter().flat_map(|t| t.modules));
     output.imports = imports.chain(barrel).collect();
     output
 }
@@ -194,16 +169,15 @@ impl<'a> Gen<'a> {
             annotations: HashMap::new(),
             sync_exports: HashMap::new(),
             workers: if options.release {
-                let interface = (options.interface)(&module.name);
                 let exported = |name: &str| {
-                    interface.as_ref().is_none_or(|i| i.exports_value(name))
+                    module.exports.values.contains_key(name)
                         || module
                             .initialization
                             .prefixes
                             .iter()
                             .any(|p| p.bindings.iter().any(|n| n == name))
                 };
-                let exported_arity = |name: &str| (options.workers)(&module.name, name);
+                let exported_arity = |name: &str| options.worker(&module.name, name);
                 release::workers(&module.name, &module.items, &exported, &exported_arity)
             } else {
                 HashMap::new()

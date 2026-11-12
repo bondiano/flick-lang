@@ -92,6 +92,7 @@ pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Di
             initialization: flick_ir::Initialization::default(),
             records: lower.records,
             package: None,
+            exports: flick_ir::Exports::default(),
         })
     } else {
         Err(lower.diagnostics)

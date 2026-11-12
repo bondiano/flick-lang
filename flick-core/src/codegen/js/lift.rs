@@ -3,7 +3,7 @@
 
 use super::Gen;
 use crate::ir::{Expr, Stage};
-use crate::types::Lift;
+use flick_ir::Lift;
 
 impl Gen<'_> {
     /// `inner`, a function adapted where one of another stage is expected.

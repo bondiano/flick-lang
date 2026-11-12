@@ -4,6 +4,8 @@
 use super::tests::release_with;
 use crate::build::builtin_modules;
 use crate::codegen::exported_worker;
+use std::collections::HashMap;
+
 use crate::ir::{Expr, ExprKind, Lit, Param, Pat, Stage};
 use crate::source::{FileId, Span};
 
@@ -16,16 +18,20 @@ const PRELUDE: &str = "module App exposing (main)\n\n\
     divide : Int -> Int -> Int\nlet divide d =\n  let q = Int.unsafe_div 1 d\n  fun n -> n + q\n\n";
 
 /// The workers of the built-in modules, as a build gives them.
-fn workers(module: &str, name: &str) -> Option<usize> {
-    let ir = builtin_modules().iter().find(|m| m.name == module)?;
-    (ir.items.iter().filter_map(exported_worker))
-        .find_map(|(n, arity)| (n == name).then_some(arity))
+fn workers() -> HashMap<(String, String), usize> {
+    let mut out = HashMap::new();
+    for m in builtin_modules() {
+        for (n, arity) in m.items.iter().filter_map(exported_worker) {
+            out.insert((m.name.clone(), n.to_owned()), arity);
+        }
+    }
+    out
 }
 
 /// The release JS of the prelude, `definitions` and a `main` of `body`.
 fn js(definitions: &str, body: &str) -> String {
     let text = format!("{PRELUDE}{definitions}main : Unit ->{{}} Unit\nlet main () =\n{body}\n");
-    release_with(&text, &workers)
+    release_with(&text, &workers())
 }
 
 /// `composed` and `written` give the same module.

@@ -6,7 +6,7 @@ use super::{Gen, indent, names};
 use std::mem;
 
 use crate::ir::{Arm, Expr, Lit, Pat};
-use crate::types::{Constructor, JsClass, Rep};
+use flick_ir::{Constructor, JsClass, Rep};
 
 #[derive(Default)]
 struct Test {
@@ -129,7 +129,7 @@ impl Gen<'_> {
             Some(names::Native::Ok) => ("Success".into(), vec!["success".into()]),
             Some(names::Native::Err) => ("Failure".into(), vec!["failure".into()]),
             None => {
-                let package = (self.options.package)(&c.module);
+                let package = self.options.package(&c.module);
                 // the fields, then the dictionaries a value of a GADT holds
                 let fields = (0..arity)
                     .map(|i| {
@@ -140,7 +140,7 @@ impl Gen<'_> {
                         }
                     })
                     .collect();
-                (names::tag(c, package.as_deref()), fields)
+                (names::tag(c, package), fields)
             }
         }
     }

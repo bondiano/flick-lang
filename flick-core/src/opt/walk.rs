@@ -9,13 +9,6 @@ use crate::numeric::{Arith, Num};
 use crate::source::Span;
 use crate::types::{Constructor, Dict};
 
-/// How often `e` reads the local `name`.
-pub fn uses(e: &Expr, name: &str) -> usize {
-    let mut n = 0;
-    each_use(e, &mut |l| n += usize::from(l == name));
-    n
-}
-
 /// Each read of a local in `e`, by its name.
 pub fn each_use<'e>(e: &'e Expr, read: &mut dyn FnMut(&'e str)) {
     if let ExprKind::Local(l) | ExprKind::Within(l, _) = &e.kind {

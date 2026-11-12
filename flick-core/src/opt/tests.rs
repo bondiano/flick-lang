@@ -1,4 +1,7 @@
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+
 use crate::build::builtin_modules;
+use crate::codegen::test_options::resolved_by;
 use crate::codegen::{EffectBridge, Known, Labels, Options, js};
 use crate::effects::rt_specifier;
 use crate::ir::tests::check_text;
@@ -21,11 +24,18 @@ pub(super) fn builtin_arity(module: &str, name: &str) -> Option<usize> {
 
 /// The JS of a self-contained module in the release profile.
 pub(super) fn release(text: &str) -> String {
-    release_with(text, &|_, _| None)
+    release_with(text, &HashMap::new())
+}
+
+/// The workers `named` by module and value, with their arity.
+fn workers(named: &[(&str, &str, usize)]) -> HashMap<(String, String), usize> {
+    (named.iter())
+        .map(|&(m, name, n)| ((m.to_owned(), name.to_owned()), n))
+        .collect()
 }
 
 /// `release` where `workers` names the workers modules export.
-pub(super) fn release_with(text: &str, workers: &dyn Fn(&str, &str) -> Option<usize>) -> String {
+pub(super) fn release_with(text: &str, workers: &HashMap<(String, String), usize>) -> String {
     let (mut ir, interface) = check_text("App", text).expect("lowers");
     super::optimize(
         &mut ir,
@@ -33,18 +43,17 @@ pub(super) fn release_with(text: &str, workers: &dyn Fn(&str, &str) -> Option<us
         &builtin_generic,
         &builtin_arity,
     );
-    let path = |m: &str| format!("{}.js", m.replace('.', "/"));
+    let resolved = resolved_by(&ir, &str::to_owned);
     let lang = lang_items();
     let known = Known::of(&lang);
     let options = Options {
-        path: &path,
-        package: &|_| None,
-        foreign: &|_, spec| spec.to_owned(),
-        typescript: false,
-        interface: &|m| (m == interface.module).then(|| interface.clone()),
+        builtins: &BTreeSet::new(),
+        packages: &BTreeMap::new(),
+        resolved: &resolved,
+        typescript: None,
         release: true,
         workers,
-        direct: &|_, _, _| false,
+        direct: &HashSet::new(),
         labels: Labels::default(),
         rt: false,
         effect_bridge: EffectBridge::Absent,
@@ -198,10 +207,7 @@ fn a_lone_tail_effect_needs_no_generator() {
 
 #[test]
 fn exported_workers_take_full_applications_across_modules() {
-    let workers = |m: &str, name: &str| match (m, name) {
-        ("Ui", "div") | ("App", "add") => Some(2),
-        _ => None,
-    };
+    let workers = workers(&[("Ui", "div", 2), ("App", "add", 2)]);
     let js = release_with(
         "module App exposing (add, view)\n\n\
          add : Float -> Float -> Float\nlet add a b = a + b\n\n\
@@ -236,10 +242,11 @@ fn equality_whose_identity_decides_is_strict() {
 
 #[test]
 fn known_instances_and_plain_foreigns_are_called_directly() {
-    let direct = |m: &str, instance: &str, method: &str| {
-        (m, instance, method) == ("Instances", "Show Float", "show")
-    };
-    let workers = |_: &str, _: &str| None;
+    let direct = HashSet::from([(
+        "Instances".to_owned(),
+        "Show Float".to_owned(),
+        "show".to_owned(),
+    )]);
     let (mut ir, interface) = check_text(
         "App",
         "module App exposing (label, both)\n\n\
@@ -256,14 +263,14 @@ fn known_instances_and_plain_foreigns_are_called_directly() {
     );
     let lang = lang_items();
     let known = Known::of(&lang);
+    let resolved = resolved_by(&ir, &str::to_owned);
     let options = Options {
-        path: &|m| format!("{}.js", m.replace('.', "/")),
-        package: &|_| None,
-        foreign: &|_, spec| spec.to_owned(),
-        typescript: false,
-        interface: &|m| (m == interface.module).then(|| interface.clone()),
+        builtins: &BTreeSet::new(),
+        packages: &BTreeMap::new(),
+        resolved: &resolved,
+        typescript: None,
         release: true,
-        workers: &workers,
+        workers: &HashMap::new(),
         direct: &direct,
         labels: Labels::default(),
         rt: false,
@@ -278,7 +285,6 @@ fn known_instances_and_plain_foreigns_are_called_directly() {
 
 #[test]
 fn a_native_binding_with_a_schema_is_called_directly_on_flicks_runtime() {
-    let workers = |_: &str, _: &str| None;
     let (mut ir, interface) = check_text(
         "App",
         "module App exposing (both)\n\n\
@@ -293,18 +299,18 @@ fn a_native_binding_with_a_schema_is_called_directly_on_flicks_runtime() {
         &builtin_generic,
         &builtin_arity,
     );
-    let foreign = |_: &str, spec: &str| rt_specifier(spec).expect("a module of the runtime");
+    let rt = |spec: &str| rt_specifier(spec).expect("a module of the runtime");
+    let resolved = resolved_by(&ir, &rt);
     let lang = lang_items();
     let known = Known::of(&lang);
     let options = Options {
-        path: &|m| format!("{}.js", m.replace('.', "/")),
-        package: &|_| None,
-        foreign: &foreign,
-        typescript: false,
-        interface: &|m| (m == interface.module).then(|| interface.clone()),
+        builtins: &BTreeSet::new(),
+        packages: &BTreeMap::new(),
+        resolved: &resolved,
+        typescript: None,
         release: true,
-        workers: &workers,
-        direct: &|_, _, _| false,
+        workers: &HashMap::new(),
+        direct: &HashSet::new(),
         labels: Labels::default(),
         rt: true,
         effect_bridge: EffectBridge::Available,
@@ -337,7 +343,7 @@ fn matches_switch_on_tags_and_skip_the_last_test() {
 
 #[test]
 fn a_worker_names_each_ignored_parameter_apart() {
-    let workers = |m: &str, name: &str| ((m, name) == ("App", "first")).then_some(3);
+    let workers = workers(&[("App", "first", 3)]);
     let js = release_with(
         "module App exposing (first)\n\n\
          first : Float -> String -> Bool -> Float\nlet first n _ _ = n\n",
@@ -351,7 +357,7 @@ fn a_worker_names_each_ignored_parameter_apart() {
 
 #[test]
 fn a_plain_foreign_named_as_a_value_is_defined_in_its_module() {
-    let workers = |m: &str, name: &str| ((m, name) == ("App", "join")).then_some(2);
+    let workers = workers(&[("App", "join", 2)]);
     let js = release_with(
         "module App exposing (join, both, pick)\n\n\
          join : String -> String -> String\nforeign pure join from \"./x.mjs\" \"join\"\n\n\

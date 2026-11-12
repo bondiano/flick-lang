@@ -322,6 +322,7 @@ mod tests {
                 initialization: crate::Initialization::default(),
                 records: BTreeMap::default(),
                 package: None,
+                exports: crate::Exports::default(),
             }],
             lang: Vec::new(),
         }

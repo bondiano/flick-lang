@@ -3,7 +3,7 @@
 //! own representation of, whatever the library names them.
 
 use crate::ir::LangItem;
-use crate::syntax::lang::Lang;
+use flick_ir::Lang;
 
 /// The module and name of each lang item of a program, by [`Lang`].
 pub struct Known<'a> {
@@ -33,7 +33,7 @@ impl<'a> Known<'a> {
 mod tests {
     use super::Known;
     use crate::ir::LangItem;
-    use crate::syntax::lang::Lang;
+    use flick_ir::Lang;
     use flick_ir::Namespace;
 
     /// What the table says, whatever the library calls the entities.

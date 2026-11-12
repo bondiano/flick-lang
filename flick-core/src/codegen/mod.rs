@@ -60,35 +60,40 @@ impl EffectBridge {
     }
 }
 
-use crate::iface::Interface;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+
+use crate::effects::runtime_specifier;
 #[cfg(feature = "native-project")]
 use crate::source::Span;
 
+/// The directory of the output under which the built-in modules are.
+pub const BUILTIN_DIR: &str = "_flick";
+
 /// Where modules are and who owns them, as the build lays them out.
 pub struct Options<'a> {
-    /// The output path of a module, relative to the output directory:
-    /// `App/Users.js`.
-    pub path: &'a dyn Fn(&str) -> String,
-    /// The package a module belongs to, for its constructor ids; `None` for
-    /// the built-in modules and a module outside any package.
-    pub package: &'a dyn Fn(&str) -> Option<String>,
-    /// The import specifier of a foreign module `spec` named in `module`.
-    pub foreign: &'a dyn Fn(&str, &str) -> String,
-    /// Emit TypeScript (`--emit ts`) instead of JavaScript.
-    pub typescript: bool,
-    /// The interface of a module, this one included: TypeScript output
-    /// declares the exported types and annotates the exported values.
-    pub interface: &'a dyn Fn(&str) -> Option<Interface>,
+    /// The built-in modules, written under [`BUILTIN_DIR`].
+    pub builtins: &'a BTreeSet<&'a str>,
+    /// The package of each module that belongs to one, for its constructor
+    /// ids.
+    pub packages: &'a BTreeMap<String, String>,
+    /// The import specifier the build gives a foreign module named in a
+    /// module, by the two: one named relative to its module, shipped beside
+    /// it, or the renderer `[build] ui` stands for. Another is a package's,
+    /// which the runtime decides (see [`Options::foreign`]).
+    pub resolved: &'a BTreeMap<(String, String), String>,
+    /// Emit TypeScript (`--emit ts`) instead of JavaScript: with the types
+    /// of the exports, which the projection of the interfaces gives.
+    pub typescript: Option<&'a ts::Typing<'a>>,
     /// The release profile: worker functions for known full applications
     /// and direct methods of canonical instances.
     pub release: bool,
     /// In release, the arity `n` of the worker `name$n` that a module,
     /// this one included, exports for its value `name` (see
     /// [`exported_worker`]); a full application calls it.
-    pub workers: &'a dyn Fn(&str, &str) -> Option<usize>,
-    /// In release, whether a module exports the method of its instance as
-    /// a constant (see [`direct_methods`]): by module, instance and method.
-    pub direct: &'a dyn Fn(&str, &str, &str) -> bool,
+    pub workers: &'a HashMap<(String, String), usize>,
+    /// In release, the methods each module exports as a constant of its
+    /// instance (see [`direct_methods`]): by module, instance and method.
+    pub direct: &'a HashSet<(String, String, String)>,
     /// In release, which top-level values keep their label; debug labels
     /// every atom, view and action.
     pub labels: Labels,
@@ -102,7 +107,49 @@ pub struct Options<'a> {
 
 impl Options<'_> {
     pub(crate) fn typescript(&self) -> bool {
-        self.typescript
+        self.typescript.is_some()
+    }
+
+    /// The output path of a module, relative to the output directory:
+    /// `App/Users.js`.
+    pub fn path(&self, module: &str) -> String {
+        module_path(self.builtins, self.typescript(), module)
+    }
+
+    /// The import specifier of a foreign module `spec` named in `module`.
+    pub fn foreign(&self, module: &str, spec: &str) -> String {
+        let key = (module.to_owned(), spec.to_owned());
+        (self.resolved.get(&key).cloned()).unwrap_or_else(|| runtime_specifier(self.rt, spec))
+    }
+
+    /// The package `module` belongs to, if any.
+    pub(crate) fn package(&self, module: &str) -> Option<&str> {
+        self.packages.get(module).map(String::as_str)
+    }
+
+    /// In release, the arity of the worker `module` exports for `name`.
+    pub(crate) fn worker(&self, module: &str, name: &str) -> Option<usize> {
+        let key = (module.to_owned(), name.to_owned());
+        self.workers.get(&key).copied()
+    }
+
+    /// In release, whether `module` exports `method` of `instance` as a
+    /// constant.
+    pub(crate) fn is_direct(&self, module: &str, instance: &str, method: &str) -> bool {
+        let key = (module.to_owned(), instance.to_owned(), method.to_owned());
+        self.direct.contains(&key)
+    }
+}
+
+/// The output path of `module`, relative to the output directory, in
+/// TypeScript or JavaScript: the built-in modules are under [`BUILTIN_DIR`].
+pub fn module_path(builtins: &BTreeSet<&str>, typescript: bool, module: &str) -> String {
+    let ext = if typescript { "ts" } else { "js" };
+    let file = format!("{}.{ext}", module.replace('.', "/"));
+    if builtins.contains(module) {
+        format!("{BUILTIN_DIR}/{file}")
+    } else {
+        file
     }
 }
 
@@ -135,5 +182,7 @@ pub struct Output {
 
 #[cfg(test)]
 mod pattern_tests;
+#[cfg(test)]
+pub(crate) mod test_options;
 #[cfg(test)]
 mod tests;
