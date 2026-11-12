@@ -35,6 +35,7 @@ theorem LeLive.kind {a b : Ty} (h : LeLive S a b) : a.kind = b.kind := by
   cases h with
   | refl | arrow | eff => rfl
   | hide _ _ _ _ ha hb => subst ha; subst hb; rw [Ty.tcon_kind', Ty.tcon_kind']
+  | data _ _ _ _ _ ha hb => subst ha; subst hb; rw [Ty.tcon_kind', Ty.tcon_kind']
 
 theorem Shp.le {a b : Ty} {e : Tm}
     (h : LeLive S a b) (hs : Shp S true a e) : Shp S true b e := by

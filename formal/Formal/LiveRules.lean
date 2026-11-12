@@ -272,10 +272,11 @@ theorem leak6_scope_rejected {S : Sig} {C : Caps} (hC : C (.v 0)) (u v t : Ty) :
     ¬ LeLive S (GT C u v) (t.up 1) := fun h =>
   Ty.up_avoid_v0 t (h.reach (.v 0) (by simp [GT, Ty.tcon, Ty.reach, hC]))
 
-/-- A row the declaration names stays put: data without a hidden row are below only
-themselves. -/
+/-- A row the declaration names stays put: data without a hidden row, whose parameters are
+all invariant, are below only themselves. -/
 theorem named_row_invariant {S : Sig} {T : Name} {us : List Ty} {b : Ty}
-    (hT : S.hidden T = none) (h : LeLive S (Ty.tcon T us) b) : b = Ty.tcon T us := by
+    (hT : S.hidden T = none) (hv : ∀ j, S.var T j = .inv) (h : LeLive S (Ty.tcon T us) b) :
+    b = Ty.tcon T us := by
   generalize hX : Ty.tcon T us = X at h
   cases h with
   | refl => rfl
@@ -284,6 +285,23 @@ theorem named_row_invariant {S : Sig} {T : Name} {us : List Ty} {b : Ty}
   | hide hi _ _ _ ha _ =>
     obtain ⟨rfl, -⟩ := Ty.tcon_eq (hX.trans ha)
     rw [hT] at hi; cases hi
+  | data hl _ _ _ hinv ha hb =>
+    obtain ⟨rfl, rfl⟩ := Ty.tcon_eq (hX.trans ha)
+    subst hb
+    congr 1
+    apply List.ext_getElem?
+    intro j
+    cases hu : us[j]? with
+    | none =>
+      cases hu' : ‹List Ty›[j]? with
+      | none => rfl
+      | some u' => have := (List.getElem?_eq_some_iff.mp hu').1; rw [← hl] at this
+                   rw [List.getElem?_eq_none_iff.mpr (by omega)] at hu; cases hu
+    | some u =>
+      obtain ⟨m, hm⟩ : ∃ m, ‹List Ty›[j]? = some m := by
+        have : j < us.length := (List.getElem?_eq_some_iff.mp hu).1
+        exact ⟨_, List.getElem?_eq_getElem (hl ▸ this)⟩
+      rw [hm, hinv j u m hu hm (by rw [hT]; simp) (hv j)]
 
 /-- The field of `type K (c : CaptureRow) = K ((Unit ->{} Unit)^c ->{} Unit)`: the row
 qualifies a parameter of the field. -/
