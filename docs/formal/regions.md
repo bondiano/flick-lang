@@ -196,8 +196,8 @@ and likewise for `Eff r ε τ`. A qualifier may move into the runtime row of a s
 - widening a qualifier is allowed, narrowing is `FLICK-G001`;
 - a function or task value, a pure one too, fits only where the reach of the position covers what it holds (the last premise, `Caps.Sub … reach` of `LeLive.arrow`, `Live/Mode.lean`; `Ty.reach` of an arrow includes its qualifier, `TyBase.lean`); for one with effects the use stages are compared besides;
 - what a function position's type shows, and what a value bound's type shows (`a` of `List a`), counts as visible, not held;
-- inside `Ref`, `List`, records and ADTs, types are compared by `≡` together with their qualifiers: "explicit stored qualifications are part of type identity", and mutable storage is invariant (`FLICK-T003`);
-- the hidden row of data with hidden storage is one of its arguments, and subtyping may only widen it: `(T C ā) ≤ (T C' ā)` when `C ⊆ C'`, the other arguments by `≡` (Lean: `LeLive.hide`, its condition `Sig.hidden_ok`; `Formal/Widen.lean`). Data with a smaller row passes where a larger one is expected, never the reverse, as for the qualifier of a function. Only the row the reading of §1.4 adds widens, and only while it is covariant: a well-formed signature has it in the fields only as the qualifier of a stored function or computation, or as the hidden row of stored data, at the top of a field, never under `Ref`, inside an argument of another type, in a contravariant position, or fixed by the result of a GADT constructor. A capture row a declaration names (`type K (c : CaptureRow)`) is invariant ([a capture row a declaration names is invariant](#a-capture-row-a-declaration-names-is-invariant)). Data inside an argument of another type (`List (G s a)`) is compared by `≡` until the variance of data arguments is specified ([§2.2.1](#221-variance-of-data-arguments-pending)); A region another argument shows does not stand in for it: `(G (File s) a)^{s}` is no `G (File s) a`, because code generic in that argument no longer sees the region, and the use the row records would be lost ([the hidden row of data is not what its arguments show](#the-hidden-row-of-data-is-not-what-its-arguments-show));
+- inside `Ref` types are compared by `≡` together with their qualifiers, mutable storage is invariant (`FLICK-T003`); inside lists, records and other data they are compared by the variance of each parameter ([§2.2.1](#221-variance-of-data-arguments));
+- the hidden row of data with hidden storage is one of its arguments, and subtyping may only widen it: `(T C ā) ≤ (T C' ā)` when `C ⊆ C'`, the other arguments by `≡` (Lean: `LeLive.hide`, its condition `Sig.hidden_ok`; `Formal/Widen.lean`). Data with a smaller row passes where a larger one is expected, never the reverse, as for the qualifier of a function. Only the row the reading of §1.4 adds widens, and only while it is covariant: a well-formed signature has it in the fields only as the qualifier of a stored function or computation, or as the hidden row of stored data, at the top of a field, never under `Ref`, inside an argument of another type, in a contravariant position, or fixed by the result of a GADT constructor. A capture row a declaration names (`type K (c : CaptureRow)`) is invariant ([a capture row a declaration names is invariant](#a-capture-row-a-declaration-names-is-invariant)). Data inside an argument of another type (`List (G s a)`) is compared by `≡` until the variance of data arguments lands in the checker ([§2.2.1](#221-variance-of-data-arguments)); A region another argument shows does not stand in for it: `(G (File s) a)^{s}` is no `G (File s) a`, because code generic in that argument no longer sees the region, and the use the row records would be lost ([the hidden row of data is not what its arguments show](#the-hidden-row-of-data-is-not-what-its-arguments-show));
 - `α^{≤C} ≤ α` and `α ≤ α^{≤C}` by §2.1: both reach `⌈υ⌉`. Hence `Option (a^{≤v}, b^{≤w}) ≡ Option (a, b)` ([bounded variable atoms](#a-bounded-variable-reaches-what-the-variable-reaches)).
 
 Checker:
@@ -206,9 +206,43 @@ Checker:
 - the ⌈·⌉ check is not done by `subsume` itself but by the `Hold` obligation (`regions/mod.rs` `hold`) with the `visible` part of the expected type: what the type shows is subtracted from what is held (`regions/solve.rs` `hidden`); subtracting it from the hidden row of data is a divergence ([the hidden row of data is not what its arguments show](#the-hidden-row-of-data-is-not-what-its-arguments-show));
 - `regions/compare.rs` `unify_captured`: qualifiers under an invariant constructor are equal.
 
-#### 2.2.1 Variance of data arguments (pending)
+#### 2.2.1 Variance of data arguments
 
-Decided: subtyping will be covariant or contravariant in the arguments of data by the variance of each parameter, computed from the fields (arrows, `Ref`, `Eff`, rows, the results of GADT constructors), so that `List (G s a)^{c}` widens like `(G s a)^{c}`. It is specified by a separate change after its design note. Until then data inside an argument of another type compares by `≡`, which rejects more programs and admits no new one.
+Each parameter of a data type has a variance, `+`, `−`, `inv` or `bi` (unused), and subtyping compares the arguments of data by it:
+
+```text
+for each i:  +: uᵢ ≤ uᵢ'    −: uᵢ' ≤ uᵢ    inv: uᵢ ≡ uᵢ'    bi: any
+──────────────────────────────────────────────────────────── (≤-Data)
+T ū ≤ T ū'
+```
+
+so `List ((Unit →P Unit)^{s})` passes where `List ((Unit →P Unit)^{s,t})` is expected, and the widening of the hidden row (§2.2) is the case of its `+` parameter. The variance is inferred from the fields, not written: the least fixed point over a group of declarations, starting from `bi`, where a field contributes the polarity of each position a parameter occupies:
+
+- an arrow: its parameter `−`, its result, qualifier and stage row `+`;
+- `Eff r ε τ C`: `r`, `ε`, `τ` and `C` `+`;
+- a record: its fields `+`; another data type: the variance of its parameter, composed;
+- `Ref τ`, a handle, an owner and a dictionary: `inv` (mutable or shared storage);
+- `Errors ρ`: `+`.
+
+Indices of GADT constructors. Matching on a constructor refines an argument to equal `res K[j]σ`. Widening that argument would make the branch assume a type the value does not have:
+
+```flick
+type Tag a =
+  | Pure : Tag (Unit -> Unit)
+
+use : forall a. Tag a -> a -> Unit -> Unit
+let use t f =
+  match t with
+  | Pure -> f
+```
+
+If `Tag` were covariant in `a`, `Pure : Tag ((Unit -> Unit)^{s})` would reach the branch, which returns `f` as a pure function, and a callback using `s` would leave its `scope`. A parameter `j` that some constructor fixes, with `res K[j]` other than `v j`, gets a sign only when `res K[j]` is closed in that direction (Scherer and Rémy, *GADTs meet subtyping*, ESOP 2013): upward closed for `+`, downward for `−`, checked syntactically. Scalars and nominal types without widening parameters are closed; a tuple, `List a`, an arrow or a qualifier is not. Otherwise the parameter is `inv`, so `Tag` and the `Expr` of `tests/check/pass/types/gadt.fl` are invariant in their index, and `TypeEq a a` too.
+
+Classes. A class parameter has a variance from the types of its methods by the same rules. A wanted `C τ` is served by an instance with head `H` when `τ ≤ Hσ` for a `−` parameter (the class only takes it, as `Show` and `Eq`), `Hσ ≤ τ` for `+` (it only produces it, as `Default` and `Decode`), and `τ ≡ Hσ` for `inv`. Coherence (K1′): two heads of a class must not be comparable by `≤` in that direction under any substitution; the check is the existing overlap error (`FLICK-C003`), extended from unification to comparison. Improvement by functional dependencies stays by `≡`: it infers types, it does not choose a dictionary.
+
+Hover and `flick inspect` show the inferred variances of data and class parameters.
+
+Pending: Lean (`Sig.var` with its condition, `LeLive` by variance for `tapp`, the closure lemma of indices, preservation and T1), the model, the checker (until then the checker compares data inside another argument by `≡`, which rejects more programs and admits no new one), and the classes (`Ty.Le` in elaboration, K1′, T6).
 
 ### 2.3 Rules
 
@@ -1065,6 +1099,13 @@ type K (c : CaptureRow) = K ((Unit ->{} Unit)^c ->{} Unit)
 
 - Symptom: a `K` whose field stores its callback in a cell made outside the `scope` is a `K ∅`. Widened to `K {s}` inside `scope s`, its field takes a callback that uses `s`; after the `scope` the callback, read from the cell as `Unit ->{} Unit`, runs and uses the closed region (T4.1). In a proof of preservation the field, matched as `(Unit ->^{s} Unit) ->{} Unit`, has a value typed `(Unit ->^∅ Unit) ->{} Unit`, and getting from one to the other narrows the qualifier of its parameter.
 - Resolution, document: only the hidden row the reading adds (§1.4) widens, under the condition of §2.2 that it is covariant in the fields; a row a declaration names keeps `≡`. Lean: the condition is part of a well-formed `Sig`, and `K` is a regression of `LiveRules.lean` (`contra_row_not_hidden`, `named_row_invariant`).
+
+### An index a GADT constructor fixes is not widened by its fields
+
+Divergence: inferring the variance of a parameter from the fields alone makes a GADT index covariant when no field uses it, and breaks T4′.
+
+- Symptom: with `Tag` of [§2.2.1](#221-variance-of-data-arguments), `a` occurs in no field, so the fields give it `bi`. `Pure` typed `Tag ((Unit -> Unit)^{s})` reaches `match t with | Pure -> f`, the branch refines `a` to the pure `Unit -> Unit`, and returns `f`, a callback using `s`, as a pure function out of its `scope`.
+- Resolution, document: a parameter some constructor fixes keeps a sign only when `res K[j]` is closed in that direction, otherwise it is `inv` ([§2.2.1](#221-variance-of-data-arguments)). Lean: the closure lemma of the index, with `Tag` a regression of `LiveRules.lean`.
 
 ### Rules of typing by use found while porting
 
