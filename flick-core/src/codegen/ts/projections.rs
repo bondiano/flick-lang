@@ -1,7 +1,8 @@
 //! The TypeScript forms modules give their types with `@ts`, read from
 //! their interfaces: the backend names no type of a library.
 
-use std::sync::{Arc, OnceLock};
+use std::cell::RefCell;
+use std::sync::Arc;
 
 use super::Projection;
 use crate::iface::Interface;
@@ -28,14 +29,13 @@ fn read(interface: &Interface) -> Forms {
     Ok(forms)
 }
 
-/// The forms of the built-in modules, read once.
-fn builtin() -> &'static [(String, Forms)] {
-    static TABLE: OnceLock<Vec<(String, Forms)>> = OnceLock::new();
-    TABLE.get_or_init(|| {
-        (types::builtins().iter())
-            .map(|interface| (interface.module.clone(), read(interface)))
-            .collect()
-    })
+thread_local! {
+    /// The forms of the built-in modules asked about so far: they are the
+    /// same in every build, so they are read once, from the interfaces a
+    /// caller has. Asking for the built-in modules here instead would check
+    /// them all again when the caller had them checked another way, as an
+    /// editor's projection has beside a build for Flick's own runtime.
+    static BUILTIN: RefCell<Vec<(String, Forms)>> = const { RefCell::new(Vec::new()) };
 }
 
 impl Projection<'_> {
@@ -46,15 +46,26 @@ impl Projection<'_> {
             Ok(forms) => Ok((forms.iter().find(|(n, _)| n == name)).map(|(_, f)| Arc::clone(f))),
             Err(why) => Err(why.clone()),
         };
-        if let Some((_, forms)) = builtin().iter().find(|(m, _)| m == module) {
-            return find(forms);
+        let of = |known: &[(String, Forms)]| {
+            (known.iter().find(|(m, _)| m == module)).map(|(_, forms)| find(forms))
+        };
+        if let Some(found) = BUILTIN.with_borrow(|known| of(known)) {
+            return found;
         }
-        if let Some((_, forms)) = self.forms.borrow().iter().find(|(m, _)| m == module) {
-            return find(forms);
+        if let Some(found) = of(&self.forms.borrow()) {
+            return found;
         }
-        let forms = (self.lookup)(module).map_or(Ok(Vec::new()), |i| read(&i));
+        let interface = (self.lookup)(module);
+        let builtin =
+            interface.is_some() && types::builtin_sources().iter().any(|(m, _)| *m == module);
+        let forms = interface.map_or(Ok(Vec::new()), |i| read(&i));
         let found = find(&forms);
-        self.forms.borrow_mut().push((module.to_owned(), forms));
+        let known = (module.to_owned(), forms);
+        if builtin {
+            BUILTIN.with_borrow_mut(|all| all.push(known));
+        } else {
+            self.forms.borrow_mut().push(known);
+        }
         found
     }
 }
