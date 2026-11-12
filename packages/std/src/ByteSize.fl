@@ -1,13 +1,64 @@
 /// An exact, non-negative number of bytes, made from decimal (`kilobytes`,
 /// 1000) or binary (`kibibytes`, 1024) units and formatted back into them.
 /// Constructors refuse a negative or inexact size.
-module ByteSize exposing (..)
+module ByteSize exposing (
+  ByteSize,
+  ByteUnit(..),
+  FormatOptions,
+  default_format,
+  zero,
+  bytes,
+  kilobytes,
+  megabytes,
+  gigabytes,
+  terabytes,
+  petabytes,
+  exabytes,
+  zettabytes,
+  yottabytes,
+  ronnabytes,
+  quettabytes,
+  kibibytes,
+  mebibytes,
+  gibibytes,
+  tebibytes,
+  pebibytes,
+  exbibytes,
+  zebibytes,
+  yobibytes,
+  from_string,
+  is_zero,
+  to_bigint,
+  to_number,
+  to_unit,
+  equals,
+  between,
+  clamp,
+  min,
+  max,
+  is_less_than,
+  is_less_than_or_equal_to,
+  is_greater_than,
+  is_greater_than_or_equal_to,
+  sum,
+  subtract,
+  times,
+  divide,
+  format,
+  reducer_sum,
+  combiner_max,
+  combiner_min,
+  json,
+  json_number,
+  json_bigint,
+)
 
+import BigInt
 import Combiner
 import Reducer
 
 /// A number of bytes, a `BigInt` at run time.
-type ByteSize
+opaque unboxed type ByteSize = ByteSize BigInt
 
 /// A unit: the byte, the decimal units (`KB` is `kB`) and the binary ones.
 type ByteUnit =
@@ -45,10 +96,216 @@ type alias FormatOptions = {
 default_format : FormatOptions
 let default_format = { precision = None; trailingZeros = None; binary = true; unit = None }
 
+/// The most bytes a `Float` counts exactly.
+safe : BigInt
+let safe = 9007199254740991n
+
+/// The place of a binary unit above the byte after the decimal units, 11 for `KiB`.
+binary_place : ByteUnit -> Int
+let binary_place unit =
+  match unit with
+  | KiB -> 11
+  | MiB -> 12
+  | GiB -> 13
+  | TiB -> 14
+  | PiB -> 15
+  | EiB -> 16
+  | ZiB -> 17
+  | YiB -> 18
+  | B | KB | MB | GB | TB | PB | EB | ZB | YB | RB | QB -> 0
+
+/// The place of a unit: 0 for the byte, 1 to 10 for the decimal units.
+place : ByteUnit -> Int
+let place unit =
+  match unit with
+  | B -> 0
+  | KB -> 1
+  | MB -> 2
+  | GB -> 3
+  | TB -> 4
+  | PB -> 5
+  | EB -> 6
+  | ZB -> 7
+  | YB -> 8
+  | RB | QB | KiB | MiB | GiB | TiB | PiB | EiB | ZiB | YiB -> later_place unit
+
+/// The places past `YB`.
+later_place : ByteUnit -> Int
+let later_place unit =
+  match unit with
+  | RB -> 9
+  | QB -> 10
+  | KiB | MiB | GiB | TiB | PiB | EiB | ZiB | YiB -> binary_place unit
+  | B | KB | MB | GB | TB | PB | EB | ZB | YB -> 0
+
+symbols : List String
+let symbols = [
+  "B",
+  "kB",
+  "MB",
+  "GB",
+  "TB",
+  "PB",
+  "EB",
+  "ZB",
+  "YB",
+  "RB",
+  "QB",
+  "KiB",
+  "MiB",
+  "GiB",
+  "TiB",
+  "PiB",
+  "EiB",
+  "ZiB",
+  "YiB",
+]
+
+words : List String
+let words = [
+  "byte",
+  "kilobyte",
+  "megabyte",
+  "gigabyte",
+  "terabyte",
+  "petabyte",
+  "exabyte",
+  "zettabyte",
+  "yottabyte",
+  "ronnabyte",
+  "quettabyte",
+  "kibibyte",
+  "mebibyte",
+  "gibibyte",
+  "tebibyte",
+  "pebibyte",
+  "exbibyte",
+  "zebibyte",
+  "yobibyte",
+]
+
+/// The bytes of the unit at each place.
+factors : List BigInt
+let factors =
+  List.map
+    (fun at ->
+      if at <= 10 then 1000n ** Numeric.bigint_of at else 1024n ** Numeric.bigint_of (at - 10)
+    )
+    (List.range 0 19)
+
+/// The bytes of the unit at a place.
+factor_at : Int -> BigInt
+let factor_at at = Option.with_default 1n (List.get at factors)
+
+/// The bytes of a unit.
+factor : ByteUnit -> BigInt
+let factor unit = factor_at (place unit)
+
+/// How the unit at a place is written after a number.
+symbol_at : Int -> String
+let symbol_at at = Option.with_default "B" (List.get at symbols)
+
+/// Each way to name a unit in text, with its bytes: its symbol, its word and
+/// the plural of the word.
+named : List (String, BigInt)
+let named =
+  List.flat_map
+    (fun at ->
+      let word = Option.with_default "byte" (List.get at words)
+      [(symbol_at at, factor_at at), (word, factor_at at), (word ++ "s", factor_at at)]
+    )
+    (List.range 0 19)
+
+/// Whether `text` is one decimal digit or more.
+digits : String -> Bool
+let digits text =
+  not (String.is_empty text) && List.all (fun c -> c >= "0" && c <= "9") (String.chars text)
+
+/// `10` to the power `n`.
+/// Ten to each power up to thirty, made once: a size is scaled and rounded
+/// by one of these in nearly every call.
+tens : List BigInt
+let tens = List.map (fun n -> 10n ** Numeric.bigint_of n) (List.range 0 31)
+
+ten_to : Int -> BigInt
+let ten_to n =
+  match List.get n tens with
+  | Some power -> power
+  | None -> 10n ** Numeric.bigint_of n
+
+/// The bytes of `quantity` units of `by` bytes, when that is whole: `quantity`
+/// is digits, with a fraction or an exponent as a `Float` is written.
+scaled : String -> BigInt -> Option BigInt
+let scaled quantity by =
+  let (mantissa, exponent) =
+    match String.split "e" quantity with
+    | [m, e] -> (
+      m,
+      Int.parse (if String.starts_with "+" e then String.slice 1 (String.length e) e else e),
+    )
+    | _ -> (quantity, Some 0)
+  let (whole, fraction, pointed) =
+    match String.split "." mantissa with
+    | [w, f] -> (w, f, true)
+    | _ -> (mantissa, "", false)
+  match (exponent, BigInt.parse (whole ++ fraction)) with
+  | (Some power, Some number) when digits whole && (not pointed || digits fraction) ->
+    let shift = power - String.length fraction
+    if shift >= 0 then
+      Some (ten_to shift * number * by)
+    else if 1n * number * by % ten_to (0 - shift) == 0n then
+      Some (1n * number * by / ten_to (0 - shift))
+    else
+      None
+  | _ -> None
+
+/// `n` units as a size, when that is a whole, non-negative, safe number of bytes.
+counted : ByteUnit -> Float -> Option ByteSize
+let counted unit n =
+  if not (Float.is_finite n) || n < 0 then
+    None
+  else if Float.is_safe_integer n then
+    match BigInt.from_number n with
+    | Some count when count * factor unit <= safe -> Some (ByteSize (count * factor unit))
+    | _ -> None
+  else
+    match scaled (Float.to_string n) (factor unit) with
+    | Some count when count <= safe -> Some (ByteSize count)
+    | _ -> None
+
+/// `value` in units of `by` bytes times `scale`, rounded half up.
+rounded : BigInt -> BigInt -> BigInt -> BigInt
+let rounded value by scale = (2n * value * scale + by) / (2n * by)
+
+/// `text` without the zeros it ends with.
+unpadded : String -> String
+let rec unpadded text =
+  if String.ends_with "0" text then
+    unpadded (String.slice 0 (String.length text - 1) text)
+  else
+    text
+
+/// `value` bytes written in the unit at `at` with `precision` digits after the point.
+written : BigInt -> Int -> Int -> Bool -> String
+let written value at precision zeros =
+  let scale = ten_to precision
+  let amount = rounded value (factor_at at) scale
+  let whole = BigInt.to_string (amount / scale)
+  let padded = String.pad_start precision "0" (BigInt.to_string (amount % scale))
+  let fraction = if zeros then padded else unpadded padded
+  if precision == 0 || String.is_empty fraction then
+    whole ++ " " ++ symbol_at at
+  else
+    whole ++ "." ++ fraction ++ " " ++ symbol_at at
+
+/// The place, from `at` down to `least`, of the largest unit `value` reaches.
+reached : BigInt -> Int -> Int -> Int
+let rec reached value least at =
+  if at > least && value < factor_at at then reached value least (at - 1) else at
+
 /// No bytes.
 zero : ByteSize
-foreign pure zero from "flick:ByteSize" "zero"
-  reviewed "effect@4.1.2 sha256:c8f5ad84568cdd21"
+let zero = ByteSize 0n
 
 instance Eq ByteSize =
   let eq x y = equals x y
@@ -64,222 +321,207 @@ instance Show ByteSize =
 
 /// `n` bytes; `None` unless that is a whole, non-negative, safe number of bytes.
 bytes : Float -> Option ByteSize
-foreign pure bytes from "flick:ByteSize" "flickBytes"
-  reviewed "effect@4.1.2 sha256:7e6fdea26a33e505"
+let bytes n = counted B n
 
 /// `n` kB (1000 bytes); `None` unless that is a whole, non-negative, safe number of bytes.
 kilobytes : Float -> Option ByteSize
-foreign pure kilobytes from "flick:ByteSize" "flickKilobytes"
-  reviewed "effect@4.1.2 sha256:5076fd1cb1d9b494"
+let kilobytes n = counted KB n
 
 /// `n` MB; `None` unless that is a whole, non-negative, safe number of bytes.
 megabytes : Float -> Option ByteSize
-foreign pure megabytes from "flick:ByteSize" "flickMegabytes"
-  reviewed "effect@4.1.2 sha256:a335e85d0c32c9a0"
+let megabytes n = counted MB n
 
 /// `n` GB; `None` unless that is a whole, non-negative, safe number of bytes.
 gigabytes : Float -> Option ByteSize
-foreign pure gigabytes from "flick:ByteSize" "flickGigabytes"
-  reviewed "effect@4.1.2 sha256:29e3945cc96095c8"
+let gigabytes n = counted GB n
 
 /// `n` TB; `None` unless that is a whole, non-negative, safe number of bytes.
 terabytes : Float -> Option ByteSize
-foreign pure terabytes from "flick:ByteSize" "flickTerabytes"
-  reviewed "effect@4.1.2 sha256:fdde24c5d238e02e"
+let terabytes n = counted TB n
 
 /// `n` PB; `None` unless that is a whole, non-negative, safe number of bytes.
 petabytes : Float -> Option ByteSize
-foreign pure petabytes from "flick:ByteSize" "flickPetabytes"
-  reviewed "effect@4.1.2 sha256:44d54101f043dad7"
+let petabytes n = counted PB n
 
 /// `n` EB; `None` unless that is a whole, non-negative, safe number of bytes.
 exabytes : Float -> Option ByteSize
-foreign pure exabytes from "flick:ByteSize" "flickExabytes"
-  reviewed "effect@4.1.2 sha256:0dba137317d678fa"
+let exabytes n = counted EB n
 
 /// `n` ZB; `None` unless that is a whole, non-negative, safe number of bytes.
 zettabytes : Float -> Option ByteSize
-foreign pure zettabytes from "flick:ByteSize" "flickZettabytes"
-  reviewed "effect@4.1.2 sha256:d896f8418e968df1"
+let zettabytes n = counted ZB n
 
 /// `n` YB; `None` unless that is a whole, non-negative, safe number of bytes.
 yottabytes : Float -> Option ByteSize
-foreign pure yottabytes from "flick:ByteSize" "flickYottabytes"
-  reviewed "effect@4.1.2 sha256:c85fd5eaff8208a0"
+let yottabytes n = counted YB n
 
 /// `n` RB; `None` unless that is a whole, non-negative, safe number of bytes.
 ronnabytes : Float -> Option ByteSize
-foreign pure ronnabytes from "flick:ByteSize" "flickRonnabytes"
-  reviewed "effect@4.1.2 sha256:35d6a048114e3dbd"
+let ronnabytes n = counted RB n
 
 /// `n` QB; `None` unless that is a whole, non-negative, safe number of bytes.
 quettabytes : Float -> Option ByteSize
-foreign pure quettabytes from "flick:ByteSize" "flickQuettabytes"
-  reviewed "effect@4.1.2 sha256:d6283c99e8b2c643"
+let quettabytes n = counted QB n
 
 /// `n` KiB (1024 bytes); `None` unless that is a whole, non-negative, safe number of bytes.
 kibibytes : Float -> Option ByteSize
-foreign pure kibibytes from "flick:ByteSize" "flickKibibytes"
-  reviewed "effect@4.1.2 sha256:b3cc57ff0a65a742"
+let kibibytes n = counted KiB n
 
 /// `n` MiB; `None` unless that is a whole, non-negative, safe number of bytes.
 mebibytes : Float -> Option ByteSize
-foreign pure mebibytes from "flick:ByteSize" "flickMebibytes"
-  reviewed "effect@4.1.2 sha256:4e998a15f8102103"
+let mebibytes n = counted MiB n
 
 /// `n` GiB; `None` unless that is a whole, non-negative, safe number of bytes.
 gibibytes : Float -> Option ByteSize
-foreign pure gibibytes from "flick:ByteSize" "flickGibibytes"
-  reviewed "effect@4.1.2 sha256:3ce5bb1d52d57a8c"
+let gibibytes n = counted GiB n
 
 /// `n` TiB; `None` unless that is a whole, non-negative, safe number of bytes.
 tebibytes : Float -> Option ByteSize
-foreign pure tebibytes from "flick:ByteSize" "flickTebibytes"
-  reviewed "effect@4.1.2 sha256:dad789457ccca587"
+let tebibytes n = counted TiB n
 
 /// `n` PiB; `None` unless that is a whole, non-negative, safe number of bytes.
 pebibytes : Float -> Option ByteSize
-foreign pure pebibytes from "flick:ByteSize" "flickPebibytes"
-  reviewed "effect@4.1.2 sha256:351e8f3e4cc3f62d"
+let pebibytes n = counted PiB n
 
 /// `n` EiB; `None` unless that is a whole, non-negative, safe number of bytes.
 exbibytes : Float -> Option ByteSize
-foreign pure exbibytes from "flick:ByteSize" "flickExbibytes"
-  reviewed "effect@4.1.2 sha256:c8a9c07fdb27579c"
+let exbibytes n = counted EiB n
 
 /// `n` ZiB; `None` unless that is a whole, non-negative, safe number of bytes.
 zebibytes : Float -> Option ByteSize
-foreign pure zebibytes from "flick:ByteSize" "flickZebibytes"
-  reviewed "effect@4.1.2 sha256:17a9755114d3d8c1"
+let zebibytes n = counted ZiB n
 
 /// `n` YiB; `None` unless that is a whole, non-negative, safe number of bytes.
 yobibytes : Float -> Option ByteSize
-foreign pure yobibytes from "flick:ByteSize" "flickYobibytes"
-  reviewed "effect@4.1.2 sha256:e9a7209cd27d053e"
+let yobibytes n = counted YiB n
 
 /// The size a string spells, as `"1.5 kB"` or `"2 mebibytes"`.
 from_string : String -> Option ByteSize
-foreign pure from_string from "flick:ByteSize" "fromString"
-  reviewed "effect@4.1.2 sha256:1fbbb9611681f55a"
+let from_string text =
+  let trimmed = String.trim text
+  let quantity =
+    String.join "" (List.take_while (fun c -> c == "." || digits c) (String.chars trimmed))
+  let unit = String.trim (String.slice (String.length quantity) (String.length trimmed) trimmed)
+  match List.find (fun (name, _) -> name == unit) named with
+  | Some (_, by) -> Option.map ByteSize (scaled quantity by)
+  | None -> None
 
 /// Whether the size is no bytes.
 is_zero : ByteSize -> Bool
-foreign pure is_zero from "flick:ByteSize" "isZero"
-  reviewed "effect@4.1.2 sha256:615311c29fc8ec15"
+let is_zero (ByteSize bytes) = bytes == 0n
 
 /// The number of bytes.
 to_bigint : ByteSize -> BigInt
-foreign pure to_bigint from "flick:ByteSize" "toBigInt"
-  reviewed "effect@4.1.2 sha256:fe413cfa29f04444"
+let to_bigint (ByteSize bytes) = bytes
 
 /// The number of bytes, when it is a safe integer.
 to_number : ByteSize -> Option Float
-foreign pure to_number from "flick:ByteSize" "toNumber"
-  reviewed "effect@4.1.2 sha256:4d89735b6c92ae19"
+let to_number (ByteSize bytes) = if bytes <= safe then Some (BigInt.to_number bytes) else None
 
 /// The size in a unit, as a number that may be fractional.
 to_unit : ByteUnit -> ByteSize -> Float
-foreign pure to_unit from "flick:ByteSize" "flickToUnit"
-  reviewed "effect@4.1.2 sha256:6291ffce829cd84a"
+let to_unit unit (ByteSize bytes) = BigInt.to_number bytes / BigInt.to_number (factor unit)
 
 /// Whether both are the same number of bytes.
 equals : ByteSize -> ByteSize -> Bool
-foreign pure equals from "flick:ByteSize" "equals"
-  arity 1
-  reviewed "effect@4.1.2 sha256:944aebda0c94ae69"
+let equals (ByteSize that) (ByteSize self) = self == that
 
 /// Whether `self` lies within `minimum` and `maximum`, both included.
 between : { minimum : ByteSize; maximum : ByteSize } -> ByteSize -> Bool
-foreign pure between from "flick:ByteSize" "between"
-  arity 1
-  reviewed "effect@4.1.2 sha256:2552698c6e66eaaf"
+let between bounds self =
+  to_bigint self >= to_bigint bounds.minimum && to_bigint self <= to_bigint bounds.maximum
 
 /// `self` kept within `minimum` and `maximum`.
 clamp : { minimum : ByteSize; maximum : ByteSize } -> ByteSize -> ByteSize
-foreign pure clamp from "flick:ByteSize" "clamp"
-  arity 1
-  reviewed "effect@4.1.2 sha256:74a54a29530d8c9d"
+let clamp bounds self =
+  if to_bigint self < to_bigint bounds.minimum then
+    bounds.minimum
+  else if to_bigint self > to_bigint bounds.maximum then
+    bounds.maximum
+  else
+    self
 
 /// The smaller of the two.
 min : ByteSize -> ByteSize -> ByteSize
-foreign pure min from "flick:ByteSize" "min"
-  arity 1
-  reviewed "effect@4.1.2 sha256:f39c8df67a0155cc"
+let min that self = if to_bigint self < to_bigint that then self else that
 
 /// The larger of the two.
 max : ByteSize -> ByteSize -> ByteSize
-foreign pure max from "flick:ByteSize" "max"
-  arity 1
-  reviewed "effect@4.1.2 sha256:a4c97cd51b22802a"
+let max that self = if to_bigint self > to_bigint that then self else that
 
 /// `self < that`: `size |> ByteSize.is_less_than limit`.
 is_less_than : ByteSize -> ByteSize -> Bool
-foreign pure is_less_than from "flick:ByteSize" "isLessThan"
-  arity 1
-  reviewed "effect@4.1.2 sha256:d7ce136aa69dc4e0"
+let is_less_than (ByteSize that) (ByteSize self) = self < that
 
 /// `self <= that`.
 is_less_than_or_equal_to : ByteSize -> ByteSize -> Bool
-foreign pure is_less_than_or_equal_to from "flick:ByteSize" "isLessThanOrEqualTo"
-  arity 1
-  reviewed "effect@4.1.2 sha256:ed62e69dbaa62f09"
+let is_less_than_or_equal_to (ByteSize that) (ByteSize self) = self <= that
 
 /// `self > that`.
 is_greater_than : ByteSize -> ByteSize -> Bool
-foreign pure is_greater_than from "flick:ByteSize" "isGreaterThan"
-  arity 1
-  reviewed "effect@4.1.2 sha256:3b2aff9d7c2ca11a"
+let is_greater_than (ByteSize that) (ByteSize self) = self > that
 
 /// `self >= that`.
 is_greater_than_or_equal_to : ByteSize -> ByteSize -> Bool
-foreign pure is_greater_than_or_equal_to from "flick:ByteSize" "isGreaterThanOrEqualTo"
-  arity 1
-  reviewed "effect@4.1.2 sha256:eb8ffc64f191efe4"
+let is_greater_than_or_equal_to (ByteSize that) (ByteSize self) = self >= that
 
 /// Both sizes together.
 sum : ByteSize -> ByteSize -> ByteSize
-foreign pure sum from "flick:ByteSize" "sum"
-  arity 1
-  reviewed "effect@4.1.2 sha256:6c2589fb48d4b85c"
+let sum (ByteSize that) (ByteSize self) = ByteSize (self + that)
 
 /// `self - that`; `None` when `that` is larger.
 subtract : ByteSize -> ByteSize -> Option ByteSize
-foreign pure subtract from "flick:ByteSize" "subtract"
-  arity 1
-  reviewed "effect@4.1.2 sha256:fc6c6b6f312d9235"
+let subtract (ByteSize that) (ByteSize self) =
+  if self < that then None else Some (ByteSize (self - that))
 
 /// `self` times a whole, non-negative, safe number; `None` otherwise.
 times : Float -> ByteSize -> Option ByteSize
-foreign pure times from "flick:ByteSize" "times"
-  arity 1
-  reviewed "effect@4.1.2 sha256:99da3dfe95feedb3"
+let times multiplier (ByteSize self) =
+  if Float.is_safe_integer multiplier && multiplier >= 0 then
+    Option.map (fun by -> ByteSize (self * by)) (BigInt.from_number multiplier)
+  else
+    None
 
 /// `self` divided by a whole, positive, safe number, rounded down; `None`
 /// otherwise.
 divide : Float -> ByteSize -> Option ByteSize
-foreign pure divide from "flick:ByteSize" "divide"
-  arity 1
-  reviewed "effect@4.1.2 sha256:00b41bab58ef0a29"
+let divide divisor (ByteSize self) =
+  if Float.is_safe_integer divisor && divisor >= 1 then
+    Option.map (fun by -> ByteSize (self / by)) (BigInt.from_number divisor)
+  else
+    None
 
 /// The size as text in a unit: `"1.5 KiB"`.
 format : FormatOptions -> ByteSize -> String
-foreign pure format from "flick:ByteSize" "flickFormat"
-  reviewed "effect@4.1.2 sha256:ce94ffb1e3723d16"
+let format options (ByteSize value) =
+  let wanted = Option.with_default 2 options.precision
+  let precision = if wanted < 0 then 0 else if wanted > 20 then 20 else wanted
+  let zeros = Option.with_default false options.trailingZeros
+  match options.unit with
+  | Some unit -> written value (place unit) precision zeros
+  | None ->
+    if value == 0n then
+      "0 B"
+    else
+      // the binary units above the byte are the places 11 to 18, the decimal ones 1 to 10
+      let (first, last, step) = if options.binary then (10, 18, 1024n) else (0, 10, 1000n)
+      let at = reached value first last
+      let by = if at == first then 1n else factor_at at
+      let next = at < last && rounded value by (ten_to precision) >= step * ten_to precision
+      let shown = if next then at + 1 else at
+      written value (if shown == first then 0 else shown) precision zeros
 
 /// Sums sizes from `zero`.
 reducer_sum : Reducer.Reducer ByteSize
-foreign pure reducer_sum from "flick:ByteSize" "ReducerSum"
-  reviewed "effect@4.1.2 sha256:b18343fbdcc9aa03"
+let reducer_sum = Reducer.make (fun a b -> sum b a) zero
 
 /// The larger of two sizes.
 combiner_max : Combiner.Combiner ByteSize
-foreign pure combiner_max from "flick:ByteSize" "CombinerMax"
-  reviewed "effect@4.1.2 sha256:af30c6a95d8ba20b"
+let combiner_max = Combiner.make (fun a b -> max b a)
 
 /// The smaller of two sizes.
 combiner_min : Combiner.Combiner ByteSize
-foreign pure combiner_min from "flick:ByteSize" "CombinerMin"
-  reviewed "effect@4.1.2 sha256:6dcd87653f39fc92"
+let combiner_min = Combiner.make (fun a b -> min b a)
 
 /// A size as JSON text such as `"1.5 KiB"` or `"10 MB"`; encodes as
 /// `"1536 bytes"`. Other text is a `SchemaError`.

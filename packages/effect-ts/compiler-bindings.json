@@ -53,11 +53,6 @@
       "@flick-lang/runtime/core/Boolean"
     ],
     [
-      "flick:ByteSize",
-      null,
-      "@flick-lang/runtime/rt/effect/ByteSize"
-    ],
-    [
       "flick:Cause",
       null,
       "@flick-lang/runtime/rt/effect/Cause"
