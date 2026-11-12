@@ -30,11 +30,13 @@ impl Native {
         }
     }
 
+    /// Every one of them, in the order their numbers have in the shape of
+    /// a function.
+    pub(super) const ALL: [Native; 4] = [Native::Int, Native::Float, Native::Bool, Native::String];
+
     /// The type Go names `go`.
     pub(super) fn named(go: &str) -> Option<Native> {
-        [Native::Int, Native::Float, Native::Bool, Native::String]
-            .into_iter()
-            .find(|native| native.go() == go)
+        Self::ALL.into_iter().find(|native| native.go() == go)
     }
 
     fn name(self) -> &'static str {

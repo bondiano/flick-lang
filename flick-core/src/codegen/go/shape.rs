@@ -34,14 +34,12 @@ pub(super) enum Shape {
 pub(super) struct Types(u64);
 
 impl Types {
-    const ALL: [Native; 4] = [Native::Int, Native::Float, Native::Bool, Native::String];
-
     pub(super) fn of(result: Option<Native>, params: &[Option<Native>]) -> Types {
         if params.len() > 20 {
             return Types(0);
         }
         let code = |n: &Option<Native>| {
-            n.and_then(|n| Self::ALL.iter().position(|&m| m == n))
+            n.and_then(|n| Native::ALL.iter().position(|&m| m == n))
                 .map_or(0, |at| at as u64 + 1)
         };
         let slots = iter::once(&result).chain(params).enumerate();
@@ -51,7 +49,7 @@ impl Types {
     fn slot(self, i: usize) -> Option<Native> {
         let shift = u32::try_from(3 * i).ok();
         let code = shift.and_then(|s| self.0.checked_shr(s)).unwrap_or(0) & 7;
-        (code > 0).then(|| Self::ALL[code as usize - 1])
+        (code > 0).then(|| Native::ALL[code as usize - 1])
     }
 
     pub(super) fn result(self) -> Option<Native> {
