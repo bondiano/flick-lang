@@ -51,6 +51,21 @@ impl Checker<'_> {
         if !cells.is_empty() {
             interface.tags.insert(iface::CELL.to_owned(), cells);
         }
+        // the labelled types an importer may name, each with its kind
+        let exported = |name: &str| {
+            (interface.exports.iter()).any(|e| {
+                e.entity.module == self.env.module
+                    && e.entity.namespace == Namespace::Type
+                    && e.entity.name == name
+            })
+        };
+        let labels: Vec<(String, Vec<String>)> = (self.own_labels())
+            .filter(|(name, _)| exported(name))
+            .map(|(name, kind)| (name.clone(), vec![kind.clone()]))
+            .collect();
+        if !labels.is_empty() {
+            interface.tags.insert(iface::LABEL.to_owned(), labels);
+        }
     }
 
     /// The types marked `@cell` an importer learns of: those the module

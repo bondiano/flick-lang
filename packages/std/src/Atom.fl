@@ -12,10 +12,12 @@ import Failure
 import Reactivity.Atom exposing (Registry)
 import Stream.Core
 
+@label atom
 @lang atom
 /// A value to read.
 type alias Atom a = Reactivity.Atom.Atom a
 
+@label atom
 @lang atom_writable
 /// A state: a value to read and write.
 type alias Writable a = Reactivity.Atom.Writable a
@@ -76,6 +78,7 @@ serializable_family : CallSite => PureCodec Json a -> (String -> Writable a) -> 
 let serializable_family wire f = Reactivity.Atom.serializable_family CallSite.definition wire f
 
 @cell
+@label atom
 @lang atom_browser
 /// A state the browser holds, such as the URL. A server has no browser, so
 /// a view reads one only through `on_server` or `client_only`, which say

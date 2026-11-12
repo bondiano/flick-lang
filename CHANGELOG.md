@@ -32,6 +32,10 @@ break programs.
   `T.check : U -> Bool`, a refined type needs no Effect of its own, and
   another module sees it as an opaque type. A class in its `deriving` takes
   no arguments.
+- **Labels:** `@label kind` before a type declaration gives the top-level
+  values of that type their names where the program runs, as the atoms,
+  views and actions of the standard library have them; a library marks its
+  own types. `labels = "components"` keeps the kind `component`.
 - **Comparisons by `Ord`:** `< <= > >=` order any type with an `Ord`
   instance by its `compare`, as they already did a type variable: `Bool`, a
   derived type, a record, a list. A type without one is `FLICK-C001`, where

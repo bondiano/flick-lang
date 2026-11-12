@@ -10,6 +10,7 @@ import Atom
 import Fiber
 import Ui.Safe exposing (SafeUrl, SanitizedHtml, safe_url, trusted_html)
 
+@label component
 @lang ui_handler
 /// What handles DOM events with snapshot `s`: a task per event under a
 /// concurrency policy. Only `Ui.Event.exhaust`, `latest`, `queue` and
@@ -270,6 +271,7 @@ mount_with :
 foreign effect mount_with from "flick:ui/react" "uiMountWith"
   retention call
 
+@label component
 @lang ui_view
 /// A component that reads atoms while it renders: React renders it again
 /// when one of them changes, or when its props do.

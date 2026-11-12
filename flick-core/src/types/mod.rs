@@ -45,6 +45,7 @@ mod instances;
 mod interpolation;
 mod irrefutable;
 mod kinds;
+mod labels;
 pub mod lang;
 #[cfg(test)]
 mod lint_tests;
@@ -354,6 +355,7 @@ fn run_in(
         typing: Typing::default(),
         predicates: HashMap::new(),
         cells: HashMap::new(),
+        labels: Vec::new(),
         root: None,
         calls: Vec::new(),
         field_path: Vec::new(),
@@ -570,6 +572,9 @@ struct Checker<'a> {
     /// The types marked `@cell`, by module: this module's own, and those the
     /// interfaces it knows declare or pass on.
     cells: HashMap<String, Vec<String>>,
+    /// The types marked `@label`: the module, the type and its kind, this
+    /// module's first. A handful, so a list.
+    labels: Vec<(String, String, String)>,
     /// The applications of a watched name, whose types settle once the
     /// module is solved.
     calls: Vec<facts::PendingCall>,
