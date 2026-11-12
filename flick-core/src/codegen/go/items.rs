@@ -95,6 +95,7 @@ impl<'a> Gen<'a> {
         let a = self.a;
         // local names are unique only within a definition
         self.natives.clear();
+        self.held.clear();
         // whether the declaration made now holds a `//line` directive
         let lines = self.lines;
         match &item.kind {
@@ -275,6 +276,7 @@ impl<'a> Gen<'a> {
         }
         for (name, value) in methods {
             self.natives.clear();
+            self.held.clear();
             let (stmts, v) = self.block(|g| g.expr(value));
             let v = if stmts.is_empty() {
                 v.doc

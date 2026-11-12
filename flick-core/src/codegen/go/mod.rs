@@ -193,7 +193,7 @@ fn compile<'a>(
     // the modules each module's initialization reads
     let mut deps: HashMap<String, BTreeSet<String>> = HashMap::new();
     let mut seen = HashSet::new();
-    let mut owned = own::Owned::new();
+    let (mut owned, records) = (own::Owned::new(), own::records(modules));
     for (m, module) in modules.iter().enumerate() {
         let items: Vec<usize> = (0..module.items.len())
             .filter(|&i| reached.contains(&(m, i)))
@@ -205,6 +205,7 @@ fn compile<'a>(
         let mut g = Gen::new(&module.name, &shapes, program.package, &arena);
         g.settled = Some(&settled);
         g.own = Some(program.own);
+        g.records = Some(&records);
         g.item_initializers = item_initializers;
         if (program.own)(&module.name) {
             g.location = Some(program.location);
@@ -437,6 +438,11 @@ struct Gen<'a> {
     own: Option<&'a dyn Fn(&str) -> bool>,
     /// The Go types of constructors the module's code names.
     owned: own::Owned,
+    /// The constructors of the program declared over a record.
+    records: Option<&'a own::Records>,
+    /// The locals of the definition being emitted bound to the record that
+    /// lies in a value of a constructor, with its labels in their places.
+    held: HashMap<String, Vec<String>>,
 }
 
 impl<'a> Gen<'a> {
@@ -474,6 +480,8 @@ impl<'a> Gen<'a> {
             returns: None,
             own: None,
             owned: own::Owned::new(),
+            records: None,
+            held: HashMap::new(),
         }
     }
 

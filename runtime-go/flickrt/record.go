@@ -297,3 +297,32 @@ func Shaped(s *Shape, vals ...Value) Value {
 	}
 	return out
 }
+
+// Over makes `r` the record of the shape `s` over `vals`: the values of its
+// labels in the order the record keeps them, which the record takes over.
+// Generated code makes so the record that lies in a value of a constructor.
+func (r *Record) Over(s *Shape, vals []Value) { r.keys, r.vals = s.keys, vals }
+
+// FieldAt is the value at place `i` of a record whose labels are known to
+// be in the order of a shape: the record that lies in a value of a
+// constructor, which generated code reads by place.
+func FieldAt(r Value, i int) Value { return r.(*Record).vals[i] }
+
+// Values fills `into` with the values the labels of `s` have in the record
+// `from`, in the order a record of the shape keeps them.
+func (s *Shape) Values(from Value, into []Value) {
+	if from == nil {
+		// no record: the runtime applies a constructor to nothing to learn
+		// its tag (`tagOf`)
+		return
+	}
+	r := record(from)
+	if len(r.keys) == len(s.keys) && (len(s.keys) == 0 || &r.keys[0] == &s.keys[0]) {
+		// a record of this very shape
+		copy(into, r.vals)
+		return
+	}
+	for i, k := range s.keys {
+		into[i] = r.Get(k)
+	}
+}

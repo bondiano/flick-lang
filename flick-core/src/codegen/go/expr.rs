@@ -202,10 +202,7 @@ impl<'a> Gen<'a> {
                 call(self.a, "flickrt.DictOf", self.entries(fields, values)).into()
             }
             ExprKind::Update(base, fields) => self.record(Some(base), fields),
-            ExprKind::Field(record, label) => {
-                let r = self.expr(record);
-                call(a, "flickrt.Field", [r.doc, self.string(label)]).into()
-            }
+            ExprKind::Field(record, label) => self.field(record, label),
             ExprKind::Binary(op, lhs, rhs) => self.binary(*op, lhs, rhs),
             ExprKind::Not(inner) => {
                 let v = self.expr(inner);

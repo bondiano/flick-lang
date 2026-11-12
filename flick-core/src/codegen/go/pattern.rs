@@ -89,6 +89,8 @@ impl<'a> Gen<'a> {
                     let then = inline(a, assigns.chain([a.text("return true")]));
                     tests.push(docvec![a, "if ", cond, " ", then]);
                     for (name, _) in &inner.binds {
+                        // bound by one alternative or another: what it is bound to is not known
+                        self.held.remove(*name);
                         if !t.lets.contains(name) {
                             t.lets.push(name);
                         }
@@ -111,13 +113,39 @@ impl<'a> Gen<'a> {
     /// The test of a tagged constructor and of its fields.
     fn tagged(&mut self, c: &Constructor, args: &[Pat], subject: Document<'a>, t: &mut Test<'a>) {
         let a = self.a;
-        if let Some(ty) = self.own_type(c) {
+        if let Some((ty, held)) = self.own_type(c) {
             // a Go type of its own: Go tells the constructor and has the fields
             t.conds
                 .push(call(a, a.alloc_str(&own::test(&ty)), [subject]));
             let ty = a.alloc_str(&ty);
-            for (i, arg) in args.iter().enumerate() {
-                self.test(arg, docvec![a, subject, ".(*", ty, ").f[", i, "]"], t);
+            let field = |i: usize| docvec![a, subject, ".(*", ty, ").f[", i, "]"];
+            let places = match (&held, args) {
+                (own::Held::Record(labels), [Pat::Record(fields)]) => {
+                    let place = |(label, _): &(String, Pat)| labels.iter().position(|l| l == label);
+                    fields.iter().map(place).collect::<Option<Vec<usize>>>()
+                }
+                _ => None,
+            };
+            match (held, args, places) {
+                // the record lies in the value: a label is a place in it
+                (_, [Pat::Record(fields)], Some(places)) => {
+                    for ((_, p), place) in fields.iter().zip(places) {
+                        self.test(p, field(place), t);
+                    }
+                }
+                (own::Held::Record(labels), [arg], _) => {
+                    if let Pat::Bind(name) = arg {
+                        // read by place where the name is read by label
+                        self.held.insert(names::local(name), labels);
+                    }
+                    let record = docvec![a, "flickrt.Value(&", subject, ".(*", ty, ").rec)"];
+                    self.test(arg, record, t);
+                }
+                (_, args, _) => {
+                    for (i, arg) in args.iter().enumerate() {
+                        self.test(arg, field(i), t);
+                    }
+                }
             }
             return;
         }

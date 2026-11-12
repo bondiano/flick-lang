@@ -320,6 +320,7 @@ mod tests {
                 items: vec![item],
                 labels: BTreeMap::default(),
                 initialization: crate::Initialization::default(),
+                records: BTreeMap::default(),
             }],
         }
     }

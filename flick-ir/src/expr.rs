@@ -20,6 +20,11 @@ pub struct Module {
     pub labels: BTreeMap<String, Label>,
     #[serde(default, skip_serializing_if = "Initialization::is_empty")]
     pub initialization: Initialization,
+    /// The constructors whose one field the declaration writes as a closed
+    /// record, each with the labels of that record in the order written: a
+    /// backend may hold such a record in the value of the constructor.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub records: BTreeMap<String, Vec<String>>,
 }
 
 /// Lexical source prefixes keep canonical entity owners while the backends

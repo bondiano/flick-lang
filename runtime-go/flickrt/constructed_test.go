@@ -67,7 +67,7 @@ func TestTheReadersOfAValueAreInlined(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
-	for _, f := range []string{"IsTag", "IsData", "Get", "Field", "At", "Len"} {
+	for _, f := range []string{"IsTag", "IsData", "Get", "Field", "FieldAt", "At", "Len"} {
 		if !strings.Contains(string(out), ": can inline "+f+"\n") {
 			t.Errorf("Go does not inline %s", f)
 		}

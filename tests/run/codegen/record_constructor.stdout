@@ -1,0 +1,9 @@
+h
+w
+s
+[0, 6, 8, 1, 5]
+["dot", "a", "a", "r", "s"]
+[Dot, Box { h = 2, name = "a", w = 3 }, Box { h = 2, name = "a", w = 4 }, Box { h = 1, name = "r", w = 1 }, Box { h = 5, name = "s", w = 1 }]
+(true, false)
+([Box { h = 1, name = "r", w = 1 }], { h = 1, name = "r", w = 1 })
+(1, 3)

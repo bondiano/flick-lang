@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::{FileId, Module};
 
 /// The version of the IR this crate reads and writes.
-pub const VERSION: &str = "0.8.0";
+pub const VERSION: &str = "0.8.1";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Program {
@@ -153,6 +153,7 @@ mod tests {
             items: vec![item],
             labels: BTreeMap::default(),
             initialization: crate::Initialization::default(),
+            records: BTreeMap::default(),
         };
         Program::new("flick test", vec![module], &|f| {
             format!("file{}.fl", f.index())

@@ -1,0 +1,52 @@
+// A constructor declared over a record: the record is written with its
+// labels in any order, updated, matched by its labels, taken whole and
+// given whole, and is the same value however it was made.
+module App.Main exposing (main)
+
+type Shape = Dot | Box { w : Int; h : Int; name : String }
+  deriving Eq, Show
+
+/// Two constructors over records of the same labels, declared in two orders.
+type Pair = Along { a : Int; b : Int } | Across { b : Int; a : Int }
+
+first : Pair -> Int
+let first pair =
+  match pair with
+  | Along r | Across r -> r.a
+
+noted : String -> Int ->{} Int
+let noted name value =
+  Platform.stdout_line name
+  value
+
+area : Shape -> Int
+let area shape =
+  match shape with
+  | Dot -> 0
+  | Box { w; h } -> w * h
+
+name_of : Shape -> String
+let name_of shape =
+  match shape with
+  | Dot -> "dot"
+  | Box box -> box.name
+
+wider : Shape -> Shape
+let wider shape =
+  match shape with
+  | Dot -> Dot
+  | Box box -> Box { box with w = box.w + 1 }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  // the values of a literal are evaluated as written, not as declared
+  let a = Box { name = "a"; h = noted "h" 2; w = noted "w" 3 }
+  let r = { w = 1; h = 1; name = "r" }
+  let shapes = [Dot, a, wider a, Box r, Box { r with name = "s"; h = noted "s" 5 }]
+  Platform.stdout_line (show (List.map area shapes))
+  Platform.stdout_line (show (List.map name_of shapes))
+  Platform.stdout_line (show shapes)
+  Platform.stdout_line (show (wider a == Box { w = 4; h = 2; name = "a" }, a == wider a))
+  Platform.stdout_line (show (List.map Box [r], r))
+  // one name for the record of either constructor: a label, not a place, finds its value
+  Platform.stdout_line (show (first (Along { a = 1; b = 2 }), first (Across { a = 3; b = 4 })))

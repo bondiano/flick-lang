@@ -22,7 +22,7 @@ mod question;
 mod ranges;
 mod wire;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::iter;
 use std::sync::Arc;
 
@@ -56,6 +56,7 @@ pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Di
         consumed: HashSet::new(),
         reuse: None,
         owners: HashMap::new(),
+        records: BTreeMap::new(),
         diagnostics: Vec::new(),
     };
     let mut items = Vec::new();
@@ -89,6 +90,7 @@ pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Di
             items,
             labels: typing.labelled.clone(),
             initialization: flick_ir::Initialization::default(),
+            records: lower.records,
         })
     } else {
         Err(lower.diagnostics)
@@ -134,6 +136,9 @@ struct Lower<'a> {
     /// Each `scope` some call acquires through: the locals of its owner and
     /// of the owner around it.
     owners: HashMap<Range, (Option<String>, Option<String>)>,
+    /// The constructors over a record written in their declaration, with
+    /// its labels (`Module::records`).
+    records: BTreeMap<String, Vec<String>>,
     diagnostics: Vec<Diagnostic>,
 }
 
@@ -294,6 +299,23 @@ impl Lower<'_> {
         }
     }
 
+    /// The labels of the one field of `variant`, in the order written,
+    /// when that field is written as a closed record.
+    fn record_field(&self, variant: &Node) -> Option<Vec<String>> {
+        let mut fields = variant.nodes().filter(|n| is_type(n.kind));
+        let (record, None) = (fields.next()?, fields.next()) else {
+            return None;
+        };
+        if record.kind != K::RecordType {
+            return None;
+        }
+        let label = |field: &Node| {
+            (field.kind == K::RecordTypeField).then(|| self.token_text(field, K::Ident))?
+        };
+        // a tail, or a field without a name, and the labels are not all known
+        record.nodes().map(label).collect()
+    }
+
     /// The constructors of a type or error; its
     /// witness `T$schema` is the code std's plugin derives.
     fn type_items(&mut self, decl: &Node, span: Span, items: &mut Vec<Item>) {
@@ -314,6 +336,9 @@ impl Lower<'_> {
                 rep: abi.rep(i),
                 dicts: written_dicts(variant),
             };
+            if let Some(labels) = self.record_field(variant) {
+                self.records.insert(constructor.name.clone(), labels);
+            }
             constructors.push(constructor.clone());
             items.push(Item {
                 kind: ItemKind::Constructor(constructor),
