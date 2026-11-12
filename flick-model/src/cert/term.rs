@@ -181,6 +181,8 @@ pub(super) fn arrow(t: &Type) -> Option<(&Type, &Stage, &Type, Caps)> {
         Type::Fun(p, s, r) => Some((p, s, r, Caps::default())),
         Type::Captured(f, c) => match &**f {
             Type::Fun(p, s, r) => Some((p, s, r, c.clone())),
+            // the qualifier nearest the arrow is its own, as the core writes it
+            Type::Captured(..) | Type::Bounded(..) => arrow(f),
             _ => None,
         },
         Type::Bounded(f, _) => arrow(f),

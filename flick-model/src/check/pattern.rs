@@ -7,7 +7,7 @@ use std::mem;
 use std::rc::Rc;
 use std::slice;
 
-use super::generalize::Inst;
+use super::generalize::{Inst, substitute_all};
 use super::{Check, Checker, Solved, error};
 use crate::syntax::{Con, Lit, Name, Pat, Path};
 use crate::types::{Fields, Kind, Scheme, Type, Var};
@@ -79,7 +79,11 @@ impl Checker<'_> {
     }
 
     fn bind_pattern(&mut self, p: &Pat, t: &Type, out: &mut Vec<(Name, Type)>) -> Check<()> {
-        if !matches!(p, Pat::Var(_) | Pat::Wild) && !matches!(self.qualifier(t), q if q.is_empty())
+        // data with hidden storage: `C` is its hidden row, which its fields
+        // take as the core's (Pat-Adt) does (`con_fields`), not (Proj)
+        if !matches!(p, Pat::Var(_) | Pat::Wild)
+            && !matches!(self.qualifier(t), q if q.is_empty())
+            && !self.bare_hidden(&self.resolve(t))
         {
             // (Proj): the parts of `(T ῡ)^C` have `C` too
             let whole = t.clone();
@@ -103,7 +107,7 @@ impl Checker<'_> {
             }
             Pat::Lit(l) => self.unify(t, &lit_type(l)),
             Pat::Con(c, ps) => {
-                let params = self.con_fields(c, t)?;
+                let params = self.con_fields(c, &full)?;
                 if params.len() != ps.len() {
                     return error(
                         "Pattern",
@@ -195,6 +199,26 @@ impl Checker<'_> {
         let unified = self.unify(&self.resolve(&ct), &self.resolve(t));
         self.refining = refining;
         unified?;
+        // data with hidden storage: the fields see the row the matched value
+        // hides, as (Pat-Adt) takes the arguments of its type (`PatTy.head`)
+        // (the instance premises keep their own row, as (Con) does)
+        if self.bare_hidden(&self.resolve(t)) {
+            let hidden = self.qualifiers(t).pop().unwrap_or_default();
+            let at: Vec<Inst> = insts
+                .iter()
+                .zip(&scheme.vars)
+                .map(|(inst, (_, k))| match (inst, k) {
+                    (Inst::Caps(_), Kind::Captures) => Inst::Caps(hidden.clone()),
+                    _ => inst.clone(),
+                })
+                .collect();
+            let mut ft = substitute_all(&scheme.body, &scheme.vars, &at);
+            params.clear();
+            while let Type::Fun(p, _, r) = ft {
+                params.push((*p).clone());
+                ft = (*r).clone();
+            }
+        }
         if gadt {
             for (inst, (n, _)) in insts.iter().zip(&scheme.vars) {
                 if let Inst::Type(Type::Var(Var::Meta(m))) = inst

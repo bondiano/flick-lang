@@ -7,6 +7,7 @@
 use std::collections::BTreeSet;
 use std::rc::Rc;
 
+use super::sealed::is_sealed;
 use super::term::{Cx, extend};
 use super::{Gen, MODULE, error_con, mono, nothing, some, unit};
 use crate::check::scope_service;
@@ -46,7 +47,7 @@ fn caps(regions: &BTreeSet<Name>) -> Caps {
 }
 
 /// `->{}`.
-fn empty() -> Stage {
+pub(super) fn empty() -> Stage {
     Stage::Runtime(Row::none(), Row::none())
 }
 
@@ -326,6 +327,10 @@ impl Gen<'_> {
                 let_(&x, Some(sig), apply, call)
             }
             _ => match self.held(cx, budget, size) {
+                Some((sig, value, held)) if is_sealed(&held) => {
+                    let rest = rest(self, Some(held));
+                    let_(&x, sig, value, self.open_sealed(&x, rest))
+                }
                 Some((sig, value, held)) => let_(&x, sig, value, rest(self, Some(held))),
                 None => rest(self, None),
             },

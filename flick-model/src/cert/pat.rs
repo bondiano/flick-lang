@@ -4,6 +4,7 @@
 //! the generator nests no further.
 
 use crate::syntax::{Arm, Con, Lit, Name, Pat, Term};
+use crate::translate::lean::elide::{caps, hidden_by};
 use crate::types::Type;
 
 use super::Unsupported;
@@ -170,10 +171,20 @@ impl Cx<'_> {
             .get(k)
             .ok_or_else(|| format!("the constructor `{k}`, not in the signature"))?;
         let (adt, args) = data(st).ok_or_else(|| format!("a pattern of `{k}` at `{st}`"))?;
-        if adt != c.adt || args.len() != c.k {
+        // data with hidden storage takes first the capture row its value
+        // hides (`translate::lean::elide::data`)
+        let stored = self.sig.types.stored.iter().any(|p| p.to_string() == adt);
+        if adt != c.adt || args.len() + usize::from(stored) != c.k {
             return Err(format!("a pattern of `{k}` at `{st}`"));
         }
-        let us = args.iter().map(|a| self.ty(a)).collect::<Result<_, _>>()?;
+        let hidden = stored
+            .then(|| caps(&hidden_by(st), &self.env).map(|q| format!("(.caps {q})")))
+            .transpose()?;
+        let us = hidden
+            .into_iter()
+            .map(Ok)
+            .chain(args.iter().map(|a| self.ty(a)))
+            .collect::<Result<_, _>>()?;
         Ok((adt, us))
     }
 
