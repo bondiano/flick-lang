@@ -2,8 +2,9 @@
 //! by name: core modules that rename them still check, and a program over
 //! them checks and lowers.
 
+use crate::diagnostics::codes;
 use crate::types::lang::{self, Lang, Table};
-use crate::types::{builtin_sources, check_sources};
+use crate::types::{builtin_sources, check_sources, implicit_package_of};
 
 /// The built-in modules up to this one hold the core and what it reaches.
 const LAST: &str = "Validation";
@@ -70,5 +71,26 @@ fn renamed_lang_items_still_compile() {
         let builtins = check_sources(&sources);
         let lowered = super::tests::check_text_with("Main", PROGRAM, &builtins);
         assert!(lowered.is_ok(), "{:?}", lowered.err());
+    });
+}
+
+/// Without std there is no `Fiber.Outlives` to give a `retention owner`
+/// declaration: it is an error to report, not a lang item to panic over.
+#[test]
+fn retention_owner_without_std_is_reported() {
+    let core: Vec<(&str, &str)> = builtin_sources()
+        .iter()
+        .copied()
+        .take_while(|(module, _)| implicit_package_of(module).is_none())
+        .collect();
+    let text = "module Main exposing (keep)\n\n\
+                keep : (Eff r none Unit)^c ->{Scope s | r} Unit\n\
+                foreign effect keep from \"./keep.js\" \"keep\"\n  retention owner\n";
+    lang::with_table(Table::of(&core), || {
+        assert_eq!(lang::module_of(Lang::Outlives), None, "std is not loaded");
+        let builtins = check_sources(&core);
+        let errors = super::tests::check_text_with("Main", text, &builtins).err();
+        let codes: Vec<_> = errors.iter().flatten().map(|d| d.code).collect();
+        assert_eq!(codes, [codes::F010], "{errors:?}");
     });
 }
