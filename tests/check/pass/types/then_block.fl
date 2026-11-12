@@ -1,0 +1,25 @@
+// Braces after `then` and `else` hold statements; a record there is in
+// parentheses.
+module App.ThenBlock exposing (..)
+
+type alias Item = { title : String; done : Bool }
+
+ordered : Int -> Int -> (Int, Int)
+let ordered a b =
+  let mut low = a
+  let mut high = b
+  if low > high then {
+    low = b
+    high = a
+  } else { low = a }
+  (low, high)
+
+finish : Item -> Item
+let finish item = if item.done then item else ({ item with done = true })
+
+first : Bool -> { id : Int; name : String }
+let first yes = if yes then ({ id = 1; name = "Ada" }) else ({ id = 2; name = "Bo" })
+
+// a record update as the value of a block in braces is no record after `then`
+reset : Item -> Item
+let reset item = if item.done then { { item with done = false } } else item

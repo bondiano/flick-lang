@@ -1,0 +1,14 @@
+// A record right after `then` or `else` was written before braces there held
+// statements: FLICK-T074, whose fix puts it in parentheses.
+module App.ThenRecord exposing (..)
+
+type alias Item = { title : String; done : Bool }
+
+finish : Item -> Item
+let finish item = if item.done then item else { item with done = true }
+
+first : Bool -> { id : Int; name : String }
+let first yes = if yes then { id = 1; name = "Ada" } else ({ id = 2; name = "Bo" })
+
+//~ FLICK-T074 @8:47-8:72 braces after `then` or `else` hold statements, so a record there goes in parentheses
+//~ FLICK-T074 @11:29-11:53 braces after `then` or `else` hold statements, so a record there goes in parentheses

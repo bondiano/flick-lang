@@ -177,7 +177,9 @@ blocks of `task`, `scope`, `provide`, `sql`, `ui`, `rec` and plugins.
      line continues the current statement, a shallower line ends the block;
    - if the block starts on the same line, it holds one statement; it
      continues on lines indented deeper than the line it started on (and
-     deeper than any enclosing brace block), and ends at any other line.
+     deeper than any enclosing brace block), and ends at any other line;
+   - after `then` and `else`, `{` opens a brace block of statements, as after
+     `do` and `loop`; a record there goes in parentheses (`FLICK-T074`).
 3. A line that starts at the block column with an infix operator other than
    `-`, with `|`, `then`, `else`, `with`, or with a closing delimiter continues
    the statement instead of starting a new one. This is what lets `|>`
@@ -495,7 +497,7 @@ too). `f x?` is `f (x?)`; write `(f x)?`.
 
 `todo` (optionally followed by a string) is an expression of any type, and
 `echo` without an operand is a function, as in `x |> echo`. `_` is a type
-only in a signature or annotation. `if` is an expression; without `else` it is `Unit`, and so must be its `then` branch (an `else ()` gets the warning `FLICK-T028`). `ignore e` discards a non-`Unit`
+only in a signature or annotation. `if` is an expression; without `else` it is `Unit`, and so must be its `then` branch (an `else ()` gets the warning `FLICK-T028`). A branch in braces holds statements: `if a > b then { low = b; high = a }`. `ignore e` discards a non-`Unit`
 result of an intermediate statement (see [Direct effectful calls](../../spec/01-direct-calls/)). `await e` runs a stored `Eff` once in
 the current fiber; `task { … }` builds a cold computation (see [Values of computations and their execution](../../spec/02-computations/)). In
 `provide e { … }` the `{` ends the head expression.

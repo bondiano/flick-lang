@@ -344,6 +344,9 @@ impl Checker<'_> {
             let fits = self.expect(&unit, expected, span);
             self.explain_since(since, expected, keyword, &why);
             if let Some(then) = children.get(1) {
+                if self.record_in_braces(node, then) {
+                    return;
+                }
                 if fits {
                     let since = self.diagnostics.len();
                     self.check(then, &unit);
@@ -357,10 +360,15 @@ impl Checker<'_> {
         self.redundant_else(node, &children, otherwise);
         // an inferred `if` takes the type of its `then` branch
         let open = matches!(self.store.resolve(expected), Type::Meta(_));
-        if let Some(then) = children.get(1) {
+        if let Some(then) = children.get(1)
+            && !self.record_in_braces(node, then)
+        {
             self.check(then, expected);
         }
         for branch in children.iter().skip(2) {
+            if self.record_in_braces(node, branch) {
+                continue;
+            }
             let since = self.diagnostics.len();
             self.check(branch, expected);
             if open {

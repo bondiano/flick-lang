@@ -1,5 +1,6 @@
 //! Expressions and block statements.
 
+use super::conditional::if_expr;
 use super::control::{control_expr, while_ahead};
 use super::{Ctx, Done, K, Parser, decl, pattern, plugin, types};
 use crate::diagnostics::codes;
@@ -708,22 +709,4 @@ fn try_expr(p: &mut Parser) -> Done {
         arms(p, true);
     }
     p.complete(m, K::TryExpr)
-}
-
-fn if_expr(p: &mut Parser) -> Done {
-    let m = p.start();
-    p.bump();
-    expr(p);
-    if p.expect(K::ThenKw) {
-        p.body(K::Block, stmt);
-        // without `else` the `if` is `Unit`, which the checker requires of `then`
-        if p.eat(K::ElseKw) {
-            if p.at(K::IfKw) && !p.raw().line_start {
-                if_expr(p);
-            } else {
-                p.body(K::Block, stmt);
-            }
-        }
-    }
-    p.complete(m, K::IfExpr)
 }
