@@ -21,6 +21,23 @@ use crate::types::lang::Lang;
 /// parameter and the result its stages leave, if known; called once.
 pub type Body<'b, 'c> = dyn FnMut(&mut Checker<'c>, Option<&Type>, Option<Type>) -> Type + 'b;
 
+/// What [`Checker::function_typed`] keeps across the call of a body.
+struct OpenFunction {
+    saved: bool,
+    mark: usize,
+    givens: usize,
+    uses: usize,
+    rest: Option<Type>,
+    stages: Vec<(Type, Option<Box<super::ty::Effects>>)>,
+    closures: Vec<(usize, Option<Type>)>,
+    unknown: Option<(usize, Type)>,
+    level: u32,
+    inferred: bool,
+    inferred_result: bool,
+    returns: Type,
+    outer: super::effects::Stage,
+}
+
 impl<'c> Checker<'c> {
     pub fn check(&mut self, node: &Node, expected: &Type) {
         self.check_value(node, expected);
@@ -47,45 +64,7 @@ impl<'c> Checker<'c> {
     pub(super) fn check_value(&mut self, node: &Node, expected: &Type) -> Type {
         let (target, captures) = self.whnf_captured(expected);
         if let Type::Forall { .. } = target {
-            self.store.level += 1;
-            let mark = self.classes.givens.len();
-            let (body, _, givens) = self.skolemize(&target);
-            let body = match captures {
-                Some(captures) if matches!(self.bound_head(expected), Type::Bounded { .. }) => {
-                    Type::Bounded {
-                        ty: Box::new(body),
-                        captures: Box::new(captures),
-                    }
-                }
-                Some(captures) => Type::Captured {
-                    ty: Box::new(body),
-                    captures: Box::new(captures),
-                    value: false,
-                    elided: Elided::default(),
-                },
-                None => body,
-            };
-            self.record_givens(self.span(node), &givens);
-            self.classes.givens.extend(givens);
-            let saved = mem::take(&mut self.cx.runtime);
-            let (holds, held) = (self.cx.regions.holds.len(), self.cx.regions.held.len());
-            self.check(node, &body);
-            if self.names_top_level(node) {
-                // a top-level value has no environment: the regions its
-                // instantiated type names under the `forall` it does not hold
-                self.cx.regions.holds.truncate(holds);
-                self.cx.regions.held.truncate(held);
-            }
-            let runtime = mem::replace(&mut self.cx.runtime, saved);
-            self.cx.runtime |= runtime;
-            self.classes.givens.truncate(mark);
-            self.store.level -= 1;
-            let span = self.span(node);
-            self.polymorphic_runtime(None, &target, runtime, span);
-            if !runtime {
-                self.polymorphic_cell(None, &target, span);
-            }
-            return expected.clone();
+            return self.check_forall(node, expected, &target, captures);
         }
         let children: Vec<&Node> = node.nodes().collect();
         let mut actual_type = None;
@@ -117,92 +96,16 @@ impl<'c> Checker<'c> {
                 self.scope_expr(node, Some(expected));
             }
             (K::TupleExpr, Type::Tuple(items)) if items.len() == children.len() => {
-                let captures = self.whnf_captured(expected).1;
-                let mut held = Vec::new();
-                for (child, item) in children.iter().zip(items) {
-                    let item = captures
-                        .as_ref()
-                        .map_or_else(|| item.clone(), |c| self.data_field(item, c));
-                    let actual = self.check_value(child, &item);
-                    if captures.is_some() {
-                        held.push((None, actual));
-                    }
-                }
-                if let Some(bound) = captures {
-                    self.hold(super::regions::Hold {
-                        held,
-                        visible: super::regions::Visible::Now(Vec::new()),
-                        bound,
-                        expected: Some(expected.clone()),
-                        written: false,
-                        what: "value",
-                        span: self.span(node),
-                    });
-                }
+                self.check_tuple(node, &children, items, expected);
             }
-            (K::ListExpr, _) if super::range_list(node).is_some() => {
-                let range = super::range_list(node).expect("checked");
-                let actual = self.range_expr(range, true);
-                self.expect(&actual, expected, self.span(node));
+            (K::ListExpr | K::ForExpr, _) => {
+                actual_type = self.check_collection(node, children, expected, captures);
             }
-            (K::ListExpr, _) if super::comprehension(node).is_some() => {
-                let strict = super::comprehension(node).expect("checked");
-                let actual = self.for_expr(strict, true, Some(expected));
-                self.expect(&actual, expected, self.span(node));
-            }
-            (K::ForExpr, _) => {
-                let actual = self.for_expr(node, false, Some(expected));
-                self.expect(&actual, expected, self.span(node));
-            }
-            (K::ListExpr, _) if self.list_item(expected).is_some() => {
-                let item = self.list_item(expected).expect("checked");
-                let mut held = Vec::new();
-                for child in children {
-                    let actual = self.check_value(child, &item);
-                    if captures.is_some() {
-                        held.push((None, actual));
-                    }
-                }
-                if let Some(bound) = captures {
-                    self.hold(super::regions::Hold {
-                        held,
-                        visible: super::regions::Visible::Now(Vec::new()),
-                        bound,
-                        expected: Some(expected.clone()),
-                        written: false,
-                        what: "value",
-                        span: self.span(node),
-                    });
-                }
-            }
-            (K::RecordExpr, Type::Record(row)) => {
-                let row = self.store.zonk_row(row);
-                if let Some(captures) = self.whnf_captured(expected).1 {
-                    let row = super::ty::Row {
-                        entries: row
-                            .entries
-                            .into_iter()
-                            .map(|(n, t)| (n, self.data_field(&t, &captures)))
-                            .collect(),
-                        tail: row.tail,
-                        ..super::ty::Row::default()
-                    };
-                    // each field holds within the bound where it is checked; the
-                    // literal is compared with those fields, as the value's own
-                    // record shows its fields bare
-                    let actual = self.record(node, Some(&row));
-                    self.expect(&actual, &Type::Record(row), self.span(node));
-                } else {
-                    let actual = self.record(node, Some(&row));
-                    self.expect(&actual, expected, self.span(node));
-                }
-            }
+            (K::RecordExpr, Type::Record(row)) => self.check_record(node, row, expected),
             (K::DoExpr, _) => {
                 self.do_expr(node, Some(expected));
             }
-            (K::TaskExpr, _) if self.eff_parts(&target).is_some() => {
-                self.task(node, Some(expected));
-            }
+            (K::TaskExpr, _) => actual_type = self.check_task(node, &target, expected),
             _ => {
                 let actual = self.infer(node);
                 self.expect(&actual, expected, self.span(node));
@@ -211,6 +114,180 @@ impl<'c> Checker<'c> {
         }
         self.note_head(node, expected);
         actual_type.unwrap_or_else(|| expected.clone())
+    }
+
+    // check_value recurses once per nesting level, so its rarer shapes live
+    // apart: their locals would otherwise widen every level's stack frame
+
+    /// [`Self::check_value`] against a `forall`: the body against its skolems.
+    fn check_forall(
+        &mut self,
+        node: &Node,
+        expected: &Type,
+        target: &Type,
+        captures: Option<Type>,
+    ) -> Type {
+        self.store.level += 1;
+        let mark = self.classes.givens.len();
+        let (body, _, givens) = self.skolemize(target);
+        let body = match captures {
+            Some(captures) if matches!(self.bound_head(expected), Type::Bounded { .. }) => {
+                Type::Bounded {
+                    ty: Box::new(body),
+                    captures: Box::new(captures),
+                }
+            }
+            Some(captures) => Type::Captured {
+                ty: Box::new(body),
+                captures: Box::new(captures),
+                value: false,
+                elided: Elided::default(),
+            },
+            None => body,
+        };
+        self.record_givens(self.span(node), &givens);
+        self.classes.givens.extend(givens);
+        let saved = mem::take(&mut self.cx.runtime);
+        let (holds, held) = (self.cx.regions.holds.len(), self.cx.regions.held.len());
+        self.check(node, &body);
+        if self.names_top_level(node) {
+            // a top-level value has no environment: the regions its
+            // instantiated type names under the `forall` it does not hold
+            self.cx.regions.holds.truncate(holds);
+            self.cx.regions.held.truncate(held);
+        }
+        let runtime = mem::replace(&mut self.cx.runtime, saved);
+        self.cx.runtime |= runtime;
+        self.classes.givens.truncate(mark);
+        self.store.level -= 1;
+        let span = self.span(node);
+        self.polymorphic_runtime(None, target, runtime, span);
+        if !runtime {
+            self.polymorphic_cell(None, target, span);
+        }
+        expected.clone()
+    }
+
+    /// A tuple literal against a tuple type of its length.
+    fn check_tuple(&mut self, node: &Node, children: &[&Node], items: &[Type], expected: &Type) {
+        let captures = self.whnf_captured(expected).1;
+        let mut held = Vec::new();
+        for (child, item) in children.iter().zip(items) {
+            let item = captures
+                .as_ref()
+                .map_or_else(|| item.clone(), |c| self.data_field(item, c));
+            let actual = self.check_value(child, &item);
+            if captures.is_some() {
+                held.push((None, actual));
+            }
+        }
+        if let Some(bound) = captures {
+            self.hold(super::regions::Hold {
+                held,
+                visible: super::regions::Visible::Now(Vec::new()),
+                bound,
+                expected: Some(expected.clone()),
+                written: false,
+                what: "value",
+                span: self.span(node),
+            });
+        }
+    }
+
+    /// A list, a range, a comprehension or a `for` against `expected`; the
+    /// type it was inferred with when nothing more specific applies.
+    fn check_collection(
+        &mut self,
+        node: &Node,
+        children: Vec<&Node>,
+        expected: &Type,
+        captures: Option<Type>,
+    ) -> Option<Type> {
+        let checked = match node.kind {
+            K::ListExpr if let Some(range) = super::range_list(node) => {
+                self.range_expr(range, true)
+            }
+            K::ListExpr if let Some(strict) = super::comprehension(node) => {
+                self.for_expr(strict, true, Some(expected))
+            }
+            K::ForExpr => self.for_expr(node, false, Some(expected)),
+            _ => {
+                if let Some(item) = self.list_item(expected) {
+                    self.check_items(node, children, &item, captures, expected);
+                    return None;
+                }
+                let actual = self.infer(node);
+                self.expect(&actual, expected, self.span(node));
+                return Some(actual);
+            }
+        };
+        self.expect(&checked, expected, self.span(node));
+        None
+    }
+
+    /// A `task` against `expected`, or the type it was inferred with when
+    /// `expected` is not an `Eff`.
+    fn check_task(&mut self, node: &Node, target: &Type, expected: &Type) -> Option<Type> {
+        if self.eff_parts(target).is_some() {
+            self.task(node, Some(expected));
+            return None;
+        }
+        let actual = self.infer(node);
+        self.expect(&actual, expected, self.span(node));
+        Some(actual)
+    }
+
+    /// A list literal against a list type of `item`s.
+    fn check_items(
+        &mut self,
+        node: &Node,
+        children: Vec<&Node>,
+        item: &Type,
+        captures: Option<Type>,
+        expected: &Type,
+    ) {
+        let mut held = Vec::new();
+        for child in children {
+            let actual = self.check_value(child, item);
+            if captures.is_some() {
+                held.push((None, actual));
+            }
+        }
+        if let Some(bound) = captures {
+            self.hold(super::regions::Hold {
+                held,
+                visible: super::regions::Visible::Now(Vec::new()),
+                bound,
+                expected: Some(expected.clone()),
+                written: false,
+                what: "value",
+                span: self.span(node),
+            });
+        }
+    }
+
+    /// A record literal against a record type.
+    fn check_record(&mut self, node: &Node, row: &super::ty::Row, expected: &Type) {
+        let row = self.store.zonk_row(row);
+        if let Some(captures) = self.whnf_captured(expected).1 {
+            let row = super::ty::Row {
+                entries: row
+                    .entries
+                    .into_iter()
+                    .map(|(n, t)| (n, self.data_field(&t, &captures)))
+                    .collect(),
+                tail: row.tail,
+                ..super::ty::Row::default()
+            };
+            // each field holds within the bound where it is checked; the
+            // literal is compared with those fields, as the value's own
+            // record shows its fields bare
+            let actual = self.record(node, Some(&row));
+            self.expect(&actual, &Type::Record(row), self.span(node));
+        } else {
+            let actual = self.record(node, Some(&row));
+            self.expect(&actual, expected, self.span(node));
+        }
     }
 
     /// The body of a polymorphic type with rigid variables, its class
@@ -449,6 +526,21 @@ impl<'c> Checker<'c> {
         expected: Option<&Type>,
         node: &Node,
     ) -> Type {
+        // the body recurses into nested functions: only what it needs back
+        // stays on this frame, so each level of nesting costs little stack
+        let mut open = self.open_function(params, expected, node);
+        let rest = open.rest.take();
+        let result = body(self, open.stages.first().map(|(ty, _)| ty), rest);
+        self.close_function(open, result, node)
+    }
+
+    /// The stages of a function before its body is checked.
+    fn open_function(
+        &mut self,
+        params: &[Option<&Node>],
+        expected: Option<&Type>,
+        node: &Node,
+    ) -> Box<OpenFunction> {
         let saved = mem::take(&mut self.cx.runtime);
         let mark = self.cx.locals.len();
         let givens = self.classes.givens.len();
@@ -524,7 +616,40 @@ impl<'c> Checker<'c> {
         let returns = rest.clone().unwrap_or_else(|| self.fresh());
         stage.returns = Some(returns.clone());
         let outer = mem::replace(&mut self.cx.stage, stage);
-        let result = body(self, stages.first().map(|(ty, _)| ty), rest);
+        Box::new(OpenFunction {
+            saved,
+            mark,
+            givens,
+            uses,
+            rest,
+            stages,
+            closures,
+            unknown,
+            level,
+            inferred,
+            inferred_result,
+            returns,
+            outer,
+        })
+    }
+
+    /// The function's type once its body has `result`.
+    fn close_function(&mut self, open: Box<OpenFunction>, result: Type, node: &Node) -> Type {
+        let OpenFunction {
+            saved,
+            mark,
+            givens,
+            uses,
+            rest: _,
+            mut stages,
+            closures,
+            unknown,
+            level,
+            inferred,
+            inferred_result,
+            returns,
+            outer,
+        } = *open;
         let inner = mem::replace(&mut self.cx.stage, outer);
         if inferred_result && self.unify(&returns, &result).is_err() {
             let (returns, result) = (self.show(&returns), self.show(&result));

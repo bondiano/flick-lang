@@ -1,5 +1,6 @@
 //! Syntax, checking, lowering and both backends scale with long lines,
-//! records and functions.
+//! records and functions, and the deepest nesting the parser accepts
+//! checks on the stack of a test thread.
 //! Checking budgets cover the target sizes (200 fields, 2000 lines);
 //! growth ratios catch quadratic behavior without a machine-specific syntax budget.
 
@@ -410,4 +411,50 @@ fn function_of_2000_lines_emits_javascript_in_linear_time() {
 #[test]
 fn function_of_2000_lines_emits_go_in_linear_time() {
     assert_stage_linear("Go", emitting_go);
+}
+
+/// The error codes of checking `text` on a thread with the stack a test
+/// thread gets (2 MiB): the checker recurses once per level of nesting, so
+/// the deepest code the parser accepts must fit in it.
+fn checked_on_a_test_stack(text: String) -> Vec<String> {
+    thread::Builder::new()
+        .stack_size(2 << 20)
+        .spawn(move || {
+            let mut sources = SourceMap::default();
+            let file = sources.add("nested.fl", text.as_str());
+            flick_core::check(&sources, file)
+                .iter()
+                .filter(|d| d.severity == Severity::Error)
+                .map(|d| d.code.to_string())
+                .collect()
+        })
+        .expect("a thread")
+        .join()
+        .expect("the check finishes")
+}
+
+#[test]
+fn the_deepest_nesting_the_parser_accepts_checks_on_a_test_stack() {
+    let none = Vec::<String>::new();
+    // 198 arrows and 198 `fun`s are as deep as the parser goes
+    let (arrows, funs) = ("Int -> ".repeat(198), "fun a -> ".repeat(198));
+    let typed = checked_on_a_test_stack(format!("x : {arrows}Int\nlet x = {funs}1"));
+    assert_eq!(typed, none);
+    let untyped = checked_on_a_test_stack(format!("let x = {}1", "fun a -> ".repeat(199)));
+    assert!(!untyped.contains(&"FLICK-S007".to_owned()), "{untyped:?}");
+    let f = "f : Int -> Int\nlet f a = a\n";
+    let applied = format!("{f}x : Int\nlet x = {}1", "f <| ".repeat(199));
+    assert_eq!(checked_on_a_test_stack(applied), none);
+    // `<|` nests to the right, so a longer chain is too deep to parse
+    let deeper = format!("{f}x : Int\nlet x = {}1", "f <| ".repeat(1000));
+    let mut sources = SourceMap::default();
+    let parsed = syntax::parse(&deeper, sources.add("nested.fl", deeper.as_str()));
+    let codes: Vec<String> = parsed
+        .diagnostics
+        .iter()
+        .map(|d| d.code.to_string())
+        .collect();
+    assert!(codes.contains(&"FLICK-S007".to_owned()), "{codes:?}");
+    let composed = format!("{f}h : Int -> Int\nlet h = f{}", " >> f".repeat(500));
+    assert_eq!(checked_on_a_test_stack(composed), none);
 }

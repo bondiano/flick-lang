@@ -64,6 +64,10 @@ break programs.
 - **Plugins:** a plugin is told where each value it watches is named, with
   the declaration around it (`CallSite.binding`), as it was for the
   serializable atoms alone.
+- **Deep nesting:** checking a nested `fun` or a `<|` takes far less of the
+  stack, so the deepest code the parser accepts (198 nested functions with
+  their signature, or 199 `<|` in a row) checks on a thread's 2 MiB stack,
+  where it overflowed.
 - **Refined types:** `refined type` is a declaration of the plugin of `std`,
   which writes the type and its `parse`, `value` and check as code of the
   language; `refined` is no reserved word. The check is a companion too,
