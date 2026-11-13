@@ -80,7 +80,10 @@ pub(crate) fn js_at(
         // the wrapper of a Sync export is the runtime's
         g.runtime |= !g.sync_exports.is_empty();
     }
-    let mut typed = options.typescript.map(|t| t.typed(&module.name, physical));
+    let mut typed = options
+        .typescript
+        .and_then(|modules| modules.get(physical))
+        .cloned();
     if let Some(typed) = &mut typed {
         g.annotations = mem::take(&mut typed.annotations);
     }

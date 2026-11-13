@@ -3,13 +3,16 @@
 //! types, the types of its exported values and the imports they need.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use super::Projection;
+use crate::codegen::lexical::prefix_key;
 use crate::codegen::{names, relative};
 use crate::iface::{Interface, Namespace};
+use crate::ir::Module;
 
 /// The TypeScript of a module beyond its JavaScript.
+#[derive(Clone)]
 pub struct Typed {
     pub declarations: Vec<String>,
     /// The type of each exported value and constructor that has one, by its
@@ -36,6 +39,22 @@ pub struct Typing<'a> {
 }
 
 impl Typing<'_> {
+    /// Prepare each physical output before the build enters JS code generation.
+    pub fn prepare<'m>(
+        &self,
+        modules: impl Iterator<Item = &'m Module>,
+    ) -> BTreeMap<String, Typed> {
+        let mut prepared = BTreeMap::new();
+        for module in modules {
+            prepared.insert(module.name.clone(), self.typed(&module.name, &module.name));
+            for prefix in &module.initialization.prefixes {
+                let physical = prefix_key(&module.name, prefix.before);
+                prepared.insert(physical.clone(), self.typed(&module.name, &physical));
+            }
+        }
+        prepared
+    }
+
     /// The TypeScript of `module`, written as the file of `physical`: the
     /// module itself or a part of it of its own.
     pub fn typed(&self, module: &str, physical: &str) -> Typed {

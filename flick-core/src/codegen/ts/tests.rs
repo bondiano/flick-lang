@@ -403,6 +403,7 @@ fn a_release_build_in_typescript_types_a_constructed_value_as_its_constructor_do
         path: &path,
         rt: false,
     };
+    let prepared = BTreeMap::from([("App".to_owned(), typing.typed("App", "App"))]);
     let emit = |typescript: bool| {
         let lang = lang_items();
         let known = Known::of(&lang);
@@ -410,7 +411,7 @@ fn a_release_build_in_typescript_types_a_constructed_value_as_its_constructor_do
             builtins: &[],
             packages: &BTreeMap::new(),
             resolved: &resolved,
-            typescript: typescript.then_some(&typing),
+            typescript: typescript.then_some(&prepared),
             release: true,
             workers: &HashMap::new(),
             direct: &HashSet::new(),

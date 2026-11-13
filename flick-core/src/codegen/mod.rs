@@ -90,8 +90,8 @@ pub struct Options<'a> {
     /// which the runtime decides (see [`Options::foreign`]).
     pub resolved: &'a [Resolved],
     /// Emit TypeScript (`--emit ts`) instead of JavaScript: with the types
-    /// of the exports, which the projection of the interfaces gives.
-    pub typescript: Option<&'a ts::Typing<'a>>,
+    /// of the exports, prepared by the build for each physical module.
+    pub typescript: Option<&'a BTreeMap<String, ts::Typed>>,
     /// The release profile: worker functions for known full applications
     /// and direct methods of canonical instances.
     pub release: bool,

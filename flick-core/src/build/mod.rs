@@ -146,8 +146,13 @@ pub fn emit(
     let path = |m: &str| codegen::module_path(&builtin_names, settings.typescript, m);
     let mut packages = BTreeMap::new();
     for c in modules {
-        if let Some(package) = &c.ir.package {
-            packages.insert(c.name.clone(), package.clone());
+        if let Some(package) =
+            c.ir.package
+                .as_deref()
+                .or(c.package.as_deref())
+                .or(settings.package)
+        {
+            packages.insert(c.name.clone(), package.to_owned());
         }
     }
     let package = |m: &str| packages.get(m).cloned();
@@ -181,11 +186,19 @@ pub fn emit(
         path: &path,
         rt: by_class,
     };
+    let typescript = settings.typescript.then(|| {
+        typing.prepare(
+            modules
+                .iter()
+                .map(|c| &c.ir)
+                .chain(builtin_modules_of(by_class)),
+        )
+    });
     let options = Options {
         builtins: &builtin_names,
         packages: &packages,
         resolved: &resolved,
-        typescript: settings.typescript.then_some(&typing),
+        typescript: typescript.as_ref(),
         release: settings.release,
         workers: &workers,
         direct: &direct,
