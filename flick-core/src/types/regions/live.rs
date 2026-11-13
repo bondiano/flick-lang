@@ -259,7 +259,7 @@ impl Checker<'_> {
             } => {
                 let param = self.elide(param, &none, kinds, path);
                 let mut held = held.clone();
-                let mut reached = self.captures_of(&param);
+                let mut reached = self.parameter_captures(&param);
                 reached.entries.retain(|(_, atom)| {
                     matches!(
                         self.atom_kind(atom, kinds),

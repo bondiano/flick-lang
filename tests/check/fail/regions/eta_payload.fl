@@ -1,14 +1,15 @@
 // A closure that applies a callback holds what the callback holds: put in
-// a payload whose type holds none of it, it is still a region mismatch, and
-// one that returns another type variable is a type mismatch.
+// a payload whose function does not keep it live, a closure that runs the
+// callback is a region mismatch, and one that returns another type variable
+// is a type mismatch.
 module App.EtaPayload exposing (..)
 
 type Opt a = Som a | Non
 
-held : (Int -> c)^d -> Opt (Int -> c)
+held : (Int ->{Async} c)^d -> Opt (Int ->{Async} c)
 let held k = Som (fun x -> k (x + 1))
 
 other : (Int -> c) -> Opt (Int -> b)
 let other k = Som (fun x -> k (x + 1))
-//~ FLICK-T003 @9:14-9:38 expected `Opt (Int -> c)`, found `(Opt (Int -> c^{d}))^{_}`
-//~ FLICK-T008 @12:15-12:39 expected `Opt (Int -> b)`, found `Opt (Int -> c)`: `b` stands for any type the caller chooses, so it cannot be `c`
+//~ FLICK-G002 @10:14-10:38 this uses `d`, which the expected type `Int ->{Async} c` does not keep live: a function or a task uses a region only while the region is live
+//~ FLICK-T008 @13:15-13:39 expected `Opt (Int -> b)`, found `Opt (Int -> c)`: `b` stands for any type the caller chooses, so it cannot be `c`
