@@ -418,15 +418,17 @@ fn rename_changes_every_use_and_refuses_what_has_no_exact_mapping() {
         .rename(f.file("App.Main"), f.at("App.Main", "total", 1) + 1, "sum")
         .expect("a local");
     assert_eq!(local.len(), 2);
-    // a class method: its signature, instances and calls cannot all be found yet
+    // Class methods share a rename across their signature, instances and calls.
     let domain = f.file("App.Domain");
     for at in [
-        f.at("App.Domain", "name :", 0),
+        f.at("App.Domain", "name :", 1),
         f.at("App.Domain", "name user", 0),
     ] {
-        let refused = ide.renamable(domain, at + 1).map(|(_, range, _)| range);
-        assert!(refused.is_err(), "{at}: {refused:?}");
-        assert!(ide.rename(domain, at + 1, "label").is_err());
+        ide.renamable(domain, at + 1).expect("class method");
+        assert_eq!(
+            ide.rename(domain, at + 1, "label").expect("rename").len(),
+            3
+        );
     }
 }
 

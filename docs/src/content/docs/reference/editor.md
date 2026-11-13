@@ -22,7 +22,7 @@ on-disk version for dependent requests.
 | `textDocument/hover` | source signatures and `///` documentation for public and private values, at declarations and uses; module documentation on qualifiers such as `Sql`; inferred locals and values, SQL aliases, columns and parameters, on a keyword that opens an expression (`task`, `scope`, `match`, `fun` …) the type of the whole expression, on `await` and `ignore` the type of the operand (see [keywords.md](../keywords/#in-the-editor)); on `|>` and `<|` the value after the step, on `>>` and `<<` the function the composition makes, each with what the operator does; declarations distinguish `type error` from `service` |
 | `textDocument/definition` | across modules; module qualifiers lead to their module header, members to their declaration; built-ins open as real read-only `.fl` files; installed packages use their published `.fl`, else `.iface`; companions lead to their type, class methods at a known instance to that instance |
 | `textDocument/references` | every occurrence in the project and, for a name of a workspace member, in the members that depend on it by path |
-| `textDocument/rename` | the project's own values, types, constructors and locals, in `.fl` sources only, and in the members of the workspace that depend on the project; names of built-in modules and packages, service operations and instance methods have no exact mapping and are refused |
+| `textDocument/rename` | the project's own values, types, constructors, class methods and locals, in `.fl` sources only, and in the members of the workspace that depend on the project; names of built-in modules and packages and service operations have no exact mapping and are refused |
 | `textDocument/completion` | items carry their `///` documentation and a snippet of a function's parameters, sorted locals first; a value of a module the file does not import is offered as `Module.name` (built-ins need no import, a project module gets its `import` added); record fields after `x.`, module exports or service operations after `M.`, otherwise names in scope; SQL blocks offer tables, aliases, columns, parameters, clauses and functions; `sql table` columns offer the SQL types of the project's dialect, then the modifiers that are not written yet and do not conflict, after `as` Flick types and after `via` the codecs in scope whose type instantiates to the column's `PureCodec`, imported ones also as `Module.codec` |
 | `textDocument/codeAction` | quick fixes of diagnostics that carry an edit: the closest name for a misspelt one, removing unused imports and definitions, exporting one unused top-level value, importing a missing class, `_` for an unused variable, the missing arms of a `match`, a `todo` definition of a missing function, the inferred type for a type hole; on `FLICK-T004` it inserts the inferred signature `name : T` right above the `let`, at its indentation, with effect rows, type variables, class constraints and names qualified as the module's imports allow; a binding the checker rejected gets none |
 | `textDocument/codeAction` (refactors) | add the signature of a `let` value; pattern match on a variable that is a block's result; qualify an imported name at every use, or drop a qualifier and import the name; extract the selected expression into a `let`; inline a local `let` into its uses |
@@ -33,6 +33,13 @@ on-disk version for dependent requests.
 | `textDocument/semanticTokens/full` | what each name is: module, type, constructor, function, variable, method or parameter |
 | `textDocument/foldingRange` | declarations, `match`, records, lists, embedded blocks and the run of imports |
 | `textDocument/inlayHint` | the type of each `let` without a signature, a local function or an instance method among them, and of each stage of a pipeline written over several lines |
+
+Renaming a class method from its signature, an instance or a call updates
+the class's signatures and defaults, instance implementations, explicit
+imports and calls. Methods of other classes with the same spelling are
+unaffected. Syntax or name-resolution errors, conflicting names in affected
+scopes and explicit `C.dictionary` records or packed module fields without
+an exact mapping refuse the rename, including in dependent workspace members.
 
 Hover resolves source bindings, not just the public export list. Private
 helpers such as a view or an error reporter show their written signatures

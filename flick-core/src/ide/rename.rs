@@ -4,11 +4,13 @@
 //! have no exact mapping and are refused.
 
 use super::{Ide, Symbol, tree};
-use crate::iface::{Decl, Namespace};
+use crate::iface::Namespace;
 use crate::resolve::declarations;
 use crate::source::FileId;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+
+mod methods;
 
 /// A name in a file: its UTF-8 byte range.
 pub type Occurrence = (FileId, (u32, u32));
@@ -17,6 +19,11 @@ impl Ide<'_> {
     /// Every occurrence of `symbol` in the analysis, its declaration first.
     pub fn references(&self, symbol: &Symbol) -> Vec<Occurrence> {
         let mut out = Vec::new();
+        if let Symbol::Entity(e) = symbol
+            && let Ok(Some(class)) = self.method_class(e)
+        {
+            out.extend(self.method_references(e, &class));
+        }
         if let Some(d) = self.definition(symbol)
             && let super::Target::File(file) = d.target
         {
@@ -78,7 +85,8 @@ impl Ide<'_> {
         offset: u32,
     ) -> Result<(Symbol, (u32, u32), bool), String> {
         let (symbol, range) = self
-            .symbol_at(file, offset)
+            .method_at(file, offset)?
+            .or_else(|| self.symbol_at(file, offset))
             .ok_or("nothing to rename here")?;
         let capital = match &symbol {
             Symbol::Local { .. } => false,
@@ -96,19 +104,8 @@ impl Ide<'_> {
                         e.name.replace('$', ".")
                     ));
                 }
-                // instances and calls name a method through the class, which
-                // references do not follow yet: renaming only the signature breaks them
-                let text = &self.sources.get(module.file).text;
-                if declarations(&module.tree, text, module.file)
-                    .iter()
-                    .any(|d| {
-                        d.decl == Decl::Method && d.name == e.name && d.namespace == e.namespace
-                    })
-                {
-                    return Err(format!(
-                        "`{}` is a method of a class: renaming it is not supported yet",
-                        e.name
-                    ));
+                if let Some(class) = self.method_class(e)? {
+                    self.check_method_mapping(e, &class)?;
                 }
                 e.namespace != Namespace::Value
             }
@@ -143,16 +140,33 @@ impl Ide<'_> {
                 if capital { "capitalized" } else { "lowercase" }
             ));
         }
-        let edits = self.references(&symbol);
+        self.rename_references(&symbol, new_name)
+    }
+
+    /// Rename occurrences of a symbol already accepted by `renamable`.
+    /// Workspace callers repeat the mapping and collision checks in each
+    /// dependent analysis before returning any edits.
+    pub fn rename_references(
+        &self,
+        symbol: &Symbol,
+        new_name: &str,
+    ) -> Result<Vec<Occurrence>, String> {
+        let edits = self.references(symbol);
+        if let Symbol::Entity(e) = symbol
+            && let Some(class) = self.method_class(e)?
+        {
+            self.check_method_mapping(e, &class)?;
+            self.check_method_name(e, new_name, &edits)?;
+        }
         // every edit must replace the old name exactly
-        let old = match &symbol {
-            Symbol::Local { name, .. } => name.clone(),
-            Symbol::Entity(e) => e.name.clone(),
-            _ => unreachable!("refused above"),
+        let old = match symbol {
+            Symbol::Local { name, .. } => name.as_str(),
+            Symbol::Entity(e) => e.name.as_str(),
+            _ => return Err("this symbol has no exact rename mapping".into()),
         };
         for (f, (s, e)) in &edits {
             let text = &self.sources.get(*f).text;
-            if text.get(*s as usize..*e as usize) != Some(old.as_str()) {
+            if text.get(*s as usize..*e as usize) != Some(old) {
                 return Err("an occurrence has no exact mapping to the name".into());
             }
         }
