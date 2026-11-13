@@ -1,5 +1,6 @@
 mod aliases;
 mod attributes;
+mod class_rename;
 mod cli;
 mod completion;
 mod features;

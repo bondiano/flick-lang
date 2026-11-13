@@ -95,11 +95,7 @@ impl Server {
         else {
             return Ok(Value::Null);
         };
-        let old = match &symbol {
-            Symbol::Entity(e) => Some(e.name.as_str()),
-            _ => None,
-        };
-        let spots = self.across(path, &symbol, home.as_deref(), old, spots)?;
+        let spots = self.across(path, &symbol, home.as_deref(), Some(new_name), spots)?;
         let mut changes = serde_json::Map::new();
         for (uri, range) in spots {
             let edit = json!({ "range": range, "newText": new_name });
@@ -160,14 +156,14 @@ impl Server {
     }
 
     /// `spots` with the occurrences of `symbol` in the other members that
-    /// compile the project at `home`, `home` included; with `old`, each must
-    /// spell it.
+    /// compile the project at `home`, `home` included; with `rename`, repeat
+    /// rename safety checks in each dependent before returning any edits.
     fn across(
         &mut self,
         path: &Path,
         symbol: &Symbol,
         home: Option<&Path>,
-        old: Option<&str>,
+        rename: Option<&str>,
         mut spots: Vec<Spot>,
     ) -> Result<Vec<Spot>, (i64, String)> {
         let (Some(home), false) = (home, matches!(symbol, Symbol::Local { .. })) else {
@@ -184,14 +180,14 @@ impl Server {
                 &member.join(project::CONFIG_FILE),
                 &mut self.caches,
             );
-            for (f, (start, end)) in ide(&snapshot).references(symbol) {
-                let text = &snapshot.sources.get(f).text;
-                if old.is_some_and(|old| text.get(start as usize..end as usize) != Some(old)) {
-                    return Err((
-                        REQUEST_FAILED,
-                        "an occurrence has no exact mapping to the name".into(),
-                    ));
-                }
+            let ide = ide(&snapshot);
+            let found = if let Some(name) = rename {
+                ide.rename_references(symbol, name)
+                    .map_err(|e| (REQUEST_FAILED, e))?
+            } else {
+                ide.references(symbol)
+            };
+            for (f, (start, end)) in found {
                 spots.push(spot(&snapshot, f, start, end)?);
             }
         }
