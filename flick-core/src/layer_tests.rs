@@ -111,3 +111,54 @@ fn a_module_names_only_its_layer_and_those_below() {
         against.join("\n")
     );
 }
+
+/// The JS and Go code generators know the lang items from the table a
+/// program gives its backend, as a backend outside the compiler must, and
+/// not from the checker's. The TypeScript projection reads checked types.
+#[test]
+fn code_generation_knows_the_lang_items_of_the_program_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/codegen");
+    let mut files = Vec::new();
+    sources(&root, &mut files);
+    let projection = |file: &Path| file == root.join("ts.rs") || file.starts_with(root.join("ts"));
+    let mut against: Vec<String> = (files.iter())
+        .filter(|file| !projection(file))
+        .filter(|file| {
+            (fs::read_to_string(file).expect("a readable source")).contains("types::lang")
+        })
+        .map(|file| file.display().to_string())
+        .collect();
+    against.sort();
+    assert!(
+        against.is_empty(),
+        "code generation reads the checker's lang items:\n{}",
+        against.join("\n")
+    );
+}
+
+/// The Go code generator reads the IR and the data of the build its input
+/// gives, as a backend outside the compiler must: nothing of the checker,
+/// the projects or the build, and no file.
+#[test]
+fn go_code_generation_reads_only_its_input() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/codegen/go");
+    let mut files = Vec::new();
+    sources(&root, &mut files);
+    let mut against = Vec::new();
+    for file in &files {
+        let text = fs::read_to_string(file).expect("a readable source");
+        let code = text.split("\n#[cfg(test)]").next().unwrap_or(&text);
+        let names = named(code).into_iter();
+        let outside = names.filter(|name| ["types", "project", "build", "syntax"].contains(name));
+        against.extend(outside.map(|name| format!("{} names `{name}`", file.display())));
+        if code.contains("std::fs") {
+            against.push(format!("{} reads files", file.display()));
+        }
+    }
+    against.sort();
+    assert!(
+        against.is_empty(),
+        "the go code generator reads more than its input:\n{}",
+        against.join("\n")
+    );
+}

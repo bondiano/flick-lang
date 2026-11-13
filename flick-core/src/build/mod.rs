@@ -27,7 +27,7 @@ use crate::clock::{micros, timed};
 #[cfg(feature = "native-project")]
 use crate::codegen::sourcemap;
 use crate::codegen::ts::{Facade, Projection, declaration_file, facade_files};
-use crate::codegen::{self, EffectBridge, Labels, Options};
+use crate::codegen::{self, EffectBridge, Known, Labels, Options};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 #[cfg(feature = "native-project")]
 use crate::iface;
@@ -178,6 +178,8 @@ pub fn emit(
     let direct = |m: &str, i: &str, method: &str| {
         direct.contains(&(m.to_owned(), i.to_owned(), method.to_owned()))
     };
+    let lang = ir::lang_items();
+    let known = Known::of(&lang);
     let options = Options {
         path: &path,
         package: &package,
@@ -190,6 +192,7 @@ pub fn emit(
         labels: settings.extras.labels,
         rt: settings.backend == Backend::Rt,
         effect_bridge: bridge_select::select(compilation, settings.effect_bridge),
+        lang: &known,
     };
     let mut out = Vec::new();
     #[cfg(feature = "native-project")]

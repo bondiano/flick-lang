@@ -6,6 +6,7 @@ use std::mem;
 
 use super::expr::arrow_body;
 use super::{Callee, Gen, Target, indent, names};
+use crate::codegen::order::post_order;
 use crate::ir::{Expr, ExprKind, Item, ItemKind};
 use crate::types::{Constructor, Dict, InstanceInfo, Rep, default_method};
 
@@ -144,7 +145,7 @@ impl Gen<'_> {
 
     fn constructor_item(&mut self, c: &Constructor) -> String {
         let name = names::ident(&c.name);
-        if names::native(c).is_some() {
+        if names::native(self.options.lang, c).is_some() {
             let native = self.constructor(c);
             return self.export(&name, &native);
         }
@@ -298,36 +299,15 @@ impl Gen<'_> {
                 by_name.insert(name, i);
             }
         }
-        let uses: Vec<Vec<usize>> = items
-            .iter()
-            .map(|item| {
-                let mut names = BTreeSet::new();
-                item_uses(item, self.module, &mut names);
-                names
-                    .iter()
-                    .filter_map(|n| by_name.get(n).copied())
-                    .collect()
-            })
-            .collect();
-        let mut state = vec![0u8; items.len()];
-        let mut out = Vec::new();
-        for start in 0..items.len() {
-            visit(start, &uses, &mut state, &mut out);
-        }
-        out
+        let mut uses = |i: usize| {
+            let mut names = BTreeSet::new();
+            item_uses(&items[i], self.module, &mut names);
+            (names.iter())
+                .filter_map(|n| by_name.get(n).copied())
+                .collect()
+        };
+        post_order(items.len(), 0..items.len(), &mut uses)
     }
-}
-
-fn visit(i: usize, uses: &[Vec<usize>], state: &mut [u8], out: &mut Vec<usize>) {
-    if state[i] != 0 {
-        return;
-    }
-    state[i] = 1;
-    for &j in &uses[i] {
-        visit(j, uses, state, out);
-    }
-    state[i] = 2;
-    out.push(i);
 }
 
 /// The JS names an item defines.

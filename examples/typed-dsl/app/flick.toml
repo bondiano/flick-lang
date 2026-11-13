@@ -1,0 +1,6 @@
+schema-version = 1
+[project]
+kind = "app"
+entry = "Main"
+[dependencies]
+validation = { path = "../library" }

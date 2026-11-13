@@ -6,7 +6,7 @@ use std::mem;
 
 use super::expr::{arrow_body, unmarked};
 use super::{Gen, Tail, indent, names, view};
-use crate::codegen::tail::{Calls, Target, jumpable, self_call, tail_callees};
+use crate::codegen::tail::{Target, binds, has_tail_call, jumpable, passed_on, self_call};
 use crate::ir::{BinOp, Expr, ExprKind, Lit, Param, Pat, Stage};
 
 impl Gen<'_> {
@@ -91,7 +91,7 @@ impl Gen<'_> {
                 state: None,
                 offsets: Vec::new(),
             })
-            .filter(|t| has_tail_call(body, t, calls));
+            .filter(|t| has_tail_call(body, &t.members, calls));
         let stmts = if let Some(call) = grouped {
             vec![format!("return {call};")]
         } else if let Some(mut tail) = tail {
@@ -216,7 +216,7 @@ impl Gen<'_> {
                 if self
                     .tail
                     .as_ref()
-                    .is_some_and(|t| has_tail_call(rhs, t, self.calls())) =>
+                    .is_some_and(|t| has_tail_call(rhs, &t.members, self.calls())) =>
             {
                 let l = self.expr(lhs);
                 let (test, value) = if *op == BinOp::And {
@@ -272,7 +272,7 @@ impl Gen<'_> {
         // a parameter passed on unchanged keeps its variable
         let changed: Vec<usize> = (0..args.len())
             .filter(|&i| !moves.iter().any(|(m, _)| *m == i))
-            .filter(|&i| !matches!(&args[i].kind, ExprKind::Local(n) if binds.get(i).is_some_and(|b| b.as_ref() == Some(n))))
+            .filter(|&i| !passed_on(args, &binds, i))
             .collect();
         let args: Vec<&Expr> = changed.iter().map(|&i| args[i]).collect();
         // the arguments read the parameters, never the loop variables
@@ -388,22 +388,6 @@ pub(super) fn offsets(walked: &[bool]) -> Vec<Option<String>> {
         .enumerate()
         .map(|(i, &w)| w.then(|| format!("$o{i}")))
         .collect()
-}
-
-/// The local each parameter binds, if it is a name.
-pub(super) fn binds(params: &[Param]) -> Vec<Option<String>> {
-    params
-        .iter()
-        .map(|p| match &p.pat {
-            Pat::Bind(n) => Some(n.clone()),
-            _ => None,
-        })
-        .collect()
-}
-
-/// Whether a tail position of `body` jumps to a member of `tail`.
-fn has_tail_call(body: &Expr, tail: &Tail, calls: Calls) -> bool {
-    !tail_callees(body, &tail.members, calls).is_empty()
 }
 
 #[cfg(test)]

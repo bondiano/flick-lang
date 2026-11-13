@@ -257,27 +257,18 @@ impl Gen<'_> {
     /// A known full application of a function of the module with a worker,
     /// its stages before the last pure and none evaluating its argument first.
     fn worker_call<'e>(&mut self, e: &'e Expr) -> Option<(String, Vec<&'e Expr>)> {
-        let mut args = Vec::new();
-        let mut head = e;
-        let mut last = true;
-        while let ExprKind::App {
-            func,
-            arg,
-            stage,
-            arg_first: false,
-        } = &head.kind
+        let (head, args) = e.spine();
+        let before_last = &args[..args.len().saturating_sub(1)];
+        if before_last
+            .iter()
+            .any(|(_, stage)| *stage == Stage::Runtime)
         {
-            if *stage == Stage::Runtime && !last {
-                return None;
-            }
-            last = false;
-            args.push(&**arg);
-            head = func;
+            return None;
         }
         let ExprKind::Global { module, name } = &head.kind else {
             return None;
         };
-        args.reverse();
+        let args: Vec<&Expr> = args.into_iter().map(|(arg, _)| arg).collect();
         if module != self.module {
             let arity = (self.options.workers)(module, name).filter(|&n| n == args.len())?;
             let worker = self.global(module, &format!("{}${arity}", names::ident(name)));
@@ -296,25 +287,16 @@ impl Gen<'_> {
         if !self.options.release {
             return None;
         }
-        let mut args = Vec::new();
-        let mut head = e;
-        while let ExprKind::App {
-            func,
-            arg,
-            stage: Stage::Pure,
-            arg_first: false,
-        } = &head.kind
-        {
-            args.push(&**arg);
-            head = func;
-        }
+        let (head, args) = e.pure_spine();
         let ExprKind::Con(c) = &head.kind else {
             return None;
         };
-        if c.rep != Rep::Tagged || names::native(c).is_some() || args.len() != c.arity {
+        if c.rep != Rep::Tagged
+            || names::native(self.options.lang, c).is_some()
+            || args.len() != c.arity
+        {
             return None;
         }
-        args.reverse();
         let js = self.ordered(&args);
         let package = (self.options.package)(&c.module);
         let tag = names::string(&names::tag(c, package.as_deref()));
@@ -453,7 +435,7 @@ impl Gen<'_> {
         {
             return names::enum_literal(literal);
         }
-        match names::native(c) {
+        match names::native(self.options.lang, c) {
             Some(names::Native::Some) => self.rt("some"),
             Some(names::Native::None) => self.rt("none"),
             Some(names::Native::Ok) => self.rt("ok"),

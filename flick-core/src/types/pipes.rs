@@ -114,7 +114,6 @@ pub fn applied_order(operators: &[Token]) -> Vec<usize> {
 struct Call {
     shape: Shape,
     provided: usize,
-    key: Range,
     operand: Span,
     span: Span,
     function: Type,
@@ -315,7 +314,6 @@ impl Checker<'_> {
         Call {
             shape,
             provided,
-            key,
             operand,
             span,
             function,
@@ -327,7 +325,6 @@ impl Checker<'_> {
         let Call {
             shape,
             provided,
-            key,
             operand,
             span,
             function,
@@ -371,7 +368,7 @@ impl Checker<'_> {
         };
         self.settle_defaults(defaults);
         self.settle_provided(provided);
-        self.note_value(key, &ty);
+        self.note_value(super::typing::range(span), &ty);
         ty
     }
 

@@ -13,7 +13,7 @@ use super::layout::{Code, call, if_else, list, statement};
 use super::{Gen, names};
 use crate::codegen::tail::{Callee, Target};
 use crate::ir::{BinOp, Expr, ExprKind, Lit, Pat, Stage, Stmt};
-use crate::types::{EnumLit, Lift};
+use flick_ir::{EnumLit, Lift};
 
 /// A literal as Go: numbers typed as the runtime holds them.
 pub(super) fn literal(lit: &Lit) -> String {
@@ -128,7 +128,14 @@ impl<'a> Gen<'a> {
                 body,
                 iterable,
             } => {
-                let lowered = loops::lower(id, condition.as_deref(), body, *iterable, e.span);
+                let lowered = loops::lower(
+                    self.input.lang,
+                    id,
+                    condition.as_deref(),
+                    body,
+                    *iterable,
+                    e.span,
+                );
                 self.expr(&lowered)
             }
             ExprKind::LoopExit { .. } => unreachable!("loop exits are lowered with their loop"),
@@ -356,7 +363,7 @@ impl<'a> Gen<'a> {
                 // declared and where it is assigned, not boxed on every assignment
                 match self
                     .native(value)
-                    .or_else(|| Native::of(value.ty.as_deref()))
+                    .or_else(|| Native::of(self.input.lang, value.ty.as_deref()))
                 {
                     Some(n) => {
                         let v = self.unboxed(value, v, n);

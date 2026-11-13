@@ -1,0 +1,28 @@
+// Under a `forall` of a signature the reading goes on as `Ty.elide` reads
+// `.all`: a result holds what the parameters before it reach of the atoms
+// outside the `forall` (`Caps.under`), never one of its own binders.
+module App.HiddenRowsRankN exposing (..)
+
+import File exposing (File, Path, FileSystem, OpenError, ReadError)
+
+type G a = G (Unit ->{Async, FileSystem; ReadError} a)
+
+run : G a ->{Async, FileSystem; ReadError} a
+let run (G f) = f ()
+
+// `(forall a. File s -> a -> G a)` reads `∀a. File s → a → (G a)^{s}`
+tagged : (forall a. File s -> a -> G a) -> File s ->{Async, FileSystem; ReadError} String
+let tagged make file = run (make file "")
+
+keep : String -> a -> a
+let keep _ x = x
+
+reads : Path ->{Async, FileSystem; OpenError, ReadError} String
+let reads path = scope {
+  let file = File.open_scoped path
+  tagged (fun f x -> G (fun _ -> keep (File.read_all f) x)) file
+}
+
+// an inner binder named as the outer region does not take its place in the row
+shadowed : File s -> (forall s. s -> G String)
+let shadowed file = fun _ -> G (fun _ -> File.read_all file)

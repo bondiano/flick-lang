@@ -17,7 +17,7 @@ make : Layer ri e ro -> Options ->{Scope s | ri; e} LayerRef s e ro
 foreign effect make from "flick:LayerRef" "flickMake"
 
 /// The services as a layer: a `provide` of it shares those already built.
-get : LayerRef s e ro -> Layer none e ro
+get : LayerRef s e ro -> (Layer none e ro)^{s}
 foreign pure get from "flick:LayerRef" "flickGet"
   retention owner
 

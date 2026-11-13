@@ -101,21 +101,22 @@ impl Checker<'_> {
     /// The makers named under `node`, outside the tasks of handlers: where,
     /// the name as written, and the maker of the library it ends at.
     pub(super) fn made(&self, node: &Node, out: &mut Vec<(Range, String, String)>) {
-        if node.kind == K::TaskExpr {
-            return;
-        }
-        if let Some(Ref::Value { module, name }) = self.typing.names.get(&node.range())
-            && let Some(maker) = self.maker(module, name)
-        {
-            let written = if *module == self.env.module {
-                name.clone()
-            } else {
-                format!("{module}.{name}")
-            };
-            out.push((node.range(), written, maker));
-        }
-        for child in node.nodes() {
-            self.made(child, out);
+        let mut pending = vec![node];
+        while let Some(node) = pending.pop() {
+            if node.kind == K::TaskExpr {
+                continue;
+            }
+            if let Some(Ref::Value { module, name }) = self.typing.names.get(&node.range())
+                && let Some(maker) = self.maker(module, name)
+            {
+                let written = if *module == self.env.module {
+                    name.clone()
+                } else {
+                    format!("{module}.{name}")
+                };
+                out.push((node.range(), written, maker));
+            }
+            pending.extend(node.nodes().collect::<Vec<_>>().into_iter().rev());
         }
     }
 }

@@ -6,9 +6,14 @@ export interface DateTime {
   readonly epochMilliseconds: number;
 }
 
-/** The Effect bridge keeps the native clock while returning its DateTime value. */
-export const dateTimeHooks: { makeUtc: (millis: number) => DateTime } = {
+/**
+ * The Effect bridge keeps the native clock while returning its DateTime value.
+ * `toDate` is the wall-clock time in the DateTime's zone as the UTC fields of
+ * a Date, as Effect's `toDate`; only the bridge makes a zoned DateTime.
+ */
+export const dateTimeHooks: { makeUtc: (millis: number) => DateTime; toDate: (value: DateTime) => Date } = {
   makeUtc: (epochMilliseconds) => Object.freeze({ epochMilliseconds }),
+  toDate: (value) => new Date(value.epochMilliseconds),
 };
 
 export const flickNow = (): DateTime => dateTimeHooks.makeUtc(clock().millis());

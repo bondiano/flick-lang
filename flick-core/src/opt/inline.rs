@@ -370,21 +370,10 @@ fn applied_global(e: &Expr) -> Option<(&str, &str, Vec<&Expr>, bool)> {
     {
         (head, piped) = (func, Some(&**arg));
     }
-    let mut args = Vec::new();
-    while let ExprKind::App {
-        func,
-        arg,
-        stage: Stage::Pure,
-        arg_first: false,
-    } = &head.kind
-    {
-        args.push(&**arg);
-        head = func;
-    }
+    let (head, mut args) = head.pure_spine();
     let ExprKind::Global { module, name } = &head.kind else {
         return None;
     };
-    args.reverse();
     args.extend(piped);
     Some((module, name, args, piped.is_some()))
 }

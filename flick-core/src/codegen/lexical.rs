@@ -140,6 +140,7 @@ pub(crate) fn js_parts(
                 labels: module.labels.clone(),
                 initialization: module.initialization.clone(),
                 records: module.records.clone(),
+                package: module.package.clone(),
             };
             let mut output = super::js::js_at(&part, options, &physical, &location);
             if phase.is_none() {

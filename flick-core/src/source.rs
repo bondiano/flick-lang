@@ -46,6 +46,11 @@ impl SourceFile {
     }
 
     /// Byte offset of the start of a 0-based line, if the line exists.
+    /// The offsets where the lines start, the first at 0.
+    pub fn line_starts(&self) -> &[u32] {
+        &self.line_starts
+    }
+
     pub fn line_start(&self, line: u32) -> Option<u32> {
         self.line_starts.get(line as usize).copied()
     }

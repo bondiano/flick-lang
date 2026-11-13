@@ -9,6 +9,7 @@ mod float;
 mod foreign;
 mod handler;
 mod instance;
+mod lang;
 mod num;
 mod op;
 mod program;
@@ -25,7 +26,8 @@ pub use expr::{
 };
 pub use foreign::{Adapter, Binding, Copies, Foreign, ForeignMode, ResultAdapter, Shape};
 pub use handler::{Handled, Handler, OpArm};
-pub use instance::{GenericInfo, InstanceInfo};
+pub use instance::{GenericInfo, InstanceInfo, default_method};
+pub use lang::{Lang, LangItem, Namespace, STRUCTURAL};
 pub use num::{Arith, Num, NumKind};
 pub use op::OpClass;
 pub use program::{Error, Program, VERSION};

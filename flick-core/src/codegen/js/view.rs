@@ -5,7 +5,7 @@
 use std::mem;
 
 use super::Gen;
-use crate::codegen::tail::{Calls, Target, self_call, tail_callees};
+use crate::codegen::tail::{Calls, Target, has_tail_call, self_call};
 use crate::ir::{Arm, BinOp, Expr, ExprKind, Param, Pat};
 use crate::opt::uses;
 
@@ -112,7 +112,7 @@ fn spine<'e>(
                 pending.extend(arms.iter().map(|a| &a.body));
             }
             ExprKind::Binary(BinOp::And | BinOp::Or, _, r)
-                if !tail_callees(r, members, Calls::Pure).is_empty() =>
+                if has_tail_call(r, members, Calls::Pure) =>
             {
                 pending.push(r);
             }

@@ -1,0 +1,13 @@
+// The layer `ErrorReporter.layer` installs sends reports to listeners of the
+// reporters' region, so its type shows that region: a closure that holds it
+// cannot leave the `scope`, where the reports would go to a closed listener.
+module App.ReporterLayer exposing (..)
+
+later : Unit ->{Async} (Unit -> Layer none none none)
+let later () = scope s {
+  let listener =
+    Events.listen s (Events.queue 4) (fun _ -> ()) (fun (_ : ErrorReporter.Report) -> task { () })
+  let reporter = ErrorReporter.make listener
+  fun _ -> ErrorReporter.layer [reporter] { mergeWithExisting = false }
+}
+//~ FLICK-G001 @11:12-11:72 this value holds region `s`, but the expected type `Layer none none none` holds no captures

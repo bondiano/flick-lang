@@ -3,28 +3,20 @@
 /// sees them without an import.
 module Prelude exposing (..)
 
-@ts "undefined"
 @lang unit
 type Unit
-@ts "never"
 @lang never
 type Never
-@ts "boolean"
 @lang bool
 type Bool
-@ts "number"
 @lang int
 type Int
-@ts "number"
 @lang float
 type Float
-@ts "bigint"
 @lang bigint
 type BigInt
-@ts "string"
 @lang string
 type String
-@ts "unknown"
 @lang unknown
 type Unknown
 
@@ -32,11 +24,9 @@ type Unknown
 /// Any JS value, as it comes from foreign code: getters, proxies, cycles
 /// and all. `Js.snapshot` turns supported data into an `Unknown`.
 type JsValue
-@ts "ReadonlyArray<{0}>"
 @lang list
 type List a
 
-@ts "Iterable<{0}>"
 @lang seq
 /// A lazy sequence that starts over on each iteration: see the module `Seq`.
 type Seq a
@@ -44,8 +34,6 @@ type Seq a
 type Ref a
 @lang redacted
 type Redacted a
-@ts "$Schema.Codec<{0}, {0}>" rt "$Schema<{0}, {0}>"
-@ts import runtime "Schema" rt "SchemaValue"
 @lang schema
 @derive std
 type Schema a
@@ -57,23 +45,16 @@ type Url a
 @derive std
 /// The form of a record type that derives `Form`: see the module `Form`.
 type Form a
-@ts "$Schema.Codec<{1}, {0}>" rt "$Schema<{1}, {0}>"
-@ts import runtime "Schema" rt "SchemaValue"
 @lang pure_codec
+@stores
 type PureCodec i a
-@ts "$Effect.Effect<{2}, {1:row}, {0:row}>" rt "$Effect<{2}, {1:row}, {0:row}>"
-@ts import runtime "Effect" rt "EffectValue"
 @lang eff
 type Eff (r : ServiceRow) (e : ErrorRow) a
-@ts "$Layer.Layer<{2:row}, {1:row}, {0:row}>" rt "$Layer<{2:row}, {1:row}, {0:row}>"
-@ts import runtime "Layer" rt "LayerValue"
 @lang layer
 type Layer (ri : ServiceRow) (e : ErrorRow) (ro : ServiceRow)
-@ts "$Schema.Codec<{3}, {2}, {0:row}, {1:row}>" rt "$Schema<{3}, {2}, {0:row}, {1:row}>"
-@ts import runtime "Schema" rt "SchemaValue"
 @lang codec
+@stores
 type Codec (rd : ServiceRow) (re : ServiceRow) i a
-@ts "{0:row}"
 @lang errors
 type Errors (e : ErrorRow)
 
@@ -81,13 +62,10 @@ type Errors (e : ErrorRow)
 /// `pack` and `unpack` are the only ways to construct and open one.
 type Module (sig : Module)
 
-@ts "$Ui"
-@ts import ui "Ui"
 @lang ui
 /// A user interface: see the module `Ui`.
 type Ui
 
-@ts none
 @lang service_tag
 /// A service named as a value, as in `Layer.succeed Clock clock_impl`.
 type ServiceTag (r : ServiceRow)
@@ -105,7 +83,6 @@ effect Async
 /// catches it: `| NotFound _ ->` or, in full, `| Fail.fail (NotFound _) ->`.
 effect Fail (e : ErrorRow)
 
-@ts none
 @lang scope
 /// The owner of what a `scope` acquires: an operation that acquires a
 /// resource of region `s` needs `Scope s`, which the innermost `scope`
@@ -129,19 +106,14 @@ service Setup (s : Region) =
   /// Runs `work` from the instance's mount to its unmount.
   start : forall c. (Lifecycle s)^c ->{} Unit
 
-@ts none
 @lang service_impl
 /// The implementation record of the one service of `r`:
 /// `ServiceImpl {Clock}` is `Clock.Impl`.
 type ServiceImpl (r : ServiceRow)
 
-@ts "$Option.Option<{0}>" rt "$Option<{0}>"
-@ts import runtime "Option" rt "OptionValue"
 @lang option
 type Option a = @lang none None | @lang some Some a
 
-@ts "$Result.Result<{1}, {0}>" rt "$Result<{1}, {0}>"
-@ts import runtime "Result" rt "ResultValue"
 @lang result
 type Result e a = @lang err Err e | @lang ok Ok a
 
@@ -247,7 +219,6 @@ type CauseReport
 /// The error of a computation that ran out of time.
 type error TimeoutError
 
-@ts "unknown"
 @lang json
 /// A JSON value: what a JSON codec reads and writes.
 type Json
@@ -259,6 +230,7 @@ type alias SchemaIssue = { message : String; path : String }
 /// Decoding or encoding failed; the issues name the paths, never the value.
 type error SchemaError = SchemaError (List SchemaIssue)
 
+@stores
 /// One field of a `codec` block: its wire name, its codec and its policy for
 /// a missing key; decoding it may need the services `rd`.
 type FieldCodec (rd : ServiceRow) a

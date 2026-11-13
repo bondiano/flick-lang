@@ -321,7 +321,9 @@ mod tests {
                 labels: BTreeMap::default(),
                 initialization: crate::Initialization::default(),
                 records: BTreeMap::default(),
+                package: None,
             }],
+            lang: Vec::new(),
         }
     }
 

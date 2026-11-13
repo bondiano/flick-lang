@@ -22,7 +22,9 @@ The site loads and validates TOML at build time. Its normalized data is embedded
 in the lesson page; the browser never parses TOML or reads the filesystem.
 `src/playground/exercise.ts` applies the same rules to browser-worker and native
 CLI results. `test/lesson.test.ts` discovers all exercises automatically and
-checks each starter, solution, and broken answer. The Docs workflow runs these
+checks each starter, solution, and broken answer.
+The running `effects/01` exercise is also tested with both emitted runtime
+forms and in the browser: errors, wrong output, then a correct answer. The Docs workflow runs these
 checks before publishing.
 
 A page of the tour mounts an exercise through `tour/index.json`, with
@@ -31,3 +33,14 @@ A page of the tour mounts an exercise through `tour/index.json`, with
 Russian page). State and actions live in Flick. Drafts
 and completion use per-exercise local storage keys; existing signatures/01 keys
 remain compatible. Showing a solution does not mark it complete.
+
+
+## Limits of the rules
+
+The evaluator checks the emitted export signature and runs the program's entrypoint,
+then compares stdout. It does not invoke an arbitrary exported API with secret
+arguments: a compilable wrong-output fixture is a rejection regression, not a
+hidden test. Hidden tests, a ban on `todo`, and complex argument/result types
+must be added to the shared loader/evaluator with browser and CI regressions
+when a course actually needs them. Browser error checking deliberately uses
+severity only; `starter_error` is the exact expected diagnostic code in CI.

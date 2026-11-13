@@ -1,10 +1,9 @@
 ---
 source: flick-core/src/iface/tests.rs
-assertion_line: 97
 expression: json
 ---
 {
-  "iface-version": 23,
+  "iface-version": 24,
   "compiler": "0.1.0",
   "module": "App.Shapes",
   "exports": [

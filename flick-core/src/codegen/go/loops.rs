@@ -15,9 +15,9 @@ use super::layout::{Code, INDENT, block, call, param_list, single, statement};
 use super::shape::Types;
 use super::{Gen, names};
 use crate::codegen::tail::{
-    Calls, Target, cycles, function, jumpable, self_call, tail_callees, target,
+    Calls, Target, binds, cycles, function, has_tail_call, jumpable, members, passed_on, self_call,
 };
-use crate::ir::{BinOp, Expr, ExprKind, Item, Lit, Param, Pat, Stage};
+use crate::ir::{BinOp, Expr, Item, Lit, Param, Pat, Stage};
 
 /// Where a tail call jumps: the members of the loop with their arity, the
 /// loop variables, and the local each parameter of the running member
@@ -88,16 +88,6 @@ impl Group {
     }
 }
 
-fn binds(params: &[Param]) -> Vec<Option<String>> {
-    params
-        .iter()
-        .map(|p| match &p.pat {
-            Pat::Bind(n) => Some(n.clone()),
-            _ => None,
-        })
-        .collect()
-}
-
 impl<'a> Gen<'a> {
     /// The Go parameters and statements of a function of `params` running
     /// `body`; with `target`, a self tail call of a pure function jumps.
@@ -118,7 +108,7 @@ impl<'a> Gen<'a> {
         );
         let looping = target.filter(|t| {
             jumpable(params, Calls::Direct)
-                && !tail_callees(body, &[(t.clone(), params.len())], Calls::Direct).is_empty()
+                && has_tail_call(body, &[(t.clone(), params.len())], Calls::Direct)
         });
         let result = match looping {
             None => {
@@ -143,7 +133,7 @@ impl<'a> Gen<'a> {
                     .iter()
                     .map(|p| {
                         matches!(p.pat, Pat::Bind(_))
-                            .then(|| Native::of(p.ty.as_deref()))
+                            .then(|| Native::of(self.input.lang, p.ty.as_deref()))
                             .flatten()
                     })
                     .collect();
@@ -221,15 +211,8 @@ impl<'a> Gen<'a> {
     /// The Go function running the group `g` of `items`.
     pub(super) fn group(&mut self, g: usize, items: &[Item]) -> Document<'a> {
         let a = self.a;
-        let functions: Vec<(&str, &[Param], &Expr)> = self.groups[g]
-            .items
-            .iter()
-            .filter_map(|&i| function(&items[i], Calls::Direct))
-            .collect();
-        let members: Vec<(Target, usize)> = functions
-            .iter()
-            .map(|(name, params, _)| (target(self.module, name), params.len()))
-            .collect();
+        let (functions, members) =
+            members(self.module, items, &self.groups[g].items, Calls::Direct);
         let vars: Vec<&'a str> = (0..self.groups[g].arity)
             .map(|i| a.alloc_str(&format!("v{i}")))
             .collect();
@@ -288,10 +271,7 @@ impl<'a> Gen<'a> {
         let state = tail.state.filter(|_| j != tail.current);
         // a parameter passed on unchanged keeps its variable
         let changed: Vec<usize> = (0..args.len())
-            .filter(|&i| {
-                !matches!(&args[i].kind, ExprKind::Local(n)
-                    if binds.get(i).is_some_and(|b| b.as_ref() == Some(n)))
-            })
+            .filter(|&i| !passed_on(&args, &binds, i))
             .collect();
         let values = self.ordered(&changed.iter().map(|&i| args[i]).collect::<Vec<_>>());
         let values: Vec<Code<'a>> = changed
@@ -320,7 +300,7 @@ impl<'a> Gen<'a> {
     pub(super) fn jumps_in(&self, rhs: &Expr) -> bool {
         self.tail
             .as_ref()
-            .is_some_and(|t| !tail_callees(rhs, &t.members, Calls::Direct).is_empty())
+            .is_some_and(|t| has_tail_call(rhs, &t.members, Calls::Direct))
     }
 
     /// `lhs && rhs` or `lhs || rhs` in tail position, its right operand a

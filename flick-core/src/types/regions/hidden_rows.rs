@@ -114,7 +114,7 @@ impl Checker<'_> {
             .map(|v| (v.name.clone(), v.kind.clone()))
             .collect();
         let mut fresh = Vec::new();
-        let body = self.rows_of_stages(&body, &Norm::default(), &mut kinds, &mut fresh, 0);
+        let body = self.rows_of_stages(&body, &Norm::default(), &mut kinds, &mut fresh, 0, true);
         if fresh.is_empty() && vars.is_empty() && constraints.is_empty() {
             return body;
         }
@@ -127,6 +127,10 @@ impl Checker<'_> {
         }
     }
 
+    /// `quantify` is off under a `∀` of the signature: `Ty.fresh` does not
+    /// enter it, so a parameter there keeps its row empty, while its results
+    /// still hold what the parameters before them reach of the atoms outside
+    /// it (`Ty.elide` of `.all`, `Caps.under`).
     fn rows_of_stages(
         &self,
         t: &Type,
@@ -134,6 +138,7 @@ impl Checker<'_> {
         kinds: &mut Vec<(String, Kind)>,
         fresh: &mut Vec<Binder>,
         depth: usize,
+        quantify: bool,
     ) -> Type {
         match t {
             Type::Fun {
@@ -141,7 +146,7 @@ impl Checker<'_> {
                 effects,
                 result,
             } => {
-                let param = self.rows_of_param(param, kinds, fresh);
+                let param = self.rows_of_param(param, kinds, fresh, quantify);
                 let mut held = held.clone();
                 let mut reached = self.captures_of(&param);
                 reached.entries.retain(|(_, atom)| {
@@ -154,8 +159,71 @@ impl Checker<'_> {
                 Type::Fun {
                     param: Box::new(param),
                     effects: effects.clone(),
-                    result: Box::new(self.rows_of_stages(result, &held, kinds, fresh, depth + 1)),
+                    result: Box::new(self.rows_of_stages(
+                        result,
+                        &held,
+                        kinds,
+                        fresh,
+                        depth + 1,
+                        quantify,
+                    )),
                 }
+            }
+            Type::Forall {
+                vars,
+                constraints,
+                body,
+            } => {
+                // a binder named as a name the row carries is renamed, so the
+                // row keeps its meaning under it
+                let carried = held.clone().into_type();
+                let renamed: Vec<(String, Type)> = (vars.iter())
+                    .filter(|v| {
+                        carried.contains(&mut |t| matches!(t, Type::Var(n) if *n == v.name))
+                    })
+                    .map(|v| {
+                        (
+                            v.name.clone(),
+                            Type::Var(format!("{}${}", v.name, kinds.len())),
+                        )
+                    })
+                    .collect();
+                let vars: Vec<Binder> = (vars.iter())
+                    .map(|v| match renamed.iter().find(|(n, _)| *n == v.name) {
+                        Some((_, Type::Var(name))) => Binder {
+                            name: name.clone(),
+                            kind: v.kind.clone(),
+                        },
+                        _ => v.clone(),
+                    })
+                    .collect();
+                // its binders count for nothing a row holds (`Caps.under`)
+                let outer = kinds.len();
+                kinds.extend(vars.iter().map(|v| (v.name.clone(), Kind::Type)));
+                let body = self.rows_of_stages(
+                    &body.substitute(&renamed),
+                    held,
+                    kinds,
+                    fresh,
+                    depth,
+                    false,
+                );
+                kinds.truncate(outer);
+                Type::Forall {
+                    vars,
+                    constraints: constraints.iter().map(|c| c.substitute(&renamed)).collect(),
+                    body: Box::new(body),
+                }
+            }
+            // a written qualifier is a field of the arrow (`Ty.elide`, `Ty.fresh`)
+            Type::Captured { ty, .. } | Type::Bounded { ty, .. }
+                if matches!(**ty, Type::Fun { .. }) =>
+            {
+                let mut out = t.clone();
+                if let Type::Captured { ty, .. } | Type::Bounded { ty, .. } = &mut out {
+                    **ty = self.rows_of_stages(ty, held, kinds, fresh, depth, quantify);
+                }
+                out
             }
             result if depth > 0 && self.bare_hidden(result) => {
                 elided(result.clone(), held.clone().into_type())
@@ -173,19 +241,22 @@ impl Checker<'_> {
         param: &Type,
         kinds: &mut Vec<(String, Kind)>,
         fresh: &mut Vec<Binder>,
+        quantify: bool,
     ) -> Type {
         match param {
-            Type::Fun { .. } => self.rows_of_stages(param, &Norm::default(), kinds, fresh, 0),
+            Type::Fun { .. } | Type::Forall { .. } => {
+                self.rows_of_stages(param, &Norm::default(), kinds, fresh, 0, quantify)
+            }
             Type::Captured { ty, .. } | Type::Bounded { ty, .. }
-                if matches!(**ty, Type::Fun { .. }) =>
+                if matches!(**ty, Type::Fun { .. } | Type::Forall { .. }) =>
             {
                 let mut param = param.clone();
                 if let Type::Captured { ty, .. } | Type::Bounded { ty, .. } = &mut param {
-                    **ty = self.rows_of_stages(ty, &Norm::default(), kinds, fresh, 0);
+                    **ty = self.rows_of_stages(ty, &Norm::default(), kinds, fresh, 0, quantify);
                 }
                 param
             }
-            _ if self.bare_hidden(param) => {
+            _ if quantify && self.bare_hidden(param) => {
                 let name = format!("{FRESH}{}", fresh.len());
                 kinds.push((name.clone(), Kind::CaptureRow));
                 fresh.push(Binder {

@@ -10,10 +10,10 @@ use std::{error, fmt};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{FileId, Module};
+use crate::{FileId, LangItem, Module};
 
 /// The version of the IR this crate reads and writes.
-pub const VERSION: &str = "0.8.1";
+pub const VERSION: &str = "0.10.0";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Program {
@@ -24,14 +24,18 @@ pub struct Program {
     /// here.
     pub files: Vec<String>,
     pub modules: Vec<Module>,
+    /// Where the modules declare each lang item, in the order of its role.
+    pub lang: Vec<LangItem>,
 }
 
 impl Program {
     /// `modules` of a compilation whose files `path` names, their spans moved
-    /// to indices of the program's list of files.
+    /// to indices of the program's list of files, and the lang items `lang`
+    /// of the compilation.
     pub fn new(
         compiler: &str,
         mut modules: Vec<Module>,
+        mut lang: Vec<LangItem>,
         path: &dyn Fn(FileId) -> String,
     ) -> Program {
         let mut index: BTreeMap<FileId, u32> = BTreeMap::new();
@@ -46,11 +50,13 @@ impl Program {
                 span.file = FileId::new(at);
             });
         }
+        lang.sort_by(|a, b| a.lang.cmp(&b.lang));
         Program {
             ir_version: VERSION.to_owned(),
             compiler: compiler.to_owned(),
             files,
             modules,
+            lang,
         }
     }
 
@@ -135,7 +141,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::{Error, Program, VERSION, compatible};
-    use crate::{Expr, ExprKind, FileId, Item, ItemKind, Lit, Module, Span};
+    use crate::{Expr, ExprKind, FileId, Item, ItemKind, LangItem, Lit, Module, Namespace, Span};
 
     fn program(x: f64) -> Program {
         let span = Span::new(FileId::new(7), 1, 4);
@@ -154,10 +160,28 @@ mod tests {
             labels: BTreeMap::default(),
             initialization: crate::Initialization::default(),
             records: BTreeMap::default(),
+            package: None,
         };
-        Program::new("flick test", vec![module], &|f| {
+        let item = |lang: &str, namespace, name: &str| LangItem {
+            lang: lang.to_owned(),
+            module: "Prelude".to_owned(),
+            namespace,
+            name: name.to_owned(),
+        };
+        let lang = vec![
+            item("some", Namespace::Constructor, "Just"),
+            item("option", Namespace::Type, "Maybe"),
+        ];
+        Program::new("flick test", vec![module], lang, &|f| {
             format!("file{}.fl", f.index())
         })
+    }
+
+    #[test]
+    fn the_lang_items_are_in_the_order_of_their_roles() {
+        let p = program(1.0);
+        let lang: Vec<&str> = p.lang.iter().map(|i| i.lang.as_str()).collect();
+        assert_eq!(lang, ["option", "some"]);
     }
 
     #[test]
@@ -191,9 +215,10 @@ mod tests {
         assert!(!compatible("0.3.0"));
         assert!(!compatible("1.0.0"));
         assert!(!compatible("0.1"));
+        assert!(!compatible("0.9.0"));
         let mut p = program(1.0);
-        p.ir_version = "0.9.0".to_owned();
-        let found = "0.9.0".to_owned();
+        p.ir_version = "0.11.0".to_owned();
+        let found = "0.11.0".to_owned();
         assert_eq!(
             Program::from_json(&p.to_json()),
             Err(Error::Version { found })

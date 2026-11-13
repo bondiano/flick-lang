@@ -138,10 +138,29 @@ fn declared(line: &str) -> Option<String> {
 /// The page of `interface`, its comments from `text`.
 pub fn page(interface: &Interface, text: &str) -> String {
     let docs = comments(text);
+    page_with_metadata(interface, text, &|export| {
+        (docs.get(&export.entity.name).cloned(), None)
+    })
+}
+
+/// Render the same public interface with declaration provenance supplied by the host.
+/// The callback is asked only about exported top-level declarations, never private ones.
+pub fn page_with_metadata(
+    interface: &Interface,
+    text: &str,
+    metadata: &impl Fn(&Export) -> (Option<String>, Option<String>),
+) -> String {
     let contracts = source_module_declarations(text, &interface.module);
     let mut out = format!("# {}\n", interface.module);
-    let doc = |name: &str, out: &mut String| {
-        if let Some(d) = docs.get(name) {
+    if let Some(comment) = module_comment(text) {
+        let _ = writeln!(out, "\n{comment}");
+    }
+    let doc = |export: &Export, out: &mut String| {
+        let (comment, source) = metadata(export);
+        if let Some(url) = source {
+            let _ = writeln!(out, "\n[Source]({url})");
+        }
+        if let Some(d) = comment {
             let _ = write!(out, "\n{d}\n");
         }
     };
@@ -156,7 +175,7 @@ pub fn page(interface: &Interface, text: &str) -> String {
     for e in types {
         let name = &e.entity.name;
         let _ = write!(out, "\n### `{name}`\n");
-        doc(name, &mut out);
+        doc(e, &mut out);
         if let Some(def) = &e.definition {
             let _ = writeln!(out, "\nKind: `{}`", def.kind);
             if matches!(
@@ -218,7 +237,7 @@ pub fn page(interface: &Interface, text: &str) -> String {
                  the server can call it with any payload, so it checks who calls itself."
             );
         }
-        doc(name, &mut out);
+        doc(e, &mut out);
     }
     out
 }

@@ -3,6 +3,7 @@
 
 use std::iter;
 
+use flick_ir::{Constructor, Dict, InstanceInfo, Rep, STRUCTURAL, default_method};
 use flick_pretty::{Document, docvec};
 
 use super::arith::Native;
@@ -15,13 +16,6 @@ use crate::codegen::names as js_names;
 use crate::codegen::tail::{Callee, Target};
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Module};
 use crate::source::Span;
-use crate::types::{Constructor, Dict, InstanceInfo, Rep, default_method};
-use crate::types::{STRUCTURAL, which};
-
-/// Whether the runtime derives the instances of `module.class`.
-fn derives(module: &str, class: &str) -> bool {
-    which(&STRUCTURAL, module, class).is_some()
-}
 
 /// The declarations of a module, each with whether it holds a `//line`
 /// directive; the statements of its init function.
@@ -99,19 +93,21 @@ impl<'a> Gen<'a> {
         // whether the declaration made now holds a `//line` directive
         let lines = self.lines;
         match &item.kind {
-            ItemKind::Value { name, dicts, body } => match super::shape(self.module, &item.kind) {
-                Shape::Var => {
-                    let var = a.alloc_str(&names::var(self.module, name));
-                    decls.push((docvec![a, "var ", var, " flickrt.Value"], false));
-                    let (mut stmts, v) = self.block(|g| g.expr(body));
-                    stmts.push(statement(a, docvec![a, var, " = ", v]));
-                    init.push(statement(a, block(a, stmts)));
+            ItemKind::Value { name, dicts, body } => {
+                match super::shape(self.input, self.module, &item.kind) {
+                    Shape::Var => {
+                        let var = a.alloc_str(&names::var(self.module, name));
+                        decls.push((docvec![a, "var ", var, " flickrt.Value"], false));
+                        let (mut stmts, v) = self.block(|g| g.expr(body));
+                        stmts.push(statement(a, docvec![a, var, " = ", v]));
+                        init.push(statement(a, block(a, stmts)));
+                    }
+                    Shape::Func { .. } => {
+                        let decl = self.function(name, dicts, body);
+                        decls.push((decl, self.lines > lines));
+                    }
                 }
-                Shape::Func { .. } => {
-                    let decl = self.function(name, dicts, body);
-                    decls.push((decl, self.lines > lines));
-                }
-            },
+            }
             ItemKind::Destructure { pattern, body } => {
                 let mut binders = Vec::new();
                 pattern.binders(&mut binders);
@@ -222,7 +218,10 @@ impl<'a> Gen<'a> {
             .collect();
         if let Some((fields, constructors)) = &info.derived {
             let (module, class) = &info.class;
-            if !derives(module, class) {
+            if !STRUCTURAL
+                .iter()
+                .any(|&l| self.input.lang.is(l, module, class))
+            {
                 self.unsupported(span, &format!("`deriving {class}`"));
                 self.emit("d := flickrt.NewDict()");
                 return;
@@ -353,12 +352,15 @@ impl<'a> Gen<'a> {
 
     /// The tag of a tagged constructor, as the JS target writes it.
     pub(super) fn tag(&self, c: &Constructor) -> String {
-        match js_names::native(c) {
+        match js_names::native(self.input.lang, c) {
             Some(js_names::Native::Some) => "Some".to_owned(),
             Some(js_names::Native::None) => "None".to_owned(),
             Some(js_names::Native::Ok) => "Success".to_owned(),
             Some(js_names::Native::Err) => "Failure".to_owned(),
-            None => js_names::tag(c, (self.package)(&c.module).as_deref()),
+            None => {
+                let own = self.input.own_module(&c.module);
+                js_names::tag(c, own.and_then(|m| m.package.as_deref()))
+            }
         }
     }
 

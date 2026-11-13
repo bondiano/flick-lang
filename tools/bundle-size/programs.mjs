@@ -31,6 +31,8 @@ export const PROGRAMS = [
     budget: 56,
     unused: ["effect/dist/Graph.js", "platform-node/dist/NodeHttpServer.js", "platform-node-shared/dist/NodeSocketServer.js"],
   },
+  // the same client on Flick's own runtime: a POST over fetch, no Effect at all
+  { name: "rpc-rt", source: "tools/bundle-size/rpc.fl", rt: true, budget: 7, effectFree: true },
   // a template renders without `react-dom/server`; its view is still a React component,
   // its atoms the registry's, with `Schema` since Effect 4.1
   {

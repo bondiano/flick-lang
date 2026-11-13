@@ -4,6 +4,7 @@ use std::fs;
 
 use flick_core::build;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
+use flick_core::ir::lang_items;
 use flick_core::project::Compilation;
 use flick_core::source::SourceMap;
 use flick_ir::Program;
@@ -36,7 +37,9 @@ pub(super) fn write(
         })
         .collect();
     let compiler = format!("flick {}", toolchain::COMPILER);
-    let program = Program::new(&compiler, ir, &|f| sources.get(f).path.clone());
+    let program = Program::new(&compiler, ir, lang_items(), &|f| {
+        sources.get(f).path.clone()
+    });
     let (name, bytes) = match format {
         IrFormat::Json => ("program.ir.json", program.to_json().into_bytes()),
         IrFormat::Cbor => ("program.ir.cbor", program.to_cbor()),

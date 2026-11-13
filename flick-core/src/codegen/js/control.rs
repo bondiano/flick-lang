@@ -20,7 +20,14 @@ impl Gen<'_> {
                 body,
                 iterable,
             } => {
-                let lowered = loops::lower(id, condition.as_deref(), body, *iterable, e.span);
+                let lowered = loops::lower(
+                    self.options.lang,
+                    id,
+                    condition.as_deref(),
+                    body,
+                    *iterable,
+                    e.span,
+                );
                 self.expr(&lowered)
             }
             ExprKind::LoopExit { .. } => unreachable!("loop exits are lowered with their loop"),

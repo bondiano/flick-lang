@@ -69,46 +69,53 @@ fn is_function(node: &Node) -> bool {
 }
 
 pub(crate) fn branches(node: &Node) -> u32 {
-    node.nodes()
-        .filter(|c| !is_function(c))
-        .map(|c| {
-            let own = match c.kind {
+    let mut total = 0;
+    let mut pending = vec![node];
+    while let Some(node) = pending.pop() {
+        for child in node.nodes().filter(|c| !is_function(c)) {
+            total += match child.kind {
                 K::IfExpr | K::Guard | K::GuardStmt => 1,
-                K::MatchExpr => u32::try_from(c.nodes().filter(|a| a.kind == K::MatchArm).count())
-                    .map_or(0, |n| n.saturating_sub(1)),
-                K::BinExpr if c.has_token(K::AndAnd) || c.has_token(K::OrOr) => 1,
+                K::MatchExpr => {
+                    u32::try_from(child.nodes().filter(|a| a.kind == K::MatchArm).count())
+                        .map_or(0, |n| n.saturating_sub(1))
+                }
+                K::BinExpr if child.has_token(K::AndAnd) || child.has_token(K::OrOr) => 1,
                 _ => 0,
             };
-            own + branches(c)
-        })
-        .sum()
+            pending.push(child);
+        }
+    }
+    total
 }
 
 fn depths(node: &Node, depth: u32, limit: u32, out: &mut Vec<Nesting>) {
-    for child in node.nodes().filter(|c| !is_function(c)) {
-        let nests = matches!(
-            child.kind,
-            K::IfExpr
-                | K::MatchExpr
-                | K::FunExpr
-                | K::DoExpr
-                | K::TaskExpr
-                | K::ForExpr
-                | K::TryExpr
-        );
-        let else_if = node.kind == K::IfExpr && child.kind == K::IfExpr;
-        let depth = depth + u32::from(nests && !else_if);
+    let mut pending = vec![(node, depth)];
+    while let Some((node, depth)) = pending.pop() {
         if depth > limit {
-            let (start, end) = child
+            let (start, end) = node
                 .child_tokens()
                 .next()
-                .map_or_else(|| child.range(), |t| (t.start, t.end));
+                .map_or_else(|| node.range(), |t| (t.start, t.end));
             out.push(Nesting {
                 span: Span { start, end },
                 depth,
             });
-        } else {
-            depths(child, depth, limit, out);
+            continue;
+        }
+        let children = node.nodes().filter(|c| !is_function(c)).collect::<Vec<_>>();
+        for child in children.into_iter().rev() {
+            let nests = matches!(
+                child.kind,
+                K::IfExpr
+                    | K::MatchExpr
+                    | K::FunExpr
+                    | K::DoExpr
+                    | K::TaskExpr
+                    | K::ForExpr
+                    | K::TryExpr
+            );
+            let else_if = node.kind == K::IfExpr && child.kind == K::IfExpr;
+            pending.push((child, depth + u32::from(nests && !else_if)));
         }
     }
 }

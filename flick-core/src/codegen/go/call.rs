@@ -13,7 +13,7 @@ use super::shape::Types;
 use super::{Gen, Shape, names, own};
 use crate::codegen::tail::Target;
 use crate::ir::{Expr, ExprKind, Lit, Param, Pat, Stage, operation_arity};
-use crate::types::{Constructor, Dict, Rep};
+use flick_ir::{Constructor, Dict, Rep};
 
 impl<'a> Gen<'a> {
     /// Builds a value of the constructor `c` from its fields, holding the
@@ -204,18 +204,7 @@ impl<'a> Gen<'a> {
             first = Some((self.spill(v), *stage));
             head = func;
         }
-        let mut args = Vec::new();
-        while let ExprKind::App {
-            func,
-            arg,
-            arg_first: false,
-            stage,
-        } = &head.kind
-        {
-            args.push((&**arg, *stage));
-            head = func;
-        }
-        args.reverse();
+        let (head, args) = head.spine();
         let (make, given, arity, effects): (Call<'a>, Vec<Code<'a>>, usize, u64) = match &head.kind
         {
             ExprKind::Con(c) => (self.construct(c, Vec::new()), Vec::new(), c.arity, 0),

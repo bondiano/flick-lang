@@ -2,15 +2,19 @@
 //! `go/<entry>/`, the program's code and the runtime, which `flick build`
 //! then compiles with `go build` into the executable `flick-<entry>`.
 
+use std::collections::BTreeMap;
 use std::env;
 use std::path::Path;
+use std::sync::OnceLock;
 
 use super::{Artifact, Settings, builtin_modules, optimized, specifier};
-use crate::codegen::go::{self, GO_MOD, GO_SUM, PACKAGES, Package, Program, RUNTIME};
+use crate::codegen::Known;
+use crate::codegen::go::{self, Bindings, GO_MOD, GO_SUM, Input, PACKAGES, Package, RUNTIME};
 use crate::diagnostics::{Diagnostic, Severity, codes};
-use crate::ir;
+use crate::ir::{self, ItemKind};
 use crate::project::{Compilation, normalize};
-use crate::source::{SourceMap, Span};
+use crate::source::{SourceFile, SourceMap};
+use crate::types;
 
 /// The name of the Go module and executable that runs a project's tests.
 pub const TEST: &str = "test";
@@ -71,44 +75,30 @@ pub fn emit(
             }
         })
         .collect();
-    let all: Vec<&ir::Module> = optimized.iter().chain(builtin_modules()).collect();
-    let own = |m: &str| modules.iter().any(|c| c.name == m);
-    let package = |m: &str| super::own_package(modules, settings, m);
-    // `./x.mjs` of a module is `x.go` beside it, named in the Go module by its
-    // path; a library's by its package and its path in it, as no store path ships
-    let foreign_file = |module: &str, spec: &str| {
-        let path = normalize(&(settings.source_dir)(module)?.join(spec)).with_extension("go");
-        let text = read(&path)?;
-        let named = (compilation.library_of(module)).and_then(|(name, dir)| {
-            Some(Path::new("/").join(name).join(path.strip_prefix(dir).ok()?))
-        });
-        let name: String = (named.as_ref().unwrap_or(&path))
-            .with_extension("")
-            .to_string_lossy()
-            .chars()
-            .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
-            .collect();
-        Some((format!("ffi{name}.go"), text))
-    };
+    let own: Vec<&ir::Module> = optimized.iter().collect();
+    let builtins: Vec<&ir::Module> = builtin_modules().iter().collect();
+    let foreign = foreign_files(compilation, settings, read);
+    let lines: Vec<&[u32]> = sources.files().map(SourceFile::line_starts).collect();
+    let lang = ir::lang_items();
+    let known = Known::of(&lang);
     let mut out = Vec::new();
     for (name, entry) in programs {
         let dir = module_dir(name);
         let module_path = settings.out_dir.join(&dir);
         // a path relative to the Go module, as a source map's: no build path ships
-        let location = |module: &str, span: Span| {
-            let compiled = modules.iter().find(|m| m.name == module)?;
-            let file = sources.get(span.file);
-            let path = specifier(&module_path, &normalize(&compiled.path));
-            Some((path, file.line_col(span.start).0 + 1))
-        };
-        let output = go::go(&Program {
-            modules: &all,
+        let paths: BTreeMap<String, String> = (modules.iter())
+            .map(|c| (c.name.clone(), specifier(&module_path, &normalize(&c.path))))
+            .collect();
+        let output = go::go(&Input {
+            own: &own,
+            builtins: &builtins,
             entry,
             suites,
-            package: &package,
-            own: &own,
-            location: &location,
-            foreign_file: &foreign_file,
+            paths: &paths,
+            lines: &lines,
+            foreign: &foreign,
+            bindings: bindings(),
+            lang: &known,
         });
         diagnostics.extend(output.diagnostics);
         let packages: Vec<&Package> = PACKAGES
@@ -146,6 +136,55 @@ pub fn emit(
         out.push(listing(&dir, &out));
     }
     (out, diagnostics)
+}
+
+/// The Go file beside each foreign JS module a module of `compilation` names
+/// relative to it: by the module and the specifier, its name in the Go module
+/// and its text, which `read` gives.
+fn foreign_files(
+    compilation: &Compilation,
+    settings: &Settings,
+    read: &dyn Fn(&Path) -> Option<String>,
+) -> BTreeMap<(String, String), (String, String)> {
+    // `./x.mjs` of a module is `x.go` beside it, named in the Go module by its
+    // path; a library's by its package and its path in it, as no store path ships
+    let foreign_file = |module: &str, spec: &str| {
+        let path = normalize(&(settings.source_dir)(module)?.join(spec)).with_extension("go");
+        let text = read(&path)?;
+        let named = (compilation.library_of(module)).and_then(|(name, dir)| {
+            Some(Path::new("/").join(name).join(path.strip_prefix(dir).ok()?))
+        });
+        let name: String = (named.as_ref().unwrap_or(&path))
+            .with_extension("")
+            .to_string_lossy()
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+            .collect();
+        Some((format!("ffi{name}.go"), text))
+    };
+    let mut foreign = BTreeMap::new();
+    for c in &compilation.modules {
+        for item in &c.ir.items {
+            if let ItemKind::Foreign(f) = &item.kind
+                && let Some(spec) = f.binding.from.as_deref().filter(|s| go::is_relative(s))
+            {
+                let key = (c.name.clone(), spec.to_owned());
+                if !foreign.contains_key(&key)
+                    && let Some(file) = foreign_file(&c.name, spec)
+                {
+                    foreign.insert(key, file);
+                }
+            }
+        }
+    }
+    foreign
+}
+
+/// The Go functions of the runtime the tables of the implicit packages bind
+/// JS exports to, read once.
+pub(crate) fn bindings() -> &'static Bindings {
+    static BINDINGS: OnceLock<Bindings> = OnceLock::new();
+    BINDINGS.get_or_init(|| Bindings::parse(types::implicit_go_bindings().map(|(_, text)| *text)))
 }
 
 /// The [`FILES`] of the Go module `dir`: the paths of `out` in it.

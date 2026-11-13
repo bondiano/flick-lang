@@ -468,3 +468,18 @@ fn long_operator_chains_check_on_a_test_stack() {
     let composed = format!("{f}h : Int -> Int\nlet h = f{}", " >> f".repeat(5000));
     assert_eq!(checked_on_a_test_stack(composed), none);
 }
+
+#[test]
+fn long_operator_chains_in_functions_check_on_a_test_stack() {
+    let _alone = alone();
+    let none = Vec::<String>::new();
+    let f = "f : Int -> Int\nlet f a = a\n";
+    for (signature, expression) in [
+        ("Unit -> Int", format!("1{}", " + 1".repeat(5000))),
+        ("Unit -> Int", format!("1{}", " |> f".repeat(5000))),
+        ("Unit -> Int -> Int", format!("f{}", " >> f".repeat(5000))),
+    ] {
+        let source = format!("{f}chain : {signature}\nlet chain () = {expression}");
+        assert_eq!(checked_on_a_test_stack(source), none);
+    }
+}

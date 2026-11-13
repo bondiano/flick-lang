@@ -12,6 +12,7 @@ use std::{fs, thread};
 use flick_core::build::{self, BuiltinStore};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::iface::Interface;
+use flick_core::ir;
 use flick_core::types;
 use flick_ir::{Module, Program};
 
@@ -153,7 +154,12 @@ fn save_modules(stages_by_class: bool, modules: &[Module]) {
         return;
     };
     // every built-in module is the one file of its own source map
-    let program = Program::new(toolchain::COMPILER, modules.to_vec(), &|_| String::new());
+    let program = Program::new(
+        toolchain::COMPILER,
+        modules.to_vec(),
+        ir::lang_items(),
+        &|_| String::new(),
+    );
     let _ = saved::write(&path, &program.to_cbor());
 }
 

@@ -8,6 +8,7 @@ use std::path::Path;
 
 use flick_core::build::Artifact;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
+use flick_core::ir::lang_items;
 use flick_core::plugin::Failure;
 use flick_core::project::{self, Compilation, Project};
 use flick_core::source::SourceMap;
@@ -55,6 +56,7 @@ pub(crate) fn ir(
             compiler: format!("flick {}", toolchain::COMPILER),
             files: Vec::new(),
             modules: compilation.modules.iter().map(|m| m.ir.clone()).collect(),
+            lang: lang_items(),
         };
         let written = match plugin.transform(&given.to_cbor()) {
             Ok(written) => written,
@@ -74,14 +76,18 @@ pub(crate) fn ir(
         let mut problems = match Program::from_cbor(&written) {
             Ok(program) => {
                 let mut problems = validate(&program, &builtin, &files);
-                let names = |p: &Program| {
-                    p.modules
-                        .iter()
-                        .map(|m| m.name.clone())
+                // the package of a module names the tags of its constructors
+                let modules = |p: &Program| {
+                    (p.modules.iter())
+                        .map(|m| (m.name.clone(), m.package.clone()))
                         .collect::<BTreeSet<_>>()
                 };
-                if names(&program) != names(&given) {
-                    problems.push("the modules are not those of the build".into());
+                if modules(&program) != modules(&given) {
+                    problems
+                        .push("the modules or their packages are not those of the build".into());
+                }
+                if program.lang != given.lang {
+                    problems.push("the lang items are not those of the build".into());
                 }
                 if problems.is_empty() {
                     let mut by_name: HashMap<String, Module> = (program.modules.into_iter())

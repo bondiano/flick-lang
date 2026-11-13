@@ -250,6 +250,24 @@ type Option a = @lang none None | Some a
   (identifier))
 
 ==================
+An attribute without arguments
+==================
+
+@stores
+type Fields (rd : ServiceRow)
+
+---
+
+(source_file
+  (attribute)
+  (keyword)
+  (constructor)
+  (parens
+    (identifier)
+    (operator)
+    (constructor)))
+
+==================
 Plugins
 ==================
 

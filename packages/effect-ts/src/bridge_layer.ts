@@ -5,7 +5,7 @@ import { type Run } from "@flick-lang/runtime/rt/fiber";
 import { HOST, Layer, type MemoMap, currentMemo, layerHooks, memoizable } from "@flick-lang/runtime/rt/layer";
 import { Owner, addTo, close, inside } from "@flick-lang/runtime/rt/owner";
 import { fromEffect, callEffect, causeFromEffect, causeToEffect } from "./bridge_runtime.ts";
-import { servicesOut } from "./bridge_host.ts";
+import { rawHostOf, servicesOut } from "./bridge_host.ts";
 
 const contextOf = (u: unknown): Context.Context<never> | undefined => Context.isContext(u) ? u : undefined;
 
@@ -73,10 +73,11 @@ export const installLayerBridge = (): void => {
 layerHooks.adopt = adopt;
 layerHooks.services = (value) => Context.isContext(value) ? [[HOST, value]] : undefined;
 layerHooks.context = servicesOut;
-layerHooks.merge = (a, b) => {
-  const first = contextOf(a);
+layerHooks.merge = (ctx, b) => {
   const second = contextOf(b);
-  return first === undefined || second === undefined ? (first ?? b) : Context.merge(first, second);
+  // the layer's services over all the evidence gives Effect, not only over the
+  // last host Context: a console or a clock of the runtime's stays under them
+  return second === undefined ? (contextOf(ctx.host) ?? b) : Context.merge(rawHostOf(ctx), second);
 };
 
 };

@@ -5,10 +5,10 @@ use std::collections::{HashMap, HashSet};
 use std::iter;
 
 use super::arith::Native;
-use super::foreign;
+use super::{Input, foreign};
 use crate::ir::reach::Key;
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Pat, Stage};
-use crate::types::{Dict, InstanceInfo, default_method};
+use flick_ir::{Dict, InstanceInfo, default_method};
 
 /// How a top-level name is held in Go.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -82,14 +82,14 @@ fn effects(stages: impl IntoIterator<Item = bool>) -> u64 {
         .fold(0, |mask, (i, effectful)| mask | u64::from(effectful) << i)
 }
 
-pub(super) fn shape(module: &str, kind: &ItemKind) -> Shape {
+pub(super) fn shape(input: &Input, module: &str, kind: &ItemKind) -> Shape {
     match kind {
         ItemKind::Value { dicts, body, .. } => match &body.kind {
             ExprKind::Lambda { params, body } => {
                 let natives: Vec<Option<Native>> = params
                     .iter()
                     .map(|p| match p.pat {
-                        Pat::Bind(_) => Native::of(p.ty.as_deref()),
+                        Pat::Bind(_) => Native::of(input.lang, p.ty.as_deref()),
                         _ => None,
                     })
                     .collect();
@@ -97,7 +97,7 @@ pub(super) fn shape(module: &str, kind: &ItemKind) -> Shape {
                     dicts: dicts.len(),
                     params: params.len(),
                     effects: effects(params.iter().map(|p| p.stage != Stage::Pure)),
-                    types: Types::of(Native::of(body.ty.as_deref()), &natives),
+                    types: Types::of(Native::of(input.lang, body.ty.as_deref()), &natives),
                 }
             }
             _ if dicts.is_empty() => Shape::Var,
@@ -120,7 +120,7 @@ pub(super) fn shape(module: &str, kind: &ItemKind) -> Shape {
                         (0..params).map(|i| f.stages.get(i).copied().unwrap_or(false)),
                     ),
                     // those the table of bindings gives its Go function
-                    types: foreign::types(module, f),
+                    types: input.bindings.types(module, f),
                 }
             }
         }

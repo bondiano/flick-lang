@@ -18,6 +18,26 @@ break programs.
 - **`retention owner` without `std`:** checking a foreign declaration with
   `retention owner` in a build of the core modules alone, which has no
   `Fiber.Outlives`, is `FLICK-F010` instead of a crash of the compiler.
+- **RPC clients on Flick's own runtime:** `Rpc` procedures, groups and their
+  unary calls over HTTP in NDJSON or JSON run on RT, in the protocol of
+  Effect's RPC server, so a browser client of a procedure bundles no Effect:
+  6.9 KB gzip instead of 55 KB. Http, RPC and server functions are one
+  family: a build that serves procedures, calls a stream, uses another
+  transport or serialization, or uses Http takes all of them from the
+  Effect adapter, as before.
+- **`Console` on Flick's own runtime:** every `Console` binding runs on RT
+  without the Effect adapter, writing to the host's console or to the one
+  `Console.with_console` gives a task; a group or a timer ends when its
+  scope closes or its task ends, however it ends. The adapter's code under a
+  layer provided on RT, such as `Logger.console_logfmt`, writes to that
+  console too: it now sees all the evidence below the layer, the runtime's
+  clock included, not only the services Effect supplied last.
+- **Http values on Flick's own runtime:** `Http.Headers`, `Http.Cookies`,
+  `Http.Url`, `Http.UrlParams`, `Http.Mime` and `Http.Etag` run on RT, with
+  the encodings, orders, parsers and error messages of Effect's modules,
+  so a program that only uses them, or them with an RPC client, loads no
+  Effect for them. A build that reaches any other Http binding still takes
+  every web binding from the adapter.
 - **`<|`, `>>` and `<<`:** `f <| x` is `f x`, the weakest operator and
   right-associative, so `say <| show <| total xs` needs no parentheses;
   `f a <| x` is the call `f a x`. `f >> g` applies `f`, then `g`, and
@@ -76,6 +96,19 @@ break programs.
 - **Plugins:** a plugin is told where each value it watches is named, with
   the declaration around it (`CallSite.binding`), as it was for the
   serializable atoms alone.
+- **The hidden row of data under a `forall`:** data with hidden storage
+  written bare under a `forall` of a signature is read as the core reads
+  `.all`: a result there holds what the parameters before it reach of the
+  atoms outside the `forall`, never one of its binders. A callback typed
+  `forall a. File s -> a -> G a` may return data over the file of `s`; one
+  typed `forall t. File t -> G String` still may not over its own `t`.
+- **`@stores`:** an attribute before a type without constructors says that
+  the values foreign code makes keep the functions they are given, as data
+  with a function field does: written bare in a signature, its result holds
+  what the parameters before it reach. `PureCodec`, `Codec`, `FieldCodec`
+  and `Codec.Derive.Fields` are marked, so a codec whose field default or
+  decoding reads a file cannot leave the file's `scope` (`FLICK-G001`);
+  before, decoding with it afterwards read the closed file without an error.
 - **Deep nesting:** checking a nested `fun` or a `<|` takes far less of the
   stack, so the deepest code the parser accepts (198 nested functions with
   their signature, or 199 `<|` in a row) checks on a thread's 2 MiB stack,
@@ -94,6 +127,11 @@ break programs.
   (`a + b + …`, `x |> f |> …`, `f >> g >> …`) in a loop, not a call per
   operator, so a chain of 5000 checks on a thread's 2 MiB stack, where some
   700 overflowed it.
+- **`ErrorReporter.layer` and `LayerRef.get`** return `(Layer …)^{s}`: the
+  layer sends reports to listeners of region `s`, or builds the services the
+  ref of `s` owns, so it cannot leave the `scope` of `s`. A layer returned
+  from that `scope` is `FLICK-G001`; before, its reports went to a closed
+  listener and were lost.
 - **Refined types:** `refined type` is a declaration of the plugin of `std`,
   which writes the type and its `parse`, `value` and check as code of the
   language; `refined` is no reserved word. The check is a companion too,

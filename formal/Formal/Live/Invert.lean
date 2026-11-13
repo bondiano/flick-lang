@@ -18,6 +18,7 @@ theorem LeLive.arrow_inv {A φ₀ t₀ C₀ a φ t C}
   | refl => exact ⟨.refl, Stage.le_refl _, .refl⟩
   | arrow h₁ h₂ h₃ => exact ⟨h₁, h₂, h₃⟩
   | hide _ _ _ _ ha => exact absurd ha Ty.arrow_ne_tcon
+  | data _ _ _ _ _ ha => exact absurd ha Ty.arrow_ne_tcon
 
 /-- The constant `op` asks for the region of its capability in the live discipline. -/
 theorem Const.ty_op_arrow (S : Sig) (ι : CArg) :
