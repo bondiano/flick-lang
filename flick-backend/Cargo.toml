@@ -11,6 +11,9 @@ publish.workspace = true
 [lints]
 workspace = true
 
+[features]
+host = ["dep:wasmtime"]
+
 [dependencies]
 caseless = "0.2.2"
 ciborium = "0.2.2"
@@ -20,10 +23,13 @@ serde = { version = "1.0.229", features = ["derive"] }
 sha2 = "0.10.9"
 unicode-normalization = "0.1.25"
 wit-bindgen = "0.63.0"
+wasmtime = { workspace = true, optional = true }
 
 [dev-dependencies]
+flick-test-backend = { path = "../tests/backends/literal" }
 flick-core = { path = "../flick-core" }
 insta = "1.49.0"
 serde_json = { workspace = true }
 wit-component = "0.262.0"
 wit-parser = "0.262.0"
+wat = "=1.254.2"

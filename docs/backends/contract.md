@@ -19,8 +19,11 @@ IR 1.0, complete the semantic prerequisites of R3a, or switch production
 JS and Go emitters remain in `flick-core`; the contract probe exercises
 both with IR and plain data without `Compilation` or `Settings`.
 
-The executable component host, registry, release components, browser
-loader, atomic publication and tool execution adapters are separate
+The optional `flick-backend/host` feature executes this world using the
+same Wasmtime configuration and compiled-code cache as the plugin host.
+The literal third-party fixture exercises it as an actual WASM component.
+Registry and CLI integration, official release components, the browser
+loader, atomic publication and tool execution adapters remain separate
 integration work. In particular, accepting a graph here does not execute
 it or establish that a tool's arguments access only declared files.
 
@@ -116,19 +119,52 @@ diagnostic validation pass, even when many diagnostics reference it.
 Payload, total serialization, file, step, diagnostic and string limits
 are host limits. A failure rejects the whole generation. A publication layer
 must stage all files and host steps, honor cancellation, validate final outputs
-and publish atomically; this library deliberately performs no file writes.
+and publish atomically; the generation driver performs no artifact writes.
 
 The driver validates all of this before returning a `Generated` value. Its
 cache key includes the complete ordered request, component digest, options,
 environment, profile, runtime/tool pins and every side-input digest. Cache
 eligibility requires two equal complete results. An unchecked generation has
 no cache key; a detected difference is an error. Cache loading must revalidate
-the result against the current host policy. Resource limits, cancellation and
-fresh guest instances also need enforcement by the component host.
+the result against the current host policy. This is eligibility for caching
+generation results; final tool outputs need their own reproducibility check.
+
+## Native component host
+
+`host::WasmBackend` verifies the component SHA-256 before compilation and its
+descriptor's id and version before accepting requests. Incompatible backend
+imports are rejected from the compiled component's actual import types.
+Compiled code is retained by digest and engine, with Wasmtime's disk cache
+available for later processes. Every operation creates a fresh store and
+instance; mutable guest state is never cached between operations.
+
+The host grants only declared, digest-checked `inputs.read` data. Other
+imports, including WASI filesystem, clock, random and process operations,
+trap when called. Input transfer and call-count limits trap even if a guest
+tries to ignore a read error. Instruction fuel, aggregate linear-memory and
+table storage, and the budget for lifting output into host-owned values are
+configured by the host. Output accounting runs during canonical ABI lifting,
+so aliased guest buffers cannot first allocate an unbounded Rust reply.
+Wasmtime engine/JIT and other embedder allocations are separate from the
+store's memory budget and still require process-level measurement.
+
+Cancellation uses engine epochs with a separate token for each build.
+Canceling one build stops its active guest execution and refuses later
+calls, while unrelated stores sharing the engine continue. Host tool steps
+and publication must also honor that token when integrated. Transport
+failures carry the backend id, version and digest in a `P013` diagnostic;
+guest diagnostics are subject to the same source-span validation as native
+results.
 
 ## Contract checks
 
-Run `cargo test -p flick-backend`. The canonical WIT and native request/result
+Run `cargo test -p flick-backend` and `just wasm-backends`. The latter builds
+the literal component and runs the native/component tests, including resource
+limits, cancellation, pin and WIT mismatches, unsupported IR, denied imports
+and invalid outputs. `just wasm-plugins` includes that recipe and verifies
+existing plugins against the shared host configuration.
+
+The canonical WIT and native request/result
 schemas have reviewable golden snapshots. Changes must review both the ABI
 and schema differences, with an incompatible 0.x change requiring a new minor
 version once this contract is published. Binary round trips retain zero and
@@ -136,6 +172,6 @@ non-UTF-8 bytes. Independent contract probes pin Unit's JS representation
 (`undefined`), its TS annotation, source-map metadata and Go's `flickrt.Unit`.
 
 These checks establish the boundary's shape and validation behavior. They do
-not replace native/component parity, production backend-selection tests,
+not replace official-backend native/component parity, production selection tests,
 debug/release conformance, locked/offline checks or before/after measurements
 on a real project, which remain required for R3/R4.
