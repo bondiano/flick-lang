@@ -1,0 +1,255 @@
+//! Plain frontend data supplied to an isolated code generator. Compiler
+//! objects and callbacks stop at this host boundary.
+
+use std::cell::RefCell;
+use std::collections::BTreeMap;
+
+use flick_backend::{
+    Abi, BackendPin, BuildRequest, Capability, Entry, Environment, Input, InputKind, Mode,
+    ModuleInput, ModuleRole, OptionValue, Profile, Source, Symbol, TargetRequest,
+};
+use flick_core::build;
+use flick_core::codegen;
+use flick_core::iface::{self, Target};
+use flick_core::project::{self, Compilation, Project};
+use flick_core::source::{FileId, SourceMap};
+use flick_core::{ir, types};
+use flick_ir::Program;
+
+use crate::artifact::Artifact;
+use crate::commands::build::{BuildPlan, Purpose};
+use crate::sources::FsHost;
+use crate::toolchain;
+
+pub(super) struct Prepared {
+    pub request: BuildRequest,
+    pub bytes: BTreeMap<String, Vec<u8>>,
+    pub files: Vec<FileId>,
+    pub shared: Vec<Artifact>,
+}
+
+impl Prepared {
+    pub(super) fn new(
+        host: &FsHost,
+        sources: &SourceMap,
+        project: Option<&Project>,
+        compilation: &Compilation,
+        output: &BuildPlan,
+        pin: BackendPin,
+    ) -> Self {
+        let files = RefCell::new(Vec::new());
+        // Target optimization belongs in the component. This boundary always
+        // exports the reference lowering, with its original source spans.
+        let program = Program::new(
+            &format!("flick {}", toolchain::COMPILER),
+            compilation.modules.iter().map(|m| m.ir.clone()).collect(),
+            ir::lang_items(),
+            &|file| {
+                files.borrow_mut().push(file);
+                sources.get(file).path.clone()
+            },
+        );
+        let package = project.and_then(|p| project::project_name(host, &p.root));
+        let mut data = Self {
+            request: BuildRequest {
+                target: target(project, output),
+                backend: pin,
+                program: program.to_cbor(),
+                module_root: None,
+                modules: vec![],
+                sources: vec![],
+                entries: output
+                    .entries
+                    .iter()
+                    .map(|(name, module)| Entry {
+                        name: name.clone(),
+                        symbol: Symbol {
+                            module: module.clone(),
+                            name: "main".into(),
+                        },
+                        runner: project
+                            .and_then(|p| p.config.entries.iter().find(|e| e.name == *name))
+                            .and_then(|e| e.runner.as_ref().map(|r| r.0.clone())),
+                    })
+                    .collect(),
+                test_roots: output
+                    .suites
+                    .iter()
+                    .map(|module| Symbol {
+                        module: module.clone(),
+                        name: "tests".into(),
+                    })
+                    .collect(),
+                foreign: vec![],
+                projections: vec![],
+                package_targets: vec![],
+                root_handlers: vec![],
+                inputs: vec![],
+                toolchains: vec![],
+                runtime_dependencies: vec![],
+            },
+            bytes: BTreeMap::new(),
+            files: files.into_inner(),
+            shared: vec![],
+        };
+        for (i, name) in program.files.into_iter().enumerate() {
+            let file = sources.get(data.files[i]);
+            let input = data.input(
+                format!("source/{i}"),
+                InputKind::Source,
+                file.text.as_bytes().to_vec(),
+            );
+            data.request.sources.push(Source {
+                name,
+                input,
+                line_starts: file.line_starts().to_vec(),
+            });
+        }
+        data.modules(compilation, project, package.as_deref(), output);
+
+        data
+    }
+
+    fn modules(
+        &mut self,
+        compilation: &Compilation,
+        project: Option<&Project>,
+        package: Option<&str>,
+        output: &BuildPlan,
+    ) {
+        let interfaces =
+            build::published_interfaces(compilation, package, project.map(|p| p.root.as_path()));
+        let builtins: Vec<&str> = types::builtin_sources()
+            .iter()
+            .map(|(name, _)| *name)
+            .collect();
+        for module in &compilation.modules {
+            let mut interface = interfaces[module.name.as_str()].clone();
+            if output.go {
+                interface.targets = vec![Target::Go];
+            }
+            let text = iface::write(&interface);
+            let input = self.input(
+                format!("interface/{}", module.name),
+                InputKind::Interface,
+                text.as_bytes().to_vec(),
+            );
+            self.shared.push(Artifact::source(
+                format!("{}.iface", module.name.replace('.', "/")),
+                text,
+            ));
+            self.request.modules.push(ModuleInput {
+                name: module.name.clone(),
+                role: ModuleRole::Own,
+                package: module
+                    .package
+                    .clone()
+                    .or_else(|| package.map(str::to_owned)),
+                output: codegen::module_path(&builtins, output.typescript, &module.name),
+                interface: Some(input),
+            });
+        }
+        // A backend can refuse any operation it cannot implement from the
+        // external ABI. Builtin IR and provenance will be explicit inputs for
+        // the official emitters; they are not fabricated from source names.
+        for interface in types::builtins_of(project::stages_by_class(project, output.extras.rt)) {
+            if self
+                .request
+                .modules
+                .iter()
+                .any(|m| m.name == interface.module)
+            {
+                continue;
+            }
+            let input = self.input(
+                format!("interface/{}", interface.module),
+                InputKind::Interface,
+                iface::write(interface).into_bytes(),
+            );
+            self.request.modules.push(ModuleInput {
+                name: interface.module.clone(),
+                role: ModuleRole::External,
+                package: None,
+                output: codegen::module_path(&builtins, output.typescript, &interface.module),
+                interface: Some(input),
+            });
+        }
+    }
+
+    fn input(&mut self, id: String, kind: InputKind, bytes: Vec<u8>) -> String {
+        self.request.inputs.push(Input {
+            id: id.clone(),
+            kind,
+            sha256: flick_backend::sha256(&bytes),
+            size: u64::try_from(bytes.len()).expect("host input fits u64"),
+        });
+        self.bytes.insert(id.clone(), bytes);
+        id
+    }
+}
+
+fn target(project: Option<&Project>, output: &BuildPlan) -> TargetRequest {
+    let environment = project
+        .and_then(|p| p.config.build.environment.as_ref())
+        .map_or_else(
+            || Environment {
+                backend: if output.go { "go" } else { "js" }.into(),
+                platform: if output.go { "native" } else { "node" }.into(),
+            },
+            |e| Environment {
+                backend: e.backend.clone(),
+                platform: e.platform.clone(),
+            },
+        );
+    let extras = output.extras;
+    let mut capabilities = vec![];
+    for (needed, name) in [
+        (output.typescript, "typescript"),
+        (extras.dts, "declarations"),
+        (extras.promise_facade, "promise-facade"),
+        (extras.schema_aot, "schema-aot"),
+    ] {
+        if needed {
+            capabilities.push(Capability {
+                name: name.into(),
+                version: "1.0.0".into(),
+            });
+        }
+    }
+    TargetRequest {
+        backend_api: flick_backend::VERSION.into(),
+        ir_version: flick_ir::VERSION.into(),
+        language_version: toolchain::COMPILER.into(),
+        runtime_abis: vec![Abi {
+            name: "flickrt".into(),
+            version: toolchain::RUNTIME.into(),
+        }],
+        environment,
+        profile: if output.release {
+            Profile::Release
+        } else {
+            Profile::Debug
+        },
+        mode: Mode::WholeProgram,
+        required_capabilities: capabilities,
+        options: vec![
+            OptionValue {
+                key: "command".into(),
+                value: if output.purpose == Purpose::Test {
+                    "test"
+                } else {
+                    "build"
+                }
+                .into(),
+            },
+            OptionValue {
+                key: "js.runtime".into(),
+                value: if extras.rt { "rt" } else { "effect" }.into(),
+            },
+            OptionValue {
+                key: "labels".into(),
+                value: format!("{:?}", extras.labels).to_lowercase(),
+            },
+        ],
+    }
+}

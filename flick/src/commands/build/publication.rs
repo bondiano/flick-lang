@@ -49,7 +49,7 @@ pub(crate) fn write_artifacts(output: &BuildPlan, emitted: &mut Emission, progre
             return;
         }
     }
-    if output.go {
+    if output.go && !output.backend.is_component() {
         let tests = [(build::go::TEST.to_owned(), String::new())];
         let built = if output.suites.is_empty() {
             &output.entries[..]
@@ -102,7 +102,7 @@ fn write_if_changed(path: &Path, contents: impl AsRef<[u8]>) -> io::Result<()> {
 /// The complete owned output set, including host tool results.
 pub(super) fn paths(output: &BuildPlan, files: &[Artifact]) -> Vec<String> {
     let mut paths: Vec<_> = files.iter().map(|file| file.path.clone()).collect();
-    if output.go {
+    if output.go && !output.backend.is_component() {
         if output.suites.is_empty() {
             paths.extend(
                 output

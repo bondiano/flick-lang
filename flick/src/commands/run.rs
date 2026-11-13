@@ -27,6 +27,7 @@ use rustix::process::{Pid, test_kill_process};
 use super::build::BuildCommand;
 use crate::args::{BuildArguments, EmitArgument, GlobalArguments, RunArguments};
 use crate::artifact::resolve_root;
+use crate::backends;
 use crate::child::{self, Running};
 use crate::command::Command;
 use crate::sources::FsHost;
@@ -39,6 +40,8 @@ pub fn generations(root: &Path) -> PathBuf {
 
 /// A directory atomically reserved by this CLI until all cleanup ends.
 pub struct Generation {
+    #[cfg(feature = "wasm-backends")]
+    backend: Option<flick_backend::BackendPin>,
     path: PathBuf,
     /// Built for Flick's own runtime, whose `DevTools` client is its own.
     rt: bool,
@@ -58,6 +61,8 @@ impl Generation {
                 Ok(()) => {
                     return Ok(Self {
                         path,
+                        #[cfg(feature = "wasm-backends")]
+                        backend: None,
                         rt: false,
                         go: false,
                     });
@@ -258,6 +263,10 @@ pub fn build_into_generation(
     if failed {
         return Err(code.max(1));
     }
+    #[cfg(feature = "wasm-backends")]
+    {
+        generation.backend = project.config.build.backend.as_ref().map(backends::pin);
+    }
     Ok(generation)
 }
 
@@ -271,7 +280,21 @@ pub fn launch(
     // a generation built for go holds the entry's executable
     let executable = generation.path().join(go::executable(name));
     let go = generation.go;
-    let mut command = if go {
+    #[cfg(feature = "wasm-backends")]
+    let component = generation.backend.as_ref().map(|pin| {
+        backends::launch::command(generation.path(), pin, flick_backend::LaunchKind::Run, name)
+    });
+    #[cfg(not(feature = "wasm-backends"))]
+    let component: Option<Result<Process, String>> = None;
+    let mut command = if let Some(command) = component {
+        match command {
+            Ok(command) => command,
+            Err(why) => {
+                report::render(global, &SourceMap::default(), &[backends::failure(why)]);
+                return None;
+            }
+        }
+    } else if go {
         Process::new(&executable)
     } else {
         let mut command = Process::new("node");

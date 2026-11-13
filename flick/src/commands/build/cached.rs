@@ -5,6 +5,7 @@ use flick_core::project::Project;
 use tracing::debug;
 
 use super::{BuildCommand, BuildPlan, Emission, write_artifacts};
+use crate::backends::Selected;
 use crate::cache;
 use crate::progress::Progress;
 use crate::sources::FsHost;
@@ -17,8 +18,9 @@ impl BuildCommand {
         host: &FsHost,
         progress: &Progress,
         key: &cache::Signed,
+        backend: &Selected,
     ) -> Option<Vec<Diagnostic>> {
-        let output = self.plan(host, Some(project), self.entries(project));
+        let output = self.plan(host, Some(project), self.entries(project), backend);
         if output.extras.schema_aot {
             return None;
         }
@@ -27,11 +29,15 @@ impl BuildCommand {
             debug!(miss = %cache::missed(&project.root, key));
             return None;
         };
+        if !backend.accepts_cached(&artifacts) {
+            return None;
+        }
         let paths = super::publication::paths(&output, &artifacts);
         let current = validate_destination_paths(&output.out_dir, paths.iter().map(String::as_str))
             .is_ok()
             && cache::artifacts_current(&output.out_dir, &artifacts)
             && (!output.go
+                || output.backend.is_component()
                 || output.entries.iter().all(|(name, _)| {
                     cache::go_current(
                         &project.root,
@@ -41,7 +47,7 @@ impl BuildCommand {
                     )
                 }));
         progress.stage("Restoring cached artifacts");
-        self.record(&output, None, &output.entries);
+        self.record(&output, None, &output.entries, &artifacts);
         if current && !self.generation {
             if !cache::outputs_current(&project.root, &output.out_dir, &paths) {
                 progress.stage("Recording build outputs");

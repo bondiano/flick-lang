@@ -6,6 +6,7 @@ use flick_backend::host::runtime;
 use flick_core::project::store;
 use wasmtime::Engine;
 
+#[cfg(any(feature = "wasm-plugins", test))]
 pub(crate) use runtime::{MemoryLimits, memory_limits, prepare, why};
 
 pub(crate) fn engine() -> Result<&'static Engine, String> {

@@ -288,10 +288,14 @@ wasm-plugins: wasm-backends
 
 # A real third-party backend fixture through the separate component world.
 wasm-backends:
+    pnpm install --frozen-lockfile
+    pnpm -C runtime build
     cargo build -p flick-test-backend --features guest --target wasm32-wasip2 --release
     cargo clippy -p flick-test-backend --features guest --target wasm32-wasip2 -- -D warnings
     cargo clippy -p flick-backend --features host --all-targets -- -D warnings
     cargo test -p flick-backend --profile e2e --features host --test component_host -- --include-ignored
+    cargo clippy -p flick --features wasm-backends --all-targets -- -D warnings
+    cargo test -p flick --profile e2e --features wasm-backends --bin flick --test backends -- --include-ignored
 
 # Build the wasm module the in-browser demo loads and hold it to its size budget.
 # The raw-byte budget retains the playground editor queries (hover, completion,

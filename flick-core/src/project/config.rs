@@ -11,6 +11,9 @@ pub use crate::plugin::reach::Grants;
 use crate::source::Span;
 use crate::types::{self, Thresholds};
 
+mod backend;
+pub use backend::{BackendEnvironment, BackendPackage};
+
 #[cfg(feature = "native-project")]
 mod deps;
 #[cfg(feature = "native-project")]
@@ -204,6 +207,10 @@ pub struct Build {
     pub out_dir: String,
     pub profile: Profile,
     pub emit: Emit,
+    /// An exact backend package pin. `emit` remains the output-format alias.
+    pub backend: Option<BackendPackage>,
+    /// Backend plus platform; absent means the compatible alias default.
+    pub environment: Option<BackendEnvironment>,
     pub emit_dts: bool,
     /// Write Promise façades of runtime functions beside the modules.
     pub promise_facade: bool,
@@ -259,6 +266,8 @@ impl Default for Build {
             out_dir: "dist".into(),
             profile: Profile::Debug,
             emit: Emit::Js,
+            backend: None,
+            environment: None,
             emit_dts: false,
             promise_facade: false,
             schema_aot: false,

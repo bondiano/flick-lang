@@ -155,6 +155,9 @@ pub fn input_files(project: &Project, roots: &[PathBuf]) -> Vec<PathBuf> {
         ]
         .map(|file| project.root.join(file)),
     );
+    if let Some(backend) = &project.config.build.backend {
+        files.push(project.root.join(&backend.component));
+    }
     files.extend(project.workspace.clone());
     files.extend(dependency_files(&project.root));
     files.extend(libraries);

@@ -27,9 +27,10 @@ inputs in both `check-target` and direct `generate` calls. A matching id and
 version with another component digest is rejected. The driver checks the
 host's loaded pin before snapshotting any input, even when that input is
 unavailable; a mismatch remains a P013 diagnostic with no reader calls.
-Registry and CLI integration, official release components, the browser
-loader, atomic publication and tool execution adapters remain separate
-integration work. In particular, accepting a graph here does not execute
+The CLI supports [explicit pinned package selection](registry.md) through
+this world for build/run/test. Projects without a pin still use the temporary
+native baseline. Official release components, the browser loader, atomic
+publication and tool execution adapters remain separate integration work. In particular, accepting a graph here does not execute
 it or establish that a tool's arguments access only declared files.
 
 ## Input boundary

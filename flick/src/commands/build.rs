@@ -1,23 +1,22 @@
 use std::cell::RefCell;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
 
-use flick_core::build::{self, Extras, Settings};
+use flick_core::build::{self, Extras};
 use flick_core::codegen::Labels;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::{Backend, Build, Emit, Kind, MAIN_ENTRY, Profile};
-use flick_core::project::{self, Compilation, Compiled, ModuleCache, Project, js};
-use flick_core::source::{FileId, SourceMap};
+use flick_core::project::{self, Compilation, Compiled, ModuleCache, Project};
+use flick_core::source::SourceMap;
 
-use self::js_artifacts::js_artifacts;
 use super::check::select;
 use super::emit_ir;
 use super::out_dir::overlap;
 use super::summary::{self, Built};
 use crate::args::{BuildArguments, EmitArgument, LabelsArgument, ProfileArgument};
 use crate::artifact::{Artifact, resolve_root};
+use crate::backends::Selected;
 use crate::command::{Command, Outcome};
 use crate::package_cache;
 use crate::progress::{Mode, Progress};
@@ -28,6 +27,7 @@ mod backend;
 mod cached;
 pub(super) mod hooks;
 mod js_artifacts;
+mod native;
 mod progress;
 mod publication;
 pub use publication::write;
@@ -68,16 +68,29 @@ impl BuildCommand {
         }
     }
 
-    fn record(&self, output: &BuildPlan, modules: Option<usize>, modules_of: &[(String, String)]) {
+    fn record(
+        &self,
+        output: &BuildPlan,
+        modules: Option<usize>,
+        modules_of: &[(String, String)],
+        artifacts: &[Artifact],
+    ) {
+        let paths = output.backend.run_paths(artifacts);
         let runners = modules_of
             .iter()
-            .map(|(name, module)| {
+            .filter_map(|(name, module)| {
+                if output.backend.is_component() {
+                    return paths
+                        .iter()
+                        .find(|(n, _)| n == name)
+                        .map(|(_, path)| (module.clone(), output.out_dir.join(path)));
+                }
                 let file = if output.go {
                     build::go::executable(name)
                 } else {
                     build::runner_file(name, output.typescript)
                 };
-                (module.clone(), output.out_dir.join(file))
+                Some((module.clone(), output.out_dir.join(file)))
             })
             .collect();
         *self.built.borrow_mut() = Some(Built {
@@ -121,8 +134,23 @@ impl Command for BuildCommand {
         if self.options.inputs {
             return super::inputs::describe(&host, sources, project.as_ref(), &roots);
         }
-        let plan = self.plan(&host, project.as_ref(), Vec::new());
+        let backend = match Selected::load(project.as_ref()) {
+            Ok(backend) => backend,
+            Err(diagnostic) => {
+                return Outcome {
+                    sources,
+                    diagnostics: vec![diagnostic],
+                };
+            }
+        };
+        let plan = self.plan(&host, project.as_ref(), Vec::new(), &backend);
         let go = plan.go;
+        if let Err(diagnostic) = backend.validate_environment(project.as_ref(), go) {
+            return Outcome {
+                sources,
+                diagnostics: vec![diagnostic],
+            };
+        }
         if plan.extras.rt && go {
             let message = "Flick's own runtime does not support Go output";
             return Outcome {
@@ -132,7 +160,7 @@ impl Command for BuildCommand {
         }
         if let Some(problem) = project
             .as_ref()
-            .filter(|_| !go)
+            .filter(|_| !go && !backend.is_component())
             .and_then(|p| toolchain::check_runtime(&p.root, plan.extras.rt))
         {
             return Outcome {
@@ -142,7 +170,8 @@ impl Command for BuildCommand {
         }
         *self.built.borrow_mut() = None;
         if let Some(p) = &project
-            && let Some(problem) = overlap(p, &self.plan(&host, Some(p), Vec::new()).out_dir)
+            && let Some(problem) =
+                overlap(p, &self.plan(&host, Some(p), Vec::new(), &backend).out_dir)
         {
             return Outcome {
                 sources,
@@ -150,7 +179,7 @@ impl Command for BuildCommand {
             };
         }
         let initial_key = project.as_ref().map(|p| {
-            let output = self.plan(&host, Some(p), self.entries(p));
+            let output = self.plan(&host, Some(p), self.entries(p), &backend);
             self.key(p, &roots, &output)
         });
         // a cached build has no IR to write
@@ -158,7 +187,7 @@ impl Command for BuildCommand {
             .as_ref()
             .zip(initial_key.as_ref())
             .filter(|_| self.options.emit_ir.is_none())
-            .and_then(|(p, key)| self.cached(p, &host, &progress, key));
+            .and_then(|(p, key)| self.cached(p, &host, &progress, key, &backend));
         if let Some(diagnostics) = cached {
             return Outcome {
                 sources,
@@ -212,14 +241,19 @@ impl Command for BuildCommand {
                 }
             }
         };
-        let output = self.plan(&host, project.as_ref(), entries);
-        self.record(&output, Some(modules.len()), &output.entries);
+        let output = self.plan(&host, project.as_ref(), entries, &backend);
         progress.stage(match (output.go, output.typescript) {
             (true, _) => "Emitting Go",
             (false, true) => "Emitting TypeScript",
             (false, false) => "Emitting JavaScript",
         });
         let mut emitted = artifacts(&host, &sources, project.as_ref(), &compilation, &output);
+        self.record(
+            &output,
+            Some(modules.len()),
+            &output.entries,
+            &emitted.artifacts,
+        );
         let extra = self
             .options
             .emit_ir
@@ -284,6 +318,7 @@ impl BuildCommand {
         host: &FsHost,
         project: Option<&Project>,
         entries: Vec<(String, String)>,
+        backend: &Selected,
     ) -> BuildPlan {
         let out_dir = match (&self.options.out_dir, project) {
             (Some(dir), _) => host.cwd.join(dir),
@@ -298,6 +333,8 @@ impl BuildCommand {
         };
         let config = project.map(|p| &p.config.build);
         BuildPlan {
+            purpose: Purpose::Build,
+            backend: backend.clone(),
             out_dir: resolve_root(
                 project.map_or(host.cwd.as_path(), |project| project.root.as_path()),
                 &project::normalize(&out_dir),
@@ -332,8 +369,9 @@ impl BuildCommand {
             output.out_dir.clone()
         };
         let package = project::project_name(&FsHost::new(), &project.root).unwrap_or_default();
+        let backend = format!("{} {:?}", output.backend.cache_identity(), output.purpose);
         let settings = format!(
-            "{} {:?} {} {} {:?} {} {package}",
+            "{} {:?} {} {} {:?} {} {package} {backend}",
             out_dir.display(),
             output.entries,
             output.typescript,
@@ -354,7 +392,15 @@ pub fn release(profile: Option<ProfileArgument>, config: Option<&Build>) -> bool
 }
 
 /// Where and what a build writes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Purpose {
+    Build,
+    Test,
+}
+
 pub struct BuildPlan {
+    pub purpose: Purpose,
+    pub backend: Selected,
     pub out_dir: PathBuf,
     /// The entries a runner is written for, by name and module.
     pub entries: Vec<(String, String)>,
@@ -388,7 +434,8 @@ pub fn emit(
     emitted
 }
 
-/// [`emit`] without writing anything.
+/// Dispatch through the selected package. A selected component cannot fall
+/// through to the temporary native baseline.
 pub fn artifacts(
     host: &FsHost,
     sources: &SourceMap,
@@ -396,83 +443,11 @@ pub fn artifacts(
     compilation: &Compilation,
     output: &BuildPlan,
 ) -> Emission {
-    let out_dir = output.out_dir.as_path();
-    let modules = &compilation.modules;
-    let package = project.and_then(|p| project::project_name(host, &p.root));
-    let paths: Vec<(FileId, PathBuf)> = modules.iter().map(|m| (m.file, m.path.clone())).collect();
-    let source_path = |file: FileId| {
-        paths
-            .iter()
-            .find(|(f, _)| *f == file)
-            .map_or_else(String::new, |(_, p)| p.display().to_string())
-    };
-    let dirs: Vec<(String, PathBuf)> = modules
-        .iter()
-        .map(|m| {
-            (
-                m.name.clone(),
-                m.path.parent().map(Path::to_path_buf).unwrap_or_default(),
-            )
-        })
-        .collect();
-    let source_dir = |module: &str| {
-        dirs.iter()
-            .find(|(name, _)| name == module)
-            .map(|(_, dir)| dir.clone())
-    };
-    let runners: Vec<(String, String)> = project
-        .iter()
-        .flat_map(|p| &p.config.entries)
-        .filter_map(|e| Some((e.name.clone(), e.runner.as_ref()?.0.clone())))
-        .collect();
-    let backend = if output.extras.rt {
-        Backend::Rt
-    } else {
-        project.map_or(Backend::Effect, |p| p.config.build.effect)
-    };
-
-    let settings = Settings {
-        source_dir: &source_dir,
-        out_dir,
-        package: package.as_deref(),
-        entries: &output.entries,
-        typescript: output.typescript,
-        source_path: &source_path,
-        extras: output.extras,
-        release: output.release,
-        root: project.map(|p| p.root.as_path()),
-        backend,
-        effect_bridge: backend::effect_bridge(host, project, compilation),
-        ui: project.and_then(|p| p.config.build.ui.as_deref()),
-        runners: &runners,
-    };
-    if output.go {
-        let (artifacts, diagnostics) =
-            build::go::emit(compilation, sources, &settings, &output.suites, &|path| {
-                fs::read_to_string(path).ok()
-            });
-        return Emission {
-            artifacts: artifacts.into_iter().map(Artifact::from).collect(),
-            diagnostics,
-        };
+    match &output.backend {
+        Selected::Native => native::artifacts(host, sources, project, compilation, output),
+        #[cfg(feature = "wasm-backends")]
+        Selected::Component(package) => {
+            package.artifacts(host, sources, project, compilation, output)
+        }
     }
-    let mut emission = js_artifacts(sources, compilation, &settings);
-    if let Some(project) = project {
-        let wanted = &compilation.js_dependencies;
-        let needs = &mut emission.diagnostics;
-        needs.extend(js::conflicts(host, &project.root, wanted));
-        needs.extend(js::unmet(host, &project.root, wanted));
-    } else {
-        // files built alone have no manifest of the outputs: the list names
-        // them, so the next build removes those it does not write
-        let contents = (emission.artifacts.iter()).fold(String::new(), |mut list, a| {
-            list.push_str(&a.path);
-            list.push('\n');
-            list
-        });
-        emission
-            .artifacts
-            .push(Artifact::source(build::go::FILES.to_owned(), contents));
-    }
-    emission
 }

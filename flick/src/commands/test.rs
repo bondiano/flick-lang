@@ -6,12 +6,10 @@
 //! runner's stdin: every running test closes its scope) and starts the next
 //! one after it.
 
-use std::fmt::Write;
-use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, ExitCode, Stdio};
+use std::process::{Child, ExitCode};
 use std::time::{Duration, SystemTime};
-use std::{env, fs, io, thread};
+use std::{fs, thread};
 
 use crate::artifact::{Artifact, resolve_root, validate_root};
 use flick_core::build::go;
@@ -19,16 +17,21 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::{Backend, Emit};
 use flick_core::project::{self, ModuleCache, Project};
 use flick_core::source::SourceMap;
-use tracing::debug;
 
-use super::build::{BuildPlan, Emission, artifacts, release, write_artifacts};
+use super::build::{BuildPlan, Purpose, artifacts, release, write_artifacts};
 use super::check::select;
-use crate::args::{Color, GlobalArguments, Reporter, TestArguments, TestEmitArgument};
+use crate::args::{GlobalArguments, Reporter, TestArguments, TestEmitArgument};
+use crate::backends::{self, Selected};
 use crate::package_cache;
 use crate::progress::{Mode, Progress};
 use crate::sources::FsHost;
 use crate::{builtins, cache, child, report, timings, toolchain};
 use flick_core::build::Extras;
+
+mod cached;
+mod runner;
+use cached::cached_prepare;
+use runner::{Runner, runner_command, runner_source, start};
 
 /// Where the test build goes, inside the project.
 const OUT_DIR: &str = ".flick/test";
@@ -41,7 +44,13 @@ pub fn test(options: &TestArguments, global: &GlobalArguments) -> ExitCode {
         return ExitCode::from(1);
     };
     let signals = child::signals();
-    let mut command = runner_command(&runner, options, global, false);
+    let mut command = match runner_command(&runner, options, global, false) {
+        Ok(command) => command,
+        Err(why) => {
+            report::render(global, &SourceMap::default(), &[backends::failure(why)]);
+            return ExitCode::from(2);
+        }
+    };
     match child::spawn(&mut command, global, "application-stderr").and_then(|r| r.wait(&signals)) {
         Ok(status) => ExitCode::from(child::code(status)),
         Err(err) => {
@@ -57,7 +66,7 @@ fn prepare(
     options: &TestArguments,
     global: &GlobalArguments,
     modules: Option<&mut ModuleCache>,
-) -> Result<PathBuf, ()> {
+) -> Result<Runner, ()> {
     let progress = Progress::new(if matches!(options.reporter, Reporter::Json) {
         Mode::Hidden
     } else {
@@ -80,6 +89,10 @@ fn prepare(
     let Some(project) = project else {
         return Err(());
     };
+    let backend = match Selected::load(Some(&project)) {
+        Ok(backend) => backend,
+        Err(diagnostic) => return fail(&sources, vec![diagnostic]),
+    };
     let wanted: Vec<PathBuf> = options
         .paths
         .iter()
@@ -92,9 +105,13 @@ fn prepare(
         Some(target) => target == TestEmitArgument::Go,
         None => project.config.build.emit == Emit::Go,
     };
+    if let Err(diagnostic) = backend.validate_environment(Some(&project), go_requested) {
+        return fail(&sources, vec![diagnostic]);
+    }
     let rt = options.rt || (!go_requested && project.config.build.effect == Backend::Rt);
+    let identity = backend.cache_identity();
     let settings = format!(
-        "test {:?} {:?} {:?} {rt}",
+        "test {:?} {:?} {:?} {rt} {identity}",
         selected,
         match options.emit {
             Some(TestEmitArgument::Go) => "go",
@@ -113,7 +130,7 @@ fn prepare(
         );
     }
     progress.stage("Checking test cache");
-    if let Some(runner) = cached_prepare(&project, &key, &out, &progress) {
+    if let Some(runner) = cached_prepare(&project, &key, &out, &progress, &backend) {
         return Ok(runner);
     }
     progress.stage("Preparing compiler");
@@ -140,7 +157,6 @@ fn prepare(
             Mode::for_cli(global)
         })
     };
-    let _ = fs::remove_dir_all(&out);
     let suites: Vec<(String, String)> = compilation
         .modules
         .iter()
@@ -158,20 +174,21 @@ fn prepare(
     }
     // with no suite, the go target has no program: the node runner reports the empty run
     let go = go_requested && !suites.is_empty();
-    if !go && let Some(problem) = toolchain::check_runtime(&project.root, rt) {
+    if !go
+        && !backend.is_component()
+        && let Some(problem) = toolchain::check_runtime(&project.root, rt)
+    {
         drop(progress);
         return fail(&sources, vec![problem]);
     }
     let output = BuildPlan {
+        purpose: Purpose::Test,
+        backend: backend.clone(),
         out_dir: out.clone(),
         entries: Vec::new(),
         typescript: false,
         go,
-        suites: if go {
-            suites.iter().map(|(name, _)| name.clone()).collect()
-        } else {
-            Vec::new()
-        },
+        suites: suites.iter().map(|(name, _)| name.clone()).collect(),
         extras: Extras {
             rt,
             ..Extras::default()
@@ -184,7 +201,7 @@ fn prepare(
         "Emitting JavaScript"
     });
     let mut emitted = artifacts(&host, &sources, Some(&project), &compilation, &output);
-    if !go {
+    if !go && !backend.is_component() {
         progress.stage("Writing test runner");
         emitted.artifacts.push(Artifact::source(
             "test.js".to_owned(),
@@ -201,147 +218,22 @@ fn prepare(
         let now = cache::key(&project, &roots, &settings, !go_requested && !rt);
         diagnostics.is_empty() && cache::store_built(&project, read, &key, &now, artifacts)
     };
+    if backend.is_component() {
+        store(&emitted.artifacts);
+        drop(progress);
+        return Ok(Runner::component(out, &project));
+    }
     if go {
         if store(&emitted.artifacts) {
             cache::mark_go(&project.root, &key, &out, &go::executable(go::TEST));
         }
         drop(progress);
-        return Ok(out.join(go::executable(go::TEST)));
+        return Ok(Runner::native(out.join(go::executable(go::TEST))));
     }
     let runner = out.join("test.js");
     store(&emitted.artifacts);
     drop(progress);
-    Ok(runner)
-}
-
-fn cached_prepare(
-    project: &Project,
-    key: &cache::Signed,
-    out: &Path,
-    progress: &Progress,
-) -> Option<PathBuf> {
-    let Some(artifacts) = cache::load(&project.root, key) else {
-        debug!(miss = %cache::missed(&project.root, key));
-        return None;
-    };
-    let go = artifacts.iter().any(|a| a.path == "go/test/go.mod");
-    let runner = out.join(if go {
-        go::executable(go::TEST)
-    } else {
-        "test.js".to_owned()
-    });
-    if cache::artifacts_current(out, &artifacts)
-        && (!go || cache::go_current(&project.root, key, out, &go::executable(go::TEST)))
-    {
-        progress.stage("Reusing test build");
-        return Some(runner);
-    }
-    progress.stage("Restoring cached test artifacts");
-    let output = BuildPlan {
-        out_dir: out.to_path_buf(),
-        entries: Vec::new(),
-        typescript: false,
-        go,
-        suites: if go {
-            vec!["cached".to_owned()]
-        } else {
-            Vec::new()
-        },
-        extras: Extras::default(),
-        release: false,
-    };
-    let mut emitted = Emission {
-        artifacts,
-        diagnostics: Vec::new(),
-    };
-    write_artifacts(&output, &mut emitted, progress);
-    if emitted.diagnostics.is_empty() {
-        if go {
-            cache::mark_go(&project.root, key, out, &go::executable(go::TEST));
-        }
-        Some(runner)
-    } else {
-        None
-    }
-}
-
-/// The runner: imports each suite's `tests` and runs them all, on Flick's own
-/// runtime with `rt`.
-fn runner_source(suites: &[(String, String)], rt: bool) -> String {
-    let runtime = if rt {
-        "@flick-lang/runtime/rt"
-    } else {
-        "@flick-lang/effect-ts"
-    };
-    let mut out = format!("import {{ runTests }} from \"{runtime}\";\n");
-    for (i, (_, path)) in suites.iter().enumerate() {
-        let _ = writeln!(out, "import * as $s{i} from {path:?};");
-    }
-    let list: Vec<String> = suites
-        .iter()
-        .enumerate()
-        .map(|(i, (name, _))| format!("[{name:?}, $s{i}.tests]"))
-        .collect();
-    let _ = write!(out, "\nawait runTests([{}]);\n", list.join(", "));
-    out
-}
-
-fn start(
-    runner: &Path,
-    options: &TestArguments,
-    global: &GlobalArguments,
-    watched: bool,
-) -> io::Result<Child> {
-    runner_command(runner, options, global, watched).spawn()
-}
-
-fn runner_command(
-    runner: &Path,
-    options: &TestArguments,
-    global: &GlobalArguments,
-    watched: bool,
-) -> Command {
-    // the runner is the test executable of the go target, or a script for node
-    let mut command = if runner.extension().is_some_and(|e| e == "js") {
-        let mut command = Command::new("node");
-        command.arg("--enable-source-maps").arg(runner);
-        command
-    } else {
-        Command::new(runner)
-    };
-    if watched {
-        command.arg("--watched").stdin(Stdio::piped());
-    }
-    if let Some(filter) = &options.filter {
-        command.args(["--filter", filter]);
-    }
-    command.args(["--jobs", &options.jobs.to_string()]);
-    if let Some(seed) = options.seed {
-        command.args(["--seed", &seed.to_string()]);
-    }
-    let reporter = match options.reporter {
-        Reporter::Human => "human",
-        Reporter::Json => "json",
-    };
-    command.args(["--reporter", reporter]);
-    if matches!(options.reporter, Reporter::Human)
-        && matches!(Mode::for_cli(global), Mode::Live { .. })
-        && io::stdout().is_terminal()
-    {
-        command.args(["--progress", "live"]);
-    }
-    let color = matches!(options.reporter, Reporter::Human)
-        && match global.color {
-            Color::Always => true,
-            Color::Never => false,
-            Color::Auto => {
-                io::stdout().is_terminal()
-                    && env::var_os("NO_COLOR").is_none()
-                    && env::var_os("TERM").is_none_or(|term| term != "dumb")
-            }
-        };
-    command.args(["--color", if color { "always" } else { "never" }]);
-    command
+    Ok(Runner::native(runner))
 }
 
 /// The source and test roots and the configuration of the project.

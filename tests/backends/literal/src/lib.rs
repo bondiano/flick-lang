@@ -1,6 +1,9 @@
 //! Test-only backend: a pure Unit main, with explicit unsupported diagnostics.
 //! The same implementation is exercised natively and as a component.
 
+mod launches;
+mod tests;
+
 use std::hint;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::SystemTime;
@@ -89,6 +92,9 @@ impl Backend for Literal {
                 ));
             }
             for item in &module.items {
+                if tests::supported(item, request) {
+                    continue;
+                }
                 let supported = matches!(&item.kind, ItemKind::Value { name, dicts, body }
                     if name == "main" && dicts.is_empty()
                     && matches!(&body.kind, ExprKind::Lambda { params, body }
@@ -106,6 +112,12 @@ impl Backend for Literal {
                     ));
                 }
             }
+        }
+        if request.entries.iter().any(|entry| entry.runner.is_some()) {
+            return Err(diagnostic(
+                "literal backend does not implement custom root runners",
+                None,
+            ));
         }
         Ok(TargetSupport {
             capabilities: vec![],
@@ -152,7 +164,8 @@ impl Backend for Literal {
                 id: format!("module:{}", m.name),
                 path: m.output.clone(),
                 kind: ArtifactKind::Source,
-                bytes: b"export const main = (_) => undefined;\n".to_vec(),
+                bytes: tests::source(request, &m.name)
+                    .unwrap_or_else(|| b"export const main = (_) => undefined;\n".to_vec()),
             })
             .collect();
         artifacts.push(Artifact {
@@ -191,11 +204,13 @@ impl Backend for Literal {
         } else {
             vec![]
         };
+        let mut launches = launches::run(request, &mut artifacts);
+        let runtime_dependencies = tests::runner(request, &mut artifacts, &mut launches);
         Ok(BuildResult {
             artifacts,
             steps: vec![],
-            runtime_dependencies: vec![],
-            launches: vec![],
+            runtime_dependencies,
+            launches,
             diagnostics,
         })
     }

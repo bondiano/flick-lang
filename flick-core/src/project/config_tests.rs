@@ -3,6 +3,9 @@ use crate::diagnostics::{Diagnostic, codes};
 use crate::source::SourceMap;
 use crate::types::Thresholds;
 
+#[path = "config_backend_tests.rs"]
+mod backend;
+
 fn parse_text(text: &str) -> Result<Config, Diagnostic> {
     let mut sources = SourceMap::default();
     let file = sources.add("flick.toml", text);
