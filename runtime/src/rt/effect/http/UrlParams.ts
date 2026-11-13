@@ -131,7 +131,7 @@ export const flickWithRedactedNames = (names: ReadonlyArray<string>, task: () =>
 export const flickToList = (self: UrlParams): UrlParams => self;
 
 /** A key's value as a string, or as strings for a key given more than once. */
-export const flickToUnknown = (self: UrlParams): unknown =>
+export const flickToUnknown = (self: UrlParams): Readonly<Record<string, string | ReadonlyArray<string> | undefined>> =>
   Object.freeze(Object.fromEntries(flickToRecord(self).map(([k, vs]) => [k, vs.length === 1 ? vs[0] : Object.freeze(vs)])));
 
 export const Equivalence = (a: UrlParams, b: UrlParams): boolean =>

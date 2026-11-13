@@ -191,7 +191,7 @@ pub fn emit(
         direct: &direct,
         labels: settings.extras.labels,
         rt: settings.backend == Backend::Rt,
-        effect_bridge: bridge_select::select(compilation, settings.effect_bridge),
+        effect_bridge: bridge_select::select(compilation, settings.effect_bridge, settings.runners),
         lang: &known,
     };
     let mut out = Vec::new();

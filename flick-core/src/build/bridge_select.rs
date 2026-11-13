@@ -8,16 +8,33 @@ use crate::codegen::EffectBridge;
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Module};
 use crate::project::Compilation;
 
-pub(super) fn select(compilation: &Compilation, available: EffectBridge) -> EffectBridge {
-    select_modules(
+pub(super) fn select(
+    compilation: &Compilation,
+    available: EffectBridge,
+    runners: &[(String, String)],
+) -> EffectBridge {
+    select_modules_with_roots(
         compilation.modules.iter().map(|module| &module.ir),
         available,
+        runners
+            .iter()
+            .map(|(_, module)| (module.clone(), "run".to_owned()))
+            .collect(),
     )
 }
 
+#[cfg(test)]
 fn select_modules<'a>(
     modules: impl Iterator<Item = &'a Module>,
     available: EffectBridge,
+) -> EffectBridge {
+    select_modules_with_roots(modules, available, Vec::new())
+}
+
+fn select_modules_with_roots<'a>(
+    modules: impl Iterator<Item = &'a Module>,
+    available: EffectBridge,
+    mut pending: Vec<(String, String)>,
 ) -> EffectBridge {
     if available != EffectBridge::Available {
         return available;
@@ -28,7 +45,6 @@ fn select_modules<'a>(
         web |= needs_web_adapter(item);
         ui && web
     };
-    let mut pending = Vec::new();
     // Include all exports of source libraries as well as the entry modules:
     // opaque atoms passed between them must use the same registry ABI.
     for module in modules {
@@ -111,7 +127,7 @@ fn globals(expr: &Expr, pending: &mut Vec<(String, String)>) {
 
 #[cfg(test)]
 mod tests {
-    use super::select_modules;
+    use super::{select_modules, select_modules_with_roots};
     use crate::codegen::EffectBridge;
     use crate::ir::tests::lower_text;
     use std::iter::once;
@@ -221,7 +237,7 @@ let to target children = Ui.route_link { route = page; url = Page.url; to = targ
     #[test]
     fn an_http_binding_of_the_adapter_takes_the_rpc_client_with_it() {
         let text = format!(
-            "module App exposing (page, run)\n{PROCEDURE}run : Unit ->{{Async; Rpc.ClientError}} String\nlet run () = Rpc.call \"/rpc\" greet \"Ada\"\nlet page = Http.ServerResponse.html \"<p></p>\"\n"
+            "module App exposing (page, run)\n{PROCEDURE}run : Unit ->{{Async; Rpc.ClientError}} String\nlet run () = Rpc.call \"/rpc\" greet \"Ada\"\npage : Http.ClientResponse.ClientResponse -> Http.ServerResponse.ServerResponse\nlet page = Http.ServerResponse.from_client_response\n"
         );
         let module = lower_text("App", &text).expect("lowers");
         assert_eq!(
@@ -244,6 +260,18 @@ let to target children = Ui.route_link { route = page; url = Page.url; to = targ
         assert_eq!(
             select_modules(once(&module), EffectBridge::Absent),
             EffectBridge::Absent
+        );
+    }
+    #[test]
+    fn a_cloudflare_runner_owns_web_values_without_a_source_reference_to_its_run() {
+        let module = lower_text("App", "module App exposing (main)\nmain : Unit -> Http.ServerResponse.ServerResponse\nlet main () = Http.ServerResponse.empty Http.ServerResponse.defaults\n").expect("lowers");
+        assert_eq!(
+            select_modules_with_roots(
+                once(&module),
+                EffectBridge::Available,
+                vec![("Runner.Cloudflare".to_owned(), "run".to_owned())]
+            ),
+            EffectBridge::AvailableWithWeb
         );
     }
 }

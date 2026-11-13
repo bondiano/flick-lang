@@ -38,6 +38,17 @@ break programs.
   so a program that only uses them, or them with an RPC client, loads no
   Effect for them. A build that reaches any other Http binding still takes
   every web binding from the adapter.
+- **An HTTP server on Flick's own runtime:** `Http.Server.serve`,
+  `Http.ServerRequest`, `Http.ServerResponse`, `Http.Body`, `Http.Router`
+  (with the find-my-way router Effect vendors) and `Http.Platform.node` run
+  on RT and answer as the adapter's server does: the same statuses for
+  typed failures, defects, interruptions and a closing server (503), the
+  same headers, `HEAD` and body limits. Closing the scope stops admission,
+  drains requests within `gracefulShutdownTimeout` on the task's clock,
+  then interrupts what is left and waits for its cleanup before the scope's
+  later resources are released. A server that streams a body, sends a file
+  body of `Http.Body`, logs its address or converts to or from the client's
+  values still takes every web binding from the adapter.
 - **`<|`, `>>` and `<<`:** `f <| x` is `f x`, the weakest operator and
   right-associative, so `say <| show <| total xs` needs no parentheses;
   `f a <| x` is the call `f a x`. `f >> g` applies `f`, then `g`, and

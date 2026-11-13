@@ -34,7 +34,14 @@ a server built with the adapter. Serving, stream calls, `Rpc.websocket`,
 `Rpc.connect`, `Rpc.with_headers` and in-memory calls stay in the adapter,
 as server functions and the rest of Http do for now. `Http.Headers`,
 `Http.Cookies`, `Http.Url`, `Http.UrlParams`, `Http.Mime` and `Http.Etag` run
-on RT, with the encodings, orders and messages of Effect's modules. Http, RPC and server
+on RT, with the encodings, orders and messages of Effect's modules. So does an
+HTTP server on Node.js: `Http.Server.serve` and `address`, `Http.ServerRequest`,
+`Http.ServerResponse`, `Http.Body`, `Http.Router` and `Http.Platform.node`
+answer as Effect's server does, and closing the server's scope drains its
+requests within `gracefulShutdownTimeout` on the task's clock before the
+scope releases anything else. Streamed bodies, file bodies of `Http.Body`,
+`Http.Server.log_address` and the conversions to and from the client's
+requests and responses stay in the adapter. Http, RPC and server
 functions are one family: a build that uses a binding of it only the adapter
 has takes the whole family from the adapter, so a request, a response or a
 procedure belongs to one implementation.
