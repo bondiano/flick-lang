@@ -42,10 +42,14 @@ fn a_block_gathers_its_fields_in_the_written_order() {
   (Profile.schema : (Schema _))
   (Codec.Derive.field
     \"nickname\"
-    ((optional_field \"nick\" String.json) : (FieldCodec _ _))
+    (Codec.Derive.decoding
+      (Codec.Derive.Decodes : (Codec.Derive.Decodes _))
+      (optional_field \"nick\" String.json))
     (Codec.Derive.field
       \"email\"
-      ((field \"email\" String.json) : (FieldCodec _ _))
+      (Codec.Derive.decoding
+        (Codec.Derive.Decodes : (Codec.Derive.Decodes _))
+        (field \"email\" String.json))
       Codec.Derive.fields))")
     );
 }

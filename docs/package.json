@@ -6,8 +6,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
+    "dev": "node scripts/api.mjs && astro dev",
+    "build": "node scripts/api.mjs && astro build",
     "preview": "astro preview",
     "typecheck": "astro check",
     "test": "node --test test/*.test.ts",

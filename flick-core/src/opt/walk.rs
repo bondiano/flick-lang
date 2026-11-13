@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 
-use crate::ir::{BinOp, Expr, ExprKind, Item, ItemKind, Pat, Stage, Stmt};
+use crate::ir::{BinOp, Expr, ExprKind, Item, ItemKind, Pat, Stmt};
 use crate::numeric::{Arith, Num};
 use crate::source::Span;
 use crate::types::{Constructor, Dict};
@@ -144,22 +144,10 @@ pub fn droppable(e: &Expr) -> bool {
 /// `C a b` as the constructor and its arguments, in order: pure stages
 /// applied left to right.
 pub fn applied(e: &Expr) -> Option<(&Constructor, Vec<&Expr>)> {
-    let mut args = Vec::new();
-    let mut head = e;
-    while let ExprKind::App {
-        func,
-        arg,
-        stage: Stage::Pure,
-        arg_first: false,
-    } = &head.kind
-    {
-        args.push(&**arg);
-        head = func;
-    }
+    let (head, args) = e.pure_spine();
     let ExprKind::Con(c) = &head.kind else {
         return None;
     };
-    args.reverse();
     Some((c, args))
 }
 
@@ -216,18 +204,7 @@ pub fn known_method(e: &Expr) -> bool {
 /// top-level function that takes more than these, applied in pure stages to
 /// arguments that are themselves [`inert`].
 pub fn partial(e: &Expr, arity: Arity) -> Option<usize> {
-    let mut args = Vec::new();
-    let mut head = e;
-    while let ExprKind::App {
-        func,
-        arg,
-        stage: Stage::Pure,
-        arg_first: false,
-    } = &head.kind
-    {
-        args.push(&**arg);
-        head = func;
-    }
+    let (head, args) = e.pure_spine();
     let ExprKind::Global { module, name } = &head.kind else {
         return None;
     };

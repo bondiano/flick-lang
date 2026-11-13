@@ -5,6 +5,8 @@
 #[path = "cli_project/artifacts.rs"]
 mod artifacts;
 mod common;
+#[path = "cli_project/doc.rs"]
+mod doc_tests;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -343,60 +345,6 @@ fn local_std() -> String {
 }
 
 include!("cli_project/pnpm.rs");
-#[test]
-fn doc_shows_source_types_kinds_constraints_effects_and_captures() {
-    let dir = project("cli_doc", &[("flick.toml", LIB), ("src/Lib/Api.fl", API)]);
-    let out = flick_in(&dir, &["doc", "--out-dir", "api"]);
-    assert_eq!(code(&out), Some(0), "{out:?}");
-    let page = fs::read_to_string(dir.join("api/Lib.Api.md")).expect("page");
-    for expected in [
-        "### `Shape`",
-        "Kind: `Type`",
-        "Circle : Float -> Shape",
-        "A shape.",
-        "service Store =",
-        "put : String ->{; StoreError} Unit",
-        "class Named a =",
-        "fetch : Named a => List a ->{Store; StoreError} Unit",
-        "keep : (Unit -> Float)^c -> Unit -> Float",
-        "The area.",
-    ] {
-        assert!(page.contains(expected), "`{expected}` in\n{page}");
-    }
-    assert!(
-        fs::read_to_string(dir.join("api/index.md"))
-            .expect("index")
-            .contains("Lib.Api")
-    );
-}
-
-#[test]
-fn doc_lists_only_public_modules_after_a_private_reexport() {
-    let dir = project(
-        "cli_doc_private",
-        &[
-            ("flick.toml", LIB),
-            (
-                "src/Lib/Hidden.fl",
-                "private module Lib.Hidden exposing (answer)\nanswer : Int\nlet answer = 42\n",
-            ),
-            (
-                "src/Lib/Api.fl",
-                "module Lib.Api exposing (answer)\nimport Lib.Hidden exposing (answer)\n",
-            ),
-        ],
-    );
-    let out = flick_in(&dir, &["doc", "--out-dir", "api"]);
-    assert_eq!(code(&out), Some(0), "{out:?}");
-    assert!(dir.join("api/Lib.Api.md").is_file());
-    assert!(!dir.join("api/Lib.Hidden.md").exists());
-    let index = fs::read_to_string(dir.join("api/index.md")).expect("index");
-    assert!(
-        index.contains("Lib.Api") && !index.contains("Lib.Hidden"),
-        "{index}"
-    );
-}
-
 #[test]
 fn inspect_prints_each_representation() {
     let dir = project(

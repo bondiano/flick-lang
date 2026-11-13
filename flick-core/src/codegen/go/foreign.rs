@@ -4,7 +4,6 @@
 //! an `Option`). A binding the program reaches without one is reported.
 
 use std::collections::HashMap;
-use std::sync::OnceLock;
 
 use flick_pretty::{Document, Documentable, docvec};
 
@@ -14,7 +13,6 @@ use super::shape::Types;
 use super::{Gen, names};
 use crate::ir::{Foreign, ForeignMode};
 use crate::source::Span;
-use crate::types;
 
 /// What a table says of a Go function written `Name(float64, int32) bool`:
 /// its name, and the Go types it takes and gives where a binding without
@@ -31,14 +29,17 @@ fn typed(go: &str) -> (&str, Types) {
     (name, Types::of(native(result), &params))
 }
 
-fn table() -> &'static HashMap<(String, String), (String, Types)> {
-    static TABLE: OnceLock<HashMap<(String, String), (String, Types)>> = OnceLock::new();
-    TABLE.get_or_init(|| {
+/// The Go functions of `flickrt` that the tables of the implicit packages
+/// bind JS exports to, and the Go types each takes and gives.
+pub struct Bindings(HashMap<(String, String), (String, Types)>);
+
+impl Bindings {
+    /// The tables `texts`, by area: under `[module]` (or `[global Module]`
+    /// for a JS global, which may mean different things for different
+    /// types), an export (or binding name) and its function of `flickrt`.
+    pub fn parse<'t>(texts: impl IntoIterator<Item = &'t str>) -> Bindings {
         let mut out = HashMap::new();
-        // the tables of the implicit packages, by area: under `[module]` (or `[global Module]`
-        // for a JS global, which may mean different things for different
-        // types), an export (or binding name) and its function of `flickrt`
-        for (_, text) in types::implicit_go_bindings() {
+        for text in texts {
             let mut module = "";
             for line in text.lines().map(str::trim) {
                 if line.is_empty() || line.starts_with('#') {
@@ -58,37 +59,36 @@ fn table() -> &'static HashMap<(String, String), (String, Types)> {
                 assert!(earlier.is_none(), "`{export}` of `{module}` is bound twice");
             }
         }
-        out
-    })
-}
+        Bindings(out)
+    }
 
-/// The Go functions and variables the tables name.
-#[cfg(test)]
-pub(super) fn targets() -> impl Iterator<Item = &'static str> {
-    table()
-        .values()
-        .map(|(go, _)| go.trim_start_matches('*').trim_start_matches("flickrt."))
-}
+    /// The Go functions and variables the tables name.
+    #[cfg(test)]
+    pub(super) fn targets(&self) -> impl Iterator<Item = &str> {
+        (self.0.values()).map(|(go, _)| go.trim_start_matches('*').trim_start_matches("flickrt."))
+    }
 
-/// The Go function of the binding `name` of `module` to `export` of `from`,
-/// and the Go types it takes and gives.
-pub(super) fn lookup(
-    module: &str,
-    name: &str,
-    from: Option<&str>,
-    export: &str,
-) -> Option<(&'static str, Types)> {
-    let key = match from {
-        Some(from) => (from.to_owned(), export.to_owned()),
-        None => (format!("global {module}"), name.to_owned()),
-    };
-    table().get(&key).map(|(go, types)| (go.as_str(), *types))
-}
+    /// The Go function of the binding `name` of `module` to `export` of
+    /// `from`, and the Go types it takes and gives.
+    pub(super) fn lookup(
+        &self,
+        module: &str,
+        name: &str,
+        from: Option<&str>,
+        export: &str,
+    ) -> Option<(&str, Types)> {
+        let key = match from {
+            Some(from) => (from.to_owned(), export.to_owned()),
+            None => (format!("global {module}"), name.to_owned()),
+        };
+        self.0.get(&key).map(|(go, types)| (go.as_str(), *types))
+    }
 
-/// The Go types of the function the binding `f` of `module` is bound to.
-pub(super) fn types(module: &str, f: &Foreign) -> Types {
-    lookup(module, &f.name, f.binding.from.as_deref(), &f.binding.name)
-        .map_or_else(Types::default, |(_, types)| types)
+    /// The Go types of the function the binding `f` of `module` is bound to.
+    pub(super) fn types(&self, module: &str, f: &Foreign) -> Types {
+        self.lookup(module, &f.name, f.binding.from.as_deref(), &f.binding.name)
+            .map_or_else(Types::default, |(_, types)| types)
+    }
 }
 
 /// How many parameters the Go function of a binding takes after its
@@ -107,7 +107,7 @@ impl<'a> Gen<'a> {
     /// Go form, which is reported.
     pub(super) fn foreign(&mut self, f: &Foreign, span: Span) -> Option<Document<'a>> {
         let a = self.a;
-        let Some((target, types)) = lookup(
+        let Some((target, types)) = self.input.bindings.lookup(
             self.module,
             &f.name,
             f.binding.from.as_deref(),
@@ -181,7 +181,8 @@ fn arguments(f: &Foreign, heads: &[String]) -> Vec<String> {
     }
 }
 
-fn is_relative(spec: &str) -> bool {
+/// Whether a foreign module is named relative to the module binding it.
+pub fn is_relative(spec: &str) -> bool {
     spec.starts_with("./") || spec.starts_with("../")
 }
 
@@ -197,7 +198,7 @@ impl<'a> Gen<'a> {
     /// the function of the same name in the Go file beside that module.
     fn local(&mut self, f: &Foreign, spec: &str, span: Span) -> Option<Document<'a>> {
         let a = self.a;
-        let found = self.foreign_file.and_then(|find| find(self.module, spec));
+        let found = (self.input.foreign).get(&(self.module.to_owned(), spec.to_owned()));
         let Some((file, text)) = found else {
             self.errors.push((
                 format!(
@@ -227,7 +228,7 @@ impl<'a> Gen<'a> {
             ));
             return None;
         }
-        self.sources.insert(file, text);
+        self.sources.insert(file.clone(), text.clone());
         let taken = parameters(f);
         if f.dicts == 0 && taken == 0 {
             let var = names::var(self.module, &f.name);

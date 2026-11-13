@@ -12,6 +12,7 @@ use crate::syntax::{Name, Path};
 use crate::translate::instance;
 use crate::translate::types::{binders, constraint, kind, scheme, ty};
 use crate::types::{Kind, Scheme, Stage, Type};
+use crate::variance::{self, Sign};
 
 /// A class: its parameters, superclasses and methods.
 #[derive(Clone, Debug, Default)]
@@ -46,6 +47,12 @@ pub struct Decls {
     pub params: HashMap<Path, Vec<Kind>>,
     /// The values a `foreign` declaration gives.
     pub foreign: HashSet<Path>,
+    /// The types without constructors with hidden storage: an opaque ADT
+    /// whose fields hide captures, or a foreign type marked `@stores`.
+    pub hidden: HashSet<Path>,
+    /// The sign of each parameter of a declared type, once every module
+    /// is added; a type without one is invariant in each.
+    pub signs: HashMap<Path, Vec<Sign>>,
 }
 
 /// The arity of a constructor's scheme: its arrows.
@@ -103,6 +110,9 @@ impl Decls {
                         Form::Alias { params, body, .. } => {
                             let vars = params.iter().map(|p| Name::from(p.as_str())).collect();
                             self.opaque.insert(path, (vars, ty(body)));
+                        }
+                        Form::Nominal { hidden: true, .. } => {
+                            self.hidden.insert(path);
                         }
                         Form::Error => {
                             self.variants
@@ -179,6 +189,7 @@ impl Decls {
                 }
             }
         }
+        self.signs = variance::signs(self);
     }
 
     /// The scheme of the method `name` of class `class` as a field of

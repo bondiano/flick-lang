@@ -13,6 +13,8 @@ with `service Log` declared, `Log.write` is the operation.
 Signatures the specification gives are declared word for word;
 `flick-core/tests/stdlib_signatures.rs` checks it.
 
+[Generated package API](../../api/) lists the public signatures, doc comments and source links from `flick doc --std`.
+
 ## Prelude
 
 | Name | What it is |

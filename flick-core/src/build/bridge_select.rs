@@ -221,7 +221,7 @@ let to target children = Ui.route_link { route = page; url = Page.url; to = targ
     #[test]
     fn an_http_binding_of_the_adapter_takes_the_rpc_client_with_it() {
         let text = format!(
-            "module App exposing (headers, run)\n{PROCEDURE}run : Unit ->{{Async; Rpc.ClientError}} String\nlet run () = Rpc.call \"/rpc\" greet \"Ada\"\nlet headers = Http.Headers.empty\n"
+            "module App exposing (page, run)\n{PROCEDURE}run : Unit ->{{Async; Rpc.ClientError}} String\nlet run () = Rpc.call \"/rpc\" greet \"Ada\"\nlet page = Http.ServerResponse.html \"<p></p>\"\n"
         );
         let module = lower_text("App", &text).expect("lowers");
         assert_eq!(

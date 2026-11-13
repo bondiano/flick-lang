@@ -190,12 +190,21 @@ This applies to data that stores a function or a `task`, directly or through
 the fields of other data and of opaque types of the standard library, at the
 outer level of a parameter or a result. A parameter that is a function is
 read the same way: in `(Handle r -> G Unit Int) -> …` the callback's result
-holds `r`, and in `(G a b -> Int) -> …` its parameter is any row. A value without arrows (`x : G s a`)
+holds `r`, and in `(G a b -> Int) -> …` its parameter is any row. So is a
+result that is a function, with a written qualifier or without. A value without arrows (`x : G s a`)
 and data inside a type argument (`List (G s a)`) hold nothing beyond what
 their type shows. Like `Live`, the row is not shown in messages or on hover;
 `FLICK-G001` names the region it holds when it is why a value cannot leave
 its `scope`, and a row a parameter's data holds is called the hidden row of
 a parameter's data.
+
+A type without constructors, whose values foreign code makes, is such data
+when its declaration says so with `@stores`: its values keep the functions
+they are given. In the standard library `PureCodec`, `Codec` and
+`FieldCodec` are marked, so a field whose default reads a file holds the
+file's region, and a codec made with it does not leave the file's `scope`.
+`@stores` takes no argument and stands only before a type without
+constructors or a body (`FLICK-S014`).
 
 ```flick
 type Handle (r : Region)

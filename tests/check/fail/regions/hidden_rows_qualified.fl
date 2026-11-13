@@ -1,0 +1,17 @@
+// What the function `lift` returns gives back data that holds the row of the
+// data it took: data over a file does not leave the file's `scope` through it.
+module App.HiddenRowsQualifiedFail exposing (..)
+
+import File exposing (Path, FileSystem, OpenError, ReadError)
+
+type G a = G (Unit ->{Async, FileSystem; ReadError} a)
+
+lift : (a -> b)^c -> (G a -> G b)^c
+let lift f = fun (G g) -> G (fun u -> f (g u))
+
+leaks : Path ->{Async, FileSystem; OpenError} G Int
+let leaks path = scope {
+  let file = File.open_scoped path
+  lift String.length (G (fun _ -> File.read_all file))
+}
+//~ FLICK-G001 @15:3-15:55 this value holds region `s`, but the expected type `G Int` holds no captures

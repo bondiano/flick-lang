@@ -36,6 +36,7 @@ test("an exercise whose export runs says so with a Boolean", () => {
   const source = readFileSync(new URL("../exercises/signatures/01/check.toml", import.meta.url), "utf8");
   assert.equal(parseExerciseMetadata(source, "test").check.runs, undefined);
   assert.equal(parseExerciseMetadata(`${source}runs = true\n`, "test").check.runs, true);
+  assert.equal(parseExerciseMetadata(`${source}runs = false\n`, "test").check.runs, undefined);
   assert.throws(() => parseExerciseMetadata(`${source}runs = "yes"\n`, "test"), /runs/);
 });
 

@@ -44,7 +44,7 @@ pub(crate) use target::js_only;
 
 use super::config::Backend;
 #[cfg(feature = "native-project")]
-use super::packages::Packages;
+use super::packages::{Packages, project_name};
 use super::{Host, Project, module_path, normalize};
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
 use crate::iface::{
@@ -446,6 +446,7 @@ fn run_in(
                             labels: BTreeMap::new(),
                             initialization: flick_ir::Initialization::default(),
                             records: BTreeMap::new(),
+                            package: None,
                         },
                         Arc::new(interface.clone()),
                     ))
@@ -456,6 +457,16 @@ fn run_in(
         _ => Vec::new(),
     };
     let fresh = loader.finish_packages(&mut compiled, mode, saved.is_some() && !failed);
+    // a module's package names the tags of its constructors: its source
+    // package, else the project's
+    #[cfg(feature = "native-project")]
+    {
+        let own = project.filter(|_| !compiled.is_empty());
+        let own = own.and_then(|p| project_name(host, &p.root));
+        for c in &mut compiled {
+            c.ir.package = c.package.clone().or_else(|| own.clone());
+        }
+    }
     let mut diagnostics = loader.reported();
     // by path, not by load order, which follows the order of imports
     diagnostics.sort_by_cached_key(|d| {

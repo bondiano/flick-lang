@@ -164,6 +164,22 @@ pub struct OutDirArguments {
     pub out_dir: String,
 }
 
+/// Documentation rendered from checked public interfaces.
+#[derive(Args)]
+pub struct DocArguments {
+    #[command(flatten)]
+    pub output: OutDirArguments,
+    /// URL of this project's root at a source revision (for example a GitHub blob URL).
+    #[arg(long, value_name = "URL")]
+    pub source_base_url: Option<String>,
+    /// Check fenced Flick examples in public documentation in this package context.
+    #[arg(long)]
+    pub check_examples: bool,
+    /// Document the loaded standard library rather than a user project.
+    #[arg(long)]
+    pub std: bool,
+}
+
 #[derive(Subcommand)]
 pub enum SchemaCommands {
     /// Export the static wire form of a JSON codec.

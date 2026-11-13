@@ -63,8 +63,9 @@ proof edits. Explain that distinction and test the implementation regression.
   and spans matter. Pass fixtures must remain diagnostic-free.
 - Execution cases in `tests/run/` need independently justified `.stdout`,
   errors and exit status. Use `tests/language/` for shared JS/Go semantics.
-- `flick fail` Markdown blocks currently require only some error. They do not
-  pin its code; use an annotated fixture to guard a specific rejection.
+- `flick fail CODE` Markdown blocks pin diagnostic codes, including plugin
+  codes such as `std/Q001`. Use annotated fixtures to guard spans and fixes
+  as well as a specific rejection.
 - Check model-supported cases against the model as well as both runtimes.
   Backend agreement alone can preserve the same bug twice.
 - Inspect snapshot and generated-file changes before accepting them. Never

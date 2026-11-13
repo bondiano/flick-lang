@@ -2,7 +2,9 @@
 //! checked project that run none of its code, except that a schema export
 //! loads the module that makes the codec, whose top level is pure.
 
-use std::fmt::Write;
+mod doc;
+pub use doc::doc;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command as Process;
@@ -15,13 +17,11 @@ use flick_core::project::{self, Analysis, Analyzed, Compilation, Host, Project, 
 use flick_core::projection::Projected;
 use flick_core::source::SourceMap;
 use flick_core::types::builtins;
-use flick_core::{doc, ir, projection, syntax};
+use flick_core::{ir, projection, syntax};
 
 use super::build::{BuildPlan, artifacts, emit, write};
 use super::check::select;
-use crate::args::{
-    InspectArguments, OutDirArguments, Representation, SchemaExportArguments, SchemaTarget,
-};
+use crate::args::{InspectArguments, Representation, SchemaExportArguments, SchemaTarget};
 use crate::command::Outcome;
 use crate::sources::FsHost;
 
@@ -187,43 +187,6 @@ pub fn interface_of(analysis: &Analysis, module: &str) -> Option<Interface> {
         .module(module)
         .map(|a| a.interface.clone())
         .or_else(|| builtins().iter().find(|i| i.module == module).cloned())
-}
-
-pub fn doc(options: &OutDirArguments, explicit: Option<&str>) -> Outcome {
-    let checked = match compile(explicit) {
-        Ok(c) => c,
-        Err(outcome) => return outcome,
-    };
-    let out = checked.host.cwd.join(&options.out_dir);
-    let mut index = String::from("# API\n\n");
-    for module in checked
-        .compilation
-        .modules
-        .iter()
-        .filter(|m| !m.test && !m.interface.private)
-    {
-        // the expanded text has the documentation of generated declarations
-        let text =
-            (module.expansion.as_ref()).map_or(&checked.sources.get(module.file).text, |e| &e.text);
-        let page = doc::page(&module.interface, text);
-        let file = format!("{}.md", module.name);
-        if let Err(err) = write(&out.join(&file), &page) {
-            return failure(
-                checked.sources,
-                codes::P013,
-                format!("cannot write `{file}`: {err}"),
-            );
-        }
-        let _ = writeln!(index, "- [{}]({file})", module.name);
-    }
-    if let Err(err) = write(&out.join("index.md"), &index) {
-        return failure(
-            checked.sources,
-            codes::P013,
-            format!("cannot write `index.md`: {err}"),
-        );
-    }
-    Outcome::default()
 }
 
 fn schema_exporter(target: SchemaTarget, value: &str, backend: Backend) -> String {
