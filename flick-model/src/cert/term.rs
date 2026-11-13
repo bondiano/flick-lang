@@ -148,6 +148,7 @@ pub(super) fn lit(l: &Lit) -> Result<String, Unsupported> {
         Lit::Int(n) => format!("(.int {n})"),
         Lit::String(s) => format!("(.str {s:?})"),
         Lit::Float(f) => return Err(format!("the literal {f}")),
+        Lit::BigInt(n) => return Err(format!("the literal {n}n")),
     })
 }
 

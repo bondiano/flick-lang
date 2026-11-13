@@ -477,6 +477,7 @@ fn lit(l: &Lit) -> Type {
     prelude(match l {
         Lit::Int(_) => "Int",
         Lit::Float(_) => "Float",
+        Lit::BigInt(_) => "BigInt",
         Lit::String(_) => "String",
         Lit::Bool(_) => "Bool",
         Lit::Unit => "Unit",

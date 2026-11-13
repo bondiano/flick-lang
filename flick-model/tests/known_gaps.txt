@@ -6,7 +6,6 @@
 gap docs/src/content/docs/reference/classes.md 2147921845e6081b # the row primitive `UnionDisjoint` has no λFlick form
 gap docs/src/content/docs/reference/cli-dsl.md 18aa7ec2ddf9b126 # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/reference/cli-dsl.md 397ca64cf69afa84 # the row primitive `Lacks` has no λFlick form
-gap docs/src/content/docs/reference/errors/flick-s006.md 4dae9935de3c6d3e # a `BigInt` literal has no λFlick form
 gap docs/src/content/docs/reference/http-api.md 545aab0d8d467a6e # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/reference/http-api.md b79edc80601e735d # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/reference/rpc.md 4765db5516dc6781 # `Record.label` has no λFlick form
@@ -15,7 +14,6 @@ gap docs/src/content/docs/reference/rpc.md caee8694c8ad2cb0 # the row primitive 
 gap docs/src/content/docs/ru/reference/classes.md 2147921845e6081b # the row primitive `UnionDisjoint` has no λFlick form
 gap docs/src/content/docs/ru/reference/cli-dsl.md 18aa7ec2ddf9b126 # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/ru/reference/cli-dsl.md 397ca64cf69afa84 # the row primitive `Lacks` has no λFlick form
-gap docs/src/content/docs/ru/reference/errors/flick-s006.md 4dae9935de3c6d3e # a `BigInt` literal has no λFlick form
 gap docs/src/content/docs/ru/reference/http-api.md 545aab0d8d467a6e # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/ru/reference/http-api.md b79edc80601e735d # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/ru/reference/rpc.md 4765db5516dc6781 # `Record.label` has no λFlick form
@@ -23,8 +21,6 @@ gap docs/src/content/docs/ru/reference/rpc.md 6fde1e5b035b1fbd # `Record.label` 
 gap docs/src/content/docs/ru/reference/rpc.md caee8694c8ad2cb0 # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/ru/spec/08-type-programming-and-edsl.md b312045395eb5882 # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/spec/08-type-programming-and-edsl.md b312045395eb5882 # the row primitive `Lacks` has no λFlick form
-gap tests/check/pass/classes/numeric.fl # a `BigInt` literal has no λFlick form
-gap tests/check/pass/classes/resolution.fl # a `BigInt` literal has no λFlick form
 gap tests/check/pass/classes/rows.fl # the row primitive `HasField` has no λFlick form
 gap tests/check/pass/cli/blocks.fl # the row primitive `Lacks` has no λFlick form
 gap tests/check/pass/cli/deriving.fl # the row primitive `Lacks` has no λFlick form
@@ -32,8 +28,6 @@ gap tests/check/pass/cli/nested.fl # the row primitive `Lacks` has no λFlick fo
 gap tests/check/pass/effects/reader.fl # `for` and `Seq` have no λFlick form; their elaboration is formal/Formal/Elab
 gap tests/check/pass/effects/sync_for.fl # `for` and `Seq` have no λFlick form; their elaboration is formal/Formal/Elab
 gap tests/check/pass/schema/http_api.fl # the row primitive `Lacks` has no λFlick form
-gap tests/check/pass/types/numbers.fl # a `BigInt` literal has no λFlick form
-gap tests/check/pass/types/numeric.fl # a `BigInt` literal has no λFlick form
 
 disagree docs/src/content/docs/reference/classes.md 219dbc5a07b6b461 # default methods are lazy fields; the model's records are eager, so its translation eta-expands a default, and the value `default : a` becomes a function (docs/formal/elaboration.md §2.5)
 disagree docs/src/content/docs/reference/regions.md 74e0a790d9f7b254 # the IR keeps no local signature, so `acquire` is inferred and acquires into the inner `scope` (docs/formal/core.md §2.3 (Let-Sig))
