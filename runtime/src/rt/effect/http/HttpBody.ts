@@ -2,7 +2,7 @@
 // `../../http/model.ts`, as Effect's `HttpBody` would be. Streamed bodies
 // and file bodies wait for Flick's streams and file system on this runtime,
 // so a program with one takes every `Http` binding from the adapter.
-import { type Option, none, some } from "../../../core/data.ts";
+import { type Option, none, some, optionalArg } from "../../../core/data.ts";
 import { tag } from "../../../tags.ts";
 import { fail, raise } from "../../cause.ts";
 import type { Run } from "../../fiber.ts";
@@ -13,8 +13,6 @@ import { type UrlParams, toString } from "./UrlParams.ts";
 
 const ERROR = /*#__PURE__*/ tag("Http.Body.HttpBodyError.HttpBodyError");
 const INVALID_JSON = /*#__PURE__*/ tag("Http.Body.BodyErrorReason.InvalidJson");
-
-const optional = <A>(option: Option<A>): A | undefined => (option._tag === "Some" ? option.value : undefined);
 
 /** The JSON text of the value; a value with no JSON text fails with `HttpBodyError InvalidJson`. */
 export const jsonText = (value: unknown): string => {
@@ -37,7 +35,7 @@ export const formData = (pairs: ReadonlyArray<readonly [string, string]>): FormD
 export const empty: Body = bodyEmpty;
 
 export const flickUint8Array = (bytes: ReadonlyArray<number>, contentType: Option<string>): Body =>
-  bodyBytes(Uint8Array.from(bytes), optional(contentType));
+  bodyBytes(Uint8Array.from(bytes), optionalArg(contentType));
 
 export const text = (body: string, contentType?: string): Body => bodyText(body, contentType);
 

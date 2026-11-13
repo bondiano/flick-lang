@@ -12,7 +12,7 @@ import { type Redacted, redactedReveal } from "../../redacted.ts";
 import type { Witness } from "../../schema.ts";
 import { flickParseHeader } from "./Cookies.ts";
 import { type Headers, flickToUnknown as headersToUnknown } from "./Headers.ts";
-import { type UrlParams, flickToUnknown } from "./UrlParams.ts";
+import { type UrlParams, flickToUnknown, flickToRecord } from "./UrlParams.ts";
 
 export const flickMethod = (self: ServerRequest) => methodToFlick(self.method);
 export const flickUrl = (self: ServerRequest): string => self.url;
@@ -24,22 +24,15 @@ export const flickRemoteAddress = (self: ServerRequest): Option<string> => self.
 export const flickCookies = (self: ServerRequest): ReadonlyArray<readonly [string, Redacted<string>]> =>
   flickParseHeader(self.headers["cookie"] ?? "");
 
-const cookieRecord = (self: ServerRequest): unknown =>
+export const cookieRecord = (self: ServerRequest): Readonly<Record<string, string>> =>
   Object.freeze(Object.fromEntries(flickCookies(self).map(([k, v]) => [k, redactedReveal(v)])));
 
 /** The parameters of the query of the request's URL. */
 export const flickSearchParams = (self: ServerRequest): UrlParams => [...new URL(self.url, "http://localhost").searchParams];
 
-/** Each key of the URL's query with all its values, in the order the keys come. */
-export const flickSearchParamsFromUrl = (url: URL): ReadonlyArray<readonly [string, ReadonlyArray<string>]> => {
-  const out = new Map<string, Array<string>>();
-  for (const [k, v] of url.searchParams) {
-    const values = out.get(k);
-    if (values === undefined) out.set(k, [v]);
-    else values.push(v);
-  }
-  return [...out];
-};
+/** Each query key with its values, following the adapter's object enumeration order. */
+export const flickSearchParamsFromUrl = (url: URL): ReadonlyArray<readonly [string, ReadonlyArray<string>]> =>
+  Object.entries(Object.fromEntries(flickToRecord([...url.searchParams])));
 
 export const flickText = (self: ServerRequest): Run => readText(self);
 export const flickJson = (self: ServerRequest): Run => readJson(self);

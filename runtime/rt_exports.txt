@@ -1794,6 +1794,7 @@
 @flick-lang/runtime/rt/effect/http/Cookies toSetCookieHeaders
 @flick-lang/runtime/rt/effect/http/Etag flickLayer
 @flick-lang/runtime/rt/effect/http/Etag flickLayerWeak
+@flick-lang/runtime/rt/effect/http/Etag value
 @flick-lang/runtime/rt/effect/http/Headers DEFAULT_REDACTED_NAMES
 @flick-lang/runtime/rt/effect/http/Headers Equivalence
 @flick-lang/runtime/rt/effect/http/Headers empty
@@ -1837,6 +1838,7 @@
 @flick-lang/runtime/rt/effect/http/HttpRouter prefixRoute
 @flick-lang/runtime/rt/effect/http/HttpServer flickAddress
 @flick-lang/runtime/rt/effect/http/HttpServer flickServe
+@flick-lang/runtime/rt/effect/http/HttpServerRequest cookieRecord
 @flick-lang/runtime/rt/effect/http/HttpServerRequest flickBytes
 @flick-lang/runtime/rt/effect/http/HttpServerRequest flickCookies
 @flick-lang/runtime/rt/effect/http/HttpServerRequest flickHeaders

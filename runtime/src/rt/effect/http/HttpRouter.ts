@@ -17,10 +17,9 @@ import { readJson } from "../../http/request.ts";
 import type { Witness } from "../../schema.ts";
 import * as FindMyWay from "../../vendor/find-my-way/FindMyWay.ts";
 import { getClosingParenthensePosition, getMaxParamLengthExceeded } from "../../vendor/find-my-way/router.ts";
-import { flickCookies, flickSearchParams } from "./HttpServerRequest.ts";
+import { cookieRecord, flickSearchParams } from "./HttpServerRequest.ts";
 import { flickToUnknown as headersToUnknown } from "./Headers.ts";
-import { flickToRecord, flickToUnknown } from "./UrlParams.ts";
-import { redactedReveal } from "../../redacted.ts";
+import { flickToUnknown } from "./UrlParams.ts";
 
 type Pairs = ReadonlyArray<readonly [string, string]>;
 type Handler = (request: ServerRequest) => unknown;
@@ -160,16 +159,13 @@ function* withParams(then: (params: Readonly<Record<string, string>>) => unknown
   return yield then(isPairs(pairs) ? Object.fromEntries(pairs) : {});
 }
 
-const record = (request: ServerRequest): Record<string, unknown> =>
-  Object.fromEntries(flickToRecord(flickSearchParams(request)).map(([k, vs]) => [k, vs.length === 1 ? vs[0] : Object.freeze(vs)]));
-
 export const flickSchemaParams = (codec: Witness, request: ServerRequest): Run =>
-  withParams((params) => codecDecode(codec, Object.freeze({ ...record(request), ...params })));
+  withParams((params) => codecDecode(codec, Object.freeze({ ...flickToUnknown(flickSearchParams(request)), ...params })));
 
 const requestInput = (request: ServerRequest, params: Readonly<Record<string, string>>) => ({
   method: request.method,
   url: request.url,
-  cookies: Object.freeze(Object.fromEntries(flickCookies(request).map(([k, v]) => [k, redactedReveal(v)]))),
+  cookies: cookieRecord(request),
   headers: headersToUnknown(request.headers),
   pathParams: Object.freeze({ ...params }),
   searchParams: flickToUnknown(flickSearchParams(request)),

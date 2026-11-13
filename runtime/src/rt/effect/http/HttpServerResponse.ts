@@ -3,7 +3,7 @@
 // `HttpServerResponse` is, so its headers come out the same. Streamed
 // bodies and the conversions to and from the client's responses are the
 // adapter's until Flick's streams and client run here.
-import type { Option } from "../../../core/data.ts";
+import { type Option, optionalArg } from "../../../core/data.ts";
 import { codecEncode } from "../../codec.ts";
 import type { Run } from "../../fiber.ts";
 import {
@@ -39,15 +39,13 @@ export interface FlickOptions {
   readonly contentType: Option<string>;
 }
 
-const value = <A>(option: Option<A>): A | undefined => (option._tag === "Some" ? option.value : undefined);
-
 /** The options of the Flick record, a field of `None` left out. */
 export const options = (o: FlickOptions): ResponseOptions => ({
-  status: value(o.status),
-  statusText: value(o.statusText),
-  headers: value(o.headers),
-  cookies: value(o.cookies),
-  contentType: value(o.contentType),
+  status: optionalArg(o.status),
+  statusText: optionalArg(o.statusText),
+  headers: optionalArg(o.headers),
+  cookies: optionalArg(o.cookies),
+  contentType: optionalArg(o.contentType),
 });
 
 export const flickEmpty = (o: FlickOptions): ServerResponse => emptyResponse(options(o));

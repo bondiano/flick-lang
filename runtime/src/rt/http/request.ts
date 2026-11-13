@@ -18,21 +18,12 @@ const maxBodySize = (): number | undefined => {
   return typeof size === "bigint" ? Number(size) : undefined;
 };
 
-/** A body larger than the limit, with the message Effect's reader gives. */
-export class MaxBytesError extends Error {
-  readonly maxBytes: number;
-  constructor(maxBytes: number) {
-    super("maxBytes exceeded");
-    this.maxBytes = maxBytes;
-  }
-}
-
 const parseError = (request: ServerRequest) => (cause: unknown) => httpServerError("RequestParseError", request, cause);
 
 /** The bytes of the body. */
 export const readBytes = (request: ServerRequest): unknown => {
   const limit = maxBodySize();
-  return foreignAsync(() => request.source.read(limit), parseError(request));
+  return foreignAsync((signal) => request.source.read(limit, signal), parseError(request));
 };
 
 const textDecoder = /*#__PURE__*/ new TextDecoder();

@@ -24,7 +24,7 @@ import { flickRedactUrl, redactedNames } from "../effect/http/UrlParams.ts";
 
 /** Reads the bytes of a request's body once, at most `maxBytes` of them. */
 export interface RequestSource {
-  readonly read: (maxBytes: number | undefined) => Promise<Uint8Array>;
+  readonly read: (maxBytes: number | undefined, signal: AbortSignal) => Promise<Uint8Array>;
 }
 
 /** `Http.ServerRequest.ServerRequest`. */

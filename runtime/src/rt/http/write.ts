@@ -22,7 +22,6 @@ const node = (): NodeJS.Process => {
 /** The built-in modules of Node.js, which only a server on Node needs. */
 export const nodeHttp = () => node().getBuiltinModule("node:http");
 export const nodeStream = () => node().getBuiltinModule("node:stream");
-export const nodeFs = () => node().getBuiltinModule("node:fs");
 const nodeStreamWeb = () => node().getBuiltinModule("node:stream/web");
 const nodePipeline = () => node().getBuiltinModule("node:stream/promises");
 

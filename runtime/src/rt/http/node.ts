@@ -10,7 +10,7 @@ import type * as Http from "node:http";
 
 import { type Option, none, some } from "../../core/data.ts";
 import { type Exit, Raise, fail } from "../cause.ts";
-import { clock } from "../clock.ts";
+import { type Clock, clock } from "../clock.ts";
 import { fromInput } from "../effect/http/Headers.ts";
 import {
   type Fiber,
@@ -27,8 +27,7 @@ import {
   owned,
 } from "../fiber.ts";
 import { Owner, closeOwn } from "../owner.ts";
-import { CLIENT_ABORT, type RequestSource, type ServerRequest, ServerResponse, causeResponse, emptyResponse } from "./model.ts";
-import { MaxBytesError } from "./request.ts";
+import { CLIENT_ABORT, type RequestSource, type ServerRequest, ServerResponse, causeResponse, emptyResponse, serveError } from "./model.ts";
 import { nodeHttp, nodeStream, pendingContinue, teardownBody, writeContinue, writeResponse } from "./write.ts";
 
 /** Where a server listens, and how long closing waits for running requests. */
@@ -59,7 +58,7 @@ const concat = (chunks: ReadonlyArray<Uint8Array>, length: number): Uint8Array =
 };
 
 /** Reads the body once; past the limit it drains the rest, so the response can still go out. */
-const readAll = (request: Http.IncomingMessage, response: Http.ServerResponse, maxBytes: number | undefined): Promise<Uint8Array> =>
+const readAll = (request: Http.IncomingMessage, response: Http.ServerResponse, maxBytes: number | undefined, signal: AbortSignal): Promise<Uint8Array> =>
   new Promise((resolve, reject) => {
     writeContinue(request, response);
     const { finished } = nodeStream();
@@ -67,6 +66,7 @@ const readAll = (request: Http.IncomingMessage, response: Http.ServerResponse, m
     let bytes = 0;
     const cleanup = finished(request, { readable: true, writable: false }, (error) => {
       request.off("data", onData);
+      signal.removeEventListener("abort", onAbort);
       cleanup();
       if (error) {
         request.destroy();
@@ -75,23 +75,33 @@ const readAll = (request: Http.IncomingMessage, response: Http.ServerResponse, m
       }
       resolve(concat(chunks, bytes));
     });
+    function stop(error: unknown): void {
+      request.off("data", onData);
+      signal.removeEventListener("abort", onAbort);
+      cleanup();
+      const done = finished(request, { readable: true, writable: false }, () => done());
+      request.resume();
+      reject(error instanceof Error ? error : new Error(String(error)));
+    }
+    function onAbort(): void {
+      stop(signal.reason);
+    }
     function onData(chunk: Uint8Array): void {
       chunks.push(chunk);
       bytes += chunk.length;
-      if (maxBytes !== undefined && bytes > maxBytes) {
-        request.off("data", onData);
-        cleanup();
-        const done = finished(request, { readable: true, writable: false }, () => done());
-        request.resume();
-        reject(new MaxBytesError(maxBytes));
-      }
+      if (maxBytes !== undefined && bytes > maxBytes) stop(new Error("maxBytes exceeded"));
+    }
+    signal.addEventListener("abort", onAbort, { once: true });
+    if (signal.aborted) {
+      onAbort();
+      return;
     }
     request.on("data", onData);
   });
 
 const nodeSource = (request: Http.IncomingMessage, response: Http.ServerResponse): RequestSource => {
   let read: Promise<Uint8Array> | undefined;
-  return Object.freeze({ read: (maxBytes: number | undefined) => (read ??= readAll(request, response, maxBytes)) });
+  return Object.freeze({ read: (maxBytes: number | undefined, signal: AbortSignal) => (read ??= readAll(request, response, maxBytes, signal)) });
 };
 
 const absoluteTarget = (url: string): URL | undefined => {
@@ -149,7 +159,7 @@ function* respond(app: App, request: ServerRequest, req: Http.IncomingMessage, o
 }
 
 /** Waits for `close` to end every connection, at most `millis` on the fiber's clock. */
-const drained = (node: Http.Server, millis: number): Suspend =>
+const drained = (node: Http.Server, millis: number, servingClock: Clock): Suspend =>
   new Suspend((resolve, reject) => {
     let stop: (() => void) | undefined;
     node.close((error) => {
@@ -158,69 +168,77 @@ const drained = (node: Http.Server, millis: number): Suspend =>
       else reject(error);
     });
     if (millis <= 0) resolve(undefined);
-    else if (Number.isFinite(millis)) stop = clock().timer(millis, () => resolve(undefined));
+    else if (Number.isFinite(millis)) stop = servingClock.timer(millis, () => resolve(undefined));
     return () => stop?.();
   });
 
 /**
  * Listens for `app` until the owner of the call closes. A failure to listen
- * is the typed failure `listenError` makes of it.
+ * is a typed `ServeError`.
  */
-export function* ownedServer(options: ServeOptions, app: App, listenError: (cause: unknown) => unknown): Run {
+export function* ownedServer(options: ServeOptions, app: App): Run {
   const ctx = currentCtx();
   const owner = ctx.owner;
   if (owner === undefined) throw new TypeError("a server needs the owner of a scope");
-  const { createServer } = nodeHttp();
-  const node = createServer();
-  const requests = new Set<Fiber>();
-  let closing = false;
-  node.prependListener("request", (_request, response) =>
-    response.once("finish", () => {
-      if (closing) setImmediate(() => node.closeIdleConnections());
-    }));
-  const handle = (req: Http.IncomingMessage, out: Http.ServerResponse): void => {
-    if (req.httpVersionMajor === 1) out.prependListener("finish", () => teardownBody(req, out));
-    const request = fromNode(req, out);
-    if (closing) {
-      void writeResponse(req, out, request.method, emptyResponse({ status: 503 }), new AbortController().signal);
-      return;
-    }
-    const fiber = fork(() => respond(app, request, req, out, owner.defects), ctx, 1);
-    requests.add(fiber);
-    fiber.observe(() => requests.delete(fiber));
-    out.on("close", () => {
-      if (!out.writableEnded) fiber.interrupt(CLIENT_ABORT);
-    });
-  };
-  node.on("request", handle);
-  node.on("checkContinue", (req: Http.IncomingMessage, out: Http.ServerResponse) => {
-    pendingContinue.add(req);
-    handle(req, out);
-  });
-  yield new Suspend((resolve, reject) => {
-    const onError = (error: Error): void => reject(new Raise(fail(listenError(error))));
-    node.once("error", onError);
-    node.listen({ host: options.host, port: options.port }, () => {
-      node.off("error", onError);
-      resolve(undefined);
-    });
-    return () => {
-      node.off("error", onError);
-      node.close();
+  if (!owner.open) throw new Error("the owner is closing: it admits no new servers");
+  const servingClock = clock();
+  const servingFiber = currentFiber();
+  servingFiber.mask++;
+  try {
+    const { createServer } = nodeHttp();
+    const node = createServer();
+    const requests = new Set<Fiber>();
+    let closing = false;
+    node.prependListener("request", (_request, response) =>
+      response.once("finish", () => {
+        if (closing) setImmediate(() => node.closeIdleConnections());
+      }));
+    const handle = (req: Http.IncomingMessage, out: Http.ServerResponse): void => {
+      if (req.httpVersionMajor === 1) out.prependListener("finish", () => teardownBody(req, out));
+      const request = fromNode(req, out);
+      if (closing) {
+        void writeResponse(req, out, request.method, emptyResponse({ status: 503 }), new AbortController().signal);
+        return;
+      }
+      const fiber = fork(() => respond(app, request, req, out, owner.defects), ctx, 1);
+      requests.add(fiber);
+      fiber.observe(() => requests.delete(fiber));
+      out.on("close", () => {
+        if (!out.writableEnded) fiber.interrupt(CLIENT_ABORT);
+      });
     };
-  });
-  owner.closing.add(function* shutdown(): Run {
-    if (closing) return undefined;
-    closing = true;
-    if (node.listening) yield drained(node, options.graceMillis);
-    node.closeAllConnections();
-    const by = currentFiber().id;
-    for (const fiber of requests) fiber.interrupt(by);
-    for (const fiber of requests) yield awaitFiber(fiber);
-    return undefined;
-  });
-  const address = node.address();
-  return Object.freeze(
-    typeof address === "object" && address !== null ? { host: address.address, port: address.port } : { host: String(address), port: 0 },
-  );
+    node.on("request", handle);
+    node.on("checkContinue", (req: Http.IncomingMessage, out: Http.ServerResponse) => {
+      pendingContinue.add(req);
+      handle(req, out);
+    });
+    yield new Suspend((resolve, reject) => {
+      const onError = (error: Error): void => reject(new Raise(fail(serveError(error))));
+      node.once("error", onError);
+      node.listen({ host: options.host, port: options.port }, () => {
+        node.off("error", onError);
+        resolve(undefined);
+      });
+      return () => {
+        node.off("error", onError);
+        node.close();
+      };
+    });
+    owner.closing.add(function* shutdown(): Run {
+      if (closing) return undefined;
+      closing = true;
+      if (node.listening) yield drained(node, options.graceMillis, servingClock);
+      node.closeAllConnections();
+      const by = currentFiber().id;
+      for (const fiber of requests) fiber.interrupt(by);
+      for (const fiber of requests) yield awaitFiber(fiber);
+      return undefined;
+    });
+    const address = node.address();
+    return Object.freeze(
+      typeof address === "object" && address !== null ? { host: address.address, port: address.port } : { host: String(address), port: 0 },
+    );
+  } finally {
+    servingFiber.mask--;
+  }
 }

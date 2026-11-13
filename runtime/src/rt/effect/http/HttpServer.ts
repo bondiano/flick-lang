@@ -8,7 +8,6 @@ import { tag } from "../../../tags.ts";
 import { type Duration, durationHooks } from "../../duration.ts";
 import type { Run } from "../../fiber.ts";
 import type { ServerRequest } from "../../http/model.ts";
-import { serveError } from "../../http/model.ts";
 import { type App, type Server, ownedServer } from "../../http/node.ts";
 
 /** `Http.Server.ServeOptions`. */
@@ -30,7 +29,6 @@ export const flickServe = (options: ServeOptions, handler: (request: ServerReque
         options.gracefulShutdownTimeout._tag === "Some" ? durationHooks.millis(options.gracefulShutdownTimeout.value) : DEFAULT_GRACE_MILLIS,
     },
     handler satisfies App,
-    serveError,
   );
 
 const TCP = /*#__PURE__*/ tag("Http.Server.Address.TcpAddress");

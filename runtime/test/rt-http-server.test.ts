@@ -2,19 +2,23 @@
 // each expected value was read from the same handlers served by
 // `@flick-lang/effect-ts` (Effect 4.1.2 on Node), requests sent raw.
 import assert from "node:assert/strict";
+import { Server as NodeServer } from "node:http";
 import { connect } from "node:net";
 import { test } from "node:test";
 
 import { type Option, none, some } from "../src/core/data.ts";
 import { fail, raise } from "../src/rt/cause.ts";
-import { type Run, Suspend } from "../src/rt/fiber.ts";
+import { type Fiber, type Run, Suspend, currentCtx, currentFiber, fork, awaitFiber, Under, extend } from "../src/rt/fiber.ts";
 import { operation, service } from "../src/rt/handle.ts";
 import { flickRoute, flickRouter, prefixRoute } from "../src/rt/effect/http/HttpRouter.ts";
-import { flickText as requestText, flickWithMaxBodySize } from "../src/rt/effect/http/HttpServerRequest.ts";
+import { flickText as requestText, flickWithMaxBodySize, flickSearchParamsFromUrl } from "../src/rt/effect/http/HttpServerRequest.ts";
 import { flickEmpty, flickText, removeHeader, setHeader, setStatus } from "../src/rt/effect/http/HttpServerResponse.ts";
-import { type ServerRequest, ServerResponse, httpServerError, serveError } from "../src/rt/http/model.ts";
+import { type ServerRequest, ServerResponse, httpServerError } from "../src/rt/http/model.ts";
 import { type App, ownedServer } from "../src/rt/http/node.ts";
-import { withOwner } from "../src/rt/owner.ts";
+import { addFinalizer, withOwner } from "../src/rt/owner.ts";
+import { flickNode } from "../src/rt/effect/http/HttpPlatform.ts";
+import { layerRun } from "../src/rt/layer.ts";
+import { CLOCK, TestClock } from "../src/rt/clock.ts";
 import { tag } from "../src/tags.ts";
 import { root, sleep } from "./rt-support.ts";
 
@@ -26,7 +30,7 @@ const serving = async <T>(app: App, use: (url: string) => Promise<T>, graceMilli
   const { promise: result, resolve: settle } = Promise.withResolvers<T>();
   const exit = await root(() =>
     withOwner(function* (): Run {
-      const server: unknown = yield ownedServer({ host: "127.0.0.1", port: 0, graceMillis }, app, serveError);
+      const server: unknown = yield ownedServer({ host: "127.0.0.1", port: 0, graceMillis }, app);
       const url = `http://127.0.0.1:${String(Reflect.get(Object(server), "port"))}`;
       yield new Suspend((resolve) => void use(url).then((value) => {
         settle(value);
@@ -237,4 +241,113 @@ test("a header set over the body's content type gives way to the body when the r
   assert.equal(response.status, 201);
   assert.equal(response.statusText, "Made");
   assert.deepEqual(Object.entries(response.headers), [["content-type", "text/plain"], ["content-length", "1"]]);
+});
+
+const timedBodyRead: App = function* (req): Run {
+  const reader = fork(() => withOwner(() => requestText(req)), currentCtx());
+  yield sleep(20);
+  reader.interrupt(currentFiber().id);
+  yield awaitFiber(reader);
+  return flickEmpty({ ...defaults, status: some(408) });
+};
+
+test("interrupting a body read closes its nested scope before the client finishes", async () => {
+  const answers = await serving(timedBodyRead, (url) => exchange(url, [[0,
+    "POST / HTTP/1.1\r\nHost: x\r\nContent-Length: 10\r\nConnection: close\r\n\r\na",
+  ]], 200));
+  assert.match(answers[0] ?? "", /^HTTP\/1.1 408 /);
+});
+
+test("a finalizer cannot acquire a server after closing hooks have run", async () => {
+  let acquired = false;
+  const exit = await root(() => withOwner(function* (): Run {
+    yield addFinalizer(function* (): Run {
+      yield ownedServer({ host: "127.0.0.1", port: 0, graceMillis: 0 }, () => text("late"));
+      acquired = true;
+      return undefined;
+    });
+    return undefined;
+  }));
+  assert.equal(acquired, false);
+  assert.equal(exit.cause?.reasons[0]?._tag, "Die");
+});
+
+test("search parameters enumerate numeric keys before other keys", () => {
+  assert.deepEqual(flickSearchParamsFromUrl(new URL("http://x/?z=x&2=b&1=a&z=y")), [
+    ["1", ["a"]], ["2", ["b"]], ["z", ["x", "y"]],
+  ]);
+});
+
+test("a NUL in a file path is a FileSystem BadArgument", async () => {
+  const platform = service("Test.HttpPlatform");
+  const exit = await root(() => layerRun(flickNode(platform), () => {
+    const file = operation(platform, "file_response", 1);
+    assert.equal(typeof file, "function");
+    const path: unknown = typeof file === "function" ? Reflect.apply(file, undefined, [{ bytesToRead: none, chunkSize: none, offset: none, response: defaults }]) : undefined;
+    assert.equal(typeof path, "function");
+    return typeof path === "function" ? Reflect.apply(path, undefined, ["bad\0path"]) : undefined;
+  }));
+  const reason = exit.cause?.reasons[0];
+  assert.equal(reason?._tag, "Fail");
+  assert.match(shown(reason), /"_tag":"Bad"/);
+  assert.match(shown(reason), /"module_":"FileSystem","method":"stat"/);
+  assert.match(shown(reason), /null bytes/);
+});
+
+test("server shutdown keeps the clock from acquisition after its context ends", async () => {
+  const timers: Array<number> = [];
+  class ServingClock extends TestClock {
+    override timer(millis: number, wake: () => void): () => void {
+      timers.push(millis);
+      const timer = setTimeout(wake, 0);
+      return () => clearTimeout(timer);
+    }
+  }
+  const servingClock = new ServingClock();
+  const { promise: begun, resolve: started } = Promise.withResolvers<void>();
+  let pending: Promise<ReadonlyArray<string>> | undefined;
+  const app: App = function* (): Run {
+    started();
+    yield sleep(10_000);
+    return text("too late");
+  };
+  const exit = await root(() => withOwner(() => new Under(extend(currentCtx(), CLOCK, servingClock), function* (): Run {
+    const server: unknown = yield ownedServer({ host: "127.0.0.1", port: 0, graceMillis: 50 }, app);
+    const url = `http://127.0.0.1:${String(Reflect.get(Object(server), "port"))}`;
+    pending = exchange(url, [[0, request("GET", "/")]], 200);
+    yield new Suspend((resolve) => void begun.then(() => resolve(undefined)));
+    return undefined;
+  })));
+  assert.equal(exit.cause, undefined);
+  await pending;
+  assert.deepEqual(timers, [50]);
+});
+
+test("interruption just after listening closes the acquired socket", async () => {
+  // oxlint-disable-next-line typescript/unbound-method -- invoked below with its original receiver
+  const emit = NodeServer.prototype.emit;
+  const servers: Array<NodeServer> = [];
+  let acquiring: Fiber | undefined;
+  NodeServer.prototype.emit = function (this: NodeServer, event: string | symbol, ...args: Array<unknown>): boolean {
+    const emitted: unknown = Reflect.apply(emit, this, [event, ...args]);
+    if (event === "listening") {
+      servers.push(this);
+      acquiring?.interrupt(0);
+    }
+    return emitted === true;
+  };
+  try {
+    for (let i = 0; i < 10; i++) {
+      // oxlint-disable-next-line no-await-in-loop -- each acquisition owns the interruption target
+      await root(() => withOwner(function* (): Run {
+        acquiring = currentFiber();
+        return yield ownedServer({ host: "127.0.0.1", port: 0, graceMillis: 0 }, () => text("ok"));
+      }));
+    }
+    assert.equal(servers.length, 10);
+    assert.ok(servers.every((server) => !server.listening));
+  } finally {
+    NodeServer.prototype.emit = emit;
+    for (const server of servers) server.close();
+  }
 });

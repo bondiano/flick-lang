@@ -5,14 +5,16 @@
 import type { BigIntStats } from "node:fs";
 import type { Readable } from "node:stream";
 
-import type { Option } from "../../../core/data.ts";
+import { type Option, some } from "../../../core/data.ts";
 import { tag } from "../../../tags.ts";
 import { fail, raise } from "../../cause.ts";
 import type { Run } from "../../fiber.ts";
 import { bodyRaw, makeResponse } from "../../http/model.ts";
-import { nodeFs, nodeStream } from "../../http/write.ts";
+import { nodeFs } from "../../host.ts";
+import { nodeStream } from "../../http/write.ts";
 import { type Layer, layerSucceed } from "../../layer.ts";
 import { foreignAsync } from "../../owner.ts";
+import { value as etagValue } from "./Etag.ts";
 import { fromInput, set } from "./Headers.ts";
 import { type FlickOptions, options as responseOptions } from "./HttpServerResponse.ts";
 import { getType } from "./Mime.ts";
@@ -42,6 +44,12 @@ const SYSTEM_TAGS: Readonly<Record<string, string>> = {
 const statError = (path: string) => (error: unknown) => {
   const code: unknown = Reflect.get(Object(error), "code");
   const syscall: unknown = Reflect.get(Object(error), "syscall");
+  if (typeof code === "string" && code.startsWith("ERR_INVALID_ARG")) {
+    return {
+      _tag: tag("PlatformError.PlatformError.PlatformError"),
+      _0: { _tag: tag("PlatformError.Reason.Bad"), _0: { module_: "FileSystem", method: "stat", description: text(error instanceof Error ? error.message : String(error)) } },
+    };
+  }
   return {
     _tag: tag("PlatformError.PlatformError.PlatformError"),
     _0: {
@@ -122,7 +130,7 @@ function* fileResponse(o: FileOptions, path: string): Run {
   let headers = given.headers ? fromInput(given.headers) : fromInput([]);
   if (given.contentType) headers = set("content-type", given.contentType)(headers);
   // a strong tag of the size and modification time, in hexadecimal
-  headers = set("etag", `"${stats.size.toString(16)}-${stats.mtime.getTime().toString(16)}"`)(headers);
+  headers = set("etag", `"${etagValue({ size: stats.size, mtime: some(stats.mtime.getTime()) })}"`)(headers);
   headers = set("last-modified", stats.mtime.toUTCString())(headers);
   const mime = getType(path);
   const contentType = headers["content-type"] ?? (mime._tag === "Some" ? mime.value : "application/octet-stream");
