@@ -2,6 +2,14 @@
 use crate::{Expr, ExprKind, ItemKind, Module, Span, Stage, Stmt};
 
 impl Expr {
+    /// How often the expression reads the local `name`.
+    pub fn uses(&self, name: &str) -> usize {
+        let here = matches!(&self.kind, ExprKind::Local(l) | ExprKind::Within(l, _) if l == name);
+        let mut n = usize::from(here);
+        self.each_child(&mut |c| n += c.uses(name));
+        n
+    }
+
     /// `f a b`, applications none of which evaluates its argument first, as
     /// the function and the arguments with their stages, in order.
     pub fn spine(&self) -> (&Expr, Vec<(&Expr, Stage)>) {

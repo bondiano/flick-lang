@@ -386,7 +386,13 @@ export function* fiberJoin(fiber: FlickFiber): Run {
 export const foreignAsync = (start: (signal: AbortSignal) => unknown, mapping?: (error: unknown) => unknown): Suspend => {
   const owner = currentCtx().owner;
   return new Suspend((resolve, reject) => {
-    const failure = (error: unknown): void => reject(mapping ? new Raise(fail(mapping(error))) : error);
+    const failure = (error: unknown): void => {
+      try {
+        reject(mapping ? new Raise(fail(mapping(error))) : error);
+      } catch (defect) {
+        reject(defect);
+      }
+    };
     const controller = new AbortController();
     let promise: Promise<unknown>;
     try {

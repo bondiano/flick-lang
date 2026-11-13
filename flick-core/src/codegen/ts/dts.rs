@@ -8,7 +8,8 @@ use crate::codegen::exports::reexports;
 use crate::codegen::names;
 use crate::effects::bindings;
 use crate::iface::{Decl, Export, Interface, Namespace};
-use crate::types::{Form, Kind, Type};
+use crate::types::{Form, Kind, Type, builtin_sources};
+use flick_ir::Namespace as IrNamespace;
 
 /// The declaration file of the module `projection` is for: its types and
 /// each exported value, and the exports refused with the reason.
@@ -112,7 +113,7 @@ pub fn declaration_file(
             .declares(&interface, export)
         })
     };
-    let (barrel, _) = reexports(projection.module, interface, path, &value, &ty);
+    let (barrel, _) = reexports(&reexported(projection.module, interface, &value, &ty), path);
     let mut out = projection.imports(path);
     out.push('\n');
     for line in types.iter().chain(&values) {
@@ -249,4 +250,34 @@ pub fn facade_files(
         let _ = writeln!(dts, "export declare const {name}: {};", f.ty);
     }
     (js, dts)
+}
+
+/// What the module `module` exports of other modules and declares in
+/// TypeScript: a value or constructor `value` lets through, a type `ty` does.
+fn reexported<'i>(
+    module: &str,
+    interface: &'i Interface,
+    value: &dyn Fn(&Export) -> bool,
+    ty: &dyn Fn(&Export) -> bool,
+) -> Vec<(&'i str, IrNamespace, &'i str)> {
+    if builtin_sources().iter().any(|(name, _)| *name == module) {
+        return Vec::new();
+    }
+    (interface.exports.iter())
+        .filter(|e| e.entity.module != module)
+        .filter_map(|e| {
+            let namespace = match e.entity.namespace {
+                Namespace::Value | Namespace::Constructor
+                    if matches!(e.decl, Decl::Method | Decl::Blocked) || !value(e) =>
+                {
+                    return None;
+                }
+                Namespace::Value => IrNamespace::Value,
+                Namespace::Constructor => IrNamespace::Constructor,
+                Namespace::Type if ty(e) => IrNamespace::Type,
+                Namespace::Type => return None,
+            };
+            Some((e.entity.module.as_str(), namespace, e.entity.name.as_str()))
+        })
+        .collect()
 }

@@ -141,15 +141,16 @@ pub(crate) fn js_parts(
                 initialization: module.initialization.clone(),
                 records: module.records.clone(),
                 package: module.package.clone(),
+                exports: module.exports.clone(),
             };
             let mut output = super::js::js_at(&part, options, &physical, &location);
             if phase.is_none() {
-                let here = (options.path)(&module.name);
+                let here = options.path(&module.name);
                 for prefix in &prefixes {
                     let _ = writeln!(
                         output.code,
                         "export * from {};",
-                        names::string(&super::relative(&here, &(options.path)(prefix)))
+                        names::string(&super::relative(&here, &options.path(prefix)))
                     );
                 }
                 output.imports.extend(prefixes.clone());

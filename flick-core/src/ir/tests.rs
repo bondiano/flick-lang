@@ -66,7 +66,9 @@ pub(crate) fn check_text_with(
     if !diagnostics.is_empty() {
         return Err(diagnostics);
     }
-    Ok((super::lower(&module, &typing)?, interface))
+    let mut lowered = super::lower(&module, &typing)?;
+    lowered.exports = super::exports(module_name, &interface);
+    Ok((lowered, interface))
 }
 
 #[test]

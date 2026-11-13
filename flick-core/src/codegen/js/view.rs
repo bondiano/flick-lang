@@ -7,7 +7,6 @@ use std::mem;
 use super::Gen;
 use crate::codegen::tail::{Calls, Target, has_tail_call, self_call};
 use crate::ir::{Arm, BinOp, Expr, ExprKind, Param, Pat};
-use crate::opt::uses;
 
 /// The loop positions, up to the largest arity, that hold a walked list:
 /// in every member that has the position, its parameter is a name used only
@@ -51,7 +50,7 @@ fn walked(params: &[Param], body: &Expr, i: usize, members: &[(Target, usize)]) 
             }
         }
     }
-    if subjects == 0 || uses(body, list) != subjects {
+    if subjects == 0 || body.uses(list) != subjects {
         return false;
     }
     rests.iter().all(|r| {
@@ -60,7 +59,7 @@ fn walked(params: &[Param], body: &Expr, i: usize, members: &[(Target, usize)]) 
             .filter_map(|leaf| self_call(leaf, members, Calls::Pure))
             .filter(|(_, args)| matches!(args.get(i).map(|a| &a.kind), Some(ExprKind::Local(n)) if n == *r))
             .count();
-        uses(body, r) == jumps
+        body.uses(r) == jumps
     })
 }
 

@@ -221,6 +221,30 @@
       "@flick-lang/runtime/rt/effect/http/Headers"
     ],
     [
+      "flick:http/HttpBody",
+      "@flick-lang/runtime/rt/effect/http/HttpBody"
+    ],
+    [
+      "flick:http/HttpPlatform",
+      "@flick-lang/runtime/rt/effect/http/HttpPlatform"
+    ],
+    [
+      "flick:http/HttpRouter",
+      "@flick-lang/runtime/rt/effect/http/HttpRouter"
+    ],
+    [
+      "flick:http/HttpServer",
+      "@flick-lang/runtime/rt/effect/http/HttpServer"
+    ],
+    [
+      "flick:http/HttpServerRequest",
+      "@flick-lang/runtime/rt/effect/http/HttpServerRequest"
+    ],
+    [
+      "flick:http/HttpServerResponse",
+      "@flick-lang/runtime/rt/effect/http/HttpServerResponse"
+    ],
+    [
       "flick:http/Mime",
       "@flick-lang/runtime/rt/effect/http/Mime"
     ],

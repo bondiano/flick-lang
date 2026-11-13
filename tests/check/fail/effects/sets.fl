@@ -90,10 +90,6 @@ type alias Scoped s = {Scope s}
 two_regions : Unit ->{...Scoped s, ...Scoped t} Unit
 let two_regions () = ()
 
-// rows stay invariant under another constructor
-narrow_list : List (Eff {...Mixed} none Unit) -> List (Eff {Log, Users; Boom} none Unit)
-let narrow_list tasks = tasks
-
 // a set cannot hold itself
 type alias Loop = {...Loop}
 
@@ -119,5 +115,4 @@ type alias Loop = {...Loop}
 //~ FLICK-E002 @82:26-82:39 the signature of `missing_service` does not allow service `Users`, which its body needs
 //~ FLICK-E002 @85:20-85:32 the signature of `taken_out` does not allow service `Log`, which its body needs
 //~ FLICK-T003 @90:36-90:47 the row already holds `Scope s`, so it cannot hold `Scope t` too: a row has one element of each name
-//~ FLICK-T003 @95:25-95:30 expected `List (Eff {Log, Users} {Boom} Unit)`, found `List (Eff {Log} {Boom} Unit)`
-//~ FLICK-R007 @98:12-98:16 type alias `Loop` is cyclic: Loop -> Loop
+//~ FLICK-R007 @94:12-94:16 type alias `Loop` is cyclic: Loop -> Loop

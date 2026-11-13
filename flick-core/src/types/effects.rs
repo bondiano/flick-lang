@@ -333,7 +333,7 @@ impl Checker<'_> {
                         self.sub_row(&e1, &e2, site, span, true);
                         self.unify(&o1, &o2)
                     }
-                    _ => self.unify(&a, &e),
+                    _ => self.subsume_data(&a, &e, span),
                 },
             },
         }

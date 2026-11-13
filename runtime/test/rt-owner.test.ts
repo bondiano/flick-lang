@@ -332,3 +332,12 @@ test("a stage that runs at once waits for branches that close scopes", async () 
   assert.equal(exit.cause, undefined);
   assert.deepEqual(seen, ["released"]);
 });
+
+test("an exception in an async failure mapper is a fiber defect", async () => {
+  const broken = new Error("mapper failed");
+  const exit = await Promise.race([
+    root(() => foreignAsync(() => Promise.reject(new Error("read failed")), () => { throw broken; })),
+    new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error("fiber did not settle")), 200)),
+  ]);
+  assert.deepEqual(exit.cause?.reasons, [{ _tag: "Die", defect: broken }]);
+});

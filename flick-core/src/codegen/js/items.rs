@@ -8,7 +8,7 @@ use super::expr::arrow_body;
 use super::{Callee, Gen, Target, indent, names};
 use crate::codegen::order::post_order;
 use crate::ir::{Expr, ExprKind, Item, ItemKind};
-use crate::types::{Constructor, Dict, InstanceInfo, Rep, default_method};
+use flick_ir::{Constructor, Dict, InstanceInfo, Rep, default_method};
 
 impl Gen<'_> {
     pub(super) fn items(&mut self, items: &[Item]) -> String {
@@ -58,7 +58,7 @@ impl Gen<'_> {
                     self.block(|g| g.lambda(params, body, Some(target), true));
                 let id = names::ident(name);
                 let worker_id = format!("{id}${}", params.len());
-                match (self.options.workers)(self.module, name) {
+                match self.options.worker(self.module, name) {
                     Some(n) if n == params.len() => stmts.push(self.export(&worker_id, &worker)),
                     Some(n) => {
                         stmts.push(self.constant(&worker_id, &worker));
@@ -83,7 +83,7 @@ impl Gen<'_> {
                 let code = self.export(&id, &value);
                 #[cfg(feature = "native-project")]
                 let code = self.named(code, &id, name, item.span);
-                match (self.options.workers)(self.module, name) {
+                match self.options.worker(self.module, name) {
                     Some(n) => format!("{code}\n{}", self.applying_worker(&id, n)),
                     None => code,
                 }
@@ -156,8 +156,8 @@ impl Gen<'_> {
             // `unboxed` and `untagged`: a value is its one field
             return self.export(&name, &format!("{} _0", self.arrow("_0")));
         }
-        let package = (self.options.package)(&c.module);
-        let tag = names::string(&names::tag(c, package.as_deref()));
+        let package = self.options.package(&c.module);
+        let tag = names::string(&names::tag(c, package));
         let fields: Vec<String> = (0..c.arity).map(|i| format!("_{i}")).collect();
         // the dictionaries a value of a GADT holds, under keys `==` skips
         let dicts: Vec<String> = (0..c.dicts).map(|i| format!("$d{i}")).collect();
@@ -290,8 +290,8 @@ impl Gen<'_> {
     }
 
     fn tag_of(&self, c: &Constructor) -> String {
-        let package = (self.options.package)(&c.module);
-        names::tag(c, package.as_deref())
+        let package = self.options.package(&c.module);
+        names::tag(c, package)
     }
 
     /// Items in an order where everything an item uses is defined first.

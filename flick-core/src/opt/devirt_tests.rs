@@ -56,3 +56,64 @@ fn a_known_default_is_taken_apart_where_it_is_and_named_elsewhere() {
         "{js}"
     );
 }
+
+#[test]
+fn settling_data_does_not_expand_a_recursive_method_function() {
+    use std::cell::Cell;
+
+    use super::{Lookup, methods};
+    use crate::ir::tests::check_text;
+    use crate::ir::{Expr, ExprKind, ItemKind};
+    use flick_ir::Dict;
+
+    let (mut module, _) = check_text(
+        "Recursive",
+        "module Recursive exposing (..)\ntype Tree = Leaf | Node Tree Tree\n  deriving Eq\n",
+    )
+    .expect("a recursive derived instance");
+    let (name, method, at) = module
+        .items
+        .iter()
+        .find_map(|item| match &item.kind {
+            ItemKind::Instance { info, methods } => methods
+                .iter()
+                .find(|(name, _)| name == "eq")
+                .map(|(_, body)| (info.name.clone(), body.clone(), item.span)),
+            _ => None,
+        })
+        .expect("Eq Tree method");
+    let dict = Dict::Instance {
+        module: module.name.clone(),
+        name: name.clone(),
+        args: Vec::new(),
+    };
+    let mut value = Expr::new(
+        ExprKind::Method {
+            dict,
+            name: "eq".to_owned(),
+        },
+        at,
+    );
+    let original = value.clone();
+    // Model a known method imported from a different module. Looking up its
+    // function is enough to know it cannot fold to a data value; following
+    // recursive calls inside it would branch once per recursive field.
+    module.name = "Client".to_owned();
+    module.items.clear();
+    let lookups = Cell::new(0);
+    let generic = |owner: &str, member: &str| {
+        assert_eq!(owner, "Recursive");
+        assert_eq!(member, format!("{name}#eq"));
+        lookups.set(lookups.get() + 1);
+        assert_eq!(
+            lookups.get(),
+            1,
+            "data settling must not follow a method function's body"
+        );
+        Some((Vec::new(), method.clone()))
+    };
+    let lookup = Lookup::new(&module, &generic);
+    assert!(!methods(&mut value, &lookup, &mut 0, 0));
+    assert_eq!(value, original);
+    assert_eq!(lookups.get(), 1);
+}

@@ -26,8 +26,8 @@ use crate::clock::{micros, timed};
 
 #[cfg(feature = "native-project")]
 use crate::codegen::sourcemap;
-use crate::codegen::ts::{Facade, Projection, declaration_file, facade_files};
-use crate::codegen::{self, EffectBridge, Known, Labels, Options};
+use crate::codegen::ts::{Facade, Projection, Typing, declaration_file, facade_files};
+use crate::codegen::{self, EffectBridge, Known, Labels, Options, Resolved};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 #[cfg(feature = "native-project")]
 use crate::iface;
@@ -37,8 +37,7 @@ use crate::project::{Compilation, Compiled, MainKind, main_kind, normalize};
 use crate::source::{FileId, SourceMap, Span};
 use crate::{ir, opt, types};
 
-/// Directory of the built-in modules inside the output.
-pub const BUILTIN_DIR: &str = "_flick";
+pub use crate::codegen::BUILTIN_DIR;
 
 /// The launcher of the entry `main`, the one `entry` names: a hyphen
 /// cannot occur in a module name.
@@ -143,17 +142,20 @@ pub fn emit(
         }
     }
     let modules = &compilation.modules;
-    let ext = if settings.typescript { "ts" } else { "js" };
-    let is_builtin = |m: &str| types::builtin_sources().iter().any(|(n, _)| *n == m);
-    let path = |m: &str| {
-        let file = format!("{}.{ext}", m.replace('.', "/"));
-        if is_builtin(m) {
-            format!("{BUILTIN_DIR}/{file}")
-        } else {
-            file
+    let builtin_names: Vec<&str> = types::builtin_sources().iter().map(|(n, _)| *n).collect();
+    let path = |m: &str| codegen::module_path(&builtin_names, settings.typescript, m);
+    let mut packages = BTreeMap::new();
+    for c in modules {
+        if let Some(package) =
+            c.ir.package
+                .as_deref()
+                .or(c.package.as_deref())
+                .or(settings.package)
+        {
+            packages.insert(c.name.clone(), package.to_owned());
         }
-    };
-    let package = |m: &str| own_package(modules, settings, m);
+    }
+    let package = |m: &str| packages.get(m).cloned();
     let published_interfaces = published_interfaces(compilation, settings);
     let interface_of = |m: &str| published_interfaces.get(m).cloned();
     let foreign = |module: &str, spec: &str| {
@@ -174,24 +176,35 @@ pub fn emit(
         })
     };
     let (workers, direct) = exports(settings.release, modules, &any_interface, by_class);
-    let workers = |m: &str, name: &str| workers.get(&(m.to_owned(), name.to_owned())).copied();
-    let direct = |m: &str, i: &str, method: &str| {
-        direct.contains(&(m.to_owned(), i.to_owned(), method.to_owned()))
-    };
+    let resolved = resolved(compilation, settings, by_class, &foreign);
     let lang = ir::lang_items();
     let known = Known::of(&lang);
-    let options = Options {
-        path: &path,
+    let typing = Typing {
+        interface: &any_interface,
         package: &package,
         foreign: &foreign,
-        typescript: settings.typescript,
-        interface: &any_interface,
+        path: &path,
+        rt: by_class,
+    };
+    let typescript = settings.typescript.then(|| {
+        typing.prepare(
+            modules
+                .iter()
+                .map(|c| &c.ir)
+                .chain(builtin_modules_of(by_class)),
+        )
+    });
+    let options = Options {
+        builtins: &builtin_names,
+        packages: &packages,
+        resolved: &resolved,
+        typescript: typescript.as_ref(),
         release: settings.release,
         workers: &workers,
         direct: &direct,
         labels: settings.extras.labels,
         rt: settings.backend == Backend::Rt,
-        effect_bridge: bridge_select::select(compilation, settings.effect_bridge),
+        effect_bridge: bridge_select::select(compilation, settings.effect_bridge, settings.runners),
         lang: &known,
     };
     let mut out = Vec::new();
@@ -207,6 +220,7 @@ pub fn emit(
         options: &options,
         path: &path,
         package: &package,
+        foreign: &foreign,
         published_interfaces: &published_interfaces,
         any_interface: &any_interface,
     };
@@ -218,14 +232,41 @@ pub fn emit(
     (out, diagnostics)
 }
 
-/// The package that owns the compiled module `m`: its source package, else
-/// the project's.
-pub(crate) fn own_package(modules: &[Compiled], settings: &Settings, m: &str) -> Option<String> {
-    let module = modules.iter().find(|c| c.name == m)?;
-    module
-        .package
-        .clone()
-        .or_else(|| settings.package.map(str::to_owned))
+/// The specifiers of the foreign modules of `compilation` and the built-in
+/// modules that the build resolves, by module and specifier: one named
+/// relative to its module, shipped beside it, or the renderer `[build] ui`
+/// stands for. The JS backend resolves the others, a package's, itself.
+fn resolved(
+    compilation: &Compilation,
+    settings: &Settings,
+    by_class: bool,
+    foreign: &dyn Fn(&str, &str) -> String,
+) -> Vec<Resolved> {
+    let own = compilation.modules.iter().map(|c| &c.ir);
+    let mut out: Vec<Resolved> = Vec::new();
+    for module in own.chain(builtin_modules_of(by_class)) {
+        for item in &module.items {
+            let ir::ItemKind::Foreign(f) = &item.kind else {
+                continue;
+            };
+            let Some(spec) = f.binding.from.as_deref() else {
+                continue;
+            };
+            let ui = settings.ui.is_some() && bindings::UI_RENDERER.contains(&spec);
+            let relative = spec.starts_with("./") || spec.starts_with("../");
+            let known = |r: &Resolved| r.module == module.name && r.spec == spec;
+            if (ui || relative || compilation.shipped_foreign(&module.name, spec).is_some())
+                && !out.iter().any(known)
+            {
+                out.push(Resolved {
+                    module: module.name.clone(),
+                    spec: spec.to_owned(),
+                    specifier: foreign(&module.name, spec),
+                });
+            }
+        }
+    }
+    out
 }
 
 fn foreign_specifier(
@@ -249,12 +290,8 @@ fn foreign_specifier(
         .filter(|_| settings.backend == Backend::Rt && relative)
         .filter(|rt| dir.as_ref().is_some_and(|d| d.join(rt).is_file()));
     let spec = beside.as_deref().unwrap_or(spec);
-    if settings.backend == Backend::Rt && !relative {
-        // a module neither target has is the adapter's
-        return effects::rt_specifier(spec).unwrap_or_else(|| effects::effect_specifier(spec));
-    }
-    if settings.backend == Backend::Effect && !relative {
-        return effects::effect_specifier(spec);
+    if !relative {
+        return effects::runtime_specifier(settings.backend == Backend::Rt, spec);
     }
     match (relative, dir) {
         (true, Some(dir)) => {
@@ -477,7 +514,7 @@ fn builtins(ctx: &Context, imports: Vec<String>, out: &mut Vec<Artifact>) {
                 ctx.any_interface,
                 ctx.package,
                 ctx.path,
-                ctx.options.foreign,
+                ctx.foreign,
                 ctx.settings.backend == Backend::Rt,
             )
         {
@@ -534,6 +571,7 @@ struct Context<'a> {
     options: &'a Options<'a>,
     path: &'a dyn Fn(&str) -> String,
     package: &'a dyn Fn(&str) -> Option<String>,
+    foreign: &'a dyn Fn(&str, &str) -> String,
     published_interfaces: &'a BTreeMap<&'a str, Interface>,
     any_interface: &'a dyn Fn(&str) -> Option<Interface>,
 }
@@ -576,7 +614,7 @@ fn compiled_module(
             ctx.any_interface,
             ctx.package,
             ctx.path,
-            ctx.options.foreign,
+            ctx.foreign,
             ctx.settings.backend == Backend::Rt,
         )
     {
@@ -599,7 +637,7 @@ fn compiled_module(
             ctx.any_interface,
             ctx.package,
             ctx.path,
-            ctx.options.foreign,
+            ctx.foreign,
             ctx.settings.backend == Backend::Rt,
         ));
     }
@@ -889,7 +927,7 @@ type Lowered = (Vec<ir::Module>, Vec<Arc<Interface>>);
 fn lower_builtins(stages_by_class: bool) -> Lowered {
     let (mut lowered, mut declarations) = (Vec::new(), Vec::new());
     let ((), elapsed) = timed(|| {
-        types::check_each(
+        let interfaces = types::check_each(
             types::builtin_sources(),
             stages_by_class,
             |module, typing| {
@@ -897,6 +935,10 @@ fn lower_builtins(stages_by_class: bool) -> Lowered {
                 declarations.push(typing.declarations.clone());
             },
         );
+        for (module, interface) in lowered.iter_mut().zip(&interfaces) {
+            assert_eq!(module.name, interface.module, "a module and its interface");
+            module.exports = ir::exports(&module.name, interface);
+        }
     });
     debug!(
         modules = lowered.len(),
