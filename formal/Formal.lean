@@ -5,6 +5,7 @@ import Formal.Syntax
 import Formal.RowLess
 import Formal.TyComp
 import Formal.TyOps
+import Formal.RowTerms
 import Formal.SchemeOps
 import Formal.DictOps
 import Formal.Subst

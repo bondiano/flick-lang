@@ -92,8 +92,8 @@ theorem Ty.reach_ren (ξ : Atom → Atom) (t : Ty) (a : Atom) :
       · exact .inl ⟨b, hb, h⟩
       · exact .inr (.inl ⟨b, hb, h⟩)
       · exact .inr (.inr ⟨b, hb, h⟩)
-  | ref t ih => simp only [Ty.ren, Ty.reach, ih]
-  | tapp f x ihf ihx | rcons _ f x ihf ihx =>
+  | ref t ih | rnm _ t ih | rless _ t ih => simp only [Ty.ren, Ty.reach, ih]
+  | tapp f x ihf ihx | rcons _ f x ihf ihx | run f x ihf ihx =>
     simp only [Ty.ren, Ty.reach, ihf, ihx]
     constructor
     · rintro (⟨b, hb, h⟩ | ⟨b, hb, h⟩)
@@ -115,7 +115,7 @@ theorem Ty.reach_ren (ξ : Atom → Atom) (t : Ty) (a : Atom) :
     simp only [Ty.ren, Ty.reach]
     exact Row.substT_reach _ _ a
   | hnd s ih | owner s ih => simp only [Ty.ren, Ty.reach, ih]
-  | base | adt | rnil | bare | dict => simp [Ty.ren, Ty.reach, Caps.none]
+  | base | adt | rnil | bare | dict | cnil | pure | rt => simp [Ty.ren, Ty.reach, Caps.none]
   | all k t ih =>
     simp only [Ty.ren, Ty.reach, ih, Atom.ty_reach]
     constructor
@@ -175,8 +175,8 @@ theorem Ty.reach_substT (σ : Atom → Ty) (t : Ty) (a : Atom) :
       · exact .inl ⟨b, hb, h⟩
       · exact .inr (.inl ⟨b, hb, h⟩)
       · exact .inr (.inr ⟨b, hb, h⟩)
-  | ref t ih => simp only [Ty.substT, Ty.reach, ih]
-  | tapp f x ihf ihx | rcons _ f x ihf ihx =>
+  | ref t ih | rnm _ t ih | rless _ t ih => simp only [Ty.substT, Ty.reach, ih]
+  | tapp f x ihf ihx | rcons _ f x ihf ihx | run f x ihf ihx =>
     simp only [Ty.substT, Ty.reach, ihf, ihx]
     constructor
     · rintro (⟨b, hb, h⟩ | ⟨b, hb, h⟩)
@@ -198,7 +198,7 @@ theorem Ty.reach_substT (σ : Atom → Ty) (t : Ty) (a : Atom) :
     simp only [Ty.substT, Ty.reach]
     exact Row.substT_reach σ _ a
   | hnd s ih | owner s ih => simp only [Ty.substT, Ty.reach, ih]
-  | base | adt | rnil | bare | dict => simp [Ty.substT, Ty.reach, Caps.none]
+  | base | adt | rnil | bare | dict | cnil | pure | rt => simp [Ty.substT, Ty.reach, Caps.none]
   | all k t ih =>
     simp only [Ty.substT, Ty.reach, ih, liftT_reach]
     constructor
@@ -217,17 +217,52 @@ theorem Ty.asRow_tvar (n : Nat) : (Ty.tvar n).asRow = fun x => x = .rv (.v n) fu
 theorem Ty.asRow_rg (p : Nat) : (Ty.rg p).asRow = fun x => x = .rv (.r p) fun _ => False := rfl
 theorem Ty.asRow_row (r : Row) : (Ty.row r).asRow = r.plain := rfl
 
+@[simp] theorem Row.none_substT (σ : Atom → Ty) : Row.none.substT σ = Row.none := by
+  funext x; cases x <;> simp [Row.substT, Row.none]
+
+@[simp] theorem Row.single_substT (σ : Atom → Ty) (N : Name) :
+    (Row.single N).substT σ = Row.single N := by
+  funext x; cases x <;> simp [Row.substT, Row.single]
+
+@[simp] theorem Row.union_substT (σ : Atom → Ty) (r r' : Row) :
+    (Row.union r r').substT σ = Row.union (r.substT σ) (r'.substT σ) := by
+  funext x; apply propext
+  cases x <;> simp only [Row.substT, Row.union] <;> grind
+
+theorem Row.less_substT (G : Name → Prop) (r : Row) (σ : Atom → Ty) :
+    (r.less G).substT σ = (r.substT σ).less G := by
+  funext x; apply propext
+  cases x with
+  | nm N | atm a => simp only [Row.less, Row.substT]; grind
+  | ob N a | obv v H a => simp [Row.less, Row.substT]
+  | rv c H =>
+    constructor
+    · rintro ⟨b, K, ⟨K', hb, rfl⟩, H', hc, rfl⟩
+      exact ⟨fun n => K' n ∨ H' n, ⟨b, K', hb, H', hc, rfl⟩, by
+        funext n; apply propext; exact or_assoc⟩
+    · rintro ⟨K, ⟨b, K', hb, H', hc, rfl⟩, rfl⟩
+      exact ⟨b, fun n => G n ∨ K' n, ⟨K', hb, rfl⟩, H', hc, by
+        funext n; apply propext; exact or_assoc.symm⟩
+
 /-- What a type stands for in a row commutes with substitution. -/
 theorem Ty.asRow_substT (σ : Atom → Ty) (t : Ty) : (t.substT σ).asRow = t.asRow.substT σ := by
   have hc : ∀ t' : Ty, t'.asRow = Row.ofCaps t'.reach → (t'.substT σ).asRow = Row.ofCaps (t'.substT σ).reach →
       (t'.substT σ).asRow = t'.asRow.substT σ := by
     intro t' h₁ h₂
     rw [h₁, h₂, Row.ofCaps_substT]; congr 1; funext a; apply propext; exact Ty.reach_substT σ t' a
-  cases t with
+  induction t with
   | tvar n => exact (Row.var_substT σ (.v n)).symm
   | rg p => exact (Row.var_substT σ (.r p)).symm
   | row r =>
     funext x; apply propext; cases x <;> simp [Ty.substT, Ty.asRow_row, Row.substT, Row.plain]
+  | cnil => simp [Ty.substT, Ty.asRow]
+  | rnm N args ih =>
+    simp only [Ty.substT, Ty.asRow, Row.union_substT, Row.single_substT, Row.ofCaps_substT,
+      Caps.substT_reach]
+  | run left right ihleft ihright =>
+    simp only [Ty.substT, Ty.asRow, ihleft, ihright, Row.union_substT]
+  | rless gone r ih =>
+    simp only [Ty.substT, Ty.asRow, ih, Row.less_substT]
   | _ => exact hc _ rfl rfl
 
 /-- A substitution that brings no name into a row: the instance of each row variable has

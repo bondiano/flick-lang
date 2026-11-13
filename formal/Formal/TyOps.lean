@@ -23,18 +23,6 @@ theorem Stage.le_substT {φ φ' : Stage} (σ : Atom → Ty) (h : φ.le φ') :
   cases φ <;> cases φ' <;> simp_all [Stage.le, Stage.substT]
   exact ⟨h.1.substT σ, h.2.substT σ⟩
 
-@[simp] theorem Row.none_substT (σ : Atom → Ty) : Row.none.substT σ = Row.none := by
-  funext x; cases x <;> simp [Row.substT, Row.none]
-
-@[simp] theorem Row.single_substT (σ : Atom → Ty) (N : Name) :
-    (Row.single N).substT σ = Row.single N := by
-  funext x; cases x <;> simp [Row.substT, Row.single]
-
-@[simp] theorem Row.union_substT (σ : Atom → Ty) (r r' : Row) :
-    (Row.union r r').substT σ = Row.union (r.substT σ) (r'.substT σ) := by
-  funext x; apply propext
-  cases x <;> simp only [Row.substT, Row.union] <;> grind
-
 /-- A substitution keeps what the names of `H` give back to a row: a name it brings in
 through a variable taken without it is one `H` names. -/
 theorem Row.back_substT (σ : Atom → Ty) (r H : Row) :

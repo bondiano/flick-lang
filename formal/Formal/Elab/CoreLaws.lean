@@ -149,11 +149,11 @@ theorem trStage_use_le {ψ φ : Stage} {q : Ty} (h : ψ.Applies φ q) :
 
 /-- A row `⟦t⟧` holds no obligation. -/
 theorem trT_asRow_ob (t : Flick.Ty) (n : Flick.Name) (a : Atom) : ¬ t.asRow (.ob n a) := by
-  cases t <;> simp [Flick.Ty.asRow, Row.plain, Row.ofCaps]
+  exact Flick.Ty.asRow_ob t n a
 
 theorem trT_asRow_obv (t : Flick.Ty) (v a : Atom) (G : Flick.Name → Prop) :
     ¬ t.asRow (.obv v G a) := by
-  cases t <;> simp [Flick.Ty.asRow, Row.plain, Row.ofCaps]
+  exact Flick.Ty.asRow_obv t v a G
 
 /-- What a call of an arrow at `R r e` with the qualifier `c` needs live, `R⟨Live c + r; e⟩`
 holds by its row: elision moves the qualifier of a later stage into its row. -/

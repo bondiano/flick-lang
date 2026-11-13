@@ -59,6 +59,9 @@ theorem Shp.of_substT {σ : Atom → Ty} :
   | .eff .., _, _ | .errors _, _, _ | .hnd _, _, _
   | .owner _, _, _ | .dict .., _, _ | .all .., _, _ | .bare, _, _ =>
     .hidden (by simp [Ty.Opaque, Ty.hd])
+  | .cnil, _, _ | .rnm .., _, _ | .run .., _, _ | .rless .., _, _
+  | .pure, _, _ | .rt .., _, _ =>
+    .hidden (by simp [Ty.Opaque, Ty.hd])
 
 theorem Covers.substT {t ps e} (σ : Atom → Ty) (h : Covers S t ps e) :
     Covers S (t.substT σ) ps e :=
