@@ -1,0 +1,25 @@
+// Data never narrows a covariant argument, and an invariant one stays: a
+// cell is mutable storage, and a GADT constructor that fixes its argument to
+// an arrow keeps it from moving (`docs/formal/regions.md` §2.2.1).
+module App.DataVarianceFail exposing (..)
+
+type Cell a = Cell (Ref a)
+
+type Tag a =
+  | Pure : Tag (Unit -> Unit)
+
+list_narrows : List ((Float -> Float)^{c, d}) -> List ((Float -> Float)^{c})
+let list_narrows fs = fs
+//                    ^^ FLICK-G001 this value holds `d`, but the expected type `(Float -> Float)^{c}` allows only `c`
+
+list_of_runtime : List (Float ->{Async} Float) -> List (Float -> Float)
+let list_of_runtime fs = fs
+//                       ^^ FLICK-T003 expected `List (Float -> Float)`, found `List (Float ->{Async} Float)`
+
+cell_widens : Cell (Float -> Float) -> Cell (Float ->{Async} Float)
+let cell_widens x = x
+//                  ^ FLICK-T003 expected `Cell (Float ->{Async} Float)`, found `Cell (Float -> Float)`
+
+tag_widens : Tag (Unit -> Unit) -> Tag (Unit ->{Async} Unit)
+let tag_widens t = t
+//                 ^ FLICK-T003 expected `Tag (Unit ->{Async} Unit)`, found `Tag (Unit -> Unit)`

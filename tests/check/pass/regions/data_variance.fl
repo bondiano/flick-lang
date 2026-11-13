@@ -1,0 +1,33 @@
+// Data compares its arguments by the variance of each parameter
+// (`docs/formal/regions.md` §2.2.1), a record and a tuple field by field: a
+// list of callbacks widens with what they hold, data of callbacks with their
+// stage, and a consumer narrows.
+module App.DataVariance exposing (..)
+
+type Box a = Box { value : a }
+
+type Sink a = Sink (a -> Unit)
+
+list_widens : List ((Float -> Float)^{c}) -> List ((Float -> Float)^{c, d})
+let list_widens fs = fs
+
+record_widens : { f : (Float -> Float)^{c} } -> { f : (Float -> Float)^{c, d} }
+let record_widens r = r
+
+tuple_widens : ((Float -> Float)^{c}, Int) -> ((Float -> Float)^{c, d}, Int)
+let tuple_widens p = p
+
+list_of_pure : List (Float -> Float) -> List (Float ->{Async} Float)
+let list_of_pure fs = fs
+
+option_of_pure : Option (Float -> Float) -> Option (Float ->{Async} Float)
+let option_of_pure f = f
+
+box_of_pure : Box (Float -> Float) -> Box (Float ->{Async} Float)
+let box_of_pure b = b
+
+record_of_pure : { f : Float -> Float } -> { f : Float ->{Async} Float }
+let record_of_pure r = r
+
+sink_narrows : Sink (Float ->{Async} Float) -> Sink (Float -> Float)
+let sink_narrows s = s
