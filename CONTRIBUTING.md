@@ -98,7 +98,8 @@ taken on trust, not loaded). Declare the names a fragment uses on hidden
 lines: a line that is `#` alone or starts with `# ` is compiled without that
 prefix and left off the page, as rustdoc does. `flick ignore` only parses a
 block, for syntax that does not compile yet; `flick fail` must report an
-error, for an example of one. Give both locales the same hidden lines and
+error, for an example of one; `flick fail T003` or `flick fail std/Q001`
+pins its diagnostic code. Give both locales the same hidden lines and
 markers. `flick check --fix <page>.md` writes the safe fixes into the default
 blocks of a page, keeping hidden lines hidden, and `just docs-fix` into those
 of every page, as a syntax change rewrites the corpus. `flick keep` checks a
@@ -149,6 +150,15 @@ Syntax highlighting loads independently through Shiki's JavaScript engine
 and the existing Flick grammar. Flick renders safe token spans over a
 native textarea; selection, caret, scrolling and resize remain native.
 The ambient wave runs without a header toggle and honors reduced motion.
+
+The generated package API lives in ignored `docs/.generated/`, outside the
+handwritten translation/doctest tree. `pnpm -C docs build` and `dev` first run
+`docs/scripts/api.mjs`: it invokes `flick doc --std --check-examples`, checks
+public doc-comment examples with real imports, and wraps the resulting Markdown
+for both locales. It does not parse signatures or create a doc JSON model.
+Rebuild the native compiler after changing `flick doc`; `FLICK_BIN` can select
+another build. Source links use the checkout's Git revision.
+`just wasm-plugins` also builds and verifies the standalone typed-DSL guide example.
 
 `docs/astro.sidebar.mjs` owns section labels and translations;
 `docs/src/styles/custom.css` owns the shared visual tokens. Geist is

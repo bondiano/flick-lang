@@ -1,0 +1,11 @@
+// The guide's LLM-generated column is absent from the migration-derived schema.
+module App.TypedDslGuide exposing (..)
+
+import Sql
+
+sql migration 1 "people" {
+  create table people (id bigint primary key, name text not null);
+}
+
+let names = sql { from p in People select { name = p.nickname } }
+//~ std/Q001 @10:52-10:62 `People` has no column `nickname`
