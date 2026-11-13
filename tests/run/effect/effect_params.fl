@@ -1,0 +1,34 @@
+// Type arguments are preserved for tail operations and typed errors.
+module App.Main exposing (main)
+
+effect Ask a =
+  ask : Unit ->{} a
+
+type error Missing a = Missing a
+
+type error Later = Later
+
+with_answer : a -> (Unit ->{Ask a | r; e} b) ->{r; e} b
+let with_answer answer body =
+  try body () with
+  | Ask.ask () -> answer
+
+recover : Eff r {Missing a | e} a ->{r; e} a
+let recover work =
+  try await work with
+  | Missing value -> value
+
+later : Unit ->{; Missing Int, Later} Int
+let later () = from_result (Err Later)
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line (show (with_answer 41 (fun () -> Ask.ask () + 1)))
+  Platform.stdout_line (with_answer "hello" (fun () -> Ask.ask () ++ "!"))
+  Platform.stdout_line (show (recover (task { from_result (Err (Missing 7)) })))
+  Platform.stdout_line
+    (show
+      (
+        try recover (task { later () }) with
+        | Later -> 99
+      ))

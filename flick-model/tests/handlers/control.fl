@@ -1,14 +1,13 @@
 module App.Main exposing (main)
 
-// the model's services and effects have no parameters
 type error Missing = Missing
 type error Other = Other
 
 effect Select =
   control select : Unit ->{} Int
 
-effect Emit =
-  control emit : Int ->{} Unit
+effect Emit a =
+  control emit : a ->{} Unit
 
 effect Choose =
   control choose : Unit ->{} Bool
@@ -16,13 +15,13 @@ effect Choose =
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-collect : (Unit ->{Emit | r; e} Unit) ->{r; e} List Int
+collect : (Unit ->{Emit a | r; e} Unit) ->{r; e} List a
 let collect body =
   try body () with
   | Emit.emit x -> [x] ++ resume ()
   | return () -> []
 
-reversed : (Unit ->{Emit | r; e} Unit) ->{r; e} List Int
+reversed : (Unit ->{Emit a | r; e} Unit) ->{r; e} List a
 let reversed body =
   try body () with
   | Emit.emit x ->
@@ -30,13 +29,13 @@ let reversed body =
     rest ++ [x]
   | return () -> []
 
-first : (Unit ->{Emit; none} Unit) ->{} Int
+first : (Unit ->{Emit Int} Unit) ->{} Int
 let first body =
   try body () with
   | Emit.emit x -> x
   | return () -> 0
 
-three : Unit ->{Emit; none} Unit
+three : Unit ->{Emit Int} Unit
 let three () =
   Emit.emit 1
   Emit.emit 2

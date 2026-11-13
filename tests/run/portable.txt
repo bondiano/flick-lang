@@ -96,6 +96,7 @@ stdlib/seq
 stdlib/seqs
 codegen/services
 effect/service_params
+effect/effect_params
 codegen/service_dictionary
 codegen/service_place
 codegen/scope_run

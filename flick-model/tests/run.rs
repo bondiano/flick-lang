@@ -10,6 +10,7 @@ use std::{env, fs, panic};
 
 use flick_model::eval::Outcome;
 use flick_model::run;
+use flick_model::syntax::Path as ModelPath;
 use flick_test_support::entries;
 
 /// Steps a case may take: enough for every case listed, few enough that a
@@ -23,6 +24,33 @@ fn root() -> PathBuf {
 fn cases(list: &str) -> Vec<String> {
     let text = fs::read_to_string(root().join(list)).expect("readable list of cases");
     entries(&text).into_iter().map(str::to_owned).collect()
+}
+
+#[test]
+fn parameterized_error_rows_keep_their_arguments() {
+    let modules = run::compile_source(
+        r"module App.Main exposing (..)
+type error Missing a = Missing a
+integers : Eff none {Missing Int} Int
+let integers = task { from_result (Err (Missing 7)) }
+strings : Eff none {Missing String} Int
+let strings = task { 0 }
+",
+    )
+    .expect("both declared error rows are valid");
+    let mut program = run::program(&modules);
+    assert!(run::check(&modules, &program).is_empty());
+    let integers = program.globals[&ModelPath::new("App.Main", "integers")].clone();
+    program
+        .globals
+        .insert(ModelPath::new("App.Main", "strings"), integers);
+    let errors = run::check(&modules, &program);
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert!(errors[0].starts_with("App.Main.strings: "), "{errors:?}");
+    assert!(
+        errors[0].contains("Int") && errors[0].contains("String"),
+        "{errors:?}"
+    );
 }
 
 #[test]
