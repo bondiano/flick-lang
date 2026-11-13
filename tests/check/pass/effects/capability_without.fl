@@ -1,0 +1,25 @@
+// An open callback row can exclude Db without excluding other services or errors.
+module App.CapabilityWithout exposing (..)
+
+service Db =
+  query : Unit ->{} Int
+
+service Tx =
+  begin : Unit ->{} Int
+
+service Clock =
+  tick : Unit ->{} Int
+
+type error Missing = Missing
+
+without_db : (Unit ->{Tx, -Db | r; e} a) ->{Tx | r; e} a
+let without_db work = work ()
+
+safe : Unit ->{Tx} Int
+let safe () = without_db (fun () -> Tx.begin ())
+
+with_clock : Unit ->{Tx, Clock} Int
+let with_clock () = without_db (fun () -> Tx.begin () + Clock.tick ())
+
+with_error : Unit ->{Tx; Missing} Int
+let with_error () = without_db (fun () -> from_result (Err Missing))

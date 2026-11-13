@@ -1,0 +1,20 @@
+// Providing Db to the caller does not allow a callback whose row excludes Db to use it.
+module App.CapabilityWithout exposing (..)
+
+service Db =
+  query : Unit ->{} Int
+
+service Tx =
+  begin : Unit ->{} Int
+
+without_db : (Unit ->{Tx, -Db | r} a) ->{Tx | r} a
+let without_db work = work ()
+
+direct : Unit ->{Tx, Db} Int
+let direct () = without_db (fun () -> Db.query ())
+
+indirect : (Unit ->{Db} Int) ->{Tx, Db} Int
+let indirect callback = without_db callback
+
+//~ FLICK-E002 @14:39-14:50 the expected type `Unit ->{Tx} Int` does not allow service `Db`, which this needs
+//~ FLICK-E002 @17:36-17:44 the expected type `Unit ->{Tx} Int` does not allow service `Db`, which this needs
