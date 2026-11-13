@@ -8,14 +8,14 @@ use crate::project::Analysis;
 use crate::source::SourceMap;
 use crate::types::Ref;
 
+mod contracts;
+
 const NAMED: &str = "module App.Named exposing (Named(..), describe)
 class Named a =
   describe : a -> String
 instance Named Int =
   let describe _ = \"value\"
 ";
-
-const CONTRACT: &str = "module App.Contracts exposing (Sig)\nimport App.Named as N\ntype module Sig =\n  class Named = N.Named\n  describe : Named a => a -> String\n";
 
 fn assert_clean(f: &Fixture) {
     let errors: Vec<_> = f
@@ -75,23 +75,17 @@ fn class_rename_refuses_type_recovery_that_skips_a_method_use() {
 }
 
 #[test]
-fn class_rename_refuses_an_unmapped_static_result_signature_field() {
-    let facade = "module App.Facade : App.Contracts.Sig exposing (Named, describe)\nimport App.Contracts\nimport App.Named exposing (Named, describe)\n";
+fn class_rename_refuses_unpack_payload_capture() {
+    let contract =
+        "module App.BoxContracts exposing (Box)\ntype module Box =\n  type Key\n  value : Key\n";
+    let payload = "module App.Payload exposing (Key, value)\ntype alias Key = Int\nvalue : Key\nlet value = 1\n";
+    let packed = "module App.Packed exposing (value)\nimport App.BoxContracts exposing (Box)\nimport App.Payload as P\nvalue : exists K : Box. K.Key\nlet value = unpack (pack P as Box) as K in K.value\n";
+    let user = "module App.Use exposing (answer)\nimport App.Packed as P\nimport App.Named exposing (describe)\nanswer : String\nlet answer = unpack P.value as K, render in describe 1\n";
     let f = fixture_of(&[
         ("src/App/Named.fl", NAMED),
-        ("src/App/Contracts.fl", CONTRACT),
-        ("src/App/Facade.fl", facade),
-    ]);
-    assert_clean(&f);
-    assert_refused(&f, "render");
-}
-
-#[test]
-fn class_rename_refuses_inline_static_result_signature_fields() {
-    let user = "module App.Use exposing (..)\nimport App.Contracts\nmodule Facade : App.Contracts.Sig exposing (Named, describe) =\n  import App.Named exposing (Named, describe)\n";
-    let f = fixture_of(&[
-        ("src/App/Named.fl", NAMED),
-        ("src/App/Contracts.fl", CONTRACT),
+        ("src/App/BoxContracts.fl", contract),
+        ("src/App/Payload.fl", payload),
+        ("src/App/Packed.fl", packed),
         ("src/App/Use.fl", user),
     ]);
     assert_clean(&f);
@@ -99,83 +93,138 @@ fn class_rename_refuses_inline_static_result_signature_fields() {
 }
 
 #[test]
-fn class_rename_refuses_static_module_ascription_alias_fields() {
-    for alias in [
-        "module Facade : App.Contracts.Sig = App.Named\n",
-        "module Facade = (App.Named : App.Contracts.Sig)\n",
-    ] {
-        let user = format!(
-            "module App.Use exposing (Facade)\nimport App.Contracts\nimport App.Named\n{alias}"
-        );
-        let f = fixture_of(&[
-            ("src/App/Named.fl", NAMED),
-            ("src/App/Contracts.fl", CONTRACT),
-            ("src/App/Use.fl", &user),
-        ]);
-        assert_clean(&f);
-        assert_refused(&f, "render");
-    }
+fn class_rename_refuses_qualified_dictionary_dispatch() {
+    let user = "module App.Use exposing (value)\nimport App.Named as Named exposing (Named)\nvalue : String\nlet value = Named.describe 1\n";
+    let f = fixture_of(&[("src/App/Named.fl", NAMED), ("src/App/Use.fl", user)]);
+    assert_clean(&f);
+    let named = NAMED.replace("describe", "dictionary");
+    let user = user.replace("Named.describe", "Named.dictionary");
+    let updated = fixture_of(&[("src/App/Named.fl", &named), ("src/App/Use.fl", &user)]);
+    assert!(
+        !updated
+            .ide()
+            .analysis
+            .module("App.Use")
+            .expect("use module")
+            .typing
+            .dictionary_constructors
+            .is_empty(),
+        "the renamed qualifier starts class-dictionary dispatch rather than the method"
+    );
+    assert_refused(&f, "dictionary");
 }
 
 #[test]
-fn class_rename_refuses_static_argument_signature_fields() {
-    let make = "private module App.Make(K : App.Contracts.Sig) exposing (answer)\nanswer : Int\nlet answer = 1\n";
-    let user = "module App.Use exposing (answer)\nmodule Built = App.Make(App.Named)\nanswer : Int\nlet answer = Built.answer\n";
-    let f = fixture_of(&[
-        ("src/App/Named.fl", NAMED),
-        ("src/App/Contracts.fl", CONTRACT),
-        ("src/App/Make.fl", make),
-        ("src/App/Use.fl", user),
-    ]);
+fn class_rename_refuses_qualified_service_operation_dispatch() {
+    let user = "module App.Use exposing (value)\nimport App.Named as Clock\nservice Clock =\n  render : Int ->{} String\nvalue : String\nlet value = Clock.describe 1\n";
+    let f = fixture_of(&[("src/App/Named.fl", NAMED), ("src/App/Use.fl", user)]);
     assert_clean(&f);
-    let renamed = NAMED.replace("describe", "render");
-    let updated = fixture_of(&[
-        ("src/App/Named.fl", &renamed),
-        ("src/App/Contracts.fl", CONTRACT),
-        ("src/App/Make.fl", make),
-        ("src/App/Use.fl", user),
-    ]);
+    let named = NAMED.replace("describe", "render");
+    let user = user.replace("Clock.describe", "Clock.render");
+    let updated = fixture_of(&[("src/App/Named.fl", &named), ("src/App/Use.fl", &user)]);
     assert!(
         updated
             .ide()
             .analysis
-            .diagnostics
-            .iter()
-            .any(|d| d.code == codes::T060 && d.message.contains("describe")),
-        "the argument's unchanged contract still requires the old method field"
+            .module("App.Use")
+            .expect("use module")
+            .typing
+            .names
+            .values()
+            .any(|r| matches!(r, Ref::Operation { name, .. } if name == "render")),
+        "the service operation takes precedence over the module's renamed method"
     );
     assert_refused(&f, "render");
 }
 
 #[test]
-fn class_rename_allows_unused_contracts_and_unannotated_aliases() {
-    for body in ["module Facade = App.Named\n", "let answer = 1\n"] {
-        let user =
-            format!("module App.Use exposing (..)\nimport App.Contracts\nimport App.Named\n{body}");
-        let f = fixture_of(&[
-            ("src/App/Named.fl", NAMED),
-            ("src/App/Contracts.fl", CONTRACT),
-            ("src/App/Use.fl", &user),
-        ]);
-        assert_clean(&f);
-        assert!(
-            f.ide()
-                .rename(
-                    f.file("App.Named"),
-                    f.at("App.Named", "describe :", 0) + 1,
-                    "render"
-                )
-                .is_ok(),
-            "an independent, unused structural signature is not a method occurrence"
-        );
-        let renamed = NAMED.replace("describe", "render");
-        let updated = fixture_of(&[
-            ("src/App/Named.fl", &renamed),
-            ("src/App/Contracts.fl", CONTRACT),
-            ("src/App/Use.fl", &user),
-        ]);
-        assert_clean(&updated);
-    }
+fn class_rename_allows_qualified_dictionary_method_through_nonclass_alias() {
+    let user = "module App.Use exposing (value)\nimport App.Named as Other\ntype alias Other = Int\nvalue : String\nlet value = Other.describe 1\n";
+    let f = fixture_of(&[("src/App/Named.fl", NAMED), ("src/App/Use.fl", user)]);
+    assert_clean(&f);
+    assert!(
+        f.ide()
+            .rename(
+                f.file("App.Named"),
+                f.at("App.Named", "describe :", 0) + 1,
+                "dictionary"
+            )
+            .is_ok(),
+        "a non-class type with the module alias's spelling cannot trigger dictionary construction"
+    );
+    let named = NAMED.replace("describe", "dictionary");
+    let user = user.replace("Other.describe", "Other.dictionary");
+    let updated = fixture_of(&[("src/App/Named.fl", &named), ("src/App/Use.fl", &user)]);
+    assert_clean(&updated);
+    assert!(
+        updated
+            .ide()
+            .analysis
+            .module("App.Use")
+            .expect("use module")
+            .typing
+            .dictionary_constructors
+            .is_empty()
+    );
+}
+
+#[test]
+fn class_rename_refuses_control_handler_resume_capture() {
+    let user = "module App.Use exposing (run)\nimport App.Named exposing (describe)\neffect Ask =\n  control ask : Unit ->{} String\nrun : Unit ->{} String\nlet run () =\n  try Ask.ask () with\n  | Ask.ask () -> describe 1\n";
+    let f = fixture_of(&[("src/App/Named.fl", NAMED), ("src/App/Use.fl", user)]);
+    assert_clean(&f);
+    assert_refused(&f, "resume");
+}
+
+#[test]
+fn class_rename_allows_resume_name_in_a_control_handler_guard() {
+    let user = "module App.Use exposing (run)\nimport App.Named exposing (describe)\neffect Ask =\n  control ask : Unit ->{} String\nrun : Unit ->{} String\nlet run () =\n  try Ask.ask () with\n  | Ask.ask () when describe 1 == \"value\" -> resume \"value\"\n  | Ask.ask () -> resume \"fallback\"\n";
+    let f = fixture_of(&[("src/App/Named.fl", NAMED), ("src/App/Use.fl", user)]);
+    assert_clean(&f);
+    assert!(
+        f.ide()
+            .rename(
+                f.file("App.Named"),
+                f.at("App.Named", "describe :", 0) + 1,
+                "resume"
+            )
+            .is_ok(),
+        "resume is introduced only for the arm body, not its guard"
+    );
+    let named = NAMED.replace("describe", "resume");
+    let user = user.replace("describe", "resume");
+    assert_clean(&fixture_of(&[
+        ("src/App/Named.fl", &named),
+        ("src/App/Use.fl", &user),
+    ]));
+}
+
+#[test]
+fn class_rename_refuses_private_component_collision() {
+    use crate::iface::Namespace;
+
+    let user = "module App.Use exposing (result)\nimport App.Named exposing (describe)\ncomponent render_widget (label : String) = ui { text label }\nresult : String\nlet result = describe 1\n";
+    let f = fixture_of(&[("src/App/Named.fl", NAMED), ("src/App/Use.fl", user)]);
+    assert_clean(&f);
+    let module = f.ide().analysis.module("App.Use").expect("use module");
+    assert!(
+        module
+            .interface
+            .find(Namespace::Value, "render_widget")
+            .is_none(),
+        "the component must be private in this regression"
+    );
+    assert!(
+        module
+            .expansion
+            .as_ref()
+            .expect("component expansion")
+            .declarations()
+            .iter()
+            .any(|d| d.name == "render_widget"),
+        "the private value is a real expansion declaration"
+    );
+    assert_refused(&f, "render_widget");
 }
 
 #[cfg(feature = "native-project")]

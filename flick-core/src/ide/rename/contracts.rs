@@ -3,6 +3,7 @@
 
 use super::Ide;
 use crate::iface::{Entity, Interface};
+use crate::project::Analyzed;
 use crate::resolve::module_syntax;
 use crate::source::FileId;
 use crate::syntax::cst::Node;
@@ -29,15 +30,22 @@ impl Ide<'_> {
         {
             return true;
         }
+        if let Some(body) = syntax.header.as_ref().and_then(|h| h.body.as_ref())
+            && self
+                .analysis
+                .module(module)
+                .is_some_and(|scope| self.method_argument_in(body, scope, e, false))
+        {
+            return true;
+        }
         for app in syntax.applications {
             // A parameter contract may require a method field even when
             // the functor's result does not re-export that method.
-            if self.analysis.module(module).is_some_and(|scope| {
-                app.arguments.iter().any(|argument| {
-                    self.opening_interface(scope, argument)
-                        .is_some_and(|i| contains(i, e))
-                })
-            }) {
+            if self
+                .analysis
+                .module(module)
+                .is_some_and(|scope| self.method_argument_in(&app.expression, scope, e, false))
+            {
                 return true;
             }
             if (app.annotation.is_some() || ascribed(&app.expression))
@@ -73,6 +81,37 @@ impl Ide<'_> {
             }
         }
         false
+    }
+
+    fn method_argument_in(
+        &self,
+        node: &Node,
+        scope: &Analyzed,
+        e: &Entity,
+        argument: bool,
+    ) -> bool {
+        match node.kind {
+            K::ModulePath if argument => {
+                let path: String = node
+                    .text(self.text(scope.file))
+                    .split_whitespace()
+                    .collect();
+                self.opening_interface(scope, &path)
+                    .is_some_and(|i| contains(i, e))
+            }
+            K::ModuleApplyExpr => node
+                .nodes()
+                .enumerate()
+                .any(|(i, child)| self.method_argument_in(child, scope, e, argument || i > 0)),
+            K::ModuleParenExpr | K::ModuleAnnotExpr => node
+                .nodes()
+                .next()
+                .is_some_and(|child| self.method_argument_in(child, scope, e, argument)),
+            K::ModuleParamGroup | K::ModuleResult => false,
+            _ => node
+                .nodes()
+                .any(|child| self.method_argument_in(child, scope, e, argument)),
+        }
     }
 }
 

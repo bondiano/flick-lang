@@ -41,6 +41,10 @@ pub struct Typing {
     pub declarations: Arc<Interface>,
     /// Every name in an expression or a constructor pattern.
     pub names: HashMap<Range, Ref>,
+    #[cfg(feature = "ide")]
+    /// Member spellings that would dispatch through an in-scope class or
+    /// service before the module of a qualified method reference.
+    pub method_dispatch: HashMap<Range, Vec<String>>,
     /// Accesses to local mutable cells, for order- and capture-sensitive fixes.
     pub mutable_reads: HashSet<Range>,
     /// The public runtime values captured by each `pack M as Sig`.
