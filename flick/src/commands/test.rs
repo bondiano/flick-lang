@@ -193,7 +193,7 @@ fn prepare(
     } else {
         "Emitting JavaScript"
     });
-    let mut emitted = artifacts(&host, &sources, Some(&project), &compilation, &output);
+    let mut emitted = artifacts(&host, &mut sources, Some(&project), &compilation, &output);
     write_artifacts(&output, &mut emitted, &progress);
     if !emitted.diagnostics.is_empty() {
         drop(progress);

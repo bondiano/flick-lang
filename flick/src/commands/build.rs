@@ -247,7 +247,7 @@ impl Command for BuildCommand {
             (false, true) => "Emitting TypeScript",
             (false, false) => "Emitting JavaScript",
         });
-        let mut emitted = artifacts(&host, &sources, project.as_ref(), &compilation, &output);
+        let mut emitted = artifacts(&host, &mut sources, project.as_ref(), &compilation, &output);
         self.record(
             &output,
             Some(modules.len()),
@@ -421,7 +421,7 @@ pub struct Emission {
 /// TypeScript form is reported.
 pub fn emit(
     host: &FsHost,
-    sources: &SourceMap,
+    sources: &mut SourceMap,
     project: Option<&Project>,
     compilation: &Compilation,
     output: &BuildPlan,
@@ -435,7 +435,7 @@ pub fn emit(
 /// through to the temporary native baseline.
 pub fn artifacts(
     host: &FsHost,
-    sources: &SourceMap,
+    sources: &mut SourceMap,
     project: Option<&Project>,
     compilation: &Compilation,
     output: &BuildPlan,
