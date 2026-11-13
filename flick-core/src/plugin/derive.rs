@@ -16,6 +16,7 @@ use std::sync::{Arc, OnceLock};
 use super::expansion::{Expanded, Expansion};
 use super::render::render;
 use super::source::BlockSource;
+use super::written::{user_type, written};
 use super::{EditorBlock, Expander, Failure, ROUNDS, blocks_under, first_party, placed};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::resolve::ModuleSyntax;
@@ -98,21 +99,49 @@ pub fn target(
             end: e - start,
         }
     };
+    let ty = |n: &Node| written(n, text, start);
     let named = |name: &str| match qualifier {
         Some(q) => format!("{q}.{name}"),
         None => name.to_owned(),
     };
     let name = decl.child_tokens().find(|t| t.kind == K::Con)?.text(text);
-    let params = (decl.nodes())
+    let (params, kinds) = (decl.nodes())
         .filter(|n| n.kind == K::TypeParam)
-        .filter_map(|p| p.child_tokens().find(|t| t.kind == K::Ident))
+        .filter_map(|p| {
+            let name = p.child_tokens().find(|t| t.kind == K::Ident)?.text(text);
+            // Canonical token spacing, independent of how the kind was written.
+            let kind = p.nodes().next().map_or_else(String::new, |k| {
+                k.tokens()
+                    .iter()
+                    .filter(|t| !t.kind.is_trivia())
+                    .map(|t| t.text(text))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            });
+            Some((name.to_owned(), kind))
+        })
+        .unzip();
+    // the words before its name: `type`, `alias`, `opaque`, `unboxed`, `error`
+    let modifiers = (decl.child_tokens())
+        .take_while(|t| t.kind != K::Con)
         .map(|t| t.text(text).to_owned())
+        .collect();
+    let deriving = (decl.nodes())
+        .filter(|n| n.kind == K::DerivingClause)
+        .flat_map(|clause| named_classes(clause, text))
+        .map(|n| {
+            if n.qualifier.is_empty() {
+                n.name
+            } else {
+                format!("{}.{}", n.qualifier, n.name)
+            }
+        })
         .collect();
     let cases = (decl.nodes())
         .filter(|n| n.kind == K::Variant)
         .filter_map(|v| {
             let con = v.child_tokens().find(|t| t.kind == K::Con)?.text(text);
-            let fields = v.nodes().filter(|n| is_type(n.kind)).map(span).collect();
+            let fields = v.nodes().filter(|n| is_type(n.kind)).map(ty).collect();
             Some(CaseTarget {
                 name: named(con),
                 fields,
@@ -132,9 +161,12 @@ pub fn target(
         decl: block,
         name: named(name),
         params,
+        kinds,
         cases,
-        alias: body.filter(|_| alias).map(span),
+        alias: body.filter(|_| alias).map(ty),
         wraps: None,
+        modifiers,
+        deriving,
         local: qualifier.is_none(),
     })
 }
@@ -149,6 +181,10 @@ pub struct Named<'n> {
 
 /// The classes `node`, a `deriving` clause or a `deriving instance`, names.
 pub fn named<'n>(node: &'n Node, text: &str) -> Vec<Named<'n>> {
+    named_classes(node, text)
+}
+
+fn named_classes<'n>(node: &'n Node, text: &str) -> Vec<Named<'n>> {
     let mut out = Vec::new();
     let mut path: Vec<Token> = Vec::new();
     let mut finish = |path: &mut Vec<Token>, args: Option<&'n Node>| {
@@ -434,7 +470,7 @@ fn std_round(
         let Some(arena) = made_or(made, first_party::PACKAGE, &source, whole, diagnostics) else {
             continue;
         };
-        let types = declared(&arena, block);
+        let types = declared(&arena, block, &|span| user_type(&source, span));
         match render(&arena, block.whole().end, source.place(), aliases) {
             Ok(rendered) => out.push((
                 Expanded {

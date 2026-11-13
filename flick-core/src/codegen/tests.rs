@@ -7,6 +7,8 @@ use crate::ir::lang_items;
 use crate::ir::tests::lower_text;
 use crate::types::{Constructor, Rep};
 
+mod layout;
+
 fn compile(text: &str) -> String {
     compile_with(text, false, Labels::default()).code
 }

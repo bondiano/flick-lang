@@ -28,6 +28,7 @@ use crate::plugin::expansion::{Expanded, Expansion};
 use crate::plugin::reach::{Gate, Reach};
 use crate::plugin::render::{Rendered, render};
 use crate::plugin::source::BlockSource;
+use crate::plugin::written::user_type;
 use crate::plugin::{
     EditorBlock, Expander, Failure, ROUNDS, blocks_under, first_party, head_token, placed,
 };
@@ -329,7 +330,7 @@ impl Loader<'_> {
                 }
                 match expanded {
                     Ok(arena) => {
-                        f.declared = declared(&arena, block);
+                        f.declared = declared(&arena, block, &|span| user_type(&f.source, span));
                         let len = u32::try_from(block.text.len()).expect("source fits in u32");
                         let aliases = self.modules[f.module].syntax.aliases();
                         match render(&arena, len, block.place, &aliases) {

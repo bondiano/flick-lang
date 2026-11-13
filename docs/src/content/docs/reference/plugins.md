@@ -186,7 +186,7 @@ the function's first parameter is applied through it: `badge props` is
 an integer literal, of any numeric type its use asks for; a declaration
 block whose group is empty declares nothing. A function in a
 plugin's code needs no signature: its type is inferred. The arena version is the version of the interface,
-`0.2.0`. Build
+`0.3.0`. Build
 a component with the `flick-plugin` of the compiler it runs in. A component
 built for another version does not load: the import that exposes its heads
 is `FLICK-P035`, naming the version it was built for and the one the
@@ -337,6 +337,15 @@ A type that names such a class in `deriving`, maybe with arguments
 - `class` is the class's full name, `Pairs.Arbitrary`;
 - `args` the `{ … }` after the class;
 - `module` every type the module declares.
+
+Protocol 0.3.0 gives each constructor field, alias and wrapped type as a
+`Written` tree with source spans; `Signature.ty` has the same representation.
+Read `Written.kind` (`Con`, `Var`, `Record`, `Tuple`, `Arrow` and the other
+variants) instead of parsing `Block.tokens` at a field's span. Parameter
+kinds are token-normalized strings, so `Type->Type` and `Type -> Type` are
+both `Type -> Type`. Spans remain relative to the declaration or signature
+for diagnostics and holes. Rebuild native plugins and WASM components with
+the matching SDK; a 0.2.0 component is rejected with `FLICK-P035`.
 
 The plugin gives declarations, an instance and what goes with it, which
 follow the type's declaration, or take the place of `deriving instance`.
@@ -612,4 +621,4 @@ is checked again in each build.
 
 `check-structure` receives the structure of a block's original expression and declaration holes, together with the project's lint thresholds. It can report warnings without type wildcards. Generated wrappers do not contribute to these facts. The UI plugin uses it for T036–T038 on `component`.
 
-A refined call carries enum literals or an expression arena with resolved references. The refined plugin recognizes `Checks.*` and evaluates supported local predicates; an unknown result remains a runtime check. The host supplies no predicate verdict. Protocol 0.2.0 changes the WIT interface and invalidates expansion caches; rebuild external plugins with the matching SDK.
+A refined call carries enum literals or an expression arena with resolved references. The refined plugin recognizes `Checks.*` and evaluates supported local predicates; an unknown result remains a runtime check. The host supplies no predicate verdict. Protocol 0.3.0 changes signature and derive inputs to parsed types and invalidates expansion caches; rebuild external plugins with the matching SDK.

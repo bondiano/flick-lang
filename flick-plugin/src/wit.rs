@@ -35,6 +35,7 @@ macro_rules! wit_conversions {
                     signature: b.signature.as_ref().map(|s| w::SignatureAbove {
                         text: s.text.clone(),
                         tokens: to_tokens(&s.tokens),
+                        ty: s.ty.as_ref().map(to_written),
                     }),
                     module: b.module.clone(),
                 }
@@ -68,6 +69,7 @@ macro_rules! wit_conversions {
                     signature: b.signature.map(|s| $crate::Signature {
                         text: s.text,
                         tokens: from_tokens(s.tokens),
+                        ty: s.ty.and_then(from_written),
                     }),
                     module: b.module,
                 }
@@ -188,15 +190,18 @@ macro_rules! wit_conversions {
                     decl: to_block(&t.decl),
                     name: t.name.clone(),
                     params: t.params.clone(),
+                    kinds: t.kinds.clone(),
                     cases: t.cases.iter().map(|c| w::CaseTarget {
                         name: c.name.clone(),
-                        fields: c.fields.iter().copied().map(to_span).collect(),
+                        fields: c.fields.iter().map(to_written).collect(),
                         literal: c.literal.map(to_span),
                         refined: c.refined,
                         constrained: c.constrained,
                     }).collect(),
-                    alias: t.alias.map(to_span),
-                    wraps: t.wraps.map(to_span),
+                    alias: t.alias.as_ref().map(to_written),
+                    wraps: t.wraps.as_ref().map(to_written),
+                    modifiers: t.modifiers.clone(),
+                    deriving: t.deriving.clone(),
                     local: t.local,
                 }
             }
@@ -206,17 +211,78 @@ macro_rules! wit_conversions {
                     decl: from_block(t.decl),
                     name: t.name,
                     params: t.params,
+                    kinds: t.kinds,
                     cases: t.cases.into_iter().map(|c| $crate::CaseTarget {
                         name: c.name,
-                        fields: c.fields.into_iter().map(from_span).collect(),
+                        // an index out of order is a type nothing reads
+                        fields: c.fields.into_iter().map(|f| {
+                            let span = f.last().map_or_else(Default::default, |n| $crate::Span { start: n.start, end: n.end });
+                            from_written(f).unwrap_or($crate::Written { kind: $crate::WrittenKind::Other, span })
+                        }).collect(),
                         literal: c.literal.map(from_span),
                         refined: c.refined,
                         constrained: c.constrained,
                     }).collect(),
-                    alias: t.alias.map(from_span),
-                    wraps: t.wraps.map(from_span),
+                    alias: t.alias.and_then(from_written),
+                    wraps: t.wraps.and_then(from_written),
+                    modifiers: t.modifiers,
+                    deriving: t.deriving,
                     local: t.local,
                 }
+            }
+
+            fn to_written(t: &$crate::Written) -> w::Written {
+                t.flatten().into_iter().map(|n| w::WrittenNode {
+                    start: n.span.start,
+                    end: n.span.end,
+                    kind: match n.kind {
+                        $crate::FlatKind::Con { name, args } => w::WrittenKind::Con(w::WrittenName { name, args }),
+                        $crate::FlatKind::Var { name, args } => w::WrittenKind::Var(w::WrittenName { name, args }),
+                        $crate::FlatKind::Record { fields, open } => w::WrittenKind::Record(w::WrittenRecord { fields, open }),
+                        $crate::FlatKind::Tuple(items) => w::WrittenKind::Tuple(items),
+                        $crate::FlatKind::Unit => w::WrittenKind::Unit,
+                        $crate::FlatKind::Arrow { from, to, row } => w::WrittenKind::Arrow(w::WrittenArrow {
+                            takes: from,
+                            gives: to,
+                            row: row.map(|r| w::WrittenRow {
+                                services: r.services,
+                                services_open: r.services_open,
+                                errors: r.errors,
+                                errors_open: r.errors_open,
+                            }),
+                        }),
+                        $crate::FlatKind::Captured(of) => w::WrittenKind::Captured(of),
+                        $crate::FlatKind::Generic => w::WrittenKind::Generic,
+                        $crate::FlatKind::Other => w::WrittenKind::Other,
+                    },
+                }).collect()
+            }
+
+            fn from_written(nodes: w::Written) -> Option<$crate::Written> {
+                let flat: Vec<$crate::FlatWritten> = nodes.into_iter().map(|n| $crate::FlatWritten {
+                    span: $crate::Span { start: n.start, end: n.end },
+                    kind: match n.kind {
+                        w::WrittenKind::Con(n) => $crate::FlatKind::Con { name: n.name, args: n.args },
+                        w::WrittenKind::Var(n) => $crate::FlatKind::Var { name: n.name, args: n.args },
+                        w::WrittenKind::Record(r) => $crate::FlatKind::Record { fields: r.fields, open: r.open },
+                        w::WrittenKind::Tuple(items) => $crate::FlatKind::Tuple(items),
+                        w::WrittenKind::Unit => $crate::FlatKind::Unit,
+                        w::WrittenKind::Arrow(a) => $crate::FlatKind::Arrow {
+                            from: a.takes,
+                            to: a.gives,
+                            row: a.row.map(|r| $crate::FlatRow {
+                                services: r.services,
+                                services_open: r.services_open,
+                                errors: r.errors,
+                                errors_open: r.errors_open,
+                            }),
+                        },
+                        w::WrittenKind::Captured(of) => $crate::FlatKind::Captured(of),
+                        w::WrittenKind::Generic => $crate::FlatKind::Generic,
+                        w::WrittenKind::Other => $crate::FlatKind::Other,
+                    },
+                }).collect();
+                $crate::Written::unflatten(&flat)
             }
 
             pub fn to_piece(p: $crate::Piece) -> w::Piece {

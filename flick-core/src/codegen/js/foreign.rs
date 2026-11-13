@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use flick_ir::Shape;
 
 use super::bridge::Toward;
+use super::doc::{After, Before, Head, Js, Stmt, call};
 use super::{Gen, names};
 use crate::codegen::Options;
 use crate::effects::owned;
@@ -14,6 +15,7 @@ use crate::effects::{belongs_to, bindings};
 use crate::effects::{effect_specifier, requires_adapter, selected_on_kernel};
 use crate::ir::Copies;
 use crate::ir::{Foreign, ForeignMode, Item, ItemKind};
+use flick_pretty::docvec;
 
 /// What crosses `f` as a copy: an import outside the runtime may change
 /// Flick data in place (`docs/formal/ts-holes.md#31-flick-data-is-copied-at-the-foreign-boundary`).
@@ -42,7 +44,7 @@ fn contains_eff(shape: &Shape) -> bool {
     }
 }
 
-impl Gen<'_> {
+impl<'d> Gen<'_, 'd> {
     /// The import used by this binding and whether its value crosses to Effect.
     fn foreign_target(&mut self, f: &Foreign) -> (String, bool) {
         let Some(module) = &f.binding.from else {
@@ -96,9 +98,11 @@ impl Gen<'_> {
         (alias, bridged)
     }
 
-    pub(super) fn foreign(&mut self, f: &Foreign) -> String {
+    pub(super) fn foreign(&mut self, f: &Foreign) -> Vec<Stmt<'d>> {
+        let a = self.a;
         let (target, bridged) = self.foreign_target(f);
         let info = &f.adapter;
+        let copy_result = copies(f).is_some_and(|c| c.result);
         let dicts: Vec<String> = (0..f.dicts).map(|i| format!("$d{i}")).collect();
         let params: Vec<String> = (0..f.taken()).map(|i| format!("$a{i}")).collect();
         let runtime = params
@@ -107,60 +111,60 @@ impl Gen<'_> {
             .and_then(|i| f.stages.get(i))
             .copied()
             .unwrap_or(false);
-        let copy_result = copies(f).is_some_and(|c| c.result);
         if f.arity == 0 && params.is_empty() && f.dicts == 0 && f.mode == ForeignMode::Pure {
-            let value = self.copied(copy_result, target);
+            let value = self.copied(copy_result, self.leaf(&target));
             let value = if bridged {
                 self.crossed(Toward::Flick, &info.result_shape, value)
             } else {
                 value
             };
-            return self.export(&names::ident(&f.name), &value);
+            return vec![self.export(&names::ident(&f.name), value)];
         }
         let id = names::ident(&f.name);
         let plain = self.direct_foreigns.contains_key(&f.name) && !bridged;
         // a constant, not `export { … as … }`: the module names it too
         if plain && params.len() == 1 {
-            return self.export(&id, &target);
+            return vec![self.export(&id, self.leaf(&target))];
         }
-        let call = self.foreign_call(f, &target, &dicts, &params, bridged);
-        let result = |g: &mut Self, v: &str| g.foreign_result(f, copy_result, v);
+        let applied = self.foreign_call(f, &target, &dicts, &params, bridged);
+        let result = |g: &mut Self, v: Js<'d>| g.foreign_result(f, copy_result, v);
         let catch = f.catch.as_ref().map(|c| self.expr(c));
+        let resolved = |g: &mut Self| {
+            let value = result(g, g.leaf("$v"));
+            g.arrow_to(a.text("($v) =>"), value)
+        };
         let bridged_body = if bridged {
-            self.bridged_body(f, runtime, &call, copy_result, catch.as_deref())
+            self.bridged_body(f, runtime, applied, copy_result, catch)
         } else {
             None
         };
         let mut body = match (bridged_body, f.mode, runtime) {
             (Some(body), _, _) => body,
-            (None, ForeignMode::Pure, _) | (None, _, false) => result(self, &call),
+            (None, ForeignMode::Pure, _) | (None, _, false) => result(self, applied),
             (None, ForeignMode::Sync | ForeignMode::Effect, true) if self.kernel => {
-                self.kernel_foreign(f, copy_result, &call, catch)
+                self.kernel_foreign(f, copy_result, applied, catch)
             }
             (None, ForeignMode::Sync, true) => {
-                let value = result(self, &call);
-                match catch {
-                    Some(c) => format!("{}(() => {value}, {c})", self.rt("foreignSync")),
-                    None => format!("{}(() => {value})", self.effect("sync")),
-                }
+                let value = result(self, applied);
+                let thunk = self.thunk(value);
+                self.guarded(("foreignSync", "sync"), thunk, catch)
             }
             (None, ForeignMode::Async, true) => {
-                let value = result(self, "$v");
-                let start = format!(
-                    "{} Promise.resolve({call}).then(($v) => {value})",
-                    self.arrow("$signal")
-                );
-                let catch = catch.map_or(String::new(), |c| format!(", {c}"));
-                format!("{}({start}{catch})", self.rt("foreignAsync"))
+                let then = resolved(self);
+                let promise = call(a, self.leaf("Promise.resolve"), &[applied]);
+                let started = call(a, self.member(promise, "then"), &[then]);
+                let start = self.lambda_of("$signal", started);
+                let foreign_async = self.rt("foreignAsync");
+                let args: Vec<Js<'d>> = [start].into_iter().chain(catch).collect();
+                call(a, foreign_async, &args)
             }
             (None, ForeignMode::Effect, true) => {
-                let effect = match catch {
-                    Some(c) => format!("{}(() => {call}, {c})", self.rt("foreignEffect")),
-                    None => format!("{}(() => {call})", self.effect("suspend")),
-                };
+                let thunk = self.thunk(applied);
+                let effect = self.guarded(("foreignEffect", "suspend"), thunk, catch);
                 if info.result.nullable || info.result.unit || copy_result {
-                    let value = result(self, "$v");
-                    format!("{}({effect}, ($v) => {value})", self.effect("map"))
+                    let then = resolved(self);
+                    let map = self.effect("map");
+                    call(a, map, &[effect, then])
                 } else {
                     effect
                 }
@@ -174,24 +178,39 @@ impl Gen<'_> {
             let worker_id = format!("{id}${n}");
             let curried = self.curried(&worker_id, n);
             let worker = if plain {
-                self.export(&worker_id, &target)
+                self.export(&worker_id, self.leaf(&target))
             } else {
-                let worker = format!("{} {body}", self.arrow(&params.join(", ")));
-                self.export(&worker_id, &worker)
+                let worker = self.lambda_of(&params.join(", "), body);
+                self.export(&worker_id, worker)
             };
-            return format!("{worker}\n{}", self.export(&id, &curried));
+            return vec![worker, self.export(&id, curried)];
         }
         for param in params.iter().rev() {
-            body = format!("{} {body}", self.arrow(param));
+            body = self.lambda_of(param, body);
         }
         if !dicts.is_empty() {
-            body = format!("{} {body}", self.arrow(&dicts.join(", ")));
+            body = self.lambda_of(&dicts.join(", "), body);
         }
-        self.export(&id, &body)
+        vec![self.export(&id, body)]
     }
 
-    /// The call of the foreign `target` with the dictionaries and parameters
-    /// of its wrapper, adapted to what JS expects.
+    /// `$rt.<caught>(thunk, catch)` with a `catch`, `Effect.<plain>(thunk)`
+    /// without.
+    fn guarded(
+        &mut self,
+        (caught, plain): (&str, &str),
+        thunk: Js<'d>,
+        catch: Option<Js<'d>>,
+    ) -> Js<'d> {
+        if let Some(catch) = catch {
+            let f = self.rt(caught);
+            call(self.a, f, &[thunk, catch])
+        } else {
+            let f = self.effect(plain);
+            call(self.a, f, &[thunk])
+        }
+    }
+
     fn foreign_call(
         &mut self,
         f: &Foreign,
@@ -199,100 +218,135 @@ impl Gen<'_> {
         dicts: &[String],
         params: &[String],
         bridged: bool,
-    ) -> String {
+    ) -> Js<'d> {
+        let a = self.a;
         let info = &f.adapter;
         let copies = copies(f);
-        let mut args: Vec<String> = dicts.to_vec();
+        let mut args: Vec<Js<'d>> = dicts.iter().map(|d| self.leaf(d)).collect();
         for (i, param) in params.iter().take(f.arity).enumerate() {
             let copy = copies.is_some_and(|c| c.args.get(i) == Some(&true));
             let callback = copies.and_then(|c| c.callbacks.get(i).cloned().flatten());
+            let value = self.leaf(param);
             let arg = match info.callbacks.get(i).copied().flatten() {
                 _ if info.optional.contains(&i) => {
                     if bridged {
-                        let value = self.copied(copy, param.clone());
-                        let shape = info.shapes.get(i).unwrap_or(&Shape::Data);
-                        let host = self.crossed(Toward::Host, shape, value);
-                        format!("{}({host})", self.rt("optionalArg"))
+                        let value = self.copied(copy, value);
+                        let host = self.crossed(
+                            Toward::Host,
+                            info.shapes.get(i).unwrap_or(&Shape::Data),
+                            value,
+                        );
+                        let optional = self.rt("optionalArg");
+                        call(a, optional, &[host])
                     } else {
-                        let arg = format!("{}({param})", self.rt("optionalArg"));
+                        let optional = self.rt("optionalArg");
+                        let arg = call(a, optional, &[value]);
                         self.copied(copy, arg)
                     }
                 }
                 n if bridged => {
-                    let value = self.copied(copy, param.clone());
-                    let shape = info.shapes.get(i).unwrap_or(&Shape::Data);
-                    let host = self.crossed(Toward::Host, shape, value);
+                    let value = self.copied(copy, value);
+                    let host = self.crossed(
+                        Toward::Host,
+                        info.shapes.get(i).unwrap_or(&Shape::Data),
+                        value,
+                    );
                     match n {
-                        Some(n) => self.callback(&format!("({host})"), n, callback.as_ref()),
-                        None if info.variadic && i + 1 == f.arity => format!("...{host}"),
+                        Some(n) => {
+                            let host = Js::code(
+                                docvec![
+                                    a,
+                                    "(",
+                                    host.at(a, Before::Delimiter, After::Delimiter),
+                                    ")"
+                                ],
+                                Head::Paren,
+                                &[host],
+                            );
+                            self.callback(host, n, callback.as_ref())
+                        }
+                        None if info.variadic && i + 1 == f.arity => self.spread(host),
                         None => host,
                     }
                 }
-                _ if info.receiver && i == 0 => self.copied(copy, param.clone()),
-                Some(n) => self.callback(param, n, callback.as_ref()),
+                _ if info.receiver && i == 0 => self.copied(copy, value),
+                Some(n) => self.callback(value, n, callback.as_ref()),
                 None if info.variadic && i + 1 == f.arity => {
-                    format!("...{}", self.copied(copy, param.clone()))
+                    let value = self.copied(copy, value);
+                    self.spread(value)
                 }
-                None => self.copied(copy, param.clone()),
+                None => self.copied(copy, value),
             };
             args.push(arg);
         }
         if info.cancel {
-            args.push("$signal".to_owned());
+            args.push(self.leaf("$signal"));
         }
         if info.receiver && !args.is_empty() {
             let receiver = args.remove(dicts.len());
-            let rest: Vec<String> = [receiver].into_iter().chain(args).collect();
-            format!("{target}.call({})", rest.join(", "))
+            let rest: Vec<Js<'d>> = [receiver].into_iter().chain(args).collect();
+            call(a, self.leaf(&format!("{target}.call")), &rest)
         } else {
-            format!("{target}({})", args.join(", "))
+            call(a, self.leaf(target), &args)
         }
     }
-}
 
-impl Gen<'_> {
-    /// What a foreign call's value `v` is to the program: a copy when asked,
-    /// its `null` a `None`, nothing for `Unit`.
-    pub(super) fn foreign_result(&mut self, f: &Foreign, copy: bool, v: &str) -> String {
+    fn spread(&self, value: Js<'d>) -> Js<'d> {
+        Js::code(
+            docvec![
+                self.a,
+                "...",
+                value.at(self.a, Before::Other, After::Delimiter)
+            ],
+            Head::Other,
+            &[value],
+        )
+    }
+
+    pub(super) fn foreign_result(&mut self, f: &Foreign, copy: bool, v: Js<'d>) -> Js<'d> {
+        let a = self.a;
         let info = &f.adapter;
-        let v = self.copied(copy, v.to_owned());
+        let v = self.copied(copy, v);
         let v = if info.result.nullable {
-            format!("{}({v})", self.rt("fromNullable"))
+            let from = self.rt("fromNullable");
+            call(a, from, &[v])
         } else {
             v
         };
         if info.result.unit {
-            format!("(void {v})")
+            Js::code(
+                docvec![a, "void ", v.at(a, Before::Other, After::Delimiter)],
+                Head::Ident,
+                &[v],
+            )
+            .in_parens()
         } else {
             v
         }
     }
 
-    /// `value`, as a copy when `copy`.
-    fn copied(&mut self, copy: bool, value: String) -> String {
+    fn copied(&mut self, copy: bool, value: Js<'d>) -> Js<'d> {
         if copy {
-            format!("{}({value})", self.rt("copyData"))
+            let copier = self.rt("copyData");
+            call(self.a, copier, &[value])
         } else {
             value
         }
     }
 
-    /// The Flick function `param` as the JS callback of `n` arguments, with
-    /// `copies` of what crosses: each argument JS gives, and the result.
-    fn callback(&mut self, param: &str, n: usize, copies: Option<&(Vec<bool>, bool)>) -> String {
+    fn callback(&mut self, param: Js<'d>, n: usize, copies: Option<&(Vec<bool>, bool)>) -> Js<'d> {
         let (args, result) = copies.map_or((&[][..], false), |(a, r)| (a.as_slice(), *r));
-        // a callback of one argument keeps its identity unless it copies
         if n == 1 && !result && !args.contains(&true) {
-            return param.to_owned();
+            return param;
         }
         let xs: Vec<String> = (0..n).map(|k| format!("$x{k}")).collect();
-        let mut call = param.to_owned();
+        let mut applied = param;
         for (k, x) in xs.iter().enumerate() {
-            let x = self.copied(args.get(k) == Some(&true), x.clone());
-            call = format!("{call}({x})");
+            let x = self.copied(args.get(k) == Some(&true), self.leaf(x));
+            applied = call(self.a, applied, &[x]);
         }
-        let call = self.copied(result, call);
-        format!("{} {call}", self.arrow(&xs.join(", ")))
+        let applied = self.copied(result, applied);
+        self.lambda_of(&xs.join(", "), applied)
     }
 }
 
