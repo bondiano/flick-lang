@@ -46,8 +46,9 @@ func ServerAuthenticated(fb *Fiber, tag, check, functions Value) Value {
 
 // inProcess is a mounted handler's procedure, called in memory.
 type inProcess struct {
-	srv  *rpcServer
-	proc *rpcProc
+	srv   *rpcServer
+	proc  *rpcProc
+	owner *Owner
 }
 
 // shortcut: one table per process, the last `Server.handler` mounted wins; key it by server once a process serves several
@@ -55,11 +56,6 @@ var (
 	localMu  sync.Mutex
 	localFns = map[string]*inProcess{}
 )
-
-// serverMount is `Server.Mounted s`: the functions served as one group, a
-// POST per call in NDJSON, whose calls in this process run in memory
-// until the innermost owner closes.
-type serverMount struct{ handler Value }
 
 func ServerHandler(fb *Fiber, functions Value) Value {
 	fns := List(functions)
@@ -74,7 +70,7 @@ func ServerHandler(fb *Fiber, functions Value) Value {
 	mine := make([]*inProcess, len(g.procs))
 	localMu.Lock()
 	for i, p := range g.procs {
-		mine[i] = &inProcess{srv, p}
+		mine[i] = &inProcess{srv: srv, proc: p, owner: fb.owner}
 		localFns[p.name] = mine[i]
 	}
 	localMu.Unlock()
@@ -88,12 +84,7 @@ func ServerHandler(fb *Fiber, functions Value) Value {
 		localMu.Unlock()
 		return Unit
 	})
-	return &serverMount{srv.httpHandler(serializationOf(RpcNdjson))}
-}
-
-// ServerServe answers a request of the mounted functions.
-func ServerServe(fb *Fiber, mounted, request Value) Value {
-	return Run(fb, Apply(fb, mounted.(*serverMount).handler, request))
+	return srv.httpHandler(serializationOf(RpcNdjson))
 }
 
 // across is `v` written and read back by its codec, as it crosses the network.
@@ -122,7 +113,15 @@ func (l *inProcess) call(fb *Fiber, payload Value) Value {
 	inner.env = l.srv.services.with(rpcHeadersKey, headers)
 	p := l.proc
 	sent := across(fb, p.payload, payload)
-	out, c := catch(func() Value { return localUnary(&inner, p, l.srv.handlers[p.name], sent) })
+	// Admission and mount closure use the owner's same lock. The handler
+	// has its own fiber: closing the mount interrupts and joins it before
+	// releasing captured services, without interrupting the caller's state.
+	child := FiberSpawn(&inner, l.owner, Fn(func(*Fiber, Value) Value { return Succeed(Unit) }), Eff(func(fb *Fiber) Value {
+		return localUnary(fb, p, l.srv.handlers[p.name], sent)
+	})).(*child)
+	// Caller interruption must also cancel and join the server-side work.
+	defer stop(fb, child)
+	out, c := catch(func() Value { return FiberJoin(fb, child) })
 	if c != nil {
 		if err, ok := typedFailure(c); ok {
 			for _, e := range p.errors {
