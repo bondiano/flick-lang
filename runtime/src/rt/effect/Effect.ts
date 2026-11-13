@@ -3,7 +3,8 @@ import { none, some, type Data } from "../../core/data.ts";
 import { clock } from "../clock.ts";
 import { allOf } from "../concurrency.ts";
 import { Duration, sleep } from "../duration.ts";
-import { type Exit, die as dieCause, hasInterrupts, interrupt, isInterrupt, raise, succeeded, unwinds } from "../cause.ts";
+import { type Exit, die as dieCause, hasInterrupts, interrupt, isDie, isInterrupt, raise, succeeded, unwinds } from "../cause.ts";
+import { describeDefect } from "../describe.ts";
 import {
   type Run,
   Suspend,
@@ -70,6 +71,18 @@ export function* flickExit(task: () => unknown): Run {
   if (exit.cause !== undefined && unwinds(exit.cause)) return raiseOf(exit);
   return exit;
 }
+
+/** Recover a defect as inert text; typed failures and unwinding pass through. */
+export const flickCatchDefect =
+  (f: (defect: string) => unknown) =>
+  (task: () => unknown): Run =>
+    (function* (): Run {
+      const exit = asExit(yield caught(task));
+      if (exit.cause === undefined) return exit.value;
+      if (unwinds(exit.cause)) return raiseOf(exit);
+      const defect = exit.cause.reasons.find(isDie);
+      return defect === undefined ? raiseOf(exit) : f(describeDefect(defect.defect));
+    })();
 
 export const uninterruptible = (task: () => unknown): Run => masked(task);
 export const interruptible = (task: () => unknown): Run => atMask(0, task);
