@@ -63,7 +63,7 @@ fn walked(params: &[Param], body: &Expr, i: usize, members: &[(Target, usize)]) 
     })
 }
 
-impl Gen<'_> {
+impl Gen<'_, '_> {
     /// Runs `f` with the walked lists among `heads` in scope.
     pub(super) fn walk(
         &mut self,

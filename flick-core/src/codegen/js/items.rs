@@ -4,16 +4,20 @@
 use std::collections::{BTreeSet, HashMap};
 use std::mem;
 
-use super::expr::arrow_body;
-use super::{Callee, Gen, Target, indent, names};
+use flick_pretty::{Document, docvec};
+
+use super::doc::{After, Before, Head, Js, MULTILINE, Stmt, array, block, call, lines, object};
+use super::{Callee, Gen, Target, names};
 use crate::codegen::order::post_order;
 use crate::ir::{Expr, ExprKind, Item, ItemKind};
 use flick_ir::{Constructor, Dict, InstanceInfo, Rep, default_method};
 
-impl Gen<'_> {
-    pub(super) fn items(&mut self, items: &[Item]) -> String {
+impl<'d> Gen<'_, 'd> {
+    /// The code of each item, in order.
+    pub(super) fn items(&mut self, items: &[Item]) -> Vec<Document<'d>> {
+        let a = self.a;
         let order = self.order(items);
-        let mut out = String::new();
+        let mut out = Vec::new();
         let mut grouped = vec![false; self.groups.len()];
         for i in order {
             let item = &items[i];
@@ -21,25 +25,19 @@ impl Gen<'_> {
             if let Some(g) = self.groups.iter().position(|g| g.items.contains(&i))
                 && !mem::replace(&mut grouped[g], true)
             {
-                out.push_str(&self.group(g, items));
-                out.push_str("\n\n");
+                out.push(self.group(g, items).doc);
             }
-            #[cfg(feature = "native-project")]
-            let mark = self.mark(item.span);
+            let mark = mark!(self, item.span);
             let code = self.item(item);
             if !code.is_empty() {
-                #[cfg(feature = "native-project")]
-                out.push_str(&mark);
-                out.push_str(&code);
-                out.push_str("\n\n");
+                let code = lines(a, code.iter().map(|s| s.doc));
+                out.push(docvec![a, mark.unwrap_or_else(|| a.empty()), code]);
             }
         }
-        out.truncate(out.trim_end().len());
-        out.push('\n');
         out
     }
 
-    fn item(&mut self, item: &Item) -> String {
+    fn item(&mut self, item: &Item) -> Vec<Stmt<'d>> {
         match &item.kind {
             ItemKind::Value {
                 name,
@@ -59,17 +57,18 @@ impl Gen<'_> {
                 let id = names::ident(name);
                 let worker_id = format!("{id}${}", params.len());
                 match self.options.worker(self.module, name) {
-                    Some(n) if n == params.len() => stmts.push(self.export(&worker_id, &worker)),
+                    Some(n) if n == params.len() => stmts.push(self.export(&worker_id, worker)),
                     Some(n) => {
-                        stmts.push(self.constant(&worker_id, &worker));
+                        stmts.push(self.constant(&worker_id, worker));
                         stmts.push(self.applying_worker(&id, n));
                     }
-                    None => stmts.push(self.constant(&worker_id, &worker)),
+                    None => stmts.push(self.constant(&worker_id, worker)),
                 }
                 if self.workers.get(name).is_some_and(|&(_, curried)| curried) {
-                    stmts.push(self.export(&id, &self.curried(&worker_id, params.len())));
+                    let curried = self.curried(&worker_id, params.len());
+                    stmts.push(self.export(&id, curried));
                 }
-                stmts.join("\n")
+                stmts
             }
             ItemKind::Value { name, dicts, body } => {
                 let target = Target {
@@ -80,32 +79,43 @@ impl Gen<'_> {
                 let value = self.scoped(&stmts, value);
                 let value = self.labelled(name, value);
                 let id = names::ident(name);
-                let code = self.export(&id, &value);
+                // the source map names `id` by `name` where it is defined
+                let mark = mark!(self, item.span);
                 #[cfg(feature = "native-project")]
-                let code = self.named(code, &id, name, item.span);
+                self.names.insert(self.spans.len() - 1, name.clone());
+                let code = self.export_marked(&id, mark, value);
                 match self.options.worker(self.module, name) {
-                    Some(n) => format!("{code}\n{}", self.applying_worker(&id, n)),
-                    None => code,
+                    Some(n) => vec![code, self.applying_worker(&id, n)],
+                    None => vec![code],
                 }
             }
             ItemKind::Destructure { pattern, body } => {
                 let (stmts, value) = self.block(|g| g.expr(body));
                 let value = self.scoped(&stmts, value);
                 let t = self.temp();
-                let mut out = vec![self.constant(&t, &value)];
+                let mut out = vec![self.constant(&t, value)];
                 let (binds, ()) = self.block(|g| g.destructure(pattern, &t));
-                out.extend(binds.into_iter().map(|b| format!("export {b}")));
-                out.join("\n")
+                out.extend(binds.into_iter().map(|b| Stmt {
+                    doc: docvec![self.a, "export ", b.doc],
+                    ..b
+                }));
+                out
             }
             ItemKind::Foreign(f) => self.foreign(f),
-            ItemKind::Constructor(c) => self.constructor_item(c),
+            ItemKind::Constructor(c) => vec![self.constructor_item(c)],
             ItemKind::Service { name, key } => {
+                let a = self.a;
                 let service = self.rt("service");
-                format!(
-                    "export const {} = {service}({});",
+                let value = call(a, service, &[self.string(key)]);
+                let doc = docvec![
+                    a,
+                    "export const ",
                     names::service(name),
-                    names::string(key)
-                )
+                    " = ",
+                    value.at(a, Before::Assign, After::Semicolon),
+                    ";"
+                ];
+                vec![Stmt::new(doc, value.flags)]
             }
             ItemKind::Instance { info, methods } => self.instance(info, methods),
         }
@@ -113,75 +123,110 @@ impl Gen<'_> {
 
     /// The exported worker `id$n` that applies the curried `id`: the value
     /// was optimized into another shape than importers expect.
-    fn applying_worker(&self, id: &str, n: usize) -> String {
+    fn applying_worker(&self, id: &str, n: usize) -> Stmt<'d> {
         let heads: Vec<String> = (0..n).map(|i| format!("$a{i}")).collect();
-        let worker = format!(
-            "{} {id}({})",
-            self.arrow(&heads.join(", ")),
-            heads.join(")(")
-        );
-        self.export(&format!("{id}${n}"), &worker)
+        let applied = heads
+            .iter()
+            .fold(self.leaf(id), |f, head| call(self.a, f, &[self.leaf(head)]));
+        let worker = self.lambda_of(&heads.join(", "), applied);
+        self.export(&format!("{id}${n}"), worker)
     }
 
     /// The curried form of the worker `worker` of `n` parameters.
-    pub(super) fn curried(&self, worker: &str, n: usize) -> String {
+    pub(super) fn curried(&self, worker: &str, n: usize) -> Js<'d> {
         let heads: Vec<String> = (0..n).map(|i| format!("$a{i}")).collect();
-        let mut curried = format!("{worker}({})", heads.join(", "));
+        let args: Vec<Js<'d>> = heads.iter().map(|h| self.leaf(h)).collect();
+        let mut curried = call(self.a, self.leaf(worker), &args);
         for head in heads.iter().rev() {
-            curried = format!("{} {curried}", self.arrow(head));
+            curried = self.lambda_of(head, curried);
         }
         curried
     }
 
     /// `value` after the statements it needs, run in a scope of their own:
     /// the locals of two top-level values may share a name.
-    fn scoped(&self, stmts: &[String], value: String) -> String {
+    fn scoped(&self, stmts: &[Stmt<'d>], value: Js<'d>) -> Js<'d> {
         if stmts.is_empty() {
-            value
-        } else {
-            format!("({} {})()", self.arrow(""), arrow_body(stmts, &value))
+            return value;
         }
+        let a = self.a;
+        let run = self.lambda_of("", self.arrow_body(stmts, value));
+        let doc = docvec![
+            a,
+            "(",
+            run.at(a, Before::Delimiter, After::Delimiter),
+            ")()"
+        ];
+        Js::code(doc, run.after_paren(), &[run]).call()
     }
 
-    fn constructor_item(&mut self, c: &Constructor) -> String {
+    fn constructor_item(&mut self, c: &Constructor) -> Stmt<'d> {
+        let a = self.a;
         let name = names::ident(&c.name);
         if names::native(self.options.lang, c).is_some() {
             let native = self.constructor(c);
-            return self.export(&name, &native);
+            return self.export(&name, native);
         }
         if let Rep::Literal(literal) = &c.rep {
-            return self.export(&name, &names::enum_literal(literal));
+            return self.export(&name, self.leaf(&names::enum_literal(literal)));
         }
         if c.rep != Rep::Tagged {
             // `unboxed` and `untagged`: a value is its one field
-            return self.export(&name, &format!("{} _0", self.arrow("_0")));
+            let identity = self.lambda_of("_0", self.leaf("_0"));
+            return self.export(&name, identity);
         }
         let package = self.options.package(&c.module);
-        let tag = names::string(&names::tag(c, package));
+        let tag = self.string(&names::tag(c, package));
         let fields: Vec<String> = (0..c.arity).map(|i| format!("_{i}")).collect();
-        // the dictionaries a value of a GADT holds, under keys `==` skips
+        let mut entries = vec![docvec![a, "_tag: ", tag.doc]];
+        entries.extend(fields.iter().map(|f| a.text(a.alloc_str(f))));
         let dicts: Vec<String> = (0..c.dicts).map(|i| format!("$d{i}")).collect();
-        let held = fields
-            .iter()
-            .cloned()
-            .chain(dicts.iter().enumerate().map(|(i, d)| format!("${i}: {d}")))
-            .collect::<Vec<_>>();
-        let mut value = if held.is_empty() {
-            format!("{{ _tag: {tag} }}")
+        entries.extend(
+            dicts
+                .iter()
+                .enumerate()
+                .map(|(i, d)| docvec![a, "$", i, ": ", a.alloc_str(d)]),
+        );
+        let object = object(a, &entries, &[]);
+        let mut value = if fields.is_empty() && dicts.is_empty() {
+            object
         } else {
-            format!("({{ _tag: {tag}, {} }})", held.join(", "))
+            // an object, not a block, as the body of the arrows
+            let doc = docvec![a, "(", object.doc, ")"];
+            Js::code(doc, Head::Paren, &[object])
         };
         for field in fields.iter().rev() {
-            value = format!("{} {value}", self.arrow(field));
+            value = self.lambda_of(field, value);
         }
-        // dictionaries come first, as a use passes them
         if !dicts.is_empty() {
-            value = format!("{} {value}", self.arrow(&dicts.join(", ")));
+            value = self.lambda_of(&dicts.join(", "), value);
         }
-        self.export(&name, &value)
+        self.export(&name, value)
     }
 
-    fn instance(&mut self, info: &InstanceInfo, methods: &[(String, Expr)]) -> String {
+    /// `{` the entries, each followed by a comma, one per line `}`.
+    fn entries(&self, entries: &[Stmt<'d>]) -> Js<'d> {
+        let a = self.a;
+        let entries: Vec<Stmt<'d>> = entries
+            .iter()
+            .map(|e| Stmt::new(docvec![a, e.doc, ","], e.flags))
+            .collect();
+        let flags = entries.iter().fold(MULTILINE, |all, e| all | e.flags);
+        Js::code(block(a, &entries), Head::Brace, &[]).with(flags)
+    }
+
+    /// `get name() { return value; }`.
+    fn getter(&self, name: &str, value: Js<'d>) -> Stmt<'d> {
+        let a = self.a;
+        let body = block(a, &[Stmt::ret(a, None, value)]);
+        Stmt::new(
+            docvec![a, "get ", a.alloc_str(name), "() ", body],
+            value.flags | MULTILINE,
+        )
+    }
+
+    fn instance(&mut self, info: &InstanceInfo, methods: &[(String, Expr)]) -> Vec<Stmt<'d>> {
+        let a = self.a;
         let mark = self.givens.len();
         // release: the methods a canonical use calls directly, before the dictionary
         let mut methods_first = Vec::new();
@@ -189,55 +234,69 @@ impl Gen<'_> {
         let mut entries = Vec::new();
         for (class, dict) in &info.supers {
             let d = self.dict(dict);
-            entries.push(format!("get ${class}() {{\n  return {d};\n}}"));
+            entries.push(self.getter(&format!("${class}"), d));
         }
         let body = if let Some((fields, constructors)) = &info.derived {
             self.derived(info, fields, constructors.as_deref(), &entries)
         } else {
-            {
-                for (name, value) in methods {
-                    let (stmts, v) = self.block(|g| g.function(&[], value, None));
-                    let v = self.scoped(&stmts, v);
-                    match self.direct.get(&(info.name.clone(), name.clone())).cloned() {
-                        Some(direct) => {
-                            methods_first.push(self.export(&direct, &v));
-                            entries.push(format!("{name}: {direct}"));
-                        }
-                        None => entries.push(format!("{name}: {v}")),
+            for (name, value) in methods {
+                let (stmts, v) = self.block(|g| g.function(&[], value, None));
+                let v = self.scoped(&stmts, v);
+                let entry = |v: Js<'d>| {
+                    let doc = docvec![
+                        a,
+                        a.alloc_str(name),
+                        ": ",
+                        v.at(a, Before::Delimiter, After::Delimiter)
+                    ];
+                    Stmt::new(doc, v.flags)
+                };
+                match self.direct.get(&(info.name.clone(), name.clone())).cloned() {
+                    Some(direct) => {
+                        methods_first.push(self.export(&direct, v));
+                        entries.push(entry(self.leaf(&direct)));
                     }
+                    None => entries.push(entry(v)),
                 }
-                for (name, own, extra) in &info.defaults {
-                    let (module, class) = &info.class;
-                    let value = self.global(module, &default_method(class, name));
-                    let dicts: Vec<String> = ["this".to_owned()]
-                        .into_iter()
-                        .chain(extra.iter().map(|d| self.dict(d)))
-                        .collect();
-                    let dicts = dicts.join(", ");
-                    let own: Vec<String> = (0..*own).map(|i| format!("$o{i}")).collect();
-                    let call = if own.is_empty() {
-                        format!("{value}({dicts})")
-                    } else {
-                        let list = own.join(", ");
-                        format!("{} {value}({dicts}, {list})", self.arrow(&list))
-                    };
-                    entries.push(format!("get {name}() {{\n  return {call};\n}}"));
-                }
-                let entries: Vec<String> = entries.into_iter().map(|e| format!("{e},")).collect();
-                format!("({{\n{}}})", indent(&entries))
             }
+            for (name, own, extra) in &info.defaults {
+                let (module, class) = &info.class;
+                let value = self.global(module, &default_method(class, name));
+                let own: Vec<String> = (0..*own).map(|i| format!("$o{i}")).collect();
+                let dicts: Vec<Js<'d>> = [self.leaf("this")]
+                    .into_iter()
+                    .chain(extra.iter().map(|d| self.dict(d)))
+                    .collect();
+                let applied = if own.is_empty() {
+                    call(a, value, &dicts)
+                } else {
+                    let args: Vec<Js<'d>> = dicts
+                        .into_iter()
+                        .chain(own.iter().map(|o| self.leaf(o)))
+                        .collect();
+                    self.lambda_of(&own.join(", "), call(a, value, &args))
+                };
+                entries.push(self.getter(name, applied));
+            }
+            self.entries(&entries).in_parens()
         };
         self.givens.truncate(mark);
         let id = names::instance(&info.name);
         if info.context.is_empty() {
-            methods_first.push(format!(
-                "export {}",
-                self.constant(&id, &super::pure(&body))
-            ));
-            methods_first.join("\n")
+            let value = self.pure(body);
+            methods_first.push(self.exported(self.constant(&id, value)));
+            methods_first
         } else {
-            let value = format!("{} {body}", self.arrow(&params));
-            format!("export {}", self.constant(&id, &value))
+            let value = self.lambda_of(&params, body);
+            vec![self.exported(self.constant(&id, value))]
+        }
+    }
+
+    /// `export stmt`.
+    fn exported(&self, stmt: Stmt<'d>) -> Stmt<'d> {
+        Stmt {
+            doc: docvec![self.a, "export ", stmt.doc],
+            ..stmt
         }
     }
 
@@ -247,43 +306,48 @@ impl Gen<'_> {
         info: &InstanceInfo,
         fields: &[Dict],
         constructors: Option<&[Constructor]>,
-        supers: &[String],
-    ) -> String {
-        let fields: Vec<String> = fields.iter().map(|d| self.dict(d)).collect();
-        let constructors = constructors.map_or("null".to_owned(), |cs| {
-            let cs: Vec<String> = cs
+        supers: &[Stmt<'d>],
+    ) -> Js<'d> {
+        let a = self.a;
+        let fields: Vec<Js<'d>> = fields.iter().map(|d| self.dict(d)).collect();
+        let constructors = constructors.map(|cs| {
+            let cs: Vec<Js<'d>> = cs
                 .iter()
                 .map(|c| {
                     let tag = self.tag_of(c);
-                    let rep = match &c.rep {
-                        Rep::Tagged => String::new(),
-                        Rep::Unboxed => ", \"unboxed\"".to_owned(),
-                        Rep::Typeof(class) => format!(", {}", names::string(class.name())),
-                        Rep::Literal(l) => format!(", \"literal\", {}", names::enum_literal(l)),
-                    };
-                    format!(
-                        "[{}, {}, {}{rep}]",
-                        names::string(&tag),
-                        names::string(&c.name),
-                        c.arity
-                    )
+                    let mut shape = vec![
+                        self.string(&tag),
+                        self.string(&c.name),
+                        self.leaf(&c.arity.to_string()),
+                    ];
+                    match &c.rep {
+                        Rep::Tagged => {}
+                        Rep::Unboxed => shape.push(self.string("unboxed")),
+                        Rep::Typeof(class) => shape.push(self.string(class.name())),
+                        Rep::Literal(l) => {
+                            shape.push(self.string("literal"));
+                            shape.push(self.leaf(&names::enum_literal(l)));
+                        }
+                    }
+                    array(a, &shape)
                 })
                 .collect();
-            format!("[{}]", cs.join(", "))
+            array(a, &cs)
         });
         let class = &info.class.1;
         let derive = self.rt("derive");
         let supers = if supers.is_empty() {
-            "{}".to_owned()
+            Js::code(a.text("{}"), Head::Brace, &[])
         } else {
-            let entries: Vec<String> = supers.iter().map(|e| format!("{e},")).collect();
-            format!("{{\n{}}}", indent(&entries))
+            self.entries(supers)
         };
-        format!(
-            "{derive}({}, () => [{}], {constructors}, {supers})",
-            names::string(class),
-            fields.join(", ")
-        )
+        let args = vec![
+            self.string(class),
+            self.thunk(array(a, &fields)),
+            constructors.unwrap_or_else(|| self.leaf("null")),
+            supers,
+        ];
+        call(a, derive, &args)
     }
 
     fn tag_of(&self, c: &Constructor) -> String {
