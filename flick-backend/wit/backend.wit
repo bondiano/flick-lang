@@ -1,0 +1,169 @@
+package flick:backend@0.1.0;
+
+/// Compiler-owned data. This package has no checker, filesystem, clock,
+/// network or process imports. IR bytes carry their own version as well.
+interface types {
+    enum profile { debug, release }
+    enum mode { per-module, whole-program }
+    record environment { backend: string, platform: string }
+    record abi { name: string, version: string }
+    record version-range { minimum: string, maximum-exclusive: string }
+    record named-range { name: string, versions: version-range }
+    record backend-id { id: string, version: string }
+    /// SHA-256 of the exact component bytes, supplied by the host.
+    record backend-pin { identity: backend-id, sha256: string }
+    record capability { name: string, version: string }
+    record descriptor {
+        identity: backend-id,
+        backend-api: version-range,
+        ir: version-range,
+        language: version-range,
+        runtime-abis: list<named-range>,
+        environments: list<environment>,
+        profiles: list<profile>,
+        modes: list<mode>,
+        capabilities: list<capability>,
+    }
+    record option-value { key: string, value: string }
+    /// Available before IR generation; the host checks descriptor ranges
+    /// first, then asks the backend for target-specific refusals.
+    record target-request {
+        backend-api: string,
+        ir-version: string,
+        language-version: string,
+        runtime-abis: list<abi>,
+        environment: environment,
+        profile: profile,
+        mode: mode,
+        required-capabilities: list<capability>,
+        options: list<option-value>,
+    }
+    record target-support { capabilities: list<capability> }
+    record span { file: u32, start: u32, end: u32 }
+    enum severity { error, warning, note }
+    record diagnostic {
+        code: string,
+        severity: severity,
+        message: string,
+        span: option<span>,
+        notes: list<string>,
+    }
+    enum input-kind { source, foreign, %interface, target-facts, %resource, lockfile }
+    /// An opaque id, never a host path. Every accessible byte is declared
+    /// here and participates in the request's cache key.
+    record input {
+        id: string,
+        kind: input-kind,
+        sha256: string,
+        size: u64,
+    }
+    record source {
+        /// Same index and logical name as Program.files; UTF-8 bytes.
+        name: string,
+        input: string,
+        line-starts: list<u32>,
+    }
+    enum module-role { %own, builtin, external }
+    record module-input {
+        name: string,
+        role: module-role,
+        %package: option<string>,
+        /// A fixed relative target path, also in per-module mode.
+        output: string,
+        %interface: option<string>,
+    }
+    record symbol { module: string, name: string }
+    record entry { name: string, symbol: symbol, runner: option<string> }
+    record foreign-binding {
+        module: string,
+        specifier: string,
+        resolved: string,
+        abi: abi,
+        inputs: list<string>,
+    }
+    /// A projection has a declared schema and version, and plain data in a
+    /// content-addressed input. Unknown schemas must be refused, not guessed.
+    /// Complete typing/effect facts and UI metadata are not implied by IR.
+    record projection { module: string, schema: abi, input: string }
+    /// Schema flick.typescript@0.1.0, produced by the shared projection.
+    /// The JS backend consumes these strings without calling the checker.
+    record typescript-projection {
+        declarations: list<string>,
+        annotations: list<option-value>,
+        imports: string,
+        modules: list<string>,
+    }
+    record package-target { %package: string, environments: list<environment> }
+    record root-handler { environment: environment, service: symbol, handler: symbol }
+    record build-request {
+        target: target-request,
+        backend: backend-pin,
+        program: list<u8>,
+        /// Required in per-module mode; graph and external ABI stay explicit.
+        module-root: option<string>,
+        modules: list<module-input>,
+        sources: list<source>,
+        entries: list<entry>,
+        test-roots: list<symbol>,
+        foreign: list<foreign-binding>,
+        projections: list<projection>,
+        package-targets: list<package-target>,
+        root-handlers: list<root-handler>,
+        inputs: list<input>,
+        toolchains: list<toolchain>,
+        runtime-dependencies: list<runtime-dependency>,
+    }
+    enum artifact-kind { source, source-map, declaration, object, executable, %resource, metadata }
+    record artifact {
+        id: string,
+        path: string,
+        kind: artifact-kind,
+        bytes: list<u8>,
+    }
+    /// Exact host-approved toolchain; guests cannot select a process path.
+    record toolchain { id: string, version: string, sha256: string }
+    /// All ids of artifacts, inputs, steps and step outputs are disjoint.
+    variant input-ref { source(string), artifact(string) }
+    record step-output { id: string, path: string, kind: artifact-kind }
+    record toolchain-step {
+        id: string,
+        dependencies: list<string>,
+        toolchain: toolchain,
+        arguments: list<string>,
+        environment: list<option-value>,
+        inputs: list<input-ref>,
+        outputs: list<step-output>,
+    }
+    record runtime-dependency { %package: string, version: string, sha256: string }
+    enum launch-kind { run, test }
+    record launch {
+        name: string,
+        kind: launch-kind,
+        artifact: string,
+        /// None executes a generated executable; Some uses a pinned VM.
+        runtime: option<toolchain>,
+        arguments: list<string>,
+    }
+    record build-result {
+        artifacts: list<artifact>,
+        steps: list<toolchain-step>,
+        runtime-dependencies: list<runtime-dependency>,
+        launches: list<launch>,
+        diagnostics: list<diagnostic>,
+    }
+    enum input-error { undeclared, unavailable, digest-mismatch }
+}
+
+interface inputs {
+    use types.{input-error};
+    /// Only an id in this request's manifest may be read.
+    read: func(id: string) -> result<list<u8>, input-error>;
+}
+
+world backend {
+    import inputs;
+    use types.{descriptor, target-request, target-support, build-request, build-result, diagnostic};
+    export describe: func() -> descriptor;
+    export check-target: func(request: build-request) -> result<target-support, list<diagnostic>>;
+    export generate: func(request: build-request) -> result<build-result, list<diagnostic>>;
+}
