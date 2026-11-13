@@ -46,11 +46,13 @@ either analysis. A required extra projection needs an identified schema,
 version and content input. Missing data must be rejected rather than inferred
 from prelude spellings or supplied through a checker callback.
 
-Built-in IR currently comes from separate checks. Each built-in check creates
-its own `SourceMap`, starting at file zero; those file ids cannot simply be
-concatenated with project IR. A combined request must assign one source table,
-remap spans and retain the actual source text used by lowering, including
-generated declarations. The same table governs diagnostics and source maps.
+Built-in checks start with separate source maps. Lowering now combines them
+into a bundle with distinct file identities and the exact text used during
+lowering, including generated declarations. The host cache retains both the
+IR and those texts; legacy IR-only entries are regenerated. Preparing a
+component request explicitly remaps that bundle into the project's source
+table and supplies built-in bodies with `builtin` module metadata. The same
+declared source inputs govern validation, diagnostics and source maps.
 
 ## Portable transformations and target representations
 

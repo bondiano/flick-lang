@@ -21,6 +21,9 @@ use crate::commands::build::{BuildPlan, Purpose};
 use crate::sources::FsHost;
 use crate::toolchain;
 
+#[cfg(test)]
+mod tests;
+
 pub(super) struct Prepared {
     pub request: BuildRequest,
     pub bytes: BTreeMap<String, Vec<u8>>,
@@ -31,18 +34,42 @@ pub(super) struct Prepared {
 impl Prepared {
     pub(super) fn new(
         host: &FsHost,
-        sources: &SourceMap,
+        sources: &mut SourceMap,
         project: Option<&Project>,
         compilation: &Compilation,
         output: &BuildPlan,
         pin: BackendPin,
     ) -> Self {
         let files = RefCell::new(Vec::new());
+        let builtins =
+            build::builtin_bundle_of(project::stages_by_class(project, output.extras.rt));
+        let builtin_files: Vec<_> = builtins
+            .sources
+            .iter()
+            .map(|s| {
+                let existing = sources
+                    .files()
+                    .position(|f| f.path == s.name && f.text == s.text);
+                existing.map_or_else(
+                    || sources.add(&s.name, &s.text),
+                    |i| FileId::new(u32::try_from(i).expect("source count fits u32")),
+                )
+            })
+            .collect();
+        let mut modules: Vec<_> = compilation.modules.iter().map(|m| m.ir.clone()).collect();
+        for builtin in &builtins.modules {
+            if compilation.modules.iter().any(|m| m.name == builtin.name) {
+                continue;
+            }
+            let mut module = builtin.clone();
+            module.each_span_mut(&mut |s| s.file = builtin_files[s.file.index() as usize]);
+            modules.push(module);
+        }
         // Target optimization belongs in the component. This boundary always
         // exports the reference lowering, with its original source spans.
         let program = Program::new(
             &format!("flick {}", toolchain::COMPILER),
-            compilation.modules.iter().map(|m| m.ir.clone()).collect(),
+            modules,
             ir::lang_items(),
             &|file| {
                 files.borrow_mut().push(file);
@@ -154,9 +181,8 @@ impl Prepared {
                 interface: Some(input),
             });
         }
-        // A backend can refuse any operation it cannot implement from the
-        // external ABI. Builtin IR and provenance will be explicit inputs for
-        // the official emitters; they are not fabricated from source names.
+        // Built-ins have explicit lowered bodies and the actual texts used
+        // during lowering. They never alias the project's source identities.
         for interface in types::builtins_of(project::stages_by_class(project, output.extras.rt)) {
             if self
                 .request
@@ -173,7 +199,7 @@ impl Prepared {
             );
             self.request.modules.push(ModuleInput {
                 name: interface.module.clone(),
-                role: ModuleRole::External,
+                role: ModuleRole::Builtin,
                 package: None,
                 output: codegen::module_path(&builtins, output.typescript, &interface.module),
                 interface: Some(input),

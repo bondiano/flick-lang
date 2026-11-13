@@ -4,6 +4,11 @@
 
 mod abi;
 mod bridge_select;
+mod builtins;
+pub use builtins::{
+    BuiltinModules, BuiltinSource, BuiltinStore, builtin_bundle_of, builtin_declarations,
+    builtin_modules, builtin_modules_of, keep_builtin_modules,
+};
 #[cfg(not(target_arch = "wasm32"))]
 mod capabilities;
 #[cfg(all(test, not(target_arch = "wasm32")))]
@@ -20,13 +25,8 @@ pub use interfaces::published_interfaces;
 pub use javascript::emit;
 
 use std::path::{Component, Path, PathBuf};
-use std::sync::{Arc, OnceLock};
 
-use tracing::debug;
-
-use crate::clock::{micros, timed};
 use crate::codegen::{EffectBridge, Labels};
-use crate::iface::Interface;
 use crate::project::Compiled;
 use crate::project::config::{Backend, MAIN_ENTRY};
 use crate::source::FileId;
@@ -193,89 +193,6 @@ pub fn optimized(modules: &[Compiled], module: &Compiled, by_class: bool) -> ir:
     let arity = |m: &str, name: &str| arity_of(modules, m, name, by_class);
     opt::optimize(&mut ir, &exported, &generics, &arity);
     ir
-}
-
-/// The built-in modules, lowered.
-pub fn builtin_modules() -> &'static [ir::Module] {
-    builtin_modules_of(false)
-}
-
-/// The built-in modules, lowered from a check with `stages_by_class`: read
-/// from the host's store, or checked and lowered once and given to it.
-pub fn builtin_modules_of(stages_by_class: bool) -> &'static [ir::Module] {
-    static MODULES: [OnceLock<Vec<ir::Module>>; 2] = [OnceLock::new(), OnceLock::new()];
-    MODULES[usize::from(stages_by_class)].get_or_init(|| {
-        let store = BUILTIN_STORE.get();
-        if let Some(kept) = store.and_then(|store| (store.load)(stages_by_class)) {
-            return kept;
-        }
-        let (modules, declarations) = lower_builtins(stages_by_class);
-        if !stages_by_class {
-            // the same pass serves the reference model
-            let _ = DECLARATIONS.set(declarations);
-        }
-        if let Some(store) = store {
-            (store.save)(stages_by_class, &modules);
-        }
-        modules
-    })
-}
-
-/// Where a host keeps the lowered built-in modules between its processes:
-/// lowering them takes longer than building a small project. What `load`
-/// gives must be what `save` got from this compiler for the same sources of
-/// the built-in modules and the same mode of `stages_by_class`. Asked for
-/// when a build first reads a mode, which only the emitters decide: a host
-/// that installed them up front would read both modes for every build.
-pub struct BuiltinStore {
-    pub load: fn(bool) -> Option<Vec<ir::Module>>,
-    pub save: fn(bool, &[ir::Module]),
-}
-
-static BUILTIN_STORE: OnceLock<BuiltinStore> = OnceLock::new();
-
-/// Keeps the lowered built-in modules in `store` from now on; false when a
-/// store is set already.
-pub fn keep_builtin_modules(store: BuiltinStore) -> bool {
-    BUILTIN_STORE.set(store).is_ok()
-}
-
-static DECLARATIONS: OnceLock<Vec<Arc<Interface>>> = OnceLock::new();
-
-/// What the reference model reads of each built-in module, in the order of
-/// [`builtin_modules`].
-pub fn builtin_declarations() -> &'static [Arc<Interface>] {
-    // lowering the modules fills this too, unless a store had them
-    builtin_modules_of(false);
-    DECLARATIONS.get_or_init(|| lower_builtins(false).1)
-}
-
-/// The built-in modules lowered, with what the reference model reads of each.
-type Lowered = (Vec<ir::Module>, Vec<Arc<Interface>>);
-
-fn lower_builtins(stages_by_class: bool) -> Lowered {
-    let (mut lowered, mut declarations) = (Vec::new(), Vec::new());
-    let ((), elapsed) = timed(|| {
-        let interfaces = types::check_each(
-            types::builtin_sources(),
-            stages_by_class,
-            |module, typing| {
-                lowered.push(ir::lower(module, typing).expect("built-in modules compile"));
-                declarations.push(typing.declarations.clone());
-            },
-        );
-        for (module, interface) in lowered.iter_mut().zip(&interfaces) {
-            assert_eq!(module.name, interface.module, "a module and its interface");
-            module.exports = ir::exports(&module.name, interface);
-        }
-    });
-    debug!(
-        modules = lowered.len(),
-        ?elapsed,
-        micros = micros(elapsed),
-        "built-in modules lowered"
-    );
-    (lowered, declarations)
 }
 
 #[cfg(test)]
