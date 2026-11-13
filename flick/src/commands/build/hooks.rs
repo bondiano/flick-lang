@@ -3,7 +3,7 @@
 //! before the build optimizes it and gives what it compiles instead; `emit`
 //! gets the files `flick build` writes and gives what it writes instead.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 
 use flick_core::build::Artifact;
@@ -76,15 +76,16 @@ pub(crate) fn ir(
         let mut problems = match Program::from_cbor(&written) {
             Ok(program) => {
                 let mut problems = validate(&program, &builtin, &files);
-                // the package of a module names the tags of its constructors
+                // a module's package and exports are its ABI to the others
                 let modules = |p: &Program| {
                     (p.modules.iter())
-                        .map(|m| (m.name.clone(), m.package.clone()))
-                        .collect::<BTreeSet<_>>()
+                        .map(|m| (m.name.clone(), (m.package.clone(), m.exports.clone())))
+                        .collect::<BTreeMap<_, _>>()
                 };
                 if modules(&program) != modules(&given) {
-                    problems
-                        .push("the modules or their packages are not those of the build".into());
+                    let problem =
+                        "the modules, their packages or exports are not those of the build";
+                    problems.push(problem.into());
                 }
                 if program.lang != given.lang {
                     problems.push("the lang items are not those of the build".into());

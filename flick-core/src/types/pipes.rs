@@ -9,7 +9,7 @@ use std::mem;
 
 use super::Checker;
 use super::sugar_lints::unparen;
-use super::ty::Type;
+use super::ty::{Effects, Type};
 use super::typing::Range;
 use crate::diagnostics::codes;
 use crate::source::Span;
@@ -109,6 +109,37 @@ pub fn applied_order(operators: &[Token]) -> Vec<usize> {
     }
 }
 
+/// The call of one operand of a composition, as far as it is checked
+/// before its argument.
+struct Call {
+    shape: Shape,
+    provided: usize,
+    operand: Span,
+    span: Span,
+    function: Type,
+}
+
+/// What the function of a call is.
+enum Shape {
+    Fun {
+        param: Type,
+        effects: Option<Box<Effects>>,
+        result: Type,
+        since: usize,
+        eff: bool,
+        /// The defaults around, set aside while the argument is typed.
+        outer: Option<Vec<(Type, usize)>>,
+    },
+    Error,
+    /// A function not known yet, made `param -> result`.
+    Unknown {
+        param: Type,
+        result: Type,
+    },
+    /// Not a function.
+    Not(Type),
+}
+
 /// A composition being typed: its operands, bound to the locals from
 /// `mark` on, and its operator as written.
 struct Chain<'a, 'n> {
@@ -119,9 +150,8 @@ struct Chain<'a, 'n> {
 }
 
 impl Checker<'_> {
-    /// `x |> f` applies `f` to `x`, evaluating `x` first.
-    pub(super) fn pipe(&mut self, lhs: &Node, rhs: &Node) -> Type {
-        let arg = self.infer(lhs);
+    /// `x |> f` applies `f` to `x`, of type `arg`: `x` is evaluated first.
+    pub(super) fn pipe_from(&mut self, arg: Type, lhs: &Node, rhs: &Node) -> Type {
         let function = self.infer(rhs);
         let call = (lhs.range().0, rhs.range().1);
         match self.ui_callable(&function, call, self.span(rhs)) {
@@ -224,18 +254,30 @@ impl Checker<'_> {
     /// The value of the calls of the operands `order` names, the first
     /// applied first, given `x`: each one typed as the application of its
     /// local to the value of the calls before it, as `apply` types `g' (f' x)`.
+    /// The calls are taken in a loop, outermost first and then back out, as
+    /// the recursion through `g' (f' x)` would: a long chain would take
+    /// stack per operand.
     fn composed(&mut self, chain: &Chain, order: &[usize], x: Type) -> Type {
-        let Some((&i, inner)) = order.split_last() else {
-            return x;
-        };
-        let mut defaults = Vec::new();
+        let mut calls = Vec::with_capacity(order.len());
+        for &i in order.iter().rev() {
+            calls.push(self.composed_call(chain, i));
+        }
+        let mut value = x;
+        for call in calls.into_iter().rev() {
+            value = self.composed_result(chain, call, &value);
+        }
+        value
+    }
+
+    /// What the call of operand `i` checks before its argument.
+    fn composed_call(&mut self, chain: &Chain, i: usize) -> Call {
         let provided = self.cx.regions.provided.len();
         let key = composed_key(chain.operands, chain.operators, i);
         let operand = self.span(chain.operands[i]);
         let span = Span::new(self.file, key.0, key.1);
         let function = self.use_local(chain.mark + i, span);
         let function = self.value_bound(function);
-        let ty = match self.ui_callable(&function, key, operand) {
+        let shape = match self.ui_callable(&function, key, operand) {
             Type::Fun {
                 param,
                 effects,
@@ -243,10 +285,62 @@ impl Checker<'_> {
             } => {
                 let since = self.diagnostics.len();
                 let eff = self.eff_parts(&param).is_some();
-                let outer = eff.then(|| self.cx.regions.defaults.replace(Vec::new()));
-                let argument = self.composed(chain, inner, x);
-                self.expect(&argument, &param, span);
-                if let Some(outer) = outer {
+                let outer = if eff {
+                    self.cx.regions.defaults.replace(Vec::new())
+                } else {
+                    None
+                };
+                Shape::Fun {
+                    param: *param,
+                    effects,
+                    result: *result,
+                    since,
+                    eff,
+                    outer,
+                }
+            }
+            Type::Error => Shape::Error,
+            meta @ Type::Meta(_) => {
+                let (param, result) = (self.fresh(), self.fresh());
+                let function = Type::pure_fun(param.clone(), result.clone());
+                if self.unify(&meta, &function).is_ok() {
+                    Shape::Unknown { param, result }
+                } else {
+                    Shape::Not(meta)
+                }
+            }
+            other => Shape::Not(other),
+        };
+        Call {
+            shape,
+            provided,
+            operand,
+            span,
+            function,
+        }
+    }
+
+    /// The value of `call` given its argument.
+    fn composed_result(&mut self, chain: &Chain, call: Call, argument: &Type) -> Type {
+        let Call {
+            shape,
+            provided,
+            operand,
+            span,
+            function,
+        } = call;
+        let mut defaults = Vec::new();
+        let ty = match shape {
+            Shape::Fun {
+                param,
+                effects,
+                result,
+                since,
+                eff,
+                outer,
+            } => {
+                self.expect(argument, &param, span);
+                if eff {
                     let mine = mem::replace(&mut self.cx.regions.defaults, outer);
                     defaults.extend(mine.unwrap_or_default());
                 }
@@ -260,34 +354,21 @@ impl Checker<'_> {
                     self.call_effects(&self.live_call(&function, &e), span);
                 }
                 let result = self.instantiate(&result, span);
-                self.application_result(result, &function, &argument, false)
+                self.application_result(result, &function, argument, false)
             }
-            Type::Error => {
-                self.composed(chain, inner, x);
-                Type::Error
+            Shape::Error => Type::Error,
+            Shape::Unknown { param, result } => {
+                self.expect(argument, &param, span);
+                result
             }
-            meta @ Type::Meta(_) => {
-                let (param, result) = (self.fresh(), self.fresh());
-                let function = Type::pure_fun(param.clone(), result.clone());
-                if self.unify(&meta, &function).is_ok() {
-                    let argument = self.composed(chain, inner, x);
-                    self.expect(&argument, &param, span);
-                    result
-                } else {
-                    self.composed(chain, inner, x);
-                    self.not_composable(&meta, operand, chain.op);
-                    Type::Error
-                }
-            }
-            other => {
-                self.composed(chain, inner, x);
-                self.not_composable(&other, operand, chain.op);
+            Shape::Not(ty) => {
+                self.not_composable(&ty, operand, chain.op);
                 Type::Error
             }
         };
         self.settle_defaults(defaults);
         self.settle_provided(provided);
-        self.note_value(key, &ty);
+        self.note_value(super::typing::range(span), &ty);
         ty
     }
 

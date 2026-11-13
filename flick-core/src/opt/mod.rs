@@ -49,7 +49,6 @@ use std::{mem, ptr};
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Lit, Module, Pat, Stmt};
 pub use fold::{js_number, json_string};
 pub use specialize::names_only;
-pub(crate) use walk::uses;
 use walk::{droppable, each_strict_use, each_use, inert, partial};
 
 /// Rounds of inlining: a body inlined in the first may inline again.

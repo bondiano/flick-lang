@@ -136,21 +136,25 @@ fn code_generation_knows_the_lang_items_of_the_program_only() {
     );
 }
 
-/// The Go code generator reads the IR and the data of the build its input
-/// gives, as a backend outside the compiler must: nothing of the checker,
-/// the projects or the build, and no file.
+/// The JS and Go code generators read the IR and the data of the build
+/// their input gives, as a backend outside the compiler must: nothing of the
+/// checker, the interfaces, the optimizer, the projects or the build, and no
+/// file. The TypeScript projection reads the interfaces.
 #[test]
-fn go_code_generation_reads_only_its_input() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/codegen/go");
+fn code_generation_reads_only_its_input() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/codegen");
     let mut files = Vec::new();
     sources(&root, &mut files);
+    let projection = |file: &Path| file == root.join("ts.rs") || file.starts_with(root.join("ts"));
+    let outside = ["types", "iface", "opt", "project", "build", "syntax"];
     let mut against = Vec::new();
-    for file in &files {
+    for file in files.iter().filter(|file| !projection(file)) {
         let text = fs::read_to_string(file).expect("a readable source");
         let code = text.split("\n#[cfg(test)]").next().unwrap_or(&text);
-        let names = named(code).into_iter();
-        let outside = names.filter(|name| ["types", "project", "build", "syntax"].contains(name));
-        against.extend(outside.map(|name| format!("{} names `{name}`", file.display())));
+        let names = named(code)
+            .into_iter()
+            .filter(|name| outside.contains(name));
+        against.extend(names.map(|name| format!("{} names `{name}`", file.display())));
         if code.contains("std::fs") {
             against.push(format!("{} reads files", file.display()));
         }
@@ -158,7 +162,7 @@ fn go_code_generation_reads_only_its_input() {
     against.sort();
     assert!(
         against.is_empty(),
-        "the go code generator reads more than its input:\n{}",
+        "code generation reads more than its input:\n{}",
         against.join("\n")
     );
 }

@@ -101,7 +101,7 @@ fn a_wasm_plugin_rewrites_the_ir_a_build_compiles() {
     let stderr = String::from_utf8_lossy(&built.stderr);
     assert!(!built.status.success(), "{stderr}");
     assert!(
-        stderr.contains("FLICK-P047") && stderr.contains("their packages"),
+        stderr.contains("FLICK-P047") && stderr.contains("their packages or exports"),
         "{stderr}"
     );
 }

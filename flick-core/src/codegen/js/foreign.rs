@@ -49,7 +49,7 @@ impl Gen<'_> {
             return (format!("globalThis.{}", f.binding.name), false);
         };
         let alias = format!("$f_{}", f.name);
-        let spec = (self.options.foreign)(self.module, module);
+        let spec = self.options.foreign(self.module, module);
         let (spec, bridged) = {
             let mut spec = spec;
             let mut bridged = false;
@@ -166,7 +166,10 @@ impl Gen<'_> {
                 }
             }
         };
-        if let Some(n) = (self.options.workers)(self.module, &f.name).filter(|&n| n == params.len())
+        if let Some(n) = self
+            .options
+            .worker(self.module, &f.name)
+            .filter(|&n| n == params.len())
         {
             let worker_id = format!("{id}${n}");
             let curried = self.curried(&worker_id, n);
@@ -326,7 +329,7 @@ pub(super) fn plain_foreigns(
             ItemKind::Foreign(f) if plain(f) => {
                 if options.rt {
                     let source = f.binding.from.as_deref()?;
-                    let spec = (options.foreign)(module, source);
+                    let spec = options.foreign(module, source);
                     let data = f.adapter.shapes.iter().all(Shape::is_data)
                         && f.adapter.result_shape.is_data();
                     // the runtime's own exports take every value as it is

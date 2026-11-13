@@ -4,7 +4,7 @@
 
 use super::{Gen, indent, names};
 use crate::ir::Handler;
-use crate::types::OpClass;
+use flick_ir::OpClass;
 
 impl Gen<'_> {
     pub(super) fn handle(&mut self, h: &Handler) -> String {

@@ -8,7 +8,7 @@ use std::rc::Rc;
 use super::Checker;
 use crate::decls::Decls;
 use crate::syntax::{Path, Term};
-use crate::types::{Fields, Kind, Row, Scheme, Stage, Type, Var};
+use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 use crate::variance::Sign;
 
 const T: &str = "T";
@@ -209,4 +209,20 @@ fn an_invariant_argument_stays() {
             "{t}"
         );
     }
+}
+
+#[test]
+fn a_hidden_row_keeps_the_capture_rows_shown_by_data_arguments() {
+    let captures = |name: &str| Caps::var(Var::Named(name.into()));
+    let before = Type::Captured(Rc::new(unit_fn(Stage::Pure)), captures("c"));
+    let after = Type::Captured(
+        Rc::new(unit_fn(Stage::Pure)),
+        captures("c").union(&captures("d")),
+    );
+    let scheme = Scheme::new(
+        vec![("c".into(), Kind::Captures), ("d".into(), Kind::Captures)],
+        Type::fun(data("Box", before), Stage::Pure, data("Box", after)),
+    );
+    let result = Checker::new(&decls()).check_top(&Term::lam("x", Term::Var("x".into())), &scheme);
+    assert!(result.is_ok(), "{result:?}");
 }

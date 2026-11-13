@@ -14,7 +14,7 @@ interface Info {
 }
 
 // the time goes through a Date as Effect's does, which drops a fraction of a millisecond
-const value = (info: Info): string =>
+export const value = (info: Info): string =>
   `${info.size.toString(16)}-${info.mtime._tag === "Some" ? new Date(info.mtime.value).getTime().toString(16) : "0"}`;
 
 const generator = (etag: string) => (service: object): Layer =>

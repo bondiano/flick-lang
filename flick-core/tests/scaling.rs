@@ -435,6 +435,7 @@ fn checked_on_a_test_stack(text: String) -> Vec<String> {
 
 #[test]
 fn the_deepest_nesting_the_parser_accepts_checks_on_a_test_stack() {
+    let _alone = alone();
     let none = Vec::<String>::new();
     // 198 arrows and 198 `fun`s are as deep as the parser goes
     let (arrows, funs) = ("Int -> ".repeat(198), "fun a -> ".repeat(198));
@@ -452,4 +453,33 @@ fn the_deepest_nesting_the_parser_accepts_checks_on_a_test_stack() {
     assert!(codes.contains(&"FLICK-S007".to_owned()), "{codes:?}");
     let composed = format!("{f}h : Int -> Int\nlet h = f{}", " >> f".repeat(500));
     assert_eq!(checked_on_a_test_stack(composed), none);
+}
+
+#[test]
+fn long_operator_chains_check_on_a_test_stack() {
+    let _alone = alone();
+    let none = Vec::<String>::new();
+    // a chain of binary operators nests as deep as it is long
+    let f = "f : Int -> Int\nlet f a = a\n";
+    let sum = format!("x : Int\nlet x = 1{}", " + 1".repeat(5000));
+    assert_eq!(checked_on_a_test_stack(sum), none);
+    let piped = format!("{f}x : Int\nlet x = 1{}", " |> f".repeat(5000));
+    assert_eq!(checked_on_a_test_stack(piped), none);
+    let composed = format!("{f}h : Int -> Int\nlet h = f{}", " >> f".repeat(5000));
+    assert_eq!(checked_on_a_test_stack(composed), none);
+}
+
+#[test]
+fn long_operator_chains_in_functions_check_on_a_test_stack() {
+    let _alone = alone();
+    let none = Vec::<String>::new();
+    let f = "f : Int -> Int\nlet f a = a\n";
+    for (signature, expression) in [
+        ("Unit -> Int", format!("1{}", " + 1".repeat(5000))),
+        ("Unit -> Int", format!("1{}", " |> f".repeat(5000))),
+        ("Unit -> Int -> Int", format!("f{}", " >> f".repeat(5000))),
+    ] {
+        let source = format!("{f}chain : {signature}\nlet chain () = {expression}");
+        assert_eq!(checked_on_a_test_stack(source), none);
+    }
 }

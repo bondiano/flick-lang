@@ -2,7 +2,7 @@
 use super::Known;
 use crate::ir::{Arm, BinOp, Expr, ExprKind, Handler, Lit, Param, Pat, Stage, Stmt};
 use crate::source::Span;
-use crate::syntax::lang::Lang;
+use flick_ir::Lang;
 use std::mem;
 fn unit(span: Span) -> Expr {
     Expr::new(ExprKind::Lit(Lit::Unit), span)

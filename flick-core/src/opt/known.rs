@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::mem;
 
 use super::devirt::{built, matches};
-use super::walk::{applied, rename, size, uses};
+use super::walk::{applied, rename, size};
 use super::{atom, place};
 use crate::ir::{Arm, Expr, ExprKind, Lit, Pat, Stage, Stmt};
 use crate::source::Span;
@@ -179,8 +179,8 @@ fn next_takes_apart(stmts: &[Stmt], i: usize, result: &Expr) -> bool {
         return false;
     }
     let read = |s: &Stmt| match s {
-        Stmt::Let(_, v) | Stmt::Var(_, v) | Stmt::Assign(_, v) | Stmt::Expr(v) => uses(v, name),
-        Stmt::Fun { value, .. } => uses(value, name),
+        Stmt::Let(_, v) | Stmt::Var(_, v) | Stmt::Assign(_, v) | Stmt::Expr(v) => v.uses(name),
+        Stmt::Fun { value, .. } => value.uses(name),
     };
     let after: usize = stmts
         .get(i + 2..)
@@ -189,7 +189,7 @@ fn next_takes_apart(stmts: &[Stmt], i: usize, result: &Expr) -> bool {
         .map(read)
         .sum();
     let last = if i + 1 < stmts.len() {
-        uses(result, name)
+        result.uses(name)
     } else {
         0
     };

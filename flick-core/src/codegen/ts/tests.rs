@@ -1,9 +1,16 @@
 use crate::types::Elided;
 use std::fmt::Write;
 
-use super::{Projection, declaration_file};
+use std::collections::{BTreeMap, HashMap, HashSet};
+
+use super::{Projection, Typing, declaration_file};
+use crate::codegen::test_options::resolved_by;
+use crate::codegen::{EffectBridge, Known, Labels, Options, js};
+use crate::effects::effect_specifier;
 use crate::iface::{Interface, Namespace};
+use crate::ir::lang_items;
 use crate::ir::tests::check_text;
+use crate::ir::tests::lower_text;
 use crate::types;
 use crate::types::lang::Lang;
 
@@ -379,4 +386,44 @@ fn a_file_beside_a_module_is_named_from_the_file_that_imports_the_module() {
     assert_eq!(beside("../Lib/Fs.js", "../io/fs.d.ts"), "../io/fs.d.ts");
     assert_eq!(beside("./Fs.js", "../fs.d.ts"), "./../fs.d.ts");
     assert_eq!(beside("pkg/Lib/Fs.js", "./fs.mjs"), "pkg/Lib/fs.mjs");
+}
+
+#[test]
+fn a_release_build_in_typescript_types_a_constructed_value_as_its_constructor_does() {
+    let text = "module App exposing (Token, start)\n\nopaque type Token = Token String Float\n\n\
+                start : Token\nlet start = Token \"a\" 1\n";
+    let ir = lower_text("App", text).expect("lowers");
+    let path = |m: &str| format!("{}.ts", m.replace('.', "/"));
+    let foreign = |_: &str, spec: &str| effect_specifier(spec);
+    let resolved = resolved_by(&ir, &effect_specifier);
+    let typing = Typing {
+        interface: &|_| None,
+        package: &|_| None,
+        foreign: &foreign,
+        path: &path,
+        rt: false,
+    };
+    let prepared = BTreeMap::from([("App".to_owned(), typing.typed("App", "App"))]);
+    let emit = |typescript: bool| {
+        let lang = lang_items();
+        let known = Known::of(&lang);
+        let options = Options {
+            builtins: &[],
+            packages: &BTreeMap::new(),
+            resolved: &resolved,
+            typescript: typescript.then_some(&prepared),
+            release: true,
+            workers: &HashMap::new(),
+            direct: &HashSet::new(),
+            labels: Labels::default(),
+            rt: false,
+            effect_bridge: EffectBridge::Absent,
+            lang: &known,
+        };
+        js(&ir, &options).code
+    };
+    // an opaque type is a brand in TypeScript, which the object does not have
+    let ts = emit(true);
+    assert!(ts.contains("_0: \"a\", _1: 1 } as any"), "{ts}");
+    assert!(!emit(false).contains("as any"));
 }

@@ -3,7 +3,6 @@
 //! destructures it, becomes one local per part. Its identity is never
 //! observed, so no object needs to exist.
 
-use super::walk::uses;
 use crate::ir::{Expr, ExprKind, Pat, Stmt};
 
 /// Splits the records and tuples bound in `stmts` that only feed reads of
@@ -63,7 +62,7 @@ fn only(
     name: &str,
     is_part: &dyn Fn(&Expr) -> bool,
 ) -> bool {
-    let mut total = uses(result, name);
+    let mut total = result.uses(name);
     let mut parts = parts(result, is_part);
     for stmt in &stmts[i + 1..] {
         match stmt {
@@ -82,7 +81,7 @@ fn only(
             | Stmt::Assign(_, v)
             | Stmt::Expr(v)
             | Stmt::Fun { value: v, .. } => {
-                total += uses(v, name);
+                total += v.uses(name);
                 parts += self::parts(v, is_part);
             }
         }

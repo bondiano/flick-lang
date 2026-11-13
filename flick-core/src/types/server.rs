@@ -52,6 +52,21 @@ impl Checker<'_> {
     // as an argument or through a class dictionary gives no path; follow
     // dictionaries and higher-order arguments when a program needs that.
     fn reached(&self, node: &Node) -> Option<Vec<String>> {
+        // down a chain of operators in a loop: its nodes, then its operands
+        let (spine, left) = node.left_spine();
+        if let Some(found) = spine.iter().find_map(|n| self.reached_at(n)) {
+            return Some(found);
+        }
+        self.reached_at(left)
+            .or_else(|| left.nodes().find_map(|child| self.reached(child)))
+            .or_else(|| {
+                (spine.iter().rev().flat_map(|n| n.nodes().skip(1)))
+                    .find_map(|child| self.reached(child))
+            })
+    }
+
+    /// The server `node` itself names, if any.
+    fn reached_at(&self, node: &Node) -> Option<Vec<String>> {
         if let Some(Ref::Value { module, name }) = self.typing.names.get(&node.range()) {
             if *module == self.env.module {
                 if let Some(rest) = self.typing.servers.get(name) {
@@ -61,7 +76,7 @@ impl Checker<'_> {
                 return Some(vec![format!("{module}.{name}")]);
             }
         }
-        node.nodes().find_map(|child| self.reached(child))
+        None
     }
 
     fn imported_server(&self, module: &str, name: &str) -> bool {

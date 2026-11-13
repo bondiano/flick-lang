@@ -43,7 +43,8 @@
   },
   "ignorePatterns": [
     "dist",
-    "test/fixtures/*.aot.js"
+    "test/fixtures/*.aot.js",
+    "src/rt/vendor"
   ],
   "overrides": [
     {

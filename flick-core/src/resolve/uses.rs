@@ -133,6 +133,15 @@ impl Walker<'_> {
                 return;
             }
             K::ImportDecl => return,
+            K::BinExpr => {
+                // down a chain of operators in a loop: its left operand, then the others
+                let (spine, left) = node.left_spine();
+                self.walk(left);
+                for child in spine.iter().rev().flat_map(|n| n.nodes().skip(1)) {
+                    self.walk(child);
+                }
+                return;
+            }
             K::ModuleHeader => {
                 for child in node
                     .nodes()

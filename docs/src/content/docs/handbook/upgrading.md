@@ -587,3 +587,14 @@ or hole location; do not reparse the declaration's token stream.
 `Signature.ty` supplies the same parsed representation. Parameter names and
 token-normalized kinds are available in `DeriveTarget.params` and `kinds`.
 See [Derives](../../reference/plugins/#derives) for the input contract.
+
+## A module of the IR lists its exports
+
+A reader of `flick build --emit-ir` meets a new version, `0.11.0`: a module has
+`exports`, what its interface exports. `values` lists the module's own exported
+values, as `{ "name": "parse", "sync": 2 }`: `sync` is the number of arrows a
+call supplies when the last stage is Sync, else `null`. `reexports` holds what it exports of other modules, as
+`{ "module": "Http.Url", "namespace": "type", "name": "Url" }`. The JS backend
+writes the module's `export … from` lines and the wrappers of its Sync exports
+from them. A plugin with `hooks = ["ir"]` gives the exports back as it got
+them; changed ones are `FLICK-P047`.

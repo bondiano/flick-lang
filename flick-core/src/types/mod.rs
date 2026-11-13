@@ -14,6 +14,7 @@
 
 mod abi;
 mod applicative_do;
+mod binary;
 mod bindings;
 mod braced_branch;
 mod builtin_sources;
@@ -90,6 +91,7 @@ mod ty;
 mod typing;
 mod ui;
 mod unify;
+mod variance;
 mod watched;
 pub mod wire;
 
@@ -310,6 +312,7 @@ fn run_in(
         kinds: KindStore::default(),
         diagnostics: Vec::new(),
         cx: ItemCx::default(),
+        signs: HashMap::new(),
         opened: Vec::new(),
         contract_types: Vec::new(),
         opened_modules: Vec::new(),
@@ -508,6 +511,8 @@ struct Checker<'a> {
     kinds: KindStore,
     diagnostics: Vec<Diagnostic>,
     cx: ItemCx,
+    /// The sign of each parameter of the declared types met so far.
+    signs: variance::Signs,
     /// The modules the blocks around the expression open, innermost last,
     /// each as the file names it: a name one of them exports is that one,
     /// before the names of the file. `ui { … }` opens `Ui`. With each, the
