@@ -9,7 +9,7 @@ const KERNEL_RUNTIME: &str = bindings::OWNED_PREFIX;
 
 impl Gen<'_> {
     pub(super) fn write_imports(&self, code: &mut String, here: &str) {
-        let runtime = (self.options.foreign)(self.module, RUNTIME);
+        let runtime = self.options.foreign(self.module, RUNTIME);
         if self.effect {
             let _ = writeln!(code, "import {{ Effect }} from \"{runtime}\";");
         }
@@ -68,7 +68,7 @@ impl Gen<'_> {
             untyped(code, alias);
         }
         for imported in &self.imports {
-            let target = (self.options.path)(imported);
+            let target = self.options.path(imported);
             let alias = self
                 .aliases
                 .get(imported)

@@ -455,5 +455,7 @@ mod imports;
 mod lang_forms;
 mod native;
 mod projections;
+mod typed;
+pub use typed::{Typed, Typing};
 #[cfg(test)]
 mod tests;

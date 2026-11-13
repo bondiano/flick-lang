@@ -6,7 +6,7 @@ use std::mem;
 use super::{Callee, Gen, Target, indent, literal, names, tidy};
 use crate::ir::{Expr, ExprKind, Pat, Stage, Stmt};
 use crate::numeric::Num;
-use crate::types::{Constructor, Dict, Rep};
+use flick_ir::{Constructor, Dict, Rep};
 
 /// Whether moving the evaluation of `js` later is unobservable: a name, a
 /// property of a module namespace, or a literal.
@@ -248,7 +248,9 @@ impl Gen<'_> {
         }
         if module != self.module {
             let constant = format!("{}${method}", names::instance(name));
-            return (self.options.direct)(module, name, method)
+            return self
+                .options
+                .is_direct(module, name, method)
                 .then(|| self.global(module, &constant));
         }
         self.direct.get(&(name.clone(), method.to_owned())).cloned()
@@ -270,7 +272,10 @@ impl Gen<'_> {
         };
         let args: Vec<&Expr> = args.into_iter().map(|(arg, _)| arg).collect();
         if module != self.module {
-            let arity = (self.options.workers)(module, name).filter(|&n| n == args.len())?;
+            let arity = self
+                .options
+                .worker(module, name)
+                .filter(|&n| n == args.len())?;
             let worker = self.global(module, &format!("{}${arity}", names::ident(name)));
             return Some((worker, args));
         }
@@ -298,8 +303,8 @@ impl Gen<'_> {
             return None;
         }
         let js = self.ordered(&args);
-        let package = (self.options.package)(&c.module);
-        let tag = names::string(&names::tag(c, package.as_deref()));
+        let package = self.options.package(&c.module);
+        let tag = names::string(&names::tag(c, package));
         let fields: Vec<String> = js
             .iter()
             .enumerate()
@@ -431,7 +436,7 @@ impl Gen<'_> {
         // TypeScript types the literal as itself, so `Get == Post` would not
         // check: it names the constructor, typed as the program's values are
         if let Rep::Literal(literal) = &c.rep
-            && !self.options.typescript
+            && !self.options.typescript()
         {
             return names::enum_literal(literal);
         }

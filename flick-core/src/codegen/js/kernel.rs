@@ -10,7 +10,7 @@ use super::function::{balanced_without_yield, lone_yield};
 use super::{Gen, indent, names};
 use crate::codegen::tail::Calls;
 use crate::ir::{Arm, Expr, Foreign, ForeignMode, Handler, Stage};
-use crate::types::{Lift, OpClass};
+use flick_ir::{Lift, OpClass};
 
 /// Which calls jump: with the kernel, those of any stage.
 pub(super) fn calls(kernel: bool) -> Calls {

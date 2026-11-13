@@ -2,9 +2,10 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use flick_core::build::{self, Artifact, Extras, Settings};
-use flick_core::codegen::EffectBridge;
+use flick_core::codegen::{self, EffectBridge};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::iface;
+use flick_core::ir::ItemKind;
 use flick_core::project::config::Backend;
 use flick_core::project::{self, Compilation, Host};
 use flick_core::source::{FileId, SourceMap};
@@ -216,4 +217,44 @@ fn an_inferred_row_argument_takes_the_kind_of_its_parameter() {
     };
     let kinds: Vec<Kind> = vars.into_iter().map(|b| b.kind).collect();
     assert_eq!(kinds, [Kind::ServiceRow]);
+}
+
+#[test]
+fn an_explicit_build_package_qualifies_tags_without_project_discovery() {
+    let source = "module Main exposing (Token(..), token)\ntype Token = Token String\ntoken : Token\nlet token = Token \"x\"\n";
+    let (diagnostics, sources, compilation) = compile(source);
+    assert!(
+        diagnostics.iter().all(|d| d.severity != Severity::Error),
+        "{diagnostics:?}"
+    );
+    let constructor = compilation
+        .modules
+        .iter()
+        .flat_map(|m| &m.ir.items)
+        .find_map(|item| {
+            if let ItemKind::Constructor(c) = &item.kind {
+                Some(c)
+            } else {
+                None
+            }
+        })
+        .expect("the Token constructor");
+    let expected = codegen::tag(constructor, Some("@acme/fallback"));
+    for typescript in [false, true] {
+        let mut options = settings(false);
+        options.package = Some("@acme/fallback");
+        options.typescript = typescript;
+        let (artifacts, diagnostics) = build::emit(&compilation, &sources, &options);
+        assert_eq!(diagnostics, []);
+        let path = if typescript { "Main.ts" } else { "Main.js" };
+        let code = &artifacts
+            .iter()
+            .find(|a| a.path == path)
+            .expect("emitted module")
+            .contents;
+        assert!(
+            code.contains(&expected),
+            "{path}: expected package-qualified tag {expected}: {code}"
+        );
+    }
 }

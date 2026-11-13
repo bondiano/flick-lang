@@ -66,6 +66,17 @@ pub fn rt_specifier(spec: &str) -> Option<String> {
     (!owned(&spec)).then(|| spec.into_owned())
 }
 
+/// The specifier of the package module `spec` as code for Flick's own
+/// runtime (`rt`) or for Effect imports it: a module neither has is the
+/// adapter's.
+pub fn runtime_specifier(rt: bool, spec: &str) -> String {
+    if rt {
+        rt_specifier(spec).unwrap_or_else(|| effect_specifier(spec))
+    } else {
+        effect_specifier(spec)
+    }
+}
+
 pub fn on_kernel(spec: &str, export: &str) -> bool {
     !belongs_to(spec, bindings::OWNED_PREFIX)
         || bindings::EXPORTS

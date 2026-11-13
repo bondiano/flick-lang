@@ -447,6 +447,7 @@ fn run_in(
                             initialization: flick_ir::Initialization::default(),
                             records: BTreeMap::new(),
                             package: None,
+                            exports: flick_ir::Exports::default(),
                         },
                         Arc::new(interface.clone()),
                     ))
@@ -457,6 +458,9 @@ fn run_in(
         _ => Vec::new(),
     };
     let fresh = loader.finish_packages(&mut compiled, mode, saved.is_some() && !failed);
+    for c in &mut compiled {
+        c.ir.exports = ir::exports(&c.name, &c.interface);
+    }
     // a module's package names the tags of its constructors: its source
     // package, else the project's
     #[cfg(feature = "native-project")]
