@@ -142,7 +142,7 @@ fn app(
     if let Some(missing) = missing_exports(&manifest, stage) {
         return failure(codes::P020, missing);
     }
-    if let Err(err) = write(&stage.join("package.json"), &format!("{manifest:#}\n")) {
+    if let Err(err) = write(&stage.join("package.json"), format!("{manifest:#}\n")) {
         return failure(
             codes::P013,
             format!("cannot write the staged `package.json`: {err}"),

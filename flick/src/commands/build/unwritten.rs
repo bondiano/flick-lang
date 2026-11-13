@@ -7,7 +7,7 @@ use std::fs;
 use std::io;
 use std::path::{Component, Path};
 
-use flick_core::build::Artifact;
+use crate::artifact::{Artifact, validate_ancestors};
 use flick_core::build::go::FILES;
 
 use crate::cache::remove_empty_parents;
@@ -31,7 +31,7 @@ pub(super) fn remove(out_dir: &Path, artifacts: &[Artifact]) -> io::Result<()> {
             let path = Path::new(line);
             let inside = path.starts_with(module)
                 && (path.components()).all(|c| matches!(c, Component::Normal(_)));
-            if !inside {
+            if !inside || validate_ancestors(out_dir, path).is_err() {
                 continue;
             }
             let path = out_dir.join(path);
@@ -49,15 +49,12 @@ pub(super) fn remove(out_dir: &Path, artifacts: &[Artifact]) -> io::Result<()> {
 mod tests {
     use std::{env, fs, process};
 
-    use flick_core::build::Artifact;
+    use crate::artifact::Artifact;
 
     use super::remove;
 
     fn artifact(path: &str, contents: &str) -> Artifact {
-        Artifact {
-            path: path.to_owned(),
-            contents: contents.to_owned(),
-        }
+        Artifact::source(path.to_owned(), contents.to_owned())
     }
 
     /// Only what the old list of a module names, inside that module, goes.
@@ -98,5 +95,31 @@ mod tests {
             ]
         );
         let _ = fs::remove_dir_all(&out);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn stale_lists_cannot_delete_through_a_symlink_outside_the_output() {
+        use std::os::unix::fs::symlink;
+
+        let root = env::temp_dir().join(format!("flick-unwritten-symlink-{}", process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let out = root.join("output");
+        let outside = root.join("outside");
+        fs::create_dir_all(out.join("go/main")).expect("output directory");
+        fs::create_dir_all(&outside).expect("outside directory");
+        fs::write(outside.join("kept.go"), "owned elsewhere").expect("outside file");
+        symlink(&outside, out.join("go/main/redirect")).expect("symlink");
+        fs::write(
+            out.join("go/main/.flick-files"),
+            "go/main/redirect/kept.go\n",
+        )
+        .expect("old list");
+        remove(&out, &[artifact("go/main/.flick-files", "")]).expect("remove stale files");
+        assert_eq!(
+            fs::read(outside.join("kept.go")).expect("outside file remains"),
+            b"owned elsewhere"
+        );
+        fs::remove_dir_all(root).expect("cleanup");
     }
 }

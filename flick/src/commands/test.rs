@@ -13,7 +13,8 @@ use std::process::{Child, Command, ExitCode, Stdio};
 use std::time::{Duration, SystemTime};
 use std::{env, fs, io, thread};
 
-use flick_core::build::{Artifact, go};
+use crate::artifact::Artifact;
+use flick_core::build::go;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::{Backend, Emit};
 use flick_core::project::{self, ModuleCache, Project};
@@ -195,15 +196,15 @@ fn prepare(
     }
     progress.stage("Writing test runner");
     let runner = out.join("test.js");
-    if let Err(err) = write(&runner, &runner_source(&suites, rt)) {
+    if let Err(err) = write(&runner, runner_source(&suites, rt)) {
         drop(progress);
         eprintln!("error: cannot write `{}`: {err}", runner.display());
         return Err(());
     }
-    emitted.artifacts.push(Artifact {
-        path: "test.js".to_owned(),
-        contents: runner_source(&suites, rt),
-    });
+    emitted.artifacts.push(Artifact::source(
+        "test.js".to_owned(),
+        runner_source(&suites, rt),
+    ));
     store(&emitted.artifacts);
     drop(progress);
     Ok(runner)

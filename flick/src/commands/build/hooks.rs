@@ -6,7 +6,6 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 
-use flick_core::build::Artifact;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::ir::lang_items;
 use flick_core::plugin::Failure;
@@ -16,6 +15,7 @@ use flick_core::types;
 use flick_ir::{Module, Program, VERSION, validate};
 
 use super::Emission;
+use crate::artifact::Artifact;
 use crate::sources::FsHost;
 use crate::{plugins, toolchain};
 
@@ -141,27 +141,34 @@ pub(super) fn emit(project: &Project, emitted: &mut Emission) {
                 continue;
             }
         };
-        let given: Vec<flick_plugin::Artifact> = (emitted.artifacts.iter())
-            .map(|a| flick_plugin::Artifact {
-                path: a.path.clone(),
-                contents: a.contents.clone(),
-            })
-            .collect();
+        let mut given = Vec::new();
+        for artifact in &emitted.artifacts {
+            match artifact.text() {
+                Ok(Some(text)) => given.push(flick_plugin::Artifact {
+                    path: text.path,
+                    contents: text.contents,
+                }),
+                Ok(None) => {}
+                Err(why) => {
+                    emitted.diagnostics.push(error(codes::P013, why));
+                    return;
+                }
+            }
+        }
         match plugin.emit(&given) {
-            Ok(written) => match unmapped(&given, &written) {
-                Some(path) => {
+            Ok(written) => {
+                if let Some(path) = unmapped(&given, &written) {
                     let message = format!("plugin `{package}` changed `{path}` without its map");
                     emitted.diagnostics.push(error(codes::P046, message));
-                }
-                None => {
-                    emitted.artifacts = (written.into_iter())
-                        .map(|a| Artifact {
-                            path: a.path,
-                            contents: a.contents,
-                        })
+                } else {
+                    let mut replaced: Vec<_> = written
+                        .into_iter()
+                        .map(|a| Artifact::source(a.path, a.contents))
                         .collect();
+                    replaced.extend(emitted.artifacts.iter().filter(|a| a.is_binary()).cloned());
+                    emitted.artifacts = replaced;
                 }
-            },
+            }
             Err(Failure::Refused(found)) => emitted.diagnostics.extend(
                 (found.into_iter())
                     .map(|d| error(codes::P036, format!("plugin `{package}`: {}", d.message))),

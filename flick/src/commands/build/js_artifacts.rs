@@ -5,6 +5,7 @@ use flick_core::project::Compilation;
 use flick_core::source::SourceMap;
 
 use super::{Emission, shipped};
+use crate::artifact::Artifact;
 
 /// The output of a js build and the foreign files it ships.
 pub(super) fn js_artifacts(
@@ -17,7 +18,7 @@ pub(super) fn js_artifacts(
     artifacts.extend(shipped);
     diagnostics.extend(problems);
     Emission {
-        artifacts,
+        artifacts: artifacts.into_iter().map(Artifact::from).collect(),
         diagnostics,
     }
 }

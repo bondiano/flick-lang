@@ -129,7 +129,16 @@ pub fn inspect(options: &InspectArguments, explicit: Option<&str>) -> Outcome {
                 &out,
             );
             match emission.artifacts.into_iter().find(|a| a.path == file) {
-                Some(a) => a.contents,
+                Some(a) => match String::from_utf8(a.contents) {
+                    Ok(text) => text,
+                    Err(_) => {
+                        return failure(
+                            checked.sources,
+                            codes::P013,
+                            format!("the emitted representation `{file}` is not UTF-8"),
+                        );
+                    }
+                },
                 None => {
                     return Outcome {
                         sources: checked.sources,
@@ -273,7 +282,7 @@ pub fn schema_export(options: &SchemaExportArguments, explicit: Option<&str>) ->
     match result {
         Ok(out) if out.status.success() => {
             let path = checked.host.cwd.join(&options.out);
-            match write(&path, &String::from_utf8_lossy(&out.stdout)) {
+            match write(&path, &out.stdout) {
                 Ok(()) => Outcome::default(),
                 Err(err) => failure(
                     checked.sources,

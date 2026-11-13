@@ -15,7 +15,9 @@ pub use driver::{Failure, Generated, generate};
 pub use handshake::handshake;
 pub use inputs::{DeclaredInputs, Inputs, sha256};
 pub use request::validate_request;
-pub use validate::{Limits, Policy, validate_result};
+pub use validate::{
+    Limits, Policy, validate_output_paths, validate_result, validate_serialized_size,
+};
 
 /// The version of the component contract, independent of the portable IR.
 pub const VERSION: &str = "0.1.0";

@@ -15,6 +15,7 @@ use crate::commands::{
 };
 
 mod args;
+mod artifact;
 mod builtins;
 mod cache;
 mod child;
