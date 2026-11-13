@@ -14,6 +14,7 @@
 
 mod abi;
 mod applicative_do;
+mod binary;
 mod bindings;
 mod braced_branch;
 mod builtin_sources;

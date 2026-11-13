@@ -82,6 +82,14 @@ impl Checker<'_> {
                     self.wildcard_arm(s, &arms);
                 }
             }
+            K::BinExpr => {
+                // a chain of operators binds nothing: its operands, in a loop
+                let (spine, left) = node.left_spine();
+                self.scope_walk(left, scope);
+                for child in spine.iter().rev().flat_map(|n| n.nodes().skip(1)) {
+                    self.scope_walk(child, scope);
+                }
+            }
             _ => node.nodes().for_each(|n| self.scope_walk(n, scope)),
         }
         scope.truncate(mark);

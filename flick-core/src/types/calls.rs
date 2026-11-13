@@ -331,68 +331,6 @@ impl Checker<'_> {
                 .is_some_and(|(m, _)| m == item.module)
     }
 
-    pub fn binary(&mut self, node: &Node, children: &[&Node]) -> Type {
-        let Some(op) = node.child_tokens().find(|t| t.kind.is_binary_op()) else {
-            return Type::Error;
-        };
-        let (Some(lhs), Some(rhs)) = (children.first(), children.get(1)) else {
-            return Type::Error;
-        };
-        let span = self.span(node);
-        let bool_ = Type::lang(Lang::Bool);
-        match op.kind {
-            K::PipeGt => {
-                // at the `|>`, the type after the stage: hover and inlay hints show it
-                let ty = self.pipe(lhs, rhs);
-                self.note_type(self.token_span(op), &ty);
-                ty
-            }
-            K::LtPipe => {
-                let ty = self.right_apply(lhs, rhs);
-                self.note_type(self.token_span(op), &ty);
-                ty
-            }
-            K::GtGt | K::LtLt => self.compose(node, None),
-            K::OrOr | K::AndAnd => {
-                self.check(lhs, &bool_);
-                self.check(rhs, &bool_);
-                bool_
-            }
-            K::EqEq | K::NotEq => {
-                let ty = self.infer(lhs);
-                self.check(rhs, &ty);
-                let givens = self.equalities_in_scope();
-                self.equalities.push((ty, span, givens));
-                bool_
-            }
-            kind => {
-                let ty = self.infer(lhs);
-                self.check(rhs, &ty);
-                let (name, domain) = match kind {
-                    K::Lt => ("<", Domain::Ordered),
-                    K::Le => ("<=", Domain::Ordered),
-                    K::Gt => (">", Domain::Ordered),
-                    K::Ge => (">=", Domain::Ordered),
-                    K::PlusPlus => ("++", Domain::Concat),
-                    K::Plus => ("+", Domain::Numeric),
-                    K::Minus => ("-", Domain::Numeric),
-                    K::Star => ("*", Domain::Numeric),
-                    K::Slash => ("/", Domain::Numeric),
-                    K::Percent => ("%", Domain::Numeric),
-                    _ => ("**", Domain::Numeric),
-                };
-                self.cx.operators.push(Operator {
-                    ty: ty.clone(),
-                    span,
-                    op: name,
-                    domain,
-                    givens: self.classes.givens.clone(),
-                });
-                if domain == Domain::Ordered { bool_ } else { ty }
-            }
-        }
-    }
-
     pub fn prefix(&mut self, node: &Node, children: &[&Node]) -> Type {
         let Some(op) = node.child_tokens().next() else {
             return Type::Error;
