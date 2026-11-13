@@ -1,0 +1,7 @@
+module PositiveDsl exposing (ValidationError(..), positive)
+
+type ValidationError = NotPositive
+  deriving Show
+
+positive : Int -> Result ValidationError Int
+let positive n = if n > 0 then Ok n else Err NotPositive

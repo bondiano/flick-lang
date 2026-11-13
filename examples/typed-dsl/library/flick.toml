@@ -1,0 +1,7 @@
+schema-version = 1
+[package]
+name = "validation"
+version = "0.1.0"
+plugin = "validation.wasm"
+[project]
+kind = "lib"

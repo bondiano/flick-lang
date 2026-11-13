@@ -53,7 +53,6 @@ export default defineConfig({
         ["learn/flick-and-effect/", "reference/effect-surface/"],
         ["guides/", "start/"],
         ["ecosystem/", "start/getting-started/"],
-        ["api/", "reference/stdlib/"],
       ].flatMap(([from, to]) => [
         [`/${from}`, `${base}/${to}`],
         [`/ru/${from}`, `${base}/ru/${to}`],

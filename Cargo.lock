@@ -669,6 +669,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "flick-example-typed-dsl"
+version = "0.1.0"
+dependencies = [
+ "flick-plugin",
+]
+
+[[package]]
 name = "flick-ir"
 version = "0.1.0"
 dependencies = [

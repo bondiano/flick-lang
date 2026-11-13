@@ -58,3 +58,43 @@ test("a running export returns its result in an Effect that needs and fails with
   assert.equal(await evaluateExercise(rules, declared("export declare const length_of: (arg: string) => number;")), "type");
   assert.equal(await evaluateExercise(contract, declared("export declare const length_of: (arg: string) => $Effect<number, never, never>;")), "type");
 });
+
+
+test("running contracts reject the wrong result, errors or requirements before executing", async () => {
+  for (const effect of ["$Effect", "$Effect.Effect"]) {
+    for (const result of ["string, never, never", "number, Invalid, never", "number, never, Database"]) {
+      let ran = false;
+      assert.equal(await evaluateExercise({ ...contract, runs: true }, {
+        ...operations,
+        compile: async () => ({ dts: `export declare const length_of: (arg: string) => ${effect}<${result}>;` }),
+        run: async () => { ran = true; return operations.run(); },
+      }), "type");
+      assert.equal(ran, false);
+    }
+  }
+});
+
+test("running contracts require successful execution and expected stdout for both emitters", async () => {
+  for (const effect of ["$Effect", "$Effect.Effect"]) {
+    const compiled = { ...operations, compile: async () => ({ dts: `export declare const length_of: (arg: string) => ${effect}<number, never, never>;` }) };
+    for (const execution of [
+      { status: "exit", code: 0, lines: [{ stream: "stdout", text: "wrong" }] },
+      { status: "exit", code: 1, lines: [{ stream: "stdout", text: "5" }] },
+      { status: "error", code: 0, lines: [{ stream: "stdout", text: "5" }] },
+      { status: "exit", code: 0, lines: [{ stream: "stderr", text: "5" }] },
+    ]) {
+      assert.equal(await evaluateExercise({ ...contract, runs: true }, { ...compiled, run: async () => execution }), "output");
+    }
+  }
+});
+
+test("browser diagnostic rules use severity, not an expected diagnostic code", async () => {
+  let compiled = false;
+  assert.equal(await evaluateExercise(contract, {
+    ...operations,
+    check: async () => [{ severity: "error", code: "FLICK-T009" }],
+    compile: async () => { compiled = true; return operations.compile(); },
+  }), "fix-errors");
+  assert.equal(compiled, false);
+  assert.equal(await evaluateExercise(contract, { ...operations, check: async () => [{ severity: "warning" }] }), "passed");
+});
