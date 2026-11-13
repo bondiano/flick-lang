@@ -186,19 +186,13 @@ pub fn emit(
         path: &path,
         rt: by_class,
     };
-    let typescript = settings.typescript.then(|| {
-        typing.prepare(
-            modules
-                .iter()
-                .map(|c| &c.ir)
-                .chain(builtin_modules_of(by_class)),
-        )
-    });
+    // each module gets its own as the build writes it (see `typed_options`)
+    let untyped = BTreeMap::new();
     let options = Options {
         builtins: &builtin_names,
         packages: &packages,
         resolved: &resolved,
-        typescript: typescript.as_ref(),
+        typescript: settings.typescript.then_some(&untyped),
         release: settings.release,
         workers: &workers,
         direct: &direct,
@@ -218,6 +212,7 @@ pub fn emit(
         #[cfg(feature = "native-project")]
         sources,
         options: &options,
+        typing: settings.typescript.then_some(&typing),
         path: &path,
         package: &package,
         foreign: &foreign,
@@ -502,7 +497,7 @@ fn builtins(ctx: &Context, imports: Vec<String>, out: &mut Vec<Artifact>) {
         if !written.insert(name) {
             continue;
         }
-        let output = codegen::js(module, ctx.options);
+        let output = typed_options(ctx, module, |options| codegen::js(module, options));
         pending.extend(output.imports);
         out.push(Artifact {
             path: (ctx.path)(&module.name),
@@ -569,11 +564,24 @@ struct Context<'a> {
     #[cfg(feature = "native-project")]
     sources: &'a SourceMap,
     options: &'a Options<'a>,
+    /// In TypeScript, what projects the types of a module's exports.
+    typing: Option<&'a Typing<'a>>,
     path: &'a dyn Fn(&str) -> String,
     package: &'a dyn Fn(&str) -> Option<String>,
     foreign: &'a dyn Fn(&str, &str) -> String,
     published_interfaces: &'a BTreeMap<&'a str, Interface>,
     any_interface: &'a dyn Fn(&str) -> Option<Interface>,
+}
+
+/// `js` with the options of `module`'s code: in TypeScript they hold the
+/// types of its exports, projected here, for the modules the build writes
+/// and no others.
+fn typed_options<R>(ctx: &Context, module: &ir::Module, js: impl FnOnce(&Options) -> R) -> R {
+    let typed = ctx.typing.map(|typing| typing.prepare(module));
+    js(&Options {
+        typescript: typed.as_ref().or(ctx.options.typescript),
+        ..*ctx.options
+    })
 }
 
 /// The JS, source map, interface and, when asked, `.d.ts` and Promise
@@ -596,11 +604,11 @@ fn compiled_module(
         effects::control_on_js(&module.ir, diagnostics);
     }
     let mut imports = Vec::new();
-    for (physical, output) in codegen::js_parts(
-        optimized.as_ref().unwrap_or(&module.ir),
-        ctx.options,
-        ctx.layout,
-    ) {
+    let ir = optimized.as_ref().unwrap_or(&module.ir);
+    let parts = typed_options(ctx, ir, |options| {
+        codegen::js_parts(ir, options, ctx.layout)
+    });
+    for (physical, output) in parts {
         imports.extend(write_js_output(ctx, &(ctx.path)(&physical), output, out));
     }
     let file = (ctx.path)(&module.name);

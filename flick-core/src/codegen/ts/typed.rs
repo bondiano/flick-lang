@@ -39,18 +39,14 @@ pub struct Typing<'a> {
 }
 
 impl Typing<'_> {
-    /// Prepare each physical output before the build enters JS code generation.
-    pub fn prepare<'m>(
-        &self,
-        modules: impl Iterator<Item = &'m Module>,
-    ) -> BTreeMap<String, Typed> {
+    /// The TypeScript of each file `module` is written as, by its physical
+    /// module: what the build gives the JS backend with the module.
+    pub fn prepare(&self, module: &Module) -> BTreeMap<String, Typed> {
         let mut prepared = BTreeMap::new();
-        for module in modules {
-            prepared.insert(module.name.clone(), self.typed(&module.name, &module.name));
-            for prefix in &module.initialization.prefixes {
-                let physical = prefix_key(&module.name, prefix.before);
-                prepared.insert(physical.clone(), self.typed(&module.name, &physical));
-            }
+        prepared.insert(module.name.clone(), self.typed(&module.name, &module.name));
+        for prefix in &module.initialization.prefixes {
+            let physical = prefix_key(&module.name, prefix.before);
+            prepared.insert(physical.clone(), self.typed(&module.name, &physical));
         }
         prepared
     }

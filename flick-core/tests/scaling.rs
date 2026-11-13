@@ -337,11 +337,19 @@ fn optimizing(compilation: &Compilation, _: &SourceMap) -> Duration {
 }
 
 fn emitting_js(compilation: &Compilation, sources: &SourceMap) -> Duration {
+    emitting(compilation, sources, false)
+}
+
+/// One build of `compilation` in JavaScript or in TypeScript.
+fn emitting(compilation: &Compilation, sources: &SourceMap, typescript: bool) -> Duration {
+    let mut settings = settings(&[]);
+    settings.typescript = typescript;
+    let main = if typescript { "Main.ts" } else { "Main.js" };
     let start = Cpu::now();
-    let (artifacts, diagnostics) = build::emit(compilation, sources, &settings(&[]));
+    let (artifacts, diagnostics) = build::emit(compilation, sources, &settings);
     let elapsed = start.elapsed();
     assert_eq!(diagnostics, []);
-    assert!(artifacts.iter().any(|a| a.path == "Main.js"));
+    assert!(artifacts.iter().any(|a| a.path == main));
     elapsed
 }
 
@@ -405,6 +413,26 @@ fn function_of_2000_lines_optimizes_in_linear_time() {
 #[test]
 fn function_of_2000_lines_emits_javascript_in_linear_time() {
     assert_stage_linear("JavaScript", emitting_js);
+}
+
+/// TypeScript adds to a module the types of its exports, so a build in it
+/// projects the modules it writes and no others: a program of two lines
+/// must not pay for every built-in module, which is tens of times the
+/// JavaScript, where the types of what it writes are a few times it.
+#[test]
+fn a_small_program_emits_typescript_near_the_time_of_its_javascript() {
+    let _alone = alone();
+    let [js, ts] = deep(|| {
+        let (sources, compilation) = compiled(&long_program(2));
+        fastest([&mut || emitting(&compilation, &sources, false), &mut || {
+            emitting(&compilation, &sources, true)
+        }])
+    });
+    let ratio = ts.as_secs_f64() / js.as_secs_f64().max(1e-6);
+    assert!(
+        ratio < 10.0,
+        "TypeScript takes {ratio:.1}x the time of JavaScript ({js:?} -> {ts:?})"
+    );
 }
 
 #[cfg(feature = "native-project")]

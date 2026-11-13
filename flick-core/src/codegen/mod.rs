@@ -78,6 +78,7 @@ pub struct Resolved {
 }
 
 /// Where modules are and who owns them, as the build lays them out.
+#[derive(Clone, Copy)]
 pub struct Options<'a> {
     /// The built-in modules, written under [`BUILTIN_DIR`].
     pub builtins: &'a [&'a str],
@@ -90,7 +91,8 @@ pub struct Options<'a> {
     /// which the runtime decides (see [`Options::foreign`]).
     pub resolved: &'a [Resolved],
     /// Emit TypeScript (`--emit ts`) instead of JavaScript: with the types
-    /// of the exports, prepared by the build for each physical module.
+    /// of the exports of the module to compile, which the build prepares
+    /// for each physical module of it as it writes the module.
     pub typescript: Option<&'a BTreeMap<String, ts::Typed>>,
     /// The release profile: worker functions for known full applications
     /// and direct methods of canonical instances.
