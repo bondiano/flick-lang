@@ -351,3 +351,18 @@ test("interruption just after listening closes the acquired socket", async () =>
     for (const server of servers) server.close();
   }
 });
+
+
+const echoSmall: App = function* (req): Run {
+  return text(String(yield small(req)));
+};
+
+test("an unsupported method with an oversized body cannot terminate the server", async () => {
+  const answers = await serving(echoSmall, async (url) => [
+    await one(url, "PROPFIND", "/", "too large"),
+    await one(url, "GET", "/"),
+  ]);
+  assert.deepEqual(answers.map((answer) => answer.split(" | ")[0]), [
+    "HTTP/1.1 500 Internal Server Error", "HTTP/1.1 200 OK",
+  ]);
+});
