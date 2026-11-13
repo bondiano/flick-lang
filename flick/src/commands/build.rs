@@ -1,10 +1,10 @@
 use std::cell::RefCell;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::time::Duration;
-use std::{fs, io};
 
-use flick_core::build::{self, Artifact, Extras, Settings};
+use flick_core::build::{self, Extras, Settings};
 use flick_core::codegen::Labels;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::{Backend, Build, Emit, Kind, MAIN_ENTRY, Profile};
@@ -12,12 +12,12 @@ use flick_core::project::{self, Compilation, Compiled, ModuleCache, Project, js}
 use flick_core::source::{FileId, SourceMap};
 
 use self::js_artifacts::js_artifacts;
-use self::schemas::compile_schemas;
 use super::check::select;
 use super::emit_ir;
 use super::out_dir::overlap;
 use super::summary::{self, Built};
 use crate::args::{BuildArguments, EmitArgument, LabelsArgument, ProfileArgument};
+use crate::artifact::Artifact;
 use crate::command::{Command, Outcome};
 use crate::package_cache;
 use crate::progress::{Mode, Progress};
@@ -29,6 +29,11 @@ mod cached;
 pub(super) mod hooks;
 mod js_artifacts;
 mod progress;
+mod publication;
+pub use publication::write;
+pub(super) use publication::write_artifacts;
+#[cfg(test)]
+mod publication_tests;
 mod schemas;
 mod shipped;
 mod unwritten;
@@ -380,82 +385,6 @@ pub fn emit(
     emitted
 }
 
-pub(super) fn write_artifacts(output: &BuildPlan, emitted: &mut Emission, progress: &Progress) {
-    if emitted
-        .diagnostics
-        .iter()
-        .any(|d| d.severity == Severity::Error)
-    {
-        return;
-    }
-    let out_dir = output.out_dir.as_path();
-    progress.stage("Writing artifacts");
-    if let Err(err) = unwritten::remove(out_dir, &emitted.artifacts) {
-        let message = format!("cannot remove an earlier build's files: {err}");
-        (emitted.diagnostics).push(Diagnostic::new(codes::P013, Severity::Error, message));
-        return;
-    }
-    for artifact in &emitted.artifacts {
-        let path = out_dir.join(&artifact.path);
-        if let Err(err) = write_if_changed(&path, &artifact.contents) {
-            emitted.diagnostics.push(Diagnostic::new(
-                codes::P013,
-                Severity::Error,
-                format!("cannot write `{}`: {err}", path.display()),
-            ));
-            return;
-        }
-    }
-    if output.go {
-        let tests = [(build::go::TEST.to_owned(), String::new())];
-        let built = if output.suites.is_empty() {
-            &output.entries[..]
-        } else {
-            &tests[..]
-        };
-        for (name, _) in built {
-            progress.stage("Building Go executable");
-            if let Some(problem) = toolchain::go_build(out_dir, name) {
-                emitted.diagnostics.push(problem);
-                return;
-            }
-        }
-    }
-    let aot = if output.extras.schema_aot {
-        output.entries.as_slice()
-    } else {
-        &[]
-    };
-    for (name, entry) in aot {
-        let ext = if output.typescript { "ts" } else { "js" };
-        let module = out_dir.join(format!("{}.{ext}", entry.replace('.', "/")));
-        let file = build::schema_aot_file(name);
-        progress.stage("Compiling schema decoders");
-        if let Err(reason) = compile_schemas(out_dir, &module, &file) {
-            emitted.diagnostics.push(Diagnostic::new(
-                codes::P013,
-                Severity::Error,
-                format!("cannot write the compiled decoders `{file}`: {reason}"),
-            ));
-            break;
-        }
-    }
-}
-
-pub fn write(path: &Path, contents: &str) -> io::Result<()> {
-    if let Some(dir) = path.parent() {
-        fs::create_dir_all(dir)?;
-    }
-    fs::write(path, contents)
-}
-
-pub fn write_if_changed(path: &Path, contents: &str) -> io::Result<()> {
-    if fs::read(path).is_ok_and(|bytes| bytes == contents.as_bytes()) {
-        return Ok(());
-    }
-    write(path, contents)
-}
-
 /// [`emit`] without writing anything.
 pub fn artifacts(
     host: &FsHost,
@@ -520,7 +449,7 @@ pub fn artifacts(
                 fs::read_to_string(path).ok()
             });
         return Emission {
-            artifacts,
+            artifacts: artifacts.into_iter().map(Artifact::from).collect(),
             diagnostics,
         };
     }
@@ -538,10 +467,9 @@ pub fn artifacts(
             list.push('\n');
             list
         });
-        emission.artifacts.push(Artifact {
-            path: build::go::FILES.to_owned(),
-            contents,
-        });
+        emission
+            .artifacts
+            .push(Artifact::source(build::go::FILES.to_owned(), contents));
     }
     emission
 }

@@ -8,6 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::{self, Write};
 
 use crate::{BuildRequest, BuildResult, Diagnostic, Inputs, Severity, Toolchain, ToolchainStep};
+use serde::Serialize;
 
 /// Host limits, independent of a backend's claims about its capabilities.
 #[derive(Clone, Copy, Debug)]
@@ -65,6 +66,31 @@ impl Write for Budget {
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
     }
+}
+
+/// Apply the same portable path policy to the complete host output set,
+/// including shared files, cached files and legacy text-hook results.
+pub fn validate_output_paths<'a>(
+    paths: impl IntoIterator<Item = &'a str>,
+    limits: Limits,
+) -> Result<(), String> {
+    let mut seen = BTreeSet::new();
+    for (n, name) in paths.into_iter().enumerate() {
+        if n >= limits.files {
+            return Err("backend output file count exceeds its limit".into());
+        }
+        path::insert(name, &mut seen, limits)?;
+    }
+    Ok(())
+}
+
+/// Bound the serialized envelope without allocating an encoded copy.
+pub fn validate_serialized_size<T: Serialize + ?Sized>(
+    value: &T,
+    bytes: usize,
+) -> Result<(), String> {
+    ciborium::into_writer(value, Budget(bytes))
+        .map_err(|_| "backend payload exceeds its serialized size limit".into())
 }
 
 pub(super) fn string(s: &str, limits: Limits) -> Result<(), String> {

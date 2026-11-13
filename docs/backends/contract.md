@@ -134,6 +134,15 @@ no cache key; a detected difference is an error. Cache loading must revalidate
 the result against the current host policy. This is eligibility for caching
 generation results; final tool outputs need their own reproducibility check.
 
+The native CLI's file boundary and internal CBOR cache retain byte payloads
+and artifact kinds, including executable permissions on Unix. The complete
+output set is checked for portable paths, collisions and size limits before
+writing or restoring files. Existing output symlinks cannot redirect writes;
+stale-file lists cannot delete through a symlink parent. Text emit hooks see
+source/declaration/metadata text while opaque object, executable and resource
+artifacts retain their bytes. Tool execution and directory publication still
+need the transactional integration described above.
+
 ## Native component host
 
 `host::WasmBackend` verifies the component SHA-256 before compilation and its

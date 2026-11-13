@@ -1,0 +1,164 @@
+//! Files of a host build, including binary component and tool outputs.
+
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
+use std::{fs, io};
+
+use flick_backend::{
+    Artifact as BackendArtifact, ArtifactKind, Limits, validate_output_paths,
+    validate_serialized_size,
+};
+use flick_core::build::Artifact as TextArtifact;
+use serde::{Deserialize, Serialize};
+use serde_bytes as byte_string;
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Artifact {
+    pub path: String,
+    #[serde(with = "byte_string")]
+    pub contents: Vec<u8>,
+    pub kind: ArtifactKind,
+}
+
+impl Artifact {
+    pub fn source(path: String, contents: String) -> Self {
+        TextArtifact { path, contents }.into()
+    }
+
+    /// Legacy emit hooks transform text; object, executable and resource
+    /// bytes retain their identity and never pass through a UTF-8 conversion.
+    pub fn text(&self) -> Result<Option<TextArtifact>, String> {
+        if self.is_binary() {
+            return Ok(None);
+        }
+        let contents = String::from_utf8(self.contents.clone())
+            .map_err(|_| format!("the text artifact `{}` is not UTF-8", self.path))?;
+        Ok(Some(TextArtifact {
+            path: self.path.clone(),
+            contents,
+        }))
+    }
+
+    pub fn is_binary(&self) -> bool {
+        matches!(
+            self.kind,
+            ArtifactKind::Object | ArtifactKind::Executable | ArtifactKind::Resource
+        )
+    }
+
+    pub fn restore_permissions(&self, path: &Path) -> io::Result<()> {
+        #[cfg(unix)]
+        if self.kind == ArtifactKind::Executable {
+            let mut permissions = fs::metadata(path)?.permissions();
+            if permissions.mode() & 0o111 != 0o111 {
+                permissions.set_mode(permissions.mode() | 0o111);
+                fs::set_permissions(path, permissions)?;
+            }
+        }
+        #[cfg(not(unix))]
+        let _ = path;
+        Ok(())
+    }
+
+    pub fn current(&self, path: &Path) -> bool {
+        if !fs::read(path).is_ok_and(|bytes| bytes == self.contents) {
+            return false;
+        }
+        #[cfg(unix)]
+        if self.kind == ArtifactKind::Executable {
+            return fs::metadata(path).is_ok_and(|m| m.permissions().mode() & 0o111 == 0o111);
+        }
+        true
+    }
+}
+
+pub fn validate(files: &[Artifact]) -> Result<(), String> {
+    let limits = Limits::default();
+    validate_output_paths(files.iter().map(|f| f.path.as_str()), limits)?;
+    if files
+        .iter()
+        .any(|f| f.contents.len() > limits.artifact_bytes)
+    {
+        return Err("a build artifact exceeds its file size limit".into());
+    }
+    validate_serialized_size(files, limits.result_bytes)
+}
+
+/// Refuse redirects and incompatible existing paths before touching any
+/// earlier output. The host chooses the root; files only choose paths below it.
+pub fn validate_destination(root: &Path, files: &[Artifact]) -> Result<(), String> {
+    validate(files)?;
+    for file in files {
+        validate_ancestors(root, Path::new(&file.path))?;
+        match fs::symlink_metadata(root.join(&file.path)) {
+            Ok(metadata) if metadata.is_symlink() || !metadata.is_file() => {
+                return Err(format!(
+                    "build output `{}` conflicts with an existing path",
+                    file.path
+                ));
+            }
+            Ok(_) => {}
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+            Err(e) => return Err(format!("cannot inspect build output `{}`: {e}", file.path)),
+        }
+    }
+    Ok(())
+}
+
+/// Check parents for a path whose relative spelling the caller validated.
+/// A stale file may itself be a symlink to unlink; its parents cannot redirect.
+pub fn validate_ancestors(root: &Path, relative: &Path) -> Result<(), String> {
+    let mut path = root.to_path_buf();
+    for part in relative.parent().unwrap_or(Path::new("")).components() {
+        path.push(part);
+        match fs::symlink_metadata(&path) {
+            Ok(metadata) if metadata.is_symlink() || !metadata.is_dir() => {
+                return Err(format!(
+                    "build output parent `{}` redirects or is not a directory",
+                    path.display()
+                ));
+            }
+            Ok(_) => {}
+            Err(e) if e.kind() == io::ErrorKind::NotFound => break,
+            Err(e) => {
+                return Err(format!(
+                    "cannot inspect build output parent `{}`: {e}",
+                    path.display()
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+impl From<TextArtifact> for Artifact {
+    fn from(file: TextArtifact) -> Self {
+        let ext = Path::new(&file.path).extension();
+        let is = |extension: &str| ext.is_some_and(|e| e.eq_ignore_ascii_case(extension));
+        let kind = if is("map") {
+            ArtifactKind::SourceMap
+        } else if file.path.to_ascii_lowercase().ends_with(".d.ts") {
+            ArtifactKind::Declaration
+        } else if is("iface") || is("json") {
+            ArtifactKind::Metadata
+        } else {
+            ArtifactKind::Source
+        };
+        Self {
+            path: file.path,
+            contents: file.contents.into_bytes(),
+            kind,
+        }
+    }
+}
+
+impl From<BackendArtifact> for Artifact {
+    fn from(file: BackendArtifact) -> Self {
+        Self {
+            path: file.path,
+            contents: file.bytes,
+            kind: file.kind,
+        }
+    }
+}
