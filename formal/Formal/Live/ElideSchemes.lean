@@ -267,50 +267,50 @@ theorem bind_eff :
 
 /-- `Prelude.field : forall a. String -> PureCodec Json a -> FieldCodec none a` -/
 theorem field :
-    Ty.elide Caps.none (.arrow (.base .string) .pure (.arrow (.tapp (.tapp (.adt "Prelude.PureCodec") (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.errors Row.none)) (.tvar 0)) Caps.none) Caps.none) Caps.none =
-      (.arrow (.base .string) .pure (.arrow (.tapp (.tapp (.adt "Prelude.PureCodec") (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.errors Row.none)) (.tvar 0)) Caps.none) Caps.none) := by
+    Ty.elide (fun x => x = .v 1) (.arrow (.base .string) .pure (.arrow (.tapp (.tapp (.tapp (.adt "Prelude.PureCodec") (.caps (fun x => x = .v 1))) (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.tapp (.adt "Prelude.FieldCodec") (.caps (fun x => x = .v 1))) (.errors Row.none)) (.tvar 0)) Caps.none) Caps.none) Caps.none =
+      (.arrow (.base .string) .pure (.arrow (.tapp (.tapp (.tapp (.adt "Prelude.PureCodec") (.caps (fun x => x = .v 1))) (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.tapp (.adt "Prelude.FieldCodec") (.caps (fun x => x = .v 1))) (.errors Row.none)) (.tvar 0)) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Prelude.optional_field : forall a. String -> PureCodec Json a -> FieldCodec none (Option a)` -/
 theorem optional_field :
-    Ty.elide Caps.none (.arrow (.base .string) .pure (.arrow (.tapp (.tapp (.adt "Prelude.PureCodec") (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.errors Row.none)) (.tapp (.adt "Prelude.Option") (.tvar 0))) Caps.none) Caps.none) Caps.none =
-      (.arrow (.base .string) .pure (.arrow (.tapp (.tapp (.adt "Prelude.PureCodec") (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.errors Row.none)) (.tapp (.adt "Prelude.Option") (.tvar 0))) Caps.none) Caps.none) := by
+    Ty.elide (fun x => x = .v 1) (.arrow (.base .string) .pure (.arrow (.tapp (.tapp (.tapp (.adt "Prelude.PureCodec") (.caps (fun x => x = .v 1))) (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.tapp (.adt "Prelude.FieldCodec") (.caps (fun x => x = .v 1))) (.errors Row.none)) (.tapp (.adt "Prelude.Option") (.tvar 0))) Caps.none) Caps.none) Caps.none =
+      (.arrow (.base .string) .pure (.arrow (.tapp (.tapp (.tapp (.adt "Prelude.PureCodec") (.caps (fun x => x = .v 1))) (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.tapp (.adt "Prelude.FieldCodec") (.caps (fun x => x = .v 1))) (.errors Row.none)) (.tapp (.adt "Prelude.Option") (.tvar 0))) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Prelude.field_effect : forall rd a. String -> Codec rd none Json a -> FieldCodec rd a` -/
 theorem field_effect :
-    Ty.elide Caps.none (.arrow (.base .string) .pure (.arrow (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Codec") (.tvar 0)) (.errors Row.none)) (.adt "Prelude.Json")) (.tvar 1)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.tvar 0)) (.tvar 1)) Caps.none) Caps.none) Caps.none =
-      (.arrow (.base .string) .pure (.arrow (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Codec") (.tvar 0)) (.errors Row.none)) (.adt "Prelude.Json")) (.tvar 1)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.tvar 0)) (.tvar 1)) Caps.none) Caps.none) := by
+    Ty.elide (fun x => x = .v 2) (.arrow (.base .string) .pure (.arrow (.tapp (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Codec") (.caps (fun x => x = .v 2))) (.tvar 0)) (.errors Row.none)) (.adt "Prelude.Json")) (.tvar 1)) .pure (.tapp (.tapp (.tapp (.adt "Prelude.FieldCodec") (.caps (fun x => x = .v 2))) (.tvar 0)) (.tvar 1)) Caps.none) Caps.none) Caps.none =
+      (.arrow (.base .string) .pure (.arrow (.tapp (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Codec") (.caps (fun x => x = .v 2))) (.tvar 0)) (.errors Row.none)) (.adt "Prelude.Json")) (.tvar 1)) .pure (.tapp (.tapp (.tapp (.adt "Prelude.FieldCodec") (.caps (fun x => x = .v 2))) (.tvar 0)) (.tvar 1)) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Prelude.option_as_null : forall a. PureCodec Json a -> PureCodec Json (Option a)` -/
 theorem option_as_null :
-    Ty.elide Caps.none (.arrow (.tapp (.tapp (.adt "Prelude.PureCodec") (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.PureCodec") (.adt "Prelude.Json")) (.tapp (.adt "Prelude.Option") (.tvar 0))) Caps.none) Caps.none =
-      (.arrow (.tapp (.tapp (.adt "Prelude.PureCodec") (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.PureCodec") (.adt "Prelude.Json")) (.tapp (.adt "Prelude.Option") (.tvar 0))) Caps.none) := by
+    Ty.elide (fun x => x = .v 1) (.arrow (.tapp (.tapp (.tapp (.adt "Prelude.PureCodec") (.caps (fun x => x = .v 1))) (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.tapp (.adt "Prelude.PureCodec") (.caps (fun x => x = .v 1))) (.adt "Prelude.Json")) (.tapp (.adt "Prelude.Option") (.tvar 0))) Caps.none) Caps.none =
+      (.arrow (.tapp (.tapp (.tapp (.adt "Prelude.PureCodec") (.caps (fun x => x = .v 1))) (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.tapp (.adt "Prelude.PureCodec") (.caps (fun x => x = .v 1))) (.adt "Prelude.Json")) (.tapp (.adt "Prelude.Option") (.tvar 0))) Caps.none) := by
   elide_eq
 
 /-- `Prelude.option_as_nullish : forall a. PureCodec Json a -> PureCodec Json (Option a)` -/
 theorem option_as_nullish :
-    Ty.elide Caps.none (.arrow (.tapp (.tapp (.adt "Prelude.PureCodec") (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.PureCodec") (.adt "Prelude.Json")) (.tapp (.adt "Prelude.Option") (.tvar 0))) Caps.none) Caps.none =
-      (.arrow (.tapp (.tapp (.adt "Prelude.PureCodec") (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.PureCodec") (.adt "Prelude.Json")) (.tapp (.adt "Prelude.Option") (.tvar 0))) Caps.none) := by
+    Ty.elide (fun x => x = .v 1) (.arrow (.tapp (.tapp (.tapp (.adt "Prelude.PureCodec") (.caps (fun x => x = .v 1))) (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.tapp (.adt "Prelude.PureCodec") (.caps (fun x => x = .v 1))) (.adt "Prelude.Json")) (.tapp (.adt "Prelude.Option") (.tvar 0))) Caps.none) Caps.none =
+      (.arrow (.tapp (.tapp (.tapp (.adt "Prelude.PureCodec") (.caps (fun x => x = .v 1))) (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.tapp (.adt "Prelude.PureCodec") (.caps (fun x => x = .v 1))) (.adt "Prelude.Json")) (.tapp (.adt "Prelude.Option") (.tvar 0))) Caps.none) := by
   elide_eq
 
 /-- `Prelude.on_missing : forall a c rd. (Unit -> a)^c -> FieldCodec rd a -> FieldCodec rd a` -/
 theorem on_missing :
-    Ty.elide (fun x => x = .v 1) (.arrow (.arrow (.base .unit) .pure (.tvar 0) (fun x => x = .v 1)) .pure (.arrow (.tapp (.tapp (.adt "Prelude.FieldCodec") (.tvar 2)) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.tvar 2)) (.tvar 0)) Caps.none) Caps.none) Caps.none =
-      (.arrow (.arrow (.base .unit) .pure (.tvar 0) (fun x => x = .v 1)) .pure (.arrow (.tapp (.tapp (.adt "Prelude.FieldCodec") (.tvar 2)) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.tvar 2)) (.tvar 0)) Caps.none) Caps.none) := by
+    Ty.elide (fun x => x = .v 1 ∨ x = .v 3) (.arrow (.arrow (.base .unit) .pure (.tvar 0) (fun x => x = .v 1)) .pure (.arrow (.tapp (.tapp (.tapp (.adt "Prelude.FieldCodec") (.caps (fun x => x = .v 3))) (.tvar 2)) (.tvar 0)) .pure (.tapp (.tapp (.tapp (.adt "Prelude.FieldCodec") (.caps (fun x => x = .v 1 ∨ x = .v 3))) (.tvar 2)) (.tvar 0)) Caps.none) Caps.none) Caps.none =
+      (.arrow (.arrow (.base .unit) .pure (.tvar 0) (fun x => x = .v 1)) .pure (.arrow (.tapp (.tapp (.tapp (.adt "Prelude.FieldCodec") (.caps (fun x => x = .v 3))) (.tvar 2)) (.tvar 0)) .pure (.tapp (.tapp (.tapp (.adt "Prelude.FieldCodec") (.caps (fun x => x = .v 1 ∨ x = .v 3))) (.tvar 2)) (.tvar 0)) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Prelude.on_missing_effect : forall r a c rd. (Unit ->{r; SchemaError} a)^c -> FieldCodec rd a -> FieldCodec (rd + r) a` -/
 theorem on_missing_effect :
-    Ty.elide (fun x => x = .v 2) (.arrow (.arrow (.base .unit) (.rt (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .nm "Prelude.SchemaError")) (.tvar 1) (fun x => x = .v 2)) .pure (.arrow (.tapp (.tapp (.adt "Prelude.FieldCodec") (.tvar 3)) (.tvar 1)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.errors (fun x => x = .rv (.v 0) (fun _ => False) ∨ x = .rv (.v 3) (fun _ => False)))) (.tvar 1)) Caps.none) Caps.none) Caps.none =
-      (.arrow (.arrow (.base .unit) (.rt (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .nm "Prelude.SchemaError")) (.tvar 1) (fun x => x = .v 2)) .pure (.arrow (.tapp (.tapp (.adt "Prelude.FieldCodec") (.tvar 3)) (.tvar 1)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.errors (fun x => x = .rv (.v 0) (fun _ => False) ∨ x = .rv (.v 3) (fun _ => False)))) (.tvar 1)) Caps.none) Caps.none) := by
+    Ty.elide (fun x => x = .v 2 ∨ x = .v 4) (.arrow (.arrow (.base .unit) (.rt (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .nm "Prelude.SchemaError")) (.tvar 1) (fun x => x = .v 2)) .pure (.arrow (.tapp (.tapp (.tapp (.adt "Prelude.FieldCodec") (.caps (fun x => x = .v 4))) (.tvar 3)) (.tvar 1)) .pure (.tapp (.tapp (.tapp (.adt "Prelude.FieldCodec") (.caps (fun x => x = .v 2 ∨ x = .v 4))) (.errors (fun x => x = .rv (.v 0) (fun _ => False) ∨ x = .rv (.v 3) (fun _ => False)))) (.tvar 1)) Caps.none) Caps.none) Caps.none =
+      (.arrow (.arrow (.base .unit) (.rt (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .nm "Prelude.SchemaError")) (.tvar 1) (fun x => x = .v 2)) .pure (.arrow (.tapp (.tapp (.tapp (.adt "Prelude.FieldCodec") (.caps (fun x => x = .v 4))) (.tvar 3)) (.tvar 1)) .pure (.tapp (.tapp (.tapp (.adt "Prelude.FieldCodec") (.caps (fun x => x = .v 2 ∨ x = .v 4))) (.errors (fun x => x = .rv (.v 0) (fun _ => False) ∨ x = .rv (.v 3) (fun _ => False)))) (.tvar 1)) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Prelude.ignore_extra_fields : forall a. PureCodec Json a -> PureCodec Json a` -/
 theorem ignore_extra_fields :
-    Ty.elide Caps.none (.arrow (.tapp (.tapp (.adt "Prelude.PureCodec") (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.PureCodec") (.adt "Prelude.Json")) (.tvar 0)) Caps.none) Caps.none =
-      (.arrow (.tapp (.tapp (.adt "Prelude.PureCodec") (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.PureCodec") (.adt "Prelude.Json")) (.tvar 0)) Caps.none) := by
+    Ty.elide (fun x => x = .v 1) (.arrow (.tapp (.tapp (.tapp (.adt "Prelude.PureCodec") (.caps (fun x => x = .v 1))) (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.tapp (.adt "Prelude.PureCodec") (.caps (fun x => x = .v 1))) (.adt "Prelude.Json")) (.tvar 0)) Caps.none) Caps.none =
+      (.arrow (.tapp (.tapp (.tapp (.adt "Prelude.PureCodec") (.caps (fun x => x = .v 1))) (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.tapp (.adt "Prelude.PureCodec") (.caps (fun x => x = .v 1))) (.adt "Prelude.Json")) (.tvar 0)) Caps.none) := by
   elide_eq
 
 /-- `Seq.of_list : forall a. List a -> Seq a` -/

@@ -25,7 +25,7 @@ use flick_pretty::{Document, docvec};
 use super::layout::{Code, call};
 use super::{Gen, names};
 use crate::ir::{Expr, ExprKind, Module};
-use crate::types::{Constructor, Rep};
+use flick_ir::{Constructor, Rep};
 
 /// How a value of a constructor with a Go type of its own holds its fields.
 #[derive(Clone, PartialEq, Eq)]
@@ -59,8 +59,8 @@ impl<'a> Gen<'a> {
     /// fields stays the one `*flickrt.Data` of its tag, and a built-in type
     /// is made by the runtime too.
     pub(super) fn own_type(&mut self, c: &Constructor) -> Option<(String, Held)> {
-        let own = self.own?;
-        if c.rep != Rep::Tagged || c.arity == 0 || c.dicts > 0 || !own(&c.module) {
+        let own = self.input.own_module(&c.module).is_some();
+        if c.rep != Rep::Tagged || c.arity == 0 || c.dicts > 0 || !own {
             return None;
         }
         let ty = names::own_type(&c.module, &c.name);

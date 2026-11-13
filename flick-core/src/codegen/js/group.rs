@@ -6,9 +6,9 @@
 use std::collections::HashMap;
 use std::mem;
 
-use super::function::{binds, offsets};
+use super::function::offsets;
 use super::{Gen, Tail, indent, names, view};
-use crate::codegen::tail::{Callee, Calls, Target, cycles, function, target};
+use crate::codegen::tail::{Callee, Calls, Target, binds, cycles, function, members};
 use crate::ir::{Expr, Item, Lit, Param, Pat, Stage};
 
 /// Mutually tail-recursive functions of a module.
@@ -75,15 +75,7 @@ impl Gen<'_> {
     /// The function running the group `g` of `items`.
     pub(super) fn group(&mut self, g: usize, items: &[Item]) -> String {
         let calls = self.calls();
-        let functions: Vec<(&str, &[Param], &Expr)> = self.groups[g]
-            .items
-            .iter()
-            .filter_map(|&i| function(&items[i], calls))
-            .collect();
-        let members: Vec<(Target, usize)> = functions
-            .iter()
-            .map(|(name, params, _)| (target(self.module, name), params.len()))
-            .collect();
+        let (functions, members) = members(self.module, items, &self.groups[g].items, calls);
         let arity = members.iter().map(|(_, n)| *n).max().unwrap_or(0);
         let vars: Vec<String> = (0..arity).map(|i| format!("$l{i}")).collect();
         let bodies: Vec<(&[Param], &Expr)> = functions.iter().map(|(_, p, b)| (*p, *b)).collect();

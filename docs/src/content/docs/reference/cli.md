@@ -36,7 +36,7 @@ installs from the store) and `--help`; `flick help <command>` prints a command's
 | `ffi check [paths]` | checks generated and reviewed bindings and their policies against the installed packages; without paths the source root |
 | `schema export <M.codec> --target json-schema-2020-12 --out <file>` | the strict JSON Schema of a `PureCodec Json a` |
 | `schema export <M.api> --target openapi-3.1 --out <file>` | an `HttpApi.Api` value as an OpenAPI 3.1 document, the same document `HttpApi.openapi` makes (see [Clients and documents](../http-api/#clients-and-documents)) |
-| `doc --out-dir <dir>` | Markdown pages of the public API: types, kinds, constraints, effects, captures |
+| `doc --out-dir <dir> [--source-base-url <url>] [--check-examples] [--std]` | Markdown pages of the public API: types, kinds, constraints, effects, captures |
 | `explain <code>` | the explanation of a diagnostic code, a plugin's too, as `std/L001` |
 | `expand [paths]` | the code each [plugin](../plugins/) block of the project or of the files stands for |
 | `doctor` | the compiler, Node.js, pnpm, git, the TypeScript Content Mapper, the installed runtime and Effect, the optional adapters, and Go when it is installed; everything but the compiler, Node.js and pnpm is a note, not a failure |
@@ -122,6 +122,25 @@ names. An app packs a staging package, with the runner of each entry, which the 
 `.d.ts` with `emit-dts`), that interfaces in the package agree on each
 other's fingerprints and that the paths `exports` names exist
 (`FLICK-P020`), and writes the tarball with `pnpm pack`.
+
+## Checked package documentation
+
+`flick doc --out-dir api --check-examples` writes Markdown from the checked
+public interface and its `///` comments, and checks their fenced Flick examples
+with the package imports available. Private declarations are not separate API
+entries. A public re-export uses the original declaration's documentation.
+
+`--source-base-url https://host/repo/blob/REV/package` links declarations to
+paths relative to the project root and their original source lines. Choose a
+fixed revision for reproducible links. Without this option, no remote URL is
+guessed. `--std` documents the compiler's checked built-in modules instead of
+compiling the standard library as a user project. With `--std`, the source URL maps the repository root (`packages/core` and `packages/std`).
+
+The site's [standard library API](../../api/) consumes this Markdown directly;
+there is no separate site-specific signature or doc JSON model. API declarations
+and source comments are shared between English and Russian navigation. See
+[Your own typed DSL](../../handbook/typed-dsl/) for generated declarations and
+the boundary between compilation errors and domain errors.
 
 ## Streams and exit codes
 

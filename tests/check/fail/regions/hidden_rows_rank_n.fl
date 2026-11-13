@@ -1,0 +1,20 @@
+// Under a `forall` a result holds none of its own binders (`Caps.under`): a
+// callback for any region cannot return data over the file it is given.
+module App.HiddenRowsRankNFail exposing (..)
+
+import File exposing (File, Path, FileSystem, OpenError, ReadError)
+
+type G a = G (Unit ->{Async, FileSystem; ReadError} a)
+
+run : G a ->{Async, FileSystem; ReadError} a
+let run (G f) = f ()
+
+with_file : (forall t. File t -> G String) -> File s ->{Async, FileSystem; ReadError} String
+let with_file make file = run (make file)
+
+reads : Path ->{Async, FileSystem; OpenError, ReadError} String
+let reads path = scope {
+  let file = File.open_scoped path
+  with_file (fun f -> G (fun _ -> File.read_all f)) file
+}
+//~ FLICK-G001 @18:23-18:51 this value holds `t`, but the expected type `G String` holds no captures

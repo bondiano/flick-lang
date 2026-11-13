@@ -73,9 +73,10 @@ fn parse(words: &str) -> (Mode, Vec<String>, String) {
 }
 
 /// Whether `word` is a diagnostic code as a fence names one: `T010` or
-/// `FLICK-T010`.
+/// `FLICK-T010`, or a plugin-qualified code such as `std/Q001`.
 fn is_code(word: &str) -> bool {
     let short = word.strip_prefix("FLICK-").unwrap_or(word);
+    let short = short.rsplit_once('/').map_or(short, |(_, code)| code);
     let bytes = short.as_bytes();
     bytes.len() == 4 && bytes[0].is_ascii_uppercase() && bytes[1..].iter().all(u8::is_ascii_digit)
 }
@@ -240,9 +241,9 @@ mod tests {
         assert!(blocks("```flickr\nx\n```\n").is_empty());
         let keep = blocks("```flick keep title=\"a.fl\"\nx\n```\n");
         assert_eq!(keep[0].mode, Mode::Keep);
-        let fail = blocks("```flick fail T010 FLICK-S001 because it overlaps\nx\n```\n");
+        let fail = blocks("```flick fail T010 FLICK-S001 std/Q001 because it overlaps\nx\n```\n");
         assert_eq!(fail[0].mode, Mode::Fail);
-        assert_eq!(fail[0].codes, ["T010", "FLICK-S001"]);
+        assert_eq!(fail[0].codes, ["T010", "FLICK-S001", "std/Q001"]);
         let ignore = blocks("```flick ignore needs a service\nx\n```\n");
         assert_eq!(ignore[0].mode, Mode::Ignore);
         assert_eq!(ignore[0].reason, "needs a service");

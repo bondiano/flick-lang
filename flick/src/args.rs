@@ -66,7 +66,7 @@ pub enum Commands {
     #[command(subcommand)]
     Schema(SchemaCommands),
     /// Write documentation of the public API.
-    Doc(OutDirArguments),
+    Doc(DocArguments),
     /// Explain a diagnostic code.
     Explain(ExplainArguments),
     /// Print the code each plugin block of the files stands for, as its

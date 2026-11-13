@@ -72,11 +72,13 @@ pub fn expand(block: &Block, compiler: &mut dyn Compiler) -> Result<Arena, Vec<D
         .any(|t| t.kind == TokenKind::Ident && EFFECTFUL.contains(&block.text_of(t.span)));
     let mut rest = name(&mut b, "Codec.Derive.fields");
     for f in &fields {
-        let row = b.at(whole).ty(Type::Wildcard);
+        // the codec holds what it captures, so its own type is not written
         let decoded = b.at(f.at).ty(Type::Wildcard);
-        let ty = applied(b.at(whole), "FieldCodec", vec![row, decoded]);
+        let ty = applied(b.at(whole), "Codec.Derive.Decodes", vec![decoded]);
+        let of = name(&mut b, "Codec.Derive.Decodes");
+        let of = b.expr(Expr::Annot { expr: of, ty });
         let value = b.expr(Expr::Hole(f.value));
-        let codec = b.expr(Expr::Annot { expr: value, ty });
+        let codec = call(&mut b, "Codec.Derive.decoding", vec![of, value]);
         let label = b.expr(Expr::Text(f.label.clone()));
         rest = call(&mut b, "Codec.Derive.field", vec![label, codec, rest]);
     }

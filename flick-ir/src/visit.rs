@@ -1,7 +1,45 @@
 //! Traversal of direct children and source spans in evaluation order.
-use crate::{Expr, ExprKind, ItemKind, Module, Span, Stmt};
+use crate::{Expr, ExprKind, ItemKind, Module, Span, Stage, Stmt};
 
 impl Expr {
+    /// `f a b`, applications none of which evaluates its argument first, as
+    /// the function and the arguments with their stages, in order.
+    pub fn spine(&self) -> (&Expr, Vec<(&Expr, Stage)>) {
+        let mut args = Vec::new();
+        let mut head = self;
+        while let ExprKind::App {
+            func,
+            arg,
+            stage,
+            arg_first: false,
+        } = &head.kind
+        {
+            args.push((&**arg, *stage));
+            head = func;
+        }
+        args.reverse();
+        (head, args)
+    }
+
+    /// The [`spine`](Self::spine) of the pure applications around the
+    /// first one that is not: its head is that application, if any.
+    pub fn pure_spine(&self) -> (&Expr, Vec<&Expr>) {
+        let mut args = Vec::new();
+        let mut head = self;
+        while let ExprKind::App {
+            func,
+            arg,
+            stage: Stage::Pure,
+            arg_first: false,
+        } = &head.kind
+        {
+            args.push(&**arg);
+            head = func;
+        }
+        args.reverse();
+        (head, args)
+    }
+
     /// Calls `f` on each direct subexpression, in evaluation order.
     pub fn each_child<'a>(&'a self, f: &mut dyn FnMut(&'a Expr)) {
         match &self.kind {
@@ -291,5 +329,56 @@ impl Expr {
             }
             _ => unreachable!("loop traversal"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Expr, ExprKind, FileId, Lit, Span, Stage};
+
+    fn at() -> Span {
+        Span::new(FileId::new(0), 0, 0)
+    }
+
+    fn app(func: Expr, arg: i32, stage: Stage) -> Expr {
+        let arg = Box::new(Expr::new(ExprKind::Lit(Lit::Int(arg)), at()));
+        let kind = ExprKind::App {
+            func: Box::new(func),
+            arg,
+            stage,
+            arg_first: false,
+        };
+        Expr::new(kind, at())
+    }
+
+    /// `f 1 2 3` with its second stage running: the arguments in order, and
+    /// the pure ones only up to that stage.
+    #[test]
+    fn a_spine_is_the_head_and_the_arguments_in_order() {
+        let f = Expr::new(ExprKind::Local("f".to_owned()), at());
+        let e = app(
+            app(app(f, 1, Stage::Pure), 2, Stage::Runtime),
+            3,
+            Stage::Pure,
+        );
+        let (head, args) = e.spine();
+        assert!(matches!(&head.kind, ExprKind::Local(f) if f == "f"));
+        let found: Vec<_> = (args.iter()).map(|(a, s)| (a.kind.clone(), *s)).collect();
+        let lit = |n| ExprKind::Lit(Lit::Int(n));
+        let expected = [
+            (lit(1), Stage::Pure),
+            (lit(2), Stage::Runtime),
+            (lit(3), Stage::Pure),
+        ];
+        assert_eq!(found, expected);
+        let (head, args) = e.pure_spine();
+        assert!(matches!(
+            head.kind,
+            ExprKind::App {
+                stage: Stage::Runtime,
+                ..
+            }
+        ));
+        assert_eq!(args.len(), 1);
     }
 }

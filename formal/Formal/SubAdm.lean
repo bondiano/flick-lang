@@ -48,6 +48,29 @@ theorem Ty.field_rcons {R : Ty} {l t} (h : R.field l = some t) :
   cases R <;> simp [Ty.field] at h
   exact ⟨_, _, _, rfl⟩
 
+/-- A supertype of a record is a record with the same labels. -/
+theorem LeLive.isRec {R R' : Ty} (hR : R.IsRec) (h : LeLive S R R') :
+    R'.IsRec ∧ R'.labels = R.labels := by
+  induction R generalizing R' with
+  | rnil => obtain rfl := h.eq_plain rfl; exact ⟨hR, rfl⟩
+  | rcons l t r _ ih =>
+    obtain ⟨_, _, rfl, _, hr, _⟩ := h.rcons_left
+    obtain ⟨h₁, h₂⟩ := ih hR hr
+    exact ⟨h₁, by simp [Ty.labels, h₂]⟩
+  | _ => exact hR.elim
+
+/-- A field of a supertype of a record is a supertype of the field. -/
+theorem LeLive.field {R R' : Ty} {l t} (h : LeLive S R R') (hf : R.field l = some t) :
+    ∃ t', R'.field l = some t' ∧ LeLive S t t' := by
+  induction R generalizing R' with
+  | rcons l' u r _ ih =>
+    obtain ⟨u', _, rfl, hu, hr, _⟩ := h.rcons_left
+    simp only [Ty.field] at hf ⊢
+    split at hf
+    · cases hf; exact ⟨u', by simp [*], hu⟩
+    · simp only [*, if_false]
+  | _ => simp [Ty.field] at hf
+
 theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe S J J' → Typ S Ψ Θ Γ e J' := by
   induction h with
   | var hi hts hH hT =>
@@ -78,16 +101,17 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe S J J' �
     intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .ctor hK hk hH (hT.trans h₁)
   | rnil => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; obtain rfl := LeLive.eq_plain h₁ rfl; exact .rnil
   | rcons hR hl _ _ ih₁ ih₂ =>
-    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex; obtain rfl := LeLive.eq_plain h₁ rfl;
-      exact .rcons hR hl (ih₁ (.st h₂)) (ih₂ (.st h₂))
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
+    obtain ⟨_, _, rfl, ht, hr, _⟩ := h₁.rcons_left
+    obtain ⟨hR', hl'⟩ := hr.isRec hR
+    exact .rcons hR' (hl' ▸ hl) (ih₁ ⟨ht, h₂⟩) (ih₂ ⟨hr, h₂⟩)
   | proj _ hf hT ih =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .proj (ih (.st h₂)) hf (hT.trans h₁)
   | update _ hf _ ih₁ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
-    obtain ⟨_, _, _, rfl⟩ := Ty.field_rcons hf
-    obtain rfl := LeLive.eq_plain h₁ rfl;
-      exact .update (ih₁ (.st h₂)) hf (ih₂ (.st h₂))
+    obtain ⟨_, hf', ht⟩ := h₁.field hf
+    exact .update (ih₁ ⟨h₁, h₂⟩) hf' (ih₂ ⟨ht, h₂⟩)
   | match_ _ _ hc ih₁ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .match_ (ih₁ (.st h₂)) (ih₂ ⟨rfl, h₁, h₂⟩) hc

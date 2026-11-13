@@ -17,6 +17,7 @@ use crate::generate::fixture_module;
 use crate::syntax::{Name, Path, Prim};
 use crate::translate::lean::elide::{Env, Types, hides, scheme_facts, ty};
 use crate::types::{Caps, Kind, Scheme, Stage, Type, Var};
+use crate::variance::Sign;
 
 /// A constructor of the core: its variables, fields and type.
 pub(crate) struct Ctor {
@@ -47,6 +48,9 @@ pub struct Sig {
     /// The kinds of the parameters of the data types, and those with hidden
     /// storage.
     pub(crate) types: Rc<Types>,
+    /// The sign of each parameter of each type of the constructors, at its
+    /// index in the core: after the hidden row of data with hidden storage.
+    vars: BTreeMap<String, Vec<Sign>>,
 }
 
 /// An operation `o : a ->{} b` of a service.
@@ -229,6 +233,30 @@ fn stored(decls: &Decls) -> HashSet<Path> {
     out
 }
 
+/// The sign of each parameter of the types of `ctors`, at its index in the
+/// core: after the hidden row of data with hidden storage.
+fn signs(
+    decls: &Decls,
+    ctors: &BTreeMap<String, Ctor>,
+    types: &Types,
+) -> BTreeMap<String, Vec<Sign>> {
+    (ctors.values())
+        .map(|c| {
+            let signs = match &*c.adt {
+                "Tuple" => vec![Sign::Pos, Sign::Pos],
+                adt => {
+                    let p = Path::parse(adt);
+                    let hidden = types.stored.contains(&p).then_some(Sign::Inv);
+                    (hidden.into_iter())
+                        .chain(decls.signs.get(&p).into_iter().flatten().copied())
+                        .collect()
+                }
+            };
+            (c.adt.clone(), signs)
+        })
+        .collect()
+}
+
 impl Sig {
     pub fn of(decls: &Decls) -> Sig {
         let module = fixture_module();
@@ -312,6 +340,7 @@ impl Sig {
             .filter(|(p, _)| &*p.module == module)
             .filter_map(|(p, schemes)| Some((p.to_string(), ops(schemes, &types)?)))
             .collect();
+        let vars = signs(decls, &ctors, &types);
         Sig {
             ctors,
             globs,
@@ -319,7 +348,32 @@ impl Sig {
             classes,
             dicts,
             types,
+            vars,
         }
+    }
+
+    /// `genVar`, the variances of the types of the constructors, and the
+    /// structure with the signature that has it.
+    fn gen_var(&self, out: &mut String) {
+        out.push_str(
+            "/-- The variance of each parameter of the generator's data (`flick-model/src/variance.rs`). -/\n\
+             def genVar : Name → Nat → Variance\n",
+        );
+        for (adt, signs) in &self.vars {
+            for (j, s) in signs.iter().enumerate() {
+                let s = match s {
+                    Sign::Pos => ".pos",
+                    Sign::Neg => ".neg",
+                    Sign::Bi => ".bi",
+                    Sign::Inv => continue,
+                };
+                let _ = writeln!(out, "  | {adt:?}, {j} => {s}");
+            }
+        }
+        out.push_str("  | _, _ => .inv\n\n");
+        // one case for each index below the most parameters, and the rest
+        let most = self.ctors.values().map(|c| c.k).max().unwrap_or(0);
+        out.push_str(&WITNESS.replace("$CASES", &"_ | ".repeat(most)));
     }
 
     pub(crate) fn glob(&self, key: &Key) -> Option<(usize, &Scheme)> {
@@ -425,7 +479,7 @@ impl Sig {
              simp only [List.mem_cons, List.mem_nil_iff, or_false, Prod.mk.injEq] at hm <;>\n    \
              rcases hm with {each} <;> subst_vars <;> closed_tac\n\n"
         );
-        out.push_str(WITNESS);
+        self.gen_var(&mut out);
         if !skipped.is_empty() {
             out.push_str("\n/-! ## Skipped -/\n\n");
             out.push_str(&skipped);
@@ -446,95 +500,6 @@ fn scheme(s: &Scheme, classes: &[String], types: &Rc<Types>) -> Result<String, S
     Ok(format!("⟨{}, {cs}, {t}⟩", s.vars.len()))
 }
 
-/// The structure, and the signature that has it.
-const WITNESS: &str = r"structure GenSig (S : Sig) : Prop where
-  ctor : ∀ K, (genCtor K).isSome → S.ctor K = genCtor K
-  res : ∀ K, (genCtor K).isSome → S.res K = genRes K
-  glob : ∀ g, (genGlob g).isSome → S.glob g = genGlob g
-  /-- A type of the generator has no constructors but its own. -/
-  closed : ∀ K k ts T, S.ctor K = some (k, ts, T) → genAdtCtors T ≠ [] → genCtor K = some (k, ts, T)
-  /-- A service of the generator has its operations and no other. -/
-  op : ∀ E o, genOps E ≠ [] → S.op E o = genOp E o
-  dict : ∀ c, (genDict c).isSome → S.dict c = genDict c
-
-theorem genAdtCtors_complete : ∀ K k ts T, genCtor K = some (k, ts, T) →
-    (K, ts.length) ∈ genAdtCtors T := by
-  intro K k ts T h
-  unfold genCtor at h
-  split at h <;> cases h <;> decide
-
-theorem genCtor_closed : ∀ K k ts T σ, genCtor K = some (k, ts, T) →
-    (∀ i, i < k → σ (.v i) = .tvar i) → ts.map (Ty.substT σ) = ts := by
-  intro K k ts T σ hK hσ
-  unfold genCtor at hK
-  split at hK <;> cases hK <;> simp [Ty.substT, Stage.substT, hσ] <;>
-    funext a <;> simp [Caps.substT, hσ]
-
-theorem genCtor_reach : ∀ K k ts T, genCtor K = some (k, ts, T) →
-    ∀ t ∈ ts, ∀ a, t.reach a → ∃ i, i < k ∧ a = .v i := by
-  intro K k ts T hK t ht a ha
-  unfold genCtor at hK
-  split at hK <;> cases hK <;> simp at ht <;>
-    (try rcases ht with rfl | rfl) <;> (try subst ht) <;>
-    simp [Ty.reach, Caps.none] at ha <;>
-    (try rcases ha with ha | ha) <;> (try subst ha) <;> refine ⟨_, ?_, rfl⟩ <;> decide
-
-theorem genRes_closed : ∀ K k ts T σ, genCtor K = some (k, ts, T) →
-    (∀ i, i < k → σ (.v i) = .tvar i) → (genRes K).map (Ty.substT σ) = genRes K := by
-  intro K k ts T σ h hσ
-  simp only [genRes, h, idTs, List.map_map]
-  apply List.map_congr_left
-  intro i hi
-  simp only [Function.comp, Ty.substT]
-  exact hσ i (List.mem_range.mp hi)
-
-theorem genGlob_closed : ∀ g s, genGlob g = some s → s.Closed s.k := by
-  intro g s h
-  unfold genGlob at h
-  split at h <;> cases h <;> closed_tac
-
-theorem genOp_closed : ∀ E o c a b σ, genOp E o = some (c, a, b) →
-    a.substT σ = a ∧ b.substT σ = b := by
-  intro E o c a b σ h
-  unfold genOp at h
-  split at h <;> cases h <;> simp [Ty.substT]
-
-theorem genOp_mem : ∀ E o x, genOp E o = some x → o ∈ genOps E := by
-  intro E o x h
-  unfold genOp at h
-  split at h <;> cases h <;> simp [genOps]
-
-/-- The arm of a service's one operation is all a handler of it needs. -/
-theorem GenSig.complete {S : Sig} (hS : GenSig S) {E o : Name} (h : genOps E = [o]) :
-    S.Complete E (recArm o) := by
-  intro o' c a b hop
-  rw [hS.op E o' (by simp [h])] at hop
-  have hm := genOp_mem E o' _ hop
-  rw [h, List.mem_singleton] at hm
-  subst hm
-  simp [Tm.armOf, Pat.spine, Pat.headName]
-
-def genSig : Sig where
-  ctor := genCtor
-  impl _ := .errors Row.none
-  ctor_closed := genCtor_closed
-  ctor_reach := genCtor_reach
-  res := genRes
-  res_closed := genRes_closed
-  impl_closed _ _ := by simp [Ty.substT, Row.none_substT]
-  dict := genDict
-  glob := genGlob
-  dict_closed := genDict_closed
-  glob_closed := genGlob_closed
-  op := genOp
-  op_closed := genOp_closed
-  op_impl _ _ _ _ _ _ _ := rfl
-  op_field _ _ _ _ _ h := (h rfl).elim
-
-/-- The assumption of a certificate holds of a signature. -/
-theorem GenSig.inhabited : ∃ S, GenSig S :=
-  ⟨genSig, fun _ _ => rfl, fun _ _ => rfl, fun _ _ => rfl, fun _ _ _ _ h _ => h, fun _ _ _ => rfl,
-    fun _ _ => rfl⟩
-
-end Flick.Cert
-";
+/// The structure, and the signature that has it; `$CASES` is a case for each
+/// index below the most parameters of a type.
+const WITNESS: &str = include_str!("witness.lean");

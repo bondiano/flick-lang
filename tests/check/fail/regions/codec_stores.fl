@@ -1,0 +1,39 @@
+// A codec keeps the functions it is made with (`@stores`): one whose
+// decoding reads the file of a `scope` does not leave the `scope`, or a
+// value decoded after it would read the closed file.
+module App.CodecStoresFail exposing (..)
+
+import File exposing (Path, FileSystem, OpenError, ReadError)
+
+type alias Row = { size : Float } deriving Schema
+
+block : Path ->{Async, FileSystem; OpenError} Codec {Async, FileSystem} none Json Row
+let block path = scope {
+  let file = File.open_scoped path
+  codec Row.schema {
+    size = field_effect "size" (Codec.general Float.json_finite)
+      |> on_missing_effect (fun () ->
+        try Int.to_float (String.length (File.read_all file)) with | ReadError _ -> -1);
+  }
+}
+
+one_field : Path ->{Async, FileSystem; OpenError} FieldCodec {Async, FileSystem} Float
+let one_field path = scope {
+  let file = File.open_scoped path
+  field_effect "size" (Codec.general Float.json_finite)
+    |> on_missing_effect (fun () ->
+      try Int.to_float (String.length (File.read_all file)) with | ReadError _ -> -1)
+}
+
+// the function `transform_effect` returns shows what it captures
+transformed : Path ->{Async, FileSystem; OpenError} Codec {Async, FileSystem} none Json Int
+let transformed path = scope {
+  let file = File.open_scoped path
+  Codec.transform_effect
+    (fun (s : String) -> try String.length (File.read_all file) with | ReadError _ -> 0)
+    (fun n -> String.repeat n "x")
+    String.json
+}
+//~ FLICK-G001 @13:3-17:4 this value holds region `s`, but the expected type `Codec {FileSystem, Async} none Json Row` holds no captures
+//~ FLICK-G001 @23:3-25:86 this value holds region `s`, but the expected type `FieldCodec {FileSystem, Async} Float` holds no captures
+//~ FLICK-G001 @32:3-35:16 this value holds region `s`, but the expected type `Codec {FileSystem, Async} none Json Int` holds no captures

@@ -1,10 +1,19 @@
 /// What a `codec` block is, as std's plugin writes it: its fields, each
 /// with the services it decodes with, gathered in the written order, then
 /// the codec of the record its schema describes.
-module Codec.Derive exposing (Fields, field, fields, record, record_effect)
+module Codec.Derive exposing (Decodes(..), Fields, decoding, field, fields, record, record_effect)
 
+@stores
 /// The fields of a block, decoding with the services `rd`.
 type Fields (rd : ServiceRow)
+
+/// The type a field decodes, which the `_` of its annotation asks the
+/// checker: a bare `FieldCodec` written there would hold no captures.
+type Decodes a = Decodes
+
+/// `codec`, of a field that decodes the type `of` names.
+decoding : Decodes a -> FieldCodec rd a -> FieldCodec rd a
+let decoding _ codec = codec
 
 /// No field.
 fields : Fields none

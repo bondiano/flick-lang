@@ -28,3 +28,4 @@ pub mod subst;
 pub mod syntax;
 pub mod translate;
 pub mod types;
+pub mod variance;

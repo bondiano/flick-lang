@@ -25,6 +25,10 @@ pub struct Module {
     /// backend may hold such a record in the value of the constructor.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub records: BTreeMap<String, Vec<String>>,
+    /// The package the module belongs to, which names its constructors in
+    /// their tags; `None` for a built-in module and one of no package.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub package: Option<String>,
 }
 
 /// Lexical source prefixes keep canonical entity owners while the backends
