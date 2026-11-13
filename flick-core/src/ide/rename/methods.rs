@@ -262,33 +262,13 @@ impl Ide<'_> {
             }).collect();
             // C(..) and (..) imports gain the new name even without a
             // written occurrence of the old one in this module.
-            let imported = m
-                .tree
-                .nodes()
-                .filter(|n| n.kind == K::ImportDecl)
-                .any(|import| {
-                    let Some(path) = import.nodes().find(|n| n.kind == K::ModulePath) else {
-                        return false;
-                    };
-                    let module: String = path.text(self.text(m.file)).split_whitespace().collect();
-                    self.interface(&module).is_some_and(|interface| {
-                        super::super::complete::exposed(import, interface, self.text(m.file))
-                            .any(|export| export.entity == *e)
-                    })
-                });
+            let imported = self.imports_value(m, &|entity| entity == e)
+                || self.inherited_value(m, &|entity| entity == e);
             let exports = m.interface.exports.iter().any(|export| export.entity == *e);
             if m.name != e.module && calls.is_empty() && !imported && !exports {
                 continue;
             }
-            if declarations(&m.tree, self.text(m.file), m.file)
-                .iter()
-                .any(|d| d.namespace == Namespace::Value && d.name == new_name)
-                || self
-                    .in_scope(m)
-                    .values
-                    .iter()
-                    .any(|(name, _)| name == new_name)
-            {
+            if self.existing_method_name(m, new_name) {
                 return Err(format!("`{new_name}` is already in scope in `{}`", m.name));
             }
             for (start, _) in &calls {
@@ -306,6 +286,67 @@ impl Ide<'_> {
             }
         }
         Ok(())
+    }
+
+    fn existing_method_name(&self, m: &Analyzed, name: &str) -> bool {
+        declarations(&m.tree, self.text(m.file), m.file)
+            .iter()
+            .any(|d| d.namespace == Namespace::Value && d.name == name)
+            || self.in_scope(m).values.iter().any(|(n, _)| n == name)
+            || m.interface
+                .exports
+                .iter()
+                .any(|e| e.entity.namespace == Namespace::Value && e.entity.name == name)
+            || self.inherited_value(m, &|entity| entity.name == name)
+    }
+
+    fn imports_value(&self, m: &Analyzed, matches: &dyn Fn(&Entity) -> bool) -> bool {
+        m.tree
+            .nodes()
+            .filter(|n| n.kind == K::ImportDecl)
+            .any(|import| {
+                let Some(path) = import.nodes().find(|n| n.kind == K::ModulePath) else {
+                    return false;
+                };
+                let module: String = path.text(self.text(m.file)).split_whitespace().collect();
+                self.interface(&module).is_some_and(|interface| {
+                    super::super::complete::exposed(import, interface, self.text(m.file)).any(
+                        |export| {
+                            export.entity.namespace == Namespace::Value && matches(&export.entity)
+                        },
+                    )
+                })
+            })
+    }
+
+    fn inherited_value(&self, m: &Analyzed, matches: &dyn Fn(&Entity) -> bool) -> bool {
+        // Inline children inherit imports and preceding declarations of
+        // lexical parents, not siblings or declarations after the child.
+        // These synthetic imports are absent from the child's source tree.
+        self.analysis
+            .modules
+            .iter()
+            .filter(|parent| {
+                parent.file == m.file
+                    && m.name.starts_with(&format!("{}.", parent.name))
+                    && parent.tree.range().0 <= m.tree.range().0
+                    && m.tree.range().1 <= parent.tree.range().1
+            })
+            .any(|parent| {
+                self.imports_value(parent, matches)
+                    || declarations(&parent.tree, self.text(parent.file), parent.file)
+                        .into_iter()
+                        .chain(parent.expansion.iter().flat_map(|e| e.declarations()))
+                        .any(|d| {
+                            d.namespace == Namespace::Value
+                                && d.span.start < m.tree.range().0
+                                && matches(&Entity {
+                                    module: parent.name.clone(),
+                                    namespace: d.namespace,
+                                    name: d.name,
+                                })
+                        })
+            })
     }
 
     fn method_module(&self, file: FileId, offset: u32) -> Option<&Analyzed> {

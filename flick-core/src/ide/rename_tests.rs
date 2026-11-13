@@ -334,3 +334,54 @@ fn class_method_rename_refuses_capture_by_lexically_opened_module_names() {
         ("src/App/Use.fl", &user),
     ]));
 }
+
+#[test]
+fn class_method_rename_refuses_capture_of_implicit_lexical_parent_bindings() {
+    let source = "module App.Main exposing (..)\nrender : Int -> String\nlet render _ = \"parent\"\nmodule Child exposing (Named(..), describe, result) =\n  class Named a =\n    describe : a -> String\n  instance Named Int =\n    let describe _ = \"child\"\n  let result = render 1\n";
+    let f = fixture_of(&[("src/App/Main.fl", source)]);
+    assert_clean(&f);
+    assert!(
+        f.ide()
+            .rename(
+                f.file("App.Main"),
+                f.at("App.Main", "describe :", 0) + 1,
+                "render"
+            )
+            .is_err(),
+        "an unchanged reference to the lexical parent's render must not start calling the child method"
+    );
+    let source = "module App.Main exposing (..)\nmodule Child exposing (Named(..), describe) =\n  class Named a =\n    describe : a -> String\n  instance Named Int =\n    let describe _ = \"child\"\nrender : Int -> String\nlet render _ = \"declared after the child\"\n";
+    let f = fixture_of(&[("src/App/Main.fl", source)]);
+    assert_clean(&f);
+    assert!(
+        f.ide()
+            .rename(
+                f.file("App.Main"),
+                f.at("App.Main", "describe :", 0) + 1,
+                "render"
+            )
+            .is_ok(),
+        "a later parent declaration is not in the child's lexical prefix"
+    );
+    assert_clean(&fixture_of(&[(
+        "src/App/Main.fl",
+        &source.replace("describe", "render"),
+    )]));
+}
+
+#[test]
+fn class_method_rename_checks_inherited_imports_even_without_method_calls() {
+    let user = "module App.Use exposing (..)\nimport App.Named exposing (Named(..))\nmodule Child exposing (render) =\n  render : Int -> String\n  let render _ = \"child\"\n";
+    let f = fixture_of(&[("src/App/Named.fl", NAMED), ("src/App/Use.fl", user)]);
+    assert_clean(&f);
+    assert!(
+        f.ide()
+            .rename(
+                f.file("App.Named"),
+                f.at("App.Named", "describe :", 0) + 1,
+                "render"
+            )
+            .is_err(),
+        "implicit inherited imports also gain the new method name"
+    );
+}
