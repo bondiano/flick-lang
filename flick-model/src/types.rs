@@ -91,7 +91,8 @@ pub struct Row {
     pub elems: BTreeMap<Path, Rc<[Type]>>,
     pub vars: BTreeSet<Var>,
     /// `(ρ, S)`: the variable `ρ` stands here without `S`, as `{-S | ρ}`
-    /// writes it. Only a name without arguments is taken out of a variable.
+    /// writes it. A parameterized name may also be removed when the whole
+    /// row explicitly fixes its unique instance's arguments.
     pub less: BTreeSet<(Var, Path)>,
 }
 
@@ -119,6 +120,8 @@ pub enum Type {
     Record(Fields),
     Tuple(Rc<[Type]>),
     Errors(Row),
+    /// A capture row used as an argument of a nominal or higher-kinded type.
+    Caps(Caps),
     /// `S.Impl`, the record of a service's operations: `ServiceImpl ρ` of
     /// the checker, which is `S.Impl` at `ρ = {S}`.
     Impl(Row),
@@ -428,6 +431,7 @@ impl fmt::Display for Type {
                 write!(f, "({})", parts.join(", "))
             }
             Type::Errors(r) => write!(f, "Errors {r}"),
+            Type::Caps(c) => write!(f, "Captures {c}"),
             Type::Impl(r) => match r.elems.keys().next() {
                 Some(s) if r.elems.len() == 1 && r.vars.is_empty() => write!(f, "{}.Impl", s.name),
                 _ => write!(f, "ServiceImpl {r}"),

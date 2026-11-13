@@ -20,6 +20,9 @@ impl Checker<'_> {
     /// meta, if it has one; a meta of `ρ` waits.
     pub(super) fn within(&mut self, a: &Row, b: &Row) -> Check<()> {
         let (a, b) = (self.zonk_row(a), self.zonk_row(b));
+        if self.row_implied(&a, &b) {
+            return Ok(());
+        }
         let mut extra = Row::none();
         let scoped = self.scope_live(&b);
         for (name, args) in &a.elems {
@@ -60,7 +63,9 @@ impl Checker<'_> {
                 }
                 Var::Named(_) => extra.add_var(v, &a.less_of(v).cloned().collect()),
                 Var::Meta(_) if held && a.owed(v, &b).next().is_none() => {}
-                Var::Meta(_) => self.pending.push((a.only(v), b.clone())),
+                Var::Meta(_) => self
+                    .pending
+                    .push((a.only(v), b.clone(), self.branch_givens())),
             }
         }
         if extra.is_none() {
@@ -85,6 +90,7 @@ impl Checker<'_> {
                 grown.vars.insert(Var::Meta(self.meta()));
                 self.bind_row(m, grown)
             }
+            None if self.infer_row_upper(&extra, &b) => Ok(()),
             None => error("⊆", format!("the row `{b}` does not allow `{extra}`")),
         }
     }
@@ -99,19 +105,19 @@ impl Checker<'_> {
             }
             let mut waiting = Vec::new();
             let mut progressed = false;
-            for (a, b) in pending {
+            for (a, b, facts) in pending {
                 let z = self.zonk_row(&a);
                 let unsolved =
                     z.elems.is_empty() && z.vars.iter().all(|v| matches!(v, Var::Meta(_)));
                 if unsolved && z == a {
-                    waiting.push((a, b));
+                    waiting.push((a, b, facts));
                 } else {
                     progressed = true;
-                    self.within(&z, &b)?;
+                    self.under_givens(&facts, |c| c.within(&z, &b))?;
                 }
             }
             if !progressed {
-                for (a, _) in &waiting {
+                for (a, _, _) in &waiting {
                     for v in &self.zonk_row(a).vars {
                         if let Var::Meta(m) = v {
                             self.bind_row(*m, Row::none())?;
@@ -217,7 +223,10 @@ impl Checker<'_> {
 
     fn subsume_unfolded(&mut self, actual: &Type, expected: &Type) -> Check<()> {
         let (a, b) = (self.follow(actual), self.follow(expected));
-        if matches!(b, Type::Var(Var::Meta(_))) {
+        // An unknown side takes the complete type, including its qualifier.
+        // Erasing it here loses captures through an inferred eta parameter.
+        let unknown_actual = matches!(&a, Type::Var(v @ Var::Meta(_)) if !self.mentions(v, &b));
+        if unknown_actual || matches!(b, Type::Var(Var::Meta(_))) {
             return self.unify(&a, &b);
         }
         self.subsume_bare(actual, expected)?;
@@ -356,13 +365,16 @@ impl Checker<'_> {
                 }
             }
         }
-        let named = (of.elems.iter()).filter(|(_, args)| args.is_empty());
+        let named =
+            (of.elems.iter()).filter(|(name, args)| args.is_empty() || r.elems.contains_key(*name));
         let gone: Vec<&Path> = named.map(|(n, _)| n).collect();
-        // a handler finds an instance of a service with arguments by its
-        // name: a variable that may hold another instance would get this one
+        // An explicit instance fixes the name's arguments throughout this
+        // well-formed row. Without one, a variable may hold another instance
+        // and handling this one must not silently subtract that other one.
         for v in r.vars.difference(&of.vars) {
-            let instance = (of.elems.iter())
-                .find(|(n, args)| !args.is_empty() && !r.less_of(v).any(|l| l == *n));
+            let instance = (of.elems.iter()).find(|(n, args)| {
+                !args.is_empty() && !r.elems.contains_key(*n) && !r.less_of(v).any(|l| l == *n)
+            });
             if let Some((n, _)) = instance {
                 return error(
                     "provide",

@@ -60,7 +60,7 @@ impl Checker<'_> {
         }
         for h in self.regions.holds.clone() {
             let (missing, _) = self.excess(&h);
-            if !missing.atoms.is_empty() {
+            if !missing.is_empty() {
                 return error(
                     h.rule,
                     format!(
@@ -152,6 +152,23 @@ impl Checker<'_> {
     /// What `h` holds beyond what it allows, and the capture row that may
     /// grow to allow it. A type never inferred holds nothing (`docs/formal/regions.md#bounded-qualifiers-are-compared-after-the-type-is-inferred`).
     fn excess(&self, h: &Hold) -> (Caps, Option<u32>) {
+        if h.givens.types.is_empty()
+            && h.givens.rows.is_empty()
+            && h.givens.caps.is_empty()
+            && self.equalities.is_empty()
+            && self.row_equalities.is_empty()
+            && self.cap_equalities.is_empty()
+        {
+            return self.excess_under(h);
+        }
+        let mut under = self.clone();
+        under.equalities.clone_from(&h.givens.types);
+        under.row_equalities.clone_from(&h.givens.rows);
+        under.cap_equalities.clone_from(&h.givens.caps);
+        under.excess_under(h)
+    }
+
+    fn excess_under(&self, h: &Hold) -> (Caps, Option<u32>) {
         let mut held = Caps::default();
         let mut bounded = Vec::new();
         for t in &h.held {
@@ -161,12 +178,18 @@ impl Checker<'_> {
         }
         let mut allowed = self.zonk_caps(&h.allowed);
         for t in &h.within {
-            let (c, b) = self.reach_bounded(t);
+            let (c, b) = self.reach_position(t);
             allowed = allowed.union(&c);
             allowed.atoms.extend(b.into_iter().map(|(a, _)| a));
         }
         // `α^{≤C}` reaches `α`, and is within what allows `C` (§2.1, `docs/formal/regions.md#a-bounded-variable-reaches-what-the-variable-reaches`)
         for (a, c) in bounded {
+            // A generic value is opaque: using it is no inspection of the
+            // regions its bound permits. Zonking a concrete type exposes
+            // any region that a real use must keep live.
+            if h.rule == "Live" && !self.is_region(&a) {
+                continue;
+            }
             if !allowed.atoms.contains(&a) {
                 held = held.union(&self.zonk_caps(&c));
             }
@@ -180,6 +203,9 @@ impl Checker<'_> {
         // an atom is a region or a type variable; a meta of a type never
         // inferred holds nothing (`docs/formal/regions.md#bounded-qualifiers-are-compared-after-the-type-is-inferred`). A capture variable of a signature
         // grows a row, for `Outlives`
+        if self.caps_implied(&held, &allowed) {
+            return (Caps::default(), None);
+        }
         let mut missing = Caps::default();
         for a in &held.atoms {
             if !allowed.atoms.contains(a) && (self.is_region(a) || matches!(a, Var::Named(_))) {

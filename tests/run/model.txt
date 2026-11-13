@@ -30,6 +30,7 @@ codegen/scope_run
 codegen/higher_rank
 codegen/functor
 codegen/gadt
+codegen/gadt_rows
 codegen/gadt_dicts
 codegen/gadt_derive
 codegen/handler_arms

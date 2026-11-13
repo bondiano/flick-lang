@@ -1,7 +1,7 @@
 //! Compiler-generated scope/provider callbacks preserve operand order and completion.
 use super::Tr;
 use super::expr::is_lang;
-use crate::syntax::{Name, Term};
+use crate::syntax::{Arm, Name, Term};
 use flick_core::{
     ir::{self, ExprKind},
     source::Span,
@@ -88,7 +88,17 @@ impl Tr {
         let body = match &arg.kind {
             ExprKind::Lambda { params, body } if params.len() == 1 => {
                 let body = translate(self, body);
-                Term::app(self.param(&params[0].pat, body), Term::unit())
+                // The source body is a unit thunk. Translate its strict
+                // beta step directly, so the surrounding expected type and
+                // effect bound reach GADT matches in that body.
+                Term::Match(
+                    Rc::new(Term::unit()),
+                    Rc::from([Arm {
+                        pat: super::expr::pat(&params[0].pat),
+                        guard: None,
+                        body,
+                    }]),
+                )
             }
             _ => {
                 let name = self.fresh("callback");

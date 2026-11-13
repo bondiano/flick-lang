@@ -1,0 +1,103 @@
+// Row indices refine the requirements of a branch without changing its stage.
+module Language.GadtRows exposing (tests)
+
+import Scope
+
+service Db =
+  get : Int ->{} Int
+
+type error Missing = Missing Int
+
+type Cmd (r : ServiceRow) (e : ErrorRow) a =
+  | Value a : Cmd none none a
+  | Read Int : Cmd {Db} {Missing} Int
+  | Fail Int : Cmd none {Missing} Int
+
+execute : Cmd r e a ->{r; e} a
+let execute command =
+  match command with
+  | Value value -> value
+  | Read key -> Db.get key
+  | Fail key -> from_result (Err (Missing key))
+
+type Packed (r : ServiceRow) =
+  | Packed (Eff s none Int) : Packed {Db | s}
+
+unpack : Packed {Db} ->{Db} Int
+let unpack packed =
+  match packed with
+  | Packed work -> await work
+
+provided : Packed {Db} ->{} Int
+let provided packed = provide (Layer.succeed Db { get = fun key -> key + 5 }) {
+  match packed with
+  | Packed work -> await work
+}
+
+type Saved (c : CaptureRow) = Saved ((Unit -> Int)^c)
+
+recover : Saved c -> (Unit -> Int)^c
+let recover packed =
+  match packed with
+  | Saved callback -> callback
+
+type Scoped (r : ServiceRow) =
+  | Scoped (Eff q none Unit) : Scoped {Scope s | q}
+
+close_once : Ref Int ->{} Unit
+let close_once closed = scope s {
+  let packed : Scoped {Scope s} =
+    Scoped (task { Scope.add_finalizer (task { Ref.set closed (Ref.get closed + 1) }) })
+  match packed with
+  | Scoped work -> await work
+}
+
+tests : List Test.Test
+let tests = [
+  Test.effect_test
+    "a value command keeps its result type"
+    (task { Test.expect (Test.equal "kept" (execute (Value "kept"))) }),
+  Test.effect_test
+    "a command calls its indexed service"
+    (task {
+      let result = provide (Layer.succeed Db { get = fun n -> n + 100 }) {
+        try execute (Read 7) with
+        | Missing _ -> -1
+      }
+      Test.expect (Test.equal 107 result)
+    }),
+  Test.effect_test
+    "a command raises its indexed error"
+    (task {
+      let result =
+        try execute (Fail 7) with
+        | Missing key -> key + 10
+      Test.expect (Test.equal 17 result)
+    }),
+  Test.effect_test
+    "a residual task may require the repeated service"
+    (task {
+      let packed : Packed {Db} = Packed (task { Db.get 3 })
+      let result = provide (Layer.succeed Db { get = fun n -> n * 10 }) { unpack packed }
+      Test.expect (Test.equal 30 result)
+    }),
+  Test.effect_test
+    "a local layer handles every permitted residual"
+    (task {
+      let packed : Packed {Db} = Packed (task { Db.get 4 })
+      Test.expect (Test.equal 9 (provided packed))
+    }),
+  Test.effect_test
+    "a capture index retains the stored callback"
+    (task {
+      let callback = recover (Saved (fun () -> 44))
+      Test.expect (Test.equal 44 (callback ()))
+    }),
+  Test.effect_test
+    "a scope handles its indexed residual and closes once"
+    (task {
+      let closed = Ref.make 0
+      close_once closed
+      Test.expect (Test.equal 1 (Ref.get closed))
+    }),
+]

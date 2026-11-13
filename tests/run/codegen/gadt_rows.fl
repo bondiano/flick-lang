@@ -1,0 +1,53 @@
+module Main exposing (main)
+
+import Platform
+import Scope
+
+service Db =
+  get : Int ->{} Int
+
+type error Missing = Missing Int
+
+type Cmd (r : ServiceRow) (e : ErrorRow) a =
+  | Value a : Cmd none none a
+  | Read Int : Cmd {Db} none Int
+  | Fail Int : Cmd none {Missing} Int
+
+execute : Cmd r e a ->{r; e} a
+let execute command =
+  match command with
+  | Value value -> value
+  | Read key -> Db.get key
+  | Fail key -> from_result (Err (Missing key))
+
+type Packed (r : ServiceRow) =
+  | Packed (Eff s none Int) : Packed {Db | s}
+
+provided : Packed {Db} ->{} Int
+let provided packed = provide (Layer.succeed Db { get = fun key -> key + 5 }) {
+  match packed with
+  | Packed work -> await work
+}
+
+type Scoped (r : ServiceRow) =
+  | Scoped (Eff q none Unit) : Scoped {Scope s | q}
+
+closed : Unit ->{} Unit
+let closed () = scope s {
+  let packed : Scoped {Scope s} =
+    Scoped (task { Scope.add_finalizer (task { Platform.stdout_line "closed" }) })
+  match packed with
+  | Scoped work -> await work
+}
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line (show (execute (Value 42)))
+  let read = provide (Layer.succeed Db { get = fun key -> key + 100 }) { execute (Read 7) }
+  Platform.stdout_line (show read)
+  Platform.stdout_line (show (provided (Packed (task { Db.get 4 }))))
+  let recovered =
+    try execute (Fail 7) with
+    | Missing key -> key + 10
+  Platform.stdout_line (show recovered)
+  closed ()

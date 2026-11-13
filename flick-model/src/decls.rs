@@ -10,7 +10,7 @@ use flick_core::types::{self as fc, Form, default_method};
 
 use crate::syntax::{Name, Path};
 use crate::translate::instance;
-use crate::translate::types::{binders, constraint, kind, scheme, ty};
+use crate::translate::types::{Types, binders, kind};
 use crate::types::{Kind, Scheme, Stage, Type};
 use crate::variance::{self, Sign};
 
@@ -67,7 +67,28 @@ fn arity(s: &Scheme) -> usize {
 }
 
 impl Decls {
+    pub fn add_kinds(&mut self, interface: &Interface) {
+        for export in &interface.exports {
+            if export.entity.namespace == Namespace::Type
+                && let Some(def) = &export.definition
+            {
+                let path = Path::new(&export.entity.module, &export.entity.name);
+                let mut params = Vec::new();
+                let mut k = &def.kind;
+                while let fc::Kind::Arrow(param, result) = k {
+                    params.push(kind(param).unwrap_or(Kind::Type));
+                    k = result;
+                }
+                if !params.is_empty() {
+                    self.params.insert(path.clone(), params);
+                }
+            }
+        }
+    }
+
     pub fn add(&mut self, interface: &Interface) {
+        self.add_kinds(interface);
+        let tr = Types::new(&self.params);
         for export in &interface.exports {
             let path = Path::new(&export.entity.module, &export.entity.name);
             match export.entity.namespace {
@@ -76,27 +97,18 @@ impl Decls {
                         self.foreign.insert(path.clone());
                     }
                     if let Some(t) = &export.scheme {
-                        self.values.insert(path, scheme(t));
+                        self.values.insert(path, tr.scheme(t));
                     }
                 }
                 Namespace::Constructor => {
                     if let Some(t) = &export.scheme {
-                        self.constructors.insert(path, scheme(t));
+                        self.constructors.insert(path, tr.scheme(t));
                     }
                 }
                 Namespace::Type => {
                     let Some(def) = &export.definition else {
                         continue;
                     };
-                    let mut params = Vec::new();
-                    let mut k = &def.kind;
-                    while let fc::Kind::Arrow(param, result) = k {
-                        params.push(kind(param).unwrap_or(Kind::Type));
-                        k = result;
-                    }
-                    if !params.is_empty() {
-                        self.params.insert(path.clone(), params);
-                    }
                     match &def.form {
                         Form::Adt { constructors, .. } => {
                             let names = constructors
@@ -109,7 +121,7 @@ impl Decls {
                         // transparent one is expanded in every scheme
                         Form::Alias { params, body, .. } => {
                             let vars = params.iter().map(|p| Name::from(p.as_str())).collect();
-                            self.opaque.insert(path, (vars, ty(body)));
+                            self.opaque.insert(path, (vars, tr.ty(body)));
                         }
                         Form::Nominal { hidden: true, .. } => {
                             self.hidden.insert(path);
@@ -124,7 +136,7 @@ impl Decls {
                         } => {
                             let ops = operations
                                 .iter()
-                                .map(|o| (Name::from(o.name.as_str()), scheme(&o.ty)))
+                                .map(|o| (Name::from(o.name.as_str()), tr.scheme(&o.ty)))
                                 .collect();
                             self.service_params.insert(path.clone(), params.len());
                             self.services.insert(path, ops);
@@ -139,11 +151,11 @@ impl Decls {
                             for (m, t) in default_sigs {
                                 let default =
                                     Path::new(&path.module, &default_method(&path.name, m));
-                                self.values.insert(default, scheme(t));
+                                self.values.insert(default, tr.scheme(t));
                             }
                             let class = Class {
                                 params: params.iter().map(|p| Name::from(p.as_str())).collect(),
-                                supers: supers.iter().map(constraint).collect(),
+                                supers: supers.iter().map(|c| tr.constraint(c)).collect(),
                                 methods: methods.iter().map(|m| Name::from(m.as_str())).collect(),
                             };
                             self.classes.insert(path, class);
@@ -154,9 +166,9 @@ impl Decls {
             }
         }
         for i in &interface.instances {
-            let mut body = constraint(&i.head);
+            let mut body = tr.constraint(&i.head);
             for c in i.context.iter().rev() {
-                body = Type::fun(constraint(c), Stage::Pure, body);
+                body = Type::fun(tr.constraint(c), Stage::Pure, body);
             }
             let s = Scheme {
                 vars: binders(&i.vars),

@@ -7,6 +7,7 @@ import Formal.TyComp
 import Formal.TyOps
 import Formal.RowTerms
 import Formal.IndexedRows
+import Formal.GadtRowExamples
 import Formal.SchemeOps
 import Formal.DictOps
 import Formal.Subst

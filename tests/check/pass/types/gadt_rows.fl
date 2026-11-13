@@ -1,0 +1,143 @@
+module App.GadtRows exposing (..)
+
+import Scope
+
+service Db =
+  get : Int ->{} Int
+
+type error Missing = Missing
+
+type Cmd (r : ServiceRow) (e : ErrorRow) a =
+  | Value a : Cmd none none a
+  | Read Int : Cmd {Db} {Missing} Int
+
+run : Cmd r e a ->{r; e} a
+let run cmd =
+  match cmd with
+  | Value value -> value
+  | Read key -> Db.get key
+
+read : Cmd {Db} {Missing} Int
+let read = Read 7
+
+pure_value : Cmd none none String
+let pure_value = Value "kept"
+
+type Captured (c : CaptureRow) a =
+  | Uncaptured a : Captured {} a
+
+get_uncaptured : Captured c a -> a
+let get_uncaptured packed =
+  match packed with
+  | Uncaptured value -> value
+
+// A repeated row index gives an inclusion; choosing an empty residual would
+// lose valid instantiations. The branch is inhabited whenever r includes Db.
+type Includes (r : ServiceRow) (s : ServiceRow) =
+  | Includes : Includes r {Db | r}
+
+included_service : Includes r r ->{r} Int
+let included_service proof =
+  match proof with
+  | Includes -> Db.get 7
+
+// The constructor's hidden row can be either none or {Db}. Its stored task
+// keeps that row; the branch must establish inclusion, not choose one value.
+type Packed (r : ServiceRow) =
+  | Packed (Eff s none Int) : Packed {Db | s}
+
+run_packed : Packed {Db} ->{Db} Int
+let run_packed packed =
+  match packed with
+  | Packed work -> await work
+
+type ErrorTask (e : ErrorRow) =
+  | ErrorTask (Eff none d Int) : ErrorTask {Missing | d}
+
+run_error_task : ErrorTask {Missing} ->{; Missing} Int
+let run_error_task packed =
+  match packed with
+  | ErrorTask work -> await work
+
+type CanDrop (c : CaptureRow) =
+  | Drop : CanDrop none
+
+drop_capture : CanDrop c -> (Unit -> Int)^c -> Unit -> Int
+let drop_capture proof callback =
+  match proof with
+  | Drop -> callback
+
+type Share (c : CaptureRow) (d : CaptureRow) =
+  | Share : Share c c
+
+share_capture : Share c d -> (Unit -> Int)^c -> (Unit -> Int)^d
+let share_capture proof callback =
+  match proof with
+  | Share -> callback
+
+type Subtracted (r : ServiceRow) (s : ServiceRow) =
+  | Subtracted : Subtracted r {-Db | r}
+
+without_db : Subtracted r r -> Eff r none Int ->{-Db | r} Int
+let without_db proof work =
+  match proof with
+  | Subtracted -> await work
+
+service Store a =
+  get : Unit ->{} a
+
+type Both (r : ServiceRow) (s : ServiceRow) (t : ServiceRow) (u : ServiceRow) =
+  | Both : Both r {Store Int | r} t {Store String | t}
+
+left_instance : Both r r t t ->{r} Int
+let left_instance proof =
+  match proof with
+  | Both -> Store.get ()
+
+right_instance : Both r r t t ->{t} String
+let right_instance proof =
+  match proof with
+  | Both -> Store.get ()
+
+// Local handlers transform the requirements before the enclosing signature
+// is checked; the equations still belong only to the constructor branch.
+handled_error : ErrorTask {Missing} ->{} Int
+let handled_error packed =
+  try
+    match packed with
+    | ErrorTask work -> await work
+  with
+  | Missing -> -1
+
+provided_packed : Packed {Db} ->{} Int
+let provided_packed packed = provide (Layer.succeed Db { get = fun key -> key }) {
+  match packed with
+  | Packed work -> await work
+}
+
+type Saved (c : CaptureRow) = Saved ((Unit -> Int)^c)
+
+recover_saved : Saved c -> (Unit -> Int)^c
+let recover_saved packed =
+  match packed with
+  | Saved callback -> callback
+
+type Scoped (r : ServiceRow) =
+  | Scoped (Eff q none Unit) : Scoped {Scope s | q}
+
+scoped_residual : Unit ->{} Unit
+let scoped_residual () = scope s {
+  let packed : Scoped {Scope s} = Scoped (task { Scope.add_finalizer (task { () }) })
+  match packed with
+  | Scoped work -> await work
+}
+
+scoped_extra : Unit ->{Scope r} Unit
+let scoped_extra () = scope s {
+  let packed : Scoped {Scope s} = Scoped (task { Scope.add_finalizer (task { () }) })
+  match packed with
+  | Scoped work -> await work
+}
+
+scope_passthrough : Eff {Scope r} none Unit ->{Scope r} Unit
+let scope_passthrough work = scope s { await work }

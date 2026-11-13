@@ -85,6 +85,7 @@ impl Checker<'_> {
                 }
             }
             Type::Tuple(ts) | Type::Dict(_, ts) => ts.iter().for_each(|t| self.metas(t, out)),
+            Type::Caps(c) => caps(&c, out),
             Type::Errors(r) | Type::Impl(r) | Type::Tag(r) | Type::Env(r) => row(&r, out),
             Type::Forall(s) => self.metas(&s.body, out),
         }
@@ -147,9 +148,7 @@ impl Checker<'_> {
         let (a, b) = (self.follow(a), self.follow(b));
         match (&a, &b) {
             (Type::Var(Var::Meta(m)), Type::Var(Var::Meta(n))) if m == n => Ok(()),
-            (Type::Var(Var::Meta(m)), t) | (t, Type::Var(Var::Meta(m))) => {
-                self.bind(*m, Solved::Type(t.clone()), t)
-            }
+            (Type::Var(Var::Meta(m)), t) | (t, Type::Var(Var::Meta(m))) => self.unify_meta(*m, t),
             // `τ^C ≡ τ'^C'`: `τ ≡ τ'`, and both reach the same
             (Type::Captured(x, c), Type::Captured(y, d))
             | (Type::Bounded(x, c), Type::Bounded(y, d))
@@ -190,6 +189,7 @@ impl Checker<'_> {
                 self.unify_rows(e, e2)
             }
             (Type::Ref(x), Type::Ref(y)) => self.unify(x, y),
+            (Type::Caps(c), Type::Caps(d)) => self.unify_caps(c, d),
             (Type::Layer(i, e, o), Type::Layer(i2, e2, o2)) => {
                 self.unify_rows(i, i2)?;
                 self.unify_rows(e, e2)?;
@@ -214,7 +214,9 @@ impl Checker<'_> {
                 .zip(ys.iter())
                 .try_for_each(|(x, y)| self.unify(x, y)),
             // an arm of a GADT match learns what a rigid variable is
-            (Type::Var(Var::Named(n)), t) | (t, Type::Var(Var::Named(n))) if self.refining => {
+            (Type::Var(Var::Named(n)), t) | (t, Type::Var(Var::Named(n)))
+                if self.refining && !self.is_region(&Var::Named(n.clone())) =>
+            {
                 if self.mentions(&Var::Named(n.clone()), t) {
                     return self.mismatch(&a, &b);
                 }
@@ -236,6 +238,17 @@ impl Checker<'_> {
             }
             _ => self.mismatch(&a, &b),
         }
+    }
+
+    fn unify_meta(&mut self, m: u32, t: &Type) -> Check<()> {
+        // a^C against a constrains a's captures, not its type shape.
+        if let Type::Bounded(inner, bound) = t
+            && self.resolve(inner) == Type::Var(Var::Meta(m))
+        {
+            self.hold(&[Type::Var(Var::Meta(m))], &[], bound, "≡");
+            return Ok(());
+        }
+        self.bind(m, Solved::Type(t.clone()), t)
     }
 
     pub(super) fn unify_stages(&mut self, s: &Stage, t: &Stage) -> Check<()> {
@@ -262,9 +275,13 @@ impl Checker<'_> {
             if x.elems.is_empty()
                 && x.less.is_empty()
                 && let [Var::Meta(m)] = x.vars.iter().collect::<Vec<_>>()[..]
+                && !y.vars.contains(&Var::Meta(*m))
             {
                 return self.bind_row(*m, y.clone());
             }
+        }
+        if self.refining {
+            return self.refine_row(a, b);
         }
         self.within(&a, &b)?;
         self.within(&b, &a)
