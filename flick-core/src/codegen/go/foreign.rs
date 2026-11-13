@@ -16,9 +16,12 @@ use crate::source::Span;
 const TABLES: &[&str] = &[
     include_str!("bindings/runtime.txt"),
     include_str!("bindings/effect.txt"),
+    include_str!("bindings/effect_core.txt"),
     include_str!("bindings/http.txt"),
     include_str!("bindings/layer.txt"),
     include_str!("bindings/globals.txt"),
+    include_str!("bindings/rpc.txt"),
+    include_str!("bindings/platform.txt"),
 ];
 
 fn table() -> &'static HashMap<(String, String), String> {

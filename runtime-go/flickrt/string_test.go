@@ -1,6 +1,11 @@
 package flickrt
 
-import "testing"
+import (
+	"strconv"
+	"strings"
+	"sync"
+	"testing"
+)
 
 func TestStringsCountUTF16CodeUnits(t *testing.T) {
 	s := "a\U0001F30Db"
@@ -48,5 +53,56 @@ func TestStringsOrderByCodeUnits(t *testing.T) {
 	}
 	if CompareStrings("ab", "abc") >= 0 || CompareStrings("b", "abc") <= 0 || CompareStrings("x", "x") != 0 {
 		t.Error("prefixes and plain order")
+	}
+}
+
+// Strings made from one string, in turn or at once, keep their own bytes
+// while the buffer they share grows.
+func TestConcatGrowsWithoutAliasing(t *testing.T) {
+	// The second `++` makes a buffer with room to grow.
+	base := Concat(Concat(strings.Repeat("x", growFrom), "!"), "!").(string)
+	a := Concat(base, "a").(string)
+	b := Concat(base, "b").(string)
+	aa := Concat(a, "a").(string)
+	if base != strings.Repeat("x", growFrom)+"!!" || a != base+"a" || b != base+"b" || aa != a+"a" {
+		t.Fatalf("branches share bytes: %q %q %q", a[len(base):], b[len(base):], aa[len(base):])
+	}
+	high := Slice(int32(0), int32(1), "\U0001F30D").(string)
+	low := Slice(int32(1), int32(2), "\U0001F30D").(string)
+	if got := Concat(Concat(base, high), low+"!"); got != base+"\U0001F30D!" || Length(got) != int32(len(base)+3) {
+		t.Errorf("a pair split across a grown string: %q", got)
+	}
+	var wg sync.WaitGroup
+	results := make([]string, 16)
+	for i := range results {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s := base
+			for j := 0; j < 200; j++ {
+				s = Concat(s, strconv.Itoa(i)+";").(string)
+			}
+			results[i] = s
+		}()
+	}
+	wg.Wait()
+	for i, s := range results {
+		if s != base+strings.Repeat(strconv.Itoa(i)+";", 200) {
+			t.Errorf("goroutine %d built %q", i, s[len(base):])
+		}
+	}
+}
+
+// `acc ++ piece` costs the piece: compare ns/op at 2 000 and 20 000 pieces.
+func BenchmarkConcatAccumulates(b *testing.B) {
+	for _, n := range []int{2000, 20000} {
+		b.Run(strconv.Itoa(n), func(b *testing.B) {
+			for range b.N {
+				var acc Value = ""
+				for i := range n {
+					acc = Concat(acc, Concat(strconv.Itoa(i), ";"))
+				}
+			}
+		})
 	}
 }

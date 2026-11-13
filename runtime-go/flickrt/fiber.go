@@ -39,7 +39,9 @@ type fiberState struct {
 	by        atomic.Int64  // the fiber that asked for the interruption
 	signal    chan struct{} // closed when interruption is asked for
 	once      sync.Once
-	mask      int // depth of uninterruptible regions; only the fiber's goroutine touches it
+	mask      int           // depth of uninterruptible regions; only the fiber's goroutine touches it
+	clock     *TestClock    // the virtual clock that counts the fiber as running, if any
+	starting  chan struct{} // closed when the fiber first blocks, for a race that starts branches in turn
 }
 
 var fibers atomic.Int64
@@ -82,7 +84,8 @@ func Run(fb *Fiber, task Value) Value {
 // wait blocks until `ch` is closed, or fails with the fiber's interruption
 // when it is interruptible.
 func wait(fb *Fiber, ch <-chan struct{}) {
-	idle()
+	park(fb)
+	defer unpark(fb)
 	s := fb.state
 	if s.mask > 0 {
 		<-ch

@@ -44,11 +44,21 @@ func StdoutWrite(text Value) Value {
 	return Unit
 }
 
-// StderrLine writes a line to stderr, after what stdout holds so far.
-func StderrLine(text Value) Value {
+// StdoutFlush writes out what stdout holds.
+func StdoutFlush() {
 	outMu.Lock()
 	stdout.Flush()
-	os.Stderr.WriteString(wellFormed(text.(string)) + "\n")
+	outMu.Unlock()
+}
+
+// StderrLine writes a line to stderr, after what stdout holds so far.
+func StderrLine(text Value) Value { return StderrWrite(text.(string) + "\n") }
+
+// StderrWrite writes text to stderr, after what stdout holds so far.
+func StderrWrite(text Value) Value {
+	outMu.Lock()
+	stdout.Flush()
+	os.Stderr.WriteString(wellFormed(text.(string)))
 	outMu.Unlock()
 	return Unit
 }

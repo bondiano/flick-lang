@@ -19,6 +19,42 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/cause.go"),
     ),
     (
+        "cause_more.go",
+        include_str!("../../../../runtime-go/flickrt/cause_more.go"),
+    ),
+    (
+        "cli_prompt.go",
+        include_str!("../../../../runtime-go/flickrt/cli_prompt.go"),
+    ),
+    (
+        "cli_prompt_confirm.go",
+        include_str!("../../../../runtime-go/flickrt/cli_prompt_confirm.go"),
+    ),
+    (
+        "cli_prompt_date.go",
+        include_str!("../../../../runtime-go/flickrt/cli_prompt_date.go"),
+    ),
+    (
+        "cli_prompt_file.go",
+        include_str!("../../../../runtime-go/flickrt/cli_prompt_file.go"),
+    ),
+    (
+        "cli_prompt_render.go",
+        include_str!("../../../../runtime-go/flickrt/cli_prompt_render.go"),
+    ),
+    (
+        "cli_prompt_select.go",
+        include_str!("../../../../runtime-go/flickrt/cli_prompt_select.go"),
+    ),
+    (
+        "cli_prompt_text.go",
+        include_str!("../../../../runtime-go/flickrt/cli_prompt_text.go"),
+    ),
+    (
+        "clock.go",
+        include_str!("../../../../runtime-go/flickrt/clock.go"),
+    ),
+    (
         "codec.go",
         include_str!("../../../../runtime-go/flickrt/codec.go"),
     ),
@@ -43,12 +79,56 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/concurrency.go"),
     ),
     (
+        "config.go",
+        include_str!("../../../../runtime-go/flickrt/config.go"),
+    ),
+    (
+        "console.go",
+        include_str!("../../../../runtime-go/flickrt/console.go"),
+    ),
+    (
+        "console_table.go",
+        include_str!("../../../../runtime-go/flickrt/console_table.go"),
+    ),
+    (
         "context.go",
         include_str!("../../../../runtime-go/flickrt/context.go"),
     ),
     (
+        "cron.go",
+        include_str!("../../../../runtime-go/flickrt/cron.go"),
+    ),
+    (
+        "cron_step.go",
+        include_str!("../../../../runtime-go/flickrt/cron_step.go"),
+    ),
+    (
+        "crypto.go",
+        include_str!("../../../../runtime-go/flickrt/crypto.go"),
+    ),
+    (
         "data.go",
         include_str!("../../../../runtime-go/flickrt/data.go"),
+    ),
+    (
+        "datetime.go",
+        include_str!("../../../../runtime-go/flickrt/datetime.go"),
+    ),
+    (
+        "datetime_intl.go",
+        include_str!("../../../../runtime-go/flickrt/datetime_intl.go"),
+    ),
+    (
+        "datetime_json.go",
+        include_str!("../../../../runtime-go/flickrt/datetime_json.go"),
+    ),
+    (
+        "datetime_ops.go",
+        include_str!("../../../../runtime-go/flickrt/datetime_ops.go"),
+    ),
+    (
+        "datetime_parse.go",
+        include_str!("../../../../runtime-go/flickrt/datetime_parse.go"),
     ),
     (
         "decimal.go",
@@ -65,6 +145,14 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "eff.go",
         include_str!("../../../../runtime-go/flickrt/eff.go"),
+    ),
+    (
+        "effect_core.go",
+        include_str!("../../../../runtime-go/flickrt/effect_core.go"),
+    ),
+    (
+        "effect_errors.go",
+        include_str!("../../../../runtime-go/flickrt/effect_errors.go"),
     ),
     (
         "events.go",
@@ -97,6 +185,18 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "filesystem.go",
         include_str!("../../../../runtime-go/flickrt/filesystem.go"),
+    ),
+    (
+        "filesystem_file.go",
+        include_str!("../../../../runtime-go/flickrt/filesystem_file.go"),
+    ),
+    (
+        "filesystem_glob.go",
+        include_str!("../../../../runtime-go/flickrt/filesystem_glob.go"),
+    ),
+    (
+        "filesystem_ops.go",
+        include_str!("../../../../runtime-go/flickrt/filesystem_ops.go"),
     ),
     (
         "fnmods.go",
@@ -211,6 +311,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/http_trace.go"),
     ),
     (
+        "http_upgrade.go",
+        include_str!("../../../../runtime-go/flickrt/http_upgrade.go"),
+    ),
+    (
         "http_url.go",
         include_str!("../../../../runtime-go/flickrt/http_url.go"),
     ),
@@ -239,6 +343,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/httpapi_server.go"),
     ),
     (
+        "inspect.go",
+        include_str!("../../../../runtime-go/flickrt/inspect.go"),
+    ),
+    (
         "json.go",
         include_str!("../../../../runtime-go/flickrt/json.go"),
     ),
@@ -263,6 +371,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/logger.go"),
     ),
     (
+        "logger_format.go",
+        include_str!("../../../../runtime-go/flickrt/logger_format.go"),
+    ),
+    (
         "mime_types.go",
         include_str!("../../../../runtime-go/flickrt/mime_types.go"),
     ),
@@ -283,8 +395,24 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/owner.go"),
     ),
     (
+        "path.go",
+        include_str!("../../../../runtime-go/flickrt/path.go"),
+    ),
+    (
+        "path_service.go",
+        include_str!("../../../../runtime-go/flickrt/path_service.go"),
+    ),
+    (
         "platform.go",
         include_str!("../../../../runtime-go/flickrt/platform.go"),
+    ),
+    (
+        "queue.go",
+        include_str!("../../../../runtime-go/flickrt/queue.go"),
+    ),
+    (
+        "random.go",
+        include_str!("../../../../runtime-go/flickrt/random.go"),
     ),
     (
         "record.go",
@@ -299,8 +427,72 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/regexp.go"),
     ),
     (
+        "resource.go",
+        include_str!("../../../../runtime-go/flickrt/resource.go"),
+    ),
+    (
+        "rpc_binary.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_binary.go"),
+    ),
+    (
+        "rpc_binary_layout.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_binary_layout.go"),
+    ),
+    (
+        "rpc_binary_read.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_binary_read.go"),
+    ),
+    (
+        "rpc_binary_write.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_binary_write.go"),
+    ),
+    (
+        "rpc_client.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_client.go"),
+    ),
+    (
+        "rpc_functions.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_functions.go"),
+    ),
+    (
+        "rpc_http.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_http.go"),
+    ),
+    (
+        "rpc_jsonrpc.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_jsonrpc.go"),
+    ),
+    (
+        "rpc_local.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_local.go"),
+    ),
+    (
+        "rpc_model.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_model.go"),
+    ),
+    (
+        "rpc_server.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_server.go"),
+    ),
+    (
+        "rpc_socket.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_socket.go"),
+    ),
+    (
+        "rpc_websocket.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_websocket.go"),
+    ),
+    (
+        "rpc_wire.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_wire.go"),
+    ),
+    (
         "schedule.go",
         include_str!("../../../../runtime-go/flickrt/schedule.go"),
+    ),
+    (
+        "schedule_run.go",
+        include_str!("../../../../runtime-go/flickrt/schedule_run.go"),
     ),
     (
         "schema.go",
@@ -323,6 +515,26 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/service.go"),
     ),
     (
+        "stat_darwin.go",
+        include_str!("../../../../runtime-go/flickrt/stat_darwin.go"),
+    ),
+    (
+        "stat_linux.go",
+        include_str!("../../../../runtime-go/flickrt/stat_linux.go"),
+    ),
+    (
+        "stat_other.go",
+        include_str!("../../../../runtime-go/flickrt/stat_other.go"),
+    ),
+    (
+        "stat_unix.go",
+        include_str!("../../../../runtime-go/flickrt/stat_unix.go"),
+    ),
+    (
+        "stat_windows.go",
+        include_str!("../../../../runtime-go/flickrt/stat_windows.go"),
+    ),
+    (
         "stream.go",
         include_str!("../../../../runtime-go/flickrt/stream.go"),
     ),
@@ -339,6 +551,34 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/syncref.go"),
     ),
     (
+        "term_darwin.go",
+        include_str!("../../../../runtime-go/flickrt/term_darwin.go"),
+    ),
+    (
+        "term_linux.go",
+        include_str!("../../../../runtime-go/flickrt/term_linux.go"),
+    ),
+    (
+        "term_other.go",
+        include_str!("../../../../runtime-go/flickrt/term_other.go"),
+    ),
+    (
+        "term_unix.go",
+        include_str!("../../../../runtime-go/flickrt/term_unix.go"),
+    ),
+    (
+        "term_windows.go",
+        include_str!("../../../../runtime-go/flickrt/term_windows.go"),
+    ),
+    (
+        "terminal.go",
+        include_str!("../../../../runtime-go/flickrt/terminal.go"),
+    ),
+    (
+        "testclock.go",
+        include_str!("../../../../runtime-go/flickrt/testclock.go"),
+    ),
+    (
         "testing.go",
         include_str!("../../../../runtime-go/flickrt/testing.go"),
     ),
@@ -349,6 +589,30 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "tracer.go",
         include_str!("../../../../runtime-go/flickrt/tracer.go"),
+    ),
+    (
+        "tty_input.go",
+        include_str!("../../../../runtime-go/flickrt/tty_input.go"),
+    ),
+    (
+        "tty_keys.go",
+        include_str!("../../../../runtime-go/flickrt/tty_keys.go"),
+    ),
+    (
+        "tty_node.go",
+        include_str!("../../../../runtime-go/flickrt/tty_node.go"),
+    ),
+    (
+        "tty_raw_other.go",
+        include_str!("../../../../runtime-go/flickrt/tty_raw_other.go"),
+    ),
+    (
+        "tty_raw_unix.go",
+        include_str!("../../../../runtime-go/flickrt/tty_raw_unix.go"),
+    ),
+    (
+        "tty_raw_windows.go",
+        include_str!("../../../../runtime-go/flickrt/tty_raw_windows.go"),
     ),
     (
         "unicode.go",

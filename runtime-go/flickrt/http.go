@@ -28,14 +28,20 @@ var (
 	tcpAddressTag  = Tag("Http.Server.Address.TcpAddress")
 )
 
-// servedRequest is a request with the fiber its handler runs in.
+// servedRequest is a request with the fiber its handler runs in, whose
+// environment names the request (what `Server.call` reads its headers
+// from) in a node of its own, so serving it allocates no more.
 type servedRequest struct {
 	state   fiberState
 	fiber   Fiber
+	reqEnv  env
 	source  requestSource
 	marks   requestMarks
 	request ServerRequest
 }
+
+// servedRequestKey is the request a fiber serves, in its environment.
+const servedRequestKey = "effect/http/HttpServerRequest"
 
 func (q *servedRequest) interrupt() { q.state.interrupt(0) }
 
@@ -54,6 +60,7 @@ func HttpServe(fb *Fiber, options, handler Value) Value {
 	}
 	concurrent.Store(true)
 	serving := *fb
+	ups := newUpgrades()
 	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// one allocation for what a request's fiber needs
 		q := &servedRequest{fiber: serving}
@@ -61,6 +68,8 @@ func HttpServe(fb *Fiber, options, handler Value) Value {
 		q.request = ServerRequest{src: &q.source, method: r.Method, url: r.RequestURI, originalURL: r.RequestURI}
 		q.state.id, q.state.signal = fibers.Add(1), make(chan struct{})
 		q.fiber.state = &q.state
+		q.reqEnv = env{servedRequestKey, &q.request, serving.env}
+		q.fiber.env = &q.reqEnv
 		stop := context.AfterFunc(r.Context(), q.interrupt)
 		out, cause := catch(func() Value { return Run(&q.fiber, Apply(handler, &q.request)) })
 		if cause != nil {
@@ -77,7 +86,7 @@ func HttpServe(fb *Fiber, options, handler Value) Value {
 			}
 		}
 		// a streamed body runs in the request's fiber, which a client gone interrupts
-		aborted := writeResponse(w, out.(*ServerResponse), &q.fiber)
+		aborted := writeResponse(w, out.(*ServerResponse), &q.fiber, ups)
 		stop()
 		if aborted {
 			panic(http.ErrAbortHandler)
@@ -99,6 +108,7 @@ func HttpServe(fb *Fiber, options, handler Value) Value {
 			panic(Defect{err.Error()})
 		}
 		srv.Close()
+		ups.close()
 		return Unit
 	})
 	return &HttpServer{srv, listener}
@@ -123,7 +133,11 @@ func HttpServerLogAddress(fb *Fiber, server Value) Value {
 // writeResponse sends the response: its headers, a `Set-Cookie` header of
 // each cookie, and the body unless its status has none; whether a
 // streamed body failed after its headers went, which aborts the response.
-func writeResponse(w http.ResponseWriter, resp *ServerResponse, fb *Fiber) bool {
+func writeResponse(w http.ResponseWriter, resp *ServerResponse, fb *Fiber, ups *upgrades) bool {
+	if resp.upgrade != nil {
+		ups.take(w, resp.upgrade)
+		return false
+	}
 	h, b := w.Header(), resp.body
 	if resp.headers == nil {
 		if b.hasType && b.contentType != "" {

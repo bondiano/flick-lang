@@ -9,7 +9,7 @@ use crate::source::Span;
 use crate::types;
 
 /// The built-in modules of the js target only: the browser UI and its
-/// reactivity, the RPC and telemetry clients, JS interop and the JS hosts.
+/// reactivity, the telemetry client, JS interop and the JS hosts.
 const JS_ONLY: &[&str] = &[
     "Action",
     "Atom",
@@ -17,7 +17,6 @@ const JS_ONLY: &[&str] = &[
     "Js",
     "Otlp",
     "Reactivity.Atom",
-    "Rpc",
     "Runner.Browser",
     "Runner.Cloudflare",
     "Runner.Node",

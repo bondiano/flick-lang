@@ -22,30 +22,38 @@ func HashMapGet(k, m Value) Value {
 	return None
 }
 
-func HashMapSize(m Value) Value    { return int32(len(hmap(m).entries)) }
-func HashMapIsEmpty(m Value) Value { return len(hmap(m).entries) == 0 }
+func HashMapSize(m Value) Value    { return int32(hmap(m).size) }
+func HashMapIsEmpty(m Value) Value { return hmap(m).size == 0 }
 
 func HashMapToList(m Value) Value {
 	t := hmap(m)
-	out := make([]Value, len(t.entries))
-	for i, e := range t.entries {
-		out[i] = []Value{e.key, e.value}
+	out := make([]Value, 0, t.size)
+	for e := range t.all {
+		out = append(out, []Value{e.key, e.value})
 	}
 	return out
 }
 
+// fromEntries is `t` with the pairs of `entries`, later ones winning.
 func fromEntries(t *table, entries Value) *table {
+	out := *t
 	for _, kv := range List(entries) {
 		pair := kv.([]Value)
-		t = t.set(pair[0], pair[1], t.w.of(pair[0]), false)
+		out.add(&entry{pair[0], pair[1], out.w.of(pair[0])}, false)
 	}
-	return t
+	return &out
 }
 
-// HashMapUnion is `a` with the entries of `b`, which win.
-func HashMapUnion(a, b Value) Value {
-	return mapOf(fromEntries(hmap(a), HashMapToList(b)))
+// union is `t` with the entries of `that`, which win.
+func union(t, that *table) *table {
+	out := *t
+	for e := range that.all {
+		out.add(e, false)
+	}
+	return &out
 }
+
+func HashMapUnion(a, b Value) Value { return mapOf(union(hmap(a), hmap(b))) }
 
 func HashMapRehash(w, m Value) Value { return mapOf(fromEntries(empty(w), HashMapToList(m))) }
 func HashMapFromList(w, entries Value) Value {
@@ -75,18 +83,18 @@ func HashMapHasBy(f, m Value) Value { return HashMapSome(f, m) }
 
 func HashMapKeys(m Value) Value {
 	t := hmap(m)
-	out := make([]Value, len(t.entries))
-	for i, e := range t.entries {
-		out[i] = e.key
+	out := make([]Value, 0, t.size)
+	for e := range t.all {
+		out = append(out, e.key)
 	}
 	return out
 }
 
 func HashMapValues(m Value) Value {
 	t := hmap(m)
-	out := make([]Value, len(t.entries))
-	for i, e := range t.entries {
-		out[i] = e.value
+	out := make([]Value, 0, t.size)
+	for e := range t.all {
+		out = append(out, e.value)
 	}
 	return out
 }
@@ -137,46 +145,46 @@ func HashMapSetMany(entries, m Value) Value { return mapOf(fromEntries(hmap(m), 
 
 // mapped is `t` with each entry's value as `f` makes it, dropping those it
 // makes nothing of.
-func mapped(t *table, f func(e entry) (Value, bool)) *table {
-	out := &table{w: t.w, next: t.next}
-	for _, e := range t.entries {
+func mapped(t *table, f func(e *entry) (Value, bool)) *table {
+	out := &table{w: t.w}
+	for e := range t.all {
 		if v, ok := f(e); ok {
-			out.entries = append(out.entries, entry{e.key, v, e.hash, e.order})
+			out.add(&entry{e.key, v, e.hash}, false)
 		}
 	}
 	return out
 }
 
 func HashMapMap(f, m Value) Value {
-	return mapOf(mapped(hmap(m), func(e entry) (Value, bool) { return apply2(f, e.value, e.key), true }))
+	return mapOf(mapped(hmap(m), func(e *entry) (Value, bool) { return apply2(f, e.value, e.key), true }))
 }
 
 // HashMapFlatMap is the union of what `f` makes of each entry, in order.
 func HashMapFlatMap(f, m Value) Value {
 	t := hmap(m)
-	out := empty(t.w)
-	for _, e := range t.entries {
-		out = fromEntries(out, HashMapToList(apply2(f, e.value, e.key)))
+	out := &table{w: t.w}
+	for e := range t.all {
+		out = union(out, hmap(apply2(f, e.value, e.key)))
 	}
 	return mapOf(out)
 }
 
 func HashMapReduce(zero, f, m Value) Value {
 	acc := zero
-	for _, e := range hmap(m).entries {
+	for e := range hmap(m).all {
 		acc = Apply(apply2(f, acc, e.value), e.key)
 	}
 	return acc
 }
 
 func HashMapFilter(f, m Value) Value {
-	return mapOf(mapped(hmap(m), func(e entry) (Value, bool) {
+	return mapOf(mapped(hmap(m), func(e *entry) (Value, bool) {
 		return e.value, Bool(apply2(f, e.value, e.key))
 	}))
 }
 
 func HashMapCompact(m Value) Value {
-	return mapOf(mapped(hmap(m), func(e entry) (Value, bool) {
+	return mapOf(mapped(hmap(m), func(e *entry) (Value, bool) {
 		o := e.value.(*Data)
 		if o.Tag == "Some" {
 			return o.Fields[0], true
@@ -186,7 +194,7 @@ func HashMapCompact(m Value) Value {
 }
 
 func HashMapFilterMap(f, m Value) Value {
-	return mapOf(mapped(hmap(m), func(e entry) (Value, bool) {
+	return mapOf(mapped(hmap(m), func(e *entry) (Value, bool) {
 		r := apply2(f, e.value, e.key).(*Data)
 		if r.Tag == "Success" {
 			return r.Fields[0], true
@@ -196,7 +204,7 @@ func HashMapFilterMap(f, m Value) Value {
 }
 
 func HashMapFindFirst(f, m Value) Value {
-	for _, e := range hmap(m).entries {
+	for e := range hmap(m).all {
 		if Bool(apply2(f, e.value, e.key)) {
 			return Some([]Value{e.key, e.value})
 		}
@@ -205,7 +213,7 @@ func HashMapFindFirst(f, m Value) Value {
 }
 
 func HashMapSome(f, m Value) Value {
-	for _, e := range hmap(m).entries {
+	for e := range hmap(m).all {
 		if Bool(apply2(f, e.value, e.key)) {
 			return true
 		}
@@ -214,7 +222,7 @@ func HashMapSome(f, m Value) Value {
 }
 
 func HashMapEvery(f, m Value) Value {
-	for _, e := range hmap(m).entries {
+	for e := range hmap(m).all {
 		if !Bool(apply2(f, e.value, e.key)) {
 			return false
 		}

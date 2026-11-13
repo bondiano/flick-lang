@@ -1,0 +1,163 @@
+# The platform on the go target: the console, configuration, paths, the
+# terminal and standard streams, cryptography, the file system, loggers,
+# Effect's CLI and its prompts, and the streams of files and stdin.
+
+[@flick-lang/runtime/effect/Console]
+flickCurrent *ConsoleCurrent
+flickWithConsole *ConsoleWith
+flickToStderr ConsoleToStderr
+log *ConsoleLog
+info *ConsoleLog
+debug *ConsoleLog
+warn *ConsoleError
+error *ConsoleError
+trace *ConsoleTrace
+assert *ConsoleAssert
+flickClear *ConsoleClear
+count *ConsoleCount
+countReset *ConsoleCountReset
+dir *ConsoleDir
+dirxml *ConsoleDirxml
+flickTable *ConsoleTable
+flickGroup *ConsoleGroup
+flickWithGroup *ConsoleWithGroup
+time *ConsoleTime
+timeLog *ConsoleTimeLog
+withTime *ConsoleWithTime
+
+# Effect's CLI
+[@flick-lang/runtime/cli]
+multiSwitch CliMultiSwitch
+multiRequired CliMultiRequired
+multiDefault CliMultiDefault
+multiOptional CliMultiOptional
+multiMany CliMultiMany
+multiSome CliMultiSome
+multiAtLeast CliMultiAtLeast
+multiAtMost CliMultiAtMost
+multiBetween CliMultiBetween
+multiConfig CliMultiConfig
+multiPrompt CliMultiPrompt
+multiHidden CliMultiHidden
+multiMetavar CliMultiMetavar
+multiOptionalValue CliMultiOptionalValue
+multiFile CliMultiFile
+multiDirectory CliMultiDirectory
+multiPath CliMultiPath
+multiFileText CliMultiFileText
+multiFileParse CliMultiFileParse
+specCommand CliSpecCommand
+specDescription CliSpecDescription
+specShortDescription CliSpecShortDescription
+specAlias CliSpecAlias
+specUnlisted CliSpecUnlisted
+specExample CliSpecExample
+specAction CliSpecAction
+specFlag CliSpecFlag
+specArg CliSpecArg
+specSubcommand CliSpecSubcommand
+specHandle CliSpecHandle
+specGroup CliSpecGroup
+cliDefaultFormatter CliDefaultFormatter
+cliDisplayWidth CliDisplayWidth
+cliHelpDoc *CliHelpDoc
+cliCompletions *CliCompletions
+cliRunWith *CliRunWith
+cliRunVersion *CliRunVersion
+
+[@flick-lang/runtime/effect/LogLevel]
+values LogLevelValues
+getOrdinal LogLevelGetOrdinal
+isGreaterThan LogLevelIsGreaterThan
+isGreaterThanOrEqualTo LogLevelIsGreaterThanOrEqualTo
+isLessThan LogLevelIsLessThan
+isLessThanOrEqualTo LogLevelIsLessThanOrEqualTo
+isEnabled *LogLevelIsEnabled
+
+[@flick-lang/runtime/effect/Logger]
+flickMake LoggerMake
+map LoggerMap
+withConsoleLog LoggerWithConsoleLog
+withConsoleError LoggerWithConsoleError
+withLeveledConsole LoggerWithLeveledConsole
+defaultLogger LoggerDefault
+formatSimple LoggerFormatSimple
+formatLogFmt LoggerFormatLogFmt
+flickFormatStructured LoggerFormatStructured
+formatJson LoggerFormatJson
+flickConsolePretty LoggerConsolePretty
+flickConsolePrettyBrowser LoggerConsolePrettyBrowser
+flickConsolePrettyTty LoggerConsolePrettyTty
+consoleLogFmt LoggerConsoleLogFmt
+consoleStructured LoggerConsoleStructured
+consoleJson LoggerConsoleJson
+tracerLogger LoggerTracer
+flickLayer LoggerLayer
+flickBatched LoggerBatched
+flickToFile LoggerToFile
+flickWithLoggers *LoggerWithLoggers
+flickWithLogToStderr *LoggerWithLogToStderr
+flickLogWrite *LoggerWrite
+
+[@flick-lang/runtime/effect/FileSystem]
+flickNode FileSystemNode
+flickFileStat *FileSystemFileStat
+flickSeek *FileSystemSeek
+flickSync *FileSystemSync
+flickReadAlloc *FileSystemReadAlloc
+flickFileTruncate *FileSystemFileTruncate
+flickWrite *FileSystemWrite
+flickWriteAll *FileSystemWriteAll
+
+# Effect's CLI prompts
+[@flick-lang/runtime/cli]
+promptNode PromptNode
+promptRun *PromptRun
+promptRunThemed *PromptRunThemed
+promptDefaultTheme PromptDefaultTheme
+promptText PromptText
+promptPassword PromptPassword
+promptHidden PromptHidden
+promptList PromptList
+promptInt PromptInt
+promptNumber PromptNumber
+promptConfirm PromptConfirm
+promptToggle PromptToggle
+promptDate PromptDate
+promptFile PromptFile
+promptSelect PromptSelect
+promptAutoComplete PromptAutoComplete
+promptMultiSelect PromptMultiSelect
+promptCustom PromptCustom
+promptCustomEvents PromptCustomEvents
+promptAll PromptAll
+promptMap PromptMap
+promptFlatMap PromptFlatMap
+promptSucceed PromptSucceed
+
+[@flick-lang/runtime/effect/Queue]
+unbounded *QueueUnbounded
+offer *QueueOffer
+
+[@flick-lang/runtime/effect/Crypto]
+flickRandomBytes *CryptoRandomBytes
+flickDigest *CryptoDigest
+flickRandom *CryptoRandom
+flickRandomBoolean *CryptoRandomBoolean
+flickRandomInt *CryptoRandomInt
+flickRandomBetween *CryptoRandomBetween
+flickRandomIntBetween *CryptoRandomIntBetween
+flickRandomShuffle *CryptoRandomShuffle
+flickRandomUuidV4 *CryptoRandomUuidV4
+flickRandomUuidV7 *CryptoRandomUuidV7
+flickRandomUlid *CryptoRandomUlid
+
+[@flick-lang/runtime/effect/Path]
+flickLayer PathLayer
+flickNode PathNode
+
+[@flick-lang/runtime/effect/Terminal]
+flickNode TerminalNode
+
+[@flick-lang/runtime/effect/Stdio]
+flickNode StdioNode

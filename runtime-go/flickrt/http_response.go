@@ -1,6 +1,8 @@
 package flickrt
 
 import (
+	"bufio"
+	"net"
 	"strconv"
 	"strings"
 )
@@ -19,6 +21,8 @@ type ServerResponse struct {
 	cookies    *Record
 	body       *Body
 	own        Body // the body of a response made with one
+	// upgrade takes the connection over instead of a response: a WebSocket's
+	upgrade func(conn net.Conn, rw *bufio.ReadWriter, stopping <-chan struct{})
 }
 
 func responseOf(v Value) *ServerResponse { return v.(*ServerResponse) }

@@ -51,6 +51,11 @@ raceFirst *RaceFirst
 timeout *Timeout
 timeoutOption *TimeoutOption
 failurePrimary FailurePrimary
+failureRawCause FailureRawCause
+failureInspect *FailureInspect
+failureRethrow *FailureRethrow
+rawCauseInspect *RawCauseInspect
+describeReport DescribeReport
 acquireRelease *AcquireRelease
 bracket *Bracket
 layerSucceed LayerSucceed
@@ -250,5 +255,8 @@ genFunction GenFunction
 genMap GenMap
 testPure TestPure
 testEffect TestEffect
+testClock TestClockTest
+testAdjust *TestAdjust
+testSetTime *TestSetTime
 testProperty TestProperty
 testGroup TestGroup

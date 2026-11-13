@@ -2,7 +2,22 @@
 /// from a client entry, `target = "client"` in `flick.toml` (`FLICK-E009`).
 /// A `server fn` runs here and is called from anywhere over HTTP: its name
 /// is the call, `server name` its implementation, which `handler` serves.
-module Server exposing (..)
+module Server exposing
+  (
+    Server,
+    node,
+    Function,
+    Guarded,
+    Unauthorized(..),
+    authenticated,
+    Procedure,
+    path,
+    handler,
+    procedure,
+    call,
+    function,
+    guarded,
+  )
 
 import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
@@ -54,8 +69,24 @@ let path = "/_flick/fn"
 /// NDJSON, for a route at `path`. It holds region `s`: when the scope
 /// owning it closes, the calls it serves finish and run their finalizers.
 handler : forall s r. List (Function r) ->{Scope s | r;} (ServerRequest ->{} ServerResponse)^{s}
-foreign effect handler from "@flick-lang/runtime/effect/server/FunctionsNode" "serverHandler"
+let handler functions =
+  let mounted = mount functions
+  fun request -> serve mounted request
+
+/// The functions `handler` serves, mounted until the scope owning region
+/// `s` closes. A foreign gives it rather than the function, so the go
+/// target, whose foreign functions take every stage at once, mounts it
+/// when `handler` runs and not anew per request.
+type Mounted (s : Region)
+
+mount : forall s r. List (Function r) ->{Scope s | r;} Mounted s
+foreign effect mount from "@flick-lang/runtime/effect/server/FunctionsNode" "serverHandler"
   retention owner
+
+serve : forall s. Mounted s -> ServerRequest ->{} ServerResponse
+foreign effect serve from "@flick-lang/runtime/effect/server/FunctionsNode" "serverServe"
+  arity 2
+  retention call
 
 /// The procedure of the `server fn` named `name`, made by the compiler.
 procedure : String -> Schema p -> Schema s -> List (Schema e) -> Procedure

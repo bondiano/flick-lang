@@ -1,10 +1,8 @@
 package flickrt
 
 import (
-	"math/big"
 	"strconv"
 	"sync"
-	"time"
 )
 
 // Event listeners: a listener queues each event for a worker, a child of
@@ -33,14 +31,18 @@ func EventsListen(fb *Fiber, owner, policy, supervisor, handler Value) Value {
 	FiberSpawn(fb, owner, Fn(func(Value) Value { return Succeed(Unit) }), Eff(func(w *Fiber) Value {
 		defer close(l.done)
 		for {
+			var e Value
+			park(w)
 			select {
-			case e := <-l.events:
-				_, cause := catch(func() Value { return Run(w, Apply(handler, e)) })
-				if cause != nil && (cause.has(causeFail) || cause.has(causeDie)) {
-					l.fail(cause)
-				}
+			case e = <-l.events:
+				unpark(w)
 			case <-w.state.signal:
+				unpark(w)
 				return Unit
+			}
+			_, cause := catch(func() Value { return Run(w, Apply(handler, e)) })
+			if cause != nil && (cause.has(causeFail) || cause.has(causeDie)) {
+				l.fail(cause)
 			}
 		}
 	}))
@@ -91,7 +93,7 @@ func ErrorReporterLayer(reporters, options Value) Value {
 
 var severityInfo Value = "Info"
 
-func (r *errorReporter) report(c *Cause) {
+func (r *errorReporter) report(clock Clock, c *Cause) {
 	r.mu.Lock()
 	seen := r.reported[c]
 	r.reported[c] = true
@@ -112,7 +114,7 @@ func (r *errorReporter) report(c *Cause) {
 			"message", message,
 			"severity", severityInfo,
 			"attributes", []Value{},
-			"timestamp", big.NewInt(time.Now().UnixNano()),
+			"timestamp", clock.nanos(),
 		))
 	}
 }
@@ -120,7 +122,7 @@ func (r *errorReporter) report(c *Cause) {
 func ErrorReporterReport(fb *Fiber, failure Value) Value {
 	if rs, ok := fb.env.get(reportersKey); ok {
 		for _, r := range rs.([]Value) {
-			r.(*errorReporter).report(causeOfFailure(failure))
+			r.(*errorReporter).report(clockOf(fb), causeOfFailure(failure))
 		}
 	}
 	return Unit
