@@ -10,6 +10,7 @@ use crate::source::FileId;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
+mod contracts;
 mod methods;
 
 /// A name in a file: its UTF-8 byte range.

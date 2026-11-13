@@ -34,6 +34,13 @@ pub fn in_scope(root: &Node, offset: u32, text: &str) -> Vec<(String, (u32, u32)
         let (scope, child) = (pair[0], pair[1]);
         let before = |n: &&Node| n.range().1 <= child.range().0;
         match scope.kind {
+            K::ScopeExpr => {
+                if let Some(t) = scope.child_tokens().find(|t| t.kind == K::Ident)
+                    && t.end <= child.range().0
+                {
+                    out.push((t.text(text).to_owned(), (t.start, t.end)));
+                }
+            }
             K::Block => {
                 for statement in scope.nodes().filter(before) {
                     if matches!(statement.kind, K::LetDecl | K::BindStmt) {

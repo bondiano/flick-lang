@@ -4,7 +4,7 @@
 use std::{collections::HashSet, ptr};
 
 use super::{Ide, Occurrence, Symbol, tree};
-use crate::diagnostics::{Severity, codes::Area};
+use crate::diagnostics::Severity;
 use crate::iface::{Decl, Entity, Interface, Namespace};
 use crate::project::Analyzed;
 use crate::resolve::declarations;
@@ -157,12 +157,18 @@ impl Ide<'_> {
     pub(super) fn check_method_mapping(&self, e: &Entity, class: &str) -> Result<(), String> {
         // Failed resolution can omit uses entirely. In particular, an
         // ambiguous import must not turn a rename into a partial edit.
-        if self.analysis.diagnostics.iter().any(|d| {
-            d.severity == Severity::Error
-                && matches!(d.code.area, Area::Syntax | Area::Resolve | Area::Classes)
-        }) {
-            return Err("class method references are incomplete or ambiguous; fix syntax and name resolution first".into());
+        if self
+            .analysis
+            .diagnostics
+            .iter()
+            .any(|d| d.severity == Severity::Error)
+        {
+            return Err(
+                "class method references may be incomplete or ambiguous; fix analysis errors first"
+                    .into(),
+            );
         }
+        self.check_method_contracts(e)?;
         if self.analysis.modules.iter().any(|m| {
             m.tree.nodes().any(|n| {
                 n.kind == K::InstanceDecl && !m.typing.instances.iter().any(|i| i.span == n.range())
@@ -257,14 +263,21 @@ impl Ide<'_> {
                 if !matches!(r, Ref::Method { module, name } if module == &e.module && name == &e.name)
                     || self.method_module(m.file, range.0).is_none_or(|owner| owner.name != m.name)
                 { return None; }
-                let node = tree::find(&m.tree, *range)?;
-                (node.kind == K::NameExpr && !node.has_token(K::Dot)).then_some(*range)
+                let node = tree::find(&m.tree, *range).and_then(name_expr)?;
+                (!node.has_token(K::Dot)).then_some(*range)
             }).collect();
             // C(..) and (..) imports gain the new name even without a
             // written occurrence of the old one in this module.
             let imported = self.imports_value(m, &|entity| entity == e)
                 || self.inherited_value(m, &|entity| entity == e);
             let exports = m.interface.exports.iter().any(|export| export.entity == *e);
+            // An opening can gain the new name even when this module has
+            // never imported or called the old method unqualified.
+            if self.opening_captures(m, &calls, e, new_name) {
+                return Err(format!(
+                    "`{new_name}` would capture a reference in an opened module"
+                ));
+            }
             if m.name != e.module && calls.is_empty() && !imported && !exports {
                 continue;
             }
@@ -278,11 +291,6 @@ impl Ide<'_> {
                 {
                     return Err(format!("`{new_name}` would capture a method reference"));
                 }
-            }
-            if self.opening_captures(m, &calls, new_name) {
-                return Err(format!(
-                    "`{new_name}` would capture a method reference in an opened module"
-                ));
             }
         }
         Ok(())
@@ -360,21 +368,32 @@ impl Ide<'_> {
             .min_by_key(|m| m.tree.range().1 - m.tree.range().0)
     }
 
-    fn opening_captures(&self, m: &Analyzed, calls: &HashSet<(u32, u32)>, new_name: &str) -> bool {
+    fn opening_captures(
+        &self,
+        m: &Analyzed,
+        calls: &HashSet<(u32, u32)>,
+        e: &Entity,
+        new_name: &str,
+    ) -> bool {
         fn walk(
             node: &Node,
             text: &str,
             calls: &HashSet<(u32, u32)>,
-            shadowed: bool,
-            conflicts: &dyn Fn(&str) -> bool,
+            existing: &HashSet<(u32, u32)>,
+            shadowed: (bool, bool),
+            conflicts: &dyn Fn(&str) -> (bool, bool),
         ) -> bool {
-            if node.kind == K::NameExpr && calls.contains(&node.range()) && shadowed {
+            if node.kind == K::NameExpr
+                && !node.has_token(K::Dot)
+                && ((calls.contains(&node.range()) && shadowed.0)
+                    || (existing.contains(&node.range()) && shadowed.1))
+            {
                 return true;
             }
             let body = (node.kind == K::OpenExpr)
                 .then(|| node.nodes().filter(|n| n.kind != K::NameType).last())
                 .flatten();
-            let opening = body.is_some_and(|_| {
+            let opening = body.map_or((false, false), |_| {
                 let module = node
                     .child_tokens()
                     .filter(|t| t.kind == K::Con)
@@ -390,26 +409,54 @@ impl Ide<'_> {
                     child,
                     text,
                     calls,
-                    shadowed || (opening && body.is_some_and(|body| ptr::eq(body, child))),
+                    existing,
+                    if body.is_some_and(|body| ptr::eq(body, child)) {
+                        (shadowed.0 || opening.0, shadowed.1 || opening.1)
+                    } else {
+                        shadowed
+                    },
                     conflicts,
                 )
             })
         }
-        if calls.is_empty() {
+        let existing: HashSet<_> = m
+            .typing
+            .names
+            .iter()
+            .filter_map(|(range, r)| {
+                matches!(r, Ref::Value { name, .. } | Ref::Method { name, .. } if name == new_name)
+                    .then_some(*range)
+            })
+            .collect();
+        if calls.is_empty() && existing.is_empty() {
             return false;
         }
         let (root, text) = m
             .expansion
             .as_ref()
             .map_or((&m.tree, self.text(m.file)), |e| (&e.tree, e.text.as_str()));
-        walk(root, text, calls, false, &|module| {
-            self.opening_interface(m, module)
-                .is_none_or(|i| i.find(Namespace::Value, new_name).is_some())
+        walk(root, text, calls, &existing, (false, false), &|module| {
+            self.opening_interface(m, module).map_or((true, true), |i| {
+                (
+                    i.find(Namespace::Value, new_name).is_some(),
+                    i.exports.iter().any(|export| export.entity == *e),
+                )
+            })
         })
     }
 
-    fn opening_interface(&self, m: &Analyzed, path: &str) -> Option<&Interface> {
+    pub(super) fn opening_interface<'b>(
+        &'b self,
+        m: &'b Analyzed,
+        path: &str,
+    ) -> Option<&'b Interface> {
         let parts: Vec<_> = path.split('.').collect();
+        if let Some(local) = parts
+            .iter()
+            .try_fold(&m.interface, |i, part| i.modules.get(*part))
+        {
+            return Some(local);
+        }
         for count in (1..=parts.len()).rev() {
             let module = self.unalias(m, parts[..count].join("."));
             let Some(interface) = self.interface(&module) else {
@@ -424,6 +471,15 @@ impl Ide<'_> {
         }
         None
     }
+}
+
+fn name_expr(node: &Node) -> Option<&Node> {
+    if node.kind == K::NameExpr {
+        return Some(node);
+    }
+    node.nodes()
+        .filter(|child| child.range() == node.range())
+        .find_map(name_expr)
 }
 
 fn member_name(member: &Node) -> Option<Token> {

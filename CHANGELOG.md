@@ -10,9 +10,8 @@ break programs.
   its class, an instance or a call updates its signatures, defaults,
   implementations, imports and calls across dependent workspace members.
   Same-spelled methods of other classes, locals and record fields stay
-  unchanged. Ambiguous or incomplete name resolution, name collisions and
-  explicit dictionary or packed module fields without an exact mapping are
-  refused.
+  unchanged. Analysis errors, name collisions and explicit dictionary,
+  packed module or static contract fields without an exact mapping are refused.
 - **Plugins get the types a declaration writes:** a derive's
   `CaseTarget.fields`, `DeriveTarget.alias` and `DeriveTarget.wraps` are now
   `Written` types, the compiler's own parse at their spans: named types and
