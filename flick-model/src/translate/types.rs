@@ -179,7 +179,17 @@ fn add(t: &fc::Type, out: &mut Row) {
                 out.elems.insert(Path::parse(&label.to_string()), args);
             }
             if let Some(tail) = &r.tail {
-                add(tail, out);
+                // The explicitly named instance is the only one of that
+                // name in the row. Its tail cannot supply the same service
+                // or error at other arguments (E11); subtraction preserves
+                // this fact when the named instance is handled.
+                let gone = r
+                    .entries
+                    .iter()
+                    .filter(|(label, element)| label.is_instance(element))
+                    .map(|(label, _)| Path::parse(&label.to_string()))
+                    .collect();
+                out.add_less(&row(tail), &gone);
             }
         }
         fc::Type::Union(a, b) => {
