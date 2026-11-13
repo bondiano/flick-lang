@@ -8,7 +8,7 @@ use crate::project::Analyzed;
 use crate::resolve::declarations;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::{SyntaxKind as K, keyword};
-use crate::types::Ref;
+use crate::types::{OpClass, Ref};
 
 impl Ide<'_> {
     pub(super) fn check_method_name(&self, e: &Entity, new_name: &str) -> Result<(), String> {
@@ -19,6 +19,17 @@ impl Ide<'_> {
             return Ok(());
         }
         for m in &self.analysis.modules {
+            if m.typing.names.iter().any(|(range, r)| {
+                matches!(r, Ref::Method { module, name } if module == &e.module && name == &e.name)
+                    && m.typing
+                        .method_dispatch
+                        .get(range)
+                        .is_some_and(|names| names.iter().any(|name| name == new_name))
+            }) {
+                return Err(format!(
+                    "`{new_name}` would select a class constructor or service operation instead of the method"
+                ));
+            }
             // The containing file also retains child namespaces' names.
             // Only unqualified calls in this lexical module can be captured.
             let calls: HashSet<_> = m.typing.names.iter().filter_map(|(range, r)| {
@@ -50,6 +61,7 @@ impl Ide<'_> {
                 if super::super::locals::in_scope(&m.tree, *start, self.text(m.file))
                     .iter()
                     .any(|(name, _)| name == new_name)
+                    || (new_name == "resume" && control_resume_at(m, *start))
                 {
                     return Err(format!("`{new_name}` would capture a method reference"));
                 }
@@ -60,7 +72,8 @@ impl Ide<'_> {
 
     fn existing_method_name(&self, m: &Analyzed, name: &str) -> bool {
         declarations(&m.tree, self.text(m.file), m.file)
-            .iter()
+            .into_iter()
+            .chain(m.expansion.iter().flat_map(|e| e.declarations()))
             .any(|d| d.namespace == Namespace::Value && d.name == name)
             || self.in_scope(m).values.iter().any(|(n, _)| n == name)
             || m.interface
@@ -231,4 +244,18 @@ fn name_expr(node: &Node) -> Option<&Node> {
     node.nodes()
         .filter(|child| child.range() == node.range())
         .find_map(name_expr)
+}
+
+fn control_resume_at(m: &Analyzed, offset: u32) -> bool {
+    tree::path_to(&m.tree, offset).windows(2).any(|pair| {
+        let (arm, body) = (pair[0], pair[1]);
+        arm.kind == K::MatchArm
+            && body.kind == K::Block
+            && arm.nodes().any(|pattern| {
+                m.typing
+                    .handled
+                    .get(&pattern.range())
+                    .is_some_and(|(class, _, _)| *class == OpClass::Control)
+            })
+    })
 }

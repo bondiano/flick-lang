@@ -34,8 +34,16 @@ pub fn in_scope(root: &Node, offset: u32, text: &str) -> Vec<(String, (u32, u32)
         let (scope, child) = (pair[0], pair[1]);
         let before = |n: &&Node| n.range().1 <= child.range().0;
         match scope.kind {
-            K::ScopeExpr => {
-                if let Some(t) = scope.child_tokens().find(|t| t.kind == K::Ident)
+            K::ScopeExpr | K::UnpackExpr => {
+                let binder = if scope.kind == K::UnpackExpr {
+                    scope
+                        .child_tokens()
+                        .skip_while(|t| t.kind != K::Comma)
+                        .find(|t| t.kind == K::Ident)
+                } else {
+                    scope.child_tokens().find(|t| t.kind == K::Ident)
+                };
+                if let Some(t) = binder
                     && t.end <= child.range().0
                 {
                     out.push((t.text(text).to_owned(), (t.start, t.end)));
