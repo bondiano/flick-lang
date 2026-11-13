@@ -1,0 +1,79 @@
+// The numeric review keeps ordinary, checked and unsafe arithmetic distinct.
+// Expectations follow the language rules, including cleanup after a defect.
+module Language.NumericBoundaries exposing (tests)
+
+power : Int -> Int -> Int
+let power a b = a ** b
+
+big_power : BigInt -> BigInt -> BigInt
+let big_power a b = a ** b
+
+tests : List Test.Test
+let tests = [
+  Test.test "checked minimum divided by minus one overflows" (fun () ->
+    Test.equal
+      "Err (ArithmeticError \"Int.checked_div: 2147483648 does not fit in Int\")"
+      (show (Int.checked_div (-2147483648) (-1)))
+  ),
+  Test.test "checked minimum remainder is representable" (fun () ->
+    Test.equal "Ok 0" (show (Int.checked_rem (-2147483648) (-1)))
+  ),
+  Test.test "checked subtraction below minimum overflows" (fun () ->
+    Test.equal
+      "Err (ArithmeticError \"Int.checked_sub: -2147483649 does not fit in Int\")"
+      (show (Int.checked_sub (-2147483648) 1))
+  ),
+  Test.test "checked remainder by zero is an error" (fun () ->
+    Test.equal
+      "Err (ArithmeticError \"Int.checked_rem: division by zero\")"
+      (show (Int.checked_rem 7 0))
+  ),
+  Test.test "unsafe division still wraps a nonzero overflow" (fun () ->
+    Test.equal (-2147483648) (Int.unsafe_div (-2147483648) (-1))
+  ),
+  Test.test "negative integer powers truncate" (fun () ->
+    Test.equal [-1, 1, 1, 0, 0] [
+      power (-1) (-3),
+      power (-1) (-4),
+      power 1 (-3),
+      power 0 (-1),
+      power 2 (-1),
+    ]
+  ),
+  Test.test "Int conversion rejects nonfinite numbers" (fun () ->
+    Test.equal [None, None, None] (List.map Int.from_float [0.0 / 0.0, 1.0 / 0.0, -1.0 / 0.0])
+  ),
+  Test.test "Int truncation maps nonfinite numbers to zero" (fun () ->
+    Test.equal [0, 0, 0] (List.map Int.truncate [0.0 / 0.0, 1.0 / 0.0, -1.0 / 0.0])
+  ),
+  Test.test "BigInt conversion rejects nonfinite numbers" (fun () ->
+    Test.equal [None, None, None] (List.map BigInt.from_number [0.0 / 0.0, 1.0 / 0.0, -1.0 / 0.0])
+  ),
+  Test.test "checked BigInt remainder by zero is an error" (fun () ->
+    Test.equal "Err (ArithmeticError \"division by zero\")" (show (BigInt.remainder (-7n) 0n))
+  ),
+  Test.effect_test
+    "unsafe division runs its finalizer before reporting a defect"
+    (task {
+      let closed = Ref.make false
+      let outcome =
+        Effect.exit
+          (task {
+            Effect.ensuring
+              (task { Ref.set closed true })
+              (task { Int.unsafe_div 7 (List.length []) })
+          })
+      let defect = Exit.match_ (fun _ -> false) Cause.has_dies outcome
+      Test.expect (Test.equal (true, true) (defect, Ref.get closed))
+    }),
+  Test.effect_test
+    "a negative BigInt exponent runs cleanup before reporting a defect"
+    (task {
+      let closed = Ref.make false
+      let outcome =
+        Effect.exit
+          (task { Effect.ensuring (task { Ref.set closed true }) (task { big_power 2n (-1n) }) })
+      let defect = Exit.match_ (fun _ -> false) Cause.has_dies outcome
+      Test.expect (Test.equal (true, true) (defect, Ref.get closed))
+    }),
+]
