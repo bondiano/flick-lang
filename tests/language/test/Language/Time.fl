@@ -49,7 +49,7 @@ let outputs schedule =
   let traced =
     Schedule.tap (fun m -> Ref.update seen (fun xs -> xs ++ [Duration.format m.output])) schedule
   let quick = Schedule.modify_delay (fun _ -> Duration.zero) traced
-  let _ = Effect.repeat (Schedule.up_to { duration = None; times = Some 3 } quick) (task { 0 })
+  let _ = Effect.repeat (Schedule.up_to { duration = None; times = Some 5 } quick) (task { 0 })
   Ref.get seen
 
 draws : Unit ->{} (Float, Int, List Int, String)
@@ -124,7 +124,7 @@ let tests =
             let fibonacci = outputs (Schedule.fibonacci (ms 10))
             Test.expect
               (Test.equal
-                (["10ms", "20ms", "40ms", "80ms"], ["10ms", "20ms", "30ms", "50ms"])
+                (["10ms", "20ms", "40ms", "80ms", "160ms", "320ms"], ["10ms", "10ms", "20ms", "30ms", "50ms", "80ms"])
                 (exponential, fibonacci))
           }),
       ],

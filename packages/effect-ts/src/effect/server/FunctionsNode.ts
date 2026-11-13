@@ -64,7 +64,3 @@ export const serverHandler = (functions: ReadonlyArray<ServerFunction>) => {
   const handlers = Object.fromEntries(functions.map((f) => [f.procedure.name, f.run]));
   return Effect.flatMap(inProcess(group, handlers), () => rpcHandler(rpcNdjson, group, handlers));
 };
-
-
-/** Applies a mounted handler to one request without remounting its group. */
-export const serverServe = <A, B>(handler: (request: A) => B, request: A): B => handler(request);

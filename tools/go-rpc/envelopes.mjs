@@ -48,13 +48,31 @@ writeFileSync(new URL("../../runtime-go/flickrt/testdata/rpc_binary.json", impor
 
 // Use the actual Flick adapter witnesses: its custom int32 filter is not
 // Effect's built-in isInt32 check, so their string-tree layouts differ.
-const { schemaInt, schemaNumber } = await import("../../packages/effect-ts/dist/schema/schemas.js");
-for (const schema of [schemaInt, schemaNumber]) {
+const { schemaInt, schemaNumber, schemaString, schemaResult } = await import("../../packages/effect-ts/dist/schema/schemas.js");
+for (const schema of [tree(schemaInt), tree(schemaNumber), Source.schemaJsonCodec(schemaResult(schemaString, schemaNumber))]) {
   try {
-    Binary.encoder(Schema.toEncoded(tree(schema)));
+    Binary.encoder(Schema.toEncoded(schema));
   } catch (error) {
     if (error.message.includes("union members are not uniquely identifiable")) continue;
     throw error;
   }
-  throw new Error("expected Flick numeric string-tree binary layout to be rejected");
+  throw new Error("expected ambiguous Flick binary layout to be rejected");
 }
+
+// The pinned serializer's error/reset and request-flag behavior is part of
+// the transport contract as well as its binary layout.
+const Serialization = await import("../../packages/effect-ts/node_modules/effect/dist/rpc/RpcSerialization.js");
+const ndjson = Serialization.makeNdjson().makeUnsafe();
+let malformedRejected = false;
+try { ndjson.decode("broken\n"); } catch (error) {
+  if (error._tag !== "NdjsonDecodeError" || error.cause.name !== "SyntaxError") throw error;
+  malformedRejected = true;
+}
+if (!malformedRejected || ndjson.decode('{"_tag":"Pong"}\n')[0]?._tag !== "Pong") throw new Error("NDJSON must reject malformed frames and reset");
+if (Serialization.makeNdjson({ maxBufferSize: 6 }).makeUnsafe().decode('"ééé"\n')[0] !== "ééé") throw new Error("NDJSON limit must count UTF-16 units");
+if (Serialization.makeNdjson().contentType !== "application/x-ndjson") throw new Error("NDJSON content type changed");
+const Effect = await import("../../packages/effect-ts/node_modules/effect/dist/Effect.js");
+const jsonrpc = Effect.runSync(Effect.provide(Effect.service(Serialization.RpcSerialization), Serialization.layerJsonRpc())).makeUnsafe();
+const discarded = { _tag: "Request", id: "7", tag: "work", payload: { a: 1 }, headers: [], discard: true };
+const discardedWire = '{"jsonrpc":"2.0","method":"work","params":{"a":1},"id":"7","discard":true}';
+if (jsonrpc.encode(discarded) !== discardedWire || jsonrpc.decode(discardedWire)[0]?.discard !== true) throw new Error("JSON-RPC must preserve discard");

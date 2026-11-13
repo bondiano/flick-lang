@@ -29,7 +29,7 @@ type rpcParser interface {
 func serializationOf(v Value) *rpcSerialization { return v.(*rpcSerialization) }
 
 var (
-	RpcNdjson  Value = &rpcSerialization{"application/ndjson", true, false, func() rpcParser { return &ndjsonParser{} }}
+	RpcNdjson  Value = &rpcSerialization{"application/x-ndjson", true, false, func() rpcParser { return &ndjsonParser{} }}
 	RpcJson    Value = &rpcSerialization{"application/json", false, false, func() rpcParser { return jsonDocParser{} }}
 	RpcJsonRpc Value = &rpcSerialization{"application/json", false, false, func() rpcParser {
 		return &jsonRpcParser{batches: map[string]*jsonRpcBatch{}}
@@ -52,8 +52,12 @@ type jsSyntaxError struct{ message string }
 
 func (e *jsSyntaxError) Error() string { return "SyntaxError: " + e.message }
 
-// ndjsonParser is a JSON message a line; a line that is no JSON is
-// skipped, as Effect skips it.
+type ndjsonDecodeError struct{ cause *jsSyntaxError }
+
+func (*ndjsonDecodeError) Error() string { return "NdjsonDecodeError" }
+
+// ndjsonParser reads one JSON value per nonempty line. Malformed frames
+// fail and reset buffering, as the pinned Effect serializer does.
 type ndjsonParser struct {
 	text   textDecoder
 	buffer string
@@ -67,16 +71,22 @@ func (p *ndjsonParser) decode(data []byte) ([]Value, error) {
 		if nl < 0 {
 			break
 		}
-		if nl > rpcMaxBuffer {
+		if Length(p.buffer[:nl]).(int32) > rpcMaxBuffer {
 			p.buffer = ""
 			return nil, errMaxBuffer
 		}
-		if v, reason := parseJSON(p.buffer[:nl]); reason == "" {
+		line := strings.TrimSuffix(p.buffer[:nl], "\r")
+		if line != "" {
+			v, reason := parseJSON(line)
+			if reason != "" {
+				p.buffer = ""
+				return nil, &ndjsonDecodeError{&jsSyntaxError{reason}}
+			}
 			out = append(out, v)
 		}
 		p.buffer = p.buffer[nl+1:]
 	}
-	if len(p.buffer) > rpcMaxBuffer {
+	if Length(p.buffer).(int32) > rpcMaxBuffer {
 		p.buffer = ""
 		return nil, errMaxBuffer
 	}
@@ -216,6 +226,13 @@ func wireDefectText(tree Value) string {
 
 // errorDefect is what a thrown error of a parser is as a defect.
 func errorDefect(err error) Value {
+	var ndjson *ndjsonDecodeError
+	if errors.As(err, &ndjson) {
+		return Rec("name", "NdjsonDecodeError", "message", "", "cause", errorDefect(ndjson.cause))
+	}
+	if errors.Is(err, errMaxBuffer) {
+		return Rec("name", "MaxBufferSizeExceeded", "message", err.Error())
+	}
 	var syntax *jsSyntaxError
 	if errors.As(err, &syntax) {
 		return Rec("name", "SyntaxError", "message", syntax.message)

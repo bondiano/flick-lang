@@ -165,7 +165,9 @@ func (c *rpcSocketClient) readLoop(sock rpcSocket, parser *lockedParser) {
 			}
 			id := msgField(m, "requestId")
 			if id == nil {
-				c.broadcast(m)
+				if tag := msgTag(m); tag == "Defect" || tag == "ClientProtocolError" {
+					c.broadcast(m)
+				}
 				continue
 			}
 			key := idKey(id)
@@ -176,7 +178,8 @@ func (c *rpcSocketClient) readLoop(sock rpcSocket, parser *lockedParser) {
 			}
 			c.mu.Unlock()
 			if f == nil {
-				c.broadcast(m)
+				// A canceled call may still have replies in flight. They belong
+				// only to its request id, never to unrelated active calls.
 				continue
 			}
 			if f.deliver(m) && msgTag(m) == "Chunk" {

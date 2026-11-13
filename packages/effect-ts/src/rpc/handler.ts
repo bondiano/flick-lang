@@ -37,6 +37,3 @@ export const rpcHandler = handlerOf("http");
 
 /** `Rpc.handler_websocket serialization group handlers`: a WebSocket per client, for a `GET` route. */
 export const rpcHandlerWebsocket = handlerOf("websocket");
-
-/** Applies a mounted handler without rebuilding its group or captured context. */
-export const rpcServe = <A, B>(handler: (request: A) => B, request: A): B => handler(request);

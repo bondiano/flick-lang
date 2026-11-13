@@ -2,7 +2,7 @@
 /// from a client entry, `target = "client"` in `flick.toml` (`FLICK-E009`).
 /// A `server fn` runs here and is called from anywhere over HTTP: its name
 /// is the call, `server name` its implementation, which `handler` serves.
-module Server exposing (Server, node, Function, Guarded, Unauthorized(..), authenticated, path, handler)
+module Server exposing (..)
 
 import Http.Headers
 import Http.ServerRequest exposing (ServerRequest)
@@ -57,17 +57,5 @@ let path = "/_flick/fn"
 /// NDJSON, for a route at `path`. It holds region `s`: when the scope
 /// owning it closes, the calls it serves finish and run their finalizers.
 handler : List (Function r) ->{Scope s | r} (ServerRequest ->{Async} ServerResponse)^{s}
-let handler functions =
-  let mounted = mount functions
-  fun request -> serve mounted request
-
-type Mounted (s : Region)
-
-mount : List (Function r) ->{Scope s | r} Mounted s
-foreign effect mount from "flick:server/FunctionsNode" "serverHandler"
+foreign effect handler from "flick:server/FunctionsNode" "serverHandler"
   retention owner
-
-serve : Mounted s -> ServerRequest ->{Async} ServerResponse
-foreign effect serve from "flick:server/FunctionsNode" "serverServe"
-  arity 2
-  retention call

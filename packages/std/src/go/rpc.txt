@@ -39,9 +39,8 @@ rpcListen *RpcListen
 rpcListenWebsocket *RpcListenWebsocket
 rpcListenTcp *RpcListenTcp
 rpcPort RpcPort
-rpcHandler *RpcHandler
-rpcHandlerWebsocket *RpcHandlerWebsocket
-rpcServe *ServerServe
+rpcHandler *RpcHandler@3
+rpcHandlerWebsocket *RpcHandlerWebsocket@3
 
 [flick:server/Functions]
 serverAuthenticated *ServerAuthenticated
@@ -52,5 +51,4 @@ serverNoErrors ServerNoErrors
 serverError ServerError
 
 [flick:server/FunctionsNode]
-serverHandler *ServerHandler
-serverServe *ServerServe
+serverHandler *ServerHandler@1

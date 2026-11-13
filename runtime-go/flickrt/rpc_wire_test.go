@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"net"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -51,7 +52,7 @@ func TestJsonRpcFailureAndDefect(t *testing.T) {
 }
 
 func TestNdjsonSplitAcrossReads(t *testing.T) {
-	text := `{"_tag":"Chunk","requestId":5,"values":[1,"é"]}` + "\nnot json\n" + `{"_tag":"Pong"}` + "\n"
+	text := `{"_tag":"Chunk","requestId":5,"values":[1,"é"]}` + "\n\r\n" + `{"_tag":"Pong"}` + "\n"
 	for size := 1; size <= len(text); size++ {
 		p := serializationOf(RpcNdjson).parser()
 		var got []Value
@@ -68,9 +69,13 @@ func TestNdjsonSplitAcrossReads(t *testing.T) {
 // ping between its fragments answered.
 func TestWebsocketFrames(t *testing.T) {
 	a, b := net.Pipe()
+	var helpers sync.WaitGroup
+	helpers.Add(2)
+	defer func() { a.Close(); b.Close(); helpers.Wait() }()
 	client := &wsConn{conn: a, r: bufio.NewReader(a), client: true}
 	server := &wsConn{conn: b, r: bufio.NewReader(b)}
 	go func() {
+		defer helpers.Done()
 		client.writeFrame(1, []byte(strings.Repeat("x", 200)))
 		client.writeFrame(9, []byte("hi"))
 		// a fragmented message: text, then its continuation
@@ -81,6 +86,7 @@ func TestWebsocketFrames(t *testing.T) {
 		client.wmu.Unlock()
 	}()
 	go func() {
+		defer helpers.Done()
 		// the pong of the ping
 		client.read()
 	}()

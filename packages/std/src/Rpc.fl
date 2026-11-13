@@ -4,66 +4,7 @@
 /// handler per procedure and a missing or extra one is a type error naming
 /// the procedure. `call` and `call_stream` call a procedure from the same
 /// value. The module is experimental.
-module Rpc exposing
-  (
-    Rpc,
-    ErrorCases,
-    Group,
-    Server,
-    Serialization,
-    ndjson,
-    json,
-    json_rpc,
-    ndjson_rpc,
-    binary,
-    ServeOptions,
-    defaults,
-    Transport,
-    http,
-    websocket,
-    tcp,
-    CallOptions,
-    call_defaults,
-    ServeError(..),
-    ClientError(..),
-    make,
-    with_payload,
-    with_success,
-    with_stream,
-    errors,
-    error_case,
-    with_errors,
-    Call,
-    with_middleware,
-    with_auth,
-    uninterruptible,
-    group,
-    authenticated,
-    add,
-    listen,
-    listen_websocket,
-    listen_tcp,
-    port,
-    handler,
-    handler_websocket,
-    call_with,
-    call,
-    call_stream_with,
-    call_stream,
-    Client,
-    connect,
-    call_on,
-    call_stream_on,
-    serve_stdio,
-    spawn,
-    serve_worker,
-    worker,
-    serve_node_worker,
-    node_worker,
-    with_headers,
-    call_local,
-    call_stream_local,
-  )
+module Rpc exposing (..)
 
 import Fiber
 import Http.Headers
@@ -291,36 +232,22 @@ foreign pure port from "flick:rpc/RpcNode" "rpcPort"
 /// "/rpc" (fun request -> rpc request)`. It holds region `s`: when the scope
 /// owning it closes, the calls it serves finish and run their finalizers.
 handler :
-  (Detached r, Fiber.Provided r s, Fiber.Outlives c s) =>
+  Fiber.Provided r s =>
   Serialization ->
   Group r hs ->
   (hs^c ->{Scope s | r} (ServerRequest ->{Async} ServerResponse)^{s})^c
-let handler serialization group handlers =
-  let mounted = mount_handler serialization group handlers
-  fun request -> serve_mounted mounted request
-
-mount_handler :
-  (Detached r, Fiber.Provided r s, Fiber.Outlives c s) =>
-  Serialization -> Group r hs -> (hs^c ->{Scope s | r} (Mounted s)^c)^c
-foreign effect mount_handler from "flick:rpc/RpcNode" "rpcHandler"
+foreign effect handler from "flick:rpc/RpcNode" "rpcHandler"
   arity 3
   retention owner
 
 /// As `handler`, each client a WebSocket whose messages carry its calls,
 /// for a `GET` route.
 handler_websocket :
-  (Detached r, Fiber.Provided r s, Fiber.Outlives c s) =>
+  Fiber.Provided r s =>
   Serialization ->
   Group r hs ->
   (hs^c ->{Scope s | r} (ServerRequest ->{Async} ServerResponse)^{s})^c
-let handler_websocket serialization group handlers =
-  let mounted = mount_handler_websocket serialization group handlers
-  fun request -> serve_mounted mounted request
-
-mount_handler_websocket :
-  (Detached r, Fiber.Provided r s, Fiber.Outlives c s) =>
-  Serialization -> Group r hs -> (hs^c ->{Scope s | r} (Mounted s)^c)^c
-foreign effect mount_handler_websocket from "flick:rpc/RpcNode" "rpcHandlerWebsocket"
+foreign effect handler_websocket from "flick:rpc/RpcNode" "rpcHandlerWebsocket"
   arity 3
   retention owner
 
@@ -443,11 +370,3 @@ call_stream_local :
 foreign pure call_stream_local from "flick:rpc/Rpc" "rpcCallStreamLocal"
   arity 4
   retention owner
-
-// Internal staging keeps mounting in the handler's lexical scope on every target.
-type Mounted (s : Region)
-
-serve_mounted : (Mounted s)^c -> (ServerRequest ->{Async} ServerResponse)^c
-foreign effect serve_mounted from "flick:rpc/RpcNode" "rpcServe"
-  arity 2
-  retention call

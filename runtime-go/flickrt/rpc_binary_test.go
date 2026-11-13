@@ -236,16 +236,14 @@ func TestBinParserError(t *testing.T) {
 	}
 }
 
-// A Result has no Effect layout; a Go peer still reads what it writes.
-func TestBinResultGoToGo(t *testing.T) {
+// The actual Effect schema for Result is an untagged union of two structs.
+// It has no uniquely identifiable binary layout: a Go-only JSON fallback
+// would emit bytes that an Effect peer cannot decode.
+func TestBinResultRejectsAmbiguousLayout(t *testing.T) {
 	n := binCodecLayout(codecOf(SchemaJsonCodec(SchemaResult(SchemaString, SchemaNumber))))
 	for _, text := range []string{`{"ok":1.5}`, `{"err":"no"}`} {
-		b, err := binEncode(n, binTree(t, text))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if back, err := binDecode(n, b); err != nil || JsonStringify(back) != text {
-			t.Errorf("%s: got %v, %v", text, back, err)
+		if _, err := binEncode(n, binTree(t, text)); err == nil || !strings.Contains(err.Error(), "union members are not uniquely identifiable") {
+			t.Fatalf("%s: expected Effect's ambiguous-layout rejection, got %v", text, err)
 		}
 	}
 }

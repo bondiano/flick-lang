@@ -6,5 +6,5 @@ flipped : PureCodec Json Json
 let flipped =
   Codec.flip (Codec.json_string (Codec.json (Codec.wire_schema (Codec.entries String.json))))
 
-procedure : Rpc.Rpc "shaped" (Json ->{r} Unit)
-let procedure = Rpc.make (Record.label : Record.Label "shaped") |> Rpc.with_payload flipped
+procedure : Rpc.Rpc "shaped" (Unit ->{r} Unit) -> Rpc.Rpc "shaped" (Json ->{r} Unit)
+let procedure source = Rpc.with_payload flipped source

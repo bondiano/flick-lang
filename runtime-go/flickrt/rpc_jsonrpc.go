@@ -97,6 +97,9 @@ func decodeJsonRpcMessage(r *Record) Value {
 		if recordField(r, "id") == nil {
 			out.put("isNotification", true)
 		}
+		if recordField(r, "discard") == true {
+			out.put("discard", true)
+		}
 		if truthy(recordField(r, "spanId")) {
 			out.put("traceId", recordField(r, "traceId"))
 			out.put("spanId", recordField(r, "spanId"))
@@ -215,6 +218,9 @@ func encodeJsonRpcMessage(m Value) Value {
 		}
 		if hs, _ := msgField(m, "headers").([]Value); len(hs) > 0 {
 			out.put("headers", hs)
+		}
+		if msgField(m, "discard") == true {
+			out.put("discard", true)
 		}
 		for _, k := range []string{"traceId", "spanId", "sampled"} {
 			if v := msgField(m, k); v != nil {

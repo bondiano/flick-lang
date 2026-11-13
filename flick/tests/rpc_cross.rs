@@ -166,7 +166,18 @@ fn a_server_of_one_target_answers_a_client_of_the_other() {
             EXPECTED,
             "{serving} server, {calling} client: {out:?}"
         );
-        answers.push(cors_answers(&running));
+        let cors = cors_answers(&running);
+        // RPC does not install CORS middleware: a foreign origin receives
+        // no permission headers, and an OPTIONS request has no route.
+        assert_eq!(
+            cors,
+            vec![
+                ("HTTP/1.1 404 Not Found".to_owned(), Vec::<String>::new()),
+                ("HTTP/1.1 200 OK".to_owned(), Vec::<String>::new()),
+            ],
+            "{serving} RPC must not add automatic CORS permissions"
+        );
+        answers.push(cors);
     }
     assert_eq!(
         answers[0], answers[1],
