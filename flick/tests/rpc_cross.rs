@@ -184,3 +184,65 @@ fn a_server_of_one_target_answers_a_client_of_the_other() {
         "CORS answers of the js and go servers"
     );
 }
+
+/// Lexical service capture is a host-RPC contract, outside the pure model.
+/// The same handler must retain its mounted service across repeated HTTP
+/// and WebSocket calls even while the server provides another service.
+#[test]
+#[ignore = "needs Go and Node"]
+fn mounted_services_are_captured_on_every_target_and_profile() {
+    let dir = project(
+        "rpc_captured_services",
+        &[
+            ("flick.toml", APP),
+            (
+                "package.json",
+                r#"{"type":"module","dependencies":{"@flick-lang/effect-ts":"*"}}"#,
+            ),
+            ("src/App/Main.fl", include_str!("rpc_cross/Captured.fl")),
+        ],
+    );
+    for emit in ["js", "ts", "go"] {
+        for profile in ["debug", "release"] {
+            let out_dir = format!("dist-{emit}-{profile}");
+            let built = flick_in(
+                &dir,
+                &[
+                    "build",
+                    "--emit",
+                    emit,
+                    "--profile",
+                    profile,
+                    "--out-dir",
+                    &out_dir,
+                ],
+            );
+            assert!(
+                built.status.success(),
+                "capture build {emit}/{profile}: {built:?}"
+            );
+            let output = dir.join(out_dir);
+            let mut run = if emit == "go" {
+                Command::new(output.join(executable("main")))
+            } else {
+                let mut node = Command::new("node");
+                node.arg(output.join(runner_path(emit == "ts")));
+                node
+            };
+            let result = run.output().expect("capture program runs");
+            assert!(
+                result.status.success(),
+                "capture run {emit}/{profile}: {result:?}"
+            );
+            assert_eq!(
+                String::from_utf8_lossy(&result.stdout),
+                "mounted\nmounted\nmounted\nmounted\n",
+                "capture output {emit}/{profile}: {result:?}"
+            );
+            assert!(
+                result.stderr.is_empty(),
+                "capture stderr {emit}/{profile}: {result:?}"
+            );
+        }
+    }
+}
