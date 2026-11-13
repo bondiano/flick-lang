@@ -6,8 +6,11 @@
 use std::collections::HashMap;
 use std::mem;
 
+use flick_pretty::docvec;
+
+use super::doc::{Js, MULTILINE, Stmt, block, block_js, call, stmt_flags};
 use super::function::{binds, offsets};
-use super::{Gen, Tail, indent, names, view};
+use super::{Gen, Tail, names, view};
 use crate::codegen::tail::{Callee, Calls, Target, cycles, function, target};
 use crate::ir::{Expr, Item, Lit, Param, Pat};
 
@@ -51,22 +54,23 @@ pub(super) fn grouped(
         .collect()
 }
 
-impl Gen<'_> {
+impl<'d> Gen<'_, 'd> {
     /// The body of the member `target`, if it is one: a call of its group.
-    pub(super) fn group_call(&self, target: &Target, heads: &[String]) -> Option<String> {
+    pub(super) fn group_call(&self, target: &Target, heads: &[String]) -> Option<Js<'d>> {
         let Callee::Global(global) = &target.callee else {
             return None;
         };
         let &(g, k) = self.grouped.get(global)?;
-        Some(format!(
-            "{}({k}, {})",
-            self.groups[g].name,
-            heads.join(", ")
-        ))
+        let args: Vec<Js<'d>> = [k.to_string()]
+            .iter()
+            .chain(heads)
+            .map(|arg| self.leaf(arg))
+            .collect();
+        Some(call(self.a, self.leaf(&self.groups[g].name), &args))
     }
 
     /// The function running the group `g` of `items`.
-    pub(super) fn group(&mut self, g: usize, items: &[Item]) -> String {
+    pub(super) fn group(&mut self, g: usize, items: &[Item]) -> Stmt<'d> {
         let functions: Vec<(&str, &[Param], &Expr)> = self.groups[g]
             .items
             .iter()
@@ -88,7 +92,7 @@ impl Gen<'_> {
                 for (p, var) in params.iter().zip(&vars) {
                     match &p.pat {
                         Pat::Bind(n) => {
-                            let c = g.constant(&names::ident(n), var);
+                            let c = g.constant(&names::ident(n), g.leaf(var));
                             g.buf.push(c);
                         }
                         Pat::Wild | Pat::Lit(Lit::Unit) => {}
@@ -112,21 +116,28 @@ impl Gen<'_> {
                     g.tail = None;
                 });
             });
-            cases.push(format!("case {k}: {{\n{}}}", indent(&stmts)));
+            let flags = stmt_flags(&stmts) | MULTILINE;
+            let case = docvec![self.a, "case ", k, ": ", block(self.a, &stmts)];
+            cases.push(Stmt::new(case, flags));
         }
         (self.generator, self.tail) = saved;
-        let switch = format!("switch ($f) {{\n{}}}", indent(&cases));
-        let mut body = vec![format!("for (;;) {{\n{}}}", indent(&[switch]))];
+        let a = self.a;
+        let flags = stmt_flags(&cases) | MULTILINE;
+        let switch = Stmt::new(docvec![a, "switch ($f) ", block(a, &cases)], flags);
+        let mut body = vec![Stmt::new(
+            docvec![a, "for (;;) ", block(a, &[switch])],
+            flags,
+        )];
         let init: Vec<String> = offsets
             .iter()
             .flatten()
             .map(|o| format!("{o} = 0"))
             .collect();
         if !init.is_empty() {
-            body.insert(0, format!("let {};", init.join(", ")));
+            body.insert(0, self.line(&format!("let {};", init.join(", "))));
         }
         let params = format!("$f, {}", vars.join(", "));
-        let value = format!("{} {{\n{}}}", self.arrow(&params), indent(&body));
-        self.constant(&self.groups[g].name, &value)
+        let value = self.lambda_of(&params, block_js(a, &body));
+        self.constant(&self.groups[g].name, value)
     }
 }

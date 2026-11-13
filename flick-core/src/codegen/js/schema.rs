@@ -1,73 +1,93 @@
 //! Refined types, schema witnesses and `codec` blocks: runtime calls that
 //! build the inert schema and codec trees.
 
+use flick_pretty::docvec;
+
+use super::doc::{After, Before, Js, Stmt, array, call, object};
 use super::{Gen, names};
 use crate::ir::Expr;
 use crate::types::{Constructor, Rep, SchemaItem, SchemaPlan, UrlRoute, companion_name};
 
-impl Gen<'_> {
+impl<'d> Gen<'_, 'd> {
     /// `T$check`, `T$parse` and `T$value` of a refined type.
-    pub(super) fn refined(&mut self, name: &str, check: &Expr) -> String {
+    pub(super) fn refined(&mut self, name: &str, check: &Expr) -> Vec<Stmt<'d>> {
         let (mut stmts, value) = self.block(|g| g.function(&[], check, None));
         let check_name = companion_name(name, "check");
-        stmts.push(self.export(&check_name, &value));
-        let parse = format!(
-            "{}({}, {check_name})",
-            self.rt("refinedParse"),
-            names::string(name)
+        stmts.push(self.export(&check_name, value));
+        let refined_parse = self.rt("refinedParse");
+        let parse = call(
+            self.a,
+            refined_parse,
+            &[self.string(name), self.leaf(&check_name)],
         );
-        stmts.push(self.export(&companion_name(name, "parse"), &parse));
-        let identity = format!("{} $x", self.arrow("$x"));
-        stmts.push(self.export(&companion_name(name, "value"), &identity));
-        stmts.join("\n")
+        stmts.push(self.export(&companion_name(name, "parse"), parse));
+        let identity = self.lambda_of("$x", self.leaf("$x"));
+        stmts.push(self.export(&companion_name(name, "value"), identity));
+        stmts
     }
 
     /// `T$schema`, a function of the witnesses of its parameters, and the
     /// `T$json` of a refined type.
-    pub(super) fn schema(&mut self, item: &SchemaItem) -> String {
+    pub(super) fn schema(&mut self, item: &SchemaItem) -> Vec<Stmt<'d>> {
+        let a = self.a;
         let mut body = self.plan(&item.plan);
         for i in (0..item.witnesses).rev() {
-            body = format!("{} {body}", self.arrow(&format!("$w{i}")));
+            body = self.lambda_of(&format!("$w{i}"), body);
         }
         let name = companion_name(&item.ty, "schema");
-        let mut out = vec![self.export(&name, &body)];
+        let mut out = vec![self.export(&name, body)];
         if matches!(item.plan, SchemaPlan::Refined { .. }) {
-            let json = format!("{}({name})", self.rt("schemaJsonCodec"));
-            out.push(self.export(&companion_name(&item.ty, "json"), &json));
+            let codec = self.rt("schemaJsonCodec");
+            let json = call(a, codec, &[self.leaf(&name)]);
+            out.push(self.export(&companion_name(&item.ty, "json"), json));
         }
         if let Some(routes) = &item.url {
             let url = self.url(&name, &item.ty, routes);
-            out.push(self.export(&companion_name(&item.ty, "url"), &url));
+            out.push(self.export(&companion_name(&item.ty, "url"), url));
         }
         if let Some(fields) = &item.form {
-            let specs: Vec<String> = fields
+            let specs: Vec<Js<'d>> = fields
                 .iter()
                 .map(|(l, p, optional)| {
-                    format!("[{}, {}, {optional}]", names::string(l), self.plan(p))
+                    let spec = [
+                        self.string(l),
+                        self.plan(p),
+                        self.leaf(&optional.to_string()),
+                    ];
+                    array(a, &spec)
                 })
                 .collect();
-            let form = format!(
-                "{}({name}, {}, [{}])",
-                self.rt("formSpec"),
-                names::string(&item.ty),
-                specs.join(", ")
+            let form_spec = self.rt("formSpec");
+            let form = call(
+                a,
+                form_spec,
+                &[self.leaf(&name), self.string(&item.ty), array(a, &specs)],
             );
-            out.push(self.export(&companion_name(&item.ty, "form"), &form));
+            out.push(self.export(&companion_name(&item.ty, "form"), form));
             // a field is its label at run time
-            let labels: Vec<String> = fields
+            let labels: Vec<_> = fields
                 .iter()
-                .map(|(l, ..)| format!("{}: {}", names::string(l), names::string(l)))
+                .map(|(l, ..)| {
+                    let label = self.string(l);
+                    docvec![
+                        a,
+                        label.doc,
+                        ": ",
+                        label.at(a, Before::Delimiter, After::Delimiter)
+                    ]
+                })
                 .collect();
-            let record = format!("{{ {} }}", labels.join(", "));
-            out.push(self.export(&companion_name(&item.ty, "fields"), &record));
+            let record = object(a, &labels, &[]);
+            out.push(self.export(&companion_name(&item.ty, "fields"), record));
         }
-        out.join("\n")
+        out
     }
 
     /// `T$url`: per constructor its tag, path, segment witnesses and query.
-    fn url(&mut self, schema: &str, ty: &str, routes: &[UrlRoute]) -> String {
+    fn url(&mut self, schema: &str, ty: &str, routes: &[UrlRoute]) -> Js<'d> {
+        let a = self.a;
         let package = (self.options.package)(self.module);
-        let routes: Vec<String> = routes
+        let routes: Vec<Js<'d>> = routes
             .iter()
             .map(|r| {
                 let constructor = Constructor {
@@ -78,34 +98,45 @@ impl Gen<'_> {
                     rep: Rep::Tagged,
                 };
                 let tag = names::tag(&constructor, package.as_deref());
-                let segments: Vec<String> = r.segments.iter().map(|p| self.plan(p)).collect();
-                let query = r.query.as_ref().map_or("null".to_owned(), |query| {
-                    let fields: Vec<String> = query
-                        .iter()
-                        .map(|(l, p, optional)| {
-                            format!("[{}, {}, {optional}]", names::string(l), self.plan(p))
-                        })
-                        .collect();
-                    format!("[{}]", fields.join(", "))
-                });
-                format!(
-                    "[{}, {}, [{}], {query}]",
-                    names::string(&tag),
-                    names::string(&r.path),
-                    segments.join(", ")
-                )
+                let segments: Vec<Js<'d>> = r.segments.iter().map(|p| self.plan(p)).collect();
+                let query = match &r.query {
+                    Some(query) => {
+                        let fields: Vec<Js<'d>> = query
+                            .iter()
+                            .map(|(l, p, optional)| {
+                                let field = [
+                                    self.string(l),
+                                    self.plan(p),
+                                    self.leaf(&optional.to_string()),
+                                ];
+                                array(a, &field)
+                            })
+                            .collect();
+                        array(a, &fields)
+                    }
+                    None => self.leaf("null"),
+                };
+                let route = [
+                    self.string(&tag),
+                    self.string(&r.path),
+                    array(a, &segments),
+                    query,
+                ];
+                array(a, &route)
             })
             .collect();
-        format!(
-            "{}({schema}, [{}])",
-            self.rt("routeCodec"),
-            routes.join(", ")
-        )
+        let route_codec = self.rt("routeCodec");
+        call(a, route_codec, &[self.leaf(schema), array(a, &routes)])
     }
 
-    fn plan(&mut self, plan: &SchemaPlan) -> String {
-        let node =
-            |g: &mut Self, f: &str, args: &[String]| format!("{}({})", g.rt(f), args.join(", "));
+    /// The runtime's schema node `f` of `args`.
+    fn node(&mut self, f: &str, args: &[Js<'d>]) -> Js<'d> {
+        let f = self.rt(f);
+        call(self.a, f, args)
+    }
+
+    fn plan(&mut self, plan: &SchemaPlan) -> Js<'d> {
+        let a = self.a;
         match plan {
             SchemaPlan::Prim(name) => {
                 let f = match name.as_str() {
@@ -122,36 +153,39 @@ impl Gen<'_> {
             }
             SchemaPlan::List(p) => {
                 let p = self.plan(p);
-                node(self, "schemaList", &[p])
+                self.node("schemaList", &[p])
             }
             SchemaPlan::Option(p) => {
                 let p = self.plan(p);
-                node(self, "schemaOption", &[p])
+                self.node("schemaOption", &[p])
             }
             SchemaPlan::Redacted(p) => {
                 let p = self.plan(p);
-                node(self, "schemaRedacted", &[p])
+                self.node("schemaRedacted", &[p])
             }
-            SchemaPlan::Result(e, a) => {
-                let (e, a) = (self.plan(e), self.plan(a));
-                node(self, "schemaResult", &[e, a])
+            SchemaPlan::Result(e, ok) => {
+                let (e, ok) = (self.plan(e), self.plan(ok));
+                self.node("schemaResult", &[e, ok])
             }
             SchemaPlan::Tuple(items) => {
-                let items: Vec<String> = items.iter().map(|p| self.plan(p)).collect();
-                node(self, "schemaTuple", &[format!("[{}]", items.join(", "))])
+                let items: Vec<Js<'d>> = items.iter().map(|p| self.plan(p)).collect();
+                self.node("schemaTuple", &[array(a, &items)])
             }
             SchemaPlan::Record(fields) => {
-                let fields: Vec<String> = fields
+                let fields: Vec<Js<'d>> = fields
                     .iter()
-                    .map(|(l, p)| format!("[{}, {}]", names::string(l), self.plan(p)))
+                    .map(|(l, p)| {
+                        let field = [self.string(l), self.plan(p)];
+                        array(a, &field)
+                    })
                     .collect();
-                node(self, "schemaRecord", &[format!("[{}]", fields.join(", "))])
+                self.node("schemaRecord", &[array(a, &fields)])
             }
             SchemaPlan::Adt { name, variants } => self.adt(name, variants),
-            SchemaPlan::Param(i) => format!("$w{i}"),
+            SchemaPlan::Param(i) => self.leaf(&format!("$w{i}")),
             SchemaPlan::Applied(i, p) => {
                 let p = self.plan(p);
-                format!("$w{i}({p})")
+                call(a, self.leaf(&format!("$w{i}")), &[p])
             }
             SchemaPlan::Constructor(name) => match name.as_str() {
                 "List" => self.rt("schemaList"),
@@ -164,34 +198,33 @@ impl Gen<'_> {
                 args,
                 lazy,
             } => {
-                let mut call = self.global(module, &companion_name(named, "schema"));
-                for a in args {
-                    let a = self.plan(a);
-                    call = format!("{call}({a})");
+                let mut applied = self.global(module, &companion_name(named, "schema"));
+                for arg in args {
+                    let arg = self.plan(arg);
+                    applied = call(a, applied, &[arg]);
                 }
                 if *lazy {
-                    let get = format!("{} {call}", self.arrow(""));
-                    node(self, "schemaLazy", &[names::string(named), get])
+                    let get = self.lambda_of("", applied);
+                    self.node("schemaLazy", &[self.string(named), get])
                 } else {
-                    call
+                    applied
                 }
             }
             SchemaPlan::Refined { name, base, known } => {
                 let base = self.plan(base);
-                let known = known.as_deref().map_or("null".to_owned(), names::string);
-                let check = companion_name(name, "check");
-                node(
-                    self,
-                    "refinedSchema",
-                    &[names::string(name), base, check, known],
-                )
+                let known = known
+                    .as_deref()
+                    .map_or_else(|| self.leaf("null"), |k| self.string(k));
+                let check = self.leaf(&companion_name(name, "check"));
+                self.node("refinedSchema", &[self.string(name), base, check, known])
             }
         }
     }
 
-    fn adt(&mut self, name: &str, variants: &[(String, Vec<SchemaPlan>)]) -> String {
+    fn adt(&mut self, name: &str, variants: &[(String, Vec<SchemaPlan>)]) -> Js<'d> {
+        let a = self.a;
         let package = (self.options.package)(self.module);
-        let variants: Vec<String> = variants
+        let variants: Vec<Js<'d>> = variants
             .iter()
             .map(|(c, fields)| {
                 let constructor = Constructor {
@@ -202,34 +235,28 @@ impl Gen<'_> {
                     rep: Rep::Tagged,
                 };
                 let tag = names::tag(&constructor, package.as_deref());
-                let fields: Vec<String> = fields.iter().map(|p| self.plan(p)).collect();
-                format!(
-                    "[{}, {}, [{}]]",
-                    names::string(&tag),
-                    names::string(c),
-                    fields.join(", ")
-                )
+                let fields: Vec<Js<'d>> = fields.iter().map(|p| self.plan(p)).collect();
+                let variant = [self.string(&tag), self.string(c), array(a, &fields)];
+                array(a, &variant)
             })
             .collect();
-        let adt = self.rt("schemaAdt");
-        format!("{adt}({}, [{}])", names::string(name), variants.join(", "))
+        self.node("schemaAdt", &[self.string(name), array(a, &variants)])
     }
 
     /// A `codec` block: its fields, evaluated in order.
-    pub(super) fn codec_block(&mut self, name: &str, fields: &[(String, Expr)]) -> String {
+    pub(super) fn codec_block(&mut self, name: &str, fields: &[(String, Expr)]) -> Js<'d> {
+        let a = self.a;
         let values: Vec<&Expr> = fields.iter().map(|(_, v)| v).collect();
         let values = self.ordered(&values);
-        let entries: Vec<String> = fields
+        let entries: Vec<Js<'d>> = fields
             .iter()
             .zip(values)
-            .map(|((l, _), v)| format!("[{}, {v}]", names::string(l)))
+            .map(|((l, _), v)| {
+                let entry = [self.string(l), v];
+                array(a, &entry)
+            })
             .collect();
-        format!(
-            "{}({}, [{}])",
-            self.rt("codecBlock"),
-            names::string(name),
-            entries.join(", ")
-        )
+        self.node("codecBlock", &[self.string(name), array(a, &entries)])
     }
 }
 

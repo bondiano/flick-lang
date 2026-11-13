@@ -3,41 +3,29 @@
 
 use std::mem;
 
-use super::{Callee, Gen, Target, indent, literal, names, tidy};
-use crate::ir::{Arm, Expr, ExprKind, Pat, Stage, Stmt};
+use flick_pretty::docvec;
+
+use super::doc::{After, Before, Form, Head, Js, Stmt, array, block_js, call, object};
+use super::{Callee, Gen, Target, names};
+use crate::ir::{Arm, Expr, ExprKind, Pat, Stage, Stmt as IrStmt};
 use crate::numeric::Num;
-use crate::types::{Constructor, Dict, Rep};
+use crate::types::Constructor;
 
-/// Whether moving the evaluation of `js` later is unobservable: a name, a
-/// property of a module namespace, or a literal.
-pub fn atomic(js: &str) -> bool {
-    let name = |s: &str| {
-        s.chars()
-            .next()
-            .is_some_and(|c| c.is_ascii_alphabetic() || c == '_' || c == '$')
-            && s.chars()
-                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$' || c == '.')
-    };
-    name(js)
-        || js.parse::<f64>().is_ok()
-        || (js.starts_with('"') && serde_json::from_str::<String>(js).is_ok())
-}
-
-impl Gen<'_> {
+impl<'d> Gen<'_, 'd> {
     /// Compiles expressions that are evaluated in order: an operand whose
     /// code needs statements makes the operands before it constants first.
-    pub(super) fn ordered(&mut self, exprs: &[&Expr]) -> Vec<String> {
-        let mut out: Vec<String> = Vec::new();
+    pub(super) fn ordered(&mut self, exprs: &[&Expr]) -> Vec<Js<'d>> {
+        let mut out: Vec<Js<'d>> = Vec::new();
         for e in exprs {
             let mark = self.buf.len();
             let js = self.expr(e);
             if self.buf.len() > mark {
                 let mut spills = Vec::new();
                 for prev in &mut out {
-                    if !atomic(prev) {
+                    if prev.atom().is_none() {
                         let t = self.temp();
-                        spills.push(self.constant(&t, prev));
-                        *prev = t;
+                        spills.push(self.constant(&t, *prev));
+                        *prev = self.leaf(&t);
                     }
                 }
                 self.buf.splice(mark..mark, spills);
@@ -48,57 +36,68 @@ impl Gen<'_> {
     }
 
     /// `js` as a constant unless it is atomic.
-    pub(super) fn spill(&mut self, js: String) -> String {
-        if atomic(&js) {
+    pub(super) fn spill(&mut self, js: Js<'d>) -> Js<'d> {
+        if js.atom().is_some() {
             return js;
         }
         let t = self.temp();
-        let c = self.constant(&t, &js);
+        let c = self.constant(&t, js);
         self.buf.push(c);
-        t
+        self.leaf(&t)
+    }
+
+    /// The text of `js` made atomic by [`spill`](Self::spill): a subject
+    /// whose parts code names.
+    pub(super) fn subject(&mut self, js: Js<'d>) -> String {
+        let js = self.spill(js);
+        js.atom().unwrap_or_default().to_owned()
+    }
+
+    /// `v;`.
+    pub(super) fn expr_stmt(&self, v: Js<'d>) -> Stmt<'d> {
+        let a = self.a;
+        let doc = docvec![a, v.at(a, Before::Statement, After::Semicolon), ";"];
+        Stmt::new(doc, v.flags)
     }
 
     /// `-inner`, kept in 32 bits on `Int`; a literal is in range already, as
     /// an `Int` literal is checked with its sign.
-    fn neg(&mut self, num: Num, inner: &Expr) -> String {
+    fn neg(&mut self, num: Num, inner: &Expr) -> Js<'d> {
         let js = self.expr(inner);
-        if num == Num::Int && !matches!(inner.kind, ExprKind::Lit(_)) {
-            format!("(-{js} | 0)")
+        let a = self.a;
+        let doc = if num == Num::Int && !matches!(inner.kind, ExprKind::Lit(_)) {
+            docvec![a, "-", js.at(a, Before::Other, After::Other), " | 0"]
         } else {
-            format!("(-{js})")
-        }
+            docvec![a, "-", js.at(a, Before::Other, After::Delimiter)]
+        };
+        Js::code(doc, Head::Other, &[js]).in_parens()
     }
 
-    pub(super) fn expr(&mut self, e: &Expr) -> String {
+    pub(super) fn expr(&mut self, e: &Expr) -> Js<'d> {
         match &e.kind {
-            ExprKind::Lit(lit) => literal::literal(lit),
-            ExprKind::Local(name) => names::ident(name),
+            ExprKind::Lit(lit) => self.literal(lit),
+            ExprKind::Local(name) => self.leaf(&names::ident(name)),
             ExprKind::Global { module, name } => self.global(module, &names::ident(name)),
-            ExprKind::Method { dict, name } => match self.direct_method(dict, name) {
-                Some(direct) => direct,
-                None => format!("{}.{name}", self.dict(dict)),
-            },
+            ExprKind::Method { dict, name } => {
+                if let Some(direct) = self.direct_method(dict, name) {
+                    direct
+                } else {
+                    let dict = self.dict(dict);
+                    self.member(dict, name)
+                }
+            }
             ExprKind::Con(c) => self.constructor(c),
             ExprKind::Operation {
                 service,
                 name,
                 stages,
-            } => {
-                let first = stages.iter().position(|&s| s != Stage::Pure);
-                let arity = first.map_or(stages.len(), |i| i + 1);
-                let tag = self.service_ref(service);
-                let op = match first.map(|i| stages[i]) {
-                    Some(Stage::Sync) => self.rt("syncOperation"),
-                    _ => self.rt("operation"),
-                };
-                format!("{op}({tag}, {}, {arity})", names::string(name))
-            }
+            } => self.operation(service, name, stages),
             ExprKind::ServiceTag(key) => self.service_ref(key),
-            ExprKind::Label(label) => names::string(label),
+            ExprKind::Label(label) => self.string(label),
             ExprKind::Dicts(inner, dicts) => {
                 let f = self.expr(inner);
-                let dicts: Vec<String> = dicts.iter().map(|d| self.dict(d)).collect();
-                format!("{f}({})", dicts.join(", "))
+                let dicts: Vec<Js<'d>> = dicts.iter().map(|d| self.dict(d)).collect();
+                call(self.a, f, &dicts)
             }
             ExprKind::Abstract(shown, inner) => self.abstraction(shown, inner),
             ExprKind::App {
@@ -117,43 +116,43 @@ impl Gen<'_> {
             ExprKind::If(c, t, f) => self.if_expr(c, t, f),
             ExprKind::Match(scrutinee, arms) => {
                 let s = self.expr(scrutinee);
-                let s = self.spill(s);
+                let s = self.subject(s);
                 let r = self.temp();
                 self.buf.push(self.declare(&r));
                 self.arms(&s, arms, Some(&r));
-                r
+                self.leaf(&r)
             }
             ExprKind::Try(body, arms) => self.try_expr(body, arms),
             ExprKind::Tuple(items) | ExprKind::List(items) => {
                 let items: Vec<&Expr> = items.iter().collect();
-                format!("[{}]", self.ordered(&items).join(", "))
+                let items = self.ordered(&items);
+                array(self.a, &items)
             }
             ExprKind::Record(fields) => self.record(None, fields),
             ExprKind::Update(record, fields) => self.record(Some(record), fields),
             ExprKind::Field(record, label) => {
                 let r = self.expr(record);
-                let r = if atomic(&r) { r } else { format!("({r})") };
-                if names::is_property(label) {
-                    format!("{r}.{label}")
-                } else {
-                    format!("{r}[{}]", names::string(label))
-                }
+                self.field(r, label)
             }
             ExprKind::Binary(op, lhs, rhs) => self.binary(e.span, *op, lhs, rhs),
-            ExprKind::Not(inner) => format!("(!{})", self.expr(inner)),
+            ExprKind::Not(inner) => {
+                let v = self.expr(inner);
+                let doc = docvec![self.a, "!", v.at(self.a, Before::Other, After::Delimiter)];
+                Js::code(doc, Head::Other, &[v]).in_parens()
+            }
             ExprKind::Unwrap(inner) => self.unwrap(inner),
             ExprKind::Neg(num, inner) => self.neg(*num, inner),
             ExprKind::Ignore(inner) => {
                 let v = self.expr(inner);
-                if !atomic(&v) {
-                    self.buf.push(format!("{v};"));
+                if v.atom().is_none() {
+                    self.buf.push(self.expr_stmt(v));
                 }
-                "undefined".to_owned()
+                self.leaf("undefined")
             }
             ExprKind::Await(inner) => {
                 let owner = self.owner.take();
                 let v = self.expr(inner);
-                self.run(owner, &v)
+                self.run(owner, v)
             }
             ExprKind::Task(body) => self.gen_block(body),
             ExprKind::Generate { .. } | ExprKind::Each { .. } | ExprKind::Yield(_) => {
@@ -172,220 +171,109 @@ impl Gen<'_> {
         }
     }
 
-    fn app(&mut self, e: &Expr, func: &Expr, arg: &Expr, stage: Stage, arg_first: bool) -> String {
-        if let Some(value) = self.constructed(e) {
-            return value;
-        }
-        if let Some((worker, args)) = self.worker_call(e) {
-            let owner = self.owner.take();
-            let js = self.ordered(&args);
-            let js = self.before_sync(stage, js);
-            let call = format!("{}{worker}({})", mark!(self, e.span), js.join(", "));
-            return self.call(stage, owner, call);
-        }
-        let owner = self.owner.take();
-        let (f, a) = if arg_first {
-            let a = self.expr(arg);
-            let a = self.spill(a);
-            (self.expr(func), a)
-        } else {
-            let js = self.ordered(&[func, arg]);
-            (js[0].clone(), js[1].clone())
+    /// The function of the operation `name` of `service`, of these stages.
+    fn operation(&mut self, service: &str, name: &str, stages: &[Stage]) -> Js<'d> {
+        let first = stages.iter().position(|&s| s != Stage::Pure);
+        let arity = first.map_or(stages.len(), |i| i + 1);
+        let tag = self.service_ref(service);
+        let op = match first.map(|i| stages[i]) {
+            Some(Stage::Sync) => self.rt("syncOperation"),
+            _ => self.rt("operation"),
         };
-        let [f, a] =
-            <[String; 2]>::try_from(self.before_sync(stage, vec![f, a])).expect("two operands");
-        // `(x) => (y)` ends with `)` too, yet needs parentheses to be called
-        let call_like = tidy::is_call(&f);
-        let f = if atomic(&f) || call_like {
-            f
-        } else {
-            format!("({f})")
-        };
-        let call = format!("{}{f}({a})", mark!(self, e.span));
-        self.call(stage, owner, call)
+        let args = [tag, self.string(name), self.leaf(&arity.to_string())];
+        call(self.a, op, &args)
     }
 
-    /// The operands of a Sync call in a generator as constants when one
-    /// yields: `$rt.sync` wraps the call in an arrow, where `yield*` is
-    /// not allowed.
-    fn before_sync(&mut self, stage: Stage, js: Vec<String>) -> Vec<String> {
-        if stage != Stage::Sync || !self.generator || !js.iter().any(|j| j.contains("yield")) {
-            return js;
-        }
-        js.into_iter().map(|j| self.spill(j)).collect()
-    }
-
-    /// The JS call `call` of `stage` made at the current stage: a Sync one
-    /// in a generator runs with the fiber's services.
-    fn call(&mut self, stage: Stage, owner: Option<String>, call: String) -> String {
-        match stage {
-            Stage::Sync if self.generator => format!("(yield* {}(() => {call}))", self.rt("sync")),
-            Stage::Pure | Stage::Sync => call,
-            Stage::Runtime => self.run(owner, &call),
-        }
-    }
-
-    /// The constant of `method` of `dict`, a canonical instance of this
-    /// module whose method is emitted on its own.
-    fn direct_method(&mut self, dict: &Dict, method: &str) -> Option<String> {
-        let Dict::Instance { module, name, args } = dict else {
-            return None;
-        };
-        if !args.is_empty() {
-            return None;
-        }
-        if module != self.module {
-            let constant = format!("{}${method}", names::instance(name));
-            return (self.options.direct)(module, name, method)
-                .then(|| self.global(module, &constant));
-        }
-        self.direct.get(&(name.clone(), method.to_owned())).cloned()
-    }
-
-    /// A known full application of a function of the module with a worker,
-    /// its stages before the last pure and none evaluating its argument first.
-    fn worker_call<'e>(&mut self, e: &'e Expr) -> Option<(String, Vec<&'e Expr>)> {
-        let mut args = Vec::new();
-        let mut head = e;
-        let mut last = true;
-        while let ExprKind::App {
-            func,
-            arg,
-            stage,
-            arg_first: false,
-        } = &head.kind
-        {
-            if *stage == Stage::Runtime && !last {
-                return None;
+    /// The field `label` of the record `r`.
+    fn field(&mut self, r: Js<'d>, label: &str) -> Js<'d> {
+        let a = self.a;
+        if let Some(text) = r.atom() {
+            if names::is_property(label) {
+                return self.leaf(&format!("{text}.{label}"));
             }
-            last = false;
-            args.push(&**arg);
-            head = func;
+            let doc = docvec![a, r.doc, "[", self.string(label).doc, "]"];
+            return Js {
+                form: Form::Member,
+                ..r.starting(doc, &[r])
+            };
         }
-        let ExprKind::Global { module, name } = &head.kind else {
-            return None;
-        };
-        args.reverse();
-        if module != self.module {
-            let arity = (self.options.workers)(module, name).filter(|&n| n == args.len())?;
-            let worker = self.global(module, &format!("{}${arity}", names::ident(name)));
-            return Some((worker, args));
-        }
-        if let Some((arity, alias)) = self.direct_foreigns.get(name) {
-            return (args.len() == *arity).then(|| (alias.clone(), args));
-        }
-        let (arity, _) = *self.workers.get(name)?;
-        (args.len() == arity).then(|| (format!("{}${arity}", names::ident(name)), args))
-    }
-
-    /// Release: a tagged constructor applied to all its fields, as the
-    /// object it builds, `{ _tag: "Rect#…", _0: 3, _1: 4 }`.
-    fn constructed(&mut self, e: &Expr) -> Option<String> {
-        if !self.options.release {
-            return None;
-        }
-        let mut args = Vec::new();
-        let mut head = e;
-        while let ExprKind::App {
-            func,
-            arg,
-            stage: Stage::Pure,
-            arg_first: false,
-        } = &head.kind
-        {
-            args.push(&**arg);
-            head = func;
-        }
-        let ExprKind::Con(c) = &head.kind else {
-            return None;
-        };
-        if c.rep != Rep::Tagged || names::native(c).is_some() || args.len() != c.arity {
-            return None;
-        }
-        args.reverse();
-        let js = self.ordered(&args);
-        let package = (self.options.package)(&c.module);
-        let tag = names::string(&names::tag(c, package.as_deref()));
-        let fields: Vec<String> = js
-            .iter()
-            .enumerate()
-            .map(|(i, v)| format!("_{i}: {v}"))
-            .collect();
-        Some(format!(
-            "{}{{ _tag: {tag}, {} }}",
-            mark!(self, e.span),
-            fields.join(", ")
-        ))
-    }
-
-    /// `yield*` of the effect `js`, in `owner` when a `Within` gave one.
-    /// Runs the effect `js`: in a generator with `yield*`, in a Sync stage
-    /// at once with the services of the context.
-    fn run(&mut self, owner: Option<String>, js: &str) -> String {
-        let js = match owner {
-            Some(owner) => format!("{}({owner}, {js})", self.rt("within")),
-            None => js.to_owned(),
-        };
-        if self.generator {
-            format!("(yield* {js})")
+        let doc = docvec![a, "(", r.at(a, Before::Delimiter, After::Delimiter), ")"];
+        let record = Js::code(doc, r.after_paren(), &[r]);
+        let access = if names::is_property(label) {
+            docvec![a, ".", a.alloc_str(label)]
         } else {
-            assert!(
-                self.sync,
-                "a runtime call runs inside a runtime or Sync stage"
-            );
-            format!("{}({js})", self.rt("runIn"))
-        }
-    }
-
-    fn provide(&mut self, layer: &Expr, body: &Expr) -> String {
-        let layer = self.expr(layer);
-        let layer = self.spill(layer);
-        let body = self.gen_block(body);
-        let provide = self.rt("provide");
-        self.run(None, &format!("{provide}({layer}, {body})"))
-    }
-
-    fn scope(&mut self, owner: Option<&str>, outer: Option<&str>, body: &Expr) -> String {
-        let owner = owner.map_or("$_".to_owned(), names::ident);
-        let params = match outer {
-            Some(outer) => format!("{owner}, {}", names::ident(outer)),
-            None => owner,
+            docvec![a, "[", self.string(label).doc, "]"]
         };
-        let body = self.gen_block(body);
-        let scope = self.rt("scope");
-        let scoped = format!("{scope}({} {body})", self.arrow(&params));
-        self.run(None, &scoped)
+        Js {
+            form: Form::Member,
+            ..Js::code(docvec![a, record.doc, access], record.head, &[record])
+        }
     }
 
     /// A value that takes the dictionaries `shown` before it is computed.
-    fn abstraction(&mut self, shown: &[String], inner: &Expr) -> String {
+    fn abstraction(&mut self, shown: &[String], inner: &Expr) -> Js<'d> {
         let mark = self.givens.len();
         let params = self.bind_givens(shown);
         let saved = mem::replace(&mut self.generator, false);
         let (stmts, value) = self.block(|g| g.expr(inner));
         self.generator = saved;
         self.givens.truncate(mark);
-        format!("{} {}", self.arrow(&params), arrow_body(&stmts, &value))
+        let body = self.arrow_body(&stmts, value);
+        self.lambda_of(&params, body)
     }
 
-    fn if_expr(&mut self, c: &Expr, t: &Expr, f: &Expr) -> String {
+    fn if_expr(&mut self, c: &Expr, t: &Expr, f: &Expr) -> Js<'d> {
+        let arena = self.a;
         let c = self.expr(c);
-        let (ts, tv) = self.block(|g| g.expr(t));
-        let (fs, fv) = self.block(|g| g.expr(f));
+        let (mut ts, tv) = self.block(|g| g.expr(t));
+        let (mut fs, fv) = self.block(|g| g.expr(f));
         if ts.is_empty() && fs.is_empty() {
-            return format!("({c} ? {tv} : {fv})");
+            let doc = docvec![
+                arena,
+                c.at(arena, Before::Delimiter, After::Other),
+                " ? ",
+                tv.at(arena, Before::Other, After::Other),
+                " : ",
+                fv.at(arena, Before::Delimiter, After::Delimiter)
+            ];
+            return c.starting(doc, &[c, tv, fv]).in_parens();
         }
         let r = self.temp();
         let declare = self.declare(&r);
-        self.buf.push(format!(
-            "{declare}\nif ({c}) {{\n{}  {r} = {tv};\n}} else {{\n{}  {r} = {fv};\n}}",
-            indent(&ts),
-            indent(&fs)
-        ));
-        r
+        ts.push(self.assign(&r, tv));
+        fs.push(self.assign(&r, fv));
+        let then = block_js(arena, &ts);
+        let otherwise = block_js(arena, &fs);
+        let doc = docvec![
+            arena,
+            declare.doc,
+            arena.line(),
+            "if (",
+            c.at(arena, Before::Delimiter, After::Delimiter),
+            ") ",
+            then.doc,
+            " else ",
+            otherwise.doc
+        ];
+        let flags = declare.flags | c.flags | then.flags | otherwise.flags;
+        self.buf.push(Stmt::new(doc, flags));
+        self.leaf(&r)
     }
 
-    fn try_expr(&mut self, body: &Expr, arms: &[Arm]) -> String {
+    /// `name = value;`.
+    pub(super) fn assign(&self, name: &str, value: Js<'d>) -> Stmt<'d> {
+        let a = self.a;
+        let doc = docvec![
+            a,
+            a.alloc_str(name),
+            " = ",
+            value.at(a, Before::Assign, After::Semicolon),
+            ";"
+        ];
+        Stmt::new(doc, value.flags)
+    }
+
+    fn try_expr(&mut self, body: &Expr, arms: &[Arm]) -> Js<'d> {
         if !self.generator && !self.sync {
             return self.expr(body);
         }
@@ -393,43 +281,50 @@ impl Gen<'_> {
         let error = self.temp();
         let (stmts, ()) = self.block(|g| g.handlers(&error, arms));
         let try_with = self.rt("tryWith");
-        let tried = format!(
-            "{try_with}({body}, {} {{\n{}}})",
-            self.arrow(&error),
-            indent(&stmts)
-        );
-        self.run(None, &tried)
+        let handler = self.lambda_of(&error, block_js(self.a, &stmts));
+        let tried = call(self.a, try_with, &[body, handler]);
+        self.run(None, tried)
     }
 
     /// `o?`: the value of the `Some`, after returning a `None` at once.
-    fn unwrap(&mut self, option: &Expr) -> String {
+    fn unwrap(&mut self, option: &Expr) -> Js<'d> {
         let v = self.expr(option);
-        let v = self.spill(v);
-        self.buf
-            .push(format!("if ({v}._tag === \"None\") return {v};"));
-        format!("{v}.value")
+        let v = self.subject(v);
+        let stmt = self.line(&format!("if ({v}._tag === \"None\") return {v};"));
+        self.buf.push(stmt);
+        self.leaf(&format!("{v}.value"))
     }
 
     /// A record literal, or `{ base with … }`.
-    fn record(&mut self, base: Option<&Expr>, fields: &[(String, Expr)]) -> String {
+    fn record(&mut self, base: Option<&Expr>, fields: &[(String, Expr)]) -> Js<'d> {
+        let a = self.a;
         let mut all: Vec<&Expr> = base.into_iter().collect();
         all.extend(fields.iter().map(|(_, v)| v));
-        let mut js = self.ordered(&all);
-        let base = base.map(|_| js.remove(0));
-        let mut entries: Vec<String> = base.map(|b| format!("...{b}")).into_iter().collect();
-        entries.extend(
-            fields
-                .iter()
-                .zip(js)
-                .map(|((label, _), v)| format!("{}: {v}", key(label))),
-        );
-        format!("{{ {} }}", entries.join(", "))
+        let js = self.ordered(&all);
+        let values = &js[usize::from(base.is_some())..];
+        let mut entries = Vec::with_capacity(js.len());
+        if base.is_some() {
+            entries.push(docvec![
+                a,
+                "...",
+                js[0].at(a, Before::Other, After::Delimiter)
+            ]);
+        }
+        entries.extend(fields.iter().zip(values).map(|((label, _), v)| {
+            docvec![
+                a,
+                key(label),
+                ": ",
+                v.at(a, Before::Delimiter, After::Delimiter)
+            ]
+        }));
+        object(a, &entries, &js)
     }
 
-    pub(super) fn stmt(&mut self, stmt: &Stmt) {
+    pub(super) fn stmt(&mut self, stmt: &IrStmt) {
         #[cfg(feature = "source-maps")]
         let span = match stmt {
-            Stmt::Let(_, e) | Stmt::Expr(e) | Stmt::Fun { value: e, .. } => e.span,
+            IrStmt::Let(_, e) | IrStmt::Expr(e) | IrStmt::Fun { value: e, .. } => e.span,
         };
         #[cfg(feature = "source-maps")]
         let first = self.buf.len();
@@ -437,22 +332,28 @@ impl Gen<'_> {
         #[cfg(feature = "source-maps")]
         if first < self.buf.len() {
             let mark = self.mark(span);
-            self.buf[first].insert_str(0, &mark);
+            let first = &mut self.buf[first];
+            // a cursor before a `return` keeps it from being taken apart
+            *first = Stmt {
+                doc: docvec![self.a, mark, first.doc],
+                ret: None,
+                ..*first
+            };
         }
     }
 
-    fn stmt_kind(&mut self, stmt: &Stmt) {
+    fn stmt_kind(&mut self, stmt: &IrStmt) {
         match stmt {
-            Stmt::Let(Pat::Bind(name), value) => {
+            IrStmt::Let(Pat::Bind(name), value) => {
                 let v = self.expr(value);
-                self.buf.push(self.constant(&names::ident(name), &v));
+                self.buf.push(self.constant(&names::ident(name), v));
             }
-            Stmt::Let(pat, value) => {
+            IrStmt::Let(pat, value) => {
                 let v = self.expr(value);
-                let v = self.spill(v);
+                let v = self.subject(v);
                 self.destructure(pat, &v);
             }
-            Stmt::Fun {
+            IrStmt::Fun {
                 name,
                 rec,
                 dicts,
@@ -463,18 +364,18 @@ impl Gen<'_> {
                     dicts: dicts.clone(),
                 });
                 let f = self.function(dicts, value, target);
-                self.buf.push(self.constant(&names::ident(name), &f));
+                self.buf.push(self.constant(&names::ident(name), f));
             }
-            Stmt::Expr(e) => {
+            IrStmt::Expr(e) => {
                 let v = self.expr(e);
-                if !atomic(&v) {
-                    self.buf.push(format!("{v};"));
+                if v.atom().is_none() {
+                    self.buf.push(self.expr_stmt(v));
                 }
             }
         }
     }
 
-    pub(super) fn constructor(&mut self, c: &Constructor) -> String {
+    pub(super) fn constructor(&mut self, c: &Constructor) -> Js<'d> {
         match names::native(c) {
             Some(names::Native::Some) => self.rt("some"),
             Some(names::Native::None) => self.rt("none"),
@@ -484,31 +385,31 @@ impl Gen<'_> {
         }
     }
 
-    fn service_ref(&mut self, key: &str) -> String {
+    fn service_ref(&mut self, key: &str) -> Js<'d> {
         let (module, name) = key.rsplit_once('.').unwrap_or(("", key));
         self.global(module, &names::service(name))
     }
-}
 
-/// `js` without its leading source markers.
-pub(super) fn unmarked(js: &str) -> &str {
-    let mut rest = js;
-    while let Some(after) = rest.strip_prefix(super::MARK_START) {
-        rest = after.split_once(super::MARK_END).map_or("", |(_, r)| r);
-    }
-    rest
-}
-
-/// The body of an arrow returning `value` after `stmts`.
-pub fn arrow_body(stmts: &[String], value: &str) -> String {
-    if stmts.is_empty() {
-        if unmarked(value).starts_with('{') {
-            format!("({value})")
-        } else {
-            value.to_owned()
+    /// The body of an arrow returning `value` after `stmts`.
+    pub(super) fn arrow_body(&self, stmts: &[Stmt<'d>], value: Js<'d>) -> Js<'d> {
+        let a = self.a;
+        if !stmts.is_empty() {
+            let mut all = stmts.to_vec();
+            all.push(Stmt::ret(a, None, value));
+            return block_js(a, &all);
         }
-    } else {
-        format!("{{\n{}  return {value};\n}}", indent(stmts))
+        if value.lead() == Head::Brace {
+            // an object, not a block
+            let doc = docvec![
+                a,
+                "(",
+                value.at(a, Before::Delimiter, After::Delimiter),
+                ")"
+            ];
+            Js::code(doc, value.after_paren(), &[value])
+        } else {
+            value
+        }
     }
 }
 

@@ -4,13 +4,16 @@
 
 use std::mem;
 
-use super::expr::atomic;
-use super::{Gen, indent, names};
+use flick_pretty::docvec;
+
+use super::doc::{After, Before, Js, MULTILINE, Stmt, YIELD_TEXT, YIELDS, block, call, stmt_flags};
+use super::function::generator as generator_fn;
+use super::{Gen, names};
 use crate::ir::{Expr, ExprKind, Lit, Pat};
 
-impl Gen<'_> {
+impl<'d> Gen<'_, 'd> {
     /// A `Generate`, or a loop or yield of one emitted for what it does.
-    pub(super) fn generated(&mut self, e: &Expr) -> String {
+    pub(super) fn generated(&mut self, e: &Expr) -> Js<'d> {
         if let ExprKind::Generate {
             body,
             strict,
@@ -21,18 +24,19 @@ impl Gen<'_> {
             return self.generate(body, *strict, *sync, limit.as_deref());
         }
         self.discard(e);
-        "undefined".to_owned()
+        self.leaf("undefined")
     }
 
-    fn generate(&mut self, body: &Expr, strict: bool, sync: bool, limit: Option<&Expr>) -> String {
+    fn generate(&mut self, body: &Expr, strict: bool, sync: bool, limit: Option<&Expr>) -> Js<'d> {
+        let a = self.a;
         let tail = self.tail.take();
         let result = if strict {
             let out = self.temp();
-            self.buf.push(format!("const {out} = [];"));
+            self.buf.push(self.line(&format!("const {out} = [];")));
             let saved = (self.collector.replace(out.clone()), self.limit.take());
             self.discard(body);
             (self.collector, self.limit) = saved;
-            out
+            self.leaf(&out)
         } else {
             // the clauses run no Effect: Sync calls at most, with the
             // services of the stage here, which each step of a `seqIn` reads
@@ -40,8 +44,14 @@ impl Gen<'_> {
             // `n` truncated, as `Seq.take` and `List.take` count it
             let limit = limit.map(|l| {
                 let n = self.expr(l);
-                let whole = n.parse::<f64>().is_ok_and(|n| n.fract() == 0.0);
-                let n = if whole { n } else { format!("Math.trunc({n})") };
+                let whole = n
+                    .atom()
+                    .is_some_and(|n| n.parse::<f64>().is_ok_and(|n| n.fract() == 0.0));
+                let n = if whole {
+                    n
+                } else {
+                    call(a, self.leaf("Math.trunc"), &[n])
+                };
                 (self.spill(n), self.temp())
             });
             let generator = mem::replace(&mut self.generator, false);
@@ -52,19 +62,28 @@ impl Gen<'_> {
             );
             let (mut stmts, ()) = self.block(|g| g.discard(body));
             if let Some((n, count)) = &limit {
-                stmts.insert(0, format!("let {count} = 0;\nif (!({n} > 0)) return;"));
+                let n = n.atom().unwrap_or_default();
+                let start = self.line(&format!("let {count} = 0;"));
+                let empty = self.line(&format!("if (!({n} > 0)) return;"));
+                let doc = docvec![a, start.doc, a.line(), empty.doc];
+                stmts.insert(0, Stmt::new(doc, start.flags | empty.flags | MULTILINE));
             }
             (self.collector, self.sync, self.limit) = saved;
             self.generator = generator;
-            let function = format!("function* () {{\n{}}}", indent(&stmts));
+            let function = generator_fn(a, &stmts);
             if !sync {
-                format!("{}({function})", self.rt("seq"))
+                let seq = self.rt("seq");
+                call(a, seq, &[function])
             } else if self.generator {
-                let context = format!("(yield* {})", self.rt("fiberContext"));
-                format!("{}({context}, {function})", self.rt("seqIn"))
+                let fiber_context = self.rt("fiberContext");
+                let context = self.yield_star(fiber_context);
+                let seq_in = self.rt("seqIn");
+                call(a, seq_in, &[context, function])
             } else {
-                let context = format!("{}()", self.rt("syncContext"));
-                format!("{}({context}, {function})", self.rt("seqIn"))
+                let sync_context = self.rt("syncContext");
+                let context = call(a, sync_context, &[]);
+                let seq_in = self.rt("seqIn");
+                call(a, seq_in, &[context, function])
             }
         };
         self.tail = tail;
@@ -73,6 +92,7 @@ impl Gen<'_> {
 
     /// Emits `e` for what it does: the loops, guards and yields of a `for`.
     pub(super) fn discard(&mut self, e: &Expr) {
+        let arena = self.a;
         match &e.kind {
             ExprKind::Each { pat, source, body } => {
                 let s = self.expr(source);
@@ -87,29 +107,45 @@ impl Gen<'_> {
                         g.discard(body);
                     }
                 });
+                let head = docvec![
+                    arena,
+                    "for (const ",
+                    arena.alloc_str(&var),
+                    " of ",
+                    s.at(arena, Before::Other, After::Delimiter),
+                    ") "
+                ];
+                let flags = s.flags | stmt_flags(&inner) | MULTILINE;
                 self.buf
-                    .push(format!("for (const {var} of {s}) {{\n{}}}", indent(&inner)));
+                    .push(Stmt::new(docvec![arena, head, block(arena, &inner)], flags));
             }
             ExprKind::Yield(value) => {
                 let v = self.expr(value);
-                let stmt = match &self.collector {
-                    Some(out) => format!("{out}.push({v});"),
-                    None => format!("yield {v};"),
+                let stmt = if let Some(out) = &self.collector {
+                    let push = self.leaf(&format!("{out}.push"));
+                    self.expr_stmt(call(arena, push, &[v]))
+                } else {
+                    let yielded = v.at(arena, Before::Other, After::Semicolon);
+                    let doc = docvec![arena, "yield ", yielded, ";"];
+                    Stmt::new(doc, v.flags | YIELD_TEXT | YIELDS)
                 };
                 self.buf.push(stmt);
                 if let Some((n, count)) = &self.limit {
-                    self.buf.push(format!("if (++{count} >= {n}) return;"));
+                    let n = n.atom().unwrap_or_default();
+                    let stmt = self.line(&format!("if (++{count} >= {n}) return;"));
+                    self.buf.push(stmt);
                 }
             }
             ExprKind::If(c, t, f) => {
                 let c = self.expr(c);
                 let (ts, ()) = self.block(|g| g.discard(t));
                 let (fs, ()) = self.block(|g| g.discard(f));
-                self.buf.push(if fs.is_empty() {
-                    format!("if ({c}) {{\n{}}}", indent(&ts))
+                let stmt = if fs.is_empty() {
+                    self.if_then(c, &ts)
                 } else {
-                    format!("if ({c}) {{\n{}}} else {{\n{}}}", indent(&ts), indent(&fs))
-                });
+                    self.if_else(c, &ts, &fs)
+                };
+                self.buf.push(stmt);
             }
             ExprKind::Block(stmts, result) => {
                 for stmt in stmts {
@@ -120,8 +156,8 @@ impl Gen<'_> {
             ExprKind::Lit(Lit::Unit) => {}
             _ => {
                 let v = self.expr(e);
-                if !atomic(&v) {
-                    self.buf.push(format!("{v};"));
+                if v.atom().is_none() {
+                    self.buf.push(self.expr_stmt(v));
                 }
             }
         }

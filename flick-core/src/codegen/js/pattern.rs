@@ -2,28 +2,69 @@
 //! bindings it makes. Arms are tried top to bottom; a guard that fails goes
 //! on to the next arm.
 
-use super::{Gen, indent, names};
 use std::mem;
 
+use flick_pretty::docvec;
+
+use super::doc::{After, Before, Head, Js, MULTILINE, Stmt, block, stmt_flags, text_flags};
+use super::{Gen, names};
 use crate::ir::{Arm, Expr, Lit, Pat};
 use crate::types::{Constructor, JsClass, Rep};
 
-#[derive(Default)]
-struct Test {
-    conds: Vec<String>,
+struct Test<'d> {
+    conds: Vec<Js<'d>>,
     binds: Vec<(String, String)>,
     /// Names an or-pattern assigns inside its test, declared before it.
     lets: Vec<String>,
 }
 
-impl Gen<'_> {
-    fn test(&mut self, pat: &Pat, subject: &str, t: &mut Test) {
+impl Test<'_> {
+    fn new() -> Self {
+        Test {
+            conds: Vec::new(),
+            binds: Vec::new(),
+            lets: Vec::new(),
+        }
+    }
+}
+
+impl<'d> Gen<'_, 'd> {
+    /// A condition written out in full.
+    fn cond(&self, text: &str) -> Js<'d> {
+        let flags = text_flags(text);
+        Js::code(self.a.text(self.a.alloc_str(text)), Head::Other, &[]).with(flags)
+    }
+
+    /// `items` joined by the operator `op`; a lone item as it is, for its
+    /// place to decide on its parentheses.
+    fn chain(&self, items: &[Js<'d>], op: &'d str) -> Js<'d> {
+        if let [only] = items {
+            return *only;
+        }
+        let a = self.a;
+        let doc = a.join(
+            items.iter().map(|j| j.at(a, Before::Other, After::Other)),
+            a.text(op),
+        );
+        Js::code(doc, Head::Other, items)
+    }
+
+    fn test(&mut self, pat: &Pat, subject: &str, t: &mut Test<'d>) {
+        let a = self.a;
         match pat {
             Pat::Wild | Pat::Lit(Lit::Unit) => {}
             Pat::Bind(name) => t.binds.push((names::ident(name), subject.to_owned())),
-            Pat::Lit(lit) => t
-                .conds
-                .push(format!("{subject} === {}", super::literal::literal(lit))),
+            Pat::Lit(lit) => {
+                let lit = self.literal(lit);
+                let doc = docvec![
+                    a,
+                    a.alloc_str(subject),
+                    " === ",
+                    lit.at(a, Before::Other, After::Other)
+                ];
+                let flags = text_flags(subject);
+                t.conds.push(Js::code(doc, Head::Other, &[lit]).with(flags));
+            }
             Pat::Tuple(items) => {
                 for (i, item) in items.iter().enumerate() {
                     self.test(item, &format!("{subject}[{i}]"), t);
@@ -39,7 +80,7 @@ impl Gen<'_> {
                 };
                 let op = if rest.is_some() { ">=" } else { "===" };
                 t.conds
-                    .push(format!("{subject}.length {op} {}", at(items.len())));
+                    .push(self.cond(&format!("{subject}.length {op} {}", at(items.len()))));
                 for (i, item) in items.iter().enumerate() {
                     self.test(item, &format!("{subject}[{}]", at(i)), t);
                 }
@@ -66,10 +107,10 @@ impl Gen<'_> {
             }
             Pat::Con(c, args) if c.rep != Rep::Tagged => {
                 if let Rep::Typeof(class) = c.rep {
-                    t.conds.push(match class {
+                    t.conds.push(self.cond(&match class {
                         JsClass::Array => format!("Array.isArray({subject})"),
                         class => format!("typeof {subject} === {}", names::string(class.name())),
-                    });
+                    }));
                 }
                 for arg in args {
                     self.test(arg, subject, t);
@@ -78,40 +119,47 @@ impl Gen<'_> {
             Pat::Con(c, args) => {
                 let (tag, fields) = self.shape(c, args.len());
                 t.conds
-                    .push(format!("{subject}._tag === {}", names::string(&tag)));
+                    .push(self.cond(&format!("{subject}._tag === {}", names::string(&tag))));
                 for (arg, field) in args.iter().zip(fields) {
                     self.test(arg, &format!("{subject}.{field}"), t);
                 }
             }
-            Pat::Or(alternatives) => {
-                let mut tests = Vec::new();
-                for alt in alternatives {
-                    let mut inner = Test::default();
-                    self.test(alt, subject, &mut inner);
-                    let mut parts = inner.conds;
-                    if !inner.binds.is_empty() {
-                        let assigns: Vec<String> = inner
-                            .binds
-                            .iter()
-                            .map(|(n, p)| format!("({n} = {p})"))
-                            .collect();
-                        parts.push(format!("({}, true)", assigns.join(", ")));
-                    }
-                    for (name, _) in &inner.binds {
-                        if !t.lets.contains(name) {
-                            t.lets.push(name.clone());
-                        }
-                    }
-                    t.lets.extend(inner.lets);
-                    tests.push(if parts.is_empty() {
-                        "true".to_owned()
-                    } else {
-                        parts.join(" && ")
-                    });
-                }
-                t.conds.push(format!("({})", tests.join(" || ")));
-            }
+            Pat::Or(alternatives) => self.alternatives(alternatives, subject, t),
         }
+    }
+
+    /// The test of an or-pattern: one of the `alternatives` matches, and
+    /// assigns the names it binds.
+    fn alternatives(&mut self, alternatives: &[Pat], subject: &str, t: &mut Test<'d>) {
+        let mut tests = Vec::new();
+        for alt in alternatives {
+            let mut inner = Test::new();
+            self.test(alt, subject, &mut inner);
+            let mut parts = inner.conds;
+            if !inner.binds.is_empty() {
+                let assigns: Vec<String> = inner
+                    .binds
+                    .iter()
+                    .map(|(n, p)| format!("{n} = {p}"))
+                    .collect();
+                parts.push(self.cond(&format!("({}, true)", assigns.join(", "))));
+            }
+            for (name, _) in &inner.binds {
+                if !t.lets.contains(name) {
+                    t.lets.push(name.clone());
+                }
+            }
+            t.lets.extend(inner.lets);
+            tests.push(if parts.is_empty() {
+                self.leaf("true")
+            } else {
+                self.chain(&parts, " && ")
+            });
+        }
+        let alternatives = self.chain(&tests, " || ");
+        let doc = alternatives.at(self.a, Before::Delimiter, After::Delimiter);
+        t.conds
+            .push(Js::code(doc, Head::Other, &[alternatives]).in_parens());
     }
 
     /// The `_tag` of a constructor and the fields its arguments are in.
@@ -131,15 +179,35 @@ impl Gen<'_> {
 
     /// Binds the names of an irrefutable pattern.
     pub(super) fn destructure(&mut self, pat: &Pat, subject: &str) {
-        let mut t = Test::default();
+        let mut t = Test::new();
         self.test(pat, subject, &mut t);
         if !t.lets.is_empty() {
             self.buf.push(self.declare(&t.lets.join(", ")));
-            self.buf.push(format!("{};", t.conds.join(" && ")));
+            let conds = self.chain(&t.conds, " && ");
+            self.buf.push(self.expr_stmt(conds));
         }
         for (name, path) in t.binds {
-            self.buf.push(self.constant(&name, &path));
+            self.buf.push(self.constant(&name, self.leaf(&path)));
         }
+    }
+
+    /// `if (c) { body }`.
+    pub(super) fn if_then(&self, c: Js<'d>, body: &[Stmt<'d>]) -> Stmt<'d> {
+        let a = self.a;
+        let doc = docvec![
+            a,
+            "if (",
+            c.at(a, Before::Delimiter, After::Delimiter),
+            ") ",
+            block(a, body)
+        ];
+        Stmt::new(doc, c.flags | stmt_flags(body) | MULTILINE)
+    }
+
+    /// `head { body }`, a statement of the lines of `body`.
+    fn braced(&self, head: String, body: &[Stmt<'d>]) -> Stmt<'d> {
+        let flags = text_flags(&head) | stmt_flags(body) | MULTILINE;
+        Stmt::new(docvec![self.a, head, block(self.a, body)], flags)
     }
 
     /// The arms of a `match` on `subject`: with `result`, the value goes
@@ -152,8 +220,8 @@ impl Gen<'_> {
         let emit = |g: &mut Self, body: &Expr| match (result, &label) {
             (Some(r), Some(label)) => {
                 let v = g.expr(body);
-                g.buf.push(format!("{r} = {v};"));
-                g.buf.push(format!("break {label};"));
+                g.buf.push(g.assign(r, v));
+                g.buf.push(g.line(&format!("break {label};")));
             }
             _ => g.tail_expr(body),
         };
@@ -164,10 +232,10 @@ impl Gen<'_> {
             for (case, arm) in cases.into_iter().zip(arms) {
                 let (stmts, ()) = self
                     .block(|g| g.arm(subject, &arm.pat, arm.guard.as_ref(), &arm.body, true, emit));
-                let head = case.map_or("default:".to_owned(), |tag| format!("case {tag}:"));
-                body.push(format!("{head} {{\n{}}}", indent(&stmts)));
+                let head = case.map_or("default: ".to_owned(), |tag| format!("case {tag}: "));
+                body.push(self.braced(head, &stmts));
             }
-            out.push(format!("switch ({subject}._tag) {{\n{}}}", indent(&body)));
+            out.push(self.braced(format!("switch ({subject}._tag) "), &body));
         } else {
             for (i, arm) in arms.iter().enumerate() {
                 // the match is exhaustive: its last arm without a guard needs no test
@@ -178,7 +246,7 @@ impl Gen<'_> {
             }
         }
         match label {
-            Some(label) => self.buf.push(format!("{label}: {{\n{}}}", indent(&out))),
+            Some(label) => self.buf.push(self.braced(format!("{label}: "), &out)),
             None => self.buf.extend(out),
         }
     }
@@ -195,11 +263,12 @@ impl Gen<'_> {
                 false,
                 |g, body| {
                     let handler = g.gen_block(body);
-                    g.buf.push(format!("return {handler};"));
+                    g.buf.push(Stmt::ret(g.a, None, handler));
                 },
             );
         }
-        self.buf.push("return undefined;".to_owned());
+        let undefined = self.leaf("undefined");
+        self.buf.push(Stmt::ret(self.a, None, undefined));
     }
 
     /// The `case` tag of each arm of a `match` a `switch` can take, `None`
@@ -243,14 +312,14 @@ impl Gen<'_> {
         exhaustive: bool,
         body: impl FnOnce(&mut Self, &Expr),
     ) {
-        let mut t = Test::default();
+        let mut t = Test::new();
         self.test(pat, subject, &mut t);
         if exhaustive && guard.is_none() {
             t.conds.clear();
         }
         let (inner, ()) = self.block(|g| {
             for (name, path) in &t.binds {
-                let c = g.constant(name, path);
+                let c = g.constant(name, g.leaf(path));
                 g.buf.push(c);
             }
             match guard {
@@ -259,7 +328,8 @@ impl Gen<'_> {
                     let c = g.expr(guard);
                     g.generator = saved;
                     let (b, ()) = g.block(|g| body(g, value));
-                    g.buf.push(format!("if ({c}) {{\n{}}}", indent(&b)));
+                    let stmt = g.if_then(c, &b);
+                    g.buf.push(stmt);
                 }
                 None => body(g, value),
             }
@@ -268,18 +338,15 @@ impl Gen<'_> {
         if t.conds.is_empty() {
             block.extend(inner);
         } else {
-            block.push(format!(
-                "if ({}) {{\n{}}}",
-                t.conds.join(" && "),
-                indent(&inner)
-            ));
+            let conds = self.chain(&t.conds, " && ");
+            block.push(self.if_then(conds, &inner));
         }
         // names are unique in a definition: only the or-pattern's need a block
         if t.lets.is_empty() {
             self.buf.extend(block);
         } else {
             block.insert(0, self.declare(&t.lets.join(", ")));
-            self.buf.push(format!("{{\n{}}}", indent(&block)));
+            self.buf.push(self.braced(String::new(), &block));
         }
     }
 }
