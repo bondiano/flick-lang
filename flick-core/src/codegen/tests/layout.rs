@@ -98,3 +98,17 @@ fn source_cursors_after_astral_text_count_utf16_columns() {
         "{generated}"
     );
 }
+
+#[test]
+fn a_nullary_constructor_returns_the_object_holding_its_dictionaries() {
+    let source =
+        "module App exposing (..)\n\ntype Witness a =\n  | Show a => Witness : Witness a\n";
+    for release in [false, true] {
+        let js = compile_with(source, release, Labels::default()).code;
+        assert!(
+            js.contains("export const Witness = ($d0) => ({ _tag: "),
+            "{js}"
+        );
+        assert!(js.contains("$0: $d0"), "{js}");
+    }
+}

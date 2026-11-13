@@ -188,7 +188,7 @@ impl<'d> Gen<'_, 'd> {
                 .map(|(i, d)| docvec![a, "$", i, ": ", a.alloc_str(d)]),
         );
         let object = object(a, &entries, &[]);
-        let mut value = if fields.is_empty() {
+        let mut value = if fields.is_empty() && dicts.is_empty() {
             object
         } else {
             // an object, not a block, as the body of the arrows
