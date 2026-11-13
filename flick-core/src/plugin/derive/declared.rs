@@ -3,7 +3,7 @@
 //! of the module. The block is the declaration, and the fields of the type are the
 //! types the user wrote in it.
 
-use flick_plugin::{Arena, Block, CaseTarget, Decl, DeriveTarget, Kind, Span, Ty};
+use flick_plugin::{Arena, Block, CaseTarget, Decl, DeriveTarget, Kind, Span, Ty, Written};
 
 /// A type of a block's code and the classes it names.
 pub struct Declared {
@@ -12,10 +12,11 @@ pub struct Declared {
     pub classes: Vec<String>,
 }
 
-/// Each type `arena`, the code of `block`, declares.
-pub fn declared(arena: &Arena, block: &Block) -> Vec<Declared> {
+/// Each type `arena`, the code of `block`, declares; `read` is the type
+/// the user wrote at a span of the block.
+pub fn declared(arena: &Arena, block: &Block, read: &dyn Fn(Span) -> Written) -> Vec<Declared> {
     let field = |id: u32| match arena.nodes.get(id as usize).map(|n| &n.kind) {
-        Some(Kind::Ty(Ty::Hole(span))) => Some(*span),
+        Some(Kind::Ty(Ty::Hole(span))) => Some(read(*span)),
         _ => None,
     };
     (arena.nodes.iter())
@@ -27,14 +28,14 @@ pub fn declared(arena: &Arena, block: &Block) -> Vec<Declared> {
                 deriving,
                 unboxed,
             }) => {
-                let fields: Option<Vec<Vec<Span>>> = (cases.iter())
+                let fields: Option<Vec<Vec<Written>>> = (cases.iter())
                     .map(|c| c.fields.iter().map(|&f| field(f)).collect())
                     .collect();
                 let target = fields.map(|fields| {
                     // a type over another, which only its block's code makes
                     let wraps = match (&cases[..], &fields[..]) {
                         ([case], [of]) if *unboxed && case.name.contains('$') => {
-                            of.first().copied()
+                            of.first().cloned()
                         }
                         _ => None,
                     };
@@ -51,9 +52,16 @@ pub fn declared(arena: &Arena, block: &Block) -> Vec<Declared> {
                         decl: block.clone(),
                         name: name.clone(),
                         params: params.clone(),
+                        kinds: vec![String::new(); params.len()],
                         cases,
                         alias: None,
                         wraps,
+                        modifiers: if *unboxed {
+                            vec!["unboxed".into(), "type".into()]
+                        } else {
+                            vec!["type".into()]
+                        },
+                        deriving: deriving.clone(),
                         local: true,
                     }
                 });
@@ -74,7 +82,7 @@ pub fn declared(arena: &Arena, block: &Block) -> Vec<Declared> {
 
 #[cfg(test)]
 mod tests {
-    use flick_plugin::{Builder, Case, Place, flick};
+    use flick_plugin::{Builder, Case, Place, WrittenKind, flick};
 
     use super::*;
 
@@ -102,7 +110,15 @@ mod tests {
             signature: None,
             module: "App.Main".into(),
         };
-        declared(&b.finish(root), &block)
+        // the user's `Float`, as the host reads a hole of a block
+        let read = |span: Span| Written {
+            kind: WrittenKind::Con {
+                name: "Float".into(),
+                args: Vec::new(),
+            },
+            span,
+        };
+        declared(&b.finish(root), &block, &read)
     }
 
     #[test]
@@ -110,8 +126,12 @@ mod tests {
         let span = Span { start: 0, end: 5 };
         let found = wrapped(|b| b.ty(Ty::Hole(span)));
         let target = found[0].target.as_ref().expect("a target");
-        assert_eq!(target.wraps, Some(span));
-        assert_eq!(target.cases[0].fields, [span]);
+        assert_eq!(target.wraps.as_ref().map(|w| w.span), Some(span));
+        assert_eq!(target.cases[0].fields[0].span, span);
+        assert!(
+            matches!(&target.cases[0].fields[0].kind, WrittenKind::Con { name, .. } if name == "Float")
+        );
+        assert_eq!(target.modifiers, ["unboxed", "type"]);
         assert_eq!(found[0].classes, ["Pairs.Arbitrary"]);
     }
 

@@ -574,6 +574,20 @@ constructors. A built-in module and one of a project without a name have none.
 A plugin with `hooks = ["ir"]` gives the packages back as it got them; a changed
 one is `FLICK-P047`.
 
+## Plugin protocol 0.3.0
+
+Rebuild external native plugins and WASM components with this compiler's
+`flick-plugin` SDK. Components using protocol 0.2.0 now report `FLICK-P035`
+instead of loading against incompatible component types.
+
+Derive inputs contain parsed types: `CaseTarget.fields` is `Vec<Written>`,
+and `DeriveTarget.alias` and `wraps` contain `Written` instead of spans.
+Read `Written.kind` to inspect a type and `Written.span` for its diagnostic
+or hole location; do not reparse the declaration's token stream.
+`Signature.ty` supplies the same parsed representation. Parameter names and
+token-normalized kinds are available in `DeriveTarget.params` and `kinds`.
+See [Derives](../../reference/plugins/#derives) for the input contract.
+
 ## A module of the IR lists its exports
 
 A reader of `flick build --emit-ir` meets a new version, `0.11.0`: a module has

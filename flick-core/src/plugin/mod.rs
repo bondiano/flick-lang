@@ -12,6 +12,7 @@ pub mod render;
 pub mod source;
 pub mod splice;
 pub mod testing;
+pub mod written;
 
 use std::panic::{self, AssertUnwindSafe};
 use std::sync::Arc;

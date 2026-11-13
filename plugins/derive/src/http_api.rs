@@ -28,7 +28,9 @@ pub fn declarations(b: &mut Builder, target: &DeriveTarget) -> Result<NodeId, Re
     if !target.params.is_empty() {
         return Err(fail("a record of endpoints has no parameters"));
     }
-    let record = target.alias.ok_or_else(|| (whole, not_a_record(&me)))?;
+    let record = (target.alias.as_ref())
+        .map(|body| body.span)
+        .ok_or_else(|| (whole, not_a_record(&me)))?;
     let endpoints = endpoint::read(&target.decl, &me, record)?;
     let guarded = endpoints.iter().filter(|e| e.guard != Guard::None).count();
     if guarded != 0 && guarded != endpoints.len() {

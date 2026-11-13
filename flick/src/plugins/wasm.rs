@@ -120,6 +120,8 @@ struct State {
 
 impl flick::plugin::types::Host for State {}
 
+impl flick::plugin::written::Host for State {}
+
 impl flick::plugin::compiler::Host for State {
     fn parse_expr(
         &mut self,

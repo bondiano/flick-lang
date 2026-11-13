@@ -9,10 +9,11 @@ use std::sync::Arc;
 
 use flick_plugin::{
     Block, Compiler, Completion, Hole, HoleKind, Namespace, Place, ReachError, Request, Response,
-    Signature, Span, Token as PluginToken, TokenKind,
+    Signature, Span, Token as PluginToken, TokenKind, Written,
 };
 
 use super::reach::Reach;
+use super::written::written;
 use crate::diagnostics::Diagnostic;
 use crate::source::FileId;
 use crate::syntax::cst::{Node, Token};
@@ -21,7 +22,7 @@ use crate::syntax::{
     Fragment, parse_body_at, parse_decl_at, parse_expr_at, parse_lines_at, parse_pat_at,
     parse_type_at,
 };
-use crate::types::{let_parts, signature_name};
+use crate::types::{is_type, let_parts, signature_name};
 
 /// Where the spans of a hole in the signature above a block start: past
 /// any of its own text.
@@ -52,6 +53,8 @@ pub(crate) fn in_signature(hole: Hole) -> Option<Span> {
 struct Above {
     whole: (u32, u32),
     tokens: Vec<Token>,
+    /// Its type, at spans of its text.
+    ty: Option<Written>,
 }
 
 mod scope;
@@ -262,6 +265,8 @@ impl BlockSource {
         self.signature = Some(Above {
             whole: sig.range(),
             tokens: sig.tokens(),
+            ty: (sig.nodes().find(|n| is_type(n.kind)))
+                .map(|ty| written(ty, &self.text, sig.range().0)),
         });
         self
     }
@@ -369,6 +374,7 @@ impl BlockSource {
                             },
                         })
                         .collect(),
+                    ty: s.ty.clone(),
                 }
             }),
             module: self.module.to_string(),

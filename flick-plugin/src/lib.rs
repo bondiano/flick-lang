@@ -24,6 +24,7 @@ mod splice;
 mod wit;
 mod wit_arena;
 mod wit_calls;
+mod written;
 
 use serde::{Deserialize, Serialize};
 
@@ -41,10 +42,11 @@ pub use reach::{ReachError, Request, Response};
 #[doc(hidden)]
 pub use splice::__private;
 pub use splice::{Name, Splice, Wildcard};
+pub use written::{EffectRow, FlatKind, FlatRow, FlatWritten, Written, WrittenKind};
 
 /// The version of the interface, as `wit/plugin.wit` declares it. Caches of
 /// expansions key on it.
-pub const VERSION: &str = "0.2.0";
+pub const VERSION: &str = "0.3.0";
 
 /// A UTF-8 byte range in the body of a block.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -113,6 +115,8 @@ pub struct Block {
 pub struct Signature {
     pub text: String,
     pub tokens: Vec<Token>,
+    /// The type it declares, at spans of `text`.
+    pub ty: Option<Written>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -376,15 +380,23 @@ pub struct DeriveTarget {
     /// Its name, qualified for a type of another module: `Other.Color`.
     pub name: String,
     pub params: Vec<String>,
+    /// The kind each parameter is written with, `Type -> Type` of
+    /// `(f : Type -> Type)`, empty without one.
+    pub kinds: Vec<String>,
     /// Its constructors, qualified as its name is, with their fields' types.
     pub cases: Vec<CaseTarget>,
     /// The type a `type alias` stands for.
-    pub alias: Option<Span>,
+    pub alias: Option<Written>,
     /// The type its values are made of, for a type over another whose
     /// constructor is its declaration's alone: a `refined type`, or an
     /// `unboxed type` of a block with a constructor only generated code can
     /// name. Its values come from `T.parse` and are read by `T.value`.
-    pub wraps: Option<Span>,
+    pub wraps: Option<Written>,
+    /// The words before its name: `type`, `alias`, `opaque`, `unboxed`,
+    /// `untagged`, `error`.
+    pub modifiers: Vec<String>,
+    /// The classes its `deriving` names, as written: `Schema`, `Cli.Value`.
+    pub deriving: Vec<String>,
     pub local: bool,
 }
 
@@ -396,7 +408,7 @@ pub struct DeriveTarget {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CaseTarget {
     pub name: String,
-    pub fields: Vec<Span>,
+    pub fields: Vec<Written>,
     pub literal: Option<Span>,
     #[serde(default)]
     pub refined: bool,
@@ -536,10 +548,15 @@ mod tests {
 
     #[test]
     fn the_version_is_the_one_of_the_interface() {
-        let wit = include_str!("../wit/plugin.wit");
-        assert!(
-            wit.starts_with(&format!("package flick:plugin@{VERSION};")),
-            "wit/plugin.wit declares another version than {VERSION}"
-        );
+        for (name, wit) in [
+            ("plugin", include_str!("../wit/plugin.wit")),
+            ("compiler", include_str!("../wit/compiler.wit")),
+            ("written", include_str!("../wit/written.wit")),
+        ] {
+            assert!(
+                wit.starts_with(&format!("package flick:plugin@{VERSION};")),
+                "wit/{name}.wit declares another version than {VERSION}"
+            );
+        }
     }
 }
