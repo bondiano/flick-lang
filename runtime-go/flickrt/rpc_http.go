@@ -204,10 +204,10 @@ func RpcListenWebsocket(fb *Fiber, options, group, handlers Value) Value {
 // RpcHandler mounts a group once with its lexical services and owner.
 func RpcHandler(fb *Fiber, ser, group, handlers Value) Value {
 	g := groupOf(group)
-	return &serverMount{newRPCServer(fb, g, rpcHandlers(g, handlers)).httpHandler(serializationOf(ser))}
+	return newRPCServer(fb, g, rpcHandlers(g, handlers)).httpHandler(serializationOf(ser))
 }
 
 func RpcHandlerWebsocket(fb *Fiber, ser, group, handlers Value) Value {
 	g := groupOf(group)
-	return &serverMount{newRPCServer(fb, g, rpcHandlers(g, handlers)).websocketHandler(serializationOf(ser))}
+	return newRPCServer(fb, g, rpcHandlers(g, handlers)).websocketHandler(serializationOf(ser))
 }

@@ -58,21 +58,25 @@ type rpcCall struct {
 	state     *fiberState
 	ack       chan struct{} // a stream's acknowledged chunks, over a socket
 	responded bool          // its exit went out already
+	silent    bool          // notification, or an acknowledged discarded call
+	discard   bool
+	pending   bool // a response is still owed
 }
 
 // rpcConn is a client of the server.
 type rpcConn struct {
-	srv     *rpcServer
-	ser     *rpcSerialization
-	headers []Value       // the transport's, before each request's own
-	acks    bool          // whether the client acknowledges chunks
-	send    func(m Value) // writes a message; safe for concurrent use
-	closer  func()        // closes the transport, or nil
-	mu      sync.Mutex
-	calls   map[string]*rpcCall
-	ended   bool
-	done    chan struct{} // closed once it ended and its calls did
-	once    sync.Once
+	srv          *rpcServer
+	ser          *rpcSerialization
+	headers      []Value       // the transport's, before each request's own
+	acks         bool          // whether the client acknowledges chunks
+	send         func(m Value) // writes a message; safe for concurrent use
+	closer       func()        // closes the transport, or nil
+	mu           sync.Mutex
+	calls        map[string]*rpcCall
+	ended        bool
+	done         chan struct{} // closed once it ended and its calls did
+	once         sync.Once
+	responseOnce sync.Once
 }
 
 func (s *rpcServer) connect(ser *rpcSerialization, headers []Value, acks bool, send func(Value), closer func()) *rpcConn {
@@ -93,29 +97,49 @@ func (s *rpcServer) connect(ser *rpcSerialization, headers []Value, acks bool, s
 // finish ends the client once its calls ended.
 func (c *rpcConn) finish() {
 	c.once.Do(func() {
-		close(c.done)
+		c.responseOnce.Do(func() { close(c.done) })
 		c.srv.mu.Lock()
 		delete(c.srv.conns, c)
 		c.srv.mu.Unlock()
 	})
 }
 
-// abort interrupts the calls: the client went away.
-func (c *rpcConn) abort() {
+// responseComplete closes the HTTP response independently of owned work.
+// c.mu must be held: silent calls remain registered until their cleanup ends.
+func (c *rpcConn) responseComplete() {
+	if !c.ended {
+		return
+	}
+	for _, call := range c.calls {
+		if call.pending {
+			return
+		}
+	}
+	c.responseOnce.Do(func() { close(c.done) })
+}
+
+func (c *rpcConn) stop(force bool) {
 	c.mu.Lock()
 	c.ended = true
 	idle := len(c.calls) == 0
 	for _, call := range c.calls {
-		call.state.interrupt(0)
+		if force || !call.silent {
+			call.state.interrupt(0)
+		}
 	}
+	c.responseComplete()
 	c.mu.Unlock()
 	if idle {
 		c.finish()
 	}
 }
 
+// A disconnected transport cannot cancel notifications or acknowledged work.
+func (c *rpcConn) abort() { c.stop(false) }
+
+// Closing the mounted group interrupts and joins every call, including silent work.
 func (c *rpcConn) close() {
-	c.abort()
+	c.stop(true)
 	if c.closer != nil {
 		c.closer()
 	}
@@ -182,6 +206,7 @@ func (c *rpcConn) receive(m Value) {
 		c.mu.Lock()
 		c.ended = true
 		idle := len(c.calls) == 0
+		c.responseComplete()
 		c.mu.Unlock()
 		if idle {
 			c.finish()
@@ -226,6 +251,7 @@ func issuesText(issues []issue) string {
 
 func (c *rpcConn) request(m Value) {
 	id := msgField(m, "id")
+	notification := msgField(m, "isNotification") == true
 	switch id.(type) {
 	case string, float64:
 	default:
@@ -235,7 +261,9 @@ func (c *rpcConn) request(m Value) {
 	tag, _ := msgField(m, "tag").(string)
 	p := c.srv.procs[tag]
 	if p == nil {
-		c.exit(binUnknownExitLayout, id, exitFailureTree(dieReason("Unknown request tag: "+tag)))
+		if !notification {
+			c.exit(binUnknownExitLayout, id, exitFailureTree(dieReason("Unknown request tag: "+tag)))
+		}
 		return
 	}
 	payload := msgField(m, "payload")
@@ -243,7 +271,9 @@ func (c *rpcConn) request(m Value) {
 		b, _ := payload.([]byte)
 		tree, err := binDecode(p.layouts().payload, b)
 		if err != nil {
-			c.exit(p.layouts().exit, id, exitFailureTree(dieReason(err.Error())))
+			if !notification {
+				c.exit(p.layouts().exit, id, exitFailureTree(dieReason(err.Error())))
+			}
 			return
 		}
 		payload = tree
@@ -251,11 +281,13 @@ func (c *rpcConn) request(m Value) {
 	fb := &Fiber{state: newState(), env: c.srv.services}
 	decoded, issues := decodeWire(fb, p.payload, payload)
 	if issues != nil {
-		c.exit(p.layouts().exit, id, exitFailureTree(dieReason(issuesText(issues))))
+		if !notification {
+			c.exit(p.layouts().exit, id, exitFailureTree(dieReason(issuesText(issues))))
+		}
 		return
 	}
 	headers := append(c.headers[:len(c.headers):len(c.headers)], asList(msgField(m, "headers"))...)
-	call := &rpcCall{state: newState()}
+	call := &rpcCall{state: newState(), silent: notification, pending: !notification, discard: !notification && msgField(m, "discard") == true}
 	if p.stream && c.acks {
 		call.ack = make(chan struct{}, 1)
 	}
@@ -306,12 +338,20 @@ func (c *rpcConn) run(call *rpcCall, p *rpcProc, id, payload Value, headers []Va
 	} else {
 		out, cause = catch(body)
 	}
-	if !call.responded {
-		c.respond(fb, p, id, out, cause)
+	if !call.responded && !call.silent {
+		if call.discard && cause != nil {
+			c.exit(p.layouts().exit, id, c.failureTree(fb, p, cause))
+		} else {
+			c.respond(fb, p, id, out, cause)
+		}
+	}
+	if cause != nil && (call.silent || call.discard) {
+		logMessage(fb, "Error", causePretty(cause))
 	}
 	key := idKey(id)
 	c.mu.Lock()
 	delete(c.calls, key)
+	c.responseComplete()
 	idle := c.ended && len(c.calls) == 0
 	c.mu.Unlock()
 	if idle {
@@ -322,6 +362,10 @@ func (c *rpcConn) run(call *rpcCall, p *rpcProc, id, payload Value, headers []Va
 // rpcInvoke runs the hooks, the check and the handler of a call: what the
 // handler gave, and the fiber with the service the check made.
 func rpcInvoke(fb *Fiber, p *rpcProc, handler, payload Value, headers []Value) (Value, *Fiber) {
+	return rpcInvokeStart(fb, p, handler, payload, headers, nil)
+}
+
+func rpcInvokeStart(fb *Fiber, p *rpcProc, handler, payload Value, headers []Value, start func()) (Value, *Fiber) {
 	seen := Rec("payload", payload, "headers", HeadersFromInput(headers))
 	for _, hook := range p.middleware {
 		runMaybe(fb, Apply(fb, hook, seen))
@@ -332,16 +376,37 @@ func rpcInvoke(fb *Fiber, p *rpcProc, handler, payload Value, headers []Value) (
 		inner.env = fb.env.with(p.authTag, impl)
 		fb = &inner
 	}
-	return runMaybe(fb, Apply(fb, handler, payload)), fb
+	result := Apply(fb, handler, payload)
+	if start != nil {
+		start()
+	}
+	return runMaybe(fb, result), fb
 }
 
 // serve runs a call, sending a stream's chunks as they come.
 func (c *rpcConn) serve(fb *Fiber, call *rpcCall, p *rpcProc, id, payload Value, headers []Value) Value {
-	result, fb := rpcInvoke(fb, p, c.srv.handlers[p.name], payload, headers)
+	result, fb := rpcInvokeStart(fb, p, c.srv.handlers[p.name], payload, headers, func() {
+		if !call.discard {
+			return
+		}
+		layout := *p.layouts().exit
+		layout.value = binLeaf(binUndefined)
+		c.mu.Lock()
+		call.silent = true
+		c.mu.Unlock()
+		c.exit(&layout, id, exitSuccessTree(JsonNull))
+		c.mu.Lock()
+		call.pending = false
+		c.responseComplete()
+		c.mu.Unlock()
+	})
 	if !p.stream {
 		return result
 	}
 	runStream(fb, streamOf(result), func(chunk []Value) {
+		if call.silent {
+			return
+		}
 		values := make([]Value, len(chunk))
 		for i, x := range chunk {
 			v, issues := encodeWire(fb, p.success, x)
@@ -392,24 +457,7 @@ func (c *rpcConn) respond(fb *Fiber, p *rpcProc, id, out Value, cause *Cause) {
 		c.defect(defectTree(cause.firstOf(causeDie).defect))
 		return
 	}
-	var reasons []Value
-	for _, r := range cause.reasons() {
-		switch r.kind {
-		case causeFail:
-			tree, ok := encodeError(fb, p, r.err)
-			if !ok {
-				message := `Failed to encode response for RPC "` + p.name + `": no error case has ` + describe(r.err)
-				c.exit(p.layouts().exit, id, exitFailureTree(dieReason(message)))
-				return
-			}
-			reasons = append(reasons, failReason(tree))
-		case causeDie:
-			reasons = append(reasons, dieReason(defectTree(r.defect)))
-		case causeInterrupt:
-			reasons = append(reasons, interruptReason(r.fiber))
-		}
-	}
-	c.exit(p.layouts().exit, id, exitFailureTree(reasons...))
+	c.exit(p.layouts().exit, id, c.failureTree(fb, p, cause))
 }
 
 // encodeError is the error as the first case whose codec has it writes it.
@@ -421,4 +469,25 @@ func encodeError(fb *Fiber, p *rpcProc, err Value) (Value, bool) {
 		}
 	}
 	return nil, false
+}
+
+// failureTree keeps a pre-ack discard failure local to its request.
+func (c *rpcConn) failureTree(fb *Fiber, p *rpcProc, cause *Cause) Value {
+	var reasons []Value
+	for _, r := range cause.reasons() {
+		switch r.kind {
+		case causeFail:
+			tree, ok := encodeError(fb, p, r.err)
+			if !ok {
+				message := `Failed to encode response for RPC "` + p.name + `": no error case has ` + describe(r.err)
+				return exitFailureTree(dieReason(message))
+			}
+			reasons = append(reasons, failReason(tree))
+		case causeDie:
+			reasons = append(reasons, dieReason(defectTree(r.defect)))
+		case causeInterrupt:
+			reasons = append(reasons, interruptReason(r.fiber))
+		}
+	}
+	return exitFailureTree(reasons...)
 }
