@@ -482,13 +482,12 @@ fn parentheses_stay_only_where_the_code_around_needs_them() {
 
 #[test]
 fn a_wide_list_breaks_one_element_per_line_and_a_lone_callback_hugs() {
-    let js = compile(
-        "module App.Layout exposing (..)\n\
+    let source = "module App.Layout exposing (..)\n\
          wide : Float -> Float -> List Float\n\
          let wide first second = [first * 1234567, second * 2345678, first * 3456789, second * 4567891, first]\n\
          run : ((Option Float -> Float) -> Float) -> Float\n\
-         let run f = f (fun x -> match x with\n  | Some y -> y\n  | None -> 0)\n",
-    );
+         let run f = f (fun x -> match x with\n  | Some y -> y\n  | None -> 0)\n";
+    let js = compile(source);
     assert!(
         js.contains("=> [\n  first * 1234567,\n  second * 2345678,\n"),
         "{js}"
@@ -498,6 +497,13 @@ fn a_wide_list_breaks_one_element_per_line_and_a_lone_callback_hugs() {
         "{js}"
     );
     assert!(js.lines().all(|line| line.len() <= 100), "{js}");
+    let release = compile_with(source, true, Labels::default()).code;
+    assert!(
+        release.contains(
+            "[first * 1234567, second * 2345678, first * 3456789, second * 4567891, first]"
+        ),
+        "{release}"
+    );
 }
 
 #[cfg(feature = "native-project")]

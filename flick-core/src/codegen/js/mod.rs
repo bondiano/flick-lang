@@ -136,6 +136,8 @@ pub(crate) fn js_at(
     }
     let mut output = print(
         docvec![a, code, a.line()],
+        // Release preserves its compact list layout; debug is laid out for reading.
+        if options.release { usize::MAX } else { WIDTH },
         #[cfg(feature = "native-project")]
         &g.spans,
         #[cfg(feature = "native-project")]
@@ -233,6 +235,7 @@ impl<'a, 'd> Gen<'a, 'd> {
 /// cursor as a mapping: the span and Flick name of its mark.
 fn print(
     code: Document<'_>,
+    width: usize,
     #[cfg(feature = "native-project")] spans: &[Span],
     #[cfg(feature = "native-project")] names: &HashMap<usize, String>,
 ) -> Output {
@@ -249,7 +252,7 @@ fn print(
             ));
         };
         // writing into a `String` cannot fail
-        let _ = code.pretty_print_observed(WIDTH, &mut out, &mut observe);
+        let _ = code.pretty_print_observed(width, &mut out, &mut observe);
         Output {
             code: out,
             mappings,
@@ -258,7 +261,7 @@ fn print(
     }
     #[cfg(not(feature = "native-project"))]
     {
-        let _ = code.pretty_print(WIDTH, &mut out);
+        let _ = code.pretty_print(width, &mut out);
         Output {
             code: out,
             imports: Vec::new(),
