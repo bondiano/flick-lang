@@ -180,6 +180,9 @@ impl<'a> Gen<'a> {
                 .into()
             }
             ExprKind::Con(_) | ExprKind::App { .. } => self.app(e),
+            // A nullary GADT constructor still applies its dictionary fields;
+            // constructing it first would pass Data to generic Inst as Poly.
+            ExprKind::Dicts(inner, _) if matches!(inner.kind, ExprKind::Con(_)) => self.app(e),
             ExprKind::Dicts(inner, dicts) => self.given(inner, dicts),
             ExprKind::Abstract(shown, inner) => self.abstraction(shown, inner),
             ExprKind::Lambda { params, body } => self.lambda(params, body, None),
