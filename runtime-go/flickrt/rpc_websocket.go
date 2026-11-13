@@ -295,18 +295,14 @@ func dialSocket(fb *Fiber, transport rpcTransport, rawURL string) (rpcSocket, er
 		port = map[bool]string{true: "443", false: "80"}[secure]
 	}
 	address := net.JoinHostPort(strings.Trim(u.host, "[]"), port)
-	type dialed struct {
-		sock rpcSocket
-		err  error
-	}
-	got := ForeignAsync(fb, func(ctx Context) Value {
+	return acquireRPCSocket(fb, func(ctx Context) (rpcSocket, error) {
 		var d net.Dialer
 		conn, err := d.DialContext(ctx, "tcp", address)
 		if err != nil {
-			return dialed{err: err}
+			return nil, err
 		}
 		if transport == "tcp" {
-			return dialed{sock: &tcpSocket{conn: conn, buf: make([]byte, 64<<10)}}
+			return &tcpSocket{conn: conn, buf: make([]byte, 64<<10)}, nil
 		}
 		stop := context.AfterFunc(ctx, func() { conn.Close() })
 		defer stop()
@@ -314,18 +310,17 @@ func dialSocket(fb *Fiber, transport rpcTransport, rawURL string) (rpcSocket, er
 			tc := tls.Client(conn, &tls.Config{ServerName: strings.Trim(u.host, "[]")})
 			if err := tc.HandshakeContext(ctx); err != nil {
 				conn.Close()
-				return dialed{err: err}
+				return nil, err
 			}
 			conn = tc
 		}
 		ws, err := wsHandshake(conn, u)
 		if err != nil {
 			conn.Close()
-			return dialed{err: err}
+			return nil, err
 		}
-		return dialed{sock: ws}
-	}).(dialed)
-	return got.sock, got.err
+		return ws, nil
+	})
 }
 
 // wsHandshake asks the server at `u` for a WebSocket over `conn`.
