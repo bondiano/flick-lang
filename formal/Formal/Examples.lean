@@ -212,7 +212,7 @@ example (S : Sig) :
       (fun h => by simp [Tm.Has] at h) .refl
     refine .app (.const (c := .refMake) (ι := { (default : CArg) with t := .tvar 0, C := (· = .v 1) })
       ?_ .refl) (.var (ts := []) rfl rfl (fun _ _ h => h.elim) .refl) (Stage.le_refl _) .refl
-    rintro k rfl; exact .inr ⟨_, .inr ⟨rfl, rfl⟩, rfl⟩
+    rintro k rfl; exact .inr ⟨_, ⟨_, .inr ⟨rfl, rfl⟩, .refl⟩, rfl⟩
   · refine .app (ψ := .rt Row.none Row.none) (C := Caps.none)
       (.var (σ := mkSch) (ts := [.hnd (.rg 0), .caps (· = .r 0)]) rfl rfl ?_ ?_)
       (.var (ts := []) rfl rfl (fun _ _ h => h.elim) .refl)
@@ -227,6 +227,6 @@ example : ¬ mkSch.Holds Facts.none [.hnd (.rg 0), .caps Caps.none] := by
   intro h
   rcases Scheme.holds_bnd.1 h (.r 0) rfl with ⟨_, rfl, h⟩ | ⟨_, h, _⟩
   · simp [instT, Ty.reach, Caps.none] at h
-  · exact h.elim
+  · simp only [Facts.close_none, Facts.none] at h
 
 end Flick

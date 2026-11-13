@@ -1,4 +1,5 @@
 import Formal.StepFrame
+import Formal.FunctionTyping
 
 /-!
 # Progress (core.md §4)
@@ -65,84 +66,71 @@ theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.le
   · exact .inl (.ctorApp hvf hK hve)
   · cases c with
     | perform E o cl =>
-      cases hf with
-      | perform hop hT' =>
-        obtain ⟨-, hψ', -⟩ := LeLive.arrow_inv hT'
-        by_cases hra : RootAnswers root E o cl
-        · obtain ⟨rfl, _, _, hr, hf⟩ := hra
-          exact step (Step.performRoot (E := []) OkE.nil (fun _ h => by cases h) hr hf hve)
-        · have hrow : Stage.le (Stage.rt (Row.single E) Row.none) φ := by
-            simpa only [Stage.use_none] using Stage.le_trans hψ' hψ
-          exact .inr (.perform ⟨[], _, _, _, _, _, _, OkE.nil, hve, rfl, hop, fun _ h => (by cases h),
-            hra, Stage.le_svc hrow _ rfl⟩)
-      | const hok _ => simp_all [Const.ok]
+      obtain ⟨_, _, _, hop, hT'⟩ := hf.perform_arrow
+      obtain ⟨-, hψ', -⟩ := LeLive.arrow_inv hT'
+      by_cases hra : RootAnswers root E o cl
+      · obtain ⟨rfl, _, _, hr, hf⟩ := hra
+        exact step (Step.performRoot (E := []) OkE.nil (fun _ h => by cases h) hr hf hve)
+      · have hrow : Stage.le (Stage.rt (Row.single E) Row.none) φ := by
+          simpa only [Stage.use_none] using Stage.le_trans hψ' hψ
+        exact .inr (.perform ⟨[], _, _, _, _, _, _, OkE.nil, hve, rfl, hop, fun _ h => (by cases h),
+          hra, Stage.le_svc hrow _ rfl⟩)
     | scopeRun => exact step (Step.ofR (.scopeRun hve))
     | refMake => exact step (Step.ofR (.refMake hve))
     | refGet =>
-      cases hf with
-      | const _ hT' =>
-        obtain ⟨hdom, -⟩ := LeLive.arrow_inv hT'
-        obtain ⟨l, rfl, hl⟩ := canonical_ref hve (LeLive.typ_ref hdom he)
-        exact step (Step.ofR (.refGet (List.getElem?_eq_getElem (hμ ▸ getElem?_lt hl))))
+      obtain ⟨_, _, hT'⟩ := hf.const_arrow (by intro E o cl h; cases h)
+      obtain ⟨hdom, -⟩ := LeLive.arrow_inv hT'
+      obtain ⟨l, _, rfl, hl, -⟩ := canonical_ref hve (LeLive.typ_ref hdom he)
+      exact step (Step.ofR (.refGet (List.getElem?_eq_getElem (hμ ▸ getElem?_lt hl))))
     | refSet => exact .inl (.constApp rfl hve)
     | addFin => exact .inl (.constApp rfl hve)
     | spawn => exact .inl (.constApp rfl hve)
     | intEq => exact .inl (.constApp rfl hve)
     | open_ =>
-      cases hf with
-      | const _ hT' =>
-        obtain ⟨hdom, -⟩ := LeLive.arrow_inv hT'
-        obtain ⟨p, rfl, -⟩ := canonical_owner hve (LeLive.typ_owner hdom he)
-        rcases live_or_dead Λ p with ⟨g, hg, hl⟩ | hd
-        · exact step (Step.ofR (.open_ hg hl))
-        · exact blocked (.inr ⟨p, hd, .inl rfl⟩)
+      obtain ⟨_, _, hT'⟩ := hf.const_arrow (by intro E o cl h; cases h)
+      obtain ⟨hdom, -⟩ := LeLive.arrow_inv hT'
+      obtain ⟨p, rfl, -⟩ := canonical_owner hve (LeLive.typ_owner hdom he)
+      rcases live_or_dead Λ p with ⟨g, hg, hl⟩ | hd
+      · exact step (Step.ofR (.open_ hg hl))
+      · exact blocked (.inr ⟨p, hd, .inl rfl⟩)
     | op =>
-      cases hf with
-      | const _ hT' =>
-        obtain ⟨p, rfl, -⟩ :=
-          canonical_hnd hve (LeLive.typ_hnd (LeLive.op_dom hT') he)
-        rcases live_or_dead Λ p with ⟨g, hg, hl⟩ | hd
-        · exact step (Step.ofR (.op hg hl))
-        · exact blocked (.inr ⟨p, hd, .inr (.inl rfl)⟩)
+      obtain ⟨_, _, hT'⟩ := hf.const_arrow (by intro E o cl h; cases h)
+      obtain ⟨p, rfl, -⟩ :=
+        canonical_hnd hve (LeLive.typ_hnd (LeLive.op_dom hT') he)
+      rcases live_or_dead Λ p with ⟨g, hg, hl⟩ | hd
+      · exact step (Step.ofR (.op hg hl))
+      · exact blocked (.inr ⟨p, hd, .inr (.inl rfl)⟩)
   · cases c with
     | refSet =>
-      cases hf with
-      | app hc' hw' _ _ =>
-        cases hc' with
-        | const _ hT' =>
-          obtain ⟨hdom, -⟩ := LeLive.arrow_inv hT'
-          obtain ⟨l, rfl, hl⟩ := canonical_ref hw (LeLive.typ_ref hdom hw')
-          exact step (Step.ofR (.refSet hve (hμ ▸ getElem?_lt hl)))
+      obtain ⟨_, _, _, _, hc', hw', _, hT⟩ := hf.app_arrow
+      obtain ⟨_, _, hT'⟩ := hc'.const_arrow (by intro E o cl h; cases h)
+      obtain ⟨hdom, -⟩ := LeLive.arrow_inv hT'
+      obtain ⟨l, _, rfl, hl, -⟩ := canonical_ref hw (LeLive.typ_ref hdom hw')
+      exact step (Step.ofR (.refSet hve (hμ ▸ getElem?_lt hl)))
     | addFin =>
-      cases hf with
-      | app hc' hw' _ _ =>
-        cases hc' with
-        | const _ hT' =>
-          obtain ⟨hdom, -⟩ := LeLive.arrow_inv hT'
-          obtain ⟨p, rfl, -⟩ := canonical_owner hw (LeLive.typ_owner hdom hw')
-          rcases live_or_dead Λ p with ⟨g, hg, hl⟩ | hd
-          · exact step (Step.addFin (E := []) OkE.nil hg hl hve)
-          · exact blocked (.inr ⟨p, hd, .inr (.inr (.inl ⟨_, rfl⟩))⟩)
+      obtain ⟨_, _, _, _, hc', hw', _, hT⟩ := hf.app_arrow
+      obtain ⟨_, _, hT'⟩ := hc'.const_arrow (by intro E o cl h; cases h)
+      obtain ⟨hdom, -⟩ := LeLive.arrow_inv hT'
+      obtain ⟨p, rfl, -⟩ := canonical_owner hw (LeLive.typ_owner hdom hw')
+      rcases live_or_dead Λ p with ⟨g, hg, hl⟩ | hd
+      · exact step (Step.addFin (E := []) OkE.nil hg hl hve)
+      · exact blocked (.inr ⟨p, hd, .inr (.inr (.inl ⟨_, rfl⟩))⟩)
     | spawn =>
-      cases hf with
-      | app hc' hw' _ _ =>
-        cases hc' with
-        | const _ hT' =>
-          obtain ⟨hdom, -⟩ := LeLive.arrow_inv hT'
-          obtain ⟨p, rfl, -⟩ := canonical_owner hw (LeLive.typ_owner hdom hw')
-          rcases live_or_dead Λ p with ⟨g, hg, hl⟩ | hd
-          · exact step (Step.spawn (E := []) OkE.nil hg hl hve)
-          · exact blocked (.inr ⟨p, hd, .inr (.inr (.inr (.inl ⟨_, rfl⟩)))⟩)
+      obtain ⟨_, _, _, _, hc', hw', _, hT⟩ := hf.app_arrow
+      obtain ⟨_, _, hT'⟩ := hc'.const_arrow (by intro E o cl h; cases h)
+      obtain ⟨hdom, -⟩ := LeLive.arrow_inv hT'
+      obtain ⟨p, rfl, -⟩ := canonical_owner hw (LeLive.typ_owner hdom hw')
+      rcases live_or_dead Λ p with ⟨g, hg, hl⟩ | hd
+      · exact step (Step.spawn (E := []) OkE.nil hg hl hve)
+      · exact blocked (.inr ⟨p, hd, .inr (.inr (.inr (.inl ⟨_, rfl⟩)))⟩)
     | intEq =>
-      cases hf with
-      | app hc' hw' _ hT =>
-        cases hc' with
-        | const _ hT' =>
-          obtain ⟨hdom, -, lt⟩ := LeLive.arrow_inv hT'
-          obtain ⟨hdom', -⟩ := LeLive.arrow_inv (LeLive.trans lt hT)
-          obtain ⟨m, rfl⟩ := canonical_int hw (LeLive.typ_base hdom hw')
-          obtain ⟨n, rfl⟩ := canonical_int hve (LeLive.typ_base hdom' he)
-          exact step (Step.ofP .intEq)
+      obtain ⟨_, _, _, _, hc', hw', _, hT⟩ := hf.app_arrow
+      obtain ⟨_, _, hT'⟩ := hc'.const_arrow (by intro E o cl h; cases h)
+      obtain ⟨hdom, -, lt⟩ := LeLive.arrow_inv hT'
+      obtain ⟨hdom', -⟩ := LeLive.arrow_inv (LeLive.trans lt hT)
+      obtain ⟨m, rfl⟩ := canonical_int hw (LeLive.typ_base hdom hw')
+      obtain ⟨n, rfl⟩ := canonical_int hve (LeLive.typ_base hdom' he)
+      exact step (Step.ofP .intEq)
     | _ => simp [Const.arity] at hc
   · exact step (Step.resumeDie (E := []) OkE.nil hve (by rintro ⟨A, E', _, _, _, _, _, h, _⟩; simp at h))
 

@@ -29,6 +29,10 @@ theorem cb_ne : cb Caps.none ≠ cb sOnly := fun h => by
   have := congrFun hC (.r 0)
   simp [Caps.none, sOnly] at this
 
+theorem cb_not_equiv : ¬ Ty.Equiv (cb Caps.none) (cb sOnly) := fun h => by
+  have := congrFun h.reach (.r 0)
+  simp [cb, Ty.reach, Caps.none, sOnly] at this
+
 /-! ### A signature with covariant `List` and `Box`
 
 `type List a = Nil | Cons a (List a)` and `type Box a = Box {f : a}`. -/
@@ -207,6 +211,10 @@ theorem tag_no_widen (S : Sig) (hK : S.ctor "Pure" = some (0, [], "Tag"))
   generalize hY : Ty.tcon "Tag" [cb sOnly] = Y at h
   cases h with
   | refl => exact cb_ne (by simpa using (Ty.tcon_eq (hX.trans hY.symm)).2)
+  | equiv he =>
+    rw [← hX, ← hY] at he
+    have := congrFun he.reach (.r 0)
+    simp [Ty.tcon, cb, Ty.reach, Caps.none, sOnly] at this
   | arrow => exact Ty.arrow_ne_tcon hX.symm
   | eff => exact Ty.eff_ne_tcon hX.symm
   | rcons => exact Ty.rcons_ne_tcon hX.symm
@@ -216,7 +224,7 @@ theorem tag_no_widen (S : Sig) (hK : S.ctor "Pure" = some (0, [], "Tag"))
   | data _ _ _ _ hinv ha hb =>
     obtain ⟨rfl, rfl⟩ := Ty.tcon_eq (hX.trans ha)
     obtain ⟨-, rfl⟩ := Ty.tcon_eq (hY.trans hb)
-    refine cb_ne (hinv 0 _ _ rfl rfl (fun hi => ?_) (tag_invariant S hK hr))
+    refine cb_not_equiv (hinv 0 _ _ rfl rfl (fun hi => ?_) (tag_invariant S hK hr))
     exact Nat.not_lt_zero _ (S.hidden_ok _ _ hi "Pure" 0 [] hK).1
 
 theorem kField_not_noV : ¬ kField.NoV 0 := fun h => by
@@ -255,6 +263,9 @@ theorem k_row_stays (S : Sig) (hK : S.ctor "K" = some (1, [kField], "K")) {C C' 
   generalize hY : Ty.tcon "K" [.caps C'] = Y at h
   cases h with
   | refl => simpa using (Ty.tcon_eq (hX.trans hY.symm)).2
+  | equiv he =>
+    rw [← hX, ← hY] at he
+    simpa [Ty.tcon, Ty.reach, Caps.none] using he.reach
   | arrow => exact absurd hX.symm Ty.arrow_ne_tcon
   | eff => exact absurd hX.symm Ty.eff_ne_tcon
   | rcons => exact absurd hX.symm Ty.rcons_ne_tcon
@@ -271,7 +282,7 @@ theorem k_row_stays (S : Sig) (hK : S.ctor "K" = some (1, [kField], "K")) {C C' 
     cases hs : S.var "K" 0 with
     | pos => exact absurd hs np
     | bi => exact absurd hs nb
-    | inv => simpa using hinv 0 _ _ rfl rfl hh hs
-    | neg => simpa using (LeLive.eq_plain (hn 0 _ _ rfl rfl hh hs) rfl)
+    | inv => exact (hinv 0 _ _ rfl rfl hh hs).reach
+    | neg => exact (LeLive.eq_plain (hn 0 _ _ rfl rfl hh hs) rfl).reach
 
 end Flick.LiveChecks

@@ -184,7 +184,7 @@ theorem field_vary {i : Nat} {s : Variance} {q : Bool} {f : Ty} (hf : Ty.Pol S.v
       · exact Ty.reach_substT_mono hpw
       · exact (ihp j u hu hv).1 rfl
       · exact (ihn j u hu hv).2 rfl
-      · exact (hin j u hu hv).substT_eq hσ
+      · rw [(hin j u hu hv).substT_eq hσ]; exact .refl
     · subst hq
       by_cases hsn : s = .neg
       · have hw := hnw hsn
@@ -197,7 +197,7 @@ theorem field_vary {i : Nat} {s : Variance} {q : Bool} {f : Ty} (hf : Ty.Pol S.v
         · exact Ty.reach_substT_mono hw
         · exact (ihp j u hu hv).2 rfl
         · exact (ihn j u hu hv).1 rfl
-        · exact ((hin j u hu hv).substT_eq hσ).symm
+        · rw [(hin j u hu hv).substT_eq hσ]; exact .refl
       · have hN := (Ty.Pol.data hPp hng hPn hin hbi rfl).noV (Variance.noV_cond hsn)
         have := same hN
         simpa only [Ty.tcon_substT] using this
@@ -228,5 +228,22 @@ theorem Ty.substT_eq_upto {t : Ty} {σ σ' : Atom → Ty} : ∀ n : Nat,
           · exact ha j (by omega)
     · have : (Atom.v j) ≠ .v n := fun e => by injection e; omega
       simpa [μ, this] using hne
+
+/-- Ignored variables may differ syntactically or by row congruence. -/
+theorem Ty.substT_equiv_upto {t : Ty} {σ τ : Atom → Ty} (n : Nat)
+    (hσ : ∀ a, (∀ j, j < n → a ≠ .v j) → Ty.Equiv (σ a) (τ a))
+    (h : ∀ j, j < n → ¬ Ty.Equiv (σ (.v j)) (τ (.v j)) → t.NoV j) :
+    Ty.Equiv (t.substT σ) (t.substT τ) := by
+  classical
+  let μ : Atom → Ty := fun a => if Ty.Equiv (σ a) (τ a) then τ a else σ a
+  have e1 : Ty.Equiv (t.substT σ) (t.substT μ) := t.substT_equiv fun a => by
+    by_cases ha : Ty.Equiv (σ a) (τ a)
+    · simp only [μ, ha, ↓reduceIte]
+    · simp only [μ, ha, ↓reduceIte]; exact .refl
+  have e2 : t.substT μ = t.substT τ := Ty.substT_eq_upto n
+    (fun a ha => by simp only [μ, hσ a ha, ↓reduceIte])
+    (fun j hj hne => h j hj (fun he => hne (by simp only [μ, he, ↓reduceIte])))
+  rw [e2] at e1
+  exact e1
 
 end Flick

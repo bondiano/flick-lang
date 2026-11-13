@@ -118,9 +118,29 @@ theorem Ty.res_tcon_self (T : Name) (us : List Ty) : (Ty.tcon T us).res = Ty.tco
   generalize Ty.tcon T us = t at this ⊢
   cases t <;> simp_all [Ty.isData, Ty.res]
 
+theorem Ty.Equiv.isAll {a b : Ty} (h : Ty.Equiv a b) : a.isAll = b.isAll := by
+  cases h.form with
+  | rows ha hb => cases ha <;> cases hb <;> rfl
+  | _ => rfl
+
+theorem Ty.RowForm.res {a : Ty} (h : a.RowForm) : a.res = a := by
+  cases h <;> rfl
+
+theorem Ty.Equiv.res {a b : Ty} (h : Ty.Equiv a b) : Ty.Equiv a.res b.res := by
+  induction a generalizing b with
+  | arrow a φ t C _ ih =>
+    cases h.form with
+    | rows hr _ => cases hr
+    | arrow _ ht => simpa only [Ty.res] using ih ht
+  | _ =>
+    cases h.form with
+    | rows ha hb => rw [ha.res, hb.res]; exact h
+    | _ => exact h
+
 theorem LeLive.res {a b : Ty} (h : LeLive S a b) : LeLive S a.res b.res := by
   induction h with
   | refl => exact .refl
+  | equiv he => exact .equiv he.res
   | arrow _ _ _ _ _ ih => exact ih
   | eff hφ ht hc => exact .eff hφ ht hc
   | rcons h₁ h₂ hc => exact .rcons h₁ h₂ hc
@@ -141,6 +161,7 @@ theorem Ty.tcon_not_isAll (T : Name) (us : List Ty) : ¬ (Ty.tcon T us).isAll :=
 theorem LeLive.not_all {x y : Ty} (h : LeLive S x y) (hx : ¬ x.isAll) : ¬ y.isAll := by
   cases h with
   | refl => exact hx
+  | equiv he => rw [← he.isAll]; exact hx
   | arrow | eff | rcons => simp [Ty.isAll]
   | hide _ _ _ _ _ hb => subst hb; exact Ty.tcon_not_isAll _ _
   | data _ _ _ _ _ _ hb => subst hb; exact Ty.tcon_not_isAll _ _
@@ -149,12 +170,16 @@ theorem LeLiveI.snoc {a k t} {us : List Ty} (h : LeLiveI S a (.all k t)) (hus : 
     LeLiveI S a (t.substT (instT us)) := by
   generalize ht : Ty.all k t = T at h
   induction h with
-  | le h => subst ht; obtain rfl := h.eq_plain_right rfl; exact .inst hus .refl
+  | le h =>
+    subst ht
+    cases (h.eq_plain_right rfl).form with
+    | rows _ hr => cases hr
+    | all he => exact .inst hus (.le (.equiv (he.substT (instT us))))
   | inst hus' _ ih => exact .inst hus' (ih ht)
 
 /-- Only a binder is below a binder. -/
 theorem LeLive.eq_all {x : Ty} {k t}
-    (h : LeLive S x (.all k t)) : x = .all k t :=
+    (h : LeLive S x (.all k t)) : Ty.Equiv x (.all k t) :=
   h.eq_plain_right rfl
 
 /-- Subtyping keeps the shape of an arrow and relates its results. -/
@@ -176,6 +201,11 @@ theorem Const.ty_isArrow (c : Const) (ι : CArg) (S : Sig) :
 theorem Typ.spine_notAll {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     Value e → ∀ {K T φ}, e.head = .ctor K → J = .ex T φ → T.isAll ∨ ¬ T.res.isAll := by
   induction h with
+  | conv _ he ih =>
+    intro hv _ _ _ hK hJ; cases hJ
+    rcases ih hv hK rfl with ha | ha
+    · exact .inl (he.isAll ▸ ha)
+    · exact .inr (he.res.isAll ▸ ha)
   | allI => intro _ _ _ _ _ hJ; cases hJ; exact .inl trivial
   | errVal => intro _ _ _ _ _ hJ; cases hJ; exact .inr (by simp [Ty.res, Ty.isAll])
   | ctor hK hk hH hT =>
@@ -199,6 +229,7 @@ theorem Caps.Sub.of_none {C : Caps} (D : Caps) (h : Caps.Sub C Caps.none) : Caps
 /-- A value has no `inside` form. -/
 theorem Typ.noIns {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → e.NoIns := by
   induction h with
+  | conv _ _ ih => exact ih
   | lam _ hn => intro _; exact hn
   | fix _ hn => intro _; exact hn
   | task _ _ hn => intro _; exact hn

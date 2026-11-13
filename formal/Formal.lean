@@ -95,6 +95,7 @@ import Formal.Generalization
 import Formal.RecordHandler
 import Formal.Examples
 import Formal.RowEquivExamples
+import Formal.ConversionExamples
 import Formal.RT.Cause
 import Formal.RT.Recover
 import Formal.RT.Config

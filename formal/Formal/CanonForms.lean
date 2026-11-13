@@ -1,4 +1,4 @@
-import Formal.Shapes
+import Formal.ValueTyping
 
 /-!
 # Canonical forms (L1)
@@ -29,6 +29,10 @@ def VKind (e : Tm) (k : Nat) : Prop :=
 theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T φ}, J = .ex T φ →
     ¬ T.isAll → VKind e T.kind := by
   induction h with
+  | conv _ he ih =>
+    intro hv _ _ hJ hA; cases hJ
+    rw [← he.kind]
+    exact ih hv rfl (fun h => hA (he.isAll.mp h))
   | allI => intro _ _ _ hJ h; cases hJ; exact (h trivial).elim
   | lam _ _ hT => intro _ _ _ hJ _; cases hJ; simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
   | fix _ _ hT => intro _ _ _ hJ _; cases hJ; simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
@@ -97,10 +101,12 @@ theorem canonical_arrow {Ψ Θ Γ v a ψ t C φ} (hv : Value v)
 
 /-- L1 for references. -/
 theorem canonical_ref {Ψ Θ Γ v t φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.ref t) φ)) :
-    ∃ l, v = .loc l ∧ Ψ[l]? = some t := by
+    ∃ l u, v = .loc l ∧ Ψ[l]? = some u ∧ Ty.Equiv u t := by
   have hk := h.vkind hv rfl (by simp [Ty.isAll])
   cases hv with
-  | loc => cases h with | loc hl => exact ⟨_, rfl, hl⟩
+  | loc =>
+    obtain ⟨u, hu, he⟩ := h.loc_ref _ _ _ rfl rfl
+    exact ⟨_, u, rfl, hu, he⟩
   | ctorApp _ hf _ => simp [VKind, Tm.head, hf, Ty.kind] at hk
   | constApp =>
     simp [VKind, Tm.head, Ty.kind] at hk
@@ -113,11 +119,8 @@ theorem canonical_eff {Ψ Θ Γ v r ε t C φ} (hv : Value v)
   have hk := h.vkind hv rfl (by simp [Ty.isAll])
   cases hv with
   | task =>
-    cases h with
-    | task he hψ _ hT =>
-      obtain ⟨_, _, _, _, h, huse, ht, -⟩ := hT.eff_left
-      cases h
-      exact ⟨_, _, _, rfl, he, Stage.le_trans hψ huse, ht⟩
+    obtain ⟨t₀, ψ, he, hψ, hT⟩ := h.task_eff _ _ _ _ _ _ rfl rfl
+    exact ⟨_, t₀, ψ, rfl, he, hψ, hT⟩
   | ctorApp _ hf _ => simp [VKind, Tm.head, hf, Ty.kind] at hk
   | constApp =>
     simp [VKind, Tm.head, Ty.kind] at hk
@@ -148,7 +151,7 @@ theorem canonical_owner {Ψ Θ Γ v s φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (
     ∃ p, v = .own p ∧ s = .rg p := by
   have hk := h.vkind hv rfl (by simp [Ty.isAll])
   cases hv with
-  | own => cases h with | own => exact ⟨_, rfl, rfl⟩
+  | own => exact ⟨_, rfl, h.own_owner _ _ _ rfl rfl⟩
   | ctorApp _ hf _ => simp [VKind, Tm.head, hf, Ty.kind] at hk
   | constApp =>
     simp [VKind, Tm.head, Ty.kind] at hk
@@ -159,7 +162,7 @@ theorem canonical_hnd {Ψ Θ Γ v s φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.e
     ∃ p, v = .cap p ∧ s = .rg p := by
   have hk := h.vkind hv rfl (by simp [Ty.isAll])
   cases hv with
-  | cap => cases h with | cap => exact ⟨_, rfl, rfl⟩
+  | cap => exact ⟨_, rfl, h.cap_hnd _ _ _ rfl rfl⟩
   | ctorApp _ hf _ => simp [VKind, Tm.head, hf, Ty.kind] at hk
   | constApp =>
     simp [VKind, Tm.head, Ty.kind] at hk

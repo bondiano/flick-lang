@@ -49,29 +49,21 @@ theorem RgsTy.append {Ψ Λ} (h : RgsTy S Ψ Λ) : RgsTy S Ψ (Λ ++ [Rgn.new]) 
 theorem await_arg {Ψ Θ c w t₀ T φ} (h : Typ S Ψ Θ [] (.app (.app (.const c) w) t₀) (.ex T φ))
     (hv : Value t₀) (hc : ∀ ι, ∃ a b r e τ C₁ C₂ ψ, c.ty S ι = .arrow a .pure (.arrow (.eff r e τ C₁) ψ b C₂) Caps.none) :
     ∃ t φ, Typ S Ψ Θ [] (.await t₀) (.ex t φ) := by
-  cases h with
-  | app hf ht _ _ =>
-    cases hf with
-    | app hc' _ _ hT₁ =>
-      cases hc' with
-      | perform =>
-        obtain ⟨_, _, _, _, _, _, _, _, hx⟩ := hc default
-        simp only [Const.ty] at hx; split at hx <;> cases hx
-      | const _ hT' =>
-        obtain ⟨_, _, _, _, _, _, _, _, hx⟩ := hc ‹_›
-        rw [hx] at hT'
-        obtain ⟨_, _, _, _, h, _, _, lt, -⟩ := hT'.arrow_left
-        cases h
-        obtain ⟨_, _, _, _, h, la, _, _, -⟩ := (lt.trans hT₁).arrow_left
-        cases h
-        obtain ⟨_, _, _, _, rfl, -⟩ := LeLive.eff_right la
-        exact ⟨_, _, .await (ht.valueAny hv _) (Stage.le_refl _) LeLive.refl⟩
-  | allI hv' => exact absurd hv' (by
-      intro hv''; cases hv'' with
-      | ctorApp _ hK _ => simp [Tm.head] at hK)
-  | errVal hv' => exact absurd hv' (by
-      intro hv''; cases hv'' with
-      | ctorApp _ hK _ => simp [Tm.head] at hK)
+  have hn : ¬ Value (.app (.app (.const c) w) t₀) := by
+    intro hv'
+    cases hv' with
+    | ctorApp _ hK _ => simp [Tm.head] at hK
+  obtain ⟨_, _, _, _, hf, ht, _, _⟩ := h.app_nonvalue _ _ _ _ rfl rfl hn
+  obtain ⟨_, _, _, _, hc', _, _, hT₁⟩ := hf.app_arrow
+  obtain ⟨ι, hT'⟩ := hc'.const_witness
+  obtain ⟨_, _, _, _, _, _, _, _, hx⟩ := hc ι
+  rw [hx] at hT'
+  obtain ⟨_, _, _, _, h, _, _, lt, -⟩ := hT'.arrow_left
+  cases h
+  obtain ⟨_, _, _, _, h, la, _, _, -⟩ := (lt.trans hT₁).arrow_left
+  cases h
+  obtain ⟨_, _, _, _, rfl, -⟩ := LeLive.eff_right la
+  exact ⟨_, _, .await (ht.valueAny hv _) (Stage.le_refl _) LeLive.refl⟩
 
 /-- The finalizer `open_` registers: `op` of the capability of its region. -/
 theorem op_cap_typ {Ψ Θ} {p : Nat} : ∃ t φ, Typ S Ψ Θ [] (.app (.const .op) (.cap p)) (.ex t φ) := by

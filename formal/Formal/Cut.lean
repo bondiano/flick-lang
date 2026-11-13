@@ -18,47 +18,48 @@ def Entails (Θ₁ Θ₂ : Facts) : Prop := ∀ C s, Outl Θ₁ C s → Outl Θ�
 
 theorem Entails.refl (Θ : Facts) : Entails Θ Θ := fun _ _ h => h
 
+/-- Entailment is determined by declared facts; congruent queries follow. -/
+theorem Entails.of_facts {Θ₁ Θ₂ : Facts} (h : ∀ C s, Θ₁ C s → Outl Θ₂ C s) :
+    Entails Θ₁ Θ₂ := by
+  intro C s hC x hx
+  rcases hC x hx with hr | ⟨D, ⟨s₀, hD, he⟩, hK⟩
+  · exact .inl hr
+  · exact (h D s₀ hD).equiv he x hK
+
 theorem Entails.lift {Θ₁ Θ₂ : Facts} (h : Entails Θ₁ Θ₂) (k : Nat) (Φ : Facts) :
     Entails (Facts.union (Θ₁.substT (shiftV k)) Φ) (Facts.union (Θ₂.substT (shiftV k)) Φ) := by
-  intro C s hC x hx
-  rcases hC x hx with h' | ⟨C', h₁ | h₁, h₂⟩
-  · exact .inl h'
-  · obtain ⟨C₀, s₀, h₀, rfl, rfl⟩ := h₁
-    have := (h C₀ s₀ fun y hy => .inr ⟨C₀, h₀, hy⟩).substT (shiftV k) x h₂
-    rcases this with h' | ⟨C'', h₃, h₄⟩
-    · exact .inl h'
-    · exact .inr ⟨C'', .inl h₃, h₄⟩
-  · exact .inr ⟨C', .inr h₁, h₂⟩
+  apply Entails.of_facts
+  intro C s hC
+  rcases hC with ⟨C₀, s₀, h₀, rfl, rfl⟩ | hΦ
+  · exact ((h C₀ s₀ (Outl.fact h₀)).substT (shiftV k)).mono fun _ _ h => .inl h
+  · exact Outl.fact (.inr hΦ)
 
 theorem Entails.union {Θ₁ Θ₂ : Facts} (h : Entails Θ₁ Θ₂) (F : Facts) :
     Entails (Facts.union Θ₁ F) (Facts.union Θ₂ F) := by
-  intro C s hC x hx
-  rcases hC x hx with h' | ⟨C', h₁ | h₁, h₂⟩
-  · exact .inl h'
-  · rcases h C' s (fun y hy => .inr ⟨C', h₁, hy⟩) x h₂ with h' | ⟨C'', h₃, h₄⟩
-    · exact .inl h'
-    · exact .inr ⟨C'', .inl h₃, h₄⟩
-  · exact .inr ⟨C', .inr h₁, h₂⟩
+  apply Entails.of_facts
+  intro C s hC
+  rcases hC with h₀ | hF
+  · exact (h C s (Outl.fact h₀)).mono fun _ _ h => .inl h
+  · exact Outl.fact (.inr hF)
 
 theorem Entails.substT {Θ₁ Θ₂ : Facts} (h : Entails Θ₁ Θ₂) (σ : Atom → Ty) :
     Entails (Θ₁.substT σ) (Θ₂.substT σ) := by
-  intro C s hC x hx
-  rcases hC x hx with h' | ⟨C', ⟨C₀, s₀, h₀, rfl, rfl⟩, h₂⟩
-  · exact .inl h'
-  · exact (h C₀ s₀ fun y hy => .inr ⟨C₀, h₀, hy⟩).substT σ x h₂
+  apply Entails.of_facts
+  rintro C s ⟨C₀, s₀, h₀, rfl, rfl⟩
+  exact (h C₀ s₀ (Outl.fact h₀)).substT σ
 
 theorem Entails.trans {Θ₁ Θ₂ Θ₃ : Facts} (h₁ : Entails Θ₁ Θ₂) (h₂ : Entails Θ₂ Θ₃) :
     Entails Θ₁ Θ₃ := fun C s h => h₂ C s (h₁ C s h)
 
-/-- Facts that hold of the order of creation entail themselves under `Facts.age`. -/
+/-- Empty additional facts change no entailment. -/
 theorem Entails.union_none {Θ : Facts} : Entails (Facts.union Θ Facts.none) Θ :=
-  fun _ _ h x hx => (h x hx).imp_right fun ⟨C', hu, h₂⟩ => ⟨C', hu.elim id False.elim, h₂⟩
+  .of_facts fun _ _ h => h.elim Outl.fact False.elim
 
 theorem Entails.of_age {Θ : Facts} (h : ∀ C s, Θ C s → Facts.age C s) : Entails Θ Facts.age :=
-  fun _ _ hC x hx => (hC x hx).imp id fun ⟨C', h₁, h₂⟩ => ⟨C', h _ _ h₁, h₂⟩
+  .of_facts fun C s hC => Outl.fact (h C s hC)
 
 theorem Entails.none (Θ : Facts) : Entails Facts.none Θ :=
-  fun _ _ h x hx => (h x hx).imp id fun ⟨_, h, _⟩ => h.elim
+  .of_facts fun _ _ h => h.elim
 
 /-- `Θ'` is `Θ` with facts that hold of the order in which regions are created:
 the facts the `inside` frames of a context add. -/
@@ -93,6 +94,7 @@ theorem Row.hP_mono {Θ₁ Θ₂ : Facts} {q : Nat} {E : Name} {r : Row} (hΘ : 
 
 theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Entails Θ₁ Θ₂ → Typ S Ψ Θ₂ Γ e J := by
   induction h with
+  | conv _ he ih => intro _ hΘ; exact .conv (ih hΘ) he
   | var hi hts hH hT => intro _ hΘ; exact .var hi hts (hH.mono hΘ) hT
   | allVar hi hk hc => intro _ _; exact .allVar hi hk hc
   | allI hv _ ih => intro _ hΘ; exact .allI hv (ih (hΘ.substT _))

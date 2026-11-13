@@ -157,9 +157,9 @@ theorem Typ.aref_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {K : Name
     {Δ : (Atom → Ty) → List Ty} (hK : S.ctor K = some (k, ts, T₀)) (hU : t.hd = .adt T₀)
     (hn : b.NoIns) (hfr : ∀ i, b.Free i → i < (Pat.spine K qs).binds + Γ.length)
     (hlc : ∀ l, b.Has (.loc l) → l < Ψ.length)
-    (hpA : ∀ θ, Fits θ b → (Ty.tcon T₀ (S.res K)).substT θ = (t.up k).substT θ →
+    (hpA : ∀ θ, Fits θ b → Ty.Equiv ((Ty.tcon T₀ (S.res K)).substT θ) ((t.up k).substT θ) →
       PatsTy S qs (ts.map (Ty.substT θ)) (Δ θ))
-    (hbA : ∀ θ, Fits θ b → (Ty.tcon T₀ (S.res K)).substT θ = (t.up k).substT θ →
+    (hbA : ∀ θ, Fits θ b → Ty.Equiv ((Ty.tcon T₀ (S.res K)).substT θ) ((t.up k).substT θ) →
       Typ S ((Ψ.map (Ty.up k)).map (Ty.substT θ)) ((Θ.substT (shiftV k)).substT θ)
         ((Δ θ).map .mono ++ (Γ.map (Scheme.up k)).map (Scheme.substT θ)) b
         (.ex ((t'.up k).substT θ) ((φ.substT (shiftV k)).substT θ)))
@@ -173,9 +173,10 @@ theorem Typ.aref_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {K : Name
       fun hi => (hn hi).elim, fun hi => (hn hi).elim, fun hi => (hn hi).elim⟩
   have cl : (Ty.tcon T₀ (S.res K)).substT (liftT k σ) = Ty.tcon T₀ (S.res K) := by
     rw [Ty.tcon_substT, S.res_closed K k ts T₀ _ hK fun i hi => by simp [liftT, hi]]
-  have unif : ∀ θ, (Ty.tcon T₀ (S.res K)).substT θ = ((t.substT σ).up k).substT θ →
-      (Ty.tcon T₀ (S.res K)).substT (fun a => (liftT k σ a).substT θ) =
-        (t.up k).substT (fun a => (liftT k σ a).substT θ) := fun θ hu => by
+  have unif : ∀ θ,
+      Ty.Equiv ((Ty.tcon T₀ (S.res K)).substT θ) (((t.substT σ).up k).substT θ) →
+      Ty.Equiv ((Ty.tcon T₀ (S.res K)).substT (fun a => (liftT k σ a).substT θ))
+        ((t.up k).substT (fun a => (liftT k σ a).substT θ)) := fun θ hu => by
     rw [← Ty.substT_comp, ← Ty.substT_comp, cl, Ty.up_comm]; exact hu
   have ets : ∀ θ, ts.map (Ty.substT (fun a => (liftT k σ a).substT θ)) = ts.map (Ty.substT θ) :=
     fun θ => by

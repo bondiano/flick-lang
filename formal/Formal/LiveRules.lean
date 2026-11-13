@@ -153,7 +153,7 @@ example : ¬ Const.ok Facts.none .addFin
   intro h
   rcases h.2.1 (.r 0) (Or.inl rfl) with h | ⟨_, h, _⟩
   · cases h
-  · exact h.elim
+  · exact False.elim (by simp only [Facts.close_none, Facts.none] at h)
 
 /-- The same check applies to a child. -/
 example : ¬ Const.ok Facts.none .spawn
@@ -161,7 +161,7 @@ example : ¬ Const.ok Facts.none .spawn
   intro h
   rcases h.2.1 (.r 0) (Or.inl rfl) with h | ⟨_, h, _⟩
   · cases h
-  · exact h.elim
+  · exact False.elim (by simp only [Facts.close_none, Facts.none] at h)
 
 /-- Work using its own region is allowed. -/
 example : Const.ok Facts.none .spawn
@@ -209,7 +209,7 @@ example : ¬ Row.Outlives Facts.none (fun x => x = .rv (.v 0) fun _ => False) (.
   intro h
   rcases h (.v 0) (Or.inr ⟨_, rfl⟩) with h | ⟨_, h, _⟩
   · cases h
-  · exact h.elim
+  · exact False.elim (by simp only [Facts.close_none, Facts.none] at h)
 
 /-- `Scope.run` of a function whose qualifier names a region not in the rows around the scope
 is rejected: the scope's rows must keep what its body uses live. -/
@@ -229,7 +229,7 @@ example : ¬ Const.ok Facts.none .refMake hndCell := by
   intro h
   rcases h (.r 0) rfl with h | ⟨_, h, _⟩
   · exact h
-  · exact h.elim
+  · exact False.elim (by simp only [Facts.close_none, Facts.none] at h)
 
 example : Const.ok Facts.none .refMake { hndCell with C := region } :=
   fun _ h => .inl h
@@ -244,7 +244,7 @@ theorem refSet_needs_capacity (S : Sig) (ι : CArg) (hok : Const.ok Facts.none .
   have hC : ι.C (.r 0) := by
     rcases hok (.r 0) (by rw [ht]; rfl) with h | ⟨_, h, _⟩
     · exact h
-    · exact h.elim
+    · exact False.elim (by simp only [Facts.close_none, Facts.none] at h)
   exact (h.arrow_use.1 (.atm (.r 0)) (Or.inr hC)).elim id id
 
 /-! ### The hidden row of data (regions.md §2.2, §6)
@@ -272,14 +272,15 @@ theorem leak6_scope_rejected {S : Sig} {C : Caps} (hC : C (.v 0)) (u v t : Ty) :
     ¬ LeLive S (GT C u v) (t.up 1) := fun h =>
   Ty.up_avoid_v0 t (h.reach (.v 0) (by simp [GT, Ty.tcon, Ty.reach, hC]))
 
-/-- A row the declaration names stays put: data without a hidden row, whose parameters are
-all invariant, are below only themselves. -/
+/-- A row the declaration names stays invariant: data without a hidden row, whose parameters
+are all invariant, can change only by type equality, including the row equations. -/
 theorem named_row_invariant {S : Sig} {T : Name} {us : List Ty} {b : Ty}
     (hT : S.hidden T = none) (hv : ∀ j, S.var T j = .inv) (h : LeLive S (Ty.tcon T us) b) :
-    b = Ty.tcon T us := by
+    Ty.Equiv b (Ty.tcon T us) := by
   generalize hX : Ty.tcon T us = X at h
   cases h with
-  | refl => rfl
+  | refl => exact .refl
+  | equiv he => exact he.symm
   | arrow => exact absurd hX.symm Ty.arrow_ne_tcon
   | eff => exact absurd hX.symm Ty.eff_ne_tcon
   | rcons => exact absurd hX.symm Ty.rcons_ne_tcon
@@ -289,8 +290,8 @@ theorem named_row_invariant {S : Sig} {T : Name} {us : List Ty} {b : Ty}
   | data hl _ _ _ hinv ha hb =>
     obtain ⟨rfl, rfl⟩ := Ty.tcon_eq (hX.trans ha)
     rw [hb, ← hX]
-    exact congrArg (Ty.tcon T) (List.ext_getElem hl fun j h1 h2 => hinv j _ _
-      (List.getElem?_eq_getElem h1) (List.getElem?_eq_getElem h2) (by rw [hT]; simp) (hv j)).symm
+    exact ((Ty.ArgsEquiv.of_get hl fun j a b ha hb =>
+      hinv j a b ha hb (by rw [hT]; simp) (hv j)).tcon T).symm
 
 /-- The field of `type K (c : CaptureRow) = K ((Unit ->{} Unit)^c ->{} Unit)`: the row
 qualifies a parameter of the field. -/

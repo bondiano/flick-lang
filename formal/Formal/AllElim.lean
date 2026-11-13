@@ -47,44 +47,72 @@ theorem Tm.StandsAt.rename {Γ Γ' s} {e : Tm} {ξ : Nat → Nat} (h : e.StandsA
   · exact .inr (.inr (.inl rfl))
   · exact .inr (.inr (.inr h))
 
-/-- A value of a binder's type is typed by (∀I): no other rule gives a value that type. -/
-theorem Typ.allInv {Ψ Θ Γ e k t φ} (hv : Value e) (h : Typ S Ψ Θ Γ e (.ex (.all k t) φ)) :
-    Typ S (Ψ.map (Ty.up k)) (Θ.substT (shiftV k)) (Γ.map (Scheme.up k)) e (.ex t .pure) := by
+private theorem Typ.constResult {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
+    ∀ c a ψ t C φ, e = .const c → c.arity = 2 → J = .ex (.arrow a ψ t C) φ → ¬ t.isAll := by
+  induction h with
+  | conv _ he ih =>
+    intro c a ψ t C φ hc hArity hJ; cases hJ
+    cases he.symm.form with
+    | rows hr _ => cases hr
+    | arrow _ ht =>
+      have hn := ih c _ _ _ _ _ hc hArity rfl
+      rw [ht.isAll]
+      exact hn
+  | const _ hT =>
+    intro c a ψ t C φ hc hArity hJ; cases hc; cases hJ
+    have key : ∀ (c : Const) ι, c.arity = 2 →
+        ∃ x y, c.ty S ι = .arrow x .pure y Caps.none ∧ ¬ y.isAll := by
+      intro c _ hc
+      cases c <;> simp [Const.arity] at hc <;> exact ⟨_, _, rfl, by simp [Ty.isAll]⟩
+    obtain ⟨_, _, hxy, hy⟩ := key _ _ hArity
+    rw [hxy] at hT
+    obtain ⟨_, _, _, _, he, ht⟩ := hT.arrow_res
+    cases he
+    exact ht.not_all hy
+  | perform => intro c a ψ t C φ hc hArity _; cases hc; simp [Const.arity] at hArity
+  | allI | errVal => intro c a ψ t C φ _ _ hJ; cases hJ
+  | _ => intro c a ψ t C φ hc _ _; cases hc
+
+private theorem Typ.allInvCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
+    Value e → ∀ k t φ, J = .ex (.all k t) φ →
+      Typ S (Ψ.map (Ty.up k)) (Θ.substT (shiftV k)) (Γ.map (Scheme.up k)) e (.ex t .pure) := by
   have noArrow : ∀ {a φ t C T}, LeLive S (.arrow a φ t C) T → ¬ T.isAll := fun h' => by
     obtain ⟨_, _, _, _, rfl, -⟩ := h'.arrow_res; simp [Ty.isAll]
   have noEff : ∀ {r ε t C T}, LeLive S (.eff r ε t C) T → ¬ T.isAll := fun h' => by
     obtain ⟨_, _, _, _, rfl, -⟩ := h'.eff_left; simp [Ty.isAll]
-  cases h with
-  | allI _ h => exact h
-  | lam _ _ hT | fix _ _ hT | perform _ hT | kont _ _ hT => exact (noArrow hT trivial).elim
-  | task _ _ _ hT => exact (noEff hT trivial).elim
+  induction h with
+  | conv _ he ih =>
+    intro hv k t φ hJ; cases hJ
+    cases he.symm.form with
+    | rows hr _ => cases hr
+    | all ht => exact (ih hv _ _ _ rfl).conv ht.symm
+  | allI _ ht => intro _ k t φ hJ; cases hJ; exact ht
+  | lam _ _ hT | fix _ _ hT | perform _ hT | kont _ _ hT =>
+    intro _ k t φ hJ; cases hJ; exact (noArrow hT trivial).elim
+  | task _ _ _ hT => intro _ k t φ hJ; cases hJ; exact (noEff hT trivial).elim
   | const _ hT =>
+    intro _ k t φ hJ; cases hJ
     obtain ⟨_, _, _, _, hx⟩ := Const.ty_isArrow _ _ S
     rw [hx] at hT; exact (noArrow hT trivial).elim
   | ctor _ _ _ hT =>
-    have := hT.res
-    rw [Sig.ctorTyR, Ty.arrows_res _ _ (Ty.tcon_not_arrow _ _)] at this
-    exact (this.not_all (Ty.not_all_of_hd (Ty.tcon_hd _ _)) trivial).elim
+    intro _ k t φ hJ; cases hJ
+    have hres := hT.res
+    rw [Sig.ctorTyR, Ty.arrows_res _ _ (Ty.tcon_not_arrow _ _)] at hres
+    exact (hres.not_all (Ty.not_all_of_hd (Ty.tcon_hd _ _)) trivial).elim
   | app hf _ _ hT =>
-    have hT0 : LeLive S _ _ := hT
+    intro hv k t φ hJ; cases hJ
     cases hv with
     | ctorApp hvf hK _ =>
       rcases Typ.spine_notAll hf hvf hK rfl with h | h
       · exact h.elim
-      · obtain rfl := hT0.eq_all; exact (h trivial).elim
-    | constApp hc _ =>
-      cases hf with
-      | const _ hT' =>
-        have key : ∀ (c : Const) ι, c.arity = 2 →
-            ∃ x y, c.ty S ι = .arrow x .pure y Caps.none ∧ ¬ y.isAll := by
-          intro c _ hc
-          cases c <;> simp [Const.arity] at hc <;> exact ⟨_, _, rfl, by simp [Ty.isAll]⟩
-        obtain ⟨_, _, hxy, hy⟩ := key _ _ hc
-        rw [hxy] at hT'
-        obtain ⟨_, _, _, _, he, lt⟩ := hT'.arrow_res
-        cases he; exact (hT0.not_all (lt.not_all hy) trivial).elim
-      | perform => simp [Const.arity] at hc
-  | _ => cases hv
+      · exact (hT.res.not_all h trivial).elim
+    | constApp hc _ => exact (hT.not_all (Typ.constResult hf _ _ _ _ _ _ rfl hc rfl) trivial).elim
+  | _ => intro hv k t φ hJ; cases hJ <;> cases hv
+
+/-- A value of a binder's type comes from (∀I), possibly followed by type conversion. -/
+theorem Typ.allInv {Ψ Θ Γ e k t φ} (hv : Value e) (h : Typ S Ψ Θ Γ e (.ex (.all k t) φ)) :
+    Typ S (Ψ.map (Ty.up k)) (Θ.substT (shiftV k)) (Γ.map (Scheme.up k)) e (.ex t .pure) :=
+  h.allInvCore hv k t φ rfl
 
 theorem Facts.up_substT (Θ : Facts) (k : Nat) (ts : List Ty) (h : ts.length = k) :
     (Θ.substT (shiftV k)).substT (instT ts) = Θ := by
@@ -97,6 +125,25 @@ theorem Facts.up_substT (Θ : Facts) (k : Nat) (ts : List Ty) (h : ts.length = k
     congr 1; omega
   | r p => simp [shiftV, Ty.substT, instT, Ty.ident]
 
+private theorem Typ.instVarCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
+    ∀ j k t φ (us : List Ty), e = .var j → J = .ex (.all k t) φ → us.length = k →
+      Typ S Ψ Θ Γ (.var j) (.ex (t.substT (instT us)) .pure) := by
+  induction h with
+  | conv _ he ih =>
+    intro j k t φ us hj hJ hus; cases hJ
+    cases he.symm.form with
+    | rows hr _ => cases hr
+    | all ht => exact (ih j k _ _ us hj rfl hus).conv (ht.symm.substT (instT us))
+  | var hi hts hH hT =>
+    intro j k t φ us hj hJ hus; cases hj; cases hJ
+    exact .var hi hts hH (hT.snoc hus)
+  | allVar hi _ hc =>
+    intro j k t φ us hj hJ hus; cases hj; cases hJ
+    exact .var hi hus (fun _ _ h => (hc _ _ h).elim) LeLiveI.refl
+  | allI hv => intro j k t φ us hj _ _; cases hj; cases hv
+  | errVal => intro j k t φ us _ hJ _; cases hJ
+  | _ => intro j k t φ us hj _ _; cases hj
+
 /-- One instance of a binder. -/
 theorem Typ.instAll {Ψ Θ Γ e k t φ} {us : List Ty} (hV : e.Stands) (hn : e.NoIns)
     (h : Typ S Ψ Θ Γ e (.ex (.all k t) φ)) (hus : us.length = k) :
@@ -106,10 +153,7 @@ theorem Typ.instAll {Ψ Θ Γ e k t φ} {us : List Ty} (hV : e.Stands) (hn : e.N
     simp only [List.map_map, Function.comp_def, Ty.up_substT _ _ _ hus,
       Scheme.up_substT _ _ _ hus, List.map_id', Flick.J.substT, Facts.up_substT _ _ _ hus] at this
     exact this
-  · cases h with
-    | var hi hts hH hT => exact .var hi hts hH (hT.snoc hus)
-    | allVar hi _ hc => exact .var hi hus (fun _ _ h => (hc _ _ h).elim) LeLiveI.refl
-    | allI hv => cases hv
+  · exact h.instVarCore j k t φ us rfl rfl hus
   · exact .todo
 
 /-- (Var) at an instance, for the term that stands for the variable. -/

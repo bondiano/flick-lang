@@ -105,6 +105,13 @@ theorem FrameTy.mk0 {Ψ Θ F r t φ}
   ⟨0, Θ, t', φ', by simpa using h, rel, .inr ⟨rfl, Ext.refl _, fun _ => rfl⟩,
     fun σ hσ X r' h' => back σ hσ X r' (by rw [List.map_up_zero, liftT_zero] at h'; exact h')⟩
 
+/-- Converting the result leaves the hole and its stage relation unchanged. -/
+theorem FrameTy.conv {Ψ Θ F r a b φ} (h : FrameTy S Ψ Θ F r a φ)
+    (he : Ty.Equiv a b) : FrameTy S Ψ Θ F r b φ := by
+  obtain ⟨k, Θ', t', φ', ht, hr, hf, hb⟩ := h
+  exact ⟨k, Θ', t', φ', ht, hr, hf,
+    fun σ hσ X r' h' => (hb σ hσ X r' h').conv (he.substT σ)⟩
+
 /-- A frame that handles `E` in its hole: the hole may also need `E`, and obligations about
 it. -/
 theorem FRel.installs {F : Frame} {E : Name} {φ₀ φ : Stage} {r ε : Row}

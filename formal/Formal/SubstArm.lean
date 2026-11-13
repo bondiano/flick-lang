@@ -189,9 +189,9 @@ theorem Typ.aref_subst {Ψ : List Ty} {Θ : Facts} {Γ Γ' : List Scheme} {σ : 
     (hU : t.hd = .adt T₀) (hσ : SubOk S Ψ Θ Γ Γ' σ) (hn : b.NoIns)
     (hfr : ∀ i, b.Free i → i < (Pat.spine K qs).binds + Γ.length)
     (hlc : ∀ l, b.Has (.loc l) → l < Ψ.length)
-    (hpA : ∀ θ, Fits θ b → (Ty.tcon T₀ (S.res K)).substT θ = (t.up k).substT θ →
+    (hpA : ∀ θ, Fits θ b → Ty.Equiv ((Ty.tcon T₀ (S.res K)).substT θ) ((t.up k).substT θ) →
       PatsTy S qs (ts.map (Ty.substT θ)) (Δ θ))
-    (ihA : ∀ θ, Fits θ b → (Ty.tcon T₀ (S.res K)).substT θ = (t.up k).substT θ →
+    (ihA : ∀ θ, Fits θ b → Ty.Equiv ((Ty.tcon T₀ (S.res K)).substT θ) ((t.up k).substT θ) →
       ∀ {Γ'' σ''}, SubOk S ((Ψ.map (Ty.up k)).map (Ty.substT θ)) ((Θ.substT (shiftV k)).substT θ)
         ((Δ θ).map .mono ++ (Γ.map (Scheme.up k)).map (Scheme.substT θ)) Γ'' σ'' →
       Typ S ((Ψ.map (Ty.up k)).map (Ty.substT θ)) ((Θ.substT (shiftV k)).substT θ) Γ''

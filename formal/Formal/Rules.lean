@@ -85,9 +85,9 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
       S.ctor K = some (k, ts, T₀) → t.hd = .adt T₀ → b.NoIns →
       (∀ i, b.Free i → i < (Pat.spine K qs).binds + Γ.length) →
       (∀ l, b.Has (.loc l) → l < Ψ.length) →
-      (∀ θ, Fits θ b → (Ty.tcon T₀ (S.res K)).substT θ = (t.up k).substT θ →
+      (∀ θ, Fits θ b → Ty.Equiv ((Ty.tcon T₀ (S.res K)).substT θ) ((t.up k).substT θ) →
         PatsTy S qs (ts.map (Ty.substT θ)) (Δ θ)) →
-      (∀ θ, Fits θ b → (Ty.tcon T₀ (S.res K)).substT θ = (t.up k).substT θ →
+      (∀ θ, Fits θ b → Ty.Equiv ((Ty.tcon T₀ (S.res K)).substT θ) ((t.up k).substT θ) →
         Typ ((Ψ.map (Ty.up k)).map (Ty.substT θ)) ((Θ.substT (shiftV k)).substT θ)
           ((Δ θ).map .mono ++ (Γ.map (Scheme.up k)).map (Scheme.substT θ)) b
           (.ex ((t'.up k).substT θ) ((φ.substT (shiftV k)).substT θ))) →
@@ -232,6 +232,8 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   /-- `resume`: the type of its cell, which holds the handler's region. -/
   | kont : Ψ[ℓ]? = some (.arrow a ψ t C) → C (.r p) → LeLive S (.arrow a ψ t C) T →
       Typ Ψ Θ Γ (.kont p ℓ) (.ex T φ)
+  /-- Row equations are type equality even below invariant constructors. -/
+  | conv : Typ Ψ Θ Γ e (.ex a φ) → Ty.Equiv a b → Typ Ψ Θ Γ e (.ex b φ)
 
 
 /-- The facts of a running configuration: a region outlives every region created

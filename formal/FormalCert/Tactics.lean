@@ -161,7 +161,7 @@ theorem LeLive.data_of {a b : Ty} {T : Name} {us us' : List Ty} (ha : a.unspine 
   all_goals have := (hs j u u' x x').2 (by simpa using hh); simp only [Nat.zero_add] at this
   · exact this.1 hv
   · exact this.2.1 hv
-  · exact this.2.2 hv
+  · exact (this.2.2 hv) ▸ Ty.Equiv.refl
 
 /-- Closes a goal under `h : S.var T j = s` where `T` of the signature has no such variance;
 `GenSig.lean`, which knows the variances, gives its rule. -/
@@ -192,7 +192,15 @@ macro "ob_out" : tactic => `(tactic| (
 
 /-- `Outl Θ C s` of concrete sets: each atom of `C` is reached by `s` or is in a fact about
 `s` of `Θ`. -/
+theorem outl_declared {Θ : Facts} {C : Caps} {s : Ty}
+    (h : ∀ k, C k → s.reach k ∨ ∃ D, Θ D s ∧ D k) : Outl Θ C s := by
+  intro k hk
+  rcases h k hk with hs | ⟨D, hD, hd⟩
+  · exact .inl hs
+  · exact Outl.fact hD k hd
+
 macro "outl" : tactic => `(tactic| (
+  apply Cert.outl_declared
   intro k hk
   rcases k with n | p <;>
     simp_all [Facts.union, Flick.Facts.single, Facts.none, Facts.bnd, Facts.substT, Ty.substT,

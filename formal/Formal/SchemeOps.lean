@@ -1,4 +1,4 @@
-import Formal.TyOps
+import Formal.TypeEquiv
 
 /-!
 # Substitution of facts, `Outlives`, the side conditions of constants and schemes
@@ -38,19 +38,54 @@ theorem Facts.substT_ident (Θ : Facts) : Θ.substT Ty.ident = Θ := by
 @[simp] theorem Facts.none_substT (σ : Atom → Ty) : Facts.none.substT σ = Facts.none := by
   funext C s; simp [Facts.substT, Facts.none]
 
+@[simp] theorem Facts.close_none : Facts.none.close = Facts.none := by
+  funext C s; apply propext
+  constructor
+  · rintro ⟨s₀, h, _⟩; exact h
+  · intro h; exact h.elim
+
+@[simp] theorem Facts.close_union (Θ Φ : Facts) :
+    (Facts.union Θ Φ).close = Facts.union Θ.close Φ.close := by
+  funext C s; apply propext
+  constructor
+  · rintro ⟨s₀, h | h, he⟩
+    · exact .inl ⟨s₀, h, he⟩
+    · exact .inr ⟨s₀, h, he⟩
+  · rintro (⟨s₀, h, he⟩ | ⟨s₀, h, he⟩)
+    · exact ⟨s₀, .inl h, he⟩
+    · exact ⟨s₀, .inr h, he⟩
+
+theorem Facts.close_idem (Θ : Facts) : Θ.close.close = Θ.close := by
+  funext C s; apply propext
+  constructor
+  · rintro ⟨s₀, ⟨s₁, h, he₁⟩, he₀⟩; exact ⟨s₁, h, he₁.trans he₀⟩
+  · intro h; exact ⟨s, h, .refl⟩
+
+/-- A declared fact entails its outlives requirement. -/
+theorem Outl.fact {Θ C s} (h : Θ C s) : Outl Θ C s :=
+  fun _ hk => .inr ⟨C, ⟨s, h, .refl⟩, hk⟩
+
 /-- `Outlives` is kept by a substitution. -/
 theorem Outl.substT {Θ C s} (σ : Atom → Ty) (h : Outl Θ C s) :
     Outl (Θ.substT σ) (C.substT σ) (s.substT σ) := by
   intro k ⟨b, hb, hk⟩
   rcases h b hb with h | ⟨C', h₁, h₂⟩
   · exact .inl ((Ty.reach_substT σ s k).mpr ⟨b, h, hk⟩)
-  · exact .inr ⟨C'.substT σ, ⟨C', s, h₁, rfl, rfl⟩, b, h₂, hk⟩
+  · obtain ⟨s₀, h₀, he⟩ := h₁
+    exact .inr ⟨C'.substT σ, ⟨s₀.substT σ, ⟨C', s₀, h₀, rfl, rfl⟩, he.substT σ⟩, b, h₂, hk⟩
 
 theorem Outl.mono {Θ Θ' C s} (h : Outl Θ C s) (hΘ : ∀ C s, Θ C s → Θ' C s) : Outl Θ' C s :=
-  fun k hk => (h k hk).imp id fun ⟨C', h₁, h₂⟩ => ⟨C', hΘ _ _ h₁, h₂⟩
+  fun k hk => (h k hk).imp id fun ⟨C', ⟨s₀, h₁, he⟩, h₂⟩ => ⟨C', ⟨s₀, hΘ _ _ h₁, he⟩, h₂⟩
+
+/-- Congruent type expressions name the same outlives requirement. -/
+theorem Outl.equiv {Θ C a b} (h : Outl Θ C a) (he : Ty.Equiv a b) : Outl Θ C b := by
+  intro k hk
+  rcases h k hk with hr | ⟨D, ⟨s₀, hD, hs⟩, hK⟩
+  · exact .inl (by rwa [← he.reach])
+  · exact .inr ⟨D, ⟨s₀, hD, hs.trans he⟩, hK⟩
 
 /-- `Outlives C D` for a capture set `D` is `C ⊆ D` up to the facts. -/
-theorem Outl.caps_iff {Θ C D} : Outl Θ C (.caps D) ↔ ∀ k, C k → D k ∨ ∃ C', Θ C' (.caps D) ∧ C' k :=
+theorem Outl.caps_iff {Θ C D} : Outl Θ C (.caps D) ↔ ∀ k, C k → D k ∨ ∃ C', Θ.close C' (.caps D) ∧ C' k :=
   Iff.rfl
 
 theorem Outl.caps_of_sub {Θ C D} (h : ∀ k, C k → D k) : Outl Θ C (.caps D) :=

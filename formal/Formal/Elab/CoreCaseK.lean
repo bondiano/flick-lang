@@ -1,4 +1,5 @@
 import Formal.Elab.CoreCase
+import Formal.ContextSubstitution
 
 /-!
 # λFlick⁺ as a `Target`: the law of an arm, assembled
@@ -157,39 +158,52 @@ theorem has_caseK (hR : Real P S N) {Γ : List TSch} {Δl Δ : List Cn} {e b r :
   · have := PatsTy.vars (S := S) ((c.ctx.map (trD N) ++ c.fields.map (trT N)).map (Flick.Ty.substT θ''))
     rwa [List.length_map, hlenT] at this
   · -- `κ`: the unifier of the open problem, which the most general one is a part of
+    let κ : Atom → Flick.Ty := fun a => (liftT c.k (trσ N σ) a).substT θ''
     have hκ₀ := hU.most (cunif_of hR hK hlen hu)
-    have hκ : ∀ a, (trσ N θ a).substT (fun a => (liftT c.k (trσ N σ) a).substT θ'') =
-        (liftT c.k (trσ N σ) a).substT θ'' := by
+    have hκ : ∀ a, Flick.Ty.Equiv ((trσ N θ a).substT κ) (κ a) := by
       intro a
       cases a with
       | v n => exact hκ₀ n
-      | r p => rfl
-    have hatom : ∀ a, (shiftV c.k a).substT
-        (fun b => (trσ N θ b).substT fun a => (liftT c.k (trσ N σ) a).substT θ'') =
-        (trσ N σ a).substT fun b => (shiftV c.k b).substT θ'' := by
+      | r p => exact .refl
+    have hatom : ∀ a, Flick.Ty.Equiv
+        ((shiftV c.k a).substT (fun b => (trσ N θ b).substT κ))
+        ((trσ N σ a).substT fun b => (shiftV c.k b).substT θ'') := by
       intro a
-      rw [Flick.Ty.substT_congr hκ, ← Flick.Ty.substT_comp, shift_lift, ← Flick.Ty.substT_comp, Flick.Ty.up_def]
+      have he := (shiftV c.k a).substT_equiv hκ
+      have hshift : (shiftV c.k a).substT κ =
+          (trσ N σ a).substT (fun b => (shiftV c.k b).substT θ'') := by
+        dsimp only [κ]
+        rw [← Flick.Ty.substT_comp, shift_lift, ← Flick.Ty.substT_comp, Flick.Ty.up_def]
+      rw [hshift] at he
+      exact he
     have hup : ∀ a, trσ N (up c.k) a = shiftV c.k a := trσ_up N c.k
-    have hTy : ∀ X : Flick.Ty, ((X.substT (trσ N (up c.k))).substT (trσ N θ)).substT
-        (fun a => (liftT c.k (trσ N σ) a).substT θ'') =
-        ((X.substT (trσ N σ)).substT (shiftV c.k)).substT θ'' := by
+    have hTy : ∀ X : Flick.Ty, Flick.Ty.Equiv
+        (((X.substT (trσ N (up c.k))).substT (trσ N θ)).substT κ)
+        (((X.substT (trσ N σ)).substT (shiftV c.k)).substT θ'') := by
       intro X
       simp only [Flick.Ty.substT_comp]
-      exact Flick.Ty.substT_congr fun a => by rw [hup a]; exact hatom a
-    have hSch : ∀ X : Flick.Scheme, ((X.substT (trσ N (up c.k))).substT (trσ N θ)).substT
-        (fun a => (liftT c.k (trσ N σ) a).substT θ'') =
-        ((X.substT (trσ N σ)).substT (shiftV c.k)).substT θ'' := by
+      apply Flick.Ty.substT_equiv
+      intro a; rw [hup a]; simpa only [Flick.Ty.substT_comp] using hatom a
+    have hSch : ∀ X : Flick.Scheme, Flick.Scheme.Equiv
+        (((X.substT (trσ N (up c.k))).substT (trσ N θ)).substT κ)
+        (((X.substT (trσ N σ)).substT (shiftV c.k)).substT θ'') := by
       intro X
       simp only [Flick.Scheme.substT_comp]
-      congr 1; funext a; rw [hup a, Flick.Ty.substT_comp, Flick.Ty.substT_comp]; exact hatom a
+      apply Flick.Scheme.Equiv.of_subst
+      intro a; rw [hup a]; simpa only [Flick.Ty.substT_comp] using hatom a
     have hts := S.ctor_closed _ _ _ _ (liftT c.k (trσ N σ)) hS fun i hi => by simp [liftT, hi]
     have hfix : ∀ f ∈ c.ctx.map (trD N) ++ c.fields.map (trT N),
-        (f.substT (trσ N θ)).substT (fun a => (liftT c.k (trσ N σ) a).substT θ'') =
-          f.substT θ'' := by
+        Flick.Ty.Equiv ((f.substT (trσ N θ)).substT κ) (f.substT θ'') := by
       intro f hf
-      rw [Flick.Ty.substT_comp, Flick.Ty.substT_congr hκ, ← Flick.Ty.substT_comp,
-        (List.map_inj_left.mp (hts.trans (List.map_id _).symm)) f hf]
-      rfl
+      rw [Flick.Ty.substT_comp]
+      have he := f.substT_equiv hκ
+      have hclosed : f.substT κ = f.substT θ'' := by
+        dsimp only [κ]
+        rw [← Flick.Ty.substT_comp,
+          (List.map_inj_left.mp (hts.trans (List.map_id _).symm)) f hf]
+        rfl
+      rw [hclosed] at he
+      exact he
     -- the arm's context: the pattern's variables, then `Γc` past the constructor's variables
     have hΓa₁ : ∀ (j : Nat) (f : Flick.Ty), (c.ctx.map (trD N) ++ c.fields.map (trT N))[j]? = some f →
         (((c.ctx.map (trD N) ++ c.fields.map (trT N)).map (Flick.Ty.substT θ'')).map
@@ -206,7 +220,7 @@ theorem has_caseK (hR : Real P S N) {Γ : List TSch} {Δl Δ : List Cn} {e b r :
       intro j u hu
       rw [List.getElem?_append_right (by simp), List.getElem?_map, List.getElem?_map]
       simp [hu]
-    have hF : Fits (fun a => (liftT c.k (trσ N σ) a).substT θ'') bu :=
+    have hF : Fits (κ) bu :=
       ⟨fun p hp => (hbu.has N _ hp).elim, fun hi => (hbu.has N _ hi).elim,
         fun hi => (hbu.has N _ hi).elim, fun hi => (hbu.has N _ hi).elim⟩
     have t₁ := tbu.substT _ hF
@@ -214,18 +228,20 @@ theorem has_caseK (hR : Real P S N) {Γ : List TSch} {Δl Δ : List Cn} {e b r :
     have t₂ := (t₁.weakenStore ((Ψ.map (Flick.Ty.up c.k)).map (Flick.Ty.substT θ''))).cut
       (Θ₂ := (Θ.substT (shiftV c.k)).substT θ'') (Entails.none _)
     simp only [List.nil_append] at t₂
-    have eJ₁ : (trTT N (.mono ((t.subst (up c.k)).subst θ))).substT
-        (fun a => (liftT c.k (trσ N σ) a).substT θ'') =
-        ((trTT N (.mono (t.subst σ))).up c.k).substT θ'' := by
+    have eJ₁ : Flick.Ty.Equiv
+        ((trTT N (.mono ((t.subst (up c.k)).subst θ))).substT κ)
+        (((trTT N (.mono (t.subst σ))).up c.k).substT θ'') := by
       simp only [trTT]; rw [trT_subst, trT_subst, trT_subst, Flick.Ty.up_def]; exact hTy (trT N t)
     have eJ₂ : (trStage N ((φ.subst (up c.k)).subst θ)).substT
-        (fun a => (liftT c.k (trσ N σ) a).substT θ'') =
+        (κ) =
         ((trStage N (φ.subst σ)).substT (shiftV c.k)).substT θ'' := by
       rw [trStage_subst, trStage_subst, trStage_subst]
       simp only [Flick.Stage.substT_comp]
-      congr 1; funext a; rw [hup a, Flick.Ty.substT_comp, Flick.Ty.substT_comp]; exact hatom a
-    rw [eJ₁, eJ₂] at t₂
-    refine t₂.subst (SubOk.of_get fun i s hi => ?_)
+      apply Flick.Stage.substT_equiv
+      intro a; rw [hup a]; simpa only [Flick.Ty.substT_comp] using hatom a
+    have t₃ := t₂.conv eJ₁
+    rw [eJ₂] at t₃
+    refine t₃.subst_congruent_entries (hbu.noIns N) (fun i s hi => ?_)
     obtain ⟨s₀, hs₀, rfl⟩ := map_get hi
     have hDl : (armΔ c θ (Δl ++ Δ)).length = c.ctx.length + Δl.length + Δ.length := hD
     rcases canonC_get hs₀ with ⟨hiD, q, hq, rfl⟩ | ⟨hiD, u, hu', rfl⟩
@@ -235,23 +251,25 @@ theorem has_caseK (hR : Real P S N) {Γ : List TSch} {Δl Δ : List Cn} {e b r :
         obtain ⟨q₀, hq₀, rfl⟩ := map_get hq'
         simp only [List.length_map] at him
         left
-        refine ⟨i, by simp [armτ, him, show i < (armΔ c θ (Δl ++ Δ)).length +
-          (armT c θ Γ).length by omega], ?_⟩
-        rw [hΓa₁ i (trD N q₀) (by rw [List.getElem?_append_left (by simpa), List.getElem?_map, hq₀]; rfl),
-          Flick.Scheme.mono_substT, trD_subst,
-          hfix _ (List.mem_append_left _ (List.mem_map.mpr ⟨q₀, List.mem_of_getElem? hq₀, rfl⟩))]
+        refine ⟨i, _, by simp [armτ, him, show i < (armΔ c θ (Δl ++ Δ)).length +
+          (armT c θ Γ).length by omega],
+          hΓa₁ i (trD N q₀) (by
+            rw [List.getElem?_append_left (by simpa), List.getElem?_map, hq₀]; rfl), ?_⟩
+        simp only [Flick.Scheme.mono_substT, trD_subst]
+        exact .mono (hfix _ (List.mem_append_left _
+          (List.mem_map.mpr ⟨q₀, List.mem_of_getElem? hq₀, rfl⟩)))
       · obtain ⟨q₁, hq₁, rfl⟩ := map_get hq'
         obtain ⟨q₀, hq₀, rfl⟩ := map_get hq₁
         simp only [List.length_map] at him hq₀
         rcases app_get hq₀ with ⟨hiL, hq₂⟩ | ⟨hiL, hq₂⟩
         · -- a premise of `Δl`
           left
-          refine ⟨δ (i - c.ctx.length) + (c.ctx.length + c.fields.length), ?_, ?_⟩
+          refine ⟨δ (i - c.ctx.length) + (c.ctx.length + c.fields.length), _, ?_,
+            hΓa₂ _ _ (by rw [hc.dict, List.getElem?_map, hq₂]; rfl), ?_⟩
           · simp [armτ, show ¬ i < c.ctx.length by omega, show i < c.ctx.length + Δl.length by omega,
               show i < (armΔ c θ (Δl ++ Δ)).length + (armT c θ Γ).length by omega]
-          · rw [hΓa₂ _ _ (by rw [hc.dict, List.getElem?_map, hq₂]; rfl), Flick.Scheme.mono_substT,
-              trD_subst, trD_subst, hTy, Flick.Scheme.up, Flick.Scheme.mono_substT,
-              Flick.Scheme.mono_substT, trD_subst]
+          · simpa only [Flick.Scheme.up, Flick.Scheme.mono_substT, trD_subst] using
+              Flick.Scheme.Equiv.mono (hTy (trD N q₀))
         · -- a closed premise
           right
           have hτ : armτ N c.ctx.length c.fields.length Δl.length (armΔ c θ (Δl ++ Δ)).length
@@ -262,11 +280,14 @@ theorem has_caseK (hR : Real P S N) {Γ : List TSch} {Δl Δ : List Cn} {e b r :
               show i - (c.ctx.length + Δl.length) = i - c.ctx.length - Δl.length by omega]
           rw [hτ]
           refine ⟨trDt_noFree (hcl _), fun a => (TrD.total (N := N) _ _).has N a, ?_, rfl, _, _, rfl⟩
-          have := closed_dict hR (hρ _ _ hq₂) (fun a => (shiftV c.k a).substT θ'')
-          rw [Flick.Scheme.mono_substT, trD_subst, trD_subst, hTy, ← trD_subst,
-            show i - c.ctx.length - Δl.length = i - c.ctx.length - Δl.length from rfl]
-          simp only [Flick.Ty.substT_comp] at this ⊢
-          exact this _ _ _
+          rw [Flick.Scheme.mono_substT, trD_subst, trD_subst]
+          have he := hTy (trD N q₀)
+          have hd := closed_dict hR (hρ _ _ hq₂) (fun a => (shiftV c.k a).substT θ'')
+          have he' : Flick.Ty.Equiv
+              ((trD N (q₀.subst σ)).substT (fun a => (shiftV c.k a).substT θ''))
+              ((((trD N q₀).substT (trσ N (up c.k))).substT (trσ N θ)).substT κ) := by
+            simpa only [trD_subst, Flick.Ty.substT_comp] using he.symm
+          exact (hd _ _ _).conv he'
     · unfold armT at hu'
       rcases app_get hu' with ⟨hin, hu₁⟩ | ⟨hin, hu₁⟩
       · -- a field of the value
@@ -274,20 +295,21 @@ theorem has_caseK (hR : Real P S N) {Γ : List TSch} {Δl Δ : List Cn} {e b r :
         simp only [List.length_map] at hin
         have hx := lt_of_some hf₀
         left
-        refine ⟨c.ctx.length + (i - (armΔ c θ (Δl ++ Δ)).length), ?_, ?_⟩
+        refine ⟨c.ctx.length + (i - (armΔ c θ (Δl ++ Δ)).length), _, ?_,
+          hΓa₁ _ (trT N f₀) (by
+            rw [List.getElem?_append_right (by simp), List.getElem?_map,
+              show c.ctx.length + (i - (armΔ c θ (Δl ++ Δ)).length) - (c.ctx.map (trD N)).length =
+                i - (armΔ c θ (Δl ++ Δ)).length by simp, hf₀]
+            rfl), ?_⟩
         · simp [armτ, show ¬ i < c.ctx.length by omega, show ¬ i < c.ctx.length + Δl.length by omega,
             show ¬ i < (armΔ c θ (Δl ++ Δ)).length by omega,
             show i < (armΔ c θ (Δl ++ Δ)).length + c.fields.length by omega,
             show i < (armΔ c θ (Δl ++ Δ)).length + (armT c θ Γ).length by omega]
-        · rw [hΓa₁ _ (trT N f₀) (by
-            rw [List.getElem?_append_right (by simp), List.getElem?_map,
-              show c.ctx.length + (i - (armΔ c θ (Δl ++ Δ)).length) - (c.ctx.map (trD N)).length =
-                i - (armΔ c θ (Δl ++ Δ)).length by simp, hf₀]
-            rfl)]
-          congr 1
-          show _ = (Flick.Scheme.mono (trT N (f₀.subst θ))).substT _
-          rw [Flick.Scheme.mono_substT, trT_subst,
-            hfix _ (List.mem_append_right _ (List.mem_map.mpr ⟨f₀, List.mem_of_getElem? hf₀, rfl⟩))]
+        · change Flick.Scheme.Equiv
+            ((Flick.Scheme.mono (trT N (f₀.subst θ))).substT κ) _
+          rw [Flick.Scheme.mono_substT, trT_subst]
+          exact .mono (hfix _ (List.mem_append_right _
+            (List.mem_map.mpr ⟨f₀, List.mem_of_getElem? hf₀, rfl⟩)))
       · -- a variable of `Γ`
         obtain ⟨u₁, hu₂, rfl⟩ := map_get hu₁
         obtain ⟨u₀, hu₀, rfl⟩ := map_get hu₂
@@ -295,14 +317,12 @@ theorem has_caseK (hR : Real P S N) {Γ : List TSch} {Δl Δ : List Cn} {e b r :
         have hy := lt_of_some hu₀
         left
         refine ⟨γ (i - (armΔ c θ (Δl ++ Δ)).length - c.fields.length) +
-          (c.ctx.length + c.fields.length), ?_, ?_⟩
+          (c.ctx.length + c.fields.length), _, ?_,
+          hΓa₂ _ _ (by rw [hc.var, List.getElem?_map, hu₀]; rfl), ?_⟩
         · simp [armτ, show ¬ i < c.ctx.length by omega, show ¬ i < c.ctx.length + Δl.length by omega,
             show ¬ i < (armΔ c θ (Δl ++ Δ)).length by omega,
             show ¬ i < (armΔ c θ (Δl ++ Δ)).length + c.fields.length by omega,
             show i < (armΔ c θ (Δl ++ Δ)).length + (armT c θ Γ).length by omega]
-        · rw [hΓa₂ _ _ (by rw [hc.var, List.getElem?_map, hu₀]; rfl)]
-          simp only [trS_subst]
-          rw [hSch]
-          rfl
+        · simpa only [trS_subst, Flick.Scheme.up] using hSch (trS N u₀)
 
 end Flick.Elab

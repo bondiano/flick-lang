@@ -1,4 +1,6 @@
-import Formal.CanonForms
+import Formal.RecordTyping
+import Formal.SpineTyping
+import Formal.NominalResults
 import Formal.Semantics
 
 /-!
@@ -8,74 +10,6 @@ import Formal.Semantics
 namespace Flick
 
 variable {S : Sig}
-
-theorem field_typ {Ψ Θ Γ l φ} :
-    ∀ {v w R t}, Typ S Ψ Θ Γ v (.ex R φ) → v.field l = some w → R.field l = some t →
-      Typ S Ψ Θ Γ w (.ex t φ) := by
-  intro v
-  induction v with
-  | rcons l' e r _ ih =>
-    intro w R t h hw hR
-    cases h with
-    | rcons _ _ he hr =>
-      simp only [Tm.field, Ty.field] at hw hR
-      split at hw
-      · simp_all
-      · next hne => simp only [hne, if_false] at hR; exact ih hr hw hR
-    | allI hv => simp [Ty.field] at hR
-    | errVal => simp [Ty.field] at hR
-  | drec =>
-    intro _ _ _ h _ hR
-    cases h with
-    | drec => simp [Ty.field] at hR
-    | allI hv => simp [Ty.field] at hR
-    | errVal => simp [Ty.field] at hR
-  | _ => intro _ _ _ _ hw; simp [Tm.field] at hw
-
-/-- A field of a record value is a value. A dictionary record is not a record. -/
-theorem Value.field {Ψ Θ Γ l φ} : ∀ {v w R t}, Value v → Typ S Ψ Θ Γ v (.ex R φ) →
-    v.field l = some w → R.field l = some t → Value w := by
-  intro v
-  induction v with
-  | rcons l' e r _ ih =>
-    intro w R t hv h hw hR
-    cases hv with
-    | rcons hv₁ hv₂ =>
-      cases h with
-      | rcons _ _ _ hr =>
-        simp only [Tm.field, Ty.field] at hw hR
-        split at hw
-        · cases hw; exact hv₁
-        · next hne => simp only [hne, if_false] at hR; exact ih hv₂ hr hw hR
-      | allI hv => simp [Ty.field] at hR
-      | errVal => simp [Ty.field] at hR
-  | drec =>
-    intro _ _ _ _ h _ hR
-    cases h with
-    | drec => simp [Ty.field] at hR
-    | allI hv => simp [Ty.field] at hR
-    | errVal => simp [Ty.field] at hR
-  | _ => intro _ _ _ _ _ hw; simp [Tm.field] at hw
-
-theorem setField_typ {Ψ Θ Γ l w t φ} (hw : Typ S Ψ Θ Γ w (.ex t φ)) :
-    ∀ {v v' R}, Typ S Ψ Θ Γ v (.ex R φ) → v.setField l w = some v' → R.field l = some t →
-      Typ S Ψ Θ Γ v' (.ex R φ) := by
-  intro v
-  induction v with
-  | rcons l' e r _ ih =>
-    intro v' R h hv hR
-    cases h with
-    | rcons hRec hl he hr =>
-      simp only [Tm.setField, Ty.field] at hv hR
-      split at hv
-      · simp_all only [if_true, Option.some.injEq]
-        subst hv hR; exact .rcons hRec hl hw hr
-      · simp_all only [if_false]
-        obtain ⟨r', hr', rfl⟩ := Option.map_eq_some_iff.mp hv
-        exact .rcons hRec hl he (ih hr hr' hR)
-    | allI hv => simp [Ty.field] at hR
-    | errVal => simp [Ty.field] at hR
-  | _ => intro _ _ _ hv; simp [Tm.setField] at hv
 
 theorem Ty.foldl_tapp_inj : ∀ {us us' : List Ty} {f f' : Ty}, us.length = us'.length →
     us.foldl .tapp f = us'.foldl .tapp f' → f = f' ∧ us = us'
@@ -88,13 +22,6 @@ theorem Ty.tcon_inj {T : Name} {us us' : List Ty} (hl : us.length = us'.length)
     (h : Ty.tcon T us = Ty.tcon T us') : us = us' :=
   (Ty.foldl_tapp_inj hl h).2
 
-theorem Ty.tcon_res (T : Name) (us : List Ty) : (Ty.tcon T us).res = Ty.tcon T us := by
-  have h := Ty.tcon_not_arrow T us
-  generalize Ty.tcon T us = t at h
-  cases t with
-  | arrow => exact absurd rfl (h _ _ _ _)
-  | _ => rfl
-
 theorem Ty.tcon_not_eff (T : Name) (us : List Ty) : ∀ r e t C, Ty.tcon T us ≠ .eff r e t C := by
   intro r e t C h
   have := Ty.tcon_kind T us; rw [h] at this; cases this
@@ -105,6 +32,9 @@ theorem LeLive.res_tcon {a b : Ty} {T : Name} {us : List Ty}
     ∃ us', b.res = Ty.tcon T us' ∧ S.Vary T us us' := by
   induction h with
   | refl => exact ⟨us, ha, .refl⟩
+  | equiv he =>
+    obtain ⟨vs, hb, hv⟩ := he.res_tcon ha
+    exact ⟨vs, hb, .of_equiv hv⟩
   | arrow _ _ _ _ _ ih => exact ih ha
   | eff => exact absurd ha.symm (Ty.tcon_not_eff _ _ _ _ _ _)
   | rcons => exact absurd ha Ty.rcons_ne_tcon
@@ -124,6 +54,9 @@ theorem LeLive.res_tcon' {a b : Ty} {T : Name} {us : List Ty}
     ∃ us₀, a.res = Ty.tcon T us₀ ∧ S.Vary T us₀ us := by
   induction h with
   | refl => exact ⟨us, hb, .refl⟩
+  | equiv he =>
+    obtain ⟨vs, ha, hv⟩ := he.symm.res_tcon hb
+    exact ⟨vs, ha, .of_equiv hv.symm⟩
   | arrow _ _ _ _ _ ih => exact ih hb
   | eff => exact absurd hb.symm (Ty.tcon_not_eff _ _ _ _ _ _)
   | rcons => exact absurd hb Ty.rcons_ne_tcon
@@ -166,6 +99,9 @@ theorem LeLive.adt_eq {T : Name} {U : Ty} (h : LeLive S (.adt T) U) : U = .adt T
   generalize hX : Ty.adt T = X at h
   cases h with
   | refl => rfl
+  | equiv he =>
+    subst hX
+    exact (show (Ty.adt T).Closed from trivial).equiv_eq he
   | arrow => cases hX
   | eff => cases hX
   | rcons => cases hX
@@ -195,6 +131,12 @@ theorem Typ.spine_res {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
         ∃ us, us.length = k ∧ ∃ ws, X.res = Ty.tcon T ws ∧
           S.Vary T ((S.res K).map (Ty.substT (instT us))) ws := by
   induction h with
+  | conv _ he ih =>
+    intro hv K k ts T X φ hK hS hJ hk hA; cases hJ
+    obtain ⟨us, hl, ws, hr, hw⟩ := ih hv hK hS rfl
+      (by rw [he.kind]; exact hk) (by rw [he.isAll]; exact hA)
+    obtain ⟨vs, hv, he⟩ := he.res_tcon hr
+    exact ⟨us, hl, vs, hv, hw.trans (.of_equiv he)⟩
   | ctor hK hk _ hT =>
     intro _ _ _ _ _ _ _ hK' hS hJ _ _
     cases hJ; simp only [Tm.head] at hK'; cases hK'
@@ -241,6 +183,11 @@ theorem PatTy.typ_match {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ) :
       (fl = true → t' = t) → (fl = false → t'.kind ≠ 7 ∧ ResBelow S t' t) →
       (∃ Z, LeLive S Z t' ∧ SpW S Z t) ∧ Inst S Ψ Θ Γ δ Δ := by
   induction hp with
+  | conv _ he ih =>
+    intro _ _ _ hvv hv hm ht _
+    obtain rfl := ht rfl
+    exact ⟨⟨_, LeLive.refl, .refl⟩,
+      (ih hvv (hv.conv he.symm) hm (fun _ => rfl) (fun h => by cases h)).2⟩
   | wild =>
     intro _ _ _ _ _ hm ht _; simp [matchP] at hm; subst hm; obtain rfl := ht rfl
     exact ⟨⟨_, LeLive.refl, .refl⟩, .nil⟩
@@ -257,47 +204,38 @@ theorem PatTy.typ_match {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ) :
     cases v <;> simp [matchP] at hm
     obtain ⟨rfl, rfl⟩ := hm
     obtain ⟨hk7, hres⟩ := hk' rfl
-    cases hv with
-    | ctor hK' hk'' _ hT =>
-      rw [hK] at hK'; cases hK'
-      obtain ⟨ws₁, h₁, hw₁⟩ := hT.res_tcon (Sig.ctorTyR_res _ _ _ _)
-      obtain ⟨ws, h₂, hw⟩ := hres.tcon (Sig.ctorTyR_res _ _ _ _)
-      obtain rfl := (Ty.tcon_eq (h₁.symm.trans h₂)).2
-      -- the instance of what it builds widens to the instance of the pattern
-      exact ⟨⟨_, hT, SpW.ctor hK hk'' (Sig.Vary.of_map hj hK hk'' hk (hw₁.trans hw))⟩, .nil⟩
-    | allI =>
-      obtain ⟨_, h₂, -⟩ := hres.tcon (Sig.ctorTyR_res _ _ _ _)
-      exact (Ty.res_tcon_not_all h₂).elim
-    | errVal => exact absurd rfl hk7
+    obtain ⟨ws, h₂, hw⟩ := hres.tcon (Sig.ctorTyR_res _ _ _ _)
+    obtain ⟨_, _, _, us, hK', hk'', _, hT⟩ :=
+      hv.ctor_type _ _ _ rfl rfl (Ty.not_all_of_res_tcon h₂) hk7
+    rw [hK] at hK'; cases hK'
+    obtain ⟨ws₁, h₁, hw₁⟩ := hT.res_tcon (Sig.ctorTyR_res _ _ _ _)
+    obtain rfl := (Ty.tcon_eq (h₁.symm.trans h₂)).2
+    -- the instance of what it builds widens to the instance of the pattern
+    exact ⟨⟨_, hT, SpW.ctor hK hk'' (Sig.Vary.of_map hj hK hk'' hk (hw₁.trans hw))⟩, .nil⟩
   | app _ _ ih₁ ih₂ =>
     intro v δ _ hvv hv hm _ hk
     obtain ⟨hk7, hres⟩ := hk rfl
     cases v with
     | app f e =>
       obtain ⟨δ₁, δ₂, h1, h2, rfl⟩ := matchP_app.mp hm
-      cases hv with
-      | app hf he hψ hT =>
-        obtain rfl := Stage.eq_pure (Stage.le_trans (Stage.le_use _ _) hψ)
-        have hvf : Value f ∧ Value e := by
-          cases hvv with
-          | ctorApp hf' _ he' => exact ⟨hf', he'⟩
-          | constApp _ he' => exact ⟨.const, he'⟩
-        obtain ⟨_, _, _, _, _, _, _, hr, _⟩ := (‹PatTy S false _ _ _›).spine rfl
-        simp only [Ty.res] at hr
-        obtain ⟨ws, hw1, hww⟩ := hres.tcon hr
-        obtain ⟨ws₀, hres', hw0⟩ := hT.res_tcon' hw1
-        obtain ⟨⟨Z, hZ, hs⟩, i₁⟩ := ih₁ hvf.1 hf h1 (fun h => by cases h)
-          (fun _ => ⟨by simp [Ty.kind], .inr ⟨_, _, _, hr, hres', hw0.trans hww⟩⟩)
-        obtain ⟨_, _, _, _, h, la, Z', lt, hs'⟩ := hs.arrow_step hZ
-        cases h
-        obtain ⟨_, i₂⟩ := ih₂ hvf.2 (he.sub ⟨la, Stage.le_refl _⟩) h2 (fun _ => rfl)
-          (fun h => by cases h)
-        exact ⟨⟨Z', lt.trans hT, hs'⟩, i₁.append i₂⟩
-      | allI =>
-        obtain ⟨_, _, _, _, _, _, _, hr, _⟩ := (‹PatTy S false _ _ _›).spine rfl
-        obtain ⟨_, h₂, -⟩ := hres.tcon hr
-        exact (Ty.res_tcon_not_all h₂).elim
-      | errVal => exact absurd rfl hk7
+      obtain ⟨_, _, _, _, _, _, _, hr, _⟩ := (‹PatTy S false _ _ _›).spine rfl
+      simp only [Ty.res] at hr
+      obtain ⟨ws, hw1, hww⟩ := hres.tcon hr
+      obtain ⟨_, _, _, _, hf, he, hψ, hT⟩ :=
+        hv.app_type _ _ _ _ rfl rfl (Ty.not_all_of_res_tcon hw1) hk7
+      obtain rfl := Stage.eq_pure (Stage.le_trans (Stage.le_use _ _) hψ)
+      have hvf : Value f ∧ Value e := by
+        cases hvv with
+        | ctorApp hf' _ he' => exact ⟨hf', he'⟩
+        | constApp _ he' => exact ⟨.const, he'⟩
+      obtain ⟨ws₀, hres', hw0⟩ := hT.res_tcon' hw1
+      obtain ⟨⟨Z, hZ, hs⟩, i₁⟩ := ih₁ hvf.1 hf h1 (fun h => by cases h)
+        (fun _ => ⟨by simp [Ty.kind], .inr ⟨_, _, _, hr, hres', hw0.trans hww⟩⟩)
+      obtain ⟨_, _, _, _, h, la, Z', lt, hs'⟩ := hs.arrow_step hZ
+      cases h
+      obtain ⟨_, i₂⟩ := ih₂ hvf.2 (he.sub ⟨la, Stage.le_refl _⟩) h2 (fun _ => rfl)
+        (fun h => by cases h)
+      exact ⟨⟨Z', lt.trans hT, hs'⟩, i₁.append i₂⟩
     | _ => simp [matchP] at hm
   | adt _ hU ih =>
     intro _ _ _ hvv hv hm ht _

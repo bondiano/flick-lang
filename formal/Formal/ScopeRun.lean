@@ -1,4 +1,5 @@
 import Formal.ScopeStep
+import Formal.FunctionTyping
 
 /-!
 # `Scope.run`
@@ -82,25 +83,26 @@ theorem Typ.scopeRun_of_scope {Ψ Θ Γ b t T φ φ'} {r ε : Row} (hn : b.NoIns
 /-- `Scope.run` of a lambda types as a `scope` of its body. -/
 theorem Typ.scope_of_scopeRun {Ψ Θ Γ b T φ} (h : Typ S Ψ Θ Γ (.app (.const .scopeRun) (.lam b)) (.ex T φ)) :
     Typ S Ψ Θ Γ (.scope b) (.ex T φ) := by
-  cases h with
-  | app hf ha hψ hT =>
-    cases hf with
-    | const hok hT' =>
-      obtain ⟨_, _, _, _, h, la, lψ, lt, -⟩ := hT'.arrow_left
-      cases h; obtain rfl := la.eq_plain_right rfl
-      have hs := hok.substT (shiftV 1)
-      rw [Row.ofCaps_substT] at hs
-      cases Typ.allInv .lam ha with
-      | lam hb hn hL =>
-        obtain ⟨_, _, _, _, h, la', lψ', lt', -⟩ := hL.arrow_left
-        cases h; obtain rfl := la'.eq_plain rfl
-        rw [show ∀ x, Row.obs x (.tvar 0) = Row.disch (.v 0) x from Row.obs_ty (.v 0)] at lψ'
-        exact .scope (F := Facts.none) hn (fun _ _ h => h.elim)
-          ((hb.sub (J' := .ex _ _) ⟨lt', Stage.le_refl _⟩).cut (Entails.union_left _ _))
-          (Stage.le_trans lψ' ⟨fun x hx => hx.elim id fun h' => .inr (.inl (hs x h')), fun _ h' => h'⟩)
-          (by simpa only [Stage.use_none] using Stage.le_trans lψ hψ) (lt.trans hT)
-  | errVal hv | allI hv => cases hv with
+  have hn : ¬ Value (.app (.const .scopeRun) (.lam b)) := by
+    intro hv
+    cases hv with
     | ctorApp _ hK _ => simp [Tm.head] at hK
     | constApp hc _ => simp [Const.arity] at hc
+  obtain ⟨_, _, _, _, hf, ha, hψ, hT⟩ := h.app_nonvalue _ _ _ _ rfl rfl hn
+  obtain ⟨_, hok, hT'⟩ := hf.const_arrow (by intro E o cl h; cases h)
+  obtain ⟨_, _, _, _, h, la, lψ, lt, -⟩ := hT'.arrow_left
+  cases h
+  have ha' := ha.conv (la.eq_plain_right rfl)
+  have hs := hok.substT (shiftV 1)
+  rw [Row.ofCaps_substT] at hs
+  obtain ⟨_, _, _, _, hb, hn, hL⟩ := (Typ.allInv .lam ha').lam_arrow
+  obtain ⟨_, _, _, _, h, la', lψ', lt', -⟩ := hL.arrow_left
+  cases h
+  obtain rfl := (la'.eq_plain rfl).owner_v_right
+  rw [show ∀ x, Row.obs x (.tvar 0) = Row.disch (.v 0) x from Row.obs_ty (.v 0)] at lψ'
+  exact .scope (F := Facts.none) hn (fun _ _ h => h.elim)
+    ((hb.sub (J' := .ex _ _) ⟨lt', Stage.le_refl _⟩).cut (Entails.union_left _ _))
+    (Stage.le_trans lψ' ⟨fun x hx => hx.elim id fun h' => .inr (.inl (hs x h')), fun _ h' => h'⟩)
+    (by simpa only [Stage.use_none] using Stage.le_trans lψ hψ) (lt.trans hT)
 
 end Flick

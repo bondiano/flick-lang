@@ -36,8 +36,9 @@ theorem Sig.Builds.of_substT {K t} {σ : Atom → Ty} (h : S.Builds K (t.substT 
   intro k ts T us hK ht hl
   obtain ⟨ρ, hρ⟩ := h k ts T (us.map (Ty.substT σ)) hK (by rw [ht, Ty.tcon_substT]) (by simpa using hl)
   refine ⟨fun a => (liftT k σ a).substT ρ, ?_⟩
-  rw [← Ty.substT_comp, ← Ty.substT_comp, Ty.up_comm, ← hρ, Ty.tcon_substT T (liftT k σ),
+  rw [← Ty.substT_comp, ← Ty.substT_comp, Ty.up_comm, Ty.tcon_substT T (liftT k σ),
     S.res_closed K k ts T _ hK fun i hi => by simp [liftT, hi]]
+  exact hρ
 
 theorem Shp.of_substT {σ : Atom → Ty} :
     ∀ {t : Ty} {v : Tm}, Shp S true (t.substT σ) v → Shp S true t v
@@ -70,6 +71,7 @@ theorem Covers.substT {t ps e} (σ : Atom → Ty) (h : Covers S t ps e) :
 theorem PatTy.substT {fl p t Δ} (σ : Atom → Ty) (h : PatTy S fl p t Δ) :
     PatTy S fl p (t.substT σ) (Δ.map (Ty.substT σ)) := by
   induction h with
+  | conv _ he ih => exact .conv ih (he.substT σ)
   | wild => exact .wild
   | var => exact .var
   | lit => exact .lit

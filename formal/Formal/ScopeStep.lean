@@ -68,15 +68,15 @@ theorem Stage.YF_kill {φ φ' : Stage} {n : Nat} (h : φ.le φ') (hφ' : φ'.sub
 theorem inside_entails {Θ F : Facts} {p n : Nat} (hp : p < n)
     (hF : ∀ C s, F C s → s = .rg p ∧ ∀ q, C (.r q) → q < p)
     (hin : Entails (Facts.age.substT (kill n)) Θ) : Entails (Facts.union Θ F) Θ := by
-  intro C s hC x hx
-  rcases hC x hx with h | ⟨C', h₁ | h₁, h₂⟩
-  · exact .inl h
-  · exact .inr ⟨C', h₁, h₂⟩
-  · obtain ⟨rfl, hC'⟩ := hF C' s h₁
-    have hfact : Facts.age.substT (kill n) C' (.rg p) :=
-      ⟨C', .rg p, fun q p' hq hp' => by cases hp'; exact hC' q hq,
-        (Caps.kill_fixed fun q hq => Nat.lt_trans (hC' q hq) hp).symm, by simp [Ty.substT, kill, hp]⟩
-    exact hin C' (.rg p) (fun y hy => .inr ⟨C', hfact, hy⟩) x h₂
+  apply Entails.of_facts
+  intro C s hC
+  rcases hC with h | h
+  · exact Outl.fact h
+  · obtain ⟨rfl, hC⟩ := hF C s h
+    have hfact : Facts.age.substT (kill n) C (.rg p) :=
+      ⟨C, .rg p, fun q p' hq hp' => by cases hp'; exact hC q hq,
+        (Caps.kill_fixed fun q hq => Nat.lt_trans (hC q hq) hp).symm, by simp [Ty.substT, kill, hp]⟩
+    exact hin C (.rg p) (Outl.fact hfact)
 
 /-- The body of a new scope, in its run-time region `n`: the regions not yet created
 are renamed out, and `n` is put for the region of the scope. -/

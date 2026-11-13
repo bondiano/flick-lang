@@ -19,51 +19,46 @@ theorem List.map_kill_YF {Ψ : List Ty} {n : Nat} (h : ∀ u ∈ Ψ, u.YF n) :
 
 theorem hwith_not_pure {Ψ Θ p ℓ E al r e t} (h : Typ S Ψ Θ [] (.hwith p ℓ E al r e) (.ex t .pure)) :
     False := by
-  cases h with
-  | hwith _ _ _ _ _ _ _ hφ _ => exact hφ
-  | errVal hv | allI hv => cases hv
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, hφ, _, _⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
+  exact hφ
 
 theorem hkeep_not_pure {Ψ Θ q ℓ E al e t} (h : Typ S Ψ Θ [] (.hkeep q ℓ E al e) (.ex t .pure)) :
     False := by
-  cases h with
-  | hkeep _ _ _ _ _ _ _ hφ _ => exact hφ
-  | errVal hv | allI hv => cases hv
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, hφ, _⟩ := h.hkeep_type _ _ _ _ _ _ _ rfl rfl
+  exact hφ
 
 theorem hctl_not_pure {Ψ Θ p ℓ κ tl E al r a k t}
     (h : Typ S Ψ Θ [] (.hctl p ℓ κ tl E al r a k) (.ex t .pure)) : False := by
-  cases h with
-  | hctl _ _ _ _ _ _ _ _ _ _ _ _ _ _ hφ _ => exact hφ
-  | errVal hv | allI hv => cases hv
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, hφ, _, _⟩ := h.hctl_type _ _ _ _ _ _ _ _ _ _ _ rfl rfl
+  exact hφ
 
 theorem unw_not_value {p ℓ a} : ¬ Value (.unw p ℓ a) := fun h => by cases h
 
 theorem unw_not_pure {Ψ Θ p ℓ a t} (h : Typ S Ψ Θ [] (.unw p ℓ a) (.ex t .pure)) : False := by
-  cases h with
-  | unw _ _ h => exact h
-  | errVal hv | allI hv => cases hv
+  obtain ⟨_, _, _, _, _, hφ⟩ := h.unw_type _ _ _ _ _ rfl rfl
+  exact hφ
 
 /-- Removing a frame around unwinding keeps it typed. -/
 theorem unw_frame {Ψ Θ p ℓ a t φ} {F : Frame} (hF : F.ok) (hni : ¬ F.isInside)
     (h : Typ S Ψ Θ [] (F.plug (.unw p ℓ a)) (.ex t φ)) : Typ S Ψ Θ [] (.unw p ℓ a) (.ex t φ) := by
   obtain ⟨k, Θ', _, φ', hr, rel, hk, _⟩ := frame_typing unw_not_value F hF h
-  cases hr with
-  | unw hℓ ha hst =>
-    have hne : φ' ≠ .pure := Stage.rt_ne_pure hst
-    obtain ⟨rfl, -, hΘ⟩ := hk.resolve_left hne
-    obtain rfl := hΘ hni
-    simp only [List.map_up_zero] at hℓ ha
-    exact .unw hℓ ha (Stage.none_le fun hp => hne (rel.pure hp))
-  | errVal hv | allI hv => cases hv
+  obtain ⟨_, _, _, hℓ, ha, hst⟩ := hr.unw_type _ _ _ _ _ rfl rfl
+  have hne : φ' ≠ .pure := Stage.rt_ne_pure hst
+  obtain ⟨rfl, -, hΘ⟩ := hk.resolve_left hne
+  obtain rfl := hΘ hni
+  simp only [List.map_up_zero] at hℓ ha
+  exact .unw hℓ ha (Stage.none_le fun hp => hne (rel.pure hp))
 
 /-- Facts of a hole, renamed with the regions not yet created, follow from those around. -/
 theorem kill_entails {Θ Θ' : Facts} {n : Nat} (hidem : Θ.substT (kill n) = Θ)
     (hin : Entails (Facts.age.substT (kill n)) Θ) (hΘ : Ext Θ Θ') : Entails (Θ'.substT (kill n)) Θ := by
-  intro C s hC x hx
-  rcases hC x hx with h | ⟨C', ⟨C₀, s₀, h₀, rfl, rfl⟩, h₂⟩
-  · exact .inl h
-  · rcases hΘ.2 _ _ h₀ with h | h
-    · exact .inr ⟨_, by rw [← hidem]; exact ⟨C₀, s₀, h, rfl, rfl⟩, h₂⟩
-    · exact hin _ _ (fun y hy => .inr ⟨_, ⟨C₀, s₀, h, rfl, rfl⟩, hy⟩) x h₂
+  apply Entails.of_facts
+  rintro C s ⟨C₀, s₀, h₀, rfl, rfl⟩
+  rcases hΘ.2 _ _ h₀ with h | h
+  · have ht : (Θ.substT (kill n)) (C₀.substT (kill n)) (s₀.substT (kill n)) := ⟨C₀, s₀, h, rfl, rfl⟩
+    rw [hidem] at ht
+    exact Outl.fact ht
+  · exact hin _ _ (Outl.fact ⟨C₀, s₀, h, rfl, rfl⟩)
 
 /-- The argument of the hole, at the facts around, when its type has no region. -/
 theorem hole_arg {Ψ Θ E f x t₀ φ₀ a₀ ψ₀ B n} (hE : OkE E) (hn : ¬ Value (.app f x)) (hx : Value x)
@@ -71,38 +66,32 @@ theorem hole_arg {Ψ Θ E f x t₀ φ₀ a₀ ψ₀ B n} (hE : OkE E) (hn : ¬ V
     (hc : RtCtx Ψ Θ n) (hb : x.Below n) (ha : a₀.substT (kill n) = a₀) :
     Typ S Ψ Θ [] x (.ex a₀ .pure) := by
   obtain ⟨K, Θ', t', φ', hr, -, hp, -⟩ := ctx_typing E hE hn h
-  cases hr with
-  | app hf' hx' hψ _ =>
-    obtain ⟨hψp, hb'⟩ := hf hf'
-    have hφ : φ' ≠ .pure := fun h =>
-      hψp ((Stage.use_eq_pure _ _).mp (Stage.eq_pure (h ▸ hψ)))
-    rcases hp with hp | ⟨rfl, hΘ⟩
-    · exact (hφ hp).elim
-    · simp only [List.map_up_zero] at hx'
-      have h₁ := (hx'.sub (J' := .ex a₀ φ') ⟨(hb' rfl).1, Stage.le_refl _⟩).substT (kill n) (Fits.kill hb)
-      rw [List.map_kill_YF hc.yf] at h₁
-      simp only [Flick.J.substT, ha] at h₁
-      exact (h₁.cut (kill_entails hc.idem hc.inΘ hΘ)).valueAny hx _
-  | errVal hv | allI hv => exact (hn hv).elim
+  obtain ⟨_, _, _, _, hf', hx', hψ, _⟩ := hr.app_nonvalue f x t' φ' rfl rfl hn
+  obtain ⟨hψp, hb'⟩ := hf hf'
+  have hφ : φ' ≠ .pure := fun h =>
+    hψp ((Stage.use_eq_pure _ _).mp (Stage.eq_pure (h ▸ hψ)))
+  rcases hp with hp | ⟨rfl, hΘ⟩
+  · exact (hφ hp).elim
+  · simp only [List.map_up_zero] at hx'
+    have h₁ := (hx'.sub (J' := .ex a₀ φ') ⟨(hb' rfl).1, Stage.le_refl _⟩).substT (kill n) (Fits.kill hb)
+    rw [List.map_kill_YF hc.yf] at h₁
+    simp only [Flick.J.substT, ha] at h₁
+    exact (h₁.cut (kill_entails hc.idem hc.inΘ hΘ)).valueAny hx _
 
 theorem perform_op {Ψ Θ E o c x t φ} {Ei : List Frame} (hEi : OkE Ei)
     (h : Typ S Ψ Θ [] (plug Ei (.app (.const (.perform E o c)) x)) (.ex t φ)) :
     ∃ a b, S.op E o = some (c, a, b) := by
   obtain ⟨_, _, _, _, hr, -⟩ := ctx_typing Ei hEi perform_not_value h
-  cases hr with
-  | app hf _ _ _ =>
-    cases hf with
-    | perform hop _ => exact ⟨_, _, hop⟩
-    | const hok _ => exact hok.elim
-  | errVal hv | allI hv => exact (perform_not_value hv).elim
+  obtain ⟨_, _, _, _, hf, _, _, _⟩ := hr.app_nonvalue _ _ _ _ rfl rfl perform_not_value
+  obtain ⟨a, b, _, hop, _⟩ := hf.perform_arrow
+  exact ⟨a, b, hop⟩
 
 /-- `todo` for the argument of the hole. -/
 theorem refill_todo {Ψ Θ E f x t₀ φ₀} (hE : OkE E) (hn : ¬ Value (.app f x))
     (h : Typ S Ψ Θ [] (plug E (.app f x)) (.ex t₀ φ₀)) : Typ S Ψ Θ [] (plug E (.app f .todo)) (.ex t₀ φ₀) := by
   obtain ⟨K, Θ', t', φ', hr, -, -, back⟩ := ctx_typing E hE hn h
-  cases hr with
-  | app hf' _ hψ hT => simpa using Refill.id back [] (.app f .todo) (by simpa using Typ.app hf' .todo hψ hT)
-  | errVal hv | allI hv => exact (hn hv).elim
+  obtain ⟨_, _, _, _, hf', _, hψ, hT⟩ := hr.app_nonvalue f x t' φ' rfl rfl hn
+  simpa using Refill.id back [] (.app f .todo) (by simpa using Typ.app hf' .todo hψ hT)
 
 /-- The cell of `resume` has no region not yet created. -/
 theorem ctl_cell_yf {Ψ : List Ty} {Θ n} {ℓ p : Nat} {r ε : Row} {t' b₀ : Ty} (hc : RtCtx Ψ Θ n)
@@ -119,50 +108,44 @@ theorem abort_pres {Ψ Θ p ℓ Ef al rf o v b t φ} {Ei : List Frame} (hEi : Ok
     (ha : al.armOf o = some b) (hv : Value v)
     (h : Typ S Ψ Θ [] (.hwith p ℓ Ef al rf (plug Ei (.app (.const (.perform Ef o .abort)) v))) (.ex t φ)) :
     Typ S Ψ Θ [] (.hwith p ℓ Ef al rf (plug Ei (.unw p ℓ (b.subst (inst [v]))))) (.ex t φ) := by
-  cases h with
-  | hwith hℓ hal hrf hψ he hφ₀ hc hφ hT hat =>
-    obtain ⟨a₀, b₀, hop⟩ := perform_op hEi he
-    have hb := (hal.arm_inv hop ha).2.1 rfl
-    refine .hwith hℓ hal hrf hψ (refill_app hEi perform_not_value he (perform_fn hop) perform_up
-      fun T φ' hΘ hψ₀ _ hx => ?_) hφ₀ hc hφ hT hat
-    exact .unw hℓ (((hb.cut hΘ.entails).inst (Δ := [_]) (.cons hv (hx.valueAny hv _) .nil)).sub
-      (J' := .ex _ (Stage.use (.rt _ _) (Ty.rg _).reach))
-      ⟨LeLive.refl, Stage.le_use _ _⟩)
-      (Stage.none_le (Stage.rt_ne_pure hψ₀))
-  | errVal hv | allI hv => cases hv
+  obtain ⟨_, _, _, _, _, _, _, hℓ, hal, hrf, hψ, he, hφ₀, hc, hφ, hT, hat⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨a₀, b₀, hop⟩ := perform_op hEi he
+  have hb := (hal.arm_inv hop ha).2.1 rfl
+  refine .hwith hℓ hal hrf hψ (refill_app hEi perform_not_value he (perform_fn hop) perform_up
+    fun T φ' hΘ hψ₀ _ hx => ?_) hφ₀ hc hφ hT hat
+  exact .unw hℓ (((hb.cut hΘ.entails).inst (Δ := [_]) (.cons hv (hx.valueAny hv _) .nil)).sub
+    (J' := .ex _ (Stage.use (.rt _ _) (Ty.rg _).reach))
+    ⟨LeLive.refl, Stage.le_use _ _⟩)
+    (Stage.none_le (Stage.rt_ne_pure hψ₀))
 
 /-- `tail`: the arm runs at the handler while the body waits for its value. -/
 theorem tail_pres {Ψ Θ n p ℓ Ef al rf o v b t φ} {Ei : List Frame} (hc : RtCtx Ψ Θ n)
     (hbv : v.Below n) (hEi : OkE Ei) (ha : al.armOf o = some b) (hv : Value v)
     (h : Typ S Ψ Θ [] (.hwith p ℓ Ef al rf (plug Ei (.app (.const (.perform Ef o .tail)) v))) (.ex t φ)) :
     Typ S Ψ Θ [] (.hctl p ℓ 0 true Ef al rf (b.subst (inst [v])) (plug Ei (.hole p))) (.ex t φ) := by
-  cases h with
-  | hwith hℓ hal hrf hψ he hφ₀ hc' hφ hT hat =>
-    obtain ⟨a₀, b₀, hop⟩ := perform_op hEi he
-    have hb := (hal.arm_inv hop ha).1 rfl
-    have hx := hole_arg hEi perform_not_value hv he (perform_fn hop) hc hbv
-      (S.op_closed _ _ _ _ _ (kill n) hop).1
-    refine .hctl hℓ hal hrf hψ hop (by decide) (by simp) hEi rfl
-      (refill_todo hEi perform_not_value he) hφ₀ ?_ (fun h => by cases h) hc' hφ hT hat
-    rw [if_pos rfl]
-    exact (hb.inst (Δ := [_]) (.cons hv hx .nil)).sub
-      ⟨LeLive.refl, Stage.le_use _ _⟩
-  | errVal hv | allI hv => cases hv
+  obtain ⟨_, _, _, _, _, _, _, hℓ, hal, hrf, hψ, he, hφ₀, hc', hφ, hT, hat⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨a₀, b₀, hop⟩ := perform_op hEi he
+  have hb := (hal.arm_inv hop ha).1 rfl
+  have hx := hole_arg hEi perform_not_value hv he (perform_fn hop) hc hbv
+    (S.op_closed _ _ _ _ _ (kill n) hop).1
+  refine .hctl hℓ hal hrf hψ hop (by decide) (by simp) hEi rfl
+    (refill_todo hEi perform_not_value he) hφ₀ ?_ (fun h => by cases h) hc' hφ hT hat
+  rw [if_pos rfl]
+  exact (hb.inst (Δ := [_]) (.cons hv hx .nil)).sub
+    ⟨LeLive.refl, Stage.le_use _ _⟩
 
 /-- `tail` under a kept handler: its arm runs there while the body waits for its value. -/
 theorem kept_pres {Ψ Θ n q ℓ Ef al o v b t φ} {Ei : List Frame} (hc : RtCtx Ψ Θ n)
     (hbv : v.Below n) (hEi : OkE Ei) (ha : al.armOf o = some b) (hv : Value v)
     (h : Typ S Ψ Θ [] (.hkeep q ℓ Ef al (plug Ei (.app (.const (.perform Ef o .tail)) v))) (.ex t φ)) :
     Typ S Ψ Θ [] (.hkarm q ℓ Ef al (b.subst (inst [v])) (plug Ei (.hole q))) (.ex t φ) := by
-  cases h with
-  | hkeep hℓ hal he hφ₀ hc' hnt hle hφ hT =>
-    obtain ⟨a₀, b₀, hop⟩ := perform_op hEi he
-    have hb := (hal.arm_inv hop ha).1 rfl
-    have hx := hole_arg hEi perform_not_value hv he (perform_fn hop) hc hbv
-      (S.op_closed _ _ _ _ _ (kill n) hop).1
-    exact .hkarm hℓ hal hop hEi rfl (refill_todo hEi perform_not_value he) hφ₀ hc' hnt
-      (hb.inst (Δ := [_]) (.cons hv hx .nil)) hle hφ hT
-  | errVal hv | allI hv => cases hv
+  obtain ⟨_, _, _, _, _, _, _, hℓ, hal, he, hφ₀, hc', hnt, hle, hφ, hT⟩ := h.hkeep_type _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨a₀, b₀, hop⟩ := perform_op hEi he
+  have hb := (hal.arm_inv hop ha).1 rfl
+  have hx := hole_arg hEi perform_not_value hv he (perform_fn hop) hc hbv
+    (S.op_closed _ _ _ _ _ (kill n) hop).1
+  exact .hkarm hℓ hal hop hEi rfl (refill_todo hEi perform_not_value he) hφ₀ hc' hnt
+    (hb.inst (Δ := [_]) (.cons hv hx .nil)) hle hφ hT
 
 /-- `control`: the arm runs at the handler with `resume`, a new cell of the type of the rest
 of the body. -/
@@ -173,20 +156,18 @@ theorem ctl_pres {Ψ Θ n p ℓ Ef al rf o v b t φ} {Ei : List Frame} (hc : RtC
     ∃ c, c.YF n ∧ Typ S Ψ Facts.age [] (.lam .todo) (.ex c .pure) ∧
       Typ S (Ψ ++ [c]) Θ [] (.hctl p ℓ Ψ.length false Ef al rf (b.subst (inst [v, .kont p Ψ.length]))
         (plug Ei (.hole p))) (.ex t φ) := by
-  cases h with
-  | hwith hℓ hal hrf hψ he hφ₀ hc' hφ hT hat =>
-    obtain ⟨a₀, b₀, hop⟩ := perform_op hEi he
-    have hb := (hal.arm_inv hop ha).2.2 rfl
-    have hx := hole_arg hEi perform_not_value hv he (perform_fn hop) hc hbv
-      (S.op_closed _ _ _ _ _ (kill n) hop).1
-    refine ⟨_, ctl_cell_yf hc hℓ (S.op_closed _ _ _ _ _ (kill n) hop).2 hp, lam_todo, ?_⟩
-    refine .hctl (getElem?_ext hℓ) (hal.weakenStore _) (hrf.weakenStore _) hψ hop (by decide) (by simp)
-      hEi rfl ((refill_todo hEi perform_not_value he).weakenStore _) hφ₀ ?_
-      (fun _ => ⟨_, List.getElem?_concat_length, rfl⟩) hc' hφ hT hat
-    rw [if_neg (by decide)]
-    exact (hb.weakenStore _).inst (Δ := [_, _])
-      (.cons hv (hx.weakenStore _) (.cons .kont (.kont List.getElem?_concat_length rfl .refl) .nil))
-  | errVal hv | allI hv => cases hv
+  obtain ⟨_, _, _, _, _, _, _, hℓ, hal, hrf, hψ, he, hφ₀, hc', hφ, hT, hat⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨a₀, b₀, hop⟩ := perform_op hEi he
+  have hb := (hal.arm_inv hop ha).2.2 rfl
+  have hx := hole_arg hEi perform_not_value hv he (perform_fn hop) hc hbv
+    (S.op_closed _ _ _ _ _ (kill n) hop).1
+  refine ⟨_, ctl_cell_yf hc hℓ (S.op_closed _ _ _ _ _ (kill n) hop).2 hp, lam_todo, ?_⟩
+  refine .hctl (getElem?_ext hℓ) (hal.weakenStore _) (hrf.weakenStore _) hψ hop (by decide) (by simp)
+    hEi rfl ((refill_todo hEi perform_not_value he).weakenStore _) hφ₀ ?_
+    (fun _ => ⟨_, List.getElem?_concat_length, rfl⟩) hc' hφ hT hat
+  rw [if_neg (by decide)]
+  exact (hb.weakenStore _).inst (Δ := [_, _])
+    (.cons hv (hx.weakenStore _) (.cons .kont (.kont List.getElem?_concat_length rfl .refl) .nil))
 
 theorem Stage.use_rg_svc {r ε : Row} {p : Nat} :
     (Stage.use (.rt r ε) (Ty.rg p).reach).svc (.atm (.r p)) := by
@@ -197,17 +178,15 @@ theorem resume_pres {Ψ Θ n p ℓh ℓ Ef al rf u k t φ} {A Ei : List Frame} (
     (hbu : u.Below n) (hA : OkE A) (hEi : OkE Ei) (hk : k = plug Ei (.hole p)) (hu : Value u)
     (h : Typ S Ψ Θ [] (.hctl p ℓh ℓ false Ef al rf (plug A (.app (.kont p ℓ) u)) k) (.ex t φ)) :
     Typ S Ψ Θ [] (.hres p ℓh (plug A (.hole p)) (.hwith p ℓh Ef al rf (plug Ei u))) (.ex t φ) := by
-  cases h with
-  | hctl hℓh hal hrf hψ hop hc' _ hE hk' hp hφ₀ ha hl hcm hφ hT _ =>
-    obtain ⟨rfl, -⟩ := plug_hole_inj hEi hE (hk.symm.trans hk')
-    obtain ⟨C', hl₁, hcp⟩ := hl rfl
-    rw [if_neg (by decide)] at ha
-    have hx := hole_arg hA kont_not_value hu ha (kont_fn hl₁) hc hbu (S.op_closed _ _ _ _ _ (kill n) hop).2
-    have hw := Typ.hwith hℓh hal hrf hψ (refill_app hE perform_not_value hp (perform_fn hop) perform_up
-        fun T φ' hΘ _ hB _ => ((hx.valueAny hu φ').sub (J' := .ex T φ') ⟨hB hc', Stage.le_refl _⟩).cut
-          hΘ.entails) hφ₀ hcm (Stage.le_use _ _) LeLive.refl
-        (Stage.use_rg_svc)
-    exact .hres hℓh hw hA rfl (refill_todo hA kont_not_value ha) hl₁ hcp hφ hT
-  | errVal hv | allI hv => cases hv
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, hℓh, hal, hrf, hψ, hop, hc', _, hE, hk', hp, hφ₀, ha, hl, hcm, hφ, hT, _⟩ := h.hctl_type _ _ _ _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨rfl, -⟩ := plug_hole_inj hEi hE (hk.symm.trans hk')
+  obtain ⟨C', hl₁, hcp⟩ := hl rfl
+  rw [if_neg (by decide)] at ha
+  have hx := hole_arg hA kont_not_value hu ha (kont_fn hl₁) hc hbu (S.op_closed _ _ _ _ _ (kill n) hop).2
+  have hw := Typ.hwith hℓh hal hrf hψ (refill_app hE perform_not_value hp (perform_fn hop) perform_up
+      fun T φ' hΘ _ hB _ => ((hx.valueAny hu φ').sub (J' := .ex T φ') ⟨hB hc', Stage.le_refl _⟩).cut
+        hΘ.entails) hφ₀ hcm (Stage.le_use _ _) LeLive.refl
+      (Stage.use_rg_svc)
+  exact .hres hℓh hw hA rfl (refill_todo hA kont_not_value ha) hl₁ hcp hφ hT
 
 end Flick

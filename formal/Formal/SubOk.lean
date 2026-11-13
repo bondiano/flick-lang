@@ -55,7 +55,7 @@ theorem Scheme.up_holds_self (s : Scheme) (Θ : Facts) :
     rw [Ty.substT_comp]; conv => rhs; rw [← r₀.substT_ident]
     exact Ty.substT_congr (atom_up_inst _)
   rw [e₁, e₂]
-  exact fun x hx => .inr ⟨C₀, .inr h₀, hx⟩
+  exact Outl.fact (.inr h₀)
 
 /-- A variable at the level of its own scheme. -/
 theorem Typ.var_self {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {i : Nat} {s : Scheme}
@@ -73,11 +73,10 @@ theorem Typ.instantiate {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {e : Tm} 
   simp only [List.map_map, Function.comp_def, Ty.up_substT _ _ _ hts,
     Scheme.up_substT _ _ _ hts, List.map_id', Flick.J.substT, Facts.at, Facts.union_substT,
     Facts.up_substT _ _ _ hts] at this
-  refine Typ.cut this fun C r hC x hx => ?_
-  rcases hC x hx with h' | ⟨C', h₁ | ⟨C₀, r₀, h₀, rfl, hr⟩, h₂⟩
-  · exact .inl h'
-  · exact .inr ⟨C', h₁, h₂⟩
-  · subst hr; exact hH C₀ r₀ h₀ x h₂
+  refine Typ.cut this (Entails.of_facts ?_)
+  rintro C r (hΘ | ⟨C₀, r₀, h₀, rfl, rfl⟩)
+  · exact Outl.fact hΘ
+  · exact hH C₀ r₀ h₀
 
 /-- A value at the level of its scheme is a fit replacement. -/
 theorem SubOk.value {Ψ : List Ty} {Θ : Facts} {Γ' : List Scheme} {v : Tm} {s : Scheme} (hv : Value v)
@@ -125,12 +124,10 @@ theorem SubOk.up {Ψ Θ Γ Γ' σ} (h : SubOk S Ψ Θ Γ Γ' σ) (k : Nat) (Φ :
   refine ⟨Typ.cut this ?_, hnI, hV.substT _⟩
   have hk : (s₀.up k).k = s₀.k := rfl
   simp only [Facts.at, hk]
-  intro C r hC x hx
-  rcases hC x hx with h' | ⟨C', h₁ | h₁, h₂⟩
-  · exact .inl h'
-  · obtain ⟨C₀, r₀, h₀, rfl, rfl⟩ := h₁
-    exact .inr ⟨_, .inl ⟨C₀, r₀, .inl h₀, rfl, rfl⟩, h₂⟩
-  · exact .inr ⟨C', .inr h₁, h₂⟩
+  apply Entails.of_facts
+  rintro C r (⟨C₀, r₀, h₀, rfl, rfl⟩ | hBound)
+  · exact Outl.fact (.inl ⟨C₀, r₀, .inl h₀, rfl, rfl⟩)
+  · exact Outl.fact (.inr hBound)
 
 theorem noIns_subst {Γ : List Scheme} {e : Tm} {σ : Nat → Tm} (hΓ : ∀ i, e.Free i → i < Γ.length) (hn : e.NoIns)
     (hσ : ∀ i s, Γ[i]? = some s → (σ i).NoIns) : (e.subst σ).NoIns := by

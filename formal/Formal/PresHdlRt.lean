@@ -1,4 +1,6 @@
 import Formal.ScopeStep
+import Formal.HandlerTyping
+import Formal.FreshEquivalence
 
 /-!
 # Preservation of the run-time steps of handlers at the redex
@@ -14,93 +16,76 @@ def AnyTy (S : Sig) (Ψ : List Ty) (Θ : Facts) (x : Tm) : Prop :=
 
 theorem raise_any {Ψ Θ w} : AnyTy S Ψ Θ (.raise w) := by
   intro _ _ _ h
-  cases h with
-  | raise h₁ hφ => exact .raise h₁ hφ
-  | raiseAdt h₁ hU hφ => exact .raiseAdt h₁ hU hφ
-  | errVal hv | allI hv => cases hv
+  exact h.raise_retype w _ _ _ rfl rfl
 
 theorem unw_any {Ψ Θ q ℓ a} : AnyTy S Ψ Θ (.unw q ℓ a) := by
   intro _ _ _ h
-  cases h with
-  | unw h₁ h₂ h₃ => exact .unw h₁ h₂ h₃
-  | errVal hv | allI hv => cases hv
+  obtain ⟨_, _, _, hl, ha, hφ⟩ := h.unw_type _ _ _ _ _ rfl rfl
+  exact .unw hl ha hφ
 
 /-- The handler catches its signal and runs what it holds. In the live discipline the
 region of the handler is live where the answer is used. -/
 theorem hwith_catch {Ψ Θ p ℓ E al r a t φ}
     (h : Typ S Ψ Θ [] (.hwith p ℓ E al r (.unw p ℓ a)) (.ex t φ)) :
     Typ S Ψ Θ [] a (.ex t φ) := by
-  cases h with
-  | hwith hℓ _ _ _ he _ _ hφ hT hat =>
-    cases he with
-    | unw hℓ' ha _ =>
-      rw [hℓ] at hℓ'
-      simp only [Option.some.injEq, Ty.arrow.injEq, Stage.rt.injEq] at hℓ'
-      obtain ⟨-, ⟨rfl, rfl⟩, rfl, -⟩ := hℓ'
-      exact ha.sub ⟨hT, Stage.use_rg_le hφ hat⟩
-    | errVal hv | allI hv => cases hv
-  | errVal hv | allI hv => cases hv
+  obtain ⟨_, _, _, _, _, _, _, hℓ, _, _, _, he, _, _, hφ, hT, hat⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, hℓ', ha, _⟩ := he.unw_type _ _ _ _ _ rfl rfl
+  rw [hℓ] at hℓ'
+  simp only [Option.some.injEq, Ty.arrow.injEq, Stage.rt.injEq] at hℓ'
+  obtain ⟨-, ⟨rfl, rfl⟩, rfl, -⟩ := hℓ'
+  exact ha.sub ⟨hT, Stage.use_rg_le hφ hat⟩
 
 /-- A signal of an arm unwinds the parked body to the handler. -/
 theorem hctl_signal {Ψ Θ p ℓ κ tl E al r x k t φ} {Ei : List Frame} (hEi : OkE Ei)
     (hk : k = plug Ei (.hole p)) (hx : ∀ {Θ'}, AnyTy S Ψ Θ' x)
     (h : Typ S Ψ Θ [] (.hctl p ℓ κ tl E al r x k) (.ex t φ)) :
     Typ S Ψ Θ [] (.hwith p ℓ E al r (plug Ei (.unw p ℓ x))) (.ex t φ) := by
-  cases h with
-  | hctl hℓ hal hrf hψ hop _ _ hE hk' hp hφ₀ ha _ hcm hφ hT hat =>
-    obtain ⟨rfl, -⟩ := plug_hole_inj hEi hE (hk.symm.trans hk')
-    refine .hwith hℓ hal hrf hψ (refill_app hE perform_not_value hp (perform_fn hop) perform_up
-      fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hcm hφ hT hat
-    exact .unw hℓ ((hx (ha.cut hΘ.entails)).sub
-      (J' := .ex _ (Stage.use (.rt _ _) (Ty.rg p).reach))
-      ⟨LeLive.refl, Stage.use_ctl_le tl _ _ _⟩)
-      (Stage.none_le (Stage.rt_ne_pure hψ₀))
-  | errVal hv | allI hv => cases hv
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, hℓ, hal, hrf, hψ, hop, _, _, hE, hk', hp, hφ₀, ha, _, hcm, hφ, hT, hat⟩ := h.hctl_type _ _ _ _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨rfl, -⟩ := plug_hole_inj hEi hE (hk.symm.trans hk')
+  refine .hwith hℓ hal hrf hψ (refill_app hE perform_not_value hp (perform_fn hop) perform_up
+    fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hcm hφ hT hat
+  exact .unw hℓ ((hx (ha.cut hΘ.entails)).sub
+    (J' := .ex _ (Stage.use (.rt _ _) (Ty.rg p).reach))
+    ⟨LeLive.refl, Stage.use_ctl_le tl _ _ _⟩)
+    (Stage.none_le (Stage.rt_ne_pure hψ₀))
 
 /-- An arm of a kept handler that raises lets the parked body go. -/
 theorem hkarm_raise {Ψ Θ q ℓ E al w k t φ} {Ei : List Frame} (hEi : OkE Ei)
     (hk : k = plug Ei (.hole q))
     (h : Typ S Ψ Θ [] (.hkarm q ℓ E al (.raise w) k) (.ex t φ)) :
     Typ S Ψ Θ [] (.hkeep q ℓ E al (plug Ei (.unw q ℓ (.raise w)))) (.ex t φ) := by
-  cases h with
-  | hkarm hℓ hal hop hE hk' hp hφ₀ hc hnt ha hle hφ hT =>
-    obtain ⟨rfl, -⟩ := plug_hole_inj hEi hE (hk.symm.trans hk')
-    refine .hkeep hℓ hal (refill_app hE perform_not_value hp (perform_fn hop) perform_up
-      fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hc hnt hle hφ hT
-    exact .unw hℓ ((raise_any (ha.cut hΘ.entails)).sub
-      (J' := .ex _ (Stage.use (.rt _ _) (Ty.rg q).reach))
-      ⟨LeLive.refl, Stage.le_use _ _⟩)
-      (Stage.none_le (Stage.rt_ne_pure hψ₀))
-  | errVal hv | allI hv => cases hv
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, hℓ, hal, hop, hE, hk', hp, hφ₀, hc, hnt, ha, hle, hφ, hT⟩ := h.hkarm_type _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨rfl, -⟩ := plug_hole_inj hEi hE (hk.symm.trans hk')
+  refine .hkeep hℓ hal (refill_app hE perform_not_value hp (perform_fn hop) perform_up
+    fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hc hnt hle hφ hT
+  exact .unw hℓ ((raise_any (ha.cut hΘ.entails)).sub
+    (J' := .ex _ (Stage.use (.rt _ _) (Ty.rg q).reach))
+    ⟨LeLive.refl, Stage.le_use _ _⟩)
+    (Stage.none_le (Stage.rt_ne_pure hψ₀))
 
 /-- A signal in an arm of a kept handler goes on through the parked body. -/
 theorem hkarm_unw {Ψ Θ q ℓ E al q' ℓ' a k t φ} {Ei : List Frame} (hEi : OkE Ei)
     (hk : k = plug Ei (.hole q))
     (h : Typ S Ψ Θ [] (.hkarm q ℓ E al (.unw q' ℓ' a) k) (.ex t φ)) :
     Typ S Ψ Θ [] (.hkeep q ℓ E al (plug Ei (.unw q' ℓ' a))) (.ex t φ) := by
-  cases h with
-  | hkarm hℓ hal hop hE hk' hp hφ₀ hc hnt ha hle hφ hT =>
-    obtain ⟨rfl, -⟩ := plug_hole_inj hEi hE (hk.symm.trans hk')
-    refine .hkeep hℓ hal (refill_app hE perform_not_value hp (perform_fn hop) perform_up
-      fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hc hnt hle hφ hT
-    cases ha with
-    | unw hℓ' ha' _ => exact .unw hℓ' (ha'.cut hΘ.entails) (Stage.none_le (Stage.rt_ne_pure hψ₀))
-    | errVal hv | allI hv => cases hv
-  | errVal hv | allI hv => cases hv
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, hℓ, hal, hop, hE, hk', hp, hφ₀, hc, hnt, ha, hle, hφ, hT⟩ := h.hkarm_type _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨rfl, -⟩ := plug_hole_inj hEi hE (hk.symm.trans hk')
+  refine .hkeep hℓ hal (refill_app hE perform_not_value hp (perform_fn hop) perform_up
+    fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hc hnt hle hφ hT
+  obtain ⟨_, _, _, hℓ', ha', _⟩ := ha.unw_type _ _ _ _ _ rfl rfl
+  exact .unw hℓ' (ha'.cut hΘ.entails) (Stage.none_le (Stage.rt_ne_pure hψ₀))
 
 /-- A signal of a resumed body lets the parked arm go. -/
 theorem hres_signal {Ψ Θ p ℓ a x t φ} {A : List Frame} (hA : OkE A) (ha : a = plug A (.hole p))
     (hx : ∀ {Θ'}, AnyTy S Ψ Θ' x)
     (h : Typ S Ψ Θ [] (.hres p ℓ a x) (.ex t φ)) :
     Typ S Ψ Θ [] (.hdone p (plug A x)) (.ex t φ) := by
-  cases h with
-  | hres _ hb hA' ha' hp hl hcp hφ hT =>
-    obtain ⟨rfl, -⟩ := plug_hole_inj hA hA' (ha.symm.trans ha')
-    have h₁ := refill_app hA' kont_not_value hp (kont_fn_rg hl hcp) (fun _ _ h l => h.trans l)
-      fun T φ' hΘ hψ₀ _ _ => hx ((hb.cut hΘ.entails).sub (J' := .ex _ φ')
-        ⟨LeLive.refl, hψ₀⟩)
-    exact .hdone (h₁.sub ⟨hT, Stage.use_mono hφ (Caps.Sub.refl _)⟩)
-  | errVal hv | allI hv => cases hv
+  obtain ⟨_, _, _, _, _, _, _, _, hb, hA', ha', hp, hl, hcp, hφ, hT⟩ := h.hres_type _ _ _ _ _ _ rfl rfl
+  obtain ⟨rfl, -⟩ := plug_hole_inj hA hA' (ha.symm.trans ha')
+  have h₁ := refill_app hA' kont_not_value hp (kont_fn_rg hl hcp) (fun _ _ h l => h.trans l)
+    fun T φ' hΘ hψ₀ _ _ => hx ((hb.cut hΘ.entails).sub (J' := .ex _ φ')
+      ⟨LeLive.refl, hψ₀⟩)
+  exact .hdone (h₁.sub ⟨hT, Stage.use_mono hφ (Caps.Sub.refl _)⟩)
 
 /-- The arms of a new handler, in its run-time region `n`: the regions not yet created are
 renamed out, and `n` is put for the region of `resume`. -/
@@ -132,7 +117,7 @@ theorem hdl_install {Ψ Θ E al rf e₀ T φ n t ψ C φ₀} {r ε : Row} {t' : 
     (hOb : φ₀.ObOut (Row.single E)) (hc : S.Handles E al r) (hφ' : (Stage.rt r ε).le φ)
     (hT : LeLive S t' T)
     (hbl : (Tm.hdl E al rf e₀).Below n) (hΨ : ∀ u ∈ Ψ, u.YF n) (hidem : Θ.substT (kill n) = Θ)
-    (ht : T.YF n) (hφ : φ.substT (kill n) = φ) :
+    (ht : T.YFMod n) (hφ : φ.substT (kill n) = φ) :
     ∃ c, c.YF n ∧ Typ S Ψ Facts.age [] (.lam .todo) (.ex c .pure) ∧
       Typ S (Ψ ++ [c]) Θ [] (.inside n (.hwith n Ψ.length E al rf e₀)) (.ex T φ) := by
   have hΨ' : Ψ.map (Ty.substT (kill n)) = Ψ := by
@@ -167,6 +152,6 @@ theorem hdl_install {Ψ Θ E al rf e₀ T φ n t ψ C φ₀} {r ε : Row} {t' : 
       ⟨fun _ h => h.elim (fun hs => .inl hs) fun hr => .inr (.inl hr), fun _ h => h⟩
       (Ty.kill_fresh _ _) (Row.kill_fresh _ _)
       (by simpa [Stage.substT] using Stage.YF_kill hφ' hφ) ?_
-    have := hT.substT (kill n); rwa [ht] at this
+    exact (hT.substT (kill n)).trans (.equiv ht)
 
 end Flick

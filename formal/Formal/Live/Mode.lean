@@ -1,4 +1,5 @@
 import Formal.Typing
+import Formal.TypeEquivArgs
 
 /-!
 # Typing by use: the stage of a use and subtyping
@@ -19,6 +20,8 @@ def Stage.use : Stage → Caps → Stage
 qualifier in an argument or a result type. -/
 inductive LeLive (S : Sig) : Ty → Ty → Prop
   | refl : LeLive S t t
+  /-- Equality of row terms is available in invariant positions too. -/
+  | equiv : Ty.Equiv a b → LeLive S a b
   | arrow : LeLive S a' a →
       (Stage.use φ C).le (Stage.use φ' C') → LeLive S t t' →
       Caps.Sub (Ty.arrow a φ t C).reach (Ty.arrow a' φ' t' C').reach →
@@ -48,7 +51,7 @@ inductive LeLive (S : Sig) : Ty → Ty → Prop
       (∀ (j : Nat) (u u' : Ty), us[j]? = some u → us'[j]? = some u' → S.hidden T ≠ some j →
         S.var T j = .neg → LeLive S u' u) →
       (∀ (j : Nat) (u u' : Ty), us[j]? = some u → us'[j]? = some u' → S.hidden T ≠ some j →
-        S.var T j = .inv → u = u') →
+        S.var T j = .inv → Ty.Equiv u u') →
       a = Ty.tcon T us → b = Ty.tcon T us' → LeLive S a b
 
 /-- A type application or a type name. -/
@@ -66,8 +69,8 @@ theorem Ty.foldl_tapp_isData (us : List Ty) : ∀ acc : Ty, acc.isData = true �
 theorem Ty.tcon_isData (T : Name) (us : List Ty) : (Ty.tcon T us).isData = true :=
   Ty.foldl_tapp_isData us _ rfl
 
-/-- A type that subtyping relates only to itself: not an arrow, a computation, a record
-field or data. -/
+/-- A type that subtyping relates only to equivalent types: not an arrow,
+a computation, a record field or data. -/
 def Ty.isPlain : Ty → Bool
   | .arrow .. | .eff .. | .rcons .. | .adt _ | .tapp _ _ => false
   | _ => true
@@ -88,30 +91,6 @@ theorem Ty.eff_ne_tcon {r e t C T us} : Ty.eff r e t C ≠ Ty.tcon T us := by
 theorem Ty.rcons_ne_tcon {l t r T us} : Ty.rcons l t r ≠ Ty.tcon T us := by
   intro h; have := Ty.tcon_isData T us; rw [← h] at this; simp [Ty.isData] at this
 
-/-- The name and the arguments of a spine of type applications. -/
-def Ty.unspine : Ty → Option (Name × List Ty)
-  | .adt T => some (T, [])
-  | .tapp f a => (Ty.unspine f).map fun p => (p.1, p.2 ++ [a])
-  | _ => none
-
-theorem Ty.unspine_foldl (us : List Ty) : ∀ (acc : Ty) (T : Name) (vs : List Ty),
-    acc.unspine = some (T, vs) → (us.foldl .tapp acc).unspine = some (T, vs ++ us) := by
-  induction us with
-  | nil => intro acc T vs h; simpa using h
-  | cons u us ih =>
-    intro acc T vs h
-    have := ih (.tapp acc u) T (vs ++ [u]) (by simp [Ty.unspine, h])
-    simpa using this
-
-theorem Ty.unspine_tcon (T : Name) (us : List Ty) : (Ty.tcon T us).unspine = some (T, us) := by
-  simpa using Ty.unspine_foldl us (.adt T) T [] rfl
-
-theorem Ty.tcon_eq {T T' : Name} {us vs : List Ty} (h : Ty.tcon T us = Ty.tcon T' vs) :
-    T = T' ∧ us = vs := by
-  have := congrArg Ty.unspine h
-  rw [Ty.unspine_tcon, Ty.unspine_tcon] at this
-  simpa using this
-
 /-- Polymorphic instantiation uses live subtyping at its leaves. -/
 inductive LeLiveI (S : Sig) : Ty → Ty → Prop
   | le : LeLive S a b → LeLiveI S a b
@@ -129,6 +108,13 @@ theorem LeLive.arrow_use {a ψ t C a' ψ' t' C'}
     | pure => trivial
     | rt _ _ => exact ⟨fun _ h => h, fun _ h => h⟩
   | arrow _ hψ _ _ => exact hψ
+  | equiv he =>
+    cases he.form with
+    | rows hr _ => cases hr
+    | arrow =>
+      cases ψ with
+      | pure => trivial
+      | rt _ _ => exact ⟨fun _ h => h, fun _ h => h⟩
   | hide _ _ _ _ ha => exact absurd ha Ty.arrow_ne_tcon
   | data _ _ _ _ _ ha => exact absurd ha Ty.arrow_ne_tcon
 
@@ -139,6 +125,10 @@ theorem LeLive.eff_use {r ε t C r' ε' t' C'}
   cases h with
   | refl => exact ⟨fun _ h => h, fun _ h => h⟩
   | eff hψ _ _ => exact hψ
+  | equiv he =>
+    cases he.form with
+    | rows hr _ => cases hr
+    | eff => exact ⟨fun _ h => h, fun _ h => h⟩
   | hide _ _ _ _ ha => exact absurd ha Ty.eff_ne_tcon
   | data _ _ _ _ _ ha => exact absurd ha Ty.eff_ne_tcon
 
