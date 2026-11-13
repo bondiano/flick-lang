@@ -3,6 +3,7 @@ fn merge_inline_ide(output: &mut Output, child_output: &Output, child: &Loaded) 
     if let Some(typing) = Arc::get_mut(&mut output.typing) {
         let child_typing = &child_output.typing;
         typing.names.extend(child_typing.names.clone());
+        typing.method_dispatch.extend(child_typing.method_dispatch.clone());
         typing.binders.extend(child_typing.binders.clone());
         typing.types.extend(child_typing.types.clone());
         typing

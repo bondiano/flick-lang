@@ -172,7 +172,11 @@ impl Checker<'_> {
                 self.instantiate(&self.live_scheme(&s), span)
             });
             match entity {
-                Some(entity) => self.record_entity(&entity, &ty, span),
+                Some(entity) => {
+                    #[cfg(feature = "ide")]
+                    self.record_method_dispatch(qualifier, &entity, span);
+                    self.record_entity(&entity, &ty, span);
+                }
                 // reported by name resolution, or taken on trust
                 None => self.cx.trusted = true,
             }
@@ -183,6 +187,28 @@ impl Checker<'_> {
             return ty;
         }
         self.service_member(qualifier, name, span)
+    }
+
+    #[cfg(feature = "ide")]
+    fn record_method_dispatch(&mut self, qualifier: &str, entity: &Entity, span: Span) {
+        self.typing.method_dispatch.remove(&range(span));
+        if entity.namespace != Namespace::Value || self.env.parent(entity).is_none() {
+            return;
+        }
+        let super::env::Found::Entity(owner) = self.env.find_type(qualifier) else {
+            return;
+        };
+        let Some(def) = self.env.type_def(&owner.module, &owner.name) else {
+            return;
+        };
+        let names = match &def.form {
+            super::env::Form::Class { .. } => vec!["dictionary".to_owned()],
+            super::env::Form::Service { operations, .. } => {
+                operations.iter().map(|op| op.name.clone()).collect()
+            }
+            _ => return,
+        };
+        self.typing.method_dispatch.insert(range(span), names);
     }
 
     /// `C.dictionary` turns an explicitly supplied record of methods and
