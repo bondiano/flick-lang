@@ -4,9 +4,12 @@
 
 mod driver;
 mod handshake;
+#[cfg(feature = "host")]
+pub mod host;
 mod inputs;
 mod request;
 mod validate;
+mod wit;
 
 pub use driver::{Failure, Generated, generate};
 pub use handshake::handshake;

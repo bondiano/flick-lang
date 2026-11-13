@@ -276,7 +276,7 @@ fuzz iterations="1000000":
 # the compiler with wasmtime, which release builds include, with the unit
 # tests that only a build with wasmtime has; the tests run in the `e2e`
 # profile, as an unoptimized wasmtime compiles a component slowly
-wasm-plugins:
+wasm-plugins: wasm-backends
     cargo build -p flick-test-pairs -p flick-example-typed-dsl --features guest --target wasm32-wasip2 --release
     cargo clippy -p flick-test-pairs -p flick-example-typed-dsl --features guest --target wasm32-wasip2 -- -D warnings
     cargo clippy -p flick --features wasm-plugins --all-targets -- -D warnings
@@ -285,6 +285,13 @@ wasm-plugins:
     pnpm -C runtime build
     pnpm -C packages/effect-ts build
     FLICK_BIN="$PWD/target/e2e/flick" node examples/typed-dsl/check.mjs
+
+# A real third-party backend fixture through the separate component world.
+wasm-backends:
+    cargo build -p flick-test-backend --features guest --target wasm32-wasip2 --release
+    cargo clippy -p flick-test-backend --features guest --target wasm32-wasip2 -- -D warnings
+    cargo clippy -p flick-backend --features host --all-targets -- -D warnings
+    cargo test -p flick-backend --profile e2e --features host --test component_host -- --include-ignored
 
 # Build the wasm module the in-browser demo loads and hold it to its size budget.
 # The raw-byte budget retains the playground editor queries (hover, completion,

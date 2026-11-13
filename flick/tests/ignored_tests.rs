@@ -9,6 +9,8 @@
 //! tests are `#[cfg(feature = "wasm-plugins")]`, so `just wasm-plugins` is
 //! the recipe that builds and runs them; the reference model is `just model`
 //! (`--include-ignored`), and `flick-pretty`'s timing probe is manual.
+//! Backend component tests use `just wasm-backends`, also reached through
+//! `just wasm-plugins`, to build the guest and enable the native host.
 //!
 //! This test holds those recipes to that mapping: an ignore attribute is a
 //! test that runs somewhere, and a new one under `flick/tests/` is covered by
@@ -58,6 +60,8 @@ enum Runner {
     Conduit,
     /// `just wasm-plugins`, which builds with the plugin feature.
     Plugins,
+    /// `just wasm-backends`, which builds the guest and enables its host.
+    Backends,
     /// `just model`, with `--include-ignored`.
     Model,
     /// No recipe: a probe or a generator, listed in `MANUAL` with its reason.
@@ -95,6 +99,16 @@ const ANCHORS: &[(&str, &str)] = &[
     ("e2e-postgres", "--test sql_postgres"),
     ("conduit-api", "--test conduit"),
     ("wasm-plugins", "--test plugins"),
+    ("wasm-plugins", "wasm-backends"),
+    ("wasm-backends", "-p flick-test-backend"),
+    (
+        "wasm-backends",
+        "--features guest --target wasm32-wasip2 --release",
+    ),
+    ("wasm-backends", "-p flick-backend"),
+    ("wasm-backends", "--features host"),
+    ("wasm-backends", "--test component_host"),
+    ("wasm-backends", "--include-ignored"),
     ("model", "--include-ignored"),
 ];
 
@@ -112,6 +126,7 @@ fn runner(test: &Ignored) -> Runner {
         ("flick", "sql_postgres", _) => Runner::Postgres,
         ("flick", "conduit", _) => Runner::Conduit,
         ("flick", "plugins", _) => Runner::Plugins,
+        ("flick-backend", "component_host", _) => Runner::Backends,
         ("flick-model", _, _) => Runner::Model,
         ("flick-core", _, "dump" | "dump_explanations" | "write_fixes_of_built_in_signatures")
         | ("flick-pretty", _, "printing_time_grows_linearly") => Runner::Manual,
@@ -449,9 +464,9 @@ fn assert_classification(tests: &[Ignored], terms: &[Term]) {
                     test.what()
                 );
             }
-            Runner::Model => assert!(
+            Runner::Model | Runner::Backends => assert!(
                 excluded.is_none(),
-                "{}: the model runs its own ignored tests, and `e2e-tests` excludes it anyway",
+                "{}: its separate recipe runs the ignored test, and `e2e-tests` excludes it anyway",
                 test.what()
             ),
         }

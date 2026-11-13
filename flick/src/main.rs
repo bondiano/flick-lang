@@ -20,6 +20,8 @@ mod cache;
 mod child;
 mod command;
 mod commands;
+#[cfg(feature = "wasm-plugins")]
+mod component;
 mod fetch;
 mod lsp;
 mod mapper;

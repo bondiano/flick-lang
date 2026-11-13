@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["flick-backend", "flick-core", "flick-ir", "flick", "flick-test-support", "flick-pretty", "flick-wasm", "flick-model", "flick-plugin", "flick-plugin/macros", "plugins/cli", "plugins/derive", "plugins/refined", "plugins/sql", "plugins/ui", "tests/plugins/pairs", "examples/typed-dsl/plugin", "packages/effect-ts/tools/surface"]
+members = ["flick-backend", "flick-core", "flick-ir", "flick", "flick-test-support", "flick-pretty", "flick-wasm", "flick-model", "flick-plugin", "flick-plugin/macros", "plugins/cli", "plugins/derive", "plugins/refined", "plugins/sql", "plugins/ui", "tests/plugins/pairs", "tests/backends/literal", "examples/typed-dsl/plugin", "packages/effect-ts/tools/surface"]
 
 [workspace.package]
 edition = "2024"
@@ -26,6 +26,7 @@ module_name_repetitions = "allow"
 
 [workspace.dependencies]
 serde_json = "1.0.154"
+wasmtime = { version = "=48.0.8", default-features = false, features = ["runtime", "cranelift", "component-model", "std", "cache"] }
 
 # Backtraces keep file and line; full variable info only bloats target/.
 [profile.dev]

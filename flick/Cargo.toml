@@ -13,16 +13,17 @@ workspace = true
 
 [features]
 # loads plugins built as WebAssembly components; release builds enable it
-wasm-plugins = ["dep:wasmtime"]
+wasm-plugins = ["dep:wasmtime", "flick-backend/host"]
 
 [dependencies]
 anstyle = "1.0.14"
 clap = { version = "4.6.7", features = ["derive", "string"] }
 flate2 = "1.1.1"
 flick-core = { path = "../flick-core", features = ["ide"] }
+flick-backend = { path = "../flick-backend" }
 flick-ir = { path = "../flick-ir", features = ["json", "cbor"] }
 flick-plugin = { path = "../flick-plugin" }
-wasmtime = { version = "=48.0.8", default-features = false, features = ["runtime", "cranelift", "component-model", "std", "cache"], optional = true }
+wasmtime = { workspace = true, optional = true }
 serde_json = { workspace = true }
 sha2 = "0.10.9"
 signal-hook = "0.4.6"
@@ -39,3 +40,4 @@ flick-test-support = { path = "../flick-test-support" }
 flick-model = { path = "../flick-model" }
 flick-wasm = { path = "../flick-wasm" }
 insta = "1.49.0"
+wat = "=1.254.2"
