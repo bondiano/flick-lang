@@ -255,3 +255,82 @@ fn class_method_rename_reaches_inline_namespace_signatures_exposures_and_calls()
         );
     }
 }
+
+#[test]
+fn class_method_rename_refuses_another_method_name_without_declaration_type_metadata() {
+    let source = "module App.Main exposing (..)\nclass First a =\n  first : a -> String\nclass Second a =\n  second : a -> String\n";
+    let f = fixture_of(&[("src/App/Main.fl", source)]);
+    assert_clean(&f);
+    assert!(
+        f.ide()
+            .rename(
+                f.file("App.Main"),
+                f.at("App.Main", "first :", 0) + 1,
+                "second"
+            )
+            .is_err(),
+        "method names share the value namespace even without a type at the declaration token"
+    );
+}
+
+#[test]
+fn class_method_rename_ignores_names_in_unrelated_sibling_namespaces() {
+    let source = "module App.Main exposing (..)\nmodule Child exposing (Named(..), describe) =\n  class Named a =\n    describe : a -> String\n  instance Named Int =\n    let describe _ = \"child\"\nmodule Sibling exposing (render) =\n  let render = \"unrelated\"\nlet result = Child.describe 1\n";
+    let f = fixture_of(&[("src/App/Main.fl", source)]);
+    assert_clean(&f);
+    let file = f.file("App.Main");
+    let edits = f
+        .ide()
+        .rename(file, f.at("App.Main", "describe :", 0) + 1, "render")
+        .expect("sibling has a separate scope");
+    assert_eq!(edits.len(), 4);
+    let renamed = source.replace("describe", "render");
+    assert_clean(&fixture_of(&[("src/App/Main.fl", &renamed)]));
+}
+
+#[test]
+fn class_method_rename_refuses_capture_by_lexically_opened_module_names() {
+    let user = "module App.Use exposing (..)\nimport App.Named exposing (describe)\nview : Ui.View Unit\nlet view = Ui.view (fun () -> ui { text (describe 1) })\n";
+    let f = fixture_of(&[("src/App/Named.fl", NAMED), ("src/App/Use.fl", user)]);
+    assert_clean(&f);
+    assert!(
+        f.ide()
+            .rename(
+                f.file("App.Named"),
+                f.at("App.Named", "describe :", 0) + 1,
+                "text"
+            )
+            .is_err(),
+        "Ui.text would capture the method call inside ui"
+    );
+    assert!(
+        f.ide()
+            .rename(
+                f.file("App.Named"),
+                f.at("App.Named", "describe :", 0) + 1,
+                "describe_item"
+            )
+            .is_ok(),
+        "a fresh name remains safe in the opened scope"
+    );
+    let qualified = "module App.Use exposing (..)\nimport App.Named as N\nview : Ui.View Unit\nlet view = Ui.view (fun () -> ui { text (N.describe 1) })\n";
+    let f = fixture_of(&[("src/App/Named.fl", NAMED), ("src/App/Use.fl", qualified)]);
+    assert_clean(&f);
+    assert_eq!(
+        f.ide()
+            .rename(
+                f.file("App.Named"),
+                f.at("App.Named", "describe :", 0) + 1,
+                "text"
+            )
+            .expect("qualified calls cannot be captured")
+            .len(),
+        5
+    );
+    let named = NAMED.replace("describe", "text");
+    let user = qualified.replace("N.describe", "N.text");
+    assert_clean(&fixture_of(&[
+        ("src/App/Named.fl", &named),
+        ("src/App/Use.fl", &user),
+    ]));
+}

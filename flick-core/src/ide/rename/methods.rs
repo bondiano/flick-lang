@@ -1,9 +1,12 @@
 //! The class identity for renaming, independent of navigation's choice of
 //! a concrete instance. No dictionary spelling is used to guess a class.
 
+use std::{collections::HashSet, ptr};
+
 use super::{Ide, Occurrence, Symbol, tree};
 use crate::diagnostics::{Severity, codes::Area};
-use crate::iface::{Decl, Entity, Namespace};
+use crate::iface::{Decl, Entity, Interface, Namespace};
+use crate::project::Analyzed;
 use crate::resolve::declarations;
 use crate::source::FileId;
 use crate::syntax::cst::{Node, Token};
@@ -33,16 +36,7 @@ impl Ide<'_> {
     pub(super) fn method_at(&self, file: FileId, offset: u32) -> Result<Option<MethodAt>, String> {
         // Inline namespaces share the file but keep their own declarations
         // and instances. The file's first analysis is not necessarily owner.
-        let Some(m) = self
-            .analysis
-            .modules
-            .iter()
-            .filter(|m| {
-                let (start, end) = m.tree.range();
-                m.file == file && start <= offset && offset <= end
-            })
-            .min_by_key(|m| m.tree.range().1 - m.tree.range().0)
-        else {
+        let Some(m) = self.method_module(file, offset) else {
             return Ok(None);
         };
         if let Some((range, Ref::Method { module, name })) =
@@ -249,12 +243,7 @@ impl Ide<'_> {
         }
     }
 
-    pub(super) fn check_method_name(
-        &self,
-        e: &Entity,
-        new_name: &str,
-        edits: &[Occurrence],
-    ) -> Result<(), String> {
+    pub(super) fn check_method_name(&self, e: &Entity, new_name: &str) -> Result<(), String> {
         if keyword(new_name).is_some() || new_name == "_" {
             return Err(format!("`{new_name}` is not a method name"));
         }
@@ -262,7 +251,15 @@ impl Ide<'_> {
             return Ok(());
         }
         for m in &self.analysis.modules {
-            let spots: Vec<_> = edits.iter().filter(|(file, _)| *file == m.file).collect();
+            // The containing file also retains child namespaces' names.
+            // Only unqualified calls in this lexical module can be captured.
+            let calls: HashSet<_> = m.typing.names.iter().filter_map(|(range, r)| {
+                if !matches!(r, Ref::Method { module, name } if module == &e.module && name == &e.name)
+                    || self.method_module(m.file, range.0).is_none_or(|owner| owner.name != m.name)
+                { return None; }
+                let node = tree::find(&m.tree, *range)?;
+                (node.kind == K::NameExpr && !node.has_token(K::Dot)).then_some(*range)
+            }).collect();
             // C(..) and (..) imports gain the new name even without a
             // written occurrence of the old one in this module.
             let imported = m
@@ -279,18 +276,22 @@ impl Ide<'_> {
                             .any(|export| export.entity == *e)
                     })
                 });
-            if spots.is_empty() && !imported {
+            let exports = m.interface.exports.iter().any(|export| export.entity == *e);
+            if m.name != e.module && calls.is_empty() && !imported && !exports {
                 continue;
             }
-            if self
-                .in_scope(m)
-                .values
+            if declarations(&m.tree, self.text(m.file), m.file)
                 .iter()
-                .any(|(name, _)| name == new_name)
+                .any(|d| d.namespace == Namespace::Value && d.name == new_name)
+                || self
+                    .in_scope(m)
+                    .values
+                    .iter()
+                    .any(|(name, _)| name == new_name)
             {
                 return Err(format!("`{new_name}` is already in scope in `{}`", m.name));
             }
-            for (_, (start, _)) in spots {
+            for (start, _) in &calls {
                 if super::super::locals::in_scope(&m.tree, *start, self.text(m.file))
                     .iter()
                     .any(|(name, _)| name == new_name)
@@ -298,8 +299,89 @@ impl Ide<'_> {
                     return Err(format!("`{new_name}` would capture a method reference"));
                 }
             }
+            if self.opening_captures(m, &calls, new_name) {
+                return Err(format!(
+                    "`{new_name}` would capture a method reference in an opened module"
+                ));
+            }
         }
         Ok(())
+    }
+
+    fn method_module(&self, file: FileId, offset: u32) -> Option<&Analyzed> {
+        self.analysis
+            .modules
+            .iter()
+            .filter(|m| {
+                let (start, end) = m.tree.range();
+                m.file == file && start <= offset && offset <= end
+            })
+            .min_by_key(|m| m.tree.range().1 - m.tree.range().0)
+    }
+
+    fn opening_captures(&self, m: &Analyzed, calls: &HashSet<(u32, u32)>, new_name: &str) -> bool {
+        fn walk(
+            node: &Node,
+            text: &str,
+            calls: &HashSet<(u32, u32)>,
+            shadowed: bool,
+            conflicts: &dyn Fn(&str) -> bool,
+        ) -> bool {
+            if node.kind == K::NameExpr && calls.contains(&node.range()) && shadowed {
+                return true;
+            }
+            let body = (node.kind == K::OpenExpr)
+                .then(|| node.nodes().filter(|n| n.kind != K::NameType).last())
+                .flatten();
+            let opening = body.is_some_and(|_| {
+                let module = node
+                    .child_tokens()
+                    .filter(|t| t.kind == K::Con)
+                    .map(|t| t.text(text))
+                    .collect::<Vec<_>>()
+                    .join(".");
+                conflicts(&module)
+            });
+            // Plugin-generated parents may have ranges beyond source holes:
+            // descend structurally rather than pruning by source position.
+            node.nodes().any(|child| {
+                walk(
+                    child,
+                    text,
+                    calls,
+                    shadowed || (opening && body.is_some_and(|body| ptr::eq(body, child))),
+                    conflicts,
+                )
+            })
+        }
+        if calls.is_empty() {
+            return false;
+        }
+        let (root, text) = m
+            .expansion
+            .as_ref()
+            .map_or((&m.tree, self.text(m.file)), |e| (&e.tree, e.text.as_str()));
+        walk(root, text, calls, false, &|module| {
+            self.opening_interface(m, module)
+                .is_none_or(|i| i.find(Namespace::Value, new_name).is_some())
+        })
+    }
+
+    fn opening_interface(&self, m: &Analyzed, path: &str) -> Option<&Interface> {
+        let parts: Vec<_> = path.split('.').collect();
+        for count in (1..=parts.len()).rev() {
+            let module = self.unalias(m, parts[..count].join("."));
+            let Some(interface) = self.interface(&module) else {
+                continue;
+            };
+            if let Some(child) = parts[count..]
+                .iter()
+                .try_fold(interface, |i, name| i.modules.get(*name))
+            {
+                return Some(child);
+            }
+        }
+        None
     }
 }
 

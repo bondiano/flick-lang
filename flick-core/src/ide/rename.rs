@@ -156,7 +156,7 @@ impl Ide<'_> {
             && let Some(class) = self.method_class(e)?
         {
             self.check_method_mapping(e, &class)?;
-            self.check_method_name(e, new_name, &edits)?;
+            self.check_method_name(e, new_name)?;
         }
         // every edit must replace the old name exactly
         let old = match symbol {
