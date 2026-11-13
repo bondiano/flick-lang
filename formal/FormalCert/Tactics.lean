@@ -116,9 +116,60 @@ macro "closed_tac" : tactic => `(tactic| (
       | (congr 1; apply Caps.substT_congr; intro b hb; subst hb; simp [hσ])
       | simp [Ty.substT, hσ]))
 
+theorem Ty.unspine_eq : ∀ {a : Ty} {T : Name} {us : List Ty}, a.unspine = some (T, us) →
+    a = Ty.tcon T us
+  | .adt _, _, _, h => by simp [Ty.unspine] at h; obtain ⟨rfl, rfl⟩ := h; rfl
+  | .tapp f x, T, us, h => by
+    simp only [Ty.unspine, Option.map_eq_some_iff, Prod.exists] at h
+    obtain ⟨T', vs, hf, he⟩ := h
+    simp only [Prod.mk.injEq] at he
+    obtain ⟨rfl, rfl⟩ := he
+    rw [Ty.unspine_eq hf]; simp [Ty.tcon]
+
+/-- The premises of `LeLive.data` for the arguments from the `j`-th on, one by one. -/
+def DataArgs (S : Sig) (T : Name) : Nat → List Ty → List Ty → Prop
+  | j, u :: us, u' :: us' => Caps.Sub u.reach u'.reach ∧
+      (S.hidden T ≠ some j → (S.var T j = .pos → LeLive S u u') ∧
+        (S.var T j = .neg → LeLive S u' u) ∧ (S.var T j = .inv → u = u')) ∧
+      DataArgs S T (j + 1) us us'
+  | _, [], [] => True
+  | _, _, _ => False
+
+theorem DataArgs.at {T : Name} : ∀ {n : Nat} {us us' : List Ty}, DataArgs S T n us us' →
+    us.length = us'.length ∧ ∀ j u u', us[j]? = some u → us'[j]? = some u' →
+      Caps.Sub u.reach u'.reach ∧ (S.hidden T ≠ some (n + j) →
+        (S.var T (n + j) = .pos → LeLive S u u') ∧ (S.var T (n + j) = .neg → LeLive S u' u) ∧
+        (S.var T (n + j) = .inv → u = u'))
+  | _, [], [], _ => ⟨rfl, fun _ _ _ h => by simp at h⟩
+  | n, u :: us, u' :: us', ⟨hr, hv, h⟩ => by
+    obtain ⟨hl, hs⟩ := DataArgs.at h
+    refine ⟨by simp [hl], fun j x x' hx hx' => ?_⟩
+    rcases j with _ | j
+    · simp at hx hx'; subst hx; subst hx'; exact ⟨hr, hv⟩
+    · simp at hx hx'
+      have := hs j x x' hx hx'
+      rwa [show n + 1 + j = n + (j + 1) by omega] at this
+  | _, [], _ :: _, h | _, _ :: _, [], h => h.elim
+
+/-- `LeLive.data` of two concrete spines of the same type. -/
+theorem LeLive.data_of {a b : Ty} {T : Name} {us us' : List Ty} (ha : a.unspine = some (T, us))
+    (hb : b.unspine = some (T, us')) (h : DataArgs S T 0 us us') : LeLive S a b := by
+  obtain ⟨hl, hs⟩ := h.at
+  refine .data hl (fun j u u' x x' => (hs j u u' x x').1)
+    (fun j u u' x x' hh hv => ?_) (fun j u u' x x' hh hv => ?_) (fun j u u' x x' hh hv => ?_)
+    (Ty.unspine_eq ha) (Ty.unspine_eq hb)
+  all_goals have := (hs j u u' x x').2 (by simpa using hh); simp only [Nat.zero_add] at this
+  · exact this.1 hv
+  · exact this.2.1 hv
+  · exact this.2.2 hv
+
+/-- Closes a goal under `h : S.var T j = s` where `T` of the signature has no such variance;
+`GenSig.lean`, which knows the variances, gives its rule. -/
+syntax "var_absurd" : tactic
+
 /-- `LeLive t t'` of concrete types: the same type, an arrow or a computation whose stage
-and reach widen, or a record whose fields do. A constructor's type `Sig.ctorTy` is written
-out first. -/
+and reach widen, a record whose fields do, or data whose arguments do by their variances.
+A constructor's type `Sig.ctorTy` is written out first. -/
 syntax "le_live" : tactic
 macro_rules
   | `(tactic| le_live) => `(tactic| first
@@ -128,7 +179,11 @@ macro_rules
        le_live)
     | (refine LeLive.arrow ?_ ?_ ?_ ?_ <;> first | le_live | stage_le | caps_set)
     | (refine LeLive.eff ?_ ?_ ?_ <;> first | le_live | stage_le | caps_set)
-    | (refine LeLive.rcons' ?_ ?_ <;> le_live))
+    | (refine LeLive.rcons' ?_ ?_ <;> le_live)
+    | (refine LeLive.data_of rfl rfl ?_
+       simp only [DataArgs]
+       repeat' (first | apply And.intro | intro _)
+       all_goals first | trivial | exact Caps.Sub.refl _ | rfl | le_live | caps_set | var_absurd))
 
 /-- `φ₀.ObOut o` of a concrete stage with no obligation about `o`. -/
 macro "ob_out" : tactic => `(tactic| (

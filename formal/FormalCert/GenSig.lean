@@ -124,6 +124,14 @@ theorem genDict_closed : ∀ c k fs, genDict c = some (k, fs) → ∀ l s, (l, s
     simp only [List.mem_cons, List.mem_nil_iff, or_false, Prod.mk.injEq] at hm <;>
     rcases hm with ⟨-, rfl⟩ | ⟨-, rfl⟩ <;> subst_vars <;> closed_tac
 
+/-- The variance of each parameter of the generator's data (`flick-model/src/variance.rs`). -/
+def genVar : Name → Nat → Variance
+  | "Prelude.List", 0 => .pos
+  | "Prelude.Option", 0 => .pos
+  | "Tuple", 0 => .pos
+  | "Tuple", 1 => .pos
+  | _, _ => .inv
+
 structure GenSig (S : Sig) : Prop where
   ctor : ∀ K, (genCtor K).isSome → S.ctor K = genCtor K
   res : ∀ K, (genCtor K).isSome → S.res K = genRes K
@@ -133,6 +141,68 @@ structure GenSig (S : Sig) : Prop where
   /-- A service of the generator has its operations and no other. -/
   op : ∀ E o, genOps E ≠ [] → S.op E o = genOp E o
   dict : ∀ c, (genDict c).isSome → S.dict c = genDict c
+  /-- A type of the generator has the variances the model gives it. -/
+  var : ∀ T, genAdtCtors T ≠ [] → ∀ j, S.var T j = genVar T j
+
+theorem GenSig.var_of {S : Sig} (hS : GenSig S) {T : Name} {j : Nat} {v : Variance}
+    (h : S.var T j = v) (hT : genAdtCtors T ≠ []) : genVar T j = v :=
+  (hS.var T hT j).symm.trans h
+
+macro_rules
+  | `(tactic| var_absurd) => `(tactic| (
+    rename_i hv
+    have := GenSig.var_of ‹GenSig _› hv (by simp [genAdtCtors])
+    simp [genVar] at this))
+
+/-- `t.NoV i` of a concrete type. -/
+macro "no_v" : tactic => `(tactic| (
+  simp [Ty.NoV, Ty.substT, Stage.substT, dropV, Ty.ident]
+  all_goals first
+    | (funext x; simp [Caps.substT, dropV, Ty.ident, Ty.reach]; (try omega))
+    | omega))
+
+/-- `Ty.Pol genVar i s true f` of a field of the generator's data. -/
+syntax "pol" : tactic
+macro_rules
+  | `(tactic| pol) => `(tactic| first
+    | exact Ty.Pol.var (.inl ⟨rfl, rfl⟩)
+    | exact Ty.Pol.var (.inr ⟨rfl, rfl⟩)
+    | (apply Ty.Pol.none; no_v)
+    | (refine Ty.Pol.rcons ?_ ?_ <;> pol)
+    | (refine Ty.Pol.arrow ?_ ?_ ?_ ?_ ?_ <;> first
+        | (intro h; cases h)
+        | (intro _; no_v)
+        | pol
+        | no_v
+        | (left; no_v)
+        | exact .inr (.inl ⟨rfl, rfl⟩)
+        | exact .inr (.inr ⟨rfl, rfl⟩))
+    | (refine Ty.Pol.data ?_ ?_ ?_ ?_ ?_ (Ty.unspine_eq rfl) <;>
+        intro j u hu hv <;> rcases j with _ | _ | j <;> simp at hu <;> (try subst hu) <;>
+        first | (simp [genVar] at hv; done) | pol | (intro _; no_v) | (intro _ _; no_v) | no_v))
+
+theorem idTs_noV {k j i : Nat} {u : Ty} (h : (idTs k)[j]? = some u) (hj : j ≠ i) : u.NoV i := by
+  simp only [idTs, List.getElem?_map, Option.map_eq_some_iff] at h
+  obtain ⟨n, hn, rfl⟩ := h
+  obtain ⟨_, rfl⟩ := List.getElem?_eq_some_iff.mp hn
+  simp [Ty.NoV, Ty.substT, dropV, hj, Ty.ident]
+
+/-- Each constructor of the generator is ordinary, and holds a parameter only where its
+variance allows. -/
+theorem genVar_ok : ∀ T i, genVar T i ≠ .inv → ∀ K k ts, genCtor K = some (k, ts, T) →
+    (∀ j u, (genRes K)[j]? = some u → j ≠ i → u.NoV i) ∧
+    ((i < k ∧ (genRes K)[i]? = some (.tvar i) ∧ ∀ f ∈ ts, (genVar T i = .bi → f.NoV i) ∧
+        (genVar T i = .pos ∨ genVar T i = .neg → Ty.Pol genVar i (genVar T i) true f)) ∨
+      (genVar T i ≠ .bi ∧ (∃ c, (genRes K)[i]? = some c ∧ c.Closed) ∧ ∀ f ∈ ts, f.NoV i)) := by
+  intro T i hv K k ts hK
+  have hres : genRes K = idTs k := by simp [genRes, hK]
+  rw [hres]
+  refine ⟨fun j u hu hj => idTs_noV hu hj, .inl ?_⟩
+  unfold genCtor at hK
+  split at hK <;> cases hK <;> rcases i with _ | _ | i <;> simp only [genVar] at hv ⊢ <;>
+    (try exact absurd rfl hv) <;>
+    refine ⟨by decide, by simp [idTs], fun f hf => ⟨fun h => (nomatch h), fun _ => ?_⟩⟩ <;>
+    simp at hf <;> (try rcases hf with rfl | rfl) <;> (try subst hf) <;> pol
 
 theorem genAdtCtors_complete : ∀ K k ts T, genCtor K = some (k, ts, T) →
     (K, ts.length) ∈ genAdtCtors T := by
@@ -207,11 +277,13 @@ def genSig : Sig where
   op_closed := genOp_closed
   op_impl _ _ _ _ _ _ _ := rfl
   op_field _ _ _ _ _ h := (h rfl).elim
+  var := genVar
+  var_ok := genVar_ok
 
 /-- The assumption of a certificate holds of a signature. -/
 theorem GenSig.inhabited : ∃ S, GenSig S :=
   ⟨genSig, fun _ _ => rfl, fun _ _ => rfl, fun _ _ => rfl, fun _ _ _ _ h _ => h, fun _ _ _ => rfl,
-    fun _ _ => rfl⟩
+    fun _ _ => rfl, fun _ _ _ => rfl⟩
 
 end Flick.Cert
 

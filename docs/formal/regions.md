@@ -244,7 +244,7 @@ Classes. A class parameter has a variance from the types of its methods by the s
 
 Hover and `flick inspect` show the inferred variances of data and class parameters.
 
-Lean: `Sig.var` with its condition `Sig.var_ok` (`Syntax.lean`), `LeLive.data` (`Live/Mode.lean`), a constructor builds every variation of the data it builds (`Sig.builds_vary`, `VaryArgs.lean`; `SpW.ctor`, `VarySpine.lean`); preservation and T1 hold with them, and `LiveRules.lean` checks the examples of this section. Pending: the model, the checker (until then the checker compares data inside another argument by `≡`, which rejects more programs and admits no new one), and the classes (`Ty.Le` in elaboration, K1′, T6).
+Lean: `Sig.var` with its condition `Sig.var_ok` (`Syntax.lean`), `LeLive.data` (`Live/Mode.lean`), a constructor builds every variation of the data it builds (`Sig.builds_vary`, `VaryArgs.lean`; `SpW.ctor`, `VarySpine.lean`); preservation and T1 hold with them, and `LiveVariance.lean` checks the examples of this section. Model: `flick-model/src/variance.rs` reads the signs from the declarations, `check/rows.rs` `subsume_data` compares data by them and records and tuples field by field; it gives a sign only to a parameter of kind `Type`, takes the built-in `List` as `+`, and compares an argument inference has yet to solve by `≡`. The certificates of its programs state the signs in `GenSig.lean` (`genVar`, proven to meet `Sig.var_ok`), and `le_live` proves `LeLive.data`. Pending: the checker (until then the checker compares data inside another argument by `≡`, which rejects more programs and admits no new one), and the classes (`Ty.Le` in elaboration, K1′, T6).
 
 ### 2.3 Rules
 

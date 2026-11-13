@@ -47,7 +47,7 @@ export const sidebar = [
   {
     label: "Handbook",
     translations: { ru: "Руководство" },
-    items: [{ slug: "handbook/designing-with-effects" }, { slug: "handbook/upgrading" }],
+    items: [{ slug: "handbook/designing-with-effects" }, { slug: "handbook/typed-dsl" }, { slug: "handbook/upgrading" }],
   },
   {
     label: "Reference",
@@ -59,6 +59,7 @@ export const sidebar = [
         items: ["types", "gadts", "effects", "classes", "regions", "modules", "grammar", "keywords"].map(reference),
       },
       { slug: "reference/errors" },
+      { label: "Package API", translations: { ru: "API пакета" }, items: [{ slug: "api" }] },
       {
         label: "Runtime",
         translations: { ru: "Среда выполнения" },
