@@ -1,0 +1,62 @@
+module App.GadtRowBoundaries exposing (..)
+
+service Db =
+  get : Int ->{} Int
+
+type Cmd (r : ServiceRow) =
+  | Read Int : Cmd {Db}
+
+// Learning the requirements does not turn a pure arrow into a runtime one.
+pure : Cmd r -> Int
+let pure command =
+  match command with
+  | Read key -> Db.get key
+//~ FLICK-E001 @13:17-13:27 this is a runtime call
+
+type Includes (r : ServiceRow) (s : ServiceRow) =
+  | Includes : Includes r {Db | r}
+
+// This branch is inhabited: r may contain Db. Its body is still checked.
+body : Includes r r -> Int
+let body proof =
+  match proof with
+  | Includes -> "still checked"
+//~ FLICK-T003 @23:17-23:32 expected `Int`, found `String`
+
+type Witness (r : ServiceRow) =
+  | Witness : Witness none
+
+type Tag (s : Region)
+
+pinned : Tag c -> (Float -> Float)^{c} -> Float
+let pinned _ f = f 1.0
+
+// Refining a row does not identify the two regions of a callback.
+regions : Witness r -> Tag y -> (Float -> Float)^{x} -> Float
+let regions witness tag callback =
+  match witness with
+  | Witness -> pinned tag callback
+//~ FLICK-G001 @38:27-38:35 this value holds `x`
+
+service Store a =
+  get : Unit ->{} a
+
+type Both (r : ServiceRow) (s : ServiceRow) (t : ServiceRow) (u : ServiceRow) =
+  | Both : Both r {Store Int | r} t {Store String | t}
+
+wrong_instance : Both r r t t ->{t} Int
+let wrong_instance proof =
+  match proof with
+  | Both -> Store.get ()
+//~ FLICK-E002 @50:13-50:25 the signature of `wrong_instance` does not allow service `Store Int`
+
+type Choice (c : CaptureRow) =
+  | Drop : Choice none
+  | Keep : Choice c
+
+wrong_capture : Choice c -> (Unit -> Int)^c -> Unit -> Int
+let wrong_capture proof callback =
+  match proof with
+  | Drop -> callback
+  | Keep -> callback
+//~ FLICK-G001 @61:13-61:21 this value holds `c`

@@ -107,6 +107,7 @@ fn occurs(a: &Name, t: &Type) -> bool {
                 || f.fields.values().any(|t| occurs(a, t))
         }
         Type::Tuple(ts) | Type::Dict(_, ts) => ts.iter().any(|t| occurs(a, t)),
+        Type::Caps(c) => in_caps(a, c),
         Type::Errors(r) | Type::Impl(r) | Type::Tag(r) | Type::Env(r) => in_row(a, r),
         Type::Forall(s) => !s.vars.iter().any(|(v, _)| v == a) && occurs(a, &s.body),
         Type::Captured(t, c) | Type::Bounded(t, c) => in_caps(a, c) || occurs(a, t),

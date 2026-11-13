@@ -10,6 +10,7 @@ use super::Site;
 use crate::diagnostics::{Diagnostic, Edit, codes};
 use crate::fmt::foralls;
 use crate::source::Span;
+use crate::types::gadt::row_facts::RowKind;
 use crate::types::lang::{self, Lang};
 use crate::types::ty::{Norm, Row, Type, Written};
 use crate::types::{Checker, regions};
@@ -47,6 +48,8 @@ struct Excess {
     /// it into the row is no fix.
     taken: bool,
 }
+
+mod excess;
 
 impl Checker<'_> {
     /// Grows unknown declared rows until nothing changes.
@@ -97,11 +100,30 @@ impl Checker<'_> {
     fn grow_row(&mut self, i: usize) -> bool {
         let actual = self.actual(i);
         let declared = self.store.normalize(&self.cx.subrows[i].declared);
+        let kind = if self.cx.subrows[i].errors {
+            RowKind::Errors
+        } else {
+            RowKind::Services
+        };
+        if !self.store.row_equalities.is_empty()
+            && self.row_implied(
+                &actual.clone().into_type(),
+                &declared.clone().into_type(),
+                kind,
+            )
+        {
+            return false;
+        }
         // a row still unknown, maybe less some names: it grows by what the
         // actual row holds, but never by a name it is taken without
         let unknown_tail = declared.tails.iter().find(|t| unknown(t).is_some());
         let open = unknown_tail.and_then(unknown);
         let never: Vec<Elem> = unknown_tail.map_or_else(Vec::new, |t| less(t).1.to_vec());
+        if let Some(m) = open
+            && self.grow_scoped_row(&actual, kind, m)
+        {
+            return true;
+        }
         if self.grow_live(&actual, &declared, open) {
             return true;
         }
@@ -206,101 +228,111 @@ impl Checker<'_> {
     fn report_rows(&mut self) {
         let mut excess: Vec<Excess> = Vec::new();
         for i in 0..self.cx.subrows.len() {
-            let actual = self.actual(i);
-            let c = self.cx.subrows[i].clone();
-            let declared = self.store.normalize(&c.declared);
-            // a declared element that is no error is reported as such, once
-            if c.errors && declared.entries.iter().any(|(_, t)| !self.may_be_error(t)) {
-                continue;
-            }
-            let mut lacking = Vec::new();
-            let mut labels = Vec::new();
-            self.report_live(&actual, &declared, c.site, c.span);
-            for (label, ty) in actual
-                .entries
-                .iter()
-                .filter(|(l, _)| !matches!(l, Elem::Live))
-            {
-                match declared.get(label) {
-                    Some(bound) => {
-                        if let Err(m) = self.unify(ty, bound) {
-                            self.mismatch(&m, ty, bound, c.span);
-                        }
-                    }
-                    None if label == regions::scope() => self.no_owner(ty, &c),
-                    None if matches!(label, Elem::Provided(_)) => {
-                        if let [service, owner] = ty.spine().1[..] {
-                            let service = self.show(service);
-                            let owner = self.show(owner);
-                            self.unprovided(service.trim_matches(['{', '}', ' ']), &owner, c.span);
-                        }
-                    }
-                    None => {
-                        lacking.push(self.show(ty));
-                        labels.push(label.clone());
-                    }
-                }
-            }
-            let mut taken = false;
-            for tail in (actual.tails.iter()).filter(|t| !matches!(t, Type::Error)) {
-                match owed(&declared, tail) {
-                    // the variable is allowed, less names nothing gives back
-                    Some(names) => {
-                        // an instance of a service the row holds itself, which
-                        // would answer one the variable holds at other arguments
-                        let (answered, names): (Vec<Elem>, Vec<Elem>) =
-                            names.into_iter().partition(|l| declared.get(l).is_some());
-                        for l in answered {
-                            self.instance_answered(&l, &declared, tail, c.span);
-                        }
-                        taken |= !names.is_empty();
-                        lacking.extend(names.iter().map(Elem::short));
-                        labels.extend(names);
-                    }
-                    None => lacking.push(self.show(tail)),
-                }
-            }
-            if declared.tails.contains(&Type::Error) || lacking.is_empty() {
-                continue;
-            }
-            if !excess.iter().any(|e| e.site == c.site) {
-                excess.push(Excess {
-                    site: c.site,
-                    span: c.span,
-                    services: Vec::new(),
-                    errors: Vec::new(),
-                    labels: Vec::new(),
-                    bound: Written::default(),
-                    taken: false,
-                });
-            }
-            let i = excess
-                .iter()
-                .position(|e| e.site == c.site)
-                .expect("just added");
-            excess[i].taken |= taken;
-            let list = if c.errors {
-                &mut excess[i].errors
-            } else {
-                &mut excess[i].services
-            };
-            for name in lacking {
-                if !list.contains(&name) {
-                    list.push(name);
-                }
-            }
-            for label in labels {
-                if !excess[i].labels.contains(&label) {
-                    excess[i].labels.push(label);
-                }
-            }
-            if !c.errors && excess[i].bound.0.is_none() {
-                excess[i].bound = self.local_place(&c.declared);
-            }
+            let givens = self.cx.subrows[i].givens.clone();
+            self.under(&givens, |this| this.collect_excess(i, &mut excess));
         }
         self.cx.subrows.clear();
         for e in excess {
             self.report_excess(&e);
+        }
+    }
+
+    /// Report under the same branch assumptions used while growing the row.
+    fn collect_excess(&mut self, i: usize, excess: &mut Vec<Excess>) {
+        let actual = self.actual(i);
+        let c = self.cx.subrows[i].clone();
+        let declared = self.store.normalize(&c.declared);
+        let kind = if c.errors {
+            RowKind::Errors
+        } else {
+            RowKind::Services
+        };
+        if !self.store.row_equalities.is_empty()
+            && self.row_implied(
+                &actual.clone().into_type(),
+                &declared.clone().into_type(),
+                kind,
+            )
+        {
+            return;
+        }
+        // a declared element that is no error is reported as such, once
+        if c.errors && declared.entries.iter().any(|(_, t)| !self.may_be_error(t)) {
+            return;
+        }
+        let mut lacking = Vec::new();
+        let mut labels = Vec::new();
+        self.report_live(&actual, &declared, c.site, c.span);
+        for (label, ty) in actual
+            .entries
+            .iter()
+            .filter(|(l, _)| !matches!(l, Elem::Live))
+        {
+            match declared.get(label) {
+                Some(bound) => {
+                    if let Err(m) = self.unify(ty, bound) {
+                        self.mismatch(&m, ty, bound, c.span);
+                    }
+                }
+                None if label == regions::scope() => self.no_owner(ty, &c),
+                None if matches!(label, Elem::Provided(_)) => {
+                    if let [service, owner] = ty.spine().1[..] {
+                        let service = self.show(service);
+                        let owner = self.show(owner);
+                        self.unprovided(service.trim_matches(['{', '}', ' ']), &owner, c.span);
+                    }
+                }
+                None => {
+                    lacking.push(self.show(ty));
+                    labels.push(label.clone());
+                }
+            }
+        }
+        let mut taken = false;
+        for tail in (actual.tails.iter()).filter(|t| !matches!(t, Type::Error)) {
+            match owed(&declared, tail) {
+                // the variable is allowed, less names nothing gives back
+                Some(names) => {
+                    // an instance of a service the row holds itself, which
+                    // would answer one the variable holds at other arguments
+                    let (answered, names): (Vec<Elem>, Vec<Elem>) =
+                        names.into_iter().partition(|l| declared.get(l).is_some());
+                    for l in answered {
+                        self.instance_answered(&l, &declared, tail, c.span);
+                    }
+                    taken |= !names.is_empty();
+                    lacking.extend(names.iter().map(Elem::short));
+                    labels.extend(names);
+                }
+                None => lacking.push(self.show(tail)),
+            }
+        }
+        if declared.tails.contains(&Type::Error) || lacking.is_empty() {
+            return;
+        }
+        let bound = if c.errors {
+            Written::default()
+        } else {
+            self.local_place(&c.declared)
+        };
+        let (services, errors) = if c.errors {
+            (Vec::new(), lacking)
+        } else {
+            (lacking, Vec::new())
+        };
+        let next = Excess {
+            site: c.site,
+            span: c.span,
+            services,
+            errors,
+            labels,
+            bound,
+            taken,
+        };
+        if let Some(earlier) = excess.iter_mut().find(|e| e.site == c.site) {
+            earlier.merge(next);
+        } else {
+            excess.push(next);
         }
     }
 

@@ -268,6 +268,7 @@ pub fn passes_dictionary(constraint: &Type) -> bool {
         && !class(Lang::Provided)
         && !class(Lang::Detached)
         && !class(Lang::TypeEq)
+        && super::gadt::row_facts::Equation::from_given(constraint).is_none()
         && as_field_given(constraint).is_none()
 }
 
@@ -292,7 +293,7 @@ impl Checker<'_> {
     /// Records the type of a name or binder at `span`, settled once the
     /// module is solved.
     pub fn note_type(&mut self, span: Span, ty: &Type) {
-        if !self.store.equalities.is_empty() {
+        if !self.store.equalities.is_empty() || !self.store.row_equalities.is_empty() {
             return self.note_refined(range(span), ty, ty);
         }
         self.typing.pending_types.push((range(span), ty.clone()));

@@ -182,7 +182,11 @@ impl Checker<'_> {
         match t {
             Type::Fun(p, s, r) => {
                 let p = go(p, &none);
-                let held = held.union(&self.shown(&self.reach(&p), regions, bound));
+                // A bound on an opaque type variable is no use of the
+                // regions it permits. A concrete type or a callable's own
+                // qualifier still exposes its actual Live requirements.
+                let (shown, _) = self.reach_bounded(&p);
+                let held = held.union(&self.shown(&shown, regions, bound));
                 let s = match s {
                     Stage::Runtime(row, e) => Stage::Runtime(add_live(row, &held), e.clone()),
                     Stage::Pure => Stage::Pure,

@@ -257,8 +257,8 @@ impl Checker<'_> {
     }
 
     /// `R` of `| K … : R` once it is a full application of the type `name`
-    /// itself whose region, row and capture arguments are variables of the
-    /// constructor; `Error` after reporting otherwise.
+    /// itself whose region arguments are variables of the constructor;
+    /// `Error` after reporting otherwise. Effect and capture rows may be indices.
     fn indexed_result(
         &mut self,
         name: &str,
@@ -283,7 +283,7 @@ impl Checker<'_> {
         }
         for (param, arg) in params.iter().zip(&args) {
             let passed = matches!(arg, Type::Var(v) if locals.iter().any(|l| l.name == *v));
-            if (param.kind.is_row() || param.kind == Kind::Region) && !passed {
+            if (matches!(param.kind, Kind::Region | Kind::Row(_))) && !passed {
                 let shown = self.show(arg);
                 self.error(
                     codes::T056,

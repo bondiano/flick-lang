@@ -8,7 +8,7 @@ use crate::iface::{Entity, Namespace};
 use crate::types::Checker;
 use crate::types::lang::Lang;
 use crate::types::patterns::Ctor;
-use crate::types::ty::Type;
+use crate::types::ty::{Binder, Type};
 
 /// What each rigid variable of a matched type equals, as a constructor tells.
 type Equals = Vec<(u32, Type)>;
@@ -71,14 +71,14 @@ impl Checker<'_> {
                     Type::Forall { vars, body, .. } => (&vars[..], &**body),
                     t => (&[][..], t),
                 };
-                let locals: Vec<String> = vars
+                let locals: Vec<Binder> = vars
                     .iter()
                     .filter(|v| !is_hidden_captures(v))
-                    .map(|v| v.name.clone())
+                    .cloned()
                     .collect();
                 let (bound, equals) = match self.refine(&locals, built(body), &t) {
                     Refined::Impossible => return None,
-                    Refined::Unifier { bound, equals } => (bound, equals),
+                    Refined::Unifier { bound, equals, .. } => (bound, equals),
                     Refined::Unknown | Refined::Unsupported(_) => return unknown(),
                 };
                 // a variable the constructor hides is not known to the check

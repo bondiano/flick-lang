@@ -86,7 +86,24 @@ impl Checker<'_> {
         self.regions.nest.push(s.clone());
         self.regions.renamed.push((name.clone(), s.clone()));
         self.locals.push((name.clone(), mono(owner(&s))));
+        // The body can acquire in this scope, in addition to the surrounding
+        // requirements. A pre-existing Scope requirement may instead pass
+        // through; its owner is inferred from the body's actual operations.
+        let bound = match self.stage_bound.clone() {
+            Some(Stage::Runtime(mut r, e)) => {
+                let owner = if r.elems.contains_key(&scope_service()) {
+                    self.fresh()
+                } else {
+                    Type::Var(region.clone())
+                };
+                r.elems.insert(scope_service(), Rc::from([owner]));
+                Some(Stage::Runtime(r, e))
+            }
+            bound => bound,
+        };
+        let outer_bound = mem::replace(&mut self.stage_bound, bound);
         let checked = self.own_stage(body, expected);
+        self.stage_bound = outer_bound;
         self.locals.pop();
         self.regions.renamed.pop();
         self.regions.nest.pop();
@@ -102,7 +119,13 @@ impl Checker<'_> {
         };
         self.settle_scope(&mut r, s);
         self.discharge_live(&mut r, s);
-        if let Some(args) = r.elems.remove(&scope_service()) {
+        if let Some(args) = r.elems.get(&scope_service()).cloned()
+            && args.iter().all(|a| {
+                self.resolve(a) == Type::Var(region.clone())
+                    || matches!(self.resolve(a), Type::Var(Var::Meta(_)))
+            })
+        {
+            r.elems.remove(&scope_service());
             for a in args.iter() {
                 self.unify(a, &Type::Var(region.clone()))?;
             }
@@ -153,7 +176,7 @@ impl Checker<'_> {
     }
 
     /// The named variables of `t`, in its rows and qualifiers too.
-    fn names(&self, t: &Type) -> BTreeSet<Name> {
+    pub(in crate::check) fn names(&self, t: &Type) -> BTreeSet<Name> {
         let mut out = BTreeSet::new();
         names_into(&self.zonk(t), &mut out);
         out
@@ -221,9 +244,11 @@ impl Checker<'_> {
             }
             _ => None,
         };
+        let bound = mem::replace(&mut self.stage_bound, stage.cloned());
         let outer = mem::replace(&mut self.regions.declared, declared);
         let out = check(self);
         self.regions.declared = outer;
+        self.stage_bound = bound;
         out
     }
 
@@ -303,6 +328,7 @@ pub(in crate::check) fn names_into(t: &Type, out: &mut BTreeSet<Name>) {
         Type::Layer(a, b, c) => [a, b, c].iter().for_each(|r| row(r, out)),
         Type::Record(f) => f.fields.values().for_each(|t| names_into(t, out)),
         Type::Tuple(ts) | Type::Dict(_, ts) => ts.iter().for_each(|t| names_into(t, out)),
+        Type::Caps(c) => caps(c, out),
         Type::Errors(r) | Type::Impl(r) | Type::Tag(r) | Type::Env(r) => row(r, out),
         Type::Forall(s) => names_into(&s.body, out),
         Type::Captured(x, c) | Type::Bounded(x, c) => {

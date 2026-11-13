@@ -9,6 +9,7 @@ use crate::types::Elem;
 use crate::types::Elided;
 use crate::types::env::Form;
 use crate::types::gadt::refine::Refined;
+use crate::types::gadt::row_facts::RowKind;
 use crate::types::gadt::scheme::{built, is_hidden_captures, is_indexed};
 use crate::types::kinds::Kind;
 use crate::types::lang::Lang;
@@ -148,10 +149,10 @@ impl Checker<'_> {
                     let mut current = match scheme {
                         // a GADT constructor over its own variables, as `t` instantiates them
                         Type::Forall { vars, body, .. } if is_indexed(scheme, module, ty_name) => {
-                            let locals: Vec<String> = vars
+                            let locals: Vec<_> = vars
                                 .iter()
                                 .filter(|v| !is_hidden_captures(v))
-                                .map(|v| v.name.clone())
+                                .cloned()
                                 .collect();
                             match self.refine(&locals, built(body), &t) {
                                 Refined::Impossible => return false,
@@ -396,6 +397,11 @@ impl Checker<'_> {
 
     /// Whether every capture of the row `captures` is one `allowed` names.
     fn within(&self, captures: &Type, allowed: &Norm) -> bool {
+        if !self.store.row_equalities.is_empty()
+            && self.row_implied(captures, &allowed.clone().into_type(), RowKind::Captures)
+        {
+            return true;
+        }
         let mut held = Norm::default();
         self.capture_row(captures, &mut held);
         held.tails.is_empty()

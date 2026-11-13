@@ -106,6 +106,7 @@ impl Checker<'_> {
             Type::Record(f) => Type::Record(self.zonk_fields(&f)),
             Type::Tuple(ts) => Type::Tuple(ts.iter().map(|t| self.zonk(t)).collect()),
             Type::Errors(r) => Type::Errors(self.zonk_row(&r)),
+            Type::Caps(c) => Type::Caps(self.zonk_caps(&c)),
             Type::Impl(r) => Type::Impl(self.zonk_row(&r)),
             Type::Tag(r) => Type::Tag(self.zonk_row(&r)),
             Type::Dict(c, ts) => Type::Dict(c, ts.iter().map(|t| self.zonk(t)).collect()),

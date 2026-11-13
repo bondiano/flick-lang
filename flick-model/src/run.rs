@@ -87,6 +87,9 @@ pub fn decls(modules: &[Compiled]) -> Decls {
     let mut decls = Decls::default();
     let builtins = build::builtin_declarations();
     for d in modules.iter().map(|m| &m.declarations).chain(builtins) {
+        decls.add_kinds(d);
+    }
+    for d in modules.iter().map(|m| &m.declarations).chain(builtins) {
         decls.add(d);
     }
     decls.finish();

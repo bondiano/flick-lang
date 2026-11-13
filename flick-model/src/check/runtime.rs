@@ -105,7 +105,11 @@ impl Checker<'_> {
                 let Type::Env(given) = self.env(theta)? else {
                     return error("With", "no `env`");
                 };
-                let (t, inner) = self.own_stage(body, expected)?;
+                let bound = self.inner_stage_bound(&given, &Row::none())?;
+                let outer_bound = mem::replace(&mut self.stage_bound, bound);
+                let checked = self.own_stage(body, expected);
+                self.stage_bound = outer_bound;
+                let (t, inner) = checked?;
                 let (mut needed, raised) = match inner {
                     Stage::Pure => (Row::none(), Row::none()),
                     Stage::Runtime(r, e) => (self.zonk_row(&r), e),

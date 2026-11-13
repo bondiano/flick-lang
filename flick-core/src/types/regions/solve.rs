@@ -7,10 +7,11 @@
 use crate::types::Elem;
 use std::{collections::HashSet, mem};
 
-use super::{Hold, Visible};
+use super::{DeferredHold, Hold, Visible};
 use crate::diagnostics::{Diagnostic, Edit, codes};
 use crate::source::Span;
 use crate::types::env::Form;
+use crate::types::gadt::row_facts::RowKind;
 use crate::types::kinds::Kind;
 use crate::types::ty::{Norm, Row, Type};
 use crate::types::{Checker, ty};
@@ -52,23 +53,39 @@ impl Checker<'_> {
     }
 
     /// Each hold as solving reads it, until a qualifier is bound.
-    fn summaries(&self) -> Vec<Summary> {
-        self.cx
-            .regions
-            .holds
-            .iter()
-            .map(|hold| self.summary(hold))
+    fn summaries(&mut self) -> Vec<Summary> {
+        (0..self.cx.regions.holds.len())
+            .map(|i| {
+                let hold = &self.cx.regions.holds[i];
+                if hold.givens.is_empty() {
+                    self.summary(hold)
+                } else {
+                    let hold = hold.clone();
+                    self.under(&hold.givens, |this| this.summary(&hold))
+                }
+            })
             .collect()
     }
 
     fn summary(&self, hold: &Hold) -> Summary {
+        let bound = self.bound_of(hold);
+        let mut hidden = self.hidden(hold);
+        if !self.store.row_equalities.is_empty()
+            && self.row_implied(
+                &hidden.clone().into_type(),
+                &bound.clone().into_type(),
+                RowKind::Captures,
+            )
+        {
+            hidden = Norm::default();
+        }
         Summary {
             visible: match &hold.visible {
                 Visible::Now(labels) => labels.clone(),
                 Visible::Late(ty) | Visible::Refined(ty) => self.shown_by(ty),
             },
-            bound: self.bound_of(hold),
-            hidden: self.hidden(hold),
+            bound,
+            hidden,
         }
     }
 
@@ -94,7 +111,7 @@ impl Checker<'_> {
     /// Adds to qualifiers not inferred yet what their values hold; `true`
     /// when one grew.
     pub fn grow_holds(&mut self) -> bool {
-        let open_bound = |hold: &Hold| {
+        let open_bound = |hold: &DeferredHold| {
             let bound = self.bound_of(hold);
             bound.tails.iter().any(|t| matches!(t, Type::Meta(_)))
                 || self.lone_open_region(&bound).is_some()
@@ -218,21 +235,7 @@ impl Checker<'_> {
         // it cover an inferred one at the same span
         holds.sort_by_key(|hold| !hold.written);
         for hold in holds {
-            let (actual, bound) = (self.hidden(&hold), self.bound_of(&hold));
-            if bound.tails.contains(&Type::Error) || actual.tails.contains(&Type::Error) {
-                continue;
-            }
-            let lacking: Vec<Type> = actual
-                .entries
-                .into_iter()
-                .filter(|(label, _)| bound.get(label).is_none())
-                .map(|(_, atom)| atom)
-                // a region never solved comes from an error reported already
-                .filter(|atom| !matches!(self.store.resolve(atom), Type::Meta(_)))
-                .collect();
-            if let Some(atom) = lacking.first() {
-                self.report_hold(&hold, atom, &bound);
-            }
+            self.under(&hold.givens, |this| this.report_one_hold(&hold));
         }
         // after the holds: what a qualifier holds too much is theirs to name
         self.compare_deferred();
@@ -256,6 +259,28 @@ impl Checker<'_> {
                     format!("`{shown}` is not an error: an error row holds types declared with `type error`"),
                 );
             }
+        }
+    }
+
+    fn report_one_hold(&mut self, hold: &Hold) {
+        let Summary {
+            hidden: actual,
+            bound,
+            ..
+        } = self.summary(hold);
+        if bound.tails.contains(&Type::Error) || actual.tails.contains(&Type::Error) {
+            return;
+        }
+        let lacking: Vec<Type> = actual
+                .entries
+                .into_iter()
+                .filter(|(label, _)| bound.get(label).is_none())
+                .map(|(_, atom)| atom)
+                // a region never solved comes from an error reported already
+                .filter(|atom| !matches!(self.store.resolve(atom), Type::Meta(_)))
+                .collect();
+        if let Some(atom) = lacking.first() {
+            self.report_hold(hold, atom, &bound);
         }
     }
 

@@ -188,8 +188,9 @@ A branch learns what the type of the matched value is: in the `IntLit` branch
 `a` is `Int`, so `n` is a result of type `a`, and an editor shows a value of
 type `a` there as `Int (= a)`. The result of a constructor is its own type
 applied to all of the type's parameters (`FLICK-T056`); an argument is a type,
-a member of a `kind` or a `Symbol`, and a region, row or capture parameter is
-passed on as a variable.
+a member of a `kind` or a `Symbol`, and parameters of regions and record rows are
+passed as variables. [Service, error and capture row indices](../row-indices/)
+can be fixed or related by the constructor.
 
 A `match` needs no arm for a constructor that builds no value of the matched
 type, and an arm for one is the warning `FLICK-T010`:
@@ -218,8 +219,8 @@ its type from what the branch learned; such a type needs an annotation. A
 branch (`FLICK-T007`). What a field holds, the value holds, so a scoped
 resource hidden in a value cannot leave its scope either. Only an arm of a
 `match` refines or hides types: the pattern of a `let`, of a parameter or an
-alternative of an or-pattern does not, and no branch learns that two regions
-or two rows are one (`FLICK-T058`).
+alternative of an or-pattern does not (`FLICK-T058`). Regions retain their
+identities; [row indices](../row-indices/) can be refined.
 
 `TypeEq a b` of the core module `TypeEq` is evidence that two types are one:
 `Refl : TypeEq a a`, and `TypeEq.cast : TypeEq a b -> a -> b`.
@@ -250,196 +251,28 @@ a case of every instance of its type, and a type it hides is `unknown`.
 
 ## Numbers and operators
 
-There are three numeric types, and no implicit conversions between them (see
-[Schema and standard data types](../../spec/07-schema/)):
-
-| Type | Values | Arithmetic |
-| - | - | - |
-| `Int` | 32-bit signed integers | wraps around: `2147483647 + 1 == -2147483648`; `/` drops the fraction (`7 / 2 == 3`, `-7 / 2 == -3`); `/` and `%` by zero are `0` |
-| `Float` | IEEE 754 binary64, a JS number | `0.0 / 0.0` is NaN, `1.0 / 0.0` is `Infinity`; `==` is SameValueZero |
-| `BigInt` | integers of any size | `/` drops the fraction; `/` and `%` by zero are `0n` |
-
-The same rules hold on every backend. `Int.checked_add`, `Int.checked_div`
-and the others return `Result Int.ArithmeticError Int` instead of wrapping or
-giving `0`; `Int.unsafe_div` and `Int.unsafe_rem` are a defect on a zero
-divisor. `Int.to_float`, `Int.from_float` (`None` unless whole and in range)
-and `Int.truncate` convert.
-
-A number literal written as an integer (`3`, `0xFF`, `1_000`) is of any
-numeric type its use asks for, and `Int` when nothing does: `let ratio :
-Float = 3` and `3 + 0.5` are `Float`, `3 + 4n` is `BigInt`. A literal with a
-fraction or an exponent (`3.0`, `1e3`) is a `Float`. An integer literal out
-of the range of its type is `FLICK-T003`. When a class constraint is all that
-decides a literal's type, it is the first of `Int`, `Float`, `BigInt` with a
-matching instance.
-
-| Operators | Operands | Result |
-| - | - | - |
-| `+ - * / % **`, prefix `-` | both `Int`, both `Float` or both `BigInt` | the same type |
-| `++` | both `String` or both `List a` | the same type |
-| `< <= > >=` | both `Int`, `Float`, `BigInt` or `String`, or both of another type with `Ord` | `Bool` |
-| `== !=` | the same type | `Bool` |
-| `&& \|\|`, `not` | `Bool` | `Bool` |
-| `x \|> f`, `f <\| x` | `f x` | the result of `f` |
-| `f >> g`, `g << f` | functions | the function that applies `f`, then `g` |
-
-`x |> f` evaluates `x` first, `f <| x` evaluates `f` first, as `f x` does;
-`f a <| x` is the call `f a x`. A composition is the closure `let f' = f;
-let g' = g; fun x -> g' (f' x)`: it evaluates its operands once, left to
-right, where it is written, and is typed as that closure. Its arrow has the
-rows of the calls it makes: two pure functions compose into a pure one, and
-`show >> Platform.stdout_line` is a runtime function. It holds what its
-operands hold ([regions](../regions/)). In release the closure is gone where
-it is applied: `(f >> g) x` is `g (f x)`.
-
-`1.5 + 1n` and `"a" ++ 1` are `FLICK-T003`. An operand nothing else
-determines is `Int` (`String` for `++`). Ranges `a..b`, `a..<b` and `a..`
-count in `Int`.
-
-One function serves every numeric type through the closed classes of the
-module `Numeric`: `Numeric a` (`Int`, `Float`, `BigInt`), `Integer a` (`Int`,
-`BigInt`) and `Floating a` (`Float`). On a type variable with one of them,
-the operators and integer literals use its methods (`add`, `div`,
-`from_int`, …); a literal with a fraction needs `Floating`. The module has
-every instance, and a program cannot declare another (`FLICK-C012`).
-
-```flick
-import Numeric exposing (Floating, Numeric)
-
-square : Numeric a => a -> a
-let square x = x * x
-
-mean : Floating a => List a -> a
-let mean xs = List.sum xs / Numeric.from_int (List.length xs)
-```
-
-`List.sum` and `List.product` take any `Numeric`. Without the constraint,
-`x + 1` on a type variable is `FLICK-C001`. `< <= > >=` on a type variable
-with a numeric class use its `lt`, `le`, `gt`, `ge`, which mean what the
-operators mean on its type (NaN is unordered); with only `Ord a`, they
-compare by `compare`. On any other type, such as `Bool`, a derived type, a
-record or a list, they compare by its `Ord` instance's `compare`; a type
-without one is `FLICK-C001`.
-
-Counts, sizes, indices, hashes and calendar parts are `Int` throughout the
-standard library (`List.length`, `HashMap.size`, `Hash.hash`, `Queue.size`,
-`Schedule.recurs`, the parts of a `DateTime`); milliseconds, epochs, byte
-sizes and measurements stay `Float`, as 32 bits do not hold them.
+See [numbers and operators](../operators/#numbers-and-operators).
 
 ## Blocks
 
-Every statement before the last must have type `Unit`; another value is
-dropped only with `ignore` (`FLICK-T011`, with that fix). The last statement
-is the value of the block and must be an expression (`FLICK-T019`).
+See [bindings and local execution](../bindings/#blocks).
 
 ## Variables
 
-`let mut name = value` declares a variable of the function whose block holds
-it, and `name = value`, a statement of type `Unit`, assigns it. A read sees
-the last value assigned before it; a value read earlier stays as it was.
-
-```flick
-clamp : Int -> Int -> Int -> Int
-let clamp low high n =
-  let mut value = n
-  if value < low then value = low
-  if value > high then value = high
-  value
-```
-
-The variable has one type, fixed where it is declared, by its signature or
-its value; it is not generalized, and a value assigned to it is checked
-against it (`FLICK-T003`). An assignment is not a runtime call: a pure
-function may assign its variables. Only a name of one `let mut` of a block
-is a variable: not a definition of the module, a function, a pattern,
-`let assert`, or a binding of `do` or `for` (`FLICK-S016`). A parameter, a
-plain `let` or a definition of the module is not assigned (`FLICK-T069`,
-whose fix adds `mut` to a plain `let`); a `mut` never assigned is the warning
-`FLICK-R020`, whose fix removes it.
-
-A variable belongs to its function. A `fun`, a local function, a `task`, a
-lazy `for`, the rest of a `do` block or an arm of a handler of operations
-inside it may run later, again or at the same time, so none of them reads or
-assigns the variable (`FLICK-G005`): the function stays pure from the outside.
-Bind the value with `let` first and use that name. A `scope`, a `provide`, a
-branch and an arm of `match` or of a `try` run in place and may assign. The
-body of `try … with` and sequential loops may also assign. A failed
-right-hand side leaves its target unchanged; a handler sees earlier completed
-assignments. Strict `[for …]` comprehensions still reject external assignments
-(`FLICK-T070`). Region safety follows the same typing-by-use rules as other
-values (see [Regions](../regions/)).
+See [bindings and local execution](../bindings/#variables).
 
 ## Local loops
 
-`loop { … }` returns the value of `break value`; all exits agree on its type.
-A bare `break` is `break ()`. `while condition do body` and `for … do body`
-return `Unit`; the condition is `Bool` and their bodies return `Unit`.
-`continue` skips the rest of an iteration. Exits target the nearest loop,
-without labels, and close each scope they leave before continuing. A nested
-function, task, lazy sequence or operation handler cannot exit an outer loop
-(`FLICK-T071`). `loop` and `while` are contextual words: existing names such
-as `Loop.loop` and `Schedule.while` remain valid.
-
-```flick
-module App.Count exposing (count)
-
-count : Int -> Int
-let count n =
-  let mut i = 0
-  while i < n do i = i + 1
-  i
-```
+See [bindings and local execution](../bindings/#local-loops).
 
 ## Recursion
 
-Top-level declarations may use each other in any order, but recursion is
-explicit: a function that uses itself is `let rec`, and functions that use
-each other are defined in one `rec { … }` group (`FLICK-T017`). Only functions
-recurse; a value that would be evaluated while it is defined is `FLICK-T012`.
-
-A recursive function may call itself at another type only when its
-signature starts with a `forall` that binds all its variables; otherwise
-that call is `FLICK-T015`. The members of a `rec` group call each other at
-their own types without one, whatever their variables are named: `odd_len`
-of `List b -> Bool` called from `even_len` of `List a -> Bool` on a
-`List a` is the same type.
-
-```flick
-type Nested a = Flat a | Nest (Nested (List a))
-
-depth : forall a. Nested a -> Float
-let rec depth value =
-  match value with
-  | Flat _ -> 0
-  | Nest inner -> 1 + depth inner
-```
+See [bindings and local execution](../bindings/#recursion).
 
 ## Generalization
 
-A binding is polymorphic only when it is built purely: no runtime call runs
-while it is defined (see [Generalization in the presence of Ref](../../spec/03-types-and-classes/#generalization-in-the-presence-of-ref)). Lambdas and `task`
-bodies are deferred and count as pure. A polymorphic signature, annotation or
-higher-rank argument over a runtime result is `FLICK-T013`, and so is a
-top-level value whose type stays unknown. Type variables of an enclosing
-signature, or of a value already in scope, are never generalized, and mutable
-containers are invariant. A row of calls still unknown when a binding is
-generalized becomes `none`, as at the end of a declaration
-([effects](../effects/)); it is not quantified.
-
-```flick
-make_empty : forall a. Unit ->{} Ref (Option a)
-let make_empty () =
-  Ref.make None
-
-fresh_cell : forall a. Eff none none (Ref (Option a))
-let fresh_cell =
-  task { Ref.make None }
-```
-
-Classes and instances: [classes.md](../classes/).
+See [bindings and local execution](../bindings/#generalization).
 
 ## Not checked yet
 
-| Construct | Today |
-| - | - |
-| `sql`, `ui`, `codec`, `schema` blocks | any type |
+See [bindings and local execution](../bindings/#not-checked-yet).

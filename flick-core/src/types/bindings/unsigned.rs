@@ -59,7 +59,11 @@ impl Checker<'_> {
             self.redundant_annotation(decl, parts, header);
         }
         // a type in a GADT branch may hold by its equalities only
-        if runtime || function || !self.store.equalities.is_empty() {
+        if runtime
+            || function
+            || !self.store.equalities.is_empty()
+            || !self.store.row_equalities.is_empty()
+        {
             self.store.lower(&ty);
             ty
         } else {

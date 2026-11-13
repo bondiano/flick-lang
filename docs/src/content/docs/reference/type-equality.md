@@ -35,8 +35,9 @@ make different nominal declarations interchangeable. See [kinds and types](../ty
 [effects](../effects/) and [GADTs](../gadts/).
 
 A GADT branch's unification problem also uses type equality: a different
-presentation of the same row cannot make a branch impossible. This does not
-add refinement of regions, rows or capture variables by GADT patterns.
+presentation of the same row cannot make a branch impossible. Patterns can
+also [refine service, error and capture row indices](../row-indices/).
+Region identities remain rigid.
 
 These are shared language rules for JS and Go. A backend receives the checked
 program; its output representation does not choose a different type equality.

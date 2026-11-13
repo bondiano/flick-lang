@@ -312,6 +312,7 @@ impl<'a> Checker<'a> {
         let saved = (
             mem::replace(&mut self.store.level, 0),
             mem::take(&mut self.store.equalities),
+            mem::take(&mut self.store.row_equalities),
             self.top.current,
             mem::take(&mut self.classes.wanted),
             mem::take(&mut self.classes.givens),
@@ -344,6 +345,7 @@ impl<'a> Checker<'a> {
         (
             self.store.level,
             self.store.equalities,
+            self.store.row_equalities,
             self.top.current,
             self.classes.wanted,
             self.classes.givens,

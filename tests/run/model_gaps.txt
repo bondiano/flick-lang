@@ -25,7 +25,7 @@ codegen/fusion # a `for` or a `Seq` has no λFlick form
 codegen/interpolation # runs in the model; not in portable.txt
 codegen/ints # no native for `checked_add` (flick:rt intCheckedAdd)
 codegen/let_assert # no native for `get` (flick:rt listGet)
-codegen/loops_owners # the model's (≡) rejects `Main.run`
+codegen/loops_owners # prints something else
 codegen/pure_main # no native for `say` (global console.log)
 codegen/question # `?` on an `Option`, a return from the function, has no λFlick form
 codegen/ranges # the model's (≡) rejects `App.Main.main`
@@ -59,7 +59,7 @@ runtime/hung_io # no native for `hang` (./timers.mjs hang)
 runtime/interrupt_after_close # no native for `make` (flick:Deferred make)
 runtime/interrupt_in_finalizer # no native for `make` (flick:Deferred make)
 runtime/interrupt_skips # no native for `make` (flick:Deferred make)
-runtime/lambda_owners # the model's (≡) rejects `App.Main.composed`
+runtime/lambda_owners # prints something else
 runtime/leases # no native for `from_acquire` (flick:ScopedRef flickFromAcquire)
 runtime/owners # the model's (≡) rejects `App.Main.keep`
 runtime/parallel # the model's (≡) rejects `App.Main.main`
@@ -164,7 +164,7 @@ stdlib/effect/shared_layer_merged # no native for `provide_` (flick:Layer provid
 stdlib/effect/sink # no native for `collect` (flick:Sink collect)
 stdlib/effect/sink_more # no native for `make` (flick:Sink flickMake)
 stdlib/effect/stream # no native for `run_collect` (flick:Stream runCollect)
-stdlib/effect/stream_combine # the model's (≤-Cap) rejects `App.Main.main`
+stdlib/effect/stream_combine # the model's (Scope) rejects `App.Main.main`
 stdlib/effect/stream_core # no native for `from_list` (flick:Stream fromArray)
 stdlib/effect/stream_errors # no native for `run_collect` (flick:Stream runCollect)
 stdlib/effect/stream_platform # no native for `mk_string` (flick:Stream mkString)

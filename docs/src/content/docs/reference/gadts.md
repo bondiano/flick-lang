@@ -170,6 +170,7 @@ core module `TypeEq` has it, as `TypeEq a b`, `Refl` and
 
 - Only an arm of a `match` learns a type. The pattern of a `let`, of a parameter
   or an alternative of an or-pattern does not, and each is `FLICK-T058`.
-- No branch learns that two regions or two rows are one (`FLICK-T058`).
+- Patterns do not identify different regions (`FLICK-T058`).
+  [Service, error and capture row indices](../row-indices/) can be refined.
 - TypeScript has no refinement: in a `.d.ts` file each constructor is a case of
   every instance of its type, and a type it hides is `unknown`.

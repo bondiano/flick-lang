@@ -10,7 +10,7 @@ use super::expr::mono;
 use super::regions::add_live;
 use super::{Check, Checker, error};
 use crate::subst::matches;
-use crate::syntax::{Arm, Name, Pat, Term};
+use crate::syntax::{Arm, Con, Name, Pat, Term};
 use crate::types::{Caps, Row, Stage, Type};
 
 impl Checker<'_> {
@@ -72,9 +72,29 @@ impl Checker<'_> {
     fn arm(&mut self, arm: &Arm, scrutinee: &Type, result: &Type) -> Check<()> {
         // what the arm learns of the rigid variables holds in it only
         let learned = self.equalities.len();
-        let checked = self.arm_under(arm, scrutinee, result);
+        let rows = self.row_equalities.len();
+        let caps = self.cap_equalities.len();
+        let outlives = self.regions.facts.len();
+        let outer = mem::replace(&mut self.stage, Stage::Pure);
+        let mut checked = self.arm_under(arm, scrutinee, result);
+        let mut inner = mem::replace(&mut self.stage, outer);
+        let learned_facts = self.equalities.len() != learned
+            || self.row_equalities.len() != rows
+            || self.cap_equalities.len() != caps;
+        if checked.is_ok()
+            && learned_facts
+            && inner != Stage::Pure
+            && let Some(bound) = self.stage_bound.clone()
+        {
+            checked = self.stage_within(&inner, &bound);
+            inner = bound;
+        }
         self.equalities.truncate(learned);
-        checked
+        self.row_equalities.truncate(rows);
+        self.cap_equalities.truncate(caps);
+        self.regions.facts.truncate(outlives);
+        checked?;
+        self.perform(&inner)
     }
 
     fn arm_under(&mut self, arm: &Arm, scrutinee: &Type, result: &Type) -> Check<()> {
@@ -157,7 +177,12 @@ impl Checker<'_> {
         arms: &[Arm],
         expected: Option<&Type>,
     ) -> Check<Type> {
-        let (t, inner) = self.own_stage(body, expected)?;
+        let caught = self.caught_bound(arms)?;
+        let bound = self.inner_stage_bound(&Row::none(), &caught)?;
+        let outer_bound = mem::replace(&mut self.stage_bound, bound);
+        let checked = self.own_stage(body, expected);
+        self.stage_bound = outer_bound;
+        let (t, inner) = checked?;
         let (services, raised) = match &inner {
             Stage::Pure => (Row::none(), Row::none()),
             Stage::Runtime(r, e) => (r.clone(), e.clone()),
@@ -223,9 +248,12 @@ impl Checker<'_> {
                 (i, e, o)
             }
         };
+        let bound = self.inner_stage_bound(&outputs, &Row::none())?;
+        let outer_bound = mem::replace(&mut self.stage_bound, bound);
         let p = self.enter_provide();
         let checked = self.own_stage(body, expected);
         self.leave_provide();
+        self.stage_bound = outer_bound;
         let (t, inner) = checked?;
         let own = inner.clone();
         let (mut needed, raised) = match inner {
@@ -244,6 +272,55 @@ impl Checker<'_> {
         let errors = self.sum(&errors, &raised)?;
         self.perform(&Stage::Runtime(services, errors))?;
         Ok(t)
+    }
+
+    /// A local handler's body may use what that handler discharges, in
+    /// addition to the surrounding signature. This is bidirectional checking
+    /// of that body, not a selected solution for a GADT's residual row.
+    pub(super) fn inner_stage_bound(
+        &mut self,
+        services: &Row,
+        errors: &Row,
+    ) -> Check<Option<Stage>> {
+        match self.stage_bound.clone() {
+            Some(Stage::Runtime(r, e)) => Ok(Some(Stage::Runtime(
+                self.sum(&r, services)?,
+                self.sum(&e, errors)?,
+            ))),
+            bound => Ok(bound),
+        }
+    }
+
+    fn caught_bound(&mut self, arms: &[Arm]) -> Check<Row> {
+        fn constructors<'a>(pat: &'a Pat, found: &mut Vec<&'a Con>) -> bool {
+            match pat {
+                Pat::Con(c, _) => {
+                    found.push(c);
+                    true
+                }
+                Pat::Or(ps) => ps.iter().all(|p| constructors(p, found)),
+                _ => false,
+            }
+        }
+        let mut row = Row::none();
+        for arm in arms {
+            let mut names = Vec::new();
+            if !constructors(&arm.pat, &mut names) {
+                return Ok(self.fresh_row());
+            }
+            for c in names {
+                let ctor = self.constructor(&c.ty.module, &c.name)?;
+                let Some((name, args)) = self.error_of(&result_of(ctor)) else {
+                    return Ok(self.fresh_row());
+                };
+                let one = Row {
+                    elems: [(name, args)].into(),
+                    ..Row::default()
+                };
+                row = self.sum(&row, &one)?;
+            }
+        }
+        Ok(row)
     }
 
     /// The compiler-owned instance of `class` for the record or tuple `t`

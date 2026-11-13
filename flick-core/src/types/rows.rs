@@ -20,6 +20,21 @@ impl Checker<'_> {
     /// Unifies two types of a row kind: rows, unions and row variables.
     #[allow(clippy::too_many_lines)]
     pub fn unify_row_types(&mut self, left: &Type, right: &Type) -> Unified {
+        use super::gadt::row_facts::RowKind;
+        if !self.store.row_equalities.is_empty() {
+            let kinds = self
+                .inferred_row_kind(left)
+                .or_else(|| self.inferred_row_kind(right))
+                .map_or_else(
+                    || vec![RowKind::Services, RowKind::Errors],
+                    |kind| vec![kind],
+                );
+            if kinds.into_iter().any(|kind| {
+                self.row_implied(left, right, kind) && self.row_implied(right, left, kind)
+            }) {
+                return Ok(());
+            }
+        }
         // what a variable is solved to keeps where the row it comes from is written
         let (left_written, right_written) = (
             self.store.resolve(left).written(),
