@@ -11,7 +11,7 @@ use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
 
 /// The built-in modules of the js target only: the browser UI, its forms
-/// and its reactivity, the RPC and telemetry clients, JS interop and the
+/// and its reactivity, the telemetry client, JS interop and the
 /// JS hosts.
 const JS_ONLY: &[&str] = &[
     "Action",
@@ -22,7 +22,6 @@ const JS_ONLY: &[&str] = &[
     "Otlp",
     "Reactivity.AsyncResult",
     "Reactivity.Atom",
-    "Rpc",
     "Runner.Browser",
     "Runner.Cloudflare",
     "Runner.Node",

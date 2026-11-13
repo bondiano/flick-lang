@@ -428,7 +428,9 @@ Go implementation: in the runtime for the standard library, part of which
 has none yet beyond the core (most of `Stream`, queues, schedules beyond
 `recurs`, parts of `Codec`), or beside the program for its own bindings
 (see [FFI](../ffi/#the-go-target)). Modules of the js target only are
-`FLICK-P030` already in `flick check`.
+`FLICK-P030` already in `flick check`. `Rpc` and `server fn` speak the
+wire of the js target, so a Go backend serves a JS frontend (see
+[Typed RPC](../rpc/#on-the-go-target)).
 
 Values have the representation of the JS target, in Go terms:
 

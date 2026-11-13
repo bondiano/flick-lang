@@ -1,6 +1,8 @@
 package flickrt
 
 import (
+	"bufio"
+	"net"
 	"strconv"
 	"strings"
 )
@@ -12,6 +14,7 @@ import (
 // allocation and the server writes them directly.
 
 type ServerResponse struct {
+	upgrade    func(net.Conn, *bufio.ReadWriter, <-chan struct{})
 	status     int32
 	statusText string
 	hasText    bool

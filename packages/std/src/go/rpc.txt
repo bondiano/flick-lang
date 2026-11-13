@@ -1,0 +1,55 @@
+# Typed RPC and the calls of `server fn`. The stdio and worker transports
+# start Node processes and workers: they have no Go form.
+
+[flick:rpc/Rpc]
+rpcNdjson RpcNdjson
+rpcJson RpcJson
+rpcJsonRpc RpcJsonRpc
+rpcNdjsonRpc RpcNdjsonRpc
+rpcBinary RpcBinary
+rpcHttp RpcHttp
+rpcWebsocket RpcWebsocket
+rpcMake RpcMake
+rpcWithPayload RpcWithPayload
+rpcWithSuccess RpcWithSuccess
+rpcWithStream RpcWithStream
+rpcErrors RpcErrors
+rpcErrorCase RpcErrorCase
+rpcWithErrors RpcWithErrors
+rpcWithMiddleware RpcWithMiddleware
+rpcWithAuth RpcWithAuth
+rpcUninterruptible RpcUninterruptible
+rpcGroup RpcGroup
+rpcAuthenticated RpcAuthenticated
+rpcAdd RpcAdd
+rpcCall *RpcCall
+rpcCallNdjson *RpcCallNdjson
+rpcCallStream RpcCallStream
+rpcCallStreamNdjson RpcCallStreamNdjson
+rpcConnect *RpcConnect
+rpcCallOn *RpcCallOn
+rpcCallStreamOn RpcCallStreamOn
+rpcWithHeaders *RpcWithHeaders
+rpcCallLocal *RpcCallLocal
+rpcCallStreamLocal RpcCallStreamLocal
+
+[flick:rpc/RpcNode]
+rpcTcp RpcTcp
+rpcListen *RpcListen
+rpcListenWebsocket *RpcListenWebsocket
+rpcListenTcp *RpcListenTcp
+rpcPort RpcPort
+rpcHandler *RpcHandler
+rpcHandlerWebsocket *RpcHandlerWebsocket
+
+[flick:server/Functions]
+serverAuthenticated *ServerAuthenticated
+serverProcedure ServerProcedure
+serverCall *ServerCall
+serverFunction ServerFunction
+serverNoErrors ServerNoErrors
+serverError ServerError
+
+[flick:server/FunctionsNode]
+serverHandler *ServerHandler
+serverServe *ServerServe
