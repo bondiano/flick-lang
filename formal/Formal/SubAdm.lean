@@ -52,7 +52,7 @@ theorem Ty.field_rcons {R : Ty} {l t} (h : R.field l = some t) :
 theorem LeLive.isRec {R R' : Ty} (hR : R.IsRec) (h : LeLive S R R') :
     R'.IsRec ∧ R'.labels = R.labels := by
   induction R generalizing R' with
-  | rnil => obtain rfl := h.eq_plain rfl; exact ⟨hR, rfl⟩
+  | rnil => obtain rfl := (h.eq_plain rfl).rnil_right; exact ⟨hR, rfl⟩
   | rcons l t r _ ih =>
     obtain ⟨_, _, rfl, _, hr, _⟩ := h.rcons_left
     obtain ⟨h₁, h₂⟩ := ih hR hr
@@ -73,10 +73,13 @@ theorem LeLive.field {R R' : Ty} {l t} (h : LeLive S R R') (hf : R.field l = som
 
 theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe S J J' → Typ S Ψ Θ Γ e J' := by
   induction h with
+  | conv _ he ih =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
+    exact ih ⟨(LeLive.equiv he).trans h₁, h₂⟩
   | var hi hts hH hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .var hi hts hH (hT.trans (·.trans h₁))
-  | allVar hi hk hc => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; obtain rfl := LeLive.eq_plain h₁ rfl; exact .allVar hi hk hc
-  | allI hv he => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; obtain rfl := LeLive.eq_plain h₁ rfl; exact .allI hv he
+  | allVar hi hk hc => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .conv (.allVar hi hk hc) (h₁.eq_plain rfl).symm
+  | allI hv he => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .conv (.allI hv he) (h₁.eq_plain rfl).symm
   | lam hb hn hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .lam hb hn (hT.trans h₁)
   | app _ _ hψ hT ih₁ ih₂ =>
@@ -93,13 +96,13 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe S J J' �
     exact .letrec hf hn (ih₂ ⟨h₁, h₂⟩)
   | fix hf hn hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .fix hf hn (hT.trans h₁)
-  | lit => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; obtain rfl := LeLive.eq_plain h₁ rfl; exact .lit
-  | loc hl => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; obtain rfl := LeLive.eq_plain h₁ rfl; exact .loc hl
+  | lit => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; obtain rfl := (h₁.eq_plain rfl).base_right; exact .lit
+  | loc hl => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .conv (.loc hl) (h₁.eq_plain rfl).symm
   | const hc hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .const hc (hT.trans h₁)
   | ctor hK hk hH hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .ctor hK hk hH (hT.trans h₁)
-  | rnil => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; obtain rfl := LeLive.eq_plain h₁ rfl; exact .rnil
+  | rnil => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; obtain rfl := (h₁.eq_plain rfl).rnil_right; exact .rnil
   | rcons hR hl _ _ ih₁ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     obtain ⟨_, _, rfl, ht, hr, _⟩ := h₁.rcons_left
@@ -141,7 +144,7 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe S J J' �
     intro _ hJ; obtain ⟨_, _, rfl, _, h₂⟩ := hJ.ex
     exact .raiseAdt (ih (.st h₂)) hU (Stage.le_trans hφ h₂)
   | errVal hv _ hU hE ih =>
-    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex; obtain rfl := LeLive.eq_plain h₁ rfl;
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex; obtain rfl := (h₁.eq_plain rfl).errors_right;
       exact .errVal hv (ih (.st h₂)) hU hE
   | tryR _ _ hφ hs ih₁ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
@@ -165,10 +168,10 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe S J J' �
   | inside hF hb hφ' ht hε hφ hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .inside hF hb hφ' ht hε (Stage.le_trans hφ h₂) (hT.trans h₁)
-  | cap => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; obtain rfl := LeLive.eq_plain h₁ rfl; exact .cap
-  | own => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; obtain rfl := LeLive.eq_plain h₁ rfl; exact .own
+  | cap => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; obtain rfl := (h₁.eq_plain rfl).hnd_rg_right; exact .cap
+  | own => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; obtain rfl := (h₁.eq_plain rfl).owner_rg_right; exact .own
   | drec hc hk hr hn =>
-    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; obtain rfl := LeLive.eq_plain h₁ rfl; exact .drec hc hk hr hn
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .conv (.drec hc hk hr hn) (h₁.eq_plain rfl).symm
   | dnil => intro _ hJ; rw [hJ.dfs]; exact .dnil
   | dcons he hr => intro _ hJ; rw [hJ.dfs]; exact .dcons he hr
   | dproj _ hc hk hl hts hH hT ih =>

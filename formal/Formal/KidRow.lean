@@ -47,29 +47,36 @@ theorem AscE.of_append {b : Nat} {F : Frame} : ∀ {E : List Frame}, AscE b (E +
 /-- Facts of an `inside` form follow the order of creation. -/
 theorem Entails.inside_age {Θ F : Facts} {p : Nat} (hΘ : Entails Θ Facts.age)
     (hF : ∀ C s, F C s → s = .rg p ∧ ∀ q, C (.r q) → q < p) : Entails (Facts.union Θ F) Facts.age := by
-  intro C s h k hk
-  rcases h k hk with h' | ⟨C', h₁ | h₁, h₂⟩
-  · exact .inl h'
-  · exact hΘ C' s (fun y hy => .inr ⟨C', h₁, hy⟩) k h₂
-  · obtain ⟨rfl, hC⟩ := hF C' s h₁
-    exact .inr ⟨C', fun q p' hq hp' => by cases hp'; exact hC q hq, h₂⟩
+  apply Entails.of_facts
+  intro C s h
+  rcases h with h | h
+  · exact hΘ C s (Outl.fact h)
+  · obtain ⟨rfl, hC⟩ := hF C s h
+    exact Outl.fact fun q p' hq hp' => by cases hp'; exact hC q hq
 
-theorem Outl.age_lt {q p : Nat} (h : q < p) : Outl Facts.age (· = .r q) (Atom.r p).ty :=
-  fun k hk => .inr ⟨(· = .r q), fun q' p' hq hp => by subst hk; cases hq; cases hp; exact h, hk⟩
+theorem Outl.age_lt {q p : Nat} (h : q < p) : Outl Facts.age (· = .r q) (Atom.r p).ty := by
+  apply Outl.fact
+  intro q' p' hq hp
+  cases hq; cases hp
+  exact h
 
 theorem Outl.age_le {q o : Nat} (h : Outl Facts.age (· = .r q) (Atom.r o).ty) : q ≤ o := by
+  simp only [Outl, Facts.age_close] at h
   rcases h (.r q) rfl with h | ⟨C', h₁, h₂⟩
   · simp [Atom.ty] at h; omega
   · exact Nat.le_of_lt (h₁ q o h₂ rfl)
 
 /-- What a younger region outlives, an older one does too. -/
 theorem Outl.age_mono {a : Atom} {q q₂ : Nat} (h : Outl Facts.age (· = .r q₂) a.ty) (hlt : q < q₂) :
-    Outl Facts.age (· = .r q) a.ty := fun k hk => .inr ⟨(· = .r q), fun q' p hq' hp => by
-  subst hk; cases hq'
+    Outl Facts.age (· = .r q) a.ty := by
+  simp only [Outl, Facts.age_close] at h
+  apply Outl.fact
+  intro q' p hq' hp
+  cases hq'
   rcases h (.r q₂) rfl with h' | ⟨C', h₁, h₂⟩
   · cases a <;> simp [Atom.ty] at h' hp
     omega
-  · exact Nat.lt_trans hlt (h₁ q₂ p h₂ hp), hk⟩
+  · exact Nat.lt_trans hlt (h₁ q₂ p h₂ hp)
 
 /-- An effect with an operation that is not `tail`. -/
 def Sig.HasNonTail (S : Sig) (N : Name) : Prop := ∃ o c a b, S.op N o = some (c, a, b) ∧ c ≠ .tail
@@ -91,13 +98,11 @@ theorem installs_op {Ψ' Θ x t φ} {F : Frame} {N : Name}
     (hi : F.installs N) : ∃ o c a b, S.op N o = some (c, a, b) := by
   cases F <;> simp only [Frame.installs] at hi
   · subst hi
-    cases h with
-    | hwith _ _ _ _ _ _ hc _ _ => exact hc.1
-    | errVal hv | allI hv => cases hv
+    obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, hc, _, _, _⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
+    exact hc.1
   · subst hi
-    cases h with
-    | hkeep _ _ _ _ hc _ _ _ _ => exact hc.1
-    | errVal hv | allI hv => cases hv
+    obtain ⟨_, _, _, _, _, _, _, _, _, _, _, hc, _, _, _, _⟩ := h.hkeep_type _ _ _ _ _ _ _ rfl rfl
+    exact hc.1
 
 /-- The row of the work under a kept handler of `E`: what the work needs besides `E` and what
 the handler's arms and the operations it does not answer need. -/
@@ -223,7 +228,9 @@ theorem KeptAtm.mono {o : Nat} {E E' : List Frame} {a : Atom} (h : ∀ F, F ∈ 
 theorem keep_old {Θ : Facts} {r : Row} {p : Nat} (hΘ : Entails Θ Facts.age)
     (hk : Row.Outlives Θ r (.rg p)) {a : Atom} (ha : r (.atm a)) :
     a = .r p ∨ ∀ x, a = .r x → x < p := by
-  rcases hΘ _ _ hk a (.inl ha) with h | ⟨C', h₁, h₂⟩
+  have ho := hΘ _ _ hk
+  simp only [Outl, Facts.age_close] at ho
+  rcases ho a (.inl ha) with h | ⟨C', h₁, h₂⟩
   · exact .inl h
   · exact .inr fun x hx => h₁ x p (hx ▸ h₂) rfl
 

@@ -12,10 +12,17 @@ The other side needs no step before it: the values at the redex are related to v
 
 namespace Flick.Elab
 
+private theorem not_alts_expr {S : Sig} {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
+    ∀ t φ, J = .ex t φ → IsAlts e → False := by
+  induction h with
+  | conv _ _ ih => intro t φ hJ ha; cases hJ; exact ih _ _ rfl ha
+  | allI hv | errVal hv => intro t φ _ ha; cases hv <;> simp [IsAlts] at ha
+  | _ => intro t φ hJ ha; cases hJ <;> simp [IsAlts] at ha
+
 /-- Lists of alternatives. -/
 theorem DP.noAlts {S : Sig} {root : Roots} : BNoAlts (DP S root) := by
-  rintro a b ⟨hv, -, -, -, Θ, t, ht⟩ ha
-  cases a <;> simp [IsAlts] at ha <;> cases ht <;> exact hv ‹_›
+  rintro a b ⟨-, -, -, -, Θ, t, ht⟩ ha
+  exact not_alts_expr ht _ _ rfl ha
 
 variable {B : Flick.Tm → Flick.Tm → Prop}
 

@@ -1,4 +1,4 @@
-import Formal.TyBase
+import Formal.TypeEquality
 
 /-!
 # Syntax of λFlick with regions (core.md §1, regions.md §1)
@@ -47,10 +47,13 @@ def Facts.union (Θ Θ' : Facts) : Facts := fun C s => Θ C s ∨ Θ' C s
 def Facts.substT (σ : Atom → Ty) (Θ : Facts) : Facts :=
   fun C s => ∃ C₀ s₀, Θ C₀ s₀ ∧ C = C₀.substT σ ∧ s = s₀.substT σ
 
+/-- Facts are queried modulo definitional equality of their right-hand type. -/
+def Facts.close (Θ : Facts) : Facts := fun C s => ∃ s₀, Θ C s₀ ∧ Ty.Equiv s₀ s
+
 /-- `Θ ⊢ Outlives C ϱ`: each atom of `C` is the region itself or is given to
 outlive it. Facts are not chained: a scope gives one fact for everything outside. -/
 def Outl (Θ : Facts) (C : Caps) (s : Ty) : Prop :=
-  ∀ k, C k → s.reach k ∨ ∃ C', Θ C' s ∧ C' k
+  ∀ k, C k → s.reach k ∨ ∃ C', Θ.close C' s ∧ C' k
 
 /-- How a handler's arm for an operation returns: `tail` gives
 the operation its value, `abort` the handler its value without coming back, and

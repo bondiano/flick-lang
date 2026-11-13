@@ -1,5 +1,6 @@
 import Formal.Reach
 import Formal.DictOps
+import Formal.TypeEquivArgs
 
 /-!
 # Values, patterns, shapes and subtyping (core.md §1.3, §2.2, §2.4)
@@ -120,6 +121,8 @@ variable (S : Sig)
 /-- `⊢ p : τ ⇒ Δ` of core.md §2.4; the flag is `false` for an unsaturated
 constructor spine. -/
 inductive PatTy : Bool → Pat → Ty → List Ty → Prop
+  /-- A completed pattern may inspect a congruent type while keeping its bindings. -/
+  | conv : PatTy true p t Δ → Ty.Equiv t u → PatTy true p u Δ
   | wild : PatTy true .wild t []
   | var : PatTy true .var t [t]
   | lit : PatTy true (.lit l) (.base l.base) []
@@ -159,11 +162,21 @@ theorem PatTy.head_plain {K k ts T us} (hK : S.ctor K = some (k, ts, T)) (hres :
   rwa [Sig.ctorTyR_plain hres hk] at h
 
 /-- `K` can build a value of `t = T us`: what it builds unifies with `t` under some
-instance of its variables and of the ones around, regions included. Exhaustiveness
+instance of its variables and of the ones around, regions included, modulo type
+congruence. Exhaustiveness
 needs no arm on a constructor that cannot. -/
 def Sig.Builds (S : Sig) (K : Name) (t : Ty) : Prop :=
   ∀ k ts T us, S.ctor K = some (k, ts, T) → t = Ty.tcon T us → us.length = (S.res K).length →
-    ∃ ρ : Atom → Ty, (Ty.tcon T (S.res K)).substT ρ = (t.up k).substT ρ
+    ∃ ρ : Atom → Ty, Ty.Equiv ((Ty.tcon T (S.res K)).substT ρ) ((t.up k).substT ρ)
+
+/-- Constructor reachability is unchanged by row congruence in its target indices. -/
+theorem Sig.Builds.equiv {S : Sig} {K : Name} {t t' : Ty} (h : S.Builds K t)
+    (he : Ty.Equiv t t') : S.Builds K t' := by
+  intro k ts T us hK ht hlen
+  subst ht
+  obtain ⟨vs, rfl, has⟩ := he.symm.tcon_left
+  obtain ⟨ρ, hρ⟩ := h k ts T vs hK rfl (has.length.symm.trans hlen)
+  exact ⟨ρ, hρ.trans ((he.up k).substT ρ)⟩
 
 /-- Shapes of closed values of a type, as far as patterns see them. The fields of
 a constructor have the types of its declaration: a field of a parameter type is

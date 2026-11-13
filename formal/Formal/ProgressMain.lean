@@ -45,6 +45,7 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
   have step : ∀ {e l o D}, Step root l Λ μ e o → Value e ∨ NV S root Λ μ e D :=
     fun h => .inr (.step ⟨_, _, h⟩)
   induction h with
+  | conv _ _ ih => intro hμ hΓ _ _ hJ; cases hJ; exact ih hμ hΓ rfl
   | var hi | allVar hi => intro _ hΓ; subst hΓ; simp at hi
   | lam => intros; exact .inl .lam
   | fix => intros; exact .inl .fix
@@ -112,8 +113,7 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih hμ hΓ rfl with hv | hn
     · subst hΓ
-      obtain ⟨r, _, _, _, rfl, hU, hc, _, hr, -⟩ := canonical_dict hv he
-      obtain rfl := Ty.spine_inj hU
+      obtain ⟨r, _, _, _, rfl, _, hc, _, hr, -⟩ := canonical_dict hv he
       rw [hc₀] at hc; cases hc
       obtain ⟨w, hw, -⟩ := hr.dfs_field (by rw [List.lookup_map_snd, hl]; rfl)
       exact step (Step.ofP (.proj hv hw))

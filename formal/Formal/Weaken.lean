@@ -13,6 +13,7 @@ variable {S : Sig}
 theorem Typ.weakenStore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) (X : List Ty) :
     Typ S (Ψ ++ X) Θ Γ e J := by
   induction h generalizing X with
+  | conv _ he ih => exact .conv (ih X) he
   | loc hl => exact .loc (by rw [List.getElem?_append_left (getElem?_lt hl)]; exact hl)
   | var hi hts hH hT => exact .var hi hts hH hT
   | allVar hi hk hc => exact .allVar hi hk hc
@@ -153,6 +154,7 @@ theorem Tm.armOf_rename {ξ : Nat → Nat} {o : Name} :
 theorem Typ.rename {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ {Γ' ξ}, RenOk Γ Γ' ξ → Typ S Ψ Θ Γ' (e.rename ξ) J := by
   induction h with
+  | conv _ he ih => intro _ _ hξ; exact .conv (ih hξ) he
   | var hi hts hH hT => intro _ _ hξ; exact .var (hξ _ _ hi) hts hH hT
   | allVar hi hk hc => intro _ _ hξ; exact .allVar (hξ _ _ hi) hk hc
   | allI hv _ ih => intro _ _ hξ; exact .allI hv.rename (ih (hξ.up _))

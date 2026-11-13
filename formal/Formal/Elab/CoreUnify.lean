@@ -1,5 +1,6 @@
 import Formal.Elab.CoreTr
 import Formal.Elab.Basic
+import Formal.TypeShapeSize
 
 /-!
 # λFlick⁺ as a `Target`: the refinement in the core
@@ -58,58 +59,62 @@ variable (N : Names)
 
 /-- `θ'` unifies the equations `E` in the core. -/
 def CUnif (E : Eqs) (θ' : Atom → Flick.Ty) : Prop :=
-  ∀ p ∈ E, (trT N p.1).substT θ' = (trT N p.2).substT θ'
+  ∀ p ∈ E, Flick.Ty.Equiv ((trT N p.1).substT θ') ((trT N p.2).substT θ')
 
 variable {N}
 
 theorem CUnif.cons {t u : Ty} {E : Eqs} {θ' : Atom → Flick.Ty} :
-    CUnif N ((t, u) :: E) θ' ↔ (trT N t).substT θ' = (trT N u).substT θ' ∧ CUnif N E θ' := by
+    CUnif N ((t, u) :: E) θ' ↔
+      Flick.Ty.Equiv ((trT N t).substT θ') ((trT N u).substT θ') ∧ CUnif N E θ' := by
   simp [CUnif]
 
 /-- A substitution that `θ'` fixes changes nothing under `θ'`. -/
 theorem trT_subst_fix {σ : Nat → Ty} {θ' : Atom → Flick.Ty}
-    (h : ∀ n, (trT N (σ n)).substT θ' = θ' (.v n)) (t : Ty) :
-    (trT N (t.subst σ)).substT θ' = (trT N t).substT θ' := by
+    (h : ∀ n, Flick.Ty.Equiv ((trT N (σ n)).substT θ') (θ' (.v n))) (t : Ty) :
+    Flick.Ty.Equiv ((trT N (t.subst σ)).substT θ') ((trT N t).substT θ') := by
   rw [trT_subst, Flick.Ty.substT_comp]
-  apply Flick.Ty.substT_congr
+  apply Flick.Ty.substT_equiv
   intro a
   cases a with
   | v n => exact h n
-  | r p => rfl
+  | r p => exact .refl
 
 theorem CUnif.subst_bind {x : Nat} {s : Ty} {E : Eqs} {θ' : Atom → Flick.Ty}
-    (hx : θ' (.v x) = (trT N s).substT θ') (h : CUnif N E θ') :
+    (hx : Flick.Ty.Equiv (θ' (.v x)) ((trT N s).substT θ')) (h : CUnif N E θ') :
     CUnif N (Eqs.subst (bindV x s) E) θ' := by
-  have fix : ∀ n, (trT N (bindV x s n)).substT θ' = θ' (.v n) := fun n => by
+  have fix : ∀ n, Flick.Ty.Equiv ((trT N (bindV x s n)).substT θ') (θ' (.v n)) := fun n => by
     simp only [bindV]
     split
     · subst_vars; exact hx.symm
-    · rfl
+    · exact .refl
   intro p hp
   obtain ⟨q, hq, rfl⟩ := List.mem_map.mp hp
-  simp only [trT_subst_fix fix]
-  exact h q hq
+  exact ((trT_subst_fix fix _).trans (h q hq)).trans (trT_subst_fix fix _).symm
 
 theorem CUnif.app {t u t' u' : Ty} {E : Eqs} {θ' : Atom → Flick.Ty}
     (h : CUnif N ((.app t u, .app t' u') :: E) θ') : CUnif N ((t, t') :: (u, u') :: E) θ' := by
   obtain ⟨h₁, h₂⟩ := CUnif.cons.mp h
-  simp only [trT, Flick.Ty.substT, Flick.Ty.tapp.injEq] at h₁
-  exact CUnif.cons.mpr ⟨h₁.1, CUnif.cons.mpr ⟨h₁.2, h₂⟩⟩
+  simp only [trT, Flick.Ty.substT] at h₁
+  cases h₁.form with
+  | rows hr _ => cases hr
+  | tapp hf ha => exact CUnif.cons.mpr ⟨hf, CUnif.cons.mpr ⟨ha, h₂⟩⟩
 
 theorem CUnif.arr {φ : Stage} {q a b a' b' : Ty} {E : Eqs} {θ' : Atom → Flick.Ty}
     (h : CUnif N ((.arr φ a b q, .arr φ a' b' q) :: E) θ') :
     CUnif N ((a, a') :: (b, b') :: E) θ' := by
   obtain ⟨h₁, h₂⟩ := CUnif.cons.mp h
   rw [trT_arr, trT_arr] at h₁
-  simp only [Flick.Ty.substT, Flick.Ty.arrow.injEq] at h₁
-  exact CUnif.cons.mpr ⟨h₁.1, CUnif.cons.mpr ⟨h₁.2.2.1, h₂⟩⟩
+  simp only [Flick.Ty.substT] at h₁
+  cases h₁.form with
+  | rows hr _ => cases hr
+  | arrow ha hb => exact CUnif.cons.mpr ⟨ha, CUnif.cons.mpr ⟨hb, h₂⟩⟩
 
 /-- **The most general unifier in the core**: each unifier `θ'` of the translated equations
 is `⟦θ⟧` followed by `θ'`. -/
 theorem Unify.most {E θ} (h : Unify E θ) {θ' : Atom → Flick.Ty} (hu : CUnif N E θ') :
-    ∀ n, (trT N (θ n)).substT θ' = θ' (.v n) := by
+    ∀ n, Flick.Ty.Equiv ((trT N (θ n)).substT θ') (θ' (.v n)) := by
   induction h with
-  | nil => intro n; rfl
+  | nil => intro n; exact .refl
   | delete _ ih => exact ih (CUnif.cons.mp hu).2
   | swap _ ih =>
     obtain ⟨h₁, h₂⟩ := CUnif.cons.mp hu
@@ -118,18 +123,19 @@ theorem Unify.most {E θ} (h : Unify E θ) {θ' : Atom → Flick.Ty} (hu : CUnif
   | arr _ ih => exact ih hu.arr
   | @bind x s E θ _ _ ih =>
     obtain ⟨h₁, h₂⟩ := CUnif.cons.mp hu
-    have hx : θ' (.v x) = (trT N s).substT θ' := h₁
+    have hx : Flick.Ty.Equiv (θ' (.v x)) ((trT N s).substT θ') := h₁
     have := ih (h₂.subst_bind hx)
     intro n
-    rw [trT_subst_fix this]
+    apply (trT_subst_fix this _).trans
     simp only [bindV]
     split
     · subst_vars; exact hx.symm
-    · rfl
+    · exact .refl
 
 /-- `⟦θ⟧` unifies the translated equations. -/
 theorem Unify.unifies {E θ} (h : Unify E θ) : CUnif N E (trσ N θ) := fun p hp => by
   rw [← trT_subst, ← trT_subst, h.sound p hp]
+  exact .refl
 
 theorem trT_con_substT (c : Nat) (θ' : Atom → Flick.Ty) : (trT N (.con c)).substT θ' = trT N (.con c) := by
   simp only [trT]
@@ -150,38 +156,71 @@ theorem trT_con_ne_arrow (c : Nat) (a : Flick.Ty) (φ : Flick.Stage) (b : Flick.
   · simp
   · split <;> simp
 
-/-- Types with heads apart stay apart in the core. -/
+theorem trT_con_closed (c : Nat) : (trT N (.con c)).Closed := by
+  simp only [trT]
+  split
+  · trivial
+  · split <;> trivial
+
+/-- Types with heads apart stay apart in the core, modulo congruence. -/
 theorem Ty.Apart.core (hinj : ∀ {c₁ c₂ : Nat}, c₁ ≠ c₂ → trT N (.con c₁) ≠ trT N (.con c₂))
     {t u : Ty} (h : t.Apart u) (θ' : Atom → Flick.Ty) :
-    (trT N t).substT θ' ≠ (trT N u).substT θ' := by
-  cases t <;> cases u <;> simp only [Ty.Apart] at h
-  all_goals first
-    | (rw [trT_con_substT, trT_con_substT]; exact hinj h)
-    | (rw [trT_con_substT]; simp only [trT, Flick.Ty.substT]; exact trT_con_ne_tapp _ _ _)
-    | (rw [trT_con_substT]; simp only [trT, Flick.Ty.substT]; exact (trT_con_ne_tapp _ _ _).symm)
-    | (rw [trT_con_substT, trT_arr]; simp only [Flick.Ty.substT]; exact trT_con_ne_arrow _ _ _ _ _)
-    | (rw [trT_con_substT, trT_arr]; simp only [Flick.Ty.substT]
-       exact (trT_con_ne_arrow _ _ _ _ _).symm)
-    | (rw [trT_arr]; simp [trT, Flick.Ty.substT])
+    ¬ Flick.Ty.Equiv ((trT N t).substT θ') ((trT N u).substT θ') := by
+  cases t with
+  | con c => cases u with
+    | con d =>
+      rw [trT_con_substT, trT_con_substT]
+      intro he
+      exact hinj h ((trT_con_closed c).equiv_eq he).symm
+    | app a b =>
+      rw [trT_con_substT]
+      intro he
+      exact trT_con_ne_tapp c _ _ ((trT_con_closed c).equiv_eq he).symm
+    | arr =>
+      rw [trT_con_substT, trT_arr]
+      intro he
+      exact trT_con_ne_arrow c _ _ _ _ ((trT_con_closed c).equiv_eq he).symm
+    | _ => cases h
+  | app a b => cases u with
+    | con c =>
+      rw [trT_con_substT]
+      intro he
+      exact trT_con_ne_tapp c _ _ ((trT_con_closed c).equiv_eq he.symm).symm
+    | arr =>
+      rw [trT_arr]
+      intro he
+      cases he.form with | rows hr _ => cases hr
+    | _ => cases h
+  | arr => cases u with
+    | con c =>
+      rw [trT_con_substT, trT_arr]
+      intro he
+      exact trT_con_ne_arrow c _ _ _ _ ((trT_con_closed c).equiv_eq he.symm).symm
+    | app =>
+      rw [trT_arr]
+      intro he
+      cases he.form with | rows hr _ => cases hr
+    | _ => cases h
+  | _ => cases h
 
 /-- A variable inside the structure of a type is smaller than the type, under any substitution. -/
 theorem Ty.OccS.size {x : Nat} {θ' : Atom → Flick.Ty} :
-    ∀ {s : Ty}, s.OccS x → sizeOf (θ' (.v x)) ≤ sizeOf ((trT N s).substT θ') ∧
-      (s ≠ .var x → sizeOf (θ' (.v x)) < sizeOf ((trT N s).substT θ'))
+    ∀ {s : Ty}, s.OccS x → (θ' (.v x)).shapeSize ≤ ((trT N s).substT θ').shapeSize ∧
+      (s ≠ .var x → (θ' (.v x)).shapeSize < ((trT N s).substT θ').shapeSize)
   | .var n, h => by
     simp only [Ty.OccS] at h; subst h
     exact ⟨Nat.le_refl _, fun h => absurd rfl h⟩
   | .app t u, h => by
-    have key : sizeOf (θ' (.v x)) < sizeOf ((trT N (.app t u)).substT θ') := by
-      simp only [trT, Flick.Ty.substT, Flick.Ty.tapp.sizeOf_spec]
+    have key : (θ' (.v x)).shapeSize < ((trT N (.app t u)).substT θ').shapeSize := by
+      simp only [trT, Flick.Ty.substT, Flick.Ty.shapeSize]
       rcases h with h | h
       · have := (Ty.OccS.size (θ' := θ') (s := t) h).1; omega
       · have := (Ty.OccS.size (θ' := θ') (s := u) h).1; omega
     exact ⟨Nat.le_of_lt key, fun _ => key⟩
   | .arr φ a b q, h => by
-    have key : sizeOf (θ' (.v x)) < sizeOf ((trT N (.arr φ a b q)).substT θ') := by
+    have key : (θ' (.v x)).shapeSize < ((trT N (.arr φ a b q)).substT θ').shapeSize := by
       rw [trT_arr]
-      simp only [Flick.Ty.substT, Flick.Ty.arrow.sizeOf_spec]
+      simp only [Flick.Ty.substT, Flick.Ty.shapeSize]
       rcases h with h | h
       · have := (Ty.OccS.size (θ' := θ') (s := a) h).1; omega
       · have := (Ty.OccS.size (θ' := θ') (s := b) h).1; omega
@@ -195,10 +234,10 @@ theorem Clash.none (hinj : ∀ {c₁ c₂ : Nat}, c₁ ≠ c₂ → trT N (.con 
   | apart ha => intro θ' hu; exact ha.core hinj θ' (CUnif.cons.mp hu).1
   | @occurs x s E hne ho =>
     intro θ' hu
-    have h₁ : θ' (.v x) = (trT N s).substT θ' := (CUnif.cons.mp hu).1
+    have h₁ : Flick.Ty.Equiv (θ' (.v x)) ((trT N s).substT θ') := (CUnif.cons.mp hu).1
     have := (Ty.OccS.size (N := N) (θ' := θ') ho).2 hne
-    rw [← h₁] at this
-    exact Nat.lt_irrefl _ this
+    have he := h₁.shapeSize
+    omega
   | delete _ ih => intro θ' hu; exact ih θ' (CUnif.cons.mp hu).2
   | swap _ ih =>
     intro θ' hu

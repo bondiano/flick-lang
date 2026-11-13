@@ -61,50 +61,43 @@ theorem hole_atm {Ψ Θ E r t φ} (hE : OkE E) (hr : ¬ Value r)
 /-- `open_ H` needs its region in the stage of its redex. -/
 theorem open_atm {Ψ Θ p T ψ} (h : Typ S Ψ Θ [] (.app (.const .open_) (.own p)) (.ex T ψ)) :
     ψ.svc (.atm (.r p)) := by
-  cases h with
-  | app hf ho hψ _ =>
-    cases hf with
-    | const _ hT' =>
-      obtain ⟨_, _, _, _, h, la, lφ, _, -⟩ := hT'.arrow_left
-      cases h; cases LeLive.eq_owner la
-      obtain ⟨q, hq, hs⟩ := canonical_owner .own ho
-      cases hq
-      exact Stage.le_svc (Stage.le_trans lφ hψ) _ (by rw [hs]; exact Or.inl rfl)
-  | errVal hv | allI hv => exact absurd hv (by intro hv; cases hv <;> simp_all [Const.arity, Tm.head])
+  obtain ⟨_, _, _, _, hf, ho, hψ, _⟩ := h.app_nonvalue _ _ _ _ rfl rfl (by
+    intro hv; cases hv <;> simp_all [Const.arity, Tm.head])
+  obtain ⟨_, _, hT'⟩ := hf.const_arrow (by intro E o cl h; cases h)
+  obtain ⟨_, _, _, _, h, la, lφ, _, -⟩ := hT'.arrow_left
+  cases h
+  obtain ⟨q, hq, hs⟩ := canonical_owner .own (ho.conv (LeLive.eq_owner la))
+  cases hq
+  exact Stage.le_svc (Stage.le_trans lφ hψ) _ (by rw [hs]; exact Or.inl rfl)
 
 /-- `op_H` needs its region in the stage of its redex. -/
 theorem op_atm {Ψ Θ p T ψ} (h : Typ S Ψ Θ [] (.app (.const .op) (.cap p)) (.ex T ψ)) :
     ψ.svc (.atm (.r p)) := by
-  cases h with
-  | app hf ho hψ _ =>
-    cases hf with
-    | const _ hT' =>
-      obtain ⟨_, _, _, _, h, la, lφ, _, -⟩ := hT'.arrow_left
-      cases h; cases LeLive.eq_hnd la
-      obtain ⟨q, hq, hs⟩ := canonical_hnd .cap ho
-      cases hq
-      exact Stage.le_svc (Stage.le_trans lφ hψ) _ (by rw [hs]; exact Or.inl rfl)
-  | errVal hv | allI hv => exact absurd hv (by intro hv; cases hv <;> simp_all [Const.arity, Tm.head])
+  obtain ⟨_, _, _, _, hf, ho, hψ, _⟩ := h.app_nonvalue _ _ _ _ rfl rfl (by
+    intro hv; cases hv <;> simp_all [Const.arity, Tm.head])
+  obtain ⟨_, _, hT'⟩ := hf.const_arrow (by intro E o cl h; cases h)
+  obtain ⟨_, _, _, _, h, la, lφ, _, -⟩ := hT'.arrow_left
+  cases h
+  obtain ⟨q, hq, hs⟩ := canonical_hnd .cap (ho.conv (LeLive.eq_hnd la))
+  cases hq
+  exact Stage.le_svc (Stage.le_trans lφ hψ) _ (by rw [hs]; exact Or.inl rfl)
 
 /-- Registering a finalizer or a child needs its owner in the stage of its redex. -/
 theorem fin_atm {Ψ Θ c p w T ψ} (hc : c = .addFin ∨ c = .spawn)
     (h : Typ S Ψ Θ [] (.app (.app (.const c) (.own p)) w) (.ex T ψ)) : ψ.svc (.atm (.r p)) := by
-  cases h with
-  | app hf _ hψ _ =>
-    cases hf with
-    | app hc' ho _ hT₁ =>
-      cases hc' with
-      | perform => rcases hc with h | h <;> cases h
-      | const _ hT' =>
-        rcases hc with rfl | rfl <;>
-        · obtain ⟨_, _, _, _, h, la₀, _, lt, -⟩ := hT'.arrow_left
-          cases h; cases LeLive.eq_owner la₀
-          obtain ⟨q, hq, hs⟩ := canonical_owner .own ho
-          cases hq
-          obtain ⟨_, _, _, _, h, _, lφ, _, -⟩ := (lt.trans hT₁).arrow_left
-          cases h
-          exact Stage.le_svc (Stage.le_trans lφ hψ) _ (by rw [hs]; exact Or.inr rfl)
-  | errVal hv' | allI hv' => exact (fin_not_value hc hv').elim
+  obtain ⟨_, _, _, _, hf, _, hψ, _⟩ := h.app_nonvalue _ _ _ _ rfl rfl (fin_not_value hc)
+  obtain ⟨_, _, _, _, hc', ho, _, hT₁⟩ := hf.app_arrow
+  obtain ⟨_, _, hT'⟩ := hc'.const_arrow (by
+    intro E o cl h
+    rcases hc with rfl | rfl <;> cases h)
+  rcases hc with rfl | rfl <;>
+  · obtain ⟨_, _, _, _, h, la₀, _, lt, -⟩ := hT'.arrow_left
+    cases h
+    obtain ⟨q, hq, hs⟩ := canonical_owner .own (ho.conv (LeLive.eq_owner la₀))
+    cases hq
+    obtain ⟨_, _, _, _, h, _, lφ, _, -⟩ := (lt.trans hT₁).arrow_left
+    cases h
+    exact Stage.le_svc (Stage.le_trans lφ hψ) _ (by rw [hs]; exact Or.inr rfl)
 
 /-- The work a child or a finalizer of `p` is given runs at a stage whose region atoms are `p`
 or older and in the stage of the registration or given by its frames, or are atoms of the arms
@@ -134,18 +127,17 @@ theorem hwith_cell {Ψ Θ E n ℓ Ef al rf e₀ t φ} (hE : OkE E)
       ∀ x, r (.atm (.r x)) → φ.svc (.atm (.r x)) ∨ x = n ∨ ∃ F ∈ E, F = .inside x ∨ F.rgn = some x := by
   have h' : Typ S Ψ Θ [] (plug (.inside n :: E) (.hwith n ℓ Ef al rf e₀)) (.ex t φ) := h
   obtain ⟨K, Θ', t', ψ, hr, hp, hat⟩ := hole_atm (OkE.cons' (F := .inside n) hE trivial) (fun hv => by cases hv) h'
-  cases hr with
-  | hwith hℓ _ _ _ _ _ _ hφ _ =>
-    rcases hp with rfl | ⟨rfl, -⟩
-    · exact absurd hφ (fun h => by simp [Stage.le] at h)
-    · rw [List.map_up_zero] at hℓ
-      refine ⟨_, _, _, hℓ, fun x hx => ?_⟩
-      rcases hat x (Stage.le_svc hφ _ hx) with h₁ | ⟨F, hF, hd⟩
-      · exact .inl h₁
-      · rcases List.mem_cons.mp hF with rfl | hF
-        · rcases hd with hd | hd
-          · cases hd; exact .inr (.inl rfl)
-          · simp [Frame.rgn] at hd
-        · exact .inr (.inr ⟨F, hF, hd⟩)
-  | errVal hv | allI hv => cases hv
+  obtain ⟨_, _, _, _, _, _, _, hℓ, _, _, _, _, _, _, hφ, _, _⟩ := hr.hwith_type _ _ _ _ _ _ _ _ rfl rfl
+  rcases hp with rfl | ⟨rfl, -⟩
+  · exact absurd hφ (fun h => by simp [Stage.le] at h)
+  · rw [List.map_up_zero] at hℓ
+    refine ⟨_, _, _, hℓ, fun x hx => ?_⟩
+    rcases hat x (Stage.le_svc hφ _ hx) with h₁ | ⟨F, hF, hd⟩
+    · exact .inl h₁
+    · rcases List.mem_cons.mp hF with rfl | hF
+      · rcases hd with hd | hd
+        · cases hd; exact .inr (.inl rfl)
+        · simp [Frame.rgn] at hd
+      · exact .inr (.inr ⟨F, hF, hd⟩)
+
 end Flick

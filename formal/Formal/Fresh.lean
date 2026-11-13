@@ -16,6 +16,15 @@ namespace Flick
 
 variable {S : Sig}
 
+/-- Age facts depend only on reachability, which congruence preserves. -/
+@[simp] theorem Facts.age_close {C : Caps} {s : Ty} :
+    Facts.age.close C s ↔ Facts.age C s := by
+  constructor
+  · rintro ⟨s₀, hs, he⟩ q p hq hp
+    rw [← he.reach] at hp
+    exact hs q p hq hp
+  · intro h; exact ⟨s, h, .refl⟩
+
 /-- Send every run-time region `≥ n` to `Unit`. -/
 def kill (n : Nat) : Atom → Ty
   | .v i => .tvar i
@@ -84,25 +93,25 @@ theorem Ty.YF.reach {n : Nat} {t : Ty} {p : Nat} (h : t.YF n) (ht : t.reach (.r 
   rw [← h] at ht; exact Ty.reach_kill ht
 
 theorem Facts.age_kill (n : Nat) : Entails (Facts.age.substT (kill n)) Facts.age := by
-  intro C s hC x hx
-  rcases hC x hx with h | ⟨C', ⟨C₀, s₀, h₀, rfl, rfl⟩, h₂⟩
-  · exact .inl h
-  · refine .inr ⟨_, fun q p hq hp => ?_, h₂⟩
-    obtain ⟨b, hb, hb'⟩ := hq
-    obtain ⟨b', hb'', hp'⟩ := (Ty.reach_substT _ _ _).mp hp
-    obtain ⟨rfl, _⟩ := kill_reach hb'
-    obtain ⟨rfl, _⟩ := kill_reach hp'
-    exact h₀ q p hb hb''
+  apply Entails.of_facts
+  rintro C s ⟨C₀, s₀, h₀, rfl, rfl⟩
+  apply Outl.fact
+  intro q p hq hp
+  obtain ⟨b, hb, hb'⟩ := hq
+  obtain ⟨b', hb'', hp'⟩ := (Ty.reach_substT _ _ _).mp hp
+  obtain ⟨rfl, _⟩ := kill_reach hb'
+  obtain ⟨rfl, _⟩ := kill_reach hp'
+  exact h₀ q p hb hb''
 
 theorem Facts.age_up (k : Nat) : Entails (Facts.age.substT (shiftV k)) Facts.age := by
-  intro C s hC x hx
-  rcases hC x hx with h | ⟨C', ⟨C₀, s₀, h₀, rfl, rfl⟩, h₂⟩
-  · exact .inl h
-  · refine .inr ⟨_, fun q p hq hp => ?_, h₂⟩
-    obtain ⟨b, hb, hb'⟩ := hq
-    obtain ⟨b', hb'', hp'⟩ := (Ty.reach_substT _ _ _).mp hp
-    cases b <;> simp [shiftV] at hb'
-    cases b' <;> simp [shiftV] at hp'
-    subst hb' hp'; exact h₀ _ _ hb hb''
+  apply Entails.of_facts
+  rintro C s ⟨C₀, s₀, h₀, rfl, rfl⟩
+  apply Outl.fact
+  intro q p hq hp
+  obtain ⟨b, hb, hb'⟩ := hq
+  obtain ⟨b', hb'', hp'⟩ := (Ty.reach_substT _ _ _).mp hp
+  cases b <;> simp [shiftV] at hb'
+  cases b' <;> simp [shiftV] at hp'
+  subst hb' hp'; exact h₀ _ _ hb hb''
 
 end Flick

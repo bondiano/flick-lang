@@ -14,6 +14,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ σ, Fits σ e →
       Typ S (Ψ.map (Ty.substT σ)) (Θ.substT σ) (Γ.map (Scheme.substT σ)) e (J.substT σ) := by
   induction h with
+  | conv _ he ih => intro σ hσ; exact .conv (ih σ hσ) (he.substT σ)
   | var hi hts hH hT => intro σ _; exact Typ.var_substT hi hts hH hT σ
   | allVar hi hk hc =>
     intro σ _

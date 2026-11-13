@@ -52,6 +52,14 @@ theorem Typ.spine_match {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
         ∀ {us' p Z Δ δ}, S.Vary T us us' → SpTy S K us' p Z Δ → matchP p v = some δ →
           (∃ Z', LeLive S Z' X ∧ SpW S Z' Z) ∧ Inst S Ψ Θ Γ δ Δ := by
   induction h with
+  | conv _ he ih =>
+    intro hv K k ts T X hK hS hJ hk hA; cases hJ
+    obtain ⟨us, hl, ⟨ws, hr, hw⟩, hus⟩ := ih hv hK hS rfl
+      (by rw [he.kind]; exact hk) (by rw [he.isAll]; exact hA)
+    obtain ⟨vs, hv, hev⟩ := he.res_tcon hr
+    refine ⟨us, hl, ⟨vs, hv, hw.trans (.of_equiv hev)⟩, fun hwu hp hm => ?_⟩
+    obtain ⟨⟨Z, hZ, hs⟩, hδ⟩ := hus hwu hp hm
+    exact ⟨⟨Z, hZ.trans (.equiv he), hs⟩, hδ⟩
   | ctor hK hk _ hT =>
     intro _ _ _ _ _ _ hK' hS hJ _ _
     cases hJ; simp only [Tm.head] at hK'; cases hK'
@@ -106,9 +114,9 @@ constructor unifies the arm's problem and types its patterns and its body. -/
 theorem aref_match {Ψ Θ v t t' φ K k ts T₀ qs b δ} {Δ : (Atom → Ty) → List Ty}
     (hv : Value v) (h₁ : Typ S Ψ Θ [] v (.ex t φ)) (hK : S.ctor K = some (k, ts, T₀))
     (hU : t.hd = .adt T₀) (hn : b.NoIns)
-    (hpA : ∀ θ, Fits θ b → (Ty.tcon T₀ (S.res K)).substT θ = (t.up k).substT θ →
+    (hpA : ∀ θ, Fits θ b → Ty.Equiv ((Ty.tcon T₀ (S.res K)).substT θ) ((t.up k).substT θ) →
       PatsTy S qs (ts.map (Ty.substT θ)) (Δ θ))
-    (hbA : ∀ θ, Fits θ b → (Ty.tcon T₀ (S.res K)).substT θ = (t.up k).substT θ →
+    (hbA : ∀ θ, Fits θ b → Ty.Equiv ((Ty.tcon T₀ (S.res K)).substT θ) ((t.up k).substT θ) →
       Typ S ((Ψ.map (Ty.up k)).map (Ty.substT θ)) ((Θ.substT (shiftV k)).substT θ)
         ((Δ θ).map .mono ++ (([] : List Scheme).map (Scheme.up k)).map (Scheme.substT θ)) b
         (.ex ((t'.up k).substT θ) ((φ.substT (shiftV k)).substT θ)))
@@ -122,8 +130,10 @@ theorem aref_match {Ψ Θ v t t' φ K k ts T₀ qs b δ} {Δ : (Atom → Ty) →
   obtain ⟨us, hk, hmap, hwu⟩ := Sig.Vary.lift hK hk₀ hw
   have hF : Fits (instT us) b := ⟨fun _ _ => rfl, fun h => (hn h).elim, fun h => (hn h).elim,
     fun h => (hn h).elim⟩
-  have hu : (Ty.tcon T₀ (S.res K)).substT (instT us) = (t.up k).substT (instT us) := by
-    rw [Ty.up_substT t k us hk, Ty.tcon_substT, hmap, hr]
+  have hu : Ty.Equiv ((Ty.tcon T₀ (S.res K)).substT (instT us))
+      ((t.up k).substT (instT us)) := by
+    rw [Ty.up_substT t k us hk, Ty.tcon_substT, hr]
+    exact hmap.tcon T₀
   have hsp := (hpA _ hF hu).spTy (K := K) (us := us) (.head hK)
   obtain ⟨-, hδ⟩ := hus hwu hsp hm
   have hb := hbA _ hF hu

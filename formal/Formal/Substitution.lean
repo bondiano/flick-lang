@@ -43,6 +43,7 @@ theorem Typ.armOf_subst {σ : Nat → Tm} {o : Name} :
 theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ {Γ' σ}, SubOk S Ψ Θ Γ Γ' σ → Typ S Ψ Θ Γ' (e.subst σ) J := by
   induction h with
+  | conv _ he ih => intro _ _ hσ; exact (ih hσ).conv he
   | var hi hts hH hT =>
     intro _ _ hσ
     obtain ⟨ht, hnI, hV⟩ := hσ _ _ hi
@@ -53,8 +54,9 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     obtain ⟨ht, _, hV⟩ := hσ _ _ hi
     show Typ _ _ _ _ (σ _) _
     rcases hV with hv | ⟨j, hj, hs⟩ | hj | ⟨hk', -⟩
-    · refine .allI hv (ht.cut fun _ _ h x hx => (h x hx).imp_right fun ⟨C', hu, h₂⟩ => ⟨C', ?_, h₂⟩)
-      exact hu.elim id fun h => (hc _ _ h).elim
+    · refine .allI hv (ht.cut (Entails.of_facts ?_))
+      intro C s hs
+      exact hs.elim Outl.fact (fun h => (hc C s h).elim)
     · rw [hj]; exact .allVar hs hk hc
     · rw [hj]; exact .todo
     · omega
@@ -142,8 +144,7 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | hactl hop _ _ ih₁ ih₂ => intro _ _ hσ; exact .hactl hop (ih₁ (SubOk.lift hσ [_, _] rfl)) (ih₂ hσ)
   | hdl hal hn _ hψ _ hφ₀ hOb hc hφ hT ih₁ ih₂ ih₃ =>
     intro _ σ hσ
-    have h₁ := ih₁ ((SubOk.up hσ 1 Facts.none).mono fun C s h x hx =>
-      (h x hx).imp id fun ⟨C', h₁, h₂⟩ => ⟨C', h₁.elim id False.elim, h₂⟩)
+    have h₁ := ih₁ ((SubOk.up hσ 1 Facts.none).mono Entails.union_none)
     exact .hdl h₁ (SubOk.noIns hσ (by simpa using hal.frees) hn) (ih₂ hσ) hψ (ih₃ hσ) hφ₀ hOb ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
       rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hφ hT
   | hwith hℓ hal _ hψ _ hφ₀ hc hφ hT hat ih₁ ih₂ ih₃ =>
