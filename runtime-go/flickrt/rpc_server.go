@@ -1,6 +1,7 @@
 package flickrt
 
 import (
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -55,6 +56,7 @@ func newRPCServer(fb *Fiber, g *rpcGroup, handlers map[string]Value) *rpcServer 
 }
 
 type rpcCall struct {
+	key       string // internal tracking identity; notifications have no wire id
 	state     *fiberState
 	ack       chan struct{} // a stream's acknowledged chunks, over a socket
 	responded bool          // its exit went out already
@@ -64,17 +66,18 @@ type rpcCall struct {
 
 // rpcConn is a client of the server.
 type rpcConn struct {
-	srv     *rpcServer
-	ser     *rpcSerialization
-	headers []Value       // the transport's, before each request's own
-	acks    bool          // whether the client acknowledges chunks
-	send    func(m Value) // writes a message; safe for concurrent use
-	closer  func()        // closes the transport, or nil
-	mu      sync.Mutex
-	calls   map[string]*rpcCall
-	ended   bool
-	done    chan struct{} // closed once it ended and its calls did
-	once    sync.Once
+	srv           *rpcServer
+	ser           *rpcSerialization
+	headers       []Value       // the transport's, before each request's own
+	acks          bool          // whether the client acknowledges chunks
+	send          func(m Value) // writes a message; safe for concurrent use
+	closer        func()        // closes the transport, or nil
+	mu            sync.Mutex
+	calls         map[string]*rpcCall
+	ended         bool
+	notifications uint64
+	done          chan struct{} // closed once it ended and its calls did
+	once          sync.Once
 }
 
 func (s *rpcServer) connect(ser *rpcSerialization, headers []Value, acks bool, send func(Value), closer func()) *rpcConn {
@@ -230,16 +233,20 @@ func issuesText(issues []issue) string {
 func (c *rpcConn) request(m Value) {
 	id := msgField(m, "id")
 	notification := msgField(m, "isNotification") == true
-	switch id.(type) {
-	case string, float64:
-	default:
-		c.defect("Invalid request id: " + rpcJSText(id))
-		return
+	if !notification {
+		switch id.(type) {
+		case string, float64:
+		default:
+			c.defect("Invalid request id: " + rpcJSText(id))
+			return
+		}
 	}
 	tag, _ := msgField(m, "tag").(string)
 	p := c.srv.procs[tag]
 	if p == nil {
-		if !notification {
+		if notification {
+			c.dropNotification("Unknown request tag: " + tag)
+		} else {
 			c.exit(binUnknownExitLayout, id, exitFailureTree(dieReason("Unknown request tag: "+tag)))
 		}
 		return
@@ -249,7 +256,9 @@ func (c *rpcConn) request(m Value) {
 		b, _ := payload.([]byte)
 		tree, err := binDecode(p.layouts().payload, b)
 		if err != nil {
-			if !notification {
+			if notification {
+				c.dropNotification(err.Error())
+			} else {
 				c.exit(p.layouts().exit, id, exitFailureTree(dieReason(err.Error())))
 			}
 			return
@@ -259,18 +268,43 @@ func (c *rpcConn) request(m Value) {
 	fb := &Fiber{state: newState(), env: c.srv.services}
 	decoded, issues := decodeWire(fb, p.payload, payload)
 	if issues != nil {
-		if !notification {
+		if notification {
+			c.dropNotification(issuesText(issues))
+		} else {
 			c.exit(p.layouts().exit, id, exitFailureTree(dieReason(issuesText(issues))))
 		}
 		return
 	}
 	headers := append(c.headers[:len(c.headers):len(c.headers)], asList(msgField(m, "headers"))...)
+	// Validate untrusted header pairs before constructing the handler. A malformed
+	// request is a local failed Exit, rather than a client-wide fatal Defect.
+	if _, cause := catch(func() Value { return HeadersFromInput(headers) }); cause != nil {
+		if notification {
+			c.dropNotification("Invalid request headers")
+		} else {
+			c.exit(p.layouts().exit, id, exitFailureTree(dieReason("Invalid request headers")))
+		}
+		return
+	}
+
 	call := &rpcCall{state: newState(), silent: notification, discard: !notification && msgField(m, "discard") == true}
 	if p.stream && c.acks {
 		call.ack = make(chan struct{}, 1)
 	}
 	key := idKey(id)
 	c.mu.Lock()
+	if notification {
+		// JSON-RPC notifications all arrive without an id. Their internal key
+		// must still be unique while their handlers overlap.
+		for {
+			key = idKey("@effect/rpc/notification/" + strconv.FormatUint(c.notifications, 10))
+			c.notifications++
+			if _, exists := c.calls[key]; !exists {
+				break
+			}
+		}
+	}
+	call.key = key
 	if _, dup := c.calls[key]; dup || c.ended {
 		c.mu.Unlock()
 		return
@@ -326,9 +360,8 @@ func (c *rpcConn) run(call *rpcCall, p *rpcProc, id, payload Value, headers []Va
 	if cause != nil && (call.silent || call.discard) {
 		logMessage(fb, "Error", causePretty(cause))
 	}
-	key := idKey(id)
 	c.mu.Lock()
-	delete(c.calls, key)
+	delete(c.calls, call.key)
 	idle := c.ended && len(c.calls) == 0
 	c.mu.Unlock()
 	if idle {
@@ -463,4 +496,9 @@ func (c *rpcConn) failureTree(fb *Fiber, p *rpcProc, cause *Cause) Value {
 		}
 	}
 	return exitFailureTree(reasons...)
+}
+
+// A notification has no response in which to carry an input error.
+func (c *rpcConn) dropNotification(reason string) {
+	logMessage(&Fiber{state: newState(), env: c.srv.services}, "Debug", "Dropped RPC notification: "+reason)
 }

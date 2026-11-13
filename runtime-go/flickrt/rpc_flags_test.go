@@ -146,3 +146,97 @@ func TestRPCFlagReplies(t *testing.T) {
 		})
 	}
 }
+
+// JSON-RPC notifications have no wire id. Effect assigns each a fresh internal
+// request id so overlapping notifications do not replace or suppress each other.
+func TestRPCConcurrentNotificationsHaveDistinctTracking(t *testing.T) {
+	started, cleaned := make(chan struct{}, 2), make(chan struct{}, 2)
+	p := rpcProcOf(RpcMake("wait"))
+	handler := Fn(func(*Fiber, Value) Value {
+		return Eff(func(fb *Fiber) Value {
+			fb.owner.add(fb, func(*Fiber, *Cause) Value { cleaned <- struct{}{}; return Unit })
+			started <- struct{}{}
+			wait(fb, make(chan struct{}))
+			return Unit
+		})
+	})
+	env := rootFiber().env.with(loggersKey, []Value{})
+	srv := makeRPCServer(env, &rpcGroup{procs: []*rpcProc{p}}, map[string]Value{"wait": handler})
+	var mu sync.Mutex
+	replies := 0
+	conn := srv.connect(serializationOf(RpcJsonRpc), nil, false, func(Value) { mu.Lock(); replies++; mu.Unlock() }, nil)
+	for range 2 {
+		conn.receive(Rec("_tag", "Request", "id", "", "tag", "wait", "payload", JsonNull, "headers", []Value{}, "isNotification", true))
+	}
+	conn.receive(eofMsg)
+	for range 2 {
+		select {
+		case <-started:
+		case <-time.After(time.Second):
+			t.Error("concurrent notification was dropped")
+		}
+	}
+	conn.abort()
+	done := make(chan struct{})
+	go func() { srv.calls.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("notification cleanup did not finish")
+	}
+	if len(cleaned) != 2 {
+		t.Errorf("cleaned %d notifications, want2", len(cleaned))
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if replies != 0 {
+		t.Errorf("sent %d replies to notifications", replies)
+	}
+}
+
+func TestRPCMalformedHeadersFailOnlyTheirRequest(t *testing.T) {
+	p := rpcProcOf(RpcMake("call"))
+	srv := makeRPCServer(rootFiber().env, &rpcGroup{procs: []*rpcProc{p}}, map[string]Value{"call": Fn(func(*Fiber, Value) Value { return Unit })})
+	var mu sync.Mutex
+	var replies []Value
+	conn := srv.connect(serializationOf(RpcNdjson), nil, false, func(v Value) { mu.Lock(); replies = append(replies, v); mu.Unlock() }, nil)
+	conn.receive(Rec("_tag", "Request", "id", 1.0, "tag", "call", "payload", JsonNull, "headers", []Value{[]Value{}}))
+	conn.receive(Rec("_tag", "Request", "id", 2.0, "tag", "call", "payload", JsonNull, "headers", []Value{}))
+	conn.receive(eofMsg)
+	select {
+	case <-conn.done:
+	case <-time.After(time.Second):
+		conn.abort()
+		t.Fatal("calls did not finish")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(replies) != 2 {
+		t.Fatalf("got %d replies", len(replies))
+	}
+	seen := map[string]bool{}
+	for _, r := range replies {
+		if msgTag(r) != "Exit" {
+			t.Fatalf("malformed request poisoned client: %s", msgTag(r))
+		}
+		id := idKey(msgField(r, "requestId"))
+		seen[id] = true
+		want := "Success"
+		if id == "1" {
+			want = "Failure"
+		}
+		if msgTag(msgField(r, "exit")) != want {
+			t.Errorf("request%s expected%s", id, want)
+		}
+		if id == "1" {
+			const expected = `{"_tag":"Failure","cause":[{"_tag":"Die","defect":"Invalid request headers"}]}`
+			if got := JsonStringify(msgField(r, "exit")); got != expected {
+				t.Errorf("header failure: %s", got)
+			}
+		}
+
+	}
+	if !seen["1"] || !seen["2"] {
+		t.Fatalf("request exits missing: %v", seen)
+	}
+}
