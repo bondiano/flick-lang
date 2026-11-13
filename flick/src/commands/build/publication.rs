@@ -46,7 +46,7 @@ pub(crate) fn write_artifacts(output: &BuildPlan, emitted: &mut Emission, progre
             return;
         }
     }
-    if output.go {
+    if output.go && !output.backend.is_component() {
         let tests = [(build::go::TEST.to_owned(), String::new())];
         let built = if output.suites.is_empty() {
             &output.entries[..]

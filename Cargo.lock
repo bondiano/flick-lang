@@ -794,6 +794,7 @@ version = "0.1.0"
 dependencies = [
  "flick-backend",
  "flick-ir",
+ "serde_json",
 ]
 
 [[package]]

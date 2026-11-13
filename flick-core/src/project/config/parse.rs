@@ -294,6 +294,17 @@ fn config(
         raw.plugins.map(Spanned::into_inner).unwrap_or_default(),
         span,
     )?;
+    let build = match raw.build {
+        Some(build) => {
+            if let Some(backend) = &build.get_ref().backend {
+                backend
+                    .validate()
+                    .map_err(|why| Diagnostic::error(codes::P005, why, span(build.span())))?;
+            }
+            build.into_inner()
+        }
+        None => Build::default(),
+    };
     Ok(Config {
         kind: project.kind,
         source_dir: project.source_dir,
@@ -302,7 +313,7 @@ fn config(
         dependencies,
         js_dependencies,
         package,
-        build: raw.build.map(Spanned::into_inner).unwrap_or_default(),
+        build,
         sql_dialect,
         allow,
         no_let_assert: lint.no_let_assert,

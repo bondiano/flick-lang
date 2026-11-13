@@ -13,7 +13,8 @@ workspace = true
 
 [features]
 # loads plugins built as WebAssembly components; release builds enable it
-wasm-plugins = ["dep:wasmtime", "flick-backend/host"]
+wasm-plugins = ["wasm-backends"]
+wasm-backends = ["dep:wasmtime", "flick-backend/host"]
 
 [dependencies]
 anstyle = "1.0.14"

@@ -4,6 +4,7 @@ use flick_core::project::Project;
 use tracing::debug;
 
 use super::{BuildCommand, BuildPlan, Emission, write_artifacts};
+use crate::backends::Selected;
 use crate::cache;
 use crate::progress::Progress;
 use crate::sources::FsHost;
@@ -16,8 +17,9 @@ impl BuildCommand {
         host: &FsHost,
         progress: &Progress,
         key: &cache::Signed,
+        backend: &Selected,
     ) -> Option<Vec<Diagnostic>> {
-        let output = self.plan(host, Some(project), self.entries(project));
+        let output = self.plan(host, Some(project), self.entries(project), backend);
         if output.extras.schema_aot {
             return None;
         }
@@ -26,8 +28,12 @@ impl BuildCommand {
             debug!(miss = %cache::missed(&project.root, key));
             return None;
         };
+        if !backend.accepts_cached(&artifacts) {
+            return None;
+        }
         let current = cache::artifacts_current(&output.out_dir, &artifacts)
             && (!output.go
+                || output.backend.is_component()
                 || output.entries.iter().all(|(name, _)| {
                     cache::go_current(
                         &project.root,
@@ -37,10 +43,10 @@ impl BuildCommand {
                     )
                 }));
         progress.stage("Restoring cached artifacts");
-        self.record(&output, None, &output.entries);
+        self.record(&output, None, &output.entries, &artifacts);
         if current && !self.generation {
             let mut paths: Vec<String> = artifacts.iter().map(|a| a.path.clone()).collect();
-            if output.go {
+            if output.go && !output.backend.is_component() {
                 paths.extend(
                     output
                         .entries
@@ -108,7 +114,7 @@ impl BuildCommand {
             return;
         };
         let mut paths: Vec<String> = emitted.artifacts.iter().map(|a| a.path.clone()).collect();
-        if output.go {
+        if output.go && !output.backend.is_component() {
             paths.extend(
                 output
                     .entries

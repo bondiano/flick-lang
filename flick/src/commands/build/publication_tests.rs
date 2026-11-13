@@ -1,3 +1,4 @@
+use crate::backends::Selected;
 use std::{env, fs, process};
 
 use flick_backend::{Artifact as BackendArtifact, ArtifactKind};
@@ -13,6 +14,8 @@ fn plan(name: &str) -> BuildPlan {
     let _ = fs::remove_dir_all(&root);
     fs::create_dir_all(root.join("output")).expect("output directory");
     BuildPlan {
+        purpose: super::Purpose::Build,
+        backend: Selected::Native,
         out_dir: root.join("output"),
         entries: vec![],
         typescript: false,

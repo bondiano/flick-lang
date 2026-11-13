@@ -22,9 +22,10 @@ both with IR and plain data without `Compilation` or `Settings`.
 The optional `flick-backend/host` feature executes this world using the
 same Wasmtime configuration and compiled-code cache as the plugin host.
 The literal third-party fixture exercises it as an actual WASM component.
-Registry and CLI integration, official release components, the browser
-loader, atomic publication and tool execution adapters remain separate
-integration work. In particular, accepting a graph here does not execute
+The CLI supports [explicit pinned package selection](registry.md) through
+this world for build/run/test. Projects without a pin still use the temporary
+native baseline. Official release components, the browser loader, atomic
+publication and tool execution adapters remain separate integration work. In particular, accepting a graph here does not execute
 it or establish that a tool's arguments access only declared files.
 
 ## Input boundary

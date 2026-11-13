@@ -126,7 +126,7 @@ fn runner(test: &Ignored) -> Runner {
         ("flick", "sql_postgres", _) => Runner::Postgres,
         ("flick", "conduit", _) => Runner::Conduit,
         ("flick", "plugins", _) => Runner::Plugins,
-        ("flick-backend", "component_host", _) => Runner::Backends,
+        ("flick-backend", "component_host", _) | ("flick", "backends", _) => Runner::Backends,
         ("flick-model", _, _) => Runner::Model,
         ("flick-core", _, "dump" | "dump_explanations" | "write_fixes_of_built_in_signatures")
         | ("flick-pretty", _, "printing_time_grows_linearly") => Runner::Manual,
