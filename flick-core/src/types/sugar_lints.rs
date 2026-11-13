@@ -40,6 +40,9 @@ pub(super) fn is_list_module(module: &str) -> bool {
 
 impl Checker<'_> {
     pub(super) fn sugar_lints(&mut self, node: &Node) {
+        if node.kind == K::BinExpr {
+            return self.operator_lints(node);
+        }
         self.shape_lints(node);
         match node.kind {
             K::DoExpr => {
@@ -54,17 +57,38 @@ impl Checker<'_> {
                 }
             }
             K::MatchExpr => self.rethrowing_match(node),
-            K::BinExpr => {
-                if let Some((function, argument)) = piped(node) {
-                    self.forced(node, function, argument);
-                    self.filter_then_map(node, argument, function);
-                }
-            }
             _ => {}
         }
         let bare = matches!(node.kind, K::Block | K::LetDecl | K::ParenExpr);
         for child in node.nodes() {
             self.lint_child(child, bare);
+        }
+    }
+
+    /// [`Self::sugar_lints`] of a binary operator, and of the operators down
+    /// its left in a loop: a long `a + b + …` would take stack per operator.
+    fn operator_lints(&mut self, node: &Node) {
+        let mut spine = vec![node];
+        loop {
+            let at = spine[spine.len() - 1];
+            self.shape_lints(at);
+            if let Some((function, argument)) = piped(at) {
+                self.forced(at, function, argument);
+                self.filter_then_map(at, argument, function);
+            }
+            let Some(left) = at.nodes().next() else { break };
+            match self.bind_chain(left, false) {
+                Some(parts) => parts.into_iter().for_each(|p| self.lint_child(p, true)),
+                None if left.kind == K::BinExpr => {
+                    spine.push(left);
+                    continue;
+                }
+                None => self.sugar_lints(left),
+            }
+            break;
+        }
+        for child in spine.iter().rev().flat_map(|n| n.nodes().skip(1)) {
+            self.lint_child(child, false);
         }
     }
 
