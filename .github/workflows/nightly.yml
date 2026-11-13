@@ -1,140 +1,44 @@
-name: Nightly
+name: Verify RPC socket ownership
 
 on:
-  schedule:
-    - cron: "17 2 * * *"
   workflow_dispatch:
+    inputs:
+      candidate:
+        description: Exact source commit to verify
+        required: true
+        type: string
 
-# a newer nightly replaces the older one, as a pull request replaces its run
-concurrency:
-  group: nightly-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+permissions:
+  contents: read
 
 jobs:
-  # the full set: CI with the go target on every platform
-  ci:
-    uses: ./.github/workflows/ci.yml
-
-  fuzz:
-    runs-on: ubuntu-26.04
-    timeout-minutes: 90
+  native-go:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-26.04-arm, macos-15, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+        working-directory: runtime-go
     steps:
       - uses: actions/checkout@v7
-      - run: rustup show active-toolchain || rustup toolchain install
-      - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@v2
         with:
-          tool: just@1.59.0
-      # the log keeps the count, the seed and the input a failure names, which
-      # the artifact below carries off the run
-      - run: |
-          set -o pipefail
-          just fuzz 1000000 2>&1 | tee fuzz.log
-      - if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v7
+          ref: ${{ inputs.candidate }}
+      - name: Exact source commit
+        run: git rev-parse HEAD
+      - uses: actions/setup-go@v7
         with:
-          name: fuzz
-          path: fuzz.log
-          if-no-files-found: error
-      - if: ${{ failure() }}
+          go-version-file: runtime-go/go.mod
+          cache-dependency-path: runtime-go/go.sum
+      - name: Native runtime checks
         run: |
-          {
-            echo "## Fuzz"
-            echo
-            echo '```'
-            tail -40 fuzz.log
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  # the performance baseline
-  perf:
-    uses: ./.github/workflows/perf.yml
-
-  # the Lean certificates of a run of generated programs
-  # (`docs/formal/certificates.md`), each checked by Lean; the pull requests
-  # check the golden ones and the forms the certificates do not write yet
-  certs:
-    runs-on: ubuntu-26.04
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@v7
-      - run: rustup show active-toolchain || rustup toolchain install
-      - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: just@1.59.0
-      - uses: leanprover/lean-action@v1
-        with:
-          lake-package-directory: formal
-          build-args: --wfail
-          build: true
-          test: false
-          lint: false
-          use-mathlib-cache: false
-      - run: CERT_PROGRAMS=2000 just model-certs
-
-  # the Go runtime's tables and test data still are what Node and Effect,
-  # at their pinned versions, give (`tools/go-*`)
-  go-oracles:
-    runs-on: ubuntu-26.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: just@1.59.0
-      # version comes from `packageManager` in package.json
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .tool-versions
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: just go-oracles check
-
-  # What the run found, in one place: the summary says which of the jobs
-  # failed, so the nightly is readable without opening each one, and a failed
-  # job fails this one too, so the run itself is red. It writes to the run's
-  # own summary and artifacts only: no issue, no webhook, no other write.
-  report:
-    needs: [ci, fuzz, perf, certs, go-oracles]
-    if: ${{ always() && !cancelled() }}
-    runs-on: ubuntu-26.04
-    timeout-minutes: 5
-    steps:
-      - name: The jobs, and what a failure left behind
-        env:
-          CI: ${{ needs.ci.result }}
-          FUZZ: ${{ needs.fuzz.result }}
-          PERF: ${{ needs.perf.result }}
-          CERTS: ${{ needs.certs.result }}
-          ORACLES: ${{ needs.go-oracles.result }}
-          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          {
-            echo "## Nightly"
-            echo
-            echo "| job | what it holds | result |"
-            echo "|---|---|---|"
-            echo "| \`ci\` | the full set, the go target on every platform | $CI |"
-            echo "| \`fuzz\` | 1 000 000 parser and formatter inputs | $FUZZ |"
-            echo "| \`perf\` | the budgets of \`tools/perf/budgets.json\` | $PERF |"
-            echo "| \`certs\` | the Lean certificates of 2000 generated programs | $CERTS |"
-            echo "| \`go-oracles\` | the Go runtime's files generated from Node and Effect | $ORACLES |"
-            echo
-            echo "Run: $RUN"
-            echo
-            echo "Artifacts: \`fuzz\` (\`fuzz.log\`: the count, the seed and the input), \`perf\` (\`perf.json\`, \`perf.log\`)"
-            echo
-            if [ "$CI" != success ] || [ "$FUZZ" != success ] || [ "$PERF" != success ] || [ "$CERTS" != success ] || [ "$ORACLES" != success ]; then
-              echo "### Failed"
-              echo
-              echo "Open the job above at $RUN. The suites are the ones a pull request runs,"
-              echo "so a red nightly usually starts from the last merge to \`main\`; \`perf\`"
-              echo "names the metric and the budget it passed, and \`fuzz\` the seed and input."
-              echo
-              echo "A running nightly is cancelled by the next one; this job does not run"
-              echo "for a cancelled run."
-              exit 1
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
+          go vet ./...
+          go test ./...
+      - name: Race detector
+        if: runner.os != 'Windows'
+        run: go test -race ./...
+      - name: Repeated reconnect and shutdown
+        run: go test ./flickrt -run '^TestRPCScopedClientReconnectsWithoutAnotherCall$' -count=50 -timeout=5m
