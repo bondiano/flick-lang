@@ -1,5 +1,7 @@
 //! Unit tests of the rules: one accepted and one rejected program each.
 
+mod runtime;
+
 use std::fmt::Debug;
 use std::rc::Rc;
 use std::slice;
