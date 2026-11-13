@@ -6,73 +6,41 @@ import (
 	"time"
 )
 
-func TestRPCSilentCallsOutliveResponseAndJoinOwner(t *testing.T) {
+// Pinned Effect HTTP waits for ClientEnd (all calls, including silent calls).
+// Transport disconnect interrupts every request; the mount owner joins cleanup.
+func TestRPCSilentHTTPCallsWaitAndDisconnect(t *testing.T) {
 	for _, flag := range []string{"discard", "isNotification"} {
 		t.Run(flag, func(t *testing.T) {
-			started, cleaned, finished := make(chan struct{}), make(chan struct{}), make(chan struct{})
-			release := make(chan struct{})
-			var mu sync.Mutex
-			var replies []Value
-			go func() {
-				defer close(finished)
-				owned(rootFiber(), func(fb *Fiber, _ *Owner) Value {
-					p := rpcProcOf(RpcMake("wait"))
-					handler := Fn(func(fb *Fiber, _ Value) Value {
-						return Eff(func(fb *Fiber) Value {
-							fb.owner.add(fb, func(*Fiber, *Cause) Value { close(cleaned); return Unit })
-							close(started)
-							wait(fb, make(chan struct{}))
-							return Unit
-						})
+			started, cleaned := make(chan struct{}), make(chan struct{})
+			owned(rootFiber(), func(fb *Fiber, _ *Owner) Value {
+				p := rpcProcOf(RpcMake("wait"))
+				handler := Fn(func(*Fiber, Value) Value {
+					return Eff(func(fb *Fiber) Value {
+						fb.owner.add(fb, func(*Fiber, *Cause) Value { close(cleaned); return Unit })
+						close(started)
+						wait(fb, make(chan struct{}))
+						return Unit
 					})
-					srv := newRPCServer(fb, &rpcGroup{procs: []*rpcProc{p}}, map[string]Value{"wait": handler})
-					conn := srv.connect(serializationOf(RpcNdjson), nil, true, func(v Value) { mu.Lock(); replies = append(replies, v); mu.Unlock() }, nil)
-					conn.receive(Rec("_tag", "Request", "id", 1.0, "tag", "wait", "payload", JsonNull, "headers", []Value{}, flag, true))
-					conn.receive(eofMsg)
-					wait(fb, started)
-					select {
-					case <-conn.done:
-					case <-time.After(time.Second):
-						t.Error("response waits for silent handler")
-					}
-					conn.abort()
-					select {
-					case <-cleaned:
-						t.Error("disconnect interrupted silent call")
-					default:
-					}
-					<-release
-					return Unit
 				})
-			}()
-			select {
-			case <-started:
-			case <-time.After(2 * time.Second):
-				t.Fatal("handler did not start")
-			}
-			close(release)
-			select {
-			case <-finished:
-			case <-time.After(3 * time.Second):
-				t.Fatal("owner did not join handler")
-			}
-			select {
-			case <-cleaned:
-			default:
-				t.Fatal("owner did not clean handler")
-			}
-			mu.Lock()
-			defer mu.Unlock()
-			want := 0
-			if flag == "discard" {
-				want = 1
-			}
-			if len(replies) != want {
-				t.Fatalf("got %d replies, want %d", len(replies), want)
-			}
-			if want == 1 && msgTag(replies[0]) != "Exit" {
-				t.Fatalf("discard reply is %s", msgTag(replies[0]))
-			}
+				srv := newRPCServer(fb, &rpcGroup{procs: []*rpcProc{p}}, map[string]Value{"wait": handler})
+				conn := srv.connect(serializationOf(RpcNdjson), nil, false, func(Value) {}, nil)
+				conn.receive(Rec("_tag", "Request", "id", 1.0, "tag", "wait", "payload", JsonNull, "headers", []Value{}, flag, true))
+				conn.receive(eofMsg)
+				wait(fb, started)
+				select {
+				case <-conn.done:
+					t.Error("HTTP response ended before silent handler cleanup")
+				default:
+				}
+				conn.abort()
+				select {
+				case <-cleaned:
+				case <-time.After(time.Second):
+					conn.close()
+					t.Error("transport disconnect did not interrupt silent handler")
+				}
+				return Unit
+			})
 		})
 	}
 }

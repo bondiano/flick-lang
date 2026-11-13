@@ -60,23 +60,21 @@ type rpcCall struct {
 	responded bool          // its exit went out already
 	silent    bool          // notification, or an acknowledged discarded call
 	discard   bool
-	pending   bool // a response is still owed
 }
 
 // rpcConn is a client of the server.
 type rpcConn struct {
-	srv          *rpcServer
-	ser          *rpcSerialization
-	headers      []Value       // the transport's, before each request's own
-	acks         bool          // whether the client acknowledges chunks
-	send         func(m Value) // writes a message; safe for concurrent use
-	closer       func()        // closes the transport, or nil
-	mu           sync.Mutex
-	calls        map[string]*rpcCall
-	ended        bool
-	done         chan struct{} // closed once it ended and its calls did
-	once         sync.Once
-	responseOnce sync.Once
+	srv     *rpcServer
+	ser     *rpcSerialization
+	headers []Value       // the transport's, before each request's own
+	acks    bool          // whether the client acknowledges chunks
+	send    func(m Value) // writes a message; safe for concurrent use
+	closer  func()        // closes the transport, or nil
+	mu      sync.Mutex
+	calls   map[string]*rpcCall
+	ended   bool
+	done    chan struct{} // closed once it ended and its calls did
+	once    sync.Once
 }
 
 func (s *rpcServer) connect(ser *rpcSerialization, headers []Value, acks bool, send func(Value), closer func()) *rpcConn {
@@ -97,49 +95,30 @@ func (s *rpcServer) connect(ser *rpcSerialization, headers []Value, acks bool, s
 // finish ends the client once its calls ended.
 func (c *rpcConn) finish() {
 	c.once.Do(func() {
-		c.responseOnce.Do(func() { close(c.done) })
+		close(c.done)
 		c.srv.mu.Lock()
 		delete(c.srv.conns, c)
 		c.srv.mu.Unlock()
 	})
 }
 
-// responseComplete closes the HTTP response independently of owned work.
-// c.mu must be held: silent calls remain registered until their cleanup ends.
-func (c *rpcConn) responseComplete() {
-	if !c.ended {
-		return
-	}
-	for _, call := range c.calls {
-		if call.pending {
-			return
-		}
-	}
-	c.responseOnce.Do(func() { close(c.done) })
-}
-
-func (c *rpcConn) stop(force bool) {
+// abort interrupts every request when its transport disconnects, including
+// notifications and acknowledged discarded calls. EOF alone waits for them.
+func (c *rpcConn) abort() {
 	c.mu.Lock()
 	c.ended = true
 	idle := len(c.calls) == 0
 	for _, call := range c.calls {
-		if force || !call.silent {
-			call.state.interrupt(0)
-		}
+		call.state.interrupt(0)
 	}
-	c.responseComplete()
 	c.mu.Unlock()
 	if idle {
 		c.finish()
 	}
 }
 
-// A disconnected transport cannot cancel notifications or acknowledged work.
-func (c *rpcConn) abort() { c.stop(false) }
-
-// Closing the mounted group interrupts and joins every call, including silent work.
 func (c *rpcConn) close() {
-	c.stop(true)
+	c.abort()
 	if c.closer != nil {
 		c.closer()
 	}
@@ -206,7 +185,6 @@ func (c *rpcConn) receive(m Value) {
 		c.mu.Lock()
 		c.ended = true
 		idle := len(c.calls) == 0
-		c.responseComplete()
 		c.mu.Unlock()
 		if idle {
 			c.finish()
@@ -287,7 +265,7 @@ func (c *rpcConn) request(m Value) {
 		return
 	}
 	headers := append(c.headers[:len(c.headers):len(c.headers)], asList(msgField(m, "headers"))...)
-	call := &rpcCall{state: newState(), silent: notification, pending: !notification, discard: !notification && msgField(m, "discard") == true}
+	call := &rpcCall{state: newState(), silent: notification, discard: !notification && msgField(m, "discard") == true}
 	if p.stream && c.acks {
 		call.ack = make(chan struct{}, 1)
 	}
@@ -351,7 +329,6 @@ func (c *rpcConn) run(call *rpcCall, p *rpcProc, id, payload Value, headers []Va
 	key := idKey(id)
 	c.mu.Lock()
 	delete(c.calls, key)
-	c.responseComplete()
 	idle := c.ended && len(c.calls) == 0
 	c.mu.Unlock()
 	if idle {
@@ -395,10 +372,6 @@ func (c *rpcConn) serve(fb *Fiber, call *rpcCall, p *rpcProc, id, payload Value,
 		call.silent = true
 		c.mu.Unlock()
 		c.exit(&layout, id, exitSuccessTree(JsonNull))
-		c.mu.Lock()
-		call.pending = false
-		c.responseComplete()
-		c.mu.Unlock()
 	})
 	if !p.stream {
 		return result
