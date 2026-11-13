@@ -24,6 +24,9 @@ jobs:
         shell: bash
         working-directory: runtime-go
     steps:
+      - name: Preserve fixture line endings
+        working-directory: .
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.candidate }}
