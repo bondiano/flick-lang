@@ -10,6 +10,6 @@ use flick_ir::Exports;
 /// arrows a call supplies.
 pub(super) fn sync_exports(exports: &Exports) -> HashMap<String, usize> {
     (exports.values.iter())
-        .filter_map(|(name, sync)| Some((names::ident(name), (*sync)?)))
+        .filter_map(|v| Some((names::ident(&v.name), v.sync?)))
         .collect()
 }

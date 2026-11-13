@@ -1,7 +1,7 @@
 //! The exports of a module as its IR gives them to the backend: its own
 //! values, with the stages of a Sync one, and what it exports of others.
 
-use flick_ir::{Exports, Namespace as IrNamespace, Reexport};
+use flick_ir::{Exported, Exports, Namespace as IrNamespace, Reexport};
 
 use crate::iface::{Decl, Interface, Namespace};
 use crate::types::Type;
@@ -14,7 +14,8 @@ pub fn exports(module: &str, interface: &Interface) -> Exports {
         if entity.module == module {
             if entity.namespace == Namespace::Value {
                 let sync = export.scheme.as_ref().and_then(sync_stages);
-                out.values.insert(entity.name.clone(), sync);
+                let name = entity.name.clone();
+                out.values.push(Exported { name, sync });
             }
             continue;
         }

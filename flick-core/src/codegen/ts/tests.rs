@@ -1,7 +1,7 @@
 use crate::types::Elided;
 use std::fmt::Write;
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use super::{Projection, Typing, declaration_file};
 use crate::codegen::test_options::resolved_by;
@@ -407,7 +407,7 @@ fn a_release_build_in_typescript_types_a_constructed_value_as_its_constructor_do
         let lang = lang_items();
         let known = Known::of(&lang);
         let options = Options {
-            builtins: &BTreeSet::new(),
+            builtins: &[],
             packages: &BTreeMap::new(),
             resolved: &resolved,
             typescript: typescript.then_some(&typing),

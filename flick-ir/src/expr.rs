@@ -39,9 +39,8 @@ pub struct Module {
 /// host call, and what it exports of other modules.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Exports {
-    /// Each exported value of the module itself, with the arrows a call
-    /// supplies when its last stage is Sync.
-    pub values: BTreeMap<String, Option<usize>>,
+    /// The exported values of the module itself.
+    pub values: Vec<Exported>,
     /// The entities of other modules the module exports.
     pub reexports: Vec<Reexport>,
 }
@@ -50,6 +49,14 @@ impl Exports {
     pub fn is_empty(&self) -> bool {
         self.values.is_empty() && self.reexports.is_empty()
     }
+}
+
+/// An exported value of a module itself: its name, and the arrows a call
+/// supplies when its last stage is Sync.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Exported {
+    pub name: String,
+    pub sync: Option<usize>,
 }
 
 /// An entity of another module that a module exports.

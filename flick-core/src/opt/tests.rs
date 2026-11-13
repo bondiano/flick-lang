@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::build::builtin_modules;
 use crate::codegen::test_options::resolved_by;
@@ -47,7 +47,7 @@ pub(super) fn release_with(text: &str, workers: &HashMap<(String, String), usize
     let lang = lang_items();
     let known = Known::of(&lang);
     let options = Options {
-        builtins: &BTreeSet::new(),
+        builtins: &[],
         packages: &BTreeMap::new(),
         resolved: &resolved,
         typescript: None,
@@ -265,7 +265,7 @@ fn known_instances_and_plain_foreigns_are_called_directly() {
     let known = Known::of(&lang);
     let resolved = resolved_by(&ir, &str::to_owned);
     let options = Options {
-        builtins: &BTreeSet::new(),
+        builtins: &[],
         packages: &BTreeMap::new(),
         resolved: &resolved,
         typescript: None,
@@ -304,7 +304,7 @@ fn a_native_binding_with_a_schema_is_called_directly_on_flicks_runtime() {
     let lang = lang_items();
     let known = Known::of(&lang);
     let options = Options {
-        builtins: &BTreeSet::new(),
+        builtins: &[],
         packages: &BTreeMap::new(),
         resolved: &resolved,
         typescript: None,

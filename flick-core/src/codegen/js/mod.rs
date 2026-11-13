@@ -80,9 +80,9 @@ pub(crate) fn js_at(
         // the wrapper of a Sync export is the runtime's
         g.runtime |= !g.sync_exports.is_empty();
     }
-    let typed = options.typescript.map(|t| t.typed(&module.name, physical));
-    if let Some(typed) = &typed {
-        g.annotations.clone_from(&typed.annotations);
+    let mut typed = options.typescript.map(|t| t.typed(&module.name, physical));
+    if let Some(typed) = &mut typed {
+        g.annotations = mem::take(&mut typed.annotations);
     }
     let body = g.items(&module.items);
     let mut code = String::new();
@@ -101,7 +101,7 @@ pub(crate) fn js_at(
     code.push_str(&body);
     // a module exposing what it imports: JS consumers find it here too
     let mut barrel = Vec::new();
-    if physical == module.name && !options.builtins.contains(module.name.as_str()) {
+    if physical == module.name && !options.builtins.contains(&module.name.as_str()) {
         let path = |m: &str| relative(&here, &options.path(m));
         let entities: Vec<(&str, Namespace, &str)> = (module.exports.reexports.iter())
             .filter(|r| r.namespace != Namespace::Type || options.typescript())
@@ -125,9 +125,11 @@ pub(crate) fn js_at(
         #[cfg(feature = "native-project")]
         &g.names,
     );
-    let imports = g.imports.into_iter();
-    let imports = imports.chain(typed.into_iter().flat_map(|t| t.modules));
-    output.imports = imports.chain(barrel).collect();
+    output.imports = g.imports.into_iter().collect();
+    output
+        .imports
+        .extend(typed.into_iter().flat_map(|t| t.modules));
+    output.imports.extend(barrel);
     output
 }
 
@@ -170,7 +172,7 @@ impl<'a> Gen<'a> {
             sync_exports: HashMap::new(),
             workers: if options.release {
                 let exported = |name: &str| {
-                    module.exports.values.contains_key(name)
+                    module.exports.values.iter().any(|v| v.name == name)
                         || module
                             .initialization
                             .prefixes

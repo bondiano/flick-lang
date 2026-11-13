@@ -15,7 +15,7 @@ pub use crate::effects;
 pub(crate) use crate::effects::bindings;
 pub use abi::interface;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::collections::{HashMap, HashSet};
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, OnceLock};
@@ -27,7 +27,7 @@ use crate::clock::{micros, timed};
 #[cfg(feature = "native-project")]
 use crate::codegen::sourcemap;
 use crate::codegen::ts::{Facade, Projection, Typing, declaration_file, facade_files};
-use crate::codegen::{self, EffectBridge, Known, Labels, Options};
+use crate::codegen::{self, EffectBridge, Known, Labels, Options, Resolved};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 #[cfg(feature = "native-project")]
 use crate::iface;
@@ -142,11 +142,14 @@ pub fn emit(
         }
     }
     let modules = &compilation.modules;
-    let builtin_names: BTreeSet<&str> = types::builtin_sources().iter().map(|(n, _)| *n).collect();
+    let builtin_names: Vec<&str> = types::builtin_sources().iter().map(|(n, _)| *n).collect();
     let path = |m: &str| codegen::module_path(&builtin_names, settings.typescript, m);
-    let packages: BTreeMap<String, String> = (modules.iter())
-        .filter_map(|c| Some((c.name.clone(), c.ir.package.clone()?)))
-        .collect();
+    let mut packages = BTreeMap::new();
+    for c in modules {
+        if let Some(package) = &c.ir.package {
+            packages.insert(c.name.clone(), package.clone());
+        }
+    }
     let package = |m: &str| packages.get(m).cloned();
     let published_interfaces = published_interfaces(compilation, settings);
     let interface_of = |m: &str| published_interfaces.get(m).cloned();
@@ -225,9 +228,9 @@ fn resolved(
     settings: &Settings,
     by_class: bool,
     foreign: &dyn Fn(&str, &str) -> String,
-) -> BTreeMap<(String, String), String> {
+) -> Vec<Resolved> {
     let own = compilation.modules.iter().map(|c| &c.ir);
-    let mut out = BTreeMap::new();
+    let mut out: Vec<Resolved> = Vec::new();
     for module in own.chain(builtin_modules_of(by_class)) {
         for item in &module.items {
             let ir::ItemKind::Foreign(f) = &item.kind else {
@@ -238,10 +241,15 @@ fn resolved(
             };
             let ui = settings.ui.is_some() && bindings::UI_RENDERER.contains(&spec);
             let relative = spec.starts_with("./") || spec.starts_with("../");
-            if ui || relative || compilation.shipped_foreign(&module.name, spec).is_some() {
-                let key = (module.name.clone(), spec.to_owned());
-                out.entry(key)
-                    .or_insert_with(|| foreign(&module.name, spec));
+            let known = |r: &Resolved| r.module == module.name && r.spec == spec;
+            if (ui || relative || compilation.shipped_foreign(&module.name, spec).is_some())
+                && !out.iter().any(known)
+            {
+                out.push(Resolved {
+                    module: module.name.clone(),
+                    spec: spec.to_owned(),
+                    specifier: foreign(&module.name, spec),
+                });
             }
         }
     }

@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use super::test_options::resolved_by;
 use super::{EffectBridge, Known, Labels, Options, js};
@@ -19,7 +19,7 @@ pub(super) fn compile_with(text: &str, release: bool, labels: Labels) -> super::
     let lang = lang_items();
     let known = Known::of(&lang);
     let options = Options {
-        builtins: &BTreeSet::new(),
+        builtins: &[],
         packages: &packages,
         resolved: &resolved,
         typescript: None,
@@ -64,7 +64,7 @@ fn on_rt_with_bridge(text: &str, effect_bridge: EffectBridge) -> String {
     let lang = lang_items();
     let known = Known::of(&lang);
     let options = Options {
-        builtins: &BTreeSet::new(),
+        builtins: &[],
         packages: &BTreeMap::new(),
         resolved: &resolved,
         typescript: None,

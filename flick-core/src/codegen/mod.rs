@@ -60,7 +60,7 @@ impl EffectBridge {
     }
 }
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::effects::runtime_specifier;
 #[cfg(feature = "native-project")]
@@ -69,10 +69,18 @@ use crate::source::Span;
 /// The directory of the output under which the built-in modules are.
 pub const BUILTIN_DIR: &str = "_flick";
 
+/// The import specifier the build gives the foreign module `spec` named in
+/// `module`.
+pub struct Resolved {
+    pub module: String,
+    pub spec: String,
+    pub specifier: String,
+}
+
 /// Where modules are and who owns them, as the build lays them out.
 pub struct Options<'a> {
     /// The built-in modules, written under [`BUILTIN_DIR`].
-    pub builtins: &'a BTreeSet<&'a str>,
+    pub builtins: &'a [&'a str],
     /// The package of each module that belongs to one, for its constructor
     /// ids.
     pub packages: &'a BTreeMap<String, String>,
@@ -80,7 +88,7 @@ pub struct Options<'a> {
     /// module, by the two: one named relative to its module, shipped beside
     /// it, or the renderer `[build] ui` stands for. Another is a package's,
     /// which the runtime decides (see [`Options::foreign`]).
-    pub resolved: &'a BTreeMap<(String, String), String>,
+    pub resolved: &'a [Resolved],
     /// Emit TypeScript (`--emit ts`) instead of JavaScript: with the types
     /// of the exports, which the projection of the interfaces gives.
     pub typescript: Option<&'a ts::Typing<'a>>,
@@ -118,8 +126,11 @@ impl Options<'_> {
 
     /// The import specifier of a foreign module `spec` named in `module`.
     pub fn foreign(&self, module: &str, spec: &str) -> String {
-        let key = (module.to_owned(), spec.to_owned());
-        (self.resolved.get(&key).cloned()).unwrap_or_else(|| runtime_specifier(self.rt, spec))
+        let found = self
+            .resolved
+            .iter()
+            .find(|r| r.module == module && r.spec == spec);
+        found.map_or_else(|| runtime_specifier(self.rt, spec), |r| r.specifier.clone())
     }
 
     /// The package `module` belongs to, if any.
@@ -143,10 +154,10 @@ impl Options<'_> {
 
 /// The output path of `module`, relative to the output directory, in
 /// TypeScript or JavaScript: the built-in modules are under [`BUILTIN_DIR`].
-pub fn module_path(builtins: &BTreeSet<&str>, typescript: bool, module: &str) -> String {
+pub fn module_path(builtins: &[&str], typescript: bool, module: &str) -> String {
     let ext = if typescript { "ts" } else { "js" };
     let file = format!("{}.{ext}", module.replace('.', "/"));
-    if builtins.contains(module) {
+    if builtins.contains(&module) {
         format!("{BUILTIN_DIR}/{file}")
     } else {
         file
