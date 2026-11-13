@@ -31,7 +31,6 @@ Effect.Core.yield_now_with
 Effect.Errors.catch_cause
 Effect.Errors.catch_cause_filter
 Effect.Errors.catch_cause_if
-Effect.Errors.catch_defect
 Effect.Errors.ignore_
 Effect.Errors.ignore_cause
 Effect.Errors.match_cause_eager

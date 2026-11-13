@@ -1,0 +1,13 @@
+{
+  "flipped structured Json": "0b2000080861017808620179",
+  "literal block": "0e20f0e0b5a239014189c386c37504",
+  "tagged codec union": "0c200a22c69a1489c386c37504",
+  "string record": "0b2000080861017808620179",
+  "entries": "09200006096102096204",
+  "bool tree true": "052074727565",
+  "bool tree false": "062066616c7365",
+  "bigint tree": "03203432",
+  "record tree": "082090d888837b0178",
+  "unknown union field": "1220d8aa96cf700b0a8fc49a1389c386c37504",
+  "unknown union element": "0e20010b0a8fc49a1389c386c37504"
+}

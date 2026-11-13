@@ -150,3 +150,16 @@ request, cookie included. Passing a guarded function to `Server.handler`
 directly is a type error, and so is a function that needs `Session`
 without listing `Server.Unauthorized` under `authenticated`: the session
 would be left to whoever serves it.
+
+## On the go target
+
+A server entry built with `emit = "go"` serves `server fn` as one built
+for the js target does: `Server.handler` answers the same POSTs of
+`Server.path`, calls made in its process run in memory, and the calls of
+other programs go to `FLICK_SERVER_URL`. So a Go backend serves a
+frontend built for the js target from the same modules: build the client
+entry for js and the server entry for go, each with its own `flick.toml`.
+
+Neither server adds CORS headers: a page served from the same origin as
+the functions calls them as it is, and a frontend on another origin needs
+a CORS middleware on the router of `Server.handler`, on either target.

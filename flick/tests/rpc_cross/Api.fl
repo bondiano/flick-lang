@@ -1,0 +1,63 @@
+// What the server and the client of the cross-target RPC test share: the
+// procedures of two groups and two server functions, one of them guarded.
+module App.Api exposing (..)
+
+import Stream.Core exposing (Stream)
+
+type error NotFound = NotFound { id : Float }
+  deriving Schema
+
+type error Unauthorized = Unauthorized
+  deriving Schema
+
+/// Who calls.
+service Session =
+  user : Unit ->{} String
+
+session : String -> Session.Impl
+let session name = { user = fun () -> name }
+
+double : Rpc.Rpc "double" (Float ->{r; NotFound} Float)
+let double =
+  Rpc.make (Record.label : Record.Label "double")
+    |> Rpc.with_payload (Codec.json Schema.number)
+    |> Rpc.with_success (Codec.json Schema.number)
+    |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (NotFound.schema)))
+
+count_to : Rpc.Rpc "count_to" (Float ->{r; NotFound} Stream none none Float)
+let count_to =
+  Rpc.make (Record.label : Record.Label "count_to")
+    |> Rpc.with_payload (Codec.json Schema.number)
+    |> Rpc.with_stream (Codec.json Schema.number)
+    |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (NotFound.schema)))
+
+type alias Numbers r =
+  { double : Float ->{r; NotFound} Float; count_to : Float ->{r; NotFound} Stream none none Float }
+
+numbers : Rpc.Group r (Numbers r)
+let numbers = Rpc.group |> Rpc.add double |> Rpc.add count_to
+
+/// The session the `authorization` header names.
+check : Rpc.Call Unit ->{; Unauthorized} Session.Impl
+let check call =
+  match Http.Headers.get "authorization" call.headers with
+  | Some "Bearer ada" -> session "ada"
+  | _ -> from_result (Err Unauthorized)
+
+me : Rpc.Rpc "me" (Unit ->{Session; Unauthorized} String)
+let me =
+  Rpc.make (Record.label : Record.Label "me")
+    |> Rpc.with_success (Codec.json Schema.string)
+    |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (Unauthorized.schema)))
+    |> Rpc.with_auth Session check
+
+type alias Secured = { me : Unit ->{Session; Unauthorized} String }
+
+secured : Rpc.Group none Secured
+let secured = Rpc.authenticated Session (Rpc.group |> Rpc.add me)
+
+twice : String ->{Server.Server;} String
+server fn twice word = word ++ word
+
+whoami : Unit ->{Server.Server, Session; Server.Unauthorized} String
+server fn whoami () = Session.user ()

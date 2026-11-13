@@ -1,0 +1,62 @@
+// The server of the cross-target RPC test: the groups over HTTP and
+// WebSocket in several serializations, and the server functions on a
+// router; it prints its ports and runs until it is stopped.
+module App.Main exposing (main)
+
+import App.Api exposing (..)
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+
+/// The session of a `user=<name>` cookie.
+by_cookie : Http.Headers.Headers ->{; Server.Unauthorized} Session.Impl
+let by_cookie headers =
+  match Http.Headers.get "cookie" headers with
+  | Some "user=ada" -> session "ada"
+  | _ -> from_result (Err Server.Unauthorized)
+
+handlers : Numbers none
+let handlers =
+  {
+    double = fun n -> if n < 0 then from_result (Err (NotFound { id = n })) else n * 2;
+    count_to = fun n ->
+      if n < 0 then from_result (Err (NotFound { id = n }))
+      else Stream.from_list (List.map Int.to_float (List.range 1 (Int.truncate n + 1)));
+  }
+
+serving : Rpc.Serialization -> Rpc.ServeOptions
+let serving serialization = { Rpc.defaults with serialization = serialization }
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  provide (Layer.merge Server.node Http.Server.layer_services) {
+    try
+      scope s {
+        let http = Rpc.listen Rpc.defaults numbers handlers
+        let binary = Rpc.listen (serving Rpc.binary) numbers handlers
+        let json_rpc = Rpc.listen (serving Rpc.json_rpc) numbers handlers
+        let ws = Rpc.listen_websocket (serving Rpc.json) numbers handlers
+        let ws_binary = Rpc.listen_websocket (serving Rpc.binary) numbers handlers
+        let auth_http = Rpc.listen Rpc.defaults secured { me = fun () -> Session.user () }
+        let auth_ws = Rpc.listen_websocket Rpc.defaults secured { me = fun () -> Session.user () }
+        functions : (ServerRequest ->{Async} ServerResponse)^{s}
+        let functions =
+          Server.handler (Server.authenticated Session by_cookie [server whoami] ++ [server twice])
+        app : (ServerRequest ->{Async, Server.Server; Http.ServerError.HttpServerError} ServerResponse)^{s}
+        let app =
+          Http.Router.router Http.Router.config
+            [Http.Router.route (Some Http.Method.POST) Server.path functions]
+        let options : Http.Server.ServeOptions =
+          { host = "127.0.0.1"; port = 0; gracefulShutdownTimeout = None }
+        let server = Http.Server.serve options app
+        let ports = List.map (fun p -> show p) [
+          Rpc.port http, Rpc.port binary, Rpc.port json_rpc, Rpc.port ws, Rpc.port ws_binary,
+          Rpc.port auth_http, Rpc.port auth_ws,
+        ]
+        Platform.stdout_line
+          ("ports " ++ String.join " " ports ++ " " ++ Http.Server.format_address (Http.Server.address server))
+        Effect.never ()
+      }
+    with
+    | Rpc.ServeError message -> Platform.stdout_line ("serve: " ++ message)
+    | Http.ServerError.ServeError _ -> Platform.stdout_line "serve failed"
+  }

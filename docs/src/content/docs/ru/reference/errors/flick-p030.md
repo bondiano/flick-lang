@@ -1,11 +1,11 @@
 ---
 title: "FLICK-P030"
-source_hash: "455d2323cf23a53f"
+source_hash: "3513640d2f9e1b56"
 ---
 
 `emit = "go"` собирает программу для цели go и импортирует модуль,
 который существует только для цели js, или пакетный модуль, не скомпилированный для
-go. Веб-интерфейс (`Ui`, `Atom`, `Reactivity.Atom`, `Action`), `Rpc`,
+go. Веб-интерфейс (`Ui`, `Atom`, `Reactivity.Atom`, `Action`),
 `Otlp`, `DevTools`, JS-взаимодействие (`Js`) и JS-хосты (`Runner.Node`,
 `Runner.Browser`, `Runner.Cloudflare`) существуют только для js; интерфейс пакета
 указывает цели, для которых он был скомпилирован.

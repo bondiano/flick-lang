@@ -1337,6 +1337,7 @@
 @flick-lang/runtime/rt/effect/Effect ensuring
 @flick-lang/runtime/rt/effect/Effect flickAddFinalizer
 @flick-lang/runtime/rt/effect/Effect flickAll
+@flick-lang/runtime/rt/effect/Effect flickCatchDefect
 @flick-lang/runtime/rt/effect/Effect flickExit
 @flick-lang/runtime/rt/effect/Effect flickFailCauseSync
 @flick-lang/runtime/rt/effect/Effect flickFiberId

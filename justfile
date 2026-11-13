@@ -79,7 +79,7 @@ go-oracles mode="":
     #!/usr/bin/env bash
     set -euo pipefail
     for s in go-arbitrary/gen go-cli/complete go-cli/parity go-collate/gen go-dates/gen go-encoding/gen \
-        go-glob/gen go-intl/gen go-mime/gen go-path/gen go-unicode/gen go-unicode/graphemes; do
+        go-glob/gen go-intl/gen go-mime/gen go-path/gen go-rpc/envelopes go-unicode/gen go-unicode/graphemes; do
         node "tools/$s.mjs"
     done
     if [ "{{mode}}" = check ] && [ -n "$(git status --porcelain -- runtime-go/flickrt)" ]; then

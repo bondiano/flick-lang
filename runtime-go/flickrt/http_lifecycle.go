@@ -17,13 +17,16 @@ type httpRequests struct {
 	done    chan struct{}
 }
 
+const serverRequestKey = "flick/http/CurrentRequest"
+
 type servedRequest struct {
-	state   fiberState
-	fiber   Fiber
-	source  requestSource
-	marks   requestMarks
-	request ServerRequest
-	exit    *Cause
+	upgrades *upgrades
+	state    fiberState
+	fiber    Fiber
+	source   requestSource
+	marks    requestMarks
+	request  ServerRequest
+	exit     *Cause
 }
 
 func (q *servedRequest) interrupt() { q.state.interrupt(0) }
@@ -115,6 +118,10 @@ func (q *servedRequest) respond(fb *Fiber, w http.ResponseWriter, handler Value)
 		}
 	}
 	// The request owner stays live through pre-response hooks and body writes.
+	if resp := out.(*ServerResponse); resp.upgrade != nil {
+		q.upgrades.take(w, resp.upgrade)
+		return Unit
+	}
 	if writeResponse(w, out.(*ServerResponse), fb) {
 		panic(http.ErrAbortHandler)
 	}

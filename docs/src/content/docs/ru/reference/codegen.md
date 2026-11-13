@@ -1,6 +1,6 @@
 ---
 title: "Генерация кода"
-source_hash: b62c4c57fb6becfb
+source_hash: cf17e9cc21d9f344
 ---
 
 `flick build` компилирует каждый модуль в ES-модуль (см. [Генерация TypeScript и граница FFI](../../spec/06-typescript-and-ffi/), [Архитектура компилятора](../../contributing/implementation-decisions/#архитектура-компилятора)).
@@ -457,7 +457,9 @@ Go-реализации: в runtime для стандартной библиот
 за пределами ядра такой реализации пока нет (большая часть `Stream`, очереди, расписания
 сверх `recurs`, часть `Codec`) — или рядом с программой для её собственных
 привязок (см. [FFI](../ffi/#go-target)). Модули только для js-target дают
-`FLICK-P030` уже в `flick check`.
+`FLICK-P030` уже в `flick check`. `Rpc` и `server fn` говорят на протоколе
+js-target, поэтому Go-бэкенд обслуживает JS-фронтенд (см.
+[Типизированные RPC](../rpc/#на-go-target)).
 
 Представление значений — как у JS-target, в терминах Go:
 
