@@ -239,4 +239,37 @@ mod tests {
         #[cfg(feature = "cbor")]
         assert_eq!(Program::from_cbor(&p.to_cbor()), Ok(p));
     }
+
+    #[test]
+    fn the_exports_of_a_module_survive_both_forms_as_a_reader_is_told() {
+        let mut p = program(1.0);
+        // a module that exports nothing says nothing about it
+        let written: serde_json::Value = serde_json::from_str(&p.to_json()).expect("JSON");
+        assert_eq!(written["modules"][0].get("exports"), None);
+        assert_eq!(Program::from_json(&p.to_json()), Ok(p.clone()));
+
+        let value = |name: &str, sync| crate::Exported {
+            name: name.to_owned(),
+            sync,
+        };
+        p.modules[0].exports = crate::Exports {
+            values: vec![value("parse", Some(2)), value("x", None)],
+            reexports: vec![crate::Reexport {
+                module: "Http.Url".to_owned(),
+                namespace: Namespace::Type,
+                name: "Url".to_owned(),
+            }],
+        };
+        let written: serde_json::Value = serde_json::from_str(&p.to_json()).expect("JSON");
+        assert_eq!(
+            written["modules"][0]["exports"],
+            serde_json::json!({
+                "values": [{ "name": "parse", "sync": 2 }, { "name": "x", "sync": null }],
+                "reexports": [{ "module": "Http.Url", "namespace": "type", "name": "Url" }],
+            })
+        );
+        assert_eq!(Program::from_json(&p.to_json()), Ok(p.clone()));
+        #[cfg(feature = "cbor")]
+        assert_eq!(Program::from_cbor(&p.to_cbor()), Ok(p));
+    }
 }

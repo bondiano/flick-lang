@@ -43,26 +43,30 @@ flick_plugin::export!(Pairs);
 
 impl Plugin for Pairs {
     /// The IR with each string `"hello"` as `"HELLO"`; a string `"break the
-    /// IR"` becomes a local nothing binds, and a module with a string `"move
-    /// the package"` goes to another package.
+    /// IR"` becomes a local nothing binds, a module with a string `"move
+    /// the package"` goes to another package, and one with `"hide the
+    /// exports"` exports nothing.
     fn transform(&self, program: Vec<u8>) -> Result<Vec<u8>, Vec<Diagnostic>> {
         let mut program = flick_ir::Program::from_cbor(&program)
             .map_err(|e| vec![Diagnostic::error(e.to_string(), Span::default())])?;
         for module in &mut program.modules {
-            let mut moved = false;
+            let mut said = Said::default();
             for item in &mut module.items {
                 match &mut item.kind {
-                    flick_ir::ItemKind::Value { body, .. } => shout(body, &mut moved),
+                    flick_ir::ItemKind::Value { body, .. } => shout(body, &mut said),
                     flick_ir::ItemKind::Instance { methods, .. } => {
                         for (_, body) in methods {
-                            shout(body, &mut moved);
+                            shout(body, &mut said);
                         }
                     }
                     _ => {}
                 }
             }
-            if moved {
+            if said.moved {
                 module.package = Some("elsewhere".into());
+            }
+            if said.hidden {
+                module.exports = flick_ir::Exports::default();
             }
         }
         Ok(program.to_cbor())
@@ -371,16 +375,25 @@ fn refuse(token: Token, message: &str) -> Diagnostic {
     Diagnostic::error(message, token.span)
 }
 
+/// What the strings of a module ask of its metadata: `"move the package"`
+/// and `"hide the exports"`.
+#[derive(Default)]
+struct Said {
+    moved: bool,
+    hidden: bool,
+}
+
 /// `e` with each string `"hello"` in it as `"HELLO"`, and `"break the IR"`
-/// as a local nothing binds; `moved` when a string says `"move the package"`.
-fn shout(e: &mut flick_ir::Expr, moved: &mut bool) {
+/// as a local nothing binds; `said` holds what its strings ask.
+fn shout(e: &mut flick_ir::Expr, said: &mut Said) {
     if let flick_ir::ExprKind::Lit(flick_ir::Lit::String(s)) = &mut e.kind {
-        *moved |= s == "move the package";
+        said.moved |= s == "move the package";
+        said.hidden |= s == "hide the exports";
         if s == "hello" {
             *s = "HELLO".into();
         } else if s == "break the IR" {
             e.kind = flick_ir::ExprKind::Local("dangling".into());
         }
     }
-    e.each_child_mut(&mut |child| shout(child, moved));
+    e.each_child_mut(&mut |child| shout(child, said));
 }
