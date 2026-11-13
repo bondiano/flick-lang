@@ -104,4 +104,18 @@ fn a_wasm_plugin_rewrites_the_ir_a_build_compiles() {
         stderr.contains("FLICK-P047") && stderr.contains("their packages or exports"),
         "{stderr}"
     );
+    // and its exports are what the other modules and the host call
+    fs::write(root.join("app/src/App/Main.fl"), main("hide the exports")).expect("write");
+    let built = flick(&root, &["build"]);
+    let stderr = String::from_utf8_lossy(&built.stderr);
+    assert!(!built.status.success(), "{stderr}");
+    assert!(
+        stderr.contains("FLICK-P047") && stderr.contains("their packages or exports"),
+        "{stderr}"
+    );
+    // the same module builds when the plugin leaves both as they were
+    fs::write(root.join("app/src/App/Main.fl"), main("keep the exports")).expect("write");
+    let built = flick(&root, &["build"]);
+    let stderr = String::from_utf8_lossy(&built.stderr);
+    assert!(built.status.success(), "{stderr}");
 }
