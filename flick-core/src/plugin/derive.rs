@@ -109,10 +109,12 @@ pub fn target(
         .filter(|n| n.kind == K::TypeParam)
         .filter_map(|p| {
             let name = p.child_tokens().find(|t| t.kind == K::Ident)?.text(text);
-            // `(f : Type -> Type)`: its kind as written, spaces collapsed
+            // Canonical token spacing, independent of how the kind was written.
             let kind = p.nodes().next().map_or_else(String::new, |k| {
-                k.text(text)
-                    .split_whitespace()
+                k.tokens()
+                    .iter()
+                    .filter(|t| !t.kind.is_trivia())
+                    .map(|t| t.text(text))
                     .collect::<Vec<_>>()
                     .join(" ")
             });

@@ -25,7 +25,23 @@ pub fn written(node: &Node, text: &str, origin: u32) -> Written {
         },
         K::NameType => named(node, text, Vec::new()),
         K::AppType => match children.split_first() {
-            Some((head, args)) if head.kind == K::NameType => named(head, text, each(args)),
+            Some((head, args)) => match written(head, text, origin).kind {
+                WrittenKind::Con {
+                    name,
+                    args: mut before,
+                } => {
+                    before.extend(each(args));
+                    WrittenKind::Con { name, args: before }
+                }
+                WrittenKind::Var {
+                    name,
+                    args: mut before,
+                } => {
+                    before.extend(each(args));
+                    WrittenKind::Var { name, args: before }
+                }
+                _ => WrittenKind::Other,
+            },
             _ => WrittenKind::Other,
         },
         K::TupleType => WrittenKind::Tuple(each(&children)),
@@ -192,5 +208,51 @@ mod tests {
             WrittenKind::Generic
         );
         assert_eq!(of("Show a => a -> String").0.kind, WrittenKind::Generic);
+    }
+    #[test]
+    fn grouped_heads_keep_all_type_arguments() {
+        for (source, expected, names) in [
+            ("(List) Int", "List", vec!["Int"]),
+            ("(f) Int", "f", vec!["Int"]),
+            ("(Result String) Int", "Result", vec!["String", "Int"]),
+        ] {
+            let ty = of(source).0;
+            let (name, args) = match ty.kind {
+                WrittenKind::Con { name, args } | WrittenKind::Var { name, args } => (name, args),
+                other => panic!("{source}: {other:?}"),
+            };
+            assert_eq!(name, expected);
+            let actual: Vec<&str> = args
+                .iter()
+                .map(|a| match &a.kind {
+                    WrittenKind::Con { name, args } if args.is_empty() => name.as_str(),
+                    other => panic!("a named argument: {other:?}"),
+                })
+                .collect();
+            assert_eq!(actual, names);
+        }
+    }
+
+    #[test]
+    fn derive_parameter_kinds_are_independent_of_whitespace() {
+        use crate::plugin::derive::target;
+        use std::sync::Arc;
+        for kind in ["Type -> Type", "Type->Type", "Type  ->Type"] {
+            let text: Arc<str> = format!("type Box (f : {kind}) a = Box (f a)\n").into();
+            let file = FileId::default();
+            let tree = parse(&text, file);
+            assert!(tree.diagnostics.is_empty(), "{:?}", tree.diagnostics);
+            let node = tree
+                .tree
+                .nodes()
+                .find(|n| n.kind == K::TypeDecl)
+                .expect("type declaration");
+            let block =
+                BlockSource::declaration(Arc::clone(&text), file, node, Arc::default(), true)
+                    .block();
+            let target = target(node, &text, block, None).expect("derive target");
+            assert_eq!(target.params, ["f", "a"]);
+            assert_eq!(target.kinds, ["Type -> Type", ""]);
+        }
     }
 }

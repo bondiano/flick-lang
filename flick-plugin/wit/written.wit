@@ -1,4 +1,4 @@
-package flick:plugin@0.2.0;
+package flick:plugin@0.3.0;
 
 /// The types a declaration or a signature writes, as the compiler parsed
 /// them, for a derive to read without parsing tokens again.

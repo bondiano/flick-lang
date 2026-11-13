@@ -1,4 +1,4 @@
-package flick:plugin@0.2.0;
+package flick:plugin@0.3.0;
 
 /// What a plugin and the compiler exchange.
 interface types {

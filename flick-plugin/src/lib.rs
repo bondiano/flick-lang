@@ -46,7 +46,7 @@ pub use written::{EffectRow, FlatKind, FlatRow, FlatWritten, Written, WrittenKin
 
 /// The version of the interface, as `wit/plugin.wit` declares it. Caches of
 /// expansions key on it.
-pub const VERSION: &str = "0.2.0";
+pub const VERSION: &str = "0.3.0";
 
 /// A UTF-8 byte range in the body of a block.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -548,10 +548,15 @@ mod tests {
 
     #[test]
     fn the_version_is_the_one_of_the_interface() {
-        let wit = include_str!("../wit/plugin.wit");
-        assert!(
-            wit.starts_with(&format!("package flick:plugin@{VERSION};")),
-            "wit/plugin.wit declares another version than {VERSION}"
-        );
+        for (name, wit) in [
+            ("plugin", include_str!("../wit/plugin.wit")),
+            ("compiler", include_str!("../wit/compiler.wit")),
+            ("written", include_str!("../wit/written.wit")),
+        ] {
+            assert!(
+                wit.starts_with(&format!("package flick:plugin@{VERSION};")),
+                "wit/{name}.wit declares another version than {VERSION}"
+            );
+        }
     }
 }
