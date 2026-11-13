@@ -5,6 +5,10 @@ switches to the [component contract](contract.md). It records dependencies that
 must cross that boundary as plain data. It is not an IR 1.0 freeze or evidence
 that the official emitters already run as components.
 
+The [environment inventory](targets.md) records the Node, browser and Go
+boundaries. The [numeric review](numeric-policy.md) confirms the existing
+ordinary/checked/unsafe policy and identifies its independent boundary tests.
+
 ## Data used by the existing build
 
 | Consumer | Current input and owner | Component boundary |
