@@ -300,7 +300,7 @@ Defaults:
 
 `formal/Formal/Elab/Defaults.lean` proves the field typed: `this_ent` derives `I δ̄` from the context, and `T6a_default_instance` gives `default_C_m (I δ̄) d̄ₖ` the method's type at the instance. Since `d̄ₖ` are derivations like any other, T6(b) covers them as it is.
 
-A `deriving` instance is the same (Instance), with methods the runtime builds from the field dictionaries (`InstanceInfo.derived`).
+A `deriving` instance is the same (Instance). Lowering writes ordinary IR methods for `Eq`, `Ord`, `Hash` and `Show` from the field dictionaries (`ir/lower/derived.rs`), preserving constructor and field order. Both backends compile those methods as ordinary instance methods; an `InstanceInfo.derived` without method bodies retains runtime derivation as a fallback. The reference model already expands derivations this way, so the Instance rule and its Lean proof obligations are unchanged.
 
 The name `I` is the head as `show` prints it (`Instance.name`; `codegen/names.rs` `instance`). Two heads of one module that print the same would get one name; in that case the head is printed with its modules (`display.rs` `show_qualified`, [module-qualified instance names](#instance-names-were-heads-without-modules)).
 

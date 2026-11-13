@@ -246,6 +246,12 @@ fn settle(e: &mut Expr, lookup: &Lookup, fresh: &mut usize, depth: usize) -> boo
     let Some(mut code) = lookup.method(dict, name, e.span) else {
         return false;
     };
+    // A function cannot become data here. Inspecting its body first would
+    // recursively expand every method it calls, branching exponentially
+    // for derived methods over data with multiple recursive fields.
+    if matches!(code.kind, ExprKind::Lambda { .. }) {
+        return false;
+    }
     *fresh += 1;
     rename(&mut code, &format!("$s{fresh}"));
     settle_parts(&mut code, lookup, fresh, depth + 1);

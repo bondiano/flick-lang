@@ -255,3 +255,17 @@ codegen/loops_guards
 codegen/loops_owners
 codegen/record_constructor
 effect/row_without
+
+stdlib/lists
+stdlib/rpc/rpc
+stdlib/rpc/auth
+stdlib/rpc/router
+stdlib/rpc/middleware
+stdlib/rpc/websocket
+stdlib/rpc/serializations
+stdlib/rpc/local
+stdlib/rpc/tcp
+stdlib/server/origin
+stdlib/server/server_fn
+stdlib/server/auth
+stdlib/server/node

@@ -4,8 +4,8 @@
 use std::collections::{HashMap, HashSet};
 use std::iter;
 
+use super::Input;
 use super::arith::Native;
-use super::{Input, foreign};
 use crate::ir::reach::Key;
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Pat, Stage};
 use flick_ir::{Dict, InstanceInfo, default_method};
@@ -109,7 +109,7 @@ pub(super) fn shape(input: &Input, module: &str, kind: &ItemKind) -> Shape {
             },
         },
         ItemKind::Foreign(f) => {
-            let params = foreign::parameters(f);
+            let params = input.bindings.parameters(module, f);
             if f.dicts == 0 && params == 0 {
                 Shape::Var
             } else {

@@ -116,7 +116,7 @@ WebSocket support can be removed from a browser bundle.
 | `json` | one JSON document; over HTTP the messages of a call come together, so a stream's elements arrive once it ends |
 | `json_rpc` | JSON-RPC 2.0 documents, for peers that speak it |
 | `ndjson_rpc` | JSON-RPC 2.0, one message a line |
-| `binary` | the schema-driven frames of the Effect library: smaller than JSON, but both ends must use Effect, and it adds to a bundle |
+| `binary` | the schema-driven frames of the Effect library: smaller than JSON, both ends must use matching schema layouts, and it adds to a browser bundle |
 
 ## Serving
 
@@ -124,12 +124,13 @@ WebSocket support can be removed from a browser bundle.
 | - | - |
 | `listen options group handlers` | a POST per call over HTTP, at `options.path` |
 | `listen_websocket …` | each client a WebSocket at `path` whose messages carry its calls (`ws://127.0.0.1:8080/rpc`); every serialization streams over it |
-| `listen_tcp …` | each client a TCP connection to `host` and `port` (`tcp://127.0.0.1:8080`). Node only. Only a serialization that frames its messages (`ndjson`, `ndjson_rpc`, `binary`) fits a byte stream; another is a `ServeError`, since TCP may split a document across reads |
+| `listen_tcp …` | each client a TCP connection to `host` and `port` (`tcp://127.0.0.1:8080`). Node and the go target. Only a serialization that frames its messages (`ndjson`, `ndjson_rpc`, `binary`) fits a byte stream; another is a `ServeError`, since TCP may split a document across reads |
 | `serve_stdio serialization group handlers` | answers the calls of the messages on stdin on stdout until stdin ends, as editors run language servers; nothing else may write to stdout meanwhile. Node only |
 | `serve_worker group handlers` | answers the calls of the page that started this Web Worker until it closes the worker |
 | `serve_node_worker group handlers` | the same in a Node worker thread. Node only |
 
-The `listen` functions run on Node and acquire a `Server s` in `Scope s`.
+The `listen` functions run on Node and on the go target and acquire a
+`Server s` in `Scope s`.
 Closing that scope stops admission and closes calls and their finalizers.
 Handlers use the services available where the server was started.
 `Rpc.port server` returns the actual port, including a system-selected one
@@ -238,7 +239,7 @@ that only calls procedures pulls in no Node HTTP or socket server.
 POST per call, the default), `Rpc.websocket` (the messages of calls over
 the global WebSocket — only a program that names it bundles it) or
 `Rpc.tcp` (a TCP connection opened on the first call, so a refused
-connection is a `ClientError` of that call; Node only). Start from
+connection is a `ClientError` of that call; Node and the go target). Start from
 `Rpc.call_defaults`. An `http://` URL serves `listen`, a `ws://` one
 `listen_websocket`, a `tcp://` one `listen_tcp`.
 
@@ -316,3 +317,20 @@ In-memory calls are useful for handler logic and declared failures. Add
 a real transport round trip when testing codec compatibility, headers or
 stream framing. `Rpc` wraps unstable RPC modules of Effect; pin matching
 compiler and runtime versions.
+
+## On the go target
+
+A program built with `emit = "go"` serves and calls procedures as on
+Node, message for message: the same requests, exits, chunks and acks in
+each serialization, `binary` included, over HTTP, WebSocket and TCP. A Go
+server answers a client built for the js target from the same modules, a
+browser page included, and the reverse. `call_local` and `call_stream_local`
+work there too. `serve_stdio`, `spawn` and the worker transports start Node
+processes and workers, so they stay js only (`FLICK-P012`).
+
+What may differ is what each side makes up for itself: the text of a
+defect for a payload that does not decode, the fiber ids of an
+interruption, the trace ids of a call, and the order of the answers to
+calls that run concurrently on one connection, which follows when each
+ends. Handlers capture the services where `handler` or `handler_websocket`
+is mounted and keep them until its owning scope closes.

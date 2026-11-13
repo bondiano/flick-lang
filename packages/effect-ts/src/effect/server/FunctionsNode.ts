@@ -64,4 +64,3 @@ export const serverHandler = (functions: ReadonlyArray<ServerFunction>) => {
   const handlers = Object.fromEntries(functions.map((f) => [f.procedure.name, f.run]));
   return Effect.flatMap(inProcess(group, handlers), () => rpcHandler(rpcNdjson, group, handlers));
 };
-

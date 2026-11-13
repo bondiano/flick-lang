@@ -252,3 +252,68 @@ fn compositions_lower_to_one_closure_and_left_pipes_to_calls() {
         assert!(printed.contains(line), "{line}\nnot in\n{printed}");
     }
 }
+
+/// The method `name` of the instance `instance`, as the IR prints it.
+fn derived_method(ir: &super::Module, instance: &str, name: &str) -> String {
+    let printed = super::print(ir);
+    let head = format!("instance {instance} ");
+    let mut lines = printed
+        .lines()
+        .skip_while(|l| !(l.starts_with(&head) && l.contains("derived")));
+    let line = lines.find(|l| l.trim_start().starts_with(name));
+    line.expect("the method").trim().to_owned()
+}
+
+#[test]
+fn a_derived_instance_has_its_methods_written_out() {
+    let ir = lower_text(
+        "App",
+        "module App exposing (..)\n\
+         type Shape = Dot | Box Int String\n  deriving Eq, Ord, Hash, Show\n\
+         type Meters = Meters Float\n  deriving Eq\n",
+    )
+    .expect("lowers");
+    // the same constructor and every field equal, by the instance of each field
+    assert_eq!(
+        derived_method(&ir, "Eq Shape", "eq"),
+        "eq = (fun a b -> (match a | Dot -> (match b | Dot -> true | _ -> false) \
+         | (Box x1_0 x1_1) -> (match b | (Box y1_0 y1_1) -> \
+         (((<Eq Int>.eq x1_0) y1_0) && ((<Eq String>.eq x1_1) y1_1)) | _ -> false)))"
+    );
+    // by constructor in the order declared, then to the first field that is not `EQ`
+    let compare = derived_method(&ir, "Ord Shape", "compare");
+    assert!(
+        compare.contains("let j = (match b | Dot -> 0 | (Box _ _) -> 1)"),
+        "{compare}"
+    );
+    assert!(
+        compare.contains("| _ -> ((<Ord Int>.compare 1) j)"),
+        "{compare}"
+    );
+    assert!(
+        compare.contains(
+            "(match ((<Ord Int>.compare x1_0) y1_0) | EQ -> \
+             (match ((<Ord String>.compare x1_1) y1_1) | EQ -> EQ | o1_1 -> o1_1) | o1_0 -> o1_0)"
+        ),
+        "{compare}"
+    );
+    // the index of the constructor, then `h * 31 + hash field`
+    assert_eq!(
+        derived_method(&ir, "Hash Shape", "hash"),
+        "hash = (fun a -> (match a | Dot -> 0 | (Box x1_0 x1_1) -> \
+         ((((1 * 31) + (<Hash Int>.hash x1_0)) * 31) + (<Hash String>.hash x1_1))))"
+    );
+    // the name, then each field as an argument is shown
+    let show = derived_method(&ir, "Show Shape", "show");
+    assert!(show.contains("| Dot -> \"Dot\""), "{show}");
+    assert!(
+        show.contains("(\"Box\" ++ \" \") ++ (Instances.show_arg (<Show Int>.show x1_0))"),
+        "{show}"
+    );
+    // one constructor: nothing to tell apart
+    assert_eq!(
+        derived_method(&ir, "Eq Meters", "eq"),
+        "eq = (fun a b -> (match a | (Meters x0_0) -> (match b | (Meters y0_0) -> \
+         ((<Eq Float>.eq x0_0) y0_0))))"
+    );
+}

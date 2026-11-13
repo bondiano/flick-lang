@@ -41,18 +41,20 @@ func HttpServe(fb *Fiber, options, handler Value) Value {
 	concurrent.Store(true)
 	serving := *fb
 	requests := newHTTPRequests()
+	ups := newUpgrades()
 	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// one allocation for what a request's fiber needs
-		q := &servedRequest{fiber: serving}
+		q := &servedRequest{fiber: serving, upgrades: ups}
 		q.source.r, q.source.head = r, requestHead(r)
 		q.request = ServerRequest{src: &q.source, method: r.Method, url: r.RequestURI, originalURL: r.RequestURI}
 		q.state.id, q.state.signal = fibers.Add(1), make(chan struct{})
 		q.fiber.state = &q.state
-		q.fiber.env = serving.env.with(requestStateKey, &q.marks)
+		q.fiber.env = serving.env.with(requestStateKey, &q.marks).with(serverRequestKey, &q.request)
 		requests.serve(q, w, r, handler)
 	}), ConnContext: orderContext}
 	go srv.Serve(orderListener{listener})
 	fb.owner.onClose(fb, func(*Fiber) {
+		ups.close()
 		requests.close(srv, o.Get("gracefulShutdownTimeout"))
 	})
 	return &HttpServer{srv, listener}

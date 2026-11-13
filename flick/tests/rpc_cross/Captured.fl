@@ -1,0 +1,49 @@
+// Mounting captures services once, even if the HTTP server has another
+// implementation. HTTP and WebSocket requests share the mounted group.
+module App.Main exposing (main)
+
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+
+service Session =
+  name : Unit ->{} String
+
+me : Rpc.Rpc "me" (Unit ->{Session} String)
+let me = Rpc.make (Record.label : Record.Label "me") |> Rpc.with_success (Codec.json Schema.string)
+
+type alias Handlers = { me : Unit ->{Session} String }
+
+group : Rpc.Group {Session} Handlers
+let group = Rpc.group |> Rpc.add me
+
+handlers : Handlers
+let handlers = { me = fun () -> Session.name () }
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  provide (Layer.merge Http.Server.layer_services (Layer.succeed Session { name = fun () -> "mounted" })) {
+    try
+      scope s {
+        http : (ServerRequest ->{Async} ServerResponse)^{s}
+        let http = Rpc.handler Rpc.ndjson group handlers
+        ws : (ServerRequest ->{Async} ServerResponse)^{s}
+        let ws = Rpc.handler_websocket Rpc.ndjson group handlers
+        let app = Http.Router.router Http.Router.config [
+          Http.Router.route (Some Http.Method.POST) "/rpc" http,
+          Http.Router.route (Some Http.Method.GET) "/ws" ws,
+        ]
+        provide (Layer.succeed Session { name = fun () -> "serving" }) {
+          let server = Http.Server.serve { host = "127.0.0.1"; port = 0; gracefulShutdownTimeout = None } app
+          let base = Http.Server.format_address (Http.Server.address server)
+          Platform.stdout_line (Rpc.call (base ++ "/rpc") me ())
+          Platform.stdout_line (Rpc.call (base ++ "/rpc") me ())
+          let socket = String.replace_all "http://" "ws://" base ++ "/ws"
+          let options = { Rpc.call_defaults with transport = Rpc.websocket }
+          Platform.stdout_line (Rpc.call_with options socket me ())
+          Platform.stdout_line (Rpc.call_with options socket me ())
+        }
+      }
+    with
+    | Http.ServerError.ServeError _ -> Platform.stdout_line "serve failed"
+    | Rpc.ClientError message -> Platform.stdout_line ("client: " ++ message)
+  }

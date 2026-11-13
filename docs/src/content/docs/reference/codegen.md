@@ -251,9 +251,12 @@ A definition with class constraints takes their dictionaries first:
 `render : Show a => a -> String` is `(dShow) => (value) => …`; a use passes
 them, `render(<Show Int>)(1)`. A dictionary is an object of the class's
 methods with a getter per superclass (`$Eq` of an `Ord` dictionary). An
-instance with a context is a function of the context's dictionaries. Derived
-instances and the compiler-owned instances of records and tuples are built
-by the runtime from the dictionaries of their fields. A higher-rank argument
+instance with a context is a function of the context's dictionaries. A
+derived `Eq`, `Ord`, `Hash` or `Show` has its methods written out for its
+type, a `match` on the constructors that asks the instance of each field,
+and is compiled as any instance is; the compiler-owned instances of records
+and tuples are built by the runtime from the dictionaries of their fields.
+A higher-rank argument
 with a constraint is a function of its dictionaries. The dictionary of
 `instance Show Float` is `$i_Show_Float`; a head that is not names
 separated by spaces, `Show (List a)`, adds a hash: `$i_Show_List_a_19082212`.
@@ -425,7 +428,9 @@ Go implementation: in the runtime for the standard library, part of which
 has none yet beyond the core (most of `Stream`, queues, schedules beyond
 `recurs`, parts of `Codec`), or beside the program for its own bindings
 (see [FFI](../ffi/#the-go-target)). Modules of the js target only are
-`FLICK-P030` already in `flick check`.
+`FLICK-P030` already in `flick check`. `Rpc` and `server fn` speak the
+wire of the js target, so a Go backend serves a JS frontend (see
+[Typed RPC](../rpc/#on-the-go-target)).
 
 Values have the representation of the JS target, in Go terms:
 

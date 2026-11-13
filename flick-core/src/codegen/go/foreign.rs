@@ -31,12 +31,20 @@ fn typed(go: &str) -> (&str, Types) {
 
 /// The Go functions of `flickrt` that the tables of the implicit packages
 /// bind JS exports to, and the Go types each takes and gives.
-pub struct Bindings(HashMap<(String, String), (String, Types)>);
+struct Binding {
+    target: String,
+    types: Types,
+    /// An opt-in Go function returning the remaining Flick stages as Fn.
+    stages: Option<usize>,
+}
+
+pub struct Bindings(HashMap<(String, String), Binding>);
 
 impl Bindings {
     /// The tables `texts`, by area: under `[module]` (or `[global Module]`
     /// for a JS global, which may mean different things for different
     /// types), an export (or binding name) and its function of `flickrt`.
+    /// `*` passes Fiber first; `@N` keeps N stages and returns Fn for the rest.
     pub fn parse<'t>(texts: impl IntoIterator<Item = &'t str>) -> Bindings {
         let mut out = HashMap::new();
         for text in texts {
@@ -50,12 +58,25 @@ impl Bindings {
                     continue;
                 }
                 let (export, go) = line.split_once(' ').expect("an export and a Go function");
+                let (go, stages) = match go.rsplit_once('@') {
+                    Some((go, count)) => {
+                        (go, Some(count.parse::<usize>().expect("a staged Go arity")))
+                    }
+                    None => (go, None),
+                };
                 let (go, types) = typed(go);
                 let go = match go.strip_prefix('*') {
                     Some(go) => format!("*flickrt.{go}"),
                     None => format!("flickrt.{go}"),
                 };
-                let earlier = out.insert((module.to_owned(), export.to_owned()), (go, types));
+                let earlier = out.insert(
+                    (module.to_owned(), export.to_owned()),
+                    Binding {
+                        target: go,
+                        types,
+                        stages,
+                    },
+                );
                 assert!(earlier.is_none(), "`{export}` of `{module}` is bound twice");
             }
         }
@@ -65,7 +86,12 @@ impl Bindings {
     /// The Go functions and variables the tables name.
     #[cfg(test)]
     pub(super) fn targets(&self) -> impl Iterator<Item = &str> {
-        (self.0.values()).map(|(go, _)| go.trim_start_matches('*').trim_start_matches("flickrt."))
+        (self.0.values()).map(|binding| {
+            binding
+                .target
+                .trim_start_matches('*')
+                .trim_start_matches("flickrt.")
+        })
     }
 
     /// The Go function of the binding `name` of `module` to `export` of
@@ -77,11 +103,30 @@ impl Bindings {
         from: Option<&str>,
         export: &str,
     ) -> Option<(&str, Types)> {
+        self.binding(module, name, from, export)
+            .map(|binding| (binding.target.as_str(), binding.types))
+    }
+
+    fn binding(
+        &self,
+        module: &str,
+        name: &str,
+        from: Option<&str>,
+        export: &str,
+    ) -> Option<&Binding> {
         let key = match from {
             Some(from) => (from.to_owned(), export.to_owned()),
             None => (format!("global {module}"), name.to_owned()),
         };
-        self.0.get(&key).map(|(go, types)| (go.as_str(), *types))
+        self.0.get(&key)
+    }
+
+    /// The stages the Go function takes. Most bindings flatten all stages;
+    /// an explicit `@N` mounts once and returns Fn for its remaining stages.
+    pub(super) fn parameters(&self, module: &str, f: &Foreign) -> usize {
+        self.binding(module, &f.name, f.binding.from.as_deref(), &f.binding.name)
+            .and_then(|binding| binding.stages)
+            .unwrap_or_else(|| parameters(f))
     }
 
     /// The Go types of the function the binding `f` of `module` is bound to.
@@ -135,7 +180,7 @@ impl<'a> Gen<'a> {
             Some(t) => (t, true),
             None => (target, false),
         };
-        let taken = parameters(f);
+        let taken = self.input.bindings.parameters(self.module, f);
         if f.dicts == 0 && taken == 0 {
             let var = names::var(self.module, &f.name);
             return Some(docvec![a, "var ", var, " flickrt.Value = ", target]);
@@ -258,5 +303,44 @@ impl<'a> Gen<'a> {
             go = call(a, "flickrt.ForeignAsync", [a.text("fb"), run]);
         }
         Some(self.wrapper(f, signature(&heads), "flickrt.Value", go))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Bindings;
+    use crate::ir::ItemKind;
+    use crate::ir::tests::lower_text;
+
+    #[test]
+    fn staged_bindings_return_the_remaining_functions_and_others_still_flatten() {
+        let ir = lower_text("App", "module App exposing (..)\nmount : Int -> Int -> Int\nforeign pure mount from \"mounts\" \"mount\"\n  arity 1\nflat : Int -> Int -> Int\nforeign pure flat from \"mounts\" \"flat\"\n  arity 1\n").expect("lowers");
+        let bindings = Bindings::parse(["[mounts]\nmount *Mount@1\nflat Flat\n"]);
+        let mut checked = 0;
+        for item in &ir.items {
+            if let ItemKind::Foreign(f) = &item.kind {
+                assert_eq!(
+                    bindings.parameters("App", f),
+                    if f.name == "mount" { 1 } else { 2 }
+                );
+                if f.name == "mount" {
+                    let mut global = f.clone();
+                    global.name = "local".to_owned();
+                    global.binding.from = None;
+                    global.binding.name = "external".to_owned();
+                    let globals = Bindings::parse(["[global App]\nlocal Global@1\n"]);
+                    assert_eq!(globals.parameters("App", &global), 1);
+                    assert!(globals.lookup("App", "local", None, "external").is_some());
+                }
+                checked += 1;
+            }
+        }
+        assert_eq!(checked, 2);
+        assert_eq!(
+            bindings
+                .lookup("App", "mount", Some("mounts"), "mount")
+                .map(|(target, _)| target),
+            Some("*flickrt.Mount")
+        );
     }
 }

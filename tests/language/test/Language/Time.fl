@@ -1,0 +1,194 @@
+// Effect's core on both targets: defects as text, schedules, seeded
+// randomness and virtual time. A seed draws the same numbers everywhere,
+// and a test clock moves only when the test moves it, waking what sleeps
+// in order.
+module Language.Time exposing (tests)
+
+type error Flaky = Flaky Int
+  deriving Show
+
+/// Lines in the order they were noted.
+type alias Log = Ref (List String)
+
+note : Log -> String ->{} Unit
+let note log text = Ref.set log (Ref.get log ++ [text])
+
+ms : Float -> Duration.Duration
+let ms n = Result.with_default Duration.zero (Duration.millis n)
+
+quiet : Failure e ->{} Unit
+let quiet _ = ()
+
+/// The defect of a failure, or what it holds instead.
+defect_of : Failure e -> String
+let defect_of f =
+  match Cause.find_defect f with
+  | Ok text -> "defect " ++ text
+  | Err rest -> "no defect " ++ show (Cause.has_fails rest)
+
+/// Fails with `Flaky n` on the first `failures` runs, counting them.
+flaky : Ref Int -> Int -> Eff none {Flaky} Int
+let flaky runs failures = task {
+  Ref.set runs (Ref.get runs + 1)
+  let n = Ref.get runs
+  if n <= failures then from_result (Err (Flaky n)) else n
+}
+
+/// How many times a task runs, repeated by `schedule`.
+count : Schedule.Schedule none none Unit o ->{Async} Int
+let count schedule =
+  let runs = Ref.make 0
+  let _ = Effect.repeat schedule (task { Ref.update runs (fun n -> n + 1) })
+  Ref.get runs
+
+/// The outputs of the first steps of `schedule`, without its delays.
+outputs : Schedule.Schedule none none Int Duration.Duration ->{Async} List String
+let outputs schedule =
+  let seen = Ref.make []
+  let traced =
+    Schedule.tap (fun m -> Ref.update seen (fun xs -> xs ++ [Duration.format m.output])) schedule
+  let quick = Schedule.modify_delay (fun _ -> Duration.zero) traced
+  let _ = Effect.repeat (Schedule.up_to { duration = None; times = Some 5 } quick) (task { 0 })
+  Ref.get seen
+
+draws : Unit ->{} (Float, Int, List Int, String)
+let draws () = (
+  Random.next (),
+  Random.next_int_between { halfOpen = None } 1 6,
+  Random.shuffle [1, 2, 3, 4, 5],
+  Random.choice (NonEmpty.cons "a" ["b", "c"]),
+)
+
+tests : List Test.Test
+let tests = [
+  Test.group "defects" [
+    Test.effect_test
+      "Effect.die is a defect, not a typed error"
+      (task {
+        let exit : Exit none String = Effect.exit (task { Effect.die "broken" })
+        let text =
+          match Exit.failure exit with
+          | Some f -> defect_of f
+          | None -> "succeeded"
+        Test.expect (Test.equal "defect broken" text)
+      }),
+    Test.effect_test
+      "catch_defect recovers a defect and lets a typed error through"
+      (task {
+        let caught = Effect.catch_defect (fun d -> "caught " ++ d) (task { Effect.die "broken" })
+        let failed : Exit {Flaky} String =
+          Effect.exit
+            (task { Effect.catch_defect (fun d -> d) (task { from_result (Err (Flaky 1)) }) })
+        Test.expect (Test.equal ("caught broken", true) (caught, Exit.has_fails failed))
+      }),
+    Test.test "Cause.find_defect finds the text of a defect among failures" (fun () ->
+      let failed = Cause.fail (Flaky 1)
+      let both = Cause.combine (Cause.die "gone") failed
+      Test.equal ["defect gone", "no defect true"] [defect_of both, defect_of failed]
+    ),
+  ],
+  Test.group "schedules" [
+    Test.effect_test
+      "repeat runs once more per recurrence and gives the last output"
+      (task {
+        let runs = Ref.make 0
+        let last = Effect.repeat (Schedule.recurs 3) (task { Ref.update runs (fun n -> n + 1) })
+        Test.expect (Test.equal (4, 3) (Ref.get runs, last))
+      }),
+    Test.effect_test
+      "retry stops at the first success or when the schedule is done"
+      (task {
+        let runs = Ref.make 0
+        let ok = Effect.retry (Schedule.recurs 5) (flaky runs 2)
+        let others = Ref.make 0
+        let gave_up =
+          try Effect.retry (Schedule.recurs 2) (flaky others 9) with
+          | Flaky n -> -n
+        Test.expect (Test.equal (3, -3) (ok, gave_up))
+      }),
+    Test.effect_test
+      "max ends with the first schedule done, min with the last"
+      (task {
+        let both = NonEmpty.cons (Schedule.recurs 1) [Schedule.recurs 3]
+        Test.expect (Test.equal (2, 4) (count (Schedule.max both), count (Schedule.min both)))
+      }),
+    Test.effect_test
+      "exponential and fibonacci delays"
+      (task {
+        let exponential = outputs (Schedule.exponential (ms 10) 2)
+        let fibonacci = outputs (Schedule.fibonacci (ms 10))
+        Test.expect
+          (Test.equal
+            (
+              ["10ms", "20ms", "40ms", "80ms", "160ms", "320ms"],
+              ["10ms", "10ms", "20ms", "30ms", "50ms", "80ms"],
+            )
+            (exponential, fibonacci))
+      }),
+  ],
+  Test.group "randomness" [
+    Test.effect_test
+      "a seed draws the same numbers"
+      (task {
+        let first = Random.with_seed 42 (task { draws () })
+        let again = Random.with_seed 42 (task { draws () })
+        Test.expect (Test.equal first again)
+        Test.expect (Test.equal (0.2272248550901319, 5, [3, 4, 5, 2, 1], "b") first)
+      }),
+  ],
+  Test.group "virtual time" [
+    Test.clock_test
+      "the clock starts at 0 and moves by adjust and set_time"
+      (task {
+        let start = Clock.current_time_millis ()
+        Test.adjust (ms 1500)
+        let later = Clock.current_time_millis ()
+        Test.set_time 60000
+        Test.expect (Test.equal (0, 1500, 60000) (start, later, Clock.current_time_millis ()))
+      }),
+    Test.clock_test
+      "sleepers wake in order, each once its time comes"
+      (task {
+        let log = Ref.make []
+        scope owner {
+          let slow =
+            Fiber.spawn
+              owner
+              quiet
+              (task {
+                Effect.sleep (ms 3000)
+                note log "slow"
+              })
+          let fast =
+            Fiber.spawn
+              owner
+              quiet
+              (task {
+                Effect.sleep (ms 1000)
+                note log "fast"
+              })
+          Test.adjust (ms 2000)
+          note log "two seconds"
+          Test.adjust (ms 2000)
+          ignore (Fiber.join_all [slow, fast])
+        }
+        Test.expect (Test.equal ["fast", "two seconds", "slow"] (Ref.get log))
+      }),
+    Test.clock_test
+      "a retry's delays pass in virtual time"
+      (task {
+        let runs = Ref.make 0
+        scope owner {
+          let retried =
+            Fiber.spawn
+              owner
+              quiet
+              (task { Effect.retry (Schedule.spaced (ms 60000)) (flaky runs 2) })
+          Test.adjust (ms 60000)
+          let after_one = Ref.get runs
+          Test.adjust (ms 60000)
+          Test.expect (Test.equal (2, 3) (after_one, Fiber.join retried))
+        }
+      }),
+  ],
+]

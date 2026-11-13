@@ -1,0 +1,86 @@
+// The client of the cross-target RPC test: calls, typed errors, streams
+// and auth over each transport the server prints, then server functions
+// at FLICK_SERVER_URL.
+module App.Main exposing (main)
+
+import App.Api exposing (..)
+
+port_ : String ->{Async} String
+let port_ name = Option.with_default "0" (Platform.env name)
+
+numbers_over : String -> Rpc.CallOptions -> String ->{Async} Unit
+let numbers_over name options url =
+  let doubled =
+    try show (Rpc.call_with options url double 21) with
+    | NotFound e -> "not found " ++ show e.id
+    | Rpc.ClientError m -> "client: " ++ m
+  let refused =
+    try show (Rpc.call_with options url double (0 - 1)) with
+    | NotFound e -> "not found " ++ show e.id
+    | Rpc.ClientError m -> "client: " ++ m
+  let counted =
+    try show (Stream.run_collect (Rpc.call_stream_with options url count_to 3)) with
+    | NotFound e -> "not found " ++ show e.id
+    | Rpc.ClientError m -> "client: " ++ m
+  let empty =
+    try show (Stream.run_collect (Rpc.call_stream_with options url count_to 0)) with
+    | NotFound e -> "not found " ++ show e.id
+    | Rpc.ClientError m -> "client: " ++ m
+  let failed =
+    try show (Stream.run_collect (Rpc.call_stream_with options url count_to (0 - 2))) with
+    | NotFound e -> "not found " ++ show e.id
+    | Rpc.ClientError m -> "client: " ++ m
+  Platform.stdout_line
+    (name ++ ": " ++ doubled ++ ", " ++ refused ++ ", " ++ counted ++ ", " ++ empty ++ ", " ++ failed)
+
+as_user : Rpc.CallOptions -> String -> String ->{Async} String
+let as_user options url token =
+  try Rpc.with_headers [("authorization", token)] (task { Rpc.call_with options url me () }) with
+  | Unauthorized -> "refused"
+  | Rpc.ClientError m -> "client: " ++ m
+
+http : String ->{Async} String
+let http p = "http://127.0.0.1:" ++ port_ p ++ "/rpc"
+
+ws : String ->{Async} String
+let ws p = "ws://127.0.0.1:" ++ port_ p ++ "/rpc"
+
+over : Rpc.Serialization -> Rpc.Transport -> Rpc.CallOptions
+let over serialization transport = { serialization = serialization; transport = transport }
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  numbers_over "http ndjson" Rpc.call_defaults (http "P0")
+  numbers_over "http binary" (over Rpc.binary Rpc.http) (http "P1")
+  numbers_over "http json_rpc" (over Rpc.json_rpc Rpc.http) (http "P2")
+  numbers_over "ws json" (over Rpc.json Rpc.websocket) (ws "P3")
+  numbers_over "ws binary" (over Rpc.binary Rpc.websocket) (ws "P4")
+  let shared =
+    try
+      scope s {
+        let connection = Rpc.connect (over Rpc.binary Rpc.websocket) (ws "P4")
+        let first = Rpc.call_on connection double 1
+        let second = Rpc.call_on connection double 2
+        let streamed = Stream.run_collect (Rpc.call_stream_on connection count_to 2)
+        show first ++ ", " ++ show second ++ ", " ++ show streamed
+      }
+    with
+    | NotFound e -> "not found " ++ show e.id
+    | Rpc.ClientError m -> "client: " ++ m
+  Platform.stdout_line ("ws connection: " ++ shared)
+  Platform.stdout_line
+    ("auth http: " ++ as_user Rpc.call_defaults (http "P5") "Bearer ada" ++ ", "
+      ++ as_user Rpc.call_defaults (http "P5") "Bearer eve")
+  let websocket = over Rpc.ndjson Rpc.websocket
+  Platform.stdout_line
+    ("auth ws: " ++ as_user websocket (ws "P6") "Bearer ada" ++ ", " ++ as_user websocket (ws "P6") "Bearer eve")
+  let doubled = try twice "ho" with | Rpc.ClientError m -> "client: " ++ m
+  let ada =
+    try Rpc.with_headers [("cookie", "user=ada")] (task { whoami () }) with
+    | Server.Unauthorized -> "refused"
+    | Rpc.ClientError m -> "client: " ++ m
+  let eve =
+    try whoami () with
+    | Server.Unauthorized -> "refused"
+    | Rpc.ClientError m -> "client: " ++ m
+  Platform.stdout_line ("server fn: " ++ doubled ++ ", " ++ ada ++ ", " ++ eve)
