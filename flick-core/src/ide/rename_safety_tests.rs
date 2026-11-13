@@ -180,6 +180,19 @@ fn class_rename_allows_unused_contracts_and_unannotated_aliases() {
 
 #[cfg(feature = "native-project")]
 fn opening_fixture(user: &str) -> (Analysis, SourceMap) {
+    let named = NAMED.replace("module App.Named", "module Pairs");
+    let (analysis, sources) = pairs_fixture(user, &named);
+    let errors: Vec<_> = analysis
+        .diagnostics
+        .iter()
+        .filter(|d| d.severity == Severity::Error)
+        .collect();
+    assert!(errors.is_empty(), "{errors:#?}");
+    (analysis, sources)
+}
+
+#[cfg(feature = "native-project")]
+fn pairs_fixture(user: &str, pairs: &str) -> (Analysis, SourceMap) {
     use std::collections::BTreeMap;
     use std::io::{self, ErrorKind};
     use std::path::{Path, PathBuf};
@@ -209,7 +222,6 @@ fn opening_fixture(user: &str) -> (Analysis, SourceMap) {
         }
     }
     let manifest = "schema-version = 1\n[project]\nkind = \"lib\"\n[dependencies]\npairs = { path = \"/pairs\" }\n";
-    let named = NAMED.replace("module App.Named", "module Pairs");
     let host = Memory(
         [
             (PathBuf::from("/p/flick.toml"), manifest.to_owned()),
@@ -218,7 +230,7 @@ fn opening_fixture(user: &str) -> (Analysis, SourceMap) {
                 PathBuf::from("/pairs/flick.toml"),
                 "schema-version = 1\n[project]\nkind = \"lib\"\n".to_owned(),
             ),
-            (PathBuf::from("/pairs/src/Pairs.fl"), named),
+            (PathBuf::from("/pairs/src/Pairs.fl"), pairs.to_owned()),
         ]
         .into(),
     );
@@ -236,13 +248,57 @@ fn opening_fixture(user: &str) -> (Analysis, SourceMap) {
         Some(&project),
         &[PathBuf::from("/p/src/App/Use.fl")],
     );
+    (analysis, sources)
+}
+
+#[cfg(feature = "native-project")]
+#[test]
+fn class_rename_refuses_an_unmapped_plugin_generated_instance_binder() {
+    use super::{Ide, tree};
+    use crate::syntax::kind::SyntaxKind as K;
+
+    let pairs = "module Pairs exposing (..)\n@derive pairs\nclass Arbitrary a =\n  arbitrary : a\n";
+    let user = "module App.Use exposing (..)\nimport Pairs\ntype Token = Token\n  deriving Pairs.Arbitrary\nvalue : Token\nlet value = Pairs.arbitrary\n";
+    let (analysis, sources) = pairs_fixture(user, pairs);
     let errors: Vec<_> = analysis
         .diagnostics
         .iter()
         .filter(|d| d.severity == Severity::Error)
         .collect();
     assert!(errors.is_empty(), "{errors:#?}");
-    (analysis, sources)
+    let use_module = analysis.module("App.Use").expect("derived instance module");
+    let instance = use_module
+        .typing
+        .instances
+        .iter()
+        .find(|i| i.class == ("Pairs".to_owned(), "Arbitrary".to_owned()))
+        .expect("generated instance");
+    assert!(
+        tree::find(&use_module.tree, instance.span).is_none_or(|n| n.kind != K::InstanceDecl),
+        "the instance binder is generated, not a written source declaration"
+    );
+
+    // Even updating every written method spelling leaves the plugin's
+    // hard-coded `let arbitrary` field inconsistent with class `sample`.
+    let renamed_pairs = pairs.replace("arbitrary", "sample");
+    let renamed_user = user.replace("Pairs.arbitrary", "Pairs.sample");
+    let (updated, _) = pairs_fixture(&renamed_user, &renamed_pairs);
+    assert!(
+        updated.diagnostics.iter().any(|d| d.code == codes::C011),
+        "{:?}",
+        updated.diagnostics
+    );
+
+    let declared = analysis.module("Pairs").expect("class module");
+    let offset = u32::try_from(pairs.find("arbitrary :").expect("method")).expect("small") + 1;
+    let ide = Ide {
+        analysis: &analysis,
+        sources: &sources,
+    };
+    assert!(
+        ide.rename(declared.file, offset, "sample").is_err(),
+        "generated instance fields have no exact source mapping and must not be omitted from rename"
+    );
 }
 
 #[cfg(feature = "native-project")]

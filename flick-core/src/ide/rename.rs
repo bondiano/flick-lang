@@ -12,6 +12,7 @@ use crate::syntax::kind::SyntaxKind as K;
 
 mod contracts;
 mod methods;
+mod scopes;
 
 /// A name in a file: its UTF-8 byte range.
 pub type Occurrence = (FileId, (u32, u32));

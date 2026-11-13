@@ -38,8 +38,9 @@ Renaming a class method from its signature, an instance or a call updates
 the class's signatures and defaults, instance implementations, explicit
 imports and calls. Methods of other classes with the same spelling are
 unaffected. Analysis errors, conflicting names in affected scopes and
-explicit `C.dictionary` records, packed module fields or static module
-contracts/arguments without an exact mapping refuse the rename, including
+unmapped generated implementations, explicit `C.dictionary` records, packed
+module fields or static module contracts/arguments without an exact mapping
+refuse the rename, including
 in dependent workspace members.
 
 Hover resolves source bindings, not just the public export list. Private
