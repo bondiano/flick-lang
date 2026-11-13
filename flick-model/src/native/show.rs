@@ -15,6 +15,7 @@ pub fn show(args: &[Term], _: &mut String) -> Result<Term, String> {
     let text = match &args[0] {
         Term::Lit(Lit::Int(i)) => i.to_string(),
         Term::Lit(Lit::Float(x)) => js_number(*x),
+        Term::Lit(Lit::BigInt(n)) => format!("{n}n"),
         Term::Lit(Lit::String(s)) => json_string(s),
         Term::Lit(Lit::Bool(b)) => b.to_string(),
         Term::Lit(Lit::Unit) => "undefined".to_owned(),
@@ -36,6 +37,7 @@ pub fn hash(args: &[Term], _: &mut String) -> Result<Term, String> {
         Term::Lit(Lit::Int(i)) => hash_string(&i.to_string()),
         Term::Lit(Lit::Float(x)) if *x == 0.0 => hash_string("0"),
         Term::Lit(Lit::Float(x)) => hash_string(&js_number(*x)),
+        Term::Lit(Lit::BigInt(n)) => hash_string(&format!("bigint:{n}")),
         Term::Lit(Lit::String(s)) => hash_string(&format!("string:{s}")),
         Term::Lit(Lit::Bool(b)) => hash_string(&format!("boolean:{b}")),
         other => return Err(format!("{other:?}")),
@@ -71,6 +73,7 @@ fn ordering(o: Ordering) -> Term {
 pub fn compare(args: &[Term], _: &mut String) -> Result<Term, String> {
     let o = match (&args[0], &args[1]) {
         (Term::Lit(Lit::Int(a)), Term::Lit(Lit::Int(b))) => a.cmp(b),
+        (Term::Lit(Lit::BigInt(a)), Term::Lit(Lit::BigInt(b))) => a.cmp(b),
         (Term::Lit(Lit::Float(a)), Term::Lit(Lit::Float(b))) => match (a.is_nan(), b.is_nan()) {
             (true, true) => Ordering::Equal,
             (true, false) => Ordering::Greater,

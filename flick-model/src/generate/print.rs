@@ -247,6 +247,7 @@ fn lit(l: &Lit) -> String {
     match l {
         Lit::Int(n) => n.to_string(),
         Lit::Float(x) => format!("{x:?}"),
+        Lit::BigInt(n) => format!("{n}n"),
         Lit::String(s) => format!("{s:?}"),
         Lit::Bool(b) => b.to_string(),
         Lit::Unit => "()".into(),

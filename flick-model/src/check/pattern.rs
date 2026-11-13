@@ -58,6 +58,7 @@ fn lit_type(l: &Lit) -> Type {
         match l {
             Lit::Int(_) => "Int",
             Lit::Float(_) => "Float",
+            Lit::BigInt(_) => "BigInt",
             Lit::String(_) => "String",
             Lit::Bool(_) => "Bool",
             Lit::Unit => "Unit",

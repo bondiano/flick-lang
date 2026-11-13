@@ -1,0 +1,32 @@
+// Arbitrary precision, signed division/remainder, zero division and radix
+// patterns have independently specified results in the model and JS/Go.
+module App.Main exposing (main)
+
+multiply : BigInt -> BigInt -> BigInt
+let multiply a b = a * b
+
+divide : BigInt -> BigInt -> BigInt
+let divide a b = a / b
+
+remainder : BigInt -> BigInt -> BigInt
+let remainder a b = a % b
+
+radix : BigInt -> String
+let radix n =
+  match n with
+  | -0xffn -> "minus 255"
+  | 0b100000000n -> "256"
+  | _ -> "other"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (show (multiply 18446744073709551616n 18446744073709551616n))
+  Platform.stdout_line (show (divide (-7n) 2n))
+  Platform.stdout_line (show (remainder (-7n) 2n))
+  Platform.stdout_line (show (divide 7n 0n))
+  Platform.stdout_line (show (remainder (-7n) 0n))
+  Platform.stdout_line (show (0n ** 0n))
+  Platform.stdout_line (show (9007199254740993n > 9007199254740992n))
+  Platform.stdout_line (show (multiply 0n 9n == -0n))
+  Platform.stdout_line (radix (-255n))
+  Platform.stdout_line (radix 0o400n)

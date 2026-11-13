@@ -11,6 +11,7 @@
 ../rt/layers
 ../rt/wake_chain
 bootstrap/app_fail
+codegen/bigints
 bootstrap/debug
 bootstrap/hello
 bootstrap/inline_declarations

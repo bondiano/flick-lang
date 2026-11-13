@@ -15,6 +15,7 @@ bootstrap/packed_module
 bootstrap/stderr
 codegen/apply_order
 codegen/applicative_do
+codegen/bigints
 codegen/category_classes
 codegen/classes
 codegen/closures

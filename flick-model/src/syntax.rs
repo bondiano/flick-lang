@@ -49,6 +49,7 @@ impl fmt::Display for Path {
 pub enum Lit {
     Int(i32),
     Float(f64),
+    BigInt(num_bigint::BigInt),
     String(Rc<str>),
     Bool(bool),
     Unit,

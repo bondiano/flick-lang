@@ -59,11 +59,16 @@ with an independent `.stdout` under the existing JS/TS/Go debug/release
 harness. `numeric::tests` and the runtime number tests exercise lower layers.
 No existing fixture expectation or model exclusion is changed by this review.
 
-The reference interpreter covers Int and Float primitives, but does not model
-BigInt values or every foreign numeric helper. Lean's safety and cleanup
+The reference interpreter covers Int, Float and BigInt primitives, including
+radix literals and patterns, but not every foreign numeric helper. Lean's safety and cleanup
 theorems do not prove the Rust optimizer's numerical equivalence, IEEE
 rounding, or either runtime implementation. The runtime and execution tests
 remain necessary.
+
+The Lean certificate writer retains its existing literal fragment: Float and
+BigInt literals are explicitly refused there. The interpreter's new BigInt
+coverage does not claim additional certified programs or change the existing
+proof obligations.
 
 ## Component and future target obligations
 

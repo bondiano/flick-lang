@@ -10,6 +10,7 @@
     reason = "every native has the signature of `Native::run`, which may fail"
 )]
 
+mod numbers;
 mod show;
 
 use std::fmt;
@@ -43,6 +44,8 @@ macro_rules! natives {
 }
 
 natives! {
+    "global", "Number", 1 => numbers::number;
+    "global", "BigInt", 1 => numbers::bigint;
     RT, "stdoutLine", 1 => stdout_line;
     RT, "show", 1 => show::show;
     RT, "listShow", 2 => show::list_show;
@@ -54,6 +57,7 @@ natives! {
     RT, "listEquals", 3 => list_equals;
     RT, "listCompare", 3 => show::list_compare;
     RT, "listMap", 2 => list_map;
+    RT, "listLength", 1 => list_length;
     RT, "listFlatMap", 2 => list_flat_map;
     RT, "listFold", 3 => list_fold;
     RT, "listMap2", 3 => list_map2;
@@ -217,6 +221,13 @@ fn floats(args: &[Term]) -> Result<(f64, f64), String> {
         [Term::Lit(Lit::Float(a)), Term::Lit(Lit::Float(b))] => Ok((*a, *b)),
         _ => Err(format!("{args:?}")),
     }
+}
+
+fn list_length(args: &[Term], _: &mut String) -> Result<Term, String> {
+    let values = list(&args[0])?;
+    Ok(Term::Lit(Lit::Int(
+        values.iter().fold(0_i32, |n, _| n.wrapping_add(1)),
+    )))
 }
 
 /// JS `===`: `NaN` differs from itself, `0` equals `-0`.

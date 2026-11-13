@@ -2,6 +2,7 @@
 //! (`flick_core::numeric::int_arith`), `Float` is IEEE, `==` is structural
 //! with `SameValueZero` on numbers, strings order by UTF-16 code units.
 
+use num_bigint::{BigInt, Sign};
 use std::cmp::Ordering;
 
 use flick_core::numeric::{Arith, Num, int_arith};
@@ -18,8 +19,13 @@ pub fn run(p: Prim, args: &[Term]) -> Result<Term, String> {
         (Prim::Arith(op, Num::Float), [Term::Lit(Lit::Float(a)), Term::Lit(Lit::Float(b))]) => {
             lit(Lit::Float(float_arith(op, *a, *b)))
         }
+        (Prim::Arith(op, Num::BigInt), [Term::Lit(Lit::BigInt(a)), Term::Lit(Lit::BigInt(b))]) => {
+            Ok(big_arith(op, a, b)
+                .map_or_else(|why| Term::Die(why.into()), |n| Term::Lit(Lit::BigInt(n))))
+        }
         (Prim::Neg(Num::Int), [Term::Lit(Lit::Int(a))]) => lit(Lit::Int(a.wrapping_neg())),
         (Prim::Neg(Num::Float), [Term::Lit(Lit::Float(a))]) => lit(Lit::Float(-a)),
+        (Prim::Neg(Num::BigInt), [Term::Lit(Lit::BigInt(a))]) => lit(Lit::BigInt(-a)),
         (Prim::Eq | Prim::NotEq, [a, b]) => match equal(a, b) {
             Some(same) => lit(Lit::Bool(same == (p == Prim::Eq))),
             None => Err(format!("`==` of {a:?} and {b:?}")),
@@ -67,8 +73,39 @@ fn float_arith(op: Arith, a: f64, b: f64) -> f64 {
         Arith::Div => a / b,
         // JS `%` keeps the sign of the dividend, as Rust's does
         Arith::Rem => a % b,
+        Arith::Pow if b.is_nan() || (a.abs().to_bits() == 1.0_f64.to_bits() && b.is_infinite()) => {
+            f64::NAN
+        }
         Arith::Pow => a.powf(b),
     }
+}
+
+fn big_arith(op: Arith, a: &BigInt, b: &BigInt) -> Result<BigInt, String> {
+    Ok(match op {
+        Arith::Add => a + b,
+        Arith::Sub => a - b,
+        Arith::Mul => a * b,
+        Arith::Div | Arith::Rem if *b == BigInt::ZERO => BigInt::ZERO,
+        Arith::Div => a / b,
+        Arith::Rem => a % b,
+        Arith::Pow => {
+            if b.sign() == Sign::Minus {
+                return Err("Exponent must be non-negative".into());
+            }
+            let (mut base, mut power) = (a.clone(), b.clone());
+            let mut result = BigInt::from(1u8);
+            while power != BigInt::ZERO {
+                if (&power & BigInt::from(1u8)) != BigInt::ZERO {
+                    result *= &base;
+                }
+                power >>= 1u8;
+                if power != BigInt::ZERO {
+                    base = &base * &base;
+                }
+            }
+            result
+        }
+    })
 }
 
 /// `<` as JS orders primitives: `None` inside when a `NaN` makes every
@@ -80,6 +117,7 @@ fn float_arith(op: Arith, a: f64, b: f64) -> f64 {
 fn order(a: &Lit, b: &Lit) -> Option<Option<Ordering>> {
     Some(match (a, b) {
         (Lit::Int(x), Lit::Int(y)) => Some(x.cmp(y)),
+        (Lit::BigInt(x), Lit::BigInt(y)) => Some(x.cmp(y)),
         (Lit::Float(x), Lit::Float(y)) => x.partial_cmp(y),
         (Lit::String(x), Lit::String(y)) => Some(x.encode_utf16().cmp(y.encode_utf16())),
         (Lit::Bool(x), Lit::Bool(y)) => Some(x.cmp(y)),
@@ -132,5 +170,63 @@ pub fn atom(text: &str) -> String {
         text.to_owned()
     } else {
         format!("({text})")
+    }
+}
+
+#[cfg(test)]
+mod numeric_tests {
+    use super::*;
+
+    fn big(n: &str) -> BigInt {
+        n.parse().expect("integer test oracle")
+    }
+
+    #[test]
+    fn bigint_arithmetic_keeps_precision_and_zero_division_policy() {
+        assert_eq!(
+            big_arith(
+                Arith::Mul,
+                &big("18446744073709551616"),
+                &big("18446744073709551616")
+            )
+            .expect("product"),
+            big("340282366920938463463374607431768211456")
+        );
+        assert_eq!(
+            big_arith(Arith::Div, &big("-7"), &big("2")).expect("quotient"),
+            big("-3")
+        );
+        assert_eq!(
+            big_arith(Arith::Rem, &big("-7"), &big("2")).expect("remainder"),
+            big("-1")
+        );
+        assert_eq!(
+            big_arith(Arith::Div, &big("7"), &big("0")).expect("zero quotient"),
+            big("0")
+        );
+        assert_eq!(
+            big_arith(Arith::Rem, &big("7"), &big("0")).expect("zero remainder"),
+            big("0")
+        );
+        assert_eq!(
+            big_arith(Arith::Pow, &big("2"), &big("128")).expect("power"),
+            big("340282366920938463463374607431768211456")
+        );
+        assert_eq!(
+            big_arith(Arith::Pow, &big("0"), &big("0")).expect("zero power"),
+            big("1")
+        );
+        assert!(big_arith(Arith::Pow, &big("2"), &big("-1")).is_err());
+    }
+
+    #[test]
+    fn float_powers_preserve_the_nan_boundaries() {
+        assert!(float_arith(Arith::Pow, 1.0, f64::INFINITY).is_nan());
+        assert!(float_arith(Arith::Pow, -1.0, f64::NEG_INFINITY).is_nan());
+        assert!(float_arith(Arith::Pow, 1.0, f64::NAN).is_nan());
+        assert_eq!(
+            float_arith(Arith::Pow, f64::NAN, 0.0).to_bits(),
+            1.0_f64.to_bits()
+        );
     }
 }

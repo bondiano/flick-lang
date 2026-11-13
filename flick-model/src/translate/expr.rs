@@ -124,7 +124,9 @@ impl Tr {
     pub(super) fn expr(&mut self, e: &ir::Expr) -> Term {
         let rc = |t: Term| Rc::new(t);
         match &e.kind {
-            ExprKind::Lit(l) => lit(l).map_or_else(|| stuck("a `BigInt` literal"), Term::Lit),
+            ExprKind::Lit(l) => {
+                lit(l).map_or_else(|| stuck("an invalid `BigInt` literal"), Term::Lit)
+            }
             ExprKind::Local(x) => Term::Var(x.as_str().into()),
             ExprKind::Var(x) => self.version(x),
             ExprKind::Global { module, name } => Term::Global(Path::new(module, name)),
@@ -339,7 +341,6 @@ pub fn pat(p: &ir::Pat) -> Pat {
     match p {
         ir::Pat::Wild => Pat::Wild,
         ir::Pat::Bind(x) => Pat::Var(x.as_str().into()),
-        // a `BigInt` pattern matches no value the model has
         ir::Pat::Lit(l) => lit(l).map_or(Pat::Or(Rc::from([])), Pat::Lit),
         ir::Pat::Tuple(ps) if ps.is_empty() => Pat::Lit(Lit::Unit),
         ir::Pat::Tuple(ps) => Pat::Tuple(ps.iter().map(pat).collect()),
@@ -369,8 +370,19 @@ fn lit(l: &ir::Lit) -> Option<Lit> {
         ir::Lit::String(s) => Lit::String(s.as_str().into()),
         ir::Lit::Bool(b) => Lit::Bool(*b),
         ir::Lit::Unit => Lit::Unit,
-        ir::Lit::BigInt(_) => return None,
+        ir::Lit::BigInt(text) => Lit::BigInt(big_literal(text)?),
     })
+}
+
+fn big_literal(text: &str) -> Option<num_bigint::BigInt> {
+    let (negative, digits) = text.strip_prefix('-').map_or((false, text), |s| (true, s));
+    let (radix, digits) = match digits.get(..2).map(str::to_ascii_lowercase).as_deref() {
+        Some("0x") => (16, &digits[2..]),
+        Some("0o") => (8, &digits[2..]),
+        Some("0b") => (2, &digits[2..]),
+        _ => (10, digits),
+    };
+    num_bigint::BigInt::parse_bytes(digits.as_bytes(), radix).map(|n| if negative { -n } else { n })
 }
 
 fn binary(op: BinOp, a: Term, b: Term) -> Term {
