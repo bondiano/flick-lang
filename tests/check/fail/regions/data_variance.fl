@@ -3,6 +3,8 @@
 // an arrow keeps it from moving (`docs/formal/regions.md` §2.2.1).
 module App.DataVarianceFail exposing (..)
 
+type Box a = Box { value : a }
+
 type Cell a = Cell (Ref a)
 
 type Tag a =
@@ -23,3 +25,11 @@ let cell_widens x = x
 tag_widens : Tag (Unit -> Unit) -> Tag (Unit ->{Async} Unit)
 let tag_widens t = t
 //                 ^ FLICK-T003 expected `Tag (Unit ->{Async} Unit)`, found `Tag (Unit -> Unit)`
+
+option_narrows : Option ((Float -> Float)^{c, d}) -> Option ((Float -> Float)^{c})
+let option_narrows value = value
+//                         ^^^^^ FLICK-G001 this value holds `d`
+
+box_narrows : Box ((Float -> Float)^{c, d}) -> Box ((Float -> Float)^{c})
+let box_narrows value = value
+//                      ^^^^^ FLICK-G001 this value holds `d`

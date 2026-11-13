@@ -127,6 +127,21 @@ impl Checker<'_> {
         }
     }
 
+    /// A parameter's elided storage row supplements what its arguments show;
+    /// it does not bound them (`Ty.reach` of an elided `Captured` in the model).
+    pub(super) fn parameter_captures(&self, param: &Type) -> Norm {
+        let mut reached = self.captures_of(param);
+        if let Type::Captured {
+            ty,
+            elided: Elided(true),
+            ..
+        } = param
+        {
+            merge(&mut reached, self.captures_of(ty));
+        }
+        reached
+    }
+
     /// `quantify` is off under a `∀` of the signature: `Ty.fresh` does not
     /// enter it, so a parameter there keeps its row empty, while its results
     /// still hold what the parameters before them reach of the atoms outside
@@ -148,7 +163,7 @@ impl Checker<'_> {
             } => {
                 let param = self.rows_of_param(param, kinds, fresh, quantify);
                 let mut held = held.clone();
-                let mut reached = self.captures_of(&param);
+                let mut reached = self.parameter_captures(&param);
                 reached.entries.retain(|(_, atom)| {
                     matches!(
                         self.atom_kind(atom, kinds),

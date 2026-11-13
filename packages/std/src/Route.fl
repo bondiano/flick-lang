@@ -8,10 +8,10 @@
 ///
 /// ```flick
 /// type Page = Home | User Float | Search { q : String; page : Option Float }
-///   deriving (Schema, Url)
+///   deriving Schema, Url
 ///
-/// Route.print Page$url (User 42)           -- "/user/42"
-/// Route.parse Page$url "/search?q=atoms"   -- Some (Search { q = "atoms"; page = None })
+/// let printed = Route.print Page.url (User 42)           // "/user/42"
+/// let parsed = Route.parse Page.url "/search?q=atoms"   // Some (Search { q = "atoms"; page = None })
 /// ```
 module Route exposing (..)
 

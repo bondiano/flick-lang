@@ -31,3 +31,9 @@ let record_of_pure r = r
 
 sink_narrows : Sink (Float ->{Async} Float) -> Sink (Float -> Float)
 let sink_narrows s = s
+
+option_widens : Option ((Float -> Float)^{c}) -> Option ((Float -> Float)^{c, d})
+let option_widens f = f
+
+box_widens : Box ((Float -> Float)^{c}) -> Box ((Float -> Float)^{c, d})
+let box_widens b = b

@@ -256,72 +256,72 @@ impl Checker<'_> {
     fn walk(
         &self,
         current: &HashMap<Key, Vec<Sign>>,
-        a: &str,
-        t: &Type,
-        q: bool,
+        parameter: &str,
+        ty: &Type,
+        positive: bool,
         flipped: bool,
         out: &mut Uses,
     ) {
-        match t {
-            Type::Var(n) if n == a => out.at(q, flipped),
+        match ty {
+            Type::Var(name) if name == parameter => out.at(positive, flipped),
             Type::Fun {
                 param,
                 effects,
                 result,
             } => {
-                self.walk(current, a, param, !q, true, out);
-                out.fixed(
-                    effects
-                        .as_ref()
-                        .is_some_and(|e| occurs(a, &e.services) || occurs(a, &e.errors)),
-                );
-                self.walk(current, a, result, q, flipped, out);
+                self.walk(current, parameter, param, !positive, true, out);
+                out.fixed(effects.as_ref().is_some_and(|errors| {
+                    occurs(parameter, &errors.services) || occurs(parameter, &errors.errors)
+                }));
+                self.walk(current, parameter, result, positive, flipped, out);
             }
             Type::Captured { ty, captures, .. } | Type::Bounded { ty, captures } => {
-                if occurs(a, captures) {
-                    out.at(q, flipped);
+                if occurs(parameter, captures) {
+                    out.at(positive, flipped);
                 }
-                self.walk(current, a, ty, q, flipped, out);
+                self.walk(current, parameter, ty, positive, flipped, out);
             }
-            Type::Record(r) if !r.tail.as_ref().is_some_and(|t| occurs(a, t)) => {
-                for (l, f) in &r.entries {
-                    out.fixed(names(l, a));
-                    self.walk(current, a, f, q, flipped, out);
+            Type::Record(row) if !row.tail.as_ref().is_some_and(|ty| occurs(parameter, ty)) => {
+                for (label, field) in &row.entries {
+                    out.fixed(names(label, parameter));
+                    self.walk(current, parameter, field, positive, flipped, out);
                 }
             }
             Type::Tuple(items) => {
-                for x in items {
-                    self.walk(current, a, x, q, flipped, out);
+                for item in items {
+                    self.walk(current, parameter, item, positive, flipped, out);
                 }
             }
             Type::App { .. } => {
-                let (head, args) = t.spine();
+                let (head, args) = ty.spine();
                 match (head, &args[..]) {
-                    (h, [r, e, x]) if h.is_lang(Lang::Eff) => {
-                        out.fixed(occurs(a, r) || occurs(a, e));
-                        self.walk(current, a, x, q, flipped, out);
+                    (callee, [row, errors, item]) if callee.is_lang(Lang::Eff) => {
+                        out.fixed(occurs(parameter, row) || occurs(parameter, errors));
+                        self.walk(current, parameter, item, positive, flipped, out);
                     }
                     (Type::Con { module, name }, _) => {
                         let key = (module.clone(), name.clone());
                         let theirs = (current.get(&key).cloned())
                             .or_else(|| self.signs.get(&key).cloned().flatten().map(|s| s.to_vec()))
                             .or_else(|| head.is_lang(Lang::List).then(|| vec![Sign::Pos]));
-                        for (j, x) in args.into_iter().enumerate() {
-                            // an unused parameter holds `a` only where `a`
+                        for (index, item) in args.into_iter().enumerate() {
+                            // an unused parameter holds `parameter` only where `parameter`
                             // itself may stand (Lean `Ty.Pol.data`)
-                            match theirs.as_ref().and_then(|s| s.get(j)).copied() {
+                            match theirs.as_ref().and_then(|s| s.get(index)).copied() {
                                 Some(Sign::Pos | Sign::Bi) => {
-                                    self.walk(current, a, x, q, flipped, out);
+                                    self.walk(current, parameter, item, positive, flipped, out);
                                 }
-                                Some(Sign::Neg) => self.walk(current, a, x, !q, true, out),
-                                Some(Sign::Inv) | None => out.fixed(occurs(a, x)),
+                                Some(Sign::Neg) => {
+                                    self.walk(current, parameter, item, !positive, true, out);
+                                }
+                                Some(Sign::Inv) | None => out.fixed(occurs(parameter, item)),
                             }
                         }
                     }
-                    _ => out.fixed(occurs(a, t)),
+                    _ => out.fixed(occurs(parameter, ty)),
                 }
             }
-            _ => out.fixed(occurs(a, t)),
+            _ => out.fixed(occurs(parameter, ty)),
         }
     }
 
@@ -375,41 +375,52 @@ impl Checker<'_> {
 
     /// `T ū ≤ T ū'` by the sign of each parameter (≤-Data), and a record or
     /// a tuple field by field; else `≡`.
-    pub(super) fn subsume_data(&mut self, a: &Type, e: &Type, span: Span) -> Unified {
-        match (a, e) {
-            (Type::Tuple(xs), Type::Tuple(ys)) if xs.len() == ys.len() => xs
-                .iter()
-                .zip(ys)
-                .try_for_each(|(x, y)| self.subsume(x, y, span)),
+    pub(super) fn subsume_data(&mut self, actual: &Type, expected: &Type, span: Span) -> Unified {
+        match (actual, expected) {
+            (Type::Tuple(args), Type::Tuple(expected_args))
+                if args.len() == expected_args.len() =>
+            {
+                args.iter()
+                    .zip(expected_args)
+                    .try_for_each(|(x, y)| self.subsume(x, y, span))
+            }
             (Type::Record(r), Type::Record(s))
                 if r.tail.is_none()
                     && s.tail.is_none()
                     && r.entries.len() == s.entries.len()
-                    && r.entries.iter().all(|(l, _)| s.get(l).is_some()) =>
+                    && r.entries.iter().all(|(label, _)| s.get(label).is_some()) =>
             {
-                r.entries.iter().try_for_each(|(l, x)| {
-                    s.get(l)
+                r.entries.iter().try_for_each(|(label, x)| {
+                    s.get(label)
                         .map_or(Ok(()), |y| self.subsume(x, &y.clone(), span))
                 })
             }
             (Type::App { .. }, Type::App { .. }) => {
-                let ((h, xs), (g, ys)) = (a.spine(), e.spine());
-                let signs = match (h, g) {
-                    (Type::Con { module, name }, Type::Con { module: m, name: n })
-                        if module == m && name == n && xs.len() == ys.len() =>
+                let ((head, args), (other_head, expected_args)) =
+                    (actual.spine(), expected.spine());
+                let signs = match (head, other_head) {
+                    (
+                        Type::Con { module, name },
+                        Type::Con {
+                            module: other_module,
+                            name: other_name,
+                        },
+                    ) if module == other_module
+                        && name == other_name
+                        && args.len() == expected_args.len() =>
                     {
-                        self.signs(module, name).filter(|s| s.len() == xs.len())
+                        self.signs(module, name).filter(|s| s.len() == args.len())
                     }
                     _ => None,
                 };
                 let Some(signs) = signs else {
-                    return self.unify(a, e);
+                    return self.unify(actual, expected);
                 };
-                let (xs, ys): (Vec<Type>, Vec<Type>) = (
-                    xs.into_iter().cloned().collect(),
-                    ys.into_iter().cloned().collect(),
+                let (args, expected_args): (Vec<Type>, Vec<Type>) = (
+                    args.into_iter().cloned().collect(),
+                    expected_args.into_iter().cloned().collect(),
                 );
-                for ((x, y), s) in xs.iter().zip(&ys).zip(signs.iter()) {
+                for ((x, y), s) in args.iter().zip(&expected_args).zip(signs.iter()) {
                     // an argument inference has yet to solve takes the other
                     // as it is, its bound too, as `≡` of the whole type did
                     let open = |t: &Type| matches!(self.whnf(t), Type::Meta(_));
@@ -425,7 +436,7 @@ impl Checker<'_> {
                 }
                 Ok(())
             }
-            _ => self.unify(a, e),
+            _ => self.unify(actual, expected),
         }
     }
 }

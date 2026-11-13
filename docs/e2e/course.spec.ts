@@ -1,5 +1,7 @@
 // The course in a browser: hints one at a time, a question, Ctrl+Enter and the progress of the contents.
 import { expect, type Page, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { replaceSource } from "./helpers.ts";
 import { courses, pageOf } from "../course/load.ts";
 
 const exercises = courses().flatMap((course) => course.lessons.flatMap((lesson) => lesson.exercises));
@@ -57,4 +59,20 @@ test("a question is answered before the code counts, and Ctrl+Enter checks the a
 test("the Russian contents count the same exercises", async ({ page }) => {
   await page.goto("/flick-lang/ru/course/");
   await expect(page.locator(".course-progress")).toContainText(`Пройдено упражнений: 0 из ${exercises.length}.`, { timeout: 30_000 });
+});
+
+test("a running exercise rejects its starter and wrong output, then accepts its solution", async ({ page }) => {
+  await page.goto("/flick-lang/tour/failures/");
+  await ready(page);
+  const lesson = page.locator(".fp-lesson");
+  for (const [name, message] of [
+    ["starter", "Fix the compiler errors first."],
+    ["broken", "The output does not match the task."],
+    ["solution", "Correct. The signature and output match."],
+  ] as const) {
+    const source = readFileSync(new URL(`../exercises/effects/01/${name}.fl`, import.meta.url), "utf8");
+    await replaceSource(page, source);
+    await page.keyboard.press("ControlOrMeta+Enter");
+    await expect(lesson).toContainText(message, { timeout: 30_000 });
+  }
 });

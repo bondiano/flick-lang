@@ -7,9 +7,20 @@
 /// the row is sent as its `Problem` instance says.
 ///
 /// ```flick
+/// import HttpApi.Derive exposing (..)
+/// # type alias Credentials = { authorization : Option String } deriving Schema
+/// # type alias UserBody = { name : String } deriving Schema
+/// # type alias ProfilePath = { username : String } deriving Schema
+/// # type alias ProfileBody = { name : String; bio : String } deriving Schema
+/// # type error Unauthorized = Unauthorized deriving Schema
+/// # instance Problem Unauthorized =
+/// #   let problem = { status = 401; body = Codec.json Unauthorized.schema }
+/// # type error NotFound = NotFound deriving Schema
+/// # instance Problem NotFound =
+/// #   let problem = { status = 404; body = Codec.json NotFound.schema }
 /// type alias Users = {
 ///   current_user : Authed (Get "/api/user" { headers : Credentials } UserBody {Unauthorized});
-///   profile : Get "/api/profiles/:username" { path : ProfilePath } ProfileBody {NotFound};
+///   profile : MaybeAuthed (Get "/api/profiles/:username" { headers : Credentials; path : ProfilePath } ProfileBody {Unauthorized, NotFound});
 /// } deriving HttpApi
 /// ```
 ///
