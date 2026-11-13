@@ -269,3 +269,4 @@ stdlib/server/origin
 stdlib/server/server_fn
 stdlib/server/auth
 stdlib/server/node
+stdlib/rpc/captured

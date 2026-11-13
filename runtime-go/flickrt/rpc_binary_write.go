@@ -426,7 +426,8 @@ func (w *binWriter) structPositional(n *binNode, r *Record) error {
 			return err
 		}
 	}
-	// shortcut: no extra keys in fingerprint mode, which only the envelope uses and which has none; port them if a fingerprinted layout gains a record
+	// Only the fixed message envelope uses fingerprint mode; its schema
+	// declares every field and contains no dictionary with extra keys.
 	return nil
 }
 

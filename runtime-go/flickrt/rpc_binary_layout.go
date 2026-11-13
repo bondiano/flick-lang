@@ -3,6 +3,7 @@ package flickrt
 import (
 	"cmp"
 	"encoding/binary"
+	"maps"
 	"slices"
 	"strconv"
 )
@@ -10,7 +11,7 @@ import (
 // The `binary` RPC serialization is Effect's SchemaBinary: each value is
 // written by a layout compiled from the encoded side of its schema. A
 // binNode is that layout for the JSON trees the program's codecs give, as
-// Effect 4.0.5 compiles it from the JS runtime's matching schemas, so a Go
+// Effect 4.1.2 compiles it from the JS runtime's matching schemas, so a Go
 // peer writes the bytes a JS peer writes.
 
 type binKind uint8
@@ -203,6 +204,25 @@ func binUnionOf(members []*binNode) *binNode {
 			continue
 		}
 		seen[m] = true
+		if m.kind == binInvalid {
+			return m
+		}
+		if m.kind == binStruct && len(m.sentinels) == 0 {
+			var sentinels []binSentinel
+			var fields []*binField
+			for _, field := range m.fields {
+				if !field.optional && field.node.kind == binLiteral && len(field.node.lits) == 1 {
+					sentinels = append(sentinels, binSentinel{field.name, field.node.lits[0]})
+				} else {
+					fields = append(fields, field)
+				}
+			}
+			if len(sentinels) > 0 {
+				variant := binStructOf(sentinels, fields)
+				variant.extra = m.extra
+				m = variant
+			}
+		}
 		switch {
 		case m.kind == binStruct && len(m.sentinels) > 0:
 			variants = append(variants, &binMember{node: m, variant: true, tag: binSentinelHash(m.sentinels)})
@@ -292,15 +312,76 @@ func (c *binCompiler) codec(x codec) *binNode {
 		return c.codec(x.codec)
 	case *stage:
 		return c.codec(x.wire)
+	case *decodedStage:
+		return c.codec(x.wire)
 	case *stringAs:
 		return binLeaf(binString)
+	case *numberAs:
+		return binLeaf(binNumber)
+	case stringRecord:
+		return &binNode{kind: binStruct, extra: binLeaf(binString)}
+	case *entriesCodec:
+		return &binNode{kind: binStruct, extra: c.codec(x.value)}
+	case *checkedEntries:
+		return c.codec(x.entriesCodec)
+	case *checkedCodec:
+		return c.codec(x.from)
+	case *fallbackCodec:
+		return c.codec(x.from)
+	case *wireOnly:
+		return c.codec(x.c)
+	case *ignoring:
+		return c.codec(x.codec)
+	case *nonEmptyList:
+		item := c.codec(x.item)
+		return &binNode{kind: binArray, elems: []*binNode{item}, rest: item}
+	case *pair:
+		return &binNode{kind: binArray, elems: []*binNode{c.codec(x.first), c.codec(x.second)}}
+	case *listEnsure:
+		return binUnionOf(append(c.members(x.item), &binNode{kind: binArray, rest: c.codec(x.item)}))
+	case *nullOption:
+		nodes := append(c.members(x.item), binLeaf(binNull))
+		if x.nullish {
+			nodes = append(nodes, binLeaf(binUndefined))
+		}
+		return binUnionOf(nodes)
+	case *literalCodec:
+		return binLiterals(x.values)
+	case *enumCodec:
+		if x.adt != nil {
+			return c.schema(x.adt)
+		}
+		values := make([]Value, len(x.values))
+		for i, v := range x.values {
+			values[i], _ = x.base.encode(nil, v)
+		}
+		return binLiterals(values)
+	case netUnion:
+		var nodes []*binNode
+		for _, item := range x {
+			nodes = append(nodes, c.members(item)...)
+		}
+		return binUnionOf(nodes)
+	case dnsUnion:
+		var nodes []*binNode
+		for _, tag := range slices.Sorted(maps.Keys(dnsCodecs)) {
+			nodes = append(nodes, c.members(dnsCodecs[tag])...)
+		}
+		return binUnionOf(nodes)
+	case maskedRedacted:
+		return binLits(binString, maskedText)
+	case refused:
+		return &binNode{kind: binInvalid, err: x.reason}
+	case *stringTree:
+		return c.stringTree(x.s)
+	case *flipped:
+		return c.decoded(x.c)
 	case losslessNumber, *taggedOption:
 		return binUnionOf(c.members(x))
 	case jsonValue:
 		return binLeaf(binJSON)
 	}
-	// shortcut: a codec of no known JS schema (stringRecord, the string tree) is written as its JSON text, which only a Go peer reads; give it its Effect layout when a JS peer needs it
-	return binLeaf(binJSON)
+	return &binNode{kind: binInvalid, err: "codec has no binary layout"}
 }
 
 func (c *binCompiler) schema(s *Schema) *binNode {
@@ -344,11 +425,19 @@ func (c *binCompiler) build(s *Schema) *binNode {
 			fields[i] = binFieldOf(l, false, c.schema(s.items[i]))
 		}
 		return binStructOf(nil, fields)
+	case kindRefined:
+		return c.schema(s.item)
+	case kindCustom:
+		return c.codec(s.jsonOf())
 	case kindResult:
-		// shortcut: Effect refuses `{ok} | {err}` (two structs without a sentinel), so a JS peer cannot carry a Result at all; a Go peer writes its JSON text until the JS runtime gives Result a tagged wire form
+		// As Effect, two untagged struct members cannot select a wire case.
+		return &binNode{kind: binInvalid, err: "union members are not uniquely identifiable"}
+	case kindUnknown:
 		return binLeaf(binJSON)
+	case kindRedacted:
+		return &binNode{kind: binInvalid, err: redactedRefusal}
 	}
-	return binLeaf(binJSON) // unknown, and a Redacted value, which has no wire form
+	return &binNode{kind: binInvalid, err: "schema has no binary layout"}
 }
 
 // members is a codec's encoded side as union members: Effect flattens
@@ -385,7 +474,15 @@ func (c *binCompiler) members(x codec) []*binNode {
 		c.variants[x] = vs
 		return vs
 	}
-	return []*binNode{c.codec(x)}
+	node := c.codec(x)
+	if node.kind == binUnion {
+		nodes := make([]*binNode, len(node.members))
+		for i, member := range node.members {
+			nodes[i] = member.node
+		}
+		return nodes
+	}
+	return []*binNode{node}
 }
 
 // adtVariants are the structs of a variant type's constructors, made

@@ -41,6 +41,7 @@ rpcListenTcp *RpcListenTcp
 rpcPort RpcPort
 rpcHandler *RpcHandler
 rpcHandlerWebsocket *RpcHandlerWebsocket
+rpcServe *ServerServe
 
 [flick:server/Functions]
 serverAuthenticated *ServerAuthenticated

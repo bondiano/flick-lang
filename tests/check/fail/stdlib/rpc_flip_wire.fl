@@ -1,0 +1,9 @@
+module App.RpcFlipWire exposing (..)
+
+// Flipping a numeric codec changes its wire to Float, which is not Json.
+procedure : Rpc.Rpc "number" (Json ->{r} Unit)
+let procedure =
+  Rpc.make (Record.label : Record.Label "number")
+    |> Rpc.with_payload (Codec.flip Codec.number_from_string)
+
+//~ FLICK-T003 @7:26-7:61 expected `PureCodec Json _`, found `PureCodec Float Json`

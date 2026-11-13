@@ -1,0 +1,10 @@
+module App.RpcFlipped exposing (..)
+
+// Both sides remain Json, but binary encoding must retain the structured
+// dictionary schema on the decoded side of json_string before flipping.
+flipped : PureCodec Json Json
+let flipped =
+  Codec.flip (Codec.json_string (Codec.json (Codec.wire_schema (Codec.entries String.json))))
+
+procedure : Rpc.Rpc "shaped" (Json ->{r} Unit)
+let procedure = Rpc.make (Record.label : Record.Label "shaped") |> Rpc.with_payload flipped

@@ -4,7 +4,7 @@ title: "FLICK-P030"
 
 `emit = "go"` builds the program for the go target, and it imports a module
 that exists on the js target only, or a package module no build compiled for
-go. The browser UI (`Ui`, `Atom`, `Reactivity.Atom`, `Action`), `Rpc`,
+go. The browser UI (`Ui`, `Atom`, `Reactivity.Atom`, `Action`),
 `Otlp`, `DevTools`, JS interop (`Js`) and the JS hosts (`Runner.Node`,
 `Runner.Browser`, `Runner.Cloudflare`) are js only; a package's interface
 lists the targets its build compiled it for.

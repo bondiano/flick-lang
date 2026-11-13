@@ -281,7 +281,7 @@ func entriesOf(r *Record) Value {
 // CodecJsonString is `Codec.json_string`: JSON text in a string.
 func CodecJsonString(c Value) Value {
 	inner := codecOf(c)
-	return &fallible{&stage{
+	return &fallible{&decodedStage{&stage{
 		&stringAs{"a string that will be decoded as JSON"},
 		func(fb *Fiber, v Value) (Value, []issue) {
 			parsed, reason := parseJSON(v.(string))
@@ -297,5 +297,5 @@ func CodecJsonString(c Value) Value {
 			}
 			return JsonStringify(w), nil
 		},
-	}}
+	}, inner}}
 }

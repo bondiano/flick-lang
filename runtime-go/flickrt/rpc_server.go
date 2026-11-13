@@ -38,7 +38,7 @@ func makeRPCServer(env *env, g *rpcGroup, handlers map[string]Value) *rpcServer 
 // interrupted and awaited, and the sockets closed.
 func newRPCServer(fb *Fiber, g *rpcGroup, handlers map[string]Value) *rpcServer {
 	s := makeRPCServer(fb.env, g, handlers)
-	fb.owner.add(fb, func(*Fiber, *Cause) Value {
+	fb.owner.onClose(fb, func(*Fiber) {
 		s.mu.Lock()
 		s.closed = true
 		conns := make([]*rpcConn, 0, len(s.conns))
@@ -50,7 +50,6 @@ func newRPCServer(fb *Fiber, g *rpcGroup, handlers map[string]Value) *rpcServer 
 			c.close()
 		}
 		s.calls.Wait()
-		return Unit
 	})
 	return s
 }
@@ -262,13 +261,13 @@ func (c *rpcConn) request(m Value) {
 	}
 	key := idKey(id)
 	c.mu.Lock()
-	if _, dup := c.calls[key]; dup {
+	if _, dup := c.calls[key]; dup || c.ended {
 		c.mu.Unlock()
 		return
 	}
 	c.calls[key] = call
-	c.mu.Unlock()
 	c.srv.calls.Add(1)
+	c.mu.Unlock()
 	concurrent.Store(true)
 	go c.run(call, p, id, decoded, headers, m)
 }

@@ -256,7 +256,13 @@ func RpcCallStreamNdjson(url, proc, payload Value) Value {
 // innermost owner closes.
 func RpcConnect(fb *Fiber, options, url Value) Value {
 	c := newRPCClient(options, url.(string))
-	fb.owner.add(fb, func(*Fiber, *Cause) Value { c.close(); return Unit })
+	if c.sock != nil {
+		c.sock.reconnect = make(chan struct{}, 1)
+		worker := fork(fb, fb.owner, Eff(c.sock.reconnectLoop), nil)
+		fb.owner.onClose(fb, func(fb *Fiber) { c.close(); stop(fb, worker) })
+	} else {
+		fb.owner.onClose(fb, func(*Fiber) { c.close() })
+	}
 	return c
 }
 

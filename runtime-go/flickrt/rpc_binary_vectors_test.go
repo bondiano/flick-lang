@@ -1,5 +1,5 @@
 // Scalar SchemaBinary frames from Effect 4.0.5; envelope frames updated
-// against pinned Effect 4.1.2 by packages/effect-ts/scripts/update-go-rpc-envelopes.mjs.
+// against pinned Effect 4.1.2 by tools/go-rpc/envelopes.mjs.
 
 package flickrt
 

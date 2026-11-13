@@ -201,19 +201,13 @@ func RpcListenWebsocket(fb *Fiber, options, group, handlers Value) Value {
 	return rpcListen(fb, true, options, group, handlers)
 }
 
-// RpcHandler answers a request of the group's calls, a POST per call.
-// The go target calls a foreign function with every stage at once, so it
-// runs per request, with the services of the request's fiber: its calls
-// end with the request, as the server lets requests finish, and a
-// WebSocket of RpcHandlerWebsocket closes with the server.
-//
-// shortcut: the handlers run with the services where the server runs, not where `handler` ran; mount it once, as Server.handler does, when a program provides them between the two
-func RpcHandler(fb *Fiber, ser, group, handlers, request Value) Value {
+// RpcHandler mounts a group once with its lexical services and owner.
+func RpcHandler(fb *Fiber, ser, group, handlers Value) Value {
 	g := groupOf(group)
-	return makeRPCServer(fb.env, g, rpcHandlers(g, handlers)).serveHTTP(fb, serializationOf(ser), requestOf(request))
+	return &serverMount{newRPCServer(fb, g, rpcHandlers(g, handlers)).httpHandler(serializationOf(ser))}
 }
 
-func RpcHandlerWebsocket(fb *Fiber, ser, group, handlers, request Value) Value {
+func RpcHandlerWebsocket(fb *Fiber, ser, group, handlers Value) Value {
 	g := groupOf(group)
-	return makeRPCServer(fb.env, g, rpcHandlers(g, handlers)).websocket(serializationOf(ser), requestOf(request))
+	return &serverMount{newRPCServer(fb, g, rpcHandlers(g, handlers)).websocketHandler(serializationOf(ser))}
 }

@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // WebSockets as RFC 6455 has them, enough for the messages of RPC: text
@@ -90,6 +91,8 @@ func (c *wsConn) write(data []byte, text bool) error {
 
 // shut sends a close frame of `code` and closes the connection.
 func (c *wsConn) shut(code uint16) {
+	// A peer that stopped reading cannot hold owner shutdown indefinitely.
+	c.conn.SetWriteDeadline(time.Now().Add(time.Second))
 	c.writeFrame(8, binary.BigEndian.AppendUint16(nil, code))
 	c.conn.Close()
 }
@@ -379,6 +382,6 @@ func RpcListenTcp(fb *Fiber, options, group, handlers Value) Value {
 			go srv.serveSocket(ser, nil, &tcpSocket{conn: conn, buf: make([]byte, 64<<10)})
 		}
 	}()
-	fb.owner.add(fb, func(*Fiber, *Cause) Value { l.Close(); return Unit })
+	fb.owner.onClose(fb, func(*Fiber) { l.Close() })
 	return &rpcListening{float64(l.Addr().(*net.TCPAddr).Port)}
 }

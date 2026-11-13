@@ -116,7 +116,7 @@ WebSocket support can be removed from a browser bundle.
 | `json` | one JSON document; over HTTP the messages of a call come together, so a stream's elements arrive once it ends |
 | `json_rpc` | JSON-RPC 2.0 documents, for peers that speak it |
 | `ndjson_rpc` | JSON-RPC 2.0, one message a line |
-| `binary` | the schema-driven frames of the Effect library: smaller than JSON, but both ends must use Effect, and it adds to a bundle |
+| `binary` | the schema-driven frames of the Effect library: smaller than JSON, both ends must use matching schema layouts, and it adds to a browser bundle |
 
 ## Serving
 
@@ -332,6 +332,5 @@ What may differ is what each side makes up for itself: the text of a
 defect for a payload that does not decode, the fiber ids of an
 interruption, the trace ids of a call, and the order of the answers to
 calls that run concurrently on one connection, which follows when each
-ends. A handler of `handler` and `handler_websocket` runs with the
-services where the HTTP server runs, which is where `handler` ran unless
-a program provides services between the two.
+ends. Handlers capture the services where `handler` or `handler_websocket`
+is mounted and keep them until its owning scope closes.

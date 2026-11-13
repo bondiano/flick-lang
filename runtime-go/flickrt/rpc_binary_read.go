@@ -330,6 +330,10 @@ func (r *binReader) structFields(n *binNode) (Value, error) {
 // extras reads the extra keys and their values in the next `size` bytes;
 // with a table, a key may be a back-reference to one read before.
 func (r *binReader) extras(n *binNode, table *[]string, size uint64) (*Record, error) {
+	if n.extra == nil {
+		_, err := r.take(size)
+		return nil, err
+	}
 	saved, err := r.enter(size)
 	if err != nil {
 		return nil, err
@@ -367,7 +371,7 @@ func (r *binReader) extras(n *binNode, table *[]string, size uint64) (*Record, e
 		if err != nil {
 			return nil, err
 		}
-		if ok {
+		if ok && v != nil {
 			out.put(key, v)
 		}
 	}
@@ -464,6 +468,9 @@ func (r *binReader) array(n *binNode) (Value, error) {
 			if err != nil {
 				return nil, err
 			}
+			if out[i] == nil {
+				return nil, binMissing("array element")
+			}
 		}
 		return out, nil
 	}
@@ -478,6 +485,9 @@ func (r *binReader) array(n *binNode) (Value, error) {
 		var err error
 		if out[i], err = r.slot(slot); err != nil {
 			return nil, err
+		}
+		if out[i] == nil {
+			return nil, binMissing("array element")
 		}
 	}
 	if n.rest == nil && r.pos < r.end {
@@ -588,7 +598,8 @@ func (r *binReader) row(st *binNode, shapes *[][]int, tables [][]string) (Value,
 		}
 		return st.record(vals, extras)
 	}
-	// shortcut: a new shape is declared by field ids as without a fingerprint; the envelope, the one fingerprinted layout, has no row run
+	// RPC payloads use field ids. Fingerprint mode is confined to the fixed
+	// message envelope, which contains no arrays of structs (row runs).
 	var declared []int
 	for r.pos < r.end {
 		id, err := r.uvarint()
@@ -687,7 +698,13 @@ func (r *binReader) union(n *binNode) (Value, error) {
 		}
 	}
 	if found == nil {
-		// shortcut: Effect reads an unknown member as absent, which drops an optional field holding it; here it fails the value, until peers evolve schemas apart
+		// Without fingerprints an evolving peer may add a union member.
+		// Its sized region is absent; optional fields omit it, required
+		// fields and array elements report a missing value.
+		if !r.positional {
+			r.pos = r.end
+			return nil, nil
+		}
 		return nil, binInvalidData("union member")
 	}
 	return r.checked(found.node)
