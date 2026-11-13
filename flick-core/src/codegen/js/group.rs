@@ -6,9 +6,12 @@
 use std::collections::HashMap;
 use std::mem;
 
+use flick_pretty::docvec;
+
+use super::doc::{Js, MULTILINE, Stmt, block, block_js, call, stmt_flags};
 use super::function::offsets;
-use super::{Gen, Tail, indent, names, view};
-use crate::codegen::tail::{Callee, Calls, Target, binds, cycles, function, members};
+use super::{Gen, Tail, names, view};
+use crate::codegen::tail::{Callee, Calls, Target, binds, cycles, function, target};
 use crate::ir::{Expr, Item, Lit, Param, Pat, Stage};
 
 /// Mutually tail-recursive functions of a module.
@@ -23,13 +26,6 @@ pub(super) struct Group {
 pub(super) fn groups(module: &str, items: &[Item], calls: Calls) -> Vec<Group> {
     cycles(module, items, calls)
         .into_iter()
-        // one function runs them: of one stage, a generator or not
-        .filter(|items_of| {
-            let last = |&i: &usize| {
-                function(&items[i], calls).and_then(|(_, params, _)| params.last().map(|p| p.stage))
-            };
-            items_of.iter().all(|i| last(i) == last(&items_of[0]))
-        })
         .map(|items_of| Group {
             name: format!(
                 "{}$rec",
@@ -58,24 +54,33 @@ pub(super) fn grouped(
         .collect()
 }
 
-impl Gen<'_> {
+impl<'d> Gen<'_, 'd> {
     /// The body of the member `target`, if it is one: a call of its group.
-    pub(super) fn group_call(&self, target: &Target, heads: &[String]) -> Option<String> {
+    pub(super) fn group_call(&self, target: &Target, heads: &[String]) -> Option<Js<'d>> {
         let Callee::Global(global) = &target.callee else {
             return None;
         };
         let &(g, k) = self.grouped.get(global)?;
-        Some(format!(
-            "{}({k}, {})",
-            self.groups[g].name,
-            heads.join(", ")
-        ))
+        let args: Vec<Js<'d>> = [k.to_string()]
+            .iter()
+            .chain(heads)
+            .map(|arg| self.leaf(arg))
+            .collect();
+        Some(call(self.a, self.leaf(&self.groups[g].name), &args))
     }
 
     /// The function running the group `g` of `items`.
-    pub(super) fn group(&mut self, g: usize, items: &[Item]) -> String {
+    pub(super) fn group(&mut self, g: usize, items: &[Item]) -> Stmt<'d> {
         let calls = self.calls();
-        let (functions, members) = members(self.module, items, &self.groups[g].items, calls);
+        let functions: Vec<(&str, &[Param], &Expr)> = self.groups[g]
+            .items
+            .iter()
+            .filter_map(|&i| function(&items[i], calls))
+            .collect();
+        let members: Vec<(Target, usize)> = functions
+            .iter()
+            .map(|(name, params, _)| (target(self.module, name), params.len()))
+            .collect();
         let arity = members.iter().map(|(_, n)| *n).max().unwrap_or(0);
         let vars: Vec<String> = (0..arity).map(|i| format!("$l{i}")).collect();
         let bodies: Vec<(&[Param], &Expr)> = functions.iter().map(|(_, p, b)| (*p, *b)).collect();
@@ -97,7 +102,7 @@ impl Gen<'_> {
                 for (p, var) in params.iter().zip(&vars) {
                     match &p.pat {
                         Pat::Bind(n) => {
-                            let c = g.constant(&names::ident(n), var);
+                            let c = g.constant(&names::ident(n), g.leaf(var));
                             g.buf.push(c);
                         }
                         Pat::Wild | Pat::Lit(Lit::Unit) => {}
@@ -121,25 +126,32 @@ impl Gen<'_> {
                     g.tail = None;
                 });
             });
-            cases.push(format!("case {k}: {{\n{}}}", indent(&stmts)));
+            let flags = stmt_flags(&stmts) | MULTILINE;
+            let case = docvec![self.a, "case ", k, ": ", block(self.a, &stmts)];
+            cases.push(Stmt::new(case, flags));
         }
         (self.generator, self.sync, self.tail) = saved;
-        let switch = format!("switch ($f) {{\n{}}}", indent(&cases));
-        let mut body = vec![format!("for (;;) {{\n{}}}", indent(&[switch]))];
+        let a = self.a;
+        let flags = stmt_flags(&cases) | MULTILINE;
+        let switch = Stmt::new(docvec![a, "switch ($f) ", block(a, &cases)], flags);
+        let mut body = vec![Stmt::new(
+            docvec![a, "for (;;) ", block(a, &[switch])],
+            flags,
+        )];
         let init: Vec<String> = offsets
             .iter()
             .flatten()
             .map(|o| format!("{o} = 0"))
             .collect();
         if !init.is_empty() {
-            body.insert(0, format!("let {};", init.join(", ")));
+            body.insert(0, self.line(&format!("let {};", init.join(", "))));
         }
         let params = format!("$f, {}", vars.join(", "));
         let value = if generator {
             self.generator_function(&params, &body)
         } else {
-            format!("{} {{\n{}}}", self.arrow(&params), indent(&body))
+            self.lambda_of(&params, block_js(a, &body))
         };
-        self.constant(&self.groups[g].name, &value)
+        self.constant(&self.groups[g].name, value)
     }
 }

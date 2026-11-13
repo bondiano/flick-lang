@@ -197,8 +197,10 @@ fn a_lone_tail_effect_needs_no_generator() {
          let twice n =\n  Platform.stdout_line (show n)\n  Platform.stdout_line (show n)\n\n\
          nested : Unit ->{} Unit\nlet nested () = Platform.stdout_line (show (Platform.env \"HOME\"))\n",
     );
+    // the printer may break the line: whitespace aside
+    let squashed: String = js.split_whitespace().collect();
     assert!(
-        js.contains("export const once = (n) => Effect.suspend(() => $m_Platform.stdout_line("),
+        squashed.contains("exportconstonce=(n)=>Effect.suspend(()=>$m_Platform.stdout_line("),
         "{js}"
     );
     // two steps, or an effect inside the arguments, keep the generator

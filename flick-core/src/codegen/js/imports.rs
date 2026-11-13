@@ -1,49 +1,50 @@
 //! Runtime, foreign and Flick imports for one generated module.
 
-use crate::effects::bindings;
-use std::fmt::Write;
+use flick_pretty::Document;
 
 use super::{Gen, RUNTIME, names, relative};
+use crate::effects::bindings;
 
-const KERNEL_RUNTIME: &str = bindings::OWNED_PREFIX;
-
-impl Gen<'_> {
-    pub(super) fn write_imports(&self, code: &mut String, here: &str) {
+impl<'d> Gen<'_, 'd> {
+    /// The import lines of the module at `here`.
+    pub(super) fn imports_of(&self, here: &str) -> Vec<Document<'d>> {
+        let mut lines = Vec::new();
+        let mut line = |text: String| lines.push(self.a.text(self.a.alloc_str(&text)));
         let runtime = self.options.foreign(self.module, RUNTIME);
         if self.effect {
-            let _ = writeln!(code, "import {{ Effect }} from \"{runtime}\";");
+            line(format!("import {{ Effect }} from \"{runtime}\";"));
         }
         // Only exports carry TypeScript types; imported module members are any.
-        let untyped = |code: &mut String, alias: &str| {
-            if self.options.typescript() {
-                let _ = writeln!(code, "const {alias}: any = {alias}$;");
+        let typescript = self.options.typescript();
+        let untyped = |line: &mut dyn FnMut(String), alias: &str| {
+            if typescript {
+                line(format!("const {alias}: any = {alias}$;"));
             }
         };
         let bound = |alias: &str| {
-            if self.options.typescript() {
+            if typescript {
                 format!("{alias}$")
             } else {
                 alias.to_owned()
             }
         };
         if self.runtime {
-            let _ = writeln!(code, "import * as {} from \"{runtime}\";", bound("$rt"));
-            untyped(code, "$rt");
+            line(format!("import * as {} from \"{runtime}\";", bound("$rt")));
+            untyped(&mut line, "$rt");
         }
         let mut namespaces: Vec<&str> = Vec::new();
         for (source, export, alias) in &self.foreign {
-            if self.kernel && source.starts_with(KERNEL_RUNTIME) {
+            if self.kernel && source.starts_with(bindings::OWNED_PREFIX) {
                 let at = namespaces
                     .iter()
                     .position(|s| s == source)
                     .unwrap_or_else(|| {
                         namespaces.push(source);
-                        let _ = writeln!(
-                            code,
+                        line(format!(
                             "import * as $n{} from {};",
                             namespaces.len() - 1,
                             names::string(source)
-                        );
+                        ));
                         namespaces.len() - 1
                     });
                 let member = if names::is_property(export) {
@@ -51,7 +52,9 @@ impl Gen<'_> {
                 } else {
                     format!("[{}]", names::string(export))
                 };
-                let _ = writeln!(code, "{}", self.constant(alias, &format!("$n{at}{member}")));
+                // A static namespace lookup; declarations still use the document model.
+                let ty = if typescript { ": any" } else { "" };
+                line(format!("const {alias}{ty} = $n{at}{member};"));
                 continue;
             }
             let export = if names::is_property(export) {
@@ -59,13 +62,12 @@ impl Gen<'_> {
             } else {
                 names::string(export)
             };
-            let _ = writeln!(
-                code,
+            line(format!(
                 "import {{ {export} as {} }} from {};",
                 bound(alias),
                 names::string(source)
-            );
-            untyped(code, alias);
+            ));
+            untyped(&mut line, alias);
         }
         for imported in &self.imports {
             let target = self.options.path(imported);
@@ -75,8 +77,9 @@ impl Gen<'_> {
                 .cloned()
                 .unwrap_or_else(|| names::module_alias(imported, 'm'));
             let from = names::string(&relative(here, &target));
-            let _ = writeln!(code, "import * as {} from {from};", bound(&alias));
-            untyped(code, &alias);
+            line(format!("import * as {} from {from};", bound(&alias)));
+            untyped(&mut line, &alias);
         }
+        lines
     }
 }

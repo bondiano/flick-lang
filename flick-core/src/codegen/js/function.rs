@@ -4,12 +4,16 @@
 
 use std::mem;
 
-use super::expr::{arrow_body, unmarked};
-use super::{Gen, Tail, indent, names, view};
+use flick_pretty::docvec;
+
+use super::doc::{
+    After, Before, Head, Js, MULTILINE, Stmt, YIELDS, block, block_js, call, stmt_flags, text_flags,
+};
+use super::{Gen, Tail, names, view};
 use crate::codegen::tail::{Target, binds, has_tail_call, jumpable, passed_on, self_call};
 use crate::ir::{BinOp, Expr, ExprKind, Lit, Param, Pat, Stage};
 
-impl Gen<'_> {
+impl<'d> Gen<'_, 'd> {
     /// A definition's value: a function of its dictionaries, if any, around
     /// its body; a self-recursive function may loop on `target`.
     pub(super) fn function(
@@ -17,7 +21,7 @@ impl Gen<'_> {
         dicts: &[String],
         value: &Expr,
         target: Option<Target>,
-    ) -> String {
+    ) -> Js<'d> {
         let mark = self.givens.len();
         let params = self.bind_givens(dicts);
         let body = match &value.kind {
@@ -28,14 +32,14 @@ impl Gen<'_> {
                 let saved = mem::replace(&mut self.generator, false);
                 let (stmts, v) = self.block(|g| g.expr(value));
                 self.generator = saved;
-                arrow_body(&stmts, &v)
+                self.arrow_body(&stmts, v)
             }
         };
         self.givens.truncate(mark);
         if dicts.is_empty() {
             body
         } else {
-            format!("{} {body}", self.arrow(&params))
+            self.lambda_of(&params, body)
         }
     }
 
@@ -47,7 +51,8 @@ impl Gen<'_> {
         body: &Expr,
         target: Option<Target>,
         uncurried: bool,
-    ) -> String {
+    ) -> Js<'d> {
+        let a = self.a;
         let saved = (
             mem::take(&mut self.buf),
             self.generator,
@@ -93,7 +98,7 @@ impl Gen<'_> {
             })
             .filter(|t| has_tail_call(body, &t.members, calls));
         let stmts = if let Some(call) = grouped {
-            vec![format!("return {call};")]
+            vec![Stmt::ret(a, None, call)]
         } else if let Some(mut tail) = tail {
             tail.offsets = offsets(&view::positions(&[(params, body)], &tail.members));
             self.looping(&mut heads, &destructure, body, tail)
@@ -115,25 +120,34 @@ impl Gen<'_> {
             self.generator_of(&stmts)
         } else {
             match &stmts[..] {
-                [only] if only.starts_with("return ") && !only.contains('\n') => {
-                    let v = &only["return ".len()..only.len() - 1];
-                    if unmarked(v).starts_with('{') {
-                        format!("({v})")
+                [only] if !only.multiline() && only.ret.is_some() => {
+                    let (marks, value) = only.ret.expect("a return");
+                    let value = value.marked_by(a, marks);
+                    if value.lead() == Head::Brace {
+                        // an object, not a block
+                        let doc = docvec![
+                            a,
+                            "(",
+                            value.at(a, Before::Delimiter, After::Delimiter),
+                            ")"
+                        ];
+                        Js::code(doc, value.after_paren(), &[value])
                     } else {
-                        v.to_owned()
+                        value
                     }
                 }
-                _ => format!("{{\n{}}}", indent(&stmts)),
+                _ => block_js(a, &stmts),
             }
         };
         if uncurried {
-            text = format!("{} {text}", self.arrow(&heads.join(", ")));
+            text = self.lambda_of(&heads.join(", "), text);
         }
         for (i, head) in heads.iter().enumerate().rev().filter(|_| !uncurried) {
             if i + 1 < params.len() && params[i].stage == Stage::Runtime && !self.kernel {
-                text = format!("{}({text})", self.effect("succeed"));
+                let succeed = self.effect("succeed");
+                text = call(a, succeed, &[text]);
             }
-            text = format!("{} {text}", self.arrow(head));
+            text = self.lambda_of(head, text);
         }
         (self.buf, self.generator, self.sync, self.tail) = saved;
         text
@@ -147,11 +161,11 @@ impl Gen<'_> {
         destructure: &[(Pat, String)],
         body: &Expr,
         tail: Tail,
-    ) -> Vec<String> {
+    ) -> Vec<Stmt<'d>> {
         let (vars, offsets) = (tail.vars.clone(), tail.offsets.clone());
         let (inner, ()) = self.block(|g| {
             for (head, var) in heads.iter().zip(&vars) {
-                let c = g.constant(head, var);
+                let c = g.constant(head, g.leaf(var));
                 g.buf.push(c);
             }
             for (pat, t) in destructure {
@@ -171,16 +185,25 @@ impl Gen<'_> {
             .collect();
         init.extend(offsets.iter().flatten().map(|o| format!("{o} = 0")));
         *heads = loop_heads;
-        vec![format!(
-            "let {};\nfor (;;) {{\n{}}}",
-            init.join(", "),
-            indent(&inner)
-        )]
+        let init = init.join(", ");
+        let flags = text_flags(&init) | stmt_flags(&inner) | MULTILINE;
+        let a = self.a;
+        let doc = docvec![
+            a,
+            "let ",
+            init,
+            ";",
+            a.line(),
+            "for (;;) ",
+            block(a, &inner)
+        ];
+        vec![Stmt::new(doc, flags)]
     }
 
     /// Emits `e` in tail position: its value is returned, a self tail call
     /// jumps to the next iteration.
     pub(super) fn tail_expr(&mut self, e: &Expr) {
+        let arena = self.a;
         match &e.kind {
             ExprKind::Block(stmts, result) => {
                 for stmt in stmts {
@@ -192,11 +215,8 @@ impl Gen<'_> {
                 let c = self.expr(c);
                 let (ts, ()) = self.block(|g| g.tail_expr(t));
                 let (fs, ()) = self.block(|g| g.tail_expr(f));
-                self.buf.push(format!(
-                    "if ({c}) {{\n{}}} else {{\n{}}}",
-                    indent(&ts),
-                    indent(&fs)
-                ));
+                let stmt = self.if_else(c, &ts, &fs);
+                self.buf.push(stmt);
             }
             ExprKind::Match(scrutinee, arms) => {
                 let s = match &scrutinee.kind {
@@ -206,7 +226,7 @@ impl Gen<'_> {
                     }
                     _ => {
                         let s = self.expr(scrutinee);
-                        self.spill(s)
+                        self.subject(s)
                     }
                 };
                 self.arms(&s, arms, None);
@@ -220,20 +240,21 @@ impl Gen<'_> {
             {
                 let l = self.expr(lhs);
                 let (test, value) = if *op == BinOp::And {
-                    (format!("!{l}"), "false")
+                    let test = docvec![arena, "!", l.at(arena, Before::Other, After::Delimiter)];
+                    (test, "false")
                 } else {
-                    (l, "true")
+                    (l.at(arena, Before::Delimiter, After::Delimiter), "true")
                 };
-                self.buf
-                    .push(format!("if ({test}) {{\n  return {value};\n}}"));
+                let returned = Stmt::new(docvec![arena, "return ", value, ";"], 0);
+                let doc = docvec![arena, "if (", test, ") ", block(arena, &[returned])];
+                self.buf.push(Stmt::new(doc, l.flags | MULTILINE));
                 self.tail_expr(rhs);
             }
             _ => {
-                let calls = self.calls();
                 if let Some((j, args)) = self
                     .tail
                     .as_ref()
-                    .and_then(|t| self_call(e, &t.members, calls))
+                    .and_then(|t| self_call(e, &t.members, self.calls()))
                 {
                     self.jump(j, &args);
                     return;
@@ -241,13 +262,28 @@ impl Gen<'_> {
                 let v = self.expr(e);
                 let v = self.tail_call(v);
                 let mark = mark!(self, e.span);
-                self.buf.push(format!("return {mark}{v};"));
+                self.buf.push(Stmt::ret(arena, mark, v));
             }
         }
     }
 
-    /// A tail call of the member `j` of the current tail: sets the loop
-    /// variables to `args` and jumps.
+    /// `if (c) { ts } else { fs }`.
+    pub(super) fn if_else(&self, c: Js<'d>, ts: &[Stmt<'d>], fs: &[Stmt<'d>]) -> Stmt<'d> {
+        let a = self.a;
+        let doc = docvec![
+            a,
+            "if (",
+            c.at(a, Before::Delimiter, After::Delimiter),
+            ") ",
+            block(a, ts),
+            " else ",
+            block(a, fs)
+        ];
+        Stmt::new(doc, c.flags | stmt_flags(ts) | stmt_flags(fs) | MULTILINE)
+    }
+
+    /// A self tail call to the member `j` with `args`: the loop variables
+    /// take the arguments, and the loop goes on.
     fn jump(&mut self, j: usize, args: &[&Expr]) {
         let (vars, binds, state, offsets) = self
             .tail
@@ -278,107 +314,59 @@ impl Gen<'_> {
         // the arguments read the parameters, never the loop variables
         let js = self.ordered(&args);
         for (&i, value) in changed.iter().zip(js) {
-            self.buf.push(format!("{} = {value};", vars[i]));
+            self.buf.push(self.assign(&vars[i], value));
             if let Some(o) = offset(i) {
-                self.buf.push(format!("{o} = 0;"));
+                self.buf.push(self.line(&format!("{o} = 0;")));
             }
         }
         for (i, start) in moves {
             if let Some(o) = offset(i) {
-                self.buf.push(format!("{o} = {start};"));
+                self.buf.push(self.line(&format!("{o} = {start};")));
             }
         }
         if let Some(state) = state {
-            self.buf.push(format!("{state} = {j};"));
+            self.buf.push(self.line(&format!("{state} = {j};")));
         }
-        // a step of the driver: the loop can be stopped and gives others a turn
         if self.kernel && self.generator {
-            self.buf.push("yield;".to_owned());
+            self.buf.push(Stmt::new(
+                self.a.text("yield;"),
+                YIELDS | super::doc::YIELD_TEXT,
+            ));
         }
-        self.buf.push("continue;".to_owned());
+        self.buf.push(self.line("continue;"));
     }
 
     /// The body of a runtime stage, `task` or handler: an `Effect.gen`.
-    pub(super) fn gen_block(&mut self, body: &Expr) -> String {
+    pub(super) fn gen_block(&mut self, body: &Expr) -> Js<'d> {
         let saved = (self.generator, self.tail.take());
         self.generator = true;
         let (stmts, ()) = self.block(|g| g.tail_expr(body));
         (self.generator, self.tail) = saved;
         if self.kernel {
-            return self.stage_function(&[], &stmts, true);
+            self.stage_function(&[], &stmts, true)
+        } else {
+            self.generator_of(&stmts)
         }
-        self.generator_of(&stmts)
     }
 
     /// An `Effect.gen` running `stmts`. In release, a lone `return (yield* x);`
     /// is `Effect.suspend(() => x)`: the same effect, built as late, without
     /// a generator.
-    fn generator_of(&mut self, stmts: &[String]) -> String {
+    fn generator_of(&mut self, stmts: &[Stmt<'d>]) -> Js<'d> {
+        let a = self.a;
         if self.options.release
             && let [only] = stmts
-            && let Some(effect) = lone_yield(only)
+            && let Some((marks, value)) = only.ret
+            && let Some((effect, flags)) = value.effect
         {
-            return format!("{}(() => {effect})", self.effect("suspend"));
+            let suspend = self.effect("suspend");
+            let marks = marks.unwrap_or_else(|| a.empty());
+            let effect = Js::code(docvec![a, marks, effect], Head::Ident, &[]).with(flags);
+            return call(a, suspend, &[self.thunk(effect)]);
         }
-        format!(
-            "{}({})",
-            self.effect("gen"),
-            self.generator_function("", stmts)
-        )
+        let effect_gen = self.effect("gen");
+        call(a, effect_gen, &[self.generator_function("", stmts)])
     }
-}
-
-/// `x` of `return (yield* x);` when `x` yields nothing itself, with the
-/// markers before it.
-pub(super) fn lone_yield(stmt: &str) -> Option<String> {
-    let value = stmt.strip_prefix("return ")?.strip_suffix(';')?;
-    let code = unmarked(value);
-    let marks = &value[..value.len() - code.len()];
-    let inner = code.strip_prefix("(yield* ")?.strip_suffix(')')?;
-    (!stmt.contains('\n') && balanced_without_yield(inner)).then(|| format!("{marks}{inner}"))
-}
-
-/// Whether the parentheses of `js` balance and it has no `yield` outside a
-/// nested `function*`, skipping string literals.
-pub(super) fn balanced_without_yield(js: &str) -> bool {
-    let bytes = js.as_bytes();
-    // braces open, `true` for the body of a nested generator
-    let mut braces: Vec<bool> = Vec::new();
-    let mut parens = 0usize;
-    let mut i = 0;
-    while i < bytes.len() {
-        match bytes[i] {
-            quote @ (b'"' | b'\'' | b'`') => {
-                i += 1;
-                while i < bytes.len() && bytes[i] != quote {
-                    i += if bytes[i] == b'\\' { 2 } else { 1 };
-                }
-            }
-            b'(' => parens += 1,
-            b')' => match parens.checked_sub(1) {
-                Some(p) => parens = p,
-                None => return false,
-            },
-            b'{' => braces.push(after_generator_head(&js[..i])),
-            b'}' => {
-                braces.pop();
-            }
-            b'y' if js[i..].starts_with("yield") && !braces.contains(&true) => return false,
-            _ => {}
-        }
-        i += 1;
-    }
-    parens == 0
-}
-
-/// Whether `js` ends with the head of a generator, `function* (…)`.
-fn after_generator_head(js: &str) -> bool {
-    let head = js.trim_end();
-    let head = head
-        .strip_suffix(": globalThis.Generator<any, any, any>")
-        .unwrap_or(head);
-    head.rfind("function* (")
-        .is_some_and(|at| head[at..].find(')') == Some(head.len() - at - 1))
 }
 
 /// The offset variable of each walked position.
@@ -388,17 +376,4 @@ pub(super) fn offsets(walked: &[bool]) -> Vec<Option<String>> {
         .enumerate()
         .map(|(i, &w)| w.then(|| format!("$o{i}")))
         .collect()
-}
-
-#[cfg(test)]
-mod generator_header_tests {
-    #[test]
-    fn typed_nested_generators_keep_their_yields_local() {
-        assert!(super::balanced_without_yield(
-            "(function* (x: any): globalThis.Generator<any, any, any> { yield x; })"
-        ));
-        assert!(!super::balanced_without_yield(
-            "(function* (x: any): globalThis.Generator<any, any, any> { yield x; }); yield 2;"
-        ));
-    }
 }

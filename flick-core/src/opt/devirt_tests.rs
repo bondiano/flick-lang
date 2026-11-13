@@ -4,12 +4,17 @@ use super::super::tests::release;
 /// instance of `Float`, and `Point` after it.
 const DEFAULT: &str = "module App exposing (..)\n\nimport Generic exposing (Generic(..), Sum(..), Con(..), Field(..))\n\n/// A value of each type: the first constructor, each field its default.\nclass Default a =\n  default : a\n  default : (Generic a rep, GDefault rep) => a\n  let default = from_rep gdefault\n\nclass GDefault rep =\n  gdefault : rep\n\ninstance GDefault Unit =\n  let gdefault = ()\n\ninstance (Default a, GDefault rest) => GDefault (Field l a, rest) =\n  let gdefault = (Field default, gdefault)\n\ninstance GDefault fields => GDefault (Con n fields) =\n  let gdefault = Con gdefault\n\ninstance GDefault a => GDefault (Sum a b) =\n  let gdefault = Inl gdefault\n\ninstance Default Float =\n  let default = 0\n\ntype Point = Point Float Float\n";
 
-/// The line of `js` that defines `name`.
+/// The declaration of `name`, including an initializer the printer wraps.
 fn line<'a>(js: &'a str, name: &str) -> &'a str {
     let start = format!("export const {name} = ");
-    js.lines()
-        .find(|l| l.starts_with(&start))
-        .unwrap_or_else(|| panic!("no {name} in\n{js}"))
+    let at = js
+        .find(&start)
+        .unwrap_or_else(|| panic!("no {name} in\n{js}"));
+    let rest = &js[at..];
+    let end = rest
+        .find(";\n")
+        .unwrap_or_else(|| panic!("no end of {name} in\n{js}"));
+    &rest[..=end]
 }
 
 #[test]

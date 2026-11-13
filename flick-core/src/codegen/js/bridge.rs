@@ -5,8 +5,10 @@
 use crate::effects::bindings;
 use flick_ir::Shape;
 
-use super::{Gen, names};
+use super::Gen;
+use super::doc::{After, Before, Head, Js, array, call, object};
 use crate::ir::{Foreign, ForeignMode};
+use flick_pretty::docvec;
 
 /// which way a value crosses the bridge to Effect.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -26,9 +28,8 @@ impl Toward {
     }
 }
 
-impl Gen<'_> {
-    /// the import alias of a helper on the Effect adapter package.
-    fn bridge(&mut self, name: &str) -> String {
+impl<'d> Gen<'_, 'd> {
+    fn bridge(&mut self, name: &str) -> Js<'d> {
         let alias = format!("$bridge_{name}");
         if !self
             .foreign
@@ -41,61 +42,64 @@ impl Gen<'_> {
                 alias.clone(),
             ));
         }
-        alias
+        self.leaf(&alias)
     }
-
-    /// the body of a wrapper of `f` that reaches Effect over the
-    /// bridge, or `None` where the bridge changes nothing.
     pub(super) fn bridged_body(
         &mut self,
         f: &Foreign,
         runtime: bool,
-        call: &str,
+        called: Js<'d>,
         copy_result: bool,
-        catch: Option<&str>,
-    ) -> Option<String> {
+        catch: Option<Js<'d>>,
+    ) -> Option<Js<'d>> {
+        let a = self.a;
         let shape = &f.adapter.result_shape;
         Some(match (f.mode, runtime) {
             (ForeignMode::Pure, _) | (_, false) => {
-                let call = format!("{}(() => {call})", self.bridge("inSyncContext"));
-                let value = self.foreign_result(f, copy_result, &call);
+                let context = self.bridge("inSyncContext");
+                let called = call(a, context, &[self.thunk(called)]);
+                let value = self.foreign_result(f, copy_result, called);
                 self.crossed(Toward::Flick, shape, value)
             }
             (ForeignMode::Effect, true) => {
+                let from = self.bridge("fromEffect");
+                let ran = call(a, from, &[called]);
                 let ran = match catch {
-                    Some(c) => format!(
-                        "{}(() => {}({call}), {c})",
-                        self.rt("foreignEffect"),
-                        self.bridge("fromEffect")
-                    ),
-                    None => format!("{}({call})", self.bridge("fromEffect")),
+                    Some(c) => {
+                        let foreign = self.rt("foreignEffect");
+                        call(a, foreign, &[self.thunk(ran), c])
+                    }
+                    None => ran,
                 };
-                let value = self.foreign_result(f, copy_result, "$v");
+                let value = self.foreign_result(f, copy_result, self.leaf("$v"));
                 let value = self.crossed(Toward::Flick, shape, value);
-                self.mapped(ran, "$v", &value)
+                self.mapped(ran, "$v", value)
             }
             (ForeignMode::Sync, true) => {
-                let call = format!("{}(() => {call})", self.bridge("inSyncContext"));
-                let value = self.foreign_result(f, copy_result, &call);
+                let context = self.bridge("inSyncContext");
+                let called = call(a, context, &[self.thunk(called)]);
+                let value = self.foreign_result(f, copy_result, called);
                 let value = self.crossed(Toward::Flick, shape, value);
                 match catch {
-                    Some(c) => format!("{}(() => {value}, {c})", self.rt("foreignSync")),
+                    Some(c) => {
+                        let foreign = self.rt("foreignSync");
+                        call(a, foreign, &[self.thunk(value), c])
+                    }
                     None => value,
                 }
             }
             (ForeignMode::Async, true) => return None,
         })
     }
-
-    /// `value`, of the shape `shape`, as the side `toward` takes it.
-    pub(super) fn crossed(&mut self, toward: Toward, shape: &Shape, value: String) -> String {
+    pub(super) fn crossed(&mut self, toward: Toward, shape: &Shape, value: Js<'d>) -> Js<'d> {
+        let a = self.a;
         match shape {
             Shape::Data => {
                 let convert = self.bridge(match toward {
                     Toward::Host => "dataToEffect",
                     Toward::Flick => "dataFromEffect",
                 });
-                format!("{convert}({value})")
+                call(a, convert, &[value])
             }
             Shape::Fun {
                 args,
@@ -103,73 +107,103 @@ impl Gen<'_> {
                 runtime,
                 sync,
             } => self.crossed_fun(toward, args, result, (*runtime, *sync), value),
-            Shape::Eff(inner) => self.crossed_eff(toward, inner, &value),
+            Shape::Eff(inner) => self.crossed_eff(toward, inner, value),
             Shape::List(inner) => {
                 let depth = self.bridge_depth();
-                let item = self.crossed(toward, inner, format!("$e{depth}"));
-                format!("({value}).map(($e{depth}) => {item})")
+                let param = format!("$e{depth}");
+                let item = self.crossed(toward, inner, self.leaf(&param));
+                let map = self.member(value.in_parens(), "map");
+                call(a, map, &[self.lambda_of(&param, item)])
             }
             Shape::Option(inner) => {
                 let depth = self.bridge_depth();
-                let item = self.crossed(toward, inner, format!("$e{depth}"));
-                let convert = match toward {
-                    Toward::Host => self.bridge("optionToEffect"),
-                    Toward::Flick => self.bridge("optionFromEffect"),
-                };
-                format!("{convert}({value}, ($e{depth}) => {item})")
+                let param = format!("$e{depth}");
+                let item = self.crossed(toward, inner, self.leaf(&param));
+                let convert = self.bridge(match toward {
+                    Toward::Host => "optionToEffect",
+                    Toward::Flick => "optionFromEffect",
+                });
+                call(a, convert, &[value, self.lambda_of(&param, item)])
             }
             Shape::Result(error, success) => {
                 let depth = self.bridge_depth();
-                let error = self.crossed(toward, error, format!("$e{depth}"));
-                let success = self.crossed(toward, success, format!("$a{depth}"));
-                let convert = match toward {
-                    Toward::Host => self.bridge("resultToEffect"),
-                    Toward::Flick => self.bridge("resultFromEffect"),
-                };
-                format!("{convert}({value}, ($a{depth}) => {success}, ($e{depth}) => {error})")
+                let ep = format!("$e{depth}");
+                let ap = format!("$a{depth}");
+                let error = self.crossed(toward, error, self.leaf(&ep));
+                let success = self.crossed(toward, success, self.leaf(&ap));
+                let convert = self.bridge(match toward {
+                    Toward::Host => "resultToEffect",
+                    Toward::Flick => "resultFromEffect",
+                });
+                call(
+                    a,
+                    convert,
+                    &[
+                        value,
+                        self.lambda_of(&ap, success),
+                        self.lambda_of(&ep, error),
+                    ],
+                )
             }
             Shape::Tuple(items) => {
                 let depth = self.bridge_depth();
-                let parts: Vec<String> = items
+                let param = format!("$t{depth}");
+                let parts: Vec<_> = items
                     .iter()
                     .enumerate()
-                    .map(|(i, item)| self.crossed(toward, item, format!("$t{depth}[{i}]")))
-                    .collect();
-                format!("(($t{depth}) => [{}])({value})", parts.join(", "))
-            }
-            Shape::Record(fields) => {
-                let depth = self.bridge_depth();
-                let parts: Vec<String> = fields
-                    .iter()
-                    .filter(|(_, field)| !field.is_data())
-                    .map(|(name, field)| {
-                        let name = names::string(name);
-                        let field = self.crossed(toward, field, format!("$t{depth}[{name}]"));
-                        format!("[{name}]: {field}")
+                    .map(|(i, item)| {
+                        self.crossed(toward, item, self.leaf(&format!("{param}[{i}]")))
                     })
                     .collect();
-                let data = self.crossed(toward, &Shape::Data, format!("$t{depth}"));
-                format!(
-                    "(($t{depth}) => ({{ ...{data}, {} }}))({value})",
-                    parts.join(", ")
+                call(
+                    a,
+                    self.lambda_of(&param, array(a, &parts)).in_parens(),
+                    &[value],
                 )
             }
-            Shape::Layer
-            | Shape::Schema
-            | Shape::Codec
-            | Shape::Fiber
-            | Shape::Duration
-            | Shape::Schedule
-            | Shape::Chunk
-            | Shape::HashMap
-            | Shape::HashSet
-            | Shape::Handlers
-            | Shape::Exit
-            | Shape::Failure => self.crossed_opaque(toward, shape, value),
+            Shape::Record(fields) => self.crossed_record(toward, fields, value),
+            _ => self.crossed_opaque(toward, shape, value),
         }
     }
+    fn crossed_record(
+        &mut self,
+        toward: Toward,
+        fields: &[(String, Shape)],
+        value: Js<'d>,
+    ) -> Js<'d> {
+        let a = self.a;
+        let depth = self.bridge_depth();
+        let param = format!("$t{depth}");
+        let mut entries = Vec::new();
+        let mut parts = Vec::new();
+        for (name, field) in fields.iter().filter(|(_, field)| !field.is_data()) {
+            let name = self.string(name);
+            let accessed = Js::code(
+                docvec![a, a.alloc_str(&param), "[", name.doc, "]"],
+                Head::Ident,
+                &[],
+            );
+            let field = self.crossed(toward, field, accessed);
+            entries.push(docvec![
+                a,
+                "[",
+                name.doc,
+                "]: ",
+                field.at(a, Before::Delimiter, After::Delimiter)
+            ]);
+            parts.push(field);
+        }
+        let data = self.crossed(toward, &Shape::Data, self.leaf(&param));
+        entries.insert(
+            0,
+            docvec![a, "...", data.at(a, Before::Other, After::Delimiter)],
+        );
+        parts.push(data);
+        let body = object(a, &entries, &parts).in_parens();
+        call(a, self.lambda_of(&param, body).in_parens(), &[value])
+    }
 
-    fn crossed_opaque(&mut self, toward: Toward, shape: &Shape, value: String) -> String {
+    fn crossed_opaque(&mut self, toward: Toward, shape: &Shape, value: Js<'d>) -> Js<'d> {
         let convert = match (toward, shape) {
             (Toward::Host, Shape::Layer) => self.bridge("layerToEffect"),
             (Toward::Host, Shape::Schema) => self.bridge("schemaToEffect"),
@@ -197,93 +231,93 @@ impl Gen<'_> {
             // a record of handlers crosses unchanged
             (Toward::Flick, _) => return value,
         };
-        format!("{convert}({value})")
+        call(self.a, convert, &[value])
     }
-
-    /// a function crossing: its arguments cross back, its result
-    /// crosses with it, and the call is run by the side that made it.
     fn crossed_fun(
         &mut self,
         toward: Toward,
         args: &[Shape],
         result: &Shape,
         (runtime, sync): (bool, bool),
-        function: String,
-    ) -> String {
+        function: Js<'d>,
+    ) -> Js<'d> {
+        let a = self.a;
         let depth = self.bridge_depth();
         let prefix = match toward {
             Toward::Host => "h",
             Toward::Flick => "g",
         };
-        let params: Vec<String> = (0..args.len())
+        let params: Vec<_> = (0..args.len())
             .map(|k| format!("${prefix}{depth}_{k}"))
             .collect();
-        let mut call = function;
+        let mut called = function;
         for (param, arg) in params.iter().zip(args) {
-            let arg = self.crossed(toward.back(), arg, param.clone());
-            call = format!("{call}({arg})");
+            let arg = self.crossed(toward.back(), arg, self.leaf(param));
+            called = call(a, called, &[arg]);
         }
         let at = format!("$r{depth}");
         let body = match (toward, sync, runtime) {
             (Toward::Host, true, _) => {
-                let value = self.crossed(toward, result, at.clone());
-                let ran = format!("{}(() => {call})", self.bridge("callSync"));
-                if value == at {
+                let value = self.crossed(toward, result, self.leaf(&at));
+                let bridge = self.bridge("callSync");
+                let ran = call(a, bridge, &[self.thunk(called)]);
+                if value.atom() == Some(at.as_str()) {
                     ran
                 } else {
-                    format!("(({at}) => {value})({ran})")
+                    call(a, self.lambda_of(&at, value).in_parens(), &[ran])
                 }
             }
             (Toward::Host, false, true) => {
-                let value = self.crossed(toward, result, at.clone());
-                let ran = self.mapped(call, &at, &value);
-                format!("{}(() => {ran})", self.bridge("callEffect"))
+                let value = self.crossed(toward, result, self.leaf(&at));
+                let ran = self.mapped(called, &at, value);
+                let bridge = self.bridge("callEffect");
+                call(a, bridge, &[self.thunk(ran)])
             }
             (Toward::Flick, true, _) => {
-                let ran = format!("{}(() => {call})", self.bridge("inSyncContext"));
+                let bridge = self.bridge("inSyncContext");
+                let ran = call(a, bridge, &[self.thunk(called)]);
                 self.crossed(toward, result, ran)
             }
             (Toward::Flick, false, true) => {
-                let value = self.crossed(toward, result, at.clone());
-                let ran = format!("{}({call})", self.bridge("fromEffect"));
-                self.mapped(ran, &at, &value)
+                let value = self.crossed(toward, result, self.leaf(&at));
+                let bridge = self.bridge("fromEffect");
+                let ran = call(a, bridge, &[called]);
+                self.mapped(ran, &at, value)
             }
-            (_, false, false) => self.crossed(toward, result, call),
+            (_, false, false) => self.crossed(toward, result, called),
         };
-        // curried, as Flick calls it: a callback the binding's host calls with several
-        // arguments at once is adapted by `callback`, as when nothing is bridged
         params
             .iter()
             .rev()
-            .fold(body, |body, param| format!("({param}) => {body}"))
+            .fold(body, |body, param| self.lambda_of(param, body))
     }
-
-    /// an `Eff`, a thunk on the kernel and an Effect on the Effect side.
-    fn crossed_eff(&mut self, toward: Toward, inner: &Shape, eff: &str) -> String {
+    fn crossed_eff(&mut self, toward: Toward, inner: &Shape, eff: Js<'d>) -> Js<'d> {
+        let a = self.a;
         let depth = self.bridge_depth();
         let at = format!("$r{depth}");
-        let value = self.crossed(toward, inner, at.clone());
+        let value = self.crossed(toward, inner, self.leaf(&at));
         match toward {
             Toward::Host => {
-                let ran = self.mapped(format!("{eff}()"), &at, &value);
-                format!("{}(() => {ran})", self.bridge("callEffect"))
+                let ran = self.mapped(call(a, eff, &[]), &at, value);
+                let bridge = self.bridge("callEffect");
+                call(a, bridge, &[self.thunk(ran)])
             }
             Toward::Flick => {
-                let ran = format!("{}({eff})", self.bridge("fromEffect"));
-                format!("() => {}", self.mapped(ran, &at, &value))
+                let bridge = self.bridge("fromEffect");
+                let ran = call(a, bridge, &[eff]);
+                let mapped = self.mapped(ran, &at, value);
+                self.thunk(mapped)
             }
         }
     }
-
-    /// `ran`, its value `at` made `value` when they differ.
-    fn mapped(&mut self, ran: String, at: &str, value: &str) -> String {
-        if value == at {
+    fn mapped(&mut self, ran: Js<'d>, at: &str, value: Js<'d>) -> Js<'d> {
+        if value.atom() == Some(at) {
             ran
         } else {
-            format!("{}({ran}, ({at}) => {value})", self.rt("mapped"))
+            let mapped = self.rt("mapped");
+            call(self.a, mapped, &[ran, self.lambda_of(at, value)])
         }
     }
-
     fn bridge_depth(&mut self) -> String {
         let temp = self.temp();
         temp.trim_start_matches('$').to_owned()
