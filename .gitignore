@@ -15,3 +15,6 @@ node_modules/
 /docs/research/
 /editors/vscode/dist/
 /.factory/video/wiki/flick-lang/
+
+# Generated wiki is local-only.
+/droid-wiki/
