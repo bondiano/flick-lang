@@ -129,7 +129,7 @@ e2e-js: docs-wasm e2e-prepare
 # "all their test targets, minus the exceptions", so a new suite is covered
 # without touching this recipe. Each exception belongs to the recipe named
 # beside it, and `flick/tests/ignored_tests.rs` holds this recipe to that.
-e2e-tests: e2e-prepare
+e2e-tests: e2e-prepare backend-fixtures
     cargo nextest run --cargo-profile e2e --profile ci --run-ignored only -p flick -p flick-core \
       -E 'not (test(=run_cases) | test(~rt_cases) | binary_id(flick::sql_postgres) | binary_id(flick::conduit) | test(~dump) | test(~write_fixes_of_built_in_signatures))'
 
@@ -301,12 +301,16 @@ update-js-component: js-component
 check-js-component: js-component
     node tools/backend-package/index.mjs check
 
+# Ignored backend tests also run in e2e-tests now that their host is enabled
+# by default. Both runners need these images in a fresh checkout.
+backend-fixtures: js-component
+    cargo build -p flick-test-backend --features guest --target wasm32-wasip2 --release
+
 # A real third-party backend fixture through the separate component world.
-wasm-backends:
+wasm-backends: backend-fixtures
     pnpm install --frozen-lockfile
     pnpm -C runtime build
     pnpm -C packages/effect-ts build
-    cargo build -p flick-test-backend --features guest --target wasm32-wasip2 --release
     cargo clippy -p flick-test-backend --features guest --target wasm32-wasip2 -- -D warnings
     just check-js-component
     cargo clippy -p flick-backend --features host --all-targets -- -D warnings
