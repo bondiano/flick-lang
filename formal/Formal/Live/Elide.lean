@@ -38,6 +38,10 @@ def Ty.elide (K : Caps) : Ty → Caps → Ty
   | .eff r e t C, H => .eff (Row.union r (Row.ofCaps H)) e (t.elide K Caps.none) C
   | .all k t, H => .all k (t.elide (Caps.under k K) (Caps.under k H))
   | .ref t, _ => .ref (t.elide K Caps.none)
+  | .rnm N args, _ => .rnm N (args.elide K Caps.none)
+  | .run left right, _ => .run (left.elide K Caps.none) (right.elide K Caps.none)
+  | .rless gone r, _ => .rless gone (r.elide K Caps.none)
+  | .rt r e, _ => .rt (r.elide K Caps.none) (e.elide K Caps.none)
   | .tapp f .bare, H => .tapp (f.elide K H) (.caps H)
   | .tapp f a, H => .tapp (f.elide K H) (a.elide K Caps.none)
   | .rcons l t r, _ => .rcons l (t.elide K Caps.none) (r.elide K Caps.none)
@@ -47,10 +51,11 @@ def Ty.elide (K : Caps) : Ty → Caps → Ty
 /-- A type that writes no `bare`. -/
 def Ty.noBare : Ty → Bool
   | .arrow a _ b _ => a.noBare && b.noBare
-  | .ref t | .eff _ _ t _ | .hnd t | .owner t | .dict _ t | .all _ t => t.noBare
-  | .tapp f a | .rcons _ f a => f.noBare && a.noBare
+  | .ref t | .eff _ _ t _ | .hnd t | .owner t | .dict _ t | .all _ t
+  | .rnm _ t | .rless _ t => t.noBare
+  | .tapp f a | .rcons _ f a | .run f a | .rt f a => f.noBare && a.noBare
   | .bare => false
-  | .tvar _ | .rg _ | .caps _ | .row _ | .base _ | .adt _ | .rnil | .errors _ => true
+  | .tvar _ | .rg _ | .caps _ | .row _ | .base _ | .adt _ | .rnil | .errors _ | .cnil | .pure => true
 
 /-- Elision of a type application whose argument is not `bare`. -/
 theorem Ty.elide_tapp {K H : Caps} {f a : Ty} (h : a ≠ .bare) :
@@ -66,7 +71,7 @@ theorem Ty.reach_le_elide : ∀ (K : Caps) (t : Ty) (H : Caps), Caps.Sub t.reach
     simp only [Ty.elide, Ty.reach] at hx ⊢; exact hx.imp_left (Ty.reach_le_elide K t _ x)
   | K, .all k t, H => fun x hx => by
     simp only [Ty.elide, Ty.reach] at hx ⊢; exact Ty.reach_le_elide _ t _ _ hx
-  | K, .ref t, _ => fun x hx => by
+  | K, .ref t, _ | K, .rnm _ t, _ | K, .rless _ t, _ => fun x hx => by
     simp only [Ty.elide, Ty.reach] at hx ⊢; exact Ty.reach_le_elide K t _ x hx
   | K, .tapp f a, H => fun x hx => by
     by_cases ha : a = .bare
@@ -76,12 +81,13 @@ theorem Ty.reach_le_elide : ∀ (K : Caps) (t : Ty) (H : Caps), Caps.Sub t.reach
     · rw [Ty.elide_tapp ha]
       simp only [Ty.reach] at hx ⊢
       exact hx.imp (Ty.reach_le_elide K f _ x) (Ty.reach_le_elide K a _ x)
-  | K, .rcons l t r, _ => fun x hx => by
+  | K, .rcons l t r, _ | K, .run t r, _ => fun x hx => by
     simp only [Ty.elide, Ty.reach] at hx ⊢
     exact hx.imp (Ty.reach_le_elide K t _ x) (Ty.reach_le_elide K r _ x)
   | _, .bare, _ => fun _ h => (h : False).elim
   | _, .tvar _, _ | _, .rg _, _ | _, .caps _, _ | _, .row _, _ | _, .base _, _ | _, .adt _, _
-  | _, .rnil, _ | _, .errors _, _ | _, .hnd _, _ | _, .owner _, _ | _, .dict _ _, _ =>
+  | _, .rnil, _ | _, .errors _, _ | _, .hnd _, _ | _, .owner _, _ | _, .dict _ _, _
+  | _, .cnil, _ | _, .pure, _ | _, .rt .., _ =>
     fun _ h => h
 
 /-- Elision of a type without `bare` changes nothing a value of it holds. -/
@@ -93,20 +99,21 @@ theorem Ty.reach_elide : ∀ (K : Caps) (t : Ty) (H : Caps), t.noBare = true →
   | K, .eff r e t C, H, h => by
     funext x; simp only [Ty.elide, Ty.reach, Ty.reach_elide K t _ h]
   | K, .all k t, H, h => by funext x; simp only [Ty.elide, Ty.reach, Ty.reach_elide _ t _ h]
-  | K, .ref t, _, h => by simp only [Ty.elide, Ty.reach, Ty.reach_elide K t _ h]
+  | K, .ref t, _, h | K, .rnm _ t, _, h | K, .rless _ t, _, h => by
+    simp only [Ty.elide, Ty.reach, Ty.reach_elide K t _ h]
   | K, .tapp f a, H, h => by
     simp only [Ty.noBare, Bool.and_eq_true] at h
     have ha : a ≠ .bare := by rintro rfl; simp [Ty.noBare] at h
     funext x
     rw [Ty.elide_tapp ha]
     simp only [Ty.reach, Ty.reach_elide K f _ h.1, Ty.reach_elide K a _ h.2]
-  | K, .rcons l t r, _, h => by
+  | K, .rcons l t r, _, h | K, .run t r, _, h => by
     simp only [Ty.noBare, Bool.and_eq_true] at h
     funext x; simp only [Ty.elide, Ty.reach, Ty.reach_elide K t _ h.1, Ty.reach_elide K r _ h.2]
   | _, .bare, _, h => by simp [Ty.noBare] at h
   | _, .tvar _, _, _ | _, .rg _, _, _ | _, .caps _, _, _ | _, .row _, _, _ | _, .base _, _, _
   | _, .adt _, _, _ | _, .rnil, _, _ | _, .errors _, _, _ | _, .hnd _, _, _ | _, .owner _, _, _
-  | _, .dict _ _, _, _ => rfl
+  | _, .dict _ _, _, _ | _, .cnil, _, _ | _, .pure, _, _ | _, .rt .., _, _ => rfl
 
 theorem Row.union_ofCaps_none (r : Row) : Row.union r (Row.ofCaps Caps.none) = r := by
   funext n; cases n <;> simp [Row.union, Row.ofCaps, Caps.none]

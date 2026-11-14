@@ -36,7 +36,9 @@ theorem Row.less_var (G : Name → Prop) (b c : Atom) (H : Name → Prop) :
 /-- `⌈τ⌉` is what `τ` stands for in a row, as atoms and as row variables. -/
 theorem Ty.reach_asRow (t : Ty) (a : Atom) :
     t.reach a ↔ t.asRow (.atm a) ∨ ∃ G, t.asRow (.rv a G) := by
-  cases t <;> simp [Ty.asRow, Ty.reach, Row.plain, Row.ofCaps]
+  induction t <;>
+    simp_all [Ty.asRow, Ty.reach, Row.plain, Row.ofCaps, Row.none, Row.single, Row.union,
+      Caps.none, Row.less] <;> grind
 
 /-- What a substituted row reaches: the atoms of the instances of its atoms and of its
 variables, whatever names these are taken without. -/
@@ -56,10 +58,10 @@ theorem Row.substT_reach (σ : Atom → Ty) (r : Row) (a : Atom) :
       · exact .inr ⟨_, b, G, hb, H', h, rfl⟩
 
 @[simp] theorem Ty.asRow_ob (t : Ty) (N : Name) (a : Atom) : ¬ t.asRow (.ob N a) := by
-  cases t <;> simp [Ty.asRow, Row.plain, Row.ofCaps]
+  induction t <;> simp_all [Ty.asRow, Row.plain, Row.ofCaps, Row.none, Row.single, Row.union]
 
 @[simp] theorem Ty.asRow_obv (t : Ty) (v a : Atom) (G : Name → Prop) : ¬ t.asRow (.obv v G a) := by
-  cases t <;> simp [Ty.asRow, Row.plain, Row.ofCaps]
+  induction t <;> simp_all [Ty.asRow, Row.plain, Row.ofCaps, Row.none, Row.single, Row.union]
 
 /-- A row variable alone becomes the row its instance stands for. -/
 theorem Row.var_substT (σ : Atom → Ty) (b : Atom) :

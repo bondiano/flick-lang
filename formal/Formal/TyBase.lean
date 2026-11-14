@@ -135,6 +135,15 @@ inductive Ty
   | rg (p : Nat)
   | caps (C : Caps)
   | row (r : Row)
+  /-- Syntactic row forms retain the arguments of a named element. The
+  predicate-row projection below is the existing parameter-free core view;
+  switching typing rules to these terms is a separate transition. -/
+  | cnil
+  | rnm (N : Name) (args : Ty)
+  | run (left right : Ty)
+  | rless (gone : Name → Prop) (row : Ty)
+  | pure
+  | rt (services errors : Ty)
   | base (b : Base)
   | arrow (a : Ty) (φ : Stage) (b : Ty) (C : Caps)
   | ref (t : Ty)
@@ -164,6 +173,9 @@ def Ty.reach : Ty → Caps
   | .rg p => fun a => a = .r p
   | .caps C => C
   | .row r => fun a => r (.atm a) ∨ ∃ G, r (.rv a G)
+  | .rnm _ args => args.reach
+  | .run left right => fun a => left.reach a ∨ right.reach a
+  | .rless _ r => r.reach
   | .arrow a _ b C => fun x => a.reach x ∨ b.reach x ∨ C x
   | .ref t => t.reach
   | .tapp f a => fun x => f.reach x ∨ a.reach x
@@ -190,6 +202,10 @@ def Ty.asRow : Ty → Row
   | .tvar n => fun x => x = .rv (.v n) fun _ => False
   | .rg p => fun x => x = .rv (.r p) fun _ => False
   | .row r => r.plain
+  | .cnil => Row.none
+  | .rnm N args => Row.union (Row.single N) (Row.ofCaps args.reach)
+  | .run left right => Row.union left.asRow right.asRow
+  | .rless gone r => r.asRow.less gone
   | t => Row.ofCaps t.reach
 
 /-- A row after a substitution: a name stays, an atom `a` (also of an obligation)
@@ -224,6 +240,12 @@ def Ty.ren (ξ : Atom → Atom) : Ty → Ty
   | .rg p => (ξ (.r p)).ty
   | .caps C => .caps (C.substT fun a => (ξ a).ty)
   | .row r => .row (r.substT fun a => (ξ a).ty)
+  | .cnil => .cnil
+  | .rnm N args => .rnm N (args.ren ξ)
+  | .run left right => .run (left.ren ξ) (right.ren ξ)
+  | .rless gone r => .rless gone (r.ren ξ)
+  | .pure => .pure
+  | .rt r e => .rt (r.ren ξ) (e.ren ξ)
   | .base b => .base b
   | .arrow a φ b C => .arrow (a.ren ξ) (φ.substT fun a => (ξ a).ty) (b.ren ξ) (C.substT fun a => (ξ a).ty)
   | .ref t => .ref (t.ren ξ)
@@ -258,6 +280,12 @@ def Ty.substT (σ : Atom → Ty) : Ty → Ty
   | .rg p => σ (.r p)
   | .caps C => .caps (C.substT σ)
   | .row r => .row (r.substT σ)
+  | .cnil => .cnil
+  | .rnm N args => .rnm N (args.substT σ)
+  | .run left right => .run (left.substT σ) (right.substT σ)
+  | .rless gone r => .rless gone (r.substT σ)
+  | .pure => .pure
+  | .rt r e => .rt (r.substT σ) (e.substT σ)
   | .base b => .base b
   | .arrow a φ b C => .arrow (a.substT σ) (φ.substT σ) (b.substT σ) (C.substT σ)
   | .ref t => .ref (t.substT σ)
