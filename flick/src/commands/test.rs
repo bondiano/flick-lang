@@ -178,6 +178,7 @@ fn prepare(
     });
     let mut emitted = artifacts(&host, &sources, Some(&project), &compilation, &output);
     if !go {
+        progress.stage("Writing test runner");
         emitted.artifacts.push(Artifact::source(
             "test.js".to_owned(),
             runner_source(&suites, rt),
