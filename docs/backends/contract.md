@@ -139,8 +139,13 @@ and artifact kinds, including executable permissions on Unix. The complete
 output set is checked for portable paths, collisions and size limits before
 writing or restoring files, including IR dumps, test runners, Go executables
 and schema AOT results. Cache reuse checks destinations before reading them.
-Existing output symlinks cannot redirect writes; stale-file lists and manifest
-cleanup cannot delete through a symlink parent. Cleanup validates every recorded
+Output roots and their ancestor traversal must be ordinary directories;
+explicit external output directories remain supported using canonical paths.
+Existing output symlinks cannot redirect writes; Unix destinations with multiple
+hard links are refused before writes or executable-mode changes. Stale-file lists
+and manifest cleanup cannot delete through a symlink parent. Relative recorded
+directories cannot contain parent traversal; the host records external directories
+as normalized absolute paths. Current and stale outputs cannot be portable aliases. Cleanup validates every recorded
 path before deleting any file. IR dumps are recorded for clean and stay outside
 the ordinary build cache. Text emit hooks see
 source/declaration/metadata text while opaque object, executable and resource

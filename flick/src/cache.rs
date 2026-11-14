@@ -383,6 +383,8 @@ pub fn mark_go(root: &Path, key: &str, out_dir: &Path, executable: &str) {
 
 /// Removes obsolete build-owned files and records a successful publication.
 pub fn record(root: &Path, out_dir: &Path, files: Vec<String>) -> io::Result<()> {
+    let normalized = project::normalize(out_dir);
+    let out_dir = normalized.as_path();
     validate_record(root, out_dir, &files)?;
     let path = root.join(cache::MANIFEST);
     let mut manifest = manifest(root);

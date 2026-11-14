@@ -9,7 +9,9 @@ use crate::artifact::Artifact;
 use crate::progress::{Mode, Progress};
 
 fn plan(name: &str) -> BuildPlan {
-    let root = env::temp_dir().join(format!("flick-publish-{name}-{}", process::id()));
+    let root = fs::canonicalize(env::temp_dir())
+        .expect("canonical temporary directory")
+        .join(format!("flick-publish-{name}-{}", process::id()));
     let _ = fs::remove_dir_all(&root);
     fs::create_dir_all(root.join("output")).expect("output directory");
     BuildPlan {
@@ -179,5 +181,69 @@ fn host_tool_outputs_are_checked_before_publishing_source_files() {
             b"owned elsewhere"
         );
         fs::remove_dir_all(output.out_dir.parent().expect("root")).expect("cleanup");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn redirected_output_roots_and_hardlinks_cannot_modify_unowned_files() {
+    use std::os::unix::fs::{PermissionsExt, symlink};
+
+    for case in ["root-link", "parent-link", "hard-link"] {
+        let mut output = plan(case);
+        let root = output.out_dir.parent().expect("root").to_path_buf();
+        let outside = root.join("outside");
+        let target = if case == "parent-link" {
+            outside.join("nested")
+        } else {
+            outside.clone()
+        };
+        fs::create_dir_all(&target).expect("outside directory");
+        fs::write(target.join("kept.bin"), b"kept").expect("outside file");
+        fs::set_permissions(target.join("kept.bin"), fs::Permissions::from_mode(0o600))
+            .expect("permissions");
+        fs::write(target.join("safe.js"), "previous build").expect("outside source");
+        if case == "hard-link" {
+            fs::hard_link(target.join("kept.bin"), output.out_dir.join("kept.bin"))
+                .expect("hard link");
+            fs::write(output.out_dir.join("safe.js"), "previous build").expect("old output");
+        } else {
+            fs::remove_dir(&output.out_dir).expect("empty output");
+            symlink(&outside, &output.out_dir).expect("redirect output");
+            if case == "parent-link" {
+                output.out_dir.push("nested");
+            }
+        }
+        let mut emitted = Emission {
+            artifacts: vec![
+                Artifact::source("safe.js".into(), "new build".into()),
+                Artifact {
+                    path: "kept.bin".into(),
+                    contents: b"kept".to_vec(),
+                    kind: ArtifactKind::Executable,
+                },
+            ],
+            diagnostics: vec![],
+        };
+        write_artifacts(&output, &mut emitted, &Progress::new(Mode::Hidden));
+        assert_eq!(emitted.diagnostics.len(), 1, "refuse {case}");
+        assert_eq!(emitted.diagnostics[0].code, codes::P013);
+        assert_eq!(
+            fs::read(output.out_dir.join("safe.js")).expect("old remains"),
+            b"previous build"
+        );
+        assert_eq!(
+            fs::read(target.join("kept.bin")).expect("outside remains"),
+            b"kept"
+        );
+        assert_eq!(
+            fs::metadata(target.join("kept.bin"))
+                .expect("metadata")
+                .permissions()
+                .mode()
+                & 0o777,
+            0o600
+        );
+        fs::remove_dir_all(root).expect("cleanup");
     }
 }

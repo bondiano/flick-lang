@@ -1,15 +1,16 @@
 //! Validate every recorded removal before changing a published build.
 
 use std::collections::HashSet;
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 use std::{fs, io};
 
 use flick_backend::{Limits, validate_output_paths};
 
 use super::{manifest, remove_empty_parents};
-use crate::artifact::validate_ancestors;
+use crate::artifact::{validate_ancestors, validate_root};
 
 fn validate_removals(out: &Path, files: &[String]) -> io::Result<()> {
+    validate_root(out).map_err(io::Error::other)?;
     validate_output_paths(files.iter().map(String::as_str), Limits::default())
         .map_err(io::Error::other)?;
     for file in files {
@@ -31,6 +32,11 @@ pub fn validate_record(root: &Path, out: &Path, files: &[String]) -> io::Result<
             .filter(|file| !current.contains(file.as_str()))
             .cloned()
             .collect();
+        validate_output_paths(
+            files.iter().chain(&stale).map(String::as_str),
+            Limits::default(),
+        )
+        .map_err(io::Error::other)?;
         validate_removals(out, &stale)?;
     }
     Ok(())
@@ -41,11 +47,11 @@ pub fn validate_record(root: &Path, out: &Path, files: &[String]) -> io::Result<
 pub fn remove_recorded(root: &Path) -> io::Result<usize> {
     let outputs = manifest(root).outputs;
     for (dir, files) in &outputs {
-        validate_removals(&root.join(dir), files)?;
+        validate_removals(&directory(root, dir)?, files)?;
     }
     let mut removed = 0;
     for (dir, files) in outputs {
-        let out = root.join(dir);
+        let out = directory(root, &dir)?;
         for file in files {
             let path = out.join(file);
             match fs::remove_file(&path) {
@@ -60,4 +66,19 @@ pub fn remove_recorded(root: &Path) -> io::Result<usize> {
         let _ = fs::remove_dir(out);
     }
     Ok(removed)
+}
+
+/// Relative ownership directories cannot escape the project. Explicit external
+/// outputs use normalized absolute paths when recorded by the host.
+fn directory(root: &Path, dir: &str) -> io::Result<PathBuf> {
+    let path = Path::new(dir);
+    if path
+        .components()
+        .any(|part| matches!(part, Component::ParentDir))
+    {
+        return Err(io::Error::other(
+            "recorded output directory contains parent traversal",
+        ));
+    }
+    Ok(root.join(path))
 }

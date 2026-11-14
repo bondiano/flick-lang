@@ -1,7 +1,7 @@
 //! Files of a host build, including binary component and tool outputs.
 
 #[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::Path;
 use std::{fs, io};
 
@@ -97,12 +97,13 @@ pub fn validate_destination_paths<'a>(
     root: &Path,
     paths: impl IntoIterator<Item = &'a str>,
 ) -> Result<(), String> {
+    validate_root(root)?;
     let paths: Vec<_> = paths.into_iter().collect();
     validate_output_paths(paths.iter().copied(), Limits::default())?;
     for file in paths {
         validate_ancestors(root, Path::new(file))?;
         match fs::symlink_metadata(root.join(file)) {
-            Ok(metadata) if metadata.is_symlink() || !metadata.is_file() => {
+            Ok(metadata) if metadata.is_symlink() || !metadata.is_file() || shared(&metadata) => {
                 return Err(format!(
                     "build output `{file}` conflicts with an existing path"
                 ));
@@ -113,6 +114,42 @@ pub fn validate_destination_paths<'a>(
         }
     }
     Ok(())
+}
+
+/// Output roots and their traversal must be ordinary directories. An external
+/// directory is allowed; a symbolic redirect to another directory is not.
+pub fn validate_root(root: &Path) -> Result<(), String> {
+    for path in root.ancestors().filter(|path| !path.as_os_str().is_empty()) {
+        match fs::symlink_metadata(path) {
+            Ok(metadata) if metadata.is_symlink() || !metadata.is_dir() => {
+                return Err(format!(
+                    "build output root `{}` redirects or is not a directory",
+                    path.display()
+                ));
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(format!(
+                    "cannot inspect output root `{}`: {error}",
+                    path.display()
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn shared(metadata: &fs::Metadata) -> bool {
+    #[cfg(unix)]
+    {
+        metadata.nlink() > 1
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = metadata;
+        false
+    }
 }
 
 /// Check parents for a path whose relative spelling the caller validated.

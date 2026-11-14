@@ -13,7 +13,9 @@ fn binary_artifacts_survive_the_build_cache_with_their_executable_kind() {
     use flick_backend::ArtifactKind;
     use flick_core::project::cache::Key;
 
-    let root = env::temp_dir().join(format!("flick-cache-binary-{}", process::id()));
+    let root = fs::canonicalize(env::temp_dir())
+        .expect("canonical temporary directory")
+        .join(format!("flick-cache-binary-{}", process::id()));
     let _ = fs::remove_dir_all(&root);
     let key = Signed::from(Key::default());
     let files = vec![Artifact {
@@ -28,7 +30,9 @@ fn binary_artifacts_survive_the_build_cache_with_their_executable_kind() {
 
 #[test]
 fn the_component_of_a_plugin_a_library_provides_is_an_input() {
-    let root = env::temp_dir().join(format!("flick-cache-plugin-{}", process::id()));
+    let root = fs::canonicalize(env::temp_dir())
+        .expect("canonical temporary directory")
+        .join(format!("flick-cache-plugin-{}", process::id()));
     let _ = fs::remove_dir_all(&root);
     fs::create_dir_all(root.join("app/src/App")).expect("dir");
     fs::create_dir_all(root.join("lib/src")).expect("dir");
@@ -74,7 +78,9 @@ fn the_component_of_a_plugin_a_library_provides_is_an_input() {
 
 #[test]
 fn a_source_saved_after_it_was_read_keeps_the_build_out_of_the_cache() {
-    let root = env::temp_dir().join(format!("flick-cache-race-{}", process::id()));
+    let root = fs::canonicalize(env::temp_dir())
+        .expect("canonical temporary directory")
+        .join(format!("flick-cache-race-{}", process::id()));
     let _ = fs::remove_dir_all(&root);
     fs::create_dir_all(root.join("src/App")).expect("dir");
     fs::write(
@@ -119,7 +125,9 @@ fn cached_files_cannot_be_current_through_symlinks() {
     use crate::artifact::Artifact;
     use std::os::unix::fs::symlink;
 
-    let root = env::temp_dir().join(format!("flick-cache-redirect-{}", process::id()));
+    let root = fs::canonicalize(env::temp_dir())
+        .expect("canonical temporary directory")
+        .join(format!("flick-cache-redirect-{}", process::id()));
     let _ = fs::remove_dir_all(&root);
     let out = root.join("output");
     let outside = root.join("outside");
@@ -157,7 +165,9 @@ fn recording_preflights_all_stale_paths_before_removing_any_file() {
         ("escape", "../outside/kept.js"),
         ("redirect", "redirect/kept.js"),
     ] {
-        let root = env::temp_dir().join(format!("flick-record-{case}-{}", process::id()));
+        let root = fs::canonicalize(env::temp_dir())
+            .expect("canonical temporary directory")
+            .join(format!("flick-record-{case}-{}", process::id()));
         let _ = fs::remove_dir_all(&root);
         let out = root.join("output");
         let outside = root.join("outside");
@@ -194,7 +204,9 @@ fn recording_preflights_all_stale_paths_before_removing_any_file() {
 fn recording_can_unlink_a_stale_leaf_symlink_in_an_external_output_directory() {
     use std::os::unix::fs::symlink;
 
-    let root = env::temp_dir().join(format!("flick-record-external-{}", process::id()));
+    let root = fs::canonicalize(env::temp_dir())
+        .expect("canonical temporary directory")
+        .join(format!("flick-record-external-{}", process::id()));
     let _ = fs::remove_dir_all(&root);
     let project = root.join("project");
     let out = root.join("output");
@@ -208,6 +220,25 @@ fn recording_can_unlink_a_stale_leaf_symlink_in_an_external_output_directory() {
     assert_eq!(
         fs::read(root.join("kept.js")).expect("outside remains"),
         b"owned elsewhere"
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn recording_rejects_portable_aliases_between_stale_and_current_outputs() {
+    let root = fs::canonicalize(env::temp_dir())
+        .expect("canonical temporary directory")
+        .join(format!("flick-record-aliases-{}", process::id()));
+    let _ = fs::remove_dir_all(&root);
+    let out = root.join("output");
+    fs::create_dir_all(&out).expect("output");
+    super::record(&root, &out, vec!["Main.js".into()]).expect("initial record");
+    fs::write(out.join("Main.js"), "previous build").expect("old file");
+    super::validate_record(&root, &out, &["Main.js".into()]).expect("unchanged spelling");
+    assert!(super::validate_record(&root, &out, &["main.js".into()]).is_err());
+    assert_eq!(
+        fs::read(out.join("Main.js")).expect("old remains"),
+        b"previous build"
     );
     fs::remove_dir_all(root).expect("cleanup");
 }
