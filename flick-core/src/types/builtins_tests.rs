@@ -1,4 +1,6 @@
 use std::collections::BTreeSet;
+use std::fs;
+use std::path::Path;
 
 use crate::resolve;
 
@@ -208,5 +210,165 @@ fn a_built_in_module_names_only_the_ones_before_it() {
             "module `Option` comes after this one among the built-in modules: a built-in module names only the ones before it"
         )],
         "{said:?}"
+    );
+}
+
+/// Module name implied by a core source path: `List/Core.fl` is `List.Core`.
+fn module_of(path: &str) -> String {
+    path.trim_end_matches(".fl").replace('/', ".")
+}
+
+/// `(module, path)` pairs in the `CORE` array, in the order written there.
+fn embedded_core(source: &str) -> Vec<(String, String)> {
+    let start = source.find("const CORE:").expect("CORE declaration");
+    let body = &source[start..];
+    let end = body.find("];").expect("CORE array end");
+    let mut rest = &body[..end];
+    let mut entries = Vec::new();
+    while let Some(at) = rest.find("builtin_source!") {
+        let before = &rest[..at];
+        let name_end = before.rfind('"').expect("a core module name");
+        let name_start = before[..name_end].rfind('"').expect("a core module name");
+        let name = before[name_start + 1..name_end].to_owned();
+        let after = &rest[at + "builtin_source!".len()..];
+        let open = after.find('(').expect("builtin_source arguments");
+        let close = after.find(')').expect("builtin_source arguments");
+        let mut parts = after[open + 1..close].split(',');
+        let package = parts.next().expect("package").trim();
+        let path = parts.next().expect("path").trim();
+        assert_eq!(package, "\"core\"", "{name}");
+        assert!(
+            path.starts_with('"') && path.ends_with('"') && path.len() >= 2,
+            "{path}"
+        );
+        entries.push((name, path[1..path.len() - 1].to_owned()));
+        rest = &after[close + 1..];
+    }
+    assert!(!entries.is_empty(), "CORE has no sources");
+    entries
+}
+
+fn core_source_files() -> Vec<String> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages/core/src");
+    let mut files = Vec::new();
+    let mut dirs = vec![root.clone()];
+    while let Some(dir) = dirs.pop() {
+        for entry in fs::read_dir(&dir).expect("core sources") {
+            let path = entry.expect("a core source entry").path();
+            if path.is_dir() {
+                dirs.push(path);
+            } else if path.extension().is_some_and(|ext| ext == "fl") {
+                let relative = path.strip_prefix(&root).expect("a path inside core");
+                files.push(relative.to_string_lossy().replace('\\', "/"));
+            }
+        }
+    }
+    files
+}
+
+/// Membership of embedded core modules against the sources on disk.
+/// Dependency order is the caller's list: it is not sorted and is not
+/// compared with directory order. No capability drops a core file.
+/// `builtin-docs` only strips documentation when embedding, and
+/// `native-project` only changes the include path.
+fn core_inventory_problems(embedded: &[(&str, &str)], files: &[&str]) -> Vec<String> {
+    let mut problems = Vec::new();
+    let mut names = BTreeSet::new();
+    let mut paths = BTreeSet::new();
+    for (name, path) in embedded {
+        if !names.insert(*name) {
+            problems.push(format!("duplicate core module {name}"));
+        }
+        if !paths.insert(*path) {
+            problems.push(format!("duplicate core source {path}"));
+        }
+        let expected = module_of(path);
+        if expected != *name {
+            problems.push(format!("core module {name} is not the source {path}"));
+        }
+    }
+    let on_disk: BTreeSet<&str> = files.iter().copied().collect();
+    for path in &paths {
+        if !on_disk.contains(path) {
+            problems.push(format!("unknown core source {path}"));
+        }
+    }
+    for file in &on_disk {
+        if !paths.contains(file) {
+            problems.push(format!("omitted core source {file}"));
+        }
+    }
+    problems
+}
+
+#[test]
+fn embedded_core_matches_the_core_package() {
+    let source = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("src/types/builtin_sources.rs"),
+    )
+    .expect("builtin sources");
+    let parsed = embedded_core(&source);
+    let declared: Vec<&str> = super::CORE.iter().map(|(name, _)| *name).collect();
+    let parsed_names: Vec<&str> = parsed.iter().map(|(name, _)| name.as_str()).collect();
+    assert_eq!(
+        parsed_names, declared,
+        "the embedded core order is the dependency order written in builtin_sources.rs"
+    );
+    let embedded: Vec<(&str, &str)> = parsed
+        .iter()
+        .map(|(name, path)| (name.as_str(), path.as_str()))
+        .collect();
+    let files = core_source_files();
+    let file_refs: Vec<&str> = files.iter().map(String::as_str).collect();
+    let problems = core_inventory_problems(&embedded, &file_refs);
+    assert!(
+        problems.is_empty(),
+        "core inventory drift:\n{}",
+        problems.join("\n")
+    );
+}
+
+#[test]
+fn core_inventory_rejects_omitted_duplicate_and_unknown_sources() {
+    let embedded = [("List.Core", "List/Core.fl"), ("Prelude", "Prelude.fl")];
+    let files = ["Prelude.fl", "List/Core.fl"];
+    assert!(
+        core_inventory_problems(&embedded, &files).is_empty(),
+        "dependency order is not directory order"
+    );
+
+    let omitted = core_inventory_problems(&embedded[..1], &files);
+    assert!(
+        omitted
+            .iter()
+            .any(|problem| problem == "omitted core source Prelude.fl"),
+        "{omitted:?}"
+    );
+
+    let extra = [("Prelude", "Prelude.fl"), ("Seq", "Seq.fl")];
+    let unknown = core_inventory_problems(&extra, &["Prelude.fl"]);
+    assert!(
+        unknown
+            .iter()
+            .any(|problem| problem == "unknown core source Seq.fl"),
+        "{unknown:?}"
+    );
+
+    let repeated_name = [("Prelude", "Prelude.fl"), ("Prelude", "Seq.fl")];
+    let duplicate_name = core_inventory_problems(&repeated_name, &["Prelude.fl", "Seq.fl"]);
+    assert!(
+        duplicate_name
+            .iter()
+            .any(|problem| problem == "duplicate core module Prelude"),
+        "{duplicate_name:?}"
+    );
+
+    let repeated_path = [("Prelude", "Prelude.fl"), ("Other", "Prelude.fl")];
+    let duplicate_path = core_inventory_problems(&repeated_path, &["Prelude.fl"]);
+    assert!(
+        duplicate_path
+            .iter()
+            .any(|problem| problem == "duplicate core source Prelude.fl"),
+        "{duplicate_path:?}"
     );
 }
