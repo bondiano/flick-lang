@@ -20,16 +20,17 @@ use std::mem;
 
 use super::inline::{exits, simple};
 use super::walk::droppable;
+use crate::Known;
 use crate::ir::{Expr, ExprKind, Lit, Pat, Stage, Stmt};
-use crate::source::Span;
-use crate::types::lang::{self, Lang};
+use flick_ir::Lang;
+use flick_ir::Span;
 
 /// Fuses combinators of `e` and below into the `for`s they take; `fresh`
 /// numbers the names it binds.
-pub fn fuse(e: &mut Expr, fresh: &mut usize) -> bool {
+pub fn fuse(e: &mut Expr, fresh: &mut usize, lang: &Known<'_>) -> bool {
     let mut changed = false;
-    e.each_child_mut(&mut |c| changed |= fuse(c, fresh));
-    changed |= combinator(e, fresh) || nested(e);
+    e.each_child_mut(&mut |c| changed |= fuse(c, fresh, lang));
+    changed |= combinator(e, fresh, lang) || nested(e);
     changed
 }
 
@@ -130,11 +131,11 @@ const COMBINATORS: [Lang; 6] = [
 ];
 
 /// A combinator applied to a `for`, rewritten into it.
-fn combinator(e: &mut Expr, fresh: &mut usize) -> bool {
+fn combinator(e: &mut Expr, fresh: &mut usize, lang: &Known<'_>) -> bool {
     let span = e.span;
     // `Seq.to_list (for …)`
     if let Some((module, name, mut args)) = call(e, 1)
-        && lang::is(Lang::SeqToList, module, name)
+        && lang.is(Lang::SeqToList, module, name)
         && fusable(args[0], false)
     {
         let mut generate = mem::replace(args.remove(0), unit(span));
@@ -147,7 +148,7 @@ fn combinator(e: &mut Expr, fresh: &mut usize) -> bool {
     let Some((module, name, mut args)) = call(e, 2) else {
         return false;
     };
-    let Some(step) = COMBINATORS.into_iter().find(|&c| lang::is(c, module, name)) else {
+    let Some(step) = COMBINATORS.into_iter().find(|&c| lang.is(c, module, name)) else {
         return false;
     };
     let lazy = !matches!(step, Lang::ListMap | Lang::ListFilter);

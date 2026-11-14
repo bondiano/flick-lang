@@ -335,3 +335,64 @@ fn component_devtools_is_refused_before_building_a_generation() {
         "refuse before reserving a generation"
     );
 }
+
+#[cfg(feature = "wasm-backends")]
+#[test]
+#[ignore = "requires just js-component"]
+fn official_js_component_builds_runs_and_tests_with_independent_results() {
+    let root = project(
+        "official_js_component",
+        &[
+            ("flick.toml", CONFIG),
+            (
+                "src/App.fl",
+                "module App exposing (main)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (20 + 22))\n",
+            ),
+            (
+                "test/Suite.fl",
+                "module Suite exposing (tests)\ntests : List Test.Test\nlet tests = [Test.test \"arithmetic\" (fun () -> Test.equal 42 (20 + 22)), Test.test \"expected failure\" (fun () -> Test.Failed \"independent error\")]\n",
+            ),
+        ],
+    );
+    let component = Path::new(env!("CARGO_MANIFEST_DIR")).join("../target/backends/js.wasm");
+    let bytes = fs::read(component).expect("official component");
+    fs::write(root.join("backend.wasm"), &bytes).expect("component");
+    let config = pinned()
+        .replace("test/literal", "flick/js")
+        .replace("1.0.0", "0.1.0")
+        .replace(&"a".repeat(64), &flick_backend::sha256(&bytes));
+    fs::write(root.join("flick.toml"), config).expect("pin");
+    for profile in ["debug", "release"] {
+        let built = flick_in(&root, &["build", "--profile", profile, "--offline"]);
+        assert!(built.status.success(), "{built:?}");
+        assert!(
+            root.join("dist/.flick-backend.cbor").is_file(),
+            "the common component driver owns the launch"
+        );
+        assert!(root.join("dist/_flick/App.js.map").is_file());
+        assert!(root.join("dist/App.iface").is_file());
+        for _ in 0..2 {
+            let run = flick_in(&root, &["run", "--profile", profile, "--offline"]);
+            assert!(run.status.success(), "{run:?}");
+            assert_eq!(String::from_utf8(run.stdout).expect("UTF-8"), "42\n");
+        }
+        let tested = flick_in(
+            &root,
+            &[
+                "test",
+                "--profile",
+                profile,
+                "--reporter",
+                "json",
+                "--offline",
+            ],
+        );
+        assert_eq!(tested.status.code(), Some(1), "{tested:?}");
+        let report: serde_json::Value =
+            serde_json::from_slice(&tested.stdout).expect("test report");
+        let tests = report["tests"].as_array().expect("tests");
+        assert_eq!(tests.len(), 2, "{report}");
+        assert_eq!(tests[0]["status"], "passed", "{report}");
+        assert_eq!(tests[1]["status"], "failed", "{report}");
+    }
+}

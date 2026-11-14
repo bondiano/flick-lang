@@ -142,7 +142,14 @@ fn javascript_declarations_and_facades_remain_shared_host_outputs() {
         "{:?}",
         prepared.diagnostics
     );
-    assert!(prepared.request.projections.is_empty());
+    assert!(
+        prepared
+            .request
+            .projections
+            .iter()
+            .all(|p| p.schema.name != "flick.typescript"),
+        "JS declarations need no TypeScript source projection"
+    );
     let text = |path: &str| {
         String::from_utf8(
             prepared

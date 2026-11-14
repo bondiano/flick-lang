@@ -14,7 +14,7 @@ use super::devirt::{built, matches};
 use super::walk::{applied, rename, size};
 use super::{atom, place};
 use crate::ir::{Arm, Expr, ExprKind, Lit, Pat, Stage, Stmt};
-use crate::source::Span;
+use flick_ir::Span;
 
 /// The size of an arm that may be copied to more than one branch.
 const SMALL: usize = 8;

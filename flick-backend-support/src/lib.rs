@@ -13,3 +13,8 @@ pub mod tail;
 
 pub use bridge::EffectBridge;
 pub use lang::Known;
+
+pub use flick_ir as ir;
+pub mod consteval;
+pub mod numeric;
+pub mod opt;

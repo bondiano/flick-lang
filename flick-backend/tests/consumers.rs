@@ -48,16 +48,15 @@ fn js_ts_and_maps_use_ir_and_plain_data_without_compilation_or_settings() {
         .iter()
         .filter_map(|m| Some((m.name.clone(), m.package.clone()?)))
         .collect();
-    let workers = HashMap::new();
-    let direct = HashSet::new();
     let options = Options {
         builtins: &[],
+        paths: None,
         packages: &packages,
         resolved: &[],
         typescript: None,
         release: false,
-        workers: &workers,
-        direct: &direct,
+        workers: &HashMap::new(),
+        direct: &HashSet::new(),
         labels: Labels::None,
         rt: true,
         effect_bridge: EffectBridge::Absent,

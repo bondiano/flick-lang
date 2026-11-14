@@ -14,7 +14,6 @@ use super::devirt::built;
 use super::known::{chooses, ends_in_data};
 use super::walk::{rename, respan, size};
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Lit, Param, Pat, Stage, Stmt};
-use crate::types::builtins;
 
 /// The size budget of a body inlined at every use, in IR nodes: no bigger
 /// than the call it replaces, give or take.
@@ -49,15 +48,17 @@ pub type Candidates = HashMap<String, Inlined>;
 /// than its call.
 pub struct Foreign<'a> {
     generics: Generics<'a>,
+    builtin: &'a dyn Fn(&str) -> bool,
     found: RefCell<HashMap<(String, String), Option<Inlined>>>,
     /// Those that choose, by a `match` or an `if`, what they give.
     shaped: RefCell<HashMap<(String, String), Option<Inlined>>>,
 }
 
 impl<'a> Foreign<'a> {
-    pub fn new(generics: Generics<'a>) -> Self {
+    pub fn new(generics: Generics<'a>, builtin: &'a dyn Fn(&str) -> bool) -> Self {
         Foreign {
             generics,
+            builtin,
             found: RefCell::default(),
             shaped: RefCell::default(),
         }
@@ -76,7 +77,7 @@ impl<'a> Foreign<'a> {
         }
         let budget = if choosing { SHAPED } else { SMALL };
         let mut found = None;
-        if builtins().iter().any(|i| i.module == module)
+        if (self.builtin)(module)
             && let Some((dicts, body)) = (self.generics)(module, name)
             && let ExprKind::Lambda { params, body } = body.kind
             && dicts.is_empty()

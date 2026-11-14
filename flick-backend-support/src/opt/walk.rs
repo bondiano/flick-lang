@@ -6,8 +6,8 @@ use std::collections::HashMap;
 
 use crate::ir::{BinOp, Expr, ExprKind, Item, ItemKind, Pat, Stmt};
 use crate::numeric::{Arith, Num};
-use crate::source::Span;
-use crate::types::{Constructor, Dict};
+use flick_ir::Span;
+use flick_ir::{Constructor, Dict};
 
 /// Each read of a local in `e`, by its name.
 pub fn each_use<'e>(e: &'e Expr, read: &mut dyn FnMut(&'e str)) {

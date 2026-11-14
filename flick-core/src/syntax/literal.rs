@@ -28,10 +28,7 @@ pub fn bigint_digits(text: &str) -> String {
 }
 
 /// The value of [`bigint_digits`], if it fits in 128 bits.
-pub fn bigint_digits_value(digits: &str) -> Option<i128> {
-    let (base, rest) = radix(digits).unwrap_or((10, digits));
-    i128::from_str_radix(rest, base).ok()
-}
+pub use flick_backend_support::numeric::bigint_digits_value;
 
 pub(crate) fn radix(digits: &str) -> Option<(u32, &str)> {
     let lower = digits.get(..2)?.to_ascii_lowercase();

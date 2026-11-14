@@ -409,6 +409,7 @@ fn a_release_build_in_typescript_types_a_constructed_value_as_its_constructor_do
         let known = Known::of(&lang);
         let options = Options {
             builtins: &[],
+            paths: None,
             packages: &BTreeMap::new(),
             resolved: &resolved,
             typescript: typescript.then_some(&prepared),

@@ -1,5 +1,5 @@
 use super::release;
-use crate::opt::fold;
+use crate::opt::js_number;
 
 #[test]
 fn show_of_a_literal_folds_into_the_string() {
@@ -172,7 +172,7 @@ fn folded_floats_are_written_as_js_writes_them() {
     for line in corpus.lines().filter(|l| !l.starts_with('#')) {
         let (bits, want) = line.split_once(' ').expect("bits and text");
         let x = f64::from_bits(u64::from_str_radix(bits, 16).expect("hex bits"));
-        assert_eq!(fold::js_number(x), want, "{bits}");
+        assert_eq!(js_number(x), want, "{bits}");
         cases += 1;
     }
     assert!(cases > 300, "{cases} cases");

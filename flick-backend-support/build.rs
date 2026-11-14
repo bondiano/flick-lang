@@ -80,6 +80,13 @@ fn binding_policy(output: &Path) -> io::Result<()> {
         "pub const ROUTES: &[(&str, Option<&str>)] = &{routes:?};"
     )
     .expect("write string");
+    binding_lists(&mut out)?;
+    binding_go(&data, &mut out);
+    fs::write(output.join("bindings.rs"), out)
+}
+
+/// Keep the readable policy and an index for repeated runtime routing lookups.
+fn binding_lists(out: &mut String) -> io::Result<()> {
     for (path, name) in [
         ("../runtime/rt_exports.txt", "EXPORTS"),
         ("../runtime/rt_stubs.txt", "STUBS"),
@@ -87,15 +94,23 @@ fn binding_policy(output: &Path) -> io::Result<()> {
         ("../packages/effect-ts/rt_bridge_stubs.txt", "BRIDGE_STUBS"),
     ] {
         println!("cargo:rerun-if-changed={path}");
-        writeln!(
-            out,
-            "pub const {name}: &str = {:?};",
-            fs::read_to_string(path)?
-        )
-        .expect("write string");
+        let text = fs::read_to_string(path)?;
+        writeln!(out, "pub const {name}: &str = {text:?};").expect("write string");
+        if name == "EXPORTS" {
+            let mut exports: Vec<_> = text
+                .lines()
+                .filter_map(|line| line.split_once(' '))
+                .collect();
+            exports.sort_unstable();
+            exports.dedup();
+            writeln!(
+                out,
+                "pub const EXPORT_INDEX: &[(&str, &str)] = &{exports:?};"
+            )
+            .expect("write string");
+        }
     }
-    binding_go(&data, &mut out);
-    fs::write(output.join("bindings.rs"), out)
+    Ok(())
 }
 
 fn binding_data() -> io::Result<serde_json::Value> {

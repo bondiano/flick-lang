@@ -1,4 +1,4 @@
-use super::walk::rename;
+use super::rename;
 use crate::ir::ItemKind;
 use crate::ir::tests::check_text;
 

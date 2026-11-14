@@ -25,7 +25,10 @@ use crate::toolchain;
 mod assets;
 #[cfg(test)]
 mod assets_tests;
+#[cfg(test)]
+mod component_tests;
 mod javascript;
+mod javascript_facts;
 #[cfg(test)]
 mod projection_tests;
 #[cfg(test)]
@@ -153,7 +156,14 @@ impl Prepared {
                 line_starts: file.line_starts().to_vec(),
             });
         }
-        data.modules(host, compilation, project, package.as_deref(), output);
+        data.modules(
+            host,
+            sources,
+            compilation,
+            project,
+            package.as_deref(),
+            output,
+        );
 
         data
     }
@@ -161,6 +171,7 @@ impl Prepared {
     fn modules(
         &mut self,
         host: &FsHost,
+        sources: &SourceMap,
         compilation: &Compilation,
         project: Option<&Project>,
         package: Option<&str>,
@@ -230,7 +241,7 @@ impl Prepared {
             });
         }
         if !output.go {
-            self.javascript(host, project, compilation, output, &interfaces);
+            self.javascript(host, sources, project, compilation, output, &interfaces);
         }
     }
 
