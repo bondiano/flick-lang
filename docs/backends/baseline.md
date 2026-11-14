@@ -68,13 +68,16 @@ The CLI now prepares JavaScript foreign specifiers, library file inputs,
 runtime/bridge options and TypeScript physical-file projections using the
 native baseline's shared rules. `.d.ts` and Promise facades use one shared
 implementation and remain reserved host outputs. These inputs cover the
-current JS/TS module emitter; release ABI calculation, launchers, complete
-dependency pins and official component integration still need the remaining
-work in the inventory. Go foreign inputs remain separate work.
+current JS/TS component, which calculates release ABI and launchers from
+reference IR and versioned frontend facts. Complete dependency pins, default
+release selection, browser loading and atomic publication remain integration
+work. Go foreign inputs remain separate work.
 
 ## Portable transformations and target representations
 
-`flick-core/src/opt` currently serves JS and Go through `build::optimized`.
+`flick-backend-support/src/opt` serves the JS component and native JS/Go
+through the compiler's `opt` adapter and `build::optimized`. Its lang items
+and built-in membership are explicit inputs; it does not load compiler globals.
 Its transformations include dictionary specialization/devirtualization,
 inlining and beta reduction, known-constructor branches, literal folding,
 constant/alias propagation, sequence fusion, temporary aggregate elimination
@@ -120,7 +123,7 @@ APIs.
 | Checked and unsafe integer APIs keep their distinct failure behavior | Checked/unsafe runtime functions | Checked/unsafe runtime functions |
 
 The implementation anchors are `flick-core/src/numeric.rs`,
-`flick-core/src/opt/fold.rs`, `backends/js/src/codegen/js/binary.rs`,
+`flick-backend-support/src/opt/fold.rs`, `backends/js/src/codegen/js/binary.rs`,
 `flick-core/src/codegen/go/arith.rs`, `runtime/src/core/text.ts` and
 `runtime-go/flickrt/{numbers,effnum}.go`. Numeric folding tests independently
 pin overflow, division, remainder, exponent and float-formatting boundaries.

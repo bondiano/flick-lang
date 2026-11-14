@@ -76,9 +76,9 @@ pub fn runtime_specifier(rt: bool, spec: &str) -> String {
 
 pub fn on_kernel(spec: &str, export: &str) -> bool {
     !belongs_to(spec, bindings::OWNED_PREFIX)
-        || bindings::EXPORTS
-            .lines()
-            .any(|line| line.split_once(' ') == Some((spec, export)))
+        || bindings::EXPORT_INDEX
+            .binary_search(&(spec, export))
+            .is_ok()
 }
 
 pub fn on_kernel_with_bridge(spec: &str, export: &str, bridge: bool) -> bool {

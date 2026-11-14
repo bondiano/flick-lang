@@ -9,7 +9,8 @@ pub mod ts;
 
 pub use flick_backend_js::codegen::{
     BUILTIN_DIR, EffectBridge, Known, Labels, Options, Output, Resolved, direct_methods,
-    exported_worker, ident, instance_export, js, module_path, qualified_id, relative, tag,
+    exported_worker, ident, instance_export, js, module_path, prefix_key, qualified_id, relative,
+    tag,
 };
 pub(crate) use flick_backend_js::codegen::{RuntimeLayout, js_parts};
 pub use flick_backend_support::tail;
