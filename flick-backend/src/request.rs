@@ -1,10 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::{iter, str};
 
 use flick_ir::{FileId, Program};
 
 use crate::validate::{Budget, Limits, id, runtime_dependency};
 use crate::{BuildRequest, InputKind, Inputs, Mode, ModuleInput, ModuleRole, VERSION};
+
+mod graph;
+mod sources;
 
 /// Validate the closed graph and all referenced side inputs before target
 /// preflight. This is structural validation, not a proof of IR semantics.
@@ -44,28 +46,8 @@ pub fn validate_request(
         }
         manifest.insert(input.id.as_str(), input.kind);
     }
-    sources(request, &program, &manifest, inputs)?;
-    let mut modules = BTreeMap::new();
-    for module in &request.modules {
-        if modules.insert(module.name.as_str(), module).is_some() {
-            return Err("duplicate module metadata".into());
-        }
-        if let Some(interface) = &module.interface
-            && manifest.get(interface.as_str()) != Some(&InputKind::Interface)
-        {
-            return Err("module interface is not a declared interface input".into());
-        }
-    }
-    if program
-        .modules
-        .iter()
-        .any(|m| !modules.contains_key(m.name.as_str()))
-        || modules.values().any(|m| {
-            m.role != ModuleRole::External && !program.modules.iter().any(|ir| ir.name == m.name)
-        })
-    {
-        return Err("request module metadata differs from its IR graph".into());
-    }
+    let texts = sources::validate(request, &program, &manifest, inputs)?;
+    let modules = graph::modules(request, &program, &manifest, limits)?;
     let files: Result<BTreeSet<_>, _> = (0..program.files.len())
         .map(|i| u32::try_from(i).map(FileId::new))
         .collect();
@@ -82,56 +64,15 @@ pub fn validate_request(
     if !problems.is_empty() {
         return Err(format!("invalid backend IR: {}", problems.join("; ")));
     }
+    sources::spans(&program, &texts)?;
     match (&request.target.mode, &request.module_root) {
         (Mode::WholeProgram, None) => {}
         (Mode::PerModule, Some(root)) if program.modules.iter().any(|m| m.name == *root) => {}
         _ => return Err("compilation mode has no valid module root".into()),
     }
-    for module in &request.modules {
-        if module.role == ModuleRole::External && module.interface.is_none() {
-            return Err("external module has no explicit interface ABI".into());
-        }
-    }
-    for entry in &request.entries {
-        if !modules.contains_key(entry.symbol.module.as_str()) {
-            return Err("entry references a module outside the graph".into());
-        }
-    }
-    for root in &request.test_roots {
-        if !modules.contains_key(root.module.as_str()) {
-            return Err("test root references a module outside the graph".into());
-        }
-    }
+    graph::roots(request, &modules)?;
     side_data(request, &manifest, &modules, limits)?;
     Ok(program)
-}
-
-fn sources(
-    request: &BuildRequest,
-    program: &Program,
-    manifest: &BTreeMap<&str, InputKind>,
-    inputs: &mut dyn Inputs,
-) -> Result<(), String> {
-    if request.sources.len() != program.files.len() {
-        return Err("request sources differ from Program.files".into());
-    }
-    for (source, name) in request.sources.iter().zip(&program.files) {
-        if source.name != *name || manifest.get(source.input.as_str()) != Some(&InputKind::Source) {
-            return Err("request source has no matching declared source input".into());
-        }
-        let bytes = inputs
-            .read(&source.input)
-            .map_err(|_| "declared source is unavailable")?;
-        let text = str::from_utf8(&bytes).map_err(|_| "request source is not UTF-8")?;
-        let lines: Result<Vec<u32>, _> = iter::once(0)
-            .chain(text.match_indices('\n').map(|(i, _)| i + 1))
-            .map(u32::try_from)
-            .collect();
-        if lines.map_err(|_| "source exceeds the span address space")? != source.line_starts {
-            return Err("request source has an invalid line index".into());
-        }
-    }
-    Ok(())
 }
 
 fn side_data(

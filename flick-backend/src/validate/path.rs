@@ -7,7 +7,7 @@ use super::{Limits, string};
 
 /// A portable relative path, with no aliases on Windows or normalization
 /// aliases on macOS. Directory/file collisions are rejected as well.
-pub(super) fn insert(
+pub(crate) fn insert(
     path: &str,
     paths: &mut BTreeSet<String>,
     limits: Limits,
