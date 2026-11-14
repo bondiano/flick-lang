@@ -57,7 +57,9 @@ reports; both profiles must be exercised for numeric review.
 `tests/run/codegen/ints.fl` additionally pins folded and runtime expressions
 with an independent `.stdout` under the existing JS/TS/Go debug/release
 harness. `numeric::tests` and the runtime number tests exercise lower layers.
-No existing fixture expectation or model exclusion is changed by this review.
+Existing fixture expectations are unchanged. The reference model now accepts
+six previously excluded numeric cases; `codegen/literals` and
+`codegen/numeric_classes` also move from `model_gaps.txt` into `model.txt`.
 
 The reference interpreter covers Int, Float and BigInt primitives, including
 radix literals and patterns, but not every foreign numeric helper.
