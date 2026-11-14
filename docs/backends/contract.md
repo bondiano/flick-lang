@@ -16,8 +16,11 @@ language that implements this world.
 This is an initial 0.x contract and validation library. It does not freeze
 IR 1.0, complete the semantic prerequisites of R3a, or switch production
 `build/run/test` to components. The portable IR remains 0.11.0. The official
-JS and Go emitters remain in `flick-core`; the contract probe exercises
-both with IR and plain data without `Compilation` or `Settings`.
+JS emitter lives in `backends/js`, independently of `flick-core`; the Go
+emitter remains in `flick-core`. The contract probe exercises both with IR
+and plain data without `Compilation` or `Settings`. Production JS component
+selection is still separate work: moving the Rust emitter alone does not
+establish the release component path.
 
 The optional `flick-backend/host` feature executes this world using the
 same Wasmtime configuration and compiled-code cache as the plugin host.

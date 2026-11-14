@@ -11,11 +11,11 @@
 /// source maps.
 macro_rules! mark {
     ($gen:expr, $span:expr) => {{
-        #[cfg(feature = "native-project")]
+        #[cfg(feature = "source-maps")]
         {
             Some(($gen).mark($span))
         }
-        #[cfg(not(feature = "native-project"))]
+        #[cfg(not(feature = "source-maps"))]
         {
             let _ = &$span;
             None
@@ -56,7 +56,7 @@ use flick_ir::Namespace;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::mem;
 
-#[cfg(feature = "native-project")]
+#[cfg(feature = "source-maps")]
 use flick_pretty::Position;
 use flick_pretty::{Document, DocumentArena, docvec};
 
@@ -64,10 +64,10 @@ use super::exports::reexports;
 use super::tail::{Callee, Target};
 use super::{Options, Output, names};
 use crate::ir::{Item, ItemKind, Label, Module};
-#[cfg(feature = "native-project")]
-use crate::source::Span;
 use doc::{Js, Stmt, WIDTH, lines};
 use exports::sync_exports;
+#[cfg(feature = "source-maps")]
+use flick_ir::Span;
 
 const RUNTIME: &str = bindings::ADAPTER_PREFIX;
 
@@ -138,9 +138,9 @@ pub(crate) fn js_at(
         docvec![a, code, a.line()],
         // Release preserves its compact list layout; debug is laid out for reading.
         if options.release { usize::MAX } else { WIDTH },
-        #[cfg(feature = "native-project")]
+        #[cfg(feature = "source-maps")]
         &g.spans,
-        #[cfg(feature = "native-project")]
+        #[cfg(feature = "source-maps")]
         &g.names,
     );
     output.imports = g.imports.into_iter().collect();
@@ -169,7 +169,7 @@ impl<'a, 'd> Gen<'a, 'd> {
             location: &|_, _| None,
             options,
             labels: &module.labels,
-            #[cfg(feature = "native-project")]
+            #[cfg(feature = "source-maps")]
             names: HashMap::new(),
             imports: BTreeSet::new(),
             foreign: Vec::new(),
@@ -178,7 +178,7 @@ impl<'a, 'd> Gen<'a, 'd> {
             kernel: options.rt,
             temps: 0,
             givens: Vec::new(),
-            #[cfg(feature = "native-project")]
+            #[cfg(feature = "source-maps")]
             spans: Vec::new(),
             buf: Vec::new(),
             generator: false,
@@ -236,11 +236,11 @@ impl<'a, 'd> Gen<'a, 'd> {
 fn print(
     code: Document<'_>,
     width: usize,
-    #[cfg(feature = "native-project")] spans: &[Span],
-    #[cfg(feature = "native-project")] names: &HashMap<usize, String>,
+    #[cfg(feature = "source-maps")] spans: &[Span],
+    #[cfg(feature = "source-maps")] names: &HashMap<usize, String>,
 ) -> Output {
     let mut out = String::new();
-    #[cfg(feature = "native-project")]
+    #[cfg(feature = "source-maps")]
     {
         let mut mappings = Vec::new();
         let mut observe = |mark: usize, at: Position| {
@@ -259,7 +259,7 @@ fn print(
             imports: Vec::new(),
         }
     }
-    #[cfg(not(feature = "native-project"))]
+    #[cfg(not(feature = "source-maps"))]
     {
         let _ = code.pretty_print(width, &mut out);
         Output {
@@ -298,7 +298,7 @@ struct Gen<'a, 'd> {
     options: &'a Options<'a>,
     /// The module's labelled top-level values (see [`Gen::labelled`]).
     labels: &'a BTreeMap<String, Label>,
-    #[cfg(feature = "native-project")]
+    #[cfg(feature = "source-maps")]
     /// The Flick name at a cursor, by its mark.
     names: HashMap<usize, String>,
     /// Modules whose exports are used.
@@ -311,7 +311,7 @@ struct Gen<'a, 'd> {
     temps: u32,
     /// Dictionaries in scope: as `Dict::Given` names them, and the parameter.
     givens: Vec<(String, String)>,
-    #[cfg(feature = "native-project")]
+    #[cfg(feature = "source-maps")]
     /// The span of each source cursor, by its mark.
     spans: Vec<Span>,
     /// Statements of the block being emitted.

@@ -326,7 +326,7 @@ impl<'d> Gen<'_, 'd> {
     }
 
     pub(super) fn stmt(&mut self, stmt: &IrStmt) {
-        #[cfg(feature = "native-project")]
+        #[cfg(feature = "source-maps")]
         let span = match stmt {
             IrStmt::Let(_, e)
             | IrStmt::Var(_, e)
@@ -334,10 +334,10 @@ impl<'d> Gen<'_, 'd> {
             | IrStmt::Expr(e)
             | IrStmt::Fun { value: e, .. } => e.span,
         };
-        #[cfg(feature = "native-project")]
+        #[cfg(feature = "source-maps")]
         let first = self.buf.len();
         self.stmt_kind(stmt);
-        #[cfg(feature = "native-project")]
+        #[cfg(feature = "source-maps")]
         if first < self.buf.len() {
             let mark = self.mark(span);
             let first = &mut self.buf[first];

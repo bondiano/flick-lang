@@ -2,7 +2,7 @@
 
 This document describes the elaboration of the surface language into the core of `core.md`. Classes and instances become dictionary passing. `do`, `for`, `?`, direct calls and `let mut` variables become core forms. Divergences from the spec, the checker and the code generator, and how each is resolved, are in §5.
 
-References are as in `core.md`. Checker paths are relative to `flick-core/src/types/`, IR lowering paths to `flick-core/src/ir/`, code generator paths to `flick-core/src/codegen/`. The probes of §5 were built with `flick build` and run on Node (`--emit js`) and as a Go executable (`--emit go`).
+References are as in `core.md`. Checker paths are relative to `flick-core/src/types/`, IR lowering paths to `flick-core/src/ir/`, JS generator paths to `backends/js/src/codegen/` and Go paths to `flick-core/src/codegen/go/`. The probes of §5 were built with `flick build` and run on Node (`--emit js`) and as a Go executable (`--emit go`).
 
 ## 0. Scope
 

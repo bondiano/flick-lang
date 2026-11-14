@@ -1,6 +1,6 @@
 ---
 title: "Пользовательские интерфейсы"
-source_hash: a0fd557972ed7aae
+source_hash: 234b2f67aea3ae47
 ---
 
 `Ui` описывает пользовательский интерфейс и обработчики его событий
@@ -823,7 +823,7 @@ HTML-конструкторы остаются привязанными к DOM: 
   атомы, действия и пользовательский рендерер.
 - [`tests/run/ffi/foreign.fl`](https://github.com/bondiano/flick-lang/blob/main/tests/run/ffi/foreign.fl):
   сохранение идентичности функции обратного вызова с одним аргументом при FFI.
-  [Генератор внешних вызовов](https://github.com/bondiano/flick-lang/blob/main/flick-core/src/codegen/js/items.rs)
+  [Генератор внешних вызовов](https://github.com/bondiano/flick-lang/blob/main/backends/js/src/codegen/js/items.rs)
   передаёт такую функцию без изменений и без выделения памяти под обёртку.
   Функции с несколькими аргументами по-прежнему адаптируются
   из каррированного ABI.

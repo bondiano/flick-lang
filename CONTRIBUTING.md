@@ -17,7 +17,10 @@ Install the [pinned Rust toolchain](./rust-toolchain.toml), Node.js
 **24.18.0 or newer** and **pnpm 12.16.1**. Go 1.23 or newer is needed only
 for the Go target (`--emit go`, `just go-test`), and Lean 4 (the version in
 [`formal/lean-toolchain`](./formal/lean-toolchain)) only for the proofs in
-[`formal/`](./formal/README.md). Development also uses
+[`formal/`](./formal/README.md). Browser compiler builds (`just wasm`,
+`just e2e-js`) also use Binaryen **133** for duplicate-function elimination;
+the pinned Nix dev shell supplies it (`nix develop`), or build it with
+`nix build .#binaryen`. Development also uses
 [`just`](https://just.systems/), `cargo-machete` and, for `just e2e`,
 [`cargo-nextest`](https://nexte.st/) (the Nix dev shell has them all):
 
@@ -43,6 +46,8 @@ errors and time-zone names differently.
 | Crate | Purpose |
 | - | - |
 | [`flick-core`](./flick-core/) | Shared compiler and language-server core |
+| [`flick-backend-js`](./backends/js/) | JavaScript/TypeScript emitter over portable IR and plain projections |
+| [`flick-backend-support`](./flick-backend-support/) | Helpers actually shared by emitters and frontend projections |
 | [`flick`](./flick/) | The `flick` command-line tool |
 | [`flick-wasm`](./flick-wasm/) | The same compiler core, built for the browser |
 | [`flick-model`](./flick-model/) | Reference checker and interpreter of the core calculus in [`docs/formal/core.md`](./docs/formal/core.md) |
