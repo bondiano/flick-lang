@@ -89,10 +89,12 @@ pub(super) fn validate(
     let mut launches = BTreeSet::new();
     for launch in &result.launches {
         string(&launch.name, limits)?;
-        if launch.name.is_empty()
-            || !launches.insert((&launch.name, matches!(launch.kind, LaunchKind::Test)))
-        {
-            return Err("empty or duplicate backend launch name".into());
+        let kind = match launch.kind {
+            LaunchKind::Run => "run",
+            LaunchKind::Test => "test",
+        };
+        if launch.name.is_empty() || !launches.insert((&launch.name, kind)) {
+            return Err("empty or duplicate backend launch name within its kind".into());
         }
         let &(_, kind) = artifacts
             .get(launch.artifact.as_str())

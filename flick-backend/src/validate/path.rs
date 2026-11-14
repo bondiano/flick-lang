@@ -22,23 +22,36 @@ pub(crate) fn insert(
         return Err(format!("invalid backend output path `{path}`"));
     }
     for part in path.split('/') {
+        // ext4 permits 255 bytes; HFS+ stores up to 255 decomposed UTF-16 units.
+        // https://kernel.org/doc/html/latest/filesystems/ext4/directory.html
+        // https://developer.apple.com/library/archive/technotes/tn/tn1150.html
+        if part.len() > 255
+            || !part.is_ascii() && part.nfd().map(char::len_utf16).sum::<usize>() > 255
+        {
+            return Err(format!(
+                "backend output path component exceeds its portable length: `{path}`"
+            ));
+        }
         let base = part
             .split('.')
             .next()
             .unwrap_or_default()
+            .trim_end_matches(' ')
             .to_ascii_uppercase();
         // Windows also reserves the ISO-8859-1 superscript device digits:
         // https://learn.microsoft.com/windows/win32/fileio/naming-a-file
         let device_digit = base
             .strip_prefix("COM")
             .or_else(|| base.strip_prefix("LPT"));
-        let reserved = matches!(base.as_str(), "CON" | "PRN" | "AUX" | "NUL")
-            || device_digit.is_some_and(|digit| {
-                matches!(
-                    digit,
-                    "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³"
-                )
-            });
+        let reserved = matches!(
+            base.as_str(),
+            "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$"
+        ) || device_digit.is_some_and(|digit| {
+            matches!(
+                digit,
+                "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³"
+            )
+        });
         if part.is_empty() || matches!(part, "." | "..") || part.ends_with(['.', ' ']) || reserved {
             return Err(format!("invalid backend output path `{path}`"));
         }
