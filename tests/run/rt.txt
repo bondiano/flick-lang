@@ -78,6 +78,7 @@ codegen/service_dictionary
 codegen/service_place
 codegen/services
 effect/service_params
+effect/effect_params
 codegen/stage_order
 codegen/strings_utf16
 codegen/tags

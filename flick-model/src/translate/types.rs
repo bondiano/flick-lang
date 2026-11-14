@@ -5,7 +5,7 @@
 //! variables of kind `Region`, qualifiers `τ^C`; the prelude's `Eff`, `Ref`,
 //! `Layer`, `Errors` and `S.Impl` become the forms of §1.2.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
 use flick_core::types::lang::Lang;
@@ -13,6 +13,9 @@ use flick_core::types::{self as fc, Binder};
 
 use crate::syntax::Path;
 use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
+
+#[cfg(test)]
+mod tests;
 
 const PRELUDE: &str = "Prelude";
 
@@ -179,7 +182,17 @@ fn add(t: &fc::Type, out: &mut Row) {
                 out.elems.insert(Path::parse(&label.to_string()), args);
             }
             if let Some(tail) = &r.tail {
-                add(tail, out);
+                // The explicitly named instance is the only one of that
+                // name in the row. Its tail cannot supply the same service
+                // or error at other arguments (E11); subtraction preserves
+                // this fact when the named instance is handled.
+                let gone = r
+                    .entries
+                    .iter()
+                    .filter(|(label, element)| label.is_instance(element))
+                    .map(|(label, _)| Path::parse(&label.to_string()))
+                    .collect();
+                out.add_less(&row(tail), &gone);
             }
         }
         fc::Type::Union(a, b) => {
@@ -187,7 +200,7 @@ fn add(t: &fc::Type, out: &mut Row) {
             add(b, out);
         }
         fc::Type::Var(v) => {
-            out.vars.insert(Var::Named(v.as_str().into()));
+            out.add_var(&Var::Named(v.as_str().into()), &BTreeSet::new());
         }
         fc::Type::Without { row: inner, gone } => {
             let gone = gone.iter().map(|l| Path::parse(&l.to_string())).collect();
