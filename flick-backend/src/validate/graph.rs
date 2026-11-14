@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use super::{Policy, id, path, runtime_dependency, string};
+use super::{Limits, Policy, id, path, runtime_dependency, string};
 use crate::{ArtifactKind, BuildRequest, BuildResult, InputRef, LaunchKind, Toolchain};
 
 fn tool(tool: &Toolchain, request: &BuildRequest, policy: &Policy) -> Result<(), String> {
@@ -108,19 +108,38 @@ pub(super) fn validate(
             string(argument, limits)?;
         }
     }
+    runtime_dependencies(request, result, limits)?;
+    for step in &result.steps {
+        (policy.authorize_step)(step)?;
+    }
+    Ok(order)
+}
+
+fn runtime_dependencies(
+    request: &BuildRequest,
+    result: &BuildResult,
+    limits: Limits,
+) -> Result<(), String> {
+    let mut pins = BTreeMap::new();
+    for dependency in &request.runtime_dependencies {
+        runtime_dependency(dependency, limits)?;
+        if pins
+            .insert(dependency.package.as_str(), dependency)
+            .is_some()
+        {
+            return Err("duplicate backend runtime dependency".into());
+        }
+    }
     let mut dependencies = BTreeSet::new();
     for dependency in &result.runtime_dependencies {
         runtime_dependency(dependency, limits)?;
-        if !request.runtime_dependencies.contains(dependency)
+        if pins.get(dependency.package.as_str()).copied() != Some(dependency)
             || !dependencies.insert(&dependency.package)
         {
             return Err("backend runtime dependency is unpinned, undeclared or duplicated".into());
         }
     }
-    for step in &result.steps {
-        (policy.authorize_step)(step)?;
-    }
-    Ok(order)
+    Ok(())
 }
 
 type ArtifactIndex<'a> = BTreeMap<&'a str, (Option<usize>, ArtifactKind)>;

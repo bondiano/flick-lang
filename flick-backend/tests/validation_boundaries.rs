@@ -377,3 +377,47 @@ fn the_complete_request_budget_is_checked_before_loading_inputs() {
     assert!(generated.cache_key().is_some());
     assert_eq!(backend.calls.get(), 2);
 }
+
+#[test]
+fn dos_short_name_shapes_cannot_alias_artifacts_or_reserved_paths() {
+    for path in ["LONGMO~1.IFA", "LONGDI~1/child.js", "a~123456.x"] {
+        let mut result = result();
+        result.artifacts[0].path = path.into();
+        assert!(validate(&request(), &result).is_err(), "{path}");
+        let policy = Policy {
+            toolchains: &[],
+            environment: &[],
+            reserved_paths: &["LongModule.iface".into(), "LongDirectory".into()],
+            authorize_step: &common::authorize,
+            limits: Limits::default(),
+        };
+        assert!(validate_result(&request(), &result, &policy, &mut inputs(&request())).is_err());
+    }
+    for path in [
+        "backup~.js",
+        "version~next.js",
+        "App~1.interface",
+        "verylongname~1.js",
+    ] {
+        let mut result = result();
+        result.artifacts[0].path = path.into();
+        assert_eq!(validate(&request(), &result), Ok(vec![]), "{path}");
+    }
+}
+
+#[test]
+fn runtime_pins_match_exact_records_independently_of_list_order() {
+    let mut request = request();
+    request.runtime_dependencies = (0..1_000)
+        .map(|index| RuntimeDependency {
+            package: format!("runtime-{index}"),
+            version: "1.0.0".into(),
+            sha256: sha256(index.to_string().as_bytes()),
+        })
+        .collect();
+    let mut result = result();
+    result.runtime_dependencies = request.runtime_dependencies.iter().rev().cloned().collect();
+    assert_eq!(validate(&request, &result), Ok(vec![]));
+    result.runtime_dependencies[0].version = "2.0.0".into();
+    assert!(validate(&request, &result).is_err());
+}

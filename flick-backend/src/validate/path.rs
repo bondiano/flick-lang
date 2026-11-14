@@ -52,7 +52,12 @@ pub(crate) fn insert(
                 "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³"
             )
         });
-        if part.is_empty() || matches!(part, "." | "..") || part.ends_with(['.', ' ']) || reserved {
+        if part.is_empty()
+            || matches!(part, "." | "..")
+            || part.ends_with(['.', ' '])
+            || reserved
+            || dos_short_name(part)
+        {
             return Err(format!("invalid backend output path `{path}`"));
         }
     }
@@ -98,4 +103,16 @@ pub(crate) fn insert(
 /// <https://developer.apple.com/library/archive/technotes/tn/tn1150.html>
 fn hfs_ignorable(character: char) -> bool {
     matches!(character, '\u{200c}'..='\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{206a}'..='\u{206f}' | '\u{feff}')
+}
+
+/// NTFS may assign these 8.3 aliases to otherwise unrelated long names.
+fn dos_short_name(part: &str) -> bool {
+    let (stem, extension) = part.split_once('.').unwrap_or((part, ""));
+    let Some((_, digits)) = stem.rsplit_once('~') else {
+        return false;
+    };
+    stem.encode_utf16().count() <= 8
+        && extension.encode_utf16().count() <= 3
+        && !digits.is_empty()
+        && digits.bytes().all(|byte| byte.is_ascii_digit())
 }
