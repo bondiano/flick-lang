@@ -19,6 +19,7 @@ codegen/task_twice
 codegen/errors
 codegen/fail
 codegen/services
+effect/service_params
 codegen/service_dictionary
 codegen/service_place
 codegen/scope_run

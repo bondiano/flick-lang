@@ -1,0 +1,21 @@
+// A service's implementation is instantiated at its argument, including
+// the runtime bind built after Layer.effect finishes its task.
+module App.Main exposing (main)
+
+service Store a =
+  get : Unit ->{} a
+
+read : Unit ->{Store a} a
+let read () = Store.get ()
+
+using : Layer none none {Store a} -> Eff {Store a} none a ->{} a
+let using layer work = provide layer { await work }
+
+main : Unit ->{} Unit
+let main () =
+  let integers = Layer.succeed Store { get = fun () -> 42 }
+  let strings = Layer.succeed Store { get = fun () -> "forty-two" }
+  Platform.stdout_line (show (using integers (task { read () })))
+  Platform.stdout_line (using strings (task { read () }))
+  let delayed = Layer.effect Store (task { { get = fun () -> 7 } })
+  Platform.stdout_line (show (using delayed (task { read () })))

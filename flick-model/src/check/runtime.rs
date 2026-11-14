@@ -16,8 +16,8 @@ use crate::decls::Decls;
 use crate::eval::Lambda;
 use crate::eval::regions::{Finalizer, reach, region_name};
 use crate::subst::any;
-use crate::syntax::{Const, Env, Term};
-use crate::types::{Kind, Row, Stage, Type, Var};
+use crate::syntax::{Const, Env, Path, Term};
+use crate::types::{Kind, Row, Scheme, Stage, Type, Var};
 
 /// `·;Ψ;Λ ⊢ e : τ ! φ` for some `Ψ` with `⊢ μ : Ψ`, and `⊢ Λ`: a
 /// configuration of the machine against the type of the program. Returns
@@ -89,8 +89,8 @@ impl Checker<'_> {
             Term::Env(theta) => self.env(theta),
             // (Bind)
             Term::Bind(s, e) => {
-                self.check(e, &Type::Impl(Row::one(s.clone())))?;
-                Ok(Type::Env(Row::one(s.clone())))
+                let row = self.bound_service(s, e)?;
+                Ok(Type::Env(row))
             }
             // (Join)
             Term::Join(a, b) => {
@@ -185,11 +185,28 @@ impl Checker<'_> {
         let mut row = Row::none();
         for (s, v) in theta {
             let outer = mem::replace(&mut self.stage, Stage::Pure);
-            self.check(v, &Type::Impl(Row::one(s.clone())))?;
+            let bound = self.bound_service(s, v)?;
             self.stage = outer;
-            row.elems.insert(s.clone(), Rc::from([]));
+            row = self.sum(&row, &bound)?;
         }
         Ok(Type::Env(row))
+    }
+
+    /// Instantiate service parameters before checking a runtime implementation,
+    /// just as the source-level layer constructor does.
+    fn bound_service(&mut self, s: &Path, value: &Term) -> Check<Row> {
+        let (vars, row) = self.service_row(s);
+        let scheme = Scheme {
+            vars,
+            body: Type::Impl(row),
+            outlives: Vec::new(),
+        };
+        let implementation = self.instantiate(&scheme);
+        self.check(value, &implementation)?;
+        let Type::Impl(row) = self.zonk(&implementation) else {
+            unreachable!("instantiating an implementation preserves its form")
+        };
+        Ok(row)
     }
 
     /// (App) on a redex `(λx. e) v` of a configuration: `x` takes the type
