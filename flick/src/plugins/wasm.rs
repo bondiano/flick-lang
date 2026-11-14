@@ -17,11 +17,12 @@ use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
 use flick_core::plugin::source::BlockSource;
 use flick_core::plugin::{Expander, Failure};
-use flick_core::project::store;
 use flick_plugin::Compiler;
 use sha2::{Digest, Sha256};
+use wasmtime::Store;
 use wasmtime::component::{Component, HasSelf, Linker};
-use wasmtime::{Cache, CacheConfig, Config, Engine, Store, StoreLimits, StoreLimitsBuilder, Trap};
+
+use crate::component::{MemoryLimits, engine, memory_limits, prepare, why};
 
 use crate::fetch;
 
@@ -115,7 +116,7 @@ struct Wasm {
 /// What a call of a plugin reaches: the block whose holes it asks for.
 struct State {
     source: BlockSource,
-    limits: StoreLimits,
+    limits: MemoryLimits,
 }
 
 impl flick::plugin::types::Host for State {}
@@ -227,30 +228,6 @@ impl flick::plugin::compiler::Host for State {
     }
 }
 
-/// Where wasmtime keeps compiled components, by their bytes, its own
-/// version and the settings of the engine.
-fn compiled_cache() -> Option<Cache> {
-    let mut config = CacheConfig::new();
-    config.with_directory(store::cache_dir()?.join("wasmtime"));
-    Cache::new(config).ok()
-}
-
-fn engine() -> Result<&'static Engine, String> {
-    static ENGINE: OnceLock<Result<Engine, String>> = OnceLock::new();
-    ENGINE
-        .get_or_init(|| {
-            let mut config = Config::new();
-            config.consume_fuel(true);
-            // the same results on every machine, which caches rely on
-            config.cranelift_nan_canonicalization(true);
-            // without a cache directory a component is only compiled anew
-            config.cache(compiled_cache());
-            Engine::new(&config).map_err(|e| e.to_string())
-        })
-        .as_ref()
-        .map_err(Clone::clone)
-}
-
 impl Wasm {
     fn compiled(&self) -> Result<&(Component, Linker<State>), String> {
         self.compiled
@@ -281,10 +258,7 @@ impl Wasm {
     ) -> (Result<R, String>, BlockSource) {
         let state = State {
             source,
-            limits: StoreLimitsBuilder::new()
-                .memory_size(MEMORY)
-                .trap_on_grow_failure(true)
-                .build(),
+            limits: memory_limits(MEMORY),
         };
         let Ok(engine) = engine() else {
             return (Err("no engine".into()), state.source);
@@ -292,8 +266,9 @@ impl Wasm {
         let mut store = Store::new(engine, state);
         store.limiter(|s| &mut s.limits);
         let result = self.compiled().and_then(|(component, linker)| {
-            let plugin = store
-                .set_fuel(FUEL)
+            // Preserve the plugin host's existing transfer budget.
+            let output_budget = store.hostcall_fuel();
+            let plugin = prepare(&mut store, FUEL, output_budget)
                 .and_then(|()| Plugin::instantiate(&mut store, component, linker))
                 .map_err(|e| {
                     format!(
@@ -305,18 +280,6 @@ impl Wasm {
             call(&plugin, &mut store).map_err(|e| why(&e))
         });
         (result, store.into_data().source)
-    }
-}
-
-/// Why a call failed, in words.
-fn why(error: &wasmtime::Error) -> String {
-    match error.downcast_ref::<Trap>() {
-        Some(Trap::OutOfFuel) => "ran out of its fuel".into(),
-        Some(Trap::AllocationTooLarge) => "ran out of its memory".into(),
-        _ if format!("{error:?}").contains("forcing trap when growing memory") => {
-            "ran out of its memory".into()
-        }
-        _ => format!("trapped: {error}"),
     }
 }
 

@@ -1,0 +1,84 @@
+---
+source: flick-backend/tests/schema.rs
+expression: "serde_json::to_string_pretty(&request).expect(\"JSON\")"
+---
+{
+  "backend": {
+    "identity": {
+      "id": "test/js",
+      "version": "1.2.3"
+    },
+    "sha256": "5768b94efe62a839224eb4696e93602a83bd4a3f7b4172fb655812dc48bb0055"
+  },
+  "entries": [
+    {
+      "name": "main",
+      "runner": null,
+      "symbol": {
+        "module": "App",
+        "name": "main"
+      }
+    }
+  ],
+  "foreign": [],
+  "inputs": [
+    {
+      "id": "source/App",
+      "kind": "Source",
+      "sha256": "de47fc3082f9faa12a1af20ed426695459d62a064a1156fab8c6f4ec8ea8f582",
+      "size": 17
+    }
+  ],
+  "module_root": null,
+  "modules": [
+    {
+      "interface": null,
+      "name": "App",
+      "output": "App.js",
+      "package": "demo",
+      "role": "Own"
+    }
+  ],
+  "package_targets": [],
+  "program": "CBOR portable IR",
+  "projections": [],
+  "root_handlers": [],
+  "runtime_dependencies": [],
+  "sources": [
+    {
+      "input": "source/App",
+      "line_starts": [
+        0,
+        17
+      ],
+      "name": "App.fl"
+    }
+  ],
+  "target": {
+    "backend_api": "0.1.0",
+    "environment": {
+      "backend": "js",
+      "platform": "node"
+    },
+    "ir_version": "0.11.0",
+    "language_version": "0.1.0",
+    "mode": "WholeProgram",
+    "options": [],
+    "profile": "Debug",
+    "required_capabilities": [],
+    "runtime_abis": [
+      {
+        "name": "flickrt",
+        "version": "0.1.0"
+      }
+    ]
+  },
+  "test_roots": [],
+  "toolchains": [
+    {
+      "id": "go",
+      "sha256": "81935c7a565a318268d8185bea0e3f8f9bda1c515a30080173099b18f3254689",
+      "version": "1.23.0"
+    }
+  ]
+}

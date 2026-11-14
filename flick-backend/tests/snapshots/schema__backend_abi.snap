@@ -1,0 +1,295 @@
+---
+source: flick-backend/tests/schema.rs
+expression: printer.output.to_string()
+---
+package flick:backend@0.1.0;
+
+interface types {
+  enum profile {
+    debug,
+    release,
+  }
+
+  enum mode {
+    per-module,
+    whole-program,
+  }
+
+  record environment {
+    backend: string,
+    platform: string,
+  }
+
+  record abi {
+    name: string,
+    version: string,
+  }
+
+  record version-range {
+    minimum: string,
+    maximum-exclusive: string,
+  }
+
+  record named-range {
+    name: string,
+    versions: version-range,
+  }
+
+  record backend-id {
+    id: string,
+    version: string,
+  }
+
+  record backend-pin {
+    identity: backend-id,
+    sha256: string,
+  }
+
+  record capability {
+    name: string,
+    version: string,
+  }
+
+  record descriptor {
+    identity: backend-id,
+    backend-api: version-range,
+    ir: version-range,
+    language: version-range,
+    runtime-abis: list<named-range>,
+    environments: list<environment>,
+    profiles: list<profile>,
+    modes: list<mode>,
+    capabilities: list<capability>,
+  }
+
+  record option-value {
+    key: string,
+    value: string,
+  }
+
+  record target-request {
+    backend-api: string,
+    ir-version: string,
+    language-version: string,
+    runtime-abis: list<abi>,
+    environment: environment,
+    profile: profile,
+    mode: mode,
+    required-capabilities: list<capability>,
+    options: list<option-value>,
+  }
+
+  record target-support {
+    capabilities: list<capability>,
+  }
+
+  record span {
+    file: u32,
+    start: u32,
+    end: u32,
+  }
+
+  enum severity {
+    error,
+    warning,
+    note,
+  }
+
+  record diagnostic {
+    code: string,
+    severity: severity,
+    message: string,
+    span: option<span>,
+    notes: list<string>,
+  }
+
+  enum input-kind {
+    source,
+    foreign,
+    %interface,
+    target-facts,
+    %resource,
+    lockfile,
+  }
+
+  record input {
+    id: string,
+    kind: input-kind,
+    sha256: string,
+    size: u64,
+  }
+
+  record source {
+    name: string,
+    input: string,
+    line-starts: list<u32>,
+  }
+
+  enum module-role {
+    %own,
+    builtin,
+    external,
+  }
+
+  record module-input {
+    name: string,
+    role: module-role,
+    %package: option<string>,
+    output: string,
+    %interface: option<string>,
+  }
+
+  record symbol {
+    module: string,
+    name: string,
+  }
+
+  record entry {
+    name: string,
+    symbol: symbol,
+    runner: option<string>,
+  }
+
+  record foreign-binding {
+    module: string,
+    specifier: string,
+    resolved: string,
+    abi: abi,
+    inputs: list<string>,
+  }
+
+  record projection {
+    module: string,
+    schema: abi,
+    input: string,
+  }
+
+  record typescript-projection {
+    declarations: list<string>,
+    annotations: list<option-value>,
+    imports: string,
+    modules: list<string>,
+  }
+
+  record package-target {
+    %package: string,
+    environments: list<environment>,
+  }
+
+  record root-handler {
+    environment: environment,
+    service: symbol,
+    handler: symbol,
+  }
+
+  enum artifact-kind {
+    source,
+    source-map,
+    declaration,
+    object,
+    executable,
+    %resource,
+    metadata,
+  }
+
+  record artifact {
+    id: string,
+    path: string,
+    kind: artifact-kind,
+    bytes: list<u8>,
+  }
+
+  record toolchain {
+    id: string,
+    version: string,
+    sha256: string,
+  }
+
+  variant input-ref {
+    source(string),
+    artifact(string),
+  }
+
+  record step-output {
+    id: string,
+    path: string,
+    kind: artifact-kind,
+  }
+
+  record toolchain-step {
+    id: string,
+    dependencies: list<string>,
+    toolchain: toolchain,
+    arguments: list<string>,
+    environment: list<option-value>,
+    inputs: list<input-ref>,
+    outputs: list<step-output>,
+  }
+
+  record runtime-dependency {
+    %package: string,
+    version: string,
+    sha256: string,
+  }
+
+  record build-request {
+    target: target-request,
+    backend: backend-pin,
+    program: list<u8>,
+    module-root: option<string>,
+    modules: list<module-input>,
+    sources: list<source>,
+    entries: list<entry>,
+    test-roots: list<symbol>,
+    foreign: list<foreign-binding>,
+    projections: list<projection>,
+    package-targets: list<package-target>,
+    root-handlers: list<root-handler>,
+    inputs: list<input>,
+    toolchains: list<toolchain>,
+    runtime-dependencies: list<runtime-dependency>,
+  }
+
+  enum launch-kind {
+    run,
+    test,
+  }
+
+  record launch {
+    name: string,
+    kind: launch-kind,
+    artifact: string,
+    runtime: option<toolchain>,
+    arguments: list<string>,
+  }
+
+  record build-result {
+    artifacts: list<artifact>,
+    steps: list<toolchain-step>,
+    runtime-dependencies: list<runtime-dependency>,
+    launches: list<launch>,
+    diagnostics: list<diagnostic>,
+  }
+
+  enum input-error {
+    undeclared,
+    unavailable,
+    digest-mismatch,
+  }
+}
+
+interface inputs {
+  use types.{input-error};
+
+  read: func(id: string) -> result<list<u8>, input-error>;
+}
+
+world backend {
+  import types;
+  import inputs;
+  use types.{descriptor, target-request, target-support, build-request, build-result, diagnostic};
+
+  export describe: func() -> descriptor;
+  export check-target: func(request: build-request) -> result<target-support, list<diagnostic>>;
+  export generate: func(request: build-request) -> result<build-result, list<diagnostic>>;
+}

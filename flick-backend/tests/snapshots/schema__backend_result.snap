@@ -1,0 +1,23 @@
+---
+source: flick-backend/tests/schema.rs
+expression: "serde_json::to_string_pretty(&common::result()).expect(\"JSON\")"
+---
+{
+  "artifacts": [
+    {
+      "id": "object",
+      "path": "obj/app.o",
+      "kind": "Object",
+      "bytes": [
+        0,
+        255,
+        128,
+        10
+      ]
+    }
+  ],
+  "steps": [],
+  "runtime_dependencies": [],
+  "launches": [],
+  "diagnostics": []
+}
