@@ -6,6 +6,7 @@ import Formal.RowLess
 import Formal.TyComp
 import Formal.TyOps
 import Formal.RowTerms
+import Formal.IndexedRows
 import Formal.SchemeOps
 import Formal.DictOps
 import Formal.Subst
@@ -38,6 +39,8 @@ import Formal.Vary
 import Formal.VaryArgs
 import Formal.VarySpine
 import Formal.Shapes
+import Formal.TypeEquivShape
+import Formal.TypeEquivInvert
 import Formal.CanonForms
 import Formal.DictCanon
 import Formal.Patterns
@@ -91,6 +94,7 @@ import Formal.LetMut
 import Formal.Generalization
 import Formal.RecordHandler
 import Formal.Examples
+import Formal.RowEquivExamples
 import Formal.RT.Cause
 import Formal.RT.Recover
 import Formal.RT.Config
