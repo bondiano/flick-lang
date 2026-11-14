@@ -245,8 +245,9 @@ pub(crate) fn command(
             })
             .chain(iter::once(root.to_path_buf()))
             .collect();
+        let mut pins = super::dependencies::Pins::default();
         for directory in directories {
-            let installed = super::dependencies::installed(&directory)?;
+            let installed = pins.installed(&directory)?;
             if manifest
                 .runtime_dependencies
                 .iter()

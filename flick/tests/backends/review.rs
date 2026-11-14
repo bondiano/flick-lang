@@ -187,3 +187,45 @@ fn test_publication_reconciles_previous_native_files_on_fresh_builds_and_cache_h
         );
     }
 }
+
+#[test]
+#[ignore = "requires just wasm-backends"]
+fn successful_component_run_notes_do_not_count_as_warnings() {
+    for (case, expected) in [("Fixture.Note", 0), ("Fixture.Warning", 1)] {
+        let root = fixture(&format!("backend_run_diagnostic_{case}"), case);
+        let result = flick_in(&root, &["run", "--warnings-as-errors"]);
+        assert_eq!(result.status.code(), Some(expected), "{result:?}");
+        assert!(String::from_utf8_lossy(&result.stderr).contains("successful backend diagnostic"));
+        assert_eq!(
+            fs::read_dir(root.join(".flick/run"))
+                .expect("run generations")
+                .count(),
+            0
+        );
+    }
+}
+
+#[test]
+#[ignore = "requires just wasm-backends"]
+fn commonjs_emission_preserves_string_contents_and_test_filters() {
+    let root = fixture("backend_commonjs_strings", "Fixture.CommonJs");
+    fs::create_dir_all(root.join("test")).expect("tests");
+    fs::write(root.join("test/Suite.fl"), "module Suite exposing (tests)\ntests : List Test.Test\nlet tests = [Test.test \"export const tests =\" (fun () -> Test.Pass)]\n").expect("suite");
+    let result = flick_in(
+        &root,
+        &[
+            "test",
+            "--reporter",
+            "json",
+            "--filter",
+            "export const tests =",
+        ],
+    );
+    assert!(result.status.success(), "{result:?}");
+    let report: serde_json::Value = serde_json::from_slice(&result.stdout).expect("real report");
+    assert_eq!(
+        report["passed"], 1,
+        "the literal filter selects the assertion"
+    );
+    assert_eq!(report["tests"][0]["name"], "Suite > export const tests =");
+}

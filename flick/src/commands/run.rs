@@ -265,7 +265,12 @@ pub fn build_into_generation(
     let outcome = build.run();
     report::render(global, &outcome.sources, &outcome.diagnostics);
     let code = report::code(&outcome.diagnostics);
-    let failed = code != 0 || (global.warnings_as_errors && !outcome.diagnostics.is_empty());
+    let failed = code != 0
+        || (global.warnings_as_errors
+            && outcome
+                .diagnostics
+                .iter()
+                .any(|d| d.severity == Severity::Warning));
     if failed {
         return Err(code.max(1));
     }

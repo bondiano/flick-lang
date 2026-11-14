@@ -80,25 +80,17 @@ pub(super) fn source(request: &BuildRequest, module: &str) -> Option<Vec<u8>> {
     let ItemKind::Value { body, .. } = &item.kind else {
         return None;
     };
-    let source = format!(
-        "import {{ testPure }} from \"@flick-lang/runtime/rt\";\nimport {{ tag }} from \"@flick-lang/runtime/tags\";\nexport const tests = {};\n",
-        expression(body)?
-    );
-    Some(if super::case(request) == "commonjs" {
-        source
-            .replace(
-                "import { testPure } from \"@flick-lang/runtime/rt\"",
-                "const { testPure } = require(\"@flick-lang/runtime/rt\")",
-            )
-            .replace(
-                "import { tag } from \"@flick-lang/runtime/tags\"",
-                "const { tag } = require(\"@flick-lang/runtime/tags\")",
-            )
-            .replace("export const tests =", "exports.tests =")
-            .into_bytes()
+    let expression = expression(body)?;
+    let source = if super::case(request) == "commonjs" {
+        format!(
+            "const {{ testPure }} = require(\"@flick-lang/runtime/rt\");\nconst {{ tag }} = require(\"@flick-lang/runtime/tags\");\nexports.tests = {expression};\n"
+        )
     } else {
-        source.into_bytes()
-    })
+        format!(
+            "import {{ testPure }} from \"@flick-lang/runtime/rt\";\nimport {{ tag }} from \"@flick-lang/runtime/tags\";\nexport const tests = {expression};\n"
+        )
+    };
+    Some(source.into_bytes())
 }
 
 pub(super) fn runner(
