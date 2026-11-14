@@ -7,7 +7,7 @@ use std::{fs, io};
 use flick_backend::{Limits, validate_output_paths};
 
 use super::{manifest, remove_empty_parents};
-use crate::artifact::{validate_ancestors, validate_root};
+use crate::artifact::{resolve_root, validate_ancestors, validate_root};
 
 fn validate_removals(out: &Path, files: &[String]) -> io::Result<()> {
     validate_root(out).map_err(io::Error::other)?;
@@ -21,6 +21,9 @@ fn validate_removals(out: &Path, files: &[String]) -> io::Result<()> {
 
 /// Validate stale paths before any current build files are published.
 pub fn validate_record(root: &Path, out: &Path, files: &[String]) -> io::Result<()> {
+    let resolved = resolve_root(root, out);
+    let trusted = resolve_root(root, root);
+    let (root, out) = (trusted.as_path(), resolved.as_path());
     validate_output_paths(files.iter().map(String::as_str), Limits::default())
         .map_err(io::Error::other)?;
     let dir = out.strip_prefix(root).unwrap_or(out).to_string_lossy();
@@ -45,6 +48,8 @@ pub fn validate_record(root: &Path, out: &Path, files: &[String]) -> io::Result<
 /// Preflight the entire manifest, including later output directories.
 /// Unlinking a leaf symlink is safe; following a parent symlink is refused.
 pub fn remove_recorded(root: &Path) -> io::Result<usize> {
+    let trusted = resolve_root(root, root);
+    let root = trusted.as_path();
     let outputs = manifest(root).outputs;
     for (dir, files) in &outputs {
         validate_removals(&directory(root, dir)?, files)?;

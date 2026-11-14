@@ -2,7 +2,7 @@
 
 #[cfg(unix)]
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::{fs, io};
 
 use flick_backend::{
@@ -114,6 +114,19 @@ pub fn validate_destination_paths<'a>(
         }
     }
     Ok(())
+}
+
+/// Resolve only the host-selected project/directory prefix. Keep the output
+/// suffix lexical so redirects inside it remain visible to validation.
+pub fn resolve_root(trusted: &Path, output: &Path) -> PathBuf {
+    output.strip_prefix(trusted).map_or_else(
+        |_| output.to_path_buf(),
+        |suffix| {
+            fs::canonicalize(trusted)
+                .unwrap_or_else(|_| trusted.to_path_buf())
+                .join(suffix)
+        },
+    )
 }
 
 /// Output roots and their traversal must be ordinary directories. An external

@@ -26,6 +26,7 @@ use rustix::process::{Pid, test_kill_process};
 
 use super::build::BuildCommand;
 use crate::args::{BuildArguments, EmitArgument, GlobalArguments, RunArguments};
+use crate::artifact::resolve_root;
 use crate::child::{self, Running};
 use crate::command::Command;
 use crate::sources::FsHost;
@@ -33,7 +34,7 @@ use crate::{report, toolchain};
 
 /// The generations of a project.
 pub fn generations(root: &Path) -> PathBuf {
-    root.join(cache::DIR).join("run")
+    resolve_root(root, root).join(cache::DIR).join("run")
 }
 
 /// A directory atomically reserved by this CLI until all cleanup ends.

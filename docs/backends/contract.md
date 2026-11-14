@@ -139,7 +139,9 @@ and artifact kinds, including executable permissions on Unix. The complete
 output set is checked for portable paths, collisions and size limits before
 writing or restoring files, including IR dumps, test runners, Go executables
 and schema AOT results. Cache reuse checks destinations before reading them.
-Output roots and their ancestor traversal must be ordinary directories;
+The host-selected project/directory prefix is resolved consistently for
+publication and manifest ownership. Output roots and their ancestor traversal
+below that trusted prefix must be ordinary directories;
 explicit external output directories remain supported using canonical paths.
 Existing output symlinks cannot redirect writes; Unix destinations with multiple
 hard links are refused before writes or executable-mode changes. Stale-file lists

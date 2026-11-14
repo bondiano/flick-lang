@@ -319,3 +319,57 @@ fn ir_files_are_owned_outputs_without_polluting_the_normal_build_cache() {
     assert!(!dir.join("dist/program.ir.json").exists());
     assert!(!dir.join("dist/program.ir.cbor").exists());
 }
+
+#[cfg(unix)]
+#[test]
+fn a_trusted_project_alias_keeps_publication_and_clean_ownership_consistent() {
+    use std::os::unix::fs::symlink;
+
+    let dir = project(
+        "cli_trusted_project_alias",
+        &[
+            ("real/flick.toml", LIB),
+            (
+                "real/src/Main.fl",
+                "module Main exposing (answer)\nlet answer = 1\n",
+            ),
+        ],
+    );
+    symlink(dir.join("real"), dir.join("alias")).expect("project alias");
+    let selected = dir.join("alias").to_string_lossy().into_owned();
+    for command in ["build", "build", "clean", "build"] {
+        let result = flick_in(&dir, &["--project", &selected, command]);
+        assert_eq!(code(&result), Some(0), "{command}: {result:?}");
+        assert_eq!(dir.join("real/dist/Main.js").exists(), command != "clean");
+    }
+    let app = project(
+        "cli_trusted_app_alias",
+        &[
+            ("real/flick.toml", APP),
+            (
+                "real/src/App/Main.fl",
+                "module App.Main exposing (main)\nmain : Unit -> Unit\nlet main () = ()\n",
+            ),
+        ],
+    );
+    symlink(app.join("real"), app.join("alias")).expect("app alias");
+    let selected_app = app.join("alias").to_string_lossy().into_owned();
+    for command in ["run", "test"] {
+        let result = flick_in(&app, &["--project", &selected_app, command]);
+        assert_eq!(code(&result), Some(0), "{command}: {result:?}");
+    }
+    let outside = dir.join("unowned");
+    fs::create_dir(&outside).expect("outside directory");
+    fs::write(outside.join("Main.js"), "owned elsewhere").expect("outside file");
+    fs::remove_dir_all(dir.join("real/dist")).expect("remove output");
+    symlink(&outside, dir.join("real/dist")).expect("output redirect");
+    for command in ["build", "clean"] {
+        let result = flick_in(&dir, &["--project", &selected, command]);
+        assert_eq!(code(&result), Some(1), "{command}: {result:?}");
+        assert!(stderr(&result).contains("FLICK-P013"), "{result:?}");
+        assert_eq!(
+            fs::read(outside.join("Main.js")).expect("outside remains"),
+            b"owned elsewhere"
+        );
+    }
+}

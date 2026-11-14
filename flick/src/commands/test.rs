@@ -13,7 +13,7 @@ use std::process::{Child, Command, ExitCode, Stdio};
 use std::time::{Duration, SystemTime};
 use std::{env, fs, io, thread};
 
-use crate::artifact::Artifact;
+use crate::artifact::{Artifact, resolve_root};
 use flick_core::build::go;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::{Backend, Emit};
@@ -104,7 +104,7 @@ fn prepare(
         release(options.profile, Some(&project.config.build)),
     );
     let key = cache::key(&project, &roots, &settings, !go_requested && !rt);
-    let out = project.root.join(OUT_DIR);
+    let out = resolve_root(&project.root, &project.root.join(OUT_DIR));
     progress.stage("Checking test cache");
     if let Some(runner) = cached_prepare(&project, &key, &out, &progress) {
         return Ok(runner);

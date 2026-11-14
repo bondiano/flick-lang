@@ -383,8 +383,9 @@ pub fn mark_go(root: &Path, key: &str, out_dir: &Path, executable: &str) {
 
 /// Removes obsolete build-owned files and records a successful publication.
 pub fn record(root: &Path, out_dir: &Path, files: Vec<String>) -> io::Result<()> {
-    let normalized = project::normalize(out_dir);
-    let out_dir = normalized.as_path();
+    let resolved = artifact::resolve_root(root, &project::normalize(out_dir));
+    let trusted = artifact::resolve_root(root, root);
+    let (root, out_dir) = (trusted.as_path(), resolved.as_path());
     validate_record(root, out_dir, &files)?;
     let path = root.join(cache::MANIFEST);
     let mut manifest = manifest(root);
@@ -432,6 +433,9 @@ pub fn manifest(root: &Path) -> Manifest {
 }
 
 pub fn outputs_current(root: &Path, out_dir: &Path, files: &[String]) -> bool {
+    let resolved = artifact::resolve_root(root, out_dir);
+    let trusted = artifact::resolve_root(root, root);
+    let (root, out_dir) = (trusted.as_path(), resolved.as_path());
     let dir = out_dir
         .strip_prefix(root)
         .unwrap_or(out_dir)

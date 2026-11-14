@@ -17,7 +17,7 @@ use super::emit_ir;
 use super::out_dir::overlap;
 use super::summary::{self, Built};
 use crate::args::{BuildArguments, EmitArgument, LabelsArgument, ProfileArgument};
-use crate::artifact::Artifact;
+use crate::artifact::{Artifact, resolve_root};
 use crate::command::{Command, Outcome};
 use crate::package_cache;
 use crate::progress::{Mode, Progress};
@@ -298,7 +298,10 @@ impl BuildCommand {
         };
         let config = project.map(|p| &p.config.build);
         BuildPlan {
-            out_dir: project::normalize(&out_dir),
+            out_dir: resolve_root(
+                project.map_or(host.cwd.as_path(), |project| project.root.as_path()),
+                &project::normalize(&out_dir),
+            ),
             entries,
             typescript: emit == Emit::Ts,
             go: emit == Emit::Go,
