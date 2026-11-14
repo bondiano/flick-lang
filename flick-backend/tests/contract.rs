@@ -106,7 +106,12 @@ fn inputs_are_content_addressed_and_undeclared_reads_fail() {
     assert!(DeclaredInputs::new(&request.inputs, |_| Some(b"changed".to_vec())).is_err());
     let mut duplicate = request.inputs;
     duplicate.push(duplicate[0].clone());
-    assert!(DeclaredInputs::new(&duplicate, |_| None).is_err());
+    assert!(
+        DeclaredInputs::new(&duplicate, |_| Some(common::TEXT.as_bytes().to_vec()))
+            .err()
+            .expect("duplicate input")
+            .contains("duplicate input id")
+    );
 }
 
 #[test]

@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 
+use caseless::Caseless;
 use unicode_normalization::UnicodeNormalization;
 
 use super::{Limits, string};
@@ -26,15 +27,31 @@ pub(super) fn insert(
             .next()
             .unwrap_or_default()
             .to_ascii_uppercase();
+        // Windows also reserves the ISO-8859-1 superscript device digits:
+        // https://learn.microsoft.com/windows/win32/fileio/naming-a-file
+        let device_digit = base
+            .strip_prefix("COM")
+            .or_else(|| base.strip_prefix("LPT"));
         let reserved = matches!(base.as_str(), "CON" | "PRN" | "AUX" | "NUL")
-            || (base.starts_with("COM") || base.starts_with("LPT"))
-                && base.len() == 4
-                && matches!(base.as_bytes()[3], b'1'..=b'9');
+            || device_digit.is_some_and(|digit| {
+                matches!(
+                    digit,
+                    "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³"
+                )
+            });
         if part.is_empty() || matches!(part, "." | "..") || part.ends_with(['.', ' ']) || reserved {
             return Err(format!("invalid backend output path `{path}`"));
         }
     }
-    let key = path.to_lowercase();
+    // Conservatively combine Unicode caseless matching with Windows'
+    // uppercase aliases (including dotless i). Normalize after folding too.
+    // https://www.unicode.org/faq/casemap_charprop.html
+    let key: String = path
+        .nfd()
+        .flat_map(char::to_uppercase)
+        .default_case_fold()
+        .nfd()
+        .collect();
     let mut prefix = String::new();
     for part in key.split('/') {
         if !prefix.is_empty() {
