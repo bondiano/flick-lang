@@ -1,9 +1,10 @@
+use super::requirements::Removed;
 use std::collections::BTreeMap;
 
 use super::{
     BridgeAliasId, BridgeConstructorOrigin, BridgeKind, BridgeMeaning, BridgeNode, BridgePlan,
     BridgeValidationError, BridgeWitnessId, KindTables, Requirement, Requirements, SemanticKind,
-    WitnessMembers, contexts, error, merge_requirement, merge_requirements, reference,
+    WitnessMembers, contexts, error, reference,
 };
 
 impl BridgePlan {
@@ -61,45 +62,41 @@ impl BridgePlan {
         tables: &KindTables,
         members: &[WitnessMembers],
     ) -> Result<(), BridgeValidationError> {
-        let kind_needs = self.kind_witnesses(tables, members)?;
-        let mut free: Vec<Requirements> = vec![BTreeMap::new(); self.nodes.len()];
+        let mut free = Requirements::new(self, kinds);
+        self.kind_witnesses(tables, members, &mut free)?;
         let mut rigids = BTreeMap::new();
         for &i in order {
             let path = format!("nodes[{i}]");
-            let mut needed = BTreeMap::new();
+            let mut needed = 0;
             // Exists handles body/contract separately: only its body scopes the witness.
             if let BridgeNode::Exists { witness, body } = self.nodes[i].node {
-                needed = free[body.0 as usize].clone();
-                needed.remove(&Requirement::Witness(witness));
-                needed.remove(&Requirement::KindWitness(witness));
-                self.check_witness_shadow(witness, &needed, &path)?;
+                needed = free.root(body.0 as usize);
+                (needed, _) = free.remove(needed, &Requirement::Witness(witness));
+                (needed, _) = free.remove(needed, &Requirement::KindWitness(witness));
+                self.check_witness_shadow(witness, needed, &free, &path)?;
                 let contract = self.witnesses[witness.0 as usize].contract;
-                merge_requirements(&mut needed, &free[contract.0 as usize], kinds, &path)?;
+                needed = free.union(needed, free.root(contract.0 as usize), &path)?;
             } else {
                 for (child, _) in &edges[i] {
-                    merge_requirements(&mut needed, &free[*child], kinds, &path)?;
+                    needed = free.union(needed, free.root(*child), &path)?;
                 }
             }
             let own = &self.nodes[i];
             match &own.node {
-                BridgeNode::Var(name) => merge_requirement(
-                    &mut needed,
-                    Requirement::Variable(name.clone()),
-                    Some(own.kind),
-                    kinds,
-                    &path,
-                )?,
+                BridgeNode::Var(name) => {
+                    needed = free.insert(
+                        needed,
+                        &Requirement::Variable(name.clone()),
+                        Some(own.kind),
+                        &path,
+                    )?;
+                }
                 BridgeNode::Con(id) => {
                     if let BridgeConstructorOrigin::Witness(witness) =
                         self.constructors[id.0 as usize].origin
                     {
-                        merge_requirement(
-                            &mut needed,
-                            Requirement::Witness(witness),
-                            None,
-                            kinds,
-                            &path,
-                        )?;
+                        needed =
+                            free.insert(needed, &Requirement::Witness(witness), None, &path)?;
                     }
                 }
                 BridgeNode::Rigid(id) => {
@@ -109,50 +106,36 @@ impl BridgePlan {
                 }
                 BridgeNode::Forall { vars, .. } => {
                     for binder in vars {
-                        if let Some(Some(required)) =
-                            needed.remove(&Requirement::Variable(binder.name.clone()))
-                        {
+                        let removed;
+                        (needed, removed) =
+                            free.remove(needed, &Requirement::Variable(binder.name.clone()));
+                        if let Removed::Kind(required) = removed {
                             Self::same_kind(required, binder.kind, kinds, &format!("{path}.vars"))?;
                         }
                     }
                 }
                 _ => {}
             }
-            for witness in &kind_needs[self.nodes[i].kind.0 as usize] {
-                merge_requirement(
-                    &mut needed,
-                    Requirement::KindWitness(*witness),
-                    None,
-                    kinds,
-                    &path,
-                )?;
-            }
+            needed = free.union(needed, free.kind(self.nodes[i].kind), &path)?;
             if let BridgeNode::Forall { vars, .. } = &self.nodes[i].node {
                 for binder in vars {
-                    for witness in &kind_needs[binder.kind.0 as usize] {
-                        merge_requirement(
-                            &mut needed,
-                            Requirement::KindWitness(*witness),
-                            None,
-                            kinds,
-                            &path,
-                        )?;
-                    }
+                    needed = free.union(needed, free.kind(binder.kind), &path)?;
                 }
             }
-            free[i] = needed;
+            free.store(i, needed);
         }
-        contexts::validate(self, edges, order, kinds, &kind_needs, &free)
+        contexts::validate(self, edges, order, kinds, &free)
     }
 
     pub(super) fn check_witness_shadow(
         &self,
         current: BridgeWitnessId,
-        needed: &Requirements,
+        needed: usize,
+        free: &Requirements,
         path: &str,
     ) -> Result<(), BridgeValidationError> {
         let binder = &self.witnesses[current.0 as usize].binder;
-        for requirement in needed.keys() {
+        for requirement in free.direct(needed) {
             if let Requirement::Witness(other) = requirement
                 && self.witnesses[other.0 as usize].binder == *binder
             {

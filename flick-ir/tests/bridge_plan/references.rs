@@ -186,6 +186,33 @@ fn rich_raw_graph_preserves_all_resolved_node_information() {
 
 #[test]
 fn schema_names_every_existing_opaque_or_projected_builtin_role() {
+    // Deliberately exhaustive: a new role must extend this catalogue even
+    // when neither optional wire format is enabled.
+    fn wire_name(role: BridgeBuiltin) -> &'static str {
+        match role {
+            BridgeBuiltin::Eff => "Eff",
+            BridgeBuiltin::List => "List",
+            BridgeBuiltin::Option => "Option",
+            BridgeBuiltin::Result => "Result",
+            BridgeBuiltin::Layer => "Layer",
+            BridgeBuiltin::Schema => "Schema",
+            BridgeBuiltin::PureCodec => "PureCodec",
+            BridgeBuiltin::Codec => "Codec",
+            BridgeBuiltin::Fiber => "Fiber",
+            BridgeBuiltin::Duration => "Duration",
+            BridgeBuiltin::Schedule => "Schedule",
+            BridgeBuiltin::Chunk => "Chunk",
+            BridgeBuiltin::NonEmptyChunk => "NonEmptyChunk",
+            BridgeBuiltin::HashMap => "HashMap",
+            BridgeBuiltin::HashSet => "HashSet",
+            BridgeBuiltin::Handlers => "Handlers",
+            BridgeBuiltin::Exit => "Exit",
+            BridgeBuiltin::Failure => "Failure",
+            BridgeBuiltin::Errors => "Errors",
+            BridgeBuiltin::Field => "Field",
+            BridgeBuiltin::ServiceImpl => "ServiceImpl",
+        }
+    }
     let roles = [
         BridgeBuiltin::Eff,
         BridgeBuiltin::List,
@@ -209,7 +236,54 @@ fn schema_names_every_existing_opaque_or_projected_builtin_role() {
         BridgeBuiltin::Field,
         BridgeBuiltin::ServiceImpl,
     ];
-    assert_eq!(roles.len(), 21);
+    let names = roles.map(wire_name);
+    assert_eq!(
+        names,
+        [
+            "Eff",
+            "List",
+            "Option",
+            "Result",
+            "Layer",
+            "Schema",
+            "PureCodec",
+            "Codec",
+            "Fiber",
+            "Duration",
+            "Schedule",
+            "Chunk",
+            "NonEmptyChunk",
+            "HashMap",
+            "HashSet",
+            "Handlers",
+            "Exit",
+            "Failure",
+            "Errors",
+            "Field",
+            "ServiceImpl",
+        ]
+    );
+    #[cfg(any(feature = "json", feature = "cbor"))]
+    for (role, name) in roles.iter().zip(names) {
+        #[cfg(feature = "json")]
+        {
+            let encoded = serde_json::to_string(role).expect("builtin role JSON");
+            assert_eq!(encoded, format!("\"{name}\""));
+            let decoded: BridgeBuiltin =
+                serde_json::from_str(&encoded).expect("builtin role decode");
+            assert_eq!(&decoded, role);
+        }
+        #[cfg(feature = "cbor")]
+        {
+            let mut encoded = Vec::new();
+            ciborium::into_writer(role, &mut encoded).expect("builtin role CBOR");
+            let actual: Value = ciborium::from_reader(encoded.as_slice()).expect("CBOR wire value");
+            assert_eq!(actual, Value::Text(name.to_owned()));
+            let decoded: BridgeBuiltin =
+                ciborium::from_reader(encoded.as_slice()).expect("builtin role decode");
+            assert_eq!(&decoded, role);
+        }
+    }
 }
 
 #[test]

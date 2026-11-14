@@ -1,9 +1,9 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use super::{
     BridgeBinder, BridgeConstructorOrigin, BridgeKind, BridgeKindId, BridgeNodeId, BridgePlan,
-    BridgeValidationError, BridgeWitnessId, KindTables, SemanticKind, WitnessMembers, error,
-    reference,
+    BridgeValidationError, KindTables, Requirement, Requirements, SemanticKind, WitnessMembers,
+    error, reference,
 };
 
 impl BridgePlan {
@@ -70,10 +70,10 @@ impl BridgePlan {
         &self,
         tables: &KindTables,
         members: &[WitnessMembers],
-    ) -> Result<Vec<BTreeSet<BridgeWitnessId>>, BridgeValidationError> {
-        let mut needed = vec![BTreeSet::new(); self.kinds.len()];
+        needed: &mut Requirements,
+    ) -> Result<(), BridgeValidationError> {
         for &i in &tables.order {
-            let mut dependencies = BTreeSet::new();
+            let mut dependencies = 0;
             match &self.kinds[i] {
                 BridgeKind::Named {
                     module,
@@ -98,21 +98,24 @@ impl BridgePlan {
                                 "undeclared witness named kind",
                             ));
                         }
-                        dependencies.insert(*id);
+                        dependencies = needed.insert(
+                            0,
+                            &Requirement::KindWitness(*id),
+                            None,
+                            &format!("kinds[{i}].origin"),
+                        )?;
                     }
                     BridgeConstructorOrigin::Global => {}
                 },
                 BridgeKind::Arrow(a, b) => {
-                    dependencies = needed[a.0 as usize]
-                        .union(&needed[b.0 as usize])
-                        .copied()
-                        .collect();
+                    dependencies =
+                        needed.union(needed.kind(*a), needed.kind(*b), &format!("kinds[{i}]"))?;
                 }
-                BridgeKind::Row(k) => dependencies.clone_from(&needed[k.0 as usize]),
+                BridgeKind::Row(k) => dependencies = needed.kind(*k),
                 _ => {}
             }
-            needed[i] = dependencies;
+            needed.store_kind(i, dependencies);
         }
-        Ok(needed)
+        Ok(())
     }
 }

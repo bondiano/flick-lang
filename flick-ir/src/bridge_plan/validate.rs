@@ -103,9 +103,12 @@ pub(super) struct KindTables {
 
 #[path = "contexts.rs"]
 mod contexts;
+mod forest;
 mod kinds;
 mod nodes;
+mod requirements;
 mod scopes;
+use requirements::Requirements;
 mod witnesses;
 
 struct WitnessMembers {
@@ -194,7 +197,6 @@ enum Requirement {
     Witness(BridgeWitnessId),
     KindWitness(BridgeWitnessId),
 }
-type Requirements = BTreeMap<Requirement, Option<BridgeKindId>>;
 
 const TYPE: u16 = 1;
 const SERVICE: u16 = 2;
@@ -256,30 +258,13 @@ fn kind_class(kind: &BridgeKind, classes: &[u16]) -> u16 {
     }
 }
 
-fn merge_requirement(
-    needed: &mut Requirements,
-    name: Requirement,
-    kind: Option<BridgeKindId>,
-    kinds: &[SemanticKind],
-    path: &str,
-) -> Result<(), BridgeValidationError> {
-    if let Some(Some(previous)) = needed.get(&name) {
-        if let Some(kind) = kind {
-            BridgePlan::same_kind(*previous, kind, kinds, path)?;
-        }
-    } else {
-        needed.insert(name, kind);
+#[cfg(test)]
+impl BridgePlan {
+    pub(super) fn measured_kind_support_cells(&self) -> Result<usize, BridgeValidationError> {
+        let tables = self.validate_kinds()?;
+        let members = self.validate_witnesses()?;
+        let mut free = Requirements::new(self, &tables.semantic);
+        self.kind_witnesses(&tables, &members, &mut free)?;
+        Ok(free.allocated())
     }
-    Ok(())
-}
-fn merge_requirements(
-    needed: &mut Requirements,
-    incoming: &Requirements,
-    kinds: &[SemanticKind],
-    path: &str,
-) -> Result<(), BridgeValidationError> {
-    for (name, kind) in incoming {
-        merge_requirement(needed, name.clone(), *kind, kinds, path)?;
-    }
-    Ok(())
 }

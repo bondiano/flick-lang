@@ -17,6 +17,11 @@ use serde::{Deserialize, Serialize};
 use crate::TypeName;
 
 mod equality;
+#[cfg(test)]
+mod metrics;
+mod persistent;
+#[cfg(test)]
+mod scaling_tests;
 mod validate;
 pub use validate::BridgeValidationError;
 

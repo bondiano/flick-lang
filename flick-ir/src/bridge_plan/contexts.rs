@@ -1,5 +1,5 @@
 //! Static declaration contexts. Alias links never inherit an invocation context.
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use super::{BridgePlan, BridgeValidationError, Requirement, Requirements, SemanticKind, error};
 use crate::bridge_plan::{
@@ -32,120 +32,15 @@ struct Context {
     ordinary: usize,
     witnesses: usize,
 }
-struct Frames {
-    ordinary: Vec<Option<(usize, Binding)>>,
-    ordinary_ids: BTreeMap<(usize, BindingId), usize>,
-    lookups: BTreeMap<(usize, String), Option<Binding>>,
-    witnesses: Vec<Option<(usize, BridgeWitnessId)>>,
-    witness_ids: BTreeMap<(usize, BridgeWitnessId), usize>,
-    contexts: Vec<Context>,
-    context_ids: BTreeMap<Context, usize>,
-}
-impl Frames {
-    fn new() -> Self {
-        Self {
-            ordinary: vec![None],
-            ordinary_ids: BTreeMap::new(),
-            lookups: BTreeMap::new(),
-            witnesses: vec![None],
-            witness_ids: BTreeMap::new(),
-            contexts: vec![],
-            context_ids: BTreeMap::new(),
-        }
-    }
-    fn context(&mut self, context: Context) -> usize {
-        let next = self.contexts.len();
-        *self.context_ids.entry(context).or_insert_with(|| {
-            self.contexts.push(context);
-            next
-        })
-    }
-    fn empty(&mut self, root: Root) -> usize {
-        self.context(Context {
-            root,
-            ordinary: 0,
-            witnesses: 0,
-        })
-    }
-    fn bind(&mut self, context: usize, binding: Binding) -> usize {
-        let mut cx = self.contexts[context];
-        let next = self.ordinary.len();
-        cx.ordinary = *self
-            .ordinary_ids
-            .entry((cx.ordinary, binding.id))
-            .or_insert_with(|| {
-                self.ordinary.push(Some((cx.ordinary, binding)));
-                next
-            });
-        self.context(cx)
-    }
-    fn witness(&mut self, context: usize, witness: BridgeWitnessId) -> usize {
-        let mut cx = self.contexts[context];
-        let next = self.witnesses.len();
-        cx.witnesses = *self
-            .witness_ids
-            .entry((cx.witnesses, witness))
-            .or_insert_with(|| {
-                self.witnesses.push(Some((cx.witnesses, witness)));
-                next
-            });
-        self.context(cx)
-    }
-    fn lookup(&mut self, context: usize, name: &str) -> Option<Binding> {
-        let mut current = self.contexts[context].ordinary;
-        let mut path = Vec::new();
-        let result = loop {
-            if let Some(cached) = self.lookups.get(&(current, name.to_owned())) {
-                break cached.clone();
-            }
-            path.push(current);
-            let Some((parent, binding)) = &self.ordinary[current] else {
-                break None;
-            };
-            if binding.name == name {
-                break Some(binding.clone());
-            }
-            current = *parent;
-        };
-        for frame in path {
-            self.lookups
-                .insert((frame, name.to_owned()), result.clone());
-        }
-        result
-    }
-    fn nearest(&self, context: usize) -> Option<BridgeWitnessId> {
-        self.witnesses[self.contexts[context].witnesses]
-            .as_ref()
-            .map(|(_, id)| *id)
-    }
-    fn contains(&self, context: usize, witness: BridgeWitnessId) -> bool {
-        let mut current = self.contexts[context].witnesses;
-        while let Some((parent, id)) = self.witnesses[current] {
-            if id == witness {
-                return true;
-            }
-            current = parent;
-        }
-        false
-    }
-    fn accessible(&self, plan: &BridgePlan, context: usize, witness: BridgeWitnessId) -> bool {
-        let mut current = self.contexts[context].witnesses;
-        while let Some((parent, id)) = self.witnesses[current] {
-            if plan.witnesses[id.0 as usize].binder == plan.witnesses[witness.0 as usize].binder {
-                return id == witness;
-            }
-            current = parent;
-        }
-        false
-    }
-}
+#[path = "contexts/frames.rs"]
+mod frames;
+use frames::Frames;
 
 struct Check<'a> {
     plan: &'a BridgePlan,
     edges: &'a [Vec<(usize, String)>],
     kinds: &'a [SemanticKind],
-    kind_needs: &'a [BTreeSet<BridgeWitnessId>],
-    free: &'a [Requirements],
+    free: &'a Requirements,
     has_owner: Vec<bool>,
     before: Vec<Option<usize>>,
     aliases: Vec<bool>,
@@ -161,8 +56,7 @@ pub(super) fn validate(
     edges: &[Vec<(usize, String)>],
     order: &[usize],
     kinds: &[SemanticKind],
-    kind_needs: &[BTreeSet<BridgeWitnessId>],
-    free: &[Requirements],
+    free: &Requirements,
 ) -> Result<(), BridgeValidationError> {
     let mut has_owner = vec![false; plan.nodes.len()];
     for &id in order {
@@ -187,14 +81,13 @@ pub(super) fn validate(
         plan,
         edges,
         kinds,
-        kind_needs,
         free,
         has_owner,
         before: vec![None; plan.witnesses.len()],
         aliases: vec![false; plan.aliases.len()],
         owned_constructors,
         owned_aliases,
-        frames: Frames::new(),
+        frames: Frames::new(plan),
         work: vec![],
         seen: BTreeSet::new(),
     };
@@ -261,15 +154,20 @@ impl Check<'_> {
         Ok(())
     }
     fn root(&mut self, node: usize, cx: usize, path: &str) -> Result<(), BridgeValidationError> {
-        self.requirements(&self.free[node], cx, path)?;
+        self.requirements(self.free.root(node), cx, path)?;
         if self.has_owner[node] {
             self.work.push((node, cx));
         }
         Ok(())
     }
     fn kind(&self, kind: BridgeKindId, cx: usize, path: &str) -> Result<(), BridgeValidationError> {
-        for id in &self.kind_needs[kind.0 as usize] {
-            if !self.frames.contains(cx, *id) {
+        let root = self.free.kind(kind);
+        let current = self.frames.nearest(cx);
+        if self.free.permits(root, current) {
+            return Ok(());
+        }
+        for id in self.free.kind_witnesses(root) {
+            if !self.free.contains(current, id) {
                 return Err(error(path, format!("unbound kind witness {id:?}")));
             }
         }
@@ -288,27 +186,33 @@ impl Check<'_> {
     }
     fn requirements(
         &mut self,
-        needed: &Requirements,
+        needed: usize,
         cx: usize,
         path: &str,
     ) -> Result<(), BridgeValidationError> {
-        for (requirement, kind) in needed {
+        for (requirement, kind) in self.free.ordinary(needed) {
             match requirement {
                 Requirement::Variable(name) => {
                     let Some(binding) = self.frames.lookup(cx, name) else {
                         return Err(error(path, format!("unbound variable {name:?}")));
                     };
                     if let Some(kind) = kind {
-                        BridgePlan::same_kind(binding.kind, *kind, self.kinds, path)?;
+                        BridgePlan::same_kind(binding.kind, kind, self.kinds, path)?;
                     }
                 }
-                Requirement::Witness(id) if !self.frames.accessible(self.plan, cx, *id) => {
+                Requirement::Witness(id) if !self.frames.accessible(cx, *id) => {
                     return Err(error(path, format!("unbound or shadowed witness {id:?}")));
                 }
-                Requirement::KindWitness(id) if !self.frames.contains(cx, *id) => {
+                Requirement::Witness(_) => {}
+                Requirement::KindWitness(_) => unreachable!("ordinary namespaces"),
+            }
+        }
+        let current = self.frames.nearest(cx);
+        if !self.free.permits(needed, current) {
+            for id in self.free.kind_witnesses(needed) {
+                if !self.free.contains(current, id) {
                     return Err(error(path, format!("unbound kind witness {id:?}")));
                 }
-                Requirement::Witness(_) | Requirement::KindWitness(_) => {}
             }
         }
         Ok(())
@@ -442,7 +346,7 @@ impl Check<'_> {
         }
         self.before[id] = Some(cx);
         self.requirements(
-            &self.free[declaration.contract.0 as usize],
+            self.free.root(declaration.contract.0 as usize),
             cx,
             &format!("witnesses[{id}].contract"),
         )?;
