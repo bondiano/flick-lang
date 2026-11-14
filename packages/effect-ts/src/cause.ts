@@ -67,11 +67,12 @@ type Selected<B> = { readonly die: Cause.Cause<never> } | { readonly handled: B 
  * `try body with arms`. `handler` returns the handling effect for a typed
  * error an arm matches, `undefined` otherwise. A cause that also holds a
  * defect is not recovered and its failures become defects; without a
- * matching arm the original cause propagates.
+ * matching arm the original cause propagates. Deferred selectors use
+ * `unhandled` to propagate that same cause after evaluating runtime guards.
  */
 export const tryWith = <A, E, R, A2, E2, R2>(
   body: Effect.Effect<A, E, R>,
-  handler: (error: E) => Effect.Effect<A2, E2, R2> | undefined,
+  handler: (error: E, unhandled: () => Effect.Effect<never, E>) => Effect.Effect<A2, E2, R2> | undefined,
 ): Effect.Effect<A | A2, E | E2, R | R2> =>
   Effect.catchCauseFilter(
     body,
@@ -80,7 +81,7 @@ export const tryWith = <A, E, R, A2, E2, R2>(
         return Cause.hasFails(cause) ? Result.succeed({ die: failsToDies(cause) }) : Result.fail(cause);
       }
       const reason = recoverable(cause);
-      const handled = reason === undefined ? undefined : handler(reason.error);
+      const handled = reason === undefined ? undefined : handler(reason.error, () => Effect.failCause(cause));
       return handled === undefined ? Result.fail(cause) : Result.succeed({ handled });
     },
     (selected) => ("die" in selected ? Effect.failCause(selected.die) : selected.handled),

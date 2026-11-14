@@ -7,6 +7,8 @@ use std::rc::Rc;
 use std::{fs, io, path};
 
 use flick_core::diagnostics::Severity;
+use flick_core::ir::memory::Name as MemoryName;
+use flick_core::opt::perceus;
 use flick_core::project::{self, Compiled, Host};
 use flick_core::source::SourceMap;
 use flick_core::{build, ir};
@@ -14,8 +16,14 @@ use flick_core::{build, ir};
 use crate::check::check_program;
 use crate::decls::Decls;
 use crate::eval::{Machine, Outcome, Program};
+use crate::memory::{
+    Error as MemoryError, ExecutionReport, Heap, ProgramOutcome, Stats, Value,
+    execute_main_program_outcome,
+};
 use crate::syntax::{Name, Path, Term};
 use crate::translate;
+
+mod counted_inputs;
 
 struct Files;
 
@@ -92,6 +100,26 @@ pub fn decls(modules: &[Compiled]) -> Decls {
     for d in modules.iter().map(|m| &m.declarations).chain(builtins) {
         decls.add(d);
     }
+    // Raw foreign shims keep the source declaration's scheme. Provenance is
+    // explicit IR metadata; generated names are never decoded or guessed.
+    for module in modules
+        .iter()
+        .map(|m| &m.ir)
+        .chain(build::builtin_modules())
+    {
+        for item in &module.items {
+            if let ir::ItemKind::Foreign(foreign) = &item.kind
+                && let Some(source) = &foreign.source_name
+            {
+                let source = Path::new(&module.name, source);
+                let raw = Path::new(&module.name, &foreign.name);
+                if decls.values.contains_key(&source) {
+                    decls.raw_aliases.insert(raw.clone(), source);
+                    decls.foreign.insert(raw);
+                }
+            }
+        }
+    }
     decls.finish();
     decls
 }
@@ -145,4 +173,111 @@ pub fn run_file(file: &path::Path, fuel: u64) -> Result<Ran, String> {
     let modules = compile(file)?;
     let main = main_of(&modules)?;
     Ok(run_main(&program(&modules), &main, fuel))
+}
+
+/// A callable Unit-main's output and the measured heap after explicit
+/// outcome/global-root release. A successful result requires zero occupied
+/// allocation slots, not just balanced allocation/free counters.
+pub struct CountedRan {
+    pub stdout: String,
+    pub memory: Stats,
+}
+
+/// Compiles the counted source path and executes it in the caller's heap.
+/// Compilation/lowering errors are outer errors, never substitution fallback.
+/// Executed return, typed-failure and fault outcomes all preserve stdout.
+/// A returned or raised value remains caller-owned: inspect and explicitly
+/// drop it before checking [`Heap::finish`]. External heap roots are untouched.
+/// General effect handlers, finalizers and other unsupported source forms
+/// still require their own explicit memory semantics.
+pub fn run_main_counted_outcome(
+    heap: &mut Heap,
+    modules: &[Compiled],
+    main: &Path,
+    fuel: u64,
+    release: bool,
+) -> Result<ExecutionReport, String> {
+    let ir: Vec<_> = modules
+        .iter()
+        .map(|module| {
+            if release {
+                build::optimized(modules, module, false)
+            } else {
+                module.ir.clone()
+            }
+        })
+        .collect();
+    let entry = MemoryName::new(&main.module, &main.name);
+    let declarations = counted_inputs::declarations(modules)?;
+    let ir = counted_inputs::modules(&ir);
+    let program = perceus::lower_with_declarations(
+        ir.iter().map(AsRef::as_ref),
+        declarations.iter().map(AsRef::as_ref),
+        &entry,
+    )
+    .map_err(|error| error.to_string())?;
+    Ok(execute_main_program_outcome(heap, &program, &entry, fuel))
+}
+
+/// Success-only convenience runner with its own heap. Function and task
+/// stages use one execution arena. Typed failures release their payload
+/// before returning an error; use [`run_main_counted_outcome`] to inspect
+/// failures or observe stdout preceding a fault.
+pub fn run_main_counted(
+    modules: &[Compiled],
+    main: &Path,
+    fuel: u64,
+    release: bool,
+) -> Result<CountedRan, String> {
+    let mut heap = Heap::new();
+    let report = run_main_counted_outcome(&mut heap, modules, main, fuel, release)?;
+    let executed = match report.outcome {
+        ProgramOutcome::Returned(value) => Ok(value),
+        ProgramOutcome::Raised(value) => heap
+            .drop_value(value)
+            .and(Err(MemoryError::UnhandledFailure)),
+        ProgramOutcome::Failed(cause) => {
+            let error = heap.cause_error(&cause);
+            heap.drop_cause(cause).and_then(|()| Err(error?))
+        }
+        ProgramOutcome::Fault(error) => Err(error),
+    };
+    let value = match executed {
+        Ok(value) => value,
+        Err(error) => {
+            heap.finish()
+                .map_err(|leak| format!("{error}; counted cleanup failed: {leak}"))?;
+            return Err(error.to_string());
+        }
+    };
+    let unit = value == Value::Unit;
+    heap.drop_value(value).map_err(|error| error.to_string())?;
+    let memory = heap.finish().map_err(|error| error.to_string())?;
+    if !unit {
+        return Err("counted main did not return Unit".into());
+    }
+    Ok(CountedRan {
+        stdout: report.stdout,
+        memory,
+    })
+}
+
+/// Compiles and runs a source file on the counted path, in either profile.
+pub fn run_file_counted(file: &path::Path, fuel: u64, release: bool) -> Result<CountedRan, String> {
+    let modules = compile(file)?;
+    let main = main_of(&modules)?;
+    run_main_counted(&modules, &main, fuel, release)
+}
+
+/// File-based counterpart of [`run_main_counted_outcome`], preserving
+/// caller ownership of both the heap and any returned or raised token.
+pub fn run_file_counted_outcome(
+    heap: &mut Heap,
+    file: &path::Path,
+    fuel: u64,
+    release: bool,
+) -> Result<ExecutionReport, String> {
+    let modules = compile(file)?;
+    let main = main_of(&modules)?;
+    run_main_counted_outcome(heap, &modules, &main, fuel, release)
 }

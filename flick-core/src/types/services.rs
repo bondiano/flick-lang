@@ -299,7 +299,8 @@ impl Checker<'_> {
     fn live_part(&self, ty: &Type, seen: &mut Vec<(String, String)>) -> Option<Type> {
         let unfold = self.enter_alias(ty, seen);
         if matches!(unfold, Unfold::Again) {
-            let (_, args) = self.store.head(ty).spine();
+            let observed = self.store.head(ty);
+            let (_, args) = observed.spine();
             return args.iter().find_map(|a| self.live_part(a, seen));
         }
         let live = self.live_unfolded(ty, seen);

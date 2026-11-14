@@ -2,12 +2,18 @@ impl ModuleSignature {
     pub fn project(&self, actual: &Interface) -> Interface {
         match self {
             Self::Structure { .. } => super::module_contract::project(&self.definition(), actual),
-            Self::Parameterized { .. } => Interface {
-                module: actual.module.clone(),
-                parameterized: Some(self.clone()),
-                signature_explicit: true,
-                ..Interface::default()
-            },
+            Self::Parameterized { .. } => {
+                let mut projected = Interface {
+                    module: actual.module.clone(),
+                    member_of: actual.member_of.clone(),
+                    support_types: actual.support_types.clone(),
+                    parameterized: Some(self.clone()),
+                    signature_explicit: true,
+                    ..Interface::default()
+                };
+                support::prune(&mut projected);
+                projected
+            }
         }
     }
 
@@ -59,6 +65,11 @@ impl ModuleSignature {
             }
         }
         map_interface_types(&mut projected, &mut |ty| replace_types(ty, &replacements));
+        if path != actual.module {
+            // A sealed alias is not the owner of the argument's private types.
+            // Their original canonical owners are discovered semantically.
+            projected.support_types.clear();
+        }
         path.clone_into(&mut projected.module);
         projected
     }

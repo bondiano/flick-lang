@@ -19,6 +19,14 @@ impl Checker<'_> {
     /// `ρ ⊆ ρ'`. An element or a rigid variable `ρ'` lacks goes into its
     /// meta, if it has one; a meta of `ρ` waits.
     pub(super) fn within(&mut self, a: &Row, b: &Row) -> Check<()> {
+        self.within_deferred(a, b, true)
+    }
+
+    pub(super) fn within_final(&mut self, a: &Row, b: &Row) -> Check<()> {
+        self.within_deferred(a, b, false)
+    }
+
+    fn within_deferred(&mut self, a: &Row, b: &Row, defer: bool) -> Check<()> {
         let (a, b) = (self.zonk_row(a), self.zonk_row(b));
         if self.row_implied(&a, &b) {
             return Ok(());
@@ -67,6 +75,13 @@ impl Checker<'_> {
                     .pending
                     .push((a.only(v), b.clone(), self.branch_givens())),
             }
+        }
+        // Common service arguments above can solve the owner of a pending
+        // Provided obligation (for example Scope ?s against Scope s). Only
+        // now can an existing, same-owner given discharge that obligation.
+        if defer {
+            self.settle_given(&mut extra);
+            self.defer_provided(&mut extra, &b);
         }
         if extra.is_none() {
             return Ok(());

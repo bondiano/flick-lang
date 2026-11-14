@@ -18,7 +18,7 @@ pub use exports::exports;
 pub use flick_ir::{
     Adapter, Arm, BinOp, Binding, Copies, Expr, ExprKind, Foreign, ForeignMode, Handled, Handler,
     Item, ItemKind, Label, LangItem, Lit, Module, OpArm, Param, Pat, ResultAdapter, Stage, Stmt,
-    TypeName, operation_arity,
+    TypeName, memory, operation_arity,
 };
 pub use lower::lower;
 pub use print::print;

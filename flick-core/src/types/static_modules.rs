@@ -36,6 +36,13 @@ impl Checker<'_> {
                 let signature = self.static_module_signature(&parameter.signature);
                 let binder = self.static_binder(&parameter.name, parameter.span.start);
                 let abstract_interface = signature.interface(&format!("$module:{binder}"));
+                if let Err(message) = self
+                    .env
+                    .static_parameter(&parameter.name, abstract_interface.clone())
+                {
+                    self.error(codes::P010, parameter.span, message);
+                    continue;
+                }
                 if let ModuleSignature::Structure { requirements } = &signature {
                     let contract = TypeDef {
                         kind: Kind::Module,
@@ -60,8 +67,6 @@ impl Checker<'_> {
                         }
                     }
                 }
-                self.env
-                    .static_parameter(&parameter.name, abstract_interface);
                 static_parameters.push((group_end - index, binder, signature));
             }
         }
@@ -107,8 +112,10 @@ impl Checker<'_> {
                     .restore_static_lexical(prefix.as_ref().expect("lexical prefix"), saved);
             }
             if let Some(result) = result {
-                self.env.static_parameter(&application.name, result.clone());
-                static_results.push((application.name.clone(), result));
+                match self.env.static_parameter(&application.name, result.clone()) {
+                    Ok(()) => static_results.push((application.name.clone(), result)),
+                    Err(message) => self.error(codes::P010, application.span, message),
+                }
             }
         }
         static_results

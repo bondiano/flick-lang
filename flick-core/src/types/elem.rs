@@ -6,17 +6,19 @@
 use std::cmp::Ordering;
 use std::fmt;
 
+use serde::ser::Error as SerializeError;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::lang::{self, Lang};
-use super::ty::Type;
+use super::ty::{MetaOccurrence, Type};
 
 /// A variable an element follows until it stands for something named.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Atom {
     Var(String),
     Skolem(u32),
     Meta(u32),
+    MetaView(Box<MetaOccurrence>),
 }
 
 impl Atom {
@@ -25,6 +27,7 @@ impl Atom {
             Type::Var(name) => Some(Atom::Var(name.clone())),
             Type::Skolem(s) => Some(Atom::Skolem(*s)),
             Type::Meta(m) => Some(Atom::Meta(*m)),
+            Type::MetaView(meta) => Some(Atom::MetaView(meta.clone())),
             _ => None,
         }
     }
@@ -51,6 +54,16 @@ const LIVE: &str = "Fiber.Live ";
 const PROVIDED: &str = "Fiber.Provided ";
 
 impl Elem {
+    pub fn has_meta_view(&self) -> bool {
+        match self {
+            Elem::Capture(Atom::MetaView(_))
+            | Elem::Error(Atom::MetaView(_))
+            | Elem::Service(Atom::MetaView(_)) => true,
+            Elem::Provided(inner) => inner.has_meta_view(),
+            _ => false,
+        }
+    }
+
     /// Whether this element, holding `ty`, is an instance of a service with
     /// parameters, which a handler finds by its name: `Store Int`, not the
     /// language's own `Scope s` or `Fail e`.
@@ -173,6 +186,7 @@ impl fmt::Display for Atom {
             Atom::Var(name) => f.write_str(name),
             Atom::Skolem(s) => write!(f, "'{s}"),
             Atom::Meta(m) => write!(f, "?{m}"),
+            Atom::MetaView(meta) => write!(f, "?{}", meta.root()),
         }
     }
 }
@@ -195,7 +209,25 @@ impl Ord for Elem {
     fn cmp(&self, other: &Self) -> Ordering {
         match (self, other) {
             (Elem::Named(a), Elem::Named(b)) => a.cmp(b),
-            _ => self.to_string().cmp(&other.to_string()),
+            _ => self.to_string().cmp(&other.to_string()).then_with(|| {
+                let rank = |label: &Elem| match label {
+                    Elem::Named(_) => 0,
+                    Elem::Capture(_) => 1,
+                    Elem::Error(_) => 2,
+                    Elem::Service(_) => 3,
+                    Elem::Live => 4,
+                    Elem::Provided(_) => 5,
+                };
+                rank(self)
+                    .cmp(&rank(other))
+                    .then_with(|| match (self, other) {
+                        (Elem::Capture(a), Elem::Capture(b))
+                        | (Elem::Error(a), Elem::Error(b))
+                        | (Elem::Service(a), Elem::Service(b)) => a.cmp(b),
+                        (Elem::Provided(a), Elem::Provided(b)) => a.cmp(b),
+                        _ => Ordering::Equal,
+                    })
+            }),
         }
     }
 }
@@ -208,6 +240,11 @@ impl PartialOrd for Elem {
 
 impl Serialize for Elem {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        if self.has_meta_view() {
+            return Err(SerializeError::custom(
+                "contextual row atoms cannot be serialized",
+            ));
+        }
         serializer.collect_str(self)
     }
 }

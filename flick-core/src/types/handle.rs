@@ -323,7 +323,7 @@ impl Checker<'_> {
         });
         let reason = reason.or_else(|| {
             let rigid = needs.tails.iter().find(|tail| {
-                !matches!(tail, Type::Meta(_) | Type::Error)
+                !matches!(tail, Type::Meta(_) | Type::MetaView(_) | Type::Error)
                     && !allowed.iter().any(|row| row.tails.contains(*tail))
             })?;
             Some(format!(

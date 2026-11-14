@@ -1,6 +1,11 @@
 //! Expressions and patterns of the IR to λFlick, by the reading of
 //! `docs/formal/core.md` §1.4: blocks are nested `let`s, `if` is a
 //! `match` on `Bool`, operators are constants, a lift is the identity.
+//! Single-use unannotated inert value lets are capture-avoiding CBV value
+//! substitutions: this erases inert operand staging, not a source execution
+//! step, before bidirectional checking supplies a higher-rank task parameter.
+//! No calculus rule or runtime term is added; annotated/shared/effectful
+//! bindings retain their let and evaluation order.
 
 use std::mem;
 use std::rc::Rc;
@@ -12,6 +17,7 @@ use flick_core::types::lang::{self, Lang};
 pub(super) use super::callbacks::layer_run;
 use super::{Tr, dict, given, lams};
 use crate::handler::{Handled, Handler, Op};
+use crate::subst::inline_suspension;
 use crate::syntax::{Arm, Con, Const, Lit, Name, Pat, Path, Prim, Term};
 
 /// The model's constructor of an IR one. A constructor of a GADT takes
@@ -155,7 +161,7 @@ impl Tr {
             }
             ExprKind::App { func, arg, .. } if layer_run(func).is_some() => self.provide(func, arg),
             ExprKind::App { func, arg, .. } if is_lang(func, Lang::ScopeRun) => self.scope(arg),
-            ExprKind::App { func, .. } if is_lang(func, Lang::ScopeCurrent) => Term::unit(),
+            ExprKind::App { func, .. } if is_lang(func, Lang::ScopeCurrent) => Term::DefaultOwner,
             ExprKind::App {
                 func,
                 arg,
@@ -165,7 +171,7 @@ impl Tr {
                 let (f, a) = (self.expr(func), self.expr(arg));
                 if *arg_first {
                     let x = self.fresh("arg");
-                    Term::Let(x.clone(), None, rc(a), rc(Term::app(f, Term::Var(x))))
+                    self.value_let(x.clone(), a, Term::app(f, Term::Var(x)))
                 } else {
                     Term::app(f, a)
                 }
@@ -214,10 +220,13 @@ impl Tr {
                 stuck("a `for` or a `Seq`")
             }
             ExprKind::Unwrap(_) => stuck("`?` on an `Option`, a return from the function,"),
-            // shortcut: the model acquires into the innermost `scope`, not the
-            // owner a `Within` names (`regions.md` §1.4, G6); a program that
-            // acquires into an outer region from a nested one is rejected
-            ExprKind::Within(_, inner) => self.expr(inner),
+            ExprKind::ReadOwnerEvidence => Term::ReadOwnerEvidence,
+            ExprKind::WithOwnerEvidence(owner, inner) => {
+                Term::WithOwnerEvidence(rc(self.expr(owner)), rc(self.expr(inner)))
+            }
+            ExprKind::Within(owner, inner) => {
+                Term::ActivateOwner(rc(Term::Var(owner.as_str().into())), rc(self.expr(inner)))
+            }
         }
     }
 
@@ -258,11 +267,20 @@ impl Tr {
         )
     }
 
+    /// Administrative inert value lets do not commit a suspension, including
+    /// a record field, to a monotype before its sole use supplies a rank-two
+    /// expectation. Effectful aggregate fields keep their original let.
+    pub(super) fn value_let(&mut self, name: Name, value: Term, rest: Term) -> Term {
+        inline_suspension(&name, &value, &rest, &mut || self.fresh("value"))
+            .unwrap_or_else(|| Term::Let(name, None, Rc::new(value), Rc::new(rest)))
+    }
+
     pub(super) fn stmt(&mut self, s: &Stmt, rest: Term) -> Term {
         let rc = |t: Term| Rc::new(t);
         match s {
             Stmt::Let(ir::Pat::Bind(x), e) => {
-                Term::Let(x.as_str().into(), None, rc(self.expr(e)), rc(rest))
+                let value = self.expr(e);
+                self.value_let(x.as_str().into(), value, rest)
             }
             Stmt::Var(..) | Stmt::Assign(..) => stuck("a variable outside a block"),
             Stmt::Let(ir::Pat::Wild, e) | Stmt::Expr(e) => {
@@ -407,4 +425,44 @@ fn binary(op: BinOp, a: Term, b: Term) -> Term {
 
 pub(super) fn is_lang(func: &ir::Expr, item: Lang) -> bool {
     matches!(&func.kind, ExprKind::Global { module, name } if lang::is(item, module, name))
+}
+
+#[cfg(test)]
+mod suspension_staging_tests {
+    use super::Tr;
+    use crate::syntax::Term;
+    use flick_core::ir::{Expr, ExprKind, Lit, Stage};
+    use flick_core::source::{FileId, Span};
+
+    fn expression(kind: ExprKind) -> Expr {
+        Expr::new(kind, Span::new(FileId::new(0), 0, 0))
+    }
+
+    fn call(argument: Expr) -> Expr {
+        expression(ExprKind::App {
+            func: Box::new(expression(ExprKind::Global {
+                module: "Test".to_owned(),
+                name: "consume".to_owned(),
+            })),
+            arg: Box::new(argument),
+            stage: Stage::Runtime,
+            arg_first: true,
+        })
+    }
+
+    #[test]
+    fn argument_first_staging_keeps_task_expectations_but_not_computations() {
+        let task = expression(ExprKind::Task(Box::new(expression(ExprKind::Lit(
+            Lit::Unit,
+        )))));
+        let translated = Tr::new("Test").expr(&call(task));
+        assert!(
+            matches!(translated, Term::App(_, argument) if matches!(&*argument, Term::Task(_)))
+        );
+        let computation = call(expression(ExprKind::Lit(Lit::Unit)));
+        let translated = Tr::new("Test").expr(&call(computation));
+        assert!(
+            matches!(translated, Term::Let(_, None, value, _) if !matches!(&*value, Term::Task(_) | Term::Lam(..)))
+        );
+    }
 }

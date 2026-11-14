@@ -9,17 +9,19 @@ import (
 // through every effectful call. Its derivations (another environment of
 // services, another owner) share the fiber's state.
 type Fiber struct {
-	state *fiberState
-	env   *env   // the services provided, by key
-	owner *Owner // the innermost scope's
+	state     *fiberState
+	env       *env   // the services provided, by key
+	owner     *Owner // the innermost scope's
+	candidate Value  // inert lexical owner evidence, independent of owner
 }
 
 // An env is the services and fiber-local settings in effect, innermost
 // first; a derived fiber adds to it without copying.
 type env struct {
-	key  string
-	v    Value
-	next *env
+	key     string
+	v       Value
+	next    *env
+	partial bool // a handler's arms, not a complete service implementation
 }
 
 func (e *env) get(key string) (Value, bool) {
@@ -31,7 +33,11 @@ func (e *env) get(key string) (Value, bool) {
 	return nil, false
 }
 
-func (e *env) with(key string, v Value) *env { return &env{key, v, e} }
+func (e *env) with(key string, v Value) *env { return &env{key: key, v: v, next: e} }
+
+func (e *env) withHandler(key string, arms *Record) *env {
+	return &env{key: key, v: arms, next: e, partial: true}
+}
 
 type fiberState struct {
 	id        int64
@@ -187,4 +193,21 @@ func LiftEff(inner func(Value) Value) func(Value) Value {
 	return func(task Value) Value {
 		return Eff(func(fb *Fiber) Value { return inner(Run(fb, task)) })
 	}
+}
+
+// ReadOwnerEvidence reads the inert lexical candidate. Absence is Unit, not
+// the default owner. Reading or transporting evidence never activates an owner.
+func ReadOwnerEvidence(fb *Fiber) Value {
+	if fb.candidate == nil {
+		return Unit
+	}
+	return fb.candidate
+}
+
+// WithOwnerEvidence derives a fiber changing only its lexical candidate.
+// In particular, closed owners can be transported without reopening them.
+func WithOwnerEvidence(fb *Fiber, owner Value) *Fiber {
+	inner := *fb
+	inner.candidate = owner
+	return &inner
 }

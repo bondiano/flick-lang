@@ -4,8 +4,9 @@
 // with the services of the place of the handler; an `abort` arm unwinds the
 // body to the handler and gives it its value. Neither is a typed failure of
 // the code in between: a `try` there does not see them (`recoverable`).
-import { Cause, type Context, Effect } from "effect";
+import { Cause, Context, Effect } from "effect";
 
+import { OwnerEvidenceContext, readOwnerEvidence } from "./owner_evidence.ts";
 import { HandlerSignal, isHandlerSignal, tryWith } from "./cause.ts";
 
 /** The signal of the handler `token` in `cause`. */
@@ -45,25 +46,36 @@ export const handle = (
   installs: ReadonlyArray<Install>,
   body: Effect.Effect<unknown, unknown, unknown>,
   ret: ((value: unknown) => Effect.Effect<unknown, unknown, unknown>) | undefined,
-  errors: ((error: unknown) => Effect.Effect<unknown, unknown, unknown> | undefined) | undefined,
+  errors: ((error: unknown, unhandled: () => Effect.Effect<never, unknown>) => Effect.Effect<unknown, unknown, unknown> | undefined) | undefined,
 ): Effect.Effect<unknown, unknown, unknown> =>
   Effect.contextWith((context: Context.Context<never>) => {
     const token = {};
     let inner: Effect.Effect<Outcome, unknown, unknown> = Effect.map(body, (value): Outcome => ({ value }));
     for (const [tag, arms, aborts] of installs) {
-      const impl: Record<string, unknown> = {};
-      for (const [name, arm] of Object.entries(arms)) {
-        impl[name] = aborts.includes(name)
-          ? around(arm, (run) => Effect.fail(new HandlerSignal(token, run)))
+      const impl = Object.fromEntries<unknown>(Object.entries(arms).map(([name, arm]) => [
+        name,
+        aborts.includes(name)
+          ? around(arm, (run) => Effect.flatMap(readOwnerEvidence(), (owner) => Effect.fail(new HandlerSignal(token, Effect.provideContext(run, Context.add(context, OwnerEvidenceContext, owner))))))
           : around(arm, (run) =>
-              Effect.mapError(Effect.provideContext(run, context), (error) => new HandlerSignal(token, undefined, error)),
-            );
-      }
-      inner = Effect.provideService(inner, tag, impl);
+              Effect.flatMap(readOwnerEvidence(), (owner) =>
+                Effect.mapError(Effect.provideContext(run, Context.add(context, OwnerEvidenceContext, owner)), (error) => new HandlerSignal(token, undefined, error))),
+            ),
+      ]));
+      // Context stores one value per tag. Resolve unmentioned operation names
+      // from the nearest outer service; a complete provider is still a barrier.
+      // Keep selected functions unchanged: each arm retains its own prompt and
+      // outer evidence, rather than re-running it as an arm of this handler.
+      const outer = Context.getOrUndefined(context, tag);
+      const partial = new Proxy(impl, {
+        get: (target, name): unknown => Object.hasOwn(target, name)
+          ? Reflect.get(target, name)
+          : outer === undefined ? undefined : Reflect.get(outer, name),
+      });
+      inner = Effect.provideService(inner, tag, partial);
     }
     if (errors !== undefined) {
-      inner = tryWith(inner, (error) => {
-        const handled = errors(error);
+      inner = tryWith(inner, (error, unhandled) => {
+        const handled = errors(error, unhandled);
         return handled === undefined ? undefined : Effect.map(handled, (result): Outcome => ({ result }));
       });
     }

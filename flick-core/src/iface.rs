@@ -16,8 +16,8 @@ pub use template::{
     StaticBinding, StaticCapture, StaticMember,
 };
 
-/// Bumped on every change of the schema.
-pub const IFACE_VERSION: u32 = 24;
+/// Bumped for schema changes or incompatible embedded-IR execution contracts.
+pub const IFACE_VERSION: u32 = 26;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -105,6 +105,18 @@ pub struct Hidden {
     pub parent: String,
 }
 
+/// A non-public definition required to interpret a public type. This does not
+/// add a source name, constructor, value, instance or namespace member.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SupportType {
+    pub entity: Entity,
+    pub definition: TypeDef,
+    /// Actual checked static-member edges from the containing interface.
+    pub owner_path: Vec<String>,
+}
+
+pub(crate) mod support;
+
 /// What a module exposes to its importers.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Interface {
@@ -132,6 +144,8 @@ pub struct Interface {
     pub exports: Vec<Export>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hidden: Vec<Hidden>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub support_types: Vec<SupportType>,
     /// The `///` comment of each export the module declares, by name, so
     /// declarations made from the interface alone (`.d.ts`) carry it too.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -346,6 +360,7 @@ pub fn read(bytes: &[u8], module: &str) -> Result<Interface, String> {
             file.interface.module
         ));
     }
+    support::validate(&file.interface)?;
     Ok(file.interface)
 }
 
@@ -357,3 +372,6 @@ fn is_zero(n: &usize) -> bool {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod support_tests;

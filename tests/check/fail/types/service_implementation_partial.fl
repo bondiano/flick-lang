@@ -1,0 +1,9 @@
+module App.ServiceImplementationPartial exposing (..)
+
+type Wrap (f : Type -> Type) = Wrap (f Int)
+
+service Store a =
+  read : Unit ->{} a
+
+type alias Bad = Wrap Store.Impl
+//                    ^^^^^^^^^^ FLICK-T002 type alias `Store.Impl` needs 1 type argument(s), here it has 0

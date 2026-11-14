@@ -179,6 +179,9 @@ impl Checker<'_> {
         let mut defaults = Vec::new();
         let provided = self.cx.regions.provided.len();
         let ty = self.apply_args(head, args, &mut defaults);
+        if !defaults.is_empty() {
+            self.grow();
+        }
         self.settle_defaults(defaults);
         self.settle_provided(provided);
         ty
@@ -218,7 +221,11 @@ impl Checker<'_> {
                     // a task acquiring into a region a later argument names
                     // waits for it (`docs/formal/regions.md#scope-region-of-a-task-argument-is-resolved-after-the-call`)
                     let eff = self.eff_parts(&param).is_some();
-                    let outer = eff.then(|| self.cx.regions.defaults.replace(Vec::new()));
+                    let defer = eff
+                        || self
+                            .arrow_stages(&param)
+                            .contains(&super::ty::Stage::Runtime);
+                    let outer = defer.then(|| self.cx.regions.defaults.replace(Vec::new()));
                     let argument = self.check_value(arg, &param);
                     if let Some(outer) = outer {
                         let mine = mem::replace(&mut self.cx.regions.defaults, outer);
@@ -249,7 +256,7 @@ impl Checker<'_> {
                     let inferred = self.infer(arg);
                     unknown.push(inferred);
                 }
-                meta @ Type::Meta(_) => {
+                meta @ (Type::Meta(_) | Type::MetaView(_)) => {
                     let (param, result) = (self.fresh(), self.fresh());
                     // a number literal's variable stands for a number only
                     if self
@@ -355,18 +362,26 @@ impl Checker<'_> {
             K::AwaitKw => {
                 let ty = self.infer(operand);
                 self.note_type(self.token_span(op), &ty);
-                let (services, errors, result) =
-                    (self.fresh(), self.store.fresh_error_row(), self.fresh());
-                let shape = super::infer::eff(services.clone(), errors.clone(), result.clone());
-                if self.unify(&self.whnf(&ty), &shape).is_err() {
-                    let shown = self.show(&ty);
-                    self.error(
-                        codes::T003,
-                        self.span(operand),
-                        format!("`await` runs an `Eff` value, but this has type `{shown}`"),
-                    );
-                    return Type::Error;
-                }
+                let (services, errors, result) = if let Some(parts) = self.known_eff_parts(&ty) {
+                    // A known task may return a polymorphic opaque value.
+                    // Decomposition does not force that result through a
+                    // fresh monotype variable merely to discover the rows.
+                    parts
+                } else {
+                    let (services, errors, result) =
+                        (self.fresh(), self.store.fresh_error_row(), self.fresh());
+                    let shape = super::infer::eff(services.clone(), errors.clone(), result.clone());
+                    if self.unify(&self.whnf(&ty), &shape).is_err() {
+                        let shown = self.show(&ty);
+                        self.error(
+                            codes::T003,
+                            self.span(operand),
+                            format!("`await` runs an `Eff` value, but this has type `{shown}`"),
+                        );
+                        return Type::Error;
+                    }
+                    (services, errors, result)
+                };
                 let span = self.span(node);
                 if self.runtime_allowed(span) {
                     let services = self.live_await(&ty, services);

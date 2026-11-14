@@ -176,6 +176,8 @@ impl<'d> Gen<'_, 'd> {
             ExprKind::Generate { .. } | ExprKind::Each { .. } | ExprKind::Yield(_) => {
                 self.generated(e)
             }
+            ExprKind::ReadOwnerEvidence => self.read_owner_evidence(),
+            ExprKind::WithOwnerEvidence(owner, call) => self.with_owner_evidence(owner, call),
             ExprKind::Within(owner, call) => {
                 self.owner = Some(names::ident(owner));
                 self.expr(call)
@@ -183,6 +185,25 @@ impl<'d> Gen<'_, 'd> {
             ExprKind::Handle(h) => self.handle(h),
             ExprKind::Lift(inner, lift) => self.lifted(inner, lift),
         }
+    }
+
+    fn read_owner_evidence(&mut self) -> Js<'d> {
+        let read = self.rt("readOwnerEvidence");
+        let read = call(self.a, read, &[]);
+        if self.kernel {
+            read
+        } else {
+            self.run(None, read)
+        }
+    }
+
+    fn with_owner_evidence(&mut self, owner: &Expr, body: &Expr) -> Js<'d> {
+        let owner = self.expr(owner);
+        let body = self.gen_block(body);
+        let thunk = if self.kernel { body } else { self.thunk(body) };
+        let with = self.rt("withOwnerEvidence");
+        let called = call(self.a, with, &[owner, thunk]);
+        self.run(None, called)
     }
 
     /// The field `label` of the record `r`.
@@ -283,9 +304,8 @@ impl<'d> Gen<'_, 'd> {
         }
         let body = self.gen_block(body);
         let error = self.temp();
-        let (stmts, ()) = self.block(|g| g.handlers(&error, arms));
+        let handler = self.handlers(&error, arms);
         let try_with = self.rt("tryWith");
-        let handler = self.lambda_of(&error, block_js(self.a, &stmts));
         let tried = call(self.a, try_with, &[body, handler]);
         self.run(None, tried)
     }
@@ -432,7 +452,7 @@ impl<'d> Gen<'_, 'd> {
 }
 
 /// A record key in an object literal.
-fn key(label: &str) -> String {
+pub(super) fn key(label: &str) -> String {
     if names::is_property(label) && label != "__proto__" {
         label.to_owned()
     } else {

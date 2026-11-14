@@ -147,7 +147,12 @@ impl Checker<'_> {
     /// may still grow.
     fn settle_want(&mut self, want: &mut Want, last: bool) -> bool {
         // an owner a row names is known once rows are solved
-        if !last && matches!(self.store.resolve(&want.owner), Type::Meta(_)) {
+        if !last
+            && matches!(
+                self.store.resolve(&want.owner),
+                Type::Meta(_) | Type::MetaView(_)
+            )
+        {
             return true;
         }
         let norm = self.store.normalize(&want.row);
@@ -180,7 +185,7 @@ impl Checker<'_> {
         let mut open = false;
         for tail in &norm.tails {
             match tail {
-                Type::Meta(_) => open = true,
+                Type::Meta(_) | Type::MetaView(_) => open = true,
                 Type::Var(_) | Type::Skolem(_)
                     if !self.discharge_tail(tail, &want.owner, &want.at) =>
                 {
@@ -241,7 +246,7 @@ impl Checker<'_> {
         if let Some(provide) = provider {
             match (self.scope_index(&owner), &owner) {
                 (Some(scope), _) if self.encloses(provide, scope) => {}
-                (_, Type::Meta(_)) => {
+                (_, Type::Meta(_) | Type::MetaView(_)) => {
                     let late = (provide, owner.clone(), service.to_owned(), span);
                     self.cx.regions.late_owners.push(late);
                 }

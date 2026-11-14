@@ -81,6 +81,9 @@ listMapEffect *ListMapEffect
 layerRun *LayerRun
 scopeRun *ScopeRun
 scopeCurrent *ScopeCurrent
+arenaMake *ArenaMake
+arenaAlloc ArenaAlloc
+arenaGet ArenaGet
 fromResult FromResult
 appFail AppFail
 recordLabels RecordLabels

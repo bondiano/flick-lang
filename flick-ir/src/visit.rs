@@ -1,11 +1,32 @@
 //! Traversal of direct children and source spans in evaluation order.
-use crate::{Expr, ExprKind, ItemKind, Module, Span, Stage, Stmt};
+use crate::{Dict, Expr, ExprKind, ItemKind, Module, Span, Stage, Stmt};
 
 impl Expr {
     /// How often the expression reads the local `name`.
     pub fn uses(&self, name: &str) -> usize {
+        fn dictionary(dict: &Dict, name: &str) -> usize {
+            match dict {
+                Dict::Field(local) | Dict::Opened { binder: local, .. } => {
+                    usize::from(local == name)
+                }
+                Dict::Instance { args, .. } | Dict::Structural { fields: args, .. } => {
+                    args.iter().map(|dict| dictionary(dict, name)).sum()
+                }
+                Dict::Super { dict, .. } => dictionary(dict, name),
+                Dict::Given(_)
+                | Dict::Value { .. }
+                | Dict::Primitive { .. }
+                | Dict::Site { .. }
+                | Dict::Error => 0,
+            }
+        }
         let here = matches!(&self.kind, ExprKind::Local(l) | ExprKind::Within(l, _) if l == name);
         let mut n = usize::from(here);
+        n += match &self.kind {
+            ExprKind::Method { dict, .. } => dictionary(dict, name),
+            ExprKind::Dicts(_, dicts) => dicts.iter().map(|dict| dictionary(dict, name)).sum(),
+            _ => 0,
+        };
         self.each_child(&mut |c| n += c.uses(name));
         n
     }
@@ -134,12 +155,13 @@ impl Expr {
                     f(v);
                 }
             }
-            ExprKind::Binary(_, l, r) => {
+            ExprKind::Binary(_, l, r) | ExprKind::WithOwnerEvidence(l, r) => {
                 f(l);
                 f(r);
             }
             ExprKind::Handle(h) => h.each_child(f),
             ExprKind::Lit(_)
+            | ExprKind::ReadOwnerEvidence
             | ExprKind::Var(_)
             | ExprKind::Local(_)
             | ExprKind::Global { .. }
@@ -270,12 +292,13 @@ impl Expr {
                     f(v);
                 }
             }
-            ExprKind::Binary(_, l, r) => {
+            ExprKind::Binary(_, l, r) | ExprKind::WithOwnerEvidence(l, r) => {
                 f(l);
                 f(r);
             }
             ExprKind::Handle(h) => h.each_child_mut(f),
             ExprKind::Lit(_)
+            | ExprKind::ReadOwnerEvidence
             | ExprKind::Var(_)
             | ExprKind::Local(_)
             | ExprKind::Global { .. }
@@ -342,7 +365,7 @@ impl Expr {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Expr, ExprKind, FileId, Lit, Span, Stage};
+    use crate::{Dict, Expr, ExprKind, FileId, Lit, Span, Stage};
 
     fn at() -> Span {
         Span::new(FileId::new(0), 0, 0)
@@ -388,5 +411,83 @@ mod tests {
             }
         ));
         assert_eq!(args.len(), 1);
+    }
+
+    #[test]
+    fn dictionary_metadata_reads_are_counted_through_every_nested_dictionary_shape() {
+        let dict = Dict::Instance {
+            module: "Test".into(),
+            name: "instance".into(),
+            args: vec![
+                Dict::Structural {
+                    class: "Base".into(),
+                    fields: vec![
+                        Dict::Field("shared".into()),
+                        Dict::Super {
+                            class: "Parent".into(),
+                            dict: Box::new(Dict::Opened {
+                                binder: "shared".into(),
+                                field: "dictionary".into(),
+                            }),
+                        },
+                        Dict::Given("shared".into()),
+                        Dict::Value {
+                            module: "shared".into(),
+                            name: "dictionary".into(),
+                        },
+                        Dict::Primitive {
+                            constraint: "shared".into(),
+                            labels: vec!["shared".into()],
+                        },
+                        Dict::Site {
+                            place: "shared".into(),
+                            definition: "shared".into(),
+                        },
+                        Dict::Error,
+                    ],
+                },
+                Dict::Opened {
+                    binder: "other".into(),
+                    field: "shared".into(),
+                },
+            ],
+        };
+        let applied = Expr::new(
+            ExprKind::Dicts(
+                Box::new(Expr::new(ExprKind::Local("shared".into()), at())),
+                vec![dict.clone(), Dict::Field("shared".into())],
+            ),
+            at(),
+        );
+        assert_eq!(applied.uses("shared"), 4);
+        assert_eq!(applied.uses("other"), 1);
+        let method = Expr::new(
+            ExprKind::Method {
+                dict,
+                name: "shared".into(),
+            },
+            at(),
+        );
+        assert_eq!(method.uses("shared"), 2);
+        assert_eq!(method.uses("other"), 1);
+    }
+
+    #[test]
+    fn owner_evidence_children_and_dictionary_metadata_are_each_counted_once() {
+        let expression = Expr::new(
+            ExprKind::WithOwnerEvidence(
+                Box::new(Expr::new(ExprKind::Local("shared".into()), at())),
+                Box::new(Expr::new(
+                    ExprKind::Method {
+                        dict: Dict::Field("shared".into()),
+                        name: "read".into(),
+                    },
+                    at(),
+                )),
+            ),
+            at(),
+        );
+        assert_eq!(expression.uses("shared"), 2);
+        assert_eq!(expression.uses("absent"), 0);
     }
 }

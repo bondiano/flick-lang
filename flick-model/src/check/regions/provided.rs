@@ -11,9 +11,10 @@
 //! What is left goes with the row of the λ or the task to what runs it,
 //! and a signature's row has no such element: `FLICK-G003` there too.
 
-use std::rc::Rc;
+use std::{mem, rc::Rc};
 
 use super::super::{Check, Checker, error};
+use super::ProvidedNeed;
 use super::{live_service, scope_service};
 use crate::syntax::{Name, Path};
 use crate::types::{PROVIDED, Row, Stage, Type, Var, provided};
@@ -137,12 +138,16 @@ impl Checker<'_> {
     /// {S} ϱ}` with `S ∈ R`.
     // shortcut: a given settles at the end of the λ or task around the call, not at the call (§2.7), so a λ with a signature row between them rejects what §2.7 accepts; settle at the call once the generator makes such a λ
     pub(in crate::check) fn settle_given(&self, r: &mut Row) {
+        self.settle_from(r, &self.regions.givens);
+    }
+
+    fn settle_from(&self, r: &mut Row, givens: &[(Row, Type)]) {
         r.elems.retain(|k, a| {
             if &*k.module != PROVIDED {
                 return true;
             }
             let owner = self.zonk(&a[0]);
-            !self.regions.givens.iter().any(|(g, s)| {
+            !givens.iter().any(|(g, s)| {
                 let g = self.zonk_row(g);
                 let named = match k.name.strip_prefix('~') {
                     Some(v) => g.vars.contains(&Var::Named(v.into())),
@@ -151,6 +156,42 @@ impl Checker<'_> {
                 named && self.zonk(s) == owner
             })
         });
+    }
+
+    /// A returned callable can be compared before the enclosing acquisition
+    /// stage fixes its Scope owner. Keep, rather than discharge, its obligation.
+    pub(in crate::check) fn defer_provided(&mut self, r: &mut Row, within: &Row) {
+        let mut waiting = Row::none();
+        r.elems.retain(|key, args| {
+            if &*key.module == PROVIDED
+                && args
+                    .first()
+                    .is_some_and(|owner| matches!(self.zonk(owner), Type::Var(Var::Meta(_))))
+            {
+                waiting.elems.insert(key.clone(), args.clone());
+                false
+            } else {
+                true
+            }
+        });
+        if !waiting.is_none() {
+            self.regions.pending_provided.push(ProvidedNeed {
+                row: waiting,
+                within: within.clone(),
+                givens: self.regions.givens.clone(),
+            });
+        }
+    }
+
+    /// Decide every delayed obligation with the facts at its generation site.
+    /// No unresolved owner is assumed to satisfy a given at this boundary.
+    pub(in crate::check) fn finish_provided(&mut self) -> Check<()> {
+        for need in mem::take(&mut self.regions.pending_provided) {
+            let mut row = self.zonk_row(&need.row);
+            self.settle_from(&mut row, &need.givens);
+            self.within_final(&row, &need.within)?;
+        }
+        Ok(())
     }
 
     /// The `Provided R ϱ` a signature `t` gives its body.
@@ -184,11 +225,12 @@ impl Checker<'_> {
         self.regions.nest.pop();
     }
 
-    pub(in crate::check) fn givens(&self) -> usize {
-        self.regions.givens.len()
+    pub(in crate::check) fn givens(&self) -> (usize, usize) {
+        (self.regions.givens.len(), self.regions.bounds.len())
     }
 
-    pub(in crate::check) fn forget_givens(&mut self, from: usize) {
-        self.regions.givens.truncate(from);
+    pub(in crate::check) fn forget_givens(&mut self, from: (usize, usize)) {
+        self.regions.givens.truncate(from.0);
+        self.regions.bounds.truncate(from.1);
     }
 }

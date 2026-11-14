@@ -181,7 +181,7 @@ impl Printer<'_> {
             Type::Meta(m) if self.store.is_numeric(*m) => {
                 out.push_str(default_num(self.store.is_fractional(*m)).name());
             }
-            Type::Meta(_) => out.push('_'),
+            Type::Meta(_) | Type::MetaView(_) => out.push('_'),
             Type::Error => out.push('?'),
             Type::App { .. } => self.print_app(t, prec, out),
             Type::Fun {
@@ -235,6 +235,7 @@ impl Printer<'_> {
                 self.print_forall(vars, constraints, body, out);
             }),
             Type::Exists {
+                scope: _,
                 binder,
                 contract,
                 body,
@@ -322,7 +323,12 @@ impl Printer<'_> {
     /// nothing yet and is left out.
     fn print_captured(&self, ty: &Type, captures: &Type, prec: Prec, out: &mut String) {
         let norm = self.store.normalize(captures);
-        if norm.entries.is_empty() && norm.tails.iter().all(|t| matches!(t, Type::Meta(_))) {
+        if norm.entries.is_empty()
+            && norm
+                .tails
+                .iter()
+                .all(|t| matches!(t, Type::Meta(_) | Type::MetaView(_)))
+        {
             self.print(ty, prec, out);
             return;
         }

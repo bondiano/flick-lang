@@ -14,9 +14,9 @@ use super::Checker;
 use super::classes::Dict;
 use super::env::Abi;
 use super::gadt::branch::as_field_given;
-use super::regions::scope;
 use super::services::OpClass;
 use super::ty::{Stage, Type};
+use crate::diagnostics::Diagnostic;
 use crate::iface::Interface;
 use crate::numeric::Num;
 use crate::source::Span;
@@ -25,7 +25,14 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::Lang;
 use flick_ir::{Adapter, ForeignMode, Label};
 
+mod owner_productivity;
+mod owner_templates;
+pub use owner_productivity::{OwnerAbstract, OwnerProductivity, OwnerRawHead};
+mod owners;
+pub use owner_templates::{OwnerTypeExpr, OwnerTypeKind, OwnerTypeTemplates};
 mod stages;
+pub use owners::{ForeignOwnerNode, ForeignOwnerPolicy, Owner, StageKey};
+use owners::{OwnerContext, OwnerStage};
 
 /// A source range of the module being checked.
 pub type Range = (u32, u32);
@@ -128,6 +135,8 @@ pub struct Typing {
     pub servers: HashMap<String, Vec<String>>,
     /// Each `foreign`: its calling convention.
     pub foreigns: HashMap<Range, ForeignInfo>,
+    /// Parsed/catch-typed original declarations with unfinished representation.
+    pub(super) pending_foreigns: Vec<super::ffi::PendingForeign>,
     /// Instances declared or derived in this module.
     pub instances: Vec<InstanceInfo>,
     /// The codec each use of `HttpApi.Derive.wire_codec` stands for.
@@ -177,16 +186,23 @@ pub struct Typing {
     /// The transparent aliases the module declares, exported or not: their
     /// parameters and bodies.
     pub aliases: HashMap<String, (Vec<String>, Type)>,
-    /// Runtime calls inside a `scope` that acquire into the owner of another
-    /// region than the innermost scope's.
+    /// Calls whose solved Scope requirement identifies a lexical owner.
     pub owners: HashMap<Range, Owner>,
     /// Pending: uses whose types are known once the module is solved.
     pending_labels: Vec<(Range, Type)>,
     /// The services of a call that needs, or whose row may still grow to
-    /// need, `Scope r`, with the scopes open around it as regions and
-    /// `scope` expressions, innermost last.
-    pub(super) pending_owners: Vec<(Range, Type, OpenScopes)>,
+    /// need, `Scope r`, and the lexical evidence available at the call.
+    pub(super) pending_owners: Vec<(Range, Type, OwnerContext)>,
+    pub owner_entries: HashSet<StageKey>,
+    pub(super) owner_stages: HashMap<StageKey, OwnerStage>,
+    pub(super) owner_stack: Vec<OwnerStage>,
     pending_dicts: Vec<(Range, u32, Dict)>,
+}
+
+impl Typing {
+    pub fn uses_owner(&self, owner: Owner) -> bool {
+        self.owners.values().any(|o| *o == owner)
+    }
 }
 
 /// A class method selected without inference or dictionary search.
@@ -237,6 +253,11 @@ pub enum Identity {
 /// what its metadata says.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ForeignInfo {
+    /// Scope explicitly declared on each original source arrow.
+    #[serde(default)]
+    pub scoped_stages: Vec<bool>,
+    #[serde(default)]
+    pub owner_result: Option<Box<ForeignOwnerPolicy>>,
     pub stages: Vec<bool>,
     pub dicts: usize,
     /// `arity n`, when written.
@@ -251,14 +272,6 @@ pub struct ForeignInfo {
 /// The scopes around a call, as their regions and `scope` expressions,
 /// innermost last.
 pub(super) type OpenScopes = Vec<(u32, Range)>;
-
-/// The owner a call acquires into: that of the `scope` expression `scope`,
-/// or with `outside`, the one around it (a region of the signature).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Owner {
-    pub scope: Range,
-    pub outside: bool,
-}
 
 /// Constraints that are solved by the region checker, and the equalities a
 /// GADT branch assumes, pass no dictionary.
@@ -310,7 +323,8 @@ impl Checker<'_> {
     /// The type of a value code generation makes at `at` without a node of
     /// its own, when it is a type constructor on its own.
     pub fn note_value(&mut self, at: Range, ty: &Type) {
-        if let t @ (Type::Con { .. } | Type::Meta(_)) = self.store.head(ty) {
+        let observed = self.store.head(ty);
+        if let t @ (Type::Con { .. } | Type::Meta(_) | Type::MetaView(_)) = observed.as_ref() {
             self.typing.pending_values.push((at, t.clone()));
         }
     }
@@ -360,10 +374,12 @@ impl Checker<'_> {
 
     /// Settles what waited for the whole module to be solved.
     pub fn finish_typing(&mut self) -> Typing {
+        self.finish_foreigns();
         let mut typing = mem::take(&mut self.typing);
         let pending = mem::take(&mut typing.pending_values);
         for (at, ty) in pending.iter().chain(&typing.pending_types) {
-            if let t @ Type::Con { .. } = self.store.head(ty) {
+            let observed = self.store.head(ty);
+            if let t @ Type::Con { .. } = observed.as_ref() {
                 typing.values.entry(*at).or_insert_with(|| t.clone());
             }
         }
@@ -397,37 +413,21 @@ impl Checker<'_> {
                 typing.labels.insert(at, label);
             }
         }
-        for (at, services, open) in mem::take(&mut typing.pending_owners) {
-            let row = self.store.normalize(&self.zonk(&services));
-            let Some(needed) = row.get(scope()) else {
-                continue;
-            };
-            let region = match needed.spine().1[..] {
-                [Type::Skolem(id)] => Some(*id),
-                // no region was ever named: the call keeps the innermost owner
-                [Type::Meta(_)] => continue,
-                _ => None,
-            };
-            let owner = match open.iter().position(|(r, _)| Some(*r) == region) {
-                Some(i) if i + 1 == open.len() => None,
-                Some(i) => Some(Owner {
-                    scope: open[i].1,
-                    outside: false,
-                }),
-                None => open.first().map(|(_, scope)| Owner {
-                    scope: *scope,
-                    outside: true,
-                }),
-            };
-            if let Some(owner) = owner {
-                typing.owners.insert(at, owner);
-            }
-        }
+        self.finish_owner_typing(&mut typing);
         let mut dicts = mem::take(&mut typing.pending_dicts);
         dicts.sort_by_key(|(at, order, _)| (*at, *order));
         for (at, _, dict) in dicts {
             typing.dicts.entry(at).or_default().push(dict);
         }
         typing
+    }
+}
+
+impl Typing {
+    pub(crate) fn pending_foreign_diagnostics(&self) -> Vec<Diagnostic> {
+        self.pending_foreigns
+            .iter()
+            .map(super::ffi::PendingForeign::diagnostic)
+            .collect()
     }
 }

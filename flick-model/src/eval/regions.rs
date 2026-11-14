@@ -4,13 +4,14 @@
 //! closes: one order of steps the rules allow, the latest a child can run.
 
 use std::cell::RefCell;
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::mem;
 use std::rc::Rc;
 
 use super::{Control, Frame, Machine, Outcome, Step, stuck};
 use crate::handler::Handler;
 use crate::subst::{any, subst_in_region};
-use crate::syntax::{Const, Env, Name, Path, RegionOp, Term};
+use crate::syntax::{Const, Env, Lit, Name, Path, RegionOp, Term};
 
 /// What `Λ` keeps of a region `π`.
 #[derive(Clone, Debug)]
@@ -22,6 +23,17 @@ pub struct Region {
     pub finalizers: Vec<Finalizer>,
     /// `K(π)`: each child's supervisor and task, run first to last.
     pub children: Vec<(Term, Term, Kept)>,
+    /// Storage roots, retired only after the last finalizer finishes.
+    pub arenas: Vec<usize>,
+}
+
+/// Strong arena slots. Handles and views are nonowning capabilities; their
+/// tombstone metadata survives close, while this payload is detached.
+/// This substitution-model state is a semantic oracle, not a counted heap.
+#[derive(Clone, Debug)]
+pub struct Arena {
+    pub owner: usize,
+    pub slots: BTreeMap<usize, Term>,
 }
 
 /// The environments `θ` of the `provide`s around the place that
@@ -35,6 +47,7 @@ pub enum Keep {
     /// A handler of effects: its operations stay in reach, but its `return`
     /// is its body's, not the child's.
     Handler(usize, Rc<Handler>),
+    Evidence(Option<usize>),
 }
 
 #[derive(Clone, Debug)]
@@ -51,6 +64,10 @@ pub enum Finalizer {
 pub struct Lambda {
     pub regions: Vec<Region>,
     pub released: HashSet<usize>,
+    /// Arena identity to owned storage, including empty closed tombstones.
+    pub arenas: BTreeMap<usize, Arena>,
+    /// View identity to arena identity: no strong contents edge.
+    views: HashMap<usize, usize>,
     /// Kept alive, so no new environment takes the address of one.
     pub ended: Vec<Rc<Env>>,
     /// Handlers that ended: a child that kept one uses it after its end.
@@ -122,6 +139,7 @@ impl Machine<'_> {
             parent: self.owner(),
             finalizers: Vec::new(),
             children: Vec::new(),
+            arenas: Vec::new(),
         });
         let body = subst_in_region(body, &[(s.clone(), Term::Own(pi))], &s, &region_name(pi));
         self.push(Frame::Inside(pi, s));
@@ -131,11 +149,38 @@ impl Machine<'_> {
     /// The region a step that needs `Scope ϱ` acquires into: the
     /// innermost `inside` around it. G6 makes the owner lexical; the
     /// generator never runs a step of an outer `Scope` in an inner `scope`.
-    fn owner(&self) -> Option<usize> {
+    pub(super) fn owner(&self) -> Option<usize> {
         self.frames.iter().rev().find_map(|f| match f {
-            Frame::Inside(p, _) | Frame::Close(p, ..) => Some(*p),
+            Frame::Inside(p, _) | Frame::Close(p, ..) | Frame::Activation(p) => Some(*p),
             _ => None,
         })
+    }
+
+    /// Installing a candidate is inert; only raw activation validates liveness.
+    pub(super) fn enter_owner_context(&mut self, raw: bool, body: &Term, value: Term) -> Step {
+        let owner = match value {
+            Term::Own(pi) | Term::OwnerCandidate(Some(pi)) => Some(pi),
+            Term::OwnerCandidate(None) | Term::Lit(Lit::Unit) if !raw => None,
+            other => return Err(stuck(format!("invalid owner context {other:?}"))),
+        };
+        let frame = if raw {
+            Frame::Activation(self.live(owner.expect("raw owner"))?)
+        } else {
+            Frame::Evidence(owner)
+        };
+        self.push(frame);
+        Ok(Control::Eval(body.clone()))
+    }
+
+    pub(super) fn evidence(&self) -> Option<usize> {
+        for frame in self.frames.iter().rev() {
+            match frame {
+                Frame::Evidence(owner) => return *owner,
+                Frame::Inside(pi, _) | Frame::Close(pi, ..) => return Some(*pi),
+                _ => {}
+            }
+        }
+        None
     }
 
     /// One step of closing `π` (§3.3): the next child, else the last
@@ -161,11 +206,21 @@ impl Machine<'_> {
             for keep in kept.iter() {
                 self.push(match keep {
                     Keep::Env(env) => Frame::Kept(env.clone()),
+                    Keep::Evidence(owner) => Frame::Evidence(*owner),
                     Keep::Handler(id, h) => Frame::KeptHandler(*id, h.clone()),
                 });
             }
             return Control::Eval(Term::Await(Rc::new(t)));
         }
+        // Detach every payload before dropping any of them. Storage is not
+        // an ordinary LIFO finalizer: an earlier finalizer may read a view
+        // acquired later through a cell or callback.
+        let arenas = mem::take(&mut self.lambda.regions[pi].arenas);
+        let detached: Vec<_> = arenas
+            .iter()
+            .map(|id| mem::take(&mut self.lambda.arenas.get_mut(id).expect("owned arena").slots))
+            .collect();
+        drop(detached);
         self.lambda.regions[pi].live = false;
         match ended {
             Ok(v) => Control::Ret(v),
@@ -184,6 +239,7 @@ impl Machine<'_> {
                 }
                 _ => None,
             })
+            .chain([Keep::Evidence(self.evidence())])
             .collect()
     }
 
@@ -192,8 +248,8 @@ impl Machine<'_> {
         Term::Cap(p.clone(), region, self.lambda.objects)
     }
 
-    fn live(&self, pi: usize) -> Result<usize, Outcome> {
-        if self.lambda.regions[pi].live {
+    pub(super) fn live(&self, pi: usize) -> Result<usize, Outcome> {
+        if self.lambda.regions.get(pi).is_some_and(|r| r.live) {
             Ok(pi)
         } else {
             Err(stuck(format!("a registration with closed region π{pi}")))
@@ -208,7 +264,7 @@ impl Machine<'_> {
         };
         Ok(match (op, args) {
             (RegionOp::Acquire, [_]) => {
-                let owner = owner()?;
+                let owner = self.live(owner()?)?;
                 let cap = self.object(p, Some(owner));
                 let Term::Cap(_, _, n) = cap else {
                     unreachable!("an object")
@@ -229,6 +285,9 @@ impl Machine<'_> {
             (RegionOp::Release, [Term::Cap(_, _, n)]) => {
                 self.lambda.released.insert(*n);
                 Control::Ret(Term::unit())
+            }
+            (RegionOp::ArenaMake | RegionOp::ArenaAlloc | RegionOp::ArenaGet, _) => {
+                return self.arena_step(p, op, args);
             }
             (RegionOp::Spawn, [Term::Own(pi), f, t]) => {
                 let pi = self.live(*pi)?;
@@ -267,6 +326,69 @@ impl Machine<'_> {
                     Rc::new(Term::Await(Rc::new(t.clone()))),
                     Rc::new(rest),
                 ))
+            }
+            (op, args) => return Err(stuck(format!("{op:?} of {args:?}"))),
+        })
+    }
+
+    /// Arena payloads are owned by the region, not by their capabilities.
+    fn arena_step(&mut self, p: &Path, op: RegionOp, args: &[Term]) -> Step {
+        Ok(match (op, args) {
+            (RegionOp::ArenaMake, [_]) => {
+                let owner = self
+                    .owner()
+                    .ok_or_else(|| stuck(format!("`{p}` outside every region")))?;
+                let owner = self.live(owner)?;
+                let cap = self.object(p, Some(owner));
+                let Term::Cap(_, _, id) = &cap else {
+                    unreachable!("an arena capability")
+                };
+                self.lambda.arenas.insert(
+                    *id,
+                    Arena {
+                        owner,
+                        slots: BTreeMap::new(),
+                    },
+                );
+                self.lambda.regions[owner].arenas.push(*id);
+                Control::Ret(cap)
+            }
+            (RegionOp::ArenaAlloc, [Term::Cap(_, Some(owner), id), value]) => {
+                if self.lambda.regions.get(*owner).is_none_or(|r| !r.live) {
+                    return Err(stuck(format!("use after close of arena {id}")));
+                }
+                let Some(arena) = self.lambda.arenas.get(id) else {
+                    return Err(stuck(format!("not an arena: object {id}")));
+                };
+                if arena.owner != *owner {
+                    return Err(stuck(format!("wrong owner of arena {id}")));
+                }
+                let view = self.object(p, Some(*owner));
+                let Term::Cap(_, _, view_id) = &view else {
+                    unreachable!("a view capability")
+                };
+                self.lambda.views.insert(*view_id, *id);
+                self.lambda
+                    .arenas
+                    .get_mut(id)
+                    .expect("validated arena")
+                    .slots
+                    .insert(*view_id, value.clone());
+                Control::Ret(view)
+            }
+            (RegionOp::ArenaGet, [Term::Cap(_, Some(owner), id)]) => {
+                if self.lambda.regions.get(*owner).is_none_or(|r| !r.live) {
+                    return Err(stuck(format!("use after close of arena view {id}")));
+                }
+                let value = self
+                    .lambda
+                    .views
+                    .get(id)
+                    .and_then(|arena| self.lambda.arenas.get(arena))
+                    .filter(|arena| arena.owner == *owner)
+                    .and_then(|arena| arena.slots.get(id))
+                    .ok_or_else(|| stuck(format!("not an arena view: object {id}")))?;
+                Control::Ret(value.clone())
             }
             (op, args) => return Err(stuck(format!("{op:?} of {args:?}"))),
         })

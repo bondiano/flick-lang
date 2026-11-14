@@ -36,7 +36,10 @@ impl Checker<'_> {
     /// `path` holds the aliases both sides unfold: one met again inside its
     /// own unfolding lifts nothing, being the same type on both.
     fn lift_in(&self, actual: &Type, expected: &Type, path: &mut Vec<AliasKey>) -> Option<Lift> {
-        let unfold = match (self.alias_key(actual), self.alias_key(expected)) {
+        let unfold = match (
+            self.projected_alias_key(actual),
+            self.projected_alias_key(expected),
+        ) {
             (Some(a), Some(e)) if a == e => self.enter_alias(actual, path),
             _ => Unfold::Plain,
         };

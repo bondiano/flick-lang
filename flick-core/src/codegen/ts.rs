@@ -238,7 +238,7 @@ impl Projection<'_> {
             Type::Exists { .. } => Ok("unknown".to_owned()),
             Type::Row(_) | Type::Union(..) | Type::Without { .. } => self.row(t, vars),
             Type::Symbol(s) => Ok(names::string(s)),
-            Type::Meta(_) | Type::Skolem(_) | Type::Error => {
+            Type::Meta(_) | Type::MetaView(_) | Type::Skolem(_) | Type::Error => {
                 Err("the type is not fully known".to_owned())
             }
         }

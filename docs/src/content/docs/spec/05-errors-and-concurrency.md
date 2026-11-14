@@ -1,6 +1,6 @@
 ---
 title: "Errors, services, resources and concurrency"
-source_hash: e6e808936974060b
+source_hash: 4e8c323ce2bffd07
 ---
 
 ## Expected errors
@@ -406,3 +406,13 @@ Scoped lifetime and waiting for the natural success of children are different th
 `timeout` and `timeout_option` use the native choice between the computation and the timer, then interrupt and await the losers. `timeout` adds `TimeoutError`; `timeout_option` represents the timeout itself as `None`, preserving other failures. There is no hard wall-clock guarantee: synchronous JS, an uninterruptible section and cleanup can delay the return, and a timeout never returns while scoped children of the work are still live. It is not guaranteed that all branches start when there is a synchronous winner, nor that the winner is stable when several are ready at once.
 
 **Runtime contract:** native typed recovery, opaque Failure/Exit/RawCause and inert diagnostics; fresh regions/captures; a two-phase scope with mandatory waiting for foreign quiescence; structured combinators and scoped supervision; native race/timeout. Permitted optimizations must preserve these boundaries, the original Cause on rethrow, the service context and the execution of finalizers.
+
+## Phase M: memory without GC
+
+The shared Wasm and Native contract uses explicit `dup`/`drop`, FBIP reuse only of a unique object with compatible capacity, and `Arena s` storage reclaimed when its region closes. Reusing a shared object falls back to allocation; it never changes the value through another alias. Module `Arena` provides `make`, `alloc` and `get`: an arena strongly holds slot values until its owner closes, `Value s a` is a nonowning slot handle, and `get` returns an ordinary value with an independent lifetime. Work and all finalizers finish before slots are released; an arena is not closed by an ordinary LIFO finalizer. Counted execution of the whole corpus remains incomplete; neither the existing substitution model nor host JS/Go garbage collection proves zero live objects.
+
+Cycles through `Ref` use cell arenas, not a tracing collector. Ordinary `Ref.make` belongs to the execution's root arena, not the nearest `scope`: cell contents are strong, reads retain them, and replacement releases the old contents. A cell handle does not own its contents through a counted edge; the arena owns them. After work and finalizers stop, arena close first detaches all contents slots, then releases their values and cell storage. This breaks `Ref → closure → Ref` cycles without tracing reachability. Unreachable cells may retain memory until their arena closes; this is an explicit tradeoff, not a promise of immediate cycle collection. The counted model implements root cells and tests these cycles; Lean proves exact owner/slot token inventories. This does not yet prove the whole pass, physical reclamation or all backend implementations.
+
+Accessing `Arena s` storage after region close is rejected at the use. Retention without use is checked separately under RG4: the old `G001` expectation for escape alone is not restored. Close releases edges from the arena into the counted heap; destroying a retained handle must not read already freed storage.
+
+Native implementation belongs to N (revision 2026-11-13): M's RC/arenas and platform-independent W2/W3 portions are shared; LLVM IR lowering belongs to the backend component, and codegen/link are host stages. This does not discharge the model and Lean obligations of M1–M4. Exact ownership rules and current implementation boundaries are recorded in the repository's `docs/formal/memory.md`.

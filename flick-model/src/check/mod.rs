@@ -256,7 +256,7 @@ pub fn check_program<S: BuildHasher>(
     globals.sort_by(|a, b| a.0.cmp(b.0));
     let mut out = Vec::new();
     for (path, term) in globals {
-        let scheme = decls.values.get(path).or_else(|| decls.instances.get(path));
+        let scheme = decls.value(path).or_else(|| decls.instances.get(path));
         let mut checker = Checker::new(decls);
         checker.module = path.module.clone();
         checker.own = scheme.map(|s| (path.clone(), s.clone()));

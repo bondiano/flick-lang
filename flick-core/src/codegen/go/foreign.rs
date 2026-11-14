@@ -124,15 +124,25 @@ impl Bindings {
     /// The stages the Go function takes. Most bindings flatten all stages;
     /// an explicit `@N` mounts once and returns Fn for its remaining stages.
     pub(super) fn parameters(&self, module: &str, f: &Foreign) -> usize {
-        self.binding(module, &f.name, f.binding.from.as_deref(), &f.binding.name)
-            .and_then(|binding| binding.stages)
-            .unwrap_or_else(|| parameters(f))
+        self.binding(
+            module,
+            f.source_name.as_deref().unwrap_or(&f.name),
+            f.binding.from.as_deref(),
+            &f.binding.name,
+        )
+        .and_then(|binding| binding.stages)
+        .unwrap_or_else(|| parameters(f))
     }
 
     /// The Go types of the function the binding `f` of `module` is bound to.
     pub(super) fn types(&self, module: &str, f: &Foreign) -> Types {
-        self.lookup(module, &f.name, f.binding.from.as_deref(), &f.binding.name)
-            .map_or_else(Types::default, |(_, types)| types)
+        self.lookup(
+            module,
+            f.source_name.as_deref().unwrap_or(&f.name),
+            f.binding.from.as_deref(),
+            &f.binding.name,
+        )
+        .map_or_else(Types::default, |(_, types)| types)
     }
 }
 
@@ -154,7 +164,7 @@ impl<'a> Gen<'a> {
         let a = self.a;
         let Some((target, types)) = self.input.bindings.lookup(
             self.module,
-            &f.name,
+            f.source_name.as_deref().unwrap_or(&f.name),
             f.binding.from.as_deref(),
             &f.binding.name,
         ) else {
@@ -341,6 +351,68 @@ mod tests {
                 .lookup("App", "mount", Some("mounts"), "mount")
                 .map(|(target, _)| target),
             Some("*flickrt.Mount")
+        );
+    }
+}
+
+#[cfg(test)]
+mod owner_identity_tests {
+    use super::{Bindings, Types};
+    use crate::ir::ItemKind;
+    use crate::ir::tests::lower_text;
+
+    #[test]
+    fn raw_owner_shim_retains_global_foreign_table_identity() {
+        let module = lower_text("Test", "module Test exposing (acquire)\nacquire : Unit ->{Scope s} Float\nforeign effect acquire from global \"Object.acquire\"\n").expect("global scoped foreign");
+        let raw = module
+            .items
+            .iter()
+            .find_map(|item| match &item.kind {
+                ItemKind::Foreign(f) => Some(f),
+                _ => None,
+            })
+            .expect("raw item");
+        assert_ne!(raw.name, "acquire");
+        assert_eq!(raw.source_name.as_deref(), Some("acquire"));
+        assert_eq!(raw.binding.from, None);
+        assert_eq!(raw.binding.name, "Object.acquire");
+        let bindings = Bindings::parse(["[global Test]\nacquire NativeAcquire(float64) float64\n"]);
+        assert_ne!(
+            bindings.types("Test", raw),
+            Types::default(),
+            "lookup must use original source name, not emitted raw symbol"
+        );
+        let staged = Bindings::parse(["[global Test]\nacquire NativeAcquire@0\n"]);
+        assert_eq!(staged.parameters("Test", raw), 0);
+    }
+
+    #[test]
+    fn flattened_raw_owner_shim_uses_the_flattened_source_identity() {
+        let module = lower_text("Test", "module Test exposing (make)\nmake : Unit ->{Scope s} Float\nforeign effect make from global \"Object.make\"\n").expect("scoped foreign");
+        let mut raw = module
+            .items
+            .iter()
+            .find_map(|item| match &item.kind {
+                ItemKind::Foreign(foreign) => Some(foreign.clone()),
+                _ => None,
+            })
+            .expect("raw item");
+        raw.name = format!("Inner${}", raw.name);
+        raw.source_name = Some("Inner$make".to_owned());
+        let bindings = Bindings::parse([
+            "[global Test]\nmake ParentMake(string) string\nInner$make InnerMake(float64) float64\n",
+        ]);
+        let inner = bindings.types("Test", &raw);
+        raw.source_name = Some("make".to_owned());
+        assert_ne!(inner, Types::default());
+        assert_ne!(
+            inner,
+            bindings.types("Test", &raw),
+            "inline source identity must not select a parent homonym"
+        );
+        assert_eq!(
+            raw.binding.name, "Object.make",
+            "relocation leaves the host binding unchanged"
         );
     }
 }

@@ -1,0 +1,25 @@
+// RG4: retaining a view without dereferencing it does not use its region.
+module App.ArenaHolding exposing (..)
+
+import Arena
+
+held_closure : Unit ->{} (Unit ->{} Unit)
+let held_closure () = scope {
+  let arena = Arena.make ()
+  let view = Arena.alloc arena "kept"
+  fun () -> ignore view
+}
+
+held_task : Unit ->{} Eff {} none Unit
+let held_task () = scope {
+  let arena = Arena.make ()
+  let view = Arena.alloc arena "kept"
+  task { ignore view }
+}
+
+used_inside : Unit ->{} String
+let used_inside () = scope {
+  let arena = Arena.make ()
+  let view = Arena.alloc arena "copied out"
+  Arena.get view
+}

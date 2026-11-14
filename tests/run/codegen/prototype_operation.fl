@@ -1,0 +1,12 @@
+// Legal operation names are own fields, not JavaScript prototype setters.
+module App.Main exposing (main)
+
+effect Proto =
+  __proto__ : Unit ->{} Int
+
+main : Unit ->{} Unit
+let main () =
+  let value =
+    try Proto.__proto__ () with
+    | Proto.__proto__ () -> 1
+  Platform.stdout_line (show value)

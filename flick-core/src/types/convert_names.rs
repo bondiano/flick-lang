@@ -9,7 +9,12 @@ impl Checker<'_> {
             while let Kind::Arrow(_, inner) = result {
                 result = inner;
             }
-            if *result == Kind::Constraint {
+            if *result == Kind::Constraint
+                && self
+                    .env
+                    .type_def(module, name)
+                    .is_some_and(|definition| matches!(definition.form, Form::Class { .. }))
+            {
                 return Some((
                     Type::con(module, &format!("{name}$Dict")),
                     as_value_kind(kind.clone()),
@@ -66,7 +71,7 @@ impl Checker<'_> {
                 let kind = self.kinds.fresh();
                 let ty = match free {
                     Free::Quantify => Type::Var(name.to_owned()),
-                    Free::Fresh => self.fresh(),
+                    Free::Fresh => self.store.fresh_of(&kind),
                     Free::Reject => {
                         self.error(
                             codes::T001,

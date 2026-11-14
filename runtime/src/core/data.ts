@@ -233,11 +233,18 @@ export const structural = (name: string, dicts: ReadonlyArray<FieldDict>): Dict 
     case "Eq":
       return { eq };
     case "Ord":
-      return { compare: cmp, $Eq: supers() };
+      return {
+        compare: cmp,
+        get $Eq() {
+          return supers();
+        },
+      };
     case "Hash":
       return {
         hash: (a: Structure) => fieldsOf(a).reduce<number>((h, x, i) => combine(h, at(dicts, i).hash(x)), 11),
-        $Eq: supers(),
+        get $Eq() {
+          return supers();
+        },
       };
     default:
       return {
@@ -372,16 +379,64 @@ export const optionalArg = <A>(option: Option<A>): A | undefined => (option._tag
  * are copied all the way down, and any other object goes through `other`
  * (`docs/formal/ts-holes.md#31-flick-data-is-copied-at-the-foreign-boundary`). A frozen object is a constant such as
  * `none`, kept with its identity.
+ * Traversal uses a worklist; cyclic mutable data still fails with RangeError,
+ * not a mutable cyclic Flick value. Arrays become fresh plain arrays: foreign
+ * map overrides and species constructors cannot bypass isolation. Own record
+ * fields are defined as data fields, including `__proto__`.
  * shortcut: a plain JS object typed `JsValue` inside data is copied too; type the copy if a binding needs its identity.
  */
 export const copyThrough = (value: unknown, other: (value: object) => unknown): unknown => {
-  if (typeof value !== "object" || value === null) return value;
-  if (Array.isArray(value)) return value.map((x: unknown) => copyThrough(x, other));
-  const proto: unknown = Object.getPrototypeOf(value);
-  if ((proto !== Object.prototype && proto !== null) || Object.isFrozen(value)) return other(value);
-  const copy: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(value)) copy[k] = copyThrough(v, other);
-  return copy;
+  const work: Array<() => void> = [];
+  const active = new WeakSet<object>();
+  let result: unknown;
+  const visit = (input: unknown, put: (copy: unknown) => void): void => {
+    if (typeof input !== "object" || input === null) { put(input); return; }
+    const array = Array.isArray(input);
+    if (!array) {
+      const proto: unknown = Object.getPrototypeOf(input);
+      if ((proto !== Object.prototype && proto !== null) || Object.isFrozen(input)) { put(other(input)); return; }
+    }
+    // Only active ancestors are rejected. Completed aliases must be copied again,
+    // not memoized: foreign mutation of one copy must not change another copy.
+    if (active.has(input)) throw new RangeError("Maximum call stack size exceeded");
+    active.add(input);
+    const finish = (copy: unknown): void => { active.delete(input); put(copy); };
+    if (Array.isArray(input)) {
+      const length = input.length;
+      const copy: unknown[] = [];
+      copy.length = length;
+      let index = 0;
+      const next = (): void => {
+        while (index < length) {
+          const key = index++;
+          // Like Array.map, read an index only after the previous child finishes.
+          if (!(key in input)) continue;
+          const child: unknown = input[key];
+          work.push(next);
+          visit(child, (copied) => { Object.defineProperty(copy, key, { value: copied, writable: true, enumerable: true, configurable: true }); });
+          return;
+        }
+        finish(copy);
+      };
+      work.push(next);
+    } else {
+      // Object.entries eagerly reads all enumerable fields before descending.
+      const entries: Array<[string, unknown]> = Object.entries(input);
+      const copy: Record<string, unknown> = {};
+      let index = 0;
+      const next = (): void => {
+        const entry = entries[index++];
+        if (entry === undefined) { finish(copy); return; }
+        const [key, child] = entry;
+        work.push(next);
+        visit(child, (copied) => { Object.defineProperty(copy, key, { value: copied, writable: true, enumerable: true, configurable: true }); });
+      };
+      work.push(next);
+    }
+  };
+  visit(value, (copy) => { result = copy; });
+  while (work.length > 0) work.pop()?.();
+  return result;
 };
 
 /** Flick data that crosses the boundary of an import outside the runtime. */

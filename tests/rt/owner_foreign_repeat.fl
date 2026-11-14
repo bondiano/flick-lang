@@ -1,0 +1,22 @@
+// A recursive foreign executable needs raw activation at every future await.
+module App.Main exposing (main)
+
+opaque type alias Repeat s = Eff {Scope s} none (Repeat s)
+
+// The returned executable exposes s; the factory has no independent retention.
+make : Fiber.Owner s -> Repeat s
+foreign pure make from "./owner_foreign_repeat.mjs" "makeRepeat"
+  retention call
+
+service Read =
+  read : Unit ->{} String
+
+main : Unit ->{} Unit
+let main () = scope outer {
+  let layer = Layer.succeed Read { read = fun () -> "unused" }
+  let first = make outer
+  let second = Layer.run layer (fun () -> await first)
+  let third = Layer.run layer (fun () -> await second)
+  let _ = Layer.run layer (fun () -> await third)
+  Platform.stdout_line "repeat"
+}

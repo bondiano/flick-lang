@@ -1,0 +1,7 @@
+module App.ServiceImplementationAlias exposing (..)
+
+type alias Handler = Clock.Impl
+
+service Clock =
+//      ^^^^^ FLICK-R007 service implementation type `Clock.Impl` is cyclic: Clock.Impl -> Handler -> Clock.Impl
+  tick : Unit ->{} Handler

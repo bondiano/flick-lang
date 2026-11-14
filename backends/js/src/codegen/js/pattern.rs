@@ -2,11 +2,12 @@
 //! bindings it makes. Arms are tried top to bottom; a guard that fails goes
 //! on to the next arm.
 
-use std::mem;
-
 use flick_pretty::docvec;
 
-use super::doc::{After, Before, Head, Js, MULTILINE, Stmt, block, stmt_flags, text_flags};
+use super::doc::{
+    After, Before, Head, Js, MULTILINE, Stmt, YIELD_TEXT, YIELDS, block, block_js, call,
+    stmt_flags, text_flags,
+};
 use super::{Gen, names};
 use crate::ir::{Arm, Expr, Lit, Pat};
 use flick_ir::{Constructor, JsClass, Rep};
@@ -271,24 +272,93 @@ impl<'d> Gen<'_, 'd> {
         }
     }
 
-    /// The arms of `try … with` on the error `subject`: a matching arm
-    /// returns its handler, and no match returns `undefined`.
-    pub(super) fn handlers(&mut self, subject: &str, arms: &[Arm]) {
-        for arm in arms {
-            self.arm(
-                subject,
-                &arm.pat,
-                arm.guard.as_ref(),
-                &arm.body,
-                false,
-                |g, body| {
-                    let handler = g.gen_block(body);
-                    g.buf.push(Stmt::ret(g.a, None, handler));
-                },
-            );
+    /// A selector for `try … with`. Pure guards choose a deferred body at once;
+    /// guards that yield choose it outside the caught body, preserving the
+    /// original cause through the runtime's `unhandled` continuation.
+    pub(super) fn handlers(&mut self, subject: &str, arms: &[Arm]) -> Js<'d> {
+        let a = self.a;
+        let saved = (self.generator, self.tail.take());
+        self.generator = true;
+        let (stmts, ()) = self.block(|g| {
+            for arm in arms {
+                g.arm(
+                    subject,
+                    &arm.pat,
+                    arm.guard.as_ref(),
+                    &arm.body,
+                    false,
+                    |g, body| {
+                        let handler = g.gen_block(body);
+                        g.buf.push(Stmt::ret(g.a, None, handler));
+                    },
+                );
+            }
+            let undefined = g.leaf("undefined");
+            g.buf.push(Stmt::ret(g.a, None, undefined));
+        });
+        (self.generator, self.tail) = saved;
+        if stmt_flags(&stmts) & YIELDS == 0 {
+            return self.lambda_of(subject, block_js(a, &stmts));
         }
-        let undefined = self.leaf("undefined");
-        self.buf.push(Stmt::ret(self.a, None, undefined));
+        let unhandled = self.temp();
+        let selected = self.temp();
+        let generator = self.generator_function("", &stmts);
+        let selection = if self.kernel {
+            call(a, generator.in_parens(), &[])
+        } else {
+            let effect_gen = self.effect("gen");
+            call(a, effect_gen, &[generator])
+        };
+        let run = if self.kernel { "yield " } else { "yield* " };
+        let selection = Js::code(
+            docvec![a, run, selection.at(a, Before::Other, After::Delimiter)],
+            Head::Ident,
+            &[selection],
+        )
+        .with(YIELDS | YIELD_TEXT)
+        .in_parens();
+        let handler = self.leaf(&selected);
+        let handler = if self.kernel {
+            call(a, handler, &[])
+        } else {
+            handler
+        };
+        let missing = call(a, self.leaf(&unhandled), &[]);
+        let continuation = Js::code(
+            docvec![
+                a,
+                a.alloc_str(&selected),
+                " === undefined ? ",
+                missing.at(a, Before::Other, After::Other),
+                " : ",
+                handler.at(a, Before::Other, After::Delimiter)
+            ],
+            Head::Ident,
+            &[missing, handler],
+        );
+        let continuation = if self.kernel {
+            continuation
+        } else {
+            Js::code(
+                docvec![a, "yield* (", continuation.doc, ")"],
+                Head::Ident,
+                &[continuation],
+            )
+            .with(YIELDS | YIELD_TEXT)
+            .in_parens()
+        };
+        let stmts = [
+            self.constant(&selected, selection),
+            Stmt::ret(a, None, continuation),
+        ];
+        let deferred = self.generator_function("", &stmts);
+        let deferred = if self.kernel {
+            deferred
+        } else {
+            let effect_gen = self.effect("gen");
+            call(a, effect_gen, &[deferred])
+        };
+        self.lambda_of(&format!("{subject}, {unhandled}"), deferred)
     }
 
     /// The `case` tag of each arm of a `match` a `switch` can take, `None`
@@ -350,9 +420,7 @@ impl<'d> Gen<'_, 'd> {
             }
             match guard {
                 Some(guard) => {
-                    let saved = mem::replace(&mut g.generator, false);
                     let c = g.expr(guard);
-                    g.generator = saved;
                     let (b, ()) = g.block(|g| body(g, value));
                     let stmt = g.if_then(c, &b);
                     g.buf.push(stmt);

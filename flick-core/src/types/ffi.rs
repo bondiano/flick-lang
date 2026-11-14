@@ -16,7 +16,9 @@ mod bridge_shape;
 mod retention;
 pub use retention::keeps_for_owner;
 
+mod pending;
 mod suspends;
+pub(super) use pending::PendingForeign;
 
 use std::slice;
 
@@ -25,10 +27,10 @@ use super::env::Form;
 use super::kinds::Kind;
 use super::regions::is_elided_row;
 use super::ty::{Stage, Type};
-use super::typing::{ForeignInfo, range};
+use super::typing::{ForeignInfo, ForeignOwnerPolicy, range};
 use crate::diagnostics::codes;
 use crate::source::Span;
-use crate::syntax::cst::Node;
+use crate::syntax::cst::{Node, foreign_words};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::{self, Lang};
 use flick_ir::{Copies, ForeignMode};
@@ -59,6 +61,13 @@ impl Checker<'_> {
     /// Checks the metadata of the foreign declaration `decl` of type
     /// `scheme` and records its calling convention.
     pub fn foreign_info(&mut self, decl: &Node, scheme: &Type) {
+        let pending = self.read_meta(decl, scheme);
+        self.typing.pending_foreigns.push(pending);
+    }
+
+    fn finalized_foreign_info(&mut self, mut pending: PendingForeign, scheme: &Type) {
+        let decl = pending.decl.clone();
+        let decl = &decl;
         let (binders, constraints, body) = match scheme {
             Type::Forall {
                 vars,
@@ -84,30 +93,27 @@ impl Checker<'_> {
                 .count(),
             _ => constraints,
         };
-        let mut info = ForeignInfo {
-            stages: stages.clone(),
-            dicts,
-            ..ForeignInfo::default()
-        };
+        self.validate_prepared_meta(&mut pending, mode, &body, stages.len());
+        let mut info = pending.info;
+        let retention = pending.retention;
+        info.stages.clone_from(&stages);
+        info.dicts = dicts;
+        info.scoped_stages = self.foreign_scoped_stages(&body);
         info.mode = mode;
-        let retention = self.read_meta(decl, mode, &body, &mut info);
         let arity = info.js_arity();
+        if let Ok(result) = self.foreign_owner_result(&body, arity, params.is_empty()) {
+            info.owner_result = result;
+        } else {
+            pending.info = info;
+            self.defer_foreign(pending, scheme);
+            return;
+        }
         let span = self.span(decl);
         self.check_meta(&info, &params, &body, span);
         info.adapter.result.unit = self
             .call_result(&body, arity)
             .is_some_and(|r| r.is_lang(Lang::Unit));
-        info.adapter.callbacks = params
-            .iter()
-            .take(arity)
-            .map(|p| {
-                // a stage that runs gives its value, not more arguments to take
-                let stages = self.arrow_stages(p);
-                let n =
-                    (stages.iter().position(|s| *s != Stage::Pure)).map_or(stages.len(), |i| i + 1);
-                (n > 0).then_some(n)
-            })
-            .collect();
+        info.adapter.callbacks = self.foreign_callbacks(&params, arity);
         info.adapter.copies = self.copies(&params, &body, arity, &info.adapter.callbacks);
         info.adapter.shapes = self.param_shapes(&params, arity);
         info.adapter.result_shape = self
@@ -161,128 +167,26 @@ impl Checker<'_> {
         self.typing.foreigns.insert(range(span), info);
     }
 
-    /// Reads the metadata lines of `decl` into `info`; the retention, if
-    /// written.
-    fn read_meta(
-        &mut self,
-        decl: &Node,
-        mode: ForeignMode,
-        body: &Type,
-        info: &mut ForeignInfo,
-    ) -> Option<Retention> {
-        let stages = info.stages.clone();
-        let mut retention = None;
-        let meta: Vec<&Node> = decl
-            .nodes()
-            .filter(|n| n.kind == K::ForeignMeta)
-            .flat_map(Node::nodes)
-            .collect();
-        for item in &meta {
-            let Some(name) = item.child_tokens().find(|t| t.kind == K::Ident) else {
-                continue;
-            };
-            let args: Vec<&Node> = item.nodes().collect();
-            let word = |i: usize| args.get(i).map(|n| n.text(self.text).trim().to_owned());
-            let number = |i: usize| word(i).and_then(|w| w.parse::<usize>().ok());
-            match name.text(self.text) {
-                "arity" => match number(0) {
-                    Some(n) if n <= stages.len() => info.arity = Some(n),
-                    _ => self.bad_meta(item, &format!(
-                        "`arity` takes the number of JS arguments, at most the {} parameters of the signature",
-                        stages.len()
-                    )),
-                },
-                "this" => info.adapter.receiver = true,
-                "reviewed" if !word(0).is_some_and(|w| w.starts_with('"')) => self.bad_meta(
-                    item,
-                    "`reviewed` takes the package and fingerprint the binding was checked against, as a string",
-                ),
-                "nullable" => info.adapter.result.nullable = true,
-                "variadic" => info.adapter.variadic = true,
-                "optional" => match number(0) {
-                    Some(i) => info.adapter.optional.push(i),
-                    None => self.bad_meta(item, "`optional` takes the position of an `Option` argument, from 0"),
-                },
-                "cancel" => match word(0).as_deref() {
-                    Some("signal") if mode == ForeignMode::Async => info.adapter.cancel = true,
-                    Some("signal") => self.bad_meta(item, "`cancel signal` is for a call whose row has `Async`: only a promise can be aborted"),
-                    _ => self.bad_meta(item, "write `cancel signal`"),
-                },
-                "retention" => match word(0).as_deref() {
-                    Some("call") => retention = Some(Retention::Call),
-                    Some("owner") => retention = Some(Retention::Owner),
-                    _ => self.bad_meta(item, "write `retention call` or `retention owner`"),
-                },
-                "catch" => match args.first() {
-                    Some(mapping) if mode != ForeignMode::Pure => {
-                        self.catch_mapping(mapping, body);
-                        info.catch = Some(mapping.range());
-                    }
-                    Some(_) => self.bad_meta(item, "a `foreign pure` call cannot throw: `catch` needs another mode"),
-                    None => self.bad_meta(item, "`catch` takes the function that maps a JS exception to an error"),
-                },
-                _ => {}
-            }
-        }
-        retention
+    fn foreign_callbacks(&self, params: &[Type], arity: usize) -> Vec<Option<usize>> {
+        params
+            .iter()
+            .take(arity)
+            .map(|param| {
+                // A stage that runs gives its value, not more arguments to take.
+                let stages = self.arrow_stages(param);
+                let n = stages
+                    .iter()
+                    .position(|stage| *stage != Stage::Pure)
+                    .map_or(stages.len(), |index| index + 1);
+                (n > 0).then_some(n)
+            })
+            .collect()
     }
+}
 
-    /// Checks the metadata in `info` against the parameters of the signature.
-    fn check_meta(&mut self, info: &ForeignInfo, params: &[Type], body: &Type, span: Span) {
-        let arity = info.js_arity();
-        let stages = &info.stages;
-        if arity == 0
-            && !stages.is_empty()
-            && !params.first().is_some_and(|p| p.is_lang(Lang::Unit))
-        {
-            self.error(
-                codes::F001,
-                span,
-                "`arity 0` drops the first argument, which must be `()`".to_owned(),
-            );
-        }
-        if info.adapter.receiver && arity == 0 {
-            self.error(
-                codes::F001,
-                span,
-                "`this` needs an argument to be the receiver".to_owned(),
-            );
-        }
-        for &i in &info.adapter.optional {
-            if !params
-                .get(i)
-                .is_some_and(|p| self.whnf(p).spine().0.is_lang(Lang::Option))
-                || i >= arity
-            {
-                self.error(
-                    codes::F001,
-                    span,
-                    format!("`optional {i}` names an argument of type `Option a`"),
-                );
-            }
-        }
-        if info.adapter.variadic
-            && (arity == 0 || !self.whnf(&params[arity - 1]).spine().0.is_lang(Lang::List))
-        {
-            self.error(
-                codes::F001,
-                span,
-                "`variadic` spreads a last argument of type `List a`".to_owned(),
-            );
-        }
-        if info.adapter.result.nullable
-            && !self
-                .call_result(body, arity)
-                .is_some_and(|r| self.whnf(&r).spine().0.is_lang(Lang::Option))
-        {
-            self.error(
-                codes::F001,
-                span,
-                "`nullable` makes the result an `Option a`".to_owned(),
-            );
-        }
-    }
+include!("ffi/metadata.rs");
 
+impl Checker<'_> {
     /// What a curried function type returns after its last arrow.
     fn result_of(&self, ty: &Type) -> Type {
         let mut ty = ty.clone();
@@ -360,6 +264,20 @@ impl Checker<'_> {
         }
     }
 
+    fn foreign_owner_result(
+        &self,
+        body: &Type,
+        arity: usize,
+        constant: bool,
+    ) -> Result<Option<Box<ForeignOwnerPolicy>>, ()> {
+        if constant {
+            self.foreign_owner_policy(body)
+        } else {
+            self.call_result(body, arity.max(1))
+                .map_or(Ok(None), |result| self.foreign_owner_policy(&result))
+        }
+    }
+
     /// The result of a call with `arity` arguments.
     fn call_result(&self, ty: &Type, arity: usize) -> Option<Type> {
         let mut ty = ty.clone();
@@ -374,17 +292,22 @@ impl Checker<'_> {
 
     /// `catch f`: `f : JsValue -> E` with `E` an error of the row the call
     /// fails with, and no capability of a scope in it.
-    fn catch_mapping(&mut self, mapping: &Node, body: &Type) {
+    fn infer_catch_mapping(&mut self, mapping: &Node) -> Option<Type> {
         let span = self.span(mapping);
         let error = self.fresh();
         let expected = Type::pure_fun(Type::lang(Lang::JsValue), error.clone());
         let actual = self.infer(mapping);
         if let Err(m) = self.unify(&actual, &expected) {
             self.mismatch(&m, &actual, &expected, span);
-            return;
+            return None;
         }
+        Some(error)
+    }
+
+    fn check_catch_mapping(&mut self, mapping: &Node, body: &Type, error: &Type) {
+        let span = self.span(mapping);
         let row = self.error_row(body);
-        let error = self.zonk(&error);
+        let error = self.zonk(error);
         let allowed = row.is_some_and(|row| {
             let norm = self.store.normalize(&row);
             norm.entries.iter().any(|(_, t)| self.zonk(t) == error)
@@ -469,3 +392,7 @@ impl ForeignInfo {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "ffi/pending_tests.rs"]
+mod pending_tests;

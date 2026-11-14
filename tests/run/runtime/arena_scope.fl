@@ -1,0 +1,21 @@
+// A copied-out ordinary value survives close; an unused view may be held.
+module App.Main exposing (main)
+
+import Arena
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let (copy, held) = scope outer {
+    let arena = Arena.make ()
+    let view = Arena.alloc arena "outer"
+    scope inner {
+      let inner_arena = Arena.make ()
+      let inner_view = Arena.alloc inner_arena "inner"
+      Platform.stdout_line (Arena.get inner_view)
+      Platform.stdout_line (Arena.get view)
+    }
+    (Arena.get view, fun () -> ignore view)
+  }
+  held ()
+  Platform.stdout_line copy
+  Platform.stdout_line "closed"

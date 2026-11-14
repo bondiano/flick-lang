@@ -11,6 +11,7 @@ mod foreign;
 mod handler;
 mod instance;
 mod lang;
+pub mod memory;
 mod num;
 mod op;
 mod program;

@@ -240,8 +240,12 @@ impl Checker<'_> {
         if c.contains(&mut |t| *t == Type::Error) {
             return Outcome::Solved(Dict::Error);
         }
-        let ground =
-            !c.contains(&mut |t| matches!(t, Type::Meta(_) | Type::Skolem(_) | Type::Var(_)));
+        let ground = !c.contains(&mut |t| {
+            matches!(
+                t,
+                Type::Meta(_) | Type::MetaView(_) | Type::Skolem(_) | Type::Var(_)
+            )
+        });
         let key = ground.then(|| c.clone());
         if let Some((_, dict)) = givens.iter().find(|(g, _)| g == c) {
             return Outcome::Solved(dict.clone());
@@ -304,10 +308,17 @@ impl Checker<'_> {
                 let differ = fd.to.iter().any(|&j| gargs.get(j).copied() != args.get(j));
                 if agree
                     && differ
-                    && fd.to.iter().all(|&j| match (args.get(j), gargs.get(j)) {
-                        (Some(a), Some(b)) => self.unify(a, b).is_ok(),
-                        _ => false,
-                    })
+                    && self
+                        .inference_trial(|this| {
+                            for &j in &fd.to {
+                                let (Some(a), Some(b)) = (args.get(j), gargs.get(j)) else {
+                                    return Err(());
+                                };
+                                this.unify(a, b).map_err(|_| ())?;
+                            }
+                            Ok(())
+                        })
+                        .is_ok()
                 {
                     return true;
                 }
@@ -434,23 +445,25 @@ impl Checker<'_> {
                 }) {
                     continue;
                 }
-                let mut changed = false;
-                for &j in &fd.to {
-                    let (Some(p), Some(t)) = (pattern.get(j), args.get(j)) else {
-                        continue;
-                    };
-                    for v in vars(p) {
-                        if !subst.iter().any(|(n, _)| *n == v) {
-                            let fresh = self.fresh();
-                            subst.push((v, fresh));
+                let attempt = self.inference_trial(|this| {
+                    let mut candidate = subst.clone();
+                    let mut changed = false;
+                    for &j in &fd.to {
+                        let (Some(p), Some(t)) = (pattern.get(j), args.get(j)) else {
+                            return Err(());
+                        };
+                        for v in vars(p) {
+                            if !candidate.iter().any(|(n, _)| *n == v) {
+                                candidate.push((v, this.fresh()));
+                            }
                         }
+                        let target = p.substitute(&candidate);
+                        this.unify(t, &target).map_err(|_| ())?;
+                        changed |= this.canon(t) != *t;
                     }
-                    let target = p.substitute(&subst);
-                    if self.unify(t, &target).is_ok() && self.canon(t) != *t {
-                        changed = true;
-                    }
-                }
-                if changed {
+                    Ok(changed)
+                });
+                if attempt == Ok(true) {
                     return true;
                 }
             }
@@ -466,7 +479,7 @@ impl Checker<'_> {
             Some(Type::Tuple(items)) => items.clone(),
             Some(Type::Record(row)) => match row.tail.as_deref() {
                 None => row.entries.iter().map(|(_, t)| t.clone()).collect(),
-                Some(Type::Meta(_)) => return Outcome::Stuck,
+                Some(Type::Meta(_) | Type::MetaView(_)) => return Outcome::Stuck,
                 Some(_) => {
                     return Outcome::Missing(
                         c.clone(),

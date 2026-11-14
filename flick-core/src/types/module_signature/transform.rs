@@ -1,13 +1,10 @@
 impl ModuleSignature {
     pub fn rename_parameter(&mut self, binder: &str, path: &str) {
         fn replace(ty: &Type, from: &str, path: &str) -> Type {
-            if let Type::Con { module, name } = ty {
-                if module == from {
-                    return Type::con(path, name);
-                }
-                if let Some(suffix) = module.strip_prefix(&format!("{from}.")) {
-                    return Type::con(&format!("{path}.{suffix}"), name);
-                }
+            if let Type::Con { module, name } = ty
+                && let Some(module) = rename_module_reference(module, from, path)
+            {
+                return Type::con(&module, name);
             }
             map_module_children(ty, &mut |ty| replace(ty, from, path))
         }

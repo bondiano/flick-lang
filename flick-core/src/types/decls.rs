@@ -70,6 +70,10 @@ impl Checker<'_> {
                 }
             }
         }
+        // Generated implementation aliases must be complete before checking
+        // alias cycles or expanding a constructor's scheme. Their headers,
+        // like the service headers, were available during body conversion.
+        self.finish_services(&pending, &mut bodies);
         // before a constructor's scheme expands an alias it names
         self.break_alias_cycles(&pending);
         for (p, body) in pending.iter().zip(bodies) {
@@ -221,12 +225,31 @@ impl Checker<'_> {
         };
         let kind = Kind::arrows(params.iter().map(|p| p.kind.clone()), result);
         self.env.define_type(&name, TypeDef { kind, form });
+        if decl.kind == K::ServiceDecl {
+            self.implementation_header(&name, &params);
+        }
         self.env.declare(Namespace::Type, &name);
         Some(Pending {
             node: decl,
             name,
             params,
         })
+    }
+
+    /// A real service's generated alias header, not an empty record. Its
+    /// named head lets earlier declarations refer to the completed record.
+    fn implementation_header(&mut self, service: &str, params: &[Binder]) {
+        self.env.define_type(
+            &format!("{service}.Impl"),
+            TypeDef {
+                kind: Kind::arrows(params.iter().map(|p| p.kind.clone()), Kind::Type),
+                form: Form::Alias {
+                    params: params.iter().map(|p| p.name.clone()).collect(),
+                    body: Type::Error,
+                    opaque: false,
+                },
+            },
+        );
     }
 
     fn with_params<T>(&mut self, params: &[Binder], f: impl FnOnce(&mut Self) -> T) -> T {
@@ -239,6 +262,14 @@ impl Checker<'_> {
         let out = f(self);
         self.cx.tyvars.truncate(mark);
         out
+    }
+
+    fn finish_services(&mut self, pending: &[Pending], bodies: &mut [Body]) {
+        for (p, body) in pending.iter().zip(bodies) {
+            if p.node.kind == K::ServiceDecl {
+                self.finish(p, mem::replace(body, Body::None));
+            }
+        }
     }
 
     /// Converts what a declaration defines with its parameters in scope.
@@ -349,10 +380,24 @@ impl Checker<'_> {
             })
             .collect();
         let module = self.env.module.clone();
+        // Body conversion has finished for every declaration. Resolve the
+        // kinds of binders retained inside aliases too, not only the alias's
+        // outer kind; an unused forall binder defaults just as in a signature.
+        let alias_body = self
+            .env
+            .type_def(&module, &p.name)
+            .and_then(|definition| match &definition.form {
+                Form::Alias { body, .. } => Some(body.clone()),
+                _ => None,
+            })
+            .map(|body| self.default_kinds(&body));
         let Some(def) = self.env.type_def_mut(&p.name) else {
             return;
         };
         def.kind = self.kinds.zonk(&def.kind, true);
+        if let (Some(completed), Form::Alias { body, .. }) = (alias_body, &mut def.form) {
+            *body = completed;
+        }
         let quantify = |body: Type| quantify(&params, body);
         match body {
             Body::None => {}

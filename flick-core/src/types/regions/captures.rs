@@ -78,7 +78,7 @@ impl Checker<'_> {
             }
             // an integer literal's type is a number, which captures nothing
             Type::Meta(m) if self.store.is_numeric(*m) => {}
-            Type::Var(_) | Type::Skolem(_) | Type::Meta(_)
+            Type::Var(_) | Type::Skolem(_) | Type::Meta(_) | Type::MetaView(_)
                 if !bounded || matches!(self.atom_kind(&t, &[]), Some(Kind::Region)) =>
             {
                 push_atom(out, &t);
@@ -214,7 +214,9 @@ impl Checker<'_> {
                 {
                     push_atom(out, &tail);
                 }
-                Type::Meta(_) if !bounded && !out.tails.contains(&tail) => out.tails.push(tail),
+                Type::Meta(_) | Type::MetaView(_) if !bounded && !out.tails.contains(&tail) => {
+                    out.tails.push(tail);
+                }
                 Type::Error if !out.tails.contains(&tail) => out.tails.push(tail),
                 _ => {}
             }
@@ -240,7 +242,9 @@ impl Checker<'_> {
         }
         for tail in norm.tails {
             match tail {
-                Type::Var(_) | Type::Skolem(_) | Type::Meta(_) if !bounded => push_atom(out, &tail),
+                Type::Var(_) | Type::Skolem(_) | Type::Meta(_) | Type::MetaView(_) if !bounded => {
+                    push_atom(out, &tail);
+                }
                 Type::Error if !out.tails.contains(&tail) => out.tails.push(tail),
                 _ => {}
             }

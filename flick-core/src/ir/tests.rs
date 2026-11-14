@@ -317,3 +317,6 @@ fn a_derived_instance_has_its_methods_written_out() {
          ((<Eq Float>.eq x0_0) y0_0))))"
     );
 }
+
+#[path = "owner_tests.rs"]
+mod owner_tests;

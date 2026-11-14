@@ -112,7 +112,7 @@ pub fn descriptor() -> Descriptor {
     Descriptor {
         identity: request().backend.identity,
         backend_api: range("0.1.0", "0.2.0"),
-        ir: range("0.11.0", "0.12.0"),
+        ir: range("0.12.0", "0.13.0"),
         language: range("0.1.0", "0.2.0"),
         runtime_abis: vec![NamedRange {
             name: "flickrt".into(),

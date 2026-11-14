@@ -113,7 +113,10 @@ impl Checker<'_> {
     pub fn grow_holds(&mut self) -> bool {
         let open_bound = |hold: &DeferredHold| {
             let bound = self.bound_of(hold);
-            bound.tails.iter().any(|t| matches!(t, Type::Meta(_)))
+            bound
+                .tails
+                .iter()
+                .any(|t| matches!(t, Type::Meta(_) | Type::MetaView(_)))
                 || self.lone_open_region(&bound).is_some()
         };
         if !self.cx.regions.holds.iter().any(open_bound) {
@@ -131,7 +134,12 @@ impl Checker<'_> {
         for i in 0..summaries.len() {
             let Summary { bound, hidden, .. } = &summaries[i];
             let region = self.lone_open_region(bound);
-            if region.is_none() && !bound.tails.iter().any(|t| matches!(t, Type::Meta(_))) {
+            if region.is_none()
+                && !bound
+                    .tails
+                    .iter()
+                    .any(|t| matches!(t, Type::Meta(_) | Type::MetaView(_)))
+            {
                 continue;
             }
             let (bound, actual) = (bound.clone(), hidden.entries.clone());
@@ -277,7 +285,7 @@ impl Checker<'_> {
                 .filter(|(label, _)| bound.get(label).is_none())
                 .map(|(_, atom)| atom)
                 // a region never solved comes from an error reported already
-                .filter(|atom| !matches!(self.store.resolve(atom), Type::Meta(_)))
+                .filter(|atom| !matches!(self.store.resolve(atom), Type::Meta(_) | Type::MetaView(_)))
                 .collect();
         if let Some(atom) = lacking.first() {
             self.report_hold(hold, atom, &bound);

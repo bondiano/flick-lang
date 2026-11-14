@@ -72,6 +72,7 @@ natives! {
     RT, "refModify", 2 => ref_modify;
     RT, "layerSucceed", 2 => layer_succeed;
     RT, "layerMerge", 2 => layer_merge;
+    RT, "layerOverride", 2 => layer_merge;
     "flick:Layer", "effect", 2 => layer_effect;
     RT, "flickTodo", 1 => todo;
     STRING, "includes", 2 => includes;

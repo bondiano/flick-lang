@@ -15,9 +15,16 @@ use crate::syntax::{Const, Head, Path, Term};
 
 impl Machine<'_> {
     /// `lookup(E, S)`: the innermost `with` that has `S`, or handler of
-    /// `S`, else `Σ₀`. One of a `provide` that ended is a use after its
-    /// release: work a region kept uses it (T4.3, `regions.md` §5.3).
-    pub(super) fn lookup(&self, s: &Path) -> Result<Option<Term>, Outcome> {
+    /// its requested operation, else `Σ₀`. A partial handler does not hide
+    /// unmentioned operations. A `with` provides the complete service and
+    /// remains a shadowing boundary, even if its record is malformed.
+    /// One of a `provide` that ended is a use after its release: work a
+    /// region kept uses it (T4.3, `regions.md` §5.3).
+    pub(super) fn lookup(
+        &self,
+        s: &Path,
+        operation: Option<&str>,
+    ) -> Result<Option<Term>, Outcome> {
         for f in self.frames.iter().rev() {
             match f {
                 Frame::With(env) | Frame::Kept(env) => {
@@ -30,6 +37,11 @@ impl Machine<'_> {
                 // a handler gives its operations, which perform
                 Frame::Handler(id, h) | Frame::KeptHandler(id, h) => {
                     if let Some(handled) = h.effects.iter().find(|e| e.effect == *s) {
+                        if operation
+                            .is_some_and(|name| !handled.ops.iter().any(|op| &*op.name == name))
+                        {
+                            continue;
+                        }
                         return Ok(Some(operations(*id, handled)));
                     }
                 }
@@ -72,19 +84,28 @@ impl Machine<'_> {
         let Some(function) = h.op(effect, op).map(|o| o.function.clone()) else {
             return Err(stuck(format!("the handler has no arm for `{effect}.{op}`")));
         };
+        // Operations run below the prompt, but C belongs to the performer,
+        // not to the handler installation context. Capturing is inert even
+        // when abort unwinds and closes a region before the arm starts.
+        let candidate = self.evidence();
+        let evidenced =
+            |body| Term::WithOwnerEvidence(Rc::new(Term::OwnerCandidate(candidate)), Rc::new(body));
         let arm = Term::apps(function, args.iter().cloned());
         Ok(match class {
             OpClass::Tail => {
                 let k = self.frames.split_off(at);
                 self.frames.push(Frame::Resume(k));
-                Control::Eval(arm)
+                Control::Eval(evidenced(arm))
             }
-            OpClass::Abort => Control::Raise(Term::Signal(Rc::new(Signal::Abort { id, arm }))),
+            OpClass::Abort => Control::Raise(Term::Signal(Rc::new(Signal::Abort {
+                id,
+                arm: evidenced(arm),
+            }))),
             OpClass::Control => {
                 let k = self.frames.split_off(at);
                 let cont = Cont(Rc::new(RefCell::new(Some(k))));
                 self.frames.push(Frame::Discontinue(id, cont.clone()));
-                Control::Eval(Term::app(arm, Term::Cont(cont)))
+                Control::Eval(evidenced(Term::app(arm, Term::Cont(cont))))
             }
         })
     }

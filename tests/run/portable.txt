@@ -19,6 +19,8 @@ codegen/bigints
 codegen/category_classes
 codegen/classes
 codegen/closures
+codegen/counted_failures
+codegen/counted_patterns
 codegen/composition
 codegen/composition_method
 codegen/deep_recursion
@@ -42,6 +44,8 @@ codegen/gadt_derive
 codegen/gadt_dicts
 codegen/handler_arms
 codegen/handlers
+codegen/partial_handlers
+codegen/prototype_operation
 codegen/generic
 codegen/given_shadow
 codegen/fusion
@@ -104,6 +108,11 @@ codegen/service_place
 codegen/scope_run
 codegen/service_child
 runtime/scope_close
+runtime/arena_scope
+runtime/arena_layer_scope
+runtime/arena_owner_list
+runtime/arena_layer_finalizers
+runtime/arena_finalizers
 codegen/release
 runtime/parallel
 runtime/scope_releases
@@ -273,3 +282,4 @@ stdlib/server/origin
 stdlib/server/server_fn
 stdlib/server/auth
 stdlib/server/node
+runtime/counted_layer_merge

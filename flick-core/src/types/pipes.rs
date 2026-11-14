@@ -127,6 +127,7 @@ enum Shape {
         result: Type,
         since: usize,
         eff: bool,
+        defer: bool,
         /// The defaults around, set aside while the argument is typed.
         outer: Option<Vec<(Type, usize)>>,
     },
@@ -172,7 +173,7 @@ impl Checker<'_> {
                 self.application_result(result, &function, &arg, false)
             }
             Type::Error => Type::Error,
-            meta @ Type::Meta(_) => {
+            meta @ (Type::Meta(_) | Type::MetaView(_)) => {
                 let result = self.fresh();
                 let _ = self.unify(&meta, &Type::pure_fun(arg, result.clone()));
                 result
@@ -285,7 +286,8 @@ impl Checker<'_> {
             } => {
                 let since = self.diagnostics.len();
                 let eff = self.eff_parts(&param).is_some();
-                let outer = if eff {
+                let defer = eff || self.arrow_stages(&param).contains(&super::Stage::Runtime);
+                let outer = if defer {
                     self.cx.regions.defaults.replace(Vec::new())
                 } else {
                     None
@@ -296,11 +298,12 @@ impl Checker<'_> {
                     result: *result,
                     since,
                     eff,
+                    defer,
                     outer,
                 }
             }
             Type::Error => Shape::Error,
-            meta @ Type::Meta(_) => {
+            meta @ (Type::Meta(_) | Type::MetaView(_)) => {
                 let (param, result) = (self.fresh(), self.fresh());
                 let function = Type::pure_fun(param.clone(), result.clone());
                 if self.unify(&meta, &function).is_ok() {
@@ -337,10 +340,11 @@ impl Checker<'_> {
                 result,
                 since,
                 eff,
+                defer,
                 outer,
             } => {
                 self.expect(argument, &param, span);
-                if eff {
+                if defer {
                     let mine = mem::replace(&mut self.cx.regions.defaults, outer);
                     defaults.extend(mine.unwrap_or_default());
                 }
@@ -366,6 +370,9 @@ impl Checker<'_> {
                 Type::Error
             }
         };
+        if !defaults.is_empty() {
+            self.grow();
+        }
         self.settle_defaults(defaults);
         self.settle_provided(provided);
         self.note_value(super::typing::range(span), &ty);

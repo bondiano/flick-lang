@@ -5,7 +5,7 @@
 
 use std::collections::BTreeSet;
 
-use crate::{Expr, ExprKind, FileId, Handler, ItemKind, Pat, Program, Span, Stmt};
+use crate::{Expr, ExprKind, FileId, Handler, ItemKind, Pat, Program, Span, Stage, Stmt};
 
 /// What is wrong with `program`, in order: a module named twice, a local
 /// used where no binder is in scope, a global of a module neither in it nor
@@ -52,6 +52,18 @@ pub fn validate(
         }
     }
     v.problems
+}
+
+/// Invocation operands must be captured before installing contextual evidence.
+fn evidence_invocation(invocation: &Expr) -> bool {
+    let evaluated = |e: &Expr| matches!(e.kind, ExprKind::Local(_) | ExprKind::Lit(_));
+    match &invocation.kind {
+        ExprKind::App {
+            func, arg, stage, ..
+        } => *stage != Stage::Pure && evaluated(func) && evaluated(arg),
+        ExprKind::Await(task) => evaluated(task),
+        _ => false,
+    }
 }
 
 struct Validator<'p> {
@@ -156,6 +168,15 @@ impl Validator<'_> {
             ExprKind::Within(name, inner) => {
                 self.used(name);
                 self.expr(inner);
+            }
+            ExprKind::WithOwnerEvidence(owner, invocation) => {
+                if !evidence_invocation(invocation) {
+                    self.problems.push(
+                        "owner evidence requires an immediate non-pure call or await with evaluated operands".into(),
+                    );
+                }
+                self.expr(owner);
+                self.expr(invocation);
             }
             ExprKind::Abstract(names, inner) => self.within(names, inner),
             ExprKind::Lambda { params, body } => {

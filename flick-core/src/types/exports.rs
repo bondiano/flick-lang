@@ -3,12 +3,14 @@
 use std::collections::HashMap;
 
 use super::Checker;
-use super::env::{Abi, Form, TypeDef};
+use super::env::{Abi, Form, ModuleSignature, TypeDef};
 use super::regions;
 use super::services::Operation;
 use super::ty::Type;
 use crate::iface::{self, Decl, Entity, Export, Interface, Namespace};
 use crate::syntax::ts_mark;
+
+mod support;
 
 impl Checker<'_> {
     /// Stores the types and kinds of this module's exports.
@@ -174,6 +176,20 @@ impl Checker<'_> {
                     .collect(),
                 effect,
             },
+            Form::ModuleContract { requirements } => {
+                // Value bodies can solve contract holes after the nominal
+                // snapshots were completed. Publish the final solutions too.
+                let mut signature = ModuleSignature::Structure { requirements };
+                signature.map_types(&mut |ty| self.exported(ty));
+                let ModuleSignature::Structure { requirements } = signature else {
+                    unreachable!()
+                };
+                Form::ModuleContract { requirements }
+            }
+            Form::ModuleSignature { mut signature } => {
+                signature.map_types(&mut |ty| self.exported(ty));
+                Form::ModuleSignature { signature }
+            }
             form => form,
         };
         d
@@ -288,7 +304,7 @@ impl Checker<'_> {
 
     /// A type as importers see it: transparent aliases expanded, so they
     /// need no alias of a module they do not import.
-    fn exported(&self, t: &Type) -> Type {
+    pub(super) fn exported(&self, t: &Type) -> Type {
         let t = self.zonk(t);
         // a use elides `Live` again from the signature (`regions/live.rs`)
         let t = if regions::has_live(&t) {

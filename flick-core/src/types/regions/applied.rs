@@ -50,7 +50,7 @@ impl Checker<'_> {
         );
         // a type variable is no use of what it stands for
         captures.entries.retain(|(_, atom)| {
-            matches!(self.store.resolve(atom), Type::Meta(_))
+            matches!(self.store.resolve(atom), Type::Meta(_) | Type::MetaView(_))
                 || matches!(
                     self.atom_kind(atom, &[]),
                     Some(Kind::Region | Kind::CaptureRow)

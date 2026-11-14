@@ -76,6 +76,11 @@ impl Lower<'_> {
         let Some((operands, operators)) = composition(node) else {
             return Expr::new(ExprKind::Lit(Lit::Unit), span);
         };
+        let entry = StageKey::Arrow {
+            node: node.range(),
+            index: 0,
+        };
+        self.register_owner_entry(entry);
         let mut stmts = Vec::new();
         let mut functions = Vec::new();
         for operand in &operands {
@@ -113,14 +118,21 @@ impl Lower<'_> {
             let dicts = self.dictionaries(key);
             value = with_dicts(self.within(key, app), dicts);
         }
-        let stage = self.typing.stages.get(&node.range()).and_then(|s| s.first());
+        let stage = self
+            .typing
+            .stages
+            .get(&node.range())
+            .and_then(|s| s.first());
         let lambda = ExprKind::Lambda {
             params: vec![Param {
                 pat: Pat::Bind(x),
                 stage: stage.copied().unwrap_or(Stage::Pure),
                 ty: (self.typing.values.get(&param_key(&operators))).and_then(type_name),
             }],
-            body: Box::new(self.adapted(result_key(&operators), value)),
+            body: Box::new({
+                let value = self.adapted(result_key(&operators), value);
+                self.owner_entry(entry, value)
+            }),
         };
         let lambda = Expr::new(lambda, span);
         if stmts.is_empty() {

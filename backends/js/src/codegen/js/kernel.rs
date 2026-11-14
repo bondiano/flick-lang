@@ -112,8 +112,7 @@ impl<'d> Gen<'_, 'd> {
         self.tail = tail;
         let thunk = self.stage_function(&[], &stmts, true);
         let error = self.temp();
-        let (handlers, ()) = self.block(|g| g.handlers(&error, arms));
-        let handler = self.lambda_of(&error, block_js(self.a, &handlers));
+        let handler = self.handlers(&error, arms);
         let tr = self.rt("trySync");
         call(self.a, tr, &[thunk, handler])
     }
@@ -188,8 +187,7 @@ impl<'d> Gen<'_, 'd> {
             self.leaf("undefined")
         } else {
             let error = self.temp();
-            let (stmts, ()) = self.block(|g| g.handlers(&error, &h.errors));
-            self.lambda_of(&error, block_js(self.a, &stmts))
+            self.handlers(&error, &h.errors)
         };
         let handle = self.rt("handle");
         let called = call(

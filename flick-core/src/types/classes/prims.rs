@@ -21,13 +21,32 @@ enum Rest {
 fn rest(row: &Row) -> Rest {
     match row.tail.as_deref() {
         None => Rest::Closed,
-        Some(Type::Meta(_)) => Rest::Unknown,
+        Some(Type::Meta(_) | Type::MetaView(_)) => Rest::Unknown,
         Some(_) => Rest::Open,
     }
 }
 
 impl Checker<'_> {
     pub(super) fn primitive(
+        &mut self,
+        c: &Type,
+        class: Lang,
+        args: &[Type],
+        givens: &Givens,
+        chain: &mut Vec<Type>,
+    ) -> Outcome {
+        match self.inference_trial(|this| {
+            match this.primitive_inner(c, class, args, givens, chain) {
+                Outcome::Solved(dict) => Ok(dict),
+                other => Err(other),
+            }
+        }) {
+            Ok(dict) => Outcome::Solved(dict),
+            Err(outcome) => outcome,
+        }
+    }
+
+    fn primitive_inner(
         &mut self,
         c: &Type,
         class: Lang,
@@ -56,7 +75,7 @@ impl Checker<'_> {
         match (class, args) {
             (Lang::HasField, [Type::Symbol(label), Type::Record(row), field]) => {
                 match row.get(label) {
-                    Some(t) if self.unify(field, t).is_ok() => solved(self),
+                    Some(t) if self.unifies(field, t) => solved(self),
                     Some(t) => refuse(format!("field `{label}` has type `{}`", self.show(t))),
                     None => elsewhere(row, format!("the record has no field `{label}`")),
                 }
@@ -96,7 +115,7 @@ impl Checker<'_> {
                 }
                 for (label, t) in &out.entries {
                     match row.get(label) {
-                        Some(field) if self.unify(t, field).is_ok() => {}
+                        Some(field) if self.unifies(t, field) => {}
                         Some(field) => {
                             let shown = self.show(field);
                             return refuse(format!("field `{label}` has type `{shown}`"));
@@ -230,7 +249,7 @@ impl Checker<'_> {
 
     /// The determined record of a primitive must be `computed`.
     fn result(&mut self, c: &Type, out: &Type, computed: &Type) -> Outcome {
-        if self.unify(out, computed).is_ok() {
+        if self.unifies(out, computed) {
             return primitive(self.show_exact(c), Vec::new());
         }
         let shown = self.show(computed);

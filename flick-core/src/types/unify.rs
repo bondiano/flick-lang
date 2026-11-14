@@ -7,7 +7,15 @@
 //! its scope.
 
 use crate::numeric::NumLang;
+use std::borrow::Cow;
 use std::collections::HashSet;
+
+use super::Checker;
+use super::env::Form;
+#[cfg(test)]
+use crate::source::Span;
+#[cfg(test)]
+use crate::types::lang::Lang;
 
 use super::elem::Elem;
 use super::kinds::Kind;
@@ -29,6 +37,12 @@ struct Skolem {
 #[derive(Debug, Default)]
 pub struct Store {
     metas: Vec<MetaState>,
+    meta_contexts: Vec<MetaContext>,
+    active_context: Context,
+    scopes: Scopes,
+    undo: Vec<Undo>,
+    transactions: Vec<u64>,
+    next_transaction: u64,
     skolems: Vec<Skolem>,
     /// The variables that stand for a capture row: an instantiated `^c`.
     capture_rows: HashSet<u32>,
@@ -61,6 +75,11 @@ pub struct Equality {
 /// Why two types do not unify, about the innermost conflicting part.
 #[derive(Debug, Clone)]
 pub enum Mismatch {
+    /// Immutable display facts captured before a failed trial is rolled back.
+    Observed {
+        reason: Box<Mismatch>,
+        views: DiagnosticViews,
+    },
     Types(Type, Type),
     /// A record or row lacks a label the other one has; `left` is the side
     /// that has it.
@@ -80,6 +99,8 @@ pub enum Mismatch {
     Untouchable(Type),
 }
 
+include!("unify/mismatch.rs");
+
 pub type Unified = Result<(), Mismatch>;
 
 fn id(n: usize) -> u32 {
@@ -88,45 +109,57 @@ fn id(n: usize) -> u32 {
 
 impl Store {
     pub fn fresh(&mut self) -> Type {
-        self.metas.push(MetaState::Open { level: self.level });
-        Type::Meta(id(self.metas.len() - 1))
+        self.allocate(self.level, self.active_context.clone(), None)
     }
 
     /// A variable for a capture row of a quantified `^c`.
     pub fn fresh_capture_row(&mut self) -> Type {
-        let row = self.fresh();
-        if let Type::Meta(m) = row {
-            self.capture_rows.insert(m);
+        let row = self.allocate(
+            self.level,
+            self.active_context.clone(),
+            Some(Kind::CaptureRow),
+        );
+        if let Some(m) = row.meta_root() {
+            self.mark(m, Mark::Capture);
         }
         row
     }
 
     /// A variable for a row of errors.
     pub fn fresh_error_row(&mut self) -> Type {
-        let row = self.fresh();
-        if let Type::Meta(m) = row {
-            self.error_rows.insert(m);
+        let row = self.allocate(
+            self.level,
+            self.active_context.clone(),
+            Some(Kind::ErrorRow),
+        );
+        if let Some(m) = row.meta_root() {
+            self.mark(m, Mark::Error);
         }
         row
     }
 
     /// A variable for a quantified variable of `kind`.
     pub fn fresh_of(&mut self, kind: &Kind) -> Type {
-        match kind {
+        let ty = match kind {
             Kind::CaptureRow => self.fresh_capture_row(),
             Kind::ErrorRow => self.fresh_error_row(),
             _ => self.fresh(),
-        }
+        };
+        let root = ty.meta_root().expect("fresh variable");
+        let mut context = self.meta_contexts[root as usize].clone();
+        context.kind = Some(kind.clone());
+        self.write_context(root, context);
+        ty
     }
 
     /// A variable that only a numeric type binds, a `Float` one when
     /// `fractional`.
     pub fn fresh_numeric(&mut self, fractional: bool) -> Type {
-        let ty = self.fresh();
-        if let Type::Meta(m) = ty {
-            self.numeric.insert(m);
+        let ty = self.allocate(self.level, self.active_context.clone(), Some(Kind::Type));
+        if let Some(m) = ty.meta_root() {
+            self.mark(m, Mark::Numeric);
             if fractional {
-                self.fractional.insert(m);
+                self.mark(m, Mark::Fractional);
             }
         }
         ty
@@ -148,9 +181,9 @@ impl Store {
         match t {
             Type::Captured { ty, .. } | Type::Bounded { ty, .. } => self.numeric_fits(m, ty),
             Type::Meta(n) => {
-                self.numeric.insert(*n);
+                self.mark(*n, Mark::Numeric);
                 if fractional {
-                    self.fractional.insert(*n);
+                    self.mark(*n, Mark::Fractional);
                 }
                 true
             }
@@ -175,19 +208,23 @@ impl Store {
     /// stands for.
     pub fn fresh_beside(&mut self, m: u32) -> Type {
         let level = self.meta_level(m).unwrap_or(self.level);
-        self.metas.push(MetaState::Open { level });
-        let rest = id(self.metas.len() - 1);
+        let ty = self.allocate(
+            level,
+            self.meta_contexts[m as usize].permitted.clone(),
+            self.meta_contexts[m as usize].kind.clone(),
+        );
+        let rest = ty.meta_root().expect("fresh variable");
         self.mark_like(rest, m);
-        Type::Meta(rest)
+        ty
     }
 
     /// Gives `to` the kind marks of `from`: a capture row or a row of errors.
     pub fn mark_like(&mut self, to: u32, from: u32) {
         if self.is_capture_row(from) {
-            self.capture_rows.insert(to);
+            self.mark(to, Mark::Capture);
         }
         if self.is_error_row(from) {
-            self.error_rows.insert(to);
+            self.mark(to, Mark::Error);
         }
     }
 
@@ -220,29 +257,82 @@ impl Store {
     }
 
     pub fn set(&mut self, m: u32, t: Type) {
-        self.metas[m as usize] = MetaState::Bound(t);
+        self.write(m, MetaState::Bound(t));
     }
 
     /// Follows bound variables at the top of `t`.
     pub fn resolve(&self, t: &Type) -> Type {
-        self.head(t).clone()
+        self.head(t).into_owned()
     }
 
-    /// [`Store::resolve`] without the copy.
-    pub fn head<'a>(&'a self, mut t: &'a Type) -> &'a Type {
+    /// The application spine with bound head variables observed. Borrowed
+    /// spines retain their original children; only a projected solution owns
+    /// new children.
+    pub(in crate::types) fn spine<'a>(
+        &'a self,
+        ty: &'a Type,
+    ) -> (Cow<'a, Type>, Vec<Cow<'a, Type>>) {
+        let mut head = self.head(ty);
+        let mut arguments = Vec::new();
         loop {
-            match t {
-                // a variable this store never made (a stored type shown by
-                // `show_type` with an empty store) is open
+            match head {
+                Cow::Borrowed(Type::App {
+                    head: function,
+                    arg,
+                }) => {
+                    arguments.push(Cow::Borrowed(arg.as_ref()));
+                    head = self.head(function);
+                }
+                Cow::Owned(Type::App {
+                    head: function,
+                    arg,
+                }) => {
+                    arguments.push(Cow::Owned(*arg));
+                    head = Cow::Owned(self.head(&function).into_owned());
+                }
+                _ => break,
+            }
+        }
+        arguments.reverse();
+        (head, arguments)
+    }
+
+    /// Observe a root without copying unchanged types. A contextual solution
+    /// is projected lazily from its canonical coordinates into this occurrence.
+    pub fn head<'a>(&'a self, t: &'a Type) -> Cow<'a, Type> {
+        let mut head = Cow::Borrowed(t);
+        loop {
+            match head.as_ref() {
+                // Types displayed with an empty store can contain foreign IDs.
+                Type::Meta(m)
+                    if self
+                        .meta_contexts
+                        .get(*m as usize)
+                        .is_some_and(|context| context.canonical.len() != 0) =>
+                {
+                    return head;
+                }
                 Type::Meta(m) => match self.metas.get(*m as usize) {
-                    Some(MetaState::Bound(next)) => t = next,
-                    Some(MetaState::Open { .. }) | None => return t,
+                    Some(MetaState::Bound(next)) => head = Cow::Borrowed(next),
+                    Some(MetaState::Open { .. }) | None => return head,
                 },
+                Type::MetaView(_) => {
+                    let Ok((root, view)) = self.occurrence(&head) else {
+                        return head;
+                    };
+                    let MetaState::Bound(solution) = &self.metas[root as usize] else {
+                        return head;
+                    };
+                    let Ok(projected) = view.transport_checked(solution) else {
+                        return head;
+                    };
+                    head = Cow::Owned(projected);
+                }
                 Type::Skolem(s) => match self.equal(*s) {
-                    Some(next) => t = next,
-                    None => return t,
+                    Some(next) => head = Cow::Borrowed(next),
+                    None => return head,
                 },
-                _ => return t,
+                _ => return head,
             }
         }
     }
@@ -271,22 +361,22 @@ impl Store {
 
     /// `t` with every bound variable replaced by its solution.
     pub fn zonk(&self, t: &Type) -> Type {
+        let head = self.head(t);
+        let t = head.as_ref();
         match t {
-            Type::Meta(m) => match &self.metas[*m as usize] {
-                MetaState::Bound(next) => self.zonk(next),
-                MetaState::Open { .. } => t.clone(),
-            },
-            Type::Skolem(s) => match self.equal(*s) {
-                Some(next) => self.zonk(next),
-                None => t.clone(),
-            },
-            Type::Con { .. } | Type::Var(_) | Type::Symbol(_) | Type::Error => t.clone(),
+            Type::Meta(_)
+            | Type::MetaView(_)
+            | Type::Skolem(_)
+            | Type::Con { .. }
+            | Type::Var(_)
+            | Type::Symbol(_)
+            | Type::Error => t.clone(),
             Type::Union(a, b) => self
                 .normalize(&Type::Union(Box::new(self.zonk(a)), Box::new(self.zonk(b))))
                 .into_type(),
             Type::Without { row, gone } => {
                 let row = Box::new(self.zonk(row));
-                let gone = gone.clone();
+                let gone = gone.iter().map(|label| self.zonk_label(label)).collect();
                 self.normalize(&Type::Without { row, gone }).into_type()
             }
             Type::Record(row) | Type::Row(row) => {
@@ -321,7 +411,7 @@ impl Store {
             .iter()
             .map(|(l, t)| {
                 let t = self.zonk(t);
-                (relabel(l, &t), t)
+                (relabel(&self.zonk_label(l), &t), t)
             })
             .collect();
         let mut tail = row.tail.as_ref().map(|t| self.zonk(t));
@@ -338,6 +428,23 @@ impl Store {
         }
     }
 
+    /// Semantic atoms in omission/provided labels follow their root as well.
+    /// Named field keys and frozen literals are never interpreted as variables.
+    pub(in crate::types) fn zonk_label(&self, label: &Elem) -> Elem {
+        use super::elem::Atom;
+        let atom = match label {
+            Elem::Provided(inner) => return Elem::Provided(Box::new(self.zonk_label(inner))),
+            Elem::Capture(atom) | Elem::Error(atom) | Elem::Service(atom) => atom,
+            Elem::Named(_) | Elem::Live => return label.clone(),
+        };
+        let ty = match atom {
+            Atom::Meta(root) => Type::Meta(*root),
+            Atom::MetaView(meta) => Type::MetaView(meta.clone()),
+            Atom::Var(_) | Atom::Skolem(_) => return label.clone(),
+        };
+        relabel(label, &self.resolve(&ty))
+    }
+
     /// A row as its labelled entries and the row variables it extends:
     /// `{A | r} + {B | s}` is `A, B` and `r, s`. Repeated labels and tails
     /// count once.
@@ -351,25 +458,34 @@ impl Store {
     }
 
     fn collect_row(&self, t: &Type, out: &mut Norm) {
-        match self.resolve(t) {
+        Self::collect_row_with(t, out, &|ty| self.resolve(ty), true);
+    }
+
+    fn collect_row_with(
+        t: &Type,
+        out: &mut Norm,
+        resolve: &impl Fn(&Type) -> Type,
+        semantic: bool,
+    ) {
+        match resolve(t) {
             Type::Row(row) => {
                 out.entries.extend(row.entries.into_iter().map(|(l, t)| {
-                    let t = self.resolve(&t);
-                    (relabel(&l, &t), t)
+                    let t = resolve(&t);
+                    (if semantic { relabel(&l, &t) } else { l }, t)
                 }));
                 if let Some(tail) = row.tail {
-                    self.collect_row(&tail, out);
+                    Self::collect_row_with(&tail, out, resolve, semantic);
                 }
             }
             Type::Union(a, b) => {
-                self.collect_row(&a, out);
-                self.collect_row(&b, out);
+                Self::collect_row_with(&a, out, resolve, semantic);
+                Self::collect_row_with(&b, out, resolve, semantic);
             }
             // a known row loses the elements; what is still a variable keeps
             // the names to lose
             Type::Without { row, gone } => {
                 let mut inner = Norm::default();
-                self.collect_row(&row, &mut inner);
+                Self::collect_row_with(&row, &mut inner, resolve, semantic);
                 let kept = (inner.entries.into_iter()).filter(|(label, _)| !gone.contains(label));
                 out.entries.extend(kept);
                 for tail in inner.tails {
@@ -403,8 +519,10 @@ impl Store {
             return Err(s);
         }
         for m in lower {
-            if let MetaState::Open { level: l } = &mut self.metas[m as usize] {
-                *l = (*l).min(level);
+            if let MetaState::Open { level: previous } = self.metas[m as usize]
+                && level < previous
+            {
+                self.write(m, MetaState::Open { level });
             }
         }
         Ok(())
@@ -446,10 +564,21 @@ fn relabel(label: &Elem, t: &Type) -> Elem {
         Elem::Capture(_) => super::ty::capture_label(t),
         Elem::Error(_) => super::ty::error_label(t),
         Elem::Service(_) => super::ty::service_label(t),
-        Elem::Named(_) | Elem::Live | Elem::Provided(_) => None,
+        Elem::Provided(inner) => Some(Elem::Provided(Box::new(relabel(inner, t)))),
+        Elem::Named(_) | Elem::Live => None,
     };
     current.unwrap_or_else(|| label.clone())
 }
 
 mod compare;
 mod instances;
+
+#[cfg(test)]
+#[path = "unify/spine_tests.rs"]
+mod spine_tests;
+
+include!("unify/transactions.rs");
+
+include!("unify/context.rs");
+
+include!("unify/read.rs");

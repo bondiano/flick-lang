@@ -8,7 +8,8 @@ import "sync"
 // (docs/formal/runtime.md §3.3): admission of children ends, the hooks
 // run, children are interrupted and each one awaited, supervisors
 // included, the foreign calls end, and only then the finalizers run, last
-// first, each seeing how the body ended; their failures join the body's.
+// first, each seeing how the body ended; arena storage is retired after
+// every finalizer, and their failures join the body's.
 type Owner struct {
 	mu   sync.Mutex
 	open bool // admits children; finalizers are admitted until `finalizing`
@@ -24,6 +25,10 @@ type Owner struct {
 	trace      int64    // its id in the trace; 0 when it is not traced (trace.go)
 	fins       int64    // the finalizers added through Flick so far, for the trace
 	calls      []int64  // the trace ids of `pending`, when traced
+
+	// Arena storage is not on the ordinary LIFO finalizer stack.
+	arenas       []*arena
+	arenasClosed bool
 }
 
 // defects collects failures of supervisors: the root's fail the program,
@@ -256,6 +261,7 @@ func (o *Owner) closeFinalizers(fb *Fiber, exit *Cause) (cause *Cause) {
 	for i := len(finalizers) - 1; i >= 0; i-- {
 		released = concat(released, finalizers[i].call(fb, exit))
 	}
+	o.closeArenas()
 	o.tracePhase("C6")
 	return Sequential(cause, released)
 }
@@ -307,7 +313,10 @@ func Scope(fb *Fiber, body func(fb *Fiber, owner, outer Value) Value) Value {
 
 // ScopeRun is `Scope.run f`, which `scope s { body }` stands for.
 func ScopeRun(fb *Fiber, f Value) Value {
-	return Scope(fb, func(inner *Fiber, owner, _ Value) Value { return Run(inner, Apply(inner, f, owner)) })
+	return Scope(fb, func(inner *Fiber, owner, _ Value) Value {
+		inner = WithOwnerEvidence(inner, owner)
+		return Run(inner, Apply(inner, f, owner))
+	})
 }
 
 // ScopeCurrent is `Scope.current ()`: the owner around, which a nested

@@ -55,13 +55,20 @@ impl Checker<'_> {
         order.push(i);
     }
 
-    /// A cycle of transparent aliases is reported by name resolution; its
-    /// members become nominal here, so expanding them terminates.
+    /// Source alias cycles are reported by resolution. Generated service
+    /// implementation aliases are known only here, so report their cycles
+    /// here too. Cyclic members become nominal to keep error recovery finite.
     fn break_alias_cycles(&mut self, pending: &[Pending]) {
         let module = self.env.module.clone();
-        let aliases: Vec<&str> = pending
+        let aliases: Vec<String> = pending
             .iter()
-            .map(|p| p.name.as_str())
+            .map(|p| p.name.clone())
+            .chain(
+                pending
+                    .iter()
+                    .filter(|p| p.node.kind == K::ServiceDecl)
+                    .map(|p| format!("{}.Impl", p.name)),
+            )
             .filter(|name| {
                 matches!(
                     self.env.type_def(&module, name).map(|d| &d.form),
@@ -89,14 +96,55 @@ impl Checker<'_> {
                 out
             })
             .collect();
+        self.report_implementation_cycles(pending, &aliases, &edges);
         let cyclic: Vec<String> = (0..aliases.len())
             .filter(|&i| resolve::shortest_cycle(i, &edges).is_some())
-            .map(|i| aliases[i].to_owned())
+            .map(|i| aliases[i].clone())
             .collect();
         for name in cyclic {
             if let Some(def) = self.env.type_def_mut(&name) {
                 def.form = Form::NOMINAL;
             }
+        }
+    }
+
+    fn report_implementation_cycles(
+        &mut self,
+        pending: &[Pending],
+        aliases: &[String],
+        edges: &[Vec<usize>],
+    ) {
+        let mut reported = vec![false; aliases.len()];
+        for p in pending.iter().filter(|p| p.node.kind == K::ServiceDecl) {
+            let name = format!("{}.Impl", p.name);
+            let Some(at) = aliases.iter().position(|alias| *alias == name) else {
+                continue;
+            };
+            if reported[at] {
+                continue;
+            }
+            let Some(cycle) = resolve::shortest_cycle(at, edges) else {
+                continue;
+            };
+            for &member in &cycle {
+                reported[member] = true;
+            }
+            let chain = cycle
+                .iter()
+                .chain([&at])
+                .map(|&i| aliases[i].as_str())
+                .collect::<Vec<_>>()
+                .join(" -> ");
+            let span = p
+                .node
+                .child_tokens()
+                .find(|token| token.kind == K::Con)
+                .map_or_else(|| self.span(p.node), |token| self.token_span(token));
+            self.error(
+                codes::R007,
+                span,
+                format!("service implementation type `{name}` is cyclic: {chain}"),
+            );
         }
     }
 

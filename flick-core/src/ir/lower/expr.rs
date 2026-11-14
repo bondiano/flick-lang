@@ -10,8 +10,8 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::types::handle::{arm_pattern, failed_pattern, operation_path};
 use crate::types::lang::{self, Lang};
 use crate::types::{
-    Dict, Identity, Range, Ref, applied_order, children, composed_key, composition, is_pattern,
-    let_parts, param_key, result_key, right_application,
+    Dict, Identity, Owner, Range, Ref, StageKey, applied_order, children, composed_key,
+    composition, is_pattern, let_parts, param_key, result_key, right_application,
 };
 
 impl Lower<'_> {
@@ -188,22 +188,17 @@ impl Lower<'_> {
     fn scope_expr(&mut self, node: &Node, body: &Node, span: Span) -> Expr {
         let mark = self.scope.len();
         let key = node.range();
-        let uses = |outside| {
-            self.typing
-                .owners
-                .values()
-                .any(|o| o.scope == key && o.outside == outside)
-        };
-        let (inner, outside) = (uses(false), uses(true));
+        let inner = self.typing.uses_owner(Owner::Scope(key));
         let owner = match node.child_tokens().find(|t| t.kind == K::Ident) {
             Some(name) => Some(self.bind(name.text(self.text), name.start)),
             None => inner.then(|| self.hidden("$owner")),
         };
-        let outer = outside.then(|| self.hidden("$outer"));
-        self.owners.insert(key, (owner.clone(), outer.clone()));
+        if let Some(owner) = &owner {
+            self.owners.insert(key, owner.clone());
+        }
         let body = self.expr(body);
         self.scope.truncate(mark);
-        Self::scope_run(owner, outer, body, span)
+        Self::scope_run(owner, None, body, span)
     }
 
     fn expr_kind(&mut self, node: &Node) -> Expr {
@@ -286,7 +281,12 @@ impl Lower<'_> {
                     errors: self.arms(node),
                 }))
             }
-            K::TaskExpr => ExprKind::Task(self.boxed(children[0])),
+            K::TaskExpr => {
+                let key = StageKey::Task { node: node.range() };
+                self.register_owner_entry(key);
+                let body = self.expr(children[0]);
+                ExprKind::Task(Box::new(self.owner_entry(key, body)))
+            }
             K::DoExpr => return self.do_expr(node),
             K::ScopeExpr => return self.scope_expr(node, children[0], span),
             K::ProvideExpr => self.layer_run(children[0], children[1], span),
@@ -455,17 +455,13 @@ impl Lower<'_> {
         }
     }
 
-    fn within(&self, key: Range, call: Expr) -> Expr {
+    fn within(&mut self, key: Range, call: Expr) -> Expr {
         let Some(owner) = self.typing.owners.get(&key) else {
             return call;
         };
-        let names = &self.owners[&owner.scope];
-        let name = if owner.outside { &names.1 } else { &names.0 };
-        let name = name
-            .clone()
-            .expect("the scope binds the owner a call needs");
+        let name = self.owner_name(*owner);
         let span = call.span;
-        Expr::new(ExprKind::Within(name, Box::new(call)), span)
+        self.evidence_call(Expr::new(ExprKind::Local(name), span), call)
     }
 }
 

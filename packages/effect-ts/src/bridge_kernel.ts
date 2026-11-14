@@ -1,3 +1,4 @@
+import { OwnerEvidenceContext } from "./owner_evidence.ts";
 // The bridge between the kernel and Effect. Effect's Context travels on
 // the kernel's evidence (`Ctx.host`); the kernel's evidence travels in Effect's
 // Context under `KERNEL`. A crossing that ends at once takes no suspension.
@@ -19,14 +20,14 @@ import {
 } from "effect";
 import type { StackFrame } from "effect/References";
 
-import { FlickFiber as HostFlickFiber } from "./owner.ts";
+import { ownerHooks as hostOwnerHooks, Owner as HostOwner, FlickFiber as HostFlickFiber } from "./owner.ts";
 import { syncContext, syncIn } from "./sync.ts";
 import { type Cause, type Exit, Raise, dieReason, failReason, failed, fromReasons, interruptReason, raise, succeeded } from "@flick-lang/runtime/rt/cause";
-import { type Ctx, type Fiber, type Run, Suspend, awaitFiber, currentCtx, currentFiber, fiberHooks, forkNow, hosted, inCtx, owned, asExit, exitOf, raiseOf, runIn } from "@flick-lang/runtime/rt/fiber";
+import { type Ctx, type Fiber, type Run, Suspend, awaitFiber, currentCtx, currentFiber, fiberHooks, forkNow, hosted, evidenced, inCtx, owned, asExit, exitOf, raiseOf, runIn } from "@flick-lang/runtime/rt/fiber";
 import { Duration } from "@flick-lang/runtime/rt/duration";
 import { streamHooks } from "@flick-lang/runtime/rt/ui/stream_hook";
 
-import { FlickFiber as NativeFlickFiber, Owner, close } from "@flick-lang/runtime/rt/owner";
+import { FlickFiber as NativeFlickFiber, Owner, close, inside, ownerHooks } from "@flick-lang/runtime/rt/owner";
 
 import { durationHooks } from "@flick-lang/runtime/rt/duration";
 import { Schedule as NativeSchedule, outOf } from "@flick-lang/runtime/rt/effect/Schedule";
@@ -39,7 +40,7 @@ import { dataFromEffect, dataToEffect, installDataBridge } from "./bridge_data.t
 import { installLayerBridge } from "./bridge_layer.ts";
 import { installSchemaBridge } from "./bridge_schema.ts";
 import { bridgeKernel } from "./bridge_runtime.ts";
-import { KERNEL, hostOf, settled } from "./bridge_host.ts";
+import { KERNEL, hostOf, hostOwnerOf, settled } from "./bridge_host.ts";
 
 
 type EffectFiber = EFiber.Fiber<unknown, unknown>;
@@ -321,7 +322,7 @@ const callKernel = (call: () => unknown, scoped: boolean): Effect.Effect<unknown
       const fiber: Fiber = forkNow(() => {
         nativeIdentities.set(currentFiber(), effectIdentities.get(ef) ?? ef.id);
         return call();
-      }, hosted(active, context), Reflect.get(ef, "interruptible") === false ? 1 : 0);
+      }, evidenced(hosted(active, context), Context.get(context, OwnerEvidenceContext)), Reflect.get(ef, "interruptible") === false ? 1 : 0);
       if (fiber.exit !== undefined) return exitOut(fiber.exit);
       return Effect.callback<unknown, unknown>((resume) => {
         fiber.observe((exit) => resume(exitOut(exit)));
@@ -340,7 +341,7 @@ export const callEffect = (call: () => unknown): Effect.Effect<unknown, unknown>
 export const callSync = (call: () => unknown): unknown => {
   const context = syncContext();
   const base = Context.getOrUndefined(context, KERNEL) ?? ROOT_CTX;
-  return inCtx(hosted(base, context), () => runIn(call()));
+  return inCtx(evidenced(hosted(base, context), Context.get(context, OwnerEvidenceContext)), () => runIn(call()));
 };
 
 /** A Sync stage of Effect's side that Flick calls: the services it reads are those of the evidence. */
@@ -373,6 +374,16 @@ bridgeKernel.fromEffect = fromEffect;
 bridgeKernel.callEffect = callEffect;
 bridgeKernel.causeFromEffect = causeFromEffect;
 bridgeKernel.causeToEffect = causeToEffect;
+  hostOwnerHooks.activate = (owner) => {
+    if (!(owner instanceof Owner)) throw new TypeError("not a native owner");
+    if (owner.closed) throw new Error("arena owner is closed");
+    return hostOwnerOf(owner);
+  };
+  ownerHooks.within = (owner, call) => {
+    if (!(owner instanceof HostOwner)) throw new TypeError("not an Effect owner");
+    return fromEffect(Effect.flatMap(ownerOfScope(owner.resources, currentCtx()), (active) =>
+      callEffect(() => inside(active, call))));
+  };
   installDataBridge();
   installLayerBridge();
   installSchemaBridge();

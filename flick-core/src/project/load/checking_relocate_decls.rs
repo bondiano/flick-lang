@@ -6,7 +6,11 @@ fn relocate_declarations(
     parent: &str,
     local: &str,
 ) -> Interface {
-    let to = Relocation { child, parent, local };
+    let to = Relocation {
+        child,
+        parent,
+        local,
+    };
     let mut exports = interface.exports.clone();
     let mut instances: Vec<_> = (interface.instances.iter())
         .filter(|i| i.module == child)
@@ -24,7 +28,17 @@ fn relocate_declarations(
         declarations_as_json(interface, &to),
         "the walk moves what the JSON form of the declarations moved"
     );
-    let mut declarations = Interface { exports, instances, ..Interface::default() };
+    let mut support_types = interface.support_types.clone();
+    for support in &mut support_types {
+        to.entity(&mut support.entity);
+        to.definition(&mut support.definition);
+    }
+    let mut declarations = Interface {
+        exports,
+        support_types,
+        instances,
+        ..Interface::default()
+    };
     // Model method lookup uses the method's field name, while the runtime
     // value in the merged file has a prefixed symbol.
     let method_names: HashSet<String> = interface
@@ -58,6 +72,30 @@ fn relocate_declarations(
 /// The declarations' half of [`Relocation`]: every name of the child in an
 /// export or instance, its types, definitions and module signatures.
 impl Relocation<'_> {
+    /// Parent declarations keep their own entity/member names, but references
+    /// to the inline child's types use the same identities as its flattened IR.
+    fn declaration_references(&self, declarations: &mut Interface) {
+        for export in &mut declarations.exports {
+            if let Some(scheme) = &mut export.scheme {
+                self.ty(scheme);
+            }
+            if let Some(definition) = &mut export.definition {
+                self.definition_view(definition, false);
+            }
+        }
+        for support in &mut declarations.support_types {
+            self.entity(&mut support.entity);
+            self.definition_view(&mut support.definition, false);
+        }
+        for instance in &mut declarations.instances {
+            self.binders(&mut instance.vars);
+            for ty in &mut instance.context {
+                self.ty(ty);
+            }
+            self.ty(&mut instance.head);
+        }
+    }
+
     fn export(&self, export: &mut resolve::Export) {
         self.name(&mut export.entity.module, &mut export.entity.name);
         if let Some(parent) = &mut export.parent {
@@ -133,7 +171,7 @@ impl Relocation<'_> {
                 }
                 self.ty(body);
             }
-            T::Var(_) | T::Symbol(_) | T::Meta(_) | T::Skolem(_) | T::Error => {}
+            T::Var(_) | T::Symbol(_) | T::Meta(_) | T::MetaView(_) | T::Skolem(_) | T::Error => {}
         }
     }
 
@@ -170,7 +208,7 @@ impl Relocation<'_> {
             | K::Region
             | K::Constraint
             | K::Service
-            | K::Meta(_) => {}
+            | K::Meta(_) | K::MetaView(_) => {}
         }
     }
 
@@ -185,17 +223,23 @@ impl Relocation<'_> {
     }
 
     fn definition(&self, definition: &mut types::TypeDef) {
+        self.definition_view(definition, true);
+    }
+
+    fn definition_view(&self, definition: &mut types::TypeDef, members: bool) {
         use types::Form as F;
         self.kind(&mut definition.kind);
         match &mut definition.form {
             F::Adt { constructors, .. } => {
-                for constructor in constructors {
-                    *constructor = format!("{}${constructor}", self.local);
+                if members {
+                    for constructor in constructors {
+                        *constructor = format!("{}${constructor}", self.local);
+                    }
                 }
             }
             F::Alias { body, .. } => self.ty(body),
-            F::ModuleContract { requirements } => self.requirements(requirements),
-            F::ModuleSignature { signature } => self.signature(signature),
+            F::ModuleContract { requirements } => self.requirements(requirements, members),
+            F::ModuleSignature { signature } => self.signature(signature, members),
             F::Service { operations, .. } => {
                 for operation in operations {
                     self.ty(&mut operation.ty);
@@ -206,7 +250,10 @@ impl Relocation<'_> {
                 default_sigs,
                 ..
             } => {
-                for ty in supers.iter_mut().chain(default_sigs.iter_mut().map(|(_, t)| t)) {
+                for ty in supers
+                    .iter_mut()
+                    .chain(default_sigs.iter_mut().map(|(_, t)| t))
+                {
                     self.ty(ty);
                 }
             }
@@ -214,19 +261,21 @@ impl Relocation<'_> {
         }
     }
 
-    fn signature(&self, signature: &mut types::ModuleSignature) {
+    fn signature(&self, signature: &mut types::ModuleSignature, members: bool) {
         match signature {
-            types::ModuleSignature::Structure { requirements } => self.requirements(requirements),
+            types::ModuleSignature::Structure { requirements } => {
+                self.requirements(requirements, members);
+            }
             types::ModuleSignature::Parameterized {
                 parameter, result, ..
             } => {
-                self.signature(parameter);
-                self.signature(result);
+                self.signature(parameter, members);
+                self.signature(result, members);
             }
         }
     }
 
-    fn requirements(&self, requirements: &mut [types::ModuleRequirement]) {
+    fn requirements(&self, requirements: &mut [types::ModuleRequirement], members: bool) {
         use types::ModuleRequirement as R;
         for requirement in requirements {
             match requirement {
@@ -235,12 +284,15 @@ impl Relocation<'_> {
                     definition,
                     ..
                 } => {
+                    let moved = identity
+                        .as_ref()
+                        .is_some_and(|entity| entity.module == self.child);
                     if let Some(identity) = identity {
                         self.entity(identity);
                     }
-                    self.definition(definition);
+                    self.definition_view(definition, members || moved);
                 }
-                R::Module { signature, .. } => self.signature(signature),
+                R::Module { signature, .. } => self.signature(signature, members),
                 R::Type {
                     params, manifest, ..
                 } => {
@@ -256,11 +308,14 @@ impl Relocation<'_> {
                     methods,
                     ..
                 } => {
+                    let moved = identity
+                        .as_ref()
+                        .is_some_and(|entity| entity.module == self.child);
                     if let Some(identity) = identity {
                         self.entity(identity);
                     }
                     if let Some(definition) = definition {
-                        self.definition(definition);
+                        self.definition_view(definition, members || moved);
                     }
                     for (_, ty) in methods {
                         self.ty(ty);
@@ -281,8 +336,8 @@ fn declarations_as_json(
 ) -> (Vec<resolve::Export>, Vec<types::Instance>) {
     let mut own = interface.clone();
     own.instances.retain(|i| i.module == to.child);
-    let mut value = serde_json::to_value((&own.exports, &own.instances))
-        .expect("declarations serialize");
+    let mut value =
+        serde_json::to_value((&own.exports, &own.instances)).expect("declarations serialize");
     relocate_decl_value(&mut value, to.child, to.parent, to.local);
     serde_json::from_value(value).expect("declarations keep their shape")
 }
@@ -323,5 +378,90 @@ fn relocate_decl_value(value: &mut serde_json::Value, child: &str, parent: &str,
             }
         }
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod declaration_reference_tests {
+    use super::*;
+    use crate::iface::Decl;
+    use crate::types::{Abi, Form, Kind, Type, TypeDef};
+
+    fn export(name: &str, namespace: Namespace, decl: Decl) -> resolve::Export {
+        resolve::Export {
+            entity: resolve::Entity {
+                module: "Parent".into(),
+                namespace,
+                name: name.into(),
+            },
+            decl,
+            parent: None,
+            scheme: None,
+            definition: None,
+            blocked: None,
+            at: None,
+        }
+    }
+
+    #[test]
+    fn parent_reference_relocation_keeps_owned_names_and_is_idempotent() {
+        let mut constructor = export("Own", Namespace::Constructor, Decl::Constructor);
+        constructor.parent = Some("Own".into());
+        constructor.scheme = Some(Type::con("Parent.Child", "Box"));
+        let mut own = export("Own", Namespace::Type, Decl::Adt);
+        own.definition = Some(TypeDef {
+            kind: Kind::Type,
+            form: Form::Adt {
+                constructors: vec!["Own".into()],
+                abi: Abi::Tagged,
+            },
+        });
+        let mut alias = export("Alias", Namespace::Type, Decl::Alias);
+        alias.definition = Some(TypeDef {
+            kind: Kind::Type,
+            form: Form::Alias {
+                params: vec![],
+                body: Type::con("Parent.Child", "Box"),
+                opaque: false,
+            },
+        });
+        let published = Interface {
+            exports: vec![constructor, own, alias],
+            ..Interface::default()
+        };
+        let mut runtime = published.clone();
+        let to = Relocation {
+            child: "Parent.Child",
+            parent: "Parent",
+            local: "Child",
+        };
+        to.declaration_references(&mut runtime);
+        for (before, after) in published.exports.iter().zip(&runtime.exports) {
+            assert_eq!(before.entity, after.entity);
+            assert_eq!(before.parent, after.parent);
+        }
+        assert_eq!(
+            runtime.exports[0].scheme,
+            Some(Type::con("Parent", "Child$Box"))
+        );
+        assert_eq!(
+            runtime.exports[1].definition,
+            published.exports[1].definition
+        );
+        let Some(TypeDef {
+            form: Form::Alias { body, .. },
+            ..
+        }) = &runtime.exports[2].definition
+        else {
+            panic!("alias")
+        };
+        assert_eq!(*body, Type::con("Parent", "Child$Box"));
+        let once = runtime.clone();
+        to.declaration_references(&mut runtime);
+        assert_eq!(runtime, once);
+        assert_eq!(
+            published.exports[0].scheme,
+            Some(Type::con("Parent.Child", "Box"))
+        );
     }
 }

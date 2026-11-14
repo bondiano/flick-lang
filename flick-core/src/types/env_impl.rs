@@ -1,88 +1,6 @@
+include!("env_impl/static_lexical.rs");
+
 impl<'b> Env<'b> {
-    /// A checked lexical prefix retains its defining entities, including
-    /// private members. Only the temporary static-expression environment
-    /// opens it; the enclosing module is still checked independently.
-    pub(super) fn static_lexical(&mut self, interface: &Interface) -> StaticLexical {
-        let mut saved = StaticLexical {
-            names: Vec::new(),
-            instances: self.instances.len(),
-        };
-        learn_exports(
-            &mut self.types,
-            &mut self.values,
-            &mut self.parents,
-            interface,
-        );
-        for instance in &interface.instances {
-            if !self
-                .builtins
-                .seen
-                .contains(&(instance.module.clone(), instance.name.clone()))
-                && !self
-                    .instances
-                    .iter()
-                    .any(|known| known.module == instance.module && known.name == instance.name)
-            {
-                self.instances.push(instance.clone());
-            }
-        }
-        for export in &interface.exports {
-            debug_assert_eq!(export.entity.module, self.module);
-            let key = (export.entity.namespace, export.entity.name.clone());
-            let ambiguous = self.ambiguous.remove(&key);
-            let previous = self.scope.insert(key.clone(), export.entity.clone());
-            saved.names.push((key, previous, ambiguous));
-        }
-        saved
-    }
-
-    pub(super) fn restore_static_lexical(&mut self, interface: &Interface, saved: StaticLexical) {
-        for export in &interface.exports {
-            let entity = &export.entity;
-            self.types
-                .remove(&entity.module, &entity.name);
-            self.types
-                .remove(&entity.module, &format!("{}.Impl", entity.name));
-            self.values.remove(entity);
-            self.parents.remove(entity);
-        }
-        self.instances.truncate(saved.instances);
-        for (key, previous, ambiguous) in saved.names {
-            if let Some(previous) = previous {
-                self.scope.insert(key.clone(), previous);
-            } else {
-                self.scope.remove(&key);
-            }
-            if ambiguous {
-                self.ambiguous.insert(key);
-            }
-        }
-    }
-
-    pub(super) fn static_known(&self, name: &str) -> Option<Interface> {
-        self.interfaces
-            .get(name)
-            .and_then(Option::as_ref)
-            .or_else(|| self.builtins.interfaces.get(name))
-            .cloned()
-    }
-    pub(super) fn static_parameter(&mut self, alias: &str, interface: Interface) {
-        // A symbolic result was unresolved during name resolution. Once its
-        // checked view is installed, this checker owns missing-member errors.
-        if self
-            .qualified_module(alias)
-            .is_none_or(|(_, i)| i.is_none())
-            || interface.module.starts_with("$module:")
-        {
-            self.imported.remove(alias);
-        }
-        // Several aliases may expose different signatures of one module.
-        // Keep their namespace views separate from its nominal identity.
-        let view = format!("$static:{}:{alias}", self.module);
-        self.qualifiers.insert(alias.to_owned(), view.clone());
-        self.learn(&interface);
-        self.interfaces.insert(view, Some(interface));
-    }
     /// The environment of `module` before its own declarations are added.
     pub fn new(
         module: &str,
@@ -106,44 +24,56 @@ impl<'b> Env<'b> {
             open_unknown: false,
             lost_unknown: false,
             instances: Vec::new(),
+            support_errors: Vec::new(),
+            support_authorities: HashSet::new(),
+            support_roles: HashMap::new(),
+            witness_manifest_aliases: HashSet::new(),
         };
+        for interface in builtins.interfaces.values() {
+            env.record_support_authorities(interface);
+        }
         for import in &syntax.imports {
             let interface = imported(&import.module);
             env.qualifiers
                 .insert(import.qualifier().to_owned(), import.module.clone());
             env.imported.insert(import.qualifier().to_owned());
-            if let Some(i) = &interface {
-                env.learn(i);
+            if let Some(i) = &interface
+                && let Err(error) = env.learn(i)
+            {
+                env.support_errors.push(error);
             }
             env.interfaces.insert(import.module.clone(), interface);
         }
         // A public value can carry `Module Sig` or `exists K : Sig. T` while
         // the consumer imports only that value's module. Learn the contract's
         // definition for opening it without bringing its names into scope.
-        let mut contracts = HashSet::new();
-        for interface in env.interfaces.values().flatten() {
-            for export in &interface.exports {
-                if let Some(scheme) = &export.scheme {
-                    scheme.visit(&mut |part| {
-                        let contract = match part {
-                            Type::Exists { contract, .. } => Some(contract.as_ref()),
-                            Type::App { head, arg }
-                                if matches!(head.as_ref(), Type::Con { module, name } if module == "Prelude" && name == "Module") => Some(arg.as_ref()),
-                            _ => None,
-                        };
-                        if let Some(Type::Con { module, .. }) = contract {
-                            contracts.insert(module.clone());
-                        }
-                    });
-                }
-            }
-        }
-        for contract_module in contracts {
-            if !env.interfaces.contains_key(&contract_module)
-                && let Some(interface) = imported(&contract_module)
+        let mut pending: Vec<_> = env
+            .interfaces
+            .values()
+            .flatten()
+            .flat_map(iface_support::dependencies)
+            .map(|e| e.module)
+            .collect();
+        let mut visited = HashSet::new();
+        while let Some(owner) = pending.pop() {
+            if !visited.insert(owner.clone())
+                || env.is_builtin(&owner)
+                || env.interfaces.contains_key(&owner)
             {
-                env.learn(&interface);
-                env.interfaces.insert(contract_module, Some(interface));
+                continue;
+            }
+            if let Some(interface) = imported(&owner) {
+                if let Err(error) = env.learn_type_support(&interface) {
+                    env.support_errors.push(error);
+                }
+                pending.extend(
+                    iface_support::dependencies(&interface)
+                        .into_iter()
+                        .map(|e| e.module),
+                );
+                // This is semantic authority only: do not add a qualifier,
+                // source name, value or instance from the discovered module.
+                env.interfaces.insert(owner, Some(interface));
             }
         }
         env.open_imports(syntax);
@@ -206,9 +136,17 @@ impl<'b> Env<'b> {
     }
 
     /// Records the types and instances an interface carries.
-    fn learn(&mut self, interface: &Interface) {
+    fn learn(&mut self, interface: &Interface) -> Result<(), String> {
+        self.learn_type_support(interface)?;
+        self.learn_public(interface);
+        Ok(())
+    }
+
+    // The complete semantic tree has already passed validation before any
+    // source names, values or instances are installed.
+    fn learn_public(&mut self, interface: &Interface) {
         for child in interface.modules.values() {
-            self.learn(child);
+            self.learn_public(child);
         }
         for instance in &interface.instances {
             let known = |i: &Instance| i.module == instance.module && i.name == instance.name;

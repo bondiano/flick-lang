@@ -65,8 +65,11 @@ pub fn named_again(e: &mut Expr) -> bool {
             place(guard, &mut reads);
         }
         place(&mut arm.body, &mut reads);
-        arm.pat = Pat::Wild;
-        changed = true;
+        if arm.body.uses(name) == 0 && arm.guard.as_ref().is_none_or(|guard| guard.uses(name) == 0)
+        {
+            arm.pat = Pat::Wild;
+            changed = true;
+        }
     }
     changed
 }

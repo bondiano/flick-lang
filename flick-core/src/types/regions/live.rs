@@ -104,14 +104,15 @@ impl Checker<'_> {
         let mut all = Norm::default();
         self.capture_row(captures, &mut all);
         let region = |t: &Type| {
-            matches!(self.store.resolve(t), Type::Meta(_))
+            matches!(self.store.resolve(t), Type::Meta(_) | Type::MetaView(_))
                 || matches!(
                     self.atom_kind(t, kinds),
                     Some(Kind::Region | Kind::CaptureRow)
                 )
         };
         all.entries.retain(|(_, t)| region(t));
-        all.tails.retain(|t| matches!(t, Type::Meta(_)));
+        all.tails
+            .retain(|t| matches!(t, Type::Meta(_) | Type::MetaView(_)));
         all
     }
 

@@ -94,4 +94,25 @@ fn an_inline_module_moves_into_its_parent_as_the_json_form_of_the_ir_moved() {
         analysis.diagnostics
     );
     assert_eq!(analysis.compilation.modules.len(), 1);
+    let compiled = &analysis.compilation.modules[0];
+    let head = |interface: &Interface| {
+        let scheme = interface
+            .exports
+            .iter()
+            .find(|export| export.entity.name == "label")
+            .and_then(|export| export.scheme.as_ref())
+            .expect("parent class-constrained declaration");
+        let types::Type::Forall { constraints, .. } = scheme else {
+            panic!("forall")
+        };
+        constraints[0].spine().0.clone()
+    };
+    assert_eq!(
+        head(&compiled.interface),
+        types::Type::con("App.Parent.Child", "Named")
+    );
+    assert_eq!(
+        head(&compiled.declarations),
+        types::Type::con("App.Parent", "Child$Named")
+    );
 }

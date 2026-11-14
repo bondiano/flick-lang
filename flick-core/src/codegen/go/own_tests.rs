@@ -1,6 +1,62 @@
 //! The Go of constructors of the program's own types.
 
-use super::tests::build;
+use super::tests::{app, build};
+
+#[test]
+fn a_nullary_constructor_stores_its_evidence_instead_of_instantiating_data() {
+    let go = app(r"module App exposing (main)
+
+class Gate a =
+  allow : a -> Bool
+
+instance Gate Int =
+  let allow value = value > 0
+
+type Flag =
+  | Gate Int => Flag : Flag
+  | Gate Int => OtherFlag : Flag
+
+equal : Flag -> Flag -> Bool
+let equal left right = left == right
+
+main : Unit ->{; AppError} Unit
+let main () = Platform.stdout_line (show (equal Flag OtherFlag))
+");
+    // Evidence is part of the constructor's storage, not a request to
+    // instantiate an already constructed (and non-callable) data value.
+    assert!(!go.contains("flickrt.Inst("), "{go}");
+    assert!(!go.contains("flickrt.Nullary(\"Flag#"), "{go}");
+    assert!(go.contains("flickrt.NewData(\"Flag#"), "{go}");
+    assert_eq!(go.matches("I_App__Gate_x20_Int)").count(), 2, "{go}");
+}
+
+#[test]
+fn a_constructor_given_as_a_function_captures_its_evidence() {
+    let go = app(r"module App exposing (main)
+
+class Gate a =
+  allow : a -> Bool
+
+instance Gate Int =
+  let allow value = value > 0
+
+type Box = Gate a => Box a : Box
+
+constructor : Unit -> (Int -> Box)
+let constructor () = Box
+
+allowed : Box -> Bool
+let allowed box =
+  match box with
+  | Box value -> allow value
+
+main : Unit ->{; AppError} Unit
+let main () = Platform.stdout_line (show (allowed (constructor () 1)))
+");
+    assert!(!go.contains("flickrt.Inst("), "{go}");
+    assert!(go.contains("flickrt.NewData(\"Box#"), "{go}");
+    assert!(go.contains(", t1, I_App__Gate_x20_Int)"), "{go}");
+}
 
 #[test]
 fn a_constructor_with_fields_of_the_program_has_a_go_type_of_its_own() {
@@ -96,4 +152,38 @@ fn a_record_under_a_constructor_lies_in_its_value() {
     assert!(go.contains("flickrt.FieldAt(l_box, 1)"), "{go}");
     // any other record is copied in
     assert!(go.contains("Of_T_App__Box(l_r)"), "{go}");
+}
+
+#[test]
+fn generic_owner_transport_keeps_the_default_fiber_owner() {
+    let go = app(
+        "module App exposing (main, forward)\nforward : (Unit ->{r} a) ->{r} a\nlet forward body = body ()\nmain : Unit ->{} Unit\nlet main () = forward (fun () -> ())\n",
+    );
+    assert!(go.contains("flickrt.ReadOwnerEvidence("), "{go}");
+    assert!(go.contains("flickrt.WithOwnerEvidence("), "{go}");
+    assert!(
+        !go.contains("flickrt.Within("),
+        "compiled forwarding transports only inert evidence: {go}"
+    );
+}
+
+#[test]
+fn wildcard_tailrec_carry_is_a_valid_go_local() {
+    let go = app(
+        "module App exposing (spin, main)\nspin : Unit -> Unit\nlet rec spin () = spin ()\nmain : Unit -> Unit\nlet main () = spin ()\n",
+    );
+    let variable = go
+        .lines()
+        .find_map(|line| {
+            let line = line.trim();
+            let declaration = line.strip_prefix("var ")?;
+            declaration
+                .contains("flickrt.Value = t")
+                .then(|| declaration.split_whitespace().next().expect("loop carry"))
+        })
+        .expect("wildcard loop-carried temporary");
+    assert!(
+        go.contains(&format!("_ = {variable}")),
+        "an ignored loop parameter still declares a Go local: {go}"
+    );
 }

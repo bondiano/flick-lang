@@ -182,3 +182,8 @@ import Formal.LiveVariance
 import Formal.Axioms
 
 import Formal.LocalControl
+import Formal.Memory
+import Formal.MemoryPass
+import Formal.MemoryInsert
+import Formal.MemoryArena
+import Formal.MemoryScopes

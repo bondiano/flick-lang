@@ -42,7 +42,7 @@ impl Checker<'_> {
                 if self.hidden_fields(&ty, &mut Vec::new()) {
                     let value = matches!(
                         self.whnf(&ty).spine().0,
-                        Type::Var(_) | Type::Meta(_) | Type::Skolem(_)
+                        Type::Var(_) | Type::Meta(_) | Type::MetaView(_) | Type::Skolem(_)
                     );
                     Type::Captured {
                         ty,
@@ -99,7 +99,8 @@ impl Checker<'_> {
     fn hidden_fields(&self, t: &Type, seen: &mut Vec<(String, String)>) -> bool {
         let unfold = self.enter_alias(t, seen);
         if matches!(unfold, Unfold::Again) {
-            let (_, args) = self.store.head(t).spine();
+            let observed = self.store.head(t);
+            let (_, args) = observed.spine();
             return args.iter().any(|a| self.hidden_fields(a, seen));
         }
         let hidden = self.hidden_unfolded(t, seen);
@@ -216,7 +217,7 @@ impl Checker<'_> {
         matches!(bare, Type::Fun { .. })
             || bare.contains(&mut |ty| match ty {
                 Type::Var(_) | Type::Skolem(_) => !self.is_region(ty, &[]),
-                Type::Meta(_) => true,
+                Type::Meta(_) | Type::MetaView(_) => true,
                 _ => false,
             })
     }
@@ -261,6 +262,15 @@ impl Checker<'_> {
         Some(self.held_fits(fits, mark, actual, expected, span))
     }
 
+    fn inferred_bound_capture(&self, allowed: &Norm, captures: &Type) -> bool {
+        let held = self.store.normalize(captures);
+        let open = |ty: &Type| matches!(self.store.resolve(ty), Type::Meta(_) | Type::MetaView(_));
+        !allowed.tails.is_empty()
+            && allowed.tails.iter().all(open)
+            && held.entries.iter().all(|(_, ty)| open(ty))
+            && held.tails.iter().all(open)
+    }
+
     fn subsume_bound_at(&mut self, actual: &Type, expected: &Type, span: Span) -> Option<Unified> {
         let a = self.bound_head(actual);
         let e = self.bound_head(expected);
@@ -276,7 +286,10 @@ impl Checker<'_> {
                     visible: Visible::Late((*ty).clone()),
                     bound: *captures.clone(),
                     expected: Some(expected.clone()),
-                    written: !matches!(self.store.resolve(&captures), Type::Meta(_)),
+                    written: !matches!(
+                        self.store.resolve(&captures),
+                        Type::Meta(_) | Type::MetaView(_)
+                    ),
                     what: "value",
                     span,
                 });
@@ -288,14 +301,6 @@ impl Checker<'_> {
             // alone gives what the value reaches (§2.1), a qualifier not
             // inferred yet says nothing either when the bound expected is
             // not inferred yet: the holds above grow it by the value (`docs/formal/regions.md#a-cell-created-empty-accepts-a-resource-of-its-scope`)
-            let inferred = |checker: &Self, captures: &Type| {
-                let held = checker.store.normalize(captures);
-                let open = |t: &Type| matches!(checker.store.resolve(t), Type::Meta(_));
-                !allowed.tails.is_empty()
-                    && allowed.tails.iter().all(open)
-                    && held.entries.iter().all(|(_, t)| open(t))
-                    && held.tails.iter().all(open)
-            };
             let mut inner = self.qualified_head(actual);
             while let Type::Bounded { ty, .. } = inner {
                 inner = self.qualified_head(&ty);
@@ -324,7 +329,7 @@ impl Checker<'_> {
                     },
                 ) if !matches!(self.whnf(&ty), Type::Fun { .. })
                     && matches!(self.qualified_head(actual), Type::Bounded { .. })
-                    && inferred(self, &captures) =>
+                    && self.inferred_bound_capture(&allowed, &captures) =>
                 {
                     self.capture_identity(&ty)
                 }
@@ -385,7 +390,7 @@ impl Checker<'_> {
         }
         if matches!(
             *self.borrowed_whnf(t),
-            Type::Var(_) | Type::Meta(_) | Type::Skolem(_)
+            Type::Var(_) | Type::Meta(_) | Type::MetaView(_) | Type::Skolem(_)
         ) {
             return false;
         }
@@ -478,7 +483,12 @@ impl Checker<'_> {
             }
             other => other.clone(),
         };
-        if complete || matches!(ty, Type::Var(_) | Type::Skolem(_) | Type::Meta(_)) {
+        if complete
+            || matches!(
+                ty,
+                Type::Var(_) | Type::Skolem(_) | Type::Meta(_) | Type::MetaView(_)
+            )
+        {
             Type::Bounded {
                 ty: Box::new(ty),
                 captures: Box::new(captures.clone()),

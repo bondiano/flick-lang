@@ -3,7 +3,7 @@
 // finalizers. Closing it is a fixed sequence of phases: admission ends (C0),
 // hooks run (C1), children are asked to stop (C2) and each is awaited with its
 // supervisor (C3), foreign calls settle (C4), finalizers run, last added first
-// (C5), and the causes join (C6).
+// (C5), arena storage is retired, and the causes join (C6).
 import {
   type Cause,
   type Exit,
@@ -22,6 +22,7 @@ import {
 } from "./cause.ts";
 import {
   type Ctx,
+  type OwnerEvidence,
   type Fiber,
   type Run,
   Suspend,
@@ -30,6 +31,8 @@ import {
   atMask,
   awaitFiber,
   currentCtx,
+  evidenced,
+  withOwnerEvidence,
   currentFiber,
   exitOf,
   fork,
@@ -40,6 +43,7 @@ import {
 } from "./fiber.ts";
 import { traceEvent, traceId, tracing } from "./trace.ts";
 import { Failure } from "./outcome.ts";
+import { Arena } from "../core/Arena.ts";
 
 /** A finalizer: the evidence it was added with, what it runs, and its place in the trace. */
 interface Finalizer {
@@ -53,6 +57,26 @@ const reported: Array<Cause> = [];
 export const reportedDefects = (): ReadonlyArray<Cause> => reported;
 
 export class Owner {
+  /** Backing storage stays live until every ordinary finalizer has ended. */
+  readonly #arenas: Array<Arena> = [];
+  #arenasClosed = false;
+
+  /** Retirement is checked only when activating, never while transporting evidence. */
+  get closed(): boolean { return this.#arenasClosed; }
+
+  makeArena(): Arena {
+    if (this.#arenasClosed) throw new Error("arena owner is closed");
+    const arena = new Arena();
+    this.#arenas.push(arena);
+    return arena;
+  }
+
+  closeArenas(): void {
+    this.#arenasClosed = true;
+    for (const arena of this.#arenas) arena.close();
+    this.#arenas.length = 0;
+  }
+
   /** C0 not yet: it admits children. */
   open = true;
   readonly children = new Set<Fiber>();
@@ -170,6 +194,7 @@ function* closeSteps(owner: Owner, exit: Exit): Run {
     const ended = asExit(yield exitOf(() => runFinalizer(finalizer, owner, exit)));
     if (ended.cause !== undefined) released = concat(released, ended.cause);
   }
+  owner.closeArenas();
   owner.phase("C6");
   cause = combine(cause, released);
   return cause.reasons.length === 0 ? succeeded(undefined) : failed(cause);
@@ -231,7 +256,7 @@ export function* ownedExits(body: (owner: Owner) => unknown): Run {
   try {
     const owner = new Owner([]);
     const ctx = owned(currentCtx(), owner);
-    const exit = asExit(yield exitOf(() => atMask(depth, () => new Under(ctx, () => body(owner)))));
+    const exit = asExit(yield exitOf(() => atMask(depth, () => new Under(evidenced(ctx, owner), () => body(owner)))));
     const cleanup = asExit(yield close(owner, succeeded(undefined)));
     return new OwnedExits(exit, cleanup, owner.defects);
   } finally {
@@ -240,13 +265,26 @@ export function* ownedExits(body: (owner: Owner) => unknown): Run {
 }
 
 /** `Scope.run f`, which `scope s { body }` stands for. */
-export const scopeRun = (f: (owner: Owner) => unknown): Run => withOwner((owner) => f(owner), "scope");
+export const scopeRun = (f: (owner: Owner) => unknown): Run => withOwner((owner) => withOwnerEvidence(owner, () => f(owner)), "scope");
 
 /** `Scope.current ()`: the owner around, which a nested `scope` may acquire into. */
 export const scopeCurrent = (): Owner | undefined => currentCtx().owner;
 
-/** A call that acquires into the owner of a region the compiler chose: an outer `scope`'s. */
-export const within = (owner: Owner, call: () => unknown): Under => inside(owner, call);
+/** `Arena.make ()`: allocation belongs to the compiler-selected owner. */
+export const arenaMake = (): Arena => {
+  const owner = currentCtx().owner;
+  if (owner === undefined) throw new Error("arena requires a scope owner");
+  return owner.makeArena();
+};
+
+/** Optional conversion at RAW activation only; evidence transport never calls it. */
+export const ownerHooks: { within?: (owner: object, call: () => unknown) => unknown } = {};
+/** A raw call acquiring into the compiler-selected lexical owner. */
+export const within = (owner: OwnerEvidence, call: () => unknown): unknown => {
+  if (owner instanceof Owner) return inside(owner, call);
+  if (owner !== undefined && ownerHooks.within !== undefined) return ownerHooks.within(owner, call);
+  throw new Error("owner evidence is absent or belongs to another runtime");
+};
 
 /**
  * A finalizer on the stack of `owner`, or run at once when its finalizers have
@@ -336,7 +374,7 @@ const spawnChild = (owner: Owner, supervisor: (failure: Failure) => unknown, tas
     if (traced) traceEvent({ e: "refuse", o: owner.trace });
     throw new Error("the owner is closing: it admits no new children");
   }
-  const ctx = owned(currentCtx(), owner);
+  const ctx = evidenced(owned(currentCtx(), owner), owner);
   const child = fork(task, ctx);
   owner.children.add(child);
   const id = traced ? traceId() : 0;

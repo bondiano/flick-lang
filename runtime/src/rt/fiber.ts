@@ -8,25 +8,31 @@
 // The driver checks for interruption before every step, so a step of the driver
 // is an interruption point; a plain function called between two is not.
 import { type Cause, Exit, Raise, causeOf, raise, concat, failed, fromReasons, interrupt, isFail, sameReason, succeeded } from "./cause.ts";
-import { env } from "./host.ts";
+import { stressing } from "./fiber-stress.ts";
 import type { Owner } from "./owner.ts";
 
-/** The evidence: an immutable list of what is in effect, innermost first, with the owner there. */
+/** An inert lexical owner identity, never an acquisition or liveness check. */
+export type OwnerEvidence = object | undefined;
+
+/** Immutable services and independent default and lexical owner channels. */
 export class Ctx {
   readonly tag: object | null;
   readonly impl: unknown;
   readonly next: Ctx | null;
   readonly owner: Owner | undefined;
+  /** Inert lexical candidate, independent of work/cancellation ownership. */
+  readonly stageOwner: OwnerEvidence;
   /** Context supplied by the Effect adapter, when a crossing provides one. */
   readonly host: unknown;
   /** Effect Context derived from this evidence, cached for later crossings. */
   bridged: unknown = undefined;
-  constructor(tag: object | null, impl: unknown, next: Ctx | null, owner: Owner | undefined, host: unknown = next?.host) {
+  constructor(tag: object | null, impl: unknown, next: Ctx | null, owner: Owner | undefined, host: unknown = next?.host, ...evidence: [] | [OwnerEvidence]) {
     this.tag = tag;
     this.impl = impl;
     this.next = next;
     this.owner = owner;
     this.host = host;
+    this.stageOwner = evidence.length === 0 ? next?.stageOwner : evidence[0];
   }
 }
 
@@ -70,6 +76,14 @@ export const owned = (ctx: Ctx, owner: Owner | undefined): Ctx => new Ctx(null, 
 /** The evidence `ctx` with a host Context from the Effect adapter. */
 export const hosted = (ctx: Ctx, host: unknown): Ctx => new Ctx(null, undefined, ctx, ctx.owner, host);
 
+/** Replace only lexical evidence, including explicit absence. */
+export const evidenced = (ctx: Ctx, owner: OwnerEvidence): Ctx => new Ctx(null, undefined, ctx, ctx.owner, ctx.host, owner);
+
+export const readOwnerEvidence = (): OwnerEvidence => currentCtx().stageOwner;
+
+export const withOwnerEvidence = (owner: OwnerEvidence, thunk: () => unknown): Under =>
+  new Under(evidenced(currentCtx(), owner), thunk);
+
 /** Calls `f` with `ctx` as the evidence. */
 export const inCtx = <A>(ctx: Ctx, f: () => A): A => {
   const saved = context;
@@ -100,27 +114,6 @@ export abstract class Instruction {
 const NEXT = 0;
 const THROW = 1;
 
-/** A generator of numbers in [0, 1) from a seed (mulberry32). */
-const seeded = (seed: number): (() => number) => {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296;
-  };
-};
-
-/**
- * Stress (`just stress`): with FLICK_STRESS set to a seed, each round of tasks
- * is shuffled and fibers give their turn at random, so that runs take
- * interleavings a plain run never does. The same seed gives the same choices.
- */
-const stressing = (): (() => number) | undefined => {
-  const seed = env("FLICK_STRESS");
-  return seed === undefined || seed === "" ? undefined : seeded(Number(seed) || 1);
-};
 const stress = /*#__PURE__*/ stressing();
 
 /** A frame: the generator, the evidence it runs with, the frame it returns to. */

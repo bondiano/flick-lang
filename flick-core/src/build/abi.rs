@@ -276,6 +276,8 @@ impl Totality<'_> {
                     })
             }
             ExprKind::Dicts(..)
+            | ExprKind::ReadOwnerEvidence
+            | ExprKind::WithOwnerEvidence(..)
             | ExprKind::Await(_)
             | ExprKind::Within(..)
             | ExprKind::Handle(_)

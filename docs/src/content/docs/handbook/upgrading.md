@@ -40,6 +40,7 @@ change needs.
 | [`Scope.current` is not exposed](#scopecurrent-is-not-exposed) | no | `FLICK-T001` |
 | [Work a region keeps holds no `control` effect](#work-a-region-keeps-holds-no-control-effect) | no | `FLICK-E017` |
 | [The IR has no `Try`, `Provide`, `Scope` or `Operation`](#the-ir-has-no-try-provide-scope-or-operation) | no | — |
+| [The IR carries lexical owner evidence](#the-ir-carries-lexical-owner-evidence) | no | — |
 | [Instances belong to one package](#instances-belong-to-one-package) | no | `FLICK-C006` |
 | [Plugins reach only what is granted](#plugins-reach-only-what-is-granted) | no | `FLICK-P038`, `FLICK-P039` |
 | [`LogLevel` is an enum](#loglevel-is-an-enum) | no | `FLICK-T001` |
@@ -598,3 +599,26 @@ call supplies when the last stage is Sync, else `null`. `reexports` holds what i
 writes the module's `export … from` lines and the wrappers of its Sync exports
 from them. A plugin with `hooks = ["ir"]` gives the exports back as it got
 them; changed ones are `FLICK-P047`.
+
+
+## The IR carries lexical owner evidence
+
+Typed IR `0.12.0` adds `ReadOwnerEvidence` and `WithOwnerEvidence`. A read
+observes inert lexical evidence at execution; it must not be hoisted across
+an invocation or task. `WithOwnerEvidence` changes that evidence for an
+immediate runtime application or await, and restores it on every exit. Its
+invocation operands are immutable locals or literals, already evaluated
+outside the node in source order. Unit means absent evidence, not a root
+owner. This does not change the default owner for work or cancellation, or
+the ordinary argument counts of functions and tasks.
+
+Backends and IR plugins must preserve these nodes instead of turning them
+into an ordinary `Within`: transporting evidence neither validates nor
+reopens a region. Actual owner use still performs the lifetime check.
+`Foreign.source_name`, when present, records the original declaration name
+of a compiler-generated foreign shim; its host module/export binding remains
+unchanged. Rebuild cached interfaces: the compiler now reads `.iface` schema
+26 and rejects older schemas, including 24 and 25. Schema 26 stores required
+non-public type definitions separately from the public export namespace; it
+does not make those names importable. The separate experimental memory IR is not a new
+field of the serialized typed program.

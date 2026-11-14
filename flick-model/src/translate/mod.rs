@@ -162,7 +162,8 @@ impl Tr {
             }
             ItemKind::Foreign(f) => {
                 let path = self.path(&f.name);
-                globals.insert(path.clone(), foreign(path, f));
+                let source = self.path(f.source_name.as_deref().unwrap_or(&f.name));
+                globals.insert(path, foreign(source, f));
             }
             ItemKind::Instance { info, methods } => {
                 let path = instance(&info.module, &info.name);
@@ -261,6 +262,35 @@ fn dict(d: &Dict) -> Term {
 fn foreign(path: Path, f: &ir::Foreign) -> Term {
     let arity = f.dicts + f.stages.len();
     let module = f.binding.from.as_deref().unwrap_or("global");
+    // Keep the internal default-owner primitive operational even when it
+    // is reached through an alias instead of the direct @lang call path.
+    if module == "flick:rt" && f.binding.name == "scopeCurrent" {
+        return Term::lam("_", Term::DefaultOwner);
+    }
+    if module == "flick:rt" && f.binding.name == "layerRun" {
+        return Term::lam(
+            "$layer",
+            Term::lam(
+                "$body",
+                Term::Provide(
+                    Rc::new(Term::Var("$layer".into())),
+                    Rc::new(Term::app(Term::Var("$body".into()), Term::unit())),
+                ),
+            ),
+        );
+    }
+    if module == "flick:rt" && f.binding.name == "scopeRun" {
+        return Term::lam(
+            "$body",
+            Term::Scope(
+                "$scope".into(),
+                Rc::new(Term::app(
+                    Term::Var("$body".into()),
+                    Term::Var("$scope".into()),
+                )),
+            ),
+        );
+    }
     let core = match (module, f.binding.name.as_str()) {
         ("flick:rt", "refMake") => Some(Const::RefMake),
         ("flick:rt", "refGet") => Some(Const::RefGet),
@@ -281,9 +311,20 @@ fn foreign(path: Path, f: &ir::Foreign) -> Term {
                 )
                 .into(),
             ),
-            None => Term::Stuck(
-                format!("no native for `{}` ({module} {})", f.name, f.binding.name).into(),
-            ),
+            None => {
+                let name = f.source_name.as_deref().unwrap_or(&f.name);
+                let unsupported = Term::Stuck(
+                    format!("no native for `{name}` ({module} {})", f.binding.name).into(),
+                );
+                // Lookup of a callable does not invoke its host. Stop only
+                // once its dictionaries and actual host-call arguments arrive;
+                // later source arrows describe the unknown returned value.
+                // A data constant (no stages) still fails at lookup.
+                lams(
+                    (0..f.dicts + f.taken()).map(|i| Name::from(format!("$foreign{i}"))),
+                    unsupported,
+                )
+            }
         },
     }
 }
@@ -296,7 +337,61 @@ fn region_op(module: &str, export: &str) -> Option<RegionOp> {
         ("./res.mjs", "close") => RegionOp::Release,
         ("flick:rt", "fiberSpawn") => RegionOp::Spawn,
         ("flick:rt", "acquireRelease") => RegionOp::AcquireRelease,
+        ("flick:rt", "arenaMake") => RegionOp::ArenaMake,
+        ("flick:rt", "arenaAlloc") => RegionOp::ArenaAlloc,
+        ("flick:rt", "arenaGet") => RegionOp::ArenaGet,
         ("flick:Scope", "flickAddFinalizer") => RegionOp::AddFinalizer,
         _ => return None,
     })
+}
+
+#[cfg(test)]
+mod foreign_staging_tests {
+    use crate::eval::{Machine, Outcome, Program};
+    use crate::syntax::{Path, Term};
+    use flick_core::ir::{Adapter, Binding, Foreign, ForeignMode};
+
+    #[test]
+    fn unsupported_foreign_waits_for_dictionaries_and_host_arguments_only() {
+        for mode in [
+            ForeignMode::Pure,
+            ForeignMode::Sync,
+            ForeignMode::Async,
+            ForeignMode::Effect,
+        ] {
+            for (stages, arity, dicts) in [
+                (vec![], 0, 0),
+                (vec![true], 0, 0),
+                (vec![false, true], 1, 1),
+            ] {
+                let foreign = Foreign {
+                    name: "$raw_source".to_owned(),
+                    source_name: Some("source".to_owned()),
+                    mode,
+                    binding: Binding {
+                        from: Some("./unknown.mjs".to_owned()),
+                        name: "hostExport".to_owned(),
+                    },
+                    stages,
+                    dicts,
+                    arity,
+                    adapter: Adapter::default(),
+                    catch: None,
+                };
+                let mut term = super::foreign(Path::new("Probe", "$raw_source"), &foreign);
+                let program = Program::default();
+                let arguments = foreign.dicts + foreign.taken();
+                for _ in 0..arguments {
+                    assert!(matches!(
+                        Machine::new(&program, 100).run(term.clone()),
+                        Outcome::Value(Term::Lam(..))
+                    ));
+                    term = Term::app(term, Term::unit());
+                }
+                assert!(
+                    matches!(Machine::new(&program, 100).run(term), Outcome::Stuck(message) if message == "no native for `source` (./unknown.mjs hostExport)")
+                );
+            }
+        }
+    }
 }

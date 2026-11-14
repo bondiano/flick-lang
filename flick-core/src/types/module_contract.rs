@@ -1,10 +1,11 @@
 //! Structural matching of a named module against `type module` requirements.
 
 use super::env::{Form, ModuleNominalKind, ModuleRequirement, TypeDef};
-use super::ty::Type;
+use super::ty::{Scope, Type};
+use super::{Elem, Kind};
 use crate::api_diff;
 use crate::diagnostics::codes;
-use crate::iface::{Decl, Export, Interface, Namespace};
+use crate::iface::{Decl, Export, Interface, Namespace, support};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
@@ -15,34 +16,14 @@ pub(super) struct Opened {
     pub values: Vec<(String, Type)>,
 }
 
-type OpenedRequirements = (
-    Vec<(String, Type)>,
-    Vec<(String, Type, super::Kind)>,
-    Vec<(String, Type)>,
-);
+mod actual;
 
-fn open_existential_type(ty: &Type, binder: &str, witness: &str) -> Type {
-    if let Type::Con { module, name } = ty
-        && module == &format!("$exists:{binder}")
-    {
-        return Type::con(witness, name);
-    }
-    if matches!(ty, Type::Exists { binder: inner, .. } if inner == binder) {
-        return ty.clone();
-    }
-    ty.map_children(&mut |child| open_existential_type(child, binder, witness))
-}
+pub(in crate::types) mod kinded;
 
-fn close_existential_type(ty: &Type, witness: &str, binder: &str) -> Type {
-    if let Type::Con { module, name } = ty
-        && module == witness
-    {
-        return Type::con(&format!("$exists:{binder}"), name);
-    }
-    ty.map_children(&mut |child| close_existential_type(child, witness, binder))
-}
+include!("module_contract/scope.rs");
 
 include!("module_contract/checker.rs");
+include!("module_contract/witness.rs");
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Mismatch {
@@ -326,6 +307,8 @@ pub(crate) fn project(contract: &TypeDef, actual: &Interface) -> Interface {
     let mut projected = Interface {
         module: actual.module.clone(),
         private: actual.private,
+        member_of: actual.member_of.clone(),
+        support_types: actual.support_types.clone(),
         ..Interface::default()
     };
     let subst: Vec<(String, Type)> = requirements
@@ -403,6 +386,7 @@ pub(crate) fn project(contract: &TypeDef, actual: &Interface) -> Interface {
         .map(|(tag, marked)| (tag.clone(), marked.iter().filter(kept).cloned().collect()))
         .collect();
     projected.targets.clone_from(&actual.targets);
+    support::prune(&mut projected);
     projected
 }
 
@@ -490,3 +474,8 @@ fn find_type<'a>(actual: &'a Interface, module: &str, name: &str) -> Option<&'a 
 
 #[cfg(test)]
 mod tests;
+
+pub(in crate::types) mod context;
+
+mod named;
+pub(in crate::types) use named::{NamedWitnesses, WitnessRefresh, WitnessRegistration};

@@ -170,11 +170,11 @@ func FiberSpawn(fb *Fiber, owner, supervisor, task Value) Value {
 	}
 	o.watchers.Add(1)
 	watcher := *fb
-	watcher.state, watcher.owner = newState(), o
+	watcher.state, watcher.owner, watcher.candidate = newState(), o, o
 	watcher.state.mask = 1
 	var c *child
 	traced := tracing && o.trace != 0
-	c = fork(fb, o, task, func(c *child) {
+	c = fork(WithOwnerEvidence(fb, o), o, task, func(c *child) {
 		defer o.watchers.Done()
 		o.mu.Lock()
 		if traced {

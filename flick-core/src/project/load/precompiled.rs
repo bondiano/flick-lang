@@ -24,6 +24,8 @@ use super::{Compiled, Loader, Mode};
 use super::{Loaded, Root, Virtual, module_path};
 #[cfg(feature = "native-project")]
 use crate::diagnostics::{Diagnostic, Severity, codes};
+#[cfg(feature = "native-project")]
+use crate::iface::IFACE_VERSION;
 use crate::ir;
 #[cfg(feature = "native-project")]
 use crate::project::Project;
@@ -213,6 +215,10 @@ fn key_of(
     keys.insert(name.to_owned(), None);
     let &(dir, library) = libraries.get(name)?;
     let mut key = Key::default();
+    // Hosts may reuse their salt across compiler builds. Embedded IR semantics
+    // and interface layout must invalidate saved modules independently of it.
+    key.add("iface-version", IFACE_VERSION.to_le_bytes());
+    key.add("ir-version", flick_ir::VERSION);
     key.add("salt", cache.salt);
     key.add("config", config);
     key.add("name", name);

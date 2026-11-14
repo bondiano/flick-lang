@@ -30,7 +30,7 @@ func EventsListen(fb *Fiber, owner, policy, supervisor, handler Value) Value {
 	o := owner.(*Owner)
 	l.fail = func(c *Cause) {
 		supervising := *fb
-		supervising.state, supervising.owner = newState(), o
+		supervising.state, supervising.owner, supervising.candidate = newState(), o, o
 		if _, failed := catch(func() Value { return Run(&supervising, Apply(&supervising, supervisor, failureOf(c))) }); failed != nil {
 			o.report(failed)
 		}

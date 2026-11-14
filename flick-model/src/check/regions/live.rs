@@ -182,10 +182,22 @@ impl Checker<'_> {
         match t {
             Type::Fun(p, s, r) => {
                 let p = go(p, &none);
-                // A bound on an opaque type variable is no use of the
-                // regions it permits. A concrete type or a callable's own
-                // qualifier still exposes its actual Live requirements.
-                let (shown, _) = self.reach_bounded(&p);
+                // Nested bounds do not create actual Live requirements, but
+                // a signature's own parameter capacity is its conservative
+                // allowance, as Core's parameter_captures reads it. Peel only
+                // outer qualifiers: a nested forall's capacity stays bound.
+                let (mut shown, _) = self.reach_bounded(&p);
+                let mut parameter = &p;
+                let mut capacity = Caps::default();
+                while let Type::Captured(inner, captures) | Type::Bounded(inner, captures) =
+                    parameter
+                {
+                    capacity = capacity.union(captures);
+                    parameter = inner;
+                }
+                if !capacity.is_empty() && !self.holds_nothing(parameter) {
+                    shown = shown.union(&capacity);
+                }
                 let held = held.union(&self.shown(&shown, regions, bound));
                 let s = match s {
                     Stage::Runtime(row, e) => Stage::Runtime(add_live(row, &held), e.clone()),

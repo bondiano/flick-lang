@@ -5,6 +5,8 @@ import { test } from "node:test";
 
 import {
   type OpInstall,
+  Under,
+  extend,
   Raise,
   raise,
   type Run,
@@ -21,6 +23,7 @@ import {
   runIn,
   scopeRun,
   service,
+  serving,
   signalOf,
   tryWith,
   trySync,
@@ -318,4 +321,276 @@ test("a handler inside a stage that runs at once works: its control arm too", ()
   assert.equal(value, 2);
   const exit = runIn(exitOf(() => handle([], () => 3, undefined, undefined)));
   assert.equal(asExit(exit).value, 3);
+});
+
+test("deferred guards suspend, continue on false, and run after body cleanup", async () => {
+  const events: Array<string> = [];
+  const exit = await root(() => tryWith(
+    () => scopeRun(function* (): Run {
+      addFinalizer(() => events.push("closed"));
+      return raise(fail("body"));
+    }),
+    (_error, unhandled) => function* (): Run {
+      events.push("guard one");
+      yield sleep(1);
+      const first = false;
+      if (first) return "wrong";
+      events.push("guard two");
+      yield sleep(1);
+      const second = true;
+      if (second) {
+        events.push("selected");
+        return "handled";
+      }
+      return unhandled();
+    },
+  ));
+  assert.equal(exit.value, "handled");
+  assert.deepEqual(events, ["closed", "guard one", "guard two", "selected"]);
+});
+
+test("a suspended guard failure reaches only the outer try", async () => {
+  const events: Array<string> = [];
+  const exit = await root(() => tryWith(
+    () => tryWith(
+      () => raise(fail("body")),
+      () => function* (): Run {
+        events.push("guard");
+        yield sleep(1);
+        return raise(fail("guard"));
+      },
+    ),
+    (error) => () => {
+      events.push(`outer ${String(error)}`);
+      return "outer";
+    },
+  ));
+  assert.equal(exit.value, "outer");
+  assert.deepEqual(events, ["guard", "outer guard"]);
+});
+
+test("deferred no-match selection rethrows the exact original cause", async () => {
+  const original = { reasons: [...fail("body").reasons, ...fail("other").reasons] };
+  const exit = await root(() => tryWith(
+    () => raise(original),
+    (_error, unhandled) => function* (): Run {
+      yield sleep(1);
+      return unhandled();
+    },
+  ));
+  assert.equal(exit.cause, original);
+});
+
+test("a recovery miss is distinct from a guard or selected body raising the same payload", async () => {
+  const first = { _tag: "First" };
+  const second = { _tag: "Second" };
+  const original = { reasons: [...fail(first).reasons, ...fail(second).reasons] };
+  await Promise.all((["miss", "guard raises", "body raises", "hit"] as const).map(async (mode) => {
+    const events: Array<string> = [];
+    const guardFailure = fail(first);
+    const exit = await root(() => tryWith(
+      () => raise(original),
+      (error, unhandled) => {
+        assert.equal(error, first, "only the first failure is selected");
+        events.push("first");
+        return function* (): Run {
+          events.push("guard");
+          yield sleep(1);
+          if (mode === "miss") return unhandled();
+          if (mode === "guard raises") return raise(guardFailure);
+          const selected = (): unknown => {
+            events.push("body");
+            return mode === "body raises" ? raise(fail(error)) : "hit";
+          };
+          return selected();
+        };
+      },
+    ));
+    assert.deepEqual(events, mode === "miss" || mode === "guard raises"
+      ? ["first", "guard"] : ["first", "guard", "body"]);
+    assert.equal(original.reasons.length, 2, "recovery never mutates the incoming cause");
+    const [keptFirst, keptSecond] = original.reasons;
+    assert.ok(keptFirst?._tag === "Fail" && keptSecond?._tag === "Fail");
+    assert.equal(keptFirst.error, first);
+    assert.equal(keptSecond.error, second);
+    if (mode === "hit") {
+      assert.equal(exit.cause, undefined);
+      assert.equal(exit.value, "hit");
+    } else if (mode === "miss") {
+      assert.equal(exit.cause, original, "miss preserves the whole cause by identity");
+    } else {
+      assert.notEqual(exit.cause, original, "a new raise is not a selector miss");
+      assert.equal(exit.cause?.reasons.length, 1, "secondary reasons are discarded");
+      const reason = exit.cause?.reasons[0];
+      assert.ok(reason?._tag === "Fail");
+      assert.equal(reason.error, first, "the payload can be the exact same object");
+      if (mode === "guard raises") assert.equal(exit.cause, guardFailure);
+    }
+  }));
+});
+
+test("effect handler error selectors preserve deferred no-match causes", async () => {
+  const original = { reasons: [...fail("body").reasons, ...fail("other").reasons] };
+  const exit = await root(() => handle([], () => raise(original), undefined,
+    (_error, unhandled) => function* (): Run {
+      yield sleep(1);
+      return unhandled();
+    },
+  ));
+  assert.equal(exit.cause, original);
+});
+
+test("partial handlers forward only unmentioned operations to the nearest applicable handler", async () => {
+  const pair = service("Test.PartialPair");
+  const left = operation(pair, "left", 1) as (u: undefined) => unknown;
+  const right = operation(pair, "right", 1) as (u: undefined) => unknown;
+  const exit = await root(() => handle(
+    [[pair, [tail("left", () => 10), tail("right", () => 20)]]],
+    () => handle(
+      [[pair, [tail("left", () => 1)]]],
+      () => handle(
+        [[pair, [tail("right", () => 2)]]],
+        () => Number(left(undefined)) + Number(right(undefined)),
+        undefined, undefined,
+      ),
+      undefined, undefined,
+    ),
+    undefined, undefined,
+  ));
+  assert.equal(exit.cause, undefined);
+  assert.equal(exit.value, 3);
+});
+
+const completeProviderBarrier = async (provider: "record" | "layer"): Promise<void> => {
+  const pair = service("Test.CompletePair");
+  const right = operation(pair, "right", 1) as (u: undefined) => unknown;
+  let called = false;
+  const exit = await root(() => handle(
+    [[pair, [tail("right", () => { called = true; return 20; })]]],
+    () => {
+      const body = () => handle(
+        [[pair, [tail("left", () => 1)]]],
+        () => right(undefined),
+        undefined, undefined,
+      );
+      return provider === "record"
+        ? new Under(extend(currentCtx(), pair, {}), body)
+        : serving(currentCtx(), [[pair, {}]], body);
+    },
+    undefined, undefined,
+  ));
+  assert.ok(exit.cause !== undefined, provider);
+  assert.equal(called, false, provider);
+};
+
+test("a complete record provider is a barrier to missing-operation forwarding", () => completeProviderBarrier("record"));
+test("a complete layer provider is a barrier to missing-operation forwarding", () => completeProviderBarrier("layer"));
+
+test("a forwarded arm keeps its outer evidence and failures bypass inner error arms", async () => {
+  const pair = service("Test.ForwardedEvidence");
+  const right = operation(pair, "right", 1) as (u: undefined) => unknown;
+  let caughtInside = false;
+  const exit = await root(() => tryWith(() => handle(
+    [[Ask, [tail("ask", () => "outer")]]],
+    () => handle(
+      [[pair, [tail("right", () => raise(fail(ask(undefined))))]]],
+      () => handle(
+        [[pair, [tail("left", () => 1)]], [Ask, [tail("ask", () => "inner")]]],
+        () => right(undefined),
+        undefined,
+        () => () => { caughtInside = true; return "wrong"; },
+      ),
+      undefined, undefined,
+    ),
+    undefined, undefined,
+  ), (error) => () => error));
+  assert.equal(exit.value, "outer");
+  assert.equal(caughtInside, false);
+});
+
+test("forwarded dictionary operations resolve at saturation, not partial application", async () => {
+  const pair = service("Test.ForwardedCurried");
+  const right = operation(pair, "right", 2, [20]) as (a: number) => (b: number) => unknown;
+  const exit = await root(() => handle(
+    [[pair, [["right", (dict: unknown) => (a: unknown) => (b: unknown) => Number(dict) + Number(a) + Number(b), "tail", 1, 2]]]],
+    function* (): Run {
+      const staged = yield handle(
+        [[pair, [["right", () => () => () => -1, "tail", 1, 2]]]],
+        () => right(2),
+        undefined, undefined,
+      );
+      assert.equal(typeof staged, "function");
+      return yield handle(
+        [[pair, [tail("left", () => 1)]]],
+        () => Reflect.apply(staged as (b: number) => unknown, undefined, [3]),
+        undefined, undefined,
+      );
+    },
+    undefined, undefined,
+  ));
+  assert.equal(exit.cause, undefined);
+  assert.equal(exit.value, 25);
+});
+
+test("a forwarded abort closes inner scopes before its arm and skips their return arms", async () => {
+  const pair = service("Test.ForwardedAbort");
+  const stop = operation(pair, "stop", 1) as (u: undefined) => unknown;
+  const seen: string[] = [];
+  const exit = await root(() => handle(
+    [[pair, [["stop", () => { seen.push("arm"); return 7; }, "abort", 0, 1]]]],
+    () => handle(
+      [[pair, [tail("left", () => 1)]]],
+      () => scopeRun(function* (): Run {
+        addFinalizer(() => seen.push("closed"));
+        return yield stop(undefined);
+      }),
+      () => { seen.push("return"); return -1; },
+      undefined,
+    ),
+    undefined, undefined,
+  ));
+  assert.equal(exit.value, 7);
+  assert.deepEqual(seen, ["closed", "arm"]);
+});
+
+test("a forwarded control resumes deeply through the skipped partial handler", async () => {
+  const pair = service("Test.ForwardedControl");
+  const pause = operation(pair, "pause", 1) as (u: undefined) => unknown;
+  const left = operation(pair, "left", 1) as (u: undefined) => unknown;
+  const exit = await root(() => handle(
+    [[pair, [["pause", () => function* (resume: (v: unknown) => unknown): Run {
+      return yield resume(20);
+    }, "control", 0, 1]]]],
+    () => handle(
+      [[pair, [tail("left", () => 1)]]],
+      function* (): Run {
+        const value = yield pause(undefined);
+        return Number(value) + Number(left(undefined));
+      },
+      (value) => Number(value) + 100,
+      undefined,
+    ),
+    undefined, undefined,
+  ));
+  assert.equal(exit.cause, undefined);
+  assert.equal(exit.value, 121);
+});
+
+test("prototype-looking operation names are own arms and forward normally", async () => {
+  const tag = service("Test.PrototypeOperations");
+  const names = ["__proto__", "constructor", "toString"];
+  const exit = await root(() => handle(
+    [[tag, names.map((name, index) => tail(name, () => (index + 1) * 10))]],
+    () => handle(
+      [[tag, [tail("__proto__", () => 1)]]],
+      () => names.map((name) => {
+        const call = operation(tag, name, 1) as (u: undefined) => unknown;
+        return call(undefined);
+      }),
+      undefined, undefined,
+    ),
+    undefined, undefined,
+  ));
+  assert.equal(exit.cause, undefined);
+  assert.deepEqual(exit.value, [1, 20, 30]);
 });

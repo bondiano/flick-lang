@@ -6,7 +6,7 @@
 //! type it names is known: a capture row grows to the least set its
 //! obligations need, and a meta outside a `scope` never takes its region.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::rc::Rc;
 
 use super::{Check, Checker, error};
@@ -32,10 +32,20 @@ pub(super) struct Hold {
     allowed: Caps,
     rule: &'static str,
     givens: super::row_facts::Givens,
+    /// Scheme-bound facts in force where the obligation was generated.
+    bounds: Vec<(Var, Caps)>,
 }
 
 /// `Outlives C ϱ` and the facts in force where it is needed.
 type Need = (Caps, Type, Vec<(Caps, Type)>);
+
+/// A row obligation whose owner is not known until its enclosing call closes.
+#[derive(Clone)]
+struct ProvidedNeed {
+    row: Row,
+    within: Row,
+    givens: Vec<(Row, Type)>,
+}
 
 /// What the rules of regions keep while a declaration is checked.
 #[derive(Clone, Default)]
@@ -60,6 +70,9 @@ pub(super) struct Regions {
     nest: Vec<Name>,
     /// `Provided R ϱ` of the signatures around (§2.7).
     givens: Vec<(Row, Type)>,
+    /// Value bounds of rigid variables introduced by a signed declaration.
+    bounds: Vec<(Var, Caps)>,
+    pending_provided: Vec<ProvidedNeed>,
     /// The calls being checked, innermost last: the unknown `Scope`
     /// regions of steps of their task arguments, each with the `scope`
     /// innermost there.
@@ -256,6 +269,7 @@ impl Checker<'_> {
             allowed: allowed.clone(),
             rule,
             givens: self.branch_givens(),
+            bounds: self.regions.bounds.clone(),
         });
     }
 
@@ -380,6 +394,44 @@ impl Checker<'_> {
             let facts = self.regions.facts.clone();
             self.regions.needs.push((c, r, facts));
         }
+    }
+    /// A signed body assumes its scheme's bound facts, just as it assumes
+    /// Outlives and Provided. Uses of the scheme still prove (Inst).
+    pub(super) fn give_bounds(&mut self, s: &Scheme, map: &HashMap<Name, super::Inst>) {
+        let mut bounds = Vec::new();
+        bounded_vars(&s.body, &s.vars, &mut bounds);
+        for (name, bound) in bounds {
+            let t = super::substitute(&Type::Var(Var::Named(name)), map);
+            if let Type::Var(variable) = t {
+                let bound = super::generalize::substitute_caps(&bound, map);
+                self.regions.bounds.push((variable, bound));
+            }
+        }
+    }
+
+    /// Variables of pending region obligations remain monomorphic (Gen,
+    /// core.md §2.5 item 4). A later argument/call can still fix their owner.
+    pub(super) fn open_region_metas(&self) -> BTreeSet<u32> {
+        let mut metas = BTreeSet::new();
+        for hold in &self.regions.holds {
+            for held in &hold.held {
+                self.metas(held, &mut metas);
+            }
+        }
+        for (captures, owner, _) in &self.regions.needs {
+            if !self.zonk_caps(captures).is_empty() {
+                self.metas(owner, &mut metas);
+                self.metas(
+                    &Type::Captured(Rc::new(Type::con("Prelude", "Unit")), captures.clone()),
+                    &mut metas,
+                );
+            }
+        }
+        for need in &self.regions.pending_provided {
+            self.metas(&Type::Errors(need.row.clone()), &mut metas);
+            self.metas(&Type::Errors(need.within.clone()), &mut metas);
+        }
+        metas
     }
 }
 

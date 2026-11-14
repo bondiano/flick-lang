@@ -1,0 +1,63 @@
+// Shared constant Layer graphs preserve right override and one run owner.
+module App.Main exposing (main)
+import Arena
+service Read =
+  read : Unit ->{} String
+service Other =
+  other : Unit ->{} String
+service Render =
+  render : Show a => a ->{} String
+
+type Token = Token
+instance Show Token =
+  let show _ = "custom"
+
+type error Gone = Gone String
+
+service Outer =
+  outer : Unit ->{} String
+
+outerImpl : Outer.Impl
+let outerImpl = { outer = fun () -> "/outer" }
+
+answer : String ->{} String
+let answer seed =
+  let left = Layer.succeed Read { read = fun () -> "wrong" }
+  let right = Layer.succeed Read { read = fun () -> seed }
+  let second = Layer.succeed Other { other = fun () -> "/other" }
+  let renderer = Layer.succeed Render { render = fun value -> seed ++ ":" ++ show value }
+  let graph = Layer.merge (Layer.merge right second) renderer
+  let shared = Layer.override graph graph
+  let merged = Layer.override left shared
+  provide (Layer.succeed Outer outerImpl) {
+    let first =
+      Layer.run merged (fun () -> scope {
+        let arena = Arena.make ()
+        let text =
+          Arena.alloc
+            arena
+            (Read.read () ++ Other.other () ++ Outer.outer () ++ "/" ++ Render.render Token)
+        Arena.get text
+      })
+    first ++ "|" ++ Layer.run graph (fun () -> Read.read () ++ Other.other ())
+  }
+uncaught : String ->{; Gone} String
+let uncaught seed =
+  let layer = Layer.succeed Read { read = fun () -> seed }
+  let shared = Layer.override layer layer
+  Layer.run shared (fun () ->
+    let text = scope {
+      let arena = Arena.make ()
+      let view = Arena.alloc arena (Read.read ())
+      Arena.get view
+    }
+    from_result (Err (Gone text))
+  )
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (answer "seed")
+  let caught =
+    try uncaught "error" with
+    | Gone text -> "caught:" ++ text
+  Platform.stdout_line caught

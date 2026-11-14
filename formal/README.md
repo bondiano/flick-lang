@@ -42,6 +42,39 @@ signature and golden certificates.
 
 ## What is proved
 
+- **Ownership tokens, phase M** (`Formal/Memory.lean`): exact
+  `dup`/`drop` balance for arbitrary consuming-use counts and continuation
+  liveness, and partial execution of the generated local token plan (every
+  prefix succeeds). `Formal/MemoryPass.lean` independently checks the
+  ownership projection of annotated ANF. From a function's fresh parameter
+  bindings, acceptance proves that every selected branch path and event
+  prefix succeeds and leaves no local tokens after transferring the return
+  token; evidence operands retain their multiplicity. It does not prove
+  that the Rust insertion pass produces accepted output. Its projected
+  source-binding checker and cached backward analysis additionally prove
+  that every computed live-in local is defined in accepted source ANF.
+  `Formal/MemoryInsert.lean` proves whole-function balance of the executable
+  cached insertion projection before validation: source acceptance and
+  computed liveness/ownership availability entail token-valid output.
+  Its pending-aware induction derives successor inventories rather than
+  assuming them. The function-entry corollary requires unique parameters;
+  sibling branches may reuse fresh local names. Selected-path and prefix
+  corollaries cover arbitrary finite width and repeated/evidence operands.
+  Pending-reuse lemmas establish local-name distinctness, not heap-object
+  nonaliasing or dynamic reuse eligibility.
+  `Formal/MemoryArena.lean` additionally proves exact
+  per-object owner/slot inventories for root-cell allocation, strong reads,
+  replacement and detach-all close, including aliases and independent
+  machine roots. `Formal/MemoryScopes.lean` covers multi-slot storage with
+  one private owner per arena, allocation/read and selected-owner close
+  preserving arbitrary other owners and external roots. Closed-owner
+  retirement is idempotent. These results do not yet prove source-to-memory
+  lowering, verified correspondence with the Rust pass or machine-counter
+  bounds, counted heap or exceptional-unwind semantics,
+  FBIP, matcher/update or evidence-erasure correctness, fresh/valid handles
+  or physical arena reclamation. See the
+  [memory contract](../docs/formal/memory.md) for
+  the still-open M1–M4 gates.
 - **The module boundary** (`Formal/Modules.lean`): separate named application
   sites have separate nominal result types, repeated imports preserve identity,
   manifest class/service requirements match exactly, abstract identities cannot

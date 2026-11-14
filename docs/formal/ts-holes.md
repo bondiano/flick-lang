@@ -315,8 +315,10 @@ The finding: Flick data crossed the foreign boundary by reference.
   - The type decides what to copy: a position with a `List`, a tuple, a record, an ADT or a type variable (`types/ffi.rs` `holds_data`, the plan in `ForeignInfo.copies`).
   - Primitives, `JsValue`, opaque types and functions are passed as they are. A callback without data keeps its identity.
   - The copy is made by the runtime's `copyData` (`runtime/src/core/data.ts`; on Effect, `packages/effect-ts/src/data.ts`, with Effect's `Option` and `Result`). It copies arrays and plain objects all the way down and passes other objects as they are.
+  - Copy traversal uses an explicit work stack, not recursive host calls. Repeated aliases are copied independently; an active-path cycle still throws `RangeError`. Copies are fresh plain arrays/objects: foreign `map`, constructor and species hooks cannot return the original array, and an own `__proto__` field remains a data field rather than changing the copy's prototype. Opaque objects and owner markers stay inert.
   - The trusted boundary (the runtime) does not copy. For it this is hypothesis G1.
 - Test: `tests/run/ffi/copy.fl` prints `argument [3, 1, 2], result [1, 2, 3]`, `held result [1, 2]`, `record ann ["a"]`, `callback result [1, 2], JS saw 3`.
+- The same fixture checks 20,000 nested ADT/list levels in foreign arguments/results, callback arguments/results, Effect success values in both directions and an Async fulfilled result. It asserts retained Flick values are unchanged after host mutation. Runtime and adapter depth tests additionally pin getter order, exceptions, cycles, repeated aliases and prototype/array-hook isolation. This is not a depth-limit change to `Js.snapshot`, nor counted-model support for arbitrary host FFI.
 
 ### 3.2 `typeof C` is not imported as `C`
 

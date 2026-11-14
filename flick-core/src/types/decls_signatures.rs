@@ -1,3 +1,5 @@
+use crate::source::Span;
+
 impl Checker<'_> {
     pub(super) fn static_module_signature(&mut self, node: &Node) -> super::ModuleSignature {
         use super::ModuleSignature as S;
@@ -107,33 +109,14 @@ impl Checker<'_> {
         if alias.is_empty() {
             return;
         }
-        let interface = signature.interface(witness);
-        if interface.parameterized.is_some() {
-            return;
-        }
-        for (name, child) in &interface.modules {
-            let child_signature = super::ModuleSignature::from_interface(child);
-            self.bind_static_witness(&format!("{alias}.{name}"), &child.module, &child_signature);
-        }
-        let types = interface
-            .exports
-            .iter()
-            .filter_map(|export| {
-                if export.entity.namespace != Namespace::Type {
-                    return None;
-                }
-                let definition = export.definition.as_ref()?;
-                let ty = match &definition.form {
-                    Form::Alias { params, body, .. } if params.is_empty() => body.clone(),
-                    _ => Type::con(&export.entity.module, &export.entity.name),
-                };
-                Some((export.entity.name.clone(), ty, definition.kind.clone()))
-            })
-            .collect();
-        self.opened_modules.push(super::module_contract::Opened {
-            alias: alias.to_owned(),
-            types,
-            values: Vec::new(),
-        });
+        let interface = match self.materialize_witness_view(signature, witness) {
+            Ok(interface) => interface,
+            Err(message) => {
+                self.error(codes::P010, Span::new(self.file, 0, 0), message);
+                return;
+            }
+        };
+        self.opened_modules
+            .extend(Self::witness_bindings(signature, &interface, alias));
     }
 }

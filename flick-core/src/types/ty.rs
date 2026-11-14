@@ -75,6 +75,8 @@ pub enum Type {
     /// `exists K : Sig. T`: a value and a hidden module witness packaged
     /// together. Abstract `K.Member` references in `body` use `$exists:K`.
     Exists {
+        #[serde(skip)]
+        scope: Scope,
         binder: String,
         contract: Box<Type>,
         body: Box<Type>,
@@ -82,6 +84,9 @@ pub enum Type {
     /// A unification variable.
     #[serde(skip)]
     Meta(u32),
+    /// The same root observed through a checked lexical witness renaming.
+    #[serde(skip)]
+    MetaView(Box<MetaOccurrence>),
     /// A rigid variable: a quantified variable while its body is checked.
     #[serde(skip)]
     Skolem(u32),
@@ -418,186 +423,11 @@ impl Type {
         args.reverse();
         (head, args)
     }
+}
 
-    /// Applies `f` to every direct child type.
-    #[must_use]
-    pub fn map_children(&self, f: &mut dyn FnMut(&Type) -> Type) -> Type {
-        let row = |row: &Row, f: &mut dyn FnMut(&Type) -> Type| Row {
-            entries: row.entries.iter().map(|(l, t)| (l.clone(), f(t))).collect(),
-            tail: row.tail.as_ref().map(|t| Box::new(f(t))),
-            written: row.written,
-        };
-        match self {
-            Type::App { head, arg } => Type::app(f(head), f(arg)),
-            Type::Fun {
-                param,
-                effects,
-                result,
-            } => Type::Fun {
-                param: Box::new(f(param)),
-                effects: effects.as_ref().map(|e| {
-                    Box::new(Effects {
-                        services: f(&e.services),
-                        errors: f(&e.errors),
-                        sync: e.sync,
-                        direct: e.direct,
-                        written: e.written,
-                    })
-                }),
-                result: Box::new(f(result)),
-            },
-            Type::Tuple(items) => Type::Tuple(items.iter().map(&mut *f).collect()),
-            Type::Record(r) => Type::Record(row(r, f)),
-            Type::Row(r) => Type::Row(row(r, f)),
-            Type::Union(a, b) => Type::Union(Box::new(f(a)), Box::new(f(b))),
-            Type::Without { row, gone } => Type::Without {
-                row: Box::new(f(row)),
-                gone: gone.clone(),
-            },
-            Type::Captured {
-                ty,
-                captures,
-                value,
-                elided,
-            } => Type::Captured {
-                ty: Box::new(f(ty)),
-                captures: Box::new(f(captures)),
-                value: *value,
-                elided: *elided,
-            },
-            Type::Bounded { ty, captures } => Type::Bounded {
-                ty: Box::new(f(ty)),
-                captures: Box::new(f(captures)),
-            },
-            Type::Forall {
-                vars,
-                constraints,
-                body,
-            } => Type::Forall {
-                vars: vars.clone(),
-                constraints: constraints.iter().map(&mut *f).collect(),
-                body: Box::new(f(body)),
-            },
-            Type::Exists {
-                binder,
-                contract,
-                body,
-            } => Type::Exists {
-                binder: binder.clone(),
-                contract: Box::new(f(contract)),
-                body: Box::new(f(body)),
-            },
-            Type::Con { .. }
-            | Type::Var(_)
-            | Type::Symbol(_)
-            | Type::Meta(_)
-            | Type::Skolem(_)
-            | Type::Error => self.clone(),
-        }
-    }
+include!("ty/traversal.rs");
 
-    /// Calls `f` on every direct child type.
-    pub fn for_each_child(&self, f: &mut dyn FnMut(&Type)) {
-        let row = |row: &Row, f: &mut dyn FnMut(&Type)| {
-            row.entries.iter().for_each(|(_, t)| f(t));
-            row.tail.iter().for_each(|t| f(t));
-        };
-        match self {
-            Type::App { head, arg } => {
-                f(head);
-                f(arg);
-            }
-            Type::Fun {
-                param,
-                effects,
-                result,
-            } => {
-                f(param);
-                if let Some(e) = effects {
-                    f(&e.services);
-                    f(&e.errors);
-                }
-                f(result);
-            }
-            Type::Tuple(items) => items.iter().for_each(f),
-            Type::Record(r) | Type::Row(r) => row(r, f),
-            Type::Without { row, .. } => f(row),
-            Type::Union(a, b)
-            | Type::Captured {
-                ty: a, captures: b, ..
-            }
-            | Type::Bounded { ty: a, captures: b } => {
-                f(a);
-                f(b);
-            }
-            Type::Forall {
-                constraints, body, ..
-            } => {
-                constraints.iter().for_each(&mut *f);
-                f(body);
-            }
-            Type::Exists { contract, body, .. } => {
-                f(contract);
-                f(body);
-            }
-            Type::Con { .. }
-            | Type::Var(_)
-            | Type::Symbol(_)
-            | Type::Meta(_)
-            | Type::Skolem(_)
-            | Type::Error => {}
-        }
-    }
-
-    /// Calls `f` on every type inside, this one first.
-    pub fn visit(&self, f: &mut dyn FnMut(&Type)) {
-        f(self);
-        self.for_each_child(&mut |t| t.visit(f));
-    }
-
-    /// Replaces the free variables named in `subst`; stops at a `forall`
-    /// that rebinds a name.
-    #[must_use]
-    pub fn substitute(&self, subst: &[(String, Type)]) -> Type {
-        if subst.is_empty() {
-            return self.clone();
-        }
-        match self {
-            Type::Var(name) => {
-                if let Some((_, ty)) = subst.iter().find(|(n, _)| n == name) {
-                    return ty.clone();
-                }
-                if let Some(class) = name.strip_suffix("$Dict")
-                    && let Some((_, identity)) = subst.iter().find(|(n, _)| n == class)
-                {
-                    return match identity {
-                        Type::Con { module, name } => Type::con(module, &format!("{name}$Dict")),
-                        Type::Var(name) => Type::Var(format!("{name}$Dict")),
-                        _ => self.clone(),
-                    };
-                }
-                self.clone()
-            }
-            Type::Forall {
-                vars,
-                constraints,
-                body,
-            } => {
-                let inner: Vec<(String, Type)> = subst
-                    .iter()
-                    .filter(|(n, _)| !vars.iter().any(|v| &v.name == n))
-                    .cloned()
-                    .collect();
-                Type::Forall {
-                    vars: vars.clone(),
-                    constraints: constraints.iter().map(|c| c.substitute(&inner)).collect(),
-                    body: Box::new(body.substitute(&inner)),
-                }
-            }
-            _ => self.map_children(&mut |t| t.substitute(subst)),
-        }
-    }
-
+impl Type {
     pub fn contains(&self, pred: &mut dyn FnMut(&Type) -> bool) -> bool {
         let mut found = false;
         self.visit(&mut |t| found |= pred(t));
@@ -610,3 +440,11 @@ pub use elided::Elided;
 
 #[cfg(test)]
 mod tests;
+
+pub(in crate::types) mod scope;
+pub use scope::{Scope, ScopeId};
+
+mod meta;
+pub use meta::MetaOccurrence;
+
+pub(in crate::types) mod carrier;

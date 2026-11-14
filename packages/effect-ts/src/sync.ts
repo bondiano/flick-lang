@@ -79,6 +79,9 @@ export const syncOperation = <S extends object>(
   return arity === 0 ? call([]) : collect([]);
 };
 
+/** Whether an immediate Sync/Pure bridge call has an explicitly installed context. */
+export const inSyncStage = (): boolean => current !== OUTSIDE;
+
 /** The services the Sync stage at hand reads. */
 export const syncContext = (): Context.Context<never> => current;
 

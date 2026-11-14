@@ -71,9 +71,13 @@ pub fn diff(old: &[Interface], new: &[Interface]) -> Vec<ModuleChanges> {
             let changes = match (old.get(module), new.get(module)) {
                 (Some(_), None) => vec![Change::Removed(format!("module {module}"))],
                 (None, Some(_)) => vec![Change::Added(format!("module {module}"))],
-                (Some(o), Some(n)) => {
-                    [exports(o, n), instances(o, n), static_members(o, n)].concat()
-                }
+                (Some(o), Some(n)) => [
+                    exports(o, n),
+                    instances(o, n),
+                    static_members(o, n),
+                    support_types(o, n),
+                ]
+                .concat(),
                 (None, None) => Vec::new(),
             };
             (!changes.is_empty()).then(|| ModuleChanges {
@@ -82,6 +86,19 @@ pub fn diff(old: &[Interface], new: &[Interface]) -> Vec<ModuleChanges> {
             })
         })
         .collect()
+}
+
+// Private semantic dependencies affect public schemes even when exported names
+// do not change. Conservatively classify any persisted definition change as breaking.
+fn support_types(old: &Interface, new: &Interface) -> Vec<Change> {
+    if old.support_types == new.support_types {
+        return Vec::new();
+    }
+    vec![Change::Changed {
+        name: "type support".into(),
+        was: serde_json::to_string(&old.support_types).unwrap_or_default(),
+        now: serde_json::to_string(&new.support_types).unwrap_or_default(),
+    }]
 }
 
 fn static_members(old: &Interface, new: &Interface) -> Vec<Change> {
@@ -112,6 +129,7 @@ fn static_members(old: &Interface, new: &Interface) -> Vec<Change> {
                     exports(child, new),
                     instances(child, new),
                     static_members(child, new),
+                    support_types(child, new),
                 ]
                 .concat()
                 {
@@ -373,6 +391,7 @@ fn rename(ty: &Type, names: &[(String, String)], next: &mut usize) -> Type {
             }
         }
         Type::Exists {
+            scope,
             binder,
             contract,
             body,
@@ -382,6 +401,7 @@ fn rename(ty: &Type, names: &[(String, String)], next: &mut usize) -> Type {
                 .chain(names.iter().cloned())
                 .collect();
             Type::Exists {
+                scope: *scope,
                 binder: fresh,
                 contract: Box::new(rename(contract, names, next)),
                 body: Box::new(rename(body, &inner, next)),
@@ -409,7 +429,7 @@ fn relabel(label: &Elem, names: &[(String, String)]) -> Elem {
         Atom::Var(name) => {
             (names.iter().find(|(n, _)| n == name)).map(|(_, f)| Atom::Var(f.clone()))
         }
-        Atom::Skolem(_) | Atom::Meta(_) => None,
+        Atom::Skolem(_) | Atom::Meta(_) | Atom::MetaView(_) => None,
     };
     let renamed = match label {
         Elem::Capture(atom) => fresh(atom).map(Elem::Capture),

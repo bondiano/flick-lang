@@ -3,7 +3,13 @@
 // finalizers. Closing it is two-phase: admission ends, children are
 // interrupted and each one awaited (supervisors included), pending foreign
 // promises settle, and only then resource finalizers run, last first.
+// Arena storage remains available through all of them and is retired last.
 import { Cause, Context, Effect, Exit, Fiber, Scope } from "effect";
+import { Arena } from "@flick-lang/runtime/core/Arena";
+
+import { type OwnerEvidence, withOwnerEvidence } from "./owner_evidence.ts";
+export { readOwnerEvidence, withOwnerEvidence } from "./owner_evidence.ts";
+export type { OwnerEvidence } from "./owner_evidence.ts";
 
 import { Failure } from "./cause.ts";
 import { spawnedChild, traceChild, traceEvent, traceId, tracing } from "./trace.ts";
@@ -13,7 +19,25 @@ export const CurrentOwner = /*#__PURE__*/ Context.Reference<Owner | undefined>("
   defaultValue: () => undefined,
 });
 
+
 export class Owner {
+  /** Arena storage is released only after the native finalizer scope. */
+  readonly #arenas: Array<Arena> = [];
+  #arenasClosed = false;
+
+  makeArena(): Arena {
+    if (this.#arenasClosed) throw new Error("arena owner is closed");
+    const arena = new Arena();
+    this.#arenas.push(arena);
+    return arena;
+  }
+
+  closeArenas(): void {
+    this.#arenasClosed = true;
+    for (const arena of this.#arenas) arena.close();
+    this.#arenas.length = 0;
+  }
+
   /** Native scope of the resource finalizers. */
   readonly resources: Scope.Closeable;
   open = true;
@@ -117,6 +141,7 @@ export const closeOwn = <A, E>(owner: Owner, exit: Exit.Exit<A, E>): Effect.Effe
     owner.finalizing = true;
     owner.phase("C5");
     const closed = yield* Effect.exit(Scope.close(owner.resources, exit));
+    owner.closeArenas();
     owner.phase("C6");
     if (Exit.isFailure(closed)) cause = Cause.combine(cause, closed.cause);
     return cause.reasons.length === 0 ? Exit.void : Exit.failCause(cause);
@@ -179,7 +204,7 @@ export const ownedExits = <A, E, R>(
     Effect.gen(function* () {
       const resources = yield* Scope.make();
       const owner = new Owner(resources, []);
-      const exit = yield* Effect.exit(restore(inside(owner, body(owner))));
+      const exit = yield* Effect.exit(restore(inside(owner, withOwnerEvidence(owner, () => body(owner)))));
       const cleanup = yield* close(owner, Exit.void);
       return { exit, cleanup, defects: owner.defects };
     }),
@@ -188,21 +213,30 @@ export const ownedExits = <A, E, R>(
 /** `scope [s] { body }`: `body` receives the owner `s` and the one around it. */
 export const scope = <A, E, R>(
   body: (owner: Owner, outer: Owner | undefined) => Effect.Effect<A, E, R>,
-): Effect.Effect<A, unknown, Exclude<R, Scope.Scope>> => withOwner(body, "scope");
+): Effect.Effect<A, unknown, Exclude<R, Scope.Scope>> => withOwner((owner, outer) => withOwnerEvidence(owner, () => body(owner, outer)), "scope");
 
 /** `Scope.run f`, which `scope s { body }` stands for. */
 export const scopeRun = <A, E, R>(
   f: (owner: Owner) => Effect.Effect<A, E, R>,
-): Effect.Effect<A, unknown, Exclude<R, Scope.Scope>> => withOwner((owner) => f(owner), "scope");
+): Effect.Effect<A, unknown, Exclude<R, Scope.Scope>> => withOwner((owner) => withOwnerEvidence(owner, () => f(owner)), "scope");
 
 /** `Scope.current ()`: the owner around, which a nested `scope` may acquire into. */
 export const scopeCurrent = (): Effect.Effect<Owner | undefined> => Effect.service(CurrentOwner);
 
-/**
- * A call that acquires into the owner of a region the compiler chose
- * lexically: an outer `scope`'s, not the innermost one's.
- */
-export const within = inside;
+/** `Arena.make ()`, in the lexical owner chosen by the compiler. */
+export const arenaMake = (): Effect.Effect<Arena> => Effect.map(Effect.service(CurrentOwner), (owner) => {
+  if (owner === undefined) throw new Error("arena requires a scope owner");
+  return owner.makeArena();
+});
+
+/** Resolve foreign identity only when a raw scoped operation activates it. */
+export const ownerHooks: { activate?: (owner: object) => Owner } = {};
+export const within = <A, E, R>(owner: OwnerEvidence, effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, Scope.Scope>> =>
+  Effect.suspend(() => {
+    const active = owner instanceof Owner ? owner : owner === undefined ? undefined : ownerHooks.activate?.(owner);
+    if (active === undefined) throw new Error("owner evidence is absent or belongs to another runtime");
+    return inside(active, effect);
+  });
 
 /** `Fiber e a`: a child spawned into an owner. */
 export class FlickFiber<A, E> {
@@ -231,7 +265,7 @@ export const fiberSpawn = <A, E, R, R2>(
       if (traced) traceEvent({ e: "refuse", o: owner.trace });
       return yield* Effect.die(new Error("the owner is closing: it admits no new children"));
     }
-    const child = yield* Effect.forkDetach(inside(owner, task));
+    const child = yield* Effect.forkDetach(inside(owner, withOwnerEvidence(owner, () => task)));
     owner.children.add(child);
     const watcher = yield* Effect.forkDetach(
       Effect.uninterruptible(
@@ -242,7 +276,7 @@ export const fiberSpawn = <A, E, R, R2>(
           if (Exit.isFailure(exit)) {
             const shutdown = !owner.open && Cause.hasInterruptsOnly(exit.cause);
             if (traced) traceEvent({ e: "sup", o: owner.trace, f: traceChild(child) });
-            const supervised = yield* Effect.exit(inside(owner, supervisor(new Failure(exit.cause, shutdown))));
+            const supervised = yield* Effect.exit(inside(owner, withOwnerEvidence(owner, () => supervisor(new Failure(exit.cause, shutdown)))));
             if (Exit.isFailure(supervised)) owner.defects.push(supervised.cause);
           }
           if (traced) traceEvent({ e: "watched", o: owner.trace, f: traceChild(child) });

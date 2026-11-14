@@ -47,7 +47,7 @@ pub(super) fn check(
                     "`{}.{}` requires the optional `{}` adapter; \
                      add it to the project's dependencies to build this program on Flick's runtime",
                     key.0,
-                    key.1,
+                    foreign.source_name.as_deref().unwrap_or(&foreign.name),
                     super::bindings::ADAPTER_PREFIX
                 ),
                 origin,

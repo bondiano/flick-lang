@@ -6,9 +6,11 @@ use crate::types::{
     Checker,
     elem::Elem,
     env::Form,
+    kinds::Kind,
+    module_contract,
     ty::{Row, Type},
 };
-use std::{borrow::Cow, ptr};
+use std::{borrow::Cow, collections::HashSet, ptr};
 
 impl Checker<'_> {
     pub fn fresh(&mut self) -> Type {
@@ -73,7 +75,23 @@ impl Checker<'_> {
     /// [`Self::qualified_head`] without the copy of a type that does not
     /// reduce, which is most of what the capture summaries ask about.
     pub fn borrowed_head<'a>(&'a self, t: &'a Type) -> Cow<'a, Type> {
-        let mut t = Cow::Borrowed(self.store.head(t));
+        self.borrowed_head_observing(t, false, &mut |_, _| {})
+    }
+
+    /// Ordinary head reduction, retaining opaque identities and qualifiers at
+    /// the witness-publication boundary. No second alias expander is used.
+    pub(in crate::types) fn witness_head(&self, ty: &Type) -> Type {
+        self.borrowed_head_observing(ty, true, &mut |_, _| {})
+            .into_owned()
+    }
+
+    fn borrowed_head_observing<'a>(
+        &'a self,
+        t: &'a Type,
+        stop_at_opaque: bool,
+        observe: &mut impl FnMut(&str, &str),
+    ) -> Cow<'a, Type> {
+        let mut t = self.store.head(t);
         for _ in 0..64 {
             // only an application or a constructor has a head to reduce
             if !matches!(*t, Type::App { .. } | Type::Con { .. }) {
@@ -85,21 +103,25 @@ impl Checker<'_> {
                 continue;
             }
             let resolved = self.store.head(head);
-            if !ptr::eq(resolved, head) && resolved != head {
-                t = Cow::Owned(Type::apps(resolved.clone(), args.into_iter().cloned()));
+            if !ptr::eq(resolved.as_ref(), head) && resolved.as_ref() != head {
+                t = Cow::Owned(Type::apps(resolved.into_owned(), args.into_iter().cloned()));
                 continue;
             }
             let Type::Con { module, name } = head else {
                 break;
             };
-            let Some(Form::Alias { params, body, .. }) =
-                self.env.type_def(module, name).map(|d| &d.form)
+            let Some(Form::Alias {
+                params,
+                body,
+                opaque,
+            }) = self.env.type_def(module, name).map(|d| &d.form)
             else {
                 break;
             };
-            if args.len() < params.len() {
+            if args.len() < params.len() || (stop_at_opaque && *opaque) {
                 break;
             }
+            observe(module, name);
             let subst: Vec<(String, Type)> = params
                 .iter()
                 .cloned()
@@ -163,7 +185,7 @@ impl Checker<'_> {
             return None;
         };
         let m = *m;
-        if matches!(other, Type::Meta(_) | Type::Error) {
+        if matches!(other, Type::Meta(_) | Type::MetaView(_) | Type::Error) {
             return None;
         }
         if other.is_lang(Lang::Never) {
@@ -176,19 +198,25 @@ impl Checker<'_> {
     }
 
     pub fn unify(&mut self, a: &Type, b: &Type) -> Unified {
-        self.compare_unfolding(a, b, |c| c.unify_unfolded(a, b))
+        self.inference_trial(|this| {
+            this.compare_unfolding(a, b, |c| c.unify_unfolded(a, b))
+                .map_err(|mismatch| this.observe_mismatch(mismatch, a, b))
+        })
     }
 
     #[allow(clippy::too_many_lines)]
     fn unify_unfolded(&mut self, a: &Type, b: &Type) -> Unified {
+        if let Some(result) = self.unify_opaque_meta(a, b) {
+            return result;
+        }
         let (mut left, mut right) = (self.bound_head(a), self.bound_head(b));
         if matches!(&left, Type::Captured { value: true, .. })
             || matches!(&right, Type::Captured { value: true, .. })
         {
             let (x, y) = (self.whnf(&left), self.whnf(&right));
             if let (Type::App { head: x, .. }, Type::App { head: y, .. }) = (&x, &y)
-                && (matches!(self.store.resolve(x), Type::Meta(_))
-                    || matches!(self.store.resolve(y), Type::Meta(_)))
+                && (matches!(self.store.resolve(x), Type::Meta(_) | Type::MetaView(_))
+                    || matches!(self.store.resolve(y), Type::Meta(_) | Type::MetaView(_)))
             {
                 self.unify(x, y)?;
                 (left, right) = (self.bound_head(a), self.bound_head(b));
@@ -259,17 +287,19 @@ impl Checker<'_> {
             (Type::Con { .. }, Type::Con { .. }) if a == b => Ok(()),
             (Type::App { head: h1, arg: a1 }, Type::App { head: h2, arg: a2 }) => {
                 // an argument that is no error explains itself better than the application
-                self.unify(h1, h2).map_err(|m| match m {
-                    Mismatch::Types(x, y)
-                        if x.spine().0.is_lang(Lang::Errors)
-                            || y.spine().0.is_lang(Lang::Errors) =>
-                    {
+                self.unify(h1, h2).map_err(|m| {
+                    m.map_reason(|reason| match reason {
                         Mismatch::Types(x, y)
-                    }
-                    // a region leaves its `scope` in the `Live` of a row,
-                    // which no type shows
-                    Mismatch::Escape(s) => Mismatch::Escape(s),
-                    _ => Mismatch::Types(a.clone(), b.clone()),
+                            if x.spine().0.is_lang(Lang::Errors)
+                                || y.spine().0.is_lang(Lang::Errors) =>
+                        {
+                            Mismatch::Types(x, y)
+                        }
+                        // a region leaves its `scope` in the `Live` of a row,
+                        // which no type shows
+                        Mismatch::Escape(s) => Mismatch::Escape(s),
+                        _ => Mismatch::Types(a.clone(), b.clone()),
+                    })
                 })?;
                 self.unify(a1, a2)
             }
@@ -302,29 +332,39 @@ impl Checker<'_> {
             (Type::Record(r1), Type::Record(r2)) => self.unify_rows(r1, r2),
             (
                 Type::Exists {
+                    scope: _,
                     binder: x,
                     contract: c1,
                     body: b1,
                 },
                 Type::Exists {
+                    scope: _,
                     binder: y,
                     contract: c2,
                     body: b2,
                 },
             ) => {
-                fn alpha(ty: &Type, binder: &str) -> Type {
-                    if let Type::Con { module, name } = ty
-                        && module == &format!("$exists:{binder}")
-                    {
-                        return Type::con("$exists:#", name);
-                    }
-                    if matches!(ty, Type::Exists { binder: inner, .. } if inner == binder) {
-                        return ty.clone();
-                    }
-                    ty.map_children(&mut |child| alpha(child, binder))
-                }
                 self.unify(c1, c2)?;
-                self.unify(&alpha(b1, x), &alpha(b2, y))
+                let contract = self.whnf(c1);
+                let Type::Con { module, name } = &contract else {
+                    return Err(Mismatch::Types(a.clone(), b.clone()));
+                };
+                let Some(definition) = self.env.type_def(module, name) else {
+                    return Err(Mismatch::Types(a.clone(), b.clone()));
+                };
+                let Form::ModuleContract { .. } = &definition.form else {
+                    return Err(Mismatch::Types(a.clone(), b.clone()));
+                };
+                let witness = self.fresh_module_witness();
+                if self
+                    .materialize_existential_witness(&contract, &witness)
+                    .is_err()
+                {
+                    return Err(Mismatch::Types(a.clone(), b.clone()));
+                }
+                let left = module_contract::open_existential_type(b1, x, &witness);
+                let right = module_contract::open_existential_type(b2, y, &witness);
+                self.unify(&left, &right)
             }
             (Type::Row(_) | Type::Union(..) | Type::Without { .. }, _)
             | (_, Type::Row(_) | Type::Union(..) | Type::Without { .. }) => {
@@ -356,17 +396,19 @@ impl Checker<'_> {
 
     /// One type constructor applied to arguments that unify: equal without
     /// expanding an alias, which a self-referencing opaque type needs.
-    fn same_application(&mut self, a: &Type, b: &Type) -> bool {
+    pub(super) fn same_application(&mut self, a: &Type, b: &Type) -> bool {
         let (a, b) = (self.store.resolve(a), self.store.resolve(b));
         let ((h1, args1), (h2, args2)) = (a.spine(), b.spine());
         if !matches!(h1, Type::Con { .. }) || h1 != h2 || args1.len() != args2.len() {
             return false;
         }
-        args1.is_empty()
-            || args1
+        self.inference_trial(|this| {
+            args1
                 .iter()
                 .zip(&args2)
-                .all(|(x, y)| self.unify(x, y).is_ok())
+                .try_for_each(|(x, y)| this.unify(x, y))
+        })
+        .is_ok()
     }
 
     /// Whether `t` is a qualifier on the meta `m` itself.
@@ -375,6 +417,10 @@ impl Checker<'_> {
     }
 
     pub fn bind(&mut self, m: u32, t: &Type) -> Unified {
+        self.inference_trial(|this| this.bind_inner(m, t))
+    }
+
+    fn bind_inner(&mut self, m: u32, t: &Type) -> Unified {
         let t = self.zonk(t);
         if t.contains(&mut |x| *x == Type::Meta(m)) {
             return Err(Mismatch::Occurs(t));
@@ -394,3 +440,5 @@ impl Checker<'_> {
         Ok(())
     }
 }
+
+include!("compare/opaque_heads.rs");

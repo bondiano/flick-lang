@@ -5,8 +5,18 @@ import { some } from "@flick-lang/runtime/core/data";
 import { runIn, currentCtx, extend, inCtx, type Run } from "@flick-lang/runtime/rt/fiber";
 import { scopeRun } from "@flick-lang/runtime/rt/owner";
 import { fail } from "@flick-lang/runtime/rt/cause";
-import { service } from "@flick-lang/runtime/rt/handle";
-import { causeToEffect, causeFromEffect, fromEffect, handlersToEffect } from "../src/bridge.ts";
+import { service, handle as nativeHandle, operation as nativeOperation, type OpInstall } from "@flick-lang/runtime/rt/handle";
+import { handle as hostHandle } from "../src/handlers.ts";
+import { causeToEffect, causeFromEffect, fromEffect, handlersToEffect, callEffect } from "../src/bridge.ts";
+
+
+const nativeArm = (name: string, value: number): OpInstall =>
+  [name, () => (function* (): Run { return yield value; })(), "tail", 0, 1];
+const callNativeOperation = (operation: unknown): unknown => {
+  assert.equal(typeof operation, "function");
+  if (typeof operation !== "function") throw new TypeError("not an operation");
+  return Reflect.apply(operation, undefined, [undefined]);
+};
 
 test("hidden handler records convert nested arguments and successful results", () => {
   const record = handlersToEffect({
@@ -66,4 +76,54 @@ test("typed failures translate their nested data in both directions", () => {
   const error = restored.reasons[0];
   assert.ok(error?._tag === "Fail");
   assert.deepEqual(error.error, { nested: some("bad") });
+});
+
+test("a native partial handler forwards unmentioned operations across an Effect crossing", () => {
+  const tag = service("Test.PartialNativeBridge");
+  const key = Context.Service<{ left: (u: undefined) => Effect.Effect<number>; right: (u: undefined) => Effect.Effect<number> }>("Test.PartialNativeBridge");
+  const request = Effect.gen(function* () {
+    const impl = yield* Effect.service(key);
+    return (yield* impl.left(undefined)) + (yield* impl.right(undefined));
+  });
+  const result: unknown = runIn(scopeRun(() => nativeHandle(
+    [[tag, [nativeArm("left", 10), nativeArm("right", 20)]]],
+    () => nativeHandle([[tag, [nativeArm("left", 1)]]], () => fromEffect(request), undefined, undefined),
+    undefined, undefined,
+  )));
+  assert.equal(result, 21);
+});
+
+test("an Effect partial handler forwards through native partial handlers without recapturing arms", async () => {
+  const tag = service("Test.PartialEffectBridge");
+  const key = Context.Service<object>("Test.PartialEffectBridge");
+  const left: unknown = nativeOperation(tag, "left", 1);
+  const right: unknown = nativeOperation(tag, "right", 1);
+  const native = callEffect(() => nativeHandle(
+    [[tag, [nativeArm("left", 1)]]],
+    function* (): Run { return Number(yield callNativeOperation(left)) + Number(yield callNativeOperation(right)); },
+    undefined, undefined,
+  ));
+  const request = hostHandle(
+    [[key, { left: () => Effect.succeed(10), right: () => Effect.succeed(20) }, []]],
+    hostHandle([[key, { left: () => Effect.succeed(2) }, []]], native, undefined, undefined),
+    undefined, undefined,
+  );
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- this test supplies every required service via the erased handler ABI
+  assert.equal(await Effect.runPromise(request as Effect.Effect<unknown, unknown>), 21);
+});
+
+test("a complete native provider remains a forwarding barrier at an Effect crossing", () => {
+  const tag = service("Test.CompleteNativeBridge");
+  const key = Context.Service<{ right: (u: undefined) => Effect.Effect<number> }>("Test.CompleteNativeBridge");
+  let called = false;
+  const request = Effect.flatMap(Effect.service(key), (impl) => impl.right(undefined));
+  assert.throws(() => runIn(scopeRun(() => nativeHandle(
+    [[tag, [["right", () => { called = true; return (function* (): Run { return yield 20; })(); }, "tail", 0, 1]]]],
+    () => inCtx(extend(currentCtx(), tag, {}), () => nativeHandle(
+      [[tag, [["left", () => 1, "tail", 0, 1]]]],
+      () => fromEffect(request), undefined, undefined,
+    )),
+    undefined, undefined,
+  ))));
+  assert.equal(called, false);
 });

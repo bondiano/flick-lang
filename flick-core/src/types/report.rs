@@ -172,6 +172,10 @@ impl Checker<'_> {
     }
 
     pub fn mismatch(&mut self, mismatch: &Mismatch, actual: &Type, expected: &Type, span: Span) {
+        let actual = mismatch.diagnostic_type(actual);
+        let expected = mismatch.diagnostic_type(expected);
+        let (actual, expected) = (&actual, &expected);
+        let mismatch = mismatch.reason();
         let reported = self.diagnostics.len();
         self.report_mismatch(mismatch, actual, expected, span);
         // a type that lacks only `Async` says so where it is written
@@ -197,6 +201,13 @@ impl Checker<'_> {
     }
 
     fn report_mismatch(&mut self, mismatch: &Mismatch, actual: &Type, expected: &Type, span: Span) {
+        if let Mismatch::Observed { reason, .. } = mismatch {
+            let actual = mismatch.diagnostic_type(actual);
+            let expected = mismatch.diagnostic_type(expected);
+            self.report_mismatch(reason, &actual, &expected, span);
+            return;
+        }
+        let source_types = (actual, expected);
         let through_live = matches!(mismatch, Mismatch::Escape(s) if self.needs_live(actual, *s));
         let (actual, expected) = self.mismatch_types(mismatch, actual, expected);
         let head = format!("expected `{expected}`, found `{actual}`");
@@ -269,6 +280,9 @@ impl Checker<'_> {
                         "{head}: a type from outside this branch would become `{t}` by what the branch learned about the matched value; annotate it"
                     ),
                 );
+            }
+            Mismatch::Observed { reason, .. } => {
+                self.report_mismatch(reason, source_types.0, source_types.1, span);
             }
             Mismatch::Polymorphic(t) => {
                 let t = self.show_exact(t);

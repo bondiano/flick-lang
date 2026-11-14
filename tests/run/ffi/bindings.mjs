@@ -127,3 +127,31 @@ export const pushInto = (f) => {
   xs.push(9);
   return xs.length;
 };
+
+// Seeds come from real Flick constructors, so this tests their actual data
+// layout without hard-coding qualified constructor tags or package names.
+export const copyDeep = (depth, leaf, branch) => {
+  let value = leaf;
+  for (let i = 0; i < depth; i++) value = { ...branch, _0: [value] };
+  return value;
+};
+
+export const copyDeepDepth = (value) => {
+  let depth = 0;
+  while (value._0 !== undefined && value._0.length !== 0) {
+    value = value._0[0];
+    depth++;
+  }
+  return depth;
+};
+
+export const spoilDeep = (value) => {
+  const depth = copyDeepDepth(value);
+  value._0 = [];
+  return depth;
+};
+
+export const copyDeepCallbackArg = (callback, leaf, branch) => callback(copyDeep(20000, leaf, branch));
+export const copyDeepCallbackResult = (callback) => spoilDeep(callback(undefined));
+export const copyDeepEffect = (value) => Effect.succeed(value);
+export const copyDeepAsync = (depth, leaf, branch) => Promise.resolve(copyDeep(depth, leaf, branch));

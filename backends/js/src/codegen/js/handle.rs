@@ -2,8 +2,8 @@
 //! functions of each effect's operations as the implementation of its
 //! service, and handles the body's value and errors.
 
-use super::Gen;
-use super::doc::{After, Before, Js, array, block_js, call, object};
+use super::doc::{After, Before, Js, array, call, object};
+use super::{Gen, expr::key};
 use crate::ir::Handler;
 use flick_ir::OpClass;
 use flick_pretty::docvec;
@@ -21,7 +21,7 @@ impl<'d> Gen<'_, 'd> {
             let mut aborts = Vec::new();
             for op in &handled.operations {
                 let function = self.expr(&op.function);
-                let name = self.string(&op.name);
+                let name = self.leaf(&key(&op.name));
                 fields.push(docvec![
                     self.a,
                     name.doc,
@@ -50,8 +50,7 @@ impl<'d> Gen<'_, 'd> {
             self.leaf("undefined")
         } else {
             let error = self.temp();
-            let (stmts, ()) = self.block(|g| g.handlers(&error, &h.errors));
-            self.lambda_of(&error, block_js(self.a, &stmts))
+            self.handlers(&error, &h.errors)
         };
         let handle = self.rt("handle");
         let called = call(

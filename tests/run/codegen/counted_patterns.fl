@@ -1,0 +1,109 @@
+// Ownership lowering must preserve Or commitment, guard order, tail views,
+// immutable updates and constructor-stored dictionaries.
+module App.Main exposing (main)
+
+type Pair = Pair Int Int
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+input : Unit ->{} Pair
+let input () =
+  say "scrutinee"
+  Pair 1 2
+
+accept : Int ->{} Bool
+let accept n =
+  say ("guard " ++ show n)
+  n > 1
+
+select : Pair ->{} String
+let select pair =
+  match pair with
+  | Pair x _ | Pair _ x when accept x -> "yes"
+  | _ -> "no"
+
+pick : List Int -> String
+let pick items =
+  match items with
+  | [0, (1 | 2), ...rest] ->
+    match rest with
+    | [] -> "short"
+    | [last] -> show last
+    | _ -> "many"
+  | _ -> "other"
+
+base : Unit ->{} { left : String; right : String }
+let base () =
+  say "base"
+  { left = "old"; right = "keep" }
+
+noted : String -> String ->{} String
+let noted label value =
+  say label
+  value
+
+class Gate a =
+  allow : a -> Bool
+
+class Textual a =
+  text : a -> String
+
+instance Gate Int =
+  let allow value = value > 0
+
+instance Textual Int =
+  let text value = show value
+
+type Packed =
+  | (Gate a, Textual a) => Packed String a : Packed
+
+type Flag =
+  | Gate Int => Flag : Flag
+  | Gate Int => OtherFlag : Flag
+
+type Ordinary = Ordinary { allow : Int }
+
+equal_flag : Flag -> Flag -> Bool
+let equal_flag left right = left == right
+
+render : Packed -> String
+let render packed =
+  match packed with
+  | Packed label value when allow value -> label ++ ":" ++ text value
+  | _ -> "denied"
+
+zero : Float -> String
+let zero value =
+  match value with
+  | -0.0 -> "zero"
+  | _ -> "nonzero"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  say (select (input ()))
+  say (pick [0, 2, 9] ++ ", " ++ pick [0, 1] ++ ", " ++ pick [0, 1, 8, 7])
+  let original = base ()
+  let changed = { original with right = noted "right" "next"; left = noted "left" "new" }
+  say (original.left ++ "/" ++ original.right ++ ", " ++ changed.left ++ "/" ++ changed.right)
+  complete : Int -> Packed
+  let complete = Packed "ok"
+  say (render (complete 42) ++ ", " ++ render (Packed "bad" 0))
+  say (zero 0.0)
+  let left = complete 42
+  let same = complete 42
+  let different = Packed "ok" 43
+  let ordinary_left = Ordinary { allow = 1 }
+  let ordinary_right = Ordinary { allow = 2 }
+  say
+    (show (left == same)
+      ++ ", "
+      ++ show (left == different)
+      ++ ", "
+      ++ show (left != different)
+      ++ ", "
+      ++ show (equal_flag Flag Flag)
+      ++ ", "
+      ++ show (equal_flag Flag OtherFlag)
+      ++ ", "
+      ++ show (ordinary_left == ordinary_right))

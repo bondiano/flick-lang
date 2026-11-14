@@ -1,3 +1,7 @@
+@flick-lang/runtime/core/Arena Arena
+@flick-lang/runtime/core/Arena ArenaValue
+@flick-lang/runtime/core/Arena arenaAlloc
+@flick-lang/runtime/core/Arena arenaGet
 @flick-lang/runtime/core/Array appendAll
 @flick-lang/runtime/core/Array cartesian
 @flick-lang/runtime/core/Array cartesianWith
@@ -296,6 +300,7 @@
 @flick-lang/runtime/core/index powInt
 @flick-lang/runtime/core/index raceFirst
 @flick-lang/runtime/core/index raceSuccess
+@flick-lang/runtime/core/index readOwnerEvidence
 @flick-lang/runtime/core/index remBigInt
 @flick-lang/runtime/core/index remInt
 @flick-lang/runtime/core/index resultMap2
@@ -379,6 +384,7 @@
 @flick-lang/runtime/core/index timeoutOption
 @flick-lang/runtime/core/index tryWith
 @flick-lang/runtime/core/index validationMap2
+@flick-lang/runtime/core/index withOwnerEvidence
 @flick-lang/runtime/core/index within
 @flick-lang/runtime/core/list flickOrder
 @flick-lang/runtime/core/list identity
@@ -497,6 +503,7 @@
 @flick-lang/runtime/core/stubs parallelResults
 @flick-lang/runtime/core/stubs raceFirst
 @flick-lang/runtime/core/stubs raceSuccess
+@flick-lang/runtime/core/stubs readOwnerEvidence
 @flick-lang/runtime/core/stubs routeCodec
 @flick-lang/runtime/core/stubs routeNested
 @flick-lang/runtime/core/stubs routeWords
@@ -521,6 +528,7 @@
 @flick-lang/runtime/core/stubs timeout
 @flick-lang/runtime/core/stubs timeoutOption
 @flick-lang/runtime/core/stubs tryWith
+@flick-lang/runtime/core/stubs withOwnerEvidence
 @flick-lang/runtime/core/stubs within
 @flick-lang/runtime/core/suites parseTestArgs
 @flick-lang/runtime/core/suites runTestsWith
@@ -595,6 +603,9 @@
 @flick-lang/runtime/rt absent
 @flick-lang/runtime/rt acquireRelease
 @flick-lang/runtime/rt appFail
+@flick-lang/runtime/rt arenaAlloc
+@flick-lang/runtime/rt arenaGet
+@flick-lang/runtime/rt arenaMake
 @flick-lang/runtime/rt atomAt
 @flick-lang/runtime/rt atomClientOnly
 @flick-lang/runtime/rt atomDerived
@@ -847,6 +858,7 @@
 @flick-lang/runtime/rt raceFirst
 @flick-lang/runtime/rt raceSuccess
 @flick-lang/runtime/rt rawCauseInspect
+@flick-lang/runtime/rt readOwnerEvidence
 @flick-lang/runtime/rt recordExtend
 @flick-lang/runtime/rt recordGet
 @flick-lang/runtime/rt recordLabel
@@ -998,6 +1010,7 @@
 @flick-lang/runtime/rt trySync
 @flick-lang/runtime/rt tryWith
 @flick-lang/runtime/rt validationMap2
+@flick-lang/runtime/rt withOwnerEvidence
 @flick-lang/runtime/rt within
 @flick-lang/runtime/rt/effect/Arbitrary Constant
 @flick-lang/runtime/rt/effect/Arbitrary filter

@@ -1,13 +1,16 @@
-//! `e[δ]` and `match(p, v) = δ` of `docs/formal/core.md` §3.3. Substituted
-//! values are closed, so substitution only has to stop at binders that
-//! shadow a name; it never renames.
+//! `e[δ]` and `match(p, v) = δ` of `docs/formal/core.md` §3.3. Evaluator
+//! substitutions contain closed values, so [`subst`] only stops at shadowing
+//! binders. Translation's separate administrative-suspension substitution
+//! accepts open values and alpha-freshens conflicting binders first.
 
 use std::borrow::Cow;
+use std::cell::{Cell, RefCell};
 use std::collections::BTreeSet;
 use std::rc::Rc;
 use std::slice;
 
 use crate::check::in_regions;
+use crate::handler::Handler;
 use crate::syntax::{Arm, Head, Lit, Name, Pat, Term};
 use crate::types::Scheme;
 
@@ -66,12 +69,17 @@ fn walk(e: &Term, s: &Subst, opened: Opened) -> Term {
         | Term::Loc(_)
         | Term::Env(_)
         | Term::Die(_)
+        | Term::OwnerCandidate(_)
+        | Term::ReadOwnerEvidence
+        | Term::DefaultOwner
         | Term::Own(_)
         | Term::Cont(_)
         | Term::Signal(_)
         | Term::Cap(..) => e.clone(),
         Term::Lam(x, b) => Term::Lam(x.clone(), Rc::new(walk(b, &without(s, x), opened))),
         Term::App(f, a) => Term::App(go(f), go(a)),
+        Term::WithOwnerEvidence(a, b) => Term::WithOwnerEvidence(go(a), go(b)),
+        Term::ActivateOwner(a, b) => Term::ActivateOwner(go(a), go(b)),
         Term::Let(x, sig, e1, e2) => Term::Let(
             x.clone(),
             signed(sig.as_ref(), opened),
@@ -243,6 +251,8 @@ pub fn any(e: &Term, f: &dyn Fn(&Term) -> bool) -> bool {
         | Term::Inside(_, _, b) => any(b, f),
         Term::Let(_, _, a, b)
         | Term::LetRec(_, _, a, b)
+        | Term::WithOwnerEvidence(a, b)
+        | Term::ActivateOwner(a, b)
         | Term::App(a, b)
         | Term::Update(a, _, b)
         | Term::Provide(a, b)
@@ -263,6 +273,9 @@ pub fn any(e: &Term, f: &dyn Fn(&Term) -> bool) -> bool {
         | Term::Loc(_)
         | Term::Env(_)
         | Term::Die(_)
+        | Term::OwnerCandidate(_)
+        | Term::ReadOwnerEvidence
+        | Term::DefaultOwner
         | Term::Own(_)
         | Term::Cap(..) => false,
     }
@@ -324,7 +337,12 @@ fn free(e: &Term, bound: &mut Vec<Name>, out: &mut BTreeSet<Name>) {
                 bound.truncate(mark);
             }
         }
-        Term::App(a, b) | Term::Update(a, _, b) | Term::Provide(a, b) | Term::Join(a, b) => {
+        Term::WithOwnerEvidence(a, b)
+        | Term::ActivateOwner(a, b)
+        | Term::App(a, b)
+        | Term::Update(a, _, b)
+        | Term::Provide(a, b)
+        | Term::Join(a, b) => {
             free(a, bound, out);
             free(b, bound, out);
         }
@@ -342,9 +360,14 @@ fn free(e: &Term, bound: &mut Vec<Name>, out: &mut BTreeSet<Name>) {
         | Term::Loc(_)
         | Term::Env(_)
         | Term::Die(_)
+        | Term::OwnerCandidate(_)
+        | Term::ReadOwnerEvidence
+        | Term::DefaultOwner
         | Term::Own(_)
         | Term::Cont(_)
         | Term::Signal(_)
         | Term::Cap(..) => {}
     }
 }
+include!("subst/suspension.rs");
+include!("subst/suspension_tests.rs");

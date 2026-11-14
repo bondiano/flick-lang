@@ -28,6 +28,8 @@ codegen/call_site
 codegen/category_classes
 codegen/classes
 codegen/closures
+codegen/counted_failures
+codegen/counted_patterns
 codegen/composition
 codegen/composition_method
 codegen/deep_recursion
@@ -55,6 +57,8 @@ codegen/generic
 codegen/given_shadow
 codegen/handler_arms
 codegen/handlers
+codegen/partial_handlers
+codegen/prototype_operation
 codegen/higher_rank
 codegen/implicit
 codegen/instance_names
@@ -117,6 +121,11 @@ runtime/paths
 runtime/ref_linearizable
 runtime/releases
 runtime/scope_close
+runtime/arena_scope
+runtime/arena_layer_scope
+runtime/arena_owner_list
+runtime/arena_layer_finalizers
+runtime/arena_finalizers
 runtime/scope_owners
 runtime/lambda_owners
 runtime/scope_releases
@@ -320,6 +329,8 @@ ui/wake_chain
 
 codegen/release
 ../rt/interrupt_closed
+../rt/owner_channel
+../rt/owner_foreign_repeat
 
 effect/host_services
 codegen/loops_state
@@ -329,3 +340,6 @@ codegen/loops_owners
 codegen/record_constructor
 
 effect/row_without
+../rt/owner_foreign_policy
+
+runtime/counted_layer_merge

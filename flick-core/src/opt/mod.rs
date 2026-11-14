@@ -1,5 +1,7 @@
 //! Compiler adapters for portable optimizer passes; semantic rules live in support.
 
+pub mod perceus;
+
 use crate::codegen::Known;
 use crate::ir::{self, Expr, Module};
 use crate::types;

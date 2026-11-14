@@ -26,6 +26,9 @@ pub struct Class {
 #[derive(Default)]
 pub struct Decls {
     pub values: HashMap<Path, Scheme>,
+    /// Compiler-only raw foreign aliases. These have source schemes but do
+    /// not add globals to the source calculus or its certificate signature.
+    pub(crate) raw_aliases: HashMap<Path, Path>,
     /// Constructors by `Module.Name`.
     pub constructors: HashMap<Path, Scheme>,
     /// The constructors of each ADT, with their arity.
@@ -86,6 +89,16 @@ impl Decls {
         }
     }
 
+    /// Compiler-private raw names share the source value's one scheme.
+    /// Keeping aliases rather than copies also preserves transformations of
+    /// the declaration inventory, such as qualifier erasure in model checks.
+    pub(crate) fn value(&self, path: &Path) -> Option<&Scheme> {
+        self.values.get(path).or_else(|| {
+            self.raw_aliases
+                .get(path)
+                .and_then(|source| self.values.get(source))
+        })
+    }
     pub fn add(&mut self, interface: &Interface) {
         self.add_kinds(interface);
         let tr = Types::new(&self.params);
