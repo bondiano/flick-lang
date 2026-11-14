@@ -203,7 +203,7 @@ fn prepare(
     } else {
         "Emitting JavaScript"
     });
-    let mut emitted = artifacts(&host, &sources, Some(&project), &compilation, &output);
+    let mut emitted = artifacts(&host, &mut sources, Some(&project), &compilation, &output);
     if !go && !backend.is_component() {
         progress.stage("Writing test runner");
         emitted.artifacts.push(Artifact::source(

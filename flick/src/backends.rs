@@ -19,7 +19,11 @@ use flick_core::project::config::BackendPackage;
 use std::sync::Arc;
 
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
-use flick_core::project::Project;
+#[cfg(feature = "wasm-backends")]
+use flick_core::project;
+use flick_core::project::{Compilation, Project};
+use flick_core::source::SourceMap;
+use flick_ir::Program;
 
 #[derive(Clone, Default)]
 pub(crate) enum Selected {
@@ -37,6 +41,25 @@ impl Selected {
             Self::Component(package) => Some(package.pin()),
         }
     }
+    pub(crate) fn reference_ir(
+        &self,
+        sources: &mut SourceMap,
+        project: Option<&Project>,
+        compilation: &Compilation,
+        rt: bool,
+    ) -> Option<Program> {
+        match self {
+            Self::Native => {
+                let _ = (sources, project, compilation, rt);
+                None
+            }
+            #[cfg(feature = "wasm-backends")]
+            Self::Component(_) => Some(
+                request::program(sources, compilation, project::stages_by_class(project, rt)).0,
+            ),
+        }
+    }
+
     /// Resolve and verify a pin before consulting cached output. Selecting an
     /// unavailable or incompatible component never selects native codegen.
     pub(crate) fn load(project: Option<&Project>) -> Result<Self, Diagnostic> {

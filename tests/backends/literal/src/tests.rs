@@ -58,11 +58,12 @@ fn expression(expr: &Expr) -> Option<String> {
 }
 
 pub(super) fn supported(item: &Item, request: &BuildRequest) -> bool {
-    let external_test = request
-        .modules
-        .iter()
-        .any(|m| m.name == "Test" && m.role == ModuleRole::External && m.package.is_none());
-    external_test
+    let test_abi = request.modules.iter().any(|m| {
+        m.name == "Test"
+            && matches!(m.role, ModuleRole::Builtin | ModuleRole::External)
+            && m.package.is_none()
+    });
+    test_abi
         && request
             .runtime_dependencies
             .iter()
