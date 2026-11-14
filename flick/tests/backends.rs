@@ -291,7 +291,9 @@ fn the_selected_backend_rejects_an_unsupported_environment() {
     assert_eq!(unsupported.status.code(), Some(1), "{unsupported:?}");
     let errors = String::from_utf8_lossy(&unsupported.stderr);
     assert!(
-        errors.contains("FLICK-P013") && errors.contains("unsupported environment"),
+        errors.contains("FLICK-P013")
+            && errors.contains("unsupported environment")
+            && errors.contains("js/unsupported"),
         "{errors}"
     );
     assert_eq!(

@@ -231,8 +231,12 @@ impl Package {
             Err(why) => Emission {
                 artifacts: vec![],
                 diagnostics: vec![failure(format!(
-                    "backend {}@{}#{}: {why}",
-                    self.pin.identity.id, self.pin.identity.version, self.pin.sha256
+                    "backend {}@{}#{} on {}/{}: {why}",
+                    self.pin.identity.id,
+                    self.pin.identity.version,
+                    self.pin.sha256,
+                    prepared.request.target.environment.backend,
+                    prepared.request.target.environment.platform,
                 ))],
             },
         };
