@@ -20,6 +20,8 @@ use crate::project::normalize;
 use crate::source::FileId;
 
 #[cfg(feature = "native-project")]
+use super::super::Settings;
+#[cfg(feature = "native-project")]
 use super::super::specifier;
 use super::super::{Artifact, optimized};
 use super::{Context, typed_options};
@@ -90,17 +92,7 @@ fn write_js_output(
     #[cfg(feature = "native-project")]
     {
         let base = file.rsplit('/').next().unwrap_or(file);
-        // an absolute source becomes relative to the map, so no build path ships
-        let map_dir = normalize(&ctx.settings.out_dir.join(file));
-        let map_dir = map_dir.parent().unwrap_or(ctx.settings.out_dir);
-        let source_path = |file: FileId| {
-            let source = (ctx.settings.source_path)(file);
-            if Path::new(&source).is_absolute() {
-                specifier(map_dir, &normalize(Path::new(&source)))
-            } else {
-                source
-            }
-        };
+        let source_path = |source: FileId| source_path(ctx.settings, file, source);
         let map = sourcemap::source_map(base, &output, ctx.sources, &source_path);
         out.push(Artifact {
             path: file.to_owned(),
@@ -252,4 +244,17 @@ pub fn shared_files(
         ));
     }
     (out, diagnostics)
+}
+
+/// Preserve native source-map path rules as frontend data for a component.
+#[cfg(feature = "native-project")]
+pub fn source_path(settings: &Settings<'_>, output: &str, file: FileId) -> String {
+    let map_dir = normalize(&settings.out_dir.join(output));
+    let map_dir = map_dir.parent().unwrap_or(settings.out_dir);
+    let source = (settings.source_path)(file);
+    if Path::new(&source).is_absolute() {
+        specifier(map_dir, &normalize(Path::new(&source)))
+    } else {
+        source
+    }
 }

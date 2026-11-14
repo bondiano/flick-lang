@@ -11,10 +11,17 @@ publish.workspace = true
 [lints]
 workspace = true
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [features]
 source-maps = []
+component = ["source-maps", "dep:flick-backend", "dep:ciborium", "flick-ir/cbor"]
+guest = ["component"]
 
 [dependencies]
+flick-backend = { path = "../../flick-backend", optional = true }
+ciborium = { version = "0.2.2", optional = true }
 flick-backend-support = { path = "../../flick-backend-support" }
 flick-ir = { path = "../../flick-ir" }
 flick-pretty = { path = "../../flick-pretty" }

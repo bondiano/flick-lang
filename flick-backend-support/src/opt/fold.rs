@@ -3,54 +3,58 @@
 //! constant conditions chosen. A result that is not certain to match JS, or
 //! that JS would throw, stays a run-time computation.
 
-use crate::ir::ExprLang;
 use std::fmt::Write as _;
 
+use crate::Known;
+use crate::consteval::Op as K;
 use crate::consteval::{self, Const};
 use crate::ir::{BinOp, Expr, ExprKind, Lit};
+use crate::numeric as literal;
 use crate::numeric::{self, Arith, Num};
-use crate::syntax::kind::SyntaxKind as K;
-use crate::syntax::literal;
-use crate::types::Dict;
-use crate::types::lang::{self, Lang};
+use flick_ir::Dict;
+use flick_ir::Lang;
 
 /// Folds `e` itself, its operands already folded; whether it changed.
-pub fn fold(e: &mut Expr) -> bool {
+pub fn fold(e: &mut Expr, lang: &Known<'_>) -> bool {
     let folded = match &e.kind {
-        ExprKind::Binary(BinOp::Arith(op, Num::Int), l, r) => int(l)
-            .zip(int(r))
+        ExprKind::Binary(BinOp::Arith(op, Num::Int), l, r) => int(l, lang)
+            .zip(int(r, lang))
             .map(|(l, r)| Const::Number(numeric::int_arith(*op, l, r).into())),
         ExprKind::Binary(op, l, r) => token(*op)
-            .zip(constant(l).zip(constant(r)))
+            .zip(constant(l, lang).zip(constant(r, lang)))
             .and_then(|(op, (l, r))| consteval::binary(op, l, r)),
         ExprKind::Neg(Num::Int, inner) => {
-            int(inner).map(|x| Const::Number(x.wrapping_neg().into()))
+            int(inner, lang).map(|x| Const::Number(x.wrapping_neg().into()))
         }
-        ExprKind::Not(inner) => constant(inner).and_then(|c| consteval::prefix(K::NotKw, c)),
+        ExprKind::Not(inner) => constant(inner, lang).and_then(|c| consteval::prefix(K::NotKw, c)),
         ExprKind::App { func, arg, .. } => match &func.kind {
             ExprKind::Method {
                 dict: Dict::Instance { module, name, args },
                 name: method,
-            } if *module == lang::item(Lang::Instances).module
+            } if lang.get(Lang::Instances).is_some_and(|(m, _)| m == module)
                 && args.is_empty()
-                && *method == lang::item(Lang::ShowMethod).name =>
+                && lang.get(Lang::ShowMethod).is_some_and(|(_, n)| n == method) =>
             {
-                constant(arg).and_then(|c| show(name, c)).map(Const::String)
+                constant(arg, lang)
+                    .and_then(|c| show(name, c))
+                    .map(Const::String)
             }
             ExprKind::Method {
                 dict: Dict::Instance { module, name, args },
                 name: method,
-            } if *module == lang::item(Lang::Instances).module
+            } if lang.get(Lang::Instances).is_some_and(|(m, _)| m == module)
                 && args.is_empty()
-                && *method == lang::item(Lang::DisplayMethod).name =>
+                && lang
+                    .get(Lang::DisplayMethod)
+                    .is_some_and(|(_, n)| n == method) =>
             {
-                constant(arg)
+                constant(arg, lang)
                     .and_then(|c| display(name, c))
                     .map(Const::String)
             }
             _ => None,
         },
-        ExprKind::If(c, t, f) => match constant(c) {
+        ExprKind::If(c, t, f) => match constant(c, lang) {
             Some(Const::Bool(true)) => {
                 *e = (**t).clone();
                 return true;
@@ -206,8 +210,8 @@ fn token(op: BinOp) -> Option<K> {
 }
 
 /// The value of an `Int` constant.
-fn int(e: &Expr) -> Option<i32> {
-    match constant(e)? {
+fn int(e: &Expr, lang: &Known<'_>) -> Option<i32> {
+    match constant(e, lang)? {
         #[allow(
             clippy::cast_possible_truncation,
             reason = "the value is checked to be an i32"
@@ -220,16 +224,20 @@ fn int(e: &Expr) -> Option<i32> {
 
 /// The value of a literal, a negated number literal, or `Float.infinity`
 /// and `Float.nan`.
-pub fn constant(e: &Expr) -> Option<Const> {
+pub fn constant(e: &Expr, lang: &Known<'_>) -> Option<Const> {
     match &e.kind {
         ExprKind::Lit(Lit::Int(n)) => Some(Const::Number((*n).into())),
         ExprKind::Lit(Lit::Float(x)) => Some(Const::Number(*x)),
         ExprKind::Lit(Lit::BigInt(n)) => literal::bigint_digits_value(n).map(Const::BigInt),
         ExprKind::Lit(Lit::String(s)) => Some(Const::String(s.clone())),
         ExprKind::Lit(Lit::Bool(b)) => Some(Const::Bool(*b)),
-        ExprKind::Neg(_, inner) => consteval::prefix(K::Minus, constant(inner)?),
-        kind if kind.is_lang(Lang::FloatInfinity) => Some(Const::Number(f64::INFINITY)),
-        kind if kind.is_lang(Lang::FloatNan) => Some(Const::Number(f64::NAN)),
+        ExprKind::Neg(_, inner) => consteval::prefix(K::Minus, constant(inner, lang)?),
+        ExprKind::Global { module, name } if lang.is(Lang::FloatInfinity, module, name) => {
+            Some(Const::Number(f64::INFINITY))
+        }
+        ExprKind::Global { module, name } if lang.is(Lang::FloatNan, module, name) => {
+            Some(Const::Number(f64::NAN))
+        }
         _ => None,
     }
 }

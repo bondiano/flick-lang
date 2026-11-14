@@ -101,6 +101,16 @@ interface types {
     }
     /// Schema flick.typescript@0.2.0: all physical files of one logical module.
     record typescript-module-projection { files: list<typescript-file> }
+    /// Shared frontend entry classification; a component never typechecks main.
+    record javascript-entry { name: string, module: string, pure: bool }
+    /// Source-map paths indexed by Program.files, for one physical output file.
+    record javascript-file { module: string, output: string, source-paths: list<string> }
+    /// Schema flick.javascript@0.1.0; visibility, entry rules and source paths.
+    record javascript-projection {
+        exports: list<string>,
+        entries: list<javascript-entry>,
+        files: list<javascript-file>,
+    }
     record package-target { %package: string, environments: list<environment> }
     record root-handler { environment: environment, service: symbol, handler: symbol }
     record build-request {

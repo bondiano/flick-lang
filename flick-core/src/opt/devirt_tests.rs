@@ -1,4 +1,4 @@
-use super::super::tests::release;
+use super::tests::release;
 
 /// `Default` of `derive_default.fl`, with `GDefault` over `Generic` and the
 /// instance of `Float`, and `Point` after it.
@@ -66,9 +66,9 @@ fn a_known_default_is_taken_apart_where_it_is_and_named_elsewhere() {
 fn settling_data_does_not_expand_a_recursive_method_function() {
     use std::cell::Cell;
 
-    use super::{Lookup, methods};
     use crate::ir::tests::check_text;
-    use crate::ir::{Expr, ExprKind, ItemKind};
+    use crate::ir::{self, Expr, ExprKind, ItemKind};
+    use flick_backend_support::opt::devirt::{Lookup, methods};
     use flick_ir::Dict;
 
     let (mut module, _) = check_text(
@@ -117,7 +117,9 @@ fn settling_data_does_not_expand_a_recursive_method_function() {
         );
         Some((Vec::new(), method.clone()))
     };
-    let lookup = Lookup::new(&module, &generic);
+    let table = ir::lang_items();
+    let known = crate::codegen::Known::of(&table);
+    let lookup = Lookup::new(&module, &generic, &known);
     assert!(!methods(&mut value, &lookup, &mut 0, 0));
     assert_eq!(value, original);
     assert_eq!(lookups.get(), 1);

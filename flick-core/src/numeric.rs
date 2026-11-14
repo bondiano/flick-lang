@@ -69,34 +69,7 @@ pub fn integer_value(text: &str) -> Option<i128> {
     }
 }
 
-/// `a op b` on `Int`: wraps around, and division by zero is zero.
-pub fn int_arith(op: Arith, a: i32, b: i32) -> i32 {
-    match op {
-        Arith::Add => a.wrapping_add(b),
-        Arith::Sub => a.wrapping_sub(b),
-        Arith::Mul => a.wrapping_mul(b),
-        Arith::Div | Arith::Rem if b == 0 => 0,
-        Arith::Div => a.wrapping_div(b),
-        Arith::Rem => a.wrapping_rem(b),
-        Arith::Pow => int_pow(a, b),
-    }
-}
-
-/// `a ** b` on `Int`, truncated like division for a negative exponent.
-fn int_pow(a: i32, b: i32) -> i32 {
-    match (a, u32::try_from(b)) {
-        (_, Ok(b)) => a.wrapping_pow(b),
-        (1, Err(_)) => 1,
-        (-1, Err(_)) => {
-            if b % 2 == 0 {
-                1
-            } else {
-                -1
-            }
-        }
-        (_, Err(_)) => 0,
-    }
-}
+pub use flick_backend_support::numeric::int_arith;
 
 #[cfg(test)]
 mod tests {

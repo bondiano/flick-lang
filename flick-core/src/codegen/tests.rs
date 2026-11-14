@@ -22,6 +22,7 @@ pub(super) fn compile_with(text: &str, release: bool, labels: Labels) -> super::
     let known = Known::of(&lang);
     let options = Options {
         builtins: &[],
+        paths: None,
         packages: &packages,
         resolved: &resolved,
         typescript: None,
@@ -67,6 +68,7 @@ fn on_rt_with_bridge(text: &str, effect_bridge: EffectBridge) -> String {
     let known = Known::of(&lang);
     let options = Options {
         builtins: &[],
+        paths: None,
         packages: &BTreeMap::new(),
         resolved: &resolved,
         typescript: None,

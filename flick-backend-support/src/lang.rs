@@ -23,6 +23,11 @@ impl<'a> Known<'a> {
         Known { items }
     }
 
+    /// The declared entity of a known role, when present in the program.
+    pub fn get(&self, lang: Lang) -> Option<(&'a str, &'a str)> {
+        self.items[lang as usize]
+    }
+
     /// Whether `module.name` is the lang item `lang`.
     pub fn is(&self, lang: Lang, module: &str, name: &str) -> bool {
         self.items[lang as usize].is_some_and(|(m, n)| m == module && n == name)

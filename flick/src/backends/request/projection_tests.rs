@@ -2,7 +2,8 @@ use super::*;
 
 use crate::backends::Selected;
 use flick_backend::{
-    BackendId, DeclaredInputs, Limits, TypescriptModuleProjection, validate_request,
+    BackendId, DeclaredInputs, JavascriptEntry, JavascriptProjection, Limits,
+    TypescriptModuleProjection, validate_request,
 };
 use flick_core::diagnostics::Severity;
 use std::io;
@@ -66,7 +67,7 @@ impl project::Host for Text {
     }
 }
 
-fn prepared_prefix() -> Prepared {
+pub(super) fn prepared_prefix() -> Prepared {
     let text = Text(
         "module App.Main exposing (main)\nseed : Int\nlet seed = 41\nmodule Narrow : App.Contracts.Output = App.Child\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (Narrow.value + seed))\n",
     );
@@ -89,7 +90,7 @@ fn prepared_prefix() -> Prepared {
         purpose: Purpose::Build,
         backend: Selected::Native,
         out_dir: "unused-projection-output".into(),
-        entries: vec![],
+        entries: vec![("main".into(), "App.Main".into())],
         typescript: true,
         go: false,
         suites: vec![],
@@ -110,6 +111,19 @@ fn prepared_prefix() -> Prepared {
             sha256: flick_backend::sha256(b"test component"),
         },
     )
+}
+
+#[test]
+fn javascript_generation_needs_versioned_frontend_facts() {
+    let prepared = prepared_fixture("tests/run/bootstrap/inline_nested.fl");
+    assert!(
+        prepared
+            .request
+            .projections
+            .iter()
+            .any(|p| { p.schema.name == "flick.javascript" && p.schema.version == "0.1.0" }),
+        "the component needs entry classification and source-map paths without checker callbacks"
+    );
 }
 
 #[test]
@@ -152,6 +166,7 @@ fn a_logical_typescript_module_retains_its_physical_prefix_files() {
         .request
         .projections
         .iter()
+        .filter(|p| p.schema.name == "flick.typescript")
         .map(|p| {
             assert_eq!(p.schema.name, "flick.typescript");
             assert_eq!(p.schema.version, "0.2.0");
@@ -191,4 +206,45 @@ fn a_logical_typescript_module_retains_its_physical_prefix_files() {
         annotation.value
     );
     assert!(!annotation.value.contains("any"));
+}
+
+#[test]
+fn javascript_facts_preserve_entry_rules_and_physical_source_paths() {
+    let prepared = prepared_prefix();
+    let projection = prepared
+        .request
+        .projections
+        .iter()
+        .find(|p| p.module == "App.Main" && p.schema.name == "flick.javascript")
+        .expect("JS facts");
+    let facts: JavascriptProjection =
+        ciborium::from_reader(&prepared.bytes[&projection.input][..]).expect("facts CBOR");
+    assert_eq!(facts.exports, ["main"]);
+    assert_eq!(
+        facts.entries,
+        [JavascriptEntry {
+            name: "main".into(),
+            module: "App.Main".into(),
+            pure: false
+        }]
+    );
+    assert!(facts.files.iter().any(|f| f.module.contains("$lexical$")));
+    let file = facts
+        .files
+        .iter()
+        .find(|f| f.module == "App.Main")
+        .expect("root file");
+    assert_eq!(file.output, "App/Main.ts");
+    assert_eq!(file.source_paths.len(), prepared.request.sources.len());
+    let source = prepared
+        .request
+        .sources
+        .iter()
+        .position(|s| s.name == "/fixture/Main.fl")
+        .expect("own source");
+    assert!(
+        file.source_paths[source].ends_with("/fixture/Main.fl"),
+        "{}",
+        file.source_paths[source]
+    );
 }
