@@ -88,7 +88,9 @@ decoding. These plain data records do not change the world's function
 signatures. The checker and projection rules remain shared.
 
 The CLI also supplies `flick.javascript@0.1.0`, CBOR of
-`javascript-projection`. It records exported value names, entry names with
+`javascript-projection`. It records builtin-name classification (including
+own modules replacing builtin names), independently of role or output path,
+exported value names, entry names with
 the defining module and pure/effect classification, and every physical file's
 output path and source-map paths indexed by `Program.files`. Entry validation
 and P026 spans use the same frontend function as the native development

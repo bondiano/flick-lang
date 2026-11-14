@@ -142,13 +142,35 @@ fn javascript_declarations_and_facades_remain_shared_host_outputs() {
         "{:?}",
         prepared.diagnostics
     );
-    assert!(
-        prepared
-            .request
-            .projections
-            .iter()
-            .all(|p| p.schema.name != "flick.typescript"),
-        "JS declarations need no TypeScript source projection"
+    let mut actual: Vec<_> = prepared
+        .request
+        .projections
+        .iter()
+        .map(|p| {
+            (
+                p.module.clone(),
+                p.schema.name.clone(),
+                p.schema.version.clone(),
+            )
+        })
+        .collect();
+    actual.sort();
+    let program = flick_ir::Program::from_cbor(&prepared.request.program).expect("IR");
+    let mut expected: Vec<_> = program
+        .modules
+        .iter()
+        .map(|m| {
+            (
+                m.name.clone(),
+                "flick.javascript".to_owned(),
+                "0.1.0".to_owned(),
+            )
+        })
+        .collect();
+    expected.sort();
+    assert_eq!(
+        actual, expected,
+        "one JS projection per IR module and no TS projections"
     );
     let text = |path: &str| {
         String::from_utf8(

@@ -50,6 +50,7 @@ impl Prepared {
                 );
             }
             let facts = JavascriptProjection {
+                builtin: builtin_names.contains(&meta.name.as_str()),
                 exports: interface
                     .exports
                     .iter()

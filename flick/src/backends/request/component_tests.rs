@@ -11,6 +11,7 @@ use flick_core::diagnostics::Severity;
 #[cfg(feature = "wasm-backends")]
 use std::fs;
 use std::path::Path;
+use std::str;
 
 fn fixture(typescript: bool, release: bool, rt: bool) -> (Prepared, Vec<build::Artifact>) {
     let host = FsHost::new();
@@ -116,6 +117,133 @@ fn official_js_native_uses_only_the_public_request_in_both_profiles() {
                 parity(&Javascript, &prepared, &native);
             }
         }
+    }
+}
+
+#[test]
+fn official_js_refuses_invalid_spans_without_the_host_driver() {
+    let (prepared, _) = fixture(false, false, false);
+    let program = flick_ir::Program::from_cbor(&prepared.request.program).expect("IR");
+    let module = program
+        .modules
+        .iter()
+        .position(|m| m.name == "App.Main")
+        .expect("own module");
+    let file = program.modules[module].items[0].span.file.index() as usize;
+    for start in [1, 3] {
+        let mut request = prepared.request.clone();
+        let mut bytes = prepared.bytes.clone();
+        let source_id = request.sources[file].input.clone();
+        bytes.insert(source_id.clone(), "é".as_bytes().to_vec());
+        for source in &mut request.sources {
+            if source.input == source_id {
+                source.line_starts = vec![0];
+            }
+        }
+        let input = request
+            .inputs
+            .iter_mut()
+            .find(|i| i.id == source_id)
+            .expect("source input");
+        input.size = 2;
+        input.sha256 = flick_backend::sha256("é".as_bytes());
+        let mut program = program.clone();
+        let item = &mut program.modules[module].items[0];
+        item.span.start = start;
+        item.span.end = start;
+        request.program = program.to_cbor();
+        for generate in [false, true] {
+            let mut inputs =
+                DeclaredInputs::new(&request.inputs, |id| bytes.get(id).cloned()).expect("inputs");
+            let errors = if generate {
+                Javascript
+                    .generate(&request, &mut inputs)
+                    .expect_err("invalid span before generation")
+            } else {
+                Javascript
+                    .check_target(&request, &mut inputs)
+                    .expect_err("invalid span in preflight")
+            };
+            assert!(
+                errors.iter().any(|d| d.message.contains("span")),
+                "{errors:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn official_js_classifies_barrel_exports_independently_of_output_paths() {
+    for (path, builtin, exports) in [
+        ("moved/Ordinary.js", false, true),
+        ("_flick/Relocated.js", false, true),
+        ("moved/BuiltinReplacement.js", true, false),
+    ] {
+        let (mut prepared, _) = fixture(false, false, false);
+        let mut program = flick_ir::Program::from_cbor(&prepared.request.program).expect("IR");
+        let module = program
+            .modules
+            .iter_mut()
+            .find(|m| m.name == "App.Main")
+            .expect("own module");
+        module.exports.reexports.push(flick_ir::Reexport {
+            module: "Platform".into(),
+            namespace: flick_ir::Namespace::Value,
+            name: "stdout_line".into(),
+        });
+        prepared.request.program = program.to_cbor();
+        let meta = prepared
+            .request
+            .modules
+            .iter_mut()
+            .find(|m| m.name == "App.Main")
+            .expect("metadata");
+        meta.output = path.into();
+        let projection = prepared
+            .request
+            .projections
+            .iter()
+            .find(|p| p.module == "App.Main" && p.schema.name == "flick.javascript")
+            .expect("JS facts");
+        let mut facts: flick_backend::JavascriptProjection =
+            ciborium::from_reader(&prepared.bytes[&projection.input][..]).expect("facts");
+        facts.builtin = builtin;
+        facts
+            .files
+            .iter_mut()
+            .find(|f| f.module == "App.Main")
+            .expect("root output")
+            .output
+            .clone_from(&meta.output);
+        let mut bytes = Vec::new();
+        ciborium::into_writer(&facts, &mut bytes).expect("facts encoding");
+        let input = prepared
+            .request
+            .inputs
+            .iter_mut()
+            .find(|i| i.id == projection.input)
+            .expect("facts input");
+        input.sha256 = flick_backend::sha256(&bytes);
+        input.size = u64::try_from(bytes.len()).expect("facts size");
+        prepared.bytes.insert(projection.input.clone(), bytes);
+        let mut inputs = DeclaredInputs::new(&prepared.request.inputs, |id| {
+            prepared.bytes.get(id).cloned()
+        })
+        .expect("inputs");
+        let result = Javascript
+            .generate(&prepared.request, &mut inputs)
+            .expect("relocated module");
+        let output = result
+            .artifacts
+            .iter()
+            .find(|a| a.path == path)
+            .expect("requested output");
+        let text = str::from_utf8(&output.bytes).expect("JS");
+        assert_eq!(
+            text.contains("export { stdout_line } from"),
+            exports,
+            "{path}: {text}"
+        );
     }
 }
 
