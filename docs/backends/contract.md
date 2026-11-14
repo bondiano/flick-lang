@@ -46,6 +46,8 @@ A `BuildRequest` carries these independent facts:
 
 The driver requires every declared input to be available and verifies its
 size and digest before preflight, including inputs the backend never reads.
+It bounds the complete serialized request before loading those inputs,
+including the inline program, options and zero-byte input declarations.
 Missing content rejects the request: a fallback result must not become
 cacheable under a key that would also describe the content once available.
 Runtime dependency pins require a package and a valid SHA-256 in both the
@@ -86,6 +88,8 @@ rejected, including collisions with outputs reserved by the shared compiler.
 Unicode filenames remain supported. Collision checks conservatively combine
 canonical normalization, Unicode case folding and uppercase aliases, and
 Windows device names include the reserved superscript-digit forms.
+Collision keys also account for HFS+ ignorable formatting characters,
+including aliases of compiler-owned files and directory/file prefixes.
 Console aliases are also reserved. Path components fit 255 UTF-8 bytes and
 255 decomposed UTF-16 units so they can be staged on the supported filesystems.
 Launch identity is `(kind, name)`: a run and a test may share a name;

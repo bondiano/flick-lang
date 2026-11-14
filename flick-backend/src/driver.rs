@@ -1,5 +1,6 @@
 use std::{error, fmt};
 
+use crate::request::validate_size;
 use crate::validate::diagnostics;
 use crate::{
     Backend, BuildRequest, BuildResult, DeclaredInputs, Diagnostic, Policy, cache_key, handshake,
@@ -61,6 +62,7 @@ pub fn generate(
     verify_determinism: bool,
 ) -> Result<Generated, Failure> {
     let protocol = Failure::Protocol;
+    validate_size(request, policy.limits).map_err(protocol)?;
     let descriptor = backend.describe();
     handshake(&request.backend, &descriptor, &request.target).map_err(protocol)?;
     // Bound declarations before reading content supplied by the host.

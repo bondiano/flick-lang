@@ -64,9 +64,13 @@ pub(crate) fn insert(
         .flat_map(char::to_uppercase)
         .default_case_fold()
         .nfd()
+        .filter(|c| !hfs_ignorable(*c))
         .collect();
     let mut prefix = String::new();
     for part in key.split('/') {
+        if part.is_empty() || matches!(part, "." | "..") {
+            return Err(format!("invalid backend output path `{path}`"));
+        }
         if !prefix.is_empty() {
             if paths.contains(&prefix) {
                 return Err(format!(
@@ -88,4 +92,10 @@ pub(crate) fn insert(
         ));
     }
     Ok(())
+}
+
+/// The 16 formatting characters ignored by TN1150's `FastUnicodeCompare`.
+/// <https://developer.apple.com/library/archive/technotes/tn/tn1150.html>
+fn hfs_ignorable(character: char) -> bool {
+    matches!(character, '\u{200c}'..='\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{206a}'..='\u{206f}' | '\u{feff}')
 }
