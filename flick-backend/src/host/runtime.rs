@@ -69,6 +69,14 @@ impl Cancellation {
         self.shared.cancelled.load(Ordering::Acquire)
     }
 
+    pub(crate) fn check(&self) -> Result<(), String> {
+        if self.is_cancelled() {
+            Err("component call cancelled".into())
+        } else {
+            Ok(())
+        }
+    }
+
     pub fn cancel(&self) {
         if self.shared.cancelled.swap(true, Ordering::AcqRel) {
             return;

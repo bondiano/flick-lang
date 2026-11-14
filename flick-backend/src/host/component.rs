@@ -5,9 +5,10 @@ use wasmtime::component::{Component, HasSelf, Linker};
 use wasmtime::{Engine, Error, Store};
 
 use super::runtime::{Cancellation, MemoryLimits, memory_limits, prepare, why};
+use crate::request::validate_size;
 use crate::{
     Backend, BackendPin, BuildRequest, BuildResult, DeclaredInputs, Descriptor, Diagnostic, Inputs,
-    Severity, TargetSupport, sha256,
+    Limits, Severity, TargetSupport, sha256,
 };
 
 #[allow(clippy::all, clippy::pedantic)]
@@ -53,7 +54,9 @@ impl State {
         request: Option<&BuildRequest>,
         inputs: &mut dyn Inputs,
         budget: Budget,
+        cancellation: &Cancellation,
     ) -> Result<Self, String> {
+        cancellation.check()?;
         let manifest = request.map_or(&[][..], |r| r.inputs.as_slice());
         let limit = u64::try_from(budget.inputs).unwrap_or(u64::MAX);
         if manifest
@@ -64,10 +67,35 @@ impl State {
         {
             return Err("component input exceeds its host limit".into());
         }
-        let contents = DeclaredInputs::new(manifest, |id| inputs.read(id).ok())?;
+        if let Some(request) = request {
+            let sized = validate_size(
+                request,
+                Limits {
+                    request_bytes: budget.inputs,
+                    ..Limits::default()
+                },
+            );
+            cancellation.check()?;
+            sized?;
+        }
+        let contents = DeclaredInputs::new(manifest, |id| {
+            if cancellation.is_cancelled() {
+                return None;
+            }
+            let bytes = inputs.read(id).ok();
+            if cancellation.is_cancelled() {
+                None
+            } else {
+                bytes
+            }
+        });
+        cancellation.check()?;
+        let contents = contents?;
+        let sizes = manifest.iter().map(|i| (i.id.clone(), i.size)).collect();
+        cancellation.check()?;
         Ok(Self {
             inputs: contents,
-            sizes: manifest.iter().map(|i| (i.id.clone(), i.size)).collect(),
+            sizes,
             remaining: limit,
             calls: budget.input_calls,
             violation: None,
@@ -210,7 +238,7 @@ impl WasmBackend {
         }
         let image = Image::load(engine, &pin.sha256, bytes)?;
         let mut no_inputs = DeclaredInputs::new(&[], |_| None)?;
-        let state = State::new(None, &mut no_inputs, budget)?;
+        let state = State::new(None, &mut no_inputs, budget, &cancellation)?;
         let descriptor =
             convert::descriptor(image.call(state, budget, &cancellation, |i, store| {
                 i.call_describe(store)
@@ -246,6 +274,10 @@ impl WasmBackend {
 }
 
 impl Backend for WasmBackend {
+    fn loaded_pin(&self) -> Option<&BackendPin> {
+        Some(&self.pin)
+    }
+
     fn describe(&self) -> Descriptor {
         self.descriptor.clone()
     }
@@ -261,7 +293,10 @@ impl Backend for WasmBackend {
                 "request backend pin differs from the loaded component",
             ));
         }
-        let state = State::new(Some(request), inputs, self.budget)
+        let state = State::new(Some(request), inputs, self.budget, &self.cancellation)
+            .map_err(|e| self.failure("preflight", &e))?;
+        self.cancellation
+            .check()
             .map_err(|e| self.failure("preflight", &e))?;
         let request = convert::request(request);
         match self
@@ -286,7 +321,10 @@ impl Backend for WasmBackend {
                 "request backend pin differs from the loaded component",
             ));
         }
-        let state = State::new(Some(request), inputs, self.budget)
+        let state = State::new(Some(request), inputs, self.budget, &self.cancellation)
+            .map_err(|e| self.failure("generation", &e))?;
+        self.cancellation
+            .check()
             .map_err(|e| self.failure("generation", &e))?;
         let request = convert::request(request);
         match self

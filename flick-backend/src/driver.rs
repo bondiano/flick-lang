@@ -3,8 +3,8 @@ use std::{error, fmt};
 use crate::request::validate_size;
 use crate::validate::diagnostics;
 use crate::{
-    Backend, BuildRequest, BuildResult, DeclaredInputs, Diagnostic, Policy, cache_key, handshake,
-    validate_request, validate_result,
+    Backend, BuildRequest, BuildResult, DeclaredInputs, Diagnostic, Policy, Severity, cache_key,
+    handshake, validate_request, validate_result,
 };
 
 #[derive(Debug)]
@@ -62,6 +62,20 @@ pub fn generate(
     verify_determinism: bool,
 ) -> Result<Generated, Failure> {
     let protocol = Failure::Protocol;
+    if let Some(pin) = backend.loaded_pin()
+        && pin != &request.backend
+    {
+        return Err(Failure::Rejected(vec![Diagnostic {
+            code: "P013".into(),
+            severity: Severity::Error,
+            message: format!(
+                "backend {}@{}#{} preflight: request backend pin differs from the loaded component",
+                pin.identity.id, pin.identity.version, pin.sha256
+            ),
+            span: None,
+            notes: vec![],
+        }]));
+    }
     validate_size(request, policy.limits).map_err(protocol)?;
     let descriptor = backend.describe();
     handshake(&request.backend, &descriptor, &request.target).map_err(protocol)?;

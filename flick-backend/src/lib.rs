@@ -40,6 +40,12 @@ pub use bindings::flick::backend::types::*;
 /// The same operations as the component world, using the same records.
 /// This trait is an implementation convenience, not a native public ABI.
 pub trait Backend {
+    /// The host's immutable binding to loaded bytes, checked before input reads.
+    /// Native development implementations need not bind a component image.
+    /// This host metadata does not add an operation to the component ABI.
+    fn loaded_pin(&self) -> Option<&BackendPin> {
+        None
+    }
     fn describe(&self) -> Descriptor;
     fn check_target(
         &self,

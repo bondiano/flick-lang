@@ -15,6 +15,8 @@ use flick_ir::{ExprKind, ItemKind, Lit, Program, Stage};
 #[derive(Default)]
 pub struct Literal;
 
+const READ_SOURCE: &str = "literal read case requires a source input";
+
 fn diagnostic(message: &str, span: Option<Span>) -> Vec<Diagnostic> {
     vec![Diagnostic {
         code: "P012".into(),
@@ -67,6 +69,9 @@ impl Backend for Literal {
         request: &BuildRequest,
         _: &mut dyn Inputs,
     ) -> Result<TargetSupport, Vec<Diagnostic>> {
+        if case(request) == "reads" && request.sources.is_empty() {
+            return Err(diagnostic(READ_SOURCE, None));
+        }
         let program =
             Program::from_cbor(&request.program).map_err(|e| diagnostic(&e.to_string(), None))?;
         for module in &program.modules {
@@ -121,8 +126,12 @@ impl Backend for Literal {
                 let _ = inputs.read("not-declared");
             }
             "reads" => {
+                let source = request
+                    .sources
+                    .first()
+                    .ok_or_else(|| diagnostic(READ_SOURCE, None))?;
                 for _ in 0..1000 {
-                    let _ = inputs.read(&request.sources[0].input);
+                    let _ = inputs.read(&source.input);
                 }
             }
             "clock" => {

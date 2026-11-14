@@ -1,6 +1,8 @@
 #![cfg(feature = "host")]
 
 mod common;
+#[path = "component_host/preparation.rs"]
+mod preparation;
 
 use std::path::PathBuf;
 use std::sync::OnceLock;
@@ -69,12 +71,34 @@ fn compile(backend: &dyn Backend, request: &BuildRequest) -> Result<Generated, F
 fn mismatched_request_pin_is_rejected_by_the_driver() {
     let (backend, mut request) = fixture(Budget::default());
     request.backend.sha256 = sha256(b"another component");
-    let error = compile(&backend, &request).err().expect("mismatched pin");
-    let Failure::Rejected(diagnostics) = error else {
-        panic!("expected the loaded component to reject a different request pin")
+    let policy = Policy {
+        toolchains: &request.toolchains,
+        environment: &[],
+        reserved_paths: &[],
+        authorize_step: &common::authorize,
+        limits: Limits::default(),
     };
-    assert_eq!(diagnostics[0].code, "P013");
-    assert!(diagnostics[0].message.contains("request backend pin"));
+    for available in [true, false] {
+        let mut reads = 0;
+        let error = generate(
+            &backend,
+            &request,
+            &policy,
+            |_| {
+                reads += 1;
+                available.then(|| common::TEXT.as_bytes().to_vec())
+            },
+            true,
+        )
+        .err()
+        .expect("mismatched pin");
+        let Failure::Rejected(diagnostics) = error else {
+            panic!("expected the loaded component to reject a different request pin")
+        };
+        assert_eq!(diagnostics[0].code, "P013");
+        assert!(diagnostics[0].message.contains("request backend pin"));
+        assert_eq!(reads, 0);
+    }
 }
 
 #[derive(Default)]

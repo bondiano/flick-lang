@@ -24,7 +24,9 @@ same Wasmtime configuration and compiled-code cache as the plugin host.
 The literal third-party fixture exercises it as an actual WASM component.
 A loaded component checks the complete request backend pin before preparing
 inputs in both `check-target` and direct `generate` calls. A matching id and
-version with another component digest is rejected.
+version with another component digest is rejected. The driver checks the
+host's loaded pin before snapshotting any input, even when that input is
+unavailable; a mismatch remains a P013 diagnostic with no reader calls.
 Registry and CLI integration, official release components, the browser
 loader, atomic publication and tool execution adapters remain separate
 integration work. In particular, accepting a graph here does not execute
@@ -143,7 +145,9 @@ instance; mutable guest state is never cached between operations.
 
 The host grants only declared, digest-checked `inputs.read` data. Other
 imports, including WASI filesystem, clock, random and process operations,
-trap when called. Input transfer and call-count limits trap even if a guest
+trap when called. The complete serialized request is bounded before input
+snapshots or conversion, including metadata on direct calls. Input transfer
+and call-count limits trap even if a guest
 tries to ignore a read error. Instruction fuel, aggregate linear-memory and
 table storage, and the budget for lifting output into host-owned values are
 configured by the host. Output accounting runs during canonical ABI lifting,
@@ -153,7 +157,9 @@ store's memory budget and still require process-level measurement.
 
 Cancellation uses engine epochs with a separate token for each build.
 Canceling one build stops its active guest execution and refuses later
-calls, while unrelated stores sharing the engine continue. Host tool steps
+calls, while unrelated stores sharing the engine continue. Preparation checks
+the token before reading inputs, between reads and before conversion; cancellation
+takes priority over preparation errors. Host tool steps
 and publication must also honor that token when integrated. Transport
 failures carry the backend id, version and digest in a `P013` diagnostic;
 guest diagnostics are subject to the same source-span validation as native
