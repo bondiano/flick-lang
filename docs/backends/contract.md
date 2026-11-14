@@ -22,6 +22,9 @@ both with IR and plain data without `Compilation` or `Settings`.
 The optional `flick-backend/host` feature executes this world using the
 same Wasmtime configuration and compiled-code cache as the plugin host.
 The literal third-party fixture exercises it as an actual WASM component.
+A loaded component checks the complete request backend pin before preparing
+inputs in both `check-target` and direct `generate` calls. A matching id and
+version with another component digest is rejected.
 Registry and CLI integration, official release components, the browser
 loader, atomic publication and tool execution adapters remain separate
 integration work. In particular, accepting a graph here does not execute

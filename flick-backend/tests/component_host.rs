@@ -12,8 +12,8 @@ use wasmtime::Engine;
 
 use flick_backend::host::{Budget, WasmBackend, runtime};
 use flick_backend::{
-    Backend, BackendPin, BuildRequest, Failure, Generated, Limits, Mode, OptionValue, Policy,
-    generate, sha256,
+    Backend, BackendPin, BuildRequest, Failure, Generated, InputError, Inputs, Limits, Mode,
+    OptionValue, Policy, generate, sha256,
 };
 use flick_ir::{ExprKind, ItemKind, Program, Stage};
 use flick_test_backend::Literal;
@@ -62,6 +62,51 @@ fn compile(backend: &dyn Backend, request: &BuildRequest) -> Result<Generated, F
         |_| Some(common::TEXT.as_bytes().to_vec()),
         true,
     )
+}
+
+#[test]
+#[ignore = "build the real component fixture with `just wasm-backends`"]
+fn mismatched_request_pin_is_rejected_by_the_driver() {
+    let (backend, mut request) = fixture(Budget::default());
+    request.backend.sha256 = sha256(b"another component");
+    let error = compile(&backend, &request).err().expect("mismatched pin");
+    let Failure::Rejected(diagnostics) = error else {
+        panic!("expected the loaded component to reject a different request pin")
+    };
+    assert_eq!(diagnostics[0].code, "P013");
+    assert!(diagnostics[0].message.contains("request backend pin"));
+}
+
+#[derive(Default)]
+struct UnreadableInputs(usize);
+
+impl Inputs for UnreadableInputs {
+    fn read(&mut self, _: &str) -> Result<Vec<u8>, InputError> {
+        self.0 += 1;
+        Err(InputError::Unavailable)
+    }
+}
+
+#[test]
+#[ignore = "build the real component fixture with `just wasm-backends`"]
+fn mismatched_request_pin_is_rejected_before_direct_input_preparation() {
+    let (backend, mut request) = fixture(Budget::default());
+    request.backend.sha256 = sha256(b"another component");
+    for generation in [false, true] {
+        let mut inputs = UnreadableInputs::default();
+        let diagnostics = if generation {
+            backend
+                .generate(&request, &mut inputs)
+                .expect_err("mismatched pin")
+        } else {
+            backend
+                .check_target(&request, &mut inputs)
+                .expect_err("mismatched pin")
+        };
+        assert_eq!(diagnostics[0].code, "P013");
+        assert!(diagnostics[0].message.contains("request backend pin"));
+        assert_eq!(inputs.0, 0);
+    }
 }
 
 #[test]

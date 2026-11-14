@@ -255,6 +255,12 @@ impl Backend for WasmBackend {
         request: &BuildRequest,
         inputs: &mut dyn Inputs,
     ) -> Result<TargetSupport, Vec<Diagnostic>> {
+        if request.backend != self.pin {
+            return Err(self.failure(
+                "preflight",
+                "request backend pin differs from the loaded component",
+            ));
+        }
         let state = State::new(Some(request), inputs, self.budget)
             .map_err(|e| self.failure("preflight", &e))?;
         let request = convert::request(request);
@@ -274,6 +280,12 @@ impl Backend for WasmBackend {
         request: &BuildRequest,
         inputs: &mut dyn Inputs,
     ) -> Result<BuildResult, Vec<Diagnostic>> {
+        if request.backend != self.pin {
+            return Err(self.failure(
+                "generation",
+                "request backend pin differs from the loaded component",
+            ));
+        }
         let state = State::new(Some(request), inputs, self.budget)
             .map_err(|e| self.failure("generation", &e))?;
         let request = convert::request(request);
