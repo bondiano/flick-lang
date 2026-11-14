@@ -5,7 +5,8 @@ mod common;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use flick_backend::{
-    Abi, Input, InputKind, Inputs, OptionValue, Projection, TypescriptProjection, sha256,
+    Abi, Input, InputKind, Inputs, OptionValue, Projection, TypescriptFile,
+    TypescriptModuleProjection, TypescriptProjection, sha256,
 };
 use flick_core::codegen::go::{Bindings, Input as GoInput};
 use flick_core::codegen::ts::Typed;
@@ -27,7 +28,7 @@ fn js_ts_and_maps_use_ir_and_plain_data_without_compilation_or_settings() {
         module: "App".into(),
         schema: Abi {
             name: "flick.typescript".into(),
-            version: "0.1.0".into(),
+            version: "0.2.0".into(),
         },
         input: "ts/App".into(),
     });
@@ -66,21 +67,29 @@ fn js_ts_and_maps_use_ir_and_plain_data_without_compilation_or_settings() {
     // codegen.md specifies Unit's JS ABI as undefined, and the function itself is pure.
     assert!(js.code.contains("=> undefined"), "{}", js.code);
     assert!(!js.code.contains("yield"));
-    let projection: TypescriptProjection =
+    let projection: TypescriptModuleProjection =
         ciborium::from_reader(&inputs.read("ts/App").expect("projection")[..]).expect("TS data");
-    let types = BTreeMap::from([(
-        "App".into(),
-        Typed {
-            declarations: projection.declarations,
-            annotations: projection
-                .annotations
-                .into_iter()
-                .map(|v| (v.key, v.value))
-                .collect(),
-            imports: projection.imports,
-            modules: projection.modules,
-        },
-    )]);
+    let types: BTreeMap<_, _> = projection
+        .files
+        .into_iter()
+        .map(|file| {
+            assert_eq!(file.output, "App.ts");
+            let projection = file.projection;
+            (
+                file.module,
+                Typed {
+                    declarations: projection.declarations,
+                    annotations: projection
+                        .annotations
+                        .into_iter()
+                        .map(|v| (v.key, v.value))
+                        .collect(),
+                    imports: projection.imports,
+                    modules: projection.modules,
+                },
+            )
+        })
+        .collect();
     let ts = codegen::js(
         module,
         &Options {
@@ -142,14 +151,20 @@ fn go_uses_ir_and_plain_data_without_compilation_or_settings() {
 }
 
 fn typescript_projection() -> Vec<u8> {
-    let projection = TypescriptProjection {
-        declarations: vec![],
-        annotations: vec![OptionValue {
-            key: "main".into(),
-            value: "(_: undefined) => undefined".into(),
+    let projection = TypescriptModuleProjection {
+        files: vec![TypescriptFile {
+            module: "App".into(),
+            output: "App.ts".into(),
+            projection: TypescriptProjection {
+                declarations: vec![],
+                annotations: vec![OptionValue {
+                    key: "main".into(),
+                    value: "(_: undefined) => undefined".into(),
+                }],
+                imports: String::new(),
+                modules: vec![],
+            },
         }],
-        imports: String::new(),
-        modules: vec![],
     };
     let mut projected = Vec::new();
     ciborium::into_writer(&projection, &mut projected).expect("TS projection");

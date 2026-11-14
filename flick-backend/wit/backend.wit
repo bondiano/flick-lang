@@ -93,6 +93,14 @@ interface types {
         imports: string,
         modules: list<string>,
     }
+    /// One physical ESM file of a logical module, including lexical prefixes.
+    record typescript-file {
+        module: string,
+        output: string,
+        projection: typescript-projection,
+    }
+    /// Schema flick.typescript@0.2.0: all physical files of one logical module.
+    record typescript-module-projection { files: list<typescript-file> }
     record package-target { %package: string, environments: list<environment> }
     record root-handler { environment: environment, service: symbol, handler: symbol }
     record build-request {

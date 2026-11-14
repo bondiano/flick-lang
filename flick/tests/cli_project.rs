@@ -7,6 +7,8 @@ mod artifacts;
 mod common;
 #[path = "cli_project/doc.rs"]
 mod doc_tests;
+#[path = "cli_project/foreign_inputs.rs"]
+mod foreign_inputs;
 #[path = "cli_project/output_guards.rs"]
 mod output_guards;
 

@@ -80,9 +80,12 @@ The current CLI bridge uses whole-program mode. Builtins are explicit lowered
 modules with interfaces and the actual lowering texts, including generated
 declarations. Their file identities are remapped into the request's source
 table alongside the project's files; cached lowering preserves this provenance.
-The official emitters still need full foreign resolution and shared projection
-inputs. Full typing/effect facts and UI metadata are not
-assumed to exist in `Program`. See the [dependency inventory](baseline.md).
+For JS/TS, the bridge also supplies host-resolved foreign specifiers, declared
+library file bytes, effective runtime/bridge options and versioned TypeScript
+projections for all physical files. Shared declarations and Promise facades
+remain host outputs. Complete npm/runtime pins, Go foreign inputs and official
+emitter integration remain open. Full typing/effect facts and UI metadata are
+not assumed to exist in `Program`. See the [dependency inventory](baseline.md).
 
 Projects without an explicit pin still use the temporary native JS/Go
 baseline. Shipping and selecting the official JS component, the browser

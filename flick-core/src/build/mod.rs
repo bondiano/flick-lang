@@ -21,8 +21,12 @@ mod javascript;
 pub use crate::effects;
 pub(crate) use crate::effects::bindings;
 pub use abi::interface;
+pub use bridge_select::select as javascript_effect_bridge;
 pub use interfaces::published_interfaces;
 pub use javascript::emit;
+pub use javascript::foreign_inputs as javascript_foreign_inputs;
+pub use javascript::foreign_specifier as javascript_foreign_specifier;
+pub use javascript::shared_files as javascript_shared_files;
 
 use std::path::{Component, Path, PathBuf};
 
