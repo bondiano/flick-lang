@@ -138,7 +138,7 @@ impl Checker<'_> {
             {
                 missing(&only_left, true)?;
                 let Type::Meta(m) = **row else {
-                    unreachable!("matched above")
+                    return Err(Mismatch::Types(left.into_type(), right.into_type()));
                 };
                 self.bind(m, &left_out(only_right, tails_right, gone, false)?)
             }
@@ -147,7 +147,7 @@ impl Checker<'_> {
             {
                 missing(&only_right, false)?;
                 let Type::Meta(m) = **row else {
-                    unreachable!("matched above")
+                    return Err(Mismatch::Types(left.into_type(), right.into_type()));
                 };
                 self.bind(m, &left_out(only_left, tails_left, gone, true)?)
             }
