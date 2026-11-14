@@ -49,14 +49,14 @@ pub(super) fn validate(
     Ok(texts)
 }
 
-fn valid(span: Span, texts: &[Arc<String>]) -> bool {
+fn valid(span: Span, texts: &[&str]) -> bool {
     span.start <= span.end
         && texts.get(span.file.index() as usize).is_some_and(|text| {
             text.is_char_boundary(span.start as usize) && text.is_char_boundary(span.end as usize)
         })
 }
 
-fn expression(expr: &Expr, texts: &[Arc<String>]) -> bool {
+fn expression(expr: &Expr, texts: &[&str]) -> bool {
     if !valid(expr.span, texts) {
         return false;
     }
@@ -65,7 +65,8 @@ fn expression(expr: &Expr, texts: &[Arc<String>]) -> bool {
     checked
 }
 
-pub(super) fn spans(program: &Program, texts: &[Arc<String>]) -> Result<(), String> {
+/// Check every item and expression byte span against its UTF-8 source.
+pub fn validate_source_spans(program: &Program, texts: &[&str]) -> Result<(), String> {
     for module in &program.modules {
         for item in &module.items {
             let mut checked = valid(item.span, texts);

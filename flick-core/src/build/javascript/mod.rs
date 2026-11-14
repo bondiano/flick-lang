@@ -2,7 +2,10 @@
 
 mod module;
 pub use module::shared_files;
+#[cfg(feature = "native-project")]
+pub use module::source_path;
 mod runner;
+pub use runner::{EntryFacts, entry_facts};
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
@@ -37,12 +40,9 @@ pub fn emit(
     #[cfg(not(feature = "native-project"))]
     let _ = sources;
     let mut diagnostics = Vec::new();
-    #[cfg(not(target_arch = "wasm32"))]
-    if settings.backend == Backend::Rt && !settings.effect_bridge.available() {
-        capabilities::check(compilation, settings, sources, &mut diagnostics);
-        if !diagnostics.is_empty() {
-            return (Vec::new(), diagnostics);
-        }
+    preflight(compilation, sources, settings, &mut diagnostics);
+    if !diagnostics.is_empty() {
+        return (Vec::new(), diagnostics);
     }
     let modules = &compilation.modules;
     let builtin_names: Vec<&str> = types::builtin_sources().iter().map(|(n, _)| *n).collect();
@@ -94,6 +94,7 @@ pub fn emit(
     let untyped = BTreeMap::new();
     let options = Options {
         builtins: &builtin_names,
+        paths: None,
         packages: &packages,
         resolved: &resolved,
         typescript: settings.typescript.then_some(&untyped),
@@ -129,6 +130,21 @@ pub fn emit(
     builtins(&ctx, imports, &mut out);
     entry_runners(settings, modules, &path, &mut out, &mut diagnostics);
     (out, diagnostics)
+}
+
+/// Common runtime capability checks before native or component generation.
+pub fn preflight(
+    compilation: &Compilation,
+    sources: &SourceMap,
+    settings: &Settings,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    #[cfg(not(target_arch = "wasm32"))]
+    if settings.backend == Backend::Rt && !settings.effect_bridge.available() {
+        capabilities::check(compilation, settings, sources, diagnostics);
+    }
+    #[cfg(target_arch = "wasm32")]
+    let _ = (compilation, sources, settings, diagnostics);
 }
 
 /// The specifiers of the foreign modules of `compilation` and the built-in

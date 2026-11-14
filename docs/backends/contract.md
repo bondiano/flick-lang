@@ -32,9 +32,10 @@ host's loaded pin before snapshotting any input, even when that input is
 unavailable; a mismatch remains a P013 diagnostic with no reader calls.
 The CLI supports [explicit pinned package selection](registry.md) through
 this world for build/run/test. Projects without a pin still use the temporary
-native baseline. Official release components, the browser loader, atomic
-publication and tool execution adapters remain separate integration work. In particular, accepting a graph here does not execute
-it or establish that a tool's arguments access only declared files.
+native baseline. Official component distribution/default selection, the browser
+loader, atomic publication and tool execution adapters remain integration work.
+Accepting a graph here does not execute it or establish that a tool's arguments
+access only declared files.
 
 ## Input boundary
 
@@ -85,6 +86,24 @@ are sorted by key. The earlier `0.1.0` contract probe used a single
 `typescript-projection`; consumers must check the schema version before
 decoding. These plain data records do not change the world's function
 signatures. The checker and projection rules remain shared.
+
+The CLI also supplies `flick.javascript@0.1.0`, CBOR of
+`javascript-projection`. It records builtin-name classification (including
+own modules replacing builtin names), independently of role or output path,
+exported value names, entry names with
+the defining module and pure/effect classification, and every physical file's
+output path and source-map paths indexed by `Program.files`. Entry validation
+and P026 spans use the same frontend function as the native development
+adapter. Source byte offsets and line starts remain in the source manifest;
+the component calculates UTF-16 columns from declared source bytes. These
+records add no checker or host-path lookup callback to the world.
+
+`backends/js` now implements the world through its `guest` feature. Its actual
+component is built without WASI by `just js-component`. Native/WASM parity
+covers JS/TS and both profiles; explicit package selection exercises the
+common CLI. The component calculates release ABI and invokes the same
+portable optimizer with `Program.lang`. This remains distinct from making it
+the default release backend or adding the browser component loader.
 
 The host prepares `.d.ts` and Promise facades with the same projection
 implementation as the native baseline and reserves their output paths.

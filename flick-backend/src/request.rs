@@ -8,6 +8,8 @@ use crate::{BuildRequest, InputKind, Inputs, Mode, ModuleInput, ModuleRole, VERS
 mod graph;
 mod sources;
 
+pub use sources::validate_source_spans;
+
 /// Validate the closed graph and all referenced side inputs before target
 /// preflight. This is structural validation, not a proof of IR semantics.
 pub fn validate_request(
@@ -63,7 +65,10 @@ pub fn validate_request(
     if !problems.is_empty() {
         return Err(format!("invalid backend IR: {}", problems.join("; ")));
     }
-    sources::spans(&program, &texts)?;
+    validate_source_spans(
+        &program,
+        &texts.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
+    )?;
     match (&request.target.mode, &request.module_root) {
         (Mode::WholeProgram, None) => {}
         (Mode::PerModule, Some(root)) if program.modules.iter().any(|m| m.name == *root) => {}

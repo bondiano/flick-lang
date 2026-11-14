@@ -181,6 +181,25 @@ interface types {
     files: list<typescript-file>,
   }
 
+  record javascript-entry {
+    name: string,
+    module: string,
+    pure: bool,
+  }
+
+  record javascript-file {
+    module: string,
+    output: string,
+    source-paths: list<string>,
+  }
+
+  record javascript-projection {
+    builtin: bool,
+    exports: list<string>,
+    entries: list<javascript-entry>,
+    files: list<javascript-file>,
+  }
+
   record package-target {
     %package: string,
     environments: list<environment>,
