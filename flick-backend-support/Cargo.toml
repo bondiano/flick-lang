@@ -1,0 +1,22 @@
+[package]
+name = "flick-backend-support"
+description = "Portable helpers shared by Flick backends and frontend projections"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+native-project = []
+
+[build-dependencies]
+serde_json = { workspace = true }
+
+[dependencies]
+flick-ir = { path = "../flick-ir" }
+serde_json = { workspace = true }

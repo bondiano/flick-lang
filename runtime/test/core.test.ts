@@ -76,7 +76,7 @@ const exportsOf = async (path: string): Promise<Set<string>> => {
 
 test("core has every runtime helper compiled code calls", async () => {
   const core = await exportsOf("../src/core/index.ts");
-  const dir = new URL("flick-core/src/codegen/js/", repo);
+  const dir = new URL("backends/js/src/codegen/js/", repo);
   // `kernel.rs` and `bridge.rs` emit only for Flick's own runtime.
   const codegen = (kernel: boolean): string =>
     readdirSync(dir)

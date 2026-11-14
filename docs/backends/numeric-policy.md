@@ -39,7 +39,7 @@ specialized operators must implement the same rules.
 ## Implementation and evidence
 
 The compiler's literal/folding policy is in `flick-core/src/numeric.rs` and
-`opt/fold.rs`. JS uses `codegen/js/binary.rs` and
+`opt/fold.rs`. JS uses `backends/js/src/codegen/js/binary.rs` and
 `runtime/src/core/text.ts`; Go uses `codegen/go/arith.rs` and
 `runtime-go/flickrt/{number,effnum}.go`. Float formatting also serves the
 reference interpreter through `flick-model/src/native/show.rs`; its existing

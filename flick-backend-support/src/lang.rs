@@ -2,8 +2,8 @@
 //! the program gives its backend: the built-in entities a backend has its
 //! own representation of, whatever the library names them.
 
-use crate::ir::LangItem;
 use flick_ir::Lang;
+use flick_ir::LangItem;
 
 /// The module and name of each lang item of a program, by [`Lang`].
 pub struct Known<'a> {
@@ -32,8 +32,8 @@ impl<'a> Known<'a> {
 #[cfg(test)]
 mod tests {
     use super::Known;
-    use crate::ir::LangItem;
     use flick_ir::Lang;
+    use flick_ir::LangItem;
     use flick_ir::Namespace;
 
     /// What the table says, whatever the library calls the entities.

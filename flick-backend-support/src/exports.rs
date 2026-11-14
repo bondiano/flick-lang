@@ -9,7 +9,7 @@ use flick_ir::Namespace;
 /// The `export … from` lines of what a module exports of other modules,
 /// `(module, namespace, name)`, by the module that defines each, and those
 /// modules; a type that a value of its module is named after goes with it.
-pub(crate) fn reexports(
+pub fn reexports(
     entities: &[(&str, Namespace, &str)],
     path: &dyn Fn(&str) -> String,
 ) -> (String, Vec<String>) {

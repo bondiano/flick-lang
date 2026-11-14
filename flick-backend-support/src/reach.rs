@@ -6,11 +6,13 @@
 use std::collections::HashMap;
 #[cfg(feature = "native-project")]
 use std::collections::HashSet;
+#[cfg(feature = "native-project")]
+use std::hash::BuildHasher;
 
 #[cfg(any(not(target_arch = "wasm32"), feature = "native-project"))]
-use crate::ir::Module;
-use crate::ir::{Expr, ExprKind, Item, ItemKind};
-use crate::types::{Dict, default_method};
+use flick_ir::Module;
+use flick_ir::{Dict, default_method};
+use flick_ir::{Expr, ExprKind, Item, ItemKind};
 
 /// A top-level name: its module, and the value, foreign or instance name.
 pub type Key = (String, String);
@@ -84,9 +86,9 @@ pub fn index(modules: &[&Module]) -> HashMap<Key, (usize, usize)> {
 /// The items reachable from `roots`, by module and item index, and the
 /// modules reached that the program does not have.
 #[cfg(feature = "native-project")]
-pub fn reachable(
+pub fn reachable<S: BuildHasher>(
     modules: &[&Module],
-    index: &HashMap<Key, (usize, usize)>,
+    index: &HashMap<Key, (usize, usize), S>,
     roots: &[Key],
 ) -> (HashSet<(usize, usize)>, Vec<String>) {
     let mut seen = HashSet::new();
