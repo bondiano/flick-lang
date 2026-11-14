@@ -191,3 +191,60 @@ fn repeated_diagnostics_load_each_source_once_per_validation() {
     );
     assert_eq!(inputs.0, 1);
 }
+
+#[test]
+fn windows_console_aliases_are_not_regular_output_paths() {
+    for path in [
+        "CONIN$",
+        "conout$",
+        "dir/CONIN$.txt",
+        "CONIN$ .txt",
+        "NUL .txt",
+        "COM1  .dat",
+    ] {
+        let mut result = result();
+        result.artifacts[0].path = path.into();
+        assert!(validate(&request(), &result).is_err(), "{path}");
+    }
+    let mut result = result();
+    result.artifacts[0].path = "CONIN_data.txt".into();
+    assert_eq!(validate(&request(), &result), Ok(vec![]));
+}
+
+#[test]
+fn filename_components_fit_common_byte_and_unicode_limits() {
+    for path in ["x".repeat(256), "é".repeat(128), "ᾂ".repeat(64)] {
+        let mut result = result();
+        result.artifacts[0].path = path.clone();
+        assert!(validate(&request(), &result).is_err(), "{path}");
+    }
+    for path in [
+        "x".repeat(255),
+        format!("{}a", "é".repeat(127)),
+        format!("{}abc", "ᾂ".repeat(63)),
+    ] {
+        let mut result = result();
+        result.artifacts[0].path = path;
+        assert_eq!(validate(&request(), &result), Ok(vec![]));
+    }
+}
+
+#[test]
+fn launch_identity_includes_the_kind_and_name() {
+    let request = request();
+    let mut result = result();
+    result.artifacts[0].kind = ArtifactKind::Executable;
+    let run = Launch {
+        name: "main".into(),
+        kind: LaunchKind::Run,
+        artifact: "object".into(),
+        runtime: None,
+        arguments: vec![],
+    };
+    let mut test = run.clone();
+    test.kind = LaunchKind::Test;
+    result.launches = vec![run, test.clone()];
+    assert_eq!(validate(&request, &result), Ok(vec![]));
+    result.launches.push(test);
+    assert!(validate(&request, &result).is_err());
+}

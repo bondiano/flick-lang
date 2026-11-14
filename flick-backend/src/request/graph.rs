@@ -29,7 +29,9 @@ pub(super) fn modules<'r>(
             return Err("external module has no explicit interface ABI".into());
         }
     }
+    let mut ir_names = BTreeSet::new();
     for module in &program.modules {
+        ir_names.insert(module.name.as_str());
         let metadata = modules
             .get(module.name.as_str())
             .ok_or("request module metadata differs from its IR graph")?;
@@ -40,9 +42,10 @@ pub(super) fn modules<'r>(
             ));
         }
     }
-    if modules.values().any(|m| {
-        m.role != ModuleRole::External && !program.modules.iter().any(|ir| ir.name == m.name)
-    }) {
+    if modules
+        .values()
+        .any(|m| m.role != ModuleRole::External && !ir_names.contains(m.name.as_str()))
+    {
         return Err("request module metadata differs from its IR graph".into());
     }
     Ok(modules)

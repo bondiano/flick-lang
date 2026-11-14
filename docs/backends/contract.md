@@ -86,6 +86,10 @@ rejected, including collisions with outputs reserved by the shared compiler.
 Unicode filenames remain supported. Collision checks conservatively combine
 canonical normalization, Unicode case folding and uppercase aliases, and
 Windows device names include the reserved superscript-digit forms.
+Console aliases are also reserved. Path components fit 255 UTF-8 bytes and
+255 decomposed UTF-16 units so they can be staged on the supported filesystems.
+Launch identity is `(kind, name)`: a run and a test may share a name;
+duplicates within one kind are rejected.
 
 Step outputs must name their producer as a direct dependency when consumed.
 The validator sorts the graph; input order need not be topological. Tool
