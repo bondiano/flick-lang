@@ -40,6 +40,16 @@ The entry points are `flick/src/commands/build.rs` (`artifacts`),
 `flick-core/src/build/go.rs` (`emit`). Build/run/test reuse those paths; their
 existing cache, package and CLI behavior must survive the extraction.
 
+The Rust JS emitter now lives in `backends/js/src/codegen`; its dependencies
+contain neither the checker nor the project driver. `flick-core::codegen`
+retains the native adapter. Names, lang-item lookup, tail/loop analysis,
+ordering, reachability and package binding policy
+are in `flick-backend-support` because the JS emitter, Go emitter and shared
+frontend actually use them. TypeScript projection rules, `.iface` and
+declarations remain in the frontend. The native source-map adapter supplies
+plain UTF-16 positions to the emitter. This source move does not establish
+the production WIT component path or the browser component loader.
+
 `Program` contains neither complete typing/effect facts nor the checker's UI
 metadata. Receiving its optional `Expr::ty`/`Param::ty` names does not provide
 either analysis. A required extra projection needs an identified schema,
@@ -110,7 +120,7 @@ APIs.
 | Checked and unsafe integer APIs keep their distinct failure behavior | Checked/unsafe runtime functions | Checked/unsafe runtime functions |
 
 The implementation anchors are `flick-core/src/numeric.rs`,
-`flick-core/src/opt/fold.rs`, `flick-core/src/codegen/js/binary.rs`,
+`flick-core/src/opt/fold.rs`, `backends/js/src/codegen/js/binary.rs`,
 `flick-core/src/codegen/go/arith.rs`, `runtime/src/core/text.ts` and
 `runtime-go/flickrt/{numbers,effnum}.go`. Numeric folding tests independently
 pin overflow, division, remainder, exponent and float-formatting boundaries.

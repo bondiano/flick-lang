@@ -2,12 +2,13 @@
 //! has its own physical ESM file, while tags, services and types keep the
 //! defining Flick module's identity.
 use super::{Options, Output, names};
-use crate::ir::{Item, ItemKind, Module, reach};
+use crate::ir::{Item, ItemKind, Module};
+use flick_backend_support::reach;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Write;
 
 #[derive(Default)]
-pub(crate) struct RuntimeLayout {
+pub struct RuntimeLayout {
     // Captured prefixes are sparse. Small vectors avoid a second family of
     // hash tables in the browser compiler and allocate only for actual owners.
     symbols: Vec<(String, Vec<(String, String)>)>,
@@ -21,7 +22,7 @@ fn defined(item: &Item) -> Vec<String> {
     }
 }
 
-pub(crate) fn prefix_key(module: &str, before: u32) -> String {
+pub fn prefix_key(module: &str, before: u32) -> String {
     format!("{module}$lexical${before}")
 }
 
@@ -59,7 +60,7 @@ pub(crate) fn phases(module: &Module) -> Vec<Option<u32>> {
 }
 
 impl RuntimeLayout {
-    pub(crate) fn new<'a>(modules: impl Iterator<Item = &'a Module>) -> Self {
+    pub fn new<'a>(modules: impl Iterator<Item = &'a Module>) -> Self {
         let mut layout = Self::default();
         for module in modules {
             layout.add(module);
@@ -100,7 +101,7 @@ impl RuntimeLayout {
     }
 }
 
-pub(crate) fn js_parts(
+pub fn js_parts(
     module: &Module,
     options: &Options,
     layout: &RuntimeLayout,

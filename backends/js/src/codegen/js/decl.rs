@@ -7,9 +7,9 @@ use flick_pretty::{Document, docvec};
 
 use super::doc::{After, Before, Form, Head, Js, Stmt, array, call, text_flags};
 use super::{Gen, names};
-#[cfg(feature = "native-project")]
-use crate::source::Span;
 use flick_ir::Dict;
+#[cfg(feature = "source-maps")]
+use flick_ir::Span;
 
 impl<'d> Gen<'_, 'd> {
     pub(super) fn temp(&mut self) -> String {
@@ -230,7 +230,7 @@ impl<'d> Gen<'_, 'd> {
         self.leaf(&format!("Effect.{name}"))
     }
 
-    #[cfg(feature = "native-project")]
+    #[cfg(feature = "source-maps")]
     /// A cursor that maps the generated position to `span`.
     pub(super) fn mark(&mut self, span: Span) -> Document<'d> {
         self.spans.push(span);

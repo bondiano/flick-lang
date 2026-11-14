@@ -12,7 +12,7 @@ The Flick checker is the source of truth for types, effects and
 diagnostics; TypeScript never decides a Flick type.
 
 ```text
-.fl ─> syntax ─> resolve ─> types ─> ir ─> opt (release) ─┬─> codegen/js ─> ESM over Effect
+.fl ─> syntax ─> resolve ─> types ─> ir ─> opt (release) ─┬─> backends/js ─> ESM over Effect
                                │                          └─> codegen/go ─> Go over flickrt
                                ├─> .iface, codegen/ts (.d.ts, Promise façades)
                                └─> ide, projection ─> flick lsp, flick content-mapper
@@ -26,12 +26,18 @@ diagnostics; TypeScript never decides a Flick type.
 | Typed IR | `flick-core/src/ir` | the checked module with application stages, dictionaries, lifts and source ranges made explicit; `ir/lower` elaborates `do`, comprehensions and `sql` |
 | Constant evaluation | `flick-core/src/consteval` | expressions of literals folded with JS semantics bit for bit |
 | Optimizer | `flick-core/src/opt` | release passes over the typed IR (specialization, inlining, fusion, scalar replacement, folding) that keep every observable contract of the debug lowering; both backends run them (see [Release profile](../../reference/codegen/#release-profile)) |
-| JS backend | `flick-core/src/codegen/js`, `runtime/`, `packages/effect-ts/` | ESM with source maps. By default, runtime stages use Flick's own RT without Effect; `effect = "effect"` selects `@flick-lang/effect-ts`, and `--rt` overrides that choice for one command |
+| JS backend | `backends/js/src/codegen/js`, `runtime/`, `packages/effect-ts/` | ESM with source maps. By default, runtime stages use Flick's own RT without Effect; `effect = "effect"` selects `@flick-lang/effect-ts`, and `--rt` overrides that choice for one command |
+| Backend support | `flick-backend-support/` | names, lang items, tail/loop analysis, ordering, reachability and package binding policy actually shared by emitters and frontend projections |
 | Go backend | `flick-core/src/codegen/go`, `flick-core/src/build/go.rs`, `runtime-go/flickrt` | `[build] emit = "go"`: a Go module per entry over the runtime package `flickrt`, compiled by `go build` (see [Go target](../../reference/codegen/#go-target)) |
 | TypeScript emitter | `flick-core/src/codegen/ts` | the types of `--emit ts`, the `.d.ts` of `--emit-dts` and the Promise façades of `--promise-facade`; a type without a TypeScript form is refused, never written as `any` |
 | Interfaces | `flick-core/src/iface.rs`, `flick-core/src/build` | the versioned JSON `.iface` of each module, with the data and dictionary ABI and fingerprints from a build (see [Interfaces](../../reference/iface/)) |
 | FFI importer | `flick-core/src/ffi`, `tools/dts-importer` | `flick ffi import` and `ffi check` over the surface the Node helper reads from `.d.ts` with TypeScript |
 | Editor | `flick-core/src/ide`, `flick-core/src/projection.rs`, `flick/src/lsp`, `flick/src/mapper.rs` | hover, definition, references, completion, rename and code actions over one analysis; `flick lsp --stdio` serves them and `flick content-mapper` the TypeScript projection with its span maps (see [Editors](../../reference/editor/)) |
+
+The JS emitter builds independently of `flick-core` from portable IR and
+plain options/TypeScript projections. Its native adapter remains in
+`flick-core/src/codegen/mod.rs`; the shared checker and declaration rules
+stay in the frontend.
 
 The Effect adapter owns its version and exact dependency pins in
 `packages/effect-ts/package.json`. The CLI checks an installed adapter against

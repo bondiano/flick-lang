@@ -669,10 +669,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "flick-backend-js"
+version = "0.1.0"
+dependencies = [
+ "flick-backend-support",
+ "flick-ir",
+ "flick-pretty",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "flick-backend-support"
+version = "0.1.0"
+dependencies = [
+ "flick-ir",
+ "serde_json",
+]
+
+[[package]]
 name = "flick-core"
 version = "0.1.0"
 dependencies = [
  "annotate-snippets",
+ "flick-backend-js",
+ "flick-backend-support",
  "flick-ir",
  "flick-plugin",
  "flick-plugin-cli",

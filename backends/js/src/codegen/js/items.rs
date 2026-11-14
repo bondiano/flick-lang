@@ -81,7 +81,7 @@ impl<'d> Gen<'_, 'd> {
                 let id = names::ident(name);
                 // the source map names `id` by `name` where it is defined
                 let mark = mark!(self, item.span);
-                #[cfg(feature = "native-project")]
+                #[cfg(feature = "source-maps")]
                 self.names.insert(self.spans.len() - 1, name.clone());
                 let code = self.export_marked(&id, mark, value);
                 match self.options.worker(self.module, name) {

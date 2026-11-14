@@ -71,6 +71,7 @@ rustPlatform.buildRustPackage {
 
   postCheck = ''
     cargo test --offline --package flick-effect-surface --test coverage
+    cargo test --offline --package flick-backend-support --package flick-backend-js --features flick-backend-js/source-maps
   '';
 
   meta = {
