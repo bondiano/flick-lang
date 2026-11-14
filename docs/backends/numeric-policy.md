@@ -60,7 +60,10 @@ harness. `numeric::tests` and the runtime number tests exercise lower layers.
 No existing fixture expectation or model exclusion is changed by this review.
 
 The reference interpreter covers Int, Float and BigInt primitives, including
-radix literals and patterns, but not every foreign numeric helper. Lean's safety and cleanup
+radix literals and patterns, but not every foreign numeric helper.
+The model-executed `codegen/bigints.fl` fixture also pins binary64 midpoint
+rounding above 2^53 and overflow to infinity, for both positive and negative
+values, against explicit expected output. Lean's safety and cleanup
 theorems do not prove the Rust optimizer's numerical equivalence, IEEE
 rounding, or either runtime implementation. The runtime and execution tests
 remain necessary.

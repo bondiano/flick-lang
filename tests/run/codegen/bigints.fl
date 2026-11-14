@@ -11,6 +11,9 @@ let divide a b = a / b
 remainder : BigInt -> BigInt -> BigInt
 let remainder a b = a % b
 
+to_number : BigInt -> Float
+let to_number n = BigInt.to_number n
+
 radix : BigInt -> String
 let radix n =
   match n with
@@ -30,3 +33,11 @@ let main () =
   Platform.stdout_line (show (multiply 0n 9n == -0n))
   Platform.stdout_line (radix (-255n))
   Platform.stdout_line (radix 0o400n)
+  // Binary64 rounds midpoint integers to an even significand, for both signs.
+  Platform.stdout_line (show (to_number 9007199254740993n))
+  Platform.stdout_line (show (to_number 9007199254740995n))
+  Platform.stdout_line (show (to_number (-9007199254740993n)))
+  Platform.stdout_line (show (to_number (-9007199254740995n)))
+  let overflow = 10n ** 400n
+  Platform.stdout_line (show (to_number overflow))
+  Platform.stdout_line (show (to_number (-overflow)))
