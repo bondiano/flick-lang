@@ -7,3 +7,8 @@ pub mod numeric;
 
 pub use flick_backend_support::effects;
 pub use flick_ir as ir;
+
+#[cfg(feature = "component")]
+mod component;
+#[cfg(feature = "component")]
+pub use component::Javascript;

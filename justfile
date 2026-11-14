@@ -286,16 +286,26 @@ wasm-plugins: wasm-backends
     pnpm -C packages/effect-ts build
     FLICK_BIN="$PWD/target/e2e/flick" node examples/typed-dsl/check.mjs
 
+# No WASI adapter: an official backend imports only the compiler input interface.
+js-component:
+    cargo build -p flick-backend-js --features guest --target wasm32-unknown-unknown --release
+    cargo clippy -p flick-backend-js --features guest --target wasm32-unknown-unknown -- -D warnings
+    mkdir -p target/backends
+    cargo run -p flick-component-build -- target/wasm32-unknown-unknown/release/flick_backend_js.wasm target/backends/js.wasm
+
 # A real third-party backend fixture through the separate component world.
 wasm-backends:
     pnpm install --frozen-lockfile
     pnpm -C runtime build
+    pnpm -C packages/effect-ts build
     cargo build -p flick-test-backend --features guest --target wasm32-wasip2 --release
     cargo clippy -p flick-test-backend --features guest --target wasm32-wasip2 -- -D warnings
+    just js-component
     cargo clippy -p flick-backend --features host --all-targets -- -D warnings
     cargo test -p flick-backend --profile e2e --features host --test component_host -- --include-ignored
     cargo clippy -p flick --features wasm-backends --all-targets -- -D warnings
     cargo test -p flick --profile e2e --features wasm-backends --bin flick --test backends -- --include-ignored
+    node tools/backend-conformance/index.mjs {{flick}} target/backends/js.wasm
 
 # Build the wasm module the in-browser demo loads and hold it to its size budget.
 # The raw-byte budget retains the playground editor queries (hover, completion,

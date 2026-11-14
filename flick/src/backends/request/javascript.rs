@@ -19,12 +19,14 @@ use flick_core::diagnostics::Severity;
 use flick_core::iface::Interface;
 use flick_core::ir;
 use flick_core::project::config::Backend;
+use flick_core::source::SourceMap;
 use flick_core::{build, codegen, types};
 
 impl Prepared {
     pub(super) fn javascript(
         &mut self,
         host: &FsHost,
+        sources: &SourceMap,
         project: Option<&Project>,
         compilation: &Compilation,
         output: &BuildPlan,
@@ -39,6 +41,17 @@ impl Prepared {
             return;
         }
         with_settings(host, project, compilation, output, |settings| {
+            build::javascript_preflight(compilation, sources, settings, &mut self.diagnostics);
+            let entries =
+                build::javascript_entries(settings, &compilation.modules, &mut self.diagnostics);
+            if self
+                .diagnostics
+                .iter()
+                .any(|d| d.severity == Severity::Error)
+            {
+                return;
+            }
+            self.javascript_facts(compilation, settings, interfaces, &entries);
             let rt = settings.backend == Backend::Rt;
             let bridge = build::javascript_effect_bridge(
                 compilation,

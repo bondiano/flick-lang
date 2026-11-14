@@ -625,6 +625,7 @@ dependencies = [
  "clap",
  "flate2",
  "flick-backend",
+ "flick-backend-js",
  "flick-core",
  "flick-ir",
  "flick-model",
@@ -672,6 +673,8 @@ dependencies = [
 name = "flick-backend-js"
 version = "0.1.0"
 dependencies = [
+ "ciborium",
+ "flick-backend",
  "flick-backend-support",
  "flick-ir",
  "flick-pretty",
@@ -685,6 +688,13 @@ version = "0.1.0"
 dependencies = [
  "flick-ir",
  "serde_json",
+]
+
+[[package]]
+name = "flick-component-build"
+version = "0.1.0"
+dependencies = [
+ "wit-component 0.262.0",
 ]
 
 [[package]]

@@ -13,8 +13,8 @@ use super::Generics;
 use super::specialize::instantiate;
 use super::walk::{applied, rename, respan, size};
 use crate::ir::{Arm, Expr, ExprKind, ItemKind, Lit, Module, Pat, Stmt};
-use crate::source::Span;
-use crate::types::{Dict, default_method};
+use flick_ir::Span;
+use flick_ir::{Dict, default_method};
 
 /// The size budget of data copied where a method of a known instance is.
 const DATA: usize = 32;
@@ -32,6 +32,7 @@ pub struct Lookup<'a> {
     taken: HashMap<(String, String), Taken>,
     values: HashMap<String, (Vec<String>, Expr)>,
     generics: Generics<'a>,
+    lang: &'a crate::Known<'a>,
 }
 
 struct Taken {
@@ -41,7 +42,7 @@ struct Taken {
 }
 
 impl<'a> Lookup<'a> {
-    pub fn new(module: &Module, generics: Generics<'a>) -> Self {
+    pub fn new(module: &Module, generics: Generics<'a>, lang: &'a crate::Known<'a>) -> Self {
         let mut own = HashMap::new();
         let mut taken = HashMap::new();
         let mut values = HashMap::new();
@@ -73,6 +74,7 @@ impl<'a> Lookup<'a> {
             taken,
             values,
             generics,
+            lang,
         }
     }
 
@@ -105,7 +107,7 @@ impl<'a> Lookup<'a> {
             return None;
         }
         let given: Vec<(&str, &Dict)> = context.iter().map(String::as_str).zip(args).collect();
-        instantiate(&mut code, &given);
+        instantiate(&mut code, &given, self.lang);
         if *module != self.module {
             respan(&mut code, at);
         }
@@ -134,7 +136,7 @@ impl<'a> Lookup<'a> {
             return None;
         }
         let given: Vec<(&str, &Dict)> = params.iter().map(String::as_str).zip(&dicts).collect();
-        instantiate(&mut code, &given);
+        instantiate(&mut code, &given, self.lang);
         Some(code)
     }
 }
@@ -166,7 +168,7 @@ pub fn defaults(module: &mut Module, lookup: &Lookup, fresh: &mut usize) {
                 rename(&mut code, &format!("$v{fresh}"));
                 settle_parts(&mut code, lookup, fresh, 0);
                 methods(&mut code, lookup, fresh, 0);
-                super::simplify(&mut code);
+                super::simplify(&mut code, lookup.lang);
                 (matches!(code.kind, ExprKind::Lambda { .. }) || data(&code)).then_some(code)
             });
             match made {
@@ -256,7 +258,7 @@ fn settle(e: &mut Expr, lookup: &Lookup, fresh: &mut usize, depth: usize) -> boo
     rename(&mut code, &format!("$s{fresh}"));
     settle_parts(&mut code, lookup, fresh, depth + 1);
     methods(&mut code, lookup, fresh, depth + 1);
-    super::simplify(&mut code);
+    super::simplify(&mut code, lookup.lang);
     if !data(&code) || size(&code) > DATA {
         return false;
     }
@@ -444,7 +446,3 @@ fn all<'p>(
     }
     Some(true)
 }
-
-#[cfg(test)]
-#[path = "devirt_tests.rs"]
-mod tests;

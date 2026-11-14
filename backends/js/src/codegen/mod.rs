@@ -2,6 +2,7 @@
 
 mod js;
 mod lexical;
+pub mod runner;
 #[cfg(feature = "source-maps")]
 pub mod sourcemap;
 pub mod ts;
@@ -33,6 +34,9 @@ pub struct Resolved {
 pub struct Options<'a> {
     /// The built-in modules, written under [`BUILTIN_DIR`].
     pub builtins: &'a [&'a str],
+    /// Explicit physical output paths supplied by a component request.
+    /// The native development adapter uses its established default layout.
+    pub paths: Option<&'a BTreeMap<String, String>>,
     /// The package of each module that belongs to one, for its constructor
     /// ids.
     pub packages: &'a BTreeMap<String, String>,
@@ -74,7 +78,10 @@ impl Options<'_> {
     /// The output path of a module, relative to the output directory:
     /// `App/Users.js`.
     pub fn path(&self, module: &str) -> String {
-        module_path(self.builtins, self.typescript(), module)
+        self.paths
+            .and_then(|paths| paths.get(module))
+            .cloned()
+            .unwrap_or_else(|| module_path(self.builtins, self.typescript(), module))
     }
 
     /// The import specifier of a foreign module `spec` named in `module`.

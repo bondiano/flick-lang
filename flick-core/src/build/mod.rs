@@ -27,6 +27,11 @@ pub use javascript::emit;
 pub use javascript::foreign_inputs as javascript_foreign_inputs;
 pub use javascript::foreign_specifier as javascript_foreign_specifier;
 pub use javascript::shared_files as javascript_shared_files;
+#[cfg(feature = "native-project")]
+pub use javascript::source_path as javascript_source_path;
+pub use javascript::{
+    EntryFacts, entry_facts as javascript_entries, preflight as javascript_preflight,
+};
 
 use std::path::{Component, Path, PathBuf};
 

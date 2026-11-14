@@ -48,6 +48,7 @@ pub(super) fn release_with(text: &str, workers: &HashMap<(String, String), usize
     let known = Known::of(&lang);
     let options = Options {
         builtins: &[],
+        paths: None,
         packages: &BTreeMap::new(),
         resolved: &resolved,
         typescript: None,
@@ -268,6 +269,7 @@ fn known_instances_and_plain_foreigns_are_called_directly() {
     let resolved = resolved_by(&ir, &str::to_owned);
     let options = Options {
         builtins: &[],
+        paths: None,
         packages: &BTreeMap::new(),
         resolved: &resolved,
         typescript: None,
@@ -307,6 +309,7 @@ fn a_native_binding_with_a_schema_is_called_directly_on_flicks_runtime() {
     let known = Known::of(&lang);
     let options = Options {
         builtins: &[],
+        paths: None,
         packages: &BTreeMap::new(),
         resolved: &resolved,
         typescript: None,

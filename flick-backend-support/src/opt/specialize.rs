@@ -5,22 +5,17 @@
 //! type: the copy is then as plain as code written for that type, and small
 //! enough to inline. The classes are closed, so the copies are finitely many.
 
-use crate::numeric::NumLang;
 use std::collections::{HashMap, HashSet};
 
 use super::walk::respan;
 use crate::ir::{BinOp, Expr, ExprKind, Item, ItemKind, Lit, Module};
 use crate::numeric::{Arith, Num};
-use crate::source::Span;
-use crate::types::Dict;
+use flick_ir::Dict;
+use flick_ir::Span;
 
 use super::Generics;
-use crate::types::lang::{self, Lang};
-
-/// The module of the numeric classes and their instances.
-fn numeric() -> &'static str {
-    &lang::item(Lang::Numeric).module
-}
+use crate::Known;
+use flick_ir::Lang;
 
 /// The methods of the numeric classes the specializer turns into operators.
 const METHODS: [Lang; 13] = [
@@ -53,7 +48,7 @@ struct Pending {
 
 /// Copies the generic functions `module` calls with numeric instances, its
 /// own and those `generics` offers, until no call is left to copy for.
-pub fn specialize(module: &mut Module, generics: Generics) {
+pub fn specialize(module: &mut Module, generics: Generics, lang: &Known<'_>) {
     let own: HashMap<String, Generic> = module
         .items
         .iter()
@@ -79,7 +74,7 @@ pub fn specialize(module: &mut Module, generics: Generics) {
     let this = module.name.clone();
     for item in &mut module.items {
         for body in super::bodies(item) {
-            calls(body, &this, &mut find, &mut made, &mut pending);
+            calls(body, &this, &mut find, &mut made, &mut pending, lang);
         }
     }
     // a copy may call another generic function, or itself, with instances
@@ -95,8 +90,8 @@ pub fn specialize(module: &mut Module, generics: Generics) {
         if let Some(span) = at {
             respan(&mut body, span);
         }
-        instantiate(&mut body, &given);
-        calls(&mut body, &this, &mut find, &mut made, &mut pending);
+        instantiate(&mut body, &given, lang);
+        calls(&mut body, &this, &mut find, &mut made, &mut pending, lang);
         let span = body.span;
         module.items.push(Item {
             kind: ItemKind::Value {
@@ -158,15 +153,20 @@ fn calls(
     find: &mut dyn FnMut(&str, &str) -> Option<Generic>,
     made: &mut HashSet<String>,
     pending: &mut Vec<Pending>,
+    lang: &Known<'_>,
 ) {
-    e.each_child_mut(&mut |c| calls(c, module, find, made, pending));
+    e.each_child_mut(&mut |c| calls(c, module, find, made, pending, lang));
     let ExprKind::Dicts(inner, dicts) = &e.kind else {
         return;
     };
     let ExprKind::Global { module: m, name } = &inner.kind else {
         return;
     };
-    let Some(dicts) = dicts.iter().map(known).collect::<Option<Vec<Dict>>>() else {
+    let Some(dicts) = dicts
+        .iter()
+        .map(|d| known(d, lang))
+        .collect::<Option<Vec<Dict>>>()
+    else {
         return;
     };
     let Some(generic) = find(m, name) else {
@@ -199,19 +199,21 @@ fn calls(
 }
 
 /// `d` as a numeric instance without context, a superclass of one included.
-fn known(d: &Dict) -> Option<Dict> {
+fn known(d: &Dict, lang: &Known<'_>) -> Option<Dict> {
     match d {
-        Dict::Instance { module, args, .. } if module == numeric() && args.is_empty() => {
+        Dict::Instance { module, args, .. }
+            if lang.get(Lang::Numeric).is_some_and(|(m, _)| m == module) && args.is_empty() =>
+        {
             Some(d.clone())
         }
         Dict::Super { dict, class } => {
-            let Dict::Instance { name, .. } = known(dict)? else {
+            let Dict::Instance { name, .. } = known(dict, lang)? else {
                 return None;
             };
             let num = name.rsplit(' ').next()?;
             let class = class.rsplit('.').next().unwrap_or(class);
             Some(Dict::Instance {
-                module: numeric().to_owned(),
+                module: lang.get(Lang::Numeric)?.0.to_owned(),
                 name: format!("{class} {num}"),
                 args: Vec::new(),
             })
@@ -229,43 +231,43 @@ fn instance_suffix(d: &Dict) -> String {
 
 /// `e` with each dictionary parameter in `given` replaced by its instance,
 /// and each method of a numeric instance by the operator of its type.
-pub(super) fn instantiate(e: &mut Expr, given: &[(&str, &Dict)]) {
-    e.each_child_mut(&mut |c| instantiate(c, given));
+pub(super) fn instantiate(e: &mut Expr, given: &[(&str, &Dict)], lang: &Known<'_>) {
+    e.each_child_mut(&mut |c| instantiate(c, given, lang));
     match &mut e.kind {
-        ExprKind::Method { dict, .. } => *dict = resolve(dict, given),
+        ExprKind::Method { dict, .. } => *dict = resolve(dict, given, lang),
         ExprKind::Dicts(_, dicts) => {
             for d in dicts.iter_mut() {
-                *d = resolve(d, given);
+                *d = resolve(d, given, lang);
             }
         }
         _ => {}
     }
-    operator(e);
+    operator(e, lang);
 }
 
-fn resolve(d: &Dict, given: &[(&str, &Dict)]) -> Dict {
+fn resolve(d: &Dict, given: &[(&str, &Dict)], lang: &Known<'_>) -> Dict {
     let d = match d {
         Dict::Given(name) => given
             .iter()
             .find(|(n, _)| n == name)
             .map_or_else(|| d.clone(), |(_, inst)| (*inst).clone()),
         Dict::Super { dict, class } => Dict::Super {
-            dict: Box::new(resolve(dict, given)),
+            dict: Box::new(resolve(dict, given, lang)),
             class: class.clone(),
         },
         Dict::Instance { module, name, args } => Dict::Instance {
             module: module.clone(),
             name: name.clone(),
-            args: args.iter().map(|a| resolve(a, given)).collect(),
+            args: args.iter().map(|a| resolve(a, given, lang)).collect(),
         },
         _ => d.clone(),
     };
-    known(&d).unwrap_or(d)
+    known(&d, lang).unwrap_or(d)
 }
 
 /// A full application of a method of a numeric instance as the operator of
 /// its type; whether it was one.
-pub fn operator(e: &mut Expr) -> bool {
+pub fn operator(e: &mut Expr, lang: &Known<'_>) -> bool {
     let span = e.span;
     let replaced = match &e.kind {
         ExprKind::App { func, arg, .. } => match &func.kind {
@@ -273,13 +275,13 @@ pub fn operator(e: &mut Expr) -> bool {
                 func: method,
                 arg: lhs,
                 ..
-            } => match method_of(method) {
+            } => match method_of(method, lang) {
                 Some((num, name)) => {
                     binary(name, num).map(|op| ExprKind::Binary(op, lhs.clone(), arg.clone()))
                 }
                 None => None,
             },
-            _ => match method_of(func) {
+            _ => match method_of(func, lang) {
                 Some((num, Lang::Negate)) => Some(ExprKind::Neg(num, arg.clone())),
                 Some((num, Lang::FromInt | Lang::FromFloat)) => literal(num, arg),
                 _ => None,
@@ -295,7 +297,7 @@ pub fn operator(e: &mut Expr) -> bool {
 }
 
 /// The numeric type and method name of a method of a numeric instance.
-fn method_of(e: &Expr) -> Option<(Num, Lang)> {
+fn method_of(e: &Expr, lang: &Known<'_>) -> Option<(Num, Lang)> {
     let ExprKind::Method {
         dict:
             Dict::Instance {
@@ -308,11 +310,22 @@ fn method_of(e: &Expr) -> Option<(Num, Lang)> {
     else {
         return None;
     };
-    if module != numeric() || !args.is_empty() {
+    if lang.get(Lang::Numeric).is_none_or(|(m, _)| m != module) || !args.is_empty() {
         return None;
     }
-    let method = METHODS.into_iter().find(|&m| lang::item(m).name == *name)?;
-    Some((Num::of(instance.rsplit(' ').next()?)?, method))
+    let method = METHODS
+        .into_iter()
+        .find(|&m| lang.get(m).is_some_and(|(_, n)| n == name))?;
+    let suffix = instance.rsplit(' ').next()?;
+    let number = [
+        (Num::Int, Lang::Int),
+        (Num::Float, Lang::Float),
+        (Num::BigInt, Lang::BigInt),
+    ]
+    .into_iter()
+    .find(|(_, role)| lang.get(*role).is_some_and(|(_, n)| n == suffix))?
+    .0;
+    Some((number, method))
 }
 
 /// The operator a binary method of `Numeric` is on `num`.

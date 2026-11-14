@@ -11,6 +11,8 @@ encoding, not on the checker or a project driver.
 | `reach` | JS lexical placement; Go selection; frontend build validation |
 | `exports` | JS and frontend TS re-export syntax |
 | `effects`, `EffectBridge` | JS emission and frontend runtime/declaration policy |
+| `opt` | JS component and native JS/Go release passes, with explicit lang items, visibility, generic bodies and arities |
+| `consteval`, `numeric` | Frontend literal facts/lints and shared backend folding/arithmetic |
 | generated binding tables | JS/Go emission and frontend runtime policy, from package-owned metadata |
 
 `native-project` enables the existing native reachability/Go table surface;

@@ -14,7 +14,7 @@ mod wit;
 pub use driver::{Failure, Generated, generate};
 pub use handshake::handshake;
 pub use inputs::{DeclaredInputs, Inputs, sha256};
-pub use request::validate_request;
+pub use request::{validate_request, validate_source_spans};
 pub use validate::{
     Limits, Policy, validate_output_paths, validate_result, validate_serialized_size,
 };
