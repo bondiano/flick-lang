@@ -35,7 +35,8 @@ pub(super) use publication::{paths as publication_paths, publish_artifacts, writ
 #[cfg(test)]
 mod publication_tests;
 mod schemas;
-mod shipped;
+pub(crate) mod settings;
+pub(crate) mod shipped;
 mod unwritten;
 
 pub struct BuildCommand {

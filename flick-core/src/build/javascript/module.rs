@@ -6,7 +6,7 @@ use std::path::Path;
 use crate::codegen;
 #[cfg(feature = "native-project")]
 use crate::codegen::sourcemap;
-use crate::codegen::ts::{Facade, Projection, declaration_file, facade_files};
+use crate::codegen::ts::{Facade, Projection, Typing, declaration_file, facade_files};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::effects;
 #[cfg(feature = "native-project")]
@@ -51,44 +51,26 @@ pub(super) fn compiled_module(
     for (physical, output) in parts {
         imports.extend(write_js_output(ctx, &(ctx.path)(&physical), output, out));
     }
-    let file = (ctx.path)(&module.name);
     let built = ctx
         .published_interfaces
         .get(module.name.as_str())
         .expect("every compiled module has a published interface");
-    if ctx.settings.extras.dts
-        && let Some((text, refused)) = declarations(
-            &module.name,
-            ctx.any_interface,
-            ctx.package,
-            ctx.path,
-            ctx.foreign,
-            ctx.settings.backend == Backend::Rt,
-        )
-    {
-        out.push(Artifact {
-            path: dts_path(&file),
-            contents: text,
-        });
-        for (name, reason) in refused {
-            diagnostics.push(Diagnostic::new(
-                codes::F004,
-                Severity::Error,
-                format!("`{}.{name}` has no TypeScript form: {reason}", module.name),
-            ));
-        }
-    }
-    if ctx.settings.extras.promise_facade {
-        out.extend(facade(
-            module,
-            built,
-            ctx.any_interface,
-            ctx.package,
-            ctx.path,
-            ctx.foreign,
-            ctx.settings.backend == Backend::Rt,
-        ));
-    }
+    let typing = Typing {
+        interface: ctx.any_interface,
+        package: ctx.package,
+        foreign: ctx.foreign,
+        path: ctx.path,
+        rt: ctx.settings.backend == Backend::Rt,
+    };
+    let (shared, issues) = shared_files(
+        &module.name,
+        built,
+        &typing,
+        ctx.settings.extras.dts,
+        ctx.settings.extras.promise_facade,
+    );
+    out.extend(shared);
+    diagnostics.extend(issues);
     #[cfg(feature = "native-project")]
     out.push(Artifact {
         path: format!("{}.iface", module.name.replace('.', "/")),
@@ -165,7 +147,7 @@ pub(super) fn dts_path(file: &str) -> String {
 /// The Promise façade of `module`: each exported runtime function that
 /// needs no service and whose earlier stages only make closures.
 fn facade(
-    module: &Compiled,
+    module: &str,
     built: &Interface,
     interfaces: &dyn Fn(&str) -> Option<Interface>,
     package: &dyn Fn(&str) -> Option<String>,
@@ -174,7 +156,7 @@ fn facade(
     rt: bool,
 ) -> Vec<Artifact> {
     // the façade module names the module's own types through an import
-    let facade_module = format!("{}.promise", module.name);
+    let facade_module = format!("{module}.promise");
     let projection =
         Projection::for_runtime(&facade_module, interfaces, package, rt).shipping(foreign);
     let summaries = built
@@ -185,7 +167,7 @@ fn facade(
     let facades: Vec<Facade> = built
         .exports
         .iter()
-        .filter(|e| e.entity.namespace == Namespace::Value && e.entity.module == module.name)
+        .filter(|e| e.entity.namespace == Namespace::Value && e.entity.module == module)
         .filter_map(|e| {
             let closures = summaries
                 .iter()
@@ -203,7 +185,7 @@ fn facade(
     if facades.is_empty() {
         return Vec::new();
     }
-    let file = path(&module.name);
+    let file = path(module);
     let stem = file
         .rsplit_once('.')
         .map_or(file.as_str(), |(s, _)| s)
@@ -222,4 +204,52 @@ fn facade(
             contents: dts,
         },
     ]
+}
+
+/// Declarations and Promise facades share the compiler's projection rules.
+/// These host outputs need only plain interfaces and ABI summaries; they
+/// do not require a checker call from the backend component.
+pub fn shared_files(
+    module: &str,
+    built: &Interface,
+    typing: &Typing<'_>,
+    dts: bool,
+    promise_facade: bool,
+) -> (Vec<Artifact>, Vec<Diagnostic>) {
+    let mut out = Vec::new();
+    let mut diagnostics = Vec::new();
+    if dts
+        && let Some((text, refused)) = declarations(
+            module,
+            typing.interface,
+            typing.package,
+            typing.path,
+            typing.foreign,
+            typing.rt,
+        )
+    {
+        out.push(Artifact {
+            path: dts_path(&(typing.path)(module)),
+            contents: text,
+        });
+        for (name, reason) in refused {
+            diagnostics.push(Diagnostic::new(
+                codes::F004,
+                Severity::Error,
+                format!("`{module}.{name}` has no TypeScript form: {reason}"),
+            ));
+        }
+    }
+    if promise_facade {
+        out.extend(facade(
+            module,
+            built,
+            typing.interface,
+            typing.package,
+            typing.path,
+            typing.foreign,
+            typing.rt,
+        ));
+    }
+    (out, diagnostics)
 }

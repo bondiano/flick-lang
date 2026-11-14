@@ -21,7 +21,7 @@ any of the missing component inputs below.
 | JS module emission | `codegen::Options`: built-in names, package identities, resolved foreign specifiers, runtime mode, bridge availability and labels | Module layout, foreign bindings and versioned target facts/options |
 | JS release ABI | Worker exports and direct instance methods derived from reference lowering and published interfaces | Backend-owned calculation from plain export/ABI facts; no callback to the checker |
 | JS initialization | `RuntimeLayout` over all own modules, prefix exports and dependencies | Complete initialization graph from IR, including physical prefix modules |
-| TypeScript emission | `Typing::prepare`, separately for every physical module | `flick.typescript@0.1.0` projection: declarations, annotations, imports and imported module names |
+| TypeScript emission | `Typing::prepare`, separately for every physical module | `flick.typescript@0.2.0`: per-file physical module/output path, declarations, annotations, imports and imported module names |
 | Public `.d.ts` and Promise facades | Shared interface/projection rules, finalized ABI summaries and foreign type forms | Shared compiler outputs remain reserved; a backend receives needed plain projections |
 | Published `.iface` | `build::interface`, finalized dependencies and ABI fingerprints | Shared compiler ownership; explicit interface inputs for external modules |
 | JS source maps | Generated mappings, source text, line/UTF-16 columns and paths relative to each output file | Source manifest plus bytes and line starts; the backend must preserve physical-module locations |
@@ -53,6 +53,14 @@ IR and those texts; legacy IR-only entries are regenerated. Preparing a
 component request explicitly remaps that bundle into the project's source
 table and supplies built-in bodies with `builtin` module metadata. The same
 declared source inputs govern validation, diagnostics and source maps.
+
+The CLI now prepares JavaScript foreign specifiers, library file inputs,
+runtime/bridge options and TypeScript physical-file projections using the
+native baseline's shared rules. `.d.ts` and Promise facades use one shared
+implementation and remain reserved host outputs. These inputs cover the
+current JS/TS module emitter; release ABI calculation, launchers, complete
+dependency pins and official component integration still need the remaining
+work in the inventory. Go foreign inputs remain separate work.
 
 ## Portable transformations and target representations
 

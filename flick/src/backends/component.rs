@@ -93,6 +93,16 @@ impl Package {
             output,
             self.pin.clone(),
         );
+        if prepared
+            .diagnostics
+            .iter()
+            .any(|d| d.severity == Severity::Error)
+        {
+            return Emission {
+                artifacts: vec![],
+                diagnostics: prepared.diagnostics,
+            };
+        }
         prepared
             .request
             .runtime_dependencies
@@ -107,7 +117,7 @@ impl Package {
             limits: Limits::default(),
             authorize_step: &|_| Err("no host tool adapter is enabled for this backend".into()),
         };
-        match flick_backend::generate(
+        let mut emission = match flick_backend::generate(
             &self.backend,
             &prepared.request,
             &policy,
@@ -116,27 +126,11 @@ impl Package {
         ) {
             Ok(generated) => {
                 let result = generated.result();
-                for (name, kind) in output
-                    .entries
-                    .iter()
-                    .map(|(name, _)| (name.as_str(), flick_backend::LaunchKind::Run))
-                    .chain(
-                        (output.purpose == Purpose::Test)
-                            .then_some(("test", flick_backend::LaunchKind::Test)),
-                    )
-                {
-                    if !result
-                        .launches
-                        .iter()
-                        .any(|l| l.name == name && l.kind == kind)
-                    {
-                        return Emission {
-                            artifacts: vec![],
-                            diagnostics: vec![failure(format!(
-                                "backend supplied no {kind:?} launch named `{name}`"
-                            ))],
-                        };
-                    }
+                if let Err(why) = required_launches(result, output) {
+                    return Emission {
+                        artifacts: vec![],
+                        diagnostics: vec![failure(why)],
+                    };
                 }
                 match launch::artifact(&self.pin, result) {
                     Ok(manifest) => prepared.shared.push(manifest),
@@ -167,7 +161,9 @@ impl Package {
                     self.pin.identity.id, self.pin.identity.version, self.pin.sha256
                 ))],
             },
-        }
+        };
+        emission.diagnostics.splice(0..0, prepared.diagnostics);
+        emission
     }
 
     fn rejected(&self, diagnostics: &[flick_backend::Diagnostic], files: &[FileId]) -> Emission {
@@ -231,4 +227,29 @@ impl Package {
         }
         mapped
     }
+}
+
+fn required_launches(
+    result: &flick_backend::BuildResult,
+    output: &BuildPlan,
+) -> Result<(), String> {
+    for (name, kind) in output
+        .entries
+        .iter()
+        .map(|(name, _)| (name.as_str(), flick_backend::LaunchKind::Run))
+        .chain(
+            (output.purpose == Purpose::Test).then_some(("test", flick_backend::LaunchKind::Test)),
+        )
+    {
+        if !result
+            .launches
+            .iter()
+            .any(|l| l.name == name && l.kind == kind)
+        {
+            return Err(format!(
+                "backend supplied no {kind:?} launch named `{name}`"
+            ));
+        }
+    }
+    Ok(())
 }
