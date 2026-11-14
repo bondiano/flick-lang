@@ -98,6 +98,8 @@ impl BuildCommand {
         *self.built.borrow_mut() = Some(Built {
             #[cfg(feature = "wasm-backends")]
             backend: output.backend.pin(),
+            #[cfg(feature = "wasm-backends")]
+            devtools: output.backend.supports_host("host-node-devtools"),
             go: output.go,
             rt: output.extras.rt,
             modules,
@@ -352,7 +354,11 @@ impl BuildCommand {
         let emit = self.emit(project);
         let config = project.map(|p| &p.config.build);
         BuildPlan {
-            purpose: Purpose::Build,
+            purpose: if self.generation {
+                Purpose::Run
+            } else {
+                Purpose::Build
+            },
             backend: backend.clone(),
             out_dir: resolve_root(
                 project.map_or(host.cwd.as_path(), |project| project.root.as_path()),
@@ -414,6 +420,7 @@ pub fn release(profile: Option<ProfileArgument>, config: Option<&Build>) -> bool
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Purpose {
     Build,
+    Run,
     Test,
 }
 

@@ -259,7 +259,7 @@ fn runtime_options(
             )));
         }
     }
-    if !matches!(option("command"), Some("build" | "test")) {
+    if !matches!(option("command"), Some("build" | "run" | "test")) {
         return Err(failure("missing or unknown command"));
     }
     Ok((rt, bridge, labels))

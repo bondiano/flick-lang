@@ -313,6 +313,7 @@ wasm-backends:
     cargo test -p flick-backend --profile e2e --features host --test component_host -- --include-ignored
     cargo clippy -p flick --features wasm-backends --all-targets -- -D warnings
     cargo test -p flick --profile e2e --features wasm-backends --bin flick --test backends -- --include-ignored
+    cargo test -p flick --release --features wasm-plugins --test default_backend -- --include-ignored
     node --test tools/backend-conformance/report.test.mjs
     node tools/backend-conformance/index.mjs {{flick}} target/backends/js.wasm
 

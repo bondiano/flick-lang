@@ -308,8 +308,17 @@ fn ir_files_are_owned_outputs_without_polluting_the_normal_build_cache() {
             flick_ir::Program::from_cbor(&bytes)
         }
         .expect("portable IR");
+        assert_eq!(ir.modules.iter().filter(|m| m.name == "Main").count(), 1);
+        #[cfg(feature = "wasm-backends")]
+        for item in &ir.lang {
+            assert!(
+                ir.modules.iter().any(|m| m.name == item.module),
+                "missing builtin IR for {}",
+                item.lang
+            );
+        }
+        #[cfg(not(feature = "wasm-backends"))]
         assert_eq!(ir.modules.len(), 1);
-        assert_eq!(ir.modules[0].name, "Main");
         let result = flick_in(&dir, &["clean"]);
         assert_eq!(code(&result), Some(0), "{result:?}");
         assert!(!dir.join("dist").join(name).exists(), "clean owns IR");

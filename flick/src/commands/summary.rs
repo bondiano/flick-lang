@@ -17,6 +17,8 @@ use crate::command::Outcome;
 pub struct Built {
     #[cfg(feature = "wasm-backends")]
     pub backend: Option<flick_backend::BackendPin>,
+    #[cfg(feature = "wasm-backends")]
+    pub devtools: bool,
     pub go: bool,
     pub rt: bool,
     /// How many modules it compiled; `None` when it reused a cached build.
@@ -160,6 +162,8 @@ mod tests {
         let built = Built {
             #[cfg(feature = "wasm-backends")]
             backend: None,
+            #[cfg(feature = "wasm-backends")]
+            devtools: true,
             go: false,
             rt: false,
             modules: Some(3),
@@ -198,6 +202,8 @@ mod tests {
         let built = Built {
             #[cfg(feature = "wasm-backends")]
             backend: None,
+            #[cfg(feature = "wasm-backends")]
+            devtools: true,
             go: false,
             rt: false,
             modules: Some(1),

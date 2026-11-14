@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 
 #[cfg(test)]
 pub(super) fn installed(root: &Path) -> Result<Vec<RuntimeDependency>, String> {
-    Pins::default().installed(root)
+    installed_for(root, false)
 }
 
 #[derive(Default)]
@@ -44,12 +44,7 @@ impl Pins {
         pins: &[RuntimeDependency],
     ) -> Result<bool, String> {
         for pin in pins {
-            let found = if pin.package == "@flick-lang/runtime" || pin.package == toolchain::ADAPTER
-            {
-                toolchain::dependency_manifest(root, &pin.package)
-            } else {
-                resolve(root, &pin.package)?
-            };
+            let found = resolve(root, &pin.package)?;
             let Some(manifest) = found else {
                 return Ok(false);
             };
@@ -73,11 +68,7 @@ pub(super) fn installed_for(root: &Path, effect: bool) -> Result<Vec<RuntimeDepe
     let mut graph = Graph::default();
     let mut pins = Vec::new();
     for name in roots {
-        let found = if name == "@flick-lang/runtime" || name == toolchain::ADAPTER {
-            toolchain::dependency_manifest(root, &name)
-        } else {
-            resolve(root, &name)?
-        };
+        let found = resolve(root, &name)?;
         if let Some(manifest) = found {
             pins.push(graph.pin(&name, &manifest)?);
         }

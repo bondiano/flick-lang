@@ -16,7 +16,7 @@ use std::{fs, io, process};
 
 use flick_core::build::{go, runner_file};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
-use flick_core::project::config::{Emit, MAIN_ENTRY};
+use flick_core::project::config::{Backend, Emit, MAIN_ENTRY};
 use flick_core::project::{self, ModuleCache, Project, cache};
 use flick_core::source::SourceMap;
 #[cfg(unix)]
@@ -223,7 +223,22 @@ pub fn build_into_generation(
         1
     })?;
     let project = &current;
-    check_devtools(project.config.build.backend.is_some(), options, global)?;
+    #[cfg(feature = "wasm-backends")]
+    if options.devtools.is_some() {
+        let go = project.config.build.emit == Emit::Go;
+        let rt = options.rt || project.config.build.effect == Backend::Rt;
+        let backend = backends::Selected::load(&FsHost::new(), Some(project), go, rt).map_err(
+            |diagnostic| {
+                report::render(global, &SourceMap::default(), &[diagnostic]);
+                1
+            },
+        )?;
+        check_devtools(
+            !backend.supports_host("host-node-devtools"),
+            options,
+            global,
+        )?;
+    }
     let mut generation = match Generation::reserve(&project.root) {
         Ok(generation) => generation,
         Err(err) => {
@@ -281,12 +296,13 @@ pub fn build_into_generation(
     generation.rt = completed.rt;
     #[cfg(feature = "wasm-backends")]
     {
-        check_devtools(completed.backend.is_some(), options, global)?;
+        check_devtools(!completed.devtools, options, global)?;
         generation.backend = completed.backend;
     }
     Ok(generation)
 }
 
+#[cfg(feature = "wasm-backends")]
 fn check_devtools(
     component: bool,
     options: &RunArguments,

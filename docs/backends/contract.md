@@ -14,13 +14,15 @@ language that implements this world.
 ## Status
 
 This is an initial 0.x contract and validation library. It does not freeze
-IR 1.0, complete the semantic prerequisites of R3a, or switch production
-`build/run/test` to components. The portable IR remains 0.11.0. The official
+IR 1.0 or complete every semantic prerequisite of R3a. Ordinary JS/TS
+`build/run/test` select the distributed JS component by default. The portable
+IR remains 0.11.0. The official
 JS emitter lives in `backends/js`, independently of `flick-core`; the Go
 emitter remains in `flick-core`. The contract probe exercises both with IR
-and plain data without `Compilation` or `Settings`. Production JS component
-selection is still separate work: moving the Rust emitter alone does not
-establish the release component path.
+and plain data without `Compilation` or `Settings`. The distributed component
+is checked against its Rust/WIT sources; real release-binary tests require
+component selection for build/run/test. The native trait remains a development
+and parity interface.
 
 The optional `flick-backend/host` feature executes this world using the
 same Wasmtime configuration and compiled-code cache as the plugin host.
@@ -31,9 +33,9 @@ version with another component digest is rejected. The driver checks the
 host's loaded pin before snapshotting any input, even when that input is
 unavailable; a mismatch remains a P013 diagnostic with no reader calls.
 The CLI supports [explicit pinned package selection](registry.md) through
-this world for build/run/test. Projects without a pin still use the temporary
-native baseline. Official component distribution/default selection, the browser
-loader, atomic publication and tool execution adapters remain integration work.
+this world for build/run/test. Projects without a pin select the shipped JS
+component for JS/TS, while Go retains its temporary native baseline. The browser
+loader, atomic publication and generic tool execution adapters remain integration work.
 Accepting a graph here does not execute it or establish that a tool's arguments
 access only declared files.
 

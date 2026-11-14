@@ -13,6 +13,8 @@ mod official;
 mod request;
 
 use crate::artifact::Artifact;
+use std::path::Path;
+use std::process::Command;
 #[cfg(feature = "wasm-backends")]
 use std::sync::Arc;
 
@@ -33,6 +35,24 @@ pub(crate) enum Selected {
 }
 
 impl Selected {
+    #[cfg(feature = "wasm-backends")]
+    pub(crate) fn supports_host(&self, capability: &str) -> bool {
+        match self {
+            Self::Native => true,
+            Self::Component(package) => package.supports_host(capability),
+        }
+    }
+
+    pub(crate) fn schema_aot_command(&self, root: &Path) -> Result<Command, String> {
+        match self {
+            Self::Native => {
+                let _ = root;
+                Ok(Command::new("node"))
+            }
+            #[cfg(feature = "wasm-backends")]
+            Self::Component(package) => package.schema_aot_command(root),
+        }
+    }
     pub(crate) fn reference_ir(
         &self,
         sources: &mut SourceMap,

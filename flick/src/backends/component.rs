@@ -3,12 +3,13 @@
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use flick_backend::host::{Budget, WasmBackend};
 use flick_backend::{
-    BackendId, BackendPin, BuildRequest, Failure, Limits, Policy, RuntimeDependency,
+    Backend, BackendId, BackendPin, BuildRequest, Failure, Limits, Policy, RuntimeDependency,
 };
-use flick_core::build::go::FILES;
+use flick_core::build::{go::FILES, schema_aot_file};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::BackendPackage;
 use flick_core::project::{Compilation, Project, js};
@@ -90,6 +91,52 @@ impl Package {
         self.pin.clone()
     }
 
+    /// These compiler-owned host integrations are approved for the exact shipped
+    /// image. A third-party descriptor cannot grant itself host tool authority.
+    pub(super) fn supports_host(&self, capability: &str) -> bool {
+        super::official::pin().is_ok_and(|pin| pin == self.pin)
+            && self
+                .backend
+                .describe()
+                .capabilities
+                .iter()
+                .any(|c| c.name == capability && c.version == "1.0.0")
+    }
+
+    pub(super) fn schema_aot_command(&self, root: &Path) -> Result<Command, String> {
+        if !self.supports_host("host-schema-aot") {
+            return Err(
+                "component schema AOT requires an approved pinned host tool adapter".into(),
+            );
+        }
+        launch::verify_runtime(root, &self.pin)?;
+        let expected = self
+            .tools
+            .iter()
+            .find(|t| t.pin.id == "node")
+            .ok_or("schema AOT requires Node")?;
+        Ok(launch::Tool::node(Some(&expected.pin))?.command())
+    }
+
+    fn preflight(
+        &self,
+        host: &FsHost,
+        project: Option<&Project>,
+        compilation: &Compilation,
+        output: &BuildPlan,
+    ) -> Vec<Diagnostic> {
+        let mut diagnostics = host_preflight(host, project, compilation, output);
+        if self.supports_host("host-source-build")
+            && self.tools.is_empty()
+            && (output.purpose != Purpose::Build || output.extras.schema_aot)
+        {
+            diagnostics.push(failure(
+                "the selected JavaScript operation requires an installed Node runtime",
+            ));
+        }
+        diagnostics
+    }
+
     pub(crate) fn artifacts(
         &self,
         host: &FsHost,
@@ -98,7 +145,7 @@ impl Package {
         compilation: &Compilation,
         output: &BuildPlan,
     ) -> Emission {
-        let diagnostics = host_preflight(host, project, compilation, output);
+        let diagnostics = self.preflight(host, project, compilation, output);
         if !diagnostics.is_empty() {
             return Emission {
                 artifacts: vec![],
@@ -133,11 +180,7 @@ impl Package {
             }
         };
         prepared.request.toolchains = self.tools.iter().map(|t| t.pin.clone()).collect();
-        let mut reserved: Vec<_> = prepared.shared.iter().map(|a| a.path.clone()).collect();
-        reserved.push(launch::FILE.into());
-        if project.is_none() {
-            reserved.push(FILES.into());
-        }
+        let reserved = reserved_outputs(&prepared, output, project);
         let policy = Policy {
             toolchains: &prepared.request.toolchains,
             environment: &[],
@@ -154,7 +197,10 @@ impl Package {
         ) {
             Ok(generated) => {
                 let result = generated.result();
-                if let Err(why) = required_launches(result, output) {
+                let require_runs = !(output.purpose == Purpose::Build
+                    && self.tools.is_empty()
+                    && self.supports_host("host-source-build"));
+                if let Err(why) = required_launches(result, output, require_runs) {
                     return Emission {
                         artifacts: vec![],
                         diagnostics: vec![failure(why)],
@@ -204,7 +250,11 @@ impl Package {
         let effect = request.target.options.iter().any(|o| {
             (o.key == "js.runtime" && o.value == "effect")
                 || (o.key == "js.effect-bridge" && o.value != "absent")
-        });
+        }) || request
+            .target
+            .required_capabilities
+            .iter()
+            .any(|c| c.name == "schema-aot");
         super::dependencies::installed_for(&self.root, effect).map_err(failure)
     }
 
@@ -271,13 +321,31 @@ impl Package {
     }
 }
 
+fn reserved_outputs(
+    prepared: &Prepared,
+    output: &BuildPlan,
+    project: Option<&Project>,
+) -> Vec<String> {
+    let mut reserved: Vec<_> = prepared.shared.iter().map(|a| a.path.clone()).collect();
+    reserved.push(launch::FILE.into());
+    if output.extras.schema_aot {
+        reserved.extend(output.entries.iter().map(|(name, _)| schema_aot_file(name)));
+    }
+    if project.is_none() {
+        reserved.push(FILES.into());
+    }
+    reserved
+}
+
 fn required_launches(
     result: &flick_backend::BuildResult,
     output: &BuildPlan,
+    require_runs: bool,
 ) -> Result<(), String> {
     for (name, kind) in output
         .entries
         .iter()
+        .filter(|_| require_runs)
         .map(|(name, _)| (name.as_str(), flick_backend::LaunchKind::Run))
         .chain(
             (output.purpose == Purpose::Test).then_some(("test", flick_backend::LaunchKind::Test)),
@@ -302,7 +370,7 @@ fn host_preflight(
     compilation: &Compilation,
     output: &BuildPlan,
 ) -> Vec<Diagnostic> {
-    if output.extras.schema_aot {
+    if output.extras.schema_aot && !output.backend.supports_host("host-schema-aot") {
         return vec![Diagnostic::new(
             codes::P012,
             Severity::Error,

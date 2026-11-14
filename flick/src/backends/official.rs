@@ -9,7 +9,9 @@ const JS: &[u8] = include_bytes!("../../../backends/js/package/component.wasm");
 const PIN: &str = include_str!("../../../backends/js/package/backend.json");
 
 pub(super) fn javascript(root: &Path, rt: bool) -> Result<Package, Diagnostic> {
-    let pin: BackendPin = serde_json::from_str(PIN)
-        .map_err(|e| failure(format!("invalid bundled JS backend pin: {e}")))?;
-    Package::from_bytes(root, pin, JS, rt)
+    Package::from_bytes(root, pin()?, JS, rt)
+}
+
+pub(super) fn pin() -> Result<BackendPin, Diagnostic> {
+    serde_json::from_str(PIN).map_err(|e| failure(format!("invalid bundled JS backend pin: {e}")))
 }

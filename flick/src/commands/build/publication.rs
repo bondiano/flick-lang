@@ -123,7 +123,7 @@ pub(crate) fn write_artifacts(output: &BuildPlan, emitted: &mut Emission, progre
         let module = out_dir.join(format!("{}.{ext}", entry.replace('.', "/")));
         let file = build::schema_aot_file(name);
         progress.stage("Compiling schema decoders");
-        if let Err(reason) = compile_schemas(out_dir, &module, &file) {
+        if let Err(reason) = compile_schemas(out_dir, &module, &file, &output.backend) {
             emitted.diagnostics.push(Diagnostic::new(
                 codes::P013,
                 Severity::Error,
@@ -152,15 +152,15 @@ fn write_if_changed(path: &Path, contents: impl AsRef<[u8]>) -> io::Result<()> {
 pub(in crate::commands) fn paths(output: &BuildPlan, files: &[Artifact]) -> Vec<String> {
     let mut paths: Vec<_> = files.iter().map(|file| file.path.clone()).collect();
     if output.go && !output.backend.is_component() {
-        if output.suites.is_empty() {
+        if output.purpose == Purpose::Test {
+            paths.push(build::go::executable(build::go::TEST));
+        } else {
             paths.extend(
                 output
                     .entries
                     .iter()
                     .map(|(name, _)| build::go::executable(name)),
             );
-        } else {
-            paths.push(build::go::executable(build::go::TEST));
         }
     }
     if output.extras.schema_aot {
@@ -172,4 +172,35 @@ pub(in crate::commands) fn paths(output: &BuildPlan, files: &[Artifact]) -> Vec<
         );
     }
     paths
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::backends::Selected;
+
+    #[test]
+    fn an_empty_go_test_still_reserves_its_executable() {
+        let output = BuildPlan {
+            purpose: Purpose::Test,
+            backend: Selected::Native,
+            out_dir: "unused-output".into(),
+            entries: vec![],
+            typescript: false,
+            go: true,
+            suites: vec![],
+            extras: build::Extras::default(),
+            release: false,
+        };
+        let files = [Artifact::source(
+            "go/test/main.go".into(),
+            "package main".into(),
+        )];
+        let executable = if cfg!(windows) {
+            "flick-test.exe"
+        } else {
+            "flick-test"
+        };
+        assert_eq!(paths(&output, &files), ["go/test/main.go", executable]);
+    }
 }

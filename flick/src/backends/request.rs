@@ -304,10 +304,10 @@ fn target(project: Option<&Project>, output: &BuildPlan) -> TargetRequest {
         options: vec![
             OptionValue {
                 key: "command".into(),
-                value: if output.purpose == Purpose::Test {
-                    "test"
-                } else {
-                    "build"
+                value: match output.purpose {
+                    Purpose::Test => "test",
+                    Purpose::Run => "run",
+                    Purpose::Build => "build",
                 }
                 .into(),
             },
