@@ -105,12 +105,12 @@ pub fn generate(
     let result = backend
         .generate(request, &mut inputs)
         .map_err(|d| refused(d, &mut inputs))?;
-    diagnostics(request, &result.diagnostics, &mut inputs, policy.limits).map_err(protocol)?;
     if result
         .diagnostics
         .iter()
         .any(|d| d.severity == crate::Severity::Error)
     {
+        diagnostics(request, &result.diagnostics, &mut inputs, policy.limits).map_err(protocol)?;
         return Err(Failure::Rejected(result.diagnostics));
     }
     let order = validate_result(request, &result, policy, &mut inputs).map_err(protocol)?;

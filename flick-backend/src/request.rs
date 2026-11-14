@@ -3,7 +3,7 @@ use std::{iter, str};
 
 use flick_ir::{FileId, Program};
 
-use crate::validate::{Budget, Limits, id};
+use crate::validate::{Budget, Limits, id, runtime_dependency};
 use crate::{BuildRequest, InputKind, Inputs, Mode, ModuleInput, ModuleRole, VERSION};
 
 /// Validate the closed graph and all referenced side inputs before target
@@ -102,7 +102,7 @@ pub fn validate_request(
             return Err("test root references a module outside the graph".into());
         }
     }
-    side_data(request, &manifest, &modules)?;
+    side_data(request, &manifest, &modules, limits)?;
     Ok(program)
 }
 
@@ -138,6 +138,7 @@ fn side_data(
     request: &BuildRequest,
     manifest: &BTreeMap<&str, InputKind>,
     modules: &BTreeMap<&str, &ModuleInput>,
+    limits: Limits,
 ) -> Result<(), String> {
     let mut projections = BTreeSet::new();
     for projection in &request.projections {
@@ -156,6 +157,13 @@ fn side_data(
                 .any(|i| manifest.get(i.as_str()) != Some(&InputKind::Foreign))
         {
             return Err("foreign binding references an undeclared foreign input".into());
+        }
+    }
+    let mut runtimes = BTreeSet::new();
+    for dependency in &request.runtime_dependencies {
+        runtime_dependency(dependency, limits)?;
+        if !runtimes.insert(&dependency.package) {
+            return Err("duplicate backend runtime dependency".into());
         }
     }
     Ok(())

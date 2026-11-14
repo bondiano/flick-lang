@@ -44,6 +44,13 @@ A `BuildRequest` carries these independent facts:
 | Package targets and root handlers | Environments rather than backend names alone |
 | Remaining dependencies | Content-addressed resources and lockfiles in the input manifest |
 
+The driver requires every declared input to be available and verifies its
+size and digest before preflight, including inputs the backend never reads.
+Missing content rejects the request: a fallback result must not become
+cacheable under a key that would also describe the content once available.
+Runtime dependency pins require a package and a valid SHA-256 in both the
+request and result; request membership alone does not validate a pin.
+
 An IR expression's optional type field is not a complete typing/effect
 analysis. UI metadata and additional optimization facts are not implied
 by receiving a `Program`. A consumer that needs a projection must require
@@ -71,6 +78,9 @@ step ids and step-output ids have one namespace. Paths are relative portable
 paths; aliases, traversal, duplicate paths and file/directory collisions are
 rejected, including collisions with outputs reserved by the shared compiler.
 `.iface` and shared declarations stay under compiler ownership.
+Unicode filenames remain supported. Collision checks conservatively combine
+canonical normalization, Unicode case folding and uppercase aliases, and
+Windows device names include the reserved superscript-digit forms.
 
 Step outputs must name their producer as a direct dependency when consumed.
 The validator sorts the graph; input order need not be topological. Tool
@@ -86,7 +96,9 @@ environment values. Every input that can affect their output belongs in the
 request and its cache key.
 
 Diagnostic spans address the supplied UTF-8 source bytes, including boundary
-checks. Payload, total serialization, file, step, diagnostic and string limits
+checks. Each referenced source is loaded and UTF-8-validated once per
+diagnostic validation pass, even when many diagnostics reference it.
+Payload, total serialization, file, step, diagnostic and string limits
 are host limits. A failure rejects the whole generation. A publication layer
 must stage all files and host steps, honor cancellation, validate final outputs
 and publish atomically; this library deliberately performs no file writes.
