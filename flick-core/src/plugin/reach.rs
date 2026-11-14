@@ -18,6 +18,7 @@ use crate::source::Span;
 #[cfg(feature = "native-project")]
 mod granted;
 
+#[cfg(feature = "native-project")]
 pub(crate) use granted::net_endpoint;
 
 #[cfg(feature = "native-project")]
