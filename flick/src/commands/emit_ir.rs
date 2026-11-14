@@ -2,7 +2,7 @@
 
 use flick_core::build;
 use flick_core::ir::lang_items;
-use flick_core::project::Compilation;
+use flick_core::project::{Compilation, Project};
 use flick_core::source::SourceMap;
 use flick_ir::Program;
 
@@ -16,29 +16,15 @@ use flick_backend::ArtifactKind;
 /// `program.ir.json` or `program.ir.cbor` of the output directory.
 pub(super) fn artifact(
     compilation: &Compilation,
-    sources: &SourceMap,
+    sources: &mut SourceMap,
+    project: Option<&Project>,
     output: &BuildPlan,
     format: IrFormat,
 ) -> Artifact {
-    let modules = &compilation.modules;
-    // shortcut: the built-in modules are left out, their spans point into
-    // source maps of their own; a reader takes them from the same compiler.
-    // Add them with their own files when a backend outside the compiler
-    // needs a program that stands alone.
-    let ir = modules
-        .iter()
-        .map(|m| {
-            if output.release && !output.backend.is_component() {
-                build::optimized(modules, m, output.extras.rt)
-            } else {
-                m.ir.clone()
-            }
-        })
-        .collect();
-    let compiler = format!("flick {}", toolchain::COMPILER);
-    let program = Program::new(&compiler, ir, lang_items(), &|f| {
-        sources.get(f).path.clone()
-    });
+    let program = output
+        .backend
+        .reference_ir(sources, project, compilation, output.extras.rt)
+        .unwrap_or_else(|| native_program(compilation, sources, output));
     let (name, bytes) = match format {
         IrFormat::Json => ("program.ir.json", program.to_json().into_bytes()),
         IrFormat::Cbor => ("program.ir.cbor", program.to_cbor()),
@@ -48,4 +34,22 @@ pub(super) fn artifact(
         contents: bytes,
         kind: ArtifactKind::Metadata,
     }
+}
+
+fn native_program(compilation: &Compilation, sources: &SourceMap, output: &BuildPlan) -> Program {
+    let modules = &compilation.modules;
+    let ir = modules
+        .iter()
+        .map(|m| {
+            if output.release {
+                build::optimized(modules, m, output.extras.rt)
+            } else {
+                m.ir.clone()
+            }
+        })
+        .collect();
+    let compiler = format!("flick {}", toolchain::COMPILER);
+    Program::new(&compiler, ir, lang_items(), &|f| {
+        sources.get(f).path.clone()
+    })
 }

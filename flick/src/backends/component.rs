@@ -70,7 +70,7 @@ impl Package {
     pub(crate) fn artifacts(
         &self,
         host: &FsHost,
-        sources: &SourceMap,
+        sources: &mut SourceMap,
         project: Option<&Project>,
         compilation: &Compilation,
         output: &BuildPlan,

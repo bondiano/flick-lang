@@ -149,9 +149,11 @@ fn release_ir_export_is_the_program_supplied_to_the_component() {
         &fs::read_to_string(root.join("dist/program.ir.json")).expect("dump"),
     )
     .expect("dump IR");
-    assert_eq!(
-        dump, given,
-        "dump exposes the selected component's exact input"
+    assert!(
+        dump == given,
+        "IR dump differs from component input ({} vs {} modules)",
+        dump.modules.len(),
+        given.modules.len(),
     );
 }
 

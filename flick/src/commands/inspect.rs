@@ -84,7 +84,7 @@ fn output(dir: PathBuf, typescript: bool) -> BuildPlan {
 }
 
 pub fn inspect(options: &InspectArguments, explicit: Option<&str>) -> Outcome {
-    let checked = match compile(explicit) {
+    let mut checked = match compile(explicit) {
         Ok(c) => c,
         Err(outcome) => return outcome,
     };
@@ -126,7 +126,7 @@ pub fn inspect(options: &InspectArguments, explicit: Option<&str>) -> Outcome {
             let out = output(checked.host.cwd.join("dist"), typescript);
             let emission = artifacts(
                 &checked.host,
-                &checked.sources,
+                &mut checked.sources,
                 checked.project.as_ref(),
                 &checked.compilation,
                 &out,
@@ -218,7 +218,7 @@ fn schema_exporter(target: SchemaTarget, value: &str, backend: Backend) -> Strin
 }
 
 pub fn schema_export(options: &SchemaExportArguments, explicit: Option<&str>) -> Outcome {
-    let checked = match compile(explicit) {
+    let mut checked = match compile(explicit) {
         Ok(c) => c,
         Err(outcome) => return outcome,
     };
@@ -249,7 +249,7 @@ pub fn schema_export(options: &SchemaExportArguments, explicit: Option<&str>) ->
     let _ = fs::remove_dir_all(&stage);
     let emission = emit(
         &checked.host,
-        &checked.sources,
+        &mut checked.sources,
         checked.project.as_ref(),
         &checked.compilation,
         &output(stage.clone(), false),

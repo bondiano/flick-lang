@@ -251,17 +251,22 @@ impl Command for BuildCommand {
             (false, true) => "Emitting TypeScript",
             (false, false) => "Emitting JavaScript",
         });
-        let mut emitted = artifacts(&host, &sources, project.as_ref(), &compilation, &output);
+        let mut emitted = artifacts(&host, &mut sources, project.as_ref(), &compilation, &output);
         self.record(
             &output,
             Some(modules.len()),
             &output.entries,
             &emitted.artifacts,
         );
-        let extra = self
-            .options
-            .emit_ir
-            .map(|format| emit_ir::artifact(&compilation, &sources, &output, format));
+        let extra = self.options.emit_ir.map(|format| {
+            emit_ir::artifact(
+                &compilation,
+                &mut sources,
+                project.as_ref(),
+                &output,
+                format,
+            )
+        });
         self.publish(project.as_ref(), &output, &mut emitted, extra, &progress);
         let clean = diagnostics.is_empty() && emitted.diagnostics.is_empty();
         diagnostics.extend(emitted.diagnostics);
@@ -428,7 +433,7 @@ pub struct Emission {
 /// TypeScript form is reported.
 pub fn emit(
     host: &FsHost,
-    sources: &SourceMap,
+    sources: &mut SourceMap,
     project: Option<&Project>,
     compilation: &Compilation,
     output: &BuildPlan,
@@ -442,7 +447,7 @@ pub fn emit(
 /// through to the temporary native baseline.
 pub fn artifacts(
     host: &FsHost,
-    sources: &SourceMap,
+    sources: &mut SourceMap,
     project: Option<&Project>,
     compilation: &Compilation,
     output: &BuildPlan,

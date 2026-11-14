@@ -78,9 +78,9 @@ fn compiled(project: Option<&project::Project>, roots: &[PathBuf], what: &str) -
 fn the_built_in_modules_round_trip() {
     let modules = build::builtin_modules().to_vec();
     assert!(modules.len() > 100);
-    // each built-in module is checked in a source map of its own
+    let bundle = build::builtin_bundle_of(false);
     round_trips("the built-in modules", modules, &|f| {
-        format!("builtin {}", f.index())
+        bundle.sources[f.index() as usize].name.clone()
     });
 }
 

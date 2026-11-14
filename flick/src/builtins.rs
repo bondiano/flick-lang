@@ -9,12 +9,13 @@ use std::sync::OnceLock;
 use std::time::Instant;
 use std::{fs, thread};
 
-use flick_core::build::{self, BuiltinStore};
+use flick_core::build::{self, BuiltinModules, BuiltinSource, BuiltinStore};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::iface::Interface;
 use flick_core::ir;
 use flick_core::types;
-use flick_ir::{Module, Program};
+use flick_ir::Program;
+use serde::{Deserialize, Serialize};
 
 use crate::fetch;
 use crate::saved;
@@ -25,6 +26,9 @@ use flick_core::project::store;
 use sha2::{Digest, Sha256};
 
 const PREFIX: &str = "builtins-";
+
+#[cfg(test)]
+mod tests;
 
 /// Installs the saved interfaces, or checks the built-in modules and saves
 /// them. A failure to read or save only means they are checked again; an
@@ -139,28 +143,78 @@ fn modules_path(stages_by_class: bool) -> Option<PathBuf> {
     Some(dir.join(name).with_extension("ir.cbor"))
 }
 
-fn saved_modules(stages_by_class: bool) -> Option<Vec<Module>> {
+fn saved_modules(stages_by_class: bool) -> Option<BuiltinModules> {
     let started = Instant::now();
     let bytes = fs::read(modules_path(stages_by_class)?).ok()?;
     // a file of another version of the IR is lowered again and replaced
-    let program = Program::from_cbor(&bytes).ok()?;
+    let cached: CachedModules = ciborium::from_reader(&bytes[..]).ok()?;
+    let bundle = cached.checked()?;
     timings::phase("built-in modules read from their cache", started.elapsed());
-    Some(program.modules)
+    Some(bundle)
+}
+
+#[derive(Serialize, Deserialize)]
+struct CachedModules {
+    program: Program,
+    sources: Vec<String>,
+}
+
+impl CachedModules {
+    fn new(bundle: &BuiltinModules) -> Self {
+        Self {
+            program: Program {
+                ir_version: flick_ir::VERSION.into(),
+                compiler: toolchain::COMPILER.into(),
+                files: bundle.sources.iter().map(|s| s.name.clone()).collect(),
+                modules: bundle.modules.clone(),
+                lang: ir::lang_items(),
+            },
+            sources: bundle.sources.iter().map(|s| s.text.clone()).collect(),
+        }
+    }
+
+    fn checked(mut self) -> Option<BuiltinModules> {
+        if self.program.ir_version != flick_ir::VERSION
+            || self.program.compiler != toolchain::COMPILER
+            || self.program.files.len() != self.sources.len()
+        {
+            return None;
+        }
+        for module in &mut self.program.modules {
+            let mut valid = true;
+            module.each_span_mut(&mut |span| {
+                valid &= self
+                    .sources
+                    .get(span.file.index() as usize)
+                    .is_some_and(|text| span.start <= span.end && text.get(span.range()).is_some());
+            });
+            if !valid {
+                return None;
+            }
+        }
+        Some(BuiltinModules {
+            modules: self.program.modules,
+            sources: self
+                .program
+                .files
+                .into_iter()
+                .zip(self.sources)
+                .map(|(name, text)| BuiltinSource { name, text })
+                .collect(),
+        })
+    }
 }
 
 /// A failure to save only means the next build lowers them again.
-fn save_modules(stages_by_class: bool, modules: &[Module]) {
+fn save_modules(stages_by_class: bool, bundle: &BuiltinModules) {
     let Some(path) = modules_path(stages_by_class) else {
         return;
     };
-    // every built-in module is the one file of its own source map
-    let program = Program::new(
-        toolchain::COMPILER,
-        modules.to_vec(),
-        ir::lang_items(),
-        &|_| String::new(),
-    );
-    let _ = saved::write(&path, &program.to_cbor());
+    let cached = CachedModules::new(bundle);
+    let mut bytes = Vec::new();
+    if ciborium::into_writer(&cached, &mut bytes).is_ok() {
+        let _ = saved::write(&path, &bytes);
+    }
 }
 
 /// What `problem`, the first error of an implicit module, means for the run.
