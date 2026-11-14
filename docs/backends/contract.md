@@ -14,13 +14,15 @@ language that implements this world.
 ## Status
 
 This is an initial 0.x contract and validation library. It does not freeze
-IR 1.0, complete the semantic prerequisites of R3a, or switch production
-`build/run/test` to components. The portable IR is 0.12.0. The official
+IR 1.0 or complete every semantic prerequisite of R3a. Ordinary JS/TS
+`build/run/test` select the distributed JS component by default. The portable
+IR is 0.12.0. The official
 JS emitter lives in `backends/js`, independently of `flick-core`; the Go
 emitter remains in `flick-core`. The contract probe exercises both with IR
-and plain data without `Compilation` or `Settings`. Production JS component
-selection is still separate work: moving the Rust emitter alone does not
-establish the release component path.
+and plain data without `Compilation` or `Settings`. The distributed component
+is checked against its Rust/WIT sources; real release-binary tests require
+component selection for build/run/test. The native trait remains a development
+and parity interface.
 
 The optional `flick-backend/host` feature executes this world using the
 same Wasmtime configuration and compiled-code cache as the plugin host.
@@ -31,9 +33,9 @@ version with another component digest is rejected. The driver checks the
 host's loaded pin before snapshotting any input, even when that input is
 unavailable; a mismatch remains a P013 diagnostic with no reader calls.
 The CLI supports [explicit pinned package selection](registry.md) through
-this world for build/run/test. Projects without a pin still use the temporary
-native baseline. Official component distribution/default selection, the browser
-loader, atomic publication and tool execution adapters remain integration work.
+this world for build/run/test. Projects without a pin select the shipped JS
+component for JS/TS, while Go retains its temporary native baseline. The browser
+loader, atomic publication and generic tool execution adapters remain integration work.
 Accepting a graph here does not execute it or establish that a tool's arguments
 access only declared files.
 
@@ -102,8 +104,8 @@ records add no checker or host-path lookup callback to the world.
 component is built without WASI by `just js-component`. Native/WASM parity
 covers JS/TS and both profiles; explicit package selection exercises the
 common CLI. The component calculates release ABI and invokes the same
-portable optimizer with `Program.lang`. This remains distinct from making it
-the default release backend or adding the browser component loader.
+portable optimizer with `Program.lang`. The browser component loader remains
+separate integration work.
 
 The host prepares `.d.ts` and Promise facades with the same projection
 implementation as the native baseline and reserves their output paths.

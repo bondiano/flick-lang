@@ -5,9 +5,9 @@
 mod doc;
 pub use doc::doc;
 
-use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command as Process;
+use std::process::{Command as Process, Output};
+use std::{fs, io};
 
 use flick_core::build::Extras;
 use flick_core::diagnostics::{Code, Diagnostic, Severity, codes};
@@ -69,18 +69,26 @@ pub fn compile(explicit: Option<&str>) -> Result<Checked, Outcome> {
     })
 }
 
-fn output(dir: PathBuf, typescript: bool) -> BuildPlan {
-    BuildPlan {
+fn output(checked: &Checked, dir: PathBuf, typescript: bool) -> Result<BuildPlan, Diagnostic> {
+    let rt = checked
+        .project
+        .as_ref()
+        .is_some_and(|p| p.config.build.effect == Backend::Rt);
+    let backend = Selected::load(&checked.host, checked.project.as_ref(), false, rt)?;
+    Ok(BuildPlan {
         purpose: Purpose::Build,
-        backend: Selected::Native,
+        backend,
         out_dir: dir,
         entries: Vec::new(),
         typescript,
         go: false,
         suites: Vec::new(),
-        extras: Extras::default(),
+        extras: Extras {
+            rt,
+            ..Extras::default()
+        },
         release: false,
-    }
+    })
 }
 
 pub fn inspect(options: &InspectArguments, explicit: Option<&str>) -> Outcome {
@@ -123,7 +131,15 @@ pub fn inspect(options: &InspectArguments, explicit: Option<&str>) -> Outcome {
                 Representation::Ts => (format!("{path}.ts"), true),
                 _ => (format!("{path}.iface"), false),
             };
-            let out = output(checked.host.cwd.join("dist"), typescript);
+            let out = match output(&checked, checked.host.cwd.join("dist"), typescript) {
+                Ok(out) => out,
+                Err(diagnostic) => {
+                    return Outcome {
+                        sources: checked.sources,
+                        diagnostics: vec![diagnostic],
+                    };
+                }
+            };
             let emission = artifacts(
                 &checked.host,
                 &mut checked.sources,
@@ -246,13 +262,22 @@ pub fn schema_export(options: &SchemaExportArguments, explicit: Option<&str>) ->
         .as_ref()
         .map_or_else(|| checked.host.cwd.clone(), |p| p.root.clone());
     let stage = root.join(cache::DIR).join("schema");
+    let plan = match output(&checked, stage.clone(), false) {
+        Ok(plan) => plan,
+        Err(diagnostic) => {
+            return Outcome {
+                sources: checked.sources,
+                diagnostics: vec![diagnostic],
+            };
+        }
+    };
     let _ = fs::remove_dir_all(&stage);
     let emission = emit(
         &checked.host,
         &mut checked.sources,
         checked.project.as_ref(),
         &checked.compilation,
-        &output(stage.clone(), false),
+        &plan,
     );
     if !emission.diagnostics.is_empty() {
         return Outcome {
@@ -282,6 +307,14 @@ pub fn schema_export(options: &SchemaExportArguments, explicit: Option<&str>) ->
         .current_dir(&stage)
         .output();
     let _ = fs::remove_dir_all(&stage);
+    save_schema(checked, options, result)
+}
+
+fn save_schema(
+    checked: Checked,
+    options: &SchemaExportArguments,
+    result: io::Result<Output>,
+) -> Outcome {
     match result {
         Ok(out) if out.status.success() => {
             let path = checked.host.cwd.join(&options.out);

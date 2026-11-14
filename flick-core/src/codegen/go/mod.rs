@@ -69,7 +69,7 @@ pub fn go(input: &Input) -> Output {
     let index = reach::index(modules);
     // main.go's documents
     let a = &DocumentArena::new();
-    if !input.suites.is_empty() {
+    if input.test || !input.suites.is_empty() {
         let start = tests_start(a, input.suites);
         return compile(input, modules, &index, a, start, input.suites);
     }
@@ -126,7 +126,7 @@ fn compile<'a>(
     roots: &[String],
 ) -> Output {
     let mut diagnostics = Vec::new();
-    let keys: Vec<Key> = if input.suites.is_empty() {
+    let keys: Vec<Key> = if !input.test && input.suites.is_empty() {
         vec![(input.entry.to_owned(), "main".to_owned())]
     } else {
         roots

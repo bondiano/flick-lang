@@ -25,7 +25,7 @@ use crate::backends::{self, Selected};
 use crate::package_cache;
 use crate::progress::{Mode, Progress};
 use crate::sources::FsHost;
-use crate::{builtins, cache, child, report, timings, toolchain};
+use crate::{builtins, cache, child, report, timings};
 use flick_core::build::Extras;
 
 mod cached;
@@ -89,10 +89,6 @@ fn prepare(
     let Some(project) = project else {
         return Err(());
     };
-    let backend = match Selected::load(Some(&project)) {
-        Ok(backend) => backend,
-        Err(diagnostic) => return fail(&sources, vec![diagnostic]),
-    };
     let wanted: Vec<PathBuf> = options
         .paths
         .iter()
@@ -105,10 +101,17 @@ fn prepare(
         Some(target) => target == TestEmitArgument::Go,
         None => project.config.build.emit == Emit::Go,
     };
+    let rt = options.rt || (!go_requested && project.config.build.effect == Backend::Rt);
+    if !go_requested && let Some(problem) = backends::check_runtime(&project, rt) {
+        return fail(&sources, vec![problem]);
+    }
+    let backend = match Selected::load(&host, Some(&project), go_requested, rt) {
+        Ok(backend) => backend,
+        Err(diagnostic) => return fail(&sources, vec![diagnostic]),
+    };
     if let Err(diagnostic) = backend.validate_environment(Some(&project), go_requested) {
         return fail(&sources, vec![diagnostic]);
     }
-    let rt = options.rt || (!go_requested && project.config.build.effect == Backend::Rt);
     let identity = backend.cache_identity();
     let settings = format!(
         "test {:?} {:?} {:?} {rt} {identity}",
@@ -175,15 +178,7 @@ fn prepare(
             vec![Diagnostic::new(codes::F004, Severity::Error, message)],
         );
     }
-    // with no suite, the go target has no program: the node runner reports the empty run
-    let go = go_requested && !suites.is_empty();
-    if !go
-        && !backend.is_component()
-        && let Some(problem) = toolchain::check_runtime(&project.root, rt)
-    {
-        drop(progress);
-        return fail(&sources, vec![problem]);
-    }
+    let go = go_requested;
     let output = BuildPlan {
         purpose: Purpose::Test,
         backend: backend.clone(),
@@ -204,8 +199,10 @@ fn prepare(
         "Emitting JavaScript"
     });
     let mut emitted = artifacts(&host, &mut sources, Some(&project), &compilation, &output);
-    if !go && !backend.is_component() {
+    if !go {
         progress.stage("Writing test runner");
+    }
+    if !go && !backend.is_component() {
         emitted.artifacts.push(Artifact::source(
             "test.js".to_owned(),
             runner_source(&suites, rt),
@@ -242,7 +239,7 @@ fn prepare(
     if backend.is_component() {
         store(&emitted.artifacts);
         drop(progress);
-        return Ok(Runner::component(out, &project));
+        return Ok(Runner::component(out, &backend));
     }
     if go {
         if store(&emitted.artifacts) {

@@ -14,9 +14,9 @@ The native development adapter is `flick-core::codegen`; frontend type rules,
 `.iface`, `.d.ts` and Promise facades remain shared. The public backend ABI is
 the separate [`flick:backend` world](../../flick-backend/wit/backend.wit), not
 this crate's Rust interface. The `component` feature implements all three operations over those records;
-`guest` exports them. Production default selection and the browser loader
-still need the integration described in the
-[backend contract](../../docs/backends/contract.md).
+`guest` exports them. Ordinary CLI builds, runs and tests select the distributed
+component through the registry. The browser loader remains separate work in
+the [backend contract](../../docs/backends/contract.md).
 
 Standalone checks:
 
@@ -37,6 +37,15 @@ requires `flick.typescript@0.2.0`; foreign bindings use
 exports are computed from reference IR and these facts, with explicit
 `Program.lang`; the frontend retains its typing and diagnostic rules.
 
-`just wasm-backends` builds this component and exercises artifact parity and
-explicit pinned `build/run/test`. This does not establish default release
-selection, browser loading or complete official-backend conformance.
+`package/component.wasm` and `package/backend.json` hold the compiler's exact
+distributed image and pin. `just update-js-component` updates them deliberately;
+`just check-js-component` rebuilds and checks byte-for-byte reproducibility.
+Guest builds normalize workspace and Cargo source paths, with fixed guest Rust
+flags, so panic locations do not embed a build machine's directory names.
+They invoke the pinned Rust toolchain directly, without compiler-cache wrappers,
+in `target/backend-guest`; ordinary compiler builds keep their existing cache.
+`just wasm-backends` exercises artifact parity, explicit and default selection,
+and the real release binary's build/run/test path. It also runs the language
+corpus through the component in Effect/RT and both profiles. Browser loading,
+generic tool steps, atomic publication and real project measurements remain
+separate gates; this does not close all of R3/R4.

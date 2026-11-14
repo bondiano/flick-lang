@@ -1,103 +1,132 @@
-//! Content pins for the host's installed kernel. The guest receives the pin,
-//! never permission to read or resolve a host filesystem path.
+//! Content pins for installed runtime roots and their actual dependency graphs.
 
-use std::collections::BTreeMap;
+mod graph;
+use crate::toolchain;
+use flick_backend::RuntimeDependency;
+use graph::Graph;
+use serde_json::Value;
+use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use flick_backend::RuntimeDependency;
-use sha2::{Digest, Sha256};
+#[cfg(test)]
+pub(super) fn installed(root: &Path) -> Result<Vec<RuntimeDependency>, String> {
+    installed_for(root, false)
+}
 
 #[derive(Default)]
 pub(super) struct Pins {
-    packages: BTreeMap<PathBuf, Option<RuntimeDependency>>,
+    graph: Graph,
 }
 
 impl Pins {
+    #[cfg(test)]
     pub(super) fn installed(&mut self, root: &Path) -> Result<Vec<RuntimeDependency>, String> {
-        let root =
-            fs::canonicalize(root).map_err(|e| format!("cannot resolve runtime importer: {e}"))?;
-        let name = "@flick-lang/runtime";
-        let Some(manifest) = root
-            .ancestors()
-            .filter(|dir| dir.file_name().is_none_or(|name| name != "node_modules"))
-            .map(|dir| dir.join("node_modules").join(name).join("package.json"))
-            .find(|path| path.is_file())
-        else {
+        let Some(manifest) = resolve(root, "@flick-lang/runtime")? else {
             return Ok(vec![]);
         };
-        let package = fs::canonicalize(
-            manifest
-                .parent()
-                .ok_or("runtime manifest has no directory")?,
-        )
-        .map_err(|e| e.to_string())?;
-        if let Some(pin) = self.packages.get(&package) {
-            return Ok(pin.iter().cloned().collect());
+        if !manifest
+            .parent()
+            .expect("manifest directory")
+            .join("dist")
+            .is_dir()
+        {
+            return Ok(vec![]);
         }
-        let pin = content_pin(&package)?;
-        self.packages.insert(package, pin.clone());
-        Ok(pin.into_iter().collect())
+        Ok(vec![self.graph.pin("@flick-lang/runtime", &manifest)?])
+    }
+
+    pub(super) fn verify(
+        &mut self,
+        root: &Path,
+        pins: &[RuntimeDependency],
+    ) -> Result<bool, String> {
+        for pin in pins {
+            let found = resolve(root, &pin.package)?;
+            let Some(manifest) = found else {
+                return Ok(false);
+            };
+            if self.graph.pin(&pin.package, &manifest)? != *pin {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 }
 
-#[cfg(all(test, unix))]
-#[test]
-fn runtime_pins_share_one_canonical_package_snapshot_per_launch() {
-    use std::os::unix::fs::symlink;
-    use std::{env, process};
-    let root = env::temp_dir().join(format!("flick-launch-pin-snapshot-{}", process::id()));
-    let _ = fs::remove_dir_all(&root);
-    let kernel = root.join("store/kernel");
-    fs::create_dir_all(kernel.join("dist")).expect("runtime");
-    fs::write(
-        kernel.join("package.json"),
-        r#"{"name":"@flick-lang/runtime","version":"0.1.0"}"#,
-    )
-    .expect("manifest");
-    fs::write(kernel.join("dist/index.js"), "first").expect("bytes");
-    for directory in ["A", "B"] {
-        let modules = root.join(directory).join("node_modules/@flick-lang");
-        fs::create_dir_all(&modules).expect("importer");
-        symlink(&kernel, modules.join("runtime")).expect("same canonical runtime");
+pub(super) fn installed_for(root: &Path, effect: bool) -> Result<Vec<RuntimeDependency>, String> {
+    let mut roots: BTreeSet<String> = ["@flick-lang/runtime".into()].into();
+    if effect {
+        roots.insert(toolchain::ADAPTER.into());
     }
-    let mut pins = Pins::default();
-    let first = pins.installed(&root.join("A")).expect("first importer");
-    assert_eq!(first.len(), 1);
-    fs::write(kernel.join("dist/index.js"), "second").expect("change bytes between queries");
-    assert_eq!(
-        pins.installed(&root.join("B")).expect("second importer"),
-        first,
-        "one launch hashes each resolved package once"
-    );
-    assert_ne!(
-        installed(&root.join("B")).expect("next launch"),
-        first,
-        "the next launch takes a fresh snapshot"
-    );
-    fs::remove_dir_all(root).expect("cleanup");
+    if let Ok(bytes) = fs::read(root.join("package.json")) {
+        let manifest: Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+        roots.extend(names(&manifest, false));
+    }
+    let mut graph = Graph::default();
+    let mut pins = Vec::new();
+    for name in roots {
+        let found = resolve(root, &name)?;
+        if let Some(manifest) = found {
+            pins.push(graph.pin(&name, &manifest)?);
+        }
+    }
+    Ok(pins)
 }
 
-pub(super) fn installed(root: &Path) -> Result<Vec<RuntimeDependency>, String> {
-    Pins::default().installed(root)
+/// Launch roots already identify every package selected at build time.
+/// The generated package.json need not repeat the source project's dependencies.
+pub(super) fn verify(root: &Path, pins: &[RuntimeDependency]) -> Result<bool, String> {
+    Pins::default().verify(root, pins)
 }
 
-fn content_pin(package: &Path) -> Result<Option<RuntimeDependency>, String> {
-    let json: serde_json::Value =
-        serde_json::from_slice(&fs::read(package.join("package.json")).map_err(|e| e.to_string())?)
-            .map_err(|e| e.to_string())?;
-    let version = json["version"]
-        .as_str()
-        .ok_or("runtime has no version")?
-        .to_owned();
-    if !package.join("dist").is_dir() {
-        return Ok(None);
+fn names(manifest: &Value, peers: bool) -> BTreeSet<String> {
+    let mut names = BTreeSet::new();
+    for key in ["dependencies", "optionalDependencies", "peerDependencies"] {
+        if key == "peerDependencies" && !peers {
+            continue;
+        }
+        if let Some(entries) = manifest[key].as_object() {
+            names.extend(entries.keys().cloned());
+        }
     }
+    names
+}
+
+fn resolve(root: &Path, name: &str) -> Result<Option<PathBuf>, String> {
+    let parts: Vec<_> = name.split('/').collect();
+    let plain = |part: &str| {
+        !part.is_empty()
+            && part != "."
+            && part != ".."
+            && part
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
+    };
+    let valid = match &parts[..] {
+        [name] => plain(name),
+        [scope, name] => scope.strip_prefix('@').is_some_and(plain) && plain(name),
+        _ => false,
+    };
+    if !valid {
+        return Err(format!("invalid runtime dependency name `{name}`"));
+    }
+    let root = fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
+    Ok(root
+        .ancestors()
+        .filter(|p| p.file_name().is_none_or(|n| n != "node_modules"))
+        .map(|p| p.join("node_modules").join(name).join("package.json"))
+        .find(|p| p.is_file()))
+}
+
+fn content(package: &Path) -> Result<String, String> {
     let mut files = vec![PathBuf::from("package.json")];
-    collect(package, Path::new("dist"), &mut files)
+    collect(package, Path::new(""), &mut files)
         .map_err(|e| format!("cannot pin the installed runtime: {e}"))?;
     files.sort();
+    files.dedup();
     let mut hash = Sha256::new();
     for relative in files {
         let name = relative.to_string_lossy().replace('\\', "/");
@@ -112,18 +141,18 @@ fn content_pin(package: &Path) -> Result<Option<RuntimeDependency>, String> {
         )
         .map_err(|e| e.to_string())?;
     }
-    Ok(Some(RuntimeDependency {
-        package: "@flick-lang/runtime".into(),
-        version,
-        sha256: format!("{:x}", hash.finalize()),
-    }))
+    Ok(format!("{:x}", hash.finalize()))
 }
 
 fn collect(package: &Path, relative: &Path, files: &mut Vec<PathBuf>) -> io::Result<()> {
     for entry in fs::read_dir(package.join(relative))? {
         let entry = entry?;
         let kind = entry.file_type()?;
-        let path = relative.join(entry.file_name());
+        let name = entry.file_name();
+        if name == "node_modules" || name == ".git" {
+            continue;
+        }
+        let path = relative.join(name);
         if kind.is_dir() {
             collect(package, &path, files)?;
         } else if kind.is_file() {
@@ -133,6 +162,51 @@ fn collect(package: &Path, relative: &Path, files: &mut Vec<PathBuf>) -> io::Res
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::installed_for;
+    use std::{env, fs, process};
+
+    #[test]
+    fn adapter_pins_include_transitive_runtime_content() {
+        let root = env::temp_dir().join(format!("flick-adapter-content-{}", process::id()));
+        let kernel = root.join("node_modules/@flick-lang/runtime");
+        let adapter = root.join("node_modules/@flick-lang/effect-ts");
+        let effect = adapter.join("node_modules/effect");
+        for directory in [&kernel, &adapter, &effect] {
+            fs::create_dir_all(directory.join("dist")).expect("package");
+        }
+        fs::write(
+            kernel.join("package.json"),
+            r#"{"name":"@flick-lang/runtime","version":"0.1.0"}"#,
+        )
+        .expect("kernel");
+        fs::write(adapter.join("package.json"), r#"{"name":"@flick-lang/effect-ts","version":"0.1.0","dependencies":{"effect":"4.0.0"}}"#).expect("adapter");
+        fs::write(
+            effect.join("package.json"),
+            r#"{"name":"effect","version":"4.0.0"}"#,
+        )
+        .expect("effect");
+        fs::write(effect.join("dist/index.js"), "first").expect("content");
+        let before = installed_for(&root, true).expect("pins");
+        let pin = before
+            .iter()
+            .find(|p| p.package == "@flick-lang/effect-ts")
+            .expect("adapter is pinned with its dependency graph");
+        fs::write(effect.join("dist/index.js"), "other").expect("same-version change");
+        let after = installed_for(&root, true).expect("changed pins");
+        assert_ne!(
+            pin.sha256,
+            after
+                .iter()
+                .find(|p| p.package == pin.package)
+                .expect("adapter pin")
+                .sha256
+        );
+        fs::remove_dir_all(root).expect("cleanup");
+    }
 }
 
 #[cfg(all(test, unix))]
@@ -199,5 +273,42 @@ fn a_project_alias_pins_the_kernel_hoisted_above_the_real_importer() {
     )
     .expect("update actual runtime");
     assert_ne!(installed(&alias).expect("updated pin"), pin);
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[cfg(all(test, unix))]
+#[test]
+fn runtime_pins_share_one_canonical_package_snapshot_per_launch() {
+    use std::os::unix::fs::symlink;
+    use std::{env, process};
+    let root = env::temp_dir().join(format!("flick-launch-pin-snapshot-{}", process::id()));
+    let _ = fs::remove_dir_all(&root);
+    let kernel = root.join("store/kernel");
+    fs::create_dir_all(kernel.join("dist")).expect("runtime");
+    fs::write(
+        kernel.join("package.json"),
+        r#"{"name":"@flick-lang/runtime","version":"0.1.0"}"#,
+    )
+    .expect("manifest");
+    fs::write(kernel.join("dist/index.js"), "first").expect("bytes");
+    for directory in ["A", "B"] {
+        let modules = root.join(directory).join("node_modules/@flick-lang");
+        fs::create_dir_all(&modules).expect("importer");
+        symlink(&kernel, modules.join("runtime")).expect("same canonical runtime");
+    }
+    let mut pins = Pins::default();
+    let first = pins.installed(&root.join("A")).expect("first importer");
+    assert_eq!(first.len(), 1);
+    fs::write(kernel.join("dist/index.js"), "second").expect("change bytes between queries");
+    assert_eq!(
+        pins.installed(&root.join("B")).expect("second importer"),
+        first,
+        "one launch hashes each resolved package once"
+    );
+    assert_ne!(
+        installed(&root.join("B")).expect("next launch"),
+        first,
+        "the next launch takes a fresh snapshot"
+    );
     fs::remove_dir_all(root).expect("cleanup");
 }

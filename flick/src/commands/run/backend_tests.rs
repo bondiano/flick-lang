@@ -65,10 +65,17 @@ fn a_generation_uses_the_successful_build_selection_after_config_changes() {
         root.join("flick.toml"),
         format!("{config}\n[build]\neffect = \"rt\"\n"),
     )
-    .expect("native RT selection");
-    let generation =
-        build_into_generation(&stale, &options, &args.global, None).expect("native RT generation");
-    assert!(generation.backend.is_none());
+    .expect("default RT selection");
+    let generation = build_into_generation(&stale, &options, &args.global, None)
+        .expect("official RT generation");
+    let bundled = fs::read(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../backends/js/package/component.wasm"),
+    )
+    .expect("shipped component");
+    let pin = generation.backend.as_ref().expect("default component pin");
+    assert_eq!(pin.identity.id, "flick/js");
+    assert_eq!(pin.identity.version, "0.1.0");
+    assert_eq!(pin.sha256, flick_backend::sha256(&bundled));
     assert!(generation.rt, "runtime mode comes from the completed build");
     drop(generation);
     fs::remove_dir_all(root).expect("cleanup");

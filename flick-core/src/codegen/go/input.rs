@@ -17,6 +17,8 @@ pub struct Input<'a> {
     pub entry: &'a str,
     /// The test modules whose `tests` the program runs instead, when any.
     pub suites: &'a [String],
+    /// A test command also when it discovers no suites.
+    pub test: bool,
     /// The source path of each own module, relative to the Go module, for the
     /// `//line` directives that give Go's stack traces the Flick source.
     pub paths: &'a BTreeMap<String, String>,

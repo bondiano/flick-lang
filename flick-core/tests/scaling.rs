@@ -358,8 +358,14 @@ fn emitting(compilation: &Compilation, sources: &SourceMap, typescript: bool) ->
 fn emitting_go(compilation: &Compilation, sources: &SourceMap) -> Duration {
     let entries = [("main".to_owned(), "Main".to_owned())];
     let start = Cpu::now();
-    let (artifacts, diagnostics) =
-        build::go::emit(compilation, sources, &settings(&entries), &[], &|_| None);
+    let (artifacts, diagnostics) = build::go::emit(
+        compilation,
+        sources,
+        &settings(&entries),
+        &[],
+        false,
+        &|_| None,
+    );
     let elapsed = start.elapsed();
     assert_eq!(diagnostics, []);
     assert!(!artifacts.is_empty());

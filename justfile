@@ -129,7 +129,7 @@ e2e-js: docs-wasm e2e-prepare
 # "all their test targets, minus the exceptions", so a new suite is covered
 # without touching this recipe. Each exception belongs to the recipe named
 # beside it, and `flick/tests/ignored_tests.rs` holds this recipe to that.
-e2e-tests: e2e-prepare
+e2e-tests: e2e-prepare backend-fixtures
     cargo nextest run --cargo-profile e2e --profile ci --run-ignored only -p flick -p flick-core \
       -E 'not (test(=run_cases) | test(~rt_cases) | binary_id(flick::sql_postgres) | binary_id(flick::conduit) | test(~dump) | test(~write_fixes_of_built_in_signatures))'
 
@@ -288,23 +288,35 @@ wasm-plugins: wasm-backends
 
 # No WASI adapter: an official backend imports only the compiler input interface.
 js-component:
-    cargo build -p flick-backend-js --features guest --target wasm32-unknown-unknown --release
-    cargo clippy -p flick-backend-js --features guest --target wasm32-unknown-unknown -- -D warnings
+    node tools/backend-package/build.mjs
     mkdir -p target/backends
-    cargo run -p flick-component-build -- target/wasm32-unknown-unknown/release/flick_backend_js.wasm target/backends/js.wasm
+    cargo run -p flick-component-build -- target/backend-guest/wasm32-unknown-unknown/release/flick_backend_js.wasm target/backends/js.wasm
+
+# Update the exact component distributed with every compiler binary.
+update-js-component: js-component
+    node tools/backend-package/index.mjs update
+
+# Release/CI checks reproduce the checked-in artifact without updating its pin.
+check-js-component: js-component
+    node tools/backend-package/index.mjs check
+
+# Ignored backend tests also run in e2e-tests now that their host is enabled
+# by default. Both runners need these images in a fresh checkout.
+backend-fixtures: js-component
+    cargo build -p flick-test-backend --features guest --target wasm32-wasip2 --release
 
 # A real third-party backend fixture through the separate component world.
-wasm-backends:
+wasm-backends: backend-fixtures
     pnpm install --frozen-lockfile
     pnpm -C runtime build
     pnpm -C packages/effect-ts build
-    cargo build -p flick-test-backend --features guest --target wasm32-wasip2 --release
     cargo clippy -p flick-test-backend --features guest --target wasm32-wasip2 -- -D warnings
-    just js-component
+    just check-js-component
     cargo clippy -p flick-backend --features host --all-targets -- -D warnings
     cargo test -p flick-backend --profile e2e --features host --test component_host -- --include-ignored
     cargo clippy -p flick --features wasm-backends --all-targets -- -D warnings
     cargo test -p flick --profile e2e --features wasm-backends --bin flick --test backends -- --include-ignored
+    cargo test -p flick --release --features wasm-plugins --test default_backend -- --include-ignored
     node --test tools/backend-conformance/report.test.mjs
     node tools/backend-conformance/index.mjs {{flick}} target/backends/js.wasm
 

@@ -19,6 +19,7 @@ pub(super) fn build(text: &str) -> Output {
         builtins: &builtins,
         entry: &ir.name,
         suites: &[],
+        test: false,
         paths: &BTreeMap::new(),
         lines: &[],
         foreign: &BTreeMap::new(),

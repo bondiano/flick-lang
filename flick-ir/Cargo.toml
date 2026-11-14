@@ -15,9 +15,10 @@ workspace = true
 [features]
 # exact for every float, which the whole build's serde_json then is
 json = ["dep:serde_json", "serde_json/float_roundtrip"]
-cbor = ["dep:ciborium"]
+cbor = ["dep:ciborium", "dep:cbor4ii"]
 
 [dependencies]
+cbor4ii = { version = "1.2.4", features = ["serde1", "use_std", "half-f16"], optional = true }
 ciborium = { version = "0.2.2", optional = true }
 serde = { version = "1.0.229", features = ["derive", "rc"] }
 serde_json = { workspace = true, optional = true }

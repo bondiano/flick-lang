@@ -1,7 +1,7 @@
 # Selecting a backend component
 
 A project can select an exact component package for `build`, `run` and
-`test`. The compiler must include `flick/wasm-backends`; release builds that
+`test`. `flick/wasm-backends` is enabled by default; release builds that
 enable `wasm-plugins` include it too. A compiler without that feature rejects
 the selection with `P013` before reading build or test caches.
 
@@ -24,11 +24,14 @@ ranges, missing fields, unknown fields and malformed digests are errors.
 `environment` is an open backend/platform pair: `js/node` and `js/browser`
 are different targets. Without it the compatibility default is `js/node`
 for JS/TS output and `go/native` for Go. The existing `js`, `ts`, `go` output
-choices remain compatible. The temporary native baseline supports its existing
-`js/node` and `go/native` environments and rejects an incompatible explicit
-environment before consulting the cache. Other environments require a component.
+choices remain compatible. Unpinned JS/TS selects the distributed `flick/js`
+component; Go retains its temporary native baseline. Environment support is
+checked against the selected backend before a cache hit is reused.
 The JS runtime setting `[build] effect = "rt"`
 or `"effect"` remains independent of component identity.
+The compiler's JS runtime version check applies to the default component and
+an explicit pin matching the distributed JS image. Other components negotiate
+their own runtime requirements through the backend ABI.
 
 ## Invocation and cache behavior
 
@@ -55,12 +58,18 @@ The result's launch records select runners by artifact id. The host stores
 validated launch metadata alongside the artifacts, including on cache hits;
 it does not guess `flick-main.js`, `test.js`, an extension or a Go executable
 name for a selected component. A runnable entry and a test build require
-corresponding launch records. Test reporter, filter, jobs, seed and watch
+corresponding launch records. The shipped JS backend also supports compile-only
+builds without Node: it emits sources without a runnable launch, then rebuilds
+with an executable pin when Node becomes available. Run and test require Node.
+Test reporter, filter, jobs, seed and watch
 arguments use the common CLI path.
 
 The initial host runtime adapter resolves Node and pins its exact executable
-version and SHA-256. The installed Flick kernel is pinned by its manifest and
-sorted `dist` contents. Both pins, the backend pin and component file contents
+version and SHA-256. Runtime pins cover selected kernel/adapter and declared
+project package roots, their package contents and actual resolved dependency
+graphs. Resolution follows real Node importers, including nested versions and
+symlinks; one launch reuses one canonical package snapshot. These pins, the
+backend pin and component file contents
 participate in cache invalidation. Missing kernel builds are not advertised
 as usable runtime dependencies. A launch rechecks its runtime executable and runtime dependency pins before
 starting the host process. Toolchain build steps are refused until an explicit
@@ -83,17 +92,21 @@ table alongside the project's files; cached lowering preserves this provenance.
 For JS/TS, the bridge also supplies host-resolved foreign specifiers, declared
 library file bytes, effective runtime/bridge options and versioned TypeScript
 projections for all physical files. Shared declarations and Promise facades
-remain host outputs. Complete npm/runtime pins, Go foreign inputs and official
-emitter integration remain open. Full typing/effect facts and UI metadata are
+remain host outputs. Complete foreign dependency closure and Go foreign inputs
+remain open. Full typing/effect facts and UI metadata are
 not assumed to exist in `Program`. See the [dependency inventory](baseline.md).
 
-Projects without an explicit pin still use the temporary native JS/Go
-baseline. Shipping and selecting the official JS component, the browser
-loader, generic host tool steps, atomic publication, the Go extraction and
+Projects without an explicit pin use the distributed JS component for JS/TS
+and the temporary native Go baseline. The browser loader, generic host tool
+steps, atomic publication, the Go extraction and
 full conformance/performance gates remain required. This integration does
 not close R3 or R4 or freeze IR 1.0.
 
-The initial component launcher refuses the host `run/dev --devtools` option
-with P012 before reserving a generation; it does not silently drop it. Supporting
-that option requires a pinned runtime import and its content dependencies. The
-native launcher retains its existing DevTools behavior.
+The exact distributed JS pin is approved for compiler-owned DevTools and
+schema-AOT integrations. DevTools imports the selected runtime's adapter;
+schema AOT requires the explicit project/CLI setting and rechecks the pinned
+Node executable and runtime dependencies before the host runs its fixed script.
+Schema output paths are reserved for the compiler. A third-party component
+cannot grant itself this authority by copying capability names: other pins
+retain the preflight refusal. This approval does not implement arbitrary
+guest-requested toolchain steps or make host-tool publication atomic.
