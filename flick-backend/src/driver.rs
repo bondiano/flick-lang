@@ -76,7 +76,10 @@ pub fn generate(
             notes: vec![],
         }]));
     }
-    validate_size(request, policy.limits).map_err(protocol)?;
+    backend.check_cancelled().map_err(Failure::Rejected)?;
+    let sized = validate_size(request, policy.limits);
+    backend.check_cancelled().map_err(Failure::Rejected)?;
+    sized.map_err(protocol)?;
     let descriptor = backend.describe();
     handshake(&request.backend, &descriptor, &request.target).map_err(protocol)?;
     // Bound declarations before reading content supplied by the host.
@@ -89,8 +92,10 @@ pub fn generate(
             "backend side inputs exceed their total input limit".into(),
         ));
     }
-    let mut inputs = DeclaredInputs::new(&request.inputs, &mut read).map_err(protocol)?;
-    validate_request(request, &mut inputs, policy.limits).map_err(protocol)?;
+    let mut inputs = snapshot(backend, request, &mut read)?;
+    let validated = validate_request(request, &mut inputs, policy.limits);
+    backend.check_cancelled().map_err(Failure::Rejected)?;
+    validated.map_err(protocol)?;
     let refused = |found: Vec<Diagnostic>, inputs: &mut DeclaredInputs| match diagnostics(
         request,
         &found,
@@ -144,4 +149,21 @@ pub fn generate(
         order,
         cache_key: verify_determinism.then(|| cache_key(request)),
     })
+}
+
+/// Cancellation takes priority over an unavailable input or a digest error.
+fn snapshot(
+    backend: &dyn Backend,
+    request: &BuildRequest,
+    mut read: impl FnMut(&str) -> Option<Vec<u8>>,
+) -> Result<DeclaredInputs, Failure> {
+    backend.check_cancelled().map_err(Failure::Rejected)?;
+    let inputs = DeclaredInputs::new(&request.inputs, |id| {
+        backend.check_cancelled().ok()?;
+        let bytes = read(id);
+        backend.check_cancelled().ok()?;
+        bytes
+    });
+    backend.check_cancelled().map_err(Failure::Rejected)?;
+    inputs.map_err(Failure::Protocol)
 }

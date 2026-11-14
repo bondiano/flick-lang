@@ -46,6 +46,11 @@ pub trait Backend {
     fn loaded_pin(&self) -> Option<&BackendPin> {
         None
     }
+    /// Check host cancellation without entering the guest or reading inputs.
+    /// Once canceled, a host binding keeps refusing later preparation.
+    fn check_cancelled(&self) -> Result<(), Vec<Diagnostic>> {
+        Ok(())
+    }
     fn describe(&self) -> Descriptor;
     fn check_target(
         &self,

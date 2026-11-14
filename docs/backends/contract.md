@@ -159,7 +159,10 @@ Cancellation uses engine epochs with a separate token for each build.
 Canceling one build stops its active guest execution and refuses later
 calls, while unrelated stores sharing the engine continue. Preparation checks
 the token before reading inputs, between reads and before conversion; cancellation
-takes priority over preparation errors. Host tool steps
+takes priority over preparation errors. The shared driver's input snapshot
+obeys the same token, including when a reader cancels and reports unavailable
+data. These checks use host metadata and do not invoke another guest operation.
+Host tool steps
 and publication must also honor that token when integrated. Transport
 failures carry the backend id, version and digest in a `P013` diagnostic;
 guest diagnostics are subject to the same source-span validation as native

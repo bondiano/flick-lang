@@ -4,7 +4,8 @@ use super::{common, fixture};
 use flick_backend::host::runtime::Cancellation;
 use flick_backend::host::{Budget, WasmBackend};
 use flick_backend::{
-    Backend, BuildRequest, Diagnostic, Input, InputError, InputKind, Inputs, OptionValue, sha256,
+    Backend, BuildRequest, Diagnostic, Failure, Input, InputError, InputKind, Inputs, Limits,
+    OptionValue, Policy, generate, sha256,
 };
 use flick_ir::Program;
 use flick_test_backend::Literal;
@@ -166,5 +167,59 @@ fn component_read_case_without_sources_returns_a_diagnostic() {
             "literal read case requires a source input"
         );
         assert_eq!(inputs.0, 0);
+    }
+}
+
+#[test]
+#[ignore = "build the real component fixture with `just wasm-backends`"]
+fn driver_cancellation_stops_input_snapshots_and_preserves_the_diagnostic() {
+    for already_cancelled in [true, false] {
+        for unavailable in [false, true] {
+            let (backend, mut request) = fixture(Budget::default());
+            request.inputs.push(Input {
+                id: "unused".into(),
+                kind: InputKind::Resource,
+                sha256: sha256(b""),
+                size: 0,
+            });
+            let token = backend.cancellation();
+            if already_cancelled {
+                token.cancel();
+            }
+            let policy = Policy {
+                toolchains: &request.toolchains,
+                environment: &[],
+                reserved_paths: &[],
+                authorize_step: &common::authorize,
+                limits: Limits::default(),
+            };
+            let mut reads = 0;
+            let result = generate(
+                &backend,
+                &request,
+                &policy,
+                |id| {
+                    reads += 1;
+                    token.cancel();
+                    (!unavailable).then(|| {
+                        if id == "source/App" {
+                            common::TEXT.as_bytes().to_vec()
+                        } else {
+                            vec![]
+                        }
+                    })
+                },
+                true,
+            );
+            let Failure::Rejected(diagnostics) = result.err().expect("cancelled build") else {
+                panic!("input availability must not mask cancellation")
+            };
+            assert_eq!(diagnostics[0].code, "P013");
+            assert!(
+                diagnostics[0].message.contains("cancelled"),
+                "{diagnostics:?}"
+            );
+            assert_eq!(reads, usize::from(!already_cancelled));
+        }
     }
 }

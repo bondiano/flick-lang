@@ -278,6 +278,12 @@ impl Backend for WasmBackend {
         Some(&self.pin)
     }
 
+    fn check_cancelled(&self) -> Result<(), Vec<Diagnostic>> {
+        self.cancellation
+            .check()
+            .map_err(|error| self.failure("preflight", &error))
+    }
+
     fn describe(&self) -> Descriptor {
         self.descriptor.clone()
     }
