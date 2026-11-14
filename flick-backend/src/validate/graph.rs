@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use super::{Policy, id, path, string};
+use super::{Policy, id, path, runtime_dependency, string};
 use crate::{ArtifactKind, BuildRequest, BuildResult, InputRef, LaunchKind, Toolchain};
 
 fn tool(tool: &Toolchain, request: &BuildRequest, policy: &Policy) -> Result<(), String> {
@@ -108,6 +108,7 @@ pub(super) fn validate(
     }
     let mut dependencies = BTreeSet::new();
     for dependency in &result.runtime_dependencies {
+        runtime_dependency(dependency, limits)?;
         if !request.runtime_dependencies.contains(dependency)
             || !dependencies.insert(&dependency.package)
         {

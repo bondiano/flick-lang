@@ -3,9 +3,9 @@
 mod graph;
 mod path;
 
-use std::collections::BTreeSet;
+use std::collections::btree_map::Entry;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::{self, Write};
-use std::str;
 
 use crate::{BuildRequest, BuildResult, Diagnostic, Inputs, Severity, Toolchain, ToolchainStep};
 
@@ -74,6 +74,22 @@ pub(super) fn string(s: &str, limits: Limits) -> Result<(), String> {
     Ok(())
 }
 
+pub(super) fn runtime_dependency(
+    dependency: &crate::RuntimeDependency,
+    limits: Limits,
+) -> Result<(), String> {
+    for value in [&dependency.package, &dependency.version, &dependency.sha256] {
+        string(value, limits)?;
+    }
+    if dependency.package.is_empty()
+        || dependency.sha256.len() != 64
+        || !dependency.sha256.bytes().all(|b| b.is_ascii_hexdigit())
+    {
+        return Err("backend runtime dependency needs a package and SHA-256 pin".into());
+    }
+    Ok(())
+}
+
 pub(super) fn id<'a>(
     value: &'a str,
     ids: &mut BTreeSet<&'a str>,
@@ -97,6 +113,7 @@ pub(super) fn diagnostics(
     if diagnostics.len() > limits.diagnostics {
         return Err("backend diagnostic count exceeds its limit".into());
     }
+    let mut sources = BTreeMap::new();
     for diagnostic in diagnostics {
         string(&diagnostic.code, limits)?;
         string(&diagnostic.message, limits)?;
@@ -108,11 +125,18 @@ pub(super) fn diagnostics(
                 .sources
                 .get(span.file as usize)
                 .ok_or("backend diagnostic references an unknown source file")?;
-            let bytes = inputs
-                .read(&source.input)
-                .map_err(|_| "backend diagnostic source is unavailable")?;
-            let text =
-                str::from_utf8(&bytes).map_err(|_| "backend diagnostic source is not UTF-8")?;
+            let text = match sources.entry(&source.input) {
+                Entry::Occupied(entry) => entry.into_mut(),
+                Entry::Vacant(entry) => {
+                    let bytes = inputs
+                        .read(&source.input)
+                        .map_err(|_| "backend diagnostic source is unavailable")?;
+                    entry.insert(
+                        String::from_utf8(bytes)
+                            .map_err(|_| "backend diagnostic source is not UTF-8")?,
+                    )
+                }
+            };
             if span.start > span.end
                 || !text.is_char_boundary(span.start as usize)
                 || !text.is_char_boundary(span.end as usize)

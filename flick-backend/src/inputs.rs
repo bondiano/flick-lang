@@ -19,9 +19,11 @@ pub trait Inputs {
 }
 
 /// A manifest checked against the actual content, equally usable by native
-/// backends and by the component host. Host paths never reach the guest.
+/// backends and by the component host. Every declared input must be available;
+/// otherwise availability could change the output without changing its key.
+/// Host paths never reach the guest.
 pub struct DeclaredInputs {
-    contents: BTreeMap<String, Option<Vec<u8>>>,
+    contents: BTreeMap<String, Vec<u8>>,
 }
 
 impl DeclaredInputs {
@@ -34,10 +36,9 @@ impl DeclaredInputs {
             if input.id.is_empty() || contents.contains_key(&input.id) {
                 return Err(format!("invalid or duplicate input id `{}`", input.id));
             }
-            let bytes = read(&input.id);
-            if let Some(bytes) = &bytes
-                && (u64::try_from(bytes.len()).ok() != Some(input.size)
-                    || sha256(bytes) != input.sha256)
+            let bytes = read(&input.id)
+                .ok_or_else(|| format!("declared input `{}` is unavailable", input.id))?;
+            if u64::try_from(bytes.len()).ok() != Some(input.size) || sha256(&bytes) != input.sha256
             {
                 return Err(format!("input digest or size mismatch for `{}`", input.id));
             }
@@ -50,8 +51,7 @@ impl DeclaredInputs {
 impl Inputs for DeclaredInputs {
     fn read(&mut self, id: &str) -> Result<Vec<u8>, InputError> {
         match self.contents.get(id) {
-            Some(Some(bytes)) => Ok(bytes.clone()),
-            Some(None) => Err(InputError::Unavailable),
+            Some(bytes) => Ok(bytes.clone()),
             None => Err(InputError::Undeclared),
         }
     }

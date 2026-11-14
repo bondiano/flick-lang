@@ -12,6 +12,7 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+caseless = "0.2.2"
 ciborium = "0.2.2"
 flick-ir = { path = "../flick-ir", features = ["cbor"] }
 semver = "1.0.28"
