@@ -1,5 +1,6 @@
 import Formal.CanonForms
 import Formal.Substitution
+import Formal.SchemeEquivalence
 
 /-!
 # Canonical form of a dictionary (L1)
@@ -19,13 +20,34 @@ theorem List.lookup_map_snd {l : Label} (g : Scheme → Scheme) : ∀ fs : List 
     simp only [List.map, List.lookup]
     split <;> simp_all [List.lookup_map_snd g fs]
 
+private theorem Typ.drec_dict {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
+    ∀ c r c' U φ, e = .drec c r → J = .ex (.dict c' U) φ →
+      ∃ k fs us, c = c' ∧ Ty.Equiv U (Ty.spine us) ∧ S.dict c = some (k, fs) ∧ us.length = k ∧
+        Typ S Ψ Θ Γ r (.dfs (fs.map fun f => (f.1, f.2.substT (instT us)))) ∧ r.NoIns := by
+  induction h with
+  | conv _ he ih =>
+    intro c r c' U φ hv hJ; cases hJ
+    cases he.symm.form with
+    | rows hr _ => cases hr
+    | dict hU =>
+      obtain ⟨k, fs, us, hC, hu, hc, hl, ht, hn⟩ := ih c r _ _ _ hv rfl
+      exact ⟨k, fs, us, hC, hU.trans hu, hc, hl, ht, hn⟩
+  | drec hc hl hr hn =>
+    intro c r c' U φ hv hJ; cases hv; cases hJ
+    exact ⟨_, _, _, rfl, .refl, hc, hl, hr, hn⟩
+  | allI | errVal => intro c r c' U φ _ hJ; cases hJ
+  | _ => intro c r c' U φ hv _; cases hv
+
 /-- L1 for dictionaries. -/
 theorem canonical_dict {Ψ Θ Γ v c U φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.dict c U) φ)) :
-    ∃ r k fs us, v = .drec c r ∧ U = Ty.spine us ∧ S.dict c = some (k, fs) ∧ us.length = k ∧
+    ∃ r k fs us, v = .drec c r ∧ Ty.Equiv U (Ty.spine us) ∧ S.dict c = some (k, fs) ∧ us.length = k ∧
       Typ S Ψ Θ Γ r (.dfs (fs.map fun f => (f.1, f.2.substT (instT us)))) ∧ r.NoIns := by
   have hk := h.vkind hv rfl (by simp [Ty.isAll])
   cases hv with
-  | drec => cases h with | drec hc hl hr hn => exact ⟨_, _, _, _, rfl, rfl, hc, hl, hr, hn⟩
+  | drec =>
+    obtain ⟨k, fs, us, hC, hu, hc, hl, hr, hn⟩ := h.drec_dict _ _ c _ _ rfl rfl
+    cases hC
+    exact ⟨_, k, fs, us, rfl, hu, hc, hl, hr, hn⟩
   | ctorApp _ hf _ => simp [VKind, Tm.head, hf, Ty.kind] at hk
   | constApp =>
     simp [VKind, Tm.head, Ty.kind] at hk
@@ -67,11 +89,13 @@ theorem dict_field {Ψ Θ v c us φ k fs l s ts w} (hv : Value v)
     (h : Typ S Ψ Θ [] v (.ex (.dict c (Ty.spine us)) φ)) (hc : S.dict c = some (k, fs))
     (hl : fs.lookup l = some s) (hts : ts.length = s.k) (hH : (s.substT (instT us)).Holds Θ ts)
     (hw : v.field l = some w) : Typ S Ψ Θ [] w (.ex ((s.substT (instT us)).inst ts) .pure) := by
-  obtain ⟨r, _, _, _, rfl, hU, hc', _, hr, hn⟩ := canonical_dict hv h
-  obtain rfl := Ty.spine_inj hU
+  obtain ⟨r, _, _, vs, rfl, hU, hc', _, hr, hn⟩ := canonical_dict hv h
+  have hus := hU.spine_args
   rw [hc] at hc'; cases hc'
   obtain ⟨w', hw', ht⟩ := hr.dfs_field (by rw [List.lookup_map_snd, hl]; rfl)
   simp only [Tm.field] at hw; rw [hw] at hw'; cases hw'
-  exact Typ.instantiate hts hH (fun h => hn (Tm.has_of_field hw h)) ht
+  have hH' : (s.substT (instT vs)).Holds Θ ts := hH.subst_equiv hus.instT
+  have typed := Typ.instantiate (s := s.substT (instT vs)) (Ψ := Ψ) (Γ := []) hts hH' (fun h => hn (Tm.has_of_field hw h)) ht
+  exact typed.conv ((s.t.substT_equiv (liftT_equiv hus.instT s.k)).substT (instT ts)).symm
 
 end Flick

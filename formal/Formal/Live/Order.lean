@@ -1,4 +1,4 @@
-import Formal.Live.UseStage
+import Formal.Live.Views
 
 /-!
 # Structural laws for typing by use
@@ -7,127 +7,6 @@ import Formal.Live.UseStage
 -/
 
 namespace Flick
-
-theorem Ty.reach_foldl_le : ∀ {us us' : List Ty} {f f' : Ty}, us.length = us'.length →
-    Caps.Sub f.reach f'.reach →
-    (∀ (j : Nat) (u u' : Ty), us[j]? = some u → us'[j]? = some u' → Caps.Sub u.reach u'.reach) →
-    Caps.Sub (us.foldl .tapp f).reach (us'.foldl .tapp f').reach
-  | [], [], _, _, _, hf, _ => hf
-  | x :: xs, y :: ys, f, f', hl, hf, hu => by
-    simp only [List.foldl]
-    refine Ty.reach_foldl_le (by simpa using hl) ?_
-      (fun j u u' h h' => hu (j + 1) u u' (by simpa using h) (by simpa using h'))
-    intro a ha
-    simp only [Ty.reach] at ha ⊢
-    rcases ha with ha | ha
-    · exact .inl (hf a ha)
-    · exact .inr (hu 0 x y rfl rfl a ha)
-  | [], _ :: _, _, _, hl, _, _ => by simp at hl
-  | _ :: _, [], _, _, hl, _, _ => by simp at hl
-
-/-- The arguments of a widened hidden row compare by reach, each of them. -/
-theorem LeLive.hide_args {i : Nat} {us us' : List Ty}
-    (he : ∀ j, j ≠ i → us[j]? = us'[j]?)
-    (hr : ∀ r r', us[i]? = some r → us'[i]? = some r' → Caps.Sub r.reach r'.reach) :
-    ∀ (j : Nat) (u u' : Ty), us[j]? = some u → us'[j]? = some u' → Caps.Sub u.reach u'.reach := by
-  intro j u u' h h'
-  by_cases hj : j = i
-  · subst hj; exact hr u u' h h'
-  · rw [he j hj, h'] at h; cases h; exact Caps.Sub.refl _
-
-theorem LeLive.reach {a b : Ty} (h : LeLive S a b) : Caps.Sub a.reach b.reach := by
-  cases h with
-  | refl => exact Caps.Sub.refl _
-  | arrow _ _ _ hc | eff _ _ hc | rcons _ _ hc => exact hc
-  | hide _ hl he hr ha hb =>
-    subst ha; subst hb
-    exact Ty.reach_foldl_le hl (Caps.Sub.refl _) (LeLive.hide_args he hr)
-  | data hl hr _ _ _ ha hb =>
-    subst ha; subst hb
-    exact Ty.reach_foldl_le hl (Caps.Sub.refl _) hr
-
-theorem LeLive.arrow_left {a φ t C T} (h : LeLive S (.arrow a φ t C) T) :
-    ∃ a' φ' t' C', T = .arrow a' φ' t' C' ∧ LeLive S a' a ∧
-      (Stage.use φ C).le (Stage.use φ' C') ∧ LeLive S t t' ∧
-      Caps.Sub (Ty.arrow a φ t C).reach T.reach := by
-  cases h with
-  | refl => exact ⟨_, _, _, _, rfl, .refl, Stage.le_refl _, .refl, Caps.Sub.refl _⟩
-  | arrow h₁ h₂ h₃ h₄ => exact ⟨_, _, _, _, rfl, h₁, h₂, h₃, h₄⟩
-  | hide _ _ _ _ ha => exact absurd ha Ty.arrow_ne_tcon
-  | data _ _ _ _ _ ha => exact absurd ha Ty.arrow_ne_tcon
-
-theorem LeLive.arrow_right {a φ t C T} (h : LeLive S T (.arrow a φ t C)) :
-    ∃ a' φ' t' C', T = .arrow a' φ' t' C' ∧ LeLive S a a' ∧
-      (Stage.use φ' C').le (Stage.use φ C) ∧ LeLive S t' t ∧
-      Caps.Sub T.reach (Ty.arrow a φ t C).reach := by
-  cases h with
-  | refl => exact ⟨_, _, _, _, rfl, .refl, Stage.le_refl _, .refl, Caps.Sub.refl _⟩
-  | arrow h₁ h₂ h₃ h₄ => exact ⟨_, _, _, _, rfl, h₁, h₂, h₃, h₄⟩
-  | hide _ _ _ _ _ hb => exact absurd hb Ty.arrow_ne_tcon
-  | data _ _ _ _ _ _ hb => exact absurd hb Ty.arrow_ne_tcon
-
-theorem LeLive.eff_left {r ε t C T} (h : LeLive S (.eff r ε t C) T) :
-    ∃ r' ε' t' C', T = .eff r' ε' t' C' ∧
-      (Stage.use (.rt r ε) C).le (Stage.use (.rt r' ε') C') ∧
-      LeLive S t t' ∧ Caps.Sub (Ty.eff r ε t C).reach T.reach := by
-  cases h with
-  | refl => exact ⟨_, _, _, _, rfl, Stage.le_refl _, .refl, Caps.Sub.refl _⟩
-  | eff h₁ h₂ h₃ => exact ⟨_, _, _, _, rfl, h₁, h₂, h₃⟩
-  | hide _ _ _ _ ha => exact absurd ha Ty.eff_ne_tcon
-  | data _ _ _ _ _ ha => exact absurd ha Ty.eff_ne_tcon
-
-theorem LeLive.eff_right {r ε t C T} (h : LeLive S T (.eff r ε t C)) :
-    ∃ r' ε' t' C', T = .eff r' ε' t' C' ∧
-      (Stage.use (.rt r' ε') C').le (Stage.use (.rt r ε) C) ∧
-      LeLive S t' t ∧ Caps.Sub T.reach (Ty.eff r ε t C).reach := by
-  cases h with
-  | refl => exact ⟨_, _, _, _, rfl, Stage.le_refl _, .refl, Caps.Sub.refl _⟩
-  | eff h₁ h₂ h₃ => exact ⟨_, _, _, _, rfl, h₁, h₂, h₃⟩
-  | hide _ _ _ _ _ hb => exact absurd hb Ty.eff_ne_tcon
-  | data _ _ _ _ _ _ hb => exact absurd hb Ty.eff_ne_tcon
-
-theorem LeLive.rcons_left {l t r T} (h : LeLive S (.rcons l t r) T) :
-    ∃ t' r', T = .rcons l t' r' ∧ LeLive S t t' ∧ LeLive S r r' ∧
-      Caps.Sub (Ty.rcons l t r).reach T.reach := by
-  cases h with
-  | refl => exact ⟨_, _, rfl, .refl, .refl, Caps.Sub.refl _⟩
-  | rcons h₁ h₂ h₃ => exact ⟨_, _, rfl, h₁, h₂, h₃⟩
-  | hide _ _ _ _ ha => exact absurd ha Ty.rcons_ne_tcon
-  | data _ _ _ _ _ ha => exact absurd ha Ty.rcons_ne_tcon
-
-theorem LeLive.rcons_right {l t r T} (h : LeLive S T (.rcons l t r)) :
-    ∃ t' r', T = .rcons l t' r' ∧ LeLive S t' t ∧ LeLive S r' r ∧
-      Caps.Sub T.reach (Ty.rcons l t r).reach := by
-  cases h with
-  | refl => exact ⟨_, _, rfl, .refl, .refl, Caps.Sub.refl _⟩
-  | rcons h₁ h₂ h₃ => exact ⟨_, _, rfl, h₁, h₂, h₃⟩
-  | hide _ _ _ _ _ hb => exact absurd hb Ty.rcons_ne_tcon
-  | data _ _ _ _ _ _ hb => exact absurd hb Ty.rcons_ne_tcon
-
-/-- A record compares field by field; what it reaches follows. -/
-theorem LeLive.rcons' {l t t' r r'} (ht : LeLive S t t') (hr : LeLive S r r') :
-    LeLive S (.rcons l t r) (.rcons l t' r') :=
-  .rcons ht hr fun x hx => hx.elim (fun h => .inl (ht.reach x h)) (fun h => .inr (hr.reach x h))
-
-/-- A plain type has no other subtype or supertype. -/
-theorem LeLive.eq_plain {a b : Ty} (h : LeLive S a b) (ha : a.isPlain = true) : b = a := by
-  cases h with
-  | refl => rfl
-  | arrow => simp [Ty.isPlain] at ha
-  | eff => simp [Ty.isPlain] at ha
-  | rcons => simp [Ty.isPlain] at ha
-  | hide _ _ _ _ ha' => exact absurd ha' (Ty.ne_tcon_of_plain ha)
-  | data _ _ _ _ _ ha' => exact absurd ha' (Ty.ne_tcon_of_plain ha)
-
-/-- A plain type has no other subtype. -/
-theorem LeLive.eq_plain_right {a b : Ty} (h : LeLive S a b) (hb : b.isPlain = true) : a = b := by
-  cases h with
-  | refl => rfl
-  | arrow => simp [Ty.isPlain] at hb
-  | eff => simp [Ty.isPlain] at hb
-  | rcons => simp [Ty.isPlain] at hb
-  | hide _ _ _ _ _ hb' => exact absurd hb' (Ty.ne_tcon_of_plain hb)
-  | data _ _ _ _ _ _ hb' => exact absurd hb' (Ty.ne_tcon_of_plain hb)
 
 /-- Widening a hidden row, then anything. -/
 theorem LeLive.hide_trans {T : Name} {i : Nat} {us us' : List Ty} {c : Ty}
@@ -138,6 +17,25 @@ theorem LeLive.hide_trans {T : Name} {i : Nat} {us us' : List Ty} {c : Ty}
   generalize hx : Ty.tcon T us' = x at h₂
   cases h₂ with
   | refl => subst hx; exact .hide hi hl he hr rfl rfl
+  | equiv heq =>
+    rw [← hx] at heq
+    obtain ⟨ws, rfl, hw⟩ := heq.tcon_left
+    refine .data (hl.trans hw.length) (fun j u w hu hw' => ?_)
+      (fun j u w hu hw' hj _ => ?_) (fun j u w hu hw' hj _ => ?_)
+      (fun j u w hu hw' hj _ => ?_) rfl rfl
+    all_goals
+      obtain ⟨v, hv⟩ : ∃ v, us'[j]? = some v := by
+        have : j < us.length := (List.getElem?_eq_some_iff.mp hu).1
+        exact ⟨us'[j]'(hl ▸ this), by simp⟩
+    · rw [← (hw.get j v w hv hw').reach]
+      exact LeLive.hide_args he hr j u v hu hv
+    all_goals
+      have hji : j ≠ i := fun e => hj (e ▸ hi)
+      rw [he j hji, hv] at hu
+      cases hu
+    · exact .equiv (hw.get j _ w hv hw')
+    · exact .equiv (hw.get j _ w hv hw').symm
+    · exact hw.get j _ w hv hw'
   | arrow => exact absurd hx.symm Ty.arrow_ne_tcon
   | eff => exact absurd hx.symm Ty.eff_ne_tcon
   | rcons => exact absurd hx.symm Ty.rcons_ne_tcon
@@ -186,6 +84,38 @@ theorem Ty.sizeOf_lt_foldl : ∀ {us : List Ty} {f : Ty},
 theorem Ty.sizeOf_lt_tcon {T : Name} {us : List Ty} {j : Nat} {u : Ty} (h : us[j]? = some u) :
     sizeOf u < sizeOf (Ty.tcon T us) := (Ty.sizeOf_lt_foldl).2 h
 
+/-- Composition of nominal arguments, including equality at invariant parameters. -/
+theorem LeLive.data_compose {T : Name} {us vs ws : List Ty}
+    (ih : ∀ {m a c : Ty}, sizeOf m < sizeOf (Ty.tcon T vs) → LeLive S a m → LeLive S m c →
+      LeLive S a c)
+    (hl : us.length = vs.length)
+    (hr : ∀ (j : Nat) (u v : Ty), us[j]? = some u → vs[j]? = some v → Caps.Sub u.reach v.reach)
+    (hp : ∀ (j : Nat) (u v : Ty), us[j]? = some u → vs[j]? = some v → S.hidden T ≠ some j →
+      S.var T j = .pos → LeLive S u v)
+    (hn : ∀ (j : Nat) (u v : Ty), us[j]? = some u → vs[j]? = some v → S.hidden T ≠ some j →
+      S.var T j = .neg → LeLive S v u)
+    (hi : ∀ (j : Nat) (u v : Ty), us[j]? = some u → vs[j]? = some v → S.hidden T ≠ some j →
+      S.var T j = .inv → Ty.Equiv u v)
+    (hl' : vs.length = ws.length)
+    (hr' : ∀ (j : Nat) (v w : Ty), vs[j]? = some v → ws[j]? = some w → Caps.Sub v.reach w.reach)
+    (hp' : ∀ (j : Nat) (v w : Ty), vs[j]? = some v → ws[j]? = some w → S.hidden T ≠ some j →
+      S.var T j = .pos → LeLive S v w)
+    (hn' : ∀ (j : Nat) (v w : Ty), vs[j]? = some v → ws[j]? = some w → S.hidden T ≠ some j →
+      S.var T j = .neg → LeLive S w v)
+    (hi' : ∀ (j : Nat) (v w : Ty), vs[j]? = some v → ws[j]? = some w → S.hidden T ≠ some j →
+      S.var T j = .inv → Ty.Equiv v w) :
+    LeLive S (Ty.tcon T us) (Ty.tcon T ws) := by
+  refine .data (hl.trans hl') (fun j u u' h h' => ?_) (fun j u u' h h' hj hv => ?_)
+    (fun j u u' h h' hj hv => ?_) (fun j u u' h h' hj hv => ?_) rfl rfl
+  all_goals
+    obtain ⟨m, hm⟩ : ∃ m, vs[j]? = some m := by
+      have : j < us.length := (List.getElem?_eq_some_iff.mp h).1
+      exact ⟨vs[j]'(hl ▸ this), by simp⟩
+  · exact (hr j u m h hm).trans (hr' j m u' hm h')
+  · exact ih (Ty.sizeOf_lt_tcon hm) (hp j u m h hm hj hv) (hp' j m u' hm h' hj hv)
+  · exact ih (Ty.sizeOf_lt_tcon hm) (hn' j m u' hm h' hj hv) (hn j u m h hm hj hv)
+  · exact (hi j u m h hm hj hv).trans (hi' j m u' hm h' hj hv)
+
 /-- Two steps of data, argument by argument, given transitivity below the middle type. -/
 theorem LeLive.data_trans {T : Name} {us vs : List Ty} {c : Ty}
     (ih : ∀ {m a c : Ty}, sizeOf m < sizeOf (Ty.tcon T vs) → LeLive S a m → LeLive S m c →
@@ -197,7 +127,7 @@ theorem LeLive.data_trans {T : Name} {us vs : List Ty} {c : Ty}
     (hn : ∀ (j : Nat) (u u' : Ty), us[j]? = some u → vs[j]? = some u' → S.hidden T ≠ some j →
       S.var T j = .neg → LeLive S u' u)
     (hi : ∀ (j : Nat) (u u' : Ty), us[j]? = some u → vs[j]? = some u' → S.hidden T ≠ some j →
-      S.var T j = .inv → u = u')
+      S.var T j = .inv → Ty.Equiv u u')
     (h₂ : LeLive S (Ty.tcon T vs) c) : LeLive S (Ty.tcon T us) c := by
   generalize hx : Ty.tcon T vs = x at h₂
   cases h₂ with
@@ -224,16 +154,15 @@ theorem LeLive.data_trans {T : Name} {us vs : List Ty} {c : Ty}
   | data hl' hr' hp' hn' hi' ha hb =>
     subst hb
     obtain ⟨rfl, rfl⟩ := Ty.tcon_eq (hx.trans ha)
-    refine .data (hl.trans hl') (fun j u u' h h' => ?_) (fun j u u' h h' hj hv => ?_)
-      (fun j u u' h h' hj hv => ?_) (fun j u u' h h' hj hv => ?_) rfl rfl
-    all_goals
-      obtain ⟨m, hm⟩ : ∃ m, vs[j]? = some m := by
-        have : j < us.length := (List.getElem?_eq_some_iff.mp h).1
-        exact ⟨vs[j]'(hl ▸ this), by simp⟩
-    · exact (hr j u m h hm).trans (hr' j m u' hm h')
-    · exact ih (Ty.sizeOf_lt_tcon hm) (hp j u m h hm hj hv) (hp' j m u' hm h' hj hv)
-    · exact ih (Ty.sizeOf_lt_tcon hm) (hn' j m u' hm h' hj hv) (hn j u m h hm hj hv)
-    · exact (hi j u m h hm hj hv).trans (hi' j m u' hm h' hj hv)
+    exact LeLive.data_compose ih hl hr hp hn hi hl' hr' hp' hn' hi'
+  | equiv he =>
+    rw [← hx] at he
+    obtain ⟨ws, rfl, hw⟩ := he.tcon_left
+    exact LeLive.data_compose ih hl hr hp hn hi hw.length
+      (fun j v w hv hw' => by rw [(hw.get j v w hv hw').reach]; exact Caps.Sub.refl _)
+      (fun j v w hv hw' _ _ => .equiv (hw.get j v w hv hw'))
+      (fun j v w hv hw' _ _ => .equiv (hw.get j v w hv hw').symm)
+      (fun j v w hv hw' _ _ => hw.get j v w hv hw')
 
 theorem LeLive.trans_lt (n : Nat) : ∀ {b a c : Ty}, sizeOf b < n → LeLive S a b →
     LeLive S b c → LeLive S a c := by
@@ -262,6 +191,31 @@ theorem LeLive.trans_lt (n : Nat) : ∀ {b a c : Ty}, sizeOf b < n → LeLive S 
       exact .rcons (ih (by simp; omega) ht gt) (ih (by simp; omega) hr gr) (hc.trans gc)
     cases h₁ with
     | refl => exact h₂
+    | equiv he =>
+      cases h₂ with
+      | refl => exact .equiv he
+      | equiv he' => exact .equiv (he.trans he')
+      | arrow => exact absurd ⟨_, _, _, _, rfl⟩ hA
+      | eff => exact absurd ⟨_, _, _, _, rfl⟩ hE
+      | rcons => exact absurd ⟨_, _, _, rfl⟩ hR
+      | hide hi hl he' hr hb hc =>
+        subst hb; subst hc
+        obtain ⟨us, rfl, hu'⟩ := he.symm.tcon_left
+        have hu := hu'.symm
+        exact LeLive.data_trans ih hu.length
+          (fun j u v h h' => by rw [(hu.get j u v h h').reach]; exact Caps.Sub.refl _)
+          (fun j u v h h' _ _ => .equiv (hu.get j u v h h'))
+          (fun j u v h h' _ _ => .equiv (hu.get j u v h h').symm)
+          (fun j u v h h' _ _ => hu.get j u v h h') (.hide hi hl he' hr rfl rfl)
+      | data hl hr hp hneg hinv hb hc =>
+        subst hb; subst hc
+        obtain ⟨us, rfl, hu'⟩ := he.symm.tcon_left
+        have hu := hu'.symm
+        exact LeLive.data_compose ih hu.length
+          (fun j u v h h' => by rw [(hu.get j u v h h').reach]; exact Caps.Sub.refl _)
+          (fun j u v h h' _ _ => .equiv (hu.get j u v h h'))
+          (fun j u v h h' _ _ => .equiv (hu.get j u v h h').symm)
+          (fun j u v h h' _ _ => hu.get j u v h h') hl hr hp hneg hinv
     | arrow => exact absurd ⟨_, _, _, _, rfl⟩ hA
     | eff => exact absurd ⟨_, _, _, _, rfl⟩ hE
     | rcons => exact absurd ⟨_, _, _, rfl⟩ hR
@@ -281,6 +235,7 @@ theorem LeLive.substT {a b : Ty} (σ : Atom → Ty) (h : LeLive S a b) :
     exact (Ty.reach_substT σ _ a).mpr ⟨b, hc b hb, h'⟩
   induction h with
   | refl => exact .refl
+  | equiv he => exact .equiv (he.substT σ)
   | arrow _ hφ _ hc ih₁ ih₂ =>
     refine .arrow ih₁ ?_ ih₂ (sub hc)
     simpa only [Stage.use_substT] using Stage.le_substT σ hφ
@@ -309,7 +264,7 @@ theorem LeLive.substT {a b : Ty} (σ : Atom → Ty) (h : LeLive S a b) :
     · exact sub (hr j u u' hu hu')
     · exact ihp j u u' hu hu' hj hv
     · exact ihn j u u' hu hu' hj hv
-    · rw [hinv j u u' hu hu' hj hv]
+    · exact (hinv j u u' hu hu' hj hv).substT σ
 
 theorem LeLiveI.trans {a b c : Ty} (h : LeLiveI S a b)
     (hc : ∀ {x}, LeLive S x b → LeLive S x c) : LeLiveI S a c := by

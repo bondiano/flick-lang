@@ -24,14 +24,37 @@ def Sig.Vary (S : Sig) (T : Name) (us us' : List Ty) : Prop :=
   (∀ (j : Nat) (u u' : Ty), us[j]? = some u → us'[j]? = some u' → S.hidden T ≠ some j →
     S.var T j = .neg → LeLive S u' u) ∧
   (∀ (j : Nat) (u u' : Ty), us[j]? = some u → us'[j]? = some u' → S.hidden T ≠ some j →
-    S.var T j = .inv → u = u')
+    S.var T j = .inv → Ty.Equiv u u')
 
 /-- Arguments of the same position. -/
 theorem List.getElem?_pair {us us' : List Ty} {j : Nat} {u : Ty} (hl : us.length = us'.length)
     (h : us[j]? = some u) : ∃ u', us'[j]? = some u' :=
   ⟨_, List.getElem?_eq_getElem (hl ▸ (List.getElem?_eq_some_iff.mp h).1)⟩
 
-/-- Equal positions vary as nothing. -/
+/-- Positions outside the changing set may differ by type congruence. -/
+theorem Sig.Vary.of_equiv_agree {T : Name} {us us' : List Ty} (hl : us.length = us'.length)
+    (P : Nat → Prop)
+    (hP : ∀ j, ¬ P j → ∀ u u', us[j]? = some u → us'[j]? = some u' → Ty.Equiv u u')
+    (hr : ∀ j u u', P j → us[j]? = some u → us'[j]? = some u' → Caps.Sub u.reach u'.reach)
+    (hp : ∀ j u u', P j → us[j]? = some u → us'[j]? = some u' → S.hidden T ≠ some j →
+      S.var T j = .pos → LeLive S u u')
+    (hn : ∀ j u u', P j → us[j]? = some u → us'[j]? = some u' → S.hidden T ≠ some j →
+      S.var T j = .neg → LeLive S u' u)
+    (hi : ∀ j u u', P j → us[j]? = some u → us'[j]? = some u' → S.hidden T ≠ some j →
+      S.var T j = .inv → Ty.Equiv u u') : S.Vary T us us' := by
+  refine ⟨hl, fun j u u' h h' => ?_, fun j u u' h h' hh hv => ?_, fun j u u' h h' hh hv => ?_,
+    fun j u u' h h' hh hv => ?_⟩
+  all_goals by_cases hj : P j
+  · exact hr j u u' hj h h'
+  · rw [(hP j hj u u' h h').reach]; exact Caps.Sub.refl _
+  · exact hp j u u' hj h h' hh hv
+  · exact .equiv (hP j hj u u' h h')
+  · exact hn j u u' hj h h' hh hv
+  · exact .equiv (hP j hj u u' h h').symm
+  · exact hi j u u' hj h h' hh hv
+  · exact hP j hj u u' h h'
+
+/-- Equal positions are a particular case of congruent positions. -/
 theorem Sig.Vary.of_agree {T : Name} {us us' : List Ty} (hl : us.length = us'.length)
     (P : Nat → Prop) (hP : ∀ j, ¬ P j → us[j]? = us'[j]?)
     (hr : ∀ j u u', P j → us[j]? = some u → us'[j]? = some u' → Caps.Sub u.reach u'.reach)
@@ -40,23 +63,20 @@ theorem Sig.Vary.of_agree {T : Name} {us us' : List Ty} (hl : us.length = us'.le
     (hn : ∀ j u u', P j → us[j]? = some u → us'[j]? = some u' → S.hidden T ≠ some j →
       S.var T j = .neg → LeLive S u' u)
     (hi : ∀ j u u', P j → us[j]? = some u → us'[j]? = some u' → S.hidden T ≠ some j →
-      S.var T j = .inv → u = u') : S.Vary T us us' := by
-  refine ⟨hl, fun j u u' h h' => ?_, fun j u u' h h' hh hv => ?_, fun j u u' h h' hh hv => ?_,
-    fun j u u' h h' hh hv => ?_⟩
-  all_goals by_cases hj : P j
-  any_goals rw [hP j hj, h'] at h; cases h
-  · exact hr j u u' hj h h'
-  · exact Caps.Sub.refl _
-  · exact hp j u u' hj h h' hh hv
-  · exact .refl
-  · exact hn j u u' hj h h' hh hv
-  · exact .refl
-  · exact hi j u u' hj h h' hh hv
-  · rfl
+      S.var T j = .inv → Ty.Equiv u u') : S.Vary T us us' :=
+  .of_equiv_agree hl P (fun j hj u u' h h' => by
+    rw [hP j hj, h'] at h; cases h; exact .refl) hr hp hn hi
 
 theorem Sig.Vary.refl {T : Name} {us : List Ty} : S.Vary T us us :=
   .of_agree rfl (fun _ => False) (fun _ _ => rfl) (fun _ _ _ h => h.elim)
     (fun _ _ _ h => h.elim) (fun _ _ _ h => h.elim) (fun _ _ _ h => h.elim)
+
+/-- Congruent arguments satisfy every declared variance. -/
+theorem Sig.Vary.of_equiv {T : Name} {us vs : List Ty} (he : Ty.ArgsEquiv us vs) :
+    S.Vary T us vs :=
+  .of_equiv_agree he.length (fun _ => False) (fun j _ u v hu hv => he.get j u v hu hv)
+    (fun _ _ _ h => h.elim) (fun _ _ _ h => h.elim)
+    (fun _ _ _ h => h.elim) (fun _ _ _ h => h.elim)
 
 theorem Sig.Vary.length {T : Name} {us us' : List Ty} (h : S.Vary T us us') :
     us.length = us'.length := h.1
@@ -116,10 +136,19 @@ theorem Ty.Closed.tcon {T : Name} {us : List Ty} (h : (Ty.tcon T us).Closed) : u
     obtain ⟨g, b, e⟩ := Ty.tcon_cons_tapp T x xs
     rw [e] at h; exact h.elim
 
+theorem Ty.Closed.equiv_eq {c u : Ty} (h : c.Closed) (he : Ty.Equiv c u) : u = c := by
+  cases c with
+  | base => exact he.symm.base_right
+  | adt => cases he.symm.form with
+    | rows _ hr => cases hr
+    | adt => rfl
+  | _ => cases h
+
 /-- Subtyping cannot move a closed type up. -/
 theorem Ty.Closed.le_eq {c u : Ty} (h : c.Closed) (hl : LeLive S c u) : u = c := by
   cases hl with
   | refl => rfl
+  | equiv he => exact h.equiv_eq he
   | arrow => exact h.elim
   | eff => exact h.elim
   | rcons => exact h.elim
@@ -132,6 +161,7 @@ theorem Ty.Closed.le_eq {c u : Ty} (h : c.Closed) (hl : LeLive S c u) : u = c :=
 theorem Ty.Closed.ge_eq {c u : Ty} (h : c.Closed) (hl : LeLive S u c) : u = c := by
   cases hl with
   | refl => rfl
+  | equiv he => exact h.equiv_eq he.symm
   | arrow => exact h.elim
   | eff => exact h.elim
   | rcons => exact h.elim
@@ -144,32 +174,15 @@ theorem Ty.Closed.ge_eq {c u : Ty} (h : c.Closed) (hl : LeLive S u c) : u = c :=
 subtyping moves neither. -/
 theorem Ty.Closed.inst_eq {c u u' : Ty} {σ : Atom → Ty} (h : c.Closed) (e : u.substT σ = c)
     (hl : LeLive S u u' ∨ LeLive S u' u) : u' = u := by
-  have atom : ∀ {x : Ty}, (∀ T us, x ≠ Ty.tcon T us) → (∀ a φ b C, x ≠ .arrow a φ b C) →
-      (∀ r e t C, x ≠ .eff r e t C) → (∀ l t r, x ≠ .rcons l t r) →
-      (LeLive S x u' ∨ LeLive S u' x) → u' = x :=
-    fun ht ha he hr hl => by
-      rcases hl with hl | hl
-      · cases hl with
-        | refl => rfl
-        | arrow => exact absurd rfl (ha _ _ _ _)
-        | eff => exact absurd rfl (he _ _ _ _)
-        | rcons => exact absurd rfl (hr _ _ _)
-        | hide _ _ _ _ hx _ | data _ _ _ _ _ hx _ => exact absurd hx (ht _ _)
-      · cases hl with
-        | refl => rfl
-        | arrow => exact absurd rfl (ha _ _ _ _)
-        | eff => exact absurd rfl (he _ _ _ _)
-        | rcons => exact absurd rfl (hr _ _ _)
-        | hide _ _ _ _ _ hx | data _ _ _ _ _ _ hx => exact absurd hx (ht _ _)
-  have nt : ∀ {x : Ty}, (∀ g b, x ≠ .tapp g b) → (∀ T, x ≠ .adt T) → ∀ T us, x ≠ Ty.tcon T us :=
-    fun hg hd T us hx => by
-      rcases Ty.tcon_shape T us with e' | ⟨g, b, e'⟩
-      · exact hd T (hx.trans e')
-      · exact hg g b (hx.trans e')
   cases u with
-  | tvar | rg =>
-    exact atom (nt (fun _ _ h => by cases h) (fun _ h => by cases h)) (fun _ _ _ _ h => by cases h)
-      (fun _ _ _ _ h => by cases h) (fun _ _ _ h => by cases h) hl
+  | tvar =>
+    rcases hl with hl | hl
+    · exact (hl.eq_plain rfl).tvar_right
+    · exact (hl.eq_plain_right rfl).tvar_right
+  | rg =>
+    rcases hl with hl | hl
+    · exact (hl.eq_plain rfl).rg_right
+    · exact (hl.eq_plain_right rfl).rg_right
   | base | adt =>
     simp only [Ty.substT] at e; subst e
     rcases hl with hl | hl
@@ -220,21 +233,12 @@ theorem Sig.Vary.eq_of_closed {T : Name} {us us' : List Ty} (hw : S.Vary T us us
   · exact .inl (hw.2.2.1 j u u' hu hu' hh hv)
   · exact .inr (hw.2.2.2.1 j u u' hu hu' hh hv)
 
-theorem Sig.Vary.eq_of_not_varies {T : Name} {us us' : List Ty} (hw : S.Vary T us us')
-    {j : Nat} (hj : ¬ S.Varies T j) : us[j]? = us'[j]? := by
-  have hinv : S.var T j = .inv := by
-    exact Classical.byContradiction fun h => hj (.inl h)
+theorem Sig.Vary.equiv_of_not_varies {T : Name} {us us' : List Ty} (hw : S.Vary T us us')
+    {j : Nat} (hj : ¬ S.Varies T j) {u u' : Ty}
+    (hu : us[j]? = some u) (hu' : us'[j]? = some u') : Ty.Equiv u u' := by
+  have hinv : S.var T j = .inv := Classical.byContradiction fun h => hj (.inl h)
   have hh : S.hidden T ≠ some j := fun h => hj (.inr h)
-  cases hu : us[j]? with
-  | none =>
-    cases hu' : us'[j]? with
-    | none => rfl
-    | some u' =>
-      obtain ⟨u, hu₀⟩ := List.getElem?_pair hw.length.symm hu'
-      rw [hu] at hu₀; cases hu₀
-  | some u =>
-    obtain ⟨u', hu'⟩ := List.getElem?_pair hw.length hu
-    rw [hu', hw.2.2.2.2 j u u' hu hu' hh hinv]
+  exact hw.2.2.2.2 j u u' hu hu' hh hinv
 
 theorem Ty.tcon_up_substT (T : Name) (us : List Ty) (k : Nat) (ρ : Atom → Ty) :
     ((Ty.tcon T us).up k).substT ρ = Ty.tcon T (us.map fun u => (u.up k).substT ρ) := by
@@ -270,53 +274,42 @@ theorem Sig.builds_vary {K T : Name} {us us' : List Ty} (hw : S.Vary T us us')
   refine ⟨ρ', ?_⟩
   rw [Ty.tcon_up_substT] at hρ ⊢
   rw [Ty.tcon_substT] at hρ ⊢
-  obtain ⟨-, hρl⟩ := Ty.tcon_eq hρ
+  have hρl := hρ.tcon_inv.2
   simp only [hup]
-  congr 1
-  apply List.ext_getElem?
-  intro n
-  simp only [List.getElem?_map]
+  apply Ty.ArgsEquiv.tcon
+  refine Ty.ArgsEquiv.of_get (by simpa using hlen.symm) ?_
+  intro n x y hx hy
+  simp only [List.getElem?_map, Option.map_eq_some_iff] at hx hy
+  obtain ⟨u, hrn, rfl⟩ := hx
+  obtain ⟨v, hv, rfl⟩ := hy
+  obtain ⟨v₀, hv₀⟩ := List.getElem?_pair hw.length.symm hv
+  have e : Ty.Equiv (u.substT ρ) ((v₀.up k).substT ρ) :=
+    hρl.get n _ _ (by simp [List.getElem?_map, hrn]) (by simp [List.getElem?_map, hv₀])
   by_cases hn : S.Varies T n ∧ (S.res K)[n]? = some (.tvar n)
-  · have hnl : n < us'.length := by rw [hlen]; exact (List.getElem?_eq_some_iff.mp hn.2).1
-    rw [hn.2, List.getElem?_eq_getElem hnl]
-    simp [Ty.substT, ρ', hn, hnl]
-  · have e := congrArg (·[n]?) hρl
-    simp only [List.getElem?_map] at e
-    cases hrn : (S.res K)[n]? with
-    | none =>
-      rw [hrn] at e
-      have : ¬ n < us'.length := fun h' => by
-        rw [hlen] at h'; rw [List.getElem?_eq_getElem h'] at hrn; cases hrn
-      rw [List.getElem?_eq_none (Nat.le_of_not_lt this)]; rfl
-    | some u =>
-      rw [hrn] at e
-      have hu_same : u.substT ρ' = u.substT ρ := by
-        refine Ty.substT_eq_upto k (fun a ha => ?_) (fun j hj hne => ?_)
-        · cases a with
-          | v j => exact hhi j (Classical.byContradiction fun h => ha j (by omega) rfl)
-          | r p => rfl
-        · have hvj : S.Varies T j ∧ (S.res K)[j]? = some (.tvar j) :=
-            Classical.byContradiction fun hv => hne (by simp [ρ', hv])
-          exact (Sig.varies_ok hvj.1 hK).1 n u hrn fun e => hn (e ▸ hvj)
-      have hlt : n < us.length := by
-        rw [hw.length, hlen]; exact (List.getElem?_eq_some_iff.mp hrn).1
-      have hlt' : n < us'.length := hw.length ▸ hlt
-      have hus : us'[n] = us[n] := by
-        by_cases hv : S.Varies T n
-        · rcases (Sig.varies_ok hv hK).2 with ⟨-, h2⟩ | ⟨hh, hpn, ⟨c, hc, hcl⟩, -⟩
-          · exact absurd ⟨hv, h2⟩ hn
-          · rw [hrn] at hc; cases hc
-            rw [List.getElem?_eq_getElem hlt] at e
-            simp only [Option.map_some, Option.some.injEq] at e
-            rw [hcl.substT, Ty.up, Ty.substT_ren] at e
-            exact hw.eq_of_closed hh hpn hcl (List.getElem?_eq_getElem hlt)
-              (List.getElem?_eq_getElem hlt') e.symm
-        · have e' := hw.eq_of_not_varies hv
-          rw [List.getElem?_eq_getElem hlt, List.getElem?_eq_getElem hlt'] at e'
-          exact (Option.some.inj e').symm
-      rw [List.getElem?_eq_getElem hlt'] at ⊢
-      rw [List.getElem?_eq_getElem hlt] at e
-      simp only [Option.map_some, Option.some.injEq] at e ⊢
-      rw [hu_same, e, hus]
+  · rw [hn.2] at hrn; cases hrn
+    have hnl : n < us'.length := (List.getElem?_eq_some_iff.mp hv).1
+    simp only [Ty.substT, ρ', hn, hnl, and_self, ↓reduceDIte]
+    have ev : us'[n] = v := (List.getElem?_eq_some_iff.mp hv).2
+    rw [ev]; exact .refl
+  · have hu_same : u.substT ρ' = u.substT ρ := by
+      refine Ty.substT_eq_upto k (fun a ha => ?_) (fun j hj hne => ?_)
+      · cases a with
+        | v j => exact hhi j (Classical.byContradiction fun h => ha j (by omega) rfl)
+        | r p => rfl
+      · have hvj : S.Varies T j ∧ (S.res K)[j]? = some (.tvar j) :=
+          Classical.byContradiction fun hv => hne (by simp [ρ', hv])
+        exact (Sig.varies_ok hvj.1 hK).1 n u hrn fun e => hn (e ▸ hvj)
+    rw [hu_same]
+    by_cases hvar : S.Varies T n
+    · rcases (Sig.varies_ok hvar hK).2 with ⟨-, h2⟩ | ⟨hh, hpn, ⟨c, hc, hcl⟩, -⟩
+      · exact absurd ⟨hvar, h2⟩ hn
+      · rw [hrn] at hc; cases hc
+        rw [hcl.substT] at e
+        have ec := hcl.equiv_eq e
+        rw [Ty.up, Ty.substT_ren] at ec
+        have ev := hw.eq_of_closed hh hpn hcl hv₀ hv ec
+        rw [ev, hcl.substT]
+        exact e
+    · exact e.trans (((hw.equiv_of_not_varies hvar hv₀ hv).up k).substT ρ)
 
 end Flick

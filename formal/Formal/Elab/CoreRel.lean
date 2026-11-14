@@ -79,14 +79,7 @@ theorem perform_redex {E o : Name} {c : OpClass} {v : Flick.Tm} (hv : Value v) :
 
 theorem perform_app_not_pure {Ψ Θ E o c v t} (h : Typ S Ψ Θ [] (.app (.const (.perform E o c)) v) (.ex t .pure)) :
     False := by
-  cases h with
-  | app hf _ hψ _ =>
-    cases hf with
-    | perform _ hT =>
-      obtain ⟨_, _, _, _, he, -, lψ, -, -⟩ := hT.arrow_left
-      cases he; exact Stage.le_trans lψ hψ
-    | const hc => exact hc.elim
-  | errVal hv | allI hv => exact (perform_not_value hv).elim
+  exact const_app_rt h fun _ => Flick.perform_arrow
 
 theorem kont_redex {p ℓ : Nat} {u : Flick.Tm} (hu : Value u) : Redex (.app (.kont p ℓ) u) := by
   refine ⟨kont_not_value, fun F a _ ha => ?_⟩
@@ -216,9 +209,9 @@ theorem dp_calm {Θ : Facts} {t : Flick.Ty} {x : Flick.Tm} (hx : ¬ Value x)
         Flick.plug E₁ (Flick.plug E₀ r₀) := by rw [plug_append]; exact hq.symm
     obtain ⟨-, -, Θ', t', h⟩ := typ (E := A ++ .hctlA p ℓh ℓ false Ef al r k :: E)
       (hA.append' (hE'.cons' trivial)) (kont_redex hu) hq'
-    cases h with
-    | app hf => cases hf with | kont hl => simp at hl
-    | errVal hv | allI hv => exact (kont_not_value hv).elim
+    obtain ⟨_, _, _, _, hf, _, _, _⟩ := h.app_nonvalue _ _ _ _ rfl rfl kont_not_value
+    obtain ⟨_, _, _, _, hl, _, _⟩ := hf.kont_arrow
+    simp at hl
 
 /-- A pure step makes no run-time form. -/
 theorem _root_.Flick.PStep.noIns {x x₁ : Flick.Tm} (hs : PStep root x x₁) (hroot : RootTy S root) (hn : x.NoIns) :

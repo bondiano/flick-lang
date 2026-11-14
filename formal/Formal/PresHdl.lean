@@ -1,5 +1,6 @@
 import Formal.Lemma3
 import Formal.Decomp
+import Formal.FunctionTyping
 
 /-!
 # Refilling a parked body
@@ -61,33 +62,29 @@ theorem refill_app {Ψ Θ E f x t₀ φ₀ a₀ w ψ₀ B} (hE : OkE E) (hn : ¬
       Typ S Ψ Θ' [] w (.ex T φ')) :
     Typ S Ψ Θ [] (plug E w) (.ex t₀ φ₀) := by
   obtain ⟨K, Θ', t', φ', hr, -, hp, back⟩ := ctx_typing E hE hn h
-  cases hr with
-  | app hf' hx hψ hT =>
-    obtain ⟨hψp, hb⟩ := hf hf'
-    have hφ : φ' ≠ .pure := fun h' =>
-      hψp ((Stage.use_eq_pure _ _).mp (Stage.eq_pure (h' ▸ hψ)))
-    rcases hp with hp | ⟨rfl, hΘ⟩
-    · exact (hφ hp).elim
-    · obtain ⟨ha, hψ₀, hbt⟩ := hb rfl
-      simp only [List.map_up_zero] at hx
-      simpa using Refill.id back [] w (by
-        simpa using hw _ _ hΘ (Stage.le_trans hψ₀ hψ) (hB _ _ hbt hT)
-          (hx.sub ⟨ha, Stage.le_refl _⟩))
-  | errVal hv | allI hv => exact (hn hv).elim
+  obtain ⟨_, _, _, _, hf', hx, hψ, hT⟩ := hr.app_nonvalue f x t' φ' rfl rfl hn
+  obtain ⟨hψp, hb⟩ := hf hf'
+  have hφ : φ' ≠ .pure := fun h' =>
+    hψp ((Stage.use_eq_pure _ _).mp (Stage.eq_pure (h' ▸ hψ)))
+  rcases hp with hp | ⟨rfl, hΘ⟩
+  · exact (hφ hp).elim
+  · obtain ⟨ha, hψ₀, hbt⟩ := hb rfl
+    simp only [List.map_up_zero] at hx
+    simpa using Refill.id back [] w (by
+      simpa using hw _ _ hΘ (Stage.le_trans hψ₀ hψ) (hB _ _ hbt hT)
+        (hx.sub ⟨ha, Stage.le_refl _⟩))
 
 /-- An operation of a declared effect at the hole. -/
 theorem perform_fn {Ψ E o c a₀ b₀} (hop : S.op E o = some (c, a₀, b₀)) :
     HoleFn S Ψ (.const (.perform E o c)) a₀ (.rt (Row.single E) Row.none)
       (fun t => c ≠ .abort → LeLive S b₀ t) := by
   intro K Θ' a ψ t C φ' h
-  cases h with
-  | perform hop' hT =>
-    rw [hop] at hop'; cases hop'
-    obtain ⟨hdom, hψ, ht⟩ := LeLive.arrow_inv hT
-    refine ⟨Stage.use_ne_pure (Stage.use_rt_le_ne_pure hψ),
-      fun _ => ⟨hdom, Stage.le_trans (Stage.le_use _ _) hψ,
-        fun hc => by simpa [hc] using ht⟩⟩
-  | const hok _ => exact hok.elim
+  obtain ⟨_, _, _, hop', hT⟩ := h.perform_arrow
+  rw [hop] at hop'; cases hop'
+  obtain ⟨hdom, hψ, ht⟩ := LeLive.arrow_inv hT
+  refine ⟨Stage.use_ne_pure (Stage.use_rt_le_ne_pure hψ),
+    fun _ => ⟨hdom, Stage.le_trans (Stage.le_use _ _) hψ,
+      fun hc => by simpa [hc] using ht⟩⟩
 
 theorem perform_up {c : OpClass} {b₀ : Ty} :
     ∀ t T, (c ≠ .abort → LeLive S b₀ t) → LeLive S t T →
@@ -98,19 +95,19 @@ theorem kont_fn {Ψ : List Ty} {p ℓ b₀ r ε t' C'}
     (hl : Ψ[ℓ]? = some (.arrow b₀ (.rt r ε) t' C')) :
     HoleFn S Ψ (.kont p ℓ) b₀ (.rt r ε) (fun t => LeLive S t' t) := by
   intro K Θ' a ψ t C φ' h
-  cases h with
-  | kont hl' _ hT =>
-    obtain ⟨hdom, hψ, ht⟩ := LeLive.arrow_inv hT
-    rw [List.getElem?_map, hl] at hl'
-    simp only [Option.map_some, Option.some.injEq, Ty.up_def, Ty.substT, Ty.arrow.injEq] at hl'
-    obtain ⟨rfl, rfl, rfl, rfl⟩ := hl'
-    refine ⟨fun h => ?_, fun hK => ?_⟩
-    · simp only [Stage.substT] at hψ
-      exact Stage.use_ne_pure (Stage.use_rt_le_ne_pure hψ) h
-    · subst hK
-      have h0 : shiftV 0 = Ty.ident := by funext a; cases a <;> rfl
-      simp only [h0, Ty.substT_ident, Stage.substT_ident] at hdom hψ ht
-      exact ⟨hdom, Stage.le_trans (Stage.le_use _ _) hψ, ht⟩
+  obtain ⟨_, _, _, _, hl', _, hT⟩ := h.kont_arrow
+  obtain ⟨hdom, hψ, ht⟩ := LeLive.arrow_inv hT
+  rw [List.getElem?_map, hl] at hl'
+  simp only [Option.map_some, Option.some.injEq, Ty.up_def, Ty.substT, Ty.arrow.injEq] at hl'
+  obtain ⟨rfl, rfl, rfl, rfl⟩ := hl'
+  refine ⟨fun h => ?_, fun hK => ?_⟩
+  · simp only [Stage.substT] at hψ
+    exact Stage.use_ne_pure (Stage.use_rt_le_ne_pure hψ) h
+  · subst hK
+    have h0 : shiftV 0 = Ty.ident := by funext a; cases a <;> rfl
+    simp only [h0, Ty.substT_ident, Stage.substT_ident] at hdom hψ ht
+    exact ⟨hdom, Stage.le_trans (Stage.le_use _ _) hψ, ht⟩
+
 
 /-- `resume` of a region `p` that its cell names: the hole uses that region too. -/
 theorem kont_fn_rg {Ψ : List Ty} {p ℓ b₀ r ε t' C'}
@@ -122,16 +119,16 @@ theorem kont_fn_rg {Ψ : List Ty} {p ℓ b₀ r ε t' C'}
   refine ⟨h₁.1, fun hK => ?_⟩
   obtain ⟨hdom, -, ht⟩ := h₁.2 hK
   subst hK
-  cases h with
-  | kont hl' _ hT =>
-    obtain ⟨-, hψ, -⟩ := LeLive.arrow_inv hT
-    rw [List.getElem?_map, hl] at hl'
-    simp only [Option.map_some, Option.some.injEq, Ty.up_def, Ty.substT, Ty.arrow.injEq] at hl'
-    obtain ⟨rfl, rfl, rfl, rfl⟩ := hl'
-    have h0 : shiftV 0 = Ty.ident := by funext a; cases a <;> rfl
-    simp only [h0, Caps.substT_ident, Stage.substT_ident] at hψ
-    exact ⟨hdom, Stage.le_trans (Stage.use_mono (Stage.le_refl _)
-      fun x hx => by cases hx; exact hcp) hψ, ht⟩
+  obtain ⟨_, _, _, _, hl', _, hT⟩ := h.kont_arrow
+  obtain ⟨-, hψ, -⟩ := LeLive.arrow_inv hT
+  rw [List.getElem?_map, hl] at hl'
+  simp only [Option.map_some, Option.some.injEq, Ty.up_def, Ty.substT, Ty.arrow.injEq] at hl'
+  obtain ⟨rfl, rfl, rfl, rfl⟩ := hl'
+  have h0 : shiftV 0 = Ty.ident := by funext a; cases a <;> rfl
+  simp only [h0, Caps.substT_ident, Stage.substT_ident] at hψ
+  exact ⟨hdom, Stage.le_trans (Stage.use_mono (Stage.le_refl _)
+    fun x hx => by cases hx; exact hcp) hψ, ht⟩
+
 
 /-- `lam todo` has every function type: the type of a cell before its use. -/
 theorem lam_todo {Ψ Θ a ψ t C φ} :

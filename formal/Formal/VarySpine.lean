@@ -90,12 +90,11 @@ theorem field_vary_all {K : Name} {k : Nat} {ts : List Ty} {T : Name} {us us' : 
         · exact absurd hv hb
       | inv =>
         have e := hw.2.2.2.2 m _ _ g1 g2 hh hv
-        have hmix : ∀ a, instMix us us' m a = instMix us us' (m + 1) a := fun a => by
+        have hmix : ∀ a, Ty.Equiv (instMix us us' m a) (instMix us us' (m + 1) a) := fun a => by
           by_cases ha : a = .v m
-          · rw [ha, ev, ev', e]
-          · exact hσ a ha
-        rw [Ty.substT_congr hmix]
-        exact .refl
+          · rw [ha, ev, ev']; exact e
+          · rw [hσ a ha]; exact .refl
+        exact .equiv (f.substT_equiv hmix)
   have chain : ∀ m, m ≤ k →
       LeLive S (f.substT (instMix us us' 0)) (f.substT (instMix us us' m)) := by
     intro m; induction m with
@@ -109,19 +108,19 @@ theorem Sig.Vary.map_res {K : Name} {k : Nat} {ts : List Ty} {T : Name} {us us' 
     S.Vary T ((S.res K).map (Ty.substT (instT us))) ((S.res K).map (Ty.substT (instT us'))) := by
   have hk' : us'.length = k := hw.length ▸ hk
   have same : ∀ n u, (S.res K)[n]? = some u → ¬ (S.Varies T n ∧ (S.res K)[n]? = some (.tvar n)) →
-      u.substT (instT us) = u.substT (instT us') := fun n u hu hn =>
-    Ty.substT_eq_upto k (fun a ha => by
+      Ty.Equiv (u.substT (instT us)) (u.substT (instT us')) := fun n u hu hn =>
+    Ty.substT_equiv_upto k (fun a ha => by
         cases a with
         | v j =>
           have : ¬ j < k := fun h => ha j h rfl
-          simp [instT, hk, hk', this]
-        | r p => rfl)
+          simp only [instT, hk, hk', this, ↓reduceDIte]; exact .refl
+        | r p => exact .refl)
       fun j hj hne => by
         have hvj : S.Varies T j := Classical.byContradiction fun hv => by
           apply hne
-          have e := hw.eq_of_not_varies hv
-          rw [List.getElem?_eq_getElem (hk ▸ hj), List.getElem?_eq_getElem (hk' ▸ hj)] at e
-          simp [instT, hk, hk', hj, Option.some.inj e]
+          have e := hw.equiv_of_not_varies hv (List.getElem?_eq_getElem (hk ▸ hj))
+            (List.getElem?_eq_getElem (hk' ▸ hj))
+          simpa only [instT, hk ▸ hj, hk' ▸ hj, ↓reduceDIte] using e
         by_cases hnj : n = j
         · subst hnj
           rcases (Sig.varies_ok hvj hK).2 with ⟨-, h2⟩ | ⟨-, -, ⟨c, hc, hcl⟩, -⟩
@@ -142,14 +141,14 @@ theorem Sig.Vary.map_res {K : Name} {k : Nat} {ts : List Ty} {T : Name} {us us' 
       obtain ⟨u', hu', rfl⟩ := get h'
       rw [hn.2] at hu hu'; cases hu; cases hu'
       simp [Ty.substT, instT, hk ▸ hnk, hk' ▸ hnk]
-  refine .of_agree (by simp) (fun n => S.Varies T n ∧ (S.res K)[n]? = some (.tvar n))
-    (fun n hn => ?_) (fun n x x' hn h h' => ?_)
+  refine .of_equiv_agree (by simp) (fun n => S.Varies T n ∧ (S.res K)[n]? = some (.tvar n))
+    (fun n hn x x' h h' => ?_) (fun n x x' hn h h' => ?_)
     (fun n x x' hn h h' hh hv => ?_) (fun n x x' hn h h' hh hv => ?_)
     (fun n x x' hn h h' hh hv => ?_)
-  · simp only [List.getElem?_map]
-    cases hu : (S.res K)[n]? with
-    | none => rfl
-    | some u => simp [same n u hu hn]
+  · obtain ⟨u, hu, rfl⟩ := get h
+    obtain ⟨u', hu', rfl⟩ := get h'
+    rw [hu] at hu'; cases hu'
+    exact same n u hu hn
   all_goals obtain ⟨g1, g2⟩ := atv n hn x x' h h'
   · exact hw.2.1 n x x' g1 g2
   · exact hw.2.2.1 n x x' g1 g2 hh hv
@@ -192,8 +191,8 @@ theorem Sig.Vary.of_map {K : Name} {k : Nat} {ts : List Ty} {T : Name} {us us' :
     rw [List.getElem?_map, List.getElem?_map, hm, List.getElem?_eq_getElem (hk ▸ hn),
       List.getElem?_eq_getElem (hk' ▸ hn)]
     simp [Ty.substT, instT, hk ▸ hn, hk' ▸ hn]
-  refine .of_agree (hk.trans hk'.symm) (fun n => S.Varies T n ∧ (S.res K)[n]? = some (.tvar n))
-    (fun n hn => ?_) (fun n x x' hn g1 g2 => ?_) (fun n x x' hn g1 g2 hh hv => ?_)
+  refine .of_equiv_agree (hk.trans hk'.symm) (fun n => S.Varies T n ∧ (S.res K)[n]? = some (.tvar n))
+    (fun n hn x x' g1 g2 => ?_) (fun n x x' hn g1 g2 => ?_) (fun n x x' hn g1 g2 hh hv => ?_)
     (fun n x x' hn g1 g2 hh hv => ?_) (fun n x x' hn g1 g2 hh hv => ?_)
   · by_cases hnk : n < k
     · obtain ⟨m, hm⟩ := hj n hnk
@@ -202,8 +201,9 @@ theorem Sig.Vary.of_map {K : Name} {k : Nat} {ts : List Ty} {T : Name} {us us' :
         · rw [hrm] at hm; cases hm; exact hn ⟨hv, hrm⟩
         · rw [hm] at hc; cases hc; exact hcl.elim
       obtain ⟨e1, e2⟩ := at_ n hnk m hm
-      rw [← e1, ← e2]; exact h.eq_of_not_varies hmv
-    · rw [List.getElem?_eq_none (by omega), List.getElem?_eq_none (by omega)]
+      rw [← e1] at g1; rw [← e2] at g2
+      exact h.equiv_of_not_varies hmv g1 g2
+    · rw [List.getElem?_eq_none (by omega)] at g1; cases g1
   all_goals
     obtain ⟨e1, e2⟩ := at_ n (Sig.varies_var hn.1 hK hn.2) n hn.2
     rw [← e1] at g1; rw [← e2] at g2
@@ -216,7 +216,7 @@ theorem Sig.Vary.of_map {K : Name} {k : Nat} {ts : List Ty} {T : Name} {us us' :
 theorem Sig.Vary.lift {K : Name} {k : Nat} {ts : List Ty} {T : Name} {us ws : List Ty}
     (hK : S.ctor K = some (k, ts, T)) (hk : us.length = k)
     (hw : S.Vary T ((S.res K).map (Ty.substT (instT us))) ws) :
-    ∃ us', us'.length = k ∧ (S.res K).map (Ty.substT (instT us')) = ws ∧ S.Vary T us us' := by
+    ∃ us', us'.length = k ∧ Ty.ArgsEquiv ((S.res K).map (Ty.substT (instT us'))) ws ∧ S.Vary T us us' := by
   classical
   have hwl : (S.res K).length = ws.length := by simpa using hw.length
   let P : Nat → Prop := fun j => S.Varies T j ∧ (S.res K)[j]? = some (.tvar j)
@@ -245,35 +245,33 @@ theorem Sig.Vary.lift {K : Name} {k : Nat} {ts : List Ty} {T : Name} {us ws : Li
           simp [instT, hk, hl', hj, Option.some.inj e]
         exact (Sig.varies_ok hvj.1 hK).1 n u hu fun e => hn (e ▸ hvj)
   refine ⟨us', hl', ?_, ?_⟩
-  · apply List.ext_getElem?
-    intro n
-    simp only [List.getElem?_map]
+  · apply Ty.ArgsEquiv.of_get (by simpa using hwl)
+    intro n x y hx hy
+    simp only [List.getElem?_map, Option.map_eq_some_iff] at hx
+    obtain ⟨u, hrn, rfl⟩ := hx
     by_cases hn : P n
     · have hnk := Sig.varies_var hn.1 hK hn.2
-      have hnw : n < ws.length := by rw [← hwl]; exact (List.getElem?_eq_some_iff.mp hn.2).1
-      rw [hn.2, List.getElem?_eq_getElem hnw]
-      simp [Ty.substT, instT, hnk, us', hn, hnw]
-    · cases hrn : (S.res K)[n]? with
-      | none =>
-        have : ¬ n < ws.length := fun h => by
-          rw [← hwl] at h; rw [List.getElem?_eq_getElem h] at hrn; cases hrn
-        simp [List.getElem?_eq_none (Nat.le_of_not_lt this)]
-      | some u =>
-        simp only [Option.map_some]
-        rw [same n u hrn hn]
-        have hnw : n < ws.length := by rw [← hwl]; exact (List.getElem?_eq_some_iff.mp hrn).1
-        have g1 : ((S.res K).map (Ty.substT (instT us)))[n]? = some (u.substT (instT us)) := by
-          simp [List.getElem?_map, hrn]
-        by_cases hv : S.Varies T n
-        · rcases (Sig.varies_ok hv hK).2 with ⟨-, h2⟩ | ⟨hh, hpn, ⟨c, hc, hcl⟩, -⟩
-          · exact absurd ⟨hv, h2⟩ hn
-          · rw [hrn] at hc; cases hc
-            rw [List.getElem?_eq_getElem hnw]
-            have := hw.eq_of_closed hh hpn hcl g1 (List.getElem?_eq_getElem hnw)
-              (σ := Ty.ident) (by rw [hcl.substT, Ty.substT_ident])
-            rw [this]
-        · have e := hw.eq_of_not_varies hv
-          rw [g1] at e; exact e
+      have hnw : n < ws.length := (List.getElem?_eq_some_iff.mp hy).1
+      rw [hn.2] at hrn; cases hrn
+      simp only [Ty.substT, instT, hl' ▸ hnk, ↓reduceDIte]
+      have ev : us'[n] = y := by
+        have hv := el n hnk
+        simp only [hn, hnw, and_self, ↓reduceDIte] at hv
+        rw [List.getElem?_eq_getElem (hl' ▸ hnk)] at hv
+        rw [List.getElem?_eq_getElem hnw] at hy
+        exact (Option.some.inj hv).trans (Option.some.inj hy)
+      rw [ev]; exact .refl
+    · rw [same n u hrn hn]
+      have g1 : ((S.res K).map (Ty.substT (instT us)))[n]? = some (u.substT (instT us)) := by
+        simp [List.getElem?_map, hrn]
+      by_cases hv : S.Varies T n
+      · rcases (Sig.varies_ok hv hK).2 with ⟨-, h2⟩ | ⟨hh, hpn, ⟨c, hc, hcl⟩, -⟩
+        · exact absurd ⟨hv, h2⟩ hn
+        · rw [hrn] at hc; cases hc
+          have ey := hw.eq_of_closed hh hpn hcl g1 hy
+            (σ := Ty.ident) (by rw [hcl.substT, Ty.substT_ident])
+          rw [ey]; exact .refl
+      · exact hw.equiv_of_not_varies hv g1 hy
   · refine .of_agree (hk.trans hl'.symm) P (fun n hn => ?_)
       (fun n x x' hn g1 g2 => ?_) (fun n x x' hn g1 g2 hh hv => ?_)
       (fun n x x' hn g1 g2 hh hv => ?_) (fun n x x' hn g1 g2 hh hv => ?_)

@@ -54,6 +54,11 @@ def PureTy (S : Sig) (Ψ : List Ty) (Θ : Facts) (Γ : List Scheme) (e : Tm) (T 
 theorem Typ.pureTy {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     Value e → ∀ {T φ}, J = .ex T φ → PureTy S Ψ Θ Γ e T := by
   induction h with
+  | conv _ he ih =>
+    intro hv _ _ hJ; cases hJ
+    obtain ⟨T₀, hT, ht, hs, hc⟩ := ih hv rfl
+    exact ⟨T₀, hT.trans (.equiv he), ht, hs,
+      fun c h hn => hc c h (by rw [he.isAll]; exact hn)⟩
   | lam hb hn hT =>
     intro _ _ _ hJ; cases hJ
     exact ⟨_, hT, .lam hb hn LeLive.refl, by simp [Tm.head], by simp⟩
