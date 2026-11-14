@@ -51,6 +51,7 @@ fn library_outputs(missing: bool, typescript: bool, extras: build::Extras) -> Pr
     );
     for module in &mut compilation.modules {
         module.package = Some("fixture-library".into());
+        module.ir.package.clone_from(&module.package);
     }
     compilation.libraries.push(("fixture-library".into(), dir));
     let output = BuildPlan {
