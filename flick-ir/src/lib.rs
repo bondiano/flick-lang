@@ -2,6 +2,7 @@
 //! backend must not guess made explicit. The compiler builds it; backends,
 //! the reference model and tools read it.
 
+pub mod bridge_plan;
 mod data;
 mod dict;
 mod expr;
