@@ -122,7 +122,7 @@ APIs.
 | BigInt arithmetic and failure cases retain the language/runtime contract | Explicit runtime helpers where needed | Flick BigInt helpers |
 | Checked and unsafe integer APIs keep their distinct failure behavior | Checked/unsafe runtime functions | Checked/unsafe runtime functions |
 
-The implementation anchors are `flick-core/src/numeric.rs`,
+The implementation anchors are `flick-backend-support/src/{numeric,consteval}.rs`,
 `flick-backend-support/src/opt/fold.rs`, `backends/js/src/codegen/js/binary.rs`,
 `flick-core/src/codegen/go/arith.rs`, `runtime/src/core/text.ts` and
 `runtime-go/flickrt/{numbers,effnum}.go`. Numeric folding tests independently

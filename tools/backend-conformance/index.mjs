@@ -5,6 +5,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "nod
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { validateReport } from "./report.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const compiler = resolve(process.argv[2] ?? join(root, "target/e2e/flick"));
@@ -36,9 +37,7 @@ for (const runtime of ["effect", "rt"]) {
     assert.equal(result.error, undefined, `${label}: ${result.error}`);
     assert.equal(result.status, 0, `${label}: ${result.stderr}\nartifacts: ${project}`);
     const report = JSON.parse(result.stdout);
-    assert.equal(report.seed, 42);
-    assert.ok(report.tests.length > 0, "the full corpus must execute");
-    assert.ok(report.tests.every(test => test.status === "passed"), `${label}: ${result.stdout}`);
+    validateReport(report, label);
     if (baseline) assert.deepEqual(report, baseline, label);
     else baseline = report;
     // The shared component driver publishes this manifest for its chosen launch.

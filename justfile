@@ -305,6 +305,7 @@ wasm-backends:
     cargo test -p flick-backend --profile e2e --features host --test component_host -- --include-ignored
     cargo clippy -p flick --features wasm-backends --all-targets -- -D warnings
     cargo test -p flick --profile e2e --features wasm-backends --bin flick --test backends -- --include-ignored
+    node --test tools/backend-conformance/report.test.mjs
     node tools/backend-conformance/index.mjs {{flick}} target/backends/js.wasm
 
 # Build the wasm module the in-browser demo loads and hold it to its size budget.
