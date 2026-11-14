@@ -215,6 +215,15 @@ pub fn build_into_generation(
     global: &GlobalArguments,
     modules: Option<Rc<RefCell<ModuleCache>>>,
 ) -> Result<Generation, u8> {
+    if project.config.build.backend.is_some() && options.devtools.is_some() {
+        let diagnostic = Diagnostic::new(
+            codes::P012,
+            Severity::Error,
+            "the selected backend component does not support the host --devtools launch option",
+        );
+        report::render(global, &SourceMap::default(), &[diagnostic]);
+        return Err(1);
+    }
     let mut generation = match Generation::reserve(&project.root) {
         Ok(generation) => generation,
         Err(err) => {

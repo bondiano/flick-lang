@@ -38,7 +38,7 @@ pub(super) struct Tool {
 }
 
 impl Tool {
-    pub(super) fn node() -> Result<Self, String> {
+    pub(super) fn node(expected: Option<&Toolchain>) -> Result<Self, String> {
         let name = if cfg!(windows) { "node.exe" } else { "node" };
         let path = env::var_os("PATH")
             .into_iter()
@@ -46,7 +46,21 @@ impl Tool {
             .map(|dir| dir.join(name))
             .find(|path| path.is_file())
             .ok_or("cannot find Node.js on PATH")?;
+        Self::at_node(&path, expected)
+    }
+
+    fn at_node(path: &Path, expected: Option<&Toolchain>) -> Result<Self, String> {
         let path = fs::canonicalize(path).map_err(|e| e.to_string())?;
+        let mut hash = Sha256::new();
+        io::copy(
+            &mut fs::File::open(&path).map_err(|e| e.to_string())?,
+            &mut hash,
+        )
+        .map_err(|e| e.to_string())?;
+        let digest = format!("{:x}", hash.finalize());
+        if expected.is_some_and(|pin| pin.id != "node" || pin.sha256 != digest) {
+            return Err("launch runtime differs from its pinned version and digest".into());
+        }
         let version = Command::new(&path)
             .arg("--version")
             .output()
@@ -61,20 +75,18 @@ impl Tool {
             .strip_prefix('v')
             .ok_or("invalid Node.js version")?
             .to_owned();
-        let mut hash = Sha256::new();
-        io::copy(
-            &mut fs::File::open(&path).map_err(|e| e.to_string())?,
-            &mut hash,
-        )
-        .map_err(|e| e.to_string())?;
-        Ok(Self {
+        let tool = Self {
             pin: Toolchain {
                 id: "node".into(),
                 version,
-                sha256: format!("{:x}", hash.finalize()),
+                sha256: digest,
             },
             path,
-        })
+        };
+        if expected.is_some_and(|expected| expected != &tool.pin) {
+            return Err("launch runtime differs from its pinned version and digest".into());
+        }
+        Ok(tool)
     }
 }
 
@@ -215,7 +227,7 @@ pub(crate) fn command(
     let artifact = root.join(&launch.path);
     let mut command = if let Some(runtime) = &launch.runtime {
         let tool = match runtime.id.as_str() {
-            "node" => Tool::node()?,
+            "node" => Tool::node(Some(runtime))?,
             _ => return Err(format!("no host runtime adapter for `{}`", runtime.id)),
         };
         if tool.pin != *runtime {
@@ -288,4 +300,38 @@ mod tests {
         assert!(error.contains("runtime dependency"), "{error}");
         fs::remove_dir_all(root).expect("cleanup");
     }
+}
+
+#[cfg(all(test, unix))]
+#[test]
+fn a_mismatched_node_pin_is_rejected_without_executing_the_candidate() {
+    use flick_backend::sha256;
+    use std::os::unix::fs::PermissionsExt;
+    use std::process;
+
+    let root = env::temp_dir().join(format!("flick-node-pin-{}", process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).expect("directory");
+    let path = root.join("node");
+    let script = b"#!/bin/sh\nprintf x > \"$0.called\"\nprintf 'v1.2.3\\n'\n";
+    fs::write(&path, script).expect("candidate");
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).expect("executable");
+    let mut pin = Toolchain {
+        id: "node".into(),
+        version: "1.2.3".into(),
+        sha256: sha256(b"other executable"),
+    };
+    assert!(Tool::at_node(&path, Some(&pin)).is_err());
+    assert!(
+        !root.join("node.called").exists(),
+        "unapproved candidate must not execute"
+    );
+    pin.sha256 = sha256(script);
+    let tool = Tool::at_node(&path, Some(&pin)).expect("matching pin");
+    assert_eq!(tool.pin, pin);
+    assert!(
+        root.join("node.called").exists(),
+        "approved version query executes"
+    );
+    fs::remove_dir_all(root).expect("cleanup");
 }

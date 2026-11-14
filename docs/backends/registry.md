@@ -87,3 +87,8 @@ baseline. Shipping and selecting the official JS component, the browser
 loader, generic host tool steps, atomic publication, the Go extraction and
 full conformance/performance gates remain required. This integration does
 not close R3 or R4 or freeze IR 1.0.
+
+The initial component launcher refuses the host `run/dev --devtools` option
+with P012 before reserving a generation; it does not silently drop it. Supporting
+that option requires a pinned runtime import and its content dependencies. The
+native launcher retains its existing DevTools behavior.

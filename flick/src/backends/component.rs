@@ -54,7 +54,7 @@ impl Package {
                 package.id, package.version, package.sha256
             ))
         })?;
-        let tools = launch::Tool::node().into_iter().collect();
+        let tools = launch::Tool::node(None).into_iter().collect();
         let runtimes = super::dependencies::installed(&project.root).map_err(failure)?;
         Ok(Self {
             pin,

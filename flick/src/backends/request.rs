@@ -117,18 +117,19 @@ impl Prepared {
         package: Option<&str>,
         output: &BuildPlan,
     ) {
-        let interfaces =
-            build::published_interfaces(compilation, package, project.map(|p| p.root.as_path()));
+        let interfaces = build::published_interfaces(
+            compilation,
+            package,
+            project.map(|p| p.root.as_path()),
+            output.go.then_some(&[Target::Go]),
+        );
         let builtins: Vec<&str> = types::builtin_sources()
             .iter()
             .map(|(name, _)| *name)
             .collect();
         for module in &compilation.modules {
-            let mut interface = interfaces[module.name.as_str()].clone();
-            if output.go {
-                interface.targets = vec![Target::Go];
-            }
-            let text = iface::write(&interface);
+            let interface = &interfaces[module.name.as_str()];
+            let text = iface::write(interface);
             let input = self.input(
                 format!("interface/{}", module.name),
                 InputKind::Interface,
@@ -253,3 +254,6 @@ fn target(project: Option<&Project>, output: &BuildPlan) -> TargetRequest {
         ],
     }
 }
+
+#[cfg(test)]
+mod tests;

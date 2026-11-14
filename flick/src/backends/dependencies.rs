@@ -8,11 +8,14 @@ use std::path::{Path, PathBuf};
 use flick_backend::RuntimeDependency;
 use sha2::{Digest, Sha256};
 
-use crate::toolchain;
-
 pub(super) fn installed(root: &Path) -> Result<Vec<RuntimeDependency>, String> {
     let name = "@flick-lang/runtime";
-    let Some(manifest) = toolchain::dependency_manifest(root, name) else {
+    let Some(manifest) = root
+        .ancestors()
+        .filter(|dir| dir.file_name().is_none_or(|name| name != "node_modules"))
+        .map(|dir| dir.join("node_modules").join(name).join("package.json"))
+        .find(|path| path.is_file())
+    else {
         return Ok(vec![]);
     };
     let package = manifest
@@ -67,4 +70,39 @@ fn collect(package: &Path, relative: &Path, files: &mut Vec<PathBuf>) -> io::Res
         }
     }
     Ok(())
+}
+
+#[cfg(all(test, unix))]
+#[test]
+fn the_kernel_pin_follows_project_resolution_with_a_symlinked_adapter() {
+    use std::os::unix::fs::symlink;
+    use std::{env, process};
+
+    let root = env::temp_dir().join(format!("flick-kernel-resolution-{}", process::id()));
+    let _ = fs::remove_dir_all(&root);
+    let project = root.join("project");
+    let kernel = project.join("node_modules/@flick-lang/runtime");
+    fs::create_dir_all(kernel.join("dist")).expect("kernel");
+    fs::write(
+        kernel.join("package.json"),
+        r#"{"name":"@flick-lang/runtime","version":"0.1.0"}"#,
+    )
+    .expect("manifest");
+    fs::write(kernel.join("dist/index.js"), "project kernel").expect("kernel bytes");
+    let expected = installed(&project).expect("project pin");
+    assert_eq!(expected.len(), 1);
+    let adapter = root.join("external/adapter");
+    let private = adapter.join("node_modules/@flick-lang/runtime");
+    fs::create_dir_all(private.join("dist")).expect("private kernel");
+    fs::write(
+        private.join("package.json"),
+        r#"{"name":"@flick-lang/runtime","version":"0.1.0"}"#,
+    )
+    .expect("manifest");
+    fs::write(private.join("dist/index.js"), "private kernel").expect("private bytes");
+    symlink(&adapter, project.join("node_modules/@flick-lang/effect-ts")).expect("adapter symlink");
+    assert_eq!(installed(&project).expect("project pin"), expected);
+    fs::write(kernel.join("dist/index.js"), "updated project kernel").expect("kernel change");
+    assert_ne!(installed(&project).expect("changed project pin"), expected);
+    fs::remove_dir_all(root).expect("cleanup");
 }

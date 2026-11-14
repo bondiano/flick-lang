@@ -58,7 +58,8 @@ pub fn emit(
         }
     }
     let package = |m: &str| packages.get(m).cloned();
-    let published_interfaces = published_interfaces(compilation, settings.package, settings.root);
+    let published_interfaces =
+        published_interfaces(compilation, settings.package, settings.root, None);
     let interface_of = |m: &str| published_interfaces.get(m).cloned();
     let foreign = |module: &str, spec: &str| {
         // a library's own file ships beside its module, so its spelling holds

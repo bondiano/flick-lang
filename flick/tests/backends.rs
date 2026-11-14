@@ -296,3 +296,39 @@ fn an_environment_cannot_be_silently_ignored_by_the_native_baseline() {
         old
     );
 }
+
+#[cfg(feature = "wasm-backends")]
+#[test]
+#[ignore = "requires just wasm-backends"]
+fn component_devtools_is_refused_before_building_a_generation() {
+    let root = project(
+        "backend_component_devtools",
+        &[
+            ("flick.toml", CONFIG),
+            (
+                "src/App.fl",
+                "module App exposing (main)\nmain : Unit -> Unit\nlet main () = ()\n",
+            ),
+        ],
+    );
+    let component = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../target/wasm32-wasip2/release/flick_test_backend.wasm");
+    let bytes = fs::read(component).expect("component fixture");
+    fs::write(root.join("backend.wasm"), &bytes).expect("component");
+    fs::write(
+        root.join("flick.toml"),
+        pinned().replace(&"a".repeat(64), &flick_backend::sha256(&bytes)),
+    )
+    .expect("pin");
+    let result = flick_in(&root, &["run", "--devtools", "http://127.0.0.1:4319"]);
+    assert_eq!(result.status.code(), Some(1), "{result:?}");
+    let errors = String::from_utf8_lossy(&result.stderr);
+    assert!(
+        errors.contains("FLICK-P012") && errors.contains("--devtools"),
+        "{errors}"
+    );
+    assert!(
+        !root.join(".flick/run").exists(),
+        "refuse before reserving a generation"
+    );
+}

@@ -6,13 +6,14 @@ use std::path::Path;
 use super::interface;
 #[cfg(feature = "native-project")]
 use crate::iface;
-use crate::iface::Interface;
+use crate::iface::{Interface, Target};
 use crate::project::Compilation;
 
 pub fn published_interfaces<'a>(
     compilation: &'a Compilation,
     package: Option<&str>,
     root: Option<&Path>,
+    targets: Option<&[Target]>,
 ) -> BTreeMap<&'a str, Interface> {
     let modules = &compilation.modules;
     let checked_interfaces = |name: &str| {
@@ -31,6 +32,9 @@ pub fn published_interfaces<'a>(
                 &[],
                 &checked_interfaces,
             );
+            if let Some(targets) = targets {
+                published.targets = targets.to_vec();
+            }
             published.source = root
                 .and_then(|root| module.path.strip_prefix(root).ok())
                 .map(|p| p.to_string_lossy().replace('\\', "/"));
