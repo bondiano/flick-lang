@@ -10,7 +10,7 @@ use toml::Spanned;
 use super::{Dependency, Grants, Package, Source};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::iface;
-use crate::plugin::reach::inside;
+use crate::plugin::reach::{inside, net_endpoint};
 use crate::source::Span;
 
 /// A dependency as written: the keys of one of its sources.
@@ -215,18 +215,6 @@ pub(super) fn grants(
     raw: BTreeMap<String, Spanned<RawGrants>>,
     span: &dyn Fn(ops::Range<usize>) -> Span,
 ) -> Result<BTreeMap<String, Grants>, Diagnostic> {
-    // labels of lower-case letters, digits and inner `-`, between dots
-    let label = |l: &str| {
-        !l.is_empty()
-            && !l.starts_with('-')
-            && !l.ends_with('-')
-            && (l.bytes()).all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
-    };
-    let name = |n: &str| n.split('.').all(label);
-    let host = |h: &str| match h.split_once(':') {
-        Some((n, port)) => name(n) && port.parse::<u16>().is_ok(),
-        None => name(h),
-    };
     let variable = |v: &str| {
         v.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_')
             && v.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
@@ -248,9 +236,9 @@ pub(super) fn grants(
                     "`fs-read` names `{p}`, which is no path inside the project"
                 )));
             }
-            if let Some(h) = net.iter().find(|h| !host(h)) {
+            if let Some(h) = net.iter().find(|h| net_endpoint(h).is_none()) {
                 return Err(wrong(format!(
-                    "`net` names `{h}`, which is no host, as `db.example.com` or `localhost:8080`"
+                    "`net` names `{h}`, which is no host, as `db.example.com`, `localhost:8080` or `[::1]`"
                 )));
             }
             if let Some(v) = env.iter().find(|v| !variable(v)) {

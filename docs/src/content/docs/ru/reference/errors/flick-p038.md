@@ -1,6 +1,6 @@
 ---
 title: "FLICK-P038"
-source_hash: "a1bde55c0941807d"
+source_hash: "5828744965e7e0b1"
 ---
 
 Плагин запросил доступ к чему-то вне своих блоков, к чему проект не
@@ -11,7 +11,7 @@ source_hash: "a1bde55c0941807d"
 ```toml
 [plugins.sql]
 fs-read = ["schema/", "db/extra.sql"]   # paths from the project's root
-net = ["db.example.com", "localhost:8080"]  # a host at any port, or at one
+net = ["db.example.com", "localhost:8080", "[::1]"]  # a host at any port, at one, or one IPv6 address
 env = ["SQL_TOKEN"]
 ```
 

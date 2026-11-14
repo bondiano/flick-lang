@@ -18,6 +18,8 @@ use crate::source::Span;
 #[cfg(feature = "native-project")]
 mod granted;
 
+pub(crate) use granted::net_endpoint;
+
 #[cfg(feature = "native-project")]
 pub use granted::{hash, snapshot_key};
 
@@ -191,7 +193,8 @@ pub struct Grants {
     /// holds.
     pub fs_read: Vec<String>,
     /// Hosts it fetches from over HTTP: `db.example.com` at any port, or
-    /// `localhost:8080` at that one.
+    /// `localhost:8080` at that one. An IPv6 address is in brackets, `[::1]`
+    /// or `[::1]:8080`, and matches that one address.
     pub net: Vec<String>,
     /// Variables of the environment it reads.
     pub env: Vec<String>,

@@ -535,7 +535,7 @@ grants more in its `flick.toml`; the package of the plugin declares nothing:
 ```toml
 [plugins.sql]
 fs-read = ["schema/", "db/extra.sql"]   # from the project's root: a directory and what it holds, or a file
-net = ["db.example.com", "localhost:8080"]  # a host at any port, or at that one
+net = ["db.example.com", "localhost:8080", "[::1]"]  # a host at any port, at that one, or one IPv6 address
 env = ["SQL_TOKEN"]
 ```
 
@@ -546,11 +546,15 @@ bytes, the value (`None` when it is unset) and the `Response { status, body }`.
 What the project does not grant is `ReachError::Denied`, and
 `FLICK-P038` on the block, naming the line to add, whatever the plugin makes
 of the error; a path with `..` or a root is never granted, nor is a URL
-other than `http` or `https`, one with `user@`, or one whose host is in
-brackets. A database is reached the same way, over HTTP or through a schema
-the project commits; the compiler has no drivers. Blocks of a library's
-modules reach nothing, and neither do `complete`, `hover`, `highlight` and
-`format`.
+other than `http` or `https`, or one with `user@`. An IPv6 address is
+written in brackets, `[::1]` at any port or `[::1]:8080` at that port. It
+is matched in canonical form, so `[2001:0db8::1]` and `[2001:db8::1]` are
+one host; that grant does not cover a different address, an IPv4 host, or
+a zone such as `fe80::1%eth0`. The port is the digits as written, so
+`[::1]:080` is not `[::1]:80`. A database is reached the same way, over HTTP
+or through a schema the project commits; the compiler has no drivers. Blocks
+of a library's modules reach nothing, and neither do `complete`, `hover`,
+`highlight` and `format`.
 
 An answer over HTTP is kept as a snapshot, the JSON file
 `.flick/plugin-snapshots/<package>/<hash>.json` in the project, which is

@@ -3,6 +3,7 @@
 //! the hash of its answer.
 
 use std::fmt::Write as _;
+use std::net::Ipv6Addr;
 use std::path::Path;
 
 use flick_plugin::{ReachError, Request, Response};
@@ -89,7 +90,7 @@ impl Reach {
             return Err(ReachError::Denied(message));
         };
         if !gate.grants.net.iter().any(|g| grants_host(g, &host)) {
-            let name = host.split(':').next().unwrap_or(&host).to_owned();
+            let name = net_endpoint(&host).map(|(name, _)| name).unwrap_or(host);
             return Err(self.denied(
                 &gate.package,
                 &format!("to fetch {what}"),
@@ -160,29 +161,104 @@ pub fn snapshot_key(request: &Request) -> String {
     ])
 }
 
-/// The host and port of an `http` or `https` URL, lower case; none for
-/// another URL, or one whose authority hides its host.
+/// The host and port of an `http` or `https` URL, in the form a grant
+/// names; none for another URL, or one whose authority hides its host.
 fn authority(url: &str) -> Option<String> {
     let rest = url
         .strip_prefix("http://")
         .or_else(|| url.strip_prefix("https://"))?;
-    let end = rest.find(['/', '?', '#', '\\']).unwrap_or(rest.len());
-    let host = rest[..end].to_ascii_lowercase();
-    let plain = !host.is_empty()
-        && (host.bytes())
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"-.:".contains(&b));
-    // shortcut: an IPv6 host in brackets is refused; allow one when a plugin needs it
-    plain.then_some(host)
+    let raw = if rest.starts_with('[') {
+        let close = rest.find(']')?;
+        let mut end = close + 1;
+        if rest[end..].starts_with(':') {
+            let from = end + 1;
+            let stop = rest[from..]
+                .find(['/', '?', '#', '\\'])
+                .map_or(rest.len(), |i| from + i);
+            end = stop;
+        }
+        let tail = &rest[end..];
+        // a `\` ends a domain, then the rest of the URL is not fetched as
+        // that host; an address in brackets is refused instead, so a grant
+        // of `[::1]` cannot cover `http://[::1]\@other/`
+        if !(tail.is_empty() || tail.starts_with(['/', '?', '#'])) {
+            return None;
+        }
+        rest[..end].to_ascii_lowercase()
+    } else {
+        let end = rest.find(['/', '?', '#', '\\']).unwrap_or(rest.len());
+        rest[..end].to_ascii_lowercase()
+    };
+    let (host, port) = net_endpoint(&raw)?;
+    Some(match port {
+        Some(port) => format!("{host}:{port}"),
+        None => host,
+    })
+}
+
+/// The host and optional port `text` grants. An IPv6 address is canonical
+/// (`[2001:db8::1]`), so two spellings of one address match and a different
+/// address does not. A zone (`%`) is refused: dropping it would grant
+/// another interface. A mapped IPv4 address stays IPv6. A port stays the
+/// digits as written, so `:080` is not `:80`.
+pub(crate) fn net_endpoint(text: &str) -> Option<(String, Option<String>)> {
+    if let Some(rest) = text.strip_prefix('[') {
+        let (literal, after) = rest.split_once(']')?;
+        if literal.is_empty() || literal.contains('%') {
+            return None;
+        }
+        let addr: Ipv6Addr = literal.parse().ok()?;
+        let port = match after {
+            "" => None,
+            port => {
+                let port = port.strip_prefix(':')?;
+                if !port_digits(port) {
+                    return None;
+                }
+                Some(port.to_owned())
+            }
+        };
+        return Some((format!("[{addr}]"), port));
+    }
+    if !domain_host(text) {
+        return None;
+    }
+    match text.split_once(':') {
+        Some((name, port)) => Some((name.to_owned(), Some(port.to_owned()))),
+        None => Some((text.to_owned(), None)),
+    }
+}
+
+/// Whether `port` is a `u16` written in digits, with no sign or other suffix.
+fn port_digits(port: &str) -> bool {
+    !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit()) && port.parse::<u16>().is_ok()
+}
+
+/// A domain or a dotted IPv4 address: lower-case labels and one optional port.
+fn domain_host(host: &str) -> bool {
+    let label = |label: &str| {
+        !label.is_empty()
+            && !label.starts_with('-')
+            && !label.ends_with('-')
+            && (label.bytes()).all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+    };
+    let labels = |name: &str| name.split('.').all(label);
+    match host.split_once(':') {
+        Some((name, port)) => labels(name) && port_digits(port),
+        None => labels(host),
+    }
 }
 
 /// Whether the grant `granted` covers `host`: a name at any port, or a
-/// name and port at that one.
+/// name and port at that one. An address in brackets is one IPv6 address.
 fn grants_host(granted: &str, host: &str) -> bool {
-    if granted.contains(':') {
-        granted == host
-    } else {
-        host.split(':').next() == Some(granted)
-    }
+    let Some((granted_host, granted_port)) = net_endpoint(granted) else {
+        return false;
+    };
+    let Some((host, port)) = net_endpoint(host) else {
+        return false;
+    };
+    granted_host == host && (granted_port.is_none() || granted_port == port)
 }
 
 #[cfg(test)]
@@ -342,7 +418,92 @@ mod tests {
             Some("good.com".into())
         );
         assert_eq!(authority("ftp://db.example.com/"), None);
-        assert_eq!(authority("http://[::1]/"), None);
+        assert_eq!(authority("http://[::1]/").as_deref(), Some("[::1]"));
+        assert_eq!(authority("http://[::1]\\@other/"), None);
+    }
+
+    #[test]
+    fn an_ipv6_grant_is_one_address_in_canonical_form() {
+        assert_eq!(
+            authority("http://[0:0:0:0:0:0:0:1]:8080/x").as_deref(),
+            Some("[::1]:8080")
+        );
+        assert_eq!(
+            authority("https://[2001:0DB8:0000::1]/").as_deref(),
+            Some("[2001:db8::1]")
+        );
+        assert_eq!(authority("http://[::1]@other/"), None);
+        assert_eq!(authority("http://user@[::1]/"), None);
+        assert_eq!(authority("http://[fe80::1%eth0]/"), None);
+        assert_eq!(authority("http://[::1]:/"), None);
+        assert_eq!(authority("http://[::1]:99999/"), None);
+        assert!(grants_host("[::1]", "[::1]"));
+        assert!(grants_host("[::1]", "[::1]:8080"));
+        assert!(grants_host("[2001:DB8::1]", "[2001:db8:0:0:0:0:0:1]"));
+        assert!(grants_host("[::1]:8080", "[::1]:8080"));
+        assert!(!grants_host("[::1]:8080", "[::1]:9090"));
+        assert!(!grants_host("[::1]:8080", "[::1]"));
+        assert!(!grants_host("[::1]:8080", "[::1]:08080"));
+        assert!(!grants_host("[::1]:080", "[::1]:80"));
+        assert!(!grants_host("[::1]", "[::2]"));
+        assert!(!grants_host("[::]", "[::1]"));
+        assert!(!grants_host("127.0.0.1", "[::ffff:127.0.0.1]"));
+        assert!(!grants_host("[::ffff:127.0.0.1]", "127.0.0.1"));
+        assert!(!grants_host("[::1]", "localhost"));
+        assert_eq!(
+            authority("http://[::ffff:127.0.0.1]/").as_deref(),
+            Some("[::ffff:127.0.0.1]")
+        );
+    }
+
+    #[test]
+    fn an_ipv6_fetch_uses_the_grant_or_stays_offline() {
+        let outside = Arc::new(Memory::default());
+        let mut reach = Reach::new(Some(Arc::new(Gate {
+            package: "sql".into(),
+            root: PathBuf::from("/p"),
+            grants: Grants {
+                net: vec!["[::1]".into(), "[2001:db8::1]:443".into()],
+                ..Grants::default()
+            },
+            outside: Arc::clone(&outside) as Arc<dyn Outside>,
+        })));
+        let asked = get("http://[0:0:0:0:0:0:0:1]/tables");
+        assert!(matches!(reach.fetch(&asked), Err(ReachError::Offline(_))));
+        assert_eq!(reach.problems[0].0, codes::P039);
+        let other = get("https://[2001:DB8::1]:443/v");
+        assert!(matches!(reach.fetch(&other), Err(ReachError::Offline(_))));
+        // `[::1]` covers every port; the other grant is only port 443 of another address.
+        let any_port = get("http://[::1]:9/no");
+        assert!(matches!(
+            reach.fetch(&any_port),
+            Err(ReachError::Offline(_))
+        ));
+        let wrong = get("http://[::2]/no");
+        let refused = reach.fetch(&wrong);
+        assert!(matches!(refused, Err(ReachError::Denied(_))), "{refused:?}");
+        assert!(reach.problems.iter().any(|(code, message)| {
+            *code == codes::P038 && message.contains("net = [\"[::2]\"]")
+        }));
+        let mapped = get("http://127.0.0.1/");
+        let refused = reach.fetch(&mapped);
+        assert!(matches!(refused, Err(ReachError::Denied(_))), "{refused:?}");
+        let mut narrow = Reach::new(Some(Arc::new(Gate {
+            package: "sql".into(),
+            root: PathBuf::from("/p"),
+            grants: Grants {
+                net: vec!["[::1]:8080".into()],
+                ..Grants::default()
+            },
+            outside: outside as Arc<dyn Outside>,
+        })));
+        let refused = narrow.fetch(&get("http://[::1]:80/"));
+        assert!(
+            matches!(refused, Err(ReachError::Denied(_)))
+                && narrow.problems[0].1.contains("net = [\"[::1]\"]"),
+            "{refused:?} {}",
+            narrow.problems[0].1
+        );
     }
 
     #[test]

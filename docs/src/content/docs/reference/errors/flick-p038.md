@@ -10,7 +10,7 @@ plugin of each package; a dependency cannot grant itself anything.
 ```toml
 [plugins.sql]
 fs-read = ["schema/", "db/extra.sql"]   # paths from the project's root
-net = ["db.example.com", "localhost:8080"]  # a host at any port, or at one
+net = ["db.example.com", "localhost:8080", "[::1]"]  # a host at any port, at one, or one IPv6 address
 env = ["SQL_TOKEN"]
 ```
 
