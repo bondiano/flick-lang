@@ -1,6 +1,7 @@
 //! Native JavaScript build orchestration and its shared frontend inputs.
 
 mod module;
+pub use module::shared_files;
 mod runner;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -167,7 +168,43 @@ fn resolved(
     out
 }
 
-fn foreign_specifier(
+/// Host-resolved foreign specifiers as plain data. A component never needs
+/// a filesystem lookup or a callback to the compiler to reproduce them.
+pub fn foreign_inputs(compilation: &Compilation, settings: &Settings) -> Vec<Resolved> {
+    let builtins: Vec<_> = types::builtin_sources()
+        .iter()
+        .map(|(name, _)| *name)
+        .collect();
+    let path = |m: &str| codegen::module_path(&builtins, settings.typescript, m);
+    let foreign = |module: &str, spec: &str| {
+        if compilation.shipped_foreign(module, spec).is_some() {
+            spec.to_owned()
+        } else {
+            foreign_specifier(settings, &path, module, spec)
+        }
+    };
+    let own = compilation.modules.iter().map(|m| &m.ir);
+    let mut out: Vec<Resolved> = Vec::new();
+    for module in own.chain(builtin_modules_of(settings.backend == Backend::Rt)) {
+        for item in &module.items {
+            if let ir::ItemKind::Foreign(f) = &item.kind
+                && let Some(spec) = f.binding.from.as_deref()
+                && !out
+                    .iter()
+                    .any(|r| r.module == module.name && r.spec == spec)
+            {
+                out.push(Resolved {
+                    module: module.name.clone(),
+                    spec: spec.to_owned(),
+                    specifier: foreign(&module.name, spec),
+                });
+            }
+        }
+    }
+    out
+}
+
+pub fn foreign_specifier(
     settings: &Settings,
     path: &dyn Fn(&str) -> String,
     module: &str,

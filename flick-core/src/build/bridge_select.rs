@@ -8,7 +8,7 @@ use crate::codegen::EffectBridge;
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Module};
 use crate::project::Compilation;
 
-pub(super) fn select(
+pub fn select(
     compilation: &Compilation,
     available: EffectBridge,
     runners: &[(String, String)],
