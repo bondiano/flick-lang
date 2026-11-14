@@ -5,7 +5,7 @@
 //! variables of kind `Region`, qualifiers `τ^C`; the prelude's `Eff`, `Ref`,
 //! `Layer`, `Errors` and `S.Impl` become the forms of §1.2.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
 use flick_core::types::lang::Lang;
@@ -13,6 +13,9 @@ use flick_core::types::{self as fc, Binder};
 
 use crate::syntax::Path;
 use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
+
+#[cfg(test)]
+mod tests;
 
 const PRELUDE: &str = "Prelude";
 
@@ -197,7 +200,7 @@ fn add(t: &fc::Type, out: &mut Row) {
             add(b, out);
         }
         fc::Type::Var(v) => {
-            out.vars.insert(Var::Named(v.as_str().into()));
+            out.add_var(&Var::Named(v.as_str().into()), &BTreeSet::new());
         }
         fc::Type::Without { row: inner, gone } => {
             let gone = gone.iter().map(|l| Path::parse(&l.to_string())).collect();
