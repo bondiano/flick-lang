@@ -112,3 +112,102 @@ fn a_source_saved_after_it_was_read_keeps_the_build_out_of_the_cache() {
     assert!(!read_unchanged(&project, &roots, &host.cwd, &sources));
     let _ = fs::remove_dir_all(&root);
 }
+
+#[cfg(unix)]
+#[test]
+fn cached_files_cannot_be_current_through_symlinks() {
+    use crate::artifact::Artifact;
+    use std::os::unix::fs::symlink;
+
+    let root = env::temp_dir().join(format!("flick-cache-redirect-{}", process::id()));
+    let _ = fs::remove_dir_all(&root);
+    let out = root.join("output");
+    let outside = root.join("outside");
+    fs::create_dir_all(&out).expect("output");
+    fs::create_dir_all(&outside).expect("outside");
+    fs::write(outside.join("same.js"), "same bytes").expect("outside file");
+    let files = [Artifact::source("same.js".into(), "same bytes".into())];
+    fs::write(out.join("same.js"), "same bytes").expect("regular file");
+    assert!(super::artifacts_current(&out, &files));
+    fs::remove_file(out.join("same.js")).expect("remove regular file");
+    symlink(outside.join("same.js"), out.join("same.js")).expect("leaf symlink");
+    assert!(
+        !super::artifacts_current(&out, &files),
+        "leaf must not satisfy cache"
+    );
+    symlink(&outside, out.join("redirect")).expect("parent symlink");
+    let files = [Artifact::source(
+        "redirect/same.js".into(),
+        "same bytes".into(),
+    )];
+    assert!(
+        !super::artifacts_current(&out, &files),
+        "parent must not satisfy cache"
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[cfg(unix)]
+#[test]
+fn recording_preflights_all_stale_paths_before_removing_any_file() {
+    use flick_core::project::cache::{MANIFEST, Manifest};
+    use std::os::unix::fs::symlink;
+
+    for (case, stale) in [
+        ("escape", "../outside/kept.js"),
+        ("redirect", "redirect/kept.js"),
+    ] {
+        let root = env::temp_dir().join(format!("flick-record-{case}-{}", process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let out = root.join("output");
+        let outside = root.join("outside");
+        fs::create_dir_all(&out).expect("output");
+        fs::create_dir_all(&outside).expect("outside");
+        fs::write(out.join("old.js"), "previous build").expect("old file");
+        fs::write(outside.join("kept.js"), "owned elsewhere").expect("outside file");
+        symlink(&outside, out.join("redirect")).expect("symlink");
+        let mut manifest = Manifest::default();
+        manifest.record("output", vec!["old.js".into(), stale.into()]);
+        let path = root.join(MANIFEST);
+        fs::create_dir_all(path.parent().expect("parent")).expect("manifest dir");
+        let original = serde_json::to_vec(&manifest).expect("manifest JSON");
+        fs::write(&path, &original).expect("manifest");
+        assert!(
+            super::record(&root, &out, vec![]).is_err(),
+            "refuse {stale}"
+        );
+        assert_eq!(
+            fs::read(out.join("old.js")).expect("old remains"),
+            b"previous build"
+        );
+        assert_eq!(
+            fs::read(outside.join("kept.js")).expect("outside remains"),
+            b"owned elsewhere"
+        );
+        assert_eq!(fs::read(&path).expect("manifest remains"), original);
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn recording_can_unlink_a_stale_leaf_symlink_in_an_external_output_directory() {
+    use std::os::unix::fs::symlink;
+
+    let root = env::temp_dir().join(format!("flick-record-external-{}", process::id()));
+    let _ = fs::remove_dir_all(&root);
+    let project = root.join("project");
+    let out = root.join("output");
+    fs::create_dir_all(&out).expect("output");
+    fs::create_dir_all(&project).expect("project");
+    fs::write(root.join("kept.js"), "owned elsewhere").expect("outside file");
+    super::record(&project, &out, vec!["old.js".into()]).expect("initial record");
+    symlink(root.join("kept.js"), out.join("old.js")).expect("leaf symlink");
+    super::record(&project, &out, vec![]).expect("remove stale link");
+    assert!(fs::symlink_metadata(out.join("old.js")).is_err());
+    assert_eq!(
+        fs::read(root.join("kept.js")).expect("outside remains"),
+        b"owned elsewhere"
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}

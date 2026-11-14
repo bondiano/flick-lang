@@ -21,7 +21,9 @@ use crate::saved;
 use crate::toolchain;
 use flick_backend::Limits;
 
+mod cleanup;
 mod signed;
+pub use cleanup::{remove_recorded, validate_record};
 
 pub use signed::{Signed, missed, path as inputs_path};
 
@@ -315,9 +317,10 @@ pub fn store(root: &Path, key: &Signed, artifacts: &[Artifact]) {
 
 /// Whether all cached files still have the bytes we published.
 pub fn artifacts_current(out_dir: &Path, artifacts: &[Artifact]) -> bool {
-    artifacts
-        .iter()
-        .all(|artifact| artifact.current(&out_dir.join(&artifact.path)))
+    artifact::validate_destination(out_dir, artifacts).is_ok()
+        && artifacts
+            .iter()
+            .all(|artifact| artifact.current(&out_dir.join(&artifact.path)))
 }
 
 /// A Go executable is reusable only with the same toolchain and unchanged bytes.
@@ -357,6 +360,9 @@ fn go_stamp_path(root: &Path, key: &str, executable: &str) -> PathBuf {
 }
 
 pub fn go_current(root: &Path, key: &str, out_dir: &Path, executable: &str) -> bool {
+    if artifact::validate_destination_paths(out_dir, [executable]).is_err() {
+        return false;
+    }
     let path = go_stamp_path(root, key, executable);
     fs::read_to_string(path)
         .ok()
@@ -377,6 +383,7 @@ pub fn mark_go(root: &Path, key: &str, out_dir: &Path, executable: &str) {
 
 /// Removes obsolete build-owned files and records a successful publication.
 pub fn record(root: &Path, out_dir: &Path, files: Vec<String>) -> io::Result<()> {
+    validate_record(root, out_dir, &files)?;
     let path = root.join(cache::MANIFEST);
     let mut manifest = manifest(root);
     let dir = out_dir.strip_prefix(root).unwrap_or(out_dir);

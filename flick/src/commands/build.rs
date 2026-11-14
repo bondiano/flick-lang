@@ -220,17 +220,17 @@ impl Command for BuildCommand {
             (false, false) => "Emitting JavaScript",
         });
         let mut emitted = artifacts(&host, &sources, project.as_ref(), &compilation, &output);
-        if let Some(format) = self.options.emit_ir {
-            emitted
-                .diagnostics
-                .extend(emit_ir::write(&compilation, &sources, &output, format));
-        }
-        self.publish(project.as_ref(), &output, &mut emitted, &progress);
+        let extra = self
+            .options
+            .emit_ir
+            .map(|format| emit_ir::artifact(&compilation, &sources, &output, format));
+        self.publish(project.as_ref(), &output, &mut emitted, extra, &progress);
         let clean = diagnostics.is_empty() && emitted.diagnostics.is_empty();
         diagnostics.extend(emitted.diagnostics);
         if let Some(p) = &project
             && clean
             && !output.extras.schema_aot
+            && self.options.emit_ir.is_none()
         {
             progress.stage("Saving build cache");
             let key = self.key(p, &roots, &output);

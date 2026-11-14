@@ -137,8 +137,12 @@ generation results; final tool outputs need their own reproducibility check.
 The native CLI's file boundary and internal CBOR cache retain byte payloads
 and artifact kinds, including executable permissions on Unix. The complete
 output set is checked for portable paths, collisions and size limits before
-writing or restoring files. Existing output symlinks cannot redirect writes;
-stale-file lists cannot delete through a symlink parent. Text emit hooks see
+writing or restoring files, including IR dumps, test runners, Go executables
+and schema AOT results. Cache reuse checks destinations before reading them.
+Existing output symlinks cannot redirect writes; stale-file lists and manifest
+cleanup cannot delete through a symlink parent. Cleanup validates every recorded
+path before deleting any file. IR dumps are recorded for clean and stay outside
+the ordinary build cache. Text emit hooks see
 source/declaration/metadata text while opaque object, executable and resource
 artifacts retain their bytes. Tool execution and directory publication still
 need the transactional integration described above.

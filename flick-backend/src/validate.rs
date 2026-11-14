@@ -8,6 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::{self, Write};
 
 use crate::{BuildRequest, BuildResult, Diagnostic, Inputs, Severity, Toolchain, ToolchainStep};
+use ciborium::ser::Error as SerializeError;
 use serde::Serialize;
 
 /// Host limits, independent of a backend's claims about its capabilities.
@@ -89,8 +90,12 @@ pub fn validate_serialized_size<T: Serialize + ?Sized>(
     value: &T,
     bytes: usize,
 ) -> Result<(), String> {
-    ciborium::into_writer(value, Budget(bytes))
-        .map_err(|_| "backend payload exceeds its serialized size limit".into())
+    ciborium::into_writer(value, Budget(bytes)).map_err(|error| match error {
+        SerializeError::Io(_) => "backend payload exceeds its serialized size limit".into(),
+        SerializeError::Value(message) => {
+            format!("cannot serialize backend payload: {message}")
+        }
+    })
 }
 
 pub(super) fn string(s: &str, limits: Limits) -> Result<(), String> {

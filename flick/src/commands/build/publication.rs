@@ -8,7 +8,7 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 
 use super::schemas::compile_schemas;
 use super::{BuildPlan, Emission, unwritten};
-use crate::artifact;
+use crate::artifact::{self, Artifact};
 use crate::progress::Progress;
 use crate::toolchain;
 
@@ -21,7 +21,10 @@ pub(crate) fn write_artifacts(output: &BuildPlan, emitted: &mut Emission, progre
         return;
     }
     let out_dir = output.out_dir.as_path();
-    if let Err(why) = artifact::validate_destination(out_dir, &emitted.artifacts) {
+    if let Err(why) = artifact::validate(&emitted.artifacts).and_then(|()| {
+        let paths = paths(output, &emitted.artifacts);
+        artifact::validate_destination_paths(out_dir, paths.iter().map(String::as_str))
+    }) {
         emitted
             .diagnostics
             .push(Diagnostic::new(codes::P013, Severity::Error, why));
@@ -94,4 +97,30 @@ fn write_if_changed(path: &Path, contents: impl AsRef<[u8]>) -> io::Result<()> {
         return Ok(());
     }
     write(path, contents)
+}
+
+/// The complete owned output set, including host tool results.
+pub(super) fn paths(output: &BuildPlan, files: &[Artifact]) -> Vec<String> {
+    let mut paths: Vec<_> = files.iter().map(|file| file.path.clone()).collect();
+    if output.go {
+        if output.suites.is_empty() {
+            paths.extend(
+                output
+                    .entries
+                    .iter()
+                    .map(|(name, _)| build::go::executable(name)),
+            );
+        } else {
+            paths.push(build::go::executable(build::go::TEST));
+        }
+    }
+    if output.extras.schema_aot {
+        paths.extend(
+            output
+                .entries
+                .iter()
+                .map(|(name, _)| build::schema_aot_file(name)),
+        );
+    }
+    paths
 }

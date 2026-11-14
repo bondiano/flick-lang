@@ -89,18 +89,27 @@ pub fn validate(files: &[Artifact]) -> Result<(), String> {
 /// earlier output. The host chooses the root; files only choose paths below it.
 pub fn validate_destination(root: &Path, files: &[Artifact]) -> Result<(), String> {
     validate(files)?;
-    for file in files {
-        validate_ancestors(root, Path::new(&file.path))?;
-        match fs::symlink_metadata(root.join(&file.path)) {
+    validate_destination_paths(root, files.iter().map(|file| file.path.as_str()))
+}
+
+/// Include tool outputs and compiler-owned files in the same preflight.
+pub fn validate_destination_paths<'a>(
+    root: &Path,
+    paths: impl IntoIterator<Item = &'a str>,
+) -> Result<(), String> {
+    let paths: Vec<_> = paths.into_iter().collect();
+    validate_output_paths(paths.iter().copied(), Limits::default())?;
+    for file in paths {
+        validate_ancestors(root, Path::new(file))?;
+        match fs::symlink_metadata(root.join(file)) {
             Ok(metadata) if metadata.is_symlink() || !metadata.is_file() => {
                 return Err(format!(
-                    "build output `{}` conflicts with an existing path",
-                    file.path
+                    "build output `{file}` conflicts with an existing path"
                 ));
             }
             Ok(_) => {}
             Err(e) if e.kind() == io::ErrorKind::NotFound => {}
-            Err(e) => return Err(format!("cannot inspect build output `{}`: {e}", file.path)),
+            Err(e) => return Err(format!("cannot inspect build output `{file}`: {e}")),
         }
     }
     Ok(())

@@ -139,3 +139,45 @@ fn cached_executable_artifacts_can_be_launched_after_restoration() {
     );
     fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[cfg(unix)]
+#[test]
+fn host_tool_outputs_are_checked_before_publishing_source_files() {
+    use flick_core::build;
+    use std::os::unix::fs::symlink;
+
+    for go in [true, false] {
+        let mut output = plan(if go {
+            "go-tool-output"
+        } else {
+            "schema-tool-output"
+        });
+        output.go = go;
+        output.extras.schema_aot = !go;
+        output.entries.push(("main".into(), "Main".into()));
+        let name = if go {
+            build::go::executable("main")
+        } else {
+            build::schema_aot_file("main")
+        };
+        let outside = output.out_dir.parent().expect("root").join("kept.bin");
+        fs::write(&outside, "owned elsewhere").expect("outside file");
+        symlink(&outside, output.out_dir.join(name)).expect("output symlink");
+        fs::write(output.out_dir.join("safe.js"), "previous build").expect("old output");
+        let mut emitted = Emission {
+            artifacts: vec![Artifact::source("safe.js".into(), "new build".into())],
+            diagnostics: vec![],
+        };
+        write_artifacts(&output, &mut emitted, &Progress::new(Mode::Hidden));
+        assert_eq!(
+            fs::read(output.out_dir.join("safe.js")).expect("old remains"),
+            b"previous build"
+        );
+        assert_eq!(emitted.diagnostics[0].code, codes::P013);
+        assert_eq!(
+            fs::read(outside).expect("outside remains"),
+            b"owned elsewhere"
+        );
+        fs::remove_dir_all(output.out_dir.parent().expect("root")).expect("cleanup");
+    }
+}

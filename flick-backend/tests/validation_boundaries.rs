@@ -421,3 +421,23 @@ fn runtime_pins_match_exact_records_independently_of_list_order() {
     result.runtime_dependencies[0].version = "2.0.0".into();
     assert!(validate(&request, &result).is_err());
 }
+
+#[test]
+fn serialized_size_preserves_serializer_errors() {
+    struct Broken;
+    impl serde::Serialize for Broken {
+        fn serialize<S: serde::Serializer>(&self, _: S) -> Result<S::Ok, S::Error> {
+            Err(serde::ser::Error::custom(
+                "independent serialization failure",
+            ))
+        }
+    }
+    let error = flick_backend::validate_serialized_size(&Broken, 1024).expect_err("invalid value");
+    assert!(
+        error.contains("independent serialization failure"),
+        "{error}"
+    );
+    let error =
+        flick_backend::validate_serialized_size(&"long payload", 1).expect_err("size bound");
+    assert!(error.contains("serialized size limit"), "{error}");
+}

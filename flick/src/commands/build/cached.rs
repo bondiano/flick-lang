@@ -1,3 +1,4 @@
+use crate::artifact::{Artifact, validate_destination_paths};
 use flick_core::build;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::Project;
@@ -26,7 +27,10 @@ impl BuildCommand {
             debug!(miss = %cache::missed(&project.root, key));
             return None;
         };
-        let current = cache::artifacts_current(&output.out_dir, &artifacts)
+        let paths = super::publication::paths(&output, &artifacts);
+        let current = validate_destination_paths(&output.out_dir, paths.iter().map(String::as_str))
+            .is_ok()
+            && cache::artifacts_current(&output.out_dir, &artifacts)
             && (!output.go
                 || output.entries.iter().all(|(name, _)| {
                     cache::go_current(
@@ -39,15 +43,6 @@ impl BuildCommand {
         progress.stage("Restoring cached artifacts");
         self.record(&output, None, &output.entries);
         if current && !self.generation {
-            let mut paths: Vec<String> = artifacts.iter().map(|a| a.path.clone()).collect();
-            if output.go {
-                paths.extend(
-                    output
-                        .entries
-                        .iter()
-                        .map(|(name, _)| build::go::executable(name)),
-                );
-            }
             if !cache::outputs_current(&project.root, &output.out_dir, &paths) {
                 progress.stage("Recording build outputs");
                 if let Err(err) = cache::record(&project.root, &output.out_dir, paths) {
@@ -67,7 +62,7 @@ impl BuildCommand {
             artifacts,
             diagnostics: Vec::new(),
         };
-        self.publish(Some(project), &output, &mut emitted, progress);
+        self.publish(Some(project), &output, &mut emitted, None, progress);
         if output.go && emitted.diagnostics.is_empty() {
             for (name, _) in &output.entries {
                 cache::mark_go(
@@ -87,6 +82,7 @@ impl BuildCommand {
         project: Option<&Project>,
         output: &BuildPlan,
         emitted: &mut Emission,
+        extra: Option<Artifact>,
         progress: &Progress,
     ) {
         // a run writes what it runs, which no plugin's `emit` changes
@@ -94,6 +90,19 @@ impl BuildCommand {
             && let Some(project) = project
         {
             super::hooks::emit(project, emitted);
+        }
+        emitted.artifacts.extend(extra);
+        let paths = super::publication::paths(output, &emitted.artifacts);
+        if !self.generation
+            && let Some(project) = project
+            && let Err(error) = cache::validate_record(&project.root, &output.out_dir, &paths)
+        {
+            emitted.diagnostics.push(Diagnostic::new(
+                codes::P013,
+                Severity::Error,
+                format!("cannot validate earlier build outputs: {error}"),
+            ));
+            return;
         }
         write_artifacts(output, emitted, progress);
         if self.generation
@@ -107,23 +116,6 @@ impl BuildCommand {
         let Some(project) = project else {
             return;
         };
-        let mut paths: Vec<String> = emitted.artifacts.iter().map(|a| a.path.clone()).collect();
-        if output.go {
-            paths.extend(
-                output
-                    .entries
-                    .iter()
-                    .map(|(name, _)| build::go::executable(name)),
-            );
-        }
-        if output.extras.schema_aot {
-            paths.extend(
-                output
-                    .entries
-                    .iter()
-                    .map(|(name, _)| build::schema_aot_file(name)),
-            );
-        }
         progress.stage("Recording build outputs");
         if let Err(err) = cache::record(&project.root, &output.out_dir, paths) {
             emitted.diagnostics.push(Diagnostic::new(

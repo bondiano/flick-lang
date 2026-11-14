@@ -21,7 +21,7 @@ use flick_core::project::{self, ModuleCache, Project};
 use flick_core::source::SourceMap;
 use tracing::debug;
 
-use super::build::{BuildPlan, Emission, artifacts, release, write, write_artifacts};
+use super::build::{BuildPlan, Emission, artifacts, release, write_artifacts};
 use super::check::select;
 use crate::args::{Color, GlobalArguments, Reporter, TestArguments, TestEmitArgument};
 use crate::package_cache;
@@ -177,6 +177,12 @@ fn prepare(
         "Emitting JavaScript"
     });
     let mut emitted = artifacts(&host, &sources, Some(&project), &compilation, &output);
+    if !go {
+        emitted.artifacts.push(Artifact::source(
+            "test.js".to_owned(),
+            runner_source(&suites, rt),
+        ));
+    }
     write_artifacts(&output, &mut emitted, &progress);
     if !emitted.diagnostics.is_empty() {
         drop(progress);
@@ -194,17 +200,7 @@ fn prepare(
         drop(progress);
         return Ok(out.join(go::executable(go::TEST)));
     }
-    progress.stage("Writing test runner");
     let runner = out.join("test.js");
-    if let Err(err) = write(&runner, runner_source(&suites, rt)) {
-        drop(progress);
-        eprintln!("error: cannot write `{}`: {err}", runner.display());
-        return Err(());
-    }
-    emitted.artifacts.push(Artifact::source(
-        "test.js".to_owned(),
-        runner_source(&suites, rt),
-    ));
     store(&emitted.artifacts);
     drop(progress);
     Ok(runner)

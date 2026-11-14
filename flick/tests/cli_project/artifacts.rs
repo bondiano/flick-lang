@@ -1,4 +1,5 @@
 use super::*;
+use std::str;
 
 #[test]
 fn cache_identity_keeps_selected_roots_separate_from_available_sources() {
@@ -255,4 +256,66 @@ fn build_watch_follows_changes_creation_and_deletion_with_a_future_file() {
         3,
         "deletion restored the previous cached selection"
     );
+}
+
+#[cfg(unix)]
+#[test]
+fn ir_output_is_checked_with_the_entire_publication_before_writing() {
+    use std::os::unix::fs::symlink;
+
+    let dir = project(
+        "cli_ir_publication_redirect",
+        &[
+            ("flick.toml", LIB),
+            (
+                "src/Main.fl",
+                "module Main exposing (answer)\nlet answer = 1\n",
+            ),
+        ],
+    );
+    fs::create_dir_all(dir.join("dist")).expect("output directory");
+    fs::write(dir.join("kept.json"), "owned elsewhere").expect("outside file");
+    symlink(dir.join("kept.json"), dir.join("dist/program.ir.json")).expect("IR output symlink");
+    let failed = flick_in(&dir, &["build", "--emit-ir", "json"]);
+    assert_eq!(code(&failed), Some(1), "{failed:?}");
+    assert!(stderr(&failed).contains("FLICK-P013"), "{failed:?}");
+    assert_eq!(
+        fs::read(dir.join("kept.json")).expect("outside remains"),
+        b"owned elsewhere"
+    );
+    assert!(!dir.join("dist/Main.js").exists(), "no partial publication");
+}
+
+#[test]
+fn ir_files_are_owned_outputs_without_polluting_the_normal_build_cache() {
+    let dir = project(
+        "cli_ir_publication_owned",
+        &[
+            ("flick.toml", LIB),
+            (
+                "src/Main.fl",
+                "module Main exposing (answer)\nlet answer = 1\n",
+            ),
+        ],
+    );
+    for (format, name) in [("json", "program.ir.json"), ("cbor", "program.ir.cbor")] {
+        let result = flick_in(&dir, &["build", "--emit-ir", format]);
+        assert_eq!(code(&result), Some(0), "{result:?}");
+        let bytes = fs::read(dir.join("dist").join(name)).expect("IR output");
+        let ir = if format == "json" {
+            flick_ir::Program::from_json(str::from_utf8(&bytes).expect("JSON"))
+        } else {
+            flick_ir::Program::from_cbor(&bytes)
+        }
+        .expect("portable IR");
+        assert_eq!(ir.modules.len(), 1);
+        assert_eq!(ir.modules[0].name, "Main");
+        let result = flick_in(&dir, &["clean"]);
+        assert_eq!(code(&result), Some(0), "{result:?}");
+        assert!(!dir.join("dist").join(name).exists(), "clean owns IR");
+    }
+    let result = flick_in(&dir, &["build"]);
+    assert_eq!(code(&result), Some(0), "{result:?}");
+    assert!(!dir.join("dist/program.ir.json").exists());
+    assert!(!dir.join("dist/program.ir.cbor").exists());
 }
