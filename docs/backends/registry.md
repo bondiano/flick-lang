@@ -29,6 +29,9 @@ component; Go retains its temporary native baseline. Environment support is
 checked against the selected backend before a cache hit is reused.
 The JS runtime setting `[build] effect = "rt"`
 or `"effect"` remains independent of component identity.
+The compiler's JS runtime version check applies to the default component and
+an explicit pin matching the distributed JS image. Other components negotiate
+their own runtime requirements through the backend ABI.
 
 ## Invocation and cache behavior
 

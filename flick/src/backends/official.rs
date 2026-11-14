@@ -3,6 +3,7 @@
 use super::{component::Package, failure};
 use flick_backend::BackendPin;
 use flick_core::diagnostics::Diagnostic;
+use flick_core::project::config::BackendPackage;
 use std::path::Path;
 
 const JS: &[u8] = include_bytes!("../../../backends/js/package/component.wasm");
@@ -14,4 +15,12 @@ pub(super) fn javascript(root: &Path, rt: bool) -> Result<Package, Diagnostic> {
 
 pub(super) fn pin() -> Result<BackendPin, Diagnostic> {
     serde_json::from_str(PIN).map_err(|e| failure(format!("invalid bundled JS backend pin: {e}")))
+}
+
+pub(super) fn matches(package: &BackendPackage) -> bool {
+    pin().is_ok_and(|pin| {
+        package.id == pin.identity.id
+            && package.version == pin.identity.version
+            && package.sha256 == pin.sha256
+    })
 }

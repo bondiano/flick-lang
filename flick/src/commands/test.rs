@@ -25,7 +25,7 @@ use crate::backends::{self, Selected};
 use crate::package_cache;
 use crate::progress::{Mode, Progress};
 use crate::sources::FsHost;
-use crate::{builtins, cache, child, report, timings, toolchain};
+use crate::{builtins, cache, child, report, timings};
 use flick_core::build::Extras;
 
 mod cached;
@@ -102,7 +102,7 @@ fn prepare(
         None => project.config.build.emit == Emit::Go,
     };
     let rt = options.rt || (!go_requested && project.config.build.effect == Backend::Rt);
-    if !go_requested && let Some(problem) = toolchain::check_runtime(&project.root, rt) {
+    if !go_requested && let Some(problem) = backends::check_runtime(&project, rt) {
         return fail(&sources, vec![problem]);
     }
     let backend = match Selected::load(&host, Some(&project), go_requested, rt) {

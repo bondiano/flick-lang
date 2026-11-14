@@ -16,12 +16,12 @@ use super::out_dir::overlap;
 use super::summary::{self, Built};
 use crate::args::{BuildArguments, EmitArgument, LabelsArgument, ProfileArgument};
 use crate::artifact::{Artifact, resolve_root};
-use crate::backends::Selected;
+use crate::backends::{self, Selected};
 use crate::command::{Command, Outcome};
 use crate::package_cache;
 use crate::progress::{Mode, Progress};
 use crate::sources::FsHost;
-use crate::{builtins, cache, toolchain};
+use crate::{builtins, cache};
 
 mod backend;
 mod cached;
@@ -157,7 +157,7 @@ impl Command for BuildCommand {
         if let Some(problem) = project
             .as_ref()
             .filter(|_| !go)
-            .and_then(|p| toolchain::check_runtime(&p.root, front.extras.rt))
+            .and_then(|p| backends::check_runtime(p, front.extras.rt))
         {
             return Outcome {
                 sources,

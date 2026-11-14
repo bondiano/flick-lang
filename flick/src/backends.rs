@@ -1,5 +1,5 @@
-//! Package selection at the common build boundary. Native code generation is
-//! the temporary baseline when no component package has been selected.
+//! Package selection at the common build boundary. JS uses the distributed
+//! component by default; Go retains its temporary native baseline.
 
 #[cfg(feature = "wasm-backends")]
 mod component;
@@ -13,6 +13,7 @@ mod official;
 mod request;
 
 use crate::artifact::Artifact;
+use crate::toolchain;
 use std::path::Path;
 use std::process::Command;
 #[cfg(feature = "wasm-backends")]
@@ -32,6 +33,23 @@ pub(crate) enum Selected {
     Native,
     #[cfg(feature = "wasm-backends")]
     Component(Arc<component::Package>),
+}
+
+/// Preserve the compiler-owned JS runtime diagnostic before loading packages.
+/// Other components negotiate their runtime requirements through the backend ABI.
+pub(crate) fn check_runtime(project: &Project, rt: bool) -> Option<Diagnostic> {
+    if let Some(package) = &project.config.build.backend {
+        #[cfg(feature = "wasm-backends")]
+        if !official::matches(package) {
+            return None;
+        }
+        #[cfg(not(feature = "wasm-backends"))]
+        {
+            let _ = package;
+            return None;
+        }
+    }
+    toolchain::check_runtime(&project.root, rt)
 }
 
 impl Selected {
