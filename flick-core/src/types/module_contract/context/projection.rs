@@ -116,9 +116,9 @@ impl Projection<'_> {
 
 impl Identities for Projection<'_> {
     fn ty(&mut self, ty: &Type, bound: &[Bound]) -> Type {
-        if let Type::MetaView(meta) = ty {
+        if let Type::Meta(meta) = ty {
             let mapped = self.view.transport_meta(meta, &Self::ids(bound));
-            return Type::MetaView(Box::new(self.observe(mapped, (**meta).clone())));
+            return Type::Meta(self.observe(mapped, meta.clone()));
         }
         let mappings = self.names(bound);
         let mut names = WitnessScope {
@@ -135,9 +135,9 @@ impl Identities for Projection<'_> {
     }
 
     fn kind(&mut self, kind: &Kind, bound: &[Bound]) -> Kind {
-        if let Kind::MetaView(meta) = kind {
+        if let Kind::Meta(meta) = kind {
             let mapped = self.view.transport_meta(meta, &Self::ids(bound));
-            return Kind::MetaView(Box::new(self.observe(mapped, (**meta).clone())));
+            return Kind::Meta(self.observe(mapped, meta.clone()));
         }
         let mappings = self.names(bound);
         WitnessScope {

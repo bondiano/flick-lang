@@ -23,7 +23,7 @@ fn unresolved_kind(kind: &Kind) -> Option<u32> {
     let mut pending = vec![kind];
     while let Some(kind) = pending.pop() {
         match kind {
-            Kind::Meta(id) => return Some(*id),
+            Kind::Meta(meta) if meta.legacy_root().is_some() => return meta.legacy_root(),
             Kind::Row(inner) => pending.push(inner),
             Kind::Arrow(input, output) => pending.extend([input.as_ref(), output.as_ref()]),
             _ => {}

@@ -81,22 +81,19 @@ impl Checker<'_> {
     /// is shared with subsumption, before it observes the representation.
     pub(in crate::types) fn unify_opaque_meta(&mut self, a: &Type, b: &Type) -> Option<Unified> {
         let (a, b) = (self.store.head(a), self.store.head(b));
-        match (a.as_ref(), b.as_ref()) {
-            (Type::Meta(meta), other) | (other, Type::Meta(meta)) => {
-                let meta = *meta;
-                if !self.store.is_numeric(meta)
-                    && !self.store.is_capture_row(meta)
-                    && !self.store.is_error_row(meta)
-                    && let Some(nominal) = self.projected_alias_type(other)
-                    && self.opaque_value_type(&nominal)
-                {
-                    // Opaque values are monotypes even when their hidden
-                    // representation is polymorphic. Do not accidentally
-                    // instantiate/unfold that representation to bind a meta.
-                    return Some(self.bind(meta, &nominal));
-                }
-            }
-            _ => {}
+        let candidate = a
+            .legacy_meta_root()
+            .map(|meta| (meta, b.as_ref()))
+            .or_else(|| b.legacy_meta_root().map(|meta| (meta, a.as_ref())));
+        if let Some((meta, other)) = candidate
+            && !self.store.is_numeric(meta)
+            && !self.store.is_capture_row(meta)
+            && !self.store.is_error_row(meta)
+            && let Some(nominal) = self.projected_alias_type(other)
+            && self.opaque_value_type(&nominal)
+        {
+            // Keep the nominal monotype instead of its possibly polymorphic representation.
+            return Some(self.bind(meta, &nominal));
         }
         None
     }

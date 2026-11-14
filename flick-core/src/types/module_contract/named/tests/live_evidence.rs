@@ -11,11 +11,12 @@ fn paired_semantic_label_root_follows_late_solution_but_literal_twin_does_not() 
             .expect("A scope");
         checker.store.enter_context(outer);
         let root = checker.store.fresh_of(&Kind::Type);
-        let Type::MetaView(meta) = root.clone() else {
+        let Type::Meta(meta) = root.clone() else {
             panic!("scoped root")
         };
+        assert!(meta.contextual().is_some(), "scoped semantic label root");
         let raw = Type::Row(Row::closed(vec![(
-            Elem::Provided(Box::new(Elem::Error(Atom::MetaView(meta)))),
+            Elem::Provided(Box::new(Elem::Error(Atom::Meta(meta)))),
             Type::Tuple(Vec::new()),
         )]));
         checker.env.define_type(
@@ -225,10 +226,11 @@ fn paired_late_descendants_are_in_the_live_scope_support_footprint() {
 
 fn provided_atom_carrier(root: &Type, role: usize) -> Type {
     use crate::types::Atom;
-    let Type::MetaView(meta) = root else {
+    let Type::Meta(meta) = root else {
         panic!("scoped atom root")
     };
-    let atom = Atom::MetaView(meta.clone());
+    assert!(meta.contextual().is_some(), "scoped atom root");
+    let atom = Atom::Meta(meta.clone());
     let label = match role {
         0 => Elem::Capture(atom),
         1 => Elem::Error(atom),
@@ -360,14 +362,14 @@ fn paired_external_constructor_kind_rejects_aborted_target_before_resolution() {
             .kinds
             .unify(&root_kind, &Kind::arrow(Kind::Type, Kind::Type))
             .expect("pretrial solution");
-        let Kind::Meta(root) = root_kind else {
+        let Some(root) = root_kind.legacy_meta_root() else {
             panic!("global pretrial root")
         };
-        let kind = Kind::MetaView(Box::new(MetaOccurrence::kind(
+        let kind = Kind::Meta(MetaOccurrence::kind(
             root,
             checker.store.witness_authority(),
             Embedding::align(&super::Context::default(), &outer).expect("outer target"),
-        )));
+        ));
         checker.store.enter_context(outer.clone());
         checker.kinds.enter_context(outer.clone());
         let b = checker

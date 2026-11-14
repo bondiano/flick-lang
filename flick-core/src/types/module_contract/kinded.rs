@@ -198,7 +198,6 @@ impl<K: Kinding, I: Identities> Walk<'_, '_, K, I> {
             | Type::Var(_)
             | Type::Symbol(_)
             | Type::Meta(_)
-            | Type::MetaView(_)
             | Type::Skolem(_)
             | Type::Error => Ok(self.identities.ty(ty, &self.bound)),
         };
@@ -215,7 +214,7 @@ impl<K: Kinding, I: Identities> Walk<'_, '_, K, I> {
         let head_kind = self.kinding.checked_kind(&head_kind)?;
         let Kind::Arrow(parameter, _) = &head_kind else {
             return Err(match head_kind {
-                Kind::Meta(_) | Kind::MetaView(_) => Incomplete::Kind(head_kind),
+                Kind::Meta(_) => Incomplete::Kind(head_kind),
                 _ => Incomplete::NotFunction(head_kind),
             });
         };
@@ -229,7 +228,7 @@ impl<K: Kinding, I: Identities> Walk<'_, '_, K, I> {
         match self.kinding.checked_kind(kind)? {
             Kind::Row(_) => Ok(true),
             Kind::ServiceRow | Kind::ErrorRow | Kind::CaptureRow => Ok(false),
-            kind @ (Kind::Meta(_) | Kind::MetaView(_)) => Err(Incomplete::Kind(kind)),
+            kind @ Kind::Meta(_) => Err(Incomplete::Kind(kind)),
             kind => Err(Incomplete::NotRow(kind)),
         }
     }

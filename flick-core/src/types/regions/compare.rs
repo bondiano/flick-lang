@@ -30,8 +30,14 @@ impl Checker<'_> {
         };
         match (&a, &b) {
             (Type::Error, _) | (_, Type::Error) => Ok(()),
-            (Type::Meta(m), _) if ca.is_none() => self.bind(*m, &captured(&b, &cb)),
-            (_, Type::Meta(m)) if cb.is_none() => self.bind(*m, &captured(&a, &ca)),
+            (Type::Meta(meta), _) if ca.is_none() && meta.legacy_root().is_some() => self.bind(
+                meta.legacy_root().expect("legacy capture binding"),
+                &captured(&b, &cb),
+            ),
+            (_, Type::Meta(meta)) if cb.is_none() && meta.legacy_root().is_some() => self.bind(
+                meta.legacy_root().expect("legacy capture binding"),
+                &captured(&a, &ca),
+            ),
             _ => {
                 // A bare type adds no hidden captures; its own fields and rows
                 // are compared by the types themselves below.
@@ -70,15 +76,12 @@ impl Checker<'_> {
     /// Whether `label` is the captures `^?m` of a type not inferred yet.
     fn uninferred(&self, label: &Elem) -> bool {
         let meta = match label {
-            Elem::Capture(Atom::Meta(m)) => Some(*m),
+            Elem::Capture(Atom::Meta(meta)) => meta.legacy_root(),
             _ => None,
         };
         meta.is_some_and(|m| {
             !self.store.is_capture_row(m)
-                && matches!(
-                    self.store.resolve(&Type::Meta(m)),
-                    Type::Meta(_) | Type::MetaView(_)
-                )
+                && matches!(self.store.resolve(&Type::meta(m)), Type::Meta(_))
         })
     }
 
@@ -159,10 +162,10 @@ impl Checker<'_> {
     ) -> Unified {
         match (&a, &e) {
             (Type::Error, _) | (_, Type::Error) => return Ok(()),
-            (_, Type::Meta(_) | Type::MetaView(_)) if ce.is_none() => {
+            (_, Type::Meta(_)) if ce.is_none() => {
                 return self.unify(actual, expected);
             }
-            (Type::Meta(_) | Type::MetaView(_), _) if ca.is_none() => {
+            (Type::Meta(_), _) if ca.is_none() => {
                 return self.unify(actual, expected);
             }
             _ => {}
@@ -178,10 +181,7 @@ impl Checker<'_> {
             Visible::Late(e.clone())
         };
         let bound = ce.unwrap_or_else(Type::empty_row);
-        let written = !matches!(
-            self.store.resolve(&bound),
-            Type::Meta(_) | Type::MetaView(_)
-        );
+        let written = !matches!(self.store.resolve(&bound), Type::Meta(_));
         // a function or a task, pure ones too, fits only where the reach of
         // the position covers what it holds (`LeLive.arrow` keeps `reach`)
         let mark = self.cx.regions.holds.len();

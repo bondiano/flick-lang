@@ -62,7 +62,7 @@ pub enum OwnerTypeKind {
     },
     /// Inference-only, retaining the complete occurrence until finalization.
     #[serde(skip)]
-    MetaView(Box<MetaOccurrence>),
+    MetaView(MetaOccurrence),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -166,7 +166,7 @@ impl Extract<'_, '_> {
         if matches!(ty, Type::Row(_)) {
             ty = self.checker.expanded(&ty);
         }
-        self.pending |= matches!(ty, Type::Meta(_) | Type::MetaView(_));
+        self.pending |= matches!(ty, Type::Meta(_));
         if let Type::Con { module, name } = &ty
             && let Some(definition) = self.checker.env.type_def(module, name)
         {
@@ -271,10 +271,12 @@ fn kind(ty: &Type) -> OwnerTypeKind {
             constraints: constraints.len(),
         },
         Type::Exists { binder, .. } => OwnerTypeKind::Exists(binder.clone()),
-        Type::MetaView(meta) => OwnerTypeKind::MetaView(meta.clone()),
-        Type::Meta(id) => OwnerTypeKind::Atom {
-            identity: format!("meta:{id}"),
-            atom: Some(format!("?{id}")),
+        Type::Meta(meta) => match meta.legacy_root() {
+            Some(id) => OwnerTypeKind::Atom {
+                identity: format!("meta:{id}"),
+                atom: Some(format!("?{id}")),
+            },
+            None => OwnerTypeKind::MetaView(meta.clone()),
         },
         Type::Skolem(id) => OwnerTypeKind::Atom {
             identity: format!("skolem:{id}"),
@@ -328,7 +330,7 @@ fn cyclic_aliases(syntax: &OwnerTypeTemplates) -> Vec<usize> {
 
 fn pending_kind(kind: &Kind) -> bool {
     match kind {
-        Kind::Meta(_) | Kind::MetaView(_) => true,
+        Kind::Meta(_) => true,
         Kind::Arrow(a, b) => pending_kind(a) || pending_kind(b),
         Kind::Row(inner) => pending_kind(inner),
         _ => false,
@@ -338,9 +340,9 @@ fn pending_kind(kind: &Kind) -> bool {
 fn pending_label(label: &Elem) -> bool {
     use crate::types::Atom;
     match label {
-        Elem::Capture(Atom::Meta(_) | Atom::MetaView(_))
-        | Elem::Error(Atom::Meta(_) | Atom::MetaView(_))
-        | Elem::Service(Atom::Meta(_) | Atom::MetaView(_)) => true,
+        Elem::Capture(Atom::Meta(_))
+        | Elem::Error(Atom::Meta(_))
+        | Elem::Service(Atom::Meta(_)) => true,
         Elem::Provided(inner) => pending_label(inner),
         _ => false,
     }

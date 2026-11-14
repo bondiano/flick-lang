@@ -53,7 +53,12 @@ impl Checker<'_> {
             }
         }
         let chosen = self.chosen_by_classes();
-        let waits = |checker: &Self, ty: &Type| matches!(checker.whnf(ty), Type::Meta(m) if chosen.contains(&m));
+        let waits = |checker: &Self, ty: &Type| {
+            checker
+                .whnf(ty)
+                .legacy_meta_root()
+                .is_some_and(|m| chosen.contains(&m))
+        };
         // a literal of the wrong type explains an operator's error better
         for literal in mem::take(&mut self.literals) {
             if waits(self, &literal.ty) {
@@ -94,7 +99,7 @@ impl Checker<'_> {
             // any other type a comparison orders by its `Ord`, as it does a type
             // variable: `Bool`, a derived type, a record, a list
             if op.domain == Domain::Ordered
-                && !matches!(head, Type::Error | Type::Meta(_) | Type::MetaView(_))
+                && !matches!(head, Type::Error | Type::Meta(_))
                 && !op.domain.allows(head)
             {
                 let class = Type::app(Type::lang(Lang::Ord), ty.clone());
@@ -107,7 +112,7 @@ impl Checker<'_> {
             let allowed = op.domain.names();
             let fits = match head {
                 Type::Error => true,
-                Type::Meta(_) | Type::MetaView(_) => {
+                Type::Meta(_) => {
                     let _ = self.unify(&ty, &Type::lang(allowed[0]));
                     true
                 }
@@ -167,10 +172,10 @@ impl Checker<'_> {
         }
         for w in &self.classes.wanted {
             self.zonk(&w.constraint).visit(&mut |t| {
-                if let Type::Meta(m) = t
-                    && self.store.is_numeric(*m)
+                if let Some(m) = t.legacy_meta_root()
+                    && self.store.is_numeric(m)
                 {
-                    chosen.insert(*m);
+                    chosen.insert(m);
                 }
             });
         }
@@ -181,7 +186,7 @@ impl Checker<'_> {
         let ty = self.whnf(&literal.ty);
         let num = match ty.spine().0 {
             Type::Error => return,
-            Type::Meta(_) | Type::MetaView(_) => {
+            Type::Meta(_) => {
                 let num = default_num(literal.fractional);
                 let _ = self.unify(&ty, &Type::lang(num.lang()));
                 num

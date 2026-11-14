@@ -6,7 +6,7 @@ fn bound_alias_constructor_heads_remain_visible_in_application_spines() {
     for name in ["Opaque", "Reveal"] {
         let mut store = Store::default();
         let variable = store.fresh();
-        let Type::Meta(meta) = variable else {
+        let Some(meta) = variable.legacy_meta_root() else {
             unreachable!()
         };
         let constructor = Type::con("Test", name);
@@ -30,7 +30,7 @@ fn bound_alias_constructor_heads_remain_visible_in_application_spines() {
 fn bound_partial_constructor_heads_prepend_their_existing_arguments() {
     let mut store = Store::default();
     let variable = store.fresh();
-    let Type::Meta(meta) = variable else {
+    let Some(meta) = variable.legacy_meta_root() else {
         unreachable!()
     };
     let constructor = Type::con("Test", "Task");
@@ -51,7 +51,7 @@ mod occurrence_baseline {
     use crate::iface::Interface;
     use crate::types::lang::Lang;
     use crate::types::ty::without;
-    use crate::types::{Atom, Elem, MetaOccurrence, Row, Scope, Type};
+    use crate::types::{Atom, Elem, MetaOccurrence, OwnerTypeKind, Row, Scope, Type};
 
     fn register(store: &mut Store, module: &str) -> Context {
         store
@@ -260,7 +260,7 @@ mod occurrence_baseline {
             store.level = 9;
             for (ty, kind, capture, error, numeric, fractional) in allocations {
                 let root = ty.meta_root().expect("fresh root");
-                assert_eq!(matches!(ty, Type::MetaView(_)), contextual);
+                assert_eq!(ty.legacy_meta_root().is_none(), contextual);
                 assert!(store.valid_occurrence(&ty));
                 assert_eq!(store.resolve(&ty), ty);
                 assert_eq!(store.meta_level(root), Some(3));
@@ -273,7 +273,7 @@ mod occurrence_baseline {
                 let beside = store.fresh_beside(root);
                 let next = beside.meta_root().expect("fresh beside root");
                 assert_ne!(next, root);
-                assert_eq!(matches!(beside, Type::MetaView(_)), contextual);
+                assert_eq!(beside.legacy_meta_root().is_none(), contextual);
                 assert!(store.valid_occurrence(&beside));
                 assert_eq!(store.meta_level(next), Some(3));
                 assert_eq!(store.meta_contexts[next as usize].kind, Some(kind));
@@ -395,10 +395,67 @@ mod occurrence_baseline {
     }
 
     #[test]
+    fn legacy_binding_preserves_contextual_targets_in_both_directions() {
+        use crate::types::kinds::KindStore;
+        use crate::types::module_contract::context::Scopes;
+        for shifted in [false, true] {
+            for legacy_left in [false, true] {
+                test_checker::with_checker(|checker| {
+                    let legacy = checker.store.fresh();
+                    let contextual = contextual_variable(&mut checker.store, shifted, &Kind::Type);
+                    let root = contextual.meta_root().expect("contextual type root");
+                    let before = format!("{:?}", checker.store.meta_contexts[root as usize]);
+                    let level = checker.store.meta_level(root);
+                    let result = if legacy_left {
+                        checker.unify(&legacy, &contextual)
+                    } else {
+                        checker.unify(&contextual, &legacy)
+                    };
+                    result.expect("legacy roots may refer to existing contextual carriers");
+                    assert_eq!(checker.store.resolve(&legacy), contextual);
+                    assert!(checker.store.valid_occurrence(&contextual));
+                    assert_eq!(checker.store.meta_level(root), level);
+                    assert_eq!(
+                        format!("{:?}", checker.store.meta_contexts[root as usize]),
+                        before
+                    );
+                    assert_eq!(checker.store.resolve(&contextual), contextual);
+                    assert_marks(&checker.store, root, (false, false, false, false));
+                });
+                let mut scopes = Scopes::default();
+                let source =
+                    scopes.append(&Context::default(), Type::con("Provider", "S"), "A".into());
+                let target =
+                    scopes.append(&Context::default(), Type::con("Provider", "S"), "X".into());
+                let mut kinds = KindStore::for_witnesses(scopes.owner());
+                let legacy = kinds.fresh();
+                kinds.enter_context(source.clone());
+                let contextual = kinds.fresh();
+                let contextual = if shifted {
+                    Embedding::align(&source, &target)
+                        .expect("alpha view")
+                        .transport_kind_checked(&contextual)
+                        .expect("kind transport")
+                } else {
+                    contextual
+                };
+                let result = if legacy_left {
+                    kinds.unify(&legacy, &contextual)
+                } else {
+                    kinds.unify(&contextual, &legacy)
+                };
+                result.expect("legacy kind roots may refer to contextual carriers");
+                assert_eq!(kinds.resolve(&legacy), contextual);
+                assert_eq!(kinds.resolve(&contextual), contextual);
+            }
+        }
+    }
+
+    #[test]
     fn inference_meta_layout_measurements() {
         use std::mem::{align_of, size_of};
         eprintln!(
-            "inference-meta-layout Type={}/{} Kind={}/{} Atom={}/{} MetaOccurrence={}/{}",
+            "inference-meta-layout Type={}/{} Kind={}/{} Atom={}/{} MetaOccurrence={}/{} OwnerTypeKind={}/{}",
             size_of::<Type>(),
             align_of::<Type>(),
             size_of::<Kind>(),
@@ -407,6 +464,8 @@ mod occurrence_baseline {
             align_of::<Atom>(),
             size_of::<MetaOccurrence>(),
             align_of::<MetaOccurrence>(),
+            size_of::<OwnerTypeKind>(),
+            align_of::<OwnerTypeKind>(),
         );
     }
 }

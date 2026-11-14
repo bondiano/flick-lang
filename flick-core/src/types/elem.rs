@@ -17,17 +17,19 @@ use super::ty::{MetaOccurrence, Type};
 pub enum Atom {
     Var(String),
     Skolem(u32),
-    Meta(u32),
-    MetaView(Box<MetaOccurrence>),
+    Meta(MetaOccurrence),
 }
 
 impl Atom {
+    pub fn meta(root: u32) -> Self {
+        Self::Meta(MetaOccurrence::legacy(root))
+    }
+
     pub fn of(t: &Type) -> Option<Atom> {
         match t {
             Type::Var(name) => Some(Atom::Var(name.clone())),
             Type::Skolem(s) => Some(Atom::Skolem(*s)),
-            Type::Meta(m) => Some(Atom::Meta(*m)),
-            Type::MetaView(meta) => Some(Atom::MetaView(meta.clone())),
+            Type::Meta(meta) => Some(Atom::Meta(meta.clone())),
             _ => None,
         }
     }
@@ -56,9 +58,9 @@ const PROVIDED: &str = "Fiber.Provided ";
 impl Elem {
     pub fn has_meta_view(&self) -> bool {
         match self {
-            Elem::Capture(Atom::MetaView(_))
-            | Elem::Error(Atom::MetaView(_))
-            | Elem::Service(Atom::MetaView(_)) => true,
+            Elem::Capture(Atom::Meta(meta))
+            | Elem::Error(Atom::Meta(meta))
+            | Elem::Service(Atom::Meta(meta)) => meta.contextual().is_some(),
             Elem::Provided(inner) => inner.has_meta_view(),
             _ => false,
         }
@@ -100,7 +102,7 @@ impl Elem {
         let atom = |rest: &str| match rest.strip_prefix('\'').map(str::parse) {
             Some(Ok(s)) => Atom::Skolem(s),
             _ => match rest.strip_prefix('?').map(str::parse) {
-                Some(Ok(m)) => Atom::Meta(m),
+                Some(Ok(m)) => Atom::meta(m),
                 _ => Atom::Var(rest.to_owned()),
             },
         };
@@ -185,8 +187,7 @@ impl fmt::Display for Atom {
         match self {
             Atom::Var(name) => f.write_str(name),
             Atom::Skolem(s) => write!(f, "'{s}"),
-            Atom::Meta(m) => write!(f, "?{m}"),
-            Atom::MetaView(meta) => write!(f, "?{}", meta.root()),
+            Atom::Meta(meta) => write!(f, "?{}", meta.root()),
         }
     }
 }
@@ -266,7 +267,7 @@ mod tests {
             Elem::named("x"),
             Elem::Capture(Atom::Var("s".into())),
             Elem::Capture(Atom::Skolem(3)),
-            Elem::Error(Atom::Meta(7)),
+            Elem::Error(Atom::meta(7)),
             Elem::Service(Atom::Var("S".into())),
             Elem::Live,
             Elem::Provided(Box::new(Elem::named("App.Main.Db"))),

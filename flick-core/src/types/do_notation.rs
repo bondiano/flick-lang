@@ -174,7 +174,7 @@ impl Checker<'_> {
     /// Whether `m a` does not know its `m` yet, so a mismatch would show `_ _`.
     fn unknown_monad(&self, monadic: &Type) -> bool {
         match self.whnf(monadic) {
-            Type::App { head, .. } => matches!(self.whnf(&head), Type::Meta(_) | Type::MetaView(_)),
+            Type::App { head, .. } => matches!(self.whnf(&head), Type::Meta(_)),
             _ => false,
         }
     }

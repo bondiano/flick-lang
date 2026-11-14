@@ -144,8 +144,7 @@ mod transaction_tests {
     use super::*;
 
     fn meta(ty: &Type) -> u32 {
-        let Type::Meta(m) = ty else { panic!("meta") };
-        *m
+        ty.legacy_meta_root().expect("legacy meta")
     }
 
     #[test]
@@ -179,7 +178,7 @@ mod transaction_tests {
         assert!(store.equalities.is_empty());
         assert_eq!(store.skolem_name(0), "kept-for-diagnostics");
         assert_eq!(skolem, Type::Skolem(0));
-        assert_eq!(store.fresh(), Type::Meta(3));
+        assert_eq!(store.fresh(), Type::meta(3));
     }
 
     #[test]
@@ -331,7 +330,7 @@ mod transaction_tests {
             assert!(result.is_err());
             assert_eq!(checker.zonk(&ty), ty);
             assert_eq!(checker.kinds.resolve(&kind), kind);
-            assert_eq!(checker.fresh(), Type::Meta(2));
+            assert_eq!(checker.fresh(), Type::meta(2));
         });
     }
 
@@ -377,7 +376,7 @@ mod transaction_tests {
             };
             let left = Type::Tuple(vec![
                 qualified(Type::Row(Row::closed(vec![(
-                    Elem::Capture(Atom::Meta(meta(&unknown))),
+                    Elem::Capture(Atom::meta(meta(&unknown))),
                     unknown,
                 )]))),
                 Type::con("Prelude", "Int"),

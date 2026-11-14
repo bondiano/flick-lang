@@ -127,7 +127,7 @@ impl Checker<'_> {
             // no scope of this stage provides it: the stage passes `Scope` on to
             // what runs it, which provides the region its row names
             if let [region] = needed.spine().1[..]
-                && let Type::Meta(_) | Type::MetaView(_) = self.store.resolve(region)
+                && let Type::Meta(_) = self.store.resolve(region)
             {
                 match (self.declared_scope(), &mut self.cx.regions.defaults) {
                     (Some(owner), _) => {
@@ -145,7 +145,7 @@ impl Checker<'_> {
         let [region] = needed.spine().1[..] else {
             return services.clone();
         };
-        if let Type::Meta(_) | Type::MetaView(_) = self.store.resolve(region) {
+        if let Type::Meta(_) = self.store.resolve(region) {
             let owner = Type::Skolem(self.cx.regions.scopes[inner].region);
             let _ = self.unify(region, &owner);
         }
@@ -164,7 +164,7 @@ impl Checker<'_> {
     /// innermost scope, once the call has all its arguments.
     pub fn settle_defaults(&mut self, defaults: Vec<(Type, usize)>) {
         for (region, inner) in defaults {
-            if let Type::Meta(_) | Type::MetaView(_) = self.store.resolve(&region) {
+            if let Type::Meta(_) = self.store.resolve(&region) {
                 let owner = Type::Skolem(self.cx.regions.scopes[inner].region);
                 let _ = self.unify(&region, &owner);
             }
@@ -190,7 +190,7 @@ impl Checker<'_> {
                     return None;
                 };
                 let region = self.store.resolve(region);
-                (!matches!(region, Type::Meta(_) | Type::MetaView(_))).then_some(region)
+                (!matches!(region, Type::Meta(_))).then_some(region)
             })
     }
 

@@ -224,7 +224,7 @@ impl Checker<'_> {
         let (pat, guarded, span) = self.arm(arm, &error, ty);
         let covers = !guarded && self.covers_all(&pat);
         let error = self.whnf(&error);
-        if let Type::Meta(_) | Type::MetaView(_) = error {
+        if let Type::Meta(_) = error {
             let _ = self.unify(&error, &Type::app(Type::lang(Lang::Errors), raised.clone()));
             caught.all |= covers;
             return;

@@ -72,7 +72,7 @@ impl Embedding {
             return Err(error);
         }
         match &mut mapped {
-            Type::MetaView(meta) => **meta = self.transport_meta(meta, bound)?,
+            Type::Meta(meta) => *meta = self.transport_meta(meta, bound)?,
             Type::Forall { vars, .. } => {
                 for binder in vars {
                     binder.kind = self.transport_kind_occurrences(&binder.kind, bound)?;
@@ -97,7 +97,7 @@ impl Embedding {
 
     fn transport_kind_occurrences(&self, kind: &Kind, bound: &[ScopeId]) -> Result<Kind, Invalid> {
         Ok(match kind {
-            Kind::MetaView(meta) => Kind::MetaView(Box::new(self.transport_meta(meta, bound)?)),
+            Kind::Meta(meta) => Kind::Meta(self.transport_meta(meta, bound)?),
             Kind::Arrow(a, b) => Kind::arrow(
                 self.transport_kind_occurrences(a, bound)?,
                 self.transport_kind_occurrences(b, bound)?,
@@ -113,9 +113,9 @@ impl Embedding {
         bound: &[ScopeId],
     ) -> Result<(), Invalid> {
         match label {
-            Elem::Capture(Atom::MetaView(meta))
-            | Elem::Error(Atom::MetaView(meta))
-            | Elem::Service(Atom::MetaView(meta)) => **meta = self.transport_meta(meta, bound)?,
+            Elem::Capture(Atom::Meta(meta))
+            | Elem::Error(Atom::Meta(meta))
+            | Elem::Service(Atom::Meta(meta)) => *meta = self.transport_meta(meta, bound)?,
             Elem::Provided(inner) => self.transport_label_occurrences(inner, bound)?,
             _ => {}
         }
@@ -127,14 +127,17 @@ impl Embedding {
         meta: &MetaOccurrence,
         bound: &[ScopeId],
     ) -> Result<MetaOccurrence, Invalid> {
-        if !self.source.belongs_to(meta.owner()) || !self.target.belongs_to(meta.owner()) {
+        let Some(context) = meta.contextual() else {
+            return Ok(meta.clone());
+        };
+        if !self.source.belongs_to(context.owner()) || !self.target.belongs_to(context.owner()) {
             return Err(Invalid::Authority);
         }
         let mut target = self.target.clone();
         // Locally bound coordinates remain in place; their contracts are
         // outside that binder and are transported through prior coordinates.
         for (index, id) in bound.iter().enumerate() {
-            let Some(coordinate) = meta.renaming().target.0.iter().find(|c| c.id == *id) else {
+            let Some(coordinate) = context.renaming().target.0.iter().find(|c| c.id == *id) else {
                 continue;
             };
             if target.contains(*id) {
@@ -154,7 +157,7 @@ impl Embedding {
                 .collect::<Result<_, _>>()?;
             target.0.push(Arc::new(coordinate));
         }
-        let image = meta
+        let image = context
             .renaming()
             .mapping()
             .map(|(_, actual)| {
@@ -169,7 +172,7 @@ impl Embedding {
                     .ok_or(Invalid::Domain)
             })
             .collect::<Result<_, _>>()?;
-        let renaming = Self::checked(meta.renaming().source.clone(), target, image)?;
+        let renaming = Self::checked(context.renaming().source.clone(), target, image)?;
         Ok(meta.with_renaming(renaming))
     }
 }

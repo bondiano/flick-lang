@@ -485,10 +485,7 @@ impl<'c> Checker<'c> {
         };
         self.redundant_else(node, &children, otherwise);
         // an inferred `if` takes the type of its `then` branch
-        let open = matches!(
-            self.store.resolve(expected),
-            Type::Meta(_) | Type::MetaView(_)
-        );
+        let open = matches!(self.store.resolve(expected), Type::Meta(_));
         if let Some(then) = children.get(1)
             && !self.record_in_braces(node, then)
         {
@@ -603,8 +600,7 @@ impl<'c> Checker<'c> {
         for param in params {
             let target = rest.as_ref().map(|t| self.whnf(t));
             let known = rest.clone().filter(|t| {
-                !matches!(target, Some(Type::Meta(_) | Type::MetaView(_)))
-                    || self.whnf_captured(t).1.is_some()
+                !matches!(target, Some(Type::Meta(_))) || self.whnf_captured(t).1.is_some()
             });
             closures.push((self.cx.locals.len(), known));
             let target = match target {
@@ -626,7 +622,7 @@ impl<'c> Checker<'c> {
                     (*ty, effects)
                 }
                 Some(Type::Error) => (Type::Error, None),
-                Some(meta @ (Type::Meta(_) | Type::MetaView(_))) => {
+                Some(meta @ Type::Meta(_)) => {
                     unknown.get_or_insert((stages.len(), meta));
                     rest = None;
                     (self.fresh(), None)
@@ -759,8 +755,11 @@ impl<'c> Checker<'c> {
                 // other failure is the closure's captures, which `close_over`
                 // reports
                 let meta = meta.clone();
-                let numeric =
-                    matches!(self.store.resolve(&meta), Type::Meta(m) if self.store.is_numeric(m));
+                let numeric = self
+                    .store
+                    .resolve(&meta)
+                    .legacy_meta_root()
+                    .is_some_and(|m| self.store.is_numeric(m));
                 if self.unify(&meta, &ty).is_err() && numeric {
                     let shown = self.show(&meta);
                     self.error(

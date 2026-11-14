@@ -59,8 +59,10 @@ pub(in crate::types) fn stamps_of_type(ty: &Type) -> Vec<Stamp> {
 
 fn kind_stamps(kind: &Kind, out: &mut Vec<Stamp>) {
     match kind {
-        Kind::Meta(root) => out.push(Stamp::KindRoot(*root)),
-        Kind::MetaView(meta) => out.push(Stamp::KindView((**meta).clone())),
+        Kind::Meta(meta) => out.push(match meta.legacy_root() {
+            Some(root) => Stamp::KindRoot(root),
+            None => Stamp::KindView(meta.clone()),
+        }),
         Kind::Arrow(a, b) => {
             kind_stamps(a, out);
             kind_stamps(b, out);
@@ -72,12 +74,12 @@ fn kind_stamps(kind: &Kind, out: &mut Vec<Stamp>) {
 
 fn label_stamps(label: &Elem, out: &mut Vec<Stamp>) {
     match label {
-        Elem::Capture(Atom::Meta(root))
-        | Elem::Error(Atom::Meta(root))
-        | Elem::Service(Atom::Meta(root)) => out.push(Stamp::TypeRoot(*root)),
-        Elem::Capture(Atom::MetaView(meta))
-        | Elem::Error(Atom::MetaView(meta))
-        | Elem::Service(Atom::MetaView(meta)) => out.push(Stamp::TypeView((**meta).clone())),
+        Elem::Capture(Atom::Meta(meta))
+        | Elem::Error(Atom::Meta(meta))
+        | Elem::Service(Atom::Meta(meta)) => out.push(match meta.legacy_root() {
+            Some(root) => Stamp::TypeRoot(root),
+            None => Stamp::TypeView(meta.clone()),
+        }),
         Elem::Provided(inner) => label_stamps(inner, out),
         _ => {}
     }
@@ -85,8 +87,10 @@ fn label_stamps(label: &Elem, out: &mut Vec<Stamp>) {
 
 fn type_stamps(ty: &Type, out: &mut Vec<Stamp>) {
     ty.visit(&mut |ty| match ty {
-        Type::Meta(root) => out.push(Stamp::TypeRoot(*root)),
-        Type::MetaView(meta) => out.push(Stamp::TypeView((**meta).clone())),
+        Type::Meta(meta) => out.push(match meta.legacy_root() {
+            Some(root) => Stamp::TypeRoot(root),
+            None => Stamp::TypeView(meta.clone()),
+        }),
         Type::Exists { scope, .. } => out.push(Stamp::Scope(scope.identity())),
         Type::Forall { vars, .. } => {
             for variable in vars {

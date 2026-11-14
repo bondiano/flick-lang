@@ -147,7 +147,7 @@ impl Checker<'_> {
             K::ParenType => return self.ty(children[0], expected, free),
             K::NameType if node.has_token(K::NoneKw) => {
                 let kind = self.kinds.resolve(expected);
-                if !kind.is_row() && !matches!(kind, Kind::Meta(_) | Kind::MetaView(_)) {
+                if !kind.is_row() && !matches!(kind, Kind::Meta(_)) {
                     self.error(
                         codes::T002,
                         span,
@@ -197,7 +197,7 @@ impl Checker<'_> {
                     .get(1)
                     .map_or(Type::Error, |r| self.ty(r, expected, free));
                 let kind = self.kinds.resolve(expected);
-                if matches!(kind, Kind::Meta(_) | Kind::MetaView(_)) || kind.is_row() {
+                if matches!(kind, Kind::Meta(_)) || kind.is_row() {
                     (Type::Union(Box::new(left), Box::new(right)), kind)
                 } else {
                     self.error(
@@ -217,10 +217,7 @@ impl Checker<'_> {
                     return base;
                 };
                 let captures = self.capture(capture, free);
-                return if matches!(
-                    &base,
-                    Type::Var(_) | Type::Meta(_) | Type::MetaView(_) | Type::Skolem(_)
-                ) {
+                return if matches!(&base, Type::Var(_) | Type::Meta(_) | Type::Skolem(_)) {
                     Type::Bounded {
                         ty: Box::new(base),
                         captures: Box::new(captures),
@@ -422,7 +419,7 @@ impl Checker<'_> {
         for arg in args {
             let (param, result) = match self.kinds.resolve(&kind) {
                 Kind::Arrow(p, r) => (*p, *r),
-                Kind::Meta(_) | Kind::MetaView(_) => {
+                Kind::Meta(_) => {
                     let (p, r) = (self.kinds.fresh(), self.kinds.fresh());
                     let _ = self.kinds.unify(&kind, &Kind::arrow(p.clone(), r.clone()));
                     (p, r)

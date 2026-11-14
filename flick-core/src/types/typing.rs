@@ -324,7 +324,7 @@ impl Checker<'_> {
     /// its own, when it is a type constructor on its own.
     pub fn note_value(&mut self, at: Range, ty: &Type) {
         let observed = self.store.head(ty);
-        if let t @ (Type::Con { .. } | Type::Meta(_) | Type::MetaView(_)) = observed.as_ref() {
+        if let t @ (Type::Con { .. } | Type::Meta(_)) = observed.as_ref() {
             self.typing.pending_values.push((at, t.clone()));
         }
     }

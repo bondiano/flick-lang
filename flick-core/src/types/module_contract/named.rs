@@ -418,14 +418,12 @@ impl Checker<'_> {
         for stamp in stamps {
             let valid = match stamp {
                 Stamp::Scope(_) => true, // A lexical handle alone grants no authority.
-                Stamp::TypeRoot(root) => self.store.valid_occurrence(&Type::Meta(root)),
-                Stamp::KindRoot(root) => self.kinds.valid_occurrence(&Kind::Meta(root)),
-                Stamp::TypeView(meta) => {
-                    self.store.valid_occurrence(&Type::MetaView(Box::new(meta)))
-                }
+                Stamp::TypeRoot(root) => self.store.valid_occurrence(&Type::meta(root)),
+                Stamp::KindRoot(root) => self.kinds.valid_occurrence(&Kind::meta(root)),
+                Stamp::TypeView(meta) => self.store.valid_occurrence(&Type::Meta(meta)),
                 Stamp::KindView(meta) => self
                     .kinds
-                    .valid_occurrence_in(&Kind::MetaView(Box::new(meta)), |context| {
+                    .valid_occurrence_in(&Kind::Meta(meta), |context| {
                         self.store.valid_witness_context(context)
                     }),
             };

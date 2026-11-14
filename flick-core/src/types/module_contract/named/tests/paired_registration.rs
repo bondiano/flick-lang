@@ -183,10 +183,15 @@ fn paired_copy_and_bound_transport_retain_actual_meta_carriers_and_live_support(
         let Type::Exists { body, .. } = projected else {
             panic!("exists")
         };
-        let Type::MetaView(meta) = *body else {
+        let Type::Meta(meta) = *body else {
             panic!("contextual body")
         };
-        let transported = meta.renaming().target().clone();
+        let transported = meta
+            .contextual()
+            .expect("contextual test occurrence")
+            .renaming()
+            .target()
+            .clone();
         checker
             .store
             .set(root.meta_root().expect("root"), Type::con("A", "Token"));
@@ -282,11 +287,16 @@ fn paired_kind_carrier_cannot_reuse_an_aborted_registration_lease() {
         let retargeted_kind = retarget
             .transport_kind_checked(&old_kind)
             .expect("kind algebra");
-        let Kind::MetaView(retargeted_kind) = retargeted_kind else {
+        let Kind::Meta(retargeted_kind) = retargeted_kind else {
             panic!("kind view")
         };
-        let thinned = retargeted_kind
-            .with_renaming(retargeted_kind.renaming().restrict(&BTreeSet::default()));
+        let thinned = retargeted_kind.with_renaming(
+            retargeted_kind
+                .contextual()
+                .expect("contextual test occurrence")
+                .renaming()
+                .restrict(&BTreeSet::default()),
+        );
         assert!(
             checker
                 .validate_stamps(vec![Stamp::KindView(thinned)])
@@ -295,15 +305,16 @@ fn paired_kind_carrier_cannot_reuse_an_aborted_registration_lease() {
         );
         assert!(
             checker
-                .validate_stamps(vec![Stamp::KindView(*retargeted_kind)])
+                .validate_stamps(vec![Stamp::KindView(retargeted_kind)])
                 .is_err()
         );
-        let Kind::MetaView(meta) = old_kind else {
+        let Kind::Meta(meta) = old_kind else {
             panic!("scoped kind root")
         };
+        assert!(meta.contextual().is_some(), "scoped kind proof carrier");
         assert!(
             checker
-                .validate_stamps(vec![Stamp::KindView(*meta)])
+                .validate_stamps(vec![Stamp::KindView(meta)])
                 .is_err(),
             "kind proof use must check the current registration, not owner/ScopeId alone"
         );

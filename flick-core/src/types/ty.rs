@@ -83,10 +83,7 @@ pub enum Type {
     },
     /// A unification variable.
     #[serde(skip)]
-    Meta(u32),
-    /// The same root observed through a checked lexical witness renaming.
-    #[serde(skip)]
-    MetaView(Box<MetaOccurrence>),
+    Meta(MetaOccurrence),
     /// A rigid variable: a quantified variable while its body is checked.
     #[serde(skip)]
     Skolem(u32),

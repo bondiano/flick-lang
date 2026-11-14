@@ -95,8 +95,8 @@ impl Checker<'_> {
         let mut open = HashSet::new();
         let mut read = |t: &Type| {
             self.store.zonk(t).visit(&mut |x| {
-                if let Type::Meta(m) = x {
-                    open.insert(*m);
+                if let Some(m) = x.legacy_meta_root() {
+                    open.insert(m);
                 }
             });
         };
@@ -113,10 +113,7 @@ impl Checker<'_> {
     pub fn grow_holds(&mut self) -> bool {
         let open_bound = |hold: &DeferredHold| {
             let bound = self.bound_of(hold);
-            bound
-                .tails
-                .iter()
-                .any(|t| matches!(t, Type::Meta(_) | Type::MetaView(_)))
+            bound.tails.iter().any(|t| matches!(t, Type::Meta(_)))
                 || self.lone_open_region(&bound).is_some()
         };
         if !self.cx.regions.holds.iter().any(open_bound) {
@@ -134,12 +131,7 @@ impl Checker<'_> {
         for i in 0..summaries.len() {
             let Summary { bound, hidden, .. } = &summaries[i];
             let region = self.lone_open_region(bound);
-            if region.is_none()
-                && !bound
-                    .tails
-                    .iter()
-                    .any(|t| matches!(t, Type::Meta(_) | Type::MetaView(_)))
-            {
+            if region.is_none() && !bound.tails.iter().any(|t| matches!(t, Type::Meta(_))) {
                 continue;
             }
             let (bound, actual) = (bound.clone(), hidden.entries.clone());
@@ -159,7 +151,7 @@ impl Checker<'_> {
                 }
                 let blocked = blocked_capture_rows(&summaries, &label);
                 let metas = bound.tails.iter().filter_map(|t| match t {
-                    Type::Meta(m) => Some(*m),
+                    Type::Meta(meta) => meta.legacy_root(),
                     _ => None,
                 });
                 // blocking only chooses among the rows: with every one
@@ -204,7 +196,7 @@ impl Checker<'_> {
     fn lone_open_region(&self, bound: &Norm) -> Option<u32> {
         let mut open = (bound.entries.iter()).filter_map(|(label, atom)| {
             match (label, self.store.resolve(atom)) {
-                (Elem::Capture(_), Type::Meta(m)) => Some(m),
+                (Elem::Capture(_), Type::Meta(meta)) => meta.legacy_root(),
                 _ => None,
             }
         });
@@ -218,7 +210,7 @@ impl Checker<'_> {
         let mut open = Vec::new();
         for hold in &self.cx.regions.holds {
             for t in self.store.normalize(&hold.bound).tails {
-                if let Type::Meta(m) = t {
+                if let Some(m) = t.legacy_meta_root() {
                     open.push(m);
                 }
             }
@@ -285,7 +277,7 @@ impl Checker<'_> {
                 .filter(|(label, _)| bound.get(label).is_none())
                 .map(|(_, atom)| atom)
                 // a region never solved comes from an error reported already
-                .filter(|atom| !matches!(self.store.resolve(atom), Type::Meta(_) | Type::MetaView(_)))
+                .filter(|atom| !matches!(self.store.resolve(atom), Type::Meta(_)))
                 .collect();
         if let Some(atom) = lacking.first() {
             self.report_hold(hold, atom, &bound);
@@ -442,14 +434,15 @@ fn blocked_capture_rows(summaries: &[Summary], label: &Elem) -> HashSet<u32> {
             if summary.visible.iter().any(|l| l == label)
                 || summary.bound.get(label).is_some()
                 || summary.bound.tails.iter().any(|t| {
-                    matches!(t, Type::Meta(m) if !blocked.contains(m)) || matches!(t, Type::Error)
+                    t.legacy_meta_root().is_some_and(|m| !blocked.contains(&m))
+                        || matches!(t, Type::Error)
                 })
             {
                 continue;
             }
             for tail in &summary.hidden.tails {
-                if let Type::Meta(m) = tail {
-                    changed |= blocked.insert(*m);
+                if let Some(m) = tail.legacy_meta_root() {
+                    changed |= blocked.insert(m);
                 }
             }
         }

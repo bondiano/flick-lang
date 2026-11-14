@@ -33,15 +33,24 @@ pub enum Kind {
     Arrow(Box<Kind>, Box<Kind>),
     /// An unknown kind while kinds are inferred.
     #[serde(skip)]
-    Meta(u32),
-    #[serde(skip)]
-    MetaView(Box<MetaOccurrence>),
+    Meta(MetaOccurrence),
 }
 
 impl Kind {
+    pub fn meta(root: u32) -> Self {
+        Self::Meta(MetaOccurrence::legacy(root))
+    }
+
+    pub(in crate::types) fn legacy_meta_root(&self) -> Option<u32> {
+        match self {
+            Self::Meta(meta) => meta.legacy_root(),
+            _ => None,
+        }
+    }
+
     pub fn has_meta_view(&self) -> bool {
         match self {
-            Kind::MetaView(_) => true,
+            Kind::Meta(meta) => meta.contextual().is_some(),
             Kind::Row(inner) => inner.has_meta_view(),
             Kind::Arrow(a, b) => a.has_meta_view() || b.has_meta_view(),
             _ => false,
@@ -98,7 +107,7 @@ impl fmt::Display for Kind {
             Kind::Named { name, .. } => f.write_str(name),
             Kind::Arrow(a, b) if matches!(**a, Kind::Arrow(..)) => write!(f, "({a}) -> {b}"),
             Kind::Arrow(a, b) => write!(f, "{a} -> {b}"),
-            Kind::Meta(_) | Kind::MetaView(_) => f.write_str("_"),
+            Kind::Meta(_) => f.write_str("_"),
         }
     }
 }
@@ -189,13 +198,13 @@ impl KindStore {
             permitted: self.active_context.clone(),
         });
         if self.active_context.len() == 0 {
-            Kind::Meta(root)
+            Kind::meta(root)
         } else {
-            Kind::MetaView(Box::new(MetaOccurrence::kind(
+            Kind::Meta(MetaOccurrence::kind(
                 root,
                 self.witness_authority.expect("checker-owned kind context"),
                 Embedding::identity(&self.active_context),
-            )))
+            ))
         }
     }
 
@@ -204,29 +213,30 @@ impl KindStore {
         let mut kind = kind.clone();
         loop {
             match &kind {
-                Kind::Meta(root) => {
-                    let Some(context) = self.contexts.get(*root as usize) else {
-                        return kind;
-                    };
-                    if context.canonical.len() != 0 {
-                        return kind;
+                Kind::Meta(meta) => {
+                    if let Some(root) = meta.legacy_root() {
+                        let Some(context) = self.contexts.get(root as usize) else {
+                            return kind;
+                        };
+                        if context.canonical.len() != 0 {
+                            return kind;
+                        }
+                        let Some(next) = &self.metas[root as usize] else {
+                            return kind;
+                        };
+                        kind = next.clone();
+                    } else {
+                        let Ok((root, view)) = self.occurrence(&kind) else {
+                            return kind;
+                        };
+                        let Some(solution) = &self.metas[root as usize] else {
+                            return kind;
+                        };
+                        let Ok(projected) = view.transport_kind_checked(solution) else {
+                            return kind;
+                        };
+                        kind = projected;
                     }
-                    let Some(next) = &self.metas[*root as usize] else {
-                        return kind;
-                    };
-                    kind = next.clone();
-                }
-                Kind::MetaView(_) => {
-                    let Ok((root, view)) = self.occurrence(&kind) else {
-                        return kind;
-                    };
-                    let Some(solution) = &self.metas[root as usize] else {
-                        return kind;
-                    };
-                    let Ok(projected) = view.transport_kind_checked(solution) else {
-                        return kind;
-                    };
-                    kind = projected;
                 }
                 _ => return kind,
             }
@@ -248,8 +258,8 @@ impl KindStore {
             return self.resolve_deep(kind);
         }
         match self.resolve(kind) {
-            Kind::Meta(m) if default => {
-                self.assign(m, Kind::Type);
+            Kind::Meta(meta) if meta.legacy_root().is_some() => {
+                self.assign(meta.legacy_root().expect("legacy kind default"), Kind::Type);
                 Kind::Type
             }
             Kind::Row(k) => Kind::Row(Box::new(self.zonk(&k, default))),
@@ -272,15 +282,21 @@ impl KindStore {
 
     fn unify_inner(&mut self, a: &Kind, b: &Kind) -> Result<(), (Kind, Kind)> {
         let (a, b) = (self.resolve(a), self.resolve(b));
-        match (&a, &b) {
-            (Kind::Meta(x), Kind::Meta(y)) if x == y => Ok(()),
-            (Kind::Meta(m), other) | (other, Kind::Meta(m)) => {
-                if self.occurs(*m, other) {
-                    return Err((self.zonk(&a, false), self.zonk(&b, false)));
-                }
-                self.assign(*m, other.clone());
-                Ok(())
+        let legacy = a
+            .legacy_meta_root()
+            .map(|m| (m, &b))
+            .or_else(|| b.legacy_meta_root().map(|m| (m, &a)));
+        if let Some((m, other)) = legacy {
+            if a == b {
+                return Ok(());
             }
+            if self.occurs(m, other) {
+                return Err((self.zonk(&a, false), self.zonk(&b, false)));
+            }
+            self.assign(m, other.clone());
+            return Ok(());
+        }
+        match (&a, &b) {
             (Kind::Row(x), Kind::Row(y)) => self.unify_inner(x, y),
             (Kind::Arrow(a1, b1), Kind::Arrow(a2, b2)) => {
                 self.unify_inner(a1, a2)?;
@@ -293,7 +309,7 @@ impl KindStore {
 
     fn occurs(&self, m: u32, kind: &Kind) -> bool {
         match self.resolve(kind) {
-            Kind::Meta(x) => x == m,
+            Kind::Meta(meta) => meta.legacy_root() == Some(m),
             Kind::Row(k) => self.occurs(m, &k),
             Kind::Arrow(a, b) => self.occurs(m, &a) || self.occurs(m, &b),
             _ => false,
@@ -330,7 +346,7 @@ mod transaction_tests {
         kinds.rollback(outer);
         assert_eq!(kinds.resolve(&original), original);
         assert_eq!(kinds.resolve(&allocated), allocated);
-        assert_eq!(kinds.fresh(), Kind::Meta(2));
+        assert_eq!(kinds.fresh(), Kind::meta(2));
         assert!(kinds.unify(&allocated, &Kind::Type).is_ok());
     }
 

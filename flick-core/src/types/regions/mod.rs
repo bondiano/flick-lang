@@ -246,7 +246,7 @@ impl Checker<'_> {
         {
             let identity = self.capture_identity(expected);
             let (bare, captures) = self.whnf_captured(&identity);
-            if !matches!(bare, Type::Meta(_) | Type::MetaView(_)) {
+            if !matches!(bare, Type::Meta(_)) {
                 let visible = if captures.is_some() {
                     Visible::Now(Vec::new())
                 } else {
@@ -285,11 +285,7 @@ impl Checker<'_> {
             };
             (row, qualified)
         };
-        let written = expected.is_some()
-            && !matches!(
-                self.store.resolve(&bound),
-                Type::Meta(_) | Type::MetaView(_)
-            );
+        let written = expected.is_some() && !matches!(self.store.resolve(&bound), Type::Meta(_));
         let visible = if expected
             .as_ref()
             .is_none_or(|e| self.whnf_captured(e).1.is_some())
@@ -372,13 +368,11 @@ impl Checker<'_> {
         let held = Type::Row(super::ty::Row::closed(vec![(label, region.clone())]));
         let inferred = match &ty {
             Type::Captured { captures, .. } => match **captures {
-                Type::Meta(m)
-                    if matches!(
-                        self.store.resolve(captures),
-                        Type::Meta(_) | Type::MetaView(_)
-                    ) =>
+                Type::Meta(ref meta)
+                    if meta.legacy_root().is_some()
+                        && matches!(self.store.resolve(captures), Type::Meta(_)) =>
                 {
-                    Some(m)
+                    meta.legacy_root()
                 }
                 _ => None,
             },

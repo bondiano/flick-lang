@@ -171,7 +171,7 @@ impl Relocation<'_> {
                 }
                 self.ty(body);
             }
-            T::Var(_) | T::Symbol(_) | T::Meta(_) | T::MetaView(_) | T::Skolem(_) | T::Error => {}
+            T::Var(_) | T::Symbol(_) | T::Meta(_) | T::Skolem(_) | T::Error => {}
         }
     }
 
@@ -208,7 +208,7 @@ impl Relocation<'_> {
             | K::Region
             | K::Constraint
             | K::Service
-            | K::Meta(_) | K::MetaView(_) => {}
+            | K::Meta(_) => {}
         }
     }
 

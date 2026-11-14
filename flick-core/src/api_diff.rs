@@ -429,7 +429,7 @@ fn relabel(label: &Elem, names: &[(String, String)]) -> Elem {
         Atom::Var(name) => {
             (names.iter().find(|(n, _)| n == name)).map(|(_, f)| Atom::Var(f.clone()))
         }
-        Atom::Skolem(_) | Atom::Meta(_) | Atom::MetaView(_) => None,
+        Atom::Skolem(_) | Atom::Meta(_) => None,
     };
     let renamed = match label {
         Elem::Capture(atom) => fresh(atom).map(Elem::Capture),

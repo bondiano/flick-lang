@@ -164,9 +164,7 @@ impl Refiner<'_, '_> {
             return Err(Stop::Impossible);
         }
         // a variable still being inferred outside would decide it
-        let open = self
-            .full(t)
-            .contains(&mut |y| matches!(y, Type::Meta(_) | Type::MetaView(_)));
+        let open = self.full(t).contains(&mut |y| matches!(y, Type::Meta(_)));
         if open {
             return Err(Stop::Unknown);
         }
@@ -205,8 +203,8 @@ impl Refiner<'_, '_> {
         if a == b || matches!(a, Type::Error) || matches!(b, Type::Error) {
             return Ok(());
         }
-        if a.contains(&mut |t| matches!(t, Type::Meta(_)))
-            || b.contains(&mut |t| matches!(t, Type::Meta(_)))
+        if a.contains(&mut |t| t.legacy_meta_root().is_some())
+            || b.contains(&mut |t| t.legacy_meta_root().is_some())
         {
             return Err(Stop::Unknown);
         }
@@ -253,10 +251,8 @@ impl Refiner<'_, '_> {
                 self.bound.insert(v.clone(), t.clone());
                 Ok(())
             }
-            (Type::Meta(x), Type::Meta(y)) if x == y => Ok(()),
-            (Type::Meta(_) | Type::MetaView(_), _) | (_, Type::Meta(_) | Type::MetaView(_)) => {
-                Err(Stop::Unknown)
-            }
+            (Type::Meta(x), Type::Meta(y)) if x.legacy_root().is_some() && x == y => Ok(()),
+            (Type::Meta(_), _) | (_, Type::Meta(_)) => Err(Stop::Unknown),
             (Type::Skolem(x), Type::Skolem(y)) if x == y => Ok(()),
             (Type::Skolem(x), Type::Skolem(y)) => {
                 // the later variable is the one the branch learns about

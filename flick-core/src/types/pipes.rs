@@ -173,7 +173,7 @@ impl Checker<'_> {
                 self.application_result(result, &function, &arg, false)
             }
             Type::Error => Type::Error,
-            meta @ (Type::Meta(_) | Type::MetaView(_)) => {
+            meta @ Type::Meta(_) => {
                 let result = self.fresh();
                 let _ = self.unify(&meta, &Type::pure_fun(arg, result.clone()));
                 result
@@ -303,7 +303,7 @@ impl Checker<'_> {
                 }
             }
             Type::Error => Shape::Error,
-            meta @ (Type::Meta(_) | Type::MetaView(_)) => {
+            meta @ Type::Meta(_) => {
                 let (param, result) = (self.fresh(), self.fresh());
                 let function = Type::pure_fun(param.clone(), result.clone());
                 if self.unify(&meta, &function).is_ok() {

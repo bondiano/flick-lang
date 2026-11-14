@@ -41,7 +41,7 @@ pub fn match_type(pattern: &Type, target: &Type, subst: &mut Subst) -> Match {
                 Match::Yes
             }
         },
-        (_, Type::Meta(_) | Type::MetaView(_)) => Match::Unknown,
+        (_, Type::Meta(_)) => Match::Unknown,
         (Type::App { head: h1, arg: a1 }, Type::App { head: h2, arg: a2 }) => {
             match_type(h1, h2, subst).and(|| match_type(a1, a2, subst))
         }
@@ -80,10 +80,7 @@ pub fn match_type(pattern: &Type, target: &Type, subst: &mut Subst) -> Match {
 /// Every labelled entry of the pattern is in the target; the pattern's tail
 /// takes the rest.
 fn match_row(pattern: &Row, target: &Row, subst: &mut Subst) -> Match {
-    let open = matches!(
-        target.tail.as_deref(),
-        Some(Type::Meta(_) | Type::MetaView(_))
-    );
+    let open = matches!(target.tail.as_deref(), Some(Type::Meta(_)));
     let mut result = Match::Yes;
     for (label, p) in &pattern.entries {
         result = result.and(|| match target.get(label) {

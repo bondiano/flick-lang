@@ -21,7 +21,7 @@ enum Rest {
 fn rest(row: &Row) -> Rest {
     match row.tail.as_deref() {
         None => Rest::Closed,
-        Some(Type::Meta(_) | Type::MetaView(_)) => Rest::Unknown,
+        Some(Type::Meta(_)) => Rest::Unknown,
         Some(_) => Rest::Open,
     }
 }

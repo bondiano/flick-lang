@@ -13,10 +13,10 @@ struct Kinds {
 impl Kinding for Kinds {
     fn resolve_kind(&self, kind: &Kind) -> Kind {
         match kind {
-            Kind::Meta(root) => self
+            Kind::Meta(meta) if meta.legacy_root().is_some() => self
                 .solutions
                 .borrow()
-                .get(root)
+                .get(&meta.legacy_root().expect("legacy test kind"))
                 .cloned()
                 .unwrap_or_else(|| kind.clone()),
             _ => kind.clone(),
@@ -176,7 +176,7 @@ fn application_roles_come_from_declared_and_lexically_bound_constructor_kinds() 
 #[test]
 fn unknown_kind_defers_and_a_later_solution_is_observed_without_a_frozen_role() {
     let kinds = kinds();
-    let unknown = Kind::Meta(7);
+    let unknown = Kind::meta(7);
     assert_eq!(
         map(&row(), &unknown, &kinds, &mut Rename),
         Err(Incomplete::Kind(unknown.clone()))

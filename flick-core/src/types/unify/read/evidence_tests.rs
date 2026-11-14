@@ -266,7 +266,7 @@ mod read_tests {
             checker.store.set(id, Type::con("Probe", "E"));
             let ty = Type::Without {
                 row: Box::new(Type::Var("r".into())),
-                gone: vec![Elem::Provided(Box::new(Elem::Error(Atom::Meta(id))))],
+                gone: vec![Elem::Provided(Box::new(Elem::Error(Atom::meta(id))))],
             };
             let expected = Type::Without {
                 row: Box::new(Type::Var("r".into())),
@@ -393,7 +393,7 @@ mod read_tests {
                 panic!("record head")
             };
             assert!(
-                matches!(record.tail.as_deref(), Some(Type::MetaView(_))),
+                matches!(record.tail.as_deref(), Some(Type::Meta(meta)) if meta.contextual().is_some()),
                 "head stays lazy below its root"
             );
             let Type::Record(expected_row) = &expected else {

@@ -132,7 +132,10 @@ impl Checker<'_> {
         // a number literal's type may still be settled otherwise, so it stays open
         let settled: Vec<(u32, Lang)> = (self.cx.operators.iter())
             .filter_map(|op| match self.zonk(&op.ty) {
-                Type::Meta(m) if !self.store.is_numeric(m) => Some((m, op.domain.names()[0])),
+                Type::Meta(meta) => meta
+                    .legacy_root()
+                    .filter(|m| !self.store.is_numeric(*m))
+                    .map(|m| (m, op.domain.names()[0])),
                 _ => None,
             })
             .collect();
@@ -176,7 +179,7 @@ impl Checker<'_> {
             .operators
             .iter()
             .all(|op| match self.zonk(&op.ty).spine().0 {
-                Type::Meta(_) | Type::MetaView(_) | Type::Error => true,
+                Type::Meta(_) | Type::Error => true,
                 head => op.domain.allows(head),
             })
     }
@@ -280,10 +283,10 @@ fn without_value_row(row: &Type, types: &[&str]) -> Type {
 fn metas_of(t: &Type) -> Vec<u32> {
     let mut metas = Vec::new();
     t.visit(&mut |t| {
-        if let Type::Meta(m) = t
-            && !metas.contains(m)
+        if let Some(m) = t.legacy_meta_root()
+            && !metas.contains(&m)
         {
-            metas.push(*m);
+            metas.push(m);
         }
     });
     metas
@@ -291,9 +294,9 @@ fn metas_of(t: &Type) -> Vec<u32> {
 
 pub(super) fn replace_metas(t: &Type, subst: &[(u32, Type)]) -> Type {
     match t {
-        Type::Meta(m) => subst
+        Type::Meta(meta) if meta.legacy_root().is_some() => subst
             .iter()
-            .find(|(x, _)| x == m)
+            .find(|(x, _)| Some(*x) == meta.legacy_root())
             .map_or_else(|| t.clone(), |(_, v)| v.clone()),
         _ => t.map_children(&mut |c| replace_metas(c, subst)),
     }
@@ -319,7 +322,7 @@ fn param_kinds(checker: &Checker<'_>, head: &Type) -> Vec<Kind> {
 fn kind_of(ty: &Type, m: u32, params: &dyn Fn(&Type) -> Vec<Kind>) -> Kind {
     fn is(t: &Type, m: u32) -> bool {
         match t {
-            Type::Meta(x) => *x == m,
+            Type::Meta(meta) => meta.legacy_root() == Some(m),
             Type::Row(row) => row.tail.as_deref().is_some_and(|t| is(t, m)),
             Type::Union(a, b) => is(a, m) || is(b, m),
             Type::Without { row, .. } => is(row, m),
@@ -354,7 +357,7 @@ fn kind_of(ty: &Type, m: u32, params: &dyn Fn(&Type) -> Vec<Kind>) -> Kind {
                 params(head)
             };
             for (arg, row) in args.iter().zip(rows) {
-                if is(arg) && !matches!(row, Kind::Meta(_) | Kind::MetaView(_)) {
+                if is(arg) && !matches!(row, Kind::Meta(_)) {
                     kind = row;
                 }
             }

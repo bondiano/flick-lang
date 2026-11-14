@@ -73,7 +73,6 @@ impl Type {
             | Type::Var(_)
             | Type::Symbol(_)
             | Type::Meta(_)
-            | Type::MetaView(_)
             | Type::Skolem(_)
             | Type::Error => self.clone(),
         }
@@ -127,7 +126,6 @@ impl Type {
             | Type::Var(_)
             | Type::Symbol(_)
             | Type::Meta(_)
-            | Type::MetaView(_)
             | Type::Skolem(_)
             | Type::Error => {}
         }

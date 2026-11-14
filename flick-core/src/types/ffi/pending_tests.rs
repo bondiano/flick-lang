@@ -249,7 +249,7 @@ fn a_late_concrete_capture_label_does_not_remain_permanently_pending() {
                 Type::lang(Lang::Int),
             )),
             captures: Box::new(Type::Row(Row::closed(vec![(
-                Elem::Capture(Atom::Meta(hole.meta_root().expect("root"))),
+                Elem::Capture(Atom::meta(hole.meta_root().expect("root"))),
                 hole.clone(),
             )]))),
             value: false,

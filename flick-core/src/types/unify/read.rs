@@ -19,7 +19,7 @@ pub(in crate::types) struct Read<'a, 'b> {
 }
 
 impl Store {
-    /// Raw canonical observation. This never projects a `MetaView` or queries a
+    /// Raw canonical observation. This never projects a contextual occurrence or queries a
     /// constructor kind, so kind lookup cannot recurse through its projector.
     fn raw_solution(&self, root: u32) -> Option<&Type> {
         match self.metas.get(root as usize)? {
@@ -64,7 +64,7 @@ impl<'s, 'e> Read<'s, 'e> {
         let mut head = Cow::Borrowed(ty);
         loop {
             match head.as_ref() {
-                Type::Meta(_) | Type::MetaView(_) => {
+                Type::Meta(_) => {
                     let (root, view) = self
                         .store
                         .occurrence(&head)
@@ -130,8 +130,7 @@ impl<'s, 'e> Read<'s, 'e> {
             Elem::Named(_) | Elem::Live => return Ok(label.clone()),
         };
         let ty = match atom {
-            Atom::Meta(root) => Type::Meta(*root),
-            Atom::MetaView(meta) => Type::MetaView(meta.clone()),
+            Atom::Meta(meta) => Type::Meta(meta.clone()),
             Atom::Var(_) | Atom::Skolem(_) => return Ok(label.clone()),
         };
         let kind = self.scoped_head_kind(&ty, binders, bound)?;
@@ -363,11 +362,11 @@ impl Kinding for Read<'_, '_> {
             Type::App { head, .. } => {
                 match self.checked_kind(&self.scoped_head_kind(head, binders, bound)?)? {
                     Kind::Arrow(_, result) => Ok(*result),
-                    kind @ (Kind::Meta(_) | Kind::MetaView(_)) => Err(Incomplete::Kind(kind)),
+                    kind @ Kind::Meta(_) => Err(Incomplete::Kind(kind)),
                     kind => Err(Incomplete::NotFunction(kind)),
                 }
             }
-            Type::Meta(_) | Type::MetaView(_) => self.root_kind(ty, binders, bound),
+            Type::Meta(_) => self.root_kind(ty, binders, bound),
             Type::Without { row, .. } => self.scoped_head_kind(row, binders, bound),
             _ => self.head_kind(ty, binders),
         }
@@ -388,10 +387,10 @@ impl Kinding for Read<'_, '_> {
             Type::Con { module, name } => self.env.constructor_kind(module, name),
             Type::Var(name) => self.variable_kind(name, binders),
             Type::Skolem(rigid) => self.rigid_kind(*rigid),
-            Type::Meta(_) | Type::MetaView(_) => return self.root_kind(ty, binders, &[]),
+            Type::Meta(_) => return self.root_kind(ty, binders, &[]),
             Type::App { head, .. } => match self.checked_kind(&self.head_kind(head, binders)?)? {
                 Kind::Arrow(_, result) => Some(*result),
-                kind @ (Kind::Meta(_) | Kind::MetaView(_)) => return Err(Incomplete::Kind(kind)),
+                kind @ Kind::Meta(_) => return Err(Incomplete::Kind(kind)),
                 kind => return Err(Incomplete::NotFunction(kind)),
             },
             Type::Fun { .. }

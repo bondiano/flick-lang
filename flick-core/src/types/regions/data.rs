@@ -42,7 +42,7 @@ impl Checker<'_> {
                 if self.hidden_fields(&ty, &mut Vec::new()) {
                     let value = matches!(
                         self.whnf(&ty).spine().0,
-                        Type::Var(_) | Type::Meta(_) | Type::MetaView(_) | Type::Skolem(_)
+                        Type::Var(_) | Type::Meta(_) | Type::Skolem(_)
                     );
                     Type::Captured {
                         ty,
@@ -217,7 +217,7 @@ impl Checker<'_> {
         matches!(bare, Type::Fun { .. })
             || bare.contains(&mut |ty| match ty {
                 Type::Var(_) | Type::Skolem(_) => !self.is_region(ty, &[]),
-                Type::Meta(_) | Type::MetaView(_) => true,
+                Type::Meta(_) => true,
                 _ => false,
             })
     }
@@ -264,7 +264,7 @@ impl Checker<'_> {
 
     fn inferred_bound_capture(&self, allowed: &Norm, captures: &Type) -> bool {
         let held = self.store.normalize(captures);
-        let open = |ty: &Type| matches!(self.store.resolve(ty), Type::Meta(_) | Type::MetaView(_));
+        let open = |ty: &Type| matches!(self.store.resolve(ty), Type::Meta(_));
         !allowed.tails.is_empty()
             && allowed.tails.iter().all(open)
             && held.entries.iter().all(|(_, ty)| open(ty))
@@ -286,10 +286,7 @@ impl Checker<'_> {
                     visible: Visible::Late((*ty).clone()),
                     bound: *captures.clone(),
                     expected: Some(expected.clone()),
-                    written: !matches!(
-                        self.store.resolve(&captures),
-                        Type::Meta(_) | Type::MetaView(_)
-                    ),
+                    written: !matches!(self.store.resolve(&captures), Type::Meta(_)),
                     what: "value",
                     span,
                 });
@@ -340,7 +337,7 @@ impl Checker<'_> {
         // a position not known yet takes a value bounded by a region with its
         // bound: what it turns out to be may store the region's resource
         if let Type::Bounded { ty, captures } = &a
-            && let Type::Meta(m) = e
+            && let Some(m) = e.legacy_meta_root()
             && !self.store.is_capture_row(m)
             && !self.store.is_numeric(m)
             && self.bounds_a_region(captures)
@@ -390,7 +387,7 @@ impl Checker<'_> {
         }
         if matches!(
             *self.borrowed_whnf(t),
-            Type::Var(_) | Type::Meta(_) | Type::MetaView(_) | Type::Skolem(_)
+            Type::Var(_) | Type::Meta(_) | Type::Skolem(_)
         ) {
             return false;
         }
@@ -483,12 +480,7 @@ impl Checker<'_> {
             }
             other => other.clone(),
         };
-        if complete
-            || matches!(
-                ty,
-                Type::Var(_) | Type::Skolem(_) | Type::Meta(_) | Type::MetaView(_)
-            )
-        {
+        if complete || matches!(ty, Type::Var(_) | Type::Skolem(_) | Type::Meta(_)) {
             Type::Bounded {
                 ty: Box::new(ty),
                 captures: Box::new(captures.clone()),
@@ -509,7 +501,7 @@ impl Checker<'_> {
     /// literal's type is one before it is settled.
     pub(in crate::types) fn scalar(&self, t: &Type) -> bool {
         match &*self.borrowed_whnf(t) {
-            Type::Meta(m) => self.store.is_numeric(*m),
+            Type::Meta(meta) => meta.legacy_root().is_some_and(|m| self.store.is_numeric(m)),
             t => SCALARS.into_iter().any(|item| t.is_lang(item)),
         }
     }

@@ -67,7 +67,7 @@ impl super::Type {
     pub(in crate::types) fn copy_bound_handle(&self, from: ScopeId, to: ScopeId) -> Self {
         let mut copied = self.map_children(&mut |child| child.copy_bound_handle(from, to));
         match &mut copied {
-            Self::MetaView(meta) => **meta = meta.copy_bound(from, to),
+            Self::Meta(meta) => *meta = meta.copy_bound(from, to),
             Self::Forall { vars, .. } => {
                 for binder in vars {
                     binder.kind = copy_kind(&binder.kind, from, to);
@@ -93,7 +93,7 @@ impl super::Type {
 
 pub(in crate::types) fn copy_kind(kind: &Kind, from: ScopeId, to: ScopeId) -> Kind {
     match kind {
-        Kind::MetaView(meta) => Kind::MetaView(Box::new(meta.copy_bound(from, to))),
+        Kind::Meta(meta) => Kind::Meta(meta.copy_bound(from, to)),
         Kind::Arrow(a, b) => Kind::arrow(copy_kind(a, from, to), copy_kind(b, from, to)),
         Kind::Row(inner) => Kind::Row(Box::new(copy_kind(inner, from, to))),
         _ => kind.clone(),
@@ -102,9 +102,9 @@ pub(in crate::types) fn copy_kind(kind: &Kind, from: ScopeId, to: ScopeId) -> Ki
 
 pub(in crate::types) fn copy_label(label: &mut Elem, from: ScopeId, to: ScopeId) {
     match label {
-        Elem::Capture(Atom::MetaView(meta))
-        | Elem::Error(Atom::MetaView(meta))
-        | Elem::Service(Atom::MetaView(meta)) => **meta = meta.copy_bound(from, to),
+        Elem::Capture(Atom::Meta(meta))
+        | Elem::Error(Atom::Meta(meta))
+        | Elem::Service(Atom::Meta(meta)) => *meta = meta.copy_bound(from, to),
         Elem::Provided(inner) => copy_label(inner, from, to),
         _ => {}
     }
@@ -271,11 +271,7 @@ mod tests {
         };
         let caller_context = register(&mut scopes, &Context::default(), caller, "Caller");
         let context = register(&mut scopes, &caller_context, bound, "Bound");
-        let occurrence = Box::new(MetaOccurrence::new(
-            77,
-            scopes.owner(),
-            Embedding::identity(&context),
-        ));
+        let occurrence = MetaOccurrence::new(77, scopes.owner(), Embedding::identity(&context));
         let template = Type::Exists {
             scope: bound,
             binder: "K".into(),
@@ -283,13 +279,13 @@ mod tests {
             body: Box::new(Type::Forall {
                 vars: vec![Binder {
                     name: "a".into(),
-                    kind: Kind::MetaView(occurrence.clone()),
+                    kind: Kind::Meta(occurrence.clone()),
                 }],
                 constraints: vec![Type::Row(Row::closed(vec![(
-                    Elem::Provided(Box::new(Elem::Capture(Atom::MetaView(occurrence.clone())))),
-                    Type::MetaView(occurrence.clone()),
+                    Elem::Provided(Box::new(Elem::Capture(Atom::Meta(occurrence.clone())))),
+                    Type::Meta(occurrence.clone()),
                 )]))],
-                body: Box::new(Type::MetaView(occurrence)),
+                body: Box::new(Type::Meta(occurrence)),
             }),
         };
         let copied = template.substitute(&[]);
@@ -305,7 +301,7 @@ mod tests {
         else {
             panic!("forall")
         };
-        let Kind::MetaView(kind) = &vars[0].kind else {
+        let Kind::Meta(kind) = &vars[0].kind else {
             panic!("kind occurrence")
         };
         let Type::Row(row) = &constraints[0] else {
@@ -314,20 +310,28 @@ mod tests {
         let Elem::Provided(label) = &row.entries[0].0 else {
             panic!("provided")
         };
-        let Elem::Capture(Atom::MetaView(label)) = &**label else {
+        let Elem::Capture(Atom::Meta(label)) = &**label else {
             panic!("label occurrence")
         };
-        let Type::MetaView(value) = &*body else {
+        let Type::Meta(value) = &*body else {
             panic!("type occurrence")
         };
         for occurrence in [kind, label, value] {
             assert_eq!(occurrence.root(), 77, "one canonical root");
             assert_eq!(
-                occurrence.renaming().mapped(bound.identity()),
+                occurrence
+                    .contextual()
+                    .expect("contextual test occurrence")
+                    .renaming()
+                    .mapped(bound.identity()),
                 Some(copied_scope)
             );
             assert_eq!(
-                occurrence.renaming().mapped(caller.identity()),
+                occurrence
+                    .contextual()
+                    .expect("contextual test occurrence")
+                    .renaming()
+                    .mapped(caller.identity()),
                 Some(caller.identity())
             );
         }

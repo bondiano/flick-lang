@@ -208,7 +208,7 @@ fn validate_type(ty: &Type) -> Result<(), String> {
     let mut pending = vec![ty];
     while let Some(ty) = pending.pop() {
         match ty {
-            Type::Meta(_) | Type::MetaView(_) | Type::Error => {
+            Type::Meta(_) | Type::Error => {
                 return Err("unresolved/error type in checked declaration context".into());
             }
             Type::Forall { vars, .. } => {
@@ -239,9 +239,7 @@ fn validate_label(mut label: &Elem) -> Result<(), String> {
     }
     if matches!(
         label,
-        Elem::Capture(Atom::Meta(_) | Atom::MetaView(_))
-            | Elem::Error(Atom::Meta(_) | Atom::MetaView(_))
-            | Elem::Service(Atom::Meta(_) | Atom::MetaView(_))
+        Elem::Capture(Atom::Meta(_)) | Elem::Error(Atom::Meta(_)) | Elem::Service(Atom::Meta(_))
     ) {
         return Err("unresolved row label in checked declaration context".into());
     }
@@ -251,7 +249,7 @@ fn validate_kind(kind: &Kind) -> Result<(), String> {
     let mut pending = vec![kind];
     while let Some(kind) = pending.pop() {
         match kind {
-            Kind::Meta(_) | Kind::MetaView(_) => {
+            Kind::Meta(_) => {
                 return Err("unresolved kind in checked declaration context".into());
             }
             Kind::Row(inner) => pending.push(inner),

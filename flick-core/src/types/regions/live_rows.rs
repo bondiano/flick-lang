@@ -71,15 +71,11 @@ impl Checker<'_> {
     /// as of a cell's capacity a generic signature names.
     pub(in crate::types) fn unify_live(&self, left: &mut Norm, right: &mut Norm) {
         let lacks = |n: &Norm| {
-            n.get(&Elem::Live).is_none()
-                && !n
-                    .tails
-                    .iter()
-                    .any(|t| matches!(t, Type::Meta(_) | Type::MetaView(_)))
+            n.get(&Elem::Live).is_none() && !n.tails.iter().any(|t| matches!(t, Type::Meta(_)))
         };
         let unknown = |this: &Self, t: &Type| {
             (this.live_atoms(t, &[]).entries.iter())
-                .all(|(_, a)| matches!(this.store.resolve(a), Type::Meta(_) | Type::MetaView(_)))
+                .all(|(_, a)| matches!(this.store.resolve(a), Type::Meta(_)))
         };
         if lacks(right) {
             left.entries
@@ -127,8 +123,7 @@ impl Checker<'_> {
         open: Option<u32>,
     ) -> bool {
         let mut missing = self.live_missing(actual, declared);
-        missing
-            .retain(|(_, a)| !matches!(self.store.resolve(a), Type::Meta(_) | Type::MetaView(_)));
+        missing.retain(|(_, a)| !matches!(self.store.resolve(a), Type::Meta(_)));
         if missing.is_empty() {
             return false;
         }
@@ -140,7 +135,7 @@ impl Checker<'_> {
                     .tails
                     .into_iter()
                     .find_map(|t| match t {
-                        Type::Meta(m) => Some(m),
+                        Type::Meta(meta) => meta.legacy_root(),
                         _ => None,
                     })
             });
@@ -184,7 +179,7 @@ impl Checker<'_> {
         let missing = self.live_missing(actual, declared);
         let Some(atom) = (missing.iter())
             .map(|(_, a)| self.store.resolve(a))
-            .find(|a| !matches!(a, Type::Meta(_) | Type::MetaView(_)))
+            .find(|a| !matches!(a, Type::Meta(_)))
         else {
             return;
         };

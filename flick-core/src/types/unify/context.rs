@@ -44,13 +44,9 @@ impl Store {
 
     fn at(&self, root: u32, view: Embedding) -> Type {
         if self.meta_contexts[root as usize].canonical.len() == 0 {
-            Type::Meta(root)
+            Type::meta(root)
         } else {
-            Type::MetaView(Box::new(MetaOccurrence::new(
-                root,
-                self.scopes.owner(),
-                view,
-            )))
+            Type::Meta(MetaOccurrence::new(root, self.scopes.owner(), view))
         }
     }
 
@@ -59,34 +55,33 @@ impl Store {
     }
 
     fn occurrence(&self, ty: &Type) -> Result<(u32, Embedding), ()> {
-        match ty {
-            Type::Meta(root) => {
-                let context = self.meta_contexts.get(*root as usize).ok_or(())?;
-                if context.canonical.len() != 0 {
-                    return Err(());
-                }
-                Ok((*root, Embedding::identity(&context.canonical)))
+        let Type::Meta(meta) = ty else { return Err(()) };
+        let root = meta.root();
+        let context = self.meta_contexts.get(root as usize).ok_or(())?;
+        if meta.legacy_root().is_some() {
+            if context.canonical.len() != 0 {
+                return Err(());
             }
-            Type::MetaView(meta) => {
-                let context = self.meta_contexts.get(meta.root() as usize).ok_or(())?;
-                let source = meta.renaming().source();
-                if !meta.is_type()
-                    || meta.owner() != self.scopes.owner()
-                    || !self.scopes.valid_context(meta.renaming().target())
-                    || !self.scopes.valid_context(source)
-                    || !self.scopes.valid_context(&context.canonical)
-                    || context.canonical.restrict(&source.ids().collect()) != *source
-                    || context.permitted.ids().any(|scope| !source.contains(scope))
-                {
-                    return Err(());
-                }
-                Ok((
-                    meta.root(),
-                    meta.renaming().restrict(&context.permitted.ids().collect()),
-                ))
-            }
-            _ => Err(()),
+            return Ok((root, Embedding::identity(&context.canonical)));
         }
+        let occurrence = meta.contextual().ok_or(())?;
+        let source = occurrence.renaming().source();
+        if !occurrence.is_type()
+            || occurrence.owner() != self.scopes.owner()
+            || !self.scopes.valid_context(occurrence.renaming().target())
+            || !self.scopes.valid_context(source)
+            || !self.scopes.valid_context(&context.canonical)
+            || context.canonical.restrict(&source.ids().collect()) != *source
+            || context.permitted.ids().any(|scope| !source.contains(scope))
+        {
+            return Err(());
+        }
+        Ok((
+            root,
+            occurrence
+                .renaming()
+                .restrict(&context.permitted.ids().collect()),
+        ))
     }
 
     fn write_context(&mut self, root: u32, context: MetaContext) {

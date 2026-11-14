@@ -256,7 +256,7 @@ impl Checker<'_> {
                     let inferred = self.infer(arg);
                     unknown.push(inferred);
                 }
-                meta @ (Type::Meta(_) | Type::MetaView(_)) => {
+                meta @ Type::Meta(_) => {
                     let (param, result) = (self.fresh(), self.fresh());
                     // a number literal's variable stands for a number only
                     if self

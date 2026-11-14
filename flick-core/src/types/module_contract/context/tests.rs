@@ -301,7 +301,7 @@ fn transport_composes_occurrence_views_and_preserves_nested_bound_coordinates() 
         scope: bound,
         binder: "K".into(),
         contract: Box::new(Type::con("A", "Contract")),
-        body: Box::new(Type::MetaView(Box::new(occurrence))),
+        body: Box::new(Type::Meta(occurrence)),
     };
     let Type::Exists {
         scope,
@@ -318,20 +318,31 @@ fn transport_composes_occurrence_views_and_preserves_nested_bound_coordinates() 
         "logical transport is not template insertion"
     );
     assert_eq!(*contract, Type::con("X", "Contract"));
-    let Type::MetaView(meta) = *body else {
+    let Type::Meta(meta) = *body else {
         panic!("contextual occurrence")
     };
     assert_eq!(meta.root(), 9);
     assert_eq!(
-        meta.renaming().mapped(source.ids().next().expect("A")),
+        meta.contextual()
+            .expect("contextual test occurrence")
+            .renaming()
+            .mapped(source.ids().next().expect("A")),
         target.ids().next()
     );
     assert_eq!(
-        meta.renaming().mapped(bound.identity()),
+        meta.contextual()
+            .expect("contextual test occurrence")
+            .renaming()
+            .mapped(bound.identity()),
         Some(bound.identity())
     );
     assert_eq!(
-        meta.renaming().target.0[1].contract,
+        meta.contextual()
+            .expect("contextual test occurrence")
+            .renaming()
+            .target
+            .0[1]
+            .contract,
         Type::con("X", "Contract")
     );
 }

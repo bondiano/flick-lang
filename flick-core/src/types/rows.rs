@@ -110,43 +110,43 @@ impl Checker<'_> {
                 missing(&only_left, true)?;
                 missing(&only_right, false)
             }
-            ([Type::Meta(a)], [Type::Meta(b)]) => {
+            ([a], [b]) if a.legacy_meta_root().is_some() && b.legacy_meta_root().is_some() => {
+                let a = a.legacy_meta_root().expect("legacy row tail");
+                let b = b.legacy_meta_root().expect("legacy row tail");
                 let rest = self.fresh();
                 // the shared rest is a row of the kind of the rows it ends
-                if let Type::Meta(r) = rest {
-                    self.store.mark_like(r, *a);
-                    self.store.mark_like(r, *b);
+                if let Some(r) = rest.legacy_meta_root() {
+                    self.store.mark_like(r, a);
+                    self.store.mark_like(r, b);
                 }
-                self.bind(*a, &extended(only_right, vec![rest.clone()]))?;
-                self.bind(*b, &extended(only_left, vec![rest]))
+                self.bind(a, &extended(only_right, vec![rest.clone()]))?;
+                self.bind(b, &extended(only_left, vec![rest]))
             }
-            ([Type::Meta(m)], _) => {
+            ([tail], _) if tail.legacy_meta_root().is_some() => {
+                let m = tail.legacy_meta_root().expect("legacy row tail");
                 missing(&only_left, true)?;
                 self.bind(
-                    *m,
+                    m,
                     &written(extended(only_right, tails_right), right_written),
                 )
             }
-            (_, [Type::Meta(m)]) => {
+            (_, [tail]) if tail.legacy_meta_root().is_some() => {
+                let m = tail.legacy_meta_root().expect("legacy row tail");
                 missing(&only_right, false)?;
-                self.bind(*m, &written(extended(only_left, tails_left), left_written))
+                self.bind(m, &written(extended(only_left, tails_left), left_written))
             }
             // `?m` less some names against a row: the least `?m` is that row,
             // which then holds none of the names
-            ([Type::Without { row, gone }], _)
-                if matches!(**row, Type::Meta(_) | Type::MetaView(_)) =>
-            {
+            ([Type::Without { row, gone }], _) if matches!(**row, Type::Meta(_)) => {
                 missing(&only_left, true)?;
-                let Type::Meta(m) = **row else {
+                let Some(m) = row.legacy_meta_root() else {
                     return Err(Mismatch::Types(left.into_type(), right.into_type()));
                 };
                 self.bind(m, &left_out(only_right, tails_right, gone, false)?)
             }
-            (_, [Type::Without { row, gone }])
-                if matches!(**row, Type::Meta(_) | Type::MetaView(_)) =>
-            {
+            (_, [Type::Without { row, gone }]) if matches!(**row, Type::Meta(_)) => {
                 missing(&only_right, false)?;
-                let Type::Meta(m) = **row else {
+                let Some(m) = row.legacy_meta_root() else {
                     return Err(Mismatch::Types(left.into_type(), right.into_type()));
                 };
                 self.bind(m, &left_out(only_left, tails_left, gone, true)?)
@@ -155,9 +155,7 @@ impl Checker<'_> {
             (metas, []) | ([], metas)
                 if only_left.is_empty()
                     && only_right.is_empty()
-                    && metas
-                        .iter()
-                        .all(|t| matches!(t, Type::Meta(_) | Type::MetaView(_))) =>
+                    && metas.iter().all(|t| matches!(t, Type::Meta(_))) =>
             {
                 metas
                     .iter()

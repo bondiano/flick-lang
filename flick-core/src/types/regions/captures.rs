@@ -71,14 +71,18 @@ impl Checker<'_> {
                 clippy::collapsible_match,
                 reason = "a known tail must not fall to an atom"
             )]
-            Type::Meta(m) if self.store.is_capture_row(*m) => {
+            Type::Meta(meta)
+                if meta
+                    .legacy_root()
+                    .is_some_and(|m| self.store.is_capture_row(m)) =>
+            {
                 if !out.tails.contains(&*t) {
                     out.tails.push(t.into_owned());
                 }
             }
             // an integer literal's type is a number, which captures nothing
-            Type::Meta(m) if self.store.is_numeric(*m) => {}
-            Type::Var(_) | Type::Skolem(_) | Type::Meta(_) | Type::MetaView(_)
+            Type::Meta(meta) if meta.legacy_root().is_some_and(|m| self.store.is_numeric(m)) => {}
+            Type::Var(_) | Type::Skolem(_) | Type::Meta(_)
                 if !bounded || matches!(self.atom_kind(&t, &[]), Some(Kind::Region)) =>
             {
                 push_atom(out, &t);
@@ -214,7 +218,7 @@ impl Checker<'_> {
                 {
                     push_atom(out, &tail);
                 }
-                Type::Meta(_) | Type::MetaView(_) if !bounded && !out.tails.contains(&tail) => {
+                Type::Meta(_) if !bounded && !out.tails.contains(&tail) => {
                     out.tails.push(tail);
                 }
                 Type::Error if !out.tails.contains(&tail) => out.tails.push(tail),
@@ -242,7 +246,7 @@ impl Checker<'_> {
         }
         for tail in norm.tails {
             match tail {
-                Type::Var(_) | Type::Skolem(_) | Type::Meta(_) | Type::MetaView(_) if !bounded => {
+                Type::Var(_) | Type::Skolem(_) | Type::Meta(_) if !bounded => {
                     push_atom(out, &tail);
                 }
                 Type::Error if !out.tails.contains(&tail) => out.tails.push(tail),
@@ -402,7 +406,13 @@ impl Checker<'_> {
                 .find(|(id, _)| id == s)
                 .map(|(_, kind)| kind.clone())
                 .or_else(|| self.scope_of(*s).map(|_| Kind::Region)),
-            Type::Meta(m) if self.store.is_error_row(*m) => Some(Kind::ErrorRow),
+            Type::Meta(meta)
+                if meta
+                    .legacy_root()
+                    .is_some_and(|m| self.store.is_error_row(m)) =>
+            {
+                Some(Kind::ErrorRow)
+            }
             _ => None,
         };
         kind.map(|k| self.kinds.resolve(&k))

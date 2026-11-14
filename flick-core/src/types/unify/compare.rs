@@ -181,11 +181,11 @@ impl Checker<'_> {
             return None;
         }
         let norm = self.store.normalize(row);
-        let ([Type::Meta(m)], true) = (&norm.tails[..], norm.entries.is_empty()) else {
+        let ([tail], true) = (&norm.tails[..], norm.entries.is_empty()) else {
             return None;
         };
-        let m = *m;
-        if matches!(other, Type::Meta(_) | Type::MetaView(_) | Type::Error) {
+        let m = tail.legacy_meta_root()?;
+        if matches!(other, Type::Meta(_) | Type::Error) {
             return None;
         }
         if other.is_lang(Lang::Never) {
@@ -215,8 +215,8 @@ impl Checker<'_> {
         {
             let (x, y) = (self.whnf(&left), self.whnf(&right));
             if let (Type::App { head: x, .. }, Type::App { head: y, .. }) = (&x, &y)
-                && (matches!(self.store.resolve(x), Type::Meta(_) | Type::MetaView(_))
-                    || matches!(self.store.resolve(y), Type::Meta(_) | Type::MetaView(_)))
+                && (matches!(self.store.resolve(x), Type::Meta(_))
+                    || matches!(self.store.resolve(y), Type::Meta(_)))
             {
                 self.unify(x, y)?;
                 (left, right) = (self.bound_head(a), self.bound_head(b));
@@ -238,15 +238,19 @@ impl Checker<'_> {
                 return self.unify(&x, &y);
             }
             // `α^c ≡ α` is no infinite type: the bound is compared below
-            (Type::Bounded { .. } | Type::Captured { .. }, Type::Meta(m))
-                if !self.qualifies_meta(&left, *m) =>
+            (Type::Bounded { .. } | Type::Captured { .. }, Type::Meta(meta))
+                if meta
+                    .legacy_root()
+                    .is_some_and(|m| !self.qualifies_meta(&left, m)) =>
             {
-                return self.bind(*m, &left);
+                return self.bind(meta.legacy_root().expect("legacy qualified root"), &left);
             }
-            (Type::Meta(m), Type::Bounded { .. } | Type::Captured { .. })
-                if !self.qualifies_meta(&right, *m) =>
+            (Type::Meta(meta), Type::Bounded { .. } | Type::Captured { .. })
+                if meta
+                    .legacy_root()
+                    .is_some_and(|m| !self.qualifies_meta(&right, m)) =>
             {
-                return self.bind(*m, &right);
+                return self.bind(meta.legacy_root().expect("legacy qualified root"), &right);
             }
             (Type::Bounded { ty, captures }, other) | (other, Type::Bounded { ty, captures }) => {
                 // A function holds what its qualifier says, not its parameter
@@ -280,8 +284,13 @@ impl Checker<'_> {
         }
         match (&a, &b) {
             (Type::Error, _) | (_, Type::Error) => Ok(()),
-            (Type::Meta(x), Type::Meta(y)) if x == y => Ok(()),
-            (Type::Meta(m), t) | (t, Type::Meta(m)) => self.bind(*m, t),
+            (Type::Meta(x), Type::Meta(y)) if x.legacy_root().is_some() && x == y => Ok(()),
+            (Type::Meta(meta), t) if meta.legacy_root().is_some() => {
+                self.bind(meta.legacy_root().expect("legacy binding root"), t)
+            }
+            (t, Type::Meta(meta)) if meta.legacy_root().is_some() => {
+                self.bind(meta.legacy_root().expect("legacy binding root"), t)
+            }
             (Type::Skolem(x), Type::Skolem(y)) if x == y => Ok(()),
             (Type::Var(x), Type::Var(y)) | (Type::Symbol(x), Type::Symbol(y)) if x == y => Ok(()),
             (Type::Con { .. }, Type::Con { .. }) if a == b => Ok(()),
@@ -413,7 +422,7 @@ impl Checker<'_> {
 
     /// Whether `t` is a qualifier on the meta `m` itself.
     fn qualifies_meta(&self, t: &Type, m: u32) -> bool {
-        self.store.resolve(&self.capture_identity(t)) == Type::Meta(m)
+        self.store.resolve(&self.capture_identity(t)) == Type::meta(m)
     }
 
     pub fn bind(&mut self, m: u32, t: &Type) -> Unified {
@@ -422,14 +431,14 @@ impl Checker<'_> {
 
     fn bind_inner(&mut self, m: u32, t: &Type) -> Unified {
         let t = self.zonk(t);
-        if t.contains(&mut |x| *x == Type::Meta(m)) {
+        if t.contains(&mut |x| *x == Type::meta(m)) {
             return Err(Mismatch::Occurs(t));
         }
         if t.contains(&mut |x| matches!(x, Type::Forall { .. })) {
             return Err(Mismatch::Polymorphic(t));
         }
         if self.store.is_numeric(m) && !self.store.numeric_fits(m, &t) {
-            return Err(Mismatch::Types(Type::Meta(m), t));
+            return Err(Mismatch::Types(Type::meta(m), t));
         }
         if self.store.untouchable(m) {
             return Err(Mismatch::Untouchable(t));

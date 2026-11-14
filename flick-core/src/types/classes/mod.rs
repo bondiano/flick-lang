@@ -228,7 +228,7 @@ impl Checker<'_> {
 
 /// Whether `t` holds unification variables.
 fn has_metas(t: &Type) -> bool {
-    t.contains(&mut |x| matches!(x, Type::Meta(_) | Type::MetaView(_)))
+    t.contains(&mut |x| matches!(x, Type::Meta(_)))
 }
 
 /// Type variables of `t`, with repeats, in order of appearance.

@@ -76,7 +76,7 @@ impl Checker<'_> {
         };
         if let [owner] = scope.spine().1[..] {
             let owner = owner.clone();
-            if let Type::Meta(_) | Type::MetaView(_) = self.store.resolve(&owner) {
+            if let Type::Meta(_) = self.store.resolve(&owner) {
                 let _ = self.unify(&owner, &region);
             }
             if self.store.resolve(&owner) == self.store.resolve(&region) {
@@ -357,14 +357,7 @@ impl Checker<'_> {
     /// row says the caller provides the owner, which fixes a public boundary.
     fn no_owner(&mut self, scope: &Type, c: &SubRow) {
         let region = match scope.spine().1[..] {
-            [region]
-                if !matches!(
-                    self.store.resolve(region),
-                    Type::Meta(_) | Type::MetaView(_)
-                ) =>
-            {
-                self.show(region)
-            }
+            [region] if !matches!(self.store.resolve(region), Type::Meta(_)) => self.show(region),
             // a region not known yet gets a name the signature does not use
             _ => {
                 let taken = self
@@ -490,7 +483,7 @@ fn less(tail: &Type) -> (&Type, &[Elem]) {
 /// The variable of a tail still to be inferred, maybe less some names.
 fn unknown(tail: &Type) -> Option<u32> {
     match less(tail).0 {
-        Type::Meta(m) => Some(*m),
+        Type::Meta(meta) => meta.legacy_root(),
         _ => None,
     }
 }

@@ -178,10 +178,16 @@ impl Printer<'_> {
             Type::Skolem(s) => out.push_str(self.store.skolem_name(*s)),
             // a number literal's type is `Int`, or `Float` with a fraction,
             // unless something says otherwise
-            Type::Meta(m) if self.store.is_numeric(*m) => {
-                out.push_str(default_num(self.store.is_fractional(*m)).name());
+            Type::Meta(meta) if meta.legacy_root().is_some_and(|m| self.store.is_numeric(m)) => {
+                out.push_str(
+                    default_num(
+                        self.store
+                            .is_fractional(meta.legacy_root().expect("legacy numeric display")),
+                    )
+                    .name(),
+                );
             }
-            Type::Meta(_) | Type::MetaView(_) => out.push('_'),
+            Type::Meta(_) => out.push('_'),
             Type::Error => out.push('?'),
             Type::App { .. } => self.print_app(t, prec, out),
             Type::Fun {
@@ -323,12 +329,7 @@ impl Printer<'_> {
     /// nothing yet and is left out.
     fn print_captured(&self, ty: &Type, captures: &Type, prec: Prec, out: &mut String) {
         let norm = self.store.normalize(captures);
-        if norm.entries.is_empty()
-            && norm
-                .tails
-                .iter()
-                .all(|t| matches!(t, Type::Meta(_) | Type::MetaView(_)))
-        {
+        if norm.entries.is_empty() && norm.tails.iter().all(|t| matches!(t, Type::Meta(_))) {
             self.print(ty, prec, out);
             return;
         }
@@ -481,7 +482,7 @@ mod tests {
     fn show_type_leaves_out_a_capture_still_being_inferred() {
         let t = Type::Captured {
             ty: Box::new(Type::lang(Lang::Int)),
-            captures: Box::new(Type::Meta(207)),
+            captures: Box::new(Type::meta(207)),
             value: false,
             elided: Elided::default(),
         };

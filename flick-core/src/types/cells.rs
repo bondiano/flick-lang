@@ -44,7 +44,7 @@ impl Checker<'_> {
     /// generalized: one cell holds one value.
     pub fn lower_cells(&mut self, ty: &Type) {
         let ty = self.zonk(ty);
-        if !ty.contains(&mut |t| matches!(t, Type::Meta(_) | Type::MetaView(_))) {
+        if !ty.contains(&mut |t| matches!(t, Type::Meta(_))) {
             return;
         }
         let mut held = Vec::new();

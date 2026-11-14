@@ -34,20 +34,16 @@ impl KindStore {
         kind: &Kind,
         valid_context: impl Fn(&Context) -> bool,
     ) -> bool {
-        let root = match kind {
-            Kind::Meta(root) => *root,
-            Kind::MetaView(meta) => {
-                if !meta.is_kind()
-                    || Some(meta.owner()) != self.witness_authority
-                    || !valid_context(meta.renaming().source())
-                    || !valid_context(meta.renaming().target())
-                {
-                    return false;
-                }
-                meta.root()
-            }
-            _ => return false,
-        };
+        let Kind::Meta(meta) = kind else { return false };
+        let root = meta.root();
+        if let Some(occurrence) = meta.contextual()
+            && (!occurrence.is_kind()
+                || Some(occurrence.owner()) != self.witness_authority
+                || !valid_context(occurrence.renaming().source())
+                || !valid_context(occurrence.renaming().target()))
+        {
+            return false;
+        }
         self.contexts.get(root as usize).is_some_and(|context| {
             valid_context(&context.canonical) && self.occurrence(kind).is_ok()
         })
@@ -62,7 +58,7 @@ impl KindStore {
     ) -> Result<Kind, super::module_contract::context::Invalid> {
         use super::module_contract::context::Invalid;
         Ok(match kind {
-            Kind::Meta(_) | Kind::MetaView(_) => {
+            Kind::Meta(_) => {
                 if !self.valid_occurrence_in(kind, valid_context) {
                     return Err(Invalid::Authority);
                 }
@@ -84,33 +80,34 @@ impl KindStore {
     }
 
     fn occurrence(&self, kind: &Kind) -> Result<(u32, Embedding), ()> {
-        match kind {
-            Kind::Meta(root) => {
-                let context = self.contexts.get(*root as usize).ok_or(())?;
-                if context.canonical.len() != 0 {
-                    return Err(());
-                }
-                Ok((*root, Embedding::identity(&context.canonical)))
+        let Kind::Meta(meta) = kind else {
+            return Err(());
+        };
+        let root = meta.root();
+        let context = self.contexts.get(root as usize).ok_or(())?;
+        if meta.legacy_root().is_some() {
+            if context.canonical.len() != 0 {
+                return Err(());
             }
-            Kind::MetaView(meta) => {
-                let context = self.contexts.get(meta.root() as usize).ok_or(())?;
-                let authority = self.witness_authority.ok_or(())?;
-                let source = meta.renaming().source();
-                if !meta.is_kind()
-                    || meta.owner() != authority
-                    || !meta.renaming().target().belongs_to(authority)
-                    || context.canonical.restrict(&source.ids().collect()) != *source
-                    || context.permitted.ids().any(|scope| !source.contains(scope))
-                {
-                    return Err(());
-                }
-                Ok((
-                    meta.root(),
-                    meta.renaming().restrict(&context.permitted.ids().collect()),
-                ))
-            }
-            _ => Err(()),
+            return Ok((root, Embedding::identity(&context.canonical)));
         }
+        let occurrence = meta.contextual().ok_or(())?;
+        let authority = self.witness_authority.ok_or(())?;
+        let source = occurrence.renaming().source();
+        if !occurrence.is_kind()
+            || occurrence.owner() != authority
+            || !occurrence.renaming().target().belongs_to(authority)
+            || context.canonical.restrict(&source.ids().collect()) != *source
+            || context.permitted.ids().any(|scope| !source.contains(scope))
+        {
+            return Err(());
+        }
+        Ok((
+            root,
+            occurrence
+                .renaming()
+                .restrict(&context.permitted.ids().collect()),
+        ))
     }
 
     fn write_context(&mut self, root: u32, context: KindContext) {
@@ -164,11 +161,11 @@ mod context_tests {
                 name: "Mode".into()
             }
         );
-        let type_carrier = Kind::MetaView(Box::new(MetaOccurrence::new(
+        let type_carrier = Kind::Meta(MetaOccurrence::new(
             root,
             scopes.owner(),
             Embedding::identity(&source),
-        )));
+        ));
         assert!(kinds.occurrence(&type_carrier).is_err());
         assert_eq!(
             kinds.resolve(&type_carrier),
@@ -176,8 +173,8 @@ mod context_tests {
             "wrong root sort never resolves by numeric ID"
         );
         assert_eq!(
-            kinds.resolve(&Kind::Meta(root)),
-            Kind::Meta(root),
+            kinds.resolve(&Kind::meta(root)),
+            Kind::meta(root),
             "dropping a view grants no authority"
         );
     }
@@ -206,9 +203,10 @@ mod context_tests {
         assert_eq!(kinds.resolve(&original), original);
         assert_eq!(kinds.resolve(&allocated), allocated);
         assert_eq!(kinds.active_context.len(), 1);
-        let Kind::MetaView(next) = kinds.fresh() else {
+        let Kind::Meta(next) = kinds.fresh() else {
             panic!("restored context")
         };
+        assert!(next.contextual().is_some(), "restored contextual root");
         assert_eq!(next.root(), 2);
     }
 }

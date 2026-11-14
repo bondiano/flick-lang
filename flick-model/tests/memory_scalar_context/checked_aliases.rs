@@ -164,7 +164,7 @@ fn duplicate_incomplete_missing_and_error_facts_fail_closed_atomically() {
             .to_string()
             .contains("incomplete declaration context")
     );
-    for bad in [None, Some(Type::Error), Some(Type::Meta(0))] {
+    for bad in [None, Some(Type::Error), Some(Type::meta(0))] {
         let mut invalid = original.clone();
         invalid[0]
             .exports

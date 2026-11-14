@@ -102,11 +102,11 @@ impl Checker<'_> {
         let mut open = Vec::new();
         for c in &wanted {
             c.visit(&mut |t| {
-                if let Type::Meta(m) = t
-                    && self.store.is_numeric(*m)
-                    && !open.contains(m)
+                if let Some(m) = t.legacy_meta_root()
+                    && self.store.is_numeric(m)
+                    && !open.contains(&m)
                 {
-                    open.push(*m);
+                    open.push(m);
                 }
             });
         }
@@ -119,12 +119,12 @@ impl Checker<'_> {
                 let ty = Type::lang(num.lang());
                 wanted
                     .iter()
-                    .filter(|c| c.contains(&mut |t| *t == Type::Meta(m)))
+                    .filter(|c| c.contains(&mut |t| *t == Type::meta(m)))
                     .all(|c| self.may_have_instance(&replace_metas(c, &[(m, ty.clone())])))
             };
             let fallback = default_num(fractional);
             let num = Num::ALL.iter().find(|n| fits(n)).unwrap_or(&fallback);
-            let _ = self.unify(&Type::Meta(m), &Type::lang(num.lang()));
+            let _ = self.unify(&Type::meta(m), &Type::lang(num.lang()));
         }
         !open.is_empty()
     }
@@ -240,12 +240,8 @@ impl Checker<'_> {
         if c.contains(&mut |t| *t == Type::Error) {
             return Outcome::Solved(Dict::Error);
         }
-        let ground = !c.contains(&mut |t| {
-            matches!(
-                t,
-                Type::Meta(_) | Type::MetaView(_) | Type::Skolem(_) | Type::Var(_)
-            )
-        });
+        let ground =
+            !c.contains(&mut |t| matches!(t, Type::Meta(_) | Type::Skolem(_) | Type::Var(_)));
         let key = ground.then(|| c.clone());
         if let Some((_, dict)) = givens.iter().find(|(g, _)| g == c) {
             return Outcome::Solved(dict.clone());
@@ -479,7 +475,7 @@ impl Checker<'_> {
             Some(Type::Tuple(items)) => items.clone(),
             Some(Type::Record(row)) => match row.tail.as_deref() {
                 None => row.entries.iter().map(|(_, t)| t.clone()).collect(),
-                Some(Type::Meta(_) | Type::MetaView(_)) => return Outcome::Stuck,
+                Some(Type::Meta(_)) => return Outcome::Stuck,
                 Some(_) => {
                     return Outcome::Missing(
                         c.clone(),

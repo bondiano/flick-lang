@@ -106,7 +106,7 @@ impl<K: Kinding, I: Identities> Actual<'_, K, I> {
         for name in names {
             let Kind::Arrow(parameter, result) = remaining else {
                 return Err(match remaining {
-                    Kind::Meta(_) | Kind::MetaView(_) => Incomplete::Kind(remaining),
+                    Kind::Meta(_) => Incomplete::Kind(remaining),
                     _ => Incomplete::NotFunction(remaining),
                 });
             };

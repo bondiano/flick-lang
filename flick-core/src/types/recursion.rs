@@ -97,7 +97,7 @@ impl Checker<'_> {
                     }
                 }
                 // nothing fixed it: it is the member's own variable
-                m @ (Type::Meta(_) | Type::MetaView(_)) => {
+                m @ Type::Meta(_) => {
                     let _ = self.unify(&m, &Type::Skolem(*own));
                 }
                 _ => return false,

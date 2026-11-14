@@ -30,7 +30,7 @@ impl Checker<'_> {
         }
         for tail in &norm.tails {
             match tail {
-                Type::Meta(_) | Type::MetaView(_) => return Outcome::Stuck,
+                Type::Meta(_) => return Outcome::Stuck,
                 Type::Error => {}
                 rigid => {
                     let given = givens

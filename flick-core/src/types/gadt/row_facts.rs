@@ -308,7 +308,7 @@ impl Checker<'_> {
         };
         let visible = |ty: &Type| {
             !ty.contains(&mut |t| match t {
-                Type::Meta(_) => true,
+                Type::Meta(meta) if meta.legacy_root().is_some() => true,
                 Type::Skolem(s) => self.store.skolem_level(*s) > level,
                 _ => false,
             })
