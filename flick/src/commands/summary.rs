@@ -15,6 +15,10 @@ use crate::command::Outcome;
 
 /// What a build wrote.
 pub struct Built {
+    #[cfg(feature = "wasm-backends")]
+    pub backend: Option<flick_backend::BackendPin>,
+    pub go: bool,
+    pub rt: bool,
     /// How many modules it compiled; `None` when it reused a cached build.
     pub modules: Option<usize>,
     pub out_dir: PathBuf,
@@ -154,6 +158,10 @@ mod tests {
     #[test]
     fn a_build_says_what_it_compiled_and_where_each_runner_is() {
         let built = Built {
+            #[cfg(feature = "wasm-backends")]
+            backend: None,
+            go: false,
+            rt: false,
             modules: Some(3),
             out_dir: PathBuf::from("/x/dist"),
             runners: vec![
@@ -188,6 +196,10 @@ mod tests {
             Diagnostic::new(codes::P004, Severity::Warning, "hm"),
         ];
         let built = Built {
+            #[cfg(feature = "wasm-backends")]
+            backend: None,
+            go: false,
+            rt: false,
             modules: Some(1),
             out_dir: PathBuf::new(),
             runners: Vec::new(),

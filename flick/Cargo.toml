@@ -13,7 +13,8 @@ workspace = true
 
 [features]
 # loads plugins built as WebAssembly components; release builds enable it
-wasm-plugins = ["dep:wasmtime", "flick-backend/host"]
+wasm-plugins = ["wasm-backends"]
+wasm-backends = ["dep:wasmtime", "flick-backend/host"]
 
 [dependencies]
 anstyle = "1.0.14"
@@ -36,7 +37,7 @@ tracing-subscriber = { version = "0.3.23", default-features = false, features = 
 ureq = "2.12.1"
 
 [target.'cfg(unix)'.dependencies]
-rustix = { version = "1.1.6", features = ["process", "termios"] }
+rustix = { version = "1.1.6", features = ["fs", "process", "termios"] }
 
 [dev-dependencies]
 flick-test-support = { path = "../flick-test-support" }

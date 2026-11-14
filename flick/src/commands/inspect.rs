@@ -19,9 +19,10 @@ use flick_core::source::SourceMap;
 use flick_core::types::builtins;
 use flick_core::{ir, projection, syntax};
 
-use super::build::{BuildPlan, artifacts, emit, write};
+use super::build::{BuildPlan, Purpose, artifacts, emit, write};
 use super::check::select;
 use crate::args::{InspectArguments, Representation, SchemaExportArguments, SchemaTarget};
+use crate::backends::Selected;
 use crate::command::Outcome;
 use crate::sources::FsHost;
 
@@ -70,6 +71,8 @@ pub fn compile(explicit: Option<&str>) -> Result<Checked, Outcome> {
 
 fn output(dir: PathBuf, typescript: bool) -> BuildPlan {
     BuildPlan {
+        purpose: Purpose::Build,
+        backend: Selected::Native,
         out_dir: dir,
         entries: Vec::new(),
         typescript,

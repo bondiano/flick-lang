@@ -1,4 +1,4 @@
-mod build;
+pub(crate) mod build;
 mod check;
 mod clean;
 #[cfg(test)]

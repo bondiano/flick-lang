@@ -16,12 +16,13 @@ use crate::commands::{
 
 mod args;
 mod artifact;
+mod backends;
 mod builtins;
 mod cache;
 mod child;
 mod command;
 mod commands;
-#[cfg(feature = "wasm-plugins")]
+#[cfg(feature = "wasm-backends")]
 mod component;
 mod fetch;
 mod lsp;

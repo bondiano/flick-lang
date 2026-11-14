@@ -20,3 +20,4 @@ guest = []
 [dependencies]
 flick-backend = { path = "../../../flick-backend" }
 flick-ir = { path = "../../../flick-ir", features = ["cbor"] }
+serde_json = { workspace = true }

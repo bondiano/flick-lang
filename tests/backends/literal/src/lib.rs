@@ -1,6 +1,9 @@
 //! Test-only backend: a pure Unit main, with explicit unsupported diagnostics.
 //! The same implementation is exercised natively and as a component.
 
+mod launches;
+mod tests;
+
 use std::hint;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::SystemTime;
@@ -33,7 +36,24 @@ fn case(request: &BuildRequest) -> &str {
         .options
         .iter()
         .find(|o| o.key == "fixture.case")
-        .map_or("", |o| &o.value)
+        .map_or_else(
+            || {
+                request
+                    .modules
+                    .iter()
+                    .find_map(|m| match m.name.as_str() {
+                        "Fixture.Warning" => Some("warning"),
+                        "Fixture.Note" => Some("note"),
+                        "Fixture.Refuse" => Some("refuse-warning"),
+                        "Fixture.BadSpan" => Some("span"),
+                        "Fixture.Ir" => Some("ir"),
+                        "Fixture.CommonJs" => Some("commonjs"),
+                        _ => None,
+                    })
+                    .unwrap_or("")
+            },
+            |o| &o.value,
+        )
 }
 
 impl Backend for Literal {
@@ -60,7 +80,10 @@ impl Backend for Literal {
             }],
             profiles: vec![Profile::Debug, Profile::Release],
             modes: vec![Mode::PerModule, Mode::WholeProgram],
-            capabilities: vec![],
+            capabilities: vec![flick_backend::Capability {
+                name: "schema-aot".into(),
+                version: "1.0.0".into(),
+            }],
         }
     }
 
@@ -69,6 +92,11 @@ impl Backend for Literal {
         request: &BuildRequest,
         _: &mut dyn Inputs,
     ) -> Result<TargetSupport, Vec<Diagnostic>> {
+        if case(request) == "refuse-warning" {
+            let mut refusal = diagnostic("intentional warning-only refusal", None);
+            refusal[0].severity = Severity::Warning;
+            return Err(refusal);
+        }
         if case(request) == "reads" && request.sources.is_empty() {
             return Err(diagnostic(READ_SOURCE, None));
         }
@@ -89,12 +117,15 @@ impl Backend for Literal {
                 ));
             }
             for item in &module.items {
+                if tests::supported(item, request) {
+                    continue;
+                }
                 let supported = matches!(&item.kind, ItemKind::Value { name, dicts, body }
                     if name == "main" && dicts.is_empty()
                     && matches!(&body.kind, ExprKind::Lambda { params, body }
                         if params.len() == 1 && params[0].stage == Stage::Pure
                             && matches!(body.kind, ExprKind::Lit(Lit::Unit))));
-                if !supported {
+                if !supported && case(request) != "ir" {
                     let span = item.span;
                     return Err(diagnostic(
                         "literal backend supports only a pure Unit main",
@@ -107,8 +138,14 @@ impl Backend for Literal {
                 }
             }
         }
+        if request.entries.iter().any(|entry| entry.runner.is_some()) {
+            return Err(diagnostic(
+                "literal backend does not implement custom root runners",
+                None,
+            ));
+        }
         Ok(TargetSupport {
-            capabilities: vec![],
+            capabilities: self.describe().capabilities,
         })
     }
 
@@ -152,7 +189,8 @@ impl Backend for Literal {
                 id: format!("module:{}", m.name),
                 path: m.output.clone(),
                 kind: ArtifactKind::Source,
-                bytes: b"export const main = (_) => undefined;\n".to_vec(),
+                bytes: tests::source(request, &m.name)
+                    .unwrap_or_else(|| b"export const main = (_) => undefined;\n".to_vec()),
             })
             .collect();
         artifacts.push(Artifact {
@@ -161,6 +199,14 @@ impl Backend for Literal {
             kind: ArtifactKind::Resource,
             bytes: vec![0, 255, 128],
         });
+        if case(request) == "ir" {
+            artifacts.push(Artifact {
+                id: "request-ir".into(),
+                path: "request.ir.cbor".into(),
+                kind: ArtifactKind::Metadata,
+                bytes: request.program.clone(),
+            });
+        }
         if case(request) == "state" {
             static COUNT: AtomicU32 = AtomicU32::new(0);
             artifacts.push(Artifact {
@@ -176,7 +222,15 @@ impl Backend for Literal {
         if case(request) == "duplicate" {
             artifacts.push(artifacts[0].clone());
         }
-        let diagnostics = if case(request) == "span" {
+        let diagnostics = if matches!(case(request), "warning" | "note") {
+            let mut diagnostics = diagnostic("successful backend diagnostic", None);
+            diagnostics[0].severity = if case(request) == "note" {
+                Severity::Note
+            } else {
+                Severity::Warning
+            };
+            diagnostics
+        } else if case(request) == "span" {
             vec![Diagnostic {
                 code: "P012".into(),
                 severity: Severity::Warning,
@@ -191,11 +245,13 @@ impl Backend for Literal {
         } else {
             vec![]
         };
+        let mut launches = launches::run(request, &mut artifacts);
+        let runtime_dependencies = tests::runner(request, &mut artifacts, &mut launches);
         Ok(BuildResult {
             artifacts,
             steps: vec![],
-            runtime_dependencies: vec![],
-            launches: vec![],
+            runtime_dependencies,
+            launches,
             diagnostics,
         })
     }
