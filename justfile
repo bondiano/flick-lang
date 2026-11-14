@@ -117,7 +117,7 @@ e2e-js: docs-wasm e2e-prepare
     node docs/scripts/parity.mjs
     FLICK_BIN={{flick}} pnpm -r typecheck
     FLICK_BIN={{flick}} pnpm -r lint
-    FLICK_BIN={{flick}} pnpm -r test
+    FLICK_BIN={{flick}} pnpm -r --workspace-concurrency=1 test
     FLICK_BIN={{flick}} pnpm -C docs build
     node docs/scripts/links.mjs
     node docs/scripts/chunks.mjs
