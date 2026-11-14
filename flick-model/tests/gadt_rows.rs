@@ -20,6 +20,31 @@ fn row_indexed_branches_check_in_the_independent_model() {
     assert!(errors.is_empty(), "{}", errors.join("\n"));
 }
 
+#[test]
+fn independent_row_indices_still_require_the_cross_cases() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/check/pass/types/gadt_rows.fl");
+    let modules = run::compile(&path).expect("the complete matrix checks");
+    let program = run::program(&modules);
+    let decls = run::decls(&modules);
+    let path = ValuePath::new("App.GadtRows", "independent");
+    let Term::Lam(name, body) = &program.globals[&path] else {
+        panic!("one argument")
+    };
+    let Term::Match(value, arms) = &**body else {
+        panic!("match matrix")
+    };
+    assert_eq!(arms.len(), 4);
+    let incomplete = Term::lam(
+        name,
+        Term::Match(value.clone(), Rc::from([arms[0].clone(), arms[3].clone()])),
+    );
+    let error = Checker::new(&decls)
+        .check_top(&incomplete, &decls.values[&path])
+        .expect_err("independent rows permit the two missing cross cases");
+    assert_eq!(error.rule, "Match", "{error}");
+    assert!(error.message.contains("cover every value"), "{error}");
+}
+
 fn callback() -> Type {
     Type::fun(
         Type::con("Prelude", "Unit"),

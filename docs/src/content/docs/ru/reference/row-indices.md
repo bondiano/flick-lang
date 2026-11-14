@@ -1,6 +1,6 @@
 ---
 title: "Индексы строк в GADT"
-source_hash: 3fa8f4744dc9c038
+source_hash: 71d5acf5b0e5d870
 ---
 
 Результат конструктора может фиксировать или связывать индексы киндов
@@ -52,6 +52,29 @@ let unpack packed =
   match packed with
   | Packed work -> await work
 ```
+
+Проверка полноты сохраняет эти равенства при проверке остальных частей
+кортежа. Здесь первая часть доказывает, что `r` содержит `Db`, поэтому во
+второй части не может встретиться `Empty`:
+
+```flick
+# service Db =
+#   get : Int ->{} Int
+type Includes (r : ServiceRow) (s : ServiceRow) =
+  | Includes : Includes r {Db | r}
+
+type RowCmd (r : ServiceRow) =
+  | Empty : RowCmd none
+  | WithDb Int : RowCmd {Db}
+
+read_value : (Includes r r, RowCmd r) -> Int
+let read_value pair =
+  match pair with
+  | (Includes, WithDb value) -> value
+```
+
+Скрытые остаточные строки разных вхождений конструктора остаются
+независимыми. Части значения связывают только их общие внешние индексы.
 
 То же рассуждение действует для строк ошибок. Локальные обработчики
 снимают покрываемые ими требования до проверки внешней сигнатуры.

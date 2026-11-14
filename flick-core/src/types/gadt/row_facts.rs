@@ -263,10 +263,10 @@ impl Checker<'_> {
             let mut payloads = Vec::new();
             if let Some(label) = &label {
                 for row in &rows {
-                    if let Some(ty) = row.get(label)
-                        && !payloads.contains(&ty)
-                    {
-                        payloads.push(ty);
+                    for (entry, ty) in &row.entries {
+                        if entry == label && !payloads.contains(&ty) {
+                            payloads.push(ty);
+                        }
                     }
                 }
             }

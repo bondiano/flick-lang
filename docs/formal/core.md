@@ -438,9 +438,15 @@ the free variables and locations of e are those of the branch
 the branch K p₁ … pₙ → e of a match on a value of T ῡ
 ```
 
-With no such `θ` the branch is dead: no value of `T ῡ` is built by `K`, and its body is not typed. The checker types the branch once, under the most general unifier, or drops it as `FLICK-T010` when there is none; both are instances of the rule. The rule over every unifier is the primary one, because the most general unifier is not kept by type substitution ([the most general unifier is not kept by substitution](#the-most-general-unifier-is-not-kept-by-substitution)).
+With no such `θ` the branch is dead: no value of `T ῡ` is built by `K`, and its body is not typed. The checker refines ordinary type indices by substitution and retains row equations as branch-local assumptions. Inclusions must hold for every solution of those equations; it does not choose a least residual or require one most general unifier. The rule over every unifier is the primary one, because the most general unifier is not kept by type substitution ([the most general unifier is not kept by substitution](#the-most-general-unifier-is-not-kept-by-substitution)).
 
 - `Exh(T ῡ, Π)` counts only the constructors that can build `T ῡ`, those whose `T ρ̄` unifies with `T ῡ` under some instance, regions included. The parts of a value share its rigid variables: what a constructor fixes in one part holds in the others, so `Exh((Tagged a, Tagged a), Π)` counts no pair of different constructors (`types/gadt/columns.rs` `columns_after`). This deadness differs on purpose from that of a branch, which keeps the regions the body writes. A constructor left out of `Exh` builds no value of the type at all. A dead branch has to stay dead under the substitutions of the regions around it (scopes, `kill`), which may move the regions it does not write.
+
+Row equations learned in one part also constrain later parts during `Exh`.
+Every constructor occurrence has its own existential residuals; equal names
+in two constructor schemes do not identify their witnesses. For example,
+`r = {Db | r}` excludes a later constructor requiring `r = none`, while
+two independent hidden rows still permit cross cases.
 
 Checker:
 

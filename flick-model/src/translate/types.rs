@@ -295,7 +295,7 @@ impl<'a> Types<'a> {
                 self.add(b, out);
             }
             fc::Type::Var(v) => {
-                out.add_var(Var::Named(v.as_str().into()), &BTreeSet::new());
+                out.add_var(&Var::Named(v.as_str().into()), &BTreeSet::new());
             }
             fc::Type::Without { row: inner, gone } => {
                 let gone = gone.iter().map(|l| Path::parse(&l.to_string())).collect();

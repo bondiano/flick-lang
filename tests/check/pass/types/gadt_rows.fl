@@ -141,3 +141,34 @@ let scoped_extra () = scope s {
 
 scope_passthrough : Eff {Scope r} none Unit ->{Scope r} Unit
 let scope_passthrough work = scope s { await work }
+
+// The first tuple column proves the requirement of the second. The pure
+// constructor is impossible, so the single correlated arm is exhaustive.
+type RowCmd (r : ServiceRow) =
+  | Bare : RowCmd none
+  | Need Int : RowCmd {Db}
+
+correlated : (Includes r r, RowCmd r) -> Int
+let correlated pair =
+  match pair with
+  | (Includes, Need value) -> value
+
+service Log =
+  write : Unit ->{} Unit
+
+// Each occurrence has its own hidden residual, even though the constructor
+// names it `rest` in both columns. The two outer indices remain independent.
+type Contains (r : ServiceRow) =
+  | Contains : Contains {Db | rest}
+
+type RowChoice (r : ServiceRow) =
+  | JustDb : RowChoice {Db}
+  | WithLog : RowChoice {Db, Log}
+
+independent : (Contains r, Contains s, RowChoice r, RowChoice s) -> Int
+let independent pair =
+  match pair with
+  | (Contains, Contains, JustDb, JustDb) -> 0
+  | (Contains, Contains, JustDb, WithLog) -> 1
+  | (Contains, Contains, WithLog, JustDb) -> 2
+  | (Contains, Contains, WithLog, WithLog) -> 3

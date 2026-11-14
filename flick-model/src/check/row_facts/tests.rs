@@ -6,6 +6,49 @@ fn variable(name: &str) -> Row {
 }
 
 #[test]
+fn coverage_excludes_an_empty_index_after_absorption() {
+    let decls = Decls::default();
+    let mut checker = Checker::new(&decls);
+    let r = variable("r");
+    let db = Row::one(Path::new("Test", "Db"));
+    checker
+        .row_equalities
+        .push((r.clone(), db.sum(&r).expect("open row")));
+    assert!(checker.coverage_consistent());
+    checker.row_equalities.push((r, Row::none()));
+    assert!(
+        !checker.coverage_consistent(),
+        "one index cannot both contain Db and be empty"
+    );
+}
+
+#[test]
+fn coverage_residuals_of_different_constructor_occurrences_are_independent() {
+    let decls = Decls::default();
+    let mut checker = Checker::new(&decls);
+    let (r, s, first, second) = (
+        variable("r"),
+        variable("s"),
+        variable("first"),
+        variable("second"),
+    );
+    let db = Row::one(Path::new("Test", "Db"));
+    let log = Row::one(Path::new("Test", "Log"));
+    checker.row_equalities.extend([
+        (r.clone(), db.sum(&first).expect("first residual")),
+        (s.clone(), db.sum(&second).expect("second residual")),
+        (r, db.clone()),
+        (s, db.sum(&log).expect("different services")),
+    ]);
+    assert!(checker.coverage_consistent(), "the residuals can differ");
+    checker.row_equalities.push((first, second));
+    assert!(
+        !checker.coverage_consistent(),
+        "identifying the two witnesses would lose a real cross case"
+    );
+}
+
+#[test]
 fn absorption_keeps_every_residual_solution() {
     let decls = Decls::default();
     let mut c = Checker::new(&decls);

@@ -42,6 +42,13 @@ theorem captures_transport (C D : Caps) (h : Ty.Equiv (.caps C) (.caps D)) :
 
 private def db : Ty := .rnm "Db" .rnil
 
+/-- A later tuple column cannot require an empty row after an earlier
+constructor has proved that the same index contains Db. -/
+example (r : Ty) (required : Ty.Equiv r (.run db r)) : ¬ Ty.Equiv r .cnil := by
+  intro empty
+  have held := member_of_absorption r "Db" .rnil required
+  exact Eq.mp (congrFun empty.indexedRow (.nm "Db" Ty.rnil.classOf)) held
+
 /-- The same index equation permits an empty residual. -/
 example : Ty.Equiv (.run db .cnil) db := .run_nil db (.rnm _ _)
 

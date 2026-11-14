@@ -52,6 +52,29 @@ let unpack packed =
   | Packed work -> await work
 ```
 
+Exhaustiveness keeps these equations while checking the other parts of a
+tuple. Here the first part proves that `r` contains `Db`, so `Empty` cannot
+occur in the second part:
+
+```flick
+# service Db =
+#   get : Int ->{} Int
+type Includes (r : ServiceRow) (s : ServiceRow) =
+  | Includes : Includes r {Db | r}
+
+type RowCmd (r : ServiceRow) =
+  | Empty : RowCmd none
+  | WithDb Int : RowCmd {Db}
+
+read_value : (Includes r r, RowCmd r) -> Int
+let read_value pair =
+  match pair with
+  | (Includes, WithDb value) -> value
+```
+
+Hidden residuals of separate constructor occurrences remain independent.
+Only their shared outer indices relate the parts of the value.
+
 The same reasoning applies to error rows. Local handlers remove the
 requirements they cover before the surrounding signature is checked.
 Equations stay inside the branch, including checks deferred until the

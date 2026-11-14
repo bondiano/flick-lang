@@ -401,7 +401,7 @@ impl Checker<'_> {
     }
 
     fn ctor_fields(&mut self, ctor: &Ctor, t: &Type) -> Check<Vec<Type>> {
-        Ok(match ctor {
+        let fields = match ctor {
             Ctor::Con(c) => self.con_fields(c, t)?,
             Ctor::Lit(_) | Ctor::Nil => Vec::new(),
             Ctor::Tuple(_) => match self.zonk(&self.resolve(t)) {
@@ -417,7 +417,11 @@ impl Checker<'_> {
                 self.unify(t, &list(x.clone()))?;
                 vec![x.clone(), list(x)]
             }
-        })
+        };
+        if !self.coverage_consistent() {
+            return error("Exh", "constructor indices contradict earlier columns");
+        }
+        Ok(fields)
     }
 }
 

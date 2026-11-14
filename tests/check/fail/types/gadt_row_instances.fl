@@ -1,0 +1,17 @@
+module App.GadtRowInstances exposing (..)
+
+service Db =
+  get : Unit ->{} Unit
+
+service Store a =
+  get : Unit ->{} a
+
+type Includes (r : ServiceRow) (s : ServiceRow) =
+  | Includes : Includes r {Db | r}
+
+forget_second : Includes r r -> Eff ({Store Int} + {Store Bool} + {Store String}) none Unit -> Eff ({Store Bool} + {Store String}) none Unit
+let forget_second proof work =
+  match proof with
+  | Includes -> task { await work }
+//~ FLICK-T003 @15:24-15:34 expected `Store String`, found `Store Int`
+//~ FLICK-T003 @15:24-15:34 expected `Store String`, found `Store Bool`

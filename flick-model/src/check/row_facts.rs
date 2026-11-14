@@ -148,6 +148,49 @@ fn witness(
 }
 
 impl Checker<'_> {
+    /// Constructor candidates for exhaustiveness must satisfy all facts
+    /// learned in earlier columns, rather than just their own equations.
+    pub(super) fn coverage_consistent(&self) -> bool {
+        let pairs: Vec<_> = self
+            .row_equalities
+            .iter()
+            .map(|(a, b)| (self.zonk_row(a), self.zonk_row(b)))
+            .collect();
+        let mut labels = BTreeSet::from([None]);
+        for row in pairs.iter().flat_map(|(a, b)| [a, b]) {
+            labels.extend(row.elems.keys().cloned().map(Some));
+            labels.extend(row.less.iter().map(|(_, label)| Some(label.clone())));
+        }
+        let rows_consistent = labels.into_iter().all(|label| {
+            let mut entries = Vec::new();
+            for row in pairs.iter().flat_map(|(a, b)| [a, b]) {
+                if let Some(args) = label.as_ref().and_then(|label| row.elems.get(label))
+                    && !entries.contains(args)
+                {
+                    entries.push(args.clone());
+                }
+            }
+            entries.iter().map(Some).chain([None]).all(|payload| {
+                let equations: Vec<_> = pairs
+                    .iter()
+                    .map(|(a, b)| {
+                        (
+                            at(a, label.as_ref(), payload, &entries),
+                            at(b, label.as_ref(), payload, &entries),
+                        )
+                    })
+                    .collect();
+                witness(&equations, None)
+            })
+        });
+        let caps: Vec<_> = self
+            .cap_equalities
+            .iter()
+            .map(|(a, b)| (captures(&self.zonk_caps(a)), captures(&self.zonk_caps(b))))
+            .collect();
+        rows_consistent && witness(&caps, None)
+    }
+
     pub(super) fn branch_givens(&self) -> Givens {
         Givens {
             types: self.equalities.clone(),
