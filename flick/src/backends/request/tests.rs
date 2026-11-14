@@ -1,12 +1,14 @@
 use std::{env, fs, process};
 
-use flick_backend::{BackendId, BackendPin, DeclaredInputs, Limits, ModuleRole, sha256, validate_request};
+use flick_backend::{
+    BackendId, BackendPin, DeclaredInputs, Limits, ModuleRole, sha256, validate_request,
+};
 use flick_core::build::{self, Extras};
 use flick_core::diagnostics::Severity;
-use std::path::Path;
 use flick_core::iface::{self, Target};
 use flick_core::project;
 use flick_core::source::SourceMap;
+use std::path::Path;
 
 use super::Prepared;
 use crate::backends::Selected;

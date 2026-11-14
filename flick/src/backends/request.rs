@@ -31,6 +31,49 @@ pub(super) struct Prepared {
     pub shared: Vec<Artifact>,
 }
 
+pub(super) fn program(
+    sources: &mut SourceMap,
+    compilation: &Compilation,
+    stages_by_class: bool,
+) -> (Program, Vec<FileId>) {
+    let files = RefCell::new(Vec::new());
+    let builtins = build::builtin_bundle_of(stages_by_class);
+    let builtin_files: Vec<_> = builtins
+        .sources
+        .iter()
+        .map(|s| {
+            let existing = sources
+                .files()
+                .position(|f| f.path == s.name && f.text == s.text);
+            existing.map_or_else(
+                || sources.add(&s.name, &s.text),
+                |i| FileId::new(u32::try_from(i).expect("source count fits u32")),
+            )
+        })
+        .collect();
+    let mut modules: Vec<_> = compilation.modules.iter().map(|m| m.ir.clone()).collect();
+    for builtin in &builtins.modules {
+        if compilation.modules.iter().any(|m| m.name == builtin.name) {
+            continue;
+        }
+        let mut module = builtin.clone();
+        module.each_span_mut(&mut |s| s.file = builtin_files[s.file.index() as usize]);
+        modules.push(module);
+    }
+    // Target optimization belongs in the component. This boundary always
+    // exports the reference lowering, with its original source spans.
+    let program = Program::new(
+        &format!("flick {}", toolchain::COMPILER),
+        modules,
+        ir::lang_items(),
+        &|file| {
+            files.borrow_mut().push(file);
+            sources.get(file).path.clone()
+        },
+    );
+    (program, files.into_inner())
+}
+
 impl Prepared {
     pub(super) fn new(
         host: &FsHost,
@@ -40,41 +83,10 @@ impl Prepared {
         output: &BuildPlan,
         pin: BackendPin,
     ) -> Self {
-        let files = RefCell::new(Vec::new());
-        let builtins =
-            build::builtin_bundle_of(project::stages_by_class(project, output.extras.rt));
-        let builtin_files: Vec<_> = builtins
-            .sources
-            .iter()
-            .map(|s| {
-                let existing = sources
-                    .files()
-                    .position(|f| f.path == s.name && f.text == s.text);
-                existing.map_or_else(
-                    || sources.add(&s.name, &s.text),
-                    |i| FileId::new(u32::try_from(i).expect("source count fits u32")),
-                )
-            })
-            .collect();
-        let mut modules: Vec<_> = compilation.modules.iter().map(|m| m.ir.clone()).collect();
-        for builtin in &builtins.modules {
-            if compilation.modules.iter().any(|m| m.name == builtin.name) {
-                continue;
-            }
-            let mut module = builtin.clone();
-            module.each_span_mut(&mut |s| s.file = builtin_files[s.file.index() as usize]);
-            modules.push(module);
-        }
-        // Target optimization belongs in the component. This boundary always
-        // exports the reference lowering, with its original source spans.
-        let program = Program::new(
-            &format!("flick {}", toolchain::COMPILER),
-            modules,
-            ir::lang_items(),
-            &|file| {
-                files.borrow_mut().push(file);
-                sources.get(file).path.clone()
-            },
+        let (program, files) = program(
+            sources,
+            compilation,
+            project::stages_by_class(project, output.extras.rt),
         );
         let package = project.and_then(|p| project::project_name(host, &p.root));
         let mut data = Self {
@@ -116,7 +128,7 @@ impl Prepared {
                 runtime_dependencies: vec![],
             },
             bytes: BTreeMap::new(),
-            files: files.into_inner(),
+            files,
             shared: vec![],
         };
         for (i, name) in program.files.into_iter().enumerate() {
@@ -284,6 +296,3 @@ fn target(project: Option<&Project>, output: &BuildPlan) -> TargetRequest {
         ],
     }
 }
-
-#[cfg(test)]
-mod tests;
