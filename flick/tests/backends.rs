@@ -1,6 +1,9 @@
 //! A backend package selection takes effect before any old output is restored.
 
 mod common;
+#[cfg(feature = "wasm-backends")]
+#[path = "backends/review.rs"]
+mod review;
 
 use std::fs;
 #[cfg(feature = "wasm-backends")]

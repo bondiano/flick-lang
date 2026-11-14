@@ -1,6 +1,6 @@
 //! Restore test artifacts under the selected backend.
 
-use super::super::build::{BuildPlan, Emission, Purpose, write_artifacts};
+use super::super::build::{BuildPlan, Emission, Purpose, publication_paths, publish_artifacts};
 use super::Runner;
 use crate::progress::Progress;
 use crate::{backends::Selected, cache};
@@ -29,17 +29,8 @@ pub(super) fn cached_prepare(
     } else {
         "test.js".to_owned()
     });
-    if cache::artifacts_current(out, &artifacts)
-        && (!go || cache::go_current(&project.root, key, out, &go::executable(go::TEST)))
-    {
-        progress.stage("Reusing test build");
-        return Some(if backend.is_component() {
-            Runner::component(out.to_path_buf(), project)
-        } else {
-            Runner::native(runner)
-        });
-    }
-    progress.stage("Restoring cached test artifacts");
+    let current = cache::artifacts_current(out, &artifacts)
+        && (!go || cache::go_current(&project.root, key, out, &go::executable(go::TEST)));
     let output = BuildPlan {
         purpose: Purpose::Test,
         backend: backend.clone(),
@@ -55,11 +46,21 @@ pub(super) fn cached_prepare(
         extras: Extras::default(),
         release: false,
     };
+    if current {
+        cache::record(&project.root, out, publication_paths(&output, &artifacts)).ok()?;
+        progress.stage("Reusing test build");
+        return Some(if backend.is_component() {
+            Runner::component(out.to_path_buf(), project)
+        } else {
+            Runner::native(runner)
+        });
+    }
+    progress.stage("Restoring cached test artifacts");
     let mut emitted = Emission {
         artifacts,
         diagnostics: Vec::new(),
     };
-    write_artifacts(&output, &mut emitted, progress);
+    publish_artifacts(&output, &mut emitted, progress, Some(&project.root));
     if emitted.diagnostics.is_empty() {
         if go {
             cache::mark_go(&project.root, key, out, &go::executable(go::TEST));

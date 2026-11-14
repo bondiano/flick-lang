@@ -31,7 +31,7 @@ mod native;
 mod progress;
 mod publication;
 pub use publication::write;
-pub(super) use publication::write_artifacts;
+pub(super) use publication::{paths as publication_paths, publish_artifacts, write_artifacts};
 #[cfg(test)]
 mod publication_tests;
 mod schemas;
@@ -94,6 +94,10 @@ impl BuildCommand {
             })
             .collect();
         *self.built.borrow_mut() = Some(Built {
+            #[cfg(feature = "wasm-backends")]
+            backend: output.backend.pin(),
+            go: output.go,
+            rt: output.extras.rt,
             modules,
             out_dir: output.out_dir.clone(),
             runners,

@@ -16,7 +16,7 @@ use std::{fs, io, process};
 
 use flick_core::build::{go, runner_file};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
-use flick_core::project::config::{Backend, Emit, MAIN_ENTRY};
+use flick_core::project::config::{Emit, MAIN_ENTRY};
 use flick_core::project::{self, ModuleCache, Project, cache};
 use flick_core::source::SourceMap;
 #[cfg(unix)]
@@ -125,9 +125,12 @@ fn process_alive(pid: &str) -> bool {
 
 /// The project, or the diagnostics that stop the command.
 pub fn find_project(global: &GlobalArguments) -> Result<Project, (SourceMap, Vec<Diagnostic>)> {
+    find_project_at(global.project.as_deref().map(Path::new))
+}
+
+fn find_project_at(explicit: Option<&Path>) -> Result<Project, (SourceMap, Vec<Diagnostic>)> {
     let host = FsHost::new();
     let mut sources = SourceMap::default();
-    let explicit = global.project.as_deref().map(Path::new);
     match project::discover(&host, &mut sources, &host.cwd, explicit) {
         Ok(Some(p)) => Ok(p),
         Ok(None) => {
@@ -215,15 +218,12 @@ pub fn build_into_generation(
     global: &GlobalArguments,
     modules: Option<Rc<RefCell<ModuleCache>>>,
 ) -> Result<Generation, u8> {
-    if project.config.build.backend.is_some() && options.devtools.is_some() {
-        let diagnostic = Diagnostic::new(
-            codes::P012,
-            Severity::Error,
-            "the selected backend component does not support the host --devtools launch option",
-        );
-        report::render(global, &SourceMap::default(), &[diagnostic]);
-        return Err(1);
-    }
+    let current = find_project_at(Some(&project.root)).map_err(|(sources, diagnostics)| {
+        report::render(global, &sources, &diagnostics);
+        1
+    })?;
+    let project = &current;
+    check_devtools(project.config.build.backend.is_some(), options, global)?;
     let mut generation = match Generation::reserve(&project.root) {
         Ok(generation) => generation,
         Err(err) => {
@@ -262,9 +262,6 @@ pub fn build_into_generation(
         built: RefCell::default(),
         modules,
     };
-    generation.go = project.config.build.emit == Emit::Go;
-    generation.rt = options.rt
-        || (project.config.build.emit != Emit::Go && project.config.build.effect == Backend::Rt);
     let outcome = build.run();
     report::render(global, &outcome.sources, &outcome.diagnostics);
     let code = report::code(&outcome.diagnostics);
@@ -272,11 +269,34 @@ pub fn build_into_generation(
     if failed {
         return Err(code.max(1));
     }
+    let Some(completed) = build.built.borrow_mut().take() else {
+        return Err(1);
+    };
+    generation.go = completed.go;
+    generation.rt = completed.rt;
     #[cfg(feature = "wasm-backends")]
     {
-        generation.backend = project.config.build.backend.as_ref().map(backends::pin);
+        check_devtools(completed.backend.is_some(), options, global)?;
+        generation.backend = completed.backend;
     }
     Ok(generation)
+}
+
+fn check_devtools(
+    component: bool,
+    options: &RunArguments,
+    global: &GlobalArguments,
+) -> Result<(), u8> {
+    if component && options.devtools.is_some() {
+        let diagnostic = Diagnostic::new(
+            codes::P012,
+            Severity::Error,
+            "the selected backend component does not support the host --devtools launch option",
+        );
+        report::render(global, &SourceMap::default(), &[diagnostic]);
+        return Err(1);
+    }
+    Ok(())
 }
 
 /// Starts the runner and records its child PID for cleanup after an orphaned CLI.
@@ -439,6 +459,10 @@ fn append_pid(lock: &Path, pid: u32) -> io::Result<()> {
     let mut file = OpenOptions::new().create(true).append(true).open(lock)?;
     writeln!(file, "{pid}")
 }
+
+#[cfg(all(test, feature = "wasm-backends"))]
+#[path = "run/backend_tests.rs"]
+mod backend_tests;
 
 #[cfg(test)]
 mod tests {

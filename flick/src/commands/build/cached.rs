@@ -4,7 +4,7 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::Project;
 use tracing::debug;
 
-use super::{BuildCommand, BuildPlan, Emission, write_artifacts};
+use super::{BuildCommand, BuildPlan, Emission, publish_artifacts};
 use crate::backends::Selected;
 use crate::cache;
 use crate::progress::Progress;
@@ -98,40 +98,9 @@ impl BuildCommand {
             super::hooks::emit(project, emitted);
         }
         emitted.artifacts.extend(extra);
-        let paths = super::publication::paths(output, &emitted.artifacts);
-        if !self.generation
-            && let Some(project) = project
-            && let Err(error) = cache::validate_record(&project.root, &output.out_dir, &paths)
-        {
-            emitted.diagnostics.push(Diagnostic::new(
-                codes::P013,
-                Severity::Error,
-                format!("cannot validate earlier build outputs: {error}"),
-            ));
-            return;
-        }
-        write_artifacts(output, emitted, progress);
-        if self.generation
-            || emitted
-                .diagnostics
-                .iter()
-                .any(|d| d.severity == Severity::Error)
-        {
-            return;
-        }
-        let Some(project) = project else {
-            return;
-        };
-        progress.stage("Recording build outputs");
-        if let Err(err) = cache::record(&project.root, &output.out_dir, paths) {
-            emitted.diagnostics.push(Diagnostic::new(
-                codes::P013,
-                Severity::Error,
-                format!(
-                    "cannot record artifacts in `{}`: {err}",
-                    output.out_dir.display()
-                ),
-            ));
-        }
+        let root = project
+            .filter(|_| !self.generation)
+            .map(|project| project.root.as_path());
+        publish_artifacts(output, emitted, progress, root);
     }
 }

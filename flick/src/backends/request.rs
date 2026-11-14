@@ -121,7 +121,11 @@ impl Prepared {
             compilation,
             package,
             project.map(|p| p.root.as_path()),
-            output.go.then_some(&[Target::Go]),
+            match self.request.target.environment.backend.as_str() {
+                "js" => Some(&[Target::Js]),
+                "go" => Some(&[Target::Go]),
+                _ => None,
+            },
         );
         let builtins: Vec<&str> = types::builtin_sources()
             .iter()

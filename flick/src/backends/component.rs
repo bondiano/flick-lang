@@ -26,6 +26,9 @@ pub(crate) struct Package {
 }
 
 impl Package {
+    pub(super) fn pin(&self) -> BackendPin {
+        self.pin.clone()
+    }
     pub(super) fn load(project: &Project, package: &BackendPackage) -> Result<Self, Diagnostic> {
         let pin = BackendPin {
             identity: BackendId {
@@ -72,6 +75,16 @@ impl Package {
         compilation: &Compilation,
         output: &BuildPlan,
     ) -> Emission {
+        if output.extras.schema_aot {
+            return Emission {
+                artifacts: vec![],
+                diagnostics: vec![Diagnostic::new(
+                    codes::P012,
+                    Severity::Error,
+                    "component schema AOT requires an approved pinned host tool adapter",
+                )],
+            };
+        }
         let mut prepared = Prepared::new(
             host,
             sources,
@@ -146,13 +159,7 @@ impl Package {
                         .collect(),
                 }
             }
-            Err(Failure::Rejected(diagnostics)) => Emission {
-                artifacts: vec![],
-                diagnostics: diagnostics
-                    .iter()
-                    .map(|d| self.diagnostic(d, &prepared.files))
-                    .collect(),
-            },
+            Err(Failure::Rejected(diagnostics)) => self.rejected(&diagnostics, &prepared.files),
             Err(why) => Emission {
                 artifacts: vec![],
                 diagnostics: vec![failure(format!(
@@ -160,6 +167,20 @@ impl Package {
                     self.pin.identity.id, self.pin.identity.version, self.pin.sha256
                 ))],
             },
+        }
+    }
+
+    fn rejected(&self, diagnostics: &[flick_backend::Diagnostic], files: &[FileId]) -> Emission {
+        let mut diagnostics: Vec<_> = diagnostics
+            .iter()
+            .map(|d| self.diagnostic(d, files))
+            .collect();
+        if !diagnostics.iter().any(|d| d.severity == Severity::Error) {
+            diagnostics.push(failure("backend refused the build"));
+        }
+        Emission {
+            artifacts: vec![],
+            diagnostics,
         }
     }
 

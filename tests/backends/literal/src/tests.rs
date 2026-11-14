@@ -80,7 +80,25 @@ pub(super) fn source(request: &BuildRequest, module: &str) -> Option<Vec<u8>> {
     let ItemKind::Value { body, .. } = &item.kind else {
         return None;
     };
-    Some(format!("import {{ testPure }} from \"@flick-lang/runtime/rt\";\nimport {{ tag }} from \"@flick-lang/runtime/tags\";\nexport const tests = {};\n", expression(body)?).into_bytes())
+    let source = format!(
+        "import {{ testPure }} from \"@flick-lang/runtime/rt\";\nimport {{ tag }} from \"@flick-lang/runtime/tags\";\nexport const tests = {};\n",
+        expression(body)?
+    );
+    Some(if super::case(request) == "commonjs" {
+        source
+            .replace(
+                "import { testPure } from \"@flick-lang/runtime/rt\"",
+                "const { testPure } = require(\"@flick-lang/runtime/rt\")",
+            )
+            .replace(
+                "import { tag } from \"@flick-lang/runtime/tags\"",
+                "const { tag } = require(\"@flick-lang/runtime/tags\")",
+            )
+            .replace("export const tests =", "exports.tests =")
+            .into_bytes()
+    } else {
+        source.into_bytes()
+    })
 }
 
 pub(super) fn runner(
@@ -91,12 +109,15 @@ pub(super) fn runner(
     let Some(node) = request.toolchains.iter().find(|t| t.id == "node") else {
         return vec![];
     };
-    artifacts.push(Artifact {
-        id: "package".into(),
-        path: "package.json".into(),
-        kind: ArtifactKind::Metadata,
-        bytes: b"{\"type\":\"module\"}\n".to_vec(),
-    });
+    let commonjs = super::case(request) == "commonjs";
+    if !commonjs {
+        artifacts.push(Artifact {
+            id: "package".into(),
+            path: "package.json".into(),
+            kind: ArtifactKind::Metadata,
+            bytes: b"{\"type\":\"module\"}\n".to_vec(),
+        });
+    }
     let test = request
         .target
         .options
@@ -112,7 +133,12 @@ pub(super) fn runner(
     else {
         return vec![];
     };
-    let mut source = "import { runTests } from \"@flick-lang/runtime/rt\";\n".to_owned();
+    let mut source = if commonjs {
+        "const { runTests } = require(\"@flick-lang/runtime/rt\");\n"
+    } else {
+        "import { runTests } from \"@flick-lang/runtime/rt\";\n"
+    }
+    .to_owned();
     let mut suites = vec![];
     for (i, root) in request.test_roots.iter().enumerate() {
         let module = request
@@ -120,17 +146,35 @@ pub(super) fn runner(
             .iter()
             .find(|m| m.name == root.module)
             .expect("test root module");
-        let _ = writeln!(
-            source,
-            "import {{ tests as suite{i} }} from {};",
-            quote(&format!("./{}", module.output))
-        );
+        if commonjs {
+            let _ = writeln!(
+                source,
+                "const {{ tests: suite{i} }} = require({});",
+                quote(&format!("./{}", module.output))
+            );
+        } else {
+            let _ = writeln!(
+                source,
+                "import {{ tests as suite{i} }} from {};",
+                quote(&format!("./{}", module.output))
+            );
+        }
         suites.push(format!("[{}, suite{i}]", quote(&root.module)));
     }
-    let _ = writeln!(source, "await runTests([{}]);", suites.join(", "));
+    let _ = writeln!(
+        source,
+        "{}runTests([{}]);",
+        if commonjs { "void " } else { "await " },
+        suites.join(", ")
+    );
     artifacts.push(Artifact {
         id: "test-launch".into(),
-        path: "invoke-tests.mjs".into(),
+        path: if commonjs {
+            "invoke-tests.js"
+        } else {
+            "invoke-tests.mjs"
+        }
+        .into(),
         kind: ArtifactKind::Source,
         bytes: source.into_bytes(),
     });

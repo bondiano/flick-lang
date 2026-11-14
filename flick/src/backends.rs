@@ -30,6 +30,13 @@ pub(crate) enum Selected {
 }
 
 impl Selected {
+    #[cfg(feature = "wasm-backends")]
+    pub(crate) fn pin(&self) -> Option<BackendPin> {
+        match self {
+            Self::Native => None,
+            Self::Component(package) => Some(package.pin()),
+        }
+    }
     /// Resolve and verify a pin before consulting cached output. Selecting an
     /// unavailable or incompatible component never selects native codegen.
     pub(crate) fn load(project: Option<&Project>) -> Result<Self, Diagnostic> {

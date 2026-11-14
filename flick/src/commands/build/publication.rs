@@ -10,7 +10,56 @@ use super::schemas::compile_schemas;
 use super::{BuildPlan, Emission, unwritten};
 use crate::artifact::{self, Artifact};
 use crate::progress::Progress;
-use crate::toolchain;
+use crate::{cache, toolchain};
+
+/// Fresh and restored build/test outputs share stale ownership preflight and
+/// reconciliation. Run generations pass no root because their lease owns them.
+pub(in crate::commands) fn publish_artifacts(
+    output: &BuildPlan,
+    emitted: &mut Emission,
+    progress: &Progress,
+    root: Option<&Path>,
+) {
+    if emitted
+        .diagnostics
+        .iter()
+        .any(|d| d.severity == Severity::Error)
+    {
+        return;
+    }
+    let paths = paths(output, &emitted.artifacts);
+    if let Some(root) = root
+        && let Err(error) = cache::validate_record(root, &output.out_dir, &paths)
+    {
+        emitted.diagnostics.push(Diagnostic::new(
+            codes::P013,
+            Severity::Error,
+            format!("cannot validate earlier build outputs: {error}"),
+        ));
+        return;
+    }
+    write_artifacts(output, emitted, progress);
+    if emitted
+        .diagnostics
+        .iter()
+        .any(|d| d.severity == Severity::Error)
+    {
+        return;
+    }
+    if let Some(root) = root {
+        progress.stage("Recording build outputs");
+        if let Err(error) = cache::record(root, &output.out_dir, paths) {
+            emitted.diagnostics.push(Diagnostic::new(
+                codes::P013,
+                Severity::Error,
+                format!(
+                    "cannot record artifacts in `{}`: {error}",
+                    output.out_dir.display()
+                ),
+            ));
+        }
+    }
+}
 
 pub(crate) fn write_artifacts(output: &BuildPlan, emitted: &mut Emission, progress: &Progress) {
     if emitted
@@ -100,7 +149,7 @@ fn write_if_changed(path: &Path, contents: impl AsRef<[u8]>) -> io::Result<()> {
 }
 
 /// The complete owned output set, including host tool results.
-pub(super) fn paths(output: &BuildPlan, files: &[Artifact]) -> Vec<String> {
+pub(in crate::commands) fn paths(output: &BuildPlan, files: &[Artifact]) -> Vec<String> {
     let mut paths: Vec<_> = files.iter().map(|file| file.path.clone()).collect();
     if output.go && !output.backend.is_component() {
         if output.suites.is_empty() {

@@ -18,7 +18,7 @@ use flick_core::project::config::{Backend, Emit};
 use flick_core::project::{self, ModuleCache, Project};
 use flick_core::source::SourceMap;
 
-use super::build::{BuildPlan, Purpose, artifacts, release, write_artifacts};
+use super::build::{BuildPlan, Purpose, artifacts, publish_artifacts, release};
 use super::check::select;
 use crate::args::{GlobalArguments, Reporter, TestArguments, TestEmitArgument};
 use crate::backends::{self, Selected};
@@ -142,7 +142,10 @@ fn prepare(
     let (mut diagnostics, mut compilation) =
         package_cache::compile(&host, &mut sources, Some(&project), &roots, rt, modules);
     super::build::hooks::ir(Some(&project), &mut compilation, &mut diagnostics);
-    let errors = diagnostics.iter().any(|d| d.severity == Severity::Error);
+    let errors = diagnostics.iter().any(|d| {
+        d.severity == Severity::Error
+            || (global.warnings_as_errors && d.severity == Severity::Warning)
+    });
     let progress = if diagnostics.is_empty() {
         progress
     } else {
@@ -208,15 +211,33 @@ fn prepare(
             runner_source(&suites, rt),
         ));
     }
-    write_artifacts(&output, &mut emitted, &progress);
-    if !emitted.diagnostics.is_empty() {
-        drop(progress);
-        return fail(&sources, emitted.diagnostics);
+    if global.warnings_as_errors {
+        emitted.diagnostics = report::promote(&emitted.diagnostics);
     }
+    publish_artifacts(&output, &mut emitted, &progress, Some(&project.root));
+    let progress = if emitted.diagnostics.is_empty() {
+        progress
+    } else {
+        drop(progress);
+        report::render(global, &sources, &emitted.diagnostics);
+        if emitted.diagnostics.iter().any(|d| {
+            d.severity == Severity::Error
+                || (global.warnings_as_errors && d.severity == Severity::Warning)
+        }) {
+            return Err(());
+        }
+        Progress::new(if matches!(options.reporter, Reporter::Json) {
+            Mode::Hidden
+        } else {
+            Mode::for_cli(global)
+        })
+    };
     let read = (&roots[..], &*host.cwd, &sources);
     let store = |artifacts: &[Artifact]| {
         let now = cache::key(&project, &roots, &settings, !go_requested && !rt);
-        diagnostics.is_empty() && cache::store_built(&project, read, &key, &now, artifacts)
+        diagnostics.is_empty()
+            && emitted.diagnostics.is_empty()
+            && cache::store_built(&project, read, &key, &now, artifacts)
     };
     if backend.is_component() {
         store(&emitted.artifacts);

@@ -38,7 +38,7 @@ fn go_dependency_fingerprints_describe_the_published_go_interfaces() {
         },
         sha256: sha256(b"component"),
     };
-    let output = BuildPlan {
+    let mut output = BuildPlan {
         purpose: Purpose::Build,
         backend: Selected::Native,
         out_dir: root.join("output"),
@@ -50,22 +50,53 @@ fn go_dependency_fingerprints_describe_the_published_go_interfaces() {
         release: false,
     };
     let prepared = Prepared::new(&host, &sources, None, &compilation, &output, pin);
-    let read = |module: &str| {
-        let path = format!("{module}.iface");
-        let artifact = prepared
+    assert_interfaces(&prepared, Target::Go);
+    for (environment, go, expected) in [
+        ("js/node", true, Target::Js),
+        ("go/native", false, Target::Go),
+    ] {
+        let config_file = sources.add("config", "");
+        let mut config = project::config::parse(
+            "schema-version = 1\n[project]\nkind = \"lib\"\n",
+            config_file,
+        )
+        .expect("config");
+        config.build.environment = Some(environment.parse().expect("environment"));
+        let project = project::Project {
+            root: root.clone(),
+            config,
+            config_file,
+            workspace: None,
+        };
+        output.go = go;
+        let prepared = Prepared::new(
+            &host,
+            &sources,
+            Some(&project),
+            &compilation,
+            &output,
+            prepared.request.backend.clone(),
+        );
+        assert_interfaces(&prepared, expected);
+    }
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+fn assert_interfaces(prepared: &Prepared, expected: Target) {
+    let interface = |name: &str| {
+        let file = prepared
             .shared
             .iter()
-            .find(|file| file.path == path)
+            .find(|artifact| artifact.path == format!("{name}.iface"))
             .expect("published interface");
-        iface::read(&artifact.contents, module).expect("interface")
+        iface::read(&file.contents, name).expect("interface")
     };
-    let helper = read("Helper");
-    let main = read("Main");
-    assert_eq!(helper.targets, [Target::Go]);
-    assert_eq!(main.targets, [Target::Go]);
+    let helper = interface("Helper");
+    let main = interface("Main");
+    assert_eq!(helper.targets, [expected]);
+    assert_eq!(main.targets, [expected]);
     assert_eq!(
         main.dependencies.get("Helper"),
         Some(&iface::fingerprint(&helper))
     );
-    fs::remove_dir_all(root).expect("cleanup");
 }

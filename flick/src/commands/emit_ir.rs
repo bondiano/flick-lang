@@ -28,7 +28,7 @@ pub(super) fn artifact(
     let ir = modules
         .iter()
         .map(|m| {
-            if output.release {
+            if output.release && !output.backend.is_component() {
                 build::optimized(modules, m, output.extras.rt)
             } else {
                 m.ir.clone()

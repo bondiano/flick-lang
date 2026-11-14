@@ -9,6 +9,8 @@ use flick_backend::RuntimeDependency;
 use sha2::{Digest, Sha256};
 
 pub(super) fn installed(root: &Path) -> Result<Vec<RuntimeDependency>, String> {
+    let root =
+        fs::canonicalize(root).map_err(|e| format!("cannot resolve runtime importer: {e}"))?;
     let name = "@flick-lang/runtime";
     let Some(manifest) = root
         .ancestors()
@@ -104,5 +106,37 @@ fn the_kernel_pin_follows_project_resolution_with_a_symlinked_adapter() {
     assert_eq!(installed(&project).expect("project pin"), expected);
     fs::write(kernel.join("dist/index.js"), "updated project kernel").expect("kernel change");
     assert_ne!(installed(&project).expect("changed project pin"), expected);
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[cfg(all(test, unix))]
+#[test]
+fn a_project_alias_pins_the_kernel_hoisted_above_the_real_importer() {
+    use std::os::unix::fs::symlink;
+    use std::{env, process};
+    let root = env::temp_dir().join(format!("flick-project-kernel-{}", process::id()));
+    let _ = fs::remove_dir_all(&root);
+    for parent in ["real", "alias-parent"] {
+        let kernel = root.join(parent).join("node_modules/@flick-lang/runtime");
+        fs::create_dir_all(kernel.join("dist")).expect("kernel");
+        fs::write(
+            kernel.join("package.json"),
+            r#"{"name":"@flick-lang/runtime","version":"0.1.0"}"#,
+        )
+        .expect("manifest");
+        fs::write(kernel.join("dist/index.js"), parent).expect("different kernel bytes");
+    }
+    let project = root.join("real/project");
+    fs::create_dir_all(&project).expect("project");
+    let alias = root.join("alias-parent/project");
+    symlink(&project, &alias).expect("alias");
+    let pin = installed(&project).expect("real pin");
+    assert_eq!(installed(&alias).expect("alias pin"), pin);
+    fs::write(
+        root.join("real/node_modules/@flick-lang/runtime/dist/index.js"),
+        "changed",
+    )
+    .expect("update actual runtime");
+    assert_ne!(installed(&alias).expect("updated pin"), pin);
     fs::remove_dir_all(root).expect("cleanup");
 }

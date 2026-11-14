@@ -2,6 +2,8 @@
 //! chooses artifact ids; only the host resolves tools to executable paths.
 
 use std::collections::BTreeSet;
+use std::ffi::OsStr;
+use std::iter;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::{env, fs, io};
@@ -20,6 +22,7 @@ pub(super) const FILE: &str = ".flick-backend.cbor";
 struct Manifest {
     backend: BackendPin,
     runtime_dependencies: Vec<RuntimeDependency>,
+    importers: Vec<String>,
     launches: Vec<Launch>,
 }
 
@@ -39,12 +42,15 @@ pub(super) struct Tool {
 
 impl Tool {
     pub(super) fn node(expected: Option<&Toolchain>) -> Result<Self, String> {
+        let paths = env::var_os("PATH").unwrap_or_default();
+        Self::node_on_path(&paths, expected)
+    }
+
+    fn node_on_path(paths: &OsStr, expected: Option<&Toolchain>) -> Result<Self, String> {
         let name = if cfg!(windows) { "node.exe" } else { "node" };
-        let path = env::var_os("PATH")
-            .into_iter()
-            .flat_map(|p| env::split_paths(&p).collect::<Vec<_>>())
+        let path = env::split_paths(paths)
             .map(|dir| dir.join(name))
-            .find(|path| path.is_file())
+            .find(|path| executable(path))
             .ok_or("cannot find Node.js on PATH")?;
         Self::at_node(&path, expected)
     }
@@ -90,6 +96,21 @@ impl Tool {
     }
 }
 
+fn executable(path: &Path) -> bool {
+    if !path.is_file() {
+        return false;
+    }
+    #[cfg(unix)]
+    {
+        use rustix::fs::{Access, AtFlags, CWD, accessat};
+        accessat(CWD, path, Access::EXEC_OK, AtFlags::EACCESS).is_ok()
+    }
+    #[cfg(not(unix))]
+    {
+        true
+    }
+}
+
 pub(super) fn artifact(pin: &BackendPin, result: &BuildResult) -> Result<Artifact, String> {
     let launches = result
         .launches
@@ -113,6 +134,7 @@ pub(super) fn artifact(pin: &BackendPin, result: &BuildResult) -> Result<Artifac
     let manifest = Manifest {
         backend: pin.clone(),
         runtime_dependencies: result.runtime_dependencies.clone(),
+        importers: result.artifacts.iter().map(|a| a.path.clone()).collect(),
         launches,
     };
     let mut contents = vec![];
@@ -167,6 +189,10 @@ fn read(bytes: &[u8], pin: &BackendPin) -> Result<Manifest, String> {
     if manifest.backend != *pin {
         return Err("launch manifest differs from the selected backend pin".into());
     }
+    flick_backend::validate_output_paths(
+        manifest.importers.iter().map(String::as_str),
+        Limits::default(),
+    )?;
     let mut names = BTreeSet::new();
     for launch in &manifest.launches {
         if launch.name.is_empty() || !names.insert((&launch.name, launch.kind == LaunchKind::Test))
@@ -208,15 +234,28 @@ pub(crate) fn command(
     }
     let manifest = read(&fs::read(&path).map_err(|e| e.to_string())?, pin)?;
     if !manifest.runtime_dependencies.is_empty() {
-        let installed = super::dependencies::installed(root)?;
-        if manifest
-            .runtime_dependencies
+        let directories: BTreeSet<_> = manifest
+            .importers
             .iter()
-            .any(|r| !installed.contains(r))
-        {
-            return Err(
-                "launch runtime dependency differs from its pinned version and digest".into(),
-            );
+            .map(|path| {
+                root.join(path)
+                    .parent()
+                    .expect("validated artifact path")
+                    .to_path_buf()
+            })
+            .chain(iter::once(root.to_path_buf()))
+            .collect();
+        for directory in directories {
+            let installed = super::dependencies::installed(&directory)?;
+            if manifest
+                .runtime_dependencies
+                .iter()
+                .any(|r| !installed.contains(r))
+            {
+                return Err(
+                    "launch runtime dependency differs from its pinned version and digest".into(),
+                );
+            }
         }
     }
     let launch = manifest
@@ -300,6 +339,60 @@ mod tests {
         assert!(error.contains("runtime dependency"), "{error}");
         fs::remove_dir_all(root).expect("cleanup");
     }
+
+    #[test]
+    fn runtime_pins_are_checked_from_nested_importers() {
+        let root = env::temp_dir().join(format!("flick-launch-shadow-{}", process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let kernel = root.join("node_modules/@flick-lang/runtime");
+        fs::create_dir_all(kernel.join("dist")).expect("kernel");
+        fs::create_dir_all(root.join("Suite")).expect("module directory");
+        fs::write(
+            kernel.join("package.json"),
+            r#"{"name":"@flick-lang/runtime","version":"0.1.0"}"#,
+        )
+        .expect("manifest");
+        fs::write(kernel.join("dist/index.js"), "pinned runtime").expect("runtime");
+        let pin = BackendPin {
+            identity: BackendId {
+                id: "test/shadow".into(),
+                version: "1.0.0".into(),
+            },
+            sha256: sha256(b"component"),
+        };
+        let result = BuildResult {
+            artifacts: vec![flick_backend::Artifact {
+                id: "entry".into(),
+                path: "Suite/Entry.js".into(),
+                kind: flick_backend::ArtifactKind::Executable,
+                bytes: vec![],
+            }],
+            steps: vec![],
+            runtime_dependencies: dependencies::installed(&root).expect("runtime pin"),
+            launches: vec![Launch {
+                name: "main".into(),
+                kind: LaunchKind::Run,
+                artifact: "entry".into(),
+                runtime: None,
+                arguments: vec![],
+            }],
+            diagnostics: vec![],
+        };
+        fs::write(
+            root.join(FILE),
+            artifact(&pin, &result).expect("manifest").contents,
+        )
+        .expect("launch metadata");
+        command(&root, &pin, LaunchKind::Run, "main").expect("matching resolution");
+        let shadow = root.join("Suite/node_modules/@flick-lang/runtime");
+        fs::create_dir_all(shadow.join("dist")).expect("shadow runtime");
+        fs::copy(kernel.join("package.json"), shadow.join("package.json")).expect("same version");
+        fs::write(shadow.join("dist/index.js"), "unapproved runtime").expect("shadow bytes");
+        let error = command(&root, &pin, LaunchKind::Run, "main")
+            .expect_err("nested importer resolves a different runtime");
+        assert!(error.contains("runtime dependency"), "{error}");
+        fs::remove_dir_all(root).expect("cleanup");
+    }
 }
 
 #[cfg(all(test, unix))]
@@ -333,5 +426,29 @@ fn a_mismatched_node_pin_is_rejected_without_executing_the_candidate() {
         root.join("node.called").exists(),
         "approved version query executes"
     );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[cfg(all(test, unix))]
+#[test]
+fn node_resolution_skips_nonexecutable_path_candidates() {
+    use std::os::unix::fs::PermissionsExt;
+    use std::process;
+    let root = env::temp_dir().join(format!("flick-node-path-{}", process::id()));
+    let _ = fs::remove_dir_all(&root);
+    for (directory, mode) in [("first", 0o644), ("second", 0o755)] {
+        let directory = root.join(directory);
+        fs::create_dir_all(&directory).expect("directory");
+        let path = directory.join("node");
+        fs::write(&path, b"#!/bin/sh\nprintf 'v1.2.3\\n'\n").expect("node");
+        fs::set_permissions(path, fs::Permissions::from_mode(mode)).expect("permissions");
+    }
+    let paths = env::join_paths([root.join("first"), root.join("second")]).expect("PATH");
+    let node = Tool::node_on_path(&paths, None).expect("executable Node later on PATH");
+    assert_eq!(
+        node.path,
+        fs::canonicalize(root.join("second/node")).expect("real node")
+    );
+    assert_eq!(node.pin.version, "1.2.3");
     fs::remove_dir_all(root).expect("cleanup");
 }
