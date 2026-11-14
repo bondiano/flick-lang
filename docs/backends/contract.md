@@ -92,6 +92,8 @@ Collision keys also account for HFS+ ignorable formatting characters,
 including aliases of compiler-owned files and directory/file prefixes.
 Console aliases are also reserved. Path components fit 255 UTF-8 bytes and
 255 decomposed UTF-16 units so they can be staged on the supported filesystems.
+DOS-short-name-shaped components are refused so automatic NTFS aliases
+cannot redirect an artifact to another output or a compiler-owned file.
 Launch identity is `(kind, name)`: a run and a test may share a name;
 duplicates within one kind are rejected.
 
