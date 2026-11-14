@@ -31,13 +31,21 @@ fn selected(request: &BuildRequest, module: &str) -> bool {
 }
 
 fn capabilities() -> Vec<Capability> {
-    ["typescript", "declarations", "promise-facade", "schema-aot"]
-        .into_iter()
-        .map(|name| Capability {
-            name: name.into(),
-            version: "1.0.0".into(),
-        })
-        .collect()
+    [
+        "typescript",
+        "declarations",
+        "promise-facade",
+        "schema-aot",
+        "host-node-devtools",
+        "host-schema-aot",
+        "host-source-build",
+    ]
+    .into_iter()
+    .map(|name| Capability {
+        name: name.into(),
+        version: "1.0.0".into(),
+    })
+    .collect()
 }
 
 impl Backend for Javascript {

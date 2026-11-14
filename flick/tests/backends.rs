@@ -263,9 +263,9 @@ fn component_preflight_refusals_preserve_spans_and_existing_output() {
 }
 
 #[test]
-fn an_environment_cannot_be_silently_ignored_by_the_native_baseline() {
+fn the_selected_backend_rejects_an_unsupported_environment() {
     let root = project(
-        "backend_native_environment",
+        "backend_selected_environment",
         &[
             ("flick.toml", CONFIG),
             (
@@ -284,14 +284,16 @@ fn an_environment_cannot_be_silently_ignored_by_the_native_baseline() {
     let old = fs::read(root.join("dist/_flick/App.js")).expect("node output");
     fs::write(
         root.join("flick.toml"),
-        format!("{CONFIG}\n[build]\nenvironment = \"js/browser\"\n"),
+        format!("{CONFIG}\n[build]\nenvironment = \"js/unsupported\"\n"),
     )
-    .expect("browser");
-    let browser = flick_in(&root, &["build", "--diagnostics", "json"]);
-    assert_eq!(browser.status.code(), Some(1), "{browser:?}");
-    let errors = String::from_utf8_lossy(&browser.stderr);
+    .expect("unsupported platform");
+    let unsupported = flick_in(&root, &["build", "--diagnostics", "json"]);
+    assert_eq!(unsupported.status.code(), Some(1), "{unsupported:?}");
+    let errors = String::from_utf8_lossy(&unsupported.stderr);
     assert!(
-        errors.contains("FLICK-P013") && errors.contains("js/browser"),
+        errors.contains("FLICK-P013")
+            && errors.contains("unsupported environment")
+            && errors.contains("js/unsupported"),
         "{errors}"
     );
     assert_eq!(

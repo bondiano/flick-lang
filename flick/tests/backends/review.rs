@@ -231,3 +231,75 @@ fn commonjs_emission_preserves_string_contents_and_test_filters() {
     );
     assert_eq!(report["tests"][0]["name"], "Suite > export const tests =");
 }
+
+#[test]
+#[ignore = "requires just wasm-backends"]
+fn third_party_components_do_not_inherit_the_official_js_runtime_check() {
+    fn copy_tree(source: &Path, destination: &Path) {
+        fs::create_dir_all(destination).expect("runtime directory");
+        for entry in fs::read_dir(source).expect("runtime files") {
+            let entry = entry.expect("runtime file");
+            let destination = destination.join(entry.file_name());
+            if entry.file_type().expect("file type").is_dir() {
+                copy_tree(&entry.path(), &destination);
+            } else {
+                fs::copy(entry.path(), destination).expect("copy runtime file");
+            }
+        }
+    }
+    let root = fixture("backend_unrelated_runtime", "App");
+    let kernel = root.join("node_modules/@flick-lang/runtime");
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("../runtime");
+    copy_tree(&runtime.join("dist"), &kernel.join("dist"));
+    let mut manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(runtime.join("package.json")).expect("runtime manifest"))
+            .expect("runtime JSON");
+    manifest["version"] = "999.0.0".into();
+    fs::write(
+        kernel.join("package.json"),
+        serde_json::to_vec(&manifest).expect("JSON"),
+    )
+    .expect("manifest");
+    for rt in [false, true] {
+        for command in ["build", "test"] {
+            let mut args = vec![command, "--offline"];
+            if rt {
+                args.push("--rt");
+            }
+            let result = flick_in(&root, &args);
+            assert!(result.status.success(), "third-party {args:?}: {result:?}");
+        }
+    }
+    assert_eq!(
+        fs::read(root.join("dist/data.bin")).expect("third-party output"),
+        [0, 255, 128]
+    );
+    let pin: flick_backend::BackendPin =
+        serde_json::from_str(include_str!("../../../backends/js/package/backend.json"))
+            .expect("official pin");
+    fs::copy(
+        runtime.join("../backends/js/package/component.wasm"),
+        root.join("backend.wasm"),
+    )
+    .expect("official component");
+    let explicit = format!(
+        "{CONFIG}\n[build.backend]\nid = {:?}\nversion = {:?}\nsha256 = {:?}\ncomponent = \"backend.wasm\"\n",
+        pin.identity.id, pin.identity.version, pin.sha256
+    );
+    for config in [CONFIG, &explicit] {
+        fs::write(root.join("flick.toml"), config).expect("select official JS");
+        for command in ["build", "test"] {
+            let result = flick_in(
+                &root,
+                &[command, "--offline", "--rt", "--diagnostics", "json"],
+            );
+            let expected_status = if command == "build" { 2 } else { 1 };
+            assert_eq!(result.status.code(), Some(expected_status), "{result:?}");
+            let diagnostics = String::from_utf8_lossy(&result.stderr);
+            assert!(
+                diagnostics.contains("FLICK-P015") && diagnostics.contains("999.0.0"),
+                "{diagnostics}"
+            );
+        }
+    }
+}

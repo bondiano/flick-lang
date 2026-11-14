@@ -162,6 +162,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cbor4ii"
+version = "1.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cae341ca01ee91c1e68cbcbd9f08e5c9fb6171c7daed060625563232520d37ae"
+dependencies = [
+ "half",
+ "serde",
+]
+
+[[package]]
 name = "cc"
 version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -746,6 +756,7 @@ dependencies = [
 name = "flick-ir"
 version = "0.1.0"
 dependencies = [
+ "cbor4ii",
  "ciborium",
  "serde",
  "serde_json",

@@ -16,16 +16,17 @@ use super::out_dir::overlap;
 use super::summary::{self, Built};
 use crate::args::{BuildArguments, EmitArgument, LabelsArgument, ProfileArgument};
 use crate::artifact::{Artifact, resolve_root};
-use crate::backends::Selected;
+use crate::backends::{self, Selected};
 use crate::command::{Command, Outcome};
 use crate::package_cache;
 use crate::progress::{Mode, Progress};
 use crate::sources::FsHost;
-use crate::{builtins, cache, toolchain};
+use crate::{builtins, cache};
 
 mod backend;
 mod cached;
 pub(super) mod hooks;
+#[cfg(any(test, feature = "native-backends-development"))]
 mod js_artifacts;
 mod native;
 mod progress;
@@ -36,6 +37,11 @@ pub(super) use publication::{paths as publication_paths, publish_artifacts, writ
 mod publication_tests;
 mod schemas;
 pub(crate) mod settings;
+#[cfg(any(
+    test,
+    feature = "wasm-backends",
+    feature = "native-backends-development"
+))]
 pub(crate) mod shipped;
 mod unwritten;
 
@@ -97,6 +103,8 @@ impl BuildCommand {
         *self.built.borrow_mut() = Some(Built {
             #[cfg(feature = "wasm-backends")]
             backend: output.backend.pin(),
+            #[cfg(feature = "wasm-backends")]
+            devtools: output.backend.supports_host("host-node-devtools"),
             go: output.go,
             rt: output.extras.rt,
             modules,
@@ -139,7 +147,29 @@ impl Command for BuildCommand {
         if self.options.inputs {
             return super::inputs::describe(&host, sources, project.as_ref(), &roots);
         }
-        let backend = match Selected::load(project.as_ref()) {
+        let front = self.plan(&host, project.as_ref(), Vec::new(), &Selected::Native);
+        let go = front.go;
+        if front.extras.rt && go {
+            return Outcome {
+                sources,
+                diagnostics: vec![Diagnostic::new(
+                    codes::F004,
+                    Severity::Error,
+                    "Flick's own runtime does not support Go output",
+                )],
+            };
+        }
+        if let Some(problem) = project
+            .as_ref()
+            .filter(|_| !go)
+            .and_then(|p| backends::check_runtime(p, front.extras.rt))
+        {
+            return Outcome {
+                sources,
+                diagnostics: vec![problem],
+            };
+        }
+        let backend = match Selected::load(&host, project.as_ref(), go, front.extras.rt) {
             Ok(backend) => backend,
             Err(diagnostic) => {
                 return Outcome {
@@ -149,28 +179,10 @@ impl Command for BuildCommand {
             }
         };
         let plan = self.plan(&host, project.as_ref(), Vec::new(), &backend);
-        let go = plan.go;
         if let Err(diagnostic) = backend.validate_environment(project.as_ref(), go) {
             return Outcome {
                 sources,
                 diagnostics: vec![diagnostic],
-            };
-        }
-        if plan.extras.rt && go {
-            let message = "Flick's own runtime does not support Go output";
-            return Outcome {
-                sources,
-                diagnostics: vec![Diagnostic::new(codes::F004, Severity::Error, message)],
-            };
-        }
-        if let Some(problem) = project
-            .as_ref()
-            .filter(|_| !go && !backend.is_component())
-            .and_then(|p| toolchain::check_runtime(&p.root, plan.extras.rt))
-        {
-            return Outcome {
-                sources,
-                diagnostics: vec![problem],
             };
         }
         *self.built.borrow_mut() = None;
@@ -322,6 +334,15 @@ impl BuildCommand {
             .collect()
     }
 
+    fn emit(&self, project: Option<&Project>) -> Emit {
+        match (self.options.emit, project) {
+            (Some(EmitArgument::Ts), _) => Emit::Ts,
+            (Some(EmitArgument::Go), _) => Emit::Go,
+            (None, Some(p)) => p.config.build.emit,
+            (Some(EmitArgument::Js), _) | (None, None) => Emit::Js,
+        }
+    }
+
     /// What the build writes where.
     fn plan(
         &self,
@@ -335,15 +356,14 @@ impl BuildCommand {
             (None, Some(p)) => p.root.join(&p.config.build.out_dir),
             (None, None) => host.cwd.join("dist"),
         };
-        let emit = match (self.options.emit, project) {
-            (Some(EmitArgument::Ts), _) => Emit::Ts,
-            (Some(EmitArgument::Go), _) => Emit::Go,
-            (None, Some(p)) => p.config.build.emit,
-            (Some(EmitArgument::Js), _) | (None, None) => Emit::Js,
-        };
+        let emit = self.emit(project);
         let config = project.map(|p| &p.config.build);
         BuildPlan {
-            purpose: Purpose::Build,
+            purpose: if self.generation {
+                Purpose::Run
+            } else {
+                Purpose::Build
+            },
             backend: backend.clone(),
             out_dir: resolve_root(
                 project.map_or(host.cwd.as_path(), |project| project.root.as_path()),
@@ -405,6 +425,7 @@ pub fn release(profile: Option<ProfileArgument>, config: Option<&Build>) -> bool
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Purpose {
     Build,
+    Run,
     Test,
 }
 

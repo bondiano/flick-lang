@@ -72,7 +72,12 @@ pub(super) fn generate(
         .iter()
         .filter(|r| selected(request, &r.module))
         .collect();
-    if !roots.is_empty() {
+    if request
+        .target
+        .options
+        .iter()
+        .any(|o| o.key == "command" && o.value == "test")
+    {
         let runtime = if data.rt {
             "@flick-lang/runtime/rt"
         } else {

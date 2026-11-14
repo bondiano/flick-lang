@@ -8,6 +8,8 @@
 use std::collections::BTreeMap;
 use std::{error, fmt};
 
+#[cfg(feature = "cbor")]
+use cbor4ii::serde::from_slice;
 use serde::{Deserialize, Serialize};
 
 use crate::{FileId, LangItem, Module};
@@ -81,8 +83,13 @@ impl Program {
 
     #[cfg(feature = "cbor")]
     pub fn from_cbor(bytes: &[u8]) -> Result<Program, Error> {
-        let program: Program =
-            ciborium::from_reader(bytes).map_err(|e| Error::Format(e.to_string()))?;
+        // Borrow map keys directly from the input instead of copying them
+        // through a streaming decoder. Keep the existing reader for CBOR forms
+        // outside the slice decoder's Serde representation.
+        let program: Program = match from_slice(bytes) {
+            Ok(program) => program,
+            Err(_) => ciborium::from_reader(bytes).map_err(|e| Error::Format(e.to_string()))?,
+        };
         program.checked()
     }
 
@@ -192,6 +199,16 @@ mod tests {
         assert_eq!(p.modules[0].items[0].span.file, FileId::new(0));
     }
 
+    #[cfg(feature = "cbor")]
+    #[test]
+    fn the_slice_reader_accepts_the_writer_float_widths() {
+        for value in [0.0, -0.0, 1.5, f64::INFINITY, f64::NAN, 0.1] {
+            let expected = program(value);
+            let decoded: Program = super::from_slice(&expected.to_cbor()).expect("writer CBOR");
+            assert_eq!(decoded, expected);
+        }
+    }
+
     #[test]
     fn floats_survive_both_forms() {
         for x in [
@@ -207,6 +224,19 @@ mod tests {
             #[cfg(feature = "cbor")]
             assert_eq!(Program::from_cbor(&p.to_cbor()), Ok(p), "{x}");
         }
+    }
+
+    #[cfg(feature = "cbor")]
+    #[test]
+    fn cbor_keeps_accepting_tagged_programs_and_trailing_input() {
+        let expected = program(1.5);
+        let bytes = expected.to_cbor();
+        let mut tagged = vec![0xd8, 42];
+        tagged.extend_from_slice(&bytes);
+        assert_eq!(Program::from_cbor(&tagged), Ok(expected.clone()));
+        let mut trailing = bytes;
+        trailing.push(0xff);
+        assert_eq!(Program::from_cbor(&trailing), Ok(expected));
     }
 
     #[test]

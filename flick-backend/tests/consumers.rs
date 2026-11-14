@@ -132,6 +132,7 @@ fn go_uses_ir_and_plain_data_without_compilation_or_settings() {
         builtins: &[],
         entry: "App",
         suites: &[],
+        test: false,
         paths: &paths,
         lines: &lines,
         foreign: &BTreeMap::new(),

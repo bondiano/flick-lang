@@ -41,6 +41,9 @@ pub(super) struct Tool {
 }
 
 impl Tool {
+    pub(super) fn command(&self) -> Command {
+        Command::new(&self.path)
+    }
     pub(super) fn node(expected: Option<&Toolchain>) -> Result<Self, String> {
         let paths = env::var_os("PATH").unwrap_or_default();
         Self::node_on_path(&paths, expected)
@@ -150,18 +153,14 @@ pub(super) fn validate(
     files: &[Artifact],
     pin: &BackendPin,
     tools: &[Toolchain],
-    runtimes: &[RuntimeDependency],
+    root: &Path,
 ) -> Result<(), String> {
     let file = files
         .iter()
         .find(|f| f.path == FILE)
         .ok_or("component build has no launch manifest")?;
     let manifest = read(&file.contents, pin)?;
-    if manifest
-        .runtime_dependencies
-        .iter()
-        .any(|r| !runtimes.contains(r))
-    {
+    if !super::dependencies::verify(root, &manifest.runtime_dependencies)? {
         return Err("cached runtime dependency differs from its host pin".into());
     }
     for launch in manifest.launches {
@@ -219,12 +218,7 @@ pub(super) fn run_paths(files: &[Artifact], pin: &BackendPin) -> Vec<(String, St
         .unwrap_or_default()
 }
 
-pub(crate) fn command(
-    root: &Path,
-    pin: &BackendPin,
-    kind: LaunchKind,
-    name: &str,
-) -> Result<Command, String> {
+fn load_manifest(root: &Path, pin: &BackendPin) -> Result<Manifest, String> {
     let path = root.join(FILE);
     let size = fs::metadata(&path)
         .map_err(|e| format!("cannot read launch manifest: {e}"))?
@@ -233,6 +227,14 @@ pub(crate) fn command(
         return Err("launch manifest exceeds its size limit".into());
     }
     let manifest = read(&fs::read(&path).map_err(|e| e.to_string())?, pin)?;
+    Ok(manifest)
+}
+
+pub(super) fn verify_runtime(root: &Path, pin: &BackendPin) -> Result<(), String> {
+    verify_runtime_manifest(root, &load_manifest(root, pin)?)
+}
+
+fn verify_runtime_manifest(root: &Path, manifest: &Manifest) -> Result<(), String> {
     if !manifest.runtime_dependencies.is_empty() {
         let directories: BTreeSet<_> = manifest
             .importers
@@ -247,18 +249,34 @@ pub(crate) fn command(
             .collect();
         let mut pins = super::dependencies::Pins::default();
         for directory in directories {
-            let installed = pins.installed(&directory)?;
-            if manifest
-                .runtime_dependencies
-                .iter()
-                .any(|r| !installed.contains(r))
-            {
+            if !pins.verify(&directory, &manifest.runtime_dependencies)? {
                 return Err(
                     "launch runtime dependency differs from its pinned version and digest".into(),
                 );
             }
         }
     }
+    Ok(())
+}
+
+pub(crate) fn command(
+    root: &Path,
+    pin: &BackendPin,
+    kind: LaunchKind,
+    name: &str,
+) -> Result<Command, String> {
+    command_with_import(root, pin, kind, name, None)
+}
+
+pub(crate) fn command_with_import(
+    root: &Path,
+    pin: &BackendPin,
+    kind: LaunchKind,
+    name: &str,
+    import: Option<&str>,
+) -> Result<Command, String> {
+    let manifest = load_manifest(root, pin)?;
+    verify_runtime_manifest(root, &manifest)?;
     let launch = manifest
         .launches
         .iter()
@@ -276,6 +294,9 @@ pub(crate) fn command(
         let mut command = Command::new(tool.path);
         if runtime.id == "node" {
             command.arg("--enable-source-maps");
+            if let Some(import) = import {
+                command.args(["--import", import]);
+            }
         }
         command.arg(artifact);
         command
