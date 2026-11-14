@@ -4,6 +4,10 @@
 
 mod common;
 
+#[cfg(unix)]
+#[path = "test_command/project_alias.rs"]
+mod project_alias;
+
 #[path = "test_command/adapter_contract.rs"]
 mod adapter_contract;
 #[path = "test_command/watch.rs"]

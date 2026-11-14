@@ -7,6 +7,8 @@ mod artifacts;
 mod common;
 #[path = "cli_project/doc.rs"]
 mod doc_tests;
+#[path = "cli_project/output_guards.rs"]
+mod output_guards;
 
 use std::fs;
 use std::path::{Path, PathBuf};

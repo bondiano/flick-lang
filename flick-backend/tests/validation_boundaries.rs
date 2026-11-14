@@ -1,5 +1,6 @@
 mod common;
 
+use serde::ser::Error as SerializeError;
 use std::cell::Cell;
 
 use flick_backend::*;
@@ -420,4 +421,33 @@ fn runtime_pins_match_exact_records_independently_of_list_order() {
     assert_eq!(validate(&request, &result), Ok(vec![]));
     result.runtime_dependencies[0].version = "2.0.0".into();
     assert!(validate(&request, &result).is_err());
+}
+
+#[test]
+fn serialized_size_preserves_serializer_errors() {
+    struct Broken;
+    impl serde::Serialize for Broken {
+        fn serialize<S: serde::Serializer>(&self, _: S) -> Result<S::Ok, S::Error> {
+            Err(SerializeError::custom("independent serialization failure"))
+        }
+    }
+    let error = flick_backend::validate_serialized_size(&Broken, 1024).expect_err("invalid value");
+    assert!(
+        error.contains("independent serialization failure"),
+        "{error}"
+    );
+    let error =
+        flick_backend::validate_serialized_size(&"long payload", 1).expect_err("size bound");
+    assert!(error.contains("serialized size limit"), "{error}");
+}
+
+#[test]
+fn unapproved_tool_errors_do_not_echo_untrusted_control_sequences() {
+    let request = request();
+    let mut result = result();
+    let mut step = common::step("link", &[]);
+    step.toolchain.id = "\u{1b}[2Jforged diagnostic\n".into();
+    result.steps.push(step);
+    let error = validate(&request, &result).expect_err("unapproved tool");
+    assert_eq!(error, "backend selected an unapproved toolchain");
 }

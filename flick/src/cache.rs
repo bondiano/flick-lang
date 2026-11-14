@@ -9,18 +9,21 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::{env, fs, io};
 
-use flick_core::build::Artifact;
 use flick_core::plugin::reach::{SNAPSHOTS, hash};
 use flick_core::project::cache::{self, Key, Manifest};
 use flick_core::project::{self, Project, config};
 use flick_core::source::SourceMap;
 
+use crate::artifact::{self, Artifact};
 use crate::builtins;
 use crate::commands::inputs::{declared_name, sibling_root};
 use crate::saved;
 use crate::toolchain;
+use flick_backend::Limits;
 
+mod cleanup;
 mod signed;
+pub use cleanup::{remove_recorded, validate_record};
 
 pub use signed::{Signed, missed, path as inputs_path};
 
@@ -259,19 +262,19 @@ fn library_files(
 fn entry_path(root: &Path, key: &str) -> PathBuf {
     root.join(cache::DIR)
         .join("cache")
-        .join(format!("{key}.json"))
+        .join(format!("{key}.cbor"))
 }
 
 /// The artifacts cached under `key`.
 pub fn load(root: &Path, key: &str) -> Option<Vec<Artifact>> {
-    let text = fs::read_to_string(entry_path(root, key)).ok()?;
-    let pairs: Vec<(String, String)> = serde_json::from_str(&text).ok()?;
-    Some(
-        pairs
-            .into_iter()
-            .map(|(path, contents)| Artifact { path, contents })
-            .collect(),
-    )
+    let path = entry_path(root, key);
+    if fs::metadata(&path).ok()?.len() > Limits::default().result_bytes as u64 {
+        return None;
+    }
+    let bytes = fs::read(path).ok()?;
+    let files: Vec<Artifact> = ciborium::from_reader(bytes.as_slice()).ok()?;
+    artifact::validate(&files).ok()?;
+    Some(files)
 }
 
 /// How many files of builds a project keeps: each state of its inputs
@@ -299,14 +302,12 @@ pub fn store_built(
 /// Caches `artifacts` under `key`; a cache that cannot be written is only
 /// slower.
 pub fn store(root: &Path, key: &Signed, artifacts: &[Artifact]) {
-    let pairs: Vec<(&str, &str)> = artifacts
-        .iter()
-        .map(|a| (a.path.as_str(), a.contents.as_str()))
-        .collect();
+    if artifact::validate(artifacts).is_err() {
+        return;
+    }
     let path = entry_path(root, key);
-    if let Ok(json) = serde_json::to_string(&pairs)
-        && saved::write(&path, json.as_bytes()).is_ok()
-    {
+    let mut bytes = Vec::new();
+    if ciborium::into_writer(artifacts, &mut bytes).is_ok() && saved::write(&path, &bytes).is_ok() {
         signed::save(root, key);
         if let Some(dir) = path.parent() {
             saved::keep_newest(dir, KEPT);
@@ -314,12 +315,12 @@ pub fn store(root: &Path, key: &Signed, artifacts: &[Artifact]) {
     }
 }
 
-/// Whether all cached text files still have the bytes we published.
+/// Whether all cached files still have the bytes we published.
 pub fn artifacts_current(out_dir: &Path, artifacts: &[Artifact]) -> bool {
-    artifacts.iter().all(|artifact| {
-        fs::read(out_dir.join(&artifact.path))
-            .is_ok_and(|bytes| bytes == artifact.contents.as_bytes())
-    })
+    artifact::validate_destination(out_dir, artifacts).is_ok()
+        && artifacts
+            .iter()
+            .all(|artifact| artifact.current(&out_dir.join(&artifact.path)))
 }
 
 /// A Go executable is reusable only with the same toolchain and unchanged bytes.
@@ -359,6 +360,9 @@ fn go_stamp_path(root: &Path, key: &str, executable: &str) -> PathBuf {
 }
 
 pub fn go_current(root: &Path, key: &str, out_dir: &Path, executable: &str) -> bool {
+    if artifact::validate_destination_paths(out_dir, [executable]).is_err() {
+        return false;
+    }
     let path = go_stamp_path(root, key, executable);
     fs::read_to_string(path)
         .ok()
@@ -379,6 +383,10 @@ pub fn mark_go(root: &Path, key: &str, out_dir: &Path, executable: &str) {
 
 /// Removes obsolete build-owned files and records a successful publication.
 pub fn record(root: &Path, out_dir: &Path, files: Vec<String>) -> io::Result<()> {
+    let resolved = artifact::resolve_root(root, &project::normalize(out_dir));
+    let trusted = artifact::resolve_root(root, root);
+    let (root, out_dir) = (trusted.as_path(), resolved.as_path());
+    validate_record(root, out_dir, &files)?;
     let path = root.join(cache::MANIFEST);
     let mut manifest = manifest(root);
     let dir = out_dir.strip_prefix(root).unwrap_or(out_dir);
@@ -425,6 +433,9 @@ pub fn manifest(root: &Path) -> Manifest {
 }
 
 pub fn outputs_current(root: &Path, out_dir: &Path, files: &[String]) -> bool {
+    let resolved = artifact::resolve_root(root, out_dir);
+    let trusted = artifact::resolve_root(root, root);
+    let (root, out_dir) = (trusted.as_path(), resolved.as_path());
     let dir = out_dir
         .strip_prefix(root)
         .unwrap_or(out_dir)
@@ -436,99 +447,4 @@ pub fn outputs_current(root: &Path, out_dir: &Path, files: &[String]) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
-    use std::{env, fs, process};
-
-    use flick_core::project::{self, discover};
-    use flick_core::source::SourceMap;
-
-    use super::{input_files, read_unchanged};
-    use crate::sources::FsHost;
-
-    #[test]
-    fn the_component_of_a_plugin_a_library_provides_is_an_input() {
-        let root = env::temp_dir().join(format!("flick-cache-plugin-{}", process::id()));
-        let _ = fs::remove_dir_all(&root);
-        fs::create_dir_all(root.join("app/src/App")).expect("dir");
-        fs::create_dir_all(root.join("lib/src")).expect("dir");
-        fs::write(
-            root.join("app/flick.toml"),
-            "schema-version = 1\n[project]\nkind = \"lib\"\n[dependencies]\npairs = { path = \"../lib\" }\n",
-        )
-        .expect("write");
-        fs::write(
-            root.join("lib/flick.toml"),
-            "schema-version = 1\n[package]\nname = \"pairs\"\nversion = \"1.0.0\"\nplugin = \"pairs.wasm\"\n[project]\nkind = \"lib\"\n",
-        )
-        .expect("write");
-        let host = FsHost::new();
-        let mut sources = SourceMap::default();
-        let project = discover(&host, &mut sources, &root.join("app"), None)
-            .expect("project")
-            .expect("found");
-        let inputs = input_files(&project, &[]);
-        assert!(
-            inputs.iter().any(|p| p.ends_with("lib/pairs.wasm")),
-            "{inputs:?}"
-        );
-        // a file of the extension its plugin loads is a module of the project
-        fs::write(
-            root.join("lib/flick.toml"),
-            "schema-version = 1\n[package]\nname = \"pairs\"\nversion = \"1.0.0\"\nplugin = \"pairs.wasm\"\nload = [\"pairs\"]\n[project]\nkind = \"lib\"\n",
-        )
-        .expect("write");
-        fs::write(root.join("app/src/App/Words.pairs"), "hello = \"hi\"\n").expect("write");
-        fs::write(root.join("app/src/App/Notes.txt"), "not a module").expect("write");
-        let inputs = input_files(&project, &[]);
-        assert!(
-            inputs.iter().any(|p| p.ends_with("App/Words.pairs")),
-            "{inputs:?}"
-        );
-        assert!(
-            !inputs.iter().any(|p| p.ends_with("App/Notes.txt")),
-            "{inputs:?}"
-        );
-        let _ = fs::remove_dir_all(&root);
-    }
-
-    #[test]
-    fn a_source_saved_after_it_was_read_keeps_the_build_out_of_the_cache() {
-        let root = env::temp_dir().join(format!("flick-cache-race-{}", process::id()));
-        let _ = fs::remove_dir_all(&root);
-        fs::create_dir_all(root.join("src/App")).expect("dir");
-        fs::write(
-            root.join("flick.toml"),
-            "schema-version = 1\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n",
-        )
-        .expect("write");
-        let helper = root.join("src/App/Helper.fl");
-        fs::write(
-            &helper,
-            "module App.Helper exposing (n)\n\nn : Float\nlet n = 1\n",
-        )
-        .expect("write");
-        fs::write(
-            root.join("src/App/Main.fl"),
-            "module App.Main exposing (main)\n\nimport App.Helper\n\nmain : Unit -> Unit\nlet main () =\n  let _ = App.Helper.n\n  ()\n",
-        )
-        .expect("write");
-        let host = FsHost::new();
-        let mut sources = SourceMap::default();
-        let project = discover(&host, &mut sources, &root, None)
-            .expect("project")
-            .expect("found");
-        let roots = [root.join("src/App/Main.fl")];
-        let (diagnostics, _) = project::compile(&host, &mut sources, Some(&project), &roots);
-        assert!(diagnostics.is_empty(), "{diagnostics:?}");
-        assert!(sources.files().any(|f| f.path.ends_with("Helper.fl")));
-        assert!(read_unchanged(&project, &roots, &host.cwd, &sources));
-        // the editor saves the helper after the compiler read it
-        fs::write(
-            &helper,
-            "module App.Helper exposing (n)\n\nn : Float\nlet n = 2\n",
-        )
-        .expect("write");
-        assert!(!read_unchanged(&project, &roots, &host.cwd, &sources));
-        let _ = fs::remove_dir_all(&root);
-    }
-}
+mod tests;

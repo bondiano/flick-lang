@@ -1,6 +1,8 @@
 mod build;
 mod check;
 mod clean;
+#[cfg(test)]
+mod clean_tests;
 mod deps;
 mod dev;
 mod diff;

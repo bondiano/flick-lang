@@ -5,10 +5,7 @@ use crate::{ArtifactKind, BuildRequest, BuildResult, InputRef, LaunchKind, Toolc
 
 fn tool(tool: &Toolchain, request: &BuildRequest, policy: &Policy) -> Result<(), String> {
     if !policy.toolchains.contains(tool) || !request.toolchains.contains(tool) {
-        return Err(format!(
-            "backend selected an unapproved toolchain `{}`",
-            tool.id
-        ));
+        return Err("backend selected an unapproved toolchain".into());
     }
     if tool.id.is_empty()
         || semver::Version::parse(&tool.version).is_err()

@@ -134,6 +134,26 @@ no cache key; a detected difference is an error. Cache loading must revalidate
 the result against the current host policy. This is eligibility for caching
 generation results; final tool outputs need their own reproducibility check.
 
+The native CLI's file boundary and internal CBOR cache retain byte payloads
+and artifact kinds, including executable permissions on Unix. The complete
+output set is checked for portable paths, collisions and size limits before
+writing or restoring files, including IR dumps, test runners, Go executables
+and schema AOT results. Cache reuse checks destinations before reading them.
+The host-selected project/directory prefix is resolved consistently for
+publication and manifest ownership. Output roots and their ancestor traversal
+below that trusted prefix must be ordinary directories;
+explicit external output directories remain supported using canonical paths.
+Existing output symlinks cannot redirect writes; Unix destinations with multiple
+hard links are refused before writes or executable-mode changes. Stale-file lists
+and manifest cleanup cannot delete through a symlink parent. Relative recorded
+directories cannot contain parent traversal; the host records external directories
+as normalized absolute paths. Current and stale outputs cannot be portable aliases. Cleanup validates every recorded
+path before deleting any file. IR dumps are recorded for clean and stay outside
+the ordinary build cache. Text emit hooks see
+source/declaration/metadata text while opaque object, executable and resource
+artifacts retain their bytes. Tool execution and directory publication still
+need the transactional integration described above.
+
 ## Native component host
 
 `host::WasmBackend` verifies the component SHA-256 before compilation and its
