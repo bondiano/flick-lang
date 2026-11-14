@@ -15,8 +15,7 @@ pub fn validate_request(
     inputs: &mut dyn Inputs,
     limits: Limits,
 ) -> Result<Program, String> {
-    ciborium::into_writer(request, Budget(limits.request_bytes))
-        .map_err(|_| "backend request exceeds its total input limit")?;
+    validate_size(request, limits)?;
     if request.target.backend_api != VERSION {
         return Err("request is for another backend API".into());
     }
@@ -73,6 +72,11 @@ pub fn validate_request(
     graph::roots(request, &modules)?;
     side_data(request, &manifest, &modules, limits)?;
     Ok(program)
+}
+
+pub(super) fn validate_size(request: &BuildRequest, limits: Limits) -> Result<(), String> {
+    ciborium::into_writer(request, Budget(limits.request_bytes))
+        .map_err(|_| "backend request exceeds its total input limit".into())
 }
 
 fn side_data(

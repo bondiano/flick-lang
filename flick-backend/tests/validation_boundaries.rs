@@ -248,3 +248,132 @@ fn launch_identity_includes_the_kind_and_name() {
     result.launches.push(test);
     assert!(validate(&request, &result).is_err());
 }
+
+#[test]
+fn hfs_ignorable_characters_cannot_bypass_output_ownership() {
+    for code in [
+        0x200c..=0x200f,
+        0x202a..=0x202e,
+        0x206a..=0x206f,
+        0xfeff..=0xfeff,
+    ]
+    .into_iter()
+    .flatten()
+    {
+        let character = char::from_u32(code).expect("HFS formatting character");
+        let request = request();
+        let mut result = result();
+        result.artifacts[0].path = "App.iface".into();
+        let mut alias = result.artifacts[0].clone();
+        alias.id = "alias".into();
+        alias.path = format!("Ap{character}p.iface");
+        result.artifacts.push(alias.clone());
+        assert!(validate(&request, &result).is_err(), "U+{code:04X}");
+        result.artifacts[1].path.push_str("/child");
+        assert!(
+            validate(&request, &result).is_err(),
+            "directory alias U+{code:04X}"
+        );
+        result.artifacts = vec![alias];
+        let policy = Policy {
+            toolchains: &[],
+            environment: &[],
+            reserved_paths: &["App.iface".into()],
+            authorize_step: &common::authorize,
+            limits: Limits::default(),
+        };
+        assert!(validate_result(&request, &result, &policy, &mut inputs(&request)).is_err());
+        for path in [
+            character.to_string(),
+            format!(".{character}"),
+            format!("..{character}"),
+        ] {
+            result.artifacts[0].path = path;
+            assert!(validate(&request, &result).is_err());
+        }
+        result.artifacts[0].path = format!("👩{character}💻.png");
+        assert_eq!(validate(&request, &result), Ok(vec![]));
+    }
+    let mut result = result();
+    result.artifacts[0].path = "App.iface".into();
+    let mut distinct = result.artifacts[0].clone();
+    distinct.id = "distinct".into();
+    distinct.path = "Ap\u{200b}p.iface".into();
+    result.artifacts.push(distinct);
+    assert_eq!(
+        validate(&request(), &result),
+        Ok(vec![]),
+        "U+200B is not ignored by HFS+"
+    );
+}
+
+#[test]
+fn the_complete_request_budget_is_checked_before_loading_inputs() {
+    let base = request();
+    let mut encoded = Vec::new();
+    ciborium::into_writer(&base, &mut encoded).expect("request");
+    let backend = Fallback {
+        calls: Cell::new(0),
+    };
+    let policy = Policy {
+        toolchains: &[],
+        environment: &[],
+        reserved_paths: &[],
+        authorize_step: &common::authorize,
+        limits: Limits {
+            request_bytes: encoded.len() + 128,
+            ..Limits::default()
+        },
+    };
+    for case in ["program", "options", "manifest"] {
+        let mut request = base.clone();
+        match case {
+            "program" => request.program = vec![0; 65_536],
+            "options" => request.target.options.push(OptionValue {
+                key: "large".into(),
+                value: "x".repeat(65_536),
+            }),
+            "manifest" => {
+                for index in 0..500 {
+                    request.inputs.push(Input {
+                        id: format!("resource/{index}"),
+                        kind: InputKind::Resource,
+                        sha256: sha256(b""),
+                        size: 0,
+                    });
+                }
+            }
+            _ => unreachable!(),
+        }
+        let mut reads = 0;
+        let error = generate(
+            &backend,
+            &request,
+            &policy,
+            |id| {
+                reads += 1;
+                Some(if id == "source/App" {
+                    common::TEXT.as_bytes().to_vec()
+                } else {
+                    vec![]
+                })
+            },
+            true,
+        )
+        .err()
+        .expect("oversized request");
+        assert!(matches!(error, Failure::Protocol(_)));
+        assert_eq!(reads, 0, "{case}");
+        assert_eq!(backend.calls.get(), 0);
+    }
+    let generated = generate(
+        &backend,
+        &base,
+        &policy,
+        |_| Some(common::TEXT.as_bytes().to_vec()),
+        true,
+    )
+    .expect("valid envelope");
+    assert!(generated.cache_key().is_some());
+    assert_eq!(backend.calls.get(), 2);
+}
