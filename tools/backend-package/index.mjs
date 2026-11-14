@@ -20,7 +20,9 @@ if (mode === "update") {
   writeFileSync(join(directory, "component.wasm"), built);
   writeFileSync(join(directory, "backend.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 } else {
-  assert.deepEqual(readFileSync(join(directory, "component.wasm")), built, "the distributed component must match the pinned Rust/WIT sources; run just update-js-component");
+  const distributed = readFileSync(join(directory, "component.wasm"));
+  const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
+  assert.ok(distributed.equals(built), `the distributed component must match the pinned Rust/WIT sources; run just update-js-component (distributed ${distributed.length} bytes #${digest(distributed)}, rebuilt ${built.length} bytes #${manifest.sha256})`);
   assert.deepEqual(JSON.parse(readFileSync(join(directory, "backend.json"), "utf8")), manifest, "the distributed backend pin must match its exact bytes");
 }
 console.log(`flick/js@0.1.0#${manifest.sha256}: ${mode}`);

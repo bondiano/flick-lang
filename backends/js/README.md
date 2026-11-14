@@ -40,6 +40,10 @@ exports are computed from reference IR and these facts, with explicit
 `package/component.wasm` and `package/backend.json` hold the compiler's exact
 distributed image and pin. `just update-js-component` updates them deliberately;
 `just check-js-component` rebuilds and checks byte-for-byte reproducibility.
+Guest builds normalize workspace and Cargo source paths, with fixed guest Rust
+flags, so panic locations do not embed a build machine's directory names.
+They invoke the pinned Rust toolchain directly, without compiler-cache wrappers,
+in `target/backend-guest`; ordinary compiler builds keep their existing cache.
 `just wasm-backends` exercises artifact parity, explicit and default selection,
 and the real release binary's build/run/test path. It also runs the language
 corpus through the component in Effect/RT and both profiles. Browser loading,
