@@ -6,4 +6,6 @@ pub mod branch;
 pub mod columns;
 pub mod derive;
 pub mod refine;
+pub(in crate::types) mod row_facts;
+mod row_logic;
 pub mod scheme;

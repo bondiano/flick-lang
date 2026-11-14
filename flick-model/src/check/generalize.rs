@@ -85,6 +85,22 @@ impl Checker<'_> {
         (substitute(&s.body, &map), insts)
     }
 
+    /// Eliminate a constructor that already established its instance
+    /// premises. Bounds on its payload stay in the field types; Outlives
+    /// premises become facts of the matching arm, not new obligations.
+    pub(super) fn instantiate_pattern(&mut self, s: &Scheme) -> (Type, Vec<Inst>) {
+        let insts: Vec<Inst> = s.vars.iter().map(|(_, k)| self.fresh_inst(k)).collect();
+        let map = names(&s.vars, &insts);
+        for (c, r) in &s.outlives {
+            self.regions
+                .facts
+                .push((substitute_caps(c, &map), substitute(r, &map)));
+        }
+        let body = substitute(&s.body, &map);
+        self.remember_row_instances(&body);
+        (body, insts)
+    }
+
     /// The body of `s` with its variables rigid and the stages of its
     /// signature holding their parameters: what (Let-Sig) checks, with the
     /// names of the rigid variables. Its facts `Θ` are given from here on.
@@ -114,6 +130,7 @@ impl Checker<'_> {
             &regions_of(&s.vars, &BTreeSet::new()),
         );
         let body = substitute(&body, &map);
+        self.remember_row_instances(&body);
         self.give_provided(&body);
         (body, rigid)
     }
@@ -242,6 +259,7 @@ fn free_atoms(t: &Type, out: &mut Caps) {
         Type::Tuple(ts) => ts.iter().for_each(|t| free_atoms(t, out)),
         Type::Record(f) => f.fields.values().for_each(|t| free_atoms(t, out)),
         Type::Errors(r) => row_atoms(r, out),
+        Type::Caps(c) => *out = out.union(c),
         _ => {}
     }
 }
@@ -285,6 +303,7 @@ pub(crate) fn substitute(t: &Type, map: &HashMap<Name, Inst>) -> Type {
             Some(Inst::Type(t)) => t.clone(),
             // a row as the argument of a type: `Fiber e a`, `Failure e`
             Some(Inst::Row(r)) => Type::Errors(r.clone()),
+            Some(Inst::Caps(c)) => Type::Caps(c.clone()),
             _ => t.clone(),
         },
         Type::Captured(x, c) => Type::Captured(s(x), substitute_caps(c, map)),
@@ -316,6 +335,7 @@ pub(crate) fn substitute(t: &Type, map: &HashMap<Name, Inst>) -> Type {
         }),
         Type::Tuple(ts) => Type::Tuple(ts.iter().map(|t| substitute(t, map)).collect()),
         Type::Errors(r) => Type::Errors(substitute_row(r, map)),
+        Type::Caps(c) => Type::Caps(substitute_caps(c, map)),
         Type::Impl(r) => Type::Impl(substitute_row(r, map)),
         Type::Tag(r) => Type::Tag(substitute_row(r, map)),
         Type::Dict(c, ts) => Type::Dict(c.clone(), ts.iter().map(|t| substitute(t, map)).collect()),

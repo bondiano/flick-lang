@@ -10,7 +10,7 @@ use std::slice;
 use super::generalize::{Inst, substitute_all};
 use super::{Check, Checker, Solved, error};
 use crate::syntax::{Con, Lit, Name, Pat, Path};
-use crate::types::{Fields, Kind, Scheme, Type, Var};
+use crate::types::{Caps, Fields, Kind, Row, Scheme, Type, Var};
 
 /// A constructor of the values of a type, as `Exh` splits them.
 #[derive(Clone, Debug, PartialEq)]
@@ -190,7 +190,7 @@ impl Checker<'_> {
             );
         };
         let gadt = indexed(&scheme);
-        let (mut ct, insts) = self.instantiate_with(&scheme);
+        let (mut ct, insts) = self.instantiate_pattern(&scheme);
         let mut params = Vec::new();
         while let Type::Fun(p, _, r) = ct {
             params.push((*p).clone());
@@ -203,16 +203,35 @@ impl Checker<'_> {
         // data with hidden storage: the fields see the row the matched value
         // hides, as (Pat-Adt) takes the arguments of its type (`PatTy.head`)
         // (the instance premises keep their own row, as (Con) does)
-        if self.bare_hidden(&self.resolve(t)) {
-            let hidden = self.qualifiers(t).pop().unwrap_or_default();
+        {
+            let hidden = self.reach(t);
+            let mut result = &scheme.body;
+            while let Type::Fun(_, _, r) = result {
+                result = r;
+            }
+            let storage = self.qualifier(result);
+            let indices = self.names(&self.resolve(result));
             let at: Vec<Inst> = insts
                 .iter()
                 .zip(&scheme.vars)
-                .map(|(inst, (_, k))| match (inst, k) {
-                    (Inst::Caps(_), Kind::Captures) => Inst::Caps(hidden.clone()),
-                    _ => inst.clone(),
+                .map(|(inst, (name, k))| {
+                    if *k == Kind::Captures
+                        && !indices.contains(name)
+                        && (storage.vars.contains(&Var::Named(name.clone()))
+                            || storage.atoms.contains(&Var::Named(name.clone())))
+                    {
+                        if let Inst::Caps(c) = inst
+                            && let [Var::Meta(m)] = c.vars.iter().collect::<Vec<_>>()[..]
+                            && self.slots[*m as usize].solved.is_none()
+                        {
+                            self.bind_caps(*m, hidden.clone())?;
+                        }
+                        Ok(Inst::Caps(hidden.clone()))
+                    } else {
+                        Ok(inst.clone())
+                    }
                 })
-                .collect();
+                .collect::<Check<Vec<_>>>()?;
             let mut ft = substitute_all(&scheme.body, &scheme.vars, &at);
             params.clear();
             while let Type::Fun(p, _, r) = ft {
@@ -221,13 +240,35 @@ impl Checker<'_> {
             }
         }
         if gadt {
-            for (inst, (n, _)) in insts.iter().zip(&scheme.vars) {
+            for (inst, (n, k)) in insts.iter().zip(&scheme.vars) {
+                let row = match inst {
+                    Inst::Row(r) if r.elems.is_empty() && r.less.is_empty() => {
+                        Some((&r.vars, false))
+                    }
+                    Inst::Caps(c) if c.atoms.is_empty() => Some((&c.vars, true)),
+                    _ => None,
+                };
+                if let Some((vars, capture)) = row
+                    && let [Var::Meta(m)] = vars.iter().collect::<Vec<_>>()[..]
+                    && self.slots[*m as usize].solved.is_none()
+                {
+                    self.rigid += 1;
+                    let v = Var::Named(format!("{n}'{}", self.rigid).into());
+                    if capture {
+                        self.bind_caps(*m, Caps::var(v))?;
+                    } else {
+                        self.bind_row(*m, Row::var(v))?;
+                    }
+                }
                 if let Inst::Type(Type::Var(Var::Meta(m))) = inst
                     && matches!(self.follow(&Type::Var(Var::Meta(*m))), Type::Var(Var::Meta(x)) if x == *m)
                 {
                     self.rigid += 1;
-                    let hidden =
-                        Type::Var(Var::Named(format!("{n}'{}", self.rigid).as_str().into()));
+                    let var = Var::Named(format!("{n}'{}", self.rigid).as_str().into());
+                    if *k == Kind::Region {
+                        self.regions.kinds.insert(var.clone());
+                    }
+                    let hidden = Type::Var(var);
                     self.bind(*m, Solved::Type(hidden.clone()), &hidden)?;
                 }
             }
@@ -360,7 +401,7 @@ impl Checker<'_> {
     }
 
     fn ctor_fields(&mut self, ctor: &Ctor, t: &Type) -> Check<Vec<Type>> {
-        Ok(match ctor {
+        let fields = match ctor {
             Ctor::Con(c) => self.con_fields(c, t)?,
             Ctor::Lit(_) | Ctor::Nil => Vec::new(),
             Ctor::Tuple(_) => match self.zonk(&self.resolve(t)) {
@@ -376,7 +417,11 @@ impl Checker<'_> {
                 self.unify(t, &list(x.clone()))?;
                 vec![x.clone(), list(x)]
             }
-        })
+        };
+        if !self.coverage_consistent() {
+            return error("Exh", "constructor indices contradict earlier columns");
+        }
+        Ok(fields)
     }
 }
 
@@ -447,10 +492,11 @@ fn indexed(s: &Scheme) -> bool {
     }
     args.reverse();
     let plain = args.len() <= s.vars.len()
-        && args
-            .iter()
-            .zip(&s.vars)
-            .all(|(a, (n, _))| matches!(&***a, Type::Var(Var::Named(x)) if x == n));
+        && args.iter().zip(&s.vars).all(|(a, (n, _))| match &***a {
+            Type::Var(Var::Named(x)) => x == n,
+            Type::Caps(c) => *c == Caps::var(Var::Named(n.clone())),
+            _ => false,
+        });
     !plain
         || s.vars[args.len().min(s.vars.len())..]
             .iter()

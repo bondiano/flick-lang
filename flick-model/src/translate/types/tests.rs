@@ -1,16 +1,19 @@
 //! Translation preserves union laws independently of operand order.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
 
 use flick_core::types as fc;
 
-use super::row;
+use super::Types;
 use crate::syntax::Path;
 use crate::types::{Row, Type, Var};
 
 #[test]
 fn unrestricted_row_union_clears_exclusions_in_both_orders() {
+    let params = HashMap::new();
+    let types = Types::new(&params);
+    let row = |ty: &fc::Type| types.row(ty);
     let variable = fc::Type::Var("e".into());
     let label = Path::new("Test", "Missing");
     let excluded = fc::Type::Without {

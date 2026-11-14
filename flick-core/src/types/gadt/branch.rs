@@ -7,6 +7,7 @@
 use std::mem;
 
 use super::refine::{Refined, Unsupported};
+use super::row_facts::Equation;
 use super::scheme::{built, is_hidden_captures, is_indexed};
 use crate::diagnostics::codes;
 use crate::syntax::cst::Node;
@@ -40,6 +41,7 @@ pub struct State {
 #[derive(Clone, Copy)]
 pub struct Arm {
     equalities: usize,
+    row_equalities: usize,
     givens: usize,
     dead: bool,
 }
@@ -51,6 +53,7 @@ impl Checker<'_> {
         self.store.level += 1;
         Arm {
             equalities: self.store.equalities.len(),
+            row_equalities: self.store.row_equalities.len(),
             givens: self.classes.givens.len(),
             dead: mem::take(&mut self.gadt.dead),
         }
@@ -67,6 +70,7 @@ impl Checker<'_> {
     /// Leaves an arm; whether its pattern matches no value.
     pub(in crate::types) fn leave_arm(&mut self, arm: Arm) -> bool {
         self.store.equalities.truncate(arm.equalities);
+        self.store.row_equalities.truncate(arm.row_equalities);
         self.classes.givens.truncate(arm.givens);
         self.store.level -= 1;
         mem::replace(&mut self.gadt.dead, arm.dead)
@@ -80,8 +84,11 @@ impl Checker<'_> {
         f: impl FnOnce(&mut Self) -> T,
     ) -> T {
         let mark = self.store.equalities.len();
+        let rows = self.store.row_equalities.len();
         for g in givens {
-            if let Some(args) = args_of(g, Lang::TypeEq)
+            if let Some(row) = Equation::from_given(g) {
+                self.store.row_equalities.push(row);
+            } else if let Some(args) = args_of(g, Lang::TypeEq)
                 && let [Type::Skolem(s), ty] = args[..]
             {
                 self.store.equalities.push(Equality {
@@ -93,6 +100,7 @@ impl Checker<'_> {
         }
         let out = f(self);
         self.store.equalities.truncate(mark);
+        self.store.row_equalities.truncate(rows);
         out
     }
 
@@ -115,7 +123,8 @@ impl Checker<'_> {
 
     /// The declared type of the local a name refers to, in a GADT branch.
     pub(in crate::types) fn declared_local(&self, i: usize) -> Option<Type> {
-        (!self.store.equalities.is_empty()).then(|| self.cx.locals[i].ty.clone())
+        (!self.store.equalities.is_empty() || !self.store.row_equalities.is_empty())
+            .then(|| self.cx.locals[i].ty.clone())
     }
 
     /// The equalities among the assumptions in scope, for a constraint that
@@ -148,8 +157,7 @@ impl Checker<'_> {
             .filter(|v| !is_hidden_captures(v))
             .cloned()
             .collect();
-        let names: Vec<String> = locals.iter().map(|v| v.name.clone()).collect();
-        let refined = self.refine(&names, built(body), scrutinee);
+        let refined = self.refine(&locals, built(body), scrutinee);
         let constraints = match scheme {
             Type::Forall { constraints, .. } => &constraints[..],
             _ => &[],
@@ -193,8 +201,12 @@ impl Checker<'_> {
                 false,
             )
         };
-        let (bound, equals) = match refined {
-            Refined::Unifier { bound, equals } => (bound, equals),
+        let (bound, equals, rows) = match refined {
+            Refined::Unifier {
+                bound,
+                equals,
+                rows,
+            } => (bound, equals, rows),
             Refined::Impossible => {
                 self.gadt.dead |= self.gadt.refining;
                 return errors();
@@ -224,7 +236,9 @@ impl Checker<'_> {
             .iter()
             .filter(|v| !bound.iter().any(|(b, _)| *b == v.name))
             .collect();
-        if (!hidden.is_empty() || !equals.is_empty() || holds) && !self.gadt.refining {
+        if (!hidden.is_empty() || !equals.is_empty() || !rows.is_empty() || holds)
+            && !self.gadt.refining
+        {
             self.error(
                 codes::T058,
                 span,
@@ -232,7 +246,7 @@ impl Checker<'_> {
             );
             return errors();
         }
-        if !equals.is_empty() && !self.gadt.signed {
+        if (!equals.is_empty() || !rows.is_empty()) && !self.gadt.signed {
             self.error(
                 codes::T057,
                 span,
@@ -264,6 +278,12 @@ impl Checker<'_> {
                 ty,
                 level,
             });
+        }
+        for row in rows {
+            let mut row = row.substitute(&subst);
+            row.level = level;
+            self.classes.givens.push(row.given());
+            self.store.row_equalities.push(row);
         }
         (subst, true)
     }
@@ -303,7 +323,7 @@ pub fn dict_local(start: u32, i: usize) -> String {
 pub fn type_eqs(givens: &[Type]) -> Vec<Type> {
     givens
         .iter()
-        .filter(|g| args_of(g, Lang::TypeEq).is_some())
+        .filter(|g| args_of(g, Lang::TypeEq).is_some() || Equation::from_given(g).is_some())
         .cloned()
         .collect()
 }

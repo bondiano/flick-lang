@@ -36,6 +36,11 @@ impl Checker<'_> {
             .filter(|v| !is_hidden_captures(v))
             .map(|v| v.name.clone())
             .collect();
+        let binders: Vec<_> = vars
+            .iter()
+            .filter(|v| !is_hidden_captures(v))
+            .cloned()
+            .collect();
         if let Some(hidden) = locals
             .iter()
             .find(|v| !result.contains(&mut |t| matches!(t, Type::Var(x) if x == *v)))
@@ -45,7 +50,7 @@ impl Checker<'_> {
         // the parameters as rigid variables, which the result may refine
         let rigid: Vec<Type> = params.iter().map(|p| self.store.skolem(&p.name)).collect();
         let own = Type::apps(Type::con(&self.env.module, name), rigid.iter().cloned());
-        let Refined::Unifier { bound, equals } = self.refine(&locals, result, &own) else {
+        let Refined::Unifier { bound, equals, .. } = self.refine(&binders, result, &own) else {
             return Err("builds an instance that a derived instance does not cover".to_owned());
         };
         // what the result leaves open stays a variable of the constructor's own

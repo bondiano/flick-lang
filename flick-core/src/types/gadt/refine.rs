@@ -1,14 +1,15 @@
 //! What matching a constructor of a GADT tells about the matched value's
-//! type: the most general unifier of the type the constructor builds and the
-//! value's type, as an outcome instead of bindings. The store keeps no undo
+//! type: ordinary bindings plus equations constraining every residual row.
+//! Idempotent row equations need not have a single most general unifier. The store keeps no undo
 //! log, so this never binds a variable of it; the caller applies the result.
 
 use std::collections::HashMap;
 
+use super::row_facts::{self, Equation, RowKind};
 use crate::types::Checker;
 use crate::types::kinds::Kind;
 use crate::types::regions::{AliasKey, Unfold, leave_alias};
-use crate::types::ty::{Effects, Type};
+use crate::types::ty::{Binder, Type};
 
 /// The outcome of matching a constructor against a value's type.
 #[derive(Debug, Clone, PartialEq)]
@@ -20,10 +21,11 @@ pub enum Refined {
     Unifier {
         bound: Vec<(String, Type)>,
         equals: Vec<(u32, Type)>,
+        rows: Vec<Equation>,
     },
     /// A type that is still being inferred decides it.
     Unknown,
-    /// The branch would learn an equality of regions or rows.
+    /// The branch would learn an unsupported equality, such as regions.
     Unsupported(Unsupported),
 }
 
@@ -42,10 +44,11 @@ enum Stop {
 
 struct Refiner<'c, 'a> {
     checker: &'c Checker<'a>,
-    /// The constructor's own variables, by name.
-    locals: &'c [String],
+    /// The constructor's own variables and their checked kinds.
+    locals: &'c [Binder],
     bound: HashMap<String, Type>,
     equals: Vec<(u32, Type)>,
+    rows: Vec<Equation>,
 }
 
 impl Checker<'_> {
@@ -53,7 +56,7 @@ impl Checker<'_> {
     /// `locals`, with `scrutinee`, the type of the matched value.
     pub(in crate::types) fn refine(
         &self,
-        locals: &[String],
+        locals: &[Binder],
         built: &Type,
         scrutinee: &Type,
     ) -> Refined {
@@ -62,15 +65,34 @@ impl Checker<'_> {
             locals,
             bound: HashMap::new(),
             equals: Vec::new(),
+            rows: Vec::new(),
         };
         match r.unify(built, scrutinee) {
             Ok(()) => {
                 let bound = locals
                     .iter()
-                    .filter_map(|v| Some((v.clone(), r.full(r.bound.get(v)?))))
+                    .filter_map(|v| Some((v.name.clone(), r.full(r.bound.get(&v.name)?))))
                     .collect();
                 let equals = r.equals.iter().map(|(s, t)| (*s, r.full(t))).collect();
-                Refined::Unifier { bound, equals }
+                let rows: Vec<_> = r
+                    .rows
+                    .iter()
+                    .map(|e| Equation {
+                        kind: e.kind,
+                        left: r.full(&e.left),
+                        right: r.full(&e.right),
+                        level: None,
+                    })
+                    .collect();
+                if row_facts::consistent(self, &rows) {
+                    Refined::Unifier {
+                        bound,
+                        equals,
+                        rows,
+                    }
+                } else {
+                    Refined::Impossible
+                }
             }
             Err(Stop::Impossible) => Refined::Impossible,
             Err(Stop::Unknown) => Refined::Unknown,
@@ -81,7 +103,7 @@ impl Checker<'_> {
 
 impl Refiner<'_, '_> {
     fn is_local(&self, v: &str) -> bool {
-        self.locals.iter().any(|l| l == v)
+        self.locals.iter().any(|l| l.name == v)
     }
 
     /// `t` without qualifiers, aliases and solved variables at its head.
@@ -135,7 +157,7 @@ impl Refiner<'_, '_> {
     fn equate(&mut self, s: u32, t: &Type) -> Result<(), Stop> {
         match self.rigid_kind(s) {
             Some(Kind::Region) => return Err(Stop::Unsupported(Unsupported::Region)),
-            Some(k) if k.is_row() => return Err(Stop::Unsupported(Unsupported::Row)),
+            Some(Kind::Row(_)) => return Err(Stop::Unsupported(Unsupported::Row)),
             _ => {}
         }
         if self.occurs(t, &Type::Skolem(s)) {
@@ -152,6 +174,73 @@ impl Refiner<'_, '_> {
 
     fn unify(&mut self, a: &Type, b: &Type) -> Result<(), Stop> {
         let (a, b) = (self.walk(a), self.walk(b));
+        let kind = self.kind(&a).or_else(|| self.kind(&b));
+        self.unify_at(&a, &b, kind.as_ref().and_then(RowKind::of))
+    }
+
+    fn kind(&self, ty: &Type) -> Option<Kind> {
+        match ty {
+            Type::Var(v) => self
+                .locals
+                .iter()
+                .find(|l| l.name == *v)
+                .map(|l| l.kind.clone()),
+            Type::Skolem(s) => self.rigid_kind(*s).cloned(),
+            Type::Con { module, name } => self
+                .checker
+                .env
+                .type_def(module, name)
+                .map(|d| d.kind.clone()),
+            Type::App { head, .. } => match self.kind(head)? {
+                Kind::Arrow(_, result) => Some(*result),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    fn row(&mut self, a: &Type, b: &Type, kind: RowKind) -> Result<(), Stop> {
+        if a == b || matches!(a, Type::Error) || matches!(b, Type::Error) {
+            return Ok(());
+        }
+        if a.contains(&mut |t| matches!(t, Type::Meta(_)))
+            || b.contains(&mut |t| matches!(t, Type::Meta(_)))
+        {
+            return Err(Stop::Unknown);
+        }
+        match (a, b) {
+            (Type::Var(v), t) | (t, Type::Var(v))
+                if self.is_local(v) && !self.occurs(t, &Type::Var(v.clone())) =>
+            {
+                self.bound.insert(v.clone(), t.clone());
+                return Ok(());
+            }
+            (Type::Skolem(s), t) | (t, Type::Skolem(s)) if !self.occurs(t, &Type::Skolem(*s)) => {
+                return self.equate(*s, t);
+            }
+            _ => {}
+        }
+        let left = self.checker.store.normalize(&self.full(a));
+        let right = self.checker.store.normalize(&self.full(b));
+        for (label, ty) in &left.entries {
+            if let Some(other) = right.get(label) {
+                self.unify(ty, other)?;
+            }
+        }
+        self.rows.push(Equation {
+            kind,
+            left: a.clone(),
+            right: b.clone(),
+            level: None,
+        });
+        Ok(())
+    }
+
+    fn unify_at(&mut self, a: &Type, b: &Type, row: Option<RowKind>) -> Result<(), Stop> {
+        let (a, b) = (self.walk(a), self.walk(b));
+        if let Some(kind) = row {
+            return self.row(&a, &b, kind);
+        }
         match (&a, &b) {
             (Type::Error, _) | (_, Type::Error) => Ok(()),
             (Type::Var(x), Type::Var(y)) if x == y => Ok(()),
@@ -180,7 +269,11 @@ impl Refiner<'_, '_> {
             }
             (Type::App { head: h1, arg: a1 }, Type::App { head: h2, arg: a2 }) => {
                 self.unify(h1, h2)?;
-                self.unify(a1, a2)
+                let row = match self.kind(h1) {
+                    Some(Kind::Arrow(param, _)) => RowKind::of(&param),
+                    _ => None,
+                };
+                self.unify_at(a1, a2, row)
             }
             (Type::Tuple(xs), Type::Tuple(ys)) => {
                 if xs.len() != ys.len() {
@@ -202,15 +295,13 @@ impl Refiner<'_, '_> {
             ) => {
                 self.unify(p1, p2)?;
                 self.unify(r1, r2)?;
-                let store = &self.checker.store;
-                let zonked = |e: &Option<Box<Effects>>| {
-                    e.as_ref()
-                        .map(|e| (store.zonk(&e.services), store.zonk(&e.errors), e.sync))
-                };
-                if zonked(e1) == zonked(e2) {
-                    Ok(())
-                } else {
-                    Err(Stop::Unsupported(Unsupported::Row))
+                match (e1, e2) {
+                    (None, None) => Ok(()),
+                    (Some(e1), Some(e2)) if e1.sync == e2.sync => {
+                        self.unify_at(&e1.services, &e2.services, Some(RowKind::Services))?;
+                        self.unify_at(&e1.errors, &e2.errors, Some(RowKind::Errors))
+                    }
+                    _ => Err(Stop::Unsupported(Unsupported::Row)),
                 }
             }
             (Type::Record(_) | Type::Row(_) | Type::Union(..) | Type::Without { .. }, _)

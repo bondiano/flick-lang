@@ -23,6 +23,8 @@ mod handle;
 mod handlers;
 mod pattern;
 mod regions;
+mod row_facts;
+mod row_instances;
 mod rows;
 mod runtime;
 pub mod trace;
@@ -107,8 +109,13 @@ pub struct Checker<'d> {
     locals: Vec<(Name, Scheme)>,
     /// `φ` of the expression being checked so far.
     stage: Stage,
+    /// The stage a signed lambda/task permits at this checking position.
+    stage_bound: Option<Stage>,
     /// `ρ ⊆ ρ'` whose left side waits for a meta to be solved.
-    pending: Vec<(Row, Row)>,
+    pending: Vec<(Row, Row, row_facts::Givens)>,
+    /// Rows before normalization merges overlapping named instances.
+    row_instances: Vec<(Row, row_facts::Givens)>,
+    solving_row_upper: bool,
     /// Compiler-owned instances waiting for the type of their record.
     structural: Vec<(Name, Rc<[Term]>, Type)>,
     /// Operands of `<`, `<=`, `>`, `>=`, checked once their type is known.
@@ -124,6 +131,8 @@ pub struct Checker<'d> {
     /// What the rigid variables equal in the arms of GADT matches being
     /// checked, innermost last: the substitution θ the arm is typed under.
     equalities: Vec<(Name, Solved)>,
+    row_equalities: Vec<(Row, Row)>,
+    cap_equalities: Vec<(Caps, Caps)>,
     /// Whether `≡` may equate a rigid variable: the result of a constructor
     /// of a GADT against the type of the matched value.
     refining: bool,
@@ -158,7 +167,10 @@ impl<'d> Checker<'d> {
             level: 0,
             locals: Vec::new(),
             stage: Stage::Pure,
+            stage_bound: None,
             pending: Vec::new(),
+            row_instances: Vec::new(),
+            solving_row_upper: false,
             structural: Vec::new(),
             ordered: Vec::new(),
             rigid: 0,
@@ -166,6 +178,8 @@ impl<'d> Checker<'d> {
             config: false,
             regions: regions::Regions::default(),
             equalities: Vec::new(),
+            row_equalities: Vec::new(),
+            cap_equalities: Vec::new(),
             refining: false,
             module: Name::from(""),
             trace: None,
@@ -221,6 +235,7 @@ impl<'d> Checker<'d> {
             self.ordered_operand(&t)?;
         }
         self.settle()?;
+        self.check_row_instances()?;
         self.solve_regions()
     }
 }

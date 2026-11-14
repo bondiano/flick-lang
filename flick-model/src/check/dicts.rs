@@ -19,6 +19,7 @@ use crate::types::{Fields, Kind, Row, Scheme, Type, Var};
 pub(super) fn arg(a: &Type) -> Inst {
     match a {
         Type::Errors(r) => Inst::Row(r.clone()),
+        Type::Caps(c) => Inst::Caps(c.clone()),
         t => Inst::Type(t.clone()),
     }
 }

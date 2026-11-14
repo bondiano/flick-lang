@@ -8,6 +8,9 @@ that the official emitters already run as components.
 The [environment inventory](targets.md) records the Node, browser and Go
 boundaries. The [numeric review](numeric-policy.md) confirms the existing
 ordinary/checked/unsafe policy and identifies its independent boundary tests.
+The [GADT row contract](../formal/gadt-rows.md) records the E10 transition
+on top of E11 type congruence. This still does not freeze IR 1.0 or complete
+any of the missing component inputs below.
 
 ## Data used by the existing build
 

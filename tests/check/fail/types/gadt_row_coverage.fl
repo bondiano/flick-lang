@@ -1,0 +1,21 @@
+module App.GadtRowCoverage exposing (..)
+
+service Db =
+  get : Unit ->{} Unit
+
+service Log =
+  write : Unit ->{} Unit
+
+type Contains (r : ServiceRow) =
+  | Contains : Contains {Db | rest}
+
+type RowChoice (r : ServiceRow) =
+  | JustDb : RowChoice {Db}
+  | WithLog : RowChoice {Db, Log}
+
+missing_cross_cases : (Contains r, Contains s, RowChoice r, RowChoice s) -> Int
+let missing_cross_cases pair =
+  match pair with
+  | (Contains, Contains, JustDb, JustDb) -> 0
+  | (Contains, Contains, WithLog, WithLog) -> 1
+//~ FLICK-T009 @18:3-18:13 `match` does not cover every value

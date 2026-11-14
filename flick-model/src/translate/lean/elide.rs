@@ -279,6 +279,7 @@ fn qualified(t: &Type, q: Option<&Caps>, env: &Env) -> Result<String, String> {
                 .unwrap_or_else(|| "(.base .unit)".into())
         }
         Type::Errors(r) => format!("(.errors {})", row(r, env)?),
+        Type::Caps(c) => format!("(.caps {})", caps(c, env)?),
         Type::Dict(c, args) => {
             let args = args
                 .iter()

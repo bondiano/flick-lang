@@ -5,7 +5,7 @@
 //! variables of kind `Region`, qualifiers `τ^C`; the prelude's `Eff`, `Ref`,
 //! `Layer`, `Errors` and `S.Impl` become the forms of §1.2.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
 
 use flick_core::types::lang::Lang;
@@ -37,180 +37,10 @@ fn passes(c: &fc::Type) -> bool {
     fc::passes_dictionary(c)
 }
 
-/// `∀ᾱ. C̄ ⇒ τ` as `∀ᾱ. C₁.Dict τ̄₁ →P … →P τ`, with `Outlives C ϱ` in `Θ`.
-pub fn scheme(t: &fc::Type) -> Scheme {
-    match t {
-        fc::Type::Forall {
-            vars,
-            constraints,
-            body,
-        } => {
-            let mut out = ty(body);
-            for c in constraints.iter().rev().filter(|c| passes(c)) {
-                out = Type::fun(constraint(c), Stage::Pure, out);
-            }
-            for c in constraints.iter().filter(|c| !passes(c)) {
-                if let (head, args) = c.spine()
-                    && let [r, s] = &args[..]
-                    && head.is_lang(Lang::Provided)
-                {
-                    out = out.with_provided(&row(r), &ty(s));
-                }
-            }
-            let outlives = constraints
-                .iter()
-                .filter(|c| !passes(c))
-                .filter_map(|c| match c.spine() {
-                    (head, args) if head.is_lang(Lang::Outlives) => match &args[..] {
-                        [c, s] => Some((caps(c), ty(s))),
-                        _ => None,
-                    },
-                    _ => None,
-                })
-                .collect();
-            Scheme {
-                vars: binders(vars),
-                body: out,
-                outlives,
-            }
-        }
-        other => Scheme {
-            vars: Vec::new(),
-            body: ty(other),
-            outlives: Vec::new(),
-        },
-    }
-}
-
 pub fn binders(vars: &[Binder]) -> Vec<(Rc<str>, Kind)> {
     vars.iter()
         .filter_map(|b| Some((b.name.as_str().into(), kind(&b.kind)?)))
         .collect()
-}
-
-/// The dictionary type of a constraint `C τ̄`.
-pub fn constraint(c: &fc::Type) -> Type {
-    let (head, args) = c.spine();
-    match head {
-        fc::Type::Con { module, name } => {
-            Type::Dict(Path::new(module, name), args.into_iter().map(ty).collect())
-        }
-        other => Type::Con(Path::new("?", &format!("{other:?}"))),
-    }
-}
-
-pub fn ty(t: &fc::Type) -> Type {
-    match t {
-        fc::Type::Con { module, name } => {
-            if let Some(class) = name.strip_suffix("$Dict") {
-                Type::Dict(Path::new(module, class), Rc::from([]))
-            } else if let Some(service) = name.strip_suffix(".Impl") {
-                Type::Impl(Row::one(Path::new(module, service)))
-            } else {
-                Type::con(module, name)
-            }
-        }
-        fc::Type::Var(v) => Type::Var(Var::Named(v.as_str().into())),
-        fc::Type::App { .. } => app(t),
-        fc::Type::Fun {
-            param,
-            effects,
-            result,
-        } => {
-            let stage = match effects {
-                None => Stage::Pure,
-                Some(e) => Stage::Runtime(row(&e.services), row(&e.errors)),
-            };
-            Type::fun(ty(param), stage, ty(result))
-        }
-        fc::Type::Tuple(ts) if ts.is_empty() => Type::con(PRELUDE, "Unit"),
-        fc::Type::Tuple(ts) => Type::Tuple(ts.iter().map(ty).collect()),
-        fc::Type::Record(r) => Type::Record(fields(r)),
-        fc::Type::Captured {
-            ty: inner,
-            captures,
-            ..
-        } => Type::Captured(Rc::new(ty(inner)), caps(captures)),
-        fc::Type::Bounded {
-            ty: inner,
-            captures,
-        } => Type::Bounded(Rc::new(ty(inner)), caps(captures)),
-        fc::Type::Forall { .. } => Type::Forall(Rc::new(scheme(t))),
-        // a row written as the argument of a type: `Atom.Async a none`, as
-        // instantiating a row variable there gives it (`generalize::substitute`)
-        fc::Type::Row(_) | fc::Type::Union(..) | fc::Type::Without { .. } => Type::Errors(row(t)),
-        other => Type::Con(Path::new("?", &format!("{other:?}"))),
-    }
-}
-
-fn app(t: &fc::Type) -> Type {
-    let (head, args) = t.spine();
-    if let fc::Type::Con { module, name } = head
-        && let Some(class) = name.strip_suffix("$Dict")
-    {
-        return Type::Dict(Path::new(module, class), args.into_iter().map(ty).collect());
-    }
-    // the forms of the core, by the lang item of their constructor: the
-    // library may move or rename what it declares
-    let form = |item| head.is_lang(item);
-    match &args[..] {
-        [r, e, a] if form(Lang::Eff) => return Type::Eff(row(r), row(e), Rc::new(ty(a))),
-        [r, e] if form(Lang::Eff) => return Type::EffOf(row(r), row(e)),
-        [i, e, o] if form(Lang::Layer) => return Type::Layer(row(i), row(e), row(o)),
-        [r] if form(Lang::Errors) => return Type::Errors(row(r)),
-        [a] if form(Lang::Ref) => return Type::Ref(Rc::new(ty(a))),
-        [r] if form(Lang::ServiceImpl) => return Type::Impl(row(r)),
-        [r] if form(Lang::ServiceTag) => return Type::Tag(row(r)),
-        _ => {}
-    }
-    args.into_iter().fold(ty(head), |h, a| Type::app(h, ty(a)))
-}
-
-/// A row of services or errors.
-pub fn row(t: &fc::Type) -> Row {
-    let mut out = Row::none();
-    add(t, &mut out);
-    out
-}
-
-fn add(t: &fc::Type, out: &mut Row) {
-    match t {
-        fc::Type::Row(r) => {
-            for (label, element) in &r.entries {
-                let (_, args) = element.spine();
-                let args: Rc<[Type]> = args.into_iter().map(ty).collect();
-                out.elems.insert(Path::parse(&label.to_string()), args);
-            }
-            if let Some(tail) = &r.tail {
-                // The explicitly named instance is the only one of that
-                // name in the row. Its tail cannot supply the same service
-                // or error at other arguments (E11); subtraction preserves
-                // this fact when the named instance is handled.
-                let gone = r
-                    .entries
-                    .iter()
-                    .filter(|(label, element)| label.is_instance(element))
-                    .map(|(label, _)| Path::parse(&label.to_string()))
-                    .collect();
-                out.add_less(&row(tail), &gone);
-            }
-        }
-        fc::Type::Union(a, b) => {
-            add(a, out);
-            add(b, out);
-        }
-        fc::Type::Var(v) => {
-            out.add_var(&Var::Named(v.as_str().into()), &BTreeSet::new());
-        }
-        fc::Type::Without { row: inner, gone } => {
-            let gone = gone.iter().map(|l| Path::parse(&l.to_string())).collect();
-            out.add_less(&row(inner), &gone);
-        }
-        fc::Type::Captured { ty: inner, .. } | fc::Type::Bounded { ty: inner, .. } => {
-            add(inner, out);
-        }
-        _ => {}
-    }
 }
 
 /// A set of captures: the atoms a row of them names, and its tails. A tail
@@ -247,15 +77,252 @@ fn add_caps(t: &fc::Type, out: &mut Caps) {
     }
 }
 
-fn fields(r: &fc::Row) -> Fields {
-    let fields: BTreeMap<Rc<str>, Type> = r
-        .entries
-        .iter()
-        .map(|(l, t)| (Rc::from(l.to_string()), ty(t)))
-        .collect();
-    let tail = match r.tail.as_deref() {
-        Some(fc::Type::Var(v)) => Some(Var::Named(v.as_str().into())),
-        _ => None,
-    };
-    Fields { fields, tail }
+/// Translation uses the declared kinds of nominal parameters. An empty
+/// capture row and an empty service row have the same source representation.
+pub(crate) struct Types<'a> {
+    params: &'a HashMap<Path, Vec<Kind>>,
+    vars: Vec<(Rc<str>, Kind)>,
+}
+
+impl<'a> Types<'a> {
+    pub fn new(params: &'a HashMap<Path, Vec<Kind>>) -> Self {
+        Self {
+            params,
+            vars: Vec::new(),
+        }
+    }
+
+    fn under(&self, vars: &[Binder]) -> Self {
+        let mut inner = Self {
+            params: self.params,
+            vars: self.vars.clone(),
+        };
+        inner.vars.extend(binders(vars));
+        inner
+    }
+    /// Class constraints pass dictionaries; Outlives stays in Θ.
+    pub fn scheme(&self, t: &fc::Type) -> Scheme {
+        match t {
+            fc::Type::Forall {
+                vars,
+                constraints,
+                body,
+            } => {
+                let inner = self.under(vars);
+                let mut out = inner.ty(body);
+                for c in constraints.iter().rev().filter(|c| passes(c)) {
+                    out = Type::fun(inner.constraint(c), Stage::Pure, out);
+                }
+                for c in constraints.iter().filter(|c| !passes(c)) {
+                    if let (head, args) = c.spine()
+                        && let [r, s] = &args[..]
+                        && head.is_lang(Lang::Provided)
+                    {
+                        out = out.with_provided(&inner.row(r), &inner.ty(s));
+                    }
+                }
+                let outlives = constraints
+                    .iter()
+                    .filter(|c| !passes(c))
+                    .filter_map(|c| match c.spine() {
+                        (head, args) if head.is_lang(Lang::Outlives) => match &args[..] {
+                            [c, s] => Some((caps(c), inner.ty(s))),
+                            _ => None,
+                        },
+                        _ => None,
+                    })
+                    .collect();
+                Scheme {
+                    vars: binders(vars),
+                    body: out,
+                    outlives,
+                }
+            }
+            other => Scheme {
+                vars: Vec::new(),
+                body: self.ty(other),
+                outlives: Vec::new(),
+            },
+        }
+    }
+
+    /// The dictionary type of a constraint C τ̄, with kinded arguments.
+    pub fn constraint(&self, c: &fc::Type) -> Type {
+        let (head, args) = c.spine();
+        match head {
+            fc::Type::Con { module, name } => {
+                Type::Dict(Path::new(module, name), self.arguments(head, &args).into())
+            }
+            other => Type::Con(Path::new("?", &format!("{other:?}"))),
+        }
+    }
+
+    pub fn ty(&self, t: &fc::Type) -> Type {
+        match t {
+            fc::Type::Con { module, name } => {
+                if let Some(class) = name.strip_suffix("$Dict") {
+                    Type::Dict(Path::new(module, class), Rc::from([]))
+                } else if let Some(service) = name.strip_suffix(".Impl") {
+                    Type::Impl(Row::one(Path::new(module, service)))
+                } else {
+                    Type::con(module, name)
+                }
+            }
+            fc::Type::Var(v) => Type::Var(Var::Named(v.as_str().into())),
+            fc::Type::App { .. } => self.app(t),
+            fc::Type::Fun {
+                param,
+                effects,
+                result,
+            } => {
+                let stage = match effects {
+                    None => Stage::Pure,
+                    Some(e) => Stage::Runtime(self.row(&e.services), self.row(&e.errors)),
+                };
+                Type::fun(self.ty(param), stage, self.ty(result))
+            }
+            fc::Type::Tuple(ts) if ts.is_empty() => Type::con(PRELUDE, "Unit"),
+            fc::Type::Tuple(ts) => Type::Tuple(ts.iter().map(|t| self.ty(t)).collect()),
+            fc::Type::Record(r) => Type::Record(self.fields(r)),
+            fc::Type::Captured {
+                ty: inner,
+                captures,
+                ..
+            } => Type::Captured(Rc::new(self.ty(inner)), caps(captures)),
+            fc::Type::Bounded {
+                ty: inner,
+                captures,
+            } => Type::Bounded(Rc::new(self.ty(inner)), caps(captures)),
+            fc::Type::Forall { .. } => Type::Forall(Rc::new(self.scheme(t))),
+            // a row written as the argument of a type: `Atom.Async a none`, as
+            // instantiating a row variable there gives it (`generalize::substitute`)
+            fc::Type::Row(_) | fc::Type::Union(..) | fc::Type::Without { .. } => {
+                Type::Errors(self.row(t))
+            }
+            other => Type::Con(Path::new("?", &format!("{other:?}"))),
+        }
+    }
+
+    fn app(&self, t: &fc::Type) -> Type {
+        let (head, args) = t.spine();
+        if let fc::Type::Con { module, name } = head
+            && let Some(class) = name.strip_suffix("$Dict")
+        {
+            return Type::Dict(
+                Path::new(module, class),
+                self.arguments(&fc::Type::con(module, class), &args).into(),
+            );
+        }
+        // the forms of the core, by the lang item of their constructor: the
+        // library may move or rename what it declares
+        let form = |item| head.is_lang(item);
+        match &args[..] {
+            [r, e, a] if form(Lang::Eff) => {
+                return Type::Eff(self.row(r), self.row(e), Rc::new(self.ty(a)));
+            }
+            [r, e] if form(Lang::Eff) => return Type::EffOf(self.row(r), self.row(e)),
+            [i, e, o] if form(Lang::Layer) => {
+                return Type::Layer(self.row(i), self.row(e), self.row(o));
+            }
+            [r] if form(Lang::Errors) => return Type::Errors(self.row(r)),
+            [a] if form(Lang::Ref) => return Type::Ref(Rc::new(self.ty(a))),
+            [r] if form(Lang::ServiceImpl) => return Type::Impl(self.row(r)),
+            [r] if form(Lang::ServiceTag) => return Type::Tag(self.row(r)),
+            _ => {}
+        }
+        self.arguments(head, &args)
+            .into_iter()
+            .fold(self.ty(head), Type::app)
+    }
+
+    fn arguments(&self, head: &fc::Type, args: &[&fc::Type]) -> Vec<Type> {
+        let params = match head {
+            fc::Type::Con { module, name } => self
+                .params
+                .get(&Path::new(module, name))
+                .cloned()
+                .unwrap_or_default(),
+            fc::Type::Var(n) => {
+                let mut result = Vec::new();
+                let mut k = self
+                    .vars
+                    .iter()
+                    .rev()
+                    .find(|(v, _)| &**v == n)
+                    .map(|(_, k)| k);
+                while let Some(Kind::Arrow(a, b)) = k {
+                    result.push((**a).clone());
+                    k = Some(b);
+                }
+                result
+            }
+            _ => Vec::new(),
+        };
+        args.iter()
+            .enumerate()
+            .map(|(i, a)| {
+                if params.get(i) == Some(&Kind::Captures) {
+                    Type::Caps(caps(a))
+                } else {
+                    self.ty(a)
+                }
+            })
+            .collect()
+    }
+
+    pub fn row(&self, t: &fc::Type) -> Row {
+        let mut out = Row::none();
+        self.add(t, &mut out);
+        out
+    }
+
+    fn add(&self, t: &fc::Type, out: &mut Row) {
+        match t {
+            fc::Type::Row(r) => {
+                for (label, element) in &r.entries {
+                    let (head, args) = element.spine();
+                    let args: Rc<[Type]> = self.arguments(head, &args).into();
+                    out.elems.insert(Path::parse(&label.to_string()), args);
+                }
+                if let Some(tail) = &r.tail {
+                    // Union retains an overlapping instance. Well-formedness
+                    // requires its arguments to agree; it is not subtraction.
+                    out.add_less(&self.row(tail), &BTreeSet::new());
+                }
+            }
+            fc::Type::Union(a, b) => {
+                self.add(a, out);
+                self.add(b, out);
+            }
+            fc::Type::Var(v) => {
+                out.add_var(&Var::Named(v.as_str().into()), &BTreeSet::new());
+            }
+            fc::Type::Without { row: inner, gone } => {
+                let gone = gone.iter().map(|l| Path::parse(&l.to_string())).collect();
+                out.add_less(&self.row(inner), &gone);
+            }
+            fc::Type::Captured { ty: inner, .. } | fc::Type::Bounded { ty: inner, .. } => {
+                self.add(inner, out);
+            }
+            _ => {}
+        }
+    }
+
+    fn fields(&self, r: &fc::Row) -> Fields {
+        let fields: BTreeMap<Rc<str>, Type> = r
+            .entries
+            .iter()
+            .map(|(l, t)| (Rc::from(l.to_string()), self.ty(t)))
+            .collect();
+        let tail = match r.tail.as_deref() {
+            Some(fc::Type::Var(v)) => Some(Var::Named(v.as_str().into())),
+            _ => None,
+        };
+        Fields { fields, tail }
+    }
+}
+
+/// Translate an isolated scheme (the Prelude certificate generator).
+pub fn scheme(t: &fc::Type) -> Scheme {
+    Types::new(&HashMap::new()).scheme(t)
 }
