@@ -22,7 +22,7 @@ type Files<'a> = BTreeMap<String, (String, &'a str)>;
 
 /// The foreign modules that the modules `selected` of `compilation` need, and
 /// why some cannot ship: one is missing, or two libraries differ on a path.
-pub(super) fn foreign_files(
+pub(crate) fn foreign_files(
     compilation: &Compilation,
     selected: &dyn Fn(&str) -> bool,
 ) -> (Vec<Artifact>, Vec<Diagnostic>) {

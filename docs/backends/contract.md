@@ -73,12 +73,37 @@ by receiving a `Program`. A consumer that needs a projection must require
 its declared schema and refuse missing or incompatible data. It cannot
 call the checker through this world.
 
-`flick.typescript@0.1.0` contains the shared projection's declarations,
-export annotations, imports and imported module names. Its payload is CBOR
-of the WIT `typescript-projection` record. JS consumes that plain data;
-the checker and projection rules remain shared. Future changes to memory
-or execution semantics need a coordinated IR version, independently of
-this backend package version.
+The CLI supplies `flick.typescript@0.2.0` as CBOR of the WIT
+`typescript-module-projection` record. Each logical module contains every
+physical file produced by `Typing::prepare`, including lexical prefixes.
+Each file identifies its physical module and output path, with declarations,
+export annotations, imports and imported module names. Annotation entries
+are sorted by key. The earlier `0.1.0` contract probe used a single
+`typescript-projection`; consumers must check the schema version before
+decoding. These plain data records do not change the world's function
+signatures. The checker and projection rules remain shared.
+
+The host prepares `.d.ts` and Promise facades with the same projection
+implementation as the native baseline and reserves their output paths.
+JavaScript output alone requires no TypeScript source projection. Its foreign
+metadata still includes type-only imports needed by shared declarations.
+`js.runtime` selects `effect` or `rt` from the effective project/CLI settings;
+`js.effect-bridge` records `absent`, `available`, `available-with-ui`,
+`available-with-web` or `available-with-ui-and-web`.
+
+`flick.javascript-ffi@0.1.0` foreign bindings carry original and host-resolved
+specifiers. Library files use the existing shipping checks, are retained as
+compiler-owned outputs and have content-addressed `foreign` inputs. Each
+library binding conservatively references the shipped input set of all
+libraries in the compilation, including files from unrelated libraries. This
+compilation-wide granularity is an over-approximation, not a per-binding
+dependency proof; the explicit foreign binding records still resolve each
+module and specifier separately.
+Ordinary package imports remain imports; this does not yet provide complete
+npm dependency pinning or Go foreign inputs.
+
+Future changes to memory or execution semantics need a coordinated IR
+version, independently of this backend package version.
 
 `check-target` receives the complete request, so unsupported operations can
 be refused with source spans before generation. Static handshake precedes

@@ -142,9 +142,10 @@ pub fn input_files(project: &Project, roots: &[PathBuf]) -> Vec<PathBuf> {
         &mut loaded,
     );
     files.retain(|p| {
-        p.extension()
-            .and_then(|e| e.to_str())
-            .is_some_and(|e| matches!(e, "fl" | "go" | "mjs") || loaded.iter().any(|l| l == e))
+        project::ships(&p.to_string_lossy())
+            || p.extension()
+                .and_then(|e| e.to_str())
+                .is_some_and(|e| matches!(e, "fl" | "go") || loaded.iter().any(|l| l == e))
     });
     files.extend(
         [
@@ -255,8 +256,8 @@ fn library_files(
         let mut modules = Vec::new();
         files_under(&at.join(&library.source_dir), &mut modules);
         out.extend(modules.into_iter().filter(|p| {
-            p.extension()
-                .is_some_and(|e| e == "fl" || e == "go" || e == "mjs" || e == "cjs")
+            project::ships(&p.to_string_lossy())
+                || p.extension().is_some_and(|e| e == "fl" || e == "go")
         }));
         library_files(&at, &library.dependencies, out, loaded);
     }

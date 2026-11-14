@@ -171,6 +171,16 @@ interface types {
     modules: list<string>,
   }
 
+  record typescript-file {
+    module: string,
+    output: string,
+    projection: typescript-projection,
+  }
+
+  record typescript-module-projection {
+    files: list<typescript-file>,
+  }
+
   record package-target {
     %package: string,
     environments: list<environment>,

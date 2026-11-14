@@ -1,0 +1,4 @@
+module Library exposing (inc)
+
+inc : Int ->{} Int
+foreign inc from "./helper.mjs" "inc"
