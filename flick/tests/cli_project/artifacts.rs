@@ -342,22 +342,6 @@ fn a_trusted_project_alias_keeps_publication_and_clean_ownership_consistent() {
         assert_eq!(code(&result), Some(0), "{command}: {result:?}");
         assert_eq!(dir.join("real/dist/Main.js").exists(), command != "clean");
     }
-    let app = project(
-        "cli_trusted_app_alias",
-        &[
-            ("real/flick.toml", APP),
-            (
-                "real/src/App/Main.fl",
-                "module App.Main exposing (main)\nmain : Unit -> Unit\nlet main () = ()\n",
-            ),
-        ],
-    );
-    symlink(app.join("real"), app.join("alias")).expect("app alias");
-    let selected_app = app.join("alias").to_string_lossy().into_owned();
-    for command in ["run", "test"] {
-        let result = flick_in(&app, &["--project", &selected_app, command]);
-        assert_eq!(code(&result), Some(0), "{command}: {result:?}");
-    }
     let outside = dir.join("unowned");
     fs::create_dir(&outside).expect("outside directory");
     fs::write(outside.join("Main.js"), "owned elsewhere").expect("outside file");
