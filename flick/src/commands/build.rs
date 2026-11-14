@@ -37,6 +37,11 @@ pub(super) use publication::{paths as publication_paths, publish_artifacts, writ
 mod publication_tests;
 mod schemas;
 pub(crate) mod settings;
+#[cfg(any(
+    test,
+    feature = "wasm-backends",
+    feature = "native-backends-development"
+))]
 pub(crate) mod shipped;
 mod unwritten;
 

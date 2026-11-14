@@ -16,7 +16,9 @@ use std::{fs, io, process};
 
 use flick_core::build::{go, runner_file};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
-use flick_core::project::config::{Backend, Emit, MAIN_ENTRY};
+#[cfg(feature = "wasm-backends")]
+use flick_core::project::config::Backend;
+use flick_core::project::config::{Emit, MAIN_ENTRY};
 use flick_core::project::{self, ModuleCache, Project, cache};
 use flick_core::source::SourceMap;
 #[cfg(unix)]

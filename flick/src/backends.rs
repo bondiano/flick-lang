@@ -61,6 +61,13 @@ impl Selected {
         }
     }
 
+    #[cfg_attr(
+        not(feature = "wasm-backends"),
+        expect(
+            clippy::unnecessary_wraps,
+            reason = "component tool authorization can fail"
+        )
+    )]
     pub(crate) fn schema_aot_command(&self, root: &Path) -> Result<Command, String> {
         match self {
             Self::Native => {
@@ -132,6 +139,7 @@ impl Selected {
         }
     }
 
+    #[cfg(feature = "wasm-backends")]
     pub(crate) fn pin(&self) -> Option<flick_backend::BackendPin> {
         match self {
             Self::Native => None,
