@@ -316,7 +316,20 @@ pub fn launch(
     let go = generation.go;
     #[cfg(feature = "wasm-backends")]
     let component = generation.backend.as_ref().map(|pin| {
-        backends::launch::command(generation.path(), pin, flick_backend::LaunchKind::Run, name)
+        let import = options.devtools.as_ref().filter(|_| !go).map(|_| {
+            if generation.rt {
+                "@flick-lang/runtime/rt/runner/devtools"
+            } else {
+                "@flick-lang/effect-ts/runner/devtools"
+            }
+        });
+        backends::launch::command_with_import(
+            generation.path(),
+            pin,
+            flick_backend::LaunchKind::Run,
+            name,
+            import,
+        )
     });
     #[cfg(not(feature = "wasm-backends"))]
     let component: Option<Result<Process, String>> = None;
@@ -347,6 +360,9 @@ pub fn launch(
         command.arg(generation.path().join(runner_file(name, false)));
         command
     };
+    if let Some(url) = &options.devtools {
+        command.env("FLICK_DEVTOOLS", url);
+    }
     command.args(&options.args);
     match child::spawn(&mut command, global, "application-stderr") {
         Ok(running) => {

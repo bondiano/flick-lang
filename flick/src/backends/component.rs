@@ -2,12 +2,16 @@
 
 use std::fs::File;
 use std::io::Read;
+use std::path::{Path, PathBuf};
 
 use flick_backend::host::{Budget, WasmBackend};
-use flick_backend::{BackendId, BackendPin, Failure, Limits, Policy};
+use flick_backend::{
+    BackendId, BackendPin, BuildRequest, Failure, Limits, Policy, RuntimeDependency,
+};
+use flick_core::build::go::FILES;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::BackendPackage;
-use flick_core::project::{Compilation, Project};
+use flick_core::project::{Compilation, Project, js};
 use flick_core::source::{FileId, SourceMap, Span};
 
 use super::request::Prepared;
@@ -20,16 +24,18 @@ use crate::sources::FsHost;
 
 pub(crate) struct Package {
     pin: BackendPin,
+    root: PathBuf,
     backend: WasmBackend,
     tools: Vec<launch::Tool>,
     runtimes: Vec<flick_backend::RuntimeDependency>,
 }
 
 impl Package {
-    pub(super) fn pin(&self) -> BackendPin {
-        self.pin.clone()
-    }
-    pub(super) fn load(project: &Project, package: &BackendPackage) -> Result<Self, Diagnostic> {
+    pub(super) fn load(
+        project: &Project,
+        package: &BackendPackage,
+        rt: bool,
+    ) -> Result<Self, Diagnostic> {
         let pin = BackendPin {
             identity: BackendId {
                 id: package.id.clone(),
@@ -37,34 +43,51 @@ impl Package {
             },
             sha256: package.sha256.clone(),
         };
-        let load = || {
-            let limit = Limits::default().artifact_bytes;
-            let mut bytes = Vec::new();
-            File::open(project.root.join(&package.component))
-                .and_then(|f| {
-                    f.take(u64::try_from(limit).unwrap_or(u64::MAX) + 1)
-                        .read_to_end(&mut bytes)
-                })
-                .map_err(|e| format!("cannot read backend component: {e}"))?;
-            if bytes.len() > limit {
-                return Err("backend component exceeds its file size limit".into());
-            }
-            WasmBackend::load(component::engine()?, pin.clone(), &bytes, Budget::default())
-        };
-        let backend = load().map_err(|why| {
+        let limit = Limits::default().artifact_bytes;
+        let mut bytes = Vec::new();
+        File::open(project.root.join(&package.component))
+            .and_then(|f| {
+                f.take(u64::try_from(limit).unwrap_or(u64::MAX) + 1)
+                    .read_to_end(&mut bytes)
+            })
+            .map_err(|e| failure(format!("cannot read backend component: {e}")))?;
+        if bytes.len() > limit {
+            return Err(failure("backend component exceeds its file size limit"));
+        }
+        Self::from_bytes(&project.root, pin, &bytes, rt)
+    }
+
+    pub(super) fn from_bytes(
+        root: &Path,
+        pin: BackendPin,
+        bytes: &[u8],
+        rt: bool,
+    ) -> Result<Self, Diagnostic> {
+        let backend = WasmBackend::load(
+            component::engine().map_err(failure)?,
+            pin.clone(),
+            bytes,
+            Budget::default(),
+        )
+        .map_err(|why| {
             failure(format!(
                 "backend {}@{}#{}: {why}",
-                package.id, package.version, package.sha256
+                pin.identity.id, pin.identity.version, pin.sha256
             ))
         })?;
         let tools = launch::Tool::node(None).into_iter().collect();
-        let runtimes = super::dependencies::installed(&project.root).map_err(failure)?;
+        let runtimes = super::dependencies::installed_for(root, !rt).map_err(failure)?;
         Ok(Self {
             pin,
+            root: root.to_path_buf(),
             backend,
             tools,
             runtimes,
         })
+    }
+
+    pub(super) fn pin(&self) -> BackendPin {
+        self.pin.clone()
     }
 
     pub(crate) fn artifacts(
@@ -75,14 +98,11 @@ impl Package {
         compilation: &Compilation,
         output: &BuildPlan,
     ) -> Emission {
-        if output.extras.schema_aot {
+        let diagnostics = host_preflight(host, project, compilation, output);
+        if !diagnostics.is_empty() {
             return Emission {
                 artifacts: vec![],
-                diagnostics: vec![Diagnostic::new(
-                    codes::P012,
-                    Severity::Error,
-                    "component schema AOT requires an approved pinned host tool adapter",
-                )],
+                diagnostics,
             };
         }
         let mut prepared = Prepared::new(
@@ -103,13 +123,21 @@ impl Package {
                 diagnostics: prepared.diagnostics,
             };
         }
-        prepared
-            .request
-            .runtime_dependencies
-            .clone_from(&self.runtimes);
+        prepared.request.runtime_dependencies = match self.runtime_dependencies(&prepared.request) {
+            Ok(pins) => pins,
+            Err(diagnostic) => {
+                return Emission {
+                    artifacts: vec![],
+                    diagnostics: vec![diagnostic],
+                };
+            }
+        };
         prepared.request.toolchains = self.tools.iter().map(|t| t.pin.clone()).collect();
         let mut reserved: Vec<_> = prepared.shared.iter().map(|a| a.path.clone()).collect();
         reserved.push(launch::FILE.into());
+        if project.is_none() {
+            reserved.push(FILES.into());
+        }
         let policy = Policy {
             toolchains: &prepared.request.toolchains,
             environment: &[],
@@ -162,8 +190,22 @@ impl Package {
                 ))],
             },
         };
+        if project.is_none() {
+            standalone_files(&mut emission);
+        }
         emission.diagnostics.splice(0..0, prepared.diagnostics);
         emission
+    }
+
+    fn runtime_dependencies(
+        &self,
+        request: &BuildRequest,
+    ) -> Result<Vec<RuntimeDependency>, Diagnostic> {
+        let effect = request.target.options.iter().any(|o| {
+            (o.key == "js.runtime" && o.value == "effect")
+                || (o.key == "js.effect-bridge" && o.value != "absent")
+        });
+        super::dependencies::installed_for(&self.root, effect).map_err(failure)
     }
 
     fn rejected(&self, diagnostics: &[flick_backend::Diagnostic], files: &[FileId]) -> Emission {
@@ -198,7 +240,7 @@ impl Package {
             files,
             &self.pin,
             &self.tools.iter().map(|t| t.pin.clone()).collect::<Vec<_>>(),
-            &self.runtimes,
+            &self.root,
         )
         .is_ok()
     }
@@ -252,4 +294,42 @@ fn required_launches(
         }
     }
     Ok(())
+}
+
+fn host_preflight(
+    host: &FsHost,
+    project: Option<&Project>,
+    compilation: &Compilation,
+    output: &BuildPlan,
+) -> Vec<Diagnostic> {
+    if output.extras.schema_aot {
+        return vec![Diagnostic::new(
+            codes::P012,
+            Severity::Error,
+            "component schema AOT requires an approved pinned host tool adapter",
+        )];
+    }
+    let Some(project) = project.filter(|_| !output.go) else {
+        return vec![];
+    };
+    let mut diagnostics = js::conflicts(host, &project.root, &compilation.js_dependencies);
+    diagnostics.extend(js::unmet(host, &project.root, &compilation.js_dependencies));
+    diagnostics
+}
+
+fn standalone_files(emission: &mut Emission) {
+    if !emission.diagnostics.is_empty() {
+        return;
+    }
+    let files = emission
+        .artifacts
+        .iter()
+        .fold(String::new(), |mut files, artifact| {
+            files.push_str(&artifact.path);
+            files.push('\n');
+            files
+        });
+    emission
+        .artifacts
+        .push(Artifact::source(FILES.into(), files));
 }

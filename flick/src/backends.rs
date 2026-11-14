@@ -8,16 +8,15 @@ mod dependencies;
 #[cfg(feature = "wasm-backends")]
 pub(crate) mod launch;
 #[cfg(feature = "wasm-backends")]
+mod official;
+#[cfg(feature = "wasm-backends")]
 mod request;
 
 use crate::artifact::Artifact;
 #[cfg(feature = "wasm-backends")]
-use flick_backend::{BackendId, BackendPin};
-#[cfg(feature = "wasm-backends")]
-use flick_core::project::config::BackendPackage;
-#[cfg(feature = "wasm-backends")]
 use std::sync::Arc;
 
+use crate::sources::FsHost;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 #[cfg(feature = "wasm-backends")]
 use flick_core::project;
@@ -34,13 +33,6 @@ pub(crate) enum Selected {
 }
 
 impl Selected {
-    #[cfg(feature = "wasm-backends")]
-    pub(crate) fn pin(&self) -> Option<BackendPin> {
-        match self {
-            Self::Native => None,
-            Self::Component(package) => Some(package.pin()),
-        }
-    }
     pub(crate) fn reference_ir(
         &self,
         sources: &mut SourceMap,
@@ -62,23 +54,51 @@ impl Selected {
 
     /// Resolve and verify a pin before consulting cached output. Selecting an
     /// unavailable or incompatible component never selects native codegen.
-    pub(crate) fn load(project: Option<&Project>) -> Result<Self, Diagnostic> {
+    pub(crate) fn load(
+        host: &FsHost,
+        project: Option<&Project>,
+        go: bool,
+        rt: bool,
+    ) -> Result<Self, Diagnostic> {
         let Some((project, package)) =
             project.and_then(|p| Some((p, p.config.build.backend.as_ref()?)))
         else {
-            return Ok(Self::Native);
+            if go {
+                return Ok(Self::Native);
+            }
+            #[cfg(feature = "wasm-backends")]
+            return official::javascript(
+                project.map_or(host.cwd.as_path(), |p| p.root.as_path()),
+                rt,
+            )
+            .map(|p| Self::Component(Arc::new(p)));
+            #[cfg(not(feature = "wasm-backends"))]
+            {
+                let _ = (host, rt);
+                return Err(failure(
+                    "JavaScript builds require WebAssembly backend support",
+                ));
+            }
         };
         #[cfg(feature = "wasm-backends")]
         {
-            component::Package::load(project, package).map(|p| Self::Component(Arc::new(p)))
+            component::Package::load(project, package, rt).map(|p| Self::Component(Arc::new(p)))
         }
         #[cfg(not(feature = "wasm-backends"))]
         {
-            let _ = project;
+            let _ = (project, rt);
             Err(failure(format!(
                 "backend {}@{}#{}: this compiler was built without WebAssembly backends",
                 package.id, package.version, package.sha256
             )))
+        }
+    }
+
+    pub(crate) fn pin(&self) -> Option<flick_backend::BackendPin> {
+        match self {
+            Self::Native => None,
+            #[cfg(feature = "wasm-backends")]
+            Self::Component(package) => Some(package.pin()),
         }
     }
 
@@ -137,15 +157,4 @@ impl Selected {
 
 pub(crate) fn failure(why: impl Into<String>) -> Diagnostic {
     Diagnostic::new(codes::P013, Severity::Error, why)
-}
-
-#[cfg(feature = "wasm-backends")]
-pub(crate) fn pin(package: &BackendPackage) -> BackendPin {
-    BackendPin {
-        identity: BackendId {
-            id: package.id.clone(),
-            version: package.version.clone(),
-        },
-        sha256: package.sha256.clone(),
-    }
 }

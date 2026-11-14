@@ -50,7 +50,7 @@ pub(super) fn cached_prepare(
         cache::record(&project.root, out, publication_paths(&output, &artifacts)).ok()?;
         progress.stage("Reusing test build");
         return Some(if backend.is_component() {
-            Runner::component(out.to_path_buf(), project)
+            Runner::component(out.to_path_buf(), backend)
         } else {
             Runner::native(runner)
         });
@@ -66,7 +66,7 @@ pub(super) fn cached_prepare(
             cache::mark_go(&project.root, key, out, &go::executable(go::TEST));
         }
         Some(if backend.is_component() {
-            Runner::component(out.to_path_buf(), project)
+            Runner::component(out.to_path_buf(), backend)
         } else {
             Runner::native(runner)
         })

@@ -7,7 +7,7 @@ use flick_core::build;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 
 use super::schemas::compile_schemas;
-use super::{BuildPlan, Emission, unwritten};
+use super::{BuildPlan, Emission, Purpose, unwritten};
 use crate::artifact::{self, Artifact};
 use crate::progress::Progress;
 use crate::{cache, toolchain};
@@ -100,10 +100,10 @@ pub(crate) fn write_artifacts(output: &BuildPlan, emitted: &mut Emission, progre
     }
     if output.go && !output.backend.is_component() {
         let tests = [(build::go::TEST.to_owned(), String::new())];
-        let built = if output.suites.is_empty() {
-            &output.entries[..]
-        } else {
+        let built = if output.purpose == Purpose::Test {
             &tests[..]
+        } else {
+            &output.entries[..]
         };
         for (name, _) in built {
             progress.stage("Building Go executable");
