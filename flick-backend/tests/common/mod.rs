@@ -35,7 +35,7 @@ pub fn request() -> BuildRequest {
         labels: BTreeMap::new(),
         initialization: Initialization::default(),
         records: BTreeMap::new(),
-        package: None,
+        package: Some("demo".into()),
         exports: Exports::default(),
     };
     let program = Program::new("flick backend test", vec![module], vec![], &|_| {

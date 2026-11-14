@@ -1,7 +1,7 @@
 //! Validate everything before the host executes a step or publishes a file.
 
 mod graph;
-mod path;
+pub(super) mod path;
 
 use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet};

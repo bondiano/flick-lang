@@ -50,6 +50,11 @@ Missing content rejects the request: a fallback result must not become
 cacheable under a key that would also describe the content once available.
 Runtime dependency pins require a package and a valid SHA-256 in both the
 request and result; request membership alone does not validate a pin.
+The complete module layout is checked for portable paths and collisions in
+both compilation modes. Module package ownership must match the IR, and
+entry, test and root-handler module references stay inside the closed graph.
+Every item and nested expression span must fit the supplied UTF-8 source.
+Source aliases share one retained input buffer and line index during validation.
 
 An IR expression's optional type field is not a complete typing/effect
 analysis. UI metadata and additional optimization facts are not implied
