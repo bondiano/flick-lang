@@ -299,7 +299,8 @@ wasm-backends:
 
 # Build the wasm module the in-browser demo loads and hold it to its size budget.
 # The raw-byte budget retains the playground editor queries (hover, completion,
-# fixes and `.d.ts`). Size optimization uses LLVM Oz and whole-program LTO;
+# fixes and `.d.ts`). Size optimization uses LLVM Oz, whole-program LTO and
+# removal of debug information;
 # native release builds retain thin LTO. Binaryen removes duplicate functions
 # across Rust crates, preserving imports/exports and wasm-bindgen metadata.
 # With the playground on Flick's own
@@ -310,7 +311,7 @@ wasm:
     node tools/wasm-dedup/index.mjs target/wasm32-unknown-unknown/release/flick_wasm.wasm
     @wasm=target/wasm32-unknown-unknown/release/flick_wasm.wasm; \
     echo "flick_wasm.wasm: $(wc -c < $wasm) bytes, $(gzip -6c $wasm | wc -c) gzipped"; \
-    test $(wc -c < $wasm) -le 4440000
+    test $(wc -c < $wasm) -le 4110000
 
 # Build the playground's compiler: the wasm module and its JS bindings
 docs-wasm: wasm
