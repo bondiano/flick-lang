@@ -10,6 +10,7 @@ use flick_backend::{
 };
 use flick_core::build;
 use flick_core::codegen;
+use flick_core::diagnostics::Diagnostic;
 use flick_core::iface::{self, Target};
 use flick_core::project::{self, Compilation, Project};
 use flick_core::source::{FileId, SourceMap};
@@ -21,6 +22,12 @@ use crate::commands::build::{BuildPlan, Purpose};
 use crate::sources::FsHost;
 use crate::toolchain;
 
+mod assets;
+#[cfg(test)]
+mod assets_tests;
+mod javascript;
+#[cfg(test)]
+mod projection_tests;
 #[cfg(test)]
 mod tests;
 
@@ -29,6 +36,7 @@ pub(super) struct Prepared {
     pub bytes: BTreeMap<String, Vec<u8>>,
     pub files: Vec<FileId>,
     pub shared: Vec<Artifact>,
+    pub diagnostics: Vec<Diagnostic>,
 }
 
 impl Prepared {
@@ -118,6 +126,7 @@ impl Prepared {
             bytes: BTreeMap::new(),
             files: files.into_inner(),
             shared: vec![],
+            diagnostics: vec![],
         };
         for (i, name) in program.files.into_iter().enumerate() {
             let file = sources.get(data.files[i]);
@@ -132,13 +141,14 @@ impl Prepared {
                 line_starts: file.line_starts().to_vec(),
             });
         }
-        data.modules(compilation, project, package.as_deref(), output);
+        data.modules(host, compilation, project, package.as_deref(), output);
 
         data
     }
 
     fn modules(
         &mut self,
+        host: &FsHost,
         compilation: &Compilation,
         project: Option<&Project>,
         package: Option<&str>,
@@ -169,8 +179,10 @@ impl Prepared {
                 name: module.name.clone(),
                 role: ModuleRole::Own,
                 package: module
+                    .ir
                     .package
                     .clone()
+                    .or_else(|| module.package.clone())
                     .or_else(|| package.map(str::to_owned)),
                 output: codegen::module_path(&builtins, output.typescript, &module.name),
                 interface: Some(input),
@@ -199,6 +211,9 @@ impl Prepared {
                 output: codegen::module_path(&builtins, output.typescript, &interface.module),
                 interface: Some(input),
             });
+        }
+        if !output.go {
+            self.javascript(host, project, compilation, output, &interfaces);
         }
     }
 

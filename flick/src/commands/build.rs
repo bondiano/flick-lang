@@ -35,7 +35,8 @@ pub(super) use publication::write_artifacts;
 #[cfg(test)]
 mod publication_tests;
 mod schemas;
-mod shipped;
+pub(crate) mod settings;
+pub(crate) mod shipped;
 mod unwritten;
 
 pub struct BuildCommand {
