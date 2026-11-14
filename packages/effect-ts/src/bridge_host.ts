@@ -1,11 +1,13 @@
+import { OwnerEvidenceContext } from "./owner_evidence.ts";
 // Effect contexts and scopes corresponding to native evidence and owners.
-import { Context, Effect, Exit as EExit, Scope as EScope } from "effect";
-import { type Ctx, Instruction, currentCtx, currentFiber, hosted, inCtx, isRun, inNativeFiber } from "@flick-lang/runtime/rt/fiber";
+import { Context, Effect, Fiber as EffectFiber, Exit as EExit, Scope as EScope } from "effect";
+import { type Ctx, Instruction, currentCtx, currentFiber, evidenced, hosted, inCtx, isRun, inNativeFiber } from "@flick-lang/runtime/rt/fiber";
 import { type Exit } from "@flick-lang/runtime/rt/cause";
+import { isOperationEntry, isPartialImplementation } from "@flick-lang/runtime/rt/handle";
 import { HOST } from "@flick-lang/runtime/rt/layer";
 import { type Owner, addTo } from "@flick-lang/runtime/rt/owner";
 import { CurrentOwner, Owner as HostOwner, close as closeHost } from "./owner.ts";
-import { syncContext } from "./sync.ts";
+import { inSyncStage, syncContext } from "./sync.ts";
 import { updatedContext } from "./bridge_context.ts";
 import { dataFromEffect, dataToEffect } from "./bridge_data.ts";
 import { fromEffect, callEffect, causeToEffect } from "./bridge_runtime.ts";
@@ -23,16 +25,29 @@ const opOut = (f: unknown): unknown =>
   typeof f !== "function"
     ? f
     : (...args: ReadonlyArray<unknown>): unknown => {
-        const context = syncContext();
+        // Terminal native handler entry points carry provenance. Calling one
+        // before callEffect runs would capture OUTSIDE's C in tail/control arms.
+        // Pure currying and explicit Sync stages must remain immediate.
+        if (isOperationEntry(f) && !inSyncStage())
+          return Effect.map(callEffect(() => Reflect.apply(f, undefined, args.map(dataFromEffect))), dataToEffect);
+        // Legacy untagged functions retain result-based Pure/Runtime detection.
+        // When called by an executing Effect, even their eager factory must see
+        // that fiber's evidence rather than OUTSIDE. Opaque factories invoked
+        // before execution still require explicit runtime provenance/adaptation.
+        const context = inSyncStage() ? syncContext() : EffectFiber.getCurrent()?.context ?? syncContext();
         const base = Context.getOrUndefined(context, KERNEL) ?? ROOT_CTX;
-        const out: unknown = inCtx(hosted(base, context), (): unknown => Reflect.apply(f, undefined, args.map(dataFromEffect)));
+        const out: unknown = inCtx(evidenced(hosted(base, context), Context.get(context, OwnerEvidenceContext)), (): unknown => Reflect.apply(f, undefined, args.map(dataFromEffect)));
         if (typeof out === "function") return opOut(out);
         return isRun(out) || out instanceof Instruction ? Effect.map(callEffect(() => out), dataToEffect) : dataToEffect(out);
       };
 
-const implOut = (impl: unknown): unknown =>
+// Missing partial arms use the already translated outer service unchanged;
+// wrapping it again would translate data twice and recapture its calling context.
+const implOut = (impl: unknown, outer?: unknown): unknown =>
   new Proxy(typeof impl === "object" && impl !== null ? impl : {}, {
-    get: (target, name) => opOut(Reflect.get(target, name)),
+    get: (target, name): unknown => isPartialImplementation(impl) && !Object.hasOwn(target, name)
+      ? Reflect.get(Object(outer), name)
+      : opOut(Reflect.get(target, name)),
   });
 
 /** The Context of the evidence `ctx`: Effect's own, with the kernel's services in, computed once per node. */
@@ -45,8 +60,11 @@ export const rawHostOf = (ctx: Ctx | null): Context.Context<never> => {
   if (ctx.host !== below?.host) out = contextOf(ctx.host) ?? EMPTY;
   else if (ctx.owner !== below?.owner && ctx.owner !== undefined) out = Context.add(rawHostOf(below), CurrentOwner, hostOwnerOf(ctx.owner));
   else if (ctx.tag !== null && Object.isFrozen(ctx.tag) && ctx.tag !== MEMO_TAG(ctx.tag)) {
-    out = Context.addUnsafe(rawHostOf(below), String(Reflect.get(ctx.tag, "key")), implOut(ctx.impl));
+    const outer = rawHostOf(below);
+    const key = String(Reflect.get(ctx.tag, "key"));
+    out = Context.addUnsafe(outer, key, implOut(ctx.impl, outer.mapUnsafe.get(key)));
   } else out = rawHostOf(below);
+  out = Context.add(out, OwnerEvidenceContext, ctx.stageOwner);
   ctx.bridged = out;
   return out;
 };
@@ -58,7 +76,7 @@ const MEMO_TAG = (tag: object): object | undefined => (Reflect.get(tag, "key") =
  * shortcut: its place on the owner's stack is that of the first crossing, not of each acquire; a crossing's own `Scope` keeps the order.
  */
 const hostOwners = /*#__PURE__*/ new WeakMap<Owner, HostOwner>();
-const hostOwnerOf = (owner: Owner): HostOwner => {
+export const hostOwnerOf = (owner: Owner): HostOwner => {
   const found = hostOwners.get(owner);
   if (found !== undefined) return found;
   const made = new HostOwner(EScope.makeUnsafe());

@@ -104,6 +104,7 @@ impl Checker<'_> {
             })
             .collect();
         let map = names(&s.vars, &insts);
+        self.give_bounds(s, &map);
         for (c, r) in &s.outlives {
             let fact = (substitute_caps(c, &map), substitute(r, &map));
             self.regions.facts.push(fact);
@@ -123,6 +124,10 @@ impl Checker<'_> {
     pub(super) fn generalize(&mut self, t: &Type) -> Scheme {
         let mut ms = BTreeSet::new();
         self.metas(t, &mut ms);
+        let region_metas = self.open_region_metas();
+        for m in region_metas {
+            self.slots[m as usize].level = self.slots[m as usize].level.min(self.level);
+        }
         let zonked = self.zonk(t);
         let mut vars = Vec::new();
         for m in ms {

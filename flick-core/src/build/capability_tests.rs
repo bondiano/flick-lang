@@ -190,6 +190,28 @@ fn a_library_reexport_requires_its_runtime_capability() {
 }
 
 #[test]
+fn a_scoped_foreign_keeps_its_source_name_in_capability_diagnostics() {
+    let source = "module App.Main exposing (make)\nimport FiberHandle exposing (make)\n";
+    for release in [false, true] {
+        let found = diagnostics_for(source, EffectBridge::Absent, release, false);
+        assert_eq!(found.len(), 1, "release={release}: {found:?}");
+        let diagnostic = &found[0];
+        assert_eq!(diagnostic.code, codes::P012);
+        assert!(
+            diagnostic
+                .message
+                .starts_with("`FiberHandle.make` requires"),
+            "{}",
+            diagnostic.message
+        );
+        assert!(!diagnostic.message.contains("$raw_"));
+        let span = diagnostic.span.expect("the reexport has a source span");
+        assert_eq!(&source[span.start as usize..span.end as usize], "make");
+        assert!(diagnostics_for(source, EffectBridge::Available, release, false).is_empty());
+    }
+}
+
+#[test]
 fn eager_dictionary_values_and_discarded_initializers_need_their_capabilities() {
     for declaration in [
         "class Seed a =\n  seed : a\ninstance Seed DateTime.TimeZone =\n  let seed = DateTime.zone_make_offset 0\n",
@@ -232,7 +254,11 @@ fn the_bindings_only_the_adapter_has_only_go_down() {
                 computed
                     .entry(family.to_owned())
                     .or_default()
-                    .insert(format!("{}.{}", module.name, foreign.name));
+                    .insert(format!(
+                        "{}.{}",
+                        module.name,
+                        foreign.source_name.as_deref().unwrap_or(&foreign.name)
+                    ));
             }
         }
     }

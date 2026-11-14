@@ -48,36 +48,80 @@ export const resultFromEffect = (
 ): unknown => (value._tag === "Success" ? ok(f(value.success)) : err(g(value.failure)));
 
 /** Service operations have no signature at this runtime boundary; convert their data recursively. */
-const serviceData = (value: unknown, toward: "host" | "flick", seen = new WeakMap<object, unknown>()): unknown => {
-  if (typeof value !== "object" || value === null) return value;
-  if (seen.has(value)) return seen.get(value);
-  seen.set(value, value);
-  const done = (mappedValue: unknown): unknown => {
-    seen.set(value, mappedValue);
-    return mappedValue;
+const serviceData = (value: unknown, toward: "host" | "flick"): unknown => {
+  const seen = new WeakMap<object, unknown>();
+  const work: Array<() => void> = [];
+  let result: unknown;
+  const visit = (input: unknown, put: (mappedValue: unknown) => void): void => {
+    if (typeof input !== "object" || input === null) { put(input); return; }
+    if (seen.has(input)) { put(seen.get(input)); return; }
+    // Preserve the generic bridge's existing active-cycle and completed-alias
+    // behavior. Unlike defensive copying, unchanged graphs keep their identity.
+    seen.set(input, input);
+    const finish = (mappedValue: unknown): void => { seen.set(input, mappedValue); put(mappedValue); };
+    const variant = (child: unknown, wrap: (item: unknown) => unknown): void => {
+      work.push(() => { visit(child, (item) => { work.push(() => { finish(wrap(item)); }); }); });
+    };
+    if (toward === "flick") {
+      if (input instanceof HostFailure) { finish(failureFromEffect(input)); return; }
+      if (EOption.isOption(input)) {
+        if (EOption.isSome(input)) variant(input.value, some);
+        else finish(none);
+        return;
+      }
+      if (EResult.isResult(input)) {
+        if (EResult.isSuccess(input)) variant(input.success, ok);
+        else variant(input.failure, err);
+        return;
+      }
+    } else {
+      if (input instanceof Failure) { finish(failureToEffect(input)); return; }
+      if (EOption.isOption(input) || EResult.isResult(input) || EExit.isExit(input)) { put(input); return; }
+      const tag: unknown = Reflect.get(input, "_tag");
+      if (tag === "Some") { variant(Reflect.get(input, "value"), EOption.some); return; }
+      if (tag === "None") { finish(EOption.none()); return; }
+      if (tag === "Success") { variant(Reflect.get(input, "success"), EResult.succeed); return; }
+      if (tag === "Failure") { variant(Reflect.get(input, "failure"), EResult.fail); return; }
+    }
+    if (Array.isArray(input)) {
+      const length = input.length;
+      const items: unknown[] = [];
+      items.length = length;
+      let index = 0;
+      const next = (): void => {
+        while (index < length) {
+          const key = index++;
+          if (!(key in input)) continue;
+          const child: unknown = input[key];
+          work.push(next);
+          visit(child, (item) => { Object.defineProperty(items, key, { value: item, writable: true, enumerable: true, configurable: true }); });
+          return;
+        }
+        finish(items.every((item, i) => item === input[i]) ? input : items);
+      };
+      work.push(next);
+      return;
+    }
+    const prototype: unknown = Object.getPrototypeOf(input);
+    if (prototype !== Object.prototype && prototype !== null) { put(input); return; }
+    const entries: Array<[string, unknown]> = Object.entries(input);
+    const converted: Array<readonly [string, unknown]> = [];
+    let index = 0;
+    const next = (): void => {
+      const entry = entries[index++];
+      if (entry === undefined) {
+        finish(converted.every(([key, item]) => item === Reflect.get(input, key)) ? input : Object.fromEntries(converted));
+        return;
+      }
+      const [key, child] = entry;
+      work.push(next);
+      visit(child, (item) => { converted.push([key, item]); });
+    };
+    work.push(next);
   };
-  if (toward === "flick") {
-    if (value instanceof HostFailure) return done(failureFromEffect(value));
-    if (EOption.isOption(value)) return done(EOption.isSome(value) ? some(serviceData(value.value, toward, seen)) : none);
-    if (EResult.isResult(value))
-      return done(EResult.isSuccess(value) ? ok(serviceData(value.success, toward, seen)) : err(serviceData(value.failure, toward, seen)));
-  } else {
-    if (value instanceof Failure) return done(failureToEffect(value));
-    if (EOption.isOption(value) || EResult.isResult(value) || EExit.isExit(value)) return value;
-    const tag: unknown = Reflect.get(value, "_tag");
-    if (tag === "Some") return done(EOption.some(serviceData(Reflect.get(value, "value"), toward, seen)));
-    if (tag === "None") return done(EOption.none());
-    if (tag === "Success") return done(EResult.succeed(serviceData(Reflect.get(value, "success"), toward, seen)));
-    if (tag === "Failure") return done(EResult.fail(serviceData(Reflect.get(value, "failure"), toward, seen)));
-  }
-  if (Array.isArray(value)) {
-    const items = value.map((item) => serviceData(item, toward, seen));
-    return done(items.every((item, i) => item === value[i]) ? value : items);
-  }
-  const prototype: unknown = Object.getPrototypeOf(value);
-  if (prototype !== Object.prototype && prototype !== null) return value;
-  const entries = Object.entries(value).map(([key, item]) => [key, serviceData(item, toward, seen)] as const);
-  return done(entries.every(([key, item]) => item === Reflect.get(value, key)) ? value : Object.fromEntries(entries));
+  visit(value, (mappedValue) => { result = mappedValue; });
+  while (work.length > 0) work.pop()?.();
+  return result;
 };
 export const dataFromEffect = (value: unknown): unknown => serviceData(value, "flick");
 export const dataToEffect = (value: unknown): unknown => serviceData(value, "host");

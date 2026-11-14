@@ -66,7 +66,9 @@ impl Checker<'_> {
                 // Whole-value proofs may differ without changing identity or captures.
                 let exact = self.capture_identity(&actual) == self.capture_identity(&expected)
                     && self.captures_of(&actual) == self.captures_of(&expected)
-                    && !actual.contains(&mut |t| matches!(t, Type::Meta(_) | Type::Error));
+                    && !actual.contains(&mut |t| {
+                        matches!(t, Type::Meta(_) | Type::MetaView(_) | Type::Error)
+                    });
                 self.expect(&actual, &expected, self.span(node));
                 exact
             }

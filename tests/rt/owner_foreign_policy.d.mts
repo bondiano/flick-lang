@@ -1,0 +1,9 @@
+export declare const makeNonregular: (owner: any) => any;
+export declare const makeRow: (owner: any) => any;
+export declare const makeProjected: (owner: any) => any;
+export declare const makeLongId: (owner: any) => any;
+export declare const makeChain: (owner: any) => any;
+export declare const makeHigher: (owner: any) => any;
+export declare const makeIdle: (owner: any) => any;
+export declare const inspect: (label: string, expected: bigint) => string;
+export declare const markProvider: (label: string) => any;

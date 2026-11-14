@@ -69,13 +69,9 @@ impl Gen<'_> {
         }
         let body = self.gen_block(body);
         let error = self.temp();
-        let (stmts, ()) = self.block(|g| g.handlers(&error, arms));
+        let handler = self.handlers(&error, arms);
         let try_with = self.rt("tryWith");
-        let tried = format!(
-            "{try_with}({body}, {} {{\n{}}})",
-            self.arrow(&error),
-            indent(&stmts)
-        );
+        let tried = format!("{try_with}({body}, {handler})");
         self.run(None, &tried)
     }
     pub(super) fn unwrap(&mut self, option: &Expr) -> String {

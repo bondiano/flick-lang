@@ -180,7 +180,7 @@ func suiteRuns(fb *Fiber, selected []named) map[*test]*suiteRun {
 			if runs[s] == nil {
 				owner := newOwner()
 				owner.defects = &defects{}
-				runs[s] = &suiteRun{fiber: Fiber{state: newState(), env: fb.env, owner: owner}}
+				runs[s] = &suiteRun{fiber: Fiber{state: newState(), env: fb.env, owner: owner, candidate: owner}}
 			}
 			runs[s].remaining++
 		}
@@ -424,7 +424,7 @@ func runOne(fb *Fiber, t named, seed int64, runs map[*test]*suiteRun) testResult
 func runLeaf(fb *Fiber, t named, seed int64, runs map[*test]*suiteRun) testResult {
 	owner := newOwner()
 	owner.defects = &defects{}
-	inner := Fiber{state: newState(), env: fb.env, owner: owner}
+	inner := Fiber{state: newState(), env: fb.env, owner: owner, candidate: owner}
 	// stopping the run interrupts each running test
 	done := make(chan struct{})
 	defer close(done)

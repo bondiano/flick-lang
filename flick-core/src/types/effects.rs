@@ -10,8 +10,8 @@
 
 mod solve;
 
-use super::Checker;
 use super::ty::{Effects, Type, Written};
+use super::{Checker, Kind};
 use crate::diagnostics::codes;
 use crate::source::Span;
 use crate::syntax::cst::Node;
@@ -142,7 +142,10 @@ impl Checker<'_> {
 
     /// A stage whose rows are inferred: they grow with its calls.
     pub fn open_stage(&mut self) -> Stage {
-        let (services, errors) = (self.fresh(), self.store.fresh_error_row());
+        let (services, errors) = (
+            self.store.fresh_of(&Kind::ServiceRow),
+            self.store.fresh_error_row(),
+        );
         self.bounded_stage(services, errors, Site::Inferred)
     }
 
@@ -280,6 +283,9 @@ impl Checker<'_> {
         expected: &Type,
         span: Span,
     ) -> super::unify::Unified {
+        if let Some(result) = self.unify_opaque_meta(actual, expected) {
+            return result;
+        }
         if let Some(result) = self.subsume_bound(actual, expected, span) {
             return result;
         }

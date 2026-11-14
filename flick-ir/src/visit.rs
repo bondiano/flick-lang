@@ -126,12 +126,13 @@ impl Expr {
                     f(v);
                 }
             }
-            ExprKind::Binary(_, l, r) => {
+            ExprKind::Binary(_, l, r) | ExprKind::WithOwnerEvidence(l, r) => {
                 f(l);
                 f(r);
             }
             ExprKind::Handle(h) => h.each_child(f),
             ExprKind::Lit(_)
+            | ExprKind::ReadOwnerEvidence
             | ExprKind::Var(_)
             | ExprKind::Local(_)
             | ExprKind::Global { .. }
@@ -262,12 +263,13 @@ impl Expr {
                     f(v);
                 }
             }
-            ExprKind::Binary(_, l, r) => {
+            ExprKind::Binary(_, l, r) | ExprKind::WithOwnerEvidence(l, r) => {
                 f(l);
                 f(r);
             }
             ExprKind::Handle(h) => h.each_child_mut(f),
             ExprKind::Lit(_)
+            | ExprKind::ReadOwnerEvidence
             | ExprKind::Var(_)
             | ExprKind::Local(_)
             | ExprKind::Global { .. }

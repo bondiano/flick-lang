@@ -30,17 +30,13 @@ impl Checker<'_> {
     /// later walk unfold it again.
     pub(in crate::types) fn alias_key(&self, t: &Type) -> Option<AliasKey> {
         // what unification asks of every pair: no copy of the spine
-        let (mut head, mut args) = (self.store.head(t), 0);
-        while let Type::App { head: h, .. } = head {
-            head = self.store.head(h);
-            args += 1;
-        }
-        let Type::Con { module, name } = head else {
+        let (head, args) = self.store.spine(t);
+        let Type::Con { module, name } = head.as_ref() else {
             return None;
         };
         matches!(
             self.env.type_def(module, name).map(|d| &d.form),
-            Some(Form::Alias { params, opaque: true, .. }) if args >= params.len()
+            Some(Form::Alias { params, opaque: true, .. }) if args.len() >= params.len()
         )
         .then(|| (module.clone(), name.clone()))
     }
@@ -48,7 +44,7 @@ impl Checker<'_> {
     /// Enters the alias at the head of `t` on `path`, the aliases a walk is
     /// unfolding (it may hold other keys too).
     pub(in crate::types) fn enter_alias(&self, t: &Type, path: &mut Vec<AliasKey>) -> Unfold {
-        let Some(key) = self.alias_key(t) else {
+        let Some(key) = self.alias_key(t).or_else(|| self.projected_alias_key(t)) else {
             return Unfold::Plain;
         };
         if path.contains(&key) {
@@ -67,15 +63,22 @@ impl Checker<'_> {
         b: &Type,
         compare: impl FnOnce(&mut Self) -> Unified,
     ) -> Unified {
-        let key = match self.alias_key(a) {
-            Some(x) if self.alias_key(b).is_some_and(|y| x == y) => x,
-            _ => return compare(self),
+        let (Some(left), Some(right)) =
+            (self.projected_alias_type(a), self.projected_alias_type(b))
+        else {
+            return compare(self);
         };
+        let key = self.alias_key(&left).expect("observed opaque alias");
+        if self.alias_key(&right).as_ref() != Some(&key) {
+            return compare(self);
+        }
         if self.unfolding.contains(&key) {
-            let (a, b) = (self.store.resolve(a), self.store.resolve(b));
-            let ((_, xs), (_, ys)) = (a.spine(), b.spine());
+            // A projection may expose an alias with different arguments than
+            // the original projection's own spine (Reveal x has just one).
+            let (left, right) = (self.store.resolve(&left), self.store.resolve(&right));
+            let ((_, xs), (_, ys)) = (left.spine(), right.spine());
             if xs.len() != ys.len() {
-                return Err(Mismatch::Types(a.clone(), b.clone()));
+                return Err(Mismatch::Types(left.clone(), right.clone()));
             }
             return xs.iter().zip(&ys).try_for_each(|(x, y)| self.unify(x, y));
         }

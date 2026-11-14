@@ -8,7 +8,7 @@ use std::mem;
 use super::Checker;
 use super::env::{Form, Found, ModuleRequirement};
 use super::kinds::Kind;
-use super::ty::{Binder, Row, Type};
+use super::ty::{Binder, Row, Scope, Type};
 use crate::diagnostics::codes;
 use crate::diagnostics::suggest::closest;
 use crate::iface::Namespace;
@@ -27,7 +27,7 @@ pub use kinds::is_type;
 use kinds::with_article;
 use rows::{place_braces, written_none};
 
-fn as_value_kind(kind: Kind) -> Kind {
+pub(super) fn as_value_kind(kind: Kind) -> Kind {
     match kind {
         Kind::Arrow(param, result) => Kind::Arrow(param, Box::new(as_value_kind(*result))),
         Kind::Constraint => Kind::Type,
@@ -147,7 +147,7 @@ impl Checker<'_> {
             K::ParenType => return self.ty(children[0], expected, free),
             K::NameType if node.has_token(K::NoneKw) => {
                 let kind = self.kinds.resolve(expected);
-                if !kind.is_row() && !matches!(kind, Kind::Meta(_)) {
+                if !kind.is_row() && !matches!(kind, Kind::Meta(_) | Kind::MetaView(_)) {
                     self.error(
                         codes::T002,
                         span,
@@ -197,7 +197,7 @@ impl Checker<'_> {
                     .get(1)
                     .map_or(Type::Error, |r| self.ty(r, expected, free));
                 let kind = self.kinds.resolve(expected);
-                if matches!(kind, Kind::Meta(_)) || kind.is_row() {
+                if matches!(kind, Kind::Meta(_) | Kind::MetaView(_)) || kind.is_row() {
                     (Type::Union(Box::new(left), Box::new(right)), kind)
                 } else {
                     self.error(
@@ -217,7 +217,10 @@ impl Checker<'_> {
                     return base;
                 };
                 let captures = self.capture(capture, free);
-                return if matches!(&base, Type::Var(_) | Type::Meta(_) | Type::Skolem(_)) {
+                return if matches!(
+                    &base,
+                    Type::Var(_) | Type::Meta(_) | Type::MetaView(_) | Type::Skolem(_)
+                ) {
                     Type::Bounded {
                         ty: Box::new(base),
                         captures: Box::new(captures),
@@ -247,51 +250,29 @@ impl Checker<'_> {
                 let Some(def) = self.env.type_def(module, name).cloned() else {
                     return Type::Error;
                 };
-                let Form::ModuleContract { requirements } = def.form else {
+                let Form::ModuleContract { .. } = def.form else {
                     return Type::Error;
                 };
-                let mut subst = Vec::new();
-                let mut types = Vec::new();
-                for requirement in &requirements {
-                    match requirement {
-                        ModuleRequirement::Type {
-                            name,
-                            params,
-                            manifest,
-                        } => {
-                            let ty = manifest.as_ref().map_or_else(
-                                || Type::con(&format!("$exists:{binder}"), name),
-                                |ty| ty.substitute(&subst),
-                            );
-                            let kind =
-                                Kind::arrows(params.iter().map(|p| p.kind.clone()), Kind::Type);
-                            subst.push((name.clone(), ty.clone()));
-                            types.push((name.clone(), ty, kind));
-                        }
-                        ModuleRequirement::Nominal {
-                            name,
-                            identity: Some(identity),
-                            ..
-                        } => {
-                            let ty = Type::con(&identity.module, &identity.name);
-                            let kind = self
-                                .env
-                                .type_def(&identity.module, &identity.name)
-                                .map_or(Kind::Type, |def| def.kind.clone());
-                            subst.push((name.clone(), ty.clone()));
-                            types.push((name.clone(), ty, kind));
-                        }
-                        _ => {}
+                let witness = self.fresh_module_witness();
+                let issued = match self.materialize_existential_witness(&contract, &witness) {
+                    Ok(view) => view,
+                    Err(message) => {
+                        self.error(codes::P010, span, message);
+                        return Type::Error;
                     }
-                }
-                self.opened_modules.push(super::module_contract::Opened {
-                    alias: binder.clone(),
-                    types,
-                    values: Vec::new(),
-                });
+                };
+                let mark = self.opened_modules.len();
+                self.opened_modules.extend(Self::witness_bindings(
+                    issued.signature(),
+                    issued.view(),
+                    &binder,
+                ));
                 let body = self.ty(body_node, &Kind::Type, free);
-                self.opened_modules.pop();
+                let body = self.resolved_witness_type(&body);
+                self.opened_modules.truncate(mark);
+                let body = super::module_contract::close_existential_type(&body, &witness, &binder);
                 return Type::Exists {
+                    scope: Scope::default(),
                     binder,
                     contract: Box::new(contract),
                     body: Box::new(body),
@@ -424,6 +405,7 @@ impl Checker<'_> {
             && let Some(Form::Alias { params, .. }) =
                 self.env.type_def(module, name).map(|d| &d.form)
             && params.len() > args.len()
+            && !self.env.is_witness_manifest_alias(module, name)
         {
             let n = params.len();
             self.error(
@@ -440,7 +422,7 @@ impl Checker<'_> {
         for arg in args {
             let (param, result) = match self.kinds.resolve(&kind) {
                 Kind::Arrow(p, r) => (*p, *r),
-                Kind::Meta(_) => {
+                Kind::Meta(_) | Kind::MetaView(_) => {
                     let (p, r) = (self.kinds.fresh(), self.kinds.fresh());
                     let _ = self.kinds.unify(&kind, &Kind::arrow(p.clone(), r.clone()));
                     (p, r)

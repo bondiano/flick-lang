@@ -2,6 +2,7 @@
 // the native lexical frame; leaving that frame restores the surrounding one.
 // Each child inherits its own list, so later writes stay local to each fiber.
 import { Context, type Fiber as EffectFiber } from "effect";
+import { OwnerEvidenceContext } from "./owner_evidence.ts";
 import type { Ctx, Fiber } from "@flick-lang/runtime/rt/fiber";
 
 interface Change {
@@ -44,9 +45,9 @@ export const updatedContext = (native: Fiber, at: Ctx | null, base: Context.Cont
     if (!activeAt(at, change.at)) continue;
     const current = change.current;
     for (const [key, value] of current.mapUnsafe)
-      if (change.initial.mapUnsafe.get(key) !== value) services.set(key, value);
+      if (key !== OwnerEvidenceContext.key && change.initial.mapUnsafe.get(key) !== value) services.set(key, value);
     for (const key of change.initial.mapUnsafe.keys())
-      if (!current.mapUnsafe.has(key)) services.delete(key);
+      if (key !== OwnerEvidenceContext.key && !current.mapUnsafe.has(key)) services.delete(key);
   }
   return Context.makeUnsafe(services);
 };

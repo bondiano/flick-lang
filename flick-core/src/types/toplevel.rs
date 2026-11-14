@@ -457,7 +457,7 @@ impl<'a> Checker<'a> {
                 let Some(ty) = self.env.value(&entity).map(|t| self.zonk(t)) else {
                     continue;
                 };
-                if ty.contains(&mut |t| matches!(t, Type::Meta(_))) {
+                if ty.contains(&mut |t| matches!(t, Type::Meta(_) | Type::MetaView(_))) {
                     let shown = self.show(&ty);
                     self.error(
                         codes::T013,

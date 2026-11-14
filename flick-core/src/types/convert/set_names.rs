@@ -17,7 +17,7 @@ impl Checker<'_> {
         // an alias whose kind is still unknown is in a cycle, which name resolution reports
         if let Some(TypeDef {
             form: Form::Alias { .. },
-            kind: Kind::Meta(_),
+            kind: Kind::Meta(_) | Kind::MetaView(_),
         }) = self.declared(item)
         {
             return;

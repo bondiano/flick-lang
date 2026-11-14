@@ -68,6 +68,20 @@ pub(super) fn learn_exports(
     parents: &mut HashMap<Entity, String>,
     interface: &Interface,
 ) {
+    for support in &interface.support_types {
+        if let Some(implementation) = impl_def(&support.definition) {
+            types.define(
+                &support.entity.module,
+                format!("{}.Impl", support.entity.name),
+                implementation,
+            );
+        }
+        types.define(
+            &support.entity.module,
+            support.entity.name.clone(),
+            support.definition.clone(),
+        );
+    }
     for export in &interface.exports {
         let entity = &export.entity;
         if let Some(def) = &export.definition {

@@ -27,6 +27,7 @@ Loop
 Log
 File
 Resource
+Arena
 Events
 Gen
 Checks

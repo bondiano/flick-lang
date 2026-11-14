@@ -14,6 +14,8 @@ codegen/stage_order
 codegen/lift
 codegen/patterns
 codegen/closures
+codegen/counted_failures
+codegen/counted_patterns
 codegen/composition
 codegen/task_twice
 codegen/errors
@@ -29,6 +31,8 @@ codegen/gadt_dicts
 codegen/gadt_derive
 codegen/handler_arms
 codegen/handlers
+codegen/partial_handlers
+codegen/prototype_operation
 codegen/generic
 codegen/defaults
 codegen/default_signatures
@@ -40,6 +44,12 @@ codegen/classes
 codegen/let_mut
 runtime/abort_closes_scopes
 runtime/discontinued_body
+runtime/lambda_owners
+runtime/arena_scope
+runtime/arena_layer_scope
+runtime/arena_owner_list
+runtime/arena_layer_finalizers
+runtime/arena_finalizers
 codegen/loops_state
 codegen/loops
 codegen/loops_for_source
@@ -53,3 +63,5 @@ codegen/record_constructor
 effect/row_without
 stdlib/effect/mutable_ref
 stdlib/effect/optic_parts
+
+runtime/counted_layer_merge

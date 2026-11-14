@@ -1,0 +1,59 @@
+// An operation without an arm passes through a partial handler. Dispatch
+// selects the nearest arm for that operation, not merely for its effect.
+module App.Main exposing (main)
+
+effect PairOps =
+  left : Unit ->{} Int
+  right : Unit ->{} Int
+
+effect Curried =
+  add : Int -> Int ->{} Int
+  other : Unit ->{} Int
+
+main : Unit ->{} Unit
+let main () =
+  let left_only =
+    try
+      try PairOps.left () + PairOps.right () with
+      | PairOps.left () -> 1
+    with
+    | PairOps.left () -> 10
+    | PairOps.right () -> 20
+  Platform.stdout_line (show left_only)
+  let right_only =
+    try
+      try PairOps.left () + PairOps.right () with
+      | PairOps.right () -> 2
+    with
+    | PairOps.left () -> 10
+    | PairOps.right () -> 20
+  Platform.stdout_line (show right_only)
+  let three_levels =
+    try
+      try
+        try PairOps.left () + PairOps.right () with
+        | PairOps.left () -> 1
+      with
+      | PairOps.right () -> 20
+    with
+    | PairOps.left () -> 100
+    | PairOps.right () -> 200
+  Platform.stdout_line (show three_levels)
+  let returned =
+    try
+      try PairOps.left () + PairOps.right () with
+      | PairOps.left () -> 1
+      | return value -> value + 100
+    with
+    | PairOps.left () -> 10
+    | PairOps.right () -> 20
+  Platform.stdout_line (show returned)
+  let add_one = Curried.add 1
+  let staged =
+    try
+      try add_one 2 + Curried.other () with
+      | Curried.other () -> 4
+    with
+    | Curried.add x y -> x + y * 10
+    | Curried.other () -> 200
+  Platform.stdout_line (show staged)

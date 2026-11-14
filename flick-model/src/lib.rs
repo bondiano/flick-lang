@@ -19,6 +19,7 @@ pub mod decls;
 pub mod eval;
 pub mod generate;
 pub mod handler;
+pub mod memory;
 #[cfg(test)]
 mod modules;
 pub mod native;

@@ -6,7 +6,7 @@ use flick_core::numeric::{Num, NumLang};
 
 use super::expr::{list, mono, prelude, runtime, scheme, var};
 use super::{Check, Checker, error};
-use crate::syntax::{Const, Prim};
+use crate::syntax::{Const, Prim, RegionOp};
 use crate::types::{Caps, Kind, Row, Scheme, Stage, Type, Var};
 
 impl Checker<'_> {
@@ -96,7 +96,16 @@ impl Checker<'_> {
                 return Ok(t);
             }
             Const::Prim(p) => prim(*p),
-            // a binding of regions has the scheme of the global it stands for
+            // Like Ref's primitives, Arena implements its declarations,
+            // not recursive source references to them. Take a fresh full
+            // scheme: pinning only its capture variables to `own` would
+            // lose the bound on a freshly instantiated `a`.
+            Const::Region(p, RegionOp::ArenaMake | RegionOp::ArenaAlloc | RegionOp::ArenaGet) => {
+                return self.declared_global(p);
+            }
+            // Preserve the existing region-binding rule, including its
+            // owner/callback row matching. Normalizing all foreign schemes
+            // independently still needs a general row-instantiation rule.
             Const::Region(p, _) => return self.global(p),
             other => {
                 return error(

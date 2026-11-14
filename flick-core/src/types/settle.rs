@@ -94,7 +94,7 @@ impl Checker<'_> {
             // any other type a comparison orders by its `Ord`, as it does a type
             // variable: `Bool`, a derived type, a record, a list
             if op.domain == Domain::Ordered
-                && !matches!(head, Type::Error | Type::Meta(_))
+                && !matches!(head, Type::Error | Type::Meta(_) | Type::MetaView(_))
                 && !op.domain.allows(head)
             {
                 let class = Type::app(Type::lang(Lang::Ord), ty.clone());
@@ -107,7 +107,7 @@ impl Checker<'_> {
             let allowed = op.domain.names();
             let fits = match head {
                 Type::Error => true,
-                Type::Meta(_) => {
+                Type::Meta(_) | Type::MetaView(_) => {
                     let _ = self.unify(&ty, &Type::lang(allowed[0]));
                     true
                 }
@@ -181,7 +181,7 @@ impl Checker<'_> {
         let ty = self.whnf(&literal.ty);
         let num = match ty.spine().0 {
             Type::Error => return,
-            Type::Meta(_) => {
+            Type::Meta(_) | Type::MetaView(_) => {
                 let num = default_num(literal.fractional);
                 let _ = self.unify(&ty, &Type::lang(num.lang()));
                 num

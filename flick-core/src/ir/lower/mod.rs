@@ -17,6 +17,8 @@ mod lambda;
 mod literals;
 mod loops;
 mod numeric;
+mod owner_descriptors;
+mod owners;
 mod pattern;
 mod question;
 mod ranges;
@@ -37,12 +39,16 @@ use crate::syntax::cst::{Node, foreign_words};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
 use crate::types::{
-    Abi, Constructor, Dict, Range, Rep, Type, Typing, class_defaults, default_method, is_type,
-    let_parts, written_dicts,
+    Abi, Constructor, Dict, Range, Rep, StageKey, Type, Typing, class_defaults, default_method,
+    is_type, let_parts, written_dicts,
 };
 
 /// Lowers `module`, which checked without errors, with what its check recorded.
 pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Diagnostic>> {
+    let pending = typing.pending_foreign_diagnostics();
+    if !pending.is_empty() {
+        return Err(pending);
+    }
     let mut lower = Lower {
         module: module.name,
         text: module.text,
@@ -56,6 +62,7 @@ pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Di
         consumed: HashSet::new(),
         reuse: None,
         owners: HashMap::new(),
+        entry_owners: HashMap::new(),
         records: BTreeMap::new(),
         diagnostics: Vec::new(),
     };
@@ -134,9 +141,9 @@ struct Lower<'a> {
     /// While a later alternative of an or-pattern is lowered: the names
     /// the first one bound.
     reuse: Option<Vec<Bound>>,
-    /// Each `scope` some call acquires through: the locals of its owner and
-    /// of the owner around it.
-    owners: HashMap<Range, (Option<String>, Option<String>)>,
+    /// The owner local of each source `scope` used by a call or value plan.
+    owners: HashMap<Range, String>,
+    entry_owners: HashMap<StageKey, String>,
     /// The constructors over a record written in their declaration, with
     /// its labels (`Module::records`).
     records: BTreeMap<String, Vec<String>>,
@@ -263,10 +270,32 @@ impl Lower<'_> {
             }
             K::ForeignDecl => {
                 if let Some(foreign) = self.foreign(decl) {
-                    items.push(Item {
-                        kind: ItemKind::Foreign(foreign),
-                        span,
-                    });
+                    let scoped = self
+                        .typing
+                        .foreigns
+                        .get(&decl.range())
+                        .map(|i| i.scoped_stages.clone())
+                        .unwrap_or_default();
+                    if scoped.iter().any(|&s| s)
+                        || self
+                            .typing
+                            .foreigns
+                            .get(&decl.range())
+                            .is_some_and(|i| i.owner_result.is_some())
+                    {
+                        self.fresh_definition();
+                        let result = self
+                            .typing
+                            .foreigns
+                            .get(&decl.range())
+                            .and_then(|i| i.owner_result.as_deref());
+                        self.scoped_foreign(foreign, &scoped, result, span, items);
+                    } else {
+                        items.push(Item {
+                            kind: ItemKind::Foreign(foreign),
+                            span,
+                        });
+                    }
                 }
             }
             K::TypeDecl | K::ErrorDecl => self.type_items(decl, span, items),
@@ -401,7 +430,11 @@ impl Lower<'_> {
     ) -> Expr {
         let mark = self.scope.len();
         let stages = stages.unwrap_or_default();
-        let params = params
+        let key = (span.start, span.end);
+        for index in 0..params.len() {
+            self.register_owner_entry(StageKey::Arrow { node: key, index });
+        }
+        let params: Vec<_> = params
             .iter()
             .zip(stages.iter().copied().chain(iter::repeat(Stage::Pure)))
             .map(|(p, stage)| Param {
@@ -410,15 +443,33 @@ impl Lower<'_> {
                 ty: self.typing.values.get(&p.range()).and_then(type_name),
             })
             .collect();
-        let body = body(self);
+        let mut body = body(self);
         self.scope.truncate(mark);
-        Expr::new(
-            ExprKind::Lambda {
-                params,
-                body: Box::new(body),
-            },
-            span,
-        )
+        let entries = (0..params.len()).any(|index| {
+            self.entry_owners
+                .contains_key(&StageKey::Arrow { node: key, index })
+        });
+        if entries {
+            for (index, param) in params.into_iter().enumerate().rev() {
+                body = self.owner_entry(StageKey::Arrow { node: key, index }, body);
+                body = Expr::new(
+                    ExprKind::Lambda {
+                        params: vec![param],
+                        body: Box::new(body),
+                    },
+                    span,
+                );
+            }
+            body
+        } else {
+            Expr::new(
+                ExprKind::Lambda {
+                    params,
+                    body: Box::new(body),
+                },
+                span,
+            )
+        }
     }
 
     /// The methods an instance defines.
@@ -471,6 +522,7 @@ impl Lower<'_> {
             Some(self.expr(node))
         });
         Some(Foreign {
+            source_name: None,
             name,
             mode: info.mode,
             binding: Binding {

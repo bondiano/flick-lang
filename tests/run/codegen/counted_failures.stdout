@@ -1,0 +1,2 @@
+guard 1
+outer handler 1 | outer guard | outer body

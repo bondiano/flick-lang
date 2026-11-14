@@ -1,4 +1,4 @@
-use crate::types::Elided;
+use crate::types::{Elided, Scope};
 use std::fmt::Write;
 
 use super::{Projection, declaration_file};
@@ -99,6 +99,7 @@ fn existential_module_value_is_exported_as_unknown() {
     let package = |_: &str| None;
     let projection = Projection::new("App.Shapes", &lookup, &package);
     let ty = types::Type::Exists {
+        scope: Scope::default(),
         binder: "K".to_owned(),
         contract: Box::new(types::Type::con("App.Shapes", "Box")),
         body: Box::new(types::Type::con("$exists:K", "Key")),

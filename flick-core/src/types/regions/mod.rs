@@ -239,7 +239,7 @@ impl Checker<'_> {
             }
             // an integer literal's type is a number, which captures nothing
             Type::Meta(m) if self.store.is_numeric(*m) => {}
-            Type::Var(_) | Type::Skolem(_) | Type::Meta(_)
+            Type::Var(_) | Type::Skolem(_) | Type::Meta(_) | Type::MetaView(_)
                 if !bounded || matches!(self.atom_kind(&t, &[]), Some(Kind::Region)) =>
             {
                 push_atom(out, &t);
@@ -375,7 +375,9 @@ impl Checker<'_> {
                 {
                     push_atom(out, &tail);
                 }
-                Type::Meta(_) if !bounded && !out.tails.contains(&tail) => out.tails.push(tail),
+                Type::Meta(_) | Type::MetaView(_) if !bounded && !out.tails.contains(&tail) => {
+                    out.tails.push(tail);
+                }
                 Type::Error if !out.tails.contains(&tail) => out.tails.push(tail),
                 _ => {}
             }
@@ -401,7 +403,9 @@ impl Checker<'_> {
         }
         for tail in norm.tails {
             match tail {
-                Type::Var(_) | Type::Skolem(_) | Type::Meta(_) if !bounded => push_atom(out, &tail),
+                Type::Var(_) | Type::Skolem(_) | Type::Meta(_) | Type::MetaView(_) if !bounded => {
+                    push_atom(out, &tail);
+                }
                 Type::Error if !out.tails.contains(&tail) => out.tails.push(tail),
                 _ => {}
             }
@@ -618,7 +622,7 @@ impl Checker<'_> {
         {
             let identity = self.capture_identity(expected);
             let (bare, captures) = self.whnf_captured(&identity);
-            if !matches!(bare, Type::Meta(_)) {
+            if !matches!(bare, Type::Meta(_) | Type::MetaView(_)) {
                 let visible = if captures.is_some() {
                     Visible::Now(Vec::new())
                 } else {
@@ -657,7 +661,11 @@ impl Checker<'_> {
             };
             (row, qualified)
         };
-        let written = expected.is_some() && !matches!(self.store.resolve(&bound), Type::Meta(_));
+        let written = expected.is_some()
+            && !matches!(
+                self.store.resolve(&bound),
+                Type::Meta(_) | Type::MetaView(_)
+            );
         let visible = if expected
             .as_ref()
             .is_none_or(|e| self.whnf_captured(e).1.is_some())
@@ -740,7 +748,14 @@ impl Checker<'_> {
         let held = Type::Row(super::ty::Row::closed(vec![(label, region.clone())]));
         let inferred = match &ty {
             Type::Captured { captures, .. } => match **captures {
-                Type::Meta(m) if matches!(self.store.resolve(captures), Type::Meta(_)) => Some(m),
+                Type::Meta(m)
+                    if matches!(
+                        self.store.resolve(captures),
+                        Type::Meta(_) | Type::MetaView(_)
+                    ) =>
+                {
+                    Some(m)
+                }
                 _ => None,
             },
             _ => None,
@@ -852,7 +867,7 @@ fn qualify(t: Type, held: Type) -> Type {
 /// Whether types differ only in what they capture: the hold, not the type,
 /// says what escapes.
 fn capture_mismatch(mismatch: &Mismatch) -> bool {
-    matches!(mismatch, Mismatch::Label { label, .. } if matches!(label, Elem::Capture(_)))
+    matches!(mismatch.reason(), Mismatch::Label { label, .. } if matches!(label, Elem::Capture(_)))
 }
 
 fn push_atom(out: &mut Norm, t: &Type) {

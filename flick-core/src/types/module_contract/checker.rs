@@ -15,7 +15,7 @@ impl super::Checker<'_> {
         let payload = tokens
             .find(|t| t.kind == K::Comma)
             .and_then(|_| tokens.find(|t| t.kind == K::Ident));
-        let witness = format!("{}.$unpack{}", self.env.module, node.range().0);
+        let witness = self.fresh_module_witness();
         let Some((signature, opened_value)) =
             self.unpacked_signature(node, source, payload.is_some(), &witness)
         else {
@@ -46,7 +46,22 @@ impl super::Checker<'_> {
             return Type::Error;
         };
         let requirements = requirements.clone();
-        let (subst, types, values) = self.opened_requirements(&requirements, &witness);
+        let issued = match self.materialize_existential_witness(&signature, &witness) {
+            Ok(view) => view,
+            Err(message) => {
+                self.error(codes::P010, self.span(source), message);
+                return Type::Error;
+            }
+        };
+        let view = issued.view();
+        let requirements = super::ModuleSignature::instantiate_members(&requirements, view);
+        let bindings = Self::witness_bindings(issued.signature(), view, &alias);
+        let subst: Vec<_> = bindings
+            .first()
+            .into_iter()
+            .flat_map(|opened| &opened.types)
+            .map(|(name, ty, _)| (name.clone(), ty.clone()))
+            .collect();
         let local_mark = self.classes.local.len();
         for requirement in &requirements {
             if let ModuleRequirement::Dictionary { head, from } = requirement {
@@ -59,22 +74,21 @@ impl super::Checker<'_> {
                 ));
             }
         }
-        self.opened_modules.push(Opened {
-            alias: alias.clone(),
-            types,
-            values,
-        });
+        let module_mark = self.opened_modules.len();
+        self.opened_modules.extend(bindings);
         let value_mark = self.cx.locals.len();
         if let (Some(payload), Some(value)) = (payload, opened_value) {
             self.push_local(payload.text(self.text), payload.start, value);
         }
         let result = self.block(body, None);
+        let result = self.resolved_witness_type(&result);
         self.cx.locals.truncate(value_mark);
-        self.opened_modules.pop();
+        self.opened_modules.truncate(module_mark);
         self.classes.local.truncate(local_mark);
-        if result.contains(&mut |ty| matches!(ty, Type::Con { module, .. } if module == &witness)) {
+        if self.witness_escapes(&result, &witness) {
             self.typing.existential_unpacks.insert(node.range());
             Type::Exists {
+                scope: Scope::default(),
                 binder: alias.clone(),
                 contract: Box::new(Type::con(module, name)),
                 body: Box::new(close_existential_type(&result, &witness, &alias)),
@@ -94,6 +108,7 @@ impl super::Checker<'_> {
         let source_ty = self.infer(source);
         let (unwrapped, _) = self.whnf_captured(&source_ty);
         let (signature, opened_value) = if let Type::Exists {
+            scope: _,
             binder,
             contract,
             body,
@@ -142,58 +157,6 @@ impl super::Checker<'_> {
             ((*signature).clone(), None)
         };
         Some((signature, opened_value))
-    }
-
-    fn opened_requirements(
-        &self,
-        requirements: &[ModuleRequirement],
-        witness: &str,
-    ) -> OpenedRequirements {
-        let mut subst = Vec::new();
-        let mut types = Vec::new();
-        for requirement in requirements {
-            match requirement {
-                ModuleRequirement::Type {
-                    name,
-                    params,
-                    manifest,
-                } => {
-                    let ty = manifest
-                        .as_ref()
-                        .map_or_else(|| Type::con(witness, name), |ty| ty.substitute(&subst));
-                    let kind = super::Kind::arrows(
-                        params.iter().map(|p| p.kind.clone()),
-                        super::Kind::Type,
-                    );
-                    subst.push((name.clone(), ty.clone()));
-                    types.push((name.clone(), ty, kind));
-                }
-                ModuleRequirement::Nominal {
-                    name,
-                    identity: Some(identity),
-                    ..
-                } => {
-                    let ty = Type::con(&identity.module, &identity.name);
-                    let kind = self
-                        .env
-                        .type_def(&identity.module, &identity.name)
-                        .map_or(super::Kind::Type, |def| def.kind.clone());
-                    subst.push((name.clone(), ty.clone()));
-                    types.push((name.clone(), ty, kind));
-                }
-                _ => {}
-            }
-        }
-        let values = requirements
-            .iter()
-            .filter_map(|requirement| match requirement {
-                ModuleRequirement::Value { name, ty } => {
-                    Some((name.clone(), ty.substitute(&subst)))
-                }
-                _ => None,
-            })
-            .collect();
-        (subst, types, values)
     }
 
     #[allow(clippy::too_many_lines)]

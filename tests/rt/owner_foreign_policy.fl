@@ -1,0 +1,391 @@
+// Declared Scope controls activation, not a widened row.
+// RowGrow: unscoped provider, outer, outer; other tasks: outer.
+// Id80/Chain200: productive residual aliases; parser unchanged.
+module App.Main exposing (main)
+
+opaque type alias Nonregular a s = Eff {Scope s} none (Nonregular (List a) s)
+opaque type alias RowGrow r s = Eff r none (RowGrow {Scope s | r} s)
+type alias Reveal a = Errors {a | none}
+opaque type alias Projected a s = Eff {Scope s} none (Reveal (Projected (List a) s))
+opaque type alias Idle a = forall b. Idle (List a)
+opaque type alias IdleTask s = Eff {Scope s} none (Idle Int)
+type alias Apply f a = f a
+type alias Task s = Eff {Scope s} none
+opaque type alias Higher s = Apply (Task s) (Higher s)
+opaque type alias Id a = a
+opaque type alias LongId a s =
+  Eff
+    {Scope s}
+    none
+    (Id
+      (Id
+        (Id
+          (Id
+            (Id
+              (Id
+                (Id
+                  (Id
+                    (Id
+                      (Id
+                        (Id
+                          (Id
+                            (Id
+                              (Id
+                                (Id
+                                  (Id
+                                    (Id
+                                      (Id
+                                        (Id
+                                          (Id
+                                            (Id
+                                              (Id
+                                                (Id
+                                                  (Id
+                                                    (Id
+                                                      (Id
+                                                        (Id
+                                                          (Id
+                                                            (Id
+                                                              (Id
+                                                                (Id
+                                                                  (Id
+                                                                    (Id
+                                                                      (Id
+                                                                        (Id
+                                                                          (Id
+                                                                            (Id
+                                                                              (Id
+                                                                                (Id
+                                                                                  (Id
+                                                                                    (Id
+                                                                                      (Id
+                                                                                        (Id
+                                                                                          (Id
+                                                                                            (Id
+                                                                                              (Id
+                                                                                                (Id
+                                                                                                  (Id
+                                                                                                    (Id
+                                                                                                      (Id
+                                                                                                        (Id
+                                                                                                          (Id
+                                                                                                            (Id
+                                                                                                              (Id
+                                                                                                                (Id
+                                                                                                                  (Id
+                                                                                                                    (Id
+                                                                                                                      (Id
+                                                                                                                        (Id
+                                                                                                                          (Id
+                                                                                                                            (Id
+                                                                                                                              (Id
+                                                                                                                                (Id
+                                                                                                                                  (Id
+                                                                                                                                    (Id
+                                                                                                                                      (Id
+                                                                                                                                        (Id
+                                                                                                                                          (Id
+                                                                                                                                            (Id
+                                                                                                                                              (Id
+                                                                                                                                                (Id
+                                                                                                                                                  (Id
+                                                                                                                                                    (Id
+                                                                                                                                                      (Id
+                                                                                                                                                        (Id
+                                                                                                                                                          (Id
+                                                                                                                                                            (Id
+                                                                                                                                                              (Id
+                                                                                                                                                                (Id
+                                                                                                                                                                  (Id
+                                                                                                                                                                    (LongId
+                                                                                                                                                                      Int
+                                                                                                                                                                      s)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+opaque type alias Chain0 a = a
+opaque type alias Chain1 a = Chain0 a
+opaque type alias Chain2 a = Chain1 a
+opaque type alias Chain3 a = Chain2 a
+opaque type alias Chain4 a = Chain3 a
+opaque type alias Chain5 a = Chain4 a
+opaque type alias Chain6 a = Chain5 a
+opaque type alias Chain7 a = Chain6 a
+opaque type alias Chain8 a = Chain7 a
+opaque type alias Chain9 a = Chain8 a
+opaque type alias Chain10 a = Chain9 a
+opaque type alias Chain11 a = Chain10 a
+opaque type alias Chain12 a = Chain11 a
+opaque type alias Chain13 a = Chain12 a
+opaque type alias Chain14 a = Chain13 a
+opaque type alias Chain15 a = Chain14 a
+opaque type alias Chain16 a = Chain15 a
+opaque type alias Chain17 a = Chain16 a
+opaque type alias Chain18 a = Chain17 a
+opaque type alias Chain19 a = Chain18 a
+opaque type alias Chain20 a = Chain19 a
+opaque type alias Chain21 a = Chain20 a
+opaque type alias Chain22 a = Chain21 a
+opaque type alias Chain23 a = Chain22 a
+opaque type alias Chain24 a = Chain23 a
+opaque type alias Chain25 a = Chain24 a
+opaque type alias Chain26 a = Chain25 a
+opaque type alias Chain27 a = Chain26 a
+opaque type alias Chain28 a = Chain27 a
+opaque type alias Chain29 a = Chain28 a
+opaque type alias Chain30 a = Chain29 a
+opaque type alias Chain31 a = Chain30 a
+opaque type alias Chain32 a = Chain31 a
+opaque type alias Chain33 a = Chain32 a
+opaque type alias Chain34 a = Chain33 a
+opaque type alias Chain35 a = Chain34 a
+opaque type alias Chain36 a = Chain35 a
+opaque type alias Chain37 a = Chain36 a
+opaque type alias Chain38 a = Chain37 a
+opaque type alias Chain39 a = Chain38 a
+opaque type alias Chain40 a = Chain39 a
+opaque type alias Chain41 a = Chain40 a
+opaque type alias Chain42 a = Chain41 a
+opaque type alias Chain43 a = Chain42 a
+opaque type alias Chain44 a = Chain43 a
+opaque type alias Chain45 a = Chain44 a
+opaque type alias Chain46 a = Chain45 a
+opaque type alias Chain47 a = Chain46 a
+opaque type alias Chain48 a = Chain47 a
+opaque type alias Chain49 a = Chain48 a
+opaque type alias Chain50 a = Chain49 a
+opaque type alias Chain51 a = Chain50 a
+opaque type alias Chain52 a = Chain51 a
+opaque type alias Chain53 a = Chain52 a
+opaque type alias Chain54 a = Chain53 a
+opaque type alias Chain55 a = Chain54 a
+opaque type alias Chain56 a = Chain55 a
+opaque type alias Chain57 a = Chain56 a
+opaque type alias Chain58 a = Chain57 a
+opaque type alias Chain59 a = Chain58 a
+opaque type alias Chain60 a = Chain59 a
+opaque type alias Chain61 a = Chain60 a
+opaque type alias Chain62 a = Chain61 a
+opaque type alias Chain63 a = Chain62 a
+opaque type alias Chain64 a = Chain63 a
+opaque type alias Chain65 a = Chain64 a
+opaque type alias Chain66 a = Chain65 a
+opaque type alias Chain67 a = Chain66 a
+opaque type alias Chain68 a = Chain67 a
+opaque type alias Chain69 a = Chain68 a
+opaque type alias Chain70 a = Chain69 a
+opaque type alias Chain71 a = Chain70 a
+opaque type alias Chain72 a = Chain71 a
+opaque type alias Chain73 a = Chain72 a
+opaque type alias Chain74 a = Chain73 a
+opaque type alias Chain75 a = Chain74 a
+opaque type alias Chain76 a = Chain75 a
+opaque type alias Chain77 a = Chain76 a
+opaque type alias Chain78 a = Chain77 a
+opaque type alias Chain79 a = Chain78 a
+opaque type alias Chain80 a = Chain79 a
+opaque type alias Chain81 a = Chain80 a
+opaque type alias Chain82 a = Chain81 a
+opaque type alias Chain83 a = Chain82 a
+opaque type alias Chain84 a = Chain83 a
+opaque type alias Chain85 a = Chain84 a
+opaque type alias Chain86 a = Chain85 a
+opaque type alias Chain87 a = Chain86 a
+opaque type alias Chain88 a = Chain87 a
+opaque type alias Chain89 a = Chain88 a
+opaque type alias Chain90 a = Chain89 a
+opaque type alias Chain91 a = Chain90 a
+opaque type alias Chain92 a = Chain91 a
+opaque type alias Chain93 a = Chain92 a
+opaque type alias Chain94 a = Chain93 a
+opaque type alias Chain95 a = Chain94 a
+opaque type alias Chain96 a = Chain95 a
+opaque type alias Chain97 a = Chain96 a
+opaque type alias Chain98 a = Chain97 a
+opaque type alias Chain99 a = Chain98 a
+opaque type alias Chain100 a = Chain99 a
+opaque type alias Chain101 a = Chain100 a
+opaque type alias Chain102 a = Chain101 a
+opaque type alias Chain103 a = Chain102 a
+opaque type alias Chain104 a = Chain103 a
+opaque type alias Chain105 a = Chain104 a
+opaque type alias Chain106 a = Chain105 a
+opaque type alias Chain107 a = Chain106 a
+opaque type alias Chain108 a = Chain107 a
+opaque type alias Chain109 a = Chain108 a
+opaque type alias Chain110 a = Chain109 a
+opaque type alias Chain111 a = Chain110 a
+opaque type alias Chain112 a = Chain111 a
+opaque type alias Chain113 a = Chain112 a
+opaque type alias Chain114 a = Chain113 a
+opaque type alias Chain115 a = Chain114 a
+opaque type alias Chain116 a = Chain115 a
+opaque type alias Chain117 a = Chain116 a
+opaque type alias Chain118 a = Chain117 a
+opaque type alias Chain119 a = Chain118 a
+opaque type alias Chain120 a = Chain119 a
+opaque type alias Chain121 a = Chain120 a
+opaque type alias Chain122 a = Chain121 a
+opaque type alias Chain123 a = Chain122 a
+opaque type alias Chain124 a = Chain123 a
+opaque type alias Chain125 a = Chain124 a
+opaque type alias Chain126 a = Chain125 a
+opaque type alias Chain127 a = Chain126 a
+opaque type alias Chain128 a = Chain127 a
+opaque type alias Chain129 a = Chain128 a
+opaque type alias Chain130 a = Chain129 a
+opaque type alias Chain131 a = Chain130 a
+opaque type alias Chain132 a = Chain131 a
+opaque type alias Chain133 a = Chain132 a
+opaque type alias Chain134 a = Chain133 a
+opaque type alias Chain135 a = Chain134 a
+opaque type alias Chain136 a = Chain135 a
+opaque type alias Chain137 a = Chain136 a
+opaque type alias Chain138 a = Chain137 a
+opaque type alias Chain139 a = Chain138 a
+opaque type alias Chain140 a = Chain139 a
+opaque type alias Chain141 a = Chain140 a
+opaque type alias Chain142 a = Chain141 a
+opaque type alias Chain143 a = Chain142 a
+opaque type alias Chain144 a = Chain143 a
+opaque type alias Chain145 a = Chain144 a
+opaque type alias Chain146 a = Chain145 a
+opaque type alias Chain147 a = Chain146 a
+opaque type alias Chain148 a = Chain147 a
+opaque type alias Chain149 a = Chain148 a
+opaque type alias Chain150 a = Chain149 a
+opaque type alias Chain151 a = Chain150 a
+opaque type alias Chain152 a = Chain151 a
+opaque type alias Chain153 a = Chain152 a
+opaque type alias Chain154 a = Chain153 a
+opaque type alias Chain155 a = Chain154 a
+opaque type alias Chain156 a = Chain155 a
+opaque type alias Chain157 a = Chain156 a
+opaque type alias Chain158 a = Chain157 a
+opaque type alias Chain159 a = Chain158 a
+opaque type alias Chain160 a = Chain159 a
+opaque type alias Chain161 a = Chain160 a
+opaque type alias Chain162 a = Chain161 a
+opaque type alias Chain163 a = Chain162 a
+opaque type alias Chain164 a = Chain163 a
+opaque type alias Chain165 a = Chain164 a
+opaque type alias Chain166 a = Chain165 a
+opaque type alias Chain167 a = Chain166 a
+opaque type alias Chain168 a = Chain167 a
+opaque type alias Chain169 a = Chain168 a
+opaque type alias Chain170 a = Chain169 a
+opaque type alias Chain171 a = Chain170 a
+opaque type alias Chain172 a = Chain171 a
+opaque type alias Chain173 a = Chain172 a
+opaque type alias Chain174 a = Chain173 a
+opaque type alias Chain175 a = Chain174 a
+opaque type alias Chain176 a = Chain175 a
+opaque type alias Chain177 a = Chain176 a
+opaque type alias Chain178 a = Chain177 a
+opaque type alias Chain179 a = Chain178 a
+opaque type alias Chain180 a = Chain179 a
+opaque type alias Chain181 a = Chain180 a
+opaque type alias Chain182 a = Chain181 a
+opaque type alias Chain183 a = Chain182 a
+opaque type alias Chain184 a = Chain183 a
+opaque type alias Chain185 a = Chain184 a
+opaque type alias Chain186 a = Chain185 a
+opaque type alias Chain187 a = Chain186 a
+opaque type alias Chain188 a = Chain187 a
+opaque type alias Chain189 a = Chain188 a
+opaque type alias Chain190 a = Chain189 a
+opaque type alias Chain191 a = Chain190 a
+opaque type alias Chain192 a = Chain191 a
+opaque type alias Chain193 a = Chain192 a
+opaque type alias Chain194 a = Chain193 a
+opaque type alias Chain195 a = Chain194 a
+opaque type alias Chain196 a = Chain195 a
+opaque type alias Chain197 a = Chain196 a
+opaque type alias Chain198 a = Chain197 a
+opaque type alias Chain199 a = Chain198 a
+opaque type alias Chain200 a = Chain199 a
+opaque type alias Deep s = Eff {Scope s} none (Chain200 (Deep s))
+
+// Returned code exposes s; the factory retains nothing independently.
+makeNonregular : Fiber.Owner s -> Nonregular Int s
+foreign pure makeNonregular from "./owner_foreign_policy.mjs" "makeNonregular"
+  retention call
+
+makeRow : Fiber.Owner s -> RowGrow {} s
+foreign pure makeRow from "./owner_foreign_policy.mjs" "makeRow"
+  retention call
+
+makeProjected : Fiber.Owner s -> Projected Int s
+foreign pure makeProjected from "./owner_foreign_policy.mjs" "makeProjected"
+  retention call
+
+makeLongId : Fiber.Owner s -> LongId Int s
+foreign pure makeLongId from "./owner_foreign_policy.mjs" "makeLongId"
+  retention call
+
+makeChain : Fiber.Owner s -> Deep s
+foreign pure makeChain from "./owner_foreign_policy.mjs" "makeChain"
+  retention call
+
+makeHigher : Fiber.Owner s -> Higher s
+foreign pure makeHigher from "./owner_foreign_policy.mjs" "makeHigher"
+  retention call
+
+makeIdle : Fiber.Owner s -> IdleTask s
+foreign pure makeIdle from "./owner_foreign_policy.mjs" "makeIdle"
+  retention call
+
+inspect : String -> BigInt -> String
+foreign pure inspect from "./owner_foreign_policy.mjs" "inspect"
+
+mark_provider : String -> Eff {} none Unit
+foreign pure mark_provider from "./owner_foreign_policy.mjs" "markProvider"
+
+service Read =
+  read : Unit ->{} String
+
+main : Unit ->{} Unit
+let main () = scope outer {
+  let layer = Layer.succeed Read { read = fun () -> "unused" }
+  let nonregular1 = makeNonregular outer
+  Platform.stdout_line (inspect "nonregular" 0)
+  let nonregular2 = Layer.run layer (fun () -> await nonregular1)
+  let nonregular3 = Layer.run layer (fun () -> await nonregular2)
+  let _ = Layer.run layer (fun () -> await nonregular3)
+  Platform.stdout_line (inspect "nonregular" 3)
+  let row1 = makeRow outer
+  Platform.stdout_line (inspect "row" 0)
+  let row2 =
+    Layer.run layer (fun () ->
+      let _ = await (mark_provider "row")
+      await row1
+    )
+  let row3 = Layer.run layer (fun () -> await row2)
+  let _ = Layer.run layer (fun () -> await row3)
+  Platform.stdout_line (inspect "row" 3)
+  let projected1 = makeProjected outer
+  Platform.stdout_line (inspect "projected" 0)
+  let projected2 = Layer.run layer (fun () -> await projected1)
+  let projected3 = Layer.run layer (fun () -> await projected2)
+  let _ = Layer.run layer (fun () -> await projected3)
+  Platform.stdout_line (inspect "projected" 3)
+  let longid1 = makeLongId outer
+  Platform.stdout_line (inspect "longid" 0)
+  let longid2 = Layer.run layer (fun () -> await longid1)
+  let longid3 = Layer.run layer (fun () -> await longid2)
+  let _ = Layer.run layer (fun () -> await longid3)
+  Platform.stdout_line (inspect "longid" 3)
+  let chain1 = makeChain outer
+  Platform.stdout_line (inspect "chain" 0)
+  let chain2 = Layer.run layer (fun () -> await chain1)
+  let chain3 = Layer.run layer (fun () -> await chain2)
+  let _ = Layer.run layer (fun () -> await chain3)
+  Platform.stdout_line (inspect "chain" 3)
+  let higher1 = makeHigher outer
+  Platform.stdout_line (inspect "higher" 0)
+  let higher2 = Layer.run layer (fun () -> await higher1)
+  let higher3 = Layer.run layer (fun () -> await higher2)
+  let _ = Layer.run layer (fun () -> await higher3)
+  Platform.stdout_line (inspect "higher" 3)
+  let idle1 = makeIdle outer
+  Platform.stdout_line (inspect "idle" 0)
+  let _ = Layer.run layer (fun () -> await idle1)
+  Platform.stdout_line (inspect "idle" 1)
+}

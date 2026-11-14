@@ -163,6 +163,12 @@ impl<'a> Gen<'a> {
                         None => statement(a, docvec![a, "var ", var, " flickrt.Value = ", head]),
                     })
                     .collect();
+                // A wildcard/unit parameter can be carried only by jumps;
+                // assignments do not count as Go reads of a local variable.
+                stmts.extend(
+                    vars.iter()
+                        .map(|var| statement(a, docvec![a, "_ = ", *var])),
+                );
                 let body = checkpoint(a, self.fiber).into_iter().chain(inner);
                 stmts.push(statement(a, docvec![a, "for ", block(a, body)]));
                 (heads, stmts)

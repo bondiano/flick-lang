@@ -3,6 +3,7 @@
 //! `Outlives` (§2.4) and (Err-Raise) (§2.5) is decided.
 
 use std::collections::BTreeSet;
+use std::mem;
 
 use super::super::{Check, Checker, Solved, error};
 use super::Hold;
@@ -74,6 +75,7 @@ impl Checker<'_> {
                 );
             }
         }
+        self.finish_provided()?;
         for (c, r, facts) in self.regions.needs.clone() {
             self.outlives(&c, &r, &facts)?;
         }
@@ -169,6 +171,41 @@ impl Checker<'_> {
         for (a, c) in bounded {
             if !allowed.atoms.contains(&a) {
                 held = held.union(&self.zonk_caps(&c));
+            }
+        }
+        // Facts of the signed declaration apply to its rigid variables.
+        // Use one direct fact, without chaining facts through another atom.
+        // Obligations retain the facts from their generation site even after
+        // leaving a nested forall; they never acquire facts from a later one.
+        let atoms = mem::take(&mut held.atoms);
+        for atom in atoms {
+            if allowed.atoms.contains(&atom) {
+                held.atoms.insert(atom);
+                continue;
+            }
+            let bounds: Vec<_> = h
+                .bounds
+                .iter()
+                .filter(|(variable, _)| *variable == atom)
+                .map(|(_, bound)| self.zonk_caps(bound))
+                .collect();
+            let fitting = bounds.iter().find(|bound| {
+                bound.atoms.is_subset(&allowed.atoms) && bound.vars.is_subset(&allowed.vars)
+            });
+            if let Some(bound) = fitting.or_else(|| bounds.first()) {
+                held = held.union(bound);
+                let open = allowed
+                    .vars
+                    .iter()
+                    .any(|v| matches!(v, Var::Meta(m) if self.slots[*m as usize].solved.is_none()));
+                if fitting.is_none() && !open {
+                    // An upper bound discharges its atom only when it fits
+                    // the allowance, or can grow an open allowed row. A
+                    // residual rigid capture-row variable is no such proof.
+                    held.atoms.insert(atom);
+                }
+            } else {
+                held.atoms.insert(atom);
             }
         }
         // Live is a use obligation, not a storage bound. An opaque type

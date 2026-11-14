@@ -250,3 +250,6 @@ fn compositions_lower_to_one_closure_and_left_pipes_to_calls() {
         assert!(printed.contains(line), "{line}\nnot in\n{printed}");
     }
 }
+
+#[path = "owner_tests.rs"]
+mod owner_tests;

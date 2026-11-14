@@ -1,6 +1,9 @@
 package flickrt
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 func failure(f func()) (c *Cause) {
 	defer func() {
@@ -33,6 +36,71 @@ func TestTryHandlesTypedFailuresOnly(t *testing.T) {
 	}
 	if report(&Cause{kind: causeFail, err: NewData(appErrorTag, Rec("message", "no port", "details", None))}) != "error: no port" {
 		t.Error("an AppError is reported by its message")
+	}
+}
+
+func TestRecoveryMissDiffersFromRaisingTheSamePayload(t *testing.T) {
+	first := &struct{ tag string }{"First"}
+	second := &struct{ tag string }{"Second"}
+	original := concat(&Cause{kind: causeFail, err: first}, &Cause{kind: causeFail, err: second})
+	for _, mode := range []string{"miss", "guard raises", "body raises", "hit"} {
+		t.Run(mode, func(t *testing.T) {
+			var events []string
+			guardFailure := &Cause{kind: causeFail, err: first}
+			body := Eff(func(*Fiber) Value { panic(&Failure{original}) })
+			out, actual := catch(func() Value {
+				return Try(rootFiber(), body, func(_ *Fiber, err Value) Value {
+					if err != first {
+						t.Fatalf("only the first failure may be selected: %v", err)
+					}
+					events = append(events, "first", "guard")
+					switch mode {
+					case "miss":
+						return Unmatched
+					case "guard raises":
+						panic(&Failure{guardFailure})
+					default:
+						events = append(events, "body")
+						if mode == "body raises" {
+							return Fail(err)
+						}
+						return "hit"
+					}
+				})
+			})
+			want := []string{"first", "guard"}
+			if mode == "body raises" || mode == "hit" {
+				want = append(want, "body")
+			}
+			if !slices.Equal(events, want) {
+				t.Fatalf("selection order: %v", events)
+			}
+			kept := original.reasons()
+			if len(kept) != 2 || kept[0].kind != causeFail || kept[1].kind != causeFail || kept[0].err != first || kept[1].err != second {
+				t.Fatal("incoming reason kinds, order and payload identities must stay unchanged")
+			}
+			switch mode {
+			case "hit":
+				if actual != nil || out != "hit" {
+					t.Fatalf("selected body: %v, %v", out, actual)
+				}
+			case "miss":
+				if actual != original {
+					t.Fatal("miss must preserve the whole cause by identity")
+				}
+			default:
+				if actual == nil || actual == original {
+					t.Fatal("a new raise must not be confused with miss")
+				}
+				reasons := actual.reasons()
+				if len(reasons) != 1 || reasons[0].kind != causeFail || reasons[0].err != first {
+					t.Fatal("new failure keeps the same payload but not secondary reasons")
+				}
+				if mode == "guard raises" && actual != guardFailure {
+					t.Fatal("guard failure must replace the incoming cause, not combine with it")
+				}
+			}
+		})
 	}
 }
 

@@ -1,0 +1,5 @@
+module App.WitnessAliasSaturation exposing (..)
+type alias Pair a = (a, a)
+type Wrapper (f : Type -> Type)
+type alias Bad = Wrapper Pair
+//~ FLICK-T002 @4:26-4:30 type alias `Pair` needs 1 type argument(s), here it has 0

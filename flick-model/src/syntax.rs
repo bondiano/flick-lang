@@ -139,13 +139,19 @@ pub enum RegionOp {
     AddFinalizer,
     /// `Resource.acquire_release`: the value, its release a finalizer.
     AcquireRelease,
+    /// Allocates region-owned storage, separately from the finalizer stack.
+    ArenaMake,
+    /// Transfers a value into a strong arena slot and returns a nonowning view.
+    ArenaAlloc,
+    /// Reads an ordinary value from a live arena slot.
+    ArenaGet,
 }
 
 impl RegionOp {
     pub fn arity(self) -> usize {
         match self {
             RegionOp::Spawn => 3,
-            RegionOp::AcquireRelease => 2,
+            RegionOp::AcquireRelease | RegionOp::ArenaAlloc => 2,
             _ => 1,
         }
     }
@@ -252,6 +258,18 @@ pub enum Term {
     // the forms of regions (`docs/formal/regions.md` §3.1); `π` is an index of Λ
     /// `own π`: the owner of region `π`.
     Own(usize),
+    /// Operational IR context, outside the source λFlick calculus. Reads C,
+    /// which may be absent and never activates or retains an owner.
+    ReadOwnerEvidence,
+    /// Typed inert carrier returned by the operational read. Unlike `Own`,
+    /// it does not claim a source region or provide a capability by itself.
+    OwnerCandidate(Option<usize>),
+    /// Source `Scope.current`: reads D, not C.
+    DefaultOwner,
+    /// Evaluate the owner in the old context, then run the body under C.
+    WithOwnerEvidence(Rc<Term>, Rc<Term>),
+    /// Raw explicit-Scope foreign activation: changes D, never C.
+    ActivateOwner(Rc<Term>, Rc<Term>),
     /// `cap π n`: object `n` the foreign binding `Path` gave. Of a region
     /// when the binding acquires into one; without, an object of G4, as
     /// the one `Resource.acquire_release` holds, or a fiber.
@@ -332,6 +350,7 @@ impl Term {
             | Term::Fix(..)
             | Term::Loc(_)
             | Term::Env(_)
+            | Term::OwnerCandidate(_)
             | Term::Own(_)
             | Term::Cont(_)
             | Term::Cap(..) => true,

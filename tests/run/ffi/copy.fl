@@ -22,10 +22,35 @@ foreign rename from "./bindings.mjs" "rename"
 push_into : (Unit -> List Float) ->{} Float
 foreign push_into from "./bindings.mjs" "pushInto"
 
+// Deep, finite plain data crosses each copy position without using the host
+// call stack. The mutable host can only change its independent copy.
+type Deep = Leaf | Branch (List Deep)
+
+deep : Float -> Deep -> Deep -> Deep
+foreign pure deep from "./bindings.mjs" "copyDeep"
+
+depth_of : Deep -> Float
+foreign pure depth_of from "./bindings.mjs" "copyDeepDepth"
+
+spoil_deep : Deep ->{} Float
+foreign spoil_deep from "./bindings.mjs" "spoilDeep"
+
+callback_arg : (Deep -> Float) -> Deep -> Deep ->{} Float
+foreign callback_arg from "./bindings.mjs" "copyDeepCallbackArg"
+
+callback_result : (Unit -> Deep) ->{} Float
+foreign callback_result from "./bindings.mjs" "copyDeepCallbackResult"
+
+deep_effect : Deep ->{} Deep
+foreign effect deep_effect from "./bindings.mjs" "copyDeepEffect"
+
+deep_async : Float -> Deep -> Deep ->{Async} Deep
+foreign deep_async from "./bindings.mjs" "copyDeepAsync"
+
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-main : Unit ->{} Unit
+main : Unit ->{Async} Unit
 let main () =
   let xs = [3, 1, 2]
   let sorted = sort_in_place xs
@@ -39,3 +64,17 @@ let main () =
   let mine = [1, 2]
   let length = push_into (fun () -> mine)
   say ("callback result " ++ show mine ++ ", JS saw " ++ show length)
+  let tree = deep 20000 Leaf (Branch [])
+  let passed = spoil_deep tree
+  say ("deep result " ++ show (depth_of tree) ++ ", argument " ++ show passed)
+  let received = callback_arg depth_of Leaf (Branch [])
+  let returned = callback_result (fun () -> tree)
+  say
+    ("deep callbacks "
+      ++ show received
+      ++ " "
+      ++ show returned
+      ++ ", retained "
+      ++ show (depth_of tree))
+  say ("deep effect " ++ show (depth_of (deep_effect tree)))
+  say ("deep async " ++ show (depth_of (deep_async 20000 Leaf (Branch []))))

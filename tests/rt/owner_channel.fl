@@ -1,0 +1,30 @@
+// Lexical Scope evidence must not replace a provider's default work owner.
+module App.Main exposing (main)
+
+service Read =
+  read : Unit ->{} String
+
+same_owner : Fiber.Owner s ->{} Bool
+foreign same_owner from "./owner_channel.mjs" "sameOwner"
+  retention call
+
+report : Fiber.Owner s ->{} Unit
+let report owner = Platform.stdout_line (if same_owner owner then "outer" else "provider")
+
+acquire : Fiber.Owner t -> Unit ->{Scope s} Unit
+let acquire owner () =
+  let _arena = Arena.make ()
+  report owner
+
+main : Unit ->{} Unit
+let main () = scope outer {
+  let layer = Layer.succeed Read { read = fun () -> "unused" }
+  Layer.run layer (fun () ->
+    let _arena = Arena.make ()
+    report outer
+  )
+  Layer.run layer (acquire outer)
+  Layer.run layer (fun () -> acquire outer ())
+  let work = task { acquire outer () }
+  Layer.run layer (fun () -> await work)
+}

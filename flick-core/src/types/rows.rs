@@ -118,14 +118,18 @@ impl Checker<'_> {
             }
             // `?m` less some names against a row: the least `?m` is that row,
             // which then holds none of the names
-            ([Type::Without { row, gone }], _) if matches!(**row, Type::Meta(_)) => {
+            ([Type::Without { row, gone }], _)
+                if matches!(**row, Type::Meta(_) | Type::MetaView(_)) =>
+            {
                 missing(&only_left, true)?;
                 let Type::Meta(m) = **row else {
                     unreachable!("matched above")
                 };
                 self.bind(m, &left_out(only_right, tails_right, gone, false)?)
             }
-            (_, [Type::Without { row, gone }]) if matches!(**row, Type::Meta(_)) => {
+            (_, [Type::Without { row, gone }])
+                if matches!(**row, Type::Meta(_) | Type::MetaView(_)) =>
+            {
                 missing(&only_right, false)?;
                 let Type::Meta(m) = **row else {
                     unreachable!("matched above")
@@ -136,7 +140,9 @@ impl Checker<'_> {
             (metas, []) | ([], metas)
                 if only_left.is_empty()
                     && only_right.is_empty()
-                    && metas.iter().all(|t| matches!(t, Type::Meta(_))) =>
+                    && metas
+                        .iter()
+                        .all(|t| matches!(t, Type::Meta(_) | Type::MetaView(_))) =>
             {
                 metas
                     .iter()

@@ -162,6 +162,8 @@ impl Gen<'_> {
             ExprKind::Generate { .. } | ExprKind::Each { .. } | ExprKind::Yield(_) => {
                 self.generated(e)
             }
+            ExprKind::ReadOwnerEvidence => self.read_owner_evidence(),
+            ExprKind::WithOwnerEvidence(owner, call) => self.with_owner_evidence(owner, call),
             ExprKind::Within(owner, call) => {
                 self.owner = Some(names::ident(owner));
                 self.expr(call)
@@ -169,6 +171,27 @@ impl Gen<'_> {
             ExprKind::Handle(h) => self.handle(h),
             ExprKind::Lift(inner, lift) => self.lifted(inner, lift),
         }
+    }
+
+    fn read_owner_evidence(&mut self) -> String {
+        let read = format!("{}()", self.rt("readOwnerEvidence"));
+        if self.kernel {
+            read
+        } else {
+            self.run(None, &read)
+        }
+    }
+
+    fn with_owner_evidence(&mut self, owner: &Expr, body: &Expr) -> String {
+        let owner = self.expr(owner);
+        let body = self.gen_block(body);
+        let thunk = if self.kernel {
+            body
+        } else {
+            format!("() => {body}")
+        };
+        let call = format!("{}({owner}, {thunk})", self.rt("withOwnerEvidence"));
+        self.run(None, &call)
     }
 
     fn app(&mut self, e: &Expr, func: &Expr, arg: &Expr, stage: Stage, arg_first: bool) -> String {
@@ -468,7 +491,7 @@ pub fn arrow_body(stmts: &[String], value: &str) -> String {
 }
 
 /// A record key in an object literal.
-fn key(label: &str) -> String {
+pub(super) fn key(label: &str) -> String {
     if names::is_property(label) && label != "__proto__" {
         label.to_owned()
     } else {

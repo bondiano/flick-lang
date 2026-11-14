@@ -1,0 +1,28 @@
+/// Region-owned storage. Closing the owning `scope` releases every slot
+/// after its work and finalizers have finished. Merely holding a view does
+/// not keep its region alive; reading it requires that region live.
+module Arena exposing (Arena, Value, make, alloc, get)
+
+/// A collection of strong value slots owned by region `s`.
+type Arena (s : Region)
+
+/// A nonowning view of a slot. Dropping or ignoring a view never reads it.
+type Value (s : Region) a
+
+/// Creates storage in the owner of region `s`, not necessarily the
+/// innermost scope. All its slots are released together at scope close.
+make : Unit ->{Scope s} Arena s
+foreign effect make from "flick:rt" "arenaMake"
+  retention call
+
+/// Keeps `value` strongly until the arena closes and returns a view.
+/// Dropping the last view does not release this slot early.
+alloc : Arena s -> a^c ->{} Value s (a^c)
+foreign alloc from "flick:rt" "arenaAlloc"
+  retention call
+
+/// Reads an ordinary immutable value. The returned value has its own
+/// lifetime; it is not a borrowed pointer into the arena's backing storage.
+get : Value s (a^c) ->{} a^c
+foreign get from "flick:rt" "arenaGet"
+  retention call

@@ -35,7 +35,8 @@ export {
 } from "./effects.ts";
 export { runIn } from "./fiber.ts";
 export { handle, operation, service, tryWith, trySync } from "./handle.ts";
-export { fiberJoin, fiberSpawn, foreignAsync, foreignSync, scopeCurrent, scopeRun, within } from "./owner.ts";
+export { arenaMake, fiberJoin, fiberSpawn, foreignAsync, foreignSync, scopeCurrent, scopeRun, within } from "./owner.ts";
+export { arenaAlloc, arenaGet } from "../core/Arena.ts";
 export { parallel, parallelAll, parallelExits, parallelResults, raceFirst, raceSuccess, timeout, timeoutOption } from "./concurrency.ts";
 export {
   durationAdd,
@@ -148,3 +149,5 @@ export {
   testSuite,
 } from "./testing.ts";
 export { RuntimeFailure, promiseFacade, runPromise } from "./facade.ts";
+
+export { readOwnerEvidence, withOwnerEvidence } from "./fiber.ts";

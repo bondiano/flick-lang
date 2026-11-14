@@ -142,7 +142,9 @@ impl Refiner<'_, '_> {
             return Err(Stop::Impossible);
         }
         // a variable still being inferred outside would decide it
-        let open = self.full(t).contains(&mut |y| matches!(y, Type::Meta(_)));
+        let open = self
+            .full(t)
+            .contains(&mut |y| matches!(y, Type::Meta(_) | Type::MetaView(_)));
         if open {
             return Err(Stop::Unknown);
         }
@@ -163,7 +165,9 @@ impl Refiner<'_, '_> {
                 Ok(())
             }
             (Type::Meta(x), Type::Meta(y)) if x == y => Ok(()),
-            (Type::Meta(_), _) | (_, Type::Meta(_)) => Err(Stop::Unknown),
+            (Type::Meta(_) | Type::MetaView(_), _) | (_, Type::Meta(_) | Type::MetaView(_)) => {
+                Err(Stop::Unknown)
+            }
             (Type::Skolem(x), Type::Skolem(y)) if x == y => Ok(()),
             (Type::Skolem(x), Type::Skolem(y)) => {
                 // the later variable is the one the branch learns about

@@ -1,7 +1,7 @@
 //! `scope` expressions and the calls that acquire into their owners.
 
 use crate::types::Elem;
-use std::mem;
+use std::{iter, mem};
 
 use super::{Need, Scope, scope};
 use crate::diagnostics::codes;
@@ -13,7 +13,7 @@ use crate::types::convert::TyVar;
 use crate::types::kinds::Kind;
 use crate::types::lang::{self, Lang};
 use crate::types::ty::{Row, Type};
-use crate::types::typing::{OpenScopes, range};
+use crate::types::typing::range;
 
 impl Checker<'_> {
     /// `scope [s] { body }`: the body runs with a fresh region as the owner
@@ -108,6 +108,10 @@ impl Checker<'_> {
     /// result: without `Scope` when a scope of the stage provides it, since
     /// each scope provides `Scope` of its own region only.
     pub fn lexical_owner(&mut self, services: &Type, span: Span) -> Type {
+        let context = self.owner_context();
+        self.typing
+            .pending_owners
+            .push((range(span), services.clone(), context));
         let Some(&inner) = self.cx.regions.open.last() else {
             return services.clone();
         };
@@ -117,17 +121,13 @@ impl Checker<'_> {
         let Some(needed) = norm.get(scope()).cloned() else {
             // a row still growing, such as that of a lambda made in an outer
             // scope, names its `Scope` only once solved: the owner is read then
-            if has_own && !norm.tails.is_empty() {
-                let open = self.open_scopes();
-                (self.typing.pending_owners).push((range(span), services.clone(), open));
-            }
             return services.clone();
         };
         if !has_own {
             // no scope of this stage provides it: the stage passes `Scope` on to
             // what runs it, which provides the region its row names
             if let [region] = needed.spine().1[..]
-                && let Type::Meta(_) = self.store.resolve(region)
+                && let Type::Meta(_) | Type::MetaView(_) = self.store.resolve(region)
             {
                 match (self.declared_scope(), &mut self.cx.regions.defaults) {
                     (Some(owner), _) => {
@@ -142,12 +142,10 @@ impl Checker<'_> {
             }
             return services.clone();
         }
-        let open = self.open_scopes();
-        (self.typing.pending_owners).push((range(span), services.clone(), open));
         let [region] = needed.spine().1[..] else {
             return services.clone();
         };
-        if let Type::Meta(_) = self.store.resolve(region) {
+        if let Type::Meta(_) | Type::MetaView(_) = self.store.resolve(region) {
             let owner = Type::Skolem(self.cx.regions.scopes[inner].region);
             let _ = self.unify(region, &owner);
         }
@@ -162,21 +160,11 @@ impl Checker<'_> {
         norm.into_type()
     }
 
-    /// The region and the expression of each open scope, outermost first.
-    fn open_scopes(&self) -> OpenScopes {
-        (self.cx.regions.open.iter())
-            .map(|&i| {
-                let scope = &self.cx.regions.scopes[i];
-                (scope.region, scope.node)
-            })
-            .collect()
-    }
-
     /// Gives the tasks an `Eff` argument left without a region the
     /// innermost scope, once the call has all its arguments.
     pub fn settle_defaults(&mut self, defaults: Vec<(Type, usize)>) {
         for (region, inner) in defaults {
-            if let Type::Meta(_) = self.store.resolve(&region) {
+            if let Type::Meta(_) | Type::MetaView(_) = self.store.resolve(&region) {
                 let owner = Type::Skolem(self.cx.regions.scopes[inner].region);
                 let _ = self.unify(&region, &owner);
             }
@@ -186,13 +174,24 @@ impl Checker<'_> {
     /// The region of the `Scope` the current stage's row names, once known:
     /// a task checked against `Eff {Scope s | r} e a` acquires into `s`.
     fn declared_scope(&self) -> Option<Type> {
-        let declared = self.store.normalize(&self.cx.stage.services);
-        let scope = declared.get(scope())?;
-        let [region] = scope.spine().1[..] else {
-            return None;
-        };
-        let region = self.store.resolve(region);
-        (!matches!(region, Type::Meta(_))).then_some(region)
+        iter::once(&self.cx.stage.services)
+            .chain(
+                self.typing
+                    .owner_stack
+                    .iter()
+                    .rev()
+                    .filter(|stage| stage.source_depth == self.cx.regions.open.len())
+                    .map(|stage| &stage.services),
+            )
+            .find_map(|services| {
+                let declared = self.store.normalize(services);
+                let scope = declared.get(scope())?;
+                let [region] = scope.spine().1[..] else {
+                    return None;
+                };
+                let region = self.store.resolve(region);
+                (!matches!(region, Type::Meta(_) | Type::MetaView(_))).then_some(region)
+            })
     }
 
     /// At the end of scope `index`: the needs it is the innermost scope of

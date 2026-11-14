@@ -24,6 +24,7 @@ pub type Body<'b, 'c> = dyn FnMut(&mut Checker<'c>, Option<&Type>, Option<Type>)
 /// What [`Checker::function_typed`] keeps across the call of a body.
 struct OpenFunction {
     saved: bool,
+    owner_mark: usize,
     mark: usize,
     givens: usize,
     uses: usize,
@@ -101,11 +102,15 @@ impl<'c> Checker<'c> {
             (K::ListExpr | K::ForExpr, _) => {
                 actual_type = self.check_collection(node, children, expected, captures);
             }
-            (K::RecordExpr, Type::Record(row)) => self.check_record(node, row, expected),
+            (K::RecordExpr, Type::Record(row)) => {
+                self.check_record(node, row, expected);
+            }
             (K::DoExpr, _) => {
                 self.do_expr(node, Some(expected));
             }
-            (K::TaskExpr, _) => actual_type = self.check_task(node, &target, expected),
+            (K::TaskExpr, _) => {
+                actual_type = self.check_task(node, &target, expected);
+            }
             _ => {
                 let actual = self.infer(node);
                 self.expect(&actual, expected, self.span(node));
@@ -406,6 +411,41 @@ impl<'c> Checker<'c> {
         }
     }
 
+    /// Observe a known task beyond ordinary bounded head reduction. The
+    /// finite productivity certificate only justifies continuing epsilon
+    /// normalization; the actual Eff spine, never P itself, supplies its rows
+    /// and result. Forall remains a source polymorphism boundary.
+    pub(in crate::types) fn known_eff_parts(&self, ty: &Type) -> Option<(Type, Type, Type)> {
+        let parts = |ty: &Type| {
+            let (head, args) = ty.spine();
+            match args[..] {
+                [services, errors, result] if head.is_lang(Lang::Eff) => {
+                    Some((services.clone(), errors.clone(), result.clone()))
+                }
+                _ => None,
+            }
+        };
+        let mut head = self.whnf(ty);
+        if let Some(parts) = parts(&head) {
+            return Some(parts);
+        }
+        if matches!(head, Type::Forall { .. } | Type::Fun { .. })
+            || !self.productive_type_head(&head)
+        {
+            return None;
+        }
+        loop {
+            let next = self.whnf(&head);
+            if let Some(parts) = parts(&next) {
+                return Some(parts);
+            }
+            if next == head || matches!(next, Type::Forall { .. } | Type::Fun { .. }) {
+                return None;
+            }
+            head = next;
+        }
+    }
+
     pub fn eff_parts(&self, t: &Type) -> Option<(Type, Type, Type)> {
         let t = self.whnf(t);
         let (head, args) = t.spine();
@@ -445,7 +485,10 @@ impl<'c> Checker<'c> {
         };
         self.redundant_else(node, &children, otherwise);
         // an inferred `if` takes the type of its `then` branch
-        let open = matches!(self.store.resolve(expected), Type::Meta(_));
+        let open = matches!(
+            self.store.resolve(expected),
+            Type::Meta(_) | Type::MetaView(_)
+        );
         if let Some(then) = children.get(1)
             && !self.record_in_braces(node, then)
         {
@@ -560,7 +603,8 @@ impl<'c> Checker<'c> {
         for param in params {
             let target = rest.as_ref().map(|t| self.whnf(t));
             let known = rest.clone().filter(|t| {
-                !matches!(target, Some(Type::Meta(_))) || self.whnf_captured(t).1.is_some()
+                !matches!(target, Some(Type::Meta(_) | Type::MetaView(_)))
+                    || self.whnf_captured(t).1.is_some()
             });
             closures.push((self.cx.locals.len(), known));
             let target = match target {
@@ -582,7 +626,7 @@ impl<'c> Checker<'c> {
                     (*ty, effects)
                 }
                 Some(Type::Error) => (Type::Error, None),
-                Some(meta @ Type::Meta(_)) => {
+                Some(meta @ (Type::Meta(_) | Type::MetaView(_))) => {
                     unknown.get_or_insert((stages.len(), meta));
                     rest = None;
                     (self.fresh(), None)
@@ -615,9 +659,11 @@ impl<'c> Checker<'c> {
         let inferred_result = rest.is_none();
         let returns = rest.clone().unwrap_or_else(|| self.fresh());
         stage.returns = Some(returns.clone());
+        let owner_mark = self.enter_owner_arrows(node.range(), &stages, &stage.services);
         let outer = mem::replace(&mut self.cx.stage, stage);
         Box::new(OpenFunction {
             saved,
+            owner_mark,
             mark,
             givens,
             uses,
@@ -637,6 +683,7 @@ impl<'c> Checker<'c> {
     fn close_function(&mut self, open: Box<OpenFunction>, result: Type, node: &Node) -> Type {
         let OpenFunction {
             saved,
+            owner_mark,
             mark,
             givens,
             uses,
@@ -651,6 +698,7 @@ impl<'c> Checker<'c> {
             outer,
         } = *open;
         let inner = mem::replace(&mut self.cx.stage, outer);
+        self.typing.owner_stack.truncate(owner_mark);
         if inferred_result && self.unify(&returns, &result).is_err() {
             let (returns, result) = (self.show(&returns), self.show(&result));
             self.error(

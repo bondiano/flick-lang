@@ -184,6 +184,8 @@ fn plain(e: &Expr, choosing: bool) -> bool {
             | ExprKind::Each { .. }
             | ExprKind::Yield(_)
             | ExprKind::Within(..)
+            | ExprKind::ReadOwnerEvidence
+            | ExprKind::WithOwnerEvidence(..)
             | ExprKind::Handle(_)
             | ExprKind::Task(_)
             | ExprKind::Await(_)

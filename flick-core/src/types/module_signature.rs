@@ -8,7 +8,18 @@ use super::{
     show_type,
 };
 use crate::api_diff::{canonical_type, canonical_type_in};
-use crate::iface::{Decl, Entity, Export, Interface, Namespace};
+use crate::iface::{Decl, Entity, Export, Interface, Namespace, support};
+
+fn rename_module_reference(module: &str, from: &str, to: &str) -> Option<String> {
+    if module == from {
+        Some(to.into())
+    } else {
+        module
+            .strip_prefix(from)
+            .filter(|suffix| suffix.starts_with('.'))
+            .map(|suffix| format!("{to}{suffix}"))
+    }
+}
 
 fn replace_types(ty: &Type, replacements: &[(Type, Type)]) -> Type {
     if let Some((_, new)) = replacements.iter().find(|(old, _)| old == ty) {
@@ -71,7 +82,10 @@ fn map_module_children(ty: &Type, f: &mut dyn FnMut(&Type) -> Type) -> Type {
     mapped
 }
 
-fn map_definition_types(definition: &mut TypeDef, f: &mut dyn FnMut(&Type) -> Type) {
+pub(in crate::types) fn map_definition_types(
+    definition: &mut TypeDef,
+    f: &mut dyn FnMut(&Type) -> Type,
+) {
     definition.kind = map_kind_types(&definition.kind, f);
     match &mut definition.form {
         Form::Alias { body, .. } => *body = f(body),
@@ -118,6 +132,9 @@ fn map_interface_types(interface: &mut Interface, f: &mut dyn FnMut(&Type) -> Ty
         if let Some(definition) = &mut export.definition {
             map_definition_types(definition, f);
         }
+    }
+    for support in &mut interface.support_types {
+        map_definition_types(&mut support.definition, f);
     }
     if let Some(signature) = &mut interface.parameterized {
         signature.map_types(f);
@@ -491,3 +508,5 @@ include!("module_signature/interface.rs");
 include!("module_signature/display.rs");
 
 include!("module_signature/contract.rs");
+
+include!("module_signature/headers.rs");

@@ -2,8 +2,8 @@
 //! bindings it makes. Arms are tried top to bottom; a guard that fails goes
 //! on to the next arm.
 
+use super::function::balanced_without_yield;
 use super::{Gen, indent, names};
-use std::mem;
 
 use crate::ir::{Arm, Expr, Lit, Pat};
 use crate::types::{Constructor, JsClass, Rep};
@@ -208,23 +208,65 @@ impl Gen<'_> {
         }
     }
 
-    /// The arms of `try … with` on the error `subject`: a matching arm
-    /// returns its handler, and no match returns `undefined`.
-    pub(super) fn handlers(&mut self, subject: &str, arms: &[Arm]) {
-        for arm in arms {
-            self.arm(
-                subject,
-                &arm.pat,
-                arm.guard.as_ref(),
-                &arm.body,
-                false,
-                |g, body| {
-                    let handler = g.gen_block(body);
-                    g.buf.push(format!("return {handler};"));
-                },
-            );
+    /// A selector for `try … with`. Pure guards choose a deferred body at once;
+    /// guards that yield choose it outside the caught body, preserving the
+    /// original cause through the runtime's `unhandled` continuation.
+    pub(super) fn handlers(&mut self, subject: &str, arms: &[Arm]) -> String {
+        let saved = (self.generator, self.tail.take());
+        self.generator = true;
+        let (stmts, ()) = self.block(|g| {
+            for arm in arms {
+                g.arm(
+                    subject,
+                    &arm.pat,
+                    arm.guard.as_ref(),
+                    &arm.body,
+                    false,
+                    |g, body| {
+                        let handler = g.gen_block(body);
+                        g.buf.push(format!("return {handler};"));
+                    },
+                );
+            }
+            g.buf.push("return undefined;".to_owned());
+        });
+        (self.generator, self.tail) = saved;
+        if stmts.iter().all(|s| balanced_without_yield(s)) {
+            return format!("{} {{\n{}}}", self.arrow(subject), indent(&stmts));
         }
-        self.buf.push("return undefined;".to_owned());
+        let unhandled = self.temp();
+        let selected = self.temp();
+        let generator = self.generator_function("", &stmts);
+        let (selection, run) = if self.kernel {
+            (format!("({generator})()"), "yield")
+        } else {
+            (format!("{}({generator})", self.effect("gen")), "yield*")
+        };
+        let handler = if self.kernel {
+            format!("{selected}()")
+        } else {
+            selected.clone()
+        };
+        let continuation = format!("{selected} === undefined ? {unhandled}() : {handler}");
+        let continuation = if self.kernel {
+            continuation
+        } else {
+            format!("yield* ({continuation})")
+        };
+        let stmts = vec![
+            format!("const {selected} = {run} {selection};"),
+            format!("return {continuation};"),
+        ];
+        let deferred = self.generator_function("", &stmts);
+        let deferred = if self.kernel {
+            deferred
+        } else {
+            format!("{}({deferred})", self.effect("gen"))
+        };
+        format!(
+            "{} {deferred}",
+            self.arrow(&format!("{subject}, {unhandled}"))
+        )
     }
 
     /// The `case` tag of each arm of a `match` a `switch` can take, `None`
@@ -283,9 +325,7 @@ impl Gen<'_> {
             }
             match guard {
                 Some(guard) => {
-                    let saved = mem::replace(&mut g.generator, false);
                     let c = g.expr(guard);
-                    g.generator = saved;
                     let (b, ()) = g.block(|g| body(g, value));
                     g.buf.push(format!("if ({c}) {{\n{}}}", indent(&b)));
                 }

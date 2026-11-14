@@ -2,6 +2,8 @@
 # do, each with what stops it: `<case> # <reason>`. `just model` holds the list
 # to what the model does: a case that begins to run moves to model.txt, a new
 # case is run or is written here, and a reason that changes is written again.
+# Unsupported callables remain cold until their actual host invocation;
+# reasons name the first unsupported boundary, not mere callable lookup.
 # A form or a native with no translation is named; a rule of the model's own
 # that rejects a program flick-core accepts is a divergence still to be read.
 # loops_owners exercises the existing G6 explicit-owner limit (docs/formal/regions.md
@@ -39,14 +41,14 @@ codegen/strings_utf16 # no native for `length` (flick:String length)
 codegen/tags # no native for `tag_of` (./tags.mjs tagOf)
 effect/host_services # a `BigInt` literal has no λFlick form
 ffi/catch_order # no native for `fail` (./bindings.mjs fail)
-ffi/copy # no native for `kept` (./bindings.mjs kept)
+ffi/copy # no native for `callback_arg` (./bindings.mjs copyDeepCallbackArg)
 ffi/defect # no native for `fail_sync` (./bindings.mjs fail)
 ffi/events # no native for `emit` (./bindings.mjs emit)
 ffi/foreign # no native for `await_both` (./bindings.mjs awaitBoth)
 ffi/snapshot # no native for `cyclic` (./bindings.mjs cyclic)
 runtime/abort_stops_children # no native for `make` (flick:Deferred make)
-runtime/cause_laws # no native for `check` (flick:Arbitrary flickCheckEffect)
-runtime/cause_lists # no native for `combine` (flick:Cause flickCombine)
+runtime/cause_laws # no native for `json_finite` (flick:rt codecNumberFinite)
+runtime/cause_lists # no native for `fail` (flick:Cause flickFail)
 runtime/close_phases # no native for `open_res` (./resources.mjs open)
 runtime/closed_owner # no native for `make` (flick:Deferred make)
 runtime/closing_causes # no native for `exit` (flick:Effect flickExit)
@@ -61,26 +63,25 @@ runtime/hung_io # no native for `hang` (./timers.mjs hang)
 runtime/interrupt_after_close # no native for `make` (flick:Deferred make)
 runtime/interrupt_in_finalizer # no native for `make` (flick:Deferred make)
 runtime/interrupt_skips # no native for `make` (flick:Deferred make)
-runtime/lambda_owners # the model's (≡) rejects `App.Main.composed`
 runtime/leases # no native for `from_acquire` (flick:ScopedRef flickFromAcquire)
-runtime/owners # the model's (≡) rejects `App.Main.keep`
+runtime/owners # no native for `open_res` (./resources.mjs open)
 runtime/parallel # the model's (≡) rejects `App.Main.main`
-runtime/paths # no native for `node_open` (flick:rt fileOpen)
+runtime/paths # no native for `env` (flick:rt platformEnv)
 runtime/ref_linearizable # the model's (Structural) rejects `App.Main.transfers`
 runtime/releases # no native for `open_raw` (./resources.mjs open)
 runtime/scope_close # no native for `add_finalizer_exit` (flick:Scope flickAddFinalizerExit)
 runtime/scope_owners # the model's (≡) rejects `App.Main.main`
 runtime/scope_releases # no native for `timeout` (flick:rt timeout)
-runtime/scoped_file # no native for `node_open` (flick:rt fileOpen)
+runtime/scoped_file # no native for `env` (flick:rt platformEnv)
 runtime/scopes # no native for `held_write` (./calls.mjs heldWrite)
 runtime/settling_calls # no native for `settle_later` (./calls.mjs settleLater)
 runtime/shared_layer # the model's (≡) rejects `App.Main.failed_build`
-runtime/slice # no native for `parallel_all` (flick:rt parallelAll)
+runtime/slice # no native for `repeat` (flick:rt listRepeat)
 runtime/supervisor_defect # no native for `make` (flick:Deferred make)
-schema/combinators # no native for `unsafe_record` (flick:rt schemaRecordOf)
+schema/combinators # no native for `string` (flick:rt schemaString)
 schema/contracts # no native for `cyclic` (./inputs.mjs cyclic)
 schema/derive # no native for `number` (flick:rt schemaNumber)
-schema/enums # no native for `unsafe_record` (flick:rt schemaRecordOf)
+schema/enums # no native for `lazy` (flick:rt schemaLazyOf)
 schema/json_wire # a `BigInt` literal has no λFlick form
 schema/policies # no native for `count` (./count.mjs count)
 schema/route # no native for `encodable` (./route.mjs encodable)
@@ -89,25 +90,25 @@ sql/queries # a `BigInt` literal has no λFlick form
 stdlib/cli/cli # the row primitive `Lacks "name" { color : Option Color; loud : Bool; times : Float }`
 stdlib/cli/cli_exit # the row primitive `Lacks "times" {}`
 stdlib/cli/file_parse # the row primitive `Lacks "data" {}`
-stdlib/cli/prompt # no native for `concat` (flick:rt listConcat)
+stdlib/cli/prompt # no native for `chars` (flick:rt stringChars)
 stdlib/cli/surface # the row primitive `Lacks "env" {}`
 stdlib/cli/trace # no native for `received` (../observability/receiver.mjs received)
 stdlib/cli/value # no native for `find` (flick:rt listFind)
-stdlib/collections # no native for `insert` (flick:rt hashSetInsert)
-stdlib/core_more # no native for `run` (flick:rt trampolineRun)
+stdlib/collections # no native for `empty` (flick:rt hashSetEmpty)
+stdlib/core_more # no native for `suspend` (flick:rt trampolineSuspend)
 stdlib/decimals # a `BigInt` literal has no λFlick form
 stdlib/devtools/devtools # no native for `got` (./server.mjs got)
 stdlib/devtools/headers # no native for `start` (./handshake.mjs start)
-stdlib/effect/arbitrary # no native for `sample` (flick:Arbitrary flickSampleEffect)
+stdlib/effect/arbitrary # no native for `map` (flick:Arbitrary map)
 stdlib/effect/array # no native for `take_right` (flick:Array takeRight)
 stdlib/effect/bytesize # no native for `is_finite` (global Number.isFinite)
 stdlib/effect/bytesize_text # no native for `is_finite` (global Number.isFinite)
 stdlib/effect/cache # the model's (Scope) rejects `App.Main.pools`
-stdlib/effect/channel # no native for `run_collect` (flick:Channel runCollect)
-stdlib/effect/channel_control # no native for `concat` (flick:Channel concat)
-stdlib/effect/channel_core # no native for `run_collect` (flick:Channel runCollect)
+stdlib/effect/channel # no native for `from_list` (flick:Channel fromArray)
+stdlib/effect/channel_control # no native for `fail` (flick:Channel fail)
+stdlib/effect/channel_core # no native for `from_list` (flick:Channel fromArray)
 stdlib/effect/channel_schema # no native for `from_list_chunked` (flick:Channel flickFromListChunked)
-stdlib/effect/channel_transform # no native for `run_collect` (flick:Channel runCollect)
+stdlib/effect/channel_transform # no native for `map` (flick:Channel map)
 stdlib/effect/channel_web # no native for `async_iterable` (./channel_js.mjs asyncIterable)
 stdlib/effect/check # a `BigInt` literal has no λFlick form
 stdlib/effect/chunk # no native for `from_list` (flick:rt chunkFromList)
@@ -117,8 +118,8 @@ stdlib/effect/codec # no native for `literal` (flick:Schema Literal)
 stdlib/effect/combine # the row primitive `Map Combiner { hits : Float; tags : List String } { hits : Combiner Float; tags : Combiner (List String) }`
 stdlib/effect/config # no native for `string` (flick:Config String)
 stdlib/effect/console # no native for `log` (flick:Console log)
-stdlib/effect/cron # no native for `parse` (flick:Cron flickParse)
-stdlib/effect/cron_more # no native for `parse` (flick:Cron flickParse)
+stdlib/effect/cron # no native for `zone_make_offset` (flick:DateTime zoneMakeOffset)
+stdlib/effect/cron_more # no native for `zone_make_offset` (flick:DateTime zoneMakeOffset)
 stdlib/effect/crypto # no native for `system_random_bytes` (flick:Crypto flickRandomBytes)
 stdlib/effect/datetime # no native for `make` (flick:DateTime flickMake)
 stdlib/effect/datetime_more # no native for `make` (flick:DateTime flickMake)
@@ -133,25 +134,25 @@ stdlib/effect/fibers # no native for `zero` (flick:rt durationZero)
 stdlib/effect/filesystem # a `BigInt` literal has no λFlick form
 stdlib/effect/filesystem_node # no native for `node_of` (flick:FileSystem flickNode)
 stdlib/effect/function # no native for `not_` (flick:Boolean not)
-stdlib/effect/graph # no native for `node_count` (flick:Graph nodeCount)
-stdlib/effect/graph_algorithms # no native for `dijkstra` (flick:Graph flickDijkstra)
-stdlib/effect/hash_map # no native for `from_list` (flick:HashMap flickFromList)
-stdlib/effect/hash_ring # no native for `max` (flick:Number max)
-stdlib/effect/hash_ring_places # no native for `max` (flick:Number max)
-stdlib/effect/hash_set # no native for `from_list` (flick:rt hashSetFromList)
+stdlib/effect/graph # no native for `directed` (flick:Graph directed)
+stdlib/effect/graph_algorithms # no native for `directed` (flick:Graph directed)
+stdlib/effect/hash_map # no native for `canonical` (flick:rt eqHashCanonical)
+stdlib/effect/hash_ring # no native for `to_float` (global Number)
+stdlib/effect/hash_ring_places # no native for `to_float` (global Number)
+stdlib/effect/hash_set # no native for `canonical` (flick:rt eqHashCanonical)
 stdlib/effect/hmac # no native for `from_string` (flick:Crypto flickUtf8Encode)
-stdlib/effect/json_schema # no native for `join` (flick:rt stringJoin)
-stdlib/effect/jwt # no native for `system_random_bytes` (flick:Crypto flickRandomBytes)
+stdlib/effect/json_schema # no native for `meta_schema_uri_draft_04` (flick:JsonSchema META_SCHEMA_URI_DRAFT_04)
+stdlib/effect/jwt # no native for `from_base64url` (flick:Crypto flickBase64UrlDecode)
 stdlib/effect/layer # the model's (⊆) rejects `App.Main.contexts`
 stdlib/effect/layer_map # no native for `make` (flick:LayerMap flickMake)
-stdlib/effect/logger # no native for `layer` (flick:Logger flickLayer)
+stdlib/effect/logger # no native for `make` (flick:Logger flickMake)
 stdlib/effect/metric # no native for `counter` (flick:Metric flickCounter)
 stdlib/effect/number # a `BigInt` literal has no λFlick form
 stdlib/effect/observe # no native for `with_loggers` (flick:Logger flickWithLoggers)
 stdlib/effect/option # no native for `any` (flick:rt listAny)
 stdlib/effect/option_pairs # no native for `floor` (global Math.floor)
 stdlib/effect/order # a `BigInt` literal has no λFlick form
-stdlib/effect/password # no native for `system_random_bytes` (flick:Crypto flickRandomBytes)
+stdlib/effect/password # no native for `from_string` (flick:Crypto flickUtf8Encode)
 stdlib/effect/platform # no native for `layer_of` (flick:Path flickLayer)
 stdlib/effect/pubsub # no native for `bounded` (flick:PubSub flickBounded)
 stdlib/effect/queue # no native for `bounded` (flick:Queue bounded)
@@ -159,19 +160,19 @@ stdlib/effect/record # the row primitive `Project { admin : Bool; age : Float; n
 stdlib/effect/ref # no native for `each_effect` (flick:rt listEachEffect)
 stdlib/effect/request # the model's (≡) rejects `App.Main.run_all`
 stdlib/effect/schedule # no native for `recurs` (flick:Schedule recurs)
-stdlib/effect/schema # no native for `json` (flick:rt schemaJsonCodec)
+stdlib/effect/schema # no native for `number` (flick:rt schemaNumber)
 stdlib/effect/schema_http # no native for `headers` (flick:SchemaHttp flickHeaders)
 stdlib/effect/schema_types # no native for `json` (flick:ByteSize flickJson)
 stdlib/effect/shared_layer_merged # no native for `provide_` (flick:Layer provide)
 stdlib/effect/sink # no native for `collect` (flick:Sink collect)
 stdlib/effect/sink_more # no native for `make` (flick:Sink flickMake)
-stdlib/effect/stream # no native for `run_collect` (flick:Stream runCollect)
+stdlib/effect/stream # no native for `make` (flick:Stream make)
 stdlib/effect/stream_combine # the model's (≤-Cap) rejects `App.Main.main`
 stdlib/effect/stream_core # no native for `from_list` (flick:Stream fromArray)
-stdlib/effect/stream_errors # no native for `run_collect` (flick:Stream runCollect)
+stdlib/effect/stream_errors # no native for `catch` (flick:Stream catch)
 stdlib/effect/stream_platform # a `BigInt` literal has no λFlick form
 stdlib/effect/stream_sink # the model's (⊆) rejects `App.Main.main`
-stdlib/effect/stream_transform # no native for `run_collect` (flick:Stream runCollect)
+stdlib/effect/stream_transform # no native for `map` (flick:Stream map)
 stdlib/effect/stream_web # no native for `aborting` (global AbortSignal.timeout)
 stdlib/effect/string # no native for `trim` (flick:String trim)
 stdlib/effect/string_locale # no native for `locale_compare` (flick:String flickLocaleCompare)
@@ -180,16 +181,16 @@ stdlib/effect/trie # no native for `char_code_at` (flick:String charCodeAt)
 stdlib/effect/trie_keys # no native for `get` (flick:rt listGet)
 stdlib/effect/txchunk # no native for `from_iterable` (flick:TxChunk fromIterable)
 stdlib/effect/txdeferred # no native for `make` (flick:TxDeferred make)
-stdlib/effect/txhashmap # no native for `make` (flick:TxHashMap flickMake)
-stdlib/effect/txhashset # no native for `make` (flick:TxHashSet flickMake)
+stdlib/effect/txhashmap # no native for `canonical` (flick:rt eqHashCanonical)
+stdlib/effect/txhashset # no native for `canonical` (flick:rt eqHashCanonical)
 stdlib/effect/txlock # no native for `make` (flick:TxReentrantLock make)
 stdlib/effect/txpubsub # no native for `unbounded` (flick:TxPubSub unbounded)
 stdlib/effect/txqueue # no native for `bounded` (flick:TxQueue bounded)
 stdlib/effect/txref # no native for `make` (flick:TxRef make)
 stdlib/effect/values # the model's (Structural) rejects `App.Main.main`
 stdlib/effect/void # no native for `void` (flick:Effect void)
-stdlib/file # no native for `node_open` (flick:rt fileOpen)
-stdlib/hash_order # no native for `from_list` (flick:rt hashSetFromList)
+stdlib/file # no native for `node_read_file` (flick:rt fileRead)
+stdlib/hash_order # no native for `canonical` (flick:rt eqHashCanonical)
 stdlib/http/api # the row primitive `Lacks "users" {}`
 stdlib/http/api_bodies # the row primitive `Lacks "bodies" {}`
 stdlib/http/auth # the row primitive `Lacks "users" {}`
@@ -197,7 +198,7 @@ stdlib/http/client # the model's (⊆) rejects `App.Main.combinators`
 stdlib/http/derive # the row primitive `Lacks "forget" { profile : { headers : Unit; path : { name : String }; payload : Unit; query : Unit } ->{r; NotFound} { name : String } }`
 stdlib/http/error_cases # the row primitive `Lacks "users" {}`
 stdlib/http/error_cases_opaque # `Record.label` has no λFlick form
-stdlib/http/forms # no native for `body_form_data` (flick:http/HttpClientRequest flickBodyFormData)
+stdlib/http/forms # no native for `post` (flick:http/HttpClientRequest post)
 stdlib/http/handlers # the model's (≡) rejects `App.Main.requests`
 stdlib/http/headers # no native for `from_input` (flick:http/Headers fromInput)
 stdlib/http/inject # the row primitive `Lacks "post" { profile : { headers : Unit; path : { name : String }; payload : Unit; query : Unit } ->{r; NotFound} { name : String } }`
@@ -211,7 +212,7 @@ stdlib/http/shutdown_stream # no native for `start` (./raw.mjs start)
 stdlib/http/shutdown_timeout # no native for `start` (./raw.mjs start)
 stdlib/http/spa # the row primitive `Lacks "greet" {}`
 stdlib/http/spans # the model's (≡) rejects `App.Main.main`
-stdlib/http/streams # no native for `stream` (flick:http/HttpBody flickStream)
+stdlib/http/streams # no native for `from_list` (flick:Stream fromArray)
 stdlib/http/types # a `BigInt` literal has no λFlick form
 stdlib/http/values # a `BigInt` literal has no λFlick form
 stdlib/lists # no native for `sleep` (../runtime/timers.mjs sleep)
@@ -245,14 +246,14 @@ stdlib/server/trace # no native for `names` (./traces.mjs names)
 ui/async # no native for `settle` (./dom.mjs settle)
 ui/atoms # no native for `click` (./dom.mjs click)
 ui/awaiting # the model's (⊆) rejects `App.Main.main`
-ui/component # no native for `to_html` (flick:ui/html uiToHtml)
+ui/component # no native for `view` (flick:ui/react uiView)
 ui/counter # no native for `badge` (./dom.mjs Badge)
 ui/directory # no native for `choose` (./dom.mjs choose)
 ui/element # no native for `click` (./dom.mjs click)
-ui/email # no native for `to_html` (flick:ui/html uiToHtml)
+ui/email # no native for `safe_url` (flick:ui/react uiSafeUrl)
 ui/family # no native for `layer` (flick:reactivity/Atom atomLayer)
 ui/form # no native for `click` (./form.mjs click)
-ui/host_field # no native for `to_html` (flick:ui/html uiToHtml)
+ui/host_field # no native for `make` (flick:rt atomState)
 ui/hydrate # no native for `click` (./dom.mjs click)
 ui/navigate # no native for `click` (./navigate.mjs click)
 ui/parity # no native for `complaints` (./dom.mjs complaints)

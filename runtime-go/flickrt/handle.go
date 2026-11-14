@@ -21,6 +21,7 @@ type handlerSignal struct {
 	arm         Value
 	cause       *Cause
 	discontinue bool
+	evidence    Value // invocation evidence survives abort unwinding
 }
 
 type handlerToken struct{ _ byte }
@@ -93,6 +94,7 @@ type request struct {
 	arm      Value
 	forward  func(*Fiber) Value
 	response Value
+	evidence Value // performer candidate, separate from the installation context
 }
 
 // A coroutine is the body of a `control` handler: what it yields to, and
@@ -120,7 +122,7 @@ func (h *controller) perform(performer *Fiber, req *request) Value {
 	}
 	if cur != h.co {
 		inner := req
-		req = &request{forward: func(driver *Fiber) Value { return h.perform(driver, inner) }}
+		req = &request{evidence: req.evidence, forward: func(driver *Fiber) Value { return h.perform(driver, inner) }}
 	}
 	if !cur.yield(req) {
 		return unwind(&handlerSignal{token: cur.token, discontinue: true})
@@ -160,7 +162,9 @@ func Handle(fb *Fiber, installs []Install, body Value, ret Value, errors func(*F
 						h = &controller{token: token, state: fb.state}
 					}
 					impl.put(name, controlled(arms.vals[i], c.Arity, func(arm Value) Value {
-						return Eff(func(performer *Fiber) Value { return h.perform(performer, &request{arm: arm}) })
+						return Eff(func(performer *Fiber) Value {
+							return h.perform(performer, &request{arm: arm, evidence: ReadOwnerEvidence(performer)})
+						})
 					}))
 					continue ops
 				}
@@ -171,11 +175,14 @@ func Handle(fb *Fiber, installs []Install, body Value, ret Value, errors func(*F
 			}
 			impl.put(name, around(arms.vals[i], func(arm Eff) Value {
 				if abort {
-					return Eff(func(*Fiber) Value { return unwind(&handlerSignal{token: token, arm: arm}) })
+					return Eff(func(performer *Fiber) Value {
+						return unwind(&handlerSignal{token: token, arm: arm, evidence: ReadOwnerEvidence(performer)})
+					})
 				}
 				return Eff(func(performer *Fiber) Value {
-					here := &Fiber{state: performer.state, env: at.env, owner: at.owner}
-					v, c := catch(func() Value { return Run(here, arm) })
+					here := *performer
+					here.env, here.owner = at.env, at.owner
+					v, c := catch(func() Value { return Run(&here, arm) })
 					if c == nil {
 						return v
 					}
@@ -186,13 +193,14 @@ func Handle(fb *Fiber, installs []Install, body Value, ret Value, errors func(*F
 				})
 			}))
 		}
-		env = env.with(in.Key, impl)
+		env = env.withHandler(in.Key, impl)
 	}
-	inner := &Fiber{state: fb.state, env: env, owner: fb.owner}
+	inner := *fb
+	inner.env = env
 	if h != nil {
-		return h.drive(fb, inner, body, func(v Value, c *Cause) Value { return handled(fb, token, v, c, ret, errors) })
+		return h.drive(fb, &inner, body, func(v Value, c *Cause) Value { return handled(fb, token, v, c, ret, errors) })
 	}
-	v, c := catch(func() Value { return Run(inner, body) })
+	v, c := catch(func() Value { return Run(&inner, body) })
 	return handled(fb, token, v, c, ret, errors)
 }
 
@@ -206,7 +214,7 @@ func handled(fb *Fiber, token *handlerToken, v Value, c *Cause, ret Value, error
 	}
 	if s := unwindingTo(c, token); s != nil {
 		if s.arm != nil {
-			return Run(fb, s.arm)
+			return Run(WithOwnerEvidence(fb, s.evidence), s.arm)
 		}
 		panic(&Failure{s.cause})
 	}
@@ -244,7 +252,7 @@ func (h *controller) drive(fb, inner *Fiber, body Value, ended func(Value, *Caus
 			return ended(value, cause)
 		}
 		if req.forward != nil {
-			req.response = req.forward(fb)
+			req.response = req.forward(WithOwnerEvidence(fb, req.evidence))
 			return step()
 		}
 		used := false
@@ -258,7 +266,8 @@ func (h *controller) drive(fb, inner *Fiber, body Value, ended func(Value, *Caus
 				return step()
 			})
 		})
-		out := Run(fb, Apply(fb, req.arm, resume))
+		invocation := WithOwnerEvidence(fb, req.evidence)
+		out := Run(invocation, Apply(invocation, req.arm, resume))
 		if !used {
 			stop()
 		}

@@ -1,0 +1,48 @@
+// Guards, handlers and unmatched typed failures propagate outside the selected try.
+module App.Main exposing (main)
+
+type error First = First Int
+type error Again = Again String
+
+start : Int ->{; First, Again} String
+let start value =
+  if value == 0 then from_result (Err (First 1)) else from_result (Err (Again "body"))
+
+gate : Int ->{; Again} Bool
+let gate value =
+  Platform.stdout_line ("guard " ++ show value)
+  from_result (Err (Again "guard"))
+
+handler_fails : Unit ->{; Again} String
+let handler_fails () =
+  try start 0 with
+  | First value -> from_result (Err (Again ("handler " ++ show value)))
+  | Again text -> "wrong inner " ++ text
+
+guard_fails : Unit ->{; Again} String
+let guard_fails () =
+  try start 0 with
+  | First value when gate value -> "wrong guard"
+  | First _ -> "wrong fallback"
+  | Again text -> "wrong inner " ++ text
+
+unmatched : Unit ->{; Again} String
+let unmatched () =
+  try start 1 with
+  | First _ -> "wrong match"
+
+answer : Unit ->{} String
+let answer () =
+  let handled =
+    try handler_fails () with
+    | Again text -> "outer " ++ text
+  let guarded =
+    try guard_fails () with
+    | Again text -> "outer " ++ text
+  let propagated =
+    try unmatched () with
+    | Again text -> "outer " ++ text
+  handled ++ " | " ++ guarded ++ " | " ++ propagated
+
+main : Unit ->{; AppError} Unit
+let main () = Platform.stdout_line (answer ())

@@ -223,6 +223,15 @@ pub enum ExprKind {
     /// A runtime call that acquires into the owner bound to the local, not
     /// into the innermost scope.
     Within(String, Box<Expr>),
+    /// Reads inert lexical owner evidence at execution, not construction.
+    /// This contextual read cannot be hoisted across an invocation or task.
+    ReadOwnerEvidence,
+    /// Executes an immediate non-pure application or await with new lexical
+    /// evidence, without changing the default work owner. Operands of the
+    /// invocation are immutable locals/literals evaluated before this node.
+    /// The first expression is evaluated under the previous evidence; Unit
+    /// denotes absence, not a root owner. Every exit restores the old evidence.
+    WithOwnerEvidence(Box<Expr>, Box<Expr>),
     /// The handler of effects of `try` arms for operations or `provide S impl`.
     Handle(Box<Handler>),
     /// A pure function value used where a runtime one is expected.

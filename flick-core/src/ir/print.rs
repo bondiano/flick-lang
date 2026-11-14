@@ -218,6 +218,10 @@ pub fn expr(e: &Expr) -> String {
         }
         ExprKind::Yield(e) => format!("(yield {})", expr(e)),
         ExprKind::Within(owner, e) => format!("(within {owner} {})", expr(e)),
+        ExprKind::ReadOwnerEvidence => "(read-owner-evidence)".into(),
+        ExprKind::WithOwnerEvidence(owner, call) => {
+            format!("(with-owner-evidence {} {})", expr(owner), expr(call))
+        }
         ExprKind::Handle(h) if h.is_try() => format!("(try {} {})", expr(&h.body), arms(&h.errors)),
         ExprKind::Handle(h) => handler(h),
         ExprKind::Lift(e, l) => format!("(lift{} {})", lift(l), expr(e)),

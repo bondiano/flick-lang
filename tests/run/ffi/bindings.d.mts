@@ -30,3 +30,15 @@ export declare const kept: () => number[];
 export declare const spoil: () => void;
 export declare const rename: (user: { name: string; tags: string[] }) => void;
 export declare const pushInto: (f: () => number[]) => number;
+
+export interface CopyDeep {
+  _tag: string;
+  _0?: CopyDeep[];
+}
+export declare const copyDeep: (depth: number, leaf: CopyDeep, branch: CopyDeep) => CopyDeep;
+export declare const copyDeepDepth: (value: CopyDeep) => number;
+export declare const spoilDeep: (value: CopyDeep) => number;
+export declare const copyDeepCallbackArg: (callback: (value: CopyDeep) => number, leaf: CopyDeep, branch: CopyDeep) => number;
+export declare const copyDeepCallbackResult: (callback: (unit: undefined) => CopyDeep) => number;
+export declare const copyDeepEffect: (value: CopyDeep) => import("@flick-lang/effect-ts").Effect.Effect<CopyDeep>;
+export declare const copyDeepAsync: (depth: number, leaf: CopyDeep, branch: CopyDeep) => Promise<CopyDeep>;

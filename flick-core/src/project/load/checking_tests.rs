@@ -269,3 +269,6 @@ include!("checking_tests_ported_followup.rs");
 include!("checking_tests_final_contracts.rs");
 #[cfg(all(feature = "ide", feature = "native-project"))]
 include!("checking_tests_ported_package.rs");
+
+#[cfg(feature = "ide")]
+include!("checking_tests_support.rs");

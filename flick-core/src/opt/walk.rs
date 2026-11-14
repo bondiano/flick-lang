@@ -21,16 +21,48 @@ pub fn each_use<'e>(e: &'e Expr, read: &mut dyn FnMut(&'e str)) {
     if let ExprKind::Local(l) | ExprKind::Within(l, _) = &e.kind {
         read(l);
     }
+    each_dictionary_use(e, read);
     e.each_child(&mut |c| each_use(c, read));
+}
+
+/// Ordinary lexical reads stored in dictionary metadata, not expression children.
+pub(super) fn each_dictionary_use<'e>(e: &'e Expr, read: &mut dyn FnMut(&'e str)) {
+    fn dictionary<'e>(dict: &'e Dict, read: &mut dyn FnMut(&'e str)) {
+        match dict {
+            Dict::Field(local) | Dict::Opened { binder: local, .. } => read(local),
+            Dict::Instance { args, .. } | Dict::Structural { fields: args, .. } => {
+                for argument in args {
+                    dictionary(argument, read);
+                }
+            }
+            Dict::Super { dict, .. } => dictionary(dict, read),
+            Dict::Given(_)
+            | Dict::Value { .. }
+            | Dict::Primitive { .. }
+            | Dict::Site { .. }
+            | Dict::Error => {}
+        }
+    }
+    match &e.kind {
+        ExprKind::Method { dict, .. } => dictionary(dict, read),
+        ExprKind::Dicts(_, dicts) => {
+            for dict in dicts {
+                dictionary(dict, read);
+            }
+        }
+        _ => {}
+    }
 }
 
 /// Each read of a local in `e` that is evaluated exactly once whenever `e`
 /// is, by its name: not inside a function, task, branch, arm or handler.
 pub fn each_strict_use<'e>(e: &'e Expr, read: &mut dyn FnMut(&'e str)) {
+    each_dictionary_use(e, read);
     match &e.kind {
         ExprKind::Local(l) => read(l),
         // only catching errors, it runs its body at once
         ExprKind::Handle(h) if h.is_try() => each_strict_use(&h.body, read),
+        ExprKind::WithOwnerEvidence(owner, _) => each_strict_use(owner, read),
         ExprKind::Lambda { .. }
         | ExprKind::Task(_)
         | ExprKind::Within(..)
@@ -300,13 +332,6 @@ fn apply(e: &mut Expr, names: &HashMap<String, String>) {
     match &mut e.kind {
         ExprKind::ControlLoop { id, .. } | ExprKind::LoopExit { id, .. } => new(id),
         ExprKind::Local(n) | ExprKind::Var(n) | ExprKind::Within(n, _) => new(n),
-        // a dictionary a matched value holds is a local of the pattern too
-        ExprKind::Dicts(_, dicts) => {
-            for d in dicts {
-                rename_dict(d, names);
-            }
-        }
-        ExprKind::Method { dict, .. } => rename_dict(dict, names),
         ExprKind::Lambda { params, .. } => {
             for p in params {
                 apply_pat(&mut p.pat, names);
@@ -336,12 +361,25 @@ fn apply(e: &mut Expr, names: &HashMap<String, String>) {
         ExprKind::Each { pat, .. } => apply_pat(pat, names),
         _ => {}
     }
+    rename_dictionaries(e, names);
     e.each_child_mut(&mut |c| apply(c, names));
+}
+
+pub(super) fn rename_dictionaries(e: &mut Expr, names: &HashMap<String, String>) {
+    match &mut e.kind {
+        ExprKind::Dicts(_, dicts) => {
+            for dict in dicts {
+                rename_dict(dict, names);
+            }
+        }
+        ExprKind::Method { dict, .. } => rename_dict(dict, names),
+        _ => {}
+    }
 }
 
 fn rename_dict(d: &mut Dict, names: &HashMap<String, String>) {
     match d {
-        Dict::Field(local) => {
+        Dict::Field(local) | Dict::Opened { binder: local, .. } => {
             if let Some(to) = names.get(local.as_str()) {
                 local.clone_from(to);
             }
@@ -354,7 +392,6 @@ fn rename_dict(d: &mut Dict, names: &HashMap<String, String>) {
         Dict::Super { dict, .. } => rename_dict(dict, names),
         Dict::Given(_)
         | Dict::Value { .. }
-        | Dict::Opened { .. }
         | Dict::Primitive { .. }
         | Dict::Site { .. }
         | Dict::Error => {}

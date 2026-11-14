@@ -1,3 +1,5 @@
+use crate::iface::StaticMember;
+
 #[cfg(feature = "ide")]
 fn merge_inline_ide(output: &mut Output, child_output: &Output, child: &Loaded) {
     if let Some(typing) = Arc::get_mut(&mut output.typing) {
@@ -61,7 +63,16 @@ fn merge_inline_lowering(
         &units.local,
     );
     let declarations = Arc::make_mut(&mut output.declarations);
+    Relocation {
+        child: &units.name,
+        parent: &loaded.name,
+        local: &units.local,
+    }
+    .declaration_references(declarations);
     declarations.exports.extend(child_declarations.exports);
+    declarations
+        .support_types
+        .extend(child_declarations.support_types);
     declarations.instances.extend(child_declarations.instances);
 }
 
@@ -178,6 +189,10 @@ fn inline_units(
         .imports
         .extend(resolve::module_syntax(&child_tree, text, loaded.file).imports);
     let mut child = inline_unit(loaded, name.clone(), child_tree, child_syntax, false);
+    child.member_of = Some(StaticMember {
+        parent: loaded.name.clone(),
+        name: local.clone(),
+    });
     set_inline_source_tree(&mut child, loaded, at);
     let parent = inline_parent(loaded, tree, inline, &name, &local, at);
     Some(InlineUnits {

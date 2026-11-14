@@ -1,6 +1,6 @@
 // The bindings of `Layer` on the kernel, as Go's `flickrt` has them.
 import { type Cause, die, dies, isFail, raise } from "../cause.ts";
-import { type Run, Suspend, asExit, currentOwner, exitOf } from "../fiber.ts";
+import { type Run, Suspend, asExit, currentOwner, exitOf, withOwnerEvidence } from "../fiber.ts";
 import {
   type Build,
   Layer,
@@ -193,7 +193,7 @@ export const flickCurrentMemoMap = (): MemoMap => currentMemo();
 const fromTask =
   (make: (memo: MemoMap) => unknown): Build =>
   (memo, into) =>
-    scoped(into, () => make(memo));
+    scoped(into, () => withOwnerEvidence(into, () => make(memo)));
 
 export const flickFromBuild = (make: (memo: MemoMap) => unknown): Layer => fromBuild(fromTask(make));
 export const flickFromBuildMemo = (make: (memo: MemoMap) => unknown): Layer => memoizable(fromTask(make));

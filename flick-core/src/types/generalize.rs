@@ -176,7 +176,7 @@ impl Checker<'_> {
             .operators
             .iter()
             .all(|op| match self.zonk(&op.ty).spine().0 {
-                Type::Meta(_) | Type::Error => true,
+                Type::Meta(_) | Type::MetaView(_) | Type::Error => true,
                 head => op.domain.allows(head),
             })
     }
@@ -354,7 +354,7 @@ fn kind_of(ty: &Type, m: u32, params: &dyn Fn(&Type) -> Vec<Kind>) -> Kind {
                 params(head)
             };
             for (arg, row) in args.iter().zip(rows) {
-                if is(arg) && !matches!(row, Kind::Meta(_)) {
+                if is(arg) && !matches!(row, Kind::Meta(_) | Kind::MetaView(_)) {
                     kind = row;
                 }
             }

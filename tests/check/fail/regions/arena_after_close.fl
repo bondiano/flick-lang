@@ -1,0 +1,14 @@
+// A read, unlike mere retention, requires the arena's region live.
+module App.ArenaAfterClose exposing (..)
+
+import Arena
+
+after_close : Unit ->{} String
+let after_close () =
+  let view = scope {
+    let arena = Arena.make ()
+    Arena.alloc arena "closed"
+  }
+  Arena.get view
+//~ FLICK-G002 @9:5-10:31
+//~ FLICK-G002 @12:13-12:17

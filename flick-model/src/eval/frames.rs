@@ -13,6 +13,12 @@ use crate::types::Scheme;
 pub enum Frame {
     /// `□ e`.
     AppL(Rc<Term>),
+    /// Evaluate an inert candidate (`false`) or raw activation (`true`).
+    OwnerOperand(bool, Rc<Term>),
+    /// Context evidence, including explicit absence.
+    Evidence(Option<usize>),
+    /// Raw activation overrides D only, without owning/closing the region.
+    Activation(usize),
     /// `v □`.
     AppR(Term),
     /// `let x = □ in e`, or `let x : σ = □ in e`.
@@ -83,6 +89,17 @@ impl Frame {
     pub fn plug(&self, e: Term) -> Term {
         let e = Rc::new(e);
         match self {
+            Frame::OwnerOperand(raw, body) => {
+                if *raw {
+                    Term::ActivateOwner(e, body.clone())
+                } else {
+                    Term::WithOwnerEvidence(e, body.clone())
+                }
+            }
+            Frame::Evidence(owner) => {
+                Term::WithOwnerEvidence(Rc::new(Term::OwnerCandidate(*owner)), e)
+            }
+            Frame::Activation(owner) => Term::ActivateOwner(Rc::new(Term::Own(*owner)), e),
             Frame::AppL(a) => Term::App(e, a.clone()),
             Frame::AppR(f) => Term::App(Rc::new(f.clone()), e),
             Frame::Let(x, sig, body) => Term::Let(x.clone(), sig.clone(), e, body.clone()),

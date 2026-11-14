@@ -9,6 +9,10 @@ use crate::Expr;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Foreign {
     pub name: String,
+    /// Original source identity when a compiler-generated shim owns `name`.
+    /// Host binding lookup and source schemes must not use a generated raw name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_name: Option<String>,
     pub mode: ForeignMode,
     /// What the host knows the function by.
     pub binding: Binding,

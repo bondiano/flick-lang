@@ -116,13 +116,8 @@ impl Gen<'_> {
         self.tail = tail;
         let thunk = self.stage_function(&[], &stmts, true);
         let error = self.temp();
-        let (handlers, ()) = self.block(|g| g.handlers(&error, arms));
-        format!(
-            "{}({thunk}, {} {{\n{}}})",
-            self.rt("trySync"),
-            self.arrow(&error),
-            indent(&handlers)
-        )
+        let handler = self.handlers(&error, arms);
+        format!("{}({thunk}, {handler})", self.rt("trySync"))
     }
 
     /// A foreign `sync` or `effect` call at its runtime stage: what it gives,
@@ -192,8 +187,7 @@ impl Gen<'_> {
             "undefined".to_owned()
         } else {
             let error = self.temp();
-            let (stmts, ()) = self.block(|g| g.handlers(&error, &h.errors));
-            format!("{} {{\n{}}}", self.arrow(&error), indent(&stmts))
+            self.handlers(&error, &h.errors)
         };
         let handle = self.rt("handle");
         let installs = installs.join(", ");

@@ -272,6 +272,9 @@ fn rename_item(item: &mut ir::Item, local: &str) {
         }
         ir::ItemKind::Foreign(foreign) => {
             foreign.name = format!("{local}${}", foreign.name);
+            if let Some(source) = &mut foreign.source_name {
+                *source = runtime_name(local, source);
+            }
         }
         ir::ItemKind::Service { name, .. } => {
             *name = format!("{local}${name}");

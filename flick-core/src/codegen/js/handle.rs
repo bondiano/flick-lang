@@ -2,7 +2,7 @@
 //! functions of each effect's operations as the implementation of its
 //! service, and handles the body's value and errors.
 
-use super::{Gen, indent, names};
+use super::{Gen, expr::key, names};
 use crate::ir::Handler;
 use crate::types::OpClass;
 
@@ -18,7 +18,7 @@ impl Gen<'_> {
             let mut aborts = Vec::new();
             for op in &handled.operations {
                 let function = self.expr(&op.function);
-                fields.push(format!("{}: {function}", names::string(&op.name)));
+                fields.push(format!("{}: {function}", key(&op.name)));
                 if op.class == OpClass::Abort {
                     aborts.push(names::string(&op.name));
                 }
@@ -41,8 +41,7 @@ impl Gen<'_> {
             "undefined".to_owned()
         } else {
             let error = self.temp();
-            let (stmts, ()) = self.block(|g| g.handlers(&error, &h.errors));
-            format!("{} {{\n{}}}", self.arrow(&error), indent(&stmts))
+            self.handlers(&error, &h.errors)
         };
         let handle = self.rt("handle");
         let installs = installs.join(", ");

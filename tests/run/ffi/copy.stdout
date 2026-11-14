@@ -2,3 +2,7 @@ argument [3, 1, 2], result [1, 2, 3]
 held result [1, 2]
 record ann ["a"]
 callback result [1, 2], JS saw 3
+deep result 20000, argument 20000
+deep callbacks 20000 20000, retained 20000
+deep effect 20000
+deep async 20000

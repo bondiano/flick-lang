@@ -142,7 +142,7 @@ impl Checker<'_> {
                 self.application_result(result, &function, &arg, false)
             }
             Type::Error => Type::Error,
-            meta @ Type::Meta(_) => {
+            meta @ (Type::Meta(_) | Type::MetaView(_)) => {
                 let result = self.fresh();
                 let _ = self.unify(&meta, &Type::pure_fun(arg, result.clone()));
                 result
@@ -243,7 +243,8 @@ impl Checker<'_> {
             } => {
                 let since = self.diagnostics.len();
                 let eff = self.eff_parts(&param).is_some();
-                let outer = eff.then(|| self.cx.regions.defaults.replace(Vec::new()));
+                let defer = eff || self.arrow_stages(&param).contains(&super::Stage::Runtime);
+                let outer = defer.then(|| self.cx.regions.defaults.replace(Vec::new()));
                 let argument = self.composed(chain, inner, x);
                 self.expect(&argument, &param, span);
                 if let Some(outer) = outer {
@@ -266,7 +267,7 @@ impl Checker<'_> {
                 self.composed(chain, inner, x);
                 Type::Error
             }
-            meta @ Type::Meta(_) => {
+            meta @ (Type::Meta(_) | Type::MetaView(_)) => {
                 let (param, result) = (self.fresh(), self.fresh());
                 let function = Type::pure_fun(param.clone(), result.clone());
                 if self.unify(&meta, &function).is_ok() {
@@ -285,6 +286,9 @@ impl Checker<'_> {
                 Type::Error
             }
         };
+        if !defaults.is_empty() {
+            self.grow();
+        }
         self.settle_defaults(defaults);
         self.settle_provided(provided);
         self.note_value(key, &ty);

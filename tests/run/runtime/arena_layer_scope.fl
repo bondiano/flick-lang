@@ -1,0 +1,85 @@
+// A provider owns its build, not allocations in the callback's outer Scope s.
+module App.Main exposing (main)
+
+service Read =
+  read : Unit ->{} String
+
+layer : Layer none none {Read}
+let layer = Layer.succeed Read { read = fun () -> "unused" }
+
+acquire : String -> Unit ->{Scope s} Arena.Value s String
+let acquire value () =
+  let arena = Arena.make ()
+  Arena.alloc arena value
+
+under : (Unit ->{Read | r; e} a) ->{r; e} a
+let under body = Layer.run layer body
+
+callbacks : { acquire : Unit ->{Read, Scope s} Arena.Value s String; extra : String }
+let callbacks = { acquire = acquire "record"; extra = "keep" }
+
+under_record : { acquire : Unit ->{Read | r; e} a; extra : String } ->{r; e} (a, String)
+let under_record values =
+  let result = Layer.run layer values.acquire
+  (result, values.extra)
+
+work : Eff {Scope s} none (Arena.Value s String)
+let work = task { acquire "task" () }
+
+under_task : Eff {Read | r} e a ->{r; e} a
+let under_task value = Layer.run layer (fun () -> await value)
+
+make_work : Unit ->{} Eff {Scope s} none (Arena.Value s String)
+let make_work () = task { acquire "task-result" () }
+
+make_callback : Eff {} none (Unit ->{Scope s} Arena.Value s String)
+let make_callback = task { acquire "callback-result" }
+
+under_tuple : (Unit ->{Read | r; e} a, String) ->{r; e} (a, String)
+let under_tuple (body, extra) = (Layer.run layer body, extra)
+
+pair : (Unit ->{Read, Scope s} Arena.Value s String, String)
+let pair = (acquire "tuple", "keep")
+
+prepare : Unit ->{Scope s} Unit ->{Scope s} Arena.Value s String
+let prepare () () = acquire "stage" ()
+
+main : Unit ->{} Unit
+let main () = scope {
+  let direct =
+    Layer.run layer (fun () ->
+      let arena = Arena.make ()
+      Arena.alloc arena "literal"
+    )
+  Platform.stdout_line (Arena.get direct)
+  let named = Layer.run layer (acquire "named")
+  Platform.stdout_line (Arena.get named)
+  let forwarded = under (acquire "forwarded")
+  Platform.stdout_line (Arena.get forwarded)
+  let (record, extra) = under_record callbacks
+  Platform.stdout_line (Arena.get record ++ "/" ++ extra)
+  let provided = provide layer {
+    let arena = Arena.make ()
+    Arena.alloc arena "provided"
+  }
+  Platform.stdout_line (Arena.get provided)
+  let ranked =
+    Scope.run (fun _ ->
+      let view = Layer.run layer (acquire "ranked")
+      Arena.get view
+    )
+  Platform.stdout_line ranked
+  let task_value = under_task work
+  Platform.stdout_line (Arena.get task_value)
+  let returned_work = Layer.run layer make_work
+  let task_result = await returned_work
+  Platform.stdout_line (Arena.get task_result)
+  let callback_result = Layer.run layer (await make_callback)
+  Platform.stdout_line (Arena.get callback_result)
+  let (tuple_value, tuple_extra) = under_tuple pair
+  Platform.stdout_line (Arena.get tuple_value ++ "/" ++ tuple_extra)
+  let piped = acquire "pipe" |> under
+  Platform.stdout_line (Arena.get piped)
+  let staged = Layer.run layer (prepare ())
+  Platform.stdout_line (Arena.get staged)
+}

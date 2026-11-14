@@ -2,6 +2,7 @@
 // adapters where a Flick value differs from what Effect takes.
 import { type Cause, Context, Effect, Exit, Layer, type LogLevel, Option, Scope, Tracer } from "effect";
 
+import { CurrentOwner, Owner, closeOwn, inside, withOwnerEvidence } from "../owner.ts";
 import { Failure, RawCause, passOn, unwinds } from "../cause.ts";
 
 export * from "effect/Layer";
@@ -47,7 +48,14 @@ type Build<A, E, R> = (memoMap: Layer.MemoMap) => Effect.Effect<Context.Context<
 const scoped =
   <A, E, R>(build: Build<A, E, R>) =>
   (memoMap: Layer.MemoMap, scope: Scope.Scope): Effect.Effect<Context.Context<A>, E, Exclude<R, Scope.Scope>> =>
-    Scope.provide(build(memoMap), scope);
+    Effect.flatMap(Effect.service(CurrentOwner), (outer) => {
+      const owner = new Owner(Scope.makeUnsafe(), outer?.defects);
+      return Effect.andThen(
+        Scope.addFinalizerExit(scope, (exit) => Effect.orDie(Effect.flatMap(closeOwn(owner, exit), (cleanup) =>
+          Exit.isFailure(cleanup) ? Effect.failCause(cleanup.cause) : Effect.void))),
+        inside(owner, withOwnerEvidence(owner, () => build(memoMap))),
+      );
+    });
 
 /** `Layer.from_build`: `build` runs with the scope of the build as its `Scope`. */
 export const flickFromBuild = <A, E, R>(build: Build<A, E, R>): Layer.Layer<A, E, Exclude<R, Scope.Scope>> =>

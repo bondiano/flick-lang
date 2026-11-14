@@ -61,6 +61,28 @@ impl<'a> Gen<'a> {
         self.code(r)
     }
 
+    pub(super) fn read_owner_evidence(&self) -> Code<'a> {
+        call(self.a, "flickrt.ReadOwnerEvidence", [self.context()]).into()
+    }
+
+    pub(super) fn with_owner_evidence(&mut self, owner: &Expr, inner: &Expr) -> Code<'a> {
+        let a = self.a;
+        let owner = self.expr(owner);
+        let fb = self.fiber.expect("owner evidence brackets an execution");
+        let region = call(a, "flickrt.WithOwnerEvidence", [a.text(fb), owner.doc]);
+        let saved = (self.fiber.replace("fbe"), self.context.replace("fbe"));
+        let (stmts, value) = self.block(|g| g.expr(inner));
+        (self.fiber, self.context) = saved;
+        let result = self.temp();
+        self.emit(docvec![a, "var ", result, " flickrt.Value"]);
+        let stmts = [statement(a, docvec![a, "fbe := ", region])]
+            .into_iter()
+            .chain(stmts)
+            .chain([statement(a, docvec![a, result, " = ", value])]);
+        self.emit(block(a, stmts));
+        self.code(result)
+    }
+
     /// `try body with arms`: the body as a task, and a handler of its typed
     /// error that gives `flickrt.Unmatched` when no arm matches.
     pub(super) fn try_expr(&mut self, body: &Expr, arms: &[Arm]) -> Code<'a> {

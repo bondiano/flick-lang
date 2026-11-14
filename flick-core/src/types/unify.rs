@@ -36,6 +36,12 @@ struct Skolem {
 #[derive(Debug, Default)]
 pub struct Store {
     metas: Vec<MetaState>,
+    meta_contexts: Vec<MetaContext>,
+    active_context: Context,
+    scopes: Scopes,
+    undo: Vec<Undo>,
+    transactions: Vec<u64>,
+    next_transaction: u64,
     skolems: Vec<Skolem>,
     /// The variables that stand for a capture row: an instantiated `^c`.
     capture_rows: HashSet<u32>,
@@ -66,6 +72,11 @@ pub struct Equality {
 /// Why two types do not unify, about the innermost conflicting part.
 #[derive(Debug, Clone)]
 pub enum Mismatch {
+    /// Immutable display facts captured before a failed trial is rolled back.
+    Observed {
+        reason: Box<Mismatch>,
+        views: DiagnosticViews,
+    },
     Types(Type, Type),
     /// A record or row lacks a label the other one has; `left` is the side
     /// that has it.
@@ -85,6 +96,8 @@ pub enum Mismatch {
     Untouchable(Type),
 }
 
+include!("unify/mismatch.rs");
+
 pub type Unified = Result<(), Mismatch>;
 
 fn id(n: usize) -> u32 {
@@ -93,45 +106,57 @@ fn id(n: usize) -> u32 {
 
 impl Store {
     pub fn fresh(&mut self) -> Type {
-        self.metas.push(MetaState::Open { level: self.level });
-        Type::Meta(id(self.metas.len() - 1))
+        self.allocate(self.level, self.active_context.clone(), None)
     }
 
     /// A variable for a capture row of a quantified `^c`.
     pub fn fresh_capture_row(&mut self) -> Type {
-        let row = self.fresh();
-        if let Type::Meta(m) = row {
-            self.capture_rows.insert(m);
+        let row = self.allocate(
+            self.level,
+            self.active_context.clone(),
+            Some(Kind::CaptureRow),
+        );
+        if let Some(m) = row.meta_root() {
+            self.mark(m, Mark::Capture);
         }
         row
     }
 
     /// A variable for a row of errors.
     pub fn fresh_error_row(&mut self) -> Type {
-        let row = self.fresh();
-        if let Type::Meta(m) = row {
-            self.error_rows.insert(m);
+        let row = self.allocate(
+            self.level,
+            self.active_context.clone(),
+            Some(Kind::ErrorRow),
+        );
+        if let Some(m) = row.meta_root() {
+            self.mark(m, Mark::Error);
         }
         row
     }
 
     /// A variable for a quantified variable of `kind`.
     pub fn fresh_of(&mut self, kind: &Kind) -> Type {
-        match kind {
+        let ty = match kind {
             Kind::CaptureRow => self.fresh_capture_row(),
             Kind::ErrorRow => self.fresh_error_row(),
             _ => self.fresh(),
-        }
+        };
+        let root = ty.meta_root().expect("fresh variable");
+        let mut context = self.meta_contexts[root as usize].clone();
+        context.kind = Some(kind.clone());
+        self.write_context(root, context);
+        ty
     }
 
     /// A variable that only a numeric type binds, a `Float` one when
     /// `fractional`.
     pub fn fresh_numeric(&mut self, fractional: bool) -> Type {
-        let ty = self.fresh();
-        if let Type::Meta(m) = ty {
-            self.numeric.insert(m);
+        let ty = self.allocate(self.level, self.active_context.clone(), Some(Kind::Type));
+        if let Some(m) = ty.meta_root() {
+            self.mark(m, Mark::Numeric);
             if fractional {
-                self.fractional.insert(m);
+                self.mark(m, Mark::Fractional);
             }
         }
         ty
@@ -153,9 +178,9 @@ impl Store {
         match t {
             Type::Captured { ty, .. } | Type::Bounded { ty, .. } => self.numeric_fits(m, ty),
             Type::Meta(n) => {
-                self.numeric.insert(*n);
+                self.mark(*n, Mark::Numeric);
                 if fractional {
-                    self.fractional.insert(*n);
+                    self.mark(*n, Mark::Fractional);
                 }
                 true
             }
@@ -180,19 +205,23 @@ impl Store {
     /// stands for.
     pub fn fresh_beside(&mut self, m: u32) -> Type {
         let level = self.meta_level(m).unwrap_or(self.level);
-        self.metas.push(MetaState::Open { level });
-        let rest = id(self.metas.len() - 1);
+        let ty = self.allocate(
+            level,
+            self.meta_contexts[m as usize].permitted.clone(),
+            self.meta_contexts[m as usize].kind.clone(),
+        );
+        let rest = ty.meta_root().expect("fresh variable");
         self.mark_like(rest, m);
-        Type::Meta(rest)
+        ty
     }
 
     /// Gives `to` the kind marks of `from`: a capture row or a row of errors.
     pub fn mark_like(&mut self, to: u32, from: u32) {
         if self.is_capture_row(from) {
-            self.capture_rows.insert(to);
+            self.mark(to, Mark::Capture);
         }
         if self.is_error_row(from) {
-            self.error_rows.insert(to);
+            self.mark(to, Mark::Error);
         }
     }
 
@@ -221,29 +250,82 @@ impl Store {
     }
 
     pub fn set(&mut self, m: u32, t: Type) {
-        self.metas[m as usize] = MetaState::Bound(t);
+        self.write(m, MetaState::Bound(t));
     }
 
     /// Follows bound variables at the top of `t`.
     pub fn resolve(&self, t: &Type) -> Type {
-        self.head(t).clone()
+        self.head(t).into_owned()
     }
 
-    /// [`Store::resolve`] without the copy.
-    pub fn head<'a>(&'a self, mut t: &'a Type) -> &'a Type {
+    /// The application spine with bound head variables observed. Borrowed
+    /// spines retain their original children; only a projected solution owns
+    /// new children.
+    pub(in crate::types) fn spine<'a>(
+        &'a self,
+        ty: &'a Type,
+    ) -> (Cow<'a, Type>, Vec<Cow<'a, Type>>) {
+        let mut head = self.head(ty);
+        let mut arguments = Vec::new();
         loop {
-            match t {
-                // a variable this store never made (a stored type shown by
-                // `show_type` with an empty store) is open
+            match head {
+                Cow::Borrowed(Type::App {
+                    head: function,
+                    arg,
+                }) => {
+                    arguments.push(Cow::Borrowed(arg.as_ref()));
+                    head = self.head(function);
+                }
+                Cow::Owned(Type::App {
+                    head: function,
+                    arg,
+                }) => {
+                    arguments.push(Cow::Owned(*arg));
+                    head = Cow::Owned(self.head(&function).into_owned());
+                }
+                _ => break,
+            }
+        }
+        arguments.reverse();
+        (head, arguments)
+    }
+
+    /// Observe a root without copying unchanged types. A contextual solution
+    /// is projected lazily from its canonical coordinates into this occurrence.
+    pub fn head<'a>(&'a self, t: &'a Type) -> Cow<'a, Type> {
+        let mut head = Cow::Borrowed(t);
+        loop {
+            match head.as_ref() {
+                // Types displayed with an empty store can contain foreign IDs.
+                Type::Meta(m)
+                    if self
+                        .meta_contexts
+                        .get(*m as usize)
+                        .is_some_and(|context| context.canonical.len() != 0) =>
+                {
+                    return head;
+                }
                 Type::Meta(m) => match self.metas.get(*m as usize) {
-                    Some(MetaState::Bound(next)) => t = next,
-                    Some(MetaState::Open { .. }) | None => return t,
+                    Some(MetaState::Bound(next)) => head = Cow::Borrowed(next),
+                    Some(MetaState::Open { .. }) | None => return head,
                 },
+                Type::MetaView(_) => {
+                    let Ok((root, view)) = self.occurrence(&head) else {
+                        return head;
+                    };
+                    let MetaState::Bound(solution) = &self.metas[root as usize] else {
+                        return head;
+                    };
+                    let Ok(projected) = view.transport_checked(solution) else {
+                        return head;
+                    };
+                    head = Cow::Owned(projected);
+                }
                 Type::Skolem(s) => match self.equal(*s) {
-                    Some(next) => t = next,
-                    None => return t,
+                    Some(next) => head = Cow::Borrowed(next),
+                    None => return head,
                 },
-                _ => return t,
+                _ => return head,
             }
         }
     }
@@ -268,22 +350,22 @@ impl Store {
 
     /// `t` with every bound variable replaced by its solution.
     pub fn zonk(&self, t: &Type) -> Type {
+        let head = self.head(t);
+        let t = head.as_ref();
         match t {
-            Type::Meta(m) => match &self.metas[*m as usize] {
-                MetaState::Bound(next) => self.zonk(next),
-                MetaState::Open { .. } => t.clone(),
-            },
-            Type::Skolem(s) => match self.equal(*s) {
-                Some(next) => self.zonk(next),
-                None => t.clone(),
-            },
-            Type::Con { .. } | Type::Var(_) | Type::Symbol(_) | Type::Error => t.clone(),
+            Type::Meta(_)
+            | Type::MetaView(_)
+            | Type::Skolem(_)
+            | Type::Con { .. }
+            | Type::Var(_)
+            | Type::Symbol(_)
+            | Type::Error => t.clone(),
             Type::Union(a, b) => self
                 .normalize(&Type::Union(Box::new(self.zonk(a)), Box::new(self.zonk(b))))
                 .into_type(),
             Type::Without { row, gone } => {
                 let row = Box::new(self.zonk(row));
-                let gone = gone.clone();
+                let gone = gone.iter().map(|label| self.zonk_label(label)).collect();
                 self.normalize(&Type::Without { row, gone }).into_type()
             }
             Type::Record(row) | Type::Row(row) => {
@@ -318,7 +400,7 @@ impl Store {
             .iter()
             .map(|(l, t)| {
                 let t = self.zonk(t);
-                (relabel(l, &t), t)
+                (relabel(&self.zonk_label(l), &t), t)
             })
             .collect();
         let mut tail = row.tail.as_ref().map(|t| self.zonk(t));
@@ -335,6 +417,23 @@ impl Store {
         }
     }
 
+    /// Semantic atoms in omission/provided labels follow their root as well.
+    /// Named field keys and frozen literals are never interpreted as variables.
+    pub(in crate::types) fn zonk_label(&self, label: &Elem) -> Elem {
+        use super::elem::Atom;
+        let atom = match label {
+            Elem::Provided(inner) => return Elem::Provided(Box::new(self.zonk_label(inner))),
+            Elem::Capture(atom) | Elem::Error(atom) | Elem::Service(atom) => atom,
+            Elem::Named(_) | Elem::Live => return label.clone(),
+        };
+        let ty = match atom {
+            Atom::Meta(root) => Type::Meta(*root),
+            Atom::MetaView(meta) => Type::MetaView(meta.clone()),
+            Atom::Var(_) | Atom::Skolem(_) => return label.clone(),
+        };
+        relabel(label, &self.resolve(&ty))
+    }
+
     /// A row as its labelled entries and the row variables it extends:
     /// `{A | r} + {B | s}` is `A, B` and `r, s`. Repeated labels and tails
     /// count once.
@@ -348,25 +447,34 @@ impl Store {
     }
 
     fn collect_row(&self, t: &Type, out: &mut Norm) {
-        match self.resolve(t) {
+        Self::collect_row_with(t, out, &|ty| self.resolve(ty), true);
+    }
+
+    fn collect_row_with(
+        t: &Type,
+        out: &mut Norm,
+        resolve: &impl Fn(&Type) -> Type,
+        semantic: bool,
+    ) {
+        match resolve(t) {
             Type::Row(row) => {
                 out.entries.extend(row.entries.into_iter().map(|(l, t)| {
-                    let t = self.resolve(&t);
-                    (relabel(&l, &t), t)
+                    let t = resolve(&t);
+                    (if semantic { relabel(&l, &t) } else { l }, t)
                 }));
                 if let Some(tail) = row.tail {
-                    self.collect_row(&tail, out);
+                    Self::collect_row_with(&tail, out, resolve, semantic);
                 }
             }
             Type::Union(a, b) => {
-                self.collect_row(&a, out);
-                self.collect_row(&b, out);
+                Self::collect_row_with(&a, out, resolve, semantic);
+                Self::collect_row_with(&b, out, resolve, semantic);
             }
             // a known row loses the elements; what is still a variable keeps
             // the names to lose
             Type::Without { row, gone } => {
                 let mut inner = Norm::default();
-                self.collect_row(&row, &mut inner);
+                Self::collect_row_with(&row, &mut inner, resolve, semantic);
                 let kept = (inner.entries.into_iter()).filter(|(label, _)| !gone.contains(label));
                 out.entries.extend(kept);
                 for tail in inner.tails {
@@ -400,8 +508,10 @@ impl Store {
             return Err(s);
         }
         for m in lower {
-            if let MetaState::Open { level: l } = &mut self.metas[m as usize] {
-                *l = (*l).min(level);
+            if let MetaState::Open { level: previous } = self.metas[m as usize]
+                && level < previous
+            {
+                self.write(m, MetaState::Open { level });
             }
         }
         Ok(())
@@ -443,7 +553,8 @@ fn relabel(label: &Elem, t: &Type) -> Elem {
         Elem::Capture(_) => super::ty::capture_label(t),
         Elem::Error(_) => super::ty::error_label(t),
         Elem::Service(_) => super::ty::service_label(t),
-        Elem::Named(_) | Elem::Live | Elem::Provided(_) => None,
+        Elem::Provided(inner) => Some(Elem::Provided(Box::new(relabel(inner, t)))),
+        Elem::Named(_) | Elem::Live => None,
     };
     current.unwrap_or_else(|| label.clone())
 }
@@ -511,7 +622,23 @@ impl Checker<'_> {
     /// [`Self::qualified_head`] without the copy of a type that does not
     /// reduce, which is most of what the capture summaries ask about.
     pub fn borrowed_head<'a>(&'a self, t: &'a Type) -> Cow<'a, Type> {
-        let mut t = Cow::Borrowed(self.store.head(t));
+        self.borrowed_head_observing(t, false, &mut |_, _| {})
+    }
+
+    /// Ordinary head reduction, retaining opaque identities and qualifiers at
+    /// the witness-publication boundary. No second alias expander is used.
+    pub(in crate::types) fn witness_head(&self, ty: &Type) -> Type {
+        self.borrowed_head_observing(ty, true, &mut |_, _| {})
+            .into_owned()
+    }
+
+    fn borrowed_head_observing<'a>(
+        &'a self,
+        t: &'a Type,
+        stop_at_opaque: bool,
+        observe: &mut impl FnMut(&str, &str),
+    ) -> Cow<'a, Type> {
+        let mut t = self.store.head(t);
         for _ in 0..64 {
             // only an application or a constructor has a head to reduce
             if !matches!(*t, Type::App { .. } | Type::Con { .. }) {
@@ -523,21 +650,25 @@ impl Checker<'_> {
                 continue;
             }
             let resolved = self.store.head(head);
-            if !ptr::eq(resolved, head) && resolved != head {
-                t = Cow::Owned(Type::apps(resolved.clone(), args.into_iter().cloned()));
+            if !ptr::eq(resolved.as_ref(), head) && resolved.as_ref() != head {
+                t = Cow::Owned(Type::apps(resolved.into_owned(), args.into_iter().cloned()));
                 continue;
             }
             let Type::Con { module, name } = head else {
                 break;
             };
-            let Some(Form::Alias { params, body, .. }) =
-                self.env.type_def(module, name).map(|d| &d.form)
+            let Some(Form::Alias {
+                params,
+                body,
+                opaque,
+            }) = self.env.type_def(module, name).map(|d| &d.form)
             else {
                 break;
             };
-            if args.len() < params.len() {
+            if args.len() < params.len() || (stop_at_opaque && *opaque) {
                 break;
             }
+            observe(module, name);
             let subst: Vec<(String, Type)> = params
                 .iter()
                 .cloned()
@@ -549,6 +680,126 @@ impl Checker<'_> {
             )));
         }
         t
+    }
+
+    /// The same declaration head observation, retaining only alias provenance
+    /// needed to prove that a finite owner-adapter tree has no execution cycle.
+    pub(in crate::types) fn owner_head(&self, ty: &Type) -> (Type, HashSet<(String, String)>) {
+        let mut aliases = HashSet::new();
+        let mut observe = |module: &str, name: &str| {
+            aliases.insert((module.to_owned(), name.to_owned()));
+        };
+        let mut head = self
+            .borrowed_head_observing(ty, false, &mut observe)
+            .into_owned();
+        for _ in 0..64 {
+            match head {
+                Type::Captured { ty, .. } | Type::Bounded { ty, .. } => {
+                    head = self
+                        .borrowed_head_observing(&ty, false, &mut observe)
+                        .into_owned();
+                }
+                _ => break,
+            }
+        }
+        (head, aliases)
+    }
+
+    /// Whole-type capture walks must see an opaque alias exposed through a
+    /// transparent head or a fixed projection before ordinary head reduction
+    /// unfolds it. Transparent aliases are acyclic; an opaque alias ends this
+    /// observation, so no depth budget or growing instantiated-type key is used.
+    pub(in crate::types) fn projected_alias_key(&self, ty: &Type) -> Option<(String, String)> {
+        self.alias_key(&self.projected_alias_type(ty)?)
+    }
+
+    pub(in crate::types) fn projected_alias_type(&self, ty: &Type) -> Option<Type> {
+        let mut ty = self.store.head(ty);
+        loop {
+            let (head, args) = self.store.spine(&ty);
+            let arguments: Vec<_> = args.iter().map(AsRef::as_ref).collect();
+            if let Some(projected) = self.project(&head, &arguments) {
+                ty = Cow::Owned(self.store.resolve(&projected));
+                continue;
+            }
+            let Type::Con { module, name } = head.as_ref() else {
+                return None;
+            };
+            let Some(Form::Alias {
+                params,
+                body,
+                opaque,
+            }) = self
+                .env
+                .type_def(module, name)
+                .map(|definition| &definition.form)
+            else {
+                return None;
+            };
+            if args.len() < params.len() {
+                return None;
+            }
+            if *opaque {
+                // Canonicalize the head, not merely the outermost meta:
+                // callers must observe args hidden in a bound HK head too.
+                return Some(Type::apps(
+                    head.into_owned(),
+                    args.into_iter().map(Cow::into_owned),
+                ));
+            }
+            let substitutions: Vec<_> = params
+                .iter()
+                .cloned()
+                .zip(args.iter().map(|arg| arg.as_ref().clone()))
+                .collect();
+            let result = body.substitute(&substitutions);
+            ty = Cow::Owned(self.store.resolve(&Type::apps(
+                result,
+                args[params.len()..].iter().map(|arg| arg.as_ref().clone()),
+            )));
+        }
+    }
+
+    /// Keep an opaque value nominal when solving an unknown monotype. This
+    /// is shared with subsumption, before it observes the representation.
+    pub(in crate::types) fn unify_opaque_meta(&mut self, a: &Type, b: &Type) -> Option<Unified> {
+        let (a, b) = (self.store.head(a), self.store.head(b));
+        match (a.as_ref(), b.as_ref()) {
+            (Type::Meta(meta), other) | (other, Type::Meta(meta)) => {
+                let meta = *meta;
+                if !self.store.is_numeric(meta)
+                    && !self.store.is_capture_row(meta)
+                    && !self.store.is_error_row(meta)
+                    && let Some(nominal) = self.projected_alias_type(other)
+                    && self.opaque_value_type(&nominal)
+                {
+                    // Opaque values are monotypes even when their hidden
+                    // representation is polymorphic. Do not accidentally
+                    // instantiate/unfold that representation to bind a meta.
+                    return Some(self.bind(meta, &nominal));
+                }
+            }
+            _ => {}
+        }
+        None
+    }
+
+    fn opaque_value_type(&self, ty: &Type) -> bool {
+        let (head, args) = ty.spine();
+        let Type::Con { module, name } = head else {
+            return false;
+        };
+        let Some(definition) = self.env.type_def(module, name) else {
+            return false;
+        };
+        let mut kind = self.kinds.resolve(&definition.kind);
+        for _ in args {
+            let Kind::Arrow(_, result) = kind else {
+                return false;
+            };
+            kind = self.kinds.resolve(&result);
+        }
+        kind == Kind::Type
     }
 
     /// The fixed projections of a row into a type, once the row is known
@@ -601,7 +852,7 @@ impl Checker<'_> {
             return None;
         };
         let m = *m;
-        if matches!(other, Type::Meta(_) | Type::Error) {
+        if matches!(other, Type::Meta(_) | Type::MetaView(_) | Type::Error) {
             return None;
         }
         if other.is_lang(Lang::Never) {
@@ -614,19 +865,25 @@ impl Checker<'_> {
     }
 
     pub fn unify(&mut self, a: &Type, b: &Type) -> Unified {
-        self.compare_unfolding(a, b, |c| c.unify_unfolded(a, b))
+        self.inference_trial(|this| {
+            this.compare_unfolding(a, b, |c| c.unify_unfolded(a, b))
+                .map_err(|mismatch| this.observe_mismatch(mismatch, a, b))
+        })
     }
 
     #[allow(clippy::too_many_lines)]
     fn unify_unfolded(&mut self, a: &Type, b: &Type) -> Unified {
+        if let Some(result) = self.unify_opaque_meta(a, b) {
+            return result;
+        }
         let (mut left, mut right) = (self.bound_head(a), self.bound_head(b));
         if matches!(&left, Type::Captured { value: true, .. })
             || matches!(&right, Type::Captured { value: true, .. })
         {
             let (x, y) = (self.whnf(&left), self.whnf(&right));
             if let (Type::App { head: x, .. }, Type::App { head: y, .. }) = (&x, &y)
-                && (matches!(self.store.resolve(x), Type::Meta(_))
-                    || matches!(self.store.resolve(y), Type::Meta(_)))
+                && (matches!(self.store.resolve(x), Type::Meta(_) | Type::MetaView(_))
+                    || matches!(self.store.resolve(y), Type::Meta(_) | Type::MetaView(_)))
             {
                 self.unify(x, y)?;
                 (left, right) = (self.bound_head(a), self.bound_head(b));
@@ -697,17 +954,19 @@ impl Checker<'_> {
             (Type::Con { .. }, Type::Con { .. }) if a == b => Ok(()),
             (Type::App { head: h1, arg: a1 }, Type::App { head: h2, arg: a2 }) => {
                 // an argument that is no error explains itself better than the application
-                self.unify(h1, h2).map_err(|m| match m {
-                    Mismatch::Types(x, y)
-                        if x.spine().0.is_lang(Lang::Errors)
-                            || y.spine().0.is_lang(Lang::Errors) =>
-                    {
+                self.unify(h1, h2).map_err(|m| {
+                    m.map_reason(|reason| match reason {
                         Mismatch::Types(x, y)
-                    }
-                    // a region leaves its `scope` in the `Live` of a row,
-                    // which no type shows
-                    Mismatch::Escape(s) => Mismatch::Escape(s),
-                    _ => Mismatch::Types(a.clone(), b.clone()),
+                            if x.spine().0.is_lang(Lang::Errors)
+                                || y.spine().0.is_lang(Lang::Errors) =>
+                        {
+                            Mismatch::Types(x, y)
+                        }
+                        // a region leaves its `scope` in the `Live` of a row,
+                        // which no type shows
+                        Mismatch::Escape(s) => Mismatch::Escape(s),
+                        _ => Mismatch::Types(a.clone(), b.clone()),
+                    })
                 })?;
                 self.unify(a1, a2)
             }
@@ -740,29 +999,39 @@ impl Checker<'_> {
             (Type::Record(r1), Type::Record(r2)) => self.unify_rows(r1, r2),
             (
                 Type::Exists {
+                    scope: _,
                     binder: x,
                     contract: c1,
                     body: b1,
                 },
                 Type::Exists {
+                    scope: _,
                     binder: y,
                     contract: c2,
                     body: b2,
                 },
             ) => {
-                fn alpha(ty: &Type, binder: &str) -> Type {
-                    if let Type::Con { module, name } = ty
-                        && module == &format!("$exists:{binder}")
-                    {
-                        return Type::con("$exists:#", name);
-                    }
-                    if matches!(ty, Type::Exists { binder: inner, .. } if inner == binder) {
-                        return ty.clone();
-                    }
-                    ty.map_children(&mut |child| alpha(child, binder))
-                }
                 self.unify(c1, c2)?;
-                self.unify(&alpha(b1, x), &alpha(b2, y))
+                let contract = self.whnf(c1);
+                let Type::Con { module, name } = &contract else {
+                    return Err(Mismatch::Types(a.clone(), b.clone()));
+                };
+                let Some(definition) = self.env.type_def(module, name) else {
+                    return Err(Mismatch::Types(a.clone(), b.clone()));
+                };
+                let Form::ModuleContract { .. } = &definition.form else {
+                    return Err(Mismatch::Types(a.clone(), b.clone()));
+                };
+                let witness = self.fresh_module_witness();
+                if self
+                    .materialize_existential_witness(&contract, &witness)
+                    .is_err()
+                {
+                    return Err(Mismatch::Types(a.clone(), b.clone()));
+                }
+                let left = super::module_contract::open_existential_type(b1, x, &witness);
+                let right = super::module_contract::open_existential_type(b2, y, &witness);
+                self.unify(&left, &right)
             }
             (Type::Row(_) | Type::Union(..) | Type::Without { .. }, _)
             | (_, Type::Row(_) | Type::Union(..) | Type::Without { .. }) => {
@@ -800,11 +1069,13 @@ impl Checker<'_> {
         if !matches!(h1, Type::Con { .. }) || h1 != h2 || args1.len() != args2.len() {
             return false;
         }
-        args1.is_empty()
-            || args1
+        self.inference_trial(|this| {
+            args1
                 .iter()
                 .zip(&args2)
-                .all(|(x, y)| self.unify(x, y).is_ok())
+                .try_for_each(|(x, y)| this.unify(x, y))
+        })
+        .is_ok()
     }
 
     /// Whether `t` is a qualifier on the meta `m` itself.
@@ -813,6 +1084,10 @@ impl Checker<'_> {
     }
 
     pub fn bind(&mut self, m: u32, t: &Type) -> Unified {
+        self.inference_trial(|this| this.bind_inner(m, t))
+    }
+
+    fn bind_inner(&mut self, m: u32, t: &Type) -> Unified {
         let t = self.zonk(t);
         if t.contains(&mut |x| *x == Type::Meta(m)) {
             return Err(Mismatch::Occurs(t));
@@ -944,3 +1219,60 @@ impl Checker<'_> {
         }
     }
 }
+
+#[cfg(test)]
+mod spine_tests {
+    use super::Store;
+    use crate::types::Type;
+
+    #[test]
+    fn bound_alias_constructor_heads_remain_visible_in_application_spines() {
+        for name in ["Opaque", "Reveal"] {
+            let mut store = Store::default();
+            let variable = store.fresh();
+            let Type::Meta(meta) = variable else {
+                unreachable!()
+            };
+            let constructor = Type::con("Test", name);
+            store.set(meta, constructor.clone());
+            let argument = Type::Var("a".to_owned());
+            let application = Type::app(variable, argument.clone());
+            let (head, args) = store.spine(&application);
+            assert_eq!(
+                head.as_ref(),
+                &constructor,
+                "top-only resolution hides {name}"
+            );
+            assert_eq!(
+                args.iter().map(AsRef::as_ref).collect::<Vec<_>>(),
+                vec![&argument]
+            );
+        }
+    }
+
+    #[test]
+    fn bound_partial_constructor_heads_prepend_their_existing_arguments() {
+        let mut store = Store::default();
+        let variable = store.fresh();
+        let Type::Meta(meta) = variable else {
+            unreachable!()
+        };
+        let constructor = Type::con("Test", "Task");
+        let first = Type::Var("scope".to_owned());
+        let second = Type::Var("result".to_owned());
+        store.set(meta, Type::app(constructor.clone(), first.clone()));
+        let application = Type::app(variable, second.clone());
+        let (head, args) = store.spine(&application);
+        assert_eq!(head.as_ref(), &constructor);
+        assert_eq!(
+            args.iter().map(AsRef::as_ref).collect::<Vec<_>>(),
+            vec![&first, &second]
+        );
+    }
+}
+
+include!("unify/transactions.rs");
+
+include!("unify/context.rs");
+
+include!("unify/read.rs");

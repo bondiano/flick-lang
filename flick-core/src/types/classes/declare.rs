@@ -224,7 +224,11 @@ impl<'n> Checker<'_> {
                 && !instance.head.contains(&mut |t| {
                     matches!(
                         t,
-                        Type::Var(_) | Type::Meta(_) | Type::Skolem(_) | Type::Error
+                        Type::Var(_)
+                            | Type::Meta(_)
+                            | Type::MetaView(_)
+                            | Type::Skolem(_)
+                            | Type::Error
                     )
                 })
                 && args[0] != args[1]

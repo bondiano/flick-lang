@@ -49,7 +49,7 @@ pub(super) fn kind_description(kind: &Kind) -> &'static str {
             "A finite kind defined by the listed members. Use one of them as a type-level argument."
         }
         Kind::Arrow(_, _) => ARROW_KIND_DESCRIPTION,
-        Kind::Meta(_) => {
+        Kind::Meta(_) | Kind::MetaView(_) => {
             "A kind still being inferred from how its type variable is used. If nothing determines it, the kind becomes `Type`."
         }
     }

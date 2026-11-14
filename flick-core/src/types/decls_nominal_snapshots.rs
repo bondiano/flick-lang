@@ -29,6 +29,7 @@ impl Checker<'_> {
                         requirements: mem::take(requirements),
                     };
                     self.refresh_nominal_requirements(&mut signature);
+                    signature.map_types(&mut |ty| self.exported(ty));
                     let super::ModuleSignature::Structure {
                         requirements: completed,
                     } = signature
@@ -37,7 +38,10 @@ impl Checker<'_> {
                     };
                     *requirements = completed;
                 }
-                Form::ModuleSignature { signature } => self.refresh_nominal_requirements(signature),
+                Form::ModuleSignature { signature } => {
+                    self.refresh_nominal_requirements(signature);
+                    signature.map_types(&mut |ty| self.exported(ty));
+                }
                 _ => {}
             }
             self.env.define_type(&p.name, definition);

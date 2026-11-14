@@ -132,7 +132,7 @@ impl Checker<'_> {
         if expected.is_row() {
             return expected;
         }
-        if !matches!(expected, Kind::Meta(_)) {
+        if !matches!(expected, Kind::Meta(_) | Kind::MetaView(_)) {
             let text = self.text_of(node);
             self.error(
                 codes::T002,

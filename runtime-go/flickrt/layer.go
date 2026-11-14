@@ -543,7 +543,8 @@ func LayerCurrentMemoMap(fb *Fiber, _ Value) Value  { return currentMemo(fb) }
 // that acquires into the layer's scope.
 func fromTask(build Value) func(*Fiber, *MemoMap, *Owner) Services {
 	return func(fb *Fiber, memo *MemoMap, scope *Owner) Services {
-		return scoped(fb, scope, Apply(fb, build, memo)).(Services)
+		inner := WithOwnerEvidence(fb, scope)
+		return scoped(inner, scope, Apply(inner, build, memo)).(Services)
 	}
 }
 

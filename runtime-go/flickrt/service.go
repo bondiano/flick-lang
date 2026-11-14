@@ -31,14 +31,27 @@ type operationId struct {
 
 var operations sync.Map
 
+// operation finds the innermost implementation with an arm for name. Only
+// partial handlers forward a missing operation: a complete service still
+// shadows the outer one, including when a malformed record lacks the field.
+func (e *env) operation(key, name string) Value {
+	for ; e != nil; e = e.next {
+		if e.key != key {
+			continue
+		}
+		impl := e.v.(*Record)
+		if e.partial && impl.index(name) < 0 {
+			continue
+		}
+		return impl.Get(name)
+	}
+	panic(Defect{"Service not found: " + key})
+}
+
 func operation(key, name string, arity int, dicts []Value) Value {
 	call := func(args []Value) Value {
 		return Eff(func(fb *Fiber) Value {
-			impl, ok := fb.env.get(key)
-			if !ok {
-				panic(Defect{"Service not found: " + key})
-			}
-			f := impl.(*Record).Get(name)
+			f := fb.env.operation(key, name)
 			if dicts != nil {
 				f = Inst(fb, f, dicts...)
 			}

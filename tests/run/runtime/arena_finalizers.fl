@@ -1,0 +1,16 @@
+// An earlier finalizer can obtain a view stored later, so arena retirement
+// cannot be just another LIFO resource finalizer.
+module App.Main exposing (main)
+
+import Arena
+
+main : Unit ->{; AppError} Unit
+let main () = scope {
+  let read = Ref.make (fun () -> Platform.stdout_line "unset")
+  Scope.add_finalizer (task { (Ref.get read) () })
+  let arena = Arena.make ()
+  let view = Arena.alloc arena "kept"
+  Ref.set read (fun () -> Platform.stdout_line ("first " ++ Arena.get view))
+  Scope.add_finalizer (task { Platform.stdout_line ("last " ++ Arena.get view) })
+  Platform.stdout_line "body"
+}

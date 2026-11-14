@@ -1,0 +1,12 @@
+module App.ServiceImplementationContract exposing (Packed)
+
+// Both the contract and its transparent alias precede the service.
+type alias Handler = Clock.Impl
+
+type module S =
+  handler : Handler
+
+service Clock =
+  tick : Unit ->{} Int
+
+type alias Packed = exists K : S. Unit

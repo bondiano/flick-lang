@@ -101,7 +101,7 @@ impl Tr {
             }),
             Stmt::Let(ir::Pat::Bind(x), e) => self.with_value(e, |tr, v| {
                 let body = tr.block(rest, tail, pack);
-                Term::Let(x.as_str().into(), None, rc(v), rc(body))
+                tr.value_let(x.as_str().into(), v, body)
             }),
             Stmt::Let(ir::Pat::Wild, e) | Stmt::Expr(e) => self.with_value(e, |tr, v| {
                 let body = tr.block(rest, tail, pack);

@@ -1,0 +1,261 @@
+#[test]
+fn exceptional_boundaries_use_saved_owner_not_current_selection() {
+    let block = Block {
+        instructions: vec![],
+        exit: Exit::Return(0),
+    };
+    let program = Program {
+        functions: BTreeMap::new(),
+        globals: vec![],
+    };
+    let mut heap = Heap::new();
+    let first = heap.allocate(Data::Arena {
+        execution: 0,
+        contents: vec![],
+    });
+    let selected = heap.allocate(Data::Arena {
+        execution: 0,
+        contents: vec![],
+    });
+    let failure = heap
+        .cause(&[Reason::Fail(&Value::Unit)], &mut 3)
+        .expect("typed fixture cause");
+    let mut machine = Machine {
+        heap: &mut heap,
+        program: &program,
+        execution: 0,
+        globals: BTreeMap::new(),
+        cells: vec![],
+        owners: vec![
+            OwnerState::default(),
+            OwnerState {
+                closed: false,
+                arenas: vec![first],
+            },
+            OwnerState {
+                closed: false,
+                arenas: vec![selected],
+            },
+        ],
+        current_owner: 2,
+        current_evidence: None,
+        frames: vec![Frame {
+            recovery_id: None,
+            evidence: None,
+            block: &block,
+            at: 0,
+            locals: Locals::new(),
+            destination: Destination::CloseScope {
+                owner: 1,
+                previous: 0,
+                binding: 0,
+            },
+        }],
+        activations: BTreeMap::new(),
+        providers: BTreeMap::new(),
+        segments: BTreeMap::new(),
+        invocations: BTreeMap::new(),
+        discard: None,
+        ready: None,
+        next_handler: 0,
+        arguments: VecDeque::new(),
+        scratch: vec![],
+        pending: None,
+        failure: Some(failure),
+        failure_elected: false,
+        recoveries: BTreeMap::new(),
+        next_recovery: 0,
+        pending_handler: None,
+        top: None,
+        stdout: String::new(),
+        fuel: 100,
+        main_stage: MainStage::Done,
+    };
+    machine.unwind().expect("valid typed-failure test");
+    assert!(machine.owners[1].closed);
+    assert!(!machine.owners[2].closed);
+    assert_eq!(machine.current_owner, 0);
+    assert_eq!(machine.heap.stats().arenas_freed, 1);
+    machine.current_owner = 2;
+    machine.frames.push(Frame {
+        recovery_id: None,
+        evidence: None,
+        block: &block,
+        at: 0,
+        locals: Locals::new(),
+        destination: Destination::RestoreOwner {
+            previous: 0,
+            binding: 0,
+        },
+    });
+    machine.unwind().expect("valid typed-failure test");
+    assert_eq!(machine.current_owner, 0);
+    assert!(
+        !machine.owners[2].closed,
+        "selection restores without closing storage"
+    );
+    assert_eq!(machine.heap.stats().arenas_freed, 1);
+    machine.cleanup().expect("valid typed-failure test");
+    machine.heap.finish().expect("valid typed-failure test");
+}
+
+#[test]
+fn catching_releases_frame_locals_before_handler_execution() {
+    let caller = function(
+        vec![],
+        vec![Instruction::Let {
+            binding: 0,
+            value: Operation::Literal(Lit::Unit),
+        }],
+        0,
+    );
+    let handler = function(vec![0, 1], vec![], 1);
+    let program = Program {
+        functions: BTreeMap::from([(0, caller), (1, handler)]),
+        globals: vec![],
+    };
+    let mut heap = Heap::new();
+    let local = heap
+        .literal(&Lit::String("unwound local".into()))
+        .expect("valid typed-failure test");
+    let local_id = local.object_id().expect("unwound local identity");
+    let handler = heap.allocate(Data::Closure {
+        execution: 0,
+        code: 1,
+        captures: vec![],
+    });
+    let handler_id = handler.object_id().expect("selector closure identity");
+    let block = &program.functions[&0].body;
+    let failure = heap
+        .cause(&[Reason::Fail(&Value::Unit)], &mut 3)
+        .expect("typed fixture cause");
+    let cause_id = ObjectId {
+        heap: heap.identity,
+        index: heap
+            .objects
+            .iter()
+            .position(|slot| {
+                slot.as_ref()
+                    .is_some_and(|object| matches!(object.data, Data::Cause(_)))
+            })
+            .expect("single original cause"),
+    };
+    let mut machine = fixture_machine(&program, &mut heap);
+    machine.fuel = 100;
+    machine.frames = vec![
+        Frame {
+            recovery_id: None,
+            evidence: None,
+            block,
+            at: 0,
+            locals: Locals::new(),
+            destination: Destination::Top,
+        },
+        Frame {
+            recovery_id: None,
+            evidence: None,
+            block,
+            at: 0,
+            locals: BTreeMap::from([(0, vec![local])]),
+            destination: Destination::Catch {
+                handler,
+                binding: 1,
+            },
+        },
+    ];
+    machine.failure = Some(failure);
+    machine.unwind().expect("valid typed-failure test");
+    assert_eq!(
+        machine.frames.len(),
+        2,
+        "handler just installed, not executed"
+    );
+    assert_eq!(
+        machine.heap.stats().live_objects,
+        2,
+        "exact original C and selector closure remain"
+    );
+    assert!(
+        !machine.heap.is_live(local_id),
+        "unwound local reclaimed before selector execution"
+    );
+    assert!(machine.heap.is_live(handler_id));
+    assert!(machine.heap.is_live(cause_id));
+    assert_eq!(machine.recoveries.len(), 1);
+    assert!(machine.failure.is_none());
+    machine.cleanup().expect("valid typed-failure test");
+    machine.heap.finish().expect("valid typed-failure test");
+}
+#[test]
+fn owner_selection_validates_identity_but_not_resource_admission() {
+    let program = Program {
+        functions: BTreeMap::new(),
+        globals: vec![],
+    };
+    let mut heap = Heap::new();
+    let mut machine = Machine {
+        heap: &mut heap,
+        program: &program,
+        execution: 7,
+        globals: BTreeMap::new(),
+        cells: vec![],
+        owners: vec![OwnerState {
+            closed: true,
+            arenas: vec![],
+        }],
+        current_owner: 0,
+        current_evidence: None,
+        frames: vec![],
+        activations: BTreeMap::new(),
+        providers: BTreeMap::new(),
+        segments: BTreeMap::new(),
+        invocations: BTreeMap::new(),
+        discard: None,
+        ready: None,
+        next_handler: 0,
+        arguments: VecDeque::new(),
+        scratch: vec![],
+        pending: None,
+        failure: None,
+        failure_elected: false,
+        recoveries: BTreeMap::new(),
+        next_recovery: 0,
+        pending_handler: None,
+        top: None,
+        stdout: String::new(),
+        fuel: 100,
+        main_stage: MainStage::Done,
+    };
+    assert_eq!(
+        machine.owner_index(&Value::Int(42)),
+        Err(Error::ExpectedOwner)
+    );
+    assert_eq!(
+        machine.owner_index(&Value::Owner(machine.owner_handle(0))),
+        Ok(0)
+    );
+    let mut owner = machine.owner_handle(0);
+    owner.index = usize::MAX;
+    assert_eq!(
+        machine.owner_index(&Value::Owner(owner)),
+        Err(Error::ForeignOwner)
+    );
+    let mut owner = machine.owner_handle(0);
+    owner.execution += 1;
+    assert_eq!(
+        machine.owner_index(&Value::Owner(owner)),
+        Err(Error::ForeignOwner)
+    );
+    let other = Heap::new();
+    let mut owner = machine.owner_handle(0);
+    owner.heap = other.identity;
+    assert_eq!(
+        machine.owner_index(&Value::Owner(owner)),
+        Err(Error::ForeignOwner)
+    );
+    machine
+        .cleanup()
+        .expect("retired owner cleanup stays idempotent");
+    machine.heap.finish().expect("no retained objects");
+    other.finish().expect("foreign heap untouched");
+}

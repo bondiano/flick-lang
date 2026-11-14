@@ -61,7 +61,7 @@ impl Checker<'_> {
     /// Whether qualifiers differ only by the captures of a type not inferred
     /// yet, inside a subsumption that can compare them once it is.
     fn unknown_captures(&self, mismatch: &Mismatch) -> bool {
-        let Mismatch::Label { label, .. } = mismatch else {
+        let Mismatch::Label { label, .. } = mismatch.reason() else {
             return false;
         };
         self.cx.regions.deferring.is_some() && self.uninferred(label)
@@ -75,7 +75,10 @@ impl Checker<'_> {
         };
         meta.is_some_and(|m| {
             !self.store.is_capture_row(m)
-                && matches!(self.store.resolve(&Type::Meta(m)), Type::Meta(_))
+                && matches!(
+                    self.store.resolve(&Type::Meta(m)),
+                    Type::Meta(_) | Type::MetaView(_)
+                )
         })
     }
 
@@ -156,8 +159,12 @@ impl Checker<'_> {
     ) -> Unified {
         match (&a, &e) {
             (Type::Error, _) | (_, Type::Error) => return Ok(()),
-            (_, Type::Meta(_)) if ce.is_none() => return self.unify(actual, expected),
-            (Type::Meta(_), _) if ca.is_none() => return self.unify(actual, expected),
+            (_, Type::Meta(_) | Type::MetaView(_)) if ce.is_none() => {
+                return self.unify(actual, expected);
+            }
+            (Type::Meta(_) | Type::MetaView(_), _) if ca.is_none() => {
+                return self.unify(actual, expected);
+            }
             _ => {}
         }
         let (a, e) = self.live_sides((a, ca.as_ref()), (e, ce.as_ref()));
@@ -171,7 +178,10 @@ impl Checker<'_> {
             Visible::Late(e.clone())
         };
         let bound = ce.unwrap_or_else(Type::empty_row);
-        let written = !matches!(self.store.resolve(&bound), Type::Meta(_));
+        let written = !matches!(
+            self.store.resolve(&bound),
+            Type::Meta(_) | Type::MetaView(_)
+        );
         // a function or a task, pure ones too, fits only where the reach of
         // the position covers what it holds (`LeLive.arrow` keeps `reach`)
         let mark = self.cx.regions.holds.len();

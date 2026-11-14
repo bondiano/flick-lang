@@ -16,6 +16,7 @@ import {
   currentCtx,
   currentFiber,
   extend,
+  evidenced,
   inCtx,
   isRun,
   lookup,
@@ -40,6 +41,24 @@ export type OpInstall = readonly [
 
 /** One effect a handler installs. */
 export type Install = readonly [tag: object, operations: ReadonlyArray<OpInstall>];
+
+// Only effect-handler installs are partial. A layer or a raw service record
+// remains a complete provider, even when a malformed record omits an operation.
+const partialImplementations = /*#__PURE__*/ new WeakSet<object>();
+
+/** Internal bridge metadata: this record supplies only its own operation arms. */
+export const isPartialImplementation = (impl: unknown): impl is object =>
+  typeof impl === "object" && impl !== null && partialImplementations.has(impl);
+
+/** The nearest provider of this operation, not merely of its effect's tag. */
+const operationImplementation = (tag: object, name: string): unknown => {
+  for (let ctx: Ctx | null = currentCtx(); ctx !== null; ctx = ctx.next) {
+    if (ctx.tag !== tag) continue;
+    if (isPartialImplementation(ctx.impl) && !Object.hasOwn(ctx.impl, name)) continue;
+    return ctx.impl;
+  }
+  return undefined;
+};
 
 const tags = /*#__PURE__*/ new Map<string, Readonly<{ key: string }>>();
 
@@ -66,10 +85,20 @@ const apply = (f: unknown, a: unknown): unknown => {
 
 const applyAll = (f: unknown, args: ReadonlyArray<unknown>): unknown => args.reduce(apply, f);
 
+// Handler wrappers know their terminal runtime stage. The bridge must defer its
+// invocation, not inspect an already invoked arm: that arm can capture context.
+const operationEntries = /*#__PURE__*/ new WeakSet<object>();
+export const isOperationEntry = (value: unknown): boolean =>
+  typeof value === "function" && operationEntries.has(value);
+
 /** The function of `arity` arguments that gives `f` all of them at once, after its dictionaries. */
 const collected = (dicts: number, arity: number, f: (given: ReadonlyArray<unknown>, args: ReadonlyArray<unknown>) => unknown): unknown => {
-  const collect = (given: ReadonlyArray<unknown>, args: ReadonlyArray<unknown>): unknown =>
-    args.length === arity ? f(given, args) : (a: unknown) => collect(given, [...args, a]);
+  const collect = (given: ReadonlyArray<unknown>, args: ReadonlyArray<unknown>): unknown => {
+    if (args.length === arity) return f(given, args);
+    const next = (a: unknown): unknown => collect(given, [...args, a]);
+    if (args.length + 1 === arity) operationEntries.add(next);
+    return next;
+  };
   return dicts === 0 ? collect([], []) : (...given: ReadonlyArray<unknown>) => collect(given, []);
 };
 
@@ -87,7 +116,7 @@ const dictsApplied = (f: unknown, given: ReadonlyArray<unknown>): unknown => {
  */
 export const operation = (tag: object, name: string, arity: number, dicts: ReadonlyArray<unknown> = []): unknown => {
   const call = (args: ReadonlyArray<unknown>): unknown => {
-    const impl = lookup(tag);
+    const impl = operationImplementation(tag, name);
     if (impl === undefined) {
       const fromHost = bridgeHooks.operation?.(tag);
       if (fromHost !== undefined) {
@@ -123,7 +152,8 @@ function* tailRun(run: unknown, token: object): Run {
 
 /** A `tail` arm's call: run with the evidence of its handler, a failure the handler's. */
 const tailCall = (prompt: Prompt, called: () => unknown): unknown => {
-  const { token, ctx } = prompt;
+  const { token } = prompt;
+  const ctx = evidenced(prompt.ctx, currentCtx().stageOwner);
   let out: unknown;
   try {
     out = inCtx(ctx, called);
@@ -186,7 +216,7 @@ class Control extends Instruction {
     bottom.prev = null;
     fiber.mask = this.prompt.mask;
     const { arm } = this;
-    return new Under(this.prompt.ctx, () => armRun(this.prompt, segment, arm)).exec(fiber);
+    return new Under(evidenced(this.prompt.ctx, currentCtx().stageOwner), () => armRun(this.prompt, segment, arm)).exec(fiber);
   }
 }
 
@@ -258,7 +288,7 @@ function* bodyRun(
   prompt: Prompt,
   body: () => unknown,
   ret: ((value: unknown) => unknown) | undefined,
-  errors: ((error: unknown) => (() => unknown) | undefined) | undefined,
+  errors: ((error: unknown, unhandled: () => never) => (() => unknown) | undefined) | undefined,
 ): Run {
   let value: unknown;
   const fiber = prompt.fiber;
@@ -284,14 +314,15 @@ function* bodyRun(
 /**
  * What a `try` does with a cause: a defect turns the failures into defects, the
  * first failure goes to the arm that matches, and otherwise the cause goes on.
+ * Deferred selectors retain `unhandled` to rethrow this exact cause after guards.
  */
-const recovered = (cause: Cause, handler: (error: unknown) => (() => unknown) | undefined): unknown => {
+const recovered = (cause: Cause, handler: (error: unknown, unhandled: () => never) => (() => unknown) | undefined): unknown => {
   skipHandler(currentFiber(), cause);
   if (unwinds(cause)) return raise(cause);
   if (hasDies(cause)) return raise(hasFails(cause) ? dies(cause) : cause);
   for (const r of cause.reasons) {
     if (r._tag === "Fail") {
-      const handled = handler(r.error);
+      const handled = handler(r.error, () => raise(cause));
       if (handled !== undefined) return handled();
       break;
     }
@@ -300,7 +331,7 @@ const recovered = (cause: Cause, handler: (error: unknown) => (() => unknown) | 
 };
 
 /** `try body with arms`, in a generator. */
-export function* tryWith(body: () => unknown, handler: (error: unknown) => (() => unknown) | undefined): Run {
+export function* tryWith(body: () => unknown, handler: (error: unknown, unhandled: () => never) => (() => unknown) | undefined): Run {
   let value: unknown;
   try {
     value = yield body();
@@ -311,7 +342,7 @@ export function* tryWith(body: () => unknown, handler: (error: unknown) => (() =
 }
 
 /** `try body with arms` in a stage that runs at once: `body` runs on the stack. */
-export const trySync = (body: () => unknown, handler: (error: unknown) => (() => unknown) | undefined): unknown => {
+export const trySync = (body: () => unknown, handler: (error: unknown, unhandled: () => never) => (() => unknown) | undefined): unknown => {
   try {
     return body();
   } catch (thrown) {
@@ -329,7 +360,8 @@ const armOf = (prompt: Prompt, [, arm, kind, dicts, arity]: OpInstall): unknown 
   }
   if (kind === "abort") {
     return collected(dicts, arity, (given, args) => {
-      return raise(fail(new Signal(token, () => called(given, args), undefined, false)));
+      const ctx = evidenced(prompt.ctx, currentCtx().stageOwner);
+      return raise(fail(new Signal(token, () => new Under(ctx, () => called(given, args)), undefined, false)));
     });
   }
   return collected(dicts, arity, (given, args) => tailCall(prompt, () => called(given, args)));
@@ -344,14 +376,14 @@ export const handle = (
   installs: ReadonlyArray<Install>,
   body: () => unknown,
   ret: ((value: unknown) => unknown) | undefined,
-  errors: ((error: unknown) => (() => unknown) | undefined) | undefined,
+  errors: ((error: unknown, unhandled: () => never) => (() => unknown) | undefined) | undefined,
 ): Under => {
   const ctx = currentCtx();
   const prompt = new Prompt(currentFiber(), ctx);
   let inner = ctx;
   for (const [tag, operations] of installs) {
-    const impl: Record<string, unknown> = {};
-    for (const op of operations) impl[op[0]] = armOf(prompt, op);
+    const impl = Object.fromEntries<unknown>(operations.map((op) => [op[0], armOf(prompt, op)]));
+    partialImplementations.add(impl);
     inner = extend(inner, tag, impl);
   }
   return new Under(inner, () => bodyRun(prompt, body, ret, errors), prompt);

@@ -17,6 +17,7 @@ export * from "./handlers.ts";
 export * from "./entry.ts";
 export * from "./layer.ts";
 export * from "./owner.ts";
+export { arenaAlloc, arenaGet } from "@flick-lang/runtime/core/Arena";
 export * from "./form.ts";
 export * from "./race.ts";
 export * from "./route.ts";

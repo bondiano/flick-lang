@@ -307,7 +307,7 @@ impl Checker<'_> {
             rec.skolems.clone_from(&skolems);
         }
         let saved = mem::take(&mut self.cx.runtime);
-        let complete = !scheme.contains(&mut |t| matches!(t, Type::Meta(_)));
+        let complete = !scheme.contains(&mut |t| matches!(t, Type::Meta(_) | Type::MetaView(_)));
         let signed = mem::replace(&mut self.gadt.signed, complete);
         if parts.params.is_empty() {
             if let Some(b) = parts.body {
@@ -345,7 +345,8 @@ impl Checker<'_> {
         let indent = &self.text[line..span.start as usize];
         let inferred = errors == self.diagnostics.len()
             && self.operators_fit()
-            && !suggestion.contains(&mut |t| matches!(t, Type::Error | Type::Meta(_)));
+            && !suggestion
+                .contains(&mut |t| matches!(t, Type::Error | Type::Meta(_) | Type::MetaView(_)));
         let at = (inferred && indent.chars().all(|c| c == ' ' || c == '\t')).then(|| {
             (
                 u32::try_from(line).expect("offsets fit in u32"),

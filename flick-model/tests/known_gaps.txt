@@ -43,7 +43,6 @@ disagree docs/src/content/docs/ru/reference/regions.md 74e0a790d9f7b254 # the IR
 disagree docs/src/content/docs/ru/reference/server-fn.md 0badc0e633345a4c # a type variable as an element of an error row, `{t | e}`, is outside the core (docs/formal/core.md §1.2)
 disagree tests/check/pass/effects/async.fl # flick-core subsumes a `Layer` by its input and error rows; the core has no such rule (docs/formal/core.md, a layer that needs less fits where more is allowed)
 disagree tests/check/pass/effects/variable_entries.fl # a type variable as an element of an error row, `{t | e}`, is outside the core (docs/formal/core.md §1.2)
-disagree tests/check/pass/regions/leases.fl # the model reads the value bound `hs^c` of a signature at its position only: instantiating `Rpc.listen` at `hs` asks `Outlives {hs} s`, where flick-core reads the bounded atom `hs^{≤c}` as `c` (docs/formal/regions.md §2.1, bounded atom)
 disagree tests/check/pass/regions/transformers.fl # passing a local `(forall v. (Option a)^v -> Option b)^c` to `map`: the model reaches `a` through the instantiated bounded parameter, flick-core does not (docs/formal/regions.md §2.1, value bound)
 disagree tests/check/pass/server/server_fn.fl # a type variable as an element of an error row, `{t | e}`, is outside the core (docs/formal/core.md §1.2)
 disagree tests/check/pass/types/recursion.fl # the IR keeps no local signature, so `go : forall a. …` is checked without its `forall` (docs/formal/core.md §2.3 (Let-Sig))

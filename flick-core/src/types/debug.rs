@@ -59,14 +59,14 @@ impl Checker<'_> {
             );
             return (Type::Error, expected.clone());
         }
-        let hole = self.fresh();
+        let hole = self.store.fresh_of(expected);
         self.holes.push((span, hole.clone(), false));
         (hole, expected.clone())
     }
 
     /// A type placeholder is inferred like `_`, but must be replaced before build.
     pub(super) fn todo_type(&mut self, span: Span, expected: &Kind) -> (Type, Kind) {
-        let hole = self.fresh();
+        let hole = self.store.fresh_of(expected);
         self.holes.push((span, hole.clone(), true));
         (hole, expected.clone())
     }

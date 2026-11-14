@@ -45,7 +45,8 @@ impl Checker<'_> {
 
     pub(super) fn fact_type(&self, t: &Type) -> FactType {
         let expanded = self.unaliased(t);
-        let unknown = expanded.contains(&mut |x| matches!(x, Type::Meta(_) | Type::Error));
+        let unknown = expanded
+            .contains(&mut |x| matches!(x, Type::Meta(_) | Type::MetaView(_) | Type::Error));
         FactType {
             shown: self.show_exact(t),
             exact: (!unknown).then(|| self.show_qualified(&expanded)),

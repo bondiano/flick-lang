@@ -135,6 +135,12 @@ fn rejects_other_versions_and_modules() {
             .contains("describes `A`")
     );
     let current = format!("\"iface-version\": {IFACE_VERSION}");
+    let previous = json.replace(&current, "\"iface-version\": 24");
+    assert!(
+        read(previous.as_bytes(), "A")
+            .expect_err("old owner-execution contract is incompatible")
+            .contains("`iface-version` 24")
+    );
     let future = json.replace(&current, "\"iface-version\": 99");
     assert!(
         read(future.as_bytes(), "A")

@@ -1,0 +1,37 @@
+module App.Main exposing (main)
+service Read =
+  read : Unit ->{} String
+layer : Layer none none {Read}
+let layer = Layer.succeed Read { read = fun () -> "unused" }
+acquire : Unit ->{Scope s} Arena.Value s String
+let acquire () = Arena.alloc (Arena.make ()) "owned"
+callbacks : List (Unit ->{Read, Scope s} Arena.Value s String)
+let callbacks = [acquire]
+
+module Box exposing (Box, make, get) =
+  opaque type Box a = Box a
+  make : a -> Box a
+  let make value = Box value
+  get : Box a -> a
+  let get (Box value) = value
+
+acquire_read : Unit ->{Read, Scope s} Arena.Value s String
+let acquire_read () = acquire ()
+
+under_box : Box.Box (Unit ->{Read | r; e} a) ->{r; e} a
+let under_box value = Layer.run layer (Box.get value)
+
+under_list : List (Unit ->{Read | r; e} a) ->{r; e} Option a
+let under_list callbacks =
+  match callbacks with
+  | [] -> None
+  | [body, ..._] -> Some (Layer.run layer body)
+main : Unit ->{} Unit
+let main () = scope {
+  match under_list callbacks with
+  | None -> Platform.stdout_line "missing"
+  | Some value -> Platform.stdout_line (Arena.get value)
+  let boxed = Box.make acquire_read
+  let opaque_value = under_box boxed
+  Platform.stdout_line ("boxed " ++ Arena.get opaque_value)
+}

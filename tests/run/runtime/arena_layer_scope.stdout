@@ -1,0 +1,12 @@
+literal
+named
+forwarded
+record/keep
+provided
+ranked
+task
+task-result
+callback-result
+tuple/keep
+pipe
+stage
