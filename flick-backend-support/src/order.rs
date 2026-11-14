@@ -3,7 +3,7 @@
 
 /// The nodes `0..n` reached from `starts` in depth-first post-order: each
 /// after the nodes `deps` gives for it; a cycle is cut where it closes.
-pub(crate) fn post_order(
+pub fn post_order(
     n: usize,
     starts: impl IntoIterator<Item = usize>,
     deps: &mut dyn FnMut(usize) -> Vec<usize>,

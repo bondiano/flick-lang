@@ -1,6 +1,6 @@
 ---
 title: "Решения по реализации"
-source_hash: 8a4f67eefa8f36b6
+source_hash: 59436b1cb0f94527
 ---
 
 ## Архитектура компилятора
@@ -13,7 +13,7 @@ source_hash: 8a4f67eefa8f36b6
 каков тип Flick.
 
 ```text
-.fl ─> syntax ─> resolve ─> types ─> ir ─> opt (release) ─┬─> codegen/js ─> ESM over Effect
+.fl ─> syntax ─> resolve ─> types ─> ir ─> opt (release) ─┬─> backends/js ─> ESM over Effect
                                │                          └─> codegen/go ─> Go over flickrt
                                ├─> .iface, codegen/ts (.d.ts, Promise façades)
                                └─> ide, projection ─> flick lsp, flick content-mapper
@@ -27,12 +27,18 @@ source_hash: 8a4f67eefa8f36b6
 | Типизированный IR | `flick-core/src/ir` | проверенный модуль, в котором явно выражены стадии применения, словари, подъёмы и диапазоны исходного кода; `ir/lower` разворачивает `do`, списковые выражения и `sql` |
 | Вычисление констант | `flick-core/src/consteval` | выражения из литералов сворачиваются с семантикой JS бит в бит |
 | Оптимизатор | `flick-core/src/opt` | проходы профиля release над типизированным IR (специализация, встраивание, слияние, скалярная замена, свёртка), сохраняющие все наблюдаемые контракты отладочной трансляции; их выполняют оба бэкенда (см. [Профиль выпуска](../../reference/codegen/#профиль-выпуска)) |
-| JS-бэкенд | `flick-core/src/codegen/js`, `runtime/`, `packages/effect-ts/` | ESM с картами исходного кода. По умолчанию стадии выполняет собственная среда RT без Effect; `effect = "effect"` выбирает `@flick-lang/effect-ts`, а `--rt` переопределяет этот выбор на один вызов |
+| JS-бэкенд | `backends/js/src/codegen/js`, `runtime/`, `packages/effect-ts/` | ESM с картами исходного кода. По умолчанию стадии выполняет собственная среда RT без Effect; `effect = "effect"` выбирает `@flick-lang/effect-ts`, а `--rt` переопределяет этот выбор на один вызов |
+| Поддержка бэкендов | `flick-backend-support/` | имена, lang items, анализ хвостовых вызовов и циклов, порядок, достижимость и политика bindings пакетов, которые действительно используют генераторы и общие проекции frontend |
 | Go-бэкенд | `flick-core/src/codegen/go`, `flick-core/src/build/go.rs`, `runtime-go/flickrt` | `[build] emit = "go"`: Go-модуль для каждого входа поверх пакета среды выполнения `flickrt`, который компилирует `go build` (см. [Go-target](../../reference/codegen/#go-target)) |
 | Генератор TypeScript | `flick-core/src/codegen/ts` | типы для `--emit ts`, `.d.ts` для `--emit-dts` и Promise-фасады для `--promise-facade`; тип без формы в TypeScript отвергается и никогда не записывается как `any` |
 | Интерфейсы | `flick-core/src/iface.rs`, `flick-core/src/build` | версионируемый JSON `.iface` каждого модуля с ABI данных и словарей и отпечатками, которые добавляет сборка (см. [Интерфейсы](../../reference/iface/)) |
 | Импорт FFI | `flick-core/src/ffi`, `tools/dts-importer` | `flick ffi import` и `ffi check` над описанием, которое вспомогательная программа на Node читает из `.d.ts` с помощью TypeScript |
 | Редактор | `flick-core/src/ide`, `flick-core/src/projection.rs`, `flick/src/lsp`, `flick/src/mapper.rs` | подсказки, переход к определению, ссылки, автодополнение, переименование и действия над кодом по одному анализу; их обслуживает `flick lsp --stdio`, а `flick content-mapper` — проекцию TypeScript с картами диапазонов (см. [Редакторы](../../reference/editor/)) |
+
+JS-emitter собирается независимо от `flick-core`, получая переносимый IR и
+plain-data options/проекции TypeScript. Его native-адаптер остаётся в
+`flick-core/src/codegen/mod.rs`; общие правила checker и деклараций остаются
+во frontend.
 
 Адаптер Effect задаёт свою версию и точные версии зависимостей в
 `packages/effect-ts/package.json`. CLI проверяет установленный адаптер по его

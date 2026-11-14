@@ -4,7 +4,7 @@
   # Usage:
   #   nix build .#flick              # ./result/bin/flick
   #   nix profile install .#flick
-  #   nix develop                    # toolchain, node, pnpm, go, just
+  #   nix develop                    # toolchain, node, pnpm, go, just, Binaryen
   #
   # On NixOS, add the package without the flake:
   #   nixpkgs.overlays = [ inputs.flick.overlays.default ];
@@ -76,6 +76,7 @@
         in
         {
           inherit flick;
+          binaryen = pkgs.binaryen;
           default = flick;
         }
       );
@@ -113,6 +114,7 @@
               just
               cargo-machete
               cargo-nextest
+              binaryen
               jq
             ]
             # a sampling profiler for the compiler: `perf record -e cpu-clock:u`

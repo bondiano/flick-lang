@@ -17,13 +17,12 @@ default = ["ide", "native-project"]
 ide = []
 # projects on disk: manifests, installed packages, published artifacts,
 # source maps and the docs of the built-in sources
-native-project = ["dep:toml", "dep:semver", "dep:sha2"]
+native-project = ["dep:toml", "dep:semver", "dep:sha2", "flick-backend-js/source-maps", "flick-backend-support/native-project"]
 # std in the binary, for a host with no packages: the playground
 embedded-std = []
 
 # the build script compiles src/source.rs, whose spans the IR serializes
 [build-dependencies]
-serde_json = { workspace = true }
 flick-ir = { path = "../flick-ir" }
 serde = { version = "1.0.229", features = ["derive"] }
 
@@ -39,6 +38,8 @@ rustix = { version = "1.1.6", features = ["time"] }
 
 [dependencies]
 annotate-snippets = "0.12.17"
+flick-backend-js = { path = "../backends/js" }
+flick-backend-support = { path = "../flick-backend-support" }
 flick-ir = { path = "../flick-ir" }
 flick-plugin = { path = "../flick-plugin" }
 flick-plugin-cli = { path = "../plugins/cli" }

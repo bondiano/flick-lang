@@ -3,8 +3,8 @@
 //! groups of top-level functions that call each other in tail position. A
 //! backend makes them jumps, so recursion through them needs no stack.
 
-use crate::ir::{BinOp, Expr, ExprKind, Item, ItemKind, Param, Pat, Stage};
 use flick_ir::Dict;
+use flick_ir::{BinOp, Expr, ExprKind, Item, ItemKind, Param, Pat, Stage};
 
 /// A function a tail call may jump to: its name and the dictionaries of its
 /// constraints, by the names `Dict::Given` gives them, which a call passes

@@ -780,7 +780,7 @@ Regression coverage is kept with the behavior:
   atoms, actions and a custom renderer.
 - [`tests/run/ffi/foreign.fl`](https://github.com/bondiano/flick-lang/blob/main/tests/run/ffi/foreign.fl):
   unary callback identity across FFI. The
-  [compiler's foreign-call lowering](https://github.com/bondiano/flick-lang/blob/main/flick-core/src/codegen/js/items.rs)
+  [compiler's foreign-call lowering](https://github.com/bondiano/flick-lang/blob/main/backends/js/src/codegen/js/items.rs)
   passes unary callbacks unchanged, avoiding a wrapper allocation;
   callbacks with several arguments still adapt the curried ABI.
 - `compiled_ui_core_imports_without_a_dom_renderer` in

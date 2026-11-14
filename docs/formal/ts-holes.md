@@ -298,7 +298,7 @@ All four are fixed.
 The finding: Flick data crossed the foreign boundary by reference.
 
 - spec/06 "Value representation" promises: "Immutable data is copied by default at an untrusted input and output boundary".
-- The codegen passed `List`, tuples, records and ADTs as they are, in both directions (`codegen/js/foreign.rs` `foreign_call`).
+- The codegen passed `List`, tuples, records and ADTs as they are, in both directions (`backends/js/src/codegen/js/foreign.rs` `foreign_call`).
 - The probe is `tests/run/ffi/copy.fl` on Node:
 
   ```text

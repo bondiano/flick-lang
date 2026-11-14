@@ -7,7 +7,7 @@ use super::Gen;
 use super::doc::{After, Before, Head, Js, MULTILINE, Stmt, block, call, items, stmt_flags};
 use crate::ir::{BinOp, Expr, ExprKind};
 use crate::numeric::{Arith, Num};
-use crate::source::Span;
+use flick_ir::Span;
 
 impl<'d> Gen<'_, 'd> {
     pub(super) fn binary(&mut self, span: Span, op: BinOp, lhs: &Expr, rhs: &Expr) -> Js<'d> {
