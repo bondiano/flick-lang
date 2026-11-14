@@ -133,7 +133,7 @@ fn a_malformed_component_span_is_rejected_before_mapping_to_host_files() {
 
 #[test]
 #[ignore = "requires just wasm-backends"]
-fn release_ir_dump_is_the_program_supplied_to_the_component() {
+fn release_ir_export_is_the_program_supplied_to_the_component() {
     let root = fixture("backend_release_ir", "Fixture.Ir");
     fs::write(root.join("src/Fixture/Ir.fl"), "module Fixture.Ir exposing (main)\nmain : Unit -> Unit\nlet main () = if true then () else ()\n").expect("unoptimized body");
     let result = flick_in(
