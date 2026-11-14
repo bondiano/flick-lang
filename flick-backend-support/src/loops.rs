@@ -1,8 +1,8 @@
 //! Backend-only completion flags. The shared IR retains typed lexical exits.
 use super::Known;
-use crate::ir::{Arm, BinOp, Expr, ExprKind, Handler, Lit, Param, Pat, Stage, Stmt};
-use crate::source::Span;
 use flick_ir::Lang;
+use flick_ir::Span;
+use flick_ir::{Arm, BinOp, Expr, ExprKind, Handler, Lit, Param, Pat, Stage, Stmt};
 use std::mem;
 fn unit(span: Span) -> Expr {
     Expr::new(ExprKind::Lit(Lit::Unit), span)
@@ -369,7 +369,7 @@ fn leaves(e: &Expr, id: &str) -> bool {
     found
 }
 
-pub(super) fn lower(
+pub fn lower(
     lang: &Known,
     id: &str,
     condition: Option<&Expr>,

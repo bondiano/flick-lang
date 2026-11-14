@@ -120,6 +120,14 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-1.64.1
       - run: pnpm install --frozen-lockfile && pnpm -C docs exec playwright install chromium
+      - uses: cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086 # v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - name: Install the pinned WASM deduplicator
+        run: |
+          binaryen=$(nix build --no-link --print-out-paths .#binaryen)
+          echo "$binaryen/bin" >> "$GITHUB_PATH"
       - run: just e2e-js
       # the site the Docs workflow deploys once this run passes
       - if: github.event_name == 'push' && github.ref == 'refs/heads/main'

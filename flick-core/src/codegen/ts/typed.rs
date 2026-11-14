@@ -6,23 +6,12 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 
 use super::Projection;
-use crate::codegen::lexical::prefix_key;
 use crate::codegen::{names, relative};
 use crate::iface::{Interface, Namespace};
 use crate::ir::Module;
+use flick_backend_js::codegen::prefix_key;
 
-/// The TypeScript of a module beyond its JavaScript.
-#[derive(Clone)]
-pub struct Typed {
-    pub declarations: Vec<String>,
-    /// The type of each exported value and constructor that has one, by its
-    /// JS name; the others stay `any`.
-    pub annotations: HashMap<String, String>,
-    /// The imports of the types the declarations and annotations name.
-    pub imports: String,
-    /// The modules those imports name.
-    pub modules: Vec<String>,
-}
+pub use flick_backend_js::codegen::ts::Typed;
 
 /// Where the projection finds what it projects, as the build has it.
 pub struct Typing<'a> {

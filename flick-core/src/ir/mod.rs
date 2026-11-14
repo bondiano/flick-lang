@@ -11,7 +11,8 @@
 mod exports;
 mod lower;
 mod print;
-pub(crate) mod reach;
+#[cfg(any(not(target_arch = "wasm32"), feature = "native-project"))]
+pub(crate) use flick_backend_support::reach;
 
 pub use exports::exports;
 pub use flick_ir::{
