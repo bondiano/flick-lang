@@ -1,4 +1,6 @@
 use super::*;
+#[cfg(feature = "wasm-backends")]
+use flick_core::types::builtin_sources;
 use std::str;
 
 #[test]
@@ -308,7 +310,20 @@ fn ir_files_are_owned_outputs_without_polluting_the_normal_build_cache() {
             flick_ir::Program::from_cbor(&bytes)
         }
         .expect("portable IR");
-        assert_eq!(ir.modules.iter().filter(|m| m.name == "Main").count(), 1);
+        let mut expected = vec!["Main"];
+        #[cfg(feature = "wasm-backends")]
+        expected.extend(builtin_sources().iter().map(|(name, _)| *name));
+        expected.sort_unstable();
+        let mut actual: Vec<_> = ir
+            .modules
+            .iter()
+            .map(|module| module.name.as_str())
+            .collect();
+        actual.sort_unstable();
+        assert_eq!(
+            actual, expected,
+            "exact source module inventory, including duplicates"
+        );
         #[cfg(feature = "wasm-backends")]
         for item in &ir.lang {
             assert!(
@@ -317,8 +332,6 @@ fn ir_files_are_owned_outputs_without_polluting_the_normal_build_cache() {
                 item.lang
             );
         }
-        #[cfg(not(feature = "wasm-backends"))]
-        assert_eq!(ir.modules.len(), 1);
         let result = flick_in(&dir, &["clean"]);
         assert_eq!(code(&result), Some(0), "{result:?}");
         assert!(!dir.join("dist").join(name).exists(), "clean owns IR");

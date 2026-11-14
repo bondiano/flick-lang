@@ -199,8 +199,10 @@ fn prepare(
         "Emitting JavaScript"
     });
     let mut emitted = artifacts(&host, &mut sources, Some(&project), &compilation, &output);
-    if !go && !backend.is_component() {
+    if !go {
         progress.stage("Writing test runner");
+    }
+    if !go && !backend.is_component() {
         emitted.artifacts.push(Artifact::source(
             "test.js".to_owned(),
             runner_source(&suites, rt),
