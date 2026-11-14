@@ -20,14 +20,14 @@ pub(super) fn generate(
         .collect();
     let lang = Known::of(&data.program.lang);
     let (workers, direct) = optimize::exports(request, data);
-    let builtin_paths: Vec<_> = request
-        .modules
+    let builtin_names: Vec<_> = data
+        .facts
         .iter()
-        .filter(|m| m.output.starts_with("_flick/"))
-        .map(|m| m.name.as_str())
+        .filter(|(_, facts)| facts.builtin)
+        .map(|(name, _)| name.as_str())
         .collect();
     let options = Options {
-        builtins: &builtin_paths,
+        builtins: &builtin_names,
         paths: Some(&data.paths),
         packages: &data.packages,
         resolved: &data.foreign,

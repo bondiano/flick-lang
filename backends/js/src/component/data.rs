@@ -4,9 +4,11 @@ use super::failure;
 use crate::codegen::{EffectBridge, Labels, Resolved, ts::Typed};
 use flick_backend::{
     BuildRequest, Diagnostic, Inputs, JavascriptProjection, ModuleRole, TypescriptModuleProjection,
+    validate_source_spans,
 };
 use flick_ir::{Expr, ExprKind, OpClass, Program};
 use std::collections::{BTreeMap, BTreeSet};
+use std::iter;
 
 pub(super) struct Data {
     pub program: Program,
@@ -123,6 +125,17 @@ impl Data {
         {
             return Err(failure("source table disagrees with the portable program"));
         }
+        for (source, text) in request.sources.iter().zip(&self.sources) {
+            let starts = iter::once(0).chain(text.match_indices('\n').map(|(i, _)| i + 1));
+            if !source.line_starts.iter().map(|&i| i as usize).eq(starts) {
+                return Err(failure("source has an invalid line index"));
+            }
+        }
+        validate_source_spans(
+            &self.program,
+            &self.sources.iter().map(String::as_str).collect::<Vec<_>>(),
+        )
+        .map_err(failure)?;
         for module in &self.program.modules {
             let meta = request
                 .modules

@@ -107,6 +107,9 @@ interface types {
     record javascript-file { module: string, output: string, source-paths: list<string> }
     /// Schema flick.javascript@0.1.0; visibility, entry rules and source paths.
     record javascript-projection {
+        /// Historical builtin-name classification, including own replacements.
+        /// Suppresses barrel exports independently of role and output path.
+        builtin: bool,
         exports: list<string>,
         entries: list<javascript-entry>,
         files: list<javascript-file>,
