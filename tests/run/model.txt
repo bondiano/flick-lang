@@ -7,6 +7,9 @@ bootstrap/inline_declarations
 bootstrap/inline_module
 bootstrap/inline_nested
 codegen/enums
+codegen/bigints
+codegen/literals
+codegen/numeric_classes
 codegen/call_site
 codegen/eval_order
 codegen/local_functions
