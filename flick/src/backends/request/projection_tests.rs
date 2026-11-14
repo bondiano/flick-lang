@@ -162,6 +162,40 @@ fn a_logical_typescript_module_retains_its_physical_prefix_files() {
     );
     assert_eq!(prepared.request.projections, again.request.projections);
     assert_eq!(prepared.request.foreign, again.request.foreign);
+    let mut inventory: Vec<_> = prepared
+        .request
+        .projections
+        .iter()
+        .map(|p| {
+            (
+                p.module.clone(),
+                p.schema.name.clone(),
+                p.schema.version.clone(),
+            )
+        })
+        .collect();
+    inventory.sort();
+    let program = flick_ir::Program::from_cbor(&prepared.request.program).expect("IR");
+    let mut expected: Vec<_> = program
+        .modules
+        .iter()
+        .flat_map(|m| {
+            [
+                (
+                    m.name.clone(),
+                    "flick.javascript".to_owned(),
+                    "0.1.0".to_owned(),
+                ),
+                (
+                    m.name.clone(),
+                    "flick.typescript".to_owned(),
+                    "0.2.0".to_owned(),
+                ),
+            ]
+        })
+        .collect();
+    expected.sort();
+    assert_eq!(inventory, expected, "exact logical module/schema inventory");
     let projections: Vec<_> = prepared
         .request
         .projections
