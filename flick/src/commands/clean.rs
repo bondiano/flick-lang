@@ -12,6 +12,7 @@ use flick_core::source::SourceMap;
 
 use super::run::{find_project, generations, locked};
 use crate::args::{CleanArguments, GlobalArguments};
+use crate::artifact::{resolve_root, validate_root};
 use crate::cache::{inputs_path, remove_recorded};
 use crate::command::Outcome;
 use crate::report;
@@ -26,7 +27,21 @@ pub fn clean(options: &CleanArguments, global: &GlobalArguments) -> Outcome {
             };
         }
     };
-    let root = &project.root;
+    let root = resolve_root(&project.root, &project.root);
+    let root = root.as_path();
+    // These directories are host-owned even when the manifest is empty.
+    // Check all recursive removals before removing any recorded output.
+    for path in ["test", "run"]
+        .into_iter()
+        .chain(options.cache.then_some("cache"))
+    {
+        if let Err(why) = validate_root(&root.join(cache::DIR).join(path)) {
+            return Outcome {
+                sources: SourceMap::default(),
+                diagnostics: vec![Diagnostic::new(codes::P013, Severity::Error, why)],
+            };
+        }
+    }
     let removed = match remove_recorded(root) {
         Ok(removed) => removed,
         Err(error) => {

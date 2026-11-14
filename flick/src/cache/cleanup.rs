@@ -15,6 +15,16 @@ fn validate_removals(out: &Path, files: &[String]) -> io::Result<()> {
         .map_err(io::Error::other)?;
     for file in files {
         validate_ancestors(out, Path::new(file)).map_err(io::Error::other)?;
+        match fs::symlink_metadata(out.join(file)) {
+            Ok(metadata) if !metadata.is_file() && !metadata.is_symlink() => {
+                return Err(io::Error::other(format!(
+                    "recorded build output `{file}` is not a file or leaf symlink"
+                )));
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
     }
     Ok(())
 }

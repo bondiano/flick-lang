@@ -26,8 +26,8 @@ impl Artifact {
         TextArtifact { path, contents }.into()
     }
 
-    /// Legacy emit hooks transform text; object, executable and resource
-    /// bytes retain their identity and never pass through a UTF-8 conversion.
+    /// Legacy emit hooks transform text. Opaque bytes retain their identity,
+    /// including metadata encoded as CBOR rather than UTF-8.
     pub fn text(&self) -> Result<Option<TextArtifact>, String> {
         if self.is_binary() {
             return Ok(None);
@@ -44,7 +44,7 @@ impl Artifact {
         matches!(
             self.kind,
             ArtifactKind::Object | ArtifactKind::Executable | ArtifactKind::Resource
-        )
+        ) || (self.kind == ArtifactKind::Metadata && str::from_utf8(&self.contents).is_err())
     }
 
     pub fn restore_permissions(&self, path: &Path) -> io::Result<()> {

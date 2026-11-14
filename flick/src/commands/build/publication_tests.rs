@@ -106,6 +106,31 @@ fn binary_component_artifacts_reach_the_filesystem_without_utf8_conversion() {
     fs::remove_dir_all(output.out_dir.parent().expect("root")).expect("cleanup");
 }
 
+#[test]
+fn binary_metadata_remains_opaque_to_text_emit_hooks() {
+    let metadata = Artifact {
+        path: "metadata.cbor".into(),
+        contents: vec![0xa1, 0x61, 0x78, 0xf5],
+        kind: ArtifactKind::Metadata,
+    };
+    assert_eq!(metadata.text(), Ok(None));
+    assert!(
+        metadata.is_binary(),
+        "hook replacement retains opaque metadata"
+    );
+    let json = Artifact::source("metadata.json".into(), "{}".into());
+    assert!(
+        !json.is_binary(),
+        "text metadata still participates in hooks"
+    );
+    assert_eq!(json.text().expect("text").expect("JSON").contents, "{}");
+    let invalid_source = Artifact {
+        kind: ArtifactKind::Source,
+        ..metadata
+    };
+    assert!(invalid_source.text().is_err(), "source text must be UTF-8");
+}
+
 #[cfg(unix)]
 #[test]
 fn cached_executable_artifacts_can_be_launched_after_restoration() {
