@@ -10,7 +10,7 @@
     "build": "node scripts/api.mjs && astro build",
     "preview": "astro preview",
     "typecheck": "astro check",
-    "test": "node --test test/*.test.ts",
+    "test": "node --test --test-concurrency=1 test/*.test.ts",
     "e2e": "playwright test"
   },
   "dependencies": {
