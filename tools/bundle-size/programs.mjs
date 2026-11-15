@@ -5,7 +5,15 @@
 export const PROGRAMS = [
   { name: "pure", source: "tools/bundle-size/pure.fl", budget: 13 },
   // Identical source, effects and observable output on the native runtime.
-  { name: "pure-rt", source: "tools/bundle-size/pure.fl", rt: true, budget: 5, effectFree: true },
+  {
+    name: "pure-rt",
+    source: "tools/bundle-size/pure.fl",
+    rt: true,
+    budget: 6,
+    effectFree: true,
+    reason: "withOwnerEvidence always returns Under so Effect legacy factories stay Instructions",
+  },
+
   // Pure arithmetic library, with no host I/O or trusted pure foreigns.
   // UI programs render views on atoms: at most 81 KB and 18 KB for effect/reactivity,
   // and 5 KB for the spans of actions and the debug log of writes;
@@ -20,7 +28,15 @@ export const PROGRAMS = [
     unused: ["effect/dist/Graph.js"],
   },
   // the same playground on Flick's own runtime: React and the kernel, no Effect at all
-  { name: "playground-rt", source: "docs/src/playground/Playground.fl", rt: true, budget: 92, effectFree: true },
+  {
+    name: "playground-rt",
+    source: "docs/src/playground/Playground.fl",
+    rt: true,
+    budget: 93,
+    effectFree: true,
+    reason: "withOwnerEvidence always returns Under so Effect legacy factories stay Instructions",
+  },
+
   { name: "atoms", source: "tests/run/ui/atoms.fl", budget: 117, unused: ["effect/dist/Graph.js"] },
   // the same atoms on Flick's own runtime, no Effect at all
   { name: "atoms-rt", source: "tests/run/ui/atoms.fl", rt: true, budget: 80, effectFree: true },
@@ -32,7 +48,15 @@ export const PROGRAMS = [
     unused: ["effect/dist/Graph.js", "platform-node/dist/NodeHttpServer.js", "platform-node-shared/dist/NodeSocketServer.js"],
   },
   // the same client on Flick's own runtime: a POST over fetch, no Effect at all
-  { name: "rpc-rt", source: "tools/bundle-size/rpc.fl", rt: true, budget: 7, effectFree: true },
+  {
+    name: "rpc-rt",
+    source: "tools/bundle-size/rpc.fl",
+    rt: true,
+    budget: 8,
+    effectFree: true,
+    reason: "withOwnerEvidence always returns Under so Effect legacy factories stay Instructions",
+  },
+
   // a template renders without `react-dom/server`; its view is still a React component,
   // its atoms the registry's, with `Schema` since Effect 4.1
   {
