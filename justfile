@@ -335,7 +335,7 @@ wasm:
     node tools/wasm-dedup/index.mjs target/wasm32-unknown-unknown/release/flick_wasm.wasm
     @wasm=target/wasm32-unknown-unknown/release/flick_wasm.wasm; \
     echo "flick_wasm.wasm: $(wc -c < $wasm) bytes, $(gzip -6c $wasm | wc -c) gzipped"; \
-    test $(wc -c < $wasm) -le 4300000
+    test $(wc -c < $wasm) -le 4300000 # reason: Meta/Phase M lexical witnesses and ownership scaffolding grew the playground compiler
 
 # Build the playground's compiler: the wasm module and its JS bindings
 docs-wasm: wasm
