@@ -107,6 +107,12 @@ common CLI. The component calculates release ABI and invokes the same
 portable optimizer with `Program.lang`. The browser component loader remains
 separate integration work.
 
+`just js-component` remaps checkout, registry and standard-library source
+paths to canonical roots. The Rust root uses the pinned compiler's full
+commit hash, so installing `rust-src` does not change embedded panic paths.
+`just update-js-component` refreshes the distributed bytes and SHA together;
+`just check-js-component` requires exact bytes and the matching identity pin.
+
 The host prepares `.d.ts` and Promise facades with the same projection
 implementation as the native baseline and reserves their output paths.
 JavaScript output alone requires no TypeScript source projection. Its foreign

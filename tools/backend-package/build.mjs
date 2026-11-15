@@ -1,22 +1,15 @@
 // The distributed guest uses canonical source paths on every build machine.
 import { spawnSync } from "node:child_process";
-import { readFileSync, realpathSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { delimiter, dirname, join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { guestEnvironment } from "./environment.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const channel = /^channel = "([^"]+)"/m.exec(readFileSync(join(root, "rust-toolchain.toml"), "utf8"))?.[1];
 if (!channel) throw new Error("rust-toolchain.toml must pin a compiler channel");
 const cargoHome = resolve(process.env.CARGO_HOME ?? join(homedir(), ".cargo"));
-const canonical = (path) => {
-  try { return realpathSync(path); } catch { return path; }
-};
-const paths = new Map([
-  [root, "/flick"], [canonical(root), "/flick"],
-  [cargoHome, "/cargo"], [canonical(cargoHome), "/cargo"],
-  ["/kache/.cargo", "/cargo"],
-]);
 const tool = (name) => {
   const result = spawnSync("rustup", ["which", "--toolchain", channel, name], { cwd: root, encoding: "utf8" });
   if (result.error) throw result.error;
@@ -24,18 +17,11 @@ const tool = (name) => {
   return result.stdout.trim();
 };
 const cargo = tool("cargo");
-const env = {
-  ...process.env,
-  PATH: `${dirname(cargo)}${delimiter}${process.env.PATH ?? ""}`,
-  RUSTC: tool("rustc"),
-  // Compiler-cache wrappers can rewrite crate identities and source paths.
-  // Keep this artifact's cache separate from wrapped development builds.
-  RUSTC_WRAPPER: "",
-  RUSTC_WORKSPACE_WRAPPER: "",
-  CARGO_TARGET_DIR: join(root, "target/backend-guest"),
-  CARGO_ENCODED_RUSTFLAGS: [...paths].map(([from, to]) => `--remap-path-prefix=${from}=${to}`).join("\x1f"),
-};
-delete env.RUSTFLAGS;
+const rustc = tool("rustc");
+const version = spawnSync(rustc, ["-vV"], { cwd: root, encoding: "utf8" });
+if (version.error) throw version.error;
+if (version.status !== 0) throw new Error(version.stderr || "cannot inspect the pinned rustc");
+const env = guestEnvironment({ root, cargoHome, cargo, rustc, rustcVersion: version.stdout, environment: process.env });
 for (const [command, extra] of [["build", ["--release"]], ["clippy", ["--", "-D", "warnings"]]]) {
   const result = spawnSync(cargo, [command, "-p", "flick-backend-js", "--features", "guest", "--target", "wasm32-unknown-unknown", ...extra], { cwd: root, env, stdio: "inherit" });
   if (result.error) throw result.error;

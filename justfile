@@ -288,6 +288,7 @@ wasm-plugins: wasm-backends
 
 # No WASI adapter: an official backend imports only the compiler input interface.
 js-component:
+    node --test tools/backend-package/*.test.mjs
     node tools/backend-package/build.mjs
     mkdir -p target/backends
     cargo run -p flick-component-build -- target/backend-guest/wasm32-unknown-unknown/release/flick_backend_js.wasm target/backends/js.wasm
