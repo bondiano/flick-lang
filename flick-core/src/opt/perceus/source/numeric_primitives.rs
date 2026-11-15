@@ -30,12 +30,15 @@ impl Lower<'_> {
             return Some(self.expr(&expression, &Env::new(), block));
         }
         if let Some(expression) = super::list_collections::array_expression(value, span) {
-            return Some((|| {
-                let function = self.expr(&expression, &Env::new(), block)?;
-                let argument =
-                    self.intrinsic(Intrinsic::ArrayToList, false, vec![], block, span)?;
-                block.emit(Operation::Apply { function, argument }, span)
-            })());
+            return Some(
+                self.expr(&expression, &Env::new(), block)
+                    .and_then(|function| {
+                        self.intrinsic(Intrinsic::ArrayToList, false, vec![], block, span)
+                            .and_then(|argument| {
+                                block.emit(Operation::Apply { function, argument }, span)
+                            })
+                    }),
+            );
         }
         if let Some(expression) = super::list_collections::expression(value, span) {
             return Some(self.expr(&expression, &Env::new(), block));

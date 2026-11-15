@@ -102,12 +102,12 @@ impl Checker<'_> {
         let depth = self.locals.len();
         self.locals
             .extend(bound.into_iter().map(|(x, t)| (x, mono(t))));
-        let checked = (|| {
-            if let Some(g) = &arm.guard {
-                self.check(g, &Type::con("Prelude", "Bool"))?;
-            }
-            self.check(&arm.body, result)
-        })();
+        let checked = match &arm.guard {
+            Some(g) => self
+                .check(g, &Type::con("Prelude", "Bool"))
+                .and_then(|()| self.check(&arm.body, result)),
+            None => self.check(&arm.body, result),
+        };
         self.locals.truncate(depth);
         checked
     }
