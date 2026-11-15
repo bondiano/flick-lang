@@ -81,8 +81,8 @@ export const evidenced = (ctx: Ctx, owner: OwnerEvidence): Ctx => new Ctx(null, 
 
 export const readOwnerEvidence = (): OwnerEvidence => currentCtx().stageOwner;
 
-export const withOwnerEvidence = (owner: OwnerEvidence, thunk: () => unknown): Under =>
-  new Under(evidenced(currentCtx(), owner), thunk);
+export const withOwnerEvidence = (owner: OwnerEvidence, thunk: () => unknown): Under | unknown =>
+  currentCtx().stageOwner === owner ? thunk() : new Under(evidenced(currentCtx(), owner), thunk);
 
 /** Calls `f` with `ctx` as the evidence. */
 export const inCtx = <A>(ctx: Ctx, f: () => A): A => {
