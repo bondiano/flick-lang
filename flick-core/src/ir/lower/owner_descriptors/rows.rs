@@ -11,7 +11,7 @@ impl Build<'_> {
         self.bind(observed, |this, spine| {
             let head = this.name();
             let stack = this.name();
-            let result = this.nodes(this.local(&head), |this, _, node, env| {
+            let result = this.nodes(this.local(&head), |this, _, node, env, _| {
                 let (name, constructor) = match &node.kind {
                     OwnerTypeKind::Con { module, name } => {
                         (this.string(&format!("{module}.{name}")), true)
@@ -62,82 +62,75 @@ impl Build<'_> {
 
     fn row(&mut self, desc: Expr) -> Expr {
         self.bind(self.observe(Op::Resolve, desc), |this, resolved| {
-            this.nodes(resolved, |this, id, node, env| {
-                let current = this.desc(id, env.clone());
-                match &node.kind {
-                    OwnerTypeKind::Row { labels, tail } => {
-                        let mut entries = Vec::new();
-                        for (index, label) in labels.iter().enumerate() {
-                            let value = this.child(node.children[index], &env);
-                            let mode = match label {
-                                Elem::Error(_) => Some(0),
-                                Elem::Service(_) => Some(1),
-                                Elem::Capture(_) => Some(2),
-                                _ => None,
-                            };
-                            let label_expr = match mode {
-                                Some(mode) => {
-                                    let observed = this.call(
-                                        Op::Atom,
-                                        value.clone(),
-                                        this.int(mode),
-                                        this.unit(),
-                                    );
-                                    this.bind(observed, |this, atom| {
-                                        this.choose(
-                                            this.binary(BinOp::Same, atom.clone(), this.unit()),
-                                            this.string(&label.to_string()),
-                                            atom,
-                                        )
-                                    })
-                                }
-                                None => this.string(&label.to_string()),
-                            };
-                            entries.push(this.tuple(vec![label_expr, value]));
-                        }
-                        let own = this.list(entries);
-                        if *tail {
-                            let tail = this.observe(
-                                Op::Row,
-                                this.child(*node.children.last().expect("row tail"), &env),
-                            );
-                            this.merge_row_results(
-                                current,
-                                this.tuple(vec![own, this.boolean(false)]),
-                                tail,
-                            )
-                        } else {
-                            let entries = this.call(Op::Merge, current, own, this.list(Vec::new()));
-                            this.tuple(vec![entries, this.boolean(false)])
-                        }
+            this.nodes(resolved, |this, _, node, env, current| match &node.kind {
+                OwnerTypeKind::Row { labels, tail } => {
+                    let mut entries = Vec::new();
+                    for (index, label) in labels.iter().enumerate() {
+                        let value = this.child(node.children[index], &env);
+                        let mode = match label {
+                            Elem::Error(_) => Some(0),
+                            Elem::Service(_) => Some(1),
+                            Elem::Capture(_) => Some(2),
+                            _ => None,
+                        };
+                        let label_expr = match mode {
+                            Some(mode) => {
+                                let observed =
+                                    this.call(Op::Atom, value.clone(), this.int(mode), this.unit());
+                                this.bind(observed, |this, atom| {
+                                    this.choose(
+                                        this.binary(BinOp::Same, atom.clone(), this.unit()),
+                                        this.string(&label.to_string()),
+                                        atom,
+                                    )
+                                })
+                            }
+                            None => this.string(&label.to_string()),
+                        };
+                        entries.push(this.tuple(vec![label_expr, value]));
                     }
-                    OwnerTypeKind::Union => this.merge_row_results(
-                        current,
-                        this.observe(Op::Row, this.child(node.children[0], &env)),
-                        this.observe(Op::Row, this.child(node.children[1], &env)),
-                    ),
-                    OwnerTypeKind::Without(gone) => {
-                        let row = this.observe(Op::Row, this.child(node.children[0], &env));
-                        let entries = this.name();
-                        let open = this.name();
-                        let filtered = this.call(
-                            Op::Filter,
-                            current,
-                            this.local(&entries),
-                            this.list(
-                                gone.iter()
-                                    .map(|label| this.string(&label.to_string()))
-                                    .collect(),
-                            ),
+                    let own = this.list(entries);
+                    if *tail {
+                        let tail = this.observe(
+                            Op::Row,
+                            this.child(*node.children.last().expect("row tail"), &env),
                         );
-                        this.unpack(
-                            row,
-                            &[&entries, &open],
-                            this.tuple(vec![filtered, this.local(&open)]),
+                        this.merge_row_results(
+                            current,
+                            this.tuple(vec![own, this.boolean(false)]),
+                            tail,
                         )
+                    } else {
+                        let entries = this.call(Op::Merge, current, own, this.list(Vec::new()));
+                        this.tuple(vec![entries, this.boolean(false)])
                     }
-                    _ => this.tuple(vec![this.list(Vec::new()), this.boolean(true)]),
                 }
+                OwnerTypeKind::Union => this.merge_row_results(
+                    current,
+                    this.observe(Op::Row, this.child(node.children[0], &env)),
+                    this.observe(Op::Row, this.child(node.children[1], &env)),
+                ),
+                OwnerTypeKind::Without(gone) => {
+                    let row = this.observe(Op::Row, this.child(node.children[0], &env));
+                    let entries = this.name();
+                    let open = this.name();
+                    let filtered = this.call(
+                        Op::Filter,
+                        current,
+                        this.local(&entries),
+                        this.list(
+                            gone.iter()
+                                .map(|label| this.string(&label.to_string()))
+                                .collect(),
+                        ),
+                    );
+                    this.unpack(
+                        row,
+                        &[&entries, &open],
+                        this.tuple(vec![filtered, this.local(&open)]),
+                    )
+                }
+                _ => this.tuple(vec![this.list(Vec::new()), this.boolean(true)]),
             })
         })
     }

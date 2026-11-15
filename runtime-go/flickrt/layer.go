@@ -257,7 +257,6 @@ func buildWith(fb *Fiber, l *Layer, memo *MemoMap, scope *Owner) Services {
 // it; the body keeps the caller's lexical candidate.
 func Provide(fb *Fiber, layer, body Value) Value {
 	return region(fb, func(inner *Fiber, owner *Owner) Value {
-		owner.kind = "provide"
 		if tracing {
 			traceOpen(owner, fb.owner, "provide")
 		}
@@ -293,7 +292,9 @@ func LayerSyncContext(make Value) Value {
 }
 
 // scoped runs `task` acquiring into `scope`.
-func scoped(fb *Fiber, scope *Owner, task Value) Value { return Run(Within(fb, scope), task) }
+func scoped(fb *Fiber, scope *Owner, task Value) Value {
+	return Run(Within(WithOwnerEvidence(fb, scope), scope), task)
+}
 
 func LayerEffect(key, task Value) Value {
 	return memoized(func(fb *Fiber, _ *MemoMap, scope *Owner) Services {

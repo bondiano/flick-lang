@@ -3,8 +3,7 @@
 // library starts (a replacement, a refresh, an eviction) waits until no lease
 // holds the value, so a value is never released while it is in use.
 import { Effect, Exit, Scope } from "effect";
-
-import { CurrentOwner, Owner, inside, withOwnerEvidence } from "../owner.ts";
+import { inAcquisitionScope } from "../owner.ts";
 
 /** A value and the scope of what its acquisition registered. */
 export interface Holder<A> {
@@ -27,10 +26,9 @@ export const plain = <A>(value: A): Holder<A> => ({
 export type Restore = <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
 
 /**
- * Runs `acquire` with a fresh owner as its `Scope` and owner evidence: what
- * it acquires belongs to the holder. A caller that registers the holder under
- * its own mask passes that mask's `restore`, so the acquisition stays
- * interruptible.
+ * Runs `acquire` with a fresh scope as its `Scope`: what it acquires belongs
+ * to the holder. A caller that registers the holder under its own mask
+ * passes that mask's `restore`, so the acquisition stays interruptible.
  */
 export const acquireHolder = <A, E, R>(
   acquire: Effect.Effect<A, E, R>,
@@ -38,13 +36,8 @@ export const acquireHolder = <A, E, R>(
 ): Effect.Effect<Holder<A>, E, Exclude<R, Scope.Scope>> =>
   Effect.uninterruptibleMask((restore) =>
     Effect.gen(function* () {
-      const parent = yield* Effect.service(CurrentOwner);
       const scope = yield* Scope.make();
-      const owner = new Owner(scope, parent?.defects);
-      owner.detached = true;
-      const exit = yield* Effect.exit(
-        restore(outer(inside(owner, withOwnerEvidence(owner, () => acquire)))),
-      );
+      const exit = yield* Effect.exit(restore(outer(Scope.provide(inAcquisitionScope(acquire), scope))));
       if (Exit.isFailure(exit)) {
         yield* Scope.close(scope, exit);
         return yield* Effect.failCause(exit.cause);

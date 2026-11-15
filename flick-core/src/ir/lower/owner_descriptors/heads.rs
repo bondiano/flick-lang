@@ -3,8 +3,7 @@ impl Build<'_> {
         let reduced = self.call(Op::Spine, desc, stack, self.unit());
         let current = self.name();
         let args = self.name();
-        let result = self.nodes(self.local(&current), |this, id, node, env| {
-            let current = this.desc(id, env.clone());
+        let result = self.nodes(self.local(&current), |this, _, node, env, current| {
             let unchanged = this.tuple(vec![current.clone(), this.local(&args)]);
             let decremented = this.unit();
             match &node.kind {
@@ -13,32 +12,16 @@ impl Build<'_> {
                         .templates
                         .aliases
                         .iter()
-                        .find(|alias| alias.module == *module && alias.name == *name);
+                        .position(|alias| alias.module == *module && alias.name == *name);
                     if let Some(alias) = alias {
-                        let bindings: Vec<_> = alias.params.iter().map(|_| this.name()).collect();
-                        let rest = this.name();
-                        let environment = this.environment(
-                            alias
-                                .params
-                                .iter()
-                                .zip(&bindings)
-                                .map(|(param, name)| (param.clone(), this.local(name)))
-                                .collect(),
-                            None,
-                        );
-                        let next = this.call(
-                            Op::Head,
-                            this.desc(alias.body, environment),
-                            this.local(&rest),
-                            decremented,
-                        );
-                        let pattern = Pat::List(
-                            bindings.into_iter().map(Pat::Bind).collect(),
-                            Some(Box::new(Pat::Bind(rest))),
-                        );
-                        this.case(
+                        this.call(
+                            Op::HeadAlias,
+                            current,
                             this.local(&args),
-                            vec![(pattern, next), (Pat::Wild, unchanged.clone())],
+                            this.tuple(vec![
+                                this.int(this.head_groups[alias]),
+                                this.int(this.templates.aliases[alias].body),
+                            ]),
                         )
                     } else if lang::is(Lang::Errors, module, name) {
                         this.project_errors(this.local(&args), decremented, unchanged.clone())
@@ -56,6 +39,58 @@ impl Build<'_> {
             }
         });
         self.unpack(reduced, &[&current, &args], result)
+    }
+
+    // Alias bodies differ, but their parameter environments depend only on the
+    // formal names. Build that environment once per distinct parameter list.
+    fn head_alias(&mut self, desc: &Expr, arguments: &Expr, data: Expr) -> Expr {
+        let group = self.name();
+        let body = self.name();
+        let representatives = self.head_representatives.clone();
+        let mut arms: Vec<_> = representatives
+            .into_iter()
+            .enumerate()
+            .map(|(group, alias)| {
+                let params = self.templates.aliases[alias].params.clone();
+                let bindings: Vec<_> = params.iter().map(|_| self.name()).collect();
+                let rest = self.name();
+                let environment = self.environment(
+                    params
+                        .into_iter()
+                        .zip(&bindings)
+                        .map(|(param, name)| (param, self.local(name)))
+                        .collect(),
+                    None,
+                );
+                let next = self.call(
+                    Op::Head,
+                    self.tuple(vec![self.local(&body), environment]),
+                    self.local(&rest),
+                    self.unit(),
+                );
+                let unchanged = self.tuple(vec![desc.clone(), arguments.clone()]);
+                (
+                    Pat::Lit(Lit::Int(
+                        i32::try_from(group).expect("alias environment group"),
+                    )),
+                    self.case(
+                        arguments.clone(),
+                        vec![
+                            (
+                                Pat::List(
+                                    bindings.into_iter().map(Pat::Bind).collect(),
+                                    Some(Box::new(Pat::Bind(rest))),
+                                ),
+                                next,
+                            ),
+                            (Pat::Wild, unchanged),
+                        ],
+                    ),
+                )
+            })
+            .collect();
+        arms.push((Pat::Wild, self.impossible()));
+        self.unpack(data, &[&group, &body], self.case(self.local(&group), arms))
     }
 
     fn project_errors(&mut self, args: Expr, state: Expr, unchanged: Expr) -> Expr {
@@ -104,9 +139,21 @@ impl Build<'_> {
         let spine = self.call(Op::Spine, desc, self.list(Vec::new()), self.unit());
         let head = self.name();
         let args = self.name();
-        let result = self.nodes(self.local(&head), |this, _, node, env| {
+        let result = self.nodes(self.local(&head), |this, _, node, env, _| {
             let (module, name) = match &node.kind {
-                OwnerTypeKind::Con { module, name } => (this.string(module), this.string(name)),
+                OwnerTypeKind::Con { module, name } => {
+                    if [Lang::Outlives, Lang::Provided, Lang::Detached, Lang::TypeEq]
+                        .into_iter()
+                        .filter_map(|item| lang::table().find(item))
+                        .any(|item| item.module == *module && item.name == *name)
+                    {
+                        return this.boolean(false);
+                    }
+                    if module != "$held" {
+                        return this.boolean(true);
+                    }
+                    (this.string(module), this.string(name))
+                }
                 OwnerTypeKind::DynamicCon => (
                     this.pure(env.clone(), this.string("$module")),
                     this.pure(env, this.string("$name")),

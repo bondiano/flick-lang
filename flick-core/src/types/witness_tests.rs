@@ -297,3 +297,66 @@ fn a_named_annotation_variable_can_infer_a_closed_manifest_solution() {
         &[],
     );
 }
+
+#[test]
+fn unpack_cannot_capture_a_hidden_type_in_an_outer_record_row() {
+    use crate::diagnostics::codes;
+    let source = "module Probe exposing (S, leak)\ntype module S =\n  type Token\n  value : Token\nmake : Unit ->{} ({ known : Unit | r } -> Unit)\nforeign make from \"fixture\" \"make\"\nleak : Module S ->{} Unit\nlet leak packed =\n  let consume = make ()\n  unpack packed as K in consume { known = (); field = K.value }\n";
+    let mut sources = SourceMap::default();
+    let file = sources.add("Probe.fl", source);
+    let diagnostics = crate::check(&sources, file);
+    assert!(
+        diagnostics.iter().any(|d| d.code == codes::T003),
+        "a row solution must not capture a hidden Token: {diagnostics:?}"
+    );
+}
+
+#[test]
+fn unpack_keeps_local_record_row_inference_polymorphic() {
+    let source = "module Probe exposing (S, okay)\ntype module S =\n  type Token\n  value : Token\nokay : Module S -> Unit\nlet okay packed = unpack packed as K in\n  let get : forall a r. { field : a | r } -> a = fun x -> x.field\n  let _token = get { field = K.value; extra = 1 }\n  let _number = get { field = 1 }\n  ()\n";
+    checked_interface("Probe", source, &[]);
+}
+
+#[test]
+fn unpack_keeps_error_projection_inference() {
+    checked_interface(
+        "Probe",
+        "module Probe exposing (S, okay)\ntype module S =\n  type Token\ntype error Oops = Oops\ndiscard : Errors e -> Unit\nlet discard _error = ()\nokay : Module S -> Unit\nlet okay packed = unpack packed as K in discard Oops\n",
+        &[],
+    );
+}
+
+#[test]
+fn unpack_cannot_capture_a_hidden_type_through_deferred_error_row_growth() {
+    use crate::diagnostics::codes;
+    let source = "module Probe exposing (S, leak)\ntype module S =\n  type Token\n  value : Token\ntype error Wrapped a = Wrapped a\nmake : Unit ->{} ((Unit ->{; e} Unit) ->{} Unit)\nforeign make from \"fixture\" \"make\"\nleak : Module S ->{} Unit\nlet leak packed =\n  let consume = make ()\n  unpack packed as K in consume (fun () -> from_result (Err (Wrapped K.value)))\n";
+    let mut sources = SourceMap::default();
+    let file = sources.add("Probe.fl", source);
+    let diagnostics = crate::check(&sources, file);
+    assert!(
+        diagnostics.iter().any(|d| d.code == codes::E002),
+        "deferred row solving must retain the outside root's witness permissions: {diagnostics:?}"
+    );
+}
+
+#[test]
+fn unpack_keeps_capture_inference_for_local_closures() {
+    checked_interface(
+        "Probe",
+        "module Probe exposing (S, okay)\ntype module S =\n  type Token\ntype File (s : Region)\nopen : Unit ->{Scope s} File s\nforeign effect open from \"fixture\" \"open\"\ndiscard : a -> Unit\nlet discard _value = ()\nokay : Module S ->{} Unit\nlet okay packed = unpack packed as K in scope s {\n  let file = open ()\n  discard (fun () -> file)\n}\n",
+        &[],
+    );
+}
+
+#[test]
+fn an_existential_annotation_hole_reopens_with_its_payload_witness() {
+    for body in [
+        "unpack x as K, item in K.take item",
+        "unpack packed as Outer in unpack x as K, item in K.take item",
+    ] {
+        let source = format!(
+            "module Probe exposing (S, Packed, inspect)\ntype module S =\n  type Token\n  take : Token -> Int\ntype alias Packed = exists K : S. K.Token\ninspect : Module S -> Packed -> Int\nlet inspect packed value =\n  let x : exists J : S. _ = value\n  {body}\n"
+        );
+        checked_interface("Probe", &source, &[]);
+    }
+}

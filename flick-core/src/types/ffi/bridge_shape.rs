@@ -119,7 +119,7 @@ impl Checker<'_> {
 
     /// An `Eff`, a type the language names, or data.
     fn named_shape(&self, ty: &Type, depth: usize) -> Shape {
-        if let Some((_, _, value)) = self.eff_parts(ty) {
+        if let Some((_, _, value)) = self.known_eff_parts(ty) {
             return Shape::Eff(Box::new(self.shape(&value, depth + 1)));
         }
         let (head, args) = ty.spine();
@@ -156,5 +156,38 @@ impl Checker<'_> {
             }
             _ => Shape::Data,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::unify::test_checker::with_checker;
+    use crate::types::{Form, Kind, TypeDef};
+
+    #[test]
+    fn productive_alias_chains_keep_their_effect_bridge_shape() {
+        with_checker(|checker| {
+            let mut body = Type::apps(
+                Type::lang(Lang::Eff),
+                [Type::empty_row(), Type::empty_row(), Type::lang(Lang::Int)],
+            );
+            for index in 0..200 {
+                let name = format!("Chain{index}");
+                checker.env.define_type(
+                    &name,
+                    TypeDef {
+                        kind: Kind::Type,
+                        form: Form::Alias {
+                            params: Vec::new(),
+                            body,
+                            opaque: true,
+                        },
+                    },
+                );
+                body = Type::con("Probe", &name);
+            }
+            assert_eq!(checker.shape(&body, 0), Shape::Eff(Box::new(Shape::Data)));
+        });
     }
 }

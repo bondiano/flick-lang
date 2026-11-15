@@ -306,6 +306,10 @@ them. `RcRef`, `RcMap` and `Pool` lend their value to the `scope` of the
 call (`Scope t`) and keep it until that scope closes, so their `get` gives
 `a^{t}`.
 
+`RcRef.make` also acquires into a fresh region for each resource. Its
+`acquire` field has type `(forall t. Eff {Scope t | r} e a^{t})^c`: the
+acquisition cannot store the resource in a cell outside that region.
+
 ## Children
 
 ```flick

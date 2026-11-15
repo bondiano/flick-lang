@@ -1,7 +1,6 @@
 impl Build<'_> {
     fn resolve(&mut self, desc: Expr) -> Expr {
-        self.nodes(desc, |this, id, node, env| {
-            let current = this.desc(id, env.clone());
+        self.nodes(desc, |this, id, node, env, current| {
             let OwnerTypeKind::Var(name) = &node.kind else {
                 return current;
             };
@@ -32,7 +31,7 @@ impl Build<'_> {
     fn derived_dictionary(&mut self, desc: Expr, fallback: usize) -> Expr {
         let resolved = self.observe(Op::Resolve, desc);
         self.bind(resolved, |this, resolved| {
-            this.nodes(resolved, |this, _, node, env| {
+            this.nodes(resolved, |this, _, node, env, _| {
                 let (target, fields) = match &node.kind {
                     OwnerTypeKind::Con { module, name } => (
                         this.templates.dynamic_con,
@@ -73,20 +72,20 @@ impl Build<'_> {
 
     fn spine(&mut self, desc: Expr, stack: &Expr) -> Expr {
         self.bind(self.observe(Op::Resolve, desc), |this, resolved| {
-            this.nodes(resolved, |this, id, node, env| match node.kind {
+            this.nodes(resolved, |this, _, node, env, current| match node.kind {
                 OwnerTypeKind::App => this.call(
                     Op::Spine,
                     this.child(node.children[0], &env),
                     this.prepend(this.child(node.children[1], &env), stack.clone()),
                     this.unit(),
                 ),
-                _ => this.tuple(vec![this.desc(id, env), stack.clone()]),
+                _ => this.tuple(vec![current, stack.clone()]),
             })
         })
     }
 
     fn metadata(&mut self, op: Op, desc: Expr) -> Expr {
-        self.nodes(desc, |this, _, node, env| {
+        self.nodes(desc, |this, _, node, env, _| {
             if matches!(op, Op::Tag) {
                 return match &node.kind {
                     OwnerTypeKind::Con { module, name } => this.tuple(vec![

@@ -29,13 +29,6 @@ type Owner struct {
 	// Arena storage is not on the ordinary LIFO finalizer stack.
 	arenas       []*arena
 	arenasClosed bool
-
-	// A detached owner is a library acquisition scope (`acquireHolder`,
-	// `RcRef`, `Pool`, `RcMap`): `Within` must not redirect finalizers onto
-	// an outer lexical owner, or releases wait until that outer scope ends.
-	detached bool
-	// kind is main/scope/provide when this owner is a traced lexical region.
-	kind string
 }
 
 // defects collects failures of supervisors: the root's fail the program,
@@ -113,12 +106,6 @@ type finalizer struct {
 }
 
 func newOwner() *Owner { return &Owner{open: true, children: map[*child]struct{}{}} }
-
-func newDetachedOwner() *Owner {
-	o := newOwner()
-	o.detached = true
-	return o
-}
 
 // catch is the result of `f`, or the cause it failed with.
 func catch(f func() Value) (out Value, cause *Cause) {
@@ -317,7 +304,6 @@ func ownedWith(fb *Fiber, close func(*Owner, *Fiber, *Cause) *Cause, body func(f
 // around it.
 func Scope(fb *Fiber, body func(fb *Fiber, owner, outer Value) Value) Value {
 	return region(fb, func(inner *Fiber, owner *Owner) Value {
-		owner.kind = "scope"
 		if tracing {
 			traceOpen(owner, fb.owner, "scope")
 		}
@@ -338,22 +324,13 @@ func ScopeRun(fb *Fiber, f Value) Value {
 func ScopeCurrent(fb *Fiber, _ Value) Value { return fb.owner }
 
 // Within is `fb` acquiring into `owner`, an outer region's, not the
-// innermost one's. When `fb` already acquires into that owner, or its
-// owner is pinned for a library acquisition, the same fiber is returned
-// so fiber-local updates and that acquisition's finalizers stay put.
+// innermost one's.
 func Within(fb *Fiber, owner Value) *Fiber {
-	target := owner.(*Owner)
-	if fb.pinOwner || fb.owner == target || (fb.owner != nil && fb.owner.detached) {
-		return fb
-	}
-	// Effect Scope.provide keeps CurrentOwner on the provide owner while
-	// finalizers land on the layer's untraced build scope. Do not pull those
-	// finalizers onto the provide owner when evidence names it.
-	if fb.owner != nil && fb.owner.trace == 0 && target.kind == "provide" {
+	if fb.owner == owner.(*Owner) {
 		return fb
 	}
 	inner := *fb
-	inner.owner = target
+	inner.owner = owner.(*Owner)
 	return &inner
 }
 

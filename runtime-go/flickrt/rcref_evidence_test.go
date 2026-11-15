@@ -5,12 +5,14 @@ import (
 	"testing"
 )
 
-// acquireForcedInto mirrors generated RcRef acquire: WithOwnerEvidence of the
-// reference's region wraps the body, then acquire_release Withins into it.
-func acquireForcedInto(n *notes, region Value, name string) Value {
+// The rank-polymorphic acquisition receives fresh evidence for its private owner,
+// independently of the region in which the reference itself was made.
+func acquireInFreshOwner(n *notes, region Value, name string) Value {
 	return Eff(func(fb *Fiber) Value {
-		fb = WithOwnerEvidence(fb, region)
 		owner := ReadOwnerEvidence(fb)
+		if owner == region {
+			n.add("acquisition reused the reference owner")
+		}
 		fb = Within(fb, owner)
 		n.add("acquire " + name)
 		name := name
@@ -19,12 +21,12 @@ func acquireForcedInto(n *notes, region Value, name string) Value {
 	})
 }
 
-func TestRcRefReleaseTimingDespiteCapturedRegionEvidence(t *testing.T) {
+func TestRcRefReleaseTimingUsesFreshAcquisitionEvidence(t *testing.T) {
 	var n notes
 	fb := &Fiber{state: newState(), owner: newOwner()}
 	Scope(fb, func(fb *Fiber, region, _ Value) Value {
 		fb = WithOwnerEvidence(fb, region)
-		acquire := acquireForcedInto(&n, region, "shared")
+		acquire := acquireInFreshOwner(&n, region, "shared")
 		ref := RcRefMake(fb, Rec("acquire", acquire, "idleTimeToLive", None))
 		Scope(fb, func(fb *Fiber, owner, _ Value) Value {
 			fb = WithOwnerEvidence(fb, owner)

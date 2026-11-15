@@ -1,0 +1,26 @@
+// An RcRef's acquisition owns a fresh region, shorter than the reference's.
+module App.RcRefAcquisition exposing (..)
+
+type Raw
+
+make_raw : Unit ->{} Raw
+foreign effect make_raw from "./resource.js" "make"
+
+release : Raw^c ->{} Unit
+foreign effect release from "./resource.js" "release"
+  retention call
+
+stashed : Unit ->{} Unit
+let stashed () = scope {
+  let cell = Ref.make None
+  let _shared = RcRef.make {
+    acquire = task {
+      let value = Resource.acquire_release (task { make_raw () }) release
+      Ref.set cell (Some value)
+      value
+    };
+    idleTimeToLive = None;
+  }
+  ()
+}
+//~ FLICK-G002 @19:21-19:31 this value holds `t`
