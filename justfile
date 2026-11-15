@@ -325,12 +325,14 @@ wasm-backends: backend-fixtures
 # The raw-byte budget retains the playground editor queries (hover, completion,
 # fixes and `.d.ts`). Size optimization uses LLVM Oz, whole-program LTO and
 # removal of debug information;
-# native release builds retain thin LTO. Binaryen removes duplicate functions
-# across Rust crates, preserving imports/exports and wasm-bindgen metadata.
+# native release builds retain thin LTO. Binaryen deduplicates across Rust
+# crates and optimizes instruction size, preserving imports/exports and
+# wasm-bindgen metadata.
 # With the playground on Flick's own
 # runtime and its bridge to the Effect adapter, and no kept answers of
 # plugins, it is about 4.06 MB raw and 1.33 MB gzip.
 wasm:
+    node --test tools/wasm-dedup/index.test.mjs
     CARGO_PROFILE_RELEASE_OPT_LEVEL=z CARGO_PROFILE_RELEASE_LTO=fat CARGO_PROFILE_RELEASE_STRIP=debuginfo cargo build -p flick-wasm --target wasm32-unknown-unknown --release
     node tools/wasm-dedup/index.mjs target/wasm32-unknown-unknown/release/flick_wasm.wasm
     @wasm=target/wasm32-unknown-unknown/release/flick_wasm.wasm; \
