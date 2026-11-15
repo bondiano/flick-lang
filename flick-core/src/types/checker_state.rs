@@ -23,6 +23,7 @@ struct Checker<'a> {
     /// Lexically opened `Module Sig` values, innermost first on lookup.
     opened_modules: Vec<module_contract::Opened>,
     witness_counter: u64,
+    annotation_contexts: Vec<Vec<ty::LexicalScope>>,
     named_witnesses: module_contract::NamedWitnesses,
     sites: Vec<effects::Site>,
     literals: Vec<NumLiteral>,

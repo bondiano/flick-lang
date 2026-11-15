@@ -25,6 +25,7 @@ pub(in crate::types) struct StoreCheckpoint {
     level: u32,
     equalities: Vec<Equality>,
     context: Context,
+    lexical: Vec<LexicalScope>,
     scopes: Scopes,
 }
 
@@ -40,6 +41,7 @@ impl Store {
             level: self.level,
             equalities: self.equalities.clone(),
             context: self.active_context.clone(),
+            lexical: self.active_lexical.clone(),
             scopes: self.scopes.clone(),
         }
     }
@@ -80,8 +82,10 @@ impl Store {
         for context in &mut self.meta_contexts[checkpoint.allocated..] {
             context.permitted = Context::default();
             context.kind = None;
+            context.lexical.permitted.clear();
         }
         self.active_context = checkpoint.context;
+        self.active_lexical = checkpoint.lexical;
         self.scopes = checkpoint.scopes;
         self.level = checkpoint.level;
         self.equalities = checkpoint.equalities;

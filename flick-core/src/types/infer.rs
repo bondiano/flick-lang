@@ -758,7 +758,7 @@ impl<'c> Checker<'c> {
                 let numeric = self
                     .store
                     .resolve(&meta)
-                    .legacy_meta_root()
+                    .inference_meta_root()
                     .is_some_and(|m| self.store.is_numeric(m));
                 if self.unify(&meta, &ty).is_err() && numeric {
                     let shown = self.show(&meta);

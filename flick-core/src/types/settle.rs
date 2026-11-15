@@ -56,7 +56,7 @@ impl Checker<'_> {
         let waits = |checker: &Self, ty: &Type| {
             checker
                 .whnf(ty)
-                .legacy_meta_root()
+                .inference_meta_root()
                 .is_some_and(|m| chosen.contains(&m))
         };
         // a literal of the wrong type explains an operator's error better
@@ -172,7 +172,7 @@ impl Checker<'_> {
         }
         for w in &self.classes.wanted {
             self.zonk(&w.constraint).visit(&mut |t| {
-                if let Some(m) = t.legacy_meta_root()
+                if let Some(m) = t.inference_meta_root()
                     && self.store.is_numeric(m)
                 {
                     chosen.insert(m);

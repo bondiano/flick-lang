@@ -64,20 +64,18 @@ impl Checker<'_> {
     /// Qualifiers that must be equal, as in mutable storage, differ.
     fn capture_mismatch(&mut self, head: &str, label: &Elem, left: bool, span: Span) {
         let meta = match label {
-            Elem::Capture(Atom::Meta(meta)) => meta.legacy_root(),
+            Elem::Capture(Atom::Meta(meta)) if meta.inference_type_root().is_some() => Some(meta),
             _ => None,
         };
-        let incomplete = meta.is_some_and(|m| {
-            self.zonk(&Type::meta(m))
+        let incomplete = meta.is_some_and(|meta| {
+            self.zonk(&Type::Meta(meta.clone()))
                 .contains(&mut |t| matches!(t, Type::Error))
         });
         self.error_help(codes::T003, span, head, incomplete, |this| {
             // a meta label names what the meta has become since
             let element = match label {
-                Elem::Capture(Atom::Meta(meta)) if meta.legacy_root().is_some() => {
-                    this.store.resolve(&Type::meta(
-                        meta.legacy_root().expect("legacy diagnostic root"),
-                    ))
+                Elem::Capture(Atom::Meta(meta)) if meta.inference_type_root().is_some() => {
+                    this.store.resolve(&Type::Meta(meta.clone()))
                 }
                 Elem::Capture(Atom::Skolem(skolem)) => Type::Skolem(*skolem),
                 Elem::Capture(Atom::Var(name)) => Type::Var(name.clone()),

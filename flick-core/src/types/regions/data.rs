@@ -337,7 +337,7 @@ impl Checker<'_> {
         // a position not known yet takes a value bounded by a region with its
         // bound: what it turns out to be may store the region's resource
         if let Type::Bounded { ty, captures } = &a
-            && let Some(m) = e.legacy_meta_root()
+            && let Some(m) = e.inference_meta_root()
             && !self.store.is_capture_row(m)
             && !self.store.is_numeric(m)
             && self.bounds_a_region(captures)
@@ -501,7 +501,9 @@ impl Checker<'_> {
     /// literal's type is one before it is settled.
     pub(in crate::types) fn scalar(&self, t: &Type) -> bool {
         match &*self.borrowed_whnf(t) {
-            Type::Meta(meta) => meta.legacy_root().is_some_and(|m| self.store.is_numeric(m)),
+            Type::Meta(meta) => meta
+                .inference_type_root()
+                .is_some_and(|m| self.store.is_numeric(m)),
             t => SCALARS.into_iter().any(|item| t.is_lang(item)),
         }
     }

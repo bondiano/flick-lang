@@ -1,4 +1,11 @@
+struct UnpackedValue {
+    body: Type,
+    binder: String,
+    scope: Scope,
+}
+
 impl super::Checker<'_> {
+    #[allow(clippy::too_many_lines)]
     pub(super) fn unpack_module(&mut self, node: &Node) -> Type {
         let mut children = node.nodes();
         let Some(source) = children.next() else {
@@ -53,49 +60,66 @@ impl super::Checker<'_> {
                 return Type::Error;
             }
         };
-        let view = issued.view();
-        let requirements = super::ModuleSignature::instantiate_members(&requirements, view);
-        let bindings = Self::witness_bindings(issued.signature(), view, &alias);
-        let subst: Vec<_> = bindings
-            .first()
-            .into_iter()
-            .flat_map(|opened| &opened.types)
-            .map(|(name, ty, _)| (name.clone(), ty.clone()))
-            .collect();
-        let local_mark = self.classes.local.len();
-        for requirement in &requirements {
-            if let ModuleRequirement::Dictionary { head, from } = requirement {
-                self.classes.local.push((
-                    head.substitute(&subst),
-                    super::Dict::Opened {
-                        binder: alias.clone(),
-                        field: from.clone(),
-                    },
-                ));
+        self.with_lexical_witness(&witness, |this, opened| {
+            let opened_value = opened_value
+                .as_ref()
+                .map(|value| lexical::open_type(&value.body, &value.binder, value.scope, opened));
+            let view = issued.view();
+            let requirements = super::ModuleSignature::instantiate_members(&requirements, view);
+            let bindings = Self::witness_bindings(issued.signature(), view, &alias);
+            let subst: Vec<_> = bindings
+                .first()
+                .into_iter()
+                .flat_map(|opened| &opened.types)
+                .map(|(name, ty, _)| (name.clone(), ty.clone()))
+                .collect();
+            let local_mark = this.classes.local.len();
+            for requirement in &requirements {
+                if let ModuleRequirement::Dictionary { head, from } = requirement {
+                    this.classes.local.push((
+                        head.substitute(&subst),
+                        super::Dict::Opened {
+                            binder: alias.clone(),
+                            field: from.clone(),
+                        },
+                    ));
+                }
             }
-        }
-        let module_mark = self.opened_modules.len();
-        self.opened_modules.extend(bindings);
-        let value_mark = self.cx.locals.len();
-        if let (Some(payload), Some(value)) = (payload, opened_value) {
-            self.push_local(payload.text(self.text), payload.start, value);
-        }
-        let result = self.block(body, None);
-        let result = self.resolved_witness_type(&result);
-        self.cx.locals.truncate(value_mark);
-        self.opened_modules.truncate(module_mark);
-        self.classes.local.truncate(local_mark);
-        if self.witness_escapes(&result, &witness) {
-            self.typing.existential_unpacks.insert(node.range());
-            Type::Exists {
-                scope: Scope::default(),
-                binder: alias.clone(),
-                contract: Box::new(Type::con(module, name)),
-                body: Box::new(close_existential_type(&result, &witness, &alias)),
+            let module_mark = this.opened_modules.len();
+            this.opened_modules.extend(bindings);
+            let value_mark = this.cx.locals.len();
+            if let (Some(payload), Some(value)) = (payload, opened_value) {
+                this.push_local(payload.text(this.text), payload.start, value);
             }
-        } else {
-            result
-        }
+            let result = this.block(body, None);
+            let result = this.resolved_witness_type(&result);
+            this.cx.locals.truncate(value_mark);
+            this.opened_modules.truncate(module_mark);
+            this.classes.local.truncate(local_mark);
+            if this.witness_escapes(&result, &witness) {
+                this.typing.existential_unpacks.insert(node.range());
+                let closed = Scope::default();
+                Type::Exists {
+                    scope: closed,
+                    binder: alias.clone(),
+                    contract: Box::new(Type::con(module, name)),
+                    body: Box::new(lexical::close_type(&result, opened, &alias, closed)),
+                }
+            } else {
+                let mut outer = this.store.lexical_context();
+                outer.pop();
+                if let Ok(result) = this.restrict_lexical_result(&result, &outer) {
+                    result
+                } else {
+                    this.error(
+                        codes::T003,
+                        this.span(body),
+                        "an inference variable cannot escape its module witness",
+                    );
+                    Type::Error
+                }
+            }
+        })
     }
 
     fn unpacked_signature(
@@ -103,12 +127,12 @@ impl super::Checker<'_> {
         node: &Node,
         source: &Node,
         payload: bool,
-        witness: &str,
-    ) -> Option<(Type, Option<Type>)> {
+        _witness: &str,
+    ) -> Option<(Type, Option<UnpackedValue>)> {
         let source_ty = self.infer(source);
         let (unwrapped, _) = self.whnf_captured(&source_ty);
         let (signature, opened_value) = if let Type::Exists {
-            scope: _,
+            scope,
             binder,
             contract,
             body,
@@ -125,7 +149,11 @@ impl super::Checker<'_> {
             }
             (
                 (**contract).clone(),
-                Some(open_existential_type(body, binder, witness)),
+                Some(UnpackedValue {
+                    body: (**body).clone(),
+                    binder: binder.clone(),
+                    scope: *scope,
+                }),
             )
         } else {
             if payload {

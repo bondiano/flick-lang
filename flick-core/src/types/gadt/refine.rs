@@ -203,8 +203,8 @@ impl Refiner<'_, '_> {
         if a == b || matches!(a, Type::Error) || matches!(b, Type::Error) {
             return Ok(());
         }
-        if a.contains(&mut |t| t.legacy_meta_root().is_some())
-            || b.contains(&mut |t| t.legacy_meta_root().is_some())
+        if a.contains(&mut |t| t.inference_meta_root().is_some())
+            || b.contains(&mut |t| t.inference_meta_root().is_some())
         {
             return Err(Stop::Unknown);
         }
@@ -251,7 +251,7 @@ impl Refiner<'_, '_> {
                 self.bound.insert(v.clone(), t.clone());
                 Ok(())
             }
-            (Type::Meta(x), Type::Meta(y)) if x.legacy_root().is_some() && x == y => Ok(()),
+            (Type::Meta(x), Type::Meta(y)) if x.inference_type_root().is_some() && x == y => Ok(()),
             (Type::Meta(_), _) | (_, Type::Meta(_)) => Err(Stop::Unknown),
             (Type::Skolem(x), Type::Skolem(y)) if x == y => Ok(()),
             (Type::Skolem(x), Type::Skolem(y)) => {

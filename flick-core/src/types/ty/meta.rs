@@ -6,6 +6,10 @@ use std::hash::{Hash, Hasher};
 use super::ScopeId;
 use crate::types::module_contract::context::Embedding;
 
+mod lexical;
+pub(in crate::types) use lexical::reference_allowed as lexical_reference_allowed;
+pub(in crate::types) use lexical::{LexicalCoordinate, LexicalMeta, LexicalRoot, LexicalScope};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum Sort {
     Type,
@@ -15,7 +19,13 @@ enum Sort {
 #[derive(Debug, Clone)]
 pub struct MetaOccurrence {
     root: u32,
-    context: Option<Box<ContextualMeta>>,
+    context: Option<Box<MetaView>>,
+}
+
+#[derive(Debug, Clone)]
+enum MetaView {
+    Contextual(ContextualMeta),
+    Lexical(LexicalMeta),
 }
 
 #[derive(Debug, Clone)]
@@ -44,7 +54,10 @@ impl MetaOccurrence {
     }
 
     pub(in crate::types) fn contextual(&self) -> Option<&ContextualMeta> {
-        self.context.as_deref()
+        match self.context.as_deref()? {
+            MetaView::Contextual(context) => Some(context),
+            MetaView::Lexical(_) => None,
+        }
     }
 
     /// Private issued-footprint integrity, not public semantic equality.
@@ -60,40 +73,52 @@ impl MetaOccurrence {
     pub(in crate::types) fn new(root: u32, owner: ScopeId, renaming: Embedding) -> Self {
         Self {
             root,
-            context: Some(Box::new(ContextualMeta {
+            context: Some(Box::new(MetaView::Contextual(ContextualMeta {
                 owner,
                 sort: Sort::Type,
                 renaming,
-            })),
+            }))),
         }
     }
 
     pub(in crate::types) fn kind(root: u32, owner: ScopeId, renaming: Embedding) -> Self {
         Self {
             root,
-            context: Some(Box::new(ContextualMeta {
+            context: Some(Box::new(MetaView::Contextual(ContextualMeta {
                 owner,
                 sort: Sort::Kind,
                 renaming,
-            })),
+            }))),
         }
     }
 
     /// Legacy roots have no lexical view to replace; contextual provenance stays contextual.
     pub(in crate::types) fn with_renaming(&self, renaming: Embedding) -> Self {
+        if self.lexical().is_some() {
+            return self.clone();
+        }
         Self {
             root: self.root,
             context: self.contextual().map(|context| {
-                Box::new(ContextualMeta {
+                Box::new(MetaView::Contextual(ContextualMeta {
                     owner: context.owner,
                     sort: context.sort,
                     renaming,
-                })
+                }))
             }),
         }
     }
 
     pub(in crate::types) fn copy_bound(&self, from: ScopeId, to: ScopeId) -> Self {
+        if self.lexical().is_some() {
+            return self.map_lexical(|coordinate| {
+                let mut coordinate = coordinate.clone();
+                if coordinate.target.id == from {
+                    coordinate.target.id = to;
+                }
+                Some(coordinate)
+            });
+        }
         self.contextual().map_or_else(
             || self.clone(),
             |context| self.with_renaming(context.renaming.copy_bound(from, to)),
@@ -119,13 +144,14 @@ impl ContextualMeta {
 impl PartialEq for MetaOccurrence {
     fn eq(&self, other: &Self) -> bool {
         self.root == other.root
-            && match (self.contextual(), other.contextual()) {
+            && match (self.context.as_deref(), other.context.as_deref()) {
                 (None, None) => true,
-                (Some(a), Some(b)) => {
+                (Some(MetaView::Contextual(a)), Some(MetaView::Contextual(b))) => {
                     a.owner == b.owner
                         && a.sort == b.sort
                         && a.renaming.mapping().eq(b.renaming.mapping())
                 }
+                (Some(MetaView::Lexical(a)), Some(MetaView::Lexical(b))) => a == b,
                 _ => false,
             }
     }
@@ -134,9 +160,9 @@ impl Eq for MetaOccurrence {}
 
 impl Hash for MetaOccurrence {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        match self.contextual() {
+        match self.context.as_deref() {
             None => self.root.hash(state),
-            Some(context) => {
+            Some(MetaView::Contextual(context)) => {
                 context.owner.hash(state);
                 self.root.hash(state);
                 context.sort.hash(state);
@@ -145,19 +171,33 @@ impl Hash for MetaOccurrence {
                     pair.hash(state);
                 }
             }
+            Some(MetaView::Lexical(lexical)) => {
+                "lexical".hash(state);
+                self.root.hash(state);
+                lexical.hash(state);
+            }
         }
     }
 }
 
 impl Ord for MetaOccurrence {
     fn cmp(&self, other: &Self) -> Ordering {
-        match (self.contextual(), other.contextual()) {
+        match (self.context.as_deref(), other.context.as_deref()) {
             (None, None) => self.root.cmp(&other.root),
-            (None, Some(_)) => Ordering::Less,
-            (Some(_), None) => Ordering::Greater,
-            (Some(a), Some(b)) => (a.owner, a.sort, self.root)
-                .cmp(&(b.owner, b.sort, other.root))
-                .then_with(|| a.renaming.mapping().cmp(b.renaming.mapping())),
+            (None, Some(_)) | (Some(MetaView::Contextual(_)), Some(MetaView::Lexical(_))) => {
+                Ordering::Less
+            }
+            (Some(_), None) | (Some(MetaView::Lexical(_)), Some(MetaView::Contextual(_))) => {
+                Ordering::Greater
+            }
+            (Some(MetaView::Contextual(a)), Some(MetaView::Contextual(b))) => {
+                (a.owner, a.sort, self.root)
+                    .cmp(&(b.owner, b.sort, other.root))
+                    .then_with(|| a.renaming.mapping().cmp(b.renaming.mapping()))
+            }
+            (Some(MetaView::Lexical(a)), Some(MetaView::Lexical(b))) => {
+                a.cmp(b).then_with(|| self.root.cmp(&other.root))
+            }
         }
     }
 }
@@ -172,6 +212,7 @@ impl super::Type {
         Self::Meta(MetaOccurrence::legacy(root))
     }
 
+    #[cfg(test)]
     pub(in crate::types) fn legacy_meta_root(&self) -> Option<u32> {
         match self {
             Self::Meta(meta) => meta.legacy_root(),
@@ -179,10 +220,17 @@ impl super::Type {
         }
     }
 
+    pub(in crate::types) fn inference_meta_root(&self) -> Option<u32> {
+        match self {
+            Self::Meta(meta) => meta.inference_type_root(),
+            _ => None,
+        }
+    }
+
     pub fn meta_root(&self) -> Option<u32> {
         match self {
             Self::Meta(meta)
-                if meta.legacy_root().is_some()
+                if meta.inference_type_root().is_some()
                     || meta.contextual().is_some_and(ContextualMeta::is_type) =>
             {
                 Some(meta.root())

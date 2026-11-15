@@ -60,7 +60,7 @@ impl Elem {
         match self {
             Elem::Capture(Atom::Meta(meta))
             | Elem::Error(Atom::Meta(meta))
-            | Elem::Service(Atom::Meta(meta)) => meta.contextual().is_some(),
+            | Elem::Service(Atom::Meta(meta)) => meta.legacy_root().is_none(),
             Elem::Provided(inner) => inner.has_meta_view(),
             _ => false,
         }

@@ -423,7 +423,7 @@ impl Checker<'_> {
                 for ((x, y), s) in args.iter().zip(&expected_args).zip(signs.iter()) {
                     // an argument inference has yet to solve takes the other
                     // as it is, its bound too, as `≡` of the whole type did
-                    let open = |t: &Type| self.whnf(t).legacy_meta_root().is_some();
+                    let open = |t: &Type| self.whnf(t).inference_meta_root().is_some();
                     match s {
                         _ if open(x) || open(y) => self.unify(x, y)?,
                         Sign::Pos => self.subsume(x, y, span)?,

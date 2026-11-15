@@ -30,14 +30,12 @@ impl Checker<'_> {
         };
         match (&a, &b) {
             (Type::Error, _) | (_, Type::Error) => Ok(()),
-            (Type::Meta(meta), _) if ca.is_none() && meta.legacy_root().is_some() => self.bind(
-                meta.legacy_root().expect("legacy capture binding"),
-                &captured(&b, &cb),
-            ),
-            (_, Type::Meta(meta)) if cb.is_none() && meta.legacy_root().is_some() => self.bind(
-                meta.legacy_root().expect("legacy capture binding"),
-                &captured(&a, &ca),
-            ),
+            (Type::Meta(meta), _) if ca.is_none() && meta.inference_type_root().is_some() => {
+                self.bind_occurrence(meta, &captured(&b, &cb))
+            }
+            (_, Type::Meta(meta)) if cb.is_none() && meta.inference_type_root().is_some() => {
+                self.bind_occurrence(meta, &captured(&a, &ca))
+            }
             _ => {
                 // A bare type adds no hidden captures; its own fields and rows
                 // are compared by the types themselves below.
@@ -76,12 +74,12 @@ impl Checker<'_> {
     /// Whether `label` is the captures `^?m` of a type not inferred yet.
     fn uninferred(&self, label: &Elem) -> bool {
         let meta = match label {
-            Elem::Capture(Atom::Meta(meta)) => meta.legacy_root(),
+            Elem::Capture(Atom::Meta(meta)) if meta.inference_type_root().is_some() => Some(meta),
             _ => None,
         };
-        meta.is_some_and(|m| {
-            !self.store.is_capture_row(m)
-                && matches!(self.store.resolve(&Type::meta(m)), Type::Meta(_))
+        meta.is_some_and(|meta| {
+            !self.store.is_capture_row(meta.root())
+                && matches!(self.store.resolve(&Type::Meta(meta.clone())), Type::Meta(_))
         })
     }
 

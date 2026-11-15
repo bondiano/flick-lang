@@ -104,11 +104,32 @@ impl WitnessScope<'_> {
                 body = open_existential_type(&body, &binder, &format!("$exists:{renamed}"));
                 binder = renamed;
             }
+            let body = if self.mappings.is_empty() {
+                self.ty(&body)
+            } else {
+                let closed = format!("$exists:{binder}");
+                let mappings = self
+                    .mappings
+                    .iter()
+                    .copied()
+                    .filter(|(from, _)| *from != closed)
+                    .collect::<Vec<_>>();
+                let mut nested = WitnessScope {
+                    from: self.from,
+                    to: self.to,
+                    mappings: &mappings,
+                    shadow: self.shadow,
+                    changed: false,
+                };
+                let body = nested.ty(&body);
+                self.changed |= nested.changed;
+                body
+            };
             return Type::Exists {
                 scope: *scope,
                 binder,
                 contract: Box::new(contract),
-                body: Box::new(self.ty(&body)),
+                body: Box::new(body),
             };
         }
         let mut mapped = match ty {
@@ -186,7 +207,7 @@ fn witness_local_scope_occurs(ty: &Type, witness: &str) -> bool {
     scope.changed
 }
 
-fn witness_scope_occurs(ty: &Type, witness: &str) -> bool {
+pub(in crate::types) fn witness_scope_occurs(ty: &Type, witness: &str) -> bool {
     let mut scope = WitnessScope {
         from: witness,
         to: witness,
@@ -209,6 +230,7 @@ pub(super) fn open_existential_type(ty: &Type, binder: &str, witness: &str) -> T
     .ty(ty)
 }
 
+#[cfg(test)]
 pub(super) fn close_existential_type(ty: &Type, witness: &str, binder: &str) -> Type {
     WitnessScope {
         from: witness,

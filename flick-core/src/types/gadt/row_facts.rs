@@ -298,8 +298,11 @@ impl Checker<'_> {
         &mut self,
         actual: &Norm,
         kind: RowKind,
-        target: u32,
+        variable: &Type,
     ) -> bool {
+        let Some(target) = variable.inference_meta_root() else {
+            return false;
+        };
         if self.store.row_equalities.is_empty() && self.store.equalities.is_empty() {
             return false;
         }
@@ -308,7 +311,7 @@ impl Checker<'_> {
         };
         let visible = |ty: &Type| {
             !ty.contains(&mut |t| match t {
-                Type::Meta(meta) if meta.legacy_root().is_some() => true,
+                Type::Meta(meta) if meta.inference_type_root().is_some() => true,
                 Type::Skolem(s) => self.store.skolem_level(*s) > level,
                 _ => false,
             })
@@ -358,11 +361,13 @@ impl Checker<'_> {
         // Do not rewrite this lexical upper bound by a branch assumption
         // while storing it. The proof above already discharged that branch;
         // the regular binder still checks occurs, scope and row restrictions.
+        let Some(rest) = self.store.fresh_beside_occurrence(variable) else {
+            return false;
+        };
         let equalities = mem::take(&mut self.store.equalities);
         let rows = mem::take(&mut self.store.row_equalities);
-        let rest = self.store.fresh_beside(target);
         let result = self
-            .bind(target, &Type::Union(Box::new(upper), Box::new(rest)))
+            .bind_inference(variable, &Type::Union(Box::new(upper), Box::new(rest)))
             .is_ok();
         self.store.equalities = equalities;
         self.store.row_equalities = rows;

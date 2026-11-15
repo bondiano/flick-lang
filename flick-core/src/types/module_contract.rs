@@ -21,6 +21,7 @@ mod actual;
 pub(in crate::types) mod kinded;
 
 include!("module_contract/scope.rs");
+pub(in crate::types) mod lexical;
 
 include!("module_contract/checker.rs");
 include!("module_contract/witness.rs");

@@ -3,7 +3,7 @@
 use super::{Mismatch, Unified};
 use crate::types::lang::{self, Lang};
 use crate::types::{
-    Checker,
+    Checker, MetaOccurrence,
     elem::Elem,
     env::Form,
     kinds::Kind,
@@ -184,15 +184,17 @@ impl Checker<'_> {
         let ([tail], true) = (&norm.tails[..], norm.entries.is_empty()) else {
             return None;
         };
-        let m = tail.legacy_meta_root()?;
+        tail.inference_meta_root()?;
         if matches!(other, Type::Meta(_) | Type::Error) {
             return None;
         }
         if other.is_lang(Lang::Never) {
-            return Some(self.bind(m, &Type::empty_row()));
+            return Some(self.bind_inference(tail, &Type::empty_row()));
         }
         Some(match self.error_label(other) {
-            Some(label) => self.bind(m, &Type::Row(Row::closed(vec![(label, other.clone())]))),
+            Some(label) => {
+                self.bind_inference(tail, &Type::Row(Row::closed(vec![(label, other.clone())])))
+            }
             None => Err(Mismatch::Types(projection.clone(), other.clone())),
         })
     }
@@ -240,17 +242,17 @@ impl Checker<'_> {
             // `α^c ≡ α` is no infinite type: the bound is compared below
             (Type::Bounded { .. } | Type::Captured { .. }, Type::Meta(meta))
                 if meta
-                    .legacy_root()
+                    .inference_type_root()
                     .is_some_and(|m| !self.qualifies_meta(&left, m)) =>
             {
-                return self.bind(meta.legacy_root().expect("legacy qualified root"), &left);
+                return self.bind_occurrence(meta, &left);
             }
             (Type::Meta(meta), Type::Bounded { .. } | Type::Captured { .. })
                 if meta
-                    .legacy_root()
+                    .inference_type_root()
                     .is_some_and(|m| !self.qualifies_meta(&right, m)) =>
             {
-                return self.bind(meta.legacy_root().expect("legacy qualified root"), &right);
+                return self.bind_occurrence(meta, &right);
             }
             (Type::Bounded { ty, captures }, other) | (other, Type::Bounded { ty, captures }) => {
                 // A function holds what its qualifier says, not its parameter
@@ -284,12 +286,14 @@ impl Checker<'_> {
         }
         match (&a, &b) {
             (Type::Error, _) | (_, Type::Error) => Ok(()),
-            (Type::Meta(x), Type::Meta(y)) if x.legacy_root().is_some() && x == y => Ok(()),
-            (Type::Meta(meta), t) if meta.legacy_root().is_some() => {
-                self.bind(meta.legacy_root().expect("legacy binding root"), t)
+            (Type::Meta(x), Type::Meta(y)) if x.inference_type_root().is_some() && x == y => {
+                self.bind_occurrence(x, &b)
             }
-            (t, Type::Meta(meta)) if meta.legacy_root().is_some() => {
-                self.bind(meta.legacy_root().expect("legacy binding root"), t)
+            (Type::Meta(meta), t) if meta.inference_type_root().is_some() => {
+                self.bind_occurrence(meta, t)
+            }
+            (t, Type::Meta(meta)) if meta.inference_type_root().is_some() => {
+                self.bind_occurrence(meta, t)
             }
             (Type::Skolem(x), Type::Skolem(y)) if x == y => Ok(()),
             (Type::Var(x), Type::Var(y)) | (Type::Symbol(x), Type::Symbol(y)) if x == y => Ok(()),
@@ -341,13 +345,13 @@ impl Checker<'_> {
             (Type::Record(r1), Type::Record(r2)) => self.unify_rows(r1, r2),
             (
                 Type::Exists {
-                    scope: _,
+                    scope: s1,
                     binder: x,
                     contract: c1,
                     body: b1,
                 },
                 Type::Exists {
-                    scope: _,
+                    scope: s2,
                     binder: y,
                     contract: c2,
                     body: b2,
@@ -371,9 +375,11 @@ impl Checker<'_> {
                 {
                     return Err(Mismatch::Types(a.clone(), b.clone()));
                 }
-                let left = module_contract::open_existential_type(b1, x, &witness);
-                let right = module_contract::open_existential_type(b2, y, &witness);
-                self.unify(&left, &right)
+                self.with_lexical_witness(&witness, |this, opened| {
+                    let left = module_contract::lexical::open_type(b1, x, *s1, opened);
+                    let right = module_contract::lexical::open_type(b2, y, *s2, opened);
+                    this.unify(&left, &right)
+                })
             }
             (Type::Row(_) | Type::Union(..) | Type::Without { .. }, _)
             | (_, Type::Row(_) | Type::Union(..) | Type::Without { .. }) => {
@@ -422,32 +428,12 @@ impl Checker<'_> {
 
     /// Whether `t` is a qualifier on the meta `m` itself.
     fn qualifies_meta(&self, t: &Type, m: u32) -> bool {
-        self.store.resolve(&self.capture_identity(t)) == Type::meta(m)
-    }
-
-    pub fn bind(&mut self, m: u32, t: &Type) -> Unified {
-        self.inference_trial(|this| this.bind_inner(m, t))
-    }
-
-    fn bind_inner(&mut self, m: u32, t: &Type) -> Unified {
-        let t = self.zonk(t);
-        if t.contains(&mut |x| *x == Type::meta(m)) {
-            return Err(Mismatch::Occurs(t));
-        }
-        if t.contains(&mut |x| matches!(x, Type::Forall { .. })) {
-            return Err(Mismatch::Polymorphic(t));
-        }
-        if self.store.is_numeric(m) && !self.store.numeric_fits(m, &t) {
-            return Err(Mismatch::Types(Type::meta(m), t));
-        }
-        if self.store.untouchable(m) {
-            return Err(Mismatch::Untouchable(t));
-        }
-        let level = self.store.meta_level(m).expect("an open variable");
-        self.store.adjust(&t, level).map_err(Mismatch::Escape)?;
-        self.store.set(m, t);
-        Ok(())
+        self.store
+            .resolve(&self.capture_identity(t))
+            .inference_meta_root()
+            == Some(m)
     }
 }
 
 include!("compare/opaque_heads.rs");
+include!("compare/bind.rs");
