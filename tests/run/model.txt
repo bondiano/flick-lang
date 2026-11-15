@@ -65,6 +65,7 @@ codegen/effect_sets
 codegen/given_shadow
 codegen/implicit
 codegen/instance_names
+codegen/known_instances
 codegen/record_constructor
 effect/row_without
 stdlib/effect/mutable_ref

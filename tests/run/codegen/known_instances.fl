@@ -1,0 +1,75 @@
+// Methods of instances the checker resolved, which the go target calls
+// directly, beside the dictionaries that stay dynamic: a constraint's, one
+// a value holds, one built from a context, a method an instance computes
+// and a default it takes from another module (`known_defaults` derives one
+// through `Generic`, `unpack_dictionary` has the local one of an `unpack`).
+// A direct call runs its effects in their place; `known_failure` fails in
+// one.
+module App.Main exposing (main)
+
+class Area a =
+  area : a -> Int
+  label : a -> String
+  let label x = "area " ++ show (area x)
+
+class Announce a =
+  announce : a ->{} Unit
+
+module Shapes exposing (Square(..), Circle(..)) =
+  type Square = Square Int
+
+  type Circle = Circle Int
+
+  // takes `label`, the default of its class in another module
+  instance Area Square =
+    let area s =
+      match s with
+      | Square side -> side * side
+
+  instance Area Circle =
+    let area c =
+      match c with
+      | Circle r -> 3 * r * r
+    let label c = "circle of " ++ show (area c)
+
+  instance Announce Square =
+    let announce s = Platform.stdout_line ("announce " ++ label s)
+
+// a dictionary built from a context
+instance Area a => Area (List a) =
+  let area xs = List.fold_left (fun acc x -> acc + area x) 0 xs
+
+type Tag = Tag
+
+// a method computed before it is a function
+instance Area Tag =
+  let area =
+    let base = 2 * 2
+    fun _ -> base
+
+/// A constraint's dictionary: the one its caller gives.
+described : Area a => a -> String
+let described x = label x ++ " / " ++ show (area x)
+
+/// A value that holds the dictionary of what it hides.
+type Sized =
+  | Area b => Sized b : Sized
+
+sized : Sized -> Int
+let sized s =
+  match s with
+  | Sized x -> area x
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+main : Unit ->{; AppError} Unit
+let main () =
+  say (show (area (Shapes.Square 3)) ++ " " ++ label (Shapes.Square 3))
+  say (show (area (Shapes.Circle 2)) ++ " " ++ label (Shapes.Circle 2))
+  say (described (Shapes.Square 4) ++ " | " ++ described (Shapes.Circle 1))
+  say (show (area [Shapes.Square 1, Shapes.Square 2]) ++ " " ++ show (area Tag))
+  say (show (sized (Sized (Shapes.Circle 1))) ++ " " ++ show (sized (Sized Tag)))
+  say "before"
+  announce (Shapes.Square 2)
+  say "after"

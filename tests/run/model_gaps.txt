@@ -25,6 +25,8 @@ codegen/for_comprehension # the model's (≡) rejects `App.Main.main`
 codegen/for_loop # the model's (≡) rejects `App.Main.main`
 codegen/fusion # a `for` or a `Seq` has no λFlick form
 codegen/interpolation # runs in the model; not in portable.txt
+codegen/known_defaults # the model's (App) rejects `App.Main.instance Points$Default Pair`
+codegen/known_failure # no native for `unsafe_div` (flick:rt intUnsafeDiv)
 codegen/ints # no native for `checked_add` (flick:rt intCheckedAdd)
 codegen/let_assert # no native for `get` (flick:rt listGet)
 codegen/pure_main # no native for `say` (global console.log)
@@ -36,6 +38,7 @@ codegen/repeated_superclass # the model's (Field) rejects `App.Main.back`
 codegen/service_child # no native for `parallel` (flick:rt parallel)
 codegen/strings_utf16 # no native for `length` (flick:String length)
 codegen/tags # no native for `tag_of` (./tags.mjs tagOf)
+codegen/unpack_dictionary # the model's (Field) rejects `App.Main.main`
 effect/host_services # no native for `env` (flick:rt platformEnv)
 ffi/catch_order # no native for `fail` (./bindings.mjs fail)
 ffi/copy # no native for `callback_arg` (./bindings.mjs copyDeepCallbackArg)
