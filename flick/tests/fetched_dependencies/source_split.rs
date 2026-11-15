@@ -7,6 +7,7 @@ use std::os::unix::fs::symlink;
 use std::os::windows::fs::symlink_dir as symlink;
 
 #[test]
+#[ignore = "requires built JS packages; run by just e2e-tests"]
 fn released_source_packages_are_fetched_pinned_and_run_offline_without_the_adapter() {
     let packages = Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages");
     let store = project("std-tarball-store", &[]);
