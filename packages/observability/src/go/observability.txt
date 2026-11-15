@@ -1,0 +1,6 @@
+# Go bindings used by the observability source package.
+
+
+[flick:observability/PrometheusMetrics]
+prometheusFormat *PrometheusFormat
+prometheusFormatWith *PrometheusFormatWith

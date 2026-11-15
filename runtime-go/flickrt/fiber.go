@@ -208,10 +208,15 @@ func ReadOwnerEvidence(fb *Fiber) Value {
 // In particular, closed owners can be transported without reopening them.
 func WithOwnerEvidence(fb *Fiber, owner Value) *Fiber {
 	// Opaque host evidence can be non-comparable. Only native owner tokens
-	// and absence participate in the context-preserving fast path.
+	// and absence (nil internally, Unit at the value boundary) participate
+	// in the context-preserving fast path.
 	same := owner == nil && fb.candidate == nil
 	if native, ok := owner.(*Owner); ok {
 		same = fb.candidate == native
+	}
+	if _, ok := owner.(UnitType); ok {
+		_, same = fb.candidate.(UnitType)
+		same = same || fb.candidate == nil
 	}
 	if same {
 		return fb

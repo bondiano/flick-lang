@@ -5,7 +5,16 @@
 
 /// The implicit packages. The first is the one `FLICK_STD_PATH` names; the
 /// others are its siblings there.
-pub const IMPLICIT_PACKAGES: &[&str] = &["std"];
+pub const IMPLICIT_PACKAGES: &[&str] = &[
+    "std",
+    "stream",
+    "process",
+    "ui",
+    "http",
+    "rpc",
+    "observability",
+    "cli",
+];
 
 /// Whether the package `name` is implicit.
 pub fn is_implicit_package(name: &str) -> bool {

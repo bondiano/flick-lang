@@ -1,11 +1,23 @@
 //! What a program built for go cannot use: built-in modules that exist on
 //! the js target only, `deriving Form`, and package modules no build
-//! compiled for go.
+//! compiled for go. Selected environments also check reachable effects.
 
-use super::Loader;
+#[cfg(not(target_arch = "wasm32"))]
+use std::path::Path;
+
+#[cfg(not(target_arch = "wasm32"))]
+use super::{Compilation, SourceMap};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::build::{Extras, Settings, target_preflight};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::codegen::EffectBridge;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::diagnostics::Severity;
+
+use super::{Loader, Project};
 use crate::diagnostics::{Diagnostic, codes};
 
-use crate::project::config::Emit;
+use crate::project::config::{Backend, Emit};
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
@@ -92,4 +104,58 @@ impl Loader<'_> {
         }
         self.diagnostics.extend(found);
     }
+}
+
+/// Check the selected environment against the complete compiled program.
+#[cfg(not(target_arch = "wasm32"))]
+pub(super) fn check_environment(
+    compilation: &Compilation,
+    project: Option<&Project>,
+    sources: &SourceMap,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    if let Some(environment) = project.and_then(|p| p.config.build.environment.as_ref())
+        && !compilation.modules.is_empty()
+        && !diagnostics.iter().any(|d| d.severity == Severity::Error)
+    {
+        let entries: Vec<(String, String)> = project
+            .map(|p| {
+                p.config
+                    .entries
+                    .iter()
+                    .map(|e| (e.name.clone(), e.module.clone()))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let runners: Vec<(String, String)> = project
+            .iter()
+            .flat_map(|p| &p.config.entries)
+            .filter_map(|e| Some((e.name.clone(), e.runner.as_ref()?.0.clone())))
+            .collect();
+        let settings = Settings {
+            package: None,
+            entries: &entries,
+            typescript: false,
+            release: false,
+            extras: Extras::default(),
+            source_path: &|_| String::new(),
+            source_dir: &|_| None,
+            out_dir: Path::new(""),
+            root: project.map(|p| p.root.as_path()),
+            backend: project.map_or(Backend::Effect, |p| p.config.build.effect),
+            effect_bridge: EffectBridge::Absent,
+            ui: project.and_then(|p| p.config.build.ui.as_deref()),
+            runners: &runners,
+            environment: Some(environment),
+        };
+        target_preflight::check(compilation, &settings, sources, environment, diagnostics);
+    }
+}
+
+/// Whether a run over `project` checks with the stages of a class derived
+/// from it, as Flick's own runtime has them: asked for with `rt`, or the
+/// project's runtime, whatever the target of the build. A host prepares the
+/// built-in modules checked this way before it runs.
+pub fn stages_by_class(project: Option<&Project>, rt: bool) -> bool {
+    rt || project.is_some_and(|p| p.config.build.effect == Backend::Rt)
 }

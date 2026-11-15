@@ -255,6 +255,7 @@ impl Loader<'_> {
                 // the module is reported as unknown
                 (None, None) => continue,
             };
+            let package = first_party::plugin_owner(&package).to_owned();
             let plugin = self.load_plugin(plugins, &package);
             // its blocks still find it, to say they have no code, unless an
             // import of a plugin that loads gives the head

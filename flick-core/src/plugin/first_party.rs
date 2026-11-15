@@ -14,6 +14,7 @@ use flick_plugin_sql::Sql;
 use flick_plugin_ui::{block as ui_block, calls, component};
 
 use super::{Expander, Native};
+use crate::implicit_packages::is_implicit_package;
 
 pub use crate::syntax::heads::{BARE, DECLARATIONS, HEADS, NAMED};
 
@@ -47,13 +48,29 @@ pub const OWN_CODES: [&str; 12] = [
     "U001", "U002", "U003", "U004", "U005", "U006", "U007", "D006", "E002", "T036", "T037", "T038",
 ];
 
-/// The package whose plugin is linked into the compiler. An implicit package
-/// without a plugin of its own needs no entry here.
+/// The logical owner of the plugin linked into the compiler. Its source
+/// modules may live in different implicit packages.
 pub const PACKAGE: &str = "std";
+
+/// The standard-library source packages share the linked plugin's logical
+/// owner. A host-supplied extra package does not acquire it. Moving a module
+/// does not rename its plugin or its diagnostics.
+pub fn has_plugin(package: &str) -> bool {
+    is_implicit_package(package)
+}
+
+/// The logical plugin owner of a physical source package.
+pub fn plugin_owner(package: &str) -> &str {
+    if has_plugin(package) {
+        PACKAGE
+    } else {
+        package
+    }
+}
 
 /// The plugin linked into the compiler for `package`.
 pub fn plugin(package: &str) -> Option<Arc<dyn Expander>> {
-    (package == PACKAGE).then(|| Arc::new(Native::new(PACKAGE, Std)) as Arc<dyn Expander>)
+    has_plugin(package).then(|| Arc::new(Native::new(PACKAGE, Std)) as Arc<dyn Expander>)
 }
 
 /// The plugin of std: `cli` blocks and `deriving Cli.Value`, `server fn`,

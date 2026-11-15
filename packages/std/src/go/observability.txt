@@ -1,4 +1,5 @@
-# Logger, Metric, Tracer and References.
+# Go bindings used by the std source package.
+
 
 [flick:Logger]
 map LoggerMap
@@ -68,11 +69,6 @@ flickWithTracerEnabled *ReferencesWithTracerEnabled
 flickWithTracerTimingEnabled *ReferencesWithTracerTimingEnabled
 flickTracerSpanAnnotations *ReferencesTracerSpanAnnotations
 
-[flick:observability/PrometheusMetrics]
-prometheusFormat *PrometheusFormat
-prometheusFormatWith *PrometheusFormatWith
-
-# Effect.Observe
 [flick:Effect]
 flickLogWithLevel *EffectLogWithLevel
 withLogger *EffectWithLogger

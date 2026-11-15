@@ -12,6 +12,7 @@ mod foreign_inputs;
 #[path = "cli_project/output_guards.rs"]
 mod output_guards;
 
+use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{self, Output, Stdio};
@@ -19,6 +20,7 @@ use std::process::{self, Output, Stdio};
 use common::{APP, flick_in, project};
 use flick_core::build::runner_path;
 use flick_core::diagnostics::codes::REGISTRY;
+use flick_core::implicit_packages::IMPLICIT_PACKAGES;
 
 const MAIN: &str = "module App.Main exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"hi\"\n";
 
@@ -338,14 +340,22 @@ fn fake_pnpm(dir: &Path, version: &str) -> (PathBuf, PathBuf) {
     (bin, marker)
 }
 
-/// The `[dependencies]` entry that keeps `std` local, so a test fetches
-/// nothing and needs no `git`.
+/// The `[dependencies]` entries that keep the implicit packages local, so a
+/// test fetches nothing and needs no `git`.
 fn local_std() -> String {
-    let std = Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages/std");
-    format!(
-        "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n\n[dependencies]\nstd = {{ path = \"{}\" }}\n",
-        std.display()
-    )
+    let packages = Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages");
+    let mut manifest =
+        "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n\n[dependencies]\n"
+            .to_owned();
+    for name in IMPLICIT_PACKAGES {
+        writeln!(
+            manifest,
+            "{name} = {{ path = \"{}\" }}",
+            packages.join(name).display()
+        )
+        .expect("manifest string");
+    }
+    manifest
 }
 
 include!("cli_project/pnpm.rs");

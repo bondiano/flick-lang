@@ -5,6 +5,50 @@ fn append(scopes: &mut Scopes, base: &Context, name: &str) -> Context {
 }
 
 #[test]
+fn scope_lookups_retain_the_registration_context_and_reject_unknown_scopes() {
+    let mut scopes = Scopes::default();
+    let a = append(&mut scopes, &Context::default(), "A");
+    let ab = append(&mut scopes, &a, "B");
+    let a_id = a.ids().next().expect("A coordinate");
+    let b_id = ab.ids().last().expect("B coordinate");
+    assert_eq!(scopes.scope_of_module("A"), Some(a_id));
+    assert_eq!(scopes.scope_of_module("B"), Some(b_id));
+    assert_eq!(scopes.registered_context(a_id), Some(a));
+    assert_eq!(scopes.registered_context(b_id), Some(ab));
+    assert_eq!(scopes.scope_of_module("Missing"), None);
+    assert_eq!(scopes.registered_context(Scope::default().identity()), None);
+}
+
+#[test]
+fn common_context_retains_shared_ancestors_and_rejects_foreign_authority() {
+    let mut scopes = Scopes::default();
+    let a = append(&mut scopes, &Context::default(), "A");
+    let ab = scopes.append(&a, Type::con("A", "Contract"), "B".into());
+    let ac = scopes.append(&a, Type::con("A", "Contract"), "C".into());
+    assert_eq!(ab.common(&ac), Ok(a.clone()));
+    assert_eq!(ac.common(&ab), Ok(a));
+    let mut foreign = Scopes::default();
+    let other = append(&mut foreign, &Context::default(), "A");
+    assert_eq!(ab.common(&other), Err(Invalid::Authority));
+}
+
+#[test]
+fn changing_ambient_context_keeps_the_image_and_requires_every_image_coordinate() {
+    let mut scopes = Scopes::default();
+    let a = append(&mut scopes, &Context::default(), "A");
+    let ab = append(&mut scopes, &a, "B");
+    let abc = append(&mut scopes, &ab, "C");
+    let view = Embedding::weaken(&a, &ab).expect("A in AB");
+    assert_eq!(view.image_context(), a);
+    let larger = view.in_context(&abc).expect("A remains in ABC");
+    assert_eq!(larger.target(), &abc);
+    assert_eq!(larger.image_context(), a);
+    assert_eq!(view.in_context(&a), Ok(Embedding::identity(&a)));
+    let missing = append(&mut scopes, &Context::default(), "Unrelated");
+    assert_eq!(view.in_context(&missing), Err(Invalid::Domain));
+}
+
+#[test]
 fn identity_weakening_and_composition_preserve_order() {
     let mut scopes = Scopes::default();
     let a = append(&mut scopes, &Context::default(), "A");

@@ -509,48 +509,5 @@ include!("owner_descriptors/abstract_types.rs");
 include!("owner_descriptors/productivity.rs");
 
 #[cfg(test)]
-mod sharing_tests {
-    use super::Op;
-    use crate::ir::tests::lower_text;
-    use crate::ir::{Expr, ExprKind, ItemKind, Lit, Pat};
-
-    fn abstract_calls(expression: &Expr) -> usize {
-        let mut count = usize::from(matches!(&expression.kind,
-            ExprKind::App { arg, .. } if matches!(&arg.kind, ExprKind::Tuple(fields)
-                if matches!(fields.first().map(|field| &field.kind), Some(ExprKind::Lit(Lit::Int(op))) if *op == Op::Abstract as i32))));
-        expression.each_child(&mut |child| count += abstract_calls(child));
-        count
-    }
-
-    fn inspect(expression: &Expr, found: &mut bool) {
-        if let ExprKind::Lambda { params, body } = &expression.kind
-            && params.len() == 1
-            && matches!(&params[0].pat, Pat::Tuple(fields) if fields.len() == 4)
-            && let ExprKind::Match(_, arms) = &body.kind
-            && let Some(arm) = arms.iter().find(|arm| {
-                matches!(&arm.pat,
-                Pat::Lit(Lit::Int(op)) if *op == Op::Productive as i32)
-            })
-        {
-            *found = true;
-            assert_eq!(
-                abstract_calls(&arm.body),
-                0,
-                "the P fastpath must tail-dispatch its fallback rather than duplicate full observations per syntax node"
-            );
-        }
-        expression.each_child(&mut |child| inspect(child, found));
-    }
-
-    #[test]
-    fn productivity_fallback_is_shared_instead_of_copied_per_type_node() {
-        let module = lower_text("Test", "module Test exposing (repeat)\nopaque type alias Id a = a\nopaque type alias Repeat a s = Eff {Scope s} none (Id (Repeat (List a) s))\nrepeat : Repeat Int s\nforeign pure repeat from \"flick:rt\" \"repeat\"\n").expect("recursive original declaration");
-        let mut found = false;
-        for item in &module.items {
-            if let ItemKind::Value { body, .. } = &item.kind {
-                inspect(body, &mut found);
-            }
-        }
-        assert!(found, "generated productivity dispatcher");
-    }
-}
+#[path = "owner_descriptors/tests.rs"]
+mod sharing_tests;

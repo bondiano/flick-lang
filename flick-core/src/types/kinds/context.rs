@@ -64,7 +64,7 @@ impl KindStore {
 
     /// Joint read-only observation: validate every occurrence before a solved
     /// root or a projection can erase its source/target registration lease.
-    #[allow(dead_code)] // Phase M: used by the unused ZonkRead path until wired
+    #[cfg(test)]
     pub(in crate::types) fn resolve_deep_in(
         &self,
         kind: &Kind,

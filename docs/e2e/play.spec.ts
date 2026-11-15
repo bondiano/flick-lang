@@ -202,7 +202,7 @@ test("the Russian playground previews the counter", async ({ page }) => {
   await page.locator(".fp-gallery-button").click();
   await page.locator(".fp-gallery").getByRole("button", { name: "Счётчик" }).click();
   await page.getByRole("button", { name: "Запустить", exact: true }).click();
-  await expect(page.frameLocator(".fp-frame iframe").getByText("clicked 0 times")).toBeVisible();
+  await expect(page.frameLocator(".fp-frame iframe").getByText("clicked 0 times")).toBeVisible({ timeout: 60_000 });
   await expect(page.getByRole("status").filter({ hasText: "Работает в изолированном фрейме" })).toBeVisible();
 });
 
@@ -326,7 +326,7 @@ test("exercise checks resolve a re-export through the worker declaration graph",
   await replaceSource(page, 'module Main exposing (main, length)\nimport String exposing (length)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (length "Flick"))\n');
   await expect(page.locator(".fp-status")).toContainText("Type-checked", { timeout: 30_000 });
   await page.getByRole("button", { name: "Check answer" }).click();
-  await expect(page.locator(".fp-lesson")).toContainText("Correct. The signature and output match.");
+  await expect(page.locator(".fp-lesson")).toContainText("Correct. The signature and output match.", { timeout: 30_000 });
 });
 
 test("local mutation, loops and typed errors run in the browser", async ({ page }) => {

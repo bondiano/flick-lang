@@ -1,5 +1,5 @@
-// Optimize the linked compiler for size, including duplicate functions across
-// Rust crates. Keep every import/export and wasm-bindgen's metadata.
+// Optimize the compiler after linking several Rust crates. Keep every
+// import/export and wasm-bindgen's metadata while minimizing instruction size.
 import { execFileSync } from "node:child_process";
 import { readFileSync, renameSync, rmSync } from "node:fs";
 
@@ -19,18 +19,22 @@ const shape = (bytes) => {
     exports: ordered(WebAssembly.Module.exports(module)),
   });
 };
+const metadata = (bytes) => JSON.stringify(WebAssembly.Module.customSections(
+  new WebAssembly.Module(bytes), "__wasm_bindgen_unstable",
+).map((section) => Buffer.from(section).toString("hex")));
 const before = readFileSync(file);
 const temporary = `${file}.${process.pid}.dedup`;
 try {
   execFileSync("wasm-opt", [
     file,
-    "-Oz", "--duplicate-function-elimination", "--converge",
+    "--duplicate-function-elimination", "--converge", "-Oz",
     "--strip-debug", "--strip-producers",
     "-o", temporary,
   ], { stdio: "inherit" });
   const after = readFileSync(temporary);
-  if (shape(after) !== shape(before)) throw new Error("WASM deduplication changed imports or exports");
-  if (after.length > before.length) throw new Error("WASM deduplication increased the artifact size");
+  if (shape(after) !== shape(before)) throw new Error("WASM optimization changed imports or exports");
+  if (metadata(after) !== metadata(before)) throw new Error("WASM optimization changed wasm-bindgen metadata");
+  if (after.length > before.length) throw new Error("WASM optimization increased the artifact size");
   renameSync(temporary, file);
   console.log(`WASM size optimization: ${before.length} → ${after.length} bytes (${version})`);
 } finally {

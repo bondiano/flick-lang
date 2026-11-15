@@ -764,8 +764,8 @@ The implementation is in the
 [React-only runner](https://github.com/bondiano/flick-lang/blob/main/packages/effect-ts/src/ui/react/index.ts),
 [DOM adapter](https://github.com/bondiano/flick-lang/blob/main/packages/effect-ts/src/ui/index.ts)
 and built-in modules
-[`Ui`](https://github.com/bondiano/flick-lang/blob/main/packages/std/src/Ui.fl)
-and [`Ui.Dom`](https://github.com/bondiano/flick-lang/blob/main/packages/std/src/Ui/Dom.fl).
+[`Ui`](https://github.com/bondiano/flick-lang/blob/main/packages/ui/src/Ui.fl)
+and [`Ui.Dom`](https://github.com/bondiano/flick-lang/blob/main/packages/ui/src/Ui/Dom.fl).
 Regression coverage is kept with the behavior:
 
 - [`packages/effect-ts/test/ui-roots.test.ts`](https://github.com/bondiano/flick-lang/blob/main/packages/effect-ts/test/ui-roots.test.ts)

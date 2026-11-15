@@ -41,15 +41,11 @@ pub use ide::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_rt, ana
 pub use precompiled::{CachedModule, Fresh, PackageCache};
 #[cfg(all(test, feature = "native-project"))]
 pub(crate) use target::js_only;
+pub use target::stages_by_class;
 
-use super::config::Backend;
 #[cfg(feature = "native-project")]
 use super::packages::{Packages, project_name};
 use super::{Host, Project, module_path, normalize};
-#[cfg(not(target_arch = "wasm32"))]
-use crate::build::{Extras, Settings, target_preflight};
-#[cfg(not(target_arch = "wasm32"))]
-use crate::codegen::EffectBridge;
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
 use crate::iface::{
     BindingOrigin, CalleeOrigin, ExpansionFrame, LexicalScope, StaticArgument, StaticBinding,
@@ -336,14 +332,6 @@ fn run(
     run_in(host, sources, project, roots, mode, cache, saved, false)
 }
 
-/// Whether a run over `project` checks with the stages of a class derived
-/// from it, as Flick's own runtime has them: asked for with `rt`, or the
-/// project's runtime, whatever the target of the build. A host prepares the
-/// built-in modules checked this way before it runs.
-pub fn stages_by_class(project: Option<&Project>, rt: bool) -> bool {
-    rt || project.is_some_and(|p| p.config.build.effect == Backend::Rt)
-}
-
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 fn run_in(
     host: &dyn Host,
@@ -489,48 +477,7 @@ fn run_in(
         js_dependencies,
     };
     #[cfg(not(target_arch = "wasm32"))]
-    if let Some(environment) = project.and_then(|p| p.config.build.environment.as_ref())
-        && !compilation.modules.is_empty()
-        && !diagnostics.iter().any(|d| d.severity == Severity::Error)
-    {
-        let entries: Vec<(String, String)> = project
-            .map(|p| {
-                p.config
-                    .entries
-                    .iter()
-                    .map(|e| (e.name.clone(), e.module.clone()))
-                    .collect()
-            })
-            .unwrap_or_default();
-        let runners: Vec<(String, String)> = project
-            .iter()
-            .flat_map(|p| &p.config.entries)
-            .filter_map(|e| Some((e.name.clone(), e.runner.as_ref()?.0.clone())))
-            .collect();
-        let settings = Settings {
-            package: None,
-            entries: &entries,
-            typescript: false,
-            release: false,
-            extras: Extras::default(),
-            source_path: &|_| String::new(),
-            source_dir: &|_| None,
-            out_dir: Path::new(""),
-            root: project.map(|p| p.root.as_path()),
-            backend: project.map_or(Backend::Effect, |p| p.config.build.effect),
-            effect_bridge: EffectBridge::Absent,
-            ui: project.and_then(|p| p.config.build.ui.as_deref()),
-            runners: &runners,
-            environment: Some(environment),
-        };
-        target_preflight::check(
-            &compilation,
-            &settings,
-            sources,
-            environment,
-            &mut diagnostics,
-        );
-    }
+    target::check_environment(&compilation, project, sources, &mut diagnostics);
     // by path, not by load order, which follows the order of imports
     diagnostics.sort_by_cached_key(|d| {
         (

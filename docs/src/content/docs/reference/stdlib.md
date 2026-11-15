@@ -82,7 +82,9 @@ and `Monad`.
 ### More modules
 
 Each of these modules is documented in its source under
-`packages/std/src/`:
+`packages/<package>/src/`, in the
+[implicit source package](../project/#flick-dependencies) that owns it.
+For example, `Clock` is in `std`, `Stream` in `stream`, and `HttpApi` in `http`:
 
 | Module | Contents |
 | - | - |

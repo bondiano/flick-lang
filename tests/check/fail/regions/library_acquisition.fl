@@ -1,0 +1,62 @@
+// A replaceable library resource cannot store its acquisition's private
+// capability in a cell owned by its caller.
+module App.LibraryAcquisition exposing (..)
+
+type Raw
+
+make_conn : Unit ->{} Raw
+foreign effect make_conn from "./conn.js" "make"
+
+close_conn : Raw^c ->{} Unit
+foreign effect close_conn from "./conn.js" "close"
+  retention call
+
+conn : Unit ->{Scope s} Raw^{s}
+let conn () = Resource.acquire_release (task { make_conn () }) close_conn
+
+rc_ref : Unit ->{} Unit
+let rc_ref () = scope {
+  let cell = Ref.make None
+  let _ref = RcRef.make {
+    acquire = task {
+      let c = conn ()
+      Ref.set cell (Some c)
+      c
+    };
+    idleTimeToLive = None;
+  }
+  ()
+}
+
+rc_map : Unit ->{} Unit
+let rc_map () = scope {
+  let cell = Ref.make None
+  let _map = RcMap.make {
+    lookup = fun (_ : String) ->
+      let c = conn ()
+      Ref.set cell (Some c)
+      c;
+    idleTimeToLive = None;
+    capacity = None;
+  }
+  ()
+}
+
+pool : Unit ->{} Unit
+let pool () = scope {
+  let cell = Ref.make None
+  let _pool = Pool.make {
+    acquire = task {
+      let c = conn ()
+      Ref.set cell (Some c)
+      c
+    };
+    size = 1;
+    concurrency = None;
+    targetUtilization = None;
+  }
+  ()
+}
+//~ FLICK-T007 @23:21-23:27 the type variable `t` would escape
+//~ FLICK-T007 @37:21-37:27 the type variable `t` would escape
+//~ FLICK-T007 @51:21-51:27 the type variable `t` would escape

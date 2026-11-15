@@ -1,5 +1,6 @@
 [package]
 name = "flick-component-build"
+default-run = "flick-component-build"
 description = "Package a self-contained backend module as a WebAssembly component"
 version = "0.1.0"
 edition.workspace = true

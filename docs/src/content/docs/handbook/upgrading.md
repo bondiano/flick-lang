@@ -83,7 +83,19 @@ of the compiler's own source:
 std = { path = "../flick-lang/packages/std" }
 ```
 
-or set `FLICK_STD_PATH` to that directory.
+The standard-library sources are split into `std`, `stream`, `process`, `ui`,
+`http`, `rpc`, `observability` and `cli`. Run `flick install` again and commit
+the updated `flick.lock`, so fetched packages are pinned together; then
+`flick install --locked --offline` uses the installed set. Public module names
+and the logical `std` plugin remain the same, including its diagnostic codes.
+A project that uses only RT-supported bindings still needs no adapter; a mixed
+project keeps the adapter version and runtime ABI its manifest requires.
+
+For a local override, set `FLICK_STD_PATH` to `packages/std` of a complete
+checkout, keeping the seven other packages beside it with their own
+`src/modules.txt`. A copied `std` directory alone no longer provides the whole
+standard library. Alternatively, add a path entry like the one above for each
+package you override; unspecified packages retain their release source.
 
 ## `schema T` is `T.schema`
 
@@ -622,3 +634,14 @@ unchanged. Rebuild cached interfaces: the compiler now reads `.iface` schema
 non-public type definitions separately from the public export namespace; it
 does not make those names importable. The separate experimental memory IR is not a new
 field of the serialized typed program.
+
+## Library acquisition regions
+
+`RcRef.make`, `RcMap.make`, `Pool.make` and `Pool.make_with_ttl` quantify a
+fresh region for each acquisition or lookup, as `ScopedRef` and `ScopedCache`
+already do. The library supplies that region when the callback runs and
+releases its resources after the last borrower finishes. Acquisition cannot
+store a capability of its private region in an outer `Ref`; this reports
+`FLICK-T007`. A separately bound polymorphic task remains a valid acquisition.
+The container's owning region and the callback's ordinary service requirements
+remain independent of the private acquisition region.

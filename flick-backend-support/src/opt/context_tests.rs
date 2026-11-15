@@ -202,3 +202,120 @@ fn dictionary_substitution_accepts_local_aliases_but_retains_nonlocal_bindings()
     assert_eq!(body.uses("module"), 0);
     assert_eq!(body.uses("alias"), 1);
 }
+
+#[test]
+fn propagation_without_named_lets_preserves_statements_and_metadata() {
+    let mut statements = vec![
+        Stmt::Let(
+            Pat::Tuple(vec![Pat::Bind("part".into())]),
+            expr(ExprKind::Tuple(vec![global()])),
+        ),
+        Stmt::Fun {
+            name: "helper".into(),
+            rec: true,
+            dicts: vec![],
+            value: bracket(0),
+        },
+        Stmt::Var("state".into(), local("part")),
+        Stmt::Assign("state".into(), local("helper")),
+        Stmt::Expr(opened()),
+    ];
+    let mut result = bracket(1);
+    let original = (statements.clone(), result.clone());
+
+    assert!(!super::propagate(&mut statements, &mut result, &|_, _| {
+        None
+    }));
+    assert_eq!((statements, result), original);
+}
+
+#[test]
+fn simplification_visits_named_lets_inside_function_only_blocks() {
+    let answer = expr(ExprKind::Lit(Lit::Int(42)));
+    let function = |body| Stmt::Fun {
+        name: "helper".into(),
+        rec: false,
+        dicts: vec![],
+        value: expr(ExprKind::Lambda {
+            params: vec![flick_ir::Param {
+                pat: Pat::Wild,
+                stage: Stage::Pure,
+                ty: None,
+            }],
+            body: Box::new(body),
+        }),
+    };
+    let mut body = expr(ExprKind::Block(
+        vec![function(expr(ExprKind::Block(
+            vec![Stmt::Let(Pat::Bind("answer".into()), answer.clone())],
+            Box::new(local("answer")),
+        )))],
+        Box::new(local("helper")),
+    ));
+
+    super::simplify(&mut body, &Known::of(&[]));
+    assert_eq!(
+        body,
+        expr(ExprKind::Block(
+            vec![function(answer)],
+            Box::new(local("helper")),
+        )),
+    );
+}
+
+#[test]
+fn nonmovable_named_lets_leave_function_bodies_untouched() {
+    let raw = expr(ExprKind::App {
+        func: Box::new(global()),
+        arg: Box::new(local("owner")),
+        stage: Stage::Pure,
+        arg_first: false,
+    });
+    let mut statements = vec![
+        Stmt::Fun {
+            name: "helper".into(),
+            rec: true,
+            dicts: vec![],
+            value: bracket(0),
+        },
+        Stmt::Let(Pat::Bind("raw".into()), raw),
+    ];
+    let mut result = expr(ExprKind::Tuple(vec![local("raw"), local("helper")]));
+    let original = (statements.clone(), result.clone());
+    assert!(!super::propagate(&mut statements, &mut result, &|_, _| {
+        Some(1)
+    }));
+    assert_eq!((statements, result), original);
+}
+
+#[test]
+fn partial_applications_can_move_to_their_completing_use() {
+    let apply = |func, arg| {
+        expr(ExprKind::App {
+            func: Box::new(func),
+            arg: Box::new(arg),
+            stage: Stage::Pure,
+            arg_first: false,
+        })
+    };
+    let function = |body| {
+        expr(ExprKind::Lambda {
+            params: vec![flick_ir::Param {
+                pat: Pat::Bind("second".into()),
+                stage: Stage::Pure,
+                ty: None,
+            }],
+            body: Box::new(body),
+        })
+    };
+    let partial = apply(global(), local("first"));
+    let mut statements = vec![Stmt::Let(Pat::Bind("partial".into()), partial.clone())];
+    let mut result = function(apply(local("partial"), local("second")));
+    assert!(super::propagate(
+        &mut statements,
+        &mut result,
+        &|_, _| Some(2)
+    ));
+    assert!(statements.is_empty());
+    assert_eq!(result, function(apply(partial, local("second"))));
+}

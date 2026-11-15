@@ -1,5 +1,5 @@
 // Compiler/worker interoperability only. Widget state and presentation live in Flick.
-import type { Built, Completion, Diagnostic, Generated, Hover, Operation, Reply, Request, Result } from "./compiler.worker.ts";
+import type { Built, CompiledExercise, Completion, Diagnostic, Generated, Hover, Operation, Reply, Request, Result } from "./compiler.worker.ts";
 import { packages } from "./loader.ts";
 import type { Message, Program } from "./runtime.ts";
 import { notify } from "./dom.ts";
@@ -121,8 +121,8 @@ export const compile = (source: string, profile: string, signal: AbortSignal): P
   request<Generated>({ action: "compile", source, profile }, signal);
 
 /** Declaration graph is requested only for explicit exercise checks. */
-export const compileExercise = (source: string, signal: AbortSignal): Promise<Generated> =>
-  request<Generated>({ action: "compile", source, profile: "debug", declarations: true }, signal);
+export const compileExercise = (source: string, signal: AbortSignal): Promise<CompiledExercise> =>
+  request<CompiledExercise>({ action: "compile", source, profile: "debug", declarations: true }, signal);
 
 /**
  * Markdown as plain text: a code block keeps its lines without its fences,
@@ -195,23 +195,25 @@ const openFrame = async (generation: number): Promise<HTMLIFrameElement> => {
   return frame;
 };
 
-/**
- * Build off-thread, then execute in the existing isolated, terminable runner: a
- * worker, or for a program with an interface a frame that stays open once it starts.
- */
-export const run = async (source: string, profile: string, signal: AbortSignal): Promise<Execution> => {
+/** A single compiled result and the preview generation that requested it. */
+export interface PreparedRun {
+  readonly built: Built;
+  readonly generation: number;
+}
+
+/** Preparation stays cancelable without spending the program's execution budget. */
+export const prepareRun = async (source: string, profile: string, signal: AbortSignal): Promise<PreparedRun> => {
   closePreview();
   const generation = previewGeneration;
-  if (signal.aborted) return { lines: [], status: "stopped", detail: "", diagnostics: [] };
-  let result: Built;
-  try {
-    result = await request<Built>({ action: "build", source, profile }, signal);
-  } catch (error) {
-    if (signal.aborted) return { lines: [], status: "stopped", detail: "", diagnostics: [] };
-    throw error;
-  }
+  const built = await request<Built>({ action: "build", source, profile }, signal);
+  return { built, generation };
+};
+
+/** Execute one prepared result in the existing isolated, terminable runner. */
+export const runPrepared = async (prepared: PreparedRun, signal: AbortSignal): Promise<Execution> => {
+  const { built: result, generation } = prepared;
   const problems = result.diagnostics;
-  if (signal.aborted) return { lines: [], status: "stopped", detail: "", diagnostics: problems };
+  if (signal.aborted || generation !== previewGeneration) return { lines: [], status: "stopped", detail: "", diagnostics: problems };
   if (result.files === null) return { lines: [], status: "invalid", detail: "", diagnostics: problems };
   if (result.entry === null) return { lines: [], status: "no-main", detail: "", diagnostics: problems };
   const program: Program = { files: result.files, entry: result.entry };
@@ -276,4 +278,20 @@ export const run = async (source: string, profile: string, signal: AbortSignal):
     finish("failure", detail(error));
   }
   return promise;
+};
+
+/** Execute a checked emit, replacing a preview only when execution actually starts. */
+export const runBuilt = (built: Built, signal: AbortSignal): Promise<Execution> => {
+  closePreview();
+  return runPrepared({ built, generation: previewGeneration }, signal);
+};
+
+/** Build and run under one caller's signal. */
+export const run = async (source: string, profile: string, signal: AbortSignal): Promise<Execution> => {
+  try {
+    return await runPrepared(await prepareRun(source, profile, signal), signal);
+  } catch (error) {
+    if (signal.aborted) return { lines: [], status: "stopped", detail: "", diagnostics: [] };
+    throw error;
+  }
 };

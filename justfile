@@ -289,6 +289,7 @@ wasm-plugins: wasm-backends
 
 # No WASI adapter: an official backend imports only the compiler input interface.
 js-component:
+    node --test tools/backend-package/*.test.mjs
     node tools/backend-package/build.mjs
     mkdir -p target/backends
     cargo run -p flick-component-build -- target/backend-guest/wasm32-unknown-unknown/release/flick_backend_js.wasm target/backends/js.wasm
@@ -325,12 +326,13 @@ wasm-backends: backend-fixtures
 # The raw-byte budget retains the playground editor queries (hover, completion,
 # fixes and `.d.ts`). Size optimization uses LLVM Oz, whole-program LTO and
 # removal of debug information;
-# native release builds retain thin LTO. Binaryen removes duplicate functions
-# across Rust crates, preserving imports/exports and wasm-bindgen metadata.
-# With the playground on Flick's own
-# runtime and its bridge to the Effect adapter, and no kept answers of
-# plugins, Binaryen also optimizes the linked module for size.
+# native release builds retain thin LTO. Binaryen deduplicates across Rust
+# crates and optimizes instruction size, preserving imports/exports and
+# wasm-bindgen metadata.
+# The optimized compiler keeps the editor query surface within the raw-byte
+# budget below; runtime bundles have separate gzip budgets.
 wasm:
+    node --test tools/wasm-dedup/index.test.mjs
     CARGO_PROFILE_RELEASE_OPT_LEVEL=z CARGO_PROFILE_RELEASE_LTO=fat CARGO_PROFILE_RELEASE_STRIP=debuginfo cargo build -p flick-wasm --target wasm32-unknown-unknown --release
     node tools/wasm-dedup/index.mjs target/wasm32-unknown-unknown/release/flick_wasm.wasm
     @wasm=target/wasm32-unknown-unknown/release/flick_wasm.wasm; \

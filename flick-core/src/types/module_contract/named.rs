@@ -1,16 +1,24 @@
 //! Named existential authority. Static/anonymous signature witnesses stay separate.
 
-use std::collections::{BTreeSet, HashMap};
+#[cfg(test)]
+use std::collections::BTreeSet;
+use std::collections::HashMap;
+#[cfg(test)]
 use std::fmt;
 use std::sync::Arc;
 
+#[cfg(test)]
 use super::context::{Context, Embedding, ProjectionError};
+#[cfg(test)]
 use super::kinded::Incomplete;
 use super::{Form, Interface, Kind, Namespace, Type, TypeDef};
 use crate::iface::Entity;
+#[cfg(test)]
+use crate::types::Scope;
 use crate::types::ty::carrier::{self, Stamp};
-use crate::types::{Checker, ModuleSignature, Scope, ScopeId};
+use crate::types::{Checker, ModuleSignature, ScopeId};
 
+#[cfg(test)]
 type Actuals = Vec<(ScopeId, Type, Interface)>;
 
 #[derive(Default)]
@@ -36,12 +44,14 @@ struct Issued {
 #[derive(Clone)]
 pub(in crate::types) struct ExistentialWitness(Arc<Issued>);
 
+#[cfg(test)]
 #[derive(Debug)]
 pub(in crate::types) enum WitnessFailure {
     Invalid(String),
     Projection(ProjectionError),
 }
 
+#[cfg(test)]
 impl WitnessFailure {
     pub(in crate::types) fn is_pending(&self) -> bool {
         matches!(
@@ -53,24 +63,28 @@ impl WitnessFailure {
     }
 }
 
+#[cfg(test)]
 impl From<String> for WitnessFailure {
     fn from(message: String) -> Self {
         Self::Invalid(message)
     }
 }
 
+#[cfg(test)]
 impl From<ProjectionError> for WitnessFailure {
     fn from(error: ProjectionError) -> Self {
         Self::Projection(error)
     }
 }
 
+#[cfg(test)]
 impl From<Incomplete> for WitnessFailure {
     fn from(error: Incomplete) -> Self {
         Self::Projection(ProjectionError::Incomplete(error))
     }
 }
 
+#[cfg(test)]
 impl fmt::Display for WitnessFailure {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -83,6 +97,7 @@ impl fmt::Display for WitnessFailure {
     }
 }
 
+#[cfg(test)]
 pub(in crate::types) struct WitnessRegistration {
     scope: Scope,
     base: Context,
@@ -90,6 +105,7 @@ pub(in crate::types) struct WitnessRegistration {
     dependencies: BTreeSet<ScopeId>,
 }
 
+#[cfg(test)]
 impl WitnessRegistration {
     pub(in crate::types) fn into_parts(
         self,
@@ -111,10 +127,12 @@ impl WitnessRefresh<'_> {
 
 impl ExistentialWitness {
     /// Metadata only: use still requires this checker's current-pair validation.
+    #[cfg(test)]
     pub(in crate::types) fn issuer_owner(&self) -> ScopeId {
         self.0.owner
     }
 
+    #[cfg(test)]
     pub(in crate::types) fn canonical_contract(&self) -> Type {
         Type::con(&self.0.contract.module, &self.0.contract.name)
     }
@@ -169,6 +187,7 @@ impl NamedWitnesses {
     }
 
     /// Identity inventory only; membership does not issue a scope or lease.
+    #[cfg(test)]
     fn scoped_modules(&self) -> BTreeSet<String> {
         self.issued
             .values()
@@ -185,8 +204,9 @@ impl NamedWitnesses {
 }
 
 impl Checker<'_> {
-    /// The only production registration funnel: refresh the exact issued pair,
+    /// Registration for issued-witness tests: refresh the exact issued pair,
     /// then derive support from its live kind-indexed actual carrier.
+    #[cfg(test)]
     pub(in crate::types) fn register_existential_scope(
         &mut self,
         scope: Scope,
@@ -211,6 +231,7 @@ impl Checker<'_> {
             .map_err(|error| WitnessFailure::Projection(ProjectionError::Invalid(error)))
     }
 
+    #[cfg(test)]
     pub(in crate::types) fn current_witness_context(
         &mut self,
         context: &Context,
@@ -219,6 +240,7 @@ impl Checker<'_> {
             .map(|(context, _)| context)
     }
 
+    #[cfg(test)]
     fn prepare_witness_context(
         &mut self,
         context: &Context,
@@ -251,6 +273,7 @@ impl Checker<'_> {
 
     /// Mathematical embedding equality never substitutes for validating both
     /// live issued carriers and their current materialized actual layouts.
+    #[cfg(test)]
     pub(in crate::types) fn align_witness_contexts(
         &mut self,
         source: &Context,

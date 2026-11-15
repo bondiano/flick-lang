@@ -3,7 +3,8 @@ import { test } from "node:test";
 
 import { Effect, References } from "effect";
 import { currentCtx, fork, awaitFiber, asExit, type Run } from "@flick-lang/runtime/rt/fiber";
-import { scopeRun } from "@flick-lang/runtime/rt/owner";
+import { scopeRun, within } from "@flick-lang/runtime/rt/owner";
+import { readOwnerEvidence, withOwnerEvidence } from "@flick-lang/runtime/rt/fiber";
 import * as Deferred from "@flick-lang/runtime/rt/effect/Deferred";
 
 import { fromEffect } from "../src/bridge.ts";
@@ -12,6 +13,15 @@ const run = (task: () => unknown): Promise<unknown> => new Promise((resolve, rej
   fork(task, currentCtx()).observe((exit) => exit.cause === undefined ? resolve(exit.value) : reject(new Error(JSON.stringify(exit.cause))));
 });
 const annotations = () => fromEffect(Effect.service(References.CurrentLogAnnotations));
+
+test("idempotent evidence and raw-owner brackets preserve scoped reference updates", async () => {
+  const result = await run(() => scopeRun(function* (): Run {
+    const owner = readOwnerEvidence();
+    yield withOwnerEvidence(owner, () => within(owner, () => fromEffect(Effect.annotateLogsScoped("request", "7"))));
+    return yield annotations();
+  }));
+  assert.deepEqual(result, { request: "7" });
+});
 
 test("a scoped Effect reference is visible to later native calls and restored at scope close", async () => {
   const result = await run(function* (): Run {

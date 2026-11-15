@@ -75,14 +75,15 @@ test("each instance sets up once under StrictMode and keeps its own state", asyn
   await stop(fiber);
 });
 
-test("an instance that unmounts interrupts the tasks of its actions", async () => {
+test("an instance that unmounts interrupts the tasks of its actions", { timeout: 5_000 }, async () => {
   const root = container();
   const registry = AtomRegistry.make();
   const shown = Atom.make(true);
   const log: Array<string> = [];
   const { run } = gated(log);
+  const stopped = Promise.withResolvers<void>();
   const busy = uiStateful(() => {
-    const work = actionExhaust(() => run(1));
+    const work = actionExhaust(() => Effect.ensuring(run(1), Effect.sync(() => stopped.resolve())));
     return () => uiButton({ disabled: false, on_click: work }, [uiText("work")]);
   });
   const page = uiView(() => (get(shown) ? uiRender(busy, undefined) : uiText("gone")));
@@ -91,7 +92,7 @@ test("an instance that unmounts interrupts the tasks of its actions", async () =
   await tick();
   assert.deepEqual(log, ["start 1"]);
   registry.set(shown, false);
-  await tick(30);
+  await stopped.promise;
   assert.equal(root.textContent, "gone");
   assert.deepEqual(log, ["start 1", "stopped 1"]);
   await stop(fiber);

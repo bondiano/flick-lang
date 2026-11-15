@@ -1,0 +1,22 @@
+# Go bindings used by the process source package.
+
+
+[flick:ChildProcess]
+flickMake ChildProcessMake
+setCwd ChildProcessSetCwd
+flickSetEnv ChildProcessSetEnv
+flickPrefix ChildProcessPrefix
+pipeTo ChildProcessPipeTo
+flickSetStdin ChildProcessSetStdin
+flickInheritOutput ChildProcessInheritOutput
+flickSpawn *ChildProcessSpawn
+flickPid ChildProcessPid
+flickWait *ChildProcessWait
+flickIsRunning *ChildProcessIsRunning
+flickKill *ChildProcessKill
+flickKillWith *ChildProcessKillWith
+flickStdout ChildProcessStdout
+flickStderr ChildProcessStderr
+flickString *ChildProcessString
+flickLines *ChildProcessLines
+flickExitCode *ChildProcessExitCode

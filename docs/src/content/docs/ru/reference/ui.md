@@ -1,6 +1,6 @@
 ---
 title: "Пользовательские интерфейсы"
-source_hash: 234b2f67aea3ae47
+source_hash: 3fa1344380494e27
 ---
 
 `Ui` описывает пользовательский интерфейс и обработчики его событий
@@ -806,8 +806,8 @@ HTML-конструкторы остаются привязанными к DOM: 
 [коде запуска для React](https://github.com/bondiano/flick-lang/blob/main/packages/effect-ts/src/ui/react/index.ts),
 [DOM-адаптере](https://github.com/bondiano/flick-lang/blob/main/packages/effect-ts/src/ui/index.ts)
 и встроенных модулях
-[`Ui`](https://github.com/bondiano/flick-lang/blob/main/packages/std/src/Ui.fl)
-и [`Ui.Dom`](https://github.com/bondiano/flick-lang/blob/main/packages/std/src/Ui/Dom.fl).
+[`Ui`](https://github.com/bondiano/flick-lang/blob/main/packages/ui/src/Ui.fl)
+и [`Ui.Dom`](https://github.com/bondiano/flick-lang/blob/main/packages/ui/src/Ui/Dom.fl).
 Для этих возможностей есть регрессионные тесты:
 
 - [`packages/effect-ts/test/ui-roots.test.ts`](https://github.com/bondiano/flick-lang/blob/main/packages/effect-ts/test/ui-roots.test.ts)

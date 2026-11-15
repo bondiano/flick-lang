@@ -1,0 +1,34 @@
+# Go bindings used by the rpc source package.
+
+
+[flick:Config]
+flickGet *ConfigGet
+flickParse *ConfigParse
+map ConfigMap
+flatMap ConfigFlatMap
+mapEffect ConfigMapEffect
+flickOrElse ConfigOrElse
+all ConfigAll
+withDefault ConfigWithDefault
+option ConfigOption
+schema ConfigSchema
+flickFail ConfigFail
+succeed ConfigSucceed
+String ConfigString
+NonEmptyString ConfigNonEmptyString
+Number ConfigNumber
+Finite ConfigFinite
+flickInt ConfigInt
+Boolean ConfigBoolean
+Port ConfigPort
+flickRedacted *ConfigRedacted
+Duration ConfigDuration
+ByteSize ConfigByteSize
+LogLevel ConfigLogLevel
+flickUrl ConfigURL
+flickDate ConfigDate
+Literal ConfigLiteral
+Literals ConfigLiterals
+flickArray ConfigArray
+flickRecord ConfigRecord
+nested ConfigNested

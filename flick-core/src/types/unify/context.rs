@@ -20,10 +20,12 @@ impl Store {
         self.scopes.valid_context(context)
     }
 
+    #[cfg(test)]
     pub(in crate::types) fn witness_context(&self) -> Context {
         self.active_context.clone()
     }
 
+    #[cfg(test)]
     pub(in crate::types) fn register_issued_witness(
         &mut self,
         registration: super::module_contract::WitnessRegistration,

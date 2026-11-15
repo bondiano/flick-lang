@@ -417,11 +417,31 @@ mod tests {
     }
 }
 
+// A parallel test can fork while this process writes a fixture and retain its
+// writable descriptor until exec, making execution fail with ETXTBSY. Like
+// tests/common::write_script, let a separate process write the final inode.
+#[cfg(all(test, unix))]
+fn node_script(path: &Path, contents: &[u8], mode: u32) {
+    use std::os::unix::fs::PermissionsExt;
+
+    let draft = path.with_extension("draft");
+    fs::write(&draft, contents).expect("script draft");
+    assert!(
+        Command::new("cp")
+            .arg(&draft)
+            .arg(path)
+            .status()
+            .expect("cp runs")
+            .success()
+    );
+    fs::remove_file(draft).expect("remove script draft");
+    fs::set_permissions(path, fs::Permissions::from_mode(mode)).expect("script permissions");
+}
+
 #[cfg(all(test, unix))]
 #[test]
 fn a_mismatched_node_pin_is_rejected_without_executing_the_candidate() {
     use flick_backend::sha256;
-    use std::os::unix::fs::PermissionsExt;
     use std::process;
 
     let root = env::temp_dir().join(format!("flick-node-pin-{}", process::id()));
@@ -429,8 +449,7 @@ fn a_mismatched_node_pin_is_rejected_without_executing_the_candidate() {
     fs::create_dir_all(&root).expect("directory");
     let path = root.join("node");
     let script = b"#!/bin/sh\nprintf x > \"$0.called\"\nprintf 'v1.2.3\\n'\n";
-    fs::write(&path, script).expect("candidate");
-    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).expect("executable");
+    node_script(&path, script, 0o755);
     let mut pin = Toolchain {
         id: "node".into(),
         version: "1.2.3".into(),
@@ -454,7 +473,6 @@ fn a_mismatched_node_pin_is_rejected_without_executing_the_candidate() {
 #[cfg(all(test, unix))]
 #[test]
 fn node_resolution_skips_nonexecutable_path_candidates() {
-    use std::os::unix::fs::PermissionsExt;
     use std::process;
     let root = env::temp_dir().join(format!("flick-node-path-{}", process::id()));
     let _ = fs::remove_dir_all(&root);
@@ -462,8 +480,7 @@ fn node_resolution_skips_nonexecutable_path_candidates() {
         let directory = root.join(directory);
         fs::create_dir_all(&directory).expect("directory");
         let path = directory.join("node");
-        fs::write(&path, b"#!/bin/sh\nprintf 'v1.2.3\\n'\n").expect("node");
-        fs::set_permissions(path, fs::Permissions::from_mode(mode)).expect("permissions");
+        node_script(&path, b"#!/bin/sh\nprintf 'v1.2.3\\n'\n", mode);
     }
     let paths = env::join_paths([root.join("first"), root.join("second")]).expect("PATH");
     let node = Tool::node_on_path(&paths, None).expect("executable Node later on PATH");

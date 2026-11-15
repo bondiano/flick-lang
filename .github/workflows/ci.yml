@@ -219,7 +219,9 @@ jobs:
   # plugins built as WebAssembly components, run by wasmtime
   plugins:
     runs-on: ubuntu-26.04
-    timeout-minutes: 30
+    # Cold guest, host and release builds plus conformance can reach 30m;
+    # leave time for the final typed-DSL validation without skipping checks.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7
       - run: rustup show active-toolchain || rustup toolchain install

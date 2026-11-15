@@ -2,13 +2,15 @@
 // their foreign bindings has an export on the kernel side, where the compiler's
 // `rt_specifier` sends it.
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import policy from "../../packages/effect-ts/compiler-bindings.json" with { type: "json" };
 
 const repo = new URL("../../", import.meta.url);
-const read = (path: string): string => readFileSync(new URL(path, repo), "utf8");
+const sources = readdirSync(new URL("packages/", repo), { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => new URL(`packages/${entry.name}/src/`, repo));
 
 /** The modules of the kernel's first tier, but `Ui` and `Atom`, which come later. */
 const MODULES = [
@@ -30,12 +32,21 @@ const MODULES = [
   "Test",
 ];
 
-/** The source of a built-in module: of the core package, else of std. */
+/** A built-in module has exactly one source owner among the source packages. */
 const source = (module: string): string => {
   const file = `${module.replaceAll(".", "/")}.fl`;
-  const core = new URL(`packages/core/src/${file}`, repo);
-  return existsSync(core) ? readFileSync(core, "utf8") : read(`packages/std/src/${file}`);
+  const paths = sources.map((dir) => new URL(file, dir)).filter((path) => existsSync(path));
+  assert.equal(paths.length, 1, `${module}: expected one packaged source, found ${paths.length}`);
+  const [path] = paths;
+  assert.ok(path);
+  return readFileSync(path, "utf8");
 };
+
+test("source lookup includes the split standard-library packages", () => {
+  for (const module of ["Stream.Core", "ChildProcess", "Ui", "HttpApi", "Rpc", "Otlp", "Cli"]) {
+    assert.ok(source(module).includes(`module ${module} exposing (`), module);
+  }
+});
 
 /** The native implementation declared by the packages. */
 const kernelPath = (spec: string): string | undefined => {

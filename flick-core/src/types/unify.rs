@@ -515,4 +515,5 @@ include!("unify/context.rs");
 include!("unify/lexical.rs");
 include!("unify/observe.rs");
 
+#[cfg(test)]
 include!("unify/read.rs");

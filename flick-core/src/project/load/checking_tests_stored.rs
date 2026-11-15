@@ -1,8 +1,10 @@
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use super::ModuleStore;
+use super::{CachedModule, ModuleStore, PackageCache};
+use crate::diagnostics::Diagnostic;
 use crate::project::config::Backend;
+use crate::source::Span;
 
 /// What a host keeps of the modules of a project between processes.
 type Saved = Arc<Mutex<BTreeMap<String, Vec<u8>>>>;
@@ -20,7 +22,10 @@ fn memory_store(salt: &str, saved: &Saved, taken: &Arc<AtomicUsize>) -> ModuleSt
         }),
         save: Box::new(move |key, module| {
             let bytes = serde_json::to_vec(module).expect("a module to save");
-            writer.lock().expect("the store").insert(key.to_owned(), bytes);
+            writer
+                .lock()
+                .expect("the store")
+                .insert(key.to_owned(), bytes);
         }),
     }
 }
@@ -89,7 +94,11 @@ fn a_saved_module_serves_only_the_configuration_it_was_checked_under() {
         assert_eq!(stored, alone);
         assert_eq!(stored.0.iter().any(|d| d.contains("T027")), strict);
     }
-    assert_eq!(stored_count(&taken), 0, "the module was saved once, unchecked by `[lint]`");
+    assert_eq!(
+        stored_count(&taken),
+        0,
+        "the module was saved once, unchecked by `[lint]`"
+    );
     assert!(taken_by(&host, &saved, "one", &["/p/src/A/Use.fl"], |_| {}) > 0);
 }
 
@@ -118,7 +127,9 @@ fn a_saved_importer_is_rechecked_when_its_import_stops_parsing() {
     let broken = Memory(BTreeMap::from([
         (
             PathBuf::from("/p/src/A/Base.fl"),
-            base("class T (t : Type -> Type)) =\n  lift : forall a. a -> t a\nx : String\nlet x = \"s\"\n"),
+            base(
+                "class T (t : Type -> Type)) =\n  lift : forall a. a -> t a\nx : String\nlet x = \"s\"\n",
+            ),
         ),
         (PathBuf::from("/p/src/A/Use.fl"), USE.to_owned()),
     ]));
@@ -148,11 +159,147 @@ fn a_saved_module_serves_only_the_run_it_was_checked_in() {
     let one = ["/p/src/A/Use.fl"];
     let same = |_: &mut Project| {};
     assert_eq!(taken_by(&host, &saved, "one", &one, same), 0);
-    assert_eq!(taken_by(&host, &saved, "one", &one, same), 2, "Base and Use");
-    assert_eq!(taken_by(&host, &saved, "two", &one, same), 0, "another compiler");
+    assert_eq!(
+        taken_by(&host, &saved, "one", &one, same),
+        2,
+        "Base and Use"
+    );
+    assert_eq!(
+        taken_by(&host, &saved, "two", &one, same),
+        0,
+        "another compiler"
+    );
     let effect = |p: &mut Project| p.config.build.effect = Backend::Effect;
-    assert_eq!(taken_by(&host, &saved, "one", &one, effect), 0, "stages by class");
+    assert_eq!(
+        taken_by(&host, &saved, "one", &one, effect),
+        0,
+        "stages by class"
+    );
     let both = ["/p/src/A/Use.fl", "/p/src/A/Other.fl"];
-    assert_eq!(taken_by(&host, &saved, "one", &both, same), 0, "one more module");
+    assert_eq!(
+        taken_by(&host, &saved, "one", &both, same),
+        0,
+        "one more module"
+    );
     assert_eq!(taken_by(&host, &saved, "one", &both, same), 3);
+}
+
+fn package_preflight_diagnostics(diagnostics: &[Diagnostic], sources: &SourceMap) -> Vec<String> {
+    diagnostics
+        .iter()
+        .map(|d| {
+            let span = d.span.expect("source span");
+            let source = sources.get(span.file);
+            let start = usize::try_from(span.start).expect("start fits");
+            let end = usize::try_from(span.end).expect("end fits");
+            format!(
+                "{} {} {}:{start}-{end} {:?}",
+                d.code,
+                d.message,
+                source.path,
+                &source.text[start..end]
+            )
+        })
+        .collect()
+}
+
+/// Target preflight follows re-exports into cached source-package bodies even
+/// when only the selected environment changes between checks.
+#[test]
+fn a_saved_package_keeps_target_preflight_identical_to_a_cold_check() {
+    const DB: &str = "module Lib.Db exposing (run)\nservice Db =\n  query : String ->{} String\nrun : String ->{Db} String\nlet run key = Db.query key\n";
+    let host = Memory(BTreeMap::from([
+        (
+            PathBuf::from("/lib/flick.toml"),
+            "schema-version = 1\n[project]\nkind = \"lib\"\n".into(),
+        ),
+        (PathBuf::from("/lib/src/Lib/Db.fl"), DB.into()),
+        (
+            PathBuf::from("/p/src/App/Root.fl"),
+            "module App.Root exposing (run)\nimport Lib.Db exposing (run)\n".into(),
+        ),
+    ]));
+    let check = |environment: Option<&str>, packages: Option<&PackageCache<'_>>| {
+        let mut sources = SourceMap::default();
+        let mut project = library(&mut sources);
+        project.config.dependencies.push(Dependency {
+            name: "lib".into(),
+            source: Source::Path("../lib".into()),
+            span: Span::new(project.config_file, 0, 0),
+        });
+        project.config.build.environment = environment.map(|e| e.parse().expect("environment"));
+        let output = run(
+            &host,
+            &mut sources,
+            Some(&project),
+            &[PathBuf::from("/p/src/App/Root.fl")],
+            Mode::Check,
+            None,
+            packages,
+        );
+        (output, sources)
+    };
+    let identity = |_: &Path, _: Option<&str>| Some("immutable-package-v1".to_owned());
+    let empty = PackageCache {
+        salt: "target-preflight",
+        identity: &identity,
+        saved: &|_| None,
+    };
+    let (node, _) = check(Some("js/node"), Some(&empty));
+    assert!(node.diagnostics.is_empty(), "{:?}", node.diagnostics);
+    let saved: BTreeMap<_, Vec<CachedModule>> = node
+        .fresh
+        .into_iter()
+        .map(|p| {
+            let bytes = serde_json::to_vec(&p.modules).expect("package serializes");
+            (
+                p.key,
+                serde_json::from_slice(&bytes).expect("package round trips"),
+            )
+        })
+        .collect();
+    assert_eq!(saved.values().flatten().count(), 1, "Lib.Db was saved");
+    let taken = AtomicUsize::new(0);
+    let load = |key: &str| {
+        let modules = saved.get(key)?.clone();
+        taken.fetch_add(modules.len(), Ordering::Relaxed);
+        Some(modules)
+    };
+    let cache = PackageCache {
+        salt: "target-preflight",
+        identity: &identity,
+        saved: &load,
+    };
+    let (unselected, _) = check(None, Some(&cache));
+    assert_eq!(stored_count(&taken), 1, "the package cache was read");
+    assert!(
+        unselected.diagnostics.is_empty(),
+        "{:?}",
+        unselected.diagnostics
+    );
+    assert!(unselected.fresh.is_empty(), "the package was not rechecked");
+    assert!(
+        unselected.compilation.modules.is_empty(),
+        "unselected checks need no IR"
+    );
+    let (cold, cold_sources) = check(Some("js/browser"), None);
+    let (warm, warm_sources) = check(Some("js/browser"), Some(&cache));
+    assert_eq!(
+        stored_count(&taken),
+        2,
+        "the same Node-warmed key was reused"
+    );
+    assert!(warm.fresh.is_empty(), "the package was not rechecked");
+    let start = DB.find("Db.query").expect("operation use");
+    assert_eq!(
+        package_preflight_diagnostics(&cold.diagnostics, &cold_sources),
+        vec![format!(
+            "FLICK-E020 unhandled effect Db on js/browser /lib/src/Lib/Db.fl:{start}-{} \"Db.query\"",
+            start + "Db.query".len()
+        )]
+    );
+    assert_eq!(
+        package_preflight_diagnostics(&warm.diagnostics, &warm_sources),
+        package_preflight_diagnostics(&cold.diagnostics, &cold_sources)
+    );
 }

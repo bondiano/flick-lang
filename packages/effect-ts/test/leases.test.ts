@@ -3,10 +3,25 @@ import { test } from "node:test";
 
 import { Deferred, Effect, Fiber } from "effect";
 
-import { flickFromAcquire, flickSet } from "../src/effect/ScopedRef.ts";
-import { acquireRelease, scope } from "../src/index.ts";
+import { flickFromAcquire, flickSet, flickUse } from "../src/effect/ScopedRef.ts";
+import { acquireRelease, readOwnerEvidence, scope } from "../src/index.ts";
 import { acquireHolder, retire } from "../src/effect/lease.ts";
 import { CurrentOwner, type FlickFiber, fiberSpawn, within } from "../src/owner.ts";
+
+test("a polymorphic holder acquisition uses the holder's evidence until its last lease ends", async () => {
+  const released: string[] = [];
+  const resource = (name: string) => Effect.flatMap(readOwnerEvidence(), (owner) =>
+    within(owner, acquireRelease(Effect.succeed(name), () => Effect.sync(() => { released.push(name); }))));
+  await Effect.runPromise(scope(() => Effect.gen(function* () {
+    const ref = yield* flickFromAcquire(resource("first"));
+    yield* flickUse(ref, () => Effect.gen(function* () {
+      yield* flickSet(resource("second"))(ref);
+      assert.deepEqual(released, []);
+    }));
+    assert.deepEqual(released, ["first"]);
+  })));
+  assert.deepEqual(released, ["first", "second"]);
+});
 
 test("a library acquisition respects an explicit outer owner activation", async () => {
   const selected = await Effect.runPromise(scope(() => Effect.gen(function* () {

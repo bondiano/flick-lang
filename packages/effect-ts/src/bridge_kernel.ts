@@ -41,6 +41,8 @@ import { dataFromEffect, dataToEffect, installDataBridge } from "./bridge_data.t
 import { installLayerBridge } from "./bridge_layer.ts";
 import { installSchemaBridge } from "./bridge_schema.ts";
 import { bridgeKernel } from "./bridge_runtime.ts";
+import { durationFromEffect, durationMillis, durationNative, durationToEffect } from "./bridge_duration.ts";
+export { durationFromEffect, durationToEffect } from "./bridge_duration.ts";
 import { KERNEL, hostOf, hostOwnerOf, settled } from "./bridge_host.ts";
 
 
@@ -50,17 +52,6 @@ const effectIdentities = /*#__PURE__*/ new WeakMap<EffectFiber, number>();
 /** Fiber-local library state keeps its identity across interpreter calls. */
 export const fiberIdentity: Effect.Effect<number> = Effect.withFiber((fiber) =>
   Effect.succeed(effectIdentities.get(fiber) ?? fiber.id));
-
-export const durationToEffect = (value: unknown): unknown =>
-  value instanceof Duration
-    ? value.nanos === undefined ? EDuration.millis(value.millis) : EDuration.nanos(value.nanos)
-    : value;
-
-export const durationFromEffect = (value: unknown): unknown => {
-  if (!EDuration.isDuration(value)) return value;
-  const nanos = EDuration.toNanos(value);
-  return EOption.isSome(nanos) ? new Duration(EDuration.toMillis(value), nanos.value) : new Duration(Infinity);
-};
 
 /** A native schedule's steps as Effect pulls, preserving delays and completion. */
 export const scheduleToEffect = (value: unknown): unknown => {
@@ -351,16 +342,8 @@ export const inSyncContext = (call: () => unknown): unknown => {
   return syncIn(context, () => Effect.runSyncWith(context)(Effect.sync(call)));
 };
 
-durationHooks.millis = (d) => {
-  if (d instanceof Duration) return d.millis;
-  if (EDuration.isDuration(d)) return EDuration.toMillis(d);
-  throw new TypeError("not a duration of this runtime or of Effect");
-};
-durationHooks.native = (d) => {
-  const converted = durationFromEffect(d);
-  if (converted instanceof Duration) return converted;
-  throw new TypeError("not a duration of this runtime or of Effect");
-};
+durationHooks.millis = durationMillis;
+durationHooks.native = durationNative;
 dateTimeHooks.makeUtc = (millis) => EDateTime.makeUnsafe(millis);
 dateTimeHooks.toDate = (value) => (EDateTime.isDateTime(value) ? EDateTime.toDate(value) : new Date(value.epochMilliseconds));
 

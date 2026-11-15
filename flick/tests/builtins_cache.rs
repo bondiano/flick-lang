@@ -3,11 +3,12 @@
 
 mod common;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{self, Command, Output};
 use std::{env, fs};
 
 use common::project;
+use flick_core::implicit_packages::IMPLICIT_PACKAGES;
 
 fn copy(from: &Path, to: &Path) {
     fs::create_dir_all(to).expect("dir");
@@ -20,6 +21,15 @@ fn copy(from: &Path, to: &Path) {
             fs::copy(&path, &target).expect("copy");
         }
     }
+}
+
+/// A complete override is the first implicit package and all its siblings.
+fn copy_packages(root: &Path) -> PathBuf {
+    let packages = Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages");
+    for name in IMPLICIT_PACKAGES {
+        copy(&packages.join(name), &root.join(name));
+    }
+    root.join(IMPLICIT_PACKAGES[0])
 }
 
 fn check(dir: &Path, std: &Path, cache: &Path) -> Output {
@@ -73,11 +83,7 @@ fn project_checks_save_the_interfaces_of_the_selected_backend() {
 fn a_changed_std_is_checked_again() {
     let root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("builtins_cache");
     let _ = fs::remove_dir_all(&root);
-    let std = root.join("std");
-    copy(
-        &Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages/std"),
-        &std,
-    );
+    let std = copy_packages(&root);
     let cache = root.join("cache");
     let main = "module App.Main exposing (x)\n\nx : String\nlet x = Markdown.shout \"hi\"\n";
     let app = project(
@@ -110,7 +116,79 @@ fn a_changed_std_is_checked_again() {
     assert_ne!(key(&app, &std, &cache), keyed);
 }
 
-/// The key of a build of the project in `dir`.
+#[test]
+fn moved_sources_and_go_tables_invalidate_cached_interfaces_and_build_inputs() {
+    let root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("builtins_cache_moved");
+    let _ = fs::remove_dir_all(&root);
+    let std = copy_packages(&root);
+    let cache = root.join("cache");
+    let app = project(
+        "builtins_cache_moved/app",
+        &[
+            (
+                "flick.toml",
+                "schema-version = 1\n[project]\nkind = \"lib\"\n",
+            ),
+            (
+                "src/App/Main.fl",
+                "module App.Main exposing (x)\nx : String\nlet x = Http.Method.cache_probe \"hi\"\n",
+            ),
+        ],
+    );
+    let missing = check(&app, &std, &cache);
+    assert!(
+        !missing.status.success(),
+        "the new export does not exist yet"
+    );
+    assert!(
+        String::from_utf8_lossy(&missing.stderr).contains("cache_probe"),
+        "{missing:?}"
+    );
+
+    let method = root.join("http/src/Http/Method.fl");
+    let text = fs::read_to_string(&method).expect("the moved HTTP module");
+    fs::write(
+        &method,
+        text + "\ncache_probe : String -> String\nlet cache_probe text = text ++ \"!\"\n",
+    )
+    .expect("change moved source");
+    let changed = check(&app, &std, &cache);
+    assert!(changed.status.success(), "{changed:?}");
+    let warmed = Command::new(env!("CARGO_BIN_EXE_flick"))
+        .args(["check", "src/App/Main.fl", "--timings"])
+        .current_dir(&app)
+        .env("FLICK_STD_PATH", &std)
+        .env("XDG_CACHE_HOME", &cache)
+        .output()
+        .expect("flick runs");
+    assert!(warmed.status.success(), "{warmed:?}");
+    assert!(
+        String::from_utf8_lossy(&warmed.stderr)
+            .contains("built-in interfaces read from their cache"),
+        "unchanged moved inputs reuse the saved interfaces: {warmed:?}"
+    );
+    let unchanged = key(&app, &std, &cache);
+    assert_eq!(key(&app, &std, &cache), unchanged);
+    let table = root.join("http/src/go/http.txt");
+    let text = fs::read_to_string(&table).expect("the moved Go table");
+    fs::write(&table, format!("{text}\n# a changed HTTP binding input\n")).expect("change table");
+    let changed_table = key(&app, &std, &cache);
+    assert_ne!(changed_table, unchanged);
+
+    let manifest = root.join("http/flick.toml");
+    let text = fs::read_to_string(&manifest).expect("the moved package manifest");
+    fs::write(&manifest, format!("{text}\n# presentation only\n")).expect("comment");
+    assert_eq!(key(&app, &std, &cache), changed_table);
+    let dependency = format!("{text}\n[js.dependencies]\n\"@acme/cache-probe\" = \"1.0.0\"\n");
+    fs::write(&manifest, &dependency).expect("declare a new dependency");
+    let changed_manifest = key(&app, &std, &cache);
+    assert_ne!(changed_manifest, changed_table);
+    assert_eq!(key(&app, &std, &cache), changed_manifest);
+    fs::write(&manifest, dependency.replace("1.0.0", "1.0.1")).expect("change dependency pin");
+    assert_ne!(key(&app, &std, &cache), changed_manifest);
+}
+
+/// A project's build key.
 fn key(dir: &Path, std: &Path, cache: &Path) -> String {
     let out = Command::new(env!("CARGO_BIN_EXE_flick"))
         .args(["build", "src/App/Main.fl", "--inputs"])
@@ -122,6 +200,44 @@ fn key(dir: &Path, std: &Path, cache: &Path) -> String {
     assert!(out.status.success(), "{out:?}");
     let inputs: serde_json::Value = serde_json::from_slice(&out.stdout).expect("JSON");
     inputs["key"].as_str().expect("a key").to_owned()
+}
+
+#[test]
+fn a_missing_moved_go_binding_family_is_reported_before_building() {
+    let root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("builtins_missing_http_go");
+    let _ = fs::remove_dir_all(&root);
+    let std = copy_packages(&root);
+    let table = root.join("http/src/go/http.txt");
+    let text = fs::read_to_string(&table).expect("HTTP bindings");
+    let (before, family) = text
+        .split_once("[flick:http/Headers]\n")
+        .expect("Headers family");
+    let after = family.find("\n[").map_or("", |at| &family[at..]);
+    fs::write(&table, format!("{before}{after}")).expect("remove the family");
+    let app = project(
+        "builtins_missing_http_go/app",
+        &[
+            ("flick.toml", common::APP),
+            (
+                "src/App/Main.fl",
+                "module App.Main exposing (main)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (Http.Headers.has \"x\" Http.Headers.empty))\n",
+            ),
+        ],
+    );
+    let out = Command::new(env!("CARGO_BIN_EXE_flick"))
+        .args(["build", "--emit", "go", "--offline"])
+        .current_dir(&app)
+        .env("FLICK_STD_PATH", &std)
+        .env("XDG_CACHE_HOME", root.join("cache"))
+        .output()
+        .expect("flick runs");
+    let diagnostics = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(1), "{diagnostics}");
+    assert!(
+        diagnostics.contains("FLICK-P012") && diagnostics.contains("Http.Headers.empty"),
+        "{diagnostics}"
+    );
+    assert!(!app.join("dist/go/main/go.mod").exists());
 }
 
 #[test]
@@ -156,11 +272,7 @@ fn lsp_in_source_checkout_uses_local_std_without_cargo_env() {
 fn a_std_that_does_not_check_is_a_diagnostic() {
     let root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("builtins_cache_unfit");
     let _ = fs::remove_dir_all(&root);
-    let std = root.join("std");
-    copy(
-        &Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages/std"),
-        &std,
-    );
+    let std = copy_packages(&root);
     // a module of another compiler's `std`, as far as this one sees it
     let markdown = std.join("src/Markdown.fl");
     let text = fs::read_to_string(&markdown).expect("Markdown.fl");
@@ -273,11 +385,7 @@ fn a_build_lowers_the_built_in_modules_once() {
 fn a_changed_std_is_lowered_again() {
     let root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("builtins_cache_lowered");
     let _ = fs::remove_dir_all(&root);
-    let std = root.join("std");
-    copy(
-        &Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages/std"),
-        &std,
-    );
+    let std = copy_packages(&root);
     let cache = root.join("cache");
     let manifest = "schema-version = 1\n\n[project]\nkind = \"lib\"\n";
     let main = |call: &str| format!("module App.Main exposing (x)\n\nx : String\nlet x = {call}\n");
