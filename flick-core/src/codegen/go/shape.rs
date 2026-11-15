@@ -7,7 +7,7 @@ use std::iter;
 use super::Input;
 use super::arith::Native;
 use crate::ir::reach::Key;
-use crate::ir::{Expr, ExprKind, Item, ItemKind, Pat, Stage};
+use crate::ir::{Expr, ExprKind, Item, ItemKind, Param, Pat, Stage};
 use flick_ir::{Dict, InstanceInfo, default_method};
 
 /// How a top-level name is held in Go.
@@ -68,6 +68,24 @@ impl Types {
 }
 
 impl Shape {
+    /// The same function taking and giving values only.
+    pub(super) fn of_values(self) -> Shape {
+        match self {
+            Shape::Func {
+                dicts,
+                params,
+                effects,
+                ..
+            } => Shape::Func {
+                dicts,
+                params,
+                effects,
+                types: Types::default(),
+            },
+            Shape::Var => Shape::Var,
+        }
+    }
+
     /// Whether the function's last language stage runs effects.
     pub(super) fn effectful(self) -> bool {
         matches!(self, Shape::Func { params, effects, .. } if params > 0 && effects >> (params - 1) & 1 == 1)
@@ -82,24 +100,28 @@ fn effects(stages: impl IntoIterator<Item = bool>) -> u64 {
         .fold(0, |mask, (i, effectful)| mask | u64::from(effectful) << i)
 }
 
+/// The shape of a Go function taking `dicts` dictionaries, then `params`,
+/// and computing `body`.
+pub(super) fn function(input: &Input, dicts: usize, params: &[Param], body: &Expr) -> Shape {
+    let natives: Vec<Option<Native>> = params
+        .iter()
+        .map(|p| match p.pat {
+            Pat::Bind(_) => Native::of(input.lang, p.ty.as_deref()),
+            _ => None,
+        })
+        .collect();
+    Shape::Func {
+        dicts,
+        params: params.len(),
+        effects: effects(params.iter().map(|p| p.stage != Stage::Pure)),
+        types: Types::of(Native::of(input.lang, body.ty.as_deref()), &natives),
+    }
+}
+
 pub(super) fn shape(input: &Input, module: &str, kind: &ItemKind) -> Shape {
     match kind {
         ItemKind::Value { dicts, body, .. } => match &body.kind {
-            ExprKind::Lambda { params, body } => {
-                let natives: Vec<Option<Native>> = params
-                    .iter()
-                    .map(|p| match p.pat {
-                        Pat::Bind(_) => Native::of(input.lang, p.ty.as_deref()),
-                        _ => None,
-                    })
-                    .collect();
-                Shape::Func {
-                    dicts: dicts.len(),
-                    params: params.len(),
-                    effects: effects(params.iter().map(|p| p.stage != Stage::Pure)),
-                    types: Types::of(Native::of(input.lang, body.ty.as_deref()), &natives),
-                }
-            }
+            ExprKind::Lambda { params, body } => function(input, dicts.len(), params, body),
             _ if dicts.is_empty() => Shape::Var,
             _ => Shape::Func {
                 dicts: dicts.len(),

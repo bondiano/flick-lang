@@ -171,6 +171,9 @@ impl<'a> Gen<'a> {
             ExprKind::Var(name) => Code::from(a.text(a.alloc_str(&names::local(name)))),
             ExprKind::Global { module, name } => self.global_value(module, name, Vec::new()),
             ExprKind::Method { dict, name } => {
+                if let Some((module, function)) = self.direct_method(dict, name) {
+                    return self.global_value(&module, &function, Vec::new());
+                }
                 let dict = self.dict(dict);
                 call(
                     a,
