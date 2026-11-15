@@ -1,12 +1,10 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use super::target_preflight::{self, gated_service, handles};
-use super::{Extras, Settings};
-use crate::codegen::EffectBridge;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::ir::tests::check_text;
-use crate::project::config::{Backend, BackendEnvironment};
+use crate::project::config::BackendEnvironment;
 use crate::project::{Compilation, Compiled};
 use crate::source::SourceMap;
 
@@ -68,24 +66,15 @@ fn diagnostics(text: &str, pair: &str, app: bool) -> Vec<Diagnostic> {
     };
     let entries = [("main".into(), "App.Main".into())];
     let env = environment(pair);
-    let settings = Settings {
-        package: None,
-        entries: if app { &entries } else { &[] },
-        typescript: false,
-        release: false,
-        extras: Extras::default(),
-        source_path: &|_| "App/Main.fl".into(),
-        source_dir: &|_| None,
-        out_dir: Path::new("/app/dist"),
-        root: None,
-        backend: Backend::Rt,
-        effect_bridge: EffectBridge::Absent,
-        ui: None,
-        runners: &[],
-        environment: Some(&env),
-    };
     let mut found = Vec::new();
-    target_preflight::check(&compilation, &settings, &sources, &env, &mut found);
+    target_preflight::check(
+        &compilation,
+        if app { &entries } else { &[] },
+        &[],
+        &sources,
+        &env,
+        &mut found,
+    );
     found
 }
 

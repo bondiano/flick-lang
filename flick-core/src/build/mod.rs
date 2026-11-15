@@ -4,8 +4,7 @@
 
 mod abi;
 mod bridge_select;
-mod builtins;
-pub use builtins::{
+pub use crate::project::builtins::{
     BuiltinModules, BuiltinSource, BuiltinStore, builtin_bundle_of, builtin_declarations,
     builtin_modules, builtin_modules_of, keep_builtin_modules,
 };
@@ -20,8 +19,6 @@ mod javascript;
 mod paths;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod target_preflight;
-#[cfg(all(test, not(target_arch = "wasm32")))]
-mod target_preflight_tests;
 
 pub use crate::effects;
 pub(crate) use crate::effects::bindings;

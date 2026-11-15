@@ -3,16 +3,11 @@
 //! compiled for go. Selected environments also check reachable effects.
 
 #[cfg(not(target_arch = "wasm32"))]
-use std::path::Path;
-
-#[cfg(not(target_arch = "wasm32"))]
 use super::{Compilation, SourceMap};
 #[cfg(not(target_arch = "wasm32"))]
-use crate::build::{Extras, Settings, target_preflight};
-#[cfg(not(target_arch = "wasm32"))]
-use crate::codegen::EffectBridge;
-#[cfg(not(target_arch = "wasm32"))]
 use crate::diagnostics::Severity;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::project::target_preflight;
 
 use super::{Loader, Project};
 use crate::diagnostics::{Diagnostic, codes};
@@ -132,23 +127,14 @@ pub(super) fn check_environment(
             .flat_map(|p| &p.config.entries)
             .filter_map(|e| Some((e.name.clone(), e.runner.as_ref()?.0.clone())))
             .collect();
-        let settings = Settings {
-            package: None,
-            entries: &entries,
-            typescript: false,
-            release: false,
-            extras: Extras::default(),
-            source_path: &|_| String::new(),
-            source_dir: &|_| None,
-            out_dir: Path::new(""),
-            root: project.map(|p| p.root.as_path()),
-            backend: project.map_or(Backend::Effect, |p| p.config.build.effect),
-            effect_bridge: EffectBridge::Absent,
-            ui: project.and_then(|p| p.config.build.ui.as_deref()),
-            runners: &runners,
-            environment: Some(environment),
-        };
-        target_preflight::check(compilation, &settings, sources, environment, diagnostics);
+        target_preflight::check(
+            compilation,
+            &entries,
+            &runners,
+            sources,
+            environment,
+            diagnostics,
+        );
     }
 }
 
