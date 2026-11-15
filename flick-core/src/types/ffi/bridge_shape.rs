@@ -119,7 +119,7 @@ impl Checker<'_> {
 
     /// An `Eff`, a type the language names, or data.
     fn named_shape(&self, ty: &Type, depth: usize) -> Shape {
-        if let Some((_, _, value)) = self.eff_parts(ty) {
+        if let Some((_, _, value)) = self.known_eff_parts(ty) {
             return Shape::Eff(Box::new(self.shape(&value, depth + 1)));
         }
         let (head, args) = ty.spine();
@@ -156,5 +156,82 @@ impl Checker<'_> {
             }
             _ => Shape::Data,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::unify::test_checker::with_checker;
+    use crate::types::{Form, Kind, TypeDef};
+
+    #[test]
+    fn productive_alias_chains_preserve_nested_eff_bridge_shapes() {
+        with_checker(|checker| {
+            for index in 0..=200 {
+                let body = if index == 0 {
+                    Type::Var("a".into())
+                } else {
+                    Type::app(
+                        Type::con("Probe", &format!("Chain{}", index - 1)),
+                        Type::Var("a".into()),
+                    )
+                };
+                checker.env.define_type(
+                    &format!("Chain{index}"),
+                    TypeDef {
+                        kind: Kind::arrow(Kind::Type, Kind::Type),
+                        form: Form::Alias {
+                            params: vec!["a".into()],
+                            body,
+                            opaque: false,
+                        },
+                    },
+                );
+            }
+            let task = |value| {
+                Type::apps(
+                    Type::lang(Lang::Eff),
+                    [Type::empty_row(), Type::empty_row(), value],
+                )
+            };
+            let wrapped = |value| Type::app(Type::con("Probe", "Chain200"), value);
+            assert_eq!(
+                checker.shape(&wrapped(task(Type::lang(Lang::Int))), 0),
+                Shape::Eff(Box::new(Shape::Data)),
+                "epsilon aliases do not turn a task into data"
+            );
+            assert_eq!(
+                checker.shape(&task(wrapped(task(Type::lang(Lang::Int)))), 0),
+                Shape::Eff(Box::new(Shape::Eff(Box::new(Shape::Data)))),
+                "the result mapper must convert the next host Effect into a native task"
+            );
+            assert_eq!(
+                checker.shape(&wrapped(Type::lang(Lang::Int)), 0),
+                Shape::Data
+            );
+            checker.env.define_type(
+                "Loop",
+                TypeDef {
+                    kind: Kind::arrow(Kind::Type, Kind::Type),
+                    form: Form::Alias {
+                        params: vec!["a".into()],
+                        opaque: false,
+                        body: Type::app(
+                            Type::con("Probe", "Loop"),
+                            Type::app(Type::lang(Lang::List), Type::Var("a".into())),
+                        ),
+                    },
+                },
+            );
+            assert_eq!(
+                checker.shape(
+                    &Type::app(Type::con("Probe", "Loop"), Type::lang(Lang::Int)),
+                    0
+                ),
+                Shape::Data,
+                "an unproductive epsilon cycle does not acquire a task representation"
+            );
+        });
     }
 }
