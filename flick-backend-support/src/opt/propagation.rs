@@ -59,6 +59,12 @@ fn dictionary_operands(e: &Expr, output: &mut HashSet<String>) {
 }
 
 fn propagate(stmts: &mut Vec<Stmt>, result: &mut Expr, arity: Arity) -> bool {
+    // Without an atom or inert value, no binding can enter `moving`.
+    if !stmts.iter().any(
+        |stmt| matches!(stmt, Stmt::Let(Pat::Bind(_), value) if atom(value) || inert(value, arity)),
+    ) {
+        return false;
+    }
     let mut evaluated = HashSet::new();
     let mut metadata = HashSet::new();
     evidence_operands(result, &mut evaluated);
