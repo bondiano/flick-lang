@@ -6,6 +6,15 @@ break programs.
 
 ## Unreleased
 
+- **Known instances called directly on the go target:** a method written as
+  a function in an instance without a context, derived ones included, is a
+  Go function of its own, and a call the checker resolved to that instance
+  calls it instead of looking the method up in the dictionary (`show 3`,
+  `compare` of a derived `Ord`). A program of such calls runs about a third
+  faster. The dictionaries of constraints, module arguments, `unpack`,
+  values that hold them and instances with a context stay lookups, and
+  generic code reaches the same function through the dictionary at the
+  cost it had.
 - **`flick plugins` across every source:** it lists the plugin of each path,
   git-tag and url+sha256 dependency, in the order the manifests name them,
   marks the ones a workspace gives a member, and shows a fetched plugin by
