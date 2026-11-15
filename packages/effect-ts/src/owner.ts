@@ -181,9 +181,9 @@ export const withOwner = <A, E, R>(
         owner.trace = traceId();
         traceEvent({ e: "open", o: owner.trace, p: outer?.trace ?? 0, k: kind });
       }
-      const exit = yield* Effect.exit(
-        restore(inside(owner, withOwnerEvidence(owner, () => body(owner, outer)))),
-      );
+      // Provide and other withOwner callers preserve the caller's lexical
+      // candidate; scope/scopeRun set evidence explicitly.
+      const exit = yield* Effect.exit(restore(inside(owner, body(owner, outer))));
       return yield* resume(yield* close(owner, exit));
     }),
   );
