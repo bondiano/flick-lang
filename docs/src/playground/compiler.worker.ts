@@ -75,6 +75,11 @@ export interface Built {
   readonly diagnostics: Array<Diagnostic>;
 }
 
+/** An explicit exercise check receives declarations and the same runnable emit. */
+export interface CompiledExercise extends Generated {
+  readonly built: Built;
+}
+
 export type Operation =
   | { readonly action: "load" }
   | { readonly action: "check"; readonly source: string }
@@ -120,9 +125,12 @@ const emitted = (source: string, profile: string, declarations = false): Emitted
   return JSON.parse(declarations ? current.emit_declarations(profile) : current.emit(profile)) as Emitted;
 };
 
-const generated = (source: string, profile: string, declarations = false): Generated => {
+const generated = (source: string, profile: string, declarations = false): Generated | CompiledExercise => {
   const result = emitted(source, profile, declarations);
-  return { code: result.js ?? "", dts: result.dts ?? "", declarations: result.declarations, declarationEntry: result.declaration_entry, diagnostics: diagnostics(result.diagnostics) };
+  const generated: Generated = { code: result.js ?? "", dts: result.dts ?? "", declarations: result.declarations, declarationEntry: result.declaration_entry, diagnostics: diagnostics(result.diagnostics) };
+  return declarations
+    ? { ...generated, built: { files: result.files, entry: result.entry, diagnostics: generated.diagnostics } }
+    : generated;
 };
 
 onmessage = async (event: MessageEvent<Request>) => {

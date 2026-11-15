@@ -1,5 +1,5 @@
 // Compiler/worker interoperability only. Widget state and presentation live in Flick.
-import type { Built, Completion, Diagnostic, Generated, Hover, Operation, Reply, Request, Result } from "./compiler.worker.ts";
+import type { Built, CompiledExercise, Completion, Diagnostic, Generated, Hover, Operation, Reply, Request, Result } from "./compiler.worker.ts";
 import { packages } from "./loader.ts";
 import type { Message, Program } from "./runtime.ts";
 import { notify } from "./dom.ts";
@@ -121,8 +121,8 @@ export const compile = (source: string, profile: string, signal: AbortSignal): P
   request<Generated>({ action: "compile", source, profile }, signal);
 
 /** Declaration graph is requested only for explicit exercise checks. */
-export const compileExercise = (source: string, signal: AbortSignal): Promise<Generated> =>
-  request<Generated>({ action: "compile", source, profile: "debug", declarations: true }, signal);
+export const compileExercise = (source: string, signal: AbortSignal): Promise<CompiledExercise> =>
+  request<CompiledExercise>({ action: "compile", source, profile: "debug", declarations: true }, signal);
 
 /**
  * Markdown as plain text: a code block keeps its lines without its fences,
@@ -280,7 +280,13 @@ export const runPrepared = async (prepared: PreparedRun, signal: AbortSignal): P
   return promise;
 };
 
-/** Build and run under one caller's signal, as exercise checks already require. */
+/** Execute a checked emit, replacing a preview only when execution actually starts. */
+export const runBuilt = (built: Built, signal: AbortSignal): Promise<Execution> => {
+  closePreview();
+  return runPrepared({ built, generation: previewGeneration }, signal);
+};
+
+/** Build and run under one caller's signal. */
 export const run = async (source: string, profile: string, signal: AbortSignal): Promise<Execution> => {
   try {
     return await runPrepared(await prepareRun(source, profile, signal), signal);
