@@ -1,4 +1,22 @@
+#[derive(PartialEq, Eq)]
+struct AbstractAliasKey {
+    arity: usize,
+    rows: Vec<(Vec<usize>, usize)>,
+}
+
 impl Build<'_> {
+    fn abstract_alias_key(&self, alias: usize) -> AbstractAliasKey {
+        AbstractAliasKey {
+            arity: self.templates.aliases[alias].params.len(),
+            rows: self
+                .certificate()
+                .aliases
+                .iter()
+                .filter(|row| row.alias == alias)
+                .map(|row| (row.arguments.clone(), row.value))
+                .collect(),
+        }
+    }
     fn abstract_named(&self, kind: u8, name: usize, held: bool, constructor: u8) -> Expr {
         let mut value = self.abstract_blank();
         value.head.kind = kind;
@@ -63,20 +81,33 @@ impl Build<'_> {
         let spine = self.call(Op::Spine, desc.clone(), self.list(Vec::new()), self.unit());
         let head = self.name();
         let arguments = self.name();
-        let result = self.nodes(self.local(&head), |this, id, node, env| {
-            let current = this.desc(id, env.clone());
-            if let OwnerTypeKind::Con { module, name } = &node.kind
-                && let Some(alias) = this
+        let result = self.nodes_grouped(
+            self.local(&head),
+            |this, node| {
+                let OwnerTypeKind::Con { module, name } = &node.kind else {
+                    return None;
+                };
+                let alias = this
                     .templates
                     .aliases
                     .iter()
-                    .position(|a| a.module == *module && a.name == *name)
-            {
-                return this.abstract_alias(alias, current, this.local(&arguments));
-            }
-            let state = this.abstract_head(id, node, env);
-            this.call(Op::AbstractApplyAll, current, state, this.local(&arguments))
-        });
+                    .position(|alias| alias.module == *module && alias.name == *name)?;
+                Some(this.abstract_alias_key(alias))
+            },
+            |this, id, node, env, current| {
+                if let OwnerTypeKind::Con { module, name } = &node.kind
+                    && let Some(alias) = this
+                        .templates
+                        .aliases
+                        .iter()
+                        .position(|a| a.module == *module && a.name == *name)
+                {
+                    return this.abstract_alias(alias, current, this.local(&arguments));
+                }
+                let state = this.abstract_head(id, node, env);
+                this.call(Op::AbstractApplyAll, current, state, this.local(&arguments))
+            },
+        );
         self.unpack(spine, &[&head, &arguments], result)
     }
     fn abstract_head(&mut self, id: usize, node: &OwnerTypeExpr, env: Expr) -> Expr {
@@ -275,7 +306,7 @@ impl Build<'_> {
                 };
                 let productive = self.bind(
                     self.observe(Op::Abstract, self.local(&value)),
-                    |this, state| this.abstract_boolean_field(state, true),
+                    |this, state| this.observe(Op::AbstractProductive, state),
                 );
                 self.binary(BinOp::Or, self.local(name), self.both(matches, productive))
             })

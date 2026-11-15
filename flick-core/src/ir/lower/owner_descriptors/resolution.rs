@@ -1,32 +1,45 @@
+#[derive(PartialEq, Eq)]
+enum ResolveKey {
+    Variable(String),
+    Unchanged,
+}
+
 impl Build<'_> {
     fn resolve(&mut self, desc: Expr) -> Expr {
-        self.nodes(desc, |this, id, node, env| {
-            let current = this.desc(id, env.clone());
-            let OwnerTypeKind::Var(name) = &node.kind else {
-                return current;
-            };
-            let found = this.pure(env.clone(), this.string(name));
-            this.bind(found, |this, found| {
-                let fallback = if let Some(base) = name.strip_suffix("$Dict") {
-                    let identity = this.pure(env.clone(), this.string(base));
-                    this.bind(identity, |this, identity| {
-                        let derived = this.derived_dictionary(identity.clone(), id);
-                        this.choose(
-                            this.binary(BinOp::Same, identity, this.unit()),
-                            this.desc(id, this.root_env()),
-                            derived,
-                        )
-                    })
-                } else {
-                    current
+        self.nodes_grouped(
+            desc,
+            |_, node| match &node.kind {
+                OwnerTypeKind::Var(name) if name.ends_with("$Dict") => None,
+                OwnerTypeKind::Var(name) => Some(ResolveKey::Variable(name.clone())),
+                _ => Some(ResolveKey::Unchanged),
+            },
+            |this, id, node, env, current| {
+                let OwnerTypeKind::Var(name) = &node.kind else {
+                    return current;
                 };
-                this.choose(
-                    this.binary(BinOp::Same, found.clone(), this.unit()),
-                    fallback,
-                    this.observe(Op::Resolve, found),
-                )
-            })
-        })
+                let found = this.pure(env.clone(), this.string(name));
+                this.bind(found, |this, found| {
+                    let fallback = if let Some(base) = name.strip_suffix("$Dict") {
+                        let identity = this.pure(env.clone(), this.string(base));
+                        this.bind(identity, |this, identity| {
+                            let derived = this.derived_dictionary(identity.clone(), id);
+                            this.choose(
+                                this.binary(BinOp::Same, identity, this.unit()),
+                                this.desc(id, this.root_env()),
+                                derived,
+                            )
+                        })
+                    } else {
+                        current
+                    };
+                    this.choose(
+                        this.binary(BinOp::Same, found.clone(), this.unit()),
+                        fallback,
+                        this.observe(Op::Resolve, found),
+                    )
+                })
+            },
+        )
     }
 
     fn derived_dictionary(&mut self, desc: Expr, fallback: usize) -> Expr {
@@ -73,15 +86,19 @@ impl Build<'_> {
 
     fn spine(&mut self, desc: Expr, stack: &Expr) -> Expr {
         self.bind(self.observe(Op::Resolve, desc), |this, resolved| {
-            this.nodes(resolved, |this, id, node, env| match node.kind {
-                OwnerTypeKind::App => this.call(
-                    Op::Spine,
-                    this.child(node.children[0], &env),
-                    this.prepend(this.child(node.children[1], &env), stack.clone()),
-                    this.unit(),
-                ),
-                _ => this.tuple(vec![this.desc(id, env), stack.clone()]),
-            })
+            this.nodes_with_default(
+                resolved,
+                |this, current| this.tuple(vec![current, stack.clone()]),
+                |this, _, node, env| match node.kind {
+                    OwnerTypeKind::App => Some(this.call(
+                        Op::Spine,
+                        this.child(node.children[0], &env),
+                        this.prepend(this.child(node.children[1], &env), stack.clone()),
+                        this.unit(),
+                    )),
+                    _ => None,
+                },
+            )
         })
     }
 

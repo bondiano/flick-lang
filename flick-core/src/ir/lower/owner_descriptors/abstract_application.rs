@@ -133,7 +133,7 @@ impl Build<'_> {
                 let productive = if source.constructor == 5 {
                     self.bind(
                         self.observe(Op::Abstract, argument.clone()),
-                        |this, value| this.abstract_boolean_field(value, false),
+                        |this, value| this.observe(Op::AbstractRowOccupied, value),
                     )
                 } else {
                     self.boolean(source.constructor == 4)

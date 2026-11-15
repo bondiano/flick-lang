@@ -39,6 +39,10 @@ enum Op {
     AbstractEntries,
     Productive,
     ProductiveSummary,
+    AbstractProductive,
+    AbstractRowOccupied,
+    AliasBody,
+    KnownNode,
 }
 
 struct Build<'a> {
@@ -115,6 +119,9 @@ impl Build<'_> {
         self.binary(BinOp::And, a, b)
     }
     fn choose(&self, c: Expr, a: Expr, b: Expr) -> Expr {
+        if let ExprKind::Lit(Lit::Bool(condition)) = c.kind {
+            return if condition { a } else { b };
+        }
         self.e(ExprKind::If(Box::new(c), Box::new(a), Box::new(b)))
     }
     fn block(&self, statements: Vec<Stmt>, body: Expr) -> Expr {
@@ -242,6 +249,10 @@ impl Build<'_> {
             Op::AbstractEntries,
             Op::Productive,
             Op::ProductiveSummary,
+            Op::AbstractProductive,
+            Op::AbstractRowOccupied,
+            Op::AliasBody,
+            Op::KnownNode,
         ]
         .into_iter()
         .map(|which| {
@@ -315,6 +326,97 @@ impl Build<'_> {
         self.unpack(desc, &[&node, &env], self.case(self.local(&node), arms))
     }
 
+    fn nodes_with_default(
+        &mut self,
+        desc: Expr,
+        default: impl FnOnce(&Self, Expr) -> Expr,
+        body: impl Fn(&mut Self, usize, &OwnerTypeExpr, Expr) -> Option<Expr>,
+    ) -> Expr {
+        let node = self.name();
+        let env = self.name();
+        let templates = self.templates;
+        let mut arms = Vec::new();
+        let mut has_default = false;
+        for (id, expression) in templates.exprs.iter().enumerate() {
+            let pattern = Pat::Lit(Lit::Int(i32::try_from(id).expect("owner syntax index")));
+            if let Some(body) = body(self, id, expression, self.local(&env)) {
+                arms.push((pattern, body));
+            } else {
+                has_default = true;
+            }
+        }
+        let fallback = if has_default {
+            let current = self.tuple(vec![self.local(&node), self.local(&env)]);
+            self.choose(
+                self.observe(Op::KnownNode, self.local(&node)),
+                default(self, current),
+                self.impossible(),
+            )
+        } else {
+            self.impossible()
+        };
+        // Share the exact original-ID membership table across selectors. The
+        // original node and lazy environment still reach the default body.
+        arms.push((Pat::Wild, fallback));
+        self.unpack(desc, &[&node, &env], self.case(self.local(&node), arms))
+    }
+
+    fn known_node(&self, node: Expr) -> Expr {
+        if self.templates.exprs.is_empty() {
+            return self.boolean(false);
+        }
+        let ids = (0..self.templates.exprs.len())
+            .map(|id| Pat::Lit(Lit::Int(i32::try_from(id).expect("owner syntax index"))))
+            .collect();
+        self.case(
+            node,
+            vec![
+                (Pat::Or(ids), self.boolean(true)),
+                (Pat::Wild, self.boolean(false)),
+            ],
+        )
+    }
+
+    fn nodes_grouped<K: Eq>(
+        &mut self,
+        desc: Expr,
+        key: impl Fn(&Self, &OwnerTypeExpr) -> Option<K>,
+        body: impl Fn(&mut Self, usize, &OwnerTypeExpr, Expr, Expr) -> Expr,
+    ) -> Expr {
+        let node = self.name();
+        let env = self.name();
+        let templates = self.templates;
+        let mut arms = Vec::new();
+        let mut groups: Vec<(K, usize, Vec<Pat>)> = Vec::new();
+        for (id, expression) in templates.exprs.iter().enumerate() {
+            let pattern = Pat::Lit(Lit::Int(i32::try_from(id).expect("owner syntax index")));
+            if let Some(key) = key(self, expression) {
+                if let Some((_, _, patterns)) =
+                    groups.iter_mut().find(|(known, _, _)| known == &key)
+                {
+                    patterns.push(pattern);
+                } else {
+                    groups.push((key, id, vec![pattern]));
+                }
+            } else {
+                let current = self.desc(id, self.local(&env));
+                arms.push((
+                    pattern,
+                    body(self, id, expression, self.local(&env), current),
+                ));
+            }
+        }
+        for (_, id, patterns) in groups {
+            let current = self.tuple(vec![self.local(&node), self.local(&env)]);
+            arms.push((
+                Pat::Or(patterns),
+                body(self, id, &templates.exprs[id], self.local(&env), current),
+            ));
+        }
+        arms.push((Pat::Wild, self.impossible()));
+        self.unpack(desc, &[&node, &env], self.case(self.local(&node), arms))
+    }
+
     fn operation(&mut self, op: Op, desc: Expr, x: Expr, y: Expr) -> Expr {
         match op {
             Op::Abstract => self.abstract_type(&desc),
@@ -324,6 +426,10 @@ impl Build<'_> {
             Op::AbstractEntries => self.abstract_entries(desc, x, y),
             Op::Productive => self.productive(desc),
             Op::ProductiveSummary => self.productive_summary(desc),
+            Op::AbstractProductive => self.abstract_boolean_field(desc, true),
+            Op::AbstractRowOccupied => self.abstract_boolean_field(desc, false),
+            Op::AliasBody => self.alias_body(desc),
+            Op::KnownNode => self.known_node(desc),
             Op::Resolve => self.resolve(desc),
             Op::Spine => self.spine(desc, &x),
             Op::Head => self.head(desc, x, y),
@@ -339,9 +445,13 @@ impl Build<'_> {
             Op::Dictionary => self.dictionary(desc),
             Op::Adapt => self.adapt(desc, &x),
             Op::IsSymbol => self.bind(self.observe(Op::Resolve, desc), |this, resolved| {
-                this.nodes(resolved, |this, _, node, _| {
-                    this.boolean(matches!(node.kind, OwnerTypeKind::Symbol(_)))
-                })
+                this.nodes_with_default(
+                    resolved,
+                    |this, _| this.boolean(false),
+                    |this, _, node, _| {
+                        matches!(node.kind, OwnerTypeKind::Symbol(_)).then(|| this.boolean(true))
+                    },
+                )
             }),
         }
     }
@@ -356,48 +466,5 @@ include!("owner_descriptors/abstract_types.rs");
 include!("owner_descriptors/productivity.rs");
 
 #[cfg(test)]
-mod sharing_tests {
-    use super::Op;
-    use crate::ir::tests::lower_text;
-    use crate::ir::{Expr, ExprKind, ItemKind, Lit, Pat};
-
-    fn abstract_calls(expression: &Expr) -> usize {
-        let mut count = usize::from(matches!(&expression.kind,
-            ExprKind::App { arg, .. } if matches!(&arg.kind, ExprKind::Tuple(fields)
-                if matches!(fields.first().map(|field| &field.kind), Some(ExprKind::Lit(Lit::Int(op))) if *op == Op::Abstract as i32))));
-        expression.each_child(&mut |child| count += abstract_calls(child));
-        count
-    }
-
-    fn inspect(expression: &Expr, found: &mut bool) {
-        if let ExprKind::Lambda { params, body } = &expression.kind
-            && params.len() == 1
-            && matches!(&params[0].pat, Pat::Tuple(fields) if fields.len() == 4)
-            && let ExprKind::Match(_, arms) = &body.kind
-            && let Some(arm) = arms.iter().find(|arm| {
-                matches!(&arm.pat,
-                Pat::Lit(Lit::Int(op)) if *op == Op::Productive as i32)
-            })
-        {
-            *found = true;
-            assert_eq!(
-                abstract_calls(&arm.body),
-                0,
-                "the P fastpath must tail-dispatch its fallback rather than duplicate full observations per syntax node"
-            );
-        }
-        expression.each_child(&mut |child| inspect(child, found));
-    }
-
-    #[test]
-    fn productivity_fallback_is_shared_instead_of_copied_per_type_node() {
-        let module = lower_text("Test", "module Test exposing (repeat)\nopaque type alias Id a = a\nopaque type alias Repeat a s = Eff {Scope s} none (Id (Repeat (List a) s))\nrepeat : Repeat Int s\nforeign pure repeat from \"flick:rt\" \"repeat\"\n").expect("recursive original declaration");
-        let mut found = false;
-        for item in &module.items {
-            if let ItemKind::Value { body, .. } = &item.kind {
-                inspect(body, &mut found);
-            }
-        }
-        assert!(found, "generated productivity dispatcher");
-    }
-}
+#[path = "owner_descriptors/tests.rs"]
+mod sharing_tests;

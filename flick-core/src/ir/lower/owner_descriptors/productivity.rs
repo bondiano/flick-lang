@@ -1,7 +1,7 @@
 impl Build<'_> {
     fn productive_summary(&mut self, desc: Expr) -> Expr {
         self.bind(self.observe(Op::Abstract, desc), |this, state| {
-            this.abstract_boolean_field(state, true)
+            this.observe(Op::AbstractProductive, state)
         })
     }
 
@@ -15,37 +15,36 @@ impl Build<'_> {
         let spine = self.call(Op::Spine, desc, self.list(Vec::new()), self.unit());
         let head = self.name();
         let arguments = self.name();
-        let result = self.nodes(self.local(&head), |this, _, node, _| {
-            let OwnerTypeKind::Con { module, name } = &node.kind else {
-                return fallback.clone();
-            };
-            let Some(alias) = this
-                .templates
-                .aliases
-                .iter()
-                .find(|alias| alias.module == *module && alias.name == *name)
-            else {
-                return fallback.clone();
-            };
-            let OwnerTypeKind::Var(parameter) = &this.templates.exprs[alias.body].kind else {
-                return fallback.clone();
-            };
-            let Some(index) = alias.params.iter().position(|name| name == parameter) else {
-                return fallback.clone();
-            };
-            let bindings: Vec<_> = alias.params.iter().map(|_| this.name()).collect();
-            let forwarded = this.observe(Op::Productive, this.local(&bindings[index]));
-            this.case(
-                this.local(&arguments),
-                vec![
-                    (
-                        Pat::List(bindings.into_iter().map(Pat::Bind).collect(), None),
-                        forwarded,
-                    ),
-                    (Pat::Wild, fallback.clone()),
-                ],
-            )
-        });
+        let result = self.nodes_with_default(
+            self.local(&head),
+            |_, _| fallback.clone(),
+            |this, _, node, _| {
+                let OwnerTypeKind::Con { module, name } = &node.kind else {
+                    return None;
+                };
+                let alias = this
+                    .templates
+                    .aliases
+                    .iter()
+                    .find(|alias| alias.module == *module && alias.name == *name)?;
+                let OwnerTypeKind::Var(parameter) = &this.templates.exprs[alias.body].kind else {
+                    return None;
+                };
+                let index = alias.params.iter().position(|name| name == parameter)?;
+                let bindings: Vec<_> = alias.params.iter().map(|_| this.name()).collect();
+                let forwarded = this.observe(Op::Productive, this.local(&bindings[index]));
+                Some(this.case(
+                    this.local(&arguments),
+                    vec![
+                        (
+                            Pat::List(bindings.into_iter().map(Pat::Bind).collect(), None),
+                            forwarded,
+                        ),
+                        (Pat::Wild, fallback.clone()),
+                    ],
+                ))
+            },
+        );
         self.unpack(spine, &[&head, &arguments], result)
     }
 }
