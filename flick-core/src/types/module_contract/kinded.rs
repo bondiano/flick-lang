@@ -310,16 +310,17 @@ impl<K: Kinding, I: Identities> Walk<'_, '_, K, I> {
             })
             .collect::<Result<Vec<_>, Incomplete>>()?;
         self.binders.extend_from_slice(vars);
-        let result = (|| {
-            Ok(Type::Forall {
-                vars: mapped,
-                constraints: constraints
-                    .iter()
-                    .map(|constraint| self.ty(constraint, &Kind::Constraint))
-                    .collect::<Result<_, _>>()?,
-                body: Box::new(self.ty(body, &Kind::Type)?),
-            })
-        })();
+        let result = constraints
+            .iter()
+            .map(|constraint| self.ty(constraint, &Kind::Constraint))
+            .collect::<Result<Vec<_>, _>>()
+            .and_then(|constraints| {
+                self.ty(body, &Kind::Type).map(|body| Type::Forall {
+                    vars: mapped,
+                    constraints,
+                    body: Box::new(body),
+                })
+            });
         self.binders.truncate(mark);
         result
     }

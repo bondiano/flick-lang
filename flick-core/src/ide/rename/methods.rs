@@ -67,14 +67,13 @@ impl Ide<'_> {
             return Ok(Some((Symbol::Entity(e), at)));
         }
         let path = tree::path_to(&m.tree, offset);
-        let member = (|| {
-            let i = path.iter().rposition(|n| n.kind == K::Members)?;
-            Some((
-                *path.get(i.checked_sub(1)?)?,
-                member_name(path.get(i + 1)?)?,
-            ))
-        })();
-        let Some((decl, t)) = member else {
+        let Some(i) = path.iter().rposition(|n| n.kind == K::Members) else {
+            return Ok(None);
+        };
+        let Some(decl) = i.checked_sub(1).and_then(|j| path.get(j).copied()) else {
+            return Ok(None);
+        };
+        let Some(t) = path.get(i + 1).and_then(|n| member_name(n)) else {
             return Ok(None);
         };
         if !(t.start <= offset && offset <= t.end) {
