@@ -16,8 +16,11 @@ pub(super) struct Opened {
     pub values: Vec<(String, Type)>,
 }
 
+// Phase M scaffolding: retained for the next ownership/witness checkpoint.
+#[allow(dead_code)]
 mod actual;
 
+#[allow(dead_code)]
 pub(in crate::types) mod kinded;
 
 include!("module_contract/scope.rs");
@@ -476,7 +479,10 @@ fn find_type<'a>(actual: &'a Interface, module: &str, name: &str) -> Option<&'a 
 #[cfg(test)]
 mod tests;
 
+// Phase M scaffolding: many context/named APIs are not yet on the live path.
+#[allow(dead_code)]
 pub(in crate::types) mod context;
 
+#[allow(dead_code)]
 mod named;
 pub(in crate::types) use named::{NamedWitnesses, WitnessRefresh, WitnessRegistration};
