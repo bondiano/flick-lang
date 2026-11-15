@@ -281,7 +281,12 @@ export const arenaMake = (): Arena => {
 export const ownerHooks: { within?: (owner: object, call: () => unknown) => unknown } = {};
 /** A raw call acquiring into the compiler-selected lexical owner. */
 export const within = (owner: OwnerEvidence, call: () => unknown): unknown => {
-  if (owner instanceof Owner) return inside(owner, call);
+  if (owner instanceof Owner) {
+    // Already acquiring into this owner: keep the current frame so fiber-local
+    // updates stay visible to the caller.
+    if (currentCtx().owner === owner) return call();
+    return inside(owner, call);
+  }
   if (owner !== undefined && ownerHooks.within !== undefined) return ownerHooks.within(owner, call);
   throw new Error("owner evidence is absent or belongs to another runtime");
 };

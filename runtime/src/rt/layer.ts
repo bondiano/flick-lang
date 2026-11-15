@@ -6,7 +6,7 @@
 import { type Cause, type Exit, combine, empty, raise } from "./cause.ts";
 import { allOf } from "./concurrency.ts";
 import { mapped } from "./effects.ts";
-import { type Ctx, type Run, Suspend, Under, asExit, currentCtx, exitOf, extend, hosted, lookup, raiseOf, uninterruptible } from "./fiber.ts";
+import { type Ctx, type Run, Suspend, Under, asExit, currentCtx, exitOf, extend, hosted, lookup, raiseOf, uninterruptible, withOwnerEvidence } from "./fiber.ts";
 import { Owner, addTo, closeOwn, finalize, inside, withOwner } from "./owner.ts";
 import { traceEvent, traceLayer, tracing } from "./trace.ts";
 
@@ -220,7 +220,10 @@ export const layerOverride = layerMerge;
 
 function* provide(layer: Layer, body: (unit: undefined) => unknown): Run {
   return yield withOwner(function* (owner: Owner): Run {
-    const services = servicesOf(yield buildWith(layer, currentMemo(), owner));
+    // Build under the provide owner's evidence; the body keeps the caller's.
+    const services = servicesOf(
+      yield withOwnerEvidence(owner, () => buildWith(layer, currentMemo(), owner)),
+    );
     return withServices(services, () => body(undefined));
   }, "provide");
 }

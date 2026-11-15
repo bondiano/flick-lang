@@ -30,8 +30,7 @@ export type Restore = <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect
  * Runs `acquire` with a fresh owner as its `Scope` and owner evidence: what
  * it acquires belongs to the holder. A caller that registers the holder under
  * its own mask passes that mask's `restore`, so the acquisition stays
- * interruptible. Owner evidence must match that owner so Phase M `Within`
- * activation does not redirect the acquisition onto an outer lexical scope.
+ * interruptible.
  */
 export const acquireHolder = <A, E, R>(
   acquire: Effect.Effect<A, E, R>,

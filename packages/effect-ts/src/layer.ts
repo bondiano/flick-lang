@@ -3,7 +3,7 @@
 // is released by the owner's two-phase close after the body.
 import { Context, Effect, Layer, Scope } from "effect";
 
-import { withOwner } from "./owner.ts";
+import { withOwner, withOwnerEvidence } from "./owner.ts";
 import { traceEvent, traceLayer, tracing } from "./trace.ts";
 
 /** `inner`, writing to the trace each layer it builds and its release. */
@@ -42,7 +42,11 @@ export const provide = <ROut, E, RIn, A, E2, R>(
 ): Effect.Effect<A, unknown, RIn | Exclude<R, ROut>> =>
   withOwner(
     (owner) =>
-      Effect.flatMap(buildInto(layer, owner.resources), (services) => Effect.provideContext(body, services)),
+      // Build under the provide owner's evidence so retention-owner finalizers
+      // land on it; the body keeps the caller's lexical candidate.
+      Effect.flatMap(withOwnerEvidence(owner, () => buildInto(layer, owner.resources)), (services) =>
+        Effect.provideContext(body, services),
+      ),
     "provide",
   );
 
