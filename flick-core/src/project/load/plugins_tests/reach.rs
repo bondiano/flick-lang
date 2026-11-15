@@ -132,6 +132,44 @@ fn a_granted_variable_is_read() {
 }
 
 #[test]
+fn an_ipv6_grant_covers_that_address_and_not_another() {
+    let world = Arc::new(World::default());
+    let grants = Grants {
+        net: vec!["[::1]".into(), "[2001:db8::1]:443".into()],
+        ..Grants::default()
+    };
+    let host = reaching("fetch_text \"http://[0:0:0:0:0:0:0:1]:8080/t\" {}", &world);
+    let (_, found) = built(&host, grants.clone());
+    assert!(found[0].starts_with("FLICK-P039 "), "{found:?}");
+    let host = reaching("fetch_text \"https://[2001:DB8::1]:443/t\" {}", &world);
+    let (_, found) = built(&host, grants.clone());
+    assert!(found[0].starts_with("FLICK-P039 "), "{found:?}");
+    let host = reaching("fetch_text \"http://[::2]/t\" {}", &world);
+    let (_, found) = built(&host, grants.clone());
+    assert!(
+        found[0].starts_with("FLICK-P038 ") && found[0].contains("net = [\"[::2]\"]"),
+        "{found:?}"
+    );
+    let host = reaching("fetch_text \"http://[::ffff:127.0.0.1]/t\" {}", &world);
+    let dotted = Grants {
+        net: vec!["127.0.0.1".into()],
+        ..Grants::default()
+    };
+    let (_, found) = built(&host, dotted);
+    assert!(found[0].starts_with("FLICK-P038 "), "{found:?}");
+    let narrow = Grants {
+        net: vec!["[::1]:8080".into()],
+        ..Grants::default()
+    };
+    let host = reaching("fetch_text \"http://[::1]:80/t\" {}", &world);
+    let (_, found) = built(&host, narrow);
+    assert!(
+        found[0].starts_with("FLICK-P038 ") && found[0].contains("net = [\"[::1]\"]"),
+        "{found:?}"
+    );
+}
+
+#[test]
 fn an_answer_in_no_snapshot_of_an_offline_run_is_refused() {
     let world = Arc::new(World::default());
     let host = reaching("fetch_text \"https://db.example.com/t\" {}", &world);

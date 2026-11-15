@@ -411,12 +411,13 @@ mod wasm {
         assert!(built(&root).contains("\"again\""));
     }
 
-    /// A server at a port of 127.0.0.1 that answers each request with
-    /// `body`, its URL, and the number of requests for that URL: a probe of
-    /// the new port, as WSL makes, asks for another.
-    fn serve(body: &'static str) -> (String, Arc<AtomicUsize>) {
-        let listener = TcpListener::bind("127.0.0.1:0").expect("a port");
-        let port = listener.local_addr().expect("bound").port();
+    /// A server at `bind` that answers each request with `body`, and the
+    /// number of requests for `/tables`: a probe of the new port, as WSL
+    /// makes, asks for another. The URL is `http://` plus the bound address,
+    /// so an IPv6 loopback is `http://[::1]:port/tables`.
+    fn serve(bind: &str, body: &'static str) -> (String, Arc<AtomicUsize>) {
+        let listener = TcpListener::bind(bind).expect("a port");
+        let address = listener.local_addr().expect("bound");
         let asked = Arc::new(AtomicUsize::new(0));
         let counted = Arc::clone(&asked);
         thread::spawn(move || {
@@ -435,17 +436,12 @@ mod wasm {
                 let _ = stream.write_all(answer.as_bytes());
             }
         });
-        (format!("http://127.0.0.1:{port}/tables"), asked)
+        (format!("http://{address}/tables"), asked)
     }
 
-    #[test]
-    fn an_answer_is_kept_as_a_snapshot_an_offline_run_replays() {
-        let (url, asked) = serve("users");
-        let root = reaching(
-            "plugins-snapshots",
-            &format!("fetch_text \"{url}\" {{}}"),
-            "net = [\"127.0.0.1\"]",
-        );
+    fn keeps_the_snapshot(name: &str, bind: &str, grant: &str) {
+        let (url, asked) = serve(bind, "users");
+        let root = reaching(name, &format!("fetch_text \"{url}\" {{}}"), grant);
         let expanded = flick(&root, &["expand"]);
         assert!(
             String::from_utf8_lossy(&expanded.stdout).contains("\"200 users\""),
@@ -484,5 +480,15 @@ mod wasm {
             let stderr = String::from_utf8_lossy(&checked.stderr);
             assert!(stderr.contains("FLICK-P039"), "{args:?}: {stderr}");
         }
+    }
+
+    #[test]
+    fn an_answer_is_kept_as_a_snapshot_an_offline_run_replays() {
+        keeps_the_snapshot("plugins-snapshots", "127.0.0.1:0", "net = [\"127.0.0.1\"]");
+    }
+
+    #[test]
+    fn an_ipv6_answer_is_kept_as_a_snapshot_an_offline_run_replays() {
+        keeps_the_snapshot("plugins-ipv6", "[::1]:0", "net = [\"[::1]\"]");
     }
 }

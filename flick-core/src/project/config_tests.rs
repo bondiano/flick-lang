@@ -403,12 +403,20 @@ fn a_project_grants_a_plugin_files_hosts_and_variables() {
         ))
     };
     let config = with(
-        "fs-read = [\"schema/\", \"db/extra.sql\"]\nnet = [\"db.example.com\", \"localhost:8080\"]\nenv = [\"SQL_TOKEN\"]",
+        "fs-read = [\"schema/\", \"db/extra.sql\"]\nnet = [\"db.example.com\", \"localhost:8080\", \"[::1]\", \"[2001:DB8::1]:443\"]\nenv = [\"SQL_TOKEN\"]",
     )
     .expect("valid");
     let sql = &config.plugins["sql"];
     assert_eq!(sql.fs_read, ["schema/", "db/extra.sql"]);
-    assert_eq!(sql.net, ["db.example.com", "localhost:8080"]);
+    assert_eq!(
+        sql.net,
+        [
+            "db.example.com",
+            "localhost:8080",
+            "[::1]",
+            "[2001:DB8::1]:443"
+        ]
+    );
     assert_eq!(sql.env, ["SQL_TOKEN"]);
     let empty = with("").expect("valid").plugins["sql"].clone();
     assert!(empty.span.is_some());
@@ -430,6 +438,12 @@ fn a_project_grants_a_plugin_files_hosts_and_variables() {
         "net = [\"-\"]",
         "net = [\"a..b\"]",
         "net = [\"db-.example.com\"]",
+        "net = [\"::1\"]",
+        "net = [\"[::1%eth0]\"]",
+        "net = [\"[gggg::1]\"]",
+        "net = [\"[::1]:99999\"]",
+        "net = [\"[]\"]",
+        "net = [\"[::1]:\"]",
         "env = [\"A-B\"]",
         "disable = [\"no such\"]",
         "disable = [\"Cli.\"]",
