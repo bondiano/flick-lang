@@ -1,0 +1,74 @@
+// A default of a class in one module taken by instances of another: one
+// derived through `Generic`, one written by hand, and a default method
+// that calls another of its class. Each instance is known where it is
+// used, so the go target calls the methods it writes as functions
+// directly; a constrained function is given the same instances.
+module App.Main exposing (main)
+
+import Generic exposing (Generic(..), Sum(..), Con(..), Field(..))
+
+/// The first constructor, each field its default.
+class Default a =
+  default : a
+  default : (Generic a rep, GDefault rep) => a
+  let default = from_rep gdefault
+
+class GDefault rep =
+  gdefault : rep
+
+instance GDefault Unit =
+  let gdefault = ()
+
+instance (Default a, GDefault rest) => GDefault (Field l a, rest) =
+  let gdefault = (Field default, gdefault)
+
+instance GDefault fields => GDefault (Con n fields) =
+  let gdefault = Con gdefault
+
+instance GDefault a => GDefault (Sum a b) =
+  let gdefault = Inl gdefault
+
+instance Default Int =
+  let default = 7
+
+class Measure a =
+  measure : a -> Int
+  twice : a -> Int
+  let twice x = 2 * measure x
+
+module Points exposing (Pair(..), Spot(..)) =
+  // `default` derived through the default of its class, another module's
+  type Pair = Pair Int Int
+    deriving Default, Show
+
+  // and the same written by hand
+  type Spot = Spot Int Int
+    deriving Show
+
+  instance Default Spot =
+    let default = Spot 7 7
+
+  instance Measure Pair =
+    let measure p =
+      match p with
+      | Pair a b -> a + b
+
+  instance Measure Spot =
+    let measure s =
+      match s with
+      | Spot a b -> a * b
+    let twice s = measure s + 1
+
+/// A constraint's dictionaries: the ones its caller gives.
+summed : (Default a, Measure a) => a -> Int
+let summed _ =
+  let made = (default : a)
+  measure made + twice made
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let pair = (default : Points.Pair)
+  let spot = (default : Points.Spot)
+  Platform.stdout_line (show pair ++ " " ++ show spot)
+  Platform.stdout_line (show [measure pair, twice pair, measure spot, twice spot])
+  Platform.stdout_line (show [summed pair, summed spot])

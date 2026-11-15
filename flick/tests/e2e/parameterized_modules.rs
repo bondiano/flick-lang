@@ -284,6 +284,17 @@ fn parameterized_module_uses_its_argument_dictionary_on_js_and_go() {
                 String::from_utf8_lossy(&output.stderr)
             );
             assert_eq!(output.stdout, expected.as_bytes(), "{emit}/{policy}");
+            if emit == "go" {
+                // the argument's dictionary, not a direct call of the
+                // global `Eq String` the go target makes elsewhere
+                let result = out.join(format!("go/{MAIN_ENTRY}/m_App_Parent_Chosen.go"));
+                let go = fs::read_to_string(&result).expect("the result module's Go");
+                assert!(
+                    go.contains("flickrt.Method(nil, V_App_Argument__equality, \"eq\")"),
+                    "{go}"
+                );
+                assert!(!go.contains("F_Instances__Eq_x20_String_x24_eq"), "{go}");
+            }
         }
     }
 }

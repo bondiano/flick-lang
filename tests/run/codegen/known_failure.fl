@@ -1,0 +1,33 @@
+// A method of a known instance, which the go target calls directly, whose
+// argument fails: the failure is the program's, after what ran before it,
+// and the scope around the call still releases what it acquired.
+module App.Main exposing (main)
+
+class Area a =
+  area : a -> Int
+
+type Square = Square Int
+
+instance Area Square =
+  let area s =
+    match s with
+    | Square side -> side * side
+
+/// Fails as soon as it is evaluated.
+broken : Unit -> Square
+let broken () = Square (Int.unsafe_div 1 0)
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+released : Unit ->{} Int
+let released () = scope {
+  ignore (Resource.acquire_release (task { say "acquired" }) (fun _ -> say "released"))
+  area (broken ())
+}
+
+main : Unit ->{; AppError} Unit
+let main () =
+  say (show (area (Square 3)))
+  ignore (released ())
+  say "unreachable"
