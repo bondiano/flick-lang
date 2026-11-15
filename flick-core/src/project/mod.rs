@@ -2,6 +2,7 @@
 //! source and test roots, the module ↔ path mapping and installed packages.
 //! File access goes through [`Host`], so the core stays free of I/O.
 
+pub(crate) mod builtins;
 #[cfg(feature = "native-project")]
 pub mod cache;
 pub mod config;
@@ -18,6 +19,10 @@ mod packages;
 pub mod pnpm;
 #[cfg(feature = "native-project")]
 pub mod store;
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) mod target_preflight;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod target_preflight_tests;
 #[cfg(feature = "native-project")]
 pub mod workspace;
 
