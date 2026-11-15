@@ -37,7 +37,7 @@ pub use load::{
 #[cfg(feature = "native-project")]
 pub use load::{ModuleStore, SavedModule, ships};
 #[cfg(feature = "native-project")]
-pub use packages::project_name;
+pub use packages::{library_dir, project_name};
 
 /// The libraries of `project` whose plugins take part in `hook`, as
 /// `hooks = ["emit"]` says, each with its component, in the order of the

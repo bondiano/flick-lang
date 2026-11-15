@@ -77,3 +77,39 @@ fn the_manifest_of_the_workspace_around_a_member_reports_its_errors() {
     assert_eq!(codes(&mut lsp, &dir.join("flick.toml")), ["FLICK-P005"]);
     lsp.close();
 }
+
+#[test]
+fn a_workspace_git_plugin_is_the_same_chain_for_the_editor_and_the_command_line() {
+    let root = "schema-version = 1\n\n[workspace]\nmembers = [\"app\"]\n\n[[workspace.plugins]]\npackage = \"pairs\"\nsource = { git = \"https://example.com/pairs\", tag = \"v1.0.0\", subdir = \"lib\" }\n";
+    let app = "schema-version = 1\n\n[project]\nkind = \"lib\"\n";
+    let main = "module App.Main exposing (point)\n\nimport Pairs exposing (plugin pairs)\n\npoint : Float\nlet point = pairs { x = 1.0 }\n";
+    let dir = project(
+        "lsp_workspace_git_plugin",
+        &[
+            ("flick.toml", root),
+            ("app/flick.toml", app),
+            ("app/src/App/Main.fl", main),
+        ],
+    );
+    let file = dir.join("app/src/App/Main.fl");
+    let mut lsp = Lsp::start(&dir.join("app"));
+    lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": main } }));
+    let message = "dependency `pairs` is not in `flick.lock`: run `flick install`";
+    // the dependency is a place in the workspace's manifest, as for check
+    let _ = lsp.diagnostics(&uri(&file));
+    let diagnostics = lsp.diagnostics(&uri(&dir.join("flick.toml")));
+    assert!(
+        diagnostics
+            .iter()
+            .any(|d| d["message"].as_str().is_some_and(|m| m.contains(message))),
+        "{diagnostics:?}"
+    );
+    lsp.close();
+    let out = flick_in(dir.join("app"), &["plugins"]);
+    assert_eq!(out.status.code(), Some(1), "{out:?}");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("FLICK-P034") && stderr.contains(message),
+        "{stderr}"
+    );
+}
