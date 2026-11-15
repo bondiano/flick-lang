@@ -34,6 +34,8 @@ type Owner struct {
 	// `RcRef`, `Pool`, `RcMap`): `Within` must not redirect finalizers onto
 	// an outer lexical owner, or releases wait until that outer scope ends.
 	detached bool
+	// kind is main/scope/provide when this owner is a traced lexical region.
+	kind string
 }
 
 // defects collects failures of supervisors: the root's fail the program,
@@ -315,6 +317,7 @@ func ownedWith(fb *Fiber, close func(*Owner, *Fiber, *Cause) *Cause, body func(f
 // around it.
 func Scope(fb *Fiber, body func(fb *Fiber, owner, outer Value) Value) Value {
 	return region(fb, func(inner *Fiber, owner *Owner) Value {
+		owner.kind = "scope"
 		if tracing {
 			traceOpen(owner, fb.owner, "scope")
 		}
@@ -339,11 +342,18 @@ func ScopeCurrent(fb *Fiber, _ Value) Value { return fb.owner }
 // owner is pinned for a library acquisition, the same fiber is returned
 // so fiber-local updates and that acquisition's finalizers stay put.
 func Within(fb *Fiber, owner Value) *Fiber {
-	if fb.pinOwner || fb.owner == owner.(*Owner) || (fb.owner != nil && fb.owner.detached) {
+	target := owner.(*Owner)
+	if fb.pinOwner || fb.owner == target || (fb.owner != nil && fb.owner.detached) {
+		return fb
+	}
+	// Effect Scope.provide keeps CurrentOwner on the provide owner while
+	// finalizers land on the layer's untraced build scope. Do not pull those
+	// finalizers onto the provide owner when evidence names it.
+	if fb.owner != nil && fb.owner.trace == 0 && target.kind == "provide" {
 		return fb
 	}
 	inner := *fb
-	inner.owner = owner.(*Owner)
+	inner.owner = target
 	return &inner
 }
 
