@@ -57,8 +57,9 @@ pub enum Commands {
     Deps(DepsArguments),
     /// Build a release package and an npm tarball of it.
     Pack(OutDirArguments),
-    /// Show the plugins the project gets, where each comes from, and whether
-    /// `flick.lock` pins the build of its component.
+    /// Show the plugins of the project's path, git and url dependencies, where
+    /// each comes from, and whether `flick.lock` pins the build of its
+    /// component.
     Plugins,
     /// Compare the public API with a git revision and name the version bump.
     Diff(DiffArguments),

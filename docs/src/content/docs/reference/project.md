@@ -255,6 +255,23 @@ hash of its component under `[[plugin]]`. A build is not held to it;
 `flick install --locked` fails when the component is another build, and
 `flick plugins` shows it.
 
+`flick plugins` lists each plugin the project's manifests name, in the order
+they name them: the project's `[dependencies]` and the `[[workspace.plugins]]`
+a member inherits. A fetched library is shown by the source `flick.lock` pins,
+not by its directory in the package store:
+
+| source | `flick plugins` shows | pinned by |
+| - | - | - |
+| `path` | the component's path from the project's root | `[[plugin]]` in `flick.lock` |
+| `git` | `git+<url>?tag=<tag>[&subdir=<dir>]#<commit> (<component>)` | the package's `[[package]]` checksum |
+| `url` | `url+<url> (<component>)` | the package's `[[package]]` checksum |
+
+The listing reads `flick.lock` and the package store and fetches or builds
+nothing; a component a path library has not built is shown as missing. A
+fetched dependency the lock does not pin, or the store does not hold, is
+`FLICK-P034`. A library's own dependencies are compiled with it, but they are
+not entries of the project's `flick.toml`, so the listing does not repeat them.
+
 A library is compiled like a [source package](#packages): for the target the
 project emits, without its warnings, after the project's own modules, as
 another package, so instances of its classes and types are its own. A change

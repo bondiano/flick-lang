@@ -55,6 +55,12 @@ export class Owner {
   fins = 0;
   /** Whether its finalizers have started: one added now runs at once. */
   finalizing = false;
+  /**
+   * A library acquisition scope (`acquireHolder`, RcRef, Pool): `Within` must
+   * not redirect finalizers onto an outer lexical owner, or releases wait
+   * until that outer scope ends.
+   */
+  detached = false;
 
   constructor(resources: Scope.Closeable, defects: Array<Cause.Cause<unknown>> = reported) {
     this.resources = resources;
@@ -181,6 +187,8 @@ export const withOwner = <A, E, R>(
         owner.trace = traceId();
         traceEvent({ e: "open", o: owner.trace, p: outer?.trace ?? 0, k: kind });
       }
+      // Provide and other withOwner callers preserve the caller's lexical
+      // candidate; scope/scopeRun set evidence explicitly.
       const exit = yield* Effect.exit(restore(inside(owner, body(owner, outer))));
       return yield* resume(yield* close(owner, exit));
     }),
@@ -232,14 +240,16 @@ export const arenaMake = (): Effect.Effect<Arena> => Effect.map(Effect.service(C
 /** Resolve foreign identity only when a raw scoped operation activates it. */
 export const ownerHooks: { activate?: (owner: object) => Owner } = {};
 export const within = <A, E, R>(owner: OwnerEvidence, effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, Scope.Scope>> =>
-  Effect.suspend(() => {
+  Effect.flatMap(Effect.service(CurrentOwner), (current) => {
     const active = owner instanceof Owner ? owner : owner === undefined ? undefined : ownerHooks.activate?.(owner);
     if (active === undefined) throw new Error("owner evidence is absent or belongs to another runtime");
-    // Both branches supply Scope: the direct branch checks the installed scope.
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the identity check discharges the same Scope requirement as inside
-    return Effect.flatMap(Effect.service(CurrentOwner), (current) => current === active
-      ? Effect.flatMap(Effect.scope, (installedScope) => installedScope === active.resources ? effect : inside(active, effect))
-      : inside(active, effect)) as Effect.Effect<A, E, Exclude<R, Scope.Scope>>;
+    // Same owner, or a pinned library acquisition: keep the current fiber so
+    // fiber-local updates stay visible and acquisition finalizers stay put.
+    if (current === active || current?.detached) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the active owner supplies the Scope requirement
+      return effect as Effect.Effect<A, E, Exclude<R, Scope.Scope>>;
+    }
+    return inside(active, effect);
   });
 
 /** `Fiber e a`: a child spawned into an owner. */

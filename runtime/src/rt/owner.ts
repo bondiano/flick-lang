@@ -94,6 +94,13 @@ export class Owner {
   /** C5 has started: a finalizer added now runs at once, with this exit. */
   finalizing = false;
   exit: Exit | undefined = undefined;
+  /**
+   * A library acquisition scope: `Within` must not redirect finalizers onto
+   * an outer lexical owner, or releases wait until that outer scope ends.
+   */
+  detached = false;
+  /** `main` / `scope` / `provide` when this owner is a lexical region. */
+  kind: string | undefined = undefined;
 
   constructor(defects: Array<Cause> = reported) {
     this.defects = defects;
@@ -224,6 +231,7 @@ export function* withOwner(body: (owner: Owner, outer: Owner | undefined) => unk
   fiber.mask = depth + 1;
   try {
     const owner = new Owner(outer?.defects);
+    if (kind !== undefined) owner.kind = kind;
     if (tracing && kind !== undefined) {
       owner.trace = traceId();
       traceEvent({ e: "open", o: owner.trace, p: outer?.trace ?? 0, k: kind });
@@ -281,7 +289,19 @@ export const arenaMake = (): Arena => {
 export const ownerHooks: { within?: (owner: object, call: () => unknown) => unknown } = {};
 /** A raw call acquiring into the compiler-selected lexical owner. */
 export const within = (owner: OwnerEvidence, call: () => unknown): unknown => {
-  if (owner instanceof Owner) return inside(owner, call);
+  const current = currentCtx().owner;
+  // A pinned library acquisition keeps its frame so finalizers stay put.
+  if (current?.detached) return call();
+  if (owner instanceof Owner) {
+    // Already acquiring into this owner: keep the current frame so fiber-local
+    // updates stay visible to the caller.
+    if (current === owner) return call();
+    // Effect Scope.provide keeps CurrentOwner on the provide owner while
+    // finalizers land on the layer's untraced build scope. Do not pull those
+    // finalizers onto the provide owner when evidence names it.
+    if (current !== undefined && current.trace === 0 && owner.kind === "provide") return call();
+    return inside(owner, call);
+  }
   if (owner !== undefined && ownerHooks.within !== undefined) return ownerHooks.within(owner, call);
   throw new Error("owner evidence is absent or belongs to another runtime");
 };

@@ -21,15 +21,25 @@ const BUNDLE = "tools/bundle-size/programs.mjs";
 
 const size = (p) => ({ better: "lower", unit: "KB gzip", budget: p.budget, tolerance: 0, reason: p.reason });
 
-/** The budgets of both sources by name, each with which way is better, its unit and tolerance. */
+/** The compiler WASM byte budget in `justfile`, and an optional `# reason:` beside it. */
 export const wasmBudget = (text) => {
-  const match = /test \$\(wc -c < \$wasm\) -le (\d+)/.exec(text);
+  const match = /test \$\(wc -c < \$wasm\) -le (\d+)(?:[ \t]*# reason: ([^\n]+))?/.exec(text);
   if (!match) throw new Error("missing compiler WASM budget in justfile");
-  return Number(match[1]);
+  return { budget: Number(match[1]), reason: match[2]?.trim() };
 };
 
 const budgets = (perf, programs, chunks = [], wasm) => ({
-  ...(wasm === undefined ? {} : { "wasm.compiler.raw": { better: "lower", unit: "bytes", budget: wasm, tolerance: 0 } }),
+  ...(wasm === undefined
+    ? {}
+    : {
+        "wasm.compiler.raw": {
+          better: "lower",
+          unit: "bytes",
+          budget: wasm.budget,
+          tolerance: 0,
+          ...(wasm.reason ? { reason: wasm.reason } : {}),
+        },
+      }),
   ...Object.fromEntries(Object.entries(perf).map(([metric, b]) => [metric, { better: "lower", unit: "", tolerance: 0, ...METRICS[metric], ...b }])),
   ...Object.fromEntries(programs.map((p) => [`bundle.${p.name}`, size(p)])),
   ...Object.fromEntries(chunks.map((c) => [`chunk.${c.name}`, size(c)])),

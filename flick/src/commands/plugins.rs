@@ -5,10 +5,12 @@ use std::fmt::Write;
 use std::fs;
 use std::path::Path;
 
+use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::plugin::first_party;
-use flick_core::project::config::{self, Source};
-use flick_core::project::{self, Project};
-use flick_core::source::FileId;
+use flick_core::project::config::{self, Dependency, Source};
+use flick_core::project::lock::Lock;
+use flick_core::project::{self, Project, store};
+use flick_core::source::{FileId, SourceMap};
 use sha2::{Digest, Sha256};
 
 use super::run::find_project;
@@ -27,46 +29,96 @@ pub fn plugins(global: &GlobalArguments) -> Outcome {
             };
         }
     };
-    let lock = fetch::lock_of(&project.root).unwrap_or_default();
+    let lock = match fetch::lock_of(&project.root) {
+        Ok(lock) => lock,
+        Err(message) => {
+            return Outcome {
+                sources: SourceMap::default(),
+                diagnostics: vec![Diagnostic::new(codes::P034, Severity::Error, message)],
+            };
+        }
+    };
+    let store = store::store_dir();
+    let inherited = inherited(&project);
+    let mut listed = Vec::new();
+    let mut diagnostics = Vec::new();
+    for dependency in &project.config.dependencies {
+        match plugin_of_dependency(&project.root, dependency, &lock, store.as_deref()) {
+            Ok(Some(line)) => listed.push((dependency.name.clone(), line)),
+            Ok(None) => {}
+            Err(diagnostic) => diagnostics.push(diagnostic),
+        }
+    }
+    if !diagnostics.is_empty() {
+        return Outcome {
+            sources: SourceMap::default(),
+            diagnostics,
+        };
+    }
     let heads: Vec<&str> = first_party::HEADS.iter().map(|(head, _)| *head).collect();
     let mut out = format!(
         "{}: linked into flick, blocks {}\n",
         first_party::PACKAGE,
         heads.join(", ")
     );
-    let inherited = inherited(&project);
-    for dependency in &project.config.dependencies {
-        let Source::Path(dir) = &dependency.source else {
-            continue;
+    for (name, line) in listed {
+        let from = if inherited.contains(&name) {
+            " (from the workspace)"
+        } else {
+            ""
         };
-        let library = project::normalize(&project.root.join(dir));
-        let Some(component) = plugin_of(&library) else {
-            continue;
-        };
-        let path = project::normalize(&library.join(component));
-        let shown = fetch::relative(&project.root, &path);
-        let status = match fs::read(&path) {
-            Err(_) => "missing: build it, as `flick run plugin` in its package does".to_owned(),
-            Ok(bytes) => {
-                let checksum = format!("sha256:{}", fetch::hex(&Sha256::digest(&bytes)));
-                match lock.plugins.iter().find(|p| p.name == dependency.name) {
+        let _ = writeln!(out, "{name}{from}: {line}");
+    }
+    print!("{out}");
+    Outcome::default()
+}
+
+/// The listing line of the plugin `dependency` provides, if it provides one.
+fn plugin_of_dependency(
+    root: &Path,
+    dependency: &Dependency,
+    lock: &Lock,
+    store: Option<&Path>,
+) -> Result<Option<String>, Diagnostic> {
+    let library = project::library_dir(root, dependency, lock, store)?;
+    let Some(component) = plugin_of(&library) else {
+        return Ok(None);
+    };
+    let path = project::normalize(&library.join(&component));
+    let path_source = matches!(dependency.source, Source::Path(_));
+    let shown = if path_source {
+        fetch::relative(root, &path)
+    } else {
+        let locked = lock
+            .find(&dependency.name, &dependency.source)
+            .expect("the library directory names a lock entry");
+        format!("{} ({component})", locked.source)
+    };
+    let status = match fs::read(&path) {
+        Err(_) if path_source => {
+            "missing: build it, as `flick run plugin` in its package does".to_owned()
+        }
+        Err(_) => "missing: the package store does not have it".to_owned(),
+        Ok(bytes) => {
+            let checksum = format!("sha256:{}", fetch::hex(&Sha256::digest(&bytes)));
+            if path_source {
+                match lock
+                    .plugins
+                    .iter()
+                    .find(|p| p.name == dependency.name && p.component == shown)
+                {
                     None => format!("{checksum}, not in `flick.lock`: run `flick install`"),
                     Some(p) if p.checksum != checksum => {
                         format!("{checksum}, another build than `flick.lock` pins")
                     }
                     Some(_) => format!("{checksum}, pinned"),
                 }
+            } else {
+                format!("{checksum}, pinned")
             }
-        };
-        let from = if inherited.contains(&dependency.name) {
-            " (from the workspace)"
-        } else {
-            ""
-        };
-        let _ = writeln!(out, "{}{from}: {shown}, {status}", dependency.name);
-    }
-    print!("{out}");
-    Outcome::default()
+        }
+    };
+    Ok(Some(format!("{shown}, {status}")))
 }
 
 /// The component of the plugin the library at `dir` provides.

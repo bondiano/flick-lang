@@ -20,7 +20,7 @@ import {
 } from "effect";
 import type { StackFrame } from "effect/References";
 
-import { ownerHooks as hostOwnerHooks, Owner as HostOwner, FlickFiber as HostFlickFiber } from "./owner.ts";
+import { CurrentOwner, ownerHooks as hostOwnerHooks, Owner as HostOwner, FlickFiber as HostFlickFiber } from "./owner.ts";
 import { syncContext, syncIn } from "./sync.ts";
 import { type Cause, type Exit, Raise, dieReason, failReason, failed, fromReasons, interruptReason, raise, succeeded } from "@flick-lang/runtime/rt/cause";
 import { type Ctx, type Fiber, type Run, Suspend, awaitFiber, currentCtx, currentFiber, fiberHooks, forkNow, hosted, evidenced, inCtx, owned, asExit, exitOf, raiseOf, runIn } from "@flick-lang/runtime/rt/fiber";
@@ -40,6 +40,8 @@ import { dataFromEffect, dataToEffect, installDataBridge } from "./bridge_data.t
 import { installLayerBridge } from "./bridge_layer.ts";
 import { installSchemaBridge } from "./bridge_schema.ts";
 import { bridgeKernel } from "./bridge_runtime.ts";
+import { durationFromEffect, durationMillis, durationNative, durationToEffect } from "./bridge_duration.ts";
+export { durationFromEffect, durationToEffect } from "./bridge_duration.ts";
 import { KERNEL, hostOf, hostOwnerOf, settled } from "./bridge_host.ts";
 
 
@@ -49,17 +51,6 @@ const effectIdentities = /*#__PURE__*/ new WeakMap<EffectFiber, number>();
 /** Fiber-local library state keeps its identity across interpreter calls. */
 export const fiberIdentity: Effect.Effect<number> = Effect.withFiber((fiber) =>
   Effect.succeed(effectIdentities.get(fiber) ?? fiber.id));
-
-export const durationToEffect = (value: unknown): unknown =>
-  value instanceof Duration
-    ? value.nanos === undefined ? EDuration.millis(value.millis) : EDuration.nanos(value.nanos)
-    : value;
-
-export const durationFromEffect = (value: unknown): unknown => {
-  if (!EDuration.isDuration(value)) return value;
-  const nanos = EDuration.toNanos(value);
-  return EOption.isSome(nanos) ? new Duration(EDuration.toMillis(value), nanos.value) : new Duration(Infinity);
-};
 
 /** A native schedule's steps as Effect pulls, preserving delays and completion. */
 export const scheduleToEffect = (value: unknown): unknown => {
@@ -304,7 +295,10 @@ const scopeOwners = /*#__PURE__*/ new WeakMap<EScope.Scope, Owner>();
 const ownerOfScope = (scope: EScope.Scope, base: Ctx): Effect.Effect<Owner> => {
   const existing = scopeOwners.get(scope);
   if (existing !== undefined) return Effect.succeed(existing);
+  // Detached like lease/RcRef holders: acquire callbacks keep WithOwnerEvidence of
+  // the resource's region, and Within must not pull finalizers onto that outer owner.
   const owner = new Owner(base.owner?.defects);
+  owner.detached = true;
   scopeOwners.set(scope, owner);
   return Effect.as(EScope.addFinalizerExit(scope, (exit) =>
     Effect.orDie(callKernel(() => close(owner, exit._tag === "Success" ? succeeded(undefined) : failed(causeIn(exit.cause))), false)),
@@ -317,22 +311,34 @@ const callKernel = (call: () => unknown, scoped: boolean): Effect.Effect<unknown
     const context = ef.context;
     const base = Context.getOrUndefined(context, KERNEL) ?? ROOT_CTX;
     const scope = scoped ? Context.getOrUndefined(context, EScope.Scope) : undefined;
-    return Effect.flatMap(scope === undefined ? Effect.succeed(base) : Effect.map(ownerOfScope(scope, base), (owner) => owned(base, owner)), (active) => {
-      // `interruptible` is not in the public type of Effect's fiber
-      const fiber: Fiber = forkNow(() => {
-        nativeIdentities.set(currentFiber(), effectIdentities.get(ef) ?? ef.id);
-        return call();
-      }, evidenced(hosted(active, context), Context.get(context, OwnerEvidenceContext)), Reflect.get(ef, "interruptible") === false ? 1 : 0);
-      if (fiber.exit !== undefined) return exitOut(fiber.exit);
-      return Effect.callback<unknown, unknown>((resume) => {
-        fiber.observe((exit) => resume(exitOut(exit)));
-        // the interruption is passed on, and waits for its finalizers
-        return Effect.callback<void>((done) => {
-          fiber.observe(() => done(Effect.void));
-          fiber.interrupt(ef.id);
+    return Effect.flatMap(
+      Effect.flatMap(Effect.service(CurrentOwner), (host) =>
+        scope === undefined
+          ? Effect.succeed(base)
+          : Effect.map(ownerOfScope(scope, base), (owner) => {
+              // Library acquisitions pin the Effect owner; the kernel owner for
+              // that Scope must stay pinned so Within cannot redirect away.
+              if (host?.detached) owner.detached = true;
+              return owned(base, owner);
+            }),
+      ),
+      (active) => {
+        // `interruptible` is not in the public type of Effect's fiber
+        const fiber: Fiber = forkNow(() => {
+          nativeIdentities.set(currentFiber(), effectIdentities.get(ef) ?? ef.id);
+          return call();
+        }, evidenced(hosted(active, context), Context.get(context, OwnerEvidenceContext)), Reflect.get(ef, "interruptible") === false ? 1 : 0);
+        if (fiber.exit !== undefined) return exitOut(fiber.exit);
+        return Effect.callback<unknown, unknown>((resume) => {
+          fiber.observe((exit) => resume(exitOut(exit)));
+          // the interruption is passed on, and waits for its finalizers
+          return Effect.callback<void>((done) => {
+            fiber.observe(() => done(Effect.void));
+            fiber.interrupt(ef.id);
+          });
         });
-      });
-    });
+      },
+    );
   });
 };
 export const callEffect = (call: () => unknown): Effect.Effect<unknown, unknown> => callKernel(call, true);
@@ -350,16 +356,8 @@ export const inSyncContext = (call: () => unknown): unknown => {
   return syncIn(context, () => Effect.runSyncWith(context)(Effect.sync(call)));
 };
 
-durationHooks.millis = (d) => {
-  if (d instanceof Duration) return d.millis;
-  if (EDuration.isDuration(d)) return EDuration.toMillis(d);
-  throw new TypeError("not a duration of this runtime or of Effect");
-};
-durationHooks.native = (d) => {
-  const converted = durationFromEffect(d);
-  if (converted instanceof Duration) return converted;
-  throw new TypeError("not a duration of this runtime or of Effect");
-};
+durationHooks.millis = durationMillis;
+durationHooks.native = durationNative;
 dateTimeHooks.makeUtc = (millis) => EDateTime.makeUnsafe(millis);
 dateTimeHooks.toDate = (value) => (EDateTime.isDateTime(value) ? EDateTime.toDate(value) : new Date(value.epochMilliseconds));
 

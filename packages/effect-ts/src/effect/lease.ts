@@ -38,6 +38,7 @@ export const acquireHolder = <A, E, R>(
     Effect.gen(function* () {
       const parent = yield* Effect.service(CurrentOwner);
       const scope = new Owner(yield* Scope.make(), parent?.defects);
+      scope.detached = true;
       const exit = yield* Effect.exit(restore(outer(inside(scope, withOwnerEvidence(scope, () => acquire)))));
       if (Exit.isFailure(exit)) {
         yield* releaseScope(scope, exit);
@@ -60,6 +61,7 @@ const releaseScope = (owner: Owner, exit: Exit.Exit<unknown, unknown>): Effect.E
 export const acquireInScope = <A, E, R>(acquire: Effect.Effect<A, E, R>): Effect.Effect<A, E, R | Scope.Scope> =>
   Effect.flatMap(Effect.scope, (scope) => Effect.flatMap(Effect.service(CurrentOwner), (parent) => {
     const owner = new Owner(Scope.makeUnsafe(), parent?.defects);
+    owner.detached = true;
     return Effect.andThen(
       Scope.addFinalizerExit(scope, (exit) => releaseScope(owner, exit)),
       inside(owner, withOwnerEvidence(owner, () => acquire)),

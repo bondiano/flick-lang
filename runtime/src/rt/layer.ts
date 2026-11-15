@@ -220,7 +220,10 @@ export const layerOverride = layerMerge;
 
 function* provide(layer: Layer, body: (unit: undefined) => unknown): Run {
   return yield withOwner(function* (owner: Owner): Run {
-    const services = servicesOf(yield buildWith(layer, currentMemo(), owner));
+    // Build under the provide owner's evidence; the body keeps the caller's.
+    const services = servicesOf(
+      yield withOwnerEvidence(owner, () => buildWith(layer, currentMemo(), owner)),
+    );
     return withServices(services, () => body(undefined));
   }, "provide");
 }

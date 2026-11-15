@@ -21,20 +21,19 @@ type holder struct {
 // plain is a holder of a value that needs no release.
 func plain(v Value) *holder { return &holder{value: v} }
 
-// acquireHolder runs `acquire` with a fresh owner as its scope, at the
-// interruptibility `outer`: what it acquires belongs to the holder. The
-// caller runs it masked and registers the holder before the mask ends, so
-// an interruption leaves nothing unreleased; on a failure the fresh owner
-// is closed.
+// acquireHolder runs `acquire` with a fresh owner as its scope and owner
+// evidence, at the interruptibility `outer`: what it acquires belongs to
+// the holder. The caller runs it masked and registers the holder before
+// the mask ends, so an interruption leaves nothing unreleased; on a failure
+// the fresh owner is closed.
 func acquireHolder(fb *Fiber, acquire Value, outer int) *holder {
-	scope := newOwner()
+	scope := newDetachedOwner()
 	if fb.owner != nil {
 		scope.defects = fb.owner.defects
 	}
-	inner := *fb
+	inner := WithOwnerEvidence(fb, scope)
 	inner.owner = scope
-	inner.candidate = scope
-	v, cause := catch(func() Value { return masked(&inner, outer, func() Value { return Run(&inner, acquire) }) })
+	v, cause := catch(func() Value { return masked(inner, outer, func() Value { return Run(inner, acquire) }) })
 	if cause != nil {
 		// lease.ts closes and then fails, outside `onExit`: no election
 		panic(&Failure{Sequential(cause, scope.closeFinalizers(fb, cause))})

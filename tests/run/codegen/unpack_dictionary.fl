@@ -1,0 +1,32 @@
+// Inside `unpack`, the dictionary its contract declares takes precedence
+// over the global instance of the same class and type, `Show Int`, which
+// the go target calls directly elsewhere; a constrained function called
+// there is given the local dictionary too.
+module App.Main exposing (main)
+
+type module Shown =
+  type Item = Int
+  class Show = Prelude.Show
+  showing : Show.Dict Item
+  instance Show Item from showing
+
+module Hashed exposing (Item, Show(..), showing) =
+  import Prelude exposing (Show(..))
+
+  type alias Item = Int
+
+  showing : Show.Dict Item
+  let showing = Show.dictionary { show = fun n -> "#" ++ show n }
+
+packed : Module Shown
+let packed = pack Hashed as Shown
+
+/// Whatever dictionary the caller has.
+shown : Show a => a -> String
+let shown x = "<" ++ show x ++ ">"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let local =
+    unpack packed as K in show 5 ++ " " ++ shown 6
+  Platform.stdout_line (local ++ " | " ++ show 5 ++ " " ++ shown 6)

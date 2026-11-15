@@ -147,6 +147,7 @@ func Main(run func(*Fiber)) {
 	}()
 	_, cause := catch(func() Value {
 		return region(fb, func(fb *Fiber, owner *Owner) Value {
+			owner.kind = "main"
 			if tracing {
 				traceOpen(owner, nil, "main")
 			}

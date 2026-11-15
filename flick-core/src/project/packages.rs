@@ -228,29 +228,47 @@ impl Fetched {
     /// The directory of the library `dependency` names, from the manifest in
     /// `dir`.
     fn dir(&self, dir: &Path, dependency: &Dependency) -> Result<PathBuf, Diagnostic> {
-        if let Source::Path(path) = &dependency.source {
-            return Ok(super::normalize(&dir.join(path)));
-        }
-        let missing = |what: &str| {
-            Diagnostic::error(
-                codes::P034,
-                format!(
-                    "dependency `{}` is not {what}: run `flick install`",
-                    dependency.name
-                ),
-                dependency.span,
-            )
-        };
-        let locked = (self.lock)
-            .find(&dependency.name, &dependency.source)
-            .ok_or_else(|| missing("in `flick.lock`"))?;
-        let store = self.store.as_ref().ok_or_else(|| missing("fetched"))?;
-        let fetched = locked.dir(store);
-        Ok(match dependency.source.subdir() {
-            Some(subdir) => fetched.join(subdir),
-            None => fetched,
-        })
+        library_dir(dir, dependency, &self.lock, self.store.as_deref())
+            .map_err(|diagnostic| diagnostic.with_span(dependency.span))
     }
+}
+
+/// The directory of the library `dependency` of the manifest in `dir`: a path
+/// relative to it, or the fetched package `lock` pins in `store`. A fetched
+/// source the lock or the store does not hold is `P034` without a place, for
+/// the caller to put at the dependency.
+pub fn library_dir(
+    dir: &Path,
+    dependency: &Dependency,
+    lock: &Lock,
+    store: Option<&Path>,
+) -> Result<PathBuf, Diagnostic> {
+    if let Source::Path(path) = &dependency.source {
+        return Ok(super::normalize(&dir.join(path)));
+    }
+    let missing = |what: &str| {
+        Diagnostic::new(
+            codes::P034,
+            Severity::Error,
+            format!(
+                "dependency `{}` is not {what}: run `flick install`",
+                dependency.name
+            ),
+        )
+    };
+    let locked = (lock)
+        .find(&dependency.name, &dependency.source)
+        .ok_or_else(|| missing("in `flick.lock`"))?;
+    let store = store.ok_or_else(|| missing("fetched"))?;
+    let fetched = locked.dir(store);
+    let at = match dependency.source.subdir() {
+        Some(subdir) => fetched.join(subdir),
+        None => fetched,
+    };
+    if !at.join(super::CONFIG_FILE).is_file() {
+        return Err(missing("fetched"));
+    }
+    Ok(at)
 }
 
 /// The libraries of a project as its manifests name them.

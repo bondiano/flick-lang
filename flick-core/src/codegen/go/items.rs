@@ -129,6 +129,7 @@ impl<'a> Gen<'a> {
                 }
             }
             ItemKind::Instance { info, methods } => {
+                decls.extend(self.method_functions(&item.kind));
                 let id = a.alloc_str(&names::instance(self.module, &info.name));
                 let dicts = self.bind_givens(&info.context);
                 let context = self.context.replace("fb");
@@ -160,7 +161,7 @@ impl<'a> Gen<'a> {
 
     /// The Go function of a top-level function: its dictionaries, then its
     /// parameters, all at once.
-    fn function(&mut self, name: &str, dicts: &[String], body: &Expr) -> Document<'a> {
+    pub(super) fn function(&mut self, name: &str, dicts: &[String], body: &Expr) -> Document<'a> {
         let a = self.a;
         let id = names::func(self.module, name);
         let shape = self.shape_of(self.module, name);
@@ -276,9 +277,19 @@ impl<'a> Gen<'a> {
             let key = self.string(&format!("${class}"));
             self.emit(call(a, "d.Lazy", [key, get]));
         }
+        let this = Dict::Instance {
+            module: self.module.to_owned(),
+            name: info.name.clone(),
+            args: Vec::new(),
+        };
         for (name, value) in methods {
             self.natives.clear();
             self.held.clear();
+            if let Some((module, function)) = self.direct_method(&this, name) {
+                let v = self.global_value(&module, &function, Vec::new());
+                self.emit(call(a, "d.Set", [self.string(name), v.doc]));
+                continue;
+            }
             let (stmts, v) = self.block(|g| g.expr(value));
             let v = if stmts.is_empty() {
                 v.doc

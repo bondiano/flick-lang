@@ -170,15 +170,7 @@ impl<'a> Gen<'a> {
             // not atomic: an operand after it that assigns it is ordered after the read
             ExprKind::Var(name) => Code::from(a.text(a.alloc_str(&names::local(name)))),
             ExprKind::Global { module, name } => self.global_value(module, name, Vec::new()),
-            ExprKind::Method { dict, name } => {
-                let dict = self.dict(dict);
-                call(
-                    a,
-                    "flickrt.Method",
-                    [self.context(), dict.doc, self.string(name)],
-                )
-                .into()
-            }
+            ExprKind::Method { dict, name } => self.method(dict, name),
             ExprKind::Con(_) | ExprKind::App { .. } => self.app(e),
             // Constructor evidence is stored after ordinary fields, even for a
             // nullary GADT; constructing first would pass Data to Inst as Poly.

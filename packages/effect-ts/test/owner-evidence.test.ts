@@ -245,7 +245,12 @@ test("untagged legacy native runtime factories see the executing Effect context"
   const performer = new native.Owner();
   const tag = native.service("Test.CrossEvidence.Legacy");
   const hostTag = Context.Service<{ read: () => Effect.Effect<unknown> }>("Test.CrossEvidence.Legacy");
-  const impl = { read: () => native.withOwnerEvidence(native.readOwnerEvidence(), () => native.readOwnerEvidence()) };
+  const impl = { read: () => {
+    const candidate = native.readOwnerEvidence();
+    return (function* (): native.Run {
+      return yield native.withOwnerEvidence(candidate, () => native.readOwnerEvidence());
+    })();
+  } };
   const out = native.runIn(new native.Under(native.extend(native.currentCtx(), tag, impl), () =>
     fromEffect(host.withOwnerEvidence(performer, () => Effect.flatMap(Effect.service(hostTag), (s) => s.read())))));
   assert.equal(out, performer);

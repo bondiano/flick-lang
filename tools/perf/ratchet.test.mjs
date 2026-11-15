@@ -44,10 +44,24 @@ test("the peak is read from what both tools print", () => {
 });
 
 test("the WASM compiler budget is ratcheted and cannot disappear", () => {
-  const gate = (n) => `test $(wc -c < $wasm) -le ${n}`;
-  assert.equal(wasmBudget(gate(4850000)), 4850000);
+  const gate = (n, reason) =>
+    `test $(wc -c < $wasm) -le ${n}${reason === undefined ? "" : ` # reason: ${reason}`}`;
+  assert.deepEqual(wasmBudget(gate(4850000)), { budget: 4850000, reason: undefined });
+  assert.equal(wasmBudget(gate(4300000, "Meta growth")).reason, "Meta growth");
   assert.throws(() => wasmBudget(""), /missing compiler WASM budget/);
-  const size = (n) => ({ "wasm.compiler.raw": { better: "lower", unit: "bytes", budget: wasmBudget(gate(n)), tolerance: 0 } });
+  const size = (n, reason) => {
+    const { budget, reason: noted } = wasmBudget(gate(n, reason));
+    return {
+      "wasm.compiler.raw": {
+        better: "lower",
+        unit: "bytes",
+        budget,
+        tolerance: 0,
+        ...(noted ? { reason: noted } : {}),
+      },
+    };
+  };
   assert.deepEqual(errors(size(5303140), size(4850000)), []);
   assert.equal(errors(size(4850000), size(5303140)).length, 1);
+  assert.deepEqual(errors(size(4850000), size(5303140, "Meta/Phase M checker growth")), []);
 });

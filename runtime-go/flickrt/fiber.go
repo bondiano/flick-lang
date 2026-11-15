@@ -13,6 +13,10 @@ type Fiber struct {
 	env       *env   // the services provided, by key
 	owner     *Owner // the innermost scope's
 	candidate Value  // inert lexical owner evidence, independent of owner
+	// pinOwner keeps Within from replacing owner: library acquisitions
+	// (RcRef, Pool, …) own a scope of their own while generated code may
+	// still wrap the acquire in WithOwnerEvidence of the reference's region.
+	pinOwner bool
 }
 
 // An env is the services and fiber-local settings in effect, innermost
@@ -206,6 +210,8 @@ func ReadOwnerEvidence(fb *Fiber) Value {
 
 // WithOwnerEvidence derives a fiber changing only its lexical candidate.
 // In particular, closed owners can be transported without reopening them.
+// When the candidate is already `owner`, the same fiber is returned so
+// fiber-local updates stay visible to the caller.
 func WithOwnerEvidence(fb *Fiber, owner Value) *Fiber {
 	if current, ok := fb.candidate.(*Owner); ok && current == owner {
 		return fb

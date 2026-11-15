@@ -46,8 +46,7 @@ func (p *pool) resize(fb *Fiber) {
 func (p *pool) allocate(fb *Fiber) *poolItem {
 	scope := newOwner()
 	t := *fb
-	t.env, t.owner = p.env, scope
-	t.candidate = scope
+	t.env, t.owner, t.candidate, t.pinOwner = p.env, scope, scope, true
 	v, cause := catch(func() Value { return Run(&t, p.acquire) })
 	item := &poolItem{exit: &Exit{v, cause}, scope: scope, idleSince: p.clock.millis()}
 	return masked(fb, fb.state.mask+1, func() Value {

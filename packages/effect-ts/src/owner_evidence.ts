@@ -7,7 +7,10 @@ export const OwnerEvidenceContext = /*#__PURE__*/ Context.Reference<OwnerEvidenc
   defaultValue: () => undefined,
 });
 export const readOwnerEvidence = (): Effect.Effect<OwnerEvidence> => Effect.service(OwnerEvidenceContext);
+/** Runs `thunk` with `owner` as the lexical candidate. When it is already
+ * current, skips `provideService` so fiber-local updates inside `thunk`
+ * remain visible afterward. */
 export const withOwnerEvidence = <A, E, R>(owner: OwnerEvidence, thunk: () => Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
-  Effect.flatMap(readOwnerEvidence(), (current) => current === owner
-    ? Effect.suspend(thunk)
-    : Effect.provideService(Effect.suspend(thunk), OwnerEvidenceContext, owner));
+  Effect.flatMap(Effect.service(OwnerEvidenceContext), (current) =>
+    current === owner ? Effect.suspend(thunk) : Effect.provideService(Effect.suspend(thunk), OwnerEvidenceContext, owner),
+  );

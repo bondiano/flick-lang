@@ -522,6 +522,21 @@ function per module, run in the order the modules depend on each other.
 The cases of `tests/run` listed in `tests/run/portable.txt` run on both
 targets and give the same output.
 
+A method written as a function in an instance without a context is a Go
+function of its own, and the instance's dictionary holds it. Where the
+checker resolved a method to such an instance (`show 3`, `compare` of two
+values whose `Ord` is derived), the code calls that function, with no
+lookup in the dictionary. It takes and gives values, not Go's own types:
+generic code reaches it through the dictionary, as `List.sort` calls
+`compare` of `Ord Int`, and a function of Go's types would need a wrapper
+converting every argument and result there. Every other method is looked
+up in its dictionary where it is used: that of a constraint, of the
+argument of a parameterized module or the local one of an `unpack`, one a
+value holds, one an instance with a context builds, and a method an
+instance computes or takes from a default of its class. This holds in both
+profiles; in release a default may first become the instance's own method
+(devirtualization above), and is then called directly too.
+
 Every generated Flick function takes its execution fiber, `*flickrt.Fiber`,
 first, including pure functions and callbacks. A saved function uses the fiber
 of its invocation, not its creation, so URL rendering observes the current
