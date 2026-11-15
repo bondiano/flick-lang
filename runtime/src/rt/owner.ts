@@ -99,6 +99,8 @@ export class Owner {
    * an outer lexical owner, or releases wait until that outer scope ends.
    */
   detached = false;
+  /** `main` / `scope` / `provide` when this owner is a lexical region. */
+  kind: string | undefined = undefined;
 
   constructor(defects: Array<Cause> = reported) {
     this.defects = defects;
@@ -229,6 +231,7 @@ export function* withOwner(body: (owner: Owner, outer: Owner | undefined) => unk
   fiber.mask = depth + 1;
   try {
     const owner = new Owner(outer?.defects);
+    if (kind !== undefined) owner.kind = kind;
     if (tracing && kind !== undefined) {
       owner.trace = traceId();
       traceEvent({ e: "open", o: owner.trace, p: outer?.trace ?? 0, k: kind });
@@ -293,6 +296,10 @@ export const within = (owner: OwnerEvidence, call: () => unknown): unknown => {
     // Already acquiring into this owner: keep the current frame so fiber-local
     // updates stay visible to the caller.
     if (current === owner) return call();
+    // Effect Scope.provide keeps CurrentOwner on the provide owner while
+    // finalizers land on the layer's untraced build scope. Do not pull those
+    // finalizers onto the provide owner when evidence names it.
+    if (current !== undefined && current.trace === 0 && owner.kind === "provide") return call();
     return inside(owner, call);
   }
   if (owner !== undefined && ownerHooks.within !== undefined) return ownerHooks.within(owner, call);
