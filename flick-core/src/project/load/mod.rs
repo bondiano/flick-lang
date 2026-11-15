@@ -46,6 +46,10 @@ use super::config::Backend;
 #[cfg(feature = "native-project")]
 use super::packages::{Packages, project_name};
 use super::{Host, Project, module_path, normalize};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::build::{Extras, Settings, target_preflight};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::codegen::EffectBridge;
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
 use crate::iface::{
     BindingOrigin, CalleeOrigin, ExpansionFrame, LexicalScope, StaticArgument, StaticBinding,
@@ -487,9 +491,7 @@ fn run_in(
     #[cfg(not(target_arch = "wasm32"))]
     if let Some(environment) = project.and_then(|p| p.config.build.environment.as_ref())
         && !compilation.modules.is_empty()
-        && !diagnostics
-            .iter()
-            .any(|d| d.severity == Severity::Error)
+        && !diagnostics.iter().any(|d| d.severity == Severity::Error)
     {
         let entries: Vec<(String, String)> = project
             .map(|p| {
@@ -505,23 +507,23 @@ fn run_in(
             .flat_map(|p| &p.config.entries)
             .filter_map(|e| Some((e.name.clone(), e.runner.as_ref()?.0.clone())))
             .collect();
-        let settings = crate::build::Settings {
+        let settings = Settings {
             package: None,
             entries: &entries,
             typescript: false,
             release: false,
-            extras: crate::build::Extras::default(),
+            extras: Extras::default(),
             source_path: &|_| String::new(),
             source_dir: &|_| None,
             out_dir: Path::new(""),
             root: project.map(|p| p.root.as_path()),
             backend: project.map_or(Backend::Effect, |p| p.config.build.effect),
-            effect_bridge: crate::codegen::EffectBridge::Absent,
+            effect_bridge: EffectBridge::Absent,
             ui: project.and_then(|p| p.config.build.ui.as_deref()),
             runners: &runners,
             environment: Some(environment),
         };
-        crate::build::target_preflight::check(
+        target_preflight::check(
             &compilation,
             &settings,
             sources,

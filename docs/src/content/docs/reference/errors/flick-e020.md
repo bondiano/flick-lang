@@ -12,12 +12,15 @@ check; a library's public exports are checked under the export policy.
 Missing toolchains stay `FLICK-P015` / `FLICK-P029`, not this code.
 
 ```flick
-# flick.toml: [build] environment = "js/browser"
+// flick.toml: [build] environment = "js/browser"
 module App.Main exposing (run)
 
 service Db =
   query : String ->{} String
 
-run : String ->{Db} String
-let run key = Db.query key
+run : String ->{} String
+let run key =
+  provide Db ({ query = fun value -> value }) {
+    Db.query key
+  }
 ```

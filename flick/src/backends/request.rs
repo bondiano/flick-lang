@@ -9,10 +9,13 @@ use flick_backend::{
     ModuleInput, ModuleRole, OptionValue, PackageTarget, Profile, RootHandler, Source, Symbol,
     TargetRequest,
 };
+use std::collections::HashSet;
+
 use flick_core::build;
 use flick_core::codegen;
 use flick_core::diagnostics::Diagnostic;
 use flick_core::iface::{self, Target};
+use flick_core::project::config::BackendEnvironment;
 use flick_core::project::{self, Compilation, Project};
 use flick_core::source::{FileId, SourceMap};
 use flick_core::{ir, types};
@@ -261,7 +264,7 @@ impl Prepared {
     /// Record package targets and std root handlers for the selected environment.
     fn fill_environment_facts(&mut self, package: Option<&str>) {
         let environment = &self.request.target.environment;
-        let selected = flick_core::project::config::BackendEnvironment {
+        let selected = BackendEnvironment {
             backend: environment.backend.clone(),
             platform: environment.platform.clone(),
         };
@@ -276,7 +279,7 @@ impl Prepared {
         }
         packages.sort();
         packages.dedup();
-        let present: std::collections::HashSet<_> = self
+        let present: HashSet<_> = self
             .request
             .modules
             .iter()
@@ -295,8 +298,8 @@ impl Prepared {
             .filter(|(service_module, _, handler_module, _)| {
                 present.contains(service_module) && present.contains(handler_module)
             })
-            .map(|(service_module, service_name, handler_module, handler_name)| {
-                RootHandler {
+            .map(
+                |(service_module, service_name, handler_module, handler_name)| RootHandler {
                     environment: environment.clone(),
                     service: Symbol {
                         module: service_module.into(),
@@ -306,8 +309,8 @@ impl Prepared {
                         module: handler_module.into(),
                         name: handler_name.into(),
                     },
-                }
-            })
+                },
+            )
             .collect();
     }
 }

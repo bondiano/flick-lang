@@ -111,8 +111,9 @@ fn browser_db_preflight_is_the_same_for_the_editor_and_check() {
         .find(|d| d["code"] == "FLICK-E020")
         .expect("check E020");
     assert_eq!(check_hit["message"], lsp_hit["message"]);
-    let start = check_hit["range"]["start"].as_u64().expect("start") as usize;
-    let end = check_hit["range"]["end"].as_u64().expect("end") as usize;
+    let start =
+        usize::try_from(check_hit["range"]["start"].as_u64().expect("start")).expect("start fits");
+    let end = usize::try_from(check_hit["range"]["end"].as_u64().expect("end")).expect("end fits");
     assert_eq!(&source[start..end], "Db.query");
     assert_eq!(
         lsp_hit["range"],

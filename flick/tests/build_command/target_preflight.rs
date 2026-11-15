@@ -20,20 +20,20 @@ kind = "lib"
 environment = "js/node"
 "#;
 
-const DB_EXPORT: &str = r#"module App.Main exposing (run)
+const DB_EXPORT: &str = r"module App.Main exposing (run)
 
 service Db =
   query : String ->{} String
 
 run : String ->{Db} String
 let run key = Db.query key
-"#;
+";
 
-const PURE: &str = r#"module App.Main exposing (run)
+const PURE: &str = r"module App.Main exposing (run)
 
 run : String -> String
 let run key = key
-"#;
+";
 
 #[test]
 fn check_rejects_reachable_db_on_js_browser_before_generation() {
@@ -52,12 +52,10 @@ fn check_rejects_reachable_db_on_js_browser_before_generation() {
         .iter()
         .find(|d| d["code"] == "FLICK-E020")
         .expect("E020");
-    assert_eq!(
-        found["message"],
-        "unhandled effect Db on js/browser"
-    );
-    let start = found["range"]["start"].as_u64().expect("start") as usize;
-    let end = found["range"]["end"].as_u64().expect("end") as usize;
+    assert_eq!(found["message"], "unhandled effect Db on js/browser");
+    let start =
+        usize::try_from(found["range"]["start"].as_u64().expect("start")).expect("start fits");
+    let end = usize::try_from(found["range"]["end"].as_u64().expect("end")).expect("end fits");
     assert_eq!(&DB_EXPORT[start..end], "Db.query");
     assert!(!app.join("dist").exists());
 }
@@ -106,7 +104,11 @@ fn changing_environment_invalidates_a_cached_preflight_decision() {
     );
     let ok = flick_in(&app, &["build", "--offline"]);
     assert_eq!(ok.status.code(), Some(0), "{ok:?}");
-    assert!(app.join("dist/App/Main.js").is_file() || app.join("dist/_flick/App/Main.js").is_file() || app.join("dist").exists());
+    assert!(
+        app.join("dist/App/Main.js").is_file()
+            || app.join("dist/_flick/App/Main.js").is_file()
+            || app.join("dist").exists()
+    );
     fs::write(app.join("flick.toml"), LIB).expect("flip to browser");
     let rejected = flick_in(&app, &["build", "--offline"]);
     assert_eq!(rejected.status.code(), Some(1), "{rejected:?}");

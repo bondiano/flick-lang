@@ -278,9 +278,9 @@ impl Loader<'_> {
             // for target preflight; a check and a build keep it
             #[cfg(feature = "ide")]
             cached_ir: if self.ide.is_some()
-                && !self
+                && self
                     .project
-                    .is_some_and(|p| p.config.build.environment.is_some())
+                    .is_none_or(|p| p.config.build.environment.is_none())
             {
                 CachedIr::Dropped
             } else {

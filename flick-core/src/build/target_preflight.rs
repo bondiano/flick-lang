@@ -151,13 +151,7 @@ fn scan_expr(
                     scan_expr(&arm.function, environment, covered, reported, diagnostics);
                 }
             }
-            scan_expr(
-                &handler.body,
-                environment,
-                &nested,
-                reported,
-                diagnostics,
-            );
+            scan_expr(&handler.body, environment, &nested, reported, diagnostics);
             if let Some(ret) = &handler.ret {
                 scan_expr(ret, environment, covered, reported, diagnostics);
             }

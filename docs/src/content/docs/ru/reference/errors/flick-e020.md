@@ -1,6 +1,6 @@
 ---
 title: "FLICK-E020"
-source_hash: 4e63eec8a54a311b
+source_hash: f7d4165349ebac7b
 ---
 
 Выбранное окружение сборки должно давать корневой обработчик каждому
@@ -15,12 +15,15 @@ source_hash: 4e63eec8a54a311b
 `FLICK-P029`, а не этим кодом.
 
 ```flick
-# flick.toml: [build] environment = "js/browser"
+// flick.toml: [build] environment = "js/browser"
 module App.Main exposing (run)
 
 service Db =
   query : String ->{} String
 
-run : String ->{Db} String
-let run key = Db.query key
+run : String ->{} String
+let run key =
+  provide Db ({ query = fun value -> value }) {
+    Db.query key
+  }
 ```

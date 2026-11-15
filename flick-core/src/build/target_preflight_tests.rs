@@ -4,20 +4,11 @@ use std::sync::Arc;
 use super::target_preflight::{self, gated_service, handles};
 use super::{Extras, Settings};
 use crate::codegen::EffectBridge;
-use crate::diagnostics::codes;
+use crate::diagnostics::{Diagnostic, codes};
 use crate::ir::tests::check_text;
 use crate::project::config::{Backend, BackendEnvironment};
 use crate::project::{Compilation, Compiled};
 use crate::source::SourceMap;
-
-const DB_QUERY: &str = r#"module App.Main exposing (main)
-
-service Db =
-  query : String ->{} String
-
-main : Unit ->{} Unit
-let main () = ignore (Db.query "x")
-"#;
 
 const DB_PROVIDED: &str = r#"module App.Main exposing (main)
 
@@ -31,7 +22,7 @@ let main () =
   }
 "#;
 
-const DB_UNUSED: &str = r#"module App.Main exposing (main)
+const DB_UNUSED: &str = r"module App.Main exposing (main)
 
 service Db =
   query : String ->{} String
@@ -41,22 +32,22 @@ let unused key = Db.query key
 
 main : Unit ->{} Unit
 let main () = ()
-"#;
+";
 
-const DB_EXPORT: &str = r#"module App.Main exposing (run)
+const DB_EXPORT: &str = r"module App.Main exposing (run)
 
 service Db =
   query : String ->{} String
 
 run : String ->{Db} String
 let run key = Db.query key
-"#;
+";
 
 fn environment(pair: &str) -> BackendEnvironment {
     pair.parse().expect("environment")
 }
 
-fn diagnostics(text: &str, pair: &str, app: bool) -> Vec<crate::diagnostics::Diagnostic> {
+fn diagnostics(text: &str, pair: &str, app: bool) -> Vec<Diagnostic> {
     let (ir, interface) = check_text("App.Main", text).expect("the source checks");
     let mut sources = SourceMap::default();
     let file = sources.add("App/Main.fl", text);
@@ -115,15 +106,9 @@ fn browser_rejects_a_reachable_unhandled_db_at_its_use() {
     let found = diagnostics(source, "js/browser", false);
     assert_eq!(found.len(), 1, "{found:?}");
     assert_eq!(found[0].code, codes::E020);
-    assert_eq!(
-        found[0].message,
-        "unhandled effect Db on js/browser"
-    );
+    assert_eq!(found[0].message, "unhandled effect Db on js/browser");
     let span = found[0].span.expect("requirement span");
-    assert_eq!(
-        &source[span.start as usize..span.end as usize],
-        "Db.query"
-    );
+    assert_eq!(&source[span.start as usize..span.end as usize], "Db.query");
 }
 
 #[test]
@@ -141,7 +126,6 @@ fn browser_accepts_a_locally_provided_db() {
 #[test]
 fn unused_db_does_not_fail_a_reachable_only_executable() {
     // main cannot leave Db open; unused stays unreachable from main.
-    let _ = DB_QUERY;
     let found = diagnostics(DB_UNUSED, "js/browser", true);
     assert!(found.is_empty(), "{found:?}");
 }
