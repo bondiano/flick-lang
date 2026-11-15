@@ -120,7 +120,7 @@ impl Checker<'_> {
         &mut self,
         actual: &Norm,
         declared: &Norm,
-        open: Option<u32>,
+        open: Option<&Type>,
     ) -> bool {
         let mut missing = self.live_missing(actual, declared);
         missing.retain(|(_, a)| !matches!(self.store.resolve(a), Type::Meta(_)));
@@ -134,34 +134,35 @@ impl Checker<'_> {
                     .normalize(t)
                     .tails
                     .into_iter()
-                    .find_map(|t| match t {
-                        Type::Meta(meta) => meta.legacy_root(),
-                        _ => None,
-                    })
+                    .find(|ty| ty.inference_meta_root().is_some())
             });
-        let (m, grown) = match (inner, open) {
-            (Some(m), _) => {
-                let rest = self.store.fresh_beside(m);
+        let (variable, grown) = match (inner.as_ref(), open) {
+            (Some(variable), _) => {
+                let Some(rest) = self.store.fresh_beside_occurrence(variable) else {
+                    return false;
+                };
                 let row = Row {
                     entries: missing,
                     tail: Some(Box::new(rest)),
                     ..Row::default()
                 };
-                (m, Type::Row(row))
+                (variable.clone(), Type::Row(row))
             }
-            (None, Some(m)) => {
-                let rest = self.store.fresh_beside(m);
+            (None, Some(variable)) => {
+                let Some(rest) = self.store.fresh_beside_occurrence(variable) else {
+                    return false;
+                };
                 let live = Type::Row(Row::closed(missing));
                 let row = Row {
                     entries: vec![(Elem::Live, live)],
                     tail: Some(Box::new(rest)),
                     ..Row::default()
                 };
-                (m, Type::Row(row))
+                (variable.clone(), Type::Row(row))
             }
             (None, None) => return false,
         };
-        self.bind(m, &grown).is_ok()
+        self.bind_inference(&variable, &grown).is_ok()
     }
 
     /// Once rows are solved: a region `actual` needs live and `declared`, the

@@ -443,5 +443,7 @@ pub use scope::{Scope, ScopeId};
 
 mod meta;
 pub use meta::MetaOccurrence;
+pub(in crate::types) use meta::lexical_reference_allowed;
+pub(in crate::types) use meta::{LexicalCoordinate, LexicalRoot, LexicalScope};
 
 pub(in crate::types) mod carrier;

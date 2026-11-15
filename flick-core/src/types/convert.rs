@@ -61,7 +61,9 @@ impl Checker<'_> {
     pub fn signature(&mut self, node: &Node) -> (Type, bool) {
         let mark = self.cx.tyvars.len();
         let hole_ok = mem::replace(&mut self.hole_ok, true);
+        self.annotation_contexts.push(self.store.lexical_context());
         let ty = self.ty(node, &Kind::Type, Free::Quantify);
+        self.annotation_contexts.pop();
         self.hole_ok = hole_ok;
         let new: Vec<Binder> = self.cx.tyvars[mark..]
             .iter()
@@ -106,7 +108,9 @@ impl Checker<'_> {
     pub fn annotation(&mut self, node: &Node) -> Type {
         let mark = self.cx.tyvars.len();
         let hole_ok = mem::replace(&mut self.hole_ok, true);
+        self.annotation_contexts.push(self.store.lexical_context());
         let ty = self.ty(node, &Kind::Type, Free::Fresh);
+        self.annotation_contexts.pop();
         self.hole_ok = hole_ok;
         self.cx.tyvars.truncate(mark);
         self.default_kinds(&ty)
@@ -258,23 +262,28 @@ impl Checker<'_> {
                         return Type::Error;
                     }
                 };
-                let mark = self.opened_modules.len();
-                self.opened_modules.extend(Self::witness_bindings(
-                    issued.signature(),
-                    issued.view(),
-                    &binder,
-                ));
-                let body = self.ty(body_node, &Kind::Type, free);
-                let body = self.resolved_witness_type(&body);
-                self.opened_modules.truncate(mark);
-                let body = super::module_contract::close_existential_type(&body, &witness, &binder);
-                return Type::Exists {
-                    scope: Scope::default(),
-                    binder,
-                    contract: Box::new(contract),
-                    body: Box::new(body),
-                };
+                let closed = Scope::default();
+                return self.with_lexical_witness(&witness, |this, opened| {
+                    let mark = this.opened_modules.len();
+                    this.opened_modules.extend(Self::witness_bindings(
+                        issued.signature(),
+                        issued.view(),
+                        &binder,
+                    ));
+                    let body = this.ty(body_node, &Kind::Type, free);
+                    let body = this.resolved_witness_type(&body);
+                    this.opened_modules.truncate(mark);
+                    Type::Exists {
+                        scope: closed,
+                        binder: binder.clone(),
+                        contract: Box::new(contract.clone()),
+                        body: Box::new(super::module_contract::lexical::close_type(
+                            &body, opened, &binder, closed,
+                        )),
+                    }
+                });
             }
+
             K::ConstrainedType => {
                 let constraints = self.constraints(children[0], free);
                 let body = children

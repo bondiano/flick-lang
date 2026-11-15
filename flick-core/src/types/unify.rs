@@ -11,7 +11,6 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 
 use super::Checker;
-#[cfg(test)]
 use super::env::Form;
 #[cfg(test)]
 use crate::source::Span;
@@ -40,6 +39,8 @@ pub struct Store {
     metas: Vec<MetaState>,
     meta_contexts: Vec<MetaContext>,
     active_context: Context,
+    active_lexical: Vec<super::ty::LexicalScope>,
+    lexical_scopes: Vec<super::ty::LexicalScope>,
     scopes: Scopes,
     undo: Vec<Undo>,
     transactions: Vec<u64>,
@@ -181,8 +182,10 @@ impl Store {
         let fractional = self.is_fractional(m);
         match t {
             Type::Captured { ty, .. } | Type::Bounded { ty, .. } => self.numeric_fits(m, ty),
-            Type::Meta(meta) if meta.legacy_root().is_some() => {
-                let n = meta.legacy_root().expect("legacy numeric target");
+            Type::Meta(meta) if meta.inference_type_root().is_some() => {
+                let n = meta
+                    .inference_type_root()
+                    .expect("inference numeric target");
                 self.mark(n, Mark::Numeric);
                 if fractional {
                     self.mark(n, Mark::Fractional);
@@ -217,7 +220,13 @@ impl Store {
         );
         let rest = ty.meta_root().expect("fresh variable");
         self.mark_like(rest, m);
-        ty
+        let mut context = self.meta_contexts[rest as usize].clone();
+        context.lexical = self.meta_contexts[m as usize].lexical.clone();
+        self.write_context(rest, context);
+        self.at(
+            rest,
+            Embedding::identity(&self.meta_contexts[rest as usize].permitted),
+        )
     }
 
     /// Gives `to` the kind marks of `from`: a capture row or a row of errors.
@@ -260,85 +269,6 @@ impl Store {
 
     pub fn set(&mut self, m: u32, t: Type) {
         self.write(m, MetaState::Bound(t));
-    }
-
-    /// Follows bound variables at the top of `t`.
-    pub fn resolve(&self, t: &Type) -> Type {
-        self.head(t).into_owned()
-    }
-
-    /// The application spine with bound head variables observed. Borrowed
-    /// spines retain their original children; only a projected solution owns
-    /// new children.
-    pub(in crate::types) fn spine<'a>(
-        &'a self,
-        ty: &'a Type,
-    ) -> (Cow<'a, Type>, Vec<Cow<'a, Type>>) {
-        let mut head = self.head(ty);
-        let mut arguments = Vec::new();
-        loop {
-            match head {
-                Cow::Borrowed(Type::App {
-                    head: function,
-                    arg,
-                }) => {
-                    arguments.push(Cow::Borrowed(arg.as_ref()));
-                    head = self.head(function);
-                }
-                Cow::Owned(Type::App {
-                    head: function,
-                    arg,
-                }) => {
-                    arguments.push(Cow::Owned(*arg));
-                    head = Cow::Owned(self.head(&function).into_owned());
-                }
-                _ => break,
-            }
-        }
-        arguments.reverse();
-        (head, arguments)
-    }
-
-    /// Observe current solutions without copying unchanged heads.
-    /// Contextual solutions project lazily into this occurrence.
-    pub fn head<'a>(&'a self, t: &'a Type) -> Cow<'a, Type> {
-        let mut head = Cow::Borrowed(t);
-        loop {
-            match head.as_ref() {
-                Type::Meta(meta) => {
-                    if let Some(root) = meta.legacy_root() {
-                        // Empty stores may display foreign legacy IDs.
-                        if self
-                            .meta_contexts
-                            .get(root as usize)
-                            .is_some_and(|context| context.canonical.len() != 0)
-                        {
-                            return head;
-                        }
-                        match self.metas.get(root as usize) {
-                            Some(MetaState::Bound(next)) => head = Cow::Borrowed(next),
-                            Some(MetaState::Open { .. }) | None => return head,
-                        }
-                    } else {
-                        let Ok((root, view)) = self.occurrence(&head) else {
-                            return head;
-                        };
-                        let MetaState::Bound(solution) = &self.metas[root as usize] else {
-                            return head;
-                        };
-                        let Ok(projected) = view.transport_checked(solution) else {
-                            return head;
-                        };
-                        head = Cow::Owned(projected);
-                    }
-                }
-                Type::Skolem(s) => match self.equal(*s) {
-                    Some(next) => head = Cow::Borrowed(next),
-                    None => return head,
-                },
-                _ => return head,
-            }
-        }
     }
 
     /// What the rigid variable `s` equals in the branch being checked.
@@ -511,7 +441,7 @@ impl Store {
         let mut escaped = None;
         let mut lower = Vec::new();
         t.visit(&mut |t| match t {
-            Type::Meta(meta) => lower.extend(meta.legacy_root()),
+            Type::Meta(meta) => lower.extend(meta.inference_type_root()),
             Type::Skolem(s) if self.skolems[*s as usize].level > level => {
                 escaped = Some(*s);
             }
@@ -534,7 +464,7 @@ impl Store {
     pub fn deep_metas(&self, t: &Type) -> Vec<u32> {
         let mut out = Vec::new();
         t.visit(&mut |t| {
-            if let Some(m) = t.legacy_meta_root()
+            if let Some(m) = t.inference_meta_root()
                 && self.meta_level(m).is_some_and(|l| l > self.level)
                 && !out.contains(&m)
             {
@@ -582,6 +512,8 @@ mod spine_tests;
 include!("unify/transactions.rs");
 
 include!("unify/context.rs");
+include!("unify/lexical.rs");
+include!("unify/observe.rs");
 
 #[cfg(test)]
 include!("unify/read.rs");

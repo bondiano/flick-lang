@@ -391,7 +391,7 @@ impl Checker<'_> {
     /// Whether `ty` holds the type of a number literal not settled yet.
     fn has_open_number(&self, ty: &Type) -> bool {
         self.zonk(ty).contains(&mut |t| {
-            t.legacy_meta_root()
+            t.inference_meta_root()
                 .is_some_and(|m| self.store.is_numeric(m))
         })
     }

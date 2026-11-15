@@ -4,7 +4,7 @@
 //! the region's scope ends before the qualified value does, reports what it
 //! lacks.
 
-use crate::types::Elem;
+use crate::types::{Elem, MetaOccurrence};
 use std::{collections::HashSet, mem};
 
 use super::{DeferredHold, Hold, Visible};
@@ -95,7 +95,7 @@ impl Checker<'_> {
         let mut open = HashSet::new();
         let mut read = |t: &Type| {
             self.store.zonk(t).visit(&mut |x| {
-                if let Some(m) = x.legacy_meta_root() {
+                if let Some(m) = x.inference_meta_root() {
                     open.insert(m);
                 }
             });
@@ -142,36 +142,39 @@ impl Checker<'_> {
                 let mut grew = None;
                 // the region a written row leaves open, `{?r}`, is the one its
                 // value holds, as instantiating the signature there would give
-                if let Some(r) = region
+                if let Some(r) = region.as_ref()
                     && self.atom_kind(&atom, &[]) == Some(Kind::Region)
-                    && self.bind(r, &atom).is_ok()
+                    && self.bind_occurrence(r, &atom).is_ok()
                 {
                     changed = true;
-                    grew = Some(r);
+                    grew = Some(r.root());
                 }
                 let blocked = blocked_capture_rows(&summaries, &label);
                 let metas = bound.tails.iter().filter_map(|t| match t {
-                    Type::Meta(meta) => meta.legacy_root(),
+                    Type::Meta(meta) if meta.inference_type_root().is_some() => Some(meta.clone()),
                     _ => None,
                 });
                 // blocking only chooses among the rows: with every one
                 // blocked, the first still grows, and its bound reports
-                let (unblocked, shut): (Vec<u32>, Vec<u32>) =
-                    metas.partition(|m| !blocked.contains(m));
-                for m in unblocked
+                let (unblocked, shut): (Vec<_>, Vec<_>) =
+                    metas.partition(|meta| !blocked.contains(&meta.root()));
+                for meta in unblocked
                     .into_iter()
                     .chain(shut)
                     .take_while(|_| grew.is_none())
                 {
-                    let rest = self.store.fresh_beside(m);
+                    let variable = Type::Meta(meta.clone());
+                    let Some(rest) = self.store.fresh_beside_occurrence(&variable) else {
+                        continue;
+                    };
                     let row = Type::Row(Row {
                         entries: vec![(label.clone(), atom.clone())],
                         tail: Some(Box::new(rest)),
                         ..Row::default()
                     });
-                    if self.bind(m, &row).is_ok() {
+                    if self.bind_occurrence(&meta, &row).is_ok() {
                         changed = true;
-                        grew = Some(m);
+                        grew = Some(meta.root());
                         break;
                     }
                 }
@@ -193,10 +196,12 @@ impl Checker<'_> {
     }
 
     /// The one region of a written capture row not known yet, `{?r}`.
-    fn lone_open_region(&self, bound: &Norm) -> Option<u32> {
+    fn lone_open_region(&self, bound: &Norm) -> Option<MetaOccurrence> {
         let mut open = (bound.entries.iter()).filter_map(|(label, atom)| {
             match (label, self.store.resolve(atom)) {
-                (Elem::Capture(_), Type::Meta(meta)) => meta.legacy_root(),
+                (Elem::Capture(_), Type::Meta(meta)) if meta.inference_type_root().is_some() => {
+                    Some(meta)
+                }
                 _ => None,
             }
         });
@@ -210,7 +215,7 @@ impl Checker<'_> {
         let mut open = Vec::new();
         for hold in &self.cx.regions.holds {
             for t in self.store.normalize(&hold.bound).tails {
-                if let Some(m) = t.legacy_meta_root() {
+                if let Some(m) = t.inference_meta_root() {
                     open.push(m);
                 }
             }
@@ -434,14 +439,15 @@ fn blocked_capture_rows(summaries: &[Summary], label: &Elem) -> HashSet<u32> {
             if summary.visible.iter().any(|l| l == label)
                 || summary.bound.get(label).is_some()
                 || summary.bound.tails.iter().any(|t| {
-                    t.legacy_meta_root().is_some_and(|m| !blocked.contains(&m))
+                    t.inference_meta_root()
+                        .is_some_and(|m| !blocked.contains(&m))
                         || matches!(t, Type::Error)
                 })
             {
                 continue;
             }
             for tail in &summary.hidden.tails {
-                if let Some(m) = tail.legacy_meta_root() {
+                if let Some(m) = tail.inference_meta_root() {
                     changed |= blocked.insert(m);
                 }
             }
