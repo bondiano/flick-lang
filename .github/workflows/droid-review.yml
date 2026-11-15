@@ -20,11 +20,35 @@ jobs:
       id-token: write
       actions: read
     steps:
+      - name: Check review size
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          echo 'should_review=false' >> "$GITHUB_OUTPUT"
+          trap 'echo "Droid review skipped: could not determine the current PR size." >> "$GITHUB_STEP_SUMMARY"' ERR
+          # Query the current PR, not the potentially stale event payload.
+          pr=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")
+          jq -e '([.additions, .deletions] | all(type == "number" and . >= 0 and . == floor)) and (.draft | type == "boolean")' <<< "$pr" > /dev/null
+          changed=$(jq '.additions + .deletions' <<< "$pr")
+          if jq -e '.draft' <<< "$pr" > /dev/null; then
+            echo 'Droid review skipped: the PR is a draft.' >> "$GITHUB_STEP_SUMMARY"
+          elif jq -e '.additions + .deletions > 1000' <<< "$pr" > /dev/null; then
+            echo "Droid review skipped: $changed changed lines (additions + deletions) exceeds the 1000-line limit. Automatic and security reviews were not run." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'should_review=true' >> "$GITHUB_OUTPUT"
+            echo "Droid review allowed: $changed changed lines (limit: 1000)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Checkout repository
+        if: steps.gate.outputs.should_review == 'true'
         uses: actions/checkout@v5
         with:
           fetch-depth: 1
       - name: Run Droid Auto Review
+        if: steps.gate.outputs.should_review == 'true'
         uses: Factory-AI/droid-action@main
         with:
           factory_api_key: ${{ secrets.FACTORY_API_KEY }}

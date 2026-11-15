@@ -1,0 +1,76 @@
+name: Droid Wiki Refresh
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+
+# Generated wiki stays out of the repository. The agent can read the code,
+# but cannot push commits or open pull requests. Results are retained only
+# as a short-lived workflow artifact.
+permissions:
+  contents: read
+
+# One refresh at a time for the whole repository: the wiki is per repo, so
+# the group must not vary by branch or run. Scheduled runs must not start
+# parallel full generations.
+concurrency:
+  group: droid-wiki-refresh
+  cancel-in-progress: false
+
+jobs:
+  wiki-refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The activity gate queries the complete default-branch history.
+          fetch-depth: 0
+
+      - name: Check refresh eligibility
+        id: gate
+        run: |
+          set -euo pipefail
+          echo 'should_refresh=false' >> "$GITHUB_OUTPUT"
+          now=$(date -u +%s)
+          # Alternate epoch days, not days of the month: */2 in cron can
+          # produce consecutive runs at month boundaries. Cron is UTC.
+          if (( (now / 86400) % 2 != 0 )); then
+            echo 'Wiki refresh skipped: not the scheduled alternate day.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # Use committer time and traverse past backdated commits. Only
+          # history reachable from the default-branch checkout counts.
+          cutoff=$((now - 172800))
+          recent=$(git log --since-as-filter="@$cutoff" --format=%H -1 HEAD)
+          if [ -z "$recent" ]; then
+            echo 'Wiki refresh skipped: no commits on the default branch in the last 48 hours.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo 'should_refresh=true' >> "$GITHUB_OUTPUT"
+          echo 'Wiki refresh allowed: scheduled alternate day with commits in the last 48 hours.' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install Factory Droid
+        if: steps.gate.outputs.should_refresh == 'true'
+        run: curl -fsSL https://app.factory.ai/cli | sh
+
+      - name: Generate wiki
+        if: steps.gate.outputs.should_refresh == 'true'
+        run: droid exec --auto high "/wiki"
+        env:
+          FACTORY_API_KEY: ${{ secrets.FACTORY_API_KEY }}
+
+      - name: Keep the generated wiki as a workflow artifact
+        if: steps.gate.outputs.should_refresh == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: droid-wiki
+          # The pages and their metadata only: the video overview and the
+          # screenshots are excluded. Keep the hidden generation metadata
+          # with the pages for inspection.
+          path: |
+            droid-wiki
+            !droid-wiki/video/**
+            !droid-wiki/images/**
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1

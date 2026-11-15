@@ -49,6 +49,7 @@ jobs:
         with:
           node-version-file: .tool-versions
       - run: node --test .github/actions/setup-flick/install.test.mjs
+      - run: node --test .github/scripts/*.test.mjs
 
   test:
     runs-on: ubuntu-26.04

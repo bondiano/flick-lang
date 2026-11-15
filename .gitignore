@@ -18,3 +18,6 @@ node_modules/
 
 # Generated wiki is local-only.
 /droid-wiki/
+
+# Local agent coordination locks.
+/.omx-state-locks*
