@@ -1,29 +1,40 @@
 //! A retained issued origin, with checked lazy transforms of its actual carrier.
 //! The sidecar is not part of structural telescope equality or hashing.
 
+#[cfg(test)]
 use std::collections::BTreeSet;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
+#[cfg(test)]
 use super::{Context, Embedding, ProjectionError};
+#[cfg(test)]
 use crate::iface::Interface;
+use crate::types::ScopeId;
+#[cfg(test)]
 use crate::types::module_contract::kinded::{self, Bound, Identities, Incomplete, Kinding};
+#[cfg(test)]
 use crate::types::module_contract::named::ExistentialWitness;
+#[cfg(test)]
 use crate::types::ty::scope::{copy_kind, copy_label};
-use crate::types::{Elem, Kind, ScopeId, Type};
+#[cfg(test)]
+use crate::types::{Elem, Kind, Type};
 
 #[derive(Clone, Default)]
 pub(super) struct Paired(Option<Origin>);
 
 #[derive(Clone)]
 struct Origin {
+    #[cfg(test)]
     issued: ExistentialWitness,
     registration: ScopeId,
     lease: Arc<()>,
+    #[cfg(test)]
     transforms: Vec<Transform>,
 }
 
+#[cfg(test)]
 #[derive(Clone)]
 enum Transform {
     Copy(ScopeId, ScopeId),
@@ -50,6 +61,7 @@ impl Hash for Paired {
 }
 
 impl Paired {
+    #[cfg(test)]
     pub(super) fn issued(issued: ExistentialWitness, registration: ScopeId) -> Self {
         Self(Some(Origin {
             issued,
@@ -69,16 +81,19 @@ impl Paired {
         self.0.as_ref().map(|origin| origin.registration)
     }
 
+    #[cfg(test)]
     pub(super) fn origin(&self) -> Option<&ExistentialWitness> {
         self.0.as_ref().map(|origin| &origin.issued)
     }
 
+    #[cfg(test)]
     pub(super) fn copy_bound(&mut self, from: ScopeId, to: ScopeId) {
         if let Some(origin) = &mut self.0 {
             origin.transforms.push(Transform::Copy(from, to));
         }
     }
 
+    #[cfg(test)]
     pub(super) fn project(&mut self, view: &Embedding) {
         if let Some(origin) = &mut self.0 {
             origin.transforms.push(Transform::Project(view.clone()));
@@ -87,6 +102,7 @@ impl Paired {
 
     /// `current` must be re-paired with this checker's live declaration before
     /// this call; an old raw revision tag alone never validates the origin.
+    #[cfg(test)]
     pub(super) fn materialize(
         &self,
         current: &ExistentialWitness,
@@ -116,7 +132,9 @@ impl Paired {
     }
 }
 
+#[cfg(test)]
 struct Copy(ScopeId, ScopeId);
+#[cfg(test)]
 impl Identities for Copy {
     fn ty(&mut self, ty: &Type, _: &[Bound]) -> Type {
         ty.copy_bound_handle(self.0, self.1)
@@ -131,6 +149,7 @@ impl Identities for Copy {
     }
 }
 
+#[cfg(test)]
 impl Context {
     pub(in crate::types) fn issued_origins(&self) -> impl Iterator<Item = &ExistentialWitness> {
         self.0
@@ -164,6 +183,7 @@ impl Context {
     }
 }
 
+#[cfg(test)]
 impl Context {
     pub(in crate::types) fn actual_dependencies(
         &self,
@@ -183,6 +203,7 @@ impl Context {
     }
 }
 
+#[cfg(test)]
 struct Dependencies<'a> {
     context: &'a Context,
     scoped: &'a BTreeSet<String>,
@@ -191,6 +212,7 @@ struct Dependencies<'a> {
     found: BTreeSet<ScopeId>,
 }
 
+#[cfg(test)]
 impl Dependencies<'_> {
     fn finish(self) -> Result<BTreeSet<ScopeId>, Incomplete> {
         if self.missing {
@@ -219,6 +241,7 @@ impl Dependencies<'_> {
     }
 }
 
+#[cfg(test)]
 impl Identities for Dependencies<'_> {
     fn ty(&mut self, ty: &Type, bound: &[Bound]) -> Type {
         if let Type::Con { module, .. } = ty {
@@ -266,6 +289,7 @@ impl Identities for Dependencies<'_> {
     }
 }
 
+#[cfg(test)]
 impl Context {
     pub(in crate::types) fn refreshed_dependencies(
         &self,
@@ -302,6 +326,7 @@ impl Context {
     }
 }
 
+#[cfg(test)]
 pub(in crate::types::module_contract) fn owned_modules(actual: &Interface) -> BTreeSet<String> {
     let mut modules = BTreeSet::new();
     let mut pending = vec![actual];

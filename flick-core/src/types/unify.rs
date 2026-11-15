@@ -11,6 +11,7 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 
 use super::Checker;
+#[cfg(test)]
 use super::env::Form;
 #[cfg(test)]
 use crate::source::Span;
@@ -582,4 +583,5 @@ include!("unify/transactions.rs");
 
 include!("unify/context.rs");
 
+#[cfg(test)]
 include!("unify/read.rs");

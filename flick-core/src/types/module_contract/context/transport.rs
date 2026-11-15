@@ -145,6 +145,7 @@ impl Embedding {
             }
             let mut coordinate = (**coordinate).clone();
             coordinate.contract = self.transport_under(&coordinate.contract, &bound[..index])?;
+            #[cfg(test)]
             coordinate.paired.project(self);
             coordinate.dependencies = coordinate
                 .dependencies

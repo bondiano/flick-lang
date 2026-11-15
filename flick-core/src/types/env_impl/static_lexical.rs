@@ -1,6 +1,7 @@
 impl Env<'_> {
     /// The canonical declaration kind; an implicit dictionary head derives
     /// its kind ONLY from an actual class declaration, never its spelling alone.
+    #[cfg(test)]
     pub(in crate::types) fn constructor_kind(&self, module: &str, name: &str) -> Option<Kind> {
         if let Some(definition) = self.type_def(module, name) {
             return Some(definition.kind.clone());

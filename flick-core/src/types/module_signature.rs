@@ -509,4 +509,5 @@ include!("module_signature/display.rs");
 
 include!("module_signature/contract.rs");
 
+#[cfg(test)]
 include!("module_signature/headers.rs");

@@ -16,8 +16,10 @@ pub(super) struct Opened {
     pub values: Vec<(String, Type)>,
 }
 
+#[cfg(test)]
 mod actual;
 
+#[cfg(test)]
 pub(in crate::types) mod kinded;
 
 include!("module_contract/scope.rs");
@@ -478,4 +480,6 @@ mod tests;
 pub(in crate::types) mod context;
 
 mod named;
-pub(in crate::types) use named::{NamedWitnesses, WitnessRefresh, WitnessRegistration};
+#[cfg(test)]
+pub(in crate::types) use named::WitnessRegistration;
+pub(in crate::types) use named::{NamedWitnesses, WitnessRefresh};

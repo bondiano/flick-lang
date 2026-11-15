@@ -1,4 +1,4 @@
-impl<'p> Machine<'p> {
+impl Machine<'_> {
     /// The value `v` returns to the frame `f`.
     fn ret(&mut self, f: Frame, v: Term) -> Step {
         Ok(match f {

@@ -29,6 +29,7 @@ pub(in crate::types) struct Context(Vec<Arc<Coordinate>>);
 pub(in crate::types) struct Scopes {
     owner: ScopeId,
     registered: BTreeMap<ScopeId, Arc<Coordinate>>,
+    #[cfg(test)]
     contexts: BTreeMap<ScopeId, Context>,
 }
 
@@ -37,6 +38,7 @@ impl Default for Scopes {
         Self {
             owner: Scope::default().identity(),
             registered: BTreeMap::new(),
+            #[cfg(test)]
             contexts: BTreeMap::new(),
         }
     }
@@ -64,6 +66,7 @@ impl Scopes {
             })
     }
 
+    #[cfg(test)]
     pub(in crate::types) fn register_issued(
         &mut self,
         registration: super::WitnessRegistration,
@@ -161,8 +164,8 @@ impl Scopes {
         self.owner
     }
 
-    /// Raw fixture registration, unavailable to production callers. Production
-    /// registration must consume the exact checker-issued existential pair.
+    /// Raw algebra fixture registration. Issued-witness tests instead consume
+    /// the exact checker-issued existential pair through `register_issued`.
     #[cfg(test)]
     pub fn register_view(
         &mut self,
@@ -214,10 +217,12 @@ impl Scopes {
         ))
     }
 
+    #[cfg(test)]
     pub fn registered_context(&self, scope: ScopeId) -> Option<Context> {
         self.contexts.get(&scope).cloned()
     }
 
+    #[cfg(test)]
     pub fn scope_of_module(&self, module: &str) -> Option<ScopeId> {
         self.registered
             .values()
@@ -235,6 +240,7 @@ impl Context {
         self.0.iter().any(|coordinate| coordinate.id == id)
     }
 
+    #[cfg(test)]
     pub fn common(&self, other: &Self) -> Result<Self, Invalid> {
         if self
             .0
@@ -365,12 +371,14 @@ impl Embedding {
             .map(|i| self.target.0[self.image[i]].id)
     }
 
+    #[cfg(test)]
     pub fn image_context(&self) -> Context {
         self.target
             .restrict(&self.image.iter().map(|i| self.target.0[*i].id).collect())
     }
 
     /// Change only the ambient context, retaining the same actual image.
+    #[cfg(test)]
     pub fn in_context(&self, target: &Context) -> Result<Self, Invalid> {
         let image = self
             .image
@@ -403,6 +411,7 @@ impl Embedding {
                 coordinate.dependencies.insert(to);
             }
             coordinate.contract = coordinate.contract.copy_bound_handle(from, to);
+            #[cfg(test)]
             coordinate.paired.copy_bound(from, to);
         }
         // A fresh in-place alpha copy preserves totality, injectivity and
@@ -432,6 +441,7 @@ impl Embedding {
     }
 
     /// Weakening retains the identities of every source coordinate.
+    #[cfg(test)]
     pub fn weaken(source: &Context, target: &Context) -> Result<Self, Invalid> {
         let image = source
             .ids()
@@ -448,10 +458,12 @@ impl Embedding {
 
     /// Replace coordinates in place by a contract-equivalent telescope. This
     /// is alpha transport, not an arbitrary permutation constructor.
+    #[cfg(test)]
     pub fn align(source: &Context, target: &Context) -> Result<Self, Invalid> {
         Self::checked(source.clone(), target.clone(), (0..source.len()).collect())
     }
 
+    #[cfg(test)]
     pub fn compose(&self, next: &Self) -> Result<Self, Invalid> {
         if self.target != next.source {
             return Err(Invalid::Domain);
@@ -479,6 +491,7 @@ impl Embedding {
 
     /// Pointwise equalizer for same-root equations. Ordered embeddings require
     /// no residual equations, even if the eventual type is an unordered row.
+    #[cfg(test)]
     pub fn equalizer(&self, other: &Self) -> Result<Self, Invalid> {
         if self.source != other.source || self.target != other.target {
             return Err(Invalid::Domain);
@@ -495,6 +508,7 @@ impl Embedding {
     }
 
     /// The dependency-closed common image in one ambient telescope.
+    #[cfg(test)]
     pub fn meet(&self, other: &Self) -> Result<(Self, Self), Invalid> {
         if self.target != other.target {
             return Err(Invalid::Domain);
@@ -511,6 +525,7 @@ impl Embedding {
         ))
     }
 
+    #[cfg(test)]
     fn inverse_image_in(&self, other: &Self) -> Result<Self, Invalid> {
         if self.target != other.target {
             return Err(Invalid::Domain);
@@ -531,6 +546,7 @@ impl Embedding {
 
     /// Inversion is defined only on the dependency-closed image, never on
     /// arbitrary ambient coordinates. The solver checks support before using it.
+    #[cfg(test)]
     pub fn inverse_on_image(&self) -> Self {
         let keep = self.image.iter().map(|i| self.target.0[*i].id).collect();
         let image = self.target.restrict(&keep);
@@ -538,6 +554,7 @@ impl Embedding {
             .expect("inverse of a checked order embedding")
     }
 
+    #[cfg(test)]
     pub fn transport(&self, ty: &Type) -> Type {
         self.transport_checked(ty)
             .expect("checked witness transport")
@@ -566,8 +583,10 @@ impl Embedding {
 }
 
 pub(super) mod paired;
+#[cfg(test)]
 mod projection;
 mod transport;
+#[cfg(test)]
 pub(in crate::types) use projection::ProjectionError;
 
 #[cfg(test)]
