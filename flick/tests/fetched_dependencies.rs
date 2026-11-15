@@ -125,6 +125,23 @@ fn a_dependency_missing_from_the_lock_is_reported() {
 }
 
 #[test]
+fn a_locked_package_missing_from_the_store_is_reported() {
+    let store = project("fetched-store-empty", &[]);
+    let source = "git+https://example.com/geo?tag=v1.0.0&subdir=lib#0123abcd";
+    let app = project(
+        "fetched-app-no-store",
+        &[
+            ("flick.toml", APP),
+            ("src/App/Main.fl", MAIN),
+            ("flick.lock", &lock(source)),
+        ],
+    );
+    let (status, codes) = check(&app, &store);
+    assert_eq!(status, Some(1));
+    assert!(codes.contains(&"FLICK-P034".to_owned()), "{codes:?}");
+}
+
+#[test]
 fn a_library_for_another_compiler_is_reported() {
     let store = store("fetched-store-old", "<0.0.1");
     let source = "git+https://example.com/geo?tag=v1.0.0&subdir=lib#0123abcd";

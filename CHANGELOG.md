@@ -6,6 +6,12 @@ break programs.
 
 ## Unreleased
 
+- **`flick plugins` across every source:** it lists the plugin of each path,
+  git-tag and url+sha256 dependency, in the order the manifests name them,
+  marks the ones a workspace gives a member, and shows a fetched plugin by
+  the `flick.lock` source and commit that pins it instead of a package-store
+  path. A dependency missing from the lock or store is `FLICK-P034`; the
+  listing fetches and builds nothing.
 - **Rename class methods in the editor:** renaming a project's method from
   its class, an instance or a call updates its signatures, defaults,
   implementations, imports and calls across dependent workspace members.

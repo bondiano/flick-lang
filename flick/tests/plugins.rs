@@ -4,6 +4,9 @@
 
 mod common;
 
+#[path = "plugin_listing/listing.rs"]
+mod listing;
+
 const APP: &str = "schema-version = 1
 
 [project]
