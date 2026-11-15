@@ -195,23 +195,25 @@ const openFrame = async (generation: number): Promise<HTMLIFrameElement> => {
   return frame;
 };
 
-/**
- * Build off-thread, then execute in the existing isolated, terminable runner: a
- * worker, or for a program with an interface a frame that stays open once it starts.
- */
-export const run = async (source: string, profile: string, signal: AbortSignal): Promise<Execution> => {
+/** A single compiled result and the preview generation that requested it. */
+export interface PreparedRun {
+  readonly built: Built;
+  readonly generation: number;
+}
+
+/** Preparation stays cancelable without spending the program's execution budget. */
+export const prepareRun = async (source: string, profile: string, signal: AbortSignal): Promise<PreparedRun> => {
   closePreview();
   const generation = previewGeneration;
-  if (signal.aborted) return { lines: [], status: "stopped", detail: "", diagnostics: [] };
-  let result: Built;
-  try {
-    result = await request<Built>({ action: "build", source, profile }, signal);
-  } catch (error) {
-    if (signal.aborted) return { lines: [], status: "stopped", detail: "", diagnostics: [] };
-    throw error;
-  }
+  const built = await request<Built>({ action: "build", source, profile }, signal);
+  return { built, generation };
+};
+
+/** Execute one prepared result in the existing isolated, terminable runner. */
+export const runPrepared = async (prepared: PreparedRun, signal: AbortSignal): Promise<Execution> => {
+  const { built: result, generation } = prepared;
   const problems = result.diagnostics;
-  if (signal.aborted) return { lines: [], status: "stopped", detail: "", diagnostics: problems };
+  if (signal.aborted || generation !== previewGeneration) return { lines: [], status: "stopped", detail: "", diagnostics: problems };
   if (result.files === null) return { lines: [], status: "invalid", detail: "", diagnostics: problems };
   if (result.entry === null) return { lines: [], status: "no-main", detail: "", diagnostics: problems };
   const program: Program = { files: result.files, entry: result.entry };
@@ -276,4 +278,14 @@ export const run = async (source: string, profile: string, signal: AbortSignal):
     finish("failure", detail(error));
   }
   return promise;
+};
+
+/** Build and run under one caller's signal, as exercise checks already require. */
+export const run = async (source: string, profile: string, signal: AbortSignal): Promise<Execution> => {
+  try {
+    return await runPrepared(await prepareRun(source, profile, signal), signal);
+  } catch (error) {
+    if (signal.aborted) return { lines: [], status: "stopped", detail: "", diagnostics: [] };
+    throw error;
+  }
 };

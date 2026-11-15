@@ -146,9 +146,17 @@ take_preview_messages : Unit ->{} List State.Line
 foreign take_preview_messages from "./compiler.ts" "takePreviewMessages"
   arity 0
 
-run_build : String -> String ->{Async; JsError} Execution
-foreign run_build from "./compiler.ts" "run"
+type PreparedRun
+
+prepare_run : String -> String ->{Async; JsError} PreparedRun
+foreign prepare_run from "./compiler.ts" "prepareRun"
   arity 2
+  catch JsError.from_js
+  cancel signal
+
+run_prepared : PreparedRun ->{Async; JsError} Execution
+foreign run_prepared from "./compiler.ts" "runPrepared"
+  arity 1
   catch JsError.from_js
   cancel signal
 
@@ -168,12 +176,11 @@ paint_generated : Atom.Writable Model ->{Atom.Write} Unit
 let paint_generated model =
   let m = Atom.current model
   if m.highlighting then
-    let result =
-      try Ok (highlight m.emitted.code "javascript") with
-      | JsError failure -> Err failure.message
-    match result with
-    | Ok tokens -> update model (fun m -> { m with generated_tokens = tokens })
-    | Err message -> syntax_failure model message
+    try
+      let tokens = highlight m.emitted.code "javascript"
+      update model (fun m -> { m with generated_tokens = tokens })
+    with
+    | JsError failure -> syntax_failure model failure.message
 
 adopt_source : Atom.Writable Model ->{Atom.Write} Unit
 let adopt_source model =
@@ -185,14 +192,12 @@ let adopt_source model =
 
 prepare_highlighting : Atom.Writable Model ->{Async, Atom.Write} Unit
 let prepare_highlighting model =
-  let result =
-    try Ok (load_highlighting ()) with
-    | JsError failure -> Err failure.message
-  match result with
-  | Err message -> syntax_failure model message
-  | Ok () ->
+  try
+    load_highlighting ()
     update model (fun m -> { m with highlighting = true; syntax_error = "" })
     paint_generated model
+  with
+  | JsError failure -> syntax_failure model failure.message
 
 /// Opens CodeMirror on the source; the native field stays when it cannot load.
 prepare_editor : Atom.Writable Model -> String ->{Async, Atom.Write} Unit
@@ -295,18 +300,16 @@ let load_compiler model =
     load_error = "";
     compile_error = "";
   })
-  let result =
-    try Ok (load ()) with
-    | JsError failure -> Err failure.message
-  match result with
-  | Err message ->
-    update model (fun m -> { m with loading = false; version = ""; load_error = message })
-  | Ok version ->
+  try
+    let version = load ()
     // a link's `?tab=` takes effect here, after hydration, and its tabs need the compiler
     let tab = requested_tab (tab_in_address ())
     update model (fun m -> { m with loading = false; checking = true; version = version; tab = tab })
     adopt_source model
     notify "fp-compile"
+  with
+  | JsError failure ->
+    update model (fun m -> { m with loading = false; version = ""; load_error = failure.message })
 
 edit : Atom.Writable Model -> String ->{Atom.Write} Unit
 let edit model source =
@@ -326,12 +329,8 @@ let replace model source =
 
 restore_source : Atom.Writable Model ->{Async, Atom.Write} Unit
 let restore_source model =
-  let result =
-    try Ok (restore_draft ()) with
-    | JsError _ -> Err ()
-  match result with
-  | Err () -> ()
-  | Ok restored ->
+  try
+    let restored = restore_draft ()
     // code from a link, or a broken link, never runs by itself
     if restored.status != "" then update model (fun m -> { m with autorun = false })
     if restored.source != "" && (Atom.current model).revision == 0 then
@@ -343,6 +342,8 @@ let restore_source model =
         m with
         storage_notice = tr m.locale "This shared link is invalid." "Ссылка на код повреждена.";
       })
+  with
+  | JsError _ -> ()
 
 share : Atom.Writable Model ->{Async, Atom.Write} Unit
 let share model =
@@ -490,13 +491,11 @@ let explain model key code =
 format : Atom.Writable Model ->{Async, Atom.Write} Unit
 let format model =
   let m = Atom.current model
-  let result =
-    try Ok (format_source m.source) with
-    | JsError failure -> Err failure.message
-  match result with
-  | Ok text ->
+  try
+    let text = format_source m.source
     if text != m.source && (Atom.current model).source == m.source then replace model text
-  | Err message -> update model (fun m -> { m with compile_error = message })
+  with
+  | JsError failure -> update model (fun m -> { m with compile_error = failure.message })
 
 // `latest` on the same button aborts and joins the worker before this Stop action.
 run_program : Atom.Writable Model ->{Async, Atom.Write} Unit
@@ -518,7 +517,10 @@ let run_program model =
       ran_profile = m.profile;
     })
     let execution =
-      try timeout 10000 (task { run_build m.source (profile_name m.profile) }) with
+      try
+        let prepared = prepare_run m.source (profile_name m.profile)
+        timeout 10000 (task { run_prepared prepared })
+      with
       | TimeoutError -> { empty_execution with status = "timeout" }
       | JsError failure -> { empty_execution with status = "failure"; detail = failure.message }
     update model (fun m -> { m with running = false; execution = execution })
