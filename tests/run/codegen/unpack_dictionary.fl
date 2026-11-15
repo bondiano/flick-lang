@@ -27,5 +27,6 @@ let shown x = "<" ++ show x ++ ">"
 
 main : Unit ->{; AppError} Unit
 let main () =
-  let local = unpack packed as K in show 5 ++ " " ++ shown 6
+  let local =
+    unpack packed as K in show 5 ++ " " ++ shown 6
   Platform.stdout_line (local ++ " | " ++ show 5 ++ " " ++ shown 6)
