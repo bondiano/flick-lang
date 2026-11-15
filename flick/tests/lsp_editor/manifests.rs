@@ -95,13 +95,24 @@ fn a_workspace_git_plugin_is_the_same_chain_for_the_editor_and_the_command_line(
     let mut lsp = Lsp::start(&dir.join("app"));
     lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": main } }));
     let message = "dependency `pairs` is not in `flick.lock`: run `flick install`";
-    // the dependency is a place in the workspace's manifest, as for check
-    let _ = lsp.diagnostics(&uri(&file));
-    let diagnostics = lsp.diagnostics(&uri(&dir.join("flick.toml")));
+    // These publications can arrive in either order. Retain both at the request barrier.
+    let publications = lsp.publications();
     assert!(
-        diagnostics
-            .iter()
-            .any(|d| d["message"].as_str().is_some_and(|m| m.contains(message))),
+        publications.iter().any(|p| p["uri"] == uri(&file)),
+        "{publications:?}"
+    );
+    // The dependency is a place in the workspace's manifest, as for check.
+    let manifest_uri = uri(&dir.join("flick.toml"));
+    let diagnostics = publications
+        .iter()
+        .rev()
+        .find(|p| p["uri"] == manifest_uri)
+        .expect("workspace manifest publication")["diagnostics"]
+        .as_array()
+        .expect("manifest diagnostics");
+    assert!(
+        diagnostics.iter().any(|d| d["code"] == "FLICK-P034"
+            && d["message"].as_str().is_some_and(|m| m.contains(message))),
         "{diagnostics:?}"
     );
     lsp.close();
