@@ -181,7 +181,9 @@ export const withOwner = <A, E, R>(
         owner.trace = traceId();
         traceEvent({ e: "open", o: owner.trace, p: outer?.trace ?? 0, k: kind });
       }
-      const exit = yield* Effect.exit(restore(inside(owner, body(owner, outer))));
+      const exit = yield* Effect.exit(
+        restore(inside(owner, withOwnerEvidence(owner, () => body(owner, outer)))),
+      );
       return yield* resume(yield* close(owner, exit));
     }),
   );
@@ -232,9 +234,14 @@ export const arenaMake = (): Effect.Effect<Arena> => Effect.map(Effect.service(C
 /** Resolve foreign identity only when a raw scoped operation activates it. */
 export const ownerHooks: { activate?: (owner: object) => Owner } = {};
 export const within = <A, E, R>(owner: OwnerEvidence, effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, Scope.Scope>> =>
-  Effect.suspend(() => {
+  Effect.flatMap(Effect.service(CurrentOwner), (current) => {
     const active = owner instanceof Owner ? owner : owner === undefined ? undefined : ownerHooks.activate?.(owner);
     if (active === undefined) throw new Error("owner evidence is absent or belongs to another runtime");
+    // Same owner: keep the current fiber so fiber-local updates (log
+    // annotations and the like) stay visible to the caller.
+    if (current === active) {
+      return effect as Effect.Effect<A, E, Exclude<R, Scope.Scope>>;
+    }
     return inside(active, effect);
   });
 

@@ -110,7 +110,8 @@ func RcMapGet(fb *Fiber, key, self Value) Value {
 		m.entries.set(key, e)
 		t := *fb
 		t.env = m.env
-		e.lookup = fork(&t, e.scope, Eff(func(fb *Fiber) Value {
+		t.pinOwner = true
+		e.lookup = fork(WithOwnerEvidence(&t, e.scope), e.scope, Eff(func(fb *Fiber) Value {
 			v, cause := catch(func() Value { return Run(fb, Apply(fb, m.lookup, key)) })
 			if cause.has(causeInterrupt) {
 				m.removeInterrupted(fb, key, e)

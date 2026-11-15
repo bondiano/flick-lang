@@ -258,6 +258,7 @@ func Provide(fb *Fiber, layer, body Value) Value {
 		if tracing {
 			traceOpen(owner, fb.owner, "provide")
 		}
+		inner = WithOwnerEvidence(inner, owner)
 		s := buildWith(inner, layerOf(layer), currentMemo(inner), owner)
 		return Run(provided(inner, s), body)
 	})
