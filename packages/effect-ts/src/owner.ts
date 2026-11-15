@@ -55,6 +55,12 @@ export class Owner {
   fins = 0;
   /** Whether its finalizers have started: one added now runs at once. */
   finalizing = false;
+  /**
+   * A library acquisition scope (`acquireHolder`, RcRef, Pool): `Within` must
+   * not redirect finalizers onto an outer lexical owner, or releases wait
+   * until that outer scope ends.
+   */
+  detached = false;
 
   constructor(resources: Scope.Closeable, defects: Array<Cause.Cause<unknown>> = reported) {
     this.resources = resources;
@@ -237,9 +243,9 @@ export const within = <A, E, R>(owner: OwnerEvidence, effect: Effect.Effect<A, E
   Effect.flatMap(Effect.service(CurrentOwner), (current) => {
     const active = owner instanceof Owner ? owner : owner === undefined ? undefined : ownerHooks.activate?.(owner);
     if (active === undefined) throw new Error("owner evidence is absent or belongs to another runtime");
-    // Same owner: keep the current fiber so fiber-local updates (log
-    // annotations and the like) stay visible to the caller.
-    if (current === active) {
+    // Same owner, or a pinned library acquisition: keep the current fiber so
+    // fiber-local updates stay visible and acquisition finalizers stay put.
+    if (current === active || current?.detached) {
       return effect as Effect.Effect<A, E, Exclude<R, Scope.Scope>>;
     }
     return inside(active, effect);
