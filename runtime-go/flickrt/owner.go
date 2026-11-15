@@ -31,8 +31,8 @@ type Owner struct {
 	arenasClosed bool
 
 	// A detached owner is a library acquisition scope (`acquireHolder`,
-	// `RcRef`, `Pool`, `RcMap`): `Within` must not redirect finalizers onto
-	// an outer lexical owner, or releases wait until that outer scope ends.
+	// `Layer`, `RcRef`, `Pool`, `RcMap`): `Within` must not redirect its
+	// finalizers onto an outer owner, delaying release until that owner ends.
 	detached bool
 	// kind is main/scope/provide when this owner is a traced lexical region.
 	kind string

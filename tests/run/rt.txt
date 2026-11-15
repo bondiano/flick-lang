@@ -64,6 +64,7 @@ codegen/implicit
 codegen/instance_names
 codegen/interpolation
 codegen/ints
+codegen/known_defaults
 codegen/known_failure
 codegen/known_instances
 codegen/let_assert
@@ -91,6 +92,7 @@ codegen/stage_order
 codegen/strings_utf16
 codegen/tags
 codegen/task_twice
+codegen/unpack_dictionary
 ffi/catch_order
 ffi/copy
 ffi/defect

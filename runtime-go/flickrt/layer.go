@@ -46,6 +46,7 @@ func layerOf(v Value) *Layer { return v.(*Layer) }
 func fromBuild(build func(fb *Fiber, memo *MemoMap, scope *Owner) Services) *Layer {
 	return &Layer{func(fb *Fiber, memo *MemoMap, scope *Owner) Services {
 		inner := forkScope(fb, scope)
+		inner.detached = true
 		out, cause := catch(func() Value { return build(fb, memo, inner) })
 		if cause != nil {
 			cause = inner.close(fb, cause)
@@ -203,7 +204,9 @@ func (m *MemoMap) getOrBuild(fb *Fiber, l *Layer, scope *Owner, build func(*Fibe
 		m.mu.Unlock()
 		return e.wait(fb)
 	}
-	e := &memoEntry{scope: newOwner(), done: make(chan struct{})}
+	entryScope := newOwner()
+	entryScope.detached = true
+	e := &memoEntry{scope: entryScope, done: make(chan struct{})}
 	if !m.observe(fb, l, e, scope) {
 		// a closed scope cannot hold a shared entry
 		m.mu.Unlock()
@@ -292,9 +295,12 @@ func LayerSyncContext(make Value) Value {
 	return memoized(func(fb *Fiber, _ *MemoMap, _ *Owner) Services { return Apply(fb, make, Unit).(Services) })
 }
 
-// scoped runs `task` acquiring into `scope`.
+// scoped enters a trusted layer acquisition scope even when the caller
+// already owns another detached acquisition. The caller's frame is retained.
 func scoped(fb *Fiber, scope *Owner, task Value) Value {
-	return Run(WithOwnerEvidence(Within(fb, scope), scope), task)
+	inner := *fb
+	inner.owner = scope
+	return Run(WithOwnerEvidence(&inner, scope), task)
 }
 
 func LayerEffect(key, task Value) Value {
