@@ -6,6 +6,14 @@ break programs.
 
 ## Unreleased
 
+- **Environment-specific target preflight:** with `build.environment` set,
+  `flick check`, the editor and build share a reachable-only check for gated
+  effects (`Db`, `Database`, `Server`). A use without a root handler for that
+  pair is `FLICK-E020` at the requirement (for example `unhandled effect Db on
+  js/browser`); `js/node` accepts the same export, unused unsupported code does
+  not fail, and public library exports are checked. Toolchain gaps stay
+  `FLICK-P015` / `FLICK-P029`. Changing the environment invalidates cached
+  preflight decisions.
 - **Known instances called directly on the go target:** a method written as
   a function in an instance without a context, derived ones included, is a
   Go function of its own, and a call the checker resolved to that instance

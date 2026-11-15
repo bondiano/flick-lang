@@ -374,8 +374,10 @@ fn run_in(
         .unwrap_or_default();
     #[cfg(not(feature = "native-project"))]
     let (diagnostics, precompiled) = (Vec::new(), Precompiled::default());
-    // a check lowers the modules of source packages only to save them
+    // a check lowers the modules of source packages only to save them;
+    // a selected environment also needs IR for target preflight
     let lower_packages_only = mode == Mode::Check && saved.is_some();
+    let environment_preflight = project.is_some_and(|p| p.config.build.environment.is_some());
     let mut loader = Loader {
         expression_serial: 0,
         expressions_active: BTreeSet::new(),
@@ -389,8 +391,9 @@ fn run_in(
         by_name: BTreeMap::new(),
         from_packages: BTreeMap::new(),
         diagnostics,
-        lowered: (mode != Mode::Check || lower_packages_only).then(Vec::new),
-        lower_packages_only,
+        lowered: (mode != Mode::Check || lower_packages_only || environment_preflight)
+            .then(Vec::new),
+        lower_packages_only: lower_packages_only && !environment_preflight,
         precompiled,
         #[cfg(feature = "ide")]
         ide: (mode == Mode::Analyze).then(Vec::new),
@@ -472,25 +475,74 @@ fn run_in(
         }
     }
     let mut diagnostics = loader.reported();
+    #[cfg(feature = "ide")]
+    let analyzed = loader.ide.take().unwrap_or_default();
+    drop(loader);
+    let compilation = Compilation {
+        modules: compiled,
+        libraries,
+        #[cfg(feature = "native-project")]
+        js_dependencies,
+    };
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(environment) = project.and_then(|p| p.config.build.environment.as_ref())
+        && !compilation.modules.is_empty()
+        && !diagnostics
+            .iter()
+            .any(|d| d.severity == Severity::Error)
+    {
+        let entries: Vec<(String, String)> = project
+            .map(|p| {
+                p.config
+                    .entries
+                    .iter()
+                    .map(|e| (e.name.clone(), e.module.clone()))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let runners: Vec<(String, String)> = project
+            .iter()
+            .flat_map(|p| &p.config.entries)
+            .filter_map(|e| Some((e.name.clone(), e.runner.as_ref()?.0.clone())))
+            .collect();
+        let settings = crate::build::Settings {
+            package: None,
+            entries: &entries,
+            typescript: false,
+            release: false,
+            extras: crate::build::Extras::default(),
+            source_path: &|_| String::new(),
+            source_dir: &|_| None,
+            out_dir: Path::new(""),
+            root: project.map(|p| p.root.as_path()),
+            backend: project.map_or(Backend::Effect, |p| p.config.build.effect),
+            effect_bridge: crate::codegen::EffectBridge::Absent,
+            ui: project.and_then(|p| p.config.build.ui.as_deref()),
+            runners: &runners,
+            environment: Some(environment),
+        };
+        crate::build::target_preflight::check(
+            &compilation,
+            &settings,
+            sources,
+            environment,
+            &mut diagnostics,
+        );
+    }
     // by path, not by load order, which follows the order of imports
     diagnostics.sort_by_cached_key(|d| {
         (
             d.span.is_none(),
             d.span
-                .map(|s| (loader.sources.get(s.file).path.clone(), s.start, s.end)),
+                .map(|s| (sources.get(s.file).path.clone(), s.start, s.end)),
         )
     });
     Output {
         diagnostics,
-        compilation: Compilation {
-            modules: compiled,
-            libraries,
-            #[cfg(feature = "native-project")]
-            js_dependencies,
-        },
+        compilation,
         fresh,
         #[cfg(feature = "ide")]
-        analyzed: loader.ide.take().unwrap_or_default(),
+        analyzed,
     }
 }
 

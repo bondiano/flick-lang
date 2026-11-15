@@ -17,6 +17,10 @@ mod capability_tests;
 pub mod go;
 mod interfaces;
 mod javascript;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod target_preflight;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod target_preflight_tests;
 
 pub use crate::effects;
 pub(crate) use crate::effects::bindings;
@@ -37,7 +41,7 @@ use std::path::{Component, Path, PathBuf};
 
 use crate::codegen::{EffectBridge, Labels};
 use crate::project::Compiled;
-use crate::project::config::{Backend, MAIN_ENTRY};
+use crate::project::config::{Backend, BackendEnvironment, MAIN_ENTRY};
 use crate::source::FileId;
 use crate::{ir, opt, types};
 
@@ -107,6 +111,8 @@ pub struct Settings<'a> {
     /// The module whose `run` starts an entry, by the entry's name; an entry
     /// without one starts the default way.
     pub runners: &'a [(String, String)],
+    /// Selected backend/platform for environment-specific preflight.
+    pub environment: Option<&'a BackendEnvironment>,
 }
 
 /// The opt-in outputs of a build.

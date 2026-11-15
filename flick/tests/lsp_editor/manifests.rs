@@ -79,6 +79,48 @@ fn the_manifest_of_the_workspace_around_a_member_reports_its_errors() {
 }
 
 #[test]
+fn browser_db_preflight_is_the_same_for_the_editor_and_check() {
+    let config = "schema-version = 1\n\n[project]\nkind = \"lib\"\n\n[build]\nenvironment = \"js/browser\"\n";
+    let source = "module App.Main exposing (run)\n\nservice Db =\n  query : String ->{} String\n\nrun : String ->{Db} String\nlet run key = Db.query key\n";
+    let dir = project(
+        "lsp_target_preflight_db",
+        &[("flick.toml", config), ("src/App/Main.fl", source)],
+    );
+    let file = dir.join("src/App/Main.fl");
+    let mut lsp = Lsp::start(&dir);
+    lsp.notify(
+        "textDocument/didOpen",
+        &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": source } }),
+    );
+    let published = lsp.diagnostics(&uri(&file));
+    let lsp_hit = published
+        .iter()
+        .find(|d| d["code"] == "FLICK-E020")
+        .unwrap_or_else(|| panic!("LSP E020 in {published:?}"));
+    assert_eq!(
+        lsp_hit["message"].as_str(),
+        Some("unhandled effect Db on js/browser")
+    );
+    lsp.close();
+    let out = flick_in(&dir, &["check", "--diagnostics", "json"]);
+    assert_eq!(out.status.code(), Some(1), "{out:?}");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let check_hit = stderr
+        .lines()
+        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+        .find(|d| d["code"] == "FLICK-E020")
+        .expect("check E020");
+    assert_eq!(check_hit["message"], lsp_hit["message"]);
+    let start = check_hit["range"]["start"].as_u64().expect("start") as usize;
+    let end = check_hit["range"]["end"].as_u64().expect("end") as usize;
+    assert_eq!(&source[start..end], "Db.query");
+    assert_eq!(
+        lsp_hit["range"],
+        json!({ "start": position(source, start), "end": position(source, end) })
+    );
+}
+
+#[test]
 fn a_workspace_git_plugin_is_the_same_chain_for_the_editor_and_the_command_line() {
     let root = "schema-version = 1\n\n[workspace]\nmembers = [\"app\"]\n\n[[workspace.plugins]]\npackage = \"pairs\"\nsource = { git = \"https://example.com/pairs\", tag = \"v1.0.0\", subdir = \"lib\" }\n";
     let app = "schema-version = 1\n\n[project]\nkind = \"lib\"\n";

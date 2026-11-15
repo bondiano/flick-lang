@@ -146,6 +146,7 @@ Every compiler code has an explanation and an example. Plugin codes belong to th
 - [FLICK-E017](./flick-e017/)
 - [FLICK-E018](./flick-e018/)
 - [FLICK-E019](./flick-e019/)
+- [FLICK-E020](./flick-e020/)
 
 ## Classes
 
