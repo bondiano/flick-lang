@@ -235,7 +235,26 @@ jobs:
         with:
           node-version-file: .tool-versions
           cache: pnpm
-      - run: just wasm-plugins
+      - run: just wasm-plugins-e2e
+
+  # The release compiler and e2e compiler are separate builds. Each keeps
+  # its full checks and the same 30-minute deadline when run in parallel.
+  release-backend:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just@1.59.0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+          cache: pnpm
+      - run: just release-backend
 
   postgres:
     runs-on: ubuntu-26.04

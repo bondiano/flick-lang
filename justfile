@@ -277,7 +277,10 @@ fuzz iterations="1000000":
 # the compiler with wasmtime, which release builds include, with the unit
 # tests that only a build with wasmtime has; the tests run in the `e2e`
 # profile, as an unoptimized wasmtime compiles a component slowly
-wasm-plugins: wasm-backends
+wasm-plugins: wasm-plugins-e2e release-backend
+
+# Native e2e-profile checks, independently runnable from the release binary.
+wasm-plugins-e2e: wasm-backends-e2e
     cargo build -p flick-test-pairs -p flick-example-typed-dsl --features guest --target wasm32-wasip2 --release
     cargo clippy -p flick-test-pairs -p flick-example-typed-dsl --features guest --target wasm32-wasip2 -- -D warnings
     cargo clippy -p flick --features wasm-plugins --all-targets -- -D warnings
@@ -307,7 +310,9 @@ backend-fixtures: js-component
     cargo build -p flick-test-backend --features guest --target wasm32-wasip2 --release
 
 # A real third-party backend fixture through the separate component world.
-wasm-backends: backend-fixtures
+wasm-backends: wasm-backends-e2e release-backend
+
+wasm-backends-e2e: backend-fixtures
     pnpm install --frozen-lockfile
     pnpm -C runtime build
     pnpm -C packages/effect-ts build
@@ -317,9 +322,16 @@ wasm-backends: backend-fixtures
     cargo test -p flick-backend --profile e2e --features host --test component_host -- --include-ignored
     cargo clippy -p flick --features wasm-backends --all-targets -- -D warnings
     cargo test -p flick --profile e2e --features wasm-backends --bin flick --test backends -- --include-ignored
-    cargo test -p flick --release --features wasm-plugins --test default_backend -- --include-ignored
     node --test tools/backend-conformance/report.test.mjs
     node tools/backend-conformance/index.mjs {{flick}} target/backends/js.wasm
+
+# Exercise the actual release binary, including the ordinary launch path.
+# CI runs this independent build beside the e2e host checks, not after them.
+release-backend:
+    pnpm install --frozen-lockfile
+    pnpm -C runtime build
+    pnpm -C packages/effect-ts build
+    cargo test -p flick --release --features wasm-plugins --test default_backend -- --include-ignored
 
 # Build the wasm module the in-browser demo loads and hold it to its size budget.
 # The raw-byte budget retains the playground editor queries (hover, completion,
