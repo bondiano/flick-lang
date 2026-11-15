@@ -14,6 +14,7 @@
 
 use flick_pretty::Document;
 
+use super::layout::{Code, call};
 use super::shape::{self, Shape};
 use super::{Gen, Input};
 use crate::ir::reach::Key;
@@ -61,6 +62,17 @@ pub(super) fn shapes(input: &Input, module: &str, kind: &ItemKind) -> Vec<(Key, 
 }
 
 impl<'a> Gen<'a> {
+    /// The method `name` of `dict` as a value: the function of a known
+    /// instance, or else looked up in the dictionary.
+    pub(super) fn method(&mut self, dict: &Dict, name: &str) -> Code<'a> {
+        if let Some((module, function)) = self.direct_method(dict, name) {
+            return self.global_value(&module, &function, Vec::new());
+        }
+        let dict = self.dict(dict);
+        let args = [self.context(), dict.doc, self.string(name)];
+        call(self.a, "flickrt.Method", args).into()
+    }
+
     /// The module and top-level name of the function of `method` of
     /// `dict`, when it is called directly.
     pub(super) fn direct_method(&self, dict: &Dict, method: &str) -> Option<Key> {
