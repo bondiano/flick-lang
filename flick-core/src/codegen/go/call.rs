@@ -224,6 +224,10 @@ impl<'a> Gen<'a> {
                 let dicts: Vec<Code<'a>> = dicts.iter().map(|d| self.dict(d)).collect();
                 self.direct(module, name, dicts)
             }
+            ExprKind::Method { dict, name } if self.direct_method(dict, name).is_some() => {
+                let (module, name) = self.direct_method(dict, name).expect("tested by the guard");
+                self.direct(&module, &name, Vec::new())
+            }
             _ => {
                 let f = self.expr(head);
                 let f = self.spill(f);

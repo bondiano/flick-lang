@@ -155,7 +155,7 @@ fn a_function_of_two_arguments_is_given_both_at_once() {
     // both values, a lambda is one too, and a call through a value gives
     // both arguments: no function is made per argument
     assert!(
-        go.contains("return F_App__add(fb, flickrt.AsInt(t2), flickrt.AsInt(t3))"),
+        go.contains("return F_App__add(fb, flickrt.AsInt(t1), flickrt.AsInt(t2))"),
         "{go}"
     );
     assert!(

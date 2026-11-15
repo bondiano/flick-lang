@@ -13,6 +13,7 @@
 mod arith;
 mod call;
 mod closures;
+mod direct;
 mod effects;
 mod expr;
 mod foreign;
@@ -149,6 +150,7 @@ fn compile<'a>(
             let held = shape(input, &modules[m].name, &item.kind);
             shapes.insert((modules[m].name.clone(), name), held);
         }
+        shapes.extend(direct::shapes(input, &modules[m].name, &item.kind));
     }
     let reached_items = reached
         .iter()
@@ -508,6 +510,8 @@ impl<'a> Gen<'a> {
 
 #[cfg(test)]
 mod compose_tests;
+#[cfg(test)]
+mod direct_tests;
 #[cfg(test)]
 mod own_tests;
 #[cfg(test)]
