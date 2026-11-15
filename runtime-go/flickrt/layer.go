@@ -257,6 +257,7 @@ func buildWith(fb *Fiber, l *Layer, memo *MemoMap, scope *Owner) Services {
 // it; the body keeps the caller's lexical candidate.
 func Provide(fb *Fiber, layer, body Value) Value {
 	return region(fb, func(inner *Fiber, owner *Owner) Value {
+		owner.kind = "provide"
 		if tracing {
 			traceOpen(owner, fb.owner, "provide")
 		}
