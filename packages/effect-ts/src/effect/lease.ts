@@ -3,11 +3,12 @@
 // library starts (a replacement, a refresh, an eviction) waits until no lease
 // holds the value, so a value is never released while it is in use.
 import { Effect, Exit, Scope } from "effect";
+import { CurrentOwner, Owner, closeOwn, inside, withOwnerEvidence } from "../owner.ts";
 
 /** A value and the scope of what its acquisition registered. */
 export interface Holder<A> {
   readonly value: A;
-  readonly scope: Scope.Closeable | undefined;
+  readonly scope: Owner | undefined;
   leases: number;
   retired: boolean;
   closed: boolean;
@@ -35,10 +36,11 @@ export const acquireHolder = <A, E, R>(
 ): Effect.Effect<Holder<A>, E, Exclude<R, Scope.Scope>> =>
   Effect.uninterruptibleMask((restore) =>
     Effect.gen(function* () {
-      const scope = yield* Scope.make();
-      const exit = yield* Effect.exit(restore(outer(Scope.provide(acquire, scope))));
+      const parent = yield* Effect.service(CurrentOwner);
+      const scope = new Owner(yield* Scope.make(), parent?.defects);
+      const exit = yield* Effect.exit(restore(outer(inside(scope, withOwnerEvidence(scope, () => acquire)))));
       if (Exit.isFailure(exit)) {
-        yield* Scope.close(scope, exit);
+        yield* releaseScope(scope, exit);
         return yield* Effect.failCause(exit.cause);
       }
       return { value: exit.value, scope, leases: 0, retired: false, closed: false };
@@ -47,8 +49,22 @@ export const acquireHolder = <A, E, R>(
 
 const release = <A>(holder: Holder<A>): Effect.Effect<void> => {
   holder.closed = true;
-  return holder.scope === undefined ? Effect.void : Scope.close(holder.scope, Exit.void);
+  return holder.scope === undefined ? Effect.void : releaseScope(holder.scope, Exit.void);
 };
+
+const releaseScope = (owner: Owner, exit: Exit.Exit<unknown, unknown>): Effect.Effect<void> =>
+  Effect.flatMap(closeOwn(owner, exit), (closed) =>
+    Exit.isFailure(closed) ? Effect.orDie(Effect.failCause(closed.cause)) : Effect.void);
+
+/** A host library's acquisition scope supplies the callback's fresh region. */
+export const acquireInScope = <A, E, R>(acquire: Effect.Effect<A, E, R>): Effect.Effect<A, E, R | Scope.Scope> =>
+  Effect.flatMap(Effect.scope, (scope) => Effect.flatMap(Effect.service(CurrentOwner), (parent) => {
+    const owner = new Owner(Scope.makeUnsafe(), parent?.defects);
+    return Effect.andThen(
+      Scope.addFinalizerExit(scope, (exit) => releaseScope(owner, exit)),
+      inside(owner, withOwnerEvidence(owner, () => acquire)),
+    );
+  }));
 
 /** The owner no longer offers `holder`: it is released once no lease holds it. */
 export const retire = <A>(holder: Holder<A>): Effect.Effect<void> =>

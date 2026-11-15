@@ -1,7 +1,7 @@
 /* oxlint-disable typescript/no-unsafe-type-assertion, require-yield, unicorn/consistent-function-scoping -- compiler-style generator callbacks */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Context, Effect, Scope } from "effect";
+import { Context, Effect, References, Scope } from "effect";
 import * as native from "@flick-lang/runtime/rt/kernel";
 import * as host from "../src/owner.ts";
 import { callEffect, callSync, fromEffect, inSyncContext } from "../src/bridge_kernel.ts";
@@ -9,6 +9,14 @@ import { sync } from "../src/sync.ts";
 import { handle } from "../src/handlers.ts";
 
 const owner = (): host.Owner => new host.Owner(Scope.makeUnsafe());
+
+test("idempotent Effect owner brackets preserve scoped reference updates", () => {
+  const annotations = Effect.runSync(host.scopeRun((fresh) => Effect.gen(function* () {
+    yield* host.withOwnerEvidence(fresh, () => host.within(fresh, Effect.annotateLogsScoped("request", "7")));
+    return yield* Effect.service(References.CurrentLogAnnotations);
+  })));
+  assert.deepEqual(annotations, { request: "7" });
+});
 
 test("Effect evidence is deferred, independent, explicit absence and task-as-data", async () => {
   const candidate = owner();

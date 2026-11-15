@@ -16,9 +16,10 @@ type error ExceededCapacity = ExceededCapacity String
 /// `lookup` runs with the services of this call. A resource stays for
 /// `idleTimeToLive key` after its last holder (`None`: no time), and the map
 /// holds at most `capacity` keys (`None`: no bound).
+/// Each lookup has a fresh region `t`; a type that names it cannot escape.
 make :
   {
-    lookup : k ->{r; e} a;
+    lookup : forall t. k ->{Scope t | r; e} a^{t};
     idleTimeToLive : Option (k -> Duration.Duration);
     capacity : Option Int;
   } ->{Scope s | r}

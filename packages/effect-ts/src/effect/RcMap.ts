@@ -5,6 +5,7 @@ import { Cause, type Duration, Effect, Option, RcMap, type Scope } from "effect"
 
 import type { Tagged } from "../data.ts";
 import { tag } from "@flick-lang/runtime/tags";
+import { acquireInScope } from "./lease.ts";
 
 export * from "effect/RcMap";
 
@@ -20,7 +21,7 @@ export const flickMake = <K, A, E, R>(options: {
   readonly capacity: Option.Option<number>;
 }): Effect.Effect<RcMap.RcMap<K, A, E | Cause.ExceededCapacityError>, never, R | Scope.Scope> =>
   RcMap.make({
-    lookup: options.lookup,
+    lookup: (key) => acquireInScope(Effect.suspend(() => options.lookup(key))),
     idleTimeToLive: Option.getOrUndefined(options.idleTimeToLive),
     capacity: Option.getOrUndefined(options.capacity) ?? Number.POSITIVE_INFINITY,
   });

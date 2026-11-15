@@ -47,6 +47,7 @@ func (p *pool) allocate(fb *Fiber) *poolItem {
 	scope := newOwner()
 	t := *fb
 	t.env, t.owner = p.env, scope
+	t.candidate = scope
 	v, cause := catch(func() Value { return Run(&t, p.acquire) })
 	item := &poolItem{exit: &Exit{v, cause}, scope: scope, idleSince: p.clock.millis()}
 	return masked(fb, fb.state.mask+1, func() Value {

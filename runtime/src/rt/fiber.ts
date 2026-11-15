@@ -11,32 +11,33 @@ import { type Cause, Exit, Raise, causeOf, raise, concat, failed, fromReasons, i
 import { stressing } from "./fiber-stress.ts";
 import type { Owner } from "./owner.ts";
 
-/** An inert lexical owner identity, never an acquisition or liveness check. */
+/** Lexical identity; transport never acquires or validates it. */
 export type OwnerEvidence = object | undefined;
 
-/** Immutable services and independent default and lexical owner channels. */
+/** Services, default owner and independent lexical evidence. */
 export class Ctx {
-  readonly tag: object | null;
-  readonly impl: unknown;
-  readonly next: Ctx | null;
-  readonly owner: Owner | undefined;
+  declare readonly tag: object | null;
+  declare readonly impl: unknown;
+  declare readonly next: Ctx | null;
+  declare readonly owner: Owner | undefined;
   /** Inert lexical candidate, independent of work/cancellation ownership. */
-  readonly stageOwner: OwnerEvidence;
+  declare readonly stageOwner: OwnerEvidence;
   /** Context supplied by the Effect adapter, when a crossing provides one. */
-  readonly host: unknown;
+  declare readonly host: unknown;
   /** Effect Context derived from this evidence, cached for later crossings. */
-  bridged: unknown = undefined;
-  constructor(tag: object | null, impl: unknown, next: Ctx | null, owner: Owner | undefined, host: unknown = next?.host, ...evidence: [] | [OwnerEvidence]) {
+  declare bridged: unknown;
+  constructor(tag: object | null, impl: unknown, next: Ctx | null, owner: Owner | undefined, host: unknown = next?.host, evidence?: OwnerEvidence) {
     this.tag = tag;
     this.impl = impl;
     this.next = next;
     this.owner = owner;
     this.host = host;
-    this.stageOwner = evidence.length === 0 ? next?.stageOwner : evidence[0];
+    // Omission inherits; explicit undefined clears evidence.
+    this.stageOwner = arguments.length > 5 ? evidence : next?.stageOwner;
   }
 }
 
-/** Optional observer installed by the Effect adapter for child-fiber metrics. */
+/** Effect's optional observer for child-fiber metrics. */
 export const fiberHooks: { started?: (ctx: Ctx, fiber: Fiber) => void } = {};
 
 const ROOT = /*#__PURE__*/ new Ctx(null, undefined, null, undefined);
@@ -53,7 +54,7 @@ export const currentCtx = (): Ctx => context;
 /** The owner of what runs now, the innermost `scope`'s. */
 export const currentOwner = (): Owner | undefined => context.owner;
 
-/** The fiber running now; one made for the purpose when code runs outside any. */
+/** Current fiber; lazily created outside the driver. */
 export const currentFiber = (): Fiber => {
   current ??= new Fiber();
   return current;
@@ -70,14 +71,16 @@ export const lookup = (tag: object): unknown => {
 /** The evidence `ctx` with `impl` for `tag` on top. */
 export const extend = (ctx: Ctx, tag: object, impl: unknown): Ctx => new Ctx(tag, impl, ctx, ctx.owner);
 
-/** The evidence `ctx` with `owner` as the owner. */
-export const owned = (ctx: Ctx, owner: Owner | undefined): Ctx => new Ctx(null, undefined, ctx, owner);
+/** Change the default owner of `ctx`. */
+export const owned = (ctx: Ctx, owner: Owner | undefined): Ctx =>
+  ctx.owner === owner ? ctx : new Ctx(null, undefined, ctx, owner);
 
 /** The evidence `ctx` with a host Context from the Effect adapter. */
 export const hosted = (ctx: Ctx, host: unknown): Ctx => new Ctx(null, undefined, ctx, ctx.owner, host);
 
 /** Replace only lexical evidence, including explicit absence. */
-export const evidenced = (ctx: Ctx, owner: OwnerEvidence): Ctx => new Ctx(null, undefined, ctx, ctx.owner, ctx.host, owner);
+export const evidenced = (ctx: Ctx, owner: OwnerEvidence): Ctx =>
+  ctx.stageOwner === owner ? ctx : new Ctx(null, undefined, ctx, ctx.owner, ctx.host, owner);
 
 export const readOwnerEvidence = (): OwnerEvidence => currentCtx().stageOwner;
 
@@ -116,15 +119,15 @@ const THROW = 1;
 
 const stress = /*#__PURE__*/ stressing();
 
-/** A frame: the generator, the evidence it runs with, the frame it returns to. */
+/** Generator, execution context and caller frame. */
 export class Frame {
-  gen: Run;
-  readonly ctx: Ctx;
-  prev: Frame | null;
+  declare gen: Run;
+  declare readonly ctx: Ctx;
+  declare prev: Frame | null;
   /** The handler whose body starts at this frame. */
-  readonly prompt: object | null;
+  declare readonly prompt: object | null;
   /** Below it is the JS stack of a Sync stage: nothing captures across it. */
-  readonly barrier: boolean;
+  declare readonly barrier: boolean;
   constructor(gen: Run, ctx: Ctx, prev: Frame | null, prompt: object | null, barrier: boolean) {
     this.gen = gen;
     this.ctx = ctx;
@@ -134,7 +137,7 @@ export class Frame {
   }
 }
 
-/** The operations a fiber runs before it gives others a turn. */
+/** Operations per fiber turn. */
 const BUDGET = 2048;
 
 /** How many wakes may nest on a stack: a longer chain of them goes on from the scheduler, or it would overflow. */
@@ -147,15 +150,15 @@ export class Fiber {
   readonly id: number = ++fiberIds;
   top: Frame | null = null;
   mode: 0 | 1 = NEXT;
-  value: unknown = undefined;
+  declare value: unknown;
   /** The mask depth: interruptible at zero. */
   mask = 0;
   /** Who asked it to stop, 0 for nobody; sticky. */
   requested = 0;
   /** While it is suspended, what stops the wait, and whether it waits at all. */
   suspended = false;
-  cancel: (() => void) | undefined = undefined;
-  exit: Exit | undefined = undefined;
+  declare cancel: (() => void) | undefined;
+  declare exit: Exit | undefined;
   started = false;
   /** How many Sync stages hold it on the JS stack: it wakes in the one on top. */
   nested = 0;
@@ -337,7 +340,7 @@ const starve = (depth: number): void => {
 /** The tasks a wake by a test clock scheduled, theirs included, not yet run; `idle` runs when none is left. */
 export class Tracker {
   pending = 0;
-  idle: (() => void) | undefined = undefined;
+  declare idle: (() => void) | undefined;
 }
 
 let tracker: Tracker | undefined;
@@ -476,7 +479,7 @@ export const runIn = (run: unknown): unknown => {
 
 /** A wait: `start` gets the functions that end it, and may give what stops it. */
 export class Suspend extends Instruction {
-  private readonly start: (resolve: (value: unknown) => void, reject: (error: unknown) => void) => (() => void) | void;
+  declare private readonly start: (resolve: (value: unknown) => void, reject: (error: unknown) => void) => (() => void) | void;
   constructor(start: (resolve: (value: unknown) => void, reject: (error: unknown) => void) => (() => void) | void) {
     super();
     this.start = start;
@@ -517,9 +520,9 @@ export class Suspend extends Instruction {
 
 /** `thunk` run with the evidence `ctx`, as a frame of its own if it is a call. */
 export class Under extends Instruction {
-  private readonly ctx: Ctx;
-  private readonly thunk: () => unknown;
-  private readonly prompt: object | null;
+  declare private readonly ctx: Ctx;
+  declare private readonly thunk: () => unknown;
+  declare private readonly prompt: object | null;
   constructor(ctx: Ctx, thunk: () => unknown, prompt: object | null = null) {
     super();
     this.ctx = ctx;

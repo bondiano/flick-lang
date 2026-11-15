@@ -3,8 +3,23 @@ import { test } from "node:test";
 
 import { Effect, Fiber } from "effect";
 
-import { flickFromAcquire, flickSet } from "../src/effect/ScopedRef.ts";
-import { acquireRelease, scope } from "../src/index.ts";
+import { flickFromAcquire, flickSet, flickUse } from "../src/effect/ScopedRef.ts";
+import { acquireRelease, readOwnerEvidence, scope, within } from "../src/index.ts";
+
+test("a polymorphic holder acquisition uses the holder's evidence until its last lease ends", async () => {
+  const released: string[] = [];
+  const resource = (name: string) => Effect.flatMap(readOwnerEvidence(), (owner) =>
+    within(owner, acquireRelease(Effect.succeed(name), () => Effect.sync(() => { released.push(name); }))));
+  await Effect.runPromise(scope(() => Effect.gen(function* () {
+    const ref = yield* flickFromAcquire(resource("first"));
+    yield* flickUse(ref, () => Effect.gen(function* () {
+      yield* flickSet(resource("second"))(ref);
+      assert.deepEqual(released, []);
+    }));
+    assert.deepEqual(released, ["first"]);
+  })));
+  assert.deepEqual(released, ["first", "second"]);
+});
 
 test("an interrupted ScopedRef.set releases what it acquired and keeps the previous resource, each released once", async () => {
   const released: Array<string> = [];

@@ -290,7 +290,9 @@ func LayerSyncContext(make Value) Value {
 }
 
 // scoped runs `task` acquiring into `scope`.
-func scoped(fb *Fiber, scope *Owner, task Value) Value { return Run(Within(fb, scope), task) }
+func scoped(fb *Fiber, scope *Owner, task Value) Value {
+	return Run(WithOwnerEvidence(Within(fb, scope), scope), task)
+}
 
 func LayerEffect(key, task Value) Value {
 	return memoized(func(fb *Fiber, _ *MemoMap, scope *Owner) Services {

@@ -58,23 +58,23 @@ export const reportedDefects = (): ReadonlyArray<Cause> => reported;
 
 export class Owner {
   /** Backing storage stays live until every ordinary finalizer has ended. */
-  readonly #arenas: Array<Arena> = [];
-  #arenasClosed = false;
+  #arenas: Array<Arena> | undefined = [];
 
   /** Retirement is checked only when activating, never while transporting evidence. */
-  get closed(): boolean { return this.#arenasClosed; }
+  get closed(): boolean { return this.#arenas === undefined; }
 
-  makeArena(): Arena {
-    if (this.#arenasClosed) throw new Error("arena owner is closed");
-    const arena = new Arena();
+  // Keep construction in the Arena binding so other programs can discard it.
+  makeArena(create: () => Arena): Arena {
+    if (this.#arenas === undefined) throw new Error("arena owner is closed");
+    const arena = create();
     this.#arenas.push(arena);
     return arena;
   }
 
   closeArenas(): void {
-    this.#arenasClosed = true;
-    for (const arena of this.#arenas) arena.close();
-    this.#arenas.length = 0;
+    const arenas = this.#arenas;
+    this.#arenas = undefined;
+    for (const arena of arenas ?? []) arena.close();
   }
 
   /** C0 not yet: it admits children. */
@@ -86,7 +86,7 @@ export class Owner {
   /** Hooks of C1, in order of addition. */
   readonly closing = new Set<() => unknown>();
   /** Failures of supervisors: the root's fail the program, a test's fail the test. */
-  readonly defects: Array<Cause>;
+  declare readonly defects: Array<Cause>;
   readonly finalizers: Array<Finalizer> = [];
   /** Its id in the trace, 0 when not traced, and the finalizers Flick added to it. */
   trace = 0;
@@ -274,7 +274,7 @@ export const scopeCurrent = (): Owner | undefined => currentCtx().owner;
 export const arenaMake = (): Arena => {
   const owner = currentCtx().owner;
   if (owner === undefined) throw new Error("arena requires a scope owner");
-  return owner.makeArena();
+  return owner.makeArena(() => new Arena());
 };
 
 /** Optional conversion at RAW activation only; evidence transport never calls it. */
@@ -352,7 +352,7 @@ export const finalize = (exit: Exit, fin: Exit): Exit => {
 
 /** `Fiber e a`: a child spawned into an owner. */
 export class FlickFiber {
-  readonly fiber: Fiber;
+  declare readonly fiber: Fiber;
   constructor(fiber: Fiber) {
     this.fiber = fiber;
     Object.freeze(this);

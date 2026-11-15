@@ -207,6 +207,12 @@ func ReadOwnerEvidence(fb *Fiber) Value {
 // WithOwnerEvidence derives a fiber changing only its lexical candidate.
 // In particular, closed owners can be transported without reopening them.
 func WithOwnerEvidence(fb *Fiber, owner Value) *Fiber {
+	if current, ok := fb.candidate.(*Owner); ok && current == owner {
+		return fb
+	}
+	if owner == Unit && ReadOwnerEvidence(fb) == Unit {
+		return fb
+	}
 	inner := *fb
 	inner.candidate = owner
 	return &inner

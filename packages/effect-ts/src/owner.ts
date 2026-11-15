@@ -22,20 +22,20 @@ export const CurrentOwner = /*#__PURE__*/ Context.Reference<Owner | undefined>("
 
 export class Owner {
   /** Arena storage is released only after the native finalizer scope. */
-  readonly #arenas: Array<Arena> = [];
-  #arenasClosed = false;
+  #arenas: Array<Arena> | undefined = [];
 
-  makeArena(): Arena {
-    if (this.#arenasClosed) throw new Error("arena owner is closed");
-    const arena = new Arena();
+  // Keep construction in the Arena binding so other programs can discard it.
+  makeArena(create: () => Arena): Arena {
+    if (this.#arenas === undefined) throw new Error("arena owner is closed");
+    const arena = create();
     this.#arenas.push(arena);
     return arena;
   }
 
   closeArenas(): void {
-    this.#arenasClosed = true;
-    for (const arena of this.#arenas) arena.close();
-    this.#arenas.length = 0;
+    const arenas = this.#arenas;
+    this.#arenas = undefined;
+    for (const arena of arenas ?? []) arena.close();
   }
 
   /** Native scope of the resource finalizers. */
@@ -226,7 +226,7 @@ export const scopeCurrent = (): Effect.Effect<Owner | undefined> => Effect.servi
 /** `Arena.make ()`, in the lexical owner chosen by the compiler. */
 export const arenaMake = (): Effect.Effect<Arena> => Effect.map(Effect.service(CurrentOwner), (owner) => {
   if (owner === undefined) throw new Error("arena requires a scope owner");
-  return owner.makeArena();
+  return owner.makeArena(() => new Arena());
 });
 
 /** Resolve foreign identity only when a raw scoped operation activates it. */
@@ -235,7 +235,11 @@ export const within = <A, E, R>(owner: OwnerEvidence, effect: Effect.Effect<A, E
   Effect.suspend(() => {
     const active = owner instanceof Owner ? owner : owner === undefined ? undefined : ownerHooks.activate?.(owner);
     if (active === undefined) throw new Error("owner evidence is absent or belongs to another runtime");
-    return inside(active, effect);
+    // Both branches supply Scope: the direct branch checks the installed scope.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the identity check discharges the same Scope requirement as inside
+    return Effect.flatMap(Effect.service(CurrentOwner), (current) => current === active
+      ? Effect.flatMap(Effect.scope, (installedScope) => installedScope === active.resources ? effect : inside(active, effect))
+      : inside(active, effect)) as Effect.Effect<A, E, Exclude<R, Scope.Scope>>;
   });
 
 /** `Fiber e a`: a child spawned into an owner. */

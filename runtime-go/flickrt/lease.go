@@ -33,6 +33,7 @@ func acquireHolder(fb *Fiber, acquire Value, outer int) *holder {
 	}
 	inner := *fb
 	inner.owner = scope
+	inner.candidate = scope
 	v, cause := catch(func() Value { return masked(&inner, outer, func() Value { return Run(&inner, acquire) }) })
 	if cause != nil {
 		// lease.ts closes and then fails, outside `onExit`: no election

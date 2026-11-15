@@ -4,8 +4,23 @@ import { type Cause, Context, Effect, Exit, Layer, type LogLevel, Option, Scope,
 
 import { CurrentOwner, Owner, closeOwn, inside, withOwnerEvidence } from "../owner.ts";
 import { Failure, RawCause, passOn, unwinds } from "../cause.ts";
+import { acquireInScope } from "./lease.ts";
 
 export * from "effect/Layer";
+
+/** Layer acquisitions establish fresh evidence without changing the consumer's. */
+export function effect<I, S>(key: Context.Key<I, S>): <E, R>(task: Effect.Effect<S, E, R>) => Layer.Layer<I, E, Exclude<R, Scope.Scope>>;
+export function effect<I, S, E, R>(key: Context.Key<I, S>, task: Effect.Effect<S, E, R>): Layer.Layer<I, E, Exclude<R, Scope.Scope>>;
+export function effect<I, S, E, R>(key: Context.Key<I, S>, task?: Effect.Effect<S, E, R>) {
+  const build = (value: Effect.Effect<S, E, R>) => Layer.effect(key, acquireInScope(value));
+  return task === undefined ? build : build(task);
+}
+
+export const effectContext = <A, E, R>(task: Effect.Effect<Context.Context<A>, E, R>): Layer.Layer<A, E, Exclude<R, Scope.Scope>> =>
+  Layer.effectContext(acquireInScope(task));
+
+export const effectDiscard = <A, E, R>(task: Effect.Effect<A, E, R>): Layer.Layer<never, E, Exclude<R, Scope.Scope>> =>
+  Layer.effectDiscard(acquireInScope(task));
 
 /** `Layer.merge_all`: the first layer and the rest. */
 export const flickMergeAll = <A, E, R>(

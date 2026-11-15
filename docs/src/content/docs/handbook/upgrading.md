@@ -634,3 +634,14 @@ unchanged. Rebuild cached interfaces: the compiler now reads `.iface` schema
 non-public type definitions separately from the public export namespace; it
 does not make those names importable. The separate experimental memory IR is not a new
 field of the serialized typed program.
+
+## Library acquisition regions
+
+`RcRef.make`, `RcMap.make`, `Pool.make` and `Pool.make_with_ttl` quantify a
+fresh region for each acquisition or lookup, as `ScopedRef` and `ScopedCache`
+already do. The library supplies that region when the callback runs and
+releases its resources after the last borrower finishes. Acquisition cannot
+store a capability of its private region in an outer `Ref`; this reports
+`FLICK-T007`. A separately bound polymorphic task remains a valid acquisition.
+The container's owning region and the callback's ordinary service requirements
+remain independent of the private acquisition region.

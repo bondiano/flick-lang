@@ -4,6 +4,7 @@ import { type Duration, type Effect, Option, Pool, type Scope } from "effect";
 
 import type { Data } from "../data.ts";
 import { tag } from "@flick-lang/runtime/tags";
+import { acquireInScope } from "./lease.ts";
 
 export * from "effect/Pool";
 
@@ -17,7 +18,7 @@ export const flickMake = <A, E, R>(options: {
   readonly targetUtilization: Option.Option<number>;
 }): Effect.Effect<Pool.Pool<A, E>, never, R | Scope.Scope> =>
   Pool.make({
-    acquire: options.acquire,
+    acquire: acquireInScope(options.acquire),
     size: options.size,
     concurrency: Option.getOrUndefined(options.concurrency),
     targetUtilization: Option.getOrUndefined(options.targetUtilization),
@@ -34,7 +35,7 @@ export const flickMakeWithTtl = <A, E, R>(options: {
   readonly timeToLiveStrategy: Option.Option<Data>;
 }): Effect.Effect<Pool.Pool<A, E>, never, R | Scope.Scope> =>
   Pool.makeWithTTL({
-    acquire: options.acquire,
+    acquire: acquireInScope(options.acquire),
     min: options.min,
     max: options.max,
     concurrency: Option.getOrUndefined(options.concurrency),

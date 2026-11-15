@@ -1,6 +1,70 @@
 package flickrt
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
+
+func TestOwnerEvidenceHolderAcquisition(t *testing.T) {
+	fb := rootFiber()
+	var released []string
+	acquire := func(name string) Value {
+		return Eff(func(at *Fiber) Value {
+			return AcquireRelease(Within(at, ReadOwnerEvidence(at)), Eff(func(*Fiber) Value { return name }),
+				Fn(func(*Fiber, Value) Value {
+					return Eff(func(*Fiber) Value { released = append(released, name); return Unit })
+				}))
+		})
+	}
+	ScopeRun(fb, Fn(func(at *Fiber, _ Value) Value {
+		return Eff(func(at *Fiber) Value {
+			ref := ScopedRefFromAcquire(at, acquire("first"))
+			ScopedRefUse(at, ref, Fn(func(at *Fiber, _ Value) Value {
+				return Eff(func(at *Fiber) Value {
+					ScopedRefSet(at, acquire("second"), ref)
+					if len(released) != 0 {
+						t.Fatal("released while leased", released)
+					}
+					return Unit
+				})
+			}))
+			if !reflect.DeepEqual(released, []string{"first"}) {
+				t.Fatal("retired holder not released", released)
+			}
+			return Unit
+		})
+	}))
+	if !reflect.DeepEqual(released, []string{"first", "second"}) {
+		t.Fatal("holder close order", released)
+	}
+}
+
+func TestOwnerEvidenceIdempotentBracketsPreserveReferences(t *testing.T) {
+	ScopeRun(rootFiber(), Fn(func(at *Fiber, owner Value) Value {
+		return Eff(func(at *Fiber) Value {
+			EffectAnnotateLogsScoped(Within(WithOwnerEvidence(at, owner), owner), "request", "7")
+			got := logAnnotationsOf(at)
+			if i := got.index("request"); i < 0 || got.vals[i] != "7" {
+				t.Fatal("scoped annotation lost", got)
+			}
+			return Unit
+		})
+	}))
+}
+
+func TestOwnerEvidenceRepeatedAbsencePreservesReferences(t *testing.T) {
+	fb := WithOwnerEvidence(rootFiber(), newOwner())
+	fb.owner = newOwner()
+	absent := WithOwnerEvidence(fb, Unit)
+	EffectAnnotateLogsScoped(WithOwnerEvidence(absent, Unit), "request", "7")
+	got := logAnnotationsOf(absent)
+	if i := got.index("request"); i < 0 || got.vals[i] != "7" {
+		t.Fatal("repeated absence lost scoped annotation", got)
+	}
+	if cause := fb.owner.close(absent, nil); cause != nil {
+		t.Fatal(cause)
+	}
+}
 
 func assertEvidence(t *testing.T, fb *Fiber, d *Owner, c Value) {
 	t.Helper()
@@ -194,4 +258,28 @@ func TestOwnerEvidenceFreshLayerBuild(t *testing.T) {
 			return Unit
 		})
 	}))
+}
+
+func TestOwnerEvidenceEffectLayerBuild(t *testing.T) {
+	fb := WithOwnerEvidence(rootFiber(), newOwner())
+	var built *Owner
+	var released bool
+	layer := LayerEffect("evidence.test", Eff(func(at *Fiber) Value {
+		built = at.owner
+		assertEvidence(t, at, built, built)
+		built.add(at, func(*Fiber, *Cause) Value { released = true; return Unit })
+		return Unit
+	}))
+	LayerRun(fb, layer, Fn(func(at *Fiber, _ Value) Value {
+		return Eff(func(at *Fiber) Value {
+			if released || at.owner == built {
+				t.Fatal("layer owner must stay live independently of the consumer")
+			}
+			assertEvidence(t, at, at.owner, ReadOwnerEvidence(fb))
+			return Unit
+		})
+	}))
+	if !released {
+		t.Fatal("layer owner was not released with its consumer")
+	}
 }

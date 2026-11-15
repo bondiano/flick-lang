@@ -76,7 +76,7 @@ export const elect = (c: Cause): Cause => (hasDies(c) && hasFails(c) ? dies(c) :
 
 /** What a failing computation throws. Not an `Error`: it captures no stack. */
 export class Raise {
-  readonly cause: Cause;
+  declare readonly cause: Cause;
   constructor(cause: Cause) {
     this.cause = cause;
   }
@@ -98,10 +98,10 @@ export const causeOf = (thrown: unknown): Cause => (thrown instanceof Raise ? th
  * for an error.
  */
 export class Signal {
-  readonly token: object;
-  readonly arm: (() => unknown) | undefined;
-  readonly cause: Cause | undefined;
-  readonly discontinue: boolean;
+  declare readonly token: object;
+  declare readonly arm: (() => unknown) | undefined;
+  declare readonly cause: Cause | undefined;
+  declare readonly discontinue: boolean;
   constructor(token: object, arm: (() => unknown) | undefined, cause: Cause | undefined, discontinue: boolean) {
     this.token = token;
     this.arm = arm;
@@ -127,8 +127,8 @@ export const recoverable = (c: Cause): Fail | undefined =>
 
 /** How a computation ended: `cause` is undefined on success. */
 export class Exit {
-  readonly value: unknown;
-  readonly cause: Cause | undefined;
+  declare readonly value: unknown;
+  declare readonly cause: Cause | undefined;
   constructor(value: unknown, cause: Cause | undefined) {
     this.value = value;
     this.cause = cause;

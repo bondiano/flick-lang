@@ -16,9 +16,10 @@ type TimeToLiveStrategy = Creation | Usage
 /// region `s`); `acquire` runs with the services of this call. Each item
 /// serves `concurrency` tasks at once (`None`: one), and the pool grows
 /// when `targetUtilization` of it is in use (`None`: all of it).
+/// Each acquisition has a fresh region `t`; a type that names it cannot escape.
 make :
   {
-    acquire : Eff r e a;
+    acquire : forall t. Eff {Scope t | r} e a^{t};
     size : Int;
     concurrency : Option Int;
     targetUtilization : Option Float;
@@ -30,7 +31,7 @@ foreign effect make from "flick:Pool" "flickMake"
 /// after `timeToLive` (by `timeToLiveStrategy`; `None`: `Usage`).
 make_with_ttl :
   {
-    acquire : Eff r e a;
+    acquire : forall t. Eff {Scope t | r} e a^{t};
     min : Int;
     max : Int;
     concurrency : Option Int;
