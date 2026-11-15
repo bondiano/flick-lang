@@ -17,6 +17,7 @@ mod capability_tests;
 pub mod go;
 mod interfaces;
 mod javascript;
+mod paths;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod target_preflight;
 #[cfg(all(test, not(target_arch = "wasm32")))]
@@ -37,7 +38,9 @@ pub use javascript::{
     EntryFacts, entry_facts as javascript_entries, preflight as javascript_preflight,
 };
 
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
+
+use paths::specifier;
 
 use crate::codegen::{EffectBridge, Labels};
 use crate::project::Compiled;
@@ -171,25 +174,6 @@ fn arity_of(modules: &[Compiled], module: &str, name: &str, by_class: bool) -> O
 
 /// The module of compiled decoders an app's runner installs.
 pub const SCHEMA_AOT: &str = "schemas.aot.js";
-
-/// The relative import specifier of `target` from the directory `from`.
-fn specifier(from: &Path, target: &Path) -> String {
-    let from: Vec<Component> = from.components().collect();
-    let to: Vec<Component> = target.components().collect();
-    let common = from.iter().zip(&to).take_while(|(a, b)| a == b).count();
-    let mut parts: Vec<String> = vec!["..".to_owned(); from.len() - common];
-    parts.extend(
-        to[common..]
-            .iter()
-            .map(|c| c.as_os_str().to_string_lossy().into_owned()),
-    );
-    let joined = parts.join("/");
-    if joined.starts_with("..") {
-        joined
-    } else {
-        format!("./{joined}")
-    }
-}
 
 /// The IR of `module` of the build `modules` as a release build optimizes
 /// it, for every target alike; `by_class` is the mode the build is checked in.

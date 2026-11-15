@@ -352,10 +352,9 @@ jobs:
 
   # the go target on the other platforms it supports: the runtime's tests and
   # the portable cases of the parity harness, built and run without Node.
-  # Linux x64 runs them in e2e-cases; pull requests leave the others to the
-  # full set, the runs on main, the nightly run and releases
+  # Linux x64 runs them in e2e-cases; check the other platforms in pull
+  # requests too, so a green PR covers the platform checks required on main.
   go:
-    if: ${{ github.event_name != 'pull_request' }}
     strategy:
       fail-fast: false
       matrix:
@@ -367,6 +366,10 @@ jobs:
       - run: git config --global core.autocrlf false
       - uses: actions/checkout@v7
       - run: rustup show active-toolchain || rustup toolchain install
+      - name: Source mapping path roots
+        run: |
+          rustc --edition=2024 --test flick-core/src/build/paths.rs -o path-tests.exe
+          ./path-tests.exe
       - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-go@v7
         with:
@@ -377,14 +380,14 @@ jobs:
           tool: just@1.59.0
       - name: Go runtime
         run: just go-test
-      # Windows is the slowest of the three: a push to main holds it to the
-      # cases of tests/run/runtime, and the nightly run and a release, which
+      # Windows is the slowest of the three: PRs and a push to main hold it
+      # to tests/run/runtime; a nightly run and a release, which
       # call this workflow with another event or ref, run every portable case
       # there. `FLICK_E2E_ONLY` is a part of the native path of a case
-      - name: Only the runtime cases on Windows for a push to main
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && runner.os == 'Windows' }}
+      - name: Only the runtime cases on Windows for pull requests and main
+        if: ${{ runner.os == 'Windows' && (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
         shell: bash
-        run: echo 'FLICK_E2E_ONLY=runtime\' >> "$GITHUB_ENV"
+        run: printf '%s\n' "FLICK_E2E_ONLY=runtime\\" >> "$GITHUB_ENV"
       - name: Portable cases, the go executable and a non-ASCII project path
         run: just e2e-go
       # the node half and the comparison of both reports run in `just e2e`;
