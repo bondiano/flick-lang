@@ -1,0 +1,7 @@
+module A.Contracts exposing (Source, Result)
+
+type module Source =
+  value : Int
+
+type module Result =
+  answer : Int

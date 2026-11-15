@@ -1,0 +1,4 @@
+module A.Other exposing (z)
+
+z : Float
+let z = 2
