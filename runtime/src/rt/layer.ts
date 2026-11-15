@@ -156,7 +156,7 @@ export const memoizable = (build: Build): Layer => {
 };
 
 /** Runs `task` acquiring into `scope`. */
-export const scoped = (scope: Owner, task: () => unknown): Under => inside(scope, task);
+export const scoped = (scope: Owner, task: () => unknown): Under => inside(scope, () => withOwnerEvidence(scope, task));
 
 /** Builds `layer` into `scope` through `memo`, which the build and what runs with its services read as the current map. */
 export const buildWith = (layer: Layer, memo: MemoMap, scope: Owner): Under =>

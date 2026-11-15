@@ -125,7 +125,7 @@ jobs:
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
-      - name: Install the pinned WASM deduplicator
+      - name: Install the pinned WASM optimizer
         run: |
           binaryen=$(nix build --no-link --print-out-paths .#binaryen)
           echo "$binaryen/bin" >> "$GITHUB_PATH"

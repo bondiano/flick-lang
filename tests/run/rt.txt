@@ -64,8 +64,10 @@ codegen/implicit
 codegen/instance_names
 codegen/interpolation
 codegen/ints
+codegen/known_defaults
 codegen/known_failure
 codegen/known_instances
+codegen/unpack_dictionary
 codegen/let_assert
 codegen/let_mut
 codegen/loops
@@ -342,7 +344,6 @@ codegen/loops_owners
 codegen/record_constructor
 
 effect/row_without
-# ../rt/owner_foreign_policy — JS backend emit exceeds plugin fuel/memory after
-# Meta/Phase M (deep Id/Chain aliases); restore when the component can emit it.
+../rt/owner_foreign_policy
 
 runtime/counted_layer_merge

@@ -1,3 +1,4 @@
+import { arenasClosed } from "@flick-lang/runtime/rt/arena-owner";
 import { OwnerEvidenceContext } from "./owner_evidence.ts";
 // The bridge between the kernel and Effect. Effect's Context travels on
 // the kernel's evidence (`Ctx.host`); the kernel's evidence travels in Effect's
@@ -20,7 +21,7 @@ import {
 } from "effect";
 import type { StackFrame } from "effect/References";
 
-import { CurrentOwner, ownerHooks as hostOwnerHooks, Owner as HostOwner, FlickFiber as HostFlickFiber } from "./owner.ts";
+import { ownerHooks as hostOwnerHooks, Owner as HostOwner, FlickFiber as HostFlickFiber } from "./owner.ts";
 import { syncContext, syncIn } from "./sync.ts";
 import { type Cause, type Exit, Raise, dieReason, failReason, failed, fromReasons, interruptReason, raise, succeeded } from "@flick-lang/runtime/rt/cause";
 import { type Ctx, type Fiber, type Run, Suspend, awaitFiber, currentCtx, currentFiber, fiberHooks, forkNow, hosted, evidenced, inCtx, owned, asExit, exitOf, raiseOf, runIn } from "@flick-lang/runtime/rt/fiber";
@@ -304,10 +305,7 @@ const scopeOwners = /*#__PURE__*/ new WeakMap<EScope.Scope, Owner>();
 const ownerOfScope = (scope: EScope.Scope, base: Ctx): Effect.Effect<Owner> => {
   const existing = scopeOwners.get(scope);
   if (existing !== undefined) return Effect.succeed(existing);
-  // Detached like lease/RcRef holders: acquire callbacks keep WithOwnerEvidence of
-  // the resource's region, and Within must not pull finalizers onto that outer owner.
   const owner = new Owner(base.owner?.defects);
-  owner.detached = true;
   scopeOwners.set(scope, owner);
   return Effect.as(EScope.addFinalizerExit(scope, (exit) =>
     Effect.orDie(callKernel(() => close(owner, exit._tag === "Success" ? succeeded(undefined) : failed(causeIn(exit.cause))), false)),
@@ -320,34 +318,22 @@ const callKernel = (call: () => unknown, scoped: boolean): Effect.Effect<unknown
     const context = ef.context;
     const base = Context.getOrUndefined(context, KERNEL) ?? ROOT_CTX;
     const scope = scoped ? Context.getOrUndefined(context, EScope.Scope) : undefined;
-    return Effect.flatMap(
-      Effect.flatMap(Effect.service(CurrentOwner), (host) =>
-        scope === undefined
-          ? Effect.succeed(base)
-          : Effect.map(ownerOfScope(scope, base), (owner) => {
-              // Library acquisitions pin the Effect owner; the kernel owner for
-              // that Scope must stay pinned so Within cannot redirect away.
-              if (host?.detached) owner.detached = true;
-              return owned(base, owner);
-            }),
-      ),
-      (active) => {
-        // `interruptible` is not in the public type of Effect's fiber
-        const fiber: Fiber = forkNow(() => {
-          nativeIdentities.set(currentFiber(), effectIdentities.get(ef) ?? ef.id);
-          return call();
-        }, evidenced(hosted(active, context), Context.get(context, OwnerEvidenceContext)), Reflect.get(ef, "interruptible") === false ? 1 : 0);
-        if (fiber.exit !== undefined) return exitOut(fiber.exit);
-        return Effect.callback<unknown, unknown>((resume) => {
-          fiber.observe((exit) => resume(exitOut(exit)));
-          // the interruption is passed on, and waits for its finalizers
-          return Effect.callback<void>((done) => {
-            fiber.observe(() => done(Effect.void));
-            fiber.interrupt(ef.id);
-          });
+    return Effect.flatMap(scope === undefined ? Effect.succeed(base) : Effect.map(ownerOfScope(scope, base), (owner) => owned(base, owner)), (active) => {
+      // `interruptible` is not in the public type of Effect's fiber
+      const fiber: Fiber = forkNow(() => {
+        nativeIdentities.set(currentFiber(), effectIdentities.get(ef) ?? ef.id);
+        return call();
+      }, evidenced(hosted(active, context), Context.get(context, OwnerEvidenceContext)), Reflect.get(ef, "interruptible") === false ? 1 : 0);
+      if (fiber.exit !== undefined) return exitOut(fiber.exit);
+      return Effect.callback<unknown, unknown>((resume) => {
+        fiber.observe((exit) => resume(exitOut(exit)));
+        // the interruption is passed on, and waits for its finalizers
+        return Effect.callback<void>((done) => {
+          fiber.observe(() => done(Effect.void));
+          fiber.interrupt(ef.id);
         });
-      },
-    );
+      });
+    });
   });
 };
 export const callEffect = (call: () => unknown): Effect.Effect<unknown, unknown> => callKernel(call, true);
@@ -391,7 +377,7 @@ bridgeKernel.causeFromEffect = causeFromEffect;
 bridgeKernel.causeToEffect = causeToEffect;
   hostOwnerHooks.activate = (owner) => {
     if (!(owner instanceof Owner)) throw new TypeError("not a native owner");
-    if (owner.closed) throw new Error("arena owner is closed");
+    if (arenasClosed(owner)) throw new Error("arena owner is closed");
     return hostOwnerOf(owner);
   };
   ownerHooks.within = (owner, call) => {
