@@ -57,13 +57,21 @@ class LessonWorker {
   }
 }
 
-for (const outcome of ["passed", "output", "type"] as const) {
+for (const scenario of [
+  { outcome: "passed", compilationMs: 6_000 },
+  { outcome: "passed", compilationMs: 6_900 },
+  { outcome: "output", compilationMs: 6_000 },
+  { outcome: "type", compilationMs: 6_000 },
+  { outcome: "prepare-timeout", compilationMs: 7_001 },
+] as const) {
+  const { outcome, compilationMs } = scenario;
   const title = {
     passed: "a re-export lesson executes its declaration build once within the original deadline",
-    output: "the original lesson deadline still terminates cached execution",
+    output: "the ten-second execution deadline terminates a lesson after preparation",
+    "prepare-timeout": "lesson preparation still times out at ten seconds and ignores a late emit",
     type: "a rejected lesson signature leaves the existing preview alone",
   }[outcome];
-  test(title, async (t) => {
+  test(outcome === "passed" && compilationMs === 6_900 ? "slow lesson preparation leaves a full execution budget" : title, async (t) => {
     const original = { Worker: globalThis.Worker, document: globalThis.document };
     const rules = { export: "length", argument_types: ["string"], return_type: outcome === "type" ? "string" : "number", output: "5" };
     let previewCloses = 0;
@@ -88,7 +96,8 @@ for (const outcome of ["passed", "output", "type"] as const) {
       const compiling = compiler.request();
       assert.equal(compiling.action, "compile");
       const built = { files: { "main.js": "export const main = () => console.log(5);" }, entry: "main.js", diagnostics: [] };
-      t.mock.timers.tick(6_000);
+      t.mock.timers.tick(compilationMs);
+      if (outcome === "prepare-timeout") assert.equal(await pending, "failed");
       compiler.reply({ id: compiling.id, result: {
         code: built.files["main.js"],
         dts: 'export { length } from "./String.js";',
@@ -99,8 +108,8 @@ for (const outcome of ["passed", "output", "type"] as const) {
       } });
       await setImmediate();
       assert.equal(compiler.messages.length, 2, "declaration compilation must not be followed by a second build");
-      if (outcome === "type") {
-        assert.equal(await pending, "type");
+      if (outcome === "type" || outcome === "prepare-timeout") {
+        assert.equal(await pending, outcome === "type" ? "type" : "failed");
         assert.equal(LessonWorker.instances.length, 1);
         assert.equal(previewCloses, 0);
         return;
@@ -115,7 +124,9 @@ for (const outcome of ["passed", "output", "type"] as const) {
         runtime.reply({ stream: "exit", code: 0 });
         assert.equal(await pending, "passed");
       } else {
-        t.mock.timers.tick(1_001);
+        t.mock.timers.tick(9_999);
+        assert.equal(runtime.terminated, false, "preparation must not shorten the runtime deadline");
+        t.mock.timers.tick(2);
         assert.equal(await pending, "output");
       }
       assert.equal(runtime.terminated, true);
