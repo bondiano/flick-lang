@@ -1,0 +1,7 @@
+module A.Make(K : A.Contracts.Source) : A.Contracts.Result exposing (answer)
+
+answer : Int
+let answer = K.value
+
+let _lost = )
+//          ^ FLICK-S007 expected an expression

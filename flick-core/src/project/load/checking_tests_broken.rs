@@ -127,3 +127,158 @@ fn an_importer_re_exports_on_trust_a_name_the_parser_lost() {
     // the import may give what the parser lost, so it is no unused one
     assert_eq!(diagnostics, ["FLICK-S007 unexpected `)`"]);
 }
+
+#[cfg(feature = "ide")]
+const PARAMETERIZED_RECOVERY_MAKE: &str = "module A.Make(K : A.Contracts.Source) : A.Contracts.Result exposing (answer)\n\
+     \nanswer : Int\nlet answer = K.value\n\
+     \nlet _lost = )\n";
+
+#[cfg(feature = "ide")]
+const PARAMETERIZED_RECOVERY_USE: &str = "module A.Use exposing (y, bad, health, use_lost)\n\
+     import A.Collections.Names exposing (answer, lost)\nimport A.Other exposing (z)\n\
+     y : Int\nlet y = answer\n\
+     bad : String\nlet bad = answer\n\
+     health : Float\nlet health = z\n\
+     use_lost : Int\nlet use_lost = lost\n";
+
+#[cfg(feature = "ide")]
+const PARAMETERIZED_RECOVERY_FIXED_MAKE: &str = "module A.Make(K : A.Contracts.Source) : A.Contracts.Result exposing (answer)\n\
+     answer : Int\nlet answer = K.value\n";
+
+#[cfg(feature = "ide")]
+const PARAMETERIZED_RECOVERY_FIXED_USE: &str = "module A.Use exposing (y, health)\n\
+     import A.Collections.Names exposing (answer)\nimport A.Other exposing (z)\n\
+     y : Int\nlet y = answer\nhealth : Float\nlet health = z\n";
+
+/// A parameterized module, its named application and importer, and a valid
+/// neighbouring module. `A.Make`'s `lost` is lost to the stray `)` in its
+/// body, so only an incomplete interface lets the importer use it.
+#[cfg(feature = "ide")]
+fn parameterized_recovery(make: &str, use_text: &str) -> Memory {
+    Memory(BTreeMap::from([
+        (
+            PathBuf::from("/p/src/A/Contracts.fl"),
+            "module A.Contracts exposing (Source, Result)\n\
+             type module Source =\n  value : Int\n\
+             type module Result =\n  answer : Int\n"
+                .to_owned(),
+        ),
+        (
+            PathBuf::from("/p/src/A/Argument.fl"),
+            "module A.Argument exposing (value)\nvalue : Int\nlet value = 41\n".to_owned(),
+        ),
+        (
+            PathBuf::from("/p/src/A/Other.fl"),
+            "module A.Other exposing (z)\nz : Float\nlet z = 2\n".to_owned(),
+        ),
+        (PathBuf::from("/p/src/A/Make.fl"), make.to_owned()),
+        (
+            PathBuf::from("/p/src/A/Collections.fl"),
+            "module A.Collections exposing (Names)\nmodule Names = A.Make(A.Argument)\n"
+                .to_owned(),
+        ),
+        (PathBuf::from("/p/src/A/Use.fl"), use_text.to_owned()),
+    ]))
+}
+
+#[cfg(feature = "ide")]
+#[test]
+fn a_malformed_parameterized_module_is_taken_on_trust_by_its_importer() {
+    use crate::diagnostics::{Diagnostic, codes};
+
+    let host = parameterized_recovery(
+        PARAMETERIZED_RECOVERY_MAKE,
+        PARAMETERIZED_RECOVERY_USE,
+    );
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let analysis = analyze(
+        &host,
+        &mut sources,
+        Some(&project),
+        &[PathBuf::from("/p/src/A/Use.fl")],
+    );
+    let file_of = |d: &Diagnostic| d.span.map(|s| sources.get(s.file).path.clone());
+    let make = "/p/src/A/Make.fl";
+    let primary = analysis
+        .diagnostics
+        .iter()
+        .find(|d| d.code == codes::S007 && file_of(d).as_deref() == Some(make))
+        .expect("the template's parse error keeps its file");
+    let span = primary.span.expect("the parse error keeps its span");
+    assert_eq!(&sources.get(span.file).text[span.range()], ")");
+    assert!(
+        analysis
+            .diagnostics
+            .iter()
+            .all(|d| d.code == codes::S007 || d.code == codes::T003),
+        "only the parse error and the deliberate mismatch: {:?}",
+        analysis.diagnostics
+    );
+    for code in [
+        codes::R004,
+        codes::R005,
+        codes::T001,
+        codes::T061,
+        codes::C002,
+        codes::C011,
+    ] {
+        assert!(
+            !analysis.diagnostics.iter().any(|d| d.code == code),
+            "{code} is a recovery cascade: {:?}",
+            analysis.diagnostics
+        );
+    }
+    // `answer` keeps its type: only the deliberate misuse is a mismatch.
+    let mismatches: Vec<_> = (analysis.diagnostics.iter())
+        .filter(|d| d.code == codes::T003)
+        .collect();
+    assert_eq!(mismatches.len(), 1, "{:?}", analysis.diagnostics);
+    assert_eq!(
+        file_of(mismatches[0]).as_deref(),
+        Some("/p/src/A/Use.fl")
+    );
+    // the valid neighbour is neither incomplete nor dragged into the trust
+    let other = "/p/src/A/Other.fl";
+    assert!(
+        !analysis
+            .diagnostics
+            .iter()
+            .any(|d| file_of(d).as_deref() == Some(other)),
+        "{:?}",
+        analysis.diagnostics
+    );
+    assert!(analysis.module("A.Other").is_some());
+}
+
+#[cfg(feature = "ide")]
+#[test]
+fn an_edited_parameterized_module_keeps_recovery_across_cache_reuse() {
+    let broken = parameterized_recovery(
+        PARAMETERIZED_RECOVERY_MAKE,
+        PARAMETERIZED_RECOVERY_USE,
+    );
+    let (_, fresh) = analyzed(&broken, None);
+    assert!(
+        fresh.iter().any(|d| d.starts_with("FLICK-S007")),
+        "{fresh:?}"
+    );
+    let mut cache = ModuleCache::default();
+    let (_, first) = analyzed(&broken, Some(&mut cache));
+    assert_eq!(first, fresh);
+    let (_, warm) = analyzed(&broken, Some(&mut cache));
+    assert_eq!(warm, fresh);
+
+    // Fixing the template must invalidate the cached incomplete interfaces,
+    // including those of its application and importer.
+    let fixed = parameterized_recovery(
+        PARAMETERIZED_RECOVERY_FIXED_MAKE,
+        PARAMETERIZED_RECOVERY_FIXED_USE,
+    );
+    let (_, after) = analyzed(&fixed, Some(&mut cache));
+    assert!(after.is_empty(), "{after:?}");
+
+    // Breaking it again must bring the recovery back, not a stale clean run.
+    let (_, again) = analyzed(&broken, Some(&mut cache));
+    assert_eq!(again, fresh);
+}

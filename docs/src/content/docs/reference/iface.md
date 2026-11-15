@@ -53,6 +53,7 @@ later arguments do not enter that lexical environment.
 | `member_of` | owner namespace and member name for a generated static member; external access uses the checked parent view |
 | `template` | checked static body (`source`) and its lexical `capture`: module bindings, signature origins, partial arguments with the caller's namespace access, lexical namespaces, inherited-import count and definition package; omitted for ordinary structures |
 | `private` | `true` for a module importable only within its package; omitted otherwise |
+| `incomplete` | `true` when the module's source did not parse in full; importers take on trust names they do not find, while finished exports stay typed and checked; omitted when false |
 | `exports` | the module's interface, in the order of its `exposing` list |
 | `hidden` | constructors of exported types that are not exported, so an import of one gets a precise `FLICK-R005`; omitted when empty |
 | `docs` | the `///` comment of each export the module declares, by name, which its `.d.ts` carries as JSDoc; omitted when empty |
