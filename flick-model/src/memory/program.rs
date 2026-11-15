@@ -140,6 +140,28 @@ pub fn execute_main_program(
     success_only(heap, report)
 }
 
+fn prepare_arguments(
+    heap: &mut Heap,
+    program: &Program,
+    entry: &Name,
+    arguments: Vec<Value>,
+) -> Result<Vec<Value>, Error> {
+    heap.ensure_owned(&arguments)?;
+    if let Err(error) = heap.admit_values(&arguments) {
+        heap.drop_values(arguments)?;
+        return Err(error);
+    }
+    if let Err(error) = memory::validate_program(program) {
+        heap.drop_values(arguments)?;
+        return Err(Error::InvalidProgram(error));
+    }
+    if !program.globals.iter().any(|global| &global.name == entry) {
+        heap.drop_values(arguments)?;
+        return Err(Error::UnknownGlobal(entry.clone()));
+    }
+    Ok(arguments)
+}
+
 fn execute(
     heap: &mut Heap,
     program: &Program,
@@ -148,23 +170,7 @@ fn execute(
     fuel: u64,
     main_stage: MainStage,
 ) -> ExecutionReport {
-    let preparation = (|| {
-        heap.ensure_owned(&arguments)?;
-        if let Err(error) = heap.admit_values(&arguments) {
-            heap.drop_values(arguments)?;
-            return Err(error);
-        }
-        if let Err(error) = memory::validate_program(program) {
-            heap.drop_values(arguments)?;
-            return Err(Error::InvalidProgram(error));
-        }
-        if !program.globals.iter().any(|global| &global.name == entry) {
-            heap.drop_values(arguments)?;
-            return Err(Error::UnknownGlobal(entry.clone()));
-        }
-        Ok(arguments)
-    })();
-    let arguments = match preparation {
+    let arguments = match prepare_arguments(heap, program, entry, arguments) {
         Ok(arguments) => arguments,
         Err(error) => {
             return ExecutionReport {

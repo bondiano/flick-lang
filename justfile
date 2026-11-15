@@ -17,6 +17,7 @@ lint:
     just feature-check
     cargo clippy -p flick-wasm --target wasm32-unknown-unknown -- -D warnings
     cargo machete
+    node tools/style/no-iife.mjs
 
 # Format everything
 fmt:

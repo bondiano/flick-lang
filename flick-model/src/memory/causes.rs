@@ -233,27 +233,7 @@ impl Heap {
     pub fn cause(&mut self, reasons: &[Reason<'_>], fuel: &mut u64) -> Result<CauseToken, Error> {
         charge(fuel, reasons.len())?;
         let mut stored = Vec::with_capacity(reasons.len());
-        let built = (|| {
-            for reason in reasons {
-                charge(fuel, 1)?;
-                let reason = match reason {
-                    Reason::Fail(value) => {
-                        self.admit_ordinary(value)?;
-                        StoredReason::Fail(self.dup(value)?)
-                    }
-                    Reason::Die(value) => {
-                        self.admit_ordinary(value)?;
-                        StoredReason::Die(self.dup(value)?)
-                    }
-                    Reason::Interrupt { fiber_id } => StoredReason::Interrupt {
-                        fiber_id: *fiber_id,
-                    },
-                };
-                stored.push(reason);
-            }
-            charge(fuel, 1)
-        })();
-        if let Err(error) = built {
+        if let Err(error) = self.duplicate_reasons(reasons, fuel, &mut stored) {
             self.drop_values(
                 stored
                     .into_iter()
@@ -266,6 +246,32 @@ impl Heap {
             unreachable!("cause allocation")
         };
         Ok(CauseToken { token })
+    }
+
+    fn duplicate_reasons(
+        &mut self,
+        reasons: &[Reason<'_>],
+        fuel: &mut u64,
+        stored: &mut Vec<StoredReason>,
+    ) -> Result<(), Error> {
+        for reason in reasons {
+            charge(fuel, 1)?;
+            let reason = match reason {
+                Reason::Fail(value) => {
+                    self.admit_ordinary(value)?;
+                    StoredReason::Fail(self.dup(value)?)
+                }
+                Reason::Die(value) => {
+                    self.admit_ordinary(value)?;
+                    StoredReason::Die(self.dup(value)?)
+                }
+                Reason::Interrupt { fiber_id } => StoredReason::Interrupt {
+                    fiber_id: *fiber_id,
+                },
+            };
+            stored.push(reason);
+        }
+        charge(fuel, 1)
     }
 
     fn cause_data(&self, cause: &CauseToken) -> Result<&[StoredReason], Error> {

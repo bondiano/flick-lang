@@ -53,36 +53,26 @@ it does not prove that every host API has been migrated.
 This table names evidence; it is not a claim that every suite was rerun for a
 documentation change. Check outcomes belong in the PR that changes behavior.
 
-## Preflight boundary to complete
+## Environment effect preflight
 
-The registry already parses an environment independently of JS runtime mode.
-The temporary native path accepts `js/node` and `go/native`; it refuses an
+The registry parses an environment independently of JS runtime mode. The
+temporary native path accepts `js/node` and `go/native`; it refuses an
 explicit incompatible environment before cache lookup. The component path
 performs descriptor/ABI/capability validation and calls `check-target` before
-`generate`. Its initial literal fixture advertises only its small supported
-subset. Neither path establishes full official-backend conformance.
+`generate`.
 
-Common `check` and IDE analysis currently establish language typing, rather
-than complete target support. Go diagnostics can still originate in the
-emitter, and explicit native `js/browser` currently fails at selection. That
-refusal does not satisfy the browser `Db` acceptance criterion.
+When `build.environment` is set, shared target preflight runs in `flick check`,
+IDE analysis and build: reachable gated effects (`Db`, `Database`, `Server`)
+need a root handler for that full backend/platform pair. A required `Db`
+without a browser root handler is `FLICK-E020` (`unhandled effect Db on
+js/browser`) at the requiring expression; the same export builds on
+`js/node`. Local `provide` handlers discharge the requirement; unused
+unsupported code does not fail; public library exports are checked under the
+export policy. CLI and IDE share the code and span. Host tool availability
+remains `FLICK-P015` / `FLICK-P029`, separate from source-effect refusal.
+Without a selected environment, check stays portable typing only.
 
-The shared target preflight must receive explicit environment root handlers,
-package target declarations and required effect/foreign/operation facts. Those
-facts cannot be assumed to exist in `Program`'s optional type names. When the
-project selects an environment, CLI and IDE should use the same preflight
-result and preserve its diagnostic code and source range. General checking
-without a selected target must continue to check portable libraries.
-
-In particular, a required `Db` without a browser root handler must be an
-unhandled-effect diagnostic on `js/browser`, at the requiring expression;
-the same project with its Node handler must build on `js/node`. Package
-`targets` and root handlers must use the complete environment, since `js`
-alone cannot distinguish those cases. Known unsupported IR and foreign forms
-must fail before generation or a host tool starts. Host tool availability
-and its approved version/digest remain separate preflight inputs.
-
-The official JS/browser/Go component routes, generic tool steps, atomic
-publication and the full target-aware CLI/IDE preflight remain implementation
-work. W and N add columns and independently expected fixtures when they are
-implemented; they are not currently supported targets.
+`BuildRequest` carries `package_targets` and std `root_handlers` for the
+selected environment. This slice does not claim full official-backend
+conformance, arbitrary IR/emit-plugin correctness, generic tool graphs or
+atomic publication. W and N remain unsupported until they have fixtures.

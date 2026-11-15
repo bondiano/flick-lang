@@ -132,7 +132,7 @@ pub fn emit(
     (out, diagnostics)
 }
 
-/// Common runtime capability checks before native or component generation.
+/// Common runtime capability and environment checks before generation.
 pub fn preflight(
     compilation: &Compilation,
     sources: &SourceMap,
@@ -140,8 +140,19 @@ pub fn preflight(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     #[cfg(not(target_arch = "wasm32"))]
-    if settings.backend == Backend::Rt && !settings.effect_bridge.available() {
-        capabilities::check(compilation, settings, sources, diagnostics);
+    {
+        if settings.backend == Backend::Rt && !settings.effect_bridge.available() {
+            capabilities::check(compilation, settings, sources, diagnostics);
+        }
+        if let Some(environment) = settings.environment {
+            super::target_preflight::check(
+                compilation,
+                settings,
+                sources,
+                environment,
+                diagnostics,
+            );
+        }
     }
     #[cfg(target_arch = "wasm32")]
     let _ = (compilation, sources, settings, diagnostics);

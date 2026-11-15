@@ -102,7 +102,6 @@ impl Checker<'_> {
         })
     }
 
-    #[allow(clippy::too_many_lines)]
     fn lexical_solution(
         &mut self,
         ty: &Type,
@@ -149,173 +148,179 @@ impl Checker<'_> {
                 }
             }
         }
-        let result = (|| {
-            Ok(match &ty {
-                Type::Meta(meta) => {
-                    // Existing contextual carriers may be retained opaquely;
-                    // this does not enable binding or pruning their roots.
-                    if meta.contextual().is_some() {
-                        return self
-                            .store
-                            .valid_occurrence(&ty)
-                            .then(|| ty.clone())
-                            .ok_or(());
-                    }
-                    let mappings = self.store.lexical_mappings(meta)?;
-                    let root = meta.inference_type_root().ok_or(())?;
-                    let permitted = mappings
-                        .iter()
-                        .filter(|(_, target)| {
-                            allowed
-                                .iter()
-                                .chain(bound)
-                                .any(|scope| scope.id == target.id)
-                        })
-                        .map(|(source, _)| source.id)
-                        .collect::<Vec<_>>();
-                    let mut context = self.store.meta_contexts[root as usize].clone();
-                    if let Some(kind) = &context.kind {
-                        let projected = lexical::transport_kind(kind, &mappings);
-                        self.kinds.restrict_lexical(&projected, allowed, bound)?;
-                    }
-                    if context.lexical.permitted != permitted {
-                        context.lexical.permitted = permitted;
-                        self.store.write_context(root, context);
-                    }
-                    Type::Meta(meta.map_lexical(|coordinate| {
-                        allowed
-                            .iter()
-                            .chain(bound)
-                            .any(|scope| scope.id == coordinate.target.id)
-                            .then(|| coordinate.clone())
-                    }))
-                }
-                Type::Con { module, .. } => {
-                    if !super::ty::lexical_reference_allowed(
-                        module,
-                        allowed,
-                        bound,
-                        &self.store.lexical_scopes,
-                    ) {
-                        return Err(());
-                    }
-                    ty.clone()
-                }
-                Type::Exists {
-                    scope,
-                    binder,
-                    contract,
-                    body,
-                } => {
-                    let contract =
-                        self.lexical_solution(contract, allowed, bound, false, aliases)?;
-                    let mut inside = bound.to_vec();
-                    inside.push(LexicalScope {
-                        id: scope.identity(),
-                        namespace: format!("$exists:{binder}"),
-                    });
-                    Type::Exists {
-                        scope: *scope,
-                        binder: binder.clone(),
-                        contract: Box::new(contract),
-                        body: Box::new(
-                            self.lexical_solution(body, allowed, &inside, false, aliases)?,
-                        ),
-                    }
-                }
-                Type::Forall {
-                    vars,
-                    constraints,
-                    body,
-                } => Type::Forall {
-                    vars: vars
-                        .iter()
-                        .map(|binder| {
-                            Ok(super::ty::Binder {
-                                name: binder.name.clone(),
-                                kind: self.kinds.restrict_lexical(&binder.kind, allowed, bound)?,
-                            })
-                        })
-                        .collect::<Result<_, ()>>()?,
-                    constraints: constraints
-                        .iter()
-                        .map(|ty| self.lexical_solution(ty, allowed, bound, false, aliases))
-                        .collect::<Result<_, _>>()?,
-                    body: Box::new(self.lexical_solution(body, allowed, bound, false, aliases)?),
-                },
-                Type::Row(row) | Type::Record(row) => {
-                    let fields = field_row || matches!(&ty, Type::Record(_));
-                    let mut row = Row {
-                        entries: row
-                            .entries
-                            .iter()
-                            .map(|(label, value)| {
-                                Ok((
-                                    if fields {
-                                        label.clone()
-                                    } else {
-                                        self.lexical_label(label, allowed, bound)?
-                                    },
-                                    self.lexical_solution(value, allowed, bound, false, aliases)?,
-                                ))
-                            })
-                            .collect::<Result<_, ()>>()?,
-                        tail: row
-                            .tail
-                            .as_ref()
-                            .map(|tail| {
-                                self.lexical_solution(tail, allowed, bound, fields, aliases)
-                                    .map(Box::new)
-                            })
-                            .transpose()?,
-                        written: row.written,
-                    };
-                    row.sort();
-                    if matches!(&ty, Type::Record(_)) {
-                        Type::Record(row)
-                    } else {
-                        Type::Row(row)
-                    }
-                }
-                Type::Union(a, b) => Type::Union(
-                    Box::new(self.lexical_solution(a, allowed, bound, field_row, aliases)?),
-                    Box::new(self.lexical_solution(b, allowed, bound, field_row, aliases)?),
-                ),
-                Type::Without { row, gone } => Type::Without {
-                    row: Box::new(self.lexical_solution(row, allowed, bound, field_row, aliases)?),
-                    gone: gone
-                        .iter()
-                        .map(|label| {
-                            if field_row {
-                                Ok(label.clone())
-                            } else {
-                                self.lexical_label(label, allowed, bound)
-                            }
-                        })
-                        .collect::<Result<_, _>>()?,
-                },
-                _ => {
-                    let mut failure = false;
-                    let mapped = ty.map_children(&mut |child| {
-                        if let Ok(ty) = self.lexical_solution(child, allowed, bound, false, aliases)
-                        {
-                            ty
-                        } else {
-                            failure = true;
-                            child.clone()
-                        }
-                    });
-                    if failure {
-                        return Err(());
-                    }
-                    mapped
-                }
-            })
-        })();
+        let result = self.project_lexical(&ty, allowed, bound, field_row, aliases);
         if alias.is_some() {
             aliases.pop();
         }
         result
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn project_lexical(
+        &mut self,
+        ty: &Type,
+        allowed: &[LexicalScope],
+        bound: &[LexicalScope],
+        field_row: bool,
+        aliases: &mut Vec<(String, String)>,
+    ) -> Result<Type, ()> {
+        Ok(match ty {
+            Type::Meta(meta) => {
+                // Existing contextual carriers may be retained opaquely;
+                // this does not enable binding or pruning their roots.
+                if meta.contextual().is_some() {
+                    return self
+                        .store
+                        .valid_occurrence(ty)
+                        .then(|| ty.clone())
+                        .ok_or(());
+                }
+                let mappings = self.store.lexical_mappings(meta)?;
+                let root = meta.inference_type_root().ok_or(())?;
+                let permitted = mappings
+                    .iter()
+                    .filter(|(_, target)| {
+                        allowed
+                            .iter()
+                            .chain(bound)
+                            .any(|scope| scope.id == target.id)
+                    })
+                    .map(|(source, _)| source.id)
+                    .collect::<Vec<_>>();
+                let mut context = self.store.meta_contexts[root as usize].clone();
+                if let Some(kind) = &context.kind {
+                    let projected = lexical::transport_kind(kind, &mappings);
+                    self.kinds.restrict_lexical(&projected, allowed, bound)?;
+                }
+                if context.lexical.permitted != permitted {
+                    context.lexical.permitted = permitted;
+                    self.store.write_context(root, context);
+                }
+                Type::Meta(meta.map_lexical(|coordinate| {
+                    allowed
+                        .iter()
+                        .chain(bound)
+                        .any(|scope| scope.id == coordinate.target.id)
+                        .then(|| coordinate.clone())
+                }))
+            }
+            Type::Con { module, .. } => {
+                if !super::ty::lexical_reference_allowed(
+                    module,
+                    allowed,
+                    bound,
+                    &self.store.lexical_scopes,
+                ) {
+                    return Err(());
+                }
+                ty.clone()
+            }
+            Type::Exists {
+                scope,
+                binder,
+                contract,
+                body,
+            } => {
+                let contract = self.lexical_solution(contract, allowed, bound, false, aliases)?;
+                let mut inside = bound.to_vec();
+                inside.push(LexicalScope {
+                    id: scope.identity(),
+                    namespace: format!("$exists:{binder}"),
+                });
+                Type::Exists {
+                    scope: *scope,
+                    binder: binder.clone(),
+                    contract: Box::new(contract),
+                    body: Box::new(self.lexical_solution(body, allowed, &inside, false, aliases)?),
+                }
+            }
+            Type::Forall {
+                vars,
+                constraints,
+                body,
+            } => Type::Forall {
+                vars: vars
+                    .iter()
+                    .map(|binder| {
+                        Ok(super::ty::Binder {
+                            name: binder.name.clone(),
+                            kind: self.kinds.restrict_lexical(&binder.kind, allowed, bound)?,
+                        })
+                    })
+                    .collect::<Result<_, ()>>()?,
+                constraints: constraints
+                    .iter()
+                    .map(|ty| self.lexical_solution(ty, allowed, bound, false, aliases))
+                    .collect::<Result<_, _>>()?,
+                body: Box::new(self.lexical_solution(body, allowed, bound, false, aliases)?),
+            },
+            Type::Row(row) | Type::Record(row) => {
+                let fields = field_row || matches!(ty, Type::Record(_));
+                let mut row = Row {
+                    entries: row
+                        .entries
+                        .iter()
+                        .map(|(label, value)| {
+                            Ok((
+                                if fields {
+                                    label.clone()
+                                } else {
+                                    self.lexical_label(label, allowed, bound)?
+                                },
+                                self.lexical_solution(value, allowed, bound, false, aliases)?,
+                            ))
+                        })
+                        .collect::<Result<_, ()>>()?,
+                    tail: row
+                        .tail
+                        .as_ref()
+                        .map(|tail| {
+                            self.lexical_solution(tail, allowed, bound, fields, aliases)
+                                .map(Box::new)
+                        })
+                        .transpose()?,
+                    written: row.written,
+                };
+                row.sort();
+                if matches!(ty, Type::Record(_)) {
+                    Type::Record(row)
+                } else {
+                    Type::Row(row)
+                }
+            }
+            Type::Union(a, b) => Type::Union(
+                Box::new(self.lexical_solution(a, allowed, bound, field_row, aliases)?),
+                Box::new(self.lexical_solution(b, allowed, bound, field_row, aliases)?),
+            ),
+            Type::Without { row, gone } => Type::Without {
+                row: Box::new(self.lexical_solution(row, allowed, bound, field_row, aliases)?),
+                gone: gone
+                    .iter()
+                    .map(|label| {
+                        if field_row {
+                            Ok(label.clone())
+                        } else {
+                            self.lexical_label(label, allowed, bound)
+                        }
+                    })
+                    .collect::<Result<_, _>>()?,
+            },
+            _ => {
+                let mut failure = false;
+                let mapped = ty.map_children(&mut |child| {
+                    if let Ok(ty) = self.lexical_solution(child, allowed, bound, false, aliases) {
+                        ty
+                    } else {
+                        failure = true;
+                        child.clone()
+                    }
+                });
+                if failure {
+                    return Err(());
+                }
+                mapped
+            }
+        })
     }
 
     pub(in crate::types) fn restrict_lexical_result(

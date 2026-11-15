@@ -65,6 +65,7 @@ fn settings(release: bool) -> Settings<'static> {
         effect_bridge: EffectBridge::Absent,
         ui: None,
         runners: &[],
+        environment: None,
     }
 }
 

@@ -6,12 +6,16 @@ use std::collections::BTreeMap;
 
 use flick_backend::{
     Abi, BackendPin, BuildRequest, Capability, Entry, Environment, Input, InputKind, Mode,
-    ModuleInput, ModuleRole, OptionValue, Profile, Source, Symbol, TargetRequest,
+    ModuleInput, ModuleRole, OptionValue, PackageTarget, Profile, RootHandler, Source, Symbol,
+    TargetRequest,
 };
+use std::collections::HashSet;
+
 use flick_core::build;
 use flick_core::codegen;
 use flick_core::diagnostics::Diagnostic;
 use flick_core::iface::{self, Target};
+use flick_core::project::config::BackendEnvironment;
 use flick_core::project::{self, Compilation, Project};
 use flick_core::source::{FileId, SourceMap};
 use flick_core::{ir, types};
@@ -164,6 +168,7 @@ impl Prepared {
             package.as_deref(),
             output,
         );
+        data.fill_environment_facts(package.as_deref());
 
         data
     }
@@ -254,6 +259,59 @@ impl Prepared {
         });
         self.bytes.insert(id.clone(), bytes);
         id
+    }
+
+    /// Record package targets and std root handlers for the selected environment.
+    fn fill_environment_facts(&mut self, package: Option<&str>) {
+        let environment = &self.request.target.environment;
+        let selected = BackendEnvironment {
+            backend: environment.backend.clone(),
+            platform: environment.platform.clone(),
+        };
+        let mut packages: Vec<String> = self
+            .request
+            .modules
+            .iter()
+            .filter_map(|module| module.package.clone())
+            .collect();
+        if let Some(name) = package {
+            packages.push(name.to_owned());
+        }
+        packages.sort();
+        packages.dedup();
+        let present: HashSet<_> = self
+            .request
+            .modules
+            .iter()
+            .map(|module| module.name.as_str())
+            .collect();
+        let environments = vec![environment.clone()];
+        self.request.package_targets = packages
+            .into_iter()
+            .map(|package| PackageTarget {
+                package,
+                environments: environments.clone(),
+            })
+            .collect();
+        self.request.root_handlers = build::target_preflight::std_root_handlers(&selected)
+            .into_iter()
+            .filter(|(service_module, _, handler_module, _)| {
+                present.contains(service_module) && present.contains(handler_module)
+            })
+            .map(
+                |(service_module, service_name, handler_module, handler_name)| RootHandler {
+                    environment: environment.clone(),
+                    service: Symbol {
+                        module: service_module.into(),
+                        name: service_name.into(),
+                    },
+                    handler: Symbol {
+                        module: handler_module.into(),
+                        name: handler_name.into(),
+                    },
+                },
+            )
+            .collect();
     }
 }
 

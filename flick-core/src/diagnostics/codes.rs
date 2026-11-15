@@ -167,6 +167,7 @@ codes! {
     E017 = Effects 17, "task in a fiber of its own needs a `control` effect";
     E018 = Effects 18, "`tail` arm that may suspend";
     E019 = Effects 19, "row variable that may hold another instance of a provided service";
+    E020 = Effects 20, "unhandled effect on the selected environment";
     C001 = Classes 1, "no instance for a constraint";
     C002 = Classes 2, "ambiguous class constraint";
     C003 = Classes 3, "overlapping instances";

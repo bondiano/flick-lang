@@ -347,7 +347,13 @@ impl Loader<'_> {
             } else {
                 Vec::new()
             };
-            if mode != Mode::Check {
+            // A selected environment checks reachable effects in package bodies,
+            // including bodies reused from an earlier source-package check.
+            if mode != Mode::Check
+                || self
+                    .project
+                    .is_some_and(|p| p.config.build.environment.is_some())
+            {
                 let saved = self.saved_compiled();
                 compiled.extend(saved);
             }

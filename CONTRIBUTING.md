@@ -28,7 +28,7 @@ the pinned Nix dev shell supplies it (`nix develop`), or build it with
 cargo install cargo-machete --version 0.9.2 --locked
 cargo install cargo-nextest --locked
 pnpm install --frozen-lockfile
-just lint   # fmt --check + clippy -D warnings + cargo machete
+just lint   # fmt --check + clippy -D warnings + cargo machete + no IIFE closures
 just test
 just check  # lint + test
 just e2e    # runtime tests + compiled programs on Node

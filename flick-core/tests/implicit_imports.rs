@@ -98,6 +98,7 @@ fn the_javascript_of_an_implicit_package_imports_what_its_source_imports() {
         effect_bridge: EffectBridge::Absent,
         ui: None,
         runners: &[],
+        environment: None,
     };
     let (artifacts, diagnostics) = build::emit(&compilation, &sources, &settings);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");

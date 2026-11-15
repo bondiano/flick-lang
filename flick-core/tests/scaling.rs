@@ -301,6 +301,7 @@ fn settings(entries: &[(String, String)]) -> Settings<'_> {
         effect_bridge: EffectBridge::Absent,
         ui: None,
         runners: &[],
+        environment: None,
     }
 }
 

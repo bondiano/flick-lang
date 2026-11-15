@@ -70,6 +70,7 @@ fn diagnostics_with_ui(
         effect_bridge: bridge,
         ui,
         runners: &[],
+        environment: None,
     };
     emit(&compilation, &sources, &settings).1
 }
