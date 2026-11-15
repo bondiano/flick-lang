@@ -274,9 +274,14 @@ impl Loader<'_> {
                     .diagnostics
                     .iter()
                     .any(|d| d.severity == Severity::Error),
-            // an editor's run reads no IR; a check and a build do
+            // an editor's run drops IR unless a selected environment needs it
+            // for target preflight; a check and a build keep it
             #[cfg(feature = "ide")]
-            cached_ir: if self.ide.is_some() {
+            cached_ir: if self.ide.is_some()
+                && self
+                    .project
+                    .is_none_or(|p| p.config.build.environment.is_none())
+            {
                 CachedIr::Dropped
             } else {
                 CachedIr::Kept

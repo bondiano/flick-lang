@@ -7,6 +7,8 @@ mod common;
 mod ir;
 #[path = "build_command/modules.rs"]
 mod modules;
+#[path = "build_command/target_preflight.rs"]
+mod target_preflight;
 
 use std::fs;
 use std::path::Path;

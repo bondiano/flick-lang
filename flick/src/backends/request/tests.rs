@@ -82,6 +82,28 @@ fn go_dependency_fingerprints_describe_the_published_go_interfaces() {
             prepared.request.backend.clone(),
         );
         assert_interfaces(&prepared, expected);
+        if environment == "js/node" {
+            assert!(
+                prepared
+                    .request
+                    .root_handlers
+                    .iter()
+                    .any(|h| h.service.module == "Database" && h.handler.name == "pg"),
+                "{:?}",
+                prepared.request.root_handlers
+            );
+        }
+        if environment == "go/native" {
+            assert!(
+                prepared
+                    .request
+                    .root_handlers
+                    .iter()
+                    .any(|h| h.service.name == "Server"),
+                "{:?}",
+                prepared.request.root_handlers
+            );
+        }
     }
     fs::remove_dir_all(root).expect("cleanup");
 }

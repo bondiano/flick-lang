@@ -64,6 +64,7 @@ pub(crate) fn with_settings<R>(
         effect_bridge: backend::effect_bridge(host, project, compilation),
         ui: project.and_then(|p| p.config.build.ui.as_deref()),
         runners: &runners,
+        environment: project.and_then(|p| p.config.build.environment.as_ref()),
     };
     prepare(&settings)
 }
