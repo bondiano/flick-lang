@@ -152,7 +152,7 @@ impl Scope<'_> {
                 .collect();
             // every module has the heads of std's plugin: an import of one is
             // needed only for a block it lets the module write without `{`
-            let of_std = implicit_package_of(&import.module) == Some(first_party::PACKAGE);
+            let of_std = implicit_package_of(&import.module).is_some_and(first_party::has_plugin);
             let needless: Vec<&Item> = (import.plugins.iter())
                 .filter(|p| of_std && first_party::HEADS.iter().any(|(h, _)| *h == p.name))
                 .filter(|p| !module.syntax.bodiless.contains(&p.name))

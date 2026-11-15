@@ -169,11 +169,40 @@ std = { git = "https://github.com/bondiano/flick-lang", tag = "std-v0.1.0", subd
 text = { url = "https://example.com/text-1.0.0.tgz", sha256 = "<64 hexadecimal digits>" }
 ```
 
-A project sees the implicit packages, `std` today, without naming them:
-`flick install` fetches each of this compiler's release, and an entry of that
-name in `[dependencies]` picks another source for it, as the `std` above does.
-A compiler built from a checkout takes that checkout's own instead of the
-release, and a `std` that does not check with the compiler is `FLICK-P043`.
+A project sees these implicit source packages without naming them. Their
+Flick module names stay the same: `Stream`, `HttpApi` and `Rpc` need no new
+import spelling.
+
+| Package | Source modules | Uses |
+| - | - | - |
+| `std` | values, effects, resources and concurrency | compiler core |
+| `stream` | `Channel`, `Sink`, `Stream` and their parts | `std` |
+| `process` | `ChildProcess` | `std`, `stream` |
+| `ui` | reactivity, `Atom`, `Ui`, `Form`, `Action` | `std`, `stream` |
+| `http` | `Http.*`, `HttpApi` and `Runner.Cloudflare` | `std`, `stream` |
+| `rpc` | `Rpc`, `Server` and `Config` | `std`, `stream`, `http` |
+| `observability` | `Otlp`, `Prometheus`, `DevTools` | `std`, `http` |
+| `cli` | `Cli.Prompt`, `Cli` | `std`, `rpc` |
+
+`Config` belongs with `Server` because secret configuration needs its
+server-only capability. Source ownership does not select a runtime: a program
+that uses only RT-supported bindings needs no Effect adapter. Stream and other
+adapter-backed bindings still require `@flick-lang/effect-ts`; mixed programs
+must match the installed adapter manifest's runtime ABI and exact dependency
+versions. Existing target restrictions and plugin diagnostic codes still apply.
+
+`flick install` fetches each package from the compiler release's
+`std-v<version>` tag, with `subdir = "packages/<name>"`, and pins it in
+`flick.lock`. An entry of that name in `[dependencies]` picks another source,
+as the `std` above does. Keep the complete lock:
+`flick install --locked --offline` reuses its installed packages without
+updating pins or reaching the network. A compiler built from a checkout takes
+that checkout's packages instead of the release. An incompatible implicit module is `FLICK-P043`.
+
+For a source override, `FLICK_STD_PATH` still names `packages/std`; the other
+seven package directories must be its siblings, each with `src/modules.txt`.
+To override packages individually, give each its own path, git or tarball entry
+in `[dependencies]`.
 
 The library's directory holds a `flick.toml` of `kind = "lib"`; its
 `source-dir` is where the modules are, and its own dependencies come along.

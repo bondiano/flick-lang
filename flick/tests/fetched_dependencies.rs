@@ -12,6 +12,7 @@ use std::{fs, thread};
 
 use common::project;
 use flick_core::build::go::executable;
+use flick_core::implicit_packages::IMPLICIT_PACKAGES;
 
 const APP: &str = "schema-version = 1
 
@@ -358,29 +359,7 @@ fn released(dir: &Path, store: &Path, args: &[&str]) -> Output {
         .expect("flick runs")
 }
 
-#[test]
-fn a_released_std_is_fetched_by_its_tarball() {
-    let std = Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages/std");
-    let store = project("std-tarball-store", &[]);
-    let out = store.join("dist");
-    let packed = released(&std, &store, &["pack", "--out-dir", &out.to_string_lossy()]);
-    assert!(packed.status.success(), "{packed:?}");
-    let line = String::from_utf8_lossy(&packed.stdout).into_owned();
-    let (sha, file) = line.trim().split_once("  ").expect("sha and path");
-    let url = serve_once(fs::read(file).expect("tarball"));
-    let manifest = format!(
-        "schema-version = 1\n\n[project]\nkind = \"lib\"\n\n[dependencies]\nstd = {{ url = \"{url}\", sha256 = \"{sha}\" }}\n"
-    );
-    let main = "module App.Main exposing (later)\n\nlater : Result Duration.DurationError Duration.Duration\nlet later = Duration.seconds 2\n";
-    let app = project(
-        "std-tarball-app",
-        &[("flick.toml", &manifest), ("src/App/Main.fl", main)],
-    );
-    let installed = released(&app, &store, &["install"]);
-    assert!(installed.status.success(), "{installed:?}");
-    let checked = released(&app, &store, &["check"]);
-    assert!(checked.status.success(), "{checked:?}");
-}
+include!("fetched_dependencies/source_split.rs");
 
 const GREET: &str = "module Lib.Greet exposing (hi)
 

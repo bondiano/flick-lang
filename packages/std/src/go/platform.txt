@@ -1,37 +1,5 @@
-# The platform modules: configuration, paths, the standard streams, the
-# terminal, the console and log levels.
+# Go bindings used by the std source package.
 
-[flick:Config]
-flickGet *ConfigGet
-flickParse *ConfigParse
-map ConfigMap
-flatMap ConfigFlatMap
-mapEffect ConfigMapEffect
-flickOrElse ConfigOrElse
-all ConfigAll
-withDefault ConfigWithDefault
-option ConfigOption
-schema ConfigSchema
-flickFail ConfigFail
-succeed ConfigSucceed
-String ConfigString
-NonEmptyString ConfigNonEmptyString
-Number ConfigNumber
-Finite ConfigFinite
-flickInt ConfigInt
-Boolean ConfigBoolean
-Port ConfigPort
-flickRedacted *ConfigRedacted
-Duration ConfigDuration
-ByteSize ConfigByteSize
-LogLevel ConfigLogLevel
-flickUrl ConfigURL
-flickDate ConfigDate
-Literal ConfigLiteral
-Literals ConfigLiterals
-flickArray ConfigArray
-flickRecord ConfigRecord
-nested ConfigNested
 
 [flick:ConfigProvider]
 flickMake ConfigProviderMake
@@ -100,26 +68,6 @@ flickReadAlloc *FileSystemReadAlloc
 flickFileTruncate *FileSystemFileTruncate
 flickWrite *FileSystemWrite
 flickWriteAll *FileSystemWriteAll
-
-[flick:ChildProcess]
-flickMake ChildProcessMake
-setCwd ChildProcessSetCwd
-flickSetEnv ChildProcessSetEnv
-flickPrefix ChildProcessPrefix
-pipeTo ChildProcessPipeTo
-flickSetStdin ChildProcessSetStdin
-flickInheritOutput ChildProcessInheritOutput
-flickSpawn *ChildProcessSpawn
-flickPid ChildProcessPid
-flickWait *ChildProcessWait
-flickIsRunning *ChildProcessIsRunning
-flickKill *ChildProcessKill
-flickKillWith *ChildProcessKillWith
-flickStdout ChildProcessStdout
-flickStderr ChildProcessStderr
-flickString *ChildProcessString
-flickLines *ChildProcessLines
-flickExitCode *ChildProcessExitCode
 
 [flick:sql]
 sqlCodec SqlCodec

@@ -28,7 +28,7 @@ type error CliError = CliError String
 /// Parsing a parameter's text into a value; the error is shown to the user.
 /// `deriving Cli.Value` makes one for a choice among constructors without
 /// fields, by their names in kebab case, and for a refined type.
-@derive
+@derive std
 class Value a =
   parse : String ->{} Result String a
 

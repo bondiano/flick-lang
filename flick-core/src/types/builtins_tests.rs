@@ -15,6 +15,7 @@ mod fixes {
     use std::path::Path;
 
     use crate::diagnostics::{Diagnostic, Edit, codes};
+    use crate::implicit_packages::IMPLICIT_PACKAGES;
     use crate::types::builtins::{builtin_sources, check_reporting};
 
     /// Writes the fixes of what `built_in_signatures_write_nothing_they_get_anyway`
@@ -27,7 +28,7 @@ mod fixes {
         let packages = Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages");
         let path = |module: &str| {
             let file = format!("src/{}.fl", module.replace('.', "/"));
-            (["core", "std"].iter())
+            (["core"].iter().chain(IMPLICIT_PACKAGES))
                 .map(|package| packages.join(package).join(&file))
                 .find(|path| path.is_file())
                 .expect("the source of a built-in module")

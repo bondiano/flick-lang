@@ -246,12 +246,29 @@ pub fn implicit_hash() -> &'static str {
     static HASH: OnceLock<String> = OnceLock::new();
     HASH.get_or_init(|| {
         let mut hasher = Sha256::new();
-        let modules = types::builtin_sources().iter();
-        for (name, text) in modules.chain(types::implicit_go_bindings()) {
+        for (name, text) in types::builtin_sources() {
+            hasher.update(
+                types::implicit_package_of(name)
+                    .unwrap_or("core")
+                    .as_bytes(),
+            );
+            hasher.update([0]);
             hasher.update(name.as_bytes());
             hasher.update([0]);
             hasher.update(text.as_bytes());
             hasher.update([0]);
+        }
+        for (name, text) in types::implicit_go_bindings() {
+            hasher.update(name.as_bytes());
+            hasher.update([0]);
+            hasher.update(text.as_bytes());
+            hasher.update([0]);
+        }
+        for (package, name, version) in types::implicit_js_dependencies() {
+            for part in [package, name, version] {
+                hasher.update(part.as_bytes());
+                hasher.update([0]);
+            }
         }
         fetch::hex(&hasher.finalize())
     })

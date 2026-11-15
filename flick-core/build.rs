@@ -65,11 +65,15 @@ fn implicit_sources(output: &Path, docs: bool) -> io::Result<()> {
 fn package_go_tables(package: &str) -> io::Result<String> {
     let manifest = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("Cargo supplies it"));
     let dir = manifest.join("../packages").join(package).join("src/go");
-    println!("cargo:rerun-if-changed={}", dir.display());
     let mut out = String::new();
     if !dir.is_dir() {
+        // Watching a missing path reruns this script on every Cargo command.
+        // Its existing parent also detects the first Go table being added.
+        let sources = dir.parent().expect("go is under src");
+        println!("cargo:rerun-if-changed={}", sources.display());
         return Ok(out);
     }
+    println!("cargo:rerun-if-changed={}", dir.display());
     let mut files: Vec<PathBuf> = fs::read_dir(&dir)?
         .map(|e| e.map(|e| e.path()))
         .collect::<io::Result<_>>()?;

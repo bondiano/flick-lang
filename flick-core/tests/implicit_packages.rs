@@ -12,6 +12,7 @@ use std::{env, fs, process};
 use flick_core::build::{self, Extras, Settings};
 use flick_core::codegen::EffectBridge;
 use flick_core::diagnostics::Severity;
+use flick_core::implicit_packages::IMPLICIT_PACKAGES;
 use flick_core::project::config::Backend;
 use flick_core::project::{self, Host};
 use flick_core::source::{FileId, SourceMap};
@@ -81,10 +82,20 @@ fn source_dir(_: &str) -> Option<PathBuf> {
 fn a_second_implicit_package_is_one_more_entry_and_directory() {
     let std = env::var_os("FLICK_STD_PATH").expect("cargo names the std of this checkout");
     let extra = extra_package();
-    assert!(types::set_implicit_packages(vec![
-        types::read_package("std", Path::new(&std)).expect("std"),
-        types::read_package("extra", &extra).expect("extra"),
-    ]));
+    let siblings = Path::new(&std).parent().expect("implicit package siblings");
+    let mut packages = IMPLICIT_PACKAGES
+        .iter()
+        .map(|name| {
+            let dir = if *name == IMPLICIT_PACKAGES[0] {
+                Path::new(&std).to_path_buf()
+            } else {
+                siblings.join(name)
+            };
+            types::read_package(name, &dir).expect("implicit package")
+        })
+        .collect::<Vec<_>>();
+    packages.push(types::read_package("extra", &extra).expect("extra"));
+    assert!(types::set_implicit_packages(packages));
     fs::remove_dir_all(&extra).expect("fixture cleanup");
 
     // checked after what it depends on, in the order of its own `modules.txt`

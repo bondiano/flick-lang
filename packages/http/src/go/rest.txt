@@ -1,0 +1,5 @@
+# Go bindings used by the http source package.
+
+
+[flick:http/HttpClientResponse]
+flickFormData *ClientResponseFormData

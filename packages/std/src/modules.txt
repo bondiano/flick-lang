@@ -1,6 +1,4 @@
-# The modules of std in the order they are checked: each imports the ones it
-# uses, which come before it. Every module sees the core modules.
-
+# Modules of std, in dependency order; imports name their source dependencies.
 Platform
 Generic
 App
@@ -44,7 +42,6 @@ Database.Migrate
 Test
 Runner.Node
 Runner.Browser
-# values and classes
 RegExp
 Combiner
 Reducer
@@ -61,14 +58,10 @@ Version
 ByteSize
 Bytes
 Crypto
-# end of values and classes
-# lists and records
 Bool
 Predicate
 Filter
 Function
-# end of lists and records
-# collections
 Trie
 HashRing
 Graph.Types
@@ -77,16 +70,12 @@ Graph.Query
 Graph.Algorithms
 Graph.Walk
 Graph
-# end of collections
-# time
 DateTime
 Cron
 Clock
 Jwt
 Random
 Host
-# end of time
-# concurrency
 SynchronizedRef
 SubscriptionRef
 Deferred
@@ -101,8 +90,6 @@ ScopedRef
 RcRef
 RcMap
 Pool
-# end of concurrency
-# transactions
 Tx
 TxRef
 TxChunk
@@ -115,15 +102,11 @@ TxPubSub
 TxReentrantLock
 TxSemaphore
 TxSubscriptionRef
-# end of transactions
-# schema
 Check
 Arbitrary
 JsonSchema
 Differ
 Net
-# end of schema
-# platform and observability
 PlatformError
 Path
 LogLevel
@@ -135,8 +118,6 @@ Logger
 ConfigProvider
 Metric
 Tracer
-# end of platform and observability
-# context, layers and requests
 Context
 Scope
 Layer.Trace
@@ -145,8 +126,6 @@ LayerRef
 ErrorReporter
 Request
 RequestResolver
-# end of context, layers and requests
-# effects, schedules and fibers
 Schedule
 Cause
 Scheduler
@@ -161,90 +140,3 @@ Effect
 FiberHandle
 FiberMap
 FiberSet
-# end of effects, schedules and fibers
-# streams, sinks and channels
-Channel.Core
-Channel.Transform
-Channel.Control
-Channel.Run
-Channel
-ChannelSchema
-# end of streams, sinks and channels
-# streams, Stream
-Stream.Core
-Sink
-Stream.Transform
-Stream.Combine
-Stream.Errors
-Stream.Run
-Stream.Pipe
-Stream.Platform
-Stream
-# end of streams, Stream
-# child processes
-ChildProcess
-# reactivity (experimental)
-Reactivity.AsyncResult
-Reactivity.Atom
-# UI on atoms: `Atom` over the reactivity modules, then `Ui`
-Atom
-Ui.Safe
-Ui
-Ui.Tracing
-Ui.Event
-Ui.Dom
-Ui.Server
-Form
-Action
-# HTTP
-Http.Method
-Http.Status
-Http.Headers
-Http.UrlParams
-Http.Url
-Http.Mime
-Http.Cookies
-Http.Etag
-Http.Codecs
-Http.Body
-Http.ClientError
-Http.ClientRequest
-Http.ClientResponse
-Http.Client
-Http.FetchClient
-Http.ServerError
-Http.ServerRequest
-Http.ServerResponse
-Http.Multipart
-Http.Platform
-Http.Middleware
-Http.Router
-Http.Server
-Http.StaticServer
-Http.TraceContext
-Runner.Cloudflare
-# end of HTTP
-# HttpApi
-HttpApi
-HttpApi.Derive
-HttpApi.Mount
-HttpApi.Inject
-# end of HttpApi
-# RPC (experimental)
-Rpc
-Server
-Server.Derive
-# after `Server`: a secret is read only on a server
-Config
-# end of RPC
-# observability (experimental)
-Otlp
-Prometheus
-# end of observability
-# devtools (experimental)
-DevTools
-# end of devtools
-# CLI
-Cli.Prompt
-Cli
-# end of CLI

@@ -59,11 +59,20 @@ pub fn with_implicit(dependencies: &[Dependency]) -> Vec<Dependency> {
 /// directory or `--project` names, or from the store outside a project.
 pub fn prepare(explicit: Option<&str>) -> Result<(), String> {
     if overridden() {
-        return if types::has_implicit_packages() {
-            Ok(())
-        } else {
-            Err("`FLICK_STD_PATH` names no `std` package with `src/modules.txt`".to_owned())
-        };
+        let packages = IMPLICIT_PACKAGES
+            .iter()
+            .map(|name| {
+                let dir = overridden_dir(name).expect("the override was checked");
+                types::read_package(name, &dir).map_err(|error| {
+                    format!(
+                        "`FLICK_STD_PATH` cannot read `{name}` at `{}`: {error}",
+                        dir.display()
+                    )
+                })
+            })
+            .collect::<Result<_, _>>()?;
+        types::set_implicit_packages(packages);
+        return Ok(());
     }
     let host = FsHost::new();
     let mut sources = SourceMap::default();

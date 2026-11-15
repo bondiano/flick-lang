@@ -63,7 +63,7 @@ capabilities with `--no-default-features --features <names>`.
 | - | - |
 | `ide` | Editor queries, projections and retained editor metadata. |
 | `native-project` | Project discovery, TOML/FFI-policy parsing, installed packages, disk-cache contracts and pnpm adapters; published `.iface`, `package.json` and publication fingerprints; source maps; documentation comments in the built-in sources. Activates `toml`, `semver` and `sha2`. |
-| `embedded-std` | `std` inside the binary, for a host without packages. |
+| `embedded-std` | The implicit source packages inside the binary, for a host without packages. |
 
 Shared in-memory project/configuration types, `Host`-backed source loading,
 type checking, diagnostics with their fixes in both renderings, TypeScript
@@ -89,6 +89,22 @@ syntax reports a diagnostic rather than reaching lowering.
 `just feature-check` checks isolated feature combinations with strict Clippy;
 `just feature-test` exercises the compiler's capability boundaries.
 Both are included in the existing lint/test recipes.
+
+## Standard-library source packages
+
+The compiler core is in `packages/core`. The implicit source packages are
+`std`, `stream`, `process`, `ui`, `http`, `rpc`, `observability` and `cli`,
+listed in dependency order in `flick-core/src/implicit_packages.rs`. Each owns
+its `src/modules.txt` and Go binding tables under `src/go`; keep source
+ownership, build inputs and coverage checks together when moving a module.
+Public Flick module names remain independent of the source package name.
+
+`FLICK_STD_PATH` still points at `packages/std`; the other implicit packages
+are read from sibling directories. Copy the complete set for an override or a
+test fixture. A release installs and locks each package from its compiler's
+`std-v<version>` tag and `packages/<name>` subdirectory. Source packaging does
+not make the optional Effect adapter a requirement of an RT-only program;
+conditional foreign-binding metadata decides which runtime families it uses.
 
 ## Documentation site
 

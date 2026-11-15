@@ -1,0 +1,16 @@
+# Modules of stream, in dependency order; imports name their source dependencies.
+Channel.Core
+Channel.Transform
+Channel.Control
+Channel.Run
+Channel
+ChannelSchema
+Stream.Core
+Sink
+Stream.Transform
+Stream.Combine
+Stream.Errors
+Stream.Run
+Stream.Pipe
+Stream.Platform
+Stream
