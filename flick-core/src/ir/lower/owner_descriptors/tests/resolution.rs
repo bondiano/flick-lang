@@ -50,7 +50,7 @@ fn resolution_preserves_exact_names_original_environments_and_dictionary_fallbac
         (4, "a$Dict"),
         (7, "a$dict"),
     ] {
-        let branch = membership::select(&expression, id).unwrap();
+        let branch = membership::select(&expression, id).expect("original variable node");
         let ExprKind::Block(lookup, result) = &branch.kind else {
             panic!("one environment lookup");
         };
@@ -76,7 +76,7 @@ fn resolution_preserves_exact_names_original_environments_and_dictionary_fallbac
         );
     }
     for id in [3, 4] {
-        let branch = membership::select(&expression, id).unwrap();
+        let branch = membership::select(&expression, id).expect("original dictionary node");
         let mut fallbacks = Vec::new();
         root_environment_ids(branch, &mut fallbacks);
         assert!(!fallbacks.is_empty());
@@ -86,7 +86,10 @@ fn resolution_preserves_exact_names_original_environments_and_dictionary_fallbac
         );
     }
     for id in [5, 6] {
-        assert_current(membership::select(&expression, id).unwrap(), current);
+        assert_current(
+            membership::select(&expression, id).expect("unchanged nonvariable node"),
+            current,
+        );
     }
     membership::assert_unknown(&expression, 8);
 }

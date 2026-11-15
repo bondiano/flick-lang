@@ -128,9 +128,10 @@ pub(super) fn assert_exact_node_domains(operations: &[Arm]) {
             .body
     };
     let expected = domain(operation(Op::Resolve));
+    let end = i32::try_from(expected.len()).expect("small original node domain");
     assert_eq!(
         expected,
-        (0..expected.len() as i32).collect(),
+        (0..end).collect(),
         "original node IDs remain dense"
     );
     for op in [
@@ -152,7 +153,7 @@ pub(super) fn assert_exact_node_domains(operations: &[Arm]) {
         for &id in &expected {
             assert!(select(expression, id).is_some(), "known node {id}");
         }
-        assert_unknown(expression, expected.len() as i32);
+        assert_unknown(expression, end);
     }
 }
 
@@ -182,7 +183,10 @@ fn dense_default_selectors_share_one_bounds_check_and_forward_the_original_descr
     assert!(matches!(arms[0].pat, Pat::Wild));
     assert_current(&arms[0].body, current);
     for id in 0..8 {
-        assert_current(select(&expression, id).unwrap(), current);
+        assert_current(
+            select(&expression, id).expect("known original node dispatch"),
+            current,
+        );
     }
     assert_unknown(&expression, 8);
 }
@@ -193,18 +197,21 @@ fn membership_is_exact_for_empty_singleton_and_original_node_domains() {
     for count in [0, 1, templates.exprs.len()] {
         let mut fixture = templates.clone();
         fixture.exprs.truncate(count);
+        let end = i32::try_from(count).expect("small fixture node domain");
         let mut build = builder(&fixture);
         let expression = build.nodes(build.local("original"), |this, _, _, _, _| {
             this.boolean(true)
         });
-        assert_eq!(domain(&expression), (0..count as i32).collect());
-        for id in 0..count as i32 {
+        assert_eq!(domain(&expression), (0..end).collect());
+        for id in 0..end {
             assert!(matches!(
-                select(&expression, id).unwrap().kind,
+                select(&expression, id)
+                    .expect("known original node dispatch")
+                    .kind,
                 ExprKind::Lit(Lit::Bool(true))
             ));
         }
-        assert_unknown(&expression, count as i32);
+        assert_unknown(&expression, end);
     }
 }
 
