@@ -29,6 +29,11 @@ type Owner struct {
 	// Arena storage is not on the ordinary LIFO finalizer stack.
 	arenas       []*arena
 	arenasClosed bool
+
+	// A detached owner is a library acquisition scope (`acquireHolder`,
+	// `RcRef`, `Pool`, `RcMap`): `Within` must not redirect finalizers onto
+	// an outer lexical owner, or releases wait until that outer scope ends.
+	detached bool
 }
 
 // defects collects failures of supervisors: the root's fail the program,
@@ -106,6 +111,12 @@ type finalizer struct {
 }
 
 func newOwner() *Owner { return &Owner{open: true, children: map[*child]struct{}{}} }
+
+func newDetachedOwner() *Owner {
+	o := newOwner()
+	o.detached = true
+	return o
+}
 
 // catch is the result of `f`, or the cause it failed with.
 func catch(f func() Value) (out Value, cause *Cause) {
@@ -324,8 +335,13 @@ func ScopeRun(fb *Fiber, f Value) Value {
 func ScopeCurrent(fb *Fiber, _ Value) Value { return fb.owner }
 
 // Within is `fb` acquiring into `owner`, an outer region's, not the
-// innermost one's.
+// innermost one's. When `fb` already acquires into that owner, or its
+// owner is pinned for a library acquisition, the same fiber is returned
+// so fiber-local updates and that acquisition's finalizers stay put.
 func Within(fb *Fiber, owner Value) *Fiber {
+	if fb.pinOwner || fb.owner == owner.(*Owner) || (fb.owner != nil && fb.owner.detached) {
+		return fb
+	}
 	inner := *fb
 	inner.owner = owner.(*Owner)
 	return &inner
