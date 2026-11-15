@@ -31,7 +31,8 @@ pub struct Budget {
 impl Default for Budget {
     fn default() -> Self {
         Self {
-            fuel: 1_000_000_000,
+            // The large owner-policy release regression uses ~1.125 billion fuel.
+            fuel: 1_200_000_000,
             memory: 64 << 20,
             output: 128 << 20,
             inputs: 256 << 20,
