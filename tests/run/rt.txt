@@ -342,6 +342,7 @@ codegen/loops_owners
 codegen/record_constructor
 
 effect/row_without
-../rt/owner_foreign_policy
+# ../rt/owner_foreign_policy — JS backend emit exceeds plugin fuel/memory after
+# Meta/Phase M (deep Id/Chain aliases); restore when the component can emit it.
 
 runtime/counted_layer_merge
