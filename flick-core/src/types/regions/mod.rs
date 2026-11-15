@@ -369,10 +369,10 @@ impl Checker<'_> {
         let inferred = match &ty {
             Type::Captured { captures, .. } => match **captures {
                 Type::Meta(ref meta)
-                    if meta.legacy_root().is_some()
+                    if meta.inference_type_root().is_some()
                         && matches!(self.store.resolve(captures), Type::Meta(_)) =>
                 {
-                    meta.legacy_root()
+                    meta.inference_type_root()
                 }
                 _ => None,
             },

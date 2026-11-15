@@ -82,10 +82,13 @@ impl Checker<'_> {
     pub(in crate::types) fn unify_opaque_meta(&mut self, a: &Type, b: &Type) -> Option<Unified> {
         let (a, b) = (self.store.head(a), self.store.head(b));
         let candidate = a
-            .legacy_meta_root()
-            .map(|meta| (meta, b.as_ref()))
-            .or_else(|| b.legacy_meta_root().map(|meta| (meta, a.as_ref())));
-        if let Some((meta, other)) = candidate
+            .inference_meta_root()
+            .map(|meta| (meta, a.as_ref(), b.as_ref()))
+            .or_else(|| {
+                b.inference_meta_root()
+                    .map(|meta| (meta, b.as_ref(), a.as_ref()))
+            });
+        if let Some((meta, variable, other)) = candidate
             && !self.store.is_numeric(meta)
             && !self.store.is_capture_row(meta)
             && !self.store.is_error_row(meta)
@@ -93,7 +96,8 @@ impl Checker<'_> {
             && self.opaque_value_type(&nominal)
         {
             // Keep the nominal monotype instead of its possibly polymorphic representation.
-            return Some(self.bind(meta, &nominal));
+            let variable = variable.clone();
+            return Some(self.bind_inference(&variable, &nominal));
         }
         None
     }

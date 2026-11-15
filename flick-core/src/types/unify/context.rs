@@ -12,6 +12,7 @@ struct MetaContext {
     canonical: Context,
     permitted: Context,
     kind: Option<Kind>,
+    lexical: LexicalRoot,
 }
 
 impl Store {
@@ -38,11 +39,23 @@ impl Store {
             canonical: context.clone(),
             permitted: context,
             kind,
+            lexical: super::ty::LexicalRoot::new(&self.active_lexical),
         });
         self.at(root, view)
     }
 
     fn at(&self, root: u32, view: Embedding) -> Type {
+        if !self.meta_contexts[root as usize]
+            .lexical
+            .canonical
+            .is_empty()
+        {
+            return Type::Meta(MetaOccurrence::lexical_type(
+                root,
+                self.scopes.owner(),
+                &self.meta_contexts[root as usize].lexical.canonical,
+            ));
+        }
         if self.meta_contexts[root as usize].canonical.len() == 0 {
             Type::meta(root)
         } else {
@@ -51,6 +64,11 @@ impl Store {
     }
 
     pub(in crate::types) fn valid_occurrence(&self, ty: &Type) -> bool {
+        if let Type::Meta(meta) = ty
+            && meta.lexical().is_some()
+        {
+            return self.lexical_mappings(meta).is_ok();
+        }
         self.occurrence(ty).is_ok()
     }
 
@@ -59,7 +77,7 @@ impl Store {
         let root = meta.root();
         let context = self.meta_contexts.get(root as usize).ok_or(())?;
         if meta.legacy_root().is_some() {
-            if context.canonical.len() != 0 {
+            if context.canonical.len() != 0 || !context.lexical.canonical.is_empty() {
                 return Err(());
             }
             return Ok((root, Embedding::identity(&context.canonical)));

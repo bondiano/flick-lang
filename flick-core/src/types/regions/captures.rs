@@ -73,7 +73,7 @@ impl Checker<'_> {
             )]
             Type::Meta(meta)
                 if meta
-                    .legacy_root()
+                    .inference_type_root()
                     .is_some_and(|m| self.store.is_capture_row(m)) =>
             {
                 if !out.tails.contains(&*t) {
@@ -81,7 +81,10 @@ impl Checker<'_> {
                 }
             }
             // an integer literal's type is a number, which captures nothing
-            Type::Meta(meta) if meta.legacy_root().is_some_and(|m| self.store.is_numeric(m)) => {}
+            Type::Meta(meta)
+                if meta
+                    .inference_type_root()
+                    .is_some_and(|m| self.store.is_numeric(m)) => {}
             Type::Var(_) | Type::Skolem(_) | Type::Meta(_)
                 if !bounded || matches!(self.atom_kind(&t, &[]), Some(Kind::Region)) =>
             {
@@ -408,7 +411,7 @@ impl Checker<'_> {
                 .or_else(|| self.scope_of(*s).map(|_| Kind::Region)),
             Type::Meta(meta)
                 if meta
-                    .legacy_root()
+                    .inference_type_root()
                     .is_some_and(|m| self.store.is_error_row(m)) =>
             {
                 Some(Kind::ErrorRow)

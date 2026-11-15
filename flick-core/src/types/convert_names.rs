@@ -68,10 +68,15 @@ impl Checker<'_> {
                 if let Some(v) = self.cx.tyvars.iter().rev().find(|v| v.name == name) {
                     return Some((v.ty.clone(), v.kind.clone()));
                 }
-                let kind = self.kinds.fresh();
+                let ambient = self
+                    .annotation_contexts
+                    .last()
+                    .cloned()
+                    .unwrap_or_else(|| self.store.lexical_context());
+                let kind = self.kinds.fresh_in(&ambient);
                 let ty = match free {
                     Free::Quantify => Type::Var(name.to_owned()),
-                    Free::Fresh => self.store.fresh_of(&kind),
+                    Free::Fresh => self.store.fresh_of_in(&kind, &ambient),
                     Free::Reject => {
                         self.error(
                             codes::T001,

@@ -117,14 +117,14 @@ impl Checker<'_> {
         // a row still unknown, maybe less some names: it grows by what the
         // actual row holds, but never by a name it is taken without
         let unknown_tail = declared.tails.iter().find(|t| unknown(t).is_some());
-        let open = unknown_tail.and_then(unknown);
+        let open = unknown_tail.map(|tail| less(tail).0.clone());
         let never: Vec<Elem> = unknown_tail.map_or_else(Vec::new, |t| less(t).1.to_vec());
-        if let Some(m) = open
-            && self.grow_scoped_row(&actual, kind, m)
+        if let Some(variable) = open.as_ref()
+            && self.grow_scoped_row(&actual, kind, variable)
         {
             return true;
         }
-        if self.grow_live(&actual, &declared, open) {
+        if self.grow_live(&actual, &declared, open.as_ref()) {
             return true;
         }
         for (label, ty) in actual
@@ -138,14 +138,16 @@ impl Checker<'_> {
                     let _ = self.unify(ty, &bound);
                 }
                 None => {
-                    if let Some(m) = open.filter(|_| !never.contains(label)) {
-                        let rest = self.store.fresh_beside(m);
+                    if let Some(variable) = open.as_ref().filter(|_| !never.contains(label)) {
+                        let Some(rest) = self.store.fresh_beside_occurrence(variable) else {
+                            return false;
+                        };
                         let row = Type::Row(Row {
                             entries: vec![(label.clone(), ty.clone())],
                             tail: Some(Box::new(rest)),
                             ..Row::default()
                         });
-                        return self.bind(m, &row).is_ok();
+                        return self.bind_inference(variable, &row).is_ok();
                     }
                 }
             }
@@ -154,10 +156,12 @@ impl Checker<'_> {
             if matches!(tail, Type::Error) || unknown(tail).is_some() || allows(&declared, tail) {
                 continue;
             }
-            if let Some(m) = open {
-                let rest = self.store.fresh_beside(m);
+            if let Some(variable) = open.as_ref() {
+                let Some(rest) = self.store.fresh_beside_occurrence(variable) else {
+                    return false;
+                };
                 let union = Type::Union(Box::new(tail.clone()), Box::new(rest));
-                return self.bind(m, &union).is_ok();
+                return self.bind_inference(variable, &union).is_ok();
             }
         }
         false
@@ -483,7 +487,7 @@ fn less(tail: &Type) -> (&Type, &[Elem]) {
 /// The variable of a tail still to be inferred, maybe less some names.
 fn unknown(tail: &Type) -> Option<u32> {
     match less(tail).0 {
-        Type::Meta(meta) => meta.legacy_root(),
+        Type::Meta(meta) => meta.inference_type_root(),
         _ => None,
     }
 }

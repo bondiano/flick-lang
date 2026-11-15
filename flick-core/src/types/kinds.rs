@@ -41,6 +41,7 @@ impl Kind {
         Self::Meta(MetaOccurrence::legacy(root))
     }
 
+    #[cfg(test)]
     pub(in crate::types) fn legacy_meta_root(&self) -> Option<u32> {
         match self {
             Self::Meta(meta) => meta.legacy_root(),
@@ -48,9 +49,16 @@ impl Kind {
         }
     }
 
+    pub(in crate::types) fn inference_meta_root(&self) -> Option<u32> {
+        match self {
+            Self::Meta(meta) => meta.inference_kind_root(),
+            _ => None,
+        }
+    }
+
     pub fn has_meta_view(&self) -> bool {
         match self {
-            Kind::Meta(meta) => meta.contextual().is_some(),
+            Kind::Meta(meta) => meta.legacy_root().is_none(),
             Kind::Row(inner) => inner.has_meta_view(),
             Kind::Arrow(a, b) => a.has_meta_view() || b.has_meta_view(),
             _ => false,
@@ -119,6 +127,8 @@ pub struct KindStore {
     metas: Vec<Option<Kind>>,
     contexts: Vec<KindContext>,
     active_context: Context,
+    active_lexical: Vec<super::ty::LexicalScope>,
+    lexical_scopes: Vec<super::ty::LexicalScope>,
     witness_authority: Option<ScopeId>,
     undo: Vec<KindUndo>,
     transactions: Vec<u64>,
@@ -132,6 +142,7 @@ pub(in crate::types) struct KindCheckpoint {
     allocated: usize,
     transaction: u64,
     context: Context,
+    lexical: Vec<super::ty::LexicalScope>,
 }
 
 impl KindStore {
@@ -144,6 +155,7 @@ impl KindStore {
             allocated: self.metas.len(),
             transaction,
             context: self.active_context.clone(),
+            lexical: self.active_lexical.clone(),
         }
     }
 
@@ -177,8 +189,10 @@ impl KindStore {
         self.metas[checkpoint.allocated..].fill(None);
         for context in &mut self.contexts[checkpoint.allocated..] {
             context.permitted = Context::default();
+            context.lexical.permitted.clear();
         }
         self.active_context = checkpoint.context;
+        self.active_lexical = checkpoint.lexical;
         self.transactions.pop();
     }
 
@@ -196,8 +210,15 @@ impl KindStore {
         self.contexts.push(KindContext {
             canonical: self.active_context.clone(),
             permitted: self.active_context.clone(),
+            lexical: super::ty::LexicalRoot::new(&self.active_lexical),
         });
-        if self.active_context.len() == 0 {
+        if !self.active_lexical.is_empty() {
+            Kind::Meta(MetaOccurrence::lexical_kind(
+                root,
+                self.witness_authority.expect("checker kind authority"),
+                &self.active_lexical,
+            ))
+        } else if self.active_context.len() == 0 {
             Kind::meta(root)
         } else {
             Kind::Meta(MetaOccurrence::kind(
@@ -214,11 +235,19 @@ impl KindStore {
         loop {
             match &kind {
                 Kind::Meta(meta) => {
-                    if let Some(root) = meta.legacy_root() {
+                    if meta.lexical().is_some() {
+                        let Ok(mappings) = self.lexical_mappings(meta) else {
+                            return kind;
+                        };
+                        let Some(solution) = &self.metas[meta.root() as usize] else {
+                            return kind;
+                        };
+                        kind = lexical::transport_kind(solution, &mappings);
+                    } else if let Some(root) = meta.legacy_root() {
                         let Some(context) = self.contexts.get(root as usize) else {
                             return kind;
                         };
-                        if context.canonical.len() != 0 {
+                        if context.canonical.len() != 0 || !context.lexical.canonical.is_empty() {
                             return kind;
                         }
                         let Some(next) = &self.metas[root as usize] else {
@@ -258,8 +287,11 @@ impl KindStore {
             return self.resolve_deep(kind);
         }
         match self.resolve(kind) {
-            Kind::Meta(meta) if meta.legacy_root().is_some() => {
-                self.assign(meta.legacy_root().expect("legacy kind default"), Kind::Type);
+            Kind::Meta(meta) if meta.inference_kind_root().is_some() => {
+                self.assign(
+                    meta.inference_kind_root().expect("inference kind default"),
+                    Kind::Type,
+                );
                 Kind::Type
             }
             Kind::Row(k) => Kind::Row(Box::new(self.zonk(&k, default))),
@@ -282,18 +314,60 @@ impl KindStore {
 
     fn unify_inner(&mut self, a: &Kind, b: &Kind) -> Result<(), (Kind, Kind)> {
         let (a, b) = (self.resolve(a), self.resolve(b));
-        let legacy = a
-            .legacy_meta_root()
-            .map(|m| (m, &b))
-            .or_else(|| b.legacy_meta_root().map(|m| (m, &a)));
-        if let Some((m, other)) = legacy {
-            if a == b {
+        let candidate = if let Kind::Meta(meta) = &a {
+            meta.inference_kind_root().map(|_| (meta, &b))
+        } else {
+            None
+        }
+        .or_else(|| {
+            if let Kind::Meta(meta) = &b {
+                meta.inference_kind_root().map(|_| (meta, &a))
+            } else {
+                None
+            }
+        });
+        if let Some((meta, other)) = candidate {
+            let m = meta.root();
+            let failure = || (a.clone(), b.clone());
+            let mappings = self.lexical_mappings(meta).map_err(|()| failure())?;
+            if other.inference_meta_root() == Some(m) {
+                let Kind::Meta(other) = other else {
+                    unreachable!("kind root")
+                };
+                let other_view = self.lexical_mappings(other).map_err(|()| failure())?;
+                if meta == other {
+                    return Ok(());
+                }
+                let mut context = self.contexts[m as usize].clone();
+                context.lexical.permitted.retain(|id| {
+                    let left = mappings
+                        .iter()
+                        .find(|(from, _)| from.id == *id)
+                        .map(|(_, target)| target);
+                    let right = other_view
+                        .iter()
+                        .find(|(from, _)| from.id == *id)
+                        .map(|(_, target)| target);
+                    left.is_some() && left == right
+                });
+                self.write_context(m, context);
                 return Ok(());
             }
             if self.occurs(m, other) {
                 return Err((self.zonk(&a, false), self.zonk(&b, false)));
             }
-            self.assign(m, other.clone());
+            let allowed = mappings
+                .iter()
+                .map(|(_, target)| target.clone())
+                .collect::<Vec<_>>();
+            let solution = self
+                .restrict_lexical(other, &allowed, &[])
+                .map_err(|()| failure())?;
+            let inverse = mappings
+                .iter()
+                .map(|(from, to)| (to.clone(), from.clone()))
+                .collect::<Vec<_>>();
+            self.assign(m, lexical::transport_kind(&solution, &inverse));
             return Ok(());
         }
         match (&a, &b) {
@@ -309,7 +383,7 @@ impl KindStore {
 
     fn occurs(&self, m: u32, kind: &Kind) -> bool {
         match self.resolve(kind) {
-            Kind::Meta(meta) => meta.legacy_root() == Some(m),
+            Kind::Meta(meta) => meta.inference_kind_root() == Some(m),
             Kind::Row(k) => self.occurs(m, &k),
             Kind::Arrow(a, b) => self.occurs(m, &a) || self.occurs(m, &b),
             _ => false,
@@ -318,6 +392,7 @@ impl KindStore {
 }
 
 include!("kinds/context.rs");
+include!("kinds/lexical.rs");
 
 #[cfg(test)]
 mod transaction_tests {

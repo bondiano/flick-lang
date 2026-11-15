@@ -273,3 +273,27 @@ fn nested_member_dictionary_and_values_use_the_same_materialized_view() {
     let source = "module Probe exposing (ChildSig, S, Packed, same)\nclass Equal a =\n  equal : a -> a -> Bool\ntype module ChildSig =\n  type Key\ntype module S =\n  module Child : ChildSig\n  value : Child.Key\n  other : Child.Key\n  equality : Equal.Dict Child.Key\n  instance Equal Child.Key from equality\ntype alias Packed = exists J : S. Unit\nsame : Packed -> Bool\nlet same packed = unpack packed as K, _payload in equal K.value K.other\n";
     checked_interface("Probe", source, &[]);
 }
+
+#[test]
+fn a_named_annotation_variable_is_outside_an_existential_even_when_first_used_inside_it() {
+    use crate::diagnostics::codes;
+    let source = "module Probe exposing (S, Packed, discard)\ntype module S =\n  type Token\ntype alias Packed = exists K : S. K.Token\ndiscard : Packed -> Unit\nlet discard value =\n  let x : exists J : S. a = value\n  ()\n";
+    let mut sources = SourceMap::default();
+    let file = sources.add("Probe.fl", source);
+    let diagnostics = crate::check(&sources, file);
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == codes::T003),
+        "annotation-wide a cannot learn a hidden Token: {diagnostics:?}"
+    );
+}
+
+#[test]
+fn a_named_annotation_variable_can_infer_a_closed_manifest_solution() {
+    checked_interface(
+        "Probe",
+        "module Probe exposing (S, Packed, discard)\ntype module S =\n  type Box a = List a\ntype alias Packed = exists K : S. K.Box Int\ndiscard : Packed -> Unit\nlet discard value =\n  let x : exists J : S. a = value\n  ()\n",
+        &[],
+    );
+}

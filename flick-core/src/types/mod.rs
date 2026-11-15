@@ -327,6 +327,7 @@ fn checker_in<'a>(
         contract_types: Vec::new(),
         opened_modules: Vec::new(),
         witness_counter: 0,
+        annotation_contexts: Vec::new(),
         named_witnesses: module_contract::NamedWitnesses::default(),
         sites: Vec::new(),
         literals: Vec::new(),

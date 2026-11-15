@@ -64,6 +64,15 @@ impl<'s, 'e> Read<'s, 'e> {
         let mut head = Cow::Borrowed(ty);
         loop {
             match head.as_ref() {
+                Type::Meta(meta) if meta.lexical().is_some() => {
+                    let mappings = store
+                        .lexical_mappings(meta)
+                        .map_err(|()| ProjectionError::Invalid(Invalid::Authority))?;
+                    let Some(solution) = store.raw_solution(meta.root()) else {
+                        return Ok(head);
+                    };
+                    head = Cow::Owned(lexical::transport_type(solution, &mappings));
+                }
                 Type::Meta(_) => {
                     let (root, view) = self
                         .store
@@ -175,6 +184,23 @@ impl<'s, 'e> Read<'s, 'e> {
         binders: &[Binder],
         bound: &[Bound],
     ) -> Result<Kind, Incomplete> {
+        if let Type::Meta(meta) = ty
+            && meta.lexical().is_some()
+        {
+            let mappings = self
+                .store
+                .lexical_mappings(meta)
+                .map_err(|()| Incomplete::InvalidOccurrence(Invalid::Authority))?;
+            let context = &self.store.meta_contexts[meta.root() as usize];
+            let canonical = if let Some(kind) = &context.kind {
+                kind.clone()
+            } else if let Some(solution) = self.store.raw_solution(meta.root()) {
+                self.scoped_head_kind(solution, binders, bound)?
+            } else {
+                return Err(Incomplete::Head(ty.clone()));
+            };
+            return self.checked_kind(&lexical::transport_kind(&canonical, &mappings));
+        }
         let (root, view) = self
             .store
             .occurrence(ty)

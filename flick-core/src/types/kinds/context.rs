@@ -7,6 +7,7 @@ use super::ty::ScopeId;
 struct KindContext {
     canonical: Context,
     permitted: Context,
+    lexical: LexicalRoot,
 }
 
 #[derive(Debug)]
@@ -24,6 +25,11 @@ impl KindStore {
     }
 
     pub(in crate::types) fn valid_occurrence(&self, kind: &Kind) -> bool {
+        if let Kind::Meta(meta) = kind
+            && meta.lexical().is_some()
+        {
+            return self.lexical_mappings(meta).is_ok();
+        }
         self.occurrence(kind).is_ok()
     }
 
@@ -36,6 +42,13 @@ impl KindStore {
     ) -> bool {
         let Kind::Meta(meta) = kind else { return false };
         let root = meta.root();
+        if meta.lexical().is_some() {
+            return self
+                .contexts
+                .get(root as usize)
+                .is_some_and(|context| valid_context(&context.canonical))
+                && self.lexical_mappings(meta).is_ok();
+        }
         if let Some(occurrence) = meta.contextual()
             && (!occurrence.is_kind()
                 || Some(occurrence.owner()) != self.witness_authority
@@ -58,9 +71,19 @@ impl KindStore {
     ) -> Result<Kind, super::module_contract::context::Invalid> {
         use super::module_contract::context::Invalid;
         Ok(match kind {
-            Kind::Meta(_) => {
+            Kind::Meta(meta) => {
                 if !self.valid_occurrence_in(kind, valid_context) {
                     return Err(Invalid::Authority);
+                }
+                if meta.lexical().is_some() {
+                    let mappings = self
+                        .lexical_mappings(meta)
+                        .map_err(|()| Invalid::Authority)?;
+                    let Some(solution) = &self.metas[meta.root() as usize] else {
+                        return Ok(kind.clone());
+                    };
+                    let projected = lexical::transport_kind(solution, &mappings);
+                    return self.resolve_deep_in(&projected, valid_context);
                 }
                 let (root, view) = self.occurrence(kind).map_err(|()| Invalid::Authority)?;
                 let Some(solution) = &self.metas[root as usize] else {
@@ -86,7 +109,7 @@ impl KindStore {
         let root = meta.root();
         let context = self.contexts.get(root as usize).ok_or(())?;
         if meta.legacy_root().is_some() {
-            if context.canonical.len() != 0 {
+            if context.canonical.len() != 0 || !context.lexical.canonical.is_empty() {
                 return Err(());
             }
             return Ok((root, Embedding::identity(&context.canonical)));
@@ -193,6 +216,7 @@ mod context_tests {
             KindContext {
                 canonical: context.clone(),
                 permitted: Context::default(),
+                lexical: LexicalRoot::default(),
             },
         );
         kinds.enter_context(Context::default());

@@ -110,46 +110,52 @@ impl Checker<'_> {
                 missing(&only_left, true)?;
                 missing(&only_right, false)
             }
-            ([a], [b]) if a.legacy_meta_root().is_some() && b.legacy_meta_root().is_some() => {
-                let a = a.legacy_meta_root().expect("legacy row tail");
-                let b = b.legacy_meta_root().expect("legacy row tail");
-                let rest = self.fresh();
+            ([a], [b])
+                if a.inference_meta_root().is_some() && b.inference_meta_root().is_some() =>
+            {
+                let a_root = a.inference_meta_root().expect("inference row tail");
+                let b_root = b.inference_meta_root().expect("inference row tail");
+                let rest = self
+                    .store
+                    .fresh_beside_occurrence(a)
+                    .expect("validated inference row");
                 // the shared rest is a row of the kind of the rows it ends
-                if let Some(r) = rest.legacy_meta_root() {
-                    self.store.mark_like(r, a);
-                    self.store.mark_like(r, b);
+                if let Some(r) = rest.inference_meta_root() {
+                    self.store.mark_like(r, a_root);
+                    self.store.mark_like(r, b_root);
                 }
-                self.bind(a, &extended(only_right, vec![rest.clone()]))?;
-                self.bind(b, &extended(only_left, vec![rest]))
+                self.bind_inference(a, &extended(only_right, vec![rest.clone()]))?;
+                self.bind_inference(b, &extended(only_left, vec![rest]))
             }
-            ([tail], _) if tail.legacy_meta_root().is_some() => {
-                let m = tail.legacy_meta_root().expect("legacy row tail");
+            ([tail], _) if tail.inference_meta_root().is_some() => {
                 missing(&only_left, true)?;
-                self.bind(
-                    m,
+                self.bind_inference(
+                    tail,
                     &written(extended(only_right, tails_right), right_written),
                 )
             }
-            (_, [tail]) if tail.legacy_meta_root().is_some() => {
-                let m = tail.legacy_meta_root().expect("legacy row tail");
+            (_, [tail]) if tail.inference_meta_root().is_some() => {
                 missing(&only_right, false)?;
-                self.bind(m, &written(extended(only_left, tails_left), left_written))
+                self.bind_inference(
+                    tail,
+                    &written(extended(only_left, tails_left), left_written),
+                )
             }
             // `?m` less some names against a row: the least `?m` is that row,
             // which then holds none of the names
             ([Type::Without { row, gone }], _) if matches!(**row, Type::Meta(_)) => {
                 missing(&only_left, true)?;
-                let Some(m) = row.legacy_meta_root() else {
+                let Some(_) = row.inference_meta_root() else {
                     return Err(Mismatch::Types(left.into_type(), right.into_type()));
                 };
-                self.bind(m, &left_out(only_right, tails_right, gone, false)?)
+                self.bind_inference(row, &left_out(only_right, tails_right, gone, false)?)
             }
             (_, [Type::Without { row, gone }]) if matches!(**row, Type::Meta(_)) => {
                 missing(&only_right, false)?;
-                let Some(m) = row.legacy_meta_root() else {
+                let Some(_) = row.inference_meta_root() else {
                     return Err(Mismatch::Types(left.into_type(), right.into_type()));
                 };
-                self.bind(m, &left_out(only_left, tails_left, gone, true)?)
+                self.bind_inference(row, &left_out(only_left, tails_left, gone, true)?)
             }
             // `r1 + r2` against what is left empty: each variable is empty
             (metas, []) | ([], metas)

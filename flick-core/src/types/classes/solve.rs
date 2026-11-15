@@ -102,15 +102,17 @@ impl Checker<'_> {
         let mut open = Vec::new();
         for c in &wanted {
             c.visit(&mut |t| {
-                if let Some(m) = t.legacy_meta_root()
+                if let Some(m) = t.inference_meta_root()
                     && self.store.is_numeric(m)
-                    && !open.contains(&m)
+                    && !open.iter().any(|(root, _)| *root == m)
                 {
-                    open.push(m);
+                    open.push((m, t.clone()));
                 }
             });
         }
-        for &m in &open {
+        let mut progress = false;
+        for (m, variable) in &open {
+            let m = *m;
             let fractional = self.store.is_fractional(m);
             let fits = |num: &Num| {
                 if fractional && !num.fractional() {
@@ -119,14 +121,14 @@ impl Checker<'_> {
                 let ty = Type::lang(num.lang());
                 wanted
                     .iter()
-                    .filter(|c| c.contains(&mut |t| *t == Type::meta(m)))
+                    .filter(|c| c.contains(&mut |t| t.inference_meta_root() == Some(m)))
                     .all(|c| self.may_have_instance(&replace_metas(c, &[(m, ty.clone())])))
             };
             let fallback = default_num(fractional);
             let num = Num::ALL.iter().find(|n| fits(n)).unwrap_or(&fallback);
-            let _ = self.unify(&Type::meta(m), &Type::lang(num.lang()));
+            progress |= self.unify(variable, &Type::lang(num.lang())).is_ok();
         }
-        !open.is_empty()
+        progress
     }
 
     /// Whether an instance head matches `c`, or its class has no declared

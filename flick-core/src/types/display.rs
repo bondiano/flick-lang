@@ -178,14 +178,12 @@ impl Printer<'_> {
             Type::Skolem(s) => out.push_str(self.store.skolem_name(*s)),
             // a number literal's type is `Int`, or `Float` with a fraction,
             // unless something says otherwise
-            Type::Meta(meta) if meta.legacy_root().is_some_and(|m| self.store.is_numeric(m)) => {
-                out.push_str(
-                    default_num(
-                        self.store
-                            .is_fractional(meta.legacy_root().expect("legacy numeric display")),
-                    )
-                    .name(),
-                );
+            Type::Meta(meta)
+                if meta
+                    .inference_type_root()
+                    .is_some_and(|m| self.store.is_numeric(m)) =>
+            {
+                out.push_str(default_num(self.store.is_fractional(meta.root())).name());
             }
             Type::Meta(_) => out.push('_'),
             Type::Error => out.push('?'),
