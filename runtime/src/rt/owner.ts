@@ -94,6 +94,11 @@ export class Owner {
   /** C5 has started: a finalizer added now runs at once, with this exit. */
   finalizing = false;
   exit: Exit | undefined = undefined;
+  /**
+   * A library acquisition scope: `Within` must not redirect finalizers onto
+   * an outer lexical owner, or releases wait until that outer scope ends.
+   */
+  detached = false;
 
   constructor(defects: Array<Cause> = reported) {
     this.defects = defects;
@@ -281,10 +286,13 @@ export const arenaMake = (): Arena => {
 export const ownerHooks: { within?: (owner: object, call: () => unknown) => unknown } = {};
 /** A raw call acquiring into the compiler-selected lexical owner. */
 export const within = (owner: OwnerEvidence, call: () => unknown): unknown => {
+  const current = currentCtx().owner;
+  // A pinned library acquisition keeps its frame so finalizers stay put.
+  if (current?.detached) return call();
   if (owner instanceof Owner) {
     // Already acquiring into this owner: keep the current frame so fiber-local
     // updates stay visible to the caller.
-    if (currentCtx().owner === owner) return call();
+    if (current === owner) return call();
     return inside(owner, call);
   }
   if (owner !== undefined && ownerHooks.within !== undefined) return ownerHooks.within(owner, call);

@@ -41,6 +41,7 @@ export const acquireHolder = <A, E, R>(
       const parent = yield* Effect.service(CurrentOwner);
       const scope = yield* Scope.make();
       const owner = new Owner(scope, parent?.defects);
+      owner.detached = true;
       const exit = yield* Effect.exit(
         restore(outer(inside(owner, withOwnerEvidence(owner, () => acquire)))),
       );
