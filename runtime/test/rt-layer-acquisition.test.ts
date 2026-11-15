@@ -9,11 +9,14 @@ import { root } from "./rt-support.ts";
 
 for (const shared of [false, true]) {
   for (const failing of [false, true]) {
-    test(`${shared ? "memoized" : "private"} layer acquisition keeps captured-owner finalizers on its build scope (${failing ? "failure" : "success"})`, async () => {
+    test(`${shared ? "memoized" : "private"} layer acquisition keeps fresh-evidence finalizers on its build scope (${failing ? "failure" : "success"})`, async () => {
       const events: string[] = [];
       const exit = await root(() => rt.scopeRun((outer) => (function* (): rt.Run {
         const acquire = function* (): rt.Run {
-          yield rt.within(outer, () => rt.addFinalizer(() => { events.push("released"); }));
+          const owner = rt.readOwnerEvidence();
+          assert.notEqual(owner, outer);
+          assert.equal(owner, rt.scopeCurrent());
+          yield rt.within(owner, () => rt.addFinalizer(() => { events.push("released"); }));
           if (failing) return rt.raise(rt.fail("acquisition failed"));
           return {};
         };
@@ -40,7 +43,7 @@ for (const shared of [false, true]) {
   }
 }
 
-test("a nested layer acquisition replaces its detached caller's owner until its consumer finishes", async () => {
+test("a nested layer acquisition replaces its acquiring caller's owner until its consumer finishes", async () => {
   const events: string[] = [];
   const exit = await root(() => rt.scopeRun((outer) => {
     const layer = effect(rt.service("OuterAcquisition"))(function* (): rt.Run {
@@ -50,7 +53,7 @@ test("a nested layer acquisition replaces its detached caller's owner until its 
         const second = rt.scopeCurrent();
         assert.notEqual(second, first);
         assert.notEqual(second, outer);
-        yield rt.within(first, () => rt.addFinalizer(() => { events.push("nested released"); }));
+        yield rt.within(rt.readOwnerEvidence(), () => rt.addFinalizer(() => { events.push("nested released"); }));
         return {};
       });
       yield layerRun(nested, () => {
@@ -60,7 +63,7 @@ test("a nested layer acquisition replaces its detached caller's owner until its 
       assert.equal(rt.scopeCurrent(), first);
       assert.equal(rt.readOwnerEvidence(), first);
       assert.deepEqual(events, ["nested body", "nested released"]);
-      yield rt.within(outer, () => rt.addFinalizer(() => { events.push("outer released"); }));
+      yield rt.within(first, () => rt.addFinalizer(() => { events.push("outer released"); }));
       return {};
     });
     return layerRun(layer, () => {
@@ -70,4 +73,22 @@ test("a nested layer acquisition replaces its detached caller's owner until its 
   }));
   assert.equal(exit.cause, undefined);
   assert.deepEqual(events, ["nested body", "nested released", "outer body", "outer released"]);
+});
+
+
+test("a layer acquisition honors explicit activation of an outer lexical owner", async () => {
+  const events: string[] = [];
+  const exit = await root(() => rt.scopeRun((outer) => (function* (): rt.Run {
+    const layer = effect(rt.service("ExplicitLayerOwner"))(function* (): rt.Run {
+      assert.notEqual(rt.scopeCurrent(), outer);
+      yield rt.within(outer, () => rt.addFinalizer(() => { events.push("outer released"); }));
+      return {};
+    });
+    yield layerRun(layer, () => { events.push("body"); });
+    assert.equal(outer.open, true);
+    assert.deepEqual(events, ["body"]);
+    return undefined;
+  })()));
+  assert.equal(exit.cause, undefined);
+  assert.deepEqual(events, ["body", "outer released"]);
 });

@@ -1,102 +1,137 @@
 use super::*;
-use crate::ir::Stmt;
 
-#[test]
-fn default_selectors_use_one_shared_known_node_membership_observation() {
-    let templates = alias_dispatch_fixture();
-    let mut build = Build {
-        templates: &templates,
-        run: "$owner".into(),
-        impossible: "$owner$invalid".into(),
-        span: Span::new(FileId::new(0), 0, 0),
-        next: 0,
-    };
-    let expression = build.nodes_with_default(
-        build.local("original"),
-        |_, current| current,
-        |_, _, _, _| None,
-    );
-    let arms = node_arms(&expression);
-    assert_eq!(
-        arms.len(),
-        1,
-        "a default-only selector must not copy the known-ID table"
-    );
-    assert!(matches!(arms[0].pat, Pat::Wild));
-    let (subject, _) = dispatch(&expression);
-    let ExprKind::If(condition, current, invalid) = &arms[0].body.kind else {
-        panic!("one shared observation must guard the default from unknown IDs");
-    };
-    assert_membership_call(condition, subject);
-    assert_impossible(invalid);
-    let ExprKind::Block(statements, _) = &expression.kind else {
-        panic!("unpack descriptor");
-    };
-    let Stmt::Let(Pat::Tuple(bindings), _) = &statements[0] else {
-        panic!("original descriptor fields");
-    };
-    assert!(
-        matches!(&current.kind, ExprKind::Tuple(fields) if fields.len() == 2 && fields.iter().zip(bindings).all(|(field, binding)|
-        matches!((&field.kind, binding), (ExprKind::Local(actual), Pat::Bind(expected)) if actual == expected))),
-        "the shared default receives exactly the original node and lazy environment"
-    );
-}
-
-fn dispatch(expression: &Expr) -> (&Expr, &[Arm]) {
-    match &expression.kind {
-        ExprKind::Block(_, body) | ExprKind::If(_, body, _) => dispatch(body),
-        ExprKind::Match(subject, arms) => (subject, arms),
-        _ => panic!("descriptor node dispatch"),
+pub(super) fn matches(pattern: &Pat, index: i32) -> bool {
+    match pattern {
+        Pat::Lit(Lit::Int(id)) => *id == index,
+        Pat::Or(alternatives) => alternatives.iter().any(|pattern| matches(pattern, index)),
+        Pat::Wild => true,
+        _ => panic!("integer dispatch pattern"),
     }
 }
 
-fn assert_impossible(expression: &Expr) {
+pub(super) fn assert_impossible(expression: &Expr) {
     assert!(
-        matches!(&expression.kind,
-        ExprKind::App { func, .. } if matches!(&func.kind,
-            ExprKind::Local(name) if name.ends_with("$invalid"))),
-        "an unknown node index must still fail closed"
+        is_impossible(expression),
+        "an unknown index must still fail closed"
     );
 }
 
-fn assert_membership_call(expression: &Expr, subject: &Expr) {
-    let ExprKind::App { func, arg, .. } = &expression.kind else {
-        panic!("shared membership call");
-    };
-    assert!(matches!(&func.kind, ExprKind::Local(_)));
-    let ExprKind::Tuple(fields) = &arg.kind else {
-        panic!("membership arguments");
-    };
-    assert!(matches!(fields[0].kind, ExprKind::Lit(Lit::Int(op)) if op == Op::KnownNode as i32));
-    assert!(
-        matches!((&fields[1].kind, &subject.kind),
-        (ExprKind::Local(actual), ExprKind::Local(expected)) if actual == expected),
-        "membership must test the same original node as the selector"
-    );
+fn is_impossible(expression: &Expr) -> bool {
+    matches!(&expression.kind, ExprKind::App { func, .. }
+        if matches!(&func.kind, ExprKind::Local(name) if name.ends_with("$invalid")))
 }
 
-pub(super) fn assert_shared_defaults(operations: &[Arm]) {
-    let membership = operations
-        .iter()
-        .find(|arm| matches!(arm.pat, Pat::Lit(Lit::Int(op)) if op == Op::KnownNode as i32))
-        .expect("one shared membership operation");
-    let (_, membership_arms) = dispatch(&membership.body);
-    assert_eq!(membership_arms.len(), 2);
-    assert!(matches!(membership_arms[0].pat, Pat::Or(_)));
-    assert!(matches!(
-        membership_arms[0].body.kind,
-        ExprKind::Lit(Lit::Bool(true))
-    ));
-    assert!(matches!(membership_arms[1].pat, Pat::Wild));
-    assert!(matches!(
-        membership_arms[1].body.kind,
-        ExprKind::Lit(Lit::Bool(false))
-    ));
-    let mut expected = BTreeSet::new();
-    known_ids(&membership_arms[0].pat, &mut expected);
+fn bound(condition: &Expr) -> Option<i32> {
+    let ExprKind::Binary(BinOp::And, lower, upper) = &condition.kind else {
+        return None;
+    };
+    let ExprKind::Binary(BinOp::Ge, low_subject, zero) = &lower.kind else {
+        return None;
+    };
+    let ExprKind::Binary(BinOp::Lt, high_subject, count) = &upper.kind else {
+        return None;
+    };
+    let (
+        ExprKind::Local(low),
+        ExprKind::Local(high),
+        ExprKind::Lit(Lit::Int(0)),
+        ExprKind::Lit(Lit::Int(count)),
+    ) = (
+        &low_subject.kind,
+        &high_subject.kind,
+        &zero.kind,
+        &count.kind,
+    )
+    else {
+        return None;
+    };
+    assert_eq!(low, high, "both bounds test the same original discriminant");
+    Some(*count)
+}
+
+fn dispatch(expression: &Expr) -> &Expr {
+    match &expression.kind {
+        ExprKind::Block(_, body) => dispatch(body),
+        ExprKind::If(condition, _, _) if bound(condition).is_some() => expression,
+        ExprKind::If(_, yes, _) => dispatch(yes),
+        ExprKind::Match(_, _) => expression,
+        _ => panic!("integer dispatch"),
+    }
+}
+
+pub(super) fn select(expression: &Expr, index: i32) -> Option<&Expr> {
+    match &dispatch(expression).kind {
+        ExprKind::If(condition, yes, no) => {
+            if (0..bound(condition).expect("checked domain")).contains(&index) {
+                select(yes, index)
+            } else {
+                assert_impossible(no);
+                None
+            }
+        }
+        ExprKind::Match(_, arms) => arms
+            .iter()
+            .find(|arm| matches(&arm.pat, index))
+            .filter(|arm| !is_impossible(&arm.body))
+            .map(|arm| &arm.body),
+        _ => unreachable!(),
+    }
+}
+
+pub(super) fn assert_unknown(expression: &Expr, end: i32) {
+    for index in [-1, end, i32::MAX] {
+        assert!(
+            select(expression, index).is_none(),
+            "unknown index {index} must not select a successful body"
+        );
+    }
+}
+
+fn domain(expression: &Expr) -> BTreeSet<i32> {
+    match &dispatch(expression).kind {
+        ExprKind::If(condition, _, invalid) => {
+            assert_impossible(invalid);
+            (0..bound(condition).expect("checked domain")).collect()
+        }
+        ExprKind::Match(_, arms) => {
+            let mut ids = BTreeSet::new();
+            for arm in arms {
+                known_ids(&arm.pat, &mut ids);
+            }
+            ids
+        }
+        _ => unreachable!(),
+    }
+}
+
+pub(super) fn assert_operation_domain(operations: &[Arm]) {
+    let mut ids = BTreeSet::new();
+    for arm in operations {
+        known_ids(&arm.pat, &mut ids);
+    }
     assert_eq!(
-        expected.iter().copied().collect::<Vec<_>>(),
-        (0..i32::try_from(expected.len()).expect("few nodes")).collect::<Vec<_>>()
+        ids,
+        (0..=Op::HeadAlias as i32).collect(),
+        "all operation discriminants remain complete and disjoint"
+    );
+    let unknown = operations.last().expect("invalid operation");
+    assert!(matches!(unknown.pat, Pat::Wild));
+    assert_impossible(&unknown.body);
+}
+
+pub(super) fn assert_exact_node_domains(operations: &[Arm]) {
+    let operation = |op: Op| {
+        &operations
+            .iter()
+            .find(|arm| matches(&arm.pat, op as i32))
+            .expect("descriptor operation")
+            .body
+    };
+    let expected = domain(operation(Op::Resolve));
+    assert_eq!(
+        expected,
+        (0..expected.len() as i32).collect(),
+        "original node IDs remain dense"
     );
     for op in [
         Op::Resolve,
@@ -108,77 +143,108 @@ pub(super) fn assert_shared_defaults(operations: &[Arm]) {
         Op::IsSymbol,
         Op::Dictionary,
     ] {
-        let operation = operations
-            .iter()
-            .find(|arm| matches!(arm.pat, Pat::Lit(Lit::Int(id)) if id == op as i32))
-            .expect("descriptor operation");
-        let (subject, arms) = dispatch(&operation.body);
-        let fallback = arms.last().expect("invalid node arm");
-        assert!(matches!(fallback.pat, Pat::Wild));
-        let mut specialized = BTreeSet::new();
-        for arm in &arms[..arms.len() - 1] {
-            known_ids(&arm.pat, &mut specialized);
+        let expression = operation(op);
+        assert_eq!(
+            domain(expression),
+            expected,
+            "every selector preserves the full original node domain"
+        );
+        for &id in &expected {
+            assert!(select(expression, id).is_some(), "known node {id}");
         }
-        assert!(specialized.is_subset(&expected));
-        if let ExprKind::If(condition, _, invalid) = &fallback.body.kind {
-            assert_membership_call(condition, subject);
-            assert_impossible(invalid);
-            assert!(
-                specialized.len() < expected.len(),
-                "only selectors with defaults need membership"
-            );
-        } else {
-            assert_impossible(&fallback.body);
-            assert_eq!(
-                specialized, expected,
-                "explicit selectors preserve every original ID"
-            );
-        }
+        assert_unknown(expression, expected.len() as i32);
     }
 }
 
 #[test]
+fn dense_default_selectors_share_one_bounds_check_and_forward_the_original_descriptor() {
+    let templates = alias_dispatch_fixture();
+    let mut build = builder(&templates);
+    let expression = build.nodes(build.local("original"), |_, _, _, _, current| current);
+    let (current, fields, source) = descriptor_parts(&expression);
+    assert!(matches!(&source.kind, ExprKind::Local(name) if name == "original"));
+    assert_eq!(
+        fields.len(),
+        2,
+        "the original node and lazy environment are unpacked together"
+    );
+    let ExprKind::If(condition, yes, invalid) = &dispatch(&expression).kind else {
+        panic!("one checked domain");
+    };
+    assert_eq!(bound(condition), Some(8));
+    assert_impossible(invalid);
+    let arms = node_arms(yes);
+    assert_eq!(
+        arms.len(),
+        1,
+        "identical results share one body inside the checked original domain"
+    );
+    assert!(matches!(arms[0].pat, Pat::Wild));
+    assert_current(&arms[0].body, current);
+    for id in 0..8 {
+        assert_current(select(&expression, id).unwrap(), current);
+    }
+    assert_unknown(&expression, 8);
+}
+
+#[test]
 fn membership_is_exact_for_empty_singleton_and_original_node_domains() {
-    let mut templates = alias_dispatch_fixture();
+    let templates = alias_dispatch_fixture();
     for count in [0, 1, templates.exprs.len()] {
         let mut fixture = templates.clone();
         fixture.exprs.truncate(count);
-        let build = Build {
-            templates: &fixture,
-            run: "$owner".into(),
-            impossible: "$owner$invalid".into(),
-            span: Span::new(FileId::new(0), 0, 0),
-            next: 0,
-        };
-        let expression = build.known_node(build.local("original"));
-        if count == 0 {
-            assert!(matches!(expression.kind, ExprKind::Lit(Lit::Bool(false))));
-        } else {
-            let (subject, arms) = dispatch(&expression);
-            assert!(matches!(&subject.kind, ExprKind::Local(name) if name == "original"));
-            assert_eq!(arms.len(), 2);
-            let mut ids = BTreeSet::new();
-            known_ids(&arms[0].pat, &mut ids);
-            assert_eq!(ids, (0..i32::try_from(count).expect("few nodes")).collect());
-            assert!(matches!(arms[0].body.kind, ExprKind::Lit(Lit::Bool(true))));
-            assert!(matches!(arms[1].pat, Pat::Wild));
-            assert!(matches!(arms[1].body.kind, ExprKind::Lit(Lit::Bool(false))));
+        let mut build = builder(&fixture);
+        let expression = build.nodes(build.local("original"), |this, _, _, _, _| {
+            this.boolean(true)
+        });
+        assert_eq!(domain(&expression), (0..count as i32).collect());
+        for id in 0..count as i32 {
+            assert!(matches!(
+                select(&expression, id).unwrap().kind,
+                ExprKind::Lit(Lit::Bool(true))
+            ));
         }
+        assert_unknown(&expression, count as i32);
     }
-    templates.exprs.truncate(1);
-    let mut build = Build {
-        templates: &templates,
-        run: "$owner".into(),
-        impossible: "$owner$invalid".into(),
-        span: Span::new(FileId::new(0), 0, 0),
-        next: 0,
-    };
-    let all_special = build.nodes_with_default(
-        build.local("original"),
-        |_, _| panic!("unused default must not be built"),
-        |this, _, _, _| Some(this.boolean(true)),
+}
+
+#[test]
+fn sparse_and_nonlocal_dispatches_preserve_membership_and_single_evaluation() {
+    let templates = alias_dispatch_fixture();
+    let build = builder(&templates);
+    let ids = [0, 2, 4, 6, 8];
+    let mut arms = ids
+        .iter()
+        .map(|&id| (Pat::Lit(Lit::Int(id)), build.boolean(true)))
+        .collect::<Vec<_>>();
+    arms.push((Pat::Wild, build.impossible()));
+    let sparse = build.case(build.local("index"), arms);
+    assert!(
+        matches!(sparse.kind, ExprKind::Match(_, _)),
+        "a sparse table must not acquire a dense range assumption"
     );
-    let (_, arms) = dispatch(&all_special);
-    assert_eq!(arms.len(), 2);
-    assert_impossible(&arms[1].body);
+    for id in -1..=9 {
+        assert_eq!(select(&sparse, id).is_some(), ids.contains(&id));
+    }
+    let source = build.pure(build.local("input"), build.unit());
+    let mut arms = (0..8)
+        .map(|id| (Pat::Lit(Lit::Int(id)), build.boolean(true)))
+        .collect::<Vec<_>>();
+    arms.push((Pat::Wild, build.impossible()));
+    let nonlocal = build.case(source, arms);
+    assert!(
+        matches!(&nonlocal.kind, ExprKind::Match(subject, _) if matches!(subject.kind, ExprKind::App { .. })),
+        "a nonlocal scrutinee remains evaluated once without duplicated range tests"
+    );
+    assert_eq!(
+        count(
+            &nonlocal,
+            |e| matches!(&e.kind, ExprKind::App { func, .. } if matches!(&func.kind, ExprKind::Local(name) if name == "input"))
+        ),
+        1
+    );
+    for id in 0..8 {
+        assert!(select(&nonlocal, id).is_some());
+    }
+    assert_unknown(&nonlocal, 8);
 }

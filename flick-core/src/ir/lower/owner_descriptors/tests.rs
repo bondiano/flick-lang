@@ -1,73 +1,54 @@
 use std::collections::BTreeSet;
 
-use super::{Build, Op};
+use super::{Build, Op, alias_groups};
 use crate::ir::tests::lower_text;
-use crate::ir::{Arm, BinOp, Expr, ExprKind, ItemKind, Lit, Pat};
+use crate::ir::{Arm, BinOp, Expr, ExprKind, ItemKind, Lit, Pat, Stmt};
 use crate::source::{FileId, Span};
 use crate::types::OwnerTypeTemplates;
 
 mod resolution {
     include!("tests/resolution.rs");
 }
-
 mod membership {
     include!("tests/membership.rs");
 }
 
-fn abstract_calls(expression: &Expr) -> usize {
-    let mut count = usize::from(matches!(&expression.kind,
-        ExprKind::App { arg, .. } if matches!(&arg.kind, ExprKind::Tuple(fields)
-            if matches!(fields.first().map(|field| &field.kind), Some(ExprKind::Lit(Lit::Int(op))) if *op == Op::Abstract as i32))));
-    expression.each_child(&mut |child| count += abstract_calls(child));
-    count
-}
-
-fn inspect(expression: &Expr, found: &mut bool) {
-    if let ExprKind::Lambda { params, body } = &expression.kind
-        && params.len() == 1
-        && matches!(&params[0].pat, Pat::Tuple(fields) if fields.len() == 4)
-        && let ExprKind::Match(_, arms) = &body.kind
-        && let Some(arm) = arms.iter().find(|arm| {
-            matches!(&arm.pat,
-            Pat::Lit(Lit::Int(op)) if *op == Op::Productive as i32)
+fn builder(templates: &OwnerTypeTemplates) -> Build<'_> {
+    let (alias_groups, alias_representatives) = alias_groups(templates);
+    let mut head_representatives = Vec::<usize>::new();
+    let head_groups = templates
+        .aliases
+        .iter()
+        .enumerate()
+        .map(|(id, alias)| {
+            head_representatives
+                .iter()
+                .position(|&other| templates.aliases[other].params == alias.params)
+                .unwrap_or_else(|| {
+                    head_representatives.push(id);
+                    head_representatives.len() - 1
+                })
         })
-    {
-        *found = true;
-        assert_eq!(
-            abstract_calls(&arm.body),
-            0,
-            "the P fastpath must tail-dispatch its fallback rather than duplicate full observations per syntax node"
-        );
+        .collect();
+    Build {
+        templates,
+        run: "$owner".into(),
+        temporaries: "$ot".into(),
+        impossible: "$owner$invalid".into(),
+        span: Span::new(FileId::new(0), 0, 0),
+        next: 0,
+        alias_groups,
+        alias_representatives,
+        head_groups,
+        head_representatives,
     }
-    expression.each_child(&mut |child| inspect(child, found));
-}
-
-fn match_count(expression: &Expr) -> usize {
-    let mut count = usize::from(matches!(&expression.kind, ExprKind::Match(..)));
-    expression.each_child(&mut |child| count += match_count(child));
-    count
-}
-
-fn static_condition_count(expression: &Expr) -> usize {
-    let mut count = usize::from(matches!(&expression.kind,
-        ExprKind::If(condition, ..) if matches!(condition.kind, ExprKind::Lit(Lit::Bool(_)))));
-    expression.each_child(&mut |child| count += static_condition_count(child));
-    count
-}
-
-fn literal_comparison_count(expression: &Expr) -> usize {
-    let mut count = usize::from(matches!(&expression.kind,
-        ExprKind::Binary(BinOp::Eq, left, right)
-            if matches!(left.kind, ExprKind::Lit(_)) && matches!(right.kind, ExprKind::Lit(_))));
-    expression.each_child(&mut |child| count += literal_comparison_count(child));
-    count
 }
 
 fn node_arms(expression: &Expr) -> &[Arm] {
     match &expression.kind {
         ExprKind::Block(_, body) | ExprKind::If(_, body, _) => node_arms(body),
         ExprKind::Match(_, arms) => arms,
-        _ => panic!("descriptor node dispatch"),
+        _ => panic!("descriptor dispatch"),
     }
 }
 
@@ -80,89 +61,111 @@ fn known_ids(pattern: &Pat, ids: &mut BTreeSet<i32>) {
             }
         }
         Pat::Wild => {}
-        _ => panic!("descriptor dispatch only tests original node IDs"),
+        _ => panic!("integer dispatch pattern"),
     }
 }
 
-fn inspect_abstract_apply(expression: &Expr, found: &mut bool) {
+fn calls(expression: &Expr, operation: Op) -> Vec<Vec<Expr>> {
+    let mut found = Vec::new();
+    if let ExprKind::App { arg, .. } = &expression.kind
+        && let ExprKind::Tuple(fields) = &arg.kind
+        && matches!(fields.first().map(|field| &field.kind), Some(ExprKind::Lit(Lit::Int(id))) if *id == operation as i32)
+    {
+        found.push(fields.clone());
+    }
+    expression.each_child(&mut |child| found.extend(calls(child, operation)));
+    found
+}
+
+fn count(expression: &Expr, predicate: fn(&Expr) -> bool) -> usize {
+    let mut found = usize::from(predicate(expression));
+    expression.each_child(&mut |child| found += count(child, predicate));
+    found
+}
+
+fn descriptor_parts(expression: &Expr) -> (&str, &[Pat], &Expr) {
+    if let ExprKind::Block(statements, body) = &expression.kind {
+        if let [Stmt::Let(Pat::Bind(current), source)] = &statements[..]
+            && let ExprKind::Block(unpack, _) = &body.kind
+            && let [Stmt::Let(Pat::Tuple(fields), value)] = &unpack[..]
+            && matches!(&value.kind, ExprKind::Local(name) if name == current)
+        {
+            return (current, fields, source);
+        }
+        return descriptor_parts(body);
+    }
+    panic!("the original descriptor is bound once before its node and environment are unpacked");
+}
+
+fn assert_current(expression: &Expr, current: &str) {
+    assert!(
+        matches!(&expression.kind, ExprKind::Local(name) if name == current),
+        "forward the original descriptor, including its lazy environment, rather than a representative ID"
+    );
+}
+
+fn inspect(expression: &Expr, found: &mut bool) {
     if let ExprKind::Lambda { params, body } = &expression.kind
         && params.len() == 1
         && matches!(&params[0].pat, Pat::Tuple(fields) if fields.len() == 4)
-        && let ExprKind::Match(_, arms) = &body.kind
-        && let Some(arm) = arms.iter().find(|arm| {
-            matches!(&arm.pat,
-            Pat::Lit(Lit::Int(op)) if *op == Op::AbstractApply as i32)
-        })
+        && let ExprKind::Match(_, operations) = &body.kind
+        && let Some(productive) = operations
+            .iter()
+            .find(|arm| membership::matches(&arm.pat, Op::Productive as i32))
     {
         *found = true;
-        membership::assert_shared_defaults(arms);
         assert_eq!(
-            match_count(&arm.body),
-            1,
-            "abstract application must share state-field observations instead of embedding a full state switch in each application case"
-        );
-        assert_eq!(
-            static_condition_count(&arm.body),
+            calls(&productive.body, Op::Abstract).len(),
             0,
-            "known abstract-state branches must be selected before generating the interpreter"
+            "productivity must tail-dispatch its fallback instead of copying full observations per node"
         );
-        let dictionary = arms
+        membership::assert_operation_domain(operations);
+        membership::assert_exact_node_domains(operations);
+        let application = operations
             .iter()
-            .find(|arm| {
-                matches!(&arm.pat,
-                Pat::Lit(Lit::Int(op)) if *op == Op::Dictionary as i32)
-            })
+            .find(|arm| membership::matches(&arm.pat, Op::AbstractApply as i32))
+            .expect("abstract application");
+        assert_eq!(
+            count(
+                &application.body,
+                |e| matches!(&e.kind, ExprKind::If(condition, ..) if matches!(condition.kind, ExprKind::Lit(Lit::Bool(_))))
+            ),
+            0,
+            "known abstract-state branches are selected before generating the interpreter"
+        );
+        let dictionary = operations
+            .iter()
+            .find(|arm| membership::matches(&arm.pat, Op::Dictionary as i32))
             .expect("dictionary operation");
         assert_eq!(
-            literal_comparison_count(&dictionary.body),
+            count(
+                &dictionary.body,
+                |e| matches!(&e.kind, ExprKind::Binary(BinOp::Eq, left, right) if matches!(left.kind, ExprKind::Lit(_)) && matches!(right.kind, ExprKind::Lit(_)))
+            ),
             0,
-            "declared constructor classification must not repeat constant comparisons at runtime"
+            "declared constructor classification does not repeat constant comparisons at runtime"
         );
     }
-    expression.each_child(&mut |child| inspect_abstract_apply(child, found));
+    expression.each_child(&mut |child| inspect(child, found));
 }
 
 #[test]
-fn abstract_application_shares_state_field_observations() {
-    let module = lower_text("Test", "module Test exposing (repeat)\ntype alias Reveal a = Errors {a | none}\nopaque type alias Repeat a s = Eff {Scope s} none (Reveal (Repeat (List a) s))\nrepeat : Repeat Int s\nforeign pure repeat from \"flick:rt\" \"repeat\"\n").expect("recursive original declaration");
-    let mut found = false;
-    for item in &module.items {
-        if let ItemKind::Value { body, .. } = &item.kind {
-            inspect_abstract_apply(body, &mut found);
-        }
-    }
-    assert!(found, "generated abstract application dispatcher");
-}
-
-#[test]
-fn productivity_fallback_is_shared_instead_of_copied_per_type_node() {
-    let module = lower_text("Test", "module Test exposing (repeat)\nopaque type alias Id a = a\nopaque type alias Repeat a s = Eff {Scope s} none (Id (Repeat (List a) s))\nrepeat : Repeat Int s\nforeign pure repeat from \"flick:rt\" \"repeat\"\n").expect("recursive original declaration");
+fn productivity_fallback_and_static_classification_remain_shared() {
+    let module = lower_text("Test", "module Test exposing (repeat)\ntype alias Reveal a = Errors {a | none}\nopaque type alias Id a = a\nopaque type alias Repeat a s = Eff {Scope s} none (Id (Reveal (Repeat (List a) s)))\nrepeat : Repeat Int s\nforeign pure repeat from \"flick:rt\" \"repeat\"\n").expect("recursive original declaration");
     let mut found = false;
     for item in &module.items {
         if let ItemKind::Value { body, .. } = &item.kind {
             inspect(body, &mut found);
         }
     }
-    assert!(found, "generated productivity dispatcher");
-}
-
-fn dynamic_descriptor_calls(expression: &Expr, operation: Op) -> usize {
-    let mut count = usize::from(matches!(&expression.kind,
-        ExprKind::App { arg, .. } if matches!(&arg.kind, ExprKind::Tuple(fields)
-            if matches!(fields.first().map(|field| &field.kind),
-                Some(ExprKind::Lit(Lit::Int(op))) if *op == operation as i32)
-                && matches!(&fields[1].kind, ExprKind::Tuple(desc)
-                    if desc.len() == 2 && desc.iter().all(|field| matches!(field.kind, ExprKind::Local(_)))))));
-    expression.each_child(&mut |child| count += dynamic_descriptor_calls(child, operation));
-    count
+    assert!(found, "generated owner dispatcher");
 }
 
 fn alias_dispatch_fixture() -> OwnerTypeTemplates {
     let names = ["A", "B", "C", "D", "E", "F", "G", "H"];
     let arities = [1, 1, 1, 2, 1, 1, 1, 2];
-    // Only A and B have the exact same key. C changes row order, D arity,
-    // E a result, and F an argument. G/H differ only in arity, with no rows.
-    // Parameter spellings are not observed.
+    // A/B/C have the same unique argument-to-result map in different orders.
+    // D changes arity, E a result, F an argument; G/H have different empty arities.
     let mappings = [
         vec![(vec![1], 2), (vec![3], 4)],
         vec![(vec![1], 2), (vec![3], 4)],
@@ -202,132 +205,187 @@ fn alias_dispatch_fixture() -> OwnerTypeTemplates {
         "exprs": exprs, "aliases": aliases,
         "productivity": { "root": 0, "names": [], "labels": [], "values": [], "aliases": rows },
     }))
-    .expect("synthetic exact-row dispatch fixture")
+    .expect("exact certified-map fixture")
+}
+
+fn certificate_rows(expression: &Expr) -> Vec<(Vec<i32>, i32)> {
+    let mut rows = Vec::new();
+    if let ExprKind::Match(_, arms) = &expression.kind {
+        for arm in arms {
+            if let (Pat::Tuple(arguments), ExprKind::Lit(Lit::Int(value))) =
+                (&arm.pat, &arm.body.kind)
+            {
+                let arguments = arguments
+                    .iter()
+                    .map(|argument| match argument {
+                        Pat::Lit(Lit::Int(id)) => *id,
+                        _ => panic!("exact certificate argument ID"),
+                    })
+                    .collect();
+                rows.push((arguments, *value));
+            }
+        }
+    }
+    expression.each_child(&mut |child| rows.extend(certificate_rows(child)));
+    rows
 }
 
 #[test]
-fn abstract_alias_sharing_uses_exact_certificate_rows_and_preserves_original_descriptors() {
+fn abstract_alias_groups_preserve_exact_certificate_maps_and_original_descriptors() {
     let templates = alias_dispatch_fixture();
-    let mut build = Build {
-        templates: &templates,
-        run: "$owner".into(),
-        impossible: "$owner$invalid".into(),
-        span: Span::new(FileId::new(0), 0, 0),
-        next: 0,
-    };
+    let mut build = builder(&templates);
+    assert_eq!(build.alias_groups, [0, 0, 0, 1, 2, 3, 4, 5]);
+    assert_eq!(build.alias_representatives, [0, 3, 4, 5, 6, 7]);
     let expression = build.abstract_type(&build.local("original"));
-    let arms = node_arms(&expression);
+    let (current, _, _) = descriptor_parts(&expression);
     let mut covered = BTreeSet::new();
-    let groups = arms
-        .iter()
-        .filter(|arm| !matches!(arm.pat, Pat::Wild))
-        .map(|arm| {
-            known_ids(&arm.pat, &mut covered);
-            let mut ids = BTreeSet::new();
-            known_ids(&arm.pat, &mut ids);
-            (ids, &arm.body)
-        })
-        .collect::<Vec<_>>();
+    for arm in node_arms(&expression) {
+        known_ids(&arm.pat, &mut covered);
+    }
     assert_eq!(
         covered,
         (0..8).collect(),
-        "original IDs remain complete and disjoint"
+        "all original IDs remain disjoint and complete"
     );
-    assert_eq!(
-        groups.len(),
-        7,
-        "only identical arity and ordered rows may share a body"
+    for id in 0..8 {
+        let branch = membership::select(&expression, id).expect("original node");
+        let observed = calls(branch, Op::AbstractAlias);
+        assert_eq!(observed.len(), 1);
+        assert_current(&observed[0][1], current);
+        assert!(
+            matches!(observed[0][3].kind, ExprKind::Lit(Lit::Int(group)) if group == build.alias_groups[id as usize] as i32)
+        );
+    }
+    membership::assert_unknown(&expression, 8);
+    let dispatch = build.operation(
+        Op::AbstractAlias,
+        build.local("original"),
+        build.local("arguments"),
+        build.local("group"),
     );
-    let shared = groups
-        .iter()
-        .find(|(ids, _)| *ids == BTreeSet::from([0, 1]))
-        .expect("A and B share one dispatch body");
-    assert_eq!(
-        dynamic_descriptor_calls(shared.1, Op::AbstractApplyAll),
-        1,
-        "the shared body forwards the original dynamic (node,env), never the representative node"
-    );
-    let invalid = arms.last().expect("invalid node branch");
-    assert!(matches!(invalid.pat, Pat::Wild));
-    assert!(matches!(&invalid.body.kind, ExprKind::App { func, .. }
-        if matches!(&func.kind, ExprKind::Local(name) if name == "$owner$invalid")));
+    for group in 0..6 {
+        let branch = membership::select(&dispatch, group).expect("certified group");
+        let rows = certificate_rows(branch);
+        let alias = build.alias_representatives[group as usize];
+        let mut expected = templates
+            .productivity
+            .as_ref()
+            .unwrap()
+            .aliases
+            .iter()
+            .filter(|row| row.alias == alias)
+            .map(|row| {
+                (
+                    row.arguments
+                        .iter()
+                        .map(|&id| id as i32)
+                        .collect::<Vec<_>>(),
+                    row.value as i32,
+                )
+            })
+            .collect::<Vec<_>>();
+        let mut actual = rows;
+        actual.sort();
+        expected.sort();
+        assert_eq!(
+            actual, expected,
+            "group {group} retains every certificate argument and result ID"
+        );
+        let arms = node_arms(branch);
+        assert!(
+            matches!(arms[0].pat, Pat::List(ref fields, Some(_)) if fields.len() == templates.aliases[alias].params.len())
+        );
+        membership::assert_impossible(&arms.last().unwrap().body);
+        let forwards = calls(branch, Op::AbstractApplyAll);
+        assert_eq!(forwards.len(), 1);
+        assert_current(&forwards[0][1], "original");
+    }
+    membership::assert_unknown(&dispatch, 6);
 }
 
 #[test]
-fn head_alias_sharing_uses_exact_parameter_names_and_keeps_body_ids_as_data() {
+fn head_alias_groups_keep_exact_parameter_names_and_original_body_ids() {
     let mut templates = alias_dispatch_fixture();
     templates.aliases[1].params = templates.aliases[0].params.clone();
     templates.aliases[0].body = 4;
     templates.aliases[1].body = 5;
-    let mut build = Build {
-        templates: &templates,
-        run: "$owner".into(),
-        impossible: "$owner$invalid".into(),
-        span: Span::new(FileId::new(0), 0, 0),
-        next: 0,
-    };
+    let mut build = builder(&templates);
+    assert_eq!(build.head_groups, [0, 0, 1, 2, 3, 4, 5, 6]);
     let expression = build.head(
         build.local("original"),
         build.list(Vec::new()),
         build.unit(),
     );
-    let arms = node_arms(&expression);
-    let mut covered = BTreeSet::new();
-    let groups = arms
-        .iter()
-        .filter(|arm| !matches!(arm.pat, Pat::Wild))
-        .map(|arm| {
-            known_ids(&arm.pat, &mut covered);
-            let mut ids = BTreeSet::new();
-            known_ids(&arm.pat, &mut ids);
-            (ids, &arm.body)
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(
-        covered,
-        (0..8).collect(),
-        "all original node IDs remain disjoint and complete"
+    let (current, _, _) = descriptor_parts(&expression);
+    for id in 0..8 {
+        let branch = membership::select(&expression, id).expect("original alias node");
+        let observed = calls(branch, Op::HeadAlias);
+        assert_eq!(observed.len(), 1);
+        assert_current(&observed[0][1], current);
+        assert!(
+            matches!(&observed[0][3].kind, ExprKind::Tuple(data)
+            if matches!(data[0].kind, ExprKind::Lit(Lit::Int(group)) if group == build.head_groups[id as usize] as i32)
+            && matches!(data[1].kind, ExprKind::Lit(Lit::Int(body)) if body == templates.aliases[id as usize].body as i32)),
+            "each occurrence supplies its original body ID independently of its shared parameter group"
+        );
+    }
+    membership::assert_unknown(&expression, 8);
+    let dispatch = build.head_alias(
+        &build.local("original"),
+        &build.local("arguments"),
+        build.local("data"),
     );
-    assert_eq!(
-        groups.len(),
-        7,
-        "only exact parameter vectors share the alias environment"
-    );
-    let shared = groups
-        .iter()
-        .find(|(ids, _)| *ids == BTreeSet::from([0, 1]))
-        .expect("equal parameter vectors share a body despite distinct original body IDs");
-    assert_eq!(
-        dynamic_descriptor_calls(shared.1, Op::AliasBody),
-        1,
-        "the shared alias body lookup receives the original dynamic descriptor"
-    );
-    let invalid = arms.last().expect("invalid node branch");
-    assert!(matches!(invalid.pat, Pat::Wild));
-    assert!(matches!(&invalid.body.kind, ExprKind::App { func, .. }
-        if matches!(&func.kind, ExprKind::Local(name) if name == "$owner$invalid")));
-    let lookup = build.alias_body(build.local("original"));
-    let body_ids = node_arms(&lookup)
-        .iter()
-        .filter_map(|arm| match (&arm.pat, &arm.body.kind) {
-            (Pat::Lit(Lit::Int(node)), ExprKind::Lit(Lit::Int(body))) => Some((*node, *body)),
-            _ => None,
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(
-        body_ids,
-        vec![
-            (0, 4),
-            (1, 5),
-            (2, 0),
-            (3, 0),
-            (4, 0),
-            (5, 0),
-            (6, 0),
-            (7, 0)
-        ],
-        "the lookup retains each original alias body ID rather than choosing its group's representative"
-    );
+    let ExprKind::Block(unpack, _) = &dispatch.kind else {
+        panic!("head group data");
+    };
+    let Stmt::Let(Pat::Tuple(data), _) = &unpack[0] else {
+        panic!("group and body");
+    };
+    let Pat::Bind(body) = &data[1] else {
+        panic!("original body binding");
+    };
+    for group in 0..7 {
+        let branch = membership::select(&dispatch, group).expect("parameter group");
+        let arms = node_arms(branch);
+        let alias = build.head_representatives[group as usize];
+        assert!(
+            matches!(&arms[0].pat, Pat::List(fields, Some(_)) if fields.len() == templates.aliases[alias].params.len())
+        );
+        assert!(
+            matches!(&arms.last().unwrap().body.kind, ExprKind::Tuple(fields)
+            if matches!(&fields[0].kind, ExprKind::Local(name) if name == "original")
+            && matches!(&fields[1].kind, ExprKind::Local(name) if name == "arguments")),
+            "a partially applied head retains the original descriptor and arguments"
+        );
+        let observed = calls(&arms[0].body, Op::Head);
+        assert_eq!(observed.len(), 1);
+        assert!(
+            matches!(&observed[0][1].kind, ExprKind::Tuple(fields)
+            if matches!(&fields[0].kind, ExprKind::Local(name) if name == body)),
+            "shared environments consume the original body ID supplied as data"
+        );
+        let ExprKind::Tuple(fields) = &observed[0][1].kind else {
+            panic!("head descriptor");
+        };
+        let ExprKind::Lambda {
+            body: environment, ..
+        } = &fields[1].kind
+        else {
+            panic!("parameter environment");
+        };
+        let parameters = node_arms(environment)
+            .iter()
+            .filter_map(|arm| match &arm.pat {
+                Pat::Lit(Lit::String(name)) => Some(name.clone()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            parameters, templates.aliases[alias].params,
+            "parameter spellings remain exact"
+        );
+    }
+    membership::assert_unknown(&dispatch, 7);
 }
 
 #[test]
@@ -343,85 +401,49 @@ fn atom_sharing_preserves_exact_names_constructor_modes_and_dynamic_nodes() {
         { "kind": "DynamicCon", "children": [] },
         { "kind": "DynamicVar", "children": [] }
     ]))
-    .expect("exact observable atom metadata");
-    let mut build = Build {
-        templates: &templates,
-        run: "$owner".into(),
-        impossible: "$owner$invalid".into(),
-        span: Span::new(FileId::new(0), 0, 0),
-        next: 0,
-    };
+    .expect("observable atom metadata");
+    let mut build = builder(&templates);
     let expression = build.atom(build.local("original"), &build.local("mode"));
-    let arms = node_arms(&expression);
     let mut covered = BTreeSet::new();
-    let groups = arms
-        .iter()
-        .filter(|arm| !matches!(arm.pat, Pat::Wild))
-        .map(|arm| {
-            known_ids(&arm.pat, &mut covered);
-            let mut ids = BTreeSet::new();
-            known_ids(&arm.pat, &mut ids);
-            (ids, &arm.body)
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(
-        covered,
-        (0..8).collect(),
-        "all original IDs stay complete and disjoint"
-    );
-    assert_eq!(
-        groups.len(),
-        5,
-        "only exact observable static atoms share a body"
-    );
-    let group = |expected| {
-        groups
-            .iter()
-            .find(|(ids, _)| *ids == BTreeSet::from(expected))
-            .expect("exact atom group")
-            .1
-    };
-    assert!(
-        matches!(&group([0, 1]).kind, ExprKind::If(condition, yes, no)
+    for arm in node_arms(&expression) {
+        known_ids(&arm.pat, &mut covered);
+    }
+    assert_eq!(covered, (0..8).collect());
+    let constructor = membership::select(&expression, 0).unwrap();
+    assert_eq!(constructor, membership::select(&expression, 1).unwrap());
+    assert!(matches!(&constructor.kind, ExprKind::If(condition, yes, no)
         if matches!(&condition.kind, ExprKind::Binary(BinOp::Eq, mode, two)
-            if matches!(&mode.kind, ExprKind::Local(name) if name == "mode")
-                && matches!(two.kind, ExprKind::Lit(Lit::Int(2))))
-            && matches!(yes.kind, ExprKind::Lit(Lit::Unit))
-            && matches!(&no.kind, ExprKind::Lit(Lit::String(name)) if name == "Test.X")),
-        "constructors still produce Unit in capture mode and the full name otherwise"
-    );
-    let ExprKind::Match(mode, variable_modes) = &group([2, 3]).kind else {
-        panic!("variable atom modes")
+            if matches!(&mode.kind, ExprKind::Local(name) if name == "mode") && matches!(two.kind, ExprKind::Lit(Lit::Int(2))))
+        && matches!(yes.kind, ExprKind::Lit(Lit::Unit))
+        && matches!(&no.kind, ExprKind::Lit(Lit::String(name)) if name == "Test.X")));
+    let variable = membership::select(&expression, 2).unwrap();
+    assert_eq!(variable, membership::select(&expression, 3).unwrap());
+    let ExprKind::Match(mode, modes) = &variable.kind else {
+        panic!("variable modes");
     };
     assert!(matches!(&mode.kind, ExprKind::Local(name) if name == "mode"));
-    assert!(matches!(
-        &variable_modes[..],
-        [
-            Arm {
-                pat: Pat::Lit(Lit::Int(0)),
-                ..
-            },
-            Arm {
-                pat: Pat::Lit(Lit::Int(1)),
-                ..
-            },
-            Arm { pat: Pat::Wild, .. }
-        ]
-    ));
-    let prefixes = variable_modes.iter().map(|arm| match &arm.body.kind {
-        ExprKind::Binary(BinOp::Concat, prefix, name)
-            if matches!(&name.kind, ExprKind::Lit(Lit::String(name)) if name == "Test.X") => {
-                let ExprKind::Lit(Lit::String(prefix)) = &prefix.kind else { panic!("atom prefix") };
-                prefix.as_str()
-            }
-        _ => panic!("complete variable atom mode"),
+    assert!(matches!(modes[0].pat, Pat::Lit(Lit::Int(0))));
+    assert!(matches!(modes[1].pat, Pat::Lit(Lit::Int(1))));
+    assert!(matches!(modes[2].pat, Pat::Wild));
+    let prefixes = modes.iter().map(|arm| match &arm.body.kind {
+        ExprKind::Binary(BinOp::Concat, prefix, name) if matches!(&name.kind, ExprKind::Lit(Lit::String(name)) if name == "Test.X") => {
+            let ExprKind::Lit(Lit::String(prefix)) = &prefix.kind else { panic!("atom prefix"); };
+            prefix.as_str()
+        }
+        _ => panic!("complete atom mode"),
     }).collect::<Vec<_>>();
     assert_eq!(prefixes, ["~", "@", "^"]);
-    assert!(matches!(group([4, 5]).kind, ExprKind::Lit(Lit::Unit)));
-    assert!(groups.iter().any(|(ids, _)| *ids == BTreeSet::from([6])));
-    assert!(groups.iter().any(|(ids, _)| *ids == BTreeSet::from([7])));
-    let invalid = arms.last().expect("invalid node branch");
-    assert!(matches!(invalid.pat, Pat::Wild));
-    assert!(matches!(&invalid.body.kind, ExprKind::App { func, .. }
-        if matches!(&func.kind, ExprKind::Local(name) if name == "$owner$invalid")));
+    assert!(matches!(
+        membership::select(&expression, 4).unwrap().kind,
+        ExprKind::Lit(Lit::Unit)
+    ));
+    assert!(matches!(
+        membership::select(&expression, 5).unwrap().kind,
+        ExprKind::Lit(Lit::Unit)
+    ));
+    assert_ne!(
+        membership::select(&expression, 6).unwrap(),
+        membership::select(&expression, 7).unwrap()
+    );
+    membership::assert_unknown(&expression, 8);
 }

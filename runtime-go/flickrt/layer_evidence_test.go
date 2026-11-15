@@ -2,9 +2,9 @@ package flickrt
 
 import "testing"
 
-// A task may carry the lexical candidate of its surrounding scope. The
-// layer's acquisition scope must still release its resources before the
-// provider returns or reports failure, while that surrounding scope lives.
+// A rank-polymorphic task receives fresh lexical acquisition evidence. Its
+// scope releases resources before the provider returns or reports failure,
+// while the surrounding scope remains live.
 func TestLayerAcquisitionKeepsItsReleaseScope(t *testing.T) {
 	for _, fails := range []bool{false, true} {
 		name := "success"
@@ -16,9 +16,12 @@ func TestLayerAcquisitionKeepsItsReleaseScope(t *testing.T) {
 			primary := &Cause{kind: causeFail, err: "layer build"}
 			Scope(rootFiber(), func(fb *Fiber, outer, _ Value) Value {
 				layer := LayerEffect("test.layer", Eff(func(at *Fiber) Value {
-					// The generated raw scoped call reinstalls captured evidence.
-					captured := WithOwnerEvidence(at, outer)
-					AddFinalizer(Within(captured, ReadOwnerEvidence(captured)), Eff(func(*Fiber) Value {
+					// The generated raw call activates the task's fresh evidence.
+					owner := ReadOwnerEvidence(at)
+					if owner == outer || owner != at.owner {
+						t.Fatal("the acquisition did not receive its fresh lexical owner")
+					}
+					AddFinalizer(Within(at, owner), Eff(func(*Fiber) Value {
 						released++
 						return Unit
 					}))
@@ -64,37 +67,38 @@ func TestLayerAcquisitionKeepsItsReleaseScope(t *testing.T) {
 	}
 }
 
-// Entering a trusted layer build scope must work even when its caller is
-// already a detached or pinned acquisition. Ordinary lexical Within stays
-// able to select an outer region when no acquisition is in progress.
+// Entering a layer build supplies its own work owner and fresh evidence;
+// a nested provider restores its caller's evidence for the consumer.
 func TestLayerBuildEntersItsScopeFromAnotherAcquisition(t *testing.T) {
-	for _, pinned := range []bool{false, true} {
-		name := "detached"
-		if pinned {
-			name = "pinned"
+	for _, shared := range []bool{false, true} {
+		name := "private"
+		if shared {
+			name = "memoized"
 		}
 		t.Run(name, func(t *testing.T) {
 			outer := newOwner()
-			outer.detached = true
 			fb := WithOwnerEvidence(rootFiber(), outer)
-			fb.owner, fb.pinOwner = outer, pinned
+			fb.owner = outer
 			released := 0
-			layer := fromBuild(func(at *Fiber, _ *MemoMap, scope *Owner) Services {
-				if !scope.detached {
-					t.Error("the layer build scope is not detached")
+			build := func(at *Fiber, _ *MemoMap, scope *Owner) Services {
+				if scope == outer {
+					t.Error("the layer reused its caller's acquisition scope")
 				}
 				return scoped(at, scope, Eff(func(at *Fiber) Value {
 					if at.owner != scope || ReadOwnerEvidence(at) != scope {
 						t.Error("the caller's acquisition prevented entering the layer build scope")
 					}
-					captured := WithOwnerEvidence(at, outer)
-					AddFinalizer(Within(captured, outer), Eff(func(*Fiber) Value {
+					AddFinalizer(Within(at, ReadOwnerEvidence(at)), Eff(func(*Fiber) Value {
 						released++
 						return Unit
 					}))
 					return Services{}
 				})).(Services)
-			})
+			}
+			layer := fromBuild(build)
+			if shared {
+				layer = memoized(build)
+			}
 			Provide(fb, layer, Eff(func(at *Fiber) Value {
 				if at.owner == outer || released != 0 {
 					t.Error("the consumer lost its provider owner or the layer released early")
@@ -113,8 +117,8 @@ func TestLayerBuildEntersItsScopeFromAnotherAcquisition(t *testing.T) {
 		outer := newOwner()
 		fb := rootFiber()
 		fb.owner = outer
-		// Channels and Streams use this generic scope helper too; only
-		// layer acquisition scopes may block an explicit lexical owner.
+		// Channels and Streams use this generic scope helper too. Explicit
+		// lexical activation selects its owner independently in every scope.
 		current := forkScope(fb, outer)
 		inner := *fb
 		inner.owner = current
@@ -125,4 +129,25 @@ func TestLayerBuildEntersItsScopeFromAnotherAcquisition(t *testing.T) {
 			t.Fatalf("closing the generic scopes failed: %v", cause)
 		}
 	})
+}
+
+func TestLayerAcquisitionRespectsExplicitOuterOwner(t *testing.T) {
+	released := 0
+	Scope(rootFiber(), func(fb *Fiber, outer, _ Value) Value {
+		layer := LayerEffect("test.explicit.layer", Eff(func(at *Fiber) Value {
+			if at.owner == outer {
+				t.Fatal("the acquisition did not start with its private work owner")
+			}
+			AddFinalizer(Within(at, outer), Eff(func(*Fiber) Value { released++; return Unit }))
+			return Unit
+		}))
+		Provide(fb, layer, Eff(func(*Fiber) Value { return Unit }))
+		if !outer.(*Owner).open || released != 0 || len(outer.(*Owner).finalizers) != 1 {
+			t.Fatal("an explicitly outer-owned finalizer did not stay with its live owner")
+		}
+		return Unit
+	})
+	if released != 1 {
+		t.Fatalf("the explicitly owned finalizer ran %d times, want once", released)
+	}
 }

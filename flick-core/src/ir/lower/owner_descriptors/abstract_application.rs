@@ -5,51 +5,36 @@ impl Build<'_> {
             .as_ref()
             .expect("recursive adapter certificate")
     }
-    fn abstract_data(&self, value: &OwnerAbstract) -> Expr {
-        self.tuple(vec![
-            self.boolean(value.productive),
-            self.int(usize::from(value.head.kind)),
-            self.int(value.head.name),
-            self.int(usize::from(value.head.arguments)),
-            self.boolean(value.head.first_symbol),
-            self.boolean(value.head.held),
-            self.int(usize::from(value.constructor)),
-            self.tuple(value.row.iter().map(|&bit| self.boolean(bit)).collect()),
-        ])
-    }
-    fn abstract_pattern(value: &OwnerAbstract) -> Pat {
-        let integer = |value: usize| {
-            Pat::Lit(Lit::Int(
-                i32::try_from(value).expect("abstract owner field"),
-            ))
-        };
-        Pat::Tuple(vec![
-            Pat::Lit(Lit::Bool(value.productive)),
-            integer(usize::from(value.head.kind)),
-            integer(value.head.name),
-            integer(usize::from(value.head.arguments)),
-            Pat::Lit(Lit::Bool(value.head.first_symbol)),
-            Pat::Lit(Lit::Bool(value.head.held)),
-            integer(usize::from(value.constructor)),
-            Pat::Tuple(
-                value
-                    .row
-                    .iter()
-                    .map(|&bit| Pat::Lit(Lit::Bool(bit)))
-                    .collect(),
-            ),
-        ])
-    }
     fn impossible(&self) -> Expr {
         self.pure(self.local(&self.impossible), self.unit())
     }
+    // This operation is called only for a row observation: every other
+    // field is the blank head. Match the row bits and retain the certificate
+    // membership check without repeating unreachable raw-head patterns.
     fn abstract_pack(&self, value: Expr) -> Expr {
+        let blank = self.abstract_blank();
         let mut arms: Vec<_> = self
             .certificate()
             .values
             .iter()
             .enumerate()
-            .map(|(id, value)| (Self::abstract_pattern(value), self.int(id)))
+            .filter(|(_, value)| {
+                !value.productive
+                    && value.head == blank.head
+                    && value.constructor == blank.constructor
+            })
+            .map(|(id, value)| {
+                (
+                    Pat::Tuple(
+                        value
+                            .row
+                            .iter()
+                            .map(|&bit| Pat::Lit(Lit::Bool(bit)))
+                            .collect(),
+                    ),
+                    self.int(id),
+                )
+            })
             .collect();
         arms.push((Pat::Wild, self.impossible()));
         self.case(value, arms)
@@ -133,7 +118,7 @@ impl Build<'_> {
                 let productive = if source.constructor == 5 {
                     self.bind(
                         self.observe(Op::Abstract, argument.clone()),
-                        |this, value| this.observe(Op::AbstractRowOccupied, value),
+                        |this, value| this.abstract_boolean_field(value, false),
                     )
                 } else {
                     self.boolean(source.constructor == 4)

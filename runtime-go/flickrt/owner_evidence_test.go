@@ -283,3 +283,30 @@ func TestOwnerEvidenceEffectLayerBuild(t *testing.T) {
 		t.Fatal("layer owner was not released with its consumer")
 	}
 }
+
+func TestOwnerEvidenceTransportAcceptsNonComparableOpaqueValues(t *testing.T) {
+	fb := rootFiber()
+	evidence := []Value{"inert"}
+	derived := WithOwnerEvidence(fb, evidence)
+	again := WithOwnerEvidence(derived, evidence)
+	evidence[0] = "same token"
+	got := ReadOwnerEvidence(again).([]Value)
+	if got[0] != "same token" || again.owner != fb.owner {
+		t.Fatal("transport must preserve opaque identity and the work owner")
+	}
+}
+
+func TestRcRefAcquisitionRespectsExplicitOwnerActivation(t *testing.T) {
+	fb := rootFiber()
+	Scope(fb, func(at *Fiber, outer, _ Value) Value {
+		acquire := Eff(func(acquiring *Fiber) Value { return Within(acquiring, outer).owner })
+		ref := RcRefMake(at, Rec("acquire", acquire, "idleTimeToLive", None))
+		Scope(at, func(borrowing *Fiber, _, _ Value) Value {
+			if got := RcRefGet(borrowing, ref); got != outer {
+				t.Fatal("an explicit lexical owner must be selected inside an acquisition")
+			}
+			return Unit
+		})
+		return Unit
+	})
+}

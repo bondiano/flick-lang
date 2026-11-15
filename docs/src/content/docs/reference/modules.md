@@ -79,6 +79,19 @@ import Effect.Log as Log
 # let load_user user = user
 ```
 
+## Incomplete modules
+
+A module whose source did not parse in full is incomplete. Its interface
+records that (`incomplete` in the [interface](../iface/)), so importers take on
+trust names they do not find there, as they do for a module that cannot be
+loaded. Exports the checker finished stay typed and are still checked; the
+parse error itself still fails `flick check` and `flick build`. A
+parameterized module is checked like any other module, and its applications
+copy its source, so an error in its body is reported where an application
+copies it. The empty-interface fallback for an inline module whose structure
+the parser could not recover marks that module incomplete by the same parse
+diagnostics.
+
 ## Module names and files
 
 A module name is a dot-separated list of capitalized names. In a project

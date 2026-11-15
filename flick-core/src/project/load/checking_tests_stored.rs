@@ -93,6 +93,51 @@ fn a_saved_module_serves_only_the_configuration_it_was_checked_under() {
     assert!(taken_by(&host, &saved, "one", &["/p/src/A/Use.fl"], |_| {}) > 0);
 }
 
+/// A dependent saved by a clean run is checked again when its import stops
+/// parsing: the saved interface must not hide the names the parser lost or
+/// the types it changed.
+#[test]
+fn a_saved_importer_is_rechecked_when_its_import_stops_parsing() {
+    let base = |text: &str| format!("module A.Base exposing (x)\n{text}");
+    let clean = Memory(BTreeMap::from([
+        (
+            PathBuf::from("/p/src/A/Base.fl"),
+            base("x : Float\nlet x = 1\n"),
+        ),
+        (PathBuf::from("/p/src/A/Use.fl"), USE.to_owned()),
+    ]));
+    let saved = Saved::default();
+    assert_eq!(
+        taken_by(&clean, &saved, "one", &["/p/src/A/Use.fl"], |_| {}),
+        0,
+        "the first run checks both modules"
+    );
+
+    // The parser loses the body of `T`, and `x` changes its type. A saved
+    // `A.Use` checked against the old interface would miss the mismatch.
+    let broken = Memory(BTreeMap::from([
+        (
+            PathBuf::from("/p/src/A/Base.fl"),
+            base("class T (t : Type -> Type)) =\n  lift : forall a. a -> t a\nx : String\nlet x = \"s\"\n"),
+        ),
+        (PathBuf::from("/p/src/A/Use.fl"), USE.to_owned()),
+    ]));
+    let taken = Arc::default();
+    let mut cache = ModuleCache::stored(memory_store("one", &saved, &taken));
+    let stored = said(&broken, Mode::Check, Some(&mut cache));
+    assert!(
+        stored
+            .0
+            .iter()
+            .any(|d| d.starts_with("FLICK-T003") && d.contains("String")),
+        "the importer is checked against the new type: {:?}",
+        stored.0
+    );
+    let fresh = said(&broken, Mode::Check, None);
+    assert_eq!(stored, fresh);
+    assert_eq!(stored_count(&taken), 0, "no changed module is taken back");
+}
+
 /// A module saved by one compiler, std or mode of the stages serves no run
 /// of another, and none where another module joins the run, which can
 /// change what is local to it.

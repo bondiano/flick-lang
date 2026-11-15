@@ -3,57 +3,48 @@ impl Build<'_> {
         let head = self.call(Op::Head, desc.clone(), self.list(Vec::new()), self.unit());
         let current = self.name();
         let args = self.name();
-        let result = self.nodes_with_default(
-            self.local(&current),
-            |_, _| raw.clone(),
-            |this, _, node, env| {
-                Some(match &node.kind {
-                    OwnerTypeKind::Fun { runtime, stage, .. } => {
-                        let arg = this.name();
-                        let stage = *stage;
-                        let call = this.app(raw.clone(), this.local(&arg), stage);
-                        let services = runtime.then(|| this.child(node.children[1], &env));
-                        let result = this.child(*node.children.last().expect("arrow result"), &env);
-                        let body = this.execute(call, services, result);
-                        this.lambda(Pat::Bind(arg), stage, body)
-                    }
-                    OwnerTypeKind::Con { module, name } if lang::is(Lang::Eff, module, name) => {
-                        let services = this.name();
-                        let errors = this.name();
-                        let result = this.name();
-                        let call = this.e(ExprKind::Await(Box::new(raw.clone())));
-                        let body =
-                            this.execute(call, Some(this.local(&services)), this.local(&result));
-                        let task = this.e(ExprKind::Task(Box::new(body)));
-                        this.case(
-                            this.local(&args),
-                            vec![
-                                (
-                                    Pat::List(
-                                        vec![
-                                            Pat::Bind(services),
-                                            Pat::Bind(errors),
-                                            Pat::Bind(result),
-                                        ],
-                                        None,
-                                    ),
-                                    task,
+        let result = self.nodes(self.local(&current), |this, _, node, env, _| {
+            match &node.kind {
+                OwnerTypeKind::Fun { runtime, stage, .. } => {
+                    let arg = this.name();
+                    let stage = *stage;
+                    let call = this.app(raw.clone(), this.local(&arg), stage);
+                    let services = runtime.then(|| this.child(node.children[1], &env));
+                    let result = this.child(*node.children.last().expect("arrow result"), &env);
+                    let body = this.execute(call, services, result);
+                    this.lambda(Pat::Bind(arg), stage, body)
+                }
+                OwnerTypeKind::Con { module, name } if lang::is(Lang::Eff, module, name) => {
+                    let services = this.name();
+                    let errors = this.name();
+                    let result = this.name();
+                    let call = this.e(ExprKind::Await(Box::new(raw.clone())));
+                    let body = this.execute(call, Some(this.local(&services)), this.local(&result));
+                    let task = this.e(ExprKind::Task(Box::new(body)));
+                    this.case(
+                        this.local(&args),
+                        vec![
+                            (
+                                Pat::List(
+                                    vec![Pat::Bind(services), Pat::Bind(errors), Pat::Bind(result)],
+                                    None,
                                 ),
-                                (Pat::Wild, raw.clone()),
-                            ],
-                        )
-                    }
-                    OwnerTypeKind::Forall { vars, constraints } => this.adapt_forall(
-                        raw,
-                        node,
-                        env,
-                        vars.iter().map(|v| v.name.clone()).collect(),
-                        *constraints,
-                    ),
-                    _ => return None,
-                })
-            },
-        );
+                                task,
+                            ),
+                            (Pat::Wild, raw.clone()),
+                        ],
+                    )
+                }
+                OwnerTypeKind::Forall { vars, constraints } => this.adapt_forall(
+                    raw,
+                    node,
+                    env,
+                    vars.iter().map(|v| v.name.clone()).collect(),
+                    *constraints,
+                ),
+                _ => raw.clone(),
+            }
+        });
         let adapted = self.unpack(head, &[&current, &args], result);
         self.choose(self.observe(Op::Productive, desc), adapted, raw.clone())
     }

@@ -20,10 +20,7 @@ export const PROGRAMS = [
     unused: ["effect/dist/Graph.js"],
   },
   // the same playground on Flick's own runtime: React and the kernel, no Effect at all
-  {
-    name: "playground-rt", source: "docs/src/playground/Playground.fl", rt: true, budget: 92.0625, effectFree: true,
-    reason: "The execution-budget split and upstream owner trace fixes exceed 92 KiB by 54 bytes; allow 64 bytes while retaining all runtime guards.",
-  },
+  { name: "playground-rt", source: "docs/src/playground/Playground.fl", rt: true, budget: 92, effectFree: true },
   { name: "atoms", source: "tests/run/ui/atoms.fl", budget: 117, unused: ["effect/dist/Graph.js"] },
   // the same atoms on Flick's own runtime, no Effect at all
   { name: "atoms-rt", source: "tests/run/ui/atoms.fl", rt: true, budget: 80, effectFree: true },

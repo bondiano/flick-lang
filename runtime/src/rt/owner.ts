@@ -1,3 +1,4 @@
+import { closeArenas, ownedArena } from "./arena-owner.ts";
 // Lexical owners (docs/formal/runtime.md §3.3). Each `scope` has one: its
 // children, the foreign calls it waits for, closing hooks and a stack of
 // finalizers. Closing it is a fixed sequence of phases: admission ends (C0),
@@ -43,7 +44,7 @@ import {
 } from "./fiber.ts";
 import { traceEvent, traceId, tracing } from "./trace.ts";
 import { Failure } from "./outcome.ts";
-import { Arena } from "../core/Arena.ts";
+import type { Arena } from "../core/Arena.ts";
 
 /** A finalizer: the evidence it was added with, what it runs, and its place in the trace. */
 interface Finalizer {
@@ -56,27 +57,8 @@ interface Finalizer {
 const reported: Array<Cause> = [];
 export const reportedDefects = (): ReadonlyArray<Cause> => reported;
 
+
 export class Owner {
-  /** Backing storage stays live until every ordinary finalizer has ended. */
-  #arenas: Array<Arena> | undefined = [];
-
-  /** Retirement is checked only when activating, never while transporting evidence. */
-  get closed(): boolean { return this.#arenas === undefined; }
-
-  // Keep construction in the Arena binding so other programs can discard it.
-  makeArena(create: () => Arena): Arena {
-    if (this.#arenas === undefined) throw new Error("arena owner is closed");
-    const arena = create();
-    this.#arenas.push(arena);
-    return arena;
-  }
-
-  closeArenas(): void {
-    const arenas = this.#arenas;
-    this.#arenas = undefined;
-    for (const arena of arenas ?? []) arena.close();
-  }
-
   /** C0 not yet: it admits children. */
   open = true;
   readonly children = new Set<Fiber>();
@@ -86,7 +68,7 @@ export class Owner {
   /** Hooks of C1, in order of addition. */
   readonly closing = new Set<() => unknown>();
   /** Failures of supervisors: the root's fail the program, a test's fail the test. */
-  declare readonly defects: Array<Cause>;
+  readonly defects: Array<Cause>;
   readonly finalizers: Array<Finalizer> = [];
   /** Its id in the trace, 0 when not traced, and the finalizers Flick added to it. */
   trace = 0;
@@ -94,13 +76,6 @@ export class Owner {
   /** C5 has started: a finalizer added now runs at once, with this exit. */
   finalizing = false;
   exit: Exit | undefined = undefined;
-  /**
-   * A library acquisition scope: `Within` must not redirect finalizers onto
-   * an outer lexical owner, or releases wait until that outer scope ends.
-   */
-  detached = false;
-  /** `main` / `scope` / `provide` when this owner is a lexical region. */
-  kind: string | undefined = undefined;
 
   constructor(defects: Array<Cause> = reported) {
     this.defects = defects;
@@ -195,13 +170,13 @@ function* closeSteps(owner: Owner, exit: Exit): Run {
   owner.exit = exit;
   owner.phase("C5");
   let released: Cause = empty;
-  while (owner.finalizers.length > 0) {
+  for (;;) {
     const finalizer = owner.finalizers.pop();
     if (finalizer === undefined) break;
     const ended = asExit(yield exitOf(() => runFinalizer(finalizer, owner, exit)));
     if (ended.cause !== undefined) released = concat(released, ended.cause);
   }
-  owner.closeArenas();
+  closeArenas(owner);
   owner.phase("C6");
   cause = combine(cause, released);
   return cause.reasons.length === 0 ? succeeded(undefined) : failed(cause);
@@ -231,7 +206,6 @@ export function* withOwner(body: (owner: Owner, outer: Owner | undefined) => unk
   fiber.mask = depth + 1;
   try {
     const owner = new Owner(outer?.defects);
-    if (kind !== undefined) owner.kind = kind;
     if (tracing && kind !== undefined) {
       owner.trace = traceId();
       traceEvent({ e: "open", o: owner.trace, p: outer?.trace ?? 0, k: kind });
@@ -282,26 +256,14 @@ export const scopeCurrent = (): Owner | undefined => currentCtx().owner;
 export const arenaMake = (): Arena => {
   const owner = currentCtx().owner;
   if (owner === undefined) throw new Error("arena requires a scope owner");
-  return owner.makeArena(() => new Arena());
+  return ownedArena(owner);
 };
 
 /** Optional conversion at RAW activation only; evidence transport never calls it. */
 export const ownerHooks: { within?: (owner: object, call: () => unknown) => unknown } = {};
 /** A raw call acquiring into the compiler-selected lexical owner. */
 export const within = (owner: OwnerEvidence, call: () => unknown): unknown => {
-  const current = currentCtx().owner;
-  // A pinned library acquisition keeps its frame so finalizers stay put.
-  if (current?.detached) return call();
-  if (owner instanceof Owner) {
-    // Already acquiring into this owner: keep the current frame so fiber-local
-    // updates stay visible to the caller.
-    if (current === owner) return call();
-    // Effect Scope.provide keeps CurrentOwner on the provide owner while
-    // finalizers land on the layer's untraced build scope. Do not pull those
-    // finalizers onto the provide owner when evidence names it.
-    if (current !== undefined && current.trace === 0 && owner.kind === "provide") return call();
-    return inside(owner, call);
-  }
+  if (owner instanceof Owner) return currentCtx().owner === owner ? call() : inside(owner, call);
   if (owner !== undefined && ownerHooks.within !== undefined) return ownerHooks.within(owner, call);
   throw new Error("owner evidence is absent or belongs to another runtime");
 };
@@ -372,7 +334,7 @@ export const finalize = (exit: Exit, fin: Exit): Exit => {
 
 /** `Fiber e a`: a child spawned into an owner. */
 export class FlickFiber {
-  declare readonly fiber: Fiber;
+  readonly fiber: Fiber;
   constructor(fiber: Fiber) {
     this.fiber = fiber;
     Object.freeze(this);

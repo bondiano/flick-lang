@@ -17,6 +17,13 @@ test("runtime size comparisons execute the same I/O program on both backends", (
   }
 });
 
+test("a program without arena allocations retains no arena storage implementation", async () => {
+  const out = path.join(repo, "target/tmp/bundle-size/no-arena");
+  build(flick, "tools/bundle-size/pure.fl", out, "release", undefined, true);
+  const { modules } = await measure(path.join(out, "flick-main.js"));
+  assert.deepEqual(modules.filter((id) => /\/runtime\/dist\/core\/Arena\.js$/.test(id.replaceAll("\\", "/"))), []);
+});
+
 test("action span construction is retained only by roots that opt in", async () => {
   const off = await measure(fileURLToPath(new URL("untraced-ui.mjs", import.meta.url)));
   const on = await measure(fileURLToPath(new URL("traced-ui.mjs", import.meta.url)));

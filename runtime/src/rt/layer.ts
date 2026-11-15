@@ -82,7 +82,6 @@ function* release(scope: Owner, exit: Exit): Run {
 /** A scope closed when `parent` closes, with how it ended. */
 export const forkScope = (parent: Owner): Owner => {
   const child = new Owner(parent.defects);
-  child.detached = true;
   addTo(parent, (exit: Exit) => release(child, exit), true);
   return child;
 };
@@ -129,7 +128,6 @@ function* getOrBuild(self: Layer, memo: MemoMap, into: Owner, build: Build): Run
   // a closing scope cannot hold a shared entry
   if (into.finalizing) return build(memo, into);
   const entry: Entry = { observers: 0, scope: new Owner(into.defects), built: false, services: [], cause: undefined, waiting: [] };
-  entry.scope.detached = true;
   memo.entries.set(self, entry);
   yield held(memo, self, entry, into);
   if (tracing) {

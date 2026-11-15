@@ -11,14 +11,13 @@ type RcRef (s : Region) (e : ErrorRow) a
 /// A reference owned by the innermost `scope` (or the one of region `s`);
 /// `acquire` runs with the services of this call, and the resource stays
 /// for `idleTimeToLive` after its last holder (`None`: no time).
-/// Acquisition has a fresh region `t`; a type that names it cannot escape.
+/// Each acquisition has its own region `t`, closed when the resource is released.
 make :
-  {
-    acquire : forall t. Eff {Scope t | r} e a^{t};
-    idleTimeToLive : Option Duration.Duration;
-  } ->{Scope s | r}
+  { acquire : (forall t. Eff {Scope t | r} e a^{t})^c; idleTimeToLive : Option Duration.Duration } ->{Scope
+    s | r}
   RcRef s e a
 foreign effect make from "flick:RcRef" "flickMake"
+  retention owner
 
 /// The resource, acquiring it if no one holds it; the innermost `scope`
 /// (or the one of region `t`) holds it until it closes.
