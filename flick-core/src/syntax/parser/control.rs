@@ -58,13 +58,14 @@ pub(super) fn control_expr(p: &mut Parser) -> Done {
         let kind = for_expr(p);
         return p.complete(m, kind);
     }
-    p.bump_as(keyword);
     let kind = match keyword {
         K::LoopKw => {
+            p.bump_as(keyword);
             p.braces(K::Block, stmt, |_| false);
             K::LoopExpr
         }
         K::WhileKw => {
+            p.bump_as(keyword);
             head_without_braces(p, |p| {
                 expr(p);
             });
@@ -78,6 +79,7 @@ pub(super) fn control_expr(p: &mut Parser) -> Done {
             K::WhileExpr
         }
         K::BreakKw => {
+            p.bump_as(keyword);
             if p.at(K::Label) {
                 p.bump();
             }
@@ -87,6 +89,7 @@ pub(super) fn control_expr(p: &mut Parser) -> Done {
             K::BreakExpr
         }
         K::ContinueKw => {
+            p.bump_as(keyword);
             if p.at(K::Label) {
                 p.bump();
             }
