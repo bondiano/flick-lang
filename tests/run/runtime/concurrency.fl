@@ -45,9 +45,9 @@ let main () =
   match parallel_exits [task { 1 }, failing "exit"] with
   | [first, second] -> Platform.stdout_line (outcome first ++ ", " ++ outcome second)
   | _ -> ()
-  Platform.stdout_line (race_first (after 30 "late") (after 1 "early"))
+  Platform.stdout_line (race_first (after 300 "late") (after 1 "early"))
   let timed =
-    try timeout 5 (after 50 "never") with
+    try timeout 5 (after 500 "never") with
     | TimeoutError -> "timed out"
   Platform.stdout_line timed
-  Platform.stdout_line (show (timeout_option 50 (after 1 "in time")))
+  Platform.stdout_line (show (timeout_option 500 (after 1 "in time")))

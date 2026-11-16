@@ -111,3 +111,18 @@ func TestTestClockDrivesTimeoutsAndSchedules(t *testing.T) {
 		}
 	})
 }
+
+func TestTimeoutArmsTimerBeforeFork(t *testing.T) {
+	onTestClock(func(fb *Fiber) {
+		timed := fork(fb, fb.owner, Eff(func(fb *Fiber) Value {
+			return TimeoutOption(fb, 50.0, Eff(func(fb *Fiber) Value {
+				sleepFor(fb, fromMillis(50))
+				return "done"
+			}))
+		}), nil)
+		TestAdjust(fb, fromMillis(50))
+		if v := FiberJoin(fb, timed); v != None {
+			t.Fatalf("equal-duration timeout should win: %v", v)
+		}
+	})
+}
