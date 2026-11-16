@@ -20,9 +20,7 @@ line. A function's signature says what it needs and how it can fail, the
 compiler holds the body to it, and the code still reads like plain code. It
 compiles to JavaScript and TypeScript, where effects run on
 [Effect](https://effect.website/) for now, and to Go for a standalone
-executable. Host calls such as standard streams, the clock, randomness,
-environment and arguments are explicit services provided by runners
-(`Host.Live`, `Host.BrowserLive`).
+executable.
 [Why Flick](./docs/src/content/docs/start/why.md) says what it is for, and
 who it is not for yet.
 
