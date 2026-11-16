@@ -3,6 +3,7 @@
 module Conduit.Server.Accounts exposing (..)
 
 import Database exposing (Database)
+import Host
 import Conduit.Api exposing (Request)
 import Conduit.Input exposing (LoginBody, NewUserBody, ProfilePath, UpdateUserBody)
 import Conduit.Model exposing (ProfileBody, UserBody)
@@ -37,7 +38,7 @@ hash : String ->{Async, Crypto.Crypto} String
 let hash password = Effect.or_die (task { Crypto.hash_password password })
 
 /// The answer for a user who just signed in or up.
-signed : Account ->{Async, Keys, Crypto.Crypto} UserBody
+signed : Account ->{Async, Keys, Crypto.Crypto, Host.Clock} UserBody
 let signed account = { user = Present.user account (Auth.issue account) }
 
 /// Signs a user up: 422 for a field missing or malformed, 409 for a name or email taken.

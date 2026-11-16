@@ -17,20 +17,23 @@ import Conduit.Problem exposing (
   Unprocessable(..),
 )
 import Conduit.Route as Route exposing (Slug, Username)
+import Host
 import Conduit.Server.App as Server
 import Conduit.Server.Postgres as Postgres
 import Conduit.Server.Session exposing (Keys)
 
 /// What the server runs with: the database of the suite, a key and the
 /// system's cryptography.
-services : Layer {Async} none {Database, Keys, Crypto.Crypto}
+services : Layer {Async} none {Database, Keys, Crypto.Crypto, Host.Clock}
 let services =
-  Layer.merge Postgres.layer (Layer.merge (Server.keys "conduit-test-key") Crypto.system)
+  Layer.merge
+    Postgres.layer
+    (Layer.merge (Server.keys "conduit-test-key") (Layer.merge Crypto.system Host.clock))
 
 /// Sends `request` to `endpoint` of the server, as a client of `/api` would.
 send :
   HttpApi.Request p q h b ->
-  HttpApi.Endpoint l (HttpApi.Request p q h b ->{r; e} s) ->{Async, Database, Keys, Crypto.Crypto; PlatformError.PlatformError, HttpApi.ClientError | e}
+  HttpApi.Endpoint l (HttpApi.Request p q h b ->{r; e} s) ->{Async, Database, Keys, Crypto.Crypto, Host.Clock; PlatformError.PlatformError, HttpApi.ClientError | e}
   s
 let send request endpoint = HttpApi.Inject.call (Server.router None) "/api" endpoint request
 
@@ -48,7 +51,7 @@ let at user path payload = { path = path; query = (); headers = as_user user; pa
 
 /// Signs `name` up, its password `<name>-password`.
 sign_up :
-  String ->{Async, Database, Keys, Crypto.Crypto; PlatformError.PlatformError, HttpApi.ClientError, Conflict, Unprocessable}
+  String ->{Async, Database, Keys, Crypto.Crypto, Host.Clock; PlatformError.PlatformError, HttpApi.ClientError, Conflict, Unprocessable}
   User
 let sign_up name =
   let user = {
@@ -81,13 +84,13 @@ let draft title tags = {
 publish :
   User ->
   String ->
-  List String ->{Async, Database, Keys, Crypto.Crypto; PlatformError.PlatformError, HttpApi.ClientError, Unauthorized, Unprocessable}
+  List String ->{Async, Database, Keys, Crypto.Crypto, Host.Clock; PlatformError.PlatformError, HttpApi.ClientError, Unauthorized, Unprocessable}
   Article
 let publish author title tags =
   (send (at (Some author) () (draft title tags)) Api.Articles.endpoints.create_article).article
 
 /// Signing up and in, and profiles.
-accounts : List (Test.Spec {Database, Keys, Crypto.Crypto})
+accounts : List (Test.Spec {Database, Keys, Crypto.Crypto, Host.Clock})
 let accounts = [
   Test.it
     "signing up answers the user and a token that signs in"
@@ -163,7 +166,7 @@ let accounts = [
 ]
 
 /// Articles, favorites, comments and the feed.
-publishing : List (Test.Spec {Database, Keys, Crypto.Crypto})
+publishing : List (Test.Spec {Database, Keys, Crypto.Crypto, Host.Clock})
 let publishing = [
   Test.it
     "an article is found by its slug, and only its author edits it"

@@ -1,13 +1,13 @@
 /// JSON Web Tokens signed with HMAC-SHA256 (RFC 7519 with `alg` `HS256`,
 /// RFC 7515 compact form). The claims are a value of a JSON codec; `exp` and
-/// `iat` are whole seconds since the epoch, read from the `Clock`.
+/// `iat` are whole seconds since the epoch, read from the `Host.Clock`.
 module Jwt exposing (Problem(..), JwtError(..), sign, verify, now, expires_in)
 
 import Bytes
-import Clock
 import Codec
 import Codec.Derive
 import Crypto
+import Host
 import Json
 import Schema
 
@@ -70,7 +70,10 @@ let refuse problem = from_result (Err (JwtError problem))
 /// its signature matches (compared in constant time), and its `exp`, when it
 /// has one, is still ahead of the clock.
 verify :
-  PureCodec Json c -> List Int -> String ->{Async, Crypto.Crypto; Crypto.CryptoError, JwtError} c
+  PureCodec Json c ->
+  List Int ->
+  String ->{Async, Crypto.Crypto, Host.Clock; Crypto.CryptoError, JwtError}
+  c
 let verify wire secret token =
   match String.split "." token with
   | [header, payload, signed] ->
@@ -88,22 +91,23 @@ let verify wire secret token =
       | None -> refuse Malformed
   | _ -> refuse Malformed
 
-claims : PureCodec Json c -> String ->{; JwtError} c
+claims : PureCodec Json c -> String ->{Host.Clock; JwtError} c
 let claims wire payload =
   match segment payload with
   | Some json ->
     match (Codec.decode_result expiry_json json, Codec.decode_result wire json) with
     | (Ok expiry, Ok value) ->
       match expiry.exp with
-      | Some exp -> if exp * 1000 <= Clock.current_time_millis () then refuse Expired else value
+      | Some exp ->
+        if exp * 1000 <= Host.Clock.current_time_millis () then refuse Expired else value
       | None -> value
     | _ -> refuse Malformed
   | None -> refuse Malformed
 
 /// The clock's time, in whole seconds since the epoch: an `iat`.
-now : Unit ->{} Float
-let now () = Float.floor (Clock.current_time_millis () / 1000)
+now : Unit ->{Host.Clock} Float
+let now () = Float.floor (Host.Clock.current_time_millis () / 1000)
 
 /// The time `seconds` from now, in whole seconds since the epoch: an `exp`.
-expires_in : Float ->{} Float
+expires_in : Float ->{Host.Clock} Float
 let expires_in seconds = now () + seconds

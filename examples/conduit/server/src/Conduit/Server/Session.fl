@@ -18,6 +18,7 @@ module Conduit.Server.Session exposing (
 )
 
 import Database exposing (Database)
+import Host
 import Conduit.Input exposing (Credentials)
 import Conduit.Problem as Problem exposing (Unauthorized(..))
 import Conduit.Server.People as People exposing (Account)
@@ -36,7 +37,7 @@ type alias InSession = {Async, Session, Database}
 type alias Authorized = {...InSession; Unauthorized}
 
 /// What signs users in, before there is a session.
-type alias Signing = {Async, Database, Keys, Crypto.Crypto}
+type alias Signing = {Async, Database, Keys, Crypto.Crypto, Host.Clock}
 
 /// The secret the server signs tokens with.
 service Keys =
@@ -55,7 +56,7 @@ lifetime : Float
 let lifetime = 30 * 24 * 60 * 60
 
 /// A new token of the account.
-issue : Account ->{Async, Keys, Crypto.Crypto} String
+issue : Account ->{Async, Keys, Crypto.Crypto, Host.Clock} String
 let issue account =
   Effect.or_die
     (task {
@@ -78,7 +79,7 @@ let token_of header =
     None
 
 /// The id a valid token signs, if it is one.
-signed_id : String ->{Async, Keys, Crypto.Crypto} Option BigInt
+signed_id : String ->{Async, Keys, Crypto.Crypto, Host.Clock} Option BigInt
 let signed_id token =
   Effect.or_die
     (task {

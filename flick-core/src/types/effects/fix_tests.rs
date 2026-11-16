@@ -80,6 +80,109 @@ fn adding_async_alone_is_safe() {
 }
 
 #[test]
+fn adding_host_runner_services_alone_is_safe() {
+    for (service, call) in [
+        ("Host.Console", "Host.Console.stdout_line \"hi\""),
+        ("Host.Clock", "let _ = Host.Clock.current_time_millis ()"),
+        ("Host.Random", "let _ = Host.Random.next ()"),
+        ("Host.Environment", "let _ = Host.Environment.env \"KEY\""),
+        ("Host.Arguments", "let _ = Host.Arguments.args ()"),
+    ] {
+        let text = format!(
+            "module Probe exposing (..)\n\
+             import Host\n\
+             f : Unit ->{{}} Unit\n\
+             let f () =\n  {call}\n  ()\n"
+        );
+        let mut sources = SourceMap::default();
+        let file = sources.add("Probe.fl", text.clone());
+        let diagnostics = crate::check(&sources, file);
+        let fixes: Vec<_> = (diagnostics.iter())
+            .filter(|d| d.code == codes::E002)
+            .flat_map(|d| &d.fixes)
+            .collect();
+        assert!(
+            matches!(fixes[..], [fix] if fix.safe),
+            "expected safe fix for {service}, got {diagnostics:?}"
+        );
+        let fix = fixes[0];
+        assert_eq!(
+            fix.edits[0].replacement, service,
+            "expected edit replacement to be fully qualified {service}"
+        );
+        let mut fixed_text = text;
+        fixed_text.replace_range(fix.edits[0].span.range(), &fix.edits[0].replacement);
+        let mut recheck_sources = SourceMap::default();
+        let recheck_file = recheck_sources.add("Probe.fl", fixed_text);
+        let recheck_diagnostics = crate::check(&recheck_sources, recheck_file);
+        assert!(
+            recheck_diagnostics.is_empty(),
+            "expected applying safe fix for {service} to check with 0 diagnostics, got {recheck_diagnostics:?}"
+        );
+    }
+}
+
+#[test]
+fn adding_runner_host_service_with_async_is_safe() {
+    let text = "module Probe exposing (..)\n\
+                import Host\n\
+                wait : Unit ->{Async} Unit\n\
+                foreign effect wait from \"./wait.mjs\" \"wait\"\n\
+                f : Unit ->{} Unit\n\
+                let f () =\n  wait ()\n  let _ = Host.Clock.current_time_millis ()\n  ()\n";
+    let mut sources = SourceMap::default();
+    let file = sources.add("Probe.fl", text.to_owned());
+    let diagnostics = crate::check(&sources, file);
+    let fixes: Vec<_> = (diagnostics.iter())
+        .filter(|d| d.code == codes::E002)
+        .flat_map(|d| &d.fixes)
+        .collect();
+    assert!(
+        matches!(fixes[..], [fix] if fix.safe),
+        "expected safe fix for Async + Host.Clock, got {diagnostics:?}"
+    );
+}
+
+#[test]
+fn adding_non_runner_service_is_not_safe() {
+    let text = "module Probe exposing (..)\n\
+                service Log =\n  line : String ->{} Unit\n\
+                f : Unit ->{} Unit\n\
+                let f () = Log.line \"hi\"\n";
+    let mut sources = SourceMap::default();
+    let file = sources.add("Probe.fl", text.to_owned());
+    let diagnostics = crate::check(&sources, file);
+    let fixes: Vec<_> = (diagnostics.iter())
+        .filter(|d| d.code == codes::E002)
+        .flat_map(|d| &d.fixes)
+        .collect();
+    assert!(
+        matches!(fixes[..], [fix] if !fix.safe),
+        "expected unsafe fix for Log, got {diagnostics:?}"
+    );
+}
+
+#[test]
+fn adding_runner_and_non_runner_service_together_is_not_safe() {
+    let text = "module Probe exposing (..)\n\
+                import Host\n\
+                service Log =\n  line : String ->{} Unit\n\
+                f : Unit ->{} Unit\n\
+                let f () =\n  Host.Console.stdout_line \"hi\"\n  Log.line \"hi\"\n";
+    let mut sources = SourceMap::default();
+    let file = sources.add("Probe.fl", text.to_owned());
+    let diagnostics = crate::check(&sources, file);
+    let fixes: Vec<_> = (diagnostics.iter())
+        .filter(|d| d.code == codes::E002)
+        .flat_map(|d| &d.fixes)
+        .collect();
+    assert!(
+        matches!(fixes[..], [fix] if !fix.safe),
+        "expected unsafe fix for Host.Console + Log, got {diagnostics:?}"
+    );
+}
+
+#[test]
 fn the_services_of_a_written_eff_get_it_too() {
     let program = "let f () = task { Log.line \"x\" }";
     assert_eq!(

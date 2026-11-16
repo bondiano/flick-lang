@@ -50,6 +50,9 @@ struct Excess {
 }
 
 mod excess;
+mod tails;
+
+use tails::{allows, less, owed, unknown};
 
 impl Checker<'_> {
     /// Grows unknown declared rows until nothing changes.
@@ -452,21 +455,53 @@ impl Checker<'_> {
             written
         };
         if let Some(written) = written.filter(|_| !e.taken) {
+            let to_add: Vec<String> = if e.labels.len() == e.services.len() {
+                e.labels
+                    .iter()
+                    .zip(&e.services)
+                    .map(|(label, short)| match label.name() {
+                        Some(name) => match name.split_once('.') {
+                            Some((module, _))
+                                if module != "Prelude" && module != self.env.module =>
+                            {
+                                name.to_owned()
+                            }
+                            _ => short.clone(),
+                        },
+                        None => short.clone(),
+                    })
+                    .collect()
+            } else {
+                e.services.clone()
+            };
             // the services go after the `{`; the errors, after the `;`, are left to the user
             let edits: Vec<Edit> = (e.errors.is_empty())
-                .then(|| written.adding(&e.services.join(", ")))
+                .then(|| written.adding(&to_add.join(", ")))
                 .flatten()
                 .map(|(span, replacement)| Edit { span, replacement })
                 .into_iter()
                 .collect();
-            // a function that suspends says so: adding `Async` alone changes nothing else
-            let only_async = e.errors.is_empty()
+            // a function that suspends or needs runner host services (Async or Host.*):
+            // adding them to the row changes nothing else callers cannot provide under a runner
+            let is_runner_service = e.errors.is_empty()
                 && !edits.is_empty()
                 // a row variable it lacks has no label
                 && e.labels.len() == e.services.len()
-                && (e.labels.iter()).all(|l| lang::label(Lang::Async) == l.name());
+                && e.labels.iter().all(|l| {
+                    lang::label(Lang::Async) == l.name()
+                        || matches!(
+                            l.name(),
+                            Some(
+                                "Host.Console"
+                                    | "Host.Clock"
+                                    | "Host.Random"
+                                    | "Host.Environment"
+                                    | "Host.Arguments"
+                            )
+                        )
+                });
             let fix = || (format!("add {list} to {bound}"), edits);
-            diagnostic = if only_async {
+            diagnostic = if is_runner_service {
                 diagnostic.with_safe_fix(fix)
             } else {
                 diagnostic.with_fix(fix)
@@ -474,44 +509,4 @@ impl Checker<'_> {
         }
         self.diagnostics.push(diagnostic);
     }
-}
-
-/// A row variable and the names it is taken without, if any.
-fn less(tail: &Type) -> (&Type, &[Elem]) {
-    match tail {
-        Type::Without { row, gone } => (row, gone),
-        other => (other, &[]),
-    }
-}
-
-/// The variable of a tail still to be inferred, maybe less some names.
-fn unknown(tail: &Type) -> Option<u32> {
-    match less(tail).0 {
-        Type::Meta(meta) => meta.inference_type_root(),
-        _ => None,
-    }
-}
-
-/// The names `declared` takes out of the variable of `tail` that neither
-/// the tail is less too nor `declared` gives back, or `None` when it does
-/// not hold the variable: `s` is within `{L | s - L}`, whatever `s` is.
-/// Only a name without arguments gives it back: `s` may hold `S b`, which
-/// `{S a | s - S}` does not.
-fn owed(declared: &Norm, tail: &Type) -> Option<Vec<Elem>> {
-    let (variable, gone) = less(tail);
-    let gives_back = |l: &Elem| declared.get(l).is_some_and(|t| !l.is_instance(t));
-    (declared.tails.iter().map(less))
-        .filter(|(held, _)| *held == variable)
-        .map(|(_, taken)| {
-            (taken.iter())
-                .filter(|l| !gone.contains(l) && !gives_back(l))
-                .cloned()
-                .collect::<Vec<_>>()
-        })
-        .min_by_key(Vec::len)
-}
-
-/// Whether `declared` allows all a `tail` stands for.
-fn allows(declared: &Norm, tail: &Type) -> bool {
-    owed(declared, tail).is_some_and(|names| names.is_empty())
 }

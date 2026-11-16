@@ -68,11 +68,6 @@ let read_later path =
 
 ## Where the promise stops
 
-- **Host calls are not named yet.** `Console.log`, `Platform.env`,
-  `DateTime.now` and `Random.next_int` are `->{}` functions. Such a signature
-  says only that the function runs in the runtime, not what it touches. In 0.2
-  the console, the clock, randomness, the environment and the arguments become
-  services: the signature names them, and a test swaps them.
 - **Defects stay outside the signature.** A pure function can still die with a
   defect or never finish. A runtime function can also be interrupted.
 - **`foreign` is taken on trust.** The compiler believes the signature of a

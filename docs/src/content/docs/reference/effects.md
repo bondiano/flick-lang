@@ -525,8 +525,12 @@ The live clock reads the ambient fiber clock; replace scheduling time with
 
 The existing `Platform`, `Clock`, `Random`, `Console` and `DateTime.now` APIs
 remain trusted ambient adapters for compatibility. Their empty rows do not
-identify host capabilities. Use `Host` in application contracts that need this
-guarantee; this API is not a sandbox against foreign code.
+identify host capabilities. Standard library modules (such as `Jwt`) declare
+explicit host service requirements (`Host.Clock`). Missing runner host services
+are classified by the effect solver as safe fixes, automatically suggested by
+the checker and language server. Application runners (`Runner.Node` and
+`Runner.Browser`) provide `Host.Live` or `Host.BrowserLive` at the root entry
+boundary.
 
 ## Effects and handlers
 
