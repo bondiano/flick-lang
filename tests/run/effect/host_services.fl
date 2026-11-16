@@ -1,6 +1,7 @@
 module App.Main exposing (main)
 
 import Host
+import Log
 
 inspect : Unit ->{Host.Clock, Host.Random, Host.Environment, Host.Arguments, Host.Console} Unit
 let inspect () =
@@ -67,4 +68,18 @@ let main () =
   Platform.stdout_line (show (args == Platform.args ()))
   let draw = fun () -> Random.with_seed 7 (task { provide Host.random { Host.Random.next () } })
   Platform.stdout_line (show (draw () == draw ()))
+  let browser_time = provide Host.browser_live { Host.Clock.current_time_millis () }
+  Platform.stdout_line (show (browser_time > 0))
+  let log_out = Ref.make []
+  let custom_console =
+    Layer.succeed Host.Console {
+      stdout_line = fun text -> Ref.update log_out (fun lines -> lines ++ [text]);
+      stderr_line = fun text -> Ref.update log_out (fun lines -> lines ++ [text]);
+      stdout_write = fun text -> Ref.update log_out (fun lines -> lines ++ [text]);
+    }
+  provide (Log.from_console custom_console) {
+    Log.info "hello info"
+    Log.warn "hello warn"
+  }
+  Platform.stdout_line (show (Ref.get log_out == ["info: hello info", "warn: hello warn"]))
   provide Host.live { Host.Console.stdout_line "live output" }

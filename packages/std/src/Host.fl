@@ -54,7 +54,17 @@ let environment = Layer.succeed Environment { env = Platform.env }
 arguments : Layer none none {Arguments}
 let arguments = Layer.succeed Arguments { args = Platform.args }
 
+/// The five host services of an app running on a host with a process and files.
+type alias Live = {Console, Clock, Random, Environment, Arguments}
+
+/// The three host services available in a browser environment.
+type alias BrowserLive = {Console, Clock, Random}
+
+/// The live browser services: console, clock, and random.
+browser_live : Layer none none BrowserLive
+let browser_live = Layer.merge console (Layer.merge clock random)
+
 /// All five live services. Prefer individual layers for narrower boundaries.
-live : Layer none none {Console, Clock, Random, Environment, Arguments}
+live : Layer none none Live
 let live =
   Layer.merge console (Layer.merge clock (Layer.merge random (Layer.merge environment arguments)))

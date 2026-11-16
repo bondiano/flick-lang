@@ -22,6 +22,10 @@ EqHash
 HashSet
 HashMap
 Loop
+Clock
+Random
+Host
+Context
 Log
 File
 Resource
@@ -72,10 +76,9 @@ Graph.Walk
 Graph
 DateTime
 Cron
-Clock
 Jwt
-Random
-Host
+# end of time
+# concurrency
 SynchronizedRef
 SubscriptionRef
 Deferred
@@ -118,7 +121,8 @@ Logger
 ConfigProvider
 Metric
 Tracer
-Context
+# end of platform and observability
+# context, layers and requests
 Scope
 Layer.Trace
 LayerMap

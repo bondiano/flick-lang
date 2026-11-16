@@ -417,3 +417,166 @@ impl Checker<'_> {
         payloads
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::diagnostics::{Diagnostic, codes};
+    use crate::source::SourceMap;
+
+    fn check(text: &str) -> Vec<Diagnostic> {
+        let mut sources = SourceMap::default();
+        let file = sources.add("Probe.fl", text.to_owned());
+        crate::check(&sources, file)
+    }
+
+    #[test]
+    fn services_are_nominal() {
+        // Two distinct services with identical signatures cannot satisfy each other
+        let text = r"
+module Probe exposing (..)
+
+service ConsoleA =
+  stdout_line : String ->{} Unit
+
+service ConsoleB =
+  stdout_line : String ->{} Unit
+
+f : String ->{ConsoleA} Unit
+let f s = ConsoleB.stdout_line s
+";
+        let diagnostics = check(text);
+        assert!(
+            diagnostics.iter().any(|d| d.code == codes::E002),
+            "expected E002 for nominal service mismatch: {diagnostics:?}"
+        );
+    }
+
+    #[test]
+    fn service_dependencies() {
+        // A function invoking a service operation that depends on another service
+        let text = r"
+module Probe exposing (..)
+
+service Dep =
+  value : Unit ->{} Int
+
+service MainService =
+  compute : Unit ->{Dep} Int
+
+f : Unit ->{MainService, Dep} Int
+let f () = MainService.compute ()
+";
+        let diagnostics = check(text);
+        assert!(
+            diagnostics.is_empty(),
+            "expected no diagnostics for valid service dependencies: {diagnostics:?}"
+        );
+    }
+
+    #[test]
+    fn layer_composition() {
+        // Merging disjoint layers succeeds and combines their service rows
+        let text = r"
+module Probe exposing (..)
+
+import Layer
+
+service Console =
+  stdout_line : String ->{} Unit
+
+service Clock =
+  now : Unit ->{} Float
+
+c : Layer none none {Console}
+let c = Layer.succeed Console { stdout_line = fun _ -> () }
+
+k : Layer none none {Clock}
+let k = Layer.succeed Clock { now = fun () -> 0.0 }
+
+merged : Layer none none {Console, Clock}
+let merged = Layer.merge c k
+";
+        let diagnostics = check(text);
+        assert!(
+            diagnostics.is_empty(),
+            "expected layer composition of disjoint services to succeed: {diagnostics:?}"
+        );
+    }
+
+    #[test]
+    fn circular_layers_fail() {
+        // Merging layers that provide the same service produces FLICK-E004
+        let text = r"
+module Probe exposing (..)
+
+import Layer
+
+service Console =
+  stdout_line : String ->{} Unit
+
+c1 : Layer none none {Console}
+let c1 = Layer.succeed Console { stdout_line = fun _ -> () }
+
+c2 : Layer none none {Console}
+let c2 = Layer.succeed Console { stdout_line = fun _ -> () }
+
+conflict : Layer none none {Console}
+let conflict = Layer.merge c1 c2
+";
+        let diagnostics = check(text);
+        assert!(
+            diagnostics.iter().any(|d| d.code == codes::E004),
+            "expected E004 when merging conflicting layers: {diagnostics:?}"
+        );
+    }
+
+    #[test]
+    fn missing_capability_fails() {
+        // Calling a service not declared in the caller's effect row produces FLICK-E002
+        let text = r"
+module Probe exposing (..)
+
+service Environment =
+  env : String ->{} Option String
+
+unpermitted : String ->{} Option String
+let unpermitted name = Environment.env name
+";
+        let diagnostics = check(text);
+        assert!(
+            diagnostics.iter().any(|d| d.code == codes::E002),
+            "expected E002 when calling unpermitted service: {diagnostics:?}"
+        );
+    }
+
+    #[test]
+    fn service_operations_must_be_tail() {
+        // Non-tail service operations produce FLICK-E013
+        let text = r"
+module Probe exposing (..)
+
+service BadService =
+  abort stop : forall b. Int ->{} b
+";
+        let diagnostics = check(text);
+        assert!(
+            diagnostics.iter().any(|d| d.code == codes::E013),
+            "expected E013 for non-tail service operation: {diagnostics:?}"
+        );
+    }
+
+    #[test]
+    fn error_payload_rejects_live_values() {
+        // Error carrying a live value (Ref) produces FLICK-E005
+        let text = r"
+module Probe exposing (..)
+
+type error BadError = BadError (Ref Float)
+";
+        let diagnostics = check(text);
+        assert!(
+            diagnostics.iter().any(|d| d.code == codes::E005),
+            "expected E005 when error payload holds a live Ref: {diagnostics:?}"
+        );
+    }
+}
