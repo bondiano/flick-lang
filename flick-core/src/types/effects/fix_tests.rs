@@ -95,7 +95,7 @@ fn adding_host_runner_services_alone_is_safe() {
              let f () =\n  {call}\n  ()\n"
         );
         let mut sources = SourceMap::default();
-        let file = sources.add("Probe.fl", text);
+        let file = sources.add("Probe.fl", text.clone());
         let diagnostics = crate::check(&sources, file);
         let fixes: Vec<_> = (diagnostics.iter())
             .filter(|d| d.code == codes::E002)
@@ -104,6 +104,20 @@ fn adding_host_runner_services_alone_is_safe() {
         assert!(
             matches!(fixes[..], [fix] if fix.safe),
             "expected safe fix for {service}, got {diagnostics:?}"
+        );
+        let fix = fixes[0];
+        assert_eq!(
+            fix.edits[0].replacement, service,
+            "expected edit replacement to be fully qualified {service}"
+        );
+        let mut fixed_text = text;
+        fixed_text.replace_range(fix.edits[0].span.range(), &fix.edits[0].replacement);
+        let mut recheck_sources = SourceMap::default();
+        let recheck_file = recheck_sources.add("Probe.fl", fixed_text);
+        let recheck_diagnostics = crate::check(&recheck_sources, recheck_file);
+        assert!(
+            recheck_diagnostics.is_empty(),
+            "expected applying safe fix for {service} to check with 0 diagnostics, got {recheck_diagnostics:?}"
         );
     }
 }

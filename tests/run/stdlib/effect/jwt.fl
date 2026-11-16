@@ -91,8 +91,8 @@ let checks () =
   line "malformed" (outcome claims_json secret "not.a token") ()
   line "wrong claims" (outcome session_json secret python) ()
 
-main : Unit ->{Async, Host.Clock; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
-  try provide Crypto.system { checks () } with
+  try provide (Layer.merge Crypto.system Host.clock) { checks () } with
   | Crypto.CryptoError message -> line "error" message ()
   | SchemaError _ -> line "error" "schema" ()

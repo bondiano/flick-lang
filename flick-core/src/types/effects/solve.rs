@@ -455,9 +455,28 @@ impl Checker<'_> {
             written
         };
         if let Some(written) = written.filter(|_| !e.taken) {
+            let to_add: Vec<String> = if e.labels.len() == e.services.len() {
+                e.labels
+                    .iter()
+                    .zip(&e.services)
+                    .map(|(label, short)| match label.name() {
+                        Some(name) => match name.split_once('.') {
+                            Some((module, _))
+                                if module != "Prelude" && module != self.env.module =>
+                            {
+                                name.to_owned()
+                            }
+                            _ => short.clone(),
+                        },
+                        None => short.clone(),
+                    })
+                    .collect()
+            } else {
+                e.services.clone()
+            };
             // the services go after the `{`; the errors, after the `;`, are left to the user
             let edits: Vec<Edit> = (e.errors.is_empty())
-                .then(|| written.adding(&e.services.join(", ")))
+                .then(|| written.adding(&to_add.join(", ")))
                 .flatten()
                 .map(|(span, replacement)| Edit { span, replacement })
                 .into_iter()
