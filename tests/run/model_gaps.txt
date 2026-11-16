@@ -224,6 +224,7 @@ stdlib/observability/prometheus # no native for `scrape` (./scrape.mjs scrape)
 stdlib/observability/settings # no native for `meta` (./receiver.mjs meta)
 stdlib/observability/tracer # no native for `received` (./receiver.mjs received)
 stdlib/process/child_process # no native for `env` (flick:rt platformEnv)
+stdlib/process/wait_large_output # no native for `env` (flick:rt platformEnv)
 stdlib/reactivity/atom # no native for `layer_of` (flick:reactivity/Atom flickLayer)
 stdlib/rpc/auth # the row primitive `Lacks "me" {}`
 stdlib/rpc/local # `Record.label` has no λFlick form

@@ -12,17 +12,26 @@ import (
 	"time"
 )
 
-// outputQueue gathers what a process writes, so that output nobody reads
-// never blocks it.
-// shortcut: unbounded, where Node pauses a stream nobody reads (the cases: "Child processes" in the stdlib reference); bound it if a program spawns one that writes much unread
+// maxOutputQueueBytes bounds the gathered unconsumed output in memory.
+const maxOutputQueueBytes = 64 * 1024
+
+// outputQueue gathers what a process writes with bounded buffering so that
+// high-volume output does not cause unbounded memory growth.
 type outputQueue struct {
-	mu     sync.Mutex
-	chunks [][]byte
-	closed bool
-	signal chan struct{} // closed when a chunk comes or the output ends, then replaced
+	mu       sync.Mutex
+	cond     *sync.Cond
+	chunks   [][]byte
+	buffered int
+	closed   bool
+	draining bool
+	signal   chan struct{} // closed when a chunk comes or the output ends, then replaced
 }
 
-func newOutputQueue() *outputQueue { return &outputQueue{signal: make(chan struct{})} }
+func newOutputQueue() *outputQueue {
+	q := &outputQueue{signal: make(chan struct{})}
+	q.cond = sync.NewCond(&q.mu)
+	return q
+}
 
 func (q *outputQueue) wake() {
 	close(q.signal)
@@ -31,9 +40,19 @@ func (q *outputQueue) wake() {
 
 func (q *outputQueue) Write(b []byte) (int, error) {
 	q.mu.Lock()
+	defer q.mu.Unlock()
+	for !q.closed && !q.draining && q.buffered >= maxOutputQueueBytes {
+		q.cond.Wait()
+	}
+	if q.closed {
+		return 0, io.ErrClosedPipe
+	}
+	if q.draining {
+		return len(b), nil
+	}
 	q.chunks = append(q.chunks, append([]byte(nil), b...))
+	q.buffered += len(b)
 	q.wake()
-	q.mu.Unlock()
 	return len(b), nil
 }
 
@@ -55,6 +74,17 @@ func (q *outputQueue) pipe() (*os.File, error) {
 func (q *outputQueue) close() {
 	q.mu.Lock()
 	q.closed = true
+	q.cond.Broadcast()
+	q.wake()
+	q.mu.Unlock()
+}
+
+func (q *outputQueue) drain() {
+	q.mu.Lock()
+	q.draining = true
+	q.chunks = nil
+	q.buffered = 0
+	q.cond.Broadcast()
 	q.wake()
 	q.mu.Unlock()
 }
@@ -66,10 +96,12 @@ func (q *outputQueue) next(fb *Fiber) ([]byte, bool) {
 		if len(q.chunks) > 0 {
 			chunk := q.chunks[0]
 			q.chunks = q.chunks[1:]
+			q.buffered -= len(chunk)
+			q.cond.Signal()
 			q.mu.Unlock()
 			return chunk, true
 		}
-		if q.closed {
+		if q.closed || q.draining {
 			q.mu.Unlock()
 			return nil, false
 		}
@@ -123,6 +155,8 @@ func (p *process) running() bool {
 
 // wait is the exit code of the process; one a signal ended fails.
 func (p *process) wait(fb *Fiber) Value {
+	p.out.drain()
+	p.err.drain()
 	wait(fb, p.exited)
 	if signal, ok := processSignal(p.state); ok {
 		return Fail(processError("UnknownError", "exitCode",

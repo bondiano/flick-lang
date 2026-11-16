@@ -1,0 +1,31 @@
+// Waiting on a child process that emits >64 KiB stdout/stderr without reading
+// it must not deadlock on Node (draining pipes concurrently) or cause
+// unbounded memory growth on Go.
+module App.Main exposing (main)
+
+/// The command line `script` in the system's shell.
+shell : Bool -> String -> ChildProcess.Command
+let shell windows script =
+  if windows then
+    ChildProcess.make "cmd" ["/d", "/c", script]
+  else
+    ChildProcess.make "sh" ["-c", script]
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  let windows = Platform.env "OS" == Some "Windows_NT"
+  let script =
+    if windows then
+      "for /L %i in (1,1,2500) do @echo 0123456789012345678901234567890123456789"
+    else
+      "awk 'BEGIN { for (i=1; i<=2500; i++) print \"0123456789012345678901234567890123456789\" }'"
+  let outcome =
+    try
+      scope {
+        let p = ChildProcess.spawn (shell windows script)
+        let code = ChildProcess.wait p
+        Platform.stdout_line ("wait exit code: " ++ show code)
+      }
+    with
+    | failure -> Platform.stdout_line "failed to run process"
+  outcome

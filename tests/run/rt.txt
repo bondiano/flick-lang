@@ -288,6 +288,7 @@ stdlib/observability/prometheus
 stdlib/observability/settings
 stdlib/observability/tracer
 stdlib/process/child_process
+stdlib/process/wait_large_output
 stdlib/reactivity/atom
 stdlib/rpc/auth
 stdlib/rpc/local
