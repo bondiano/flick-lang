@@ -28,6 +28,7 @@ struct Control<'k> {
     id: String,
     next: usize,
     lang: &'k Known<'k>,
+    enclosing_loops: Vec<String>,
 }
 impl Control<'_> {
     fn hidden(&mut self, label: &str) -> String {
@@ -45,20 +46,20 @@ impl Control<'_> {
                     if Self::has_exit(&value, flag) {
                         let name = self.hidden("exitvalue");
                         let value = self.guarded_parts(value, flag);
-                        let finish = Expr::new(
-                            ExprKind::Block(
-                                vec![
-                                    Stmt::Assign(
-                                        result.into(),
-                                        Expr::new(ExprKind::Local(name.clone()), span),
-                                    ),
-                                    Stmt::Assign(flag.into(), boolean(false, span)),
-                                    Stmt::Assign(format!("{flag}$step"), boolean(false, span)),
-                                ],
-                                Box::new(unit(span)),
-                            ),
-                            span,
-                        );
+                        let mut finish_stmts = vec![Stmt::Assign(
+                            result.into(),
+                            Expr::new(ExprKind::Local(name.clone()), span),
+                        )];
+                        for inter in &self.enclosing_loops {
+                            finish_stmts.push(Stmt::Assign(inter.clone(), boolean(false, span)));
+                            finish_stmts
+                                .push(Stmt::Assign(format!("{inter}$step"), boolean(false, span)));
+                        }
+                        finish_stmts.push(Stmt::Assign(flag.into(), boolean(false, span)));
+                        finish_stmts
+                            .push(Stmt::Assign(format!("{flag}$step"), boolean(false, span)));
+                        let finish =
+                            Expr::new(ExprKind::Block(finish_stmts, Box::new(unit(span))), span);
                         *e = Expr::new(
                             ExprKind::Block(
                                 vec![Stmt::Let(Pat::Bind(name), value)],
@@ -71,12 +72,28 @@ impl Control<'_> {
                     stmts.push(Stmt::Assign(result.into(), value));
                     stmts.push(Stmt::Assign(flag.into(), boolean(false, span)));
                 }
+                for inter in &self.enclosing_loops {
+                    stmts.push(Stmt::Assign(inter.clone(), boolean(false, span)));
+                    stmts.push(Stmt::Assign(format!("{inter}$step"), boolean(false, span)));
+                }
                 stmts.push(Stmt::Assign(format!("{flag}$step"), boolean(false, span)));
                 *e = Expr::new(ExprKind::Block(stmts, Box::new(unit(span))), span);
             }
             return;
         }
-        if matches!(e.kind, ExprKind::ControlLoop { .. }) {
+        if let ExprKind::ControlLoop {
+            id: child_id,
+            condition,
+            body,
+            ..
+        } = &mut e.kind
+        {
+            self.enclosing_loops.push(child_id.clone());
+            if let Some(cond) = condition {
+                self.exits(cond, flag, result);
+            }
+            self.exits(body, flag, result);
+            self.enclosing_loops.pop();
             return;
         }
         e.each_child_mut(&mut |c| self.exits(c, flag, result));
@@ -283,6 +300,15 @@ impl Control<'_> {
                     flag,
                 )
             }
+            ExprKind::ControlLoop {
+                condition, body, ..
+            } => {
+                if let Some(c) = condition {
+                    **c = self.guarded_parts((**c).clone(), flag);
+                }
+                **body = self.guarded_parts((**body).clone(), flag);
+                e
+            }
             ExprKind::Loop { .. } | ExprKind::Each { .. } | ExprKind::Generate { .. } => e,
             _ => {
                 let mut values = Vec::new();
@@ -364,6 +390,13 @@ fn leaves(e: &Expr, id: &str) -> bool {
     if matches!(&e.kind, ExprKind::LoopExit { id: of, .. } if of == id) {
         return true;
     }
+    if let ExprKind::Block(stmts, _) = &e.kind
+        && stmts
+            .iter()
+            .any(|s| matches!(s, Stmt::Assign(n, _) if n == &format!("{id}$step")))
+    {
+        return true;
+    }
     let mut found = false;
     e.each_child(&mut |c| found |= leaves(c, id));
     found
@@ -399,6 +432,7 @@ pub fn lower(
         id: id.into(),
         next: 0,
         lang,
+        enclosing_loops: Vec::new(),
     };
     let flag = id;
     let result = format!("{id}$result");
@@ -460,3 +494,6 @@ pub fn lower(
         span,
     )
 }
+
+#[cfg(test)]
+mod tests;

@@ -31,6 +31,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "label"
+        },
+        {
+          "type": "SYMBOL",
           "name": "_foreign"
         },
         {
@@ -245,6 +249,10 @@
         {
           "type": "SYMBOL",
           "name": "braces"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "label"
         },
         {
           "type": "SYMBOL",
@@ -946,6 +954,22 @@
           {
             "type": "STRING",
             "value": "@"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[a-z_][A-Za-z0-9_]*"
+          }
+        ]
+      }
+    },
+    "label": {
+      "type": "TOKEN",
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "STRING",
+            "value": "'"
           },
           {
             "type": "PATTERN",

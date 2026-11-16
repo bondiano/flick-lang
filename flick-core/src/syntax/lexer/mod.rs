@@ -138,6 +138,15 @@ impl Lexer<'_> {
                 if doc { K::DocComment } else { K::LineComment }
             }
             b'/' if self.peek(1) == b'*' => self.block_comment(),
+            b'\'' if matches!(self.peek(1), b'a'..=b'z' | b'_') => {
+                self.pos += 1;
+                while is_ident_byte(self.peek(0))
+                    || (self.generated && self.peek(0) == b'$' && is_ident_byte(self.peek(1)))
+                {
+                    self.pos += 1;
+                }
+                K::Label
+            }
             b'"' => self.string(),
             b'r' if self.raw_string_start().is_some() => self.raw_string(),
             b'0'..=b'9' => self.number(),
@@ -619,3 +628,34 @@ fn plural(s: &str) -> &'static str {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod label_tests {
+    use super::*;
+    use crate::source::SourceMap;
+
+    #[test]
+    fn lex_loop_label() {
+        let mut map = SourceMap::default();
+        let file = map.add("t.fl", "'outer 'inner_1 'a");
+        let (tokens, errors) = lex("'outer 'inner_1 'a", file);
+        assert!(errors.is_empty());
+        let kinds: Vec<_> = tokens
+            .into_iter()
+            .filter(|t| !t.kind.is_trivia())
+            .map(|t| t.kind)
+            .collect();
+        assert_eq!(
+            kinds,
+            vec![SyntaxKind::Label, SyntaxKind::Label, SyntaxKind::Label]
+        );
+    }
+
+    #[test]
+    fn stray_quote_is_error() {
+        let mut map = SourceMap::default();
+        let file = map.add("t.fl", "'123");
+        let (_tokens, errors) = lex("'123", file);
+        assert!(!errors.is_empty());
+    }
+}

@@ -324,3 +324,143 @@ fn a_case_the_model_does_not_run_says_why() {
         changed.join("\n")
     );
 }
+
+#[test]
+fn nested_labeled_loop_break_outer() {
+    let text = r"module Main exposing (main)
+main : Unit ->{} Unit
+let main () =
+  let result =
+    'outer : loop {
+      let mut i = 0
+      'inner : loop {
+        i = i + 1
+        if i == 3 then break 'outer 42
+      }
+    }
+  Platform.stdout_line (show result)
+";
+    let modules = run::compile_source(text).expect("source checks");
+    let main = run::main_of(&modules).expect("main");
+    let program = run::program(&modules);
+    assert_eq!(run::check(&modules, &program), Vec::<String>::new());
+    let ran = run::run_main(&program, &main, 100_000);
+    assert_eq!(ran.stdout, "42\n", "{:?}", ran.outcome);
+}
+
+#[test]
+fn nested_labeled_loop_continue_outer() {
+    let text = r"module Main exposing (main)
+main : Unit ->{} Unit
+let main () =
+  let mut outer_count = 0
+  let mut inner_count = 0
+  'outer : while outer_count < 3 do {
+    outer_count = outer_count + 1
+    'inner : loop {
+      inner_count = inner_count + 1
+      continue 'outer
+    }
+  }
+  Platform.stdout_line (show outer_count)
+  Platform.stdout_line (show inner_count)
+";
+    let modules = run::compile_source(text).expect("source checks");
+    let main = run::main_of(&modules).expect("main");
+    let program = run::program(&modules);
+    assert_eq!(run::check(&modules, &program), Vec::<String>::new());
+    let ran = run::run_main(&program, &main, 100_000);
+    assert_eq!(ran.stdout, "3\n3\n", "{:?}", ran.outcome);
+}
+
+#[test]
+fn three_level_nested_labeled_loop_break_ancestor() {
+    let text = r"module Main exposing (main)
+main : Unit ->{} Unit
+let main () =
+  let mut trace = 0
+  let result =
+    'outer : loop {
+      'middle : loop {
+        'inner : loop {
+          trace = trace + 1
+          break 'outer 99
+        }
+      }
+    }
+  Platform.stdout_line (show result)
+  Platform.stdout_line (show trace)
+";
+    let modules = run::compile_source(text).expect("source checks");
+    let main = run::main_of(&modules).expect("main");
+    let program = run::program(&modules);
+    assert_eq!(run::check(&modules, &program), Vec::<String>::new());
+    let ran = run::run_main(&program, &main, 100_000);
+    assert_eq!(ran.stdout, "99\n1\n", "{:?}", ran.outcome);
+}
+
+#[test]
+fn nested_labeled_loop_break_across_try() {
+    let text = r"module Main exposing (main)
+type error Missing = Missing
+
+main : Unit ->{} Unit
+let main () =
+  let result =
+    'outer : loop {
+      'inner : loop {
+        try break 'outer 123 with
+        | Missing -> ()
+      }
+    }
+  Platform.stdout_line (show result)
+";
+    let modules = run::compile_source(text).expect("source checks");
+    let main = run::main_of(&modules).expect("main");
+    let program = run::program(&modules);
+    assert_eq!(run::check(&modules, &program), Vec::<String>::new());
+    let ran = run::run_main(&program, &main, 100_000);
+    assert_eq!(ran.stdout, "123\n", "{:?}", ran.outcome);
+}
+
+#[test]
+fn nested_labeled_loops_support_distinct_types_for_and_try() {
+    let text = r#"module Main exposing (main)
+type error Missing = Missing
+
+main : Unit ->{} Unit
+let main () =
+  let answer =
+    'outer : loop {
+      let n =
+        'inner : loop {
+          if false then break 'outer "early"
+          break 'inner 21
+        }
+      let mut total = 0
+      'items : for x <- [1, 2, 3, 4] do {
+        if x == 3 then break 'items
+        total = total + x
+      }
+      try
+        'guarded : loop {
+          if n + total == 24 then break 'outer "ok"
+          break 'guarded
+        }
+      with
+      | Missing -> ()
+      break 'outer "fallback"
+    }
+  Platform.stdout_line answer
+"#;
+    let modules = run::compile_source(text).expect("source checks");
+    let main = run::main_of(&modules).expect("main");
+    let program = run::program(&modules);
+    let errors = run::check(&modules, &program);
+    assert!(
+        errors.is_empty(),
+        "model rejects translated program: {errors:?}"
+    );
+    let ran = run::run_main(&program, &main, 100_000);
+    assert_eq!(ran.stdout, "ok\n", "{:?}", ran.outcome);
+}

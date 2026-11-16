@@ -121,13 +121,8 @@ impl Validator<'_> {
     }
 
     fn loop_exit(&mut self, id: &str, value: Option<&Expr>) {
-        if self.loops.last().map(String::as_str) != Some(id) {
-            let problem = if self.loops.iter().any(|loop_id| loop_id == id) {
-                format!("exit does not target the nearest loop: `{id}`")
-            } else {
-                format!("exit targets no loop: `{id}`")
-            };
-            self.problems.push(problem);
+        if !self.loops.iter().any(|loop_id| loop_id == id) {
+            self.problems.push(format!("exit targets no loop: `{id}`"));
         }
         if let Some(value) = value {
             self.expr(value);
@@ -470,7 +465,7 @@ mod tests {
         let nested = looping("outer", looping("inner", exit()));
         assert_eq!(
             validate(&program(nested), &|_| false, &files),
-            ["exit does not target the nearest loop: `outer`"]
+            Vec::<String>::new()
         );
     }
 }

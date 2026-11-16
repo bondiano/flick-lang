@@ -60,6 +60,7 @@ codegen/loops_state
 codegen/loops
 codegen/loops_for_source
 codegen/loops_guards
+codegen/labeled_loops_finalizers
 codegen/category_classes
 codegen/effect_sets
 codegen/given_shadow

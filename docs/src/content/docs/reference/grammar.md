@@ -26,6 +26,7 @@ UTF-8 byte ranges; layout columns count characters.
 | - | - | - |
 | name | `[a-z_][A-Za-z0-9_]*` | values, functions, fields, type variables |
 | capitalized name | `[A-Z][A-Za-z0-9_]*` | types, constructors, modules, classes, services, errors |
+| label | `'[a-z_][A-Za-z0-9_]*` | loop labels (`'outer: loop { … }`, `break 'outer`) |
 | `_` | alone | wildcard pattern |
 
 Qualified names are written without spaces around `.`: `Users.get`,
@@ -437,9 +438,9 @@ save_with :
 block       = statement { line break statement }
 statement   = "let" … | signature | name "=" block | expr
 expr        = "fun" atom_pattern { atom_pattern } "->" block
-            | "loop" "{" block "}"
-            | "while" expr "do" block
-            | "break" [expr] | "continue"
+            | [label [":"]] "loop" "{" block "}"
+            | [label [":"]] "while" expr "do" block
+            | "break" [label] [expr] | "continue" [label]
             | "match" expr "with" arm { arm }
             | "try" block "with" handler_arm { handler_arm }
             | "if" expr "then" block [ "else" (if_expr | block) ]
@@ -456,7 +457,7 @@ atom        = name | Con { "." Con } ["." name] | Float | BigInt | String
             | "{" expr "with" field "=" block { … } "}"
             | "task" "{" block "}" | "ui" "{" block "}"
             | "do" "{" do_stmt { ";" | line break … } "}"
-            | "for" ("{" clause_list "}" | clause_list) ("yield" expr | "do" block)
+            | [label [":"]] "for" ("{" clause_list "}" | clause_list) ("yield" expr | "do" block)
             | "scope" [name] "{" block "}" | "provide" expr "{" block "}"
             | head { head_arg } ["{" { token } "}"]
                                             // a head an import exposes as `plugin head`, with an

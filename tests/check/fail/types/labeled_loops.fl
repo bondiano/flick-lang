@@ -1,0 +1,62 @@
+module App.BadLabeledLoops exposing (..)
+
+unknown_label : Unit -> Unit
+let unknown_label () = loop {
+  break 'unknown
+//^^^^^^^^^^^^^^ FLICK-T071
+}
+
+duplicate_label : Unit -> Unit
+let duplicate_label () =
+  'dup: loop {
+    'dup: loop {
+//  ^^^^ FLICK-T071
+      break 'dup
+    }
+    break 'dup
+  }
+
+across_fun : Unit -> Unit
+let across_fun () =
+  'outer: loop {
+    let f = fun () -> break 'outer
+//                    ^^^^^^^^^^^^ FLICK-T071
+    f ()
+    break
+  }
+
+across_comp : Unit -> Unit
+let across_comp () =
+  'outer: loop {
+    ignore [for _ <- [1] yield break 'outer]
+//                             ^^^^^^^^^^^^ FLICK-T071
+    break
+  }
+
+duplicate_for : Unit -> Unit
+let duplicate_for () =
+  'dup_for: for _x <- [1] do {
+    'dup_for: for _y <- [2] do {
+//  ^^^^^^^^ FLICK-T071
+      break 'dup_for
+    }
+  }
+
+duplicate_loop_for : Unit -> Unit
+let duplicate_loop_for () =
+  'dup_both: loop {
+    'dup_both: for _x <- [1] do {
+//  ^^^^^^^^^ FLICK-T071
+      break 'dup_both
+    }
+    break
+  }
+
+duplicate_for_loop : Unit -> Unit
+let duplicate_for_loop () =
+  'dup_fl: for _x <- [1] do {
+    'dup_fl: loop {
+//  ^^^^^^^ FLICK-T071
+      break 'dup_fl
+    }
+  }

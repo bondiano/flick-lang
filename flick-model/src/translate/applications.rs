@@ -45,15 +45,12 @@ fn argument(call: &ir::Expr, value: &ir::Expr) -> ir::Expr {
 
 impl Tr {
     pub(super) fn loop_completion(&self, e: &ir::Expr, id: &str) -> bool {
-        if matches!(&e.kind, ExprKind::LoopExit { id: target, .. } if target == id)
-            || matches!(&e.kind, ExprKind::App { func, .. } if matches!(&func.kind, ExprKind::Local(n) if self.resumptions.iter().any(|(r, target)| r == n && target == id)))
+        if matches!(&e.kind, ExprKind::LoopExit { id: target, .. } if target == id || self.control_loops.iter().any(|c| c == target))
+            || matches!(&e.kind, ExprKind::App { func, .. } if matches!(&func.kind, ExprKind::Local(n) if self.resumptions.iter().any(|(r, target)| r == n && (target == id || self.control_loops.iter().any(|c| c == target)))))
         {
             return true;
         }
-        if matches!(
-            e.kind,
-            ExprKind::ControlLoop { .. } | ExprKind::Generate { .. }
-        ) {
+        if matches!(e.kind, ExprKind::Generate { .. }) {
             return false;
         }
         let mut found = false;

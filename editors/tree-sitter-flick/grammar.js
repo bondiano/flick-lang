@@ -34,6 +34,7 @@ module.exports = grammar({
       $._loop,
       $._while,
       $.attribute,
+      $.label,
       $._foreign,
       $._from,
       $._component,
@@ -64,7 +65,7 @@ module.exports = grammar({
     _loop: $ => prec.dynamic(1, seq(alias('loop', $.keyword), $.braces)),
     _while: $ => prec.dynamic(1, seq(alias('while', $.keyword), repeat1($._condition_token), alias('do', $.keyword))),
     _condition_token: $ => choice(
-      $.parens, $.brackets, $.braces, $.identifier, $.constructor, $.boolean,
+      $.parens, $.brackets, $.braces, $.label, $.identifier, $.constructor, $.boolean,
       $.number, $.string, $.raw_string, $.multiline_string, $.member,
       alias(choice(...KEYWORDS.filter(k => !['do', 'let', 'module', 'import', 'type', 'service', 'class', 'instance'].includes(k))), $.keyword),
       alias(choice(...OPERATORS.filter(k => ![',', ';', '='].includes(k))), $.operator),
@@ -88,6 +89,7 @@ module.exports = grammar({
     boolean: _ => choice('true', 'false'),
     // `@lang int`: the attribute's name; its arguments are plain identifiers and strings
     attribute: _ => token(seq('@', /[a-z_][A-Za-z0-9_]*/)),
+    label: _ => token(seq("'", /[a-z_][A-Za-z0-9_]*/)),
     operator: _ => choice(...OPERATORS),
 
     // `.name` is a field or module member even when it spells a keyword

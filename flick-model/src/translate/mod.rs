@@ -114,6 +114,7 @@ struct Tr {
     functions: Rc<HashMap<Path, ir::Expr>>,
     control: Option<String>,
     error_action: Option<Name>,
+    pub(super) control_loops: Vec<String>,
 }
 
 impl Tr {
@@ -127,6 +128,7 @@ impl Tr {
             functions: Rc::default(),
             control: None,
             error_action: None,
+            control_loops: Vec::new(),
         }
     }
 

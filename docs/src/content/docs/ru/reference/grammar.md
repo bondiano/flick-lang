@@ -1,6 +1,6 @@
 ---
 title: "Грамматика Flick"
-source_hash: 246add294e710b7a
+source_hash: 0c83bce6efcbd9e6
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -30,6 +30,7 @@ source_hash: 246add294e710b7a
 | - | - | - |
 | имя | `[a-z_][A-Za-z0-9_]*` | значения, функции, поля, переменные типов |
 | имя с заглавной буквы | `[A-Z][A-Za-z0-9_]*` | типы, конструкторы, модули, классы, сервисы, ошибки |
+| метка | `'[a-z_][A-Za-z0-9_]*` | метки циклов (`'outer: loop { … }`, `break 'outer`) |
 | `_` | отдельно | образец, который не связывает имя |
 
 В квалифицированных именах вокруг `.` нет пробелов: `Users.get`,
@@ -464,9 +465,9 @@ save_with :
 block       = statement { line break statement }
 statement   = "let" … | signature | name "=" block | expr
 expr        = "fun" atom_pattern { atom_pattern } "->" block
-            | "loop" "{" block "}"
-            | "while" expr "do" block
-            | "break" [expr] | "continue"
+            | [label [":"]] "loop" "{" block "}"
+            | [label [":"]] "while" expr "do" block
+            | "break" [label] [expr] | "continue" [label]
             | "match" expr "with" arm { arm }
             | "try" block "with" handler_arm { handler_arm }
             | "if" expr "then" block [ "else" (if_expr | block) ]
@@ -483,7 +484,7 @@ atom        = name | Con { "." Con } ["." name] | Float | BigInt | String
             | "{" expr "with" field "=" block { … } "}"
             | "task" "{" block "}" | "ui" "{" block "}"
             | "do" "{" do_stmt { ";" | line break … } "}"
-            | "for" ("{" clause_list "}" | clause_list) ("yield" expr | "do" block)
+            | [label [":"]] "for" ("{" clause_list "}" | clause_list) ("yield" expr | "do" block)
             | "scope" [name] "{" block "}" | "provide" expr "{" block "}"
             | head { head_arg } ["{" { token } "}"]
                                             // голова, которую импорт открывает как `plugin head`, с

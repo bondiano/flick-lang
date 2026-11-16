@@ -50,11 +50,14 @@ values (see [Regions](../regions/)).
 `loop { … }` returns the value of `break value`; all exits agree on its type.
 A bare `break` is `break ()`. `while condition do body` and `for … do body`
 return `Unit`; the condition is `Bool` and their bodies return `Unit`.
-`continue` skips the rest of an iteration. Exits target the nearest loop,
-without labels, and close each scope they leave before continuing. A nested
-function, task, lazy sequence or operation handler cannot exit an outer loop
-(`FLICK-T071`). `loop` and `while` are contextual words: existing names such
-as `Loop.loop` and `Schedule.while` remain valid.
+`continue` skips the rest of an iteration. Unlabeled exits target the nearest
+loop; a loop may carry a label (`'outer: loop { … }`, `'outer: while … do …`,
+`'outer: for … do …`) so `break 'outer` or `continue 'outer` exits or
+continues that enclosing loop instead, closing each scope it leaves before
+continuing. Duplicate labels in the same scope and unknown labels are
+`FLICK-T071`. A nested function, task, lazy sequence or operation handler
+cannot exit an outer loop (`FLICK-T071`). `loop` and `while` are contextual
+words: existing names such as `Loop.loop` and `Schedule.while` remain valid.
 
 ```flick
 module App.Count exposing (count)

@@ -342,6 +342,7 @@ codegen/loops_state
 codegen/loops_for_source
 codegen/loops_guards
 codegen/loops_owners
+codegen/labeled_loops_finalizers
 codegen/record_constructor
 
 effect/row_without

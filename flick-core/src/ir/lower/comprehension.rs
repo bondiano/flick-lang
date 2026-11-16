@@ -24,11 +24,12 @@ impl Lower<'_> {
 
     pub(super) fn for_expr(&mut self, node: &Node, strict: bool) -> Expr {
         let span = self.span(node);
+        let label = self.loop_label(node);
         let (clauses, element) = for_parts(node);
         let clauses: Vec<&Node> = clauses.collect();
         let looping = node.has_token(K::DoKw);
         let mark = self.scope.len();
-        let control = looping.then(|| self.start_loop());
+        let control = looping.then(|| self.start_loop(label));
         let mut body = self.clauses(&clauses, element, looping, span);
         if let Some(id) = control {
             self.loops.pop();
