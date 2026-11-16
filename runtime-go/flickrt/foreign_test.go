@@ -173,6 +173,10 @@ func (c *testCounter) SumAll(args []Value) int32 {
 	return total
 }
 
+func (c *testCounter) FailMethod(fb *Fiber, _ Value) (Value, error) {
+	return nil, errors.New("method error")
+}
+
 func TestCallMethod(t *testing.T) {
 	fb := rootFiber()
 	counter := &testCounter{val: 5}
@@ -187,6 +191,36 @@ func TestCallMethod(t *testing.T) {
 	resSum := CallMethod(fb, counter, "SumAll", []Value{int32(1), int32(2), int32(3)})
 	if resSum != int32(6) {
 		t.Fatalf("expected 6, got %v", resSum)
+	}
+}
+
+func TestCallMethodCatchForeign(t *testing.T) {
+	fb := rootFiber()
+	counter := &testCounter{val: 5}
+	mapErr := Fn(func(_ *Fiber, err Value) Value {
+		return "mapped: " + err.(string)
+	})
+
+	// CallMethod returning (nil, err) wrapped in CatchForeign produces Fail(Apply(fb, catchFn, err.Error()))
+	_, cause := catch(func() Value {
+		return CatchForeign(fb, func() (Value, error) {
+			return CallMethod(fb, counter, "FailMethod", []Value{Unit}), nil
+		}, mapErr)
+	})
+
+	if cause == nil || cause.kind != causeFail {
+		t.Fatalf("expected fail cause, got %v", cause)
+	}
+	if cause.err != "mapped: method error" {
+		t.Fatalf("expected 'mapped: method error', got %v", cause.err)
+	}
+
+	// Unwrapped CallMethod error panics with error, which unwinds to fiber defect (causeDie)
+	_, unwrappedCause := catch(func() Value {
+		return CallMethod(fb, counter, "FailMethod", []Value{Unit})
+	})
+	if unwrappedCause == nil || unwrappedCause.kind != causeDie {
+		t.Fatalf("expected die cause for unwrapped CallMethod error, got %v", unwrappedCause)
 	}
 }
 

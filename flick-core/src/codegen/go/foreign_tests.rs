@@ -69,6 +69,15 @@ fn foreign_metadata_receiver_lowering() {
 }
 
 #[test]
+fn foreign_metadata_receiver_catch_lowering() {
+    let code = "module App exposing (main)\ntype error MethodErr = MethodErr String\nfrom_err : JsValue -> MethodErr\nlet from_err _ = MethodErr \"err\"\ntype alias Counter = String\ninc : Counter -> Int ->{; MethodErr} Counter\nforeign inc from \"./counter.mjs\" \"Inc\"\n  this\n  catch from_err\nmain : Unit ->{; MethodErr} Counter\nlet main () = inc \"c1\" 1\n";
+    let go = app_with_foreign(code, &[("App", "./counter.mjs", "package main\n")]);
+    assert!(go.contains("flickrt.CatchForeign"), "{go}");
+    assert!(go.contains("return flickrt.CallMethod(fb, a0, \"Inc\", []flickrt.Value{a1}), nil"), "{go}");
+    assert!(go.contains("F_App__from_err"), "{go}");
+}
+
+#[test]
 fn foreign_metadata_callback_lowering() {
     let code = "module App exposing (main)\ncombine : (Float -> Float -> Float) -> Float -> Float -> Float\nforeign pure combine from \"./math.mjs\" \"Combine\"\nmain : Unit -> Float\nlet main () = combine (fun x y -> x + y) 1.0 2.0\n";
     let go = app_with_foreign(code, &[("App", "./math.mjs", "package main\n")]);

@@ -249,7 +249,7 @@ func CallMethod(fb *Fiber, receiver Value, method string, args []Value) Value {
 			err = results[1].Interface().(error)
 		}
 		if err != nil {
-			Fail(err.Error())
+			panic(err)
 		}
 		return results[0].Interface()
 	}

@@ -360,10 +360,15 @@ impl<'a> Gen<'a> {
         if let Some(catch_expr) = &f.catch {
             let catch_code = self.expr(catch_expr);
             let catch_doc = catch_code.to_doc(a);
+            let body = if info.receiver {
+                docvec![a, "return ", go, ", nil"]
+            } else {
+                docvec![a, "return ", go]
+            };
             let run = closure(
                 a,
                 "func() (flickrt.Value, error)",
-                [docvec![a, "return ", go]],
+                [body],
             );
             go = call(a, "flickrt.CatchForeign", [a.text("fb"), run, catch_doc]);
         }
