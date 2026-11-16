@@ -249,6 +249,102 @@ fn sibling(spec: &str) -> String {
 }
 
 impl<'a> Gen<'a> {
+    fn local_receiver_call(
+        &self,
+        f: &Foreign,
+        first: &'a str,
+        heads: &[&'a str],
+        count: usize,
+    ) -> Document<'a> {
+        let a = self.a;
+        let info = &f.adapter;
+        let receiver_name = heads[f.dicts];
+        let mut method_args: Vec<Document<'a>> = Vec::new();
+        for i in 1..count {
+            let param_name = heads[f.dicts + i];
+            if info.optional.contains(&i) {
+                method_args.push(call(a, "flickrt.ToOptVal", [a.text(param_name)]));
+            } else if let Some(Some(n)) = info.callbacks.get(i) {
+                method_args.push(call(
+                    a,
+                    "flickrt.WrapCallback",
+                    [
+                        a.text("fb"),
+                        a.text(param_name),
+                        a.text(a.alloc_str(&n.to_string())),
+                    ],
+                ));
+            } else if info.variadic && i + 1 == f.arity {
+                method_args.push(call(a, "flickrt.List", [a.text(param_name)]));
+            } else {
+                method_args.push(a.text(param_name));
+            }
+        }
+        let args_slice = if info.variadic && count > 1 {
+            if let Some(last) = method_args.pop() {
+                if method_args.is_empty() {
+                    last
+                } else {
+                    let fixed = list(a, "[]flickrt.Value{", method_args, "}");
+                    call(a, "append", [fixed, docvec![a, last, "..."]])
+                }
+            } else {
+                list(a, "[]flickrt.Value{", method_args, "}")
+            }
+        } else {
+            list(a, "[]flickrt.Value{", method_args, "}")
+        };
+        let method_lit = a.alloc_str(&format!("\"{}\"", f.binding.name));
+        call(
+            a,
+            "flickrt.CallMethod",
+            [
+                a.text(first),
+                a.text(receiver_name),
+                a.text(method_lit),
+                args_slice,
+            ],
+        )
+    }
+
+    fn local_free_call(
+        &self,
+        f: &Foreign,
+        first: &'a str,
+        heads: &[&'a str],
+        count: usize,
+    ) -> Document<'a> {
+        let a = self.a;
+        let info = &f.adapter;
+        let mut call_args: Vec<Document<'a>> = Vec::new();
+        call_args.push(a.text(first));
+        for &head in heads.iter().take(f.dicts) {
+            call_args.push(a.text(head));
+        }
+        for i in 0..count {
+            let param_name = heads[f.dicts + i];
+            if info.optional.contains(&i) {
+                call_args.push(call(a, "flickrt.ToOptVal", [a.text(param_name)]));
+            } else if let Some(Some(n)) = info.callbacks.get(i) {
+                call_args.push(call(
+                    a,
+                    "flickrt.WrapCallback",
+                    [
+                        a.text("fb"),
+                        a.text(param_name),
+                        a.text(a.alloc_str(&n.to_string())),
+                    ],
+                ));
+            } else if info.variadic && i + 1 == f.arity {
+                call_args.push(docvec![a, "flickrt.List(", param_name, ")..."]);
+            } else {
+                call_args.push(a.text(param_name));
+            }
+        }
+        let export = a.alloc_str(&f.binding.name);
+        call(a, export, call_args)
+    }
+
     /// A binding to the JS module `spec` beside the program's code: on Go,
     /// the function of the same name in the Go file beside that module.
     fn local(&mut self, f: &Foreign, spec: &str, span: Span) -> Option<Document<'a>> {
@@ -291,71 +387,11 @@ impl<'a> Gen<'a> {
         };
         let count = if f.arity == 0 { 0 } else { taken };
 
-        let go = if info.receiver {
-            let receiver_name = heads[f.dicts];
-            let mut method_args: Vec<Document<'a>> = Vec::new();
-            for i in 1..count {
-                let param_name = heads[f.dicts + i];
-                if info.optional.contains(&i) {
-                    method_args.push(call(a, "flickrt.ToOptVal", [a.text(param_name)]));
-                } else if let Some(Some(n)) = info.callbacks.get(i) {
-                    method_args.push(call(
-                        a,
-                        "flickrt.WrapCallback",
-                        [a.text("fb"), a.text(param_name), a.text(a.alloc_str(&n.to_string()))],
-                    ));
-                } else if info.variadic && i + 1 == f.arity {
-                    method_args.push(call(a, "flickrt.List", [a.text(param_name)]));
-                } else {
-                    method_args.push(a.text(param_name));
-                }
-            }
-            let args_slice = if info.variadic && count > 1 {
-                let last = method_args.pop().unwrap();
-                if method_args.is_empty() {
-                    last
-                } else {
-                    let fixed = list(a, "[]flickrt.Value{", method_args, "}");
-                    call(a, "append", [fixed, docvec![a, last, "..."]])
-                }
-            } else {
-                list(a, "[]flickrt.Value{", method_args, "}")
-            };
-            let method_lit = a.alloc_str(&format!("\"{}\"", f.binding.name));
-            call(
-                a,
-                "flickrt.CallMethod",
-                [a.text(first), a.text(receiver_name), a.text(method_lit), args_slice],
-            )
+        let mut go = if info.receiver {
+            self.local_receiver_call(f, first, &heads, count)
         } else {
-            let mut call_args: Vec<Document<'a>> = Vec::new();
-            if f.arity > 0 {
-                call_args.push(a.text(first));
-            }
-            for i in 0..f.dicts {
-                call_args.push(a.text(heads[i]));
-            }
-            for i in 0..count {
-                let param_name = heads[f.dicts + i];
-                if info.optional.contains(&i) {
-                    call_args.push(call(a, "flickrt.ToOptVal", [a.text(param_name)]));
-                } else if let Some(Some(n)) = info.callbacks.get(i) {
-                    call_args.push(call(
-                        a,
-                        "flickrt.WrapCallback",
-                        [a.text("fb"), a.text(param_name), a.text(a.alloc_str(&n.to_string()))],
-                    ));
-                } else if info.variadic && i + 1 == f.arity {
-                    call_args.push(docvec![a, "flickrt.List(", param_name, ")..."]);
-                } else {
-                    call_args.push(a.text(param_name));
-                }
-            }
-            let export = a.alloc_str(&f.binding.name);
-            call(a, export, call_args)
+            self.local_free_call(f, first, &heads, count)
         };
-
-        let mut go = go;
 
         if let Some(catch_expr) = &f.catch {
             let catch_code = self.expr(catch_expr);
@@ -365,11 +401,7 @@ impl<'a> Gen<'a> {
             } else {
                 docvec![a, "return ", go]
             };
-            let run = closure(
-                a,
-                "func() (flickrt.Value, error)",
-                [body],
-            );
+            let run = closure(a, "func() (flickrt.Value, error)", [body]);
             go = call(a, "flickrt.CatchForeign", [a.text("fb"), run, catch_doc]);
         }
 
