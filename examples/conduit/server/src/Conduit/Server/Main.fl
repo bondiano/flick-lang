@@ -6,6 +6,7 @@
 module Conduit.Server.Main exposing (main)
 
 import Database exposing (Database)
+import Host
 import Conduit.Server.App as Server
 import Conduit.Server.Schema as Schema
 import Conduit.Server.Session exposing (Signing)
@@ -46,7 +47,7 @@ let serve config =
   }
 
 /// Serves Conduit; a wrong setting stops it with what is wrong.
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Async, Host.Clock; AppError} Unit
 let main () =
   let config =
     try settings () with

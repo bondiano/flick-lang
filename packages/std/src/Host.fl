@@ -4,9 +4,6 @@
 module Host exposing (..)
 
 import Layer
-import Platform
-import Clock as AmbientClock
-import Random as AmbientRandom
 
 service Console =
   stdout_line : String ->{} Unit
@@ -28,31 +25,63 @@ service Environment =
 service Arguments =
   args : Unit ->{} List String
 
+raw_stdout_line : String ->{} Unit
+foreign raw_stdout_line from "flick:rt" "stdoutLine"
+
+raw_stderr_line : String ->{} Unit
+foreign raw_stderr_line from "flick:rt" "stderrLine"
+
+raw_stdout_write : String ->{} Unit
+foreign raw_stdout_write from "flick:rt" "stdoutWrite"
+
+raw_current_time_millis : Unit ->{} Float
+foreign effect raw_current_time_millis from "flick:Clock" "flickCurrentTimeMillis"
+  arity 0
+
+raw_current_time_nanos : Unit ->{} BigInt
+foreign effect raw_current_time_nanos from "flick:Clock" "flickCurrentTimeNanos"
+  arity 0
+
+raw_monotonic_time_nanos : Unit ->{} BigInt
+foreign effect raw_monotonic_time_nanos from "flick:Clock" "flickMonotonicTimeNanos"
+  arity 0
+
+raw_next : Unit ->{} Float
+foreign effect raw_next from "flick:Random" "flickNext"
+  arity 0
+
+raw_env : String ->{} Option String
+foreign raw_env from "flick:rt" "platformEnv"
+
+raw_args : Unit ->{} List String
+foreign raw_args from "flick:rt" "platformArgs"
+  arity 0
+
 /// Trusted adapters to ambient host APIs; constructing a layer performs no I/O.
 console : Layer none none {Console}
 let console =
   Layer.succeed Console {
-    stdout_line = Platform.stdout_line;
-    stderr_line = Platform.stderr_line;
-    stdout_write = Platform.stdout_write;
+    stdout_line = raw_stdout_line;
+    stderr_line = raw_stderr_line;
+    stdout_write = raw_stdout_write;
   }
 
 clock : Layer none none {Clock}
 let clock =
   Layer.succeed Clock {
-    current_time_millis = AmbientClock.current_time_millis;
-    current_time_nanos = AmbientClock.current_time_nanos;
-    monotonic_time_nanos = AmbientClock.monotonic_time_nanos;
+    current_time_millis = raw_current_time_millis;
+    current_time_nanos = raw_current_time_nanos;
+    monotonic_time_nanos = raw_monotonic_time_nanos;
   }
 
 random : Layer none none {Random}
-let random = Layer.succeed Random { next = AmbientRandom.next }
+let random = Layer.succeed Random { next = raw_next }
 
 environment : Layer none none {Environment}
-let environment = Layer.succeed Environment { env = Platform.env }
+let environment = Layer.succeed Environment { env = raw_env }
 
 arguments : Layer none none {Arguments}
-let arguments = Layer.succeed Arguments { args = Platform.args }
+let arguments = Layer.succeed Arguments { args = raw_args }
 
 /// The five host services of an app running on a host with a process and files.
 type alias Live = {Console, Clock, Random, Environment, Arguments}

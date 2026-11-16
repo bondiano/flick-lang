@@ -5,6 +5,7 @@
 module App.Main exposing (main)
 
 import Codec
+import Host
 
 type alias Claims = { sub : String; admin : Bool }
   deriving Schema
@@ -34,7 +35,11 @@ let issuer_json =
 secret : List Int
 let secret = Bytes.from_string "secret"
 
-outcome : PureCodec Json a -> List Int -> String ->{Async, Crypto.Crypto; Crypto.CryptoError} String
+outcome :
+  PureCodec Json a ->
+  List Int ->
+  String ->{Async, Crypto.Crypto, Host.Clock; Crypto.CryptoError}
+  String
 let outcome wire key token =
   try
     let _ = Jwt.verify wire key token
@@ -50,7 +55,7 @@ python : String
 let python =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZGEiLCJhZG1pbiI6dHJ1ZX0.LG5jqWCrAAWbUMv6IIF_kHEjmYwSQrtDQajAELdwFLs"
 
-checks : Unit ->{Async, Crypto.Crypto; Crypto.CryptoError, SchemaError} Unit
+checks : Unit ->{Async, Crypto.Crypto, Host.Clock; Crypto.CryptoError, SchemaError} Unit
 let checks () =
   let rfc_key =
     Option.with_default
@@ -86,7 +91,7 @@ let checks () =
   line "malformed" (outcome claims_json secret "not.a token") ()
   line "wrong claims" (outcome session_json secret python) ()
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Async, Host.Clock; AppError} Unit
 let main () =
   try provide Crypto.system { checks () } with
   | Crypto.CryptoError message -> line "error" message ()
