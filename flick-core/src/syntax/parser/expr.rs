@@ -128,7 +128,7 @@ fn prefix(p: &mut Parser) -> Option<Done> {
         K::Ident if p.at_word("unpack") && keyword_ahead(p, K::AsKw) => Some(unpack_expr(p)),
         K::Ident if p.at_word("loop") && p.nth(1) == K::LBrace => Some(control_expr(p)),
         K::Ident if p.at_word("while") && while_ahead(p) => Some(control_expr(p)),
-        K::BreakKw | K::ContinueKw => Some(control_expr(p)),
+        K::Label | K::BreakKw | K::ContinueKw => Some(control_expr(p)),
         K::FunKw => Some(fun_expr(p)),
         K::MatchKw => Some(match_expr(p)),
         K::TryKw => Some(try_expr(p)),
@@ -183,7 +183,8 @@ pub(super) fn at_operand_start(p: &Parser) -> bool {
     at_arg_start(p)
         || matches!(
             p.current(),
-            K::Minus
+            K::Label
+                | K::Minus
                 | K::NotKw
                 | K::AwaitKw
                 | K::IgnoreKw
@@ -537,7 +538,7 @@ fn do_expr(p: &mut Parser) -> K {
 /// `for { clauses } yield e`, or the clauses inline, separated by `;` or a
 /// guard's `if`: `[for x <- xs if x > 0 yield x]`. `do body` instead of
 /// `yield e` runs the body for each element.
-fn for_expr(p: &mut Parser) -> K {
+pub(super) fn for_expr(p: &mut Parser) -> K {
     p.bump();
     if p.at(K::LBrace) {
         p.braces(K::Block, do_stmt, |_| false);

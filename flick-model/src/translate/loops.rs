@@ -1,5 +1,7 @@
 //! A loop body returns either its value or a lexical exit, alongside state.
 //! Exit values cross scope callbacks as ordinary results, so scopes close normally.
+mod for_each;
+
 use super::{
     Tr,
     expr::{cond, is_lang, layer_run, pat},
@@ -101,6 +103,17 @@ pub(super) fn list_step(list: &Name, head: Name, tail: Name, empty: Term, matche
 }
 
 impl Tr {
+    pub(super) fn exit_payload(&self, target: &str, value: Option<Term>) -> Term {
+        let opt = option(value);
+        let Some(pos) = self.control_loops.iter().rposition(|id| id == target) else {
+            return opt;
+        };
+        let mut payload = if pos > 0 { result(true, opt) } else { opt };
+        for _ in (pos + 1)..self.control_loops.len() {
+            payload = result(false, payload);
+        }
+        payload
+    }
     pub(super) fn loop_pack(&self, ok: bool, v: Term, xs: &[String]) -> Term {
         self.pack(result(ok, v), xs)
     }
@@ -111,7 +124,12 @@ impl Tr {
         out: &[String],
         k: &dyn Fn(&mut Self, Term) -> Term,
     ) -> Term {
-        if modified(e).is_empty() && !self.loop_completion(e, id) {
+        if !matches!(
+            e.kind,
+            ExprKind::ControlLoop { .. } | ExprKind::LoopExit { .. }
+        ) && modified(e).is_empty()
+            && !self.loop_completion(e, id)
+        {
             let value = self.expr(e);
             return k(self, value);
         }
@@ -190,8 +208,13 @@ impl Tr {
         }
     }
     pub(super) fn loop_value(&mut self, e: &ir::Expr, id: &str, xs: &[String]) -> Term {
-        if !matches!(e.kind, ExprKind::Each { .. } | ExprKind::Yield(_))
-            && modified(e).is_empty()
+        if !matches!(
+            e.kind,
+            ExprKind::Each { .. }
+                | ExprKind::Yield(_)
+                | ExprKind::ControlLoop { .. }
+                | ExprKind::LoopExit { .. }
+        ) && modified(e).is_empty()
             && !self.loop_completion(e, id)
         {
             let value = self.expr(e);
@@ -207,12 +230,17 @@ impl Tr {
                     tr.pack(resume, xs)
                 })
             }
-            ExprKind::LoopExit { id: target, value } if target == id => match value {
-                Some(value) => self.loop_with(value, id, xs, &|tr, v| {
-                    tr.loop_pack(false, option(Some(v)), xs)
-                }),
-                None => self.loop_pack(false, option(None), xs),
-            },
+            ExprKind::LoopExit { id: target, value } => {
+                if let Some(value) = value {
+                    self.loop_with(value, id, xs, &|tr, v| {
+                        let payload = tr.exit_payload(target, Some(v));
+                        tr.loop_pack(false, payload, xs)
+                    })
+                } else {
+                    let payload = self.exit_payload(target, None);
+                    self.loop_pack(false, payload, xs)
+                }
+            }
             ExprKind::Handle(h) if h.is_try() => {
                 let saved = self.control.replace(id.into());
                 let value = self.try_state(&h.body, &h.errors, xs);
@@ -258,10 +286,15 @@ impl Tr {
                     tr.provide_value(layer, arg, &|tr, body| tr.loop_value(body, id, xs))
                 })
             }
+            ExprKind::ControlLoop {
+                id: child_id,
+                condition,
+                body,
+                iterable,
+            } => self.nested_control_loop(child_id, condition.as_deref(), body, *iterable, xs),
             ExprKind::Lambda { .. }
             | ExprKind::Abstract(..)
             | ExprKind::Task(_)
-            | ExprKind::ControlLoop { .. }
             | ExprKind::Generate { .. } => {
                 // A nested source loop consumes only its own exits.
                 self.with_value(e, |tr, v| tr.loop_pack(true, v, xs))
@@ -276,6 +309,23 @@ impl Tr {
             }
         }
     }
+    fn nested_control_loop(
+        &mut self,
+        child_id: &str,
+        condition: Option<&ir::Expr>,
+        body: &ir::Expr,
+        iterable: bool,
+        xs: &[String],
+    ) -> Term {
+        let tracked = self.active_variables();
+        let value = if iterable {
+            self.source_for(child_id, body, &tracked)
+        } else {
+            self.source_loop(child_id, condition, body, &tracked)
+        };
+        self.unpack_loop(value, &tracked, xs, &|tr, v| tr.loop_pack(true, v, xs))
+    }
+
     fn loop_parts(
         &mut self,
         e: &ir::Expr,
@@ -308,6 +358,8 @@ impl Tr {
         body: &ir::Expr,
         xs: &[String],
     ) -> Term {
+        let nested = !self.control_loops.is_empty();
+        self.control_loops.push(id.to_string());
         let effectful = self.iteration_effectful(body)
             || condition.is_some_and(|c| self.iteration_effectful(c));
         let call = |t| {
@@ -326,7 +378,8 @@ impl Tr {
             .extend(xs.iter().cloned().zip(names.iter().cloned()));
         let step = if let Some(c) = condition {
             self.loop_with(c, id, xs, &|tr, c| {
-                let done = tr.loop_pack(false, option(Some(Term::unit())), xs);
+                let payload = tr.exit_payload(id, Some(Term::unit()));
+                let done = tr.loop_pack(false, payload, xs);
                 let body = tr.loop_value(body, id, xs);
                 cond(c, body, done)
             })
@@ -341,208 +394,61 @@ impl Tr {
             self.pack(Term::unit(), xs),
         ));
         let v = self.fresh("break");
-        let done = self.pack(Term::Var(v.clone()), xs);
-        self.versions.truncate(mark);
+        let done = if nested {
+            self.loop_pack(true, Term::Var(v.clone()), xs)
+        } else {
+            self.pack(Term::Var(v.clone()), xs)
+        };
         let pattern = |p| state_pattern(p, &values);
-        let dispatch = Term::Match(
-            Rc::new(step),
-            Rc::from([
-                Arm {
-                    pat: pattern(rpat(true, Pat::Wild)),
-                    guard: None,
-                    body: recur.clone(),
-                },
-                Arm {
-                    pat: pattern(rpat(false, none())),
-                    guard: None,
-                    body: recur,
-                },
-                Arm {
-                    pat: pattern(rpat(false, some(Pat::Var(v)))),
-                    guard: None,
-                    body: done,
-                },
-            ]),
-        );
+        let mut arms = vec![Arm {
+            pat: pattern(rpat(true, Pat::Wild)),
+            guard: None,
+            body: recur.clone(),
+        }];
+        if nested {
+            let other = self.fresh("other_exit");
+            let bubble = self.loop_pack(false, Term::Var(other.clone()), xs);
+            arms.push(Arm {
+                pat: pattern(rpat(false, rpat(true, none()))),
+                guard: None,
+                body: recur,
+            });
+            arms.push(Arm {
+                pat: pattern(rpat(false, rpat(true, some(Pat::Var(v))))),
+                guard: None,
+                body: done,
+            });
+            arms.push(Arm {
+                pat: pattern(rpat(false, rpat(false, Pat::Var(other)))),
+                guard: None,
+                body: bubble,
+            });
+        } else {
+            arms.push(Arm {
+                pat: pattern(rpat(false, none())),
+                guard: None,
+                body: recur,
+            });
+            arms.push(Arm {
+                pat: pattern(rpat(false, some(Pat::Var(v)))),
+                guard: None,
+                body: done,
+            });
+        }
+        self.versions.truncate(mark);
+        let dispatch = Term::Match(Rc::new(step), arms.into());
         let dispatch = if effectful {
             Term::Task(Rc::new(dispatch))
         } else {
             dispatch
         };
         let function = state_function(&state, Pat::Wild, &names, dispatch);
+        self.control_loops.pop();
         Term::LetRec(
             name.clone(),
             None,
             Rc::new(function),
             Rc::new(call(Term::app(Term::Var(name), initial))),
         )
-    }
-}
-
-impl Tr {
-    pub(super) fn source_for(&mut self, id: &str, body: &ir::Expr, xs: &[String]) -> Term {
-        let value = self.loop_value(body, id, xs);
-        let names: Vec<_> = xs.iter().map(|x| self.fresh(x)).collect();
-        let mark = self.versions.len();
-        self.versions
-            .extend(xs.iter().cloned().zip(names.iter().cloned()));
-        let done = self.pack(Term::unit(), xs);
-        self.versions.truncate(mark);
-        let pattern = Pat::Tuple(
-            iter::once(Pat::Wild)
-                .chain(names.into_iter().map(Pat::Var))
-                .collect(),
-        );
-        Term::Match(
-            Rc::new(value),
-            Rc::from([Arm {
-                pat: pattern,
-                guard: None,
-                body: done,
-            }]),
-        )
-    }
-    fn source_each(
-        &mut self,
-        p: &ir::Pat,
-        source: Term,
-        body: &ir::Expr,
-        id: &str,
-        xs: &[String],
-    ) -> Term {
-        let name = self.fresh("each");
-        let arg = self.fresh("state");
-        let list = self.fresh("list");
-        let head = self.fresh("head");
-        let tail = self.fresh("tail");
-        let task = self.iteration_effectful(body);
-        let call = |t| if task { Term::Await(Rc::new(t)) } else { t };
-        let initial = self.pack(source, xs);
-        let names: Vec<_> = xs.iter().map(|x| self.fresh(x)).collect();
-        let mark = self.versions.len();
-        self.versions
-            .extend(xs.iter().cloned().zip(names.iter().cloned()));
-        let empty = self.loop_pack(true, Term::unit(), xs);
-        let skip = call(Term::app(
-            Term::Var(name.clone()),
-            self.pack(Term::Var(tail.clone()), xs),
-        ));
-        let body = self.loop_value(body, id, xs);
-        let values: Vec<_> = xs.iter().map(|x| self.fresh(x)).collect();
-        self.versions
-            .extend(xs.iter().cloned().zip(values.iter().cloned()));
-        let next = call(Term::app(
-            Term::Var(name.clone()),
-            self.pack(Term::Var(tail.clone()), xs),
-        ));
-        let exit = self.fresh("exit");
-        let done = self.loop_pack(false, option(Some(Term::Var(exit.clone()))), xs);
-        self.versions.truncate(mark);
-        let pattern = |p| state_pattern(p, &values);
-        let dispatch = Term::Match(
-            Rc::new(body),
-            Rc::from([
-                Arm {
-                    pat: pattern(rpat(true, Pat::Wild)),
-                    guard: None,
-                    body: next.clone(),
-                },
-                Arm {
-                    pat: pattern(rpat(false, none())),
-                    guard: None,
-                    body: next,
-                },
-                Arm {
-                    pat: pattern(rpat(false, some(Pat::Var(exit)))),
-                    guard: None,
-                    body: done,
-                },
-            ]),
-        );
-        let matched = Term::Match(
-            Rc::new(Term::Var(head.clone())),
-            Rc::from([
-                Arm {
-                    pat: pat(p),
-                    guard: None,
-                    body: dispatch,
-                },
-                Arm {
-                    pat: Pat::Wild,
-                    guard: None,
-                    body: skip,
-                },
-            ]),
-        );
-        let step = list_step(&list, head, tail, empty, matched);
-        let step = if task {
-            Term::Task(Rc::new(step))
-        } else {
-            step
-        };
-        let function = state_function(&arg, Pat::Var(list), &names, step);
-        Term::LetRec(
-            name.clone(),
-            None,
-            Rc::new(function),
-            Rc::new(call(Term::app(Term::Var(name), initial))),
-        )
-    }
-}
-
-impl Tr {
-    fn loop_arms(&mut self, value: Term, arms: &[ir::Arm], id: &str, xs: &[String]) -> Term {
-        let Some((arm, rest)) = arms.split_first() else {
-            return Term::Die("unmatched source match".into());
-        };
-        let tracked = self.active_variables();
-        let (next, fallback) =
-            self.state_thunk(&tracked, |tr| tr.loop_arms(value.clone(), rest, id, xs));
-        let call_next =
-            |tr: &Self| Term::app(Term::Var(next.clone()), tr.pack(Term::unit(), &tracked));
-        let body = if let Some(g) = &arm.guard {
-            self.loop_with(g, id, xs, &|tr, condition| {
-                let yes = tr.loop_value(&arm.body, id, xs);
-                let no = call_next(tr);
-                cond(condition, yes, no)
-            })
-        } else {
-            self.loop_value(&arm.body, id, xs)
-        };
-        let matched = Term::Match(
-            Rc::new(value),
-            Rc::from([
-                Arm {
-                    pat: pat(&arm.pat),
-                    guard: None,
-                    body,
-                },
-                Arm {
-                    pat: Pat::Wild,
-                    guard: None,
-                    body: call_next(self),
-                },
-            ]),
-        );
-        Term::Let(next, None, Rc::new(fallback), Rc::new(matched))
-    }
-}
-
-impl Tr {
-    /// Bind a continuation to the current monomorphic state shape once.
-    pub(super) fn state_thunk(
-        &mut self,
-        tracked: &[String],
-        build: impl FnOnce(&mut Self) -> Term,
-    ) -> (Name, Term) {
-        let name = self.fresh("next");
-        let arg = self.fresh("state");
-        let names: Vec<_> = tracked.iter().map(|x| self.fresh(x)).collect();
-        let mark = self.versions.len();
-        self.versions
-            .extend(tracked.iter().cloned().zip(names.iter().cloned()));
-        let body = build(self);
-        self.versions.truncate(mark);
-        (name, state_function(&arg, Pat::Wild, &names, body))
     }
 }

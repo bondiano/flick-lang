@@ -141,7 +141,7 @@ impl Checker<'_> {
     /// now, so the clauses and the body may make runtime calls.
     fn for_loop(&mut self, node: &Node, expected: Option<&Type>) -> Type {
         let mark = self.cx.locals.len();
-        self.enter_loop(Type::lang(Lang::Unit), false);
+        self.enter_loop_node(node, Type::lang(Lang::Unit), false);
         let (clauses, body) = for_parts(node);
         for clause in clauses {
             self.for_clause(clause);

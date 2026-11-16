@@ -163,12 +163,18 @@ impl Tr {
             return self.protected_resumption(e, &id, xs);
         }
         match &e.kind {
-            ExprKind::LoopExit { id, value } if self.control.as_deref() == Some(id.as_str()) => {
-                match value {
-                    Some(v) => self.protected_with(v, xs, |tr, v| {
-                        tr.pack(result(true, result(false, option(Some(v)))), xs)
-                    }),
-                    None => self.pack(result(true, result(false, option(None))), xs),
+            ExprKind::LoopExit { id, value }
+                if self.control_loops.iter().any(|c| c == id)
+                    || self.control.as_deref() == Some(id.as_str()) =>
+            {
+                if let Some(v) = value {
+                    self.protected_with(v, xs, |tr, v| {
+                        let payload = tr.exit_payload(id, Some(v));
+                        tr.pack(result(true, result(false, payload)), xs)
+                    })
+                } else {
+                    let payload = self.exit_payload(id, None);
+                    self.pack(result(true, result(false, payload)), xs)
                 }
             }
             ExprKind::ControlLoop {

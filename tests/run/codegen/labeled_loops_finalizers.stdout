@@ -1,0 +1,27 @@
+outer body
+inner body
+inner finalizer
+outer finalizer
+42
+inner_cnt finalizer 1
+outer_cnt finalizer 1
+inner_cnt finalizer 2
+outer_cnt finalizer 2
+2
+=== Test for with break and finalizers ===
+outer_for iter 1
+inner_loop breaking outer_for
+inner_loop fin
+outer_for fin 1
+after outer_for
+=== Test for with continue and finalizers ===
+outer_cont iter 1
+inner_cont continuing outer_cont
+inner_cont fin
+outer_cont fin 1
+outer_cont iter 2
+inner_cont breaking outer_cont
+inner_cont fin
+outer_cont fin 2
+after outer_cont
+nested_for: 18

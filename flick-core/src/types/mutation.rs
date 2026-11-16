@@ -43,24 +43,56 @@ pub enum Apart {
     HandlerArm,
 }
 
+#[derive(Debug, Clone)]
+pub struct LoopFrame {
+    pub label: Option<String>,
+    pub apart_depth: usize,
+    pub settled_depth: usize,
+    pub result: Type,
+    pub accepts_value: bool,
+}
+
 #[derive(Debug, Default)]
 pub struct Frames {
     /// The locals below each enclosing function, `task`, sequence or arm.
     apart: Vec<(usize, Apart)>,
     /// The locals below each enclosing strict comprehension.
     settled: Vec<usize>,
-    loops: Vec<(usize, usize, Type, bool)>,
+    loops: Vec<LoopFrame>,
 }
 
 impl Checker<'_> {
-    pub fn enter_loop(&mut self, result: Type, value: bool) {
-        self.cx.mutation.loops.push((
-            self.cx.mutation.apart.len(),
-            self.cx.mutation.settled.len(),
+    pub fn enter_loop_node(&mut self, node: &Node, result: Type, value: bool) {
+        let label_token = node.child_tokens().find(|t| t.kind == K::Label);
+        let label = label_token.map(|t| {
+            let text = t.text(self.text);
+            text.strip_prefix('\'').unwrap_or(text).to_owned()
+        });
+        if let Some(ref name) = label {
+            let current_apart = self.cx.mutation.apart.len();
+            let current_settled = self.cx.mutation.settled.len();
+            if self.cx.mutation.loops.iter().any(|f| {
+                f.apart_depth == current_apart
+                    && f.settled_depth == current_settled
+                    && f.label.as_ref() == Some(name)
+            }) {
+                let span = label_token.map_or_else(|| self.span(node), |t| self.token_span(t));
+                self.error(
+                    codes::T071,
+                    span,
+                    format!("duplicate loop label `'{name}` in the same scope"),
+                );
+            }
+        }
+        self.cx.mutation.loops.push(LoopFrame {
+            label,
+            apart_depth: self.cx.mutation.apart.len(),
+            settled_depth: self.cx.mutation.settled.len(),
             result,
-            value,
-        ));
+            accepts_value: value,
+        });
     }
+
     pub fn leave_loop(&mut self) {
         self.cx.mutation.loops.pop();
     }
@@ -72,7 +104,7 @@ impl Checker<'_> {
             expected.cloned().unwrap_or_else(|| self.fresh())
         };
         let mut children = node.nodes();
-        self.enter_loop(result.clone(), node.kind == K::LoopExpr);
+        self.enter_loop_node(node, result.clone(), node.kind == K::LoopExpr);
         if node.kind == K::WhileExpr
             && let Some(c) = children.next()
         {
@@ -89,37 +121,71 @@ impl Checker<'_> {
     }
 
     pub fn loop_exit(&mut self, node: &Node) -> Type {
-        let target = self
-            .cx
-            .mutation
-            .loops
-            .last()
-            .cloned()
-            .filter(|(depth, barriers, _, _)| {
-                *depth == self.cx.mutation.apart.len()
-                    && *barriers == self.cx.mutation.settled.len()
-            });
-        if let Some((_, _, ty, value)) = target {
-            if node.kind == K::BreakExpr {
-                if let Some(e) = node.nodes().next() {
-                    if !value {
-                        self.error(
-                            codes::T071,
-                            self.span(node),
-                            "only `loop` accepts `break value`",
-                        );
-                    }
-                    self.check(e, &ty);
+        let label_token = node.child_tokens().find(|t| t.kind == K::Label);
+        let label = label_token.map(|t| {
+            t.text(self.text)
+                .strip_prefix('\'')
+                .unwrap_or_else(|| t.text(self.text))
+        });
+        let target = if let Some(target_label) = label {
+            let found = self
+                .cx
+                .mutation
+                .loops
+                .iter()
+                .rposition(|f| f.label.as_deref() == Some(target_label));
+            if let Some(idx) = found {
+                let frame = &self.cx.mutation.loops[idx];
+                if frame.apart_depth != self.cx.mutation.apart.len()
+                    || frame.settled_depth != self.cx.mutation.settled.len()
+                {
+                    self.error(
+                        codes::T071,
+                        self.span(node),
+                        "`break` and `continue` cannot cross function, task, or comprehension boundaries",
+                    );
+                    None
                 } else {
-                    self.expect(&Type::lang(Lang::Unit), &ty, self.span(node));
+                    Some(frame.clone())
                 }
+            } else {
+                self.error(
+                    codes::T071,
+                    self.span(node),
+                    format!("no enclosing loop labeled `'{target_label}`"),
+                );
+                None
             }
         } else {
-            self.error(
-                codes::T071,
-                self.span(node),
-                "`break` and `continue` need an enclosing loop in the same function",
-            );
+            let target = self.cx.mutation.loops.last().cloned().filter(|frame| {
+                frame.apart_depth == self.cx.mutation.apart.len()
+                    && frame.settled_depth == self.cx.mutation.settled.len()
+            });
+            if target.is_none() {
+                self.error(
+                    codes::T071,
+                    self.span(node),
+                    "`break` and `continue` need an enclosing loop in the same function",
+                );
+            }
+            target
+        };
+
+        if let Some(frame) = target
+            && node.kind == K::BreakExpr
+        {
+            if let Some(e) = node.nodes().next() {
+                if !frame.accepts_value {
+                    self.error(
+                        codes::T071,
+                        self.span(node),
+                        "only `loop` accepts `break value`",
+                    );
+                }
+                self.check(e, &frame.result);
+            } else {
+                self.expect(&Type::lang(Lang::Unit), &frame.result, self.span(node));
+            }
         }
         self.fresh()
     }

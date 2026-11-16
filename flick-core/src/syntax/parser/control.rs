@@ -1,5 +1,5 @@
 //! Contextual loop recognition and lexical control expressions.
-use super::expr::{at_operand_start, expr, head_without_braces, stmt};
+use super::expr::{at_operand_start, expr, for_expr, head_without_braces, stmt};
 use super::{Done, K, Parser};
 
 pub(super) fn while_ahead(p: &Parser) -> bool {
@@ -43,6 +43,10 @@ pub(super) fn while_ahead(p: &Parser) -> bool {
 
 pub(super) fn control_expr(p: &mut Parser) -> Done {
     let m = p.start();
+    if p.at(K::Label) {
+        p.bump();
+        p.eat(K::Colon);
+    }
     let keyword = if p.at_word("loop") {
         K::LoopKw
     } else if p.at_word("while") {
@@ -50,6 +54,10 @@ pub(super) fn control_expr(p: &mut Parser) -> Done {
     } else {
         p.current()
     };
+    if keyword == K::ForKw {
+        let kind = for_expr(p);
+        return p.complete(m, kind);
+    }
     p.bump_as(keyword);
     let kind = match keyword {
         K::LoopKw => {
@@ -70,12 +78,39 @@ pub(super) fn control_expr(p: &mut Parser) -> Done {
             K::WhileExpr
         }
         K::BreakKw => {
+            if p.at(K::Label) {
+                p.bump();
+            }
             if at_operand_start(p) {
                 expr(p);
             }
             K::BreakExpr
         }
-        _ => K::ContinueExpr,
+        K::ContinueKw => {
+            if p.at(K::Label) {
+                p.bump();
+            }
+            K::ContinueExpr
+        }
+        _ => {
+            p.error_expected("a loop, `while` or `for`");
+            K::Error
+        }
     };
     p.complete(m, kind)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::source::SourceMap;
+    use crate::syntax::parser::parse;
+
+    #[test]
+    fn parse_labeled_loops() {
+        let mut map = SourceMap::default();
+        let src = "let f () =\n  'outer: loop {\n    break 'outer 1\n  }\n  'w: while true do {\n    continue 'w\n  }\n  'f: for x <- xs do {\n    break 'f\n  }\n  'no_colon loop {\n    break\n  }\n";
+        let file = map.add("t.fl", src);
+        let parsed = parse(src, file);
+        assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+    }
 }

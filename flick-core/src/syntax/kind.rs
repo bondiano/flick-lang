@@ -57,6 +57,7 @@ syntax_kinds! {
         Number,
         BigInt,
         String,
+        Label,
         /// `"text\{` of a string with holes: up to its first hole.
         StringStart,
         /// `}text\{` between two holes.
@@ -432,6 +433,7 @@ pub fn describe(kind: SyntaxKind) -> &'static str {
         return word;
     }
     match kind {
+        K::Label => "a label",
         K::Ident => "a name",
         K::Con => "a capitalized name",
         K::Number | K::BigInt => "a number",

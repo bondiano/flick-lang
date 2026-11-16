@@ -15,7 +15,7 @@ impl Tr {
             return if protected_result {
                 self.captured(false, self.cast_error_action(action), out)
             } else {
-                consume_error(action)
+                self.consume_error(action)
             };
         };
         let tracked = self.active_variables();
@@ -62,7 +62,7 @@ impl Tr {
         let select_task =
             |body| Term::app(Term::Var(selected_cast.clone()), Term::Task(Rc::new(body)));
         let selected = Term::Try(
-            Rc::new(consume_error(action)),
+            Rc::new(self.consume_error(action)),
             Rc::from([
                 Arm {
                     pat: pat(&arm.pat),
@@ -82,10 +82,23 @@ impl Tr {
 }
 
 /// Error actions have result Never; elimination gives any continuation type.
-fn consume_error(action: Term) -> Term {
-    Term::Match(Rc::new(Term::Await(Rc::new(action))), Rc::from([]))
-}
 impl Tr {
+    fn consume_error(&mut self, action: Term) -> Term {
+        let never_id = self.fresh("never_id");
+        let value = self.fresh("never");
+        let never = Type::con("Prelude", "Never");
+        let signature = Scheme::new(
+            Vec::new(),
+            Type::fun(never.clone(), ModelStage::Pure, never),
+        );
+        let typed = Term::app(Term::Var(never_id.clone()), Term::Await(Rc::new(action)));
+        Term::Let(
+            never_id,
+            Some(Rc::new(signature)),
+            Rc::new(Term::lam(&value, Term::Var(value.clone()))),
+            Rc::new(Term::Match(Rc::new(typed), Rc::from([]))),
+        )
+    }
     pub(in crate::translate) fn cast_error_action(&self, action: Term) -> Term {
         match &self.error_action {
             Some(cast) => Term::app(Term::Var(cast.clone()), action),

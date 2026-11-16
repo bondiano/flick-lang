@@ -1,0 +1,101 @@
+module Main exposing (main)
+
+nested_for : Unit -> Int
+let nested_for () =
+  let mut total = 0
+  'outer : for x <- [1, 2, 3] do {
+    'inner : for y <- [4, 5, 6] do {
+      if y == 5 then continue 'outer
+      total = total + x + y
+    }
+  }
+  total
+
+test_loop_break : Unit ->{} Unit
+let test_loop_break () =
+  let result =
+    'outer : loop {
+      scope {
+        Scope.add_finalizer (task { Platform.stdout_line "outer finalizer" })
+        Platform.stdout_line "outer body"
+        'inner : loop {
+          scope {
+            Scope.add_finalizer (task { Platform.stdout_line "inner finalizer" })
+            Platform.stdout_line "inner body"
+            break 'outer 42
+          }
+          Platform.stdout_line "unreachable inner"
+        }
+        Platform.stdout_line "unreachable outer"
+      }
+    }
+  Platform.stdout_line (show result)
+
+test_loop_continue : Unit ->{} Unit
+let test_loop_continue () =
+  let mut count = 0
+  'outer_cnt : loop {
+    count = count + 1
+    let c = count
+    scope {
+      Scope.add_finalizer (task { Platform.stdout_line ("outer_cnt finalizer " ++ show c) })
+      'inner_cnt : loop {
+        scope {
+          Scope.add_finalizer (task { Platform.stdout_line ("inner_cnt finalizer " ++ show c) })
+          if count == 1 then continue 'outer_cnt
+          break 'outer_cnt
+        }
+      }
+    }
+  }
+  Platform.stdout_line (show count)
+
+test_for_break : Unit ->{} Unit
+let test_for_break () =
+  Platform.stdout_line "=== Test for with break and finalizers ==="
+  'outer_for : for x <- [1, 2] do {
+    scope {
+      Scope.add_finalizer (task { Platform.stdout_line ("outer_for fin " ++ show x) })
+      Platform.stdout_line ("outer_for iter " ++ show x)
+      'inner_loop : loop {
+        scope {
+          Scope.add_finalizer (task { Platform.stdout_line "inner_loop fin" })
+          Platform.stdout_line "inner_loop breaking outer_for"
+          break 'outer_for
+        }
+      }
+      Platform.stdout_line "unreachable after inner_loop"
+    }
+  }
+  Platform.stdout_line "after outer_for"
+
+test_for_continue : Unit ->{} Unit
+let test_for_continue () =
+  Platform.stdout_line "=== Test for with continue and finalizers ==="
+  'outer_cont : for x <- [1, 2] do {
+    scope {
+      Scope.add_finalizer (task { Platform.stdout_line ("outer_cont fin " ++ show x) })
+      Platform.stdout_line ("outer_cont iter " ++ show x)
+      'inner_cont : loop {
+        scope {
+          Scope.add_finalizer (task { Platform.stdout_line "inner_cont fin" })
+          if x == 1 then {
+            Platform.stdout_line "inner_cont continuing outer_cont"
+            continue 'outer_cont
+          }
+          Platform.stdout_line "inner_cont breaking outer_cont"
+          break 'outer_cont
+        }
+      }
+      Platform.stdout_line "unreachable after inner_cont"
+    }
+  }
+  Platform.stdout_line "after outer_cont"
+
+main : Unit ->{} Unit
+let main () =
+  test_loop_break ()
+  test_loop_continue ()
+  test_for_break ()
+  test_for_continue ()
+  Platform.stdout_line ("nested_for: " ++ show (nested_for ()))

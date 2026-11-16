@@ -6,6 +6,7 @@ let saved = loop
 let other = while
 loop { break }
 while ready do { continue }
+'outer: loop { break 'outer 1 }
 let f while = (while true, do { pure () })
 
 ---
@@ -15,5 +16,6 @@ let f while = (while true, do { pure () })
   (keyword) (identifier) (operator) (identifier)
   (keyword) (braces (keyword))
   (keyword) (identifier) (keyword) (braces (keyword))
+  (label) (operator) (keyword) (braces (keyword) (label) (number))
   (keyword) (identifier) (identifier) (operator)
   (parens (identifier) (boolean) (operator) (keyword) (braces (identifier) (parens))))

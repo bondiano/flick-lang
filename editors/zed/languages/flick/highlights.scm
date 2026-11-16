@@ -13,6 +13,7 @@
 (operator) @operator
 
 (attribute) @attribute
+(label) @label
 (constructor) @type
 (member) @property
 (identifier) @variable
