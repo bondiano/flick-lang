@@ -149,6 +149,9 @@ func Apply(fb *Fiber, f Value, a Value) Value {
 	if g, ok := f.(Fn); ok {
 		return g(fb, a)
 	}
+	if g, ok := f.(func(Value) Value); ok {
+		return g(a)
+	}
 	return applyFirst(f, a)
 }
 
@@ -159,6 +162,10 @@ func applyFirst(f Value, a Value) Value {
 		return Fn(func(fb *Fiber, b Value) Value { return g(fb, a, b) })
 	case Fn3:
 		return Fn2(func(fb *Fiber, b, c Value) Value { return g(fb, a, b, c) })
+	case func(Value, Value) Value:
+		return Fn(func(_ *Fiber, b Value) Value { return g(a, b) })
+	case func(Value, Value, Value) Value:
+		return Fn2(func(_ *Fiber, b, c Value) Value { return g(a, b, c) })
 	}
 	// what is no function fails as an application of it always did
 	return f.(Fn)(nil, a)

@@ -1,6 +1,6 @@
 ---
 title: "TypeScript generation and the FFI boundary"
-source_hash: d9d778f0ec9d9fee
+source_hash: 782c5df33addd3bd
 ---
 
 The examples of generated code below are the output of the debug profile, the reference lowering; [Code generation](../../reference/codegen/) describes it in full.
@@ -239,7 +239,7 @@ A throw and a rejected Promise become a typed error only through `catch f`, with
 
 ### The Go target
 
-On the Go target (`[build] emit = "go"`) a binding to a module of the program, `./timers.mjs`, calls the Go function of the same name in `timers.go` beside it, which the build copies into the Go module; without that file the binding is `FLICK-P012`. The Go function takes and returns `flickrt.Value` and every argument of the binding at once: `pure`, `sync` and `effect` functions take the executing fiber first, an `async` one takes a `flickrt.Context`, cancelled on interruption, and runs in a goroutine of its own, which the owner waits for as it waits for a Promise. A panic is a defect. `catch`, `this`, `optional`, `variadic` and adapted callbacks are `FLICK-P012` on this target. See [FFI on the go target](../../reference/ffi/#the-go-target).
+On the Go target (`[build] emit = "go"`) a binding to a module of the program, `./timers.mjs`, calls the Go function of the same name in `timers.go` beside it, which the build copies into the Go module; without that file the binding is `FLICK-P012`. The Go function takes and returns `flickrt.Value` and every argument of the binding at once: `pure`, `sync` and `effect` functions take the executing fiber first, an `async` one takes a `flickrt.Context`, cancelled on interruption, and runs in a goroutine of its own, which the owner waits for as it waits for a Promise. Foreign metadata annotations (`catch`, `this`, `optional`, `variadic`, and `callbacks`) are supported on Go and lowered to `flickrt` runtime helpers. See [FFI on the go target](../../reference/ffi/#the-go-target).
 
 ## Value representation and callbacks
 

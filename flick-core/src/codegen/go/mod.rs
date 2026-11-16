@@ -513,6 +513,8 @@ mod compose_tests;
 #[cfg(test)]
 mod direct_tests;
 #[cfg(test)]
+mod foreign_tests;
+#[cfg(test)]
 mod own_tests;
 #[cfg(test)]
 mod tests;
