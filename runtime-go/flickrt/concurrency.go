@@ -352,9 +352,9 @@ func RaceFirst(fb *Fiber, a, b Value) Value   { return race(fb, a, b, false) }
 // timeoutAfter is the task's result, or `late()` when `millis` pass first,
 // the task interrupted and awaited.
 func timeoutAfter(fb *Fiber, millis Value, task Value, done func(Value) Value, late func() Value) Value {
-	c := fork(fb, fb.owner, task, nil)
 	timer, cancel := clockOf(fb).timer(time.Duration(millis.(float64) * float64(time.Millisecond)))
 	defer cancel()
+	c := fork(fb, fb.owner, task, nil)
 	switch firstClosed(fb, c.done, timer, signalOf(fb)) {
 	case 0:
 		return done(c.result())
