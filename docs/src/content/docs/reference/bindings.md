@@ -54,7 +54,7 @@ return `Unit`; the condition is `Bool` and their bodies return `Unit`.
 loop; a loop may carry a label (`'outer: loop { … }`, `'outer: while … do …`,
 `'outer: for … do …`) so `break 'outer` or `continue 'outer` exits or
 continues that enclosing loop instead, closing each scope it leaves before
-continuing. Duplicate labels in the same scope and unknown labels are
+continuing. Duplicate labels on enclosing loops and unknown labels are
 `FLICK-T071`. A nested function, task, lazy sequence or operation handler
 cannot exit an outer loop (`FLICK-T071`). `loop` and `while` are contextual
 words: existing names such as `Loop.loop` and `Schedule.while` remain valid.
