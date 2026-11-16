@@ -168,3 +168,62 @@ fn the_cloudflare_runner_answers_fetch_with_main() {
         "{cli:?}"
     );
 }
+
+#[test]
+#[ignore = "needs Node and pnpm install"]
+fn runners_provide_host_services_on_both_runtimes() {
+    let node_main = r#"module App.Main exposing (main)
+
+import Host
+
+main : Unit ->{...Host.Live; AppError} Unit
+let main () =
+  let _ = Host.Clock.current_time_millis ()
+  let _ = Host.Random.next ()
+  let _ = Host.Environment.env "PATH"
+  let _ = Host.Arguments.args ()
+  Host.Console.stdout_line "host ok"
+"#;
+    let browser_main = r#"module App.Main exposing (main)
+
+import Host
+
+main : Unit ->{...Host.BrowserLive; AppError} Unit
+let main () =
+  let _ = Host.Clock.current_time_millis ()
+  let _ = Host.Random.next ()
+  Host.Console.stdout_line "browser host ok"
+"#;
+    for (suffix, with_adapter) in [("effect", true), ("rt", false)] {
+        for (runner, source, expected) in [
+            ("Runner.Node", node_main, "host ok\n"),
+            ("Runner.Browser", browser_main, "browser host ok\n"),
+        ] {
+            let name = format!("build_runner_host_{suffix}_{}", runner.replace('.', "_"));
+            let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+            let _ = fs::remove_dir_all(&dir);
+            fs::create_dir_all(dir.join("src/App")).expect("dir");
+            let config = format!(
+                "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\nrunner = \"{runner}\"\n"
+            );
+            fs::write(dir.join("flick.toml"), config).expect("write");
+            if with_adapter {
+                fs::write(dir.join("package.json"), ADAPTER).expect("manifest");
+            }
+            fs::write(dir.join("src/App/Main.fl"), source).expect("write");
+            let out = flick_in(&dir, &["build"]);
+            assert!(out.status.success(), "{suffix} {runner}: {out:?}");
+            let run = Command::new("node")
+                .arg(Path::new("dist").join(runner_file("main", false)))
+                .current_dir(&dir)
+                .output()
+                .expect("node");
+            assert_eq!(run.status.code(), Some(0), "{suffix} {runner}: {run:?}");
+            assert_eq!(
+                String::from_utf8_lossy(&run.stdout),
+                expected,
+                "{suffix} {runner}"
+            );
+        }
+    }
+}

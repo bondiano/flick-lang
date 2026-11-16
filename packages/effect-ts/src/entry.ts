@@ -125,6 +125,7 @@ export const start = <I>(main: Main<I>, input: I, provide: Around = (program) =>
 export interface RunOptions {
   readonly capabilities?: ReadonlyArray<string>;
   readonly shutdownNotice?: number;
+  readonly provide?: Around;
 }
 
 /**
@@ -159,7 +160,7 @@ export const runMain = async (
   });
   // a fiber waiting on nothing but a signal must not let the process exit
   const keepAlive = setInterval(() => {}, 2 ** 30);
-  const fiber = start(main, undefined);
+  const fiber = start(main, undefined, options.provide);
   run.fiber = fiber;
   const exit = await new Promise<Exit.Exit<unknown, unknown>>((resolve) => fiber.addObserver(resolve));
   clearTimeout(run.timer);

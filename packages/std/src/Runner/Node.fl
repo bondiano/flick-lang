@@ -3,8 +3,10 @@
 /// interrupt it, and the exit code tells how it ended.
 module Runner.Node exposing (Main, run)
 
+import Host
+
 /// What `main` of an entry is.
-type alias Main = Unit ->{Async; AppError} Unit
+type alias Main = Unit ->{Async, ...Host.Live; AppError} Unit
 
 /// Starts `main`; the runner of the entry exports what it returns.
 run : Main -> Unknown

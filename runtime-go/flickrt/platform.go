@@ -126,6 +126,52 @@ func Format(v Value) string {
 	return Show(v).(string)
 }
 
+func liveHostEnv(e *env) *env {
+	consoleRec := Rec(
+		"stdout_line", Fn(func(_ *Fiber, text Value) Value {
+			return Eff(func(_ *Fiber) Value { return StdoutLine(text) })
+		}),
+		"stderr_line", Fn(func(_ *Fiber, text Value) Value {
+			return Eff(func(_ *Fiber) Value { return StderrLine(text) })
+		}),
+		"stdout_write", Fn(func(_ *Fiber, text Value) Value {
+			return Eff(func(_ *Fiber) Value { return StdoutWrite(text) })
+		}),
+	)
+	clockRec := Rec(
+		"current_time_millis", Fn(func(_ *Fiber, _ Value) Value {
+			return Eff(func(fb *Fiber) Value { return ClockCurrentTimeMillis(fb) })
+		}),
+		"current_time_nanos", Fn(func(_ *Fiber, _ Value) Value {
+			return Eff(func(fb *Fiber) Value { return ClockCurrentTimeNanos(fb) })
+		}),
+		"monotonic_time_nanos", Fn(func(_ *Fiber, _ Value) Value {
+			return Eff(func(fb *Fiber) Value { return ClockMonotonicTimeNanos(fb) })
+		}),
+	)
+	randomRec := Rec(
+		"next", Fn(func(_ *Fiber, _ Value) Value {
+			return Eff(func(fb *Fiber) Value { return RandomNext(fb) })
+		}),
+	)
+	envRec := Rec(
+		"env", Fn(func(_ *Fiber, name Value) Value {
+			return Eff(func(_ *Fiber) Value { return PlatformEnv(name) })
+		}),
+	)
+	argsRec := Rec(
+		"args", Fn(func(_ *Fiber, _ Value) Value {
+			return Eff(func(_ *Fiber) Value { return PlatformArgs() })
+		}),
+	)
+	return e.
+		withHandler("Host.Console", record(consoleRec)).
+		withHandler("Host.Clock", record(clockRec)).
+		withHandler("Host.Random", record(randomRec)).
+		withHandler("Host.Environment", record(envRec)).
+		withHandler("Host.Arguments", record(argsRec))
+}
+
 // Main runs the program: `run` starts `main` in the root fiber, under the
 // root owner. SIGINT and SIGTERM interrupt it, and the owner closes as
 // after any end. The exit code is the JS runner's.
@@ -137,6 +183,7 @@ func Main(run func(*Fiber)) {
 		debug.SetGCPercent(400)
 	}
 	fb := rootFiber()
+	fb.env = liveHostEnv(fb.env)
 	var stopped atomic.Value // the signal that interrupted main
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)

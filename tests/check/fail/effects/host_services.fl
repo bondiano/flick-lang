@@ -1,5 +1,8 @@
 module App.HostServices exposing (..)
 
+import Host
+import Layer
+
 read_environment : Unit ->{} Option String
 let read_environment () = Host.Environment.env "MODE"
 
@@ -15,8 +18,18 @@ let read_arguments () = Host.Arguments.args ()
 write_console : String ->{} Unit
 let write_console text = Host.Console.stdout_line text
 
-//~ FLICK-E002 @4:27-4:54 the signature of `read_environment` does not allow service `Environment`
-//~ FLICK-E001 @7:21-7:54 this is a runtime call, but `read_clock` is pure
-//~ FLICK-E002 @10:22-10:41 the signature of `read_random` does not allow service `Random`
-//~ FLICK-E002 @13:25-13:47 the signature of `read_arguments` does not allow service `Arguments`
-//~ FLICK-E002 @16:26-16:55 the signature of `write_console` does not allow service `Console`
+conflicting_consoles : Layer none none {Host.Console}
+let conflicting_consoles = Layer.merge Host.console Host.console
+
+service BadHost =
+  abort stop : forall b. Int ->{} b
+  control pause : Unit ->{} Unit
+
+//~ FLICK-E002 @7:27-7:54 the signature of `read_environment` does not allow service `Environment`
+//~ FLICK-E001 @10:21-10:54 this is a runtime call, but `read_clock` is pure
+//~ FLICK-E002 @13:22-13:41 the signature of `read_random` does not allow service `Random`
+//~ FLICK-E002 @16:25-16:47 the signature of `read_arguments` does not allow service `Arguments`
+//~ FLICK-E002 @19:26-19:55 the signature of `write_console` does not allow service `Console`
+//~ FLICK-E004 @22:28-22:65 both layers build `Console`: a merged environment has one implementation of each service
+//~ FLICK-E013 @25:3-25:36 service operation `stop` must be `tail`
+//~ FLICK-E013 @26:3-26:33 service operation `pause` must be `tail`

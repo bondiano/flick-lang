@@ -8,6 +8,7 @@ import { asMain, conclude, start } from "../entry.ts";
 import { writeStderr } from "../host.ts";
 import { reportedDefects } from "../owner.ts";
 import { hotCarryTo, hotStates } from "../hot.ts";
+import { provideBrowserServices } from "./host.ts";
 
 /** The running program, which a module replacement in development stops. */
 let current: Fiber.Fiber<unknown, unknown> | undefined;
@@ -16,7 +17,7 @@ export const run = async (main: unknown, input?: unknown): Promise<void> => {
   const problems = versionProblems();
   for (const problem of problems) writeStderr(`error: ${problem}\n`);
   if (problems.length > 0) return;
-  const fiber = start(asMain(main), input);
+  const fiber = start(asMain(main), input, provideBrowserServices);
   current = fiber;
   const exit = await new Promise<Exit.Exit<unknown, unknown>>((resolve) => fiber.addObserver(resolve));
   // a replaced program was stopped on purpose

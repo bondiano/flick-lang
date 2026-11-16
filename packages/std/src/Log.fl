@@ -1,6 +1,8 @@
 /// Logging as a service; `console` writes to the standard streams.
 module Log exposing (..)
 
+import Context
+import Host
 import Layer
 
 service Log =
@@ -24,3 +26,18 @@ foreign write_console from "flick:rt" "logConsole"
 /// Info and debug to stdout, warnings and errors to stderr, with the level.
 console : Layer none none {Log}
 let console = Layer.succeed Log { write = write_console }
+
+/// Adapts a `Host.Console` layer into a `Log` layer: info and debug to stdout,
+/// warnings and errors to stderr, prefixed with the level.
+from_console : Layer none none {Host.Console} -> Layer none none {Log}
+let from_console layer =
+  Layer.flat_map
+    (fun ctx ->
+      let c = Context.get Host.Console ctx
+      Layer.succeed Log {
+        write = fun level message ->
+          let text = level ++ ": " ++ message
+          if level == "warn" || level == "error" then c.stderr_line text else c.stdout_line text;
+      }
+    )
+    layer

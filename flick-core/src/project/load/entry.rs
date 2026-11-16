@@ -11,7 +11,7 @@ use crate::project::{Project, is_module_name, module_path};
 use crate::resolve::Interface;
 use crate::source::Span;
 use crate::types::lang::{self, Lang};
-use crate::types::{Effects, Type, show_type};
+use crate::types::{Effects, Elem, Type, show_type};
 
 /// How the runner starts `main`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -20,6 +20,20 @@ pub enum MainKind {
     Pure,
     /// `Unit ->{; AppError} Unit`: run as an effect.
     Effect,
+}
+
+fn is_runner_service(elem: &Elem) -> bool {
+    lang::label(Lang::Async) == elem.name()
+        || matches!(
+            elem.name(),
+            Some(
+                "Host.Console"
+                    | "Host.Clock"
+                    | "Host.Random"
+                    | "Host.Environment"
+                    | "Host.Arguments"
+            )
+        )
 }
 
 /// How a runner starts `main : t`, or why none can: it takes and returns
@@ -54,9 +68,8 @@ pub fn main_kind(t: &Type) -> Result<MainKind, String> {
     } = effects.as_ref();
     match services {
         Type::Var(_) => {}
-        // the scheduler of every runner handles `Async`
-        Type::Row(row)
-            if (row.entries.iter()).all(|(l, _)| lang::label(Lang::Async) == l.name()) => {}
+        // runner-provided services: `Async` and host services
+        Type::Row(row) if (row.entries.iter()).all(|(l, _)| is_runner_service(l)) => {}
         _ => {
             return Err(format!(
                 "entry `main` needs `{}`, which no runner provides; provide it inside `main`",
@@ -146,6 +159,9 @@ impl Loader<'_> {
                         )),
                     );
                 }
+                // a client entry defaults to Runner.Browser when no runner is named
+                let default_client_runner = ("Runner.Browser".to_string(), span);
+                let runner = runner.or_else(|| client.then_some(&default_client_runner));
                 // no type when the module failed to check: that is reported already
                 if let Some((runner, runner_at)) = runner
                     && project.config.build.emit == Emit::Go

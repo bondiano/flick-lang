@@ -423,9 +423,24 @@ fn a_runner_gives_the_type_of_main() {
     };
     let effect = "main : Unit ->{; AppError} Unit\nlet main () = ()\n";
     let pure = "main : Unit -> Unit\nlet main () = ()\n";
+    let host_live = "import Host\nmain : Unit ->{Host.Console, Host.Environment; AppError} Unit\nlet main () = ()\n";
+    let browser_live = "import Host\nmain : Unit ->{Host.Console, Host.Clock, Host.Random; AppError} Unit\nlet main () = ()\n";
     assert_eq!(check("Runner.Node", effect), Vec::<String>::new());
+    assert_eq!(check("Runner.Node", host_live), Vec::<String>::new());
     assert_eq!(check("Runner.Browser", pure), Vec::<String>::new());
+    assert_eq!(check("Runner.Browser", browser_live), Vec::<String>::new());
+    let local_console = "service Console =\n  write : String ->{} Unit\nmain : Unit ->{Console; AppError} Unit\nlet main () = ()\n";
     let wrong = [
+        (
+            "Runner.Node",
+            local_console,
+            "FLICK-P026 src/App/Main.fl `main`: entry `main` is not a `Runner.Node.Main`",
+        ),
+        (
+            "Runner.Browser",
+            host_live,
+            "FLICK-P026 src/App/Main.fl `main`: entry `main` is not a `Runner.Browser.Main`",
+        ),
         (
             "Runner.Node",
             "main : Float -> Unit\nlet main _ = ()\n",
