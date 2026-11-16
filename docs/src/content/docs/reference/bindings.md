@@ -52,7 +52,7 @@ A bare `break` is `break ()`. `while condition do body` and `for … do body`
 return `Unit`; the condition is `Bool` and their bodies return `Unit`.
 `continue` skips the rest of an iteration. Unlabeled exits target the nearest
 loop; a loop may carry a label (`'outer: loop { … }`, `'outer: while … do …`,
-`'outer: for … do …`) so `break 'outer` or `continue 'outer` exits or
+`'outer: for … do …`; the colon after the label is optional) so `break 'outer` or `continue 'outer` exits or
 continues that enclosing loop instead, closing each scope it leaves before
 continuing. Duplicate labels on enclosing loops and unknown labels are
 `FLICK-T071`. A nested function, task, lazy sequence or operation handler

@@ -70,13 +70,12 @@ impl Checker<'_> {
         });
         if let Some(ref name) = label {
             let current_apart = self.cx.mutation.apart.len();
-            if self
-                .cx
-                .mutation
-                .loops
-                .iter()
-                .any(|f| f.apart_depth == current_apart && f.label.as_ref() == Some(name))
-            {
+            let current_settled = self.cx.mutation.settled.len();
+            if self.cx.mutation.loops.iter().any(|f| {
+                f.apart_depth == current_apart
+                    && f.settled_depth == current_settled
+                    && f.label.as_ref() == Some(name)
+            }) {
                 let span = label_token.map_or_else(|| self.span(node), |t| self.token_span(t));
                 self.error(
                     codes::T071,

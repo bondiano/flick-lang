@@ -26,3 +26,9 @@ let nested_for () =
     }
   }
   total
+
+reuse_label_inside_comprehension : Unit -> Unit
+let reuse_label_inside_comprehension () = 'outer : for x <- [1, 2] do {
+  let _xs = [for y <- [x] yield 'outer : loop { break 'outer y }]
+  ()
+}
