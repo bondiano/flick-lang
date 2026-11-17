@@ -17,8 +17,15 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const manifest = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
 const extensionPath = path.join(root, "extension.js");
 
-function createHarness({ initialConfig = {}, failStartOn = () => false } = {}) {
+function createHarness({
+  initialConfig = {},
+  failStartOn = () => false,
+  hangStartOn = () => false,
+  stopDelayMs = 0,
+} = {}) {
   const State = { Stopped: 1, Running: 2, Starting: 3, StartFailed: 4 };
+  const CloseAction = { DoNotRestart: 1, Restart: 2 };
+  const ErrorAction = { Continue: 1, Shutdown: 2 };
   const configValues = {
     path: "flick",
     "trace.server": "off",
@@ -94,6 +101,8 @@ function createHarness({ initialConfig = {}, failStartOn = () => false } = {}) {
       this.stopCalls = 0;
       this.disposeCalls = 0;
       this.stateListeners = [];
+      this.serverProcess = undefined;
+      this.killedSignals = [];
       createdClients.push(this);
     }
     onDidChangeState(listener) {
@@ -115,14 +124,36 @@ function createHarness({ initialConfig = {}, failStartOn = () => false } = {}) {
     async start() {
       this.startCalls += 1;
       this.emitState(State.Starting);
-      if (failStartOn(this.serverOptions.command)) {
+      const proc = {
+        pid: 10000 + createdClients.length,
+        killed: false,
+        kill: (signal = "SIGTERM") => {
+          proc.killed = true;
+          this.killedSignals.push(signal);
+        },
+      };
+      this.serverProcess = proc;
+      if (hangStartOn(this.serverOptions.command, this)) {
+        return new Promise(() => {});
+      }
+      if (failStartOn(this.serverOptions.command, this)) {
         this.emitState(State.StartFailed);
         throw new Error(`spawn ${this.serverOptions.command} ENOENT`);
       }
       this.emitState(State.Running);
     }
     async stop() {
+      if (this.state === State.StartFailed || this.state === State.Starting) {
+        const label = this.state === State.StartFailed ? "startFailed" : "starting";
+        throw new Error(`Client is not running and can't be stopped. It's current state is: ${label}`);
+      }
+      if (this.state === State.Stopped) {
+        return;
+      }
       this.stopCalls += 1;
+      if (stopDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, stopDelayMs));
+      }
       this.emitState(State.Stopped);
     }
     async dispose() {
@@ -188,7 +219,7 @@ function createHarness({ initialConfig = {}, failStartOn = () => false } = {}) {
   Module._load = function patchedLoad(request, parent, isMain) {
     if (request === "vscode") return fakeVscode;
     if (request === "vscode-languageclient/node") {
-      return { LanguageClient: FakeLanguageClient, State };
+      return { LanguageClient: FakeLanguageClient, State, CloseAction, ErrorAction };
     }
     return originalLoad.call(this, request, parent, isMain);
   };
@@ -297,11 +328,17 @@ test("status bar reflects Busy during in-flight requests and Error on startup fa
   assert.equal(bar.command, "flick.restartServer");
   assert.equal(bar.backgroundColor?.id, "statusBarItem.errorBackground");
 
-  // Fixing flick.path and triggering flick.restartServer recovers cleanly to Ready.
+  // Fixing flick.path and triggering flick.restartServer recovers cleanly to Ready
+  // without calling dispose() on the StartFailed client or logging a stop error.
   h.configValues.path = "/usr/local/bin/flick";
   await h.registeredCommands.get("flick.restartServer")();
   assert.equal(h.createdClients.length, 2);
-  assert.equal(h.createdClients[0].disposeCalls, 1);
+  assert.equal(h.createdClients[0].disposeCalls, 0);
+  assert.equal(
+    h.createdChannels[0].logs.some(([level, msg]) => level === "error" && msg.includes("Failed to stop")),
+    false,
+    "recovering from StartFailed must not log a spurious stop error",
+  );
   assert.deepEqual(h.createdClients[1].serverOptions, {
     command: "/usr/local/bin/flick",
     args: ["lsp", "--stdio"],
@@ -357,6 +394,147 @@ test("configuration listener restarts only when relevant Flick settings change",
   await new Promise((r) => setTimeout(r, 20));
   assert.equal(h.createdClients.length, 3);
   assert.equal(h.createdClients[1].disposeCalls, 1);
+
+  await h.extension.deactivate();
+});
+
+test("deactivate race ignores restartServer and configuration changes without leaking clients or watchers", async () => {
+  const h = createHarness({ stopDelayMs: 30 });
+  const context = { subscriptions: [] };
+
+  await h.extension.activate(context);
+  assert.equal(h.createdClients.length, 1);
+
+  // Trigger deactivate while stopCurrentClient is awaiting an async stop.
+  const deactivatePromise = h.extension.deactivate();
+  h.configValues.path = "/opt/flick/bin/flick-after-deactivate";
+  h.fireConfigChange("flick.path");
+  await h.extension.restartServer();
+  await deactivatePromise;
+
+  // Give any erroneously queued tasks a chance to run.
+  await new Promise((resolve) => setTimeout(resolve, 40));
+
+  assert.equal(h.createdClients.length, 1, "no new client may be spawned after deactivate() starts");
+  assert.ok(h.createdWatchers.every((w) => w.disposed), "all watchers must remain disposed after deactivate()");
+  assert.equal(h.createdWatchers.length, 3);
+  assert.equal(h.registeredCommands.size, 0, "commands should be disposed on deactivate()");
+});
+
+test("StartFailed recovery and deactivation skip client stop/dispose without spurious error logs", async () => {
+  const h = createHarness({
+    initialConfig: { path: "/bad/flick" },
+    failStartOn: (cmd) => cmd === "/bad/flick",
+  });
+  await h.extension.activate({ subscriptions: [] });
+  assert.match(h.createdStatusBars[0].text, /Error/);
+
+  // Deactivating directly from StartFailed must not throw or log a stop error.
+  await h.extension.deactivate();
+  assert.equal(h.createdClients[0].disposeCalls, 0);
+  assert.equal(
+    h.createdChannels[0].logs.some(([level, msg]) => level === "error" && msg.includes("Failed to stop")),
+    false,
+  );
+  assert.ok(h.createdWatchers.every((w) => w.disposed));
+});
+
+test("hung startup is preempted by restartServer and deactivate without deadlocking", async () => {
+  const h = createHarness({
+    initialConfig: { path: "/hung/cat" },
+    hangStartOn: (cmd) => cmd === "/hung/cat",
+  });
+
+  const activatePromise = h.extension.activate({ subscriptions: [] });
+  // Yield so startNewClient begins awaiting the hung start().
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(h.createdClients.length, 1);
+  assert.match(h.createdStatusBars[0].text, /Starting/);
+
+  // Updating flick.path and triggering restartServer must preempt the hung start immediately.
+  h.configValues.path = "/good/flick";
+  const restartPromise = h.registeredCommands.get("flick.restartServer")();
+
+  await Promise.race([
+    Promise.all([activatePromise, restartPromise]),
+    new Promise((_, reject) => setTimeout(() => reject(new Error("restartServer deadlocked behind hung startup")), 500)),
+  ]);
+
+  assert.equal(h.createdClients.length, 2);
+  assert.equal(h.createdClients[0].serverProcess.killed, true, "hung server process must be terminated on preemption");
+  assert.match(h.createdStatusBars[0].text, /Ready/);
+
+  // Now test deactivate() preempting another hung startup.
+  h.configValues.path = "/hung/cat";
+  const hungRestart = h.registeredCommands.get("flick.restartServer")();
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(h.createdClients.length, 3);
+
+  await Promise.race([
+    Promise.all([hungRestart, h.extension.deactivate()]),
+    new Promise((_, reject) => setTimeout(() => reject(new Error("deactivate deadlocked behind hung startup")), 500)),
+  ]);
+
+  assert.equal(h.createdClients[2].serverProcess.killed, true);
+  assert.ok(h.createdWatchers.every((w) => w.disposed));
+});
+
+test("hung startup times out cleanly, kills server process, sets Error status, and allows recovery", async (t) => {
+  const prevTimeout = process.env.FLICK_LSP_START_TIMEOUT_MS;
+  process.env.FLICK_LSP_START_TIMEOUT_MS = "40";
+  t.after(() => {
+    if (prevTimeout === undefined) {
+      delete process.env.FLICK_LSP_START_TIMEOUT_MS;
+    } else {
+      process.env.FLICK_LSP_START_TIMEOUT_MS = prevTimeout;
+    }
+  });
+
+  const h = createHarness({
+    initialConfig: { path: "/hung/sleep" },
+    hangStartOn: (cmd) => cmd === "/hung/sleep",
+  });
+
+  await Promise.race([
+    h.extension.activate({ subscriptions: [] }),
+    new Promise((_, reject) => setTimeout(() => reject(new Error("activate hung past startup timeout")), 500)),
+  ]);
+
+  assert.equal(h.createdClients.length, 1);
+  assert.equal(h.createdClients[0].serverProcess.killed, true);
+  assert.match(h.createdStatusBars[0].text, /Error/);
+  assert.equal(h.createdStatusBars[0].command, "flick.restartServer");
+  assert.ok(
+    h.createdChannels[0].logs.some(([level, msg]) => level === "error" && /timed out/i.test(msg)),
+    "timeout must be logged to output channel",
+  );
+
+  // Recovery after timeout must succeed without logging a spurious stop error.
+  h.configValues.path = "/good/flick";
+  await h.registeredCommands.get("flick.restartServer")();
+  assert.equal(h.createdClients.length, 2);
+  assert.match(h.createdStatusBars[0].text, /Ready/);
+  assert.equal(
+    h.createdChannels[0].logs.some(([level, msg]) => level === "error" && msg.includes("Failed to stop")),
+    false,
+  );
+
+  await h.extension.deactivate();
+});
+
+test("synchronous throw in middleware sendRequest next() resets status bar from Busy to Ready", async () => {
+  const h = createHarness();
+  await h.extension.activate({ subscriptions: [] });
+  const bar = h.createdStatusBars[0];
+  const sendRequest = h.createdClients[0].clientOptions.middleware.sendRequest;
+
+  await assert.rejects(
+    () => Promise.resolve(sendRequest("textDocument/hover", {}, undefined, () => {
+      throw new Error("sync boom");
+    })),
+    /sync boom/,
+  );
+  assert.match(bar.text, /Ready/);
 
   await h.extension.deactivate();
 });
