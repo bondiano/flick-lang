@@ -109,6 +109,15 @@ impl Relocation<'_> {
         }
     }
 
+    /// The child's instances a parent's interface publishes, under the names
+    /// the parent's file defines them by: an importer names its dictionaries
+    /// by these. Their heads keep the child's types, as the checker knows them.
+    fn published_instances(&self, interface: &mut Interface) {
+        for instance in &mut interface.instances {
+            self.name(&mut instance.module, &mut instance.name);
+        }
+    }
+
     fn declared_instance(&self, instance: &mut types::Instance) {
         self.name(&mut instance.module, &mut instance.name);
         self.binders(&mut instance.vars);
