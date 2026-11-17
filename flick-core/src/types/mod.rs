@@ -16,6 +16,7 @@ use std::mem;
 
 mod abi;
 mod applicative_do;
+mod assumed_pure;
 mod binary;
 mod bindings;
 mod braced_branch;
@@ -531,6 +532,9 @@ struct ItemCx {
     /// A name was taken on trust: a class constraint left open has no type
     /// to choose an instance by, and no error of its own.
     trusted: bool,
+    /// Locals applied before their type was known, each with the pure arrow
+    /// taken for it, its name and where it is bound.
+    assumed_pure: Vec<(Type, String, u32)>,
 }
 
 include!("checker_state.rs");

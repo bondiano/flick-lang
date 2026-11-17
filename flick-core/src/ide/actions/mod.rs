@@ -1,12 +1,13 @@
 //! Code actions that rewrite code without a diagnostic asking for it:
-//! adding a signature, matching on a variable, qualifying a name, and
-//! extracting or inlining a variable.
+//! adding a signature, matching on a variable, qualifying a name,
+//! extracting or inlining a variable, and keeping one in a `Ref`.
 
 mod extract;
 mod import_class;
 mod match_on;
 mod qualify;
 mod signature;
+mod to_ref;
 
 use super::Ide;
 use crate::diagnostics::Edit;
@@ -31,6 +32,7 @@ impl Ide<'_> {
         out.extend(self.qualify(file, start));
         out.extend(self.extract(file, start, end));
         out.extend(self.inline(file, start));
+        out.extend(self.to_ref(file, start));
         out
     }
 }
@@ -68,3 +70,5 @@ fn to_u32(n: usize) -> u32 {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod to_ref_tests;

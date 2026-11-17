@@ -294,3 +294,51 @@ fn redundant_annotation_quick_fix_removes_it() {
     assert!(fixed.contains("\nlet kinds = [A, B]\n"), "{fixed}");
     lsp.close();
 }
+
+/// A `let mut` a `task` reads offers its rewrite into a `Ref`; the fix that
+/// annotates a callback taken for a pure function is offered, not preferred.
+#[test]
+fn a_captured_variable_offers_a_ref_and_an_unsafe_fix_is_not_preferred() {
+    let initial = "module App.Main exposing (run, apply)\n\nrun : Unit ->{} Int\nlet run () =\n  let mut count = 1\n  count = count + 1\n  let later = task { count }\n  await later\n\nservice Log =\n  info : String ->{} Unit\n\nsay : Unit ->{Log} Unit\nlet say () = Log.info \"hi\"\n\napply : Unit ->{Log} Unit\nlet apply () = (fun h -> h ()) say\n";
+    let dir = project(
+        "lsp_unsafe_actions",
+        &[("flick.toml", LIB), ("src/App/Main.fl", initial)],
+    );
+    let file = dir.join("src/App/Main.fl");
+    let document = json!({ "uri": uri(&file) });
+    let mut lsp = Lsp::start(&dir);
+    lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": initial } }));
+    let diagnostics = lsp.diagnostics(&uri(&file));
+    let mut actions = |code: &str| {
+        let diagnostic = diagnostics
+            .iter()
+            .find(|d| d["code"] == code)
+            .unwrap_or_else(|| panic!("missing {code}: {diagnostics:?}"));
+        let reply = lsp.request(
+            "textDocument/codeAction",
+            &json!({
+                "textDocument": document,
+                "range": diagnostic["range"],
+                "context": { "diagnostics": [diagnostic] },
+            }),
+        );
+        reply["result"].as_array().expect("actions").clone()
+    };
+    let captured = actions("FLICK-G005");
+    assert!(
+        captured
+            .iter()
+            .any(|a| a["title"] == "keep `count` in a `Ref`"),
+        "{captured:?}"
+    );
+    let callback = actions("FLICK-T003");
+    let annotate = callback
+        .iter()
+        .find(|a| {
+            a["title"]
+                .as_str()
+                .is_some_and(|t| t.starts_with("annotate `h`"))
+        })
+        .unwrap_or_else(|| panic!("missing annotate: {callback:?}"));
+    assert_eq!(annotate["isPreferred"], false, "{annotate:?}");
+}

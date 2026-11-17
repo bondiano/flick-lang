@@ -175,7 +175,10 @@ impl Checker<'_> {
             Type::Error => Type::Error,
             meta @ Type::Meta(_) => {
                 let result = self.fresh();
-                let _ = self.unify(&meta, &Type::pure_fun(arg, result.clone()));
+                let arrow = Type::pure_fun(arg, result.clone());
+                if self.unify(&meta, &arrow).is_ok() {
+                    self.assume_pure(rhs, &arrow);
+                }
                 result
             }
             other => {
