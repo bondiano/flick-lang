@@ -4,6 +4,8 @@
 
 mod doc;
 pub use doc::doc;
+mod doc_run;
+mod example_host;
 
 use std::path::{Path, PathBuf};
 use std::process::{Command as Process, Output};

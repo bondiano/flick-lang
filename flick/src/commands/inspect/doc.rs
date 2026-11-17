@@ -1,16 +1,13 @@
 //! Public API Markdown and package-context documentation examples.
-use std::fmt::Write;
-use std::io;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-
 use flick_core::diagnostics::{Severity, codes};
-use flick_core::plugin::{Expander, reach::Outside};
-use flick_core::project::{self, Compilation, Host, Project};
+use flick_core::project::{self, Compilation, Project};
 use flick_core::source::{SourceMap, Span};
 use flick_core::types::{builtin_sources, builtins, implicit_package_of};
 use flick_core::{doc, syntax};
+use std::fmt::Write;
+use std::path::Path;
 
+use super::example_host::ExampleHost;
 use super::{Checked, compile, failure, write};
 use crate::args::DocArguments;
 use crate::builtins as builtin_cache;
@@ -274,33 +271,6 @@ fn doc_std(options: &DocArguments) -> Outcome {
 /// check that trusts its imports. No example files are written to the project.
 fn check_doc_examples(checked: &Checked, comment: &str) -> Option<String> {
     use flick_core::markdown::{self, Mode};
-    struct ExampleHost<'a> {
-        host: &'a FsHost,
-        path: PathBuf,
-        text: String,
-    }
-    impl Host for ExampleHost<'_> {
-        fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
-            if path == self.path {
-                Ok(self.text.as_bytes().to_vec())
-            } else {
-                self.host.read(path)
-            }
-        }
-        fn display(&self, path: &Path) -> String {
-            self.host.display(path)
-        }
-        fn plugin(
-            &self,
-            package: &str,
-            component: Option<&Path>,
-        ) -> Result<Arc<dyn Expander>, String> {
-            self.host.plugin(package, component)
-        }
-        fn outside(&self) -> Option<Arc<dyn Outside>> {
-            self.host.outside()
-        }
-    }
     for block in markdown::blocks(comment) {
         if block.mode == Mode::Ignore {
             let mut sources = SourceMap::default();
@@ -352,10 +322,22 @@ fn check_doc_examples(checked: &Checked, comment: &str) -> Option<String> {
             errors.is_empty()
         };
         if !valid {
+            // a missing dependency is what the reader must add, not the
+            // resolution error that follows from it
+            if let Some(package) = super::doc_run::undeclared_import(checked, &block.text) {
+                return Some(format!(
+                    "line {} imports `{package}`, which is not a declared dependency",
+                    block.line
+                ));
+            }
             return Some(format!(
                 "line {} did not satisfy {:?}: {errors:?}",
                 block.line, block.mode
             ));
+        }
+        // A runnable example must also run: its expected behavior is its exit.
+        if let Some(message) = super::doc_run::check_example(checked, &block) {
+            return Some(message);
         }
     }
     None
