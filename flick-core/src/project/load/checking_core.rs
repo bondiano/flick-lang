@@ -35,60 +35,22 @@ impl Checking<'_> {
             output
         };
         let Some(cache) = self.cache else {
-            return (check(), None, None);
+            return (check(), None, None, Reason::Changed(Vec::new()));
         };
         #[cfg(feature = "native-project")]
         if let Some(store) = &cache.store {
-            let (output, digest) = self.stored(loaded, store, interfaces, digests, check);
-            return (output, None, digest);
+            let (output, digest, reason) = self.stored(loaded, store, interfaces, digests, check);
+            return (output, None, digest, reason);
         }
         #[cfg(not(feature = "native-project"))]
         let _ = digests;
-        let mut key = Key {
-            file: loaded.file,
-            // the code of its blocks too, which other modules' blocks change
-            text: self.text_of(loaded).to_owned(),
-            config: self.project.map(|p| p.config.clone()),
-            lower: self.lower,
-            cached_ir: self.cached_ir,
-            imports: loaded
-                .syntax
-                .imports
-                .iter()
-                .chain(&loaded.syntax.inline_imports)
-                .map(|i| {
-                    let interface =
-                        if self
-                            .raw_interface(interfaces, &i.module)
-                            .is_some_and(|raw| {
-                                raw.member_of
-                                    .as_ref()
-                                    .is_some_and(|member| !loaded.can_access_member(member))
-                            })
-                        {
-                            known(&i.module).map(comparable_copy)
-                        } else {
-                            match self.by_name.get(&i.module) {
-                                Some(&j) => comparable[j].clone(),
-                                None => self.from_packages.get(&i.module).map(comparable_copy),
-                            }
-                        };
-                    (interface, self.by_name.contains_key(&i.module))
-                })
-                .collect(),
-            virtual_contracts: self
-                .virtual_contract_inputs(loaded, comparable, &lookup, &contracts),
-            virtual_capture: loaded.virtual_of.as_ref().map(|v| v.capture.clone()),
-            watching: (self.watching.iter())
-                .map(|w| w.plugin.id().to_owned())
-                .collect(),
-        };
+        let mut key = self.memory_key(loaded, interfaces, comparable, &lookup, &contracts);
         // an output that was lowered serves a run that would not lower: an
         // error in another module changes nothing the module reads
         let entry = cache.entries.get(&loaded.path);
         key.lower |= entry.is_some_and(|(cached, _)| cached.lower);
         match entry {
-            Some((cached, output)) if *cached == key => {
+            Some((cached, output)) if *cached == key || stale_reuse(cache, cached, &key) => {
                 let mut output = output.clone();
                 // re-exported names are declared where their module now says
                 for import in &loaded.syntax.imports {
@@ -98,11 +60,16 @@ impl Checking<'_> {
                     }
                 }
                 debug!(module = %loaded.name, "module reused");
-                (output, Some(key), None)
+                (output, Some(key), None, Reason::Reused)
             }
             _ => {
+                let imports = (loaded.syntax.imports.iter())
+                    .chain(&loaded.syntax.inline_imports)
+                    .map(|i| i.module.as_str());
+                let changed = (entry.filter(|_| cache.explain))
+                    .map_or_else(Vec::new, |(cached, _)| cached.differs(&key, imports));
                 key.lower = self.lower;
-                (check(), Some(key), None)
+                (check(), Some(key), None, Reason::Changed(changed))
             }
         }
     }

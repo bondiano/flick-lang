@@ -16,6 +16,7 @@ use flick_core::project::{
 };
 use flick_core::source::SourceMap;
 use sha2::{Digest, Sha256};
+use tracing::{Level, debug, enabled};
 
 use crate::cache::files_under;
 use crate::{builtins, fetch, saved, toolchain};
@@ -65,13 +66,18 @@ pub fn with_modules<R>(
     kept: Option<&mut ModuleCache>,
     run: impl FnOnce(Option<&mut ModuleCache>) -> R,
 ) -> R {
-    if kept.is_some() {
-        return run(kept);
+    if let Some(kept) = kept {
+        kept.explain(enabled!(Level::DEBUG));
+        let result = run(Some(&mut *kept));
+        explain(kept);
+        return result;
     }
     let Some(saved) = Saved::new() else {
         return run(None);
     };
     let dir = saved.dir.with_file_name("modules");
+    // what a later miss of each path names as changed, apart from the modules
+    let inputs_dir = saved.dir.with_file_name("module-inputs");
     let binary = saved.binary.replacen(PREFIX, MODULES, 1);
     let wrote = Arc::new(AtomicBool::new(false));
     let path = {
@@ -79,8 +85,22 @@ pub fn with_modules<R>(
         move |key: &str| dir.join(format!("{binary}{key}.json"))
     };
     let (load, save) = (path.clone(), path);
+    let inputs_path = {
+        let (dir, binary) = (inputs_dir.clone(), binary.clone());
+        move |path: &str| dir.join(format!("{binary}{path}.json"))
+    };
+    let (read_inputs, write_inputs) = (inputs_path.clone(), inputs_path);
     let written = Arc::clone(&wrote);
     let mut cache = ModuleCache::stored(ModuleStore {
+        inputs: Box::new(move |path| {
+            let bytes = fs::read(read_inputs(path)).ok()?;
+            serde_json::from_slice(&bytes).ok()
+        }),
+        keep_inputs: Box::new(move |path, parts| {
+            if let Ok(json) = serde_json::to_vec(parts) {
+                let _ = saved::write(&write_inputs(path), &json);
+            }
+        }),
         salt: saved.salt,
         load: Box::new(move |key| {
             let bytes = fs::read(load(key)).ok()?;
@@ -94,13 +114,25 @@ pub fn with_modules<R>(
             }
         }),
     });
+    cache.explain(enabled!(Level::DEBUG));
     let result = run(Some(&mut cache));
+    explain(&cache);
     if wrote.load(Ordering::Relaxed) {
         // other binaries' modules are stale once this one saves
-        saved::evict_others(&dir, MODULES, &binary);
-        saved::keep_newest(&dir, KEPT_MODULES);
+        for dir in [&dir, &inputs_dir] {
+            saved::evict_others(dir, MODULES, &binary);
+            saved::keep_newest(dir, KEPT_MODULES);
+        }
     }
     result
+}
+
+/// Says for `--timings` what the run did with each module of the project;
+/// a cache records that only while someone listens.
+fn explain(cache: &ModuleCache) {
+    for (module, reason) in cache.reasons() {
+        debug!(module = %module, reason = %reason, "module cache");
+    }
 }
 
 /// Where this compiler keeps the modules of packages, and what keys them

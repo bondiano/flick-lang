@@ -107,3 +107,53 @@ fn a_build_takes_the_modules_saved_with_their_ir() {
     assert_eq!((code, count), (Some(0), 1), "{out}");
     assert!(out.contains("3\n"), "{out}");
 }
+
+/// What `--timings` says the module cache did with each module of a check,
+/// as `module: reason`, in the order of their names.
+fn reasons(root: &Path) -> Vec<String> {
+    let (_, out, _) = flick(root, &["check", "--diagnostics", "json"]);
+    let timings: serde_json::Value = (out.lines())
+        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+        .find(|event| event["type"] == "timings")
+        .expect("a timings event");
+    (timings["module-cache"]
+        .as_array()
+        .expect("the module cache"))
+    .iter()
+    .map(|m| {
+        format!(
+            "{}: {}",
+            m["module"].as_str().unwrap_or(""),
+            m["reason"].as_str().unwrap_or("")
+        )
+    })
+    .collect()
+}
+
+#[test]
+fn timings_say_why_each_module_was_checked_again() {
+    let root = app("module-store-reasons");
+    let base = root.join("app/src/App/Base.fl");
+    assert_eq!(
+        reasons(&root),
+        ["App.Base: no earlier entry", "App.Main: no earlier entry"]
+    );
+    assert_eq!(
+        reasons(&root),
+        [
+            "App.Base: taken from the store",
+            "App.Main: taken from the store"
+        ]
+    );
+    fs::write(&base, BASE.replace("x = 1.0", "x = 2.0")).expect("write");
+    assert_eq!(
+        reasons(&root),
+        ["App.Base: source", "App.Main: taken from the store"]
+    );
+    let exported = BASE.replace("exposing (x,", "exposing (x, y,");
+    fs::write(&base, format!("{exported}\ny : Float\nlet y = 2.0\n")).expect("write");
+    assert_eq!(
+        reasons(&root),
+        ["App.Base: source", "App.Main: import App.Base ← source"]
+    );
+}
