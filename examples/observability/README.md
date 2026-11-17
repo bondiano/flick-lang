@@ -25,5 +25,5 @@ pnpm install
 flick run
 ```
 
-`flick/tests/examples.rs` runs the example against a local collector in
+`flick/tests/cli/examples.rs` runs the example against a local collector in
 Node and checks that every signal reaches it.

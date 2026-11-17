@@ -1,6 +1,6 @@
 ---
 title: "Стандартная библиотека"
-source_hash: 1c1b7b82313da2b9
+source_hash: c6acaea776e421a2
 ---
 
 Стандартная библиотека написана на Flick и использует адаптер среды выполнения
@@ -15,7 +15,7 @@ source_hash: 1c1b7b82313da2b9
 операция этого сервиса.
 
 Сигнатуры в библиотеке дословно совпадают со спецификацией.
-Это проверяет `flick-core/tests/stdlib_signatures.rs`.
+Это проверяет `flick-core/tests/compiler/stdlib_signatures.rs`.
 
 [Сгенерированный API пакета](../../api/) содержит публичные сигнатуры, doc comments и ссылки на исходники из `flick doc --std`.
 

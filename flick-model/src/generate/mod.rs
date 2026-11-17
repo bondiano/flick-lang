@@ -1,5 +1,5 @@
 //! A generator of well-typed λFlick programs for the model properties (`just model`)
-//! (`flick-model/tests/props.rs`). A program is built type first from a
+//! (`flick-model/tests/model/props.rs`). A program is built type first from a
 //! sequence of choices: `pick(n)` takes the next one modulo `n`, and a
 //! choice past the end is 0, the simplest form, so proptest shrinking the
 //! sequence shrinks the program with it. The programs use the declarations

@@ -1,6 +1,6 @@
 ---
 title: "Тестирование"
-source_hash: 33877e08132f6d05
+source_hash: 4115b31282c7f207
 ---
 
 Установите инструмент проверки зависимостей, используемый локально и в CI:
@@ -91,7 +91,7 @@ let x : Float = "hi"
 случайные арифметические выражения с `Float`, скомпилированные из Flick,
 с теми же выражениями в JS.
 
-## `flick test` — `flick/tests/test_command.rs`
+## `flick test` — `flick/tests/cli/test_command.rs`
 
 Тест создаёт примеры проектов в `target/tmp/test_command/` и запускает для них
 `flick test`. Провал утверждения, типизированная ошибка, дефект и ошибка
@@ -101,7 +101,7 @@ let x : Float = "hi"
 как предыдущий освободит ресурсы.
 
 Стандартная библиотека объявляет все сигнатуры из спецификации дословно:
-`flick-core/tests/stdlib_signatures.rs` читает их из блоков `text` русской спецификации (`ru/spec`).
+`flick-core/tests/compiler/stdlib_signatures.rs` читает их из блоков `text` русской спецификации (`ru/spec`).
 
 ## Языковые тесты — `tests/language/`
 
@@ -210,17 +210,17 @@ CPU, версию Node и методику рядом с результатам�
 | Поведение | Тесты |
 | - | - |
 | кинды, выбор экземпляров и их согласованность | `tests/check/{pass,fail}/types/kinds.fl`, `tests/check/fail/classes/` |
-| холодные задачи, прямые вызовы, связывающие результат, порядок стадий и вычисления | `tests/run/codegen/{task_twice,stage_order,eval_order}.fl`, `tests/check/{pass,fail}/effects/`, `flick/tests/first_slice.rs` над `examples/first-slice/` |
+| холодные задачи, прямые вызовы, связывающие результат, порядок стадий и вычисления | `tests/run/codegen/{task_twice,stage_order,eval_order}.fl`, `tests/check/{pass,fail}/effects/`, `flick/tests/cli/first_slice.rs` над `examples/first-slice/` |
 | строки ошибок и `Cause`, сервисы и слои | `tests/run/stdlib/effect/`, `tests/run/codegen/{errors,defect,services}.fl`, `packages/effect-ts/test/{cause,layer}.test.ts` |
 | области, владельцы, `parallel` и гонки | `tests/run/runtime/`, `packages/effect-ts/test/{scope,concurrency,race}.test.ts` |
 | регионы и захваты | `tests/check/{pass,fail}/regions/`, `tests/check/projects/regions/` |
-| семантика `Float` в debug, release и при свёртке констант | `flick/tests/e2e_numbers.rs`, `tests/run/codegen/numbers.fl`, `flick-core/tests/consteval_node.rs` |
+| семантика `Float` в debug, release и при свёртке констант | `flick/tests/cli/e2e_numbers.rs`, `tests/run/codegen/numbers.fl`, `flick-core/tests/compiler/consteval_node.rs` |
 | проходы оптимизатора | `flick-core/src/opt/tests.rs`, `tests/run/codegen/release.fl` |
-| `deriving Schema`, политики кодеков, строгий экспорт, OpenAPI | `tests/{check,run}/**/schema/`, `packages/effect-ts/test/{schema,httpapi}.test.ts`, `flick/tests/schema_export.rs` |
+| `deriving Schema`, политики кодеков, строгий экспорт, OpenAPI | `tests/{check,run}/**/schema/`, `packages/effect-ts/test/{schema,httpapi}.test.ts`, `flick/tests/cli/schema_export.rs` |
 | обратные вызовы FFI, импорт `.d.ts` и проверенные привязки | `tests/run/ffi/`, `packages/effect-ts/test/callbacks.test.ts`, `flick-core/src/ffi/tests.rs`, `flick/tests/ffi_command.rs`, `tools/dts-importer/test/` |
 | SQL | `tests/check/{pass,fail}/sql/`, `tests/run/sql/`, `packages/effect-ts/test/sql.test.ts`, `flick/tests/sql_postgres.rs` над `tests/postgres/` |
 | UI | `tests/check/{pass,fail}/ui/`, `tests/run/ui/`, `packages/effect-ts/test/ui-*.test.ts` |
-| блок `cli` | `tests/check/{pass,fail}/cli/`, `tests/run/stdlib/cli/`, `flick-core/src/project/load/plugins_tests.rs` (вызовы, которые он означает), `flick/tests/lsp_editor/cli.rs` |
-| подсказки, языковой сервер и проекция TypeScript | `flick-core/src/ide/tests.rs`, `flick/tests/{lsp_command.rs,lsp_editor/}`, `flick-core/tests/projection.rs`, `flick-core/src/codegen/ts/tests.rs` |
-| CLI: `check`/`build` не запускают код, поколения запуска, `dev`, кеш, pnpm, коды выхода, NDJSON | `flick/tests/{cli_project,cli_run,check_command}.rs` |
-| фасады `.d.ts` и `pack` | `flick/tests/dts_command.rs`, `flick/tests/cli_run.rs` |
+| блок `cli` | `tests/check/{pass,fail}/cli/`, `tests/run/stdlib/cli/`, `flick-core/src/project/load/plugins_tests.rs` (вызовы, которые он означает), `flick/tests/cli/lsp_editor/cli.rs` |
+| подсказки, языковой сервер и проекция TypeScript | `flick-core/src/ide/tests.rs`, `flick/tests/cli/{lsp_command.rs,lsp_editor/}`, `flick-core/tests/compiler/projection.rs`, `flick-core/src/codegen/ts/tests.rs` |
+| CLI: `check`/`build` не запускают код, поколения запуска, `dev`, кеш, pnpm, коды выхода, NDJSON | `flick/tests/cli/{cli_project,cli_run,check_command}.rs` |
+| фасады `.d.ts` и `pack` | `flick/tests/cli/dts_command.rs`, `flick/tests/cli/cli_run.rs` |
