@@ -4,7 +4,7 @@ module Main exposing (main)
 type error NotFound = NotFound String
 
 find : String ->{; NotFound} Float
-let find name = if name == "ada" then 36 else from_result (Err (NotFound name))
+let find name = if name == "ada" then 36 else Fail.fail (NotFound name)
 
 main : Unit ->{} Unit
 let main () =

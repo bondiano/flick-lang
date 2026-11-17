@@ -8,12 +8,7 @@ type error Denied = Denied String
 
 find : Float ->{; NotFound, Denied} String
 let find id =
-  if id == 1 then
-    "one"
-  else if id == 2 then
-    from_result (Err (NotFound id))
-  else
-    from_result (Err (Denied "no"))
+  if id == 1 then "one" else if id == 2 then Fail.fail (NotFound id) else Fail.fail (Denied "no")
 
 lookup : Float ->{; Denied} String
 let lookup id =

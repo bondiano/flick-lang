@@ -54,7 +54,7 @@ let deferreds () =
   let shared : Deferred.Deferred {Boom} Float = Deferred.make ()
   let _ = Deferred.complete_with counted shared
   Platform.stdout_line ("complete_with: " ++ outcome shared ++ ", " ++ outcome shared)
-  let exits = parallel_exits [task { 6 }, task { from_result (Err (Boom 7)) }]
+  let exits = parallel_exits [task { 6 }, task { Fail.fail (Boom 7) }]
   List.each_effect
     (fun exit -> Platform.stdout_line ("done: " ++ completed (Deferred.done exit)))
     exits

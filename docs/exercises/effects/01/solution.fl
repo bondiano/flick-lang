@@ -6,7 +6,7 @@ parse_age : String ->{; Invalid} Int
 let parse_age text =
   match Int.parse text with
   | Some n -> n
-  | None -> from_result (Err (Invalid text))
+  | None -> Fail.fail (Invalid text)
 
 sum_ages : String ->{; Invalid} Int
 let sum_ages text =

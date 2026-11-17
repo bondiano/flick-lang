@@ -13,10 +13,10 @@ type alias Held = {Log; ...OnlyErrors}
 type alias Paused = {Suspends}
 
 boom : Unit ->{; Boom} Int
-let boom () = from_result (Err Boom)
+let boom () = Fail.fail Boom
 
 other : Unit ->{; Other} Int
-let other () = from_result (Err Other)
+let other () = Fail.fail Other
 
 wait : Unit ->{Suspends} Unit
 let wait () = App.Errors.wait ()

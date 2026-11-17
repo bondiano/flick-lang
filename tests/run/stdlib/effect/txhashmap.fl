@@ -114,7 +114,7 @@ let main () =
       Tx.atomically
         (task {
           TxHashMap.clear scores
-          from_result (Err Stop)
+          Fail.fail Stop
         })
     with
     | Stop -> Tx.atomically (task { TxHashMap.size scores })

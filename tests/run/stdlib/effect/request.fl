@@ -13,7 +13,7 @@ type error NotFound = NotFound Float
 type alias UserEntry = Entry Query {NotFound} String
 
 lookup : Float ->{; NotFound} String
-let lookup id = if id < 10 then "user" ++ show id else from_result (Err (NotFound id))
+let lookup id = if id < 10 then "user" ++ show id else Fail.fail (NotFound id)
 
 id_of : UserEntry -> Float
 let id_of entry =

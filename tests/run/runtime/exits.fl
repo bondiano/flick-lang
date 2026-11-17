@@ -25,7 +25,7 @@ let quiet _ = ()
 
 main : Unit ->{Async; AppError} Unit
 let main () =
-  let exits = parallel_exits [task { 1 }, task { from_result (Err (Boom 2)) }]
+  let exits = parallel_exits [task { 1 }, task { Fail.fail (Boom 2) }]
   say (show (List.map ended exits))
   say (show (List.length (List.filter_map Exit.failure exits), List.filter_map Exit.value exits))
   let made : List (Exit {Boom} Float) = [
@@ -43,7 +43,7 @@ let main () =
   | Err _ -> say "no defect"
   let awaited = scope owner {
     let ok = Fiber.spawn owner quiet (task { 5 })
-    let bad = Fiber.spawn owner quiet (task { from_result (Err (Boom 6)) })
+    let bad = Fiber.spawn owner quiet (task { Fail.fail (Boom 6) })
     let slow =
       Fiber.spawn
         owner

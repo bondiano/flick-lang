@@ -64,13 +64,13 @@ let wider name = merged name
 
 // a set of errors stands in either slot
 errors_after : Int ->{; ...UserErrors, Boom} Int
-let errors_after n = if n > 0 then from_result (Err InvalidEmail) else from_result (Err Boom)
+let errors_after n = if n > 0 then Fail.fail InvalidEmail else Fail.fail Boom
 
 errors_before : Int ->{...UserErrors; Boom} Int
 let errors_before n = errors_after n
 
 only_errors : Int ->{...OnlyErrors} Int
-let only_errors _ = from_result (Err Boom)
+let only_errors _ = Fail.fail Boom
 
 // a set can be taken apart where it is used
 quiet : String ->{...Orders, -Log; -InvalidEmail, -OrderNotFound} String
@@ -83,7 +83,7 @@ no_reads : Int ->{...NoReads} Unit
 let no_reads _ = Billing.charge 0
 
 public : Int ->{; ...Public} Int
-let public _ = from_result (Err OrderNotFound)
+let public _ = Fail.fail OrderNotFound
 
 // the arguments of a set are its own
 in_scope : String ->{...Db s} Unit

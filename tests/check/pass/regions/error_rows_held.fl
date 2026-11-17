@@ -27,7 +27,7 @@ let keep x = fun () -> ignore x
 
 hide : File s ->{} (Unit -> Unit)
 let hide file =
-  try from_result (Err (Wrapped file)) with
+  try Fail.fail (Wrapped file) with
   | err -> keep err
 
 // the closure `hide` returns holds the file and runs nothing of it
@@ -42,14 +42,14 @@ let leak path = scope {
 leak_local : File s ->{} { run : Unit -> Unit }
 let leak_local file =
   let k = { keep = fun y -> fun () -> ignore (Exit.fail y) }
-  try from_result (Err (Wrapped file)) with
+  try Fail.fail (Wrapped file) with
   | err -> { run = k.keep err }
 
 // a local generalized over the row its stage holds
 leak_generic : File s ->{} { run : Unit -> Unit }
 let leak_generic file =
   let k = { keep = keep }
-  try from_result (Err (Wrapped file)) with
+  try Fail.fail (Wrapped file) with
   | err -> { run = k.keep err }
 
 // the errors `err` stands for are `e` and a row not known yet, with no error

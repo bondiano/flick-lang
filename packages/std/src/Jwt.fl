@@ -64,7 +64,7 @@ let segment text =
     (Option.bind Bytes.to_string (Bytes.from_base64url text))
 
 refuse : Problem ->{; JwtError} a
-let refuse problem = from_result (Err (JwtError problem))
+let refuse problem = Fail.fail (JwtError problem)
 
 /// The claims of a token signed with the secret: its header names `HS256`,
 /// its signature matches (compared in constant time), and its `exp`, when it

@@ -46,7 +46,7 @@ let synchronized () =
   let n = SynchronizedRef.update_some_and_get_effect (less 1) ref
   let failed =
     try
-      SynchronizedRef.update_effect (fun n -> from_result (Err (Refused n))) ref
+      SynchronizedRef.update_effect (fun n -> Fail.fail (Refused n)) ref
       "updated"
     with
     | Refused n -> "refused at " ++ show n

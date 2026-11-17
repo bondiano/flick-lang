@@ -41,7 +41,7 @@ let main () = provide File.node {
       say (reading "success" (fun text -> text))
       say
         (
-          try reading "error" (fun _ -> from_result (Err (Oops "body failed"))) with
+          try reading "error" (fun _ -> Fail.fail (Oops "body failed")) with
           | Oops text -> text
         )
       let timed =

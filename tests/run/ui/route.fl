@@ -59,7 +59,7 @@ let profile =
       | Home -> "home"
       | User 404 ->
         let _ = name 404
-        from_result (Err NotFound)
+        Fail.fail NotFound
       | User id -> name id
     }))
 

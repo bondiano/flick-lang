@@ -53,13 +53,13 @@ found : String ->{...InSession; NotFound} Articles.Row
 let found slug =
   match Articles.find (Auth.reader ()) slug with
   | Some row -> row
-  | None -> from_result (Err (NotFound (Problem.problem "article" "not found")))
+  | None -> Fail.fail (NotFound (Problem.problem "article" "not found"))
 
 /// 403 unless the signed-in user is `author`.
 own : String -> BigInt ->{Session; Forbidden} Unit
 let own what author =
   if (Auth.signed_in ()).account.id != author then
-    from_result (Err (Forbidden (Problem.problem what "forbidden")))
+    Fail.fail (Forbidden (Problem.problem what "forbidden"))
 
 /// A page of the articles `filter` keeps, and how many it keeps in all.
 listed : Articles.Filter -> Option Float -> Option Float ->{...InSession} ArticlesBody
@@ -169,7 +169,7 @@ let delete_comment request =
   | Some c ->
     own "comment" c.author_id
     Comments.delete c.id
-  | None -> from_result (Err missing)
+  | None -> Fail.fail missing
 
 /// The tags in use.
 tags : Request Unit Unit Unit ->{Async, Database | r} TagsBody

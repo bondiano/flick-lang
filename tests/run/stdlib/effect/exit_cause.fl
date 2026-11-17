@@ -218,8 +218,7 @@ let causes () =
 frames : Unit ->{} Unit
 let frames () =
   let traced : Exit {Boom} Unit =
-    Effect.exit
-      (task { Tracer.with_span "outer" span_options (task { from_result (Err (Boom 9)) }) })
+    Effect.exit (task { Tracer.with_span "outer" span_options (task { Fail.fail (Boom 9) }) })
   let frame = Option.bind Cause.stack_trace (Exit.failure traced)
   match frame with
   | Some f ->
@@ -250,9 +249,9 @@ let handled t =
 errors : Unit ->{Async} Unit
 let errors () =
   let raised = [
-    task { from_result (Err (Cause.NoSuchElementError "empty")) },
-    task { from_result (Err (Cause.IllegalArgumentError "negative")) },
-    task { from_result (Err (Cause.UnknownError "foreign")) },
+    task { Fail.fail (Cause.NoSuchElementError "empty") },
+    task { Fail.fail (Cause.IllegalArgumentError "negative") },
+    task { Fail.fail (Cause.UnknownError "foreign") },
     task { timeout 1 (task { Effect.never () }) },
   ]
   Platform.stdout_line ("errors: " ++ show (List.map_effect handled raised))

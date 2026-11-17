@@ -54,12 +54,12 @@ let unknown c =
 // inferred; a `Unit` holds nothing, whatever its bound says (found by the model properties)
 dropped : Unit ->{; Oops} Unit
 let dropped () =
-  ({ a = from_result (Err (Oops 0)); b = from_result (Err (Oops 1)) }).a
+  ({ a = Fail.fail (Oops 0); b = Fail.fail (Oops 1) }).a
   ()
 
 matched : Unit ->{; Oops} Int
 let matched () =
-  match ({ a = from_result (Err (Oops 0)); b = from_result (Err (Oops 1)) }).a with
+  match ({ a = Fail.fail (Oops 0); b = Fail.fail (Oops 1) }).a with
   | () -> 0
 
 type error Bad = Bad String
@@ -71,7 +71,7 @@ let in_cell () =
   let cell =
     Ref.make
       (
-        try { a = from_result (Err (Oops 1)); b = await (from_result (Err (Bad ""))) } with
-        | Oops _ -> { a = from_result (Err (Bad "")); b = () }
+        try { a = Fail.fail (Oops 1); b = await (Fail.fail (Bad "")) } with
+        | Oops _ -> { a = Fail.fail (Bad ""); b = () }
       )
   0

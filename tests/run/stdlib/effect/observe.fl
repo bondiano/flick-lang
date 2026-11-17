@@ -206,7 +206,7 @@ let tracked t =
 metrics : Unit ->{} Unit
 let metrics () =
   let ok : Eff none {Boom} Float = task { 2 }
-  let bad : Eff none {Boom} Float = task { from_result (Err (Boom 3)) }
+  let bad : Eff none {Boom} Float = task { Fail.fail (Boom 3) }
   let broken : Eff none {Boom} Float = task { Effect.die "broken" }
   List.each_effect tracked [ok, bad, broken]
   Platform.stdout_line

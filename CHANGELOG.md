@@ -6,6 +6,12 @@ break programs.
 
 ## Unreleased
 
+- **Raise with `Fail.fail`:** `from_result (Err e)` is `FLICK-T075`, a
+  warning whose safe fix writes `Fail.fail e`: the same type and meaning,
+  without building a `Result` to fail with. `flick check --fix --only T075`
+  rewrites a project; the examples, the standard library and the docs now
+  raise this way. `FLICK-T034` also recognizes a `match` that fails with
+  `Fail.fail e` as `r?`.
 - **`let mut` captured by a closure or a `task`:** `FLICK-G005` says what
   to do for a read and for an assignment, and an editor offers "keep `x` in
   a `Ref`", which rewrites the declaration, its reads and its assignments

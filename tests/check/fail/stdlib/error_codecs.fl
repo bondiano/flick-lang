@@ -10,7 +10,7 @@ type error Conflict = Conflict { id : Float }
   deriving Schema
 
 lookup : Float ->{; NotFound, Conflict} Float
-let lookup id = if id < 0 then from_result (Err (Conflict { id = id })) else id
+let lookup id = if id < 0 then Fail.fail (Conflict { id = id }) else id
 
 http : Unit ->{Async; HttpApi.ServeError} Unit
 let http () =

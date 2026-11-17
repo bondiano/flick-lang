@@ -43,7 +43,7 @@ let create request =
   }
 
 boom : ServerRequest ->{; Boom} ServerResponse
-let boom _ = from_result (Err Boom)
+let boom _ = Fail.fail Boom
 
 /// The handler of the server's routes.
 app :
@@ -84,7 +84,7 @@ fails_serving :
   Unit
 let fails_serving url = scope s {
   Ref.set url (base (Http.Server.serve options (app ())))
-  from_result (Err Boom)
+  Fail.fail Boom
 }
 
 failing :

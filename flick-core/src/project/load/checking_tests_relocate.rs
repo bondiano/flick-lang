@@ -43,7 +43,7 @@ module Child exposing (Shape(..), Pair(..), Named(..), Titled(..), Ask, Log, Mis
   probe : Unit ->{Ask; Missing} Float
   let probe () =
     let asked = Ask.ask ()
-    if asked > 9 then from_result (Err (Missing \"too much\")) else asked + area unit
+    if asked > 9 then Fail.fail (Missing \"too much\") else asked + area unit
 
 label : Child.Named a => a -> String
 let label value = Child.name_of value ++ Child.twice value

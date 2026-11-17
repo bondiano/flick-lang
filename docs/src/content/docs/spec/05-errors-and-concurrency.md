@@ -1,6 +1,6 @@
 ---
 title: "Errors, services, resources and concurrency"
-source_hash: 4e8c323ce2bffd07
+source_hash: c6aefcb4ad4059a4
 ---
 
 ## Expected errors
@@ -35,7 +35,7 @@ type error RetryExhausted e = RetryExhausted e Float
 retry : Float -> Eff r e a ->{r; RetryExhausted (Errors e)} a
 # let retry times body =
 #   try await body with
-#   | cause -> from_result (Err (RetryExhausted cause times))
+#   | cause -> Fail.fail (RetryExhausted cause times)
 ```
 
 Removing an error from a row is allowed only when the selected typed recovery fully covers its nominal variant. A guard or a partial pattern on the payload leaves the error possible. The requirements/errors of the handler are added to the result. Row subtraction applies to the selected recoverable error; it does not prove the absence of such a tag among secondary raw failures.
@@ -96,7 +96,7 @@ The block `provide layer { ... }` establishes the environment before the body ru
 #   url : Unit ->{} String
 # type error ConnectError = ConnectError
 # users_live : Layer {Config} {ConnectError} {Users}
-# let users_live = Layer.effect Users (task { from_result (Err ConnectError) })
+# let users_live = Layer.effect Users (task { Fail.fail ConnectError })
 # load_name : UserId ->{Users, Log; NotFound} String
 # let load_name id = (Users.get id).name
 #

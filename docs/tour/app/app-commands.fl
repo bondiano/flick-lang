@@ -41,7 +41,7 @@ pages_of : String ->{; BadCommand} Int
 let pages_of text =
   match Int.parse text with
   | Some n -> n
-  | None -> from_result (Err (BadCommand "not a number: \{text}"))
+  | None -> Fail.fail (BadCommand "not a number: \{text}")
 
 run : String ->{Shelf; BadCommand} Unit
 let run command =
@@ -49,7 +49,7 @@ let run command =
   | ["add", title, pages] -> Shelf.add title (pages_of pages)
   | ["finish", title] -> Shelf.finish title
   | ["report"] -> report ()
-  | _ -> from_result (Err (BadCommand "unknown command: \{command}"))
+  | _ -> Fail.fail (BadCommand "unknown command: \{command}")
 
 main : Unit ->{} Unit
 let main () =

@@ -25,7 +25,7 @@ session : Option String -> Session.Impl
 let session name = { user = fun () -> name }
 
 refuse : String ->{; Unauthorized} a
-let refuse reason = from_result (Err (Unauthorized { errors = { token = [reason] } }))
+let refuse reason = Fail.fail (Unauthorized { errors = { token = [reason] } })
 
 /// The user a `Token` credential names.
 known : String ->{; Unauthorized} Session.Impl

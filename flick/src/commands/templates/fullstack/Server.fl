@@ -19,8 +19,8 @@ let check headers =
       let name = String.slice (String.length prefix) (String.length cookie) cookie
       { user = fun () -> name }
     else
-      from_result (Err Server.Unauthorized)
-  | None -> from_result (Err Server.Unauthorized)
+      Fail.fail Server.Unauthorized
+  | None -> Fail.fail Server.Unauthorized
 
 main : Unit ->{Async; AppError} Unit
 let main () =

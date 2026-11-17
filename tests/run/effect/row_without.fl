@@ -29,12 +29,7 @@ stamp : Unit -> Eff {Clock, Log} {Missing, Late} Int
 let stamp () = task {
   Log.line "reading the clock"
   let at = Clock.now ()
-  if at > 2 then
-    from_result (Err Late)
-  else if at > 1 then
-    from_result (Err (Missing "gone"))
-  else
-    at
+  if at > 2 then Fail.fail Late else if at > 1 then Fail.fail (Missing "gone") else at
 }
 
 /// `Clock` and `Late` are what is left of the rows of `stamp`.

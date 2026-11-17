@@ -116,7 +116,7 @@ let laws = [
             source : Eff none {Offline} Float
             let source = task {
               Ref.update trace (fun xs -> xs ++ ["source"])
-              if branch < 0 then from_result (Err (Offline branch)) else n
+              if branch < 0 then Fail.fail (Offline branch) else n
             }
             f : Float -> Float
             let f x = a * x + b
@@ -155,17 +155,17 @@ let laws = [
             u : Eff none {Offline} (Float -> Float)
             let u = task {
               Ref.update trace (fun xs -> xs ++ ["u"])
-              if branch == 0 - 5 then from_result (Err (Offline 1)) else fun x -> a * x + b
+              if branch == 0 - 5 then Fail.fail (Offline 1) else fun x -> a * x + b
             }
             v : Eff none {Offline} (Float -> Float)
             let v = task {
               Ref.update trace (fun xs -> xs ++ ["v"])
-              if branch == 0 then from_result (Err (Offline 2)) else fun x -> b * x - a
+              if branch == 0 then Fail.fail (Offline 2) else fun x -> b * x - a
             }
             w : Eff none {Offline} Float
             let w = task {
               Ref.update trace (fun xs -> xs ++ ["w"])
-              if branch == 5 then from_result (Err (Offline 3)) else n
+              if branch == 5 then Fail.fail (Offline 3) else n
             }
             f : Float -> Float
             let f x = a * x + b
@@ -234,17 +234,17 @@ let laws = [
             source : Eff none {Offline} Float
             let source = task {
               Ref.update trace (fun xs -> xs ++ ["source"])
-              if branch < 0 then from_result (Err (Offline branch)) else n
+              if branch < 0 then Fail.fail (Offline branch) else n
             }
             f : Float -> Eff none {Offline} Float
             let f x = task {
               Ref.update trace (fun xs -> xs ++ ["f \{show x}"])
-              if (x + branch) % 3 == 0 then from_result (Err (Offline x)) else a * x + b
+              if (x + branch) % 3 == 0 then Fail.fail (Offline x) else a * x + b
             }
             g : Float -> Eff none {Offline} Float
             let g x = task {
               Ref.update trace (fun xs -> xs ++ ["g \{show x}"])
-              if (x - branch) % 4 == 0 then from_result (Err (Offline x)) else b * x - a
+              if (x - branch) % 4 == 0 then Fail.fail (Offline x) else b * x - a
             }
             let left_identity = flat_map f (pure n)
             let right_identity = flat_map pure source
@@ -282,12 +282,12 @@ let laws = [
             source : Eff none {Offline} Float
             let source = task {
               Ref.update trace (fun xs -> xs ++ ["source"])
-              if branch < 0 then from_result (Err (Offline branch)) else n
+              if branch < 0 then Fail.fail (Offline branch) else n
             }
             f : Float -> Eff none {Offline} Float
             let f x = task {
               Ref.update trace (fun xs -> xs ++ ["f \{show x}"])
-              if x + branch == 0 then from_result (Err (Offline x)) else a * x + b
+              if x + branch == 0 then Fail.fail (Offline x) else a * x + b
             }
             let bound = flat_map f source
             maybe_left : MaybeT (Eff none {Offline}) Float
@@ -398,7 +398,7 @@ let behavior = [
       offline : Eff none {Offline} Float
       let offline = task {
         Ref.update trace (fun xs -> xs ++ ["offline"])
-        from_result (Err (Offline 42))
+        Fail.fail (Offline 42)
       }
       after : Eff none {Offline} Float
       let after = task {

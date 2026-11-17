@@ -32,7 +32,7 @@ let caches () =
   let lookup key =
     Ref.update lookups (fun n -> n + 1)
     if key.n < 0 then
-      from_result (Err (Missing key.name))
+      Fail.fail (Missing key.name)
     else
       Int.to_float (String.length key.name) + key.n
   let cache : Cache.Cache Key {Missing} Float =
@@ -216,7 +216,7 @@ let resources () =
         (task {
           Ref.update version (fun n -> n + 1)
           if Ref.get version == 3 then
-            from_result (Err (Missing "third"))
+            Fail.fail (Missing "third")
           else
             acquire ("version " ++ show (Ref.get version))
         })

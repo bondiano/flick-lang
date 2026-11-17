@@ -37,7 +37,7 @@ let check headers =
   match Http.Headers.get "cookie" headers with
   | Some "user=ada" -> session "ada"
   | Some "user=bob" -> session "bob"
-  | _ -> from_result (Err Server.Unauthorized)
+  | _ -> Fail.fail Server.Unauthorized
 
 /// A page that greets who asks.
 page : ServerRequest ->{Async, Server.Server} ServerResponse

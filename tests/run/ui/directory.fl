@@ -61,7 +61,7 @@ let people = [{ id = 1; name = "Ada" }, { id = 2; name = "Mallory" }, { id = 3; 
 save : Atom.Writable (Option User) -> String -> User ->{Async, Atom.Write; Refused} Unit
 let save model log user =
   if user.name == "Mallory" then
-    from_result (Err (Refused user.name))
+    Fail.fail (Refused user.name)
   else
     let line = user.name ++ " saved to " ++ log
     if user.name == "Carol" then write_on_release line else Platform.stdout_line line

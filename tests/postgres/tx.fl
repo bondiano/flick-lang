@@ -132,7 +132,7 @@ let run () =
           Database.transaction
             (task {
               put b 2n
-              from_result (Err Abandoned)
+              Fail.fail Abandoned
             })
         with
         | Abandoned -> "abandoned"
@@ -149,7 +149,7 @@ let run () =
           Database.transaction
             (task {
               put c 4n
-              from_result (Err Abandoned)
+              Fail.fail Abandoned
             })
         with
         | Abandoned -> "inner undone"

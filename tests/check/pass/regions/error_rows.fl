@@ -17,7 +17,7 @@ let keep_field x = { run = fun () -> ignore x }
 // the closure `keep` returns holds `s`, which the stage shows
 hide : File s ->{} (Unit -> Unit)
 let hide file =
-  try from_result (Err (Wrapped file)) with
+  try Fail.fail (Wrapped file) with
   | err -> keep err
 
 hide_shown : File s ->{} Unit -> Unit
@@ -25,7 +25,7 @@ let hide_shown file = hide file
 
 hide_field : File s ->{} { run : (Unit -> Unit)^{s} }
 let hide_field file =
-  try from_result (Err (Wrapped file)) with
+  try Fail.fail (Wrapped file) with
   | err -> keep_field err
 
 // a local without a signature over a row not known yet, and one generalized
@@ -33,17 +33,17 @@ let hide_field file =
 show_local : File s ->{} { run : (Unit -> Unit)^{s} }
 let show_local file =
   let k = { keep = fun y -> fun () -> ignore (Exit.fail y) }
-  try from_result (Err (Wrapped file)) with
+  try Fail.fail (Wrapped file) with
   | err -> { run = k.keep err }
 
 show_generic : File s ->{} { run : (Unit -> Unit)^{s}; other : Unit -> Unit }
 let show_generic file =
   let k = { keep = keep }
   let run =
-    try from_result (Err (Wrapped file)) with
+    try Fail.fail (Wrapped file) with
     | err -> { run = k.keep err }
   let other =
-    try from_result (Err (Wrapped 1)) with
+    try Fail.fail (Wrapped 1) with
     | err -> { run = k.keep err }
   { run = run.run; other = other.run }
 

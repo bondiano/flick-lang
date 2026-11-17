@@ -143,7 +143,7 @@ let load_view_direct id =
   let user =
     match find_name id with
     | Some name -> { id = id; name = name }
-    | None -> from_result (Err (NotFound id))
+    | None -> Fail.fail (NotFound id)
   let view = to_view user
   console_log "[log] Loaded \{view.title}"
   view
@@ -343,7 +343,7 @@ let users_live =
     get = fun id ->
       match find_name id with
       | Some name -> { id = id; name = name }
-      | None -> from_result (Err (NotFound id));
+      | None -> Fail.fail (NotFound id);
   }
 
 log_live : Layer none none {Log}
@@ -500,7 +500,7 @@ user-facing response:
 #     get = fun id ->
 #       match find_name id with
 #       | Some name -> { id = id; name = name }
-#       | None -> from_result (Err (NotFound id));
+#       | None -> Fail.fail (NotFound id);
 #   }
 #
 # log_live : Layer none none {Log}
@@ -591,7 +591,7 @@ let users_test =
     get = fun id ->
       match List.find (fun user -> eq user.id id) [ada, grace] with
       | Some user -> user
-      | None -> from_result (Err (NotFound id));
+      | None -> Fail.fail (NotFound id);
   }
 
 log_test : Ref (List String) -> Layer none none {Log}
@@ -667,7 +667,7 @@ The example then exports these three tests:
 #     get = fun id ->
 #       match List.find (fun user -> eq user.id id) [ada, grace] with
 #       | Some user -> user
-#       | None -> from_result (Err (NotFound id));
+#       | None -> Fail.fail (NotFound id);
 #   }
 #
 # log_test : Ref (List String) -> Layer none none {Log}

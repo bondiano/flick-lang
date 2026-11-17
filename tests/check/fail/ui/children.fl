@@ -49,8 +49,8 @@ let refusing n = ui {
   button
     {
       disabled = false;
-      on_click = Ui.Event.exhaust (fun _ -> task { from_result (Err (Refused "no")) });
-      //~ FLICK-E002 @52:52-52:84 does not allow error `Refused`
+      on_click = Ui.Event.exhaust (fun _ -> task { Fail.fail (Refused "no") });
+      //~ FLICK-E002 @52:52-52:76 does not allow error `Refused`
     }
 }
 

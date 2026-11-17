@@ -47,7 +47,7 @@ let main () =
       let _ = Deferred.complete_with (task { "ada" }) name_gate
       settle ()
       Platform.stdout_line (text ())
-      let _ = Deferred.complete_with (task { from_result (Err Offline) }) offline_gate
+      let _ = Deferred.complete_with (task { Fail.fail Offline }) offline_gate
       settle ()
       Platform.stdout_line (text ())
     }

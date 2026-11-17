@@ -59,7 +59,7 @@ below_five : Float ->{} Bool
 let below_five n = n < 5
 
 small : Float ->{; TooBig} Bool
-let small n = if n > 3 then from_result (Err (TooBig n)) else true
+let small n = if n > 3 then Fail.fail (TooBig n) else true
 
 run : Unit ->{; Arbitrary.SampleError} Unit
 let run () =

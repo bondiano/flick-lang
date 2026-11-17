@@ -4,4 +4,4 @@ module App.A exposing (NotFound(..), find)
 type error NotFound = NotFound String
 
 find : String ->{; NotFound} Int
-let find key = from_result (Err (NotFound key))
+let find key = Fail.fail (NotFound key)

@@ -45,7 +45,7 @@ let server =
   )
 
 even : Int ->{; Config.ConfigError} Int
-let even n = if n % 2 == 0 then n else from_result (Err (Config.ConfigError "odd"))
+let even n = if n % 2 == 0 then n else Fail.fail (Config.ConfigError "odd")
 
 /// A provider of our own: `NAME` is a value, `LIST` an array of two.
 own : ConfigProvider.ConfigProvider
@@ -60,7 +60,7 @@ let own =
       Some (ConfigProvider.make_value (show (i * 10)))
     | [ConfigProvider.Key "REC"] -> Some (ConfigProvider.make_record ["x"] None)
     | [ConfigProvider.Key "REC", ConfigProvider.Key "x"] -> Some (ConfigProvider.ValueNode "1")
-    | [ConfigProvider.Key "BROKEN"] -> from_result (Err (ConfigProvider.SourceError "unreachable"))
+    | [ConfigProvider.Key "BROKEN"] -> Fail.fail (ConfigProvider.SourceError "unreachable")
     | _ -> None
   )
 

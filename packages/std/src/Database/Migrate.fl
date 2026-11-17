@@ -72,8 +72,7 @@ let apply step =
 run : List Migration ->{Async, Database; MigrationError, EncodeError, DbError, DecodeError} List Int
 let run steps =
   match out_of_order steps with
-  | Some step ->
-    from_result (Err (MigrationError ("step " ++ show step.version ++ " is out of order")))
+  | Some step -> Fail.fail (MigrationError ("step " ++ show step.version ++ " is out of order"))
   | None ->
     Database.transaction
       (task {

@@ -22,7 +22,7 @@ let late_a n millis =
   Effect.uninterruptible
     (task {
       nap millis
-      from_result (Err (A n))
+      Fail.fail (A n)
     })
 
 late_b : String -> Float ->{Async; B} Float
@@ -30,7 +30,7 @@ let late_b s millis =
   Effect.uninterruptible
     (task {
       nap millis
-      from_result (Err (B s))
+      Fail.fail (B s)
     })
 
 /// Fails with `A n` as its mask ends, telling `entered` once masked: the
@@ -42,7 +42,7 @@ let stopped_a n entered =
       let _ = Deferred.succeed () entered
       // a masked fiber cannot see the request come in: only time keeps the mask on until it does
       nap 250
-      from_result (Err (A n))
+      Fail.fail (A n)
     })
 
 /// `parallel` of a branch failing with `A first` that stops, once masked,

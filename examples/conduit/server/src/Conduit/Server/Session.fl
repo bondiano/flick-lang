@@ -68,7 +68,7 @@ let issue account =
 
 /// The 401 of a token, with why.
 refuse : String ->{; Unauthorized} a
-let refuse reason = from_result (Err (Unauthorized (Problem.problem "token" reason)))
+let refuse reason = Fail.fail (Unauthorized (Problem.problem "token" reason))
 
 /// The token of a `Token <jwt>` header.
 token_of : String -> Option String

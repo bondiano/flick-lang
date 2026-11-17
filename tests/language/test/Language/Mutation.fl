@@ -73,7 +73,7 @@ in_arm : String ->{} String
 let in_arm key =
   let mut seen = "nothing"
   let n =
-    try from_result (Err (Missing key)) with
+    try Fail.fail (Missing key) with
     | Missing k ->
       seen = k
       -1

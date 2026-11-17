@@ -21,7 +21,7 @@ let rec ready id tries =
   if ChildProcess.exit_code (docker probe) == 0 then
     ()
   else if tries <= 0 then
-    from_result (Err (NotReady "the database in \{id} did not start"))
+    Fail.fail (NotReady "the database in \{id} did not start")
   else
     match Duration.millis 300 with
     | Ok pause ->
