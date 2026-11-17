@@ -1,22 +1,25 @@
 /// The process the program runs in: its arguments, environment and
-/// standard streams.
+/// standard streams, through the `Host` services.
 module Platform exposing (stdout_line, stderr_line, stdout_write, args, env)
 
-stdout_line : String ->{} Unit
-foreign stdout_line from "flick:rt" "stdoutLine"
+import Host
 
-stderr_line : String ->{} Unit
-foreign stderr_line from "flick:rt" "stderrLine"
+/// Writes `text` and a line break to stdout.
+stdout_line : String ->{Host.Console} Unit
+let stdout_line text = Host.Console.stdout_line text
+
+/// Writes `text` and a line break to stderr.
+stderr_line : String ->{Host.Console} Unit
+let stderr_line text = Host.Console.stderr_line text
 
 /// Writes `text` to stdout without a line break.
-stdout_write : String ->{} Unit
-foreign stdout_write from "flick:rt" "stdoutWrite"
+stdout_write : String ->{Host.Console} Unit
+let stdout_write text = Host.Console.stdout_write text
 
 /// The arguments after `--` of `flick run`, or after the script name.
-args : Unit ->{} List String
-foreign args from "flick:rt" "platformArgs"
-  arity 0
+args : Unit ->{Host.Arguments} List String
+let args () = Host.Arguments.args ()
 
 /// The environment variable `name`, if set.
-env : String ->{} Option String
-foreign env from "flick:rt" "platformEnv"
+env : String ->{Host.Environment} Option String
+let env name = Host.Environment.env name

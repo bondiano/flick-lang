@@ -12,6 +12,7 @@ import { pretty } from "./entry.ts";
 import { type Ctx, type Fiber, type Run, Under, asExit, awaitFiber, currentCtx, extend, fork } from "./fiber.ts";
 import { type Layer, MemoMap, buildWith, servicesOf, withServices } from "./layer.ts";
 import { Owner, OwnedExits, close, inside, ownedExits } from "./owner.ts";
+import { hostLiveServices } from "./runner/host.ts";
 
 export {
   genBool,
@@ -146,7 +147,8 @@ function* runOne({ name, test, suites }: Named, seed: number, runs: Map<Suite, S
 /** The tests on the kernel: a fiber running them `jobs` at a time, whose interruption releases the suites. */
 const engine: Engine<Task, Layer> = (selected, seed, jobs, hooks) => {
   const runs = suiteRuns(selected);
-  const ctx = currentCtx();
+  // the tests and their suites run with the live host services, as a `main` of `Runner.Node`
+  const ctx = hostLiveServices.reduce((c, [key, impl]) => extend(c, key, impl), currentCtx());
   const results: Array<TestResult> = [];
   const tasks = selected.map((t, index) => () => {
     hooks?.started(index, t.name);

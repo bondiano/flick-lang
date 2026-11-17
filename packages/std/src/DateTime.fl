@@ -4,6 +4,7 @@
 module DateTime exposing (..)
 
 import Duration
+import Host
 import Layer
 
 /// An instant, in UTC or in a time zone.
@@ -96,13 +97,17 @@ foreign pure make_zoned from "flick:DateTime" "flickMakeZoned"
 make_zoned_from_string : String -> Result DateTimeError DateTime
 foreign pure make_zoned_from_string from "flick:DateTime" "flickMakeZonedFromString"
 
-/// The current instant, in UTC, from the fiber's clock.
-now : Unit ->{} DateTime
-foreign effect now from "flick:DateTime" "flickNow"
-  arity 0
+/// The UTC date-time `millis` milliseconds after 1970-01-01. Unchecked:
+/// `millis` must be a time a date-time can hold, as a clock reads.
+unsafe_from_epoch_millis : Float -> DateTime
+foreign pure unsafe_from_epoch_millis from "flick:DateTime" "flickUnsafeFromEpochMillis"
+
+/// The current instant, in UTC, from `Host.Clock`.
+now : Unit ->{Host.Clock} DateTime
+let now () = unsafe_from_epoch_millis (Host.Clock.current_time_millis ())
 
 /// The current instant in the current time zone.
-now_in_current_zone : Unit ->{CurrentTimeZone} DateTime
+now_in_current_zone : Unit ->{CurrentTimeZone, Host.Clock} DateTime
 let now_in_current_zone () = set_zone_current (now ())
 
 /// Whether the date-time is UTC.
@@ -305,12 +310,12 @@ foreign pure is_greater_than_or_equal_to from "flick:DateTime" "isGreaterThanOrE
   arity 1
 
 /// Whether the date-time is after the clock's now.
-is_future : DateTime ->{} Bool
-foreign effect is_future from "flick:DateTime" "isFuture"
+is_future : DateTime ->{Host.Clock} Bool
+let is_future date = is_greater_than (now ()) date
 
 /// Whether the date-time is before the clock's now.
-is_past : DateTime ->{} Bool
-foreign effect is_past from "flick:DateTime" "isPast"
+is_past : DateTime ->{Host.Clock} Bool
+let is_past date = is_less_than (now ()) date
 
 /// Formats in the date-time's zone (UTC for a UTC one).
 format : FormatOptions -> DateTime -> Result DateTimeError String

@@ -1,12 +1,6 @@
 # Random, DateTime and Cron.
 [flick:Random]
 flickNext *RandomNext
-flickNextBoolean *RandomNextBoolean
-flickNextInt *RandomNextInt
-nextBetween *RandomNextBetween
-flickNextIntBetween *RandomNextIntBetween
-shuffle *RandomShuffle
-choice *RandomChoice
 withSeed *RandomWithSeed
 
 [flick:Cron]

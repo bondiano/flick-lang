@@ -1,7 +1,7 @@
 // Effect's `Config` for the bindings of the standard library, and the
 // adapters where a Flick value differs from what Effect takes: a failure
 // to read is the Flick error `Config.ConfigError`.
-import { Config, ConfigProvider, Effect, Option, Schema } from "effect";
+import { Config, ConfigProvider, Context, Effect, Option, Schema } from "effect";
 
 import { tag } from "@flick-lang/runtime/tags";
 
@@ -13,9 +13,24 @@ const CONFIG_ERROR = /*#__PURE__*/ tag("Config.ConfigError.ConfigError");
 const toFlick = (error: unknown): unknown =>
   error instanceof Config.ConfigError ? { _tag: CONFIG_ERROR, _0: error.message } : error;
 
-/** `Config.get`. */
-export const flickGet = <A>(config: Config.Config<A>): Effect.Effect<A, unknown> =>
-  Effect.mapError(config, toFlick);
+/**
+ * `Config.get_with lookup config`: the provider a layer made current, or else
+ * the variables `lookup` reads by the path joined with `_`, an empty one missing.
+ */
+export const flickGetWith = <A>(
+  lookup: (name: string) => Effect.Effect<Option.Option<string>>,
+  config: Config.Config<A>,
+): Effect.Effect<A, unknown> =>
+  Effect.flatMap(Effect.context(), (context) => {
+    const provider = context.mapUnsafe.has(ConfigProvider.ConfigProvider.key)
+      ? Context.get(context, ConfigProvider.ConfigProvider)
+      : ConfigProvider.make((path) =>
+          Effect.map(lookup(path.join("_")), (found) =>
+            Option.isSome(found) && found.value !== "" ? ConfigProvider.makeValue(found.value) : undefined,
+          ),
+        );
+    return Effect.mapError(config.parse(provider), toFlick);
+  });
 
 /** `Config.parse`. */
 export const flickParse = <A>(provider: ConfigProvider.ConfigProvider, config: Config.Config<A>): Effect.Effect<A, unknown> =>

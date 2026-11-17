@@ -243,12 +243,17 @@ func cliStrings(v Value) []string {
 	return out
 }
 
-func cliStdoutLog(text string) { StdoutLine(text) }
+// cliHostLog writes a line as the built-in flags print: through the
+// `Host.Console` of the fiber.
+func cliHostLog(fb *Fiber) func(string) {
+	line := Operation("Host.Console", "stdout_line", 1)
+	return func(text string) { Run(fb, Apply(fb, line, text)) }
+}
 
 // CliRunWith is `Cli.run_with settings command args`.
 func CliRunWith(fb *Fiber, settings, spec, args Value) Value {
 	s := record(settings)
-	env := &cliEnv{version: s.Get("version").(string), log: cliStdoutLog}
+	env := &cliEnv{version: s.Get("version").(string), log: cliHostLog(fb)}
 	for _, b := range List(s.Get("builtIns")) {
 		name := ConstructorName(b.(*Data).Tag)
 		if g, ok := cliBuiltIns[name]; ok {
@@ -294,7 +299,7 @@ func cliTerminal() cliCapabilities {
 
 // CliRunVersion is `Cli.run_version version command args`: every built-in flag.
 func CliRunVersion(fb *Fiber, version, spec, args Value) Value {
-	env := &cliEnv{version: version.(string), builtIns: cliAllBuiltIns, trace: true, log: cliStdoutLog,
+	env := &cliEnv{version: version.(string), builtIns: cliAllBuiltIns, trace: true, log: cliHostLog(fb),
 		format: cliDefaultFormat(cliTerminal().canColor)}
 	if err := cliRun(fb, spec.(*cliSpec), cliStrings(args), env); err != nil {
 		return Fail(cliFlickError(err))

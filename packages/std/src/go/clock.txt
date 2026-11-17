@@ -1,9 +1,5 @@
 # Clock, and the virtual time of tests.
 [flick:Clock]
-clockWith *ClockWith
-flickMillisOf ClockMillisOf
-flickNanosOf ClockNanosOf
-flickMonotonicNanosOf ClockMonotonicNanosOf
 flickCurrentTimeMillis *ClockCurrentTimeMillis
 flickCurrentTimeNanos *ClockCurrentTimeNanos
 flickMonotonicTimeNanos *ClockMonotonicTimeNanos

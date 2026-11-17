@@ -4,6 +4,10 @@
 import { type Duration, Effect, Fiber, Option, type PlatformError, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
+import { mapped } from "@flick-lang/runtime/rt/effects";
+import { processHooks } from "@flick-lang/runtime/rt/runner/host";
+
+import { dataFromEffect, dataToEffect, fromEffect } from "../bridge.ts";
 import { nodeModule } from "../host.ts";
 import { mapError, toFlick } from "./PlatformError.ts";
 
@@ -46,6 +50,12 @@ export const flickInheritOutput = (self: Command): Command =>
 /** `ChildProcess.spawn`, in the scope of the caller. */
 export const flickSpawn = (command: Command) =>
   mapError(Effect.provide(Effect.flatMap(ChildProcessSpawner.ChildProcessSpawner, (s) => s.spawn(command)), services()));
+
+// Flick's own runtime has no spawner: its live `Host.Process` starts commands
+// here, as compiled code crossing into this adapter would
+processHooks.spawn = (command) =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- only `ChildProcess.make` makes a command
+  mapped(fromEffect(flickSpawn(dataToEffect(command) as Command)), (handle) => dataFromEffect(handle));
 
 export const flickPid = (handle: Handle): number => handle.pid;
 

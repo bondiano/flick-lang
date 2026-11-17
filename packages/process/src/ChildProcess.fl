@@ -6,14 +6,18 @@
 module ChildProcess exposing (..)
 
 import Duration
+import Host
 import PlatformError
+import Scope
 import Stream.Core exposing (Stream)
+import Stream.Platform
+import Stream.Run
 
 /// A program to run, with its arguments and how it runs.
-type Command
+type alias Command = Host.Command
 
 /// A running process of region `s`.
-type Process (s : Region)
+type alias Process (s : Region) = Host.Child s
 
 /// A signal by its name, as `"SIGTERM"`.
 type alias Signal = String
@@ -59,9 +63,10 @@ foreign pure set_stdin from "flick:ChildProcess" "flickSetStdin"
 inherit_output : Command -> Command
 foreign pure inherit_output from "flick:ChildProcess" "flickInheritOutput"
 
-/// Starts the command; the scope of region `s` stops it if it still runs.
-spawn : Command ->{Scope s; PlatformError.PlatformError} Process s
-foreign effect spawn from "flick:ChildProcess" "flickSpawn"
+/// Starts the command through `Host.Process`; the scope of region `s` stops
+/// it if it still runs.
+spawn : Command ->{Scope s, Host.Process; PlatformError.PlatformError} Process s
+let spawn command = Host.Process.spawn command
 
 /// The process's ID.
 pid : Process s -> Int
@@ -103,13 +108,18 @@ foreign pure stderr from "flick:ChildProcess" "flickStderr"
   retention call
 
 /// What the command writes to stdout, as text; it runs to its end.
-string : Command ->{Async; PlatformError.PlatformError} String
-foreign effect string from "flick:ChildProcess" "flickString"
+string : Command ->{Async, Host.Process; PlatformError.PlatformError} String
+let string command = scope {
+  Stream.Run.mk_string (Stream.Platform.decode_text (stdout (spawn command)))
+}
 
 /// The lines the command writes to stdout.
-lines : Command ->{Async; PlatformError.PlatformError} List String
-foreign effect lines from "flick:ChildProcess" "flickLines"
+lines : Command ->{Async, Host.Process; PlatformError.PlatformError} List String
+let lines command = scope {
+  let text = Stream.Platform.decode_text (stdout (spawn command))
+  Stream.Run.run_collect (Stream.Platform.split_lines text)
+}
 
 /// Runs the command to its end: its exit code.
-exit_code : Command ->{Async; PlatformError.PlatformError} Int
-foreign effect exit_code from "flick:ChildProcess" "flickExitCode"
+exit_code : Command ->{Async, Host.Process; PlatformError.PlatformError} Int
+let exit_code command = scope { wait (spawn command) }

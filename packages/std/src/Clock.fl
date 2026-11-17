@@ -1,38 +1,17 @@
-/// The fiber's source of time. It is a default service, so reading it needs
-/// no service row; each read is a runtime call.
+/// Reads of the time, through the `Host.Clock` service. The live clock is
+/// the fiber's, which `Test.clock_test` replaces with virtual time.
 module Clock exposing (..)
 
-/// The clock a fiber runs with.
-type Clock
-
-/// Runs `f` with the fiber's clock.
-clock_with : (Clock ->{r; e} a)^c ->{r; e} a
-foreign effect clock_with from "flick:Clock" "clockWith"
-  retention call
-
-/// The clock's milliseconds since 1970-01-01 UTC.
-millis_of : Clock ->{} Float
-foreign effect millis_of from "flick:Clock" "flickMillisOf"
-
-/// The clock's nanoseconds since 1970-01-01 UTC.
-nanos_of : Clock ->{} BigInt
-foreign effect nanos_of from "flick:Clock" "flickNanosOf"
-
-/// The clock's monotonic nanoseconds, for measuring elapsed time.
-monotonic_nanos_of : Clock ->{} BigInt
-foreign effect monotonic_nanos_of from "flick:Clock" "flickMonotonicNanosOf"
+import Host
 
 /// The milliseconds since 1970-01-01 UTC.
-current_time_millis : Unit ->{} Float
-foreign effect current_time_millis from "flick:Clock" "flickCurrentTimeMillis"
-  arity 0
+current_time_millis : Unit ->{Host.Clock} Float
+let current_time_millis () = Host.Clock.current_time_millis ()
 
 /// The nanoseconds since 1970-01-01 UTC.
-current_time_nanos : Unit ->{} BigInt
-foreign effect current_time_nanos from "flick:Clock" "flickCurrentTimeNanos"
-  arity 0
+current_time_nanos : Unit ->{Host.Clock} BigInt
+let current_time_nanos () = Host.Clock.current_time_nanos ()
 
 /// Monotonic nanoseconds: never go back, for measuring elapsed time.
-monotonic_time_nanos : Unit ->{} BigInt
-foreign effect monotonic_time_nanos from "flick:Clock" "flickMonotonicTimeNanos"
-  arity 0
+monotonic_time_nanos : Unit ->{Host.Clock} BigInt
+let monotonic_time_nanos () = Host.Clock.monotonic_time_nanos ()

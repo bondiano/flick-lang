@@ -1,105 +1,25 @@
-/// The JS console of the current fiber, which a program may replace for a
-/// task with `with_console`. It needs no service row: the global console is
-/// the default.
-module Console exposing (..)
+/// Messages by level, through the `Host.Console` service: `log`, `info` and
+/// `debug` write a line to stdout, `warn` and `error` to stderr.
+module Console exposing (log, info, debug, warn, error)
 
-/// A JS console.
-type Console
-
-/// The console of the current fiber.
-current : Unit ->{} Console
-foreign effect current from "flick:Console" "flickCurrent"
-  arity 0
-
-/// Runs `task` with `console` as its console.
-with_console : Console -> (Eff r e a)^c ->{r; e} a
-foreign effect with_console from "flick:Console" "flickWithConsole"
-  arity 1
-  retention call
-
-/// A console of Node.js that writes everything to stderr.
-to_stderr : Unit ->{} Console
-foreign to_stderr from "flick:Console" "flickToStderr"
-  arity 0
+import Host
 
 /// Writes the message to stdout.
-log : String ->{} Unit
-foreign effect log from "flick:Console" "log"
+log : String ->{Host.Console} Unit
+let log message = Host.Console.stdout_line message
 
-info : String ->{} Unit
-foreign effect info from "flick:Console" "info"
+/// Writes the message to stdout.
+info : String ->{Host.Console} Unit
+let info message = Host.Console.stdout_line message
 
-debug : String ->{} Unit
-foreign effect debug from "flick:Console" "debug"
-
-/// Writes the message to stderr.
-warn : String ->{} Unit
-foreign effect warn from "flick:Console" "warn"
+/// Writes the message to stdout.
+debug : String ->{Host.Console} Unit
+let debug message = Host.Console.stdout_line message
 
 /// Writes the message to stderr.
-error : String ->{} Unit
-foreign effect error from "flick:Console" "error"
+warn : String ->{Host.Console} Unit
+let warn message = Host.Console.stderr_line message
 
-/// Writes `Trace: message` and the JS stack to stderr.
-trace : String ->{} Unit
-foreign effect trace from "flick:Console" "trace"
-
-/// Writes `Assertion failed: message` to stderr unless the condition holds.
-assert : Bool -> String ->{} Unit
-foreign effect assert from "flick:Console" "assert"
-  arity 2
-
-/// Clears the terminal, when stdout is one.
-clear : Unit ->{} Unit
-foreign effect clear from "flick:Console" "flickClear"
-  arity 0
-
-/// Counts the calls with the label and writes `label: n`.
-count : String ->{} Unit
-foreign effect count from "flick:Console" "count"
-
-/// Restarts the count of the label.
-count_reset : String ->{} Unit
-foreign effect count_reset from "flick:Console" "countReset"
-
-/// Writes the value as the JS console inspects it.
-dir : a ->{} Unit
-foreign effect dir from "flick:Console" "dir"
-
-/// `dir`, as XML where the console knows how.
-dirxml : a ->{} Unit
-foreign effect dirxml from "flick:Console" "dirxml"
-
-/// Writes the list of records as a table, with only the given columns.
-table : Option (List String) -> List a ->{} Unit
-foreign effect table from "flick:Console" "flickTable"
-  arity 2
-
-/// Options of a group: its label and whether it starts collapsed.
-type alias GroupOptions = { label : Option String; collapsed : Bool }
-
-/// Indents what the console writes until the scope of region `s` closes.
-group : GroupOptions ->{Scope s} Unit
-foreign effect group from "flick:Console" "flickGroup"
-
-/// Runs `task` in a group.
-with_group : GroupOptions -> (Eff r e a)^c ->{r; e} a
-foreign effect with_group from "flick:Console" "flickWithGroup"
-  arity 1
-  retention call
-
-/// Starts the timer of the label; the scope of region `s` ends it, writing
-/// `label: <elapsed>`.
-time : String ->{Scope s} Unit
-foreign effect time from "flick:Console" "time"
-
-/// Writes `label: <elapsed> message` for a running timer.
-time_log : String -> String ->{} Unit
-foreign effect time_log from "flick:Console" "timeLog"
-  arity 2
-
-/// Runs `task` under the timer of the label.
-with_time : String -> (Eff r e a)^c ->{r; e} a
-foreign effect with_time from "flick:Console" "withTime"
-  arity 1
-  retention call
+/// Writes the message to stderr.
+error : String ->{Host.Console} Unit
+let error message = Host.Console.stderr_line message

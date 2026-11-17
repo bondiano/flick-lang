@@ -8,6 +8,7 @@ module Ui exposing (.., SafeUrl, SanitizedHtml, safe_url, trusted_html)
 
 import Atom
 import Fiber
+import Host
 import Ui.Safe exposing (SafeUrl, SanitizedHtml, safe_url, trusted_html)
 
 @label component
@@ -372,8 +373,11 @@ foreign pure stateful from "flick:ui/react" "uiStateful"
 
 /// `task` as work of an instance of region `s`: it starts after the
 /// instance mounts, and its unmount interrupts it, so what it uses
-/// outlives `s`.
-mounted : Fiber.Outlives c s => (Eff {Async, Atom.Write, Document} none Unit)^c -> (Lifecycle s)^c
+/// outlives `s`. It runs with the browser's host services, those the
+/// runner provides the root.
+mounted :
+  Fiber.Outlives c s =>
+  (Eff {Async, Atom.Write, Document, ...Host.BrowserLive} none Unit)^c -> (Lifecycle s)^c
 foreign pure mounted from "flick:ui/react" "uiMounted"
   retention call
 
@@ -382,7 +386,9 @@ foreign pure mounted from "flick:ui/react" "uiMounted"
 /// defect goes to the root's supervisor. React's `useEffect` without
 /// dependencies, run once per instance. What `task` uses outlives the
 /// instance.
-on_mount : Fiber.Outlives c s => (Eff {Async, Atom.Write, Document} none Unit)^c ->{Setup s} Unit
+on_mount :
+  Fiber.Outlives c s =>
+  (Eff {Async, Atom.Write, Document, ...Host.BrowserLive} none Unit)^c ->{Setup s} Unit
 let on_mount work = Setup.start (mounted work)
 
 /// `run` of what `read` reads as work of an instance of region `s`, again
@@ -390,7 +396,7 @@ let on_mount work = Setup.start (mounted work)
 watched :
   Fiber.Outlives c s =>
   (Unit ->{Atom.Read} a)^c ->
-  (a -> (Eff {Async, Atom.Write, Document} none Unit)^c)^c ->
+  (a -> (Eff {Async, Atom.Write, Document, ...Host.BrowserLive} none Unit)^c)^c ->
   (Lifecycle s)^c
 foreign pure watched from "flick:ui/react" "uiWatched"
   retention call
@@ -403,7 +409,7 @@ foreign pure watched from "flick:ui/react" "uiWatched"
 watch :
   Fiber.Outlives c s =>
   (Unit ->{Atom.Read} a)^c ->
-  (a -> (Eff {Async, Atom.Write, Document} none Unit)^c)^c ->{Setup s}
+  (a -> (Eff {Async, Atom.Write, Document, ...Host.BrowserLive} none Unit)^c)^c ->{Setup s}
   Unit
 let watch read run = Setup.start (watched read run)
 

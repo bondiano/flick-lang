@@ -1,6 +1,4 @@
-// The instant part of DateTime on Flick's own runtime. It reads the fiber's
-// clock, including Test.clock_test's virtual clock.
-import { clock } from "../clock.ts";
+// The instant part of DateTime on Flick's own runtime.
 
 export interface DateTime {
   readonly epochMilliseconds: number;
@@ -16,5 +14,6 @@ export const dateTimeHooks: { makeUtc: (millis: number) => DateTime; toDate: (va
   toDate: (value) => new Date(value.epochMilliseconds),
 };
 
-export const flickNow = (): DateTime => dateTimeHooks.makeUtc(clock().millis());
+/** `DateTime.unsafe_from_epoch_millis`: unchecked, as a clock reads a valid time. */
+export const flickUnsafeFromEpochMillis = (millis: number): DateTime => dateTimeHooks.makeUtc(millis);
 export const toEpochMillis = (value: DateTime): number => value.epochMilliseconds;

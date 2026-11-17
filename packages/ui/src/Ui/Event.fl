@@ -4,32 +4,43 @@
 module Ui.Event exposing (..)
 
 import Atom
+import Host
 import Ui
 
 @lang event_exhaust
 /// Ignores events while the task of an earlier one runs.
-exhaust : (s -> (Eff {Async, Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
+exhaust :
+  (s -> (Eff {Async, Atom.Write, Ui.Document, ...Host.BrowserLive} none Unit)^c)^c ->
+  (Ui.Handler s)^c
 foreign pure exhaust from "flick:ui/react" "eventExhaust"
   retention call
 
 @lang event_latest
 /// Interrupts the running task, waits until it stopped, then runs the
 /// last event; one event waits at most.
-latest : (s -> (Eff {Async, Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
+latest :
+  (s -> (Eff {Async, Atom.Write, Ui.Document, ...Host.BrowserLive} none Unit)^c)^c ->
+  (Ui.Handler s)^c
 foreign pure latest from "flick:ui/react" "eventLatest"
   retention call
 
 @lang event_queue
 /// Runs events one by one, `capacity` of them waiting at most; an event
 /// that finds the queue full is rejected and reported to the supervisor.
-queue : Int -> (s -> (Eff {Async, Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
+queue :
+  Int ->
+  (s -> (Eff {Async, Atom.Write, Ui.Document, ...Host.BrowserLive} none Unit)^c)^c ->
+  (Ui.Handler s)^c
 foreign pure queue from "flick:ui/react" "eventQueue"
   retention call
 
 @lang event_concurrent
 /// Runs at most `limit` tasks at once; an event beyond that is rejected and
 /// reported to the supervisor.
-concurrent : Int -> (s -> (Eff {Async, Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
+concurrent :
+  Int ->
+  (s -> (Eff {Async, Atom.Write, Ui.Document, ...Host.BrowserLive} none Unit)^c)^c ->
+  (Ui.Handler s)^c
 foreign pure concurrent from "flick:ui/react" "eventConcurrent"
   retention call
 

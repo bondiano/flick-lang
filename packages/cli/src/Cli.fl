@@ -9,6 +9,7 @@ import BigInt
 import Cli.Prompt
 import Config
 import DateTime
+import Host
 import Redacted
 
 /// A command ready to run.
@@ -227,7 +228,8 @@ type alias ActionContext = { commandPath : List String; version : String }
 
 /// The switch `--<name>` of this command and its subcommands, with its help
 /// text: given, it runs `act` instead of any handler, like `--version`.
-action : String -> String -> (ActionContext ->{} Unit)^c -> (Spec r e o)^c -> (Spec r e o)^c
+action :
+  String -> String -> (ActionContext ->{Host.Console} Unit)^c -> (Spec r e o)^c -> (Spec r e o)^c
 foreign pure action from "flick:cli" "specAction"
   arity 4
   retention call
@@ -377,19 +379,20 @@ let settings = { version = "0.0.0"; builtIns = builtins; formatter = None }
 
 /// Parses `args` and runs the handler of the command they name, in the
 /// current fiber, after the whole line parsed. The built-in flags print to
-/// stdout and run no handler; invalid input is `CliError` with the text
-/// shown for it.
-run_with : Settings -> (Command r e)^c -> List String ->{Async | r; CliError | e} Unit
+/// stdout through `Host.Console` and run no handler; invalid input is
+/// `CliError` with the text shown for it.
+run_with : Settings -> (Command r e)^c -> List String ->{Async, Host.Console | r; CliError | e} Unit
 foreign effect run_with from "flick:cli" "cliRunWith"
   arity 3
   retention call
 
 /// `run_with` the `settings` with `version`.
-run_version : String -> (Command r e)^c -> List String ->{Async | r; CliError | e} Unit
+run_version :
+  String -> (Command r e)^c -> List String ->{Async, Host.Console | r; CliError | e} Unit
 foreign effect run_version from "flick:cli" "cliRunVersion"
   arity 3
   retention call
 
 /// `run_version "0.0.0"`.
-run : (Command r e)^c -> List String ->{Async | r; CliError | e} Unit
+run : (Command r e)^c -> List String ->{Async, Host.Console | r; CliError | e} Unit
 let run command args = run_version "0.0.0" command args

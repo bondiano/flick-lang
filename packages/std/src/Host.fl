@@ -5,6 +5,7 @@
 module Host exposing (..)
 
 import Layer
+import PlatformError
 
 service Console =
   stdout_line : String ->{} Unit
@@ -25,6 +26,16 @@ service Environment =
 
 service Arguments =
   args : Unit ->{} List String
+
+/// A program to run, as `ChildProcess.make` describes it.
+type Command
+
+/// A running child process of region `s`.
+type Child (s : Region)
+
+/// Starts child processes; `ChildProcess` runs its commands through it.
+service Process =
+  spawn : forall s. Command ->{Scope s; PlatformError.PlatformError} Child s
 
 raw_stdout_line : String ->{} Unit
 foreign raw_stdout_line from "flick:rt" "stdoutLine"
@@ -58,6 +69,9 @@ raw_args : Unit ->{} List String
 foreign raw_args from "flick:rt" "platformArgs"
   arity 0
 
+raw_spawn : Command ->{Scope s; PlatformError.PlatformError} Child s
+foreign effect raw_spawn from "flick:rt" "processSpawn"
+
 /// Trusted adapters to ambient host APIs; constructing a layer performs no I/O.
 console : Layer none none {Console}
 let console =
@@ -84,8 +98,11 @@ let environment = Layer.succeed Environment { env = raw_env }
 arguments : Layer none none {Arguments}
 let arguments = Layer.succeed Arguments { args = raw_args }
 
-/// The five host services of an app running on a host with a process and files.
-type alias Live = {Console, Clock, Random, Environment, Arguments}
+process : Layer none none {Process}
+let process = Layer.succeed Process { spawn = raw_spawn }
+
+/// The six host services of an app running on a host with a process and files.
+type alias Live = {Console, Clock, Random, Environment, Arguments, Process}
 
 /// The three host services available in a browser environment.
 type alias BrowserLive = {Console, Clock, Random}
@@ -94,7 +111,11 @@ type alias BrowserLive = {Console, Clock, Random}
 browser_live : Layer none none BrowserLive
 let browser_live = Layer.merge console (Layer.merge clock random)
 
-/// All five live services. Prefer individual layers for narrower boundaries.
+/// All six live services. Prefer individual layers for narrower boundaries.
 live : Layer none none Live
 let live =
-  Layer.merge console (Layer.merge clock (Layer.merge random (Layer.merge environment arguments)))
+  Layer.merge
+    console
+    (Layer.merge
+      clock
+      (Layer.merge random (Layer.merge environment (Layer.merge arguments process))))

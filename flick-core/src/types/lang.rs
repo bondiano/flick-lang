@@ -166,6 +166,23 @@ pub fn label(lang: Lang) -> Option<&'static str> {
     table().find(lang).map(|item| item.label.as_str())
 }
 
+/// The services of `Host.Live`: those a runner provides at the root, so a
+/// row that lacks one may safely gain it, and an entry without a runner
+/// gets those its `main` names.
+pub const HOST_SERVICES: [&str; 6] = [
+    "Host.Console",
+    "Host.Clock",
+    "Host.Random",
+    "Host.Environment",
+    "Host.Arguments",
+    "Host.Process",
+];
+
+/// Whether the service `name` is one of [`HOST_SERVICES`].
+pub fn is_host_service(name: &str) -> bool {
+    HOST_SERVICES.contains(&name)
+}
+
 /// The module whose names every module sees unqualified.
 pub fn prelude() -> &'static str {
     &item(Lang::Prelude).module

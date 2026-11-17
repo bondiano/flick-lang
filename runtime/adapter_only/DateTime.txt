@@ -16,12 +16,10 @@ DateTime.format_local
 DateTime.format_utc
 DateTime.from_epoch_seconds
 DateTime.from_parts
-DateTime.is_future
 DateTime.is_greater_than
 DateTime.is_greater_than_or_equal_to
 DateTime.is_less_than
 DateTime.is_less_than_or_equal_to
-DateTime.is_past
 DateTime.is_utc
 DateTime.is_zoned
 DateTime.json_utc

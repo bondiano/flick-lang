@@ -26,29 +26,7 @@ func randomOf(fb *Fiber) Random {
 	return liveRandom{}
 }
 
-func RandomNext(fb *Fiber) Value        { return randomOf(fb).nextDouble() }
-func RandomNextBoolean(fb *Fiber) Value { return randomOf(fb).nextDouble() > 0.5 }
-
-// RandomNextInt draws over Flick's 32-bit `Int`, as the JS adapter's.
-func RandomNextInt(fb *Fiber) Value { return randomIntBetween(fb, math.MinInt32, math.MaxInt32, 1) }
-
-// randomIntBetween is an integer from `min` to `max`; `extra` is 0 half open.
-func randomIntBetween(fb *Fiber, min, max, extra float64) Value {
-	lo, hi := math.Ceil(min), math.Floor(max)
-	return int32(math.Floor(randomOf(fb).nextDouble()*(hi-lo+extra)) + lo)
-}
-
-func RandomNextIntBetween(fb *Fiber, options, min, max Value) Value {
-	extra := 1.0
-	if o := record(options).Get("halfOpen"); isSome(o) && value(o).(bool) {
-		extra = 0
-	}
-	return randomIntBetween(fb, float64(min.(int32)), float64(max.(int32)), extra)
-}
-
-func RandomNextBetween(fb *Fiber, min, max Value) Value {
-	return nextBetween(min.(float64), max.(float64), randomOf(fb).nextDouble())
-}
+func RandomNext(fb *Fiber) Value { return randomOf(fb).nextDouble() }
 
 // nextBetween is `draw` scaled between `lo` and `hi`: a draw that rounds
 // up to the excluded `max` gives its predecessor.
@@ -58,22 +36,6 @@ func nextBetween(lo, hi, draw float64) float64 {
 		return v
 	}
 	return math.Nextafter(hi, math.Inf(-1))
-}
-
-func RandomShuffle(fb *Fiber, xs Value) Value {
-	r := randomOf(fb)
-	buffer := append([]Value{}, List(xs)...)
-	for i := len(buffer) - 1; i >= 1; i-- {
-		index := min(i, int(math.Floor(r.nextDouble()*float64(i+1))))
-		buffer[i], buffer[index] = buffer[index], buffer[i]
-	}
-	return buffer
-}
-
-func RandomChoice(fb *Fiber, xs Value) Value {
-	buffer := List(xs)
-	n := len(buffer)
-	return buffer[min(n-1, int(math.Floor(randomOf(fb).nextDouble()*float64(n))))]
 }
 
 // RandomWithSeed runs `task` with the ISAAC generator seeded by `seed`.

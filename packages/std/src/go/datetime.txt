@@ -6,7 +6,7 @@ flickFromParts DateTimeFromParts
 flickFromEpochSeconds DateTimeFromEpochSeconds
 flickMakeZoned DateTimeMakeZoned
 flickMakeZonedFromString DateTimeMakeZonedFromString
-flickNow *DateTimeNow
+flickUnsafeFromEpochMillis DateTimeUnsafeFromEpochMillis
 isUtc DateTimeIsUtc
 isZoned DateTimeIsZoned
 match *DateTimeMatch
@@ -46,8 +46,6 @@ isLessThan DateTimeIsLessThan
 isLessThanOrEqualTo DateTimeIsLessThanOrEqualTo
 isGreaterThan DateTimeIsGreaterThan
 isGreaterThanOrEqualTo DateTimeIsGreaterThanOrEqualTo
-isFuture *DateTimeIsFuture
-isPast *DateTimeIsPast
 flickFormat DateTimeFormat
 flickFormatLocal DateTimeFormatLocal
 flickFormatUtc DateTimeFormatUtc

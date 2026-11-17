@@ -1,38 +1,71 @@
-/// The fiber's source of randomness. It is a default service, so drawing
-/// needs no service row; each draw is a runtime call, and `with_seed` makes
-/// the draws of a task repeatable.
-module Random exposing (..)
+/// Random draws, through the `Host.Random` service: each operation is made
+/// of draws in [0, 1), so a fake `Host.Random` fixes them all, and
+/// `with_seed` makes the draws of a task repeatable.
+module Random exposing (
+  next,
+  next_boolean,
+  next_int,
+  next_between,
+  next_int_between,
+  shuffle,
+  choice,
+  with_seed,
+)
+
+import Host
 
 /// A number in [0, 1).
-next : Unit ->{} Float
-foreign effect next from "flick:Random" "flickNext"
-  arity 0
+next : Unit ->{Host.Random} Float
+let next () = Host.Random.next ()
 
 /// `true` or `false`.
-next_boolean : Unit ->{} Bool
-foreign effect next_boolean from "flick:Random" "flickNextBoolean"
-  arity 0
+next_boolean : Unit ->{Host.Random} Bool
+let next_boolean () = Host.Random.next () > 0.5
+
+/// The draw scaled to an integer in [0, `n`).
+below : Float ->{Host.Random} Int
+let below n = Int.truncate (Float.floor (Host.Random.next () * n))
 
 /// An `Int`, over its whole 32-bit range.
-next_int : Unit ->{} Int
-foreign effect next_int from "flick:Random" "flickNextInt"
-  arity 0
+next_int : Unit ->{Host.Random} Int
+let next_int () = Int.truncate (Float.floor (Host.Random.next () * 4294967296) - 2147483648)
 
 /// A number in [min, max).
-next_between : Float -> Float ->{} Float
-foreign effect next_between from "flick:Random" "nextBetween"
+next_between : Float -> Float ->{Host.Random} Float
+let next_between min max = min + Host.Random.next () * (max - min)
 
 /// An integer in [min, max], or [min, max) with `halfOpen`.
-next_int_between : { halfOpen : Option Bool } -> Int -> Int ->{} Int
-foreign effect next_int_between from "flick:Random" "flickNextIntBetween"
+next_int_between : { halfOpen : Option Bool } -> Int -> Int ->{Host.Random} Int
+let next_int_between options min max =
+  // in floats, as the span of the whole `Int` range does not fit one
+  let extra = if options.halfOpen == Some true then 0.0 else 1.0
+  let lower = Int.to_float min
+  let span = Int.to_float max - lower + extra
+  Int.truncate (Float.floor (Host.Random.next () * span) + lower)
+
+/// `elements` with those up to `i` shuffled, from the last down.
+shuffle_down : Int -> List a ->{Host.Random} List a
+let rec shuffle_down i elements =
+  if i < 1 then
+    elements
+  else
+    let index = Int.min i (below (Int.to_float (i + 1)))
+    match (List.get i elements, List.get index elements) with
+    | (Some at_i, Some at_index) ->
+      shuffle_down (i - 1) (List.set index at_i (List.set i at_index elements))
+    | _ -> elements
 
 /// The elements in a random order.
-shuffle : List a ->{} List a
-foreign effect shuffle from "flick:Random" "shuffle"
+shuffle : List a ->{Host.Random} List a
+// shortcut: O(n²), each swap copies the list; draw into a mutable buffer once long lists are shuffled
+let shuffle elements = shuffle_down (List.length elements - 1) elements
 
 /// One of the elements.
-choice : NonEmpty.NonEmpty a ->{} a
-foreign effect choice from "flick:Random" "choice"
+choice : NonEmpty.NonEmpty a ->{Host.Random} a
+let choice elements =
+  let n = NonEmpty.length elements
+  let index = Int.min (n - 1) (below (Int.to_float n))
+  Option.with_default (NonEmpty.head elements) (List.get index (NonEmpty.to_list elements))
 
 /// Runs `task` with a generator seeded by `seed`: the same seed, the same draws.
 with_seed : Float -> (Eff r e a)^c ->{r; e} a
