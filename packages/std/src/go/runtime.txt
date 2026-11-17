@@ -195,6 +195,8 @@ refGet RefGet
 refSame RefSame
 refSet RefSet
 refModify *RefModify
+lazyMake LazyMake
+lazyForce *LazyForce
 stringFromNumber StringFromNumber
 intParse IntParse
 intFromFloat IntFromFloat
