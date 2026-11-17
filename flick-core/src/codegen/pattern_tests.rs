@@ -89,10 +89,20 @@ let select pair =
             let code = emit(text, release, typescript);
             assert_eq!(code.matches("yield* accept(").count(), 1, "{code}");
             let guard = code.find("yield* accept(").expect("runtime guard");
-            let first = (code.find("= pair._0;")).unwrap_or_else(|| panic!("{code}"));
+            let first = (code.find("= pair._0")).unwrap_or_else(|| panic!("{code}"));
             assert!(first < guard, "{code}");
-            // the first alternative matches every `Pair`: the second binds nothing
-            assert!(!code.contains("pair._1"), "{code}");
+            if cfg!(feature = "native-project") {
+                // the decision graph: the first alternative matches every
+                // `Pair`, so the second binds nothing
+                assert!(!code.contains("pair._1"), "{code}");
+            } else {
+                // arm by arm: the alternatives are tried before the guard
+                let second = code
+                    .find("x = pair._1")
+                    .expect("second alternative binding");
+                assert!(first < second && second < guard, "{code}");
+                assert!(code[first..guard].contains(" || "), "{code}");
+            }
             assert!(code[guard..].contains("return \"yes\";"), "{code}");
             assert!(code[guard..].contains("return \"no\";"), "{code}");
             assert!(!code.contains("runIn("), "{code}");
@@ -234,6 +244,8 @@ let answer () =
     }
 }
 
+// the decision graph is the JS backend's where it builds projects
+#[cfg(feature = "native-project")]
 #[test]
 fn the_arms_of_one_constructor_test_it_once() {
     let text = "module App exposing (name)\n\n\
@@ -251,6 +263,7 @@ fn the_arms_of_one_constructor_test_it_once() {
     }
 }
 
+#[cfg(feature = "native-project")]
 #[test]
 fn a_match_that_would_write_an_arm_twice_tries_its_arms_in_turn() {
     // the guarded arm under `Line` and under `Pair`
