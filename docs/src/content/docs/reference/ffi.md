@@ -133,10 +133,11 @@ Pass the invocation's fiber to `flickrt.Apply(fb, f, arg)` and
 or immutable schema metadata outside program execution. This hidden context
 does not make a pure Flick stage effectful.
 
-A panic is a defect. `catch`, `this`, `optional`, `variadic` and adapted
-callbacks are `FLICK-P012` on the go target for now. The Go representation
-of values is not a stable interface yet: a Go file follows the compiler it
-is built with.
+A panic is a defect unless handled by `catch`. Foreign metadata annotations
+(`catch`, `this`, `optional`, `variadic`, and `callbacks`) are lowered to
+`flickrt` runtime helpers (`OptVal`, `CatchForeign`, `CallMethod`, `WrapCallback`).
+The Go representation of values is not a stable interface yet: a Go file follows
+the compiler it is built with.
 
 ## Importing a package's `.d.ts`
 

@@ -43,6 +43,9 @@ assert.equal(app.app.kind, "component");
 
 /// `tsc --noEmit` over everything `--emit ts` wrote under `dir`.
 fn typecheck(repo: &Path, dir: &Path) -> Option<String> {
+    if !dir.exists() {
+        return None;
+    }
     let config = r#"{
   "compilerOptions": {
     "strict": true,

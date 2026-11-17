@@ -1,7 +1,7 @@
 // Effect's child processes for the bindings of the standard library: a
 // `ChildProcess.Command` is Effect's command, run by the spawner of Node.js;
 // a `PlatformError` becomes the Flick error, and bytes are Flick lists.
-import { type Duration, Effect, Option, type PlatformError, Stream } from "effect";
+import { type Duration, Effect, Fiber, Option, type PlatformError, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { nodeModule } from "../host.ts";
@@ -49,7 +49,20 @@ export const flickSpawn = (command: Command) =>
 
 export const flickPid = (handle: Handle): number => handle.pid;
 
-export const flickWait = (handle: Handle) => mapError(handle.exitCode);
+export const flickWait = (handle: Handle) =>
+  mapError(
+    Effect.acquireUseRelease(
+      Effect.forkChild(
+        Effect.ignore(
+          Effect.all([Stream.runDrain(handle.stdout), Stream.runDrain(handle.stderr)], {
+            concurrency: "unbounded",
+          }),
+        ),
+      ),
+      () => handle.exitCode,
+      (fiber) => Fiber.interrupt(fiber),
+    ),
+  );
 
 export const flickIsRunning = (handle: Handle) => mapError(handle.isRunning);
 
