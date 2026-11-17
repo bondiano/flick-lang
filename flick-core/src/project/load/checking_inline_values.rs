@@ -107,6 +107,13 @@ impl Checking<'_> {
             .diagnostics
             .extend(resolve::import_warnings(&source_module, lookup));
         output.diagnostics.extend(child_output.diagnostics.clone());
+        let to = Relocation {
+            child: &units.name,
+            parent: &loaded.name,
+            local: &units.local,
+        };
+        to.published_instances(&mut output.interface);
+        to.published_instances(&mut output.exported);
         merge_inline_lowering(&mut output, &mut child_output, loaded, &units);
         output
     }
