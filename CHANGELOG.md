@@ -6,6 +6,12 @@ break programs.
 
 ## Unreleased
 
+- **`let lazy`:** `let lazy x = e` binds a lazy of its function alone, read
+  as `await x`: `e` runs the first time, and later awaits get its outcome.
+  No other fiber can reach it, so awaiting it needs no `Async`; a closure or
+  a `task` using it is `FLICK-G005`, and a use other than `await x` is
+  `FLICK-T003`. `let lazy mut x = e` can be assigned, and a value assigned
+  before the first `await` means `e` never runs.
 - **Suspended parameters `~`:** a signature can mark a parameter of type
   `Eff` with `~`, `or_die : ~(Eff r e a)^c ->{r} a`, and a runtime call
   written there is passed unstarted, as `task { … }` would pass it. The

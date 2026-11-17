@@ -73,6 +73,7 @@ natives! {
     RT, "refModify", 2 => ref_modify;
     RT, "lazyMake", 1 => lazy::lazy_make;
     RT, "lazyForce", 1 => lazy::lazy_force;
+    RT, "lazyDone", 1 => lazy::lazy_done;
     RT, "layerSucceed", 2 => layer_succeed;
     RT, "layerMerge", 2 => layer_merge;
     RT, "layerOverride", 2 => layer_merge;

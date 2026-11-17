@@ -109,6 +109,7 @@ impl Validator<'_> {
         }
         if child.kind == K::LetDecl {
             self.mutable(child, node.kind == K::Block, place);
+            self.lazy(child, node.kind == K::Block, place);
         }
     }
 
@@ -159,6 +160,36 @@ impl Validator<'_> {
             "a recursive binding cannot be `mut`"
         } else if !decl.nodes().any(|n| n.kind == K::VarPat) {
             "only a name can be `mut`: bind the pattern, then a `let mut` of one name"
+        } else {
+            return;
+        };
+        self.errors.push(Diagnostic::error(
+            codes::S016,
+            message.to_owned(),
+            Span::new(self.file, kw.start, kw.end),
+        ));
+    }
+
+    /// `let lazy`: a binding of one name, a statement of an ordinary block,
+    /// as `let mut` is.
+    fn lazy(&mut self, decl: &Node, block: bool, place: Place) {
+        let Some(kw) = decl.child_tokens().find(|t| t.kind == K::LazyKw) else {
+            return;
+        };
+        let message = if !block {
+            "a definition of the module cannot be `lazy`: build a `lazy { … }` where it is needed"
+        } else if place == Place::Do {
+            "a binding of `do` cannot be `lazy`: its statements run in the functions `flat_map` takes"
+        } else if place == Place::For {
+            "a binding of `for` cannot be `lazy`: bind it in the body"
+        } else if decl.has_token(K::AssertKw) {
+            "`let assert` cannot be `lazy`: bind the names it matches from a `let lazy` of one name"
+        } else if decl.nodes().any(|n| n.kind == K::Params) {
+            "a function cannot be `lazy`: it already runs only when it is called"
+        } else if decl.has_token(K::RecKw) {
+            "a recursive binding cannot be `lazy`"
+        } else if !decl.nodes().any(|n| n.kind == K::VarPat) {
+            "only a name can be `lazy`: bind the pattern after a `let lazy` of one name"
         } else {
             return;
         };

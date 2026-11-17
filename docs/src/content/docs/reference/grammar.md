@@ -438,7 +438,7 @@ save_with :
 
 ```text
 block       = statement { line break statement }
-statement   = "let" … | signature | name "=" block | expr
+statement   = "let" ["lazy"] ["mut"] … | signature | name "=" block | expr
 expr        = "fun" atom_pattern { atom_pattern } "->" block
             | [label [":"]] "loop" "{" block "}"
             | [label [":"]] "while" expr "do" block

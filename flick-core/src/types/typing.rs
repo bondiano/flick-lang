@@ -85,6 +85,12 @@ pub struct Typing {
     pub suspended: BTreeMap<String, Vec<usize>>,
     /// Arguments passed unstarted to a parameter marked `~`: the task of each.
     pub suspends: HashSet<Range>,
+    /// `await`s of a `let lazy`, which read it with `lazy_read`.
+    pub read_lazy: HashSet<Range>,
+    /// `let lazy` declarations, whose value is the cell of their task.
+    pub lazy_lets: HashSet<Range>,
+    /// Assignments to a `let lazy mut`, whose value is a cell already done.
+    pub lazy_sets: HashSet<Range>,
     /// Lazy `for`s whose body makes Sync calls: each step runs with the
     /// services of the stage that built the sequence.
     pub sync_generators: HashSet<Range>,

@@ -143,6 +143,9 @@ impl Checker<'_> {
     pub fn use_local(&mut self, index: usize, span: Span) -> Type {
         self.cx.regions.uses.push(index);
         self.mutable_use(index, span, false);
+        if self.lazy_unforced(index, span) {
+            return Type::Error;
+        }
         let Local { ty, rec, .. } = self.cx.locals[index].clone();
         // a local `let rec` is in scope only in its own body
         let ty = match rec {
@@ -365,7 +368,9 @@ impl Checker<'_> {
                 Type::lang(Lang::Unit)
             }
             K::AwaitKw => {
+                let awaiting = mem::replace(&mut self.cx.awaiting, operand.kind == K::NameExpr);
                 let ty = self.infer(operand);
+                self.cx.awaiting = awaiting;
                 self.note_type(self.token_span(op), &ty);
                 if let Some(result) = self.force(node, &ty) {
                     return result;

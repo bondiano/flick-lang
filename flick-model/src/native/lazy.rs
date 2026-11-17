@@ -41,6 +41,12 @@ pub(super) fn lazy_make(args: &[Term], _: &mut String) -> Result<Term, String> {
     ))
 }
 
+/// `Ref.make (2, (0, value))`: a cell already done with `value`.
+pub(super) fn lazy_done(args: &[Term], _: &mut String) -> Result<Term, String> {
+    let done = tagged(2, tagged(0, args[0].clone()));
+    Ok(Term::app(Term::konst(Const::RefMake), done))
+}
+
 /// The outcome of a pending cell, after running its task; the kept one of a
 /// done cell; a defect for a running one, which only its own initializer can
 /// force on one thread.

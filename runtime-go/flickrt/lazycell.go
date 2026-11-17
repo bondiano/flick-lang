@@ -19,6 +19,9 @@ type LazyCell struct {
 // LazyMake is `lazy task`: a pending cell; nothing runs.
 func LazyMake(task Value) Value { return &LazyCell{task: task} }
 
+// LazyDone is a cell already done with `value`: forcing it runs nothing.
+func LazyDone(value Value) Value { return &LazyCell{exit: &Exit{value, nil}} }
+
 const lazySelfForce = "lazy forced during its own initialization"
 
 // LazyForce is `await cell`: its outcome, running the initializer in this

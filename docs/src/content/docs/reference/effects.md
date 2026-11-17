@@ -228,6 +228,22 @@ let names id =
 - A `Lazy` keeps what its body captured, and also the error it failed with,
   so it cannot outlive the `scope` of a resource it holds.
 
+`let lazy x = e` binds a lazy of its function alone, as `let mut` binds a
+variable: it is read only as `await x`, which runs `e` the first time and
+gives its outcome after that, and needs no `Async`, since no other fiber
+can reach it. A closure or a `task` cannot use it (`FLICK-G005`); share one
+with `lazy { … }`. A `let lazy mut` can be assigned, and a value assigned
+before the first `await` means `e` never runs.
+
+```flick
+# service Config =
+#   load : Unit ->{} String
+banner : Bool ->{Config} String
+let banner verbose =
+  let lazy config = Config.load ()
+  if verbose then await config else "quiet"
+```
+
 `docs/formal/lazy.md` gives the formal rules.
 
 ## Expected errors

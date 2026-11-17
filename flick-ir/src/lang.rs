@@ -178,6 +178,8 @@ lang_items! {
     FromResult = "from_result",
     LazyMake = "lazy_make",
     LazyForce = "lazy_force",
+    LazyDone = "lazy_done",
+    LazyRead = "lazy_read",
     Fail = "fail",
     LayerRun = "layer_run",
     ScopeRun = "scope_run",

@@ -24,6 +24,15 @@ export class LazyCell<A, E, R> {
 export const lazyMake = <A, E, R>(task: Effect.Effect<A, E, R>): Effect.Effect<LazyCell<A, E, R>> =>
   Effect.sync(() => new LazyCell(task));
 
+/** A cell already done with `value`: forcing it runs nothing. */
+export const lazyDone = <A>(value: A): Effect.Effect<LazyCell<A, never, never>> =>
+  Effect.sync(() => {
+    const cell = new LazyCell<A, never, never>(Effect.succeed(value));
+    cell.task = undefined;
+    cell.exit = Exit.succeed(value);
+    return cell;
+  });
+
 const SELF_FORCE = "lazy forced during its own initialization";
 
 const cached = (cause: Cause.Cause<unknown>): boolean => !Cause.hasInterrupts(cause) && !unwinds(cause);

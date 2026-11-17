@@ -24,6 +24,14 @@ export class LazyCell {
 /** `lazy task`: a pending cell; nothing runs. */
 export const lazyMake = (task: Task): LazyCell => new LazyCell(task);
 
+/** A cell already done with `value`: forcing it runs nothing. */
+export const lazyDone = (value: unknown): LazyCell => {
+  const cell = new LazyCell(() => value);
+  cell.task = undefined;
+  cell.exit = succeeded(value);
+  return cell;
+};
+
 const SELF_FORCE = "lazy forced during its own initialization";
 
 /** `await cell`: its outcome, running the initializer in this fiber when no attempt has settled it. */

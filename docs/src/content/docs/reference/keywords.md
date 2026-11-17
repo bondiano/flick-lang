@@ -70,7 +70,7 @@ and [ffi.md](../ffi/).
 | - | - | - |
 | `task` | builds an `Eff r e a` from its block without running it | `task { Users.get id }` |
 | `await` | runs an `Eff` once in the current fiber and gives its result, or forces a `Lazy` | `await request` |
-| `lazy` | builds a `Lazy r e a`, which runs its block at most once, at its first `await` | `lazy { Config.load () }` |
+| `lazy` | builds a `Lazy r e a`, which runs its block at most once, at its first `await`; `let lazy x = e` binds one of its function | `lazy { Config.load () }` |
 | `scope` | runs its block in a fresh region and releases what the block acquired when it ends | `scope { File.read_all (File.open_scoped path) }` |
 | `provide` | runs its block with the services a layer builds | `provide live { run user }` |
 | `ignore` | discards the value of an intermediate statement | `ignore (Store.save user)` |

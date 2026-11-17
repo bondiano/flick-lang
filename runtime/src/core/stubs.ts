@@ -44,6 +44,7 @@ export const foreignEffect = /*#__PURE__*/ needsEffect("foreignEffect");
 export const foreignSync = /*#__PURE__*/ needsEffect("foreignSync");
 export const fromResult = /*#__PURE__*/ needsEffect("fromResult");
 export const label = /*#__PURE__*/ needsEffect("label");
+export const lazyDone = /*#__PURE__*/ needsEffect("lazyDone");
 export const lazyForce = /*#__PURE__*/ needsEffect("lazyForce");
 export const lazyMake = /*#__PURE__*/ needsEffect("lazyMake");
 export const listEachEffect = /*#__PURE__*/ needsEffect("listEachEffect");

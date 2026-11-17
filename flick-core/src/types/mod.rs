@@ -53,6 +53,7 @@ mod kinds;
 mod labels;
 pub mod lang;
 mod lazy;
+mod let_lazy;
 #[cfg(test)]
 mod lint_tests;
 mod lints;
@@ -537,6 +538,9 @@ struct ItemCx {
     /// Locals applied before their type was known, each with the pure arrow
     /// taken for it, its name and where it is bound.
     assumed_pure: Vec<(Type, String, u32)>,
+    /// The operand of an `await` being typed is a name: a `let lazy` may be
+    /// read there.
+    awaiting: bool,
 }
 
 include!("checker_state.rs");

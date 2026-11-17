@@ -266,6 +266,18 @@ foreign effect lazy_make from "flick:rt" "lazyMake"
 lazy_force : Lazy r e a ->{Async | r; e} a
 foreign effect lazy_force from "flick:rt" "lazyForce"
 
+@lang lazy_read
+/// `lazy_force` of a `let lazy`, which only its own function reaches: no
+/// other fiber can be running it, so it never waits.
+lazy_read : Lazy r e a ->{r; e} a
+foreign effect lazy_read from "flick:rt" "lazyForce"
+
+@lang lazy_done
+/// A lazy already done with `value`: forcing it runs nothing and gives
+/// `value`; an assignment to a `let lazy mut` is this.
+lazy_done : a ->{} Lazy r e a
+foreign effect lazy_done from "flick:rt" "lazyDone"
+
 @lang detached
 /// No effect of the services `r` has a `control` operation, so a task that
 /// needs them may run in a fiber of its own: the handler of such an effect,

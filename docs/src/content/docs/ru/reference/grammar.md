@@ -1,6 +1,6 @@
 ---
 title: "Грамматика Flick"
-source_hash: 721b2b30b1b1f998
+source_hash: f79194c59e16b7e4
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -466,7 +466,7 @@ save_with :
 
 ```text
 block       = statement { line break statement }
-statement   = "let" … | signature | name "=" block | expr
+statement   = "let" ["lazy"] ["mut"] … | signature | name "=" block | expr
 expr        = "fun" atom_pattern { atom_pattern } "->" block
             | [label [":"]] "loop" "{" block "}"
             | [label [":"]] "while" expr "do" block
