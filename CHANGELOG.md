@@ -12,6 +12,17 @@ break programs.
   rewrites a project; the examples, the standard library and the docs now
   raise this way. `FLICK-T034` also recognizes a `match` that fails with
   `Fail.fail e` as `r?`.
+- **A runner-less `main` gets the live host services:** an entry without a
+  runner whose `main` needs `Host.Console`, `Host.Clock`, `Host.Random`,
+  `Host.Environment` or `Host.Arguments` now runs on both JavaScript runtimes,
+  as it already did on the go target, instead of failing at run time with no
+  handler. The launcher imports and provides only the services `main` names,
+  so a `main` that names none keeps its bundle; a layer `main` provides
+  itself still wins. `Runner.Cloudflare` provides `Host.BrowserLive` beside
+  `Env`. The reference model and its counted memory executor give `main`
+  the live services as its root on a fixed host: no environment variables
+  or arguments, a clock stopped at 1 700 000 000 000 ms and every random
+  draw 0.5.
 - **`let mut` captured by a closure or a `task`:** `FLICK-G005` says what
   to do for a read and for an assignment, and an editor offers "keep `x` in
   a `Ref`", which rewrites the declaration, its reads and its assignments

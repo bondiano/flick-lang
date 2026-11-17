@@ -773,6 +773,11 @@
 @flick-lang/runtime/rt hashSetToList
 @flick-lang/runtime/rt hashSetUnion
 @flick-lang/runtime/rt hashSetWith
+@flick-lang/runtime/rt hostArguments
+@flick-lang/runtime/rt hostClock
+@flick-lang/runtime/rt hostConsole
+@flick-lang/runtime/rt hostEnvironment
+@flick-lang/runtime/rt hostRandom
 @flick-lang/runtime/rt identity
 @flick-lang/runtime/rt intAbs
 @flick-lang/runtime/rt intCheckedAdd
@@ -1010,6 +1015,7 @@
 @flick-lang/runtime/rt trySync
 @flick-lang/runtime/rt tryWith
 @flick-lang/runtime/rt validationMap2
+@flick-lang/runtime/rt withHost
 @flick-lang/runtime/rt withOwnerEvidence
 @flick-lang/runtime/rt within
 @flick-lang/runtime/rt/effect/Arbitrary Constant

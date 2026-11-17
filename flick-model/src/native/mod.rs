@@ -10,6 +10,7 @@
     reason = "every native has the signature of `Native::run`, which may fail"
 )]
 
+pub mod host;
 mod numbers;
 mod show;
 
@@ -47,6 +48,14 @@ natives! {
     "global", "Number", 1 => numbers::number;
     "global", "BigInt", 1 => numbers::bigint;
     RT, "stdoutLine", 1 => stdout_line;
+    RT, "stderrLine", 1 => host::stderr_line;
+    RT, "stdoutWrite", 1 => host::stdout_write;
+    RT, "platformEnv", 1 => host::env;
+    RT, "platformArgs", 1 => host::args;
+    "flick:Clock", "flickCurrentTimeMillis", 1 => host::current_time_millis;
+    "flick:Clock", "flickCurrentTimeNanos", 1 => host::current_time_nanos;
+    "flick:Clock", "flickMonotonicTimeNanos", 1 => host::monotonic_time_nanos;
+    "flick:Random", "flickNext", 1 => host::next;
     RT, "show", 1 => show::show;
     RT, "listShow", 2 => show::list_show;
     RT, "equals", 2 => equals;

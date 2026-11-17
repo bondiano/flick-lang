@@ -71,6 +71,7 @@ impl Prepared {
                         name: e.name.clone(),
                         module: e.defining.clone(),
                         pure: e.pure,
+                        host: e.host.clone(),
                     })
                     .collect(),
                 files: physical

@@ -34,8 +34,8 @@ pub(super) fn generate(
         let start = match entry.runner.as_ref() {
             Some(module) => Start::Run(relative(&file, &options.path(module))),
             None if facts.pure => Start::Call,
-            None if data.rt => Start::RunMainRt,
-            None => Start::RunMain,
+            None if data.rt => Start::RunMainRt(facts.host.clone()),
+            None => Start::RunMain(facts.host.clone()),
         };
         let schema = request
             .target

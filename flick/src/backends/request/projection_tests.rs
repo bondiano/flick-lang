@@ -259,7 +259,8 @@ fn javascript_facts_preserve_entry_rules_and_physical_source_paths() {
         [JavascriptEntry {
             name: "main".into(),
             module: "App.Main".into(),
-            pure: false
+            pure: false,
+            host: vec![],
         }]
     );
     assert!(facts.files.iter().any(|f| f.module.contains("$lexical$")));

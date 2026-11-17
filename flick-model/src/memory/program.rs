@@ -90,6 +90,27 @@ pub fn execute_main_program_outcome(
     execute(heap, program, entry, vec![], fuel, MainStage::Function)
 }
 
+/// [`execute_main_program_outcome`] with the root services `Σ₀`: the layer
+/// the global `root` gives answers each operation no frame answers, for the
+/// whole execution, and is released with its other roots.
+pub fn execute_rooted_main_program_outcome(
+    heap: &mut Heap,
+    program: &Program,
+    entry: &Name,
+    root: &Name,
+    fuel: u64,
+) -> ExecutionReport {
+    // `execute` checks the root it starts from; `main` is checked here
+    if !program.globals.iter().any(|global| &global.name == entry) {
+        return ExecutionReport {
+            outcome: ProgramOutcome::Fault(Error::UnknownGlobal(entry.clone())),
+            stdout: String::new(),
+        };
+    }
+    let stage = MainStage::Root(entry.clone());
+    execute(heap, program, root, vec![], fuel, stage)
+}
+
 fn success_only(heap: &mut Heap, report: ExecutionReport) -> Result<Executed, Error> {
     match report.outcome {
         ProgramOutcome::Returned(value) => Ok(Executed {
@@ -211,6 +232,7 @@ fn execute(
         stdout: String::new(),
         fuel,
         main_stage,
+        root: None,
     };
     let result = machine.global(entry, None).and_then(|()| machine.run());
     let outcome = machine.finish(result);
@@ -267,8 +289,10 @@ enum Destination {
     },
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 enum MainStage {
+    /// The root layer is evaluated; `main`, named here, comes next.
+    Root(Name),
     Function,
     Task,
     Done,
@@ -397,6 +421,8 @@ struct Machine<'p, 'h> {
     stdout: String,
     fuel: u64,
     main_stage: MainStage,
+    /// The provider of `Σ₀`, which no frame holds.
+    root: Option<usize>,
 }
 
 include!("program/driving.rs");

@@ -21,6 +21,9 @@ mod bigint;
 #[path = "bigint_conversion.rs"]
 mod bigint_conversion;
 
+#[path = "host.rs"]
+mod host;
+
 pub(super) fn metered_primitive(
     heap: &mut Heap,
     kind: Intrinsic,
@@ -292,6 +295,7 @@ pub(super) fn intrinsic(
             };
             heap.literal(&Lit::String(text))
         }
+        Intrinsic::Host(primitive) => host::run(heap, primitive, value, stdout),
         Intrinsic::Try
         | Intrinsic::FromResult
         | Intrinsic::Raise

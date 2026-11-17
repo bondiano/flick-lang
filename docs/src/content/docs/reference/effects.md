@@ -529,9 +529,11 @@ remain trusted ambient adapters for compatibility. Their empty rows do not
 identify host capabilities. Standard library modules (such as `Jwt`) declare
 explicit host service requirements (`Host.Clock`). Missing runner host services
 are classified by the effect solver as safe fixes, automatically suggested by
-the checker and language server. Application runners (`Runner.Node` and
-`Runner.Browser`) provide `Host.Live` or `Host.BrowserLive` at the root entry
-boundary.
+the checker and language server. Application runners (`Runner.Node`,
+`Runner.Browser` and `Runner.Cloudflare`) provide `Host.Live` or
+`Host.BrowserLive` at the root entry boundary, and an entry without a runner
+gets there the services of `Host.Live` its `main` names (see
+[entry points](../project/#entry-points)).
 
 ## Effects and handlers
 

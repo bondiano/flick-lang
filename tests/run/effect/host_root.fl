@@ -1,0 +1,31 @@
+module App.Main exposing (main)
+
+import Host
+
+// No runner and no `provide` around these calls: the entry gives a
+// runner-less `main` the live host services as its root.
+main :
+  Unit ->{Host.Console, Host.Clock, Host.Random, Host.Environment, Host.Arguments; AppError} Unit
+let main () =
+  Host.Console.stdout_line "from the root"
+  Host.Console.stdout_write "no line break, "
+  Host.Console.stdout_line "then one"
+  Host.Console.stderr_line "to stderr"
+  let millis = Host.Clock.current_time_millis ()
+  let nanos = Host.Clock.current_time_nanos ()
+  let monotonic = Host.Clock.monotonic_time_nanos ()
+  let draw = Host.Random.next ()
+  Host.Console.stdout_line (show (millis > 0 && nanos > 0n && monotonic >= 0n))
+  Host.Console.stdout_line (show (draw >= 0 && draw < 1))
+  Host.Console.stdout_line (show (Host.Environment.env "FLICK_HOST_ROOT_UNSET"))
+  Host.Console.stdout_line (show (Host.Arguments.args ()))
+  // what `main` provides itself is inner, so it wins over the root
+  let told = Ref.make []
+  let fake =
+    Layer.succeed Host.Console {
+      stdout_line = fun text -> Ref.update told (fun lines -> lines ++ [text])
+      stderr_line = fun text -> Ref.update told (fun lines -> lines ++ [text])
+      stdout_write = fun text -> Ref.update told (fun lines -> lines ++ [text])
+    }
+  provide fake { Host.Console.stdout_line "kept" }
+  Host.Console.stdout_line (show (Ref.get told))

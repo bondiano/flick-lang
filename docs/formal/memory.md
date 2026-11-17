@@ -496,6 +496,24 @@ or memoized builders, parallel build/release, finalizers or cancellation.
 The dynamic provider/heap semantics are tested, not proved by the Lean
 insertion theorem.
 
+### Root services
+
+The counted main runner first evaluates the global `Host.live` and installs
+the Layer it gives as the root provider `Σ₀` of `core.md` (premise G3). No
+frame holds it: an operation that no frame's provider or handler answers is
+answered by it, under the root owner, keeping the performer's frames, owner
+and evidence as a frame provider does. Cleanup releases it with the other
+execution roots. A service outside it is still a `MissingHandler` defect.
+
+Its host primitives are intrinsics on a fixed host, the same as the
+evaluator's natives: `stdoutLine` and `stdoutWrite` write the captured
+stdout, `stderrLine` borrows its text and writes nothing, `platformEnv`
+allocates `None` and `platformArgs` an empty list, the wall clock reads
+1 700 000 000 000 ms and the same instant in nanoseconds, the monotonic clock
+0 ns, and every `flickNext` draw is 0.5. `platformEnv` and `platformArgs` allocate their result
+afresh in Flick's representation, which discharges the host result copy and
+shape conversion of their bindings; this is not generic foreign-copy erasure.
+
 ### Pattern selection and immutable updates
 
 `Match object pattern` borrows its receiver and returns a counted tagged

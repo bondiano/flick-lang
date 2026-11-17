@@ -12,6 +12,23 @@ impl<'p> Machine<'p> {
         }
     }
 
+    /// `Σ₀ := build(v)` for the value `v` of `layer`: the services the
+    /// runner provides, which answer an operation no handler of the run does.
+    pub fn provide_roots(&mut self, layer: Term) -> Result<(), Outcome> {
+        let v = match self.run(layer) {
+            Outcome::Value(v) => v,
+            other => return Err(other),
+        };
+        match self.run(build(&v)?) {
+            Outcome::Value(Term::Env(env)) => {
+                self.roots = (*env).clone();
+                Ok(())
+            }
+            Outcome::Value(other) => Err(stuck(format!("the root services are {other:?}"))),
+            other => Err(other),
+        }
+    }
+
     /// Runs `e` to its outcome.
     pub fn run(&mut self, e: Term) -> Outcome {
         self.drive(e, None)
