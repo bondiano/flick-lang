@@ -274,7 +274,8 @@ impl<'p> Builder<'p> {
             let mut width = 0;
             for row in &rows {
                 if test(row.pats[col]).is_some_and(|t| same(t, case)) {
-                    width = width.max(parts(row.pats[col]).len());
+                    let (items, rest) = parts(row.pats[col]);
+                    width = width.max(items.len() + usize::from(rest.is_some()));
                 }
             }
             let mut subplaces = Vec::with_capacity(width);
@@ -337,10 +338,7 @@ impl<'p> Builder<'p> {
         let mut col = 0;
         while col < cols.len() {
             if rows.iter().any(|r| matches!(r.pats[col], Pat::Or(_))) {
-                *rows = alternatives(mem::take(rows), col);
-                if rows.len() > self.budget {
-                    return None;
-                }
+                *rows = alternatives(mem::take(rows), col, self.budget)?;
                 continue;
             }
             let mut revealed = false;
@@ -428,47 +426,52 @@ fn spliced<T: Copy>(items: &[T], at: usize, count: usize, with: &[T]) -> Vec<T> 
 }
 
 /// `rows` with each or-pattern in column `col` an alternative per row, in
-/// order: the first that matches binds the names.
-fn alternatives(rows: Vec<Row<'_>>, col: usize) -> Vec<Row<'_>> {
+/// order: the first that matches binds the names. `None` past `limit` rows:
+/// or-patterns in several fields multiply them.
+fn alternatives(rows: Vec<Row<'_>>, col: usize, limit: usize) -> Option<Vec<Row<'_>>> {
     let mut out = Vec::with_capacity(rows.len());
     for row in rows {
-        flatten(row, col, &mut out);
+        flatten(row, col, &mut out, limit)?;
     }
-    out
+    Some(out)
 }
 
-fn flatten<'p>(row: Row<'p>, col: usize, out: &mut Vec<Row<'p>>) {
+fn flatten<'p>(row: Row<'p>, col: usize, out: &mut Vec<Row<'p>>, limit: usize) -> Option<()> {
     let Pat::Or(alts) = row.pats[col] else {
         out.push(row);
-        return;
+        return (out.len() <= limit).then_some(());
     };
     for alt in alts {
         let mut r = row.clone();
         r.pats[col] = alt;
-        flatten(r, col, out);
+        flatten(r, col, out, limit)?;
     }
+    Some(())
 }
 
 /// `row` where the value at `col` passed `case`, whose parts are the
 /// `width` columns after it; `None` when the row cannot match there.
 fn specialize<'p>(row: &Row<'p>, col: usize, case: Test<'p>, width: usize) -> Option<Row<'p>> {
-    let mut subs = vec![&WILD; width];
-    let mut row = row.clone();
-    match test(row.pats[col]) {
-        Some(t) if same(t, case) => {
-            for (at, part) in parts(row.pats[col]).into_iter().enumerate() {
-                subs[at] = part;
-            }
-            row.pats[col] = &WILD;
-        }
+    let head = row.pats[col];
+    let (taken, (items, rest)) = match test(head) {
+        Some(t) if same(t, case) => (true, parts(head)),
         Some(t) if exclusive(case, t) => return None,
         // a pattern accepting anything, or a test that may hold too, stays
-        _ => {}
-    }
-    row.pats = spliced(&row.pats, col + 1, 0, &subs);
-    Some(row)
+        _ => (false, (&[][..], None)),
+    };
+    let mut pats = Vec::with_capacity(row.pats.len() + width);
+    pats.extend_from_slice(&row.pats[..col]);
+    pats.push(if taken { &WILD } else { head });
+    pats.extend(items);
+    pats.extend(rest);
+    pats.resize(col + 1 + width, &WILD);
+    pats.extend_from_slice(&row.pats[col + 1..]);
+    Some(Row {
+        pats,
+        arm: row.arm,
+        binds: row.binds.clone(),
+    })
 }
-
 mod tests_of;
 
 #[cfg(test)]

@@ -399,7 +399,7 @@ corpus runs in both profiles against the same expectations.
 | dictionaries | a method of an instance without a context, written, derived or a default made its own, is an exported constant `<instance>$<method>`; a method of an instance with a context whose methods are all written as functions, and that takes no default, is the constant `<instance>$<method>` of the context's dictionaries, which its dictionary is built with. A canonical use calls it directly, in the module or an importer, given the dictionaries of the context as resolved (`$i_Show_Option_a_…$show($i_Show_Int)(x)`): no dictionary of the instance is built, which runs none of the program's code. A dictionary passed as a value (an `EqHash` witness) is never replaced |
 | foreign | a pure `foreign` that passes its arguments and result as they are is the import itself: `export const div$2 = $f_div`, and a full application in the module calls `$f_div` |
 | lone effects | a runtime body that only returns one effect, `Effect.gen(function* () { return yield* x; })`, is `Effect.suspend(() => x)`: built as late, without a generator |
-| matches and constructors | the last arm of a `match` without a guard is not tested, since the match is exhaustive; three or more arms that are constructors with only bound fields, the last one possibly any binding, are a `switch (x._tag)` with `default` last; a tagged constructor applied to all its fields is the object it builds, `{ _tag: "Rect#…", _0: 3, _1: 4 }` |
+| matches and constructors | a `match` goes through the decision graph the go target uses too (see below), each test an `if`; the last test before a failure is not made, since the match is exhaustive; a tagged constructor applied to all its fields is the object it builds, `{ _tag: "Rect#…", _0: 3, _1: 4 }` |
 
 A function whose first stage computes or runs something gets no worker:
 joining the stages would move that work after the next argument. The loop
@@ -546,7 +546,7 @@ and a method an instance takes from a default of its class. This holds in
 both profiles; in release a default may first become the instance's own
 method (devirtualization above), and is then called directly too.
 
-A `match` is compiled through a decision graph
+On both targets a `match` is compiled through a decision graph
 (`flick-backend-support/src/decision.rs`). Each test the arms make of the
 scrutinee, a constructor's tag, a literal or a list's length, is made once
 for every arm that needs it, so arms of one constructor with different
@@ -558,7 +558,10 @@ never to another alternative of its or-pattern. Names are bound before
 the guard, to the parts the first alternative that matches gives. An arm
 the graph reaches from several branches has its body written once: each
 branch assigns the arm's names, declared before the tests, and goes to the
-body with `goto`. A match whose graph would have more than 32 nodes plus
+body with `goto`. The JS target tries such a match arm by arm instead, as it
+does one of more than 16 arms, whose graph would spend the fuel budget of
+the backend component, one on a walked list, and every match in the
+browser compiler, whose size is budgeted. A match whose graph would have more than 32 nodes plus
 16 per arm is compiled arm by arm instead.
 
 Every generated Flick function takes its execution fiber, `*flickrt.Fiber`,

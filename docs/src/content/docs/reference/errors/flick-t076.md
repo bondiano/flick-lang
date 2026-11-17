@@ -2,28 +2,13 @@
 title: "FLICK-T076"
 ---
 
-`T.prove v` makes a value of a type with an invariant, such as a refined
-type, without checking it when the program runs. The compiler must prove
-that the type's check holds for `v` from what the path to it establishes:
-the condition of an `if` it is in, a `T.check v` that gave `true`, or the
-invariant of a `S.value s`. Nothing here established it, so the program is
-rejected. The value may well pass the check; the compiler cannot tell.
-Check it first, or use `T.parse v`, which checks it when the program runs
-and gives a `Result`.
-
-```flick fail T076
-refined type Email = String where Checks.email
-
-as_email : String -> Email
-let as_email text = Email.prove text
-```
-
-is
+`~` marks the parameter of a function that takes its argument as a
+computation, `~(Eff r e a)`: at a call, a direct runtime call written as that
+argument is passed unstarted, as `task { … }` would pass it, so the function
+decides when it runs. The marker belongs only left of a `->`, and only on a
+parameter of type `Eff`.
 
 ```flick
-refined type Email = String where Checks.email
-
-as_email : String -> Option Email
-let as_email text =
-  if Email.check text then Some (Email.prove text) else None
+or_die_int : ~(Eff r e Int)^c ->{r} Int
+let or_die_int job = Effect.or_die job
 ```

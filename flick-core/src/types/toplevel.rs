@@ -84,6 +84,7 @@ enum State {
 impl<'a> Checker<'a> {
     pub fn module(&mut self, tree: &'a Node) {
         self.root = Some(tree);
+        self.typing.suspended = super::suspended::marks(tree, self.text);
         let decls: Vec<&'a Node> = tree
             .nodes()
             .filter(|n| !matches!(n.kind, K::ModuleHeader | K::ImportDecl))

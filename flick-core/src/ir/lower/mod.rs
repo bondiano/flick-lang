@@ -15,6 +15,7 @@ mod generic;
 mod handle;
 mod interpolation;
 mod lambda;
+mod lazy;
 mod literals;
 mod loops;
 mod numeric;

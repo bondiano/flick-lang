@@ -188,7 +188,7 @@ impl Checker<'_> {
                 "cannot prove the check of `{}`: the compiler proves the check of a type without parameters over `Int`, `Float`, `String` or `Bool`; `{}.parse` checks a value when the program runs",
                 ty.name, ty.name
             );
-            self.error(codes::T076, span, message);
+            self.error(codes::T077, span, message);
             return Some(super::ty::Type::Error);
         }
         let entity = Entity {

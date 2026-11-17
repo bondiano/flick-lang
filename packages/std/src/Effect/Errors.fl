@@ -93,13 +93,13 @@ foreign effect match_cause_effect_eager from "flick:Effect" "flickMatchCauseEffe
   retention call
 
 /// Turns each typed failure of `task` into a defect.
-or_die : (Eff r e a)^c ->{r} a
+or_die : ~(Eff r e a)^c ->{r} a
 foreign effect or_die from "flick:Effect" "orDie"
   retention call
 
 /// Runs `task` and drops its typed failure, logging it at the level if
 /// one is given.
-ignore_ : Option LogLevel.LogLevel -> (Eff r e a)^c ->{r} Unit
+ignore_ : Option LogLevel.LogLevel -> ~(Eff r e a)^c ->{r} Unit
 foreign effect ignore_ from "flick:Effect" "flickIgnore"
   arity 1
   retention call

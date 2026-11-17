@@ -1,0 +1,20 @@
+// A runtime call written for a parameter marked `~` is passed unstarted:
+// the function runs it when it awaits it, as often as it awaits it. An
+// `Eff` value passed there is passed as it is.
+module App.Main exposing (main)
+
+twice : ~(Eff r e Int)^c ->{r; e} Int
+let twice job = await job + await job
+
+bump : Ref Int ->{} Int
+let bump cell =
+  Ref.set cell (Ref.get cell + 1)
+  Ref.get cell
+
+main : Unit ->{} Unit
+let main () =
+  let cell = Ref.make 0
+  let direct = twice (bump cell)
+  let job = task { bump cell }
+  let stored = twice job
+  Platform.stdout_line "direct: \{direct}, stored: \{stored}, cell: \{Ref.get cell}"

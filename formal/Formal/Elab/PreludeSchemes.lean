@@ -164,6 +164,26 @@ def from_result (result errors : Nat) : Scheme :=
   ⟨2, [],
     .arr (.R .cnil (.var 0)) (.app (.app (.con result) (.app (.con errors) (.var 0))) (.var 1)) (.var 1) .cnil, .cnil, []⟩
 
+/-- `Prelude.lazy_make : forall r e a c. Detached r => (Eff r e a)^c ->{} Lazy r e a` -/
+def lazy_make (detached eff lazy : Nat) : Scheme :=
+  ⟨4, [⟨detached, [.var 0]⟩],
+    .arr (.R (.run (.cun (.var 3) .cnil) .cnil) .cnil) (.app (.app (.con eff) (.var 3)) (.var 2)) (.app (.app (.app (.con lazy) (.var 0)) (.var 1)) (.var 2)) .cnil, .cnil, []⟩
+
+/-- `Prelude.lazy_force : forall r e a. Lazy r e a ->{Async | r; e} a` -/
+def lazy_force (async lazy : Nat) : Scheme :=
+  ⟨3, [],
+    .arr (.R (.run (.rnm async (.con async)) (.var 0)) (.var 1)) (.app (.app (.app (.con lazy) (.var 0)) (.var 1)) (.var 2)) (.var 2) .cnil, .cnil, []⟩
+
+/-- `Prelude.lazy_read : forall r e a. Lazy r e a ->{r; e} a` -/
+def lazy_read (lazy : Nat) : Scheme :=
+  ⟨3, [],
+    .arr (.R (.var 0) (.var 1)) (.app (.app (.app (.con lazy) (.var 0)) (.var 1)) (.var 2)) (.var 2) .cnil, .cnil, []⟩
+
+/-- `Prelude.lazy_done : forall a r e. a ->{} Lazy r e a` -/
+def lazy_done (lazy : Nat) : Scheme :=
+  ⟨3, [],
+    .arr (.R .cnil .cnil) (.var 0) (.app (.app (.app (.con lazy) (.var 1)) (.var 2)) (.var 0)) .cnil, .cnil, []⟩
+
 /-- `Prelude.parallel : forall r e a c b. Detached r => (Eff r e a)^c -> (Eff r e b)^c ->{r; e} (a, b)` -/
 def parallel (detached eff tup : Nat) : Scheme :=
   ⟨6, [⟨detached, [.var 0]⟩],

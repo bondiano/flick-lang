@@ -149,9 +149,10 @@ codes! {
     T073 = Types 73, "children of a call written as a list";
     T074 = Types 74, "a record in the braces of an `if` branch";
     T075 = Types 75, "`from_result (Err e)`, which `Fail.fail e` says";
-    T076 = Types 76, "cannot prove the check of a type with an invariant";
-    T077 = Types 77, "the check of a type with an invariant fails for this value";
-    T078 = Types 78, "`T.prove` or a constructor with an invariant not applied to its argument";
+    T076 = Types 76, "a `~` other than on a parameter of type `Eff`";
+    T077 = Types 77, "cannot prove the check of a type with an invariant";
+    T078 = Types 78, "the check of a type with an invariant fails for this value";
+    T079 = Types 79, "`T.prove` or a constructor with an invariant not applied to its argument";
     E001 = Effects 1, "runtime call in a pure position";
     E002 = Effects 2, "services or errors not allowed by the bound";
     E003 = Effects 3, "argument runs before the function that takes an Eff";

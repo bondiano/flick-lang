@@ -1,0 +1,33 @@
+// Fibers that force one lazy at once share one run of its task. An owner
+// interrupted while running it leaves no outcome behind: the next `await`
+// runs the task again, and the waiters see no interruption.
+module App.Main exposing (main)
+
+import Duration
+import Effect
+
+nap : Float ->{Async} Unit
+let nap millis =
+  match Duration.millis millis with
+  | Ok d -> Effect.sleep d
+  | Err _ -> ()
+
+main : Unit ->{Async} Unit
+let main () =
+  let runs = Ref.make 0
+  let shared = lazy {
+    Ref.set runs (Ref.get runs + 1)
+    nap 20
+    7
+  }
+  let (a, b) = parallel (task { await shared }) (task { await shared })
+  Platform.stdout_line "together: \{a} \{b}, runs: \{Ref.get runs}"
+  let slow_runs = Ref.make 0
+  let slow = lazy {
+    Ref.set slow_runs (Ref.get slow_runs + 1)
+    nap 50
+    1
+  }
+  let cut = timeout_option 5 (task { await slow })
+  let after = await slow
+  Platform.stdout_line "cut: \{show cut}, after: \{after}, runs: \{Ref.get slow_runs}"

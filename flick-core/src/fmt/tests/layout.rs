@@ -270,6 +270,20 @@ fn breaks_a_record_in_a_plugin_block_by_lines() {
     "#);
 }
 
+/// `lazy { … }` lays out as `task { … }`, and `lazy e` as `await e`.
+#[test]
+fn lays_out_lazy_like_task_and_await() {
+    let src = "let l = lazy {   load  id }\nlet m = lazy   load id\nlet long = lazy {\n  let user = load id\n  user.name }\n";
+    insta::assert_snapshot!(fmt(src), @r#"
+    let l = lazy { load id }
+    let m = lazy load id
+    let long = lazy {
+      let user = load id
+      user.name
+    }
+    "#);
+}
+
 /// Comments keep their lines: own-line comments before what follows, trailing ones at the end of theirs.
 #[test]
 fn keeps_comments_in_place() {

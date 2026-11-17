@@ -10,44 +10,44 @@ refined type Digit = Int where fun n -> n >= 0 && n <= 9
 
 incomplete : Float -> Option Port
 let incomplete n = if n > 0 then Some (Port.prove n) else None
-//                                     ^^^^^^^^^^^^ FLICK-T076 nothing here establishes `n < 65536`
+//                                     ^^^^^^^^^^^^ FLICK-T077 nothing here establishes `n < 65536`
 
 lower_open : Float -> Option Port
 let lower_open n = if n < 65536 then Some (Port.prove n) else None
-//                                         ^^^^^^^^^^^^ FLICK-T076 nothing here establishes `n > 0`
+//                                         ^^^^^^^^^^^^ FLICK-T077 nothing here establishes `n > 0`
 
 // NaN is neither below nor above 0: `not (n <= 0)` holds of it
 not_below : Float -> Option Positive
 let not_below n = if n <= 0 then None else Some (Positive.prove n)
-//                                               ^^^^^^^^^^^^^^^^ FLICK-T076 nothing here establishes `n > 0`
+//                                               ^^^^^^^^^^^^^^^^ FLICK-T077 nothing here establishes `n > 0`
 
 // `>= 0` holds of 0, which `> 0` does not
 zero : Float -> Option Positive
 let zero n = if n >= 0 then Some (Positive.prove n) else None
-//                                ^^^^^^^^^^^^^^^^ FLICK-T076 nothing here establishes `n > 0`
+//                                ^^^^^^^^^^^^^^^^ FLICK-T077 nothing here establishes `n > 0`
 
 refuted : Float -> Option Port
 let refuted n = if n < 0 then Some (Port.prove n) else None
-//                                  ^^^^^^^^^^^^ FLICK-T077 `n > 0` is false here
+//                                  ^^^^^^^^^^^^ FLICK-T078 `n > 0` is false here
 
 bad_constant : Port
 let bad_constant = Port.prove 65536
-//                 ^^^^^^^^^^^^^^^^ FLICK-T077 `65536 < 65536` is false here
+//                 ^^^^^^^^^^^^^^^^ FLICK-T078 `65536 < 65536` is false here
 
 // a positive `Int` plus one may wrap below 0
 wrapped : Int -> Option Digit
 let wrapped n = if n >= 0 && n <= 9 then Some (Digit.prove (n + 1)) else None
-//                                             ^^^^^^^^^^^^^^^^^^^ FLICK-T076 nothing here establishes `n + 1 >= 0`
+//                                             ^^^^^^^^^^^^^^^^^^^ FLICK-T077 nothing here establishes `n + 1 >= 0`
 
 // the invariant of `Positive` says nothing of the upper bound
 back : Positive -> Port
 let back p = Port.prove (Positive.value p)
-//           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-T076 nothing here establishes `Positive.value p < 65536`
+//           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-T077 nothing here establishes `Positive.value p < 65536`
 
 // `||` that held does not say which side did
 either : Float -> Option Port
 let either n = if n > 0 || n < 65536 then Some (Port.prove n) else None
-//                                              ^^^^^^^^^^^^ FLICK-T076 nothing here establishes `n > 0`
+//                                              ^^^^^^^^^^^^ FLICK-T077 nothing here establishes `n > 0`
 
 // a type over another than a number, a text or a `Bool`, whose `>` its
 // `Ord` decides, has no `T.prove`
@@ -58,4 +58,4 @@ refined type Big = Size where fun s -> s > Small
 
 big : Size -> Option Big
 let big s = if s > Small then Some (Big.prove s) else None
-//                                  ^^^^^^^^^ FLICK-T076 the compiler proves the check of a type without parameters
+//                                  ^^^^^^^^^ FLICK-T077 the compiler proves the check of a type without parameters

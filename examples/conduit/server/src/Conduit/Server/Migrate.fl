@@ -15,6 +15,6 @@ let main () =
     try url () with
     | Config.ConfigError message -> App.fail "configuration: \{message}"
   provide (Database.pg (Database.config database)) {
-    let applied = Effect.or_die (task { Database.Migrate.run Schema.migrations })
+    let applied = Effect.or_die (Database.Migrate.run Schema.migrations)
     Platform.stdout_line "migrations applied: \{show applied}"
   }

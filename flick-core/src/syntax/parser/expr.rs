@@ -110,6 +110,13 @@ fn expr_bp(p: &mut Parser, min_bp: u8) -> Option<Done> {
 }
 
 fn prefix(p: &mut Parser) -> Option<Done> {
+    // `lazy e` binds as `await e` does; `lazy { … }` is a block, as `task`
+    if p.at(K::LazyKw) && p.nth(1) != K::LBrace {
+        let m = p.start();
+        p.bump();
+        expr_bp(p, PREFIX_OPERAND);
+        return Some(p.complete(m, K::LazyExpr));
+    }
     if matches!(
         p.current(),
         K::Minus | K::NotKw | K::AwaitKw | K::IgnoreKw | K::EchoKw
@@ -187,6 +194,7 @@ pub(super) fn at_operand_start(p: &Parser) -> bool {
                 | K::Minus
                 | K::NotKw
                 | K::AwaitKw
+                | K::LazyKw
                 | K::IgnoreKw
                 | K::EchoKw
                 | K::FunKw
@@ -273,6 +281,7 @@ pub(super) fn at_arg_start(p: &Parser) -> bool {
         | K::TodoKw
         | K::ScopeKw
         | K::ProvideKw => true,
+        K::LazyKw => p.nth(1) == K::LBrace,
         K::LBrace => !p.no_brace,
         _ => false,
     }
@@ -392,6 +401,11 @@ pub(super) fn atom(p: &mut Parser) -> Option<Done> {
             p.bump();
             p.braces(K::Block, stmt, |_| false);
             K::TaskExpr
+        }
+        K::LazyKw => {
+            p.bump();
+            p.braces(K::Block, stmt, |_| false);
+            K::LazyExpr
         }
         K::ScopeKw => {
             p.bump();

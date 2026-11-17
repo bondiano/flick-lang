@@ -89,12 +89,20 @@ let select pair =
             let code = emit(text, release, typescript);
             assert_eq!(code.matches("yield* accept(").count(), 1, "{code}");
             let guard = code.find("yield* accept(").expect("runtime guard");
-            let first = code.find("x = pair._0").expect("first alternative binding");
-            let second = code
-                .find("x = pair._1")
-                .expect("second alternative binding");
-            assert!(first < second && second < guard, "{code}");
-            assert!(code[first..guard].contains(" || "), "{code}");
+            let first = (code.find("= pair._0")).unwrap_or_else(|| panic!("{code}"));
+            assert!(first < guard, "{code}");
+            if cfg!(feature = "native-project") {
+                // the decision graph: the first alternative matches every
+                // `Pair`, so the second binds nothing
+                assert!(!code.contains("pair._1"), "{code}");
+            } else {
+                // arm by arm: the alternatives are tried before the guard
+                let second = code
+                    .find("x = pair._1")
+                    .expect("second alternative binding");
+                assert!(first < second && second < guard, "{code}");
+                assert!(code[first..guard].contains(" || "), "{code}");
+            }
             assert!(code[guard..].contains("return \"yes\";"), "{code}");
             assert!(code[guard..].contains("return \"no\";"), "{code}");
             assert!(!code.contains("runIn("), "{code}");
@@ -233,5 +241,40 @@ let answer () =
             assert!(code.contains("[\"__proto__\"]:"), "{code}");
             assert!(!code.contains("{ \"__proto__\":"), "{code}");
         }
+    }
+}
+
+// the decision graph is the JS backend's where it builds projects
+#[cfg(feature = "native-project")]
+#[test]
+fn the_arms_of_one_constructor_test_it_once() {
+    let text = "module App exposing (name)\n\n\
+         type Shape = Dot | Line Int | Pair Shape Shape\n\n\
+         name : Shape -> String\nlet name s =\n  match s with\n  \
+         | Pair Dot _ -> \"dot first\"\n  | Pair (Line n) _ -> \"line\"\n  \
+         | Pair (Pair _ _) Dot -> \"nested\"\n  | _ -> \"other\"\n";
+    for release in [false, true] {
+        let js = emit(text, release, false);
+        // one test of `Pair` for its three arms, then of its first field
+        assert_eq!(js.matches("s._tag === \"Pair#").count(), 1, "{js}");
+        assert_eq!(js.matches("s._0._tag === \"Line#").count(), 1, "{js}");
+        // the tests that fail fall to the catch-all, written once
+        assert_eq!(js.matches("return \"other\"").count(), 1, "{js}");
+    }
+}
+
+#[cfg(feature = "native-project")]
+#[test]
+fn a_match_that_would_write_an_arm_twice_tries_its_arms_in_turn() {
+    // the guarded arm under `Line` and under `Pair`
+    let text = "module App exposing (first)\n\n\
+         type Shape = Dot | Line Int | Pair Shape Shape\n\n\
+         first : Shape -> Int\nlet first s =\n  match s with\n  \
+         | Line n | Pair (Line n) _ when n > 0 -> n\n  | _ -> 0\n";
+    for release in [false, true] {
+        let js = emit(text, release, false);
+        assert_eq!(js.matches("return n;").count(), 1, "{js}");
+        assert_eq!(js.matches("s._tag === \"Line#").count(), 1, "{js}");
+        assert!(js.contains(" || "), "{js}");
     }
 }

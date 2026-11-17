@@ -78,6 +78,7 @@ lang_items! {
     Form = "form",
     PureCodec = "pure_codec",
     Eff = "eff",
+    Lazy = "lazy",
     Layer = "layer",
     Codec = "codec",
     Errors = "errors",
@@ -175,6 +176,10 @@ lang_items! {
     Ge = "ge",
     // functions that syntax stands for or the optimizer knows
     FromResult = "from_result",
+    LazyMake = "lazy_make",
+    LazyForce = "lazy_force",
+    LazyDone = "lazy_done",
+    LazyRead = "lazy_read",
     Fail = "fail",
     LayerRun = "layer_run",
     ScopeRun = "scope_run",
