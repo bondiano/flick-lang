@@ -30,7 +30,7 @@ param ::= … | "~" atom-type                -- only directly left of `->` in a 
 
 ## 2. Types
 
-```flick
+```text
 -- Prelude
 @lang lazy
 @stores
@@ -158,7 +158,7 @@ Each is a contextual equivalence (`formal/Formal/ContextEquivalence.lean`) prove
 
 A parameter marked `~` takes its argument as a computation. At a call whose argument is not already an `Eff`, the argument is wrapped in `task`:
 
-```flick
+```text
 or_die : ~(Eff r e a)^c ->{r} a
 let rows = Effect.or_die (Database.query q)     -- elaborates to Effect.or_die (task { Database.query q })
 let job = task { Database.query q }
