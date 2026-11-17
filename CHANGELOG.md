@@ -6,6 +6,14 @@ break programs.
 
 ## Unreleased
 
+- **`lazy`:** `lazy { body }` (or `lazy e`) builds a `Lazy r e a`, which runs
+  its body at most once, at its first `await`, in the fiber that awaits;
+  every later `await` gets the same value, typed failure or defect. Fibers
+  that await one lazy at once share one run, and an interrupted run leaves
+  nothing behind, so the next `await` runs the body again. Building one is a
+  runtime call; awaiting one needs `Async`. On JavaScript, Flick's own
+  runtime and Go; the reference model runs it. **Breaking:** `lazy` is a
+  keyword, so `Schema.lazy` is now `Schema.suspend`.
 - **Raise with `Fail.fail`:** `from_result (Err e)` is `FLICK-T075`, a
   warning whose safe fix writes `Fail.fail e`: the same type and meaning,
   without building a `Result` to fail with. `flick check --fix --only T075`

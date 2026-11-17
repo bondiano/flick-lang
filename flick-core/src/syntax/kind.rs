@@ -84,6 +84,7 @@ syntax_kinds! {
         ElseKw = "else",
         TaskKw = "task",
         AwaitKw = "await",
+        LazyKw = "lazy",
         ScopeKw = "scope",
         ProvideKw = "provide",
         IgnoreKw = "ignore",
@@ -287,6 +288,8 @@ syntax_kinds! {
         TryExpr,
         IfExpr,
         TaskExpr,
+        /// `lazy { … }`: a computation run at most once, at its first `await`.
+        LazyExpr,
         /// `do { … }`: statements sequenced through `Monad`.
         DoExpr,
         /// `pattern <- expr` in a `do` block.

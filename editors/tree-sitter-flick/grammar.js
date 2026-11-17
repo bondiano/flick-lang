@@ -3,7 +3,7 @@
 
 const KEYWORDS = [
   'module', 'exposing', 'import', 'as', 'let', 'mut', 'rec', 'assert', 'fun', 'match', 'with',
-  'try', 'if', 'then', 'else', 'task', 'await', 'scope', 'provide', 'ignore',
+  'try', 'if', 'then', 'else', 'task', 'await', 'lazy', 'scope', 'provide', 'ignore',
   'todo', 'echo',
   'type', 'opaque', 'refined', 'where', 'kind', 'error', 'service', 'class',
   'instance', 'deriving', 'forall', 'not', 'none',

@@ -1,0 +1,20 @@
+// Building a lazy allocates a cell, as `Ref.make` does, so a pure function
+// cannot; forcing one may wait for another fiber, so it needs `Async`; its
+// task may run in another fiber, so it cannot use a `control` operation.
+module App.Stages exposing (..)
+
+pure_lazy : Int -> Lazy {} {} Int
+let pure_lazy n = lazy { n }
+
+no_async : Lazy {} {} Int ->{} Int
+let no_async l = await l
+
+effect Emit =
+  control emit : Int ->{} Unit
+
+emitting : Unit ->{Emit} Lazy {Emit} {} Unit
+let emitting () = lazy { Emit.emit 1 }
+
+//~ FLICK-E001 @7:19-7:29 `pure_lazy` is pure
+//~ FLICK-E002 @10:18-10:25 does not allow service `Async`
+//~ FLICK-E017 @16:19-16:39 `Detached {Emit}` does not hold

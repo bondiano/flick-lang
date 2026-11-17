@@ -69,7 +69,8 @@ and [ffi.md](../ffi/).
 | Keyword | Meaning | Example |
 | - | - | - |
 | `task` | builds an `Eff r e a` from its block without running it | `task { Users.get id }` |
-| `await` | runs an `Eff` once in the current fiber and gives its result | `await request` |
+| `await` | runs an `Eff` once in the current fiber and gives its result, or forces a `Lazy` | `await request` |
+| `lazy` | builds a `Lazy r e a`, which runs its block at most once, at its first `await` | `lazy { Config.load () }` |
 | `scope` | runs its block in a fresh region and releases what the block acquired when it ends | `scope { File.read_all (File.open_scoped path) }` |
 | `provide` | runs its block with the services a layer builds | `provide live { run user }` |
 | `ignore` | discards the value of an intermediate statement | `ignore (Store.save user)` |
@@ -77,7 +78,7 @@ and [ffi.md](../ffi/).
 `ignore` evaluates its operand and throws the value away. An `Eff` it
 discards is not run: write `ignore (await t)` to run `t` and drop its result.
 
-See [effects.md](../effects/#task-and-await) and [regions.md](../regions/).
+See [effects.md](../effects/#task-and-await), [`lazy`](../effects/#lazy) and [regions.md](../regions/).
 
 ## Debugging
 
@@ -114,6 +115,7 @@ with what the keyword does:
 | Hover on | Shows |
 | - | - |
 | `task` | `task { … } : Eff {Store} {StoreError} Float`: the computation the block builds |
+| `lazy` | `lazy { … } : Lazy {Store} {StoreError} Float`: the lazy the block builds |
 | `scope` | `scope { … } : Float`: the value the block returns once its resources are released |
 | `provide`, `try` | the value of the block, with the services or errors it removes |
 | `match`, `if` | `match … with : String`: the value of the arm or branch taken |

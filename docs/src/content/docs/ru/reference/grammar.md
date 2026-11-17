@@ -1,6 +1,6 @@
 ---
 title: "Грамматика Flick"
-source_hash: 66bd177d6ef5d369
+source_hash: be4a71842d0d008e
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -474,6 +474,7 @@ expr        = "fun" atom_pattern { atom_pattern } "->" block
             | "match" expr "with" arm { arm }
             | "try" block "with" handler_arm { handler_arm }
             | "if" expr "then" block [ "else" (if_expr | block) ]
+            | "lazy" expr                    // binds as `await`: `lazy f x` is `lazy (f x)`
             | operator expression over application (see the operator table)
 arm         = "|" or_pattern ["when" expr] "->" block
 handler_arm = arm | "|" "return" or_pattern "->" block
@@ -485,7 +486,7 @@ atom        = name | Con { "." Con } ["." name] | Float | BigInt | String
             | "(" expr "," expr { "," expr } ")" | "[" [expr { "," expr } [","]] "]"
             | "{" "}" | "{" field "=" block { ";" | line break … } "}"
             | "{" expr "with" field "=" block { … } "}"
-            | "task" "{" block "}" | "ui" "{" block "}"
+            | "task" "{" block "}" | "lazy" "{" block "}" | "ui" "{" block "}"
             | "do" "{" do_stmt { ";" | line break … } "}"
             | [label [":"]] "for" ("{" clause_list "}" | clause_list) ("yield" expr | "do" block)
             | "scope" [name] "{" block "}" | "provide" expr "{" block "}"

@@ -93,7 +93,7 @@ The combinators the derive writes are values of `Schema` a program may use:
 | `Schema.unsafe_record [Schema.field "x" s, …]` | a record, its fields in label order |
 | `Schema.unsafe_tuple [Schema.item s, …]` | a tuple |
 | `Schema.unsafe_adt "Shape" [Schema.unsafe_case Circle [Schema.item s], …]` | a variant type, its constructors given as values |
-| `Schema.lazy "T" (fun _ -> s)` | a reference named `T` in JSON Schema, made on first use |
+| `Schema.suspend "T" (fun _ -> s)` | a reference named `T` in JSON Schema, made on first use |
 | `Schema.recursive "T" (fun self -> s)` | a recursive type, `self` the reference to it |
 | `Schema.unsafe_unboxed s`, `Schema.unsafe_refined "T" known s T.parse` | an `unboxed type`, a refined one |
 | `Schema.enum Schema.string`, `Schema.unsafe_enum_tags Schema.string [("Get", Get), …]` | an enum, on the wire its literals or `{ "_tag" }` |
