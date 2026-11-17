@@ -4,6 +4,7 @@
 //! same analysis that compiles it, and publishes the diagnostics `flick
 //! check` reports, positions converted to UTF-16.
 
+mod deferred;
 mod diagnostics;
 mod features;
 mod logging;
@@ -12,6 +13,7 @@ pub mod protocol;
 mod registration;
 mod requests;
 mod snapshot;
+mod worker;
 
 use std::collections::{HashMap, HashSet};
 use std::env;
@@ -20,17 +22,21 @@ use std::io::{self, BufReader, Write};
 use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::process::{self, ExitCode};
-use std::time::Instant;
+use std::sync::mpsc;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use flick_core::diagnostics::Diagnostic;
 use flick_core::project;
 use serde_json::Value;
-use tracing::{debug, error, info, info_span, warn};
+use tracing::{debug, error, info, info_span};
 
 use crate::builtins;
+use deferred::Deferred;
 use diagnostics::{lsp_diagnostic, publish};
 use snapshot::{BUILTIN_DIR, builtin_index, canonical, overlay};
 pub use snapshot::{Caches, Context, Snapshot, analyze};
+use worker::Worker;
 
 pub struct Server {
     docs: HashMap<PathBuf, String>,
@@ -49,6 +55,14 @@ pub struct Server {
     registered: Option<HashSet<String>>,
     /// The requests the server sent the client.
     requests: u64,
+    /// The thread that analyzes document changes off the message loop.
+    worker: Worker,
+    /// The newest revision asked for each document.
+    pending: HashMap<PathBuf, u64>,
+    /// Counts revisions, so a slow analysis of an old text is dropped.
+    generation: u64,
+    /// The requests held until the analysis of their document is published.
+    deferred: Vec<Deferred>,
 }
 
 pub fn serve() -> ExitCode {
@@ -72,13 +86,35 @@ pub fn serve() -> ExitCode {
         out: Box::new(io::stdout()),
         registered: None,
         requests: 0,
+        worker: Worker::new(),
+        pending: HashMap::new(),
+        generation: 0,
+        deferred: Vec::new(),
     };
-    let mut input = BufReader::new(io::stdin().lock());
+    // the protocol reader has its own thread: waiting for the editor's next
+    // message does not stop a finished analysis from being published
+    let (messages, input) = mpsc::channel::<io::Result<Option<Value>>>();
+    thread::Builder::new()
+        .name("flick-lsp-input".to_owned())
+        .spawn(move || {
+            let mut reader = BufReader::new(io::stdin().lock());
+            loop {
+                let message = protocol::read(&mut reader);
+                let last = !matches!(message, Ok(Some(_)));
+                if messages.send(message).is_err() || last {
+                    return;
+                }
+            }
+        })
+        .expect("the protocol reader starts");
     let mut shut_down = false;
     loop {
-        let message = match protocol::read(&mut input) {
-            Ok(Some(m)) => m,
-            Ok(None) => {
+        // publish what the worker finished and answer what waited for it
+        server.guarded(Server::poll);
+        let message = match input.recv_timeout(Duration::from_millis(10)) {
+            Ok(Ok(Some(message))) => message,
+            Ok(Ok(None)) | Err(mpsc::RecvTimeoutError::Disconnected) => {
+                server.guarded(Server::settle);
                 info!(
                     shutdown = shut_down,
                     reason = "eof",
@@ -86,10 +122,12 @@ pub fn serve() -> ExitCode {
                 );
                 return ExitCode::from(u8::from(!shut_down));
             }
-            Err(err) => {
+            Ok(Err(err)) => {
                 error!(error = %err, "cannot read protocol message");
                 return ExitCode::FAILURE;
             }
+            // nothing from the editor for a while: keep publishing analyses
+            Err(mpsc::RecvTimeoutError::Timeout) => continue,
         };
         let method = message["method"].as_str().unwrap_or("");
         let params = &message["params"];
@@ -120,20 +158,16 @@ pub fn serve() -> ExitCode {
             }
             // what the client answers a request of the server's
             ("", Some(_)) => debug!("response received"),
+            ("$/cancelRequest", None) => server.cancel_request(params),
             (_, Some(id)) => {
-                let reply = match server.guarded(|s| s.request(method, params)) {
-                    Some(Ok(result)) => protocol::response(id, &result),
-                    Some(Err((code, text))) => {
-                        warn!(code, error = %text, "request failed");
-                        protocol::error(id, code, &text)
-                    }
-                    None => protocol::error(
-                        id,
-                        INTERNAL_ERROR,
-                        "internal error in the language server; its log has the details",
-                    ),
-                };
-                server.send(&reply);
+                // a request reads the analysis of its document: holding it
+                // until the background analysis lands keeps the loop free
+                // and lets the client cancel it meanwhile
+                if server.should_defer(method, params) {
+                    server.defer(id.clone(), method, params.clone());
+                } else {
+                    server.answer(id, method, params);
+                }
             }
             (_, None) => {
                 server.guarded(|s| s.notify(method, params));
@@ -142,9 +176,6 @@ pub fn serve() -> ExitCode {
         debug!(elapsed = ?started.elapsed(), "message handled");
     }
 }
-
-/// The JSON-RPC code of a request the server failed on itself.
-const INTERNAL_ERROR: i64 = -32603;
 
 impl Server {
     /// Runs `f`; a panic in it, which the hook has logged, is `None`, and
@@ -156,6 +187,7 @@ impl Server {
             self.snapshots.clear();
             self.latest = None;
             self.caches.clear();
+            self.worker.clear(None);
         }
         out
     }
@@ -167,6 +199,11 @@ impl Server {
     }
 
     fn notify(&mut self, method: &str, params: &Value) {
+        // a notification about files on disk, not about an open document
+        if method == "workspace/didChangeWatchedFiles" {
+            self.watched_files(params);
+            return;
+        }
         let uri = params["textDocument"]["uri"].as_str().unwrap_or("");
         let Some(path) = protocol::path_of(uri) else {
             return;
@@ -190,29 +227,30 @@ impl Server {
                 self.docs.insert(path.clone(), text);
             }
             "textDocument/didChange" => {
+                // Incremental sync: each change replaces the range it names
+                // in the text as the previous changes left it. A change
+                // without a range still replaces the whole document.
                 let changes = params["contentChanges"].as_array();
-                if let Some(text) = changes
-                    .and_then(|c| c.last())
-                    .and_then(|c| c["text"].as_str())
-                {
-                    self.docs.insert(path.clone(), text.to_owned());
+                let text = self.docs.entry(path.clone()).or_default();
+                if let Some(changes) = changes {
+                    apply_changes(text, changes);
                 }
-                // Publish the new result, including an empty diagnostic list
-                // when a previously reported error has just been fixed.
-                self.refresh(&path);
-                return;
             }
             "textDocument/didClose" => {
                 let context = Context::of(&self.docs, &path);
                 self.docs.remove(&path);
-                if !self
+                // the closed text is gone: analyze an open document of its
+                // project instead, so the disk view is what gets published
+                let open = self
                     .docs
                     .keys()
-                    .any(|p| Context::of(&self.docs, p) == context)
-                {
-                    self.clear(&context);
-                    return;
+                    .find(|p| Context::of(&self.docs, p) == context)
+                    .cloned();
+                match open {
+                    Some(open) => self.refresh(&open),
+                    None => self.clear(&context),
                 }
+                return;
             }
             "textDocument/didSave" => {}
             _ => return,
@@ -233,18 +271,23 @@ impl Server {
         match context {
             Context::Standalone(_) => {
                 self.caches.remove(context);
+                self.worker.clear(Some(context.clone()));
             }
             Context::Project(_) => {
-                let open: HashSet<Context> = self
+                let mut kept: HashSet<Context> = self
                     .docs
                     .keys()
                     .map(|p| Context::of(&self.docs, p))
                     .collect();
-                self.caches
-                    .retain(|kept, _| kept == context || open.contains(kept));
+                kept.insert(context.clone());
+                self.caches.retain(|cached, _| kept.contains(cached));
+                self.worker.retain(kept);
             }
             Context::Builtin(_) => {}
         }
+        // analyses still running for it describe a text nobody sees now
+        self.pending
+            .retain(|path, _| Context::of(&self.docs, path) != *context);
         if let Some(files) = self.published.remove(context) {
             let others = self.release(files);
             for open in others {
@@ -281,8 +324,25 @@ impl Server {
     }
 
     /// Re-analyzes and publishes this context's diagnostics.
+    /// Analyzes the document's context in the background and publishes the
+    /// result when the worker finishes, unless a newer revision replaced it.
     fn refresh(&mut self, path: &Path) {
-        let snapshot = analyze(&self.docs, path, &mut self.caches);
+        self.generation += 1;
+        let generation = self.generation;
+        self.pending.insert(path.to_path_buf(), generation);
+        self.worker.submit(worker::Job {
+            path: path.to_path_buf(),
+            docs: self.docs.clone(),
+            generation,
+        });
+    }
+
+    /// Publishes a finished analysis if it is still the newest of its document.
+    fn publish(&mut self, path: &Path, generation: u64, snapshot: Snapshot) {
+        if self.pending.get(path) != Some(&generation) {
+            return;
+        }
+        self.pending.remove(path);
         self.register_loaded(snapshot.analysis.modules.iter().map(|m| m.path.as_path()));
         let mut by_file: HashMap<PathBuf, Vec<&Diagnostic>> = HashMap::new();
         for d in &snapshot.analysis.diagnostics {
@@ -355,6 +415,82 @@ impl Server {
                     self.refresh(&open);
                 }
             }
+        }
+    }
+
+    /// Publishes the analyses that finished and answers the requests they held.
+    fn poll(&mut self) {
+        while let Some(done) = self.worker.try_recv() {
+            self.publish(&done.path, done.generation, done.snapshot);
+        }
+        self.resume();
+    }
+
+    /// Waits for every queued analysis, for the end of input.
+    fn settle(&mut self) {
+        while !self.pending.is_empty() {
+            match self.worker.recv_timeout(Duration::from_secs(30)) {
+                Some(done) => self.publish(&done.path, done.generation, done.snapshot),
+                None => break,
+            }
+        }
+    }
+
+    /// Files on disk outside the editor changed: the analyses that read them
+    /// are stale, so their caches go and the open documents are analyzed anew.
+    fn watched_files(&mut self, params: &Value) {
+        let mut contexts = HashSet::new();
+        let mut manifest = false;
+        for change in params["changes"].as_array().into_iter().flatten() {
+            let Some(path) = change["uri"].as_str().and_then(protocol::path_of) else {
+                continue;
+            };
+            manifest |= path.file_name() == Some(OsStr::new(project::CONFIG_FILE));
+            contexts.insert(Context::of(&self.docs, &path));
+        }
+        if manifest {
+            self.worker.clear(None);
+            self.caches.clear();
+            self.snapshots.clear();
+            self.latest = None;
+            self.pending.clear();
+        } else {
+            for context in &contexts {
+                self.worker.clear(Some(context.clone()));
+                self.caches.remove(context);
+                self.snapshots.remove(context);
+            }
+            self.pending
+                .retain(|path, _| !contexts.contains(&Context::of(&self.docs, path)));
+        }
+        let open: Vec<PathBuf> = self.docs.keys().cloned().collect();
+        for path in open {
+            if manifest || contexts.contains(&Context::of(&self.docs, &path)) {
+                self.refresh(&path);
+            }
+        }
+    }
+}
+
+/// Applies the changes of a `textDocument/didChange` notification in order:
+/// each range refers to the text as the previous changes left it.
+fn apply_changes(text: &mut String, changes: &[Value]) {
+    for change in changes {
+        let replacement = change["text"].as_str().unwrap_or("");
+        match change.get("range") {
+            Some(range) if !range.is_null() => {
+                let start = protocol::offset(text, &range["start"]) as usize;
+                let end = protocol::offset(text, &range["end"]) as usize;
+                let start = start.min(text.len());
+                let end = end.min(text.len());
+                let (start, end) = if start <= end {
+                    (start, end)
+                } else {
+                    (end, start)
+                };
+                text.replace_range(start..end, replacement);
+            }
+            _ => replacement.clone_into(text),
         }
     }
 }
