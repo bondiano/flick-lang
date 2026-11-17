@@ -57,7 +57,7 @@ fn check(text: &str, imported: &[Interface]) -> (Interface, Vec<Diagnostic>) {
 fn library() -> &'static Interface {
     static LIBRARY: LazyLock<Interface> = LazyLock::new(|| {
         let (interface, diagnostics) = check(
-            include_str!("../../../tests/check/pass/regions/transformers.fl"),
+            include_str!("../../tests/check/pass/regions/transformers.fl"),
             &[],
         );
         assert!(diagnostics.is_empty(), "{diagnostics:?}");

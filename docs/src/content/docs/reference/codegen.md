@@ -396,7 +396,7 @@ corpus runs in both profiles against the same expectations.
 | scalar replacement | a local record whose every use reads a field, or a local tuple only destructured, becomes one local per part: no object |
 | dead code | unused pure bindings (an unused `task { … }` included) and private top-level values nothing reaches; a runtime call always stays, its result used or not |
 | workers | a top-level function whose stages before the last are pure gets `f$n` taking all `n` arguments; a known full application calls it, a partial one keeps the curried `f`; a private function only ever applied fully has no curried form. An exported function of two or more parameters without dictionaries, `foreign` included, exports `f$n` beside `f`, and a full application in another module calls it: the `stages` of its `.iface` summary give `n` |
-| dictionaries | a method written in an instance without a context is an exported constant `<instance>$<method>`; a canonical use calls it directly, in the module or an importer; a dictionary passed as a value (an `EqHash` witness) is never replaced |
+| dictionaries | a method of an instance without a context, written, derived or a default made its own, is an exported constant `<instance>$<method>`; a method of an instance with a context whose methods are all written as functions, and that takes no default, is the constant `<instance>$<method>` of the context's dictionaries, which its dictionary is built with. A canonical use calls it directly, in the module or an importer, given the dictionaries of the context as resolved (`$i_Show_Option_a_…$show($i_Show_Int)(x)`): no dictionary of the instance is built, which runs none of the program's code. A dictionary passed as a value (an `EqHash` witness) is never replaced |
 | foreign | a pure `foreign` that passes its arguments and result as they are is the import itself: `export const div$2 = $f_div`, and a full application in the module calls `$f_div` |
 | lone effects | a runtime body that only returns one effect, `Effect.gen(function* () { return yield* x; })`, is `Effect.suspend(() => x)`: built as late, without a generator |
 | matches and constructors | the last arm of a `match` without a guard is not tested, since the match is exhaustive; three or more arms that are constructors with only bound fields, the last one possibly any binding, are a `switch (x._tag)` with `default` last; a tagged constructor applied to all its fields is the object it builds, `{ _tag: "Rect#…", _0: 3, _1: 4 }` |
@@ -522,20 +522,29 @@ function per module, run in the order the modules depend on each other.
 The cases of `tests/run` listed in `tests/run/portable.txt` run on both
 targets and give the same output.
 
-A method written as a function in an instance without a context is a Go
-function of its own, and the instance's dictionary holds it. Where the
-checker resolved a method to such an instance (`show 3`, `compare` of two
-values whose `Ord` is derived), the code calls that function, with no
-lookup in the dictionary. It takes and gives values, not Go's own types:
-generic code reaches it through the dictionary, as `List.sort` calls
-`compare` of `Ord Int`, and a function of Go's types would need a wrapper
+A method written as a function is a Go function of its own, and the
+instance's dictionary holds it; that of an instance with a context takes
+the context's dictionaries first, as a constrained function does, and the
+dictionary holds it applied to them. A method an instance without a
+context computes is a package variable, set as its dictionary is built.
+Where the checker resolved a method to such an instance (`show 3`,
+`compare` of two values whose `Ord` is derived, `show` of an
+`Option Int`), the code calls that function, or applies that variable,
+with no lookup in the dictionary; the dictionaries of a context are passed
+as they were resolved, a known instance, a constraint's or the local one
+of an `unpack`, and the instance's own dictionary is not built. That
+holds for an instance with a context only when every method is written
+as a function: building its dictionary then runs none of the program's
+code. The functions take and give values, not Go's own types: generic
+code reaches them through the dictionary, as `List.sort` calls `compare`
+of `Ord Int`, and a function of Go's types would need a wrapper
 converting every argument and result there. Every other method is looked
 up in its dictionary where it is used: that of a constraint, of the
 argument of a parameterized module or the local one of an `unpack`, one a
-value holds, one an instance with a context builds, and a method an
-instance computes or takes from a default of its class. This holds in both
-profiles; in release a default may first become the instance's own method
-(devirtualization above), and is then called directly too.
+value holds, one of an instance with a context that computes a method,
+and a method an instance takes from a default of its class. This holds in
+both profiles; in release a default may first become the instance's own
+method (devirtualization above), and is then called directly too.
 
 Every generated Flick function takes its execution fiber, `*flickrt.Fiber`,
 first, including pure functions and callbacks. A saved function uses the fiber

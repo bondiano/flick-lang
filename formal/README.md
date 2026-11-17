@@ -95,6 +95,13 @@ signature and golden certificates.
   `lemma_6` (the types of old cells), `T4'` (T4′, below) and `T1_regions` (`T1` with
   `op_H`, without the blocked outcome of a step that needs a region that is not live, which
   `T4'` rules out).
+- **Lazy cells** (`Formal/Lazy.lean`, [`lazy.md`](../docs/formal/lazy.md) §3): `Lazy ρ ε τ`
+  (`Ty.lazy`), `lazy e`, `force e` and the run-time frame `settle ℓ e` are part of the core
+  above, so `T1`, `T2a`, `T2b`, `T3`, `T4'` and `T1_regions` cover them. `Lazy.L1`: on any
+  path the initializer of a cell starts at most once (`StartsN`, `Starts`). `Lazy.L2`: on any
+  path from a typed configuration a settled cell keeps its outcome, and a later force of it
+  steps to the term of that outcome without changing the store (`Step.done_stays`,
+  `Step.force_done`).
 - **T7, local mutation** (`Formal/LetMut.lean`): the straight-line block
   fragment with assignments, branches and scope translates to a typed core
   term. `T7_pure` derives purity from T2a; `T7_regions` derives safety by
@@ -144,6 +151,11 @@ signature and golden certificates.
 - **T5, the runtime contract** (`Formal/RT/`, `RT/T5.lean`): for any core and any
   interleaving, every reachable configuration of λRT satisfies R1–R4, R6 and R7, and R5 and
   R8 hold of the cause algebra, under the hypotheses on the libraries (`Hyp`) and `G11`.
+- **R9, single flight** (`Formal/RT/LazyCell.lean`, `lazy.md` §5): in every interleaving of
+  the atomic steps of a lazy cell (`LStep`, `LReach`), at most one attempt runs, a settled cell
+  stays settled and every later force gets its outcome, the interruption of a waiter removes
+  only it, the interruption of the owner or the unwind of its handler makes the cell pending
+  for attempt `n + 1` without caching anything, and a force by the owner is a defect (`R9`).
 - **T6, the elaboration** (`Formal/Elab/`), with runtime stages `R r e` whose rows take
   variables, and constructors whose values carry the dictionaries of their constraints, with
   arms on them refined by the most general unifier: `T6a` (`Elab/T6a.lean`), an elaborated term is
@@ -167,13 +179,14 @@ signature and golden certificates.
   are T6 on it, the last three without premises of typing.
 
 `#print axioms` of `T1`, `T2a`, `T2b`, `T2b_await`, `lemma_3_1`, `T3`, `lemma_6`, `T4'`,
-`T1_regions`, `T5`, `T6a`, `T6a_core`, `T6a_close`, `T6b`, `T6b_core`,
+`T1_regions`, `T5`, `Lazy.L1`, `Lazy.L2`, `R9`, `T6a`, `T6a_core`, `T6a_close`, `T6b`, `T6b_core`,
 `witness_T6b_example`, `witness_T6b_closed` and `witness_T6b_open` lists only Lean's standard `propext`,
 `Classical.choice` and `Quot.sound`; the hypotheses of T5 (`Hyp`, `G11`), of T6(a)
 (`Target`; for the core, `Real`) and of T6(b) (`Coherent`, `Sim`) are their parameters.
 `hdl_err_live` lists only `propext`. `Formal/Axioms.lean` pins what `#print axioms` prints
 for `T1`, `T1_regions`, `T2a`, `T2b`, `T2b_await`, `T3`, `lemma_6`, `T4'`, `hdl_err_live`,
-`T6a`, `T6b`, `T6a_core` and `T6b_core` with `#guard_msgs`, so `lake build` fails on a
+`T6a`, `T6b`, `T6a_core`, `T6b_core`, `Lazy.L1`, `Lazy.L2` and `R9` with `#guard_msgs`, so
+`lake build` fails on a
 `sorry` or a new axiom.
 
 T4.3 is the premise G11 of T5 in the form [the answering provide must be live](../docs/formal/runtime.md#the-provide-liveness-premise-is-stronger-than-typing-gives) gives it: an operation answered by a handler of the region `q` happens only while `q` is live.
@@ -262,11 +275,16 @@ operation, and `c.at i` ranges over the main thread and the children of live reg
 | the checker's arm under the most general unifier, and a dropped dead arm | `Mgu`, `Typ.aref_mgu`, `Typ.aref_dead` (`ArefMgu.lean`) |
 | §1.4 `provide S impl`, `provide layer` | `recArms`, `T6c_tail`; `KnownLayer`, `chain`, `layer_typ`, `layer_answers` (`RecordHandler.lean`) |
 | (Try), (Handle) | `HPat`, `Catches`, `HCov`; `tryR`, `tryP`, `handle` |
-| §3.6 `⊢ μ : Ψ`; §2.6 `Σ₀` | `StoreTy`, `RootTy` (`Rules.lean`) |
+| §3.6 `⊢ μ : Ψ`; §2.6 `Σ₀` | `StoreTy`, `CellTy` (`StoreTy.lean`), `RootTy` (`Rules.lean`) |
+| `lazy.md` §2 `Lazy ρ ε τ`, its reach with the errors it caches | `Ty.lazy`, `Ty.reach` (`TyBase.lean`) |
+| `lazy.md` §3 terms, the frames `force E` and `settle ℓ E`, the states of a cell | `Tm.lazy`, `Tm.force`, `Tm.settle`, `Frame.force`, `Frame.settle`; `Tm.running`, `Tm.done`, `Tm.IsCell` (`Syntax.lean`, `EvalCtx.lean`) |
+| (T-Lazy), (T-Force); a cell of the store and its location | `Typ.lazy`, `Typ.force`, `Typ.lazyLoc`, `Typ.settle` (`Rules.lean`); `Ty.lazyCell`, `Typ.value_not_cell`, `canonical_lazy` (`CanonForms.lean`) |
+| `lazy.md` §3 steps | `RHead.lazy`, `.forcePending`, `.forceDone`, `.forceRunning`, `.settleVal`, `.settleRaise`, `.settleUnw`, `settleCell` (`Semantics.lean`); their preservation: `lazy_new`, `force_pending`, `force_done`, `settle_val`, `settle_raise`, `settle_unw` (`PresLazy.lean`) |
+| `lazy.md` L1, L2 | `Lazy.L1`, `Lazy.L2` (`Lazy.lean`) |
 | `core.md` §3.2 contexts; the handler of an operation; the frame `inside π E` | `Frame`, `plug`, `handlerOf` (`EvalCtx.lean`) |
 | `core.md` §3.3 `→ₚ`; §3.4–3.5 steps; `regions.md` §3.2–§3.3 | `PHead`, `RHead`, `Step`, `Steps` (`Semantics.lean`) |
 | `regions.md` §3.1 `Λ`, children step at any time | `Rgn`, `Cfg`, `CStep`, `CSteps` (`Semantics.lean`) |
-| L1 | `canonical_arrow`, `canonical_ref`, `canonical_eff`, `canonical_owner`, `canonical_hnd`, `canonical_errors`, `Typ.valueAny` (`CanonForms.lean`, `Canonical.lean`) |
+| L1 | `canonical_arrow`, `canonical_ref`, `canonical_lazy`, `canonical_eff`, `canonical_owner`, `canonical_hnd`, `canonical_errors`, `Typ.valueAny` (`CanonForms.lean`, `Canonical.lean`) |
 | (Let-Gen), (Let-Mono) | `Typ.letGen`, `Typ.let_` (`Rules.lean`) |
 | §2.3 (∀I), (∀I-Var), (Var) at an instance | `Typ.allI`, `Typ.allVar`, `LeLiveI` (`Rules.lean`, `Live/Mode.lean`); `Typ.allInv`, `Typ.elim`, `Tm.StandsAt` in `SubOk` (`AllElim.lean`) |
 | type substitution lemma | `Typ.substT`, with `Fits` (`TySubst.lean`, `SubstPat.lean`) |
@@ -530,6 +548,21 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
 - **A handler's body has no obligation about its effect** (`Stage.ObOut`), nor over a row variable,
   which an instance could make its effect: the first case of `regions.md` §2.7, as for `provide`.
 - **The arms for errors of a handler** are a `try` around it: errors pass `hdl`.
+- **Lazy cells.** `Lazy ρ ε τ` has the hidden qualifier `C` of its initializer, as `Eff`, and
+  no subtyping. (T-Lazy) has no premise `Detached ρ`, as `spawn` has none: the checker's
+  (`classes/detached.rs`). The store gives a cell the type `lazyCell ρ ε τ C`, which no value
+  has, so a `Ref` operation never writes a cell, and holds its state as a term that is no
+  value: `Pending e` is `lazy e`, `Running` is `anil`, `Done o` is `await o` with `o` one of
+  `v`, `raise v`, `todo` (`Tm.IsCell`). `Ref.get` of a cell is a defect (`refGetCell`), and so
+  is a force of a cell that is neither pending nor settled (`forceRunning`), a running one or
+  one that holds no lazy; neither happens in a program, but `progress` holds without a typed
+  store. A defect ends the thread (`Step.todo`), so `settle ℓ die` is that step through the
+  frame. `raise` and `unw` leave `settle ℓ` by steps of their own (`Frame.isCtl`): an error is
+  recorded, a signal passes and leaves the cell running. The outcome is written only into a
+  running cell (`settleCell`), which is the state of the cell at every `settle ℓ` a program
+  reaches, so `Lazy.L2` holds of every typed configuration. Elision (`Ty.elide`) leaves a lazy
+  type as it is. The relation of `Formal/Elab` keeps the outer form of a cell (`BNoCell`):
+  no base pair has it on either side.
 
 ## Findings
 
@@ -591,6 +624,7 @@ is a parameter of it.
 | I6 | `Inv6.obsIn`, `Good6` of `release` (`RT/Layers.lean`) |
 | R6; its premise from [provide services must not outlive their layer](../docs/formal/runtime.md#a-provide-service-outlives-the-release-of-its-layer) | `R6`, `Good6`, `GoodUse` (`RT/Layers.lean`, `RT/T5.lean`); `G11` (`RT/Hyp.lean`) |
 | §3.7, R7 | `Step.modify`, `cell`, `R7` (`RT/RefLin.lean`) |
+| `lazy.md` §5, R9 | `LSt`, `LEv`, `LStep`, `LReach`, `LInv`, `R9` (`RT/LazyCell.lean`) |
 | T5 | `T5` (`RT/T5.lean`) |
 
 Simplifications of the cause algebra:
@@ -650,6 +684,12 @@ Simplifications of λRT:
 12. **R7** is `Hist GoodRef`: each `Ref.modify ℓ` read the value of the latest `make` or
     `modify` of `ℓ` (`cell`), and the memory is the replay of the journal. Allocation is
     deterministic, as in the core development.
+13. **R9** is a property of the protocol of one lazy cell (`LStep`), each step atomic, as
+    `Ref.modify` is: `Step` and `Inv` have no lazy cell, and `T5` does not include it. A
+    running cell keeps its initializer, which the reset of (d) gives back; an attempt is cached
+    only with an outcome without an interruption (`Cached`). Which code a fiber runs, and that
+    a woken waiter forces again, are not modelled: a waiter that retries forces from the pending
+    cell, and the first such force starts attempt `n + 1`.
 
 ## Elaboration and T6
 

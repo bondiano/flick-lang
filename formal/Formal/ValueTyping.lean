@@ -23,8 +23,22 @@ theorem Typ.loc_ref {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       obtain ⟨u, hu, heu⟩ := ih l _ _ hl rfl
       exact ⟨u, hu, heu.trans ha.symm⟩
   | loc hl => intro l a φ hv hJ; cases hv; cases hJ; exact ⟨_, hl, .refl⟩
-  | allI | errVal => intro l a φ _ hJ; cases hJ
+  | allI | errVal | lazyLoc => intro l a φ _ hJ; cases hJ
   | _ => intro l a φ hv _; cases hv
+
+/-- The location of a lazy cell: the store gives the cell the type of the lazy. -/
+theorem Typ.loc_lazy {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
+    ∀ l r ε t C φ, e = .loc l → J = .ex (.lazy r ε t C) φ →
+      ∃ u, Ψ[l]? = some (.lazyCell r ε u C) ∧ Ty.Equiv u t := by
+  induction h with
+  | conv _ he ih =>
+    intro l r ε t C φ hl hJ; cases hJ
+    obtain ⟨u, rfl, hu⟩ := he.symm.lazy_left
+    obtain ⟨u', hu', heu⟩ := ih l _ _ _ _ _ hl rfl
+    exact ⟨u', hu', heu.trans hu.symm⟩
+  | lazyLoc hl => intro l r ε t C φ hv hJ; cases hv; cases hJ; exact ⟨_, hl, .refl⟩
+  | allI | errVal | loc => intro l r ε t C φ _ hJ; cases hJ
+  | _ => intro l r ε t C φ hv _; cases hv
 
 theorem Typ.task_eff {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
     ∀ e r ε t C φ, v = .task e → J = .ex (.eff r ε t C) φ →

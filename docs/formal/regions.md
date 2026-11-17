@@ -148,6 +148,7 @@ Lean: `Const.ty`, `Const.ok` (`formal/Formal/Syntax.lean`). A cell type is `Ref 
 ⌈{ℓᵢ : τᵢ | ρ}⌉ = ⋃ ⌈τᵢ⌉
 ⌈τ₁ →φ τ₂⌉     = ⌈τ₁⌉ ∪ ⌈τ₂⌉
 ⌈Eff r e τ⌉    = ⌈τ⌉
+⌈Lazy r e τ⌉   = ⌈τ⌉ ∪ ⌈e⌉
 ⌈Layer ri e ro⌉ = ⌈S.Impl⌉ = ∅
 ⌈Errors ρ⌉     = ⌈ρ⌉
 ⌈ρ⌉            = ⋃ ⌈ῡ⌉ over elements E ῡ ∈ ρ, and the row variables of ρ     ρ of kind ERow
@@ -170,6 +171,8 @@ Lean: `α^{≤C}` is the variable `α` under the fact `Outlives α C` (`Facts.bn
 Why service rows are excluded from ⌈·⌉: a value of type `Eff r e τ`, `τ₁ →R⟨r;e⟩ τ₂` or `Layer ri e ro` is used only through `await`, application or `provide`, and these add `r` (`ri`) to the stage of the user. A region from the row, for example `Scope s`, appears in the type of every place where the value runs; an unused value reaches nothing.
 
 Why the result is included: the result can be discarded (`ignore (await t)`), and a region the type showed only in the result would vanish from the type of the enclosing value. Hence `⌈Eff r e τ⌉ ⊇ ⌈τ⌉`, as for a function. Treating `Eff` as opaque is unsound ([the reach bound of `Eff` includes its result](#the-reach-bound-of-eff-includes-its-result)).
+
+Why the error row of `Lazy` is included ([`lazy.md`](lazy.md) §2): a lazy keeps the outcome of its initializer once it is forced, a typed failure too, so it holds the errors of its row, as a value of `Errors e` does; a computation `Eff r e τ` holds no error, which each `await` raises anew. Its captures are its hidden qualifier, as for `Eff`: `⌈Lazy r e τ^C⌉ = ⌈τ⌉ ∪ ⌈e⌉ ∪ C`. So a lazy that holds a `File s`, or may fail with an error that does, does not leave `scope s` (`FLICK-G001`/`G002`), and no lazy is forced after its region closes. Lean: `Ty.lazy` and its `Ty.reach` (`formal/Formal/TyBase.lean`); the store type of a cell, `Ty.lazyCell`, reaches the same.
 
 Why the parameter is included: a closure whose parameter type shows `s` may omit `s` from its qualifier. Narrowing the parameter by subtyping (§2.2) then compares ⌈·⌉ of the whole value, not just the qualifier.
 

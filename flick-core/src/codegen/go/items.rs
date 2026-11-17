@@ -280,31 +280,12 @@ impl<'a> Gen<'a> {
         let this = Dict::Instance {
             module: self.module.to_owned(),
             name: info.name.clone(),
-            args: Vec::new(),
+            args: info.context.iter().cloned().map(Dict::Given).collect(),
         };
         for (name, value) in methods {
             self.natives.clear();
             self.held.clear();
-            if let Some((module, function)) = self.direct_method(&this, name) {
-                let v = self.global_value(&module, &function, Vec::new());
-                self.emit(call(a, "d.Set", [self.string(name), v.doc]));
-                continue;
-            }
-            let (stmts, v) = self.block(|g| g.expr(value));
-            let v = if stmts.is_empty() {
-                v.doc
-            } else {
-                let ret = statement(a, docvec![a, "return ", v]);
-                let body = block(a, stmts.into_iter().chain([ret]));
-                docvec![
-                    a,
-                    "func(fb *flickrt.Fiber) flickrt.Value ",
-                    body,
-                    "(",
-                    self.context(),
-                    ")"
-                ]
-            };
+            let v = self.method_entry(&this, name, value);
             self.emit(call(a, "d.Set", [self.string(name), v]));
         }
         self.defaults(info);

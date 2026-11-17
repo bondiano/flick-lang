@@ -51,6 +51,7 @@ codegen/given_shadow
 codegen/fusion
 codegen/higher_rank
 codegen/instance_names
+codegen/known_contexts
 codegen/known_defaults
 codegen/known_failure
 codegen/known_instances

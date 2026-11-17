@@ -75,7 +75,7 @@ impl Env<'_> {
         self.interfaces
             .get(name)
             .and_then(Option::as_ref)
-            .or_else(|| self.builtins.interfaces.get(name))
+            .or_else(|| self.builtins.interfaces.get(name).map(AsRef::as_ref))
             .cloned()
     }
     pub(super) fn static_parameter(

@@ -1,0 +1,71 @@
+// Methods of derived instances and of instances with a context, which
+// both targets call directly, given the dictionaries of the context as
+// the checker resolved them: a known instance or the caller's
+// (`unpack_dictionary` gives the local one of an `unpack`). A
+// constraint's own dictionary, one passed on, and an instance that
+// computes a method stay dictionaries.
+module App.Main exposing (main)
+
+type Color = Red | Green | Blue Int
+  deriving Eq, Ord, Show
+
+class Area a =
+  area : a -> Int
+  label : a -> String
+
+instance Area Color =
+  let area c =
+    match c with
+    | Red -> 1
+    | Green -> 2
+    | Blue n -> n
+  let label _ = "color"
+
+// each method a function: called directly
+instance Area a => Area (Option a) =
+  let area o =
+    match o with
+    | None -> 0
+    | Some x -> 10 * area x
+  let label o = "option of " ++ show (area o)
+
+type Box a = Box a
+
+// computes a method: its dictionary is built where it is used
+instance Area a => Area (Box a) =
+  let area =
+    let base = 100
+    fun b ->
+      match b with
+      | Box x -> base + area x
+  let label _ = "box"
+
+/// The caller's dictionary, also as the context of a known instance.
+wrapped : Area a => a -> Int
+let wrapped x = area (Some x) + area x
+
+/// A dictionary passed on.
+labelled : Area a => a -> String
+let labelled x = label x
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+main : Unit ->{; AppError} Unit
+let main () =
+  say (show Green ++ " " ++ show (Blue 3) ++ " " ++ show [Some Red, None])
+  say
+    (show (Red == Blue 1)
+      ++ " "
+      ++ show (compare (Blue 2) (Blue 1))
+      ++ " "
+      ++ show (compare [Some Green] [Some (Blue 0)]))
+  say
+    (show (area (Some (Blue 4)))
+      ++ " "
+      ++ label (Some Red)
+      ++ " "
+      ++ show (area (Some (Some Green))))
+  say (show (wrapped Green) ++ " " ++ show (wrapped (Some Red)) ++ " " ++ labelled (Some Green))
+  say
+    (show (area (Box Red)) ++ " " ++ label (Box Green) ++ " " ++ show (area (Some (Box (Blue 5)))))

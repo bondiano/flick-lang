@@ -81,7 +81,10 @@ theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.le
       obtain ⟨_, _, hT'⟩ := hf.const_arrow (by intro E o cl h; cases h)
       obtain ⟨hdom, -⟩ := LeLive.arrow_inv hT'
       obtain ⟨l, _, rfl, hl, -⟩ := canonical_ref hve (LeLive.typ_ref hdom he)
-      exact step (Step.ofR (.refGet (List.getElem?_eq_getElem (hμ ▸ getElem?_lt hl))))
+      obtain ⟨c, hc⟩ : ∃ c, μ[l]? = some c := ⟨_, List.getElem?_eq_getElem (hμ ▸ getElem?_lt hl)⟩
+      by_cases hv : c.IsCell
+      · exact step (Step.ofR (.refGetCell hc hv))
+      · exact step (Step.ofR (.refGet hc hv))
     | refSet => exact .inl (.constApp rfl hve)
     | addFin => exact .inl (.constApp rfl hve)
     | spawn => exact .inl (.constApp rfl hve)

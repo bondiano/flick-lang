@@ -80,7 +80,7 @@ theorem thread_sim (hroot : RootTy S root) {t₁ t₂ : Flick.Tm} (ht : Cg (DP S
   | rt hE hh =>
     rcases around hroot hE ht (.rt hE hh) with hw | ⟨E₂, e₂, rfl, hfr, hE₂, he, hw⟩
     · exact .inl hw
-    rcases rhead_sim hV hR hA hC DP.plain hh he hst with hb | ⟨_, _, e₂', hh₂, hr, hst'⟩
+    rcases rhead_sim hV hR hA hC DP.plain DP.noCell hh he hst with hb | ⟨_, _, e₂', hh₂, hr, hst'⟩
     · exact .inl (hw hb)
     · exact .inr ⟨_, _, _, _, .rt hE₂ hh₂, FrR.plugs hfr hr, hst'⟩
   | glob hE hg =>

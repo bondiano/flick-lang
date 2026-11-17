@@ -127,24 +127,26 @@ impl<'d> Gen<'_, 'd> {
         }
     }
 
-    /// The constant of `method` of `dict`, a canonical instance of this
-    /// module whose method is emitted on its own.
+    /// The constant of `method` of `dict`, a canonical instance whose
+    /// method is emitted on its own: given the dictionaries of its context.
     pub(super) fn direct_method(&mut self, dict: &Dict, method: &str) -> Option<Js<'d>> {
         let Dict::Instance { module, name, args } = dict else {
             return None;
         };
-        if !args.is_empty() {
-            return None;
-        }
-        if module != self.module {
+        let constant = if module == self.module {
+            let constant = self.direct.get(&(name.clone(), method.to_owned()))?;
+            self.leaf(constant)
+        } else {
             let constant = format!("{}${method}", names::instance(name));
-            return self
-                .options
+            self.options
                 .is_direct(module, name, method)
-                .then(|| self.global(module, &constant));
+                .then(|| self.global(module, &constant))?
+        };
+        if args.is_empty() {
+            return Some(constant);
         }
-        let constant = self.direct.get(&(name.clone(), method.to_owned()))?;
-        Some(self.leaf(constant))
+        let args: Vec<Js<'d>> = args.iter().map(|d| self.dict(d)).collect();
+        Some(call(self.a, constant, &args))
     }
 
     /// A known full application of a function of the module with a worker,

@@ -17,6 +17,7 @@ import Formal.EvalCtx
 import Formal.RuleRows
 import Formal.Live.Mode
 import Formal.Rules
+import Formal.StoreTy
 import Formal.Semantics
 import Formal.Order
 import Formal.Covers
@@ -58,6 +59,7 @@ import Formal.PresPure
 import Formal.ScopeStep
 import Formal.ScopeRun
 import Formal.PresHdlRt
+import Formal.PresLazy
 import Formal.PresRt
 import Formal.Below
 import Formal.PresHdlStep
@@ -93,6 +95,7 @@ import Formal.T43Main
 import Formal.Effects
 import Formal.LetMut
 import Formal.Generalization
+import Formal.Lazy
 import Formal.RecordHandler
 import Formal.Examples
 import Formal.RowEquivExamples
@@ -120,6 +123,7 @@ import Formal.RT.Props
 import Formal.RT.Layers
 import Formal.RT.Layers2
 import Formal.RT.RefLin
+import Formal.RT.LazyCell
 import Formal.RT.T5
 import Formal.Decomp
 import Formal.Closed
@@ -159,6 +163,8 @@ import Formal.Elab.CoreCgOps
 import Formal.Elab.CoreCgFrames
 import Formal.Elab.CoreCgHdl
 import Formal.Elab.CoreRel
+import Formal.Elab.CoreCell
+import Formal.Elab.CorePHead
 import Formal.Elab.CoreHead
 import Formal.Elab.CoreStep
 import Formal.Elab.CoreSim

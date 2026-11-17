@@ -40,7 +40,7 @@ termination_by sizeOf x
 /-- **The base pairs**: a closed computation typed at the pure stage that is not yet a value,
 and a closed term with the same values. -/
 def DP (S : Sig) (root : Roots) (a b : Flick.Tm) : Prop :=
-  ¬ Value a ∧ b.Closed ∧ (a.NoIns ∧ b.NoIns ∧ ¬ IsAlts b) ∧ SemEq root a b ∧
+  ¬ Value a ∧ b.Closed ∧ (a.NoIns ∧ b.NoIns ∧ ¬ IsAlts b ∧ ¬ b.IsCell) ∧ SemEq root a b ∧
     ∃ Θ t, Typ S [] Θ [] a (.ex t .pure)
 
 theorem DP.closed : BClosed (DP S root) := by
@@ -49,7 +49,7 @@ theorem DP.closed : BClosed (DP S root) := by
 
 theorem DP.noVal : BNoVal (DP S root) := fun _ _ h => h.1
 
-theorem DP.plain : BPlain (DP S root) := fun _ _ h => h.2.2.1
+theorem DP.plain : BPlain (DP S root) := fun _ _ h => ⟨h.2.2.1.1, h.2.2.1.2.1, h.2.2.1.2.2.1⟩
 
 theorem DP.noRaise : BNoRaise (DP S root) :=
   ⟨by rintro a b ⟨-, -, -, -, Θ, t, ht⟩; exact raise_not_pure ht,
@@ -103,6 +103,8 @@ theorem _root_.Flick.RHead.redex' {Λ Λ' : List Rgn} {μ μ' : List Flick.Tm} {
   | hctlUnw _ _ => exact .inr (.inr ⟨.hctlA _ _ _ _ _ _ _ _, _, _, _, trivial, rfl⟩)
   | hresUnw _ _ => exact .inr (.inr ⟨.hresB _ _ _, _, _, _, trivial, rfl⟩)
   | hwithCatch => exact .inr (.inr ⟨.hwith _ _ _ _ _, _, _, _, trivial, rfl⟩)
+  | settleRaise hv => exact .inr (.inl ⟨.settle _, _, trivial, hv, rfl⟩)
+  | settleUnw => exact .inr (.inr ⟨.settle _, _, _, _, trivial, rfl⟩)
   | finRun _ _ hw _ _ | close _ _ hw _ _ =>
     rcases hw with hw | ⟨v, hv, rfl⟩ | ⟨q, ℓ, a, rfl⟩
     · left; refine ⟨nv, fun F a _ ha => ?_⟩
@@ -121,7 +123,7 @@ theorem _root_.Flick.RHead.redex' {Λ Λ' : List Rgn} {μ μ' : List Flick.Tm} {
     | (obtain ⟨-, rfl⟩ := ha
        first | assumption | exact .loc | exact .cap | exact .own)
     | (subst ha
-       first | assumption | exact .task)
+       first | assumption | exact .task | exact .loc)
 
 /-- The hole of a pure term is typed at the pure stage. -/
 theorem hole_pure {Θ : Facts} {t : Flick.Ty} {E : List Frame} {r : Flick.Tm} (hE : OkE E)

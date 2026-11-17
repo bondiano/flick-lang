@@ -45,6 +45,11 @@ theorem Typ.weakenStore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) (X : List Ty) :
   | todo => exact .todo
   | task he hψ hn hT ih => exact .task (ih X) hψ hn hT
   | await _ hφ hT ih => exact .await (ih X) hφ hT
+  | lazy _ hψ hn hφ ih => exact .lazy (ih X) hψ hn hφ
+  | force _ hφ hT ih => exact .force (ih X) hφ hT
+  | lazyLoc hl => exact .lazyLoc (by rw [List.getElem?_append_left (getElem?_lt hl)]; exact hl)
+  | settle hl _ hψ hφ hT ih =>
+    exact .settle (by rw [List.getElem?_append_left (getElem?_lt hl)]; exact hl) (ih X) hψ hφ hT
   | raise _ hφ ih => exact .raise (ih X) hφ
   | raiseAdt _ hU hφ ih => exact .raiseAdt (ih X) hU hφ
   | errVal hv _ hU hE ih => exact .errVal hv (ih X) hU hE
@@ -202,6 +207,10 @@ theorem Typ.rename {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro _ _ hξ
     exact .task (ih hξ) hψ (hn.rename _) hT
   | await _ hφ hT ih => intro _ _ hξ; exact .await (ih hξ) hφ hT
+  | lazy _ hψ hn hφ ih => intro _ _ hξ; exact .lazy (ih hξ) hψ (hn.rename _) hφ
+  | force _ hφ hT ih => intro _ _ hξ; exact .force (ih hξ) hφ hT
+  | lazyLoc hl => intro _ _ _; exact .lazyLoc hl
+  | settle hl _ hψ hφ hT ih => intro _ _ hξ; exact .settle hl (ih hξ) hψ hφ hT
   | raise _ hφ ih => intro _ _ hξ; exact .raise (ih hξ) hφ
   | raiseAdt _ hU hφ ih => intro _ _ hξ; exact .raiseAdt (ih hξ) hU hφ
   | errVal hv _ hU hE ih => intro _ _ hξ; exact .errVal hv.rename (ih hξ) hU hE

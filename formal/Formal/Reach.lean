@@ -42,6 +42,8 @@ def Tm.Has : Tm → Site → Prop
   | .todo, _ => False
   | .task e, s => e.Has s
   | .await e, s => e.Has s
+  | .lazy e, s => e.Has s
+  | .force e, s => e.Has s
   | .raise e, s => e.Has s
   | .try_ e al, s => e.Has s ∨ al.Has s
   | .handle v al, s => v.Has s ∨ al.Has s
@@ -63,6 +65,7 @@ def Tm.Has : Tm → Site → Prop
   | .hole p, s => s = .ins ∨ s = .rgn p
   | .hkeep q _ _ al e, s => s = .ins ∨ s = .rgn q ∨ al.Has s ∨ e.Has s
   | .hkarm q _ _ al a k, s => s = .ins ∨ s = .rgn q ∨ al.Has s ∨ a.Has s ∨ k.Has s
+  | .settle _ e, s => e.Has s
 
 /-- No `inside` form: values and unevaluated code. -/
 def Tm.NoIns (e : Tm) : Prop := ¬ e.Has .ins
@@ -83,6 +86,8 @@ def Tm.Free : Tm → Nat → Prop
   | .aguard p g b r, j => g.Free (j + p.binds) ∨ b.Free (j + p.binds) ∨ r.Free j
   | .task e, j => e.Free j
   | .await e, j => e.Free j
+  | .lazy e, j => e.Free j
+  | .force e, j => e.Free j
   | .raise e, j => e.Free j
   | .try_ e al, j => e.Free j ∨ al.Free j
   | .handle v al, j => v.Free j ∨ al.Free j
@@ -97,6 +102,7 @@ def Tm.Free : Tm → Nat → Prop
   | .unw _ _ a, j => a.Free j
   | .hkeep _ _ _ al e, j => al.Free j ∨ e.Free j
   | .hkarm _ _ _ al a k, j => al.Free j ∨ a.Free j ∨ k.Free j
+  | .settle _ e, j => e.Free j
   | _, _ => False
 
 theorem Tm.has_rename (ξ : Nat → Nat) (e : Tm) (s : Site) : (e.rename ξ).Has s ↔ e.Has s := by
@@ -158,7 +164,8 @@ theorem Tm.free_rename (ξ : Nat → Nat) :
     rcases h with h | h
     · obtain ⟨i, hi, he⟩ := ih₁ ξ j h; exact ⟨i, .inl hi, he⟩
     · obtain ⟨i, hi, he⟩ := ih₂ ξ j h; exact ⟨i, .inr hi, he⟩
-  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | inside _ _ ih | drec _ _ ih =>
+  | proj _ _ ih | task _ ih | await _ ih | lazy _ ih | force _ ih | raise _ ih | inside _ _ ih
+  | drec _ _ ih =>
     intro j h; exact ih ξ j h
   | hres _ _ _ _ ih₁ ih₂ | hkeep _ _ _ _ _ ih₁ ih₂ =>
     intro j h
@@ -178,7 +185,7 @@ theorem Tm.free_rename (ξ : Nat → Nat) :
     · obtain ⟨i, hi, he⟩ := ih₂ ξ j h; exact ⟨i, .inr (.inl hi), he⟩
     · obtain ⟨i, hi, he⟩ := ih₃ ξ j h; exact ⟨i, .inr (.inr (.inl hi)), he⟩
     · obtain ⟨i, hi, he⟩ := ih₄ ξ j h; exact ⟨i, .inr (.inr (.inr hi)), he⟩
-  | hdone _ _ ih | unw _ _ _ ih => intro j h; exact ih ξ j h
+  | hdone _ _ ih | unw _ _ _ ih | settle _ _ ih => intro j h; exact ih ξ j h
   | _ => intro j h; exact h.elim
 
 theorem liftS_free {n : Nat} {σ : Nat → Tm} {i j : Nat} (h : (liftS n σ i).Free (j + n)) :
@@ -240,7 +247,8 @@ theorem Tm.free_subst :
     rcases h with h | h
     · obtain ⟨i, hi, he⟩ := ih₁ σ j h; exact ⟨i, .inl hi, he⟩
     · obtain ⟨i, hi, he⟩ := ih₂ σ j h; exact ⟨i, .inr hi, he⟩
-  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | inside _ _ ih | drec _ _ ih =>
+  | proj _ _ ih | task _ ih | await _ ih | lazy _ ih | force _ ih | raise _ ih | inside _ _ ih
+  | drec _ _ ih =>
     intro σ j h; exact ih σ j h
   | hres _ _ _ _ ih₁ ih₂ | hkeep _ _ _ _ _ ih₁ ih₂ =>
     intro σ j h
@@ -260,7 +268,7 @@ theorem Tm.free_subst :
     · obtain ⟨i, hi, he⟩ := ih₂ σ j h; exact ⟨i, .inr (.inl hi), he⟩
     · obtain ⟨i, hi, he⟩ := ih₃ σ j h; exact ⟨i, .inr (.inr (.inl hi)), he⟩
     · obtain ⟨i, hi, he⟩ := ih₄ σ j h; exact ⟨i, .inr (.inr (.inr hi)), he⟩
-  | hdone _ _ ih | unw _ _ _ ih => intro σ j h; exact ih σ j h
+  | hdone _ _ ih | unw _ _ _ ih | settle _ _ ih => intro σ j h; exact ih σ j h
   | _ => intro σ j h; exact h.elim
 
 theorem Tm.has_subst :
@@ -305,7 +313,7 @@ theorem Tm.has_subst :
     rcases h with h | h
     · exact (ih₁ σ s h).imp .inl fun ⟨i, hi, he⟩ => ⟨i, .inl hi, he⟩
     · exact (ih₂ σ s h).imp .inr fun ⟨i, hi, he⟩ => ⟨i, .inr hi, he⟩
-  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | drec _ _ ih =>
+  | proj _ _ ih | task _ ih | await _ ih | lazy _ ih | force _ ih | raise _ ih | drec _ _ ih =>
     intro σ s h; exact ih σ s h
   | inside p e ih =>
     intro σ s h
@@ -329,7 +337,7 @@ theorem Tm.has_subst :
     have := ih₁ σ s; have := ih₂ σ s
     simp only [Tm.subst, Tm.Has, Tm.Free] at h ⊢
     grind
-  | hdone _ _ ih | unw _ _ _ ih =>
+  | hdone _ _ ih | unw _ _ _ ih | settle _ _ ih =>
     intro σ s h
     have := ih σ s
     simp only [Tm.subst, Tm.Has, Tm.Free] at h ⊢

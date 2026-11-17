@@ -30,7 +30,7 @@ impl<'b> Env<'b> {
             witness_manifest_aliases: HashSet::new(),
         };
         for interface in builtins.interfaces.values() {
-            env.record_support_authorities(interface);
+            env.record_support_authorities(interface.as_ref());
         }
         for import in &syntax.imports {
             let interface = imported(&import.module);
@@ -310,7 +310,7 @@ impl<'b> Env<'b> {
 
     /// The interfaces of the imported and of the built-in modules.
     pub fn known_interfaces(&self) -> impl Iterator<Item = &Interface> {
-        (self.interfaces.values().flatten()).chain(self.builtins.interfaces.values())
+        (self.interfaces.values().flatten()).chain(self.builtins.interfaces.values().map(AsRef::as_ref))
     }
 
     /// Whether `module` is one every module knows without importing it.
@@ -373,7 +373,7 @@ impl<'b> Env<'b> {
     pub fn interface(&self, module: &str) -> Option<&Interface> {
         match self.interfaces.get(module) {
             Some(interface) => interface.as_ref(),
-            None => self.builtins.interfaces.get(module),
+            None => self.builtins.interfaces.get(module).map(AsRef::as_ref),
         }
     }
 
@@ -399,7 +399,7 @@ impl<'b> Env<'b> {
         };
         let interface = match self.interfaces.get(module) {
             Some(interface) => interface.as_ref(),
-            None => self.builtins.interfaces.get(module),
+            None => self.builtins.interfaces.get(module).map(AsRef::as_ref),
         };
         Some((interface.map_or(module, |i| i.module.as_str()), interface))
     }

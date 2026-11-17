@@ -195,3 +195,82 @@ fn existential_module_result_opens_on_js_and_go() {
         assert_eq!(output.stdout, b"42\n", "{emit}");
     }
 }
+
+/// An importer reaches instances an inline child declares through a value
+/// of the parent: a derived `Show`, a derived instance that takes its
+/// class's default and one written without methods. Its build must name
+/// them where the parent's file defines them, under the child's prefix,
+/// not in a module of the child's path that no build emits.
+#[test]
+#[ignore = "needs Node and Go; run `just e2e`"]
+fn an_importer_calls_the_instances_of_an_inline_child_on_js_and_go() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("inline_child_instances");
+    let source = dir.join("App");
+    fs::create_dir_all(&source).expect("source directory");
+    let parent = "module App.Parent exposing (Describe(..), pair, box)
+
+class Describe a =
+  describe : a -> String
+  describe : Show a => a -> String
+  let describe x = \"<\" ++ show x ++ \">\"
+
+module Child exposing (Pair(..), Box(..)) =
+  type Pair = Pair Int Int
+    deriving Show, Describe
+  type Box = Box Int
+    deriving Show
+  instance Describe Box
+
+pair : Child.Pair
+let pair = Child.Pair 1 2
+
+box : Child.Box
+let box = Child.Box 3
+";
+    let main = "module App.Main exposing (main)
+
+import App.Parent exposing (Describe(..), pair, box)
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (describe pair ++ \" \" ++ show pair ++ \" \" ++ describe box)
+";
+    fs::write(source.join("Parent.fl"), parent).expect("write source");
+    fs::write(source.join("Main.fl"), main).expect("write source");
+    for emit in ["js", "go"] {
+        let out = dir.join(format!("out-{emit}"));
+        let build = Command::new(env!("CARGO_BIN_EXE_flick"))
+            .arg("build")
+            .arg(source.join("Main.fl"))
+            .args(["--emit", emit, "--out-dir"])
+            .arg(&out)
+            .output()
+            .expect("build runs");
+        assert!(
+            build.status.success(),
+            "{emit}: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        let output = if emit == "js" {
+            Command::new("node")
+                .arg(out.join(runner_path(false)))
+                .output()
+                .expect("Node runs")
+        } else {
+            Command::new(out.join(executable(MAIN_ENTRY)))
+                .output()
+                .expect("Go executable runs")
+        };
+        assert!(
+            output.status.success(),
+            "{emit}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        // `show` writes a constructor and its fields apart by spaces, and
+        // the default of `describe` puts what `show` writes in brackets
+        assert_eq!(
+            String::from_utf8_lossy(&output.stdout),
+            "<Pair 1 2> Pair 1 2 <Box 3>\n",
+            "{emit}"
+        );
+    }
+}

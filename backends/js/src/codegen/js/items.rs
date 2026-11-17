@@ -255,9 +255,17 @@ impl<'d> Gen<'_, 'd> {
                     Stmt::new(doc, v.flags)
                 };
                 match self.direct.get(&(info.name.clone(), name.clone())).cloned() {
-                    Some(direct) => {
+                    Some(direct) if info.context.is_empty() => {
                         methods_first.push(self.export(&direct, v));
                         entries.push(entry(self.leaf(&direct)));
+                    }
+                    // a function of the context's dictionaries, applied to them here
+                    Some(direct) => {
+                        methods_first.push(self.export(&direct, self.lambda_of(&params, v)));
+                        let givens: Vec<Js<'d>> = (info.context.iter())
+                            .map(|c| self.dict(&Dict::Given(c.clone())))
+                            .collect();
+                        entries.push(entry(call(a, self.leaf(&direct), &givens)));
                     }
                     None => entries.push(entry(v)),
                 }
@@ -285,14 +293,13 @@ impl<'d> Gen<'_, 'd> {
         };
         self.givens.truncate(mark);
         let id = names::instance(&info.name);
-        if info.context.is_empty() {
-            let value = self.pure(body);
-            methods_first.push(self.exported(self.constant(&id, value)));
-            methods_first
+        let value = if info.context.is_empty() {
+            self.pure(body)
         } else {
-            let value = self.lambda_of(&params, body);
-            vec![self.exported(self.constant(&id, value))]
-        }
+            self.lambda_of(&params, body)
+        };
+        methods_first.push(self.exported(self.constant(&id, value)));
+        methods_first
     }
 
     /// `export stmt`.

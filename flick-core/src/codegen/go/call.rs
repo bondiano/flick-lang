@@ -226,7 +226,8 @@ impl<'a> Gen<'a> {
             }
             ExprKind::Method { dict, name } if self.direct_method(dict, name).is_some() => {
                 let (module, name) = self.direct_method(dict, name).expect("tested by the guard");
-                self.direct(&module, &name, Vec::new())
+                let dicts = self.context_dicts(dict);
+                self.direct(&module, &name, dicts)
             }
             _ => {
                 let f = self.expr(head);

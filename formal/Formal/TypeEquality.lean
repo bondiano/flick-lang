@@ -35,6 +35,8 @@ inductive Ty.Equiv : Ty → Ty → Prop
   | rcons {l a a' r r'} : Ty.Equiv a a' → Ty.Equiv r r' →
       Ty.Equiv (.rcons l a r) (.rcons l a' r')
   | eff {r e t t' C} : Ty.Equiv t t' → Ty.Equiv (.eff r e t C) (.eff r e t' C)
+  | lazy {r e t t' C} : Ty.Equiv t t' → Ty.Equiv (.lazy r e t C) (.lazy r e t' C)
+  | lazyCell {r e t t' C} : Ty.Equiv t t' → Ty.Equiv (.lazyCell r e t C) (.lazyCell r e t' C)
   | hnd {a b} : Ty.Equiv a b → Ty.Equiv (.hnd a) (.hnd b)
   | owner {a b} : Ty.Equiv a b → Ty.Equiv (.owner a) (.owner b)
   | dict {c a b} : Ty.Equiv a b → Ty.Equiv (.dict c a) (.dict c b)

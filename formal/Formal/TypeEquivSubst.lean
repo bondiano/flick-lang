@@ -50,6 +50,12 @@ theorem Ty.substT_equiv (t : Ty) {σ σ' : Atom → Ty} (h : ∀ a, Ty.Equiv (σ
   | eff r e t C ih =>
     simp only [Ty.substT, Row.substT_equiv h r, Row.substT_equiv h e, Caps.substT_equiv h C]
     exact .eff (ih h)
+  | lazy r e t C ih =>
+    simp only [Ty.substT, Row.substT_equiv h r, Row.substT_equiv h e, Caps.substT_equiv h C]
+    exact .lazy (ih h)
+  | lazyCell r e t C ih =>
+    simp only [Ty.substT, Row.substT_equiv h r, Row.substT_equiv h e, Caps.substT_equiv h C]
+    exact .lazyCell (ih h)
   | errors e => simp only [Ty.substT, Row.substT_equiv h e]; exact .refl
   | hnd a ih => exact .hnd (ih h)
   | owner a ih => exact .owner (ih h)

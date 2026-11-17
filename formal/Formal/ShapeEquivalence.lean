@@ -24,6 +24,8 @@ def Ty.kind : Ty → Nat
   | .rg _ | .caps _ | .row _ | .bare | .cnil | .rnm .. | .run .. | .rless .. | .pure | .rt .. => 12
   | .dict .. => 13
   | .all .. => 14
+  | .lazy .. => 15
+  | .lazyCell .. => 16
 
 theorem Ty.tcon_kind' (T : Name) (us : List Ty) : (Ty.tcon T us).kind = 3 := by
   have : ∀ (us : List Ty) (f : Ty), f.kind = 3 → (us.foldl .tapp f).kind = 3 := by

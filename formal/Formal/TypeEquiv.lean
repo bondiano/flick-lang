@@ -50,6 +50,8 @@ theorem Ty.Equiv.asRow {a b : Ty} (h : Ty.Equiv a b) : a.asRow = b.asRow := by
   | tapp h₁ h₂ => exact congrArg Row.ofCaps (Ty.Equiv.tapp h₁ h₂).reach
   | rcons h₁ h₂ => exact congrArg Row.ofCaps (Ty.Equiv.rcons h₁ h₂).reach
   | eff h => exact congrArg Row.ofCaps (Ty.Equiv.eff h).reach
+  | lazy h => exact congrArg Row.ofCaps (Ty.Equiv.lazy h).reach
+  | lazyCell h => exact congrArg Row.ofCaps (Ty.Equiv.lazyCell h).reach
   | hnd h => exact congrArg Row.ofCaps (Ty.Equiv.hnd h).reach
   | owner h => exact congrArg Row.ofCaps (Ty.Equiv.owner h).reach
   | dict h => exact congrArg Row.ofCaps (Ty.Equiv.dict h).reach
@@ -113,6 +115,8 @@ theorem Ty.Equiv.substT {a b : Ty} (h : Ty.Equiv a b) (σ : Atom → Ty) :
   | tapp _ _ ih₁ ih₂ => exact .tapp (ih₁ σ) (ih₂ σ)
   | rcons _ _ ih₁ ih₂ => exact .rcons (ih₁ σ) (ih₂ σ)
   | eff _ ih => exact .eff (ih σ)
+  | lazy _ ih => exact .lazy (ih σ)
+  | lazyCell _ ih => exact .lazyCell (ih σ)
   | hnd _ ih => exact .hnd (ih σ)
   | owner _ ih => exact .owner (ih σ)
   | dict _ ih => exact .dict (ih σ)

@@ -177,6 +177,20 @@ command spends in a process it starts, the app or the tests, is the phase
 (each a `module` and `micros`, the slowest first) and `cache-misses`. The
 measurements are no input of the build cache.
 
+The report also says what the module cache did with each module of the
+run: `reused` (kept in memory by a watching command), `taken from the store`
+(saved by an earlier process), `not storable` (a module a saved key does not
+cover, such as one with inline modules), `no earlier entry`, or the inputs
+that differ from those of the entry kept or saved last: `source`, `file`,
+`config`, `mode`, `compiler`, `project modules` (a module added to or
+removed from the run), `plugin inputs`, `plugin output`, `module arguments`
+and `import M`, followed by what changed in `M` (`import App.Base ← source`).
+The human report counts them and lists the modules checked again, at most
+twenty; with `--diagnostics json` the event has `module-cache`, each entry a
+`module` and its `reason`, ordered by module. A reason names an input, never
+its value. `cache-misses` explains why a whole build was not taken from the
+build cache; these reasons explain the checking of each module.
+
 Explicit `build` and `build --watch` show one updating line with the current
 phase and elapsed time when stderr is a TTY, `TERM` is not `dumb`, and `CI` is
 unset. Pipes, CI and dumb terminals get one line per phase, without animation.

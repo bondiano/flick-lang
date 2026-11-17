@@ -89,6 +89,18 @@ theorem Typ.context_equiv {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | todo => intros; exact .todo
   | task _ hφ hb ht ih => intro _ _ hn hΨ hΓ; exact .task (ih hn hΨ hΓ) hφ hb ht
   | await _ hφ ht ih => intro _ _ hn hΨ hΓ; exact .await (ih hn hΨ hΓ) hφ ht
+  | lazy _ hψ hb hφ ih => intro _ _ hn hΨ hΓ; exact .lazy (ih hn hΨ hΓ) hψ hb hφ
+  | force _ hφ ht ih => intro _ _ hn hΨ hΓ; exact .force (ih hn hΨ hΓ) hφ ht
+  | lazyLoc hl =>
+    intro _ _ _ hΨ _
+    obtain ⟨t', hl', he⟩ := hΨ.lookup hl
+    obtain ⟨u, rfl, hu⟩ := he.lazyCell_left
+    exact (Typ.lazyLoc hl').conv (.lazy hu.symm)
+  | settle hl _ hψ hφ ht ih =>
+    intro _ _ hn hΨ hΓ
+    obtain ⟨t', hl', he⟩ := hΨ.lookup hl
+    obtain ⟨u, rfl, hu⟩ := he.lazyCell_left
+    exact .settle hl' ((ih hn hΨ hΓ).conv hu) hψ hφ ((LeLive.equiv hu.symm).trans ht)
   | raise _ hφ ih => intro _ _ hn hΨ hΓ; exact .raise (ih hn hΨ hΓ) hφ
   | raiseAdt _ hU hφ ih => intro _ _ hn hΨ hΓ; exact .raiseAdt (ih hn hΨ hΓ) hU hφ
   | errVal hv _ hU hε ih => intro _ _ hn hΨ hΓ; exact .errVal hv (ih hn hΨ hΓ) hU hε
