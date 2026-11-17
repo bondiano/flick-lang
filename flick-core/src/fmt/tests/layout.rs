@@ -272,7 +272,7 @@ fn breaks_a_record_in_a_plugin_block_by_lines() {
 
 /// `lazy { … }` lays out as `task { … }`, and `lazy e` as `await e`.
 #[test]
-fn lays_out_lazy_as_task() {
+fn lays_out_lazy_like_task_and_await() {
     let src = "let l = lazy {   load  id }\nlet m = lazy   load id\nlet long = lazy {\n  let user = load id\n  user.name }\n";
     insta::assert_snapshot!(fmt(src), @r#"
     let l = lazy { load id }
