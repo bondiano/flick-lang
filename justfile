@@ -337,7 +337,7 @@ wasm:
     node tools/wasm-dedup/index.mjs target/wasm32-unknown-unknown/release/flick_wasm.wasm
     @wasm=target/wasm32-unknown-unknown/release/flick_wasm.wasm; \
     echo "flick_wasm.wasm: $(wc -c < $wasm) bytes, $(gzip -6c $wasm | wc -c) gzipped"; \
-    test $(wc -c < $wasm) -le 4110000
+    test $(wc -c < $wasm) -le 4180000 # reason: the four editor query surfaces (semantic tokens, inlay hints, signature help, code actions) grew the playground compiler (~4.15 MB after CI wasm-opt)
 
 # Build the playground's compiler: the wasm module and its JS bindings
 docs-wasm: wasm

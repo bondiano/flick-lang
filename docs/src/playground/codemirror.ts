@@ -6,6 +6,7 @@ import { Annotation, EditorState, RangeSetBuilder } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, hoverTooltip, keymap, lineNumbers, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 
 import { complete, hover } from "./compiler.ts";
+import { ide } from "./ide.ts";
 import type { Diagnostic } from "./compiler.worker.ts";
 import { highlight } from "./highlight.ts";
 import { renderMarkdown } from "./markdown.ts";
@@ -113,6 +114,7 @@ export const create = (parent: HTMLElement, text: string, label: string, describ
         history(),
         colors,
         types,
+        ide(),
         autocompletion({ override: [completions] }),
         // Ctrl+Enter checks an exercise's answer, or runs the program; Flick owns both buttons
         keymap.of([{ key: "Mod-Enter", run: pressCheckOrRun }, ...completionKeymap, ...lintKeymap, ...defaultKeymap, ...historyKeymap, indentWithTab]),
