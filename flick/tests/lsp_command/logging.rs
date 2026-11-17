@@ -132,3 +132,66 @@ fn each_project_keeps_its_analysis_until_a_document_changes() {
     let selected = |cached: bool| logs.matches(&format!("cached={cached}")).count();
     assert_eq!((selected(true), selected(false)), (6, 0), "{logs}");
 }
+
+#[test]
+fn dotted_completion_uses_cached_snapshot_without_synchronous_analysis() {
+    let source = "module App.Main exposing (User, run)\n\ntype alias User = { name : String; age : Float }\n\nrun : User -> String\nlet run user = user.name\n";
+    let dir = project(
+        "lsp_dot_cached",
+        &[("flick.toml", LIB), ("src/App/Main.fl", source)],
+    );
+    let file = dir.join("src/App/Main.fl");
+    let log = dir.join("stderr.log");
+    let mut child = Command::new(env!("CARGO_BIN_EXE_flick"))
+        .args(["lsp", "--stdio"])
+        .current_dir(&dir)
+        .env("RUST_LOG", "flick::lsp=debug")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(fs::File::create(&log).expect("log file"))
+        .spawn()
+        .expect("flick lsp");
+    let mut lsp = Lsp {
+        input: child.stdin.take().expect("stdin"),
+        output: BufReader::new(child.stdout.take().expect("stdout")),
+        next: 0,
+        child,
+    };
+    lsp.request("initialize", &json!({ "capabilities": {} }));
+    lsp.notify(
+        "textDocument/didOpen",
+        &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": source } }),
+    );
+    let dot_user = source.replace("user.name", "user.");
+    lsp.notify(
+        "textDocument/didChange",
+        &json!({ "textDocument": { "uri": uri(&file), "version": 2 }, "contentChanges": [{ "text": dot_user }] }),
+    );
+    let record_reply = lsp.request(
+        "textDocument/completion",
+        &json!({ "textDocument": { "uri": uri(&file) }, "position": position(&dot_user, dot_user.find("user.").expect("dot") + 5) }),
+    );
+    let record_items = record_reply["result"].to_string();
+    assert!(
+        record_items.contains("\"name\"") && record_items.contains("\"age\""),
+        "{record_items}"
+    );
+    let dot_list = source.replace("user.name", "List.");
+    lsp.notify(
+        "textDocument/didChange",
+        &json!({ "textDocument": { "uri": uri(&file), "version": 3 }, "contentChanges": [{ "text": dot_list }] }),
+    );
+    let module_reply = lsp.request(
+        "textDocument/completion",
+        &json!({ "textDocument": { "uri": uri(&file) }, "position": position(&dot_list, dot_list.find("List.").expect("dot") + 5) }),
+    );
+    let module_items = module_reply["result"].to_string();
+    assert!(
+        module_items.contains("\"map\"") && module_items.contains("\"length\""),
+        "{module_items}"
+    );
+    lsp.close();
+    let logs = fs::read_to_string(&log).expect("logs");
+    let selected = |cached: bool| logs.matches(&format!("cached={cached}")).count();
+    assert_eq!((selected(true), selected(false)), (2, 0), "{logs}");
+}
