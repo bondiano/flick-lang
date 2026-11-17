@@ -401,7 +401,16 @@ pub(super) fn are_builtins(interfaces: &[Interface]) -> Option<bool> {
 /// What every module knows of the built-in modules in a mode.
 pub(super) fn builtin_env(stages_by_class: bool) -> &'static Builtins {
     static ENV: [OnceLock<Builtins>; 2] = [OnceLock::new(), OnceLock::new()];
-    ENV[usize::from(stages_by_class)].get_or_init(|| Builtins::new(builtins_of(stages_by_class)))
+    ENV[usize::from(stages_by_class)].get_or_init(|| {
+        let interfaces = builtins_of(stages_by_class);
+        let (env, elapsed) = timed(|| Builtins::new(interfaces));
+        debug!(
+            ?elapsed,
+            micros = micros(elapsed),
+            "built-in environment learned"
+        );
+        env
+    })
 }
 
 #[cfg(test)]

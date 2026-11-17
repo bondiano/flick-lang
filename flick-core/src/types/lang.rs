@@ -7,6 +7,9 @@
 use std::cell::Cell;
 use std::sync::OnceLock;
 
+use tracing::debug;
+
+use crate::clock::{micros, timed};
 use crate::iface::{Entity, Namespace};
 use crate::source::SourceMap;
 use crate::syntax::{self, cst::Node, kind::SyntaxKind as K};
@@ -124,7 +127,11 @@ pub fn table() -> &'static Table {
     if let Some(table) = OVERRIDE.with(Cell::get) {
         return table;
     }
-    TABLE.get_or_init(|| Table::of(super::builtin_sources()))
+    TABLE.get_or_init(|| {
+        let (table, elapsed) = timed(|| Table::of(super::builtin_sources()));
+        debug!(?elapsed, micros = micros(elapsed), "lang items found");
+        table
+    })
 }
 
 #[cfg(test)]
