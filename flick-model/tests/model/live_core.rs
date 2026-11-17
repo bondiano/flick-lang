@@ -3,7 +3,7 @@
 //! the programs that only hold a region past its `scope`, generated
 //! programs, and cases by hand. The machine judges what is accepted: a
 //! leak must be rejected because it reaches a use after close.
-//! `cargo test -p flick-model --test live_core -- --nocapture` prints the
+//! `cargo test -p flick-model --test model live_core:: -- --nocapture` prints the
 //! counts; `LIVE_CORE_ROUNDS` sets how many programs are generated.
 
 use crate::live_support;

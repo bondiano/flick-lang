@@ -1,4 +1,4 @@
-# Cases flick-core accepts and the model does not, checked by `tests/accepted.rs`.
+# Cases flick-core accepts and the model does not, checked by `tests/model/accepted.rs`.
 # `<gap|disagree> <key> # <reason>`; the key is a pass fixture or `<page> <fingerprint>`
 # of a docs example. A `gap` is a form the model does not translate, a `disagree` a
 # divergence `docs/formal` records. The list may only shrink.

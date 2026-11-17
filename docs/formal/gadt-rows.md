@@ -72,7 +72,7 @@ The formal relation, the executable reference checker and the compiler
 remain distinct implementations with their existing proof boundaries.
 
 The accepted and rejected cases are in `tests/check/{pass,fail}/types/gadt_rows.fl`.
-`flick-model/tests/gadt_rows.rs` checks the accepted program and independent
+`flick-model/tests/model/gadt_rows.rs` checks the accepted program and independent
 capture failures; `check/row_facts/tests.rs` checks nonempty residuals,
 nominal arguments and deferred assumptions. `tests/run/codegen/gadt_rows`
 has independently derived stdout, and `Language.GadtRows` exercises both

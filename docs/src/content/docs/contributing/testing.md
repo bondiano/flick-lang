@@ -81,7 +81,7 @@ there. `just e2e` also builds every `tests/check/pass/**` fixture and runs
 `node --check` on the output, and `e2e_numbers.rs` compares random `Float`
 arithmetic, compiled from Flick, with the same expressions in JS.
 
-## `flick test` — `flick/tests/test_command.rs`
+## `flick test` — `flick/tests/cli/test_command.rs`
 
 Builds sample projects in `target/tmp/test_command/` and runs `flick test` on
 them: each kind of outcome (assertion, typed failure, defect, failed cleanup)
@@ -90,7 +90,7 @@ is reported apart, a seed draws the same values again, `--filter` and
 previous one released its resources.
 
 The standard library declares every signature the specification gives for
-it word for word: `flick-core/tests/stdlib_signatures.rs` reads them from the
+it word for word: `flick-core/tests/compiler/stdlib_signatures.rs` reads them from the
 Russian spec's (`ru/spec`) `text` blocks.
 
 ## Language tests — `tests/language/`
@@ -195,17 +195,17 @@ Where to look for the tests of a behavior, and where a new one goes:
 | Behavior | Tests |
 | - | - |
 | kinds, instance resolution and coherence | `tests/check/{pass,fail}/types/kinds.fl`, `tests/check/fail/classes/` |
-| cold tasks, direct calls binding results, stage and evaluation order | `tests/run/codegen/{task_twice,stage_order,eval_order}.fl`, `tests/check/{pass,fail}/effects/`, `flick/tests/first_slice.rs` over `examples/first-slice/` |
+| cold tasks, direct calls binding results, stage and evaluation order | `tests/run/codegen/{task_twice,stage_order,eval_order}.fl`, `tests/check/{pass,fail}/effects/`, `flick/tests/cli/first_slice.rs` over `examples/first-slice/` |
 | error rows and `Cause`, services and layers | `tests/run/stdlib/effect/`, `tests/run/codegen/{errors,defect,services}.fl`, `packages/effect-ts/test/{cause,layer}.test.ts` |
 | scopes, owners, `parallel` and races | `tests/run/runtime/`, `packages/effect-ts/test/{scope,concurrency,race}.test.ts` |
 | regions and captures | `tests/check/{pass,fail}/regions/`, `tests/check/projects/regions/` |
-| `Float` semantics in debug, release and constant folding | `flick/tests/e2e_numbers.rs`, `tests/run/codegen/numbers.fl`, `flick-core/tests/consteval_node.rs` |
+| `Float` semantics in debug, release and constant folding | `flick/tests/cli/e2e_numbers.rs`, `tests/run/codegen/numbers.fl`, `flick-core/tests/compiler/consteval_node.rs` |
 | optimizer passes | `flick-core/src/opt/tests.rs`, `tests/run/codegen/release.fl` |
-| `deriving Schema`, codec policies, strict export, OpenAPI | `tests/{check,run}/**/schema/`, `packages/effect-ts/test/{schema,httpapi}.test.ts`, `flick/tests/schema_export.rs` |
+| `deriving Schema`, codec policies, strict export, OpenAPI | `tests/{check,run}/**/schema/`, `packages/effect-ts/test/{schema,httpapi}.test.ts`, `flick/tests/cli/schema_export.rs` |
 | FFI callbacks, `.d.ts` import and reviewed bindings | `tests/run/ffi/`, `packages/effect-ts/test/callbacks.test.ts`, `flick-core/src/ffi/tests.rs`, `flick/tests/ffi_command.rs`, `tools/dts-importer/test/` |
 | SQL | `tests/check/{pass,fail}/sql/`, `tests/run/sql/`, `packages/effect-ts/test/sql.test.ts`, `flick/tests/sql_postgres.rs` over `tests/postgres/` |
 | UI | `tests/check/{pass,fail}/ui/`, `tests/run/ui/`, `packages/effect-ts/test/ui-*.test.ts` |
-| the `cli` block | `tests/check/{pass,fail}/cli/`, `tests/run/stdlib/cli/`, `flick-core/src/project/load/plugins_tests.rs` (the calls it stands for), `flick/tests/lsp_editor/cli.rs` |
-| hover, the language server and the TypeScript projection | `flick-core/src/ide/tests.rs`, `flick/tests/{lsp_command.rs,lsp_editor/}`, `flick-core/tests/projection.rs`, `flick-core/src/codegen/ts/tests.rs` |
+| the `cli` block | `tests/check/{pass,fail}/cli/`, `tests/run/stdlib/cli/`, `flick-core/src/project/load/plugins_tests.rs` (the calls it stands for), `flick/tests/cli/lsp_editor/cli.rs` |
+| hover, the language server and the TypeScript projection | `flick-core/src/ide/tests.rs`, `flick/tests/cli/{lsp_command.rs,lsp_editor/}`, `flick-core/tests/compiler/projection.rs`, `flick-core/src/codegen/ts/tests.rs` |
 | the CLI: no code run by `check`/`build`, run generations, `dev`, cache, pnpm, exit codes, NDJSON | `flick/tests/{cli_project,cli_run,check_command}.rs` |
-| `.d.ts` façades and `pack` | `flick/tests/dts_command.rs`, `flick/tests/cli_run.rs` |
+| `.d.ts` façades and `pack` | `flick/tests/cli/dts_command.rs`, `flick/tests/cli/cli_run.rs` |

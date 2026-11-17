@@ -23,7 +23,7 @@ checked source IR without substitution fallback, explicitly release the
 main outcome, and require `Heap::finish` to observe zero occupied slots.
 The main runner applies a returned ordinary function to Unit and awaits a
 resulting task, at most once each, in the same execution and cell arena.
-`flick-model/tests/memory_source.rs` runs forty-nine selected corpus cases
+`flick-model/tests/model/memory_source.rs` runs forty-nine selected corpus cases
 against their unchanged expectations in debug and release: the seven
 bootstrap cases `hello`, `inline_declarations`, `inline_module`, `inline_nested`, `inline_pack`,
 `inline_pack_nominals` and `packed_module`; the codegen cases `call_site`, `stage_order`,

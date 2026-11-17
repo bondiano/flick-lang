@@ -380,7 +380,7 @@ These are taken on trust, and the tests do not check them:
 
 The program generator of the model properties (`flick-model/src/generate/`) builds Flick forms
 whose TS counterpart has a hole, and `mutate` makes the change that would open that hole. The
-property `checkers_agree` (`flick-model/tests/props.rs`) requires the model and flick-core to
+property `checkers_agree` (`flick-model/tests/model/props.rs`) requires the model and flick-core to
 accept the changed program together or reject it together. The bindings are in `Gen.fl`:
 `JsValue` from `js_of`, the opaque `Shape` from `shape_of`, the member `shape_name` (a call with
 `this`), the predicate `is_point` (`foreign pure`).

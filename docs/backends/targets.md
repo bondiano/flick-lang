@@ -42,12 +42,12 @@ it does not prove that every host API has been migrated.
 | --- | --- |
 | Shared language behavior | `tests/language/` assertions; `tests/run/portable.txt` selects JS/TS/Go debug/release cases with expected output; `flick-model/tests` checks its supported fragment |
 | Effect/RT availability | `flick-core/src/build/capability_tests.rs` accepts supported and unreachable unused bindings, rejects reachable adapter-only bindings at their use, including re-exports and initialization |
-| Foreign typing and trust | `tests/check/{pass,fail}/ffi/`, `flick/tests/ffi_forms.rs`, `flick/tests/lsp_editor/foreign.rs`; a `foreign pure` declaration remains the binding author's promise |
+| Foreign typing and trust | `tests/check/{pass,fail}/ffi/`, `flick/tests/cli/ffi_forms.rs`, `flick/tests/cli/lsp_editor/foreign.rs`; a `foreign pure` declaration remains the binding author's promise |
 | Go foreign emission | `codegen/go/foreign.rs` and `codegen/go/tests.rs` cover mapped and missing bindings; `tests/run/codegen/abi.{fl,go,mjs}` pins a portable local binding |
 | Go run/test/cache behavior | `flick/tests/go_main.rs` checks real executables, restoration, exits/signals, matching failure reports and output after cleanup |
-| Browser compilation and execution | `flick/tests/wasm_demo.rs`, `docs/test/compiler.test.ts`, `docs/test/loader.test.ts` and `docs/e2e/`; shared invalid programs retain diagnostics, worker isolation is tested separately |
+| Browser compilation and execution | `flick/tests/cli/wasm_demo.rs`, `docs/test/compiler.test.ts`, `docs/test/loader.test.ts` and `docs/e2e/`; shared invalid programs retain diagnostics, worker isolation is tested separately |
 | Browser-only APIs | `tests/check/fail/ui/browser.fl` pins browser/server UI boundaries; those checks are not general package-target preflight |
-| Source maps and positions | `flick-core/tests/features.rs`, `flick/tests/unicode_path.rs`, `flick/tests/wasm_demo.rs`, `flick/tests/lsp_editor/`; Go uses the `//line` path in `codegen/go/mod.rs` |
+| Source maps and positions | `flick-core/tests/features.rs`, `flick/tests/unicode_path.rs`, `flick/tests/cli/wasm_demo.rs`, `flick/tests/cli/lsp_editor/`; Go uses the `//line` path in `codegen/go/mod.rs` |
 | Component selection | `flick/tests/backends.rs` checks literal third-party build/run/test, profile/cache/offline behavior, version/digest/target rejection and guest diagnostics |
 
 This table names evidence; it is not a claim that every suite was rerun for a

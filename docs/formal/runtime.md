@@ -797,7 +797,7 @@ let tests = [
 
 - Divergence: `flick test --emit js` and `--emit go` printed `✓ a supervisor that dies`, exit code 0. The same code in `main` ends the program with code 1 ("a defect of a supervisor"). Breaks R4.
 - Cause: the defect sink was global (`owner.ts:38-43`, Go `reported`), and only the `main` runner read it (`entry.ts:164`, Go `platform.go:146`). The test runner (`ownedExits`, Go `testing.go`) did not.
-- Resolution — both runtimes: a test is its own root. An owner gets its defect sink from the enclosing owner; a test has its own. Supervisor defects that arrive during the test are joined with the outcome of the body, and the test fails with kind `defect`. Fixed (`Owner.defects` in JS and Go, `stdlib/testing.ts`, `testing.go`); tests: "a supervisor that dies" in `flick/tests/test_command.rs`, `testing_test.go` `TestASupervisorThatFailsFailsItsTest`.
+- Resolution — both runtimes: a test is its own root. An owner gets its defect sink from the enclosing owner; a test has its own. Supervisor defects that arrive during the test are joined with the outcome of the body, and the test fails with kind `defect`. Fixed (`Owner.defects` in JS and Go, `stdlib/testing.ts`, `testing.go`); tests: "a supervisor that dies" in `flick/tests/cli/test_command.rs`, `testing_test.go` `TestASupervisorThatFailsFailsItsTest`.
 
 ### Go: a failing `Events.listen` supervisor is dropped
 

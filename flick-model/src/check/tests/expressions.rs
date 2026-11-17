@@ -64,7 +64,7 @@ fn let_sig_rule() {
 
 /// An opaque alias that names itself, `opaque type alias Stream = Option
 /// (Float, Stream)`, inside its module: two of it are equal by their
-/// arguments, and zonking a type does not unfold it (`tests/opaque.rs`
+/// arguments, and zonking a type does not unfold it (`tests/model/opaque.rs`
 /// checks its source).
 #[test]
 fn a_recursive_opaque_alias_is_checked() {

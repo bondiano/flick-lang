@@ -2,8 +2,8 @@
 //! generator, the generated programs and their changes, and the values of
 //! the built-in modules, where a region is live where a row has `Live` of
 //! it. A change the model accepts must run without a use after close or
-//! another stuck state: the machine is the judge. `cargo test -p flick-model --test live -- --nocapture`
-//! prints what it counted.
+//! another stuck state: the machine is the judge.
+//! `cargo test -p flick-model --test model live:: -- --nocapture` prints what it counted.
 
 use crate::live_support;
 
