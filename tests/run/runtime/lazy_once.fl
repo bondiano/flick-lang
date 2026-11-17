@@ -1,0 +1,33 @@
+// A lazy runs its task at most once, at its first `await`: later awaits get
+// the kept value or the kept typed failure, and a lazy nobody awaits never
+// runs its task.
+module App.Main exposing (main)
+
+type error Boom = Boom String
+
+counted : Ref Int -> Int ->{; Boom} Int
+let counted runs n =
+  Ref.set runs (Ref.get runs + 1)
+  if n < 0 then Fail.fail (Boom "negative \{n}") else n * 2
+
+main : Unit ->{Async} Unit
+let main () =
+  let runs = Ref.make 0
+  let doubled = lazy { counted runs 21 }
+  let failing = lazy counted runs (-1)
+  ignore (lazy { counted runs 5 })
+  let a =
+    try await doubled with
+    | Boom _ -> 0
+  let b =
+    try await doubled with
+    | Boom _ -> 0
+  let first =
+    try show (await failing) with
+    | Boom m -> m
+  let second =
+    try show (await failing) with
+    | Boom m -> m
+  Platform.stdout_line "\{a} \{b}"
+  Platform.stdout_line "\{first} / \{second}"
+  Platform.stdout_line "runs: \{Ref.get runs}"

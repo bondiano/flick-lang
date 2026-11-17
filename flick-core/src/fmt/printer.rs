@@ -144,9 +144,13 @@ impl<'a> Printer<'a> {
             K::BindStmt => self.bind(n),
             K::BindGroup => self.bind_group(n),
             K::Block => self.block(n),
-            K::LoopExpr | K::TaskExpr | K::ScopeExpr | K::ProvideExpr | K::DoExpr | K::RecGroup => {
-                self.braced(n, &[])
-            }
+            K::LoopExpr
+            | K::TaskExpr
+            | K::LazyExpr
+            | K::ScopeExpr
+            | K::ProvideExpr
+            | K::DoExpr
+            | K::RecGroup => self.braced(n, &[]),
             K::ForExpr | K::WhileExpr => self.for_(n),
             K::ListExpr | K::TupleExpr | K::ListPat | K::TuplePat | K::TupleType | K::Exposing => {
                 self.bracket(n, &[])
@@ -333,6 +337,7 @@ fn space((a, a_parent): (K, K), (b, b_parent): (K, K)) -> bool {
         (K::LBrace, _) => !tight_braces(a_parent),
         (_, K::RBrace) => !tight_braces(b_parent),
         (K::Minus, _) => !matches!(a_parent, K::PrefixExpr | K::LitPat | K::RowOmit),
+        (K::Tilde, _) => false,
         (K::Con, K::LParen) => !matches!(
             b_parent,
             K::ExposeItem

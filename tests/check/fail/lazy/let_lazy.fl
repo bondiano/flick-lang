@@ -1,0 +1,25 @@
+// A `let lazy` is its function's and is read only as `await x`; it binds a
+// name, inside a function, as `let mut` does.
+module App.LetLazy exposing (..)
+
+let lazy top = 1
+
+bare : Unit ->{} Int
+let bare () =
+  let lazy x = 1
+  x + 1
+
+escapes : Unit ->{} Eff {} {} Int
+let escapes () =
+  let lazy x = 1
+  task { await x }
+
+local : Unit ->{} Int
+let local () =
+  let lazy f n = n
+  f 1
+
+//~ FLICK-S016 @5:5-5:9 a definition of the module cannot be `lazy`
+//~ FLICK-T003 @10:3-10:4 `x` is a `let lazy`, read only as `await x`
+//~ FLICK-G005 @15:16-15:17 a `let lazy` binding
+//~ FLICK-S016 @19:7-19:11 a function cannot be `lazy`

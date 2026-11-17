@@ -1,0 +1,24 @@
+// A parameter marked `~` takes its argument as a computation: a runtime call
+// written there is passed unstarted, as `task { … }` would pass it, and an
+// `Eff` value or a call that builds one is passed as it is.
+module App.Suspended exposing (..)
+
+type error Missing = Missing
+
+service Users =
+  find : Int ->{; Missing} String
+
+twice : ~(Eff r e String)^c ->{r; e} (String, String)
+let twice job = (await job, await job)
+
+named : Int -> Eff {Users} {Missing} String
+let named id = task { Users.find id }
+
+direct : Int ->{Users; Missing} (String, String)
+let direct id = twice (Users.find id)
+
+stored : Int ->{Users; Missing} (String, String)
+let stored id = twice (named id)
+
+kept : Int ->{Users} String
+let kept id = Effect.or_die (Users.find id)

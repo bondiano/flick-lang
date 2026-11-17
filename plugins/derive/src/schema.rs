@@ -510,7 +510,7 @@ fn apply(b: &mut Builder, f: &str, args: Vec<NodeId>) -> NodeId {
     }
 }
 
-/// `Schema.lazy "T" (fun _ -> of)`.
+/// `Schema.suspend "T" (fun _ -> of)`.
 pub fn lazy(b: &mut Builder, ty: &str, of: NodeId) -> NodeId {
     let unit = b.pat(Pat::Wildcard);
     let thunk = b.expr(Expr::Lambda {
@@ -518,5 +518,5 @@ pub fn lazy(b: &mut Builder, ty: &str, of: NodeId) -> NodeId {
         body: of,
     });
     let text = b.expr(Expr::Text(ty.to_owned()));
-    call(b, "Schema.lazy", vec![text, thunk])
+    call(b, "Schema.suspend", vec![text, thunk])
 }

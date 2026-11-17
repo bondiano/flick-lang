@@ -1,0 +1,11 @@
+// `~` marks only the parameter of an arrow, and only one of type `Eff`.
+module App.Suspended exposing (..)
+
+not_eff : ~Int -> Int
+let not_eff n = n
+
+result : Int -> ~(Eff {} {} Int)
+let result n = task { n }
+
+//~ FLICK-T076 @4:11-4:15 but `Int` is no `Eff`
+//~ FLICK-T076 @7:17-7:33 left of its `->`
