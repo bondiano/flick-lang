@@ -1,7 +1,6 @@
 package flickrt
 
 import (
-	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -13,10 +12,10 @@ import (
 // (whose schema is `root`, a keyword in Flick).
 
 var (
-	anchorPattern          = regexp.MustCompile(`^[A-Za-z_][-A-Za-z0-9._]*$`)
-	legacyIDFragment       = regexp.MustCompile(`^[A-Za-z][-A-Za-z0-9._:]*$`)
-	openApiComponentsKey   = regexp.MustCompile(`^[a-zA-Z0-9.\-_]+$`)
-	notOpenApiComponentKey = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
+	anchorPattern          = lazyRegexp{pattern: `^[A-Za-z_][-A-Za-z0-9._]*$`}
+	legacyIDFragment       = lazyRegexp{pattern: `^[A-Za-z][-A-Za-z0-9._:]*$`}
+	openApiComponentsKey   = lazyRegexp{pattern: `^[a-zA-Z0-9.\-_]+$`}
+	notOpenApiComponentKey = lazyRegexp{pattern: `[^a-zA-Z0-9._-]`}
 )
 
 var (
@@ -155,7 +154,7 @@ func convertDraft07ID(out *Record, v Value) {
 		return
 	}
 	id, anchor, _ := strings.Cut(s, "#")
-	if anchor != "" && !anchorPattern.MatchString(anchor) {
+	if anchor != "" && !anchorPattern.re().MatchString(anchor) {
 		unsupportedKeyword("$id", "Draft 2020-12", "fragment \"#"+anchor+"\" is not a valid $anchor")
 	}
 	if id != "" {
@@ -212,7 +211,7 @@ func sanitizeOpenApiComponentsKey(s string) string {
 	if s == "" {
 		return "_"
 	}
-	return notOpenApiComponentKey.ReplaceAllString(s, "_")
+	return notOpenApiComponentKey.re().ReplaceAllString(s, "_")
 }
 
 // JsonSchemaToOpenApi31 is `toMultiDocumentOpenApi3_1`: definitions under
@@ -227,7 +226,7 @@ func JsonSchemaToOpenApi31(multi Value) Value {
 	used := map[string]bool{}
 	var invalid []string
 	for _, k := range shared.keys {
-		if openApiComponentsKey.MatchString(k) {
+		if openApiComponentsKey.re().MatchString(k) {
 			used[k] = true
 		} else {
 			invalid = append(invalid, k)

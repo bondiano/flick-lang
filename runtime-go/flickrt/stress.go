@@ -14,6 +14,8 @@ import (
 // off (startup.go), so the runs of a program take interleavings a plain
 // run rarely does; the monitor of λRT checks the trace of each. Go's own
 // scheduler is not seeded: a seed picks the delays, not the interleaving.
+//
+// Eager: every checkpoint and new fiber tests it, as a plain bool.
 var stressing = os.Getenv("FLICK_STRESS") != ""
 
 var stressRand = struct {

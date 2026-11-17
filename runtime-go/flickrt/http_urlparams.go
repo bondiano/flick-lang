@@ -1,7 +1,6 @@
 package flickrt
 
 import (
-	"regexp"
 	"strings"
 )
 
@@ -212,9 +211,9 @@ func UrlParamsRedactUrl(names, url Value) Value { return redactURL(url.(string),
 // Masking a URL works on the text, so a URL no parser accepts is still
 // masked.
 var (
-	authorityStart      = regexp.MustCompile(`(?i)^(?:(https?|ftp|wss?):[/\\]*|[a-z][a-z\d+.-]*://|[/\\]{2,})`)
-	specialAuthorityEnd = regexp.MustCompile(`[/\\?#]`)
-	plainAuthorityEnd   = regexp.MustCompile(`[/?#]`)
+	authorityStart      = lazyRegexp{pattern: `(?i)^(?:(https?|ftp|wss?):[/\\]*|[a-z][a-z\d+.-]*://|[/\\]{2,})`}
+	specialAuthorityEnd = lazyRegexp{pattern: `[/\\?#]`}
+	plainAuthorityEnd   = lazyRegexp{pattern: `[/?#]`}
 )
 
 func redactURL(url string, names []string) string {
@@ -255,18 +254,18 @@ func redactUserinfo(url string) string {
 		normalized = append(normalized, c)
 		offsets = append(offsets, i)
 	}
-	m := authorityStart.FindSubmatchIndex(normalized)
+	m := authorityStart.re().FindSubmatchIndex(normalized)
 	if m == nil {
 		return url
 	}
 	start := m[1]
 	special := m[2] >= 0 || !strings.Contains(string(normalized[:start]), ":")
 	rest := string(normalized[start:])
-	end := plainAuthorityEnd
+	end := &plainAuthorityEnd
 	if special {
-		end = specialAuthorityEnd
+		end = &specialAuthorityEnd
 	}
-	if loc := end.FindStringIndex(rest); loc != nil {
+	if loc := end.re().FindStringIndex(rest); loc != nil {
 		rest = rest[:loc[0]]
 	}
 	at := strings.LastIndexByte(rest, '@')

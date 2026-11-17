@@ -3,7 +3,6 @@ package flickrt
 import (
 	"math"
 	"math/big"
-	"regexp"
 	"strconv"
 	"sync"
 )
@@ -171,7 +170,7 @@ func expected(what string, in Value) []issue {
 	return fail("expected " + what + ", got " + describeInput(in))
 }
 
-var digitsPattern = regexp.MustCompile(`^-?\d+$`)
+var digitsPattern = lazyRegexp{pattern: `^-?\d+$`}
 
 const redactedRefusal = "a Redacted value has no JSON form without an explicit policy"
 
@@ -256,7 +255,7 @@ func (w *wire) decode(fb *Fiber, in Value) (Value, []issue) {
 		if !ok {
 			return nil, expected("a string of digits", in)
 		}
-		if !digitsPattern.MatchString(text) {
+		if !digitsPattern.re().MatchString(text) {
 			return nil, fail("expected a string of digits")
 		}
 		n, _ := new(big.Int).SetString(text, 10)
@@ -507,12 +506,11 @@ func (w *wire) encode(fb *Fiber, v Value) (Value, []issue) {
 
 // emailPattern is the JS target's: one `@` with text on both sides and a
 // dot in the domain.
-var emailPattern = func() *regexp.Regexp {
-	// JS's \s, which reaches past ASCII
-	other := `[^\t\n\v\f\r \x{a0}\x{1680}\x{2000}-\x{200a}\x{2028}\x{2029}\x{202f}\x{205f}\x{3000}\x{feff}@]+`
-	return regexp.MustCompile(`^` + other + `@` + other + `\.` + other + `$`)
-}()
+var emailPattern = lazyRegexp{pattern: `^` + emailOther + `@` + emailOther + `\.` + emailOther + `$`}
 
-func CheckEmail(s Value) Value    { return emailPattern.MatchString(s.(string)) }
+// emailOther is neither `@` nor JS's \s, which reaches past ASCII.
+const emailOther = `[^\t\n\v\f\r \x{a0}\x{1680}\x{2000}-\x{200a}\x{2028}\x{2029}\x{202f}\x{205f}\x{3000}\x{feff}@]+`
+
+func CheckEmail(s Value) Value    { return emailPattern.re().MatchString(s.(string)) }
 func CheckNonEmpty(s Value) Value { return s.(string) != "" }
 func CheckPositive(n Value) Value { return n.(float64) > 0 }

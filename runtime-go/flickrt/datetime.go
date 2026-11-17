@@ -2,7 +2,6 @@ package flickrt
 
 import (
 	"math"
-	"regexp"
 	"strings"
 	"time"
 )
@@ -77,12 +76,12 @@ func attempt(what string, f func() Value) Value {
 	return out
 }
 
-var hasZone = regexp.MustCompile(`Z|GMT|[+-]\d{2}$|[+-]\d{2}:?\d{2}$|\]$`)
+var hasZone = lazyRegexp{pattern: `Z|GMT|[+-]\d{2}$|[+-]\d{2}:?\d{2}$|\]$`}
 
 // parseInstant is the instant of a string: one without a zone is read as
 // UTC.
 func parseInstant(s string) (*DateTime, bool) {
-	if !hasZone.MatchString(s) {
+	if !hasZone.re().MatchString(s) {
 		s += "Z"
 	}
 	ms := parseJsDate(s)
@@ -146,14 +145,14 @@ func DateTimeMakeZonedFromString(s Value) Value {
 	return checkedDateTime("not a zoned date-time: "+QuoteJSON(s.(string)), d, ok)
 }
 
-var zonedText = regexp.MustCompile(`^(.{17,35})\[(.+)\]$`)
+var zonedText = lazyRegexp{pattern: `^(.{17,35})\[(.+)\]$`}
 
 // makeZonedFromString reads ISO text with an offset, then maybe the zone
 // in brackets; the instant keeps its offset's meaning.
 func makeZonedFromString(s string) (*DateTime, bool) {
 	iso := s
 	var zone *TimeZone
-	if m := zonedText.FindStringSubmatch(s); m != nil {
+	if m := zonedText.re().FindStringSubmatch(s); m != nil {
 		z, ok := zoneFromString(m[2])
 		if !ok {
 			return nil, false

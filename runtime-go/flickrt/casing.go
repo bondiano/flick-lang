@@ -1,7 +1,6 @@
 package flickrt
 
 import (
-	"regexp"
 	"strings"
 )
 
@@ -88,10 +87,10 @@ func SnakeToPascal(s Value) Value { return snakeTo(s.(string), true) }
 func SnakeToKebab(s Value) Value  { return strings.ReplaceAll(s.(string), "_", "-") }
 func KebabToSnake(s Value) Value  { return strings.ReplaceAll(s.(string), "-", "_") }
 
-var upperLetter = regexp.MustCompile(`([A-Z])`)
+var upperLetter = lazyRegexp{pattern: `([A-Z])`}
 
 func CamelToSnake(s Value) Value {
-	return ToLowerCase(upperLetter.ReplaceAllString(s.(string), "_${1}"))
+	return ToLowerCase(upperLetter.re().ReplaceAllString(s.(string), "_${1}"))
 }
 
 func PascalToSnake(s Value) Value {
@@ -99,26 +98,26 @@ func PascalToSnake(s Value) Value {
 	if len(units) == 0 {
 		return ""
 	}
-	return ToLowerCase(unit(units, 0) + upperLetter.ReplaceAllString(fromUnits(units[1:]), "_${1}"))
+	return ToLowerCase(unit(units, 0) + upperLetter.re().ReplaceAllString(fromUnits(units[1:]), "_${1}"))
 }
 
 var (
-	splitCase = []*regexp.Regexp{
-		regexp.MustCompile(`([a-z0-9])([A-Z])`),
-		regexp.MustCompile(`([A-Z])([A-Z][a-z])`),
-		regexp.MustCompile(`(?i)([A-Z])([0-9])`),
-		regexp.MustCompile(`(?i)([0-9])([A-Z])`),
+	splitCase = []lazyRegexp{
+		{pattern: `([a-z0-9])([A-Z])`},
+		{pattern: `([A-Z])([A-Z][a-z])`},
+		{pattern: `(?i)([A-Z])([0-9])`},
+		{pattern: `(?i)([0-9])([A-Z])`},
 	}
-	stripCase = regexp.MustCompile(`(?i)[^A-Z0-9]+`)
+	stripCase = lazyRegexp{pattern: `(?i)[^A-Z0-9]+`}
 )
 
 // words is the words of an identifier, each transformed, joined by
 // `delimiter`.
-func words(s string, splits []*regexp.Regexp, delimiter string, transform func(w string, i int) string) Value {
-	for _, re := range splits {
-		s = re.ReplaceAllString(s, "${1}\x00${2}")
+func words(s string, splits []lazyRegexp, delimiter string, transform func(w string, i int) string) Value {
+	for i := range splits {
+		s = splits[i].re().ReplaceAllString(s, "${1}\x00${2}")
 	}
-	s = strings.Trim(stripCase.ReplaceAllString(s, "\x00"), "\x00")
+	s = strings.Trim(stripCase.re().ReplaceAllString(s, "\x00"), "\x00")
 	if s == "" {
 		return ""
 	}

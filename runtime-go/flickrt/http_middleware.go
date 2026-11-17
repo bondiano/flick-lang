@@ -2,7 +2,6 @@ package flickrt
 
 import (
 	"net/netip"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -326,11 +325,11 @@ func forwardedAddress(text string) (netip.Addr, bool) {
 	return netip.Addr{}, false
 }
 
-var forwardedHostShape = regexp.MustCompile(`(?i)^(?:\[[0-9a-f:.]+\]|[a-z0-9._-]+)(?::\d{1,5})?$`)
+var forwardedHostShape = lazyRegexp{pattern: `(?i)^(?:\[[0-9a-f:.]+\]|[a-z0-9._-]+)(?::\d{1,5})?$`}
 
 // validForwardedHost is a host and port a URL can have: no path, user or list.
 func validForwardedHost(host string) bool {
-	if !forwardedHostShape.MatchString(host) {
+	if !forwardedHostShape.re().MatchString(host) {
 		return false
 	}
 	name, port := host, ""

@@ -201,17 +201,17 @@ func (p *tomlParser) parseKeyPath(stop rune) []string {
 }
 
 var (
-	tomlSpacedDateTime = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})?)`)
-	tomlDateTime       = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2})[Tt](\d{2}:\d{2}:\d{2}(?:\.\d+)?)([Zz]|[+-]\d{2}:\d{2})?$`)
-	tomlLocalDate      = regexp.MustCompile(`^(\d{4})-(\d{2})-(\d{2})$`)
-	tomlLocalTime      = regexp.MustCompile(`^(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?$`)
-	tomlNumericOffset  = regexp.MustCompile(`^[+-](\d{2}):(\d{2})$`)
-	tomlSpecial        = regexp.MustCompile(`^[+-]?(?:inf|nan)$`)
-	tomlHex            = regexp.MustCompile(`^0x[0-9A-Fa-f](?:_?[0-9A-Fa-f])*$`)
-	tomlOctal          = regexp.MustCompile(`^0o[0-7](?:_?[0-7])*$`)
-	tomlBinary         = regexp.MustCompile(`^0b[01](?:_?[01])*$`)
-	tomlInteger        = regexp.MustCompile(`^[+-]?(?:0|[1-9](?:_?\d)*)$`)
-	tomlFloat          = regexp.MustCompile(`^[+-]?(?:(?:0|[1-9](?:_?\d)*)\.\d(?:_?\d)*(?:[eE][+-]?\d(?:_?\d)*)?|(?:0|[1-9](?:_?\d)*)[eE][+-]?\d(?:_?\d)*)$`)
+	tomlSpacedDateTime = lazyRegexp{pattern: `^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})?)`}
+	tomlDateTime       = lazyRegexp{pattern: `^(\d{4}-\d{2}-\d{2})[Tt](\d{2}:\d{2}:\d{2}(?:\.\d+)?)([Zz]|[+-]\d{2}:\d{2})?$`}
+	tomlLocalDate      = lazyRegexp{pattern: `^(\d{4})-(\d{2})-(\d{2})$`}
+	tomlLocalTime      = lazyRegexp{pattern: `^(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?$`}
+	tomlNumericOffset  = lazyRegexp{pattern: `^[+-](\d{2}):(\d{2})$`}
+	tomlSpecial        = lazyRegexp{pattern: `^[+-]?(?:inf|nan)$`}
+	tomlHex            = lazyRegexp{pattern: `^0x[0-9A-Fa-f](?:_?[0-9A-Fa-f])*$`}
+	tomlOctal          = lazyRegexp{pattern: `^0o[0-7](?:_?[0-7])*$`}
+	tomlBinary         = lazyRegexp{pattern: `^0b[01](?:_?[01])*$`}
+	tomlInteger        = lazyRegexp{pattern: `^[+-]?(?:0|[1-9](?:_?\d)*)$`}
+	tomlFloat          = lazyRegexp{pattern: `^[+-]?(?:(?:0|[1-9](?:_?\d)*)\.\d(?:_?\d)*(?:[eE][+-]?\d(?:_?\d)*)?|(?:0|[1-9](?:_?\d)*)[eE][+-]?\d(?:_?\d)*)$`}
 )
 
 func (p *tomlParser) parseValue() Value {
@@ -225,7 +225,7 @@ func (p *tomlParser) parseValue() Value {
 	case '{':
 		return p.parseInlineTable()
 	}
-	if m := tomlSpacedDateTime.FindStringSubmatch(p.rest()); m != nil {
+	if m := tomlSpacedDateTime.re().FindStringSubmatch(p.rest()); m != nil {
 		p.advance(len(m[0]))
 		v, _ := p.parseDate(m[1] + "T" + m[2])
 		return v
@@ -254,7 +254,7 @@ func (p *tomlParser) parseValue() Value {
 }
 
 func (p *tomlParser) parseDate(token string) (Value, bool) {
-	if m := tomlDateTime.FindStringSubmatch(token); m != nil {
+	if m := tomlDateTime.re().FindStringSubmatch(token); m != nil {
 		date, time, offset := m[1], m[2], m[3]
 		// `Date` cannot represent a leap second, so offset date-times reject `:60`
 		offsetValid := offset == "" || isValidTomlOffset(offset) && time[6:8] != "60"
@@ -266,13 +266,13 @@ func (p *tomlParser) parseDate(token string) (Value, bool) {
 		}
 		return newJsDate(parseJsDate(date + "T" + time + strings.ToUpper(offset))).isoString(), true
 	}
-	if tomlLocalDate.MatchString(token) {
+	if tomlLocalDate.re().MatchString(token) {
 		if !isValidTomlDate(token) {
 			p.fail("Invalid date-time '" + token + "'")
 		}
 		return token, true
 	}
-	if tomlLocalTime.MatchString(token) {
+	if tomlLocalTime.re().MatchString(token) {
 		if !isValidTomlTime(token) {
 			p.fail("Invalid date-time '" + token + "'")
 		}
@@ -294,7 +294,7 @@ func tomlFields(pattern *regexp.Regexp, s string) []int {
 var tomlDaysInMonth = [12]int{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
 
 func isValidTomlDate(date string) bool {
-	f := tomlFields(tomlLocalDate, date)
+	f := tomlFields(tomlLocalDate.re(), date)
 	year, month, day := f[0], f[1], f[2]
 	if month < 1 || month > 12 {
 		return false
@@ -307,16 +307,16 @@ func isValidTomlDate(date string) bool {
 }
 
 func isValidTomlTime(time string) bool {
-	f := tomlFields(tomlLocalTime, time)
+	f := tomlFields(tomlLocalTime.re(), time)
 	return f[0] <= 23 && f[1] <= 59 && f[2] <= 60
 }
 
 // isValidTomlOffset is true of `Z` too.
 func isValidTomlOffset(offset string) bool {
-	if !tomlNumericOffset.MatchString(offset) {
+	if !tomlNumericOffset.re().MatchString(offset) {
 		return true
 	}
-	f := tomlFields(tomlNumericOffset, offset)
+	f := tomlFields(tomlNumericOffset.re(), offset)
 	return f[0] <= 23 && f[1] <= 59
 }
 
@@ -324,7 +324,7 @@ func isValidTomlOffset(offset string) bool {
 func (p *tomlParser) parseNumber(token string) (float64, bool) {
 	normalized := strings.ReplaceAll(token, "_", "")
 	switch {
-	case tomlSpecial.MatchString(token):
+	case tomlSpecial.re().MatchString(token):
 		if strings.HasSuffix(normalized, "nan") {
 			return math.NaN(), true
 		}
@@ -332,7 +332,7 @@ func (p *tomlParser) parseNumber(token string) (float64, bool) {
 			return math.Inf(-1), true
 		}
 		return math.Inf(1), true
-	case tomlHex.MatchString(token) || tomlOctal.MatchString(token) || tomlBinary.MatchString(token) || tomlInteger.MatchString(token):
+	case tomlHex.re().MatchString(token) || tomlOctal.re().MatchString(token) || tomlBinary.re().MatchString(token) || tomlInteger.re().MatchString(token):
 		var n float64
 		switch normalized[:min(2, len(normalized))] {
 		case "0x":
@@ -348,7 +348,7 @@ func (p *tomlParser) parseNumber(token string) (float64, bool) {
 			p.fail("Integer out of range '" + token + "'")
 		}
 		return n, true
-	case tomlFloat.MatchString(token):
+	case tomlFloat.re().MatchString(token):
 		n, _ := strconv.ParseFloat(normalized, 64) // out of range is ±Infinity, as Number gives
 		return n, true
 	}

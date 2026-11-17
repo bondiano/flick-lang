@@ -1,11 +1,9 @@
 package flickrt
 
-import "regexp"
-
 // CliOutput.displayWidth: the columns text takes in a terminal, without
 // its ANSI escapes, by grapheme.
 
-var cliAnsi = regexp.MustCompile("\x1b\\[[0-9;]*m")
+var cliAnsi = lazyRegexp{pattern: "\x1b\\[[0-9;]*m"}
 
 var zeroWidthTable, emojiTable onFirstUse[[]valueRange]
 
@@ -29,7 +27,7 @@ func cliFullWidth(r rune) bool {
 
 func cliDisplayWidth(text string) int {
 	total := 0
-	for _, g := range graphemes(cliAnsi.ReplaceAllString(text, "")) {
+	for _, g := range graphemes(cliAnsi.re().ReplaceAllString(text, "")) {
 		var visible rune = -1
 		emoji := false
 		for _, r := range g {

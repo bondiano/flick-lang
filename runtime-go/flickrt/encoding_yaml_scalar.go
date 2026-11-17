@@ -2,7 +2,6 @@ package flickrt
 
 import (
 	"math"
-	"regexp"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -113,11 +112,11 @@ func foldLineBreak(blankLines int) string {
 	return strings.Repeat("\n", blankLines)
 }
 
-var yamlFlowLineBreak = regexp.MustCompile(`[ \t]*\n(?:[ \t]*\n)*[ \t]*`)
+var yamlFlowLineBreak = lazyRegexp{pattern: `[ \t]*\n(?:[ \t]*\n)*[ \t]*`}
 
 // foldFlowLines folds the line breaks of a multi-line plain flow scalar.
 func foldFlowLines(input string) string {
-	return yamlFlowLineBreak.ReplaceAllStringFunc(input, func(m string) string {
+	return yamlFlowLineBreak.re().ReplaceAllStringFunc(input, func(m string) string {
 		return foldLineBreak(strings.Count(m, "\n") - 1)
 	})
 }
@@ -211,10 +210,10 @@ func asciiLower(s string) string {
 }
 
 var (
-	yamlHex     = regexp.MustCompile(`^[+-]?0x[0-9a-f]+$`)
-	yamlOctal   = regexp.MustCompile(`^[+-]?0o[0-7]+$`)
-	yamlInteger = regexp.MustCompile(`^[+-]?(?:0|[1-9]\d*)$`)
-	yamlFloat   = regexp.MustCompile(`^[+-]?(?:(?:0|[1-9]\d*)?\.\d+|(?:0|[1-9]\d*)\.?\d*[eE][+-]?\d+)$`)
+	yamlHex     = lazyRegexp{pattern: `^[+-]?0x[0-9a-f]+$`}
+	yamlOctal   = lazyRegexp{pattern: `^[+-]?0o[0-7]+$`}
+	yamlInteger = lazyRegexp{pattern: `^[+-]?(?:0|[1-9]\d*)$`}
+	yamlFloat   = lazyRegexp{pattern: `^[+-]?(?:(?:0|[1-9]\d*)?\.\d+|(?:0|[1-9]\d*)\.?\d*[eE][+-]?\d+)$`}
 )
 
 // parseYamlScalar is a scalar of YAML 1.2's core schema: null, a boolean,
@@ -253,11 +252,11 @@ func parseYamlScalar(input string) Value {
 	}
 	lower := asciiLower(normalized)
 	switch {
-	case yamlHex.MatchString(lower):
+	case yamlHex.re().MatchString(lower):
 		return sign * parseIntRadix(lower[strings.Index(lower, "x")+1:], 16)
-	case yamlOctal.MatchString(lower):
+	case yamlOctal.re().MatchString(lower):
 		return sign * parseIntRadix(lower[strings.Index(lower, "o")+1:], 8)
-	case yamlInteger.MatchString(normalized) || yamlFloat.MatchString(normalized):
+	case yamlInteger.re().MatchString(normalized) || yamlFloat.re().MatchString(normalized):
 		n, _ := strconv.ParseFloat(normalized, 64)
 		return n
 	}

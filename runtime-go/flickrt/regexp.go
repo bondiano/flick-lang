@@ -18,6 +18,20 @@ type RegExp struct {
 	global bool
 }
 
+// lazyRegexp is a constant pattern of the runtime, compiled on first use:
+// a package-level regexp.MustCompile would run at init in every program,
+// whether it reaches the pattern's subsystem or not. A literal of it is
+// static data. TestRuntimePatterns compiles every pattern, so `re` cannot
+// panic.
+type lazyRegexp struct {
+	pattern string
+	value   onFirstUse[*regexp.Regexp]
+}
+
+func (l *lazyRegexp) re() *regexp.Regexp {
+	return l.value.get(func() *regexp.Regexp { return regexp.MustCompile(l.pattern) })
+}
+
 var regexpTag = Tag("RegExp.RegExpError.RegExpError")
 
 func regexpError(message string) Value { return Err(NewData(regexpTag, message)) }
@@ -46,10 +60,10 @@ func RegExpMake(pattern, flags Value) Value {
 	return Ok(&RegExp{re, strings.Contains(f, "g")})
 }
 
-var escaped = regexp.MustCompile(`[/\\^$*+?.()|[\]{}]`)
+var escaped = lazyRegexp{pattern: `[/\\^$*+?.()|[\]{}]`}
 
 // RegExpEscape escapes what JS reads as syntax in a pattern.
-func RegExpEscape(s Value) Value { return escaped.ReplaceAllString(s.(string), `\$0`) }
+func RegExpEscape(s Value) Value { return escaped.re().ReplaceAllString(s.(string), `\$0`) }
 
 func match(s string, loc []int) Value {
 	captures := make([]Value, len(loc)/2-1)

@@ -1,7 +1,5 @@
 package flickrt
 
-import "regexp"
-
 // The command line as the CLI reads it: a lexer and a parser. Tokens are
 // routed to the commands they name and to their flags; values are parsed
 // later, by the parameters.
@@ -15,7 +13,7 @@ type cliToken struct {
 
 func (t cliToken) flag() bool { return t.kind != "value" }
 
-var cliNegativeNumber = regexp.MustCompile(`^-(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$`)
+var cliNegativeNumber = lazyRegexp{pattern: `^-(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$`}
 
 // cliLex is the tokens before `--`, and what follows it.
 func cliLex(argv []string) ([]cliToken, []string) {
@@ -29,7 +27,7 @@ func cliLex(argv []string) ([]cliToken, []string) {
 	tokens := []cliToken{}
 	for _, arg := range argv {
 		switch {
-		case len(arg) == 0 || arg[0] != '-' || cliNegativeNumber.MatchString(arg) || arg == "-":
+		case len(arg) == 0 || arg[0] != '-' || cliNegativeNumber.re().MatchString(arg) || arg == "-":
 			tokens = append(tokens, cliToken{kind: "value", name: arg})
 		case len(arg) > 1 && arg[1] == '-':
 			if i := indexByte(arg, '='); i == 2 {

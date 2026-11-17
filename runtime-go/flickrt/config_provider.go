@@ -6,7 +6,6 @@ package flickrt
 
 import (
 	"os"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -319,14 +318,14 @@ func StringFromAny(v Value) string {
 	return Format(v)
 }
 
-var dotEnvLine = regexp.MustCompile("(?m)^[ \\t\\f\\v]*(?:export\\s+)?([\\w.-]+)(?:\\s*=\\s*?|:\\s+?)(\\s*'(?:\\\\'|[^'])*'|\\s*\"(?:\\\\\"|[^\"])*\"|\\s*`(?:\\\\`|[^`])*`|[^#\\r\\n]+)?\\s*(?:#.*)?$")
+var dotEnvLine = lazyRegexp{pattern: "(?m)^[ \\t\\f\\v]*(?:export\\s+)?([\\w.-]+)(?:\\s*=\\s*?|:\\s+?)(\\s*'(?:\\\\'|[^'])*'|\\s*\"(?:\\\\\"|[^\"])*\"|\\s*`(?:\\\\`|[^`])*`|[^#\\r\\n]+)?\\s*(?:#.*)?$"}
 
 // parseDotEnv is the variables of `.env` text, in order.
 func parseDotEnv(text string) ([]string, map[string]string) {
 	text = strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n")
 	env := map[string]string{}
 	var names []string
-	for _, m := range dotEnvLine.FindAllStringSubmatch(text, -1) {
+	for _, m := range dotEnvLine.re().FindAllStringSubmatch(text, -1) {
 		key, value := m[1], strings.TrimSpace(m[2])
 		quote := byte(0)
 		if value != "" {

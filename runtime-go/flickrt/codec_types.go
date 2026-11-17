@@ -15,9 +15,10 @@ var CodecBigint Value = sch(SchemaBigint).jsonOf()
 // isPattern is the check of a regular expression without flags, which its
 // JSON Schema states only approximately.
 func isPattern(source string) *check {
-	re := regexp.MustCompile(source)
+	var re onFirstUse[*regexp.Regexp] // compiled on the first test, not as the check is made at init
+	compile := func() *regexp.Regexp { return regexp.MustCompile(source) }
 	return &check{
-		test:     func(_ *Fiber, v Value) bool { return re.MatchString(v.(string)) },
+		test:     func(_ *Fiber, v Value) bool { return re.get(compile).MatchString(v.(string)) },
 		expected: "a string matching the RegExp " + source,
 		keywords: func(string) (*Record, bool) { return newRecord(0), false },
 	}

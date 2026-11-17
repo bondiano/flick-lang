@@ -195,12 +195,13 @@ var (
 // patternCheck is the check of a JS pattern, run as Go's, with its own
 // expected text (the RegExp's by default) and keywords.
 func patternCheck(source, expected string, keywords ...Value) *check {
-	re := regexp.MustCompile(goPattern(utf16Units(source)))
+	var re onFirstUse[*regexp.Regexp] // compiled on the first test, not as the check is made at init
+	compile := func() *regexp.Regexp { return regexp.MustCompile(goPattern(utf16Units(source))) }
 	if expected == "" {
 		expected = "a string matching the RegExp " + source
 	}
 	return &check{
-		test:     func(_ *Fiber, v Value) bool { return re.MatchString(v.(string)) },
+		test:     func(_ *Fiber, v Value) bool { return re.get(compile).MatchString(v.(string)) },
 		expected: expected,
 		keywords: exactly(append([]Value{"pattern", source}, keywords...)...),
 		arb:      &arbConstraint{patterns: []string{source}},

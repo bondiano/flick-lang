@@ -6,7 +6,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
-	"regexp"
 	"sort"
 	"strings"
 )
@@ -60,7 +59,7 @@ func apiURL(base string, e *apiEndpoint, params, query []Value) string {
 		k, v := pairOf(p)
 		values[k] = v
 	}
-	resolved := pathParam.ReplaceAllStringFunc(e.path, func(m string) string {
+	resolved := pathParam.re().ReplaceAllStringFunc(e.path, func(m string) string {
 		encoded, ok := encodeURIComponent(values[m[1:]])
 		if !ok {
 			panic(Defect{"URIError: URI malformed"})
@@ -417,18 +416,18 @@ func (i *ignoring) decode(fb *Fiber, in Value) (Value, []issue) {
 }
 
 var (
-	blankLine = regexp.MustCompile(`\r?\n\r?\n`)
-	lineBreak = regexp.MustCompile(`\r?\n`)
+	blankLine = lazyRegexp{pattern: `\r?\n\r?\n`}
+	lineBreak = lazyRegexp{pattern: `\r?\n`}
 )
 
 // sseEvents is the events of the text: their id, name and data lines.
 func sseEvents(text string) []Value {
 	out := []Value{}
-	for _, block := range blankLine.Split(text, -1) {
+	for _, block := range blankLine.re().Split(text, -1) {
 		var data []string
 		id, event := None, "message"
 		haveID, haveEvent := false, false
-		for _, line := range lineBreak.Split(block, -1) {
+		for _, line := range lineBreak.re().Split(block, -1) {
 			var k, v string
 			if i := strings.IndexByte(line, ':'); i >= 0 {
 				k, v = line[:i], strings.TrimPrefix(line[i+1:], " ")

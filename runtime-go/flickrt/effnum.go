@@ -300,11 +300,11 @@ func BigIntFromString(s Value) Value {
 	if text == "" {
 		return None
 	}
-	if radix.MatchString(text) {
+	if radix.re().MatchString(text) {
 		n, _ := new(big.Int).SetString(text, 0)
 		return Some(n)
 	}
-	if !finiteInt.MatchString(text) {
+	if !finiteInt.re().MatchString(text) {
 		return None
 	}
 	n, _ := new(big.Int).SetString(strings.TrimPrefix(text, "+"), 10)

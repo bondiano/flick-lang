@@ -3,7 +3,6 @@ package flickrt
 import (
 	"math"
 	"math/big"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -162,8 +161,8 @@ func StringReplaceAll(pattern, replacement, s Value) Value {
 }
 
 var (
-	decimal = regexp.MustCompile(`^[+-]?(Infinity|([0-9]+\.?[0-9]*|\.[0-9]+)([eE][+-]?[0-9]+)?)$`)
-	radix   = regexp.MustCompile(`^0([xX][0-9a-fA-F]+|[oO][0-7]+|[bB][01]+)$`)
+	decimal = lazyRegexp{pattern: `^[+-]?(Infinity|([0-9]+\.?[0-9]*|\.[0-9]+)([eE][+-]?[0-9]+)?)$`}
+	radix   = lazyRegexp{pattern: `^0([xX][0-9a-fA-F]+|[oO][0-7]+|[bB][01]+)$`}
 )
 
 // StringToNumber is the number `s` spells in JS syntax, as `Number(s)`
@@ -175,11 +174,11 @@ func StringToNumber(s Value) Value {
 		return None
 	case text == "NaN":
 		return Some(math.NaN())
-	case radix.MatchString(text):
+	case radix.re().MatchString(text):
 		n, _ := new(big.Int).SetString(text, 0)
 		f, _ := new(big.Float).SetInt(n).Float64()
 		return Some(f)
-	case decimal.MatchString(text):
+	case decimal.re().MatchString(text):
 		if strings.HasSuffix(text, "Infinity") {
 			return Some(math.Inf(1 - 2*boolInt(text[0] == '-')))
 		}

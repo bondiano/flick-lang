@@ -111,15 +111,24 @@ func (b *arbASTs) jsonNode() *arbAST {
 }
 
 // arbLinks are the declared types of codecs, by codec: what the decoded
-// side of `Codec.to_schema` of one generates.
-var arbLinks sync.Map // codec → func(*arbASTs) *arbAST
+// side of `Codec.to_schema` of one generates. Those of the runtime's own
+// codecs are stored on the first lookup rather than at init.
+var (
+	arbLinks     sync.Map // codec → func(*arbASTs) *arbAST
+	arbLinksOnce sync.Once
+)
 
 func linkCodec(c Value, node func(*arbASTs) *arbAST) Value {
 	arbLinks.Store(c, node)
 	return c
 }
 
-func init() {
+func arbLink(c Value) (any, bool) {
+	arbLinksOnce.Do(linkRuntimeCodecs)
+	return arbLinks.Load(c)
+}
+
+func linkRuntimeCodecs() {
 	duration := func(*arbASTs) *arbAST { return durationNode() }
 	linkCodec(CodecDurationMillis, duration)
 	linkCodec(CodecDurationNanos, duration)

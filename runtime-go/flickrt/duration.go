@@ -3,7 +3,6 @@ package flickrt
 import (
 	"math"
 	"math/big"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -142,7 +141,7 @@ func DurationMicros(n Value) Value {
 	return Ok(fromNanos(new(big.Int).Mul(x, big.NewInt(1000))))
 }
 
-var durationInput = regexp.MustCompile(`^(-?\d+(?:\.\d+)?)\s+(nanos?|micros?|millis?|seconds?|minutes?|hours?|days?|weeks?)$`)
+var durationInput = lazyRegexp{pattern: `^(-?\d+(?:\.\d+)?)\s+(nanos?|micros?|millis?|seconds?|minutes?|hours?|days?|weeks?)$`}
 
 // parseNanos is a decimal number times `scale`, rounded half away from zero.
 func parseNanos(text string, scale int64) *big.Int {
@@ -183,7 +182,7 @@ func parseDuration(text string) (*Duration, bool) {
 	if text == "Infinity" {
 		return dur(DurationInfinity), true
 	}
-	m := durationInput.FindStringSubmatch(text)
+	m := durationInput.re().FindStringSubmatch(text)
 	if !strings.Contains(text, " ") || m == nil {
 		return nil, false
 	}
