@@ -116,3 +116,9 @@ fn an_inline_module_moves_into_its_parent_as_the_json_form_of_the_ir_moved() {
         types::Type::con("App.Parent", "Child$Named")
     );
 }
+
+/// The forms of an inline module the walk moves outside expressions.
+#[cfg(feature = "ide")]
+mod forms {
+    include!("checking_tests_relocate_forms.rs");
+}

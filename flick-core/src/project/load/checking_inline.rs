@@ -32,6 +32,14 @@ fn merge_inline_lowering(
     loaded: &Loaded,
     units: &InlineUnits,
 ) {
+    let to = Relocation {
+        child: &units.name,
+        parent: &loaded.name,
+        local: &units.local,
+    };
+    // importers name the child's instances by what the parent publishes
+    to.published_instances(&mut output.interface);
+    to.published_instances(&mut output.exported);
     // Invalid child interfaces may contain unresolved error types, which are
     // not serializable. A module with errors cannot contribute executable IR
     // or model declarations to the compilation.
@@ -64,12 +72,7 @@ fn merge_inline_lowering(
         &units.local,
     );
     let declarations = Arc::make_mut(&mut output.declarations);
-    Relocation {
-        child: &units.name,
-        parent: &loaded.name,
-        local: &units.local,
-    }
-    .declaration_references(declarations);
+    to.declaration_references(declarations);
     declarations.exports.extend(child_declarations.exports);
     declarations
         .support_types
