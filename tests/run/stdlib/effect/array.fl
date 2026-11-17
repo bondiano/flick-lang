@@ -1,10 +1,10 @@
 // `List` and `NonEmpty`: lists and non-empty lists.
 module App.Main exposing (main)
 
-say : String -> List String -> Unit ->{} Unit
+say : String -> List String -> Unit ->{Host.Console} Unit
 let say label parts () = Platform.stdout_line (label ++ ": " ++ List.join " " parts)
 
-line : String -> String ->{} Unit
+line : String -> String ->{Host.Console} Unit
 let line label text = Platform.stdout_line (label ++ ": " ++ text)
 
 even : Float -> Bool
@@ -13,7 +13,7 @@ let even n = n - 2 * Float.floor (n / 2) == 0
 half : Float -> Result String Float
 let half n = if even n then Ok (n / 2) else Err ("odd " ++ show n)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let xs = [3, 1, 4, 1, 5, 9, 2, 6]
   let nothing : List Float = List.empty

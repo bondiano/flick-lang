@@ -3,5 +3,5 @@ module Main exposing (main, percent)
 percent : Int -> Int -> Float
 let percent part whole = Int.to_float part / Int.to_float whole * 100.0
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (show (percent 1 4))

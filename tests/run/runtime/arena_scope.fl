@@ -3,7 +3,7 @@ module App.Main exposing (main)
 
 import Arena
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let (copy, held) = scope outer {
     let arena = Arena.make ()

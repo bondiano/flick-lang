@@ -8,5 +8,5 @@ let squares xs = List.sum (List.map (fun x -> x * x) xs)
 sum_squares : Int -> Int
 let sum_squares n = squares (List.range 0 n)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (show (sum_squares 3))

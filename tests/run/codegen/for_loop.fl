@@ -5,14 +5,14 @@ module App.Main exposing (main)
 sleep : Float ->{Async} Unit
 foreign sleep from "../runtime/timers.mjs" "sleep"
 
-report : List (String, Float) ->{} Unit
+report : List (String, Float) ->{Host.Console} Unit
 let report scores = for {
   (name, score) <- scores
   if score > 1
 } do
   Platform.stdout_line (name ++ " " ++ show score)
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   for x <- [1, 2, 3] do Platform.stdout_line ("item " ++ show x)
   report [("ada", 3), ("bob", 1), ("cy", 2)]

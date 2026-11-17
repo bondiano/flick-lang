@@ -9,5 +9,5 @@ let size_of n = if n < 10 then Small else if n < 100 then Medium else Large
 size_name : Int -> String
 let size_name n = show (size_of n)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (String.join " " (List.map size_name [3, 42, 512]))

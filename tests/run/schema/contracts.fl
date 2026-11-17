@@ -65,7 +65,7 @@ let exported result =
   | Ok text -> text
   | Err (Codec.ExportError reason) -> "ExportError: " ++ reason
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let trees = Codec.json Tree.schema
   Platform.stdout_line (outcome (Codec.decode_result trees (cyclic ())))

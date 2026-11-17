@@ -4,5 +4,5 @@ module Main exposing (main)
 total : List Float -> Float
 let total xs = List.fold_left (fun acc x -> acc + x) 0 xs
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (show (total ["1", "2"]))

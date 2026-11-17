@@ -13,7 +13,7 @@ let ms n = Result.with_default Duration.zero (Duration.millis n)
 
 handle :
   Deferred.Deferred {} Unit ->
-  Http.ServerRequest.ServerRequest ->{Async}
+  Http.ServerRequest.ServerRequest ->{Host.Console, Async}
   Http.ServerResponse.ServerResponse
 let handle started _ = scope {
   Resource.acquire_release (task { () }) (fun _ ->
@@ -31,7 +31,7 @@ let handle started _ = scope {
   Http.ServerResponse.text "done" Http.ServerResponse.defaults
 }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let started : Deferred.Deferred {} Unit = Deferred.make ()
   let pending =

@@ -2,7 +2,7 @@
 // sizes written back with each precision, unit and rounding.
 module App.Main exposing (main)
 
-line : String -> String ->{} Unit
+line : String -> String ->{Host.Console} Unit
 let line label text = Platform.stdout_line (label ++ ": " ++ text)
 
 size : Option ByteSize.ByteSize -> String
@@ -14,7 +14,7 @@ let size made =
 sizes : List (Option ByteSize.ByteSize) -> String
 let sizes made = String.join " " (List.map size made)
 
-numbers : Unit ->{} Unit
+numbers : Unit ->{Host.Console} Unit
 let numbers () =
   line
     "bytes"
@@ -33,7 +33,7 @@ let numbers () =
     ])
   line "not numbers" (sizes (List.map ByteSize.megabytes [0 / 0, 1 / 0, -1 / 0]))
 
-texts : Unit ->{} Unit
+texts : Unit ->{Host.Console} Unit
 let texts () =
   line
     "units"
@@ -91,7 +91,7 @@ let in_unit unit = { precision = Some 3; trailingZeros = None; binary = false; u
 of_bytes : Float -> ByteSize.ByteSize
 let of_bytes n = Option.with_default ByteSize.zero (ByteSize.bytes n)
 
-written : Unit ->{} Unit
+written : Unit ->{Host.Console} Unit
 let written () =
   let all =
     List.map of_bytes [
@@ -163,7 +163,7 @@ let written () =
         ByteSize.MiB,
       ]))
 
-arithmetic : Unit ->{} Unit
+arithmetic : Unit ->{Host.Console} Unit
 let arithmetic () =
   let k = of_bytes 1024
   let m = of_bytes 1000000
@@ -192,7 +192,7 @@ let arithmetic () =
       size (Some (Combiner.combine ByteSize.combiner_min k m)),
     ))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   numbers ()
   texts ()

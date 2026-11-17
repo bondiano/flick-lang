@@ -8,7 +8,7 @@ type error Missing = Missing String
 type error Late = Late
 
 service Log =
-  line : String ->{} Unit
+  line : String ->{Host.Console} Unit
 
 service Clock =
   now : Unit ->{} Int
@@ -25,7 +25,7 @@ let found work =
   try await work with
   | Missing _ -> 0
 
-stamp : Unit -> Eff {Clock, Log} {Missing, Late} Int
+stamp : Unit -> Eff {Host.Console, Clock, Log} {Missing, Late} Int
 let stamp () = task {
   Log.line "reading the clock"
   let at = Clock.now ()
@@ -33,7 +33,7 @@ let stamp () = task {
 }
 
 /// `Clock` and `Late` are what is left of the rows of `stamp`.
-read : Unit ->{Clock; Late} Int
+read : Unit ->{Host.Console, Clock; Late} Int
 let read () = found (task { quiet (stamp ()) })
 
 /// A row without `Log` loses nothing.
@@ -43,7 +43,7 @@ let plain () = quiet (task { Clock.now () })
 at : Int -> Layer none none {Clock}
 let at time = Layer.succeed Clock { now = fun () -> time }
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   provide (at 1) {
     Platform.stdout_line

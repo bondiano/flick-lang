@@ -13,7 +13,7 @@ let bump o =
   | Some n -> Some (n + 1)
   | None -> Some 1
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line ("from_list: " ++ show (sorted stock))
   Platform.stdout_line

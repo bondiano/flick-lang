@@ -35,7 +35,7 @@ let exported c =
       | Ok json -> Json.stringify json
       | Err e -> issues e
 
-line : String -> String ->{} Unit
+line : String -> String ->{Host.Console} Unit
 let line name text = Platform.stdout_line (name ++ ": " ++ text)
 
 ms : Float -> Duration.Duration
@@ -65,7 +65,7 @@ let check_input text =
   with
   | SchemaError found -> issues (SchemaError found)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   line
     "literal"

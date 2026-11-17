@@ -3,13 +3,13 @@
 // does not run, and the fiber ends interrupted, also when a finalizer died.
 module App.Main exposing (main)
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 quiet : Failure e ->{} Unit
 let quiet _ = ()
 
-report : Failure e ->{} Unit
+report : Failure e ->{Host.Console} Unit
 let report f =
   say ("supervised " ++ show (Cause.has_fails f, Cause.has_dies f, Cause.has_interrupts f))
 
@@ -30,7 +30,7 @@ let signal_when_stopped started stopped = task {
 
 /// Runs `body` with a finalizer that holds until the fiber was asked to stop.
 closes_under_request :
-  (Deferred.Deferred none Unit -> Deferred.Deferred none Unit -> Eff {Async} none Unit) ->{Async}
+  (Deferred.Deferred none Unit -> Deferred.Deferred none Unit -> Eff {Host.Console, Async} none Unit) ->{Host.Console, Async}
   Unit
 let closes_under_request body = scope owner {
   let in_finalizer : Deferred.Deferred none Unit = Deferred.make ()
@@ -44,7 +44,7 @@ let closes_under_request body = scope owner {
   Fiber.interrupt_all [target, stopper]
 }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   closes_under_request (fun in_finalizer go -> task {
     scope {

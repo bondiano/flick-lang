@@ -14,7 +14,7 @@ class Area a =
   let label x = "area " ++ show (area x)
 
 class Announce a =
-  announce : a ->{} Unit
+  announce : a ->{Host.Console} Unit
 
 module Shapes exposing (Square(..), Circle(..)) =
   type Square = Square Int
@@ -61,10 +61,10 @@ let sized s =
   match s with
   | Sized x -> area x
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   say (show (area (Shapes.Square 3)) ++ " " ++ label (Shapes.Square 3))
   say (show (area (Shapes.Circle 2)) ++ " " ++ label (Shapes.Circle 2))

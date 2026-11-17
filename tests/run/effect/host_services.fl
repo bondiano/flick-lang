@@ -22,7 +22,7 @@ let inspect () =
   Host.Console.stderr_line "stderr"
   Host.Console.stdout_write "partial"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console, Host.Environment, Host.Arguments; AppError} Unit
 let main () =
   let output = Ref.make []
   let fake =

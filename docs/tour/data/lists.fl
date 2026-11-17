@@ -1,6 +1,6 @@
 module Main exposing (main)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let numbers = [5, 3, 8, 1]
   Platform.stdout_line (show [for n <- numbers; if n > 2 yield n * 10])

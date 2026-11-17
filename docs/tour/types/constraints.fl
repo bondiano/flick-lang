@@ -8,7 +8,7 @@ let square x = x * x
 mean : Floating a => List a -> a
 let mean xs = List.sum xs / Numeric.from_int (List.length xs)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line (show (square 4))
   Platform.stdout_line (show (square 1.5))

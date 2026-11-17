@@ -2,18 +2,18 @@
 // the root sees it: the program runs to its end and exits with code 1 (R4).
 module App.Main exposing (main)
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 ping : Deferred.Deferred none Unit ->{} Unit
 let ping d = ignore (Deferred.succeed () d)
 
-broken : Failure e ->{} Unit
+broken : Failure e ->{Host.Console} Unit
 let broken _ =
   say "supervisor dies"
   Effect.die "in the supervisor"
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   scope owner {
     let started : Deferred.Deferred none Unit = Deferred.make ()

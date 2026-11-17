@@ -5,7 +5,7 @@ module App.Main exposing (main)
 service Tenant =
   name : Unit ->{} String
 
-tenant : Ref Float -> String -> Layer none none {Tenant}
+tenant : Ref Float -> String -> Layer {Host.Console} none {Tenant}
 let tenant builds key =
   Layer.effect
     Tenant
@@ -18,7 +18,7 @@ let tenant builds key =
 options : LayerMap.Options String
 let options = { idleTimeToLive = None; preloadKeys = Some ["a"] }
 
-maps : Unit ->{Async} Unit
+maps : Unit ->{Host.Console, Async} Unit
 let maps () =
   let builds = Ref.make 0
   scope s {
@@ -36,7 +36,7 @@ let maps () =
   }
   Platform.stdout_line ("map builds " ++ show (Ref.get builds))
 
-refs : Unit ->{Async} Unit
+refs : Unit ->{Host.Console, Async} Unit
 let refs () =
   let builds = Ref.make 0
   scope s {
@@ -55,10 +55,10 @@ let refs () =
 
 type error Boom = Boom String
 
-supervise : Failure none ->{} Unit
+supervise : Failure none ->{Host.Console} Unit
 let supervise _ = Platform.stdout_line "supervisor"
 
-reports : Unit ->{Async} Unit
+reports : Unit ->{Host.Console, Async} Unit
 let reports () =
   let exits = parallel_exits [task { Fail.fail (Boom "reported") }]
   let done : Deferred.Deferred none Unit = Deferred.make ()
@@ -82,7 +82,7 @@ let reports () =
     Deferred.await_ done
   }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   maps ()
   refs ()

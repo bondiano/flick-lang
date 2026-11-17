@@ -16,7 +16,7 @@ type alias Session = { sub : String; iat : Float; exp : Float }
 type alias Issuer = { iss : String }
   deriving Schema
 
-line : String -> String -> Unit ->{} Unit
+line : String -> String -> Unit ->{Host.Console} Unit
 let line label value () = Platform.stdout_line (label ++ ": " ++ value)
 
 claims_json : PureCodec Json Claims
@@ -55,7 +55,8 @@ python : String
 let python =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZGEiLCJhZG1pbiI6dHJ1ZX0.LG5jqWCrAAWbUMv6IIF_kHEjmYwSQrtDQajAELdwFLs"
 
-checks : Unit ->{Async, Crypto.Crypto, Host.Clock; Crypto.CryptoError, SchemaError} Unit
+checks :
+  Unit ->{Host.Console, Async, Crypto.Crypto, Host.Clock; Crypto.CryptoError, SchemaError} Unit
 let checks () =
   let rfc_key =
     Option.with_default
@@ -91,7 +92,7 @@ let checks () =
   line "malformed" (outcome claims_json secret "not.a token") ()
   line "wrong claims" (outcome session_json secret python) ()
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   try provide (Layer.merge Crypto.system Host.clock) { checks () } with
   | Crypto.CryptoError message -> line "error" message ()

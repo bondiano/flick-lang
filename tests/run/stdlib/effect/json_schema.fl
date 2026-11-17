@@ -17,13 +17,13 @@ let json text =
     )
   | Err _ -> App.fail "not JSON"
 
-line : String -> String ->{} Unit
+line : String -> String ->{Host.Console} Unit
 let line name text = Platform.stdout_line (name ++ ": " ++ text)
 
 document : JsonSchema.Document -> String
 let document d = d.dialect ++ " " ++ Json.stringify d.root ++ " " ++ Json.stringify d.definitions
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   line
     "meta"

@@ -16,5 +16,5 @@ let unused text =
   }
   best
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (most_common "blue red green red red blue")

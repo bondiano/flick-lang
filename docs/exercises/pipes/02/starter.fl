@@ -3,5 +3,5 @@ module Main exposing (main, word_count)
 word_count : String -> Int
 let word_count = List.length >> String.split " "
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line <| show <| word_count "pipes and composition"

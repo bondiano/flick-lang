@@ -166,7 +166,7 @@ let event_step input _ =
 on_event : Cli.Prompt.Handlers Float String (Cli.Prompt.ProcessInput String)
 let on_event = { render = fun _ _ -> "waiting"; process = event_step; clear = fun _ _ -> "" }
 
-questions : Unit ->{Async, Cli.Prompt.Tty; Terminal.QuitError} Unit
+questions : Unit ->{Host.Console, Host.Clock, Async, Cli.Prompt.Tty; Terminal.QuitError} Unit
 let questions () =
   let name = Cli.Prompt.run (Cli.Prompt.text question)
   Platform.stdout_line ("text " ++ name)
@@ -226,7 +226,7 @@ let questions () =
   Platform.stdout_line ("map/flat_map " ++ chained)
   Platform.stdout_line ("custom " ++ show (Cli.Prompt.run (Cli.Prompt.custom 0 counter)))
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Clock, Host.Console, Async; AppError} Unit
 let main () =
   // `<name>` is the key of that name, other text is typed
   let script =

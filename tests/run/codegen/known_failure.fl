@@ -17,16 +17,16 @@ instance Area Square =
 broken : Unit -> Square
 let broken () = Square (Int.unsafe_div 1 0)
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
-released : Unit ->{} Int
+released : Unit ->{Host.Console} Int
 let released () = scope {
   ignore (Resource.acquire_release (task { say "acquired" }) (fun _ -> say "released"))
   area (broken ())
 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   say (show (area (Square 3)))
   ignore (released ())

@@ -16,7 +16,7 @@ instance Describe Weather =
 instance Describe a => Describe (List a) =
   let describe xs = String.join ", " (List.map describe xs)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line (describe Sun)
   Platform.stdout_line (describe [Sun, Rain, Sun])

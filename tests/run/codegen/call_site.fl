@@ -17,10 +17,10 @@ let traced label = label ++ " at " ++ here
 fixed : String
 let fixed = here
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   say here
   say here

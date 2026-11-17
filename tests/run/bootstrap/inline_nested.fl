@@ -8,5 +8,5 @@ module Outer exposing (answer) =
 
   let answer = Inner.value
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (show Outer.answer)

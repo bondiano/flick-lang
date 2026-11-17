@@ -13,7 +13,7 @@ instance Tag HttpApi.ServeError =
 instance Tag Rpc.ServeError =
   let tag _ = "Rpc.ServeError"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (tag (None : Option HttpApi.ServeError))
   Platform.stdout_line (tag (None : Option Rpc.ServeError))

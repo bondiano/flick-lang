@@ -21,7 +21,7 @@ let attempt body =
   try show (body ()) with
   | Throw.throw message -> "thrown: " ++ message
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let n =
     try asked () with

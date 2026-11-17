@@ -67,7 +67,7 @@ rec {
     | [_, ...rest] -> even_len rest
 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (show (sum_to 0 1000000))
   let cell = Ref.make 0

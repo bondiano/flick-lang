@@ -22,7 +22,7 @@ let greeter_live =
       { greet = fun name -> p ++ ", " ++ name }
     })
 
-greet : String ->{Greeter} Unit
+greet : String ->{Host.Console, Greeter} Unit
 let greet name = Platform.stdout_line (Greeter.greet name)
 
 failing : Layer none {BootError} {Greeter}
@@ -31,7 +31,7 @@ let failing = Layer.effect Greeter (task { Fail.fail (BootError "no greeter") })
 fallback : Layer none none {Greeter}
 let fallback = Layer.succeed Greeter { greet = fun name -> "fallback " ++ name }
 
-recovered : Layer none none {Greeter}
+recovered : Layer {Host.Console} none {Greeter}
 let recovered =
   failing
   |> Layer.tap_error (fun err ->
@@ -52,10 +52,10 @@ let counting count =
 level : Context.Reference String
 let level = Context.reference "App.level" (fun () -> "default")
 
-show_level : Unit ->{} Unit
+show_level : Unit ->{Host.Console} Unit
 let show_level () = Platform.stdout_line ("level " ++ Context.read level)
 
-contexts : Unit ->{} Unit
+contexts : Unit ->{Host.Console} Unit
 let contexts () =
   let tag = Config
   let c : Context.Context {Config} = Context.make tag { prefix = fun () -> "ctx" }
@@ -80,7 +80,7 @@ let contexts () =
   Context.with_reference level "changed" (task { show_level () })
   show_level ()
 
-layers : Unit ->{; BootError} Unit
+layers : Unit ->{Host.Console; BootError} Unit
 let layers () =
   provide (greeter_live |> Layer.provide_ config_layer) { greet "provide_" }
   provide (greeter_live |> Layer.provide_merge config_layer) {
@@ -135,7 +135,7 @@ let layers () =
   let died = List.map (fun exit -> Option.is_some (Exit.failure exit)) exits
   Platform.stdout_line ("or_die died " ++ show died)
 
-shared : Unit ->{} Unit
+shared : Unit ->{Host.Console} Unit
 let shared () =
   let count = Ref.make 0
   let once = counting count
@@ -159,7 +159,7 @@ let shared () =
   let memoized = Layer.from_build_memo (fun m -> Layer.build_with_memo_map m config_layer)
   provide memoized { Platform.stdout_line ("from_build_memo " ++ Config.prefix ()) }
 
-finalizers : Unit ->{Async} Unit
+finalizers : Unit ->{Host.Console, Async} Unit
 let finalizers () =
   scope {
     Scope.add_finalizer (task { Platform.stdout_line "finalizer ran" })
@@ -175,7 +175,7 @@ let finalizers () =
       (task { Layer.launch (Layer.effect_discard (task { Platform.stdout_line "launched" })) })
   Platform.stdout_line ("launch interrupted " ++ show (Option.is_none launched))
 
-failed_build_cleanup : Unit ->{} Unit
+failed_build_cleanup : Unit ->{Host.Console} Unit
 let failed_build_cleanup () =
   let released = Ref.make 0
   let zero = Ref.make 0
@@ -219,8 +219,9 @@ span_options : Layer.Trace.SpanOptions
 let span_options = {
   span = trace_options
   onEnd =
+    // the row of `onEnd` is closed: it prints through the trusted host adapter
     Some (fun span exit ->
-      Platform.stdout_line
+      Host.raw_stdout_line
         ("ended " ++ show (Tracer.span_name span) ++ " failed " ++ show (Option.is_some exit))
     )
 }
@@ -249,7 +250,7 @@ let traced_id =
       { prefix = fun () -> id }
     })
 
-traces : Unit ->{Async} Unit
+traces : Unit ->{Host.Console, Async} Unit
 let traces () =
   provide Layer.Trace.span "boot" span_options { Platform.stdout_line ("span " ++ current_span ()) }
   provide Layer.Trace.with_span "build" span_options traced {
@@ -264,7 +265,7 @@ let traces () =
     Platform.stdout_line ("with_parent_span " ++ Config.prefix ())
   }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   contexts ()
   try layers () with

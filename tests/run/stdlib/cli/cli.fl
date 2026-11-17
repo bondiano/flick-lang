@@ -8,7 +8,7 @@ import Cli
 type Color = Red | GreenLight
   deriving Cli.Value, Show
 
-greet : Cli.Command none none
+greet : Cli.Command {Host.Console} none
 let greet = cli "greet" {
   description "Prints a greeting"
   /// Print in capitals
@@ -25,14 +25,14 @@ let greet = cli "greet" {
     Platform.stdout_line (String.join " / " (List.repeat (Int.truncate times) line))
 }
 
-sum : Cli.Command none none
+sum : Cli.Command {Host.Console} none
 let sum = cli "sum" {
   description "Adds numbers"
   arg numbers : NonEmpty.NonEmpty Float
   handle fun { numbers } -> Platform.stdout_line (show (List.sum (NonEmpty.to_list numbers)))
 }
 
-tool : Cli.Command none none
+tool : Cli.Command {Host.Console} none
 let tool = cli "tool" {
   description "Project tools"
   /// Verbose output
@@ -42,13 +42,13 @@ let tool = cli "tool" {
 }
 
 /// Runs the command line, printing the error a bad one gives.
-attempt : Cli.Command none none -> List String ->{Async} Unit
+attempt : Cli.Command {Host.Console} none -> List String ->{Host.Console, Async} Unit
 let attempt command args =
   Platform.stdout_line ("$ " ++ String.join " " args)
   try Cli.run command args with
   | Cli.CliError message -> Platform.stdout_line ("CliError: " ++ message)
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   attempt greet ["Ada"]
   attempt greet ["--loud", "-n", "2", "--color", "green-light", "Bob"]

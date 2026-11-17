@@ -294,12 +294,12 @@ let abort_loop () =
     break n
   }
 
-scrutinee : Unit ->{} Int
+scrutinee : Unit ->{Host.Console} Int
 let scrutinee () =
   Platform.stdout_line "scrutinee"
   1
 
-scrutinee_once : Unit ->{} Int
+scrutinee_once : Unit ->{Host.Console} Int
 let scrutinee_once () =
   let mut value = 0
   match scrutinee () with
@@ -317,17 +317,17 @@ scope_callback_exit : Unit ->{} Int
 let scope_callback_exit () =
   loop { ignore (Scope.run (if true then break 8 else fun _ -> "scope")) }
 
-make_layer : Unit ->{} Layer {} {} {Ask}
+make_layer : Unit ->{Host.Console} Layer {} {} {Ask}
 let make_layer () =
   Platform.stdout_line "layer"
   Layer.succeed Ask { ask = fun () -> 5 }
 
-make_callback : Unit ->{} (Unit ->{Ask} Int)
+make_callback : Unit ->{Host.Console} (Unit ->{Ask} Int)
 let make_callback () =
   Platform.stdout_line "callback"
   fun () -> Ask.ask ()
 
-loop_scrutinee_once : Unit ->{} Int
+loop_scrutinee_once : Unit ->{Host.Console} Int
 let loop_scrutinee_once () =
   loop {
     match scrutinee () with
@@ -335,7 +335,7 @@ let loop_scrutinee_once () =
     | _ -> break 1
   }
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line (show (loop_scrutinee_once ()))
   Platform.stdout_line (show (scrutinee_once ()))

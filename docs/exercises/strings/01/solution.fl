@@ -3,5 +3,5 @@ module Main exposing (main, greet)
 greet : String -> String
 let greet name = "Hello, \{name}!"
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (greet "Ada")

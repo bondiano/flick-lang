@@ -54,7 +54,7 @@ let uncaught seed =
     Fail.fail (Gone text)
   )
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (answer "seed")
   let caught =

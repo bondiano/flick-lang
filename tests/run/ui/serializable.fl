@@ -13,7 +13,7 @@ let draft = Atom.serializable_family (Codec.json Schema.string) (fun _ -> Atom.m
 local : Atom.Writable Float
 let local = Atom.make 7
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () = provide Atom.layer {
   Atom.set count 3
   Atom.set (draft "intro") "hello"

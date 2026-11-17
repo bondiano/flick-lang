@@ -38,7 +38,7 @@ let twice m = do {
   pure (x + y)
 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (show (pair_optional (Some 1) (Some "a")))
   Platform.stdout_line (show (pair_optional (Some 1) (None : Option String)))

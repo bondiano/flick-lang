@@ -6,7 +6,7 @@ type alias Book = { title : String; pages : Int; read : Bool }
 finish : Book -> Book
 let finish book = { book with read = true }
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let shelf = [
     { title = "Dune"; pages = 412; read = false },

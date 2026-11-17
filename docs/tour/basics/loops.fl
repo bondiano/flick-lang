@@ -10,7 +10,7 @@ let digits n =
   }
   count
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line (show (digits 7))
   Platform.stdout_line (show (digits 2026))

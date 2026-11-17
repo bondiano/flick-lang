@@ -11,17 +11,19 @@ foreign wait from "./raw.mjs" "wait"
 ms : Float -> Duration.Duration
 let ms n = Result.with_default Duration.zero (Duration.millis n)
 
+/// The response body: a stream's row is closed, so it prints through the
+/// trusted host adapter.
 body : Deferred.Deferred {} Unit ->{Async} String
 let body started = scope {
   Resource.acquire_release (task { () }) (fun _ ->
-    Platform.stdout_line "request cleanup started"
+    Host.raw_stdout_line "request cleanup started"
     Effect.sleep (ms 50)
-    Platform.stdout_line "request cleanup finished"
+    Host.raw_stdout_line "request cleanup finished"
   )
-  Platform.stdout_line "request started"
+  Host.raw_stdout_line "request started"
   ignore (Deferred.succeed () started)
   Effect.sleep (ms 500)
-  Platform.stdout_line "unexpected normal completion"
+  Host.raw_stdout_line "unexpected normal completion"
   "done"
 }
 
@@ -34,7 +36,7 @@ let handle started _ =
     (Stream.from_effect (task { body started }))
     Http.ServerResponse.defaults
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let started : Deferred.Deferred {} Unit = Deferred.make ()
   let pending =

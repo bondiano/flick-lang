@@ -36,7 +36,7 @@ let same x y = eq x y
 both : (forall a. Show a => a -> String) -> String
 let both render = render 1 ++ " " ++ render "two"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let small = Node Leaf 1 Leaf
   let big = Node small 2 Leaf

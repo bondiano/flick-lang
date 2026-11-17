@@ -9,5 +9,5 @@ let label status =
   | Running -> "running"
   | Done -> "done"
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (label Paused)

@@ -6,7 +6,7 @@ type alias Point = { x : Float; y : Float }
 
 type alias Shape = { name : String; corner : Option Point }
 
-line : String -> String ->{} Unit
+line : String -> String ->{Host.Console} Unit
 let line label text = Platform.stdout_line (label ++ ": " ++ text)
 
 corner : Optic.Optional Shape Point
@@ -51,7 +51,7 @@ let shapes = [box, dot, behind]
 each : Show b => (Shape -> b) -> String
 let each f = show (List.map f shapes)
 
-reads : Unit ->{} Unit
+reads : Unit ->{Host.Console} Unit
 let reads () =
   line "get_result" (each (Optic.get_result corner))
   line "composed" (each (Optic.get_result corner_x))
@@ -67,7 +67,7 @@ let reads () =
     (show
       (Optic.get_result (Optic.prism_optional (Optic.from_check (fun n -> n < 10) "too big")) 30))
 
-writes : Unit ->{} Unit
+writes : Unit ->{Host.Console} Unit
 let writes () =
   line "replace" (each (Optic.replace corner_x 7))
   line "replace refused" (each (Optic.replace corner_x (-7)))
@@ -93,7 +93,7 @@ let parts =
         | _ -> Err "not two parts"
       ))
 
-lists : Unit ->{} Unit
+lists : Unit ->{Host.Console} Unit
 let lists () =
   line "get_all" (each (Optic.get_all parts))
   line "modify_all" (each (Optic.modify_all parts (fun n -> n + 1)))
@@ -118,7 +118,7 @@ let lists () =
       Optic.get_result (Optic.prism_optional err_prism) (Ok 1),
     ))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   reads ()
   writes ()

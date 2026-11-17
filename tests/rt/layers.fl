@@ -23,7 +23,7 @@ let greeter_live =
       { greet = fun name -> p ++ ", " ++ name }
     })
 
-greet : String ->{Greeter} Unit
+greet : String ->{Host.Console, Greeter} Unit
 let greet name = Platform.stdout_line (Greeter.greet name)
 
 failing : Layer none {BootError} {Greeter}
@@ -32,7 +32,7 @@ let failing = Layer.effect Greeter (task { Fail.fail (BootError "no greeter") })
 fallback : Layer none none {Greeter}
 let fallback = Layer.succeed Greeter { greet = fun name -> "fallback " ++ name }
 
-recovered : Layer none none {Greeter}
+recovered : Layer {Host.Console} none {Greeter}
 let recovered =
   failing
   |> Layer.tap_error (fun err ->
@@ -50,7 +50,7 @@ let counting count =
       { prefix = fun () -> "counted" }
     })
 
-layers : Unit ->{; BootError} Unit
+layers : Unit ->{Host.Console; BootError} Unit
 let layers () =
   provide (greeter_live |> Layer.provide_ config_layer) { greet "provide_" }
   provide (greeter_live |> Layer.provide_merge config_layer) {
@@ -94,7 +94,7 @@ let layers () =
   let died = List.map (fun exit -> Option.is_some (Exit.failure exit)) exits
   Platform.stdout_line ("or_die died " ++ show died)
 
-shared : Unit ->{} Unit
+shared : Unit ->{Host.Console} Unit
 let shared () =
   let count = Ref.make 0
   let once = counting count
@@ -118,7 +118,7 @@ let shared () =
   let memoized = Layer.from_build_memo (fun m -> Layer.build_with_memo_map m config_layer)
   provide memoized { Platform.stdout_line ("from_build_memo " ++ Config.prefix ()) }
 
-finalizers : Unit ->{Async} Unit
+finalizers : Unit ->{Host.Console, Async} Unit
 let finalizers () =
   scope {
     Scope.add_finalizer (task { Platform.stdout_line "finalizer ran" })
@@ -134,7 +134,7 @@ let finalizers () =
       (task { Layer.launch (Layer.effect_discard (task { Platform.stdout_line "launched" })) })
   Platform.stdout_line ("launch interrupted " ++ show (Option.is_none launched))
 
-failed_build_cleanup : Unit ->{} Unit
+failed_build_cleanup : Unit ->{Host.Console} Unit
 let failed_build_cleanup () =
   let released = Ref.make 0
   let zero = Ref.make 0
@@ -161,7 +161,7 @@ let failed_build_cleanup () =
           (Exit.failure outcome)))
   Platform.stdout_line ("failed build cleanup count " ++ show (Ref.get released))
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   try layers () with
   | BootError m -> Platform.stdout_line ("unexpected " ++ m)

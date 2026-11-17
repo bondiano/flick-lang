@@ -5,7 +5,7 @@ module App.Main exposing (main)
 plain : FileSystem.WriteOptions
 let plain = { flag = None; mode = None }
 
-line : String -> String ->{} Unit
+line : String -> String ->{Host.Console} Unit
 let line label value = Platform.stdout_line (label ++ ": " ++ value)
 
 /// The tag of a failed system call.
@@ -31,7 +31,7 @@ let contents file =
   | Some bytes -> show bytes
   | None -> "end of file"
 
-work : String ->{Async, FileSystem.FileSystem; PlatformError.PlatformError} Unit
+work : String ->{Host.Console, Async, FileSystem.FileSystem; PlatformError.PlatformError} Unit
 let work dir =
   let a = dir ++ "/a.txt"
   FileSystem.write_file_string plain a "hello"
@@ -113,7 +113,7 @@ let work dir =
     | e -> reason e
   line "exclusive" exclusive
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let outcome =
     try

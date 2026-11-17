@@ -19,5 +19,5 @@ let total_age text =
   try sum_ages text with
   | Invalid _ -> 0
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line "\{total_age "36,41"} \{total_age "36,x"}"

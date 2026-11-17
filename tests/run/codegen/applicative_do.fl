@@ -38,7 +38,7 @@ let carry value = do {
   Some (kept, value)
 }
 
-ticks : Eff none none Float
+ticks : Eff {Host.Console} none Float
 let ticks = do {
   x <- task {
     Platform.stdout_line "first"
@@ -76,7 +76,7 @@ let wrapped fa fb = do {
   (pure (x + y))
 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (show (pair (Some 1) (Some "a")))
   Platform.stdout_line (show (pair None (Some "a")))

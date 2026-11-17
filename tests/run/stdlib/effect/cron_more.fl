@@ -3,7 +3,7 @@
 // zone's daylight saving transitions.
 module App.Main exposing (main)
 
-at : String ->{} DateTime.DateTime
+at : String ->{Host.Clock} DateTime.DateTime
 let at s =
   match DateTime.make s with
   | Ok t -> t
@@ -29,7 +29,7 @@ let on o =
 
 /// The next and previous matches of the expression in the zone, and the
 /// two after the next.
-around : DateTime.TimeZone -> String -> String ->{} String
+around : DateTime.TimeZone -> String -> String ->{Host.Clock} String
 let around tz expression now =
   match Cron.parse tz expression with
   | Ok c ->
@@ -52,7 +52,7 @@ let fields = {
   tz = utc
 }
 
-texts : Unit ->{} Unit
+texts : Unit ->{Host.Console} Unit
 let texts () =
   Platform.stdout_line
     ("parse: "
@@ -91,7 +91,7 @@ let texts () =
         parsed (Cron.make { fields with weekdays = [8] }),
       ])
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Clock, Host.Console; AppError} Unit
 let main () =
   texts ()
   Platform.stdout_line ("or: " ++ around utc "0 0 13 * 5" "2024-09-01T00:00:00Z")

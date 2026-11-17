@@ -6,7 +6,7 @@ type error Stop = Stop
 contents : TxChunk.TxChunk Float ->{Tx.Transaction} List Float
 let contents chunk = Chunk.to_list (TxChunk.get chunk)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let xs = TxChunk.from_iterable [3, 4]
   let shown =

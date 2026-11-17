@@ -11,7 +11,7 @@ service Greeter =
 greeter : Layer none none {Greeter}
 let greeter = Layer.succeed Greeter { greet = fun name -> "hello " ++ name }
 
-line : (String, List Float) ->{} Unit
+line : (String, List Float) ->{Host.Console} Unit
 let line (label, xs) = Platform.stdout_line (label ++ ": " ++ show xs)
 
 /// 1, 2, then `Boom 3`.
@@ -27,7 +27,7 @@ let is_boom failure = Option.is_some (Failure.primary failure)
 record : Ref (List String) -> String ->{} Unit
 let record log entry = Ref.set log (Ref.get log ++ [entry])
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   line (
     "catch",

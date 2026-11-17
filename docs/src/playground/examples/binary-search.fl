@@ -16,7 +16,7 @@ let binary_search target values =
       if value < target then low = middle + 1 else high = middle
   }
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line (show (binary_search 9 [-1, 0, 3, 5, 9, 12]))
   Platform.stdout_line (show (binary_search 2 [-1, 0, 3, 5, 9, 12]))

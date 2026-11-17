@@ -11,12 +11,12 @@ let each_shown log =
   log "two"
   log [Some 3]
 
-stop_at_text : Show a => a ->{; AppError, Stop} Unit
+stop_at_text : Show a => a ->{Host.Console; AppError, Stop} Unit
 let stop_at_text value =
   let text = show value
   if text == "\"two\"" then Fail.fail (Stop text) else Platform.stdout_line ("seen " ++ text)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   each_shown (fun x -> Platform.stdout_line (show x))
   let outcome =

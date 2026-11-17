@@ -3,5 +3,5 @@ module Main exposing (main, length_of)
 length_of : String -> Int
 let length_of text = String.length text
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (show (length_of "Flick"))

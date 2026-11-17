@@ -1,9 +1,9 @@
 module App.IfWithoutElse exposing (..)
 
-say : Bool ->{a; b} Unit
+say : Bool ->{Host.Console | a; b} Unit
 let say c = if c then Console.log "yes" else ()
 
-chain : Bool ->{a; b} Unit
+chain : Bool ->{Host.Console | a; b} Unit
 let chain c = if c then Console.log "a" else if not c then Console.log "b" else ()
 
 kept : Bool -> Unit
@@ -13,7 +13,7 @@ let kept c =
   else
     ()
 
-quiet : Bool ->{a; b} Unit
+quiet : Bool ->{Host.Console | a; b} Unit
 let quiet c = if c then Console.log "c"
 
 value : Bool -> Float

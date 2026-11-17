@@ -2,7 +2,7 @@
 // collation and ICU's special casing. An invalid tag is a defect.
 module App.Main exposing (main)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line
     ("locale_compare: "

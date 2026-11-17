@@ -3,7 +3,7 @@
 // written, and calls them in order each time it is applied.
 module App.Main exposing (main)
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 double : Int -> Int
@@ -13,24 +13,24 @@ inc : Int -> Int
 let inc n = n + 1
 
 /// `f`, after saying that it was evaluated.
-named : String -> (Int -> Int) ->{} (Int -> Int)
+named : String -> (Int -> Int) ->{Host.Console} (Int -> Int)
 let named name f =
   say ("evaluated " ++ name)
   f
 
 /// `n`, after saying that it was evaluated.
-value : String -> Int ->{} Int
+value : String -> Int ->{Host.Console} Int
 let value name n =
   say ("evaluated " ++ name)
   n
 
 /// `n`, after saying that it saw it: a function with a runtime call.
-seen : Int ->{} Int
+seen : Int ->{Host.Console} Int
 let seen n =
   say ("saw " ++ show n)
   n
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   say <| show <| (double >> inc) 5
   say <| show <| (double << inc) 5

@@ -44,11 +44,11 @@ let page =
       button { disabled = false; on_click = increment } (text "+1")
   })
 
-report : Failure e ->{} Unit
+report : Failure e ->{Host.Console} Unit
 let report failure =
   Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let (markup, state) = provide Atom.layer {
     Atom.set count 5

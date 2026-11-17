@@ -5,7 +5,7 @@ module App.Main exposing (main)
 
 type error Oops = Oops String
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 nap : Float ->{Async} Unit
@@ -17,7 +17,7 @@ let nap millis =
 quiet : Failure e ->{} Unit
 let quiet _ = ()
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let answer : Deferred.Deferred none Float = Deferred.make ()
   let waiters = scope owner {

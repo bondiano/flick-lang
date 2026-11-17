@@ -19,7 +19,7 @@ let welcome name =
   let n = Counter.next ()
   Greeter.greet name ++ " #" ++ show n
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let cell = Ref.make 0
   let layer =

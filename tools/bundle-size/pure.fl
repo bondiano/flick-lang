@@ -13,7 +13,7 @@ let area s =
 add : Float -> Float -> Float
 let add a b = a + b
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let a = area (Circle 2)
   let b = area (Rect 3 4)

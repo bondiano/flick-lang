@@ -7,7 +7,7 @@ let greet =
   |> Rpc.with_payload (Codec.json Schema.string)
   |> Rpc.with_success (Codec.json Schema.string)
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let answer =
     try Rpc.call "/rpc" greet "Ada" with

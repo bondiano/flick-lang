@@ -38,7 +38,7 @@ let heard name =
 built : Layer none none Services
 let built = Layer.succeed Greeter { greet = fun name -> "hello, " ++ name }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let (first, second, third) = provide built { (heard "ada", heard "gone", heard "late") }
   Platform.stdout_line first

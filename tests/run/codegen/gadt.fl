@@ -87,7 +87,7 @@ let coerce eq =
   match eq with
   | Same -> fun x -> x
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let sum = Add (IntLit 1) (If (Less (IntLit 1) (IntLit 2)) (IntLit 2) (Lit 3))
   Platform.stdout_line (show (eval sum))

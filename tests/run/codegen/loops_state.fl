@@ -89,7 +89,7 @@ let find n =
     break i
   }
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line (show (dictionary_snapshot ()))
   Platform.stdout_line (show (polymorphic_exit true, polymorphic_exit false))

@@ -19,7 +19,7 @@ module Child exposing (Tag(..), describe, Greeter, speak) =
   speak : String ->{Greeter} String
   let speak name = Greeter.greet name ++ " " ++ decorated (Tag 42)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let greeter : Child.Greeter.Impl = { greet = fun name -> "hello " ++ name }
   let message = provide Child.Greeter greeter { Child.speak "Ada" }

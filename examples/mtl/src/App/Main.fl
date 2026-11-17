@@ -7,7 +7,7 @@ import Cli
 refined type Minutes = Float where fun n -> Float.is_safe_integer n && n >= 0
   deriving Cli.Value
 
-plan_command : Cli.Command none {AppError}
+plan_command : Cli.Command {Host.Console} {AppError}
 let plan_command = cli "plan" {
   description "Plan tasks in order, stopping when a task is unknown or does not fit"
   /// Available time in whole minutes
@@ -37,7 +37,7 @@ let plan_command = cli "plan" {
         "Plan stopped. Unscheduled: \{unscheduled}. The first unscheduled task is unknown or does not fit the remaining time (base time + overhead). Later tasks were not scheduled; the completed prefix is kept. Use 'mtl catalog' to list task names and times."
 }
 
-catalog_command : Cli.Command none none
+catalog_command : Cli.Command {Host.Console} none
 let catalog_command = cli "catalog" {
   description "List available tasks and their base time before per-task overhead"
   handle fun _ ->
@@ -45,14 +45,14 @@ let catalog_command = cli "catalog" {
     for (name, minutes) <- Plan.catalog do Platform.stdout_line "  \{name}: \{minutes} min"
 }
 
-command : Cli.Command none {AppError}
+command : Cli.Command {Host.Console} {AppError}
 let command = cli "mtl" {
   description "A pure task-time planner built with MaybeT, StateT and ReaderT"
   subcommand plan_command
   subcommand catalog_command
 }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Arguments, Host.Console, Async; AppError} Unit
 let main () =
   try Cli.run command (Platform.args ()) with
   | Cli.CliError message -> App.fail message

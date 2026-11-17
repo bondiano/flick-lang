@@ -34,7 +34,7 @@ let info () = {
   blocks = None
 }
 
-line : String -> String ->{} Unit
+line : String -> String ->{Host.Console} Unit
 let line label value = Platform.stdout_line (label ++ ": " ++ value)
 
 etags : List Http.Etag.Etag
@@ -155,7 +155,8 @@ point : Codec none none Json Point
 let point = Codec.general (Codec.json Point.schema)
 
 forms :
-  Unit ->{Async; Http.Multipart.MultipartError, SchemaError, Http.ServerError.HttpServerError} Unit
+  Unit ->{Host.Console, Async; Http.Multipart.MultipartError, SchemaError, Http.ServerError.HttpServerError}
+  Unit
 let forms () =
   let form = [("title", "notes"), ("tag", "a"), ("tag", "b"), ("meta", "{\"x\":3}")]
   multipart : Unit -> ServerRequest
@@ -176,7 +177,7 @@ let forms () =
       (show (Http.Multipart.schema_body_form_json point "meta" (multipart ())))
   }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   line "etags" (show etags)
   line "literal" (show (literal, Http.Status.from_literal literal))

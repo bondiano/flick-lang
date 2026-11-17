@@ -24,7 +24,7 @@ let step state event =
   | Shipped _ -> Err "already shipped"
   | Cancelled -> Err "already cancelled"
 
-apply : State -> Event ->{} State
+apply : State -> Event ->{Host.Console} State
 let apply state event =
   match step state event with
   | Ok next ->
@@ -34,7 +34,7 @@ let apply state event =
     Platform.stdout_line "\{show event} rejected: \{reason}"
     state
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let mut state = AwaitingPayment
   for event <- [Ship "FL-42", Pay, Pay, Ship "FL-42", Cancel] do { state = apply state event }

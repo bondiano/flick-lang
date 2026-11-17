@@ -10,7 +10,7 @@ effect Curried =
   add : Int -> Int ->{} Int
   other : Unit ->{} Int
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let left_only =
     try

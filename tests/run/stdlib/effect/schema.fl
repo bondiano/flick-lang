@@ -53,7 +53,7 @@ let profile_json = codec Profile.schema {
   level = field_effect "level" (Codec.general Float.json_finite) |> on_missing_effect default_level
 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line ("number: " ++ dec "1.5" (Codec.json Schema.number))
   Platform.stdout_line ("string: " ++ dec "\"s\"" (Codec.json Schema.string))

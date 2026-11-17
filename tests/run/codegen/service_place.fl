@@ -35,7 +35,7 @@ let by_name () =
     Greeter.greet "by name"
   )
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (by_record ())
   Platform.stdout_line (by_layer ())

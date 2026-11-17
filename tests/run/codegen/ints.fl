@@ -13,7 +13,7 @@ let half x = x / 2
 rounded : BigInt -> BigInt -> BigInt -> BigInt
 let rounded value by scale = (value * scale * 2n + by) / (by * 2n)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let zero = 0
   Platform.stdout_line (show (big + 1))

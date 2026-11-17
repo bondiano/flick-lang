@@ -21,7 +21,7 @@ let track active peak n = task {
   n
 }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   Platform.stdout_line (show (List.map (fun x -> x + 1) [1, 2, 3]))
   let log = Ref.make []

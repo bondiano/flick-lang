@@ -40,7 +40,7 @@ let show_c c =
   match c with
   | Celsius x -> "C " ++ show x
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (show_f (there (Celsius 100)))
   Platform.stdout_line (show_c (back (Fahrenheit 212)))

@@ -11,7 +11,7 @@ let read () = Store.get ()
 using : Layer none none {Store a} -> Eff {Store a} none a ->{} a
 let using layer work = provide layer { await work }
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let integers = Layer.succeed Store { get = fun () -> 42 }
   let strings = Layer.succeed Store { get = fun () -> "forty-two" }

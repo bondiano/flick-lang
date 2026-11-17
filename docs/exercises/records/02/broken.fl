@@ -8,5 +8,5 @@ let older person = { person with age = person.age + 2 }
 birthday : Int -> Int
 let birthday age = (older { name = "Ada"; age = age }).age
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (show (birthday 41))

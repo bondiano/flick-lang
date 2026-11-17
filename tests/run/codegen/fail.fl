@@ -36,7 +36,7 @@ let after () =
   with
   | Gone why -> "stopped " ++ why
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (full "a")
   Platform.stdout_line (short "b")

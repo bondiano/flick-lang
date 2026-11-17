@@ -5,13 +5,13 @@ type error Invalid = Invalid Int
 check : Int ->{; Invalid} Int
 let check n = if n < 0 then Fail.fail (Invalid n) else n
 
-open : String -> Eff none none String
+open : String -> Eff {Host.Console} none String
 let open name = task {
   Platform.stdout_line "open \{name}"
   name
 }
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let result =
     try

@@ -51,7 +51,7 @@ let pair a b =
 shown_all : List (Result Duration.DurationError Duration.Duration) -> String
 let shown_all rs = show (List.map shown rs)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let one = ms 1
   let two = ms 2

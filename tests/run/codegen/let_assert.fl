@@ -13,7 +13,7 @@ let pair xs =
   let sum = a + b
   sum * 2
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line (show (first [3, 4]))
   Platform.stdout_line (show (pair [1, 2]))

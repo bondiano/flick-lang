@@ -11,7 +11,7 @@ let rec to_list tree =
 size : Tree a -> Int
 let size tree = List.length (to_list tree)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let numbers = Node (Node Leaf 1 Leaf) 2 (Node Leaf 3 Leaf)
   let words = Node Leaf "only" Leaf

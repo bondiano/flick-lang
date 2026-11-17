@@ -41,11 +41,11 @@ let greeting_view =
     ui { text (" hello " ++ name ++ more) }
   )
 
-report : Failure e ->{} Unit
+report : Failure e ->{Host.Console} Unit
 let report failure =
   Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   setup ()
   match Ui.Dom.container "app" with

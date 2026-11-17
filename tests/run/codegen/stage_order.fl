@@ -2,17 +2,17 @@
 // argument is evaluated.
 module App.Main exposing (main)
 
-stage : Float ->{} (Float -> Float)
+stage : Float ->{Host.Console} (Float -> Float)
 let stage x =
   Platform.stdout_line "stage 1"
   fun y -> x + y
 
-argument : Float ->{} Float
+argument : Float ->{Host.Console} Float
 let argument n =
   Platform.stdout_line "argument"
   n
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let result = stage 1 (argument 2)
   Platform.stdout_line (show result)

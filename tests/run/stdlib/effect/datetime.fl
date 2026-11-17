@@ -26,7 +26,7 @@ let text r =
   | Err (DateTime.DateTimeError message) -> "error: " ++ message
 
 /// A date-time of a string the test knows is valid.
-at : String ->{} DateTime.DateTime
+at : String ->{Host.Clock} DateTime.DateTime
 let at s =
   match DateTime.make s with
   | Ok t -> t
@@ -47,14 +47,14 @@ let describe t =
     }
     t
 
-zoned_in : DateTime.DateTime ->{CurrentTimeZone} String
+zoned_in : DateTime.DateTime ->{Host.Clock, CurrentTimeZone} String
 let zoned_in t =
   let here = DateTime.now_in_current_zone ()
   DateTime.format_iso_offset (DateTime.set_zone_current t)
     ++ " "
     ++ show (Option.is_some (DateTime.zoned_offset here))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console, Host.Clock; AppError} Unit
 let main () =
   let t = at "2024-03-10T08:30:15.250Z"
   Platform.stdout_line

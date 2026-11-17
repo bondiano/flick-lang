@@ -7,7 +7,7 @@ import App.Remote
 import App.Shared
 import Server
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () = provide Server.node {
   Console.log (App.Shared.greeting (App.Db.lookup "1"))
   scope {

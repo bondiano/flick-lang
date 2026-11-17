@@ -551,7 +551,7 @@ let runtime_messages model =
     )
     if crashes != [] then close_preview ()
 
-report : Atom.Writable Model -> Failure e ->{Atom.Write} Unit
+report : Atom.Writable Model -> Failure e ->{Host.Console, Atom.Write} Unit
 let report model failure =
   let message = RawCause.describe (Failure.inspect failure)
   update model (fun m -> { m with fault = message; running = false; loading = false })

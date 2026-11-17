@@ -37,7 +37,7 @@ instance (GCount a, GCount b) => GCount (Sum a b) =
 count : (Generic a rep, GCount rep) => a -> Int
 let count x = gcount (to_rep x)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (show (List.map count [Circle 1, Rect 2 3, Dot]))
   Platform.stdout_line

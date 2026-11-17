@@ -30,7 +30,7 @@ let email order =
       track
   }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let order = { customer = "<Ann & Bob>"; items = [("Tea", 2), ("Cup", 1)] }
   Platform.stdout_line (Ui.Server.to_html (email order))

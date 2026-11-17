@@ -11,14 +11,14 @@ foreign settle_later from "./calls.mjs" "settleLater"
 under_way : String ->{Async} Unit
 foreign under_way from "./calls.mjs" "underWay"
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 quiet : Failure e ->{} Unit
 let quiet _ = ()
 
 /// A child in a call, the owner closing around it.
-child_in_call : Unit ->{Async} Unit
+child_in_call : Unit ->{Host.Console, Async} Unit
 let child_in_call () = scope owner {
   Scope.add_finalizer (task { say "finalizer, after the call" })
   let _child = Fiber.spawn owner quiet (task { settle_later "the child's call" })
@@ -27,7 +27,7 @@ let child_in_call () = scope owner {
 }
 
 /// The body is the fiber in the call, and the race it lost stops it.
-body_in_call : Unit ->{Async} Unit
+body_in_call : Unit ->{Host.Console, Async} Unit
 let body_in_call () =
   let winner =
     race_first
@@ -44,7 +44,7 @@ let body_in_call () =
       })
   say winner
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   child_in_call ()
   say "--"

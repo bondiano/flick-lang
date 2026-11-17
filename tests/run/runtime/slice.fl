@@ -19,7 +19,7 @@ instance Area Shape =
     | Circle r -> 3 * r * r
     | Rect w h -> w * h
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 total : Area a => List a -> Float
@@ -62,7 +62,7 @@ let fail_fast stopped =
   with
   | Stop text -> text
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let shapes = List.map (scaled 2) [Circle 1, Rect 2 3]
   say (show shapes ++ " " ++ show (total shapes) ++ " " ++ show (shapes == [Circle 2, Rect 4 6]))

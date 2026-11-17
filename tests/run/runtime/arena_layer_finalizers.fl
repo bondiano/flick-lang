@@ -8,10 +8,12 @@ acquire : Unit ->{Scope s} Arena.Value s String
 let acquire () =
   let arena = Arena.make ()
   let value = Arena.alloc arena "kept"
-  Scope.add_finalizer (task { Platform.stdout_line ("final " ++ Arena.get value) })
+  // a finalizer prints through the trusted host adapter: it may outlive the
+  // caller's provider of `Host.Console` (`FLICK-G003`)
+  Scope.add_finalizer (task { Host.raw_stdout_line ("final " ++ Arena.get value) })
   value
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = scope {
   let layer = Layer.succeed Read { read = fun () -> "unused" }
   let value = Layer.run layer acquire

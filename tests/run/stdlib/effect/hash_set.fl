@@ -10,7 +10,7 @@ let odd = HashSet.from_list EqHash.canonical [1, 3, 5, 7]
 small : HashSet.HashSet EqHash.Canonical Float
 let small = HashSet.insert 2 (HashSet.insert 1 HashSet.empty)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line ("from_list: " ++ show (sorted odd, HashSet.size odd))
   Platform.stdout_line

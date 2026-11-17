@@ -4,16 +4,16 @@ module App.Main exposing (main)
 
 type error Broken = Broken String
 
-unexpected : Failure e ->{} Unit
+unexpected : Failure e ->{Host.Console} Unit
 let unexpected failure = Platform.stdout_line "unexpected failure"
 
 ms : Float -> Duration.Duration
 let ms n = Result.with_default Duration.zero (Duration.millis n)
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
-queues : Unit ->{Async; Broken} Unit
+queues : Unit ->{Host.Console, Async; Broken} Unit
 let queues () =
   let q : Queue.Queue {Broken} Float = Queue.bounded 4
   let offered = Queue.offer 1 q
@@ -113,7 +113,7 @@ let queues () =
     | Broken why -> "fail_cause: " ++ why
   say cause
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   try queues () with
   | Broken why -> say ("unexpected " ++ why)

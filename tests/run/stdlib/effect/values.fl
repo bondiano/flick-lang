@@ -12,7 +12,7 @@ type alias Shape = {
   corner : Point
 } deriving Schema
 
-line : String -> String -> Unit ->{} Unit
+line : String -> String -> Unit ->{Host.Console} Unit
 let line label value () = Platform.stdout_line (label ++ ": " ++ value)
 
 corner : Optic.Lens Shape Point
@@ -56,7 +56,7 @@ let describe op =
   | JsonPatch.Remove path -> "remove " ++ path
   | JsonPatch.Replace path value -> "replace " ++ path ++ " " ++ Json.stringify value
 
-patches : Json -> Json ->{} Unit
+patches : Json -> Json ->{Host.Console} Unit
 let patches before after =
   let patch : JsonPatch.JsonPatch = JsonPatch.get before after
   line "patch" (String.join "; " (List.map describe patch)) ()
@@ -78,7 +78,7 @@ let patches before after =
       ++ show (String.contains "\n" (Formatter.format_json 2 data)))
     ()
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let corner_x = corner |> Optic.compose_lens x_of
   line "get" (show (shape |> Optic.get corner_x)) ()

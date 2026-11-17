@@ -5,7 +5,7 @@ module App.Main exposing (main)
 
 type error Boom = Boom String
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 note : Ref (List String) -> String ->{} Unit
@@ -54,7 +54,7 @@ let resource log n =
       n
     })
 
-sources : Unit ->{Async; Boom} Unit
+sources : Unit ->{Host.Console, Async; Boom} Unit
 let sources () =
   say ("from_list: " ++ show (Channel.run_collect nums))
   say ("from_list_chunked: " ++ show (lists (Channel.from_list_chunked 2 [1, 2, 3, 4, 5])))
@@ -73,7 +73,7 @@ let sources () =
   let acquired = Channel.acquire_release (fun n -> note log ("release " ++ show n)) (task { 5 })
   say ("acquire_release: " ++ show (Channel.run_collect acquired) ++ " " ++ show (Ref.get log))
 
-transforms : Unit ->{Async; Boom} Unit
+transforms : Unit ->{Host.Console, Async; Boom} Unit
 let transforms () =
   say ("map: " ++ show (Channel.run_collect (Channel.map (fun n -> n * 10) nums)))
   let log = Ref.make []
@@ -103,7 +103,7 @@ let transforms () =
   say
     ("pipe_to_or_fail ok: " ++ show (Channel.run_collect (nums |> Channel.pipe_to_or_fail offset)))
 
-failures : Unit ->{Async; Boom} Unit
+failures : Unit ->{Host.Console, Async; Boom} Unit
 let failures () =
   let caught = Ref.make None
   let kept =
@@ -132,7 +132,7 @@ let failures () =
     )
   say ("on_exit failure: " ++ outcome failed ++ " " ++ show (Ref.get log))
 
-merges : Unit ->{Async; Boom} Unit
+merges : Unit ->{Host.Console, Async; Boom} Unit
 let merges () =
   let nested = Channel.from_list [Channel.from_list [1], Channel.from_list [2, 3]]
   let one = { concurrency = Some 1; bufferSize = None; switch = false }
@@ -161,7 +161,7 @@ let merges () =
     ("interrupt_when ended: "
       ++ Channel.run_drain (Channel.interrupt_when late (Channel.end "first")))
 
-runs : Unit ->{; Boom} Unit
+runs : Unit ->{Host.Console; Boom} Unit
 let runs () =
   say ("run_fold: " ++ show (Channel.run_fold (fun () -> 0) (fun total n -> total + n) nums))
   let log = Ref.make []
@@ -173,7 +173,7 @@ let runs () =
   say ("run_drain: " ++ show (Channel.run_drain nums))
   say ("run_collect failure: " ++ outcome broken)
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   try
     sources ()

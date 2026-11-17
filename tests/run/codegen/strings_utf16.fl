@@ -4,7 +4,7 @@
 // release folds them or the runtime shows them.
 module App.Main exposing (main)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let globe = "a\u{1F30D}b"
   Platform.stdout_line

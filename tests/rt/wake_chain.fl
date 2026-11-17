@@ -22,7 +22,7 @@ let rec link owner prev i =
         })
     link owner next (i - 1)
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   scope owner {
     let first : Deferred.Deferred none Unit = Deferred.make ()

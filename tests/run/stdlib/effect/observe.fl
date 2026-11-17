@@ -33,7 +33,7 @@ let counter_options = { description = None; attributes = []; incremental = false
 count_of : Metric.Counter ->{} Float
 let count_of c = (Metric.value c).count
 
-logs : Unit ->{} Unit
+logs : Unit ->{Host.Console} Unit
 let logs () =
   Logger.with_loggers
     none_loggers
@@ -86,7 +86,7 @@ let logs () =
         })
     })
 
-spans : Unit ->{; Cause.NoSuchElementError} Unit
+spans : Unit ->{Host.Console; Cause.NoSuchElementError} Unit
 let spans () =
   let _ : Tracer.Tracer = Effect.tracer ()
   let outside =
@@ -203,7 +203,7 @@ let tracked t =
       })
   ()
 
-metrics : Unit ->{} Unit
+metrics : Unit ->{Host.Console} Unit
 let metrics () =
   let ok : Eff none {Boom} Float = task { 2 }
   let bad : Eff none {Boom} Float = task { Fail.fail (Boom 3) }
@@ -219,7 +219,7 @@ let metrics () =
         count_of timing,
       ))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   logs ()
   try spans () with

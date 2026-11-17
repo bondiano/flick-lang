@@ -11,7 +11,7 @@ let nested_for () =
   }
   total
 
-test_loop_break : Unit ->{} Unit
+test_loop_break : Unit ->{Host.Console} Unit
 let test_loop_break () =
   let result =
     'outer : loop {
@@ -31,7 +31,7 @@ let test_loop_break () =
     }
   Platform.stdout_line (show result)
 
-test_loop_continue : Unit ->{} Unit
+test_loop_continue : Unit ->{Host.Console} Unit
 let test_loop_continue () =
   let mut count = 0
   'outer_cnt : loop {
@@ -50,7 +50,7 @@ let test_loop_continue () =
   }
   Platform.stdout_line (show count)
 
-test_for_break : Unit ->{} Unit
+test_for_break : Unit ->{Host.Console} Unit
 let test_for_break () =
   Platform.stdout_line "=== Test for with break and finalizers ==="
   'outer_for : for x <- [1, 2] do {
@@ -69,7 +69,7 @@ let test_for_break () =
   }
   Platform.stdout_line "after outer_for"
 
-test_for_continue : Unit ->{} Unit
+test_for_continue : Unit ->{Host.Console} Unit
 let test_for_continue () =
   Platform.stdout_line "=== Test for with continue and finalizers ==="
   'outer_cont : for x <- [1, 2] do {
@@ -92,7 +92,7 @@ let test_for_continue () =
   }
   Platform.stdout_line "after outer_cont"
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   test_loop_break ()
   test_loop_continue ()

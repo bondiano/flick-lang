@@ -40,7 +40,7 @@ let describe part =
       ++ "="
       ++ String.join "" (Stream.run_collect (Stream.Platform.decode_text f.content))
 
-bodies : Unit ->{Async; HttpClientError, HttpServerError} Unit
+bodies : Unit ->{Host.Console, Async; HttpClientError, HttpServerError} Unit
 let bodies () =
   let body = Http.Body.stream hello (Some "text/plain") (Some 5)
   Platform.stdout_line
@@ -53,7 +53,7 @@ let bodies () =
   let got = Stream.run_collect (Stream.Platform.decode_text (Http.ClientResponse.stream answer))
   Platform.stdout_line ("response stream: " ++ String.join "" got)
 
-files : Unit ->{Async; PlatformError.PlatformError, HttpServerError} Unit
+files : Unit ->{Host.Console, Async; PlatformError.PlatformError, HttpServerError} Unit
 let files () = provide FileSystem.node {
   scope {
     let dir =
@@ -70,7 +70,7 @@ let files () = provide FileSystem.node {
   }
 }
 
-forms : Unit ->{Async; MultipartError} Unit
+forms : Unit ->{Host.Console, Async; MultipartError} Unit
 let forms () =
   Platform.stdout_line
     ("parts: "
@@ -88,7 +88,7 @@ let forms () =
       ("persisted files: " ++ show (List.length (Http.Multipart.files persisted)))
   }
 
-compressed : Unit ->{Async; HttpClientError} Unit
+compressed : Unit ->{Host.Console, Async; HttpClientError} Unit
 let compressed () =
   zipped : Http.Middleware.Handler none none
   let zipped =
@@ -99,7 +99,7 @@ let compressed () =
     Http.ClientRequest.set_header "accept-encoding" "gzip" (Http.ClientRequest.get "http://fake/z")
   send :
     Http.ServerRequest.ServerRequest ->
-    Http.ServerResponse.ServerResponse ->{Async; HttpClientError}
+    Http.ServerResponse.ServerResponse ->{Host.Console, Async; HttpClientError}
     Unit
   let send _ response =
     Platform.stdout_line
@@ -109,7 +109,7 @@ let compressed () =
     Platform.stdout_line ("gzip magic: " ++ show (List.take 2 zbytes))
   Http.Middleware.to_handled send zipped (Http.ServerRequest.from_client_request request)
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   try
     bodies ()

@@ -6,7 +6,7 @@ let label n = "n = \{n}, n + 1 = \{n + 1}!"
 greeting : String
 let greeting = "Hello, \{"Ada"}: \{42} \{1.5} \{true} \{-0.0}"
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let name = "Flick"
   Platform.stdout_line "Hello, \{name}!"

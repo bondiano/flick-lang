@@ -13,5 +13,5 @@ let terms = [
   TmIf (TmInt 0) (TmInt 1) (TmInt 2),
 ]
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (String.join "\n" (results terms))

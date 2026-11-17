@@ -1,7 +1,7 @@
 // `ByteSize`: sizes in bytes.
 module App.Main exposing (main)
 
-line : String -> String -> Unit ->{} Unit
+line : String -> String -> Unit ->{Host.Console} Unit
 let line label value () = Platform.stdout_line (label ++ ": " ++ value)
 
 size : Option ByteSize.ByteSize -> String
@@ -21,7 +21,7 @@ let in_unit unit = {
   unit = Some unit
 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   line
     "bytes"

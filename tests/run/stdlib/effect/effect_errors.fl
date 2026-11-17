@@ -40,7 +40,7 @@ let defects f =
   | Ok d -> Ok d
   | Err _ -> Err f
 
-catching : Unit ->{} Unit
+catching : Unit ->{Host.Console} Unit
 let catching () =
   Platform.stdout_line
     ("catch_cause: "
@@ -99,7 +99,7 @@ let catching () =
   Platform.stdout_line
     ("with_error_reporting: " ++ outcome (task { Effect.with_error_reporting true boom }))
 
-finalizers : Unit ->{} Unit
+finalizers : Unit ->{Host.Console} Unit
 let finalizers () =
   let seen = Ref.make []
   note : String ->{} Unit
@@ -141,7 +141,7 @@ let finalizers () =
   }
   Platform.stdout_line ("finalizers: " ++ show (Ref.get seen))
 
-interruption : Unit ->{Async} Unit
+interruption : Unit ->{Host.Console, Async} Unit
 let interruption () =
   Platform.stdout_line ("interrupt: " ++ ended (task { Effect.interrupt () }))
   let steps = Ref.make []
@@ -178,7 +178,7 @@ let interruption () =
       (task { Effect.uninterruptible (task { Effect.interruptible (task { Effect.never () }) }) })
   Platform.stdout_line ("interruptible: " ++ show freed)
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   catching ()
   finalizers ()

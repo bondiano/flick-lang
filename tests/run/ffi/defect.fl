@@ -7,7 +7,7 @@ type error FsError = FsError String
 fail_sync : String ->{} Unit
 foreign fail_sync from "./bindings.mjs" "fail"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   fail_sync "unmapped"
   Platform.stdout_line "not reached"

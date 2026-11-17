@@ -5,7 +5,7 @@ module App.Main exposing (main)
 
 type error Oops = Oops String
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 nap : Float ->{Async} Unit
@@ -15,7 +15,7 @@ let nap millis =
   | Err _ -> ()
 
 /// The file, in Windows' temporary directory there and in `/tmp` elsewhere.
-path : Unit ->{} String
+path : Unit ->{Host.Environment} String
 let path () =
   match Platform.env "TEMP" with
   | Some dir -> dir ++ "/flick-scoped-file.txt"
@@ -24,7 +24,7 @@ let path () =
 /// Reads the file in a scope that says when it closes, then ends by `finish`.
 reading :
   String ->
-  (String ->{Async, File.FileSystem; e} String) ->{Async, File.FileSystem; e + {File.OpenError, File.ReadError}}
+  (String ->{Async, File.FileSystem; e} String) ->{Host.Console, Host.Environment, Async, File.FileSystem; e + {File.OpenError, File.ReadError}}
   String
 let reading label finish = scope {
   let file = File.open_scoped (path ())
@@ -33,7 +33,7 @@ let reading label finish = scope {
   finish text
 }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Host.Environment, Async; AppError} Unit
 let main () = provide File.node {
   let outcome =
     try

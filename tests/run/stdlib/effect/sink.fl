@@ -7,7 +7,7 @@ type error Boom = Boom String
 service Scale =
   factor : Unit ->{} Int
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 /// Feeds 1 to 5 in chunks of two to the sink; its end.
@@ -36,7 +36,7 @@ let small = Filter.make (fun n -> if n < 3 then Ok (n * 10) else Err n)
 small_effect : Filter.FilterEffect none none Float Float Float
 let small_effect = Filter.make_effect (fun n -> if n < 3 then Ok (n * 10) else Err n)
 
-folds : Unit ->{Async; Boom} Unit
+folds : Unit ->{Host.Console, Async; Boom} Unit
 let folds () =
   say (ended "collect" (run (Sink.collect ())))
   say (ended "count" (run Sink.count))
@@ -116,7 +116,7 @@ let folds () =
       "never, interrupted"
       (Channel.run_drain (Channel.interrupt_when (task { stopped }) forever)))
 
-shapes : Unit ->{Async; Boom} Unit
+shapes : Unit ->{Host.Console, Async; Boom} Unit
 let shapes () =
   say (ended "succeed" (run (Sink.succeed "x")))
   say (ended "sync" (run (Sink.sync (fun () -> "lazy"))))
@@ -171,7 +171,7 @@ let shapes () =
   let scaled = Sink.map_effect (fun n -> n * Scale.factor ()) Sink.count
   say (ended "provide_service" (run (Sink.provide_service Scale { factor = fun () -> 10 } scaled)))
 
-failures : Unit ->{; Boom} Unit
+failures : Unit ->{Host.Console; Boom} Unit
 let failures () =
   let failing : Sink.Sink none {Boom} Float Float Float = Sink.fail (Boom "sink")
   say
@@ -212,7 +212,7 @@ let failures () =
     | Boom why -> why
   say ("map_error: " ++ message)
 
-targets : Unit ->{Async; Boom} Unit
+targets : Unit ->{Host.Console, Async; Boom} Unit
 let targets () =
   let q : Queue.Queue none Float = Queue.unbounded ()
   let _ = run (Sink.from_queue q)
@@ -235,7 +235,7 @@ let targets () =
     Sink.to_channel Sink.sum
   say (ended "from_channel" (run (Sink.from_channel summing)))
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   try
     folds ()

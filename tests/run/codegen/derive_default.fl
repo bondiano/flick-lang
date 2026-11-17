@@ -44,7 +44,7 @@ type Named = Named { width : Float; label : String }
 type Pair a = Pair a a
   deriving Default, Show
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (show (default : Point))
   Platform.stdout_line (show (default : Shape))

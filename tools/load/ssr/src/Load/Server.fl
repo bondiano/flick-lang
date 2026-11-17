@@ -80,7 +80,7 @@ client :
   ServerResponse
 let client path _ = Http.Platform.file Http.Platform.file_options path
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Environment, Host.Console, Async; AppError} Unit
 let main () =
   let port = Option.with_default 3000 (Option.bind String.to_number (Platform.env "PORT"))
   let bundle = Option.with_default "dist/client.js" (Platform.env "CLIENT_JS")

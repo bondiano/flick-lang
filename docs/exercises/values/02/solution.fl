@@ -3,5 +3,5 @@ module Main exposing (main, area)
 area : Int -> Int -> Int
 let area width height = width * height
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (show (area 3 4))

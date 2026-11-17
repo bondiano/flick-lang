@@ -27,7 +27,7 @@ type ApiRoute =
   | Tags
   deriving Eq, Show, Schema, Url
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   match Slug.parse "how-to" with
   | Err _ -> App.fail "a slug"

@@ -33,13 +33,13 @@ foreign written_numbers from "./channel_js.mjs" "writtenSoFar"
 boom : JsValue -> Boom
 let boom value = Boom "js"
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 lists : Channel.Channel {Async} e i (NonEmpty.NonEmpty a) d none Unit ->{Async; e} List (List a)
 let lists channel = Channel.run_collect (Channel.map NonEmpty.to_list channel)
 
-sources : Unit ->{Async; Boom} Unit
+sources : Unit ->{Host.Console, Async; Boom} Unit
 let sources () =
   let stream = readable ["x", "y"]
   let web =
@@ -69,7 +69,7 @@ let sources () =
       })
   say ("from_transform_stream: " ++ show (lists shouted))
 
-sinks : Unit ->{Async; Boom} Unit
+sinks : Unit ->{Host.Console, Async; Boom} Unit
 let sinks () =
   let stream = writable ()
   let into =
@@ -95,7 +95,7 @@ let sinks () =
             })))
   say ("Sink.from_writable_stream: " ++ show (written_numbers ()))
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   try
     sources ()

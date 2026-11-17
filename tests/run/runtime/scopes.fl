@@ -22,12 +22,12 @@ foreign release_write from "./calls.mjs" "releaseWrite"
 
 type error Oops = Oops String
 
-report : Failure {Oops} ->{} Unit
+report : Failure {Oops} ->{Host.Console} Unit
 let report failure =
   Platform.stdout_line "supervisor saw a failure"
   release_write "log"
 
-unexpected : Failure none ->{} Unit
+unexpected : Failure none ->{Host.Console} Unit
 let unexpected failure = Platform.stdout_line "unexpected failure"
 
 worker : Unit ->{Async; Oops} Unit
@@ -35,7 +35,7 @@ let worker () =
   held_write "log"
   Fail.fail (Oops "late")
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   scope owner {
     let first = open_raw "first"

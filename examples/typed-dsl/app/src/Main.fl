@@ -5,5 +5,5 @@ import PositiveDsl exposing (ValidationError, plugin validate)
 answer : Result ValidationError Int
 let answer = validate { positive 42 }
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (show answer)

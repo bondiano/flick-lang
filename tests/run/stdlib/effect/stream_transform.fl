@@ -11,10 +11,10 @@ let ms5 = Result.with_default Duration.zero (Duration.millis 5)
 ms1000 : Duration.Duration
 let ms1000 = Result.with_default Duration.zero (Duration.millis 1000)
 
-line : Show a => (String, List a) ->{} Unit
+line : Show a => (String, List a) ->{Host.Console} Unit
 let line (label, xs) = Platform.stdout_line (label ++ ": " ++ show xs)
 
-lists : (String, List (List Float)) ->{} Unit
+lists : (String, List (List Float)) ->{Host.Console} Unit
 let lists (label, xs) = Platform.stdout_line (label ++ ": " ++ show xs)
 
 nums : Stream.Stream none none Float
@@ -35,7 +35,7 @@ let grow chunk = NonEmpty.map (fun n -> n * 10) chunk
 collect : Stream.Stream none none (NonEmpty.NonEmpty Float) ->{} List (List Float)
 let collect s = List.map NonEmpty.to_list (Stream.run_collect s)
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   line ("map", (Stream.run_collect (Stream.map (fun n -> n * n) nums)))
   line ("as_", (Stream.run_collect (Stream.as_ 0 (Stream.take 2 nums))))

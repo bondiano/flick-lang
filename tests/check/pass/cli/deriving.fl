@@ -9,7 +9,7 @@ type Color = Red | GreenLight
 refined type Port = Float where fun n -> n > 0 && n < 65536
   deriving Cli.Value
 
-paint : Cli.Command none none
+paint : Cli.Command {Host.Console} none
 let paint = cli "paint" {
   flag color "c" : Color = Red
   flag port : Option Port

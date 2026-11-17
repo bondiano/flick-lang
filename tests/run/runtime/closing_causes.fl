@@ -7,7 +7,7 @@ module App.Main exposing (main)
 type error Oops = Oops String
   deriving Show
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 view : Failure e -> List String
@@ -29,7 +29,7 @@ let first_defect f =
 dies : String -> Eff none none Unit
 let dies text = task { Effect.die text }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   // the body succeeds, one finalizer dies: the value is gone
   let one =

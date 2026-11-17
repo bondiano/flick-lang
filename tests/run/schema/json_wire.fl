@@ -17,7 +17,7 @@ type alias Bag = {
   outcome : Result String Int
 } deriving Schema
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 encoded : Schema a -> a -> String
@@ -36,7 +36,7 @@ let decoded s text =
     | Ok value -> "ok " ++ encoded s value
     | Err (SchemaError issues) -> show (List.map (fun i -> i.path ++ ": " ++ i.message) issues)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let bag = {
     count = 12345678901234567890n

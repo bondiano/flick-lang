@@ -69,7 +69,7 @@ let page _ =
 same : String -> String ->{} String
 let same a b = a ++ " and " ++ b ++ " in one trace: " ++ show (shares a b)
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let collector = "http://127.0.0.1:" ++ show (start ())
   let layers =

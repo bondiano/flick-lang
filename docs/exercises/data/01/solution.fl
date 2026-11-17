@@ -20,5 +20,5 @@ let count_coins amount =
   }
   coins
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line "\{count_coins 68} \{count_coins 99}"

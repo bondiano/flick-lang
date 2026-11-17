@@ -6,5 +6,5 @@ module Greeting exposing (greet) =
   greet : String -> String
   let greet name = "Hello, \{name}\{mark}"
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (Greeting.greet "modules")

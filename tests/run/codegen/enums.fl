@@ -27,7 +27,7 @@ let literals values = List.map Enum.value values
 unknown : String -> Bool
 let unknown literal = Result.is_err (Method.parse literal)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (show (List.map name [Delete, Get, Post]))
   Platform.stdout_line (show [Get, Post, Delete])

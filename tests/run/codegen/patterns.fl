@@ -41,7 +41,7 @@ let split xs =
 area : { w : Float; h : Float } -> Float
 let area { w; h = height } = w * height
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line
     (classify (Circle 20)

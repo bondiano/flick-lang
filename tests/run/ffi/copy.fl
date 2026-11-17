@@ -47,10 +47,10 @@ foreign effect deep_effect from "./bindings.mjs" "copyDeepEffect"
 deep_async : Float -> Deep -> Deep ->{Async} Deep
 foreign deep_async from "./bindings.mjs" "copyDeepAsync"
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
-main : Unit ->{Async} Unit
+main : Unit ->{Host.Console, Async} Unit
 let main () =
   let xs = [3, 1, 2]
   let sorted = sort_in_place xs

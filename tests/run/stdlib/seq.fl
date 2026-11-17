@@ -13,7 +13,7 @@ let collatz n =
 fibs : Seq Float
 let fibs = Seq.unfold (fun (a, b) -> Some (a, (b, a + b))) (0, 1)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let naturals = Seq.from 1
   let squares = Seq.map (fun n -> n * n) naturals

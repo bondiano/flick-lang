@@ -7,11 +7,11 @@ module App.Main exposing (main)
 effect Emit =
   control emit : Int ->{} Unit
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 /// Nested scopes in the body: the arm abandons them all.
-nested : Unit ->{} Int
+nested : Unit ->{Host.Console} Int
 let nested () =
   try
     scope {
@@ -31,7 +31,7 @@ let nested () =
     x
 
 /// A resume, then a discontinue: only the second lets the body go.
-resumed_once : Unit ->{} Int
+resumed_once : Unit ->{Host.Console} Int
 let resumed_once () =
   try
     scope {
@@ -46,7 +46,7 @@ let resumed_once () =
   | Emit.emit x -> if x == 0 then resume () else x
 
 /// A scope around the handler closes on its own.
-around : Unit ->{} Int
+around : Unit ->{Host.Console} Int
 let around () = scope {
   Scope.add_finalizer (task { say "around, when its scope ends" })
   let x =
@@ -62,7 +62,7 @@ let around () = scope {
   x
 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   say (show (nested ()))
   say "--"

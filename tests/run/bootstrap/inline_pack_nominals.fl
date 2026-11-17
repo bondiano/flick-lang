@@ -18,7 +18,7 @@ type module Sig =
 packed : Module Sig
 let packed = pack Child as Sig
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let greeter : Child.Greeter.Impl = { greet = fun name -> "hello " ++ name }
   let message = provide Child.Greeter greeter {

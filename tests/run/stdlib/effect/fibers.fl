@@ -44,7 +44,7 @@ let joined_by t =
   with
   | Boom n -> "Boom " ++ show n
 
-fibers : Unit ->{Async} Unit
+fibers : Unit ->{Host.Console, Async} Unit
 let fibers () = scope s {
   let a : Fiber.Fiber {Boom} String = Fiber.spawn s quiet (after ms1 "a")
   let b = Fiber.spawn s quiet (task { Fail.fail (Boom 2) })
@@ -69,7 +69,7 @@ let fibers () = scope s {
   Platform.stdout_line ("interrupt_all: " ++ show (List.map ended (Fiber.await_all [f, g, h])))
 }
 
-sets : Unit ->{Async} Unit
+sets : Unit ->{Host.Console, Async} Unit
 let sets () =
   let run_options = { propagateInterruption = false; startImmediately = false }
   let joined = scope s {
@@ -134,7 +134,7 @@ let sets () =
     Platform.stdout_line ("handle join: " ++ failed)
   }
 
-races : Unit ->{Async; Boom} Unit
+races : Unit ->{Host.Console, Async; Boom} Unit
 let races () =
   Platform.stdout_line
     ("race_all: " ++ show (Effect.race_all [after ms1000 "slow", after ms1 "fast"]))
@@ -157,7 +157,7 @@ let races () =
   await invalidate
   Platform.stdout_line ("cached_invalidate_with_ttl: " ++ show (before, await cached))
 
-scheduling : Unit ->{} Unit
+scheduling : Unit ->{Host.Console} Unit
 let scheduling () =
   let mine = Scheduler.make_mixed ()
   let used = Scheduler.with_scheduler mine (task { Scheduler.current () })
@@ -170,7 +170,7 @@ let scheduling () =
     ("with_prevent_scheduler_yield: "
       ++ show (Scheduler.with_prevent_scheduler_yield true (task { 1 + 1 })))
 
-plans : Unit ->{Async; Boom} Unit
+plans : Unit ->{Host.Console, Async; Boom} Unit
 let plans () =
   let english = Layer.succeed Greeter { greet = fun n -> "hello " ++ n }
   let failing = Layer.succeed Greeter { greet = fun n -> "" }
@@ -205,7 +205,7 @@ let plans () =
   Platform.stdout_line ("with_execution_plan: " ++ greeted)
   Platform.stdout_line ("events: " ++ show (Ref.get events))
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   fibers ()
   sets ()

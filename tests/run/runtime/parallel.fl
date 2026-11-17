@@ -6,7 +6,7 @@ module App.Main exposing (main)
 
 type error Oops = Oops String
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 nap : Float ->{Async} Unit
@@ -26,7 +26,7 @@ let failing text = task { Fail.fail (Oops text) }
 
 /// A task that waits long, saying when it is interrupted; it tells
 /// `started` once that saying is in place.
-patient : String -> Deferred.Deferred none Unit -> Eff {Async} none Float
+patient : String -> Deferred.Deferred none Unit -> Eff {Host.Console, Async} none Float
 let patient name started = task {
   Effect.ensuring
     (task { say (name ++ " ended") })
@@ -47,7 +47,7 @@ quiet : Failure e ->{} Unit
 let quiet _ = ()
 
 /// The sibling of a failing branch ends before the failure is caught.
-fail_fast : Unit ->{Async} String
+fail_fast : Unit ->{Host.Console, Async} String
 let fail_fast () =
   let started : Deferred.Deferred none Unit = Deferred.make ()
   try
@@ -62,7 +62,7 @@ let fail_fast () =
   with
   | Oops text -> text
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let (a, b) = parallel (after 30 "slow") (after 1 "fast")
   say (a ++ " " ++ b)

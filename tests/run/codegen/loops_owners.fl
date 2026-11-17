@@ -1,15 +1,17 @@
 module Main exposing (main)
 
-run : Bool ->{} Unit
+run : Bool ->{Host.Console} Unit
 let run stop = scope outer {
+  // the resource prints through the trusted host adapter: its release may
+  // outlive the caller's provider of `Host.Console` (`FLICK-G003`)
   acquire : String ->{Scope outer} String
   let acquire name =
     Resource.acquire_release
       (task {
-        Platform.stdout_line ("open " ++ name)
+        Host.raw_stdout_line ("open " ++ name)
         name
       })
-      (fun value -> Platform.stdout_line ("release " ++ value))
+      (fun value -> Host.raw_stdout_line ("release " ++ value))
   scope inner {
     loop {
       ignore (acquire (if stop then break else "kept"))
@@ -21,7 +23,7 @@ let run stop = scope outer {
   Platform.stdout_line "outer done"
 }
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   run false
   run true

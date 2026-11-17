@@ -46,7 +46,7 @@ let checking = {
 parsed : String -> String
 let parsed url = url ++ " -> " ++ show (Route.parse Page.url url)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   match Slug.parse "hello world" with
   | Err _ -> App.fail "a slug"

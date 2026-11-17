@@ -58,7 +58,8 @@ people : List User
 let people = [{ id = 1; name = "Ada" }, { id = 2; name = "Mallory" }, { id = 3; name = "Carol" }]
 
 // The handler task: nothing of it runs while rendering.
-save : Atom.Writable (Option User) -> String -> User ->{Async, Atom.Write; Refused} Unit
+save :
+  Atom.Writable (Option User) -> String -> User ->{Host.Console, Async, Atom.Write; Refused} Unit
 let save model log user =
   if user.name == "Mallory" then
     Fail.fail (Refused user.name)
@@ -88,7 +89,7 @@ let directory model log selected = ui {
       [tab "About" (paragraph (text "about"))])
 }
 
-report : Failure e ->{} Unit
+report : Failure e ->{Host.Console} Unit
 let report failure =
   Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
 
@@ -96,13 +97,13 @@ let report failure =
 // tree is unmounted, though the write of the task it interrupted is still
 // pending. Only now that write may finish, and the scope waits for it
 // before it releases the log.
-closed : Failure e ->{} Unit
+closed : Failure e ->{Host.Console} Unit
 let closed failure =
   Platform.stdout_line
     ("root closed: " ++ RawCause.describe (Failure.inspect failure) ++ ", page [" ++ text () ++ "]")
   release ()
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   setup ()
   let model = Atom.make None

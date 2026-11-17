@@ -1,4 +1,4 @@
-// Declared Scope controls activation, not a widened row.
+// Declared Scope controls activation, not a wider row.
 // RowGrow: unscoped provider, outer, outer; other tasks: outer.
 // Id80/Chain200: productive residual aliases; parser unchanged.
 module App.Main exposing (main)
@@ -303,7 +303,7 @@ opaque type alias Chain199 a = Chain198 a
 opaque type alias Chain200 a = Chain199 a
 opaque type alias Deep s = Eff {Scope s} none (Chain200 (Deep s))
 
-// Returned code exposes s; the factory retains nothing independently.
+// Returned code exposes s; the factory keeps nothing itself.
 makeNonregular : Fiber.Owner s -> Nonregular Int s
 foreign pure makeNonregular from "./owner_foreign_policy.mjs" "makeNonregular"
   retention call
@@ -341,7 +341,7 @@ foreign pure mark_provider from "./owner_foreign_policy.mjs" "markProvider"
 service Read =
   read : Unit ->{} String
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = scope outer {
   let layer = Layer.succeed Read { read = fun () -> "unused" }
   let nonregular1 = makeNonregular outer

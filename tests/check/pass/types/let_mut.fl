@@ -52,7 +52,7 @@ let scoped_mut () = scope {
   Files.name file
 }
 
-loop_reads : List Int ->{} Unit
+loop_reads : List Int ->{Host.Console} Unit
 let loop_reads xs =
   let mut limit = 3
   limit = limit + 1

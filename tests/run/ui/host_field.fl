@@ -11,5 +11,5 @@ let form =
   let hinted = Ui.with_host { Ui.host with id = Some "name"; aria_describedby = Some "hint" } field
   Ui.with_host { Ui.host with aria_label = Some "Your name" } hinted
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () = Platform.stdout_line (Ui.Server.to_html form)

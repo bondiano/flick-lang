@@ -51,7 +51,7 @@ let outputs schedule =
   let _ = Effect.repeat (Schedule.up_to { duration = None; times = Some 5 } quick) (task { 0 })
   Ref.get seen
 
-draws : Unit ->{} (Float, Int, List Int, String)
+draws : Unit ->{Host.Random} (Float, Int, List Int, String)
 let draws () = (
   Random.next (),
   Random.next_int_between { halfOpen = None } 1 6,

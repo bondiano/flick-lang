@@ -6,7 +6,7 @@ type error Boom = Boom Float
 service Greeter =
   greet : String ->{} String
 
-line : Show a => String -> List a ->{} Unit
+line : Show a => String -> List a ->{Host.Console} Unit
 let line label xs = Platform.stdout_line (label ++ ": " ++ show xs)
 
 nums : Stream.Stream none none Float
@@ -32,7 +32,7 @@ let greeting =
       if text == "" then Fail.fail (Boom 0) else text
     })
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   line "run" [Stream.run summed nums]
   line "run take" (Stream.run pairs nums)

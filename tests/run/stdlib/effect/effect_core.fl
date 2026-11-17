@@ -54,7 +54,7 @@ let checked t =
   try show (await t) with
   | Odd n -> "Odd " ++ show n
 
-single : Unit ->{Async} Unit
+single : Unit ->{Host.Console, Async} Unit
 let single () =
   let exit : Exit {Boom} Float = Effect.exit (task { Fail.fail (Boom 1) })
   Platform.stdout_line ("exit: " ++ show (Exit.is_failure exit))
@@ -126,7 +126,7 @@ let single () =
   Platform.stdout_line
     ("race_first: " ++ show (race_first (task { Effect.never () }) (task { "first" })))
 
-collections : Unit ->{} Unit
+collections : Unit ->{Host.Console} Unit
 let collections () =
   let xs = [1, 2, 3, 4]
   Platform.stdout_line
@@ -191,7 +191,7 @@ let collections () =
     ("filter_map_or_fail: "
       ++ checked (task { Effect.filter_map_or_fail parity (fun _ -> Odd 0) (task { 4 }) }))
 
-resources : Unit ->{Async} Unit
+resources : Unit ->{Host.Console, Async} Unit
 let resources () =
   let log = Ref.make []
   let used =
@@ -224,13 +224,13 @@ let resources () =
   }
   Platform.stdout_line ("resource_auto: " ++ show seen)
 
-transactions : Unit ->{} Unit
+transactions : Unit ->{Host.Console} Unit
 let transactions () =
   let meta : Tx.Meta = Tx.atomically (task { Tx.current () })
   let reason = meta.retryReason
   Platform.stdout_line ("tx: " ++ show (meta.attempt, reason))
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   single ()
   collections ()

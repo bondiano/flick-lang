@@ -65,7 +65,7 @@ let summed _ =
   let made = (default : a)
   measure made + twice made
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let pair = (default : Points.Pair)
   let spot = (default : Points.Spot)

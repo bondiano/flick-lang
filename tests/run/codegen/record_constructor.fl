@@ -14,7 +14,7 @@ let first pair =
   match pair with
   | Along r | Across r -> r.a
 
-noted : String -> Int ->{} Int
+noted : String -> Int ->{Host.Console} Int
 let noted name value =
   Platform.stdout_line name
   value
@@ -37,7 +37,7 @@ let wider shape =
   | Dot -> Dot
   | Box box -> Box { box with w = box.w + 1 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   // the values of a literal are evaluated as written, not as declared
   let a = Box { name = "a"; h = noted "h" 2; w = noted "w" 3 }

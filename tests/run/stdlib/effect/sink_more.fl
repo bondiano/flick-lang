@@ -2,7 +2,7 @@
 // its input, run on chunks of two through its channel.
 module App.Main exposing (main)
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 /// Feeds 1 to 5 in chunks of two to the sink; its end.
@@ -17,7 +17,7 @@ let ended label end =
   | (value, leftover) ->
     label ++ ": " ++ show value ++ " " ++ show (Option.map NonEmpty.to_list leftover)
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   say (ended "make, run_collect" (run (Sink.make (fun input -> Stream.run_collect input))))
   say (ended "make, take" (run (Sink.make (fun input -> Stream.run_count (Stream.take 3 input)))))

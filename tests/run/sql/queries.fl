@@ -124,7 +124,7 @@ let composed other = sql p {
   select u.name
 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let q = Sql.bind by_name { name = "'; DROP TABLE users; --" }
   Platform.stdout_line (Sql.text q)

@@ -10,5 +10,5 @@ let collatz n =
     steps = steps + 1
   }
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (show (collatz 6))

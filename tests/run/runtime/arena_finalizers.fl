@@ -4,7 +4,7 @@ module App.Main exposing (main)
 
 import Arena
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () = scope {
   let read = Ref.make (fun () -> Platform.stdout_line "unset")
   Scope.add_finalizer (task { (Ref.get read) () })

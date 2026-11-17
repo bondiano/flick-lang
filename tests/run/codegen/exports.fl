@@ -55,7 +55,7 @@ let parse text = if text == "one" then Ok 1 else Err (NotFound text)
 load : String ->{Users; NotFound} Point
 let load id = Users.get id
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (show (area (Rect 2 3) + size (Node Leaf 1 Leaf)))
   Platform.stdout_line (show (first [origin.y]))

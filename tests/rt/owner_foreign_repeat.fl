@@ -11,7 +11,7 @@ foreign pure make from "./owner_foreign_repeat.mjs" "makeRepeat"
 service Read =
   read : Unit ->{} String
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = scope outer {
   let layer = Layer.succeed Read { read = fun () -> "unused" }
   let first = make outer

@@ -48,10 +48,10 @@ let wrapped x = area (Some x) + area x
 labelled : Area a => a -> String
 let labelled x = label x
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   say (show Green ++ " " ++ show (Blue 3) ++ " " ++ show [Some Red, None])
   say

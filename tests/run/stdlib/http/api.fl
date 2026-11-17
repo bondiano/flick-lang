@@ -131,7 +131,7 @@ let files =
 find : List User -> String -> Option User
 let find all id = List.find (fun u -> u.id == id) all
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let store = Ref.make [{ id = "1"; name = "Ada" }]
   let handlers : { users : Handlers none } = {

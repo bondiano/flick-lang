@@ -3,7 +3,7 @@
 // never sees the middle of a transfer; a modify that dies changes nothing.
 module App.Main exposing (main)
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 /// `count` tickets from `cell`, stepping aside after each.
@@ -22,7 +22,7 @@ let rec ascending tickets =
   | [a, b, ...rest] -> a < b && ascending ([b] ++ rest)
   | _ -> true
 
-tickets : Unit ->{Async} Unit
+tickets : Unit ->{Host.Console, Async} Unit
 let tickets () =
   let cell = Ref.make 0
   let all = parallel_all 8 (List.repeat 8 (task { take cell 25 [] }))
@@ -32,7 +32,7 @@ let tickets () =
   say ("next ticket: " ++ show (Ref.modify cell (fun n -> (n, n + 1))))
 
 /// Moves from one field to the other while a reader sums them.
-transfers : Unit ->{Async} Unit
+transfers : Unit ->{Host.Console, Async} Unit
 let transfers () =
   let cell = Ref.make (100, 0)
   let move = task {
@@ -62,14 +62,14 @@ let rec reads_constant cell count =
     Effect.yield_now ()
     a + b == 100 && reads_constant cell (count - 1)
 
-dying : Unit ->{Async} Unit
+dying : Unit ->{Host.Console, Async} Unit
 let dying () =
   let cell = Ref.make 7
   let ex : Exit none Int = Effect.exit (task { Ref.modify cell (fun _ -> todo) })
   say ("the modify died: " ++ show (Exit.has_dies ex))
   say ("the cell is unchanged: " ++ show (Ref.get cell))
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   tickets ()
   transfers ()

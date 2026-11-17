@@ -27,7 +27,7 @@ server fn twice word = word ++ word
 page : ServerRequest ->{Server.Server} ServerResponse
 let page _ = Http.ServerResponse.text "page" Http.ServerResponse.defaults
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let layers =
     Layer.merge

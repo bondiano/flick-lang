@@ -23,7 +23,7 @@ service Render =
 
 type error Oops = Oops String
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 /// An error arm and an operation arm in one handler; `return` doubles the
@@ -52,7 +52,7 @@ let strict () =
   | Ask.ask _ -> Fail.fail (Oops "in the arm")
 
 /// An `abort` leaves the scope, which closes first.
-leaving : Unit ->{} String
+leaving : Unit ->{Host.Console} String
 let leaving () =
   try
     scope {
@@ -71,7 +71,7 @@ let render_impl = {
   pair = fun x y -> show x ++ "/" ++ show y
 }
 
-logged : Unit ->{} Unit
+logged : Unit ->{Host.Console} Unit
 let logged () =
   try
     Log.log 1
@@ -79,7 +79,7 @@ let logged () =
   with
   | Log.log x -> say ("log " ++ show x)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   say (show (both (fun () -> Ask.ask 4)))
   say (show (both (fun () -> Fail.fail (Oops "x"))))

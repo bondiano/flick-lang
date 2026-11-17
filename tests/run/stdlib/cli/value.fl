@@ -28,7 +28,7 @@ let port parsed =
   | Ok p -> "ok " ++ show (Port.value p)
   | Err why -> "error " ++ why
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (shown (Cli.parse "green-light" : Result String Color))
   Platform.stdout_line (shown (Cli.parse "blue" : Result String Color))

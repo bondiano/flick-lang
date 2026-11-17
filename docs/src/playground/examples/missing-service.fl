@@ -9,7 +9,7 @@ let report name =
   Log.info "reporting \{name}"
   "done"
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let quiet = Layer.succeed Log { info = fun _ -> () }
   Platform.stdout_line (provide quiet { report "ada" })

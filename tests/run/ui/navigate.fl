@@ -94,11 +94,11 @@ let view =
       footer { class_name = "footer" } (classed "error-messages" (list (item (text "ok"))))
   })
 
-report : Failure e ->{} Unit
+report : Failure e ->{Host.Console} Unit
 let report failure =
   Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   Platform.stdout_line (Ui.Server.to_html (Ui.render view ()))
   open "http://localhost/"

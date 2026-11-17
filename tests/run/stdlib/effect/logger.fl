@@ -1,6 +1,6 @@
 // `Logger`: the `Log` service through its loggers, custom and
 // built-in formats, batches and a log file. Loggers whose lines carry the
-// time write to a console on stderr.
+// time write to stderr, with `Logger.with_log_to_stderr`.
 module App.Main exposing (main)
 
 ms : Float -> Duration.Duration
@@ -19,7 +19,7 @@ let logged loggers body = provide (Layer.merge loggers Logger.effect_log) { body
 contains : String -> String -> Bool
 let contains part whole = String.contains part whole
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   logged (Logger.layer replace [Logger.with_console_log simple]) (fun () ->
     Log.info "hello"
@@ -60,8 +60,8 @@ let main () =
   logged (Logger.batched keep replace structured) (fun () -> Log.info "formatted")
   Platform.stdout_line ("formats " ++ show (Ref.get formats))
   let pretty_date = Some (fun _ -> "DATE")
-  Console.with_console
-    (Console.to_stderr ())
+  Logger.with_log_to_stderr
+    true
     (task {
       logged
         (Logger.layer replace [

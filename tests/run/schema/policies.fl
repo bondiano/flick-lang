@@ -47,7 +47,7 @@ base : String
 let base =
   "\"required\": \"r\", \"nullable\": null, \"nullish\": null, \"tagged\": {\"_tag\": \"None\"}"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let calls = Ref.make 0
   let wire = row_json calls
