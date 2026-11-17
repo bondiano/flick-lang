@@ -337,6 +337,7 @@ fn space((a, a_parent): (K, K), (b, b_parent): (K, K)) -> bool {
         (K::LBrace, _) => !tight_braces(a_parent),
         (_, K::RBrace) => !tight_braces(b_parent),
         (K::Minus, _) => !matches!(a_parent, K::PrefixExpr | K::LitPat | K::RowOmit),
+        (K::Tilde, _) => false,
         (K::Con, K::LParen) => !matches!(
             b_parent,
             K::ExposeItem

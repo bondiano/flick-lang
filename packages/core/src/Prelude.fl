@@ -308,12 +308,12 @@ foreign effect race_first from "flick:rt" "raceFirst"
   retention call
 
 /// Fails with `TimeoutError` when `millis` pass before the task ends.
-timeout : Detached r => Float -> (Eff r e a)^c ->{r; TimeoutError | e} a
+timeout : Detached r => Float -> ~(Eff r e a)^c ->{r; TimeoutError | e} a
 foreign effect timeout from "flick:rt" "timeout"
   retention call
 
 /// `None` when `millis` pass before the task ends; other failures stay.
-timeout_option : Detached r => Float -> (Eff r e a)^c ->{r; e} Option a
+timeout_option : Detached r => Float -> ~(Eff r e a)^c ->{r; e} Option a
 foreign effect timeout_option from "flick:rt" "timeoutOption"
   retention call
 

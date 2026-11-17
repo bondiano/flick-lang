@@ -269,3 +269,4 @@ ui/sync_data # no native for `layer` (flick:reactivity/Atom atomLayer)
 ui/sync_for # a `for` or a `Seq` has no λFlick form
 ui/wake_chain # no native for `click` (./dom.mjs click)
 runtime/lazy_shared # no native for `parallel` (flick:rt parallel)
+runtime/suspended_std # no native for `or_die` (flick:Effect orDie)

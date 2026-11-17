@@ -81,6 +81,10 @@ pub struct Typing {
     pub questions: HashMap<Range, super::Question>,
     /// `await`s of a `Lazy`, which force it rather than run a task.
     pub forced: HashSet<Range>,
+    /// The parameters each top-level signature marks `~`, by position.
+    pub suspended: BTreeMap<String, Vec<usize>>,
+    /// Arguments passed unstarted to a parameter marked `~`: the task of each.
+    pub suspends: HashSet<Range>,
     /// Lazy `for`s whose body makes Sync calls: each step runs with the
     /// services of the stage that built the sequence.
     pub sync_generators: HashSet<Range>,

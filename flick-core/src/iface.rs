@@ -17,7 +17,7 @@ pub use template::{
 };
 
 /// Bumped for schema changes or incompatible embedded-IR execution contracts.
-pub const IFACE_VERSION: u32 = 26;
+pub const IFACE_VERSION: u32 = 27;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -150,6 +150,10 @@ pub struct Interface {
     /// declarations made from the interface alone (`.d.ts`) carry it too.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub docs: BTreeMap<String, String>,
+    /// The parameters each value's signature marks `~`, by position: an
+    /// argument there that is a runtime call is passed unstarted.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub suspended: BTreeMap<String, Vec<usize>>,
     /// The instances of the module and of every module it depends on: an
     /// importer sees them all, whatever it imports by name.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

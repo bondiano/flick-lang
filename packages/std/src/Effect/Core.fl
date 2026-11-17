@@ -23,7 +23,7 @@ foreign effect sleep from "flick:Effect" "sleep"
 /// Runs `task` again after each typed failure, as long as the schedule,
 /// which gets the error, recurs; then fails with the last error. A defect
 /// or an interruption is never retried.
-retry : Schedule.Schedule r2 e2 (Errors e) o -> (Eff r e a)^c ->{Async | r + r2; e + e2} a
+retry : Schedule.Schedule r2 e2 (Errors e) o -> ~(Eff r e a)^c ->{Async | r + r2; e + e2} a
 foreign effect retry from "flick:Effect" "retry"
   arity 1
   retention call
@@ -33,7 +33,7 @@ foreign effect retry from "flick:Effect" "retry"
 retry_or_else :
   Schedule.Schedule r2 e2 (Errors e) o ->
   (Errors e -> o ->{r3; e3} a) ->
-  (Eff r e a)^c ->{Async | r + r2 + r3; e2 + e3}
+  ~(Eff r e a)^c ->{Async | r + r2 + r3; e2 + e3}
   a
 foreign effect retry_or_else from "flick:Effect" "retryOrElse"
   arity 2
@@ -42,7 +42,7 @@ foreign effect retry_or_else from "flick:Effect" "retryOrElse"
 /// Runs `task`, then again as long as the schedule, which gets each
 /// result, recurs; the schedule's last output. The first typed failure
 /// stops it.
-repeat : Schedule.Schedule r2 e2 a o -> (Eff r e a)^c ->{Async | r + r2; e + e2} o
+repeat : Schedule.Schedule r2 e2 a o -> ~(Eff r e a)^c ->{Async | r + r2; e + e2} o
 foreign effect repeat from "flick:Effect" "repeat"
   arity 1
   retention call
@@ -52,7 +52,7 @@ foreign effect repeat from "flick:Effect" "repeat"
 repeat_or_else :
   Schedule.Schedule r2 e2 a o ->
   (Errors (e + e2) -> Option (Schedule.Metadata o a) ->{r3; e3} o) ->
-  (Eff r e a)^c ->{Async | r + r2 + r3; e3}
+  ~(Eff r e a)^c ->{Async | r + r2 + r3; e3}
   o
 foreign effect repeat_or_else from "flick:Effect" "repeatOrElse"
   arity 2
@@ -98,7 +98,7 @@ foreign effect yield_now_with from "flick:Effect" "yieldNowWith"
 
 /// How `task` ends, its typed failure, defect or interruption included;
 /// never fails itself.
-exit : (Eff r e a)^c ->{r} Exit e a
+exit : ~(Eff r e a)^c ->{r} Exit e a
 foreign effect exit from "flick:Effect" "flickExit"
   retention call
 
@@ -115,7 +115,7 @@ foreign effect zip_with from "flick:Effect" "zipWith"
   retention call
 
 /// Runs `task` after the duration.
-delay : Duration.Duration -> (Eff r e a)^c ->{r; e} a
+delay : Duration.Duration -> ~(Eff r e a)^c ->{r; e} a
 foreign effect delay from "flick:Effect" "delay"
   arity 1
   retention call
@@ -127,13 +127,13 @@ foreign effect timed from "flick:Effect" "timed"
 
 /// Runs `fallback` instead when `task` does not end within the duration;
 /// `task` is interrupted.
-timeout_or_else : Duration.Duration -> (Eff r2 e2 a)^c -> (Eff r e a)^c ->{r + r2; e + e2} a
+timeout_or_else : Duration.Duration -> ~(Eff r2 e2 a)^c -> ~(Eff r e a)^c ->{r + r2; e + e2} a
 foreign effect timeout_or_else from "flick:Effect" "flickTimeoutOrElse"
   arity 2
   retention call
 
 /// Runs `task` again and again until it fails.
-forever : (Eff r e a)^c ->{r; e} b
+forever : ~(Eff r e a)^c ->{r; e} b
 foreign effect forever from "flick:Effect" "forever"
   retention call
 

@@ -379,7 +379,7 @@ rec {
 ```text
 type        = "forall" name { name } "." type
             | union "=>" type                  // constraint(s): `Show a =>`, `(Show a, Eq a) =>`
-            | union ["->" [effects] type]      // right associative
+            | ["~"] union ["->" [effects] type] // right associative; `~` marks a suspended parameter
 effects     = "{" [row] [";" [row]] "}"     // written `->{` with no space
 row         = union { "," union } ["|" union]  // `none`, `r`, `Users, Log | r`
 union       = app { "+" app }                  // row or capture union

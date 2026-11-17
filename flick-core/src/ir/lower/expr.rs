@@ -398,7 +398,7 @@ impl Lower<'_> {
             let key = (start, arg.range().1);
             let span = Span::new(self.file, key.0, key.1);
             func = self.ui_callable(func, key);
-            let arg = self.expr(arg);
+            let arg = self.argument(arg);
             let app = ExprKind::App {
                 func: Box::new(func),
                 arg: Box::new(arg),
