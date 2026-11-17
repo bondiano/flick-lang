@@ -106,7 +106,10 @@ theorem RHead.caught {Λ : List Rgn} {μ : List Tm} {r Λ' μ' r'} {n : Nat} {H 
   have fresh : ¬ H Λ.length := fun h' => Nat.lt_irrefl _ (hH _ h')
   cases hh with
   | refMake hv => exact keep (Tm.Caught.noIns (by simp [Tm.NoIns, Tm.Has])) (.refl _)
-  | refGet hl => exact keep (Tm.Caught.noIns (hμ _ _ hl)) (.refl _)
+  | refGet hl _ => exact keep (Tm.Caught.noIns (hμ _ _ hl)) (.refl _)
+  | refGetCell | forceRunning | lazy => exact keep trivial (.refl _)
+  | forcePending hl | forceDone hl => exact keep (Tm.Caught.noIns fun hi => hμ _ _ hl hi) (.refl _)
+  | settleVal | settleRaise | settleUnw => exact keep h (.refl _)
   | refSet => exact keep (Tm.Caught.noIns (by simp [Tm.NoIns, Tm.Has])) (.refl _)
   | await => exact keep h (.refl _)
   | scopeRun hv =>

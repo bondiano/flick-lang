@@ -23,7 +23,8 @@ def Tm.Caught : Tm → (Nat → Prop) → Prop
   | .var _, _ | .lit _, _ | .loc _, _ | .const _, _ | .ctor _, _ | .rnil, _ | .anil, _
   | .todo, _ | .cap _, _ | .own _, _ | .glob _, _ | .kont _ _, _ | .hole _, _ => True
   | .lam b, H | .fix b, H | .proj b _, H | .task b, H | .await b, H | .raise b, H
-  | .scope b, H | .drec _ b, H | .hdone _ b, H => b.Caught H
+  | .scope b, H | .drec _ b, H | .hdone _ b, H | .lazy b, H | .force b, H
+  | .settle _ b, H => b.Caught H
   | .app a b, H | .let_ a b, H | .letrec a b, H | .rcons _ a b, H | .update a _ b, H
   | .match_ a b, H | .acons _ a b, H | .try_ a b, H | .handle a b, H
   | .hres _ _ a b, H => a.Caught H ∧ b.Caught H
@@ -41,7 +42,7 @@ def Tm.Caught : Tm → (Nat → Prop) → Prop
 def Frame.Caught (H : Nat → Prop) : Frame → Prop
   | .appL a | .appR a | .let_ a | .match_ a | .rconsL _ a | .rconsR _ a | .updL _ a | .updR a _
   | .try_ a | .hresB _ _ a => a.Caught hs cell H
-  | .proj _ | .await | .raise | .hdone _ => True
+  | .proj _ | .await | .raise | .hdone _ | .force | .settle _ => True
   | .inside p => ¬ H p
   | .hwith p ℓ _ al r => hs p = H ∧ cell p = ℓ ∧ al.Caught hs cell H ∧ r.Caught hs cell H
   | .hctlA p ℓ _ _ _ al r k => hs p = H ∧ cell p = ℓ ∧ al.Caught hs cell H ∧ r.Caught hs cell H ∧

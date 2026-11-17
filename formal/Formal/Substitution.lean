@@ -106,6 +106,12 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro _ _ hσ
     exact .task (ih hσ) hψ (SubOk.noIns (e := .task _) hσ he.frees hne) hT
   | await _ hφ hT ih => intro _ _ hσ; exact .await (ih hσ) hφ hT
+  | lazy he hψ hne hφ ih =>
+    intro _ _ hσ
+    exact .lazy (ih hσ) hψ (SubOk.noIns (e := .lazy _) hσ he.frees hne) hφ
+  | force _ hφ hT ih => intro _ _ hσ; exact .force (ih hσ) hφ hT
+  | lazyLoc hl => intro _ _ _; exact .lazyLoc hl
+  | settle hl _ hψ hφ hT ih => intro _ _ hσ; exact .settle hl (ih hσ) hψ hφ hT
   | raise _ hφ ih => intro _ _ hσ; exact .raise (ih hσ) hφ
   | raiseAdt _ hU hφ ih => intro _ _ hσ; exact .raiseAdt (ih hσ) hU hφ
   | errVal hv _ hU hE ih => intro _ _ hσ; exact .errVal hv.subst (ih hσ) hU hE

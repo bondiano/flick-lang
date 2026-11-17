@@ -1,4 +1,4 @@
-import Formal.Rules
+import Formal.StoreTy
 import Formal.EvalCtx
 
 /-!
@@ -65,6 +65,32 @@ inductive PHead : Tm → Tm → Prop
 /-- `Λ[π] := g`. -/
 def setRgn (Λ : List Rgn) (p : Nat) (g : Rgn) : List Rgn := Λ.set p g
 
+/-- `μ` with the lazy cell `ℓ` settled to the outcome `o`, if it is running: a settled cell
+stays settled (L2), also in a configuration no program reaches. -/
+noncomputable def settleCell (μ : List Tm) (l : Nat) (o : Tm) : List Tm :=
+  open Classical in if μ[l]? = some .running then μ.set l (.done o) else μ
+
+theorem mem_set_get {μ : List Tm} {l i : Nat} {v w : Tm} (h : (μ.set l v)[i]? = some w) :
+    μ[i]? = some w ∨ (i = l ∧ w = v) := by
+  rw [List.getElem?_set] at h
+  split at h
+  · subst_vars
+    split at h
+    · cases h; exact .inr ⟨rfl, rfl⟩
+    · cases h
+  · exact .inl h
+
+theorem settleCell_get {μ : List Tm} {l i : Nat} {o w : Tm} (h : (settleCell μ l o)[i]? = some w) :
+    μ[i]? = some w ∨ (i = l ∧ w = .done o) := by
+  unfold settleCell at h
+  split at h
+  · exact mem_set_get h
+  · exact .inl h
+
+@[simp] theorem settleCell_length (μ : List Tm) (l : Nat) (o : Tm) :
+    (settleCell μ l o).length = μ.length := by
+  unfold settleCell; split <;> simp
+
 /-- Runtime steps of core.md §3.4–3.5 and regions.md §3.2–§3.3 at the redex,
 except operations and the propagation of `raise`, which need the context. An
 acquisition registers the use that releases it as a finalizer. A finalizer runs
@@ -72,10 +98,26 @@ as a child once the body is finished and the earlier children are, the last one
 first; the region closes when none is left. -/
 inductive RHead : List Rgn → List Tm → Tm → List Rgn → List Tm → Tm → Prop
   | refMake : Value v → RHead Λ μ (.app (.const .refMake) v) Λ (μ ++ [v]) (.loc μ.length)
-  | refGet : μ[l]? = some v → RHead Λ μ (.app (.const .refGet) (.loc l)) Λ μ v
+  | refGet : μ[l]? = some v → ¬ v.IsCell → RHead Λ μ (.app (.const .refGet) (.loc l)) Λ μ v
+  /-- Reading a lazy cell as a `Ref` is a defect. -/
+  | refGetCell : μ[l]? = some c → c.IsCell → RHead Λ μ (.app (.const .refGet) (.loc l)) Λ μ .todo
   | refSet : Value v → l < μ.length →
       RHead Λ μ (.app (.app (.const .refSet) (.loc l)) v) Λ (μ.set l v) (.lit .unit)
   | await : RHead Λ μ (.await (.task e)) Λ μ e
+  /-- A lazy cell (lazy.md §3): `lazy e` allocates it `Pending e`; the first force runs `e` in
+  the frame `settle ℓ`, which records its outcome; a force after it gives the outcome. A force
+  of any other cell is a defect: of a running one, by its own initializer, or of one that
+  holds no lazy. A raised error and a signal leave the frame by steps of their own; a defect
+  ends the thread (`Step.todo`). -/
+  | lazy : RHead Λ μ (.lazy e) Λ (μ ++ [.lazy e]) (.loc μ.length)
+  | forcePending : μ[l]? = some (.lazy e) →
+      RHead Λ μ (.force (.loc l)) Λ (μ.set l .running) (.settle l e)
+  | forceDone : μ[l]? = some (.done o) → RHead Λ μ (.force (.loc l)) Λ μ o
+  | forceRunning : μ[l]? = some c → (∀ e, c ≠ .lazy e) → (∀ o, c ≠ .done o) →
+      RHead Λ μ (.force (.loc l)) Λ μ .todo
+  | settleVal : Value v → RHead Λ μ (.settle l v) Λ (settleCell μ l v) v
+  | settleRaise : Value v → RHead Λ μ (.settle l (.raise v)) Λ (settleCell μ l (.raise v)) (.raise v)
+  | settleUnw : RHead Λ μ (.settle l (.unw p ℓ a)) Λ μ (.unw p ℓ a)
   | tryRaise : Value v → RHead Λ μ (.try_ (.raise v) A) Λ μ (.handle v A)
   | handleYes : Value v → matchP p v = some δ →
       RHead Λ μ (.handle v (.acons p b r)) Λ μ (b.subst (inst δ))

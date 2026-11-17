@@ -122,6 +122,10 @@ theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Ent
   | todo => intro _ _; exact .todo
   | task _ hψ hn hT ih => intro _ hΘ; exact .task (ih hΘ) hψ hn hT
   | await _ hφ hT ih => intro _ hΘ; exact .await (ih hΘ) hφ hT
+  | lazy _ hψ hn hφ ih => intro _ hΘ; exact .lazy (ih hΘ) hψ hn hφ
+  | force _ hφ hT ih => intro _ hΘ; exact .force (ih hΘ) hφ hT
+  | lazyLoc hl => intro _ _; exact .lazyLoc hl
+  | settle hl _ hψ hφ hT ih => intro _ hΘ; exact .settle hl (ih hΘ) hψ hφ hT
   | raise _ hφ ih => intro _ hΘ; exact .raise (ih hΘ) hφ
   | raiseAdt _ hU hφ ih => intro _ hΘ; exact .raiseAdt (ih hΘ) hU hφ
   | errVal hv _ hU hE ih => intro _ hΘ; exact .errVal hv (ih hΘ) hU hE

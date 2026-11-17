@@ -50,7 +50,8 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
   | lam => intros; exact .inl .lam
   | fix => intros; exact .inl .fix
   | lit => intros; exact .inl .lit
-  | loc => intros; exact .inl .loc
+  | loc | lazyLoc => intros; exact .inl .loc
+  | lazy => intros; exact step (Step.ofR .lazy)
   | const | perform => intros; exact .inl .const
   | kont => intros; exact .inl .kont
   | ctor => intros; exact .inl .ctor
@@ -142,6 +143,24 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
       obtain ⟨_, _, _, rfl, -⟩ := canonical_eff hv he
       exact step (Step.ofR .await)
     · exact .inr (hn.frame' (F := .await) trivial (nt id) (ni id))
+  | force he _ _ ih =>
+    intro hμ hΓ _ _ hJ; cases hJ
+    rcases ih hμ hΓ rfl with hv | hn
+    · subst hΓ
+      obtain ⟨l, _, rfl, hl, -⟩ := canonical_lazy hv he
+      obtain ⟨c, hc⟩ : ∃ c, μ[l]? = some c := ⟨_, List.getElem?_eq_getElem (hμ ▸ getElem?_lt hl)⟩
+      by_cases hp : ∃ e, c = .lazy e
+      · obtain ⟨e, rfl⟩ := hp; exact step (Step.ofR (.forcePending hc))
+      by_cases hd : ∃ o, c = .done o
+      · obtain ⟨o, rfl⟩ := hd; exact step (Step.ofR (.forceDone hc))
+      exact step (Step.ofR (.forceRunning hc (fun e h => hp ⟨e, h⟩) (fun o h => hd ⟨o, h⟩)))
+    · exact .inr (hn.frame' (F := .force) trivial (nt id) (ni id))
+  | settle _ _ hψ hφ _ ih =>
+    intro hμ hΓ _ _ hJ; cases hJ
+    rcases ih hμ hΓ rfl with hv | hn
+    · exact step (Step.ofR (.settleVal hv))
+    exact .inr (hn.frame (F := .settle _) trivial (nt id) (ni id)
+      (fun N h => .inr (Stage.le_svc (Stage.le_trans hψ hφ) (.nm N) h)))
   | raise _ _ ih =>
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih hμ hΓ rfl with hv | hn

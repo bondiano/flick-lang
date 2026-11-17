@@ -137,6 +137,16 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe S J J' �
   | await _ hφ hT ih =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .await (ih (.st h₂)) (Stage.le_trans hφ h₂) (hT.trans h₁)
+  | lazy he hψ hn hφ =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
+    exact .conv (.lazy he hψ hn (Stage.le_trans hφ h₂)) (h₁.eq_plain rfl).symm
+  | force _ hφ hT ih =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
+    exact .force (ih (.st h₂)) (Stage.le_trans hφ h₂) (hT.trans h₁)
+  | lazyLoc hl => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .conv (.lazyLoc hl) (h₁.eq_plain rfl).symm
+  | settle hl he hψ hφ hT =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
+    exact .settle hl he hψ (Stage.le_trans hφ h₂) (hT.trans h₁)
   | raise _ hφ ih =>
     intro _ hJ; obtain ⟨_, _, rfl, _, h₂⟩ := hJ.ex
     exact .raise (ih (.st h₂)) (Stage.le_trans hφ h₂)

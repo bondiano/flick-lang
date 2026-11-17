@@ -98,6 +98,12 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
       Typ Ψ Θ Γ (.task e) (.ex T φ)
   | await : Typ Ψ Θ Γ e (.ex (.eff r ε t C) φ) → (Stage.use (.rt r ε) C).le φ → LeLive S t T →
       Typ Ψ Θ Γ (.await e) (.ex T φ)
+  /-- (T-Lazy) of lazy.md §2: the initializer is typed as the body of a `task`; making the
+  cell is a runtime step, as `Ref.make`. (T-Force): forcing runs it as `await` runs a task. -/
+  | lazy : Typ Ψ Θ Γ e (.ex t ψ) → ψ.le (Stage.use (.rt r ε) C) → e.NoIns →
+      (Stage.rt Row.none Row.none).le φ → Typ Ψ Θ Γ (.lazy e) (.ex (.lazy r ε t C) φ)
+  | force : Typ Ψ Θ Γ e (.ex (.lazy r ε t C) φ) → (Stage.use (.rt r ε) C).le φ → LeLive S t T →
+      Typ Ψ Θ Γ (.force e) (.ex T φ)
   | raise : Typ Ψ Θ Γ e (.ex (.errors ε) φ) → (Stage.rt Row.none ε).le φ →
       Typ Ψ Θ Γ (.raise e) (.ex t φ)
   | raiseAdt : Typ Ψ Θ Γ e (.ex U φ) → U.hd = .adt E → (Stage.rt Row.none (Row.err E U)).le φ →
@@ -232,6 +238,12 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   /-- `resume`: the type of its cell, which holds the handler's region. -/
   | kont : Ψ[ℓ]? = some (.arrow a ψ t C) → C (.r p) → LeLive S (.arrow a ψ t C) T →
       Typ Ψ Θ Γ (.kont p ℓ) (.ex T φ)
+  /-- A lazy cell, of the type `lazyCell` in the store: its location, and its frame while its
+  initializer runs. -/
+  | lazyLoc : Ψ[l]? = some (.lazyCell r ε t C) → Typ Ψ Θ Γ (.loc l) (.ex (.lazy r ε t C) φ)
+  | settle : Ψ[l]? = some (.lazyCell r ε t C) → Typ Ψ Θ Γ e (.ex t ψ) →
+      ψ.le (Stage.use (.rt r ε) C) → (Stage.use (.rt r ε) C).le φ → LeLive S t T →
+      Typ Ψ Θ Γ (.settle l e) (.ex T φ)
   /-- Row equations are type equality even below invariant constructors. -/
   | conv : Typ Ψ Θ Γ e (.ex a φ) → Ty.Equiv a b → Typ Ψ Θ Γ e (.ex b φ)
 
@@ -241,12 +253,6 @@ after it. A scope gives its region facts about everything outside it, which
 exists before the region; with the regions not yet created renamed out, they hold
 of this order (regions.md §3.4). -/
 def Facts.age : Facts := fun C s => ∀ q p, C (.r q) → s.reach (.r p) → q < p
-
-/-- `⊢ μ : Ψ` of core.md §3.6. -/
-def StoreTy (Ψ : List Ty) (μ : List Tm) : Prop :=
-  μ.length = Ψ.length ∧
-    ∀ (i : Nat) v t, μ[i]? = some v → Ψ[i]? = some t →
-      Value v ∧ Typ S Ψ Facts.age [] v (.ex t .pure)
 
 /-- The root environment `Σ₀` of core.md §2.6 and the bodies of the globals of λFlick⁺. -/
 structure Roots where

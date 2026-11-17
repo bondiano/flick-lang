@@ -118,6 +118,11 @@ private theorem Typ.runtimeStage {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | await _ hφ _ =>
     intro _ _ _ _ _ _ _ hJ _; cases hJ
     exact Stage.use_rt_le_ne_pure hφ rfl
+  | force _ hφ _ | settle _ _ _ hφ _ =>
+    intro _ _ _ _ _ _ _ hJ _; cases hJ
+    exact Stage.use_rt_le_ne_pure hφ rfl
+  | lazy _ _ _ hφ =>
+    intro _ _ _ _ _ _ _ hJ _; cases hJ; exact hφ
   | tryP hb _ =>
     intro _ _ _ _ _ _ _ hJ hh; cases hJ
     cases hh with

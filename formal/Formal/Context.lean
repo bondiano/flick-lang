@@ -234,6 +234,25 @@ private theorem Typ.frameCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       cases hterm.symm
       exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun σ _ _ _ h' => .await h' (by simpa only [Stage.use_substT] using Stage.le_substT σ hφ) (hT.substT σ)⟩
     all_goals cases hterm
+  | force h₁ hφ hT =>
+    intro r F t φ hctx hterm hjudge hr hok
+    cases hctx; cases hjudge
+    cases F <;> simp only [Frame.plug] at hterm
+    case force =>
+      cases hterm.symm
+      exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun σ _ _ _ h' => .force h' (by simpa only [Stage.use_substT] using Stage.le_substT σ hφ) (hT.substT σ)⟩
+    all_goals cases hterm
+  | settle hl h₁ hψ hφ hT =>
+    intro r F t φ hctx hterm hjudge hr hok
+    cases hctx; cases hjudge
+    cases F <;> simp only [Frame.plug] at hterm
+    case settle =>
+      cases hterm.symm
+      exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_trans hψ hφ), fun σ _ X _ h' =>
+        .settle (by simpa [Ty.substT] using cell_sx (σ := σ) hl X) h'
+          (by simpa only [Stage.use_substT] using Stage.le_substT σ hψ)
+          (by simpa only [Stage.use_substT] using Stage.le_substT σ hφ) (hT.substT σ)⟩
+    all_goals cases hterm
   | raise h₁ hφ =>
     intro r F t φ hctx hterm hjudge hr hok
     cases hctx; cases hjudge

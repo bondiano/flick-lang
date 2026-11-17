@@ -33,6 +33,8 @@ def Tm.rename (ξ : Nat → Nat) : Tm → Tm
   | .todo => .todo
   | .task e => .task (e.rename ξ)
   | .await e => .await (e.rename ξ)
+  | .lazy e => .lazy (e.rename ξ)
+  | .force e => .force (e.rename ξ)
   | .raise e => .raise (e.rename ξ)
   | .try_ e al => .try_ (e.rename ξ) (al.rename ξ)
   | .handle v al => .handle (v.rename ξ) (al.rename ξ)
@@ -52,6 +54,7 @@ def Tm.rename (ξ : Nat → Nat) : Tm → Tm
   | .hole p => .hole p
   | .hkeep q ℓ E al e => .hkeep q ℓ E (al.rename ξ) (e.rename ξ)
   | .hkarm q ℓ E al a k => .hkarm q ℓ E (al.rename ξ) (a.rename ξ) (k.rename ξ)
+  | .settle ℓ e => .settle ℓ (e.rename ξ)
 
 /-- Lift a substitution under `n` binders. -/
 def liftS (n : Nat) (σ : Nat → Tm) (i : Nat) : Tm :=
@@ -80,6 +83,8 @@ def Tm.subst (σ : Nat → Tm) : Tm → Tm
   | .todo => .todo
   | .task e => .task (e.subst σ)
   | .await e => .await (e.subst σ)
+  | .lazy e => .lazy (e.subst σ)
+  | .force e => .force (e.subst σ)
   | .raise e => .raise (e.subst σ)
   | .try_ e al => .try_ (e.subst σ) (al.subst σ)
   | .handle v al => .handle (v.subst σ) (al.subst σ)
@@ -99,6 +104,7 @@ def Tm.subst (σ : Nat → Tm) : Tm → Tm
   | .hole p => .hole p
   | .hkeep q ℓ E al e => .hkeep q ℓ E (al.subst σ) (e.subst σ)
   | .hkarm q ℓ E al a k => .hkarm q ℓ E (al.subst σ) (a.subst σ) (k.subst σ)
+  | .settle ℓ e => .settle ℓ (e.subst σ)
 
 /-- The constructor a pattern starts with: the operation of an arm of a handler. -/
 def Pat.headName : Pat → Option Name

@@ -186,6 +186,9 @@ theorem trDt_noIns {δ : Nat → Nat} {d : Dict} : (trDt N δ d).NoIns := by
 theorem trDt_noAlts {δ : Nat → Nat} {d : Dict} : ¬ IsAlts (trDt N δ d) := by
   cases d <;> simp [trDt, IsAlts]
 
+theorem trDt_noCell {δ : Nat → Nat} {d : Dict} : ¬ (trDt N δ d).IsCell := by
+  cases d <;> simp [trDt, Flick.Tm.IsCell]
+
 theorem trDt_closed {d : Dict} (hd : d.NoVar) (δ : Nat → Nat) : (trDt N δ d).Closed := by
   induction d with
   | var k => exact (hd k rfl).elim
@@ -235,7 +238,8 @@ theorem dsim_cg (hR : Real P Sg N) (hRun : RealRun P N root) {d d' : Dict} (h : 
   | base hd hd' heq =>
     intro Δ T ht δ
     rw [trDt_noVar hd, trDt_noVar hd']
-    exact .base ⟨(trDt_shape id _).1, trDt_closed hd' id, ⟨trDt_noIns, trDt_noIns, trDt_noAlts⟩,
+    exact .base ⟨(trDt_shape id _).1, trDt_closed hd' id,
+      ⟨trDt_noIns, trDt_noIns, trDt_noAlts, trDt_noCell⟩,
       eqv_sem hRun heq,
       Facts.none, _, DTyp.core hR (ht.strengthen hd)⟩
 

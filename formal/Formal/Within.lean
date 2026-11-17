@@ -54,6 +54,8 @@ def Tm.Within : Tm → (Nat → Prop) → Prop
   | .todo, _ => True
   | .task e, A => e.Within A ∧ e.NoIns
   | .await e, A => e.Within A
+  | .lazy e, A => e.Within A ∧ e.NoIns
+  | .force e, A => e.Within A
   | .raise e, A => e.Within A
   | .try_ e al, A => e.Within A ∧ al.Within A ∧ al.NoIns
   | .handle v al, A => v.Within A ∧ al.Within A ∧ v.NoIns ∧ al.NoIns
@@ -83,6 +85,7 @@ def Tm.Within : Tm → (Nat → Prop) → Prop
     (∀ x, anc q x → A x) ∧ HCell Ψ q ℓ ∧ HLocs Ψ q al
   | .hkarm q ℓ _ al a k, A => A q ∧ al.Within (anc q) ∧ a.Within A ∧ k.Within A ∧ al.NoIns ∧
     (∀ x, a.Has (.frame x) → ¬ k.Has (.frame x)) ∧ (∀ x, anc q x → A x) ∧ HCell Ψ q ℓ ∧ HLocs Ψ q al
+  | .settle _ e, A => e.Within A
 
 /-- The frames of a context at a place with the regions `A`: what the frame
 holds besides the hole is there, and does not evaluate before the hole. -/
@@ -96,7 +99,7 @@ def Frame.Within (A : Nat → Prop) : Frame → Prop
   | .proj _ => True
   | .updL _ e' => e'.Within Ψ B anc A ∧ e'.NoIns
   | .updR v _ => v.Within Ψ B anc A ∧ Value v
-  | .await => True
+  | .await | .force | .settle _ => True
   | .try_ al => al.Within Ψ B anc A ∧ al.NoIns
   | .raise => True
   | .inside p => ¬ A p ∧ anc p = fun x => A x ∨ x = p

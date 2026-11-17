@@ -55,7 +55,7 @@ theorem Tm.rename_fix :
   | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ =>
     intro ξ h; simp only [Tm.rename]
     rw [ih₁ ξ fun i hi => h i (.inl hi), ih₂ ξ fun i hi => h i (.inr hi)]
-  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | inside _ _ ih
+  | proj _ _ ih | task _ ih | await _ ih | lazy _ ih | force _ ih | raise _ ih | inside _ _ ih
   | drec _ _ ih => intro ξ h; simp only [Tm.rename]; rw [ih ξ h]
   | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ _ ih₁ ih₂ ih₃ | hkarm _ _ _ _ _ _ ih₁ ih₂ ih₃ =>
     intro ξ h; simp only [Tm.rename]
@@ -66,7 +66,7 @@ theorem Tm.rename_fix :
   | hres _ _ _ _ ih₁ ih₂ | hkeep _ _ _ _ _ ih₁ ih₂ =>
     intro ξ h; simp only [Tm.rename]
     rw [ih₁ ξ fun i hi => h i (.inl hi), ih₂ ξ fun i hi => h i (.inr hi)]
-  | hdone _ _ ih₁ | unw _ _ _ ih₁ =>
+  | hdone _ _ ih₁ | unw _ _ _ ih₁ | settle _ _ ih₁ =>
     intro ξ h; simp only [Tm.rename]
     rw [ih₁ ξ fun i hi => h i hi]
   | _ => intro ξ _; rfl
@@ -100,7 +100,7 @@ theorem Tm.subst_fix :
   | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ =>
     intro σ h; simp only [Tm.subst]
     rw [ih₁ σ fun i hi => h i (.inl hi), ih₂ σ fun i hi => h i (.inr hi)]
-  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | inside _ _ ih
+  | proj _ _ ih | task _ ih | await _ ih | lazy _ ih | force _ ih | raise _ ih | inside _ _ ih
   | drec _ _ ih => intro σ h; simp only [Tm.subst]; rw [ih σ h]
   | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ _ ih₁ ih₂ ih₃ | hkarm _ _ _ _ _ _ ih₁ ih₂ ih₃ =>
     intro σ h; simp only [Tm.subst]
@@ -111,7 +111,7 @@ theorem Tm.subst_fix :
   | hres _ _ _ _ ih₁ ih₂ | hkeep _ _ _ _ _ ih₁ ih₂ =>
     intro σ h; simp only [Tm.subst]
     rw [ih₁ σ fun i hi => h i (.inl hi), ih₂ σ fun i hi => h i (.inr hi)]
-  | hdone _ _ ih₁ | unw _ _ _ ih₁ =>
+  | hdone _ _ ih₁ | unw _ _ _ ih₁ | settle _ _ ih₁ =>
     intro σ h; simp only [Tm.subst]
     rw [ih₁ σ fun i hi => h i hi]
   | _ => intro σ _; rfl

@@ -32,6 +32,8 @@ def Tm.Asc : Tm → Nat → Prop
   | .todo, _ => True
   | .task e, _ => e.NoIns
   | .await e, n => e.Asc n
+  | .lazy e, _ => e.NoIns
+  | .force e, n => e.Asc n
   | .raise e, n => e.Asc n
   | .try_ e al, n => e.Asc n ∧ al.NoIns
   | .handle v al, _ => v.NoIns ∧ al.NoIns
@@ -52,6 +54,7 @@ def Tm.Asc : Tm → Nat → Prop
   | .hole _, _ => True
   | .hkeep q _ _ al e, n => al.NoIns ∧ e.Asc (max n (q + 1)) ∧ n ≤ q
   | .hkarm q _ _ al a k, n => al.NoIns ∧ a.Asc (max n (q + 1)) ∧ k.Asc (max n (q + 1)) ∧ n ≤ q
+  | .settle _ e, n => e.Asc n
 
 theorem Tm.Asc.of_noIns : ∀ {e : Tm} {n : Nat}, e.NoIns → e.Asc n := by
   intro e

@@ -251,7 +251,7 @@ theorem Typ.noIns {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → e.NoIns 
       rintro (h | h)
       · exact h
       · exact ih₂ hve h
-  | lit | loc | const | ctor | rnil | cap | own | dnil | perform => intro _ h; cases h
+  | lit | loc | lazyLoc | const | ctor | rnil | cap | own | dnil | perform => intro _ h; cases h
   | kont => intro _ h; simp [Tm.Has] at h
   | drec _ _ _ hn => intro _; exact hn
   | dcons _ _ ih₁ ih₂ =>

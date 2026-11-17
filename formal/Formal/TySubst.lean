@@ -88,6 +88,18 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       (hT.substT σ)
   | await _ hφ hT ih =>
     intro σ hσ; exact .await (ih σ hσ) (by simpa only [Stage.use_substT] using Stage.le_substT σ hφ) (hT.substT σ)
+  | lazy _ hψ hn hφ ih =>
+    intro σ hσ
+    exact .lazy (ih σ hσ) (by simpa only [Stage.use_substT] using Stage.le_substT σ hψ) hn
+      (by simpa [Stage.substT] using Stage.le_substT σ hφ)
+  | force _ hφ hT ih =>
+    intro σ hσ; exact .force (ih σ hσ) (by simpa only [Stage.use_substT] using Stage.le_substT σ hφ) (hT.substT σ)
+  | lazyLoc hl => intro σ _; exact .lazyLoc (by rw [List.getElem?_map, hl]; rfl)
+  | settle hl _ hψ hφ hT ih =>
+    intro σ hσ
+    exact .settle (by rw [List.getElem?_map, hl]; rfl) (ih σ hσ)
+      (by simpa only [Stage.use_substT] using Stage.le_substT σ hψ)
+      (by simpa only [Stage.use_substT] using Stage.le_substT σ hφ) (hT.substT σ)
   | raise _ hφ ih =>
     intro σ hσ; exact .raise (ih σ hσ) (by simpa [Stage.substT] using Stage.le_substT σ hφ)
   | raiseAdt _ hU hφ ih =>
