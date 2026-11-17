@@ -546,6 +546,21 @@ and a method an instance takes from a default of its class. This holds in
 both profiles; in release a default may first become the instance's own
 method (devirtualization above), and is then called directly too.
 
+A `match` is compiled through a decision graph
+(`flick-backend-support/src/decision.rs`). Each test the arms make of the
+scrutinee, a constructor's tag, a literal or a list's length, is made once
+for every arm that needs it, so arms of one constructor with different
+nested patterns share its test. Tests only read the scrutinee, evaluated
+once, and its parts. Arms are still tried in the order written: a guard
+runs only when its arm's pattern matched and every arm before it failed,
+at most once, and a guard that fails goes on to the arms after its own,
+never to another alternative of its or-pattern. Names are bound before
+the guard, to the parts the first alternative that matches gives. An arm
+the graph reaches from several branches has its body written once: each
+branch assigns the arm's names, declared before the tests, and goes to the
+body with `goto`. A match whose graph would have more than 32 nodes plus
+16 per arm is compiled arm by arm instead.
+
 Every generated Flick function takes its execution fiber, `*flickrt.Fiber`,
 first, including pure functions and callbacks. A saved function uses the fiber
 of its invocation, not its creation, so URL rendering observes the current

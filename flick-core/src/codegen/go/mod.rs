@@ -13,6 +13,7 @@
 mod arith;
 mod call;
 mod closures;
+mod decide;
 mod direct;
 mod effects;
 mod expr;
@@ -510,6 +511,8 @@ impl<'a> Gen<'a> {
 
 #[cfg(test)]
 mod compose_tests;
+#[cfg(test)]
+mod decide_tests;
 #[cfg(test)]
 mod direct_tests;
 #[cfg(test)]

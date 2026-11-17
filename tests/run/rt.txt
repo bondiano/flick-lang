@@ -75,6 +75,7 @@ codegen/loops
 codegen/lift
 codegen/literals
 codegen/local_functions
+codegen/match_graph
 codegen/numbers
 codegen/numeric_classes
 codegen/patterns
@@ -94,7 +95,6 @@ codegen/stage_order
 codegen/strings_utf16
 codegen/tags
 codegen/task_twice
-codegen/unpack_dictionary
 ffi/catch_order
 ffi/copy
 ffi/defect
