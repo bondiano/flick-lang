@@ -3,9 +3,10 @@ title: "Standard library"
 ---
 
 The standard library is Flick code over the runtime adapter (see [Higher-order functions and collection traversal](../../spec/04-higher-order/), [Schema and standard data types](../../spec/07-schema/), [Compiler CLI](../cli/)).
-Its modules are built into the compiler: a program names them qualified
-without an import (`List.map`, `Ref.make`), or imports names from them like
-from any module (`import File exposing (FileSystem, OpenError)`). The
+Its modules are organized across eight implicit packages (`std`, `stream`,
+`process`, `ui`, `http`, `rpc`, `observability`, `cli`): a program names them
+qualified without an import (`List.map`, `Ref.make`), or imports names from them
+like from any module (`import File exposing (FileSystem, OpenError)`). The
 Prelude is seen by every module without qualification. A service or type of
 a program shadows a built-in module of the same name for its operations:
 with `service Log` declared, `Log.write` is the operation.
