@@ -34,7 +34,7 @@ pub use checking::ModuleCache;
 pub(crate) use checking::check_file;
 #[cfg(feature = "native-project")]
 pub use checking::{ModuleStore, SavedModule};
-pub use entry::{MainKind, main_kind};
+pub use entry::{MainKind, host_services, main_kind};
 pub use format_plugins::FormatPlugins;
 #[cfg(feature = "ide")]
 pub use ide::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_rt, analyze_with};

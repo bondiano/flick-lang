@@ -139,7 +139,7 @@ impl Lower<'_> {
                         })
                 })
         } else {
-            !adapter.copies.result
+            (!adapter.copies.result || fresh_result(kind))
                 && (kind == Intrinsic::Show || !adapter.copies.args.contains(&true))
                 && !adapter
                     .copies
@@ -150,7 +150,7 @@ impl Lower<'_> {
         };
         if value.dicts != 0
             || value.stages.len() != kind.arity()
-            || value.arity != kind.arity()
+            || value.taken() != kind.arity()
             || value.catch.is_some()
             || adapter.receiver
             || adapter.cancel
@@ -159,7 +159,7 @@ impl Lower<'_> {
             || adapter.result.nullable
             || !callbacks_valid
             || !copies_valid
-            || !matches!(adapter.result_shape, Shape::Data)
+            || !(fresh_result(kind) || matches!(adapter.result_shape, Shape::Data))
             || adapter.shapes.iter().enumerate().any(|(index, shape)| {
                 if kind == Intrinsic::ScopeRun && index == 0 {
                     !matches!(shape, Shape::Fun { args, result, runtime: true, .. }
@@ -171,7 +171,7 @@ impl Lower<'_> {
         {
             return Err(unsupported("foreign ownership adapter", span));
         }
-        let unit = adapter.result.unit && !matches!(kind, Intrinsic::PrintLine | Intrinsic::RefSet);
+        let unit = adapter.result.unit && !writes(kind);
         self.intrinsic(kind, unit, vec![], block, span)
     }
 
@@ -214,4 +214,24 @@ impl Lower<'_> {
             span,
         )
     }
+}
+
+/// The host's environment and arguments are allocated afresh by their
+/// intrinsic in Flick's representation: a host result copy or shape
+/// conversion has nothing left to do.
+fn fresh_result(kind: Intrinsic) -> bool {
+    matches!(
+        kind,
+        Intrinsic::Host(HostPrimitive::Env | HostPrimitive::Args)
+    )
+}
+
+/// An intrinsic that writes, and gives its own Unit rather than a literal.
+fn writes(kind: Intrinsic) -> bool {
+    matches!(
+        kind,
+        Intrinsic::PrintLine
+            | Intrinsic::RefSet
+            | Intrinsic::Host(HostPrimitive::StderrLine | HostPrimitive::StdoutWrite)
+    )
 }

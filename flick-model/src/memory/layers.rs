@@ -106,6 +106,34 @@ impl Machine<'_, '_> {
         Ok(())
     }
 
+    /// `Σ₀`: the layer the root global gave becomes a provider that no
+    /// frame holds. It answers what no frame does until cleanup releases it.
+    pub(super) fn install_root(&mut self) -> Result<(), Error> {
+        layer_data(self.heap, self.top.as_ref().expect("root layer"))?;
+        let id = self.handler_identity()?;
+        let layer = self.top.take().expect("root layer");
+        let owner = self.current_owner;
+        self.providers.insert(
+            id,
+            Provider {
+                layer,
+                owner,
+                previous: owner,
+            },
+        );
+        self.root = Some(id);
+        Ok(())
+    }
+
+    /// The root provider, when it has `effect`.
+    pub(super) fn root_with(&mut self, effect: &str) -> Result<Option<usize>, Error> {
+        let Some(root) = self.root else {
+            return Ok(None);
+        };
+        let provider = &self.providers[&root];
+        Ok(Self::provider_matches(self.heap, provider, effect, &mut self.fuel)?.then_some(root))
+    }
+
     pub(super) fn leave_provider(&mut self, id: usize) -> Result<(), Error> {
         let provider = self.providers.remove(&id).expect("departed provider");
         self.scratch.push(provider.layer);

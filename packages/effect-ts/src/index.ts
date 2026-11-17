@@ -15,6 +15,15 @@ export * from "./storage.ts";
 export * from "./effects.ts";
 export * from "./handlers.ts";
 export * from "./entry.ts";
+export {
+  type HostService,
+  hostArguments,
+  hostClock,
+  hostConsole,
+  hostEnvironment,
+  hostRandom,
+  provideHost,
+} from "./runner/host.ts";
 export * from "./layer.ts";
 export { lazyDone, lazyForce, lazyMake } from "./effect/Lazy.ts";
 export * from "./owner.ts";

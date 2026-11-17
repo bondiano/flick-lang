@@ -56,6 +56,7 @@ pub mod memory_source_eff_combinators;
 pub mod memory_source_failures;
 pub mod memory_source_fold_tasks;
 pub mod memory_source_handlers;
+pub mod memory_source_host_root;
 pub mod memory_source_int_string;
 pub mod memory_source_layer_merge;
 pub mod memory_source_layers;

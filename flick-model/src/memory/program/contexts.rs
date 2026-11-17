@@ -132,7 +132,7 @@ impl Machine<'_, '_> {
                 self.primitive_result(binding, Value::Bool(same))?;
             }
             Intrinsic::RefModify => self.modify(binding)?,
-            Intrinsic::PrintLine | Intrinsic::Show => {
+            Intrinsic::PrintLine | Intrinsic::Show | Intrinsic::Host(_) => {
                 let value =
                     primitives::intrinsic(self.heap, kind, &self.scratch[0], &mut self.stdout)?;
                 self.primitive_result(binding, value)?;
