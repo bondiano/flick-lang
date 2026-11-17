@@ -64,6 +64,7 @@ codegen/loops
 codegen/lift
 codegen/literals
 codegen/local_functions
+codegen/match_graph
 codegen/numbers
 codegen/numeric_classes
 codegen/patterns

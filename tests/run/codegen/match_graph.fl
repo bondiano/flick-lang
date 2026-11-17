@@ -1,0 +1,126 @@
+// A `match` as a decision graph: arms of one constructor share its test,
+// guards run in the order of their arms and at most once each, a guard
+// that fails goes on to the arms after its own, never to another
+// alternative of its or-pattern, and an or-pattern binds the names of its
+// first alternative that matches.
+module App.Main exposing (main)
+
+type Shape = Dot | Line Int | Pair Shape Shape
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+/// A guard that says when it runs.
+check : String -> Bool ->{} Bool
+let check name answer =
+  say ("  " ++ name)
+  answer
+
+describe : Shape -> String
+let describe shape =
+  match shape with
+  | Dot -> "dot"
+  | Line n -> "line " ++ show n
+  | Pair _ _ -> "pair"
+
+name : Shape ->{} String
+let name shape =
+  match shape with
+  | Pair Dot Dot -> "two dots"
+  | Pair (Line n) Dot when check "line, dot" (n > 1) -> "long line, dot"
+  | Pair (Line n) _ | Pair _ (Line n) when check ("either " ++ show n) (n == 1) ->
+    "a unit line in a pair"
+  | Pair (Pair _ _) right -> "nested, then " ++ describe right
+  | Line 0 -> "empty line"
+  | Line n when check "line" (n % 2 == 0) -> "even line"
+  | Pair left _ when check "any pair" true -> "pair from " ++ describe left
+  | other -> "other " ++ describe other
+
+sizes : List Int ->{} String
+let sizes items =
+  match items with
+  | [] -> "none"
+  | [0] -> "a zero"
+  | [x] when check "one" (x > 5) -> "one big"
+  | [x, ...rest] when check "head" (x == List.length rest) -> "counted " ++ show x
+  | [1, 2] | [2, 1] -> "one and two"
+  | [_, _] -> "two"
+  | _ -> "many"
+
+greet : String -> String
+let greet word =
+  match word with
+  | "hi" | "hello" -> "greeting"
+  | "bye" -> "farewell"
+  | _ -> "word " ++ word
+
+classify : (Shape, Int) -> String
+let classify pair =
+  match pair with
+  | (Line n, 0) -> "line at zero " ++ show n
+  | (Line _, k) | (Pair _ _, k) when k > 2 -> "far " ++ show k
+  | (Dot, _) -> "dot"
+  | (_, k) -> "near " ++ show k
+
+/// A `match` whose value goes on: the arm reached from several branches
+/// is written once in its loop.
+bracketed : Shape -> String
+let bracketed shape =
+  let inner =
+    match shape with
+    | Pair Dot _ -> "dot first"
+    | Pair _ Dot -> "dot second"
+    | _ -> "plain"
+  "<" ++ inner ++ ">"
+
+scaled : { shape : Shape; scale : Int } -> Int
+let scaled r =
+  match r with
+  | { shape = Line n; scale = 2 } -> n * 2
+  | { shape = Line n } -> n
+  | { scale = s } -> s
+
+main : Unit ->{; AppError} Unit
+let main () =
+  say (name (Pair Dot Dot))
+  say (name (Pair (Line 3) Dot))
+  say (name (Pair (Line 1) Dot))
+  say (name (Pair (Line 2) (Line 1)))
+  say (name (Pair Dot (Line 1)))
+  say (name (Pair (Pair Dot Dot) (Line 4)))
+  say (name (Line 0))
+  say (name (Line 4))
+  say (name (Line 3))
+  say (name Dot)
+  say (sizes [])
+  say (sizes [0])
+  say (sizes [7])
+  say (sizes [3])
+  say (sizes [2, 1])
+  say (sizes [1, 5])
+  say (sizes [4, 4])
+  say (sizes [2, 0, 0])
+  say (sizes [9, 9, 9])
+  say (greet "hi" ++ ", " ++ greet "hello" ++ ", " ++ greet "bye" ++ ", " ++ greet "yo")
+  say
+    (classify (Line 5, 0)
+      ++ ", "
+      ++ classify (Line 1, 3)
+      ++ ", "
+      ++ classify (Pair Dot Dot, 1)
+      ++ ", "
+      ++ classify (Dot, 7))
+  say
+    (bracketed (Pair Dot Dot)
+      ++ " "
+      ++ bracketed (Pair (Line 1) Dot)
+      ++ " "
+      ++ bracketed Dot
+      ++ " "
+      ++ bracketed (Pair (Line 1) (Line 2)))
+  say
+    (show (scaled { shape = Line 3; scale = 2 })
+      ++ " "
+      ++ show (scaled { shape = Line 3; scale = 5 })
+      ++ " "
+      ++ show (scaled { shape = Dot; scale = 4 }))

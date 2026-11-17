@@ -191,6 +191,9 @@ impl<'a> Gen<'a> {
     /// The arms of a `match` on `subject`: with `result`, the value goes
     /// there; otherwise each arm is in tail position and returns.
     pub(super) fn arms(&mut self, subject: Document<'a>, arms: &[Arm], result: Option<&'a str>) {
+        if self.decide(subject, arms, result) {
+            return;
+        }
         let a = self.a;
         let mut out = Vec::new();
         for arm in arms {
@@ -200,14 +203,7 @@ impl<'a> Gen<'a> {
                     &arm.pat,
                     arm.guard.as_ref(),
                     &arm.body,
-                    |g, body| match result {
-                        Some(r) => {
-                            let v = g.expr(body);
-                            g.emit(docvec![a, r, " = ", v]);
-                            g.emit("break");
-                        }
-                        None => g.tail_expr(body),
-                    },
+                    |g, body| g.arm_body(body, result),
                 );
             });
             out.extend(stmts);

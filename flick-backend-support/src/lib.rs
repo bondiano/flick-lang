@@ -16,5 +16,6 @@ pub use lang::Known;
 
 pub use flick_ir as ir;
 pub mod consteval;
+pub mod decision;
 pub mod numeric;
 pub mod opt;
