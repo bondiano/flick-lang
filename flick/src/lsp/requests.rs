@@ -199,8 +199,8 @@ impl Server {
         Ok(Value::Array(actions))
     }
 
-    /// Completions; after a `.` the incomplete member is cut out so the
-    /// module parses, and the text before the dot is analyzed.
+    /// Completions from the document's analyzed snapshot; after a `.`, the
+    /// offset points at the `.` so qualifier and receiver completions are found.
     fn completion(&mut self, params: &Value) -> Reply {
         let (path, text) = self.document(params)?;
         let cursor = protocol::offset(&text, &params["position"]) as usize;
@@ -214,22 +214,9 @@ impl Server {
             .last()
             .map_or(cursor, |(i, _)| i);
         let dotted = text[..word].ends_with('.');
-        let cut;
-        let (snapshot, offset) = if dotted {
-            let dot = word - 1;
-            let mut docs = self.docs.clone();
-            docs.insert(path.clone(), format!("{}{}", &text[..dot], &text[cursor..]));
-            cut = analyze(&docs, &path, &mut self.caches);
-            (&cut, dot)
-        } else if self.docs.contains_key(&path) {
-            // the text of an open document is what its last change analyzed
-            (self.snapshot_for(&path), word)
-        } else {
-            let mut docs = self.docs.clone();
-            docs.insert(path.clone(), text.clone());
-            cut = analyze(&docs, &path, &mut self.caches);
-            (&cut, word)
-        };
+        let offset = if dotted { word - 1 } else { word };
+        // the text of an open document is what its last change analyzed
+        let snapshot = self.snapshot_for(&path);
         let Some(file) = snapshot.file(&path) else {
             return Ok(json!([]));
         };
@@ -261,7 +248,7 @@ impl Server {
                     item["insertTextFormat"] = json!(2);
                 }
                 if !c.edits.is_empty() {
-                    // imports go above the cursor, where both texts agree
+                    // imports go above the cursor
                     let edits: Vec<Value> = c
                         .edits
                         .iter()

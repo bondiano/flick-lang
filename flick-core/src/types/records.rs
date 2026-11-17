@@ -58,12 +58,12 @@ impl Checker<'_> {
     }
 
     pub(super) fn field(&mut self, node: &Node, target: &Node) -> Type {
+        let record = self.infer(target);
         let Some(label) = node.child_tokens().find(|t| t.kind == K::Ident) else {
             return Type::Error;
         };
         let label_span = self.token_span(label);
         let label = label.text(self.text).to_owned();
-        let record = self.infer(target);
         #[cfg(feature = "ide")]
         self.note_field(label_span, &record);
         // a polymorphic field (`S.Impl`, a dictionary) is used at an instance,

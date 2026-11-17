@@ -284,3 +284,38 @@ fn a_watched_file_change_analyzes_the_documents_that_read_it() {
         "the project was analyzed again"
     );
 }
+
+#[test]
+fn a_dotted_completion_waits_for_the_background_analysis_and_reads_its_snapshot() {
+    let written = Written::default();
+    let mut server = server(Box::new(written.clone()));
+    let dir = env::temp_dir().join(format!("flick-lsp-dot-defer-{}", process::id()));
+    let path = dir.join("A.fl");
+    let source = "module A exposing (User, run)\n\ntype alias User = { name : String; age : Float }\n\nrun : User -> String\nlet run user = user.name\n";
+    server.notify("textDocument/didOpen", &opened(&path, source));
+    settle(&mut server);
+    server.notify(
+        "textDocument/didChange",
+        &change(&path, (5, 20), (5, 24), ""),
+    );
+    assert!(!server.pending.is_empty(), "the change is being analyzed");
+    let completion = json!({
+        "textDocument": { "uri": protocol::uri_of(&path) },
+        "position": { "line": 5, "character": 20 }
+    });
+    assert!(server.should_defer("textDocument/completion", &completion));
+    server.defer(json!(9), "textDocument/completion", completion);
+    written.0.lock().expect("not poisoned").clear();
+    settle(&mut server);
+    server.resume();
+    assert!(server.deferred.is_empty());
+    assert!(
+        server.caches.is_empty(),
+        "dotted completion must not run synchronous analyze on the server thread"
+    );
+    let out = written_text(&written);
+    assert!(
+        out.contains("\"id\":9") && out.contains("\"name\"") && out.contains("\"age\""),
+        "{out}"
+    );
+}

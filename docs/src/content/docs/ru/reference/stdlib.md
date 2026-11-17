@@ -1,6 +1,6 @@
 ---
 title: "Стандартная библиотека"
-source_hash: 6a52038cb14d6b83
+source_hash: 1c1b7b82313da2b9
 ---
 
 Стандартная библиотека написана на Flick и использует адаптер среды выполнения
@@ -175,13 +175,13 @@ let case_blind =
 
 ## Дочерние процессы
 
-`stdout` и `stderr` процесса — это pipe. Что происходит с выводом, который
-программа не читает, на двух target разное:
+`stdout` и `stderr` процесса — это pipe. Оба target ограничивают буфер
+непрочитанного вывода и дренируют его в `wait` и `exit_code`:
 
 | | JS-target (Node) | Go-target |
 | - | - | - |
-| непрочитанный вывод | Node приостанавливает поток; когда буфер pipe (около 64 КиБ) полон, дочерний процесс ждёт, пока вывод прочтут | читается сразу и копится в памяти; дочерний процесс не ждёт |
-| цена | дочерний процесс с большим выводом может заблокироваться навсегда | память растёт с объёмом вывода, пока не закроется scope процесса |
+| до `wait` / чтения | Node ставит поток на паузу при заполнении буфера pipe (~64 КиБ) | `outputQueue` буферизует до 64 КиБ на поток, затем тормозит запись |
+| при `wait` / `exit_code` | параллельно дренирует `stdout`/`stderr` и возвращает код без deadlock | сбрасывает буфер и входящий вывод (`drain()`), возвращая код без роста памяти |
 
 Примеры:
 
@@ -190,22 +190,22 @@ let case_blind =
 waits : Unit ->{Async; PlatformError.PlatformError} Int
 let waits () = scope {
   let p = ChildProcess.spawn (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"])
-  ChildProcess.wait p // JS: не возвращается; Go: 0
+  ChildProcess.wait p // JS: 0; Go: 0 (непрочитанный вывод дренируется)
 }
 
 // b. exit_code команды с большим выводом: так же
 chatty : Unit ->{Async; PlatformError.PlatformError} Int
 let chatty () =
-  ChildProcess.exit_code (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"])
+  ChildProcess.exit_code (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"]) // JS: 0; Go: 0
 
-// c. бесконечный непрочитанный вывод, например `yes`: на JS ребёнок встаёт;
-//    на Go всё написанное держится в памяти до `kill` или закрытия scope
+// c. бесконечный непрочитанный вывод (`yes`): до `wait` ограничен ~64 КиБ;
+//    во время `wait` оба target дренируют вывод в ограниченной памяти до `kill` или закрытия scope
 ```
-Читайте то, что пишет дочерний процесс (`stdout`, `stderr`, `string`, `lines`), или
-отдайте ему потоки программы через `inherit_output` — тогда target ведут
-себя одинаково. Поведение Go закреплено тестом
-`TestChildProcessUnreadOutputDoesNotBlock` в
-`runtime-go/flickrt/process_test.go`.
+
+Читайте вывод дочернего процесса (`stdout`, `stderr`, `string`, `lines`) или
+перенаправьте его через `inherit_output` — оба target ведут себя одинаково.
+Поведение закреплено тестом `tests/run/stdlib/process/wait_large_output.fl` и
+`TestChildProcessUnreadOutputDoesNotBlock` в `runtime-go/flickrt/process_test.go`.
 
 ## Тесты
 

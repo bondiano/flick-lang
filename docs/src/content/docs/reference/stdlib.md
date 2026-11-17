@@ -165,13 +165,13 @@ let case_blind =
 
 ## Child processes
 
-A process's `stdout` and `stderr` are pipes. What happens to output the
-program never reads differs between the targets:
+A process's `stdout` and `stderr` are pipes. Both targets bound unread buffering
+and drain unread output on `wait` and `exit_code`:
 
 | | JS target (Node) | Go target |
 | - | - | - |
-| unread output | Node pauses the stream; once the pipe's buffer (about 64 KiB) is full, the child waits until someone reads | read as it comes and kept in memory; the child never waits |
-| cost | a child that writes much can stall forever | memory grows with what the child writes, until the process's scope closes |
+| before `wait` / reading | Node pauses the stream once the pipe buffer (~64 KiB) fills | `outputQueue` buffers up to 64 KiB per stream, then pauses the writer |
+| on `wait` / `exit_code` | concurrently drains `stdout` and `stderr` and returns exit code without deadlocking | discards queued/incoming output (`drain()`) and returns exit code in bounded memory |
 
 Cases:
 
@@ -180,23 +180,22 @@ Cases:
 waits : Unit ->{Async; PlatformError.PlatformError} Int
 let waits () = scope {
   let p = ChildProcess.spawn (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"])
-  ChildProcess.wait p // JS: never returns; Go: 0
+  ChildProcess.wait p // JS: 0; Go: 0 (drains unread output)
 }
 
 // b. exit_code of a command with much output: the same
 chatty : Unit ->{Async; PlatformError.PlatformError} Int
 let chatty () =
-  ChildProcess.exit_code (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"])
+  ChildProcess.exit_code (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"]) // JS: 0; Go: 0
 
-// c. endless output nobody reads, e.g. `yes`: JS stalls the child;
-//    Go holds everything it wrote until `kill` or the scope's close
+// c. endless output nobody reads, e.g. `yes`: bounded to ~64 KiB before `wait`;
+//    during `wait`, both targets drain output in bounded memory until `kill` or scope close
 ```
 
 Read what a child writes (`stdout`, `stderr`, `string`, `lines`), or let it
-write to the program's own streams with `inherit_output`; then both targets
-behave alike. The Go behavior is pinned by
-`TestChildProcessUnreadOutputDoesNotBlock` in
-`runtime-go/flickrt/process_test.go`.
+write to the program's own streams with `inherit_output`; both targets behave
+alike. This is pinned by `tests/run/stdlib/process/wait_large_output.fl` and
+`TestChildProcessUnreadOutputDoesNotBlock` in `runtime-go/flickrt/process_test.go`.
 
 ## Tests
 
