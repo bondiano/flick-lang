@@ -3,6 +3,8 @@ ChildProcess.is_running
 ChildProcess.kill
 ChildProcess.kill_with
 ChildProcess.make
+ChildProcess.output_lines
+ChildProcess.output_string
 ChildProcess.pid
 ChildProcess.pipe_to
 ChildProcess.prefix

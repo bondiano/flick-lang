@@ -1,6 +1,6 @@
 [wrapped]
 ChildProcessSpawner = "ChildProcess.spawn 40dccc7fabdf7b49"
-ChildProcessHandle = "ChildProcess.Process 2687b5e42628f930"
+ChildProcessHandle = "Host.Child 2687b5e42628f930"
 ExitCode = "ChildProcess.wait 6da3b9d4e047c7e2"
 ProcessId = "ChildProcess.pid f7d1cc90ab08e778"
 

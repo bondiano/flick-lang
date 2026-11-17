@@ -10,8 +10,6 @@ import Host
 import PlatformError
 import Scope
 import Stream.Core exposing (Stream)
-import Stream.Platform
-import Stream.Run
 
 /// A program to run, with its arguments and how it runs.
 type alias Command = Host.Command
@@ -107,19 +105,25 @@ stderr : Process s -> (Stream {Async} {PlatformError.PlatformError} (List Int))^
 foreign pure stderr from "flick:ChildProcess" "flickStderr"
   retention call
 
+/// What the process writes to stdout until it closes it, as text; what it
+/// writes to stderr is dropped, so a full pipe never stops it.
+output_string : Process s ->{Async; PlatformError.PlatformError} String
+foreign effect output_string from "flick:ChildProcess" "flickOutputString"
+  retention call
+
+/// The lines of `output_string`.
+output_lines : Process s ->{Async; PlatformError.PlatformError} List String
+foreign effect output_lines from "flick:ChildProcess" "flickOutputLines"
+  retention call
+
 /// What the command writes to stdout, as text; it runs to its end.
 string : Command ->{Async, Host.Process; PlatformError.PlatformError} String
-let string command = scope {
-  Stream.Run.mk_string (Stream.Platform.decode_text (stdout (spawn command)))
-}
+let string command = Scope.run (fun _ -> output_string (spawn command))
 
 /// The lines the command writes to stdout.
 lines : Command ->{Async, Host.Process; PlatformError.PlatformError} List String
-let lines command = scope {
-  let text = Stream.Platform.decode_text (stdout (spawn command))
-  Stream.Run.run_collect (Stream.Platform.split_lines text)
-}
+let lines command = Scope.run (fun _ -> output_lines (spawn command))
 
 /// Runs the command to its end: its exit code.
 exit_code : Command ->{Async, Host.Process; PlatformError.PlatformError} Int
-let exit_code command = scope { wait (spawn command) }
+let exit_code command = Scope.run (fun _ -> wait (spawn command))

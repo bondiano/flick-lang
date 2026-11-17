@@ -2,7 +2,36 @@
 /// live layers an application needs at its entry boundary, or substitute records
 /// in tests. No service here has an implicit default inside a program: only the
 /// runner of an entry provides the live ones, to `main`, as its root.
-module Host exposing (..)
+module Host exposing (
+  Console,
+  Clock,
+  Random,
+  Environment,
+  Arguments,
+  Command,
+  Child,
+  Process,
+  raw_stdout_line,
+  raw_stderr_line,
+  raw_stdout_write,
+  raw_current_time_millis,
+  raw_current_time_nanos,
+  raw_monotonic_time_nanos,
+  raw_next,
+  raw_env,
+  raw_args,
+  raw_spawn,
+  console,
+  clock,
+  random,
+  environment,
+  arguments,
+  process,
+  Live,
+  BrowserLive,
+  browser_live,
+  live,
+)
 
 import Layer
 import PlatformError
@@ -107,15 +136,21 @@ type alias Live = {Console, Clock, Random, Environment, Arguments, Process}
 /// The three host services available in a browser environment.
 type alias BrowserLive = {Console, Clock, Random}
 
+// each merge is a top-level value of its own: a bundle drops the ones a
+// program does not use, as a nested call would keep them
+clock_random : Layer none none {Clock, Random}
+let clock_random = Layer.merge clock random
+
 /// The live browser services: console, clock, and random.
 browser_live : Layer none none BrowserLive
-let browser_live = Layer.merge console (Layer.merge clock random)
+let browser_live = Layer.merge console clock_random
+
+arguments_process : Layer none none {Arguments, Process}
+let arguments_process = Layer.merge arguments process
+
+process_host : Layer none none {Environment, Arguments, Process}
+let process_host = Layer.merge environment arguments_process
 
 /// All six live services. Prefer individual layers for narrower boundaries.
 live : Layer none none Live
-let live =
-  Layer.merge
-    console
-    (Layer.merge
-      clock
-      (Layer.merge random (Layer.merge environment (Layer.merge arguments process))))
+let live = Layer.merge browser_live process_host

@@ -35,6 +35,9 @@ import { Schedule as NativeSchedule, outOf } from "@flick-lang/runtime/rt/effect
 import { nativeParentSpan, tracerHooks } from "@flick-lang/runtime/rt/effect/Tracer";
 import { causeHooks } from "@flick-lang/runtime/rt/effect/Cause";
 import { dateTimeHooks } from "@flick-lang/runtime/rt/effect/DateTime";
+import { mapped } from "@flick-lang/runtime/rt/effects";
+import { processHooks } from "@flick-lang/runtime/rt/runner/host";
+import { flickSpawn } from "./effect/ChildProcess.ts";
 import { inheritContext, rememberContext } from "./bridge_context.ts";
 
 import { dataFromEffect, dataToEffect, installDataBridge } from "./bridge_data.ts";
@@ -371,6 +374,11 @@ bridgeKernel.causeToEffect = causeToEffect;
   installDataBridge();
   installLayerBridge();
   installSchemaBridge();
+  // the kernel has no spawner: its live `Host.Process` starts commands here,
+  // as compiled code crossing into the adapter would
+  processHooks.spawn = (command) =>
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- only `ChildProcess.make` makes a command
+    mapped(fromEffect(flickSpawn(dataToEffect(command) as Parameters<typeof flickSpawn>[0])), (handle) => dataFromEffect(handle));
   // the native `Ui.Server.stream` renders a stream of text; it starts when the Stream is run, with that run's evidence
   streamHooks.text = (start) =>
     Stream.withSpan(

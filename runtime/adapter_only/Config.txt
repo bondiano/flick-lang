@@ -7,7 +7,7 @@ Config.duration
 Config.fail
 Config.finite
 Config.flat_map
-Config.get
+Config.get_with
 Config.int
 Config.literal
 Config.literals
