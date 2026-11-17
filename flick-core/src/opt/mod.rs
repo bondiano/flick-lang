@@ -1,6 +1,7 @@
 //! Compiler adapters for portable optimizer passes; semantic rules live in support.
 
 pub mod perceus;
+pub mod tuple_match;
 
 use crate::codegen::Known;
 use crate::ir::{self, Expr, Module};
@@ -19,6 +20,7 @@ pub fn optimize(
     let table = ir::lang_items();
     let known = Known::of(&table);
     let builtin = |module: &str| types::builtins().iter().any(|i| i.module == module);
+    tuple_match::fold_tuple_matches(module);
     portable::optimize(module, exported, generics, arity, &known, &builtin);
 }
 
