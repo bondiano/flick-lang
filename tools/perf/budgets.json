@@ -6,11 +6,16 @@
   "lsp.hover_after_interface_edit.p95": {"budget": 400, "tolerance": 0.5},
   "load.json.go.rps": {"budget": 8500, "tolerance": 0.25},
   "load.json.go.binary": {"budget": 10000000, "tolerance": 0.05},
-  "load.ssr.rps": {"budget": 5200, "tolerance": 0.25},
+  "load.ssr.rps": {"budget": 5200, "tolerance": 0.25, "runners": {
+    "AMD EPYC 7763": {"budget": 3300, "reason": "nightlies on this CPU measure 3292-3340 req/s for the code that measures 5740 on a Xeon 6975P (11-13 to 11-17)"},
+    "AMD EPYC 9V74": {"budget": 4600, "reason": "nightlies on this CPU measure 4513-4706 req/s since the SSR fix of 4d1225ed7 (11-11 to 11-12)"}
+  }},
   "lsp.rss.peak": {"budget": 120, "tolerance": 0.25},
   "load.json.go.rss.peak": {"budget": 70, "tolerance": 0.25},
   "load.ssr.rss.peak": {"budget": 420, "tolerance": 0.25},
   "load.json.go.cold_start": {"budget": 25, "tolerance": 0.25},
-  "load.ssr.cold_start": {"budget": 500, "tolerance": 0.25},
+  "load.ssr.cold_start": {"budget": 500, "tolerance": 0.25, "runners": {
+    "AMD EPYC 7763": {"budget": 600, "reason": "nightlies on this CPU measure 579-614 ms for the code that starts in 375 ms on a Xeon 6975P (11-11 to 11-17)"}
+  }},
   "lsp.soak.rss.growth": {"budget": 1, "tolerance": 0.5}
 }

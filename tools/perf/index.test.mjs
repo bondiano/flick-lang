@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { METRICS, coldStart, peakRss, report } from "./index.mjs";
+import { METRICS, budgetOn, coldStart, peakRss, report } from "./index.mjs";
 import { createServer } from "node:http";
 
 const budgets = Object.fromEntries(Object.keys(METRICS).map((key) => [key, { budget: null, tolerance: 0.25 }]));
@@ -45,4 +45,17 @@ test("cold start rejects an HTTP listener owned by another process", async () =>
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
+});
+
+test("a runner's CPU model selects its own budget, any other CPU the metric's", () => {
+  const ssr = { budget: 5200, tolerance: 0.25, runners: { "AMD EPYC 7763": { budget: 3300, reason: "slower CPU" } } };
+  const on = (cpu) => report({ "load.ssr.rps": 3300 }, { ...budgets, "load.ssr.rps": ssr }, [], cpu);
+  const slow = on("AMD EPYC 7763 64-Core Processor");
+  assert.ok(!slow.errors.some((e) => e.includes("load.ssr.rps is")), slow.errors.join("\n"));
+  assert.match(slow.table, /load.ssr.rps \| 3300 \| req\/s \| 3300 on AMD EPYC 7763 \|/);
+  const fast = on("Intel(R) Xeon(R) 6975P-C");
+  assert.ok(fast.errors.includes("load.ssr.rps is 3300 req/s, past its budget of 5200 req/s with a tolerance of 25%"));
+  assert.equal(budgetOn(ssr).budget, 5200);
+  const failed = report({ "load.ssr.rps": 2000 }, { ...budgets, "load.ssr.rps": ssr }, [], "AMD EPYC 7763 64-Core Processor");
+  assert.ok(failed.errors.some((e) => e.endsWith("on AMD EPYC 7763")), failed.errors.join("\n"));
 });

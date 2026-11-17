@@ -178,7 +178,11 @@ Linux reads RSS from `/proc`; macOS uses `ps`. The LSP uses Linux's lifetime
 high-water mark or samples every 250 ms on macOS. Server RSS is sampled during
 the soak. `target/perf-environment.json` records the platform, CPU, Node version
 and methods beside the measurements. Compare runs on the same host and toolchain;
-these budgets do not promise equal latency on different hardware.
+these budgets do not promise equal latency on different hardware. A budget's
+`runners` give CI's hosted CPU models, by the start of the model name, their
+own budget with a `reason`: those models measure the same code slower or faster,
+by a different factor for each metric. Any other CPU is held to the metric's
+budget, and a failure names the model whose budget it missed.
 
 `just bundle-size` compares the same arithmetic-and-output source on Effect
 (`pure`) and the native runtime (`pure-rt`), and checks a separate pure library

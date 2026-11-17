@@ -4,7 +4,8 @@
 // nothing. Loosening one, that is raising it (lowering it for a throughput),
 // widening its tolerance or setting it back to null, needs a `reason`
 // beside it that the base did not have; without one the ratchet fails.
-// A budget added or removed is only printed.
+// A budget added or removed is only printed, except a runner's own budget,
+// which is held to the budget of its metric the base had.
 //
 //   node tools/perf/ratchet.mjs <base ref>
 import { execFileSync } from "node:child_process";
@@ -40,7 +41,13 @@ const budgets = (perf, programs, chunks = [], wasm) => ({
           ...(wasm.reason ? { reason: wasm.reason } : {}),
         },
       }),
-  ...Object.fromEntries(Object.entries(perf).map(([metric, b]) => [metric, { better: "lower", unit: "", tolerance: 0, ...METRICS[metric], ...b }])),
+  ...Object.fromEntries(
+    Object.entries(perf).flatMap(([metric, { runners = {}, ...b }]) => {
+      const entry = { better: "lower", unit: "", tolerance: 0, ...METRICS[metric], ...b };
+      const own = Object.entries(runners).map(([cpu, r]) => [`${metric} on ${cpu}`, { ...entry, reason: undefined, ...r }]);
+      return [[metric, entry], ...own];
+    }),
+  ),
   ...Object.fromEntries(programs.map((p) => [`bundle.${p.name}`, size(p)])),
   ...Object.fromEntries(chunks.map((c) => [`chunk.${c.name}`, size(c)])),
 });
@@ -53,7 +60,8 @@ const show = ({ budget, unit, tolerance }) => `${budget === null ? "null" : `${b
 /** Each change from the budgets `base` to `head`: a line and, for a looser budget without a new reason, an error. */
 export const compare = (base, head) =>
   [...new Set([...Object.keys(base), ...Object.keys(head)])].sort().flatMap((name) => {
-    const [was, now] = [base[name], head[name]];
+    // a runner's first own budget is held to its metric's
+    const [was, now] = [base[name] ?? base[name.split(" on ")[0]], head[name]];
     if (now === undefined) return [{ line: `${name}: removed` }];
     if (was === undefined) return [{ line: `${name}: new, ${show(now)}` }];
     if (was.budget === now.budget && was.tolerance === now.tolerance) return [];
