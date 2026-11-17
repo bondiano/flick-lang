@@ -11,31 +11,31 @@ fn library() -> &'static [Interface] {
         for (name, source) in [
             (
                 "Mtl.Classes",
-                include_str!("../../../../examples/mtl/src/Mtl/Classes.fl"),
+                include_str!("../../../examples/mtl/src/Mtl/Classes.fl"),
             ),
             (
                 "Mtl.Identity",
-                include_str!("../../../../examples/mtl/src/Mtl/Identity.fl"),
+                include_str!("../../../examples/mtl/src/Mtl/Identity.fl"),
             ),
             (
                 "Mtl.MaybeT",
-                include_str!("../../../../examples/mtl/src/Mtl/MaybeT.fl"),
+                include_str!("../../../examples/mtl/src/Mtl/MaybeT.fl"),
             ),
             (
                 "Mtl.StateT",
-                include_str!("../../../../examples/mtl/src/Mtl/StateT.fl"),
+                include_str!("../../../examples/mtl/src/Mtl/StateT.fl"),
             ),
             (
                 "Mtl.ReaderT",
-                include_str!("../../../../examples/mtl/src/Mtl/ReaderT.fl"),
+                include_str!("../../../examples/mtl/src/Mtl/ReaderT.fl"),
             ),
             (
                 "Mtl.WriterT",
-                include_str!("../../../../examples/mtl/src/Mtl/WriterT.fl"),
+                include_str!("../../../examples/mtl/src/Mtl/WriterT.fl"),
             ),
             (
                 "Mtl.ExceptT",
-                include_str!("../../../../examples/mtl/src/Mtl/ExceptT.fl"),
+                include_str!("../../../examples/mtl/src/Mtl/ExceptT.fl"),
             ),
         ] {
             let (interface, diagnostics) = check(source, &interfaces);
