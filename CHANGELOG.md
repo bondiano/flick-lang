@@ -23,8 +23,11 @@ break programs.
   facts too, read as intervals that keep NaN apart: `if n > 0 && n < 65536
   then Some (Port.prove n)` checks, `Positive.prove (Port.value p)` follows
   from the invariant of `Port`, and `not (n <= 0)` does not prove `n > 0`.
-  The logic is proved sound in Lean (`formal/Formal/Refine.lean`). Imported
-  types come next.
+  The logic is proved sound in Lean (`formal/Formal/Refine.lean`). An
+  exported refined type publishes its invariant in its `.iface`
+  (`iface-version` 28), and importers, module aliases and re-exports prove
+  with it; an edit of the check alone rechecks what relied on it. Rebuild
+  dependencies written with an older interface.
 - **Raise with `Fail.fail`:** `from_result (Err e)` is `FLICK-T075`, a
   warning whose safe fix writes `Fail.fail e`: the same type and meaning,
   without building a `Result` to fail with. `flick check --fix --only T075`

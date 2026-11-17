@@ -163,7 +163,7 @@ impl<'b> Env<'b> {
         // an interface that lost declarations gives no evidence
         if !interface.incomplete {
             for invariant in &interface.invariants {
-                let known = |i: &crate::iface::Invariant| i.module == invariant.module && i.ty == invariant.ty;
+                let known = |i: &Invariant| i.module == invariant.module && i.ty == invariant.ty;
                 if !self.invariants.iter().any(known) {
                     self.invariants.push(invariant.clone());
                 }

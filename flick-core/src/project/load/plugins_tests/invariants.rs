@@ -70,3 +70,68 @@ fn no_plugin_gives_an_invariant_to_a_type_of_another_block() {
         "{found:?}"
     );
 }
+
+const PORTS: &str = "module App.Ports exposing (Port, Positive)\n\nrefined type Port = Float where fun n -> n > 0 && n < 65536\n\nrefined type Positive = Float where fun n -> n > 0\n";
+
+const AGAIN: &str = "module App.Again exposing (Port)\n\nimport App.Ports exposing (Port)\n";
+
+const USES: &str = "module App.Main exposing (..)\n\nimport App.Ports as P exposing (Port)\nimport App.Again as A\n\nas_port : Float -> Option Port\nlet as_port n = if n > 0 && n < 65536 then Some (Port.prove n) else None\n\naliased : Float -> Option P.Port\nlet aliased n = if P.Port.check n then Some (P.Port.prove n) else None\n\nagain : Float -> Option A.Port\nlet again n = if n > 0 && n < 65536 then Some (A.Port.prove n) else None\n\npositive : Port -> P.Positive\nlet positive p = P.Positive.prove (Port.value p)\n";
+
+/// Each diagnostic of checking the modules `files` and the main module with
+/// one host, which keeps the interfaces of a check for the next.
+fn checks(host: &super::Memory, files: &[(&str, &str)]) -> Vec<String> {
+    use super::{check, library, roots, show};
+    use crate::source::SourceMap;
+    for (path, text) in files {
+        host.write(path, text);
+    }
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let found = check(host, &mut sources, Some(&project), &roots());
+    found.iter().map(|d| show(&sources, d)).collect()
+}
+
+#[test]
+fn an_imported_invariant_proves_through_imports_aliases_and_re_exports() {
+    let host = super::host(USES);
+    let files = [
+        ("/p/src/App/Ports.fl", PORTS),
+        ("/p/src/App/Again.fl", AGAIN),
+    ];
+    assert_eq!(checks(&host, &files), [""; 0]);
+    // the interfaces kept from the first check prove the same
+    assert_eq!(checks(&host, &[]), [""; 0]);
+    let unproved = USES.replace(
+        "if n > 0 && n < 65536 then Some (Port.prove n)",
+        "if n > 0 then Some (Port.prove n)",
+    );
+    host.write("/p/src/App/Main.fl", &unproved);
+    assert_eq!(
+        checks(&host, &[]),
+        [
+            "FLICK-T076 `Port.prove n`: cannot prove the check of `Port` holds for this value: nothing here establishes `n < 65536`; `Port.parse n` checks it when the program runs"
+        ]
+    );
+}
+
+#[test]
+fn an_edited_check_invalidates_what_importers_proved() {
+    let host = super::host(USES);
+    let files = [
+        ("/p/src/App/Ports.fl", PORTS),
+        ("/p/src/App/Again.fl", AGAIN),
+    ];
+    assert_eq!(checks(&host, &files), [""; 0]);
+    // only the check changes: no signature does, the proofs do; a fact of
+    // `Port.check` and the lower bound `Positive` reads still prove theirs
+    let narrower = PORTS.replace("n < 65536", "n < 1024");
+    let found = checks(&host, &[("/p/src/App/Ports.fl", &narrower)]);
+    let open = "cannot prove the check of `Port` holds for this value: nothing here establishes `n < 1024`; `Port.parse n` checks it when the program runs";
+    assert_eq!(
+        found,
+        [
+            format!("FLICK-T076 `Port.prove n`: {open}"),
+            format!("FLICK-T076 `A.Port.prove n`: {open}"),
+        ]
+    );
+}

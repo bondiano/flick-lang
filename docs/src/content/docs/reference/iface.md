@@ -9,9 +9,10 @@ native package can instantiate it without the original checkout (see
 [Compiler architecture](../../contributing/implementation-decisions/#compiler-architecture)).
 It is versioned JSON. `.d.ts` is only a projection for TypeScript; `.iface` is the source of truth for Flick importers.
 
-The current schema is `iface-version` 17. It includes module visibility,
+The current schema is `iface-version` 28. It includes module visibility,
 `type module` contracts, nested static modules, higher-order signatures, the
-`exists` type form and implicit conversion instances. Every schema change
+`exists` type form, implicit conversion instances and the invariants of
+refined types. Every schema change
 bumps the version; a compiler rejects any other version with `FLICK-P010`. The simplified example below shows the envelope;
 use the current compiler to write an interface for a new package.
 
@@ -19,7 +20,7 @@ use the current compiler to write an interface for a new package.
 
 ```json
 {
-  "iface-version": 17,
+  "iface-version": 28,
   "compiler": "0.1.0",
   "module": "App.Shapes",
   "exports": [
@@ -58,6 +59,7 @@ later arguments do not enter that lexical environment.
 | `hidden` | constructors of exported types that are not exported, so an import of one gets a precise `FLICK-R005`; omitted when empty |
 | `docs` | the `///` comment of each export the module declares, by name, which its `.d.ts` carries as JSDoc; omitted when empty |
 | `instances` | the instances of the module and of every module it depends on, except built-in ones; omitted when empty |
+| `invariants` | the invariant of each exported type with one the compiler proves, such as a refined type, of the module and of every module it depends on: the type, its hidden constructor, its `check` and `value`, the member that proves one, the base and the check as a formula; an importer checks it against the exports before `T.prove` reads it; omitted when empty |
 | `abi` | how the compiled code represents what the module defines, see [ABI](#abi); written by `flick build`, absent from `flick check` |
 | `dependencies` | the fingerprint of each imported module's interface the module was built against; omitted when empty |
 | `source` | the module's source, relative to the root of its package, so editors find declarations in a published package; written by `flick build` |

@@ -1,6 +1,6 @@
 # Invariants: proof-required construction and facts of paths
 
-Status: **contract** (RFC #595, #594). §1–§5 are implemented for invariants a module declares itself, and the logic of §4–§5 is proved in Lean (`Formal/Refine.lean`). §6, the module boundary, comes next. This page fixes what the checker accepts for `T.prove`, what a plugin's invariant must be, and what the guarantee does not cover. Each rule lists where it is checked.
+Status: **contract** (RFC #595, #594), implemented: §1–§6 hold in the checker, and the logic of §4–§5 is proved in Lean (`Formal/Refine.lean`, `Formal/Refine/Numbers.lean`). This page fixes what the checker accepts for `T.prove`, what a plugin's invariant must be, and what the guarantee does not cover. Each rule lists where it is checked.
 
 References as in [`core.md`](core.md). Checker paths are relative to `flick-core/src/types/`.
 
@@ -152,7 +152,7 @@ Checked by: `proofs/interval.rs` unit tests, `proofs/props.rs` (NaN, infinities,
 
 Lean (`Formal/Refine/Numbers.lean`): `Num` is a total preorder with a point NaN that every ordered comparison finds false, the model of binary64 comparisons and of `Int`'s. `Num.learn_sound` and `Num.decide_sound` are the laws of the interval. `numbers_sound`: atoms with their results together with the intervals are a sound `Theory`, so `sound` holds of the checker's knowledge. `intNum` and `Interval.int_side`: an `Int`'s open end moved to the closed one next to it holds of the same integers.
 
-## 6. Modules (next)
+## 6. Modules
 
 An exported type with an active contract publishes it in `.iface`:
 - the type;
@@ -161,7 +161,11 @@ An exported type with an active contract publishes it in `.iface`:
 - the base;
 - the summary, with atoms as canonical entities.
 
-`IFACE_VERSION` changes with it. The fingerprint covers the contract, so a changed check invalidates its dependents. An importer validates the contract against the interface's own exports and drops one that does not match.
+It also passes on the contracts it learned, as instances travel, so a re-export carries them (`Interface.invariants`, `iface-version` 28). The fingerprint covers the contract, so a changed check invalidates its dependents.
+
+An importer (`proofs/exported.rs`) validates each contract against the exports it sees: the type is opaque, the constructor has `$`, `check : Base -> Bool` and `value : T -> Base` with a scalar base. One that does not match gives nothing. An interface that lost declarations (`incomplete`) gives none, and a module with errors publishes none of its own. `T.prove` of an imported type records the hidden unboxed constructor; a module alias or a re-export names the same canonical entity.
+
+Checked by: `plugins_tests/invariants.rs` (imports, aliases, a re-export, a second check from the kept interfaces, and an edit of the check alone that breaks exactly the proofs that needed it), `proofs/exported.rs` (a check reads back as written, a malformed one is opaque), `tests/run/schema/prove_imported.fl` on JS, Go, the model and Flick's runtime.
 
 ## 7. Trust boundary
 

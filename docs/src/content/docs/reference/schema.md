@@ -35,6 +35,59 @@ compiler knows the check — a `Checks` function (`Checks.email`,
 literal with the constant in place of its parameter. A constant that fails
 it is `FLICK-D006`.
 
+### Proving a refinement
+
+`T.prove v` makes a `T` where the compiler proves the check holds for `v`:
+no `Result`, and the check does not run again. It is the type's constructor
+when the program runs, so `v` is evaluated once.
+
+```flick
+refined type Port = Float where fun n -> n > 0 && n < 65536
+
+refined type Positive = Float where fun n -> n > 0
+
+as_port : Float -> Option Port
+let as_port n = if n > 0 && n < 65536 then Some (Port.prove n) else None
+
+positive_port : Port -> Positive
+let positive_port p = Positive.prove (Port.value p)
+```
+
+The compiler proves the check from the facts of the path to `T.prove`:
+
+- the condition of an `if` around it, true in `then` and false in `else`,
+  and the left of `&&` (true) or `||` (false) before it;
+- a `T.check v` that gave `true`, or a call of the same function the check
+  names, such as `Checks.email v`: the compiler does not run it, it reuses
+  the result;
+- the invariant of another refined value: `Port.value p` is above 0 and
+  below 65536;
+- comparisons `<`, `<=`, `>`, `>=` of an `Int` or a `Float` with a literal,
+  and `==` with a literal.
+
+A fact is about one value: a name bound once with `let` or as a parameter,
+or another name `let` binds to it. A shadowing name is another value, a
+`let mut` variable has no facts, and the body of a `fun` or a `task`
+starts with none. Arithmetic is not read: `x > 0` says nothing of
+`x + 1`, which may wrap. NaN compares false with every number, so
+`not (x <= 0)` does not prove `x > 0`.
+
+```flick fail T076
+refined type Port = Float where fun n -> n > 0 && n < 65536
+
+incomplete : Float -> Option Port
+let incomplete n = if n > 0 then Some (Port.prove n) else None
+```
+
+`FLICK-T076` says what is not established, here `n < 65536`; the value
+may still pass the check, and `Port.parse n` checks it when the program
+runs. `FLICK-T077` is a check the facts prove fails. `T.prove` is no
+function: named alone, passed or kept, it is `FLICK-T078`. A type with
+parameters, or over a base other than `Int`, `Float`, `String` or `Bool`,
+has no `T.prove`. The guarantee holds within Flick's own code: a `foreign`
+function or an `unsafe` schema can still make a value that fails the
+check.
+
 ## Deriving
 
 `deriving Schema` defines the witness `T.schema`. The plugin of `std` writes
