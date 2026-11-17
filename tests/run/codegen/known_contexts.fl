@@ -54,7 +54,18 @@ let say line = Platform.stdout_line line
 main : Unit ->{; AppError} Unit
 let main () =
   say (show Green ++ " " ++ show (Blue 3) ++ " " ++ show [Some Red, None])
-  say (show (Red == Blue 1) ++ " " ++ show (compare (Blue 2) (Blue 1)) ++ " " ++ show (compare [Some Green] [Some (Blue 0)]))
-  say (show (area (Some (Blue 4))) ++ " " ++ label (Some Red) ++ " " ++ show (area (Some (Some Green))))
+  say
+    (show (Red == Blue 1)
+      ++ " "
+      ++ show (compare (Blue 2) (Blue 1))
+      ++ " "
+      ++ show (compare [Some Green] [Some (Blue 0)]))
+  say
+    (show (area (Some (Blue 4)))
+      ++ " "
+      ++ label (Some Red)
+      ++ " "
+      ++ show (area (Some (Some Green))))
   say (show (wrapped Green) ++ " " ++ show (wrapped (Some Red)) ++ " " ++ labelled (Some Green))
-  say (show (area (Box Red)) ++ " " ++ label (Box Green) ++ " " ++ show (area (Some (Box (Blue 5)))))
+  say
+    (show (area (Box Red)) ++ " " ++ label (Box Green) ++ " " ++ show (area (Some (Box (Blue 5)))))
