@@ -81,3 +81,4 @@ codegen/loops_owners
 runtime/lazy_once
 runtime/suspended
 runtime/lazy_let
+schema/prove

@@ -59,6 +59,10 @@ pub fn expand(
             | "signed"
             | "wrapped"
             | "gated"
+            | "kept"
+            | "leaky"
+            | "claimed"
+            | "stray"
     );
     if !expression && !declaration {
         return None;
@@ -95,6 +99,8 @@ pub fn expand(
         "variants" => variants(block, &mut b),
         "wrapped" => wrapped(block, compiler, &mut b),
         "gated" => gated(block, compiler, &mut b),
+        "kept" | "leaky" => kept(block, compiler, &mut b),
+        "claimed" | "stray" => claimed(block, &mut b),
         _ => Ok(shows(block, &mut b)),
     };
     Some(made.map(|root| b.finish(root)))
@@ -339,6 +345,110 @@ fn gated(
         decl: admit,
     });
     Ok(b.group(vec![held, checked]))
+}
+
+/// `kept Positive { p }`: `unboxed type Positive = Positive$Make Float`
+/// with the invariant `p`, `Positive.check` and `Positive.value`, which the
+/// compiler proves for `Positive.prove`. `leaky` also aliases and applies
+/// its own constructor where nothing proves the check, which the compiler
+/// refuses to the plugin as to anyone.
+fn kept(
+    block: &Block,
+    compiler: &mut dyn Compiler,
+    b: &mut Builder,
+) -> Result<u32, Vec<Diagnostic>> {
+    let name = (block.cursor().next())
+        .filter(|t| t.kind == TokenKind::Con)
+        .map(|t| block.text_of(t.span).to_owned())
+        .ok_or_else(|| vec![Diagnostic::error("expected a type", block.whole())])?;
+    let predicate = block.body().expr(compiler).map_err(|d| vec![d])?;
+    let make = format!("{name}$Make");
+    let field = flick!(b, type Float);
+    let ty = b.decl(Decl::Adt {
+        name: name.clone(),
+        params: Vec::new(),
+        cases: vec![Case {
+            name: make.clone(),
+            fields: vec![field],
+        }],
+        deriving: Vec::new(),
+        unboxed: true,
+    });
+    let ty = b.decl(Decl::Invariant {
+        check: "check".into(),
+        value: "value".into(),
+        prove: "prove".into(),
+        decl: ty,
+    });
+    let check = flick!(b, let #(format!("{name}.check")) = #predicate);
+    let field = b.pat(Pat::Var("value".into()));
+    let taken = b.pat(Pat::Con {
+        name: make.clone(),
+        arguments: vec![field],
+    });
+    let body = flick!(b, value);
+    let value = b.decl(Decl::Let {
+        name: format!("{name}.value"),
+        params: vec![taken],
+        ty: None,
+        body,
+        rec: false,
+    });
+    let mut decls = vec![ty, check, value];
+    if block.head == "leaky" {
+        decls.push(flick!(b, let #(format!("{name}.raw")) = #(Name(&make))));
+        decls.push(flick!(b, let #(format!("{name}.forge")) value = #(Name(&make)) value));
+    }
+    Ok(b.group(decls))
+}
+
+/// `claimed Meters`: a type with an invariant whose check, `Meters.label`,
+/// another block declares. `stray Meters`: an invariant before no type, so
+/// before the type the next block declares, if anything.
+fn claimed(block: &Block, b: &mut Builder) -> Result<u32, Vec<Diagnostic>> {
+    let name = (block.cursor().next())
+        .filter(|t| t.kind == TokenKind::Con)
+        .map(|t| block.text_of(t.span).to_owned())
+        .ok_or_else(|| vec![Diagnostic::error("expected a type", block.whole())])?;
+    let invariant = |b: &mut Builder, decl| {
+        b.decl(Decl::Invariant {
+            check: "label".into(),
+            value: "value".into(),
+            prove: "prove".into(),
+            decl,
+        })
+    };
+    if block.head == "stray" {
+        let nothing = b.group(Vec::new());
+        return Ok(invariant(b, nothing));
+    }
+    let make = format!("{name}$Make");
+    let field = flick!(b, type Float);
+    let ty = b.decl(Decl::Adt {
+        name: name.clone(),
+        params: Vec::new(),
+        cases: vec![Case {
+            name: make.clone(),
+            fields: vec![field],
+        }],
+        deriving: Vec::new(),
+        unboxed: true,
+    });
+    let ty = invariant(b, ty);
+    let field = b.pat(Pat::Var("value".into()));
+    let taken = b.pat(Pat::Con {
+        name: make,
+        arguments: vec![field],
+    });
+    let body = flick!(b, value);
+    let value = b.decl(Decl::Let {
+        name: format!("{name}.value"),
+        params: vec![taken],
+        ty: None,
+        body,
+        rec: false,
+    });
+    Ok(b.group(vec![ty, value]))
 }
 
 /// `instance Show Box = let show _ = "Box"`.

@@ -150,6 +150,9 @@ codes! {
     T074 = Types 74, "a record in the braces of an `if` branch";
     T075 = Types 75, "`from_result (Err e)`, which `Fail.fail e` says";
     T076 = Types 76, "a `~` other than on a parameter of type `Eff`";
+    T077 = Types 77, "cannot prove the check of a type with an invariant";
+    T078 = Types 78, "the check of a type with an invariant fails for this value";
+    T079 = Types 79, "`T.prove` or a constructor with an invariant not applied to its argument";
     E001 = Effects 1, "runtime call in a pure position";
     E002 = Effects 2, "services or errors not allowed by the bound";
     E003 = Effects 3, "argument runs before the function that takes an Eff";
@@ -286,6 +289,7 @@ codes! {
     P046 = Project 46, "a plugin's emit changed code without its map";
     P047 = Project 47, "the IR a plugin gave does not hold together";
     P048 = Project 48, "a plugin rewrote the IR of the build";
+    P049 = Project 49, "the invariant a plugin gave does not hold together";
 }
 
 #[cfg(test)]

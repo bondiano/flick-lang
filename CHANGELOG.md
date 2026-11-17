@@ -6,6 +6,20 @@ break programs.
 
 ## Unreleased
 
+- **`T.prove` for refined types:** `T.prove v` makes a `T` with no
+  `Result` and without running the check again, where the compiler proves
+  the check holds for `v` from the facts of its path: the condition of an
+  `if` or the left of `&&`/`||` around it, a `T.check v` that gave `true`,
+  a call of the same check, or `v` under another immutable name. A fact
+  is about the value bound at one place, so shadowing and `let mut` give
+  none, and the body of a `fun` or a `task` starts with none. An unproved
+  check is `FLICK-T077`, a refuted one `FLICK-T078`, and `T.prove` used
+  other than applied to its argument `FLICK-T079`. The plugin interface
+  gains `Decl::Invariant`, the `@invariant$of` attribute of generated code:
+  the compiler checks the relation of the type to its check and value
+  (`FLICK-P049`) and proves the check wherever the type's constructor is
+  applied, in the plugin's own code too. `docs/formal/refinements.md` is
+  the contract; comparisons with literals and imported types come next.
 - **`let lazy`:** `let lazy x = e` binds a lazy of its function alone, read
   as `await x`: `e` runs the first time, and later awaits get its outcome.
   No other fiber can reach it, so awaiting it needs no `Async`; a closure or

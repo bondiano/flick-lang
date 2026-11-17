@@ -22,6 +22,11 @@ pub const OPEN: &str = "open$module";
 /// to, naming the value that reads the constant: `@checked$by Port$check`.
 pub const CHECKED_BY: &str = "@checked$by";
 
+/// The attribute of generated code before an `unboxed` type whose values its
+/// check holds for, naming the members of the check, of the value and of the
+/// operation that proves one: `@invariant$of check value prove`.
+pub const INVARIANT_OF: &str = "@invariant$of";
+
 /// The heads whose blocks need no body even where no import exposes them,
 /// as the compiler read them before: `server fn f x = …` and `server f`.
 pub const BARE: [&str; 1] = ["server"];

@@ -169,6 +169,17 @@ macro_rules! wit_arena_conversions {
                             $crate::Decl::Checked { by, decl } => {
                                 w::Decl::Checked(w::Checked { by, decl })
                             }
+                            $crate::Decl::Invariant {
+                                check,
+                                value,
+                                prove,
+                                decl,
+                            } => w::Decl::Invariant(w::Invariant {
+                                check,
+                                value,
+                                prove,
+                                decl,
+                            }),
                         }),
                     },
                     origin: to_span(n.origin),
@@ -319,6 +330,12 @@ macro_rules! wit_arena_conversions {
                             w::Decl::Checked(c) => $crate::Decl::Checked {
                                 by: c.by,
                                 decl: c.decl,
+                            },
+                            w::Decl::Invariant(i) => $crate::Decl::Invariant {
+                                check: i.check,
+                                value: i.value,
+                                prove: i.prove,
+                                decl: i.decl,
                             },
                         }),
                     },

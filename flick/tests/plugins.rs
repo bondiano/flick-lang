@@ -100,6 +100,7 @@ mod wasm {
 
     mod block_derive;
     mod compiled;
+    mod invariant;
     mod opened;
     mod stages;
     mod watched;

@@ -148,6 +148,7 @@ schema/derive
 schema/enums
 schema/json_wire
 schema/policies
+schema/prove
 schema/route
 schema/route_nested
 sql/queries

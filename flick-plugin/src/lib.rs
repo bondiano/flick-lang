@@ -46,7 +46,7 @@ pub use written::{EffectRow, FlatKind, FlatRow, FlatWritten, Written, WrittenKin
 
 /// The version of the interface, as `wit/plugin.wit` declares it. Caches of
 /// expansions key on it.
-pub const VERSION: &str = "0.3.0";
+pub const VERSION: &str = "0.4.0";
 
 /// A UTF-8 byte range in the body of a block.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -328,6 +328,18 @@ pub enum Decl {
     /// `Port.parse`: a plugin that watches the function is told how that
     /// value is written wherever the function is applied to a constant.
     Checked { by: String, decl: NodeId },
+    /// `decl`, an `unboxed` type of the block, whose values its check
+    /// holds for: the companions `check : Base -> Bool` and `value : T ->
+    /// Base` the block declares, and `prove`, the member under which the
+    /// compiler makes a value of the type where it can prove the check
+    /// holds. The compiler validates the relation; it then checks every
+    /// application of the type's constructor, the block's own included.
+    Invariant {
+        check: String,
+        value: String,
+        prove: String,
+        decl: NodeId,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

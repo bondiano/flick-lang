@@ -198,10 +198,12 @@ impl Checker<'_> {
     /// locals bound so far are that function's.
     pub fn enter_apart(&mut self, what: Apart) {
         self.cx.mutation.apart.push((self.cx.locals.len(), what));
+        self.set_facts_aside();
     }
 
     pub fn leave_apart(&mut self) {
         self.cx.mutation.apart.pop();
+        self.take_facts_back();
     }
 
     /// A strict comprehension starts here.

@@ -171,7 +171,9 @@ impl Kind {
                     .collect(),
                 Decl::Group(decls) => decls.clone(),
                 Decl::Hole(_) => Vec::new(),
-                Decl::Doc { decl, .. } | Decl::Checked { decl, .. } => vec![*decl],
+                Decl::Doc { decl, .. }
+                | Decl::Checked { decl, .. }
+                | Decl::Invariant { decl, .. } => vec![*decl],
             },
         }
     }
