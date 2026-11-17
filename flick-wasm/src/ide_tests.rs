@@ -1,0 +1,185 @@
+//! The editor features of a session: the offsets an editor sees, the
+//! diagnostics and the build a reused cache must not change.
+
+use std::fs::{read_dir, read_to_string};
+use std::path::Path;
+
+use serde_json::Value;
+
+use flick_core::diagnostics::render::json_events;
+use flick_core::project::{self, Analysis};
+use flick_core::source::SourceMap;
+
+use crate::{Demo, Session, path, positions};
+
+fn json(text: &str) -> Value {
+    serde_json::from_str(text).expect("JSON")
+}
+
+/// The diagnostics of `text` from a run that keeps nothing.
+fn cold(text: &str) -> Value {
+    let mut sources = SourceMap::default();
+    let analysis: Analysis = project::analyze_rt(&Demo(text), &mut sources, None, &[path()]);
+    let mut events =
+        serde_json::to_value(json_events(&sources, &analysis.diagnostics).collect::<Vec<_>>())
+            .expect("diagnostic events serialize");
+    positions(text, &mut events);
+    events
+}
+
+/// The sources of the playground examples, as the site ships them.
+fn examples() -> Vec<(String, String)> {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/src/playground/examples");
+    let mut out: Vec<(String, String)> = read_dir(dir)
+        .expect("the playground examples")
+        .filter_map(|entry| {
+            let entry = entry.expect("entry");
+            let path = entry.path();
+            (path.extension().is_some_and(|e| e == "fl")).then(|| {
+                (
+                    entry.file_name().to_string_lossy().into_owned(),
+                    read_to_string(&path).expect("example"),
+                )
+            })
+        })
+        .collect();
+    out.sort();
+    out
+}
+
+#[test]
+fn offsets_cross_the_boundary_in_utf16_units() {
+    // "é" is 2 bytes and 1 UTF-16 unit; "𝄞" is 4 bytes and 2 units, so every
+    // offset after the string is 3 less in UTF-16 than in UTF-8
+    let source = "module Main exposing (main)\n\ngreeting : String\nlet greeting = \"é𝄞\"\n\nmain : Unit -> Unit\nlet main () =\n  if greeting == \"\" then ()\n";
+    let mut session = Session::new();
+    assert_eq!(
+        json(&session.update(source)),
+        Value::Array(Vec::new()),
+        "the fixture type checks"
+    );
+
+    let tokens = json(&session.semantic_tokens());
+    let used = tokens["tokens"]
+        .as_array()
+        .expect("tokens")
+        .iter()
+        .find(|token| {
+            let from = usize::try_from(token["from"].as_u64().expect("from")).expect("offset");
+            let byte = source_after(source, from);
+            // the use in `main`, not the declaration
+            from > 100 && token["type"] == "variable" && byte.starts_with("greeting")
+        })
+        .expect("the use of `greeting` is a variable token");
+    let from = usize::try_from(used["from"].as_u64().expect("from")).expect("offset");
+    let byte_start = source
+        .match_indices("greeting")
+        .map(|(i, _)| i)
+        .find(|&i| i > source.find("main : Unit").expect("main"))
+        .expect("the use");
+    // the token slice read at the converted offset is the same name
+    assert!(
+        source_after(source, from).starts_with("greeting"),
+        "the UTF-16 offset names the use"
+    );
+    assert_eq!(from, byte_start - 3, "UTF-16 offset of the use");
+    assert_eq!(
+        usize::try_from(used["to"].as_u64().expect("to")).expect("offset") - from,
+        "greeting".len(),
+        "the token covers the whole name"
+    );
+
+    // an offset given in UTF-16 units reaches the same byte of the module,
+    // and an action's UTF-16 range reaches the same bytes again
+    let byte = usize::try_from(crate::byte_offset(
+        source,
+        u32::try_from(from).expect("offset"),
+    ))
+    .expect("offset");
+    assert_eq!(byte, byte_start, "the round trip is the identity");
+    let actions = json(&session.code_actions(
+        u32::try_from(from).expect("offset"),
+        u32::try_from(from + "greeting".len()).expect("offset"),
+    ));
+    assert!(actions.is_array(), "{actions}");
+}
+
+/// The module text from the UTF-16 offset `at`, decoded, used to check that a
+/// converted offset lands on the same name an editor would see.
+fn source_after(source: &str, at: usize) -> String {
+    let mut units = 0;
+    for (byte, ch) in source.char_indices() {
+        if units == at {
+            return source[byte..].to_owned();
+        }
+        units += ch.len_utf16();
+    }
+    String::new()
+}
+
+#[test]
+fn a_reused_cache_reports_what_a_cold_run_reports() {
+    for (name, source) in examples() {
+        let mut session = Session::new();
+        let first = json(&session.update(&source));
+        assert_eq!(first, cold(&source), "{name}: first analysis");
+
+        // an edit and its undo: the cache of the first analysis is reused
+        let edited = source.replace(
+            "module Main exposing (main)",
+            "module Main exposing (main)\n",
+        );
+        let analysed = json(&session.update(&edited));
+        assert_eq!(analysed, cold(&edited), "{name}: after an edit");
+        let again = json(&session.update(&source));
+        assert_eq!(again, cold(&source), "{name}: after the undo");
+        // the revision count is not in the report, but the cache is: every
+        // update goes through the same `ModuleCache` the session owns, which
+        // `checking.rs` retains by path, so the second analysis of the same
+        // text cannot parse it again
+        assert_eq!(again, first, "{name}: the same text analyses the same");
+    }
+}
+
+#[test]
+fn emission_is_the_same_after_the_cache_was_reused() {
+    for (name, source) in examples() {
+        let mut session = Session::new();
+        session.update(&source);
+        session.update(&source.replace(
+            "module Main exposing (main)",
+            "module Main exposing (main)\n",
+        ));
+        session.update(&source);
+        let mut fresh = Session::new();
+        fresh.update(&source);
+        for profile in ["debug", "release"] {
+            let reused: Value = json(&session.emit(profile));
+            let cold: Value = json(&fresh.emit(profile));
+            assert_eq!(reused, cold, "{name}: `emit {profile}`");
+            let reused: Value = json(&session.emit_declarations(profile));
+            let cold: Value = json(&fresh.emit_declarations(profile));
+            assert_eq!(reused, cold, "{name}: `emit_declarations {profile}`");
+        }
+    }
+}
+
+#[test]
+fn signature_help_reaches_the_call_under_the_parenthesis() {
+    let source = "module Main exposing (main)\n\ndouble : Int -> Int\nlet double x = x * 2\n\nmain : Unit -> Unit\nlet main () =\n  let doubled = double (21)\n  if doubled == 42 then ()\n";
+    let mut session = Session::new();
+    assert_eq!(json(&session.update(source)), Value::Array(Vec::new()));
+    let at = source.find("double (21)").expect("the call") + "double (".len();
+    let help = json(&session.signature_help(u32::try_from(at).expect("offset")));
+    assert!(
+        help["label"]
+            .as_str()
+            .is_some_and(|label| label.contains("Int")),
+        "{help}"
+    );
+    let hints = json(&session.inlay_hints());
+    assert!(
+        hints.as_array().is_some_and(|hints| !hints.is_empty()),
+        "{hints}"
+    );
+}

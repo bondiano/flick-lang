@@ -7,6 +7,8 @@
 //! The core counts in UTF-8 bytes and an editor in UTF-16 units, so every
 //! position crosses this boundary as a UTF-16 offset.
 
+use std::cell::{Ref, RefCell};
+use std::collections::BTreeMap;
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -16,10 +18,12 @@ use flick_core::diagnostics::render::json_events;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::fmt;
 use flick_core::ide::{CompletionKind, Ide};
-use flick_core::project::config::Backend;
-use flick_core::project::{self, Analysis, Host};
+use flick_core::project::config::{Backend, Build, Config, Kind};
+use flick_core::project::{self, Analysis, Host, ModuleCache, Project};
 use flick_core::source::{FileId, SourceMap};
 use serde_json::{Value, json};
+
+mod ide;
 use wasm_bindgen::prelude::*;
 
 /// Version of the compiler in this build, e.g. `"0.1.0"`.
@@ -28,12 +32,27 @@ pub fn compiler_version() -> String {
     flick_core::VERSION.to_owned()
 }
 
-/// The module being edited and its last analysis.
+/// The module being edited, its last analysis, and the cache the next one
+/// reuses: a revision parses and checks only what changed.
 #[wasm_bindgen]
 pub struct Session {
     text: String,
     sources: SourceMap,
     analysis: Analysis,
+    /// The in-memory project the cached analysis is of, so that it stages
+    /// the built-in modules as a run on Flick's own runtime does.
+    rt: Project,
+    cache: ModuleCache,
+    /// The analysis `emit` builds from: a cached editor run drops IR, so
+    /// emission takes a cold run of the same text, kept until it changes.
+    emitted: RefCell<Option<Box<Emitted>>>,
+}
+
+/// A cold analysis of the text it is of, with the sources its file ids name.
+struct Emitted {
+    text: String,
+    analysis: Analysis,
+    sources: SourceMap,
 }
 
 impl Default for Session {
@@ -47,12 +66,18 @@ impl Session {
     #[wasm_bindgen(constructor)]
     #[must_use]
     pub fn new() -> Session {
+        let rt = rt_project();
         let mut sources = SourceMap::default();
-        let analysis = project::analyze_rt(&Demo(""), &mut sources, None, &[path()]);
+        let mut cache = ModuleCache::default();
+        let analysis =
+            project::analyze_with(&Demo(""), &mut sources, Some(&rt), &[path()], &mut cache);
         Session {
             text: String::new(),
             sources,
             analysis,
+            rt,
+            cache,
+            emitted: RefCell::new(None),
         }
     }
 
@@ -63,9 +88,14 @@ impl Session {
         if source != self.text {
             source.clone_into(&mut self.text);
             self.sources = SourceMap::default();
-            self.analysis = project::analyze_rt(&Demo(source), &mut self.sources, None, &[path()]);
+            self.emitted = RefCell::new(None);
+            let text = &self.text;
+            let sources = &mut self.sources;
+            let (rt, cache) = (&self.rt, &mut self.cache);
+            self.analysis = project::analyze_with(&Demo(text), sources, Some(rt), &[path()], cache);
         }
-        self.diagnostics(&self.analysis.diagnostics).to_string()
+        self.diagnostics(&self.sources, &self.analysis.diagnostics)
+            .to_string()
     }
 
     /// `{ "js", "dts", "files", "entry", "diagnostics", "dts_diagnostics" }`
@@ -126,22 +156,47 @@ impl Session {
 }
 
 impl Session {
+    /// The cold analysis of the current text, made once for each revision.
+    fn emitted(&self) -> Ref<'_, Emitted> {
+        let stale = self
+            .emitted
+            .borrow()
+            .as_ref()
+            .is_none_or(|e| e.text != self.text);
+        if stale {
+            let mut sources = SourceMap::default();
+            let analysis = project::analyze_rt(&Demo(&self.text), &mut sources, None, &[path()]);
+            let emitted = Emitted {
+                text: self.text.clone(),
+                analysis,
+                sources,
+            };
+            *self.emitted.borrow_mut() = Some(Box::new(emitted));
+        }
+        Ref::map(self.emitted.borrow(), |slot| {
+            slot.as_deref().expect("the analysis was just made")
+        })
+    }
+
     fn emit_output(&self, profile: &str, include_declarations: bool) -> String {
-        let mut diagnostics = self.analysis.diagnostics.clone();
+        let emitted = self.emitted();
+        let sources = &emitted.sources;
+        let analysis = &emitted.analysis;
+        let mut diagnostics = analysis.diagnostics.clone();
         let mut declarations = Vec::new();
         let mut out = json!({ "js": null, "dts": null, "files": null, "entry": null });
         if !has_errors(&diagnostics) {
-            let (artifacts, problems) = self.artifacts(profile);
+            let (artifacts, problems) = Self::artifacts(profile, analysis, sources);
             let (left_out, problems): (Vec<_>, Vec<_>) =
                 problems.into_iter().partition(|d| d.code == codes::F004);
             declarations = left_out;
             diagnostics.extend(problems);
             if !has_errors(&diagnostics) {
-                out = self.output(artifacts, include_declarations);
+                out = Self::output(artifacts, include_declarations, analysis);
             }
         }
-        out["diagnostics"] = self.diagnostics(&diagnostics);
-        out["dts_diagnostics"] = self.diagnostics(&declarations);
+        out["diagnostics"] = self.diagnostics(sources, &diagnostics);
+        out["dts_diagnostics"] = self.diagnostics(sources, &declarations);
         out.to_string()
     }
 
@@ -153,8 +208,12 @@ impl Session {
             .map(|m| m.file)
     }
 
-    fn artifacts(&self, profile: &str) -> (Vec<build::Artifact>, Vec<Diagnostic>) {
-        let compilation = &self.analysis.compilation;
+    fn artifacts(
+        profile: &str,
+        analysis: &Analysis,
+        sources: &SourceMap,
+    ) -> (Vec<build::Artifact>, Vec<Diagnostic>) {
+        let compilation = &analysis.compilation;
         let module = compilation.modules.iter().find(|m| m.path == path());
         // like `flick build` without a project: a module with `main` gets the runner
         let entries: Vec<(String, String)> = module
@@ -184,11 +243,15 @@ impl Session {
             runners: &[],
             environment: None,
         };
-        build::emit(compilation, &self.sources, &settings)
+        build::emit(compilation, sources, &settings)
     }
 
-    fn output(&self, artifacts: Vec<build::Artifact>, include_declarations: bool) -> Value {
-        let stem = (self.analysis.compilation.modules.iter())
+    fn output(
+        artifacts: Vec<build::Artifact>,
+        include_declarations: bool,
+        analysis: &Analysis,
+    ) -> Value {
+        let stem = (analysis.compilation.modules.iter())
             .find(|m| m.path == path())
             .map(|m| m.name.replace('.', "/"));
         let declaration_entry = if include_declarations {
@@ -241,9 +304,9 @@ impl Session {
         output
     }
 
-    fn diagnostics(&self, diagnostics: &[Diagnostic]) -> Value {
+    fn diagnostics(&self, sources: &SourceMap, diagnostics: &[Diagnostic]) -> Value {
         let mut events =
-            serde_json::to_value(json_events(&self.sources, diagnostics).collect::<Vec<_>>())
+            serde_json::to_value(json_events(sources, diagnostics).collect::<Vec<_>>())
                 .expect("diagnostic events serialize");
         positions(&self.text, &mut events);
         events
@@ -372,6 +435,39 @@ fn line_column(text: &str, byte: u32) -> String {
         .count()
         + 1;
     format!("{line}:{column}")
+}
+
+/// The in-memory project of the playground: one file at the root, staged for
+/// Flick's own runtime, with no manifest on disk.
+// `Thresholds` is not exported, so its name cannot be written here.
+#[allow(clippy::default_trait_access)]
+fn rt_project() -> Project {
+    let config = Config {
+        kind: Kind::Lib,
+        source_dir: ".".to_owned(),
+        test_dir: "test".to_owned(),
+        entries: Vec::new(),
+        dependencies: Vec::new(),
+        js_dependencies: Vec::new(),
+        package: None,
+        build: Build {
+            effect: Backend::Rt,
+            ..Build::default()
+        },
+        sql_dialect: "",
+        allow: Vec::new(),
+        no_let_assert: false,
+        thresholds: Default::default(),
+        plugins: BTreeMap::new(),
+    };
+    let mut sources = SourceMap::default();
+    let config_file = sources.add("/flick.toml".to_owned(), "");
+    Project {
+        root: PathBuf::from("/"),
+        config,
+        config_file,
+        workspace: None,
+    }
 }
 
 /// The one file of the playground, and how diagnostics name it.
