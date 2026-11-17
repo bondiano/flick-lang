@@ -202,6 +202,7 @@ impl Checker<'_> {
         // the places a plugin watches: read before any argument, so an
         // application of a name none watches pays only the lookup
         let watched = self.watched_name(head);
+        let marked = self.suspended_params(head);
         let mut given = Vec::new();
         let end = args.last().map_or(head.range().1, |last| last.range().1);
         for (i, arg) in args.iter().enumerate() {
@@ -226,7 +227,12 @@ impl Checker<'_> {
                             .arrow_stages(&param)
                             .contains(&super::ty::Stage::Runtime);
                     let outer = defer.then(|| self.cx.regions.defaults.replace(Vec::new()));
-                    let argument = self.check_value(arg, &param);
+                    // a runtime call for a parameter marked `~` is passed unstarted
+                    let argument = if eff && marked.contains(&i) && self.runs_now(arg) {
+                        self.suspended_arg(arg, &param)
+                    } else {
+                        self.check_value(arg, &param)
+                    };
                     if let Some(outer) = outer {
                         let mine = mem::replace(&mut self.cx.regions.defaults, outer);
                         defaults.extend(mine.unwrap_or_default());

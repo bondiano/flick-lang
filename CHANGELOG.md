@@ -6,6 +6,16 @@ break programs.
 
 ## Unreleased
 
+- **Suspended parameters `~`:** a signature can mark a parameter of type
+  `Eff` with `~`, `or_die : ~(Eff r e a)^c ->{r} a`, and a runtime call
+  written there is passed unstarted, as `task { … }` would pass it. The
+  combinators of the standard library that run a computation are marked
+  (`Effect.or_die`, `Effect.retry`, `Effect.repeat`, `Effect.exit`,
+  `Effect.delay`, `Effect.forever`, `Effect.ignore_`, `timeout`,
+  `timeout_option`, `Effect.timeout_or_else`), so
+  `Effect.or_die (Database.query q)` needs no `task`. The marker is not part
+  of the type and works where the function is called by name; a misplaced
+  `~` is `FLICK-T076`. Interfaces are version 27.
 - **`lazy`:** `lazy { body }` (or `lazy e`) builds a `Lazy r e a`, which runs
   its body at most once, at its first `await`, in the fiber that awaits;
   every later `await` gets the same value, typed failure or defect. Fibers

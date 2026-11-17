@@ -35,7 +35,7 @@ let unique taken =
 
 /// The stored form of a password, PBKDF2 with a salt of its own.
 hash : String ->{Async, Crypto.Crypto} String
-let hash password = Effect.or_die (task { Crypto.hash_password password })
+let hash password = Effect.or_die (Crypto.hash_password password)
 
 /// The answer for a user who just signed in or up.
 signed : Account ->{Async, Keys, Crypto.Crypto, Host.Clock} UserBody
@@ -63,7 +63,7 @@ let login request =
   let refused = Unauthorized (Problem.problem "credentials" "invalid")
   match People.by_email given.email with
   | Some account ->
-    if Effect.or_die (task { Crypto.verify_password given.password account.password_hash }) then
+    if Effect.or_die (Crypto.verify_password given.password account.password_hash) then
       signed account
     else
       Fail.fail refused

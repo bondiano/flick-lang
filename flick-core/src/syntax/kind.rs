@@ -180,6 +180,8 @@ syntax_kinds! {
         Dollar,
         /// `@`, which starts an attribute: `@lang int`.
         At,
+        /// `~` before the parameter of a function type: a suspended parameter.
+        Tilde,
         /// Postfix `?`: the value of an `Option` or a `Result`, or an early exit.
         Question,
         Underscore,
@@ -346,6 +348,9 @@ syntax_kinds! {
         NameType,
         AppType,
         ArrowType,
+        /// `~T`, the parameter of a function that takes its argument as a
+        /// computation: a direct call there is passed as `task { … }`.
+        SuspendedType,
         EffectAnnot,
         Row,
         RowTail,

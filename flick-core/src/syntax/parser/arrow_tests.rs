@@ -41,3 +41,12 @@ fn lazy_takes_a_block_or_an_operand() {
         "(LetDecl let (VarPat v) = (Block (AppExpr (NameExpr f) (LazyExpr lazy { (Block (NameExpr x)) }))))"
     );
 }
+
+/// `~T` marks the parameter of an arrow: it wraps the parameter's type.
+#[test]
+fn a_suspended_parameter_wraps_its_type() {
+    assert_eq!(
+        sexp("f : ~(Eff r e a)^c ->{r} a"),
+        "(Signature f : (ArrowType (SuspendedType ~ (CaptureType (ParenType ( (AppType (NameType Eff) (NameType r) (NameType e) (NameType a)) )) ^ (NameType c))) -> (EffectAnnot { (Row (NameType r)) }) (NameType a)))"
+    );
+}

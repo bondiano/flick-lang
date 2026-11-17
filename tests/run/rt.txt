@@ -353,3 +353,5 @@ effect/row_without
 runtime/counted_layer_merge
 runtime/lazy_once
 runtime/lazy_shared
+runtime/suspended
+runtime/suspended_std

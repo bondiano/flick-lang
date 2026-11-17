@@ -89,6 +89,7 @@ mod shown;
 mod signature_lints;
 mod stub;
 mod sugar_lints;
+mod suspended;
 mod toplevel;
 mod ts_forms;
 mod ty;

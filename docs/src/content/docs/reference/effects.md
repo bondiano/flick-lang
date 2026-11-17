@@ -179,6 +179,24 @@ A function that takes an `Eff` decides when it runs. A runtime call written
 as its argument has already run when the function starts: the warning
 `FLICK-E003` suggests passing `task { … }` instead.
 
+A function can take its argument unstarted itself: a parameter marked `~`,
+`~(Eff r e a)`, receives a runtime call written there as the computation
+`task { … }` would make of it. The standard library's combinators that run
+a computation mark it, so `Effect.or_die (Database.query q)`,
+`timeout 500 (Http.get url)` and `Effect.retry policy (fetch id)` need no
+`task`; an `Eff` value passed there is passed as it is.
+
+```flick
+twice : ~(Eff r e Int)^c ->{r; e} Int
+let twice job = await job + await job
+```
+
+- `twice (count ())` runs `count ()` twice, once per `await`.
+- The marker is not part of the type: it belongs to the signature, travels
+  in the module's interface, and works where the function is called by its
+  name. A pipe `x |> f` evaluates `x` first, as ever.
+- `~` goes only on a parameter of type `Eff` (`FLICK-T076`).
+
 ## `lazy`
 
 `lazy { body }` builds a `Lazy r e a`: like `task`, it runs nothing yet, but

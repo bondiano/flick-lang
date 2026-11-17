@@ -150,6 +150,10 @@ pub struct Interface {
     /// declarations made from the interface alone (`.d.ts`) carry it too.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub docs: BTreeMap<String, String>,
+    /// The parameters each value's signature marks `~`, by position: an
+    /// argument there that is a runtime call is passed unstarted.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub suspended: BTreeMap<String, Vec<usize>>,
     /// The instances of the module and of every module it depends on: an
     /// importer sees them all, whatever it imports by name.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
