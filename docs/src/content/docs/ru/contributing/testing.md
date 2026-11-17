@@ -1,6 +1,6 @@
 ---
 title: "Тестирование"
-source_hash: fcf1f240b45f3e2c
+source_hash: 65d724eb0621ec5a
 ---
 
 Установите инструмент проверки зависимостей, используемый локально и в CI:
@@ -101,7 +101,7 @@ let x : Float = "hi"
 как предыдущий освободит ресурсы.
 
 Стандартная библиотека объявляет все сигнатуры из спецификации дословно:
-`flick-core/tests/compiler/stdlib_signatures.rs` читает их из блоков `text` русской спецификации (`ru/spec`).
+`flick-core/tests/stdlib_signatures.rs` читает их из блоков `text` русской спецификации (`ru/spec`).
 
 ## Языковые тесты — `tests/language/`
 
@@ -225,6 +225,6 @@ CPU, версию Node и методику рядом с результатам�
 | SQL | `tests/check/{pass,fail}/sql/`, `tests/run/sql/`, `packages/effect-ts/test/sql.test.ts`, `flick/tests/sql_postgres.rs` над `tests/postgres/` |
 | UI | `tests/check/{pass,fail}/ui/`, `tests/run/ui/`, `packages/effect-ts/test/ui-*.test.ts` |
 | блок `cli` | `tests/check/{pass,fail}/cli/`, `tests/run/stdlib/cli/`, `flick-core/src/project/load/plugins_tests.rs` (вызовы, которые он означает), `flick/tests/cli/lsp_editor/cli.rs` |
-| подсказки, языковой сервер и проекция TypeScript | `flick-core/src/ide/tests.rs`, `flick/tests/cli/{lsp_command.rs,lsp_editor/}`, `flick-core/tests/compiler/projection.rs`, `flick-core/src/codegen/ts/tests.rs` |
+| подсказки, языковой сервер и проекция TypeScript | `flick-core/src/ide/tests.rs`, `flick/tests/cli/{lsp_command.rs,lsp_editor/}`, `flick-core/tests/projection.rs`, `flick-core/src/codegen/ts/tests.rs` |
 | CLI: `check`/`build` не запускают код, поколения запуска, `dev`, кеш, pnpm, коды выхода, NDJSON | `flick/tests/cli/{cli_project,cli_run,check_command}.rs` |
 | фасады `.d.ts` и `pack` | `flick/tests/cli/dts_command.rs`, `flick/tests/cli/cli_run.rs` |

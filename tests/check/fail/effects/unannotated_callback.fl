@@ -1,0 +1,15 @@
+module App.UnannotatedCallback exposing (..)
+
+// Applied before its type is known, `h` is taken for a pure function, so the
+// runtime function `say` does not fit it: the error is at `say`, its related
+// note at the binder of `h`, and its fix writes the arrow `h` is given.
+service Log =
+  info : String ->{} Unit
+
+say : Unit ->{Log} Unit
+let say () = Log.info "hi"
+
+apply : Unit ->{Log} Unit
+let apply () = (fun h -> h ()) say
+
+//~ FLICK-T003 @13:32-13:35 expected `Unit -> _`, found `Unit ->{Log} Unit`

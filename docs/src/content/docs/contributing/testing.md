@@ -90,7 +90,7 @@ is reported apart, a seed draws the same values again, `--filter` and
 previous one released its resources.
 
 The standard library declares every signature the specification gives for
-it word for word: `flick-core/tests/compiler/stdlib_signatures.rs` reads them from the
+it word for word: `flick-core/tests/stdlib_signatures.rs` reads them from the
 Russian spec's (`ru/spec`) `text` blocks.
 
 ## Language tests — `tests/language/`
@@ -210,6 +210,6 @@ Where to look for the tests of a behavior, and where a new one goes:
 | SQL | `tests/check/{pass,fail}/sql/`, `tests/run/sql/`, `packages/effect-ts/test/sql.test.ts`, `flick/tests/sql_postgres.rs` over `tests/postgres/` |
 | UI | `tests/check/{pass,fail}/ui/`, `tests/run/ui/`, `packages/effect-ts/test/ui-*.test.ts` |
 | the `cli` block | `tests/check/{pass,fail}/cli/`, `tests/run/stdlib/cli/`, `flick-core/src/project/load/plugins_tests.rs` (the calls it stands for), `flick/tests/cli/lsp_editor/cli.rs` |
-| hover, the language server and the TypeScript projection | `flick-core/src/ide/tests.rs`, `flick/tests/cli/{lsp_command.rs,lsp_editor/}`, `flick-core/tests/compiler/projection.rs`, `flick-core/src/codegen/ts/tests.rs` |
+| hover, the language server and the TypeScript projection | `flick-core/src/ide/tests.rs`, `flick/tests/cli/{lsp_command.rs,lsp_editor/}`, `flick-core/tests/projection.rs`, `flick-core/src/codegen/ts/tests.rs` |
 | the CLI: no code run by `check`/`build`, run generations, `dev`, cache, pnpm, exit codes, NDJSON | `flick/tests/cli/{cli_project,cli_run,check_command}.rs` |
 | `.d.ts` façades and `pack` | `flick/tests/cli/dts_command.rs`, `flick/tests/cli/cli_run.rs` |

@@ -153,7 +153,8 @@ The checker relates `none` to the rest as follows:
 - A parameter of unknown type applied to an argument is taken as a pure
   function, so `(fun h -> h ()) f` with an effectful `f` is `FLICK-T003`.
   An effectful callback gets its type from the expected type or from a
-  signature.
+  signature. The error points at `h` and offers to annotate it,
+  `fun (h : Unit ->{Log} Unit) -> h ()`.
 - A row the constraints leave unknown at the end of a declaration becomes
   `none`: an inferred function that calls no service gets an empty service
   row, not a free row variable.

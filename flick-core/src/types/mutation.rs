@@ -210,8 +210,8 @@ impl Checker<'_> {
     }
 
     /// `FLICK-G005` when the local `index`, a `let mut` variable, is used
-    /// from code that runs apart from its function.
-    pub fn mutable_use(&mut self, index: usize, span: Span) -> bool {
+    /// (`write`: assigned) from code that runs apart from its function.
+    pub fn mutable_use(&mut self, index: usize, span: Span, write: bool) -> bool {
         if self.cx.locals[index].binding != Binding::Mut {
             return true;
         }
@@ -236,10 +236,17 @@ impl Checker<'_> {
             span,
         )
         .with_fix(|| {
-            (
-                format!("bind the value with `let` before {before} and use that name"),
-                Vec::new(),
-            )
+            let help = if write {
+                // a copy cannot take an assignment: shared state lives in a cell
+                format!(
+                    "to change `{name}` from {before}, keep it in a `Ref`: `let {name} = Ref.make …`, then `Ref.set {name} …` and `Ref.get {name}`"
+                )
+            } else {
+                format!(
+                    "bind the value with `let` before {before} and use that name; to see later changes, keep `{name}` in a `Ref`"
+                )
+            };
+            (help, Vec::new())
         });
         let diagnostic = match self.cx.locals[index].at {
             Some(at) => {
@@ -342,7 +349,7 @@ impl Checker<'_> {
                 .insert((span.start, span.end), (at, end));
         }
         self.cx.regions.uses.push(index);
-        if self.mutable_use(index, span) {
+        if self.mutable_use(index, span, true) {
             self.settled_assignment(index, &name, span);
         }
         let ty = self.cx.locals[index].ty.clone();

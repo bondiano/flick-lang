@@ -2,7 +2,7 @@
 
 package flickrt
 
-// CLDR 48, as Node 24.22.1 (ICU 78.3) collates.
+// CLDR 48, as Node 24.18.0 (ICU 78.3) collates.
 const (
 	// collationRootData is the root's mappings, apart by ";": `key:elements` or
 	// `prefix|key:elements`, the key and prefix code points in hex apart by ",", the elements

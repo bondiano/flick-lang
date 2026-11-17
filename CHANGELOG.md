@@ -6,6 +6,14 @@ break programs.
 
 ## Unreleased
 
+- **`let mut` captured by a closure or a `task`:** `FLICK-G005` says what
+  to do for a read and for an assignment, and an editor offers "keep `x` in
+  a `Ref`", which rewrites the declaration, its reads and its assignments
+  into `Ref.make`, `Ref.get` and `Ref.set`. A callback parameter taken for a
+  pure function because it is applied before its type is known,
+  `(fun h -> h ()) f`, is now pointed at in the `FLICK-T003` it causes, with
+  a fix that annotates it. An editor no longer marks a fix that is not safe
+  as preferred.
 - **Broken records without `;`:** `flick fmt` puts one field of a broken
   record, record type, pattern or update per line with no `;`, as a block
   puts its statements, so a field ending in a `match` or `try` no longer
