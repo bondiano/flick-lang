@@ -66,7 +66,7 @@ and `Monad`.
 | `Platform` | `stdout_line`, `stderr_line`, `stdout_write` through `Host.Console`, `args` through `Host.Arguments`, `env` through `Host.Environment` |
 | `Log` | the `Log` service with `info`, `warn`, `error`, `debug`, and `Log.console` over `Host.console` |
 | `File` | the `FileSystem` service: `open_scoped`, `read_all`, `read_text`, `write_text`, and `File.node` |
-| `ChildProcess` | child processes: a `Command` (`make`, `set_cwd`, `set_env`, `set_stdin`, `prefix`, `pipe_to`, `inherit_output`) run to its end by `string`, `lines` and `exit_code`, or started by `spawn` as a `Process` of a scope, all through `Host.Process`, with `stdout`, `stderr`, `wait`, `is_running`, `kill` and `kill_with` |
+| `ChildProcess` | child processes: a `Command` (`make`, `set_cwd`, `set_env`, `set_stdin`, `prefix`, `pipe_to`, `inherit_output`) run to its end by `string`, `lines` and `exit_code`, or started by `spawn` as a `Process` of a scope, all through `Host.Process`, with `stdout`, `stderr`, `output_string`, `output_lines`, `wait`, `is_running`, `kill` and `kill_with` |
 | `Resource` | `acquire_release` into a scope's owner, and `bracket` |
 | `Events` | `queue` policies and the `log_failures` supervisor |
 | `Ui`, `Ui.Event` | user interfaces rendered with React, see [ui.md](../ui/) |

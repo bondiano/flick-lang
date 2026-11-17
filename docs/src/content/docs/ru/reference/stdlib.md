@@ -1,6 +1,6 @@
 ---
 title: "Стандартная библиотека"
-source_hash: 9ea5af61aed08424
+source_hash: c21d6faa7c24c97e
 ---
 
 Стандартная библиотека написана на Flick и использует адаптер среды выполнения
@@ -69,7 +69,7 @@ source_hash: 9ea5af61aed08424
 | `Platform` | `stdout_line`, `stderr_line`, `stdout_write` через `Host.Console`, `args` через `Host.Arguments`, `env` через `Host.Environment` |
 | `Log` | сервис `Log` с `info`, `warn`, `error`, `debug` и `Log.console` поверх `Host.console` |
 | `File` | сервис `FileSystem`: `open_scoped`, `read_all`, `read_text`, `write_text` и `File.node` |
-| `ChildProcess` | дочерние процессы: команда `Command` (`make`, `set_cwd`, `set_env`, `set_stdin`, `prefix`, `pipe_to`, `inherit_output`) выполняется до конца через `string`, `lines` и `exit_code` или запускается `spawn` как `Process` scope'а, всё через `Host.Process`, с `stdout`, `stderr`, `wait`, `is_running`, `kill` и `kill_with` |
+| `ChildProcess` | дочерние процессы: команда `Command` (`make`, `set_cwd`, `set_env`, `set_stdin`, `prefix`, `pipe_to`, `inherit_output`) выполняется до конца через `string`, `lines` и `exit_code` или запускается `spawn` как `Process` scope'а, всё через `Host.Process`, с `stdout`, `stderr`, `output_string`, `output_lines`, `wait`, `is_running`, `kill` и `kill_with` |
 | `Resource` | `acquire_release` с передачей ресурса владельцу области и `bracket` |
 | `Events` | политики `queue` и супервизор `log_failures` |
 | `Ui`, `Ui.Event` | пользовательские интерфейсы, отображаемые с помощью React, см. [пользовательские интерфейсы](../ui/) |
