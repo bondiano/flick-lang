@@ -5,7 +5,8 @@
 
 use std::rc::Rc;
 
-use super::logic::Formula;
+use super::interval::{Bound, Op};
+use super::logic::{Atomic, Formula};
 use crate::consteval::{self, Const};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -28,6 +29,34 @@ pub enum Value {
     Once(Range),
     /// The parameter of a check, before it is given an argument.
     Param,
+    /// A constant the program writes.
+    Lit(Literal),
+}
+
+/// A literal: a number by its bits, text or a `Bool`.
+#[derive(Clone, PartialEq, Eq)]
+#[cfg_attr(test, derive(Debug))]
+pub enum Literal {
+    Number(u64),
+    Text(String),
+    Bool(bool),
+}
+
+impl Literal {
+    /// Whether two literals are equal as `==` compares them: numbers as
+    /// `SameValueZero`, so the two zeros are one.
+    #[allow(clippy::float_cmp, reason = "SameValueZero is the semantics")]
+    fn equals(&self, other: &Literal) -> Option<bool> {
+        match (self, other) {
+            (Literal::Number(a), Literal::Number(b)) => {
+                let (a, b) = (f64::from_bits(*a), f64::from_bits(*b));
+                Some(a == b || (a.is_nan() && b.is_nan()))
+            }
+            (Literal::Text(a), Literal::Text(b)) => Some(a == b),
+            (Literal::Bool(a), Literal::Bool(b)) => Some(a == b),
+            _ => None,
+        }
+    }
 }
 
 impl Value {
@@ -54,6 +83,40 @@ pub enum Atom {
     },
     /// A `Bool` value itself.
     Truth(Value),
+    /// `value op bound`, a primitive comparison of an `Int` or a `Float`.
+    /// The walk reads the bound as a `Float`; the solved module says which.
+    Compare { value: Value, op: Op, bound: Bound },
+    /// `value == literal`: an exact atom, never a substitution.
+    Equals { value: Value, literal: Literal },
+}
+
+impl Atomic for Atom {
+    type Subject = Value;
+
+    fn comparison(&self) -> Option<(&Value, Op, Bound)> {
+        match self {
+            Atom::Compare { value, op, bound } if !matches!(value, Value::Lit(_)) => {
+                Some((value, *op, *bound))
+            }
+            _ => None,
+        }
+    }
+
+    fn constant(&self) -> Option<bool> {
+        match self {
+            Atom::Compare {
+                value: Value::Lit(Literal::Number(bits)),
+                op,
+                bound,
+            } => Some(op.of(f64::from_bits(*bits), bound.value())),
+            Atom::Equals {
+                value: Value::Lit(l),
+                literal,
+            } => l.equals(literal),
+            Atom::Truth(Value::Lit(Literal::Bool(b))) => Some(*b),
+            _ => None,
+        }
+    }
 }
 
 impl Atom {
@@ -70,6 +133,15 @@ impl Atom {
                 argument: of.given(argument),
             },
             Atom::Truth(v) => Atom::Truth(v.given(argument)),
+            Atom::Compare { value, op, bound } => Atom::Compare {
+                value: value.given(argument),
+                op: *op,
+                bound: *bound,
+            },
+            Atom::Equals { value, literal } => Atom::Equals {
+                value: value.given(argument),
+                literal: literal.clone(),
+            },
         }
     }
 }
@@ -132,6 +204,7 @@ impl Checker<'_> {
                     Formula::Or(left, right)
                 }
             }
+            (K::BinExpr, [left, right]) => self.proof_comparison(node, left, right, value),
             (K::AppExpr, [head, rest @ ..]) => match arguments(rest)[..] {
                 [argument] => self.proof_call(head, argument, value),
                 _ => Formula::Opaque,
@@ -158,7 +231,7 @@ impl Checker<'_> {
         let Some(Ref::Value { module, name }) = self.typing.names.get(&at) else {
             return Formula::Opaque;
         };
-        match value(argument) {
+        match self.proof_operand(argument, value) {
             Some(argument) => Formula::Atom(Raw {
                 atom: Atom::Call {
                     module: module.clone(),
@@ -168,6 +241,82 @@ impl Checker<'_> {
                 at,
             }),
             None => Formula::Opaque,
+        }
+    }
+
+    /// `a op b` of a value and a literal: an ordered comparison, which the
+    /// solved module says is of `Int` or `Float`, or `==`, `!=`.
+    fn proof_comparison(
+        &self,
+        node: &Node,
+        left: &Node,
+        right: &Node,
+        value: &dyn Fn(&Node) -> Option<Value>,
+    ) -> Formula<Raw> {
+        let Some(op) = node.child_tokens().find(|t| t.kind.is_binary_op()) else {
+            return Formula::Opaque;
+        };
+        let (Some(left), Some(right)) = (
+            self.proof_operand(left, value),
+            self.proof_operand(right, value),
+        ) else {
+            return Formula::Opaque;
+        };
+        // the literal on the right: `0 < n` is `n > 0`
+        let (value, literal, flipped) = match (left, right) {
+            (value, Value::Lit(literal)) => (value, literal, false),
+            (Value::Lit(literal), value) => (value, literal, true),
+            _ => return Formula::Opaque,
+        };
+        let ordered = match op.kind {
+            K::Lt => Op::Lt,
+            K::Le => Op::Le,
+            K::Gt => Op::Gt,
+            K::Ge => Op::Ge,
+            K::EqEq | K::NotEq => {
+                let equals = Formula::Atom(Raw {
+                    atom: Atom::Equals { value, literal },
+                    at: node.range(),
+                });
+                return if op.kind == K::EqEq {
+                    equals
+                } else {
+                    Formula::Not(Box::new(equals))
+                };
+            }
+            _ => return Formula::Opaque,
+        };
+        let Literal::Number(bits) = literal else {
+            return Formula::Opaque;
+        };
+        let op = if flipped { ordered.flipped() } else { ordered };
+        Formula::Atom(Raw {
+            atom: Atom::Compare {
+                value,
+                op,
+                bound: Bound::Float(bits),
+            },
+            at: node.range(),
+        })
+    }
+
+    /// A value `value` reads, or a literal.
+    fn proof_operand(&self, node: &Node, value: &dyn Fn(&Node) -> Option<Value>) -> Option<Value> {
+        value(node).or_else(|| self.proof_literal(node).map(Value::Lit))
+    }
+
+    /// A literal the program writes, a negative number included; folding
+    /// more would read `Int` arithmetic, which wraps, as a `Float`'s.
+    pub(super) fn proof_literal(&self, node: &Node) -> Option<Literal> {
+        let node = unparen(node);
+        let negated = node.kind == K::PrefixExpr && node.has_token(K::Minus);
+        let literal = node.kind == K::Literal
+            || (negated && node.nodes().next().is_some_and(|n| n.kind == K::Literal));
+        match consteval::eval(node, self.text).filter(|_| literal)? {
+            Const::Number(n) => Some(Literal::Number(n.to_bits())),
+            Const::String(s) => Some(Literal::Text(s)),
+            Const::Bool(b) => Some(Literal::Bool(b)),
+            Const::BigInt(_) => None,
         }
     }
 

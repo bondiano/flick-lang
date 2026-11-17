@@ -1,6 +1,6 @@
 # Invariants: proof-required construction and facts of paths
 
-Status: **contract** (RFC #595, #594). §1–§4 are implemented for invariants a module declares itself. §5 describes the numeric atoms and §6 the module boundary, which come next. This page fixes what the checker accepts for `T.prove`, what a plugin's invariant must be, and what the guarantee does not cover. Each rule lists where it is checked.
+Status: **contract** (RFC #595, #594). §1–§5 are implemented for invariants a module declares itself, and the logic of §4–§5 is proved in Lean (`Formal/Refine.lean`). §6, the module boundary, comes next. This page fixes what the checker accepts for `T.prove`, what a plugin's invariant must be, and what the guarantee does not cover. Each rule lists where it is checked.
 
 References as in [`core.md`](core.md). Checker paths are relative to `flick-core/src/types/`.
 
@@ -11,7 +11,7 @@ References as in [`core.md`](core.md). Checker paths are relative to `flick-core
 | `@invariant$of check value prove` | a block's `unboxed` type whose values its check holds for | §1 |
 | `T.prove e` | `e` as a `T`, where the facts of its path prove `T.check e` | §2 |
 | a fact | a Boolean expression the path ran, with the result it gave | §3 |
-| the logic | what facts establish of the check | §4 |
+| the logic | what facts establish of the check | §4, §5 |
 
 Out of scope for v1:
 - facts across a join;
@@ -95,6 +95,9 @@ Checked by: `tests/check/pass/schema/prove.fl`, `tests/check/fail/schema/prove.f
 **Atoms.**
 - `f v`, where `f` is a top-level function, keyed by its module and name, and the call takes no dictionary.
 - `v`, a `Bool` value.
+- `v op c` with `op` one of `<`, `<=`, `>`, `>=` and `c` a finite literal, where the comparison settled to the primitive one of `Int` or `Float` (§5). A literal on the left is flipped: `0 < n` is `n > 0`.
+- `v == c` with a literal `c`, an exact atom (`!=` is its negation).
+- An atom of constants alone, `8080 > 0`, gives its result by itself, as the program compares.
 
 **Knowledge.** `K = Φ*` is what the facts establish (`proofs/logic.rs`, `Knowledge::of`):
 - `(φ && ψ, true)` gives both, true. `(φ || ψ, false)` gives both, false.
@@ -128,11 +131,13 @@ holds(φ || ψ) = true  if holds(φ) = true;   holds(ψ) if holds(φ) = false; u
 
 Unknown is no claim that the value is invalid. Both diagnostics point to `T.parse`, which checks the value when the program runs.
 
-Checked by: `proofs/logic.rs` unit tests, `tests/check/{pass,fail}/schema/prove.fl`.
+Checked by: `proofs/logic.rs` unit tests, `proofs/props.rs` (random formulas, facts and worlds against an evaluator of its own), `tests/check/{pass,fail}/schema/prove.fl`.
 
-## 5. Numeric atoms (next)
+Lean: `Formal/Refine.lean`. `eval` is the three-valued evaluation, `holds` and `assume` are generic in a `Theory` of atoms, and `learn` runs rounds of facts with any budget. `sound`: in a world where every fact ran to its result, a formula `holds` decides gives that result. `unobserved_or_true` and `or_true_decides_neither` pin definedness. No `sorry`, no new axioms (`Formal/Axioms.lean`).
 
-Comparisons `<`, `<=`, `>`, `>=` of a value with a finite literal, on primitive `Int` or `Float`:
+## 5. Numeric atoms
+
+Comparisons `<`, `<=`, `>`, `>=` of a value with a finite literal, on primitive `Int` or `Float` (`proofs/interval.rs`):
 
 - **Float.** The domain of a value is `{NaN?} ∪ [lo, hi]`, each end strict or not, and ±0 compare equal.
   - `x > c` true removes NaN and raises `lo`.
@@ -140,7 +145,12 @@ Comparisons `<`, `<=`, `>`, `>=` of a value with a finite literal, on primitive 
 - **Int.** The domain is an i32 interval.
 - **No arithmetic.** `x + 1` is opaque, so wrapping cannot make a proof.
 - **Equality.** `==` and `!=` with a literal are exact atoms, never a substitution.
-- **Not primitive.** A comparison that settled to `Ord` (`typing.generic_ordered`) is opaque.
+- **Not primitive.** A comparison that settled to `Ord` (`typing.generic_ordered`) is opaque. `settle.rs` notes each primitive one (`note_compared`).
+- **Unbounded.** A value nothing compared has the full interval of its type: an `Int` is within i32 and never NaN.
+
+Checked by: `proofs/interval.rs` unit tests, `proofs/props.rs` (NaN, infinities, signed zeros, the bounds of i32), `tests/check/{pass,fail}/schema/prove_numbers.fl`, `plugins_tests/refined.rs` (the lowered `as_port` applies `Port$Make` and never names `Port$check`), `tests/run/schema/prove.fl` on the model, JS, Go and Flick's runtime.
+
+Lean (`Formal/Refine/Numbers.lean`): `Num` is a total preorder with a point NaN that every ordered comparison finds false, the model of binary64 comparisons and of `Int`'s. `Num.learn_sound` and `Num.decide_sound` are the laws of the interval. `numbers_sound`: atoms with their results together with the intervals are a sound `Theory`, so `sound` holds of the checker's knowledge. `intNum` and `Interval.int_side`: an `Int`'s open end moved to the closed one next to it holds of the same integers.
 
 ## 6. Modules (next)
 
@@ -159,4 +169,4 @@ The invariant of §1 holds for values made by `C`'s applications, which are `T.p
 - A `foreign` function returning `T` is trusted, as `foreign` contracts are, and so are the `unsafe` APIs such as `Schema.unsafe_unboxed`; either can break the invariant.
 - Wire codecs and `deriving Schema` go through `T.parse` (`Schema.unsafe_refined`).
 - A pure atom is assumed deterministic. A `foreign pure` function that is not deterministic breaks the assumption, as it breaks purity.
-- The model and Lean prove the logic of §4 (next); they do not prove the Rust checker or the runtimes' IEEE arithmetic.
+- Lean proves the logic of §4–§5; it does not prove the Rust checker or the runtimes' IEEE arithmetic, and the model sees `T.prove e` as `C e`.

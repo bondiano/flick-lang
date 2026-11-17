@@ -12,6 +12,8 @@ import Formal.Lemma4
 import Formal.IndexedRows
 import Formal.TypeEquivShape
 import Formal.Lazy
+import Formal.Refine
+import Formal.Refine.Numbers
 import Formal.RT.LazyCell
 
 /-!
@@ -105,3 +107,11 @@ prints, and `#guard_msgs` turns the difference into an error.
 /-- info: 'Flick.RT.R9' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Flick.RT.R9
+
+/-- info: 'Flick.Refine.sound' depends on axioms: [propext] -/
+#guard_msgs in
+#print axioms Flick.Refine.sound
+
+/-- info: 'Flick.Refine.numbers_sound' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Refine.numbers_sound

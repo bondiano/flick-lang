@@ -85,6 +85,23 @@ fn a_refined_type_is_the_code_of_its_plugin() {
 }
 
 #[test]
+fn a_proved_value_is_its_constructor_with_no_second_check() {
+    let source = "module App.Main exposing (..)\n\nrefined type Port = Float where fun n -> n > 0 && n < 65536\n\nas_port : Float -> Option Port\nlet as_port n = if n > 0 && n < 65536 then Some (Port.prove n) else None\n";
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let (diagnostics, compilation) = compile(&host(source), &mut sources, Some(&project), &roots());
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let printed = ir::print(&compilation.modules[0].ir);
+    let made = printed
+        .split("\nlet ")
+        .find(|item| item.starts_with("as_port "))
+        .expect("as_port is lowered");
+    // the argument once, into the unboxed constructor; the check never runs
+    assert!(made.contains("Port$Make n"), "{made}");
+    assert!(!made.contains("Port$check"), "{made}");
+}
+
+#[test]
 fn what_a_refined_declaration_lacks_is_said_where_it_is_missing() {
     let head = "module App.Main exposing (..)\n\n";
     let of = |decl: &str| report(&format!("{head}{decl}\n"));

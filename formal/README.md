@@ -102,6 +102,16 @@ signature and golden certificates.
   path from a typed configuration a settled cell keeps its outcome, and a later force of it
   steps to the term of that outcome without changing the store (`Step.done_stays`,
   `Step.force_done`).
+- **The logic of `T.prove`** (`Formal/Refine.lean`, `Formal/Refine/Numbers.lean`, [`refinements.md`](../docs/formal/refinements.md)
+  §4–§5): formulas run left to right with three-valued evaluation (`eval`: true, false, or a
+  call that never returns). `sound`: in a world where every fact ran to its result, what
+  `holds` decides from the learned knowledge (`assume`, `learn`, any budget) is what the
+  formula gives there, for any theory of atoms sound in that world. `numbers_sound`: atoms
+  with their results together with an interval per compared subject (`Num.learn_sound`,
+  `Num.decide_sound`) are such a theory, over any total preorder with a NaN point every
+  ordered comparison finds false; `intNum` and `Interval.int_side` cover `Int`'s closed ends.
+  `unobserved_or_true` and `or_true_decides_neither` pin definedness. Separate from the core:
+  it proves the decision procedure, not the Rust checker or IEEE arithmetic of a runtime.
 - **T7, local mutation** (`Formal/LetMut.lean`): the straight-line block
   fragment with assignments, branches and scope translates to a typed core
   term. `T7_pure` derives purity from T2a; `T7_regions` derives safety by
