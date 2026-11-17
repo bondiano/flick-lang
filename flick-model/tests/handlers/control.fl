@@ -12,7 +12,7 @@ effect Emit a =
 effect Choose =
   control choose : Unit ->{} Bool
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 collect : (Unit ->{Emit a | r; e} Unit) ->{r; e} List a
@@ -29,7 +29,7 @@ let reversed body =
     rest ++ [x]
   | return () -> []
 
-first : (Unit ->{Emit Int} Unit) ->{} Int
+first : (Unit ->{Host.Console, Emit Int} Unit) ->{Host.Console} Int
 let first body =
   try body () with
   | Emit.emit x -> x
@@ -150,7 +150,7 @@ let keep_after first continuation last =
   ignore (first, last)
   continuation
 
-forwarded_exit : Unit ->{} Int
+forwarded_exit : Unit ->{Host.Console} Int
 let forwarded_exit () =
   loop {
     try
@@ -175,7 +175,7 @@ let forwarded_exit () =
       relay traced 19
   }
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   say (show (collect three))
   say (show (reversed three))

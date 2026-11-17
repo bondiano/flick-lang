@@ -275,6 +275,9 @@ fn foreign_intrinsic(value: &Foreign) -> Option<Intrinsic> {
         (Some("flick:Random"), "flickNext", ForeignMode::Effect) => {
             Some(Host(HostPrimitive::RandomNext))
         }
+        (Some("flick:rt"), "processSpawn", ForeignMode::Effect) => {
+            Some(Host(HostPrimitive::ProcessSpawn))
+        }
         (Some("flick:rt"), "show", ForeignMode::Pure) => Some(Intrinsic::Show),
         (Some("flick:rt"), "refMake", ForeignMode::Sync) => Some(Intrinsic::RefMake),
         (Some("flick:rt"), "refGet", ForeignMode::Sync) => Some(Intrinsic::RefGet),

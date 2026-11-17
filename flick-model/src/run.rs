@@ -213,6 +213,32 @@ pub fn run_main_counted_outcome(
     fuel: u64,
     release: bool,
 ) -> Result<ExecutionReport, String> {
+    let counted = counted_main(modules, main, release)?;
+    Ok(counted.execute(heap, fuel))
+}
+
+/// The counted program of a `main` and the root layer it runs under, lowered
+/// once: a caller may execute it again, as with every fuel.
+pub struct CountedMain {
+    pub program: ir::memory::Program,
+    pub entry: MemoryName,
+    pub root: Option<MemoryName>,
+}
+
+impl CountedMain {
+    /// Runs `main` with its root services, `Σ₀`, when the program has them.
+    pub fn execute(&self, heap: &mut Heap, fuel: u64) -> ExecutionReport {
+        match &self.root {
+            Some(root) => {
+                execute_rooted_main_program_outcome(heap, &self.program, &self.entry, root, fuel)
+            }
+            None => execute_main_program_outcome(heap, &self.program, &self.entry, fuel),
+        }
+    }
+}
+
+/// Lowers `main` of `modules` and its root layer for the counted executor.
+pub fn counted_main(modules: &[Compiled], main: &Path, release: bool) -> Result<CountedMain, String> {
     let ir: Vec<_> = modules
         .iter()
         .map(|module| {
@@ -242,9 +268,10 @@ pub fn run_main_counted_outcome(
         &roots,
     )
     .map_err(|error| error.to_string())?;
-    Ok(match &root {
-        Some(root) => execute_rooted_main_program_outcome(heap, &program, &entry, root, fuel),
-        None => execute_main_program_outcome(heap, &program, &entry, fuel),
+    Ok(CountedMain {
+        program,
+        entry,
+        root,
     })
 }
 

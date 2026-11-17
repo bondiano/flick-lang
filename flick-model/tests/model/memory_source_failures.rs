@@ -83,9 +83,9 @@ let raise_gone text = from_result (Err (Gone text))
 
 main : Unit ->{; Gone} Unit
 let main () =
-  Platform.stdout_line "before"
+  Host.raw_stdout_line "before"
   raise_gone "payload"
-  Platform.stdout_line "unreachable"
+  Host.raw_stdout_line "unreachable"
 "#;
     let modules = run::compile_source(text).expect("typed failure source checks");
     let main = run::main_of(&modules).expect("main export");
@@ -131,9 +131,9 @@ let rec burn value =
 
 main : Unit ->{} Unit
 let main () =
-  Platform.stdout_line "before"
+  Host.raw_stdout_line "before"
   burn 0
-  Platform.stdout_line "unreachable"
+  Host.raw_stdout_line "unreachable"
 "#;
     let modules = run::compile_source(text).expect("recursive source checks");
     let main = run::main_of(&modules).expect("main export");
@@ -177,7 +177,7 @@ let start value =
 
 gate : Int ->{; Again} Bool
 let gate value =
-  Platform.stdout_line ("guard " ++ show value)
+  Host.raw_stdout_line ("guard " ++ show value)
   from_result (Err (Again "guard"))
 
 handler_fails : Unit ->{; Again} String
@@ -238,9 +238,9 @@ type error Gone = Gone String
 
 make : Unit ->{; Gone} Eff {} {Gone} Unit
 let make () =
-  Platform.stdout_line "make"
+  Host.raw_stdout_line "make"
   task {
-    Platform.stdout_line "task"
+    Host.raw_stdout_line "task"
     from_result (Err (Gone "later"))
   }
 
@@ -248,10 +248,10 @@ main : Unit ->{; Gone} Unit
 let main () =
   let delayed =
     try make () with
-    | Gone _ -> task { Platform.stdout_line "wrong handler" }
-  Platform.stdout_line "returned"
+    | Gone _ -> task { Host.raw_stdout_line "wrong handler" }
+  Host.raw_stdout_line "returned"
   await delayed
-  Platform.stdout_line "unreachable"
+  Host.raw_stdout_line "unreachable"
 "#;
     let modules = run::compile_source(text).expect("delayed failure source checks");
     let main = run::main_of(&modules).expect("main export");
@@ -285,7 +285,7 @@ foreign external_call from global "unmodeledHostOperation"
 
 main : Unit ->{} Unit
 let main () =
-  Platform.stdout_line "must not execute"
+  Host.raw_stdout_line "must not execute"
   external_call ()
 "#;
     let modules = run::compile_source(text).expect("declared foreign source checks");

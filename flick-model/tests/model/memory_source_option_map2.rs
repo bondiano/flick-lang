@@ -87,7 +87,7 @@ let cold captured =
     ++ "|" ++ render (map2 wrong_second None None) ++ "|" ++ captured
 argument : String -> Option String ->{} Option String
 let argument label value =
-  Platform.stdout_line label
+  Host.raw_stdout_line label
   value
 eager : Unit ->{} String
 let eager () =

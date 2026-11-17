@@ -89,11 +89,11 @@ let identity () =
   Ref.same a cell && Ref.same b cell && Ref.same c cell && Ref.same d cell && Ref.get cell == "changed"
 nested : Unit ->{} String
 let nested () =
-  let saved : Eff none none (Eff none none String) = pure_eff (task { Platform.stdout_line "inner saved"; "S" })
-  let mapped = map_eff (fun _ -> task { Platform.stdout_line "inner mapped"; "M" }) (task { "ignored" })
+  let saved : Eff none none (Eff none none String) = pure_eff (task { Host.raw_stdout_line "inner saved"; "S" })
+  let mapped = map_eff (fun _ -> task { Host.raw_stdout_line "inner mapped"; "M" }) (task { "ignored" })
   let a = await saved
   let b = await mapped
-  Platform.stdout_line "between"
+  Host.raw_stdout_line "between"
   await a ++ await b
 nested_services : Unit ->{} String
 let nested_services () =
@@ -203,11 +203,11 @@ const FAILURES: &str = r#"
 type error Stop = Stop String String
 input : String -> String -> Bool -> Eff none {Stop} String
 let input seed label failed = task {
-  Platform.stdout_line label
+  Host.raw_stdout_line label
   if failed then from_result (Err (Stop label seed)) else seed
 }
 right_die : String -> Eff none {Stop} String
-let right_die seed = task { Platform.stdout_line "R"; show (Int.unsafe_rem 1 0) ++ seed }
+let right_die seed = task { Host.raw_stdout_line "R"; show (Int.unsafe_rem 1 0) ++ seed }
 bad_map : String -> String
 let bad_map value = show (Int.unsafe_div 1 0) ++ value
 bad_flat : String -> Eff none {Stop} String
@@ -238,11 +238,11 @@ both_body_die : String ->{; Stop} String
 let both_body_die seed = await (map2_eff bad_first (input seed "L" false) (right_die seed))
 ordinary_argument : String -> String ->{} String
 let ordinary_argument label value =
-  Platform.stdout_line ("build " ++ label)
+  Host.raw_stdout_line ("build " ++ label)
   value
 task_argument : String -> Eff none {Stop} String ->{} Eff none {Stop} String
 let task_argument label value =
-  Platform.stdout_line ("build " ++ label)
+  Host.raw_stdout_line ("build " ++ label)
   value
 cold : String ->{} String
 let cold seed =
@@ -254,7 +254,7 @@ let cold seed =
   let _partial_flat = flat_map_eff bad_flat
   let _partial_pair = map2_eff bad_first
   let _partial_left = map2_eff bad_first (input seed "unreachable" true)
-  Platform.stdout_line "constructed"
+  Host.raw_stdout_line "constructed"
   seed
 factory_map : Unit -> (String -> String)
 let factory_map () = if Int.unsafe_div 1 0 == 0 then bad_map else fun value -> value

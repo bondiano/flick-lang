@@ -75,6 +75,7 @@ codegen/record_constructor
 effect/row_without
 stdlib/effect/mutable_ref
 stdlib/effect/optic_parts
+stdlib/server/node
 
 runtime/counted_layer_merge
 codegen/loops_owners

@@ -81,7 +81,7 @@ let cold captured =
   map2 wrong_first [] ["right"] ++ map2 wrong_first ["left"] [] ++ map2 wrong_second [] []
 argument : String -> List String ->{} List String
 let argument label value =
-  Platform.stdout_line label
+  Host.raw_stdout_line label
   value
 factory : Unit -> (String -> String -> String)
 let factory () =

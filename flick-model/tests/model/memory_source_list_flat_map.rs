@@ -66,7 +66,7 @@ let identity () =
   | _ -> false
 argument : String -> List String ->{} List String
 let argument label values =
-  Platform.stdout_line label
+  Host.raw_stdout_line label
   values
 factory : Unit -> (String -> List String)
 let factory () = fun value -> [value, value]

@@ -26,7 +26,7 @@ let answer subject =
       && not (String.contains "é" subject)
       && not (String.starts_with "e\u{301}" subject)
       && not (String.contains "😁" subject)
-  Platform.stdout_line (if matched then "matched" else "wrong")
+  Host.raw_stdout_line (if matched then "matched" else "wrong")
   matched
 "#;
     let modules = run::compile_source(text).expect("accepted String source");
@@ -65,7 +65,7 @@ let answer subject =
 const JOIN_SOURCE: &str = r#"module App.StringJoin exposing (answer, escaped, shared)
 mark : String ->{} String
 let mark text =
-  Platform.stdout_line text
+  Host.raw_stdout_line text
   text
 escaped : String -> List String -> String
 let escaped separator = String.join separator

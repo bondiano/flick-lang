@@ -79,7 +79,7 @@ let cold captured =
   render (map2 wrong_first (Err "left") (Ok "R")) ++ "|" ++ render (map2 wrong_first (Ok "L") (Err "right")) ++ "|" ++ render (map2 wrong_second (Err "first") (Err "second")) ++ "|" ++ captured
 argument : String -> Result String String ->{} Result String String
 let argument label value =
-  Platform.stdout_line label
+  Host.raw_stdout_line label
   value
 factory : Unit -> (String -> String -> String)
 let factory () =

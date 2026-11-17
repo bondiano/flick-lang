@@ -4,23 +4,23 @@
 # divergence `docs/formal` records. The list may only shrink.
 
 gap docs/src/content/docs/reference/classes.md 2147921845e6081b # the row primitive `UnionDisjoint` has no λFlick form
-gap docs/src/content/docs/reference/cli-dsl.md 18aa7ec2ddf9b126 # the row primitive `Lacks` has no λFlick form
-gap docs/src/content/docs/reference/cli-dsl.md 397ca64cf69afa84 # the row primitive `Lacks` has no λFlick form
+gap docs/src/content/docs/reference/cli-dsl.md 148570fbdefc9d19 # the row primitive `Lacks` has no λFlick form
+gap docs/src/content/docs/reference/cli-dsl.md 893351d5d410e61b # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/reference/http-api.md 545aab0d8d467a6e # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/reference/http-api.md b79edc80601e735d # the row primitive `Lacks` has no λFlick form
-gap docs/src/content/docs/reference/rpc.md 510aa164b80d1789 # `Record.label` has no λFlick form
-gap docs/src/content/docs/reference/rpc.md 6fde1e5b035b1fbd # `Record.label` has no λFlick form
+gap docs/src/content/docs/reference/rpc.md 7b70fbc9f2acbe9e # `Record.label` has no λFlick form
+gap docs/src/content/docs/reference/rpc.md f61f1463678e83be # `Record.label` has no λFlick form
 gap docs/src/content/docs/reference/rpc.md caee8694c8ad2cb0 # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/ru/reference/classes.md 2147921845e6081b # the row primitive `UnionDisjoint` has no λFlick form
-gap docs/src/content/docs/ru/reference/cli-dsl.md 18aa7ec2ddf9b126 # the row primitive `Lacks` has no λFlick form
-gap docs/src/content/docs/ru/reference/cli-dsl.md 397ca64cf69afa84 # the row primitive `Lacks` has no λFlick form
+gap docs/src/content/docs/ru/reference/cli-dsl.md 148570fbdefc9d19 # the row primitive `Lacks` has no λFlick form
+gap docs/src/content/docs/ru/reference/cli-dsl.md 893351d5d410e61b # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/ru/reference/http-api.md 545aab0d8d467a6e # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/ru/reference/http-api.md b79edc80601e735d # the row primitive `Lacks` has no λFlick form
-gap docs/src/content/docs/ru/reference/rpc.md 510aa164b80d1789 # `Record.label` has no λFlick form
-gap docs/src/content/docs/ru/reference/rpc.md 6fde1e5b035b1fbd # `Record.label` has no λFlick form
+gap docs/src/content/docs/ru/reference/rpc.md 7b70fbc9f2acbe9e # `Record.label` has no λFlick form
+gap docs/src/content/docs/ru/reference/rpc.md f61f1463678e83be # `Record.label` has no λFlick form
 gap docs/src/content/docs/ru/reference/rpc.md caee8694c8ad2cb0 # the row primitive `Lacks` has no λFlick form
-gap docs/src/content/docs/ru/spec/08-type-programming-and-edsl.md b312045395eb5882 # the row primitive `Lacks` has no λFlick form
-gap docs/src/content/docs/spec/08-type-programming-and-edsl.md b312045395eb5882 # the row primitive `Lacks` has no λFlick form
+gap docs/src/content/docs/ru/spec/08-type-programming-and-edsl.md c604707b0399741b # the row primitive `Lacks` has no λFlick form
+gap docs/src/content/docs/spec/08-type-programming-and-edsl.md c604707b0399741b # the row primitive `Lacks` has no λFlick form
 gap tests/check/pass/classes/rows.fl # the row primitive `HasField` has no λFlick form
 gap tests/check/pass/cli/blocks.fl # the row primitive `Lacks` has no λFlick form
 gap tests/check/pass/cli/deriving.fl # the row primitive `Lacks` has no λFlick form

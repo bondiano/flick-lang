@@ -149,17 +149,17 @@ fn short_circuit_and_pipe_argument_order_follow_source_execution() {
 
 function : Unit ->{} (Int -> Int)
 let function () =
-  Platform.stdout_line "function"
+  Host.raw_stdout_line "function"
   fun value -> value + 1
 
 argument : Unit ->{} Int
 let argument () =
-  Platform.stdout_line "argument"
+  Host.raw_stdout_line "argument"
   1
 
 unexpected : Unit ->{} Bool
 let unexpected () =
-  Platform.stdout_line "unexpected"
+  Host.raw_stdout_line "unexpected"
   true
 
 answer : Unit ->{} Unit
@@ -168,7 +168,7 @@ let answer () =
   let skipped_or = true || unexpected ()
   let ordinary = function () (argument ())
   let piped = argument () |> function ()
-  Platform.stdout_line (show (ordinary + piped))
+  Host.raw_stdout_line (show (ordinary + piped))
 "#;
     let entry = Name::new("App", "answer");
     for release in [false, true] {
@@ -211,14 +211,14 @@ fn tasks_are_lazy_replayable_owned_values_not_callable_closures() {
 
 make : String -> Eff {} none String
 let make prefix = task {
-  Platform.stdout_line prefix
+  Host.raw_stdout_line prefix
   prefix ++ "!"
 }
 
 answer : Unit ->{} String
 let answer () =
   let job = make "body"
-  Platform.stdout_line "built"
+  Host.raw_stdout_line "built"
   let first = await job
   let second = await job
   first ++ second
@@ -255,7 +255,7 @@ let main () =
     let held = Ref.get left
     ()
   )
-  Platform.stdout_line "cyclic cells closed"
+  Host.raw_stdout_line "cyclic cells closed"
 "#;
     let modules = run::compile_source(text).expect("well-typed closure cycle");
     let main = run::main_of(&modules).expect("main");
@@ -272,13 +272,13 @@ fn task_mains_keep_one_execution_arena_across_function_and_await_stages() {
     let sources = [
         r#"module App exposing (main)
 main : Eff {} none Unit
-let main = task { Platform.stdout_line "task main" }
+let main = task { Host.raw_stdout_line "task main" }
 "#,
         r#"module App exposing (main)
 main : Unit ->{} Eff {} none Unit
 let main () =
   let cell = Ref.make "task main"
-  task { Platform.stdout_line (Ref.get cell) }
+  task { Host.raw_stdout_line (Ref.get cell) }
 "#,
     ];
     for text in sources {

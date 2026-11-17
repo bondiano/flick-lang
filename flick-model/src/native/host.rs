@@ -1,9 +1,9 @@
 //! The host primitives `Host.live` adapts, on the deterministic host the
 //! model runs on: no environment variables and no arguments, as the
 //! playground's host; a wall clock stopped at [`MILLIS`] and a monotonic
-//! clock at zero; every random draw [`DRAW`]. The model observes stdout
-//! only, so what goes to stderr is dropped. The counted executor answers
-//! the same primitives with the same values.
+//! clock at zero; every random draw [`DRAW`]; no processes to start. The
+//! model observes stdout only, so what goes to stderr is dropped. The
+//! counted executor answers the same primitives with the same values.
 
 use num_bigint::BigInt;
 

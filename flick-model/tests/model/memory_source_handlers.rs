@@ -24,30 +24,30 @@ let answer seed =
   let error_prefix = seed ++ "/error"
   let good =
     try
-      Platform.stdout_line "body"
+      Host.raw_stdout_line "body"
       Read.read body_prefix
     with
     | Read.read text ->
-      Platform.stdout_line "arm"
+      Host.raw_stdout_line "arm"
       arm_prefix ++ ":" ++ text
     | return text ->
-      Platform.stdout_line "ret"
+      Host.raw_stdout_line "ret"
       ret_prefix ++ ":" ++ text
     | Failed text -> error_prefix ++ ":" ++ text
   let failed =
     try
-      Platform.stdout_line "failing"
+      Host.raw_stdout_line "failing"
       ignore (Read.read body_prefix)
       from_result (Err (Failed body_prefix))
     with
     | Read.read text ->
-      Platform.stdout_line "arm"
+      Host.raw_stdout_line "arm"
       arm_prefix ++ ":" ++ text
     | return text ->
-      Platform.stdout_line "wrong ret"
+      Host.raw_stdout_line "wrong ret"
       ret_prefix ++ ":" ++ text
     | Failed text ->
-      Platform.stdout_line "error"
+      Host.raw_stdout_line "error"
       error_prefix ++ ":" ++ text
   good ++ "|" ++ failed
 "#;
@@ -65,12 +65,12 @@ type error Gone = Gone String
 uncaught : String ->{; Gone} String
 let uncaught seed =
   try
-    Platform.stdout_line "body"
+    Host.raw_stdout_line "body"
     try Ask.ask () with
     | Gone _ -> "wrong body catch"
   with
   | Ask.ask () ->
-    Platform.stdout_line "arm"
+    Host.raw_stdout_line "arm"
     from_result (Err (Gone (seed ++ "/tail")))
   | Gone _ -> "wrong selected catch"
   | return _ -> "wrong return"
@@ -103,9 +103,9 @@ let answer seed =
   try
     try
       try
-        Platform.stdout_line "before"
+        Host.raw_stdout_line "before"
         Exit.stop seed
-        Platform.stdout_line "wrong continuation"
+        Host.raw_stdout_line "wrong continuation"
         "wrong body value"
       with
       | Gone _ -> "wrong body catch"

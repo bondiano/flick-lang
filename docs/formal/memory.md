@@ -510,7 +510,8 @@ evaluator's natives: `stdoutLine` and `stdoutWrite` write the captured
 stdout, `stderrLine` borrows its text and writes nothing, `platformEnv`
 allocates `None` and `platformArgs` an empty list, the wall clock reads
 1 700 000 000 000 ms and the same instant in nanoseconds, the monotonic clock
-0 ns, and every `flickNext` draw is 0.5. `platformEnv` and `platformArgs` allocate their result
+0 ns, and every `flickNext` draw is 0.5. The host has no processes:
+`processSpawn` stops the run as an unsupported operation. `platformEnv` and `platformArgs` allocate their result
 afresh in Flick's representation, which discharges the host result copy and
 shape conversion of their bindings; this is not generic foreign-copy erasure.
 
