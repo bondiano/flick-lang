@@ -51,7 +51,7 @@ let uncaught seed =
       let view = Arena.alloc arena (Read.read ())
       Arena.get view
     }
-    from_result (Err (Gone text))
+    Fail.fail (Gone text)
   )
 
 main : Unit ->{; AppError} Unit

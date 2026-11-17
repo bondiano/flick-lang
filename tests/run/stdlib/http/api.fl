@@ -95,7 +95,7 @@ let me =
     if String.starts_with "Bearer " request.headers.authorization then
       ()
     else
-      from_result (Err (HttpApi.HttpError { status = 401; message = "not a bearer token" }))
+      Fail.fail (HttpApi.HttpError { status = 401; message = "not a bearer token" })
   )
   |> HttpApi.deprecate
 
@@ -139,7 +139,7 @@ let main () =
       get_user = fun request ->
         match find (Ref.get store) request.path.id with
         | Some user -> user
-        | None -> from_result (Err (NotFound { id = request.path.id }))
+        | None -> Fail.fail (NotFound { id = request.path.id })
       create_user = fun request ->
         let user = { id = show (List.length (Ref.get store) + 1); name = request.payload.name }
         Ref.set store (Ref.get store ++ [user])
@@ -148,7 +148,7 @@ let main () =
         if request.headers.authorization == "Bearer ada" then
           "Ada"
         else
-          from_result (Err (HttpApi.HttpError { status = 403; message = "not Ada" }))
+          Fail.fail (HttpApi.HttpError { status = 403; message = "not Ada" })
       health = fun _ -> ()
       echo = fun request -> String.to_upper request.payload
       login = fun request -> "welcome " ++ request.payload.name

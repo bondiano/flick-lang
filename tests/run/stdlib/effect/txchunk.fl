@@ -52,7 +52,7 @@ let main () =
       Tx.atomically
         (task {
           TxChunk.set (Chunk.from_list [42]) ys
-          from_result (Err Stop)
+          Fail.fail Stop
         })
     with
     | Stop -> Tx.atomically (task { contents ys })

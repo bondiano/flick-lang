@@ -107,7 +107,7 @@ recovered : String ->{} String
 let recovered key =
   let mut status = "found"
   let value =
-    try from_result (Err (Missing key)) with
+    try Fail.fail (Missing key) with
     | Missing k ->
       status = "missing \{k}"
       0

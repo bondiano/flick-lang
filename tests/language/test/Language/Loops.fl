@@ -33,7 +33,7 @@ let recover () =
   let recovered =
     try
       value = 5
-      value = from_result (Err Missing)
+      value = Fail.fail Missing
       value
     with
     | Missing -> value

@@ -6,7 +6,7 @@ type error Boom = Boom Float
   deriving Show
 
 boom : Eff none {Boom} String
-let boom = task { from_result (Err (Boom 1)) }
+let boom = task { Fail.fail (Boom 1) }
 
 broken : Eff none {Boom} String
 let broken = task { Effect.die "broken" }
@@ -54,7 +54,7 @@ let pretty () =
         Tracer.with_span
           "outer"
           untraced
-          (task { Tracer.with_span "inner" untraced (task { from_result (Err (Boom 2)) }) })
+          (task { Tracer.with_span "inner" untraced (task { Fail.fail (Boom 2) }) })
       })
   say ("traced: " ++ Cause.pretty (failure_of traced))
   let frame = Cause.stack_trace (failure_of traced)
@@ -139,7 +139,7 @@ let handlers () =
   say ("or_die interrupt: " ++ RawCause.describe (Failure.inspect (failure_of interrupted)))
 
 even : Float ->{; Boom} Float
-let even n = if n % 2 == 0 then n * 10 else from_result (Err (Boom n))
+let even n = if n % 2 == 0 then n * 10 else Fail.fail (Boom n)
 
 /// Collections run by the other concurrencies.
 collections : Unit ->{} Unit

@@ -59,7 +59,7 @@ let queues () =
   }
   say ("into/collect: " ++ show collected)
   let broken : Queue.Queue {Broken} Float = Queue.unbounded ()
-  let _ = task { from_result (Err (Broken "producer")) } |> Queue.into broken
+  let _ = task { Fail.fail (Broken "producer") } |> Queue.into broken
   let awaited =
     try
       Queue.await_ broken
@@ -104,7 +104,7 @@ let queues () =
       ++ ", interrupt "
       ++ show (graceful, Queue.poll interrupted))
   let fails : Queue.Queue {Broken} Float = Queue.unbounded ()
-  let exits = parallel_exits [task { from_result (Err (Broken "cause")) }]
+  let exits = parallel_exits [task { Fail.fail (Broken "cause") }]
   List.each_effect
     (fun failure -> ignore (Queue.fail_cause failure fails))
     (List.filter_map Exit.failure exits)

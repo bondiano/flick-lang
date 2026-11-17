@@ -13,7 +13,7 @@ A failure the caller should handle is a typed error.
 `find : String ->{; NotFound} Float` says, after the `;`, that `find` may fail
 with it.
 
-`from_result (Err …)` fails. `try … with` handles the failure, with an arm for
+`Fail.fail (NotFound name)` fails with that error. `try … with` handles the failure, with an arm for
 each error. Once handled, the error leaves the signature: `main` has no
 `NotFound` in its own.
 

@@ -36,7 +36,7 @@ type error RetryExhausted e = RetryExhausted e Float
 retry : Float -> Eff r e a ->{r; RetryExhausted (Errors e)} a
 # let retry times body =
 #   try await body with
-#   | cause -> from_result (Err (RetryExhausted cause times))
+#   | cause -> Fail.fail (RetryExhausted cause times)
 ```
 
 Обработчик может удалить ошибку из строки, только если полностью покрывает её номинальный вариант. Условие ветки или образец, который подходит лишь части данных ошибки, оставляет её в строке. Требования и ошибки самого обработчика добавляются к результату. Удаление из строки относится к выбранной ожидаемой ошибке и не доказывает, что такой же тег отсутствует среди вторичных сбоев в полной причине завершения.
@@ -97,7 +97,7 @@ users_live :
 #   url : Unit ->{} String
 # type error ConnectError = ConnectError
 # users_live : Layer {Config} {ConnectError} {Users}
-# let users_live = Layer.effect Users (task { from_result (Err ConnectError) })
+# let users_live = Layer.effect Users (task { Fail.fail ConnectError })
 # load_name : UserId ->{Users, Log; NotFound} String
 # let load_name id = (Users.get id).name
 #

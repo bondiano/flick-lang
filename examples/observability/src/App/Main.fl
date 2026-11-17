@@ -43,8 +43,7 @@ main : Unit ->{; AppError} Unit
 let main () =
   let url =
     try endpoint () with
-    | Config.ConfigError message ->
-      from_result (Err (AppError { message = message; details = None }))
+    | Config.ConfigError message -> Fail.fail (AppError { message = message; details = None })
   provide (Otlp.layer { url = url; service_name = "flick-shop" }) {
     checkout "ada"
     checkout "grace"

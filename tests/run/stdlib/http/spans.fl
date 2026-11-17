@@ -50,7 +50,7 @@ let main () =
   failing : Http.Middleware.Handler none {Boom}
   let failing _ =
     Ref.set seen (Tracer.parent_span ())
-    from_result (Err Boom)
+    Fail.fail Boom
   try
     Http.Middleware.with_tracer_header_filter
       chosen

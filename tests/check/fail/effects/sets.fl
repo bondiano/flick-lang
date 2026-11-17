@@ -76,7 +76,7 @@ opaque type alias Hidden = {Log}
 
 // a set holds what it names, so what it does not name is still refused
 outside : Unit ->{...Mixed} Unit
-let outside () = from_result (Err Oops)
+let outside () = Fail.fail Oops
 
 missing_service : Unit ->{...Mixed} String
 let missing_service () = Users.get "a"
@@ -111,7 +111,7 @@ type alias Loop = {...Loop}
 //~ FLICK-T002 @69:26-69:32 `{...s}`: `...`, `-` and `;` are for rows of services and errors
 //~ FLICK-T002 @72:35-72:46 `{Log; Boom}` holds services, but a row of errors is expected here
 //~ FLICK-T002 @75:1-75:33 `Hidden` cannot be opaque: a set is its row, which a signature that names it must show
-//~ FLICK-E002 @79:18-79:40 the signature of `outside` does not allow error `Oops`, which its body needs
+//~ FLICK-E002 @79:18-79:32 the signature of `outside` does not allow error `Oops`, which its body needs
 //~ FLICK-E002 @82:26-82:39 the signature of `missing_service` does not allow service `Users`, which its body needs
 //~ FLICK-E002 @85:20-85:32 the signature of `taken_out` does not allow service `Log`, which its body needs
 //~ FLICK-T003 @90:36-90:47 the row already holds `Scope s`, so it cannot hold `Scope t` too: a row has one element of each name

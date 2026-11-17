@@ -116,8 +116,7 @@ let verify_password password stored =
   | _ -> malformed_hash ()
 
 malformed_hash : Unit ->{; CryptoError} Bool
-let malformed_hash () =
-  from_result (Err (CryptoError "not a password hash written by hash_password"))
+let malformed_hash () = Fail.fail (CryptoError "not a password hash written by hash_password")
 
 /// A random number from 0 up to 1.
 random : Unit ->{Crypto} Float

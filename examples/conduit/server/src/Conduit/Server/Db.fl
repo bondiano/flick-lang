@@ -28,7 +28,7 @@ let run_once query =
   Effect.or_die
     (task {
       try ignore (Database.execute (Sql.bind query {})) with
-      | DbError e -> if e.code == unique_violation then () else from_result (Err (DbError e))
+      | DbError e -> if e.code == unique_violation then () else Fail.fail (DbError e)
     })
 
 /// The id an insert returns.

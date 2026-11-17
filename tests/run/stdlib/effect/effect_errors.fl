@@ -10,7 +10,7 @@ ms100 : Duration.Duration
 let ms100 = Result.with_default Duration.zero (Duration.millis 100)
 
 boom : Eff none {Boom} String
-let boom = task { from_result (Err (Boom 1)) }
+let boom = task { Fail.fail (Boom 1) }
 
 broken : Eff none {Boom} String
 let broken = task { Effect.die "broken" }

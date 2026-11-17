@@ -3,7 +3,7 @@ module Main exposing (main)
 type error Invalid = Invalid Int
 
 check : Int ->{; Invalid} Int
-let check n = if n < 0 then from_result (Err (Invalid n)) else n
+let check n = if n < 0 then Fail.fail (Invalid n) else n
 
 open : String -> Eff none none String
 let open name = task {

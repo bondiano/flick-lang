@@ -22,7 +22,7 @@ type error OutOfStock = OutOfStock String
 place : Order ->{Server.Server; OutOfStock} String
 server fn place order =
   if order.count > 3 then
-    from_result (Err (OutOfStock order.item))
+    Fail.fail (OutOfStock order.item)
   else
     "placed " ++ show order.count ++ " " ++ order.item
 

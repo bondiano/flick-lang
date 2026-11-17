@@ -1,6 +1,6 @@
 ---
 title: "Types and classes"
-source_hash: 3ff9e97e8c7d2377
+source_hash: 4198521c66509090
 ---
 
 ## Computations and kinds
@@ -33,7 +33,7 @@ In the position of a single row, the following are used: `none`, a variable `r`,
 
 `r1 + r2` and `e1 + e2` denote the union of rows of one kind, for example `Eff (r1 + r2) (e1 + e2) a`. This is a built-in operation of the row solver, not a user type family. A signature gives an upper bound: an implementation may require fewer services or allow fewer errors. Extending a row does not turn a runtime arrow into a pure one.
 
-`Errors e` turns an error row into an ordinary type of values: `Errors none = Never`, `Errors {NotFound} = NotFound`. With two or more elements, or with a row variable, `Errors e` is an opaque type: its value comes only from the `x`/`_` branch of `try` and goes to `from_result`, `Failure.rethrow` or generic code; to take it apart by error, write a `try` with error branches over `from_result (Err e)`. This is a fixed projection of the checker. An arbitrary type cannot be automatically turned back into a row: a generic bridge needs a saved row `e` or an annotation, and for a single declared error a singleton row is available.
+`Errors e` turns an error row into an ordinary type of values: `Errors none = Never`, `Errors {NotFound} = NotFound`. With two or more elements, or with a row variable, `Errors e` is an opaque type: its value comes only from the `x`/`_` branch of `try` and goes to `from_result`, `Failure.rethrow` or generic code; to take it apart by error, write a `try` with error branches over `Fail.fail e`. This is a fixed projection of the checker. An arbitrary type cannot be automatically turned back into a row: a generic bridge needs a saved row `e` or an annotation, and for a single declared error a singleton row is available.
 
 ## An HKT example
 

@@ -11,7 +11,7 @@ flaky : Ref Float -> Float -> Eff none {Flaky} String
 let flaky calls failures = task {
   let n = Ref.get calls + 1
   Ref.set calls n
-  if n <= failures then from_result (Err (Flaky n)) else "ok after " ++ show n
+  if n <= failures then Fail.fail (Flaky n) else "ok after " ++ show n
 }
 
 /// The attempt a step's metadata names, read through both record types.
@@ -142,7 +142,7 @@ let main () =
     Effect.repeat_or_else
       (Schedule.recurs 3)
       (fun _ step -> if Option.is_some step then 1 else 0)
-      (task { from_result (Err (Flaky 0)) })
+      (task { Fail.fail (Flaky 0) })
   Platform.stdout_line ("repeat_or_else: " ++ show recovered)
   Platform.stdout_line ("schedule: " ++ show (Effect.schedule (Schedule.recurs 2) Effect.void))
   Platform.stdout_line

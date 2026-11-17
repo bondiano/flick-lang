@@ -30,7 +30,7 @@ slug_of : String ->{; NotFound} Paths.Slug
 let slug_of text =
   match Paths.Slug.parse text with
   | Ok slug -> slug
-  | Err _ -> from_result (Err (NotFound [("article", ["not found"])]))
+  | Err _ -> Fail.fail (NotFound [("article", ["not found"])])
 
 /// Each article as a reader sees it, which a change of articles loads again.
 articles :

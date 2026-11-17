@@ -47,7 +47,7 @@ let joined_by t =
 fibers : Unit ->{Async} Unit
 let fibers () = scope s {
   let a : Fiber.Fiber {Boom} String = Fiber.spawn s quiet (after ms1 "a")
-  let b = Fiber.spawn s quiet (task { from_result (Err (Boom 2)) })
+  let b = Fiber.spawn s quiet (task { Fail.fail (Boom 2) })
   let c = Fiber.spawn s quiet (after ms1 "c")
   Platform.stdout_line ("await_: " ++ ended (Fiber.await_ a))
   Platform.stdout_line ("await_all: " ++ show (List.map ended (Fiber.await_all [a, b, c])))
@@ -84,7 +84,7 @@ let sets () =
     FiberSet.add false other set
     FiberSet.clear set
     Platform.stdout_line ("set clear: " ++ ended (Fiber.await_ other))
-    let _ = FiberSet.run run_options (task { from_result (Err (Boom 3)) }) set
+    let _ = FiberSet.run run_options (task { Fail.fail (Boom 3) }) set
     try
       FiberSet.join set
       "joined"
@@ -113,7 +113,7 @@ let sets () =
     let _ = FiberMap.run map_options "z" (after ms50 "z") map
     FiberMap.clear map
     Platform.stdout_line ("map clear: " ++ show (FiberMap.size map))
-    let _ = FiberMap.run map_options "e" (task { from_result (Err (Boom 4)) }) map
+    let _ = FiberMap.run map_options "e" (task { Fail.fail (Boom 4) }) map
     let failed = joined_by (task { FiberMap.join map })
     Platform.stdout_line ("map join: " ++ failed)
   }
@@ -129,7 +129,7 @@ let sets () =
     FiberHandle.set { onlyIfMissing = false; propagateInterruption = false } other handle
     FiberHandle.clear handle
     Platform.stdout_line ("handle clear: " ++ ended (Fiber.await_ other))
-    let _ = FiberHandle.run map_options (task { from_result (Err (Boom 5)) }) handle
+    let _ = FiberHandle.run map_options (task { Fail.fail (Boom 5) }) handle
     let failed = joined_by (task { FiberHandle.join handle })
     Platform.stdout_line ("handle join: " ++ failed)
   }
@@ -139,7 +139,7 @@ let races () =
   Platform.stdout_line
     ("race_all: " ++ show (Effect.race_all [after ms1000 "slow", after ms1 "fast"]))
   let first =
-    try Effect.race_all_first [after ms1000 "slow", task { from_result (Err (Boom 6)) }] with
+    try Effect.race_all_first [after ms1000 "slow", task { Fail.fail (Boom 6) }] with
     | Boom n -> "Boom " ++ show n
   Platform.stdout_line ("race_all_first: " ++ first)
   Platform.stdout_line ("fiber_id: " ++ show (Effect.fiber_id () >= 0))
@@ -200,10 +200,7 @@ let plans () =
       (task {
         let meta : ExecutionPlan.Metadata = ExecutionPlan.current_metadata ()
         let text = Greeter.greet "ada"
-        if text == "" then
-          from_result (Err (Boom meta.attempt))
-        else
-          text ++ " at " ++ show meta.attempt
+        if text == "" then Fail.fail (Boom meta.attempt) else text ++ " at " ++ show meta.attempt
       })
   Platform.stdout_line ("with_execution_plan: " ++ greeted)
   Platform.stdout_line ("events: " ++ show (Ref.get events))

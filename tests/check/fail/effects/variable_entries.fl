@@ -19,7 +19,7 @@ foreign pure handle from "./covered.mjs" "handle"
   arity 2
 
 either : Unit ->{; NotFound, Conflict} Float
-let either _ = from_result (Err (Conflict "x"))
+let either _ = Fail.fail (Conflict "x")
 
 uncovered : Unit
 let uncovered = handle nothing either
@@ -31,7 +31,7 @@ wrong : Covered {Conflict}
 let wrong = nothing |> cover (NotFound "")
 
 missing : Unit ->{; NotFound} Float
-let missing _ = from_result (Err (NotFound "x"))
+let missing _ = Fail.fail (NotFound "x")
 
 // a number stands for no error: refused as that, not as the handler's
 // error the row does not have

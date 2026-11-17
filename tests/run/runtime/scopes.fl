@@ -33,7 +33,7 @@ let unexpected failure = Platform.stdout_line "unexpected failure"
 worker : Unit ->{Async; Oops} Unit
 let worker () =
   held_write "log"
-  from_result (Err (Oops "late"))
+  Fail.fail (Oops "late")
 
 main : Unit ->{Async; AppError} Unit
 let main () =

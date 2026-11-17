@@ -3,10 +3,12 @@
 //! `x <- e; pure x` (`e`), T031 a whole infinite `Seq`, T032
 //! `Seq.to_list` of a `for` (`[for …]`) and T033 `List.filter` piped into
 //! `List.map` (`[for …]`), T034 a `match` that fails with the error of a
-//! `Result` (`?`), T035 a chain of `flat_map` (`do`, in [`chains`]). They
-//! run once the module is solved.
+//! `Result` (`?`), T035 a chain of `flat_map` (`do`, in [`chains`]), T075
+//! `from_result (Err e)` (`Fail.fail e`, in [`raise`]). They run once the
+//! module is solved.
 
 mod chains;
+mod raise;
 
 use super::Checker;
 use super::ty::Type;
@@ -55,6 +57,7 @@ impl Checker<'_> {
                 if let [head, .., last] = children[..] {
                     self.forced(node, head, last);
                 }
+                self.raise_lint(node);
             }
             K::MatchExpr => self.rethrowing_match(node),
             _ => {}
@@ -348,15 +351,20 @@ impl Checker<'_> {
         })
     }
 
-    /// Whether `failure` is `from_result (Err e)` of the Prelude.
+    /// Whether `failure` fails with `e`: `from_result (Err e)` of the
+    /// Prelude, or `Fail.fail e` of the core.
     fn rethrows(&self, failure: &Node, e: &Node) -> bool {
+        let e = self.source_of(e).trim();
+        if let Some(raised) = self.raised(failure) {
+            return words(self.source_of(unparen(raised))) == e;
+        }
         let parts: Vec<&Node> = failure.nodes().collect();
         let (K::AppExpr, [head, arg]) = (failure.kind, &parts[..]) else {
             return false;
         };
         matches!(self.typing.names.get(&head.range()),
-            Some(Ref::Value { module, name }) if lang::is(Lang::FromResult, module, name))
-            && words(self.source_of(unparen(arg))) == format!("Err {}", self.source_of(e).trim())
+            Some(Ref::Value { module, name }) if module == "Fail" && name == "fail")
+            && words(self.source_of(unparen(arg))) == e
     }
 
     /// The function argument of `List.name f`, as written.

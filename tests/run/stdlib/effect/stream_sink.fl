@@ -29,7 +29,7 @@ let greeting =
   Stream.from_effect
     (task {
       let text = Greeter.greet "ada"
-      if text == "" then from_result (Err (Boom 0)) else text
+      if text == "" then Fail.fail (Boom 0) else text
     })
 
 main : Unit ->{Async; AppError} Unit

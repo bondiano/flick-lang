@@ -15,7 +15,7 @@ let fill xs q = TxQueue.offer_all xs q
 /// A failure of `Closed`, as a child's exit gives it.
 closed_failure : String ->{} Option (Failure {Closed})
 let closed_failure why =
-  match parallel_exits [task { from_result (Err (Closed why)) }] with
+  match parallel_exits [task { Fail.fail (Closed why) }] with
   | [exit] -> Exit.failure exit
   | _ -> None
 

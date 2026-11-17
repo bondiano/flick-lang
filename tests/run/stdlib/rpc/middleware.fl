@@ -10,7 +10,7 @@ authorized : Rpc.Call Unit ->{; Unauthorized} Unit
 let authorized call =
   match Http.Headers.get "authorization" call.headers with
   | Some _ -> ()
-  | None -> from_result (Err (Unauthorized { reason = "no authorization" }))
+  | None -> Fail.fail (Unauthorized { reason = "no authorization" })
 
 me : Rpc.Rpc "me" (Unit ->{r; Unauthorized} String)
 let me =

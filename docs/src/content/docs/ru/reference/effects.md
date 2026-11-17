@@ -1,6 +1,6 @@
 ---
 title: "Эффекты, ошибки и сервисы"
-source_hash: 1272bca5dba2f8ca
+source_hash: b675eafeae0e2004
 ---
 
 Компилятор проверяет, где допустимы эффектные вызовы, какие сервисы им нужны
@@ -440,7 +440,7 @@ let timed layer work = quiet layer work
 #   url : Unit ->{} String
 # type error ConnectError = ConnectError
 # users_live : Layer {Config} {ConnectError} {Users}
-# let users_live = Layer.effect Users (task { from_result (Err ConnectError) })
+# let users_live = Layer.effect Users (task { Fail.fail ConnectError })
 # load_name : UserId ->{Users, Log; NotFound} String
 # let load_name id = (Users.get id).name
 #

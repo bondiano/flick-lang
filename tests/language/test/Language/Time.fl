@@ -31,7 +31,7 @@ flaky : Ref Int -> Int -> Eff none {Flaky} Int
 let flaky runs failures = task {
   Ref.set runs (Ref.get runs + 1)
   let n = Ref.get runs
-  if n <= failures then from_result (Err (Flaky n)) else n
+  if n <= failures then Fail.fail (Flaky n) else n
 }
 
 /// How many times a task runs, repeated by `schedule`.
@@ -77,8 +77,7 @@ let tests = [
       (task {
         let caught = Effect.catch_defect (fun d -> "caught " ++ d) (task { Effect.die "broken" })
         let failed : Exit {Flaky} String =
-          Effect.exit
-            (task { Effect.catch_defect (fun d -> d) (task { from_result (Err (Flaky 1)) }) })
+          Effect.exit (task { Effect.catch_defect (fun d -> d) (task { Fail.fail (Flaky 1) }) })
         Test.expect (Test.equal ("caught broken", true) (caught, Exit.has_fails failed))
       }),
     Test.test "Cause.find_defect finds the text of a defect among failures" (fun () ->

@@ -8,7 +8,7 @@ transfer : Float -> TxRef.TxRef Float -> TxRef.TxRef Float ->{Tx.Transaction; Br
 let transfer amount src dst =
   TxRef.update (fun b -> b - amount) src
   TxRef.update (fun b -> b + amount) dst
-  if TxRef.get src < 0 then from_result (Err Broke)
+  if TxRef.get src < 0 then Fail.fail Broke
 
 /// Retries until `flag` is set, telling `started` once it has to wait, so
 /// that the setter comes after a first attempt on any scheduling.

@@ -101,7 +101,7 @@ let forwarded request =
   Http.Middleware.x_forwarded_headers proxies seen request
 
 broken : ServerRequest ->{; Boom} ServerResponse
-let broken _ = from_result (Err Boom)
+let broken _ = Fail.fail Boom
 
 parse : ServerRequest ->{Async; Http.ServerError.HttpServerError} ServerResponse
 let parse request =

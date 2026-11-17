@@ -1,7 +1,7 @@
 ---
 title: Проектирование программы с эффектами
 description: Отделите логику предметной области от внешних вызовов, выберите реализации сервисов в точке входа и предоставьте тестовые реализации в тестах.
-source_hash: e800f34e7820236e
+source_hash: 78c32e7685616d77
 ---
 
 Поиск пользователя можно написать одной функцией: вызвать поиск из учебного
@@ -152,7 +152,7 @@ let load_view_direct id =
   let user =
     match find_name id with
     | Some name -> { id = id; name = name }
-    | None -> from_result (Err (NotFound id))
+    | None -> Fail.fail (NotFound id)
   let view = to_view user
   console_log "[log] Loaded \{view.title}"
   view
@@ -358,7 +358,7 @@ let users_live =
     get = fun id ->
       match find_name id with
       | Some name -> { id = id; name = name }
-      | None -> from_result (Err (NotFound id));
+      | None -> Fail.fail (NotFound id);
   }
 
 log_live : Layer none none {Log}
@@ -518,7 +518,7 @@ let load_two first_id second_id =
 #     get = fun id ->
 #       match find_name id with
 #       | Some name -> { id = id; name = name }
-#       | None -> from_result (Err (NotFound id));
+#       | None -> Fail.fail (NotFound id);
 #   }
 #
 # log_live : Layer none none {Log}
@@ -613,7 +613,7 @@ let users_test =
     get = fun id ->
       match List.find (fun user -> eq user.id id) [ada, grace] with
       | Some user -> user
-      | None -> from_result (Err (NotFound id));
+      | None -> Fail.fail (NotFound id);
   }
 
 log_test : Ref (List String) -> Layer none none {Log}
@@ -689,7 +689,7 @@ let log_test lines =
 #     get = fun id ->
 #       match List.find (fun user -> eq user.id id) [ada, grace] with
 #       | Some user -> user
-#       | None -> from_result (Err (NotFound id));
+#       | None -> Fail.fail (NotFound id);
 #   }
 #
 # log_test : Ref (List String) -> Layer none none {Log}

@@ -33,7 +33,7 @@ let any_error id =
   | _ -> "unknown"
 
 db_down : Unit ->{; DbUnavailable} User
-let db_down () = from_result (Err (DbUnavailable "down"))
+let db_down () = Fail.fail (DbUnavailable "down")
 
 // what a handler needs is added
 fallback : UserId ->{Users; DbUnavailable} User
@@ -75,7 +75,7 @@ let recover n =
   | Failed reason -> Int.to_float (String.length reason)
 
 conflict : UserId -> Float ->{; Conflict} Unit
-let conflict id version = from_result (Err (Conflict id version))
+let conflict id version = Fail.fail (Conflict id version)
 
 // an omitted row is empty, so the explicit `none` is the same type
 conflict_again : UserId -> Float ->{; Conflict} Unit
@@ -99,7 +99,7 @@ let lookup_or_missing id =
 rethrown : Eff r e a -> Eff r e a
 let rethrown t = task {
   try await t with
-  | e -> from_result (Err e)
+  | e -> Fail.fail e
 }
 
 /// `Fail e` in a row is the error `e`, and `Fail.fail` raises it.

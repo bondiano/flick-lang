@@ -32,7 +32,7 @@ let profiles =
           match Paths.Username.parse name with
           | Ok username ->
             Session.call (Session.at jwt { username = username } ()) Api.Users.endpoints.get_profile
-          | Err _ -> from_result (Err (NotFound [("profile", ["not found"])]))
+          | Err _ -> Fail.fail (NotFound [("profile", ["not found"])])
         })
   )
 

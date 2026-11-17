@@ -54,7 +54,7 @@ let fail_fast stopped =
   }
   let failing = task {
     nap 5
-    from_result (Err (Stop "a branch failed"))
+    Fail.fail (Stop "a branch failed")
   }
   try
     let (a, b) = parallel slow failing

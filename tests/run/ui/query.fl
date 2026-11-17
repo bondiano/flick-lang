@@ -58,7 +58,7 @@ let counts =
   })
 
 place : Bool ->{; Refused} Unit
-let place ok = if ok then () else from_result (Err Refused)
+let place ok = if ok then () else Fail.fail Refused
 
 /// A placed order changes the orders, not the stock.
 placed : Bool ->{Atom.Write; Refused} Unit

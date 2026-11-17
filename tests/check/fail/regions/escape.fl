@@ -82,7 +82,7 @@ let outer_callback path =
 raised : Path ->{FileSystem; OpenError} String
 let raised path = scope {
   let file = FileSystem.open_scoped path
-  try from_result (Err (Wrapped file)) with
+  try Fail.fail (Wrapped file) with
   | Wrapped _ -> "caught"
 }
 
@@ -119,7 +119,7 @@ let empty_cell_out path =
 //~ FLICK-G002 @71:19-71:28
 //~ FLICK-G002 @96:5-97:60 region `s` ends with its `scope`
 //~ FLICK-G002 @79:26-79:50 this uses region `s`
-//~ FLICK-E005 @85:7-85:39
+//~ FLICK-E005 @85:7-85:31
 //~ FLICK-G002 @108:5-110:9
 //~ FLICK-G004 @102:29-102:56
 //~ FLICK-G002 @49:5-52:20 region `s` ends with its `scope`

@@ -7,10 +7,10 @@ type error B = B String
 type error C = C String
 
 raise_any : Bool ->{; A, B, C} Unit
-let raise_any b = if b then from_result (Err (C "not a number")) else from_result (Err (B "x"))
+let raise_any b = if b then Fail.fail (C "not a number") else Fail.fail (B "x")
 
 rethrow : Errors {A, B} ->{; A, B} String
-let rethrow e = from_result (Err e)
+let rethrow e = Fail.fail e
 
 payload : A -> Float
 let payload e =

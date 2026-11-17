@@ -64,7 +64,7 @@ let try_reads key =
   fallback = fallback * 2
   try
     let mut inner = fallback
-    inner = inner + from_result (Err (Missing key))
+    inner = inner + Fail.fail (Missing key)
     inner
   with
   | Missing _ -> fallback
@@ -72,7 +72,7 @@ let try_reads key =
 arm_assigns : String ->{} String
 let arm_assigns key =
   let mut status = "ok"
-  try from_result (Err (Missing key)) with
+  try Fail.fail (Missing key) with
   | Missing k -> status = k
   status
 
@@ -91,7 +91,7 @@ let in_try_body key =
   let mut status = 0
   try
     status = 1
-    from_result (Err (Missing key))
+    Fail.fail (Missing key)
   with
   | Missing _ -> status
 

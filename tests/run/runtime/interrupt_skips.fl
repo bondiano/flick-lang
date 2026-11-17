@@ -25,7 +25,7 @@ let late entered =
       let _ = Deferred.succeed () entered
       // a masked fiber cannot see the request come in: only time keeps the mask on until it does
       nap 250
-      from_result (Err (A 1))
+      Fail.fail (A 1)
     })
 
 quiet : Failure e ->{} Unit

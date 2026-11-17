@@ -52,7 +52,7 @@ let masked_failure () = scope owner {
             ping entered
             Deferred.await_ closing
             say "child fails while its owner closes"
-            from_result (Err (Oops "late"))
+            Fail.fail (Oops "late")
           })
       })
   Deferred.await_ entered
@@ -105,7 +105,7 @@ let failing_body () = scope owner {
           })
       })
   Deferred.await_ started
-  from_result (Err (Oops "the body's"))
+  Fail.fail (Oops "the body's")
 }
 
 main : Unit ->{Async; AppError} Unit

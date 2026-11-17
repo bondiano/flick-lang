@@ -56,7 +56,7 @@ let group = Rpc.group |> Rpc.add double |> Rpc.add count_to |> Rpc.add slow |> R
 
 handlers : Handlers {Async}
 let handlers = {
-  double = fun n -> if n < 0 then from_result (Err (NotFound { id = n })) else n * 2
+  double = fun n -> if n < 0 then Fail.fail (NotFound { id = n }) else n * 2
   count_to = fun n -> Stream.from_list (List.map Int.to_float (List.range 1 (Int.truncate n + 1)))
   slow = fun () ->
     Effect.ensuring
