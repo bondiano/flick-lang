@@ -37,6 +37,8 @@ fn store_of(
     );
     ModuleStore {
         salt: salt.to_owned(),
+        inputs: Box::new(|_| None),
+        keep_inputs: Box::new(|_, _| {}),
         load: Box::new(move |key| {
             let bytes = reader.lock().expect("the store").get(key).cloned()?;
             taken.fetch_add(1, Ordering::Relaxed);

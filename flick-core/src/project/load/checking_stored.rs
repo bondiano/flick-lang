@@ -8,6 +8,11 @@ pub struct ModuleStore {
     pub load: Box<Load>,
     /// Saves a module under a key; a failure only means it is checked again.
     pub save: Box<Save>,
+    /// The inputs of the module last saved from a path: what a later miss
+    /// of the same path names as changed. Without a record it cannot.
+    pub inputs: Box<LoadInputs>,
+    /// Records the inputs of a module just saved.
+    pub keep_inputs: Box<SaveInputs>,
 }
 
 /// How a host reads a saved module, from any thread that checks.
@@ -15,6 +20,13 @@ pub type Load = dyn Fn(&str) -> Option<SavedModule> + Send + Sync;
 
 /// How a host saves a module, from any thread that checks.
 pub type Save = dyn Fn(&str, &SavedModule) + Send + Sync;
+
+/// How a host reads the digests of the inputs of the module last saved
+/// from a path, by a digest of the path.
+pub type LoadInputs = dyn Fn(&str) -> Option<Vec<(String, String)>> + Send + Sync;
+
+/// How a host records them for a module it saved.
+pub type SaveInputs = dyn Fn(&str, &[(String, String)]) + Send + Sync;
 
 /// A module of the project as a run checked it: without errors or
 /// warnings, so with nothing to report.
@@ -31,7 +43,7 @@ pub struct SavedModule {
 impl Checking<'_> {
     /// [`Checking::module`] with a store: the module saved under its key,
     /// else `check`, saved when it reports nothing; with the digest of what
-    /// importers read of it.
+    /// importers read of it, and why it was checked or taken.
     fn stored(
         &self,
         loaded: &Loaded,
@@ -39,10 +51,14 @@ impl Checking<'_> {
         interfaces: &[Option<Interface>],
         digests: &[Option<String>],
         check: impl FnOnce() -> Output,
-    ) -> (Output, Option<String>) {
-        let key = self.stored_key(loaded, store, interfaces, digests);
+    ) -> (Output, Option<String>, Reason) {
+        let signed = self.stored_key(loaded, store, interfaces, digests);
         let wants_ir = self.lower && !self.lower_packages_only;
-        if let Some(key) = &key {
+        // the inputs of a key are recorded by the digest of its path
+        let path = signed.as_ref().and_then(|(_, parts)| {
+            (parts.iter()).find(|(label, _)| label == "path").map(|(_, digest)| digest.clone())
+        });
+        if let Some((key, _)) = &signed {
             // one saved with the IR serves a run that does not lower too
             let found = (!wants_ir)
                 .then(|| (store.load)(&format!("{key}-n")))
@@ -51,19 +67,34 @@ impl Checking<'_> {
             if let Some(saved) = found {
                 debug!(module = %loaded.name, "module taken from the store");
                 let digest = saved.digest.clone();
-                return (self.restored(loaded, saved, wants_ir, interfaces), Some(digest));
+                let restored = self.restored(loaded, saved, wants_ir, interfaces);
+                return (restored, Some(digest), Reason::Restored);
             }
         }
+        let reason = match (&signed, &path) {
+            _ if !self.cache.is_some_and(|c| c.explain) => Reason::Changed(Vec::new()),
+            (Some((_, parts)), Some(path)) => Reason::Changed(
+                (store.inputs)(path).map_or_else(Vec::new, |saved| {
+                    let imports: Vec<&str> =
+                        (loaded.syntax.imports.iter()).map(|i| i.module.as_str()).collect();
+                    changed_inputs(&saved, parts, &imports)
+                }),
+            ),
+            _ => Reason::NotStorable,
+        };
         let output = check();
         let digest = exported_digest(&output.exported);
-        if let (Some(key), Some(digest)) = (key, &digest)
+        if let (Some((key, parts)), Some(digest)) = (&signed, &digest)
             && output.diagnostics.is_empty()
             && let Some(saved) = saved_module(loaded.file, &output, digest.clone())
         {
             let which = if saved.ir.is_some() { "i" } else { "n" };
             (store.save)(&format!("{key}-{which}"), &saved);
+            if let Some(path) = &path {
+                (store.keep_inputs)(path, parts);
+            }
         }
-        (output, digest)
+        (output, digest, reason)
     }
 
     /// The output of `loaded` from what a run saved of it.
@@ -103,16 +134,16 @@ impl Checking<'_> {
         }
     }
 
-    /// The key `loaded` is saved under: every input of its checking, each
-    /// import by the digest of its interface; `None` for a module whose
-    /// inputs a key does not cover.
+    /// The key `loaded` is saved under, with the digest of each labeled
+    /// part: every input of its checking, each import by the digest of its
+    /// interface; `None` for a module whose inputs a key does not cover.
     fn stored_key(
         &self,
         loaded: &Loaded,
         store: &ModuleStore,
         interfaces: &[Option<Interface>],
         digests: &[Option<String>],
-    ) -> Option<String> {
+    ) -> Option<(String, Vec<(String, String)>)> {
         let project = self.project?;
         if !self.storable(loaded, interfaces) {
             return None;
@@ -170,7 +201,7 @@ impl Checking<'_> {
             let digest = self.import_digest(&import.module, digests)?;
             key.add(format!("import {n}"), format!("{} {digest}", import.module));
         }
-        Some(key.finish())
+        Some(key.signed())
     }
 
     /// The digest of the interface an import reads: a module of the run by

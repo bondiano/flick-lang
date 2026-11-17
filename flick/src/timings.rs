@@ -1,5 +1,6 @@
 //! `--timings`: how long the phases of a command and its slowest modules
-//! took and why the build cache missed, collected from the `tracing` events
+//! took, what the module cache reused and why it checked the others again,
+//! and why the build cache missed, collected from the `tracing` events
 //! the compiler and the commands emit. Without the flag nothing subscribes,
 //! so each of those events costs a disabled callsite.
 
@@ -22,6 +23,9 @@ use crate::args::{DiagnosticsFormat, GlobalArguments};
 /// How many of the slowest modules a person reads.
 const SLOWEST: usize = 10;
 
+/// How many of the modules checked again a person reads the reasons of.
+const EXPLAINED: usize = 20;
+
 /// What the events said since the last report.
 struct Records {
     /// Each phase a command announced, with when it began.
@@ -30,6 +34,8 @@ struct Records {
     phases: Vec<(String, u64)>,
     /// Modules checked, in microseconds.
     modules: Vec<(String, u64)>,
+    /// What the module cache did with each module, sorted by name.
+    reasons: Vec<(String, String)>,
     misses: Vec<String>,
 }
 
@@ -37,6 +43,7 @@ static RECORDS: Mutex<Records> = Mutex::new(Records {
     stages: Vec::new(),
     phases: Vec::new(),
     modules: Vec::new(),
+    reasons: Vec::new(),
     misses: Vec::new(),
 });
 
@@ -84,6 +91,11 @@ impl<S: Subscriber> Layer<S> for Collect {
             } => records.misses.push(miss),
             Fields {
                 module: Some(module),
+                reason: Some(reason),
+                ..
+            } => records.reasons.push((module, reason)),
+            Fields {
+                module: Some(module),
                 micros: Some(micros),
                 ..
             } => records.modules.push((module, micros)),
@@ -103,6 +115,7 @@ struct Fields {
     stage: Option<String>,
     miss: Option<String>,
     module: Option<String>,
+    reason: Option<String>,
     message: Option<String>,
     micros: Option<u64>,
 }
@@ -123,6 +136,7 @@ impl Visit for Fields {
             "stage" => &mut self.stage,
             "miss" => &mut self.miss,
             "module" => &mut self.module,
+            "reason" => &mut self.reason,
             "message" => &mut self.message,
             _ => return,
         };
@@ -137,6 +151,7 @@ struct Report {
     phases: Vec<(String, u64)>,
     /// The slowest first.
     modules: Vec<(String, u64)>,
+    reasons: Vec<(String, String)>,
     misses: Vec<String>,
 }
 
@@ -157,6 +172,7 @@ impl Report {
             stages,
             phases: records.phases,
             modules,
+            reasons: records.reasons,
             misses: records.misses,
         }
     }
@@ -175,6 +191,23 @@ impl Report {
         if !self.modules.is_empty() {
             let _ = writeln!(out, "Slowest of {} modules checked", self.modules.len());
             (self.modules.iter().take(SLOWEST)).for_each(|module| line(&mut out, module));
+        }
+        if !self.reasons.is_empty() {
+            let kept = |reason: &str| self.reasons.iter().filter(|(_, r)| r == reason).count();
+            let (reused, restored) = (kept("reused"), kept("taken from the store"));
+            let checked = self.reasons.len() - reused - restored;
+            let _ = writeln!(
+                out,
+                "Module cache: {reused} reused, {restored} taken from the store, {checked} checked"
+            );
+            let explained =
+                (self.reasons.iter()).filter(|(_, r)| r != "reused" && r != "taken from the store");
+            for (module, reason) in explained.take(EXPLAINED) {
+                let _ = writeln!(out, "  {module}: {reason}");
+            }
+            if checked > EXPLAINED {
+                let _ = writeln!(out, "  and {} more", checked - EXPLAINED);
+            }
         }
         for miss in &self.misses {
             let _ = writeln!(out, "Build cache missed: {miss}");
@@ -195,6 +228,9 @@ impl Report {
             "stages": timed("label", &self.stages),
             "phases": timed("label", &self.phases),
             "modules": timed("module", &self.modules),
+            "module-cache": (self.reasons.iter())
+                .map(|(module, reason)| json!({ "module": module, "reason": reason }))
+                .collect::<Vec<_>>(),
             "cache-misses": self.misses,
         });
         format!("{event}\n")
@@ -207,6 +243,7 @@ fn collected() -> Records {
         stages: Vec::new(),
         phases: Vec::new(),
         modules: Vec::new(),
+        reasons: Vec::new(),
         misses: Vec::new(),
     };
     mem::replace(&mut *records(), empty)
@@ -221,7 +258,7 @@ pub fn report(global: &GlobalArguments) {
     }
     let collected = collected();
     // a watching command that reported its last run has nothing more to say
-    if collected.stages.is_empty() && collected.modules.is_empty() {
+    if collected.stages.is_empty() && collected.modules.is_empty() && collected.reasons.is_empty() {
         return;
     }
     let report = Report::of(collected, Instant::now());
@@ -257,6 +294,11 @@ mod tests {
             ],
             phases: vec![("built-in modules checked".to_owned(), 1500)],
             modules: vec![("A".to_owned(), 10), ("B".to_owned(), 4000)],
+            reasons: vec![
+                ("A".to_owned(), "source".to_owned()),
+                ("B".to_owned(), "reused".to_owned()),
+                ("C".to_owned(), "import A ← source".to_owned()),
+            ],
             misses: vec!["`config` differs".to_owned()],
         };
         let report = Report::of(records, at(7));
@@ -274,6 +316,9 @@ Within them
 Slowest of 2 modules checked
        4.0 ms  B
        0.0 ms  A
+Module cache: 1 reused, 0 taken from the store, 2 checked
+  A: source
+  C: import A ← source
 Build cache missed: `config` differs
 "
         );
@@ -281,5 +326,7 @@ Build cache missed: `config` differs
         assert_eq!(json["type"], "timings");
         assert_eq!(json["modules"][0]["module"], "B");
         assert_eq!(json["stages"][1]["micros"], 5000);
+        assert_eq!(json["module-cache"][1]["module"], "B");
+        assert_eq!(json["module-cache"][1]["reason"], "reused");
     }
 }
