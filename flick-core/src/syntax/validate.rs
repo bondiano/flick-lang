@@ -5,7 +5,7 @@
 //! one function.
 
 use super::cst::{Node, Token};
-use super::heads::CHECKED_BY;
+use super::heads::{CHECKED_BY, INVARIANT_OF};
 use super::kind::SyntaxKind as K;
 use super::patterns::{is_part, is_pattern};
 use super::ts_mark;
@@ -239,6 +239,17 @@ impl Validator<'_> {
                     return;
                 }
                 "a check is named before the function it reads a constant for".to_owned()
+            }
+            // generated code alone writes it, before the type it is the
+            // invariant of
+            [name, _, _, _]
+                if INVARIANT_OF.ends_with(name.text(self.src))
+                    && name.text(self.src).contains('$') =>
+            {
+                if matches!(next, Some(K::TypeDecl)) {
+                    return;
+                }
+                "an invariant is named before the type whose values it holds for".to_owned()
             }
             [name] if name.text(self.src) == "owner" => {
                 if matches!(next, Some(K::ServiceDecl | K::Attribute))

@@ -1,4 +1,4 @@
-package flick:plugin@0.3.0;
+package flick:plugin@0.4.0;
 
 /// What a plugin and the compiler exchange.
 interface types {
@@ -140,6 +140,9 @@ interface types {
   record doc { text: string, decl: node-id }
 
   record checked { by: string, decl: node-id }
+  /// An `unboxed` type with the companions of its check, its value and the
+  /// member that proves a value of it.
+  record invariant { check: string, value: string, prove: string, decl: node-id }
 
   /// A declaration of the module.
   variant decl {
@@ -155,6 +158,8 @@ interface types {
     doc(doc),
     /// A function with the value that reads a constant given to it.
     checked(checked),
+    /// A type whose values the check of its block holds for.
+    invariant(invariant),
   }
 
   variant kind { expr(expr), ty(ty), pat(pat), decl(decl) }

@@ -283,6 +283,7 @@ impl Checker<'_> {
             let span = Span::new(self.file, head.range().0, head.range().1);
             self.watched_call(&module, &name, span, given);
         }
+        self.note_construction(head, args);
         if let [first, second] = &params[..]
             && self.is_builtin(head, Lang::LayerMerge)
         {

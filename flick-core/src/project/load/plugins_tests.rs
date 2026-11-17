@@ -15,6 +15,7 @@ mod block_derive;
 mod calls;
 mod derive;
 mod forms;
+mod invariants;
 mod loaded;
 mod names;
 mod nested;

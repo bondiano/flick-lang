@@ -1,0 +1,28 @@
+---
+title: "FLICK-T077"
+---
+
+`T.prove v` makes a value of a type with an invariant, such as a refined
+type, and the compiler must prove the type's check holds for `v`. Here
+what the path to it establishes proves the opposite: the check fails for
+every value that reaches this place, so the value made would break the
+invariant of its type. A path the check rules out has no value to make;
+`T.parse v` gives the error instead.
+
+```flick fail T077
+refined type Email = String where Checks.email
+
+as_email : String -> Option Email
+let as_email text =
+  if Email.check text then None else Some (Email.prove text)
+```
+
+is
+
+```flick
+refined type Email = String where Checks.email
+
+as_email : String -> Option Email
+let as_email text =
+  if Email.check text then Some (Email.prove text) else None
+```

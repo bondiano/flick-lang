@@ -1,0 +1,11 @@
+---
+title: "FLICK-P049"
+---
+
+A plugin declared the invariant of a type, but the code it gave does not
+relate as an invariant needs: an `unboxed` type of one constructor with
+one field, a `let` of its check that is a pure function from the field's
+type to `Bool`, a `let` of its value that gives the field back, and no
+value of the member that proves one. The compiler then gives the type no
+`T.prove` and leaves its constructor as it is. The plugin is at fault;
+report it to its authors, or rebuild it with the compiler's `flick-plugin`.

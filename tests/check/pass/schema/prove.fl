@@ -1,0 +1,57 @@
+// `T.prove` makes a value of a refined type where the facts of its path
+// prove the check holds for its argument: a `T.check` of the same value,
+// a call of the same check, the same value under another immutable name,
+// or the left of a `&&` before it.
+module App.Proved exposing (..)
+
+import Checks as C
+
+refined type Email = String where C.email
+
+refined type Name = String where Checks.non_empty
+
+checked : String -> Option Email
+let checked text = if Email.check text then Some (Email.prove text) else None
+
+called : String -> Option Email
+let called text = if C.email text then Some (Email.prove text) else None
+
+aliased : String -> Option Email
+let aliased text =
+  let copy = text
+  if Email.check copy then Some (Email.prove text) else None
+
+both : String -> Option (Email, Name)
+let both text =
+  if Email.check text && Name.check text then Some (Email.prove text, Name.prove text) else None
+
+unless : String -> Option Name
+let unless text =
+  if not (Name.check text) then None else if text == "" then None else Some (Name.prove text)
+
+nested : String -> Option Email
+let nested text =
+  if text == "" then None else if Email.check text then Some (Email.prove text) else None
+
+// the right of `||` runs where the left was false
+fallback : String -> Option Name
+let fallback text =
+  if not (Name.check text) || Email.check text then None else Some (Name.prove text)
+
+snapshot : String -> Option Email
+let snapshot text =
+  let mut current = text
+  let saved = current
+  current = "changed"
+  if Email.check saved then Some (Email.prove saved) else None
+
+refined type Title = String where Checks.non_empty
+
+// a value of a refined type holds its check: `Name.value` is non-empty
+as_title : Name -> Title
+let as_title name = Title.prove (Name.value name)
+
+as_title_later : Name -> Title
+let as_title_later name =
+  let raw = Name.value name
+  Title.prove raw

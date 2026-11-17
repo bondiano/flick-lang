@@ -99,6 +99,7 @@ impl<'a> Checker<'a> {
         let declared = self.declare_instances(&decls);
         self.declare_schemas(&decls);
         self.declare_checks(&decls);
+        self.declare_invariants(&decls);
         self.collect(&decls);
         for i in 0..self.top.items.len() {
             self.check_item(i);

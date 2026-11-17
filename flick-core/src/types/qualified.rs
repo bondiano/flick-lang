@@ -43,6 +43,7 @@ impl Checker<'_> {
         let parent = self.env.parent(entity);
         let r = match (entity.namespace, parent) {
             (Namespace::Constructor, Some((module, ty_name))) => {
+                self.note_constructor(&module, &entity.name, span);
                 let arity = self.arrow_stages(ty).len();
                 let rep = self.env.constructor_rep(&module, &ty_name, &entity.name);
                 let dicts = self.env.value(entity).map_or(0, dicts);
@@ -296,6 +297,9 @@ impl Checker<'_> {
         let super::env::Found::Entity(e) = self.env.find_type(qualifier) else {
             return None;
         };
+        if let Some(constructor) = self.prove_member(&e, name, span) {
+            return Some(constructor);
+        }
         let entity = Entity {
             module: e.module.clone(),
             namespace: Namespace::Value,

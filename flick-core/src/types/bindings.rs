@@ -219,7 +219,9 @@ impl Checker<'_> {
             }
             self.polymorphic_signature(&name, &scheme, runtime, decl, &parts);
             let ty = self.inferred_captures(scheme, captures, self.span(decl));
+            let alias = self.let_alias(&parts);
             self.push_local(&name, at, ty);
+            self.proof_alias(at, alias);
             if let Some(local) = self.cx.locals.last_mut()
                 && !parts.is_function()
                 && !parts.rec
@@ -235,7 +237,9 @@ impl Checker<'_> {
             if parts.rec {
                 self.cx.locals.pop();
             }
+            let alias = self.let_alias(&parts);
             self.push_local(&name, at, ty);
+            self.proof_alias(at, alias);
             if let Some(local) = self.cx.locals.last_mut() {
                 local.unsigned = parts.is_function();
                 if !parts.is_function() && !parts.rec {

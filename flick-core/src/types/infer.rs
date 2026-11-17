@@ -460,6 +460,9 @@ impl<'c> Checker<'c> {
         if let Some(condition) = children.first() {
             self.check(condition, &Type::lang(Lang::Bool));
         }
+        // each branch runs where the condition gave its result
+        let fact = children.first().and_then(|c| self.proof_condition(c));
+        let fact = fact.as_ref();
         let Some(&otherwise) = children.get(2) else {
             let (unit, span) = (Type::lang(Lang::Unit), self.span(node));
             let keyword = node.child_tokens().find(|t| t.kind == K::IfKw);
@@ -475,10 +478,10 @@ impl<'c> Checker<'c> {
                 }
                 if fits {
                     let since = self.diagnostics.len();
-                    self.check(then, &unit);
+                    self.with_fact(fact, true, |this| this.check(then, &unit));
                     self.explain_since(since, &unit, keyword, &why);
                 } else {
-                    self.infer(then);
+                    self.with_fact(fact, true, |this| this.infer(then));
                 }
             }
             return;
@@ -489,14 +492,14 @@ impl<'c> Checker<'c> {
         if let Some(then) = children.get(1)
             && !self.record_in_braces(node, then)
         {
-            self.check(then, expected);
+            self.with_fact(fact, true, |this| this.check(then, expected));
         }
         for branch in children.iter().skip(2) {
             if self.record_in_braces(node, branch) {
                 continue;
             }
             let since = self.diagnostics.len();
-            self.check(branch, expected);
+            self.with_fact(fact, false, |this| this.check(branch, expected));
             if open {
                 let then = self.span(children[1]);
                 self.explain_since(since, expected, then, &|t| {

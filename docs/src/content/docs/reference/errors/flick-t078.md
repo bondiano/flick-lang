@@ -1,0 +1,25 @@
+---
+title: "FLICK-T078"
+---
+
+`T.prove` makes a value of a type with an invariant only applied to its
+argument, `T.prove v`, where the compiler proves the type's check holds
+for that `v`. It is no function: named alone, passed to another function
+or kept in a list or a value, it would make values where nothing proved
+them. Apply it where the facts about its argument are known.
+
+```flick fail T078
+refined type Email = String where Checks.email
+
+make : String -> Email
+let make = Email.prove
+```
+
+is
+
+```flick
+refined type Email = String where Checks.email
+
+make : String -> Option Email
+let make text = if Email.check text then Some (Email.prove text) else None
+```

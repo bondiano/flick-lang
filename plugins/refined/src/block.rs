@@ -12,8 +12,12 @@
 //! ```
 //!
 //! The constructor is a name only generated code writes, and only this
-//! plugin's: `T.parse` is the one way in. `Show` is written here over the
-//! base, as a value shows the way its base does.
+//! plugin's. The type is declared with its invariant: the compiler checks
+//! that the companions relate as above, and proves the check holds wherever
+//! `T$Make` is applied, `T.parse` included. `T.prove v` is that application
+//! where the program writes it: a `T` where the compiler can prove the check
+//! holds for `v`. `Show` is written here over the base, as a value shows the
+//! way its base does.
 
 use std::mem;
 
@@ -23,7 +27,7 @@ use flick_plugin::{
 };
 
 /// What an editor shows on the head.
-const ABOUT: &str = "A type of its own over another, whose values pass a check: `T.parse` makes one, `T.value` reads it.";
+const ABOUT: &str = "A type of its own over another, whose values pass a check: `T.parse` makes one, `T.prove` makes one where the compiler proves the check holds, `T.value` reads it.";
 
 /// The parts of the declaration, at spans of the block.
 struct Parts {
@@ -250,6 +254,13 @@ pub fn expand(block: &Block, compiler: &mut dyn Compiler) -> Result<Arena, Vec<D
     } else {
         b.doc(&block.docs, ty)
     };
+    // the compiler checks the relation, and every `T$Make` against the check
+    let ty = b.decl(Decl::Invariant {
+        check: "check".into(),
+        value: "value".into(),
+        prove: "prove".into(),
+        decl: ty,
+    });
     let mut decls = vec![ty];
     let [signature, check] = code.check(b.at(block.whole()), parts.predicate);
     decls.push(signature);

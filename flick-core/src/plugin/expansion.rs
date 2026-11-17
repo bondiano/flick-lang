@@ -207,6 +207,7 @@ impl Expansion {
         };
         diagnostics.extend(expansion.stray_companions());
         diagnostics.extend(expansion.foreign_constructors());
+        diagnostics.extend(expansion.foreign_invariants());
         (Some(expansion), diagnostics)
     }
 

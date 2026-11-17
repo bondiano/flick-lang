@@ -70,6 +70,7 @@ mod expression_fact;
 mod origin;
 mod patterns;
 mod pipes;
+mod proofs;
 mod qualified;
 mod question;
 mod ranges;
@@ -340,6 +341,7 @@ fn checker_in<'a>(
         classes: classes::State::default(),
         typing: Typing::default(),
         predicates: HashMap::new(),
+        proofs: proofs::Proofs::default(),
         cells: HashMap::new(),
         labels: Vec::new(),
         owners: Vec::new(),
@@ -393,6 +395,7 @@ fn run_in(
     }
     checker.report_holes();
     checker.record_call_sites();
+    checker.discharge_proofs();
     checker.unannotated_codecs();
     checker.fill(interface);
     checker.finish_static_module(
@@ -535,6 +538,10 @@ struct ItemCx {
     /// Locals applied before their type was known, each with the pure arrow
     /// taken for it, its name and where it is bound.
     assumed_pure: Vec<(Type, String, u32)>,
+    /// What the path to the expression being checked establishes.
+    facts: Vec<proofs::Fact>,
+    /// The facts around each body that runs apart, set aside.
+    held_facts: Vec<Vec<proofs::Fact>>,
 }
 
 include!("checker_state.rs");

@@ -7,7 +7,7 @@ use std::mem;
 use flick_plugin::{Case, Decl, Hole, HoleKind, Kind, NodeId, Span};
 
 use super::{Names, Printer, Role};
-use crate::syntax::heads::CHECKED_BY;
+use crate::syntax::heads::{CHECKED_BY, INVARIANT_OF};
 
 impl Printer<'_> {
     pub(super) fn decl(&mut self, decl: &Decl, depth: u32) -> Result<(), String> {
@@ -87,6 +87,24 @@ impl Printer<'_> {
                 self.push(CHECKED_BY);
                 self.push(" ");
                 self.value(by)?;
+                self.push("\n");
+                self.node(*decl, Role::Decl, d)?;
+            }
+            // an attribute only generated code writes, before the type
+            Decl::Invariant {
+                check,
+                value,
+                prove,
+                decl,
+            } => {
+                self.push(INVARIANT_OF);
+                for member in [check, value, prove] {
+                    if !is_member(member) {
+                        return Err(format!("`{member}` is no member of a type"));
+                    }
+                    self.push(" ");
+                    self.push(member);
+                }
                 self.push("\n");
                 self.node(*decl, Role::Decl, d)?;
             }
@@ -192,11 +210,7 @@ impl Printer<'_> {
             Some((owner, member)) => {
                 self.declared(owner, Names::Constructor)?;
                 // a member may spell a keyword, as `schema`: `Owner$member` is one name
-                let word = member.starts_with(|c: char| c.is_ascii_lowercase() || c == '_')
-                    && member
-                        .chars()
-                        .all(|c| c.is_ascii_alphanumeric() || c == '_');
-                if !word {
+                if !is_member(member) {
                     return Err(format!("`{member}` is not a lowercase name"));
                 }
                 self.push("$");
@@ -237,3 +251,11 @@ impl Printer<'_> {
 
 /// The text a hole of a declaration stands as until the splice.
 pub const DECL_PLACEHOLDER: &str = "let hole = ()";
+
+/// Whether `member` is a lowercase name, as a companion's member is.
+fn is_member(member: &str) -> bool {
+    member.starts_with(|c: char| c.is_ascii_lowercase() || c == '_')
+        && member
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+}

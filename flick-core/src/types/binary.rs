@@ -40,7 +40,10 @@ impl Checker<'_> {
             K::GtGt | K::LtLt => self.compose(node, None),
             K::OrOr | K::AndAnd => {
                 self.check(lhs, &bool_);
-                self.check(rhs, &bool_);
+                // the right runs only after the left gave `true` to `&&`, `false` to `||`
+                let fact = self.proof_condition(lhs);
+                let ran = op.kind == K::AndAnd;
+                self.with_fact(fact.as_ref(), ran, |this| this.check(rhs, &bool_));
                 bool_
             }
             _ => {

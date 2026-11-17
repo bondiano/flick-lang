@@ -45,6 +45,8 @@ struct Checker<'a> {
     typing: Typing,
     /// The predicate of each refined type of the module, by type name.
     predicates: HashMap<String, &'a Node>,
+    /// The invariants of the module's types and what must be proved of them.
+    proofs: proofs::Proofs<'a>,
     /// The tree of the module being checked: a fix that depends on what is
     /// around a node finds the node from here.
     root: Option<&'a Node>,
