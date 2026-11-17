@@ -28,7 +28,7 @@ impl Checker<'_> {
             .collect();
         interface.suspended = (self.typing.suspended.iter())
             .filter(|(name, _)| exported.contains(&name.as_str()))
-            .map(|(name, marked)| (name.clone(), marked.clone()))
+            .cloned()
             .collect();
         let makers = tagged(&self.typing.makers, &exported, |_| Vec::new());
         let servers = tagged(&self.typing.servers, &exported, Vec::clone);

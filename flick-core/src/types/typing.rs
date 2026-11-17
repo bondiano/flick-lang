@@ -82,7 +82,7 @@ pub struct Typing {
     /// `await`s of a `Lazy`, which force it rather than run a task.
     pub forced: HashSet<Range>,
     /// The parameters each top-level signature marks `~`, by position.
-    pub suspended: BTreeMap<String, Vec<usize>>,
+    pub suspended: Vec<(String, Vec<usize>)>,
     /// Arguments passed unstarted to a parameter marked `~`: the task of each.
     pub suspends: HashSet<Range>,
     /// `await`s of a `let lazy`, which read it with `lazy_read`.

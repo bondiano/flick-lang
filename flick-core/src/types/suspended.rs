@@ -4,8 +4,6 @@
 //! not part of the type: it stays beside the signature, in the module's
 //! interface, and only a call of the value by its name reads it.
 
-use std::collections::BTreeMap;
-
 use super::Checker;
 use super::env::{Form, Found};
 use super::ty::Type;
@@ -15,8 +13,8 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
 /// The parameters each top-level signature of `root` marks `~`, by position.
-pub fn marks(root: &Node, text: &str) -> BTreeMap<String, Vec<usize>> {
-    let mut out = BTreeMap::new();
+pub fn marks(root: &Node, text: &str) -> Vec<(String, Vec<usize>)> {
+    let mut out = Vec::new();
     for signature in root.nodes().filter(|n| n.kind == K::Signature) {
         let Some(name) = signature.child_tokens().find(|t| t.kind == K::Ident) else {
             continue;
@@ -43,7 +41,7 @@ pub fn marks(root: &Node, text: &str) -> BTreeMap<String, Vec<usize>> {
             ty = result;
         }
         if !marked.is_empty() {
-            out.insert(name.text(text).to_owned(), marked);
+            out.push((name.text(text).to_owned(), marked));
         }
     }
     out
@@ -55,12 +53,14 @@ impl Checker<'_> {
         let Some(Ref::Value { module, name }) = self.typing.names.get(&head.range()) else {
             return Vec::new();
         };
-        let marked = if *module == self.env.module {
-            self.typing.suspended.get(name)
+        let marks = if *module == self.env.module {
+            Some(&self.typing.suspended)
         } else {
-            (self.env.interface(module)).and_then(|i| i.suspended.get(name))
+            self.env.interface(module).map(|i| &i.suspended)
         };
-        marked.cloned().unwrap_or_default()
+        (marks.into_iter().flatten())
+            .find(|(n, _)| n == name)
+            .map_or_else(Vec::new, |(_, marked)| marked.clone())
     }
 
     /// `arg`, a runtime call for a parameter marked `~` of type `param`,
