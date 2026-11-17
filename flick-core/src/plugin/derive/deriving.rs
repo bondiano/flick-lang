@@ -84,6 +84,7 @@ impl Deriving<'_> {
                 rendered,
                 source,
                 plugin: package,
+                plugin_id: plugin.id().to_owned(),
                 keep,
                 whole,
             }),

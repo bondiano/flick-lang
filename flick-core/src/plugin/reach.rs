@@ -49,7 +49,7 @@ pub struct Gate {
 }
 
 /// What a call reached, as a kept result is checked again.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Asked {
     File(String),
     Env(String),
@@ -74,7 +74,7 @@ impl Asked {
 }
 
 /// What a call reached and the hash of its answer.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Used {
     pub asked: Asked,
     pub answer: String,

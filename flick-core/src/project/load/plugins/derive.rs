@@ -318,6 +318,7 @@ impl Call<'_, '_> {
             node: decl.clone(),
             source,
             package,
+            plugin_id: plugin.id().to_owned(),
             keep,
             whole: at,
             declared: Vec::new(),
@@ -402,6 +403,7 @@ impl Call<'_, '_> {
             node: block.node.clone(),
             source,
             package,
+            plugin_id: plugin.id().to_owned(),
             keep: false,
             whole: block.whole,
             declared: Vec::new(),
@@ -450,6 +452,7 @@ impl Call<'_, '_> {
             &state,
             &mut found.source,
         );
+        found.source.reach.used.extend(collecting.reach.used);
         for (code, message) in found.source.reach.problems.drain(..) {
             diagnostics.push(Diagnostic::error(code, message, found.whole));
         }

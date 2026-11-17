@@ -15,23 +15,23 @@ mod enums;
 mod groups;
 mod published;
 mod results;
+mod sink;
 mod watching;
 
 use published::Publications;
 use results::Results;
+use sink::Sink;
 pub(super) use watching::{Watchers, Watching};
 
 use super::{Loaded, Loader, Root};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::plugin::derive::{Declared, declared};
 use crate::plugin::expansion::{Expanded, Expansion};
-use crate::plugin::reach::{Gate, Reach};
+use crate::plugin::reach::{Gate, Reach, Used};
 use crate::plugin::render::{Rendered, render};
 use crate::plugin::source::BlockSource;
 use crate::plugin::written::user_type;
-use crate::plugin::{
-    EditorBlock, Expander, Failure, ROUNDS, blocks_under, first_party, head_token, placed,
-};
+use crate::plugin::{EditorBlock, Expander, Failure, ROUNDS, blocks_under, first_party, placed};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -41,15 +41,23 @@ use crate::types;
 type Plugins = HashMap<String, Result<Arc<dyn Expander>, String>>;
 
 /// A group collected: its plugin's package, its members, their blocks,
-/// its state and its gate.
-type Collected = (String, Vec<usize>, Vec<Block>, Vec<u8>, Option<Arc<Gate>>);
+/// its state, its gate and what `collect` reached.
+type Collected = (
+    String,
+    Vec<usize>,
+    Vec<Block>,
+    Vec<u8>,
+    Option<Arc<Gate>>,
+    Vec<Used>,
+);
 
 /// A block of a loaded module and the package of its plugin.
-struct Found {
+pub(super) struct Found {
     module: usize,
     node: Node,
     source: BlockSource,
     package: String,
+    plugin_id: String,
     /// A type declaration whose derived code goes after it.
     keep: bool,
     /// What the whole block stands for in the module: the block, or the
@@ -194,6 +202,7 @@ impl Loader<'_> {
                     rendered,
                     source: f.source,
                     plugin: f.package,
+                    plugin_id: f.plugin_id,
                     keep: f.keep,
                     whole: (f.whole.start, f.whole.end),
                 });
@@ -303,7 +312,7 @@ impl Loader<'_> {
     ) -> Vec<Option<Rendered>> {
         let mut rendered: Vec<Option<Rendered>> = found.iter().map(|_| None).collect();
         let states = self.collect_groups(plugins, results, publications, found, diagnostics);
-        for (package, members, blocks, state, gate) in states {
+        for (package, members, blocks, state, gate, collect_used) in states {
             let Some(Ok(plugin)) = plugins.get(&package) else {
                 continue;
             };
@@ -323,8 +332,10 @@ impl Loader<'_> {
             }
             for (&j, block) in members.iter().zip(&blocks) {
                 let f = &mut found[j];
+                plugin.id().clone_into(&mut f.plugin_id);
                 f.source.reach = Reach::new(gate.clone());
                 let expanded = results.expand(plugin.as_ref(), block, &state, &mut f.source);
+                f.source.reach.used.extend(collect_used.iter().cloned());
                 // what the host refused, whatever the plugin made of it
                 for (code, message) in f.source.reach.problems.drain(..) {
                     diagnostics.push(Diagnostic::error(code, message, f.whole));
@@ -363,77 +374,6 @@ impl Loader<'_> {
             }
         }
         rendered
-    }
-}
-
-/// Where the blocks of a round go: those to expand, and those only editors
-/// see while they are not closed.
-struct Sink<'a> {
-    plugins: &'a Plugins,
-    /// The heads of the module the blocks are in, by the package of each.
-    heads: &'a HashMap<String, String>,
-    found: &'a mut Vec<Found>,
-    editing: &'a mut Vec<(usize, EditorBlock)>,
-}
-
-impl Sink<'_> {
-    /// The block `node` of the module `i`, read as `source`.
-    fn take(
-        &mut self,
-        loader: &Loader,
-        i: usize,
-        node: &Node,
-        source: Option<BlockSource>,
-        diagnostics: &mut Vec<Diagnostic>,
-    ) {
-        let m = &loader.modules[i];
-        let text = &loader.sources.get(m.file).text;
-        let Some(token) = head_token(node) else {
-            return;
-        };
-        let head = token.text(text);
-        let Some(package) = self.heads.get(head) else {
-            return;
-        };
-        if let Some(off) = loader.disabled(package, head, Span::new(m.file, token.start, token.end))
-        {
-            diagnostics.push(off);
-            return;
-        }
-        if let Some(Err(_)) = self.plugins.get(package) {
-            let import = (m.syntax.imports.iter())
-                .flat_map(|i| &i.plugins)
-                .find(|item| item.name == head);
-            let (start, end) = node.range();
-            let mut d = Diagnostic::error(
-                codes::P036,
-                format!("plugin `{package}` is not loaded, so this block has no code"),
-                Span::new(m.file, start, end),
-            );
-            if let Some(item) = import {
-                d = d.with_related(item.span, "the import says why it does not load");
-            }
-            diagnostics.push(d);
-            return;
-        }
-        let Some(source) = source else {
-            return;
-        };
-        if source.closed() {
-            let (start, end) = node.range();
-            self.found.push(Found {
-                module: i,
-                node: node.clone(),
-                whole: Span::new(source.file(), start, end),
-                source,
-                package: package.clone(),
-                keep: false,
-                declared: Vec::new(),
-            });
-        } else if let Some(Ok(plugin)) = self.plugins.get(package) {
-            self.editing
-                .push((i, EditorBlock::new(&source, &[], plugin)));
-        }
     }
 }
 

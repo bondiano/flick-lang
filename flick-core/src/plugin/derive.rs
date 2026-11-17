@@ -478,6 +478,7 @@ fn std_round(
                     rendered,
                     source,
                     plugin: first_party::PACKAGE.into(),
+                    plugin_id: plugin.id().to_owned(),
                     keep: false,
                     whole: (start, end),
                 },

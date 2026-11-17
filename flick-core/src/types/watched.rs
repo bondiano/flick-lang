@@ -49,6 +49,11 @@ impl Watched {
         self.names.is_empty()
     }
 
+    /// The `(module, name)` pairs watched, with `""` for `*` and `"@"` for `@tag`.
+    pub fn names(&self) -> &[(String, String)] {
+        &self.names
+    }
+
     /// The names of `other` watched here too.
     pub fn extend(&mut self, other: &Watched) {
         for name in &other.names {
