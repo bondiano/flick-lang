@@ -403,7 +403,7 @@ pub(super) fn builtin_env(stages_by_class: bool) -> &'static Builtins {
     static ENV: [OnceLock<Builtins>; 2] = [OnceLock::new(), OnceLock::new()];
     ENV[usize::from(stages_by_class)].get_or_init(|| {
         let interfaces = builtins_of(stages_by_class);
-        let (env, elapsed) = timed(|| Builtins::new(interfaces));
+        let (env, elapsed) = timed(|| Builtins::borrowing(interfaces));
         debug!(
             ?elapsed,
             micros = micros(elapsed),
