@@ -36,12 +36,12 @@ A plugin declares the invariant of a type of its own block with `Decl::Invariant
 
 A broken contract gives nothing: there is no `T.prove`, and the constructor is as it was.
 
-**Active contracts.** A contract is **active** when `T` has no parameters and `Base` is `Int`, `Float`, `String` or `Bool`. Only an active contract binds its constructor and gives `T.prove`. For an inactive one, `T.prove` is `FLICK-T076`.
+**Active contracts.** A contract is **active** when `T` has no parameters and `Base` is `Int`, `Float`, `String` or `Bool`. Only an active contract binds its constructor and gives `T.prove`. For an inactive one, `T.prove` is `FLICK-T077`.
 
 **(C-Intro) the constructor discipline.** Every use of the constructor `C` of an active contract in an expression is the head of an application `C e`. Each such application is an obligation: the facts of its path prove that `T$check e` gives `true` (§4).
 
-- A use that is not an application is `FLICK-T078`. This covers naming it alone, passing it, keeping it in a value, or applying it through a pipe.
-- An obligation that is not proved is `FLICK-T076`. One whose opposite is proved is `FLICK-T077`.
+- A use that is not an application is `FLICK-T079`. This covers naming it alone, passing it, keeping it in a value, or applying it through a pipe.
+- An obligation that is not proved is `FLICK-T077`. One whose opposite is proved is `FLICK-T078`.
 - The discipline holds for the owning plugin's code too. `T.parse value = if T.check value then Ok (C value) else …` meets it through the fact `T$check value`.
 - Patterns are not restricted.
 
@@ -63,7 +63,7 @@ Checked by: `proofs/mod.rs` (`note_construction`, `discharge_proofs`), `project/
 - The name records the constructor `C` in `Typing.names`. There is no `let T$prove` and no rewrite of the source.
 - Lowering emits the existing `Con` of `C`, which is `Rep::Unboxed`: the identity on JS and Go.
 - `e` runs once. The check does not run, and no `Result` is built.
-- `T.prove` is subject to (C-Intro): applied to its argument, or `FLICK-T078`.
+- `T.prove` is subject to (C-Intro): applied to its argument, or `FLICK-T079`.
 
 Checked by: `tests/check/pass/schema/prove.fl`, `tests/check/fail/schema/prove.fl`, the model's `accepted.rs` (it sees `C e`).
 
@@ -123,8 +123,8 @@ holds(φ || ψ) = true  if holds(φ) = true;   holds(ψ) if holds(φ) = false; u
 | Outcome | When | Diagnostic |
 | - | - | - |
 | **Proven** | `holds(T$check v) = true`, or `holds(summary(v)) = true` | accepted |
-| **Refuted** | one of them is `false` | `FLICK-T077` |
-| **Unknown** | otherwise | `FLICK-T076`, naming the first part that is not proved, in the order it runs |
+| **Refuted** | one of them is `false` | `FLICK-T078` |
+| **Unknown** | otherwise | `FLICK-T077`, naming the first part that is not proved, in the order it runs |
 
 Unknown is no claim that the value is invalid. Both diagnostics point to `T.parse`, which checks the value when the program runs.
 

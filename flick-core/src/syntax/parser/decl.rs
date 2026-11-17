@@ -103,7 +103,8 @@ pub(super) fn let_decl(p: &mut Parser) {
         );
         p.bump();
     }
-    // `validate` says where `mut` may stand; `let assert mut` is read to say so
+    // `validate` says where `lazy` and `mut` may stand; `let assert mut` is read to say so
+    p.eat(K::LazyKw);
     let mutable = p.eat(K::MutKw);
     let assert = p.eat(K::AssertKw);
     if assert && !mutable {

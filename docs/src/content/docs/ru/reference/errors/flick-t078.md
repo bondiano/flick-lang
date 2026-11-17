@@ -1,15 +1,16 @@
 ---
 title: "FLICK-T078"
-source_hash: "87902989f8d63b80"
+source_hash: "4051427ab5dc2447"
 ---
 
-`T.prove` создаёт значение типа с инвариантом только применённым к своему аргументу, `T.prove v`, где компилятор доказывает, что проверка типа выполняется для этого `v`. Это не функция: названный отдельно, переданный другой функции или сохранённый в списке или значении, он создавал бы значения, которые ничто не доказало. Применяйте его там, где известны факты о его аргументе.
+`T.prove v` создаёт значение типа с инвариантом, например refined type, и компилятор должен доказать, что проверка типа выполняется для `v`. Здесь то, что устанавливает путь к этому месту, доказывает обратное: проверка не проходит для любого значения, которое сюда попадает, и созданное значение нарушило бы инвариант своего типа. Создавать значение на пути, который проверка исключает, нечего; `T.parse v` вернёт ошибку вместо него.
 
 ```flick fail T078
 refined type Email = String where Checks.email
 
-make : String -> Email
-let make = Email.prove
+as_email : String -> Option Email
+let as_email text =
+  if Email.check text then None else Some (Email.prove text)
 ```
 
 это
@@ -17,6 +18,7 @@ let make = Email.prove
 ```flick
 refined type Email = String where Checks.email
 
-make : String -> Option Email
-let make text = if Email.check text then Some (Email.prove text) else None
+as_email : String -> Option Email
+let as_email text =
+  if Email.check text then Some (Email.prove text) else None
 ```

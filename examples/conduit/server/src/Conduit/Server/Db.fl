@@ -12,7 +12,7 @@ let unique_violation = "23505"
 
 /// The rows of a query.
 rows : Sql.Template Pg {} a ->{Async, Database} List a
-let rows query = Effect.or_die (task { Database.query (Sql.bind query {}) })
+let rows query = Effect.or_die (Database.query (Sql.bind query {}))
 
 /// The first row, if any.
 first : Sql.Template Pg {} a ->{Async, Database} Option a

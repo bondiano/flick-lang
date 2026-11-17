@@ -179,6 +179,73 @@ A function that takes an `Eff` decides when it runs. A runtime call written
 as its argument has already run when the function starts: the warning
 `FLICK-E003` suggests passing `task { … }` instead.
 
+A function can take its argument unstarted itself: a parameter marked `~`,
+`~(Eff r e a)`, receives a runtime call written there as the computation
+`task { … }` would make of it. The standard library's combinators that run
+a computation mark it, so `Effect.or_die (Database.query q)`,
+`timeout 500 (Http.get url)` and `Effect.retry policy (fetch id)` need no
+`task`; an `Eff` value passed there is passed as it is.
+
+```flick
+twice : ~(Eff r e Int)^c ->{r; e} Int
+let twice job = await job + await job
+```
+
+- `twice (count ())` runs `count ()` twice, once per `await`.
+- The marker is not part of the type: it belongs to the signature, travels
+  in the module's interface, and works where the function is called by its
+  name. A pipe `x |> f` evaluates `x` first, as ever.
+- `~` goes only on a parameter of type `Eff` (`FLICK-T076`).
+
+## `lazy`
+
+`lazy { body }` builds a `Lazy r e a`: like `task`, it runs nothing yet, but
+its first `await` runs the body, in the fiber that awaits, and every later
+`await` gets the same outcome without running it again: the value, the typed
+failure, or the defect. `lazy e` is `lazy { e }`.
+
+```flick
+# type error Missing = Missing
+# service Users =
+#   find : Int ->{; Missing} String
+names : Int ->{Users, Async; Missing} (String, String)
+let names id =
+  let name = lazy { Users.find id }
+  (await name, await name)
+```
+
+- Building a lazy allocates its cell, as `Ref.make` does, so it is a runtime
+  call (`FLICK-E001` in a pure function).
+- `await` of a `Lazy r e a` needs `{Async | r}` and fails with `e`: another
+  fiber may be running the body, and then the `await` waits for it. Fibers
+  that await one lazy at once share one run.
+- An interruption is not kept. When the fiber running the body is
+  interrupted, the next `await` runs the body again; the fibers waiting for
+  it see no interruption.
+- The body may run in another fiber than the one that built the lazy, so it
+  needs `Detached r`: no `control` operation (`FLICK-E017`).
+- A lazy that is never awaited never runs its body.
+- A `Lazy` keeps what its body captured, and also the error it failed with,
+  so it cannot outlive the `scope` of a resource it holds.
+
+`let lazy x = e` binds a lazy of its function alone, as `let mut` binds a
+variable: it is read only as `await x`, which runs `e` the first time and
+gives its outcome after that, and needs no `Async`, since no other fiber
+can reach it. A closure or a `task` cannot use it (`FLICK-G005`); share one
+with `lazy { … }`. A `let lazy mut` can be assigned, and a value assigned
+before the first `await` means `e` never runs.
+
+```flick
+# service Config =
+#   load : Unit ->{} String
+banner : Bool ->{Config} String
+let banner verbose =
+  let lazy config = Config.load ()
+  if verbose then await config else "quiet"
+```
+
+`docs/formal/lazy.md` gives the formal rules.
+
 ## Expected errors
 
 `type error E = E T …` declares an error with a nominal identity, its module

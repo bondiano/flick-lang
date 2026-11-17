@@ -76,4 +76,7 @@ stdlib/effect/optic_parts
 
 runtime/counted_layer_merge
 codegen/loops_owners
+runtime/lazy_once
+runtime/suspended
+runtime/lazy_let
 schema/prove

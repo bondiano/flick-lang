@@ -48,8 +48,8 @@ let values () =
   let seen = Ref.make 0
   let drained = Channel.run_count (Channel.from_effect_drain (task { Ref.set seen 7 }))
   say ("from_effect_drain: " ++ show (drained, Ref.get seen))
-  let lazy = Channel.suspend (fun () -> Channel.from_list [3])
-  say ("suspend: " ++ show (Channel.run_collect lazy))
+  let deferred = Channel.suspend (fun () -> Channel.from_list [3])
+  say ("suspend: " ++ show (Channel.run_collect deferred))
   say
     ("unwrap: "
       ++ show (Channel.run_collect (Channel.unwrap (task { Channel.from_list ["built"] }))))

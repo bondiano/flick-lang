@@ -26,7 +26,7 @@ fn a_wasm_plugin_declares_a_type_with_an_invariant() {
     let checked = flick(&root, &["check"]);
     let stderr = String::from_utf8_lossy(&checked.stderr);
     assert!(
-        !checked.status.success() && stderr.contains("FLICK-T076"),
+        !checked.status.success() && stderr.contains("FLICK-T077"),
         "{stderr}"
     );
     let leaky = main
@@ -35,6 +35,6 @@ fn a_wasm_plugin_declares_a_type_with_an_invariant() {
     let root = app("plugins-invariant-leaky", &leaky);
     let checked = flick(&root, &["check"]);
     let stderr = String::from_utf8_lossy(&checked.stderr);
-    let both = stderr.contains("FLICK-T078") && stderr.contains("FLICK-T076");
+    let both = stderr.contains("FLICK-T079") && stderr.contains("FLICK-T077");
     assert!(!checked.status.success() && both, "{stderr}");
 }

@@ -5,7 +5,9 @@ title: "FLICK-E003"
 Arguments are evaluated before a function is applied. A function that takes an
 `Eff` decides when the computation runs, e.g. after it installs an environment;
 a runtime call written as its argument has already run by then. Pass the
-computation unstarted with `task { … }`.
+computation unstarted with `task { … }`, or, as the author of the function,
+mark its parameter `~(Eff r e a)`: a runtime call written there is then
+passed unstarted at every call.
 
 ```text
 // was: with_users users_layer (load_request id)

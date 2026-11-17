@@ -29,10 +29,11 @@ pub fn interface(
     });
     // only the js target compiles a library's modules
     out.targets = vec![Target::Js];
-    out.dependencies = imports
-        .iter()
-        .filter_map(|m| Some((m.clone(), fingerprint(&interface_of(m)?))))
-        .collect::<BTreeMap<_, _>>();
+    // `extend`, not `collect`: collecting compiles a sort of its own into the
+    // wasm compiler, where `insert` of this map type is already there
+    out.dependencies = BTreeMap::new();
+    out.dependencies
+        .extend((imports.iter()).filter_map(|m| Some((m.clone(), fingerprint(&interface_of(m)?)))));
     out
 }
 
@@ -149,13 +150,17 @@ fn summaries(
             _ => {}
         }
     }
-    let imported: BTreeMap<String, Vec<Summary>> = module
-        .items
-        .iter()
-        .flat_map(|item| globals(item))
-        .filter(|m| *m != module.name)
-        .filter_map(|m| Some((m.to_owned(), interface_of(m)?.abi?.values)))
-        .collect();
+    // a list, searched: a map of this type would bring its own sort and
+    // tree code into the wasm compiler for a handful of modules
+    let mut imported: Vec<(String, Vec<Summary>)> = Vec::new();
+    for m in module.items.iter().flat_map(|item| globals(item)) {
+        if m != module.name
+            && !imported.iter().any(|(n, _)| n == m)
+            && let Some(values) = interface_of(m).and_then(|i| i.abi).map(|a| a.values)
+        {
+            imported.push((m.to_owned(), values));
+        }
+    }
     loop {
         let mut changed = false;
         for i in 0..all.len() {
@@ -170,7 +175,10 @@ fn summaries(
                     let summary = if m == module.name {
                         all.iter().map(|(s, _)| s).find(|s| s.name == name)
                     } else {
-                        imported.get(m)?.iter().find(|s| s.name == name)
+                        (imported.iter().find(|(n, _)| n == m))?
+                            .1
+                            .iter()
+                            .find(|s| s.name == name)
                     }?;
                     (!summary.stages.contains('!'))
                         .then_some((summary.stages.len(), summary.partial))

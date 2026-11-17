@@ -19,7 +19,7 @@ fn a_type_with_an_invariant_is_made_where_its_check_is_proved() {
     assert_eq!(
         report(&unproved),
         [
-            "FLICK-T076 `Positive.prove x`: cannot prove the check of `Positive` holds for this value: nothing here establishes `Checks.positive x`; `Positive.parse x` checks it when the program runs"
+            "FLICK-T077 `Positive.prove x`: cannot prove the check of `Positive` holds for this value: nothing here establishes `Checks.positive x`; `Positive.parse x` checks it when the program runs"
         ]
     );
 }
@@ -29,9 +29,9 @@ fn the_plugin_that_owns_the_constructor_proves_its_check_too() {
     let main = format!("{HEAD}leaky Positive {{ Checks.positive }}\n");
     let found = report(&main);
     assert_eq!(found.len(), 2, "{found:?}");
-    assert!(found[0].starts_with("FLICK-T078"), "{found:?}");
+    assert!(found[0].starts_with("FLICK-T079"), "{found:?}");
     assert!(found[0].contains("`Positive$Make` makes a value only applied to one"));
-    assert!(found[1].starts_with("FLICK-T076"), "{found:?}");
+    assert!(found[1].starts_with("FLICK-T077"), "{found:?}");
 }
 
 #[test]

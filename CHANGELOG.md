@@ -13,13 +13,37 @@ break programs.
   a call of the same check, or `v` under another immutable name. A fact
   is about the value bound at one place, so shadowing and `let mut` give
   none, and the body of a `fun` or a `task` starts with none. An unproved
-  check is `FLICK-T076`, a refuted one `FLICK-T077`, and `T.prove` used
-  other than applied to its argument `FLICK-T078`. The plugin interface
+  check is `FLICK-T077`, a refuted one `FLICK-T078`, and `T.prove` used
+  other than applied to its argument `FLICK-T079`. The plugin interface
   gains `Decl::Invariant`, the `@invariant$of` attribute of generated code:
   the compiler checks the relation of the type to its check and value
   (`FLICK-P049`) and proves the check wherever the type's constructor is
   applied, in the plugin's own code too. `docs/formal/refinements.md` is
   the contract; comparisons with literals and imported types come next.
+- **`let lazy`:** `let lazy x = e` binds a lazy of its function alone, read
+  as `await x`: `e` runs the first time, and later awaits get its outcome.
+  No other fiber can reach it, so awaiting it needs no `Async`; a closure or
+  a `task` using it is `FLICK-G005`, and a use other than `await x` is
+  `FLICK-T003`. `let lazy mut x = e` can be assigned, and a value assigned
+  before the first `await` means `e` never runs.
+- **Suspended parameters `~`:** a signature can mark a parameter of type
+  `Eff` with `~`, `or_die : ~(Eff r e a)^c ->{r} a`, and a runtime call
+  written there is passed unstarted, as `task { … }` would pass it. The
+  combinators of the standard library that run a computation are marked
+  (`Effect.or_die`, `Effect.retry`, `Effect.repeat`, `Effect.exit`,
+  `Effect.delay`, `Effect.forever`, `Effect.ignore_`, `timeout`,
+  `timeout_option`, `Effect.timeout_or_else`), so
+  `Effect.or_die (Database.query q)` needs no `task`. The marker is not part
+  of the type and works where the function is called by name; a misplaced
+  `~` is `FLICK-T076`. Interfaces are version 27.
+- **`lazy`:** `lazy { body }` (or `lazy e`) builds a `Lazy r e a`, which runs
+  its body at most once, at its first `await`, in the fiber that awaits;
+  every later `await` gets the same value, typed failure or defect. Fibers
+  that await one lazy at once share one run, and an interrupted run leaves
+  nothing behind, so the next `await` runs the body again. Building one is a
+  runtime call; awaiting one needs `Async`. On JavaScript, Flick's own
+  runtime and Go; the reference model runs it. **Breaking:** `lazy` is a
+  keyword, so `Schema.lazy` is now `Schema.suspend`.
 - **Raise with `Fail.fail`:** `from_result (Err e)` is `FLICK-T075`, a
   warning whose safe fix writes `Fail.fail e`: the same type and meaning,
   without building a `Result` to fail with. `flick check --fix --only T075`

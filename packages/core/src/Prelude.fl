@@ -50,6 +50,12 @@ type Form a
 type PureCodec i a
 @lang eff
 type Eff (r : ServiceRow) (e : ErrorRow) a
+@lang lazy
+@stores
+/// A computation that runs at most once, at its first `await`, in the fiber
+/// that forces it; every later `await` gets the same outcome: its value, its
+/// typed failure or its defect. `lazy { … }` builds one.
+type Lazy (r : ServiceRow) (e : ErrorRow) a
 @lang layer
 type Layer (ri : ServiceRow) (e : ErrorRow) (ro : ServiceRow)
 @lang codec
@@ -248,6 +254,30 @@ let identity value = value
 from_result : Result (Errors e) a ->{; e} a
 foreign effect from_result from "flick:rt" "fromResult"
 
+@lang lazy_make
+/// The lazy of `task`, which `lazy { … }` builds: nothing runs yet.
+lazy_make : Detached r => (Eff r e a)^c ->{} Lazy r e a
+foreign effect lazy_make from "flick:rt" "lazyMake"
+  retention call
+
+@lang lazy_force
+/// Runs `lazy` if no fiber has, or waits for the fiber running it, and gives
+/// its outcome; `await` on a `Lazy` is this.
+lazy_force : Lazy r e a ->{Async | r; e} a
+foreign effect lazy_force from "flick:rt" "lazyForce"
+
+@lang lazy_read
+/// `lazy_force` of a `let lazy`, which only its own function reaches: no
+/// other fiber can be running it, so it never waits.
+lazy_read : Lazy r e a ->{r; e} a
+foreign effect lazy_read from "flick:rt" "lazyForce"
+
+@lang lazy_done
+/// A lazy already done with `value`: forcing it runs nothing and gives
+/// `value`; an assignment to a `let lazy mut` is this.
+lazy_done : a ->{} Lazy r e a
+foreign effect lazy_done from "flick:rt" "lazyDone"
+
 @lang detached
 /// No effect of the services `r` has a `control` operation, so a task that
 /// needs them may run in a fiber of its own: the handler of such an effect,
@@ -290,12 +320,12 @@ foreign effect race_first from "flick:rt" "raceFirst"
   retention call
 
 /// Fails with `TimeoutError` when `millis` pass before the task ends.
-timeout : Detached r => Float -> (Eff r e a)^c ->{r; TimeoutError | e} a
+timeout : Detached r => Float -> ~(Eff r e a)^c ->{r; TimeoutError | e} a
 foreign effect timeout from "flick:rt" "timeout"
   retention call
 
 /// `None` when `millis` pass before the task ends; other failures stay.
-timeout_option : Detached r => Float -> (Eff r e a)^c ->{r; e} Option a
+timeout_option : Detached r => Float -> ~(Eff r e a)^c ->{r; e} Option a
 foreign effect timeout_option from "flick:rt" "timeoutOption"
   retention call
 

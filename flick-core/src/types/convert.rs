@@ -185,6 +185,7 @@ impl Checker<'_> {
                 Kind::Type,
             ),
             K::ArrowType => (self.arrow(node, &children, free), Kind::Type),
+            K::SuspendedType => self.misplaced_suspension(node, expected, free),
             K::RecordType => (Type::Record(self.record_type(node, free)), Kind::Type),
             K::RowType => {
                 let expected = self.kinds.resolve(expected);
@@ -304,7 +305,7 @@ impl Checker<'_> {
 
     /// `a -> b`, `a ->{r; e} b`.
     fn arrow(&mut self, node: &Node, children: &[&Node], free: Free) -> Type {
-        let param = self.ty(children[0], &Kind::Type, free);
+        let param = self.parameter(children[0], free);
         let effects = children
             .iter()
             .find(|c| c.kind == K::EffectAnnot)

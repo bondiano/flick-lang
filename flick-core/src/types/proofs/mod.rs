@@ -174,7 +174,7 @@ impl Checker<'_> {
                 "cannot prove the check of `{}`: the compiler proves the check of a type without parameters over `Int`, `Float`, `String` or `Bool`; `{}.parse` checks a value when the program runs",
                 ty.name, ty.name
             );
-            self.error(codes::T076, span, message);
+            self.error(codes::T077, span, message);
             return Some(super::ty::Type::Error);
         }
         let entity = Entity {
@@ -230,7 +230,7 @@ impl Checker<'_> {
             let message = format!(
                 "`{shown}` makes a value only applied to one: it is no function to name alone, pass or apply in part"
             );
-            self.error(codes::T078, span, message);
+            self.error(codes::T079, span, message);
         }
         let summaries: Vec<Option<Formula<Atom>>> = (0..self.proofs.contracts.len())
             .map(|i| self.check_summary(i))
@@ -309,7 +309,7 @@ impl Checker<'_> {
                 format!(": `{}` is false here", self.proof_shown(f))
             });
             let message = format!("the check of `{ty}` fails for this value{part}; {runtime}");
-            self.error(codes::T077, pending.span, message);
+            self.error(codes::T078, pending.span, message);
             return;
         }
         let part = match knowledge.missing(wanted, true) {
@@ -318,7 +318,7 @@ impl Checker<'_> {
         };
         let message =
             format!("cannot prove the check of `{ty}` holds for this value: {part}; {runtime}");
-        self.error(codes::T076, pending.span, message);
+        self.error(codes::T077, pending.span, message);
     }
 
     /// The atoms of `fact` that stay atoms once the module is solved: a call

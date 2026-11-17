@@ -16,7 +16,9 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 source-maps = []
-component = ["source-maps", "dep:flick-backend", "dep:ciborium", "flick-ir/cbor"]
+# a `match` written through its decision graph; without it, arm by arm
+decision-graph = []
+component = ["source-maps", "decision-graph", "dep:flick-backend", "dep:ciborium", "flick-ir/cbor"]
 guest = ["component"]
 
 [dependencies]

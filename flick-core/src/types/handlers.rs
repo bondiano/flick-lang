@@ -26,9 +26,15 @@ impl Checker<'_> {
     /// `task { body }`: the body runs when the `Eff` is awaited, so its calls
     /// count against the rows of the `Eff`, not against the enclosing stage.
     pub fn task(&mut self, node: &Node, expected: Option<&Type>) -> Type {
-        let Some(body) = node.nodes().next() else {
-            return Type::Error;
-        };
+        match node.nodes().next() {
+            Some(body) => self.deferred(node, body, expected),
+            None => Type::Error,
+        }
+    }
+
+    /// The `Eff` of `body`, checked as the body of a task that `node` stands
+    /// for: `task { body }`, or an argument passed unstarted.
+    pub fn deferred(&mut self, node: &Node, body: &Node, expected: Option<&Type>) -> Type {
         let saved = mem::take(&mut self.cx.runtime);
         let (uses, locals) = (self.uses_mark(), self.cx.locals.len());
         let parts = expected.and_then(|t| Some((t.clone(), self.eff_parts(t)?)));

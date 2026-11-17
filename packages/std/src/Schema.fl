@@ -124,8 +124,8 @@ foreign pure unsafe_adt from "flick:rt" "schemaAdtOf"
 
 /// The schema of `name`, made on first use: a reference to a type whose
 /// schema is defined elsewhere in the module, named in JSON Schema.
-lazy : String -> (Unit -> Schema a) -> Schema a
-foreign pure lazy from "flick:rt" "schemaLazyOf"
+suspend : String -> (Unit -> Schema a) -> Schema a
+foreign pure suspend from "flick:rt" "schemaLazyOf"
 
 /// The schema of a recursive type `name`: `of` gets the schema itself, a
 /// reference named in JSON Schema.
