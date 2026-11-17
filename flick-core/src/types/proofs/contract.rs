@@ -53,6 +53,7 @@ impl<'a> Checker<'a> {
                 ),
             }
         }
+        self.imported_invariants();
     }
 
     /// The invariant of `ty` with the companions `members` names, when the
@@ -111,6 +112,8 @@ impl<'a> Checker<'a> {
             active,
             at: self.span(check_decl),
             body: let_parts(check_decl, self.text).body,
+            summary: None,
+            base: None,
         })
     }
 
@@ -152,7 +155,8 @@ impl<'a> Checker<'a> {
     pub(super) fn validate_contracts(&mut self) {
         for i in 0..self.proofs.contracts.len() {
             let contract = &self.proofs.contracts[i];
-            if !contract.active {
+            // an imported one was validated against its interface
+            if !contract.active || contract.body.is_none() {
                 continue;
             }
             let constructor = Entity {

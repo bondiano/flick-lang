@@ -1,0 +1,22 @@
+// `T.prove` of a type another module declares: the invariant travels in
+// the module's interface, and the value is the base when the program runs.
+module App.Main exposing (main)
+
+module Ports exposing (Port, Positive) =
+  refined type Port = Float where fun n -> n > 0 && n < 65536
+    deriving Show
+
+  refined type Positive = Float where fun n -> n > 0
+    deriving Show
+
+as_port : Float -> Option Ports.Port
+let as_port n = if n > 0 && n < 65536 then Some (Ports.Port.prove n) else None
+
+positive : Ports.Port -> Ports.Positive
+let positive p = Ports.Positive.prove (Ports.Port.value p)
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line (show (as_port 8080))
+  Platform.stdout_line (show (as_port 70000))
+  Platform.stdout_line (show (Option.map positive (as_port 0.5)))

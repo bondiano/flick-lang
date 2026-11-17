@@ -24,6 +24,7 @@ impl<'b> Env<'b> {
             open_unknown: false,
             lost_unknown: false,
             instances: Vec::new(),
+            invariants: Vec::new(),
             support_errors: Vec::new(),
             support_authorities: HashSet::new(),
             support_roles: HashMap::new(),
@@ -157,6 +158,15 @@ impl<'b> Env<'b> {
                 && !self.instances.iter().any(known)
             {
                 self.instances.push(instance.clone());
+            }
+        }
+        // an interface that lost declarations gives no evidence
+        if !interface.incomplete {
+            for invariant in &interface.invariants {
+                let known = |i: &crate::iface::Invariant| i.module == invariant.module && i.ty == invariant.ty;
+                if !self.invariants.iter().any(known) {
+                    self.invariants.push(invariant.clone());
+                }
             }
         }
         learn_exports(

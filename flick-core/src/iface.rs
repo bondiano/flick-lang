@@ -17,7 +17,7 @@ pub use template::{
 };
 
 /// Bumped for schema changes or incompatible embedded-IR execution contracts.
-pub const IFACE_VERSION: u32 = 27;
+pub const IFACE_VERSION: u32 = 28;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -105,6 +105,53 @@ pub struct Hidden {
     pub parent: String,
 }
 
+/// The invariant of a type: the type, its hidden constructor, the
+/// companions of its check and value, the member that proves one, its base
+/// and what its check is of the parameter. An importer validates it against
+/// the exports before it proves anything with it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Invariant {
+    pub module: String,
+    pub ty: String,
+    pub constructor: String,
+    pub check: String,
+    pub value: String,
+    pub prove: String,
+    /// `Int`, `Float`, `String` or `Bool`.
+    pub base: String,
+    pub summary: CheckOf,
+}
+
+/// The check of an invariant, of its parameter, in the order it runs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CheckOf {
+    Const(bool),
+    Not(Box<CheckOf>),
+    And(Box<CheckOf>, Box<CheckOf>),
+    Or(Box<CheckOf>, Box<CheckOf>),
+    /// `f x` of a top-level function that takes no dictionary.
+    Call {
+        module: String,
+        name: String,
+    },
+    /// The parameter itself, a `Bool`.
+    Truth,
+    /// `x op c`: `<`, `<=`, `>`, `>=`; an `Int` or the bits of a finite `Float`.
+    Compare {
+        op: String,
+        int: Option<i32>,
+        float: Option<u64>,
+    },
+    /// `x == c`: a number by its bits, a text or a `Bool`.
+    Equals {
+        number: Option<u64>,
+        text: Option<String>,
+        boolean: Option<bool>,
+    },
+    Opaque,
+}
+
 /// A non-public definition required to interpret a public type. This does not
 /// add a source name, constructor, value, instance or namespace member.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -154,6 +201,11 @@ pub struct Interface {
     /// importer sees them all, whatever it imports by name.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub instances: Vec<Instance>,
+    /// The invariant of each type with one the compiler proves, of the
+    /// module and of every module it depends on, as instances travel: an
+    /// importer's `T.prove` reads it (`docs/formal/refinements.md` §6).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub invariants: Vec<Invariant>,
     /// How compiled code represents what the module defines; written by a build.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub abi: Option<Abi>,

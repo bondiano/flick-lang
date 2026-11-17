@@ -166,8 +166,12 @@ impl Checker<'_> {
 
     /// What the check of the invariant at `index` is, of its parameter: the
     /// body of a `fun`, or a call of the function it names.
-    fn check_summary(&self, index: usize) -> Option<Formula<Atom>> {
-        let body = self.proofs.contracts[index].body?;
+    pub(super) fn check_summary(&self, index: usize) -> Option<Formula<Atom>> {
+        let contract = &self.proofs.contracts[index];
+        if let Some(summary) = &contract.summary {
+            return Some(summary.clone());
+        }
+        let body = contract.body?;
         let mut statements = unparen(body).nodes();
         let node = match (statements.next(), statements.next()) {
             (Some(only), None) => unparen(only),

@@ -302,6 +302,9 @@ pub struct Env<'b> {
     /// The instances this module sees beyond the built-in ones: of the
     /// modules it depends on, however they are imported, and its own.
     instances: Vec<Instance>,
+    /// The invariants of the modules it depends on, from complete
+    /// interfaces.
+    pub(super) invariants: Vec<crate::iface::Invariant>,
     pub(super) support_errors: Vec<String>,
     support_authorities: HashSet<Entity>,
     support_roles: HashMap<Entity, support::CompanionRole>,
