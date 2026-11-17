@@ -125,7 +125,41 @@ impl Checking<'_> {
         );
         key.add("config", format!("{:?}", project.config.checked()));
         key.add("path", loaded.path.to_string_lossy().as_bytes());
+        key.add("source", self.sources.get(loaded.file).text.as_bytes());
         key.add("text", self.text_of(loaded));
+        if let Some(expansion) = &loaded.expansion {
+            for (n, plugin) in expansion.plugins.iter().enumerate() {
+                key.add(format!("plugin {n}"), plugin.as_bytes());
+            }
+            for (n, used) in expansion.used.iter().enumerate() {
+                key.add(
+                    format!("used {n}"),
+                    serde_json::to_vec(used).unwrap_or_default(),
+                );
+            }
+        }
+        let mut editing: Vec<&_> = loaded.editing.iter().collect();
+        editing.sort_by_key(|e| (e.start, e.plugin.id(), e.state.as_ref()));
+        for (n, editor) in editing.into_iter().enumerate() {
+            key.add(format!("editing {n} start"), editor.start.to_le_bytes());
+            key.add(format!("editing {n} plugin"), editor.plugin.id().as_bytes());
+            key.add(format!("editing {n} state"), editor.state.as_ref());
+        }
+        let mut watching: Vec<&Watching> = self.watching.iter().collect();
+        watching.sort_by(|a, b| {
+            a.package
+                .cmp(&b.package)
+                .then_with(|| a.plugin.id().cmp(b.plugin.id()))
+                .then_with(|| a.watched.names().cmp(b.watched.names()))
+        });
+        for (n, w) in watching.into_iter().enumerate() {
+            key.add(format!("watching {n} package"), w.package.as_bytes());
+            key.add(format!("watching {n} plugin"), w.plugin.id().as_bytes());
+            key.add(
+                format!("watching {n} watched"),
+                serde_json::to_vec(w.watched.names()).unwrap_or_default(),
+            );
+        }
         // which modules are the project's decides what is local and private
         let mut modules = String::new();
         for (name, &j) in self.by_name {
@@ -157,11 +191,11 @@ impl Checking<'_> {
     }
 
     /// Whether a key covers what checking `loaded` reads: a module of the
-    /// project's sources or tests outside an editor, without plugin blocks
-    /// or derives but those of the compiler's own plugin, which its text
-    /// holds once expanded; without applications, inline modules or
-    /// lexical scopes; whose imports are all found, none an application or
-    /// a scope; and which no plugin but std's watches.
+    /// project's sources or tests outside an editor, including modules with
+    /// plugin blocks, custom derives or watching plugins (whose ids, reached
+    /// inputs, block states and watched names are in the key); without
+    /// applications, inline modules, module templates or lexical scopes; and
+    /// whose imports are all found, none an application or a scope.
     fn storable(&self, loaded: &Loaded, interfaces: &[Option<Interface>]) -> bool {
         let plain = |m: &Loaded| m.virtual_of.is_none() && m.scope_of.is_none();
         let found = |name: &str| {
@@ -169,18 +203,20 @@ impl Checking<'_> {
                 .is_some_and(|raw| raw.member_of.is_none())
                 && (self.by_name.get(name)).is_none_or(|&j| plain(&self.modules[j]))
         };
+        let tree = loaded
+            .expansion
+            .as_ref()
+            .map_or(&loaded.parse.tree, |e| &e.tree);
         self.cached_ir == CachedIr::Kept
             && matches!(loaded.root, Root::Source | Root::Test)
             && plain(loaded)
             && loaded.member_of.is_none()
-            && loaded.derives_alone()
-            && loaded.editing.is_empty()
             && loaded.syntax.inline_imports.is_empty()
             && !Self::is_module_template(loaded)
             && !loaded.parse.tree.nodes().any(|n| n.kind == K::InlineModuleDecl)
+            && !tree.nodes().any(|n| n.kind == K::InlineModuleDecl)
             && !(self.modules.iter())
                 .any(|m| m.scope_of.as_ref().is_some_and(|s| s.module == loaded.name))
-            && (self.watching.iter()).all(|w| w.package == first_party::PACKAGE)
             && loaded.syntax.imports.iter().all(|i| found(&i.module))
     }
 }

@@ -6,10 +6,9 @@
 
 mod check;
 mod private;
+mod tree;
 
 use std::collections::HashSet;
-use std::iter::Peekable;
-use std::mem;
 
 use flick_plugin::{Hole, Place};
 
@@ -20,10 +19,12 @@ use crate::source::{FileId, Span};
 use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
 
+use super::reach::Used;
 use super::render::Rendered;
 use super::source::{BlockSource, in_signature};
 use super::splice::{splice, splice_decls};
 use super::testing::shown;
+use tree::{parse_holes, replace_blocks};
 
 /// A block and the code its plugin gave for it.
 pub struct Expanded {
@@ -31,6 +32,7 @@ pub struct Expanded {
     pub rendered: Rendered,
     pub source: BlockSource,
     pub plugin: String,
+    pub plugin_id: String,
     /// The node stays, its code after it: a type declaration and what a
     /// derive gives for it.
     pub keep: bool,
@@ -53,6 +55,10 @@ pub struct Expansion {
     origins: Vec<((u32, u32), (u32, u32))>,
     /// The range of each expanded block, the code of it and its plugin.
     blocks: Vec<Block>,
+    /// The component/plugin IDs (`Expander::id()`) that produced this expansion.
+    pub plugins: Vec<String>,
+    /// Capability and source inputs reached while collecting and expanding this module.
+    pub used: Vec<Used>,
 }
 
 #[derive(Clone)]
@@ -113,6 +119,8 @@ impl Expansion {
         let mut origins = Vec::new();
         let mut spliced = Vec::new();
         let mut holes = Vec::new();
+        let mut plugins = Vec::new();
+        let mut used = Vec::new();
         for block in blocks {
             out.push('\n');
             let at = u32::try_from(out.len()).expect("source fits in u32");
@@ -151,6 +159,8 @@ impl Expansion {
                     if let Some(signature) = block.source.signature().filter(|_| taken) {
                         spliced.push((signature, Vec::new(), false));
                     }
+                    plugins.push(block.plugin_id);
+                    used.extend(block.source.reach.used.iter().cloned());
                     let end = u32::try_from(out.len()).expect("source fits in u32");
                     done.push(Block {
                         range: block.whole,
@@ -176,6 +186,10 @@ impl Expansion {
         if done.is_empty() {
             return (None, diagnostics);
         }
+        plugins.sort();
+        plugins.dedup();
+        used.sort();
+        used.dedup();
         let mut expanded = tree.clone();
         replace_blocks(&mut expanded, &mut spliced);
         let mut source_tree = tree.clone();
@@ -188,6 +202,8 @@ impl Expansion {
             file,
             origins,
             blocks: done,
+            plugins,
+            used,
         };
         diagnostics.extend(expansion.stray_companions());
         diagnostics.extend(expansion.foreign_constructors());
@@ -202,6 +218,7 @@ impl Expansion {
         file: FileId,
         rendered: &Rendered,
         plugin: &str,
+        plugin_id: &str,
     ) -> Result<Self, String> {
         let len = u32::try_from(text.len()).map_err(|_| "the file is too long")?;
         let mut out = format!("{text}\n");
@@ -236,6 +253,8 @@ impl Expansion {
                 holes: Vec::new(),
                 signature: String::new(),
             }],
+            plugins: vec![plugin_id.to_owned()],
+            used: Vec::new(),
         })
     }
 
@@ -391,118 +410,4 @@ impl Expansion {
             .or_else(|| self.block_of(offset).map(|b| b.range))
             .unwrap_or((self.len, self.len))
     }
-}
-
-/// The code of each block and whether the block stays before it, by range.
-type Spliced = Vec<((u32, u32), Vec<Node>, bool)>;
-
-/// Replaces each block under `node` by its code from `spliced`, by range:
-/// an expression by its tree, a declaration of the module by its
-/// declarations; a type declaration a derive gives code for stays, its
-/// code after it.
-fn replace_blocks(node: &mut Node, spliced: &mut Spliced) {
-    let mut children = Vec::with_capacity(node.children.len());
-    for child in mem::take(&mut node.children) {
-        let Element::Node(mut n) = child else {
-            children.push(child);
-            continue;
-        };
-        if matches!(
-            n.kind,
-            K::PluginExpr
-                | K::PluginDecl
-                | K::TypeDecl
-                | K::ErrorDecl
-                | K::DerivingDecl
-                | K::Signature
-        ) {
-            let range = n.range();
-            let (mut code, mut found, mut keep) = (Vec::new(), false, false);
-            while let Some(i) = spliced.iter().position(|(r, ..)| *r == range) {
-                let (_, nodes, kept) = spliced.remove(i);
-                (found, keep) = (true, keep || kept);
-                code.extend(nodes);
-            }
-            if found {
-                if keep {
-                    children.push(Element::Node(n));
-                }
-                // the user's code in its code has blocks of its own
-                for mut code in code {
-                    replace_blocks(&mut code, spliced);
-                    children.push(Element::Node(code));
-                }
-                continue;
-            }
-        } else {
-            replace_blocks(&mut n, spliced);
-        }
-        children.push(Element::Node(n));
-    }
-    node.children = children;
-}
-
-/// Replaces the tokens of the user's code inside each block under `node` by
-/// that code parsed, from `holes` (a block's range and a tree of its code).
-fn parse_holes(node: &mut Node, holes: &[((u32, u32), Node)]) {
-    for child in &mut node.children {
-        let Element::Node(n) = child else {
-            continue;
-        };
-        if !matches!(n.kind, K::PluginExpr | K::PluginDecl) {
-            parse_holes(n, holes);
-            continue;
-        }
-        let range = n.range();
-        let mut trees: Vec<&Node> = holes
-            .iter()
-            .filter(|(r, _)| *r == range)
-            .map(|(_, t)| t)
-            .collect();
-        trees.sort_by_key(|t| t.range());
-        trees.dedup_by_key(|t| t.range());
-        let mut next = trees.into_iter().peekable();
-        n.children = in_place(mem::take(&mut n.children), &mut next);
-        // the blocks inside that code
-        parse_holes(n, holes);
-    }
-}
-
-/// `elements` of a block with the tokens of each tree `next` gives replaced
-/// by the tree: its string arguments, and inside `( … )` and the body.
-fn in_place<'t>(
-    elements: Vec<Element>,
-    next: &mut Peekable<impl Iterator<Item = &'t Node>>,
-) -> Vec<Element> {
-    let mut children = Vec::new();
-    for element in elements {
-        let t = match element {
-            Element::Token(t) => t,
-            Element::Node(mut raw)
-                if matches!(raw.kind, K::PluginArgs | K::Block | K::PluginRest) =>
-            {
-                raw.children = in_place(mem::take(&mut raw.children), next);
-                children.push(Element::Node(raw));
-                continue;
-            }
-            other @ Element::Node(_) => {
-                children.push(other);
-                continue;
-            }
-        };
-        // a tree that took no token of the block is none of its own
-        while next.peek().is_some_and(|tree| tree.range().1 <= t.start) {
-            next.next();
-        }
-        match next.peek() {
-            Some(tree) if tree.range().0 <= t.start && t.end <= tree.range().1 => {
-                if tree.range().1 == t.end {
-                    children.push(Element::Node((*tree).clone()));
-                    next.next();
-                }
-            }
-            _ => children.push(Element::Token(t)),
-        }
-    }
-    children
 }

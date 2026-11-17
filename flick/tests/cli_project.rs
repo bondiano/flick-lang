@@ -438,6 +438,84 @@ fn doctor_notes_a_missing_git_rather_than_failing_on_it() {
     assert_eq!(code(&out), Some(2), "{out:?}");
 }
 
+#[test]
+fn module_store_persists_plugin_blocks_and_derives_across_cli_runs() {
+    let schema = "module App.Schema exposing (Users, User, user_json)\n\nimport Codec\n\nsql table Users \"users\" {\n  id : bigint primary key as BigInt\n  name : text not null as String\n}\n\ntype alias User = { name : String } deriving Schema\n\nuser_json : PureCodec Json User\nlet user_json = codec User.schema {\n  name = field \"name\" String.json\n}\n";
+    let ui = "module App.View exposing (badge)\n\nimport Ui\n\nbadge : String -> Ui\nlet badge label = ui { text label }\n";
+    let api = "module App.Api exposing (Public)\n\nimport HttpApi.Derive exposing (..)\n\ntype alias Public = {\n  ping : Get \"/ping\" {} Unit {};\n} deriving HttpApi\n";
+    let main = "module App.Main exposing (main, greet, query, check_api)\n\nimport App.Api exposing (Public)\nimport App.Schema exposing (Users)\nimport App.View exposing (badge)\n\ncheck_api : Public -> Public\nlet check_api p = p\n\nlet query = sql {\n  from u in Users\n  select { id = u.id; name = u.name }\n}\n\ngreet : Cli.Command none none\nlet greet = cli \"greet\" {\n  handle fun {} -> Platform.stdout_line \"hi\"\n}\n\nmain : Unit ->{; AppError} Unit\nlet main () =\n  let _ = badge \"ok\"\n  Platform.stdout_line \"ok\"\n";
+    let dir = project(
+        "cli_module_store_plugins",
+        &[
+            ("app/flick.toml", APP),
+            ("app/src/App/Schema.fl", schema),
+            ("app/src/App/View.fl", ui),
+            ("app/src/App/Api.fl", api),
+            ("app/src/App/Main.fl", main),
+        ],
+    );
+    let cache = dir.join("cache");
+    let check_timed = || {
+        let out = process::Command::new(env!("CARGO_BIN_EXE_flick"))
+            .args(["--timings", "check"])
+            .current_dir(dir.join("app"))
+            .env("XDG_CACHE_HOME", &cache)
+            .env("NO_COLOR", "1")
+            .output()
+            .expect("flick runs");
+        let stderr_text = String::from_utf8_lossy(&out.stderr).into_owned();
+        let checked: usize = (stderr_text.lines())
+            .filter_map(|l| {
+                l.strip_prefix("Slowest of ")?
+                    .strip_suffix(" modules checked")
+            })
+            .map(|n| n.parse::<usize>().expect("module count"))
+            .sum();
+        (out.status.code(), stderr_text, checked)
+    };
+
+    // Cold run checks all 4 modules and persists them to ModuleStore.
+    let (status, err, checked) = check_timed();
+    assert_eq!((status, checked), (Some(0), 4), "{err}");
+    let saved_count = fs::read_dir(cache.join("flick/modules"))
+        .expect("modules cache dir")
+        .count();
+    assert_eq!(
+        saved_count, 4,
+        "all 4 plugin/derive modules persisted: {err}"
+    );
+
+    // Warm run in a separate CLI process restores all 4 modules without checking.
+    let (status, err, checked) = check_timed();
+    assert_eq!((status, checked), (Some(0), 0), "{err}");
+
+    // Modifying `App.Schema` invalidates `App.Schema`, `App.Main` (SQL query
+    // & interface), and `App.View` (its `ui` block shares `std`'s collected
+    // `EditorBlock::state`), while `App.Api` (`deriving HttpApi`) stays cached.
+    let schema_v2 = schema.replace(
+        "name : text not null as String\n",
+        "name : text not null as String\n  role : text not null as String\n",
+    );
+    fs::write(dir.join("app/src/App/Schema.fl"), schema_v2).expect("write");
+    let (status, err, checked) = check_timed();
+    assert_eq!((status, checked), (Some(0), 3), "{err}");
+
+    // Subsequent run restores all 4 again.
+    let (status, err, checked) = check_timed();
+    assert_eq!((status, checked), (Some(0), 0), "{err}");
+
+    // Modifying `App.View`'s `ui` block body (keeping its interface and `sql`
+    // state identical) re-checks only `App.View`.
+    let ui_v2 = ui.replace("ui { text label }", "ui { text (\"[\" ++ label ++ \"]\") }");
+    fs::write(dir.join("app/src/App/View.fl"), ui_v2).expect("write");
+    let (status, err, checked) = check_timed();
+    assert_eq!((status, checked), (Some(0), 1), "{err}");
+
+    // Final warm run restores all 4.
+    let (status, err, checked) = check_timed();
+    assert_eq!((status, checked), (Some(0), 0), "{err}");
+}
+
 fn pnpm_version() -> String {
     process::Command::new("pnpm")
         .env("npm_config_manage_package_manager_versions", "false")

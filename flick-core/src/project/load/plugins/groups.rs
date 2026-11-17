@@ -73,7 +73,7 @@ impl Loader<'_> {
                     continue;
                 }
             }
-            states.push((package, members, blocks, state, gate));
+            states.push((package, members, blocks, state, gate, collecting.reach.used));
         }
         states
     }

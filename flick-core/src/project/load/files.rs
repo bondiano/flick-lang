@@ -197,7 +197,7 @@ impl Loader<'_> {
                     continue;
                 }
             };
-            match Expansion::whole(&text, m.file, &rendered, &package) {
+            match Expansion::whole(&text, m.file, &rendered, &package, plugin.id()) {
                 Ok(expansion) => self.modules[i].expansion = Some(Arc::new(expansion)),
                 Err(why) => {
                     diagnostics.push(failed(format!("gave code that cannot be placed: {why}")));
