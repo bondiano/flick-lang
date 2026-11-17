@@ -246,6 +246,8 @@ export const report = (values, budgets, failures = [], cpu = "") => {
     const value = values[metric];
     const budget = budgets[metric] && budgetOn(budgets[metric], cpu);
     if (budget === undefined) errors.push(`${metric} has no entry in tools/perf/budgets.json`);
+    // a runner's entry without a budget would silently measure nothing against
+    if (budget?.runner && budget.budget === undefined) errors.push(`${metric} on ${budget.runner} has no budget in tools/perf/budgets.json`);
     if (!Number.isFinite(value)) {
       errors.push(`${metric} was not measured`);
       table.push(`| ${metric} | — | ${unit} | ${budget?.budget ?? "—"} (not measured) |`);

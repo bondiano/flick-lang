@@ -59,3 +59,9 @@ test("a runner's CPU model selects its own budget, any other CPU the metric's", 
   const failed = report({ "load.ssr.rps": 2000 }, { ...budgets, "load.ssr.rps": ssr }, [], "AMD EPYC 7763 64-Core Processor");
   assert.ok(failed.errors.some((e) => e.endsWith("on AMD EPYC 7763")), failed.errors.join("\n"));
 });
+
+test("a runner's entry without a budget is an error, not a pass", () => {
+  const ssr = { budget: 5200, tolerance: 0.25, runners: { "AMD EPYC 7763": { reason: "slower CPU" } } };
+  const result = report({ "load.ssr.rps": 1 }, { ...budgets, "load.ssr.rps": ssr }, [], "AMD EPYC 7763 64-Core Processor");
+  assert.ok(result.errors.includes("load.ssr.rps on AMD EPYC 7763 has no budget in tools/perf/budgets.json"), result.errors.join("\n"));
+});
