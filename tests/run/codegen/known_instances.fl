@@ -1,8 +1,9 @@
 // Methods of instances the checker resolved, which the go target calls
-// directly, beside the dictionaries that stay dynamic: a constraint's, one
-// a value holds, one built from a context, a method an instance computes
-// and a default it takes from another module (`known_defaults` derives one
-// through `Generic`, `unpack_dictionary` has the local one of an `unpack`).
+// directly, one of `Area (List a)` given its context and one `Area Tag`
+// computes as its variable, beside the dictionaries that stay dynamic: a
+// constraint's, one a value holds and a default it takes from another
+// module (`known_defaults` derives one through `Generic`, `known_contexts`
+// has more contexts, `unpack_dictionary` the local one of an `unpack`).
 // A direct call runs its effects in their place; `known_failure` fails in
 // one.
 module App.Main exposing (main)
