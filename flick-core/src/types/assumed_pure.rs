@@ -4,7 +4,7 @@
 
 use super::Checker;
 use super::ty::Type;
-use crate::diagnostics::Edit;
+use crate::diagnostics::{Edit, codes};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -26,9 +26,9 @@ impl Checker<'_> {
     }
 
     /// When `expected`, a pure arrow taken for a local, met the runtime
-    /// function `actual`: the last diagnostic says so at the local's binder
-    /// and offers to annotate it.
-    pub(super) fn explain_assumed_pure(&mut self, actual: &Type, expected: &Type) {
+    /// function `actual`: the `FLICK-T003` just reported at `span` says so at
+    /// the local's binder and offers to annotate it.
+    pub(super) fn explain_assumed_pure(&mut self, actual: &Type, expected: &Type, span: Span) {
         let runtime = matches!(
             actual,
             Type::Fun {
@@ -39,15 +39,16 @@ impl Checker<'_> {
         if !runtime || !matches!(expected, Type::Fun { effects: None, .. }) {
             return;
         }
+        let reported = (self.diagnostics.last())
+            .is_some_and(|d| d.code == codes::T003 && d.span == Some(span));
         let found = (self.cx.assumed_pure.iter())
-            .find(|(arrow, _, _)| super::report::uncaptured(&self.zonk(arrow)) == *expected)
-            .map(|(_, name, at)| (name.clone(), *at));
-        let Some((name, at)) = found else {
+            .position(|(arrow, _, _)| super::report::uncaptured(&self.zonk(arrow)) == *expected);
+        let (true, Some(index)) = (reported, found) else {
             return;
         };
-        let Some(last) = self.diagnostics.pop() else {
-            return;
-        };
+        // one explanation per arrow taken
+        let (_, name, at) = self.cx.assumed_pure.remove(index);
+        let last = self.diagnostics.pop().expect("the T003 just reported");
         let end = at + u32::try_from(name.len()).expect("source fits in u32");
         let binder = Span::new(self.file, at, end);
         let shown = self.show(actual);

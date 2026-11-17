@@ -341,4 +341,5 @@ fn a_captured_variable_offers_a_ref_and_an_unsafe_fix_is_not_preferred() {
         })
         .unwrap_or_else(|| panic!("missing annotate: {callback:?}"));
     assert_eq!(annotate["isPreferred"], false, "{annotate:?}");
+    lsp.close();
 }

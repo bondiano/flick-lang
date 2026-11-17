@@ -153,10 +153,11 @@ fn only_expression(block: &Node) -> Option<&Node> {
     }
 }
 
-/// The edits in order, or none when two overlap: a read inside the value
-/// of an assignment is rewritten by the edit of that assignment's value.
+/// The edits in order, or none when two overlap or start at one place,
+/// where their order would be the editor's to choose.
 fn separate(mut edits: Vec<Edit>) -> Option<Vec<Edit>> {
     edits.sort_by_key(|e| e.span.start);
-    let overlapping = edits.windows(2).any(|w| w[0].span.end > w[1].span.start);
+    let overlapping = (edits.windows(2))
+        .any(|w| w[0].span.end > w[1].span.start || w[0].span.start == w[1].span.start);
     (!overlapping).then_some(edits)
 }

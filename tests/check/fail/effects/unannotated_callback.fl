@@ -1,8 +1,8 @@
 module App.UnannotatedCallback exposing (..)
 
-// Applied before its type is known, `h` is taken for a pure function, so a
-// runtime function does not fit it; the note points at `h`, and the fix
-// writes the runtime arrow it is given.
+// Applied before its type is known, `h` is taken for a pure function, so the
+// runtime function `say` does not fit it: the error is at `say`, its related
+// note at the binder of `h`, and its fix writes the arrow `h` is given.
 service Log =
   info : String ->{} Unit
 
