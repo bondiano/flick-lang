@@ -6,12 +6,11 @@
 //! `f x || true` is never proved for an `f x` nothing observed, while
 //! `true || f x` is. `docs/formal/refinements.md` states the rules.
 
-use std::collections::HashMap;
-use std::hash::Hash;
 use std::rc::Rc;
 
 /// A Boolean expression in the order the program evaluates it.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 pub enum Formula<A> {
     Const(bool),
     Atom(A),
@@ -24,7 +23,7 @@ pub enum Formula<A> {
 
 impl<A> Formula<A> {
     /// Each atom, in the order the formula runs them.
-    pub fn each_atom(&self, f: &mut impl FnMut(&A)) {
+    pub fn each_atom(&self, f: &mut dyn FnMut(&A)) {
         match self {
             Formula::Atom(a) => f(a),
             Formula::Not(x) => x.each_atom(f),
@@ -37,7 +36,7 @@ impl<A> Formula<A> {
     }
 
     /// The formula with each atom replaced by what `f` makes of it.
-    pub fn map<B>(&self, f: &mut impl FnMut(&A) -> Formula<B>) -> Formula<B> {
+    pub fn map<B>(&self, f: &mut dyn FnMut(&A) -> Formula<B>) -> Formula<B> {
         match self {
             Formula::Const(b) => Formula::Const(*b),
             Formula::Atom(a) => f(a),
@@ -56,18 +55,19 @@ const BUDGET: u32 = 10_000;
 
 /// What facts establish: the result each atom gave when it ran.
 pub struct Knowledge<A> {
-    atoms: HashMap<A, bool>,
+    /// A handful: a list costs less code than a map.
+    atoms: Vec<(A, bool)>,
     steps: u32,
 }
 
-impl<A: Clone + Eq + Hash> Knowledge<A> {
+impl<A: Clone + PartialEq> Knowledge<A> {
     /// What `facts`, formulas each with the result it ran to, establish.
     /// `unfold` gives the definition of an atom that is a call of a check
     /// the logic reads: it ran, with the result of the call, where the call
     /// ran.
     pub fn of(facts: &[(Rc<Formula<A>>, bool)], unfold: &dyn Fn(&A) -> Option<Formula<A>>) -> Self {
         let mut knowledge = Knowledge {
-            atoms: HashMap::new(),
+            atoms: Vec::new(),
             steps: 0,
         };
         // one fact can make another tell more: `p || q` once `p` is false
@@ -97,10 +97,10 @@ impl<A: Clone + Eq + Hash> Knowledge<A> {
             Formula::Const(_) | Formula::Opaque => {}
             Formula::Atom(atom) => {
                 // a second result for an atom is a path no run takes
-                if self.atoms.contains_key(atom) {
+                if self.atoms.iter().any(|(a, _)| a == atom) {
                     return;
                 }
-                self.atoms.insert(atom.clone(), result);
+                self.atoms.push((atom.clone(), result));
                 if let Some(definition) = unfold(atom) {
                     self.assume(&definition, result, unfold);
                 }
@@ -133,7 +133,7 @@ impl<A: Clone + Eq + Hash> Knowledge<A> {
     pub fn holds(&self, formula: &Formula<A>) -> Option<bool> {
         match formula {
             Formula::Const(b) => Some(*b),
-            Formula::Atom(atom) => self.atoms.get(atom).copied(),
+            Formula::Atom(atom) => self.atoms.iter().find(|(a, _)| a == atom).map(|(_, b)| *b),
             Formula::Not(x) => self.holds(x).map(|b| !b),
             // the second runs only after the first gave its result; a first
             // that gives `false` to `&&`, `true` to `||`, decides alone

@@ -12,7 +12,7 @@ mod contract;
 mod formula;
 mod logic;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::mem;
 use std::rc::Rc;
 
@@ -70,7 +70,7 @@ pub(super) struct Proofs<'a> {
     /// The uses the program writes `T.prove`.
     spelled: HashSet<Range>,
     /// The value an immutable `let y = x` binds `y` to, by `y`'s binder.
-    aliases: HashMap<u32, Value>,
+    aliases: Vec<(u32, Value)>,
 }
 
 impl Proofs<'_> {
@@ -80,7 +80,8 @@ impl Proofs<'_> {
     }
 
     fn aliased(&self, at: u32) -> Value {
-        self.aliases.get(&at).cloned().unwrap_or(Value::Local(at))
+        let alias = self.aliases.iter().rev().find(|(of, _)| *of == at);
+        alias.map_or(Value::Local(at), |(_, v)| v.clone())
     }
 
     /// The invariant whose `value` companion is `module.name`.
@@ -147,7 +148,7 @@ impl Checker<'_> {
 
     pub(super) fn proof_alias(&mut self, at: u32, value: Option<Value>) {
         if let Some(value) = value {
-            self.proofs.aliases.insert(at, value);
+            self.proofs.aliases.push((at, value));
         }
     }
 

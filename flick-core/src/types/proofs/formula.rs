@@ -16,7 +16,8 @@ use crate::types::sugar_lints::unparen;
 use crate::types::typing::{Range, Ref};
 
 /// A value facts are about.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq)]
+#[cfg_attr(test, derive(Debug))]
 pub enum Value {
     /// An immutable local, by where its binder is written.
     Local(u32),
@@ -41,7 +42,8 @@ impl Value {
 }
 
 /// What a formula reads of values.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq)]
+#[cfg_attr(test, derive(Debug))]
 pub enum Atom {
     /// `f v` of a top-level function of a module, which takes no
     /// dictionary.
@@ -74,7 +76,7 @@ impl Atom {
 
 /// An atom as the walk read it, and where its name is written: whether it
 /// takes a dictionary is known once the module is solved.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone)]
 pub struct Raw {
     pub atom: Atom,
     pub at: Range,
