@@ -151,7 +151,8 @@ test("a signature lesson checks a correction and remembers completion", async ({
   await page.goto("/flick-lang/tour/signatures/");
   await expect(page.locator(".fp-cm .cm-content")).toBeVisible({ timeout: 60_000 });
   await page.getByRole("button", { name: "Check answer" }).click();
-  await expect(page.locator(".fp-lesson")).toContainText("Fix the compiler errors first");
+  // the first check compiles the lesson in the browser, as slow as the second one
+  await expect(page.locator(".fp-lesson")).toContainText("Fix the compiler errors first", { timeout: 30_000 });
   await page.getByRole("button", { name: "Hint" }).click();
   await expect(page.locator(".fp-lesson")).toContainText("String.length returns Int");
   await page.getByRole("button", { name: "Show solution" }).click();
