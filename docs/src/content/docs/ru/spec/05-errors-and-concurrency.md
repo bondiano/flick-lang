@@ -61,7 +61,7 @@ retry : Float -> Eff r e a ->{r; RetryExhausted (Errors e)} a
 
 ```flick
 service Time =
-  now : Unit ->{} Float
+  now : Unit ->{Host.Clock} Float
 
 time_impl : Time.Impl
 let time_impl =
@@ -72,7 +72,7 @@ let time_layer =
   Layer.succeed Time time_impl
 ```
 
-`Clock.current_time_millis` — функция стандартной библиотеки, которая читает часы файбера. `Time.now` требует сервис `Time`. `Time.Impl` — запись операций с типами, как они объявлены; слой, которому нужен ресурс, получает его при построении (`Layer.effect`). Методы сервиса не становятся экземплярами классов типов. Подробности — в [Эффекты, ошибки и сервисы](../../reference/effects/#сервисы). [Сервисы Effect](https://effect.website/docs/v4/requirements-management/services).
+`Clock.current_time_millis` — функция стандартной библиотеки, которая читает часы файбера через `Host.Clock`, поэтому этот сервис указан в ряду `now`. `Time.now` требует сервис `Time`. `Time.Impl` — запись операций с типами, как они объявлены; слой, которому нужен ресурс, получает его при построении (`Layer.effect`). Методы сервиса не становятся экземплярами классов типов. Подробности — в [Эффекты, ошибки и сервисы](../../reference/effects/#сервисы). [Сервисы Effect](https://effect.website/docs/v4/requirements-management/services).
 
 ## Предоставление окружения
 

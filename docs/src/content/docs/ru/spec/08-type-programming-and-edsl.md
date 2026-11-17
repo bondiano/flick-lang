@@ -155,7 +155,7 @@ component counter (start : Float) =
 ```flick
 import Cli
 
-greet : Cli.Command none none
+greet : Cli.Command {Host.Console} none
 let greet = cli "greet" {
   description "Prints a greeting"
   /// Print in capitals

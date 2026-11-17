@@ -1,7 +1,7 @@
 ---
 title: Проектирование программы с эффектами
 description: Отделите логику предметной области от внешних вызовов, выберите реализации сервисов в точке входа и предоставьте тестовые реализации в тестах.
-source_hash: 78c32e7685616d77
+source_hash: c0f2a0cdcc48edd4
 ---
 
 Поиск пользователя можно написать одной функцией: вызвать поиск из учебного
@@ -174,8 +174,8 @@ let load_view_direct id =
 
 Стрелка `->{Async; NotFound}` означает, что вызов может приостановиться и
 завершиться типизированной ошибкой `NotFound`. Она **не** описывает все внешние
-возможности: вызовы `foreign` и операции среды выполнения, например вывод в
-консоль, пока не все отражаются в строках эффектов Flick. Пустая строка
+возможности: стандартная библиотека называет свои операции хоста, например
+вывод в консоль (`Host.Console`), но вызов `foreign` принимается на доверии. Пустая строка
 эффектов не гарантирует изоляции от таких операций. Подробнее — в разделе
 [об ограничениях](../../start/why/#ограничения).
 
@@ -529,7 +529,7 @@ let describe raw =
   try (load_view (user_id raw)).title with
   | NotFound id -> "not found: \{show id}"
 
-program : Unit ->{Async, Users, Log} Unit
+program : Unit ->{Host.Console, Async, Users, Log} Unit
 let program () =
   let both =
     try
@@ -540,7 +540,7 @@ let program () =
   Platform.stdout_line both
   Platform.stdout_line (describe "u3")
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () = provide Layer.merge users_live log_live { program () }
 ```
 

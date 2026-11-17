@@ -67,13 +67,14 @@ The smallest program prints a line:
 ```flick
 module Main exposing (main)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line "Hello from Flick"
 ```
 
-`->{}` says that `main` runs in the runtime and asks for no services. Host calls
-such as `Platform.stdout_line` are not named in signatures yet;
+`->{Host.Console}` says that `main` runs in the runtime and needs the console
+that `Platform.stdout_line` writes to; `flick run` provides it. A `foreign`
+binding is still taken on trust:
 [Why Flick](../why/#where-the-promise-stops) has the details.
 
 ## A project
@@ -97,7 +98,7 @@ module App.Main exposing (main)
 
 import App.Greeting exposing (greet)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Arguments, Host.Console; AppError} Unit
 let main () =
   let name = Platform.args () |> List.head |> Option.with_default "world"
   Platform.stdout_line (greet name)

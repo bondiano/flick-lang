@@ -1,6 +1,6 @@
 ---
 title: "Эффекты, ошибки и сервисы"
-source_hash: 715388589ebccbf8
+source_hash: b474a53a5a80f851
 ---
 
 Компилятор проверяет, где допустимы эффектные вызовы, какие сервисы им нужны
@@ -600,11 +600,12 @@ let twice () =
 
 ## Явные зависимости от хоста
 
-`Host` предоставляет пять обычных сервисов: `Host.Console` (стандартные потоки),
+`Host` предоставляет шесть обычных сервисов: `Host.Console` (стандартные потоки),
 `Host.Clock` (чтение обычного и монотонного времени), `Host.Random` (число в `[0, 1)`),
-`Host.Environment` и `Host.Arguments`. Неявных реализаций у них нет.
-На границе входа предоставьте `Host.console`, `Host.clock`, `Host.random`,
-`Host.environment` или `Host.arguments`; `Host.live` объединяет все пять.
+`Host.Environment`, `Host.Arguments` и `Host.Process` (запуск дочерних
+процессов). Неявных реализаций у них нет. На границе входа предоставьте
+`Host.console`, `Host.clock`, `Host.random`, `Host.environment`,
+`Host.arguments` или `Host.process`; `Host.live` объединяет все шесть.
 
 ```flick
 mode : Unit ->{Host.Environment} Option String
@@ -622,10 +623,14 @@ let selected () =
 внешний после завершения. Живые часы читают ambient-часы файбера; время таймеров
 подменяется через `Test.clock_test`, а не произвольной реализацией `Host.Clock`.
 
-Существующие `Platform`, `Clock`, `Random`, `Console` и `DateTime.now` остаются
-доверенными ambient-адаптерами для совместимости. Их пустые строки не обозначают
-возможности хоста. Модули стандартной библиотеки (например, `Jwt`) объявляют
-явные требования сервисов хоста (`Host.Clock`). Отсутствующие сервисы хоста
+Стандартная библиотека обращается к хосту через эти сервисы: `Platform`,
+`Console` и `Log.console` — через `Host.Console`, `Platform.args` — через
+`Host.Arguments`, `Platform.env` и `Config.get` по умолчанию — через
+`Host.Environment`, `Clock`, `DateTime.now` и `Jwt` — через `Host.Clock`,
+`Random` — через `Host.Random` (подставной сервис фиксирует каждое число),
+`ChildProcess` — через `Host.Process`, поэтому их строки называют то, что они
+используют. `Host.raw_*` остаются доверенными адаптерами, из которых сделаны
+живые слои. Отсутствующие сервисы хоста
 классифицируются резолвером эффектов как безопасные автофиксы и предлагаются
 компилятором и LSP. Раннеры приложений (`Runner.Node`, `Runner.Browser` и
 `Runner.Cloudflare`) предоставляют `Host.Live` или `Host.BrowserLive` на

@@ -1,6 +1,6 @@
 ---
 title: "Type-level programming and eDSLs"
-source_hash: b4abaf8cf10dbf3c
+source_hash: 29cdf8a1c1a7f6e5
 ---
 
 Flick's SQL, UI and CLI DSLs — `sql params { … }`, `ui { … }` with `component` declarations, and `cli "name" { … }` — are libraries over one type core: rows, labels, finite kinds, HKT and multiparameter classes with functional dependencies. Their backends are PostgreSQL, React (in the browser and on the server) and Effect CLI.
@@ -150,7 +150,7 @@ A command-line application is a value `Cli.Command r e`: a pure description of f
 ```flick
 import Cli
 
-greet : Cli.Command none none
+greet : Cli.Command {Host.Console} none
 let greet = cli "greet" {
   description "Prints a greeting"
   /// Print in capitals

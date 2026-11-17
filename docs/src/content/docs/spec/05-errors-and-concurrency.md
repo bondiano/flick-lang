@@ -1,6 +1,6 @@
 ---
 title: "Errors, services, resources and concurrency"
-source_hash: c6aefcb4ad4059a4
+source_hash: 0e6ad4878cc2a95e
 ---
 
 ## Expected errors
@@ -60,7 +60,7 @@ Services and errors get the qualified identity of their package and module; a se
 
 ```flick
 service Time =
-  now : Unit ->{} Float
+  now : Unit ->{Host.Clock} Float
 
 time_impl : Time.Impl
 let time_impl =
@@ -71,7 +71,7 @@ let time_layer =
   Layer.succeed Time time_impl
 ```
 
-`Clock.current_time_millis` is the standard library's reading of the fiber's clock. `Time.now` requires the service `Time`. `Time.Impl` is the record of the operations with their types as declared; a layer that needs a resource acquires it while it is built (`Layer.effect`). Service methods do not become class instances. The details are in [Effects, errors and services](../../reference/effects/#services). [Effect services](https://effect.website/docs/v4/requirements-management/services).
+`Clock.current_time_millis` is the standard library's reading of the fiber's clock through `Host.Clock`, which the row of `now` therefore names. `Time.now` requires the service `Time`. `Time.Impl` is the record of the operations with their types as declared; a layer that needs a resource acquires it while it is built (`Layer.effect`). Service methods do not become class instances. The details are in [Effects, errors and services](../../reference/effects/#services). [Effect services](https://effect.website/docs/v4/requirements-management/services).
 
 ## Providing the environment
 

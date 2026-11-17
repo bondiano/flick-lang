@@ -1,7 +1,7 @@
 ---
 title: Начало работы
 description: Установите инструменты, создайте приложение и запустите его.
-source_hash: 3ac73dfef57b9489
+source_hash: 08fe8a2b114c3535
 ---
 
 ## Установка
@@ -70,14 +70,14 @@ cargo build --release -p flick
 ```flick
 module Main exposing (main)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line "Hello from Flick"
 ```
 
-`->{}` обозначает эффектную функцию `main`, которой не требуются сервисы.
-Вызовы функций хоста вроде `Platform.stdout_line` пока не обозначаются отдельными
-требованиями в сигнатурах;
+`->{Host.Console}` обозначает эффектную функцию `main`, которой нужна консоль,
+куда пишет `Platform.stdout_line`; её предоставляет `flick run`. Привязки
+`foreign` по-прежнему принимаются на доверии;
 подробности в разделе [Зачем Flick](../why/#ограничения).
 
 ## Проект
@@ -102,7 +102,7 @@ module App.Main exposing (main)
 
 import App.Greeting exposing (greet)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Arguments, Host.Console; AppError} Unit
 let main () =
   let name = Platform.args () |> List.head |> Option.with_default "world"
   Platform.stdout_line (greet name)

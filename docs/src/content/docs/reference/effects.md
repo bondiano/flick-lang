@@ -569,11 +569,12 @@ signature, an `Eff`, or the row given to a type such as `Handlers none`.
 
 ## Explicit host dependencies
 
-`Host` provides five ordinary services: `Host.Console` (standard streams),
+`Host` provides six ordinary services: `Host.Console` (standard streams),
 `Host.Clock` (wall and monotonic time reads), `Host.Random` (a draw in `[0, 1)`),
-`Host.Environment` and `Host.Arguments`. None has an implicit implementation.
-Provide `Host.console`, `Host.clock`, `Host.random`, `Host.environment` or
-`Host.arguments` at the entry boundary; `Host.live` combines all five.
+`Host.Environment`, `Host.Arguments` and `Host.Process` (starting child
+processes). None has an implicit implementation. Provide `Host.console`,
+`Host.clock`, `Host.random`, `Host.environment`, `Host.arguments` or
+`Host.process` at the entry boundary; `Host.live` combines all six.
 
 ```flick
 mode : Unit ->{Host.Environment} Option String
@@ -591,10 +592,13 @@ services where they run; an inner provider restores the outer one when it ends.
 The live clock reads the ambient fiber clock; replace scheduling time with
 `Test.clock_test`, rather than expecting a custom `Host.Clock` to drive timers.
 
-The existing `Platform`, `Clock`, `Random`, `Console` and `DateTime.now` APIs
-remain trusted ambient adapters for compatibility. Their empty rows do not
-identify host capabilities. Standard library modules (such as `Jwt`) declare
-explicit host service requirements (`Host.Clock`). Missing runner host services
+The standard library reaches the host through these services: `Platform`,
+`Console` and `Log.console` through `Host.Console`, `Platform.args` through
+`Host.Arguments`, `Platform.env` and the default of `Config.get` through
+`Host.Environment`, `Clock`, `DateTime.now` and `Jwt` through `Host.Clock`,
+`Random` through `Host.Random` (a fake one fixes every draw), and
+`ChildProcess` through `Host.Process`, so their rows name what they use.
+`Host.raw_*` remain the trusted adapters the live layers are made of. Missing runner host services
 are classified by the effect solver as safe fixes, automatically suggested by
 the checker and language server. Application runners (`Runner.Node`,
 `Runner.Browser` and `Runner.Cloudflare`) provide `Host.Live` or
