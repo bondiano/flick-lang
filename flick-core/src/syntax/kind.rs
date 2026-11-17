@@ -84,6 +84,7 @@ syntax_kinds! {
         ElseKw = "else",
         TaskKw = "task",
         AwaitKw = "await",
+        LazyKw = "lazy",
         ScopeKw = "scope",
         ProvideKw = "provide",
         IgnoreKw = "ignore",
@@ -179,6 +180,8 @@ syntax_kinds! {
         Dollar,
         /// `@`, which starts an attribute: `@lang int`.
         At,
+        /// `~` before the parameter of a function type: a suspended parameter.
+        Tilde,
         /// Postfix `?`: the value of an `Option` or a `Result`, or an early exit.
         Question,
         Underscore,
@@ -287,6 +290,8 @@ syntax_kinds! {
         TryExpr,
         IfExpr,
         TaskExpr,
+        /// `lazy { … }`: a computation run at most once, at its first `await`.
+        LazyExpr,
         /// `do { … }`: statements sequenced through `Monad`.
         DoExpr,
         /// `pattern <- expr` in a `do` block.
@@ -343,6 +348,9 @@ syntax_kinds! {
         NameType,
         AppType,
         ArrowType,
+        /// `~T`, the parameter of a function that takes its argument as a
+        /// computation: a direct call there is passed as `task { … }`.
+        SuspendedType,
         EffectAnnot,
         Row,
         RowTail,

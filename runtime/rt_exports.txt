@@ -245,6 +245,9 @@
 @flick-lang/runtime/core/index jsArraySet
 @flick-lang/runtime/core/index label
 @flick-lang/runtime/core/index layerRun
+@flick-lang/runtime/core/index lazyDone
+@flick-lang/runtime/core/index lazyForce
+@flick-lang/runtime/core/index lazyMake
 @flick-lang/runtime/core/index listAll
 @flick-lang/runtime/core/index listAny
 @flick-lang/runtime/core/index listCompare
@@ -491,6 +494,9 @@
 @flick-lang/runtime/core/stubs handle
 @flick-lang/runtime/core/stubs label
 @flick-lang/runtime/core/stubs layerRun
+@flick-lang/runtime/core/stubs lazyDone
+@flick-lang/runtime/core/stubs lazyForce
+@flick-lang/runtime/core/stubs lazyMake
 @flick-lang/runtime/core/stubs listEachEffect
 @flick-lang/runtime/core/stubs listFoldEffect
 @flick-lang/runtime/core/stubs listMapEffect
@@ -802,6 +808,9 @@
 @flick-lang/runtime/rt layerOverride
 @flick-lang/runtime/rt layerRun
 @flick-lang/runtime/rt layerSucceed
+@flick-lang/runtime/rt lazyDone
+@flick-lang/runtime/rt lazyForce
+@flick-lang/runtime/rt lazyMake
 @flick-lang/runtime/rt listAll
 @flick-lang/runtime/rt listAny
 @flick-lang/runtime/rt listCompare
@@ -1539,6 +1548,10 @@
 @flick-lang/runtime/rt/effect/Layer tapError
 @flick-lang/runtime/rt/effect/Layer unwrap
 @flick-lang/runtime/rt/effect/Layer updateService
+@flick-lang/runtime/rt/effect/Lazy LazyCell
+@flick-lang/runtime/rt/effect/Lazy lazyDone
+@flick-lang/runtime/rt/effect/Lazy lazyForce
+@flick-lang/runtime/rt/effect/Lazy lazyMake
 @flick-lang/runtime/rt/effect/Number ReducerMax
 @flick-lang/runtime/rt/effect/Number ReducerMin
 @flick-lang/runtime/rt/effect/Number ReducerMultiply

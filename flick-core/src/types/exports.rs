@@ -26,6 +26,10 @@ impl Checker<'_> {
             })
             .map(|e| e.entity.name.as_str())
             .collect();
+        interface.suspended = (self.typing.suspended.iter())
+            .filter(|(name, _)| exported.contains(&name.as_str()))
+            .cloned()
+            .collect();
         let makers = tagged(&self.typing.makers, &exported, |_| Vec::new());
         let servers = tagged(&self.typing.servers, &exported, Vec::clone);
         let tags = [(iface::MAKER, makers), (iface::SERVER, servers)];

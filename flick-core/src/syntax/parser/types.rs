@@ -47,7 +47,14 @@ pub(super) fn type_(p: &mut Parser) -> Option<Done> {
 
 /// `A -> B`, `A ->{r; e} B`, `A ->{} B`; right associative.
 fn arrow(p: &mut Parser) -> Option<Done> {
-    let lhs = union(p)?;
+    let lhs = if p.at(K::Tilde) {
+        let m = p.start();
+        p.bump();
+        union(p);
+        p.complete(m, K::SuspendedType)
+    } else {
+        union(p)?
+    };
     if !p.at(K::Arrow) {
         return Some(lhs);
     }

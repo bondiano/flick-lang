@@ -91,7 +91,7 @@ create_article :
   Request Unit Unit NewArticleBody ->{...Authorized, Crypto.Crypto | r; Unprocessable} ArticleBody
 let create_article request =
   let draft = Accounts.valid (Validate.draft request.payload.article)
-  let suffix = String.slice 0 8 (Effect.or_die (task { Crypto.random_uuid_v4 () }))
+  let suffix = String.slice 0 8 (Effect.or_die (Crypto.random_uuid_v4 ()))
   let slug = Slug.slug draft.title suffix
   let fields = { title = draft.title; description = draft.description; body = draft.body }
   let id = Articles.insert (Auth.signed_in ()).account.id slug fields (now ())

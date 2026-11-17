@@ -51,7 +51,7 @@ fn hugs(n: &Node) -> bool {
         K::ParenExpr => n.nodes().next().is_some_and(|c| c.kind == K::FunExpr),
         K::ListExpr | K::RecordExpr | K::RecordUpdate | K::TupleExpr => n.nodes().next().is_some(),
         K::TaskExpr | K::ScopeExpr | K::ProvideExpr | K::DoExpr => true,
-        K::PluginExpr => n.has_token(K::LBrace),
+        K::PluginExpr | K::LazyExpr => n.has_token(K::LBrace),
         _ => false,
     }
 }
@@ -307,7 +307,9 @@ impl<'a> Printer<'a> {
             K::RecordExpr | K::RecordUpdate | K::RecordType | K::RecordPat => {
                 self.record(n, suffix)
             }
-            K::TaskExpr | K::ScopeExpr | K::ProvideExpr | K::DoExpr => self.braced(n, suffix),
+            K::TaskExpr | K::LazyExpr | K::ScopeExpr | K::ProvideExpr | K::DoExpr => {
+                self.braced(n, suffix)
+            }
             _ => {
                 let doc = self.node(n);
                 let suffix = self.suffix(suffix);

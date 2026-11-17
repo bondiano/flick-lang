@@ -183,7 +183,15 @@ impl Checker<'_> {
         };
         let binder = decl.nodes().find(|n| n.kind == K::VarPat);
         let at = binder.unwrap_or(decl).range().0;
-        // `validate` reports the other places of `mut`, which bind as plain `let`
+        // `validate` reports the other places of `lazy` and `mut`, which bind as plain `let`
+        if decl.has_token(K::LazyKw) && parts.params.is_empty() && !parts.rec {
+            self.local_lazy(decl, &parts, &name, at);
+            if let (Some(binder), Some(local)) = (binder, self.cx.locals.last()) {
+                let ty = local.ty.clone();
+                self.note_type(self.span(binder), &ty);
+            }
+            return;
+        }
         if decl.has_token(K::MutKw) && parts.params.is_empty() && !parts.rec {
             self.local_mut(decl, sig, &parts, &name, at);
             if let (Some(binder), Some(local)) = (binder, self.cx.locals.last()) {
