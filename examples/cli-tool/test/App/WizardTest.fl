@@ -23,7 +23,7 @@ let terminal keys =
       | Some key ->
         Ref.update keys (List.drop 1)
         key
-      | None -> from_result (Err Terminal.QuitError)
+      | None -> Fail.fail Terminal.QuitError
     display = fun _ -> ()
     columns = fun () -> 80
     rows = fun () -> 24

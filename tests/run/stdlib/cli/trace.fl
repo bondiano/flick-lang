@@ -52,7 +52,7 @@ let command = cli "shop" {
       (task {
         Tracer.with_span "pay" options (task { Effect.log_info "checkout" })
         // a span that fails has an `exception` event
-        try Tracer.with_span "refund" options (task { from_result (Err Declined) }) with
+        try Tracer.with_span "refund" options (task { Fail.fail Declined }) with
         | Declined -> ()
         Effect.log_debug "details"
       })

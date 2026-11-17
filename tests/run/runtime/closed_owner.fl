@@ -94,7 +94,7 @@ let added_in_finalizer () = scope {
       )
       say "finalizer ends"
     })
-  from_result (Err (Oops "the body's"))
+  Fail.fail (Oops "the body's")
 }
 
 main : Unit ->{Async; AppError} Unit

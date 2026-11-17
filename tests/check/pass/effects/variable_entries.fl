@@ -23,10 +23,10 @@ foreign pure handle from "./covered.mjs" "handle"
   arity 2
 
 missing : Unit ->{; NotFound} Float
-let missing _ = from_result (Err (NotFound "x"))
+let missing _ = Fail.fail (NotFound "x")
 
 either : Unit ->{; NotFound, Conflict} Float
-let either _ = from_result (Err (Conflict "x"))
+let either _ = Fail.fail (Conflict "x")
 
 one : Unit
 let one = handle (nothing |> cover (NotFound "")) missing

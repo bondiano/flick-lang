@@ -22,4 +22,4 @@ with_clock : Unit ->{Tx, Clock} Int
 let with_clock () = without_db (fun () -> Tx.begin () + Clock.tick ())
 
 with_error : Unit ->{Tx; Missing} Int
-let with_error () = without_db (fun () -> from_result (Err Missing))
+let with_error () = without_db (fun () -> Fail.fail Missing)

@@ -34,7 +34,7 @@ let next_key keys =
     next
   | None ->
     Effect.sleep (Result.with_default Duration.zero (Duration.millis 20))
-    from_result (Err Terminal.QuitError)
+    Fail.fail Terminal.QuitError
 
 /// A terminal that plays `keys` and keeps what is drawn.
 scripted : Ref (List Terminal.UserInput) -> Ref (List String) -> Layer none none {Cli.Prompt.Tty}

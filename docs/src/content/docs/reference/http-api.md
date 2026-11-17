@@ -100,8 +100,8 @@ check : HttpApi.Request Unit Unit Credentials Unit ->{; Unauthorized} Session.Im
 let check request =
   match request.headers.authorization with
   | Some "Token ada" -> { user = fun () -> Some "ada" }
-  | Some _ -> from_result (Err (Unauthorized { errors = { token = ["is invalid"] } }))
-  | None -> from_result (Err (Unauthorized { errors = { token = ["is missing"] } }))
+  | Some _ -> Fail.fail (Unauthorized { errors = { token = ["is invalid"] } })
+  | None -> Fail.fail (Unauthorized { errors = { token = ["is missing"] } })
 
 me : HttpApi.Endpoint "me" (HttpApi.Request Unit Unit Credentials Unit ->{Session; Unauthorized} String)
 let me =

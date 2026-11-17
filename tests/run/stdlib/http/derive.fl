@@ -61,7 +61,7 @@ check : HttpApi.Request Unit Unit Credentials Unit ->{; Unauthorized} Session.Im
 let check request =
   match request.headers.authorization with
   | Some "Token ada" -> session (Some "ada")
-  | _ -> from_result (Err (Unauthorized "no session"))
+  | _ -> Fail.fail (Unauthorized "no session")
 
 maybe : HttpApi.Request Unit Unit Credentials Unit ->{; Unauthorized} Session.Impl
 let maybe request =
@@ -143,10 +143,7 @@ let main () =
     }
     public = {
       profile = fun request ->
-        if request.path.name == "ada" then
-          request.path
-        else
-          from_result (Err (NotFound request.path.name))
+        if request.path.name == "ada" then request.path else Fail.fail (NotFound request.path.name)
       forget = fun _ -> Platform.stdout_line "forgetting"
     }
   }

@@ -98,7 +98,7 @@ let failed_build () =
               (task {
                 say "failing layer acquires"
                 Scope.add_finalizer (task { say "failing layer releases" })
-                from_result (Err (Boot "no base"))
+                Fail.fail (Boot "no base")
               })
           provide failing { say "not reached: no service" }
         }

@@ -27,7 +27,7 @@ let acquire name =
 failing_scope : Unit ->{; Oops} Float
 let failing_scope () = scope {
   let _ = acquire "on error"
-  from_result (Err (Oops "body failed"))
+  Fail.fail (Oops "body failed")
 }
 
 slow_scope : Unit ->{Async} String
@@ -49,7 +49,7 @@ let waiting = task {
 failing_soon : Eff {Async} {Oops} Float
 let failing_soon = task {
   nap 5
-  from_result (Err (Oops "sibling failed"))
+  Fail.fail (Oops "sibling failed")
 }
 
 race_sibling : Unit ->{Async} String

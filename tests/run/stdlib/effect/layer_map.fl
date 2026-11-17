@@ -60,7 +60,7 @@ let supervise _ = Platform.stdout_line "supervisor"
 
 reports : Unit ->{Async} Unit
 let reports () =
-  let exits = parallel_exits [task { from_result (Err (Boom "reported")) }]
+  let exits = parallel_exits [task { Fail.fail (Boom "reported") }]
   let done : Deferred.Deferred none Unit = Deferred.make ()
   scope s {
     let listener =

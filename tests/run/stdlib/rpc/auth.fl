@@ -20,7 +20,7 @@ let check call =
   match Http.Headers.get "authorization" call.headers with
   | Some "Bearer ada" -> session "ada"
   | Some "Bearer bob" -> session "bob"
-  | _ -> from_result (Err Unauthorized)
+  | _ -> Fail.fail Unauthorized
 
 me : Rpc.Rpc "me" (Unit ->{Session; Unauthorized} String)
 let me =

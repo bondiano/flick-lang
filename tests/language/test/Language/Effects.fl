@@ -24,10 +24,10 @@ let nap millis =
   | Err _ -> ()
 
 find : String ->{; NotFound} Int
-let find key = if key == "a" then 1 else from_result (Err (NotFound key))
+let find key = if key == "a" then 1 else Fail.fail (NotFound key)
 
 check : Int ->{; Invalid} Int
-let check n = if n > 0 then n else from_result (Err (Invalid n))
+let check n = if n > 0 then n else Fail.fail (Invalid n)
 
 /// The defect a task dies with, or what it gave instead.
 defect_of : Eff none e String ->{} String

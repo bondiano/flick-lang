@@ -19,13 +19,13 @@ let recover work =
   | Missing value -> value
 
 later : Unit ->{; Missing Int, Later} Int
-let later () = from_result (Err Later)
+let later () = Fail.fail Later
 
 main : Unit ->{} Unit
 let main () =
   Platform.stdout_line (show (with_answer 41 (fun () -> Ask.ask () + 1)))
   Platform.stdout_line (with_answer "hello" (fun () -> Ask.ask () ++ "!"))
-  Platform.stdout_line (show (recover (task { from_result (Err (Missing 7)) })))
+  Platform.stdout_line (show (recover (task { Fail.fail (Missing 7) })))
   Platform.stdout_line
     (show
       (

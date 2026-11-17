@@ -68,7 +68,7 @@ let main () =
       (task {
         scope {
           Scope.add_finalizer (dies "first added")
-          from_result (Err (Oops "the body's"))
+          Fail.fail (Oops "the body's")
         }
       })
   say ("failure, one dies: " ++ outcome failed)

@@ -125,7 +125,7 @@ let failures () =
     Channel.from_effect
       (task {
         Ref.set retries (Ref.get retries + 1)
-        if Ref.get retries < 3 then from_result (Err (Boom "flaky")) else Ref.get retries
+        if Ref.get retries < 3 then Fail.fail (Boom "flaky") else Ref.get retries
       })
   say ("retry: " ++ outcome (Channel.retry (Schedule.recurs 5) flaky))
   say

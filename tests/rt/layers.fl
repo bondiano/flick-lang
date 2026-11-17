@@ -27,7 +27,7 @@ greet : String ->{Greeter} Unit
 let greet name = Platform.stdout_line (Greeter.greet name)
 
 failing : Layer none {BootError} {Greeter}
-let failing = Layer.effect Greeter (task { from_result (Err (BootError "no greeter")) })
+let failing = Layer.effect Greeter (task { Fail.fail (BootError "no greeter") })
 
 fallback : Layer none none {Greeter}
 let fallback = Layer.succeed Greeter { greet = fun name -> "fallback " ++ name }
@@ -146,7 +146,7 @@ let failed_build_cleanup () =
           Ref.update released (fun n -> n + 1)
           ignore (Int.unsafe_div 1 (Ref.get zero))
         })
-      from_result (Err (BootError "build failed"))
+      Fail.fail (BootError "build failed")
     )
   let outcome = Effect.exit (task { provide broken { () } })
   Platform.stdout_line

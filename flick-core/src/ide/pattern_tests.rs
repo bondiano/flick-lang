@@ -15,7 +15,7 @@ type error CliError = CliError String
 type Box = Box String
 
 fail : Unit ->{; CliError} String
-let fail () = from_result (Err (CliError \"broken\"))
+let fail () = Fail.fail (CliError \"broken\")
 ",
         ),
         (
@@ -128,7 +128,7 @@ let page = Atom.route Page.url Home
 
 name : Float ->{; NotFound} String
 let name id =
-  if id == 404 then from_result (Err NotFound) else show id
+  if id == 404 then Fail.fail NotFound else show id
 
 profile : Atom.Atom (Atom.Async String {NotFound})
 let profile =
@@ -140,7 +140,7 @@ let profile =
       | Home -> \"home\"
       | User 404 ->
         let _ = name 404
-        from_result (Err NotFound)
+        Fail.fail NotFound
       | User id -> name id
     }))
 ";

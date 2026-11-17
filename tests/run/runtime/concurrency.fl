@@ -14,7 +14,7 @@ let after millis text = task {
 }
 
 failing : String -> Eff none {Oops} Float
-let failing text = task { from_result (Err (Oops text)) }
+let failing text = task { Fail.fail (Oops text) }
 
 describe : Result Oops Float -> String
 let describe result =

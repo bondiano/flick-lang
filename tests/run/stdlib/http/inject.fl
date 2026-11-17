@@ -37,10 +37,7 @@ let app () =
   let handlers = {
     notes = {
       profile = fun request ->
-        if request.path.name == "ada" then
-          request.path
-        else
-          from_result (Err (NotFound request.path.name))
+        if request.path.name == "ada" then request.path else Fail.fail (NotFound request.path.name)
       post = post_note
     }
   }

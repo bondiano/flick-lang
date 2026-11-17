@@ -278,8 +278,7 @@ let responses () =
 
 failures : Unit ->{} Unit
 let failures () =
-  let exits =
-    parallel_exits [task { Http.ServerResponse.text "fine" ok }, task { from_result (Err Boom) }]
+  let exits = parallel_exits [task { Http.ServerResponse.text "fine" ok }, task { Fail.fail Boom }]
   Platform.stdout_line
     ("exit_response: "
       ++ (show

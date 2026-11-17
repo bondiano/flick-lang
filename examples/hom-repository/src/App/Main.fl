@@ -41,9 +41,7 @@ let failure mode name =
   let state = Ref.make Driver.initial
   let outcome =
     Effect.exit
-      (task {
-        provide Driver.live mode state { provide Base.layer { from_result (Err BodyError) } }
-      })
+      (task { provide Driver.live mode state { provide Base.layer { Fail.fail BodyError } } })
   Platform.stdout_line "\{name} failed=\{Exit.is_failure outcome}"
   report name (Ref.get state)
 

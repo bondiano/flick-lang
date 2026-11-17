@@ -128,10 +128,7 @@ let main () =
     Stream.from_effect
       (task {
         Ref.set attempts (Ref.get attempts + 1)
-        if Ref.get attempts < 3 then
-          from_result (Err (Boom (Ref.get attempts)))
-        else
-          Ref.get attempts
+        if Ref.get attempts < 3 then Fail.fail (Boom (Ref.get attempts)) else Ref.get attempts
       })
   line (
     "retry",

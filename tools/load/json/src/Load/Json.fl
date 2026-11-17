@@ -32,7 +32,7 @@ let get_item _ =
   let base =
     match Json.parse stored with
     | Ok doc -> Codec.decode item doc
-    | Err e -> from_result (Err e)
+    | Err e -> Fail.fail e
   let made = { base with id = id; label = "item " ++ id; price = base.price * 2 }
   Http.ServerResponse.schema_json item made Http.ServerResponse.defaults
 

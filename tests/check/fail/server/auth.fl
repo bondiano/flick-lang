@@ -17,7 +17,7 @@ leaky : Unit ->{Server.Server, Session} String
 server fn leaky () = Session.user ()
 
 check : Http.Headers.Headers ->{; Server.Unauthorized} Session.Impl
-let check _ = from_result (Err Server.Unauthorized)
+let check _ = Fail.fail Server.Unauthorized
 
 unguarded : Unit ->{Scope s, Server.Server} (ServerRequest ->{Async} ServerResponse)^{s}
 let unguarded () = Server.handler [server whoami]

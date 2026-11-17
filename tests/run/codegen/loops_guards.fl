@@ -16,7 +16,7 @@ error_guard : Int ->{} (Int, Int)
 let error_guard n =
   let mut seen = 0
   let chosen =
-    try from_result (Err Missing) with
+    try Fail.fail Missing with
     | Missing when (
       if n > 0 then
         seen = seen + 1
@@ -50,7 +50,7 @@ let mixed_errors n =
   let chosen =
     try
       seen = seen + 1
-      if n > 0 then from_result (Err Missing) else from_result (Err Other)
+      if n > 0 then Fail.fail Missing else Fail.fail Other
     with
     | Missing -> seen + 10
     | Other -> seen + 20
@@ -63,7 +63,7 @@ let nested_guard n =
     try
       try
         seen = 1
-        from_result (Err Missing)
+        Fail.fail Missing
       with
       | Missing when (
         if n > 0 then
@@ -84,11 +84,11 @@ let handler_failure () =
     try
       try
         seen = 1
-        from_result (Err Missing)
+        Fail.fail Missing
       with
       | Missing ->
         seen = seen + 1
-        from_result (Err Other)
+        Fail.fail Other
       | Other -> 99
     with
     | Other -> seen
@@ -104,7 +104,7 @@ let delayed_loop () =
         let mut local = 0
         try
           local = 7
-          from_result (Err Missing)
+          Fail.fail Missing
         with
         | Missing -> local
       }
@@ -116,7 +116,7 @@ let delayed_loop () =
 provider_failure : Int ->{} (Int, Int)
 let provider_failure n =
   let mut seen = 0
-  let failed = Layer.effect Counter (task { from_result (Err Missing) })
+  let failed = Layer.effect Counter (task { Fail.fail Missing })
   let chosen =
     try
       seen = 1
@@ -140,7 +140,7 @@ let handler_error_state () =
   let recovered =
     try
       value = Ask.ask ()
-      from_result (Err Missing)
+      Fail.fail Missing
     with
     | Ask.ask () -> 20
     | Missing -> value
@@ -181,12 +181,12 @@ let nested_handler_state () =
       let inner =
         try
           value = Ask.ask ()
-          from_result (Err Missing)
+          Fail.fail Missing
         with
         | Ask.ask () -> 20
         | Missing -> value
       ignore inner
-      from_result (Err Other)
+      Fail.fail Other
     with
     | Ask.ask () -> 5
     | Other -> value
@@ -255,7 +255,7 @@ let long_protected_match n =
   let value =
     try
       seen = 1
-      if n < 0 then from_result (Err Missing)
+      if n < 0 then Fail.fail Missing
       match n with
       | _ when n == 0 -> 0
       | _ when n == 1 -> 1

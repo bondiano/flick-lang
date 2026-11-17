@@ -8,7 +8,7 @@ let flaky calls = task {
   let n = Ref.get calls + 1
   Ref.set calls n
   Platform.stdout_line "attempt \{n}"
-  if n < 3 then from_result (Err (Flaky n)) else "done after \{n}"
+  if n < 3 then Fail.fail (Flaky n) else "done after \{n}"
 }
 
 main : Unit ->{Async} Unit

@@ -49,7 +49,7 @@ let strict () =
     try Ask.ask 1 with
     | Oops _ -> 0
   with
-  | Ask.ask _ -> from_result (Err (Oops "in the arm"))
+  | Ask.ask _ -> Fail.fail (Oops "in the arm")
 
 /// An `abort` leaves the scope, which closes first.
 leaving : Unit ->{} String
@@ -82,7 +82,7 @@ let logged () =
 main : Unit ->{} Unit
 let main () =
   say (show (both (fun () -> Ask.ask 4)))
-  say (show (both (fun () -> from_result (Err (Oops "x")))))
+  say (show (both (fun () -> Fail.fail (Oops "x"))))
   say
     (show
       (

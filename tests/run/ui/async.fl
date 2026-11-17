@@ -22,7 +22,7 @@ user : Atom.Atom (Atom.Async String none)
 let user = Atom.task (task { "ada" })
 
 offline : Atom.Atom (Atom.Async String {Offline})
-let offline = Atom.task (task { from_result (Err Offline) })
+let offline = Atom.task (task { Fail.fail Offline })
 
 status_view : Ui.View Unit
 let status_view =

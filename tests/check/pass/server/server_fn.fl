@@ -15,7 +15,7 @@ type error OutOfStock = OutOfStock String
 
 place : Order ->{Server.Server; OutOfStock} String
 server fn place order =
-  if order.count > 3 then from_result (Err (OutOfStock order.item)) else order.item
+  if order.count > 3 then Fail.fail (OutOfStock order.item) else order.item
 
 stock : Unit ->{Server.Server} List String
 server fn stock () = ["tea", "cake"]

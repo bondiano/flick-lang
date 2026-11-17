@@ -1,6 +1,6 @@
 ---
 title: "Серверные функции"
-source_hash: a89b7da3d9c27c01
+source_hash: 19291900f4964c71
 ---
 
 `server fn` — функция, которая выполняется на сервере и которую любой код,
@@ -24,7 +24,7 @@ type error OutOfStock = OutOfStock String
 /// Не больше трёх штук.
 place : Order ->{Server.Server, App.Db.Db; OutOfStock} String
 server fn place order =
-  if order.count > 3 then from_result (Err (OutOfStock order.item))
+  if order.count > 3 then Fail.fail (OutOfStock order.item)
   else App.Db.save order
 ```
 
@@ -129,7 +129,7 @@ check : Http.Headers.Headers ->{; Server.Unauthorized} Session.Impl
 let check headers =
   match Http.Headers.get "cookie" headers with
   | Some cookie -> { user = fun () -> cookie }
-  | None -> from_result (Err Server.Unauthorized)
+  | None -> Fail.fail Server.Unauthorized
 
 # open_door : Unit ->{Server.Server} String
 # server fn open_door () = "open"

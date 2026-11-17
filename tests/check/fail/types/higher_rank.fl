@@ -32,7 +32,7 @@ let each_shown log =
   log "two"
 
 failing : Show a => a ->{; Stop} Unit
-let failing value = from_result (Err (Stop (show value)))
+let failing value = Fail.fail (Stop (show value))
 
 lost_error : Unit ->{} Unit
 let lost_error () = each_shown failing

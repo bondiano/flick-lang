@@ -64,8 +64,8 @@ let api =
 handle : HttpApi.Request Unit Unit Unit Name ->{; Conflict, Unprocessable} String
 let handle request =
   match request.payload.name with
-  | "" -> from_result (Err (Unprocessable [("username", ["can't be blank"])]))
-  | "ada" -> from_result (Err (Conflict [("username", ["has already been taken"])]))
+  | "" -> Fail.fail (Unprocessable [("username", ["can't be blank"])])
+  | "ada" -> Fail.fail (Conflict [("username", ["has already been taken"])])
   | name -> "welcome " ++ name
 
 post_raw : String -> String ->{Async} String

@@ -32,7 +32,7 @@ let failing () = scope {
   Scope.add_finalizer_exit (fun cause ->
     say ("finalizer saw a failure: " ++ show (Option.is_some cause))
   )
-  from_result (Err (Oops "body failed"))
+  Fail.fail (Oops "body failed")
 }
 
 nested : Unit ->{} Unit
@@ -52,7 +52,7 @@ let bracketed () =
       say "bracket acquire"
       "file"
     })
-    (fun f -> from_result (Err (Oops ("use of " ++ f))))
+    (fun f -> Fail.fail (Oops ("use of " ++ f)))
     (fun f -> say ("bracket release " ++ f))
 
 main : Unit ->{; AppError} Unit

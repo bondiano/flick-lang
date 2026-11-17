@@ -56,7 +56,7 @@ let main () =
   let recovered =
     try
       status = 5
-      status = from_result (Err Missing)
+      status = Fail.fail Missing
       status
     with
     | Missing -> status
@@ -75,7 +75,7 @@ let main () =
     loop {
       attempts = attempts + 1
       try
-        if attempts < 2 then from_result (Err Missing)
+        if attempts < 2 then Fail.fail Missing
         break attempts
       with
       | Missing -> continue
@@ -86,7 +86,7 @@ let main () =
     try
       while changes < 3 do {
         changes = changes + 1
-        if changes == 2 then from_result (Err Missing)
+        if changes == 2 then Fail.fail Missing
       }
       changes
     with
@@ -108,7 +108,7 @@ let main () =
     try
       for x <- [1, 2, 3] do {
         from_for = from_for + x
-        if x == 2 then from_result (Err Missing)
+        if x == 2 then Fail.fail Missing
       }
       from_for
     with

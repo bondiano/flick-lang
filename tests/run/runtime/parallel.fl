@@ -22,7 +22,7 @@ let after millis text = task {
 }
 
 failing : String -> Eff none {Oops} Float
-let failing text = task { from_result (Err (Oops text)) }
+let failing text = task { Fail.fail (Oops text) }
 
 /// A task that waits long, saying when it is interrupted; it tells
 /// `started` once that saying is in place.
@@ -56,7 +56,7 @@ let fail_fast () =
         (patient "sibling" started)
         (task {
           Deferred.await_ started
-          from_result (Err (Oops "fail fast"))
+          Fail.fail (Oops "fail fast")
         })
     "both ended"
   with
@@ -74,7 +74,7 @@ let main () =
   say (race_first (after 300 "late") (after 1 "early"))
   say
     (
-      try race_success (task { from_result (Err (Oops "lost")) }) (after 5 "won") with
+      try race_success (task { Fail.fail (Oops "lost") }) (after 5 "won") with
       | Oops text -> text
     )
   let timed =

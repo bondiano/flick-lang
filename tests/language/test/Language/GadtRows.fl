@@ -18,7 +18,7 @@ let execute command =
   match command with
   | Value value -> value
   | Read key -> Db.get key
-  | Fail key -> from_result (Err (Missing key))
+  | Fail key -> Fail.fail (Missing key)
 
 type Packed (r : ServiceRow) =
   | Packed (Eff s none Int) : Packed {Db | s}

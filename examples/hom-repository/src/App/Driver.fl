@@ -40,7 +40,7 @@ let live mode state =
     acquire = fun () ->
       Ref.update state (fun s -> { s with attempts = s.attempts + 1 })
       if mode == 1 then
-        from_result (Err (Boot "acquire"))
+        Fail.fail (Boot "acquire")
       else
         let id =
           Ref.modify state (fun s ->
@@ -50,7 +50,7 @@ let live mode state =
         {
           release = fun () ->
             Ref.update state (fun s -> { s with active = s.active - 1; closed = s.closed ++ [id] })
-          initialize = fun () -> if mode == 2 then from_result (Err (Boot "initialize"))
+          initialize = fun () -> if mode == 2 then Fail.fail (Boot "initialize")
           fetch = fun key -> "\{id}:\{key}"
         }
   }

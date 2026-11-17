@@ -35,11 +35,11 @@ flaky : Ref Float -> Float -> Eff none {Boom} Float
 let flaky runs failures = task {
   Ref.update runs (fun n -> n + 1)
   let n = Ref.get runs
-  if n <= failures then from_result (Err (Boom n)) else n
+  if n <= failures then Fail.fail (Boom n) else n
 }
 
 even : Float ->{; Odd} Float
-let even n = if n % 2 == 0 then n * 10 else from_result (Err (Odd n))
+let even n = if n % 2 == 0 then n * 10 else Fail.fail (Odd n)
 
 parity : Float -> Result String Float
 let parity n = if n % 2 == 0 then Ok (n * 10) else Err ("odd " ++ show n)
@@ -56,7 +56,7 @@ let checked t =
 
 single : Unit ->{Async} Unit
 let single () =
-  let exit : Exit {Boom} Float = Effect.exit (task { from_result (Err (Boom 1)) })
+  let exit : Exit {Boom} Float = Effect.exit (task { Fail.fail (Boom 1) })
   Platform.stdout_line ("exit: " ++ show (Exit.is_failure exit))
   let died : Exit none Float = Effect.exit (task { Effect.die "broken" })
   Platform.stdout_line
@@ -171,7 +171,7 @@ let collections () =
   Platform.stdout_line
     ("find_first_filter: " ++ show (Effect.find_first_filter (fun n -> parity n) xs))
   let attempts : List (Eff none {Boom} String) = [
-    task { from_result (Err (Boom 1)) },
+    task { Fail.fail (Boom 1) },
     task { "second" },
   ]
   Platform.stdout_line ("first_success_of: " ++ outcome (task { Effect.first_success_of attempts }))
@@ -218,7 +218,7 @@ let resources () =
       Effect.eventually
         (task {
           let n = Resource.use auto (fun v -> v)
-          if n >= 2 then n else from_result (Err (Boom n))
+          if n >= 2 then n else Fail.fail (Boom n)
         })
     (first >= 1, later >= 2)
   }

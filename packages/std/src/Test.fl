@@ -43,7 +43,7 @@ expect : Assertion ->{; AssertionFailed} Unit
 let expect assertion =
   match assertion with
   | Pass -> ()
-  | Failed message -> from_result (Err (AssertionFailed message))
+  | Failed message -> Fail.fail (AssertionFailed message)
 
 /// A pure test.
 test : String -> (Unit -> Assertion) -> Test

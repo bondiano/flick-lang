@@ -1,9 +1,9 @@
 ---
 title: "FLICK-T034"
-source_hash: "bb63e7b3ed468c66"
+source_hash: "81e74435eb722a62"
 ---
 
-Предупреждение: `match` на `Result`, у которого `Ok x` ветвь возвращает `x`, а `Err e` ветвь завершается с ошибкой `e` (`from_result (Err e)`), является `r?`. Быстрое исправление записывает `?`; `flick check --fix` применяет его.
+Предупреждение: `match` на `Result`, у которого `Ok x` ветвь возвращает `x`, а `Err e` ветвь завершается с ошибкой `e` (`Fail.fail e`), является `r?`. Быстрое исправление записывает `?`; `flick check --fix` применяет его.
 
 ```flick fail T034
 # type error Invalid = Invalid String
@@ -13,7 +13,7 @@ total : String ->{; Invalid} Float
 let total s =
   match parse s with
   | Ok n -> n
-  | Err e -> from_result (Err e)
+  | Err e -> Fail.fail e
 ```
 
 это
