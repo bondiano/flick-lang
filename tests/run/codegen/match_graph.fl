@@ -62,8 +62,8 @@ let classify pair =
   | (Dot, _) -> "dot"
   | (_, k) -> "near " ++ show k
 
-/// A `match` whose value goes on: the arm reached from several branches
-/// is written once in its loop.
+/// A `match` whose value goes on: the arms after `Pair` test its fields,
+/// and every other value falls to the last arm.
 bracketed : Shape -> String
 let bracketed shape =
   let inner =
