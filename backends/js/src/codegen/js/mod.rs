@@ -27,6 +27,7 @@ mod binary;
 mod bridge;
 mod call;
 mod control;
+mod decide;
 mod decl;
 mod doc;
 mod exports;

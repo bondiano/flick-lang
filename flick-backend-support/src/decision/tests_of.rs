@@ -21,18 +21,14 @@ pub(super) fn test(p: &Pat) -> Option<Test<'_>> {
     }
 }
 
-/// The patterns of the parts of what `p` tests.
-pub(super) fn parts(p: &Pat) -> Vec<&Pat> {
-    let mut out = Vec::new();
+/// The patterns of the parts of what `p` tests: its fields, or the items
+/// of a list and the pattern of its rest.
+pub(super) fn parts(p: &Pat) -> (&[Pat], Option<&Pat>) {
     match p {
-        Pat::Con(_, args) => out.extend(args),
-        Pat::List(items, rest) => {
-            out.extend(items);
-            out.extend(rest.as_deref());
-        }
-        _ => {}
+        Pat::Con(_, args) => (args, None),
+        Pat::List(items, rest) => (items, rest.as_deref()),
+        _ => (&[], None),
     }
-    out
 }
 
 /// Whether two tests of one place are the same; the constructors of a

@@ -356,7 +356,7 @@ fn a_native_binding_with_a_schema_is_called_directly_on_flicks_runtime() {
 }
 
 #[test]
-fn matches_switch_on_tags_and_skip_the_last_test() {
+fn matches_test_each_tag_once_and_skip_the_last_test() {
     let js = release(
         "module App exposing (area, name, unit)\n\n\
          type Shape = Circle Float | Rect Float Float | Dot\n\n\
@@ -366,11 +366,10 @@ fn matches_switch_on_tags_and_skip_the_last_test() {
          let name s =\n  match s with\n  | Circle _ -> \"circle\"\n  | _ -> \"other\"\n\n\
          unit : Unit -> Float\nlet unit () = area (Rect 2 3)\n",
     );
-    assert!(js.contains("switch (s._tag) {"), "{js}");
-    assert!(js.contains("case \"Circle#"), "{js}");
-    assert!(js.contains("default: {"), "{js}");
-    // two arms: one test, the last arm runs whatever reaches it
-    assert_eq!(js.matches("s._tag ===").count(), 1, "{js}");
+    // the last arm runs whatever reaches it: three arms, two tests; two, one
+    assert_eq!(js.matches("if (s._tag === \"Circle#").count(), 2, "{js}");
+    assert_eq!(js.matches("if (s._tag === \"Rect#").count(), 1, "{js}");
+    assert!(!js.contains("s._tag === \"Dot#"), "{js}");
     assert!(js.contains("{ _tag: \"Rect#"), "{js}");
     assert!(js.contains("_0: 2, _1: 3 }"), "{js}");
 }
