@@ -2,10 +2,19 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { test } from "node:test";
 
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 
 import { devToolsListen } from "../src/effect/devtools/DevToolsServer.ts";
-import { appFail, capabilities, runMain, stdoutLine, versionProblems } from "../src/index.ts";
+import {
+  appFail,
+  capabilities,
+  hostConsole,
+  provideHost,
+  runMain,
+  service,
+  stdoutLine,
+  versionProblems,
+} from "../src/index.ts";
 
 const fixture = new URL("../fixtures/entry.ts", import.meta.url).pathname;
 
@@ -91,6 +100,24 @@ test("a defect of a supervisor fails the run", async () => {
   assert.match(r.stderr, /a supervisor failed[\s\S]*supervisor broke/);
 });
 
+test("main gets the live host services the launcher passes as its root", async () => {
+  const r = await run("host-root", { env: { FLICK_HOST_ROOT: "set" } });
+  assert.deepEqual(
+    [r.code, r.stdout, r.stderr],
+    [0, 'from the root\nset ["host-root"] number number\n', "to stderr\n"],
+  );
+});
+
+test("what main provides itself wins over the root services", async () => {
+  const r = await run("host-own");
+  assert.deepEqual([r.code, r.stdout, r.stderr], [0, "fake: mine\n", ""]);
+});
+
+test("an explicit provide gives main its root services", async () => {
+  const r = await run("host-provide");
+  assert.deepEqual([r.code, r.stdout, r.stderr], [0, "fake: provided\n", ""]);
+});
+
 test("another Effect release is refused with exit code 2", async () => {
   const r = await run("old-effect");
   assert.deepEqual([r.code, r.stderr], [2, "error: the Flick Effect adapter requires effect 4.1.2, found 4.1.0\n"]);
@@ -107,6 +134,24 @@ test("the capability check names the version and missing operations", () => {
 });
 
 const line = (text: string) => Effect.sync(() => stdoutLine(text));
+
+/** Whether the service `key` is provided. */
+const named = (key: string) => Effect.map(Effect.serviceOption(service(key)), Option.isSome);
+
+test("a main that names only Host.Console gets no clock or random source", async (t) => {
+  t.mock.method(process.stdout, "write", () => true);
+  const seen: Array<boolean> = [];
+  const record = Effect.gen(function* () {
+    for (const key of ["Host.Console", "Host.Clock", "Host.Random"]) seen.push(yield* named(key));
+  });
+  try {
+    await runMain(() => record, { provide: provideHost([hostConsole]) });
+    await runMain(() => record);
+  } finally {
+    process.exitCode = 0;
+  }
+  assert.deepEqual(seen, [true, false, false, false, false, false]);
+});
 
 test("runMain in process maps success and AppError to exit codes", async (t) => {
   const written: Array<[string, string]> = [];

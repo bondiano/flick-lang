@@ -4,7 +4,7 @@
 
 use std::collections::HashSet;
 use std::rc::Rc;
-use std::{fs, io, path};
+use std::{fs, io, iter, path};
 
 use flick_core::diagnostics::Severity;
 use flick_core::ir::memory::Name as MemoryName;
@@ -18,7 +18,7 @@ use crate::decls::Decls;
 use crate::eval::{Machine, Outcome, Program};
 use crate::memory::{
     Error as MemoryError, ExecutionReport, Heap, ProgramOutcome, Stats, Value,
-    execute_main_program_outcome,
+    execute_main_program_outcome, execute_rooted_main_program_outcome,
 };
 use crate::syntax::{Name, Path, Term};
 use crate::translate;
@@ -151,9 +151,25 @@ pub struct Ran {
     pub stdout: String,
 }
 
-/// Runs `main` of `program` within `fuel` steps.
+/// The layer the runner builds the root services `Σ₀` of `main` from:
+/// `Host.live`, when the program has `Host`.
+pub fn root_layer() -> Path {
+    Path::new("Host", "live")
+}
+
+/// Runs `main` of `program` within `fuel` steps, with the live `Host`
+/// services as its root (`docs/formal/core.md`, premise G3).
 pub fn run_main(program: &Program, main: &Path, fuel: u64) -> Ran {
     let mut machine = Machine::new(program, fuel);
+    let root = root_layer();
+    if program.globals.contains_key(&root)
+        && let Err(outcome) = machine.provide_roots(Term::Global(root))
+    {
+        return Ran {
+            outcome,
+            stdout: machine.stdout,
+        };
+    }
     let mut outcome = machine.run(Term::Global(main.clone()));
     // `main` is a function of `()`, or a task; a task is awaited
     if let Outcome::Value(v @ (Term::Lam(..) | Term::Fix(..) | Term::Apply(..))) = outcome {
@@ -210,13 +226,26 @@ pub fn run_main_counted_outcome(
     let entry = MemoryName::new(&main.module, &main.name);
     let declarations = counted_inputs::declarations(modules)?;
     let ir = counted_inputs::modules(&ir);
-    let program = perceus::lower_with_declarations(
+    // the root services, as the evaluator's `run_main` provides them
+    let layer = root_layer();
+    let defines = |m: &ir::Module| {
+        (m.items.iter())
+            .any(|i| matches!(&i.kind, ir::ItemKind::Value { name, .. } if *name == *layer.name))
+    };
+    let root = (ir.iter())
+        .any(|m| *m.name == *layer.module && defines(m))
+        .then(|| MemoryName::new(&layer.module, &layer.name));
+    let roots: Vec<&MemoryName> = iter::once(&entry).chain(&root).collect();
+    let program = perceus::lower_roots_with_declarations(
         ir.iter().map(AsRef::as_ref),
         declarations.iter().map(AsRef::as_ref),
-        &entry,
+        &roots,
     )
     .map_err(|error| error.to_string())?;
-    Ok(execute_main_program_outcome(heap, &program, &entry, fuel))
+    Ok(match &root {
+        Some(root) => execute_rooted_main_program_outcome(heap, &program, &entry, root, fuel),
+        None => execute_main_program_outcome(heap, &program, &entry, fuel),
+    })
 }
 
 /// Success-only convenience runner with its own heap. Function and task

@@ -28,6 +28,7 @@ fn fixture_machine<'p, 'h>(program: &'p Program, heap: &'h mut Heap) -> Machine<
         stdout: String::new(),
         fuel: 1000,
         main_stage: MainStage::Done,
+        root: None,
     }
 }
 

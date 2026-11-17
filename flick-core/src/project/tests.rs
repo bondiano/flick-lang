@@ -477,13 +477,13 @@ fn main_may_need_the_services_its_runner_provides() {
     let check = |main: &str| {
         let config = "schema-version = 1\n[project]\nkind = \"app\"\nentry = \"App.Main\"\nrunner = \"Runner.Cloudflare\"\n";
         let source = format!(
-            "module App.Main exposing (main)\n\nimport Runner.Cloudflare exposing (Fetch, Env)\nimport Http.ServerResponse exposing (ServerResponse)\n\nservice Other\n\n{main}"
+            "module App.Main exposing (main)\n\nimport Host\nimport Runner.Cloudflare exposing (Fetch, Env)\nimport Http.ServerResponse exposing (ServerResponse)\n\nservice Other\n\n{main}"
         );
         let host = memory(&[("flick.toml", config), ("src/App/Main.fl", &source)]);
         run(&host, &["src/App/Main.fl"])
     };
     let answer = "Http.ServerResponse.text \"hi\" Http.ServerResponse.defaults";
-    for services in ["Env", ""] {
+    for services in ["Env", "", "Env, Host.Console, Host.Clock, Host.Random"] {
         assert_eq!(
             check(&format!(
                 "main : Fetch ->{{{services}; AppError}} ServerResponse\nlet main _ = {answer}\n"
@@ -496,11 +496,14 @@ fn main_may_need_the_services_its_runner_provides() {
         "main : Fetch ->{{Env; AppError}} ServerResponse\nlet main _ =\n  let _ = Runner.Cloudflare.var \"KEY\"\n  {answer}\n"
     );
     assert_eq!(check(&reads), Vec::<String>::new());
-    let diagnostics = check(&format!(
-        "main : Fetch ->{{Env, Other; AppError}} ServerResponse\nlet main _ = {answer}\n"
-    ));
-    assert!(
-        matches!(&diagnostics[..], [d] if d.starts_with("FLICK-P026 src/App/Main.fl `main`: entry `main` is not a `Runner.Cloudflare.Main`")),
-        "{diagnostics:?}"
-    );
+    // a Worker has no process: no environment or arguments of its own
+    for services in ["Env, Other", "Env, Host.Environment"] {
+        let diagnostics = check(&format!(
+            "main : Fetch ->{{{services}; AppError}} ServerResponse\nlet main _ = {answer}\n"
+        ));
+        assert!(
+            matches!(&diagnostics[..], [d] if d.starts_with("FLICK-P026 src/App/Main.fl `main`: entry `main` is not a `Runner.Cloudflare.Main`")),
+            "{services}: {diagnostics:?}"
+        );
+    }
 }

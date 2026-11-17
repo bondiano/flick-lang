@@ -22,18 +22,42 @@ pub enum MainKind {
     Effect,
 }
 
+/// The services of `Host.Live`, which an entry without a runner provides.
+const HOST_SERVICES: [&str; 5] = [
+    "Host.Console",
+    "Host.Clock",
+    "Host.Random",
+    "Host.Environment",
+    "Host.Arguments",
+];
+
 fn is_runner_service(elem: &Elem) -> bool {
     lang::label(Lang::Async) == elem.name()
-        || matches!(
-            elem.name(),
-            Some(
-                "Host.Console"
-                    | "Host.Clock"
-                    | "Host.Random"
-                    | "Host.Environment"
-                    | "Host.Arguments"
-            )
-        )
+        || elem.name().is_some_and(|n| HOST_SERVICES.contains(&n))
+}
+
+/// The `Host` services the row of `main : t` names, in order: those a
+/// launcher provides as the root of a `main` it starts without a runner.
+pub fn host_services(t: &Type) -> Vec<String> {
+    let body = match t {
+        Type::Forall { body, .. } => body,
+        _ => t,
+    };
+    let Type::Fun {
+        effects: Some(effects),
+        ..
+    } = body
+    else {
+        return Vec::new();
+    };
+    let Type::Row(row) = &effects.services else {
+        return Vec::new();
+    };
+    let named = |name: &str| row.entries.iter().any(|(l, _)| l.name() == Some(name));
+    (HOST_SERVICES.into_iter())
+        .filter(|n| named(n))
+        .map(str::to_owned)
+        .collect()
 }
 
 /// How a runner starts `main : t`, or why none can: it takes and returns

@@ -185,6 +185,7 @@ interface types {
     name: string,
     module: string,
     pure: bool,
+    host: list<string>,
   }
 
   record javascript-file {

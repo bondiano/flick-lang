@@ -308,6 +308,29 @@ pub enum Intrinsic {
     ArrayToList,
     /// Audited global `BigInt` conversion over checked language primitives.
     ToBigInt,
+    /// A primitive of the host that `Host.live` adapts; it takes one argument.
+    Host(HostPrimitive),
+}
+
+/// The host primitives of `Host.live` besides `PrintLine`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HostPrimitive {
+    /// Writes a line to stderr; borrows the text and returns Unit.
+    StderrLine,
+    /// Writes text to stdout without a line break; returns Unit.
+    StdoutWrite,
+    /// The host's environment variable of a name, as an `Option String`.
+    Env,
+    /// The host's arguments of Unit, as a `List String`.
+    Args,
+    /// The host's wall clock of Unit, in milliseconds as a Float.
+    CurrentTimeMillis,
+    /// The host's wall clock of Unit, in nanoseconds as a `BigInt`.
+    CurrentTimeNanos,
+    /// The host's monotonic clock of Unit, in nanoseconds as a `BigInt`.
+    MonotonicTimeNanos,
+    /// A draw of the host's random source of Unit, a Float in [0, 1).
+    RandomNext,
 }
 
 impl Intrinsic {
@@ -328,7 +351,8 @@ impl Intrinsic {
             | Self::StringLength
             | Self::NumberToFloat
             | Self::ArrayToList
-            | Self::ToBigInt => 1,
+            | Self::ToBigInt
+            | Self::Host(_) => 1,
             Self::RefSet
             | Self::RefModify
             | Self::RefSame

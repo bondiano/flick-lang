@@ -90,11 +90,13 @@ fn the_runtimes_own_runners_run_main_without_the_adapter() {
 
 const WORKER: &str = "module App.Worker exposing (main)
 
+import Host
 import Runner.Cloudflare exposing (Fetch, Env)
 import Http.ServerResponse exposing (ServerResponse)
 
-main : Fetch ->{Env; AppError} ServerResponse
+main : Fetch ->{Env, Host.Console; AppError} ServerResponse
 let main event =
+  Host.Console.stdout_line (\"handling \" ++ Http.ServerRequest.url event.request)
   if Http.ServerRequest.url event.request == \"/boom\" then App.fail \"boom\"
   else
     let greeting = Option.with_default \"hello\" (Runner.Cloudflare.var \"GREETING\")
@@ -151,7 +153,8 @@ fn the_cloudflare_runner_answers_fetch_with_main() {
     assert_eq!(run.status.code(), Some(0), "{run:?}");
     let stdout = String::from_utf8_lossy(&run.stdout);
     assert!(
-        stdout.contains("200 hey from /hi\n")
+        stdout.contains("handling /hi\n")
+            && stdout.contains("200 hey from /hi\n")
             && stdout.contains("500 Internal Server Error\n")
             && stdout.contains("after the response\n"),
         "{stdout}"
