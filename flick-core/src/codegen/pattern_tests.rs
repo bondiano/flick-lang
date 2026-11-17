@@ -271,8 +271,10 @@ fn a_match_that_would_write_an_arm_twice_tries_its_arms_in_turn() {
          type Shape = Dot | Line Int | Pair Shape Shape\n\n\
          first : Shape -> Int\nlet first s =\n  match s with\n  \
          | Line n | Pair (Line n) _ when n > 0 -> n\n  | _ -> 0\n";
-    let js = emit(text, false, false);
-    assert_eq!(js.matches("return n;").count(), 1, "{js}");
-    assert_eq!(js.matches("s._tag === \"Line#").count(), 1, "{js}");
-    assert!(js.contains(" || "), "{js}");
+    for release in [false, true] {
+        let js = emit(text, release, false);
+        assert_eq!(js.matches("return n;").count(), 1, "{js}");
+        assert_eq!(js.matches("s._tag === \"Line#").count(), 1, "{js}");
+        assert!(js.contains(" || "), "{js}");
+    }
 }

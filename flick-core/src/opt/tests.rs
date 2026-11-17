@@ -366,9 +366,9 @@ fn matches_test_each_tag_once_and_skip_the_last_test() {
          let name s =\n  match s with\n  | Circle _ -> \"circle\"\n  | _ -> \"other\"\n\n\
          unit : Unit -> Float\nlet unit () = area (Rect 2 3)\n",
     );
-    assert!(js.contains("if (s._tag === \"Circle#"), "{js}");
     // the last arm runs whatever reaches it: three arms, two tests; two, one
-    assert_eq!(js.matches("s._tag ===").count(), 3, "{js}");
+    assert_eq!(js.matches("if (s._tag === \"Circle#").count(), 2, "{js}");
+    assert_eq!(js.matches("if (s._tag === \"Rect#").count(), 1, "{js}");
     assert!(!js.contains("s._tag === \"Dot#"), "{js}");
     assert!(js.contains("{ _tag: \"Rect#"), "{js}");
     assert!(js.contains("_0: 2, _1: 3 }"), "{js}");
