@@ -21,6 +21,7 @@ url Type Prelude.Url
 form Type Prelude.Form
 pure_codec Type Prelude.PureCodec
 eff Type Prelude.Eff
+lazy Type Prelude.Lazy
 layer Type Prelude.Layer
 codec Type Prelude.Codec
 errors Type Prelude.Errors
@@ -109,6 +110,8 @@ le Value Numeric.le
 gt Value Numeric.gt
 ge Value Numeric.ge
 from_result Value Prelude.from_result
+lazy_make Value Prelude.lazy_make
+lazy_force Value Prelude.lazy_force
 fail Type Prelude.Fail
 layer_run Value Layer.run
 scope_run Value Scope.run

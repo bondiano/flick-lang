@@ -243,6 +243,9 @@ impl Lower<'_> {
                 match node.child_tokens().next().map(|t| t.kind) {
                     Some(K::NotKw) => ExprKind::Not(operand),
                     Some(K::IgnoreKw) => ExprKind::Ignore(operand),
+                    Some(K::AwaitKw) if self.typing.forced.contains(&node.range()) => {
+                        super::lazy::force(*operand, span)
+                    }
                     Some(K::AwaitKw) => {
                         let span = self.span(node);
                         let wait = Expr::new(ExprKind::Await(operand), span);
@@ -287,6 +290,7 @@ impl Lower<'_> {
                 let body = self.expr(children[0]);
                 ExprKind::Task(Box::new(self.owner_entry(key, body)))
             }
+            K::LazyExpr => self.lazy_expr(node, children[0], span),
             K::DoExpr => return self.do_expr(node),
             K::ScopeExpr => return self.scope_expr(node, children[0], span),
             K::ProvideExpr => self.layer_run(children[0], children[1], span),

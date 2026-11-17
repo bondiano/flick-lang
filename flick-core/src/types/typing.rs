@@ -79,6 +79,8 @@ pub struct Typing {
     pub applicative: HashSet<Range>,
     /// What each postfix `?` does.
     pub questions: HashMap<Range, super::Question>,
+    /// `await`s of a `Lazy`, which force it rather than run a task.
+    pub forced: HashSet<Range>,
     /// Lazy `for`s whose body makes Sync calls: each step runs with the
     /// services of the stage that built the sequence.
     pub sync_generators: HashSet<Range>,
@@ -340,6 +342,7 @@ impl Checker<'_> {
         }
         let head = match node.kind {
             K::TaskExpr => K::TaskKw,
+            K::LazyExpr => K::LazyKw,
             K::DoExpr => K::DoKw,
             K::ForExpr => K::ForKw,
             K::ScopeExpr => K::ScopeKw,

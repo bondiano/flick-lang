@@ -1,6 +1,6 @@
 ---
 title: "Схемы и кодеки"
-source_hash: 9dbae67fc5245a2e
+source_hash: 3789f8b758f9344f
 ---
 
 Схема описывает структуру значений типа и доступна во время выполнения.
@@ -104,7 +104,7 @@ let methods = Open.schema Schema.string
 | `Schema.unsafe_record [Schema.field "x" s, …]` | запись, поля в порядке меток |
 | `Schema.unsafe_tuple [Schema.item s, …]` | кортеж |
 | `Schema.unsafe_adt "Shape" [Schema.unsafe_case Circle [Schema.item s], …]` | тип-сумма, конструкторы — значения |
-| `Schema.lazy "T" (fun _ -> s)` | ссылка с именем `T` в JSON Schema, создаётся при первом использовании |
+| `Schema.suspend "T" (fun _ -> s)` | ссылка с именем `T` в JSON Schema, создаётся при первом использовании |
 | `Schema.recursive "T" (fun self -> s)` | рекурсивный тип, `self` — ссылка на него |
 | `Schema.unsafe_unboxed s`, `Schema.unsafe_refined "T" known s T.parse` | `unboxed type` и уточнённый тип |
 | `Schema.enum Schema.string`, `Schema.unsafe_enum_tags Schema.string [("Get", Get), …]` | перечисление, в формате передачи — литералы или `{ "_tag" }` |

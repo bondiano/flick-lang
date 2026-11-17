@@ -361,6 +361,9 @@ impl Checker<'_> {
             K::AwaitKw => {
                 let ty = self.infer(operand);
                 self.note_type(self.token_span(op), &ty);
+                if let Some(result) = self.force(node, &ty) {
+                    return result;
+                }
                 let (services, errors, result) = if let Some(parts) = self.known_eff_parts(&ty) {
                     // A known task may return a polymorphic opaque value.
                     // Decomposition does not force that result through a
@@ -375,7 +378,7 @@ impl Checker<'_> {
                         self.error(
                             codes::T003,
                             self.span(operand),
-                            format!("`await` runs an `Eff` value, but this has type `{shown}`"),
+                            format!("`await` runs an `Eff` value or forces a `Lazy`, but this has type `{shown}`"),
                         );
                         return Type::Error;
                     }

@@ -1,4 +1,4 @@
-//! Arrows and the braces after them.
+//! Arrows and the braces after them, and `lazy`.
 
 use super::tests::{errors, parse_str, sexp};
 
@@ -23,4 +23,21 @@ fn a_record_touching_its_arrow_is_reported_with_a_space() {
          (NameType B)) })))"
     );
     assert!(errors("f : A ->{r; e} B\n").is_empty());
+}
+
+/// `lazy { … }` is a block, as `task { … }`; `lazy e` binds as `await e`.
+#[test]
+fn lazy_takes_a_block_or_an_operand() {
+    assert_eq!(
+        sexp("let l = lazy { load id }"),
+        "(LetDecl let (VarPat l) = (Block (LazyExpr lazy { (Block (AppExpr (NameExpr load) (NameExpr id))) })))"
+    );
+    assert_eq!(
+        sexp("let l = lazy load id"),
+        "(LetDecl let (VarPat l) = (Block (LazyExpr lazy (AppExpr (NameExpr load) (NameExpr id)))))"
+    );
+    assert_eq!(
+        sexp("let v = f lazy { x }"),
+        "(LetDecl let (VarPat v) = (Block (AppExpr (NameExpr f) (LazyExpr lazy { (Block (NameExpr x)) }))))"
+    );
 }

@@ -52,6 +52,7 @@ mod irrefutable;
 mod kinds;
 mod labels;
 pub mod lang;
+mod lazy;
 #[cfg(test)]
 mod lint_tests;
 mod lints;

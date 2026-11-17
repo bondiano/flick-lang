@@ -291,3 +291,5 @@ stdlib/server/server_fn
 stdlib/server/auth
 stdlib/server/node
 runtime/counted_layer_merge
+runtime/lazy_once
+runtime/lazy_shared

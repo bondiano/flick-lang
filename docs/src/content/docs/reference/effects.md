@@ -179,6 +179,39 @@ A function that takes an `Eff` decides when it runs. A runtime call written
 as its argument has already run when the function starts: the warning
 `FLICK-E003` suggests passing `task { … }` instead.
 
+## `lazy`
+
+`lazy { body }` builds a `Lazy r e a`: like `task`, it runs nothing yet, but
+its first `await` runs the body, in the fiber that awaits, and every later
+`await` gets the same outcome without running it again: the value, the typed
+failure, or the defect. `lazy e` is `lazy { e }`.
+
+```flick
+# type error Missing = Missing
+# service Users =
+#   find : Int ->{; Missing} String
+names : Int ->{Users, Async; Missing} (String, String)
+let names id =
+  let name = lazy { Users.find id }
+  (await name, await name)
+```
+
+- Building a lazy allocates its cell, as `Ref.make` does, so it is a runtime
+  call (`FLICK-E001` in a pure function).
+- `await` of a `Lazy r e a` needs `{Async | r}` and fails with `e`: another
+  fiber may be running the body, and then the `await` waits for it. Fibers
+  that await one lazy at once share one run.
+- An interruption is not kept. When the fiber running the body is
+  interrupted, the next `await` runs the body again; the fibers waiting for
+  it see no interruption.
+- The body may run in another fiber than the one that built the lazy, so it
+  needs `Detached r`: no `control` operation (`FLICK-E017`).
+- A lazy that is never awaited never runs its body.
+- A `Lazy` keeps what its body captured, and also the error it failed with,
+  so it cannot outlive the `scope` of a resource it holds.
+
+`docs/formal/lazy.md` gives the formal rules.
+
 ## Expected errors
 
 `type error E = E T …` declares an error with a nominal identity, its module

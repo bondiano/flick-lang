@@ -56,6 +56,6 @@ let literal_element () =
 //~ FLICK-T003 @27:22-27:25 this is not a function: it has type `Float`, so it cannot
 //~ FLICK-T003 @39:22-39:25 this is not a function: it has type `Int`, so it cannot
 //~ FLICK-T003 @45:13-45:23 expected `Int`, found a function
-//~ FLICK-T003 @30:23-30:24 `await` runs an `Eff` value, but this has type `Float`
+//~ FLICK-T003 @30:23-30:24 `await` runs an `Eff` value or forces a `Lazy`, but this has type `Float`
 //~ FLICK-T008 @33:18-33:31 expected `a`, found `List _`: `a` stands for any type the
 //~ FLICK-E001 @24:20-24:33 this is a runtime call, but module initialization is pure
