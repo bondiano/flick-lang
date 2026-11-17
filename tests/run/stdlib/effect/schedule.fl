@@ -18,12 +18,12 @@ let flaky calls failures = task {
 attempt_of : Schedule.Metadata o i -> Int
 let attempt_of m =
   let input : Schedule.InputMetadata i = {
-    input = m.input;
-    attempt = m.attempt;
-    start = m.start;
-    now = m.now;
-    elapsed = m.elapsed;
-    elapsedSincePrevious = m.elapsedSincePrevious;
+    input = m.input
+    attempt = m.attempt
+    start = m.start
+    now = m.now
+    elapsed = m.elapsed
+    elapsedSincePrevious = m.elapsedSincePrevious
   }
   input.attempt
 

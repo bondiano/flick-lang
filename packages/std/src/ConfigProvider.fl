@@ -91,17 +91,17 @@ foreign pure from_dot_env_contents from "flick:ConfigProvider" "flickFromDotEnvC
 /// Values from a `.env` file, by default `.env`.
 from_dot_env :
   {
-    path : Option String;
-    expandVariables : Bool;
-    preserveEmptyStrings : Bool;
+    path : Option String
+    expandVariables : Bool
+    preserveEmptyStrings : Bool
   } ->{Async, FileSystem.FileSystem; PlatformError.PlatformError}
   ConfigProvider
 let from_dot_env options =
   let text = FileSystem.read_file_string (Option.with_default ".env" options.path)
   from_dot_env_contents
     {
-      expandVariables = options.expandVariables;
-      preserveEmptyStrings = options.preserveEmptyStrings;
+      expandVariables = options.expandVariables
+      preserveEmptyStrings = options.preserveEmptyStrings
     }
     text
 

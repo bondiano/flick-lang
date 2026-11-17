@@ -22,8 +22,8 @@ let count_to =
   |> Rpc.with_stream (Codec.json Schema.number)
 
 type alias Handlers r = {
-  double : Float ->{r; NotFound} Float;
-  count_to : Float ->{r} Stream none none Float;
+  double : Float ->{r; NotFound} Float
+  count_to : Float ->{r} Stream none none Float
 }
 
 group : Rpc.Group r (Handlers r)
@@ -31,8 +31,8 @@ let group = Rpc.group |> Rpc.add double |> Rpc.add count_to
 
 handlers : Handlers none
 let handlers = {
-  double = fun n -> if n < 0 then from_result (Err (NotFound { id = n })) else n * 2;
-  count_to = fun n -> Stream.from_list (List.map Int.to_float (List.range 1 (Int.truncate n + 1)));
+  double = fun n -> if n < 0 then from_result (Err (NotFound { id = n })) else n * 2
+  count_to = fun n -> Stream.from_list (List.map Int.to_float (List.range 1 (Int.truncate n + 1)))
 }
 
 main : Unit ->{Async; AppError} Unit

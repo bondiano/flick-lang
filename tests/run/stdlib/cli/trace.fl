@@ -30,15 +30,15 @@ let plain =
 /// A child span of the command's, with an attribute.
 options : Tracer.SpanOptions
 let options = {
-  attributes = [("cart", "3 items")];
-  links = [];
-  parent = None;
-  root = false;
-  kind_ = Tracer.internal;
-  sampled = None;
-  level = None;
-  captureStackTrace = false;
-  disablePropagation = false;
+  attributes = [("cart", "3 items")]
+  links = []
+  parent = None
+  root = false
+  kind_ = Tracer.internal
+  sampled = None
+  level = None
+  captureStackTrace = false
+  disablePropagation = false
 }
 
 type error Declined = Declined

@@ -14,9 +14,9 @@ type alias Count = { n : Int }
 
 users : Migration
 let users = {
-  version = 1;
-  name = "users";
-  statements = ["create table people (id serial primary key, name text not null)"];
+  version = 1
+  name = "users"
+  statements = ["create table people (id serial primary key, name text not null)"]
 }
 
 seed : Migration
@@ -24,16 +24,16 @@ let seed = { version = 2; name = "seed"; statements = ["insert into people (name
 
 emails : Migration
 let emails = {
-  version = 3;
-  name = "emails";
-  statements = ["alter table people add column email text"];
+  version = 3
+  name = "emails"
+  statements = ["alter table people add column email text"]
 }
 
 broken : Migration
 let broken = {
-  version = 4;
-  name = "broken";
-  statements = ["create table half (id int)", "select * from no_such_table"];
+  version = 4
+  name = "broken"
+  statements = ["create table half (id int)", "select * from no_such_table"]
 }
 
 people : Sql.Query Pg Count

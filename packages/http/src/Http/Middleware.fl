@@ -18,32 +18,32 @@ type alias Handler (r : ServiceRow) (e : ErrorRow) = ServerRequest ->{r; e} Serv
 /// the request), the headers a browser may read, how long the answer to a
 /// preflight request holds, in seconds, and whether credentials are sent.
 type alias CorsOptions = {
-  allowedOrigins : List String;
-  allowedMethods : List String;
-  allowedHeaders : List String;
-  exposedHeaders : List String;
-  maxAge : Option Float;
-  credentials : Bool;
+  allowedOrigins : List String
+  allowedMethods : List String
+  allowedHeaders : List String
+  exposedHeaders : List String
+  maxAge : Option Float
+  credentials : Bool
 }
 
 /// `cors` that allows any origin.
 cors_options : CorsOptions
 let cors_options = {
-  allowedOrigins = [];
-  allowedMethods = [];
-  allowedHeaders = [];
-  exposedHeaders = [];
-  maxAge = None;
-  credentials = false;
+  allowedOrigins = []
+  allowedMethods = []
+  allowedHeaders = []
+  exposedHeaders = []
+  maxAge = None
+  credentials = false
 }
 
 /// What `compression` does: the algorithms it may use, preferred first
 /// (none: the platform's), the smallest body it compresses, and the level of
 /// an algorithm.
 type alias CompressionOptions = {
-  algorithms : List Http.Platform.CompressionAlgorithm;
-  minSize : Option Float;
-  levels : List (Http.Platform.CompressionAlgorithm, Int);
+  algorithms : List Http.Platform.CompressionAlgorithm
+  minSize : Option Float
+  levels : List (Http.Platform.CompressionAlgorithm, Int)
 }
 
 /// Logs each request with its method, URL and status, and its failure.

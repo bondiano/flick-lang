@@ -18,9 +18,18 @@ instance Problem Gone =
   let problem = { status = 410; body = Codec.json Gone.schema }
 
 type alias Profiles = {
-  profile : Get "/profiles/:name" { path : Name } (Created Name) {Gone};
-  forget : Delete "/profiles" {} () {};
+  profile : Get "/profiles/:name" { path : Name } (Created Name) {Gone}
+  forget : Delete "/profiles" {} () {}
 } deriving HttpApi
 
 profile : HttpApi.Endpoint "profile" (Handler Name Unit Unit Unit r {Gone} Name)
 let profile = Profiles.endpoints.profile
+
+/// Endpoints separated by line breaks, as `flick fmt` writes a broken record.
+type alias Lines = {
+  find : Get "/lines/:name" { path : Name } Name {Gone}
+  drop : Delete "/lines" {} () {}
+} deriving HttpApi
+
+find : HttpApi.Endpoint "find" (Handler Name Unit Unit Unit r {Gone} Name)
+let find = Lines.endpoints.find

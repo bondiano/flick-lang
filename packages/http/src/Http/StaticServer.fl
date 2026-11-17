@@ -15,21 +15,21 @@ import PlatformError
 /// single-page app), the `Cache-Control` header, and media types by
 /// extension besides the built-in ones.
 type alias StaticOptions = {
-  root : String;
-  index : Option String;
-  spa : Bool;
-  cacheControl : Option String;
-  mimeTypes : List (String, String);
+  root : String
+  index : Option String
+  spa : Bool
+  cacheControl : Option String
+  mimeTypes : List (String, String)
 }
 
 /// The files below the directory, with the defaults.
 static_options : String -> StaticOptions
 let static_options root = {
-  root = root;
-  index = None;
-  spa = false;
-  cacheControl = None;
-  mimeTypes = [];
+  root = root
+  index = None
+  spa = false
+  cacheControl = None
+  mimeTypes = []
 }
 
 /// The handler of the files; fails if the directory cannot be read.

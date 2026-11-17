@@ -16,12 +16,12 @@ let seeded n = { count = Some n; size = None; maxDiscards = None; seed = Some 42
 
 checking : Arbitrary.CheckOptions
 let checking = {
-  runs = Some 50;
-  size = None;
-  maxDiscards = None;
-  maxShrinks = None;
-  seed = Some 7;
-  replay = None;
+  runs = Some 50
+  size = None
+  maxDiscards = None
+  maxShrinks = None
+  seed = Some 7
+  replay = None
 }
 
 /// Generated within the bounds its checks state.

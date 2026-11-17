@@ -86,10 +86,10 @@ type ByteUnit =
 /// to an integer from 0 to 20), whether to keep trailing zeros, and either a
 /// unit or the largest fitting one of the binary or the decimal units.
 type alias FormatOptions = {
-  precision : Option Int;
-  trailingZeros : Option Bool;
-  binary : Bool;
-  unit : Option ByteUnit;
+  precision : Option Int
+  trailingZeros : Option Bool
+  binary : Bool
+  unit : Option ByteUnit
 }
 
 /// The options of `format` that pick the largest fitting binary unit.

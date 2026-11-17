@@ -40,7 +40,7 @@ let problem subject message = [(subject, [message])]
 /// The codec of the body of every error.
 body : PureCodec Json Body
 let body = codec Body.schema {
-  errors = field "errors" (Codec.entries (Codec.list String.json));
+  errors = field "errors" (Codec.entries (Codec.list String.json))
 }
 
 /// The body of a 401.

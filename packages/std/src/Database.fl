@@ -31,19 +31,19 @@ foreign effect transaction from "flick:sql" "pgTransaction"
 /// before the server ends it (`57014`), and how long a query waits for a
 /// connection of the pool before it fails.
 type alias PgConfig = {
-  connection_string : String;
-  max_connections : Int;
-  statement_timeout_ms : Option Float;
-  acquire_timeout_ms : Option Float;
+  connection_string : String
+  max_connections : Int
+  statement_timeout_ms : Option Float
+  acquire_timeout_ms : Option Float
 }
 
 /// A pool of 10 connections to `url`, without timeouts.
 config : String -> PgConfig
 let config url = {
-  connection_string = url;
-  max_connections = 10;
-  statement_timeout_ms = None;
-  acquire_timeout_ms = None;
+  connection_string = url
+  max_connections = 10
+  statement_timeout_ms = None
+  acquire_timeout_ms = None
 }
 
 pg_layer : ServiceTag {Database} -> PgConfig -> Layer none none {Database}

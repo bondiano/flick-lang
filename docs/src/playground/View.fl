@@ -39,15 +39,15 @@ let result_pane model m =
       Ui.with_host
         {
           Ui.host with
-          id = Some "fp-frame";
-          data = [("title", tr m.locale "Preview of the program" "Предпросмотр программы")];
+          id = Some "fp-frame"
+          data = [("title", tr m.locale "Preview of the program" "Предпросмотр программы")]
         }
         (div {
           class_name =
             if m.tab == Output && m.execution.status == "preview" then
               "fp-frame fp-frame-open"
             else
-              "fp-frame";
+              "fp-frame"
         })
       body
   }
@@ -66,33 +66,33 @@ let view model m = ui {
     Ui.with_host
       {
         Ui.host with
-        id = Some "fp-compile";
-        class_name = Some "fp-refresh";
-        aria_hidden = Some true;
-        tab_index = Some (-1);
+        id = Some "fp-compile"
+        class_name = Some "fp-refresh"
+        aria_hidden = Some true
+        tab_index = Some (-1)
       }
       (button { disabled = false; on_click = Ui.Event.latest (fun _ -> task { refresh model }) })
     // and another takes in an edit of CodeMirror, which lives outside the view
     Ui.with_host
       {
         Ui.host with
-        id = Some "fp-edit";
-        class_name = Some "fp-refresh";
-        aria_hidden = Some true;
-        tab_index = Some (-1);
+        id = Some "fp-edit"
+        class_name = Some "fp-refresh"
+        aria_hidden = Some true
+        tab_index = Some (-1)
       }
       (button { disabled = false; on_click = Ui.Event.latest (fun _ -> task { edited model }) })
     Ui.with_host
       {
         Ui.host with
-        id = Some "fp-runtime";
-        class_name = Some "fp-refresh";
-        aria_hidden = Some true;
-        tab_index = Some (-1);
+        id = Some "fp-runtime"
+        class_name = Some "fp-refresh"
+        aria_hidden = Some true
+        tab_index = Some (-1)
       }
       (button {
-        disabled = false;
-        on_click = Ui.Event.exhaust (fun _ -> task { runtime_messages model });
+        disabled = false
+        on_click = Ui.Event.exhaust (fun _ -> task { runtime_messages model })
       })
     div { class_name = "fp-workspace" }
       (if m.lesson then Lesson.view model m else empty)
@@ -111,8 +111,8 @@ let view model m = ui {
                 m.load_error)
               (button
                 {
-                  disabled = m.loading;
-                  on_click = Ui.Event.exhaust (fun _ -> task { load_compiler model });
+                  disabled = m.loading
+                  on_click = Ui.Event.exhaust (fun _ -> task { load_compiler model })
                 }
                 (text (tr m.locale "Retry compiler" "Загрузить снова"))))
         else
@@ -132,8 +132,8 @@ let view model m = ui {
                 m.compile_error)
               (button
                 {
-                  disabled = false;
-                  on_click = Ui.Event.latest (fun _ -> task { notify "fp-compile" });
+                  disabled = false
+                  on_click = Ui.Event.latest (fun _ -> task { notify "fp-compile" })
                 }
                 (text (tr m.locale "Retry compilation" "Повторить компиляцию"))))
         else
@@ -174,9 +174,9 @@ let view model m = ui {
         (Ui.with_host
           {
             Ui.host with
-            role = Some "separator";
-            tab_index = Some 0;
-            aria_label = Some (tr m.locale "Resize the panels" "Изменить размер панелей");
+            role = Some "separator"
+            tab_index = Some 0
+            aria_label = Some (tr m.locale "Resize the panels" "Изменить размер панелей")
           }
           (div { class_name = "fp-split" }))
         (result_pane model m))

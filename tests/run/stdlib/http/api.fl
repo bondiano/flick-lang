@@ -47,12 +47,12 @@ let create_user =
   |> HttpApi.describe "Adds a user"
 
 type alias Handlers r = {
-  create_user : HttpApi.Request Unit Unit Unit NewUser ->{r} User;
-  get_user : HttpApi.Request UserPath Unit Unit Unit ->{r; NotFound} User;
-  me : HttpApi.Request Unit Unit Auth Unit ->{r; HttpApi.HttpError} String;
-  health : HttpApi.Request Unit Unit Unit Unit ->{r} Unit;
-  echo : HttpApi.Request Unit Unit Unit String ->{r} String;
-  login : HttpApi.Request Unit Unit Unit NewUser ->{r} String;
+  create_user : HttpApi.Request Unit Unit Unit NewUser ->{r} User
+  get_user : HttpApi.Request UserPath Unit Unit Unit ->{r; NotFound} User
+  me : HttpApi.Request Unit Unit Auth Unit ->{r; HttpApi.HttpError} String
+  health : HttpApi.Request Unit Unit Unit Unit ->{r} Unit
+  echo : HttpApi.Request Unit Unit Unit String ->{r} String
+  login : HttpApi.Request Unit Unit Unit NewUser ->{r} String
 }
 
 users : HttpApi.Group "users" r (Handlers r)
@@ -69,9 +69,9 @@ api : HttpApi.Api r { users : Handlers r }
 let api =
   HttpApi.api "Users"
   |> HttpApi.info {
-    version = "1.0.0";
-    description = "People and their accounts";
-    servers = ["http://127.0.0.1"];
+    version = "1.0.0"
+    description = "People and their accounts"
+    servers = ["http://127.0.0.1"]
   }
   |> HttpApi.add_group users
 
@@ -139,30 +139,30 @@ let main () =
       get_user = fun request ->
         match find (Ref.get store) request.path.id with
         | Some user -> user
-        | None -> from_result (Err (NotFound { id = request.path.id }));
+        | None -> from_result (Err (NotFound { id = request.path.id }))
       create_user = fun request ->
         let user = { id = show (List.length (Ref.get store) + 1); name = request.payload.name }
         Ref.set store (Ref.get store ++ [user])
-        user;
+        user
       me = fun request ->
         if request.headers.authorization == "Bearer ada" then
           "Ada"
         else
-          from_result (Err (HttpApi.HttpError { status = 403; message = "not Ada" }));
-      health = fun _ -> ();
-      echo = fun request -> String.to_upper request.payload;
-      login = fun request -> "welcome " ++ request.payload.name;
-    };
+          from_result (Err (HttpApi.HttpError { status = 403; message = "not Ada" }))
+      health = fun _ -> ()
+      echo = fun request -> String.to_upper request.payload
+      login = fun request -> "welcome " ++ request.payload.name
+    }
   }
   match HttpApi.openapi files with
   | Ok _ -> Platform.stdout_line "files: exported?"
   | Err (Codec.ExportError message) -> Platform.stdout_line ("files: " ++ message)
   let options : HttpApi.ServeOptions = {
-    host = "127.0.0.1";
-    port = 0;
-    openapi = Some "/openapi.json";
-    swagger = Some "/docs";
-    scalar = Some "/scalar";
+    host = "127.0.0.1"
+    port = 0
+    openapi = Some "/openapi.json"
+    swagger = Some "/docs"
+    scalar = Some "/scalar"
   }
   let result =
     try
@@ -171,10 +171,10 @@ let main () =
         let base = "http://127.0.0.1:" ++ show (HttpApi.port server)
         let created =
           HttpApi.call base create_user {
-            path = ();
-            query = ();
-            headers = ();
-            payload = { name = "Bob" };
+            path = ()
+            query = ()
+            headers = ()
+            payload = { name = "Bob" }
           }
         Platform.stdout_line ("created " ++ show created)
         let ada =
@@ -184,29 +184,29 @@ let main () =
           try
             show
               (HttpApi.call base get_user {
-                path = { id = "99" };
-                query = ();
-                headers = ();
-                payload = ();
+                path = { id = "99" }
+                query = ()
+                headers = ()
+                payload = ()
               })
           with
           | NotFound e -> "not found " ++ e.id
         Platform.stdout_line missing
         let who =
           HttpApi.call base me {
-            path = ();
-            query = ();
-            headers = { authorization = "Bearer ada" };
-            payload = ();
+            path = ()
+            query = ()
+            headers = { authorization = "Bearer ada" }
+            payload = ()
           }
         Platform.stdout_line ("me: " ++ who)
         let refused =
           try
             HttpApi.call base me {
-              path = ();
-              query = ();
-              headers = { authorization = "Bearer bob" };
-              payload = ();
+              path = ()
+              query = ()
+              headers = { authorization = "Bearer bob" }
+              payload = ()
             }
           with
           | HttpApi.HttpError e -> show e.status ++ " " ++ e.message
@@ -214,10 +214,10 @@ let main () =
         let basic =
           try
             HttpApi.call base me {
-              path = ();
-              query = ();
-              headers = { authorization = "Basic YWRhOg==" };
-              payload = ();
+              path = ()
+              query = ()
+              headers = { authorization = "Basic YWRhOg==" }
+              payload = ()
             }
           with
           | HttpApi.HttpError e -> show e.status ++ " " ++ e.message
@@ -225,18 +225,18 @@ let main () =
         Platform.stdout_line
           ("echo: "
             ++ HttpApi.call base echo_text {
-              path = ();
-              query = ();
-              headers = ();
-              payload = "plain text";
+              path = ()
+              query = ()
+              headers = ()
+              payload = "plain text"
             })
         Platform.stdout_line
           ("login: "
             ++ HttpApi.call base login {
-              path = ();
-              query = ();
-              headers = ();
-              payload = { name = "Cy D" };
+              path = ()
+              query = ()
+              headers = ()
+              payload = { name = "Cy D" }
             })
         Platform.stdout_line ("no credentials: " ++ get_raw (base ++ "/me"))
         Platform.stdout_line

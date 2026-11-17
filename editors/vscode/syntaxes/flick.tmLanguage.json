@@ -115,7 +115,7 @@
       "match": "@[a-z_][A-Za-z0-9_]*"
     },
     "effect-row": {
-      "begin": "(->)\\s*(\\{)",
+      "begin": "(->)(\\{)",
       "beginCaptures": {
         "1": { "name": "keyword.operator.flick" },
         "2": { "name": "punctuation.definition.effect-row.begin.flick" }

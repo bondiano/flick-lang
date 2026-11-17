@@ -79,10 +79,10 @@ let texts () =
 
 with_precision : Option Int -> Option Bool -> ByteSize.FormatOptions
 let with_precision precision zeros = {
-  precision = precision;
-  trailingZeros = zeros;
-  binary = false;
-  unit = None;
+  precision = precision
+  trailingZeros = zeros
+  binary = false
+  unit = None
 }
 
 in_unit : ByteSize.ByteUnit -> ByteSize.FormatOptions

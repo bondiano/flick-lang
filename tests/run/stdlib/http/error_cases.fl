@@ -19,7 +19,7 @@ type alias Body = { errors : Problems }
 
 body : PureCodec Json Body
 let body = codec Body.schema {
-  errors = field "errors" (Codec.entries (Codec.list String.json));
+  errors = field "errors" (Codec.entries (Codec.list String.json))
 }
 
 conflict : PureCodec Json Conflict
@@ -53,7 +53,7 @@ let register =
     (HttpApi.errors |> HttpApi.error_case 409 conflict |> HttpApi.error_case 422 unprocessable)
 
 type alias Handlers = {
-  register : HttpApi.Request Unit Unit Unit Name ->{; Conflict, Unprocessable} String;
+  register : HttpApi.Request Unit Unit Unit Name ->{; Conflict, Unprocessable} String
 }
 
 api : HttpApi.Api none { users : Handlers }
@@ -83,11 +83,11 @@ let ask base name =
 main : Unit ->{Async; AppError} Unit
 let main () =
   let options : HttpApi.ServeOptions = {
-    host = "127.0.0.1";
-    port = 0;
-    openapi = None;
-    swagger = None;
-    scalar = None;
+    host = "127.0.0.1"
+    port = 0
+    openapi = None
+    swagger = None
+    scalar = None
   }
   try
     scope s {

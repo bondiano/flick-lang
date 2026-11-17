@@ -1,5 +1,5 @@
 //! Lists, tuples, `exposing (…)` and records of every kind: on one line, or
-//! one item per line ending with its separator.
+//! one item per line, a bracket's ending with `,` and a record's with none.
 
 use std::ptr;
 
@@ -24,7 +24,8 @@ struct Shape {
     /// What follows the last item when it stays on the line.
     last: &'static str,
     /// Broken one item per line whatever the width: written with a trailing
-    /// separator, a blank line between items, or a comment.
+    /// `,` (a record: a line break after its `{`), a blank line between
+    /// items, or a comment.
     force: bool,
     /// Several short items per line, as many as fit.
     fill: bool,
@@ -128,15 +129,21 @@ impl<'a> Printer<'a> {
     }
 
     /// `{ a = 1; b = 2 }`, `{ r with a = 1 }`, `{ a : T | r }`, `{ a; b = p }`.
+    /// Broken, one field per line with no `;`, as statements are.
     pub fn record(&mut self, n: &'a Node, suffix: &[Part]) -> Doc<'a> {
-        let (Some(open), (separator, Some(close))) = (position(n, K::LBrace), last_two(n)) else {
+        let (Some(open), (_, Some(close))) = (position(n, K::LBrace), last_two(n)) else {
             return self.generic(n);
         };
         let Element::Token(opener) = n.children[open] else {
             unreachable!("a token position")
         };
-        let opener = self.tok(opener);
         let items = nodes(n);
+        // the author's choice, and what keeps a broken record broken when
+        // formatted again: a line break right after the `{`
+        let lined = items.first().is_some_and(|first| {
+            self.text[opener.end as usize..first.range().0 as usize].contains('\n')
+        });
+        let opener = self.tok(opener);
         let update = n.kind == K::RecordUpdate;
         let base = if update { items.first().copied() } else { None };
         let with = n.children.iter().find_map(|c| match c {
@@ -147,7 +154,7 @@ impl<'a> Printer<'a> {
             sep: ';',
             pad: " ",
             last: " ",
-            force: separator.is_some_and(|s| s.kind == K::Semi) && !items.is_empty(),
+            force: lined,
             fill: false,
         };
         let tails: Vec<bool> = items.iter().map(|i| i.kind == K::RowTail).collect();
@@ -164,12 +171,10 @@ impl<'a> Printer<'a> {
                 return (docvec![p.a, doc, with], ("", " "));
             }
             let doc = p.node(item);
-            let sep = if tails[i] {
+            let sep = if tails[i] || tails.get(i + 1).copied().unwrap_or(false) {
                 ("", " ")
-            } else if tails.get(i + 1).copied().unwrap_or(false) {
-                (";", " ")
             } else {
-                (";", "; ")
+                ("", "; ")
             };
             (doc, sep)
         })

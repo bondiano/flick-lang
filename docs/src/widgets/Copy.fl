@@ -32,14 +32,14 @@ let view input model m =
       [("aria-label", label), ("title", label), ("aria-live", "polite")]
       (button
         {
-          disabled = false;
+          disabled = false
           on_click =
             Ui.Event.latest (fun _ -> task {
               let problem =
                 try (copy_text input.source |> fun _ -> "") with
                 | JsError failure -> failure.message
               Atom.set model { copied = problem == ""; problem = problem }
-            });
+            })
         }
         (Elements.icon (if m.copied then "check" else "copy"))
         (span { class_name = "sr-only" } (text label)))

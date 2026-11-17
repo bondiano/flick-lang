@@ -16,15 +16,15 @@ let fine = task { "fine" }
 
 untraced : Tracer.SpanOptions
 let untraced = {
-  attributes = [];
-  links = [];
-  parent = None;
-  root = false;
-  kind_ = Tracer.internal;
-  sampled = None;
-  level = None;
-  captureStackTrace = false;
-  disablePropagation = false;
+  attributes = []
+  links = []
+  parent = None
+  root = false
+  kind_ = Tracer.internal
+  sampled = None
+  level = None
+  captureStackTrace = false
+  disablePropagation = false
 }
 
 say : String ->{} Unit
@@ -82,8 +82,8 @@ logged : Unit ->{Async} Unit
 let logged () =
   let seen = Ref.make []
   let collect = {
-    window = Result.with_default Duration.zero (Duration.millis 1);
-    flush = fun causes -> Ref.set seen (Ref.get seen ++ causes);
+    window = Result.with_default Duration.zero (Duration.millis 1)
+    flush = fun causes -> Ref.set seen (Ref.get seen ++ causes)
   }
   let causes = Logger.make (fun (o : Logger.Options) -> o.cause)
   provide (Logger.batched collect { mergeWithExisting = false } causes) {
@@ -96,8 +96,8 @@ let logged () =
   say ("logged: " ++ show described)
   let texts = Ref.make []
   let keep = {
-    window = Result.with_default Duration.zero (Duration.millis 1);
-    flush = fun outputs -> Ref.set texts (Ref.get texts ++ outputs);
+    window = Result.with_default Duration.zero (Duration.millis 1)
+    flush = fun outputs -> Ref.set texts (Ref.get texts ++ outputs)
   }
   let structured = Logger.map (fun (s : Logger.Structured) -> s.cause) Logger.format_structured
   provide (Logger.batched keep { mergeWithExisting = false } structured) {

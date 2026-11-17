@@ -67,9 +67,9 @@ let main () =
         (Logger.layer replace [
           Logger.default_logger,
           Logger.console_pretty {
-            colors = Some false;
-            formatDate = pretty_date;
-            mode = Logger.Tty;
+            colors = Some false
+            formatDate = pretty_date
+            mode = Logger.Tty
           },
           Logger.console_pretty_tty { colors = false; formatDate = None },
           Logger.console_pretty_browser { colors = false; formatDate = None },

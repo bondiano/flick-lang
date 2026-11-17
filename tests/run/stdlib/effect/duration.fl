@@ -31,9 +31,9 @@ stored : Duration.Duration -> String
 let stored d =
   Duration.match_
     {
-      onMillis = fun n -> "millis " ++ show n;
-      onNanos = fun n -> "nanos " ++ show n;
-      onInfinity = fun () -> "infinite";
+      onMillis = fun n -> "millis " ++ show n
+      onNanos = fun n -> "nanos " ++ show n
+      onInfinity = fun () -> "infinite"
     }
     d
 
@@ -42,9 +42,9 @@ let pair a b =
   Duration.match_pair
     a
     {
-      onMillis = fun x y -> "millis " ++ show (x + y);
-      onNanos = fun x y -> "nanos " ++ show (x + y);
-      onInfinity = fun _ _ -> "infinite";
+      onMillis = fun x y -> "millis " ++ show (x + y)
+      onNanos = fun x y -> "nanos " ++ show (x + y)
+      onInfinity = fun _ _ -> "infinite"
     }
     b
 

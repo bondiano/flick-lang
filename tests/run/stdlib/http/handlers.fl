@@ -216,9 +216,9 @@ let responses () =
     Http.ServerResponse.uint8_array [1, 2] ok,
     Http.ServerResponse.text "t" {
       ok with
-      status = Some 202;
-      statusText = Some "Fine";
-      headers = Some [("x-a", "1")];
+      status = Some 202
+      statusText = Some "Fine"
+      headers = Some [("x-a", "1")]
     },
     Http.ServerResponse.html "<b>x</b>",
     Http.ServerResponse.json (Codec.encode point { x = 1 }) ok,
@@ -385,9 +385,9 @@ let middlewares () =
     ["content-encoding"]
     (Http.Middleware.compression
       {
-        algorithms = [Http.Platform.Zstd, Http.Platform.Brotli];
-        minSize = Some 10;
-        levels = [(Http.Platform.Zstd, 5)];
+        algorithms = [Http.Platform.Zstd, Http.Platform.Brotli]
+        minSize = Some 10
+        levels = [(Http.Platform.Zstd, 5)]
       }
       big)
     (accepting "br, zstd")

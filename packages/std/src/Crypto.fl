@@ -199,15 +199,15 @@ foreign effect system_random_ulid from "flick:Crypto" "flickRandomUlid"
 system : Layer none none {Crypto}
 let system =
   Layer.succeed Crypto {
-    random_bytes = system_random_bytes;
-    digest = system_digest;
-    random = system_random;
-    random_boolean = system_random_boolean;
-    random_int = system_random_int;
-    random_between = system_random_between;
-    random_int_between = system_random_int_between;
-    random_shuffle = system_random_shuffle;
-    random_uuid_v4 = system_random_uuid_v4;
-    random_uuid_v7 = system_random_uuid_v7;
-    random_ulid = system_random_ulid;
+    random_bytes = system_random_bytes
+    digest = system_digest
+    random = system_random
+    random_boolean = system_random_boolean
+    random_int = system_random_int
+    random_between = system_random_between
+    random_int_between = system_random_int_between
+    random_shuffle = system_random_shuffle
+    random_uuid_v4 = system_random_uuid_v4
+    random_uuid_v7 = system_random_uuid_v7
+    random_ulid = system_random_ulid
   }

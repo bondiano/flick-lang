@@ -167,9 +167,9 @@ syntax_failure : Atom.Writable Model -> String ->{Atom.Write} Unit
 let syntax_failure model message =
   update model (fun m -> {
     m with
-    highlighting = false;
-    generated_tokens = [];
-    syntax_error = message;
+    highlighting = false
+    generated_tokens = []
+    syntax_error = message
   })
 
 paint_generated : Atom.Writable Model ->{Atom.Write} Unit
@@ -282,11 +282,11 @@ let emit model =
     | Ok emitted ->
       update model (fun m -> {
         m with
-        checking = false;
-        emitted = emitted;
-        emitted_key = emit_key m;
-        diagnostics = emitted.diagnostics;
-        generated_tokens = [];
+        checking = false
+        emitted = emitted
+        emitted_key = emit_key m
+        diagnostics = emitted.diagnostics
+        generated_tokens = []
       })
       mark_diagnostics m.source emitted.diagnostics
       paint_generated model
@@ -295,10 +295,10 @@ load_compiler : Atom.Writable Model ->{Async, Atom.Write} Unit
 let load_compiler model =
   update model (fun m -> {
     m with
-    loading = true;
-    checking = false;
-    load_error = "";
-    compile_error = "";
+    loading = true
+    checking = false
+    load_error = ""
+    compile_error = ""
   })
   try
     let version = load ()
@@ -340,7 +340,7 @@ let restore_source model =
     if restored.status == "invalid-link" then
       update model (fun m -> {
         m with
-        storage_notice = tr m.locale "This shared link is invalid." "Ссылка на код повреждена.";
+        storage_notice = tr m.locale "This shared link is invalid." "Ссылка на код повреждена."
       })
   with
   | JsError _ -> ()
@@ -375,9 +375,9 @@ let discard_draft model =
   set_editor_text source
   update model (fun m -> {
     m with
-    source = source;
-    revision = m.revision + 1;
-    storage_notice = tr m.locale "Draft cleared." "Черновик удалён.";
+    source = source
+    revision = m.revision + 1
+    storage_notice = tr m.locale "Draft cleared." "Черновик удалён."
   })
   notify "fp-compile"
 
@@ -434,9 +434,9 @@ let check_code model =
   if fresh && result == "passed" then complete_lesson ()
   update model (fun m -> {
     m with
-    lesson_checking = false;
-    lesson_result = if fresh then message else "";
-    lesson_done = m.lesson_done || (fresh && result == "passed");
+    lesson_checking = false
+    lesson_result = if fresh then message else ""
+    lesson_done = m.lesson_done || (fresh && result == "passed")
   })
 
 reveal_lesson_hint : Atom.Writable Model ->{Atom.Write} Unit
@@ -462,9 +462,9 @@ let choose model example =
   close_preview ()
   update model (fun m -> {
     m with
-    revision = m.revision + 1;
-    execution = empty_execution;
-    tab = Output;
+    revision = m.revision + 1
+    execution = empty_execution
+    tab = Output
   })
   replace model example.source
 
@@ -476,9 +476,9 @@ let explain model key code =
   else
     update model (fun m -> {
       m with
-      explained = key;
-      explanation = "";
-      explain_revision = m.explain_revision + 1;
+      explained = key
+      explanation = ""
+      explain_revision = m.explain_revision + 1
     })
     let request = Atom.current model
     let text =
@@ -504,17 +504,17 @@ let run_program model =
   if m.running then
     update model (fun m -> {
       m with
-      running = false;
-      execution = { empty_execution with status = "stopped" };
+      running = false
+      execution = { empty_execution with status = "stopped" }
     })
   else
     update model (fun m -> {
       m with
-      running = true;
-      tab = Output;
-      execution = empty_execution;
-      ran_source = m.source;
-      ran_profile = m.profile;
+      running = true
+      tab = Output
+      execution = empty_execution
+      ran_source = m.source
+      ran_profile = m.profile
     })
     let execution =
       try
@@ -543,10 +543,10 @@ let runtime_messages model =
         m with
         execution = {
           m.execution with
-          lines = m.execution.lines ++ output;
-          status = "failure";
-          detail = first.text;
-        };
+          lines = m.execution.lines ++ output
+          status = "failure"
+          detail = first.text
+        }
       }
     )
     if crashes != [] then close_preview ()

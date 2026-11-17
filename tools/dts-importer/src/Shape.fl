@@ -20,12 +20,12 @@ let handles = ["Date", "RegExp", "Error", "AbortSignal", "URL", "Uint8Array", "A
 /// each named object type it mentions with where that is declared, and
 /// `globals` each such declaration the global scope has with its name there.
 type alias Export = {
-  name : String;
-  local : String;
-  body : List (String, Value);
-  fingerprint : String;
-  named : List (String, String);
-  globals : List (String, String);
+  name : String
+  local : String
+  body : List (String, Value)
+  fingerprint : String
+  named : List (String, String)
+  globals : List (String, String)
 }
 
 tag : String -> Value
@@ -335,12 +335,12 @@ let export_of c exported =
       let fingerprinted =
         JsonText.render (unaliased (JObject (List.concat [[("name", JString name)], body])))
       {
-        name = name;
-        local = local_name exported symbol;
-        body = body;
-        fingerprint = "sha256:" ++ Ts.sha256 fingerprinted;
-        named = sites (JObject sited);
-        globals = globals (JObject sited);
+        name = name
+        local = local_name exported symbol
+        body = body
+        fingerprint = "sha256:" ++ Ts.sha256 fingerprinted
+        named = sites (JObject sited)
+        globals = globals (JObject sited)
       }
     )
     (describe c symbol)

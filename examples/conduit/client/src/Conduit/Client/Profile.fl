@@ -47,11 +47,11 @@ let listed =
         ["articles"]
         (task {
           let query = {
-            tag = None;
-            author = if favorites then None else Some name;
-            favorited = if favorites then Some name else None;
-            limit = Some 10;
-            offset = None;
+            tag = None
+            author = if favorites then None else Some name
+            favorited = if favorites then Some name else None
+            limit = Some 10
+            offset = None
           }
           Session.call
             { path = (); query = query; headers = Session.credentials jwt; payload = () }

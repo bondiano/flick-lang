@@ -44,20 +44,20 @@ type FileType =
 
 /// What `stat` tells of a file; times are milliseconds since the epoch.
 type alias Info = {
-  type_ : FileType;
-  mtime : Option Float;
-  atime : Option Float;
-  birthtime : Option Float;
-  dev : BigInt;
-  ino : Option BigInt;
-  mode : Int;
-  nlink : Option BigInt;
-  uid : Option Float;
-  gid : Option Float;
-  rdev : Option BigInt;
-  size : BigInt;
-  blksize : Option BigInt;
-  blocks : Option BigInt;
+  type_ : FileType
+  mtime : Option Float
+  atime : Option Float
+  birthtime : Option Float
+  dev : BigInt
+  ino : Option BigInt
+  mode : Int
+  nlink : Option BigInt
+  uid : Option Float
+  gid : Option Float
+  rdev : Option BigInt
+  size : BigInt
+  blksize : Option BigInt
+  blocks : Option BigInt
 }
 
 type alias AccessOptions = { ok : Bool; readable : Bool; writable : Bool }
@@ -66,9 +66,9 @@ type alias GlobOptions = { root : Option String; exclude : List String }
 type alias MakeDirectoryOptions = { recursive : Bool; mode : Option Int }
 type alias TempDirectoryOptions = { directory : Option String; prefix : Option String }
 type alias TempFileOptions = {
-  directory : Option String;
-  prefix : Option String;
-  suffix : Option String;
+  directory : Option String
+  prefix : Option String
+  suffix : Option String
 }
 type alias OpenOptions = { flag : Option OpenFlag; mode : Option Int; noFollow : Bool }
 type alias RemoveOptions = { recursive : Bool; force : Bool }

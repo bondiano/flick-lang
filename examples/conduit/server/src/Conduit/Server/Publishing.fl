@@ -109,9 +109,9 @@ let update_article request =
   own "article" row.author_id
   let edit = Accounts.valid (Validate.edit request.payload.article)
   let fields = {
-    title = Option.with_default row.title edit.title;
-    description = Option.with_default row.description edit.description;
-    body = Option.with_default row.body edit.body;
+    title = Option.with_default row.title edit.title
+    description = Option.with_default row.description edit.description
+    body = Option.with_default row.body edit.body
   }
   Articles.save row.id fields (now ())
   match edit.tags with

@@ -91,8 +91,8 @@ foreign pure tap from "flick:Stream" "tap"
 /// Runs `onElement` on each element and `onError` on the error.
 tap_both :
   {
-    onElement : (a ->{r2; e2} x)^c;
-    onError : (Errors e ->{r3; e3} y)^c;
+    onElement : (a ->{r2; e2} x)^c
+    onError : (Errors e ->{r3; e3} y)^c
   } ->
   (Stream r e a)^c ->
   (Stream (r + r2 + r3) (e + e2 + e3) a)^c
@@ -357,11 +357,11 @@ foreign pure debounce from "flick:Stream" "debounce"
 /// can be fractional.
 throttle :
   {
-    cost : (NonEmpty.NonEmpty a -> Float)^c;
-    units : Float;
-    duration : Duration.Duration;
-    burst : Option Float;
-    strategy : Option ThrottleStrategy;
+    cost : (NonEmpty.NonEmpty a -> Float)^c
+    units : Float
+    duration : Duration.Duration
+    burst : Option Float
+    strategy : Option ThrottleStrategy
   } ->
   (Stream r e a)^c ->
   (Stream r e a)^c
@@ -372,11 +372,11 @@ foreign pure throttle from "flick:Stream" "flickThrottle"
 /// `throttle` with a task as the cost.
 throttle_effect :
   {
-    cost : (NonEmpty.NonEmpty a ->{r2; e2} Float)^c;
-    units : Float;
-    duration : Duration.Duration;
-    burst : Option Float;
-    strategy : Option ThrottleStrategy;
+    cost : (NonEmpty.NonEmpty a ->{r2; e2} Float)^c
+    units : Float
+    duration : Duration.Duration
+    burst : Option Float
+    strategy : Option ThrottleStrategy
   } ->
   (Stream r e a)^c ->
   (Stream (r + r2) (e + e2) a)^c

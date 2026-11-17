@@ -15,11 +15,11 @@ type alias Credentials = { email : String; password : String }
 
 /// A change of the user: each field to set, `None` to keep. `Some None` clears.
 type alias Change = {
-  email : Option String;
-  username : Option String;
-  password : Option String;
-  bio : Option (Option String);
-  image : Option (Option String);
+  email : Option String
+  username : Option String
+  password : Option String
+  bio : Option (Option String)
+  image : Option (Option String)
 }
 
 /// A new article with every field there.
@@ -27,10 +27,10 @@ type alias Draft = { title : String; description : String; body : String; tags :
 
 /// A change of an article: `None` keeps a field.
 type alias Edit = {
-  title : Option String;
-  description : Option String;
-  body : Option String;
-  tags : Option (List String);
+  title : Option String
+  description : Option String
+  body : Option String
+  tags : Option (List String)
 }
 
 /// What RealWorld says of a field missing or blank.
@@ -156,11 +156,11 @@ let change input =
   match (username, address, password) with
   | (Ok u, Ok e, Ok p) ->
     Ok {
-      email = e;
-      username = u;
-      password = p;
-      bio = cleared input.bio;
-      image = cleared input.image;
+      email = e
+      username = u
+      password = p
+      bio = cleared input.bio
+      image = cleared input.image
     }
   | _ -> Err (problems_of [check username, check address, check password])
 

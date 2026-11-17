@@ -6,22 +6,22 @@ module App.Main exposing (main)
 import Codec
 
 type alias Row = {
-  required : String;
-  nullable : Option String;
-  missing : Option String;
-  nullish : Option String;
-  tagged : Option Float;
-  quota : Float;
+  required : String
+  nullable : Option String
+  missing : Option String
+  nullish : Option String
+  tagged : Option Float
+  quota : Float
 } deriving Schema
 
 row_json : Ref Float -> PureCodec Json Row
 let row_json calls = codec Row.schema {
-  required = field "required" String.json;
-  nullable = field "nullable" (option_as_null String.json);
-  missing = optional_field "missing" String.json;
-  nullish = field "nullish" (option_as_nullish String.json);
-  tagged = field "tagged" (Codec.tagged_option Float.json_finite);
-  quota = field "quota" Float.json_finite |> on_missing (fun () -> count calls);
+  required = field "required" String.json
+  nullable = field "nullable" (option_as_null String.json)
+  missing = optional_field "missing" String.json
+  nullish = field "nullish" (option_as_nullish String.json)
+  tagged = field "tagged" (Codec.tagged_option Float.json_finite)
+  quota = field "quota" Float.json_finite |> on_missing (fun () -> count calls)
 }
 
 count : Ref Float -> Float
@@ -67,11 +67,11 @@ let main () =
   Platform.stdout_line (decode wire ("{" ++ base ++ ", \"extra\": 1}"))
   Platform.stdout_line (decode (ignore_extra_fields wire) ("{" ++ base ++ ", \"extra\": 1}"))
   let row = {
-    required = "r";
-    nullable = None;
-    missing = None;
-    nullish = None;
-    tagged = Some 1;
-    quota = 2;
+    required = "r"
+    nullable = None
+    missing = None
+    nullish = None
+    tagged = Some 1
+    quota = 2
   }
   Platform.stdout_line (encode wire row)

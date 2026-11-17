@@ -29,7 +29,7 @@ issuer_json : PureCodec Json Issuer
 let issuer_json =
   ignore_extra_fields
     (codec Issuer.schema {
-      iss = field "iss" String.json;
+      iss = field "iss" String.json
     })
 
 secret : List Int

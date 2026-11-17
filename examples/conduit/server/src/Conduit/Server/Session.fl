@@ -61,8 +61,8 @@ let issue account =
   Effect.or_die
     (task {
       Jwt.sign claims (Keys.secret ()) {
-        sub = BigInt.to_string account.id;
-        exp = Jwt.expires_in lifetime;
+        sub = BigInt.to_string account.id
+        exp = Jwt.expires_in lifetime
       }
     })
 

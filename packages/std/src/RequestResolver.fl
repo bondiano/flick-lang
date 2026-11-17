@@ -16,17 +16,17 @@ type alias RequestResolver p (e : ErrorRow) a = Request.RequestResolver p e a
 /// `collectWhile` decides whether a batch takes more entries, and `runAll`
 /// resolves a batch with its key.
 type alias MakeOptions p (e : ErrorRow) a k = {
-  batchKey : Entry p e a -> k;
-  preCheck : Option (Entry p e a -> Bool);
-  delay : Eff none none Unit;
-  collectWhile : List (Entry p e a) -> Bool;
-  runAll : NonEmpty.NonEmpty (Entry p e a) -> k ->{; e} Unit;
+  batchKey : Entry p e a -> k
+  preCheck : Option (Entry p e a -> Bool)
+  delay : Eff none none Unit
+  collectWhile : List (Entry p e a) -> Bool
+  runAll : NonEmpty.NonEmpty (Entry p e a) -> k ->{; e} Unit
 }
 
 /// How `make_grouped` groups a batch by key, and resolves each group.
 type alias GroupedOptions p (e : ErrorRow) a k = {
-  key : Entry p e a -> k;
-  resolver : NonEmpty.NonEmpty (Entry p e a) -> k ->{; e} Unit;
+  key : Entry p e a -> k
+  resolver : NonEmpty.NonEmpty (Entry p e a) -> k ->{; e} Unit
 }
 
 /// Which entries `with_cache` drops first: `lru` or `fifo`.
@@ -47,8 +47,8 @@ type alias CacheOptions = { capacity : Int; strategy : Option Strategy }
 /// The options of `as_cache`: at most `capacity` results, each kept for
 /// `timeToLive` of how it ended and its request (`None`: until dropped).
 type alias AsCacheOptions p (e : ErrorRow) a = {
-  capacity : Int;
-  timeToLive : Option (Exit e a -> Request.Request p e a -> Duration.Duration);
+  capacity : Int
+  timeToLive : Option (Exit e a -> Request.Request p e a -> Duration.Duration)
 }
 
 /// A resolver running `run_all` on each batch; a failure of it fails every

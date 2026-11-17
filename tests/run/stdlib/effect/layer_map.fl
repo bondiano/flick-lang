@@ -29,8 +29,8 @@ let maps () =
     provide LayerMap.get "a" map { Platform.stdout_line ("tenant " ++ Tenant.name ()) }
     let named =
       LayerMap.from_record [("x", Layer.succeed Tenant { name = fun () -> "record x" })] {
-        idleTimeToLive = None;
-        preload = false;
+        idleTimeToLive = None
+        preload = false
       }
     provide LayerMap.get "x" named { Platform.stdout_line (Tenant.name ()) }
   }
@@ -42,8 +42,8 @@ let refs () =
   scope s {
     let ref =
       LayerRef.make (tenant builds "ref") {
-        idleTimeToLive = Some Duration.infinity;
-        preload = true;
+        idleTimeToLive = Some Duration.infinity
+        preload = true
       }
     provide LayerRef.get ref { Platform.stdout_line ("ref " ++ Tenant.name ()) }
     provide LayerRef.get ref { Platform.stdout_line ("ref again " ++ Tenant.name ()) }

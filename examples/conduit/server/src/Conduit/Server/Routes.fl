@@ -17,9 +17,9 @@ let token = HttpApi.api_key "Token" { key = "authorization"; location = HttpApi.
 let api =
   HttpApi.api "Conduit"
   |> HttpApi.info {
-    version = "1.0.0";
-    description = "The RealWorld Conduit API, served by Flick on the go target";
-    servers = [];
+    version = "1.0.0"
+    description = "The RealWorld Conduit API, served by Flick on the go target"
+    servers = []
   }
   |> HttpApi.add_group Api.Public.api
   |> HttpApi.add_group (Api.Users.api token Session Auth.check Auth.maybe)
@@ -27,25 +27,25 @@ let api =
   |> HttpApi.Mount.under "/api"
 
 let handlers = {
-  public = { register = Accounts.register; login = Accounts.login; tags = Publishing.tags };
+  public = { register = Accounts.register; login = Accounts.login; tags = Publishing.tags }
   users = {
-    current_user = Accounts.current_user;
-    update_user = Accounts.update_user;
-    get_profile = Accounts.get_profile;
-    follow = Accounts.follow;
-    unfollow = Accounts.unfollow;
-  };
+    current_user = Accounts.current_user
+    update_user = Accounts.update_user
+    get_profile = Accounts.get_profile
+    follow = Accounts.follow
+    unfollow = Accounts.unfollow
+  }
   articles = {
-    list_articles = Publishing.list_articles;
-    feed = Publishing.feed;
-    get_article = Publishing.get_article;
-    create_article = Publishing.create_article;
-    update_article = Publishing.update_article;
-    delete_article = Publishing.delete_article;
-    favorite = Publishing.favorite;
-    unfavorite = Publishing.unfavorite;
-    list_comments = Publishing.list_comments;
-    add_comment = Publishing.add_comment;
-    delete_comment = Publishing.delete_comment;
-  };
+    list_articles = Publishing.list_articles
+    feed = Publishing.feed
+    get_article = Publishing.get_article
+    create_article = Publishing.create_article
+    update_article = Publishing.update_article
+    delete_article = Publishing.delete_article
+    favorite = Publishing.favorite
+    unfavorite = Publishing.unfavorite
+    list_comments = Publishing.list_comments
+    add_comment = Publishing.add_comment
+    delete_comment = Publishing.delete_comment
+  }
 }

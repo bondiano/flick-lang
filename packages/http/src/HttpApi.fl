@@ -61,11 +61,11 @@ type Server (s : Region)
 /// Where the server listens, and where it serves its OpenAPI document,
 /// Swagger UI and Scalar, if anywhere.
 type alias ServeOptions = {
-  host : String;
-  port : Float;
-  openapi : Option String;
-  swagger : Option String;
-  scalar : Option String;
+  host : String
+  port : Float
+  openapi : Option String
+  swagger : Option String
+  scalar : Option String
 }
 
 /// The server could not start, or the document it should serve has no

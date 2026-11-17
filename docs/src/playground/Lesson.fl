@@ -21,21 +21,21 @@ let question_view model m =
       Ui.with_host
         {
           Ui.host with
-          class_name = Some (if m.lesson_choice == index then "fp-choice fp-on" else "fp-choice");
-          aria_pressed = Some (m.lesson_choice == index);
+          class_name = Some (if m.lesson_choice == index then "fp-choice fp-on" else "fp-choice")
+          aria_pressed = Some (m.lesson_choice == index)
         }
         (Ui.button
           {
-            disabled = false;
-            on_click = Ui.Event.exhaust (fun _ -> task { choose_answer model index });
+            disabled = false
+            on_click = Ui.Event.exhaust (fun _ -> task { choose_answer model index })
           }
           [Ui.text label])
     ui {
       Ui.with_host
         {
           Ui.host with
-          role = Some "group";
-          aria_label = Some (tr m.locale m.lesson_question m.lesson_question_ru);
+          role = Some "group"
+          aria_label = Some (tr m.locale m.lesson_question m.lesson_question_ru)
         }
         (div
           { class_name = "fp-lesson-question" }
@@ -58,8 +58,8 @@ let hint_button model m =
     ui {
       button
         {
-          disabled = m.lesson_hints_shown >= total;
-          on_click = Ui.Event.exhaust (fun _ -> task { reveal_lesson_hint model });
+          disabled = m.lesson_hints_shown >= total
+          on_click = Ui.Event.exhaust (fun _ -> task { reveal_lesson_hint model })
         }
         (text label)
     }
@@ -80,8 +80,8 @@ let check_button model m =
     { Ui.host with id = Some "fp-check" }
     (Ui.button
       {
-        disabled = m.lesson_checking || m.loading;
-        on_click = Ui.Event.exhaust (fun _ -> task { check_lesson model });
+        disabled = m.lesson_checking || m.loading
+        on_click = Ui.Event.exhaust (fun _ -> task { check_lesson model })
       }
       [
         Ui.text
@@ -104,8 +104,8 @@ let view model m = ui {
       (hint_button model m)
       (button
         {
-          disabled = false;
-          on_click = Ui.Event.exhaust (fun _ -> task { show_lesson_solution model });
+          disabled = false
+          on_click = Ui.Event.exhaust (fun _ -> task { show_lesson_solution model })
         }
         (text (tr m.locale "Show solution" "Показать решение")))
       (button

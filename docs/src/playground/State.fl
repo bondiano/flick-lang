@@ -37,24 +37,24 @@ type Tab = Output | Problems | Js | Dts
   deriving Eq
 
 type alias Configuration = {
-  locale : String;
-  examples : List Example;
-  lesson : Bool;
-  lesson_title : String;
-  lesson_title_ru : String;
-  lesson_task : String;
-  lesson_task_ru : String;
-  lesson_hints : List String;
-  lesson_hints_ru : List String;
-  lesson_question : String;
-  lesson_question_ru : String;
-  lesson_choices : List String;
-  lesson_choices_ru : List String;
-  lesson_answer : Int;
-  solution : String;
-  done : Bool;
+  locale : String
+  examples : List Example
+  lesson : Bool
+  lesson_title : String
+  lesson_title_ru : String
+  lesson_task : String
+  lesson_task_ru : String
+  lesson_hints : List String
+  lesson_hints_ru : List String
+  lesson_question : String
+  lesson_question_ru : String
+  lesson_choices : List String
+  lesson_choices_ru : List String
+  lesson_answer : Int
+  solution : String
+  done : Bool
   /// Whether a clean source runs by itself once typing pauses, as on a page of the tour.
-  autorun : Bool;
+  autorun : Bool
 }
 type alias SyntaxToken = { text : String; class_name : String }
 /// A change a fix makes; `start` and `end` are UTF-16 offsets of the module.
@@ -62,78 +62,78 @@ type alias Edit = { start : Int; end : Int; insert : String }
 type alias Fix = { message : String; edits : List Edit }
 /// `start` and `end` are UTF-16 offsets of the module, or -1 for a place elsewhere.
 type alias Diagnostic = {
-  code : String;
-  severity : String;
-  message : String;
-  at : String;
-  start : Int;
-  end : Int;
-  fixes : List Fix;
+  code : String
+  severity : String
+  message : String
+  at : String
+  start : Int
+  end : Int
+  fixes : List Fix
 }
 type alias Generated = { code : String; dts : String; diagnostics : List Diagnostic }
 type alias Line = { stream : String; text : String }
 type alias Execution = {
-  lines : List Line;
-  status : String;
-  detail : String;
-  diagnostics : List Diagnostic;
+  lines : List Line
+  status : String
+  detail : String
+  diagnostics : List Diagnostic
 }
 
 type alias Model = {
-  locale : Locale;
-  examples : List Example;
-  source : String;
-  revision : Float;
-  profile : Profile;
-  tab : Tab;
+  locale : Locale
+  examples : List Example
+  source : String
+  revision : Float
+  profile : Profile
+  tab : Tab
   /// What the last check of `source` says.
-  diagnostics : List Diagnostic;
+  diagnostics : List Diagnostic
   /// What the compiler wrote for `emitted_key`: the profile and the source.
-  emitted : Generated;
-  emitted_key : String;
-  execution : Execution;
-  ran_source : String;
-  ran_profile : Profile;
-  running : Bool;
-  loading : Bool;
-  checking : Bool;
-  highlighting : Bool;
-  generated_tokens : List SyntaxToken;
-  syntax_error : String;
+  emitted : Generated
+  emitted_key : String
+  execution : Execution
+  ran_source : String
+  ran_profile : Profile
+  running : Bool
+  loading : Bool
+  checking : Bool
+  highlighting : Bool
+  generated_tokens : List SyntaxToken
+  syntax_error : String
   /// Whether CodeMirror holds the source in place of the native field.
-  editor_open : Bool;
+  editor_open : Bool
   /// The diagnostic whose explanation is open, by code, place and message, and the text.
-  explained : String;
-  explanation : String;
-  explain_revision : Float;
-  version : String;
-  load_error : String;
-  compile_error : String;
-  fault : String;
-  storage_notice : String;
-  lesson : Bool;
-  lesson_title : String;
-  lesson_title_ru : String;
-  lesson_task : String;
-  lesson_task_ru : String;
-  lesson_hints : List String;
-  lesson_hints_ru : List String;
+  explained : String
+  explanation : String
+  explain_revision : Float
+  version : String
+  load_error : String
+  compile_error : String
+  fault : String
+  storage_notice : String
+  lesson : Bool
+  lesson_title : String
+  lesson_title_ru : String
+  lesson_task : String
+  lesson_task_ru : String
+  lesson_hints : List String
+  lesson_hints_ru : List String
   /// How many of the hints are shown, in order.
-  lesson_hints_shown : Int;
+  lesson_hints_shown : Int
   /// A question to answer as well: the right choice, or -1 without one.
-  lesson_question : String;
-  lesson_question_ru : String;
-  lesson_choices : List String;
-  lesson_choices_ru : List String;
-  lesson_answer : Int;
+  lesson_question : String
+  lesson_question_ru : String
+  lesson_choices : List String
+  lesson_choices_ru : List String
+  lesson_answer : Int
   /// The choice picked, or -1.
-  lesson_choice : Int;
-  lesson_solution : String;
-  lesson_result : String;
-  lesson_done : Bool;
-  lesson_checking : Bool;
+  lesson_choice : Int
+  lesson_solution : String
+  lesson_result : String
+  lesson_done : Bool
+  lesson_checking : Bool
   /// Off for code that came from a link, which runs only on Run.
-  autorun : Bool;
+  autorun : Bool
 }
 
 empty_generated : Generated
@@ -198,50 +198,50 @@ let requested_tab name =
 
 initial_model : Configuration -> Model
 let initial_model config = {
-  locale = if config.locale == "ru" then Ru else En;
-  examples = config.examples;
-  source = first_source config.examples;
-  revision = 0;
-  profile = Debug;
-  tab = Output;
-  diagnostics = [];
-  emitted = empty_generated;
-  emitted_key = "";
-  execution = empty_execution;
-  ran_source = "";
-  ran_profile = Debug;
-  running = false;
-  loading = true;
-  checking = false;
-  highlighting = false;
-  generated_tokens = [];
-  syntax_error = "";
-  editor_open = false;
-  explained = "";
-  explanation = "";
-  explain_revision = 0;
-  version = "";
-  load_error = "";
-  compile_error = "";
-  fault = "";
-  storage_notice = "";
-  lesson = config.lesson;
-  lesson_title = config.lesson_title;
-  lesson_title_ru = config.lesson_title_ru;
-  lesson_task = config.lesson_task;
-  lesson_task_ru = config.lesson_task_ru;
-  lesson_hints = config.lesson_hints;
-  lesson_hints_ru = config.lesson_hints_ru;
-  lesson_hints_shown = 0;
-  lesson_question = config.lesson_question;
-  lesson_question_ru = config.lesson_question_ru;
-  lesson_choices = config.lesson_choices;
-  lesson_choices_ru = config.lesson_choices_ru;
-  lesson_answer = config.lesson_answer;
-  lesson_choice = -1;
-  lesson_solution = config.solution;
-  lesson_result = "";
-  lesson_done = config.done;
-  lesson_checking = false;
-  autorun = config.autorun;
+  locale = if config.locale == "ru" then Ru else En
+  examples = config.examples
+  source = first_source config.examples
+  revision = 0
+  profile = Debug
+  tab = Output
+  diagnostics = []
+  emitted = empty_generated
+  emitted_key = ""
+  execution = empty_execution
+  ran_source = ""
+  ran_profile = Debug
+  running = false
+  loading = true
+  checking = false
+  highlighting = false
+  generated_tokens = []
+  syntax_error = ""
+  editor_open = false
+  explained = ""
+  explanation = ""
+  explain_revision = 0
+  version = ""
+  load_error = ""
+  compile_error = ""
+  fault = ""
+  storage_notice = ""
+  lesson = config.lesson
+  lesson_title = config.lesson_title
+  lesson_title_ru = config.lesson_title_ru
+  lesson_task = config.lesson_task
+  lesson_task_ru = config.lesson_task_ru
+  lesson_hints = config.lesson_hints
+  lesson_hints_ru = config.lesson_hints_ru
+  lesson_hints_shown = 0
+  lesson_question = config.lesson_question
+  lesson_question_ru = config.lesson_question_ru
+  lesson_choices = config.lesson_choices
+  lesson_choices_ru = config.lesson_choices_ru
+  lesson_answer = config.lesson_answer
+  lesson_choice = -1
+  lesson_solution = config.solution
+  lesson_result = ""
+  lesson_done = config.done
+  lesson_checking = false
+  autorun = config.autorun
 }

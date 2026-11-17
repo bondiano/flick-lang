@@ -118,14 +118,16 @@ impl Reader<'_> {
     }
 
     /// The pieces of `span` between the separators `sep` outside brackets,
-    /// empty ones left out.
+    /// empty ones left out. Fields of a record are separated by `;` or by a
+    /// line break, so with `;` a line starting `label :` starts a piece too.
     fn split(&self, span: Span, sep: &str) -> Vec<Span> {
         let mut out = Vec::new();
         let mut depth = 0usize;
         let mut start: Option<u32> = None;
         let mut end = span.start;
-        for t in self.tokens(span) {
-            let text = self.text(&t);
+        let tokens = self.tokens(span);
+        for (i, t) in tokens.iter().enumerate() {
+            let text = self.text(t);
             match text {
                 "(" | "{" | "[" => depth += 1,
                 ")" | "}" | "]" => depth = depth.saturating_sub(1),
@@ -134,6 +136,15 @@ impl Reader<'_> {
                         out.push(Span { start: s, end });
                     }
                     continue;
+                }
+                _ if depth == 0
+                    && sep == ";"
+                    && start.is_some()
+                    && self.starts_field(&tokens, i) =>
+                {
+                    if let Some(s) = start.take() {
+                        out.push(Span { start: s, end });
+                    }
                 }
                 _ => {}
             }
@@ -144,6 +155,20 @@ impl Reader<'_> {
             out.push(Span { start: s, end });
         }
         out
+    }
+
+    /// Whether token `i` begins a line and a field, `label :`: a type never
+    /// holds `name :` outside brackets, so a continuation line cannot.
+    fn starts_field(&self, tokens: &[Token], i: usize) -> bool {
+        let (Some(t), Some(colon)) = (tokens.get(i), tokens.get(i + 1)) else {
+            return false;
+        };
+        let before = i.checked_sub(1).map_or(0, |p| tokens[p].span.end as usize);
+        t.kind == TokenKind::Ident
+            && self.text(colon) == ":"
+            && (self.block.text)
+                .get(before..t.span.start as usize)
+                .is_some_and(|gap| gap.contains('\n'))
     }
 
     /// `label : ty`.

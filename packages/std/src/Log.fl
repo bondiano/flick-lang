@@ -37,7 +37,7 @@ let from_console layer =
       Layer.succeed Log {
         write = fun level message ->
           let text = level ++ ": " ++ message
-          if level == "warn" || level == "error" then c.stderr_line text else c.stdout_line text;
+          if level == "warn" || level == "error" then c.stderr_line text else c.stdout_line text
       }
     )
     layer

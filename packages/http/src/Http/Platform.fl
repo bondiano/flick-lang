@@ -13,19 +13,19 @@ type CompressionAlgorithm = Gzip | Deflate | Brotli | Zstd
 /// Which part of a file `file` sends: at most `bytesToRead` bytes from
 /// `offset`, read in chunks of `chunkSize`; and the response's options.
 type alias FileOptions = {
-  bytesToRead : Option ByteSize.ByteSize;
-  chunkSize : Option Int;
-  offset : Option ByteSize.ByteSize;
-  response : Http.ServerResponse.Options;
+  bytesToRead : Option ByteSize.ByteSize
+  chunkSize : Option Int
+  offset : Option ByteSize.ByteSize
+  response : Http.ServerResponse.Options
 }
 
 /// The whole file, with no options of the response.
 file_options : FileOptions
 let file_options = {
-  bytesToRead = None;
-  chunkSize = None;
-  offset = None;
-  response = Http.ServerResponse.defaults;
+  bytesToRead = None
+  chunkSize = None
+  offset = None
+  response = Http.ServerResponse.defaults
 }
 
 /// The operations of `HttpPlatform`.

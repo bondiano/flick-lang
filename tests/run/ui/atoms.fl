@@ -39,8 +39,8 @@ let counter_view =
           text ("count " ++ show n)
           button
             {
-              disabled = false;
-              on_click = increment;
+              disabled = false
+              on_click = increment
             }
             (text "+1")
       }

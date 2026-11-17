@@ -54,10 +54,10 @@ let done_command = cli "done" {
 first_note : Cli.Prompt.Prompt String
 let first_note =
   Cli.Prompt.text {
-    message = "Your first note?";
-    default = None;
+    message = "Your first note?"
+    default = None
     validate =
-      Some (fun text -> if String.trim text == "" then Err "a note needs words" else Ok text);
+      Some (fun text -> if String.trim text == "" then Err "a note needs words" else Ok text)
   }
 
 init_command : Cli.Command {Async, File.FileSystem} {AppError}

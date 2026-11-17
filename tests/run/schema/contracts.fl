@@ -17,9 +17,9 @@ type alias Session = { token : String }
   deriving Schema
 
 type alias Profile = {
-  email : Email;
-  secret : Redacted String;
-  session : Session;
+  email : Email
+  secret : Redacted String
+  session : Session
 } deriving Schema
 
 cyclic : Unit -> Unknown
@@ -39,18 +39,18 @@ foreign validate from "./inputs.mjs" "validate"
 
 profile_json : PureCodec Json Profile
 let profile_json = codec Profile.schema {
-  email = field "email" Email.json;
-  secret = field "secret" (Redacted.json_reveal String.json);
-  session = field "session" (Codec.json Session.schema);
+  email = field "email" Email.json
+  secret = field "secret" (Redacted.json_reveal String.json)
+  session = field "session" (Codec.json Session.schema)
 }
 
 scoped_session : PureCodec Json Profile
 let scoped_session = codec Profile.schema {
-  email = field "email" Email.json;
-  secret = field "secret" Redacted.json_masked;
+  email = field "email" Email.json
+  secret = field "secret" Redacted.json_masked
   session = field
     "session"
-    (Codec.json (Schema.opaque "Session" "scoped resource has no wire codec"));
+    (Codec.json (Schema.opaque "Session" "scoped resource has no wire codec"))
 }
 
 outcome : Result SchemaError a -> String

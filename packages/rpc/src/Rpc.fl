@@ -60,10 +60,10 @@ foreign pure binary from "flick:rpc/Rpc" "rpcBinary"
 /// Where the server listens, the path of its procedures and how it writes
 /// its messages.
 type alias ServeOptions = {
-  host : String;
-  port : Float;
-  path : String;
-  serialization : Serialization;
+  host : String
+  port : Float
+  path : String
+  serialization : Serialization
 }
 
 /// `127.0.0.1`, a port the system chooses, `/rpc` and `ndjson`.

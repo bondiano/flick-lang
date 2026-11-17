@@ -173,33 +173,33 @@ let main () =
   let throttled =
     Stream.throttle
       {
-        cost = fun chunk -> Int.to_float (NonEmpty.length chunk);
-        units = 100;
-        duration = ms1000;
-        burst = None;
-        strategy = None;
+        cost = fun chunk -> Int.to_float (NonEmpty.length chunk)
+        units = 100
+        duration = ms1000
+        burst = None
+        strategy = None
       }
       nums
   line ("throttle", (Stream.run_collect throttled))
   let shaped =
     Stream.throttle_effect
       {
-        cost = fun _ -> 1;
-        units = 100;
-        duration = ms1000;
-        burst = Some 1;
-        strategy = Some Stream.Shape;
+        cost = fun _ -> 1
+        units = 100
+        duration = ms1000
+        burst = Some 1
+        strategy = Some Stream.Shape
       }
       nums
   line ("throttle_effect", (Stream.run_collect shaped))
   let enforced =
     Stream.throttle
       {
-        cost = fun _ -> 1;
-        units = 100;
-        duration = ms1000;
-        burst = None;
-        strategy = Some Stream.Enforce;
+        cost = fun _ -> 1
+        units = 100
+        duration = ms1000
+        burst = None
+        strategy = Some Stream.Enforce
       }
       nums
   line ("throttle enforce", [Stream.run_count enforced])

@@ -37,12 +37,12 @@ let save =
     let jwt = Atom.current Session.token
     let change = {
       user = {
-        image = cleared (Atom.current picture);
-        username = Some (Some (Atom.current username));
-        bio = cleared (Atom.current bio);
-        email = Some (Some (Atom.current email));
-        password = if Atom.current password == "" then None else Some (Some (Atom.current password));
-      };
+        image = cleared (Atom.current picture)
+        username = Some (Some (Atom.current username))
+        bio = cleared (Atom.current bio)
+        email = Some (Some (Atom.current email))
+        password = if Atom.current password == "" then None else Some (Some (Atom.current password))
+      }
     }
     let outcome : Result Problems User =
       try Ok (Session.call (Session.at jwt () change) Api.Users.endpoints.update_user).user with

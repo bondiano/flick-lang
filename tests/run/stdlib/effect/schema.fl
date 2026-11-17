@@ -6,12 +6,12 @@ module App.Main exposing (main)
 import Codec
 
 type alias Profile = {
-  name : String;
-  nick : Option String;
-  age : Option Float;
-  tags : Option (List String);
-  retries : Float;
-  level : Float;
+  name : String
+  nick : Option String
+  age : Option Float
+  tags : Option (List String)
+  retries : Float
+  level : Float
 } deriving Schema
 
 type Shape = Circle Float | Square Float
@@ -45,12 +45,12 @@ let default_level () = 3
 
 profile_json : Codec none none Json Profile
 let profile_json = codec Profile.schema {
-  name = field "name" String.json;
-  nick = field "nick" (option_as_null String.json);
-  age = field "age" (option_as_nullish Float.json_finite);
-  tags = optional_field "tags" (Codec.list String.json);
-  retries = field "retries" Float.json_finite |> on_missing (fun () -> 1);
-  level = field_effect "level" (Codec.general Float.json_finite) |> on_missing_effect default_level;
+  name = field "name" String.json
+  nick = field "nick" (option_as_null String.json)
+  age = field "age" (option_as_nullish Float.json_finite)
+  tags = optional_field "tags" (Codec.list String.json)
+  retries = field "retries" Float.json_finite |> on_missing (fun () -> 1)
+  level = field_effect "level" (Codec.general Float.json_finite) |> on_missing_effect default_level
 }
 
 main : Unit ->{; AppError} Unit

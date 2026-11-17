@@ -1,6 +1,7 @@
 //! Types, rows, capture qualifiers and kinds (kinds share the type grammar).
 
 use super::{Ctx, Done, K, Parser, expr};
+use crate::diagnostics::{Diagnostic, Edit, codes};
 
 /// `forall a b. T`, `C => T` or an arrow type.
 pub(super) fn type_(p: &mut Parser) -> Option<Done> {
@@ -54,10 +55,38 @@ fn arrow(p: &mut Parser) -> Option<Done> {
     p.bump();
     // `->{` written without a space is the effect annotation; `-> {…}` is a type
     if p.raw().kind == K::LBrace && p.adjacent() {
-        effect_annot(p);
+        if record_ahead(p) {
+            spaceless_record(p);
+        } else {
+            effect_annot(p);
+        }
     }
     type_(p);
     Some(p.complete(m, K::ArrowType))
+}
+
+/// Whether the `{` here opens a record type, `{ f : T; … }`: a row never
+/// starts `name :`.
+fn record_ahead(p: &Parser) -> bool {
+    let at = |i: usize| p.toks[(p.pos + i).min(p.toks.len() - 1)].kind;
+    at(1) == K::Ident && at(2) == K::Colon
+}
+
+/// `a ->{ f : T }`, meant as an arrow to a record: reported with the space
+/// that makes it one, then read as that.
+fn spaceless_record(p: &mut Parser) {
+    let brace = p.raw();
+    let at = p.span(brace.start, brace.start);
+    let message = "`->{` starts an effect annotation; an arrow to a record type is written `-> {`";
+    let diagnostic = Diagnostic::error(codes::S007, message, p.span(brace.start, brace.end))
+        .with_safe_fix(|| {
+            let space = Edit {
+                span: at,
+                replacement: " ".into(),
+            };
+            ("put a space between `->` and `{`", vec![space])
+        });
+    p.report(diagnostic);
 }
 
 fn effect_annot(p: &mut Parser) {

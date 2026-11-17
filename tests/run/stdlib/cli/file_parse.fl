@@ -3,7 +3,7 @@
 module App.Main exposing (main)
 
 type alias DataOptions = {
-  data : String;
+  data : String
 }
 
 data : Cli.Command none none

@@ -54,9 +54,9 @@ let main () =
             ),
           ]
         let options : Http.Server.ServeOptions = {
-          host = "127.0.0.1";
-          port = 0;
-          gracefulShutdownTimeout = None;
+          host = "127.0.0.1"
+          port = 0
+          gracefulShutdownTimeout = None
         }
         let server = Http.Server.serve options app
         Platform.stdout_line (shown { item = "tea"; count = 2 })

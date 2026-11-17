@@ -88,9 +88,9 @@ let main () = provide (Layer.merge
           Http.Router.route (Some Http.Method.GET) "/page" page,
         ]
       let options : Http.Server.ServeOptions = {
-        host = "127.0.0.1";
-        port = 0;
-        gracefulShutdownTimeout = None;
+        host = "127.0.0.1"
+        port = 0
+        gracefulShutdownTimeout = None
       }
       let server = Http.Server.serve options app
       let base = Http.Server.format_address (Http.Server.address server)

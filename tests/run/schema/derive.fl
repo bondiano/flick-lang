@@ -6,8 +6,8 @@ type Tree a = Leaf a | Branch (List (Tree a))
   deriving Schema
 
 type alias PairOf f = {
-  count : f Float;
-  label : f String;
+  count : f Float
+  label : f String
 } deriving Schema
 
 type Expr = Num Float | Neg Expr | Block Statements

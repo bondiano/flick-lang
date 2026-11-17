@@ -187,8 +187,8 @@ let view model m =
           [("aria-pressed", if m.lying then "true" else "false")]
           (button
             {
-              disabled = not m.ready || asking;
-              on_click = Ui.Event.exhaust (fun _ -> task { press model });
+              disabled = not m.ready || asking
+              on_click = Ui.Event.exhaust (fun _ -> task { press model })
             }
             (text label)))
 

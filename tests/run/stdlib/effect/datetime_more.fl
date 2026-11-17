@@ -23,9 +23,9 @@ let at s =
 
 styled : String -> String -> String -> DateTime.FormatOptions
 let styled locale date time = {
-  locale = Some locale;
-  dateStyle = if date == "" then None else Some date;
-  timeStyle = if time == "" then None else Some time;
+  locale = Some locale
+  dateStyle = if date == "" then None else Some date
+  timeStyle = if time == "" then None else Some time
 }
 
 in_zone : DateTime.DateTime -> String -> DateTime.DateTime

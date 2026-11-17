@@ -233,3 +233,11 @@ test("word boundaries prevent spurious keyword matches on partial identifiers an
     );
   }
 });
+
+test("an effect row begins only where `{` touches `->`, as the compiler reads it", () => {
+  const begin = new RegExp(grammar.repository["effect-row"].begin);
+  assert.ok(begin.test("f : A ->{Log; E} B"));
+  assert.ok(begin.test("f : A ->{} B"));
+  assert.ok(!begin.test("f : A -> { x : Int }"));
+  assert.ok(!begin.test("let g = fun x -> { a = 1 }"));
+});

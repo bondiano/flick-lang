@@ -55,7 +55,7 @@ let test_users =
     get = fun id ->
       match find_user id with
       | Some user -> user
-      | None -> from_result (Err (NotFound id));
+      | None -> from_result (Err (NotFound id))
   }
 
 in_a_test : Unit ->{; NotFound} UserView

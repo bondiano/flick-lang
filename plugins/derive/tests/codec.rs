@@ -54,6 +54,19 @@ fn a_block_gathers_its_fields_in_the_written_order() {
     );
 }
 
+/// Fields on lines of their own need no `;`, as `flick fmt` writes them.
+#[test]
+fn a_block_reads_a_field_a_line() {
+    let lined = one(
+        "codec Profile.schema {\n  email = field \"email\" String.json\n  nickname = optional_field \"nick\" String.json\n}",
+    );
+    let separated = one(
+        "codec Profile.schema {\n  email = field \"email\" String.json;\n  nickname = optional_field \"nick\" String.json;\n}",
+    );
+    assert!(lined.is_ok(), "{lined:?}");
+    assert_eq!(lined, separated);
+}
+
 #[test]
 fn a_field_that_needs_services_makes_a_codec_of_them() {
     let code = one(

@@ -32,8 +32,8 @@ let schedule name = do {
   MaybeT.from_option (if minutes <= state.remaining - config.overhead then Some () else None)
   // Commit only after both checks; a rejected task consumes no time.
   put {
-    remaining = state.remaining - config.overhead - minutes;
-    completed = state.completed ++ [name];
+    remaining = state.remaining - config.overhead - minutes
+    completed = state.completed ++ [name]
   }
 }
 

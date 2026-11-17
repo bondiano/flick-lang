@@ -37,14 +37,14 @@ let main () =
         parsed (Cron.parse utc "0 99 * * *"),
       ])
   let fields = {
-    seconds = None;
-    minutes = [0, 30];
-    hours = [12];
-    days = [];
-    months = [];
-    weekdays = [6];
-    and = None;
-    tz = utc;
+    seconds = None
+    minutes = [0, 30]
+    hours = [12]
+    days = []
+    months = []
+    weekdays = [6]
+    and = None
+    tz = utc
   }
   Platform.stdout_line
     ("make: "

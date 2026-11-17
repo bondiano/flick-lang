@@ -4,14 +4,14 @@
 module App.Main exposing (main)
 
 type alias DeployOptions = {
-  env : List (String, String);
-  token : Option (Redacted String);
-  level : String;
-  color : String;
-  at : Option DateTime.DateTime;
-  tags : List String;
-  owner : String;
-  target : String;
+  env : List (String, String)
+  token : Option (Redacted String)
+  level : String
+  color : String
+  at : Option DateTime.DateTime
+  tags : List String
+  owner : String
+  target : String
 }
 
 run_deploy : DeployOptions ->{} Unit
@@ -66,12 +66,12 @@ let deploy =
   |> Cli.handle run_deploy
 
 type alias FilesOptions = {
-  dir : String;
-  notes : Option String;
-  data : Option String;
-  out : Option String;
-  any : List String;
-  rest : List String;
+  dir : String
+  notes : Option String
+  data : Option String
+  out : Option String
+  any : List String
+  rest : List String
 }
 
 run_files : FilesOptions ->{} Unit
@@ -181,9 +181,9 @@ let group_name g = g.group
 
 only_help : Cli.Settings
 let only_help = {
-  version = "1.2.3";
-  builtIns = [Cli.HelpFlag, Cli.VersionFlag];
-  formatter = Some custom;
+  version = "1.2.3"
+  builtIns = [Cli.HelpFlag, Cli.VersionFlag]
+  formatter = Some custom
 }
 
 with_settings : List String ->{Async} Unit
@@ -203,8 +203,8 @@ let script shell =
 
 custom : Cli.Formatter
 let custom = {
-  formatHelpDoc = show_help;
-  formatVersion = fun name version -> name ++ "@" ++ version;
+  formatHelpDoc = show_help
+  formatVersion = fun name version -> name ++ "@" ++ version
 }
 
 main : Unit ->{Async; AppError} Unit

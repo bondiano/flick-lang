@@ -82,9 +82,9 @@ let view =
           (Ui.with_host
             { Ui.host with name = Some "password"; input_type = Some Ui.PasswordInput }
             (input {
-              value = "";
-              placeholder = "Password";
-              on_input = typed;
+              value = ""
+              placeholder = "Password"
+              on_input = typed
             })))
         (classed
           "btn btn-primary"

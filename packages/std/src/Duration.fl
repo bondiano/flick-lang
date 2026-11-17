@@ -11,12 +11,12 @@ type error DurationError = DurationError String
 
 /// A finite duration split into whole units, largest first.
 type alias Parts = {
-  days : Int;
-  hours : Int;
-  minutes : Int;
-  seconds : Int;
-  millis : Int;
-  nanos : Int;
+  days : Int
+  hours : Int
+  minutes : Int
+  seconds : Int
+  millis : Int
+  nanos : Int
 }
 
 /// `n` nanoseconds; an error when negative.
@@ -123,9 +123,9 @@ foreign pure match_ from "flick:Duration" "match"
 match_pair :
   Duration ->
   {
-    onMillis : Float -> Float -> a;
-    onNanos : BigInt -> BigInt -> a;
-    onInfinity : Duration -> Duration -> a;
+    onMillis : Float -> Float -> a
+    onNanos : BigInt -> BigInt -> a
+    onInfinity : Duration -> Duration -> a
   } ->
   Duration ->
   a

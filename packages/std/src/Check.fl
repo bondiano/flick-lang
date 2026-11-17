@@ -137,13 +137,13 @@ foreign pure less_than_or_equal_to from "flick:Schema" "isLessThanOrEqualTo"
 between :
   {
     /// The lower bound.
-    minimum : Float;
+    minimum : Float
     /// The upper bound.
-    maximum : Float;
+    maximum : Float
     /// Whether the lower bound itself is excluded.
-    exclusiveMinimum : Bool;
+    exclusiveMinimum : Bool
     /// Whether the upper bound itself is excluded.
-    exclusiveMaximum : Bool;
+    exclusiveMaximum : Bool
   } ->
   Check Float
 foreign pure between from "flick:Schema" "isBetween"
@@ -188,13 +188,13 @@ foreign pure less_than_or_equal_to_bigint from "flick:Schema" "isLessThanOrEqual
 between_bigint :
   {
     /// The lower bound.
-    minimum : BigInt;
+    minimum : BigInt
     /// The upper bound.
-    maximum : BigInt;
+    maximum : BigInt
     /// Whether the lower bound itself is excluded.
-    exclusiveMinimum : Bool;
+    exclusiveMinimum : Bool
     /// Whether the upper bound itself is excluded.
-    exclusiveMaximum : Bool;
+    exclusiveMaximum : Bool
   } ->
   Check BigInt
 foreign pure between_bigint from "flick:Schema" "isBetweenBigInt"
@@ -219,13 +219,13 @@ foreign pure less_than_or_equal_to_decimal from "flick:Schema" "isLessThanOrEqua
 between_decimal :
   {
     /// The lower bound.
-    minimum : BigDecimal.BigDecimal;
+    minimum : BigDecimal.BigDecimal
     /// The upper bound.
-    maximum : BigDecimal.BigDecimal;
+    maximum : BigDecimal.BigDecimal
     /// Whether the lower bound itself is excluded.
-    exclusiveMinimum : Bool;
+    exclusiveMinimum : Bool
     /// Whether the upper bound itself is excluded.
-    exclusiveMaximum : Bool;
+    exclusiveMaximum : Bool
   } ->
   Check BigDecimal.BigDecimal
 foreign pure between_decimal from "flick:Schema" "isBetweenBigDecimal"

@@ -1,6 +1,6 @@
 ---
 title: "Пользовательские интерфейсы"
-source_hash: 3fa1344380494e27
+source_hash: e0f6610287d479a2
 ---
 
 `Ui` описывает пользовательский интерфейс и обработчики его событий
@@ -15,17 +15,17 @@ source_hash: 3fa1344380494e27
 
 ```flick
 type alias SaveButtonProps c = {
-  label : String;
-  disabled : Bool;
-  on_save : (Unit ->{Atom.Write} Unit)^c;
+  label : String
+  disabled : Bool
+  on_save : (Unit ->{Atom.Write} Unit)^c
 }
 
 save_button : SaveButtonProps c -> Ui^c
 let save_button props = ui {
   button
     {
-      disabled = props.disabled;
-      on_click = Ui.Event.exhaust (fun _ -> task { props.on_save () });
+      disabled = props.disabled
+      on_click = Ui.Event.exhaust (fun _ -> task { props.on_save () })
     }
     (text props.label)
 }

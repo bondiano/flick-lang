@@ -10,5 +10,15 @@ let finish item = if item.done then item else { item with done = true }
 first : Bool -> { id : Int; name : String }
 let first yes = if yes then { id = 1; name = "Ada" } else ({ id = 2; name = "Bo" })
 
+// every field named after a parameter: assigning one is no statement either
+named : Int -> String -> Bool -> { id : Int; name : String }
+let named id name yes = if yes then { id = id; name = name } else ({ id = 0; name = "" })
+
+// without `else` the braces hold statements: assigning a parameter is that
+reset : Int -> Bool -> Unit
+let reset id yes = if yes then { id = 0 }
+
 //~ FLICK-T074 @8:47-8:72 braces after `then` or `else` hold statements, so a record there goes in parentheses
 //~ FLICK-T074 @11:29-11:53 braces after `then` or `else` hold statements, so a record there goes in parentheses
+//~ FLICK-T074 @15:37-15:61 braces after `then` or `else` hold statements, so a record there goes in parentheses
+//~ FLICK-T069 @19:34-19:36 `id` is not `let mut`

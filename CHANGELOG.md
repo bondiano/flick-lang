@@ -6,6 +6,21 @@ break programs.
 
 ## Unreleased
 
+- **Broken records without `;`:** `flick fmt` puts one field of a broken
+  record, record type, pattern or update per line with no `;`, as a block
+  puts its statements, so a field ending in a `match` or `try` no longer
+  carries a stray `;` on its last arm. A line break right after a record's
+  `{` keeps it broken; a trailing `;` no longer does. One-line records keep
+  `{ a = 1; b = 2 }`, and `;` is still accepted everywhere. Codec blocks,
+  `HttpApi` records and `Sql.Template` parameters read fields separated by
+  line breaks. Run `flick fmt` to update a project.
+- **Braces next to an arrow:** `a ->{ x : Int }`, meant as an arrow to a
+  record, is `FLICK-S007` with a fix that adds the space, and
+  `a -> {r; e} b`, meant as an effect annotation, is `FLICK-T002` with a fix
+  that removes it, instead of an error about `:` or a kind. `then { id = id }`
+  with an `else`, whose fields name parameters, is `FLICK-T074` with its
+  parentheses fix instead of one `FLICK-T069` per field. The VS Code grammar
+  highlights an effect row only where `{` touches `->`, as the compiler reads it.
 - **Environment-specific target preflight:** with `build.environment` set,
   `flick check`, the editor and build share a reachable-only check for gated
   effects (`Db`, `Database`, `Server`). A use without a root handler for that

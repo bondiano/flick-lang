@@ -4,8 +4,8 @@
 module App.Main exposing (main)
 
 type alias Point = {
-  x : Int;
-  label : Option String;
+  x : Int
+  label : Option String
 } deriving Schema
 
 type Shape = Circle Float | Rect Float Float | Dot

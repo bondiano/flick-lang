@@ -85,10 +85,10 @@ foreign pure stream_async from "flick:http/HttpBody" "flickStream"
 /// Which part of a file `file` streams: at most `bytesToRead` bytes from
 /// `offset`, in chunks of `chunkSize`; and the content type.
 type alias FileOptions = {
-  offset : Option ByteSize.ByteSize;
-  bytesToRead : Option ByteSize.ByteSize;
-  chunkSize : Option Int;
-  contentType : Option String;
+  offset : Option ByteSize.ByteSize
+  bytesToRead : Option ByteSize.ByteSize
+  chunkSize : Option Int
+  contentType : Option String
 }
 
 /// The whole file, `application/octet-stream`.

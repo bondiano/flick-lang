@@ -30,15 +30,15 @@ foreign set_env from "../cli/env.mjs" "set"
 
 options : Tracer.SpanOptions
 let options = {
-  attributes = [];
-  links = [];
-  parent = None;
-  root = false;
-  kind_ = Tracer.internal;
-  sampled = None;
-  level = None;
-  captureStackTrace = false;
-  disablePropagation = false;
+  attributes = []
+  links = []
+  parent = None
+  root = false
+  kind_ = Tracer.internal
+  sampled = None
+  level = None
+  captureStackTrace = false
+  disablePropagation = false
 }
 
 stock : String ->{Server.Server} Float
@@ -90,9 +90,9 @@ let main () =
               Http.Router.route (Some Http.Method.GET) "/page" page,
             ]
           let server_options : Http.Server.ServeOptions = {
-            host = "127.0.0.1";
-            port = 0;
-            gracefulShutdownTimeout = None;
+            host = "127.0.0.1"
+            port = 0
+            gracefulShutdownTimeout = None
           }
           let server = Http.Server.serve server_options app
           let base = Http.Server.format_address (Http.Server.address server)

@@ -21,8 +21,8 @@ type alias Note = { text : String }
   deriving Schema
 
 type alias Notes = {
-  profile : Get "/profiles/:name" { path : Name } Name {NotFound};
-  post : Post "/notes" { payload : Note } (Created Note) {};
+  profile : Get "/profiles/:name" { path : Name } Name {NotFound}
+  post : Post "/notes" { payload : Note } (Created Note) {}
 } deriving HttpApi
 
 type alias Handler = ServerRequest ->{Async; Http.ServerError.HttpServerError} ServerResponse
@@ -40,9 +40,9 @@ let app () =
         if request.path.name == "ada" then
           request.path
         else
-          from_result (Err (NotFound request.path.name));
-      post = post_note;
-    };
+          from_result (Err (NotFound request.path.name))
+      post = post_note
+    }
   }
   Http.Router.router Http.Router.config [HttpApi.route "/api/*" api handlers]
 

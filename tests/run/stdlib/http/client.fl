@@ -48,7 +48,7 @@ let answer request url =
     else if String.contains "/item" path then
       Http.ServerResponse.text "{\"label\":\"pen\",\"size\":2}" {
         ok with
-        contentType = Some "application/json";
+        contentType = Some "application/json"
       }
     else if String.contains "/form" path then
       Http.ServerResponse.url_params (Http.UrlParams.make [("a", "1"), ("a", "2")]) ok
@@ -73,8 +73,8 @@ let requests () =
   let base =
     Http.ClientRequest.make Http.Method.POST "/a" {
       Http.ClientRequest.defaults with
-      acceptJson = true;
-      urlParams = Some [("q", "1")];
+      acceptJson = true
+      urlParams = Some [("q", "1")]
     }
   Platform.stdout_line ("make: " ++ (show base))
   let r =
@@ -235,8 +235,8 @@ let responses () =
     Codec.general
       (ignore_extra_fields
         (codec Whole.schema {
-          status = field "status" Float.json;
-          body = field "body" item_json;
+          status = field "status" Float.json
+          body = field "body" item_json
         }))
   Platform.stdout_line
     ("schema_no_body: "

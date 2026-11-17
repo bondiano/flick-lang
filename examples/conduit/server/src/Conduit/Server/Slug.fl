@@ -22,6 +22,6 @@ let slug title suffix = "\{base title}-\{suffix}"
 /// A page of a list: at most 100 items, 20 unless asked, from `offset`.
 page : Option Float -> Option Float -> { limit : Int; offset : Int }
 let page limit offset = {
-  limit = Int.truncate (Float.clamp { minimum = 1; maximum = 100 } (Option.with_default 20 limit));
-  offset = Int.truncate (Float.max 0 (Option.with_default 0 offset));
+  limit = Int.truncate (Float.clamp { minimum = 1; maximum = 100 } (Option.with_default 20 limit))
+  offset = Int.truncate (Float.max 0 (Option.with_default 0 offset))
 }

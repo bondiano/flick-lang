@@ -10,10 +10,10 @@ type alias Point a = (Int, String, a, Float)
 /// A ring of nodes `a`.
 opaque type HashRing a =
   | HashRing {
-    key : a -> String;
-    base : Float;
-    nodes : List (String, a, Float);
-    points : List (Point a);
+    key : a -> String
+    base : Float
+    nodes : List (String, a, Float)
+    points : List (Point a)
   }
 
 /// The nodes with `node` under `name`, in the place of the node of that name.
@@ -122,10 +122,10 @@ type alias Spread = { counts : List (String, Int); full : List String }
 /// What shards are spread over: the points of a ring, the weight of all its
 /// nodes, how many nodes it has, and how many shards there are.
 type alias Plan a = {
-  points : List (Point a);
-  total : Float;
-  nodes : Int;
-  count : Int;
+  points : List (Point a)
+  total : Float
+  nodes : Int
+  count : Int
 }
 
 /// How many shards the node of a key has.
@@ -242,10 +242,10 @@ let get_shards requested (HashRing self) =
   else
     let count = Int.max requested 0
     let plan = {
-      points = self.points;
-      total = total_of self.nodes;
-      nodes = List.length self.nodes;
-      count = count;
+      points = self.points
+      total = total_of self.nodes
+      nodes = List.length self.nodes
+      count = count
     }
     let closest =
       List.sort_by

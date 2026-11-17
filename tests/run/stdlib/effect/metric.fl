@@ -8,9 +8,9 @@ let none_options = { description = None; attributes = [] }
 requests : Metric.Counter
 let requests =
   Metric.counter "test_requests" {
-    description = Some "requests seen";
-    attributes = [];
-    incremental = false;
+    description = Some "requests seen"
+    attributes = []
+    incremental = false
   }
 
 ms : Float -> Duration.Duration
@@ -52,9 +52,9 @@ let main () =
   Platform.stdout_line ("gauge " ++ show gauged.value)
   let words : Metric.Frequency =
     Metric.frequency "test_words" {
-      description = None;
-      attributes = [];
-      preregisteredWords = ["zero"];
+      description = None
+      attributes = []
+      preregisteredWords = ["zero"]
     }
   words |> Metric.update "a"
   words |> Metric.update "a"
@@ -72,11 +72,11 @@ let main () =
   let h : Metric.HistogramState = Metric.value sizes
   Platform.stdout_line ("histogram " ++ show (h.buckets, h.count, h.min, h.max, h.sum))
   let options = {
-    description = None;
-    attributes = [];
-    maxAge = ms 60000;
-    maxSize = 10;
-    quantiles = [0.5];
+    description = None
+    attributes = []
+    maxAge = ms 60000
+    maxSize = 10
+    quantiles = [0.5]
   }
   let latency : Metric.Summary Float = Metric.summary "test_latency" options
   List.each_effect (fun n -> latency |> Metric.update n) [1, 2, 3]

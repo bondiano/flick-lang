@@ -11,12 +11,12 @@ type Part = Bolt Float | Panel Float Float
   deriving Schema
 
 type alias Item = {
-  id : String;
-  label : String;
-  price : Float;
-  tags : List String;
-  parts : List Part;
-  note : Option String;
+  id : String
+  label : String
+  price : Float
+  tags : List String
+  parts : List Part
+  note : Option String
 } deriving Schema
 
 item : Codec none none Json Item

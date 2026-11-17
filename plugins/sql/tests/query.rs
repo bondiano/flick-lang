@@ -37,6 +37,21 @@ fn a_query_is_its_text_and_the_function_of_its_types() {
     insta::assert_snapshot!(code);
 }
 
+/// The parameters of a signature broken a field a line, as `flick fmt`
+/// writes it, are the ones it declares on one line with `;`.
+#[test]
+fn parameters_on_lines_of_their_own_are_declared() {
+    let query = "let q =\n  sql params {\n    from user in Users\n    where user.id == params.user_id && user.name == params.name\n    select { name = user.name }\n  }";
+    let separated = last(&format!(
+        "q : Sql.Template Pg {{ user_id : BigInt; name : String }} {{ name : String }}\n{query}"
+    ));
+    let lined = last(&format!(
+        "q : Sql.Template Pg {{\n  user_id : BigInt\n  name : String\n}} {{ name : String }}\n{query}"
+    ));
+    assert!(separated.is_ok(), "{separated:?}");
+    assert_eq!(lined, separated);
+}
+
 #[test]
 fn a_query_that_breaks_a_rule_of_sql_is_refused_where_it_does() {
     for (query, expected) in [

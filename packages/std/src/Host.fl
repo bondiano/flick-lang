@@ -61,17 +61,17 @@ foreign raw_args from "flick:rt" "platformArgs"
 console : Layer none none {Console}
 let console =
   Layer.succeed Console {
-    stdout_line = raw_stdout_line;
-    stderr_line = raw_stderr_line;
-    stdout_write = raw_stdout_write;
+    stdout_line = raw_stdout_line
+    stderr_line = raw_stderr_line
+    stdout_write = raw_stdout_write
   }
 
 clock : Layer none none {Clock}
 let clock =
   Layer.succeed Clock {
-    current_time_millis = raw_current_time_millis;
-    current_time_nanos = raw_current_time_nanos;
-    monotonic_time_nanos = raw_monotonic_time_nanos;
+    current_time_millis = raw_current_time_millis
+    current_time_nanos = raw_current_time_nanos
+    monotonic_time_nanos = raw_monotonic_time_nanos
   }
 
 random : Layer none none {Random}

@@ -32,9 +32,9 @@ type Address = TcpAddress String Float | UnixAddress String
 /// Where `serve` listens: a host and a port (0: one the system picks), and
 /// how long closing waits for running requests.
 type alias ServeOptions = {
-  host : String;
-  port : Float;
-  gracefulShutdownTimeout : Option Duration.Duration;
+  host : String
+  port : Float
+  gracefulShutdownTimeout : Option Duration.Duration
 }
 
 /// Serves the handler until the scope of region `s` closes.

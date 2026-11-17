@@ -25,11 +25,11 @@ fn breaks_a_long_body_after_its_equals() {
     let summary =
       describe_user_profile first_argument second_argument third_argument fourth_argument fifth
     let config = {
-      host = "localhost";
-      port = 8080;
-      timeout_seconds = 30;
-      retries = 5;
-      verbose_logging = true;
+      host = "localhost"
+      port = 8080
+      timeout_seconds = 30
+      retries = 5
+      verbose_logging = true
     }
     let t = task { Users.get id }
     let run id = provide (Layer.merge UsersLive LogLive) {
@@ -170,7 +170,8 @@ fn keeps_a_last_branch_on_its_line_before_a_comma() {
     "#);
 }
 
-/// A trailing separator or a blank line keeps a bracket broken; constants written several per line fill lines.
+/// A trailing `,` or a blank line keeps a bracket broken; constants written several per line fill lines.
+/// A trailing `;` is no choice: a record breaks by its width or a line break after its `{`.
 #[test]
 fn follows_trailing_separators_and_blank_lines() {
     let src = "let xs = [1,\n  2]\nlet ys = [1, 2,]\nlet filled = [\n  \"one\", \"two\", \"three\", \"four\", \"five\", \"six\", \"seven\", \"eight\", \"nine\", \"ten\", \"eleven\",\n  \"twelve\", \"thirteen\",\n]\nlet spaced = [\n  1,\n\n  2,\n]\nlet r = { a = 1; b = 2; }\nlet u = { base with a = 1; b = 2 }\nlet long = { base_record_with_a_long_name with first_field = 1; second_field = \"two\"; third = 3 }\nlet one = (1,)\nlet [ x ,  ...  rest ] = xs\n";
@@ -186,14 +187,86 @@ fn follows_trailing_separators_and_blank_lines() {
 
       2,
     ]
-    let r = {
-      a = 1;
-      b = 2;
-    }
+    let r = { a = 1; b = 2 }
     let u = { base with a = 1; b = 2 }
     let long = { base_record_with_a_long_name with first_field = 1; second_field = "two"; third = 3 }
     let one = (1,)
     let [x, ...rest] = xs
+    "#);
+}
+
+/// A broken record puts one field per line with no `;`: a line break ends a
+/// field whatever its value ends with, as it ends a statement.
+#[test]
+fn breaks_records_by_lines() {
+    let src = "let users_live =\n  Layer.succeed Users {\n    get = fun id ->\n      match find_name id with\n      | Some name -> { id = id; name = name }\n      | None -> Fail.fail (NotFound id);\n    count = fun () -> total;\n  }\nlet steps = {\n  names = users\n    |> List.map name\n    |> List.filter long;\n  run = task {\n    load ()\n    save ()\n  };\n  sum = 1 + 2 }\nlet nested = [\n  { base with\n    a = try load () with | NotFound _ -> 0;\n    b = { c = 1; d = 2 };\n  },\n]\ntype alias Open r = {\n  a : Int;\n  b : String\n  | r\n}\nlet f r =\n  let {\n    a;\n    b = p\n  } = r\n  a + p\nlet commented = {\n  a = 1; // one\n  b = 2\n}\nlet kept = {\n  a = 1; b = 2 }\nlet joined = { a = 1\n               b = 2 }\n";
+    insta::assert_snapshot!(fmt(src), @r#"
+    let users_live =
+      Layer.succeed Users {
+        get = fun id ->
+          match find_name id with
+          | Some name -> { id = id; name = name }
+          | None -> Fail.fail (NotFound id)
+        count = fun () -> total
+      }
+    let steps = {
+      names =
+        users
+        |> List.map name
+        |> List.filter long
+      run = task {
+        load ()
+        save ()
+      }
+      sum = 1 + 2
+    }
+    let nested = [
+      {
+        base with
+        a =
+          try load () with
+          | NotFound _ -> 0
+        b = { c = 1; d = 2 }
+      },
+    ]
+    type alias Open r = {
+      a : Int
+      b : String
+      | r
+    }
+    let f r =
+      let {
+        a
+        b = p
+      } =
+        r
+      a + p
+    let commented = {
+      a = 1 // one
+      b = 2
+    }
+    let kept = {
+      a = 1
+      b = 2
+    }
+    let joined = { a = 1; b = 2 }
+    "#);
+}
+
+/// A record in the code of a plugin block drops its `;` as any other: the
+/// block's tokens mean the same with a line break there.
+#[test]
+fn breaks_a_record_in_a_plugin_block_by_lines() {
+    let src = "component counter () = ui {\n  button\n    {\n      disabled = false;\n      on_click = Ui.Event.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) });\n    }\n    (text \"+1\")\n}\n";
+    insta::assert_snapshot!(fmt(src), @r#"
+    component counter () = ui {
+      button
+        {
+          disabled = false
+          on_click = Ui.Event.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
+        }
+        (text "+1")
+    }
     "#);
 }
 
@@ -244,7 +317,7 @@ fn keeps_block_comments_inline() {
     let t = x /* a */ // b
     let after = [1, /* s */ 2]
     let last = {
-      a = 1; /* e */
+      a = 1 /* e */
     }
     v : List /* v */ A
     w : { a : Int /* w */ }

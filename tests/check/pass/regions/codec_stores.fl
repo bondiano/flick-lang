@@ -15,7 +15,7 @@ let inside path u = scope {
       |> on_missing_effect (fun () ->
         try Int.to_float (String.length (File.read_all file)) with
         | ReadError _ -> -1
-      );
+      )
   }
   (Codec.decode row u).size
 }

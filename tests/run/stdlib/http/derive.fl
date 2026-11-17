@@ -32,7 +32,7 @@ type alias Credentials = { authorization : Option String }
 /// A request without the header is anonymous.
 credentials : PureCodec Json Credentials
 let credentials = codec Credentials.schema {
-  authorization = optional_field "authorization" String.json;
+  authorization = optional_field "authorization" String.json
 }
 
 type alias Name = { name : String }
@@ -42,16 +42,16 @@ type alias Note = { text : String }
   deriving Schema
 
 type alias Users = {
-  me : Authed (Get "/me" { headers : Credentials } String {Unauthorized});
-  greet : MaybeAuthed (Get "/greet" { headers : Credentials } String {Unauthorized});
+  me : Authed (Get "/me" { headers : Credentials } String {Unauthorized})
+  greet : MaybeAuthed (Get "/greet" { headers : Credentials } String {Unauthorized})
   post : Authed
-    (Post "/notes" { headers : Credentials; payload : Note } (Created Note) {Unauthorized});
+    (Post "/notes" { headers : Credentials; payload : Note } (Created Note) {Unauthorized})
 } deriving HttpApi
 
 /// A group of its own: a group with guarded endpoints guards each.
 type alias Public = {
-  profile : Get "/profiles/:name" { path : Name } Name {NotFound};
-  forget : Delete "/notes" {} Unit {};
+  profile : Get "/profiles/:name" { path : Name } Name {NotFound}
+  forget : Delete "/notes" {} Unit {}
 } deriving HttpApi
 
 session : Option String -> Session.Impl
@@ -78,10 +78,10 @@ let user () = Option.with_default "stranger" (Session.user ())
 /// The request of an endpoint with only `headers`.
 asking : Option String -> HttpApi.Request Unit Unit Credentials Unit
 let asking authorization = {
-  path = ();
-  query = ();
-  headers = { authorization = authorization };
-  payload = ();
+  path = ()
+  query = ()
+  headers = { authorization = authorization }
+  payload = ()
 }
 
 /// What a call of a guarded endpoint answers.
@@ -105,10 +105,10 @@ let profile base name =
 post : String ->{Async} String
 let post base =
   let note = {
-    path = ();
-    query = ();
-    headers = { authorization = Some "Token ada" };
-    payload = { text = "hi" };
+    path = ()
+    query = ()
+    headers = { authorization = Some "Token ada" }
+    payload = { text = "hi" }
   }
   try (HttpApi.call base Users.endpoints.post note).text with
   | Unauthorized why -> "401 " ++ why
@@ -125,11 +125,11 @@ let forget base =
 main : Unit ->{Async; AppError} Unit
 let main () =
   let options : HttpApi.ServeOptions = {
-    host = "127.0.0.1";
-    port = 0;
-    openapi = None;
-    swagger = None;
-    scalar = None;
+    host = "127.0.0.1"
+    port = 0
+    openapi = None
+    swagger = None
+    scalar = None
   }
   let api =
     HttpApi.api "Users"
@@ -137,18 +137,18 @@ let main () =
     |> HttpApi.add_group Public.api
   let handlers = {
     users = {
-      me = fun _ -> user ();
-      greet = fun _ -> "hello " ++ user ();
-      post = fun request -> { text = user () ++ ": " ++ request.payload.text };
-    };
+      me = fun _ -> user ()
+      greet = fun _ -> "hello " ++ user ()
+      post = fun request -> { text = user () ++ ": " ++ request.payload.text }
+    }
     public = {
       profile = fun request ->
         if request.path.name == "ada" then
           request.path
         else
-          from_result (Err (NotFound request.path.name));
-      forget = fun _ -> Platform.stdout_line "forgetting";
-    };
+          from_result (Err (NotFound request.path.name))
+      forget = fun _ -> Platform.stdout_line "forgetting"
+    }
   }
   try
     scope s {

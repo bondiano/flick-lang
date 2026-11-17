@@ -134,8 +134,8 @@ let main () =
         scope {
           let dir =
             FileSystem.make_temp_directory_scoped {
-              directory = None;
-              prefix = Some "flick-stream-";
+              directory = None
+              prefix = Some "flick-stream-"
             }
           files dir
           FileSystem.write_file_string plain (dir ++ "/h.txt") "handle"

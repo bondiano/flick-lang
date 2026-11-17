@@ -42,8 +42,8 @@ describe : DateTime.DateTime -> String
 let describe t =
   DateTime.match_
     {
-      onUtc = fun u -> "utc " ++ DateTime.format_iso u;
-      onZoned = fun z -> "zoned " ++ DateTime.format_iso_offset z;
+      onUtc = fun u -> "utc " ++ DateTime.format_iso u
+      onZoned = fun z -> "zoned " ++ DateTime.format_iso_offset z
     }
     t
 
@@ -72,10 +72,10 @@ let main () =
       ++ iso
         (DateTime.from_parts {
           DateTime.no_parts with
-          year = Some 2024;
-          month = Some 2;
-          day = Some 29;
-          hour = Some 12;
+          year = Some 2024
+          month = Some 2
+          day = Some 29
+          hour = Some 12
         }))
   Platform.stdout_line
     ("zoned string: "

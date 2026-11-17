@@ -18,8 +18,8 @@ let plan_command = cli "plan" {
   arg tasks : List String
   handle fun { budget; overhead; tasks } ->
     let config = {
-      budget = Minutes.value budget;
-      overhead = Option.with_default Plan.default_config.overhead (map Minutes.value overhead);
+      budget = Minutes.value budget
+      overhead = Option.with_default Plan.default_config.overhead (map Minutes.value overhead)
     }
     let (result, state) = Plan.plan config tasks
     Platform.stdout_line "Budget: \{config.budget} min; overhead: \{config.overhead} min/task"

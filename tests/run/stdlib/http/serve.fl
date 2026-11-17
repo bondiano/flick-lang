@@ -39,7 +39,7 @@ let create request =
   let created = Http.ServerRequest.schema_body_json item request
   Http.ServerResponse.schema_json item { created with size = created.size + 1 } {
     ok with
-    status = Some 201;
+    status = Some 201
   }
 
 boom : ServerRequest ->{; Boom} ServerResponse

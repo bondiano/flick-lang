@@ -2,10 +2,10 @@
 module Examples exposing (Example)
 
 type alias Example = {
-  id : String;
-  group : String;
-  group_ru : String;
-  name : String;
-  name_ru : String;
-  source : String;
+  id : String
+  group : String
+  group_ru : String
+  name : String
+  name_ru : String
+  source : String
 }

@@ -39,9 +39,9 @@ let main () =
     say ("now " ++ Resource.use res (fun v -> v))
     let cache : ScopedCache.ScopedCache s String none String =
       ScopedCache.make {
-        lookup = fun (key : String) -> acquire ("entry " ++ key);
-        capacity = 4;
-        timeToLive = None;
+        lookup = fun (key : String) -> acquire ("entry " ++ key)
+        capacity = 4
+        timeToLive = None
       }
     ScopedCache.use "a" cache (fun v ->
       ScopedCache.invalidate "a" cache

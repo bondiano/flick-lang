@@ -215,10 +215,10 @@ foreign pure from_writable_stream from "flick:Channel" "fromWritableStream"
 /// comes out.
 from_transform_stream :
   {
-    evaluate : Unit -> TransformStream a b;
-    onError : JsValue -> Errors e;
-    closeOnDone : Bool;
-    releaseLockOnEnd : Bool;
+    evaluate : Unit -> TransformStream a b
+    onError : JsValue -> Errors e
+    closeOnDone : Bool
+    releaseLockOnEnd : Bool
   } ->
   Channel {Async} (e + ie) (NonEmpty.NonEmpty a) (NonEmpty.NonEmpty b) Unit ie id
 foreign pure from_transform_stream from "flick:Channel" "fromTransformStream"
