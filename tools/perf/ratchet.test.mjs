@@ -65,3 +65,20 @@ test("the WASM compiler budget is ratcheted and cannot disappear", () => {
   assert.equal(errors(size(4850000), size(5303140)).length, 1);
   assert.deepEqual(errors(size(4850000), size(5303140, "Meta/Phase M checker growth")), []);
 });
+
+test("a runner's own budget is held to its metric's budget in the base", () => {
+  const runners = (own) => ({ x: { better: "higher", unit: "req/s", budget: 5200, tolerance: 0.25, runners: own } });
+  const flat = (perf) =>
+    Object.fromEntries(
+      Object.entries(perf).flatMap(([metric, { runners: own = {}, ...b }]) => [
+        [metric, b],
+        ...Object.entries(own).map(([cpu, r]) => [`${metric} on ${cpu}`, { ...b, reason: undefined, ...r }]),
+      ]),
+    );
+  const base = flat(runners({}));
+  assert.deepEqual(errors(base, flat(runners({ Slow: { budget: 3300 } }))), [
+    "x on Slow has a looser budget without a new `reason` beside it",
+  ]);
+  assert.deepEqual(errors(base, flat(runners({ Slow: { budget: 3300, reason: "a slower CPU" } }))), []);
+  assert.deepEqual(errors(base, flat(runners({ Fast: { budget: 6000 } }))), []);
+});

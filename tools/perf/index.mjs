@@ -6,7 +6,10 @@
 // when a metric is past its budget in budgets.json; a budget of null is
 // only reported. A metric that beats its budget by a factor of more than
 // 1 + 2 × tolerance prints a note that the budget can be tightened;
-// loosening one takes a `reason` beside it (ratchet.mjs).
+// loosening one takes a `reason` beside it (ratchet.mjs). A budget may name
+// `runners`, CPU models (as a prefix of `os.cpus()[0].model`) whose own
+// budget replaces it: a hosted runner of another model measures the same
+// code faster or slower, and by a different factor for each metric.
 //
 //   node tools/perf/index.mjs <flick binary>
 import { execFileSync, spawnSync } from "node:child_process";
@@ -60,6 +63,12 @@ export const slack = (metric, value, { budget, tolerance }) => {
   const { unit, better } = METRICS[metric];
   const far = better === "lower" ? value * (1 + 2 * tolerance) < budget : value > budget * (1 + 2 * tolerance);
   return far ? `${metric} is ${value} ${unit}, well within its budget of ${budget} ${unit}: it can be ${better === "lower" ? "lowered" : "raised"}` : null;
+};
+
+/** The budget of `entry` on a runner whose CPU model is `cpu`, and that runner's model when it has its own. */
+export const budgetOn = (entry, cpu = "") => {
+  const [model, own] = Object.entries(entry.runners ?? {}).find(([model]) => cpu.startsWith(model)) ?? [];
+  return own === undefined ? entry : { ...entry, budget: own.budget, runner: model };
 };
 
 const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
@@ -215,7 +224,7 @@ const main = async () => {
     errors.push(error.message);
   } finally {
     const budgets = JSON.parse(readFileSync(path.join(root, "tools/perf/budgets.json"), "utf8"));
-    const result = report(values, budgets, errors);
+    const result = report(values, budgets, errors, cpus()[0]?.model);
     mkdirSync(path.join(root, "target"), { recursive: true });
     writeFileSync(path.join(root, "target/perf.json"), `${JSON.stringify(result.rows, null, 2)}\n`);
     writeFileSync(path.join(root, "target/perf-errors.json"), `${JSON.stringify(result.errors, null, 2)}\n`);
@@ -228,15 +237,17 @@ const main = async () => {
 };
 
 /** Reports completed metrics even when a later stage failed. Missing metrics fail the run. */
-export const report = (values, budgets, failures = []) => {
+export const report = (values, budgets, failures = [], cpu = "") => {
   const rows = [];
   const errors = [...failures];
   const notes = [];
   const table = ["| metric | value | unit | budget |", "|---|---:|---|---:|"];
   for (const [metric, { unit }] of Object.entries(METRICS)) {
     const value = values[metric];
-    const budget = budgets[metric];
+    const budget = budgets[metric] && budgetOn(budgets[metric], cpu);
     if (budget === undefined) errors.push(`${metric} has no entry in tools/perf/budgets.json`);
+    // a runner's entry without a budget would silently measure nothing against
+    if (budget?.runner && budget.budget === undefined) errors.push(`${metric} on ${budget.runner} has no budget in tools/perf/budgets.json`);
     if (!Number.isFinite(value)) {
       errors.push(`${metric} was not measured`);
       table.push(`| ${metric} | — | ${unit} | ${budget?.budget ?? "—"} (not measured) |`);
@@ -244,10 +255,11 @@ export const report = (values, budgets, failures = []) => {
     }
     rows.push({ metric, value, unit });
     const failed = budget && failure(metric, value, budget);
-    if (failed) errors.push(failed);
+    if (failed) errors.push(budget.runner ? `${failed} on ${budget.runner}` : failed);
     const note = budget && slack(metric, value, budget);
     if (note) notes.push(note);
-    table.push(`| ${metric} | ${value} | ${unit} | ${budget?.budget ?? "—"}${failed ? " (failed)" : ""} |`);
+    const on = budget?.runner ? ` on ${budget.runner}` : "";
+    table.push(`| ${metric} | ${value} | ${unit} | ${budget?.budget ?? "—"}${on}${failed ? " (failed)" : ""} |`);
   }
   return { rows, errors, notes, table: table.join("\n") };
 };
