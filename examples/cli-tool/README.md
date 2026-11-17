@@ -56,6 +56,6 @@ command line interactively.
 ## Tests
 
 The tests run the wizard on a fake terminal, a `Cli.Prompt.Tty` that
-types a script of keys. `flick/tests/examples.rs` builds and runs both
+types a script of keys. `flick/tests/cli/examples.rs` builds and runs both
 JavaScript and Go, checks argument failures leave the notes unchanged, and
 executes the generated Bash completion script.

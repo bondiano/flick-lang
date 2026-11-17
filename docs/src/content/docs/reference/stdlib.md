@@ -12,7 +12,7 @@ a program shadows a built-in module of the same name for its operations:
 with `service Log` declared, `Log.write` is the operation.
 
 Signatures the specification gives are declared word for word;
-`flick-core/tests/stdlib_signatures.rs` checks it.
+`flick-core/tests/compiler/stdlib_signatures.rs` checks it.
 
 [Generated package API](../../api/) lists the public signatures, doc comments and source links from `flick doc --std`.
 
