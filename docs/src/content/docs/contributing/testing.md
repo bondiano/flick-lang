@@ -207,5 +207,5 @@ Where to look for the tests of a behavior, and where a new one goes:
 | UI | `tests/check/{pass,fail}/ui/`, `tests/run/ui/`, `packages/effect-ts/test/ui-*.test.ts` |
 | the `cli` block | `tests/check/{pass,fail}/cli/`, `tests/run/stdlib/cli/`, `flick-core/src/project/load/plugins_tests.rs` (the calls it stands for), `flick/tests/cli/lsp_editor/cli.rs` |
 | hover, the language server and the TypeScript projection | `flick-core/src/ide/tests.rs`, `flick/tests/cli/{lsp_command.rs,lsp_editor/}`, `flick-core/tests/compiler/projection.rs`, `flick-core/src/codegen/ts/tests.rs` |
-| the CLI: no code run by `check`/`build`, run generations, `dev`, cache, pnpm, exit codes, NDJSON | `flick/tests/{cli_project,cli_run,check_command}.rs` |
+| the CLI: no code run by `check`/`build`, run generations, `dev`, cache, pnpm, exit codes, NDJSON | `flick/tests/cli/{cli_project,cli_run,check_command}.rs` |
 | `.d.ts` façades and `pack` | `flick/tests/cli/dts_command.rs`, `flick/tests/cli/cli_run.rs` |

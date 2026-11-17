@@ -1,6 +1,6 @@
 ---
 title: "Тестирование"
-source_hash: 70ea50c81cd00853
+source_hash: 4115b31282c7f207
 ---
 
 Установите инструмент проверки зависимостей, используемый локально и в CI:
@@ -222,5 +222,5 @@ CPU, версию Node и методику рядом с результатам�
 | UI | `tests/check/{pass,fail}/ui/`, `tests/run/ui/`, `packages/effect-ts/test/ui-*.test.ts` |
 | блок `cli` | `tests/check/{pass,fail}/cli/`, `tests/run/stdlib/cli/`, `flick-core/src/project/load/plugins_tests.rs` (вызовы, которые он означает), `flick/tests/cli/lsp_editor/cli.rs` |
 | подсказки, языковой сервер и проекция TypeScript | `flick-core/src/ide/tests.rs`, `flick/tests/cli/{lsp_command.rs,lsp_editor/}`, `flick-core/tests/compiler/projection.rs`, `flick-core/src/codegen/ts/tests.rs` |
-| CLI: `check`/`build` не запускают код, поколения запуска, `dev`, кеш, pnpm, коды выхода, NDJSON | `flick/tests/{cli_project,cli_run,check_command}.rs` |
+| CLI: `check`/`build` не запускают код, поколения запуска, `dev`, кеш, pnpm, коды выхода, NDJSON | `flick/tests/cli/{cli_project,cli_run,check_command}.rs` |
 | фасады `.d.ts` и `pack` | `flick/tests/cli/dts_command.rs`, `flick/tests/cli/cli_run.rs` |
