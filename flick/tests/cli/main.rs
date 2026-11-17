@@ -14,6 +14,7 @@ pub mod build_inputs;
 pub mod build_runner;
 pub mod build_ui;
 pub mod builtins_cache;
+pub mod builtins_timings;
 pub mod check_command;
 pub mod cli_devtools;
 pub mod cli_entries;

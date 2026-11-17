@@ -107,7 +107,7 @@ impl Env<'_> {
             .interfaces
             .values()
             .filter_map(Option::as_ref)
-            .chain(self.builtins.interfaces.values())
+            .chain(self.builtins.interfaces.values().map(AsRef::as_ref))
             .collect();
         let mut interface = false;
         while let Some(current) = pending.pop() {
