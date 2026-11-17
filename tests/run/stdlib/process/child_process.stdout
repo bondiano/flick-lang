@@ -10,4 +10,5 @@ inherit_output: 0
 spawn: (true, ["out"], ["err"], 0)
 kill: (true, false, false)
 missing: NotFound
+fake: bad argument spawn
 done

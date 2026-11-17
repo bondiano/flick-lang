@@ -87,6 +87,16 @@ let run windows dir =
     try show (ChildProcess.exit_code (ChildProcess.make "flick-no-such-program" [])) with
     | e -> reason e
   line "missing" missing
+  // commands start through `Host.Process`: a fake one refuses each of them
+  let refusal = { module_ = "Fake"; method = "spawn"; description = None }
+  let refusing =
+    Layer.succeed Host.Process {
+      spawn = fun _ -> Fail.fail (PlatformError.PlatformError (PlatformError.Bad refusal))
+    }
+  let faked =
+    try provide refusing { show (ChildProcess.exit_code (shell windows "exit 0")) } with
+    | e -> reason e
+  line "fake" faked
 
 main : Unit ->{Host.Process, Host.Environment, Host.Console, Async; AppError} Unit
 let main () =

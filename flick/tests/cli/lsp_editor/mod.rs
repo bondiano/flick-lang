@@ -290,7 +290,7 @@ let main () =
         "{diagnostics:?}"
     );
     for (needle, expected) in [
-        ("report (Ui", "report : Failure e ->{} Unit"),
+        ("report (Ui", "report : Failure e ->{Host.Console} Unit"),
         (
             "view model (Atom",
             "view : Atom.Writable Float -> Float -> Ui",

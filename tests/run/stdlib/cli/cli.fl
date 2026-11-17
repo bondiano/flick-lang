@@ -67,3 +67,13 @@ let main () =
   attempt tool ["--help"]
   attempt greet ["--version"]
   attempt greet ["--completions", "fish"]
+  // the built-in flags print through `Host.Console`: a fake one keeps their lines
+  let kept = Ref.make []
+  let keeping =
+    Layer.succeed Host.Console {
+      stdout_line = fun text -> Ref.update kept (fun lines -> lines ++ [text])
+      stderr_line = fun text -> Ref.update kept (fun lines -> lines ++ [text])
+      stdout_write = fun text -> Ref.update kept (fun lines -> lines ++ [text])
+    }
+  provide keeping { attempt greet ["--version"] }
+  Platform.stdout_line ("kept: " ++ show (Ref.get kept))

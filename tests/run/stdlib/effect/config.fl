@@ -190,6 +190,20 @@ let main () =
     try provide (ConfigProvider.layer env) { Config.get (Config.string "MODE") } with
     | Config.ConfigError m -> m
   Platform.stdout_line ("layer " ++ provided)
+  // without a provider, `get` reads the variables through `Host.Environment`
+  let host_env =
+    Layer.succeed Host.Environment {
+      env = fun name -> if name == "MODE" then Some "from the host" else None
+    }
+  let from_host =
+    try
+      provide host_env { Config.get (Config.all [Config.string "MODE", Config.string "HOST"]) }
+    with
+    | Config.ConfigError m -> ["missing " ++ show (String.contains "HOST" m)]
+  let read_mode =
+    try provide host_env { Config.get (Config.with_default "unset" (Config.string "MODE")) } with
+    | Config.ConfigError m -> m
+  Platform.stdout_line ("host " ++ show from_host ++ " " ++ read_mode)
   let added =
     try
       provide (ConfigProvider.layer env) {
