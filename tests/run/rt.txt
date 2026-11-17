@@ -91,6 +91,7 @@ codegen/service_place
 codegen/services
 effect/service_params
 effect/effect_params
+effect/host_root
 codegen/stage_order
 codegen/strings_utf16
 codegen/tags

@@ -21,7 +21,7 @@ mod primitives;
 mod program;
 pub use program::{
     Executed, ExecutionReport, ProgramOutcome, execute_main_program, execute_main_program_outcome,
-    execute_program, execute_program_outcome,
+    execute_program, execute_program_outcome, execute_rooted_main_program_outcome,
 };
 
 /// An allocation's identity includes its heap. Slots are never recycled, so

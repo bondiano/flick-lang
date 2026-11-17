@@ -1,6 +1,7 @@
 /// Explicit dependencies on the process and its environment. Provide only the
 /// live layers an application needs at its entry boundary, or substitute records
-/// in tests. No service here has an implicit default.
+/// in tests. No service here has an implicit default inside a program: only the
+/// runner of an entry provides the live ones, to `main`, as its root.
 module Host exposing (..)
 
 import Layer

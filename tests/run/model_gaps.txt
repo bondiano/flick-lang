@@ -13,7 +13,6 @@ bootstrap/debug # no native for `echoed` (flick:rt flickEcho)
 bootstrap/inline_pack # the model's (Field) rejects `App.Main.main`
 bootstrap/inline_pack_nominals # the model's (Field) rejects `App.Main.main`
 bootstrap/packed_module # the model's (Field) rejects `App.Main.main`
-bootstrap/stderr # no native for `stderr_line` (flick:rt stderrLine)
 codegen/abi # no native for `js_type` (./abi.mjs kind)
 codegen/apply_order # no native for `unsafe_div` (flick:rt intUnsafeDiv)
 codegen/composition_method # no native for `unsafe_div` (flick:rt intUnsafeDiv)
@@ -39,7 +38,7 @@ codegen/service_child # no native for `parallel` (flick:rt parallel)
 codegen/strings_utf16 # no native for `length` (flick:String length)
 codegen/tags # no native for `tag_of` (./tags.mjs tagOf)
 codegen/unpack_dictionary # the model's (Field) rejects `App.Main.main`
-effect/host_services # no native for `raw_env` (flick:rt platformEnv)
+effect/host_services # no native for `with_seed` (flick:Random withSeed)
 ffi/catch_order # no native for `fail` (./bindings.mjs fail)
 ffi/copy # no native for `callback_arg` (./bindings.mjs copyDeepCallbackArg)
 ffi/defect # no native for `fail_sync` (./bindings.mjs fail)
@@ -66,13 +65,13 @@ runtime/interrupt_skips # no native for `make` (flick:Deferred make)
 runtime/leases # no native for `from_acquire` (flick:ScopedRef flickFromAcquire)
 runtime/owners # no native for `open_res` (./resources.mjs open)
 runtime/parallel # the model's (≡) rejects `App.Main.main`
-runtime/paths # no native for `env` (flick:rt platformEnv)
+runtime/paths # no native for `node_write_file` (flick:rt fileWrite)
 runtime/ref_linearizable # the model's (Structural) rejects `App.Main.transfers`
 runtime/releases # no native for `open_raw` (./resources.mjs open)
 runtime/scope_close # no native for `add_finalizer_exit` (flick:Scope flickAddFinalizerExit)
 runtime/scope_owners # the model's (≡) rejects `App.Main.main`
 runtime/scope_releases # no native for `timeout` (flick:rt timeout)
-runtime/scoped_file # no native for `env` (flick:rt platformEnv)
+runtime/scoped_file # no native for `node_write_file` (flick:rt fileWrite)
 runtime/scopes # no native for `held_write` (./calls.mjs heldWrite)
 runtime/settling_calls # no native for `settle_later` (./calls.mjs settleLater)
 runtime/shared_layer # the model's (≡) rejects `App.Main.failed_build`
@@ -112,8 +111,8 @@ stdlib/effect/channel_transform # no native for `map` (flick:Channel map)
 stdlib/effect/channel_web # no native for `async_iterable` (./channel_js.mjs asyncIterable)
 stdlib/effect/check # no native for `min_length` (flick:Schema isMinLength)
 stdlib/effect/chunk # no native for `from_list` (flick:rt chunkFromList)
-stdlib/effect/clock # no native for `current_time_millis` (flick:Clock flickCurrentTimeMillis)
-stdlib/effect/clock_random # no native for `current_time_millis` (flick:Clock flickCurrentTimeMillis)
+stdlib/effect/clock # no native for `zero` (flick:rt durationZero)
+stdlib/effect/clock_random # no native for `zero` (flick:rt durationZero)
 stdlib/effect/codec # no native for `literal` (flick:Schema Literal)
 stdlib/effect/combine # the row primitive `Map Combiner { hits : Float; tags : List String } { hits : Combiner Float; tags : Combiner (List String) }`
 stdlib/effect/config # no native for `string` (flick:Config String)
@@ -223,8 +222,8 @@ stdlib/observability/otlp # no native for `received` (./receiver.mjs received)
 stdlib/observability/prometheus # no native for `scrape` (./scrape.mjs scrape)
 stdlib/observability/settings # no native for `meta` (./receiver.mjs meta)
 stdlib/observability/tracer # no native for `received` (./receiver.mjs received)
-stdlib/process/child_process # no native for `env` (flick:rt platformEnv)
-stdlib/process/wait_large_output # no native for `env` (flick:rt platformEnv)
+stdlib/process/child_process # no native for `node_of` (flick:FileSystem flickNode)
+stdlib/process/wait_large_output # no native for `make` (flick:ChildProcess flickMake)
 stdlib/reactivity/atom # no native for `layer_of` (flick:reactivity/Atom flickLayer)
 stdlib/rpc/auth # the row primitive `Lacks "me" {}`
 stdlib/rpc/local # `Record.label` has no λFlick form

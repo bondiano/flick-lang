@@ -63,7 +63,8 @@ pub struct Machine<'p> {
     mem: Vec<Term>,
     lambda: Lambda,
     frames: Vec<Frame>,
-    /// `Σ₀`, the services the runner provides.
+    /// `Σ₀`, the services the runner provides: none until
+    /// [`Machine::provide_roots`].
     roots: Env,
     /// What `Platform.stdout_line` wrote.
     pub stdout: String,

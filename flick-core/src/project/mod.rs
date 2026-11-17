@@ -37,7 +37,7 @@ pub(crate) use load::js_only;
 pub use load::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_rt, analyze_with};
 pub use load::{
     CachedModule, Compilation, Compiled, FormatPlugins, Fresh, MainKind, ModuleCache, PackageCache,
-    check, check_with, compile, compile_with, main_kind, stages_by_class,
+    check, check_with, compile, compile_with, host_services, main_kind, stages_by_class,
 };
 #[cfg(feature = "native-project")]
 pub use load::{ModuleStore, SavedModule, ships};

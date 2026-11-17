@@ -1,9 +1,10 @@
 /// The runner of a Cloudflare Worker: `[project] runner = "Runner.Cloudflare"`.
 /// The runner of the entry exports `{ fetch }`, which answers each request
-/// with `main` run under its own root owner; a failure is a 500 response,
-/// reported on the console.
+/// with `main` run under its own root owner, with the bindings and the live
+/// browser host services; a failure is a 500 response, reported on the console.
 module Runner.Cloudflare exposing (Main, Fetch, Env, Context, run, var, binding, wait_until)
 
+import Host
 import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
 
@@ -20,7 +21,7 @@ type Context
 type alias Fetch = { request : ServerRequest; context : Context }
 
 /// What `main` of an entry is: the response to a request.
-type alias Main = Fetch ->{Async, Env; AppError} ServerResponse
+type alias Main = Fetch ->{Async, Env, ...Host.BrowserLive; AppError} ServerResponse
 
 /// The Worker's handler of `main`.
 run : Main -> Unknown

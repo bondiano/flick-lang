@@ -1,7 +1,7 @@
 // `Runner.Cloudflare`: a Worker whose `fetch` answers each request with
 // `main`, run under its own root owner on `{ request, context }` with the
-// bindings as the service `Env`; a failure is reported on the console and
-// answered with 500.
+// bindings as the service `Env` and the live browser `Host` services; a
+// failure is reported on the console and answered with 500.
 import { Effect, Exit, Option } from "effect";
 import * as ServerRequest from "effect/http/HttpServerRequest";
 import * as ServerResponse from "effect/http/HttpServerResponse";
@@ -10,6 +10,7 @@ import { service } from "../effects.ts";
 import { asMain, conclude, pretty, start } from "../entry.ts";
 import { writeStderr } from "../host.ts";
 import { reportedDefects } from "../owner.ts";
+import { provideBrowserServices } from "./host.ts";
 
 /** What a Worker's runtime gives `fetch` besides the request. */
 interface Context {
@@ -41,7 +42,9 @@ export const run = (main: unknown) => {
   const handle = asMain<Fetch>(main);
   return {
     fetch: async (request: Request, env: Env = {}, context: Context = { waitUntil: () => {} }): Promise<Response> => {
-      const fiber = start(handle, { request: ServerRequest.fromWeb(request), context }, Effect.provideService(EnvService, bindings(env)));
+      const provide = (program: Effect.Effect<unknown, unknown>) =>
+        provideBrowserServices(Effect.provideService(program, EnvService, bindings(env)));
+      const fiber = start(handle, { request: ServerRequest.fromWeb(request), context }, provide);
       const exit = await new Promise<Exit.Exit<unknown, unknown>>((resolve) => fiber.addObserver(resolve));
       if (Exit.isFailure(exit)) {
         conclude(exit, undefined, reportedDefects());

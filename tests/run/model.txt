@@ -6,6 +6,7 @@ bootstrap/hello
 bootstrap/inline_declarations
 bootstrap/inline_module
 bootstrap/inline_nested
+bootstrap/stderr
 codegen/enums
 codegen/bigints
 codegen/literals
@@ -26,6 +27,7 @@ codegen/fail
 codegen/services
 effect/service_params
 effect/effect_params
+effect/host_root
 codegen/service_dictionary
 codegen/service_place
 codegen/scope_run

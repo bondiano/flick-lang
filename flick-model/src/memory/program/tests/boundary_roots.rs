@@ -70,6 +70,7 @@ fn exceptional_boundaries_use_saved_owner_not_current_selection() {
         stdout: String::new(),
         fuel: 100,
         main_stage: MainStage::Done,
+        root: None,
     };
     machine.unwind().expect("valid typed-failure test");
     assert!(machine.owners[1].closed);
@@ -225,6 +226,7 @@ fn owner_selection_validates_identity_but_not_resource_admission() {
         stdout: String::new(),
         fuel: 100,
         main_stage: MainStage::Done,
+        root: None,
     };
     assert_eq!(
         machine.owner_index(&Value::Int(42)),

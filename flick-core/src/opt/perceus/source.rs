@@ -33,8 +33,8 @@ use flick_ir::{Constructor, Dict, Foreign, ForeignMode, InstanceInfo, Shape};
 
 use crate::iface::Interface;
 use crate::ir::memory::{
-    self, Block, CodeId, Exit, Function, Global, Instruction, Intrinsic, Local, Name, Operation,
-    Program,
+    self, Block, CodeId, Exit, Function, Global, HostPrimitive, Instruction, Intrinsic, Local,
+    Name, Operation, Program,
 };
 use crate::ir::{Arm, BinOp, Expr, ExprKind, Item, ItemKind, Lit, Module, Param, Pat, Stage, Stmt};
 use crate::source::Span;
@@ -111,7 +111,7 @@ pub fn lower<'a>(
     modules: impl IntoIterator<Item = &'a Module>,
     entry: &Name,
 ) -> Result<Program, LowerError> {
-    lower_in(modules, entry, None)
+    lower_in(modules, &[entry], None)
 }
 
 /// Adds matching checked compiler declaration facts, including private/open
@@ -122,14 +122,25 @@ pub fn lower_with_declarations<'a>(
     declarations: impl IntoIterator<Item = &'a Interface>,
     entry: &Name,
 ) -> Result<Program, LowerError> {
+    lower_roots_with_declarations(modules, declarations, &[entry])
+}
+
+/// [`lower_with_declarations`] of every definition one of `roots` reaches:
+/// the entry and what a runner evaluates beside it, such as the layer of the
+/// services it provides.
+pub fn lower_roots_with_declarations<'a>(
+    modules: impl IntoIterator<Item = &'a Module>,
+    declarations: impl IntoIterator<Item = &'a Interface>,
+    roots: &[&Name],
+) -> Result<Program, LowerError> {
     let declarations =
         scalar_context::ScalarContext::new(declarations).map_err(LowerError::Declarations)?;
-    lower_in(modules, entry, Some(declarations))
+    lower_in(modules, roots, Some(declarations))
 }
 
 fn lower_in<'a>(
     modules: impl IntoIterator<Item = &'a Module>,
-    entry: &Name,
+    roots: &[&Name],
     declarations: Option<scalar_context::ScalarContext<'a>>,
 ) -> Result<Program, LowerError> {
     let mut sources = BTreeMap::new();
@@ -167,7 +178,9 @@ fn lower_in<'a>(
         program: Program::default(),
         next: 0,
     };
-    lower.global(entry, None)?;
+    for root in roots {
+        lower.global(root, None)?;
+    }
     memory::validate_program(&lower.program).map_err(LowerError::Program)?;
     Ok(lower.program)
 }
@@ -235,12 +248,33 @@ include!("source/expression_lowering.rs");
 include!("source/branch_lowering.rs");
 
 fn foreign_intrinsic(value: &Foreign) -> Option<Intrinsic> {
+    use Intrinsic::Host;
     match (
         value.binding.from.as_deref(),
         value.binding.name.as_str(),
         value.mode,
     ) {
         (Some("flick:rt"), "stdoutLine", ForeignMode::Sync) => Some(Intrinsic::PrintLine),
+        (Some("flick:rt"), "stderrLine", ForeignMode::Sync) => {
+            Some(Host(HostPrimitive::StderrLine))
+        }
+        (Some("flick:rt"), "stdoutWrite", ForeignMode::Sync) => {
+            Some(Host(HostPrimitive::StdoutWrite))
+        }
+        (Some("flick:rt"), "platformEnv", ForeignMode::Sync) => Some(Host(HostPrimitive::Env)),
+        (Some("flick:rt"), "platformArgs", ForeignMode::Sync) => Some(Host(HostPrimitive::Args)),
+        (Some("flick:Clock"), "flickCurrentTimeMillis", ForeignMode::Effect) => {
+            Some(Host(HostPrimitive::CurrentTimeMillis))
+        }
+        (Some("flick:Clock"), "flickCurrentTimeNanos", ForeignMode::Effect) => {
+            Some(Host(HostPrimitive::CurrentTimeNanos))
+        }
+        (Some("flick:Clock"), "flickMonotonicTimeNanos", ForeignMode::Effect) => {
+            Some(Host(HostPrimitive::MonotonicTimeNanos))
+        }
+        (Some("flick:Random"), "flickNext", ForeignMode::Effect) => {
+            Some(Host(HostPrimitive::RandomNext))
+        }
         (Some("flick:rt"), "show", ForeignMode::Pure) => Some(Intrinsic::Show),
         (Some("flick:rt"), "refMake", ForeignMode::Sync) => Some(Intrinsic::RefMake),
         (Some("flick:rt"), "refGet", ForeignMode::Sync) => Some(Intrinsic::RefGet),

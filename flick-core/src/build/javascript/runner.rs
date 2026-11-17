@@ -4,7 +4,7 @@ use crate::codegen;
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::iface::Namespace;
 use crate::project::config::Backend;
-use crate::project::{Compiled, MainKind, main_kind};
+use crate::project::{Compiled, MainKind, host_services, main_kind};
 use crate::source::Span;
 
 use super::super::{Artifact, Settings, runner_file, schema_aot_file};
@@ -16,6 +16,9 @@ pub struct EntryFacts {
     pub name: String,
     pub defining: String,
     pub pure: bool,
+    /// The `Host` services `main` names, which a launcher without a runner
+    /// provides as its root.
+    pub host: Vec<String>,
 }
 
 /// Validate entry types once in the frontend, including standalone files.
@@ -54,6 +57,9 @@ pub fn entry_facts(
                 name: name.clone(),
                 defining: defining.to_owned(),
                 pure: matches!(kind, Some(Ok(MainKind::Pure))),
+                host: (main.filter(|_| started_by.is_none()))
+                    .and_then(|e| Some(host_services(e.scheme.as_ref()?)))
+                    .unwrap_or_default(),
             }),
         }
     }
@@ -82,8 +88,8 @@ pub(super) fn entry_runners(
         let start = match started_by {
             Some(module) => Start::Run(codegen::relative(&file, &path(module))),
             None if entry.pure => Start::Call,
-            None if settings.backend == Backend::Rt => Start::RunMainRt,
-            None => Start::RunMain,
+            None if settings.backend == Backend::Rt => Start::RunMainRt(entry.host),
+            None => Start::RunMain(entry.host),
         };
         let contents = runner(
             &codegen::relative(&file, &path(&entry.defining)),

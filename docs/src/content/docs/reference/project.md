@@ -46,7 +46,7 @@ max-params = 5
 | `project.test-dir` | directory of test modules | `"test"` |
 | `project.entry` | module that exports `main`, its own or re-exported: the entry `main`, whose runner is `flick-main.js` | — |
 | `project.entries` | several entries, `{ server = "App.Server", cli = "App.Cli" }`: a runner `flick-<name>.js` each; an entry with a runner of its own is a table, `web = { module = "App.Worker", runner = "Runner.Cloudflare" }`; `target = "client"` marks an entry that runs in a browser: nothing its `main` reaches may need `Server` (`FLICK-E009`, with the path to it), so its bundle keeps no server module; names are lower-case letters, digits and `-`; instead of `entry` | — |
-| `project.runner` | the module that starts each entry without a runner of its own: it exports `type alias Main`, the type `main` must have (`FLICK-P026` otherwise), and `run`, which takes `main` and whose result the runner exports as `default`; built in are `"Runner.Node"`, `"Runner.Browser"` and `"Runner.Cloudflare"`, a Worker whose `fetch` gives `main : Runner.Cloudflare.Fetch ->{Runner.Cloudflare.Env; AppError} Http.ServerResponse.ServerResponse` the request and the context (`wait_until`), and provides the bindings as the service `Env` (`Runner.Cloudflare.var`, `binding`); a runner may provide services this way, and `main` may need any of those its `Main` names; a package may provide another; without one, a pure `main` is called and an effect runs as on Node | — |
+| `project.runner` | the module that starts each entry without a runner of its own: it exports `type alias Main`, the type `main` must have (`FLICK-P026` otherwise), and `run`, which takes `main` and whose result the runner exports as `default`; built in are `"Runner.Node"`, `"Runner.Browser"` and `"Runner.Cloudflare"`, a Worker whose `fetch` gives `main : Runner.Cloudflare.Fetch ->{Runner.Cloudflare.Env; AppError} Http.ServerResponse.ServerResponse` the request and the context (`wait_until`), and provides the bindings as the service `Env` (`Runner.Cloudflare.var`, `binding`) and the live browser services `Host.BrowserLive`; a runner may provide services this way, and `main` may need any of those its `Main` names; a package may provide another; without one, a pure `main` is called and an effect runs as on Node | — |
 | `build.out-dir` | base directory of artifacts; not the project's root, the directory of its sources or tests, or one above them (`FLICK-P028`, before anything is written) | `"dist"` |
 | `build.profile` | `"debug"` or `"release"` (see [codegen.md](../codegen/)); `--profile` of `build` and `test` overrides it | `"debug"` |
 | `build.emit` | `"js"`, `"ts"`, or `"go"`: a Go module per entry under `go/<entry>/`, which `go build` compiles into the executable `flick-<entry>`; Go must be on `PATH` (`FLICK-P029`), an import of a module of the js target only (`Ui`, `Atom`, `Action`, `Otlp`, `DevTools`, `Js`, the `Node`/`Browser`/`Cloudflare` runners) or of a package not built for go is `FLICK-P030` already in `flick check`, and what the go target does not compile yet is `FLICK-P012` (see [Go target](../codegen/#go-target)) | `"js"` |
@@ -83,7 +83,7 @@ Errors in the configuration exit with code `2`:
 | no project found, or `--project` names none | `FLICK-P008` |
 | a command needs a project at a workspace root, `--package` names no member, a member has no `flick.toml`, a path dependency is not a library, or dependencies form a cycle | `FLICK-P031` |
 | an entry is not a source module that exports `main` | `FLICK-P011` |
-| an entry `main` does not take and return `Unit`, needs a service or can fail with an error other than `AppError` | `FLICK-P026` |
+| an entry `main` does not take and return `Unit`, needs a service other than the `Host` ones (with a runner, other than those its `Main` names) or can fail with an error other than `AppError` | `FLICK-P026` |
 | `sql.dialect` names a dialect that is not supported yet | `FLICK-P022` |
 | `sql.dialect` names no dialect; the message lists the known ones | `FLICK-P023` |
 | `lint.allow` names an unknown code | `FLICK-P005` |
@@ -100,9 +100,15 @@ package's `bin`, and the only entry `main` under the package's name.
 name may be left out.
 
 Every entry exports `main : Unit -> Unit` or a runtime function taking and
-returning `Unit`, requiring no services and failing only with `AppError`
-(an empty error row is valid too). Provide required layers and handle other
-errors inside `main`, not in the launcher.
+returning `Unit`, requiring no services but those of `Host.Live` (with a
+runner, those its `Main` names, such as `Env` of `Runner.Cloudflare`) and
+failing only with `AppError` (an empty error row is valid too). A `main` started
+without a runner gets the live implementations of the `Host` services its row
+names (`Console`, `Clock`, `Random`, `Environment`, `Arguments`) from the
+launcher, which imports only those, so a `main` that names none carries none;
+what `main` provides itself wins over them. The playground's are the same,
+with no environment variables and no arguments. Provide other required layers
+and handle other errors inside `main`, not in the launcher.
 
 A pure `main` is called directly. Normally its launcher imports no runtime;
 `schema-aot = true` still imports the schema installation helpers.

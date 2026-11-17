@@ -144,7 +144,13 @@ impl Machine<'_, '_> {
     }
 
     fn advance_main(&mut self) -> Result<(), Error> {
-        let stage = self.main_stage;
+        if let MainStage::Root(main) = &self.main_stage {
+            let main = main.clone();
+            self.install_root()?;
+            self.main_stage = MainStage::Function;
+            return self.global(&main, None);
+        }
+        let stage = self.main_stage.clone();
         self.main_stage = if stage == MainStage::Function {
             MainStage::Task
         } else {
@@ -152,7 +158,7 @@ impl Machine<'_, '_> {
         };
         let callable = if let Some(Value::Object(token)) = &self.top {
             matches!(
-                (&self.heap.object(token.id)?.data, stage),
+                (&self.heap.object(token.id)?.data, &stage),
                 (Data::Closure { .. }, MainStage::Function) | (Data::Task { .. }, MainStage::Task)
             )
         } else {
