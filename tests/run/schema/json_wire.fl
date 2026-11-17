@@ -9,12 +9,12 @@ type alias Point = { x : Int; y : Int; label : Option String }
   deriving Schema
 
 type alias Bag = {
-  count : BigInt;
-  done : Bool;
-  nothing : Unit;
-  pair : (String, Float);
-  shapes : List Shape;
-  outcome : Result String Int;
+  count : BigInt
+  done : Bool
+  nothing : Unit
+  pair : (String, Float)
+  shapes : List Shape
+  outcome : Result String Int
 } deriving Schema
 
 say : String ->{} Unit
@@ -39,12 +39,12 @@ let decoded s text =
 main : Unit ->{; AppError} Unit
 let main () =
   let bag = {
-    count = 12345678901234567890n;
-    done = true;
-    nothing = ();
-    pair = ("p\"q\u{1F600}", 0.1 + 0.2);
-    shapes = [Circle 1, Rect 2 3.5, Dot];
-    outcome = Ok 7;
+    count = 12345678901234567890n
+    done = true
+    nothing = ()
+    pair = ("p\"q\u{1F600}", 0.1 + 0.2)
+    shapes = [Circle 1, Rect 2 3.5, Dot]
+    outcome = Ok 7
   }
   say (encoded Bag.schema bag)
   say (encoded Bag.schema { bag with outcome = Err "bad" })

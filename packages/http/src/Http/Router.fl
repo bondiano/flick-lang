@@ -16,19 +16,19 @@ type Route (r : ServiceRow) (e : ErrorRow)
 /// How paths match; `None` keeps the default: trailing slashes count,
 /// duplicate slashes do not, case counts, parameters up to 100 characters.
 type alias RouterConfig = {
-  ignoreTrailingSlash : Option Bool;
-  ignoreDuplicateSlashes : Option Bool;
-  caseSensitive : Option Bool;
-  maxParamLength : Option Int;
+  ignoreTrailingSlash : Option Bool
+  ignoreDuplicateSlashes : Option Bool
+  caseSensitive : Option Bool
+  maxParamLength : Option Int
 }
 
 /// The defaults.
 config : RouterConfig
 let config = {
-  ignoreTrailingSlash = None;
-  ignoreDuplicateSlashes = None;
-  caseSensitive = None;
-  maxParamLength = None;
+  ignoreTrailingSlash = None
+  ignoreDuplicateSlashes = None
+  caseSensitive = None
+  maxParamLength = None
 }
 
 /// What a route's handler knows of the match.

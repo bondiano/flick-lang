@@ -16,7 +16,7 @@ let users_test =
     get = fun id ->
       match List.find (fun user -> eq user.id id) [ada, grace] with
       | Some user -> user
-      | None -> from_result (Err (NotFound id));
+      | None -> from_result (Err (NotFound id))
   }
 
 log_test : Ref (List String) -> Layer none none {Log}

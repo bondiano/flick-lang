@@ -76,9 +76,9 @@ let view model m =
             ("type", "search"),
           ]
           (input {
-            value = m.query;
-            placeholder = if m.ru then "Эффекты, типы, сервисы…" else "Effects, types, services…";
-            on_input = Ui.Event.latest (fun event -> task { find model event.value });
+            value = m.query
+            placeholder = if m.ru then "Эффекты, типы, сервисы…" else "Effects, types, services…"
+            on_input = Ui.Event.latest (fun event -> task { find model event.value })
           }))
 
       attributes

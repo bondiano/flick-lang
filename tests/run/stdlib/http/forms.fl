@@ -30,8 +30,8 @@ let forms () =
       Http.Multipart.schema_persisted
         (json_of
           (codec Note.schema {
-            title = field "title" String.json;
-            tag = field "tag" (Codec.list String.json);
+            title = field "title" String.json
+            tag = field "tag" (Codec.list String.json)
           }))
         form
     Platform.stdout_line ("schema_persisted: " ++ (show note))
@@ -49,13 +49,13 @@ let forms () =
   with
   | Http.Multipart.MultipartError reason -> Platform.stdout_line ("with_limits: " ++ (show reason))
   let info : Http.Multipart.PartInfo = {
-    name = "f";
-    filename = None;
-    contentType = "text/plain";
-    contentTypeParameters = [("charset", "utf-8")];
-    contentDisposition = "form-data";
-    contentDispositionParameters = [];
-    headers = [];
+    name = "f"
+    filename = None
+    contentType = "text/plain"
+    contentTypeParameters = [("charset", "utf-8")]
+    contentDisposition = "form-data"
+    contentDispositionParameters = []
+    headers = []
   }
   Platform.stdout_line
     ("default_is_file: "
@@ -65,10 +65,10 @@ let forms () =
       )))
   Platform.stdout_line ("decode_field: " ++ (Http.Multipart.decode_field info [104, 105]))
   let persisted_file : Http.Multipart.PersistedFile = {
-    key = "k";
-    name = "n";
-    contentType = "c";
-    path = "p";
+    key = "k"
+    name = "n"
+    contentType = "c"
+    path = "p"
   }
   Platform.stdout_line ("persisted file: " ++ (persisted_file.name))
 
@@ -76,9 +76,9 @@ traces : Unit ->{} Unit
 let traces () =
   let span =
     Tracer.external_span {
-      spanId = "00f067aa0ba902b7";
-      traceId = "4bf92f3577b34da6a3ce929d0e0e4736";
-      sampled = true;
+      spanId = "00f067aa0ba902b7"
+      traceId = "4bf92f3577b34da6a3ce929d0e0e4736"
+      sampled = true
     }
   let headers = Http.TraceContext.to_headers span
   Platform.stdout_line ("to_headers: " ++ (show (Http.Headers.to_list headers)))

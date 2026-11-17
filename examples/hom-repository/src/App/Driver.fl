@@ -14,20 +14,20 @@ module App.Driver exposing (
 type error Boot = Boot String
 
 type alias Connection = {
-  release : Unit ->{} Unit;
-  initialize : Unit ->{; Boot} Unit;
-  fetch : String ->{} String;
+  release : Unit ->{} Unit
+  initialize : Unit ->{; Boot} Unit
+  fetch : String ->{} String
 }
 
 service Db =
   acquire : Unit ->{; Boot} Connection
 
 type alias State = {
-  attempts : Int;
-  next : Int;
-  active : Int;
-  peak : Int;
-  closed : List Int;
+  attempts : Int
+  next : Int
+  active : Int
+  peak : Int
+  closed : List Int
 }
 
 initial : State
@@ -49,10 +49,10 @@ let live mode state =
           )
         {
           release = fun () ->
-            Ref.update state (fun s -> { s with active = s.active - 1; closed = s.closed ++ [id] });
-          initialize = fun () -> if mode == 2 then from_result (Err (Boot "initialize"));
-          fetch = fun key -> "\{id}:\{key}";
-        };
+            Ref.update state (fun s -> { s with active = s.active - 1; closed = s.closed ++ [id] })
+          initialize = fun () -> if mode == 2 then from_result (Err (Boot "initialize"))
+          fetch = fun key -> "\{id}:\{key}"
+        }
   }
 
 acquire : Unit ->{Db; Boot} Connection

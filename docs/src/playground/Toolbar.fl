@@ -10,8 +10,8 @@ let choice label active disabled act =
   Ui.with_host
     {
       Ui.host with
-      class_name = Some (if active then "fp-choice fp-on" else "fp-choice");
-      aria_pressed = Some (active);
+      class_name = Some (if active then "fp-choice fp-on" else "fp-choice")
+      aria_pressed = Some (active)
     }
     (Ui.button { disabled = disabled; on_click = Ui.Event.latest (fun _ -> task { act () }) } [
       Ui.text label,
@@ -90,8 +90,8 @@ let examples_view model m =
         (Ui.with_host
           {
             Ui.host with
-            class_name = Some "fp-gallery-button";
-            aria_label = Some (examples ++ ": " ++ current);
+            class_name = Some "fp-gallery-button"
+            aria_label = Some (examples ++ ": " ++ current)
           }
           (button
             { disabled = false; on_click = Ui.Event.latest (fun _ -> task { () }) }
@@ -110,15 +110,15 @@ let run_button model m =
     {
       Ui.host with
       // a lesson's autorun presses it, so that Stop interrupts that run as well
-      id = Some "fp-run";
-      class_name = Some (if m.running then "fp-primary fp-stop" else "fp-primary");
+      id = Some "fp-run"
+      class_name = Some (if m.running then "fp-primary fp-stop" else "fp-primary")
     }
     (Ui.button
       {
         disabled =
           not m.running
-            && (m.loading || m.checking || m.version == "" || m.compile_error != "" || errors m > 0);
-        on_click = Ui.Event.latest (fun _ -> task { run_program model });
+            && (m.loading || m.checking || m.version == "" || m.compile_error != "" || errors m > 0)
+        on_click = Ui.Event.latest (fun _ -> task { run_program model })
       }
       [
         Ui.text
@@ -129,8 +129,8 @@ format_button : Atom.Writable Model -> Model -> Ui
 let format_button model m =
   Ui.button
     {
-      disabled = m.version == "" || m.running;
-      on_click = Ui.Event.exhaust (fun _ -> task { format model });
+      disabled = m.version == "" || m.running
+      on_click = Ui.Event.exhaust (fun _ -> task { format model })
     }
     [Ui.text (tr m.locale "Format" "Форматировать")]
 
@@ -165,14 +165,14 @@ let view model m = ui {
             else if m.version == "" || m.compile_error != "" || errors m > 0 then
               "fp-status fp-bad"
             else
-              "fp-status fp-status-ready";
+              "fp-status fp-status-ready"
         }
         (text (status m)))
     Ui.with_host
       {
         Ui.host with
-        role = Some "group";
-        aria_label = Some (tr m.locale "Build profile" "Профиль сборки");
+        role = Some "group"
+        aria_label = Some (tr m.locale "Build profile" "Профиль сборки")
       }
       (div { class_name = "fp-profiles" } (set_profile model m Debug) (set_profile model m Release))
 }

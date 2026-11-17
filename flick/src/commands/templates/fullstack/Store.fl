@@ -14,10 +14,10 @@ memory : Unit ->{} Store.Impl
 let memory () =
   let todos = Ref.make []
   {
-    all = fun () -> Ref.get todos;
+    all = fun () -> Ref.get todos
     add = fun title ->
       Ref.modify todos (fun items ->
         let item = { id = List.length items + 1; title = title }
         (item, items ++ [item])
-      );
+      )
   }

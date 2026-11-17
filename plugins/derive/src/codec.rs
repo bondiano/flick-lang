@@ -177,8 +177,9 @@ pub fn hover(block: &Block, offset: u32, facts: &[Fact]) -> Option<Hover> {
 }
 
 /// The layout of the block: the schema and `{`, then a field a line, one
-/// level in, each `label = codec;`; a block written on one line stays on
-/// one, `{ a = c; b = d }`. None when it does not read.
+/// level in, each `label = codec` with no `;`, as a broken record has; a
+/// block written on one line stays on one, `{ a = c; b = d }`. None when it
+/// does not read.
 pub fn format(block: &Block, compiler: &mut dyn Compiler) -> Option<Vec<Piece>> {
     let schema = schema_span(block)?;
     let hole = |span: Span| {
@@ -200,12 +201,7 @@ pub fn format(block: &Block, compiler: &mut dyn Compiler) -> Option<Vec<Piece>> 
     }
     let mut out = vec![hole(schema), text(" {"), Piece::Indent];
     for f in &fields {
-        out.extend([
-            Piece::Line,
-            text(&format!("{} = ", f.label)),
-            hole(f.value),
-            text(";"),
-        ]);
+        out.extend([Piece::Line, text(&format!("{} = ", f.label)), hole(f.value)]);
     }
     out.extend([Piece::Dedent, Piece::Line]);
     Some(out)

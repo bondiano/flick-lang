@@ -3,24 +3,24 @@
 module App.Main exposing (main)
 
 type alias Item = {
-  id : Int;
-  name : String;
-  tags : List String;
-  price : Float;
-  active : Bool;
-  note : Option String;
+  id : Int
+  name : String
+  tags : List String
+  price : Float
+  active : Bool
+  note : Option String
 } deriving Schema
 
 items : Int -> List Item
 let items round =
   List.map
     (fun i -> {
-      id = i;
-      name = "item " ++ show i;
-      tags = ["t" ++ show (i % 7), "r" ++ show round];
-      price = Int.to_float i * 1.25;
-      active = i % 3 == 0;
-      note = if i % 5 == 0 then Some "five" else None;
+      id = i
+      name = "item " ++ show i
+      tags = ["t" ++ show (i % 7), "r" ++ show round]
+      price = Int.to_float i * 1.25
+      active = i % 3 == 0
+      note = if i % 5 == 0 then Some "five" else None
     })
     (List.range 0 5000)
 

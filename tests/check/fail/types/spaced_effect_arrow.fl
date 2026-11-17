@@ -1,0 +1,17 @@
+module App.SpacedEffectArrow exposing (..)
+
+// With a space after `->`, `{Log; Missing}` is a row of its own, applied to
+// the result type; the effect annotation it is meant as touches its arrow.
+service Log =
+  info : String ->{} Unit
+
+type error Missing = Missing
+
+find : Int -> {Log; Missing} Int
+let find n = n
+
+pure : Int -> {} Int
+let pure n = n
+
+//~ FLICK-T002 @10:15-10:29 an effect annotation touches its arrow: `->{Log; Missing}`
+//~ FLICK-T002 @13:15-13:17 an effect annotation touches its arrow: `->{}`

@@ -69,36 +69,36 @@ let completing =
 with_options : RequestResolver Query {NotFound} String
 let with_options =
   RequestResolver.make_with {
-    batchKey = fun entry -> id_of entry % 2;
-    preCheck = None;
-    delay = Effect.void;
-    collectWhile = fun entries -> List.length entries < 10;
+    batchKey = fun entry -> id_of entry % 2
+    preCheck = None
+    delay = Effect.void
+    collectWhile = fun entries -> List.length entries < 10
     runAll = fun entries key ->
       Platform.stdout_line ("key " ++ show key ++ " batch of " ++ show (NonEmpty.length entries))
-      List.each_effect answer (NonEmpty.to_list entries);
+      List.each_effect answer (NonEmpty.to_list entries)
   }
 
 by_parity : RequestResolver Query {NotFound} String
 let by_parity =
   RequestResolver.make_grouped {
-    key = fun entry -> id_of entry < 3;
+    key = fun entry -> id_of entry < 3
     resolver = fun entries small ->
       Platform.stdout_line
         ("small " ++ show small ++ " batch of " ++ show (NonEmpty.length entries))
-      List.each_effect answer (NonEmpty.to_list entries);
+      List.each_effect answer (NonEmpty.to_list entries)
   }
 
 trace_options : Tracer.SpanOptions
 let trace_options = {
-  attributes = [];
-  links = [];
-  parent = None;
-  root = false;
-  kind_ = Tracer.internal;
-  sampled = None;
-  level = None;
-  captureStackTrace = false;
-  disablePropagation = false;
+  attributes = []
+  links = []
+  parent = None
+  root = false
+  kind_ = Tracer.internal
+  sampled = None
+  level = None
+  captureStackTrace = false
+  disablePropagation = false
 }
 
 /// Prints the attributes and the number of links of the batch's span.

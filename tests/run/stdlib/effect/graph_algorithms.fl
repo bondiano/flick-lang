@@ -67,10 +67,10 @@ let main () =
     ("dijkstra, unreachable: "
       ++ path (Graph.dijkstra { source = 3; target = 0; cost = fun w -> w } roads))
   let guided : Graph.AstarConfig Float String = {
-    source = 0;
-    target = 3;
-    cost = fun w -> w;
-    heuristic = fun s t -> if s == t then 0 else 1;
+    source = 0
+    target = 3
+    cost = fun w -> w
+    heuristic = fun s t -> if s == t then 0 else 1
   }
   Platform.stdout_line ("astar: " ++ path (Graph.astar guided roads))
   let signed : Graph.BellmanFordConfig Float = { source = 0; target = 3; cost = fun w -> w - 2 }
@@ -100,10 +100,10 @@ let main () =
       ++ paths (Graph.simple_paths { source = 0; target = 3; limit = Some 1 } roads))
   let tied = edge 0 2 3 roads
   let shortest : Graph.AllShortestPathsConfig Float = {
-    source = 0;
-    target = 3;
-    cost = fun w -> w;
-    limit = None;
+    source = 0
+    target = 3
+    cost = fun w -> w
+    limit = None
   }
   Platform.stdout_line ("all_shortest_paths: " ++ paths (Graph.all_shortest_paths shortest tied))
   let reach : Graph.ReachabilityConfig = { direction = None }

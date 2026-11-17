@@ -116,7 +116,7 @@ let layers () =
     Layer.flat_map
       (fun ctx ->
         Layer.succeed Greeter {
-          greet = fun n -> (Context.get Config ctx).prefix () ++ " flat_map " ++ n;
+          greet = fun n -> (Context.get Config ctx).prefix () ++ " flat_map " ++ n
         }
       )
       config_layer
@@ -204,25 +204,25 @@ let failed_build_cleanup () =
 
 trace_options : Tracer.SpanOptions
 let trace_options = {
-  attributes = [];
-  links = [];
-  parent = None;
-  root = false;
-  kind_ = Tracer.internal;
-  sampled = None;
-  level = None;
-  captureStackTrace = false;
-  disablePropagation = false;
+  attributes = []
+  links = []
+  parent = None
+  root = false
+  kind_ = Tracer.internal
+  sampled = None
+  level = None
+  captureStackTrace = false
+  disablePropagation = false
 }
 
 span_options : Layer.Trace.SpanOptions
 let span_options = {
-  span = trace_options;
+  span = trace_options
   onEnd =
     Some (fun span exit ->
       Platform.stdout_line
         ("ended " ++ show (Tracer.span_name span) ++ " failed " ++ show (Option.is_some exit))
-    );
+    )
 }
 
 current_span : Unit ->{} String

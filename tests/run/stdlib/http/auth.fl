@@ -53,7 +53,7 @@ let token = HttpApi.api_key "Token" { key = "authorization"; location = HttpApi.
 /// A request without the header is anonymous.
 credentials : PureCodec Json Credentials
 let credentials = codec Credentials.schema {
-  authorization = optional_field "authorization" String.json;
+  authorization = optional_field "authorization" String.json
 }
 
 refusals : HttpApi.ErrorCases {Unauthorized}
@@ -76,8 +76,8 @@ let greet =
   |> HttpApi.with_optional_auth token Session maybe
 
 type alias Handlers = {
-  me : Request ->{Session; Unauthorized} String;
-  greet : Request ->{Session; Unauthorized} String;
+  me : Request ->{Session; Unauthorized} String
+  greet : Request ->{Session; Unauthorized} String
 }
 
 users : HttpApi.Group "users" none Handlers
@@ -92,9 +92,9 @@ let api = HttpApi.api "Users" |> HttpApi.add_group users
 handlers : { users : Handlers }
 let handlers = {
   users = {
-    me = fun _ -> Option.with_default "?" (Session.user ());
-    greet = fun _ -> "hello " ++ Option.with_default "stranger" (Session.user ());
-  };
+    me = fun _ -> Option.with_default "?" (Session.user ())
+    greet = fun _ -> "hello " ++ Option.with_default "stranger" (Session.user ())
+  }
 }
 
 get_raw : String ->{Async} String
@@ -115,11 +115,11 @@ let ask base authorization endpoint =
 main : Unit ->{Async; AppError} Unit
 let main () =
   let options : HttpApi.ServeOptions = {
-    host = "127.0.0.1";
-    port = 0;
-    openapi = None;
-    swagger = None;
-    scalar = None;
+    host = "127.0.0.1"
+    port = 0
+    openapi = None
+    swagger = None
+    scalar = None
   }
   try
     scope s {

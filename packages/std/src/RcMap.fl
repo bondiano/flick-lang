@@ -19,9 +19,9 @@ type error ExceededCapacity = ExceededCapacity String
 /// Each lookup has a fresh region `t`; a type that names it cannot escape.
 make :
   {
-    lookup : forall t. k ->{Scope t | r; e} a^{t};
-    idleTimeToLive : Option (k -> Duration.Duration);
-    capacity : Option Int;
+    lookup : forall t. k ->{Scope t | r; e} a^{t}
+    idleTimeToLive : Option (k -> Duration.Duration)
+    capacity : Option Int
   } ->{Scope s | r}
   RcMap s k e a
 foreign effect make from "flick:RcMap" "flickMake"

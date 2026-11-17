@@ -4,15 +4,15 @@ module App.Main exposing (main)
 
 options : Tracer.SpanOptions
 let options = {
-  attributes = [("user", "ada")];
-  links = [];
-  parent = None;
-  root = false;
-  kind_ = Tracer.internal;
-  sampled = None;
-  level = None;
-  captureStackTrace = false;
-  disablePropagation = false;
+  attributes = [("user", "ada")]
+  links = []
+  parent = None
+  root = false
+  kind_ = Tracer.internal
+  sampled = None
+  level = None
+  captureStackTrace = false
+  disablePropagation = false
 }
 
 remote : Tracer.Span

@@ -22,8 +22,8 @@ let count_to =
   |> Rpc.with_stream (Codec.json Schema.number)
 
 type alias Handlers r = {
-  double : Float ->{r} Float;
-  count_to : Float ->{r} Stream none none Float;
+  double : Float ->{r} Float
+  count_to : Float ->{r} Stream none none Float
 }
 
 numbers : Rpc.Group r (Handlers r)
@@ -37,8 +37,8 @@ let hello _ =
 main : Unit ->{Async; AppError} Unit
 let main () =
   let handlers : Handlers none = {
-    double = fun n -> n * 2;
-    count_to = fun n -> Stream.from_list (List.map Int.to_float (List.range 1 (Int.truncate n + 1)));
+    double = fun n -> n * 2
+    count_to = fun n -> Stream.from_list (List.map Int.to_float (List.range 1 (Int.truncate n + 1)))
   }
   provide (Layer.merge Http.FetchClient.layer Http.Server.layer_services) {
     try
@@ -52,9 +52,9 @@ let main () =
             Http.Router.route (Some Http.Method.GET) "/hello/:name" hello,
           ]
         let options : Http.Server.ServeOptions = {
-          host = "127.0.0.1";
-          port = 0;
-          gracefulShutdownTimeout = None;
+          host = "127.0.0.1"
+          port = 0
+          gracefulShutdownTimeout = None
         }
         let server = Http.Server.serve options app
         let base = Http.Server.format_address (Http.Server.address server)

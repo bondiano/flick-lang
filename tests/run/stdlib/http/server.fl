@@ -32,7 +32,7 @@ let item = Codec.general (Codec.json Item.schema)
 stdout_log : Layer none none {Log}
 let stdout_log =
   Layer.succeed Log {
-    write = fun level message -> Platform.stdout_line ("log " ++ level ++ ": " ++ message);
+    write = fun level message -> Platform.stdout_line ("log " ++ level ++ ": " ++ message)
   }
 
 /// The server's log of the address, without the port the system picked.
@@ -59,7 +59,7 @@ let create request =
   let response =
     Http.ServerResponse.schema_json item { created with size = created.size + 1 } {
       ok with
-      status = Some 201;
+      status = Some 201
     }
   let attributes = { Http.Cookies.attributes with httpOnly = true; path = Some "/" }
   let with_cookie =
@@ -238,9 +238,9 @@ let serve_all dir =
           static_route,
         ]
       let options : Http.Server.ServeOptions = {
-        host = "127.0.0.1";
-        port = 0;
-        gracefulShutdownTimeout = Some (ms 2000);
+        host = "127.0.0.1"
+        port = 0
+        gracefulShutdownTimeout = Some (ms 2000)
       }
       let server = Http.Server.serve options app
       let base = Http.Server.format_address (Http.Server.address server)

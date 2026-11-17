@@ -68,9 +68,9 @@ let caches () =
   say ("invalidate_all: " ++ show (Cache.size cache))
   let short =
     Cache.make_with (fun (n : Float) -> n * 2) {
-      capacity = 1;
+      capacity = 1
       timeToLive =
-        Some (fun exit key -> if Option.is_some (Exit.value exit) then hour else Duration.zero);
+        Some (fun exit key -> if Option.is_some (Exit.value exit) then hour else Duration.zero)
     }
   let first = Cache.get 1 short
   let second = Cache.get 2 short
@@ -81,9 +81,9 @@ let scoped () =
   scope s {
     let cache : ScopedCache.ScopedCache s String none String =
       ScopedCache.make {
-        lookup = fun (key : String) -> acquire ("entry " ++ key);
-        capacity = 2;
-        timeToLive = None;
+        lookup = fun (key : String) -> acquire ("entry " ++ key)
+        capacity = 2
+        timeToLive = None
       }
     let a = ScopedCache.use "a" cache (fun v -> v)
     let b = ScopedCache.use "b" cache (fun v -> v)
@@ -105,9 +105,9 @@ let scoped () =
     ScopedCache.invalidate_all cache
     let timed =
       ScopedCache.make_with {
-        lookup = fun (key : String) -> acquire ("with " ++ key);
-        capacity = 1;
-        timeToLive = Some (fun _ _ -> Duration.infinity);
+        lookup = fun (key : String) -> acquire ("with " ++ key)
+        capacity = 1
+        timeToLive = Some (fun _ _ -> Duration.infinity)
       }
     say (ScopedCache.use "x" timed (fun v -> v))
   }
@@ -139,9 +139,9 @@ let counted () =
   let full = scope s {
     let map : RcMap.RcMap s String none String =
       RcMap.make {
-        lookup = fun (key : String) -> acquire ("rc " ++ key);
-        idleTimeToLive = Some (fun _ -> Duration.zero);
-        capacity = Some 1;
+        lookup = fun (key : String) -> acquire ("rc " ++ key)
+        idleTimeToLive = Some (fun _ -> Duration.zero)
+        capacity = Some 1
       }
     let first = RcMap.get "a" map
     say
@@ -185,24 +185,24 @@ let pools () =
   scope {
     let pool =
       Pool.make_with_ttl {
-        acquire = task { acquire "ttl" };
-        min = 0;
-        max = 1;
-        concurrency = Some 2;
-        targetUtilization = Some 1;
-        timeToLive = hour;
-        timeToLiveStrategy = Some Pool.Creation;
+        acquire = task { acquire "ttl" }
+        min = 0
+        max = 1
+        concurrency = Some 2
+        targetUtilization = Some 1
+        timeToLive = hour
+        timeToLiveStrategy = Some Pool.Creation
       }
     say ("ttl pool: " ++ Pool.use (fun i -> i) pool)
     let usage =
       Pool.make_with_ttl {
-        acquire = task { acquire "usage" };
-        min = 1;
-        max = 1;
-        concurrency = None;
-        targetUtilization = None;
-        timeToLive = hour;
-        timeToLiveStrategy = Some Pool.Usage;
+        acquire = task { acquire "usage" }
+        min = 1
+        max = 1
+        concurrency = None
+        targetUtilization = None
+        timeToLive = hour
+        timeToLiveStrategy = Some Pool.Usage
       }
     say ("usage pool: " ++ Pool.use (fun i -> i) usage)
   }

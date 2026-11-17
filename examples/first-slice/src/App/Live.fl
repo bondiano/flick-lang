@@ -17,7 +17,7 @@ let users_live =
     get = fun id ->
       match find_name id with
       | Some name -> { id = id; name = name }
-      | None -> from_result (Err (NotFound id));
+      | None -> from_result (Err (NotFound id))
   }
 
 log_live : Layer none none {Log}

@@ -27,7 +27,7 @@ type alias ClickSnapshot = { button : Int; alt : Bool; ctrl : Bool; shift : Bool
 /// The text of an input after an edit.
 type alias InputSnapshot = {
   /// The whole text, as the input holds it now.
-  value : String;
+  value : String
 }
 
 /// A tab of `tabs`: a label and its content.
@@ -46,13 +46,13 @@ type Component p
 type alias ElementProps = {
   /// The CSS classes of the element, separated by spaces: its `class`
   /// attribute.
-  class_name : String;
+  class_name : String
 }
 
 /// The props of `link`.
 type alias LinkProps = {
   /// Where the link goes: a URL with a safe scheme, or a relative one.
-  href : SafeUrl;
+  href : SafeUrl
 }
 
 /// The props of `image`: a URL with a safe scheme or a relative one, the
@@ -73,49 +73,49 @@ type alias RouteLinkProps a = { route : Atom.Writable a; url : Url a; to : a }
 /// The props of `tabs`.
 type alias TabsProps = {
   /// The tab shown, counting from 0.
-  selected : Int;
+  selected : Int
 }
 
 /// The props of `button`.
 type alias ButtonProps c = {
   /// Whether the button is greyed out and ignores clicks.
-  disabled : Bool;
+  disabled : Bool
   /// What runs on each click, with a copy of it.
-  on_click : (Handler ClickSnapshot)^c;
+  on_click : (Handler ClickSnapshot)^c
 }
 
 /// The props of `input`.
 type alias InputProps c = {
   /// The initial text: later edits do not reset it.
-  value : String;
+  value : String
   /// The hint shown while the input is empty.
-  placeholder : String;
+  placeholder : String
   /// What runs after each edit, with the new text.
-  on_input : (Handler InputSnapshot)^c;
+  on_input : (Handler InputSnapshot)^c
 }
 
 /// The props of `select`: every field speaks of the same `a`.
 type alias SelectProps a c = {
   /// The choices, in the order they are listed.
-  items : List a;
+  items : List a
   /// The item shown as chosen, if any: the one with its `key`.
-  selected : Option a;
+  selected : Option a
   /// What tells the items apart: their React key, which finds `selected`.
-  key : (a -> String)^c;
+  key : (a -> String)^c
   /// How an item is shown in the list.
-  render_item : (a -> Ui^c)^c;
+  render_item : (a -> Ui^c)^c
   /// What runs when an item is chosen, with that item.
-  on_change : (Handler a)^c;
+  on_change : (Handler a)^c
 }
 
 /// The named places of `panel`.
 type alias PanelSlots c = {
   /// The top of the panel.
-  header : Ui^c;
+  header : Ui^c
   /// The content of the panel.
-  body : Ui^c;
+  body : Ui^c
   /// The bottom of the panel, when there is one.
-  footer : Option (Ui^c);
+  footer : Option (Ui^c)
 }
 
 /// Text through the text channel: markup in it stays text.
@@ -421,11 +421,11 @@ foreign pure render from "flick:ui/react" "uiRender"
 /// The props of a field bound to a state.
 type alias FieldProps c = {
   /// The state the field shows and each keystroke writes.
-  bind : Atom.Writable String;
+  bind : Atom.Writable String
   /// The hint shown while the field is empty.
-  placeholder : String;
+  placeholder : String
   /// What runs as a task after each edit, once `bind` is written.
-  on_input : Option ((Handler InputSnapshot)^c);
+  on_input : Option ((Handler InputSnapshot)^c)
 }
 
 /// An input showing the state `bind`. Each keystroke writes it at once,
@@ -451,40 +451,40 @@ type Live = Polite | Assertive | Off
 /// none: `with_host { host with role = Some "status" } node`.
 type alias Host = {
   /// The `id` attribute: unique in the page.
-  id : Option String;
+  id : Option String
   /// The CSS classes, separated by spaces; they replace the ones the
   /// props give.
-  class_name : Option String;
+  class_name : Option String
   /// The ARIA role, such as `"status"` or `"dialog"`.
-  role : Option String;
+  role : Option String
   /// The name assistive technology reads.
-  aria_label : Option String;
+  aria_label : Option String
   /// The `id` of the element that describes this one.
-  aria_describedby : Option String;
+  aria_describedby : Option String
   /// Whether assistive technology skips the element.
-  aria_hidden : Option Bool;
+  aria_hidden : Option Bool
   /// The value fails its check.
-  aria_invalid : Option Bool;
+  aria_invalid : Option Bool
   /// A toggle button is on.
-  aria_pressed : Option Bool;
+  aria_pressed : Option Bool
   /// `aria-live`: how changes inside the element are announced.
-  aria_live : Option Live;
+  aria_live : Option Live
   /// `tabindex`: 0 puts the element in the tab order, -1 takes it out.
-  tab_index : Option Int;
+  tab_index : Option Int
   /// `data-*` attributes, by the name after `data-`: lowercase letters,
   /// digits and hyphens.
-  data : List (String, String);
+  data : List (String, String)
   /// `autocapitalize`: whether text entry starts sentences with a capital.
-  auto_capitalize : Option Bool;
+  auto_capitalize : Option Bool
   /// `autocorrect`: whether text entry corrects spelling.
-  auto_correct : Option Bool;
+  auto_correct : Option Bool
   /// Whether a text area wraps long lines (`wrap="soft"`) or scrolls
   /// (`wrap="off"`).
-  wrap : Option Bool;
+  wrap : Option Bool
   /// The `name` of a form field.
-  name : Option String;
+  name : Option String
   /// The kind of text an input takes: its `type`.
-  input_type : Option InputType;
+  input_type : Option InputType
 }
 
 /// The `type` of an input: `text`, `password` or `email`.
@@ -494,22 +494,22 @@ type InputType = TextInput | PasswordInput | EmailInput
 /// No host attribute.
 host : Host
 let host = {
-  id = None;
-  class_name = None;
-  role = None;
-  aria_label = None;
-  aria_describedby = None;
-  aria_hidden = None;
-  aria_invalid = None;
-  aria_pressed = None;
-  aria_live = None;
-  tab_index = None;
-  data = [];
-  auto_capitalize = None;
-  auto_correct = None;
-  wrap = None;
-  name = None;
-  input_type = None;
+  id = None
+  class_name = None
+  role = None
+  aria_label = None
+  aria_describedby = None
+  aria_hidden = None
+  aria_invalid = None
+  aria_pressed = None
+  aria_live = None
+  tab_index = None
+  data = []
+  auto_capitalize = None
+  auto_correct = None
+  wrap = None
+  name = None
+  input_type = None
 }
 
 /// The element `node` with the host attributes `attrs`; `data` names are

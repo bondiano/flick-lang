@@ -23,12 +23,12 @@ type alias BadArgument = { module_ : String; method : String; description : Opti
 
 /// A system call that failed; `pathOrDescriptor` is the file it was about.
 type alias SystemError = {
-  tag : SystemErrorTag;
-  module_ : String;
-  method : String;
-  description : Option String;
-  syscall : Option String;
-  pathOrDescriptor : Option String;
+  tag : SystemErrorTag
+  module_ : String
+  method : String
+  description : Option String
+  syscall : Option String
+  pathOrDescriptor : Option String
 }
 
 /// Why a platform call failed.

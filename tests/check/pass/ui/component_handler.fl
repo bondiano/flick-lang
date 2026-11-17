@@ -8,8 +8,8 @@ let count = Atom.make 0
 component counter () = ui {
   button
     {
-      disabled = false;
-      on_click = Ui.Event.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) });
+      disabled = false
+      on_click = Ui.Event.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
     }
     (text (show (Atom.value count)))
 }

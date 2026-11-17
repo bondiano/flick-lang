@@ -35,12 +35,12 @@ foreign pure site_encodable from "./route.mjs" "encodable"
 
 checking : Arbitrary.CheckOptions
 let checking = {
-  runs = Some 200;
-  size = None;
-  maxDiscards = None;
-  maxShrinks = None;
-  seed = Some 11;
-  replay = None;
+  runs = Some 200
+  size = None
+  maxDiscards = None
+  maxShrinks = None
+  seed = Some 11
+  replay = None
 }
 
 parsed : String -> String

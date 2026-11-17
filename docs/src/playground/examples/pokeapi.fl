@@ -15,7 +15,7 @@ named_json : PureCodec Json Named
 let named_json =
   ignore_extra_fields
     (codec Named.schema {
-      name = field "name" String.json;
+      name = field "name" String.json
     })
 
 type alias PokemonType = { slot : Int; info : Named }
@@ -26,26 +26,26 @@ pokemon_type_json : PureCodec Json PokemonType
 let pokemon_type_json =
   ignore_extra_fields
     (codec PokemonType.schema {
-      slot = field "slot" Int.json;
-      info = field "type" named_json;
+      slot = field "slot" Int.json
+      info = field "type" named_json
     })
 
 // A schema checks the fields we use; the API's other fields are ignored.
 type alias Pokemon = {
-  id : Int;
-  name : String;
-  height : Int;
-  weight : Int;
-  types : List PokemonType;
+  id : Int
+  name : String
+  height : Int
+  weight : Int
+  types : List PokemonType
 } deriving Schema
 
 pokemon_json : PureCodec Json Pokemon
 let pokemon_json = codec Pokemon.schema {
-  id = field "id" Int.json;
-  name = field "name" String.json;
-  height = field "height" Int.json;
-  weight = field "weight" Int.json;
-  types = field "types" (Codec.list pokemon_type_json);
+  id = field "id" Int.json
+  name = field "name" String.json
+  height = field "height" Int.json
+  weight = field "weight" Int.json
+  types = field "types" (Codec.list pokemon_type_json)
 }
 
 type alias Summary = { id : Int; name : String; types : List String }
@@ -59,9 +59,9 @@ let fetch_pokemon name =
 
 summarize : Pokemon -> Summary
 let summarize pokemon = {
-  id = pokemon.id;
-  name = pokemon.name;
-  types = List.map (fun item -> item.info.name) pokemon.types;
+  id = pokemon.id
+  name = pokemon.name
+  types = List.map (fun item -> item.info.name) pokemon.types
 }
 
 main : Unit ->{Async} Unit

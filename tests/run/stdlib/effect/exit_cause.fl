@@ -12,15 +12,15 @@ type alias Ex = Exit {Boom} Float
 
 span_options : Tracer.SpanOptions
 let span_options = {
-  attributes = [];
-  links = [];
-  parent = None;
-  root = false;
-  kind_ = Tracer.internal;
-  sampled = None;
-  level = None;
-  captureStackTrace = true;
-  disablePropagation = false;
+  attributes = []
+  links = []
+  parent = None
+  root = false
+  kind_ = Tracer.internal
+  sampled = None
+  level = None
+  captureStackTrace = true
+  disablePropagation = false
 }
 
 /// What a failure holds: fails, dies, interrupts, only interrupts.

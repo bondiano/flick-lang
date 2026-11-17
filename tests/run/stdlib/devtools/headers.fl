@@ -15,15 +15,15 @@ foreign stop from "./handshake.mjs" "stop"
 
 options : Tracer.SpanOptions
 let options = {
-  attributes = [];
-  links = [];
-  parent = None;
-  root = false;
-  kind_ = Tracer.internal;
-  sampled = None;
-  level = None;
-  captureStackTrace = false;
-  disablePropagation = false;
+  attributes = []
+  links = []
+  parent = None
+  root = false
+  kind_ = Tracer.internal
+  sampled = None
+  level = None
+  captureStackTrace = false
+  disablePropagation = false
 }
 
 main : Unit ->{Async; AppError} Unit

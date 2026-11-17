@@ -13,12 +13,12 @@ type error Offline = Offline Float
 
 checking : Arbitrary.CheckOptions
 let checking = {
-  runs = Some 100;
-  size = None;
-  maxDiscards = None;
-  maxShrinks = None;
-  seed = Some 7;
-  replay = None;
+  runs = Some 100
+  size = None
+  maxDiscards = None
+  maxShrinks = None
+  seed = Some 7
+  replay = None
 }
 
 integer_json : PureCodec Json Float
@@ -27,10 +27,10 @@ let integer_json =
   |> Check.apply Check.int
   |> Check.apply
     (Check.between {
-      minimum = 0 - 5;
-      maximum = 5;
-      exclusiveMinimum = false;
-      exclusiveMaximum = false;
+      minimum = 0 - 5
+      maximum = 5
+      exclusiveMinimum = false
+      exclusiveMaximum = false
     })
 
 ints : Arbitrary.Arbitrary Float

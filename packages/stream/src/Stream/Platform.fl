@@ -77,9 +77,9 @@ foreign pure watch_with from "flick:Stream" "flickWatchWith"
 /// Where `read_file` starts and how much it reads (`None`: from the start,
 /// all of it, in chunks of 64 KiB).
 type alias ReadOptions = {
-  offset : Option ByteSize.ByteSize;
-  bytesToRead : Option ByteSize.ByteSize;
-  chunkSize : Option Int;
+  offset : Option ByteSize.ByteSize
+  bytesToRead : Option ByteSize.ByteSize
+  chunkSize : Option Int
 }
 
 /// The bytes of the file in chunks, read through the `open` of the file

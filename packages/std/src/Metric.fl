@@ -19,20 +19,20 @@ type alias FrequencyState = { occurrences : List (String, Float) }
 
 /// The count of the values up to each boundary, and their total.
 type alias HistogramState = {
-  buckets : List (Float, Float);
-  count : Float;
-  min : Float;
-  max : Float;
-  sum : Float;
+  buckets : List (Float, Float)
+  count : Float
+  min : Float
+  max : Float
+  sum : Float
 }
 
 /// Each quantile with its value, `None` before any input.
 type alias SummaryState = {
-  quantiles : List (Float, Option Float);
-  count : Float;
-  min : Float;
-  max : Float;
-  sum : Float;
+  quantiles : List (Float, Option Float)
+  count : Float
+  min : Float
+  max : Float
+  sum : Float
 }
 
 /// Adds its inputs, or keeps the last one unless it is `incremental`.
@@ -48,36 +48,36 @@ type alias Histogram i = Metric i HistogramState
 type alias Summary i = Metric i SummaryState
 
 type alias CounterOptions = {
-  description : Option String;
-  attributes : Attributes;
-  incremental : Bool;
+  description : Option String
+  attributes : Attributes
+  incremental : Bool
 }
 type alias GaugeOptions = { description : Option String; attributes : Attributes }
 type alias FrequencyOptions = {
-  description : Option String;
-  attributes : Attributes;
-  preregisteredWords : List String;
+  description : Option String
+  attributes : Attributes
+  preregisteredWords : List String
 }
 type alias HistogramOptions = {
-  description : Option String;
-  attributes : Attributes;
-  boundaries : List Float;
+  description : Option String
+  attributes : Attributes
+  boundaries : List Float
 }
 
 /// `maxAge` and `maxSize` bound the inputs a summary keeps.
 type alias SummaryOptions = {
-  description : Option String;
-  attributes : Attributes;
-  maxAge : Duration.Duration;
-  maxSize : Int;
-  quantiles : List Float;
+  description : Option String
+  attributes : Attributes
+  maxAge : Duration.Duration
+  maxSize : Int
+  quantiles : List Float
 }
 
 /// `boundaries` defaults to exponential ones from 1 millisecond.
 type alias TimerOptions = {
-  description : Option String;
-  attributes : Attributes;
-  boundaries : Option (List Float);
+  description : Option String
+  attributes : Attributes
+  boundaries : Option (List Float)
 }
 
 /// The state of a metric, by kind.
@@ -90,10 +90,10 @@ type State =
 
 /// A metric of the registry and its state.
 type alias Snapshot = {
-  id : String;
-  description : Option String;
-  attributes : Attributes;
-  state : State;
+  id : String
+  description : Option String
+  attributes : Attributes
+  state : State
 }
 
 counter : String -> CounterOptions -> Counter

@@ -71,13 +71,13 @@ let login =
   |> HttpApi.security_set_cookie session
 
 type alias Handlers r = {
-  bytes : HttpApi.Request Unit Unit Unit (List Int) ->{r} List Int;
-  form : HttpApi.Request Unit Unit Unit Note ->{r} String;
-  parts : HttpApi.Request Unit Unit Unit Parts ->{r; MultipartError} String;
-  chunks : HttpApi.Request Unit Unit Unit Unit ->{r} Stream none none (List Int);
-  ticks : HttpApi.Request Unit Unit Unit Unit ->{r} Stream none none Tick;
-  events : HttpApi.Request Unit Unit Unit Unit ->{r} Stream none none HttpApi.SseEvent;
-  login : HttpApi.Request Unit Unit Unit Unit ->{r} ((String, Count), Option (Redacted String));
+  bytes : HttpApi.Request Unit Unit Unit (List Int) ->{r} List Int
+  form : HttpApi.Request Unit Unit Unit Note ->{r} String
+  parts : HttpApi.Request Unit Unit Unit Parts ->{r; MultipartError} String
+  chunks : HttpApi.Request Unit Unit Unit Unit ->{r} Stream none none (List Int)
+  ticks : HttpApi.Request Unit Unit Unit Unit ->{r} Stream none none Tick
+  events : HttpApi.Request Unit Unit Unit Unit ->{r} Stream none none HttpApi.SseEvent
+  login : HttpApi.Request Unit Unit Unit Unit ->{r} ((String, Count), Option (Redacted String))
 }
 
 api : HttpApi.Api {Async | r} { bodies : Handlers {Async | r} }
@@ -113,10 +113,10 @@ let upload =
       (List (List Int)))
   let file =
     File {
-      key = "doc";
-      name = "a.txt";
-      contentType = "text/plain";
-      content = Stream.from_list_effect text;
+      key = "doc"
+      name = "a.txt"
+      contentType = "text/plain"
+      content = Stream.from_list_effect text
     }
   Stream.from_list_effect
     (task { [Field { key = "title"; contentType = "text/plain"; value = "notes" }, file] } : Eff
@@ -127,15 +127,15 @@ let upload =
 handlers : { bodies : Handlers {Async} }
 let handlers = {
   bodies = {
-    bytes = fun request -> List.reverse request.payload;
-    form = fun request -> "title " ++ request.payload.title;
+    bytes = fun request -> List.reverse request.payload
+    form = fun request -> "title " ++ request.payload.title
     parts = fun request ->
-      String.join ", " (Stream.run_collect (Stream.map_effect describe request.payload));
-    chunks = fun _ -> Stream.Platform.encode_text (Stream.from_list ["ab", "cd"]);
-    ticks = fun _ -> Stream.from_list [{ n = 1 }, { n = 2 }];
-    events = fun _ -> Stream.from_list [{ id = Some "7"; event = "note"; data = "two\nlines" }];
-    login = fun _ -> (("hi", { total = "3" }), Some (Redacted.make "s3cret"));
-  };
+      String.join ", " (Stream.run_collect (Stream.map_effect describe request.payload))
+    chunks = fun _ -> Stream.Platform.encode_text (Stream.from_list ["ab", "cd"])
+    ticks = fun _ -> Stream.from_list [{ n = 1 }, { n = 2 }]
+    events = fun _ -> Stream.from_list [{ id = Some "7"; event = "note"; data = "two\nlines" }]
+    login = fun _ -> (("hi", { total = "3" }), Some (Redacted.make "s3cret"))
+  }
 }
 
 empty : HttpApi.Request Unit Unit Unit Unit
@@ -151,11 +151,11 @@ let main () =
         String.contains "multipart/form-data" document,
       ))
   let options : HttpApi.ServeOptions = {
-    host = "127.0.0.1";
-    port = 0;
-    openapi = None;
-    swagger = None;
-    scalar = None;
+    host = "127.0.0.1"
+    port = 0
+    openapi = None
+    swagger = None
+    scalar = None
   }
   try
     scope s {
@@ -168,10 +168,10 @@ let main () =
       Platform.stdout_line
         ("form: "
           ++ HttpApi.call base form {
-            path = ();
-            query = ();
-            headers = ();
-            payload = { title = "notes" };
+            path = ()
+            query = ()
+            headers = ()
+            payload = { title = "notes" }
           })
       Platform.stdout_line
         ("parts: "

@@ -41,8 +41,8 @@ let make_optional get set = Optional { find = get; write = set }
 from_check : (a -> Bool) -> String -> Prism a a
 let from_check ok message =
   Prism {
-    find = fun value -> if ok value then Ok value else Err message;
-    build = fun value -> value;
+    find = fun value -> if ok value then Ok value else Err message
+    build = fun value -> value
   }
 
 /// The iso of a value to itself.
@@ -56,8 +56,8 @@ let some () =
     find = fun value ->
       match value with
       | Some part -> Ok part
-      | None -> Err "expected a Some value";
-    build = fun part -> Some part;
+      | None -> Err "expected a Some value"
+    build = fun part -> Some part
   }
 
 /// A `None`.
@@ -67,8 +67,8 @@ let none () =
     find = fun value ->
       match value with
       | None -> Ok ()
-      | Some _ -> Err "expected a None value";
-    build = fun _ -> None;
+      | Some _ -> Err "expected a None value"
+    build = fun _ -> None
   }
 
 /// The value of an `Ok`.
@@ -78,8 +78,8 @@ let success () =
     find = fun value ->
       match value with
       | Ok part -> Ok part
-      | Err _ -> Err "expected a Result.Success value";
-    build = fun part -> Ok part;
+      | Err _ -> Err "expected a Result.Success value"
+    build = fun part -> Ok part
   }
 
 /// The error of an `Err`.
@@ -89,8 +89,8 @@ let failure () =
     find = fun value ->
       match value with
       | Err part -> Ok part
-      | Ok _ -> Err "expected a Result.Failure value";
-    build = fun part -> Err part;
+      | Ok _ -> Err "expected a Result.Failure value"
+    build = fun part -> Err part
   }
 
 /// The part a lens focuses on: `whole |> Optic.get lens`.
@@ -144,27 +144,27 @@ let modify_all (Traversal optional) f whole = modify optional (List.map f) whole
 compose : Optional a b -> Optional s a -> Optional s b
 let compose (Optional inner) (Optional outer) =
   Optional {
-    find = fun whole -> Result.bind inner.find (outer.find whole);
+    find = fun whole -> Result.bind inner.find (outer.find whole)
     write = fun part whole ->
       outer.find whole
       |> Result.bind (inner.write part)
-      |> Result.bind (fun middle -> outer.write middle whole);
+      |> Result.bind (fun middle -> outer.write middle whole)
   }
 
 /// `compose` of two lenses, a lens.
 compose_lens : Lens a b -> Lens s a -> Lens s b
 let compose_lens (Lens inner) (Lens outer) =
   Lens {
-    read = fun whole -> inner.read (outer.read whole);
-    write = fun part whole -> outer.write (inner.write part (outer.read whole)) whole;
+    read = fun whole -> inner.read (outer.read whole)
+    write = fun part whole -> outer.write (inner.write part (outer.read whole)) whole
   }
 
 /// `compose` of two prisms, a prism.
 compose_prism : Prism a b -> Prism s a -> Prism s b
 let compose_prism (Prism inner) (Prism outer) =
   Prism {
-    find = fun whole -> Result.bind inner.find (outer.find whole);
-    build = fun part -> outer.build (inner.build part);
+    find = fun whole -> Result.bind inner.find (outer.find whole)
+    build = fun part -> outer.build (inner.build part)
   }
 
 /// An optional of a list of parts, as a traversal of the parts.
@@ -183,8 +183,8 @@ let iso_prism (Iso iso) = Prism { find = fun whole -> Ok (iso.there whole); buil
 lens_optional : Lens s a -> Optional s a
 let lens_optional (Lens lens) =
   Optional {
-    find = fun whole -> Ok (lens.read whole);
-    write = fun part whole -> Ok (lens.write part whole);
+    find = fun whole -> Ok (lens.read whole)
+    write = fun part whole -> Ok (lens.write part whole)
   }
 
 /// A prism as an optional.

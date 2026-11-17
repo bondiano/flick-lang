@@ -19,10 +19,10 @@ type TimeToLiveStrategy = Creation | Usage
 /// Each acquisition has a fresh region `t`; a type that names it cannot escape.
 make :
   {
-    acquire : forall t. Eff {Scope t | r} e a^{t};
-    size : Int;
-    concurrency : Option Int;
-    targetUtilization : Option Float;
+    acquire : forall t. Eff {Scope t | r} e a^{t}
+    size : Int
+    concurrency : Option Int
+    targetUtilization : Option Float
   } ->{Scope s | r}
   Pool s e a
 foreign effect make from "flick:Pool" "flickMake"
@@ -31,13 +31,13 @@ foreign effect make from "flick:Pool" "flickMake"
 /// after `timeToLive` (by `timeToLiveStrategy`; `None`: `Usage`).
 make_with_ttl :
   {
-    acquire : forall t. Eff {Scope t | r} e a^{t};
-    min : Int;
-    max : Int;
-    concurrency : Option Int;
-    targetUtilization : Option Float;
-    timeToLive : Duration.Duration;
-    timeToLiveStrategy : Option TimeToLiveStrategy;
+    acquire : forall t. Eff {Scope t | r} e a^{t}
+    min : Int
+    max : Int
+    concurrency : Option Int
+    targetUtilization : Option Float
+    timeToLive : Duration.Duration
+    timeToLiveStrategy : Option TimeToLiveStrategy
   } ->{Scope s | r}
   Pool s e a
 foreign effect make_with_ttl from "flick:Pool" "flickMakeWithTtl"

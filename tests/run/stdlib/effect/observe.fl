@@ -7,15 +7,15 @@ type error Boom = Boom Float
 
 options : Tracer.SpanOptions
 let options = {
-  attributes = [("user", "ada")];
-  links = [];
-  parent = None;
-  root = false;
-  kind_ = Tracer.internal;
-  sampled = None;
-  level = None;
-  captureStackTrace = false;
-  disablePropagation = false;
+  attributes = [("user", "ada")]
+  links = []
+  parent = None
+  root = false
+  kind_ = Tracer.internal
+  sampled = None
+  level = None
+  captureStackTrace = false
+  disablePropagation = false
 }
 
 /// A logger writing the level and the message to stdout.

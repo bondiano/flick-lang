@@ -23,8 +23,8 @@ finish_button : String -> Ui
 let finish_button title = ui {
   button
     {
-      disabled = false;
-      on_click = Ui.Event.exhaust (fun _ -> task { Atom.update shelf (Books.finish title) });
+      disabled = false
+      on_click = Ui.Event.exhaust (fun _ -> task { Atom.update shelf (Books.finish title) })
     }
     (text "finish")
 }

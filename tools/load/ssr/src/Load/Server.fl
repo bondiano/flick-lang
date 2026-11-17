@@ -18,7 +18,7 @@ let id () = Option.with_default "none" (Http.Router.param "id")
 html_options : Http.ServerResponse.Options
 let html_options = {
   Http.ServerResponse.defaults with
-  contentType = Some "text/html; charset=utf-8";
+  contentType = Some "text/html; charset=utf-8"
 }
 
 /// The streamed markup of `view` for request `n`, with a registry of its own.

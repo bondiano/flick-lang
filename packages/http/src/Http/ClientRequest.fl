@@ -21,23 +21,23 @@ type CompressionAlgorithm = Gzip | Deflate
 /// What `make` and `modify` set besides the method and the URL; `defaults`
 /// sets nothing.
 type alias Options = {
-  urlParams : Option Http.UrlParams.Input;
-  hash : Option String;
-  headers : Option Http.Headers.Input;
-  body : Option Http.Body.Body;
-  accept : Option String;
-  acceptJson : Bool;
+  urlParams : Option Http.UrlParams.Input
+  hash : Option String
+  headers : Option Http.Headers.Input
+  body : Option Http.Body.Body
+  accept : Option String
+  acceptJson : Bool
 }
 
 /// Options that set nothing: `{ Http.ClientRequest.defaults with acceptJson = true }`.
 defaults : Options
 let defaults = {
-  urlParams = None;
-  hash = None;
-  headers = None;
-  body = None;
-  accept = None;
-  acceptJson = false;
+  urlParams = None
+  hash = None
+  headers = None
+  body = None
+  accept = None
+  acceptJson = false
 }
 
 /// A `GET` of no URL.

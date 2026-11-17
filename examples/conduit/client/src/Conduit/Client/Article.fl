@@ -217,8 +217,8 @@ module Comments exposing (thread) =
       if mine then
         span { class_name = "mod-options" }
           button {
-            disabled = false;
-            on_click = Action.with delete_comment (props.slug, comment.id);
+            disabled = false
+            on_click = Action.with delete_comment (props.slug, comment.id)
           }
             icon { class_name = "ion-trash-a" }
       else

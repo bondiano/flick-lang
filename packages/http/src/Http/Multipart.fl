@@ -35,21 +35,21 @@ type error MultipartError = MultipartError MultipartErrorReason
 /// a file and of the whole body, and the media types of parts read as
 /// fields (none: the default ones).
 type alias Limits = {
-  maxParts : Option Int;
-  maxFieldSize : Option ByteSize.ByteSize;
-  maxFileSize : Option ByteSize.ByteSize;
-  maxTotalSize : Option ByteSize.ByteSize;
-  fieldMimeTypes : List String;
+  maxParts : Option Int
+  maxFieldSize : Option ByteSize.ByteSize
+  maxFileSize : Option ByteSize.ByteSize
+  maxTotalSize : Option ByteSize.ByteSize
+  fieldMimeTypes : List String
 }
 
 /// No bounds besides the defaults.
 limits : Limits
 let limits = {
-  maxParts = None;
-  maxFieldSize = None;
-  maxFileSize = None;
-  maxTotalSize = None;
-  fieldMimeTypes = [];
+  maxParts = None
+  maxFieldSize = None
+  maxFileSize = None
+  maxTotalSize = None
+  fieldMimeTypes = []
 }
 
 /// Reads the form of the request; its files are removed when the scope of
@@ -111,13 +111,13 @@ foreign effect with_limits from "flick:http/Multipart" "flickWithLimits"
 /// What the header of a part says: its field name, file name, media type
 /// and disposition, with their parameters, and all its headers.
 type alias PartInfo = {
-  name : String;
-  filename : Option String;
-  contentType : String;
-  contentTypeParameters : List (String, String);
-  contentDisposition : String;
-  contentDispositionParameters : List (String, String);
-  headers : List (String, String);
+  name : String
+  filename : Option String
+  contentType : String
+  contentTypeParameters : List (String, String)
+  contentDisposition : String
+  contentDispositionParameters : List (String, String)
+  headers : List (String, String)
 }
 
 /// Whether the parser reads the part as a file: it has a file name, or a
@@ -135,10 +135,10 @@ foreign pure decode_field from "flick:http/Multipart" "flickDecodeField"
 type Part =
   | Field { key : String; contentType : String; value : String }
   | File {
-    key : String;
-    name : String;
-    contentType : String;
-    content : Stream {Async} {MultipartError} (List Int);
+    key : String
+    name : String
+    contentType : String
+    content : Stream {Async} {MultipartError} (List Int)
   }
 
 /// The parts of the request's form, in order.

@@ -48,9 +48,9 @@ let register request =
   unique (People.taken None (Some given.username) (Some given.email))
   let id =
     People.insert {
-      username = given.username;
-      email = given.email;
-      password_hash = hash given.password;
+      username = given.username
+      email = given.email
+      password_hash = hash given.password
     }
   match People.by_id id with
   | Some account -> signed account
@@ -78,15 +78,15 @@ let current_user _ =
 /// The account with the change applied; a new password is hashed.
 changed : Account -> Validate.Change ->{Async, Crypto.Crypto} Account
 let changed account change = {
-  id = account.id;
-  username = Option.with_default account.username change.username;
-  email = Option.with_default account.email change.email;
+  id = account.id
+  username = Option.with_default account.username change.username
+  email = Option.with_default account.email change.email
   password_hash =
     match change.password with
     | Some password -> hash password
-    | None -> account.password_hash;
-  bio = Option.with_default account.bio change.bio;
-  image = Option.with_default account.image change.image;
+    | None -> account.password_hash
+  bio = Option.with_default account.bio change.bio
+  image = Option.with_default account.image change.image
 }
 
 /// Changes the signed-in user: a name or email another has is 409.

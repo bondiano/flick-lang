@@ -124,10 +124,10 @@ let main () =
         big
           "\"2\""
           (Check.between_bigint {
-            minimum = 1n;
-            maximum = 2n;
-            exclusiveMinimum = false;
-            exclusiveMaximum = false;
+            minimum = 1n
+            maximum = 2n
+            exclusiveMinimum = false
+            exclusiveMaximum = false
           }),
       ])
   let one = BigDecimal.from_integer 1n
@@ -142,10 +142,10 @@ let main () =
         decimal
           "\"1.25\""
           (Check.between_decimal {
-            minimum = one;
-            maximum = two;
-            exclusiveMinimum = false;
-            exclusiveMaximum = false;
+            minimum = one
+            maximum = two
+            exclusiveMinimum = false
+            exclusiveMaximum = false
           }),
       ])
   both "greater_than_by" "\"c\"" "\"a\"" (Check.greater_than_by "b")

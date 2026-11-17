@@ -12,24 +12,24 @@ type Schedule (r : ServiceRow) (e : ErrorRow) i o
 
 /// What a callback of a schedule sees of the step it decides.
 type alias InputMetadata i = {
-  input : i;
-  attempt : Int;
-  start : Float;
-  now : Float;
-  elapsed : Float;
-  elapsedSincePrevious : Float;
+  input : i
+  attempt : Int
+  start : Float
+  now : Float
+  elapsed : Float
+  elapsedSincePrevious : Float
 }
 
 /// A step's metadata with its output and the delay chosen.
 type alias Metadata o i = {
-  input : i;
-  output : o;
-  duration : Duration.Duration;
-  attempt : Int;
-  start : Float;
-  now : Float;
-  elapsed : Float;
-  elapsedSincePrevious : Float;
+  input : i
+  output : o
+  duration : Duration.Duration
+  attempt : Int
+  start : Float
+  now : Float
+  elapsed : Float
+  elapsedSincePrevious : Float
 }
 
 /// Recurs forever, `n` counting the recurrences from 0, without a delay.

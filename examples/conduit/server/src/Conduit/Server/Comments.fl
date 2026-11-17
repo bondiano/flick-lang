@@ -9,15 +9,15 @@ import Conduit.Server.Schema exposing (Comments, Follows, Users)
 
 /// A comment with its author and whether the reader follows them.
 type alias Row = {
-  id : BigInt;
-  body : String;
-  created_at : String;
-  updated_at : String;
-  author_id : BigInt;
-  username : String;
-  bio : Option String;
-  image : Option String;
-  following : BigInt;
+  id : BigInt
+  body : String
+  created_at : String
+  updated_at : String
+  author_id : BigInt
+  username : String
+  bio : Option String
+  image : Option String
+  following : BigInt
 }
 
 /// The comments `which` keeps, oldest first.

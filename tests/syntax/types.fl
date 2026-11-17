@@ -30,8 +30,8 @@ constrained : (Show a, Eq a) => a -> a -> Bool
 multiline : forall c. SaveButtonProps c -> Ui^c
 
 type alias Props c = {
-  on_save : (Unit ->{Users; SaveError} Unit)^c;
-  render : (a -> Ui^c)^c;
+  on_save : (Unit ->{Users; SaveError} Unit)^c
+  render : (a -> Ui^c)^c
 }
 
 holes : List _ -> (_, Float)

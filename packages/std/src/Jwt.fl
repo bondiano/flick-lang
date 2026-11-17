@@ -29,14 +29,14 @@ header_json : PureCodec Json Header
 let header_json =
   ignore_extra_fields
     (codec Header.schema {
-      alg = field "alg" String.json;
+      alg = field "alg" String.json
     })
 
 expiry_json : PureCodec Json Expiry
 let expiry_json =
   ignore_extra_fields
     (codec Expiry.schema {
-      exp = optional_field "exp" Float.json_finite;
+      exp = optional_field "exp" Float.json_finite
     })
 
 /// The base64url of `{"alg":"HS256","typ":"JWT"}`.

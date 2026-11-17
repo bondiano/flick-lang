@@ -25,9 +25,9 @@ form_input : String -> Ui.InputType -> String -> Atom.Writable String -> Ui
 let form_input name input placeholder bind = ui {
   let attributes = {
     host with
-    name = Some name;
-    input_type = Some input;
-    class_name = Some "form-control form-control-lg";
+    name = Some name
+    input_type = Some input
+    class_name = Some "form-control form-control-lg"
   }
   fieldset { class_name = "form-group" }
     with_host attributes (field { bind = bind; placeholder = placeholder; on_input = None })
@@ -79,9 +79,9 @@ sign_up : Action.Action Unit
 let sign_up =
   Action.exhaust (fun _ -> task {
     let user = {
-      username = Some (Atom.current username);
-      email = Some (Atom.current email);
-      password = Some (Atom.current password);
+      username = Some (Atom.current username)
+      email = Some (Atom.current email)
+      password = Some (Atom.current password)
     }
     failed (fun () ->
       (Session.call (Session.at None () { user = user }) Api.Public.endpoints.register).user
@@ -116,15 +116,15 @@ sign_in_page : Ui
 let sign_in_page = ui {
   render form_page {
     layout = {
-      heading = "Sign in";
-      other = Route.to Register (text "Need an account?");
-      submit = sign_in;
-      label = "Sign in";
-    };
+      heading = "Sign in"
+      other = Route.to Register (text "Need an account?")
+      submit = sign_in
+      label = "Sign in"
+    }
     fields = [
       form_input "email" EmailInput "Email" email,
       form_input "password" PasswordInput "Password" password,
-    ];
+    ]
   }
 }
 
@@ -133,15 +133,15 @@ sign_up_page : Ui
 let sign_up_page = ui {
   render form_page {
     layout = {
-      heading = "Sign up";
-      other = Route.to Login (text "Have an account?");
-      submit = sign_up;
-      label = "Sign up";
-    };
+      heading = "Sign up"
+      other = Route.to Login (text "Have an account?")
+      submit = sign_up
+      label = "Sign up"
+    }
     fields = [
       form_input "username" TextInput "Username" username,
       form_input "email" EmailInput "Email" email,
       form_input "password" PasswordInput "Password" password,
-    ];
+    ]
   }
 }

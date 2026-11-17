@@ -17,6 +17,7 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
 use crate::types::lang::Lang;
 
+mod arrows;
 mod kinds;
 mod omit;
 mod rows;
@@ -183,7 +184,7 @@ impl Checker<'_> {
                 ),
                 Kind::Type,
             ),
-            K::ArrowType => (self.arrow(&children, free), Kind::Type),
+            K::ArrowType => (self.arrow(node, &children, free), Kind::Type),
             K::RecordType => (Type::Record(self.record_type(node, free)), Kind::Type),
             K::RowType => {
                 let expected = self.kinds.resolve(expected);
@@ -302,17 +303,18 @@ impl Checker<'_> {
     }
 
     /// `a -> b`, `a ->{r; e} b`.
-    fn arrow(&mut self, children: &[&Node], free: Free) -> Type {
+    fn arrow(&mut self, node: &Node, children: &[&Node], free: Free) -> Type {
         let param = self.ty(children[0], &Kind::Type, free);
         let effects = children
             .iter()
             .find(|c| c.kind == K::EffectAnnot)
             .map(|e| Box::new(self.effects(e, free)));
-        let result = children
-            .iter()
-            .skip(1)
-            .find(|c| is_type(c.kind))
-            .map_or(Type::Error, |r| self.ty(r, &Kind::Type, free));
+        let result = children.iter().skip(1).find(|c| is_type(c.kind));
+        let result = match result {
+            Some(r) if effects.is_none() && self.spaced_effect_arrow(node, r) => Type::Error,
+            Some(r) => self.ty(r, &Kind::Type, free),
+            None => Type::Error,
+        };
         Type::Fun {
             param: Box::new(param),
             effects,

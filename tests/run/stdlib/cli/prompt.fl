@@ -40,10 +40,10 @@ let next_key keys =
 scripted : Ref (List Terminal.UserInput) -> Ref (List String) -> Layer none none {Cli.Prompt.Tty}
 let scripted keys frames =
   Layer.succeed Tty {
-    read_key = fun () -> next_key keys;
-    display = fun text -> Ref.set frames ([text] ++ Ref.get frames);
-    columns = fun () -> 80;
-    rows = fun () -> 24;
+    read_key = fun () -> next_key keys
+    display = fun text -> Ref.set frames ([text] ++ Ref.get frames)
+    columns = fun () -> 80
+    rows = fun () -> 24
   }
 
 /// A question without a default or a check; the frames are not shown here.
@@ -55,11 +55,11 @@ let not_empty value = if value == "" then Err "required" else Ok value
 
 choice : String -> a -> Cli.Prompt.SelectChoice a
 let choice title value = {
-  title = title;
-  value = value;
-  description = None;
-  disabled = false;
-  selected = false;
+  title = title
+  value = value
+  description = None
+  disabled = false
+  selected = false
 }
 
 sure : Cli.Prompt.ConfirmOptions
@@ -67,33 +67,33 @@ let sure = { message = "Sure?"; initial = None; label = None; placeholder = None
 
 toggle_options : Cli.Prompt.ToggleOptions
 let toggle_options = {
-  message = "On?";
-  initial = Some false;
-  active = Some "on";
-  inactive = Some "off";
+  message = "On?"
+  initial = Some false
+  active = Some "on"
+  inactive = Some "off"
 }
 
 int_options : Cli.Prompt.IntOptions
 let int_options = {
-  message = "Count?";
-  default = None;
-  min = Some 0;
-  max = Some 100;
-  incrementBy = None;
-  decrementBy = None;
-  validate = None;
+  message = "Count?"
+  default = None
+  min = Some 0
+  max = Some 100
+  incrementBy = None
+  decrementBy = None
+  validate = None
 }
 
 number_options : Cli.Prompt.NumberOptions
 let number_options = {
-  message = "Ratio?";
-  default = None;
-  min = None;
-  max = None;
-  incrementBy = None;
-  decrementBy = None;
-  validate = None;
-  precision = Some 2;
+  message = "Ratio?"
+  default = None
+  min = None
+  max = None
+  incrementBy = None
+  decrementBy = None
+  validate = None
+  precision = Some 2
 }
 
 list_options : Cli.Prompt.ListOptions
@@ -101,28 +101,28 @@ let list_options = { message = "Tags?"; default = None; validate = None; delimit
 
 colors : Cli.Prompt.SelectOptions Float
 let colors = {
-  message = Some "Pick";
-  choices = [choice "red" 1, choice "green" 2, choice "blue" 3];
-  maxPerPage = None;
+  message = Some "Pick"
+  choices = [choice "red" 1, choice "green" 2, choice "blue" 3]
+  maxPerPage = None
 }
 
 languages : Cli.Prompt.AutoCompleteOptions String
 let languages = {
-  message = "Language?";
-  choices = [choice "TypeScript" "ts", choice "Rust" "rs"];
-  maxPerPage = None;
-  filterLabel = None;
-  filterPlaceholder = None;
-  emptyMessage = None;
+  message = "Language?"
+  choices = [choice "TypeScript" "ts", choice "Rust" "rs"]
+  maxPerPage = None
+  filterLabel = None
+  filterPlaceholder = None
+  emptyMessage = None
 }
 
 date_options : DateTime.DateTime -> Cli.Prompt.DateOptions
 let date_options start = {
-  message = "When?";
-  initial = Some start;
-  dateMask = None;
-  validate = None;
-  locales = None;
+  message = "When?"
+  initial = Some start
+  dateMask = None
+  validate = None
+  locales = None
 }
 
 /// The default theme with another prefix and no colors.
@@ -150,9 +150,9 @@ let count_key input state =
 /// Counts the up arrows until return.
 counter : Cli.Prompt.Handlers Float Float Terminal.UserInput
 let counter = {
-  render = fun state _ -> "count " ++ show state;
-  process = count_key;
-  clear = fun _ _ -> "";
+  render = fun state _ -> "count " ++ show state
+  process = count_key
+  clear = fun _ _ -> ""
 }
 
 /// A step of `on_event`: the first event ends it.
@@ -187,10 +187,10 @@ let questions () =
   let no =
     Cli.Prompt.run
       (Cli.Prompt.confirm {
-        message = "Really?";
-        initial = Some true;
-        label = Some label;
-        placeholder = Some placeholder;
+        message = "Really?"
+        initial = Some true
+        label = Some label
+        placeholder = Some placeholder
       })
   Platform.stdout_line ("confirm " ++ show (yes, no))
   let on = Cli.Prompt.run (Cli.Prompt.toggle toggle_options)
@@ -205,11 +205,11 @@ let questions () =
   let language = Cli.Prompt.run (Cli.Prompt.auto_complete languages)
   Platform.stdout_line ("auto_complete " ++ language)
   let multi : Cli.Prompt.MultiSelectOptions = {
-    selectAll = None;
-    selectNone = None;
-    inverseSelection = None;
-    min = Some 1;
-    max = None;
+    selectAll = None
+    selectNone = None
+    inverseSelection = None
+    min = Some 1
+    max = None
   }
   let many = Cli.Prompt.run (Cli.Prompt.multi_select colors multi)
   Platform.stdout_line ("multi_select " ++ show many)
@@ -266,12 +266,12 @@ let main () =
   let drawn = List.any (fun f -> String.contains ">>" f) (Ref.get frames)
   Platform.stdout_line ("run_themed " ++ themed ++ " prefix drawn " ++ show drawn)
   let walk : Cli.Prompt.FileOptions = {
-    type_ = Some Cli.Prompt.DirectoryPath;
-    message = None;
-    startingPath = Some "/";
-    default = None;
-    maxPerPage = Some 5;
-    filter = None;
+    type_ = Some Cli.Prompt.DirectoryPath
+    message = None
+    startingPath = Some "/"
+    default = None
+    maxPerPage = Some 5
+    filter = None
   }
   let _ = directories walk
   let _ : Layer none none {Cli.Prompt.Tty} = Cli.Prompt.node

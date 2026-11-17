@@ -11,17 +11,17 @@ React 19 (`react-dom/client`) and runs each event as a task.
 
 ```flick
 type alias SaveButtonProps c = {
-  label : String;
-  disabled : Bool;
-  on_save : (Unit ->{Atom.Write} Unit)^c;
+  label : String
+  disabled : Bool
+  on_save : (Unit ->{Atom.Write} Unit)^c
 }
 
 save_button : SaveButtonProps c -> Ui^c
 let save_button props = ui {
   button
     {
-      disabled = props.disabled;
-      on_click = Ui.Event.exhaust (fun _ -> task { props.on_save () });
+      disabled = props.disabled
+      on_click = Ui.Event.exhaust (fun _ -> task { props.on_save () })
     }
     (text props.label)
 }

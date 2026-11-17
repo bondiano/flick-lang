@@ -88,9 +88,9 @@ let remove_tag =
 written :
   Unit ->{Atom.Write} { title : Option String; description : Option String; body : Option String }
 let written () = {
-  title = Some (Atom.current title);
-  description = Some (Atom.current description);
-  body = Some (Atom.current body);
+  title = Some (Atom.current title)
+  description = Some (Atom.current description)
+  body = Some (Atom.current body)
 }
 
 /// Sends the article: a new one, or a change of the one at `slug`.
@@ -104,21 +104,21 @@ let send slug =
   | Some (Ok path) ->
     let change = {
       article = {
-        title = fields.title;
-        description = fields.description;
-        body = fields.body;
-        tagList = Some (Some (Atom.current tags));
-      };
+        title = fields.title
+        description = fields.description
+        body = fields.body
+        tagList = Some (Some (Atom.current tags))
+      }
     }
     (Session.call (Session.at jwt { slug = path } change) Api.Articles.endpoints.update_article).article
   | _ ->
     let draft = {
       article = {
-        title = fields.title;
-        description = fields.description;
-        body = fields.body;
-        tagList = Some (Atom.current tags);
-      };
+        title = fields.title
+        description = fields.description
+        body = fields.body
+        tagList = Some (Atom.current tags)
+      }
     }
     (Session.call (Session.at jwt () draft) Api.Articles.endpoints.create_article).article
 

@@ -124,9 +124,9 @@ let view props = ui {
 
 json : PureCodec Json Profile
 let json = codec Profile.schema {
-  email = field "email" Email.json;
+  email = field "email" Email.json
   nickname = optional_field "nickname" String.json
-    |> on_missing (fun () -> None);
+    |> on_missing (fun () -> None)
 }
 
 tree : Schema a -> Schema (Tree a)

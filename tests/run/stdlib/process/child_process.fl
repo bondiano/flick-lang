@@ -94,8 +94,8 @@ let main () =
         scope {
           let dir =
             FileSystem.make_temp_directory_scoped {
-              directory = None;
-              prefix = Some "flick-process-";
+              directory = None
+              prefix = Some "flick-process-"
             }
           run windows dir
         }

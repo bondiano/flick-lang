@@ -9,10 +9,10 @@ type alias Point = { x : Int; y : Int; label : Option String }
   deriving Schema
 
 type alias Order = {
-  id : BigInt;
-  items : List { sku : String; qty : Int };
-  shape : Shape;
-  paid : Result String Bool;
+  id : BigInt
+  items : List { sku : String; qty : Int }
+  shape : Shape
+  paid : Result String Bool
 } deriving Schema
 
 refined type Port = Float where fun n -> n > 0 && n < 65536

@@ -15,14 +15,14 @@ type error CronParseError = CronParseError String
 /// to `[0]`; with `and`, both the days and the weekdays must match. The
 /// zone is required, so matching never depends on the machine's zone.
 type alias Fields = {
-  seconds : Option (List Int);
-  minutes : List Int;
-  hours : List Int;
-  days : List Int;
-  months : List Int;
-  weekdays : List Int;
-  and : Option Bool;
-  tz : DateTime.TimeZone;
+  seconds : Option (List Int)
+  minutes : List Int
+  hours : List Int
+  days : List Int
+  months : List Int
+  weekdays : List Int
+  and : Option Bool
+  tz : DateTime.TimeZone
 }
 
 /// A cron of the fields; an error when a value is out of its range.

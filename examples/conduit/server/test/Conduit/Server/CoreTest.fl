@@ -44,16 +44,16 @@ let tests = [
       Test.equal
         [("password", ["is too short (minimum is 8 characters)"])]
         (problems {
-          username = Some "ada";
-          email = Some "ada@example.org";
-          password = Some "short7c";
+          username = Some "ada"
+          email = Some "ada@example.org"
+          password = Some "short7c"
         }),
       Test.equal
         []
         (problems {
-          username = Some "ada";
-          email = Some "ada@example.org";
-          password = Some (String.repeat 64 "a");
+          username = Some "ada"
+          email = Some "ada@example.org"
+          password = Some (String.repeat 64 "a")
         }),
     ]
   ),

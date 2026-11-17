@@ -165,7 +165,7 @@ fn lays_out_variants_and_deriving() {
       | Polygon (List Point)
       deriving Eq, Show
     type alias Wrapped (f : Type -> Type) a = {
-      value : f a;
+      value : f a
     } deriving Schema
     type alias Point = { x : Float; y : Float }
       deriving Eq

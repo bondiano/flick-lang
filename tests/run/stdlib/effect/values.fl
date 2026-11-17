@@ -3,13 +3,13 @@
 module App.Main exposing (main)
 
 type alias Point = {
-  x : Float;
-  y : Float;
+  x : Float
+  y : Float
 } deriving Schema
 
 type alias Shape = {
-  name : String;
-  corner : Point;
+  name : String
+  corner : Point
 } deriving Schema
 
 line : String -> String -> Unit ->{} Unit

@@ -24,18 +24,18 @@ let wrapped = [
 
 /// A snapshot: `modules` maps an entrypoint to `Module.name` → `kind fingerprint`.
 type alias Snapshot = {
-  package : String;
-  version : String;
-  entrypoints : List String;
-  modules : List (String, List (String, String));
+  package : String
+  version : String
+  entrypoints : List String
+  modules : List (String, List (String, String))
 } deriving Schema
 
 snapshot_json : PureCodec Json Snapshot
 let snapshot_json = codec Snapshot.schema {
-  package = field "package" String.json;
-  version = field "version" String.json;
-  entrypoints = field "entrypoints" (Codec.list String.json);
-  modules = field "modules" (Codec.entries (Codec.entries String.json));
+  package = field "package" String.json
+  version = field "version" String.json
+  entrypoints = field "entrypoints" (Codec.list String.json)
+  modules = field "modules" (Codec.entries (Codec.entries String.json))
 }
 
 /// The files of an entrypoint's conditions.
@@ -46,8 +46,8 @@ conditions_json : PureCodec Json Conditions
 let conditions_json =
   ignore_extra_fields
     (codec Conditions.schema {
-      types = optional_field "types" String.json;
-      default = optional_field "default" String.json;
+      types = optional_field "types" String.json
+      default = optional_field "default" String.json
     })
 
 /// What an entry of `exports` in `package.json` names: nothing, a file, or

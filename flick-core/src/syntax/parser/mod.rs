@@ -17,6 +17,7 @@ mod expr;
 mod fragment;
 mod pattern;
 mod plugin;
+mod report;
 mod types;
 
 use std::{iter, mem};
@@ -32,7 +33,7 @@ pub use fragment::{
 use super::cst::Node;
 use super::kind::{SyntaxKind, describe};
 use super::lexer::{RawToken, lex};
-use crate::diagnostics::{Code, Diagnostic, codes};
+use crate::diagnostics::{Diagnostic, codes};
 use crate::source::{FileId, Span};
 
 pub struct Parse {
@@ -410,31 +411,6 @@ impl<'t> Parser<'t> {
         }
     }
 
-    fn found(&self) -> String {
-        let t = self.raw();
-        if t.kind == K::Eof {
-            "end of file".into()
-        } else if self.sep().is_some() {
-            "the end of the line".into()
-        } else {
-            format!("`{}`", self.text_of(t))
-        }
-    }
-
-    fn error_at(&mut self, code: Code, span: Span, message: String) {
-        if self.failed || self.last_error_at == Some(self.pos) {
-            return;
-        }
-        self.failed = true;
-        self.last_error_at = Some(self.pos);
-        self.errors.push(Diagnostic::error(code, message, span));
-    }
-
-    fn error_expected(&mut self, what: &str) {
-        let message = format!("expected {what}, found {}", self.found());
-        self.error_at(codes::S007, self.here_span(), message);
-    }
-
     /// Wraps the rest of the current statement in an `Error` node.
     fn recover(&mut self) {
         let m = self.start();
@@ -629,6 +605,8 @@ impl<'t> Parser<'t> {
     }
 }
 
+#[cfg(test)]
+mod arrow_tests;
 #[cfg(test)]
 mod branch_tests;
 #[cfg(test)]

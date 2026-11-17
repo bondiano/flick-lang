@@ -53,9 +53,9 @@ let main () =
     (document (JsonSchema.from_openapi_3_0 (json "{\"type\": \"string\", \"nullable\": true}")))
   let defs : JsonSchema.Definitions = doc.definitions
   let multi : JsonSchema.MultiDocument = {
-    dialect = "draft-2020-12";
-    schemas = NonEmpty.singleton doc.root;
-    definitions = defs;
+    dialect = "draft-2020-12"
+    schemas = NonEmpty.singleton doc.root
+    definitions = defs
   }
   let openapi = JsonSchema.to_openapi_3_1 multi
   line "to_openapi_3_1" (openapi.dialect ++ " " ++ Json.stringify (NonEmpty.head openapi.schemas))

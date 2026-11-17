@@ -8,8 +8,8 @@ service Render =
 
 render_impl : Render.Impl
 let render_impl = {
-  render = fun x -> "<" ++ show x ++ ">";
-  pair = fun x y -> show x ++ "/" ++ show y;
+  render = fun x -> "<" ++ show x ++ ">"
+  pair = fun x y -> show x ++ "/" ++ show y
 }
 
 // the dictionary of `a` is the one `twice` is given

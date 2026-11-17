@@ -93,9 +93,9 @@ let sets () =
   }
   Platform.stdout_line ("set join: " ++ joined)
   let map_options = {
-    onlyIfMissing = false;
-    propagateInterruption = false;
-    startImmediately = false;
+    onlyIfMissing = false
+    propagateInterruption = false
+    startImmediately = false
   }
   scope s {
     let map : FiberMap.FiberMap s String {Boom} String = FiberMap.make ()

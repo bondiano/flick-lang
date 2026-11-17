@@ -6,8 +6,8 @@ import Cli.Prompt exposing (Tty)
 
 press : String -> Option String -> Terminal.UserInput
 let press name input = {
-  input = input;
-  key = { name = name; ctrl = false; meta = false; shift = false };
+  input = input
+  key = { name = name; ctrl = false; meta = false; shift = false }
 }
 
 /// `text` typed, then return.
@@ -23,10 +23,10 @@ let terminal keys =
       | Some key ->
         Ref.update keys (List.drop 1)
         key
-      | None -> from_result (Err Terminal.QuitError);
-    display = fun _ -> ();
-    columns = fun () -> 80;
-    rows = fun () -> 24;
+      | None -> from_result (Err Terminal.QuitError)
+    display = fun _ -> ()
+    columns = fun () -> 80
+    rows = fun () -> 24
   }
 
 /// The answer to `first_note` when the keys are `keys`.

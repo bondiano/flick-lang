@@ -45,15 +45,15 @@ let ms n = Result.with_default Duration.zero (Duration.millis n)
 
 options : Tracer.SpanOptions
 let options = {
-  attributes = [];
-  links = [];
-  parent = None;
-  root = false;
-  kind_ = Tracer.internal;
-  sampled = None;
-  level = None;
-  captureStackTrace = false;
-  disablePropagation = false;
+  attributes = []
+  links = []
+  parent = None
+  root = false
+  kind_ = Tracer.internal
+  sampled = None
+  level = None
+  captureStackTrace = false
+  disablePropagation = false
 }
 
 failures : Unit ->{Async; Boom} Unit
@@ -228,10 +228,10 @@ let running () =
     let chunked =
       Channel.to_pubsub_array
         {
-          capacity = Some 4;
-          strategy = Some Queue.Dropping;
-          replay = Some 2;
-          shutdownOnEnd = false;
+          capacity = Some 4
+          strategy = Some Queue.Dropping
+          replay = Some 2
+          shutdownOnEnd = false
         }
         (Channel.from_list_chunked 2 [5, 6])
     let sub2 = PubSub.subscribe chunked

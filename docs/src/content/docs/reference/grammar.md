@@ -394,7 +394,9 @@ atom        = name | Con { "." Con } | "none" | "(" ")" | "(" type ")"
 - `a -> b` is pure; `a ->{r; e} b` is a runtime call needing services `r` and
   failing with errors `e`; `a ->{} b` is a runtime call with both rows empty,
   never the same as `->` (see [Specification](../../spec/), [Values of computations and their execution](../../spec/02-computations/)). `-> {` with a space is an arrow to a record
-  type.
+  type. A record touching its arrow, `->{ x : Int }`, is `FLICK-S007` and a
+  spaced row applied to the result, `-> {r; e} b`, is `FLICK-T002`; the fix of
+  each adds or removes the space.
 - `none` is the empty row literal. An arrow side left out is empty too:
   `->{; E}` is `->{none; E}`, `->{R}` is `->{R; none}` (see
   [effects.md](../effects/#empty-rows-none)). `{Users, Log}` is a closed row, a
@@ -621,8 +623,8 @@ multi-line strings and comments are copied verbatim. The formatter drops a
 redundant outer `forall` from a nonrecursive `let` signature, including a method
 of an `instance`, when its variables remain implicitly quantified; it keeps one
 needed by recursion, type shadowing or a comment. Other rewrites are separators that change nothing: `;` between
-statements becomes a line break, a broken bracket gets a trailing `,` and a
-broken record a `;` after every field, a broken variant list starts with
+statements becomes a line break, and so does `;` between the fields of a
+broken record, a broken bracket gets a trailing `,`, a broken variant list starts with
 `|`, and empty rows of an arrow are dropped, which are the same type:
 `->{none; E}` becomes `->{; E}`, `->{R; none}` becomes `->{R}`, and
 `->{none; none}` becomes `->{}`. `Eff none none a` stays as written. The formatter re-parses
@@ -656,7 +658,8 @@ fits; otherwise it breaks, outermost construct first:
   the last branch or arm stays on its line;
 - lists, tuples and `exposing (…)` put one item per line followed by `,`;
   records, record types, patterns and updates (`base with` on its own line)
-  put one field per line followed by `;`, a row tail `| r` last;
+  put one field per line with no `;`, as a block puts its statements, a row
+  tail `| r` last; on one line their fields are separated by `; `;
 - a signature puts its type on the next line, then `forall a.`, a context and
   each parameter of a function type on lines of their own; elsewhere a
   function type breaks after its arrows, one level in, `->{r; e}` staying
@@ -667,9 +670,9 @@ fits; otherwise it breaks, outermost construct first:
   of a `foreign` binding and the columns of a `sql table` always go one per
   line; in `sql`, `on` stays after its `join` when it fits.
 
-What the author decides, as in Gleam: a trailing `,` or `;` (`[a, b,]`,
-`{ a = 1; }`), or a blank line between items, keeps a bracket broken one item
-per line; a list of constants written several per line with a trailing `,`
+What the author decides, as in Gleam: a trailing `,` (`[a, b,]`), a line
+break right after the `{` of a record, or a blank line between items, keeps a
+bracket or a record broken one item per line; a list of constants written several per line with a trailing `,`
 is filled, as many per line as fit; a pipeline written with a step on its own
 line, its `|>` or `<|` at the start or at the end of a line, keeps one step
 per line, each operator at the start of its line. Blank lines between declarations, statements,

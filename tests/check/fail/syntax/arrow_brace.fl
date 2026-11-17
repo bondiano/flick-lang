@@ -1,0 +1,8 @@
+module App.ArrowBrace exposing (..)
+
+// `->{` opens an effect annotation, so an arrow to a record type needs a
+// space before its `{`; the fix adds it and the rest reads as the record.
+point : Int ->{ x : Int }
+let point n = { x = n }
+
+//~ FLICK-S007 @5:15-5:16 an arrow to a record type is written `-> {`

@@ -43,10 +43,10 @@ let paths () =
 fake_terminal : Layer none none {Terminal.Terminal}
 let fake_terminal =
   Layer.succeed Terminal {
-    columns = fun () -> 80;
-    rows = fun () -> 24;
-    read_line = fun () -> "typed";
-    display = fun text -> Platform.stdout_write ("[" ++ text ++ "]\n");
+    columns = fun () -> 80
+    rows = fun () -> 24
+    read_line = fun () -> "typed"
+    display = fun text -> Platform.stdout_write ("[" ++ text ++ "]\n")
   }
 
 quit_on_q : Terminal.UserInput -> Bool
@@ -89,17 +89,17 @@ let main () =
       provide Stdio.node { stdio () }
       let busy = PlatformError.Busy
       let system : PlatformError.SystemError = {
-        tag = busy;
-        module_ = "App";
-        method = "main";
-        description = None;
-        syscall = None;
-        pathOrDescriptor = Some "/x";
+        tag = busy
+        module_ = "App"
+        method = "main"
+        description = None
+        syscall = None
+        pathOrDescriptor = Some "/x"
       }
       let argument : PlatformError.BadArgument = {
-        module_ = "App";
-        method = "main";
-        description = Some "no";
+        module_ = "App"
+        method = "main"
+        description = Some "no"
       }
       let made = PlatformError.system_error system
       let refused = PlatformError.bad_argument argument

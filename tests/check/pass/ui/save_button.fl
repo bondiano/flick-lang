@@ -12,17 +12,17 @@ service Users =
   save : String ->{; SaveError} Unit
 
 type alias SaveButtonProps c = {
-  label : String;
-  disabled : Bool;
-  on_save : (Unit ->{Atom.Write} Unit)^c;
+  label : String
+  disabled : Bool
+  on_save : (Unit ->{Atom.Write} Unit)^c
 }
 
 save_button : SaveButtonProps c -> Ui^c
 let save_button props = ui {
   button
     {
-      disabled = props.disabled;
-      on_click = Ui.Event.exhaust (fun _ -> task { props.on_save () });
+      disabled = props.disabled
+      on_click = Ui.Event.exhaust (fun _ -> task { props.on_save () })
     }
     (text props.label)
 }
@@ -31,8 +31,8 @@ save_button_calls : SaveButtonProps c -> Ui^c
 let save_button_calls props =
   Ui.button
     {
-      disabled = props.disabled;
-      on_click = Ui.Event.exhaust (fun _ -> task { props.on_save () });
+      disabled = props.disabled
+      on_click = Ui.Event.exhaust (fun _ -> task { props.on_save () })
     }
     [Ui.text props.label]
 
@@ -54,14 +54,14 @@ reader : File.Path -> Ui
 let reader path = ui {
   button
     {
-      disabled = false;
+      disabled = false
       on_click =
         Ui.Event.exhaust (fun _ -> task {
           provide File.node {
             try scope { ignore (File.read_all (File.open_scoped path)) } with
             | _ -> ()
           }
-        });
+        })
     }
     (text "read")
 }
@@ -72,14 +72,14 @@ let held_in_scope path = scope {
   let view = ui {
     button
       {
-        disabled = false;
+        disabled = false
         on_click =
           Ui.Event.exhaust (fun _ -> task {
             provide File.node {
               try ignore (File.read_all file) with
               | _ -> ()
             }
-          });
+          })
       }
       (text "read")
   }

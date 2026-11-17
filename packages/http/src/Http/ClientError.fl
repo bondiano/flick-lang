@@ -6,17 +6,17 @@ import Http.Method
 
 /// The request a failure is about: its method, URL and what went wrong.
 type alias RequestDetails = {
-  method : Http.Method.Method;
-  url : String;
-  description : Option String;
+  method : Http.Method.Method
+  url : String
+  description : Option String
 }
 
 /// The request and the status of the response a failure is about.
 type alias ResponseDetails = {
-  method : Http.Method.Method;
-  url : String;
-  status : Int;
-  description : Option String;
+  method : Http.Method.Method
+  url : String
+  status : Int
+  description : Option String
 }
 
 /// Why a request failed: before a response came (`TransportError`, the

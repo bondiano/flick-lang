@@ -24,9 +24,9 @@ let main () =
           Http.ServerResponse.ServerResponse
         let app = Http.Router.router Http.Router.config [Prometheus.route "/metrics"]
         let options : Http.Server.ServeOptions = {
-          host = "127.0.0.1";
-          port = 0;
-          gracefulShutdownTimeout = None;
+          host = "127.0.0.1"
+          port = 0
+          gracefulShutdownTimeout = None
         }
         let server = Http.Server.serve options app
         let scraped = scrape (Http.Server.format_address (Http.Server.address server) ++ "/metrics")

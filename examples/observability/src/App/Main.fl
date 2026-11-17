@@ -14,15 +14,15 @@ let endpoint () =
 /// A span with one attribute.
 span : String -> String -> Tracer.SpanOptions
 let span key value = {
-  attributes = [(key, value)];
-  links = [];
-  parent = None;
-  root = false;
-  kind_ = Tracer.internal;
-  sampled = None;
-  level = None;
-  captureStackTrace = false;
-  disablePropagation = false;
+  attributes = [(key, value)]
+  links = []
+  parent = None
+  root = false
+  kind_ = Tracer.internal
+  sampled = None
+  level = None
+  captureStackTrace = false
+  disablePropagation = false
 }
 
 orders : Metric.Counter

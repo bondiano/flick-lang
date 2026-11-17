@@ -36,13 +36,13 @@ let view model m =
           [("aria-label", theme_label), ("title", theme_label)]
           (button
             {
-              disabled = false;
+              disabled = false
               on_click =
                 Ui.Event.latest (fun _ -> task {
                   let dark = not m.dark
                   set_dark dark
                   Atom.set model { m with dark = dark }
-                });
+                })
             }
             (span { class_name = "theme-light-icon" } (Elements.icon "moon"))
             (span { class_name = "theme-dark-icon" } (Elements.icon "sun"))))

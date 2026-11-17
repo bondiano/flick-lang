@@ -95,10 +95,10 @@ foreign effect to_queue_array from "flick:Channel" "flickToQueueArray"
 /// and strategy, the last `replay` messages for a new subscriber, and
 /// whether the hub shuts down when the channel ends.
 type alias HubOptions = {
-  capacity : Option Int;
-  strategy : Option Queue.Strategy;
-  replay : Option Int;
-  shutdownOnEnd : Bool;
+  capacity : Option Int
+  strategy : Option Queue.Strategy
+  replay : Option Int
+  shutdownOnEnd : Bool
 }
 
 /// Runs the channel in the background of the innermost `scope` (or the

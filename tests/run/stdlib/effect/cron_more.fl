@@ -42,14 +42,14 @@ let around tz expression now =
 
 fields : Cron.Fields
 let fields = {
-  seconds = None;
-  minutes = [];
-  hours = [];
-  days = [];
-  months = [];
-  weekdays = [];
-  and = None;
-  tz = utc;
+  seconds = None
+  minutes = []
+  hours = []
+  days = []
+  months = []
+  weekdays = []
+  and = None
+  tz = utc
 }
 
 texts : Unit ->{} Unit
@@ -82,10 +82,10 @@ let texts () =
         parsed
           (Cron.make {
             fields with
-            seconds = Some [30, 0, 30];
-            hours = [9, 17];
-            weekdays = [7, 1, 0];
-            and = Some true;
+            seconds = Some [30, 0, 30]
+            hours = [9, 17]
+            weekdays = [7, 1, 0]
+            and = Some true
           }),
         parsed (Cron.make { fields with minutes = [60] }),
         parsed (Cron.make { fields with weekdays = [8] }),

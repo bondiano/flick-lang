@@ -35,9 +35,9 @@ totals :
     Pg
     { min : BigInt }
     {
-      name : String;
-      accounts : BigInt;
-      total : Option BigDecimal.BigDecimal;
+      name : String
+      accounts : BigInt
+      total : Option BigDecimal.BigDecimal
     }
 let totals = sql p {
   from u in Users

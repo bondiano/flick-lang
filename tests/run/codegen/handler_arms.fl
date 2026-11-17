@@ -67,8 +67,8 @@ let greeter = { greet = fun name -> "hello, " ++ name }
 
 render_impl : Render.Impl
 let render_impl = {
-  render = fun x -> "<" ++ show x ++ ">";
-  pair = fun x y -> show x ++ "/" ++ show y;
+  render = fun x -> "<" ++ show x ++ ">"
+  pair = fun x y -> show x ++ "/" ++ show y
 }
 
 logged : Unit ->{} Unit

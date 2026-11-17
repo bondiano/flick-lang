@@ -40,102 +40,102 @@ type alias Public = {
     (Users None)
     { headers : Credentials; payload : NewUserBody }
     (Created UserBody)
-    {Conflict, Unprocessable};
+    {Conflict, Unprocessable}
   login : Post
     (Users (Some Login))
     { headers : Credentials; payload : LoginBody }
     UserBody
-    {Unauthorized, Unprocessable};
-  tags : Get Tags { headers : Credentials } TagsBody {};
+    {Unauthorized, Unprocessable}
+  tags : Get Tags { headers : Credentials } TagsBody {}
 } deriving HttpApi
 
 /// The signed-in user and the profiles.
 type alias Users = {
-  current_user : Authed (Get User { headers : Credentials } UserBody {Unauthorized});
+  current_user : Authed (Get User { headers : Credentials } UserBody {Unauthorized})
   update_user : Authed
     (Put
       User
       { headers : Credentials; payload : UpdateUserBody }
       UserBody
-      {Unauthorized, Conflict, Unprocessable});
+      {Unauthorized, Conflict, Unprocessable})
   get_profile : MaybeAuthed
     (Get
       (Profiles Username None)
       { headers : Credentials; path : ProfilePath }
       ProfileBody
-      {Unauthorized, NotFound});
+      {Unauthorized, NotFound})
   follow : Authed
     (Post
       (Profiles Username (Some Follow))
       { headers : Credentials; path : ProfilePath }
       ProfileBody
-      {Unauthorized, NotFound});
+      {Unauthorized, NotFound})
   unfollow : Authed
     (Delete
       (Profiles Username (Some Follow))
       { headers : Credentials; path : ProfilePath }
       ProfileBody
-      {Unauthorized, NotFound});
+      {Unauthorized, NotFound})
 } deriving HttpApi
 
 /// The articles, the feed, favorites and comments.
 type alias Articles = {
   list_articles : MaybeAuthed
-    (Get (Articles None) { headers : Credentials; query : ListQuery } ArticlesBody {Unauthorized});
+    (Get (Articles None) { headers : Credentials; query : ListQuery } ArticlesBody {Unauthorized})
   feed : Authed
-    (Get (Articles (Some Feed)) { headers : Credentials; query : Page } ArticlesBody {Unauthorized});
+    (Get (Articles (Some Feed)) { headers : Credentials; query : Page } ArticlesBody {Unauthorized})
   get_article : MaybeAuthed
     (Get
       (Articles (Some (Index Slug None)))
       { headers : Credentials; path : ArticlePath }
       ArticleBody
-      {Unauthorized, NotFound});
+      {Unauthorized, NotFound})
   create_article : Authed
     (Post
       (Articles None)
       { headers : Credentials; payload : NewArticleBody }
       (Created ArticleBody)
-      {Unauthorized, Unprocessable});
+      {Unauthorized, Unprocessable})
   update_article : Authed
     (Put
       (Articles (Some (Index Slug None)))
       { headers : Credentials; path : ArticlePath; payload : UpdateArticleBody }
       ArticleBody
-      {Unauthorized, Forbidden, NotFound, Unprocessable});
+      {Unauthorized, Forbidden, NotFound, Unprocessable})
   delete_article : Authed
     (Delete
       (Articles (Some (Index Slug None)))
       { headers : Credentials; path : ArticlePath }
       Unit
-      {Unauthorized, Forbidden, NotFound});
+      {Unauthorized, Forbidden, NotFound})
   favorite : Authed
     (Post
       (Articles (Some (Index Slug (Some Favorite))))
       { headers : Credentials; path : ArticlePath }
       ArticleBody
-      {Unauthorized, NotFound});
+      {Unauthorized, NotFound})
   unfavorite : Authed
     (Delete
       (Articles (Some (Index Slug (Some Favorite))))
       { headers : Credentials; path : ArticlePath }
       ArticleBody
-      {Unauthorized, NotFound});
+      {Unauthorized, NotFound})
   list_comments : MaybeAuthed
     (Get
       (Articles (Some (Index Slug (Some (Comments None)))))
       { headers : Credentials; path : ArticlePath }
       CommentsBody
-      {Unauthorized, NotFound});
+      {Unauthorized, NotFound})
   add_comment : Authed
     (Post
       (Articles (Some (Index Slug (Some (Comments None)))))
       { headers : Credentials; path : ArticlePath; payload : NewCommentBody }
       (Created CommentBody)
-      {Unauthorized, NotFound, Unprocessable});
+      {Unauthorized, NotFound, Unprocessable})
   delete_comment : Authed
     (Delete
       (Articles (Some (Index Slug (Some (Comments (Some CommentId))))))
       { headers : Credentials; path : CommentPath }
       Unit
-      {Unauthorized, Forbidden, NotFound});
+      {Unauthorized, Forbidden, NotFound})
 } deriving HttpApi

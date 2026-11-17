@@ -213,8 +213,8 @@ let main () =
         scope {
           let dir =
             FileSystem.make_temp_directory_scoped {
-              directory = None;
-              prefix = Some "flick-config-";
+              directory = None
+              prefix = Some "flick-config-"
             }
           FileSystem.write_file_string
             { flag = None; mode = None }
@@ -224,9 +224,9 @@ let main () =
           FileSystem.write_file_string { flag = None; mode = None } (dir ++ "/db/host") "tree\n"
           let dot =
             ConfigProvider.from_dot_env {
-              path = Some (dir ++ "/.env");
-              expandVariables = false;
-              preserveEmptyStrings = false;
+              path = Some (dir ++ "/.env")
+              expandVariables = false
+              preserveEmptyStrings = false
             }
           let tree = ConfigProvider.from_dir { rootPath = Some dir; preserveEmptyStrings = false }
           let a =

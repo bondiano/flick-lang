@@ -17,10 +17,10 @@ type alias Settings = { port : Float; database : String; secret : String; files 
 /// The settings of the environment, or which one is wrong.
 settings : Unit ->{; Config.ConfigError} Settings
 let settings () = {
-  port = Config.get (Config.with_default 8000 (Config.port "PORT"));
-  database = Config.get (Config.string "DATABASE_URL");
-  secret = Config.get (Config.non_empty_string "JWT_SECRET");
-  files = Config.get (Config.with_default "client/dist" (Config.non_empty_string "STATIC_DIR"));
+  port = Config.get (Config.with_default 8000 (Config.port "PORT"))
+  database = Config.get (Config.string "DATABASE_URL")
+  secret = Config.get (Config.non_empty_string "JWT_SECRET")
+  files = Config.get (Config.with_default "client/dist" (Config.non_empty_string "STATIC_DIR"))
 }
 
 /// Migrates the database, then serves until the process is stopped.
@@ -33,9 +33,9 @@ let serve config =
   Platform.stdout_line "migrations applied: \{show applied}"
   scope {
     let options : Http.Server.ServeOptions = {
-      host = "0.0.0.0";
-      port = config.port;
-      gracefulShutdownTimeout = None;
+      host = "0.0.0.0"
+      port = config.port
+      gracefulShutdownTimeout = None
     }
     let server = Http.Server.serve options (Server.router (Some config.files))
     let url =

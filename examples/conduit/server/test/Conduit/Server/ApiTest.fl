@@ -55,9 +55,9 @@ sign_up :
   User
 let sign_up name =
   let user = {
-    username = Some name;
-    email = Some "\{name}@example.org";
-    password = Some "\{name}-password";
+    username = Some name
+    email = Some "\{name}@example.org"
+    password = Some "\{name}-password"
   }
   (send (at None () { user = user }) Api.Public.endpoints.register).user
 
@@ -73,11 +73,11 @@ let slug article = from_result (Route.Slug.parse article.slug)
 draft : String -> List String -> { article : NewArticle }
 let draft title tags = {
   article = {
-    title = Some title;
-    description = Some "about \{title}";
-    body = Some "# \{title}";
-    tagList = Some tags;
-  };
+    title = Some title
+    description = Some "about \{title}"
+    body = Some "# \{title}"
+    tagList = Some tags
+  }
 }
 
 /// `author` publishes an article with a title and tags.
@@ -178,7 +178,7 @@ let publishing = [
       let found = (send (at None path ()) Api.Articles.endpoints.get_article).article
       let tags = (send (asking None) Api.Public.endpoints.tags).tags
       let change = {
-        article = { title = None; description = Some "edited"; body = None; tagList = None };
+        article = { title = None; description = Some "edited"; body = None; tagList = None }
       }
       let forbidden =
         try
@@ -227,8 +227,8 @@ let publishing = [
       let added = (send (at (Some jo) path comment) Api.Articles.endpoints.add_comment).comment
       let listed = (send (at None path ()) Api.Articles.endpoints.list_comments).comments
       let one = {
-        slug = slug article;
-        comment_id = from_result (Route.CommentId.parse (show added.id));
+        slug = slug article
+        comment_id = from_result (Route.CommentId.parse (show added.id))
       }
       let forbidden =
         try
@@ -261,11 +261,11 @@ let publishing = [
           { path = (); query = page; headers = as_user (Some kim); payload = () }
           Api.Articles.endpoints.feed
       let by = {
-        tag = None;
-        author = Some "lee-writer";
-        favorited = None;
-        limit = Some 1;
-        offset = None;
+        tag = None
+        author = Some "lee-writer"
+        favorited = None
+        limit = Some 1
+        offset = None
       }
       let listed =
         send

@@ -35,7 +35,7 @@ fn parse_ok(src: &str) -> Parse {
     parsed
 }
 
-fn parse_str(src: &str) -> Parse {
+pub(super) fn parse_str(src: &str) -> Parse {
     let mut map = SourceMap::default();
     let file = map.add("t.fl", src);
     parse(src, file)

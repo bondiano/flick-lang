@@ -16,7 +16,7 @@ service Clock =
 /// Gives `Log`; the rest of `r` is the caller's.
 quiet : Eff r e a ->{-Log | r; e} a
 let quiet work = provide (Layer.succeed Log {
-  line = fun text -> Platform.stdout_line ("log: " ++ text);
+  line = fun text -> Platform.stdout_line ("log: " ++ text)
 }) { await work }
 
 /// Handles `Missing`; the other errors of `e` pass.

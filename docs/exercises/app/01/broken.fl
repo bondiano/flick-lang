@@ -21,9 +21,9 @@ service Shelf =
 memory : Ref (List Books.Book) -> Layer {} none {Shelf}
 let memory store =
   Layer.succeed Shelf {
-    add = fun title pages -> Ref.update store (Books.add title pages);
-    finish = fun title -> Ref.update store (Books.finish title);
-    books = fun () -> Ref.get store;
+    add = fun title pages -> Ref.update store (Books.add title pages)
+    finish = fun title -> Ref.update store (Books.finish title)
+    books = fun () -> Ref.get store
   }
 
 summary : Int -> String

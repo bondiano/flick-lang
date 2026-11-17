@@ -28,22 +28,22 @@ let main () =
   let fake =
     Layer.merge
       (Layer.succeed Host.Clock {
-        current_time_millis = fun () -> 42;
-        current_time_nanos = fun () -> 42000000n;
-        monotonic_time_nanos = fun () -> 7n;
+        current_time_millis = fun () -> 42
+        current_time_nanos = fun () -> 42000000n
+        monotonic_time_nanos = fun () -> 7n
       })
       (Layer.merge
         (Layer.succeed Host.Random { next = fun () -> 0.25 })
         (Layer.merge
           (Layer.succeed Host.Environment {
-            env = fun name -> if name == "MODE" then Some "test" else None;
+            env = fun name -> if name == "MODE" then Some "test" else None
           })
           (Layer.merge
             (Layer.succeed Host.Arguments { args = fun () -> ["fixture"] })
             (Layer.succeed Host.Console {
-              stdout_line = fun text -> Ref.update output (fun lines -> lines ++ [text]);
-              stderr_line = fun text -> Ref.update output (fun lines -> lines ++ [text]);
-              stdout_write = fun text -> Ref.update output (fun lines -> lines ++ [text]);
+              stdout_line = fun text -> Ref.update output (fun lines -> lines ++ [text])
+              stderr_line = fun text -> Ref.update output (fun lines -> lines ++ [text])
+              stdout_write = fun text -> Ref.update output (fun lines -> lines ++ [text])
             }))))
   // A task constructed outside the boundary reads its services when run.
   let later = task { inspect () }
@@ -73,9 +73,9 @@ let main () =
   let log_out = Ref.make []
   let custom_console =
     Layer.succeed Host.Console {
-      stdout_line = fun text -> Ref.update log_out (fun lines -> lines ++ [text]);
-      stderr_line = fun text -> Ref.update log_out (fun lines -> lines ++ [text]);
-      stdout_write = fun text -> Ref.update log_out (fun lines -> lines ++ [text]);
+      stdout_line = fun text -> Ref.update log_out (fun lines -> lines ++ [text])
+      stderr_line = fun text -> Ref.update log_out (fun lines -> lines ++ [text])
+      stdout_write = fun text -> Ref.update log_out (fun lines -> lines ++ [text])
     }
   provide (Log.from_console custom_console) {
     Log.info "hello info"

@@ -28,7 +28,8 @@
 //!   lines; `match` and `try` put each arm on its own line, under `match`;
 //! - lists, tuples and `exposing (…)` stay on one line or put one item per
 //!   line followed by `,`; records (also record types, patterns and updates)
-//!   put one field per line followed by `;`, a row tail `| r` last;
+//!   put one field per line with no `;`, as statements are, a row tail
+//!   `| r` last;
 //! - a function type breaks after each arrow, `->{r; e}` staying whole; an
 //!   empty row is dropped: `->{none; E}` becomes `->{; E}`,
 //!   `->{S; none}` becomes `->{S}` and `->{none; none}` becomes `->{}`;
@@ -40,8 +41,9 @@
 //!   `sql table` always go one per line; `on` stays after its `join` when it
 //!   fits.
 //!
-//! What the author decides: a trailing separator (`[a, b,]`, `{ a = 1; }`)
-//! or a blank line between items keeps a bracket broken one item per line
+//! What the author decides: a trailing `,` (`[a, b,]`), a line break right
+//! after a record's `{`, or a blank line between items keeps a bracket or a
+//! record broken one item per line
 //! (a list of constants written several per line is then filled); a
 //! pipeline written with a step on its own line, its operator at either end
 //! of a line, keeps one step per line;

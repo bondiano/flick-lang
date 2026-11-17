@@ -21,15 +21,15 @@ foreign stop from "./receiver.mjs" "stop"
 
 span : List (String, String) -> Tracer.SpanOptions
 let span attributes = {
-  attributes = attributes;
-  links = [];
-  parent = None;
-  root = false;
-  kind_ = Tracer.internal;
-  sampled = None;
-  level = None;
-  captureStackTrace = false;
-  disablePropagation = false;
+  attributes = attributes
+  links = []
+  parent = None
+  root = false
+  kind_ = Tracer.internal
+  sampled = None
+  level = None
+  captureStackTrace = false
+  disablePropagation = false
 }
 
 millis : Float -> Option Duration.Duration
@@ -46,9 +46,9 @@ let main () =
   let base = "http://127.0.0.1:" ++ show (start ())
   let described = {
     Otlp.settings (base ++ "/v1/traces") "shop" with
-    service_version = Some "1.2.0";
-    attributes = [("deploy", "blue")];
-    headers = [("x-api-key", "secret")];
+    service_version = Some "1.2.0"
+    attributes = [("deploy", "blue")]
+    headers = [("x-api-key", "secret")]
   }
   provide (Otlp.traces_with described) { Tracer.with_span "checkout" (span []) Effect.void }
   Platform.stdout_line (has (received ()) "\"1.2.0\"")

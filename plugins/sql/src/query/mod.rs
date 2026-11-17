@@ -416,8 +416,11 @@ pub fn declared_types(block: &Block) -> Option<Vec<(String, String)>> {
                 }
             }
             ";" if depth == 1 => flush(&mut ty, t.span.start, &mut out),
+            // a line break separates fields as `;` does: the next `label :`
+            // ends the field before it
             ":" if depth == 1 => {
                 if let Some(label) = i.checked_sub(1).and_then(|j| tokens.get(j)) {
+                    flush(&mut ty, label.span.start, &mut out);
                     ty = Some((text(label.span).to_owned(), t.span));
                 }
             }
