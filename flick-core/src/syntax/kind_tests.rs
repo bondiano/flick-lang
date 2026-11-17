@@ -10,7 +10,7 @@ use super::kind::{FOREIGN_MODES, KEYWORDS, SyntaxKind, describe};
 
 /// Words a grammar or the reference may show as keywords besides the
 /// reserved ones: the parser's contextual words and plugin heads.
-const CONTEXTUAL: [&str; 12] = [
+const CONTEXTUAL: [&str; 24] = [
     "loop",
     "while",
     "and",
@@ -23,6 +23,18 @@ const CONTEXTUAL: [&str; 12] = [
     "sql",
     "ui",
     "refined",
+    "effect",
+    "tail",
+    "abort",
+    "control",
+    "return",
+    "exists",
+    "codec",
+    "alias",
+    "unboxed",
+    "untagged",
+    "pack",
+    "unpack",
 ];
 
 fn read(path: &str) -> String {

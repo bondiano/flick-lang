@@ -29,6 +29,12 @@ no `node_modules` and no other npm package.
 | Setting | Default | What |
 | - | - | - |
 | `flick.path` | `flick` | the executable that serves `flick lsp --stdio` |
+| `flick.trace.server` | `off` | traces communication between VS Code and the language server (`off`, `messages`, `verbose`) |
+
+## Commands
+
+- **Flick: Restart Language Server** (`flick.restartServer`) restarts the language server process.
+- **Flick: Show Language Server Output** (`flick.showOutput`) opens the Flick output channel.
 
 Files ending in `.fl` are recognized as Flick, with spaces-only indentation,
 and are formatted by the server on save.

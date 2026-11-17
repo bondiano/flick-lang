@@ -287,3 +287,49 @@ test("`<|`, `>>` and `<<` are one operator each", async () => {
     }
   } finally { highlighter.dispose(); }
 });
+
+test("effect, sql, and contextual keywords obey word boundaries in Shiki", async () => {
+  const highlighter = await createHighlighterCore({
+    engine: createJavaScriptRegexEngine(),
+    themes: [],
+    langs: [{ ...grammar, name: "flick" }],
+  });
+  try {
+    const language = highlighter.getLanguage("flick");
+    const scopes = (line: string, word: string): readonly string[] => {
+      const result = language.tokenizeLine(line, null);
+      const at = line.indexOf(word);
+      assert.ok(at >= 0, word);
+      const token = result.tokens.find((t) => t.startIndex <= at && at < t.endIndex);
+      assert.ok(token, `${word} in ${line}`);
+      return token.scopes;
+    };
+
+    assert.ok(scopes("effect Emit a =", "effect").includes("keyword.other.flick"));
+    assert.ok(scopes("  tail ping : Unit ->{} Unit", "tail").includes("keyword.other.flick"));
+    assert.ok(scopes("  abort throw : forall b. String ->{} b", "abort").includes("keyword.other.flick"));
+    assert.ok(scopes("  control emit : a ->{} Unit", "control").includes("keyword.other.flick"));
+    assert.ok(scopes("  | return () -> []", "return").includes("keyword.control.flick"));
+    assert.ok(scopes("let q = sql params { from u in Users }", "sql").includes("keyword.other.flick"));
+    assert.ok(scopes('sql table Users "users" {', "sql").includes("keyword.other.flick"));
+    assert.ok(scopes("let c = codec Profile.schema {", "codec").includes("keyword.other.flick"));
+    assert.ok(scopes("type Box = exists A : Type. A", "exists").includes("keyword.other.flick"));
+    assert.ok(scopes("do { a <- x and b <- y; pure (a, b) }", "and").includes("keyword.other.flick"));
+    assert.ok(scopes("type alias UserId = String", "alias").includes("keyword.other.flick"));
+    assert.ok(scopes("opaque unboxed type Token = Token String", "unboxed").includes("keyword.other.flick"));
+
+    for (const [line, word] of [
+      ["let sql_query = 1", "sql_query"],
+      ["let abort_flag = true", "abort_flag"],
+      ["let returning_value = 1", "returning_value"],
+      ["let tail_call : Int = 1", "tail_call"],
+      ["let control_flow : Int = 1", "control_flow"],
+      ["let effect_id = 1", "effect_id"],
+      ["  | return -> 0", "return"],
+      ["let x = row.sql", "sql"],
+      ["let x = row.abort", "abort"],
+    ] as const) {
+      assert.ok(!scopes(line, word).some((s) => s.startsWith("keyword.")), `${word} in ${line}`);
+    }
+  } finally { highlighter.dispose(); }
+});
