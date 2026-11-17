@@ -112,151 +112,188 @@ fn broken(module: &Compiled) -> Vec<(&'static str, String)> {
         .collect()
 }
 
+/// The parent's compiled module, read by the text of [`FORMS`].
+struct Parent<'a>(&'a Compiled);
+
+impl<'a> Parent<'a> {
+    /// The text of `span` when it is in the parent's file.
+    fn at(&self, span: Span) -> Option<&'static str> {
+        (span.file == self.0.file).then(|| &FORMS[span.range()])
+    }
+
+    fn items(&self, source: &str) -> Vec<&'a ir::Item> {
+        let items = self.0.ir.items.iter();
+        items
+            .filter(|item| self.at(item.span) == Some(source))
+            .collect()
+    }
+
+    fn one(&self, source: &str) -> Result<&'a ir::Item, String> {
+        match self.items(source)[..] {
+            [item] => Ok(item),
+            ref items => Err(format!("{} items at `{source}`", items.len())),
+        }
+    }
+
+    fn body(&self, source: &str) -> Result<&'a ir::Expr, String> {
+        match &self.one(source)?.kind {
+            ir::ItemKind::Value { body, .. } => Ok(body),
+            other => Err(format!("`{source}` is {other:?}")),
+        }
+    }
+
+    fn calls(&self, source: &str, kind: &ir::ExprKind) -> Result<(), String> {
+        find(self.body(source)?, &|e| e.kind == *kind)
+            .map(|_| ())
+            .ok_or(format!("`{source}` names no {kind:?}"))
+    }
+
+    /// The instances declared at `source` and named `name`.
+    fn instances(&self, source: &str, name: &str) -> Vec<&'a ir::Item> {
+        let named = |item: &&ir::Item| matches!(&item.kind, ir::ItemKind::Instance { info, .. } if info.name == name);
+        self.items(source).into_iter().filter(named).collect()
+    }
+}
+
+/// The definition of `answer`, which reaches into the child.
+const ANSWER: &str = "let answer () =
+  Child.fail \"boom\"
+  describe (Child.Box low) ++ describe pair ++ show (Child.sums [pair])";
+
 /// What the form moved by `visit` expects of the parent's IR, written from
 /// [`FORMS`] alone: the names the parent's file holds the child's under,
 /// the places in the parent's file and that each reference of the child's
 /// names a declaration of the file.
 fn expect(visit: &str, module: &Compiled) -> Result<(), String> {
-    let ir = &module.ir;
-    let at = |span: Span| (span.file == module.file).then(|| &FORMS[span.range()]);
-    let item = |source: &str| {
-        ir.items
-            .iter()
-            .filter(|item| at(item.span) == Some(source))
-            .collect::<Vec<_>>()
-    };
-    let one = |source: &str| match item(source)[..] {
-        [item] => Ok(item),
-        ref items => Err(format!("{} items at `{source}`", items.len())),
-    };
-    let body = |source: &str| match &one(source)?.kind {
-        ir::ItemKind::Value { body, .. } => Ok(body),
-        other => Err(format!("`{source}` is {other:?}")),
-    };
-    let calls = |source: &str, kind: &ir::ExprKind| {
-        find(body(source)?, &|e| e.kind == *kind)
-            .map(|_| ())
-            .ok_or(format!("`{source}` names no {kind:?}"))
-    };
-    let answer = "let answer () =";
-    let answer = &FORMS[FORMS.find(answer).expect("answer")..FORMS.len() - 1];
-    if one("Pair Int Int")?.kind != ir::ItemKind::Constructor(pair()) {
+    let parent = Parent(module);
+    if parent.one("Pair Int Int")?.kind != ir::ItemKind::Constructor(pair()) {
         return Err("`Pair` is not declared as the child's".into());
     }
     match visit {
-        "destructure" => {
-            for (source, names) in [
-                (
-                    "let Pair left right = Pair 1 2",
-                    ["Child$left", "Child$right"],
-                ),
-                ("let Child.Pair low high = Child.Pair 5 6", ["low", "high"]),
-            ] {
-                let names = names.map(|name| ir::Pat::Bind(name.into())).into();
-                match &one(source)?.kind {
-                    ir::ItemKind::Destructure { pattern, .. }
-                        if *pattern == ir::Pat::Con(pair(), names) => {}
-                    other => return Err(format!("`{source}` is {other:?}")),
-                }
-            }
-            calls(
-                "let pair = Child.Pair Child.left high",
-                &global("Child$left"),
-            )
-        }
-        "for" => {
-            let sums = "let sums pairs = [for Pair a b <- pairs yield a + b + right]";
-            let each = find(body(sums)?, &|e| {
-                matches!(e.kind, ir::ExprKind::Each { .. })
-            })
-            .ok_or("`sums` has no `for`")?;
-            let ir::ExprKind::Each { pat, .. } = &each.kind else {
-                unreachable!()
-            };
-            let bound = ["a", "b"].map(|name| ir::Pat::Bind(name.into())).into();
-            if *pat != ir::Pat::Con(pair(), bound) || at(each.span) != Some("Pair a b <- pairs") {
-                return Err(format!("the `for` of `sums` is {each:?}"));
-            }
-            calls(answer, &global("Child$sums"))
-        }
-        "defaults" => {
-            for (source, name, show) in [
-                (
-                    "instance Describe Box",
-                    "Child$Describe Box",
-                    "Child$Show Box",
-                ),
-                (
-                    "deriving Generic, Show, Describe",
-                    "Child$Describe Pair",
-                    "Child$Show Pair",
-                ),
-            ] {
-                let shown = item(source).into_iter().chain(item("deriving Show"));
-                if !shown.clone().any(|item| {
-                    matches!(&item.kind, ir::ItemKind::Instance { info, .. } if info.name == show)
-                }) {
-                    return Err(format!("no instance `{show}` at `{source}`"));
-                }
-                let taken = shown.filter_map(|item| match &item.kind {
-                    ir::ItemKind::Instance { info, methods } if info.name == name => {
-                        Some((info, methods))
-                    }
-                    _ => None,
-                });
-                let [(info, methods)] = taken.collect::<Vec<_>>()[..] else {
-                    return Err(format!("no one instance `{name}` at `{source}`"));
-                };
-                let class = ("App.Parent".to_owned(), "Describe".to_owned());
-                let defaults = vec![("describe".to_owned(), 0, vec![instance(show)])];
-                if info.module != "App.Parent"
-                    || info.class != class
-                    || info.defaults != defaults
-                    || !methods.is_empty()
-                {
-                    return Err(format!("`{name}` is {info:?}"));
-                }
-            }
-            let described = ir::ExprKind::Method {
-                dict: instance("Child$Describe Box"),
-                name: "describe".into(),
-            };
-            calls(answer, &described)
-        }
-        "generic" => {
-            let generic = item("deriving Generic, Show, Describe")
-                .into_iter()
-                .find_map(|item| match &item.kind {
-                    ir::ItemKind::Instance { info, .. } if info.class.1 == "Generic" => Some(info),
-                    _ => None,
-                })
-                .ok_or("no derived `Generic`")?;
-            let cases = generic.generic.as_ref().map(|g| (&g.cases, &g.inl.module));
-            if generic.module != "App.Parent"
-                || !generic.name.starts_with("Child$Generic Pair ")
-                || cases != Some((&vec![(pair(), None)], &"Generic".to_owned()))
-            {
-                return Err(format!("the derived `Generic` is {generic:?}"));
-            }
-            Ok(())
-        }
-        "catch" => {
-            let foreign = "foreign fail from \"./bindings.mjs\" \"fail\"\n    catch to_broken";
-            let ir::ItemKind::Foreign(foreign) = &one(foreign)?.kind else {
-                return Err("`fail` is not foreign".into());
-            };
-            let catch = foreign.catch.as_ref().ok_or("`fail` has no `catch`")?;
-            if foreign.name != "Child$fail"
-                || catch.kind != global("Child$to_broken")
-                || at(catch.span) != Some("to_broken")
-            {
-                return Err(format!("`fail` is {foreign:?}"));
-            }
-            body("let to_broken _ = Broken \"mapped\"")?;
-            calls(answer, &global("Child$fail"))
-        }
+        "destructure" => destructured(&parent),
+        "for" => looped(&parent),
+        "defaults" => defaulted(&parent),
+        "generic" => generic(&parent),
+        "catch" => caught(&parent),
         _ => Err(format!("no form is moved by `{visit}`")),
     }
+}
+
+/// The child's top-level destructuring binds its names under the prefix,
+/// and the parent's matches the child's constructor.
+fn destructured(parent: &Parent) -> Result<(), String> {
+    for (source, names) in [
+        (
+            "let Pair left right = Pair 1 2",
+            ["Child$left", "Child$right"],
+        ),
+        ("let Child.Pair low high = Child.Pair 5 6", ["low", "high"]),
+    ] {
+        let names = names.map(|name| ir::Pat::Bind(name.into())).into();
+        match &parent.one(source)?.kind {
+            ir::ItemKind::Destructure { pattern, .. }
+                if *pattern == ir::Pat::Con(pair(), names) => {}
+            other => return Err(format!("`{source}` is {other:?}")),
+        }
+    }
+    let source = "let pair = Child.Pair Child.left high";
+    parent.calls(source, &global("Child$left"))
+}
+
+/// The pattern of the child's `for` matches the moved constructor.
+fn looped(parent: &Parent) -> Result<(), String> {
+    let sums = "let sums pairs = [for Pair a b <- pairs yield a + b + right]";
+    let is_each = |e: &ir::Expr| matches!(e.kind, ir::ExprKind::Each { .. });
+    let each = find(parent.body(sums)?, &is_each).ok_or("`sums` has no `for`")?;
+    let ir::ExprKind::Each { pat, .. } = &each.kind else {
+        unreachable!()
+    };
+    let bound = ["a", "b"].map(|name| ir::Pat::Bind(name.into())).into();
+    if *pat != ir::Pat::Con(pair(), bound) || parent.at(each.span) != Some("Pair a b <- pairs") {
+        return Err(format!("the `for` of `sums` is {each:?}"));
+    }
+    parent.calls(ANSWER, &global("Child$sums"))
+}
+
+/// An instance that takes its class's default, written and derived, takes
+/// the child's `Show` the default needs under its moved name.
+fn defaulted(parent: &Parent) -> Result<(), String> {
+    for (source, name, show) in [
+        (
+            "instance Describe Box",
+            "Child$Describe Box",
+            "Child$Show Box",
+        ),
+        (
+            "deriving Generic, Show, Describe",
+            "Child$Describe Pair",
+            "Child$Show Pair",
+        ),
+    ] {
+        let shown = [source, "deriving Show"].map(|at| parent.instances(at, show));
+        if shown.iter().all(Vec::is_empty) {
+            return Err(format!("no instance `{show}` at `{source}`"));
+        }
+        let [item] = parent.instances(source, name)[..] else {
+            return Err(format!("no one instance `{name}` at `{source}`"));
+        };
+        let ir::ItemKind::Instance { info, methods } = &item.kind else {
+            unreachable!()
+        };
+        let class = ("App.Parent".to_owned(), "Describe".to_owned());
+        let defaults = vec![("describe".to_owned(), 0, vec![instance(show)])];
+        if info.module != "App.Parent"
+            || info.class != class
+            || info.defaults != defaults
+            || !methods.is_empty()
+        {
+            return Err(format!("`{name}` is {info:?}"));
+        }
+    }
+    let described = ir::ExprKind::Method {
+        dict: instance("Child$Describe Box"),
+        name: "describe".into(),
+    };
+    parent.calls(ANSWER, &described)
+}
+
+/// A derived `Generic` converts the moved constructor; the constructors of
+/// the representation stay `Generic`'s.
+fn generic(parent: &Parent) -> Result<(), String> {
+    let generic = parent
+        .items("deriving Generic, Show, Describe")
+        .into_iter()
+        .find_map(|item| match &item.kind {
+            ir::ItemKind::Instance { info, .. } if info.class.1 == "Generic" => Some(info),
+            _ => None,
+        })
+        .ok_or("no derived `Generic`")?;
+    let cases = generic.generic.as_ref().map(|g| (&g.cases, &g.inl.module));
+    if generic.module != "App.Parent"
+        || !generic.name.starts_with("Child$Generic Pair ")
+        || cases != Some((&vec![(pair(), None)], &"Generic".to_owned()))
+    {
+        return Err(format!("the derived `Generic` is {generic:?}"));
+    }
+    Ok(())
+}
+
+/// The `catch` of a foreign function of the child names the child's
+/// mapping by its moved name, at its place.
+fn caught(parent: &Parent) -> Result<(), String> {
+    let foreign = "foreign fail from \"./bindings.mjs\" \"fail\"\n    catch to_broken";
+    let ir::ItemKind::Foreign(foreign) = &parent.one(foreign)?.kind else {
+        return Err("`fail` is not foreign".into());
+    };
+    let catch = foreign.catch.as_ref().ok_or("`fail` has no `catch`")?;
+    if foreign.name != "Child$fail"
+        || catch.kind != global("Child$to_broken")
+        || parent.at(catch.span) != Some("to_broken")
+    {
+        return Err(format!("`fail` is {foreign:?}"));
+    }
+    parent.body("let to_broken _ = Broken \"mapped\"")?;
+    parent.calls(ANSWER, &global("Child$fail"))
 }
 
 /// The parent of [`FORMS`] compiled on its own, by a fresh analysis.
@@ -345,17 +382,17 @@ fn built(cache: Option<&mut ModuleCache>, shift: usize) -> BTreeMap<String, Comp
 /// The definition of `used` in the importer's IR, at its place in its own
 /// file and naming the parent's `pair`.
 fn used(modules: &BTreeMap<String, Compiled>) -> &ir::Expr {
-    let user = &modules["App.Use"];
+    let importer = &modules["App.Use"];
     let source = "let used = describe pair ++ show pair";
-    let used = user.ir.items.iter().find(|item| {
-        item.span.file == user.file && IMPORTER.get(item.span.range()) == Some(source)
+    let used = importer.ir.items.iter().find(|item| {
+        item.span.file == importer.file && IMPORTER.get(item.span.range()) == Some(source)
     });
     let Some(ir::Item {
         kind: ir::ItemKind::Value { body, .. },
         ..
     }) = used
     else {
-        panic!("no `used` at `{source}`: {:?}", user.ir.items);
+        panic!("no `used` at `{source}`: {:?}", importer.ir.items);
     };
     assert!(find(body, &|e| e.kind == global("pair")).is_some());
     body
@@ -398,16 +435,24 @@ fn a_parent_moves_its_child_again_beside_an_importer_from_a_store() {
 /// emit no reference to a module they do not compile.
 #[test]
 fn an_importer_names_the_child_instances_where_the_build_declares_them() {
-    let mut builds = vec![built(None, 0)];
+    let fresh = built(None, 0);
+    #[cfg(not(feature = "native-project"))]
+    let builds = [fresh];
     #[cfg(feature = "native-project")]
-    {
+    let builds = {
         let (saved, taken): (Saved, Arc<AtomicUsize>) = Default::default();
-        for shift in [0, 2] {
+        let stored = |shift| {
             let mut store = ModuleCache::stored(memory_store("one", &saved, &taken));
-            builds.push(built(Some(&mut store), shift));
-        }
-        assert_eq!(stored_count(&taken), 1);
-    }
+            built(Some(&mut store), shift)
+        };
+        let builds = [fresh, stored(0), stored(2)];
+        assert_eq!(
+            stored_count(&taken),
+            1,
+            "the last build restores the importer"
+        );
+        builds
+    };
     for modules in &builds {
         for method in ["describe", "show"] {
             let named = find(

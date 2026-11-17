@@ -41,14 +41,17 @@ fn relocate_ir(module: &mut ir::Module, child: &str, parent: &str, local: &str) 
 }
 
 #[cfg(test)]
+use std::cell::Cell;
+
+#[cfg(test)]
 thread_local! {
     /// The visit of the walk a test leaves out, to show that what it expects
     /// of a moved module notices the omission.
-    static OMITTED: std::cell::Cell<Option<&'static str>> = const { std::cell::Cell::new(None) };
+    static OMITTED: Cell<Option<&'static str>> = const { Cell::new(None) };
 }
 
 /// [`relocate_ir`] leaves out `visit` while `run` runs on this thread.
-#[cfg(test)]
+#[cfg(all(test, feature = "ide"))]
 pub(super) fn omitting<T>(visit: &'static str, run: impl FnOnce() -> T) -> T {
     OMITTED.set(Some(visit));
     let result = run();
