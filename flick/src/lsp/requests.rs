@@ -359,7 +359,7 @@ fn closed(literal: &str) -> bool {
 fn capabilities() -> Value {
     json!({
         "capabilities": {
-            "textDocumentSync": { "openClose": true, "change": 1, "save": true },
+            "textDocumentSync": { "openClose": true, "change": 2, "save": true },
             "hoverProvider": true,
             "definitionProvider": true,
             "referencesProvider": true,
