@@ -79,6 +79,9 @@ go-test:
 go-oracles mode="":
     #!/usr/bin/env bash
     set -euo pipefail
+    # the tables name their Node: only the pinned one keeps them
+    grep -qx "nodejs $(node --version | cut -c2-)" .tool-versions \
+        || { echo "tools/go-* need the Node of .tool-versions" >&2; exit 1; }
     for s in go-arbitrary/gen go-cli/complete go-cli/parity go-collate/gen go-dates/gen go-encoding/gen \
         go-glob/gen go-intl/gen go-mime/gen go-path/gen go-rpc/envelopes go-unicode/gen go-unicode/graphemes; do
         node "tools/$s.mjs"
