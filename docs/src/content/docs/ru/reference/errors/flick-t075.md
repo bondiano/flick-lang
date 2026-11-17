@@ -1,9 +1,22 @@
 ---
 title: "FLICK-T075"
-source_hash: "4f371237c5b0fe42"
+source_hash: "9466dc479e83bd46"
 ---
 
 Предупреждение: `from_result (Err e)` строит `Result` только для того, чтобы завершиться с его ошибкой. `Fail.fail e` завершается с ошибкой `e` напрямую и имеет тот же тип, `Errors e ->{; e} a`, в любой функции, строка которой допускает `e`. Быстрое исправление записывает его; `flick check --fix` применяет его.
+
+```flick fail T075
+# type error NotFound = NotFound Int
+# find : Int -> Option String
+# let find id = None
+name : Int ->{; NotFound} String
+let name id =
+  match find id with
+  | Some found -> found
+  | None -> from_result (Err (NotFound id))
+```
+
+это
 
 ```flick
 # type error NotFound = NotFound Int
