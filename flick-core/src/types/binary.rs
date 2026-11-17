@@ -42,8 +42,8 @@ impl Checker<'_> {
                 self.check(lhs, &bool_);
                 // the right runs only after the left gave `true` to `&&`, `false` to `||`
                 let fact = self.proof_condition(lhs);
-                let ran = op.kind == K::AndAnd;
-                self.with_fact(fact.as_ref(), ran, |this| this.check(rhs, &bool_));
+                let left = op.kind == K::AndAnd;
+                self.with_fact(fact.as_ref(), left, |this| this.check(rhs, &bool_));
                 bool_
             }
             _ => {
