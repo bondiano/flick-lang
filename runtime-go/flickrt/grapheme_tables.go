@@ -2,7 +2,7 @@
 
 package flickrt
 
-// Unicode 17.0, as Node 24.22.1 (ICU 78.3) computes it.
+// Unicode 17.0, as Node 24.18.0 (ICU 78.3) computes it.
 const (
 	// graphemeData is the Grapheme_Cluster_Break class of each code point (grapheme.go's
 	// numbering), plus 16 for Extended_Pictographic and 32, 64 or 96 for an
