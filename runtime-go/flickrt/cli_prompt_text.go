@@ -1,16 +1,15 @@
 package flickrt
 
 import (
-	"regexp"
 	"strconv"
 	"strings"
 )
 
 // The text, confirm and toggle prompts, and the drawing they share.
 
-var promptNewline = regexp.MustCompile(`\r?\n`)
+var promptNewline = lazyRegexp{pattern: `\r?\n`}
 
-func promptLines(text string) []string { return promptNewline.Split(text, -1) }
+func promptLines(text string) []string { return promptNewline.re().Split(text, -1) }
 
 // promptAnnotateSymbol is a symbol in its styles: nothing for no symbol.
 func promptAnnotateSymbol(t *promptTheme, symbol string, styles ...string) string {

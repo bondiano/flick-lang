@@ -3,7 +3,6 @@ package flickrt
 import (
 	"math"
 	"math/big"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -19,12 +18,12 @@ func StringFromNumber(n Value) Value {
 	return ShowNumber(n.(float64))
 }
 
-var digits = regexp.MustCompile(`^[+-]?[0-9]+$`)
+var digits = lazyRegexp{pattern: `^[+-]?[0-9]+$`}
 
 // IntParse is the Int the decimal digits spell, with an optional sign.
 func IntParse(s Value) Value {
 	text := strings.TrimSpace(s.(string))
-	if !digits.MatchString(text) {
+	if !digits.re().MatchString(text) {
 		return None
 	}
 	n, err := strconv.ParseInt(text, 10, 32)
@@ -148,7 +147,7 @@ func BigIntString(n Value) Value { return n.(*big.Int).String() }
 // in JS white space.
 func BigIntParse(s Value) Value {
 	text := strings.TrimFunc(s.(string), isJSSpace)
-	if !finiteInt.MatchString(text) {
+	if !finiteInt.re().MatchString(text) {
 		return None
 	}
 	n, _ := new(big.Int).SetString(text, 10)

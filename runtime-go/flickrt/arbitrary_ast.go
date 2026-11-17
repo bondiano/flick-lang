@@ -339,7 +339,7 @@ func (b *arbASTs) ofCodec(c codec) *arbAST {
 		}
 		return base.withChecks(checks...)
 	}
-	if link, ok := arbLinks.Load(c); ok {
+	if link, ok := arbLink(c); ok {
 		return link.(func(*arbASTs) *arbAST)(b)
 	}
 	return &arbAST{tag: astNever, what: "an unsupported Declaration"}

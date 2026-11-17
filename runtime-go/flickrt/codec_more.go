@@ -1,7 +1,6 @@
 package flickrt
 
 import (
-	"regexp"
 	"slices"
 	"strings"
 )
@@ -295,20 +294,20 @@ func CodecEncodeXml(fb *Fiber, c, v Value) Value {
 }
 
 var (
-	xmlStart     = regexp.MustCompile(`^[A-Za-z_]`)
-	xmlUnsafe    = regexp.MustCompile(`[^A-Za-z0-9._-]`)
-	xmlPrefix    = regexp.MustCompile(`(?i)^xml`)
+	xmlStart     = lazyRegexp{pattern: `^[A-Za-z_]`}
+	xmlUnsafe    = lazyRegexp{pattern: `[^A-Za-z0-9._-]`}
+	xmlPrefix    = lazyRegexp{pattern: `(?i)^xml`}
 	xmlText      = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
 	xmlAttribute = strings.NewReplacer("&", "&amp;", `"`, "&quot;", "<", "&lt;", ">", "&gt;")
 )
 
 func xmlName(name string) string {
 	safe := name
-	if !xmlStart.MatchString(safe) {
+	if !xmlStart.re().MatchString(safe) {
 		safe = "_" + safe
 	}
-	safe = xmlUnsafe.ReplaceAllString(safe, "_")
-	if xmlPrefix.MatchString(safe) {
+	safe = xmlUnsafe.re().ReplaceAllString(safe, "_")
+	if xmlPrefix.re().MatchString(safe) {
 		safe = "_" + safe
 	}
 	return safe

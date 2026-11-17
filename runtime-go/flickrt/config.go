@@ -9,7 +9,6 @@ package flickrt
 import (
 	"math"
 	"math/big"
-	"regexp"
 	"strings"
 )
 
@@ -274,7 +273,7 @@ func decodeDuration(text string) (Value, string) {
 	return r.Fields()[0], ""
 }
 
-var byteSizeText = regexp.MustCompile(`^\s*(\d+)(?:\.(\d+))?\s*([A-Za-z]+)\s*$`)
+var byteSizeText = lazyRegexp{pattern: `^\s*(\d+)(?:\.(\d+))?\s*([A-Za-z]+)\s*$`}
 
 var byteSizeUnits = func() map[string]*big.Int {
 	units := map[string]*big.Int{}
@@ -297,7 +296,7 @@ var byteSizeUnits = func() map[string]*big.Int {
 }()
 
 func decodeByteSize(text string) (Value, string) {
-	m := byteSizeText.FindStringSubmatch(text)
+	m := byteSizeText.re().FindStringSubmatch(text)
 	if m == nil || byteSizeUnits[m[3]] == nil {
 		return nil, "Expected a valid ByteSize string"
 	}

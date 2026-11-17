@@ -2,7 +2,6 @@ package flickrt
 
 import (
 	"net/netip"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -27,13 +26,13 @@ type hostPort struct {
 }
 
 var (
-	labelPattern = regexp.MustCompile(`^[a-z0-9_](?:[a-z0-9_-]{0,61}[a-z0-9_])?$`)
-	numericLabel = regexp.MustCompile(`^(?:\d+|0x[0-9a-f]*)$`)
-	domainChars  = regexp.MustCompile(`^[a-z0-9_.-]+$`)
-	asciiName    = regexp.MustCompile(`(?i)^[a-z0-9_.-]$`)
-	dottedDigits = regexp.MustCompile(`^[\d.]+$`)
+	labelPattern = lazyRegexp{pattern: `^[a-z0-9_](?:[a-z0-9_-]{0,61}[a-z0-9_])?$`}
+	numericLabel = lazyRegexp{pattern: `^(?:\d+|0x[0-9a-f]*)$`}
+	domainChars  = lazyRegexp{pattern: `^[a-z0-9_.-]+$`}
+	asciiName    = lazyRegexp{pattern: `(?i)^[a-z0-9_.-]$`}
+	dottedDigits = lazyRegexp{pattern: `^[\d.]+$`}
 	// JS `/[%[\]/\s\p{Cc}]/u`: Unicode whitespace too
-	badZone = regexp.MustCompile(`[%\[\]/\s\p{Zs}\p{Cc}\x{2028}\x{2029}\x{feff}]`)
+	badZone = lazyRegexp{pattern: `[%\[\]/\s\p{Zs}\p{Cc}\x{2028}\x{2029}\x{feff}]`}
 )
 
 func validateDomainName(name string) string {
@@ -54,11 +53,11 @@ func validateDomainName(name string) string {
 			return "domain name labels must not be empty"
 		case len(utf16Units(l)) > 63:
 			return "domain name labels must be at most 63 characters"
-		case !labelPattern.MatchString(l):
+		case !labelPattern.re().MatchString(l):
 			return "domain name labels must contain only letters, digits, hyphens, or underscores and must not start or end with a hyphen"
 		}
 	}
-	if numericLabel.MatchString(labels[len(labels)-1]) {
+	if numericLabel.re().MatchString(labels[len(labels)-1]) {
 		return "the last domain name label must not be numeric"
 	}
 	return ""
@@ -70,7 +69,7 @@ func toAsciiDomainName(s string) (string, bool) {
 	ascii := true
 	for _, r := range s {
 		if r < 0x80 {
-			if !asciiName.MatchString(string(r)) {
+			if !asciiName.re().MatchString(string(r)) {
 				return "", false
 			}
 		} else {
@@ -85,7 +84,7 @@ func toAsciiDomainName(s string) (string, bool) {
 
 func isDomainName(v Value) bool {
 	s, ok := v.(string)
-	return ok && domainChars.MatchString(s) && validateDomainName(s) == ""
+	return ok && domainChars.re().MatchString(s) && validateDomainName(s) == ""
 }
 
 func domainNameFromString(s string) (Value, string) {
@@ -105,10 +104,10 @@ func scopedFromString(s string) (Value, string) {
 		return nil, "expected an IPv6 zone"
 	}
 	zone := s[sep+1:]
-	if zone == "" || badZone.MatchString(zone) {
+	if zone == "" || badZone.re().MatchString(zone) {
 		return nil, "invalid IPv6 scope identifier"
 	}
-	if digitsOnly.MatchString(zone) {
+	if digitsOnly.re().MatchString(zone) {
 		n, _ := strconv.ParseFloat(zone, 64)
 		if n > 0xffffffff {
 			return nil, "scope identifier must be an unsigned 32-bit integer"
@@ -137,7 +136,7 @@ func hostFromString(s string) (Value, string) {
 		return scopedFromString(s)
 	case strings.Contains(s, ":"):
 		return addrParse(ipFromString)(s)
-	case dottedDigits.MatchString(s):
+	case dottedDigits.re().MatchString(s):
 		if a, msg := ipFromString(s); msg == "" {
 			return a, ""
 		}
@@ -154,7 +153,7 @@ func formatHost(h Value) string {
 
 // portOf is an unpadded decimal port, or why it is not one.
 func portOf(text string) (int, string) {
-	if !unpadded.MatchString(text) {
+	if !unpadded.re().MatchString(text) {
 		return 0, "port must be an unpadded decimal integer"
 	}
 	n, err := strconv.Atoi(text)
@@ -216,7 +215,7 @@ func inetFromString(s string) (Value, string) {
 		host, portText = s[1:end], s[end+2:]
 		if sep := strings.Index(host, "%"); sep != -1 {
 			scopeText := host[sep+1:]
-			if strings.Contains(scopeText, "%") || !digitsOnly.MatchString(scopeText) {
+			if strings.Contains(scopeText, "%") || !digitsOnly.re().MatchString(scopeText) {
 				return nil, "scope identifier must be decimal"
 			}
 			n, err := strconv.ParseUint(scopeText, 10, 32)
@@ -235,7 +234,7 @@ func inetFromString(s string) (Value, string) {
 		}
 		host, portText = s[:sep], s[sep+1:]
 	}
-	if !unpadded.MatchString(portText) {
+	if !unpadded.re().MatchString(portText) {
 		return nil, "port must be an unpadded decimal integer"
 	}
 	addr, msg := ipFromString(host)

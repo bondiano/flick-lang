@@ -2,7 +2,6 @@ package flickrt
 
 import (
 	"net/netip"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -23,11 +22,11 @@ type ipInterface struct {
 }
 
 var (
-	ipv4Part   = regexp.MustCompile(`^\d{1,3}$`)
-	ipv6Part   = regexp.MustCompile(`^[0-9a-fA-F]{1,4}$`)
-	macText    = regexp.MustCompile(`^(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$`)
-	unpadded   = regexp.MustCompile(`^(0|[1-9][0-9]*)$`)
-	digitsOnly = regexp.MustCompile(`^\d+$`)
+	ipv4Part   = lazyRegexp{pattern: `^\d{1,3}$`}
+	ipv6Part   = lazyRegexp{pattern: `^[0-9a-fA-F]{1,4}$`}
+	macText    = lazyRegexp{pattern: `^(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$`}
+	unpadded   = lazyRegexp{pattern: `^(0|[1-9][0-9]*)$`}
+	digitsOnly = lazyRegexp{pattern: `^\d+$`}
 )
 
 // An address parser: the value, or the message of a NetAddressError.
@@ -39,7 +38,7 @@ func ipv4FromString(s string) (netip.Addr, string) {
 		return netip.Addr{}, "expected exactly four decimal octets"
 	}
 	for _, p := range parts {
-		if !ipv4Part.MatchString(p) {
+		if !ipv4Part.re().MatchString(p) {
 			return netip.Addr{}, "expected exactly four decimal octets"
 		}
 	}
@@ -116,7 +115,7 @@ func ipv6FromString(s string) (netip.Addr, string) {
 			segments = append(segments, 0)
 			continue
 		}
-		if !ipv6Part.MatchString(p) {
+		if !ipv6Part.re().MatchString(p) {
 			return fail("segments must contain one through four hexadecimal digits")
 		}
 		n, _ := strconv.ParseUint(p, 16, 16)
@@ -138,7 +137,7 @@ func ipFromString(s string) (netip.Addr, string) {
 }
 
 func macFromString(s string) (Value, string) {
-	if !macText.MatchString(s) {
+	if !macText.re().MatchString(s) {
 		return nil, "expected six two-digit hexadecimal octets separated by colons"
 	}
 	var m macAddress
@@ -241,7 +240,7 @@ func parseWithPrefix(s string, required bool, parse func(string) (netip.Addr, st
 		if slash <= 0 || slash != strings.LastIndex(s, "/") || slash == len(s)-1 {
 			return nil, "expected an address and prefix length separated by one slash"
 		}
-		if !unpadded.MatchString(s[slash+1:]) {
+		if !unpadded.re().MatchString(s[slash+1:]) {
 			return nil, "prefix length must be an unpadded ASCII decimal integer"
 		}
 		text = s[:slash]

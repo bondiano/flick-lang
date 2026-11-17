@@ -3,7 +3,6 @@ package flickrt
 import (
 	"math"
 	"math/big"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -101,7 +100,7 @@ func decCompare(a, b *Decimal) int {
 	return a.rescale(s).value.Cmp(b.rescale(s).value)
 }
 
-var finiteInt = regexp.MustCompile(`^[+-]?\d+$`)
+var finiteInt = lazyRegexp{pattern: `^[+-]?\d+$`}
 
 // parseDecimal reads a decimal from a string: an empty string is 0.
 func parseDecimal(s string) (*Decimal, bool) {
@@ -113,7 +112,7 @@ func parseDecimal(s string) (*Decimal, bool) {
 		trail := s[i+1:]
 		base = s[:i]
 		e, err := strconv.ParseInt(trail, 10, 64)
-		if base == "" || err != nil || !finiteInt.MatchString(trail) || math.Abs(float64(e)) > maxSafe {
+		if base == "" || err != nil || !finiteInt.re().MatchString(trail) || math.Abs(float64(e)) > maxSafe {
 			return nil, false
 		}
 		exp = e
@@ -127,7 +126,7 @@ func parseDecimal(s string) (*Decimal, bool) {
 		digits = base[:dot] + trail
 		offset = int64(len(trail))
 	}
-	if !finiteInt.MatchString(digits) {
+	if !finiteInt.re().MatchString(digits) {
 		return nil, false
 	}
 	scale := offset - exp

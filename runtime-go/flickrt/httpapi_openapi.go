@@ -1,7 +1,6 @@
 package flickrt
 
 import (
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -197,7 +196,7 @@ func (d *openAPI) operation(g *apiGroup, e *apiEndpoint) Value {
 	return Rec(append(op, "responses", responses)...)
 }
 
-var pathParam = regexp.MustCompile(`:([A-Za-z_]\w*)`)
+var pathParam = lazyRegexp{pattern: `:([A-Za-z_]\w*)`}
 
 // operationSecurity is the security requirements of the operation: its
 // schemes and that of its `with_auth`, after `{}` when that is optional.
@@ -243,7 +242,7 @@ func (d *openAPI) document(a *apiDefinition) Value {
 			if e.auth != nil {
 				schemes.put(e.auth.security.name, securityScheme(e.auth.security))
 			}
-			path := pathParam.ReplaceAllString(e.path, "{$1}")
+			path := pathParam.re().ReplaceAllString(e.path, "{$1}")
 			methods, ok := recordField(paths, path).(*Record)
 			if !ok {
 				methods = newRecord(1)

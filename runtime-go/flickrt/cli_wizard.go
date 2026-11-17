@@ -1,7 +1,6 @@
 package flickrt
 
 import (
-	"regexp"
 	"strings"
 )
 
@@ -269,7 +268,7 @@ func (w *cliWizardRun) single(s *cliSingle) cliWizardArg {
 	return cliWizardPlain(w.ask(PromptText(Rec("message", message, "default", None, "validate", None))).(string))
 }
 
-var cliWizardWords = regexp.MustCompile(`[-_]+`)
+var cliWizardWords = lazyRegexp{pattern: `[-_]+`}
 
 func cliWizardLabel(s *cliSingle) string {
 	label := cliHumanize(s.name)
@@ -286,7 +285,7 @@ func cliWizardLabel(s *cliSingle) string {
 
 func cliHumanize(name string) string {
 	words := []string{}
-	for _, w := range cliWizardWords.Split(name, -1) {
+	for _, w := range cliWizardWords.re().Split(name, -1) {
 		if w != "" {
 			words = append(words, w)
 		}
@@ -319,13 +318,13 @@ func cliWizardBlock(label string, line []string, colors bool, commandColor, labe
 	return strings.Join(append(out, ""), "\n")
 }
 
-var cliShellSafe = regexp.MustCompile(`^[A-Za-z0-9_./:@%+=,-]+$`)
+var cliShellSafe = lazyRegexp{pattern: `^[A-Za-z0-9_./:@%+=,-]+$`}
 
 func cliWrapCommand(line []string) []string {
 	const width, first, continuation = 88, "  $ ", "    "
 	lines, current := []string{}, first
 	for _, arg := range line {
-		if !cliShellSafe.MatchString(arg) {
+		if !cliShellSafe.re().MatchString(arg) {
 			arg = "'" + strings.ReplaceAll(arg, "'", `'"'"'`) + "'"
 		}
 		separator := " "

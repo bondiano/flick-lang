@@ -2,7 +2,6 @@ package flickrt
 
 import (
 	"math"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -28,19 +27,19 @@ type promptNumberOptions struct {
 }
 
 var (
-	promptIntPrefix   = regexp.MustCompile(`^[+-]?\d+`)
-	promptFloatPrefix = regexp.MustCompile(`^[+-]?(Infinity|(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?)`)
+	promptIntPrefix   = lazyRegexp{pattern: `^[+-]?\d+`}
+	promptFloatPrefix = lazyRegexp{pattern: `^[+-]?(Infinity|(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?)`}
 )
 
 // promptParse is JS `parseInt` (base 10) or `parseFloat`: the number the
 // text starts with, NaN for none.
 func promptParse(text string, float bool) float64 {
 	text = strings.TrimLeft(text, " \t\n\r\v\f")
-	prefix := promptIntPrefix
+	prefix := &promptIntPrefix
 	if float {
-		prefix = promptFloatPrefix
+		prefix = &promptFloatPrefix
 	}
-	match := prefix.FindString(text)
+	match := prefix.re().FindString(text)
 	if match == "" {
 		return math.NaN()
 	}

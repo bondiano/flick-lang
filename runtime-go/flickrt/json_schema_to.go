@@ -198,10 +198,10 @@ func convertLegacyID(source, out *Record, targetKey, dialect string) {
 		return
 	}
 	s, ok := anchor.(string)
-	if !ok || !anchorPattern.MatchString(s) {
+	if !ok || !anchorPattern.re().MatchString(s) {
 		unsupportedKeyword("$anchor", dialect, "the anchor is not valid")
 	}
-	if !legacyIDFragment.MatchString(s) {
+	if !legacyIDFragment.re().MatchString(s) {
 		unsupportedKeyword("$anchor", dialect, "the anchor cannot be represented as a plain-name fragment identifier")
 	}
 	if id != nil {

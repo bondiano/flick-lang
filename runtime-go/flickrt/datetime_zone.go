@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -61,13 +60,13 @@ func zoneTable(id string) (string, bool) {
 var zoneCache sync.Map // resolved id → *TimeZone
 
 // offsetZoneName is the offsets Intl takes as a zone's name.
-var offsetZoneName = regexp.MustCompile(`^([+\-\x{2212}])([01]\d|2[0-3])(?::?([0-5]\d))?$`)
+var offsetZoneName = lazyRegexp{pattern: `^([+\-\x{2212}])([01]\d|2[0-3])(?::?([0-5]\d))?$`}
 
 // zoneNamed is the zone of a name: an IANA identifier, or an offset.
 func zoneNamed(id string) (*TimeZone, bool) {
 	var loc *time.Location
 	resolved, ok := resolveZone(id)
-	if m := offsetZoneName.FindStringSubmatch(id); m != nil {
+	if m := offsetZoneName.re().FindStringSubmatch(id); m != nil {
 		h, _ := strconv.Atoi(m[2])
 		mm, _ := strconv.Atoi(m[3]) // 0 for none
 		seconds := (h*60 + mm) * 60
@@ -117,11 +116,11 @@ func localZone() *TimeZone {
 	})
 }
 
-var offsetText = regexp.MustCompile(`([+-])(\d{2}):(\d{2})$`)
+var offsetText = lazyRegexp{pattern: `([+-])(\d{2}):(\d{2})$`}
 
 // parseOffset reads `+hh:mm` at the end of `s`, in milliseconds.
 func parseOffset(s string) (float64, bool) {
-	m := offsetText.FindStringSubmatch(s)
+	m := offsetText.re().FindStringSubmatch(s)
 	if m == nil {
 		return 0, false
 	}

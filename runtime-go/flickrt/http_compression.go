@@ -7,7 +7,6 @@ import (
 	"io"
 	"maps"
 	"math/big"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,9 +17,9 @@ import (
 // their `Content-Encoding`.
 
 var (
-	acceptMember = regexp.MustCompile(`^([a-z0-9!#$%&'*+.^_` + "`" + `|~-]+)(?:;q=(0(?:\.[0-9]{0,3})?|1(?:\.0{0,3})?))?$`)
-	paramSpaces  = regexp.MustCompile(`[ \t]*;[ \t]*`)
-	noTransform  = regexp.MustCompile(`(?i)(?:^|[\s,])no-transform(?:$|[\s,;])`)
+	acceptMember = lazyRegexp{pattern: `^([a-z0-9!#$%&'*+.^_` + "`" + `|~-]+)(?:;q=(0(?:\.[0-9]{0,3})?|1(?:\.0{0,3})?))?$`}
+	paramSpaces  = lazyRegexp{pattern: `[ \t]*;[ \t]*`}
+	noTransform  = lazyRegexp{pattern: `(?i)(?:^|[\s,])no-transform(?:$|[\s,;])`}
 	algorithmOf  = map[string]string{"Gzip": "gzip", "Deflate": "deflate", "Brotli": "br", "Zstd": "zstd"}
 )
 
@@ -33,8 +32,8 @@ func negotiate(header string, preferred []string, supported map[string]openCompr
 	}
 	accepted := map[string]float64{}
 	for _, part := range strings.Split(header, ",") {
-		member := paramSpaces.ReplaceAllString(strings.ToLower(strings.TrimSpace(part)), ";")
-		m := acceptMember.FindStringSubmatch(member)
+		member := paramSpaces.re().ReplaceAllString(strings.ToLower(strings.TrimSpace(part)), ";")
+		m := acceptMember.re().FindStringSubmatch(member)
 		if m == nil {
 			return ""
 		}
@@ -206,7 +205,7 @@ func compression(fb *Fiber, options, handler, request Value, web bool) Value {
 		if r.body.kind == bodyEmpty || r.body.kind == bodyForm {
 			return response
 		}
-		if cc, ok := recordField(headers, "cache-control").(string); ok && noTransform.MatchString(cc) {
+		if cc, ok := recordField(headers, "cache-control").(string); ok && noTransform.re().MatchString(cc) {
 			return response
 		}
 		ct, ok := recordField(headers, "content-type").(string)

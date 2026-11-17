@@ -3,7 +3,6 @@ package flickrt
 import (
 	"math"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -234,7 +233,7 @@ func isTransientFailure(err Value) bool {
 		reason.Tag == statusErrorTag && transientStatus[record(reason.Fields()[0]).Get("status").(int32)]
 }
 
-var retryAfterSeconds = regexp.MustCompile(`^\d+(?:\.\d+)?$`)
+var retryAfterSeconds = lazyRegexp{pattern: `^\d+(?:\.\d+)?$`}
 
 // retryAfter is the delay a `Retry-After` value asks for at `now`, at
 // least a millisecond: seconds or a date; nil for none.
@@ -244,7 +243,7 @@ func retryAfter(now float64, header Value) *Duration {
 		return nil
 	}
 	v = strings.TrimSpace(v)
-	if retryAfterSeconds.MatchString(v) {
+	if retryAfterSeconds.re().MatchString(v) {
 		s, _ := strconv.ParseFloat(v, 64)
 		if math.IsInf(s, 0) {
 			return nil

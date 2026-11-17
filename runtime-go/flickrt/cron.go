@@ -2,7 +2,6 @@ package flickrt
 
 import (
 	"math"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -123,7 +122,7 @@ func CronMake(fields Value) Value {
 var (
 	monthAliases   = map[string]int{"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6, "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12}
 	weekdayAliases = map[string]int{"sun": 0, "mon": 1, "tue": 2, "wed": 3, "thu": 4, "fri": 5, "sat": 6}
-	decimalText    = regexp.MustCompile(`^\d+$`)
+	decimalText    = lazyRegexp{pattern: `^\d+$`}
 )
 
 // cronNumber is the number of a field's text: an alias's, else NaN unless
@@ -132,7 +131,7 @@ func cronNumber(s string, aliases map[string]int) float64 {
 	if v, ok := aliases[strings.ToLower(s)]; ok {
 		return float64(v)
 	}
-	if !decimalText.MatchString(s) {
+	if !decimalText.re().MatchString(s) {
 		return nan
 	}
 	n, _ := strconv.ParseFloat(s, 64)

@@ -2,35 +2,34 @@ package flickrt
 
 import (
 	"math"
-	"regexp"
 	"strings"
 )
 
 // PrometheusMetrics: the registry in Prometheus's text format.
 
 var (
-	metricNameUnsafe = regexp.MustCompile(`[^a-zA-Z0-9_:]`)
-	labelNameUnsafe  = regexp.MustCompile(`[^a-zA-Z0-9_]`)
-	underscores      = regexp.MustCompile(`_+`)
+	metricNameUnsafe = lazyRegexp{pattern: `[^a-zA-Z0-9_:]`}
+	labelNameUnsafe  = lazyRegexp{pattern: `[^a-zA-Z0-9_]`}
+	underscores      = lazyRegexp{pattern: `_+`}
 	prometheusTypes  = map[string]string{
 		"Counter": "counter", "Gauge": "gauge", "Histogram": "histogram", "Summary": "summary", "Frequency": "counter",
 	}
 )
 
 func sanitizeMetricName(name string) string {
-	s := metricNameUnsafe.ReplaceAllString(name, "_")
+	s := metricNameUnsafe.re().ReplaceAllString(name, "_")
 	if s != "" && (s[0] >= '0' && s[0] <= '9' || s[0] == ':') {
 		s = "_" + s
 	}
-	return strings.TrimSuffix(underscores.ReplaceAllString(s, "_"), "_")
+	return strings.TrimSuffix(underscores.re().ReplaceAllString(s, "_"), "_")
 }
 
 func sanitizeLabelName(name string) string {
-	s := labelNameUnsafe.ReplaceAllString(name, "_")
+	s := labelNameUnsafe.re().ReplaceAllString(name, "_")
 	if s != "" && s[0] >= '0' && s[0] <= '9' {
 		s = "_" + s
 	}
-	return underscores.ReplaceAllString(s, "_")
+	return underscores.re().ReplaceAllString(s, "_")
 }
 
 var (

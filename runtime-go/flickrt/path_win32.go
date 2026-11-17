@@ -21,14 +21,6 @@ func hasDrive(path string) bool { return len(path) >= 2 && isDriveLetter(path[0]
 
 func jsLower(s string) string { return ToLowerCase(s).(string) }
 
-var winReservedNames = map[string]bool{}
-
-func init() {
-	for _, n := range strings.Fields("CON PRN AUX NUL COM1 COM2 COM3 COM4 COM5 COM6 COM7 COM8 COM9 LPT1 LPT2 LPT3 LPT4 LPT5 LPT6 LPT7 LPT8 LPT9 COM¹ COM² COM³ LPT¹ LPT² LPT³") {
-		winReservedNames[n] = true
-	}
-}
-
 // isWinReserved is Node's isWindowsReservedName: whether `path` up to
 // `colon` names a device. A `colon` of -1 drops the last code unit, as
 // JS's `slice(0, -1)`.
@@ -40,7 +32,13 @@ func isWinReserved(path string, colon int) bool {
 		}
 		colon = len(path) - size
 	}
-	return winReservedNames[ToUpperCase(path[:colon]).(string)]
+	// a switch rather than a set, which a program would build at init
+	switch ToUpperCase(path[:colon]).(string) {
+	case "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+		"LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9", "COM¹", "COM²", "COM³", "LPT¹", "LPT²", "LPT³":
+		return true
+	}
+	return false
 }
 
 // win32UNC matches `\\server\share` at the start of `path`, with either

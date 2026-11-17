@@ -32,6 +32,8 @@ import (
 //	settle o t     the call settled
 //	build l        a memoized layer builds; release l: its scope releases it
 //	exit x         main ends: ok, fail or int
+//
+// Eager: read before the init below removes the variable from the environment.
 var (
 	tracePath = os.Getenv("FLICK_TRACE")
 	tracing   = tracePath != ""

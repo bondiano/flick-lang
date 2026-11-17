@@ -1,7 +1,6 @@
 package flickrt
 
 import (
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -38,19 +37,19 @@ const (
 	promptMillis
 )
 
-var promptDateMask = regexp.MustCompile(`\\(.)|"((?:\\["\\]|[^"])+)"|(D[Do]?|d{3,4}|d)|(M{1,4})|(YY(?:YY)?)|([aA])|([Hh]{1,2})|(m{1,2})|(s{1,2})|(S{1,4})|.`)
+var promptDateMask = lazyRegexp{pattern: `\\(.)|"((?:\\["\\]|[^"])+)"|(D[Do]?|d{3,4}|d)|(M{1,4})|(YY(?:YY)?)|([aA])|([Hh]{1,2})|(m{1,2})|(s{1,2})|(S{1,4})|.`}
 
-var promptUnescape = regexp.MustCompile(`\\(.)`)
+var promptUnescape = lazyRegexp{pattern: `\\(.)`}
 
 func promptDateParts(mask string) []promptDatePart {
 	var parts []promptDatePart
-	for _, m := range promptDateMask.FindAllStringSubmatch(mask, -1) {
+	for _, m := range promptDateMask.re().FindAllStringSubmatch(mask, -1) {
 		part := promptDatePart{promptToken, m[0]}
 		switch group := promptFirstGroup(m); {
 		case group == 1:
 			part.token = m[1]
 		case group == 2:
-			part.token = promptUnescape.ReplaceAllString(m[2], "$1")
+			part.token = promptUnescape.re().ReplaceAllString(m[2], "$1")
 		case group > 2:
 			part = promptDatePart{group - 2, m[group]}
 		}

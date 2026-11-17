@@ -9,7 +9,6 @@ package flickrt
 import (
 	"math"
 	"math/big"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -49,10 +48,10 @@ func SqlTable(table Value) Value { return table }
 
 // sqlPlaceholder is a placeholder `$n`, or a quoted identifier, which may
 // hold `$` itself.
-var sqlPlaceholder = regexp.MustCompile(`"(?:[^"]|"")*"|\$(\d+)`)
+var sqlPlaceholder = lazyRegexp{pattern: `"(?:[^"]|"")*"|\$(\d+)`}
 
 func renumberSql(text string, slot func(n int) string) string {
-	return sqlPlaceholder.ReplaceAllStringFunc(text, func(m string) string {
+	return sqlPlaceholder.re().ReplaceAllStringFunc(text, func(m string) string {
 		if m[0] == '"' {
 			return m
 		}
@@ -144,12 +143,12 @@ func SqlParameterCount(q Value) Value {
 	return int32(len(query.params))
 }
 
-var sqlIdentifierPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+var sqlIdentifierPattern = lazyRegexp{pattern: `^[A-Za-z_][A-Za-z0-9_]*$`}
 
 // SqlIdentifier is a checked identifier, or None.
 func SqlIdentifier(name Value) Value {
 	n := name.(string)
-	if sqlIdentifierPattern.MatchString(n) && len(n) <= 63 {
+	if sqlIdentifierPattern.re().MatchString(n) && len(n) <= 63 {
 		return Some(n)
 	}
 	return None
@@ -250,7 +249,7 @@ func encodeKind(kind string, v Value) (*string, string) {
 	return text(s)
 }
 
-var sqlInteger = regexp.MustCompile(`^-?\d+$`)
+var sqlInteger = lazyRegexp{pattern: `^-?\d+$`}
 
 // decodeKind is a value of a kind read from its text.
 func decodeKind(kind, text string) (Value, string) {
@@ -262,7 +261,7 @@ func decodeKind(kind, text string) (Value, string) {
 		}
 		return x, ""
 	case "bigint":
-		if !sqlInteger.MatchString(text) {
+		if !sqlInteger.re().MatchString(text) {
 			return nil, text + " is not an integer"
 		}
 		n, _ := new(big.Int).SetString(text, 10)

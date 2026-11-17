@@ -3,7 +3,6 @@ package flickrt
 import (
 	"math"
 	"math/big"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -44,7 +43,7 @@ func checkTree(s *Schema, seen map[*Schema]bool) {
 
 func (t *stringTree) accepts(Value) bool { return true }
 
-var finiteText = regexp.MustCompile(`^[+-]?[0-9]*\.?[0-9]+(?:[Ee][+-]?[0-9]+)?$`)
+var finiteText = lazyRegexp{pattern: `^[+-]?[0-9]*\.?[0-9]+(?:[Ee][+-]?[0-9]+)?$`}
 
 // numberOfText is the number of a string: a finite number's text, or
 // `NaN`, `Infinity` or `-Infinity`.
@@ -54,7 +53,7 @@ func numberOfText(in Value) (float64, []issue) {
 		return 0, expected("Union", in)
 	}
 	switch {
-	case finiteText.MatchString(s):
+	case finiteText.re().MatchString(s):
 		x, _ := strconv.ParseFloat(s, 64)
 		return x, nil
 	case s == "NaN":
@@ -109,7 +108,7 @@ func decodeTree(fb *Fiber, s *Schema, in Value) (Value, []issue) {
 		if !ok {
 			return nil, expected("a string", in)
 		}
-		if !digitsPattern.MatchString(text) {
+		if !digitsPattern.re().MatchString(text) {
 			return nil, expected("a string representing a bigint", in)
 		}
 		n, _ := new(big.Int).SetString(text, 10)
@@ -219,7 +218,7 @@ func bracketTokens(path string) []any {
 	if path == "" {
 		return []any{""}
 	}
-	replaced := bracketPart.ReplaceAllString(path, ".$1")
+	replaced := bracketPart.re().ReplaceAllString(path, ".$1")
 	parts := strings.Split(replaced, ".")
 	if strings.HasPrefix(replaced, ".") {
 		parts = parts[1:]
@@ -234,7 +233,7 @@ func bracketTokens(path string) []any {
 	return out
 }
 
-var bracketPart = regexp.MustCompile(`\[(.*?)\]`)
+var bracketPart = lazyRegexp{pattern: `\[(.*?)\]`}
 
 // maxArrayHoles is how many missing indices an array may have; past that
 // it stays an object.

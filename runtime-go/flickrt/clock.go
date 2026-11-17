@@ -25,7 +25,7 @@ type liveClock struct{}
 
 var (
 	systemClock Clock = liveClock{}
-	clockStart        = time.Now()
+	clockStart        = time.Now() // eager: the monotonic clock counts from the start
 )
 
 func (liveClock) millis() float64     { return float64(time.Now().UnixMilli()) }

@@ -1,7 +1,6 @@
 package flickrt
 
 import (
-	"regexp"
 	"strings"
 )
 
@@ -74,10 +73,10 @@ func cliGenerateCompletions(executable, shell string, d completeCommand) string 
 
 var fishEscape = strings.NewReplacer(`\`, `\\`, `'`, `\'`)
 
-var fishChoiceSpecial = regexp.MustCompile(`[^A-Za-z0-9_.,/@%+-]`)
+var fishChoiceSpecial = lazyRegexp{pattern: `[^A-Za-z0-9_.,/@%+-]`}
 
 func fishChoice(s string) string {
-	return fishEscape.Replace(fishChoiceSpecial.ReplaceAllStringFunc(s, func(m string) string { return `\` + m }))
+	return fishEscape.Replace(fishChoiceSpecial.re().ReplaceAllStringFunc(s, func(m string) string { return `\` + m }))
 }
 
 func fishSubcommandCondition(parent, children []string) string {
