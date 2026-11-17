@@ -14,7 +14,7 @@ use flick_model::{
 fn predicates_preserve_partial_application_aliases_and_unicode_in_both_profiles() {
     let text = r#"module App.StringPredicates exposing (answer)
 import String
-answer : String ->{} Bool
+answer : String ->{Host.Console} Bool
 let answer subject =
   let prefix = String.starts_with "😀"
   let includes = String.contains
@@ -63,7 +63,7 @@ let answer subject =
 }
 
 const JOIN_SOURCE: &str = r#"module App.StringJoin exposing (answer, escaped, shared)
-mark : String ->{} String
+mark : String ->{Host.Console} String
 let mark text =
   Platform.stdout_line text
   text
@@ -74,7 +74,7 @@ let shared separator =
   let joiner = escaped separator
   let first = joiner ["a", "b", ""]
   joiner [first, "😀"]
-answer : Unit ->{} String
+answer : Unit ->{Host.Console} String
 let answer () =
   let joiner = escaped (mark "/")
   let empty = joiner []

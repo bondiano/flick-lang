@@ -169,7 +169,7 @@ fn rt_checks_a_reexported_entry_against_its_runtime_capabilities() {
 fn unused_members_of_a_mixed_builtin_do_not_import_the_adapter() {
     let source = r"module App.Main exposing (main)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Clock} Unit
 let main () = ignore (DateTime.now ())
 ";
     let app = project(
@@ -273,7 +273,7 @@ fn supported_native_members_emit_typechecking_typescript() {
             ("package.json", "{\"type\":\"module\"}"),
             (
                 "src/App/Main.fl",
-                "module App.Main exposing (main, Generator)\nservice Generator =\n  value : Unit ->{} Unit\nmain : Unit ->{} Unit\nlet main () = ignore (DateTime.now ())\n",
+                "module App.Main exposing (main, Generator)\nservice Generator =\n  value : Unit ->{} Unit\nmain : Unit ->{Host.Clock} Unit\nlet main () = ignore (DateTime.now ())\n",
             ),
         ],
     );

@@ -31,7 +31,7 @@ fn named_parameterized_module_result_runs_from_two_importers_on_js_and_go() {
         ),
         (
             "Main.fl",
-            "module App.Main exposing (main)\nimport App.First as First\nimport App.Second as Second\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (First.answer + Second.answer))\n",
+            "module App.Main exposing (main)\nimport App.First as First\nimport App.Second as Second\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show (First.answer + Second.answer))\n",
         ),
     ] {
         fs::write(source.join(name), text).expect("write source");
@@ -113,7 +113,7 @@ fn case_insensitive_set_keeps_its_policy_across_importers_on_js_and_go() {
         ),
         (
             "Main.fl",
-            "module App.Main exposing (main)\nimport App.Second as Second\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show Second.has_name ++ \" \" ++ show Second.count ++ \" \" ++ show Second.exact_has_name ++ \" \" ++ show Second.exact_count ++ \" \" ++ show Second.converted_has_name)\n",
+            "module App.Main exposing (main)\nimport App.Second as Second\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show Second.has_name ++ \" \" ++ show Second.count ++ \" \" ++ show Second.exact_has_name ++ \" \" ++ show Second.exact_count ++ \" \" ++ show Second.converted_has_name)\n",
         ),
     ] {
         fs::write(source.join(name), text).expect("write source");
@@ -236,7 +236,7 @@ fn parameterized_module_uses_its_argument_dictionary_on_js_and_go() {
         ),
         (
             "Main.fl",
-            "module App.Main exposing (main)\nimport App.Parent.Chosen exposing (answer)\nimport App.Parent.HashChosen as HashChosen\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (if answer == false && HashChosen.answer == false && HashChosen.hash_answer == 0 then \"ok\" else \"wrong\")\n",
+            "module App.Main exposing (main)\nimport App.Parent.Chosen exposing (answer)\nimport App.Parent.HashChosen as HashChosen\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (if answer == false && HashChosen.answer == false && HashChosen.hash_answer == 0 then \"ok\" else \"wrong\")\n",
         ),
     ] {
         fs::write(source.join(name), text).expect("write source");
@@ -327,7 +327,7 @@ fn higher_order_factory_with_partial_application_runs_on_js_and_go() {
         ),
         (
             "Main.fl",
-            "module App.Main exposing (main)\nimport App.Instances.Chosen as Chosen\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show Chosen.answer)\n",
+            "module App.Main exposing (main)\nimport App.Instances.Chosen as Chosen\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show Chosen.answer)\n",
         ),
     ] {
         fs::write(source.join(name), text).expect("source");

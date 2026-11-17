@@ -16,7 +16,7 @@ effect Read =
 
 type error Failed = Failed String
 
-answer : String ->{} String
+answer : String ->{Host.Console} String
 let answer seed =
   let body_prefix = seed ++ "/body"
   let arm_prefix = seed ++ "/arm"
@@ -62,7 +62,7 @@ effect Ask =
 
 type error Gone = Gone String
 
-uncaught : String ->{; Gone} String
+uncaught : String ->{Host.Console; Gone} String
 let uncaught seed =
   try
     Platform.stdout_line "body"
@@ -75,7 +75,7 @@ let uncaught seed =
   | Gone _ -> "wrong selected catch"
   | return _ -> "wrong return"
 
-answer : String ->{} String
+answer : String ->{Host.Console} String
 let answer seed =
   let tail =
     try uncaught seed with
@@ -98,7 +98,7 @@ effect Exit =
 
 type error Gone = Gone String
 
-answer : String ->{} String
+answer : String ->{Host.Console} String
 let answer seed =
   try
     try

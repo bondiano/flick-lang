@@ -147,22 +147,22 @@ let answer () =
 fn short_circuit_and_pipe_argument_order_follow_source_execution() {
     let text = r#"module App exposing (answer)
 
-function : Unit ->{} (Int -> Int)
+function : Unit ->{Host.Console} (Int -> Int)
 let function () =
   Platform.stdout_line "function"
   fun value -> value + 1
 
-argument : Unit ->{} Int
+argument : Unit ->{Host.Console} Int
 let argument () =
   Platform.stdout_line "argument"
   1
 
-unexpected : Unit ->{} Bool
+unexpected : Unit ->{Host.Console} Bool
 let unexpected () =
   Platform.stdout_line "unexpected"
   true
 
-answer : Unit ->{} Unit
+answer : Unit ->{Host.Console} Unit
 let answer () =
   let skipped_and = false && unexpected ()
   let skipped_or = true || unexpected ()
@@ -209,13 +209,13 @@ let answer () =
 fn tasks_are_lazy_replayable_owned_values_not_callable_closures() {
     let text = r#"module App exposing (answer)
 
-make : String -> Eff {} none String
+make : String -> Eff {Host.Console} none String
 let make prefix = task {
   Platform.stdout_line prefix
   prefix ++ "!"
 }
 
-answer : Unit ->{} String
+answer : Unit ->{Host.Console} String
 let answer () =
   let job = make "body"
   Platform.stdout_line "built"
@@ -243,7 +243,7 @@ fn root_cell_arena_breaks_closure_cycles_without_a_collector() {
 nop : Unit ->{} Unit
 let nop () = ()
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let left = Ref.make nop
   let right = Ref.make nop
@@ -271,11 +271,11 @@ let main () =
 fn task_mains_keep_one_execution_arena_across_function_and_await_stages() {
     let sources = [
         r#"module App exposing (main)
-main : Eff {} none Unit
+main : Eff {Host.Console} none Unit
 let main = task { Platform.stdout_line "task main" }
 "#,
         r#"module App exposing (main)
-main : Unit ->{} Eff {} none Unit
+main : Unit ->{} Eff {Host.Console} none Unit
 let main () =
   let cell = Ref.make "task main"
   task { Platform.stdout_line (Ref.get cell) }

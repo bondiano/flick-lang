@@ -134,7 +134,7 @@ fn lexical_prefix_values_initialize_before_their_results_on_js_and_go() {
         "module App.Factory exposing (Make, MakeMore, answer)\nplus : Int -> Int -> Int\nlet plus a b = a + b\noffset : Int\nlet offset = plus 0 1\nmodule Make(K : App.Contracts.Input) : App.Contracts.Output =\n  answer : Int\n  let answer = plus offset K.seed\nmodule Example = Make(App.Argument)\nincrement : Int\nlet increment = Example.answer - 40\nmodule MakeMore(K : App.Contracts.Input) : App.Contracts.Output =\n  answer : Int\n  let answer = plus (plus offset increment) K.seed\nanswer : Int\nlet answer = Example.answer\n",
         "module App.Instances exposing (Chosen, More)\nmodule Chosen = App.Factory.Make(App.Argument)\nmodule More = App.Factory.MakeMore(App.Argument)\n",
     );
-    fs::write(source.join("Main.fl"), "module App.Main exposing (main)\nimport App.Factory as Factory\nimport App.Instances.Chosen as Chosen\nimport App.Instances.More as More\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show Factory.answer ++ \" \" ++ show Chosen.answer ++ \" \" ++ show More.answer)\n").expect("main source");
+    fs::write(source.join("Main.fl"), "module App.Main exposing (main)\nimport App.Factory as Factory\nimport App.Instances.Chosen as Chosen\nimport App.Instances.More as More\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show Factory.answer ++ \" \" ++ show Chosen.answer ++ \" \" ++ show More.answer)\n").expect("main source");
     assert_hom_execution(&source, &dir, "lexical-prefix", b"42 42 44\n");
 }
 
@@ -167,7 +167,7 @@ fn captured_layer_keeps_one_memoized_identity_on_js_and_go() {
         ),
         (
             "Main",
-            "module App.Main exposing (main)\nimport App.Support as S\nimport App.Factory as Factory\nimport App.Instances.A as A\nimport App.Instances.B as B\nmain : Unit ->{} Unit\nlet main () =\n  let count = Ref.make 0\n  let acquire = Layer.succeed S.Acquire { next = fun () -> Ref.modify count (fun n -> (n + 1, n + 1)) }\n  let before = Ref.get count\n  let layers = Layer.override (Layer.override A.layer B.layer) Factory.own_layer\n  let value = provide acquire { provide layers { S.Value.get () } }\n  Platform.stdout_line (show before ++ \" \" ++ show (Ref.get count) ++ \" \" ++ show value)\n",
+            "module App.Main exposing (main)\nimport App.Support as S\nimport App.Factory as Factory\nimport App.Instances.A as A\nimport App.Instances.B as B\nmain : Unit ->{Host.Console} Unit\nlet main () =\n  let count = Ref.make 0\n  let acquire = Layer.succeed S.Acquire { next = fun () -> Ref.modify count (fun n -> (n + 1, n + 1)) }\n  let before = Ref.get count\n  let layers = Layer.override (Layer.override A.layer B.layer) Factory.own_layer\n  let value = provide acquire { provide layers { S.Value.get () } }\n  Platform.stdout_line (show before ++ \" \" ++ show (Ref.get count) ++ \" \" ++ show value)\n",
         ),
     ] {
         fs::write(source.join(format!("{name}.fl")), text).expect("source");

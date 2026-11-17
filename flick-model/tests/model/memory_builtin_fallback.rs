@@ -19,7 +19,7 @@ fn stdout(source: &str, expected: &str) {
 fn disjoint_app_entities_do_not_compete_with_builtin_app() {
     stdout(
         r#"module App exposing (main)
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line "kept"
 "#,
         "kept\n",
@@ -32,7 +32,7 @@ fn explicit_app_value_overrides_the_matching_builtin_entity() {
         r"module App exposing (main)
 fail : Int -> Int
 let fail value = value + 1
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (show (fail 41))
 ",
         "42\n",
@@ -43,7 +43,7 @@ let main () = Platform.stdout_line (show (fail 41))
 fn same_module_builtin_scalar_fallback_keeps_its_checked_declaration() {
     stdout(
         r"module BigInt exposing (main)
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (show (BigInt.to_number 7n))
 ",
         "7\n",
@@ -56,7 +56,7 @@ fn explicit_scalar_scheme_and_ir_override_together_without_losing_other_builtins
         r#"module BigInt exposing (main)
 to_string : Int -> BigInt
 foreign pure to_string from global "BigInt"
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line (show (to_string 42) ++ "|" ++ show (BigInt.to_number 9n))
 "#,

@@ -328,7 +328,7 @@ fn a_case_the_model_does_not_run_says_why() {
 #[test]
 fn nested_labeled_loop_break_outer() {
     let text = r"module Main exposing (main)
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let result =
     'outer : loop {
@@ -351,7 +351,7 @@ let main () =
 #[test]
 fn nested_labeled_loop_continue_outer() {
     let text = r"module Main exposing (main)
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let mut outer_count = 0
   let mut inner_count = 0
@@ -376,7 +376,7 @@ let main () =
 #[test]
 fn three_level_nested_labeled_loop_break_ancestor() {
     let text = r"module Main exposing (main)
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let mut trace = 0
   let result =
@@ -404,7 +404,7 @@ fn nested_labeled_loop_break_across_try() {
     let text = r"module Main exposing (main)
 type error Missing = Missing
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let result =
     'outer : loop {
@@ -428,7 +428,7 @@ fn nested_labeled_loops_support_distinct_types_for_and_try() {
     let text = r#"module Main exposing (main)
 type error Missing = Missing
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let answer =
     'outer : loop {

@@ -26,7 +26,7 @@ fn app(name: &str, runner: &str, main: &str) -> PathBuf {
     dir
 }
 
-const NODE_MAIN: &str = "module App.Main exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"started by Runner.Node\"\n";
+const NODE_MAIN: &str = "module App.Main exposing (main)\n\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () = Platform.stdout_line \"started by Runner.Node\"\n";
 
 #[test]
 fn a_runner_module_starts_the_entry() {
@@ -118,7 +118,7 @@ fn workers_and_cli(name: &str) -> PathBuf {
     fs::write(dir.join("src/App/Worker.fl"), WORKER).expect("write");
     fs::write(
         dir.join("src/App/Cli.fl"),
-        "module App.Cli exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"cli on node\"\n",
+        "module App.Cli exposing (main)\n\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () = Platform.stdout_line \"cli on node\"\n",
     )
     .expect("write");
     let out = flick_in(&dir, &["build"]);

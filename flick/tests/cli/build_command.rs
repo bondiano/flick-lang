@@ -17,7 +17,7 @@ use std::process::Command;
 use common::{APP, flick_in, project};
 use flick_core::{build::runner_path, iface};
 
-const MAIN: &str = "module App.Main exposing (main)\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"hi\"\n";
+const MAIN: &str = "module App.Main exposing (main)\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () = Platform.stdout_line \"hi\"\n";
 const LIB: &str = "schema-version = 1\n[project]\nkind = \"lib\"\n";
 const FAILURE: &str = "module B exposing (answer)\nanswer : Float\nlet answer = \"wrong\"\n";
 
@@ -175,7 +175,7 @@ fn build_writes_modules_maps_builtins_and_the_runner() {
     fs::write(dir.join("package.json"), "{ \"name\": \"@acme/hello\" }\n").expect("write");
     fs::write(
         dir.join("src/App/Main.fl"),
-        "module App.Main exposing (main)\n\ntype Greeting = Hello\n\nmain : Unit ->{none; AppError} Unit\nlet main () =\n  Platform.stdout_line \"hi\"\n",
+        "module App.Main exposing (main)\n\ntype Greeting = Hello\n\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () =\n  Platform.stdout_line \"hi\"\n",
     )
     .expect("write");
     let out = flick_in(&dir, &["build"]);
@@ -219,7 +219,7 @@ fn standalone_main_preserves_exports_and_runs_in_all_emit_profiles() {
     fs::create_dir_all(&dir).expect("dir");
     fs::write(
         dir.join("Main.fl"),
-        "module Main exposing (answer, main)\n\nanswer : Float\nlet answer = 42\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"ran main\"\n",
+        "module Main exposing (answer, main)\n\nanswer : Float\nlet answer = 42\n\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () = Platform.stdout_line \"ran main\"\n",
     )
     .expect("write");
     for (emit, profile) in [("js", "debug"), ("ts", "debug"), ("js", "release")] {
@@ -343,7 +343,7 @@ type alias Point = { x : Float; y : Float }
 point_json : PureCodec Json Point
 let point_json = Codec.json Point.schema
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   match Json.parse "{\"x\": 1, \"y\": 2}" with
   | Err _ -> Platform.stdout_line "not JSON"
@@ -437,7 +437,7 @@ fn several_entries_build_a_runner_each() {
     .expect("write");
     fs::write(
         dir.join("src/App/Server.fl"),
-        "module App.Server exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"serving\"\n",
+        "module App.Server exposing (main)\n\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () = Platform.stdout_line \"serving\"\n",
     )
     .expect("write");
     fs::write(
@@ -482,7 +482,7 @@ fn an_output_directory_holding_the_project_is_refused_before_anything_is_written
     fs::write(dir.join("package.json"), manifest).expect("write");
     fs::write(
         dir.join("src/App/Main.fl"),
-        "module App.Main exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"hi\"\n",
+        "module App.Main exposing (main)\n\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () = Platform.stdout_line \"hi\"\n",
     )
     .expect("write");
     for out_dir in [".", "..", "src"] {

@@ -19,7 +19,7 @@ use flick_core::build::go::executable;
 /// when its scope closes.
 const WAITING: &str = "module App.Main exposing (main)
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   scope {
     Resource.acquire_release (task { Platform.stdout_line \"started\" }) (fun _ -> Platform.stdout_line \"cleanup\")
@@ -52,7 +52,7 @@ fn lines(child: &mut Child) -> mpsc::Receiver<String> {
 #[test]
 #[ignore = "needs Go"]
 fn unchanged_go_build_reuses_and_restores_its_executable() {
-    let main = "module App.Main exposing (main)\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"hi\"\n";
+    let main = "module App.Main exposing (main)\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () = Platform.stdout_line \"hi\"\n";
     let dir = project(
         "go_build_noop",
         &[("flick.toml", APP), ("src/App/Main.fl", main)],
@@ -131,7 +131,7 @@ fn exit_codes_follow_the_outcome_and_signals() {
 #[ignore = "needs Go"]
 fn run_and_test_use_the_go_executable() {
     let config = format!("{APP}test-dir = \"test\"\n\n[build]\nemit = \"go\"\n");
-    let main = "module App.Main exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line (String.join \",\" (Platform.args ()))\n";
+    let main = "module App.Main exposing (main)\n\nmain : Unit ->{Host.Arguments, Host.Console; AppError} Unit\nlet main () = Platform.stdout_line (String.join \",\" (Platform.args ()))\n";
     let tests = "module App.MainTest exposing (tests)
 
 import Test exposing (..)
@@ -301,8 +301,8 @@ let tests =
 #[test]
 #[ignore = "needs Go"]
 fn a_module_that_drops_out_leaves_no_go_file_behind() {
-    let with = "module A exposing (main)\nimport B\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line (Int.to_string (B.twice 21))\n";
-    let without = "module A exposing (main)\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line (Int.to_string 42)\n";
+    let with = "module A exposing (main)\nimport B\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () = Platform.stdout_line (Int.to_string (B.twice 21))\n";
+    let without = "module A exposing (main)\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () = Platform.stdout_line (Int.to_string 42)\n";
     let b = "module B exposing (twice)\ntwice : Int -> Int\nlet twice x = Int.max (x * 2) 0\n";
     let mine = ["out/notes.txt", "out/go/main/notes.txt"];
     let dir = project(

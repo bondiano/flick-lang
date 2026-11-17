@@ -75,7 +75,7 @@ import App.Instances.Curried as Curried
 import App.Instances.Nested as Nested
 import App.Instances.Captured as Captured
 import App.Instances.CapturedOther as CapturedOther
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (show Curried.answer ++ " " ++ show Nested.answer ++ " " ++ show Captured.answer ++ " " ++ show CapturedOther.answer ++ " " ++ show (eq "x" "x"))
 "#,
             ),

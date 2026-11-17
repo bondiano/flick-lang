@@ -49,7 +49,7 @@ fn a_dictionary_built_from_others_is_built_once() {
          less : Ord a => a -> a -> Bool\nlet less x y = compare x y == LT\n\n\
          below : Option Int -> Bool\nlet below o = less o (Some 5)\n\n\
          both : Option Int -> Bool\nlet both o = below o && less None o\n\n\
-         main : Unit ->{; AppError} Unit\n\
+         main : Unit ->{Host.Console; AppError} Unit\n\
          let main () = Platform.stdout_line (show (both (Some 1)))\n");
     // `Ord (Option Int)`, given in two functions, is one package variable
     // built on first use; neither function builds it
@@ -73,7 +73,7 @@ fn a_dictionary_whose_method_is_computed_is_built_where_it_is_needed() {
          class Named a =\n  named : a -> String\n\n\
          instance Show a => Named (Option a) =\n  \
          let named =\n    let prefix = show 1\n    fun _ -> prefix\n\n\
-         main : Unit ->{; AppError} Unit\n\
+         main : Unit ->{Host.Console; AppError} Unit\n\
          let main () = Platform.stdout_line (named (Some 2))\n");
     // `prefix` is computed when the dictionary is built, by code that may
     // read what the fiber carries: built once it would keep the first answer
@@ -87,7 +87,7 @@ fn a_dictionary_whose_method_is_computed_is_built_where_it_is_needed() {
 const SUM: &str = "module App exposing (main, sum)\n\n\
 sum : Int -> Int\nlet sum n =\n  let mut acc = 0\n  let mut i = n\n  \
 while i > 0 do\n    acc = acc + i\n    i = i - 1\n  acc\n\n\
-main : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line (show (sum 3))\n";
+main : Unit ->{Host.Console; AppError} Unit\nlet main () = Platform.stdout_line (show (sum 3))\n";
 
 #[test]
 fn a_while_nothing_leaves_is_a_plain_loop_over_variables_of_their_go_type() {
@@ -106,7 +106,7 @@ type Mark = Low | High Int\n\n\
 scale : BigInt -> BigInt\nlet scale n =\n  match n with\n  | 0n -> 10n\n  | _ -> n * 10n\n\n\
 pick : Bool -> Mark\nlet pick high = if high then High 1 else Low\n\n\
 label : Mark -> String\nlet label mark =\n  match mark with\n  | Low -> \"low\"\n  | High _ -> \"high\"\n\n\
-main : Unit ->{; AppError} Unit\n\
+main : Unit ->{Host.Console; AppError} Unit\n\
 let main () = Platform.stdout_line (label (pick false) ++ BigInt.to_string (scale 2n))\n";
 
 #[test]
@@ -130,7 +130,7 @@ fn the_labels_of_a_record_literal_are_placed_once() {
          point : Int -> Point\nlet point n = { y = n; x = n + 1 }\n\n\
          moved : Point -> Point\nlet moved p = { y = p.x; x = p.y }\n\n\
          raised : Point -> Point\nlet raised p = { p with y = p.y + 1 }\n\n\
-         main : Unit ->{; AppError} Unit\n\
+         main : Unit ->{Host.Console; AppError} Unit\n\
          let main () = Platform.stdout_line (show (raised (moved (point 1))).x)\n");
     // two literals of the same labels in the same order: one shape, no label where a record is made
     assert_eq!(
@@ -150,7 +150,7 @@ fn a_function_of_two_arguments_is_given_both_at_once() {
     let go = app("module App exposing (main)\n\n\
          add : Int -> Int -> Int\nlet add a b = a + b\n\n\
          twice : (Int -> Int -> Int) -> Int -> Int\nlet twice f x = f x x\n\n\
-         main : Unit ->{; AppError} Unit\n\
+         main : Unit ->{Host.Console; AppError} Unit\n\
          let main () = Platform.stdout_line (show (twice add 1 + twice (fun a b -> a * b) 2))\n");
     // a function of numbers given as a value is one Go function that takes
     // both values, a lambda is one too, and a call through a value gives
@@ -172,7 +172,7 @@ fn an_argument_that_runs_code_is_not_given_with_the_one_before_it() {
     let go = app("module App exposing (main)\n\n\
          next : Int -> Int\nlet next n = n + 1\n\n\
          twice : (Int -> Int -> Int) -> Int -> Int\nlet twice f x = f x (next x)\n\n\
-         main : Unit ->{; AppError} Unit\n\
+         main : Unit ->{Host.Console; AppError} Unit\n\
          let main () = Platform.stdout_line (show (twice (fun a b -> a * b) 2))\n");
     // `f x` may fail before `next x` runs, as it does on JavaScript
     assert!(
@@ -185,7 +185,7 @@ fn an_argument_that_runs_code_is_not_given_with_the_one_before_it() {
 fn a_function_of_more_stages_than_a_word_has_bits_compiles() {
     let names: Vec<String> = (0..65).map(|i| format!("a{i}")).collect();
     let out = build(&format!(
-        "module App exposing (main)\n\nmain : Unit ->{{; AppError}} Unit\nlet main () =\n  \
+        "module App exposing (main)\n\nmain : Unit ->{{Host.Console; AppError}} Unit\nlet main () =\n  \
          let wide = fun {} -> 0\n  Platform.stdout_line (show (List.length [wide]))\n",
         names.join(" ")
     ));
@@ -205,8 +205,9 @@ fn a_loop_with_an_exit_keeps_the_flags_of_its_exits() {
 #[test]
 fn only_a_program_that_names_zones_embeds_the_zone_database() {
     let main_go = |body: &str| {
-        let text =
-            format!("module App exposing (main)\nmain : Unit ->{{}} Unit\nlet main () = {body}\n");
+        let text = format!(
+            "module App exposing (main)\nmain : Unit ->{{Host.Clock, Host.Console}} Unit\nlet main () = {body}\n"
+        );
         let output = build(&text);
         assert_eq!(output.diagnostics, []);
         let (_, main) = output
@@ -227,8 +228,9 @@ fn only_a_program_that_names_zones_embeds_the_zone_database() {
 #[test]
 fn only_a_program_that_reaches_an_optional_package_imports_it() {
     let packages = |body: &str| {
-        let text =
-            format!("module App exposing (main)\nmain : Unit ->{{}} Unit\nlet main () = {body}\n");
+        let text = format!(
+            "module App exposing (main)\nmain : Unit ->{{Host.Console}} Unit\nlet main () = {body}\n"
+        );
         let output = build(&text);
         assert_eq!(output.diagnostics, []);
         let main = &output
@@ -301,7 +303,7 @@ fn what_the_target_cannot_run_yet_is_reported() {
     let errors = compile(
         "module App exposing (main)\n\
          now : Unit ->{} Float\nforeign now from global \"Date.now\"\n\
-         main : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (now ()))\n",
+         main : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show (now ()))\n",
     );
     assert_eq!(
         errors.iter().map(|error| error.code).collect::<Vec<_>>(),
@@ -316,7 +318,7 @@ fn unreachable_foreigns_do_not_reject_a_supported_entry() {
     let errors = compile(
         "module App exposing (main)\n\
          now : Unit ->{} Float\nforeign now from global \"Date.now\"\n\
-         main : Unit ->{} Unit\nlet main () = Platform.stdout_line \"hi\"\n",
+         main : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line \"hi\"\n",
     );
     assert_eq!(errors, []);
 }
@@ -444,7 +446,7 @@ fn a_scalar_stays_in_its_go_type_through_a_choice_and_a_test() {
          let wide = if a > b && not (word < \"m\") then a - b else b - a\n  \
          let mark =\n    match word with\n    | \"none\" -> 0\n    | _ -> 1\n  \
          wide * 2 + mark\n\n\
-         main : Unit ->{; AppError} Unit\n\
+         main : Unit ->{Host.Console; AppError} Unit\n\
          let main () = Platform.stdout_line (show (spread 5 2 \"word\"))\n");
     // the result of an `if` and of a `match` whose branches are numbers is a number
     assert!(
@@ -478,8 +480,8 @@ fib : Int -> Int\nlet rec fib n = if n < 2 then n else fib (n - 1) + fib (n - 2)
 first : a -> b -> a\nlet first x _ = x\n\n\
 shout : Int -> List String -> Int\n\
 let shout n words = n + List.length (List.map (fun word -> word ++ \"!\") words)\n\n\
-tick : Int ->{} Int\nlet tick n =\n  Platform.stdout_line \"tick\"\n  n + 1\n\n\
-main : Unit ->{; AppError} Unit\n\
+tick : Int ->{Host.Console} Int\nlet tick n =\n  Platform.stdout_line \"tick\"\n  n + 1\n\n\
+main : Unit ->{Host.Console; AppError} Unit\n\
 let main () =\n  \
 let folded = List.fold_left first 0 [fib 5, shout 1 [\"a\"]]\n  \
 Platform.stdout_line (show (tick folded))\n";

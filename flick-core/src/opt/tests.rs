@@ -193,10 +193,10 @@ fn unused_pure_code_is_dropped_and_effects_stay() {
 fn a_lone_tail_effect_needs_no_generator() {
     let js = release(
         "module App exposing (once, twice, nested)\n\n\
-         once : Float ->{} Unit\nlet once n = Platform.stdout_line (show n)\n\n\
-         twice : Float ->{} Unit\n\
+         once : Float ->{Host.Console} Unit\nlet once n = Platform.stdout_line (show n)\n\n\
+         twice : Float ->{Host.Console} Unit\n\
          let twice n =\n  Platform.stdout_line (show n)\n  Platform.stdout_line (show n)\n\n\
-         nested : Unit ->{} Unit\nlet nested () = Platform.stdout_line (show (Platform.env \"HOME\"))\n",
+         nested : Unit ->{Host.Environment, Host.Console} Unit\nlet nested () = Platform.stdout_line (show (Platform.env \"HOME\"))\n",
     );
     // the printer may break the line: whitespace aside
     let squashed: String = js.split_whitespace().collect();

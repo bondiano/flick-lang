@@ -85,11 +85,11 @@ let cold captured =
   render (map2 wrong_first None (Some "right"))
     ++ "|" ++ render (map2 wrong_first (Some "left") None)
     ++ "|" ++ render (map2 wrong_second None None) ++ "|" ++ captured
-argument : String -> Option String ->{} Option String
+argument : String -> Option String ->{Host.Console} Option String
 let argument label value =
   Platform.stdout_line label
   value
-eager : Unit ->{} String
+eager : Unit ->{Host.Console} String
 let eager () =
   let result = map2 wrong_first (argument "left" None) (argument "right" (Some "right"))
   render result

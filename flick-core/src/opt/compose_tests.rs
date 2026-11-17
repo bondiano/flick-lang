@@ -10,11 +10,11 @@ use crate::ir::{Expr, ExprKind, Lit, Param, Pat, Stage};
 use crate::source::{FileId, Span};
 
 const PRELUDE: &str = "module App exposing (main)\n\n\
-    say : String ->{} Unit\nlet say line = Platform.stdout_line line\n\n\
+    say : String ->{Host.Console} Unit\nlet say line = Platform.stdout_line line\n\n\
     step : Int -> Int\nlet step n =\n  match n with\n  | 0 -> 1\n  | k -> k * 3\n\n\
     shrink : Int -> Int\nlet shrink n =\n  match n with\n  | 1 -> 0\n  | k -> k - 1\n\n\
     big : Int -> Bool\nlet big n = n > 2\n\n\
-    seen : Int ->{} Int\nlet seen n =\n  say (show n)\n  n\n\n\
+    seen : Int ->{Host.Console} Int\nlet seen n =\n  say (show n)\n  n\n\n\
     divide : Int -> Int -> Int\nlet divide d =\n  let q = Int.unsafe_div 1 d\n  fun n -> n + q\n\n";
 
 /// The workers of the built-in modules, as a build gives them.
@@ -30,7 +30,9 @@ fn workers() -> HashMap<(String, String), usize> {
 
 /// The release JS of the prelude, `definitions` and a `main` of `body`.
 fn js(definitions: &str, body: &str) -> String {
-    let text = format!("{PRELUDE}{definitions}main : Unit ->{{}} Unit\nlet main () =\n{body}\n");
+    let text = format!(
+        "{PRELUDE}{definitions}main : Unit ->{{Host.Console}} Unit\nlet main () =\n{body}\n"
+    );
     release_with(&text, &workers())
 }
 

@@ -501,7 +501,7 @@ mod tests {
 
     #[test]
     fn playground_compiles_and_queries_an_inline_module() {
-        let source = "module Main exposing (main)\nmodule Child exposing (answer) =\n  let answer = 42\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show Child.answer)\n";
+        let source = "module Main exposing (main)\nmodule Child exposing (answer) =\n  let answer = 42\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show Child.answer)\n";
         let mut session = Session::new();
         let diagnostics: Value = serde_json::from_str(&session.update(source)).expect("JSON");
         assert_eq!(diagnostics, serde_json::json!([]));
@@ -525,7 +525,7 @@ mod tests {
     #[test]
     fn a_playground_program_runs_on_flicks_own_runtime() {
         let mut session = Session::new();
-        session.update("module Main exposing (main)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line \"hi\"\n");
+        session.update("module Main exposing (main)\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line \"hi\"\n");
         let built: Value = serde_json::from_str(&session.emit("debug")).expect("JSON");
         let runner = built["files"]["flick-main.js"].as_str().expect("a runner");
         assert!(

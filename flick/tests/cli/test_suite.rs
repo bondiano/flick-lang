@@ -15,7 +15,7 @@ const SUITE: &str = r#"module Test.Sample exposing (tests)
 service Box =
   value : Unit ->{} String
 
-box : Layer none none {Box}
+box : Layer {Host.Console} none {Box}
 let box =
   Layer.from_build (fun memo ->
     Platform.stdout_line "acquire"

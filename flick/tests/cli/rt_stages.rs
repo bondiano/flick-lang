@@ -42,7 +42,7 @@ import Ctl exposing (Ask, twice)
 use : Unit ->{Ask;} Int
 let use () = twice () + Ask.ask 3
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let r =
     try use () with
@@ -58,7 +58,7 @@ import Ctl exposing (plain)
 plain_too : Int ->{} Int
 let plain_too x = plain x
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () = Platform.stdout_line (show (plain_too 1))
 ";
 
@@ -78,7 +78,7 @@ import App.Ctl exposing (Ask, twice)
 use : Unit ->{Ask;} Int
 let use () = twice () + Ask.ask 3
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let r =
     try use () with
@@ -260,7 +260,7 @@ fn optional_effect_arguments_cross_the_bridge_only_when_present() {
                 "module App.Main exposing (main)\n\n\
              pick : Option (Eff none none Float) ->{} Float\n\
              foreign effect pick from \"./bindings.mjs\" \"pick\"\n  optional 0\n\n\
-             main : Unit ->{Async; AppError} Unit\n\
+             main : Unit ->{Host.Console, Async; AppError} Unit\n\
              let main () =\n  Platform.stdout_line (show (pick (Some (task { 42 }))))\n  Platform.stdout_line (show (pick None))\n",
             ),
             (

@@ -21,7 +21,7 @@ divide : Int -> Int ->{} Int
 let divide a b =
   Int.unsafe_div a b
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Arguments, Host.Console; AppError} Unit
 let main () =
   let args = Platform.args ()
   Platform.stdout_line (\"привет \" ++ String.join \",\" args)

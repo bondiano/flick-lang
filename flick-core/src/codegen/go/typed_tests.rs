@@ -8,7 +8,7 @@ fn a_binding_of_numbers_takes_and_gives_them_in_their_go_type() {
     let go = app("module App exposing (main)\n\n\
          root : Int -> Float\nlet root n = Float.floor (Float.sqrt (Int.to_float n))\n\n\
          odd : Int -> Bool\nlet odd n = Int.bit_and n 1 == 1\n\n\
-         main : Unit ->{; AppError} Unit\n\
+         main : Unit ->{Host.Console; AppError} Unit\n\
          let main () = Platform.stdout_line (show (root 9, odd 3, List.map Float.abs [1.5]))\n");
     // a number goes from one function of the runtime to the next as it is
     assert!(

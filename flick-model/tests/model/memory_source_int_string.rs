@@ -21,7 +21,7 @@ fn success(source: &str, expected: &str) {
 fn unsafe_division_truncates_toward_zero_and_wraps_the_signed_overflow() {
     success(
         r"module App.IntDivide exposing (main)
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line (show (Int.unsafe_div 7 3))
   Platform.stdout_line (show (Int.unsafe_div (-7) 3))
@@ -38,7 +38,7 @@ let main () =
 fn unsafe_remainder_keeps_the_dividend_sign_and_has_no_negative_zero() {
     success(
         r"module App.IntRemainder exposing (main)
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line (show (Int.unsafe_rem 7 3))
   Platform.stdout_line (show (Int.unsafe_rem (-7) 3))
@@ -55,7 +55,7 @@ let main () =
 fn string_length_counts_utf16_units_without_normalizing_text() {
     success(
         r#"module App.TextLength exposing (main)
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line (show (String.length ""))
   Platform.stdout_line (show (String.length "abc"))
@@ -70,7 +70,7 @@ let main () =
 
 fn zero_fault(operation: &str) {
     let source = format!(
-        "module App.IntFault exposing (main)\n\nmain : Unit ->{{}} Unit\nlet main () =\n  let kept = Ref.make \"held\"\n  Platform.stdout_line (Ref.get kept)\n  ignore (Int.{operation} 7 0)\n  Platform.stdout_line \"unreachable\"\n"
+        "module App.IntFault exposing (main)\n\nmain : Unit ->{{Host.Console}} Unit\nlet main () =\n  let kept = Ref.make \"held\"\n  Platform.stdout_line (Ref.get kept)\n  ignore (Int.{operation} 7 0)\n  Platform.stdout_line \"unreachable\"\n"
     );
     let modules = run::compile_source(&source).expect("defect source checks");
     let main = run::main_of(&modules).expect("main");

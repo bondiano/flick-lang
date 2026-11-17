@@ -23,7 +23,7 @@ fn copy(from: &Path, to: &Path) {
     }
 }
 
-/// A complete override is the first implicit package and all its siblings.
+/// A complete override: the first implicit package and all its siblings.
 fn copy_packages(root: &Path) -> PathBuf {
     let packages = Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages");
     for name in IMPLICIT_PACKAGES {
@@ -108,7 +108,7 @@ fn a_changed_std_is_checked_again() {
     fs::write(&markdown, text).expect("write");
     let after = check(&app, &std, &cache);
     assert!(after.status.success(), "{after:?}");
-    // the tables of Go bindings decide a build for go as the modules do
+    // Go's binding tables decide a build for go as the modules do
     let keyed = key(&app, &std, &cache);
     let table = std.join("src/go/globals.txt");
     let text = fs::read_to_string(&table).expect("a table");
@@ -220,7 +220,7 @@ fn a_missing_moved_go_binding_family_is_reported_before_building() {
             ("flick.toml", common::APP),
             (
                 "src/App/Main.fl",
-                "module App.Main exposing (main)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (Http.Headers.has \"x\" Http.Headers.empty))\n",
+                "module App.Main exposing (main)\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show (Http.Headers.has \"x\" Http.Headers.empty))\n",
             ),
         ],
     );

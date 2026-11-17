@@ -197,7 +197,7 @@ let under_list callbacks =
   match callbacks with
   | [] -> None
   | [body, ..._] -> Some (Layer.run layer body)
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = scope {
   match under_list callbacks with
   | None -> Platform.stdout_line "missing"
@@ -309,7 +309,7 @@ fn source_foreign_alias_keeps_declared_scheme_and_raw_activation() {
     let modules = run::compile_source(
         r#"
 module App.Main exposing (main)
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = scope {
   let make = Arena.make
   let arena = make ()

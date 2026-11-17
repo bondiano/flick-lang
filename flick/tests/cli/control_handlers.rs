@@ -18,7 +18,7 @@ effect Emit a =
 effect Choose =
   control choose : Unit ->{} Bool
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 collect : forall a r e. (Unit ->{Emit a | r; e} Unit) ->{r; e} List a
@@ -35,7 +35,7 @@ let reversed body =
     rest ++ [x]
   | return () -> []
 
-first : (Unit ->{Emit Int; none} Unit) ->{} Int
+first : (Unit ->{Host.Console, Emit Int; none} Unit) ->{Host.Console} Int
 let first body =
   try body () with
   | Emit.emit x -> x
@@ -47,7 +47,7 @@ let three () =
   Emit.emit 2
   Emit.emit 3
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   say (show (collect three))
   say (show (reversed three))

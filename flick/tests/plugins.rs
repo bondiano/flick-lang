@@ -50,7 +50,7 @@ import Pairs exposing (plugin pairs)
 point : { x : Float; blocks : Float }
 let point = pairs { x = 1.0 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () = Platform.stdout_line (show point.x)
 ";
 
@@ -200,7 +200,7 @@ mod wasm {
     /// A module that calls `tally` twice, once with a count of `n`.
     fn counting(n: &str) -> String {
         format!(
-            "module App.Main exposing (main, counted)\n\nimport Pairs exposing (tally)\n\ncounted : Float\nlet counted = tally {n} + tally 2.0\n\nmain : Unit ->{{; AppError}} Unit\nlet main () = Platform.stdout_line (show counted)\n"
+            "module App.Main exposing (main, counted)\n\nimport Pairs exposing (tally)\n\ncounted : Float\nlet counted = tally {n} + tally 2.0\n\nmain : Unit ->{{Host.Console; AppError}} Unit\nlet main () = Platform.stdout_line (show counted)\n"
         )
     }
 
@@ -255,7 +255,7 @@ mod wasm {
 
     #[test]
     fn a_plugin_that_fails_on_the_calls_is_reported_with_its_package() {
-        let main = "module App.Main exposing (main, boomed)\n\nimport Pairs exposing (boom)\n\nboomed : Float\nlet boomed = boom 1.0\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line (show boomed)\n";
+        let main = "module App.Main exposing (main, boomed)\n\nimport Pairs exposing (boom)\n\nboomed : Float\nlet boomed = boom 1.0\n\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () = Platform.stdout_line (show boomed)\n";
         let root = app("plugins-calls-fail", main);
         let checked = flick(&root, &["check"]);
         let stderr = String::from_utf8_lossy(&checked.stderr);

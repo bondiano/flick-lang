@@ -348,7 +348,7 @@ fn official_js_component_builds_runs_and_tests_with_independent_results() {
             ("flick.toml", CONFIG),
             (
                 "src/App.fl",
-                "module App exposing (main)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (20 + 22))\n",
+                "module App exposing (main)\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show (20 + 22))\n",
             ),
             (
                 "test/Suite.fl",

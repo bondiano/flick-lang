@@ -4,23 +4,23 @@ fn match_commits_the_first_or_alternative_before_running_its_guard() {
 
 type Pair = Pair Int Int
 
-input : Unit ->{} Pair
+input : Unit ->{Host.Console} Pair
 let input () =
   Platform.stdout_line "scrutinee"
   Pair 1 2
 
-test : Int ->{} Bool
+test : Int ->{Host.Console} Bool
 let test n =
   Platform.stdout_line ("guard " ++ show n)
   n > 1
 
-select : Pair ->{} String
+select : Pair ->{Host.Console} String
 let select pair =
   match pair with
   | Pair x _ | Pair _ x when test x -> "yes"
   | _ -> "no"
 
-answer : Unit ->{} String
+answer : Unit ->{Host.Console} String
 let answer () = select (input ())
 "#;
     let entry = Name::new("App.MatchControl", "answer");
@@ -71,17 +71,17 @@ let answer () = pick [0, 2, 9] ++ ", " ++ pick [0, 1] ++ ", " ++ pick [0, 1, 8, 
 fn immutable_record_update_preserves_aliases_and_written_effect_order() {
     let text = r#"module App.RecordUpdate exposing (answer)
 
-base : Unit ->{} { left : String; right : String }
+base : Unit ->{Host.Console} { left : String; right : String }
 let base () =
   Platform.stdout_line "base"
   { left = "old"; right = "keep" }
 
-noted : String -> String ->{} String
+noted : String -> String ->{Host.Console} String
 let noted label value =
   Platform.stdout_line label
   value
 
-answer : Unit ->{} String
+answer : Unit ->{Host.Console} String
 let answer () =
   let original = base ()
   let changed = { original with right = noted "right" "next"; left = noted "left" "new" }

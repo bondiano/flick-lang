@@ -39,13 +39,13 @@ const MAIN: &str = "module Main exposing (main)
 
 import Shared.Answer
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (show Shared.Answer.answer)
 ";
 
 const OTHER: &str = "module Other exposing (main)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line \"other\"
 ";
 
