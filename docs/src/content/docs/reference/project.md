@@ -83,7 +83,7 @@ Errors in the configuration exit with code `2`:
 | no project found, or `--project` names none | `FLICK-P008` |
 | a command needs a project at a workspace root, `--package` names no member, a member has no `flick.toml`, a path dependency is not a library, or dependencies form a cycle | `FLICK-P031` |
 | an entry is not a source module that exports `main` | `FLICK-P011` |
-| an entry `main` does not take and return `Unit`, needs a service other than the `Host` ones or can fail with an error other than `AppError` | `FLICK-P026` |
+| an entry `main` does not take and return `Unit`, needs a service other than the `Host` ones (with a runner, other than those its `Main` names) or can fail with an error other than `AppError` | `FLICK-P026` |
 | `sql.dialect` names a dialect that is not supported yet | `FLICK-P022` |
 | `sql.dialect` names no dialect; the message lists the known ones | `FLICK-P023` |
 | `lint.allow` names an unknown code | `FLICK-P005` |
@@ -100,8 +100,9 @@ package's `bin`, and the only entry `main` under the package's name.
 name may be left out.
 
 Every entry exports `main : Unit -> Unit` or a runtime function taking and
-returning `Unit`, requiring no services but those of `Host.Live` and failing
-only with `AppError` (an empty error row is valid too). A `main` started
+returning `Unit`, requiring no services but those of `Host.Live` (with a
+runner, those its `Main` names, such as `Env` of `Runner.Cloudflare`) and
+failing only with `AppError` (an empty error row is valid too). A `main` started
 without a runner gets the live implementations of the `Host` services its row
 names (`Console`, `Clock`, `Random`, `Environment`, `Arguments`) from the
 launcher, which imports only those, so a `main` that names none carries none;
