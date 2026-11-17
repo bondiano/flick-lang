@@ -103,15 +103,26 @@ fn count_calls<'a>(e: &'a Expr, module: &str, out: &mut HashMap<&'a str, HashMap
     e.each_child(&mut |c| count_calls(c, module, out));
 }
 
-/// The methods of `item`, an instance without a context, written in it
-/// rather than derived or defaulted: in release each is a constant
-/// `<instance>$<method>` the module exports, and a canonical use calls it
-/// directly, in this module or an importer. A method of another dictionary
-/// of the same type is never replaced.
+/// The methods of `item` that in release are each a constant
+/// `<instance>$<method>` the module exports, which a canonical use calls
+/// directly, in this module or an importer. Those of an instance without a
+/// context, written, derived or made of a default by the optimizer, are
+/// the method itself. Those of an instance with a context are functions of
+/// its dictionaries, when each of its methods is written as a function and
+/// it takes no default: building the dictionary then runs no code of the
+/// program, so a call that does not build it is not seen. An importer
+/// reads this of the reference lowering and the module of its optimized
+/// code, where no function is anything else and a default made a method of
+/// its own was a default before. A method of another dictionary of the
+/// same type is never replaced.
 pub fn direct_methods(item: &Item) -> Vec<(&str, &str)> {
     match &item.kind {
         ItemKind::Instance { info, methods }
-            if info.context.is_empty() && info.derived.is_none() =>
+            if info.context.is_empty()
+                || info.defaults.is_empty()
+                    && methods
+                        .iter()
+                        .all(|(_, m)| matches!(m.kind, ExprKind::Lambda { .. })) =>
         {
             methods
                 .iter()

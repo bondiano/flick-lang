@@ -288,6 +288,35 @@ fn known_instances_and_plain_foreigns_are_called_directly() {
 }
 
 #[test]
+fn derived_and_context_instances_are_called_directly_given_their_dictionaries() {
+    // each value is a parameter: the optimizer takes known data apart itself
+    let js = release(
+        "module App exposing (colored, boxed, given, shown, sized)\n\n\
+         type Color = Red | Green\n  deriving Show\n\n\
+         type Box a = Box a\n\n\
+         instance Show a => Show (Box a) =\n  let show b =\n    match b with\n    | Box x -> \"[\" ++ show x ++ \"]\"\n\n\
+         class Size a =\n  size : a -> Int\n  name : a -> String\n\n\
+         instance Size a => Size (Box a) =\n  let size =\n    let base = String.length \"four\"\n    fun _ -> base\n  \
+         let name _ = \"box\"\n\n\
+         colored : Color -> String\nlet colored c = show c\n\n\
+         boxed : Box Color -> String\nlet boxed b = show b\n\n\
+         given : Show a => Box a -> String\nlet given b = show b\n\n\
+         shown : Show a => a -> String\nlet shown x = show x ++ given (Box x)\n\n\
+         sized : Size a => Box a -> String\nlet sized b = name b\n",
+    );
+    // a derived method, and a written one given the dictionaries of its context
+    assert!(js.contains("$i_Show_Color$show(c)"), "{js}");
+    assert!(js.contains("$show($i_Show_Color)(b)"), "{js}");
+    assert!(js.contains("$show = ($d0) => (b) =>"), "{js}");
+    // a constraint's dictionary, also as the context of a known instance
+    assert!(js.contains("$d0.show(x)"), "{js}");
+    assert!(js.contains("$show($d0)(b)"), "{js}");
+    // a dictionary passed on stays one, and one that computes a method is built
+    assert!(js.contains("given($d0)"), "{js}");
+    assert!(js.contains("($d0).name)(b)"), "{js}");
+}
+
+#[test]
 fn a_native_binding_with_a_schema_is_called_directly_on_flicks_runtime() {
     let (mut ir, interface) = check_text(
         "App",

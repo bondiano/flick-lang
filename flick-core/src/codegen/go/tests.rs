@@ -46,17 +46,18 @@ pub(super) fn app(text: &str) -> String {
 #[test]
 fn a_dictionary_built_from_others_is_built_once() {
     let go = app("module App exposing (main)\n\n\
-         below : Option Int -> Bool\nlet below o = compare o (Some 5) == LT\n\n\
-         both : Option Int -> Bool\nlet both o = below o && compare o None == GT\n\n\
+         less : Ord a => a -> a -> Bool\nlet less x y = compare x y == LT\n\n\
+         below : Option Int -> Bool\nlet below o = less o (Some 5)\n\n\
+         both : Option Int -> Bool\nlet both o = below o && less None o\n\n\
          main : Unit ->{; AppError} Unit\n\
          let main () = Platform.stdout_line (show (both (Some 1)))\n");
-    // `Ord (Option Int)`, needed in two functions, is one package variable
+    // `Ord (Option Int)`, given in two functions, is one package variable
     // built on first use; neither function builds it
     let made = "= flickrt.Lazy(func() flickrt.Value { return I_Instances__Ord";
     assert_eq!(go.matches(made).count(), 1, "{go}");
     // set in `init`: a variable whose own value named an instance that names it is a cycle to Go
     assert!(
-        go.contains("var K_App__0 func() flickrt.Value\n\nfunc init() { K_App__0 = "),
+        go.contains("var K_App__1 func() flickrt.Value\n\nfunc init() { K_App__1 = "),
         "{go}"
     );
     assert_eq!(
