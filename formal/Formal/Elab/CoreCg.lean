@@ -48,6 +48,8 @@ inductive Cg (B : Flick.Tm → Flick.Tm → Prop) : Bool → Flick.Tm → Flick.
   | todo {x} : Cg B x .todo .todo
   | task {x e e'} : Cg B false e e' → Cg B x (.task e) (.task e')
   | await {x e e'} : Cg B false e e' → Cg B x (.await e) (.await e')
+  | lazy {x e e'} : Cg B false e e' → Cg B x (.lazy e) (.lazy e')
+  | force {x e e'} : Cg B false e e' → Cg B x (.force e) (.force e')
   | raise {x e e'} : Cg B false e e' → Cg B x (.raise e) (.raise e')
   | try_ {x e e' al al'} : Cg B false e e' → Cg B false al al' →
       Cg B x (.try_ e al) (.try_ e' al')
@@ -74,6 +76,7 @@ inductive Cg (B : Flick.Tm → Flick.Tm → Prop) : Bool → Flick.Tm → Flick.
   | unw {x p ℓ a a'} : Cg B false a a' → Cg B x (.unw p ℓ a) (.unw p ℓ a')
   | kont {x p ℓ} : Cg B x (.kont p ℓ) (.kont p ℓ)
   | hole {x p} : Cg B x (.hole p) (.hole p)
+  | settle {x ℓ e e'} : Cg B false e e' → Cg B x (.settle ℓ e) (.settle ℓ e')
   | base {a b} : B a b → Cg B false a b
 
 variable {B : Flick.Tm → Flick.Tm → Prop}

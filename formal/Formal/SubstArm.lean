@@ -63,7 +63,7 @@ theorem Tm.has_subst_free :
     rcases h with h | h
     · exact .inl (ih₁ σ s i h hs)
     · exact .inr (ih₂ σ s i h hs)
-  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | drec _ _ ih =>
+  | proj _ _ ih | task _ ih | await _ ih | lazy _ ih | force _ ih | raise _ ih | drec _ _ ih =>
     intro σ s i h hs; exact ih σ s i h hs
   | inside p e ih => intro σ s i h hs; exact .inr (.inr (.inr (ih σ s i h hs)))
   | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ _ ih₁ ih₂ ih₃ | hkarm _ _ _ _ _ _ ih₁ ih₂ ih₃ =>
@@ -81,7 +81,7 @@ theorem Tm.has_subst_free :
     have := ih₁ σ s i; have := ih₂ σ s i
     simp only [Tm.subst, Tm.Has, Tm.Free] at h ⊢
     grind
-  | hdone _ _ ih₁ | unw _ _ _ ih₁ =>
+  | hdone _ _ ih₁ | unw _ _ _ ih₁ | settle _ _ ih₁ =>
     intro σ s i h hs
     have := ih₁ σ s i
     simp only [Tm.subst, Tm.Has, Tm.Free] at h ⊢
@@ -121,7 +121,7 @@ theorem Tm.subst_congr : ∀ (e : Tm) {σ σ' : Nat → Tm}, (∀ i, e.Free i �
   | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ =>
     intro σ σ' h; simp only [Tm.subst]
     rw [ih₁ fun i hi => h i (.inl hi), ih₂ fun i hi => h i (.inr hi)]
-  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | inside _ _ ih | drec _ _ ih =>
+  | proj _ _ ih | task _ ih | await _ ih | lazy _ ih | force _ ih | raise _ ih | inside _ _ ih | drec _ _ ih =>
     intro σ σ' h; simp only [Tm.subst]; rw [ih h]
   | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ _ ih₁ ih₂ ih₃ | hkarm _ _ _ _ _ _ ih₁ ih₂ ih₃ =>
     intro σ σ' h; simp only [Tm.subst]
@@ -132,7 +132,7 @@ theorem Tm.subst_congr : ∀ (e : Tm) {σ σ' : Nat → Tm}, (∀ i, e.Free i �
   | hres _ _ _ _ ih₁ ih₂ | hkeep _ _ _ _ _ ih₁ ih₂ =>
     intro σ σ' h; simp only [Tm.subst]
     rw [ih₁ fun i hi => h i (.inl hi), ih₂ fun i hi => h i (.inr hi)]
-  | hdone _ _ ih₁ | unw _ _ _ ih₁ =>
+  | hdone _ _ ih₁ | unw _ _ _ ih₁ | settle _ _ ih₁ =>
     intro σ σ' h; simp only [Tm.subst]
     rw [ih₁ fun i hi => h i hi]
   | _ => intro _ _ _; rfl

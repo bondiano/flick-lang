@@ -228,6 +228,7 @@ theorem NV.frame {root Λ μ e D D'} (h : NV S root Λ μ e D) {F : Frame} (hF :
         exact .step ⟨_, _, Step.ofR (.hresRaise hA hk hv)⟩
       · obtain ⟨Ei, hEi, hk⟩ := hk
         exact .step ⟨_, _, Step.ofR (.hkarmRaise hEi hk hv)⟩
+      · exact .step ⟨_, _, Step.ofR (.settleRaise hv)⟩
     · exact .step ⟨_, _, Step.raise (E := []) OkE.nil hF hnt hni hc hv⟩
   | step h =>
     obtain ⟨_, _, hs⟩ := h
@@ -250,6 +251,7 @@ theorem NV.frame {root Λ μ e D D'} (h : NV S root Λ μ e D) {F : Frame} (hF :
         exact .step ⟨_, _, Step.ofR (.hresUnw hA hk)⟩
       · obtain ⟨Ei, hEi, hk⟩ := hk
         exact .step ⟨_, _, Step.ofR (.hkarmUnw hEi hk)⟩
+      · exact .step ⟨_, _, Step.ofR .settleUnw⟩
     · by_cases hh : F.catches p ℓ
       · cases F <;> simp only [Frame.catches] at hh
         obtain ⟨rfl, rfl⟩ := hh; exact .step ⟨_, _, Step.ofR .hwithCatch⟩

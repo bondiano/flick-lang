@@ -21,7 +21,8 @@ The probe programs of §7 are built with `flick build --emit js` and `--emit go`
 - interruption and masking;
 - `parallel*`, `race_*`, `timeout*`;
 - building layers with memoization by identity, and release after all consumers;
-- atomicity of `Ref`.
+- atomicity of `Ref`;
+- lazy cells shared between fibers, one attempt at a time (R9).
 
 | Out of scope | How λRT accounts for it |
 | - | - |
@@ -431,6 +432,17 @@ Effect 4.1.2 has no tree, so the Sequential/Parallel distinction reduces to a si
 - JS: [E] `FX/internal/core.ts:280-347`, `FX/internal/effect.ts:184-191` (G7f).
 - Go: [Go] `cause.go`: `nub` with `Equals` for `Fail`, the fiber number for `Int`, and value equality for `Die` except thrown defects, which compare by identity ([combining causes in Go](#go-combining-causes-without-nub), [defects by value](#go-two-defects-with-the-same-string-are-two-reasons)).
 
+**R9 (a lazy cell runs one attempt at a time).** A lazy cell ([`lazy.md`](lazy.md) §5) is `Pending e`, `Running(π, n, W)` — the fiber `π` runs attempt `n` of `e`, and the fibers `W` wait — or `Done o`. Its transitions are atomic, as `Ref.modify` is (§3.7). For every cell:
+
+- (a) at most one attempt runs at any time, and the attempts run one after another;
+- (b) `Done o` is final, and every force after it returns `o`, as the waiters of the attempt that settled it do;
+- (c) the interruption of a waiter removes only that waiter: the cell's state and the attempt are unchanged;
+- (d) the interruption of the owner, or the unwind of its handler, makes the cell `Pending e` again and wakes the waiters; the first fiber to force again owns attempt `n + 1`. The owner gets its interruption; the waiters do not. An outcome with an interruption is not cached;
+- (e) a force by the owner of a running cell is a defect; a force by another fiber waits. A cycle of forces through other fibers waits forever, as with `Deferred` (not detected).
+
+- JS: `runtime/src/rt/effect/Lazy.ts`, waiters as in `Deferred.ts`; the Effect adapter `packages/effect-ts/src/effect/Lazy.ts`.
+- Go: `runtime-go/flickrt/lazycell.go`: a mutex guards the state, never the run.
+
 ## 5. Hypotheses
 
 G1–G6 hold (`core.md`, `regions.md`). Added:
@@ -454,6 +466,8 @@ G1–G6 hold (`core.md`, `regions.md`). Added:
 **T5 (the runtime contract).** Let `e₀` be a program (`core.md` §2.6), let G1–G10 hold, and let `⟨{f₀ ↦ e₀}, {π₀ ↦ open}, ∅, ∅, ∅⟩ →* C` under any admissible interleaving (§3.1). Then R1–R7 hold on the path to `C`. The premise of R6 — a service is taken from the environment only of a live `provide` — is given by the typing of the program (`regions.md` §2.7, [the premise is per request](#the-provide-liveness-premise-is-stronger-than-typing-gives)).
 
 Lean: `T5` (`formal/Formal/RT/T5.lean`) — for any core (`Core`, a parameter) and any interleaving: R1–R4 (`R1`–`R4`), R6 (`R6`), R7 (`R7`) in every reachable configuration (`Reach`), and R5 (`R5`). The hypotheses are parameters: G7(a)–(g) except (c), G8 and G9 are fields of `Hyp` (`formal/Formal/RT/Hyp.lean`); the premise of R6 is `G11`: a request for a service from the environment is answered by the `provide` of a live owner. The typing rule of `regions.md` §2.7, point 3 of T4′, gives it; in the core model it is the third conjunct of `T4'`. G7(c) is not needed: the model has no mask, and interruption is delivered at any point of user code, which is more interleavings than §3.2 allows. G10 and the liveness parts of G8 and G9 are not part of safety. The model's simplifications are listed in `formal/README.md`.
+
+R9 is a property of the protocol of one lazy cell, whose steps are atomic: Lean `R9` (`formal/Formal/RT/LazyCell.lean`) proves it of every interleaving of those steps (`LStep`, `LReach`), with the bookkeeping of attempts `LInv`. λRT's `Step` has no lazy cell, so T5 does not include R9; `Step` and `Inv` gain nothing for it.
 
 R8 is not a statement about interleavings but a property of the functions `⊕`, `⧺`, `recover`, `pretty` and `report`. `tests/run/runtime/cause_laws.fl` checks it on both runtimes. Lean: `R8` (`formal/Formal/RT/Cause.lean`).
 

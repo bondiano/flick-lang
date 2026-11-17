@@ -71,6 +71,18 @@ theorem Ty.up_def (k : Nat) (t : Ty) : t.up k = t.substT (shiftV k) := by
   simp only [Ty.up, Ty.ren_eq]
   congr 1; funext a; cases a <;> rfl
 
+theorem exists_or3 {p q r s : Atom → Prop} :
+    ((∃ b, p b ∧ s b) ∨ (∃ b, q b ∧ s b) ∨ ∃ b, r b ∧ s b) ↔ ∃ b, (p b ∨ q b ∨ r b) ∧ s b := by
+  constructor
+  · rintro (⟨b, hb, h⟩ | ⟨b, hb, h⟩ | ⟨b, hb, h⟩)
+    · exact ⟨b, .inl hb, h⟩
+    · exact ⟨b, .inr (.inl hb), h⟩
+    · exact ⟨b, .inr (.inr hb), h⟩
+  · rintro ⟨b, hb | hb | hb, h⟩
+    · exact .inl ⟨b, hb, h⟩
+    · exact .inr (.inl ⟨b, hb, h⟩)
+    · exact .inr (.inr ⟨b, hb, h⟩)
+
 /-- **⌈·⌉ commutes with a renaming.** -/
 theorem Ty.reach_ren (ξ : Atom → Atom) (t : Ty) (a : Atom) :
     (t.ren ξ).reach a ↔ ∃ b, t.reach b ∧ (ξ b).ty.reach a := by
@@ -83,15 +95,7 @@ theorem Ty.reach_ren (ξ : Atom → Atom) (t : Ty) (a : Atom) :
     exact Row.substT_reach _ _ a
   | arrow x φ y C ihx ihy =>
     simp only [Ty.ren, Ty.reach, Caps.substT, ihx, ihy]
-    constructor
-    · rintro (⟨b, hb, h⟩ | ⟨b, hb, h⟩ | ⟨b, hb, h⟩)
-      · exact ⟨b, .inl hb, h⟩
-      · exact ⟨b, .inr (.inl hb), h⟩
-      · exact ⟨b, .inr (.inr hb), h⟩
-    · rintro ⟨b, hb | hb | hb, h⟩
-      · exact .inl ⟨b, hb, h⟩
-      · exact .inr (.inl ⟨b, hb, h⟩)
-      · exact .inr (.inr ⟨b, hb, h⟩)
+    exact exists_or3
   | ref t ih | rnm _ t ih | rless _ t ih => simp only [Ty.ren, Ty.reach, ih]
   | tapp f x ihf ihx | rcons _ f x ihf ihx | run f x ihf ihx =>
     simp only [Ty.ren, Ty.reach, ihf, ihx]
@@ -116,6 +120,9 @@ theorem Ty.reach_ren (ξ : Atom → Atom) (t : Ty) (a : Atom) :
     exact Row.substT_reach _ _ a
   | hnd s ih | owner s ih => simp only [Ty.ren, Ty.reach, ih]
   | base | adt | rnil | bare | dict | cnil | pure | rt => simp [Ty.ren, Ty.reach, Caps.none]
+  | lazy r e t C ih | lazyCell r e t C ih =>
+    simp only [Ty.ren, Ty.reach, Caps.substT, ih, Row.substT_reach]
+    exact exists_or3
   | all k t ih =>
     simp only [Ty.ren, Ty.reach, ih, Atom.ty_reach]
     constructor
@@ -166,15 +173,7 @@ theorem Ty.reach_substT (σ : Atom → Ty) (t : Ty) (a : Atom) :
     exact Row.substT_reach σ _ a
   | arrow x φ y C ihx ihy =>
     simp only [Ty.substT, Ty.reach, Caps.substT, ihx, ihy]
-    constructor
-    · rintro (⟨b, hb, h⟩ | ⟨b, hb, h⟩ | ⟨b, hb, h⟩)
-      · exact ⟨b, .inl hb, h⟩
-      · exact ⟨b, .inr (.inl hb), h⟩
-      · exact ⟨b, .inr (.inr hb), h⟩
-    · rintro ⟨b, hb | hb | hb, h⟩
-      · exact .inl ⟨b, hb, h⟩
-      · exact .inr (.inl ⟨b, hb, h⟩)
-      · exact .inr (.inr ⟨b, hb, h⟩)
+    exact exists_or3
   | ref t ih | rnm _ t ih | rless _ t ih => simp only [Ty.substT, Ty.reach, ih]
   | tapp f x ihf ihx | rcons _ f x ihf ihx | run f x ihf ihx =>
     simp only [Ty.substT, Ty.reach, ihf, ihx]
@@ -199,6 +198,9 @@ theorem Ty.reach_substT (σ : Atom → Ty) (t : Ty) (a : Atom) :
     exact Row.substT_reach σ _ a
   | hnd s ih | owner s ih => simp only [Ty.substT, Ty.reach, ih]
   | base | adt | rnil | bare | dict | cnil | pure | rt => simp [Ty.substT, Ty.reach, Caps.none]
+  | lazy r e t C ih | lazyCell r e t C ih =>
+    simp only [Ty.substT, Ty.reach, Caps.substT, ih, Row.substT_reach]
+    exact exists_or3
   | all k t ih =>
     simp only [Ty.substT, Ty.reach, ih, liftT_reach]
     constructor

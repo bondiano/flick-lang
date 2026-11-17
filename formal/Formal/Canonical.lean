@@ -70,6 +70,8 @@ theorem Typ.pureTy {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | lit => intro _ _ _ hJ; cases hJ; exact ⟨_, LeLive.refl, .lit, by simp [Tm.head], by simp⟩
   | loc hl =>
     intro _ _ _ hJ; cases hJ; exact ⟨_, LeLive.refl, .loc hl, by simp [Tm.head], by simp⟩
+  | lazyLoc hl =>
+    intro _ _ _ hJ; cases hJ; exact ⟨_, LeLive.refl, .lazyLoc hl, by simp [Tm.head], by simp⟩
   | const hc hT =>
     intro _ _ _ hJ; cases hJ
     exact ⟨_, hT, .const hc LeLive.refl, by simp [Tm.head], fun _ h _ => by cases h; exact ⟨_, rfl⟩⟩

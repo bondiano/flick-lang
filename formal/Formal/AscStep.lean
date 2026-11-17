@@ -94,6 +94,27 @@ theorem RHead.asc {Λ μ r Λ' μ' r'} {n : Nat} {e : Tm} (hh : RHead Λ μ r Λ
       | zero => simp [hj] at hv'; subst hv'; exact vn hv hr.2.1
       | succ => simp [hj] at hv'
   | refGet hl => exact noins (hc.mem _ _ hl)
+  | refGetCell | forceRunning => exact noins (by simp [Tm.NoIns, Tm.Has])
+  | lazy =>
+    refine ⟨Tm.Asc.of_noIns (by simp [Tm.NoIns, Tm.Has]), fun e' he => ⟨he, hc.rgs, fun l v' hv' => ?_⟩⟩
+    by_cases hl : l < μ.length
+    · rw [List.getElem?_append_left hl] at hv'; exact hc.mem l v' hv'
+    · rw [List.getElem?_append_right (by omega)] at hv'
+      cases hj : l - μ.length with
+      | zero => simp [hj] at hv'; subst hv'; exact hr
+      | succ => simp [hj] at hv'
+  | forcePending hl =>
+    refine ⟨Tm.Asc.of_noIns fun h => hc.mem _ _ hl h, fun e' he => ⟨he, hc.rgs, fun i w hw => ?_⟩⟩
+    rcases mem_set_get hw with hw | ⟨-, rfl⟩
+    · exact hc.mem i w hw
+    · simp [Tm.NoIns, Tm.Has]
+  | forceDone hl => exact noins fun h => hc.mem _ _ hl h
+  | settleVal hv | settleRaise hv =>
+    refine ⟨hr, fun e' he => ⟨he, hc.rgs, fun i w hw => ?_⟩⟩
+    rcases settleCell_get hw with hw | ⟨-, rfl⟩
+    · exact hc.mem i w hw
+    · exact fun h => vn hv hr h
+  | settleUnw => exact same hr
   | @refSet v l₀ _ _ hv hlt =>
     refine ⟨Tm.Asc.of_noIns (by simp [Tm.NoIns, Tm.Has]), fun e' he => ⟨he, hc.rgs, fun l v' hv' => ?_⟩⟩
     by_cases hi : l₀ = l

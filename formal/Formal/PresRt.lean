@@ -1,6 +1,4 @@
-import Formal.PresHdlRt
-import Formal.ScopeRun
-import Formal.RaiseTyping
+import Formal.PresLazy
 
 /-!
 # Preservation of runtime steps at the redex
@@ -43,38 +41,6 @@ theorem HCov.tail {Ψ Θ ε₀ p θ Δ v H H' ε'} (hp : HPat S ε₀ p θ Δ) (
     · exact .inl h'
   · exact .inr h
 
-/-- A raised value of a body with errors `ε₀`, at `Errors ε₀`. -/
-theorem raise_inv {Ψ Θ v t φ} (hv : Value v) (h : Typ S Ψ Θ [] (.raise v) (.ex t φ)) :
-    ∃ ε, Typ S Ψ Θ [] v (.ex (.errors ε) .pure) ∧ (Stage.rt Row.none ε).le φ := by
-  exact h.raise_value v t φ rfl rfl hv
-
-theorem StoreTy.alloc {Ψ μ v t₀} (hμ : StoreTy S Ψ μ) (hv : Value v)
-    (h : Typ S Ψ Facts.age [] v (.ex t₀ .pure)) :
-    StoreTy S (Ψ ++ [t₀]) (μ ++ [v]) := by
-  refine ⟨by simp [hμ.1], fun i w s hw hs => ?_⟩
-  by_cases hi : i < μ.length
-  · rw [List.getElem?_append_left hi] at hw
-    rw [List.getElem?_append_left (hμ.1 ▸ hi)] at hs
-    obtain ⟨a, b⟩ := hμ.2 i w s hw hs
-    exact ⟨a, b.weakenStore _⟩
-  · rw [List.getElem?_append_right (by omega)] at hw
-    rw [List.getElem?_append_right (by rw [← hμ.1]; omega)] at hs
-    rw [hμ.1] at hw
-    cases hj : i - Ψ.length with
-    | zero => simp [hj] at hw hs; subst hw hs; exact ⟨hv, h.weakenStore _⟩
-    | succ => simp [hj] at hw
-
-theorem StoreTy.set {Ψ μ l v t₀} (hμ : StoreTy S Ψ μ) (hl : Ψ[l]? = some t₀)
-    (hlt : l < μ.length) (hv : Value v) (h : Typ S Ψ Facts.age [] v (.ex t₀ .pure)) :
-    StoreTy S Ψ (μ.set l v) := by
-  refine ⟨by simp [hμ.1], fun i w s hw hs => ?_⟩
-  by_cases hi : l = i
-  · subst hi
-    rw [List.getElem?_set_self hlt] at hw
-    cases hw; rw [hl] at hs; cases hs; exact ⟨hv, h⟩
-  · rw [List.getElem?_set_ne hi] at hw
-    exact hμ.2 i w s hw hs
-
 theorem Stage.rt_sub {r r' e e' : Row} (hr : Row.Sub r r') (he : Row.Sub e e') :
     (Stage.rt r e).le (.rt r' e') := ⟨hr, he⟩
 
@@ -88,12 +54,6 @@ theorem Stage.rt_union_right {i r e ε : Row} :
 
 theorem Ty.YF.ref {n : Nat} {t : Ty} (h : (Ty.ref t).YF n) : t.YF n := by
   simp only [Ty.YF, Ty.substT, Ty.ref.injEq] at h; exact h
-
-/-- An unchanged store needs no new cells. -/
-theorem StoreTy.same {Ψ μ Θ e t φ} (hμ : StoreTy S Ψ μ)
-    (h : Typ S Ψ Θ [] e (.ex t φ)) {n : Nat} :
-    ∃ X, StoreTy S (Ψ ++ X) μ ∧ Typ S (Ψ ++ X) Θ [] e (.ex t φ) ∧ ∀ u ∈ X, u.YF n :=
-  ⟨[], by simpa using hμ, by simpa using h, by simp⟩
 
 private theorem Typ.rtStepCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ Λ μ t φ Λ' μ' e', Γ = [] → J = .ex t φ → StoreTy S Ψ μ → RtCtx Ψ Θ Λ.length →
@@ -128,12 +88,14 @@ private theorem Typ.rtStepCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       · exact (Typ.loc (by simp [hμ.1])).sub
           ⟨(LeLive.equiv (.ref hfresh)).trans (lt.trans hT), Stage.pure_le _⟩
       · simpa using Ty.yf_kill Λ.length ι.t
-    | refGet hl =>
+    | refGetCell => exact hμ.same .todo
+    | refGet hl hn =>
       obtain ⟨_, _, hT'⟩ := hf.const_arrow (by intro E o cl h; cases h)
       obtain ⟨_, _, _, _, h, la, _, lt, -⟩ := hT'.arrow_left
       cases h
       obtain ⟨u, hl', hu⟩ := (ha.conv (LeLive.eq_ref la)).loc_ref _ _ _ rfl rfl
-      have hv := (hμ.2 _ _ _ hl hl').2
+      have hv := (hμ.2 _ _ _ hl hl').elim (fun h => h.2)
+        fun ⟨_, _, _, _, _, hc⟩ => (hn hc.isCell).elim
       have hk := hv.substT (kill Λ.length) (Fits.kill (hμb _ _ hl))
       simp only [Flick.J.substT, Stage.substT] at hk
       have hΨ := List.map_congr_left hcRt.yf
@@ -183,6 +145,25 @@ private theorem Typ.rtStepCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     | await =>
       obtain ⟨_, _, he', hψ, ht⟩ := he.task_eff _ _ _ _ _ _ rfl rfl
       exact hμ.same (he'.sub ⟨ht.trans hT, Stage.le_trans hψ hφ⟩)
+  | lazy he hψ hn hφ =>
+    intro Λ μ t φ Λ' μ' e' hΓ hJ hμ hcRt hbl hμb ht hφfixed hh
+    cases hΓ; cases hJ
+    cases hh with
+    | lazy => exact lazy_new hμ hcRt he hψ hn ht
+  | force he hφ hT =>
+    intro Λ μ t φ Λ' μ' e' hΓ hJ hμ hcRt hbl hμb ht hφfixed hh
+    cases hΓ; cases hJ
+    cases hh with
+    | forcePending hl => exact force_pending hμ hcRt hμb he hφ hT hl
+    | forceDone hl => exact force_done hμ hcRt hμb he hφ hT hl
+    | forceRunning => exact hμ.same .todo
+  | settle hl he hψ hφ hT =>
+    intro Λ μ t φ Λ' μ' e' hΓ hJ hμ hcRt hbl hμb ht hφfixed hh
+    cases hΓ; cases hJ
+    cases hh with
+    | settleVal hv => exact settle_val hμ hcRt hl he hψ hφ hT hv
+    | settleRaise hv => exact settle_raise hμ hcRt hl he hψ hφ hv
+    | settleUnw => exact hμ.same (settle_unw he hφ)
   | tryR hb hA hφ hs =>
     intro Λ μ t φ Λ' μ' e' hΓ hJ hμ hcRt hbl hμb ht hφfixed hh
     cases hΓ; cases hJ

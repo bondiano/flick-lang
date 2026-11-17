@@ -79,6 +79,8 @@ theorem Ty.Equiv.indexedRow {a b : Ty} (h : Ty.Equiv a b) :
   | tapp h₁ h₂ => exact congrArg IndexedRow.ofCaps (Ty.Equiv.tapp h₁ h₂).reach
   | rcons h₁ h₂ => exact congrArg IndexedRow.ofCaps (Ty.Equiv.rcons h₁ h₂).reach
   | eff h => exact congrArg IndexedRow.ofCaps (Ty.Equiv.eff h).reach
+  | lazy h => exact congrArg IndexedRow.ofCaps (Ty.Equiv.lazy h).reach
+  | lazyCell h => exact congrArg IndexedRow.ofCaps (Ty.Equiv.lazyCell h).reach
   | hnd h => exact congrArg IndexedRow.ofCaps (Ty.Equiv.hnd h).reach
   | owner h => exact congrArg IndexedRow.ofCaps (Ty.Equiv.owner h).reach
   | dict h => exact congrArg IndexedRow.ofCaps (Ty.Equiv.dict h).reach

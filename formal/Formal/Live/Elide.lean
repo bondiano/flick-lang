@@ -52,7 +52,7 @@ def Ty.elide (K : Caps) : Ty → Caps → Ty
 def Ty.noBare : Ty → Bool
   | .arrow a _ b _ => a.noBare && b.noBare
   | .ref t | .eff _ _ t _ | .hnd t | .owner t | .dict _ t | .all _ t
-  | .rnm _ t | .rless _ t => t.noBare
+  | .rnm _ t | .rless _ t | .lazy _ _ t _ | .lazyCell _ _ t _ => t.noBare
   | .tapp f a | .rcons _ f a | .run f a | .rt f a => f.noBare && a.noBare
   | .bare => false
   | .tvar _ | .rg _ | .caps _ | .row _ | .base _ | .adt _ | .rnil | .errors _ | .cnil | .pure => true
@@ -87,7 +87,7 @@ theorem Ty.reach_le_elide : ∀ (K : Caps) (t : Ty) (H : Caps), Caps.Sub t.reach
   | _, .bare, _ => fun _ h => (h : False).elim
   | _, .tvar _, _ | _, .rg _, _ | _, .caps _, _ | _, .row _, _ | _, .base _, _ | _, .adt _, _
   | _, .rnil, _ | _, .errors _, _ | _, .hnd _, _ | _, .owner _, _ | _, .dict _ _, _
-  | _, .cnil, _ | _, .pure, _ | _, .rt .., _ =>
+  | _, .cnil, _ | _, .pure, _ | _, .rt .., _ | _, .lazy .., _ | _, .lazyCell .., _ =>
     fun _ h => h
 
 /-- Elision of a type without `bare` changes nothing a value of it holds. -/
@@ -113,7 +113,8 @@ theorem Ty.reach_elide : ∀ (K : Caps) (t : Ty) (H : Caps), t.noBare = true →
   | _, .bare, _, h => by simp [Ty.noBare] at h
   | _, .tvar _, _, _ | _, .rg _, _, _ | _, .caps _, _, _ | _, .row _, _, _ | _, .base _, _, _
   | _, .adt _, _, _ | _, .rnil, _, _ | _, .errors _, _, _ | _, .hnd _, _, _ | _, .owner _, _, _
-  | _, .dict _ _, _, _ | _, .cnil, _, _ | _, .pure, _, _ | _, .rt .., _, _ => rfl
+  | _, .dict _ _, _, _ | _, .cnil, _, _ | _, .pure, _, _ | _, .rt .., _, _ | _, .lazy .., _, _
+  | _, .lazyCell .., _, _ => rfl
 
 theorem Row.union_ofCaps_none (r : Row) : Row.union r (Row.ofCaps Caps.none) = r := by
   funext n; cases n <;> simp [Row.union, Row.ofCaps, Caps.none]

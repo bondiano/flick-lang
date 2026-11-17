@@ -116,6 +116,7 @@ e ::= x | c | K
     | match e with ā
     | {ℓ₁ = e₁, …, ℓₙ = eₙ} | e.ℓ | {e with ℓ = e}
     | task e | await e
+    | lazy e | force e
     | try e with ā
     | todo
 
@@ -140,7 +141,7 @@ v ::= λx. e | K v₁ … vₖ | {ℓ₁ = v₁, …, ℓₙ = vₙ} | task e | 
     | c v₁ … vₖ                   k less than the arity of c
 ```
 
-`task e` is a value for any `e`. A computation in the core is itself a value: its body is not evaluated until `await`. Runtime-only forms (`fix`, locations, `env`, `with`, `handle`) are described in §3.1.
+`task e` is a value for any `e`. A computation in the core is itself a value: its body is not evaluated until `await`. `lazy e` is not a value: it makes a lazy cell, and its value is the location of the cell (§3.4). `force e` forces it; the surface `await l` with `l : Lazy ρ ε τ` is `force l` ([`lazy.md`](lazy.md) §2). Runtime-only forms (`fix`, locations, `env`, `with`, `handle`, `settle`) are described in §3.1.
 
 ### 1.4 Reduction of the surface
 
@@ -536,8 +537,10 @@ Forms absent from the source language:
 
 ```text
 v ::= … | ℓ | fix f. λx. e
-e ::= … | handle v with ā
+e ::= … | handle v with ā | settle ℓ e
 ```
+
+A location `ℓ` is a `Ref` cell or a lazy cell; `settle ℓ e` is the frame of the lazy cell `ℓ` while its initializer `e` runs.
 
 ### 3.2 Contexts
 
@@ -548,7 +551,7 @@ E ::= □ | E e | v E
     | let x = E in e | let x : σ = E in e
     | match E with ā
     | {ℓ₁ = v₁, …, ℓᵢ = E, ℓᵢ₊₁ = eᵢ₊₁, …} | E.ℓ | {E with ℓ = e} | {v with ℓ = E}
-    | await E | try E with ā
+    | await E | force E | settle ℓ E | try E with ā
 ```
 
 Contexts do not enter `λ`, `task` or branches. `F` is a single-frame context: one of the forms above with `□` in place of `E`.
@@ -593,6 +596,25 @@ undefined in all other cases
 ⟨μ, E[perform_{S.o} v]⟩           →  ⟨μ, E[f v]⟩                 no handler in E answers it, f = Σ₀(S).o
 ```
 
+Lazy cells ([`lazy.md`](lazy.md) §3). A cell holds `Pending e`, `Running` or `Done o`, with `o ::= ok v | err v | defect`; the term of `o` is `v`, `raise v` or `todo`:
+
+```text
+⟨μ, E[lazy e]⟩                         →  ⟨μ[ℓ ↦ Pending e], E[ℓ]⟩          ℓ ∉ dom μ
+⟨μ, E[force ℓ]⟩, μ(ℓ) = Pending e      →  ⟨μ[ℓ ↦ Running], E[settle ℓ e]⟩
+⟨μ, E[force ℓ]⟩, μ(ℓ) = Done o         →  ⟨μ, E[o]⟩                        o the term of the outcome
+⟨μ, E[force ℓ]⟩, μ(ℓ) is neither       →  die                              a running cell: forced by its own initializer
+⟨μ, E[settle ℓ v]⟩                     →  ⟨μ[ℓ ↦ Done (ok v)], E[v]⟩        if μ(ℓ) = Running
+⟨μ, E[settle ℓ (raise v)]⟩             →  ⟨μ[ℓ ↦ Done (err v)], E[raise v]⟩ if μ(ℓ) = Running
+⟨μ, E[settle ℓ (unw p ℓ' a)]⟩          →  ⟨μ, E[unw p ℓ' a]⟩
+⟨μ, E[Ref.get ℓ]⟩, ℓ a lazy cell       →  die
+```
+
+- `settle ℓ □` is transparent to operations. A raised error leaves it by its own step, which records it; a signal of a handler (§3.7) passes it and leaves the cell `Running`. A defect ends the thread, so `settle ℓ die` is the step of `todo` through the frame: the cell's `Done defect` is not observed in one thread.
+- The outcome is written only into a running cell, which every `settle ℓ` of a program finds; with the condition the laws L1 and L2 of [`lazy.md`](lazy.md) hold of every typed configuration, not only of the reachable ones (§4).
+- A force of a cell that holds neither `Pending` nor `Done`, and `Ref.get` of a lazy cell, are defects. Of these only a force of a running cell is reachable: a force by the initializer of its own cell. The others keep progress free of the typing of the store and preservation free of a premise on (Loc), which types the location of a lazy cell as `Ref (Cell ρ ε τ)` too.
+
+Lean: `RHead.lazy`, `.forcePending`, `.forceDone`, `.forceRunning`, `.settleVal`, `.settleRaise`, `.settleUnw`, `.refGetCell`, `settleCell` (`formal/Formal/Semantics.lean`). The store holds a state as a term that is no value (`Tm.IsCell`): `Pending e` is `lazy e`, `Running` is `anil`, `Done o` is `await o`.
+
 What this shows:
 
 - `await` runs the body anew on every call. `task` is neither a cache nor a Promise (spec/02 "Re-running and the value of await").
@@ -626,7 +648,7 @@ How it works:
 
 Ψ is a store typing: `Loc ⇀ τ` with monotypes. Their free type variables are free inference variables of the configuration's derivation; (Let-Gen) does not generalize them (see [store typing](#a-store-typing-of-closed-types-is-not-preserved)).
 
-`⊢ μ : Ψ` ⇔ `dom μ = dom Ψ` and `·;Ψ ⊢ μ(ℓ) : Ψ(ℓ) ! P` for every `ℓ`.
+`⊢ μ : Ψ` ⇔ `dom μ = dom Ψ` and, for every `ℓ`, `·;Ψ ⊢ μ(ℓ) : Ψ(ℓ) ! P`, or `Ψ(ℓ) = Cell ρ ε τ` and `μ(ℓ)` is a state of a lazy of `Lazy ρ ε τ`: `Pending e` with `·;Ψ ⊢ e : τ ! ψ` and `ψ ⊑ R⟨ρ;ε⟩`, `Running`, `Done (ok v)` with `v : τ`, `Done (err v)` with `v : Errors ε`, or `Done defect`. `Cell ρ ε τ` is a type of the store only: no value has it, so no `Ref` cell has it and `Ref.set` never writes a lazy cell.
 
 The rules of §2 are read with `Ψ` in the context. In addition:
 
@@ -643,6 +665,14 @@ E : ∀ᾱ. τ̄ →P E ᾱ    Γ ⊢ w̄ : τ̄[ᾱ := ῡ] ! P    E ῡ ∈ ε
 ────────────────────────────────────────────────────────────────── (Handle)
 Γ ⊢ handle v with ā : τ ! R⟨none; ε'⟩ ⊔ ⊔ᵢ (ψᵢ ⊔ φᵢ)
 ```
+
+```text
+Ψ(ℓ) = Cell ρ ε τ                     Ψ(ℓ) = Cell ρ ε τ    Γ ⊢ e : τ ! ψ    ψ ⊑ R⟨ρ;ε⟩ ⊑ φ
+───────────────────────── (LazyLoc)    ──────────────────────────────────────────────── (Settle)
+Γ;Ψ ⊢ ℓ : Lazy ρ ε τ ! P               Γ ⊢ settle ℓ e : τ ! φ
+```
+
+`R⟨ρ;ε⟩` is read with the hidden qualifier of the lazy, as for (Await). A cell in `Running` has the type of its frame. Lean: `Typ.lazyLoc`, `Typ.settle` (`formal/Formal/Rules.lean`), `Ty.lazyCell`, `CellTy`, `StoreTy` (`formal/Formal/StoreTy.lean`); (T-Lazy) and (T-Force) of [`lazy.md`](lazy.md) §2 are `Typ.lazy` and `Typ.force`.
 
 (Handle) does not require the whole row `ε_b ⊆ H + ε'`, only the error of `v` itself: after a failed branch the remainder has a smaller `H` (see [(Handle) after a failed branch](#handle-required-the-whole-error-row-after-a-failed-branch)). Coming from `try (raise v)`, the premise follows from `ε_b ⊆ H + ε'` of (Try).
 
@@ -719,6 +749,7 @@ Lemmas:
   - for `τ = τ₁ →φ' τ₂`, `v` is a λ, a `fix`, or a partial application of a constant or a constructor (see [partial constructor application](#a-partial-constructor-application-is-a-value));
   - for `Eff r ε τ'`, `task e`;
   - for `Ref τ'`, `ℓ` with `Ψ(ℓ) = τ'`;
+  - for `Lazy ρ ε τ'`, `ℓ` with `Ψ(ℓ) = Cell ρ ε τ'`;
   - for `T ῡ`, `K v̄` with a constructor `K` of type `T`;
   - for a record, a record with the same labels;
   - for `Errors ε`, `E w̄` with `E ῡ ∈ ε`.
@@ -742,8 +773,10 @@ T1 follows from two statements:
   - `perform_{E.o} v`: by L3, a handler of `E` answers it or `E ∈ r₀ ⊆ dom Σ₀`, whose record has a function for `o`.
   - `await v`: by L1, `v = task e`.
   - `Ref.get ℓ`: by L1 and `⊢ μ : Ψ`, the location `ℓ ∈ dom μ`.
+  - `force v`: by L1, `v = ℓ` with `ℓ ∈ dom μ`; one of the steps of a force applies to every content of the cell.
 - **Preservation.** Let `·;Ψ ⊢ e : τ ! φ`, `⊢ μ : Ψ` and `⟨μ, e⟩ → ⟨μ', e'⟩`. Then there is `Ψ' ⊇ Ψ` with `⊢ μ' : Ψ'` and `·;Ψ' ⊢ e' : τ ! φ'`, where `φ' ⊑ φ`.
-  - `Ψ'` differs from `Ψ` only after a `Ref.make` step: then `Ψ' = Ψ[ℓ ↦ τ']` with a monotype `τ'` (see [store typing](#a-store-typing-of-closed-types-is-not-preserved)).
+  - `Ψ'` differs from `Ψ` only after a step that allocates: after `Ref.make`, `Ψ' = Ψ[ℓ ↦ τ']` with a monotype `τ'` (see [store typing](#a-store-typing-of-closed-types-is-not-preserved)); after `lazy e`, `Ψ' = Ψ[ℓ ↦ Cell ρ ε τ]`.
+  - The steps of a lazy cell: the initializer of a pending cell is typed in the store as the body of a `task`, so `settle ℓ e` is typed at the stage of the force; a settled value has `τ`, and a raised error has a row within `ε`, since the stage of the initializer is within `R⟨ρ;ε⟩`, so the cell keeps a state of its type.
   - The `let` case with generalization is treated in T3.
   - The case `try (raise v)`: the value `v` came from the body with `v : Errors ε'`, `ε' ⊆ ε_b`, and (Errors-Val) gives `v : Errors ε_b` for (Handle).
   - The false-guard case: the remainder `match v with ā` is typed by (Match-Val).
@@ -765,6 +798,13 @@ Progress and Preservation are checked on the reference checker by the property `
   For `· ⊢ v : Eff r ε τ` the same holds for `await v`. Formally this is a statement about a semantics where an operation of `S` answered by `Σ₀` is labelled `S`.
 
   Corollary: with `ε = none` the evaluation does not end in an expected error. A defect and divergence remain possible (spec/05 "Expected errors").
+
+**The laws of a lazy cell** ([`lazy.md`](lazy.md) §3, one thread):
+
+- **L1 (once).** On any path, the initializer of a cell starts at most once: only the force of a pending cell starts it, and no step makes a cell pending again. Lean: `Lazy.L1`, `StartsN`, `Starts`, `Step.pending` (`formal/Formal/Lazy.lean`).
+- **L2 (final).** On any path from a typed configuration, a settled cell keeps its outcome, and a force of it in a later configuration steps to the term of the outcome without changing the store. Lean: `Lazy.L2`, `Step.done_stays`, `Step.force_done` (`formal/Formal/Lazy.lean`). A `Ref.set` cannot write the cell, whose type no value has, and a `settle ℓ` writes only a running cell.
+
+These are distinct from the lemmas L1–L3 above.
 
 **T3 (generalization).**
 

@@ -33,6 +33,8 @@ inductive Frame
   | hdone (p : Nat)
   | hkeep (q ℓ : Nat) (E : Name) (al : Tm)
   | hkarmA (q ℓ : Nat) (E : Name) (al k : Tm)
+  | force
+  | settle (ℓ : Nat)
 
 def Frame.plug : Frame → Tm → Tm
   | .appL a, e => .app e a
@@ -54,6 +56,8 @@ def Frame.plug : Frame → Tm → Tm
   | .hdone p, e => .hdone p e
   | .hkeep q ℓ E al, e => .hkeep q ℓ E al e
   | .hkarmA q ℓ E al k, e => .hkarm q ℓ E al e k
+  | .force, e => .force e
+  | .settle ℓ, e => .settle ℓ e
 
 /-- Left-to-right order: a frame to the right of a value needs the value. -/
 def Frame.ok : Frame → Prop
@@ -70,9 +74,10 @@ def Frame.isInside : Frame → Prop
   | _ => False
 
 /-- The arm of a handler and its resumed body: `raise` and `unw` leave them by steps
-of their own, which let the waiting part go. -/
+of their own, which let the waiting part go. So do they leave the frame of a lazy cell, which
+records an error. -/
 def Frame.isCtl : Frame → Prop
-  | .hctlA .. | .hresB .. | .hkarmA .. => True
+  | .hctlA .. | .hresB .. | .hkarmA .. | .settle _ => True
   | _ => False
 
 /-- The handler that catches unwinding to `p` through its cell `ℓ`. -/

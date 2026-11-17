@@ -122,7 +122,11 @@ a b` while the resumed body `b` runs and the arm `a` waits, `hdone p a` after; `
 unwinds to the handler, which then runs `a`; `kont p κ` is `resume`. A child or a finalizer
 keeps the handlers around where it started: `hkeep q ℓ E al e` around its body answers the
 `tail` operations of `E`, `hkarm q ℓ E al a k` while an arm of it runs. They run no `return`,
-and pass signals. -/
+and pass signals.
+
+`lazy e` makes a lazy cell whose initializer is `e`, and `force e` forces the lazy `e`
+(lazy.md §3). At run time the location of a lazy cell is `loc ℓ`, and `settle ℓ e` is the
+frame of the cell `ℓ` while its initializer `e` runs: it records the outcome. -/
 inductive Tm
   | var (i : Nat)
   | lam (b : Tm)
@@ -145,6 +149,8 @@ inductive Tm
   | todo
   | task (e : Tm)
   | await (e : Tm)
+  | lazy (e : Tm)
+  | force (e : Tm)
   | raise (e : Tm)
   | try_ (e alts : Tm)
   | handle (v alts : Tm)
@@ -164,6 +170,19 @@ inductive Tm
   | hole (p : Nat)
   | hkeep (q ℓ : Nat) (E : Name) (al e : Tm)
   | hkarm (q ℓ : Nat) (E : Name) (al a k : Tm)
+  | settle (ℓ : Nat) (e : Tm)
+
+/-- The states of a lazy cell as the store holds them (lazy.md §3): `Pending e` is `lazy e`,
+`Running` is `running`, and `Done o` is `done o` with the term of the outcome `o`: `v`,
+`raise v` or `todo`. No value has these forms (`IsCell`), so no `Ref` cell holds one; and they
+are kept apart by their outer form, which a relation of terms keeps (`Formal/Elab`). -/
+abbrev Tm.running : Tm := .anil
+
+abbrev Tm.done (o : Tm) : Tm := .await o
+
+def Tm.IsCell : Tm → Prop
+  | .lazy _ | .await _ | .anil => True
+  | _ => False
 
 def Tm.head : Tm → Tm
   | .app f _ => f.head

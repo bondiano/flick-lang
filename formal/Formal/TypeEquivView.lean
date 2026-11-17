@@ -23,6 +23,8 @@ inductive Ty.SameForm : Ty → Ty → Prop
   | rcons {l a a' r r'} : Ty.Equiv a a' → Ty.Equiv r r' →
       Ty.SameForm (.rcons l a r) (.rcons l a' r')
   | eff {r e a b C} : Ty.Equiv a b → Ty.SameForm (.eff r e a C) (.eff r e b C)
+  | lazy {r e a b C} : Ty.Equiv a b → Ty.SameForm (.lazy r e a C) (.lazy r e b C)
+  | lazyCell {r e a b C} : Ty.Equiv a b → Ty.SameForm (.lazyCell r e a C) (.lazyCell r e b C)
   | errors (e) : Ty.SameForm (.errors e) (.errors e)
   | hnd {a b} : Ty.Equiv a b → Ty.SameForm (.hnd a) (.hnd b)
   | owner {a b} : Ty.Equiv a b → Ty.SameForm (.owner a) (.owner b)
@@ -45,6 +47,8 @@ theorem Ty.SameForm.refl (t : Ty) : t.SameForm t := by
   | rnil => exact .rnil
   | rcons => exact .rcons .refl .refl
   | eff => exact .eff .refl
+  | lazy => exact .lazy .refl
+  | lazyCell => exact .lazyCell .refl
   | errors e => exact .errors e
   | hnd => exact .hnd .refl
   | owner => exact .owner .refl
@@ -62,6 +66,8 @@ theorem Ty.SameForm.symm {a b : Ty} (h : a.SameForm b) : b.SameForm a := by
   | tapp hf ha => exact .tapp hf.symm ha.symm
   | rcons ha hr => exact .rcons ha.symm hr.symm
   | eff h => exact .eff h.symm
+  | lazy h => exact .lazy h.symm
+  | lazyCell h => exact .lazyCell h.symm
   | hnd h => exact .hnd h.symm
   | owner h => exact .owner h.symm
   | dict h => exact .dict h.symm
@@ -88,6 +94,12 @@ theorem Ty.SameForm.trans {a b c : Ty} (h : a.SameForm b) (h' : b.SameForm c) :
   | eff h => cases h' with
     | rows h _ => cases h
     | eff h' => exact .eff (h.trans h')
+  | lazy h => cases h' with
+    | rows h _ => cases h
+    | lazy h' => exact .lazy (h.trans h')
+  | lazyCell h => cases h' with
+    | rows h _ => cases h
+    | lazyCell h' => exact .lazyCell (h.trans h')
   | hnd h => cases h' with
     | rows h _ => cases h
     | hnd h' => exact .hnd (h.trans h')
@@ -118,6 +130,8 @@ theorem Ty.Equiv.form {a b : Ty} (h : Ty.Equiv a b) : a.SameForm b := by
   | tapp hf ha => exact .tapp hf ha
   | rcons ha hr => exact .rcons ha hr
   | eff h => exact .eff h
+  | lazy h => exact .lazy h
+  | lazyCell h => exact .lazyCell h
   | hnd h => exact .hnd h
   | owner h => exact .owner h
   | dict h => exact .dict h
@@ -162,6 +176,18 @@ theorem Ty.Equiv.owner_rg_right {a : Ty} {p} (h : Ty.Equiv a (.owner (.rg p))) :
   cases h.form with
   | rows _ hr => cases hr
   | owner hr => cases hr.rg_right; rfl
+
+theorem Ty.Equiv.lazyCell_left {r e t C} {b : Ty} (h : Ty.Equiv (.lazyCell r e t C) b) :
+    ∃ u, b = .lazyCell r e u C ∧ Ty.Equiv t u := by
+  cases h.form with
+  | rows hr _ => cases hr
+  | lazyCell hu => exact ⟨_, rfl, hu⟩
+
+theorem Ty.Equiv.lazy_left {r e t C} {b : Ty} (h : Ty.Equiv (.lazy r e t C) b) :
+    ∃ u, b = .lazy r e u C ∧ Ty.Equiv t u := by
+  cases h.form with
+  | rows hr _ => cases hr
+  | lazy hu => exact ⟨_, rfl, hu⟩
 
 theorem Ty.Equiv.owner_v_right {a : Ty} {n} (h : Ty.Equiv a (.owner (.tvar n))) :
     a = .owner (.tvar n) := by

@@ -131,6 +131,22 @@ theorem RHead.below {Λ μ e Λ' μ' e'} (hh : RHead Λ μ e Λ' μ' e') (h : Cf
       | zero => simp [hj] at hv'; subst hv'; exact sub fun _ h => .inr h
       | succ => simp [hj] at hv'
   | refGet hl => exact same (h.mem _ _ hl)
+  | refGetCell | forceRunning => exact same (Tm.Below.empty fun p => by simp [Tm.Has])
+  | lazy =>
+    exact ⟨(⟨Tm.Below.empty fun p => by simp [Tm.Has], h.mem, h.rgs⟩ : CfgBelow Λ μ (.loc _)).alloc
+      (sub fun _ h => h), Nat.le_refl _⟩
+  | forcePending hl =>
+    refine ⟨⟨fun p hp => h.mem _ _ hl p hp, fun i w hw => ?_, h.rgs⟩, Nat.le_refl _⟩
+    rcases mem_set_get hw with hw | ⟨-, rfl⟩
+    · exact h.mem i w hw
+    · exact Tm.Below.empty fun p => by simp [Tm.Has]
+  | forceDone hl => exact same fun p hp => h.mem _ _ hl p hp
+  | settleVal _ | settleRaise _ =>
+    refine ⟨⟨sub fun _ h => h, fun i w hw => ?_, h.rgs⟩, Nat.le_refl _⟩
+    rcases settleCell_get hw with hw | ⟨-, rfl⟩
+    · exact h.mem i w hw
+    · exact sub fun _ h => h
+  | settleUnw => exact same (sub fun _ h => h)
   | @refSet v l₀ _ _ hv hlt =>
     refine ⟨⟨Tm.Below.empty fun p => by simp [Tm.Has], fun l v hv' => ?_, h.rgs⟩, Nat.le_refl _⟩
     by_cases hi : l₀ = l

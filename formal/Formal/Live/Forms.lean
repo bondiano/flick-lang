@@ -41,6 +41,8 @@ def Tm.Fw : Tm → (Nat → Prop) → Prop
   | .todo, _ => True
   | .task e, A => e.Fw A ∧ e.NoIns
   | .await e, A => e.Fw A
+  | .lazy e, A => e.Fw A ∧ e.NoIns
+  | .force e, A => e.Fw A
   | .raise e, A => e.Fw A
   | .try_ e al, A => e.Fw A ∧ al.Fw A ∧ al.NoIns
   | .handle v al, A => v.Fw A ∧ al.Fw A ∧ v.NoIns ∧ al.NoIns
@@ -66,6 +68,7 @@ def Tm.Fw : Tm → (Nat → Prop) → Prop
     (∀ x, anc q x → A x) ∧ LCell Ψ anc q ℓ
   | .hkarm q ℓ _ al a k, A => A q ∧ al.Fw (anc q) ∧ a.Fw A ∧ k.Fw A ∧ al.NoIns ∧
     (∀ x, a.Has (.frame x) → ¬ k.Has (.frame x)) ∧ (∀ x, anc q x → A x) ∧ LCell Ψ anc q ℓ
+  | .settle _ e, A => e.Fw A
 
 /-- The frames of a context at a place with the regions `A`. -/
 def Frame.Fw (A : Nat → Prop) : Frame → Prop
@@ -78,7 +81,7 @@ def Frame.Fw (A : Nat → Prop) : Frame → Prop
   | .proj _ => True
   | .updL _ e' => e'.Fw Ψ anc A ∧ e'.NoIns
   | .updR v _ => v.Fw Ψ anc A ∧ Value v
-  | .await => True
+  | .await | .force | .settle _ => True
   | .try_ al => al.Fw Ψ anc A ∧ al.NoIns
   | .raise => True
   | .inside p => ¬ A p ∧ anc p = fun x => A x ∨ x = p

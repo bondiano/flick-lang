@@ -161,6 +161,11 @@ inductive Ty
   where it is written decides what it stands for (`Scheme.elide`), and no typing rule meets
   it. It reaches nothing, but it is not the written `caps ∅`. -/
   | bare
+  /-- `Lazy ρ ε τ` (lazy.md §2), with the hidden qualifier `C` of its initializer, as `eff`. -/
+  | lazy (r e : Row) (t : Ty) (C : Caps)
+  /-- The type the store gives a lazy cell of `Lazy ρ ε τ` (lazy.md §3): no value has it, so
+  a lazy cell is never a `Ref` cell. -/
+  | lazyCell (r e : Row) (t : Ty) (C : Caps)
 def Atom.up (k : Nat) : Atom → Atom
   | .v n => .v (n + k)
   | .r p => .r p
@@ -185,6 +190,8 @@ def Ty.reach : Ty → Caps
   | .hnd s => s.reach
   | .owner s => s.reach
   | .all k t => fun a => t.reach (a.up k)
+  -- a lazy keeps the outcome it caches: an error too
+  | .lazy _ e t C | .lazyCell _ e t C => fun x => t.reach x ∨ (e (.atm x) ∨ ∃ G, e (.rv x G)) ∨ C x
   | _ => Caps.none
 
 /-- A set of atoms after a substitution: each atom becomes `⌈σ a⌉`. -/
@@ -260,6 +267,8 @@ def Ty.ren (ξ : Atom → Atom) : Ty → Ty
   | .dict c a => .dict c (a.ren ξ)
   | .all k t => .all k (t.ren (liftA k ξ))
   | .bare => .bare
+  | .lazy r e t C => .lazy (r.substT fun a => (ξ a).ty) (e.substT fun a => (ξ a).ty) (t.ren ξ) (C.substT fun a => (ξ a).ty)
+  | .lazyCell r e t C => .lazyCell (r.substT fun a => (ξ a).ty) (e.substT fun a => (ξ a).ty) (t.ren ξ) (C.substT fun a => (ξ a).ty)
 
 /-- The renaming `i ↦ i + k` as a substitution; run-time regions stay. -/
 def shiftV (k : Nat) : Atom → Ty
@@ -300,6 +309,8 @@ def Ty.substT (σ : Atom → Ty) : Ty → Ty
   | .dict c a => .dict c (a.substT σ)
   | .all k t => .all k (t.substT (liftT k σ))
   | .bare => .bare
+  | .lazy r e t C => .lazy (r.substT σ) (e.substT σ) (t.substT σ) (C.substT σ)
+  | .lazyCell r e t C => .lazyCell (r.substT σ) (e.substT σ) (t.substT σ) (C.substT σ)
 
 /-- The identity substitution. -/
 def Ty.ident : Atom → Ty

@@ -11,6 +11,8 @@ import Formal.Generalization
 import Formal.Lemma4
 import Formal.IndexedRows
 import Formal.TypeEquivShape
+import Formal.Lazy
+import Formal.RT.LazyCell
 
 /-!
 # The axioms of the main theorems
@@ -91,3 +93,15 @@ prints, and `#guard_msgs` turns the difference into an error.
 /-- info: 'Flick.Ty.Equiv.kind' depends on axioms: [propext] -/
 #guard_msgs in
 #print axioms Flick.Ty.Equiv.kind
+
+/-- info: 'Flick.Lazy.L1' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Lazy.L1
+
+/-- info: 'Flick.Lazy.L2' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Lazy.L2
+
+/-- info: 'Flick.RT.R9' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.RT.R9

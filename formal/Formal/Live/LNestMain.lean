@@ -117,7 +117,7 @@ theorem LNest.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
         cases hj : l' - μ.length with
         | zero => rw [hj] at hw; simp at hw; subst hw; exact hvn
         | succ => rw [hj] at hw; simp at hw
-    | @refGet _ l₀ _ _ hl' =>
+    | @refGet _ l₀ _ _ hl' _ =>
       rw [nil rfl, List.append_nil]
       have hcn := hn.cells _ _ hl'
       have hr0 : Tm.NoIns (.app (.const .refGet) (.loc l₀)) := by simp [Tm.NoIns, Tm.Has]
@@ -138,6 +138,47 @@ theorem LNest.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
     | await =>
       rw [nil rfl, List.append_nil]
       exact keep (hn.sub hi hE hnv hrW.2 fun _ h => h)
+    | refGetCell | forceRunning =>
+      rw [nil rfl, List.append_nil]
+      exact keep (hn.sub hi hE hnv (by simp [Tm.NoIns, Tm.Has]) fun _ h => by cases h)
+    | lazy =>
+      refine keep (hn.redex hi hE hnv (nf hrW.2) (fun q h => by simp [Tm.Has] at h) app
+        (fun _ => trivial) fun l' w hw => ?_)
+      by_cases hl' : l' < μ.length
+      · rw [List.getElem?_append_left hl'] at hw
+        exact hn.cells l' w hw
+      · rw [List.getElem?_append_right (by omega)] at hw
+        cases hj : l' - μ.length with
+        | zero => rw [hj] at hw; simp at hw; subst hw; exact hrW.2
+        | succ => rw [hj] at hw; simp at hw
+    | forcePending hl =>
+      have hX := nil (by simp)
+      subst hX
+      rw [List.append_nil]
+      have hcn := hn.cells _ _ hl
+      refine keep (hn.redex hi hE hnv (nf (by simp [Tm.NoIns, Tm.Has])) (nf fun h => hcn h)
+        (fun _ _ h => h) (fun _ => Tm.Fw.of_noIns fun h => hcn h) fun l' w hw => ?_)
+      rcases mem_set_get hw with hw | ⟨-, rfl⟩
+      · exact hn.cells l' w hw
+      · simp [Tm.NoIns, Tm.Has]
+    | forceDone hl =>
+      rw [nil rfl, List.append_nil]
+      have hcn := hn.cells _ _ hl
+      exact keep (hn.redex hi hE hnv (nf (by simp [Tm.NoIns, Tm.Has])) (nf fun h => hcn h)
+        (fun _ _ h => h) (fun _ => Tm.Fw.of_noIns fun h => hcn h) hn.cells)
+    | settleVal hv | settleRaise hv =>
+      have hX := nil (by simp)
+      subst hX
+      rw [List.append_nil]
+      have hvn := hv.noInsF hrW
+      refine keep (hn.redex hi hE hnv (nf fun h => hvn h) (nf fun h => hvn h) (fun _ _ h => h)
+        (fun h => h) fun l' w hw => ?_)
+      rcases settleCell_get hw with hw | ⟨-, rfl⟩
+      · exact hn.cells l' w hw
+      · exact fun h => hvn h
+    | settleUnw =>
+      rw [nil rfl, List.append_nil]
+      exact keep (hn.redex' hi hE hnv (fun _ _ => Iff.rfl) id)
     | scopeRun hv =>
       rw [nil rfl, List.append_nil]
       exact keep (hn.sub hi hE hnv (fun h => h.elim (fun h => by cases h) (hv.noInsF hrW.2.1))

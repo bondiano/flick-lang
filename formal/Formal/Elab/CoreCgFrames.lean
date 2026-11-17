@@ -35,6 +35,8 @@ inductive FrR (B : Flick.Tm → Flick.Tm → Prop) : Frame → Frame → Prop
   | hkeep {q ℓ E al al'} : Cg B false al al' → FrR B (.hkeep q ℓ E al) (.hkeep q ℓ E al')
   | hkarmA {q ℓ E al al' k k'} : Cg B false al al' → Cg B false k k' →
       FrR B (.hkarmA q ℓ E al k) (.hkarmA q ℓ E al' k')
+  | force : FrR B .force .force
+  | settle {ℓ} : FrR B (.settle ℓ) (.settle ℓ)
 
 variable {B : Flick.Tm → Flick.Tm → Prop}
 

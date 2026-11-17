@@ -18,7 +18,7 @@ def VKind (e : Tm) (k : Nat) : Prop :=
   | .ctor _ => k = 1 ∨ k = 3 ∨ k = 7
   | .const _ | .lam _ | .fix _ | .kont _ _ => k = 1
   | .lit _ => k = 0
-  | .loc _ => k = 2
+  | .loc _ => k = 2 ∨ k = 15
   | .rnil | .rcons .. => k = 4
   | .task _ => k = 5
   | .cap _ => k = 10
@@ -40,7 +40,8 @@ theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
   | cap => intro _ _ _ hJ _; cases hJ; rfl
   | own => intro _ _ _ hJ _; cases hJ; rfl
   | lit => intro _ _ _ hJ _; cases hJ; rfl
-  | loc => intro _ _ _ hJ _; cases hJ; rfl
+  | loc => intro _ _ _ hJ _; cases hJ; exact .inl rfl
+  | lazyLoc => intro _ _ _ hJ _; cases hJ; exact .inr rfl
   | rnil => intro _ _ _ hJ _; cases hJ; rfl
   | rcons => intro _ _ _ hJ _; cases hJ; rfl
   | drec => intro _ _ _ hJ _; cases hJ; rfl
@@ -110,6 +111,27 @@ theorem canonical_ref {Ψ Θ Γ v t φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.e
   | ctorApp _ hf _ => simp [VKind, Tm.head, hf, Ty.kind] at hk
   | constApp =>
     simp [VKind, Tm.head, Ty.kind] at hk
+  | _ => simp [VKind, Tm.head, Ty.kind] at hk
+
+/-- L1 for lazies. -/
+theorem canonical_lazy {Ψ Θ Γ v r ε t C φ} (hv : Value v)
+    (h : Typ S Ψ Θ Γ v (.ex (.lazy r ε t C) φ)) :
+    ∃ l u, v = .loc l ∧ Ψ[l]? = some (.lazyCell r ε u C) ∧ Ty.Equiv u t := by
+  have hk := h.vkind hv rfl (by simp [Ty.isAll])
+  cases hv with
+  | loc =>
+    obtain ⟨u, hu, he⟩ := h.loc_lazy _ _ _ _ _ _ rfl rfl
+    exact ⟨_, u, rfl, hu, he⟩
+  | ctorApp _ hf _ => simp [VKind, Tm.head, hf, Ty.kind] at hk
+  | constApp => simp [VKind, Tm.head, Ty.kind] at hk
+  | _ => simp [VKind, Tm.head, Ty.kind] at hk
+
+/-- No value has the type the store gives a lazy cell. -/
+theorem Typ.value_not_cell {Ψ Θ Γ v r ε t C φ} (hv : Value v)
+    (h : Typ S Ψ Θ Γ v (.ex (.lazyCell r ε t C) φ)) : False := by
+  have hk := h.vkind hv rfl (by simp [Ty.isAll])
+  cases hv with
+  | ctorApp _ hf _ => simp [VKind, Tm.head, hf, Ty.kind] at hk
   | _ => simp [VKind, Tm.head, Ty.kind] at hk
 
 /-- L1 for computations. -/

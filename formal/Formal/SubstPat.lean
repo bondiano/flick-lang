@@ -58,7 +58,8 @@ theorem Shp.of_substT {σ : Atom → Ty} :
       · exact .hidden h
   | .tvar _, _, _ | .rg _, _, _ | .caps _, _, _ | .row _, _, _ | .arrow .., _, _ | .ref _, _, _
   | .eff .., _, _ | .errors _, _, _ | .hnd _, _, _
-  | .owner _, _, _ | .dict .., _, _ | .all .., _, _ | .bare, _, _ =>
+  | .owner _, _, _ | .dict .., _, _ | .all .., _, _ | .bare, _, _ | .lazy .., _, _
+  | .lazyCell .., _, _ =>
     .hidden (by simp [Ty.Opaque, Ty.hd])
   | .cnil, _, _ | .rnm .., _, _ | .run .., _, _ | .rless .., _, _
   | .pure, _, _ | .rt .., _, _ =>
