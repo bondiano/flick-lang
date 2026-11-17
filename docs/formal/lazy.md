@@ -114,7 +114,9 @@ x = v      (lazy mut)     ⇝  x$ = Forced (ok v)          -- before or after th
 - No cell, no `Async`, no synchronization: the state is a local variable, threaded as the state of `let mut` is.
 - `let lazy mut` written before its first read never runs `e` (RFC). A write after a read replaces the cached outcome.
 
-Checked by: elaboration in the model, Lean T7 extended to `x$`, `tests/check/fail/lazy/confined.fl`, `tests/run/runtime/lazy_let.fl`.
+The compiler does not thread `x$` yet. It lowers `let lazy x = e` to a cell that only its function reaches: `lazy_make` at the declaration, `await x` to `lazy_read` (the force of `Lazy.force` with the row `{r}; e`, without `Async`), and `x = v` to a new cell `lazy_done v`. G005 keeps the cell from a second fiber, which is the condition of O3 (§6), so it has the outcomes of the threaded form: `e` runs at the first `await x`, once, and a write before it means `e` never runs. The model runs the same lowering.
+
+Checked by: `tests/check/fail/lazy/let_lazy.fl` (G005, T003, S016) and `tests/run/runtime/lazy_let.fl` on JS, TS, Go, the rt runtime and the model. The elaboration to `x$` and Lean T7 for it are open (§8).
 
 ## 5. λRT: many fibers (law R9)
 
@@ -177,3 +179,4 @@ Effect.or_die job                               -- an `Eff` passes as before
 3. Whether `~` is also allowed on parameters of class methods.
 4. In the core of §3 a signal of a handler passes `settle ℓ` and leaves the cell `Running`, so a later force in the same thread is a defect; (d) of §5 resets the cell to `Pending e` instead. The core would need `Running` to keep `e` to match (d).
 5. `Ty.elide` (the reading of a signature in the live discipline) leaves `Lazy` as it is: a `Lazy` in a signature gets no `Live` of the parameters before it, as `Eff` does.
+6. `let lazy` is lowered to a confined cell (§4), not to the threaded state `x$`; T7 does not cover it yet.
