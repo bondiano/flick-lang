@@ -10,6 +10,7 @@
     reason = "every native has the signature of `Native::run`, which may fail"
 )]
 
+mod lazy;
 mod numbers;
 mod show;
 
@@ -70,6 +71,9 @@ natives! {
     RT, "map2Eff", 3 => map2_eff;
     RT, "fromResult", 1 => from_result;
     RT, "refModify", 2 => ref_modify;
+    RT, "lazyMake", 1 => lazy::lazy_make;
+    RT, "lazyForce", 1 => lazy::lazy_force;
+    RT, "lazyDone", 1 => lazy::lazy_done;
     RT, "layerSucceed", 2 => layer_succeed;
     RT, "layerMerge", 2 => layer_merge;
     RT, "layerOverride", 2 => layer_merge;

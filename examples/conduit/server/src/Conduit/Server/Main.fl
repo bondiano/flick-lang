@@ -29,7 +29,7 @@ serve :
   Unit
 let serve config =
   // without its schema the server cannot answer anything
-  let applied = Effect.or_die (task { Database.Migrate.run Schema.migrations })
+  let applied = Effect.or_die (Database.Migrate.run Schema.migrations)
   Platform.stdout_line "migrations applied: \{show applied}"
   scope {
     let options : Http.Server.ServeOptions = {

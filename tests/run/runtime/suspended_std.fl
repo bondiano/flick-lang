@@ -1,0 +1,17 @@
+// The combinators of the standard library that run a computation mark it
+// `~`: a direct runtime call passed to them runs when they run it.
+module App.Main exposing (main)
+
+import Effect
+
+bump : Ref Int ->{} Int
+let bump cell =
+  Ref.set cell (Ref.get cell + 1)
+  Ref.get cell
+
+main : Unit ->{Async} Unit
+let main () =
+  let cell = Ref.make 0
+  let kept = Effect.or_die (bump cell)
+  let timed = timeout_option 1000 (bump cell)
+  Platform.stdout_line "kept: \{kept}, timed: \{show timed}, cell: \{Ref.get cell}"

@@ -143,6 +143,9 @@ impl Checker<'_> {
     pub fn use_local(&mut self, index: usize, span: Span) -> Type {
         self.cx.regions.uses.push(index);
         self.mutable_use(index, span, false);
+        if self.lazy_unforced(index, span) {
+            return Type::Error;
+        }
         let Local { ty, rec, .. } = self.cx.locals[index].clone();
         // a local `let rec` is in scope only in its own body
         let ty = match rec {
@@ -202,6 +205,7 @@ impl Checker<'_> {
         // the places a plugin watches: read before any argument, so an
         // application of a name none watches pays only the lookup
         let watched = self.watched_name(head);
+        let marked = self.suspended_params(head);
         let mut given = Vec::new();
         let end = args.last().map_or(head.range().1, |last| last.range().1);
         for (i, arg) in args.iter().enumerate() {
@@ -226,7 +230,12 @@ impl Checker<'_> {
                             .arrow_stages(&param)
                             .contains(&super::ty::Stage::Runtime);
                     let outer = defer.then(|| self.cx.regions.defaults.replace(Vec::new()));
-                    let argument = self.check_value(arg, &param);
+                    // a runtime call for a parameter marked `~` is passed unstarted
+                    let argument = if eff && marked.contains(&i) && self.runs_now(arg) {
+                        self.suspended_arg(arg, &param)
+                    } else {
+                        self.check_value(arg, &param)
+                    };
                     if let Some(outer) = outer {
                         let mine = mem::replace(&mut self.cx.regions.defaults, outer);
                         defaults.extend(mine.unwrap_or_default());
@@ -360,8 +369,13 @@ impl Checker<'_> {
                 Type::lang(Lang::Unit)
             }
             K::AwaitKw => {
+                let awaiting = mem::replace(&mut self.cx.awaiting, operand.kind == K::NameExpr);
                 let ty = self.infer(operand);
+                self.cx.awaiting = awaiting;
                 self.note_type(self.token_span(op), &ty);
+                if let Some(result) = self.force(node, &ty) {
+                    return result;
+                }
                 let (services, errors, result) = if let Some(parts) = self.known_eff_parts(&ty) {
                     // A known task may return a polymorphic opaque value.
                     // Decomposition does not force that result through a
@@ -376,7 +390,7 @@ impl Checker<'_> {
                         self.error(
                             codes::T003,
                             self.span(operand),
-                            format!("`await` runs an `Eff` value, but this has type `{shown}`"),
+                            format!("`await` runs an `Eff` value or forces a `Lazy`, but this has type `{shown}`"),
                         );
                         return Type::Error;
                     }

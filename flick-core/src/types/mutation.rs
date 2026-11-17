@@ -32,6 +32,10 @@ pub enum Binding {
     Restricted(&'static str),
     /// `let mut name = value`.
     Mut,
+    /// `let lazy name = value`: forced with `await`, at most once.
+    Lazy,
+    /// `let lazy mut name = value`: a `let lazy` an assignment may replace.
+    LazyMut,
 }
 
 /// What runs apart from the function around it.
@@ -214,7 +218,8 @@ impl Checker<'_> {
     /// `FLICK-G005` when the local `index`, a `let mut` variable, is used
     /// (`write`: assigned) from code that runs apart from its function.
     pub fn mutable_use(&mut self, index: usize, span: Span, write: bool) -> bool {
-        if self.cx.locals[index].binding != Binding::Mut {
+        let binding = self.cx.locals[index].binding;
+        if !matches!(binding, Binding::Mut | Binding::Lazy | Binding::LazyMut) {
             return true;
         }
         self.typing.mutable_reads.insert((span.start, span.end));
@@ -230,15 +235,22 @@ impl Checker<'_> {
             Apart::Sequence => ("A lazy `for`", "the `for`"),
             Apart::HandlerArm => ("An arm of a handler of operations", "the handler"),
         };
+        let what = if binding == Binding::Mut {
+            "a `let mut` variable"
+        } else {
+            "a `let lazy` binding"
+        };
         let diagnostic = Diagnostic::error(
             codes::G005,
             format!(
-                "{inner} cannot use `{name}`, a `let mut` variable of the function around it: it may run later, more than once or at the same time"
+                "{inner} cannot use `{name}`, {what} of the function around it: it may run later, more than once or at the same time"
             ),
             span,
         )
         .with_fix(|| {
-            let help = if write {
+            let help = if binding != Binding::Mut {
+                format!("to share a computation run once with {before}, build it with `lazy {{ … }}` and pass that")
+            } else if write {
                 // a copy cannot take an assignment: shared state lives in a cell
                 format!(
                     "to change `{name}` from {before}, keep it in a `Ref`: `let {name} = Ref.make …`, then `Ref.set {name} …` and `Ref.get {name}`"
@@ -334,7 +346,8 @@ impl Checker<'_> {
         let generated = span.start >= self.generated;
         let found =
             (self.cx.locals.iter()).rposition(|l| l.name == name && l.generated == generated);
-        let Some(index) = found.filter(|&i| self.cx.locals[i].binding == Binding::Mut) else {
+        let assignable = |b: Binding| matches!(b, Binding::Mut | Binding::LazyMut);
+        let Some(index) = found.filter(|&i| assignable(self.cx.locals[i].binding)) else {
             self.not_assignable(&name, span, found);
             if let Some(value) = value {
                 self.infer(value);
@@ -354,7 +367,8 @@ impl Checker<'_> {
         if self.mutable_use(index, span, true) {
             self.settled_assignment(index, &name, span);
         }
-        let ty = self.cx.locals[index].ty.clone();
+        let ty =
+            (self.lazy_assigned(index, node)).unwrap_or_else(|| self.cx.locals[index].ty.clone());
         self.note_type(span, &ty);
         if let Some(value) = value {
             self.check(value, &ty);

@@ -103,7 +103,7 @@ impl Checker<'_> {
     pub(super) fn made(&self, node: &Node, out: &mut Vec<(Range, String, String)>) {
         let mut pending = vec![node];
         while let Some(node) = pending.pop() {
-            if node.kind == K::TaskExpr {
+            if matches!(node.kind, K::TaskExpr | K::LazyExpr) {
                 continue;
             }
             if let Some(Ref::Value { module, name }) = self.typing.names.get(&node.range())
@@ -162,7 +162,7 @@ impl Checker<'_> {
         around: &mut Vec<Enclosing>,
         out: &mut Vec<CallSite>,
     ) {
-        if node.kind == K::TaskExpr {
+        if matches!(node.kind, K::TaskExpr | K::LazyExpr) {
             // what a task does runs later, outside the functions around it
             let fresh = &mut Vec::new();
             return (node.nodes()).for_each(|child| self.tagged_under(child, heads, fresh, out));

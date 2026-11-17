@@ -379,7 +379,7 @@ rec {
 ```text
 type        = "forall" name { name } "." type
             | union "=>" type                  // constraint(s): `Show a =>`, `(Show a, Eq a) =>`
-            | union ["->" [effects] type]      // right associative
+            | ["~"] union ["->" [effects] type] // right associative; `~` marks a suspended parameter
 effects     = "{" [row] [";" [row]] "}"     // written `->{` with no space
 row         = union { "," union } ["|" union]  // `none`, `r`, `Users, Log | r`
 union       = app { "+" app }                  // row or capture union
@@ -438,7 +438,7 @@ save_with :
 
 ```text
 block       = statement { line break statement }
-statement   = "let" … | signature | name "=" block | expr
+statement   = "let" ["lazy"] ["mut"] … | signature | name "=" block | expr
 expr        = "fun" atom_pattern { atom_pattern } "->" block
             | [label [":"]] "loop" "{" block "}"
             | [label [":"]] "while" expr "do" block
@@ -446,6 +446,7 @@ expr        = "fun" atom_pattern { atom_pattern } "->" block
             | "match" expr "with" arm { arm }
             | "try" block "with" handler_arm { handler_arm }
             | "if" expr "then" block [ "else" (if_expr | block) ]
+            | "lazy" expr                    // binds as `await`: `lazy f x` is `lazy (f x)`
             | operator expression over application (see the operator table)
 arm         = "|" or_pattern ["when" expr] "->" block
 handler_arm = arm | "|" "return" or_pattern "->" block
@@ -457,7 +458,7 @@ atom        = name | Con { "." Con } ["." name] | Float | BigInt | String
             | "(" expr "," expr { "," expr } ")" | "[" [expr { "," expr } [","]] "]"
             | "{" "}" | "{" field "=" block { ";" | line break … } "}"
             | "{" expr "with" field "=" block { … } "}"
-            | "task" "{" block "}" | "ui" "{" block "}"
+            | "task" "{" block "}" | "lazy" "{" block "}" | "ui" "{" block "}"
             | "do" "{" do_stmt { ";" | line break … } "}"
             | [label [":"]] "for" ("{" clause_list "}" | clause_list) ("yield" expr | "do" block)
             | "scope" [name] "{" block "}" | "provide" expr "{" block "}"

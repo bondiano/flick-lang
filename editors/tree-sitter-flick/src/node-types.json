@@ -649,6 +649,10 @@
     "named": true
   },
   {
+    "type": "lazy",
+    "named": false
+  },
+  {
     "type": "let",
     "named": false
   },
@@ -787,6 +791,10 @@
   },
   {
     "type": "}",
+    "named": false
+  },
+  {
+    "type": "~",
     "named": false
   }
 ]

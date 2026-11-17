@@ -8,63 +8,63 @@ refined type Name = String where Checks.non_empty
 
 unchecked : String -> Email
 let unchecked text = Email.prove text
-//                   ^^^^^^^^^^^^^^^^ FLICK-T076 nothing here establishes `Checks.email text`
+//                   ^^^^^^^^^^^^^^^^ FLICK-T077 nothing here establishes `Checks.email text`
 
 wrong_branch : String -> Option Email
 let wrong_branch text = if Email.check text then None else Some (Email.prove text)
-//                                                               ^^^^^^^^^^^^^^^^ FLICK-T077 `Checks.email text` is false here
+//                                                               ^^^^^^^^^^^^^^^^ FLICK-T078 `Checks.email text` is false here
 
 another_value : String -> String -> Option Email
 let another_value text other = if Email.check text then Some (Email.prove other) else None
-//                                                            ^^^^^^^^^^^^^^^^^ FLICK-T076 `Checks.email other`
+//                                                            ^^^^^^^^^^^^^^^^^ FLICK-T077 `Checks.email other`
 
 shadowed : String -> Option Email
 let shadowed text =
   if Email.check text then
     let text = text ++ "!"
     Some (Email.prove text)
-  //      ^^^^^^^^^^^^^^^^ FLICK-T076 cannot prove the check of `Email`
+  //      ^^^^^^^^^^^^^^^^ FLICK-T077 cannot prove the check of `Email`
   else
     None
 
 another_check : String -> Option Email
 let another_check text = if Name.check text then Some (Email.prove text) else None
-//                                                     ^^^^^^^^^^^^^^^^ FLICK-T076 `Checks.email text`
+//                                                     ^^^^^^^^^^^^^^^^ FLICK-T077 `Checks.email text`
 
 either : String -> Option Email
 let either text = if Email.check text || Name.check text then Some (Email.prove text) else None
-//                                                                  ^^^^^^^^^^^^^^^^ FLICK-T076 `Checks.email text`
+//                                                                  ^^^^^^^^^^^^^^^^ FLICK-T077 `Checks.email text`
 
 after_the_if : String -> Email
 let after_the_if text =
   let checked = if Email.check text then 1 else 0
   Email.prove text
-//^^^^^^^^^^^^^^^^ FLICK-T076 `Checks.email text`
+//^^^^^^^^^^^^^^^^ FLICK-T077 `Checks.email text`
 
 deferred : String -> Option (Unit -> Email)
 let deferred text = if Email.check text then Some (fun () -> Email.prove text) else None
-//                                                           ^^^^^^^^^^^^^^^^ FLICK-T076 `Checks.email text`
+//                                                           ^^^^^^^^^^^^^^^^ FLICK-T077 `Checks.email text`
 
 mutable : String -> Option Email
 let mutable text =
   let mut current = text
   current = current ++ "!"
   if Email.check current then Some (Email.prove current) else None
-//                                  ^^^^^^^^^^^^^^^^^^^ FLICK-T076 `Checks.email current`
+//                                  ^^^^^^^^^^^^^^^^^^^ FLICK-T077 `Checks.email current`
 
 alone : String -> Email
 let alone = Email.prove
-//          ^^^^^^^^^^^ FLICK-T078 `Email.prove` makes a value only applied to one
+//          ^^^^^^^^^^^ FLICK-T079 `Email.prove` makes a value only applied to one
 
 in_a_list : List (String -> Email)
 let in_a_list = [Email.prove]
-//               ^^^^^^^^^^^ FLICK-T078 makes a value only applied to one
+//               ^^^^^^^^^^^ FLICK-T079 makes a value only applied to one
 
 wrapper : String -> Email
 let wrapper text = Email.prove text
-//                 ^^^^^^^^^^^^^^^^ FLICK-T076 cannot prove the check of `Email`
+//                 ^^^^^^^^^^^^^^^^ FLICK-T077 cannot prove the check of `Email`
 
 // the invariant of `Name` says nothing of `Checks.email`
 from_a_name : Name -> Email
 let from_a_name name = Email.prove (Name.value name)
-//                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-T076 `Checks.email (Name.value name)`
+//                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-T077 `Checks.email (Name.value name)`

@@ -72,17 +72,17 @@ starts with none. Arithmetic is not read: `x > 0` says nothing of
 `x + 1`, which may wrap. NaN compares false with every number, so
 `not (x <= 0)` does not prove `x > 0`.
 
-```flick fail T076
+```flick fail T077
 refined type Port = Float where fun n -> n > 0 && n < 65536
 
 incomplete : Float -> Option Port
 let incomplete n = if n > 0 then Some (Port.prove n) else None
 ```
 
-`FLICK-T076` says what is not established, here `n < 65536`; the value
+`FLICK-T077` says what is not established, here `n < 65536`; the value
 may still pass the check, and `Port.parse n` checks it when the program
-runs. `FLICK-T077` is a check the facts prove fails. `T.prove` is no
-function: named alone, passed or kept, it is `FLICK-T078`. A type with
+runs. `FLICK-T078` is a check the facts prove fails. `T.prove` is no
+function: named alone, passed or kept, it is `FLICK-T079`. A type with
 parameters, or over a base other than `Int`, `Float`, `String` or `Bool`,
 has no `T.prove`. The guarantee holds within Flick's own code: a `foreign`
 function or an `unsafe` schema can still make a value that fails the
@@ -146,7 +146,7 @@ The combinators the derive writes are values of `Schema` a program may use:
 | `Schema.unsafe_record [Schema.field "x" s, …]` | a record, its fields in label order |
 | `Schema.unsafe_tuple [Schema.item s, …]` | a tuple |
 | `Schema.unsafe_adt "Shape" [Schema.unsafe_case Circle [Schema.item s], …]` | a variant type, its constructors given as values |
-| `Schema.lazy "T" (fun _ -> s)` | a reference named `T` in JSON Schema, made on first use |
+| `Schema.suspend "T" (fun _ -> s)` | a reference named `T` in JSON Schema, made on first use |
 | `Schema.recursive "T" (fun self -> s)` | a recursive type, `self` the reference to it |
 | `Schema.unsafe_unboxed s`, `Schema.unsafe_refined "T" known s T.parse` | an `unboxed type`, a refined one |
 | `Schema.enum Schema.string`, `Schema.unsafe_enum_tags Schema.string [("Get", Get), …]` | an enum, on the wire its literals or `{ "_tag" }` |

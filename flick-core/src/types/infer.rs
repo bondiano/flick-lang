@@ -380,6 +380,7 @@ impl<'c> Checker<'c> {
                 ty
             }
             K::TaskExpr => self.task(node, None),
+            K::LazyExpr => self.lazy_expr(node, None),
             K::DoExpr => self.do_expr(node, None),
             K::ScopeExpr => self.scope_expr(node, None),
             K::ProvideExpr => self.provide(node, None),

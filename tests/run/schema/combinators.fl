@@ -52,7 +52,7 @@ let expr =
       Schema.unsafe_case Neg [Schema.item self],
       Schema.unsafe_case Block [
         Schema.item
-          (Schema.lazy "Statements" (fun () ->
+          (Schema.suspend "Statements" (fun () ->
             Schema.unsafe_adt "Statements" [
               Schema.unsafe_case Statements [Schema.item (Schema.list self)],
             ]
@@ -66,7 +66,7 @@ let rec tree item =
   Schema.unsafe_adt "Tree" [
     Schema.unsafe_case Leaf [Schema.item item],
     Schema.unsafe_case Branch [
-      Schema.item (Schema.list (Schema.lazy "Tree" (fun () -> tree item))),
+      Schema.item (Schema.list (Schema.suspend "Tree" (fun () -> tree item))),
     ],
   ]
 

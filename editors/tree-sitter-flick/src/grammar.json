@@ -349,6 +349,10 @@
               },
               {
                 "type": "STRING",
+                "value": "lazy"
+              },
+              {
+                "type": "STRING",
                 "value": "scope"
               },
               {
@@ -560,6 +564,10 @@
               {
                 "type": "STRING",
                 "value": "?"
+              },
+              {
+                "type": "STRING",
+                "value": "~"
               }
             ]
           },
@@ -638,6 +646,10 @@
         {
           "type": "STRING",
           "value": "await"
+        },
+        {
+          "type": "STRING",
+          "value": "lazy"
         },
         {
           "type": "STRING",
@@ -1112,6 +1124,10 @@
         {
           "type": "STRING",
           "value": "?"
+        },
+        {
+          "type": "STRING",
+          "value": "~"
         }
       ]
     },

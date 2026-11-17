@@ -197,6 +197,12 @@ pub struct Interface {
     /// declarations made from the interface alone (`.d.ts`) carry it too.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub docs: BTreeMap<String, String>,
+    /// The parameters each value's signature marks `~`, by position: an
+    /// argument there that is a runtime call is passed unstarted. A list,
+    /// not a map: it is short, and a map of its own type costs the wasm
+    /// compiler a sort and a map's code.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub suspended: Vec<(String, Vec<usize>)>,
     /// The instances of the module and of every module it depends on: an
     /// importer sees them all, whatever it imports by name.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

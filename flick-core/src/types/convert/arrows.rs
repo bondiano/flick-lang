@@ -1,13 +1,54 @@
-//! An arrow written `-> {r; e} B`: with the space, `{r; e}` is a row applied
-//! to `B`, not the effect annotation `->{r; e}` it is usually meant as.
+//! The parts of an arrow that need a word of their own: `-> {r; e} B`, whose
+//! space makes `{r; e}` a row applied to `B` rather than the effect
+//! annotation `->{r; e}` it is usually meant as, and a suspended parameter
+//! `~(Eff r e a)`, which is its `Eff` to the type (`docs/formal/lazy.md` §7).
 
+use super::Free;
 use crate::diagnostics::{Diagnostic, Edit, codes};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::Checker;
+use crate::types::kinds::Kind;
+use crate::types::report::uncaptured;
+use crate::types::ty::Type;
 
 impl Checker<'_> {
+    /// The parameter `node` of an arrow. `~T` is `T`, which must be an `Eff`
+    /// (`FLICK-T076` otherwise).
+    pub(super) fn parameter(&mut self, node: &Node, free: Free) -> Type {
+        let inner = (node.kind == K::SuspendedType)
+            .then(|| node.nodes().next())
+            .flatten();
+        let Some(inner) = inner else {
+            return self.ty(node, &Kind::Type, free);
+        };
+        let ty = self.ty(inner, &Kind::Type, free);
+        if ty != Type::Error && self.eff_parts(&uncaptured(&ty)).is_none() {
+            let shown = self.text_of(inner);
+            let message = format!(
+                "`~` marks a parameter that takes a computation, `~(Eff r e a)`, but `{shown}` is no `Eff`"
+            );
+            self.error(codes::T076, self.span(node), message);
+        }
+        ty
+    }
+
+    /// `~T` other than as the parameter of an arrow: `FLICK-T076`, and `T`.
+    pub(super) fn misplaced_suspension(
+        &mut self,
+        node: &Node,
+        expected: &Kind,
+        free: Free,
+    ) -> (Type, Kind) {
+        let message = "`~` marks the parameter of a function, left of its `->`";
+        self.error(codes::T076, self.span(node), message);
+        match node.nodes().next() {
+            Some(inner) => (self.ty(inner, expected, free), expected.clone()),
+            None => (Type::Error, Kind::Type),
+        }
+    }
+
     /// Whether `result`, the result of the arrow `node`, is a row in braces
     /// applied to a type; reported with a fix that joins the brace to its
     /// arrow when only spaces part them.

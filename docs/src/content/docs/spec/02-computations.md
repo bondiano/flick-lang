@@ -1,6 +1,6 @@
 ---
 title: "Values of computations and their execution"
-source_hash: 08cb9bc1e6ca5aff
+source_hash: 1cbdebff26461d22
 ---
 
 ## Two different kinds of functions
@@ -56,7 +56,7 @@ let load_twice id =
   (first, second)
 ```
 
-The call `Users.get` happens twice. Storing `request` does not make it a cache and does not create a Promise. To obtain a result once and reuse it, write `let user = Users.get id` and then use the ready `user`. Memoizing a computation is a separate runtime operation with explicit sharing.
+The call `Users.get` happens twice. Storing `request` does not make it a cache and does not create a Promise. To obtain a result once and reuse it, write `let user = Users.get id` and then use the ready `user`. Memoizing a computation is a separate runtime operation with explicit sharing: `lazy { Users.get id }` builds a `Lazy`, which runs its body at most once, at its first `await`, and gives later `await`s the same outcome.
 
 `await` is needed only for an already existing `Eff` value. An ordinary runtime call `let user = Users.get id` stays direct and needs no additional `await`.
 

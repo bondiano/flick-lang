@@ -205,6 +205,30 @@ theorem from_result :
       (.arrow (.tapp (.tapp (.adt "Prelude.Result") (.errors (fun x => x = .rv (.v 0) (fun _ => False)))) (.tvar 1)) (.rt Row.none (fun x => x = .rv (.v 0) (fun _ => False))) (.tvar 1) Caps.none) := by
   elide_eq
 
+/-- `Prelude.lazy_make : forall r e a c. Detached r => (Eff r e a)^c ->{} Lazy r e a` -/
+theorem lazy_make :
+    Ty.elide (fun x => x = .v 3) (.arrow (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3)) (.rt Row.none Row.none) (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Lazy") (.caps (fun x => x = .v 3))) (.tvar 0)) (.tvar 1)) (.tvar 2)) Caps.none) Caps.none =
+      (.arrow (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3)) (.rt (fun x => x = .atm (.v 3)) Row.none) (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Lazy") (.caps (fun x => x = .v 3))) (.tvar 0)) (.tvar 1)) (.tvar 2)) Caps.none) := by
+  elide_eq
+
+/-- `Prelude.lazy_force : forall r e a. Lazy r e a ->{Async | r; e} a` -/
+theorem lazy_force :
+    Ty.elide (fun x => x = .v 3) (.arrow (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Lazy") (.caps (fun x => x = .v 3))) (.tvar 0)) (.tvar 1)) (.tvar 2)) (.rt (fun x => x = .nm "Prelude.Async" ∨ x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False))) (.tvar 2) Caps.none) Caps.none =
+      (.arrow (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Lazy") (.caps (fun x => x = .v 3))) (.tvar 0)) (.tvar 1)) (.tvar 2)) (.rt (fun x => x = .nm "Prelude.Async" ∨ x = .atm (.v 3) ∨ x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False))) (.tvar 2) Caps.none) := by
+  elide_eq
+
+/-- `Prelude.lazy_read : forall r e a. Lazy r e a ->{r; e} a` -/
+theorem lazy_read :
+    Ty.elide (fun x => x = .v 3) (.arrow (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Lazy") (.caps (fun x => x = .v 3))) (.tvar 0)) (.tvar 1)) (.tvar 2)) (.rt (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False))) (.tvar 2) Caps.none) Caps.none =
+      (.arrow (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Lazy") (.caps (fun x => x = .v 3))) (.tvar 0)) (.tvar 1)) (.tvar 2)) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False))) (.tvar 2) Caps.none) := by
+  elide_eq
+
+/-- `Prelude.lazy_done : forall a r e. a ->{} Lazy r e a` -/
+theorem lazy_done :
+    Ty.elide Caps.none (.arrow (.tvar 0) (.rt Row.none Row.none) (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Lazy") (.caps Caps.none)) (.tvar 1)) (.tvar 2)) (.tvar 0)) Caps.none) Caps.none =
+      (.arrow (.tvar 0) (.rt Row.none Row.none) (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Lazy") (.caps Caps.none)) (.tvar 1)) (.tvar 2)) (.tvar 0)) Caps.none) := by
+  elide_eq
+
 /-- `Prelude.parallel : forall r e a c b. Detached r => (Eff r e a)^c -> (Eff r e b)^c ->{r; e} (a, b)` -/
 theorem parallel :
     Ty.elide (fun x => x = .v 3) (.arrow (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3)) .pure (.arrow (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 4) (fun x => x = .v 3)) (.rt (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False))) (.tapp (.tapp (.adt "Tuple") (.tvar 2)) (.tvar 4)) Caps.none) Caps.none) Caps.none =

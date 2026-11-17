@@ -111,6 +111,7 @@ fn depths(node: &Node, depth: u32, limit: u32, out: &mut Vec<Nesting>) {
                     | K::FunExpr
                     | K::DoExpr
                     | K::TaskExpr
+                    | K::LazyExpr
                     | K::ForExpr
                     | K::TryExpr
             );

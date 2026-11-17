@@ -255,14 +255,16 @@ impl Lexer<'_> {
         matches!(
             before[..],
             [.., "foreign"] | [.., "foreign", "pure" | "sync" | "async" | "effect"]
-        ) || (matches!(before[..], ["let"] | ["let", "rec" | "mut"])
-            && !matches!(word, "rec" | "assert" | "mut"))
+        ) || (matches!(
+            before[..],
+            ["let"] | ["let", "rec" | "mut" | "lazy"] | ["let", "lazy", "mut"]
+        ) && !matches!(word, "rec" | "assert" | "mut" | "lazy"))
     }
 
     /// Length and kind of the operator or delimiter at `pos`, if any.
     fn punct(&self) -> Option<(usize, SyntaxKind)> {
         use SyntaxKind as K;
-        const TABLE: [(&str, SyntaxKind); 41] = [
+        const TABLE: [(&str, SyntaxKind); 42] = [
             ("...", K::DotDotDot),
             ("..<", K::DotDotLt),
             ("..", K::DotDot),
@@ -304,6 +306,7 @@ impl Lexer<'_> {
             ("$", K::Dollar),
             ("?", K::Question),
             ("@", K::At),
+            ("~", K::Tilde),
         ];
         let rest = self.rest();
         let (text, kind) = TABLE.iter().find(|(text, _)| rest.starts_with(text))?;

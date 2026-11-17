@@ -12,15 +12,15 @@ use super::{Gen, names};
 use crate::ir::{Arm, Expr, Lit, Pat};
 use flick_ir::{Constructor, JsClass, Rep};
 
-struct Test<'d> {
-    conds: Vec<Js<'d>>,
+pub(super) struct Test<'d> {
+    pub(super) conds: Vec<Js<'d>>,
     binds: Vec<(String, String)>,
     /// Names an or-pattern assigns inside its test, declared before it.
     lets: Vec<String>,
 }
 
 impl Test<'_> {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         Test {
             conds: Vec::new(),
             binds: Vec::new(),
@@ -31,14 +31,14 @@ impl Test<'_> {
 
 impl<'d> Gen<'_, 'd> {
     /// A condition written out in full.
-    fn cond(&self, text: &str) -> Js<'d> {
+    pub(super) fn cond(&self, text: &str) -> Js<'d> {
         let flags = text_flags(text);
         Js::code(self.a.text(self.a.alloc_str(text)), Head::Other, &[]).with(flags)
     }
 
     /// `items` joined by the operator `op`; a lone item as it is, for its
     /// place to decide on its parentheses.
-    fn chain(&self, items: &[Js<'d>], op: &'d str) -> Js<'d> {
+    pub(super) fn chain(&self, items: &[Js<'d>], op: &'d str) -> Js<'d> {
         if let [only] = items {
             return *only;
         }
@@ -50,7 +50,7 @@ impl<'d> Gen<'_, 'd> {
         Js::code(doc, Head::Other, items)
     }
 
-    fn test(&mut self, pat: &Pat, subject: &str, t: &mut Test<'d>) {
+    pub(super) fn test(&mut self, pat: &Pat, subject: &str, t: &mut Test<'d>) {
         let a = self.a;
         match pat {
             Pat::Wild | Pat::Lit(Lit::Unit) => {}
@@ -133,6 +133,13 @@ impl<'d> Gen<'_, 'd> {
         }
     }
 
+    /// `items` joined by `op`, in parentheses.
+    pub(super) fn chain_in_parens(&self, items: &[Js<'d>], op: &'d str) -> Js<'d> {
+        let either = self.chain(items, op);
+        let doc = either.at(self.a, Before::Delimiter, After::Delimiter);
+        Js::code(doc, Head::Other, &[either]).in_parens()
+    }
+
     /// The test of an or-pattern: one of the `alternatives` matches, and
     /// assigns the names it binds.
     fn alternatives(&mut self, alternatives: &[Pat], subject: &str, t: &mut Test<'d>) {
@@ -161,14 +168,12 @@ impl<'d> Gen<'_, 'd> {
                 self.chain(&parts, " && ")
             });
         }
-        let alternatives = self.chain(&tests, " || ");
-        let doc = alternatives.at(self.a, Before::Delimiter, After::Delimiter);
-        t.conds
-            .push(Js::code(doc, Head::Other, &[alternatives]).in_parens());
+        let alternatives = self.chain_in_parens(&tests, " || ");
+        t.conds.push(alternatives);
     }
 
     /// The `_tag` of a constructor and the fields its arguments are in.
-    fn shape(&self, c: &Constructor, arity: usize) -> (String, Vec<String>) {
+    pub(super) fn shape(&self, c: &Constructor, arity: usize) -> (String, Vec<String>) {
         match names::native(self.options.lang, c) {
             Some(names::Native::Some) => ("Some".into(), vec!["value".into()]),
             Some(names::Native::None) => ("None".into(), Vec::new()),
@@ -218,51 +223,38 @@ impl<'d> Gen<'_, 'd> {
     }
 
     /// `head { body }`, a statement of the lines of `body`.
-    fn braced(&self, head: String, body: &[Stmt<'d>]) -> Stmt<'d> {
+    pub(super) fn braced(&self, head: String, body: &[Stmt<'d>]) -> Stmt<'d> {
         let flags = text_flags(&head) | stmt_flags(body) | MULTILINE;
         Stmt::new(docvec![self.a, head, block(self.a, body)], flags)
     }
 
     /// The arms of a `match` on `subject`: with `result`, the value goes
-    /// there; otherwise each arm is in tail position.
+    /// there; otherwise each arm is in tail position. Through the decision
+    /// graph of the arms, or when it has none tried one by one.
     pub(super) fn arms(&mut self, subject: &str, arms: &[Arm], result: Option<&str>) {
         let label = result.map(|_| format!("$m{}", self.temps + 1));
         if label.is_some() {
             self.temps += 1;
         }
-        let emit = |g: &mut Self, body: &Expr| match (result, &label) {
-            (Some(r), Some(label)) => {
-                let v = g.expr(body);
-                g.buf.push(g.assign(r, v));
-                g.buf.push(g.line(&format!("break {label};")));
-            }
-            _ => g.tail_expr(body),
-        };
-        let release = self.options.release;
-        let mut out = Vec::new();
-        if release && let Some(cases) = self.switch_cases(arms) {
-            let mut body = Vec::new();
-            for (case, arm) in cases.into_iter().zip(arms) {
-                let (stmts, ()) = self
-                    .block(|g| g.arm(subject, &arm.pat, arm.guard.as_ref(), &arm.body, true, emit));
-                let head = case.map_or("default: ".to_owned(), |tag| format!("case {tag}: "));
-                body.push(self.braced(head, &stmts));
-            }
-            let by_value = arms
-                .iter()
-                .any(|a| matches!(&a.pat, Pat::Con(c, _) if matches!(c.rep, Rep::Literal(_))));
-            let on = if by_value {
-                subject.to_owned()
-            } else {
-                format!("{subject}._tag")
-            };
-            out.push(self.braced(format!("switch ({on}) "), &body));
-        } else {
+        let into = result.zip(label.as_deref());
+        let (mut out, decided) = self.block(|g| g.decide(subject, arms, into));
+        if !decided {
+            let release = self.options.release;
             for (i, arm) in arms.iter().enumerate() {
                 // the match is exhaustive: its last arm without a guard needs no test
                 let last = release && i + 1 == arms.len();
-                let (stmts, ()) = self
-                    .block(|g| g.arm(subject, &arm.pat, arm.guard.as_ref(), &arm.body, last, emit));
+                let (stmts, ()) = self.block(|g| {
+                    g.arm(
+                        subject,
+                        &arm.pat,
+                        arm.guard.as_ref(),
+                        &arm.body,
+                        last,
+                        |g, body| {
+                            g.arm_body(body, into);
+                        },
+                    );
+                });
                 out.extend(stmts);
             }
         }
@@ -359,41 +351,6 @@ impl<'d> Gen<'_, 'd> {
             call(a, effect_gen, &[deferred])
         };
         self.lambda_of(&format!("{subject}, {unhandled}"), deferred)
-    }
-
-    /// The `case` tag of each arm of a `match` a `switch` can take, `None`
-    /// for the last arm, which is `default`: three or more arms without
-    /// guards, each a tagged constructor of distinct tag whose fields are
-    /// only bound, or for the last arm any binding.
-    fn switch_cases(&self, arms: &[Arm]) -> Option<Vec<Option<String>>> {
-        if arms.len() < 3 || arms.iter().any(|a| a.guard.is_some()) {
-            return None;
-        }
-        let plain = |p: &Pat| matches!(p, Pat::Wild | Pat::Bind(_) | Pat::Lit(Lit::Unit));
-        let mut cases = Vec::new();
-        for (i, arm) in arms.iter().enumerate() {
-            let case = match &arm.pat {
-                Pat::Con(c, args) if c.rep == Rep::Tagged && args.iter().all(plain) => {
-                    Some(names::string(&self.shape(c, args.len()).0))
-                }
-                Pat::Con(c, args) if matches!(c.rep, Rep::Literal(_)) && args.is_empty() => {
-                    let Rep::Literal(l) = &c.rep else {
-                        unreachable!()
-                    };
-                    Some(names::enum_literal(l))
-                }
-                p if plain(p) && i + 1 == arms.len() => None,
-                _ => return None,
-            };
-            if case.is_some() && cases.contains(&case) {
-                return None;
-            }
-            cases.push(case);
-        }
-        if let Some(last) = cases.last_mut() {
-            *last = None;
-        }
-        Some(cases)
     }
 
     /// An arm on `subject`; `exhaustive`, it matches whatever reaches it.

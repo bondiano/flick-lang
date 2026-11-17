@@ -31,7 +31,7 @@ pub(super) fn hugs(n: &Node) -> bool {
             | K::ProvideExpr
             | K::DoExpr
             | K::FunExpr
-    ) || matches!(n.kind, K::ForExpr | K::PluginExpr) && n.has_token(K::LBrace)
+    ) || matches!(n.kind, K::ForExpr | K::PluginExpr | K::LazyExpr) && n.has_token(K::LBrace)
 }
 
 fn is_expression(n: &Node) -> bool {
