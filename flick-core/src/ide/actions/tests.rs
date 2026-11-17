@@ -8,13 +8,13 @@ type Shape = Circle Float | Rect Float Float | Empty
 ";
 
 /// `App.Main` of `main` (with `App.Shapes` beside it) and its text.
-fn main(main: &str) -> (Fixture, String) {
+pub(super) fn main(main: &str) -> (Fixture, String) {
     let f = fixture_of(&[("src/App/Shapes.fl", SHAPES), ("src/App/Main.fl", main)]);
     (f, main.to_owned())
 }
 
 /// The action titled `title` for the range `start..end` of `App.Main`.
-fn action(f: &Fixture, start: u32, end: u32, title: &str) -> Option<Action> {
+pub(super) fn action(f: &Fixture, start: u32, end: u32, title: &str) -> Option<Action> {
     let file = f.file("App.Main");
     f.ide()
         .actions(file, start, end)
@@ -22,7 +22,7 @@ fn action(f: &Fixture, start: u32, end: u32, title: &str) -> Option<Action> {
         .find(|a| a.title.starts_with(title))
 }
 
-fn applied(text: &str, action: &Action) -> String {
+pub(super) fn applied(text: &str, action: &Action) -> String {
     let mut edits = action.edits.clone();
     edits.sort_by_key(|e| e.span.start);
     let mut out = text.to_owned();

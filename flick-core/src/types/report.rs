@@ -237,6 +237,7 @@ impl Checker<'_> {
                 self.error_help(codes::T003, span, &head, incomplete, |this| {
                     this.mismatch_hint(&a, &b, &actual, &expected)
                 });
+                self.explain_assumed_pure(&a, &b, span);
             }
             Mismatch::Label { label, left } if matches!(label, Elem::Capture(_)) => {
                 self.capture_mismatch(&head, label, *left, span);
@@ -435,7 +436,7 @@ impl Checker<'_> {
 }
 
 /// `ty` without capture qualifiers at any depth.
-fn uncaptured(ty: &Type) -> Type {
+pub(super) fn uncaptured(ty: &Type) -> Type {
     match ty {
         Type::Captured { ty, .. } | Type::Bounded { ty, .. } => uncaptured(ty),
         other => other.map_children(&mut uncaptured),

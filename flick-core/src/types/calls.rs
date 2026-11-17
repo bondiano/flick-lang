@@ -142,7 +142,7 @@ impl Checker<'_> {
 
     pub fn use_local(&mut self, index: usize, span: Span) -> Type {
         self.cx.regions.uses.push(index);
-        self.mutable_use(index, span);
+        self.mutable_use(index, span, false);
         let Local { ty, rec, .. } = self.cx.locals[index].clone();
         // a local `let rec` is in scope only in its own body
         let ty = match rec {
@@ -258,13 +258,12 @@ impl Checker<'_> {
                 }
                 meta @ Type::Meta(_) => {
                     let (param, result) = (self.fresh(), self.fresh());
+                    let arrow = Type::pure_fun(param.clone(), result.clone());
                     // a number literal's variable stands for a number only
-                    if self
-                        .unify(&meta, &Type::pure_fun(param.clone(), result.clone()))
-                        .is_err()
-                    {
+                    if self.unify(&meta, &arrow).is_err() {
                         return self.not_a_function(&meta, span, &args[i..]);
                     }
+                    self.assume_pure(head, &arrow);
                     self.check(arg, &param);
                     ty = result;
                 }

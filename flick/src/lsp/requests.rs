@@ -183,7 +183,8 @@ impl Server {
                     "title": fix.message,
                     "kind": "quickfix",
                     "diagnostics": [lsp_diagnostic(&snapshot.sources, d)],
-                    "isPreferred": true,
+                    // only a fix that keeps the program's meaning is applied unasked
+                    "isPreferred": fix.safe,
                     "edit": { "changes": changes(&snapshot.sources, &fix.edits) },
                 }));
             }
