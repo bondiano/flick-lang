@@ -11,11 +11,15 @@ fn relocate_ir(module: &mut ir::Module, child: &str, parent: &str, local: &str) 
                 to.expr(body);
             }
             ir::ItemKind::Destructure { pattern, body } => {
-                to.pattern(pattern);
+                if !omits("destructure") {
+                    to.pattern(pattern);
+                }
                 to.expr(body);
             }
             ir::ItemKind::Foreign(foreign) => {
-                if let Some(catch) = &mut foreign.catch {
+                if let Some(catch) = &mut foreign.catch
+                    && !omits("catch")
+                {
                     to.expr(catch);
                 }
             }
@@ -29,8 +33,38 @@ fn relocate_ir(module: &mut ir::Module, child: &str, parent: &str, local: &str) 
             ir::ItemKind::Service { .. } => {}
         }
     }
+    // a walk a test cut short stands for a JSON form cut short the same way
     #[cfg(test)]
-    assert_eq!(*module, expected, "the walk moves what the JSON form of it moved");
+    if OMITTED.get().is_none() {
+        assert_eq!(*module, expected, "the walk moves what the JSON form of it moved");
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    /// The visit of the walk a test leaves out, to show that what it expects
+    /// of a moved module notices the omission.
+    static OMITTED: std::cell::Cell<Option<&'static str>> = const { std::cell::Cell::new(None) };
+}
+
+/// [`relocate_ir`] leaves out `visit` while `run` runs on this thread.
+#[cfg(test)]
+pub(super) fn omitting<T>(visit: &'static str, run: impl FnOnce() -> T) -> T {
+    OMITTED.set(Some(visit));
+    let result = run();
+    OMITTED.set(None);
+    result
+}
+
+#[cfg(test)]
+fn omits(visit: &str) -> bool {
+    OMITTED.get() == Some(visit)
+}
+
+/// The walk leaves out nothing outside tests.
+#[cfg(not(test))]
+const fn omits(_visit: &str) -> bool {
+    false
 }
 
 /// The names of the module `child` as the file of `parent` holds them,
@@ -103,9 +137,13 @@ impl Relocation<'_> {
             }
         }
         for (_, _, dicts) in &mut info.defaults {
-            self.dicts(dicts);
+            if !omits("defaults") {
+                self.dicts(dicts);
+            }
         }
-        if let Some(generic) = &mut info.generic {
+        if let Some(generic) = &mut info.generic
+            && !omits("generic")
+        {
             let types::GenericInfo { cases, inl, inr, con, field } = generic;
             let cases = cases.iter_mut().map(|(constructor, _)| constructor);
             for constructor in cases.chain([inl, inr, con, field]) {
@@ -159,7 +197,7 @@ impl Relocation<'_> {
                 self.key(key);
             }
             ir::ExprKind::Dicts(_, dicts) => self.dicts(dicts),
-            ir::ExprKind::Each { pat, .. } => self.pattern(pat),
+            ir::ExprKind::Each { pat, .. } if !omits("for") => self.pattern(pat),
             ir::ExprKind::Lambda { params, .. } => {
                 for param in params {
                     self.pattern(&mut param.pat);
