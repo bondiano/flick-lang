@@ -248,9 +248,9 @@ let callback_caught () =
 #[test]
 fn a_user_app_module_keeps_its_own_fail_binding() {
     let source = r#"module App exposing (main, fail)
-fail : String ->{Host.Console} Unit
+fail : String ->{} Unit
 let fail message = Platform.stdout_line ("user " ++ message)
-main : Unit ->{Host.Console} Unit
+main : Unit ->{} Unit
 let main () = fail "binding"
 "#;
     let modules = run::compile_source(source).expect("user App module checks");

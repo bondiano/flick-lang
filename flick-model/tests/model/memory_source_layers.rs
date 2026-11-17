@@ -67,7 +67,7 @@ effect Add =
 
 type error Gone = Gone String
 
-uncaught : String ->{Host.Console; Gone} String
+uncaught : String ->{; Gone} String
 let uncaught seed =
   let layer = Layer.succeed Read { read = fun () -> seed }
   Layer.run layer (fun unit ->
@@ -83,7 +83,7 @@ let uncaught seed =
     from_result (Err (Gone value))
   )
 
-answer : String ->{Host.Console} String
+answer : String ->{} String
 let answer seed =
   let layer = Layer.succeed Read { read = fun () -> seed }
   let callback = fun unit ->

@@ -81,7 +81,7 @@ type error Gone = Gone String
 raise_gone : String ->{; Gone} Unit
 let raise_gone text = from_result (Err (Gone text))
 
-main : Unit ->{Host.Console; Gone} Unit
+main : Unit ->{; Gone} Unit
 let main () =
   Platform.stdout_line "before"
   raise_gone "payload"
@@ -129,7 +129,7 @@ let rec burn value =
   let next = value + 1
   burn next
 
-main : Unit ->{Host.Console} Unit
+main : Unit ->{} Unit
 let main () =
   Platform.stdout_line "before"
   burn 0
@@ -175,7 +175,7 @@ start : Int ->{; First, Again} String
 let start value =
   if value == 0 then from_result (Err (First 1)) else from_result (Err (Again "body"))
 
-gate : Int ->{Host.Console; Again} Bool
+gate : Int ->{; Again} Bool
 let gate value =
   Platform.stdout_line ("guard " ++ show value)
   from_result (Err (Again "guard"))
@@ -186,7 +186,7 @@ let handler_fails () =
   | First value -> from_result (Err (Again ("handler " ++ show value)))
   | Again text -> "wrong inner " ++ text
 
-guard_fails : Unit ->{Host.Console; Again} String
+guard_fails : Unit ->{; Again} String
 let guard_fails () =
   try start 0 with
   | First value when gate value -> "wrong guard"
@@ -198,7 +198,7 @@ let unmatched () =
   try start 1 with
   | First _ -> "wrong match"
 
-answer : Unit ->{Host.Console} String
+answer : Unit ->{} String
 let answer () =
   let handled =
     try handler_fails () with
@@ -236,7 +236,7 @@ fn returning_a_delayed_task_does_not_capture_the_surrounding_try() {
 
 type error Gone = Gone String
 
-make : Unit ->{Host.Console; Gone} Eff {Host.Console} {Gone} Unit
+make : Unit ->{; Gone} Eff {} {Gone} Unit
 let make () =
   Platform.stdout_line "make"
   task {
@@ -244,7 +244,7 @@ let make () =
     from_result (Err (Gone "later"))
   }
 
-main : Unit ->{Host.Console; Gone} Unit
+main : Unit ->{; Gone} Unit
 let main () =
   let delayed =
     try make () with
@@ -283,7 +283,7 @@ fn source_lowering_failure_does_not_start_execution_or_touch_external_roots() {
 external_call : Unit ->{} Unit
 foreign external_call from global "unmodeledHostOperation"
 
-main : Unit ->{Host.Console} Unit
+main : Unit ->{} Unit
 let main () =
   Platform.stdout_line "must not execute"
   external_call ()

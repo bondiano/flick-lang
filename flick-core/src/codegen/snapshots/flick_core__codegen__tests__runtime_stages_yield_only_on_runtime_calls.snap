@@ -8,9 +8,9 @@ import * as $m_String from "../String.js";
 
 export const NotFound = (_0) => ({ _tag: "NotFound#82397ace53fc", _0 });
 
-export const $s_Users = $rt.service("App.Users.Users");
+export const $s_Users = /*#__PURE__*/ $rt.service("App.Users.Users");
 
-export const $s_Log = $rt.service("App.Users.Log");
+export const $s_Log = /*#__PURE__*/ $rt.service("App.Users.Log");
 
 export const normalize_name = (name) => $m_String.trim(name);
 

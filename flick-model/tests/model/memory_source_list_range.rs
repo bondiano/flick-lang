@@ -70,15 +70,15 @@ const CASES: &str = r#"module App.Range exposing (bounds, eager, first_fault, se
 import Arena
 bounds : Int -> Int -> List Int
 let bounds start stop = List.range start stop
-argument : String -> Int ->{Host.Console} Int
+argument : String -> Int ->{} Int
 let argument label value =
   Platform.stdout_line label
   value
-eager : Unit ->{Host.Console} List Int
+eager : Unit ->{} List Int
 let eager () = List.range (argument "left" 4) (argument "right" 2)
-first_fault : Unit ->{Host.Console} List Int
+first_fault : Unit ->{} List Int
 let first_fault () = List.range (Int.unsafe_div 1 0) (argument "unreachable" 3)
-second_fault : Unit ->{Host.Console} List Int
+second_fault : Unit ->{} List Int
 let second_fault () = List.range (argument "left" 2) (Int.unsafe_rem 1 0)
 captured : String -> Unit -> List Int
 let captured text () =

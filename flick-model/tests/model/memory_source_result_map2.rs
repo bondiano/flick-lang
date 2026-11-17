@@ -77,7 +77,7 @@ let cold captured =
   let partial = map2 (fun left right -> captured ++ wrong_second left right)
   let _partial_left = partial (Ok "left" : Result String String)
   render (map2 wrong_first (Err "left") (Ok "R")) ++ "|" ++ render (map2 wrong_first (Ok "L") (Err "right")) ++ "|" ++ render (map2 wrong_second (Err "first") (Err "second")) ++ "|" ++ captured
-argument : String -> Result String String ->{Host.Console} Result String String
+argument : String -> Result String String ->{} Result String String
 let argument label value =
   Platform.stdout_line label
   value
@@ -87,13 +87,13 @@ let factory () =
 factory_good : Unit -> (String -> String -> String)
 let factory_good () =
   fun a b -> a ++ "/" ++ b
-eager_full : Unit ->{Host.Console} String
+eager_full : Unit ->{} String
 let eager_full () = render (map2 (factory_good ()) (argument "left" (Ok "L")) (argument "right" (Ok "R")))
 factory_error : Unit -> (String -> String -> String)
 let factory_error () = if Int.unsafe_div 1 0 == 0 then wrong_first else wrong_second
-eager_f : Unit ->{Host.Console} String
+eager_f : Unit ->{} String
 let eager_f () = render (map2 (factory_error ()) (argument "left" (Err "first")) (argument "right" (Err "second")))
-eager : Unit ->{Host.Console} String
+eager : Unit ->{} String
 let eager () = render (map2 (factory ()) (argument "left" (Err "first")) (argument "right" (Err "second")))
 combine : String -> Result String String -> Result String String -> Result String String
 let combine captured left right = map2 (fun a b -> captured ++ ":" ++ a ++ "/" ++ b) left right
