@@ -10,10 +10,20 @@ use crate::source::Span;
 type Saved = Arc<Mutex<BTreeMap<String, Vec<u8>>>>;
 
 /// A store as a host keeps one on disk: each module by its key, written as
-/// JSON; `taken` counts the modules it gave back.
+/// JSON, and the inputs of each path's last module under `inputs <path>`;
+/// `taken` counts the modules it gave back.
 fn memory_store(salt: &str, saved: &Saved, taken: &Arc<AtomicUsize>) -> ModuleStore {
     let (reader, writer, taken) = (Arc::clone(saved), Arc::clone(saved), Arc::clone(taken));
+    let (inputs, keep) = (Arc::clone(saved), Arc::clone(saved));
     ModuleStore {
+        inputs: Box::new(move |path| {
+            let bytes = inputs.lock().expect("the store").get(&format!("inputs {path}")).cloned()?;
+            Some(serde_json::from_slice(&bytes).expect("saved inputs"))
+        }),
+        keep_inputs: Box::new(move |path, parts| {
+            let bytes = serde_json::to_vec(parts).expect("inputs to save");
+            keep.lock().expect("the store").insert(format!("inputs {path}"), bytes);
+        }),
         salt: salt.to_owned(),
         load: Box::new(move |key| {
             let bytes = reader.lock().expect("the store").get(key).cloned()?;

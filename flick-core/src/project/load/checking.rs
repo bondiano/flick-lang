@@ -142,6 +142,16 @@ pub struct ModuleCache {
     /// the process reads it.
     #[cfg(feature = "native-project")]
     store: Option<ModuleStore>,
+    /// What the last run did with each module, by name, when asked to
+    /// explain: comparing a whole key again on each miss is no work an
+    /// editor's run should do for nothing.
+    reasons: Vec<(String, Reason)>,
+    explain: bool,
+    /// A mutation for tests: reuse a module whose own text is unchanged,
+    /// whatever its imports became, which a replay against a run without
+    /// a cache must catch.
+    #[cfg(test)]
+    pub(super) stale: bool,
 }
 
 type Parsed = (Arc<Parse>, Arc<ModuleSyntax>);
@@ -218,6 +228,9 @@ impl Loader<'_> {
             comparable: vec![None; self.modules.len()],
             digests: vec![None; self.modules.len()],
         };
+        if let Some(cache) = &mut self.cache {
+            cache.reasons.clear();
+        }
         let Some(levels) = levels(edges) else {
             let mut visiting = vec![false; self.modules.len()];
             for i in 0..self.modules.len() {
@@ -294,8 +307,14 @@ impl Loader<'_> {
         }
     }
 
-    fn apply(&mut self, i: usize, (output, key, digest): Outcome, known: &mut Known) {
+    fn apply(&mut self, i: usize, (output, key, digest, reason): Outcome, known: &mut Known) {
         known.digests[i] = digest;
+        if let Some(cache) = &mut self.cache
+            && cache.explain
+            && self.modules[i].scope_of.is_none()
+        {
+            cache.reasons.push((self.modules[i].name.clone(), reason));
+        }
         if let (Some(cache), Some(key)) = (&mut self.cache, key) {
             known.comparable[i] = Some(comparable_copy(&output.exported));
             cache
@@ -341,9 +360,9 @@ struct Known {
     digests: Vec<Option<String>>,
 }
 
-/// A module's output, the key to keep it by in memory, and the digest its
-/// importers' keys in a store take.
-type Outcome = (Output, Option<Key>, Option<String>);
+/// A module's output, the key to keep it by in memory, the digest its
+/// importers' keys in a store take, and why it was checked or reused.
+type Outcome = (Output, Option<Key>, Option<String>, Reason);
 
 /// What checking a module reads of the loader; shared by parallel checks.
 struct Checking<'a> {
@@ -365,6 +384,7 @@ struct Checking<'a> {
 }
 
 include!("checking_core.rs");
+include!("checking_reasons.rs");
 include!("checking_contracts.rs");
 include!("checking_lexical.rs");
 
