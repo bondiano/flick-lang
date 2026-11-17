@@ -55,16 +55,16 @@ let fibers () = scope s {
     try show (Fiber.join_all [a, c]) with
     | Boom n -> "Boom " ++ show n
   Platform.stdout_line ("join_all: " ++ joined)
-  let d = Fiber.spawn s quiet (after ms50 "d")
+  let d = Fiber.spawn s quiet (after ms1000 "d")
   Fiber.interrupt d
   Platform.stdout_line ("interrupt: " ++ ended (Fiber.await_ d))
-  let e = Fiber.spawn s quiet (after ms50 "e")
+  let e = Fiber.spawn s quiet (after ms1000 "e")
   Fiber.interrupt_as (Some 42) e
   Platform.stdout_line ("interrupt_as: " ++ ended (Fiber.await_ e))
-  let f = Fiber.spawn s quiet (after ms50 "f")
-  let g = Fiber.spawn s quiet (after ms50 "g")
+  let f = Fiber.spawn s quiet (after ms1000 "f")
+  let g = Fiber.spawn s quiet (after ms1000 "g")
   Fiber.interrupt_all [f, g]
-  let h = Fiber.spawn s quiet (after ms50 "h")
+  let h = Fiber.spawn s quiet (after ms1000 "h")
   Fiber.interrupt_all_as 7 [h]
   Platform.stdout_line ("interrupt_all: " ++ show (List.map ended (Fiber.await_all [f, g, h])))
 }
@@ -80,7 +80,7 @@ let sets () =
     FiberSet.await_empty set
     Platform.stdout_line
       ("set empty: " ++ show (FiberSet.size set) ++ " " ++ ended (Fiber.await_ one))
-    let other = Fiber.spawn s quiet (after ms50 "added")
+    let other = Fiber.spawn s quiet (after ms1000 "added")
     FiberSet.add false other set
     FiberSet.clear set
     Platform.stdout_line ("set clear: " ++ ended (Fiber.await_ other))
@@ -99,13 +99,13 @@ let sets () =
   }
   scope s {
     let map : FiberMap.FiberMap s String {Boom} String = FiberMap.make ()
-    let first = FiberMap.run map_options "k" (after ms50 "first") map
+    let first = FiberMap.run map_options "k" (after ms1000 "first") map
     let _ = FiberMap.run map_options "k" (after ms50 "second") map
     Platform.stdout_line ("map replaced: " ++ ended (Fiber.await_ first))
     Platform.stdout_line
       ("map has: " ++ show (FiberMap.has "k" map, FiberMap.has "x" map, FiberMap.size map))
     Platform.stdout_line ("map get: " ++ show (Option.is_some (FiberMap.get "k" map)))
-    let kept = Fiber.spawn s quiet (after ms50 "kept")
+    let kept = Fiber.spawn s quiet (after ms1000 "kept")
     FiberMap.set { onlyIfMissing = false; propagateInterruption = false } "j" kept map
     FiberMap.remove "j" map
     Platform.stdout_line ("map remove: " ++ ended (Fiber.await_ kept))
@@ -119,13 +119,13 @@ let sets () =
   }
   scope s {
     let handle : FiberHandle.FiberHandle s {Boom} String = FiberHandle.make ()
-    let first = FiberHandle.run map_options (after ms50 "first") handle
+    let first = FiberHandle.run map_options (after ms1000 "first") handle
     let second = FiberHandle.run map_options (after ms50 "second") handle
     Platform.stdout_line ("handle replaced: " ++ ended (Fiber.await_ first))
     Platform.stdout_line ("handle get: " ++ show (Option.is_some (FiberHandle.get handle)))
     FiberHandle.await_empty handle
     Platform.stdout_line ("handle second: " ++ ended (Fiber.await_ second))
-    let other = Fiber.spawn s quiet (after ms50 "other")
+    let other = Fiber.spawn s quiet (after ms1000 "other")
     FiberHandle.set { onlyIfMissing = false; propagateInterruption = false } other handle
     FiberHandle.clear handle
     Platform.stdout_line ("handle clear: " ++ ended (Fiber.await_ other))
