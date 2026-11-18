@@ -102,8 +102,8 @@ theorem into :
 
 /-- `Prelude.map : forall f c d a b. Functor f => (forall v. a^v -> b)^c -> (f a)^d -> (f b)^(c + d)` -/
 theorem map :
-    Ty.Reads (Ty.elide (fun x => x = .v 1 ∨ x = .v 2) (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.arrow (.tvar 3) .pure (.tvar 4) Caps.none) .pure (.arrow (.tapp (.tvar 0) (.tvar 3)) .pure (.tapp (.tvar 0) (.tvar 4)) Caps.none) Caps.none) Caps.none) Caps.none)
-      (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.arrow (.tvar 3) .pure (.tvar 4) Caps.none) .pure (.arrow (.tapp (.tvar 0) (.tvar 3)) .pure (.tapp (.tvar 0) (.tvar 4)) Caps.none) Caps.none) Caps.none) := by
+    Ty.Reads (Ty.elide (fun x => x = .v 1 ∨ x = .v 2) (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.arrow (.tvar 3) .pure (.tvar 4) (fun x => x = .v 1)) .pure (.arrow (.tapp (.tvar 0) (.tvar 3)) .pure (.tapp (.tvar 0) (.tvar 4)) Caps.none) Caps.none) Caps.none) Caps.none)
+      (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.arrow (.tvar 3) .pure (.tvar 4) (fun x => x = .v 1)) .pure (.arrow (.tapp (.tvar 0) (.tvar 3)) .pure (.tapp (.tvar 0) (.tvar 4)) Caps.none) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Prelude.fold : forall f c a b. Foldable f => (b -> a -> b)^c -> b^c -> f a -> b` -/
@@ -136,14 +136,14 @@ theorem pure :
 
 /-- `Prelude.map2 : forall f c d a b x. Applicative f => (forall u v. a^u -> b^v -> x)^c -> (f a)^d -> (f b)^d -> (f x)^(c + d)` -/
 theorem map2 :
-    Ty.Reads (Ty.elide (fun x => x = .v 1 ∨ x = .v 2) (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.arrow (.tvar 3) .pure (.arrow (.tvar 4) .pure (.tvar 5) Caps.none) Caps.none) .pure (.arrow (.tapp (.tvar 0) (.tvar 3)) .pure (.arrow (.tapp (.tvar 0) (.tvar 4)) .pure (.tapp (.tvar 0) (.tvar 5)) Caps.none) Caps.none) Caps.none) Caps.none) Caps.none)
-      (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.arrow (.tvar 3) .pure (.arrow (.tvar 4) .pure (.tvar 5) Caps.none) Caps.none) .pure (.arrow (.tapp (.tvar 0) (.tvar 3)) .pure (.arrow (.tapp (.tvar 0) (.tvar 4)) .pure (.tapp (.tvar 0) (.tvar 5)) Caps.none) Caps.none) Caps.none) Caps.none) := by
+    Ty.Reads (Ty.elide (fun x => x = .v 1 ∨ x = .v 2) (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.arrow (.tvar 3) .pure (.arrow (.tvar 4) .pure (.tvar 5) Caps.none) (fun x => x = .v 1)) .pure (.arrow (.tapp (.tvar 0) (.tvar 3)) .pure (.arrow (.tapp (.tvar 0) (.tvar 4)) .pure (.tapp (.tvar 0) (.tvar 5)) Caps.none) Caps.none) Caps.none) Caps.none) Caps.none)
+      (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.arrow (.tvar 3) .pure (.arrow (.tvar 4) .pure (.tvar 5) Caps.none) (fun x => x = .v 1)) .pure (.arrow (.tapp (.tvar 0) (.tvar 3)) .pure (.arrow (.tapp (.tvar 0) (.tvar 4)) .pure (.tapp (.tvar 0) (.tvar 5)) Caps.none) Caps.none) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Prelude.flat_map : forall m c d a b. Monad m => (forall v. a^v -> (m b)^(c + v))^c -> (m a)^d -> (m b)^(c + d)` -/
 theorem flat_map :
-    Ty.Reads (Ty.elide (fun x => x = .v 1 ∨ x = .v 2) (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.arrow (.tvar 3) .pure (.tapp (.tvar 0) (.tvar 4)) Caps.none) .pure (.arrow (.tapp (.tvar 0) (.tvar 3)) .pure (.tapp (.tvar 0) (.tvar 4)) Caps.none) Caps.none) Caps.none) Caps.none)
-      (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.arrow (.tvar 3) .pure (.tapp (.tvar 0) (.tvar 4)) Caps.none) .pure (.arrow (.tapp (.tvar 0) (.tvar 3)) .pure (.tapp (.tvar 0) (.tvar 4)) Caps.none) Caps.none) Caps.none) := by
+    Ty.Reads (Ty.elide (fun x => x = .v 1 ∨ x = .v 2) (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.arrow (.tvar 3) .pure (.tapp (.tvar 0) (.tvar 4)) (fun x => x = .v 1)) .pure (.arrow (.tapp (.tvar 0) (.tvar 3)) .pure (.tapp (.tvar 0) (.tvar 4)) Caps.none) Caps.none) Caps.none) Caps.none)
+      (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.arrow (.tvar 3) .pure (.tapp (.tvar 0) (.tvar 4)) (fun x => x = .v 1)) .pure (.arrow (.tapp (.tvar 0) (.tvar 3)) .pure (.tapp (.tvar 0) (.tvar 4)) Caps.none) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Prelude.nothing : forall f a. Alternative f => f a` -/
@@ -400,8 +400,8 @@ theorem Seq.append :
 
 /-- `Seq.map : forall a b c d. (forall v. a^v -> b)^c -> (Seq a)^d -> (Seq b)^(c + d)` -/
 theorem Seq.map :
-    Ty.Reads (Ty.elide (fun x => x = .v 2 ∨ x = .v 3) (.arrow (.arrow (.tvar 0) .pure (.tvar 1) Caps.none) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 3))) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 2 ∨ x = .v 3))) (.tvar 1)) Caps.none) Caps.none) Caps.none)
-      (.arrow (.arrow (.tvar 0) .pure (.tvar 1) Caps.none) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 3))) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 2 ∨ x = .v 3))) (.tvar 1)) Caps.none) Caps.none) := by
+    Ty.Reads (Ty.elide (fun x => x = .v 2 ∨ x = .v 3) (.arrow (.arrow (.tvar 0) .pure (.tvar 1) (fun x => x = .v 2)) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 3))) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 2 ∨ x = .v 3))) (.tvar 1)) Caps.none) Caps.none) Caps.none)
+      (.arrow (.arrow (.tvar 0) .pure (.tvar 1) (fun x => x = .v 2)) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 3))) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 2 ∨ x = .v 3))) (.tvar 1)) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Seq.filter : forall a c d. (a -> Bool)^c -> (Seq a)^d -> (Seq a)^(c + d)` -/
@@ -418,8 +418,8 @@ theorem Seq.filter_map :
 
 /-- `Seq.flat_map : forall a b c d. (forall v. a^v -> (Seq b)^(c + v))^c -> (Seq a)^d -> (Seq b)^(c + d)` -/
 theorem Seq.flat_map :
-    Ty.Reads (Ty.elide (fun x => x = .v 2 ∨ x = .v 3) (.arrow (.arrow (.tvar 0) .pure (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 2 ∨ x = .v 0))) (.tvar 1)) Caps.none) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 3))) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 2 ∨ x = .v 3))) (.tvar 1)) Caps.none) Caps.none) Caps.none)
-      (.arrow (.arrow (.tvar 0) .pure (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 2 ∨ x = .v 0))) (.tvar 1)) Caps.none) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 3))) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 2 ∨ x = .v 3))) (.tvar 1)) Caps.none) Caps.none) := by
+    Ty.Reads (Ty.elide (fun x => x = .v 2 ∨ x = .v 3) (.arrow (.arrow (.tvar 0) .pure (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 2 ∨ x = .v 0))) (.tvar 1)) (fun x => x = .v 2)) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 3))) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 2 ∨ x = .v 3))) (.tvar 1)) Caps.none) Caps.none) Caps.none)
+      (.arrow (.arrow (.tvar 0) .pure (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 2 ∨ x = .v 0))) (.tvar 1)) (fun x => x = .v 2)) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 3))) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 2 ∨ x = .v 3))) (.tvar 1)) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Seq.take : forall a d. Int -> (Seq a)^d -> (Seq a)^d` -/
@@ -544,8 +544,8 @@ theorem Seq.singleton :
 
 /-- `Option.map : forall a b c d. (forall v. a^v -> b)^c -> (Option a)^d -> (Option b)^c` -/
 theorem Option.map :
-    Ty.Reads (Ty.elide (fun x => x = .v 2 ∨ x = .v 3) (.arrow (.arrow (.tvar 0) .pure (.tvar 1) Caps.none) .pure (.arrow (.tapp (.adt "Prelude.Option") (.tvar 0)) .pure (.tapp (.adt "Prelude.Option") (.tvar 1)) Caps.none) Caps.none) Caps.none)
-      (.arrow (.arrow (.tvar 0) .pure (.tvar 1) Caps.none) .pure (.arrow (.tapp (.adt "Prelude.Option") (.tvar 0)) .pure (.tapp (.adt "Prelude.Option") (.tvar 1)) Caps.none) Caps.none) := by
+    Ty.Reads (Ty.elide (fun x => x = .v 2 ∨ x = .v 3) (.arrow (.arrow (.tvar 0) .pure (.tvar 1) (fun x => x = .v 2)) .pure (.arrow (.tapp (.adt "Prelude.Option") (.tvar 0)) .pure (.tapp (.adt "Prelude.Option") (.tvar 1)) Caps.none) Caps.none) Caps.none)
+      (.arrow (.arrow (.tvar 0) .pure (.tvar 1) (fun x => x = .v 2)) .pure (.arrow (.tapp (.adt "Prelude.Option") (.tvar 0)) .pure (.tapp (.adt "Prelude.Option") (.tvar 1)) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Option.bind : forall a b c. (a -> Option b)^c -> Option a -> Option b` -/
@@ -742,8 +742,8 @@ theorem Option.zip_with :
 
 /-- `Result.map : forall a b c e d. (forall v. a^v -> b)^c -> (Result e a)^d -> (Result e b)^(c + d)` -/
 theorem Result.map :
-    Ty.Reads (Ty.elide (fun x => x = .v 2 ∨ x = .v 4) (.arrow (.arrow (.tvar 0) .pure (.tvar 1) Caps.none) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Result") (.tvar 3)) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.Result") (.tvar 3)) (.tvar 1)) Caps.none) Caps.none) Caps.none)
-      (.arrow (.arrow (.tvar 0) .pure (.tvar 1) Caps.none) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Result") (.tvar 3)) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.Result") (.tvar 3)) (.tvar 1)) Caps.none) Caps.none) := by
+    Ty.Reads (Ty.elide (fun x => x = .v 2 ∨ x = .v 4) (.arrow (.arrow (.tvar 0) .pure (.tvar 1) (fun x => x = .v 2)) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Result") (.tvar 3)) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.Result") (.tvar 3)) (.tvar 1)) Caps.none) Caps.none) Caps.none)
+      (.arrow (.arrow (.tvar 0) .pure (.tvar 1) (fun x => x = .v 2)) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Result") (.tvar 3)) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.Result") (.tvar 3)) (.tvar 1)) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Result.map_err : forall e x c a. (e -> x)^c -> Result e a -> Result x a` -/
