@@ -2,7 +2,7 @@
 //! each goal and the proof's body, with the parameters in scope. The
 //! module's own IR has none of them; a proof runs nowhere.
 
-use super::{Expr, ExprKind, Lit, Lower};
+use super::{Expr, ExprKind, Item, ItemKind, Lit, Lower, Module};
 use crate::diagnostics::Diagnostic;
 use crate::logic::{self, Failure};
 use crate::resolve;
@@ -10,6 +10,7 @@ use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::{GoalSyntax, GoalType, ProofInfo, Range, Typing, goal_syntax};
+use flick_ir::InstanceInfo;
 
 /// One proof declaration, lowered.
 #[derive(Debug, Clone)]
@@ -116,20 +117,40 @@ impl Lower<'_> {
 
 /// Each proof of `module`, which checked without errors, checked: what
 /// fails to be a certificate of its goal.
-pub fn check_proofs(module: &resolve::Module, typing: &Typing) -> Vec<Diagnostic> {
+pub fn check_proofs(
+    module: &resolve::Module,
+    typing: &Typing,
+    imported: &dyn Fn() -> &'static [Module],
+) -> Vec<Diagnostic> {
     if typing.proofs.is_empty() {
         return Vec::new();
     }
+    // the definitions a proof unfolds: the module's own, then the imported
+    let own = super::lower(module, typing).ok();
+    let program = Modules {
+        own: own.as_ref(),
+        imported: imported(),
+    };
     let mut out = Vec::new();
+    // the proofs checked so far, in order: what a later one may use
+    let mut lemmas = Vec::new();
     for lowered in lower_proofs(module, typing) {
         let Some(info) = typing.proofs.iter().find(|i| i.at == lowered.at) else {
             continue;
         };
-        if let Err(failure) = statement(&lowered, info).and_then(|(s, body)| {
-            let cert = logic::cert(body)?;
-            logic::prove(&s, &cert, &info.data)
-        }) {
-            out.push(failure.diagnostic(&info.name));
+        let checked = statement(&lowered, info).and_then(|(s, body)| {
+            let cert = logic::cert(body, &lemmas)?;
+            logic::prove(&s, &cert, &info.data, &program, &lemmas).map(|()| s)
+        });
+        match checked {
+            Ok(statement) => lemmas.push(logic::Lemma {
+                statement,
+                order: (lowered.params.iter())
+                    .zip(&lowered.premise)
+                    .map(|(x, p)| (x.as_str().into(), *p))
+                    .collect(),
+            }),
+            Err(failure) => out.push(failure.diagnostic(&info.name)),
         }
     }
     out
@@ -195,4 +216,43 @@ fn statement<'p>(
         goal,
     };
     Ok((statement, body))
+}
+
+/// The compiled modules a proof reads definitions from.
+struct Modules<'a> {
+    own: Option<&'a Module>,
+    imported: &'a [Module],
+}
+
+impl Modules<'_> {
+    fn module(&self, name: &str) -> Option<&Module> {
+        self.own
+            .into_iter()
+            .chain(self.imported)
+            .find(|m| m.name == name)
+    }
+}
+
+impl logic::Program for Modules<'_> {
+    fn item(&self, module: &str, name: &str) -> Option<&Item> {
+        self.module(module)?.items.iter().find(|i| match &i.kind {
+            ItemKind::Value { name: n, .. } => n == name,
+            ItemKind::Foreign(f) => f.name == name,
+            _ => false,
+        })
+    }
+
+    fn instance(&self, module: &str, name: &str) -> Option<(&InstanceInfo, &[(String, Expr)])> {
+        self.module(module)?
+            .items
+            .iter()
+            .find_map(|i| match &i.kind {
+                ItemKind::Instance { info, methods }
+                    if info.module == module && info.name == name =>
+                {
+                    Some((&**info, methods.as_slice()))
+                }
+                _ => None,
+            })
+    }
 }

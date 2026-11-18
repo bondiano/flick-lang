@@ -14,4 +14,10 @@ export const lessonConfiguration = (exercise: ExerciseMetadata | undefined) => (
   lesson_choices_ru: [...exercise?.question?.choices_ru ?? []],
   // the right choice, or -1 without a question
   lesson_answer: exercise?.question?.answer ?? -1,
+  // what the check compares, which the goal shows; an empty export shows no goal
+  lesson_export: exercise?.check.export ?? "",
+  lesson_arguments: [...exercise?.check.argument_types ?? []],
+  lesson_returns: exercise?.check.return_type ?? "",
+  lesson_runs: exercise?.check.runs ?? false,
+  lesson_output: exercise?.check.output ?? "",
 });

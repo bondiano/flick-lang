@@ -18,9 +18,10 @@
 Flick is a language for whole apps: the browser, the server and the command
 line. A function's signature says what it needs and how it can fail, the
 compiler holds the body to it, and the code still reads like plain code. It
-compiles to JavaScript and TypeScript, where effects run on
-[Effect](https://effect.website/) for now, and to Go for a standalone
-executable.
+compiles to JavaScript and TypeScript, where effects run on a small runtime
+of Flick's own and parts of the standard library still use
+[Effect](https://effect.website/) through an adapter, and to Go for a
+standalone executable.
 [Why Flick](./docs/src/content/docs/start/why.md) says what it is for, and
 who it is not for yet.
 

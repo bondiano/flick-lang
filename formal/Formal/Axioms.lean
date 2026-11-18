@@ -11,6 +11,7 @@ import Formal.Live.Install
 import Formal.Generalization
 import Formal.Lemma4
 import Formal.IndexedRows
+import Formal.InstanceHandlers
 import Formal.TypeEquivShape
 import Formal.Lazy
 import Formal.Refine
@@ -128,6 +129,14 @@ prints, and `#guard_msgs` turns the difference into an error.
 /-- info: 'Flick.Ty.rless_removes_all' depends on axioms: [propext] -/
 #guard_msgs in
 #print axioms Flick.Ty.rless_removes_all
+
+/-- info: 'Flick.Row.hBody_store_bool' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Row.hBody_store_bool
+
+/-- info: 'Flick.Row.hBody_var_without' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Row.hBody_var_without
 
 /-- info: 'Flick.Ty.Equiv.kind' depends on axioms: [propext] -/
 #guard_msgs in

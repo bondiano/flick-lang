@@ -46,7 +46,7 @@ pub(super) fn references(module: &Module) -> (Vec<Reference>, Vec<Unused>) {
         unused: Vec::new(),
         used: Vec::new(),
         top: 0,
-        proof: false,
+        proof: (false, Vec::new()),
     };
     for (i, decl) in module.tree.nodes().enumerate() {
         walker.top = i;
@@ -92,8 +92,8 @@ struct Walker<'a> {
     /// Where each binder that was used is written.
     used: Vec<u32>,
     top: usize,
-    /// In a proof: rules are no references, binders need no use.
-    proof: bool,
+    /// In a proof, and the proofs before it: rules and lemmas.
+    proof: (bool, Vec<String>),
 }
 
 impl Walker<'_> {
@@ -361,7 +361,7 @@ impl Walker<'_> {
             }
             if let (Some((token, punned)), false) = (local.binder, local.used)
                 && !local.name.starts_with('_')
-                && !self.proof
+                && !self.proof.0
             {
                 self.unused.push(Unused {
                     name: local.name.to_owned(),

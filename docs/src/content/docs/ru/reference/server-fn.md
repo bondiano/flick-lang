@@ -1,6 +1,6 @@
 ---
 title: "Серверные функции"
-source_hash: 19291900f4964c71
+source_hash: 419310bf8e8efb2a
 ---
 
 `server fn` — функция, которая выполняется на сервере и которую любой код,
@@ -44,9 +44,10 @@ place : Order ->{; Rpc.ClientError, OutOfStock} String
 (`target = "client"`, см. `FLICK-E009`), и это
 обычная задача: `Atom.task (task { place order })` или тело action.
 Объявленная ошибка возвращается как есть; `Rpc.ClientError` значит, что
-вызов не дошёл до сервера или ответ не декодировался. В браузере вызов идёт
-на origin страницы, вне браузера — на `FLICK_SERVER_URL`, по пути
-`Server.path` (`/_flick/fn`).
+вызов не дошёл до сервера или ответ не декодировался. Вызов идёт по пути
+`Server.path` (`/_flick/fn`) на origin ближайшего `Server.with_origin`, а
+без него в браузере — на origin страницы (см.
+[Вне браузера](#вне-браузера)).
 
 Секреты остаются на сервере так же: `Config.redacted` требует
 `Server.Server`, поэтому клиентский вход, который прочёл бы пароль или ключ,
@@ -58,6 +59,37 @@ place : Order ->{; Rpc.ClientError, OutOfStock} String
 памяти: с сервисами обработчика, заголовками обслуживаемого запроса и
 кодеками для всего, что передаётся, как по HTTP. Задача атома, запущенная
 при рендере страницы, тоже попадает в трейс запроса.
+
+## Вне браузера
+
+У программы, которая не страница, например у клиента командной строки или
+теста, своего origin нет. `Server.with_origin` задаёт его вызовам задачи,
+а вне его такой вызов завершается ошибкой `Rpc.ClientError`. Вызов ничего
+не читает из окружения, поэтому программа, которая берёт адрес сервера из
+переменной, читает её сама и указывает `Host.Environment` в своей строке
+эффектов:
+
+```flick
+# import Server
+# type alias Order = { item : String; count : Float }
+# type error OutOfStock = OutOfStock String
+#
+# place : Order ->{; Rpc.ClientError, OutOfStock} String
+# let place order = order.item
+#
+main : Unit ->{Host.Environment, Host.Console, Async; AppError} Unit
+let main () =
+  let origin = Option.with_default "http://127.0.0.1:3000" (Platform.env "FLICK_SERVER_URL")
+  let placed =
+    try Server.with_origin origin (task { place { item = "tea"; count = 1 } }) with
+    | OutOfStock item -> "out of stock: " ++ item
+    | Rpc.ClientError message -> message
+  Platform.stdout_line placed
+```
+
+В браузере `Server.with_origin` отправляет вызовы на другой origin, не
+страницы, и тогда нужен CORS (см. [На Go-target](#на-go-target)). Вызов,
+который выполняется в памяти, остаётся в памяти и внутри него.
 
 ## Обслуживание
 
@@ -157,7 +189,7 @@ let functions =
 Серверный вход, собранный с `emit = "go"`, обслуживает `server fn` так
 же, как собранный для js-target: `Server.handler` отвечает на те же
 POST-запросы к `Server.path`, вызовы в его процессе идут в памяти, а
-вызовы других программ уходят на `FLICK_SERVER_URL`. Поэтому Go-бэкенд
+остальные его вызовы уходят на origin `Server.with_origin`. Поэтому Go-бэкенд
 обслуживает фронтенд, собранный для js-target из тех же модулей:
 соберите клиентский вход для js, а серверный — для go, каждый со своим
 `flick.toml`.
