@@ -15,7 +15,7 @@ class Monad m => MonadState (m : Type -> Type) s | m -> s =
   get : m s
   /// Replaces the current state with the supplied value.
   put : forall c. s^c -> (m Unit)^c
-  state : forall c a. (forall v. s^v -> (a, s)^(c + v))^c -> (m a)^c
+  state : forall c a. (s^v -> (a, s)^(c + v))^c -> (m a)^c
   let state step = do {
     before <- get
     let (value, after) = step before
@@ -26,8 +26,8 @@ class Monad m => MonadState (m : Type -> Type) s | m -> s =
 class Monad m => MonadReader (m : Type -> Type) r | m -> r =
   /// Reads the shared environment.
   ask : m r
-  local : forall c d a. (forall v. r^v -> r^(c + v))^c -> (m a)^d -> (m a)^(c + d)
-  reader : forall c a. (forall v. r^v -> a)^c -> (m a)^c
+  local : forall c d a. (r^v -> r^(c + v))^c -> (m a)^d -> (m a)^(c + d)
+  reader : forall c a. (r^v -> a)^c -> (m a)^c
   let reader project = map project ask
 
 class (Monad m, Monoid w) => MonadWriter (m : Type -> Type) w | m -> w =
@@ -42,4 +42,4 @@ class (Monad m, Monoid w) => MonadWriter (m : Type -> Type) w | m -> w =
 
 class Monad m => MonadError (m : Type -> Type) e | m -> e =
   throw_error : forall c a. e^c -> (m a)^c
-  catch_error : forall c d a. (forall v. e^v -> (m a)^(c + v))^c -> (m a)^d -> (m a)^(c + d)
+  catch_error : forall c d a. (e^v -> (m a)^(c + v))^c -> (m a)^d -> (m a)^(c + d)

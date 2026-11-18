@@ -1,0 +1,35 @@
+// A capture row that only a callback mentions, and that bounds what the
+// callback is given, is bound on the callback: `(a^v -> b)^c` is
+// `(forall v. a^v -> b)^c`. So a body may give the callback what it holds.
+module App.CallbackBinders exposing (Mapper(..), Box(..), boxed, later, pairs)
+
+class Mapper (f : Type -> Type) =
+  over : forall c d a b. (a^v -> b)^c -> (f a)^d -> (f b)^(c + d)
+  both : (a^u -> b^v -> x)^c -> (f a)^d -> (f b)^d -> (f x)^(c + d)
+
+type Box a = Box a
+
+// a signature the body needs: it names `b`
+instance Mapper Box =
+  over : (a^v -> b)^c -> (Box a)^d -> (Box b)^(c + d)
+  let over f (Box x) =
+    let _ : Option b = None
+    Box (f x)
+  let both f (Box x) (Box y) = Box (f x y)
+
+instance Mapper (Eff r e) =
+  let over f eff = task { f (await eff) }
+  let both f left right = task { f (await left) (await right) }
+
+boxed : Box Float -> Box String
+let boxed box = over (fun n -> show (n + 1)) box
+
+later : Eff none none Float -> Eff none none Float -> Eff none none Float
+let later left right = both (fun a b -> a + b) left right
+
+// the same shape outside a class, with the binder written on the other
+apply_pair : ((a, a)^v -> b)^c -> a -> b
+let apply_pair f x = f (x, x)
+
+pairs : Float -> Float
+let pairs n = apply_pair (fun (a, b) -> a * b) n
