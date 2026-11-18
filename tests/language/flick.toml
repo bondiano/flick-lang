@@ -11,3 +11,6 @@ out-dir = "dist"
 profile = "debug"
 emit = "js"
 effect = "effect"
+
+[tools]
+"flick/go" = ["go"]

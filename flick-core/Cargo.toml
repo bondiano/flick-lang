@@ -17,7 +17,7 @@ default = ["ide", "native-project"]
 ide = []
 # projects on disk: manifests, installed packages, published artifacts,
 # source maps and the docs of the built-in sources
-native-project = ["dep:toml", "dep:semver", "dep:sha2", "flick-backend-js/source-maps", "flick-backend-js/decision-graph", "flick-backend-support/native-project"]
+native-project = ["dep:flick-backend-go", "dep:toml", "dep:semver", "dep:sha2", "flick-backend-js/source-maps", "flick-backend-js/decision-graph", "flick-backend-support/native-project"]
 # std in the binary, for a host with no packages: the playground
 embedded-std = []
 
@@ -38,6 +38,7 @@ rustix = { version = "1.1.6", features = ["time"] }
 
 [dependencies]
 annotate-snippets = "0.12.17"
+flick-backend-go = { path = "../backends/go", optional = true }
 flick-backend-js = { path = "../backends/js" }
 flick-backend-support = { path = "../flick-backend-support" }
 flick-ir = { path = "../flick-ir" }

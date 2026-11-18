@@ -9,13 +9,24 @@ use std::path::Path;
 
 const JS: &[u8] = include_bytes!("../../../backends/js/package/component.wasm");
 const PIN: &str = include_str!("../../../backends/js/package/backend.json");
+const GO: &[u8] = include_bytes!("../../../backends/go/package/component.wasm");
+const GO_PIN: &str = include_str!("../../../backends/go/package/backend.json");
 
 pub(super) fn javascript(
     root: &Path,
     rt: bool,
-    tools: &BTreeMap<String, Vec<String>>,
+    tools: Option<&BTreeMap<String, Vec<String>>>,
 ) -> Result<Package, Diagnostic> {
     Package::from_bytes(root, pin()?, JS, rt, tools)
+}
+
+pub(super) fn go(
+    root: &Path,
+    tools: Option<&BTreeMap<String, Vec<String>>>,
+) -> Result<Package, Diagnostic> {
+    let pin = serde_json::from_str(GO_PIN)
+        .map_err(|e| failure(format!("invalid bundled Go backend pin: {e}")))?;
+    Package::from_bytes(root, pin, GO, false, tools)
 }
 
 pub(super) fn pin() -> Result<BackendPin, Diagnostic> {

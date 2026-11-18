@@ -1,6 +1,6 @@
 ---
 title: "`.iface` — нативный интерфейс модуля"
-source_hash: 4c88ba3948f6ec49
+source_hash: fc471ca35bf3df23
 ---
 
 Файл `.iface` содержит интерфейс модуля в формате, который нужен модулю
@@ -24,9 +24,9 @@ refined types и компаньоны переэкспортированных �
 
 ## Пример
 
-```json
+```text
 {
-  "iface-version": IFACE_VERSION,
+  "iface-version": <IFACE_VERSION>,
   "compiler": "<version of flick>",
   "module": "App.Shapes",
   "exports": [

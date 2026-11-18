@@ -201,6 +201,11 @@ interface types {
     files: list<javascript-file>,
   }
 
+  record go-projection {
+    exports: list<string>,
+    line-path: string,
+  }
+
   record package-target {
     %package: string,
     environments: list<environment>,

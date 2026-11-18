@@ -9,7 +9,10 @@ global options `--project <path>`, `--package <name>` (`-p`, a member of the
 `--timings` ([what took the time](#timings)),
 `--offline` (no network: [plugins](../plugins/#reaching-outside) answer
 from the project's snapshots, which `CI` set means too, and `install`
-installs from the store) and `--help`; `flick help <command>` prints a command's help and
+installs from the store), `--allow-tool <tool>` (lets the selected backend
+run a host tool, as `go`, in a build outside a project; a project allows
+its tools in [`[tools]`](../project/#flicktoml), and the flag there is
+`FLICK-P051`) and `--help`; `flick help <command>` prints a command's help and
 `flick --version` the compiler's version (`flick doctor` shows the rest).
 
 ## Commands

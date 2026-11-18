@@ -9,3 +9,6 @@ test-dir = "test"
 [build]
 out-dir = "dist"
 emit = "js"
+
+[tools]
+"flick/go" = ["go"]

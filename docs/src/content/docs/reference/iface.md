@@ -21,9 +21,9 @@ use the current compiler to write an interface for a new package.
 
 ## Example
 
-```json
+```text
 {
-  "iface-version": IFACE_VERSION,
+  "iface-version": <IFACE_VERSION>,
   "compiler": "<version of flick>",
   "module": "App.Shapes",
   "exports": [

@@ -24,8 +24,8 @@ use flick_pretty::{Document, docvec};
 
 use super::layout::{Code, call};
 use super::{Gen, names};
-use crate::ir::{Expr, ExprKind, Module};
 use flick_ir::{Constructor, Rep};
+use flick_ir::{Expr, ExprKind, Module};
 
 /// How a value of a constructor with a Go type of its own holds its fields.
 #[derive(Clone, PartialEq, Eq)]

@@ -10,10 +10,8 @@
 //! The pass is pure over one [`Module`]: it reads and rewrites the IR only,
 //! and leaves syntax, type checking and code generation untouched.
 
-use crate::ir::{Expr, ExprKind, ItemKind, Module, Pat, Stmt};
+use flick_ir::{Expr, ExprKind, ItemKind, Module, Pat, Span, Stmt};
 use std::mem;
-
-use crate::source::Span;
 
 /// Folds every foldable tuple match of `module`, giving how many it folded.
 pub fn fold_tuple_matches(module: &mut Module) -> usize {
@@ -160,8 +158,8 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::{fold, fold_tuple_matches};
-    use crate::ir::{Arm, Expr, ExprKind, Item, ItemKind, Lit, Module, Pat, Stmt};
-    use crate::source::{FileId, Span};
+    use crate::Known;
+    use flick_ir::{Arm, Expr, ExprKind, FileId, Item, ItemKind, Lit, Module, Pat, Span, Stmt};
     use flick_ir::{Exports, Initialization};
 
     fn local(name: &str) -> Expr {
@@ -434,9 +432,15 @@ mod tests {
             )],
         )]);
 
-        super::super::optimize(&mut module, &|name| name == "v0", &|_, _| None, &|_, _| {
-            None
-        });
+        fold_tuple_matches(&mut module);
+        super::super::optimize(
+            &mut module,
+            &|name| name == "v0",
+            &|_, _| None,
+            &|_, _| None,
+            &Known::of(&[]),
+            &|_| false,
+        );
 
         // the pass turned the match into bindings the other passes then
         // simplify to the element it selected; a match the pass skipped
@@ -447,7 +451,7 @@ mod tests {
         assert_eq!(
             body,
             &local("a"),
-            "`optimize` runs the pass before the portable passes"
+            "the portable passes simplify what the pass folded"
         );
     }
 

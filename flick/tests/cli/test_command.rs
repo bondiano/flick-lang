@@ -83,7 +83,7 @@ fn project(name: &str) -> PathBuf {
     fs::create_dir_all(dir.join("test/Test")).expect("dir");
     fs::write(
         dir.join("flick.toml"),
-        "schema-version = 1\n\n[project]\nkind = \"lib\"\n",
+        "schema-version = 1\n\n[tools]\n\"flick/go\" = [\"go\"]\n\n[project]\nkind = \"lib\"\n",
     )
     .expect("write");
     fs::write(dir.join("package.json"), "{ \"name\": \"@acme/sample\" }\n").expect("write");
@@ -241,8 +241,9 @@ fn test_preparation_reports_phases_without_changing_json() {
             assert!(stderr.contains(phase), "{emit}: {stderr}");
         }
         assert!(
+            // the backend's `go build` step runs while Go is emitted
             stderr.contains(if emit == "go" {
-                "Building Go executable"
+                "Emitting Go"
             } else {
                 "Writing test runner"
             }),

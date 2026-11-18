@@ -8,7 +8,7 @@ use flick_pretty::{Document, DocumentArena, docvec};
 
 use super::layout::{Code, block, call, closure, signature, statement};
 use super::shape::Types;
-use crate::ir::{Expr, ExprKind};
+use flick_ir::{Expr, ExprKind};
 
 /// How to build a call from the fiber in scope and its Go arguments.
 pub(super) type Call<'a> = Box<dyn Fn(&'static str, &[Code<'a>]) -> Code<'a> + 'a>;

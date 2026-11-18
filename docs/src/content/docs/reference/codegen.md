@@ -414,13 +414,12 @@ cancellation points, explicit yields and finalizers of the program do not.
 ## Go target
 
 `emit = "go"` (or `--emit go`) builds an app into one executable without
-Node: for each entry, a Go module under `go/<entry>/` of the output, `package
-main` with one file per Flick module and the runtime package `flickrt`
-beside it, which `flick build` compiles with `go build` into
-`flick-<entry>`. `go build` compiles every file of a package, so the module
-lists what the build wrote in `go/<entry>/.flick-files`, and the next build
-into the same output removes the listed files it no longer writes; files it
-did not write stay. Only what `main` reaches is compiled, and a construct the
+Node. The official backend component `flick/go` writes, for each entry, a Go
+module under `go/<entry>/` of the output, `package main` with one file per
+Flick module and the runtime package `flickrt` beside it, and declares a
+host step that compiles it with `go build` into `flick-<entry>`. The step
+runs on a copy that holds only what this build wrote, so a file an earlier
+build left in `go/<entry>/` never reaches the compiler. Only what `main` reaches is compiled, and a construct the
 target does not compile yet is `FLICK-P012` with what it names, never a
 runtime stub; for now that is a lazy `for` that reads services,
 schemas deriving `Form`, and a `foreign` binding without a
@@ -644,6 +643,8 @@ restarting it on each change; `flick test` builds one executable,
 `flick-test`, that runs the `tests` of every test module with the node
 runner's options, seeds and output. Building needs Go 1.23 or later on
 `PATH`, as Gleam needs Erlang or Node: `flick` does not ship a Go
-toolchain, and the executable it builds needs nothing installed. It is
-built without cgo, so no C compiler is needed either, unless
-`CGO_ENABLED` is set.
+toolchain, and the executable it builds needs nothing installed. The
+project must also let the backend run it: `[tools]` `"flick/go" = ["go"]`
+in `flick.toml`, or `--allow-tool go` for a file built outside a project
+(`FLICK-P029` otherwise). It is built without cgo, so no C compiler is
+needed either.

@@ -8,11 +8,11 @@ use flick_core::build;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 
 use super::schemas::compile_schemas;
-use super::{BuildPlan, Emission, Purpose, unwritten};
+use super::{BuildPlan, Emission, unwritten};
 use crate::artifact::{self, Artifact};
+use crate::cache;
 use crate::progress::Progress;
 use crate::publish::{self, Beside};
-use crate::{cache, toolchain};
 
 /// Fresh and restored build/test outputs share stale ownership preflight and
 /// reconciliation. Run generations pass no root because their lease owns them.
@@ -71,17 +71,16 @@ fn publish(
         .map_err(|e| failed(format!("cannot publish to `{}`: {e}", out_dir.display())))
 }
 
-/// The files host tools make from a build's own: Go executables and the
-/// compiled schema decoders. The tools run on a copy of the build beside
-/// the output, so their results are published with it or not at all.
+/// The files host tools make from a build's own: the compiled schema
+/// decoders. The tools run on a copy of the build beside the output, so
+/// their results are published with it or not at all.
 fn host_outputs(
     output: &BuildPlan,
     artifacts: &[Artifact],
     progress: &Progress,
 ) -> Result<Vec<Artifact>, Box<Diagnostic>> {
     let failed = |why: String| Box::new(Diagnostic::new(codes::P013, Severity::Error, why));
-    let go = output.go && !output.backend.is_component();
-    if !go && !output.extras.schema_aot {
+    if !output.extras.schema_aot {
         return Ok(Vec::new());
     }
     let copy = Beside::new(&output.out_dir).map_err(|e| failed(e.to_string()))?;
@@ -102,21 +101,6 @@ fn host_outputs(
             })
             .map_err(|e| failed(e.to_string()))
     };
-    if go {
-        let tests = [(build::go::TEST.to_owned(), String::new())];
-        let built = if output.purpose == Purpose::Test {
-            &tests[..]
-        } else {
-            &output.entries[..]
-        };
-        for (name, _) in built {
-            progress.stage("Building Go executable");
-            if let Some(problem) = toolchain::go_build(dir, name) {
-                return Err(Box::new(problem));
-            }
-            made.push(read(build::go::executable(name), ArtifactKind::Executable)?);
-        }
-    }
     let aot = if output.extras.schema_aot {
         output.entries.as_slice()
     } else {
@@ -147,18 +131,6 @@ pub fn write(path: &Path, contents: impl AsRef<[u8]>) -> io::Result<()> {
 /// The complete owned output set, including host tool results.
 pub(in crate::commands) fn paths(output: &BuildPlan, files: &[Artifact]) -> Vec<String> {
     let mut paths: Vec<_> = files.iter().map(|file| file.path.clone()).collect();
-    if output.go && !output.backend.is_component() {
-        if output.purpose == Purpose::Test {
-            paths.push(build::go::executable(build::go::TEST));
-        } else {
-            paths.extend(
-                output
-                    .entries
-                    .iter()
-                    .map(|(name, _)| build::go::executable(name)),
-            );
-        }
-    }
     if output.extras.schema_aot {
         paths.extend(
             output
@@ -168,35 +140,4 @@ pub(in crate::commands) fn paths(output: &BuildPlan, files: &[Artifact]) -> Vec<
         );
     }
     paths
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::backends::Selected;
-
-    #[test]
-    fn an_empty_go_test_still_reserves_its_executable() {
-        let output = BuildPlan {
-            purpose: Purpose::Test,
-            backend: Selected::Native,
-            out_dir: "unused-output".into(),
-            entries: vec![],
-            typescript: false,
-            go: true,
-            suites: vec![],
-            extras: build::Extras::default(),
-            release: false,
-        };
-        let files = [Artifact::source(
-            "go/test/main.go".into(),
-            "package main".into(),
-        )];
-        let executable = if cfg!(windows) {
-            "flick-test.exe"
-        } else {
-            "flick-test"
-        };
-        assert_eq!(paths(&output, &files), ["go/test/main.go", executable]);
-    }
 }

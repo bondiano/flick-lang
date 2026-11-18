@@ -13,6 +13,9 @@ use flick_core::build::go::executable;
 
 const APP: &str = "schema-version = 1
 
+[tools]
+\"flick/go\" = [\"go\"]
+
 [project]
 kind = \"app\"
 entry = \"Main\"
@@ -229,6 +232,9 @@ func hi(fb *flickrt.Fiber, name flickrt.Value) flickrt.Value {
 ";
 
 const LIB_APP: &str = "schema-version = 1
+
+[tools]
+\"flick/go\" = [\"go\"]
 
 [project]
 kind = \"app\"
