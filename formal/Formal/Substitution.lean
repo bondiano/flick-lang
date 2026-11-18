@@ -143,35 +143,35 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | dcons _ _ ih₁ ih₂ => intro _ _ hσ; exact .dcons (ih₁ (SubOk.up hσ _ _)) (ih₂ hσ)
   | dproj _ hc hk hl hts hH hT ih => intro _ _ hσ; exact .dproj (ih hσ) hc hk hl hts hH hT
   | glob hg hts hH hT => intro _ _ _; exact .glob hg hts hH hT
-  | perform hop hT => intro _ _ _; exact .perform hop hT
+  | perform hus hop hT => intro _ _ _; exact .perform hus hop hT
   | hanil => intro _ _ _; exact .hanil
   | hatail hop _ _ ih₁ ih₂ => intro _ _ hσ; exact .hatail hop (ih₁ (SubOk.lift hσ [_] rfl)) (ih₂ hσ)
   | haabort hop _ _ ih₁ ih₂ => intro _ _ hσ; exact .haabort hop (ih₁ (SubOk.lift hσ [_] rfl)) (ih₂ hσ)
   | hactl hop _ _ ih₁ ih₂ => intro _ _ hσ; exact .hactl hop (ih₁ (SubOk.lift hσ [_, _] rfl)) (ih₂ hσ)
-  | hdl hal hn _ hψ _ hφ₀ hOb hc hφ hT ih₁ ih₂ ih₃ =>
+  | hdl hus hal hn _ hψ _ hφ₀ hOb hc hφ hT ih₁ ih₂ ih₃ =>
     intro _ σ hσ
     have h₁ := ih₁ ((SubOk.up hσ 1 Facts.none).mono Entails.union_none)
-    exact .hdl h₁ (SubOk.noIns hσ (by simpa using hal.frees) hn) (ih₂ hσ) hψ (ih₃ hσ) hφ₀ hOb ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
+    exact .hdl hus h₁ (SubOk.noIns hσ (by simpa using hal.frees) hn) (ih₂ hσ) hψ (ih₃ hσ) hφ₀ hOb ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
       rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hφ hT
-  | hwith hℓ hal _ hψ _ hφ₀ hc hφ hT hat ih₁ ih₂ ih₃ =>
+  | hwith hus hℓ hal _ hψ _ hφ₀ hc hφ hT hat ih₁ ih₂ ih₃ =>
     intro _ σ hσ
-    exact .hwith hℓ (ih₁ hσ) (ih₂ hσ) hψ (ih₃ hσ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
+    exact .hwith hus hℓ (ih₁ hσ) (ih₂ hσ) hψ (ih₃ hσ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
       rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hφ hT hat
-  | hctl hℓ hal _ hψ hop hc htl hE hk hp hφ₀ _ hl hcm hφ hT hat ih₁ ih₂ _ ih₄ =>
+  | hctl hus hℓ hal _ hψ hop hc htl hE hk hp hφ₀ _ hl hcm hφ hT hat ih₁ ih₂ _ ih₄ =>
     intro _ σ hσ
     subst hk
     rw [Tm.subst, (plug_hole_closed hp).subst]
-    exact .hctl hℓ (ih₁ hσ) (ih₂ hσ) hψ hop hc htl hE rfl hp hφ₀ (ih₄ hσ) hl ⟨hcm.1, fun h => hcm.2 fun hc' => h fun o c a b ho => by
+    exact .hctl hus hℓ (ih₁ hσ) (ih₂ hσ) hψ hop hc htl hE rfl hp hφ₀ (ih₄ hσ) hl ⟨hcm.1, fun h => hcm.2 fun hc' => h fun o c a b ho => by
       rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hφ hT hat
-  | hkeep hℓ hal _ hφ₀ hc hnt hle hφ hT ih₁ ih₂ =>
+  | hkeep hus hℓ hal _ hφ₀ hc hnt hle hφ hT ih₁ ih₂ =>
     intro _ σ hσ
-    exact .hkeep hℓ (ih₁ hσ) (ih₂ hσ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
+    exact .hkeep hus hℓ (ih₁ hσ) (ih₂ hσ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
       rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hnt hle hφ hT
-  | hkarm hℓ hal hop hE hk hp hφ₀ hc hnt _ hle hφ hT ih₁ _ ih₃ =>
+  | hkarm hus hℓ hal hop hE hk hp hφ₀ hc hnt _ hle hφ hT ih₁ _ ih₃ =>
     intro _ σ hσ
     subst hk
     rw [Tm.subst, (plug_hole_closed hp).subst]
-    exact .hkarm hℓ (ih₁ hσ) hop hE rfl hp hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
+    exact .hkarm hus hℓ (ih₁ hσ) hop hE rfl hp hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
       rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hnt (ih₃ hσ) hle hφ hT
   | hres hℓ _ hA ha hp hl hcp hφ hT ih₁ _ =>
     intro _ σ hσ

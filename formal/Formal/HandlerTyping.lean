@@ -25,7 +25,7 @@ theorem Typ.hwith_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     obtain ⟨t', r, ε, t, ψ, C, φ₀, hℓ, hal, hrf, hψ, hb, hφ₀, hc, hφ, ht, hp⟩ :=
       ih p ℓ E al rf body _ _ hv rfl
     exact ⟨t', r, ε, t, ψ, C, φ₀, hℓ, hal, hrf, hψ, hb, hφ₀, hc, hφ, ht.trans (.equiv he), hp⟩
-  | hwith hℓ hal hrf hψ hb hφ₀ hc hφ ht hp =>
+  | hwith _ hℓ hal hrf hψ hb hφ₀ hc hφ ht hp =>
     intro p ℓ E al rf body T φ hv hJ; cases hv; cases hJ
     exact ⟨_, _, _, _, _, _, _, hℓ, hal, hrf, hψ, hb, hφ₀, hc, hφ, ht, hp⟩
   | allI hv | errVal hv => intro p ℓ E al rf body T φ he _; cases he; cases hv
@@ -64,7 +64,7 @@ theorem Typ.hctl_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       ih p ℓ κ tl E al rf a k _ _ hv rfl
     exact ⟨t', r, ε, t, ψ, C, o, c, a₀, b₀, φ₀, Ei,
       hl, hal, hrf, hψ, hop, hc, htl, hE, hk, hp, hφ₀, ha, hκ, hcm, hφ, ht.trans (.equiv he), hsvc⟩
-  | hctl hl hal hrf hψ hop hc htl hE hk hp hφ₀ ha hκ hcm hφ ht hsvc =>
+  | hctl _ hl hal hrf hψ hop hc htl hE hk hp hφ₀ ha hκ hcm hφ ht hsvc =>
     intro p ℓ κ tl E al rf a k T φ hv hJ; cases hv; cases hJ
     exact ⟨_, _, _, _, _, _, _, _, _, _, _, _,
       hl, hal, hrf, hψ, hop, hc, htl, hE, hk, hp, hφ₀, ha, hκ, hcm, hφ, ht, hsvc⟩
@@ -85,7 +85,7 @@ theorem Typ.hkeep_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     obtain ⟨t', r, ε, t, φ₀, r₁, ε₁, hl, hal, hb, hφ₀, hc, hn, hle, hφ, ht⟩ :=
       ih q ℓ E al body _ _ hv rfl
     exact ⟨t', r, ε, t, φ₀, r₁, ε₁, hl, hal, hb, hφ₀, hc, hn, hle, hφ, ht.trans (.equiv he)⟩
-  | hkeep hl hal hb hφ₀ hc hn hle hφ ht =>
+  | hkeep _ hl hal hb hφ₀ hc hn hle hφ ht =>
     intro q ℓ E al body T φ hv hJ; cases hv; cases hJ
     exact ⟨_, _, _, _, _, _, _, hl, hal, hb, hφ₀, hc, hn, hle, hφ, ht⟩
   | allI hv | errVal hv => intro q ℓ E al body T φ he _; cases he; cases hv
@@ -108,7 +108,7 @@ theorem Typ.hkarm_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       hl, hal, hop, hE, hk, hp, hφ₀, hc, hn, ha, hle, hφ, ht⟩ := ih q ℓ E al a k _ _ hv rfl
     exact ⟨t', r, ε, o, a₀, b₀, t, φ₀, r₁, ε₁, Ei,
       hl, hal, hop, hE, hk, hp, hφ₀, hc, hn, ha, hle, hφ, ht.trans (.equiv he)⟩
-  | hkarm hl hal hop hE hk hp hφ₀ hc hn ha hle hφ ht =>
+  | hkarm _ hl hal hop hE hk hp hφ₀ hc hn ha hle hφ ht =>
     intro q ℓ E al a k T φ hv hJ; cases hv; cases hJ
     exact ⟨_, _, _, _, _, _, _, _, _, _, _, hl, hal, hop, hE, hk, hp, hφ₀, hc, hn, ha, hle, hφ, ht⟩
   | allI hv | errVal hv => intro q ℓ E al a k T φ he _; cases he; cases hv

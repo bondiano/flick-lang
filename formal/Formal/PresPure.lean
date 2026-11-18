@@ -147,14 +147,14 @@ private theorem Typ.pureStepCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     cases hh with
     | tryVal hv =>
       exact h₁.valueAny hv _
-  | hwith _ _ hrf hψ he _ _ hφ hT =>
+  | hwith _ _ _ hrf hψ he _ _ hφ hT =>
     intro t φ e' hΓ hJ hh
     cases hΓ; cases hJ
     cases hh with
     | hwithVal hv =>
       exact .app (hrf.sub ⟨LeLive.refl, hφ⟩) (he.valueAny hv _)
         (Stage.le_trans hψ hφ) hT
-  | hctl hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha _ hcm hφ hT hat =>
+  | hctl _ hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha _ hcm hφ hT hat =>
     intro t φ e' hΓ hJ hh
     cases hΓ; cases hJ
     cases hh with
@@ -170,13 +170,13 @@ private theorem Typ.pureStepCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
         fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hcm hφ hT hat
       exact .unw hℓ ((by simpa using ha : Typ S _ _ [] _ (.ex _ _)).cut hΘ.entails)
           (Stage.none_le (Stage.rt_ne_pure hψ₀))
-  | hkeep _ _ he _ _ _ _ hφ hT =>
+  | hkeep _ _ _ he _ _ _ _ hφ hT =>
     intro t φ e' hΓ hJ hh
     cases hΓ; cases hJ
     cases hh with
     | hkeepVal hv =>
       exact (he.valueAny hv _).sub ⟨hT, Stage.pure_le _⟩
-  | hkarm hℓ hal hop hE hk hp hφ₀ hc hnt ha hle hφ hT =>
+  | hkarm _ hℓ hal hop hE hk hp hφ₀ hc hnt ha hle hφ hT =>
     intro t φ e' hΓ hJ hh
     cases hΓ; cases hJ
     cases hh with

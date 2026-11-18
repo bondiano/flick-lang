@@ -137,7 +137,7 @@ theorem Typ.context_equiv {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | dproj _ hc hk hl hts hH ht ih =>
     intro _ _ hn hΨ hΓ; exact .dproj (ih hn hΨ hΓ) hc hk hl hts hH ht
   | glob hg hts hH ht => intros; exact .glob hg hts hH ht
-  | perform hop ht => intros; exact .perform hop ht
+  | perform hus hop ht => intros; exact .perform hus hop ht
   | hanil => intros; exact .hanil
   | hatail hop _ _ ihb ihr =>
     intro _ _ hn hΨ hΓ
@@ -149,9 +149,9 @@ theorem Typ.context_equiv {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro _ _ hn hΨ hΓ
     exact .hactl hop (ihb (hn.sub Or.inl) hΨ (.cons (.refl _) (.cons (.refl _) hΓ)))
       (ihr (hn.sub Or.inr) hΨ hΓ)
-  | hdl _ hb _ hψ _ hφ₀ hOb hc hφ ht iha ihr ihe =>
+  | hdl hus _ hb _ hψ _ hφ₀ hOb hc hφ ht iha ihr ihe =>
     intro _ _ hn hΨ hΓ
-    exact .hdl (iha (hn.sub Or.inl) (hΨ.up _) (hΓ.up _)) hb
+    exact .hdl hus (iha (hn.sub Or.inl) (hΨ.up _) (hΓ.up _)) hb
       (ihr (hn.sub fun h => .inr (.inl h)) hΨ hΓ) hψ
       (ihe (hn.sub fun h => .inr (.inr h)) hΨ hΓ) hφ₀ hOb hc hφ ht
   | kont hl hp ht =>

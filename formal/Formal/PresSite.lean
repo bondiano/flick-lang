@@ -95,17 +95,17 @@ private theorem Typ.runtimeStage {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     | refSet => exact const_app2_rt h fun _ => ⟨_, _, _, _, _, _, rfl, _, _, rfl⟩
     | op => exact const_app_rt h fun ι => op_rt ι
     | _ => exact const_app_rt h fun _ => ⟨_, _, _, _, _, rfl⟩
-  | hwith _ _ _ _ _ _ _ hφ _ _ =>
+  | hwith _ _ _ _ _ _ _ _ hφ _ _ =>
     intro _ _ _ _ _ _ _ hJ _; cases hJ; exact hφ
-  | hctl _ _ _ _ _ _ _ _ _ _ _ _ _ _ hφ _ _ =>
+  | hctl _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ hφ _ _ =>
     intro _ _ _ _ _ _ _ hJ _; cases hJ; exact hφ
-  | hkeep _ _ _ _ _ _ _ hφ _ =>
+  | hkeep _ _ _ _ _ _ _ _ hφ _ =>
     intro _ _ _ _ _ _ _ hJ _; cases hJ; exact hφ
-  | hkarm _ _ _ _ _ _ _ _ _ _ _ hφ _ =>
+  | hkarm _ _ _ _ _ _ _ _ _ _ _ _ hφ _ =>
     intro _ _ _ _ _ _ _ hJ _; cases hJ; exact hφ
   | hres _ _ _ _ _ _ _ hφ _ =>
     intro _ _ _ _ _ _ _ hJ _; cases hJ; exact hφ
-  | hdl _ _ _ _ _ _ _ _ hφ _ =>
+  | hdl _ _ _ _ _ _ _ _ _ hφ _ =>
     intro _ _ _ _ _ _ _ hJ _; cases hJ; exact hφ
   | scope _ _ _ _ hφ _ =>
     intro _ _ _ _ _ _ _ hJ _; cases hJ; exact hφ

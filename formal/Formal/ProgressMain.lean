@@ -238,12 +238,12 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
       · obtain ⟨_, _, hs'⟩ := h; exact step hs'
       · exact .inr (.perform h)
       · exact .inr (.blocked h)
-  | hwith _ _ _ _ _ hφ₀ hc hφ _ _ _ _ ih =>
+  | hwith hus _ _ _ _ _ hφ₀ hc hφ _ _ _ _ ih =>
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih hμ hΓ rfl with hv | hn
     · exact step (Step.ofP (.hwithVal hv))
     obtain ⟨_, _, rfl, hr, _⟩ := Stage.rt_le hφ
-    refine .inr (hn.frame (F := .hwith _ _ _ _ _) trivial (nt id) (ni id) (fun N h => ?_)
+    refine .inr (hn.frame (F := .hwith hus _ _ _ _ _) trivial (nt id) (ni id) (fun N h => ?_)
       (hpart := fun N o c ⟨a, b, hop⟩ hN hh _ => ?_))
     · rcases (FRel.installs (F := .hwith _ _ _ _ _) rfl hφ₀ hφ).svc (.nm₀ N) h
         with h' | h'
@@ -253,7 +253,7 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
       exact hr _ (hc.2 fun hcomp => by
         have h₁ := hcomp o c a b hop
         simp [Frame.handles, h₁] at hh)
-  | hctl _ _ _ _ _ _ _ hE hk _ _ _ _ _ hφ _ _ _ _ _ ih =>
+  | hctl _ _ _ _ _ _ _ _ hE hk _ _ _ _ _ hφ _ _ _ _ _ ih =>
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih hμ hΓ rfl with hv | hn
     · obtain ⟨_, hh⟩ := hctl_progress hE hk hv
@@ -268,12 +268,12 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
     obtain ⟨_, _, rfl, hr, _⟩ := Stage.rt_le hφ
     exact .inr (hn.frame (F := .hresB _ _ _) trivial (nt id) (ni id)
       (fun N h => .inr (hr (.nm₀ N) (Stage.use_svc_nm h))) ⟨_, hA, ha⟩)
-  | hkeep _ _ _ hφ₀ hc hnt hle hφ _ _ ih =>
+  | hkeep hus _ _ _ hφ₀ hc hnt hle hφ _ _ ih =>
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih hμ hΓ rfl with hv | hn
     · exact step (Step.ofP (.hkeepVal hv))
     obtain ⟨_, _, rfl, hr, _⟩ := Stage.rt_le hφ
-    refine .inr (hn.frame (F := .hkeep _ _ _ _) trivial (nt id) (ni id)
+    refine .inr (hn.frame (F := .hkeep hus _ _ _ _) trivial (nt id) (ni id)
       (fun N h => by
         rcases (FRel.installs (F := .hkeep _ _ _ _) rfl hφ₀ hφ).svc (.nm₀ N) h
           with h' | h'
@@ -288,7 +288,7 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
         have h₁ := hcomp o _ a b hop
         simp [Frame.handles, h₁] at hh
     · exact hnt ⟨o, c, a, b, hop, hct⟩
-  | hkarm _ _ _ hE hk _ _ _ _ _ hle hφ _ _ _ ih =>
+  | hkarm _ _ _ _ hE hk _ _ _ _ _ hle hφ _ _ _ ih =>
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih hμ hΓ rfl with hv | hn
     · exact step (Step.ofP (.hkarmVal hE hk hv))

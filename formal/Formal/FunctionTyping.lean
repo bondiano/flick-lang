@@ -92,7 +92,7 @@ private theorem Typ.performCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     obtain ⟨a, b, u, hop, ht⟩ := ih E o cl _ _ hc rfl
       (by rw [he.isAll]; exact hA) (by rw [he.kind]; exact hk)
     exact ⟨a, b, u, hop, ht.trans (.equiv he)⟩
-  | perform hop ht => intro E o cl T φ hc hJ _ _; cases hc; cases hJ; exact ⟨_, _, _, hop, ht⟩
+  | perform _ hop ht => intro E o cl T φ hc hJ _ _; cases hc; cases hJ; exact ⟨_, _, _, hop, ht⟩
   | const hi _ => intro E o cl T φ hc _ _ _; cases hc; exact hi.elim
   | allI => intro E o cl T φ _ hJ hA _; cases hJ; exact (hA trivial).elim
   | errVal => intro E o cl T φ _ hJ _ hk; cases hJ; exact (hk rfl).elim

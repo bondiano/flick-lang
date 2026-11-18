@@ -190,8 +190,8 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe S J J' �
     exact .dproj (ih (.st h₂)) hc hk hl hts hH (hT.trans h₁)
   | glob hg hts hH hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .glob hg hts hH (hT.trans h₁)
-  | perform hop hT =>
-    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .perform hop (hT.trans h₁)
+  | perform hus hop hT =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .perform hus hop (hT.trans h₁)
   | hanil =>
     intro J' hJ; cases J' <;> simp only [JLe] at hJ
     obtain ⟨rfl, rfl, rfl, rfl⟩ := hJ; exact .hanil
@@ -204,23 +204,23 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe S J J' �
   | hactl hop hb hr =>
     intro J' hJ; cases J' <;> simp only [JLe] at hJ
     obtain ⟨rfl, rfl, rfl, rfl⟩ := hJ; exact .hactl hop hb hr
-  | hdl hal hn hrf hψ he hφ₀ hOb hc hφ hT =>
+  | hdl hus hal hn hrf hψ he hφ₀ hOb hc hφ hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
-    exact .hdl hal hn hrf hψ he hφ₀ hOb hc (Stage.le_trans hφ h₂) (hT.trans h₁)
-  | hwith hℓ hal hrf hψ he hφ₀ hc hφ hT hat =>
+    exact .hdl hus hal hn hrf hψ he hφ₀ hOb hc (Stage.le_trans hφ h₂) (hT.trans h₁)
+  | hwith hus hℓ hal hrf hψ he hφ₀ hc hφ hT hat =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
-    exact .hwith hℓ hal hrf hψ he hφ₀ hc (Stage.le_trans hφ h₂) (hT.trans h₁)
+    exact .hwith hus hℓ hal hrf hψ he hφ₀ hc (Stage.le_trans hφ h₂) (hT.trans h₁)
       (Stage.atom_le h₂ hat)
-  | hctl hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha hl hcm hφ hT hat =>
+  | hctl hus hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha hl hcm hφ hT hat =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
-    exact .hctl hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha hl hcm (Stage.le_trans hφ h₂) (hT.trans h₁)
+    exact .hctl hus hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha hl hcm (Stage.le_trans hφ h₂) (hT.trans h₁)
       (Stage.atom_le h₂ hat)
-  | hkeep hℓ hal he hφ₀ hc hnt hle hφ hT =>
+  | hkeep hus hℓ hal he hφ₀ hc hnt hle hφ hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
-    exact .hkeep hℓ hal he hφ₀ hc hnt hle (Stage.le_trans hφ h₂) (hT.trans h₁)
-  | hkarm hℓ hal hop hE hk hp hφ₀ hc hnt ha hle hφ hT =>
+    exact .hkeep hus hℓ hal he hφ₀ hc hnt hle (Stage.le_trans hφ h₂) (hT.trans h₁)
+  | hkarm hus hℓ hal hop hE hk hp hφ₀ hc hnt ha hle hφ hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
-    exact .hkarm hℓ hal hop hE hk hp hφ₀ hc hnt ha hle (Stage.le_trans hφ h₂) (hT.trans h₁)
+    exact .hkarm hus hℓ hal hop hE hk hp hφ₀ hc hnt ha hle (Stage.le_trans hφ h₂) (hT.trans h₁)
   | hres hℓ hb hA ha hp hl hcp hφ hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .hres hℓ hb hA ha hp hl hcp (Stage.le_trans hφ h₂) (hT.trans h₁)
