@@ -1,0 +1,21 @@
+module Main exposing (main)
+
+// The first two numbers of `xs`, the smaller one first, that add up to `target`.
+pair : Int -> List Int -> Option (Int, Int)
+let pair target xs =
+  let mut found = None
+  'outer: for a <- xs do {
+    for b <- xs do {
+      if b <= a then continue
+      if a + b == target then {
+        found = Some (a, b)
+        break 'outer
+      }
+    }
+  }
+  found
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  Platform.stdout_line (show (pair 10 [1, 4, 6, 9]))
+  Platform.stdout_line (show (pair 3 [5, 7]))

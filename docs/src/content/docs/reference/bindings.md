@@ -37,7 +37,8 @@ A variable belongs to its function. A `fun`, a local function, a `task`, a
 lazy `for`, the rest of a `do` block or an arm of a handler of operations
 inside it may run later, again or at the same time, so none of them reads or
 assigns the variable (`FLICK-G005`): the function stays pure from the outside.
-Bind the value with `let` first and use that name. A `scope`, a `provide`, a
+Bind the value with `let` first and use that name. The tour has an
+[example](../../tour/captures/) of this error. A `scope`, a `provide`, a
 branch and an arm of `match` or of a `try` run in place and may assign. The
 body of `try … with` and sequential loops may also assign. A failed
 right-hand side leaves its target unchanged; a handler sees earlier completed
@@ -58,6 +59,7 @@ continuing. Duplicate labels on enclosing loops and unknown labels are
 `FLICK-T071`. A nested function, task, lazy sequence or operation handler
 cannot exit an outer loop (`FLICK-T071`). `loop` and `while` are contextual
 words: existing names such as `Loop.loop` and `Schedule.while` remain valid.
+The tour has a runnable [example](../../tour/labels/).
 
 ```flick
 module App.Count exposing (count)

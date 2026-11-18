@@ -21,8 +21,8 @@ const summary = `# Flick
 > Flick is a language for whole apps, where every function does what it says.
 
 A function's signature says what it needs and how it can fail, and the compiler holds its body to it.
-Flick compiles to JavaScript and TypeScript, and to Go. It is alpha: host calls such as \`Console.log\`,
-the clock and randomness are not named in signatures yet.`;
+Flick compiles to JavaScript and TypeScript, and to Go. It is alpha. The console, the clock, randomness
+and the rest of the host are services too, which signatures name.`;
 
 /** The slugs of a section of the sidebar, in its order. */
 const slugs = (items: ReadonlyArray<Item | string>): ReadonlyArray<string> =>

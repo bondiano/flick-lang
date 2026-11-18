@@ -1,0 +1,21 @@
+module Main exposing (main)
+
+flip : Unit ->{Host.Random} String
+let flip () = if Random.next_boolean () then "heads" else "tails"
+
+greet : Unit ->{Host.Arguments, Host.Random} String
+let greet () =
+  let name =
+    match Platform.args () with
+    | [first, ..._] -> first
+    | [] -> "stranger"
+  "\{name} flips \{flip ()}"
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  let ada = Layer.succeed Host.Arguments { args = fun () -> ["Ada"] }
+  let heads = Layer.succeed Host.Random { next = fun () -> 0.9 }
+  let tails = Layer.succeed Host.Random { next = fun () -> 0.1 }
+  Platform.stdout_line (provide (Layer.merge ada heads) { greet () })
+  let passed = provide (Layer.merge ada tails) { greet () } == "Ada flips tails"
+  Platform.stdout_line (if passed then "test passed" else "test failed")
