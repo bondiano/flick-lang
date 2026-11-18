@@ -135,11 +135,11 @@ theorem Typ.frees {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ i, e.Free i → 
     · have := ih₁ _ h; simp [hp.binds] at this; omega
     · have := ih₂ _ h; simp [hp.binds] at this; omega
     · exact ih₃ i h
-  | hatail _ _ _ ih₁ ih₂ | haabort _ _ _ ih₁ ih₂ =>
+  | hatail _ _ _ _ ih₁ ih₂ | haabort _ _ _ _ ih₁ ih₂ =>
     intro i h; rcases h with h | h
     · have := ih₁ _ h; simp [Pat.spine_binds, Pat.binds] at this; omega
     · exact ih₂ i h
-  | hactl _ _ _ ih₁ ih₂ =>
+  | hactl _ _ _ _ ih₁ ih₂ =>
     intro i h; rcases h with h | h
     · have := ih₁ _ h; simp [Pat.spine_binds, Pat.binds] at this; omega
     · exact ih₂ i h

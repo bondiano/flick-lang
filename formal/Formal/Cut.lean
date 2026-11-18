@@ -148,9 +148,9 @@ theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Ent
   | glob hg hts hH hT => intro _ hΘ; exact .glob hg hts (hH.mono hΘ) hT
   | perform hus hop hT => intro _ _; exact .perform hus hop hT
   | hanil => intro _ _; exact .hanil
-  | hatail hop _ _ ih₁ ih₂ => intro _ hΘ; exact .hatail hop (ih₁ hΘ) (ih₂ hΘ)
-  | haabort hop _ _ ih₁ ih₂ => intro _ hΘ; exact .haabort hop (ih₁ hΘ) (ih₂ hΘ)
-  | hactl hop _ _ ih₁ ih₂ => intro _ hΘ; exact .hactl hop (ih₁ hΘ) (ih₂ hΘ)
+  | hatail hus hop _ _ ih₁ ih₂ => intro _ hΘ; exact .hatail hus hop (ih₁ hΘ) (ih₂ hΘ)
+  | haabort hus hop _ _ ih₁ ih₂ => intro _ hΘ; exact .haabort hus hop (ih₁ hΘ) (ih₂ hΘ)
+  | hactl hus hop _ _ ih₁ ih₂ => intro _ hΘ; exact .hactl hus hop (ih₁ hΘ) (ih₂ hΘ)
   | hdl hus _ hn _ hψ _ hφ₀ hOb hc hφ hT ih₁ ih₂ ih₃ =>
     intro _ hΘ; exact .hdl hus (ih₁ (hΘ.substT _)) hn (ih₂ hΘ) hψ (ih₃ hΘ) hφ₀ hOb hc hφ hT
   | hwith hus hℓ _ _ hψ _ hφ₀ hc hφ hT ha ih₁ ih₂ ih₃ =>

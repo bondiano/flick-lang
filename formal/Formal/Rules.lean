@@ -157,15 +157,15 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   `resume`, which runs the rest of the body under the handler and holds its region. The types
   of the operations are those at the arguments `us` of the arms. -/
   | hanil {us : List Ty} : Typ Ψ Θ Γ .anil (.harms E us t φ s)
-  | hatail {us : List Ty} : S.op E o = some (.tail, a, b) →
+  | hatail {us : List Ty} : us.length = S.arity E → S.op E o = some (.tail, a, b) →
       Typ Ψ Θ (.mono (a.substT (instT us)) :: Γ) e (.ex (b.substT (instT us)) φ.asStage) →
       Typ Ψ Θ Γ r (.harms E us t φ s) →
       Typ Ψ Θ Γ (.acons (Pat.spine o [.var]) e r) (.harms E us t φ s)
-  | haabort {us : List Ty} : S.op E o = some (.abort, a, b) →
+  | haabort {us : List Ty} : us.length = S.arity E → S.op E o = some (.abort, a, b) →
       Typ Ψ Θ (.mono (a.substT (instT us)) :: Γ) e (.ex t φ.asStage) →
       Typ Ψ Θ Γ r (.harms E us t φ s) →
       Typ Ψ Θ Γ (.acons (Pat.spine o [.var]) e r) (.harms E us t φ s)
-  | hactl {us : List Ty} : S.op E o = some (.control, a, b) →
+  | hactl {us : List Ty} : us.length = S.arity E → S.op E o = some (.control, a, b) →
       -- The handler's own region is live while its control arm calls resume.
       Typ Ψ Θ (.mono (a.substT (instT us)) :: .mono (.arrow (b.substT (instT us)) φ t s.reach) :: Γ)
         e (.ex t (Stage.use φ.asStage s.reach)) →

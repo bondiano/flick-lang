@@ -148,7 +148,7 @@ theorem Typ.arm_inv {Ψ Θ E t φ s o c a₀ b₀} (hop : S.op E o = some (c, a�
   | .acons _ _ _, _, _, h, ha => by
     simp only [Tm.armOf] at ha
     cases h with
-    | hatail hop' he hr | haabort hop' he hr | hactl hop' he hr =>
+    | hatail _ hop' he hr | haabort _ hop' he hr | hactl _ hop' he hr =>
       split at ha
       · rename_i hn
         cases ha

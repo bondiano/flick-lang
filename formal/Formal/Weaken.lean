@@ -75,9 +75,9 @@ theorem Typ.weakenStore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) (X : List Ty) :
   | glob hg hts hH hT => exact .glob hg hts hH hT
   | perform hus hop hT => exact .perform hus hop hT
   | hanil => exact .hanil
-  | hatail hop _ _ ih₁ ih₂ => exact .hatail hop (ih₁ X) (ih₂ X)
-  | haabort hop _ _ ih₁ ih₂ => exact .haabort hop (ih₁ X) (ih₂ X)
-  | hactl hop _ _ ih₁ ih₂ => exact .hactl hop (ih₁ X) (ih₂ X)
+  | hatail hus hop _ _ ih₁ ih₂ => exact .hatail hus hop (ih₁ X) (ih₂ X)
+  | haabort hus hop _ _ ih₁ ih₂ => exact .haabort hus hop (ih₁ X) (ih₂ X)
+  | hactl hus hop _ _ ih₁ ih₂ => exact .hactl hus hop (ih₁ X) (ih₂ X)
   | hdl hus _ hn _ hψ _ hφ₀ hOb hc hφ hT ih₁ ih₂ ih₃ =>
     refine .hdl hus ?_ hn (ih₂ X) hψ (ih₃ X) hφ₀ hOb hc hφ hT
     rw [List.map_append]; exact ih₁ _
@@ -239,9 +239,9 @@ theorem Typ.rename {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | dproj _ hc hk hl hts hH hT ih => intro _ _ hξ; exact .dproj (ih hξ) hc hk hl hts hH hT
   | perform hus hop hT => intro _ _ _; exact .perform hus hop hT
   | hanil => intro _ _ _; exact .hanil
-  | hatail hop _ _ ih₁ ih₂ => intro _ _ hξ; exact .hatail hop (ih₁ (hξ.lift [_] rfl)) (ih₂ hξ)
-  | haabort hop _ _ ih₁ ih₂ => intro _ _ hξ; exact .haabort hop (ih₁ (hξ.lift [_] rfl)) (ih₂ hξ)
-  | hactl hop _ _ ih₁ ih₂ => intro _ _ hξ; exact .hactl hop (ih₁ (hξ.lift [_, _] rfl)) (ih₂ hξ)
+  | hatail hus hop _ _ ih₁ ih₂ => intro _ _ hξ; exact .hatail hus hop (ih₁ (hξ.lift [_] rfl)) (ih₂ hξ)
+  | haabort hus hop _ _ ih₁ ih₂ => intro _ _ hξ; exact .haabort hus hop (ih₁ (hξ.lift [_] rfl)) (ih₂ hξ)
+  | hactl hus hop _ _ ih₁ ih₂ => intro _ _ hξ; exact .hactl hus hop (ih₁ (hξ.lift [_, _] rfl)) (ih₂ hξ)
   | hdl hus _ hn _ hψ _ hφ₀ hOb hc hφ hT ih₁ ih₂ ih₃ =>
     intro _ ξ hξ
     exact .hdl hus (ih₁ (hξ.up 1)) (hn.rename ξ) (ih₂ hξ) hψ (ih₃ hξ) hφ₀ hOb ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by

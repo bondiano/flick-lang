@@ -92,7 +92,7 @@ private theorem Typ.allInvCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | task _ _ _ hT => intro _ k t φ hJ; cases hJ; exact (noEff hT trivial).elim
   | const _ hT =>
     intro _ k t φ hJ; cases hJ
-    obtain ⟨_, _, _, _, hx⟩ := Const.ty_isArrow _ _ S
+    obtain ⟨_, _, _, _, hx⟩ := Const.ty_isArrow _ _
     rw [hx] at hT; exact (noArrow hT trivial).elim
   | ctor _ _ _ hT =>
     intro _ k t φ hJ; cases hJ

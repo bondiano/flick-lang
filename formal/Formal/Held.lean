@@ -196,14 +196,8 @@ theorem LeLive.arrow_res {a φ t C T : _}
     ∃ a' φ' t' C', T = .arrow a' φ' t' C' ∧ LeLive S t t' := by
   obtain ⟨_, _, _, _, he, _, _, ht, -⟩ := LeLive.arrow_left h; exact ⟨_, _, _, _, he, ht⟩
 
-theorem Const.ty_isArrow (c : Const) (ι : CArg) (S : Sig) :
-    ∃ a φ t C, c.ty ι = .arrow a φ t C := by
-  cases c
-  case perform E o _ =>
-    simp only [Const.ty]
-    split <;> exact ⟨_, _, _, _, rfl⟩
-  case op => exact ⟨_, _, _, _, rfl⟩
-  all_goals exact ⟨_, _, _, _, rfl⟩
+theorem Const.ty_isArrow (c : Const) (ι : CArg) : ∃ a φ t C, c.ty ι = .arrow a φ t C := by
+  cases c <;> exact ⟨_, _, _, _, rfl⟩
 
 /-- The result of a constructor spine is not a binder, unless the value itself is one. -/
 theorem Typ.spine_notAll {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :

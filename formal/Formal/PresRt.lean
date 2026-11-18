@@ -121,7 +121,7 @@ private theorem Typ.rtStepCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       exact hμ.same ((Typ.cap).sub ⟨lt.trans hT, Stage.pure_le _⟩)
     | op =>
       obtain ⟨_, _, hT'⟩ := hf.const_arrow (by intro E o cl h; cases h)
-      obtain ⟨_, hop⟩ := Const.ty_op_arrow S _
+      obtain ⟨_, hop⟩ := Const.ty_op_arrow _
       rw [hop] at hT'
       obtain ⟨_, _, _, _, h, _, _, lt, -⟩ := hT'.arrow_left
       cases h

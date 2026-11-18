@@ -195,15 +195,15 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe S J J' �
   | hanil =>
     intro J' hJ; cases J' <;> simp only [JLe] at hJ
     obtain ⟨rfl, rfl, rfl, rfl, rfl⟩ := hJ; exact .hanil
-  | hatail hop hb hr =>
+  | hatail hus hop hb hr =>
     intro J' hJ; cases J' <;> simp only [JLe] at hJ
-    obtain ⟨rfl, rfl, rfl, rfl, rfl⟩ := hJ; exact .hatail hop hb hr
-  | haabort hop hb hr =>
+    obtain ⟨rfl, rfl, rfl, rfl, rfl⟩ := hJ; exact .hatail hus hop hb hr
+  | haabort hus hop hb hr =>
     intro J' hJ; cases J' <;> simp only [JLe] at hJ
-    obtain ⟨rfl, rfl, rfl, rfl, rfl⟩ := hJ; exact .haabort hop hb hr
-  | hactl hop hb hr =>
+    obtain ⟨rfl, rfl, rfl, rfl, rfl⟩ := hJ; exact .haabort hus hop hb hr
+  | hactl hus hop hb hr =>
     intro J' hJ; cases J' <;> simp only [JLe] at hJ
-    obtain ⟨rfl, rfl, rfl, rfl, rfl⟩ := hJ; exact .hactl hop hb hr
+    obtain ⟨rfl, rfl, rfl, rfl, rfl⟩ := hJ; exact .hactl hus hop hb hr
   | hdl hus hal hn hrf hψ he hφ₀ hOb hc hφ hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .hdl hus hal hn hrf hψ he hφ₀ hOb hc (Stage.le_trans hφ h₂) (hT.trans h₁)

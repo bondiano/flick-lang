@@ -12,7 +12,7 @@ namespace Flick
 variable {S : Sig}
 
 theorem Const.ty_kind (c : Const) (ι : CArg) : (c.ty ι).kind = 1 := by
-  obtain ⟨_, _, _, _, h⟩ := Const.ty_isArrow c ι S
+  obtain ⟨_, _, _, _, h⟩ := Const.ty_isArrow c ι
   rw [h]; rfl
 
 /-- The result of a binary constant after one argument. -/

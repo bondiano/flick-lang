@@ -216,33 +216,33 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | dcons _ _ ih₁ ih₂ => exact Typ.dcons_substT ih₁ ih₂
   | dproj _ hc hk hl hts hH hT ih => exact Typ.dproj_substT ih hc hk hl hts hH hT
   | glob hg hts hH hT => intro σ _; exact Typ.glob_substT hg hts hH hT σ
-  | @perform E o c a b t T _ _ _ _ hop hT =>
+  | @perform E o c a b t T _ _ _ _ us hus hop hT =>
     intro σ _
-    obtain ⟨ha, hb⟩ := S.op_closed _ _ _ _ _ σ hop
-    refine .perform (t := t.substT σ) hop ?_
+    obtain ⟨ha, hb⟩ := S.op_inst_substT hop hus σ
+    refine .perform (t := t.substT σ) (us := us.map (Ty.substT σ)) (by simpa using hus) hop ?_
     have := hT.substT σ
-    split at this <;> split <;> simp_all [Ty.substT, Ty.isStage]
+    split at this <;> split <;> simp_all [Ty.substT, Ty.isStage, Ty.tcon_substT]
   | hanil => intro _ _; exact .hanil
-  | hatail hop _ _ ih₁ ih₂ =>
+  | hatail hus hop _ _ ih₁ ih₂ =>
     intro σ hσ
-    obtain ⟨ha, hb⟩ := S.op_closed _ _ _ _ _ σ hop
+    obtain ⟨ha, hb⟩ := S.op_inst_substT hop hus σ
     have h₁ := ih₁ σ (hσ.sub fun _ h => .inl h)
     simp only [List.map_cons, Scheme.mono_substT, Flick.J.substT, Stage.substT_asStage, ha, hb] at h₁
-    exact .hatail hop h₁ (ih₂ σ (hσ.sub fun _ h => .inr h))
-  | haabort hop _ _ ih₁ ih₂ =>
+    exact .hatail (by simpa using hus) hop h₁ (ih₂ σ (hσ.sub fun _ h => .inr h))
+  | haabort hus hop _ _ ih₁ ih₂ =>
     intro σ hσ
-    obtain ⟨ha, hb⟩ := S.op_closed _ _ _ _ _ σ hop
+    obtain ⟨ha, -⟩ := S.op_inst_substT hop hus σ
     have h₁ := ih₁ σ (hσ.sub fun _ h => .inl h)
     simp only [List.map_cons, Scheme.mono_substT, Flick.J.substT, Stage.substT_asStage, ha] at h₁
-    exact .haabort hop h₁ (ih₂ σ (hσ.sub fun _ h => .inr h))
-  | hactl hop _ _ ih₁ ih₂ =>
+    exact .haabort (by simpa using hus) hop h₁ (ih₂ σ (hσ.sub fun _ h => .inr h))
+  | hactl hus hop _ _ ih₁ ih₂ =>
     intro σ hσ
-    obtain ⟨ha, hb⟩ := S.op_closed _ _ _ _ _ σ hop
+    obtain ⟨ha, hb⟩ := S.op_inst_substT hop hus σ
     have h₁ := ih₁ σ (hσ.sub fun _ h => .inl h)
     simp only [List.map_cons, Scheme.mono_substT, Flick.J.substT, Stage.use_substT,
       Stage.substT_asStage, Ty.substT, ha, hb] at h₁
     rw [Caps.substT_reach] at h₁
-    exact .hactl hop h₁ (ih₂ σ (hσ.sub fun _ h => .inr h))
+    exact .hactl (by simpa using hus) hop h₁ (ih₂ σ (hσ.sub fun _ h => .inr h))
   | hdl hus _ hn _ hψ _ hφ₀ hOb hc hφ hT ih₁ ih₂ ih₃ =>
     intro σ hσ
     have h₁ := ih₁ (liftT 1 σ) ((hσ.sub fun _ h => .inl h).lift 1)

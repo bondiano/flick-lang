@@ -145,9 +145,9 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | glob hg hts hH hT => intro _ _ _; exact .glob hg hts hH hT
   | perform hus hop hT => intro _ _ _; exact .perform hus hop hT
   | hanil => intro _ _ _; exact .hanil
-  | hatail hop _ _ ih₁ ih₂ => intro _ _ hσ; exact .hatail hop (ih₁ (SubOk.lift hσ [_] rfl)) (ih₂ hσ)
-  | haabort hop _ _ ih₁ ih₂ => intro _ _ hσ; exact .haabort hop (ih₁ (SubOk.lift hσ [_] rfl)) (ih₂ hσ)
-  | hactl hop _ _ ih₁ ih₂ => intro _ _ hσ; exact .hactl hop (ih₁ (SubOk.lift hσ [_, _] rfl)) (ih₂ hσ)
+  | hatail hus hop _ _ ih₁ ih₂ => intro _ _ hσ; exact .hatail hus hop (ih₁ (SubOk.lift hσ [_] rfl)) (ih₂ hσ)
+  | haabort hus hop _ _ ih₁ ih₂ => intro _ _ hσ; exact .haabort hus hop (ih₁ (SubOk.lift hσ [_] rfl)) (ih₂ hσ)
+  | hactl hus hop _ _ ih₁ ih₂ => intro _ _ hσ; exact .hactl hus hop (ih₁ (SubOk.lift hσ [_, _] rfl)) (ih₂ hσ)
   | hdl hus hal hn _ hψ _ hφ₀ hOb hc hφ hT ih₁ ih₂ ih₃ =>
     intro _ σ hσ
     have h₁ := ih₁ ((SubOk.up hσ 1 Facts.none).mono Entails.union_none)

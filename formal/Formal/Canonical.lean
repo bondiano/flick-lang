@@ -43,7 +43,7 @@ theorem Const.ty_first {c : Const} {ι : CArg} (h : c.arity = 2) :
   cases c <;> simp [Const.arity] at h <;> exact ⟨_, _, rfl⟩
 
 theorem Const.ty_arrow (c : Const) (ι : CArg) : ∃ x φ y C, c.ty ι = .arrow x φ y C :=
-  Const.ty_isArrow c ι S
+  Const.ty_isArrow c ι
 
 /-- What `Value.pure` gives. -/
 def PureTy (S : Sig) (Ψ : List Ty) (Θ : Facts) (Γ : List Scheme) (e : Tm) (T : Ty) : Prop :=
