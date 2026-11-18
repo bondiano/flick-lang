@@ -3,5 +3,5 @@
 # is what the contract asks for. The e2e harness still runs them and fails on
 # one that passes, so a line here goes when its target catches up. `just stress`
 # skips them on that target.
-js runtime/discontinued_body # FLICK-P012: `control` arms do not run on JS yet
-js runtime/discontinued_fiber # FLICK-P012: `control` arms do not run on JS yet
+js runtime/discontinued_body # FLICK-P012: `control` arms do not run on the Effect adapter
+js runtime/discontinued_fiber # FLICK-P012: `control` arms do not run on the Effect adapter
