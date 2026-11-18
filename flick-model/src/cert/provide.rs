@@ -8,7 +8,7 @@ use std::iter;
 use std::rc::Rc;
 
 use crate::syntax::{Const, Head, Name, Term};
-use crate::translate::lean::elide::{row, stage};
+use crate::translate::lean::elide::{row, stage_pred};
 use crate::types::{Fields, Row, Stage, Type};
 
 use super::Unsupported;
@@ -120,8 +120,9 @@ impl Cx<'_> {
             tail: None,
         });
         let (own, rest) = (self.node(body)?.own.clone()).ok_or("a `provide` without its stage")?;
+        // the rows outside as row terms: the handler's value and arms are typed at them
         let errors = match &own {
-            Stage::Pure => "Row.none".to_owned(),
+            Stage::Pure => ".cnil".to_owned(),
             Stage::Runtime(_, e) => row(e, &self.env)?,
         };
         let w = if effect {
@@ -144,7 +145,7 @@ impl Cx<'_> {
             self.ty(&record)?,
             self.ty(t)?,
             row(&rest, &self.env)?,
-            stage(&own, &self.env)?
+            stage_pred(&own, &self.env)?
         ))
     }
 }

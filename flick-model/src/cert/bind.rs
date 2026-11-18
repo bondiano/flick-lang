@@ -104,7 +104,7 @@ impl Cx<'_> {
         };
         let instance = self.ty(&self.inferred(e)?)?;
         Ok(format!(
-            "(Cert.typ_var (ts := [{}]) (T' := {instance}) rfl rfl (by holds) (by inst_eq) (by le_live))",
+            "(Cert.typ_var (ts := [{}]) (T' := {instance}) rfl rfl (by holds) (by inst_le) (by le_live))",
             ts.join(", ")
         ))
     }

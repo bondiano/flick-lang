@@ -54,7 +54,7 @@ private theorem Typ.constResult {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro c a ψ t C φ hc hArity hJ; cases hJ
     cases he.symm.form with
     | rows hr _ => cases hr
-    | arrow _ ht =>
+    | arrow _ _ ht =>
       have hn := ih c _ _ _ _ _ hc hArity rfl
       rw [ht.isAll]
       exact hn

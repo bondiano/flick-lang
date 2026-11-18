@@ -17,7 +17,7 @@ variable {S : Sig}
 
 /-- A raised value of a body with errors `ε₀`, at `Errors ε₀`. -/
 theorem raise_inv {Ψ Θ v t φ} (hv : Value v) (h : Typ S Ψ Θ [] (.raise v) (.ex t φ)) :
-    ∃ ε, Typ S Ψ Θ [] v (.ex (.errors ε) .pure) ∧ (Stage.rt Row.none ε).le φ := by
+    ∃ ε, Typ S Ψ Θ [] v (.ex (.errors ε) .pure) ∧ (Stage.rt Row.none ε.asRow).le φ := by
   exact h.raise_value v t φ rfl rfl hv
 
 theorem CellTy.weakenStore {Ψ r ε t C c} (h : CellTy S Ψ r ε t C c) (X : List Ty) :
@@ -107,7 +107,7 @@ theorem store_read {Ψ : List Ty} {Θ : Facts} {Λ : List Rgn} {μ : List Tm} {l
   exact hk.cut hcRt.inΘ
 
 /-- The type of a lazy cell names no region not yet created. -/
-theorem cell_yf {Ψ : List Ty} {Θ : Facts} {n l : Nat} {r ε : Row} {t : Ty} {C : Caps} (hcRt : RtCtx Ψ Θ n) (hl : Ψ[l]? = some (.lazyCell r ε t C)) :
+theorem cell_yf {Ψ : List Ty} {Θ : Facts} {n l : Nat} {r ε : Ty} {t : Ty} {C : Caps} (hcRt : RtCtx Ψ Θ n) (hl : Ψ[l]? = some (.lazyCell r ε t C)) :
     r.substT (kill n) = r ∧ ε.substT (kill n) = ε ∧ t.substT (kill n) = t ∧
       C.substT (kill n) = C := by
   have := hcRt.yf _ (List.mem_of_getElem? hl)
@@ -124,31 +124,37 @@ theorem Stage.none_err_le {r ε : Row} {C : Caps} {φ : Stage}
 
 /-- `lazy e` makes a cell of the type of the lazy, renamed out of the regions not yet created. -/
 theorem lazy_new {Ψ Θ n μ e t₀ ψ r ε C φ} (hμ : StoreTy S Ψ μ) (hcRt : RtCtx Ψ Θ n)
-    (he : Typ S Ψ Θ [] e (.ex t₀ ψ)) (hψ : ψ.le (Stage.use (.rt r ε) C)) (hn : e.NoIns)
+    (he : Typ S Ψ Θ [] e (.ex t₀ ψ)) (hψ : ψ.le (Stage.use (.rt r.asRow ε.asRow) C)) (hn : e.NoIns)
     (ht : (Ty.lazy r ε t₀ C).YFMod n) :
     ∃ X, StoreTy S (Ψ ++ X) (μ ++ [.lazy e]) ∧
       Typ S (Ψ ++ X) Θ [] (.loc μ.length) (.ex (.lazy r ε t₀ C) φ) ∧ ∀ u ∈ X, u.YF n := by
-  obtain ⟨u, hu, htu⟩ := ht.symm.lazy_left
+  obtain ⟨r', ε', u, hu, hr, hε, htu⟩ := ht.symm.lazy_left
   simp only [Ty.substT, Ty.lazy.injEq] at hu
-  obtain ⟨hr, hε, rfl, hC⟩ := hu
-  refine ⟨[.lazyCell r ε (t₀.substT (kill n)) C],
-    hμ.allocCell (.pending ((he.conv htu).cut hcRt.outΘ) hψ hn), ?_, ?_⟩
-  · exact (Typ.lazyLoc (by simp [hμ.1])).conv (.lazy htu.symm)
+  obtain ⟨rfl, rfl, rfl, hC⟩ := hu
+  have hψ' : ψ.le (Stage.use (.rt (r.substT (kill n)).asRow (ε.substT (kill n)).asRow) C) := by
+    rwa [← hr.asRow, ← hε.asRow]
+  refine ⟨[.lazyCell (r.substT (kill n)) (ε.substT (kill n)) (t₀.substT (kill n)) C],
+    hμ.allocCell (.pending ((he.conv htu).cut hcRt.outΘ) hψ' hn), ?_, ?_⟩
+  · exact (Typ.lazyLoc (by simp [hμ.1])).conv (.lazy hr.symm hε.symm htu.symm)
   · simp only [List.mem_singleton]
     rintro _ rfl
     have hk := Ty.yf_kill n t₀
-    simp only [Ty.YF] at hk
-    simp only [Ty.YF, Ty.substT, hr, hε, hC, hk]
+    have hkr := Ty.yf_kill n r
+    have hke := Ty.yf_kill n ε
+    simp only [Ty.YF] at hk hkr hke
+    simp only [Ty.YF, Ty.substT, hkr, hke, hC, hk]
 
 /-- Forcing a pending cell runs its initializer in the frame of the cell, now running. -/
 theorem force_pending {Ψ : List Ty} {Θ : Facts} {Λ : List Rgn} {μ : List Tm} {l : Nat} {e₀ : Tm}
-    {r ε : Row} {t C T φ} (hμ : StoreTy S Ψ μ)
+    {r ε : Ty} {t C T φ} (hμ : StoreTy S Ψ μ)
     (hcRt : RtCtx Ψ Θ Λ.length) (hμb : ∀ (l : Nat) (v : Tm), μ[l]? = some v → v.Below Λ.length)
-    (he : Typ S Ψ Θ [] (.loc l) (.ex (.lazy r ε t C) φ)) (hφ : (Stage.use (.rt r ε) C).le φ)
+    (he : Typ S Ψ Θ [] (.loc l) (.ex (.lazy r ε t C) φ))
+    (hφ : (Stage.use (.rt r.asRow ε.asRow) C).le φ)
     (hT : LeLive S t T) (hl : μ[l]? = some (.lazy e₀)) {n : Nat} :
     ∃ X, StoreTy S (Ψ ++ X) (μ.set l .running) ∧
       Typ S (Ψ ++ X) Θ [] (.settle l e₀) (.ex T φ) ∧ ∀ u ∈ X, u.YF n := by
-  obtain ⟨u, hl', hu⟩ := he.loc_lazy _ _ _ _ _ _ rfl rfl
+  obtain ⟨r', ε', u, hl', hr', hε', hu⟩ := he.loc_lazy _ _ _ _ _ _ rfl rfl
+  rw [← hr'.asRow, ← hε'.asRow] at hφ
   rcases hμ.2 _ _ _ hl hl' with ⟨hv, -⟩ | ⟨_, _, _, _, heq, hc⟩
   · cases hv
   cases heq
@@ -158,19 +164,20 @@ theorem force_pending {Ψ : List Ty} {Θ : Facts} {Λ : List Rgn} {μ : List Tm}
     have hk := store_read hcRt hμb hl he₀ fun _ h => h
     simp only [Flick.J.substT, htk] at hk
     have hψ' := Stage.le_substT (kill Λ.length) hψ
-    rw [Stage.use_substT, hC,
-      show (Stage.rt r ε).substT (kill Λ.length) = .rt r ε by simp [Stage.substT, hr, hε]] at hψ'
+    rw [Stage.use_substT, hC, Stage.substT_rt, Row.substT_asRow, Row.substT_asRow, hr, hε] at hψ'
     exact ⟨[], by simpa using hμ.setCell hl' .running,
       by simpa using Typ.settle hl' hk hψ' hφ ((LeLive.equiv hu).trans hT), by simp⟩
 
 /-- Forcing a settled cell gives its outcome and leaves the store. -/
 theorem force_done {Ψ : List Ty} {Θ : Facts} {Λ : List Rgn} {μ : List Tm} {l : Nat} {o : Tm}
-    {r ε : Row} {t C T φ} (hμ : StoreTy S Ψ μ)
+    {r ε : Ty} {t C T φ} (hμ : StoreTy S Ψ μ)
     (hcRt : RtCtx Ψ Θ Λ.length) (hμb : ∀ (l : Nat) (v : Tm), μ[l]? = some v → v.Below Λ.length)
-    (he : Typ S Ψ Θ [] (.loc l) (.ex (.lazy r ε t C) φ)) (hφ : (Stage.use (.rt r ε) C).le φ)
+    (he : Typ S Ψ Θ [] (.loc l) (.ex (.lazy r ε t C) φ))
+    (hφ : (Stage.use (.rt r.asRow ε.asRow) C).le φ)
     (hT : LeLive S t T) (hl : μ[l]? = some (.done o)) {n : Nat} :
     ∃ X, StoreTy S (Ψ ++ X) μ ∧ Typ S (Ψ ++ X) Θ [] o (.ex T φ) ∧ ∀ u ∈ X, u.YF n := by
-  obtain ⟨u, hl', hu⟩ := he.loc_lazy _ _ _ _ _ _ rfl rfl
+  obtain ⟨r', ε', u, hl', hr', hε', hu⟩ := he.loc_lazy _ _ _ _ _ _ rfl rfl
+  rw [← hr'.asRow, ← hε'.asRow] at hφ
   rcases hμ.2 _ _ _ hl hl' with ⟨hv, -⟩ | ⟨_, _, _, _, heq, hc⟩
   · cases hv
   cases heq
@@ -187,9 +194,10 @@ theorem force_done {Ψ : List Ty} {Θ : Facts} {Λ : List Rgn} {μ : List Tm} {l
   | defect => exact hμ.same .todo
 
 /-- The initializer's value is the outcome of its cell. -/
-theorem settle_val {Ψ Θ n μ l v r ε t C ψ T φ} (hμ : StoreTy S Ψ μ) (hcRt : RtCtx Ψ Θ n)
+theorem settle_val {Ψ Θ n μ l v t C ψ T φ} {r ε : Ty} (hμ : StoreTy S Ψ μ) (hcRt : RtCtx Ψ Θ n)
     (hl : Ψ[l]? = some (.lazyCell r ε t C)) (he : Typ S Ψ Θ [] v (.ex t ψ))
-    (hψ : ψ.le (Stage.use (.rt r ε) C)) (hφ : (Stage.use (.rt r ε) C).le φ) (hT : LeLive S t T)
+    (hψ : ψ.le (Stage.use (.rt r.asRow ε.asRow) C)) (hφ : (Stage.use (.rt r.asRow ε.asRow) C).le φ)
+    (hT : LeLive S t T)
     (hv : Value v) :
     ∃ X, StoreTy S (Ψ ++ X) (settleCell μ l v) ∧ Typ S (Ψ ++ X) Θ [] v (.ex T φ) ∧
       ∀ u ∈ X, u.YF n :=
@@ -197,13 +205,14 @@ theorem settle_val {Ψ Θ n μ l v r ε t C ψ T φ} (hμ : StoreTy S Ψ μ) (hc
     by simpa using he.sub (J' := .ex _ _) ⟨hT, Stage.le_trans hψ hφ⟩, by simp⟩
 
 /-- An error the initializer raises is an error of the lazy: its cell keeps it. -/
-theorem settle_raise {Ψ Θ n μ l v r ε t C ψ T φ} (hμ : StoreTy S Ψ μ) (hcRt : RtCtx Ψ Θ n)
+theorem settle_raise {Ψ Θ n μ l v t C ψ T φ} {r ε : Ty} (hμ : StoreTy S Ψ μ) (hcRt : RtCtx Ψ Θ n)
     (hl : Ψ[l]? = some (.lazyCell r ε t C)) (he : Typ S Ψ Θ [] (.raise v) (.ex t ψ))
-    (hψ : ψ.le (Stage.use (.rt r ε) C)) (hφ : (Stage.use (.rt r ε) C).le φ) (hv : Value v) :
+    (hψ : ψ.le (Stage.use (.rt r.asRow ε.asRow) C)) (hφ : (Stage.use (.rt r.asRow ε.asRow) C).le φ)
+    (hv : Value v) :
     ∃ X, StoreTy S (Ψ ++ X) (settleCell μ l (.raise v)) ∧
       Typ S (Ψ ++ X) Θ [] (.raise v) (.ex T φ) ∧ ∀ u ∈ X, u.YF n := by
   obtain ⟨ε', hv', hε'⟩ := raise_inv hv he
-  have hsub : Row.Sub ε' ε := fun x hx => by
+  have hsub : Row.Sub ε'.asRow ε.asRow := fun x hx => by
     simpa using Stage.le_err hψ x (Stage.le_err hε' x hx)
   obtain ⟨_, _, _, _, U, _, _, _, hU, ht, hs⟩ := canonical_errors hv hv'
   exact ⟨[], by simpa using hμ.settle hl (.err hv ((Typ.errVal hv ht hU (hs.trans hsub)).cut hcRt.outΘ)),
@@ -211,8 +220,8 @@ theorem settle_raise {Ψ Θ n μ l v r ε t C ψ T φ} (hμ : StoreTy S Ψ μ) (
     by simp⟩
 
 /-- A signal leaves the frame of a cell, which stays running. -/
-theorem settle_unw {Ψ Θ p ℓ a t ψ r ε C T φ} (he : Typ S Ψ Θ [] (.unw p ℓ a) (.ex t ψ))
-    (hφ : (Stage.use (.rt r ε) C).le φ) : Typ S Ψ Θ [] (.unw p ℓ a) (.ex T φ) := by
+theorem settle_unw {Ψ Θ p ℓ a t ψ C T φ} {r ε : Ty} (he : Typ S Ψ Θ [] (.unw p ℓ a) (.ex t ψ))
+    (hφ : (Stage.use (.rt r.asRow ε.asRow) C).le φ) : Typ S Ψ Θ [] (.unw p ℓ a) (.ex T φ) := by
   obtain ⟨_, _, _, h₁, h₂, _⟩ := he.unw_type _ _ _ _ _ rfl rfl
   exact .unw h₁ h₂ (Stage.none_le (Stage.use_rt_le_ne_pure hφ))
 

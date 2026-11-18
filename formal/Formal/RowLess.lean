@@ -10,12 +10,12 @@ substituted row reaches, and the substitution of a variable alone.
 
 namespace Flick
 
-@[simp] theorem Row.less_nm (G : Name → Prop) (r : Row) (n : Name) :
-    r.less G (.nm n) ↔ ¬ G n ∧ r (.nm n) := Iff.rfl
+@[simp] theorem Row.less_nm (G : Name → Prop) (r : Row) (n : Name) (c : TyClass) :
+    r.less G (.nm n c) ↔ ¬ G n ∧ r (.nm n c) := Iff.rfl
 @[simp] theorem Row.less_atm (G : Name → Prop) (r : Row) (a : Atom) :
     r.less G (.atm a) ↔ r (.atm a) := Iff.rfl
-@[simp] theorem Row.less_ob (G : Name → Prop) (r : Row) (N : Name) (a : Atom) :
-    ¬ r.less G (.ob N a) := id
+@[simp] theorem Row.less_ob (G : Name → Prop) (r : Row) (N : Name) (c : TyClass) (a : Atom) :
+    ¬ r.less G (.ob N c a) := id
 @[simp] theorem Row.less_obv (G H : Name → Prop) (r : Row) (v a : Atom) :
     ¬ r.less G (.obv v H a) := id
 theorem Row.less_rv (G : Name → Prop) (r : Row) (c : Atom) (H : Name → Prop) :
@@ -37,7 +37,7 @@ theorem Row.less_var (G : Name → Prop) (b c : Atom) (H : Name → Prop) :
 theorem Ty.reach_asRow (t : Ty) (a : Atom) :
     t.reach a ↔ t.asRow (.atm a) ∨ ∃ G, t.asRow (.rv a G) := by
   induction t <;>
-    simp_all [Ty.asRow, Ty.reach, Row.plain, Row.ofCaps, Row.none, Row.single, Row.union,
+    simp_all [Ty.asRow, Ty.reach, Row.ofCaps, Row.none, Row.inst, Row.union,
       Caps.none, Row.less] <;> grind
 
 /-- What a substituted row reaches: the atoms of the instances of its atoms and of its
@@ -57,20 +57,21 @@ theorem Row.substT_reach (σ : Atom → Ty) (r : Row) (a : Atom) :
       · exact .inl (.inr ⟨b, G, hb, h⟩)
       · exact .inr ⟨_, b, G, hb, H', h, rfl⟩
 
-@[simp] theorem Ty.asRow_ob (t : Ty) (N : Name) (a : Atom) : ¬ t.asRow (.ob N a) := by
-  induction t <;> simp_all [Ty.asRow, Row.plain, Row.ofCaps, Row.none, Row.single, Row.union]
+@[simp] theorem Ty.asRow_ob (t : Ty) (N : Name) (c : TyClass) (a : Atom) :
+    ¬ t.asRow (.ob N c a) := by
+  induction t <;> simp_all [Ty.asRow, Row.ofCaps, Row.none, Row.inst, Row.union, Row.less]
 
 @[simp] theorem Ty.asRow_obv (t : Ty) (v a : Atom) (G : Name → Prop) : ¬ t.asRow (.obv v G a) := by
-  induction t <;> simp_all [Ty.asRow, Row.plain, Row.ofCaps, Row.none, Row.single, Row.union]
+  induction t <;> simp_all [Ty.asRow, Row.ofCaps, Row.none, Row.inst, Row.union, Row.less]
 
 /-- A row variable alone becomes the row its instance stands for. -/
 theorem Row.var_substT (σ : Atom → Ty) (b : Atom) :
     Row.substT σ (fun x => x = .rv b fun _ => False) = (σ b).asRow := by
   funext x; apply propext
   cases x with
-  | nm N =>
+  | nm N c =>
     constructor
-    · rintro (h | ⟨_, _, h, -, h'⟩)
+    · rintro (⟨_, h, -⟩ | ⟨_, _, h, -, h'⟩)
       · cases h
       · cases h; exact h'
     · exact fun h => .inr ⟨b, _, rfl, id, h⟩
@@ -80,9 +81,9 @@ theorem Row.var_substT (σ : Atom → Ty) (b : Atom) :
       · cases h
       · cases h; exact h'
     · exact fun h => .inr ⟨b, _, rfl, h⟩
-  | ob N a =>
-    refine ⟨fun h => ?_, fun h => (Ty.asRow_ob _ _ _ h).elim⟩
-    rcases h with ⟨_, h, -⟩ | ⟨_, _, _, h, -⟩ <;> cases h
+  | ob N c a =>
+    refine ⟨fun h => ?_, fun h => (Ty.asRow_ob _ _ _ _ h).elim⟩
+    rcases h with ⟨_, _, h, -⟩ | ⟨_, _, _, h, -⟩ <;> cases h
   | obv v G a => exact ⟨fun ⟨_, _, _, h, _⟩ => (nomatch h), fun h => (Ty.asRow_obv _ _ _ _ h).elim⟩
   | rv c H =>
     constructor

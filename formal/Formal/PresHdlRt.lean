@@ -31,7 +31,7 @@ theorem hwith_catch {Ψ Θ p ℓ E al r a t φ}
   obtain ⟨_, _, _, _, _, _, _, hℓ, _, _, _, he, _, _, hφ, hT, hat⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
   obtain ⟨_, _, _, hℓ', ha, _⟩ := he.unw_type _ _ _ _ _ rfl rfl
   rw [hℓ] at hℓ'
-  simp only [Option.some.injEq, Ty.arrow.injEq, Stage.rt.injEq] at hℓ'
+  simp only [Option.some.injEq, Ty.arrow.injEq] at hℓ'
   obtain ⟨-, ⟨rfl, rfl⟩, rfl, -⟩ := hℓ'
   exact ha.sub ⟨hT, Stage.use_rg_le hφ hat⟩
 
@@ -89,33 +89,35 @@ theorem hres_signal {Ψ Θ p ℓ a x t φ} {A : List Frame} (hA : OkE A) (ha : a
 
 /-- The arms of a new handler, in its run-time region `n`: the regions not yet created are
 renamed out, and `n` is put for the region of `resume`. -/
-theorem arms_body {Ψ Θ E al} {t' : Ty} {φ : Stage} {n : Nat} (hn : al.NoIns) (hb : al.Below n)
+theorem arms_body {Ψ Θ E al} {t' r ε : Ty} {n : Nat} (hn : al.NoIns) (hb : al.Below n)
     (hΨ : ∀ u ∈ Ψ, u.YF n) (hidem : Θ.substT (kill n) = Θ)
     (h : Typ S (Ψ.map (Ty.up 1)) (Θ.substT (shiftV 1)) [] al
-      (.harms E (t'.up 1) (φ.substT (shiftV 1)) (.tvar 0))) :
-    Typ S Ψ Θ [] al (.harms E (t'.substT (kill n)) (φ.substT (kill n)) (.rg n)) := by
+      (.harms E (t'.up 1) ((Ty.rt r ε).substT (shiftV 1)) (.tvar 0))) :
+    Typ S Ψ Θ [] al (.harms E (t'.substT (kill n)) (.rt (r.substT (kill n)) (ε.substT (kill n)))
+      (.rg n)) := by
   have hΨ' : Ψ.map (Ty.substT (kill n)) = Ψ := by
     conv => rhs; rw [← List.map_id Ψ]
     exact List.map_congr_left fun u hu => hΨ u hu
   have h₁ := h.substT (liftT 1 (kill n)) ((Fits.kill hb).lift 1)
   simp only [Flick.J.substT, List.map_nil] at h₁
-  rw [shift_comm, Facts.up_comm, Ty.up_comm, Stage.up_comm, hΨ', hidem] at h₁
-  simp only [Ty.substT, liftT, if_true, Nat.zero_lt_one] at h₁
+  rw [shift_comm, Facts.up_comm, Ty.up_comm, hΨ', hidem] at h₁
+  simp only [Ty.substS, Ty.substT, Ty.isStage, if_true, Ty.substT_shift_comm, liftT,
+    Nat.zero_lt_one] at h₁
   have h₂ := h₁.substT (instT [.rg n]) (Fits.noIns hn fun _ => rfl)
   simp only [Flick.J.substT, List.map_map, Function.comp_def, Ty.up_inst1, List.map_id_fun', id,
-    List.map_nil, Facts.up_inst1, Stage.up_substT _ 1 [_] rfl] at h₂
-  simpa [Ty.substT, instT] using h₂
+    List.map_nil, Facts.up_inst1] at h₂
+  simpa [Ty.substT, Ty.isStage, instT, ← Ty.up_def] using h₂
 
 /-- A handler is installed in the region `n` with its cell at the end of the store. -/
-theorem hdl_install {Ψ Θ E al rf e₀ T φ n t ψ C φ₀} {r ε : Row} {t' : Ty}
+theorem hdl_install {Ψ Θ E al rf e₀ T φ n t ψ C φ₀} {r ε : Ty} {t' : Ty}
     (hal : Typ S (Ψ.map (Ty.up 1)) (Θ.substT (shiftV 1)) [] al
-      (.harms E (t'.up 1) ((Stage.rt r ε).substT (shiftV 1)) (.tvar 0))) (hn : al.NoIns)
-    (hrf : Typ S Ψ Θ [] rf (.ex (.arrow t ψ t' C) (.rt r ε)))
-    (hψ : (Stage.use ψ C).le (.rt r ε))
+      (.harms E (t'.up 1) ((Ty.rt r ε).substT (shiftV 1)) (.tvar 0))) (hn : al.NoIns)
+    (hrf : Typ S Ψ Θ [] rf (.ex (.arrow t ψ t' C) (.rt r.asRow ε.asRow)))
+    (hψ : (Stage.use ψ.asStage C).le (.rt r.asRow ε.asRow))
     (he : Typ S Ψ Θ [] e₀ (.ex t φ₀))
-    (hφ₀ : φ₀.le (.rt (Row.union (Row.single E) (r.back (Row.single E))) ε))
-    (hOb : φ₀.ObOut (Row.single E)) (hc : S.Handles E al r) (hφ' : (Stage.rt r ε).le φ)
-    (hT : LeLive S t' T)
+    (hφ₀ : φ₀.le (.rt (Row.union (Row.single E).nameClose (r.asRow.back (Row.single E))) ε.asRow))
+    (hOb : φ₀.ObOut (Row.single E)) (hc : S.Handles E al r.asRow)
+    (hφ' : (Stage.rt r.asRow ε.asRow).le φ) (hT : LeLive S t' T)
     (hbl : (Tm.hdl E al rf e₀).Below n) (hΨ : ∀ u ∈ Ψ, u.YF n) (hidem : Θ.substT (kill n) = Θ)
     (ht : T.YFMod n) (hφ : φ.substT (kill n) = φ) :
     ∃ c, c.YF n ∧ Typ S Ψ Facts.age [] (.lam .todo) (.ex c .pure) ∧
@@ -128,30 +130,28 @@ theorem hdl_install {Ψ Θ E al rf e₀ T φ n t ψ C φ₀} {r ε : Row} {t' : 
   have h₂ := hrf.substT (kill n) (fk.sub fun _ h => .inr (.inl h))
   have h₃ := he.substT (kill n) (fk.sub fun _ h => .inr (.inr h))
   rw [hΨ', hidem] at h₂ h₃
-  simp only [Flick.J.substT, Ty.substT, List.map_nil] at h₂ h₃
+  simp only [Flick.J.substT, Stage.substT_rt, Row.substT_asRow, List.map_nil] at h₂ h₃
   let c : Ty := .arrow (.base .unit) (.rt (r.substT (kill n)) (ε.substT (kill n))) (t'.substT (kill n))
     Caps.none
   refine ⟨c, ?_, lam_todo, ?_⟩
   · have := Ty.yf_kill n (.arrow (.base .unit) (.rt r ε) t' Caps.none)
-    simpa [Ty.substT, Stage.substT] using this
+    simpa [Ty.substT, Ty.isStage] using this
   · have hw : Typ S (Ψ ++ [c]) Θ [] (.hwith n Ψ.length E al rf e₀)
         (.ex (t'.substT (kill n))
-          (.rt (Row.union (Row.scope (.rg n)) (r.substT (kill n))) (ε.substT (kill n)))) :=
+          (.rt (Row.union (Row.scope (.rg n)) (r.substT (kill n)).asRow) (ε.substT (kill n)).asRow)) :=
       .hwith (by simp [c]) (h₁.weakenStore _) (h₂.weakenStore _)
-        (by
-          rw [← Stage.use_substT ψ C (kill n)]
-          simpa [Stage.substT] using Stage.le_substT (kill n) hψ)
+        (by simpa_substT Stage.le_substT (kill n) hψ)
         (h₃.weakenStore _)
-        (Stage.hP_of_out (Stage.le_back_substT (kill n) hφ₀)
+        (Stage.hP_of_out (by simpa only [Row.substT_asRow] using Stage.le_back_substT (kill n) hφ₀)
           (by simpa [Row.single_substT] using hOb.substT (kill n)))
-        ⟨hc.1, fun h => .inl (hc.2 h)⟩
+        (hc.substT (kill n))
         (Stage.le_rt_sub (Stage.le_refl _) (fun _ h => Or.inr h)) .refl
         (Or.inl (by simp [Row.scope, Row.ofCaps]))
-    refine .inside (F := Facts.none) (r := r.substT (kill n)) (ε := ε.substT (kill n))
+    refine .inside (F := Facts.none) (r := (r.substT (kill n)).asRow) (ε := (ε.substT (kill n)).asRow)
       (fun _ _ h => h.elim) (hw.cut (Entails.union_left _ _))
       ⟨fun _ h => h.elim (fun hs => .inl hs) fun hr => .inr (.inl hr), fun _ h => h⟩
-      (Ty.kill_fresh _ _) (Row.kill_fresh _ _)
-      (by simpa [Stage.substT] using Stage.YF_kill hφ' hφ) ?_
+      (Ty.kill_fresh _ _) (by rw [← Row.substT_asRow]; exact Row.kill_fresh _ _)
+      (by simpa_substT Stage.YF_kill hφ' hφ) ?_
     exact (hT.substT (kill n)).trans (.equiv ht)
 
 end Flick

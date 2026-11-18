@@ -8,26 +8,16 @@ namespace Flick
 
 variable {S : Sig}
 
-/-- The error type of a raised value. -/
-theorem err_type {Ψ Θ v ε} (hv : Value v) (h : Typ S Ψ Θ [] v (.ex (.errors ε) .pure))
-    {K k ts T} (hK : v.head = .ctor K) (hS : S.ctor K = some (k, ts, T)) :
-    ∃ U, ε (.nm T) ∧ U.hd = .adt T ∧ Typ S Ψ Θ [] v (.ex U .pure) ∧ Row.Sub (Row.err T U) ε := by
-  obtain ⟨K', k', ts', T', U, hK', hS', hε, hU, ht, hsub⟩ := canonical_errors hv h
-  rw [hK] at hK'; cases hK'; rw [hS] at hS'; cases hS'
-  exact ⟨U, hε, hU, ht, hsub⟩
-
 /-- After a failed `try` arm, the remaining arms still remove or let through the
 error of the value. -/
-theorem HCov.tail {Ψ Θ ε₀ p θ Δ v H H' ε'} (hp : HPat S ε₀ p θ Δ) (hv : Value v)
-    (hv' : Typ S Ψ Θ [] v (.ex (.errors ε₀) .pure)) (hc : HCov S v H ε')
-    (hH : ∀ n, H n → Catches S ε₀ p θ n ∨ H' n) (hm : matchP p v = none) : HCov S v H' ε' := by
-  intro K k ts T hK hS
-  rcases hc K k ts T hK hS with h | h
+theorem HCov.tail {Ψ Θ ε₀ p θ Δ v H H' ε' E U} (hp : HPat S ε₀ p θ Δ) (hv : Value v)
+    (hvU : Typ S Ψ Θ [] v (.ex U .pure)) (hU : U.hd = .adt E) (hc : HCov H ε' E U)
+    (hH : ∀ n, H n → Catches S ε₀ p θ n ∨ H' n) (hm : matchP p v = none) : HCov H' ε' E U := by
+  rcases hc with ⟨c, h⟩ | h
   · rcases hH _ h with (⟨rfl, _⟩ | ⟨rfl, hx⟩) | h'
     · cases hp <;> simp [matchP] at hm
-    · obtain ⟨U, _, hU, ht, _⟩ := err_type hv hv' hK hS
-      have hs' : Shp S true (.adt T) v := by
-        have hs := (ht.shape hv rfl).1
+    · have hs' : Shp S true (.adt E) v := by
+        have hs := (hvU.shape hv rfl).1
         cases hs with
         | hidden ho => simp [Ty.Opaque, hU] at ho
         | adt hs hU₁ hU₂ =>
@@ -38,7 +28,7 @@ theorem HCov.tail {Ψ Θ ε₀ p θ Δ v H H' ε'} (hp : HPat S ε₀ p θ Δ) (
         | _ => simp [Ty.hd] at hU
       obtain ⟨q, hq, hqm⟩ := hx v hs'
       simp at hq; subst hq; simp [hm] at hqm
-    · exact .inl h'
+    · exact .inl ⟨c, h'⟩
   · exact .inr h
 
 theorem Stage.rt_sub {r r' e e' : Row} (hr : Row.Sub r r') (he : Row.Sub e e') :
@@ -172,19 +162,23 @@ private theorem Typ.rtStepCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       obtain ⟨ε, hv', hε⟩ := raise_inv hv hb
       obtain ⟨K, k, ts, T, U, hK, hS, hT, hU, ht, hsub⟩ := canonical_errors hv hv'
       obtain ⟨_, _, rfl, _, hε'⟩ := Stage.rt_le hφ
-      refine hμ.same (.handle hv (.errVal hv ht hU (hsub.trans hε.2)) hA
-        (fun K' k' ts' T' hK' hS' => ?_) (fun x hx => ?_) ⟨fun _ h => h.elim, hε'⟩)
-      · rw [hK] at hK'; cases hK'; rw [hS] at hS'; cases hS'; exact hs _ (hε.2 _ hT)
-      · exact .inr ((hs _ hx).imp_right Row.back_modNames)
+      refine hμ.same (.handle hv ht hU (hsub.trans hε.2) hA (by exact hs _ (hε.2 _ hT))
+        (fun x hx => ?_) ⟨fun _ h => h.elim, hε'⟩)
+      rcases hs _ hx with h | h
+      · cases x with
+        | nm N c => exact .inl ⟨N, c, rfl⟩
+        | _ => exact .inr (.inl h)
+      · exact .inr (.inr (Row.back_modNames h))
   | tryP hb =>
     intro Λ μ t φ Λ' μ' e' hΓ hJ hμ hcRt hbl hμb ht hφfixed hh
     cases hΓ; cases hJ
     cases hh with
     | tryRaise hv =>
       obtain ⟨_, _, hε⟩ := raise_inv hv hb; exact hε.elim
-  | handle hv hv' hA hc ha hφ =>
+  | handle hv hvU hU hE hA hc ha hφ =>
     intro Λ μ t φ Λ' μ' e' hΓ hJ hμ hcRt hbl hμb ht hφfixed hh
     cases hΓ; cases hJ
+    have hv' := Typ.errVal hv hvU hU hE
     cases hh with
     | handleYes hv hm =>
       cases hA with
@@ -192,12 +186,12 @@ private theorem Typ.rtStepCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     | handleNo hv hm =>
       cases hA with
       | hcons hp _ hr hH =>
-        refine hμ.same (.handle hv hv' hr (hc.tail hp hv hv' hH hm) (fun x hx => ?_) hφ)
+        refine hμ.same (.handle hv hvU hU hE hr (hc.tail hp hv hvU hU hH hm) (fun x hx => ?_) hφ)
         rcases ha x hx with h | h | h
         · exact .inl h
         · rcases hH x h with h | h
           · cases x with
-            | nm N => exact .inl ⟨N, rfl⟩
+            | nm N c => exact .inl ⟨N, c, rfl⟩
             | _ => obtain ⟨rfl, _⟩ := h; cases hp <;> simp [matchP] at hm
           · exact .inr (.inl h)
         · exact .inr (.inr h)
@@ -206,25 +200,26 @@ private theorem Typ.rtStepCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       | hguard hp hg hb hr hH =>
         have hδ := (hp.inst hv hv' hm).1
         exact hμ.same (guard_typ (hg.inst hδ) (hb.inst hδ)
-          (.handle hv hv' hr (fun K k ts T hK hS => (hc K k ts T hK hS).imp_left (hH _))
+          (.handle hv hvU hU hE hr (hc.imp (fun ⟨c, h⟩ => ⟨c, hH _ h⟩) id)
             (fun x hx => (ha x hx).imp_right (Or.imp_left (hH x))) hφ))
     | hguardNo hv hm =>
       cases hA with
       | hguard _ _ _ hr hH =>
-        exact hμ.same (.handle hv hv' hr (fun K k ts T hK hS => (hc K k ts T hK hS).imp_left (hH _))
+        exact hμ.same (.handle hv hvU hU hE hr (hc.imp (fun ⟨c, h⟩ => ⟨c, hH _ h⟩) id)
           (fun x hx => (ha x hx).imp_right (Or.imp_left (hH x))) hφ)
     | handleNil hv =>
       cases hA with
       | hnil hH =>
-        obtain ⟨K, k, ts, T, U, hK, hS, _, hU, ht, hsub⟩ := canonical_errors hv hv'
-        rcases hc K k ts T hK hS with h | h
+        rcases hc with ⟨c, h⟩ | h
         · exact (hH _ h).elim
-        · refine hμ.same (.raise (.errVal hv (ht.valueAny hv _) hU fun x hx => ?_) hφ)
+        · obtain ⟨_, _, rfl, _, hε'⟩ := Stage.rt_le hφ
+          refine hμ.same (.raiseAdt (hvU.valueAny hv _) hU ?_)
+          refine ⟨fun _ h => h.elim, fun x hx => hε' x ?_⟩
           rcases hx with rfl | hx
           · exact h
           · cases x with
             | atm a =>
-              exact (((ha _ (hsub _ (.inr hx))).resolve_left fun ⟨_, h⟩ => by cases h).resolve_left
+              exact (((ha _ (hE _ (.inr hx))).resolve_left fun ⟨_, _, h⟩ => by cases h).resolve_left
                 (hH _))
             | _ => exact hx.elim
   | scope hn hF hbody hφ' hφs hT =>

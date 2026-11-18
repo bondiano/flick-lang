@@ -21,7 +21,7 @@ variable {S : Sig} {mk E : Name}
 def effT (E : Name) (q b : Flick.Ty) : Flick.Ty := .tapp (.tapp (.adt E) q) b
 
 /-- The field of `MkEff : eff ∅ ∅ b {q} → Eff q b`, over `q = tvar 0`, `b = tvar 1`. -/
-def effField : Flick.Ty := .eff Row.none Row.none (.tvar 1) fun a => a = .v 0
+def effField : Flick.Ty := .eff .cnil .cnil (.tvar 1) fun a => a = .v 0
 
 /-- `match e with MkEff t → b`, exhaustive as `MkEff` is the only constructor (`exh_one`). -/
 def unEff (mk : Name) (e b : Flick.Tm) : Flick.Tm :=
@@ -44,14 +44,14 @@ def effMap2 (mk : Name) : Flick.Tm :=
     (.app (.app (.var 4) (.await (.var 1))) (.await (.var 0))))))))
 
 theorem effField_inst (q b : Flick.Ty) :
-    effField.substT (instT [q, b]) = .eff Row.none Row.none b q.reach := by
-  simp only [effField, Flick.Ty.substT, Row.none_substT]
+    effField.substT (instT [q, b]) = .eff .cnil .cnil b q.reach := by
+  simp only [effField, Flick.Ty.substT]
   congr 1
   funext a; apply propext
   simp [Caps.substT, instT]
 
 theorem ctorTy_eff (q b : Flick.Ty) :
-    Sig.ctorTy [effField] E [q, b] = .arrow (.eff Row.none Row.none b q.reach) .pure (effT E q b) Caps.none := by
+    Sig.ctorTy [effField] E [q, b] = .arrow (.eff .cnil .cnil b q.reach) .pure (effT E q b) Caps.none := by
   simp only [Sig.ctorTy, List.map, effField_inst]; rfl
 
 theorem typ_var_mono {Ψ Θ Γ i t φ} (h : Γ[i]? = some (Flick.Scheme.mono t)) :
@@ -60,10 +60,10 @@ theorem typ_var_mono {Ψ Θ Γ i t φ} (h : Γ[i]? = some (Flick.Scheme.mono t))
     (by rw [Flick.Scheme.inst]; simp only [Flick.Scheme.mono]; rw [substT_instT_nil]; exact .refl)
 
 /-- The stage of a lazy body whose `Eff` has the qualifier `Q`: it may use `Q`. -/
-abbrev useStage (Q : Caps) : Flick.Stage := Stage.use (.rt Row.none Row.none) Q
+abbrev useStage (Q : Caps) : Flick.Stage := Stage.use (.rt Flick.Ty.cnil.asRow Flick.Ty.cnil.asRow) Q
 
 /-- Awaiting a task of the qualifier `q` needs `q` live in the stage. -/
-theorem typ_await_var {Ψ Θ Γ i a q} {Q : Caps} (h : Γ[i]? = some (.mono (.eff Row.none Row.none a q)))
+theorem typ_await_var {Ψ Θ Γ i a q} {Q : Caps} (h : Γ[i]? = some (.mono (.eff .cnil .cnil a q)))
     (hq : ∀ x, q x → Q x) :
     Typ S Ψ Θ Γ (.await (.var i)) (.ex a (useStage Q)) :=
   .await (typ_var_mono h) ⟨fun x hx => hx.elim (fun h => h.elim) fun h => by
@@ -89,7 +89,7 @@ theorem typ_mkEff {Ψ Θ Γ e q b ψ φ} (he : Typ S Ψ Θ Γ e (.ex b ψ))
     (.task he hψ (hn .ins) .refl) trivial .refl
 
 theorem typ_unEff {Ψ Θ Γ e b q a t φ} (he : Typ S Ψ Θ Γ e (.ex (effT E q a) φ))
-    (hb : Typ S Ψ Θ (.mono (.eff Row.none Row.none a q.reach) :: Γ) b (.ex t φ)) :
+    (hb : Typ S Ψ Θ (.mono (.eff .cnil .cnil a q.reach) :: Γ) b (.ex t φ)) :
     Typ S Ψ Θ Γ (unEff mk e b) (.ex t φ) := by
   have hh := PatTy.head_plain (S := S) hmk hmkr (us := [q, a]) rfl
   rw [ctorTy_eff] at hh

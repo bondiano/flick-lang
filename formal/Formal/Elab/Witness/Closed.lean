@@ -28,77 +28,6 @@ theorem caps_congr {C : Caps} {σ σ' : Atom → Flick.Ty} (h : ∀ b, C b → �
   · rintro ⟨b, hb, h'⟩; exact ⟨b, hb, h b hb ▸ h'⟩
   · rintro ⟨b, hb, h'⟩; exact ⟨b, hb, (h b hb).symm ▸ h'⟩
 
-/-- A substitution acts on a row only through the atoms its elements name. -/
-theorem Row.substT_congr {r : Row} {σ σ' : Atom → Flick.Ty}
-    (h : ∀ b, (r (.atm b) ∨ (∃ G, r (.rv b G)) ∨ (∃ N, r (.ob N b)) ∨
-      ∃ c G, r (.obv b G c) ∨ r (.obv c G b)) → σ b = σ' b) :
-    r.substT σ = r.substT σ' := by
-  funext x; apply propext
-  cases x with
-  | nm N =>
-    simp only [Row.substT]
-    constructor
-    · exact fun h' => h'.imp id fun ⟨b, G, hb, hG, h''⟩ =>
-        ⟨b, G, hb, hG, h b (.inr (.inl ⟨G, hb⟩)) ▸ h''⟩
-    · exact fun h' => h'.imp id fun ⟨b, G, hb, hG, h''⟩ =>
-        ⟨b, G, hb, hG, (h b (.inr (.inl ⟨G, hb⟩))).symm ▸ h''⟩
-  | atm a =>
-    simp only [Row.substT]
-    constructor
-    · exact fun h' => h'.imp (fun ⟨b, hb, h''⟩ => ⟨b, hb, h b (.inl hb) ▸ h''⟩)
-        fun ⟨b, G, hb, h''⟩ => ⟨b, G, hb, h b (.inr (.inl ⟨G, hb⟩)) ▸ h''⟩
-    · exact fun h' => h'.imp (fun ⟨b, hb, h''⟩ => ⟨b, hb, (h b (.inl hb)).symm ▸ h''⟩)
-        fun ⟨b, G, hb, h''⟩ => ⟨b, G, hb, (h b (.inr (.inl ⟨G, hb⟩))).symm ▸ h''⟩
-  | ob N a =>
-    simp only [Row.substT]
-    have hv : ∀ {v G b}, r (.obv v G b) → σ v = σ' v ∧ σ b = σ' b := fun hb =>
-      ⟨h _ (.inr (.inr (.inr ⟨_, _, .inl hb⟩))), h _ (.inr (.inr (.inr ⟨_, _, .inr hb⟩)))⟩
-    constructor
-    · exact fun h' => h'.imp (fun ⟨b, hb, h''⟩ => ⟨b, hb, h b (.inr (.inr (.inl ⟨N, hb⟩))) ▸ h''⟩)
-        fun ⟨v, G, b, hb, hG, h₁, h₂⟩ => ⟨v, G, b, hb, hG, (hv hb).1 ▸ h₁, (hv hb).2 ▸ h₂⟩
-    · exact fun h' => h'.imp
-        (fun ⟨b, hb, h''⟩ => ⟨b, hb, (h b (.inr (.inr (.inl ⟨N, hb⟩)))).symm ▸ h''⟩)
-        fun ⟨v, G, b, hb, hG, h₁, h₂⟩ =>
-          ⟨v, G, b, hb, hG, (hv hb).1.symm ▸ h₁, (hv hb).2.symm ▸ h₂⟩
-  | obv w H a =>
-    simp only [Row.substT]
-    have hv : ∀ {v G b}, r (.obv v G b) → σ v = σ' v ∧ σ b = σ' b := fun hb =>
-      ⟨h _ (.inr (.inr (.inr ⟨_, _, .inl hb⟩))), h _ (.inr (.inr (.inr ⟨_, _, .inr hb⟩)))⟩
-    constructor
-    · exact fun ⟨v, G, b, hb, h₁, h₂⟩ => ⟨v, G, b, hb, (hv hb).1 ▸ h₁, (hv hb).2 ▸ h₂⟩
-    · exact fun ⟨v, G, b, hb, h₁, h₂⟩ =>
-        ⟨v, G, b, hb, (hv hb).1.symm ▸ h₁, (hv hb).2.symm ▸ h₂⟩
-  | rv a H =>
-    simp only [Row.substT]
-    constructor
-    · exact fun ⟨b, G, hb, h''⟩ => ⟨b, G, hb, h b (.inr (.inl ⟨G, hb⟩)) ▸ h''⟩
-    · exact fun ⟨b, G, hb, h''⟩ => ⟨b, G, hb, (h b (.inr (.inl ⟨G, hb⟩))).symm ▸ h''⟩
-
-/-- What a translated row names is among the variables of the source row. -/
-theorem asRow_trT_atoms {t : Ty} {b : Atom}
-    (h : (trT N t).asRow (.atm b) ∨ (∃ G, (trT N t).asRow (.rv b G)) ∨
-      (∃ M, (trT N t).asRow (.ob M b)) ∨
-      ∃ c G, (trT N t).asRow (.obv b G c) ∨ (trT N t).asRow (.obv c G b)) :
-    ∃ n, b = .v n ∧ t.Occurs n := by
-  refine trT_reach_sub N ((Flick.Ty.reach_asRow _ _).2 ?_)
-  rcases h with h | h | ⟨M, h⟩ | ⟨c, G, h | h⟩
-  · exact .inl h
-  · exact .inr h
-  all_goals simp at h
-
-/-- What a translated row of errors names is among the variables of the source row. -/
-theorem errRow_trT_atoms {t : Ty} {b : Atom}
-    (h : errRow (trT N t) (.atm b) ∨ (∃ G, errRow (trT N t) (.rv b G)) ∨
-      (∃ M, errRow (trT N t) (.ob M b)) ∨
-      ∃ c G, errRow (trT N t) (.obv b G c) ∨ errRow (trT N t) (.obv c G b)) :
-    ∃ n, b = .v n ∧ t.Occurs n := by
-  simp only [errRow, Row.union, Row.ofCaps, or_false] at h
-  rcases h with (h | h) | h | ⟨M, h⟩ | ⟨c, G, h | h⟩
-  · exact asRow_trT_atoms N (.inl h)
-  · exact trT_reach_sub N h
-  · exact asRow_trT_atoms N (.inr (.inl h))
-  all_goals simp at h
-
 theorem trT_substT_congr {σ σ' : Atom → Flick.Ty} {t : Ty}
     (h : ∀ n, t.Occurs n → σ (.v n) = σ' (.v n)) : (trT N t).substT σ = (trT N t).substT σ' := by
   have hc : ∀ b, (trT N t).reach b → σ b = σ' b := by
@@ -119,29 +48,24 @@ theorem trT_substT_congr {σ σ' : Atom → Flick.Ty} {t : Ty}
     rw [iht (fun n hn => h n (.inl hn)) (fun b hb => hc b (.inl hb)),
       ihu (fun n hn => h n (.inr hn)) (fun b hb => hc b (.inr hb))]
   | cun q q' _ _ => exact congrArg Flick.Ty.caps (caps_congr hc)
-  | rnm _ _ _ | run _ _ _ _ =>
+  | rnm _ t iht => simp only [trT, Flick.Ty.substT, iht h hc]
+  | run r r' ihr ihr' =>
     simp only [trT, Flick.Ty.substT]
-    congr 1
-    refine Row.substT_congr fun b hb => ?_
-    rcases hb with hb | hb | ⟨M, hb⟩ | ⟨c, G, hb | hb⟩
-    · exact hc b (Or.inl hb)
-    · exact hc b (Or.inr hb)
-    all_goals simp [Row.err, Row.union, Row.single, Row.ofCaps] at hb
-  | arr φ a b q iha ihb _ _ =>
-    have hst : (trStage N φ).substT σ = (trStage N φ).substT σ' := by
+    rw [ihr (fun n hn => h n (.inl hn)) (fun b hb => hc b (.inl hb)),
+      ihr' (fun n hn => h n (.inr hn)) (fun b hb => hc b (.inr hb))]
+  | arr φ a b q iha ihb _ ihφ =>
+    have reach : ∀ {u : Ty}, (∀ n, u.Occurs n → σ (.v n) = σ' (.v n)) →
+        ∀ x, (trT N u).reach x → σ x = σ' x := fun hu x hx => by
+      obtain ⟨n, rfl, hn⟩ := trT_reach_sub N hx; exact hu n hn
+    have hst : (trStageT N φ).substS σ = (trStageT N φ).substS σ' := by
       cases φ with
       | P => rfl
       | R r e =>
-        have stage : ∀ x, (∃ n, x = .v n ∧ (Stage.R r e).Occurs n) → σ x = σ' x := by
-          rintro x ⟨n, rfl, hn⟩; exact h n (.inr (.inr (.inr hn)))
-        simp only [trStage, Flick.Stage.substT]
-        rw [Row.substT_congr fun x hx => stage x (let ⟨n, e, h⟩ := asRow_trT_atoms N hx; ⟨n, e, .inl h⟩),
-          Row.substT_congr (r := Row.union _ allNames) fun x hx => stage x ?_]
-        simp only [Row.union, allNames, or_false] at hx
-        obtain ⟨n, e, h⟩ := errRow_trT_atoms N hx
-        exact ⟨n, e, .inr h⟩
+        have hr : ∀ n, r.Occurs n → σ (.v n) = σ' (.v n) := fun n hn => h n (.inr (.inr (.inr (.inl hn))))
+        have he : ∀ n, e.Occurs n → σ (.v n) = σ' (.v n) := fun n hn => h n (.inr (.inr (.inr (.inr hn))))
+        simp only [trStageT, Ty.substS_rt, errT_substT, ihφ.1 hr (reach hr), ihφ.2 he (reach he)]
     rw [trT_arr] at hc ⊢
-    simp only [Flick.Ty.substT]
+    simp only [Flick.Ty.substT_arrow]
     rw [iha (fun n hn => h n (.inl hn)) (fun x hx => hc x (.inl hx)),
       ihb (fun n hn => h n (.inr (.inl hn))) (fun x hx => hc x (.inr (.inl hx))), hst,
       caps_congr fun x hx => hc x (.inr (.inr hx))]

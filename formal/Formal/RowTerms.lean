@@ -1,35 +1,20 @@
 import Formal.TyOps
 
 /-!
-# Syntactic rows and stages: the bridge to predicate rows
+# Row and stage terms: what they stand for
 
-The row terms retain their arguments under renaming and substitution. Their
-projection still uses the existing parameter-free `Elem`; switching the typing
-rules and indexing `Elem` by the arguments are later parts of E11. These lemmas
-do not establish the soundness of parameterized handlers.
+The row terms keep their arguments under renaming and substitution, and what they stand
+for (`Ty.asRow`, `Ty.asStage`) keeps them too: a named element is its name at its argument
+up to congruence. Subtraction removes a name at every argument.
 -/
 
 namespace Flick
 
-/-- The predicate-stage interpretation of a syntactic stage. A non-stage
-type has no interpretation, rather than being silently treated as pure. -/
-def Ty.stage : Ty → Option Stage
-  | .pure => some .pure
-  | .rt r e => some (.rt r.asRow e.asRow)
-  | _ => none
+@[simp] theorem Ty.asStage_pure : Ty.pure.asStage = .pure := rfl
 
-@[simp] theorem Ty.stage_pure : Ty.pure.stage = some .pure := rfl
+@[simp] theorem Ty.asStage_rt (r e : Ty) : (Ty.rt r e).asStage = .rt r.asRow e.asRow := rfl
 
-@[simp] theorem Ty.stage_rt (r e : Ty) : (Ty.rt r e).stage = some (.rt r.asRow e.asRow) := rfl
-
-theorem Ty.stage_rt_substT (σ : Atom → Ty) (r e : Ty) :
-    ((Ty.rt r e).substT σ).stage = (Ty.rt r e).stage.map (Stage.substT σ) := by
-  simp [Ty.substT, Ty.stage, Stage.substT, Ty.asRow_substT]
-
-theorem Ty.stage_pure_substT (σ : Atom → Ty) :
-    (Ty.pure.substT σ).stage = Ty.pure.stage.map (Stage.substT σ) := rfl
-
-example : (Ty.base .int).stage = none := rfl
+example : (Ty.base .int).asStage = .pure := rfl
 
 /-- Union is extensional at the predicate boundary, even though its syntax
 records the order of its operands. -/
@@ -39,13 +24,15 @@ theorem Ty.run_asRow_comm (r s : Ty) : (Ty.run r s).asRow = (Ty.run s r).asRow :
 theorem Ty.run_asRow_idem (r : Ty) : (Ty.run r r).asRow = r.asRow := by
   funext x; simp [Ty.asRow, Row.union]
 
+/-- `Store α`, the named element of the service `Store` at the argument `α`. -/
+def storeOf (a : Ty) : Ty := .rnm "Store" (.tapp (.adt "Store") a)
+
 /-- Instantiating a row element keeps its type argument, rather than only the
 argument's reach or its name. -/
-example : (Ty.rnm "Store" (.tvar 0)).substT (instT [.base .int]) =
-    .rnm "Store" (.base .int) := by
-  simp [Ty.substT, instT]
+example : (storeOf (.tvar 0)).substT (instT [.base .int]) = storeOf (.base .int) := by
+  simp [storeOf, Ty.substT, instT]
 
-example : Ty.rnm "Store" (.base .int) ≠ Ty.rnm "Store" (.base .bool) := by
+example : storeOf (.base .int) ≠ storeOf (.base .bool) := by
   intro h; cases h
 
 /-- A binder in an element's argument is protected by lifted substitution. -/
@@ -53,14 +40,14 @@ example : (Ty.rnm "Store" (.all 1 (.tvar 0))).substT (instT [.base .int]) =
     .rnm "Store" (.all 1 (.tvar 0)) := by
   simp [Ty.substT, liftT]
 
-/-- Substitution into an open row still excludes a forbidden capability. -/
-example : ¬ ((Ty.rless (fun n => n = "Db") (.tvar 0)).substT
-    (instT [.rnm "Db" .rnil])).asRow (.nm "Db") := by
+/-- Substitution into an open row still excludes a forbidden capability, at every argument. -/
+example (c : TyClass) : ¬ ((Ty.rless (fun n => n = "Store") (.tvar 0)).substT
+    (instT [.run (storeOf (.base .int)) (storeOf (.base .bool))])).asRow (.nm "Store" c) := by
   simp [Ty.substT, instT, Ty.asRow, Row.less]
 
 /-- A service not named by the subtraction is retained. -/
 example : ((Ty.rless (fun n => n = "Db") (.tvar 0)).substT
-    (instT [.rnm "Clock" .rnil])).asRow (.nm "Clock") := by
-  simp [Ty.substT, instT, Ty.asRow, Row.less, Row.union, Row.single]
+    (instT [.rnm "Clock" (.adt "Clock")])).asRow (.nm "Clock" (Ty.adt "Clock").classOf) := by
+  simp [Ty.substT, instT, Ty.asRow, Row.less, Row.union, Row.inst]
 
 end Flick

@@ -1,137 +1,105 @@
 import Formal.TypeEquivSubst
+import Formal.TypeEquivView
 
 /-!
-# Rows indexed by type arguments
+# Named row elements keep their arguments
 
-Unlike the legacy `Elem`, these elements retain the arguments of services
-and errors modulo the type congruence. The projection is used to validate
-that congruence before transporting typing across it.
+A named element of a row stands for its name at its argument up to congruence
+(`Ty.asRow`), so congruence never identifies `Store Int` with `Store Bool`: not as rows,
+not after a substitution, not under an invariant type such as `Ref`, and not under a
+binder, which lifted substitution protects. Subtraction `rless G` still removes a name at
+every argument.
 -/
 
 namespace Flick
 
-def Ty.equivSetoid : Setoid Ty where
-  r := Ty.Equiv
-  iseqv := ⟨fun _ => .refl, fun h => .symm h, fun h h' => .trans h h'⟩
-
-abbrev TyClass := Quotient Ty.equivSetoid
-
-def Ty.classOf (t : Ty) : TyClass := Quotient.mk _ t
-
-inductive IndexedElem
-  | nm (name : Name) (args : TyClass)
-  | atm (atom : Atom)
-  | ob (name : Name) (args : TyClass) (atom : Atom)
-  | rv (atom : Atom) (gone : Name → Prop)
-  | obv (varAtom : Atom) (gone : Name → Prop) (owner : Atom)
-
-abbrev IndexedRow := IndexedElem → Prop
-
-def IndexedRow.none : IndexedRow := fun _ => False
-def IndexedRow.union (r s : IndexedRow) : IndexedRow := fun x => r x ∨ s x
-def IndexedRow.single (N : Name) (args : TyClass) : IndexedRow := fun x => x = .nm N args
-def IndexedRow.ofCaps (C : Caps) : IndexedRow
-  | .atm a => C a
-  | _ => False
-
-def IndexedRow.less (G : Name → Prop) (r : IndexedRow) : IndexedRow
-  | .nm N args => ¬ G N ∧ r (.nm N args)
-  | .atm a => r (.atm a)
-  | .rv c H => ∃ H', r (.rv c H') ∧ H = fun n => G n ∨ H' n
-  | _ => False
-
-/-- Legacy rows have no type arguments. Their plain part embeds at the
-empty argument spine; obligations are not imported through a row variable. -/
-def IndexedRow.ofLegacy (r : Row) : IndexedRow
-  | .nm N args => args = Ty.rnil.classOf ∧ r (.nm N)
-  | .atm a => r (.atm a)
-  | .rv c G => r (.rv c G)
-  | _ => False
-
-def Ty.asIndexedRow : Ty → IndexedRow
-  | .tvar n => fun x => x = .rv (.v n) fun _ => False
-  | .rg p => fun x => x = .rv (.r p) fun _ => False
-  | .row r => .ofLegacy r
-  | .cnil => .none
-  | .rnm N args => .union (.single N args.classOf) (.ofCaps args.reach)
-  | .run r s => .union r.asIndexedRow s.asIndexedRow
-  | .rless G r => r.asIndexedRow.less G
-  | t => .ofCaps t.reach
-
-@[simp] theorem Ty.asIndexedRow_ob (t : Ty) (N : Name) (args : TyClass) (a : Atom) :
-    ¬ t.asIndexedRow (.ob N args a) := by
-  induction t <;> simp_all [Ty.asIndexedRow, IndexedRow.ofLegacy, IndexedRow.ofCaps,
-    IndexedRow.none, IndexedRow.single, IndexedRow.union, IndexedRow.less]
-
-@[simp] theorem Ty.asIndexedRow_obv (t : Ty) (v a : Atom) (G : Name → Prop) :
-    ¬ t.asIndexedRow (.obv v G a) := by
-  induction t <;> simp_all [Ty.asIndexedRow, IndexedRow.ofLegacy, IndexedRow.ofCaps,
-    IndexedRow.none, IndexedRow.single, IndexedRow.union, IndexedRow.less]
-
-theorem Ty.Equiv.indexedRow {a b : Ty} (h : Ty.Equiv a b) :
-    a.asIndexedRow = b.asIndexedRow := by
-  induction h with
-  | refl => rfl
-  | symm _ ih => exact ih.symm
-  | trans _ _ ih₁ ih₂ => exact ih₁.trans ih₂
-  | arrow h₁ h₂ => exact congrArg IndexedRow.ofCaps (Ty.Equiv.arrow h₁ h₂).reach
-  | ref h => exact congrArg IndexedRow.ofCaps (Ty.Equiv.ref h).reach
-  | tapp h₁ h₂ => exact congrArg IndexedRow.ofCaps (Ty.Equiv.tapp h₁ h₂).reach
-  | rcons h₁ h₂ => exact congrArg IndexedRow.ofCaps (Ty.Equiv.rcons h₁ h₂).reach
-  | eff h => exact congrArg IndexedRow.ofCaps (Ty.Equiv.eff h).reach
-  | lazy h => exact congrArg IndexedRow.ofCaps (Ty.Equiv.lazy h).reach
-  | lazyCell h => exact congrArg IndexedRow.ofCaps (Ty.Equiv.lazyCell h).reach
-  | hnd h => exact congrArg IndexedRow.ofCaps (Ty.Equiv.hnd h).reach
-  | owner h => exact congrArg IndexedRow.ofCaps (Ty.Equiv.owner h).reach
-  | dict h => exact congrArg IndexedRow.ofCaps (Ty.Equiv.dict h).reach
-  | all h => exact congrArg IndexedRow.ofCaps (Ty.Equiv.all h).reach
-  | rnm h =>
-    have he : Ty.classOf _ = Ty.classOf _ := Quotient.sound h
-    simp only [Ty.asIndexedRow, he, h.reach]
-  | run _ _ ih₁ ih₂ => simp only [Ty.asIndexedRow, ih₁, ih₂]
-  | rless G _ ih => simp only [Ty.asIndexedRow, ih]
-  | rt => rfl
-  | run_comm r s => funext x; simp [Ty.asIndexedRow, IndexedRow.union, or_comm]
-  | run_assoc r s t => funext x; simp [Ty.asIndexedRow, IndexedRow.union, or_assoc]
-  | run_idem r _ => funext x; simp [Ty.asIndexedRow, IndexedRow.union]
-  | run_nil r _ => funext x; simp [Ty.asIndexedRow, IndexedRow.union, IndexedRow.none]
-  | rless_nil G => funext x; cases x <;> simp [Ty.asIndexedRow, IndexedRow.less, IndexedRow.none]
-  | rless_none r _ =>
-    funext x; cases x <;> simp [Ty.asIndexedRow, IndexedRow.less]
-  | rless_run G r s =>
-    funext x; apply propext
-    cases x <;> simp only [Ty.asIndexedRow, IndexedRow.less, IndexedRow.union] <;> grind
-  | rless_merge G H r =>
-    funext x; apply propext
-    cases x with
-    | nm N args | atm a | ob N args a | obv v G a => simp [Ty.asIndexedRow, IndexedRow.less] <;> grind
-    | rv c K =>
-      simp only [Ty.asIndexedRow, IndexedRow.less]
-      constructor
-      · rintro ⟨K', ⟨K'', h, rfl⟩, rfl⟩
-        exact ⟨K'', h, by funext n; apply propext; exact or_assoc.symm⟩
-      · rintro ⟨K', h, rfl⟩
-        exact ⟨fun n => H n ∨ K' n, ⟨K', h, rfl⟩, by
-          funext n; apply propext; exact or_assoc⟩
-  | rless_keep G N a h | rless_drop G N a h =>
-    funext x; cases x <;>
-      simp [Ty.asIndexedRow, IndexedRow.less, IndexedRow.union, IndexedRow.single,
-        IndexedRow.ofCaps, Ty.reach] <;> grind
-  | caps_nil =>
-    funext x; cases x <;> simp [Ty.asIndexedRow, Ty.reach, IndexedRow.ofCaps, IndexedRow.none, Caps.none]
-  | caps_union C D =>
-    funext x; cases x <;> simp [Ty.asIndexedRow, Ty.reach, IndexedRow.ofCaps, IndexedRow.union]
-  | rless_caps G C =>
-    funext x; cases x <;> simp [Ty.asIndexedRow, Ty.reach, IndexedRow.ofCaps, IndexedRow.less]
+/-- Two named elements are congruent exactly when their arguments are. -/
+theorem Ty.Equiv.rnm_iff {N : Name} {a b : Ty} : Ty.Equiv (.rnm N a) (.rnm N b) ↔ Ty.Equiv a b := by
+  refine ⟨fun h => ?_, .rnm⟩
+  have hi : (Ty.rnm N a).asRow (.nm N a.classOf) := .inl rfl
+  have hb := Eq.mp (congrFun h.asRow (.nm N a.classOf)) hi
+  have he : a.classOf = b.classOf := by
+    simpa [Ty.asRow, Row.union, Row.inst, Row.ofCaps] using hb
+  exact Ty.classOf_eq.mp he
 
 theorem Ty.rnm_int_not_bool (N : Name) :
-    ¬ Ty.Equiv (.rnm N (.base .int)) (.rnm N (.base .bool)) := by
+    ¬ Ty.Equiv (.rnm N (.base .int)) (.rnm N (.base .bool)) := fun h =>
+  nomatch (Ty.Equiv.rnm_iff.mp h).base_inj
+
+/-- `S α`: the element of the service or error `S` at its one argument `α`. -/
+def Ty.nm1 (S : Name) (a : Ty) : Ty := .rnm S (.tapp (.adt S) a)
+
+theorem Ty.nm1_int_not_bool (S : Name) : ¬ Ty.Equiv (Ty.nm1 S (.base .int)) (Ty.nm1 S (.base .bool)) :=
+  fun h => by
+    have h := Ty.Equiv.rnm_iff.mp h
+    cases h.form with
+    | rows hr _ => cases hr
+    | tapp _ ha => exact nomatch ha.base_inj
+
+/-- A row that holds `S Int` does not hold `S Bool`, and congruence keeps what a row holds. -/
+theorem Ty.Equiv.row_int_not_bool {S : Name} {r : Ty}
+    (h : Ty.Equiv (.run (Ty.nm1 S (.base .int)) r) (.run (Ty.nm1 S (.base .bool)) r))
+    (hr : ¬ r.asRow (.nm S (Ty.tapp (.adt S) (.base .int)).classOf)) : False := by
+  have hi : (Ty.run (Ty.nm1 S (.base .int)) r).asRow (.nm S (Ty.tapp (.adt S) (.base .int)).classOf) :=
+    .inl (.inl rfl)
+  rcases Eq.mp (congrFun h.asRow _) hi with (hb | hb) | hb
+  · have := Ty.classOf_eq.mp (Elem.nm.inj hb).2
+    exact Ty.nm1_int_not_bool S (.rnm this)
+  · exact hb
+  · exact hr hb
+
+/-- The stage of a function that performs `S Int` is not that of one performing `S Bool`, even
+inside the invariant `Ref`. -/
+theorem Ty.ref_int_not_bool (S : Name) (a b : Ty) (C : Caps) :
+    ¬ Ty.Equiv (.ref (.arrow a (.rt (Ty.nm1 S (.base .int)) .cnil) b C))
+      (.ref (.arrow a (.rt (Ty.nm1 S (.base .bool)) .cnil) b C)) := by
   intro h
-  have hi : (Ty.rnm N (.base .int)).asIndexedRow (.nm N (Ty.base .int).classOf) := .inl rfl
-  have hb := Eq.mp (congrFun h.indexedRow (.nm N (Ty.base .int).classOf)) hi
-  have he : (Ty.base .int).classOf = (Ty.base .bool).classOf := by
-    simpa [Ty.asIndexedRow, IndexedRow.union, IndexedRow.single, IndexedRow.ofCaps] using hb
-  have hc := (Quotient.exact he : Ty.Equiv (.base .int) (.base .bool)).base_inj
-  cases hc
+  cases h.form with
+  | rows hr _ => cases hr
+  | ref h =>
+    cases h.form with
+    | rows hr _ => cases hr
+    | arrow _ hφ _ =>
+      have := congrArg Stage.svc hφ.asStage
+      have hi : (Ty.nm1 S (.base .int)).asRow (.nm S (Ty.tapp (.adt S) (.base .int)).classOf) :=
+        .inl rfl
+      have hb := Eq.mp (congrFun this _) hi
+      simp only [Ty.asStage, Stage.svc, Ty.nm1, Ty.asRow, Row.union, Row.inst, Row.ofCaps,
+        Elem.nm.injEq, true_and, or_false] at hb
+      exact Ty.nm1_int_not_bool S (.rnm (Ty.classOf_eq.mp hb))
+
+/-- A substitution keeps them apart: the instance of `α` in `S α` is protected below a binder
+by lifted substitution, so the bound `Ref (∀β. β →{S α} β)` at `Int` and at `Bool` differ. -/
+theorem Ty.bound_int_not_bool (S : Name) :
+    let body := Ty.all 1 (.arrow (.tvar 0) (.rt (Ty.nm1 S (.tvar 1)) .cnil) (.tvar 0) Caps.none)
+    ¬ Ty.Equiv ((Ty.ref body).substT (instT [.base .int]))
+      ((Ty.ref body).substT (instT [.base .bool])) := by
+  intro body h
+  simp only [body, Ty.substT, Ty.isStage, if_true, Ty.nm1, liftT, instT] at h
+  simp at h
+  cases h.form with
+  | rows hr _ => cases hr
+  | ref h =>
+    cases h.form with
+    | rows hr _ => cases hr
+    | all h =>
+      cases h.form with
+      | rows hr _ => cases hr
+      | arrow _ hφ _ =>
+        have := congrArg Stage.svc hφ.asStage
+        have hi : (Ty.rnm S (.tapp (.adt S) (.base .int))).asRow
+            (.nm S (Ty.tapp (.adt S) (.base .int)).classOf) := .inl rfl
+        have hb := Eq.mp (congrFun this _) (by simpa [Ty.up, Ty.ren, Atom.up, Atom.ty] using hi)
+        simp only [Ty.asStage, Stage.svc, Ty.asRow, Row.union, Row.inst, Row.ofCaps,
+          Elem.nm.injEq, true_and, or_false] at hb
+        have := Ty.classOf_eq.mp hb
+        simp only [Ty.up, Ty.ren] at this
+        exact Ty.nm1_int_not_bool S (.rnm this)
+
+/-- Subtraction is by name: `-S` removes `S` at every argument, before and after a
+substitution. -/
+theorem Ty.rless_removes_all (S : Name) (r : Ty) (σ : Atom → Ty) (c : TyClass) :
+    ¬ ((Ty.rless (· = S) r).substT σ).asRow (.nm S c) := by
+  simp [Ty.substT, Ty.asRow, Row.less]
 
 end Flick

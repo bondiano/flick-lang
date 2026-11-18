@@ -55,7 +55,7 @@ theorem kill_atom (n : Nat) (b a : Atom) (h : (kill n b).reach a) : kill n b = a
     · simp [kill, hq, Ty.reach, Caps.none] at h
 
 theorem kill_noNames (n : Nat) : NoNames (kill n) := by
-  intro b N hb
+  intro b N c hb
   cases b with
   | v i => simp [kill, Ty.asRow_tvar] at hb
   | r q =>

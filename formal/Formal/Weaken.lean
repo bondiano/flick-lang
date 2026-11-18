@@ -55,7 +55,7 @@ theorem Typ.weakenStore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) (X : List Ty) :
   | errVal hv _ hU hE ih => exact .errVal hv (ih X) hU hE
   | tryR _ _ hφ hs ih₁ ih₂ => exact .tryR (ih₁ X) (ih₂ X) hφ hs
   | tryP _ _ ih₁ ih₂ => exact .tryP (ih₁ X) (ih₂ X)
-  | handle hv _ _ hc ha hφ ih₁ ih₂ => exact .handle hv (ih₁ X) (ih₂ X) hc ha hφ
+  | handle hv _ hU hE _ hc ha hφ ih₁ ih₂ => exact .handle hv (ih₁ X) hU hE (ih₂ X) hc ha hφ
   | hnil hH => exact .hnil hH
   | hcons hp _ _ hH ih₁ ih₂ => exact .hcons hp (ih₁ X) (ih₂ X) hH
   | hguard hp _ _ _ hH ih₁ ih₂ ih₃ => exact .hguard hp (ih₁ X) (ih₂ X) (ih₃ X) hH
@@ -216,9 +216,9 @@ theorem Typ.rename {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | errVal hv _ hU hE ih => intro _ _ hξ; exact .errVal hv.rename (ih hξ) hU hE
   | tryR _ _ hφ hs ih₁ ih₂ => intro _ _ hξ; exact .tryR (ih₁ hξ) (ih₂ hξ) hφ hs
   | tryP _ _ ih₁ ih₂ => intro _ _ hξ; exact .tryP (ih₁ hξ) (ih₂ hξ)
-  | handle hv _ _ hc ha hφ ih₁ ih₂ =>
+  | handle hv _ hU hE _ hc ha hφ ih₁ ih₂ =>
     intro _ ξ hξ
-    exact .handle hv.rename (ih₁ hξ) (ih₂ hξ) (hc.map (Homo.rename ξ) hv) ha hφ
+    exact .handle hv.rename (ih₁ hξ) hU hE (ih₂ hξ) hc ha hφ
   | hnil hH => intro _ _ _; exact .hnil hH
   | hcons hp _ _ hH ih₁ ih₂ =>
     intro _ _ hξ; exact .hcons hp (ih₁ (hξ.lift _ (by simpa using hp.binds))) (ih₂ hξ) hH

@@ -82,14 +82,14 @@ fn a_row_given_to_a_row_parameter_is_its_instance() {
     let written = |t: &Type| super::ty(&substitute(t, &at), &env);
     assert_eq!(
         written(&app("Failure", e())),
-        Ok("(.tapp (.adt \"Prelude.Failure\") (.row Row.none))".into())
+        Ok("(.tapp (.adt \"Prelude.Failure\") .cnil)".into())
     );
     assert_eq!(
         written(&app(
             "Option",
             Type::Errors(Row::var(Var::Named("e".into())))
         )),
-        Ok("(.tapp (.adt \"Prelude.Option\") (.errors Row.none))".into())
+        Ok("(.tapp (.adt \"Prelude.Option\") (.errors .cnil))".into())
     );
 }
 

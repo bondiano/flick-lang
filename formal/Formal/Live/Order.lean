@@ -182,7 +182,7 @@ theorem LeLive.trans_lt (n : Nat) : ∀ {b a c : Ty}, sizeOf b < n → LeLive S 
     · obtain ⟨r, ε, t, C, rfl⟩ := hE
       obtain ⟨_, _, _, _, rfl, hφ, ht, hc⟩ := h₁.eff_right
       obtain ⟨_, _, _, _, rfl, gφ, gt, gc⟩ := h₂.eff_left
-      exact .eff (Stage.le_trans hφ gφ) (ih (by first | simp | (simp; omega)) ht gt)
+      exact .eff (Stage.le_trans hφ gφ) (ih (by simp; omega) ht gt)
         (hc.trans gc)
     by_cases hR : ∃ l t r, b = .rcons l t r
     · obtain ⟨l, t, r, rfl⟩ := hR
@@ -238,10 +238,12 @@ theorem LeLive.substT {a b : Ty} (σ : Atom → Ty) (h : LeLive S a b) :
   | equiv he => exact .equiv (he.substT σ)
   | arrow _ hφ _ hc ih₁ ih₂ =>
     refine .arrow ih₁ ?_ ih₂ (sub hc)
-    simpa only [Stage.use_substT] using Stage.le_substT σ hφ
+    simpa only [Stage.use_substT, Ty.asStage_substS] using Stage.le_substT σ hφ
   | eff hφ _ hc ih =>
     refine .eff ?_ ih (sub hc)
-    simpa only [Stage.use_substT] using Stage.le_substT σ hφ
+    have := Stage.le_substT σ hφ
+    rw [Stage.use_substT, Stage.use_substT] at this
+    simpa only [Stage.substT, Ty.asRow_substT] using this
   | rcons _ _ hc ih₁ ih₂ => exact .rcons ih₁ ih₂ (sub hc)
   | hide hi hl he hr ha hb =>
     subst ha; subst hb
@@ -289,9 +291,11 @@ theorem Const.ok_substT {Θ c ι} (σ : Atom → Ty)
     (h : Const.ok Θ c ι) : Const.ok (Θ.substT σ) c (ι.substT σ) := by
   cases c <;> simp only [Const.ok, CArg.substT] at h ⊢
   case addFin =>
-    exact ⟨h.1.substT σ, Row.outlives_substT σ h.2.1, by rw [← Row.ofCaps_substT]; exact h.2.2.substT σ⟩
+    exact ⟨h.1.substT σ, Row.outlives_substT σ h.2.1, by
+      rw [← Row.ofCaps_substT, Ty.asRow_substT]; exact h.2.2.substT σ⟩
   case spawn =>
-    refine ⟨?_, Row.outlives_substT σ h.2.1, by rw [← Row.ofCaps_substT]; exact h.2.2.substT σ⟩
+    refine ⟨?_, Row.outlives_substT σ h.2.1, by
+      rw [← Row.ofCaps_substT, Ty.asRow_substT]; exact h.2.2.substT σ⟩
     have hs := h.1.substT σ
     intro a ha
     apply hs a
@@ -299,7 +303,7 @@ theorem Const.ok_substT {Θ c ι} (σ : Atom → Ty)
     · exact ⟨b, .inl hb, h'⟩
     · obtain ⟨b, hb, h'⟩ := (Ty.reach_substT σ _ a).mp ha
       exact ⟨b, .inr hb, h'⟩
-  case scopeRun => rw [← Row.ofCaps_substT]; exact h.substT σ
+  case scopeRun => rw [← Row.ofCaps_substT, Ty.asRow_substT]; exact h.substT σ
   case refMake | refGet | refSet => rw [← Ty.reach_caps]; exact h.substT σ
   all_goals exact h
 

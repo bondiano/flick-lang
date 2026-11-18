@@ -22,7 +22,7 @@ macro_rules
 
 /-- `t.NoV i` of a concrete type. -/
 macro "no_v" : tactic => `(tactic| (
-  simp [Ty.NoV, Ty.substT, Stage.substT, dropV, Ty.ident]
+  simp [Ty.NoV, Ty.substT, Ty.isStage, dropV, Ty.ident]
   all_goals first
     | (funext x; simp [Caps.substT, dropV, Ty.ident, Ty.reach]; (try omega))
     | omega))
@@ -80,7 +80,7 @@ theorem genCtor_closed : ∀ K k ts T σ, genCtor K = some (k, ts, T) →
     (∀ i, i < k → σ (.v i) = .tvar i) → ts.map (Ty.substT σ) = ts := by
   intro K k ts T σ hK hσ
   unfold genCtor at hK
-  split at hK <;> cases hK <;> simp [Ty.substT, Stage.substT, hσ] <;>
+  split at hK <;> cases hK <;> simp [Ty.substT, Ty.isStage, hσ] <;>
     funext a <;> simp [Caps.substT, hσ]
 
 theorem genCtor_reach : ∀ K k ts T, genCtor K = some (k, ts, T) →
@@ -129,12 +129,12 @@ theorem GenSig.complete {S : Sig} (hS : GenSig S) {E o : Name} (h : genOps E = [
 
 def genSig : Sig where
   ctor := genCtor
-  impl _ := .errors Row.none
+  impl _ := .errors .cnil
   ctor_closed := genCtor_closed
   ctor_reach := genCtor_reach
   res := genRes
   res_closed := genRes_closed
-  impl_closed _ _ := by simp [Ty.substT, Row.none_substT]
+  impl_closed _ _ := rfl
   dict := genDict
   glob := genGlob
   dict_closed := genDict_closed

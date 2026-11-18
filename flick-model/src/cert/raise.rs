@@ -4,7 +4,7 @@
 //! `formal/FormalCert/Match.lean`.
 
 use crate::syntax::{Arm, Const, Head, Pat, Term};
-use crate::translate::lean::elide::row;
+use crate::translate::lean::elide::{row, row_pred};
 use crate::types::{Stage, Type};
 
 use super::Unsupported;
@@ -51,9 +51,10 @@ impl Cx<'_> {
             .clone()
             .ok_or("a `try` without its stage")?;
         let pb = self.typing(body, t, col + 2)?;
+        // the errors of the body as a row term, which the arms read (`Catches`)
         let (services, e0) = match &stage {
-            Stage::Pure => (None, "Row.none".to_owned()),
-            Stage::Runtime(r, e) => (Some(row(r, &self.env)?), row(e, &self.env)?),
+            Stage::Pure => (None, ".cnil".to_owned()),
+            Stage::Runtime(r, e) => (Some(row_pred(r, &self.env)?), row(e, &self.env)?),
         };
         let boolean = Type::con("Prelude", "Bool");
         let mut h = "Row.none".to_owned();
@@ -82,11 +83,11 @@ impl Cx<'_> {
             } else {
                 let catches = match error {
                     None => {
-                        h.clone_from(&e0);
+                        h = format!("(Ty.asRow {e0})");
                         "catches_all".to_owned()
                     }
                     Some((e, true)) => {
-                        h = format!("(fun x => x = .nm {e:?} ∨ {after} x)");
+                        h = format!("(fun x => x = .nm₀ {e:?} ∨ {after} x)");
                         format!(
                             "(catches_ctor (exh_gen hS (T := {e:?}) (us := []) (by decide) (by decide)))"
                         )
@@ -100,7 +101,7 @@ impl Cx<'_> {
             None => format!("(.tryP (H := {h}){pad}{pb}{pad}{alts})"),
             Some(r) => format!(
                 "(.tryR (r := {r}) (ε₀ := {e0}) (H := {h}) (ε' := {}){pad}{pb}{pad}{alts}{pad}(by stage_le) (by row_set))",
-                row(&rest, &self.env)?
+                row_pred(&rest, &self.env)?
             ),
         })
     }

@@ -1,4 +1,4 @@
-import Formal.Rules
+import Formal.Roots
 
 /-!
 # Typing of the store (core.md §3.6, lazy.md §3)
@@ -13,8 +13,8 @@ variable (S : Sig)
 
 /-- The states of a lazy cell of `Lazy r ε t C`: `Pending e` with `e` typed as the body of a
 `task`, `Running`, and `Done o` with the term of an outcome of the lazy. -/
-inductive CellTy (Ψ : List Ty) (r ε : Row) (t : Ty) (C : Caps) : Tm → Prop
-  | pending : Typ S Ψ Facts.age [] e (.ex t ψ) → ψ.le (Stage.use (.rt r ε) C) → e.NoIns →
+inductive CellTy (Ψ : List Ty) (r ε : Ty) (t : Ty) (C : Caps) : Tm → Prop
+  | pending : Typ S Ψ Facts.age [] e (.ex t ψ) → ψ.le (Stage.use (.rt r.asRow ε.asRow) C) → e.NoIns →
       CellTy Ψ r ε t C (.lazy e)
   | running : CellTy Ψ r ε t C .running
   | ok : Value v → Typ S Ψ Facts.age [] v (.ex t .pure) → CellTy Ψ r ε t C (.done v)

@@ -15,12 +15,12 @@ variable {S : Sig}
 theorem Typ.app_arrow {Ψ Θ Γ f x a ψ t C φ}
     (h : Typ S Ψ Θ Γ (.app f x) (.ex (.arrow a ψ t C) φ)) :
     ∃ A χ u D, Typ S Ψ Θ Γ f (.ex (.arrow A χ u D) φ) ∧
-      Typ S Ψ Θ Γ x (.ex A φ) ∧ (Stage.use χ D).le φ ∧ LeLive S u (.arrow a ψ t C) :=
+      Typ S Ψ Θ Γ x (.ex A φ) ∧ (Stage.use χ.asStage D).le φ ∧ LeLive S u (.arrow a ψ t C) :=
   h.app_type f x _ φ rfl rfl (by simp [Ty.isAll]) (by simp [Ty.kind])
 
 private theorem Typ.lamCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ b T φ, e = .lam b → J = .ex T φ → ¬ T.isAll → T.kind ≠ 7 →
-      ∃ A χ u D, Typ S Ψ Θ (.mono A :: Γ) b (.ex u (Stage.use χ D)) ∧
+      ∃ A χ u D, Typ S Ψ Θ (.mono A :: Γ) b (.ex u (Stage.use χ.asStage D)) ∧
         b.NoIns ∧ LeLive S (.arrow A χ u D) T := by
   induction h with
   | conv _ he ih =>
@@ -35,13 +35,13 @@ private theorem Typ.lamCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
 
 theorem Typ.lam_arrow {Ψ Θ Γ b a ψ t C φ}
     (h : Typ S Ψ Θ Γ (.lam b) (.ex (.arrow a ψ t C) φ)) :
-    ∃ A χ u D, Typ S Ψ Θ (.mono A :: Γ) b (.ex u (Stage.use χ D)) ∧
+    ∃ A χ u D, Typ S Ψ Θ (.mono A :: Γ) b (.ex u (Stage.use χ.asStage D)) ∧
       b.NoIns ∧ LeLive S (.arrow A χ u D) (.arrow a ψ t C) :=
   h.lamCore b _ φ rfl rfl (by simp [Ty.isAll]) (by simp [Ty.kind])
 
 private theorem Typ.fixCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ b T φ, e = .fix b → J = .ex T φ → ¬ T.isAll → T.kind ≠ 7 →
-      ∃ A χ u D, Typ S Ψ Θ (.mono A :: .mono (.arrow A χ u D) :: Γ) b (.ex u (Stage.use χ D)) ∧
+      ∃ A χ u D, Typ S Ψ Θ (.mono A :: .mono (.arrow A χ u D) :: Γ) b (.ex u (Stage.use χ.asStage D)) ∧
         b.NoIns ∧ LeLive S (.arrow A χ u D) T := by
   induction h with
   | conv _ he ih =>
@@ -56,7 +56,7 @@ private theorem Typ.fixCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
 
 theorem Typ.fix_arrow {Ψ Θ Γ b a ψ t C φ}
     (h : Typ S Ψ Θ Γ (.fix b) (.ex (.arrow a ψ t C) φ)) :
-    ∃ A χ u D, Typ S Ψ Θ (.mono A :: .mono (.arrow A χ u D) :: Γ) b (.ex u (Stage.use χ D)) ∧
+    ∃ A χ u D, Typ S Ψ Θ (.mono A :: .mono (.arrow A χ u D) :: Γ) b (.ex u (Stage.use χ.asStage D)) ∧
       b.NoIns ∧ LeLive S (.arrow A χ u D) (.arrow a ψ t C) :=
   h.fixCore b _ φ rfl rfl (by simp [Ty.isAll]) (by simp [Ty.kind])
 
@@ -85,7 +85,7 @@ theorem Typ.const_arrow {Ψ Θ Γ c a ψ t C φ}
 private theorem Typ.performCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ E o cl T φ, e = .const (.perform E o cl) → J = .ex T φ → ¬ T.isAll → T.kind ≠ 7 →
       ∃ a b u, S.op E o = some (cl, a, b) ∧
-        LeLive S (.arrow a (.rt (Row.single E) Row.none) (if cl = .abort then u else b) Caps.none) T := by
+        LeLive S (.arrow a (.rt (.rnm E (.adt E)) .cnil) (if cl = .abort then u else b) Caps.none) T := by
   induction h with
   | conv _ he ih =>
     intro E o cl T φ hc hJ hA hk; cases hJ
@@ -101,7 +101,7 @@ private theorem Typ.performCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
 theorem Typ.perform_arrow {Ψ Θ Γ E o cl a ψ t C φ}
     (h : Typ S Ψ Θ Γ (.const (.perform E o cl)) (.ex (.arrow a ψ t C) φ)) :
     ∃ a₀ b₀ u, S.op E o = some (cl, a₀, b₀) ∧
-      LeLive S (.arrow a₀ (.rt (Row.single E) Row.none) (if cl = .abort then u else b₀) Caps.none)
+      LeLive S (.arrow a₀ (.rt (.rnm E (.adt E)) .cnil) (if cl = .abort then u else b₀) Caps.none)
         (.arrow a ψ t C) :=
   h.performCore E o cl _ φ rfl rfl (by simp [Ty.isAll]) (by simp [Ty.kind])
 

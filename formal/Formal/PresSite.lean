@@ -39,7 +39,8 @@ theorem const_app_rt {Ψ Θ c w t} (h : Typ S Ψ Θ [] (.app (.const c) w) (.ex 
   exact Stage.use_rt_le_ne_pure (Stage.le_trans lψ hψ) rfl
 
 theorem const_app2_rt {Ψ Θ c w₁ w₂ t} (h : Typ S Ψ Θ [] (.app (.app (.const c) w₁) w₂) (.ex t .pure))
-    (hc : ∀ ι, ∃ a b r e d C C', c.ty S ι = .arrow a .pure (.arrow b (.rt r e) d C) C') : False := by
+    (hc : ∀ ι, ∃ a b φ d C C', c.ty S ι = .arrow a .pure (.arrow b φ d C) C' ∧
+      ∃ r e, φ.asStage = .rt r e) : False := by
   have hn : ¬ Value (.app (.app (.const c) w₁) w₂) := by
     intro hv
     cases hv with
@@ -47,12 +48,13 @@ theorem const_app2_rt {Ψ Θ c w₁ w₂ t} (h : Typ S Ψ Θ [] (.app (.app (.co
   obtain ⟨_, _, _, _, hf, _, hψ, _⟩ := h.app_nonvalue _ _ _ _ rfl rfl hn
   obtain ⟨_, _, _, _, hc', _, _, hT₁⟩ := hf.app_arrow
   obtain ⟨ι, hT'⟩ := hc'.const_witness
-  obtain ⟨_, _, _, _, _, _, _, hx⟩ := hc ι
+  obtain ⟨_, _, _, _, _, _, hx, _, _, hφ⟩ := hc ι
   rw [hx] at hT'
   obtain ⟨_, _, _, _, h, _, _, lt, -⟩ := hT'.arrow_left
   cases h
   obtain ⟨_, _, _, _, h, _, lψ, _, -⟩ := (lt.trans hT₁).arrow_left
   cases h
+  rw [hφ] at lψ
   exact Stage.use_rt_le_ne_pure (Stage.le_trans lψ hψ) rfl
 
 theorem perform_arrow {E o c} {ι : CArg} :
@@ -62,12 +64,12 @@ theorem perform_arrow {E o c} {ι : CArg} :
 
 /-- An operation takes a stage with its effect. -/
 theorem perform_svc {Ψ Θ E o c w t φ} (h : Typ S Ψ Θ [] (.app (.const (.perform E o c)) w) (.ex t φ)) :
-    φ.svc (.nm E) := by
+    φ.svc (.nm₀ E) := by
   obtain ⟨_, _, _, _, hf, _, hψ, _⟩ := h.app_nonvalue _ _ _ _ rfl rfl perform_not_value
   obtain ⟨_, _, _, _, hT'⟩ := hf.perform_arrow
   obtain ⟨_, _, _, _, h, _, lψ, _, -⟩ := hT'.arrow_left
   cases h
-  exact Stage.le_svc (Stage.le_trans (Stage.le_trans (Stage.le_use _ _) lψ) hψ) _ rfl
+  exact Stage.le_svc (Stage.le_trans (Stage.le_trans (Stage.le_use _ _) lψ) hψ) _ (.inl rfl)
 
 /-- An operation that has a type is declared. -/
 theorem perform_op' {Ψ Θ E o c w t φ} (h : Typ S Ψ Θ [] (.app (.const (.perform E o c)) w) (.ex t φ)) :
@@ -90,7 +92,7 @@ private theorem Typ.runtimeStage {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro Λ μ Λ' μ' e' t hΓ hJ hh; cases hΓ; cases hJ
     have h := Typ.app hf hx hψ hT
     cases hh with
-    | refSet => exact const_app2_rt h fun _ => ⟨_, _, _, _, _, _, _, rfl⟩
+    | refSet => exact const_app2_rt h fun _ => ⟨_, _, _, _, _, _, rfl, _, _, rfl⟩
     | op => exact const_app_rt h fun ι => op_rt ι
     | _ => exact const_app_rt h fun _ => ⟨_, _, _, _, _, rfl⟩
   | hwith _ _ _ _ _ _ _ hφ _ _ =>
@@ -109,7 +111,7 @@ private theorem Typ.runtimeStage {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro _ _ _ _ _ _ _ hJ _; cases hJ; exact hφ
   | inside _ _ _ _ _ hφ _ =>
     intro _ _ _ _ _ _ _ hJ _; cases hJ; exact hφ
-  | handle _ _ _ _ _ hφ =>
+  | handle _ _ _ _ _ _ _ hφ =>
     intro _ _ _ _ _ _ _ hJ _; cases hJ; exact hφ
   | tryR _ _ hφ _ =>
     intro _ _ _ _ _ _ _ hJ _; cases hJ; exact hφ
@@ -178,7 +180,7 @@ theorem fin_unit {Ψ Θ c p w T φ} (h : Typ S Ψ Θ [] (.app (.app (.const c) (
 /-- The hole of a registration is not pure. -/
 theorem fin_not_pure {Ψ Θ c p w} (h : Typ S Ψ Θ [] (.app (.app (.const c) (.own p)) w) (.ex T .pure))
     (hc : c = .addFin ∨ c = .spawn) : False := by
-  rcases hc with rfl | rfl <;> exact const_app2_rt h fun _ => ⟨_, _, _, _, _, _, _, rfl⟩
+  rcases hc with rfl | rfl <;> exact const_app2_rt h fun _ => ⟨_, _, _, _, _, _, rfl, _, _, rfl⟩
 
 /-- A context refilled after the regions not yet created are renamed out of the
 whole derivation. -/
@@ -245,7 +247,7 @@ theorem root_field {root Ψ Θ Ef o w f c v t φ} (hroot : RootTy S root) (hr₀
   obtain ⟨_, _, _, _, hf', hx, hψ, hT⟩ := h.app_nonvalue _ _ _ _ rfl rfl perform_not_value
   obtain ⟨_, _, _, hop, hT'⟩ := hf'.perform_arrow
   obtain ⟨hwv, hwt⟩ := hroot.svc _ _ hr₀
-  have hne : S.impl Ef ≠ .errors Row.none := fun he => by
+  have hne : S.impl Ef ≠ .errors .cnil := fun he => by
     rw [he] at hwt
     obtain ⟨_, _, _, _, _, _, _, hN, _⟩ := canonical_errors hwv hwt
     exact hN.elim

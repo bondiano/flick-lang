@@ -1,4 +1,4 @@
-import Formal.Rules
+import Formal.Roots
 
 /-!
 # Renaming and substitution keep values, matches and the coverage premise
@@ -172,11 +172,5 @@ theorem matchP_map {m : Tm → Tm} (hm : Homo m) :
 theorem Covers.map {m : Tm → Tm} (hm : Homo m) {t ps e} (h : Covers S t ps e) :
     Covers S t ps (m e) :=
   h.imp id fun ⟨hv, p, hp, hmt⟩ => ⟨hm.value hv, p, hp, matchP_map hm p hmt⟩
-
-/-- The `try` coverage of a value is about its head constructor. -/
-theorem HCov.map {m : Tm → Tm} (hm : Homo m) {v H ε'} (hv : Value v) (h : HCov S v H ε') :
-    HCov S (m v) H ε' := by
-  intro K k ts T hK hS
-  exact h K k ts T (hm.head_rev hv hK) hS
 
 end Flick

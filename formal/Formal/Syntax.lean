@@ -1,4 +1,4 @@
-import Formal.TypeEquality
+import Formal.Rows
 
 /-!
 # Syntax of λFlick with regions (core.md §1, regions.md §1)
@@ -235,7 +235,7 @@ hidden row of stored data, so that widening the row widens the field. -/
 def Ty.CovRow (hid : Name → Option Nat) (i : Nat) (f : Ty) : Prop :=
   f.NoV i ∨
   (∃ a φ b C, f = .arrow a φ b C ∧ a.NoV i ∧ φ.NoV i ∧ b.NoV i) ∨
-  (∃ r e t C, f = .eff r e t C ∧ (Ty.row r).NoV i ∧ (Ty.row e).NoV i ∧ t.NoV i) ∨
+  (∃ r e t C, f = .eff r e t C ∧ r.NoV i ∧ e.NoV i ∧ t.NoV i) ∨
   (∃ T us j, f = Ty.tcon T us ∧ hid T = some j ∧ ∀ l u, us[l]? = some u → l ≠ j → u.NoV i)
 
 /-- The variance of a parameter of data (regions.md §2.2.1): covariant, contravariant,
@@ -267,7 +267,7 @@ inductive Ty.Pol (var : Name → Nat → Variance) (i : Nat) (s : Variance) : Bo
   | var {q} : s.at q → Ty.Pol var i s q (.tvar i)
   | arrow {q a φ b C} : (s = .pos → a.NoV i) → Ty.Pol var i s (!q) a → φ.NoV i →
       Ty.Pol var i s q b → ((Ty.caps C).NoV i ∨ s.at q) → Ty.Pol var i s q (.arrow a φ b C)
-  | eff {q r e t C} : (Ty.row r).NoV i → (Ty.row e).NoV i → Ty.Pol var i s q t →
+  | eff {q r e t C} : r.NoV i → e.NoV i → Ty.Pol var i s q t →
       ((Ty.caps C).NoV i ∨ s.at q) → Ty.Pol var i s q (.eff r e t C)
   | rcons {q l t r} : Ty.Pol var i s q t → Ty.Pol var i s q r → Ty.Pol var i s q (.rcons l t r)
   | data {q t T us} :
@@ -305,11 +305,11 @@ structure Sig where
   op_closed : ∀ E o c a b σ, op E o = some (c, a, b) → a.substT σ = a ∧ b.substT σ = b
   /-- An effect with an operation that is not `tail` has no root: its record has no
   value (E016). -/
-  op_impl : ∀ E o c a b, op E o = some (c, a, b) → c ≠ .tail → impl E = .errors Row.none
+  op_impl : ∀ E o c a b, op E o = some (c, a, b) → c ≠ .tail → impl E = .errors .cnil
   /-- The record of any other effect has a function for each operation, of no row:
   a root answers it without anything around. -/
-  op_field : ∀ E o a b, op E o = some (.tail, a, b) → impl E ≠ .errors Row.none →
-    (impl E).field o = some (.arrow a (.rt Row.none Row.none) b Caps.none)
+  op_field : ∀ E o a b, op E o = some (.tail, a, b) → impl E ≠ .errors .cnil →
+    (impl E).field o = some (.arrow a (.rt .cnil .cnil) b Caps.none)
   dict_closed : ∀ c k fs, dict c = some (k, fs) → ∀ l s, (l, s) ∈ fs → s.Closed (s.k + k)
   glob_closed : ∀ g s, glob g = some s → s.Closed s.k
   /-- The hidden row of data with hidden storage: the parameter the reading of a signature
@@ -335,60 +335,52 @@ structure Sig where
         (var T i ≠ .bi ∧ (∃ c, (res K)[i]? = some c ∧ c.Closed) ∧ ∀ f ∈ ts, f.NoV i)) := by
     intro _ _ h; exact absurd rfl h
 
-/-- The instance of a constant's type variables. -/
+/-- The instance of a constant's type variables; `r` and `e` are rows. -/
 structure CArg where
   t : Ty
   s : Ty
   C : Caps
-  r : Row
-  e : Row
+  r : Ty
+  e : Ty
 
 instance : Inhabited CArg :=
-  ⟨⟨.base .unit, .base .unit, Caps.none, Row.none, Row.none⟩⟩
+  ⟨⟨.base .unit, .base .unit, Caps.none, .cnil, .cnil⟩⟩
 
 /-- `Scope ϱ` as a row. -/
 def Row.scope (s : Ty) : Row := Row.ofCaps s.reach
-
-/-- `Fiber.Provided r s` of regions.md §2.7 as row elements: one obligation for each
-service and each row variable of `r`. -/
-def Row.obs (r : Row) (s : Ty) : Row
-  | .ob N a => r (.nm N) ∧ s.reach a
-  | .obv v G a => r (.rv v G) ∧ s.reach a
-  | _ => False
 
 /-- The type of a constant at an instance. A spawned child and a finalizer are
 `Eff` with qualifier `C`; their owner is `s`. A cell stores `t`, and `C` is its capacity,
 the bound `α^c` of `Ref.*`: storing into a cell needs the capacity live. -/
 def Const.ty (S : Sig) : Const → CArg → Ty
-  | .refMake, ι => .arrow ι.t (.rt Row.none Row.none) (.ref ι.t) Caps.none
-  | .refGet, ι => .arrow (.ref ι.t) (.rt Row.none Row.none) ι.t Caps.none
+  | .refMake, ι => .arrow ι.t (.rt .cnil .cnil) (.ref ι.t) Caps.none
+  | .refGet, ι => .arrow (.ref ι.t) (.rt .cnil .cnil) ι.t Caps.none
   | .refSet, ι =>
-    .arrow (.ref ι.t) .pure (.arrow ι.t (.rt Row.none Row.none) (.base .unit) ι.C) Caps.none
-  | .open_, ι => .arrow (.owner ι.s) (.rt (Row.scope ι.s) Row.none) (.hnd ι.s) Caps.none
+    .arrow (.ref ι.t) .pure (.arrow ι.t (.rt .cnil .cnil) (.base .unit) ι.C) Caps.none
+  | .open_, ι => .arrow (.owner ι.s) (.rt (.caps ι.s.reach) .cnil) (.hnd ι.s) Caps.none
   | .op, ι =>
-    .arrow (.hnd ι.s) (.rt (Row.scope ι.s) Row.none) (.base .unit) Caps.none
+    .arrow (.hnd ι.s) (.rt (.caps ι.s.reach) .cnil) (.base .unit) Caps.none
   | .addFin, ι =>
-    .arrow (.owner ι.s) .pure (.arrow (.eff ι.r Row.none (.base .unit) ι.C)
-      (.rt (Row.union (Row.scope ι.s) (Row.union ι.r (Row.obs ι.r ι.s))) Row.none) (.base .unit)
-      ι.s.reach) Caps.none
+    .arrow (.owner ι.s) .pure (.arrow (.eff ι.r .cnil (.base .unit) ι.C)
+      (.rtob (.run (.caps ι.s.reach) ι.r) ι.s .cnil) (.base .unit) ι.s.reach) Caps.none
   | .spawn, ι =>
-    .arrow (.owner ι.s) .pure (.arrow (.eff (Row.union (Row.scope ι.s) ι.r) ι.e ι.t ι.C)
-      (.rt (Row.union ι.r (Row.obs ι.r ι.s)) Row.none) (.base .unit) ι.s.reach) Caps.none
+    .arrow (.owner ι.s) .pure (.arrow (.eff (.run (.caps ι.s.reach) ι.r) ι.e ι.t ι.C)
+      (.rtob ι.r ι.s .cnil) (.base .unit) ι.s.reach) Caps.none
   | .intEq, _ => .arrow (.base .int) .pure (.arrow (.base .int) .pure (.base .bool) Caps.none) Caps.none
   | .scopeRun, ι =>
-    let r := ι.r.substT (shiftV 1)
+    let r := ι.r.up 1
     .arrow (.all 1 (.arrow (.owner (.tvar 0))
-        (.rt (Row.union (Row.scope (.tvar 0)) (Row.union r (Row.obs r (.tvar 0)))) (ι.e.substT (shiftV 1)))
+        (.rtob (.run (.caps (Ty.tvar 0).reach) r) (.tvar 0) (ι.e.up 1))
         (ι.t.up 1) (ι.C.substT (shiftV 1))))
       (.rt ι.r ι.e) ι.t Caps.none
   | .perform E o _, ι => match S.op E o with
-    | some (.abort, a, _) => .arrow a (.rt (Row.single E) Row.none) ι.t Caps.none
-    | some (_, a, b) => .arrow a (.rt (Row.single E) Row.none) b Caps.none
-    | none => .arrow (.base .unit) (.rt (Row.single E) Row.none) (.base .unit) Caps.none
+    | some (.abort, a, _) => .arrow a (.rt (.rnm E (.adt E)) .cnil) ι.t Caps.none
+    | some (_, a, b) => .arrow a (.rt (.rnm E (.adt E)) .cnil) b Caps.none
+    | none => .arrow (.base .unit) (.rt (.rnm E (.adt E)) .cnil) (.base .unit) Caps.none
 
 /-- Regions required by a work row must outlive the owner that keeps that work.
 Row variables are included: instantiating one may introduce a Live atom. -/
-def Row.Outlives (Θ : Facts) (r : Row) (s : Ty) : Prop := Outl Θ (Ty.row r).reach s
+def Row.Outlives (Θ : Facts) (r : Ty) (s : Ty) : Prop := Outl Θ r.reach s
 
 /-- Side conditions of a constant at an instance: a finalizer and a child outlive their
 owner, with everything they hold
@@ -396,11 +388,11 @@ owner, with everything they hold
 bounds what the cell stores, `⌈t⌉ ⊆ C`, the premise (Inst) gives the value bound `α^c`. -/
 def Const.ok (Θ : Facts) : Const → CArg → Prop
   | .addFin, ι =>
-    Outl Θ ι.C ι.s ∧ Row.Outlives Θ ι.r ι.s ∧ Row.Sub (Row.ofCaps ι.C) ι.r
-  | .scopeRun, ι => Row.Sub (Row.ofCaps ι.C) ι.r
+    Outl Θ ι.C ι.s ∧ Row.Outlives Θ ι.r ι.s ∧ Row.Sub (Row.ofCaps ι.C) ι.r.asRow
+  | .scopeRun, ι => Row.Sub (Row.ofCaps ι.C) ι.r.asRow
   | .spawn, ι =>
     Outl Θ (fun a => ι.C a ∨ ι.t.reach a) ι.s ∧ Row.Outlives Θ ι.r ι.s ∧
-      Row.Sub (Row.ofCaps ι.C) ι.r
+      Row.Sub (Row.ofCaps ι.C) ι.r.asRow
   | .refMake, ι | .refGet, ι | .refSet, ι => Outl Θ ι.t.reach (.caps ι.C)
   | .perform _ _ _, _ => False
   | _, _ => True
