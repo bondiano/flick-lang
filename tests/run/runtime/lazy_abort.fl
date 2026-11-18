@@ -26,14 +26,14 @@ let main () =
   let third = forced doubled
   Platform.stdout_line "\{first} / \{second} / \{third}, runs: \{Ref.get runs}"
   let again = Ref.make 0
-  let lazy tripled = attempt again 7
+  let lazy twice = attempt again 7
   let a =
-    try show (await tripled) with
+    try show (await twice) with
     | Stop.stop why -> why
   let b =
-    try show (await tripled) with
+    try show (await twice) with
     | Stop.stop why -> why
   let c =
-    try show (await tripled) with
+    try show (await twice) with
     | Stop.stop why -> why
   Platform.stdout_line "\{a} / \{b} / \{c}, runs: \{Ref.get again}"
