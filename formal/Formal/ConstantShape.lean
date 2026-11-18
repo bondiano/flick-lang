@@ -22,7 +22,7 @@ theorem Const.ty_res {c : Const} {ι : CArg} (h : c.arity = 2) :
 
 theorem Const.res_kind {c : Const} {ι a ψ t C T'} (hc : c.arity = 2)
     (h : LeLive S (c.ty ι) (.arrow a ψ t C)) (hT : LeLive S t T') : T'.kind = 1 := by
-  obtain ⟨x, y, hxy, hk⟩ := Const.ty_res (S := S) (ι := ι) hc
+  obtain ⟨x, y, hxy, hk⟩ := Const.ty_res (ι := ι) hc
   rw [hxy] at h
   obtain ⟨_, _, _, _, h', _, _, lt, -⟩ := h.arrow_left
   cases h'; rw [← hT.kind, ← lt.kind, hk]
