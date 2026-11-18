@@ -450,12 +450,14 @@ which the signature does not allow (`FLICK-E002`). Errors work the same after
 `;`, as in `->{; -NotFound | e}` over a `try` that handles `NotFound`.
 
 A handler finds a service by its name, not by its arguments. `provide` of a
-layer of `Store Int` answers every `Store` operation in its body, so the body
-may need a row variable only where the variable holds no other instance of
-`Store`: one taken out, `Eff {-Store | r} …`, or one beside the instance it
-names, `Eff {Store Int | r} …`, which holds `Store` only as `Store Int`. A
-variable that may hold `Store String` would get the layer's `Store Int` for it,
-and is `FLICK-E019`.
+layer or a record of `Store Int` answers every `Store` operation in its body,
+so the body may need a row variable only where the variable holds no other
+instance of `Store`: one taken out, `Eff {-Store | r} …`, or one beside the
+instance it names, `Eff {Store Int | r} …`, which holds `Store` only as
+`Store Int`. A variable that may hold `Store String` would get the provider's
+`Store Int` for it, and is `FLICK-E019`; so is a function of such a variable
+given where one of `{Store Int | r}` is expected. A handler of an effect with
+arguments works the same ([Effects and handlers](#effects-and-handlers)).
 
 A set may take parameters, as in `type alias Db s = {Scope s, Log}`.
 
@@ -742,6 +744,15 @@ when arms without a guard take every argument of each of its operations;
 other calls of it go on to the handler around. The arms run where the
 handler is: what they need is the enclosing stage's, and a failure of a
 `tail` arm is the handler's, which no `try` in the body sees.
+
+An effect may take type arguments, as `Ask a` below. A handler answers one
+instance, the one its arms are typed at: `Ask String` in `with_name`. It
+finds an operation by its name, so the body may perform `Ask` only at that
+instance, and a row variable of the body that may hold `Ask` at other
+arguments is `FLICK-E019`: take it out, `{-Ask | r}`, or name the instance,
+`{Ask String | r}`, as `with_name` does. `Ask Int` and `Ask String` stay
+apart through substitution, under data and in polymorphic arguments, and
+`-Ask Int` is `FLICK-T002`: `-` takes out every instance of a name.
 
 ```flick
 effect Ask a =
