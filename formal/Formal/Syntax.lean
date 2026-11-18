@@ -297,13 +297,17 @@ structure Sig where
   res : Name → List Ty
   res_closed : ∀ K k ts T σ, ctor K = some (k, ts, T) →
     (∀ i, i < k → σ (.v i) = .tvar i) → (res K).map (Ty.substT σ) = res K
-  impl_closed : ∀ N σ, (impl N).substT σ = impl N
+  /-- The parameters of an effect or a service `E`: its operations and its record are over the
+  variables `0 … arity E - 1`, which an instance `E ū` fills. -/
+  arity : Name → Nat := fun _ => 0
+  impl_closed : ∀ N σ, (∀ i, i < arity N → σ (.v i) = .tvar i) → (impl N).substT σ = impl N
   dict : Nat → Option (Nat × List (Label × Scheme))
   glob : Nat → Option Scheme
-  /-- The operation `o` of the effect `E`: its class, argument and result, closed;
-  an `abort` one returns any type. -/
+  /-- The operation `o` of the effect `E`: its class, argument and result, over the parameters
+  of `E`; an `abort` one returns any type. -/
   op : Name → Name → Option (OpClass × Ty × Ty)
-  op_closed : ∀ E o c a b σ, op E o = some (c, a, b) → a.substT σ = a ∧ b.substT σ = b
+  op_closed : ∀ E o c a b σ, op E o = some (c, a, b) → (∀ i, i < arity E → σ (.v i) = .tvar i) →
+    a.substT σ = a ∧ b.substT σ = b
   /-- An effect with an operation that is not `tail` has no root: its record has no
   value (E016). -/
   op_impl : ∀ E o c a b, op E o = some (c, a, b) → c ≠ .tail → impl E = .errors .cnil

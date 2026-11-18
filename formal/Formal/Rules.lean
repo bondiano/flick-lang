@@ -147,60 +147,70 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
       LeLive S ((s.substT (instT us)).inst ts) T → Typ Ψ Θ Γ (.proj e l) (.ex T φ)
   | glob {ts : List Ty} : S.glob g = some σ → ts.length = σ.k → σ.Holds Θ ts → LeLive S (σ.inst ts) T →
       Typ Ψ Θ Γ (.glob g) (.ex T φ)
-  /-- An operation of a declared effect: its value needs the effect; an `abort`
-  operation never returns, so its result has any type. -/
-  | perform : S.op E o = some (c, a, b) →
-      LeLive S (.arrow a (.rt (.rnm E (.adt E)) .cnil) (if c = .abort then t else b) Caps.none) T →
+  /-- An operation of a declared effect at the arguments `us`: its value needs the effect at
+  them; an `abort` operation never returns, so its result has any type. -/
+  | perform {us : List Ty} : us.length = S.arity E → S.op E o = some (c, a, b) →
+      LeLive S (.arrow (a.substT (instT us)) (.rt (.rnm E (Ty.tcon E us)) .cnil)
+        (if c = .abort then t else b.substT (instT us)) Caps.none) T →
       Typ Ψ Θ Γ (.const (.perform E o c)) (.ex T φ)
   /-- The arms of a handler, `x` the operation's argument and, for `control`, `k` its
-  `resume`, which runs the rest of the body under the handler and holds its region. -/
-  | hanil : Typ Ψ Θ Γ .anil (.harms E t φ s)
-  | hatail : S.op E o = some (.tail, a, b) → Typ Ψ Θ (.mono a :: Γ) e (.ex b φ.asStage) →
-      Typ Ψ Θ Γ r (.harms E t φ s) → Typ Ψ Θ Γ (.acons (Pat.spine o [.var]) e r) (.harms E t φ s)
-  | haabort : S.op E o = some (.abort, a, b) → Typ Ψ Θ (.mono a :: Γ) e (.ex t φ.asStage) →
-      Typ Ψ Θ Γ r (.harms E t φ s) → Typ Ψ Θ Γ (.acons (Pat.spine o [.var]) e r) (.harms E t φ s)
-  | hactl : S.op E o = some (.control, a, b) →
+  `resume`, which runs the rest of the body under the handler and holds its region. The types
+  of the operations are those at the arguments `us` of the arms. -/
+  | hanil {us : List Ty} : Typ Ψ Θ Γ .anil (.harms E us t φ s)
+  | hatail {us : List Ty} : S.op E o = some (.tail, a, b) →
+      Typ Ψ Θ (.mono (a.substT (instT us)) :: Γ) e (.ex (b.substT (instT us)) φ.asStage) →
+      Typ Ψ Θ Γ r (.harms E us t φ s) →
+      Typ Ψ Θ Γ (.acons (Pat.spine o [.var]) e r) (.harms E us t φ s)
+  | haabort {us : List Ty} : S.op E o = some (.abort, a, b) →
+      Typ Ψ Θ (.mono (a.substT (instT us)) :: Γ) e (.ex t φ.asStage) →
+      Typ Ψ Θ Γ r (.harms E us t φ s) →
+      Typ Ψ Θ Γ (.acons (Pat.spine o [.var]) e r) (.harms E us t φ s)
+  | hactl {us : List Ty} : S.op E o = some (.control, a, b) →
       -- The handler's own region is live while its control arm calls resume.
-      Typ Ψ Θ (.mono a :: .mono (.arrow b φ t s.reach) :: Γ) e (.ex t (Stage.use φ.asStage s.reach)) →
-      Typ Ψ Θ Γ r (.harms E t φ s) → Typ Ψ Θ Γ (.acons (Pat.spine o [.var, .var]) e r) (.harms E t φ s)
-  /-- (Handle): the body may perform `E`; the arms run at the handler's stage, `resume`
+      Typ Ψ Θ (.mono (a.substT (instT us)) :: .mono (.arrow (b.substT (instT us)) φ t s.reach) :: Γ)
+        e (.ex t (Stage.use φ.asStage s.reach)) →
+      Typ Ψ Θ Γ r (.harms E us t φ s) →
+      Typ Ψ Θ Γ (.acons (Pat.spine o [.var, .var]) e r) (.harms E us t φ s)
+  /-- (Handle): the body may perform `E` at the arguments the handler answers (`Sig.answers`,
+  `Row.hBody`); the arms, at the arguments `us`, run at the handler's stage, `resume`
   over a region variable of the handler, as the region of a `scope`; `rf` makes the
   handler's value of the body's. Without an arm for every operation, the body's other
   operations of `E` go on to the handler around. -/
-  | hdl {al rf : Tm} : Typ (Ψ.map (Ty.up 1)) (Θ.substT (shiftV 1)) (Γ.map (Scheme.up 1)) al
-        (.harms E (t'.up 1) ((Ty.rt r ε).substT (shiftV 1)) (.tvar 0)) → al.NoIns →
-      Typ Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r.asRow ε.asRow)) →
+  | hdl {al rf : Tm} {us : List Ty} : us.length = S.arity E →
+      Typ (Ψ.map (Ty.up 1)) (Θ.substT (shiftV 1)) (Γ.map (Scheme.up 1)) al
+        (.harms E (us.map (Ty.up 1)) (t'.up 1) ((Ty.rt r ε).substT (shiftV 1)) (.tvar 0)) →
+      al.NoIns → Typ Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r.asRow ε.asRow)) →
       (Stage.use ψ.asStage C).le (.rt r.asRow ε.asRow) →
-      Typ Ψ Θ Γ e (.ex t φ₀) →
-      φ₀.le (.rt (Row.union (Row.single E).nameClose (r.asRow.back (Row.single E))) ε.asRow) →
+      Typ Ψ Θ Γ e (.ex t φ₀) → φ₀.le (.rt (Row.hBody E (S.answers E us) r.asRow) ε.asRow) →
       φ₀.ObOut (Row.single E) →
-      S.Handles E al r.asRow → (Stage.rt r.asRow ε.asRow).le φ → LeLive S t' T →
+      S.Handles E us al r.asRow → (Stage.rt r.asRow ε.asRow).le φ → LeLive S t' T →
       Typ Ψ Θ Γ (.hdl E al rf e) (.ex T φ)
   /-- The run-time forms of a handler, whose region is `p`; the cell `ℓ` holds the type and
   the stage of its value. -/
-  | hwith {al rf : Tm} : Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
-      Typ Ψ Θ Γ al (.harms E t' (.rt r ε) (.rg p)) →
+  | hwith {al rf : Tm} {us : List Ty} : us.length = S.arity E →
+      Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
+      Typ Ψ Θ Γ al (.harms E us t' (.rt r ε) (.rg p)) →
       Typ Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r.asRow ε.asRow)) →
       (Stage.use ψ.asStage C).le (.rt r.asRow ε.asRow) →
-      Typ Ψ Θ Γ e (.ex t φ₀) → φ₀.le (.rt (Row.hP Θ p E r.asRow) ε.asRow) →
-      S.Handles E al r.asRow → (Stage.rt r.asRow ε.asRow).le φ → LeLive S t' T →
+      Typ Ψ Θ Γ e (.ex t φ₀) → φ₀.le (.rt (Row.hP Θ p E (S.answers E us) r.asRow) ε.asRow) →
+      S.Handles E us al r.asRow → (Stage.rt r.asRow ε.asRow).le φ → LeLive S t' T →
       φ.svc (.atm (.r p)) →
       Typ Ψ Θ Γ (.hwith p ℓ E al rf e) (.ex T φ)
   /-- While an arm runs, the body is parked where it performed the operation `o`: it is
   typed with the operation at the hole, the argument left out. A `tail` arm gives that
   operation its value, a `control` arm the handler its value, with `resume` the cell `κ`. -/
-  | hctl {Ei : List Frame} {al rf : Tm} {tl : Bool} :
+  | hctl {Ei : List Frame} {al rf : Tm} {tl : Bool} {us : List Ty} : us.length = S.arity E →
       Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
-      Typ Ψ Θ Γ al (.harms E t' (.rt r ε) (.rg p)) →
+      Typ Ψ Θ Γ al (.harms E us t' (.rt r ε) (.rg p)) →
       Typ Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r.asRow ε.asRow)) →
       (Stage.use ψ.asStage C).le (.rt r.asRow ε.asRow) →
       S.op E o = some (c, a₀, b₀) → c ≠ .abort → (tl = true ↔ c = .tail) →
       OkE Ei → k = plug Ei (.hole p) → Typ Ψ Θ [] (plug Ei (.app (.const (.perform E o c)) .todo)) (.ex t φ₀) →
-      φ₀.le (.rt (Row.hP Θ p E r.asRow) ε.asRow) →
-      Typ Ψ Θ Γ a (.ex (if tl then b₀ else t')
+      φ₀.le (.rt (Row.hP Θ p E (S.answers E us) r.asRow) ε.asRow) →
+      Typ Ψ Θ Γ a (.ex (if tl then b₀.substT (instT us) else t')
         (Stage.use (.rt r.asRow ε.asRow) (if tl then Caps.none else (Ty.rg p).reach))) →
-      (tl = false → ∃ C', Ψ[κ]? = some (.arrow b₀ (.rt r ε) t' C') ∧ C' (.r p)) →
-      S.Handles E al r.asRow → (Stage.rt r.asRow ε.asRow).le φ → LeLive S t' T →
+      (tl = false → ∃ C', Ψ[κ]? = some (.arrow (b₀.substT (instT us)) (.rt r ε) t' C') ∧ C' (.r p)) →
+      S.Handles E us al r.asRow → (Stage.rt r.asRow ε.asRow).le φ → LeLive S t' T →
       φ.svc (.atm (.r p)) →
       Typ Ψ Θ Γ (.hctl p ℓ κ tl E al rf a k) (.ex T φ)
   /-- While the resumed body runs, the arm is parked where it called `resume`, the
@@ -221,19 +231,21 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   /-- A handler kept around a child: `ℓ` and the arms are those of the handler it keeps. The
   child runs the arms, so its stage holds theirs; an operation the kept handler does not answer
   goes on to the handler around, or the root. -/
-  | hkeep {al : Tm} : Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
-      Typ Ψ Θ Γ al (.harms E t' (.rt r ε) (.rg q)) →
-      Typ Ψ Θ Γ e (.ex t φ₀) → φ₀.le (.rt (Row.hP Θ q E r₁) ε₁) →
-      S.Handles E al r₁ → S.NonTail E r₁ → (Stage.rt r.asRow ε.asRow).le (.rt r₁ ε₁) →
+  | hkeep {al : Tm} {us : List Ty} : us.length = S.arity E →
+      Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
+      Typ Ψ Θ Γ al (.harms E us t' (.rt r ε) (.rg q)) →
+      Typ Ψ Θ Γ e (.ex t φ₀) → φ₀.le (.rt (Row.hP Θ q E (S.answers E us) r₁) ε₁) →
+      S.Handles E us al r₁ → S.NonTail E us r₁ → (Stage.rt r.asRow ε.asRow).le (.rt r₁ ε₁) →
       (Stage.rt r₁ ε₁).le φ → LeLive S t T → Typ Ψ Θ Γ (.hkeep q ℓ E al e) (.ex T φ)
   /-- While an arm of a kept handler runs, the body is parked where it performed the operation
   `o`, as for `hctl` of a `tail` operation. -/
-  | hkarm {Ei : List Frame} {al : Tm} : Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
-      Typ Ψ Θ Γ al (.harms E t' (.rt r ε) (.rg q)) →
+  | hkarm {Ei : List Frame} {al : Tm} {us : List Ty} : us.length = S.arity E →
+      Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
+      Typ Ψ Θ Γ al (.harms E us t' (.rt r ε) (.rg q)) →
       S.op E o = some (.tail, a₀, b₀) → OkE Ei → k = plug Ei (.hole q) →
       Typ Ψ Θ [] (plug Ei (.app (.const (.perform E o .tail)) .todo)) (.ex t φ₀) →
-      φ₀.le (.rt (Row.hP Θ q E r₁) ε₁) → S.Handles E al r₁ → S.NonTail E r₁ →
-      Typ Ψ Θ Γ a (.ex b₀ (.rt r.asRow ε.asRow)) → (Stage.rt r.asRow ε.asRow).le (.rt r₁ ε₁) →
+      φ₀.le (.rt (Row.hP Θ q E (S.answers E us) r₁) ε₁) → S.Handles E us al r₁ →
+      S.NonTail E us r₁ → Typ Ψ Θ Γ a (.ex (b₀.substT (instT us)) (.rt r.asRow ε.asRow)) → (Stage.rt r.asRow ε.asRow).le (.rt r₁ ε₁) →
       (Stage.rt r₁ ε₁).le φ → LeLive S t T → Typ Ψ Θ Γ (.hkarm q ℓ E al a k) (.ex T φ)
   /-- `resume`: the type of its cell, which holds the handler's region. -/
   | kont : Ψ[ℓ]? = some (.arrow a ψ t C) → C (.r p) → LeLive S (.arrow a ψ t C) T →

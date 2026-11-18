@@ -13,14 +13,22 @@ namespace Flick
 `rnm E U` stands for. -/
 def Row.err (E : Name) (U : Ty) : Row := Row.union (Row.inst E U.classOf) (Row.ofCaps U.reach)
 
-/-- What a handler of `E` of the region `q` gives its body (regions.md §2.7): the frame
-answers `E` at every argument, as it answers by name, and it discharges an obligation
-`Provided {E} ϱ` when `q` outlives `ϱ`; everything else comes from outside, where a row
-variable may stand without `E` (`Row.back`). -/
-def Row.hP (Θ : Facts) (q : Nat) (E : Name) (r : Row) : Row
-  | .nm N c => N = E ∨ r (.nm N c)
-  | .ob N c a => (N = E → Outl Θ (· = .r q) a.ty) ∧ (N ≠ E → r (.ob N c a))
-  | x => r.back (Row.single E) x
+/-- What a handler of `E` answering the arguments `A` (`Sig.answers`) lets its body do with the
+row `r` outside: `E` at those arguments, every other name of `r`, and the variables of `r`. A
+variable may give `E` back, standing without fewer names inside than outside (`Row.back`),
+only when the handler answers every argument; otherwise it stands without `E` inside, so no
+instance of `E` the handler cannot answer comes in through it. -/
+def Row.hBody (E : Name) (A : TyClass → Prop) (r : Row) : Row
+  | .nm N c => (N = E ∧ A c) ∨ (N ≠ E ∧ r (.nm N c))
+  | .rv a G' => ∃ G, r (.rv a G) ∧ (∀ n, G' n → G n ∨ n = E ∧ ¬ ∀ c, A c) ∧
+      (∀ n, G n → G' n ∨ n = E ∧ ∀ c, A c) ∧ ((¬ ∀ c, A c) → G' E)
+  | x => r x
+
+/-- What a handler of `E` of the region `q` gives its body: as `Row.hBody`, and it discharges
+an obligation `Provided {E} ϱ` at an argument it answers when `q` outlives `ϱ`. -/
+def Row.hP (Θ : Facts) (q : Nat) (E : Name) (A : TyClass → Prop) (r : Row) : Row
+  | .ob N c a => (N = E ∧ A c → Outl Θ (· = .r q) a.ty) ∧ (¬ (N = E ∧ A c) → r (.ob N c a))
+  | x => Row.hBody E A r x
 
 /-- No obligation of the stage `φ₀` of the body of a handler is about an effect it may
 give (regions.md §2.7, first case, rejected): a named obligation needs `o` without row

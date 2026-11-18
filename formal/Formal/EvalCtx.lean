@@ -194,14 +194,22 @@ row of its body. -/
 def Sig.Complete (S : Sig) (E : Name) (al : Tm) : Prop :=
   ∀ o c a b, S.op E o = some (c, a, b) → (al.armOf o).isSome
 
-/-- An effect with an operation that is not `tail` stays in the row `r` around a kept handler:
-a child does not run such an arm. -/
-def Sig.NonTail (S : Sig) (E : Name) (r : Row) : Prop :=
-  (∃ o c a b, S.op E o = some (c, a, b) ∧ c ≠ .tail) → r (.nm₀ E)
+/-- The arguments at which a handler of `E` with arms at `us` answers it. A handler answers by
+name at run time, so it may answer only arguments at which the operations of `E` have the types
+of its arms: every one when `E` has no parameters, otherwise `E us` itself. -/
+def Sig.answers (S : Sig) (E : Name) (us : List Ty) (c : TyClass) : Prop :=
+  S.arity E = 0 ∨ c = (Ty.tcon E us).classOf
 
-/-- A handler handles a declared effect, which leaves the row `r` outside unless the
-handler has an arm for every operation. -/
-def Sig.Handles (S : Sig) (E : Name) (al : Tm) (r : Row) : Prop :=
-  (∃ o c a b, S.op E o = some (c, a, b)) ∧ (¬ S.Complete E al → r (.nm₀ E))
+/-- An effect with an operation that is not `tail` stays in the row `r` around a kept handler,
+at the arguments `us` of its arms: a child does not run such an arm. -/
+def Sig.NonTail (S : Sig) (E : Name) (us : List Ty) (r : Row) : Prop :=
+  (∃ o c a b, S.op E o = some (c, a, b) ∧ c ≠ .tail) → r (.nm E (Ty.tcon E us).classOf)
+
+/-- A handler handles a declared effect at the arguments `us`, which leaves the row `r` outside
+unless the handler has an arm for every operation. The operations of an effect are the same at
+every argument (`Sig.Complete`); their types are those of `us` (`J.harms`). -/
+def Sig.Handles (S : Sig) (E : Name) (us : List Ty) (al : Tm) (r : Row) : Prop :=
+  (∃ o c a b, S.op E o = some (c, a, b)) ∧
+    (¬ S.Complete E al → r (.nm E (Ty.tcon E us).classOf))
 
 end Flick
