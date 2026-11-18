@@ -32,7 +32,7 @@ Not in phase 1: admission of definitions and methods, lemmas, law bundles, proof
   - `same_type A B` compares two types by the compiler's own type equality.
 
   Any other goal is `FLICK-T083`.
-- **Premises.** A parameter `(h : goal)` is a premise: a proof of `goal` the body may use. It is part of the statement, so the statement claims the goal only where its premises hold.
+- **Premises.** A parameter `(h : equal l r)` or `(h : holds p)` is a premise: a proof of that equation the body may use. It is part of the statement, so the statement claims the goal only where its premises hold. A `same_type` premise parses but is `FLICK-T082`: a premise is an equation of values.
 - **The proof is typed.** It is an ordinary expression whose rule names have types of their own, indexed by the type of the equation they prove:
 
 | Rule | Type |

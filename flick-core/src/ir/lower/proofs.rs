@@ -149,7 +149,10 @@ fn statement<'p>(
     let equation =
         |ty: &logic::Ty, sides: &Option<(Expr, Expr)>| -> Result<logic::Equation, Failure> {
             let Some((l, r)) = sides else {
-                return Err(refused(lowered.span, "a premise is an equation of values"));
+                return Err(refused(
+                    lowered.span,
+                    "a premise is an equation of values, `equal l r` or `holds p`",
+                ));
             };
             Ok(logic::Equation {
                 ty: ty.clone(),

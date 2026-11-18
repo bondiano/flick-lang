@@ -1,20 +1,22 @@
 ---
 title: "FLICK-T081"
-source_hash: "f04e6e96c01e23eb"
+source_hash: "056f17d4d908462b"
 ---
 
-`proof` утверждает, что две стороны равны. Правило в этом месте не делает их равными: после вычисления стороны всё ещё различаются, и сообщение показывает, что осталось. Утверждение может быть верным, но ему нужно другое доказательство. Разберите переменную через `match`, чтобы каждый случай вычислялся дальше, или используйте `funext` для функций.
+`proof` утверждает, что две стороны равны. Правило в этом месте не делает их равными: после вычисления стороны всё ещё различаются, и сообщение показывает, что осталось. Утверждение может быть верным, но ему нужно другое доказательство: `match`, разбирающий переменную, чтобы каждый случай вычислялся дальше, `funext` для функций или предпосылка. Ниже `match` в цели ждёт `v`, и разбор `v` закрывает каждый случай.
 
 ```flick fail T081
-proof constant (f : Bool -> Bool)
-where equal (f true) (f false) =
+proof rebuilt (v : Option a)
+where equal (match v with | None -> None | Some x -> Some x) v =
   refl
 ```
 
 это
 
 ```flick
-proof applied (f : Bool -> Bool) (x : Bool)
-where equal ((fun y -> f y) x) (f x) =
-  refl
+proof rebuilt (v : Option a)
+where equal (match v with | None -> None | Some x -> Some x) v =
+  match v with
+  | None -> refl
+  | Some y -> refl
 ```

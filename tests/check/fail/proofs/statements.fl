@@ -43,4 +43,8 @@ where equal ((fun t -> t (t (t (t (t (t (t (t (t f))))))))) (fun g y -> g (g y))
   refl
 //^^^^ FLICK-T084 ran out of its budget
 
+// a premise is an equation of values
+proof typed (h : same_type a a) where equal true true = refl
+
 //~ FLICK-T082 @22:1-22:40 its type is not fully known
+//~ FLICK-T082 @47:1-47:61 a premise is an equation of values

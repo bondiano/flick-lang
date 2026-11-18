@@ -5,19 +5,22 @@ title: "FLICK-T081"
 A `proof` states that its two sides are equal. Here the rule at this
 place does not make them equal: after computing, the two sides still
 differ, and the message shows what is left. The statement may still be
-true; it needs a different proof. Split a variable with `match` so each
-case computes further, or use `funext` for functions.
+true and need another proof: a `match` that splits a variable so each
+case computes further, `funext` for functions, or a premise. Below, the
+`match` in the goal waits for `v`, and splitting `v` closes each case.
 
 ```flick fail T081
-proof constant (f : Bool -> Bool)
-where equal (f true) (f false) =
+proof rebuilt (v : Option a)
+where equal (match v with | None -> None | Some x -> Some x) v =
   refl
 ```
 
 is
 
 ```flick
-proof applied (f : Bool -> Bool) (x : Bool)
-where equal ((fun y -> f y) x) (f x) =
-  refl
+proof rebuilt (v : Option a)
+where equal (match v with | None -> None | Some x -> Some x) v =
+  match v with
+  | None -> refl
+  | Some y -> refl
 ```
