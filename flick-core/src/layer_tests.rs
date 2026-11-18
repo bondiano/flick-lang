@@ -17,7 +17,7 @@ const LAYERS: &[&[&str]] = &[
     ],
     &["syntax", "consteval", "ffi", "builtin_source"],
     &[
-        "fmt", "types", "resolve", "iface", "plugin", "doc", "numeric", "api_diff",
+        "fmt", "types", "resolve", "iface", "plugin", "doc", "numeric", "api_diff", "logic",
     ],
     &["ir", "opt", "codegen", "effects"],
     &["project"],

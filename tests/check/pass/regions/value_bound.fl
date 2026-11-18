@@ -1,0 +1,25 @@
+// `a^{}` takes a value that holds no region: a scalar, data of such values,
+// a raw value no scope owns, and a value of generic code bounded the same.
+module App.ValueBound exposing (..)
+
+type Raw
+
+make_raw : String ->{} Raw
+foreign effect make_raw from "./conn.js" "make"
+
+type Holder = Holder Raw
+
+free : a^{} -> Unit
+let free _ = ()
+
+forward : a^{} -> Unit
+let forward x = free x
+
+values : Unit ->{} Unit
+let values () =
+  free 1
+  free (Some "text")
+  let raw = make_raw "db"
+  free raw
+  free (Holder raw)
+  forward [1, 2]

@@ -64,3 +64,50 @@ let as_port n = if n > 0 && n < 65536 then Some (Port.prove n) else None\n";
     assert_eq!(codes(&diagnostics), ["FLICK-T077"], "{diagnostics:?}");
     lsp.close();
 }
+
+#[test]
+fn a_proof_declaration_follows_editor_changes() {
+    let proved = concat!(
+        "module App.Main exposing (..)\n",
+        "proof rebuilt (v : Option a)\n",
+        "where equal (match v with | None -> None | Some x -> Some x) v =\n",
+        "  match v with\n",
+        "  | None -> refl\n",
+        "  | Some y -> refl\n",
+    );
+    let unsplit = proved.replace(
+        "  match v with\n  | None -> refl\n  | Some y -> refl\n",
+        "  refl\n",
+    );
+    let dir = project(
+        "lsp_proof_declarations",
+        &[("flick.toml", LIB), ("src/App/Main.fl", proved)],
+    );
+    let main = uri(&dir.join("src/App/Main.fl"));
+    let mut lsp = Lsp::start(&dir);
+    lsp.notify(
+        "textDocument/didOpen",
+        &json!({ "textDocument": {
+            "uri": main, "languageId": "flick", "version": 1, "text": proved,
+        } }),
+    );
+    assert_eq!(codes(&lsp.diagnostics(&main)), Vec::<String>::new());
+    // without the split the match on `v` does not compute: the goal is left open
+    for (version, (text, expected)) in [(unsplit.as_str(), vec!["FLICK-T081"]), (proved, vec![])]
+        .into_iter()
+        .enumerate()
+    {
+        lsp.notify(
+            "textDocument/didChange",
+            &json!({ "textDocument": { "uri": main, "version": version + 2 },
+                "contentChanges": [{ "text": text }] }),
+        );
+        let diagnostics = lsp.diagnostics(&main);
+        assert_eq!(codes(&diagnostics), expected, "{diagnostics:?}");
+        if let Some(d) = diagnostics.first() {
+            let start = text.rfind("refl").expect("the proof");
+            assert_eq!(d["range"]["start"], position(text, start), "{d}");
+        }
+    }
+    lsp.close();
+}

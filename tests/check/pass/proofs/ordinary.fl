@@ -1,0 +1,27 @@
+// Code without proofs keeps its rules. The words of a proof are names
+// outside one, and a proof beside a recursive function and a partial one
+// analyzes neither: only what the proof itself states is checked.
+module App.Ordinary exposing (..)
+
+proof : Int -> Int
+let proof n = n + 1
+
+equal : Int -> Int -> Bool
+let equal a b = a == b
+
+refl : Int
+let refl = proof 1
+
+holds : Bool
+let holds = equal refl 2
+
+countdown : Int -> Int
+let rec countdown n = if n > 0 then countdown (n - 1) else 0
+
+first : List Int -> Int
+let first xs =
+  match xs with
+  | [x, ..._] -> x
+  | [] -> Int.unsafe_div 1 0
+
+proof reflexive (x : Bool) where equal x x = refl

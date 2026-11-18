@@ -1,9 +1,10 @@
 // Tokens a regular expression cannot express: nested `/* */` comments, raw
-// strings closed by as many `#` as they opened with, and `"""` strings.
+// strings closed by as many `#` as they opened with, `"""` strings, and
+// `proof`, a keyword only first on its line and before a name.
 
 #include "tree_sitter/parser.h"
 
-enum TokenType { BLOCK_COMMENT, RAW_STRING, MULTILINE_STRING };
+enum TokenType { BLOCK_COMMENT, RAW_STRING, MULTILINE_STRING, PROOF };
 
 void *tree_sitter_flick_external_scanner_create(void) { return NULL; }
 void tree_sitter_flick_external_scanner_destroy(void *payload) {}
@@ -72,11 +73,38 @@ static bool multiline_string(TSLexer *lexer) {
   return true;
 }
 
+static bool is_lower(int32_t c) { return (c >= 'a' && c <= 'z') || c == '_'; }
+
+// `proof name`, the token ending after `proof`.
+static bool proof(TSLexer *lexer) {
+  for (const char *c = "proof"; *c; c++) {
+    if (lexer->lookahead != *c) return false;
+    advance(lexer);
+  }
+  lexer->mark_end(lexer);
+  if (lexer->lookahead != ' ' && lexer->lookahead != '\t') return false;
+  while (lexer->lookahead == ' ' || lexer->lookahead == '\t') advance(lexer);
+  if (!is_lower(lexer->lookahead)) return false;
+  lexer->result_symbol = PROOF;
+  return true;
+}
+
 bool tree_sitter_flick_external_scanner_scan(void *payload, TSLexer *lexer, const bool *valid_symbols) {
+  // only blanks since the line began: either a line break was skipped, or as
+  // many blanks were skipped as the column of what follows them
+  bool newline = false;
+  unsigned blanks = 0;
   while (lexer->lookahead == ' ' || lexer->lookahead == '\t' || lexer->lookahead == '\r' || lexer->lookahead == '\n') {
+    if (lexer->lookahead == '\n') {
+      newline = true;
+    } else {
+      blanks++;
+    }
     lexer->advance(lexer, true);
   }
   switch (lexer->lookahead) {
+    case 'p':
+      return valid_symbols[PROOF] && (newline || lexer->get_column(lexer) == blanks) && proof(lexer);
     case '/': return valid_symbols[BLOCK_COMMENT] && block_comment(lexer);
     case 'r': return valid_symbols[RAW_STRING] && raw_string(lexer);
     case '"': return valid_symbols[MULTILINE_STRING] && multiline_string(lexer);

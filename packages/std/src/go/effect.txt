@@ -468,6 +468,7 @@ flickAll *EffectAll
 [flick:Scope]
 flickAddFinalizer *AddFinalizer
 flickAddFinalizerExit *AddFinalizerExit
+flickAddClose *AddClose
 
 [flick:Fiber]
 flickInterrupt *FiberInterrupt

@@ -124,6 +124,7 @@ runtime/interrupt_in_finalizer
 runtime/interrupt_skips
 runtime/leases
 runtime/owners
+runtime/owned_close
 runtime/parallel
 runtime/paths
 runtime/ref_linearizable
@@ -294,6 +295,7 @@ stdlib/observability/otlp
 stdlib/observability/prometheus
 stdlib/observability/settings
 stdlib/observability/tracer
+stdlib/option_ap_strictness
 stdlib/process/child_process
 stdlib/process/wait_large_output
 stdlib/reactivity/atom

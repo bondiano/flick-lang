@@ -26,8 +26,9 @@ fn key(service: &str) -> Path {
 
 impl Checker<'_> {
     /// The call splits `{Provided R ϱ}` of the row it performs by the
-    /// services of `R`, but `Scope` and the obligations; an unsolved tail
-    /// of `R` is the least, none.
+    /// services of `R`, but `Scope`, `Async`, which is the root's and no
+    /// owner provides, and the obligations; an unsolved tail of `R` is the
+    /// least, none.
     pub(in crate::check) fn split_provided(&mut self, r: &Row) -> Check<Row> {
         let mut r = self.zonk_row(r);
         let Some(args) = r.elems.remove(&provided()) else {
@@ -43,6 +44,7 @@ impl Checker<'_> {
             .keys()
             .filter(|s| {
                 **s != scope_service()
+                    && **s != Path::new("Prelude", "Async")
                     && **s != live_service()
                     && **s != provided()
                     && &*s.module != PROVIDED
@@ -205,6 +207,13 @@ impl Checker<'_> {
                     self.regions.givens.push((g.clone(), owner.clone()));
                 }
                 self.give_provided(r);
+            }
+            Type::Eff(row, _, _) => {
+                if let Some(args) = row.elems.get(&provided())
+                    && let [Type::Tag(g), owner] = &args[..]
+                {
+                    self.regions.givens.push((g.clone(), owner.clone()));
+                }
             }
             Type::Captured(t, _) => self.give_provided(t),
             _ => {}
