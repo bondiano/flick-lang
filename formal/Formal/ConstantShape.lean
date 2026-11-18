@@ -11,18 +11,18 @@ namespace Flick
 
 variable {S : Sig}
 
-theorem Const.ty_kind (c : Const) (ι : CArg) : (c.ty S ι).kind = 1 := by
-  obtain ⟨_, _, _, _, h⟩ := Const.ty_isArrow c ι S
+theorem Const.ty_kind (c : Const) (ι : CArg) : (c.ty ι).kind = 1 := by
+  obtain ⟨_, _, _, _, h⟩ := Const.ty_isArrow c ι
   rw [h]; rfl
 
 /-- The result of a binary constant after one argument. -/
 theorem Const.ty_res {c : Const} {ι : CArg} (h : c.arity = 2) :
-    ∃ x y, c.ty S ι = .arrow x .pure y Caps.none ∧ y.kind = 1 := by
+    ∃ x y, c.ty ι = .arrow x .pure y Caps.none ∧ y.kind = 1 := by
   cases c <;> simp [Const.arity] at h <;> exact ⟨_, _, rfl, rfl⟩
 
 theorem Const.res_kind {c : Const} {ι a ψ t C T'} (hc : c.arity = 2)
-    (h : LeLive S (c.ty S ι) (.arrow a ψ t C)) (hT : LeLive S t T') : T'.kind = 1 := by
-  obtain ⟨x, y, hxy, hk⟩ := Const.ty_res (S := S) (ι := ι) hc
+    (h : LeLive S (c.ty ι) (.arrow a ψ t C)) (hT : LeLive S t T') : T'.kind = 1 := by
+  obtain ⟨x, y, hxy, hk⟩ := Const.ty_res (ι := ι) hc
   rw [hxy] at h
   obtain ⟨_, _, _, _, h', _, _, lt, -⟩ := h.arrow_left
   cases h'; rw [← hT.kind, ← lt.kind, hk]

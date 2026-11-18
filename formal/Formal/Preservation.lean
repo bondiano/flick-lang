@@ -20,11 +20,11 @@ theorem preservation {root Ψ Λ μ e t φ l Λ' μ' e'} (hroot : RootTy S root)
       ∀ u ∈ X, u.YF Λ.length := by
   cases hs with
   | pure hE hh =>
-    obtain ⟨_, _, _, _, hr, _, _, back⟩ := ctx_typing _ hE hh.not_value h
+    obtain ⟨_, _, _, _, hr, _, _, back, -⟩ := ctx_typing _ hE hh.not_value h
     exact ⟨[], by simpa using hμ, refill_kill back hbl hΨ (by
       simpa using pure_preservation (hole_kill hr hbl hΨ) hh), by simp⟩
   | rt hE hh =>
-    obtain ⟨K, Θ', _, _, hr, _, hK, back⟩ := ctx_typing _ hE hh.not_value h
+    obtain ⟨K, Θ', _, _, hr, _, hK, back, -⟩ := ctx_typing _ hE hh.not_value h
     obtain ⟨rfl, hΘ⟩ := hK.resolve_left fun hp => by subst hp; exact hh.not_pure hr
     have hr' := hole_kill hr hbl hΨ
     simp only [List.map_up_zero, liftT_zero] at hr'
@@ -32,60 +32,60 @@ theorem preservation {root Ψ Λ μ e t φ l Λ' μ' e'} (hroot : RootTy S root)
       (hbl.sub fun _ h => plug_has _ h) hμb (Ty.yf_kill _ _) (Stage.kill_idem _ _) hh
     exact ⟨X, hμ', refill_kill back hbl hΨ (by simpa using hr''), hX⟩
   | performRoot hE _ hr₀ hf hv =>
-    obtain ⟨K, Θ', t₁, φ₁, hr, _, hK, back⟩ := ctx_typing _ hE perform_not_value h
+    obtain ⟨K, Θ', t₁, φ₁, hr, _, hK, back, -⟩ := ctx_typing _ hE perform_not_value h
     obtain ⟨rfl, -⟩ := hK.resolve_left fun hp => by subst hp; exact const_app_rt hr fun _ => perform_arrow
     have hr' := hole_kill hr hbl hΨ
     simp only [List.map_up_zero, liftT_zero] at hr'
     exact ⟨[], by simpa using hμ, refill_kill back hbl hΨ (by simpa using root_field hroot hr₀ hf hr'),
       by simp⟩
   | glob hE hg =>
-    obtain ⟨_, _, _, _, hr, _, _, back⟩ := ctx_typing _ hE (fun h => by cases h) h
+    obtain ⟨_, _, _, _, hr, _, _, back, -⟩ := ctx_typing _ hE (fun h => by cases h) h
     exact ⟨[], by simpa using hμ, refill_kill back hbl hΨ (by
       simpa using glob_preservation hroot (hole_kill hr hbl hΨ) hg), by simp⟩
   | unw hE hF hni _ _ =>
-    obtain ⟨K, Θ', _, _, hr, _, hK, back⟩ := ctx_typing _ hE (not_value_plug unw_not_value _) h
+    obtain ⟨K, Θ', _, _, hr, _, hK, back, -⟩ := ctx_typing _ hE (not_value_plug unw_not_value _) h
     obtain ⟨rfl, -⟩ := hK.resolve_left fun hp => by
       subst hp; exact unw_not_pure (unw_frame hF hni hr)
     have hr' := hole_kill hr hbl hΨ
     simp only [List.map_up_zero, liftT_zero] at hr'
     exact ⟨[], by simpa using hμ, refill_kill back hbl hΨ (by simpa using unw_frame hF hni hr'), by simp⟩
-  | performAbort hE hEi _ ha hv =>
-    obtain ⟨K, Θ', _, _, hr, _, hK, back⟩ := ctx_typing _ hE (fun h => by cases h) h
+  | performAbort hE hEi hno ha hv =>
+    obtain ⟨K, Θ', _, _, hr, _, hK, back, -⟩ := ctx_typing _ hE (fun h => by cases h) h
     obtain ⟨rfl, -⟩ := hK.resolve_left fun hp => by subst hp; exact hwith_not_pure hr
     have hr' := hole_kill hr hbl hΨ
     simp only [List.map_up_zero, liftT_zero] at hr'
-    exact ⟨[], by simpa using hμ, refill_kill back hbl hΨ (by simpa using abort_pres hEi ha hv hr'),
+    exact ⟨[], by simpa using hμ, refill_kill back hbl hΨ (by simpa using abort_pres hEi hno ha hv hr'),
       by simp⟩
-  | performTail hE hEi _ ha hv =>
-    obtain ⟨K, Θ', _, _, hr, _, hK, back⟩ := ctx_typing _ hE (fun h => by cases h) h
+  | performTail hE hEi hno ha hv =>
+    obtain ⟨K, Θ', _, _, hr, _, hK, back, -⟩ := ctx_typing _ hE (fun h => by cases h) h
     obtain ⟨rfl, hΘ⟩ := hK.resolve_left fun hp => by subst hp; exact hwith_not_pure hr
     have hr' := hole_kill hr hbl hΨ
     simp only [List.map_up_zero, liftT_zero] at hr'
     exact ⟨[], by simpa using hμ, refill_kill back hbl hΨ (by
       simpa using tail_pres (RtCtx.hole hΘ hΨ) (hbl.sub fun _ h => plug_has _ (by
-        simp only [Tm.Has]; exact .inr (.inr (.inr (.inr (plug_has _ (.inr h))))))) hEi ha hv hr'),
+        simp only [Tm.Has]; exact .inr (.inr (.inr (.inr (plug_has _ (.inr h))))))) hEi hno ha hv hr'),
       by simp⟩
-  | performKept hE hEi _ ha hv _ =>
-    obtain ⟨K, Θ', _, _, hr, _, hK, back⟩ := ctx_typing _ hE (fun h => by cases h) h
+  | performKept hE hEi hno ha hv _ =>
+    obtain ⟨K, Θ', _, _, hr, _, hK, back, -⟩ := ctx_typing _ hE (fun h => by cases h) h
     obtain ⟨rfl, hΘ⟩ := hK.resolve_left fun hp => by subst hp; exact hkeep_not_pure hr
     have hr' := hole_kill hr hbl hΨ
     simp only [List.map_up_zero, liftT_zero] at hr'
     exact ⟨[], by simpa using hμ, refill_kill back hbl hΨ (by
       simpa using kept_pres (RtCtx.hole hΘ hΨ) (hbl.sub fun _ h => plug_has _ (by
-        simp only [Tm.Has]; exact .inr (.inr (.inr (plug_has _ (.inr h)))))) hEi ha hv hr'),
+        simp only [Tm.Has]; exact .inr (.inr (.inr (.inl (plug_has _ (.inr h))))))) hEi hno ha hv hr'),
       by simp⟩
-  | performCtl hE hEi _ ha hv =>
-    obtain ⟨K, Θ', _, _, hr, _, hK, back⟩ := ctx_typing _ hE (fun h => by cases h) h
+  | performCtl hE hEi hno ha hv =>
+    obtain ⟨K, Θ', _, _, hr, _, hK, back, -⟩ := ctx_typing _ hE (fun h => by cases h) h
     obtain ⟨rfl, hΘ⟩ := hK.resolve_left fun hp => by subst hp; exact hwith_not_pure hr
     have hr' := hole_kill hr hbl hΨ
     simp only [List.map_up_zero, liftT_zero] at hr'
     obtain ⟨c, hcy, hcl, ht'⟩ := ctl_pres (RtCtx.hole hΘ hΨ) (hbl.sub fun _ h => plug_has _ (by
         simp only [Tm.Has]; exact .inr (.inr (.inr (.inr (plug_has _ (.inr h)))))))
-      (hbl _ ((plug_has _ (by simp [Tm.Has])))) hEi ha hv hr'
+      (hbl _ ((plug_has _ (by simp [Tm.Has])))) hEi hno ha hv hr'
     exact ⟨[c], hμ.alloc .lam hcl, refill_kill back hbl hΨ (by rw [hμ.1]; simpa using ht'),
       by simpa using hcy⟩
   | resume hE hA hEi hk hn hu =>
-    obtain ⟨K, Θ', _, _, hr, _, hK, back⟩ := ctx_typing _ hE (fun h => by cases h) h
+    obtain ⟨K, Θ', _, _, hr, _, hK, back, -⟩ := ctx_typing _ hE (fun h => by cases h) h
     obtain ⟨rfl, hΘ⟩ := hK.resolve_left fun hp => by subst hp; exact hctl_not_pure hr
     have hr' := hole_kill hr hbl hΨ
     simp only [List.map_up_zero, liftT_zero] at hr'
@@ -94,7 +94,7 @@ theorem preservation {root Ψ Λ μ e t φ l Λ' μ' e'} (hroot : RootTy S root)
         simp only [Tm.Has]; exact .inr (.inr (.inr (.inr (.inl (plug_has _ (.inr h)))))))) hA hEi hk hu hr'),
       by simp⟩
   | raise hE hF hnt hni _ hv =>
-    obtain ⟨K, Θ', _, _, hr, _, hK, back⟩ :=
+    obtain ⟨K, Θ', _, _, hr, _, hK, back, -⟩ :=
       ctx_typing _ hE (not_value_plug raise_not_value _) h
     obtain ⟨rfl, -⟩ := hK.resolve_left fun hp => by
       subst hp
@@ -106,14 +106,14 @@ theorem preservation {root Ψ Λ μ e t φ l Λ' μ' e'} (hroot : RootTy S root)
     exact ⟨[], by simpa using hμ, refill_kill back hbl hΨ (by simpa using raise_frame hF hnt hni hv hr'),
       by simp⟩
   | addFin hE _ _ _ =>
-    obtain ⟨K, Θ', _, _, hr, _, hK, back⟩ := ctx_typing _ hE (fin_not_value (.inl rfl)) h
+    obtain ⟨K, Θ', _, _, hr, _, hK, back, -⟩ := ctx_typing _ hE (fin_not_value (.inl rfl)) h
     obtain ⟨rfl, -⟩ := hK.resolve_left fun hp => by subst hp; exact fin_not_pure hr (.inl rfl)
     have hr' := hole_kill hr hbl hΨ
     simp only [List.map_up_zero, liftT_zero] at hr'
     exact ⟨[], by simpa using hμ, refill_kill back hbl hΨ (by simpa using fin_unit hr' (.inl rfl)),
       by simp⟩
   | spawn hE _ _ _ =>
-    obtain ⟨K, Θ', _, _, hr, _, hK, back⟩ := ctx_typing _ hE (fin_not_value (.inr rfl)) h
+    obtain ⟨K, Θ', _, _, hr, _, hK, back, -⟩ := ctx_typing _ hE (fin_not_value (.inr rfl)) h
     obtain ⟨rfl, -⟩ := hK.resolve_left fun hp => by subst hp; exact fin_not_pure hr (.inr rfl)
     have hr' := hole_kill hr hbl hΨ
     simp only [List.map_up_zero, liftT_zero] at hr'

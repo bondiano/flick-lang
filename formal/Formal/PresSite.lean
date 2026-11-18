@@ -23,7 +23,7 @@ theorem raise_not_pure {Ψ Θ e t} (h : Typ S Ψ Θ [] (.raise e) (.ex t .pure))
 
 /-- The stage of an application of a constant whose type has a runtime stage. -/
 theorem const_app_rt {Ψ Θ c w t} (h : Typ S Ψ Θ [] (.app (.const c) w) (.ex t .pure))
-    (hc : ∀ ι, ∃ a r e b C, c.ty S ι = .arrow a (.rt r e) b C) : False := by
+    (hc : ∀ ι, ∃ a r e b C, c.ty ι = .arrow a (.rt r e) b C) : False := by
   have hn : ¬ Value (.app (.const c) w) := by
     intro hv
     cases hv with
@@ -31,7 +31,13 @@ theorem const_app_rt {Ψ Θ c w t} (h : Typ S Ψ Θ [] (.app (.const c) w) (.ex 
     | constApp hArity _ =>
       cases c <;> simp_all [Const.arity, Const.ty] <;> exact (hc default).elim
   obtain ⟨_, _, _, _, hf, _, hψ, _⟩ := h.app_nonvalue _ _ _ _ rfl rfl hn
-  obtain ⟨ι, hT'⟩ := hf.const_witness
+  by_cases hp : ∃ E o cl, c = .perform E o cl
+  · obtain ⟨E, o, cl, rfl⟩ := hp
+    obtain ⟨_, _, _, _, _, _, hT'⟩ := hf.perform_arrow
+    obtain ⟨_, _, _, _, h, _, lψ, _, -⟩ := hT'.arrow_left
+    cases h
+    exact Stage.use_rt_le_ne_pure (Stage.le_trans lψ hψ) rfl
+  obtain ⟨ι, hT'⟩ := hf.const_witness fun E o cl he => hp ⟨E, o, cl, he⟩
   obtain ⟨_, _, _, _, _, hx⟩ := hc ι
   rw [hx] at hT'
   obtain ⟨_, _, _, _, h, _, lψ, _, -⟩ := hT'.arrow_left
@@ -39,7 +45,7 @@ theorem const_app_rt {Ψ Θ c w t} (h : Typ S Ψ Θ [] (.app (.const c) w) (.ex 
   exact Stage.use_rt_le_ne_pure (Stage.le_trans lψ hψ) rfl
 
 theorem const_app2_rt {Ψ Θ c w₁ w₂ t} (h : Typ S Ψ Θ [] (.app (.app (.const c) w₁) w₂) (.ex t .pure))
-    (hc : ∀ ι, ∃ a b φ d C C', c.ty S ι = .arrow a .pure (.arrow b φ d C) C' ∧
+    (hc : ∀ ι, ∃ a b φ d C C', c.ty ι = .arrow a .pure (.arrow b φ d C) C' ∧
       ∃ r e, φ.asStage = .rt r e) : False := by
   have hn : ¬ Value (.app (.app (.const c) w₁) w₂) := by
     intro hv
@@ -47,7 +53,8 @@ theorem const_app2_rt {Ψ Θ c w₁ w₂ t} (h : Typ S Ψ Θ [] (.app (.app (.co
     | ctorApp _ hK _ => simp [Tm.head] at hK
   obtain ⟨_, _, _, _, hf, _, hψ, _⟩ := h.app_nonvalue _ _ _ _ rfl rfl hn
   obtain ⟨_, _, _, _, hc', _, _, hT₁⟩ := hf.app_arrow
-  obtain ⟨ι, hT'⟩ := hc'.const_witness
+  obtain ⟨ι, hT'⟩ := hc'.const_witness fun E o cl he => by
+    subst he; obtain ⟨_, _, _, _, _, _, hx, -⟩ := hc default; cases hx
   obtain ⟨_, _, _, _, _, _, hx, _, _, hφ⟩ := hc ι
   rw [hx] at hT'
   obtain ⟨_, _, _, _, h, _, _, lt, -⟩ := hT'.arrow_left
@@ -58,27 +65,27 @@ theorem const_app2_rt {Ψ Θ c w₁ w₂ t} (h : Typ S Ψ Θ [] (.app (.app (.co
   exact Stage.use_rt_le_ne_pure (Stage.le_trans lψ hψ) rfl
 
 theorem perform_arrow {E o c} {ι : CArg} :
-    ∃ a r e b C, (Const.perform E o c).ty S ι = .arrow a (.rt r e) b C := by
-  simp only [Const.ty]
-  split <;> exact ⟨_, _, _, _, _, rfl⟩
+    ∃ a r e b C, (Const.perform E o c).ty ι = .arrow a (.rt r e) b C :=
+  ⟨_, _, _, _, _, rfl⟩
 
-/-- An operation takes a stage with its effect. -/
+/-- An operation takes a stage with its effect at the arguments it is performed at. -/
 theorem perform_svc {Ψ Θ E o c w t φ} (h : Typ S Ψ Θ [] (.app (.const (.perform E o c)) w) (.ex t φ)) :
-    φ.svc (.nm₀ E) := by
+    ∃ us, us.length = S.arity E ∧ φ.svc (.nm E (Ty.tcon E us).classOf) := by
   obtain ⟨_, _, _, _, hf, _, hψ, _⟩ := h.app_nonvalue _ _ _ _ rfl rfl perform_not_value
-  obtain ⟨_, _, _, _, hT'⟩ := hf.perform_arrow
+  obtain ⟨us, _, _, _, hus, _, hT'⟩ := hf.perform_arrow
   obtain ⟨_, _, _, _, h, _, lψ, _, -⟩ := hT'.arrow_left
   cases h
-  exact Stage.le_svc (Stage.le_trans (Stage.le_trans (Stage.le_use _ _) lψ) hψ) _ (.inl rfl)
+  exact ⟨us, hus, Stage.le_svc (Stage.le_trans (Stage.le_trans (Stage.le_use _ _) lψ) hψ) _
+    (.inl rfl)⟩
 
 /-- An operation that has a type is declared. -/
 theorem perform_op' {Ψ Θ E o c w t φ} (h : Typ S Ψ Θ [] (.app (.const (.perform E o c)) w) (.ex t φ)) :
     ∃ a b, S.op E o = some (c, a, b) := by
   obtain ⟨_, _, _, _, hf, _, _, _⟩ := h.app_nonvalue _ _ _ _ rfl rfl perform_not_value
-  obtain ⟨a, b, _, hop, _⟩ := hf.perform_arrow
+  obtain ⟨_, a, b, _, _, hop, _⟩ := hf.perform_arrow
   exact ⟨a, b, hop⟩
 
-theorem op_rt (ι : CArg) : ∃ a r e b C, Const.ty S .op ι = .arrow a (.rt r e) b C := by
+theorem op_rt (ι : CArg) : ∃ a r e b C, Const.ty .op ι = .arrow a (.rt r e) b C := by
   exact ⟨_, _, _, _, _, rfl⟩
 
 private theorem Typ.runtimeStage {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
@@ -95,17 +102,17 @@ private theorem Typ.runtimeStage {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     | refSet => exact const_app2_rt h fun _ => ⟨_, _, _, _, _, _, rfl, _, _, rfl⟩
     | op => exact const_app_rt h fun ι => op_rt ι
     | _ => exact const_app_rt h fun _ => ⟨_, _, _, _, _, rfl⟩
-  | hwith _ _ _ _ _ _ _ hφ _ _ =>
+  | hwith _ _ _ _ _ _ _ _ hφ _ _ =>
     intro _ _ _ _ _ _ _ hJ _; cases hJ; exact hφ
-  | hctl _ _ _ _ _ _ _ _ _ _ _ _ _ _ hφ _ _ =>
+  | hctl _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ hφ _ _ =>
     intro _ _ _ _ _ _ _ hJ _; cases hJ; exact hφ
   | hkeep _ _ _ _ _ _ _ hφ _ =>
     intro _ _ _ _ _ _ _ hJ _; cases hJ; exact hφ
-  | hkarm _ _ _ _ _ _ _ _ _ _ _ hφ _ =>
+  | hkarm _ _ _ _ _ _ _ _ _ _ _ _ hφ _ =>
     intro _ _ _ _ _ _ _ hJ _; cases hJ; exact hφ
   | hres _ _ _ _ _ _ _ hφ _ =>
     intro _ _ _ _ _ _ _ hJ _; cases hJ; exact hφ
-  | hdl _ _ _ _ _ _ _ _ hφ _ =>
+  | hdl _ _ _ _ _ _ _ _ _ hφ _ =>
     intro _ _ _ _ _ _ _ hJ _; cases hJ; exact hφ
   | scope _ _ _ _ hφ _ =>
     intro _ _ _ _ _ _ _ hJ _; cases hJ; exact hφ
@@ -167,7 +174,7 @@ theorem fin_unit {Ψ Θ c p w T φ} (h : Typ S Ψ Θ [] (.app (.app (.const c) (
     (hc : c = .addFin ∨ c = .spawn) : Typ S Ψ Θ [] (.lit .unit) (.ex T φ) := by
   obtain ⟨_, _, _, _, hf, _, _, hT⟩ := h.app_nonvalue _ _ _ _ rfl rfl (fin_not_value hc)
   obtain ⟨_, _, _, _, hc', _, _, hT₁⟩ := hf.app_arrow
-  obtain ⟨_, hT'⟩ := hc'.const_witness
+  obtain ⟨_, hT'⟩ := hc'.const_witness fun _ _ _ h => by rcases hc with rfl | rfl <;> cases h
   rcases hc with rfl | rfl <;>
   · obtain ⟨_, _, _, _, h, _, _, lt, -⟩ := hT'.arrow_left
     cases h
@@ -245,7 +252,7 @@ theorem root_field {root Ψ Θ Ef o w f c v t φ} (hroot : RootTy S root) (hr₀
     (h : Typ S Ψ Θ [] (.app (.const (.perform Ef o c)) v) (.ex t φ)) :
     Typ S Ψ Θ [] (.app f v) (.ex t φ) := by
   obtain ⟨_, _, _, _, hf', hx, hψ, hT⟩ := h.app_nonvalue _ _ _ _ rfl rfl perform_not_value
-  obtain ⟨_, _, _, hop, hT'⟩ := hf'.perform_arrow
+  obtain ⟨us, _, _, _, hus, hop, hT'⟩ := hf'.perform_arrow
   obtain ⟨hwv, hwt⟩ := hroot.svc _ _ hr₀
   have hne : S.impl Ef ≠ .errors .cnil := fun he => by
     rw [he] at hwt
@@ -253,7 +260,11 @@ theorem root_field {root Ψ Θ Ef o w f c v t φ} (hroot : RootTy S root) (hr₀
     exact hN.elim
   have hc : c = .tail := Classical.byContradiction fun hc => hne (S.op_impl _ _ _ _ _ hop hc)
   subst hc
-  have ft := field_typ hwt hf (S.op_field _ _ _ _ hop hne)
+  -- the root answers every argument of its service: its record is over the parameters
+  have ft := (field_typ hwt hf (S.op_field _ _ _ _ hop hne)).substT (instT us)
+    (Fits.noIns (fun h => hwt.noIns hwv (matchP_below.field_has hf h)) fun _ => rfl)
+  simp only [Flick.J.substT, List.map_nil, Facts.none_substT, Ty.substT, Ty.isStage, if_true,
+    Caps.none_substT, Stage.substT_pure] at ft
   have ft' := (ft.cut (Entails.none Θ)).weakenStore Ψ
   simp only [List.nil_append] at ft'
   obtain ⟨_, _, _, _, h, la, lψ, lt, -⟩ := hT'.arrow_left

@@ -260,7 +260,7 @@ def Sg : Sig where
   ctor_reach := ctorF_reach
   res := resF
   res_closed := resF_closed
-  impl_closed _ _ := rfl
+  impl_closed _ _ _ := rfl
   dict c := some (c / 8, dfields (c % 8) (c / 8))
   glob := globF
   dict_closed := dict_closed

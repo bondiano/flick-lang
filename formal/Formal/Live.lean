@@ -121,7 +121,7 @@ def SafeUse (root : Roots) (Ok : Tm → Ty → Stage → Prop) : Prop :=
     (∀ (p : Nat) (g : Rgn), c.rgs[p]? = some g → g.live = true → ∀ k ∈ g.kids, ∀ E r,
       OkE E → k = plug E r → ¬ DeadUse c.rgs r) ∧
     (∀ i e E Ef o k v q, c.at i = some e → OkE E → e = plug E (.app (.const (.perform Ef o k)) v) →
-      handlerOf E Ef o k = some q → Live c.rgs q)
+      handlerOf E Ef o = some q → Live c.rgs q)
 
 /-- T4′ is closed under a smaller judgment: a discipline that accepts less keeps it. -/
 theorem SafeUse.mono {root : Roots} {Ok Ok' : Tm → Ty → Stage → Prop}

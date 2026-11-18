@@ -13,7 +13,7 @@ namespace Flick
 
 /-- The cell of the handler of region `q`: its arms' row names only ancestors of `q`. -/
 def LCell (Ψ : List Ty) (anc : Nat → Nat → Prop) (q ℓ : Nat) : Prop :=
-  ∃ r ε t, Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t Caps.none) ∧ ∀ x, r.asRow (.atm (.r x)) → anc q x
+  ∃ u r ε t, Ψ[ℓ]? = some (.arrow u (.rt r ε) t Caps.none) ∧ ∀ x, r.asRow (.atm (.r x)) → anc q x
 
 section
 variable (Ψ : List Ty) (anc : Nat → Nat → Prop)
@@ -136,28 +136,30 @@ theorem Tm.Fw.frame {q : Nat} : ∀ {e : Tm} {A : Nat → Prop}, e.Fw Ψ anc A �
   induction e with
   | hkeep p ℓ E' al e _ ih =>
     intro A h hs
-    rcases hs with hs | hs | hs | hs
+    rcases hs with hs | hs | hs | hs | hs
     · cases hs
     · cases hs
     · exact absurd (Tm.has_frame_ins hs) h.2.2.2.1
     · obtain ⟨h₁, h₂, h₃, h₄⟩ := ih h.2.2.1 hs
-      exact ⟨h₁, h₂, h₃, fun x hx => (h₄ x hx).imp_right fun h => .inr (.inr (.inr h))⟩
+      exact ⟨h₁, h₂, h₃, fun x hx => (h₄ x hx).imp_right fun h => .inr (.inr (.inr (.inl h)))⟩
+    · cases hs
   | hkarm p ℓ E' al a k _ ih₁ ih₂ =>
     intro A h hs
-    rcases hs with hs | hs | hs | hs | hs
+    rcases hs with hs | hs | hs | hs | hs | hs
     · cases hs
     · cases hs
     · exact absurd (Tm.has_frame_ins hs) h.2.2.2.2.1
     · obtain ⟨h₁, h₂, h₃, h₄⟩ := ih₁ h.2.2.1 hs
       exact ⟨h₁, h₂, h₃, fun x hx => (h₄ x hx).imp_right fun h => .inr (.inr (.inr (.inl h)))⟩
     · obtain ⟨h₁, h₂, h₃, h₄⟩ := ih₂ h.2.2.2.1 hs
-      exact ⟨h₁, h₂, h₃, fun x hx => (h₄ x hx).imp_right fun h => .inr (.inr (.inr (.inr h)))⟩
+      exact ⟨h₁, h₂, h₃, fun x hx => (h₄ x hx).imp_right fun h => .inr (.inr (.inr (.inr (.inl h))))⟩
+    · cases hs
   | _ => intro A h hs; simp only [Tm.Fw, Tm.Has] at h hs ⊢ <;> grind
 
 theorem LCell.mono {Ψ' : List Ty} {anc' : Nat → Nat → Prop} {q ℓ : Nat}
     (hΨ : ∀ (l : Nat) (t : Ty), Ψ[l]? = some t → Ψ'[l]? = some t) (h : LCell Ψ anc q ℓ) (ha : anc' q = anc q) :
     LCell Ψ' anc' q ℓ :=
-  let ⟨r, ε, t, h₁, h₂⟩ := h; ⟨r, ε, t, hΨ _ _ h₁, fun x hx => ha ▸ h₂ x hx⟩
+  let ⟨u, r, ε, t, h₁, h₂⟩ := h; ⟨u, r, ε, t, hΨ _ _ h₁, fun x hx => ha ▸ h₂ x hx⟩
 
 /-- A term stays at its place in a larger store, with the ancestors of the regions of its
 place and of its `inside` forms kept. -/

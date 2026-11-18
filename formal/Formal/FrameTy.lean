@@ -20,12 +20,16 @@ structure FRel (F : Frame) (φ' φ : Stage) : Prop where
   err : ¬ F.isTry → Row.Sub φ'.err φ.err
   pure : φ = .pure → φ' = .pure
   rt : ¬ F.isTry → φ' ≠ .pure → φ ≠ .pure
+  /-- Only a handler gives a name back to a row variable: any other frame passes the variables
+  of its hole as they are. -/
+  vars : (∀ N, ¬ F.installs N) → ∀ a G, φ'.svc (.rv a G) → φ.svc (.rv a G)
 
 theorem FRel.of_le {F φ' φ} (h : φ'.le φ) : FRel F φ' φ where
   svc := fun n hn => .inl (Row.le_modNames (Stage.le_svc h n hn))
   err := fun _ => Stage.le_err h
   pure := fun hp => by subst hp; exact Stage.eq_pure h
   rt := fun _ hp hφ => by subst hφ; exact hp (Stage.eq_pure h)
+  vars := fun _ _ _ hn => Stage.le_svc h _ hn
 
 /-- A hole that uses what the frame provides: in the live discipline a runtime form of a
 handler stands for its own region, so the hole may use it. -/
@@ -40,6 +44,8 @@ theorem FRel.use_rgn {F φ ψ} {C : Caps}
   pure := fun hp => by
     subst hp; simp only [Stage.use_pure] at h; exact Stage.eq_pure h
   rt := fun _ hp hφ => by subst hφ; simp only [Stage.use_pure] at h; exact hp (Stage.eq_pure h)
+  vars := fun _ _ _ hn => (Stage.use_svc φ C (Stage.le_svc h _ hn)).resolve_right fun ⟨_, _, h⟩ =>
+    by cases h
 
 /-- The hole after a step, in a store grown by `X`, refills the frame; so it does
 after a substitution `σ` that fits the term, which renames the regions not yet
@@ -98,45 +104,88 @@ theorem Typ.sx1 {Ψ Θ a e J} (h : Typ S Ψ Θ [.mono a] e J) {σ : Atom → Ty}
 
 
 
+/-- What a handler frame tells of the instances of its effect: its hole performs the effect
+only at arguments it answers (`Sig.answers`), at the arguments `us` of its arms, and an
+operation it does not answer goes on to the handler around at `us`. -/
+def Frame.Inst (S : Sig) (F : Frame) (φ' φ : Stage) : Prop :=
+  ∀ E, F.installs E → ∃ us, us.length = S.arity E ∧
+    (∀ c, φ'.svc (.nm E c) → S.answers E us c) ∧
+    ∀ o cl a b, S.op E o = some (cl, a, b) → F.handles E o = none →
+      φ.svc (.nm E (Ty.tcon E us).classOf)
+
+/-- An argument of `E` at which an operation of `E` may be performed: `E ū` with as many
+arguments as `E` has parameters. -/
+def Sig.Kinded (S : Sig) (E : Name) (c : TyClass) : Prop :=
+  ∃ vs, vs.length = S.arity E ∧ c = (Ty.tcon E vs).classOf
+
+/-- The arguments of `E` a handler at `us` answers, at the arguments of a stage. -/
+def Stage.Answered (S : Sig) (E : Name) (us : List Ty) (φ : Stage) : Prop :=
+  ∀ c, φ.svc (.nm E c) → S.Kinded E c → S.answers E us c
+
+/-- A frame that does not answer the operation `o` of `E` passes what the handler around at `us`
+answers to its hole: a handler of `E` in it answers its own arguments `us'`, and leaves `o` to the
+handler around at `us'`, which therefore answers them. -/
+theorem Frame.Inst.carry {F : Frame} {φ' φ : Stage} {E o : Name} {cl : OpClass} {a b : Ty}
+    {us : List Ty} (rel : FRel F φ' φ) (hi : Frame.Inst S F φ' φ) (hop : S.op E o = some (cl, a, b))
+    (hno : F.handles E o = none) (h : Stage.Answered S E us φ) : Stage.Answered S E us φ' := by
+  intro c hc hk
+  rcases rel.svc _ hc with h' | h'
+  · exact h c h' hk
+  · obtain ⟨us', hl, hA, hout⟩ := hi E (Frame.provides_nm h')
+    have hu := h _ (hout o cl a b hop hno) ⟨us', hl, rfl⟩
+    rcases hA c hc with h₀ | rfl
+    · exact .inl h₀
+    · exact hu
+
 /-- One frame of L3: the hole is `k` type variables deep, and pure if `k ≠ 0`;
 at depth `0` it has the facts of the frame. -/
 def FrameTy (S : Sig) (Ψ : List Ty) (Θ : Facts) (F : Frame) (r : Tm) (t : Ty) (φ : Stage) : Prop :=
   ∃ k Θ' t' φ', Typ S (Ψ.map (Ty.up k)) Θ' [] r (.ex t' φ') ∧ FRel F φ' φ ∧
-    (φ' = .pure ∨ k = 0 ∧ Ext Θ Θ' ∧ (¬ F.isInside → Θ' = Θ)) ∧ Refill S Ψ Θ k Θ' t' φ' F.plug t φ r
+    (φ' = .pure ∨ k = 0 ∧ Ext Θ Θ' ∧ (¬ F.isInside → Θ' = Θ)) ∧
+    Refill S Ψ Θ k Θ' t' φ' F.plug t φ r ∧ Frame.Inst S F φ' φ
 
-theorem FrameTy.mk0 {Ψ Θ F r t φ}
+/-- A frame at the depth of its hole, which tells what `Frame.Inst` asks of the instances of its
+effect. -/
+theorem FrameTy.mk0I {Ψ Θ F r t φ}
+    (h : ∃ t' φ', Typ S Ψ Θ [] r (.ex t' φ') ∧ FRel F φ' φ ∧ Refill0 S Ψ Θ t' φ' F.plug t φ r ∧
+      Frame.Inst S F φ' φ) : FrameTy S Ψ Θ F r t φ :=
+  let ⟨t', φ', h, rel, back, hi⟩ := h
+  ⟨0, Θ, t', φ', by simpa using h, rel, .inr ⟨rfl, Ext.refl _, fun _ => rfl⟩,
+    fun σ hσ X r' h' => back σ hσ X r' (by rw [List.map_up_zero, liftT_zero] at h'; exact h'), hi⟩
+
+/-- A frame at the depth of its hole that handles no effect. -/
+theorem FrameTy.mk0 {Ψ Θ F r t φ} (hn : ∀ E, ¬ F.installs E)
     (h : ∃ t' φ', Typ S Ψ Θ [] r (.ex t' φ') ∧ FRel F φ' φ ∧ Refill0 S Ψ Θ t' φ' F.plug t φ r) : FrameTy S Ψ Θ F r t φ :=
   let ⟨t', φ', h, rel, back⟩ := h
-  ⟨0, Θ, t', φ', by simpa using h, rel, .inr ⟨rfl, Ext.refl _, fun _ => rfl⟩,
-    fun σ hσ X r' h' => back σ hσ X r' (by rw [List.map_up_zero, liftT_zero] at h'; exact h')⟩
+  .mk0I ⟨t', φ', h, rel, back, fun E hE => (hn E hE).elim⟩
 
 /-- Converting the result leaves the hole and its stage relation unchanged. -/
 theorem FrameTy.conv {Ψ Θ F r a b φ} (h : FrameTy S Ψ Θ F r a φ)
     (he : Ty.Equiv a b) : FrameTy S Ψ Θ F r b φ := by
-  obtain ⟨k, Θ', t', φ', ht, hr, hf, hb⟩ := h
+  obtain ⟨k, Θ', t', φ', ht, hr, hf, hb, hi⟩ := h
   exact ⟨k, Θ', t', φ', ht, hr, hf,
-    fun σ hσ X r' h' => (hb σ hσ X r' h').conv (he.substT σ)⟩
+    fun σ hσ X r' h' => (hb σ hσ X r' h').conv (he.substT σ), hi⟩
 
 /-- A frame that handles `E` in its hole: the hole may also need `E`, and obligations about
 it. -/
-theorem FRel.installs {F : Frame} {E : Name} {φ₀ φ : Stage} {r ε : Row}
+theorem FRel.installs {F : Frame} {E : Name} {A : TyClass → Prop} {φ₀ φ : Stage} {r ε : Row}
     {Θ : Facts} {q : Nat}
-    (hE : F.installs E) (h₀ : φ₀.le (.rt (Row.hP Θ q E r) ε)) (h : (Stage.rt r ε).le φ) :
+    (hE : F.installs E) (h₀ : φ₀.le (.rt (Row.hP Θ q E A r) ε)) (h : (Stage.rt r ε).le φ) :
     FRel F φ₀ φ := by
   obtain ⟨_, _, rfl, hr, he⟩ := Stage.rt_le h
   refine ⟨fun n hn => ?_, fun _ => (Stage.le_err h₀).trans he, fun hp => (by cases hp),
-    fun _ _ h => (by cases h)⟩
+    fun _ _ h => (by cases h), fun h => (h E hE).elim⟩
   have h₁ := Stage.le_svc h₀ n hn
   cases n with
-  | nm N =>
-    rcases h₁ with rfl | h₁
+  | nm N c =>
+    rcases h₁ with ⟨rfl, -⟩ | ⟨-, h₁⟩
     · exact .inr (Frame.provides_of hE)
     · exact .inl (hr _ h₁)
-  | ob N a =>
+  | ob N c a =>
     by_cases hN : N = E
     · subst hN; exact .inr (Frame.provides_of (.inl hE))
     · exact .inl (hr _ (h₁.2 hN))
-  | atm a | obv v a => exact .inl (hr _ h₁)
+  | atm a | obv v G a => exact .inl (hr _ h₁)
   | rv a G' => obtain ⟨G, h₁, -⟩ := h₁; exact .inl ⟨G, hr _ h₁⟩
 
 end Flick

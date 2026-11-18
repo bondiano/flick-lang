@@ -121,7 +121,7 @@ private theorem Typ.rtStepCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       exact hμ.same ((Typ.cap).sub ⟨lt.trans hT, Stage.pure_le _⟩)
     | op =>
       obtain ⟨_, _, hT'⟩ := hf.const_arrow (by intro E o cl h; cases h)
-      obtain ⟨_, hop⟩ := Const.ty_op_arrow S _
+      obtain ⟨_, hop⟩ := Const.ty_op_arrow _
       rw [hop] at hT'
       obtain ⟨_, _, _, _, h, _, _, lt, -⟩ := hT'.arrow_left
       cases h
@@ -246,30 +246,30 @@ private theorem Typ.rtStepCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
         obtain ⟨rout, εout, rfl, _, he⟩ := Stage.rt_le hφ
         exact hμ.same (.raise (φ := .rt rout εout) (hv'.valueAny hv _) ⟨fun _ h => h.elim,
           fun n hn => he n ((Stage.le_err (Stage.le_trans hε hφ')) n hn)⟩)
-      · obtain ⟨_, _, _, h₁, h₂, _⟩ := hbody.unw_type _ _ _ _ _ rfl rfl
+      · obtain ⟨_, _, _, _, h₁, h₂, _⟩ := hbody.unw_type _ _ _ _ _ rfl rfl
         exact hμ.same (.unw h₁ h₂ (Stage.none_le (Stage.rt_ne_pure hφ)))
     | finRun =>
       exact hμ.same h
-  | hdl hal hn hrf hψ he hφ₀ hOb hc' hφ' hT =>
+  | hdl hus hal hn hrf hψ he hφ₀ hOb hc' hφ' hT =>
     intro Λ μ t φ Λ' μ' e' hΓ hJ hμ hcRt hbl hμb ht hφfixed hh
     cases hΓ; cases hJ
     cases hh with
     | hdl =>
-      obtain ⟨c, hcy, hcl, hb⟩ := hdl_install hal hn hrf hψ he hφ₀ hOb hc' hφ' hT hbl hcRt.yf hcRt.idem ht hφfixed
+      obtain ⟨c, hcy, hcl, hb⟩ := hdl_install hus hal hn hrf hψ he hφ₀ hOb hc' hφ' hT hbl hcRt.yf hcRt.idem ht hφfixed
       exact ⟨[c], hμ.alloc .lam hcl, by rw [hμ.1]; exact hb, by simpa using hcy⟩
-  | hctl hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha hl hcm hφ hT hat =>
+  | hctl hus hℓ hal hrf hψ hop hc htl hE hk hno hp hφ₀ ha hl hcm hφ hT hat =>
     intro Λ μ t φ Λ' μ' e' hΓ hJ hμ hcRt hbl hμb ht hφfixed hh
     cases hΓ; cases hJ
-    have h := Typ.hctl hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha hl hcm hφ hT hat
+    have h := Typ.hctl hus hℓ hal hrf hψ hop hc htl hE hk hno hp hφ₀ ha hl hcm hφ hT hat
     cases hh with
     | hctlRaise hEi hk _ =>
       exact hμ.same (hctl_signal hEi hk raise_any h)
     | hctlUnw hEi hk =>
       exact hμ.same (hctl_signal hEi hk unw_any h)
-  | hkarm hℓ hal hop hE hk hp hφ₀ hc hnt ha hle hφ hT =>
+  | hkarm hus hℓ hal hop hE hk hno hp hφ₀ hc ha hle hφ hT =>
     intro Λ μ t φ Λ' μ' e' hΓ hJ hμ hcRt hbl hμb ht hφfixed hh
     cases hΓ; cases hJ
-    have h := Typ.hkarm hℓ hal hop hE hk hp hφ₀ hc hnt ha hle hφ hT
+    have h := Typ.hkarm hus hℓ hal hop hE hk hno hp hφ₀ hc ha hle hφ hT
     cases hh with
     | hkarmRaise hEi hk _ =>
       exact hμ.same (hkarm_raise hEi hk h)
@@ -284,10 +284,10 @@ private theorem Typ.rtStepCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       exact hμ.same (hres_signal hA ha raise_any h)
     | hresUnw hA ha =>
       exact hμ.same (hres_signal hA ha unw_any h)
-  | hwith hℓ hal hrf hψ he hφ₀ hc hφ hT hat =>
+  | hwith hus hℓ hal hrf hψ he hφ₀ hc hφ hT hat =>
     intro Λ μ t φ Λ' μ' e' hΓ hJ hμ hcRt hbl hμb ht hφfixed hh
     cases hΓ; cases hJ
-    have h := Typ.hwith hℓ hal hrf hψ he hφ₀ hc hφ hT hat
+    have h := Typ.hwith hus hℓ hal hrf hψ he hφ₀ hc hφ hT hat
     cases hh with
     | hwithCatch =>
       exact hμ.same (hwith_catch h)
