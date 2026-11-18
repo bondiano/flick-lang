@@ -1,0 +1,10 @@
+// A test's body that does not parse is reported once, where it is: the
+// block still declares its case, which the module's `tests` names.
+module App.BodiesTest
+
+test "first" {}
+
+test "second" {
+  let total = (1 +
+}
+//~ FLICK-S007 @8:19-8:19 expected an expression

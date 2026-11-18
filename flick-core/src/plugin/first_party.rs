@@ -11,12 +11,13 @@ use flick_plugin_cli::Cli;
 use flick_plugin_derive::{codec, server_fn};
 use flick_plugin_refined::block as refined;
 use flick_plugin_sql::Sql;
+use flick_plugin_test::{Test, owns as test_head};
 use flick_plugin_ui::{block as ui_block, calls, component};
 
 use super::{Expander, Native};
 use crate::implicit_packages::is_implicit_package;
 
-pub use crate::syntax::heads::{BARE, DECLARATIONS, HEADS, NAMED};
+pub use crate::syntax::heads::{BARE, DECLARATIONS, HEADS, NAMED, TOP};
 
 /// The names whose places of call the plugin of std checks, as the `watch`
 /// of a package declares them. Every module is watched for them without a
@@ -74,7 +75,8 @@ pub fn plugin(package: &str) -> Option<Arc<dyn Expander>> {
 }
 
 /// The plugin of std: `cli` blocks and `deriving Cli.Value`, `server fn`,
-/// `codec`, `sql table`, and the derives of the witnesses of the Prelude.
+/// `codec`, `sql table`, `suite` and `test`, and the derives of the
+/// witnesses of the Prelude.
 struct Std;
 
 /// Whether `block` is a `cli` block.
@@ -82,21 +84,38 @@ fn cli(block: &Block) -> bool {
     !matches!(
         block.head.as_str(),
         "server" | "codec" | "sql" | "component" | "ui" | "refined"
-    )
+    ) && !test_head(&block.head)
+}
+
+/// The state of `sql` and that of the tests, which follows it after a zero
+/// byte when there is one: JSON has none. A group without tests keeps the
+/// state of `sql` alone, as its caches have it.
+fn split(state: &[u8]) -> (&[u8], &[u8]) {
+    match state.iter().position(|&b| b == 0) {
+        Some(at) => (&state[..at], &state[at + 1..]),
+        None => (state, &[]),
+    }
 }
 
 impl Plugin for Std {
-    // the state is the tables' and migrations' of `sql`: the others keep none
+    // the state is the tables' and migrations' of `sql`, and the order of the
+    // tests of each module: the others keep none
     fn collect(&self, blocks: &[Block], compiler: &mut dyn Compiler) -> Vec<u8> {
         let sql: Vec<Block> = (blocks.iter())
             .filter(|b| b.head == "sql")
             .cloned()
             .collect();
-        Sql.collect(&sql, compiler)
+        let mut state = Sql.collect(&sql, compiler);
+        let tests = Test.collect(blocks, compiler);
+        if !tests.is_empty() {
+            state.push(0);
+            state.extend(tests);
+        }
+        state
     }
 
     fn publish(&self, state: &[u8]) -> Vec<Published> {
-        Sql.publish(state)
+        Sql.publish(split(state).0)
     }
 
     fn expand(
@@ -108,7 +127,8 @@ impl Plugin for Std {
         match block.head.as_str() {
             "server" => server_fn::expand(block, compiler),
             "codec" => codec::expand(block, compiler),
-            "sql" => Sql.expand(block, state, compiler),
+            "sql" => Sql.expand(block, split(state).0, compiler),
+            head if test_head(head) => Test.expand(block, split(state).1, compiler),
             "component" => component::expand(block, compiler),
             "ui" => ui_block::expand(block, compiler),
             "refined" => refined::expand(block, compiler),
@@ -119,7 +139,7 @@ impl Plugin for Std {
     fn check(&self, block: &Block, state: &[u8], facts: &[Fact]) -> Vec<Diagnostic> {
         match block.head.as_str() {
             "codec" => codec::check(block, facts),
-            "sql" => Sql.check(block, state, facts),
+            "sql" => Sql.check(block, split(state).0, facts),
             _ => Vec::new(),
         }
     }
@@ -149,7 +169,7 @@ impl Plugin for Std {
         compiler: &mut dyn Compiler,
     ) -> Vec<Completion> {
         match block.head.as_str() {
-            "sql" => Sql.complete(block, state, offset, member, compiler),
+            "sql" => Sql.complete(block, split(state).0, offset, member, compiler),
             _ if cli(block) => Cli.complete(block, state, offset, member, compiler),
             _ => Vec::new(),
         }
@@ -158,7 +178,8 @@ impl Plugin for Std {
     fn hover(&self, block: &Block, state: &[u8], offset: u32, facts: &[Fact]) -> Option<Hover> {
         match block.head.as_str() {
             "codec" => codec::hover(block, offset, facts),
-            "sql" => Sql.hover(block, state, offset, facts),
+            "sql" => Sql.hover(block, split(state).0, offset, facts),
+            head if test_head(head) => Test.hover(block, split(state).1, offset, facts),
             "component" => component::hover(block, offset),
             "ui" => ui_block::hover(block, offset),
             "refined" => refined::hover(block, offset),
@@ -170,6 +191,8 @@ impl Plugin for Std {
     fn highlight(&self, block: &Block, state: &[u8]) -> Vec<Highlight> {
         if cli(block) {
             Cli.highlight(block, state)
+        } else if test_head(&block.head) {
+            Test.highlight(block, split(state).1)
         } else {
             Vec::new()
         }
@@ -183,7 +206,8 @@ impl Plugin for Std {
     ) -> Option<Vec<Piece>> {
         match block.head.as_str() {
             "codec" => codec::format(block, compiler),
-            "sql" => Sql.format(block, state, compiler),
+            "sql" => Sql.format(block, split(state).0, compiler),
+            head if test_head(head) => Test.format(block, split(state).1, compiler),
             "component" => component::format(block, compiler),
             "ui" => ui_block::format(block, compiler),
             "refined" => refined::format(block, compiler),

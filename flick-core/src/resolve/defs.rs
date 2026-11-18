@@ -3,6 +3,7 @@
 
 use std::collections::{HashMap, VecDeque};
 
+use super::syntax::TESTS;
 use super::{Decl, Namespace};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::{FileId, Span};
@@ -162,13 +163,35 @@ fn foreign(
     })
 }
 
-/// A second definition of a name in the same namespace.
-pub(super) fn duplicates(defs: &[Def]) -> Vec<Diagnostic> {
+/// A second definition of a name in the same namespace. `generated` is
+/// where the code of plugins starts, and `tests` the first `suite` or `test`
+/// block, whose code declares the module's `tests`.
+pub(super) fn duplicates(defs: &[Def], generated: u32, tests: Option<Span>) -> Vec<Diagnostic> {
     let mut first: HashMap<(Namespace, &str, bool), &Def> = HashMap::new();
     let mut out = Vec::new();
     for def in defs {
         let key = (def.namespace, def.name.as_str(), def.signature);
+        let by_hand = |d: &Def| d.span.start < generated;
         match first.get(&key) {
+            // the blocks' `tests` and one written by hand
+            Some(original)
+                if def.name == TESTS
+                    && def.namespace == Namespace::Value
+                    && by_hand(def) != by_hand(original)
+                    && let Some(blocks) = tests =>
+            {
+                let written = if by_hand(def) { def } else { original };
+                out.push(
+                    Diagnostic::error(
+                        codes::R008,
+                        "this module declares `tests` by hand and its `suite` and `test` blocks \
+                         declare them too: move the hand-written tests into a block or drop the \
+                         blocks",
+                        written.span,
+                    )
+                    .with_related(blocks, "the blocks start here"),
+                );
+            }
             Some(original) => out.push(
                 Diagnostic::error(
                     codes::R008,

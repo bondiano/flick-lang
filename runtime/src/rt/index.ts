@@ -148,8 +148,10 @@ export {
   testClock,
   testEffect,
   testGroup,
+  testOnly,
   testProperty,
   testPure,
+  testSkip,
   testSetTime,
   testSuite,
 } from "./testing.ts";

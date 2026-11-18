@@ -198,7 +198,10 @@ impl<'a> Printer<'a> {
         // which the check of the declaration then refuses
         self.comments.skip(n.range().1);
         let head = head_token(n).map_or("", |t| t.text(self.text));
-        let mut levels: Vec<Vec<Doc<'a>>> = vec![vec![self.str(head), a.text(" ")]];
+        // a modifier of the head follows it: `test.skip "name" { … }`
+        let modifier = matches!(layout.pieces.first(), Some(Piece::Text(t)) if t.starts_with('.'));
+        let space = if modifier { "" } else { " " };
+        let mut levels: Vec<Vec<Doc<'a>>> = vec![vec![self.str(head), a.text(space)]];
         if layout.opens {
             levels[0].push(a.text("{"));
         }

@@ -8,7 +8,7 @@ export type FailureKind = "assertion" | "defect" | "interrupted" | "failure" | "
 /** The result of one test, as the reporters write it. */
 export interface TestResult {
   readonly name: string;
-  readonly status: "passed" | "failed";
+  readonly status: "passed" | "failed" | "skipped";
   readonly kind?: FailureKind;
   readonly message?: string;
   readonly cleanup?: string;
@@ -24,6 +24,10 @@ export interface TestOptions {
   readonly color?: boolean;
   readonly write?: (text: string) => void;
   readonly progress?: boolean;
+  /** Print the full names of the tests a run would run, and run none. */
+  readonly list?: boolean;
+  /** Fail a run with a test marked `only` before running any. */
+  readonly forbidOnly?: boolean;
 }
 
 /** Options of `flick test`, from the runner's arguments. */
@@ -36,6 +40,8 @@ export const parseTestArgs = (argv: ReadonlyArray<string>): TestOptions => {
     watched: boolean;
     color: boolean;
     progress: boolean;
+    list: boolean;
+    forbidOnly: boolean;
   } = {
     filter: "",
     jobs: 1,
@@ -44,6 +50,8 @@ export const parseTestArgs = (argv: ReadonlyArray<string>): TestOptions => {
     watched: false,
     color: false,
     progress: false,
+    list: false,
+    forbidOnly: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i];
@@ -54,8 +62,10 @@ export const parseTestArgs = (argv: ReadonlyArray<string>): TestOptions => {
     else if (flag === "--reporter") options.reporter = value;
     else if (flag === "--color") options.color = value === "always";
     else if (flag === "--progress") options.progress = value === "live";
-    else if (flag === "--watched") {
-      options.watched = true;
+    else if (flag === "--watched" || flag === "--list" || flag === "--forbid-only") {
+      if (flag === "--watched") options.watched = true;
+      else if (flag === "--list") options.list = true;
+      else options.forbidOnly = true;
       continue;
     } else continue;
     i++;
@@ -87,6 +97,7 @@ const humanResult = (
 
 const report = (
   results: ReadonlyArray<TestResult>,
+  skipped: ReadonlyArray<TestResult>,
   seed: number,
   reporter: string | undefined,
   write: (text: string) => void,
@@ -96,14 +107,20 @@ const report = (
   const failed = results.filter((r) => r.status === "failed").length;
   const passed = results.length - failed;
   if (reporter === "json") {
-    write(`${JSON.stringify({ seed, passed, failed, tests: results })}\n`);
+    // a run without skipped tests reports as before they existed
+    const counts = skipped.length > 0 ? { seed, passed, failed, skipped: skipped.length } : { seed, passed, failed };
+    write(`${JSON.stringify({ ...counts, tests: [...results, ...skipped] })}\n`);
     return failed;
   }
   const reset = color ? "\x1b[0m" : "";
   const dim = color ? "\x1b[2m" : "";
   const passedColor = color && passed > 0 ? "\x1b[32m" : dim;
   const failedColor = color && failed > 0 ? "\x1b[31m" : dim;
-  write(`\n  Tests  ${passedColor}${passed}${reset} passed · ${failedColor}${failed}${reset} failed · ${results.length} total\n`);
+  if (skipped.length > 0) write("\n");
+  for (const { name } of skipped) write(`  ${dim}- ${name}  (skipped)${reset}\n`);
+  const also = skipped.length > 0 ? ` · ${dim}${skipped.length}${reset} skipped` : "";
+  const total = results.length + skipped.length;
+  write(`\n  Tests  ${passedColor}${passed}${reset} passed · ${failedColor}${failed}${reset} failed${also} · ${total} total\n`);
   write(`  Time   ${dim}${Math.max(0, Math.floor(elapsedMs))} ms${reset}\n`);
   if (failed > 0) write(`seed: ${seed} (rerun with --seed ${seed})\n`);
   return failed;
@@ -155,9 +172,27 @@ export const runTestsWith = async <Task, L>(
   const seed =
     options.seed !== undefined && Number.isInteger(options.seed) ? options.seed : Math.floor(Math.random() * 2 ** 31);
   const jobs = options.jobs !== undefined && Number.isInteger(options.jobs) && options.jobs > 0 ? options.jobs : 1;
-  const selected = modules
-    .flatMap(([module, tests]) => flatten(module, tests ?? []))
-    .filter(({ name }) => name.includes(options.filter ?? ""));
+  const all = modules.flatMap(([module, tests]) => flatten(module, tests ?? []));
+  const marked = all.filter((t) => t.only);
+  if (options.forbidOnly && marked.length > 0) {
+    write(`--forbid-only: ${marked.length} test${marked.length === 1 ? " is" : "s are"} marked only\n`);
+    for (const { name } of marked) write(`  ${name}\n`);
+    process.exitCode = 1;
+    return;
+  }
+  // a test marked `only` in the selected files keeps the run to such tests
+  const onlyMarked = all.some((t) => t.only && !t.skip);
+  const filtered = all.filter(({ name }) => name.includes(options.filter ?? ""));
+  const runs = (t: (typeof all)[number]): boolean => !t.skip && (!onlyMarked || t.only);
+  const selected = filtered.filter(runs);
+  if (options.list) {
+    for (const { name } of selected) write(`${name}\n`);
+    process.exitCode = 0;
+    return;
+  }
+  const skipped: ReadonlyArray<TestResult> = filtered
+    .filter((t) => !runs(t))
+    .map(({ name }) => ({ name, status: "skipped" }));
   const human = options.reporter !== "json";
   const color = options.color ?? false;
   let completed = 0;
@@ -218,6 +253,6 @@ export const runTestsWith = async <Task, L>(
     process.exitCode = interrupted ? 130 : 1;
     return;
   }
-  const failed = report(ended, seed, options.reporter, write, color, human ? performance.now() - started : 0);
+  const failed = report(ended, skipped, seed, options.reporter, write, color, human ? performance.now() - started : 0);
   process.exitCode = failed > 0 ? 1 : 0;
 };
