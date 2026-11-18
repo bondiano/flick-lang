@@ -92,6 +92,7 @@ codegen/service_reprovide
 codegen/services
 effect/service_params
 effect/effect_params
+effect/effect_instances
 effect/host_root
 codegen/stage_order
 codegen/strings_utf16

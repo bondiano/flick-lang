@@ -8,6 +8,7 @@
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::{env, fs};
 
 use flick_model::cert::{certificate, sig::Sig};
@@ -15,6 +16,8 @@ use flick_model::check::Checker;
 use flick_model::decls::Decls;
 use flick_model::generate::{self, Program};
 use flick_model::run;
+use flick_model::syntax::{self, Const, Lit, Name, Term};
+use flick_model::types::{Row, Scheme, Type};
 
 /// How many certificates `Golden.lean` has.
 const GOLDEN: usize = 32;
@@ -56,6 +59,25 @@ fn certify(decls: &Decls, sig: &Sig, name: &str, p: &Program) -> Result<String, 
         .check_top_traced(&p.term, &p.scheme)
         .map_err(|_| "the model rejects it".to_owned())?;
     certificate(name, p, &trace, sig)
+}
+
+/// `task { provide (Layer.succeed Box { take = fun u -> 1 }) { Box.take () } }`: a service
+/// with a parameter, provided and asked at `Box Int`, so its certificate types the handler and
+/// the operation at the instance (`Cert.typ_provide`, `Cert.typ_op` at `us`).
+fn at_instance() -> Program {
+    let boxed = syntax::Path::new("Fixture", "Box");
+    let record = Term::Record(Rc::from([(
+        Name::from("take"),
+        Term::lam("u", Term::Lit(Lit::Int(1))),
+    )]));
+    let layer = Term::app(Term::konst(Const::LayerSucceed(boxed.clone())), record);
+    let ask = Term::app(Term::konst(Const::Ask(boxed)), Term::unit());
+    let take = Term::app(Term::Field(Rc::new(ask), "take".into()), Term::unit());
+    let int = Rc::new(Type::con("Prelude", "Int"));
+    Program {
+        scheme: Scheme::new(Vec::new(), Type::Eff(Row::none(), Row::none(), int)),
+        term: Term::Task(Rc::new(Term::Provide(Rc::new(layer), Rc::new(take)))),
+    }
 }
 
 /// The source of `p` as a comment above its certificate.
@@ -124,6 +146,14 @@ fn the_certificates_are_fresh() {
                   the model's generator whose certificates were once wrong\n(`flick-model/tests/certs.rs`), \
                   each above its typing in the core.\n-/\n\n";
     fresh("formal/FormalCert/Gen/Kept.lean", &file(header, &kept));
+    let p = at_instance();
+    let cert = certify(&decls, &sig, "box_int", &p).expect("a certificate");
+    let header = "/-!\n# A service at an instance\n\nA service with a parameter provided and asked at \
+                  `Box Int` (`flick-model/tests/certs.rs`).\n-/\n\n";
+    fresh(
+        "formal/FormalCert/Gen/Instances.lean",
+        &file(header, &format!("{}{cert}\n", comment(&p))),
+    );
 }
 
 /// `reason -> count` of `cert_gaps.txt`.
