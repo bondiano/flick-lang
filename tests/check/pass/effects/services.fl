@@ -57,6 +57,22 @@ let replaced = Layer.override clock_layer clock_layer
 lookup : Float ->{Repo String} Option String
 let lookup id = Repo.find id
 
+// an instance stays the one a variable is substituted with: under a cell,
+// and at each use of a polymorphic argument
+keep : Ref (Float ->{Repo a} Option a) -> (Float ->{Repo a} Option a) ->{} Unit
+let keep cell work = Ref.set cell work
+
+cells : Ref (Float ->{Repo Int} Option Int) -> Ref (Float ->{Repo String} Option String) ->{} Unit
+let cells ints texts =
+  keep ints (fun id -> Repo.find id)
+  keep texts lookup
+
+found : (forall a. Float ->{Repo a} Option a) ->{} (Option Int, Option String)
+let found find = (
+  provide Repo ({ find = fun _ -> Some 1 }) { find 1 },
+  provide Repo ({ find = fun _ -> None }) { find 2 },
+)
+
 // a method of an implementation record runs without a lookup
 read_clock : Ticker.Impl -> Unit ->{} Float
 let read_clock implementation () = implementation.now ()

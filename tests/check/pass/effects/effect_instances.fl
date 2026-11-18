@@ -1,0 +1,98 @@
+// An effect with arguments has an instance per argument: a handler of
+// `Store Int` and one of `Store Bool` answer apart, whatever a type variable
+// in between is substituted with, and `-Store` takes every instance out.
+module App.EffectInstances exposing (..)
+
+effect Store a =
+  get : Unit ->{} a
+
+effect Log =
+  line : String ->{} Unit
+
+/// A generic handler names its instance in the body's row: `r` cannot hold
+/// `Store` besides it, so it answers nothing it was not given.
+with_store : a -> (Unit ->{Store a | r; e} b) ->{r; e} b
+let with_store value body =
+  try body () with
+  | Store.get () -> value
+
+read : Unit ->{Store a} a
+let read () = Store.get ()
+
+/// One polymorphic function, instantiated at each instance.
+both : Unit ->{} (Int, Bool)
+let both () = (with_store 1 (fun () -> read () + 1), with_store true (fun () -> not (read ())))
+
+/// A cell is invariant: its content type stays the instance it was made at.
+keep : Ref (Unit ->{Store a} a) -> (Unit ->{Store a} a) ->{} Unit
+let keep cell work = Ref.set cell work
+
+/// The parameter is an argument and a result, so `Slot` is invariant too.
+type Slot a = Slot (a -> a)
+
+same : Slot (Unit ->{Store a} a) -> Slot (Unit ->{Store a} a) -> Unit
+let same _ _ = ()
+
+cells : Ref (Unit ->{Store Int} Int) -> Ref (Unit ->{Store Bool} Bool) ->{} Unit
+let cells ints flags =
+  keep ints (fun () -> read () + 1)
+  keep flags (fun () -> not (read ()))
+
+slots : Slot (Unit ->{Store Int} Int) -> Slot (Unit ->{Store Bool} Bool) -> Unit
+let slots ints flags =
+  same ints ints
+  same flags flags
+
+/// A local function with a signature is generalized: each use under a
+/// handler is at that handler's instance.
+local : Unit ->{} (Int, Bool)
+let local () =
+  get_it : Unit ->{Store a} a
+  let get_it () = Store.get ()
+  (with_store 2 (fun () -> get_it ()), with_store false (fun () -> get_it ()))
+
+/// A polymorphic argument is instantiated at each handler's instance.
+both_ways : (forall a. Unit ->{Store a} a) ->{} (Int, Bool)
+let both_ways work = (with_store 3 work, with_store true work)
+
+ranked : Unit ->{} (Int, Bool)
+let ranked () = both_ways read
+
+/// A handler of `Store Int` and one of `Store Bool` leave no instance:
+/// `-Store` takes out every one.
+pair :
+  (Unit ->{Store Int | r; e} Int) -> (Unit ->{Store Bool | r; e} Bool) ->{-Store | r; e} (Int, Bool)
+let pair count flag =
+  let n =
+    try count () with
+    | Store.get () -> 4
+  let b =
+    try flag () with
+    | Store.get () -> true
+  (n, b)
+
+paired : Unit ->{} (Int, Bool)
+let paired () = pair (fun () -> read () * 10) (fun () -> read ())
+
+/// What is left of `r` is the caller's.
+logged : Unit ->{Log} (Int, Bool)
+let logged () =
+  pair
+    (fun () ->
+      Log.line "count"
+      read ()
+    )
+    (fun () -> read ())
+
+/// A body without any instance of `Store` may be handled at one.
+apart : (Unit ->{-Store | r; e} Int) ->{r; e} Int
+let apart body =
+  try body () with
+  | Store.get () -> 5
+
+quiet : Unit ->{Log} Int
+let quiet () =
+  apart (fun () ->
+    Log.line "no store"
+    0
+  )

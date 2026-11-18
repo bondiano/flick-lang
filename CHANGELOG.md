@@ -40,6 +40,17 @@ break programs.
   stopped the program with a failed type assertion when the error of the
   program came.
 
+- **Breaking: a `server fn` call outside a browser takes its server from
+  `Server.with_origin`.** The new `Server.with_origin origin task` sends
+  the calls of `server fn` in `task` to `origin`, at `Server.path`. Outside
+  it a call in a browser goes to the page's origin, as before, and a call
+  elsewhere fails with `Rpc.ClientError "no server for <name>: call it
+  within Server.with_origin"`. Neither Node nor Go reads
+  `FLICK_SERVER_URL` any more: a program that takes the server from the
+  environment reads it with `Platform.env`, naming `Host.Environment` in
+  its row, and passes it to `Server.with_origin`. The call itself still
+  needs no service, so a client entry reaches it as before.
+
 - **Callback binders of capture rows may be left out.** A capture row of a
   signature, `^v`, that only one callback mentions, not on the callback's
   own qualifier, and that bounds a parameter of it is bound on that

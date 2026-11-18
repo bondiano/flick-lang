@@ -352,7 +352,8 @@ impl Checker<'_> {
         let Type::Dict(c, args) = self.zonk(t) else {
             return error("Structural", "not a dictionary");
         };
-        let at: Vec<Type> = match args.first().map(|a| self.zonk(a)) {
+        // a qualifier bounds what the value holds, not its shape
+        let at: Vec<Type> = match args.first().map(|a| self.zonk(&self.resolve(a))) {
             Some(Type::Record(f)) if f.tail.is_none() => f.fields.values().cloned().collect(),
             Some(Type::Tuple(ts)) => ts.to_vec(),
             other => {

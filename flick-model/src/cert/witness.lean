@@ -6,11 +6,16 @@ structure GenSig (S : Sig) : Prop where
   closed : ∀ K k ts T, S.ctor K = some (k, ts, T) → genAdtCtors T ≠ [] → genCtor K = some (k, ts, T)
   /-- A service of the generator has its operations and no other. -/
   op : ∀ E o, genOps E ≠ [] → S.op E o = genOp E o
-  /-- A service of the generator has no parameters: its operations are of closed types. -/
-  arity : ∀ E, genOps E ≠ [] → S.arity E = 0
+  /-- A service of the generator has its parameters, which its operations are over. -/
+  arity : ∀ E, genOps E ≠ [] → S.arity E = genArity E
   dict : ∀ c, (genDict c).isSome → S.dict c = genDict c
   /-- A type of the generator has the variances the model gives it. -/
   var : ∀ T, genAdtCtors T ≠ [] → ∀ j, S.var T j = genVar T j
+
+/-- The arguments of an instance of a service of the generator, as many as its parameters. -/
+theorem GenSig.arity_of {S : Sig} (hS : GenSig S) {E : Name} {us : List Ty} (hE : genOps E ≠ [])
+    (h : us.length = genArity E) : us.length = S.arity E :=
+  h.trans (hS.arity E hE).symm
 
 theorem GenSig.var_of {S : Sig} (hS : GenSig S) {T : Name} {j : Nat} {v : Variance}
     (h : S.var T j = v) (hT : genAdtCtors T ≠ []) : genVar T j = v :=
@@ -109,10 +114,10 @@ theorem genGlob_closed : ∀ g s, genGlob g = some s → s.Closed s.k := by
   split at h <;> cases h <;> closed_tac
 
 theorem genOp_closed : ∀ E o c a b σ, genOp E o = some (c, a, b) →
-    a.substT σ = a ∧ b.substT σ = b := by
-  intro E o c a b σ h
+    (∀ i, i < genArity E → σ (.v i) = .tvar i) → a.substT σ = a ∧ b.substT σ = b := by
+  intro E o c a b σ h hσ
   unfold genOp at h
-  split at h <;> cases h <;> simp [Ty.substT]
+  split at h <;> cases h <;> simp_all [Ty.substT, genArity]
 
 theorem genOp_mem : ∀ E o x, genOp E o = some x → o ∈ genOps E := by
   intro E o x h
@@ -142,7 +147,8 @@ def genSig : Sig where
   dict_closed := genDict_closed
   glob_closed := genGlob_closed
   op := genOp
-  op_closed E o c a b σ h _ := genOp_closed E o c a b σ h
+  arity := genArity
+  op_closed := genOp_closed
   op_impl _ _ _ _ _ _ _ := rfl
   op_field _ _ _ _ _ h := (h rfl).elim
   var := genVar

@@ -56,12 +56,16 @@ const signatures = [
   },
 ];
 
+// Stations on main, for the next release; the track beyond them is planned.
+const built = [
+  { title: text("The host in the signature", "Хост в сигнатуре"), body: text("The console, the clock, randomness, the environment, the arguments and child processes are `Host` services. The signature names them, and a test swaps them like any other.", "Консоль, часы, случайные числа, окружение, аргументы и дочерние процессы — сервисы `Host`. Сигнатура их называет, а тест подменяет, как любой другой сервис.") },
+  { title: text("A runtime of its own", "Свой рантайм"), body: text("Effects run on a small runtime of Flick's own, on JavaScript and Go alike. Effect is a package that only some bindings still need.", "Эффекты работают на собственном небольшом рантайме Flick и в JavaScript, и в Go. Effect стал пакетом, который нужен лишь части привязок.") },
+  { title: text("Loops and local state", "Циклы и локальное состояние"), body: text("`let mut`, `loop` and `while`, with labels for `break` and `continue`. A function that changes its own variables stays pure from the outside.", "`let mut`, `loop` и `while`, с метками для `break` и `continue`. Функция, которая меняет свои переменные, снаружи остаётся чистой.") },
+  { title: text("A small core", "Маленькое ядро"), body: text("The compiler keeps types, effects and regions. The standard library is a package, its blocks come from its plugin, and the JavaScript and Go backends are components.", "В компиляторе остались типы, эффекты и регионы. Стандартная библиотека — пакет, её блоки даёт её плагин, а бэкенды JavaScript и Go — компоненты.") },
+];
 const next = [
-  { title: text("The host in the signature", "Хост в сигнатуре"), body: text("The console, the clock, randomness, the environment and the arguments become services. The signature names them, and a test swaps them like any other.", "Консоль, часы, случайные числа, окружение и аргументы станут сервисами. Сигнатура будет их называть, а тест — подменять, как любой другой сервис.") },
-  { title: text("A runtime of its own", "Свой рантайм"), body: text("Effects run on a small runtime of Flick's own, on JavaScript and Go alike. Effect becomes a package.", "Эффекты будут работать на собственном небольшом рантайме Flick и в JavaScript, и в Go. Effect станет отдельным пакетом.") },
-  { title: text("Loops and local state", "Циклы и локальное состояние"), body: text("`let mut`, `loop` and `while`. A function that changes its own variables stays pure from the outside.", "`let mut`, `loop` и `while`. Функция, которая меняет свои переменные, снаружи останется чистой.") },
+  { title: text("Effect only by choice", "Effect только по выбору"), body: text("Streams, the command line and the rest of HTTP and RPC move to Flick's runtime, so a program needs the Effect adapter only when it asks for it.", "Потоки, командная строка и остальная часть HTTP и RPC переходят на рантайм Flick, и адаптер Effect нужен программе, только если она сама его выбрала.") },
   { title: "WebAssembly", body: text("A third target: command-line programs and servers on WASI, Node, and the browser with `ui`.", "Третья цель: консольные программы и серверы на WASI, Node и браузер вместе с `ui`.") },
-  { title: text("A small core", "Маленькое ядро"), body: text("The compiler keeps types, effects and regions. The standard library, its blocks and the Go backend are packages and plugins that update without a compiler release.", "В компиляторе останутся типы, эффекты и регионы. Стандартная библиотека, её блоки и Go-бэкенд станут пакетами и плагинами и будут обновляться без релиза компилятора.") },
 ];
 
 // The column each station stands in, in steps of 120 design pixels; the rail bends between them.
@@ -115,7 +119,7 @@ const place = (stop: Stop) => `--shift: ${columns[stop]}; --bend: ${bendHeight(s
             <a class="action action-primary" href={`${prefix}/start/getting-started/`}>{text("Get started", "Начать")} <Icon name="arrow" size={20} /></a>
             <a class="action" href={`${prefix}/play/`}>{text("Open playground", "Открыть песочницу")}</a>
           </div>
-          <p class="hero-limit"><a href={`${prefix}/start/why/#${ru ? "ограничения" : "where-the-promise-stops"}`}>{text("Alpha: console, clock and randomness join signatures in 0.2", "Альфа: консоль, часы и случайные числа войдут в сигнатуры в 0.2")} <Icon name="arrow" size={15} /></a></p>
+          <p class="hero-limit"><a href={`${prefix}/start/why/#${ru ? "ограничения" : "where-the-promise-stops"}`}>{text("Alpha: foreign bindings are taken on trust", "Альфа: внешним привязкам компилятор верит на слово")} <Icon name="arrow" size={15} /></a></p>
         </div>
         <div id="flick-hero" data-flick-ssr set:html={heroHtml}></div>
       </section>
@@ -186,7 +190,7 @@ const place = (stop: Stop) => `--shift: ${columns[stop]}; --bend: ${bendHeight(s
             </div>
           </div>
           <p class="stop-text" set:html={inlineCode(text("`sql` blocks are checked against the migrations in your project, not against a live database. `ui` runs only on JavaScript, and when part of the standard library does not compile to Go yet, the build says so with `FLICK-P012`, never at run time.", "Блоки `sql` сверяются с миграциями проекта, а не с живой базой. `ui` работает только на JavaScript, а если используемая часть стандартной библиотеки ещё не поддерживает Go, компилятор сообщает об этом кодом `FLICK-P012` при сборке, а не во время работы программы."))} />
-          <p class="stop-text">{text("The server passes the official RealWorld API suite. The app runs the frontend suite in its full-stack mode: 75 tests pass, and the 65 that need a separate API or browser mocks do not apply. Both are run by hand for now, not in CI.", "Сервер проходит официальный набор RealWorld для API. Приложение запускает набор для фронтенда в режиме full-stack: 75 тестов проходят, а 65, которым нужен отдельный API или моки в браузере, в этом режиме не применяются. Оба набора пока запускаются вручную, а не в CI.")}</p>
+          <p class="stop-text" set:html={inlineCode(text("The server passed the official RealWorld API suite. The app ran the frontend suite in its full-stack mode: 75 tests passed, and the 65 that need a separate API or browser mocks do not apply. Both were last run by hand on 2026-11-18, not in CI: `just conduit-api` and `just conduit-e2e`.", "Сервер прошёл официальный набор RealWorld для API. Приложение запустило набор для фронтенда в режиме full-stack: 75 тестов прошли, а 65, которым нужен отдельный API или моки в браузере, в этом режиме не применяются. Оба набора последний раз запускались вручную 18.11.2026, а не в CI: `just conduit-api` и `just conduit-e2e`."))} />
           <a class="stop-link" href={`${repository}/tree/main/examples/conduit`}>{text("Read the Conduit example", "Посмотреть пример Conduit")} <Icon name="arrow" size={18} /></a>
         </section>
 
@@ -196,7 +200,7 @@ const place = (stop: Stop) => `--shift: ${columns[stop]}; --bend: ${bendHeight(s
           <div class="split">
             <div class="split-text">
               <p class="stop-lead">{text("A teammate, a library or a model wrote it, and now you are reviewing it. The signature tells you what it needs and how it fails before you read the body.", "Код мог написать коллега или модель; он также мог быть взят из библиотеки. Сигнатура позволяет узнать зависимости функции и возможные ошибки до чтения её реализации.")}</p>
-          <p class="stop-text" set:html={inlineCode(text("Mistakes are compile errors with codes. `flick explain FLICK-E002` explains one, and `--diagnostics json` gives tools one event per line. The source stays about as long as the same app in Go and React: 30,174 tokens against 29,778 by GPT's tokenizer, for this one app. `node tools/tokens/index.mjs` repeats the count.", "Нарушения контракта выявляются при компиляции. `flick explain FLICK-E002` объясняет сообщение об ошибке, а `--diagnostics json` выводит диагностические события для инструментов, по одному на строку. Исходник остаётся примерно такой же длины, как то же приложение на Go и React: 30 174 токена против 29 778 по токенизатору GPT для этого одного приложения. `node tools/tokens/index.mjs` повторяет подсчёт."))} />
+          <p class="stop-text" set:html={inlineCode(text("Mistakes are compile errors with codes. `flick explain FLICK-E002` explains one, and `--diagnostics json` gives tools one event per line. The source stays about as long as the same app in Go and React: 29,979 tokens against 29,778 by GPT's tokenizer on 2026-11-18, for this one app. `node tools/tokens/index.mjs` repeats the count.", "Нарушения контракта выявляются при компиляции. `flick explain FLICK-E002` объясняет сообщение об ошибке, а `--diagnostics json` выводит диагностические события для инструментов, по одному на строку. Исходник остаётся примерно такой же длины, как то же приложение на Go и React: 29 979 токенов против 29 778 по токенизатору GPT на 18.11.2026 для этого одного приложения. `node tools/tokens/index.mjs` повторяет подсчёт."))} />
             </div>
             <div class="sign-panel sign-output">
               <p><span class="sign-fails">error[FLICK-E002]</span>: the signature of `load_view` does not allow service `Log`, which its body needs</p>
@@ -218,7 +222,7 @@ const place = (stop: Stop) => `--shift: ${columns[stop]}; --bend: ${bendHeight(s
               <li><b>{text("Well-typed programs do not get stuck", "Типизированные программы не застревают")}</b><code>T1</code></li>
               <li><b>{text("Pure code makes only pure steps", "Чистое вычисление состоит только из чистых шагов")}</b><code>T2a</code></li>
               <li><b>{text("Runtime code keeps to its row", "Эффекты и ошибки вычисления ограничены его строкой эффектов")}</b><code>T2b</code></li>
-              <li><b>{text("Live work reaches only live regions", "Выполняемый код обращается только к ещё не закрытым регионам")}</b><code>T4</code></li>
+              <li><b>{text("Code uses a region only while it is live", "Код обращается к региону, только пока тот не закрыт")}</b><code>T4′</code></li>
             </ul>
           </div>
           <a class="stop-link" href={`${repository}/blob/main/formal/README.md`}>{text("What exactly is proved", "Что именно доказано")} <Icon name="arrow" size={18} /></a>
@@ -240,7 +244,13 @@ const place = (stop: Stop) => `--shift: ${columns[stop]}; --bend: ${bendHeight(s
           <RouteBend from={from("next")} to={columns.next} />
           <div class="next-built">
             <h2 id="next-title">{text("Where it's going", "Куда движется Flick")}</h2>
-            <p class="stop-lead">{text("Flick is in alpha, at version 0.1: before 1.0 a minor release may break programs. These are the next stations, all in 0.2.", "Flick в альфе, версия 0.1: до 1.0 минорный релиз может сломать программы. Следующие станции — все в версии 0.2.")}</p>
+            <p class="stop-lead">{text("Flick is in alpha, at version 0.1: before 1.0 a minor release may break programs. The first four stations are on main and ship in 0.2; the last two are still ahead.", "Flick в альфе, версия 0.1: до 1.0 минорный релиз может сломать программы. Первые четыре станции уже в main и войдут в версию 0.2, последние две ещё впереди.")}</p>
+            <ol class="next-stops">
+              {built.map(({ title, body }) => <li>
+                <h3>{title}</h3>
+                <p set:html={inlineCode(body)} />
+              </li>)}
+            </ol>
           </div>
           <ol class="next-stops">
             {next.map(({ title, body }) => <li>

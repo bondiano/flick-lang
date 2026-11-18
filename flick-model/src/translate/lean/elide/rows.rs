@@ -2,11 +2,21 @@
 //! type a row term (`Ty`), in a judgment the predicate it stands for (`Row`, `Ty.asRow`), which
 //! alone holds obligations.
 
+use std::rc::Rc;
+
 use crate::check::{live_service, scope_service};
 use crate::syntax::Path;
 use crate::types::{Caps, PROVIDED, Row, Stage, Type, Var, provided};
 
-use super::{Env, disjunction};
+use super::{Env, disjunction, ty};
+
+/// The instance `N ū` a named element of a row stands for, as a type term (`Ty.tcon N ū`).
+fn instance(name: &Path, args: &[Type], env: &Env) -> Result<String, String> {
+    let t = (args.iter()).fold(Type::Con(name.clone()), |h, a| {
+        Type::App(Rc::new(h), Rc::new(a.clone()))
+    });
+    ty(&t, env)
+}
 
 /// The atoms of `Live C` or `Scope ϱ`, an element of a row.
 fn live_atoms(name: &Path, args: &[Type], env: &Env) -> Result<Vec<usize>, String> {
@@ -34,10 +44,8 @@ pub(crate) fn row(r: &Row, env: &Env) -> Result<String, String> {
             // `Provided {} ϱ` holds no obligation
         } else if *name == provided() || &*name.module == PROVIDED {
             return Err(format!("the obligation `{name}` in a row term"));
-        } else if args.is_empty() {
-            parts.push(format!("(.rnm \"{name}\" (.adt \"{name}\"))"));
         } else {
-            return Err(format!("the element `{name}` with arguments"));
+            parts.push(format!("(.rnm \"{name}\" {})", instance(name, args, env)?));
         }
     }
     for v in env.kept(r.vars.iter()) {
@@ -97,7 +105,8 @@ pub(crate) fn row_pred(r: &Row, env: &Env) -> Result<String, String> {
         } else if args.is_empty() {
             parts.push(format!("x = .nm₀ \"{name}\""));
         } else {
-            return Err(format!("the element `{name}` with arguments"));
+            let at = instance(name, args, env)?;
+            parts.push(format!("x = .nm \"{name}\" (Ty.classOf {at})"));
         }
     }
     for v in env.kept(r.vars.iter()) {

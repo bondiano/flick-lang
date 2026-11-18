@@ -142,7 +142,14 @@ impl Checker<'_> {
         let mut ms = BTreeSet::new();
         self.metas(t, &mut ms);
         let region_metas = self.open_region_metas();
-        for m in region_metas {
+        // a scheme carries no inclusion: a meta one still waits on stays
+        // monomorphic, and the inclusion settles it later
+        let mut waiting = BTreeSet::new();
+        for (a, b, _) in &self.pending {
+            self.metas(&Type::Errors(a.clone()), &mut waiting);
+            self.metas(&Type::Errors(b.clone()), &mut waiting);
+        }
+        for m in region_metas.into_iter().chain(waiting) {
             self.slots[m as usize].level = self.slots[m as usize].level.min(self.level);
         }
         let zonked = self.zonk(t);

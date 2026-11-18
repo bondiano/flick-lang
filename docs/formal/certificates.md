@@ -36,7 +36,7 @@ It does not prove:
 | The core | `formal/Formal/` | The typing rules the certificates use. |
 | The derived rules | `formal/FormalCert/Rules.lean`, `Match.lean` | Theorems that `lake build --wfail` checks. They add nothing to the trusted base. |
 | The tactics | `formal/FormalCert/Tactics.lean`, `Checks.lean` | Macros over `simp`, `decide` and `omega`. The kernel checks what they produce, so a tactic that fails makes its certificate fail. `Checks.lean` keeps goals they once failed on. |
-| The signature | `formal/FormalCert/GenSig.lean` | Generated. `GenSig S` assumes that `S` has the generator's constructors at their declared types and that those types have no other constructors, the list constructors `Nil`/`Cons` among them. It assumes the globals at their elided schemes (`check::elided`), with their facts: the generator's values, `List.Core.get`, the region globals `open_scoped`, `use`, `Fiber.spawn`, `Resource.acquire_release` and `Scope.add_finalizer`, and the dictionary of each instance. It assumes the operations of each service without parameters, and no others, and the fields of each class's dictionary. `GenSig.inhabited` gives a signature that satisfies all of it, so the assumption is consistent. It says nothing about `Typ`. |
+| The signature | `formal/FormalCert/GenSig.lean` | Generated. `GenSig S` assumes that `S` has the generator's constructors at their declared types and that those types have no other constructors, the list constructors `Nil`/`Cons` among them. It assumes the globals at their elided schemes (`check::elided`), with their facts: the generator's values, `List.Core.get`, the region globals `open_scoped`, `use`, `Fiber.spawn`, `Resource.acquire_release` and `Scope.add_finalizer`, and the dictionary of each instance. It assumes the operations of each service, and no others, and the number of its parameters (`genArity`), which its operations' types are over (`Within s`, `Box a`), and the fields of each class's dictionary. `GenSig.inhabited` gives a signature that satisfies all of it, so the assumption is consistent. It says nothing about `Typ`. |
 | The printers | `flick-model/src/cert/`, `flick-model/src/translate/lean/elide.rs`, `elide/data.rs` | They write the term, its type and the signature. A wrong printer certifies the wrong statement. |
 
 Each certificate depends only on the axioms `propext`, `Classical.choice` and
@@ -82,12 +82,16 @@ Each certificate depends only on the axioms `propext`, `Classical.choice` and
 - **Lists.** The core has no list. A literal `[x, y]` is the spine
   `Cons x (Cons y Nil)` of constructors only the signature has.
 - **Services.** An operation `(ask_S ()).o` is the core's `perform`, at the
-  arrow `a →{S} b`. The model types it `a →{} b` and asks for `S` where it
-  runs. `provide (Layer.succeed S w) e` is lowered to
-  `let w = ⟦w⟧ in hdl S (o x → w.o x) (λv. v) ⟦e⟧` (`Cert.typ_provide`): the
-  arm reads the layer's record through a variable, so the record may hold
-  anything. `Layer.effect S task` builds the record once, before the body,
-  with `await ⟦task⟧`.
+  arrow `a[ū] →{S ū} b[ū]` of the instance `S ū` the check gave `ask_S`
+  (`Cert.typ_op`). The model types it `a[ū] →{} b[ū]` and asks for `S ū`
+  where it runs. `provide (Layer.succeed S w) e` is lowered to
+  `let w = ⟦w⟧ in hdl S (o x → w.o x) (λv. v) ⟦e⟧` (`Cert.typ_provide`), a
+  handler of the instance its layer builds: the arm reads the layer's record
+  through a variable, so the record may hold anything, and the row outside fits
+  the body, `S` in it only at `ū` and its variables without `S`, which holds at
+  once for a service without parameters (`Cert.body_none`). `Layer.effect S task`
+  builds the record once, before the body, with `await ⟦task⟧`. The certificate
+  of `formal/FormalCert/Gen/Instances.lean` provides and calls `Box Int`.
 - **Dictionaries.** A method `d.m` or a superclass `d.$S` is (Dproj) of the
   dictionary's class, numbered by the sorted classes of the generator
   (`Cert.typ_dproj`). An instance is a global.
@@ -130,8 +134,7 @@ yet. It is computed over a fixed run of 500 programs, and each program is
 counted at the first form it stops at. On that run, every program has a
 certificate, so the list is empty. What a certificate still refuses, with its
 reason, is what the generator does not make today: an operation used without
-being called, a service with several operations or with parameters (`Within s`,
-whose global `touch` the signature skips), a layer that is neither `succeed`
+being called, a service with several operations, a layer that is neither `succeed`
 nor `effect`, a monomorphic `let` with facts, polymorphic recursion, a float,
 an open record, and a value bound over a variable of a parameter's `∀`.
 
@@ -142,9 +145,9 @@ closed gap lets through to a later form.
 ## Running
 
 - `just formal-certs` regenerates `GenSig.lean`, the 32 golden certificates of
-  `formal/FormalCert/Gen/Golden.lean` and the certificates of
-  `formal/FormalCert/Gen/Kept.lean`: programs of the fixed run whose
-  certificates were once wrong. A test of `cargo test -p flick-model` fails
+  `formal/FormalCert/Gen/Golden.lean`, the certificates of
+  `formal/FormalCert/Gen/Kept.lean` (programs of the fixed run whose
+  certificates were once wrong) and that of `formal/FormalCert/Gen/Instances.lean`. A test of `cargo test -p flick-model` fails
   when any of them is stale, and the `lean` job of CI checks them.
 - `just model-certs` certifies the fixed run and writes it to
   `target/certs/Batch/`, 50 certificates a file, which Lean then checks. With

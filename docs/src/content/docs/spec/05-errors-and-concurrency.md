@@ -1,11 +1,11 @@
 ---
 title: "Errors, services, resources and concurrency"
-source_hash: 002c93afab1e4d98
+source_hash: e45dea7d732bea22
 ---
 
 ## Expected errors
 
-Errors have nominal identity and a payload. `try ... with` handles the selected expected error with native Effect semantics. The payload of every error constructor is region-free: it cannot hold a value of a region (a scoped handle such as `File s`), a cell (`Ref`), a computation (`Eff`), a layer, a runtime function or an `Unknown`, also through the types it uses (`FLICK-E005`, see [Regions and captures](../../reference/regions/#what-cannot-leave-a-scope)). The check applies even to an error that is caught locally. So an error carries a path, an id or a copy of the data, not a live resource.
+Errors have nominal identity and a payload. `try ... with` handles the selected expected error by the same rules on Flick's runtime, the Effect adapter and Go. The payload of every error constructor is region-free: it cannot hold a value of a region (a scoped handle such as `File s`), a cell (`Ref`), a computation (`Eff`), a layer, a runtime function or an `Unknown`, also through the types it uses (`FLICK-E005`, see [Regions and captures](../../reference/regions/#what-cannot-leave-a-scope)). The check applies even to an error that is caught locally. So an error carries a path, an id or a copy of the data, not a live resource.
 
 An error is declared with `type error`. Its single constructor has the same name as the error itself and lists the fields like an ADT variant: `type error NotFound = NotFound UserId`. An error without fields is written `type error Timeout`.
 
@@ -42,7 +42,7 @@ Removing an error from a row is allowed only when the selected typed recovery fu
 
 Expected failure, defect and interruption remain distinct outcomes. An empty error row does not guarantee termination, the absence of a defect, or that cancellation is impossible. In Effect, defects and interruption are kept in the runtime termination cause, not in the ordinary parameter `E`. [Kinds of Effect errors](https://effect.website/docs/v4/error-management/two-error-types).
 
-`try ... with` compiles to handling an Effect typed failure; on the Go target, to recovering the cause a failing computation panics with. A JavaScript `try/catch` that surrounds only the construction of an Effect value does not implement this contract.
+On JavaScript, `try ... with` compiles to handling the typed failure of the runtime, Flick's own or Effect through the adapter; on the Go target, to recovering the cause a failing computation panics with. A JavaScript `try/catch` that surrounds only the construction of an effect value does not implement this contract.
 
 ## Services and type classes
 
@@ -136,7 +136,7 @@ A handler is deep: `resume` goes on with the body under the same handler and giv
 
 `scope` combines runtime finalization with a static ban on unsafe escape. Acquisition registers a finalizer with the lexical owner. The safe scoped API has **no early close**; separate manual-handle bindings do not get this guarantee. A library owner that replaces or evicts its resources (`ScopedRef`, `Resource`, `ScopedCache`) hands its value out only under a lease, and releases a value once no lease holds it. With this restriction resources need neither linearity nor typestate for an open/closed handle.
 
-Fresh regions and transitive tracking of captures make it impossible to obtain, through the safe API, a usable capability of an already finished region. A native Cause may physically retain a closed foreign object; the safe wrapper does not expose it. There is no affine/linear type system. The native [Effect Scope](https://effect.website/docs/v4/resource-management/scope) performs finalization on the JS target; the static part belongs to the checker, and the two-phase owner to the runtime adapter ([Runtime adapter](../../reference/runtime/#owners-and-scopes)).
+Fresh regions and checking by use make it impossible to use, through the safe API, a capability of an already finished region: a closure or a task may hold one past its region only if nothing it runs uses it there. A native Cause may physically retain a closed foreign object; the safe wrapper does not expose it. There is no affine/linear type system. On the JS target the runtime performs finalization: Flick's own, or the native [Effect Scope](https://effect.website/docs/v4/resource-management/scope) through the adapter; the static part belongs to the checker, and the two-phase owner to the runtime ([Runtime adapter](../../reference/runtime/#owners-and-scopes)).
 
 A scoped finalizer has an empty expected-error channel; its failure remains a defect in the full outcome. `Resource.bracket` allows a separate typed release error and adds it to the error row. The two operations are explicitly distinct. The primary error and cleanup are preserved under the native Cause contract; release is not replaced by an ordinary JS `finally` that loses the original failure.
 
@@ -154,7 +154,7 @@ Retry, schedules, streams, queues, cache, tracing and HTTP are a typed standard 
 
 `deriving Schema` and codecs for external formats are part of the language. Generics, recursion, refinements, field policies and effectful transformations are covered in [Schema and standard data types](../07-schema/).
 
-The handlers of a program's effects are one-shot: a continuation resumes at most once, never several times. Services and `provide layer` still rely on the mechanisms of Effect, and on the Go target on the same mechanisms of `runtime-go/flickrt`; `control` arms run on Go and on Flick's own JavaScript runtime (`effect = "rt"`), not on the Effect adapter (`effect = "effect"`).
+The handlers of a program's effects are one-shot: a continuation resumes at most once, never several times. Services and `provide layer` rely on the layer mechanisms of the runtime: on JavaScript those of Flick's own runtime or of Effect through the adapter, on the Go target those of `runtime-go/flickrt`; `control` arms run on Go and on Flick's own JavaScript runtime (`effect = "rt"`), not on the Effect adapter (`effect = "effect"`).
 
 ## Execution and static lifetime contracts
 
@@ -323,18 +323,18 @@ let bad_callback path =
   }
 ```
 
-Such a callback also cannot be returned. A higher-rank `forall s` prevents the direct escape of `File s`, but does not prove the absence of capture in a callback, task or generic container without an additional capture system.
+Such a callback also cannot be returned. A higher-rank `forall s` prevents the direct escape of `File s`, but not a later use of it through a callback, task or generic container: the checker finds such a use in the qualifier of what makes it.
 
 | Leak path | Checker requirement |
 | - | - |
 | A direct result or a nested record/ADT | The region does not outlive the owner; the dependency propagates transitively |
-| Closure or Eff | Captures are preserved on passing, generalization and across module interfaces |
+| Closure or Eff | Its qualifier, what using it needs live, is preserved on passing, generalization and across module interfaces |
 | Existential/opaque packaging | Nominality and type hiding do not erase the lifetime |
 | Writing to an external Ref or cache | The lifetime of the storage does not exceed the permitted lifetime of the value written |
 | Error, Exit or diagnostic value | All exits are checked, including failure payloads; the error path does not bypass lifetime |
 | Foreign call | A region-bound argument requires a verified retention contract |
 
-Captures are a separate static property, not a third effect row. The notation `T^{s, t}` specifies concrete regions, `T^c` a row of kind CaptureRow, and `T^(c + d)` their union. An explicit qualifier is an upper bound on the full set of reachable usable captures of the value: the dependencies known from T must be included in it. Widening this bound is allowed, but unsafe narrowing is not. A bare T adds no hidden captures and does not erase intrinsic dependencies: File s and List (File s) depend on s. Merely mentioning s in a function's input type does not mean that its closure holds the resource s; the checker tracks the reachability of a capability, not all the names in a signature.
+Captures are a separate static property, not a third effect row. The notation `T^{s, t}` specifies concrete regions, `T^c` a row of kind CaptureRow, and `T^(c + d)` their union. An explicit qualifier says what using the value needs live: calling a function, awaiting a task or running a stream with qualifier `C` needs `C` live there. Widening a qualifier is allowed; narrowing it hides a need and is `FLICK-G001`. A bare T adds no hidden need and does not erase intrinsic dependencies: File s and List (File s) depend on s. Holding is not using: a closure that holds `File s` and never uses it may outlive s, and mentioning s in a function's input type does not mean that its closure needs s; the checker tracks the use of a capability, not all the names in a signature.
 
 ```text
 read_later :
