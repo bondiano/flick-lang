@@ -61,8 +61,8 @@ fills it, given `x` there at `a₀`; the hole is used at a stage of which `P` ho
 stage below one the context passes to its hole does (`EInst`). -/
 theorem refill_app {Ψ Θ E f x t₀ φ₀ a₀ w ψ₀ B P} (hE : OkE E) (hn : ¬ Value (.app f x))
     (h : Typ S Ψ Θ [] (plug E (.app f x)) (.ex t₀ φ₀)) (hf : HoleFn S Ψ f a₀ ψ₀ B P)
-    (hP : ∀ φ', EInst S E φ' φ₀ → ∀ ψ', ψ'.le φ' → P ψ')
     (hB : ∀ t T, B t → LeLive S t T → B T)
+    (hP : ∀ φ', EInst S E φ' φ₀ → ∀ ψ', ψ'.le φ' → P ψ')
     (hw : ∀ {Θ'} T φ', Ext Θ Θ' → ψ₀.le φ' → B T → Typ S Ψ Θ' [] x (.ex a₀ φ') →
       Typ S Ψ Θ' [] w (.ex T φ')) :
     Typ S Ψ Θ [] (plug E w) (.ex t₀ φ₀) := by
