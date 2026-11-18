@@ -25,9 +25,10 @@ def Row.hBody (E : Name) (A : TyClass → Prop) (r : Row) : Row
   | x => r x
 
 /-- What a handler of `E` of the region `q` gives its body: as `Row.hBody`, and it discharges
-an obligation `Provided {E} ϱ` at an argument it answers when `q` outlives `ϱ`. -/
+an obligation `Provided {E} ϱ` when `q` outlives `ϱ`, at every argument, as it answers by name
+whatever operation of `E` reaches it. -/
 def Row.hP (Θ : Facts) (q : Nat) (E : Name) (A : TyClass → Prop) (r : Row) : Row
-  | .ob N c a => (N = E ∧ A c → Outl Θ (· = .r q) a.ty) ∧ (¬ (N = E ∧ A c) → r (.ob N c a))
+  | .ob N c a => (N = E → Outl Θ (· = .r q) a.ty) ∧ (N ≠ E → r (.ob N c a))
   | x => Row.hBody E A r x
 
 /-- No obligation of the stage `φ₀` of the body of a handler is about an effect it may

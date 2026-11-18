@@ -13,11 +13,19 @@ namespace Flick
 
 variable {S : Sig}
 
-theorem Sig.impl_reach (S : Sig) (N : Name) (a : Atom) : ¬ (S.impl N).reach a := by
-  intro h
-  rw [← S.impl_closed N (fun _ => .base .unit), Ty.reach_substT] at h
-  obtain ⟨_, _, h⟩ := h
-  exact h
+/-- The record of a service reaches only its parameters. -/
+theorem Sig.impl_reach (S : Sig) (N : Name) (a : Atom) (h : (S.impl N).reach a) :
+    ∃ i, i < S.arity N ∧ a = .v i := by
+  let σ : Atom → Ty := fun
+    | .v i => if i < S.arity N then .tvar i else .base .unit
+    | .r _ => .base .unit
+  rw [← S.impl_closed N σ (fun i hi => by simp [σ, hi]), Ty.reach_substT] at h
+  obtain ⟨b, -, h⟩ := h
+  rcases b with i | p
+  · by_cases hi : i < S.arity N
+    · exact ⟨i, hi, by simpa [σ, hi] using h⟩
+    · exact absurd h (by simp [σ, hi, Ty.reach, Caps.none])
+  · exact absurd h (by simp [σ, Ty.reach, Caps.none])
 
 /-- The result after all stages of an arrow. -/
 def Ty.res : Ty → Ty
