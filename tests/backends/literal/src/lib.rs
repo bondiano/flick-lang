@@ -2,6 +2,7 @@
 //! The same implementation is exercised natively and as a component.
 
 mod launches;
+mod steps;
 mod tests;
 
 use std::hint;
@@ -48,6 +49,8 @@ fn case(request: &BuildRequest) -> &str {
                         "Fixture.BadSpan" => Some("span"),
                         "Fixture.Ir" => Some("ir"),
                         "Fixture.CommonJs" => Some("commonjs"),
+                        "Fixture.Steps" => Some("steps"),
+                        "Fixture.StepsEscape" => Some("steps-escape"),
                         _ => None,
                     })
                     .unwrap_or("")
@@ -248,8 +251,8 @@ impl Backend for Literal {
         let mut launches = launches::run(request, &mut artifacts);
         let runtime_dependencies = tests::runner(request, &mut artifacts, &mut launches);
         Ok(BuildResult {
+            steps: steps::steps(request, case(request), &artifacts),
             artifacts,
-            steps: vec![],
             runtime_dependencies,
             launches,
             diagnostics,

@@ -5,8 +5,8 @@
 
 use std::io::{BufRead, BufReader, Read};
 use std::process::{Child, Command, ExitStatus, Stdio};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use std::{io, thread};
 
@@ -16,15 +16,26 @@ use signal_hook::flag;
 use crate::args::{DiagnosticsFormat, GlobalArguments};
 use crate::{report, timings};
 
-/// The last signal `flick` received, `0` for none.
+static LAST: OnceLock<Arc<AtomicUsize>> = OnceLock::new();
+
+/// The last signal `flick` received, `0` for none. The first call makes
+/// SIGINT and SIGTERM set it instead of ending `flick`.
 pub fn signals() -> Arc<AtomicUsize> {
-    let last = Arc::new(AtomicUsize::new(0));
-    for signal in [SIGINT, SIGTERM] {
-        // registration fails only for forbidden signals, which these are not
-        let value = usize::try_from(signal).expect("signal numbers are positive");
-        let _ = flag::register_usize(signal, Arc::clone(&last), value);
-    }
-    last
+    Arc::clone(LAST.get_or_init(|| {
+        let last = Arc::new(AtomicUsize::new(0));
+        for signal in [SIGINT, SIGTERM] {
+            // registration fails only for forbidden signals, which these are not
+            let value = usize::try_from(signal).expect("signal numbers are positive");
+            let _ = flag::register_usize(signal, Arc::clone(&last), value);
+        }
+        last
+    }))
+}
+
+/// Whether `flick` received SIGINT or SIGTERM since [`signals`] made it wait.
+pub fn interrupted() -> bool {
+    LAST.get()
+        .is_some_and(|last| last.load(Ordering::Relaxed) != 0)
 }
 
 /// Sends `signal` to the process `pid`.

@@ -67,6 +67,7 @@ max-params = 5
 | `lint.max-complexity` | branches of a function (cyclomatic complexity) past which `FLICK-T038` warns | `10` |
 | `lint.max-params` | parameters of a function past which `FLICK-T039` warns | `5` |
 | `plugins.<package>` | what the plugin of a dependency may reach for the project's blocks: `fs-read` (paths from the project's root), `net` (`host` or `host:port`) and `env` (names); not at a workspace root (see [Reaching outside](../plugins/#reaching-outside)) | nothing |
+| `tools.<id>` | the host tools, `"node"` or `"go"`, that the build steps of the backend or plugin `<id>` may run, as `"flick/go" = ["go"]`; a step with another tool is `FLICK-P051`, before anything runs. The compiler finds an allowed tool on `PATH`, pins its digest and version, and runs each step in a directory beside the output with only the step's declared inputs and a cleared environment; the outputs are published with the rest of the build or not at all (`FLICK-P050`). A tool that only launches the program, as Node for `flick run`, needs no entry | nothing |
 
 The same T036–T038 limits apply to `component`: setup and render are measured together in the source, without generated wrappers. Local functions are measured separately.
 

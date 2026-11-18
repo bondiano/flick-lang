@@ -17,6 +17,7 @@ use flick_core::source::SourceMap;
 use crate::artifact::{self, Artifact};
 use crate::builtins;
 use crate::commands::inputs::{declared_name, sibling_root};
+use crate::publish;
 use crate::saved;
 use crate::toolchain;
 use flick_backend::Limits;
@@ -385,36 +386,28 @@ pub fn mark_go(root: &Path, key: &str, out_dir: &Path, executable: &str) {
     let _ = fs::write(path, stamp);
 }
 
-/// Removes obsolete build-owned files and records a successful publication.
-pub fn record(root: &Path, out_dir: &Path, files: Vec<String>) -> io::Result<()> {
+/// The obsolete build-owned files of `out_dir`, and the project manifest
+/// that records `files` as its outputs: what a publication removes and writes.
+pub fn recorded(
+    root: &Path,
+    out_dir: &Path,
+    files: Vec<String>,
+) -> io::Result<(Vec<String>, PathBuf, Vec<u8>)> {
     let resolved = artifact::resolve_root(root, &project::normalize(out_dir));
     let trusted = artifact::resolve_root(root, root);
     let (root, out_dir) = (trusted.as_path(), resolved.as_path());
-    validate_record(root, out_dir, &files)?;
-    let path = root.join(cache::MANIFEST);
+    let stale = validate_record(root, out_dir, &files)?;
     let mut manifest = manifest(root);
     let dir = out_dir.strip_prefix(root).unwrap_or(out_dir);
-    let dir = dir.to_string_lossy();
-    let current: HashSet<&str> = files.iter().map(String::as_str).collect();
-    if let Some((_, previous)) = manifest.outputs.iter().find(|(output, _)| output == &dir) {
-        for stale in previous
-            .iter()
-            .filter(|file| !current.contains(file.as_str()))
-        {
-            let path = out_dir.join(stale);
-            match fs::remove_file(&path) {
-                Ok(()) => remove_empty_parents(&path, out_dir),
-                Err(err) if err.kind() == io::ErrorKind::NotFound => {}
-                Err(err) => return Err(err),
-            }
-        }
-    }
-    manifest.record(&dir, files);
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
+    manifest.record(&dir.to_string_lossy(), files);
     let json = serde_json::to_string_pretty(&manifest).map_err(io::Error::other)?;
-    fs::write(path, json)
+    Ok((stale, root.join(cache::MANIFEST), json.into_bytes()))
+}
+
+/// Removes obsolete build-owned files and records a successful publication.
+pub fn record(root: &Path, out_dir: &Path, files: Vec<String>) -> io::Result<()> {
+    let (stale, path, manifest) = recorded(root, out_dir, files)?;
+    publish::commit(out_dir, &[], &stale, Some((path, manifest)))
 }
 
 /// Removes the directories of `path` up to `top` that are left empty.

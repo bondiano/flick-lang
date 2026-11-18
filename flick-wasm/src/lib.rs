@@ -461,6 +461,7 @@ fn rt_project() -> Project {
         no_let_assert: false,
         thresholds: Default::default(),
         plugins: BTreeMap::new(),
+        tools: BTreeMap::new(),
     };
     let mut sources = SourceMap::default();
     let config_file = sources.add("/flick.toml".to_owned(), "");

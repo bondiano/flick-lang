@@ -4,6 +4,9 @@ mod common;
 #[cfg(feature = "wasm-backends")]
 #[path = "backends/review.rs"]
 mod review;
+#[cfg(all(feature = "wasm-backends", unix))]
+#[path = "backends/steps.rs"]
+mod steps;
 
 use std::fs;
 #[cfg(feature = "wasm-backends")]

@@ -44,9 +44,9 @@ pub struct Policy<'a> {
     pub environment: &'a [String],
     /// Outputs owned by the shared compiler, such as `.iface` and `.d.ts`.
     pub reserved_paths: &'a [String],
-    /// Approve the command's argument grammar, declared file access and
-    /// network policy in a host-owned tool adapter. A tool pin alone never
-    /// authorizes arbitrary arguments.
+    /// The host's own check of a complete step, as the variables its tool's
+    /// adapter lets it set. Whether a tool may run at all is the project's
+    /// grant, which the host checks before running any step.
     pub authorize_step: &'a dyn Fn(&ToolchainStep) -> Result<(), String>,
     pub limits: Limits,
 }
