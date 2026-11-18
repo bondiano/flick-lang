@@ -40,9 +40,10 @@ let nested n =
   else
     None
 
-// both branches of `else if` see the conditions before them as false
-otherwise : Float -> Option Positive
-let otherwise n = if n <= 0 then None else if n > 0 then Some (Positive.prove n) else None
+// an `else` sees the conditions before it as false: an `Int` neither below 0
+// nor above 9 is a digit (a `Float` could still be NaN)
+otherwise : Int -> Option Digit
+let otherwise n = if n < 0 then None else if n > 9 then None else Some (Digit.prove n)
 
 // a snapshot of arithmetic, checked before it is used
 next : Int -> Option Digit
