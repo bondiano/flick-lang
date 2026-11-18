@@ -5,6 +5,7 @@ use std::{mem, ptr};
 use flick_pretty::{NextBreakFitsMode, docvec};
 
 use super::block::Value;
+use super::lines::{child, children, commented};
 use super::printer::{Calls, Doc, INDENT, Printer, nodes, position, token};
 use crate::syntax::cst::{Element, Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
@@ -87,35 +88,57 @@ impl<'a> Printer<'a> {
             .split_last()
             .filter(|(last, _)| last.kind == K::Children)
         {
+            // the parser reads lines here, whatever is around
+            let outer = mem::replace(&mut self.calls, Calls::Lines);
             let call = match call {
                 [head] => self.node(head),
-                _ => self.call(n, call, &[]),
+                _ => self.call(n, call, &[], None),
             };
             let children = nodes(lines);
             let count = children.len();
             let mut at = 0;
-            let items = self.items(&children, n.range().1, None, &mut |p, child| {
+            let items = self.items(&children, n.range().1, None, &mut |p, line| {
                 at += 1;
-                if at == count {
-                    p.with_suffix(child, suffix)
-                } else {
-                    p.node(child)
+                // a call in parentheses on a line of its own is that call
+                let suffix = if at == count { suffix } else { &[] };
+                let doc = p.with_suffix(line, suffix);
+                let (start, end) = line.range();
+                match child(line).filter(|_| !commented(line, start, end)) {
+                    Some(call) => {
+                        let bare = p.bare(call, suffix, doc);
+                        // its `)` is passed: a comment after it ends the line
+                        p.comments.cursor = p.comments.cursor.max(end);
+                        bare
+                    }
+                    None => doc,
                 }
             });
+            self.calls = outer;
             let under = docvec![a, a.line(), self.join_lines(&items)].nest(a, INDENT);
             return docvec![a, call, under].force_break(a);
         }
-        self.call(n, &parts, suffix)
+        self.call(n, &parts, suffix, None)
     }
 
     /// A function and its arguments: on one line, or an argument a line.
-    fn call(&mut self, n: &'a Node, parts: &[&'a Node], suffix: &[Part]) -> Doc<'a> {
+    /// Where the lines under a call are its arguments, its arguments stay
+    /// on its line, but the calls in parentheses that end them go on lines
+    /// of their own under it, without the parentheses, when it does not fit.
+    /// `fallback` is laid out instead where the first line of the call
+    /// would not fit either.
+    fn call(
+        &mut self,
+        n: &'a Node,
+        parts: &[&'a Node],
+        suffix: &[Part],
+        fallback: Option<Doc<'a>>,
+    ) -> Doc<'a> {
         let a = self.a;
-        let Some((head, args)) = parts.split_first() else {
+        let Some((head_node, args)) = parts.split_first() else {
             return self.generic(n);
         };
         let mut commented = false;
-        let mut head = self.node(head);
+        let mut head = self.node(head_node);
         if let Some(c) = args
             .first()
             .and_then(|f| self.comments.trailing(f.range().0, None))
@@ -148,37 +171,78 @@ impl<'a> Printer<'a> {
             }
             docs.push((comments, doc));
         }
-        let hug = !commented && args.last().is_some_and(|l| hugs(l));
-        let count = docs.len();
         // where a line under a call is a child of it, its arguments stay on
         // its line
         let fixed = self.calls == Calls::Lines;
-        let args = a.concat(docs.into_iter().enumerate().map(|(i, (comments, doc))| {
-            let doc = if hug && i + 1 == count {
-                doc.group(a).next_break_fits(a, NextBreakFitsMode::Enabled)
+        let between = if fixed {
+            a.text(" ")
+        } else {
+            a.break_("", " ")
+        };
+        let hugging = |doc: Doc<'a>| doc.group(a).next_break_fits(a, NextBreakFitsMode::Enabled);
+        // the call with its first `count` arguments, the last of them
+        // hugging when it can; `whole`, groups around measure it in full
+        let line = |count: usize, closing: Doc<'a>, whole: bool| {
+            let hug = !commented && count > 0 && hugs(args[count - 1]);
+            let args = docs[..count]
+                .iter()
+                .enumerate()
+                .map(|(i, &(comments, doc))| {
+                    let doc = if hug && i + 1 == count {
+                        hugging(doc)
+                    } else {
+                        doc
+                    };
+                    docvec![a, between, comments, doc]
+                });
+            let doc = docvec![a, head, a.concat(args).nest_if_broken(a, INDENT), closing].group(a);
+            if hug && whole {
+                // outer groups measure the call in full, only its own group
+                // lets the last argument hug
+                doc.next_break_fits(a, NextBreakFitsMode::Disabled)
             } else {
                 doc
-            };
-            let between = if fixed {
-                a.text(" ")
-            } else {
-                a.break_("", " ")
-            };
-            docvec![a, between, comments, doc]
-        }));
-        let suffix = if inside {
+            }
+        };
+        let closing = if inside {
             a.empty()
         } else {
             self.suffix(suffix)
         };
-        let doc = docvec![a, head, args.nest_if_broken(a, INDENT), suffix];
-        if hug {
-            // outer groups measure the call in full, only its own group lets
-            // the last argument hug
-            doc.group(a).next_break_fits(a, NextBreakFitsMode::Disabled)
+        let moved = if fixed {
+            children(n, head_node, args)
         } else {
-            doc.group(a)
+            0
+        };
+        // what measures a line of its own measures up to where it hugs
+        let doc = line(docs.len(), closing, fallback.is_none() || moved > 0);
+        if moved == 0 {
+            return fallback.map_or(doc, |other| a.either(doc, other));
         }
+        // the lines are laid out once more, without comments to take twice
+        let kept = docs.len() - moved;
+        let (read, misplaced) = (self.comments.save(), self.comments.misplaced);
+        let lines: Vec<Doc<'a>> = (args[kept..].iter().zip(&docs[kept..]).enumerate())
+            .filter_map(|(i, (arg, &(_, paren)))| {
+                let last = kept + i + 1 == docs.len();
+                Some(self.bare(child(arg)?, if last { suffix } else { &[] }, paren))
+            })
+            .collect();
+        self.comments.restore(read);
+        self.comments.misplaced = misplaced;
+        let lines = docvec![a, a.line(), a.join(lines, a.line())].nest(a, INDENT);
+        // only this layout measures its first line, up to where it hugs
+        let broken = docvec![a, line(kept, a.empty(), false), lines];
+        let broken = fallback.map_or(broken, |other| a.either(broken, other));
+        a.either(doc, broken)
+    }
+
+    /// `call`, which `paren` lays out in its parentheses, on a line of its
+    /// own: without them where its first line fits, in them, an argument a
+    /// line, otherwise.
+    fn bare(&mut self, call: &'a Node, suffix: &[Part], paren: Doc<'a>) -> Doc<'a> {
+        let parts = nodes(call);
+        self.call(call, &parts, suffix, Some(paren))
     }
 
     /// A chain of operators of one precedence: on one line, or broken before

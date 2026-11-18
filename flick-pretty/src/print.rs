@@ -210,19 +210,20 @@ impl<'a, W: Write, O: CursorPositionObserver> Printer<'a, '_, W, O> {
                     stack.extend(docs.iter().rev().map(|&doc| Item { indent, mode, doc }));
                 }
                 Node::Group(inner) => {
-                    let mode = if mode == Mode::Fitted {
-                        Mode::Fitted
-                    } else {
-                        match self.fits(self.width, Some(*inner), &[]) {
-                            Fit::No => Mode::Broken,
-                            Fit::UpToBreak => Mode::Flat,
-                            Fit::Whole => Mode::Fitted,
-                        }
-                    };
+                    let mode = self.decide(mode, *inner);
                     stack.push(Item {
                         indent,
                         mode,
                         doc: *inner,
+                    });
+                }
+                Node::Either { flat, broken } => {
+                    let mode = self.decide(mode, *flat);
+                    let doc = if mode == Mode::Broken { broken } else { flat };
+                    stack.push(Item {
+                        indent,
+                        mode,
+                        doc: *doc,
                     });
                 }
                 Node::Nest {
@@ -294,6 +295,19 @@ impl<'a, W: Write, O: CursorPositionObserver> Printer<'a, '_, W, O> {
         Ok(())
     }
 
+    /// How a group of `inner` is laid out inside a document laid out as
+    /// `mode`.
+    fn decide(&mut self, mode: Mode, inner: Document<'a>) -> Mode {
+        if mode == Mode::Fitted {
+            return Mode::Fitted;
+        }
+        match self.fits(self.width, Some(inner), &[]) {
+            Fit::No => Mode::Broken,
+            Fit::UpToBreak => Mode::Flat,
+            Fit::Whole => Mode::Fitted,
+        }
+    }
+
     /// Whether `first`, then the documents of `rest` from its top, fit on the
     /// line from column `width` on.
     fn fits(&mut self, width: usize, first: Option<Document<'a>>, rest: &[Item<'a>]) -> Fit {
@@ -339,8 +353,9 @@ fn fits<'a>(
             }
             Node::Concat(docs) => stack.extend(docs.iter().rev().map(|&doc| (mode, doc))),
             // A group inside a broken one is measured flat: it is that group
-            // which must fit, not the broken one around it.
-            Node::Group(inner) => {
+            // which must fit, not the broken one around it. So is the flat
+            // layout of an `either`.
+            Node::Group(inner) | Node::Either { flat: inner, .. } => {
                 let mode = if mode == Mode::Broken {
                     Mode::Flat
                 } else {

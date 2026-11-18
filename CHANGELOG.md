@@ -6,6 +6,17 @@ break programs.
 
 ## Unreleased
 
+- **UI children on lines:** in a `ui { … }` body, `flick fmt` puts the
+  calls in parentheses that end the arguments of a call that does not fit
+  on its line on lines of their own under it, without the parentheses, and
+  drops them around a call alone on a child line where its first line fits.
+  A tree written `div props (div props (text a) (text b))` comes out as
+  `div props`, `div props` one level in, then a line for each child, with
+  no new syntax: the lines under a call were already its arguments. Only
+  calls of a name move; `(-x)`, `if`, `match`, `fun`, anything with a
+  comment and anything inside brackets keep their parentheses. Run
+  `flick fmt` to update a project.
+
 - **Callback binders of capture rows may be left out.** A capture row of a
   signature, `^v`, that only one callback mentions, not on the callback's
   own qualifier, and that bounds a parameter of it is bound on that

@@ -133,6 +133,15 @@ impl<'a> DocumentArena<'a> {
         })
     }
 
+    /// `flat` where it fits on the line, as a [`group`](Document::group)
+    /// would lay it out, and otherwise `broken`, a different layout of the
+    /// same content. Groups around it measure `flat`. It lets a layout
+    /// change more than its breaks when it does not fit, such as move
+    /// arguments onto lines of their own without their parentheses.
+    pub fn either(&'a self, flat: Document<'a>, broken: Document<'a>) -> Document<'a> {
+        self.alloc(Node::Either { flat, broken })
+    }
+
     /// A document that prints nothing; when the printer reaches it, it calls
     /// the [`CursorPositionObserver`](crate::CursorPositionObserver) with
     /// `mark` and the current position. A code generator puts one before the

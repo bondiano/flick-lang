@@ -47,14 +47,14 @@ pub(super) fn heads(tree: &Node, text: &str, file: FileId) -> Arc<[String]> {
 }
 
 /// The layouts the plugins of the blocks of `tree` give, those of blocks
-/// inside the holes of others too, and `P036` on each block whose plugin
-/// failed to lay it out.
+/// inside the holes of others too, the heads of the blocks whose body is
+/// lines, and `P036` on each block whose plugin failed to lay it out.
 pub(super) fn layouts(
     tree: &Node,
     text: &str,
     file: FileId,
     plugin_of: PluginOf,
-) -> (Layouts, Vec<Diagnostic>) {
+) -> (Layouts, Vec<String>, Vec<Diagnostic>) {
     let syntax = resolve::module_syntax(tree, text, file);
     let modules: HashMap<&str, &str> = (syntax.imports.iter())
         .flat_map(|i| {
@@ -73,6 +73,7 @@ pub(super) fn layouts(
     let shared: Arc<str> = Arc::from(text);
     let heads = syntax.heads();
     let mut out = Layouts::new();
+    let mut lines: Vec<String> = Vec::new();
     let mut failed = Vec::new();
     let mut blocks = Vec::new();
     blocks_under(tree, &mut blocks);
@@ -100,6 +101,11 @@ pub(super) fn layouts(
             None
         });
         if let Some(layout) = laid_out {
+            if let Some(head) = head.filter(|_| layout.braced == Some(HoleKind::Lines))
+                && !lines.iter().any(|l| l == head.text(text))
+            {
+                lines.push(head.text(text).to_owned());
+            }
             for hole in &layout.holes {
                 if matches!(hole.kind, K::PluginExpr | K::PluginDecl) {
                     pending.push(hole.clone());
@@ -112,7 +118,7 @@ pub(super) fn layouts(
             out.insert(node.range(), layout);
         }
     }
-    (out, failed)
+    (out, lines, failed)
 }
 
 /// The layout `plugin` gives the block `node`, read as `source`; a block
