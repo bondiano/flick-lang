@@ -292,6 +292,14 @@ impl Checker<'_> {
         self.store.level += 1;
         let kinds = binders(scheme);
         let (body, skolems, givens) = self.skolemize(scheme);
+        // each top-level item is checked from level 0
+        if self.store.level == 1 {
+            let rigid = skolems.iter().filter_map(|(_, t)| match t {
+                Type::Skolem(s) => Some(*s),
+                _ => None,
+            });
+            self.cx.regions.signed.extend(rigid);
+        }
         self.record_givens(self.span(decl), &givens);
         let body = match captures {
             Some(c) => Type::Captured {

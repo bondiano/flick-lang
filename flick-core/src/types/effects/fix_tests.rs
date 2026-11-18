@@ -440,6 +440,30 @@ fn the_fix_of_g003_adds_the_constraint_to_the_context() {
 }
 
 #[test]
+fn the_fix_of_g003_names_only_a_region_of_the_signature() {
+    // the region of `Scope.run` is not the signature's `s`, though shown as
+    // `s`, and that of a `from_build` body or of a named task is not there
+    let text = "module Probe exposing (..)\n\
+        service Log =\n  line : String ->{} Unit\n\
+        service Box =\n  value : Unit ->{} String\n\
+        ran : Unit ->{Scope s, Log} Int\n\
+        let ran () = Scope.run (fun _ ->\n  Scope.add_finalizer (task { Log.line \"x\" })\n  1\n)\n\
+        box : Layer {Log} none {Box}\n\
+        let box = Layer.from_build (fun memo ->\n  \
+          let release = task { Scope.add_finalizer (task { Log.line \"x\" }) }\n  \
+          await release\n  \
+          Layer.build_with_memo_map memo (Layer.succeed Box { value = fun () -> \"box\" })\n)\n";
+    let mut sources = SourceMap::default();
+    let file = sources.add("Probe.fl", text.to_owned());
+    let diagnostics = crate::check(&sources, file);
+    let unnamed: Vec<_> = (diagnostics.iter())
+        .filter(|d| d.code == codes::G003)
+        .collect();
+    assert_eq!(unnamed.len(), 2, "{diagnostics:?}");
+    assert!(unnamed.iter().all(|d| d.fixes.is_empty()), "{unnamed:?}");
+}
+
+#[test]
 fn the_fix_of_g001_adds_the_region_to_a_written_qualifier() {
     let text = |signature: &str| {
         format!(

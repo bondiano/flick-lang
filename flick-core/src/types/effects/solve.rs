@@ -284,9 +284,10 @@ impl Checker<'_> {
                 None if label == regions::scope() => self.no_owner(ty, &c),
                 None if matches!(label, Elem::Provided(_)) => {
                     if let [service, owner] = ty.spine().1[..] {
-                        let service = self.show(service);
+                        let (service, named) = (self.show(service), self.signed(owner));
                         let owner = self.show(owner);
-                        self.unprovided(service.trim_matches(['{', '}', ' ']), &owner, c.span);
+                        let service = service.trim_matches(['{', '}', ' ']);
+                        self.unprovided(service, &owner, named, c.span);
                     }
                 }
                 None => {

@@ -46,7 +46,9 @@ break programs.
   into a region a function's signature names without the constraint, is now
   `FLICK-G003`, as a lazy build of `LayerRef` or `LayerMap` after that
   `provide` ended could use a released service. `provide` and `Layer.launch`
-  are unchanged.
+  are unchanged. The fix of a `FLICK-G003` that would add `Fiber.Provided`
+  to a signature is offered only when that signature names the region, not
+  for the region of a `forall` in an argument such as a `from_build` body.
 
 - **`T.prove` for refined types:** `T.prove v` makes a `T` with no
   `Result` and without running the check again, where the compiler proves
