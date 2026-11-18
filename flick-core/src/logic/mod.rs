@@ -5,6 +5,7 @@
 
 mod cert;
 mod check;
+mod defs;
 mod eval;
 mod show;
 mod term;
@@ -16,7 +17,8 @@ use crate::diagnostics::{Diagnostic, codes};
 use crate::source::Span;
 
 pub use cert::{Cert, Rule, cert};
-pub use term::{Ctor, Literal, Pat, RULES, Refused, Term, term};
+pub use defs::Program;
+pub use term::{Ctor, Def, Literal, Pat, RULES, Refused, Term, term};
 
 /// The domain every statement is about, and the version of its checker.
 pub const DOMAIN: &str = "PureTotalV1";
@@ -228,8 +230,13 @@ impl Failure {
 }
 
 /// Checks the certificate of `statement`.
-pub fn prove(statement: &Statement, proof: &Cert, data: &Data) -> Result<(), Failure> {
-    check::prove(statement, proof, data)
+pub fn prove(
+    statement: &Statement,
+    proof: &Cert,
+    data: &Data,
+    program: &dyn Program,
+) -> Result<(), Failure> {
+    check::prove(statement, proof, data, program)
 }
 
 #[cfg(test)]

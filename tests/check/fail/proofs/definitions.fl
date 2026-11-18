@@ -1,0 +1,47 @@
+// What the domain keeps out of a proof: recursion, direct or through a
+// group, a diverging argument a function ignores, a partial function
+// inside a value, `todo` and foreign code. The definitions themselves are
+// ordinary code; only the proofs that name them fail.
+module App.Diverging exposing (..)
+
+countdown : Int -> Bool
+let rec countdown n = countdown n
+
+forever : Unit -> Option Bool
+let rec forever () = forever ()
+
+rec {
+  ping : Bool -> Bool
+  let ping b = pong b
+
+  pong : Bool -> Bool
+  let pong b = ping b
+}
+
+later : Unit -> Bool
+let later () = todo
+
+proof direct (n : Int) where equal (countdown n) (countdown n) = refl
+
+proof hidden (b : Bool) where equal (ping b) (ping b) = refl
+
+proof ignored where equal ((fun _ -> None) (forever ())) None = refl
+
+proof unfinished where equal (later ()) true = refl
+
+proof partial_inside
+where equal (Some (fun n -> countdown n)) (Some (fun n -> countdown n)) = refl
+
+proof through_ffi (v : Option a)
+where equal (map2 (fun f x -> f x) (pure identity) v) v =
+  match v with
+  | None -> refl
+  | Some x -> refl
+
+//~ FLICK-T022 @22:16-22:20 `todo` is left in the code
+//~ FLICK-T082 @24:1-24:70 `App.Diverging.countdown` names itself
+//~ FLICK-T082 @26:1-26:61 `App.Diverging.ping` → `App.Diverging.pong` names itself
+//~ FLICK-T082 @28:1-28:69 `App.Diverging.forever` names itself
+//~ FLICK-T082 @22:16-22:20 this form is outside the domain
+//~ FLICK-T082 @32:1-33:79 `App.Diverging.countdown` names itself
+//~ FLICK-T082 @35:1-39:19 `Instances.map2_option` is foreign code

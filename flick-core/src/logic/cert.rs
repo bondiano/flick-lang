@@ -145,3 +145,27 @@ fn arity(rule: &str) -> &'static str {
         _ => "is no rule of a proof",
     }
 }
+
+impl Cert {
+    /// The terms the certificate writes: what its rules name too.
+    pub fn terms<'a>(&'a self, out: &mut Vec<&'a Term>) {
+        match &self.kind {
+            Rule::Refl | Rule::Fact(_) => {}
+            Rule::Symm(p) | Rule::Funext(_, p) => p.terms(out),
+            Rule::Trans(m, p, q) => {
+                out.push(m);
+                p.terms(out);
+                q.terms(out);
+            }
+            Rule::Cong(_, e, p) => {
+                out.push(e);
+                p.terms(out);
+            }
+            Rule::Case(_, arms) => arms.iter().for_each(|(_, p)| p.terms(out)),
+            Rule::Let(_, p, rest) => {
+                p.terms(out);
+                rest.terms(out);
+            }
+        }
+    }
+}

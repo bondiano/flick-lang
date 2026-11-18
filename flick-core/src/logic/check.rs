@@ -3,6 +3,7 @@
 use std::mem;
 use std::rc::Rc;
 
+use super::defs::{Admitted, Program, admit};
 use super::eval::{Env, Machine, Nf, STEPS, Stop, Value, distinct};
 use super::show::show;
 use super::term::{Literal, Pat, Refused, Term};
@@ -12,6 +13,8 @@ use flick_ir::Lit;
 
 struct Checker<'a> {
     data: &'a Data,
+    /// The definitions the statement and its proof name, admitted.
+    defs: Admitted,
     /// The variables in scope and their types.
     vars: Vec<(Rc<str>, Ty)>,
     /// What case analysis knows of variables.
@@ -22,9 +25,25 @@ struct Checker<'a> {
     fresh: u32,
 }
 
-pub(super) fn prove(statement: &Statement, proof: &Cert, data: &Data) -> Result<(), Failure> {
+pub(super) fn prove(
+    statement: &Statement,
+    proof: &Cert,
+    data: &Data,
+    program: &dyn Program,
+) -> Result<(), Failure> {
+    let mut terms: Vec<&Term> = statement
+        .premises
+        .iter()
+        .flat_map(|(_, eq)| [&eq.left, &eq.right])
+        .collect();
+    if let Goal::Equal(eq) = &statement.goal {
+        terms.extend([&eq.left, &eq.right]);
+    }
+    proof.terms(&mut terms);
+    let defs = admit(&terms, program, statement.span).map_err(Failure::Refused)?;
     let mut checker = Checker {
         data,
+        defs,
         vars: Vec::new(),
         refined: Vec::new(),
         facts: Vec::new(),
@@ -143,7 +162,7 @@ impl Checker<'_> {
     /// Each constructor `t` names builds a type of the domain.
     fn admit_term(&self, t: &Term, span: Span) -> Result<(), Failure> {
         match t {
-            Term::Var(_) | Term::Lit(_) => Ok(()),
+            Term::Var(_) | Term::Lit(_) | Term::Def(_) => Ok(()),
             Term::Con(c) => self.admit_data(&c.module, &c.ty, span),
             Term::Lam(_, b) => self.admit_term(b, span),
             Term::App(f, a) | Term::Let(_, f, a) => {
@@ -171,7 +190,7 @@ impl Checker<'_> {
     }
 
     fn nf(&mut self, t: &Term, span: Span) -> Result<Nf, Failure> {
-        let mut machine = Machine::new(&self.refined, self.steps);
+        let mut machine = Machine::new(&self.refined, &self.defs, self.steps);
         let found = machine
             .eval(t, &Env::default())
             .and_then(|v| machine.read(v, 0));
@@ -181,6 +200,10 @@ impl Checker<'_> {
             Stop::Missed => Failure::Refused(Refused {
                 span,
                 why: "a `match` here has no arm for its value".into(),
+            }),
+            Stop::Unadmitted => Failure::Refused(Refused {
+                span,
+                why: "it names a definition that was not admitted".into(),
             }),
         })
     }
@@ -262,8 +285,8 @@ impl Checker<'_> {
                 let eq = self.fact(h, span)?;
                 let note = Some(format!(
                     "`{h}` proves `{} = {}`",
-                    show_term(&eq.left),
-                    show_term(&eq.right)
+                    self.show_term(&eq.left),
+                    self.show_term(&eq.right)
                 ));
                 self.same(&eq.left, &goal.left, span, note.clone())?;
                 self.same(&eq.right, &goal.right, span, note)
@@ -444,10 +467,12 @@ fn case_name(p: &Pat) -> String {
     }
 }
 
-fn show_term(t: &Term) -> String {
-    let mut machine = Machine::new(&[], STEPS);
-    machine
-        .eval(t, &Env::default())
-        .and_then(|v| machine.read(v, 0))
-        .map_or_else(|_| "…".into(), |nf| show(&nf))
+impl Checker<'_> {
+    fn show_term(&self, t: &Term) -> String {
+        let mut machine = Machine::new(&self.refined, &self.defs, STEPS);
+        machine
+            .eval(t, &Env::default())
+            .and_then(|v| machine.read(v, 0))
+            .map_or_else(|_| "…".into(), |nf| show(&nf))
+    }
 }

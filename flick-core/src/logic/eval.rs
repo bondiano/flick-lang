@@ -5,6 +5,7 @@
 
 use std::rc::Rc;
 
+use super::defs::Admitted;
 use super::term::{Arm, Ctor, Literal, Pat, Term};
 
 #[derive(Debug, Clone)]
@@ -72,6 +73,8 @@ pub enum Stop {
     Budget,
     /// A `match` has no arm for the value: the computation fails.
     Missed,
+    /// A definition no admission let in.
+    Unadmitted,
 }
 
 /// The work allowed for one proof.
@@ -82,6 +85,8 @@ pub const DEPTH: u32 = 400;
 pub struct Machine<'a> {
     /// What case analysis knows of the variables of the statement.
     pub refined: &'a [(Rc<str>, Value)],
+    /// The admitted definitions, which evaluation unfolds.
+    defs: &'a Admitted,
     pub steps: u64,
     depth: u32,
 }
@@ -93,9 +98,10 @@ enum Matched {
 }
 
 impl<'a> Machine<'a> {
-    pub fn new(refined: &'a [(Rc<str>, Value)], steps: u64) -> Self {
+    pub fn new(refined: &'a [(Rc<str>, Value)], defs: &'a Admitted, steps: u64) -> Self {
         Machine {
             refined,
+            defs,
             steps,
             depth: 0,
         }
@@ -137,6 +143,10 @@ impl<'a> Machine<'a> {
                 let s = self.eval(s, env)?;
                 self.case(s, env, arms)?
             }
+            Term::Def(d) => match self.defs.body(d) {
+                Some(body) => self.eval(body, &Env::default())?,
+                None => return Err(Stop::Unadmitted),
+            },
             Term::Let(x, value, body) => {
                 let value = self.eval(value, env)?;
                 self.eval(body, &env.with(x.clone(), value))?

@@ -26,10 +26,11 @@ where equal (x + 0) x =
 //           ^^^^^ FLICK-T082 a primitive operation is outside the domain
   refl
 
+// a method unfolds, but its `match` on `v` waits for a split of `v`
 proof method (v : Option Int)
 where equal (map identity v) v =
-//           ^^^ FLICK-T082 `map` is a method
   refl
+//^^^^ FLICK-T081 does not close the goal
 
 // `refl` does not say which equation `cong` lifts
 proof wrapped (x : Bool) (y : Bool)

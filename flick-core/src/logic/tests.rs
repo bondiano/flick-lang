@@ -11,6 +11,23 @@ use super::{
 };
 use crate::source::{SourceMap, Span};
 
+/// A program without definitions.
+struct Nothing;
+
+impl super::Program for Nothing {
+    fn item(&self, _: &str, _: &str) -> Option<&flick_ir::Item> {
+        None
+    }
+
+    fn instance(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Option<(&flick_ir::InstanceInfo, &[(String, flick_ir::Expr)])> {
+        None
+    }
+}
+
 fn span() -> Span {
     Span::new(SourceMap::default().add("t.fl", ""), 0, 0)
 }
@@ -115,21 +132,41 @@ fn types_are_the_same_only_when_they_are() {
         goal: Goal::SameType(a, b),
     };
     assert_eq!(
-        code(&prove(&same(rigid("a"), rigid("a")), &refl(), &data())),
+        code(&prove(
+            &same(rigid("a"), rigid("a")),
+            &refl(),
+            &data(),
+            &Nothing
+        )),
         "ok"
     );
     // two variables may stand for different types: not proved, not false
     assert_eq!(
-        code(&prove(&same(rigid("a"), rigid("b")), &refl(), &data())),
+        code(&prove(
+            &same(rigid("a"), rigid("b")),
+            &refl(),
+            &data(),
+            &Nothing
+        )),
         "T081"
     );
     assert_eq!(
-        code(&prove(&same(Ty::Bool, option(Ty::Bool)), &refl(), &data())),
+        code(&prove(
+            &same(Ty::Bool, option(Ty::Bool)),
+            &refl(),
+            &data(),
+            &Nothing
+        )),
         "T080"
     );
     let symm = cert(Rule::Symm(Box::new(refl())));
     assert_eq!(
-        code(&prove(&same(rigid("a"), rigid("a")), &symm, &data())),
+        code(&prove(
+            &same(rigid("a"), rigid("a")),
+            &symm,
+            &data(),
+            &Nothing
+        )),
         "T083"
     );
 }
@@ -144,9 +181,9 @@ fn functions_are_equal_by_their_values() {
         var("f"),
     );
     // without the rule the two are different terms
-    assert_eq!(code(&prove(&eta, &refl(), &data())), "T081");
+    assert_eq!(code(&prove(&eta, &refl(), &data(), &Nothing)), "T081");
     let funext = cert(Rule::Funext("y".into(), Box::new(refl())));
-    assert_eq!(code(&prove(&eta, &funext, &data())), "ok");
+    assert_eq!(code(&prove(&eta, &funext, &data(), &Nothing)), "ok");
     // a function's values at different arguments are not one value
     let pred = fun(Ty::Bool, Ty::Bool);
     let t = |b| Term::Lit(Literal(Lit::Bool(b)));
@@ -156,10 +193,10 @@ fn functions_are_equal_by_their_values() {
         app(var("f"), t(true)),
         app(var("f"), t(false)),
     );
-    assert_eq!(code(&prove(&constant, &refl(), &data())), "T081");
+    assert_eq!(code(&prove(&constant, &refl(), &data(), &Nothing)), "T081");
     // `funext` proves only functions equal
     let at_bool = equal(vec![("x", Ty::Bool)], Ty::Bool, var("x"), var("x"));
-    assert_eq!(code(&prove(&at_bool, &funext, &data())), "T083");
+    assert_eq!(code(&prove(&at_bool, &funext, &data(), &Nothing)), "T083");
 }
 
 #[test]
@@ -185,26 +222,26 @@ fn a_split_proves_each_case() {
         rebuilt,
         var("v"),
     );
-    assert_eq!(code(&prove(&goal, &refl(), &data())), "T081");
+    assert_eq!(code(&prove(&goal, &refl(), &data(), &Nothing)), "T081");
     let arm = |name, arity, binders: Vec<Pat>| (Pat::Con(ctor(name, arity), binders), refl());
     let split = |arms| cert(Rule::Case("v".into(), arms));
     let both = split(vec![
         arm("None", 0, vec![]),
         arm("Some", 1, vec![Pat::Bind("y".into())]),
     ]);
-    assert_eq!(code(&prove(&goal, &both, &data())), "ok");
+    assert_eq!(code(&prove(&goal, &both, &data(), &Nothing)), "ok");
     // every case, once
     let missing = split(vec![arm("None", 0, vec![])]);
-    assert_eq!(code(&prove(&goal, &missing, &data())), "T083");
+    assert_eq!(code(&prove(&goal, &missing, &data(), &Nothing)), "T083");
     let twice = split(vec![
         arm("None", 0, vec![]),
         arm("None", 0, vec![]),
         arm("Some", 1, vec![Pat::Wild]),
     ]);
-    assert_eq!(code(&prove(&goal, &twice, &data())), "T083");
+    assert_eq!(code(&prove(&goal, &twice, &data(), &Nothing)), "T083");
     // a split of what is no variable of the statement
     let stranger = cert(Rule::Case("w".into(), vec![arm("None", 0, vec![])]));
-    assert_eq!(code(&prove(&goal, &stranger, &data())), "T083");
+    assert_eq!(code(&prove(&goal, &stranger, &data(), &Nothing)), "T083");
 }
 
 #[test]
@@ -215,7 +252,7 @@ fn different_values_are_disproved() {
         some(var("x")),
         none(),
     );
-    assert_eq!(code(&prove(&goal, &refl(), &data())), "T080");
+    assert_eq!(code(&prove(&goal, &refl(), &data(), &Nothing)), "T080");
 }
 
 #[test]
@@ -233,9 +270,9 @@ fn trans_needs_both_of_its_steps() {
         Box::new(refl()),
         Box::new(refl()),
     ));
-    assert_eq!(code(&prove(&goal, &good, &data())), "ok");
+    assert_eq!(code(&prove(&goal, &good, &data(), &Nothing)), "ok");
     let wrong = cert(Rule::Trans(none(), Box::new(refl()), Box::new(refl())));
-    assert_eq!(code(&prove(&goal, &wrong, &data())), "T080");
+    assert_eq!(code(&prove(&goal, &wrong, &data(), &Nothing)), "T080");
 }
 
 #[test]
@@ -249,7 +286,10 @@ fn cong_reads_its_proof_from_a_premise() {
     );
     let cong = |p| cert(Rule::Cong("z".into(), some(var("z")), Box::new(p)));
     // `refl` says nothing of which equation it proves
-    assert_eq!(code(&prove(&goal, &cong(refl()), &data())), "T083");
+    assert_eq!(
+        code(&prove(&goal, &cong(refl()), &data(), &Nothing)),
+        "T083"
+    );
     goal.premises.push((
         "h".into(),
         Equation {
@@ -259,14 +299,27 @@ fn cong_reads_its_proof_from_a_premise() {
         },
     ));
     assert_eq!(
-        code(&prove(&goal, &cong(cert(Rule::Fact("h".into()))), &data())),
+        code(&prove(
+            &goal,
+            &cong(cert(Rule::Fact("h".into()))),
+            &data(),
+            &Nothing
+        )),
         "ok"
     );
     // the premise proves `x = y`, not `y = x`
     let flipped = cert(Rule::Symm(Box::new(cert(Rule::Fact("h".into())))));
-    assert_eq!(code(&prove(&goal, &cong(flipped), &data())), "T081");
     assert_eq!(
-        code(&prove(&goal, &cert(Rule::Fact("absent".into())), &data())),
+        code(&prove(&goal, &cong(flipped), &data(), &Nothing)),
+        "T081"
+    );
+    assert_eq!(
+        code(&prove(
+            &goal,
+            &cert(Rule::Fact("absent".into())),
+            &data(),
+            &Nothing
+        )),
         "T083"
     );
 }
@@ -279,7 +332,7 @@ fn types_outside_the_domain_are_refused() {
         var("x"),
         var("x"),
     );
-    assert_eq!(code(&prove(&unknown, &refl(), &data())), "T082");
+    assert_eq!(code(&prove(&unknown, &refl(), &data(), &Nothing)), "T082");
     let mut recursive = data();
     recursive
         .get_mut(&("Prelude".into(), "Option".into()))
@@ -291,10 +344,10 @@ fn types_outside_the_domain_are_refused() {
         var("v"),
         var("v"),
     );
-    assert_eq!(code(&prove(&goal, &refl(), &recursive)), "T082");
+    assert_eq!(code(&prove(&goal, &refl(), &recursive, &Nothing)), "T082");
     // a constructor of a type the proof does not know
     let goal = equal(vec![], option(Ty::Bool), none(), none());
-    assert_eq!(code(&prove(&goal, &refl(), &Data::new())), "T082");
+    assert_eq!(code(&prove(&goal, &refl(), &Data::new(), &Nothing)), "T082");
 }
 
 #[test]
@@ -313,7 +366,7 @@ fn a_proof_that_runs_out_proves_nothing() {
         left,
         app(var("f"), var("x")),
     );
-    assert_eq!(code(&prove(&goal, &refl(), &data())), "T084");
+    assert_eq!(code(&prove(&goal, &refl(), &data(), &Nothing)), "T084");
     // the same, every time
-    assert_eq!(code(&prove(&goal, &refl(), &data())), "T084");
+    assert_eq!(code(&prove(&goal, &refl(), &data(), &Nothing)), "T084");
 }

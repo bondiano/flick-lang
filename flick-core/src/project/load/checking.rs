@@ -30,6 +30,7 @@ use crate::plugin::calls as plugin_calls;
 use crate::plugin::expansion::Expansion;
 use crate::plugin::first_party;
 use crate::project::Project;
+use crate::project::builtins::builtin_modules_of;
 #[cfg(feature = "native-project")]
 use crate::project::cache::Key as Hashed;
 use crate::project::config::{Checked, Config};
