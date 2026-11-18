@@ -1,19 +1,22 @@
 //! A `match` on a value of `Errors ε`, the errors of a row: an arm headed by
 //! an error `E` matches the values of the element `E ῡ` of `ε`, and the
 //! elements of the row are the constructors its arms have to cover. The
-//! match removes no error from a row: it only takes one value apart.
+//! match removes no error from a row: it only takes one value apart. A
+//! term of an error has the type of the errors of a row that names it
+//! (Errors-In).
+
+use std::slice;
 
 use super::Checker;
 use super::env::Found;
 use super::exhaust::arity;
-use super::handle::{arm_pattern, failed_pattern};
-use super::handlers::catch_all;
-use super::patterns::{Ctor, is_pattern};
+use super::gadt::columns::Coverage;
+use super::patterns::{Ctor, Pat};
 use super::ty::{Norm, Row, Type};
 use crate::diagnostics::codes;
 use crate::iface::{Entity, Namespace};
+use crate::source::Span;
 use crate::syntax::cst::Node;
-use crate::syntax::kind::SyntaxKind as K;
 use crate::types::Elem;
 use crate::types::lang::Lang;
 
@@ -31,10 +34,12 @@ impl Checker<'_> {
 
     /// What a constructor pattern that builds `built` matches in a value of
     /// `ty`: for `Errors ε` and an error `E`, the element `E ῡ` of `ε`.
-    /// `None` when `ty` is no such row, or a row still unknown, which the
-    /// error then joins as `Errors e ~ E` makes it. An error outside a
-    /// known row is reported, and its pattern matches nothing, as in a row
-    /// already reported.
+    /// `None` when `ty` is no such row. In a pattern of a `match`, the
+    /// error joins a row still unknown, which stays open behind it until
+    /// [`Self::close_error_rows`]; elsewhere `None`, and the row becomes
+    /// the error, as `Errors e ~ E` makes it. An error outside a known row
+    /// is reported, and its pattern matches nothing, as in a row already
+    /// reported.
     pub(super) fn error_element(&mut self, built: &Type, ty: &Type, node: &Node) -> Option<Type> {
         let label = self.error_label(built)?;
         let norm = self.errors_row(ty)?;
@@ -44,8 +49,21 @@ impl Checker<'_> {
         if norm.tails.iter().any(|t| matches!(t, Type::Error)) {
             return Some(Type::Error);
         }
-        if norm.tails.iter().any(|t| t.inference_meta_root().is_some()) {
-            return None;
+        if let Some(tail) = norm
+            .tails
+            .iter()
+            .find(|t| t.inference_meta_root().is_some())
+        {
+            self.error_rows.as_ref()?;
+            let rest = self.store.fresh_error_row();
+            let row = Row {
+                entries: vec![(label, built.clone())],
+                tail: Some(Box::new(rest.clone())),
+                ..Row::default()
+            };
+            let _ = self.bind_inference(tail, &Type::Row(row));
+            self.error_rows.get_or_insert_default().push(rest);
+            return Some(built.clone());
         }
         let (error, row) = (self.show(built), self.show(ty));
         self.error(
@@ -56,83 +74,73 @@ impl Checker<'_> {
         Some(Type::Error)
     }
 
-    /// `match e with …` with `e : Errors ε`, where `ε` is not known yet:
-    /// without an arm for every error, `ε` is exactly the errors the arms
-    /// are headed by, its only solution. An arm for every error tells
-    /// nothing of `ε`, which then has to be known.
-    pub(super) fn errors_of_arms(&mut self, node: &Node, scrutinee: &Type) {
-        let Some(norm) = self.errors_row(scrutinee) else {
-            return;
-        };
-        let [tail] = &norm.tails[..] else {
-            return;
-        };
-        if tail.inference_meta_root().is_none() {
+    /// After the arms of a `match`: the rows its patterns added errors to
+    /// stay open when the arms without `when` cover the value with them
+    /// open, which leaves them to the rest of the program, as the
+    /// `raised ⊆ caught` of a `try`. Otherwise `Exh` needs them closed, and
+    /// the errors named are their only solution.
+    pub(super) fn close_error_rows(
+        &mut self,
+        rows: Vec<Type>,
+        arms: &[(Pat, bool, Span)],
+        scrutinee: &Type,
+    ) {
+        if rows.is_empty() {
             return;
         }
-        let (mut heads, mut every) = (Vec::new(), None);
-        for arm in node.nodes().filter(|n| n.kind == K::MatchArm) {
-            let Some(pattern) = arm_pattern(arm) else {
-                continue;
-            };
-            let pattern = failed_pattern(pattern, self.text).unwrap_or(pattern);
-            if !catch_all(pattern) {
-                self.error_heads(pattern, &norm.entries, &mut heads);
-            } else if !arm.nodes().any(|n| n.kind == K::Guard) {
-                every = Some(pattern);
+        let unguarded: Vec<Vec<Pat>> = arms
+            .iter()
+            .filter(|(_, guarded, _)| !guarded)
+            .map(|(pat, _, _)| vec![pat.clone()])
+            .collect();
+        let tys = slice::from_ref(scrutinee);
+        if self
+            .useful_at(&unguarded, &[Pat::Wild], tys, &Coverage::new(self))
+            .is_none()
+        {
+            return;
+        }
+        for row in rows {
+            for tail in self.store.normalize(&row).tails {
+                if tail.inference_meta_root().is_some() {
+                    let _ = self.bind_inference(&tail, &Type::empty_row());
+                }
             }
         }
-        if heads.is_empty() {
-            return;
-        }
-        let row = if let Some(pattern) = every {
-            self.error(
-                codes::T057,
-                self.span(pattern),
-                "this arm matches every error, so the arms do not tell the errors of the value: annotate it",
-            );
-            // what the row should be is not known: nothing else is reported of it
-            Type::Error
-        } else {
-            Type::Row(Row::closed(heads))
-        };
-        let _ = self.bind_inference(tail, &row);
     }
 
-    /// The errors `pattern` is headed by that `known` lacks, each at
-    /// unknown arguments.
-    fn error_heads(
-        &mut self,
-        pattern: &Node,
-        known: &[(Elem, Type)],
-        heads: &mut Vec<(Elem, Type)>,
-    ) {
-        if matches!(pattern.kind, K::OrPat | K::ParenPat) {
-            for alternative in pattern.nodes().filter(|n| is_pattern(n.kind)) {
-                self.error_heads(alternative, known, heads);
-            }
-            return;
+    /// (Errors-In): a term of an error `E ῡ` checked against `Errors ε`
+    /// whose row names `E` has the element `E ῡ` of `ε` as its type. `None`
+    /// when the rule does not apply: a row of one error is that error, and
+    /// a row not known yet becomes the error, as `Errors e ~ E` makes it.
+    /// `Some(false)` after a diagnostic.
+    pub(super) fn errors_in(&mut self, actual: &Type, expected: &Type, span: Span) -> Option<bool> {
+        let norm = self.errors_row(expected)?;
+        let actual = self.whnf(actual);
+        let label = self.error_label(&actual)?;
+        if let Some(element) = element(&norm.entries, &label).cloned() {
+            return Some(match self.unify(&actual, &element) {
+                Ok(()) => true,
+                Err(mismatch) => {
+                    self.mismatch(&mismatch, &actual, expected, span);
+                    false
+                }
+            });
         }
-        if pattern.kind != K::ConPat {
-            return;
+        let unknown = norm
+            .tails
+            .iter()
+            .any(|t| matches!(t, Type::Error) || t.inference_meta_root().is_some());
+        if unknown || norm.entries.is_empty() || (norm.tails.is_empty() && norm.entries.len() < 2) {
+            return None;
         }
-        // the arms report a name that is missing when they are checked
-        let mark = self.diagnostics.len();
-        let entity = self.pattern_constructor(pattern).and_then(|(_, e)| e);
-        self.diagnostics.truncate(mark);
-        let Some(scheme) = entity.and_then(|e| self.env.value(&e).cloned()) else {
-            return;
-        };
-        let mut built = self.instantiate(&scheme, self.span(pattern));
-        while let Type::Fun { result, .. } = self.whnf(&built) {
-            built = *result;
-        }
-        let Some(head) = self.error_label(&built) else {
-            return;
-        };
-        if element(known, &head).is_none() && element(heads, &head).is_none() {
-            heads.push((head, built));
-        }
+        let (error, row) = (self.show(&actual), self.show(expected));
+        self.error(
+            codes::T003,
+            span,
+            format!("`{error}` is not one of the errors of `{row}`"),
+        );
+        Some(false)
     }
 
     /// The constructors of a column of `Errors ε` with the row `row`: one

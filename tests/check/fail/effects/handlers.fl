@@ -62,16 +62,26 @@ let outside_row e =
   | C _ -> "c"
 //  ^^^ FLICK-T003 `C` is not one of the errors of `Errors {A, B}`
 
-// an arm for every error tells nothing of the errors of `e`, which then
-// have to be known
-unknown_row : Unit ->{; A, B, C} String
-let unknown_row () =
+// without an arm for every error the row of `e` is the errors the arms
+// name, which the body exceeds
+closed_by_arms : Unit ->{; A, B, C} String
+let closed_by_arms () =
   try
     raise_any true
     "ok"
   with
   | e ->
+//  ^ FLICK-E002 the expected type `Errors {A}` does not allow errors `B`, `C`, which this needs
     match e with
+    | _ when false -> "other"
     | A _ -> "a"
-    | _ -> "other"
-//    ^ FLICK-T057 this arm matches every error, so the arms do not tell the errors of the value
+
+// a term of an error outside the row is not one of its errors
+not_in_row : Errors {A, B}
+let not_in_row = C "c"
+//               ^^^^^ FLICK-T003 `C` is not one of the errors of `Errors {A, B}`
+
+// (Errors-In) types a term, and does not reach under an arrow
+widened : (Unit -> A) -> Unit -> Errors {A, B}
+let widened f = f
+//              ^ FLICK-T003 expected `Unit -> Errors {A, B}`, found `Unit -> A`: a term of `A` has the type `Errors {A, B}`, but a type built of `A` is not one built of it: build the value again, as `fun x -> f x`

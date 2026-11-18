@@ -363,6 +363,7 @@ fn checker_in<'a>(
             .any(|(name, _)| *name == module.name),
         sugar: Vec::new(),
         gadt: gadt::branch::State::default(),
+        error_rows: None,
         unfolding: Vec::new(),
     }
 }

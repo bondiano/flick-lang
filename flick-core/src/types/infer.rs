@@ -782,11 +782,11 @@ impl<'c> Checker<'c> {
         let scrutinee = nodes.next().map_or(Type::Error, |s| self.infer(s));
         let result = expected.cloned().unwrap_or_else(|| self.fresh());
         let errors = self.diagnostics.len();
-        self.errors_of_arms(node, &scrutinee);
         // an inferred `match` takes the type of its first arm
         let open = expected.is_none();
         let mut first = None;
         let mut arms = Vec::new();
+        let outer = self.error_rows.replace(Vec::new());
         for arm in nodes.filter(|n| n.kind == K::MatchArm) {
             let since = self.diagnostics.len();
             arms.push(self.arm(arm, &scrutinee, &result));
@@ -802,6 +802,8 @@ impl<'c> Checker<'c> {
                 None => first = body,
             }
         }
+        let rows = mem::replace(&mut self.error_rows, outer).unwrap_or_default();
+        self.close_error_rows(rows, &arms, &scrutinee);
         // an error in an arm makes its patterns unreliable; a warning does
         // not, and must not let a `match` that misses a value through
         if !self.diagnostics[errors..]
@@ -825,6 +827,8 @@ impl<'c> Checker<'c> {
         let mut guarded = false;
         let mut span = self.span(arm);
         let frame = self.enter_arm();
+        // only the pattern of a `match` arm tells the rows it meets
+        let mut rows = self.error_rows.take();
         for child in arm.nodes() {
             // an arm that matches nothing is not checked: its patterns contradict
             if self.gadt.dead {
@@ -841,11 +845,14 @@ impl<'c> Checker<'c> {
                 kind if super::patterns::is_pattern(kind) => {
                     let child = super::handle::failed_pattern(child, self.text).unwrap_or(child);
                     span = self.span(child);
+                    self.error_rows = rows.take();
                     pat = self.bind_arm_pattern(child, scrutinee);
+                    rows = self.error_rows.take();
                 }
                 _ => {}
             }
         }
+        self.error_rows = rows;
         if self.leave_arm(frame) {
             self.typing
                 .dead_arms

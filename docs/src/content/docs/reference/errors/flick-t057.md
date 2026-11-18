@@ -26,8 +26,3 @@ let eval e =
 ```
 
 Without the signature of `eval`, the `match` is reported.
-
-A `match` on a value of `Errors e` takes it apart by the errors of `e`.
-While `e` is not known yet, as for the variable of a `try`, the arms tell
-it; an arm that matches every error tells nothing, so the row has to be
-known: annotate the value, or give the function that takes it a signature.

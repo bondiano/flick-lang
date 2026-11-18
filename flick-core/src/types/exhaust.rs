@@ -124,7 +124,7 @@ impl Checker<'_> {
 
     /// [`Self::useful`] where the columns have the types `tys`, as far as
     /// they are known.
-    fn useful_at(
+    pub(super) fn useful_at(
         &self,
         rows: &[Vec<Pat>],
         v: &[Pat],
