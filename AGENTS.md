@@ -1,8 +1,9 @@
 # Working on Flick
 
-These instructions apply throughout the repository. Each crate and package
-directory has its own `AGENTS.md` with its ownership, pitfalls and checks:
-read it before editing there, and follow it where it is more specific.
+These instructions apply throughout the repository. Each top-level area
+has its own `AGENTS.md` with its ownership, pitfalls and checks; a group
+such as `plugins/` or `backends/` shares one. Read the nearest one before
+editing there, and follow it where it is more specific.
 
 ## Start here
 

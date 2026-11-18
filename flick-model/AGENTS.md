@@ -22,7 +22,7 @@ traces and writes the generated Lean files of `formal/`.
 - Implement the rules of `docs/formal/`, not flick-core's behavior; change
   a rule's page, its code here and the Lean proof together.
 - Each `tests/run` case is listed in `tests/run/model.txt` (and in
-  `portable.txt`) or in `tests/run/model_gaps.txt` with its reason. Move a
+  `tests/run/portable.txt`) or in `tests/run/model_gaps.txt` with its reason. Move a
   case to `model.txt` once it runs.
 - `tests/known_gaps.txt` and `tests/cert_gaps.txt` only shrink.
 - Regenerate Lean output with `just formal-schemes` or `just formal-certs`;

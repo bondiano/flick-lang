@@ -15,7 +15,7 @@ compiler build, the browser's too, as one plugin owned by `std`.
   search `plugins/` before taking one. Each needs
   `packages/std/explain/<code>.md` for `flick explain`; `cli`, `derive`,
   `sql` and `test` check theirs in `std_explains_every_code_*` tests,
-  `ui` by review.
+  `refined` (`D006`) and `ui` by review.
 - Codes in `OWN_CODES` of `first_party.rs` stay compiler codes
   (`FLICK-U001`), explained in `flick-core/src/diagnostics/explain/`.
 - Keep dependencies buildable for `wasm32-unknown-unknown`; their code
