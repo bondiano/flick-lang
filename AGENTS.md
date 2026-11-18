@@ -1,7 +1,8 @@
 # Working on Flick
 
-These instructions apply throughout the repository. Follow more specific
-`AGENTS.md` files where present.
+These instructions apply throughout the repository. Each crate and package
+directory has its own `AGENTS.md` with its ownership, pitfalls and checks:
+read it before editing there, and follow it where it is more specific.
 
 ## Start here
 
@@ -19,7 +20,7 @@ These instructions apply throughout the repository. Follow more specific
 | - | - |
 | Parser, resolver, checker | `flick-core/src/{syntax,resolve,types}/` |
 | Lowering and shared IR | `flick-core/src/ir/`, `flick-ir/` |
-| Optimization and backends | `flick-core/src/{opt,codegen}/` |
+| Optimization and backends | `flick-core/src/{opt,codegen}/`, `backends/`, `flick-backend/` |
 | CLI, project execution, LSP | `flick/src/`, `flick-core/src/{project,ide}/` |
 | Browser compiler | `flick-wasm/` |
 | Standard library and plugins | `packages/`, `plugins/`, `flick-plugin/` |
