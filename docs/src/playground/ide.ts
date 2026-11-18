@@ -221,7 +221,6 @@ class Editor implements PluginValue {
 }
 
 const theme = EditorView.theme({
-  "& .fp-ide-token": { textDecoration: "underline dotted" },
   "& .fp-ide-hint": { opacity: "0.65", fontStyle: "italic", padding: "0 0.15em" },
   "& .fp-ide-signature": {
     margin: "0 0.2em",
