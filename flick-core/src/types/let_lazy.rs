@@ -51,17 +51,18 @@ impl Checker<'_> {
         }
     }
 
-    /// Whether `operand` names a `let lazy` binding.
-    pub(super) fn lazy_local(&self, operand: &Node) -> bool {
+    /// Where the name of the `let lazy` binding `operand` names is written.
+    pub(super) fn lazy_local(&self, operand: &Node) -> Option<u32> {
         if operand.kind != K::NameExpr
             || !matches!(self.typing.names.get(&operand.range()), Some(Ref::Local))
         {
-            return false;
+            return None;
         }
         let name = self.text_of(operand);
         (self.cx.locals.iter().rev())
             .find(|l| l.name == name)
-            .is_some_and(|l| matches!(l.binding, Binding::Lazy | Binding::LazyMut))
+            .filter(|l| matches!(l.binding, Binding::Lazy | Binding::LazyMut))
+            .and_then(|l| l.at)
     }
 
     /// Whether the use of the local `index` is one of a `let lazy` other

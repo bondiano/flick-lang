@@ -127,9 +127,10 @@ fn ir_makes_stages_dictionaries_and_lifts_explicit() {
 }
 
 /// A `let lazy` is a variable of its function, `None` until an `await`
-/// keeps the outcome of its initializer: no cell. The second `await` runs a
-/// copy of the initializer with its locals renamed, and a write to a `let
-/// lazy mut` is `Some (Ok v)`.
+/// keeps the outcome of its initializer: no cell. The initializer of `x`,
+/// which two `await`s run, is a local function they call; the one of `y`,
+/// with one `await`, runs in place. A write to a `let lazy mut` is
+/// `Some (Ok v)`.
 #[test]
 fn a_let_lazy_lowers_to_a_variable_of_its_function() {
     let ir = lower_text(
@@ -144,6 +145,24 @@ fn a_let_lazy_lowers_to_a_variable_of_its_function() {
     )
     .expect("lowers");
     insta::assert_snapshot!(super::print(&ir));
+}
+
+/// A `let lazy` lowers its initializer once, however many `await`s run it
+/// and however deep it is in the initializer of another: with more than one
+/// `await`, each calls a local function of the declaration.
+#[test]
+fn a_let_lazy_initializer_is_lowered_once() {
+    let ir = lower_text(
+        "App",
+        "module App exposing (..)\n\
+         mark : Int ->{} Int\nlet mark n = n\n\
+         run : Unit ->{} Int\n\
+         let run () =\n  let lazy top =\n    let lazy v2 =\n      let lazy v1 = mark 7\n      \
+         await v1 + await v1\n    await v2 + await v2\n  await top\n",
+    )
+    .expect("lowers");
+    let printed = super::print(&ir);
+    assert_eq!(printed.matches("App.mark 7").count(), 1, "{printed}");
 }
 
 #[test]

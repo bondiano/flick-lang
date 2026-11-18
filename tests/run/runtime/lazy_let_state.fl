@@ -1,8 +1,8 @@
 // A `let lazy` keeps its state in a variable of its function. An error of the
-// initializer is kept like a value. A local of the initializer is bound
-// again by each copy of it. An `await` in a loop or in a branch runs it once, and so does
-// one inside a `scope`. A write to a `let lazy mut` after a read replaces
-// what the read kept.
+// initializer is kept like a value. An `await` in a loop or in a branch runs
+// the initializer once, and so does one inside a `scope`. A `let lazy` in the
+// initializer of another runs once too. A write to a `let lazy mut` after a
+// read replaces what the read kept.
 module App.Main exposing (main)
 
 type error Boom = Boom String
@@ -40,6 +40,12 @@ let main () =
     7
   let inside = scope { await once + await once }
   Platform.stdout_line "in a scope: \{inside}, runs: \{Ref.get counted}"
+  let lazy top =
+    let lazy inner =
+      Platform.stdout_line "inner runs"
+      1
+    (await inner) + (await inner)
+  Platform.stdout_line "nested: \{await top} \{await top}"
   let lazy mut cached = step runs 5
   let before =
     try await cached with

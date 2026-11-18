@@ -192,7 +192,7 @@ impl Lower<'_> {
                     result = Some(self.let_assert(statement, span, |l| l.statements(rest, span)));
                     break;
                 }
-                K::LetDecl => stmts.push(self.local_let(statement)),
+                K::LetDecl => stmts.extend(self.local_let_stmts(statement)),
                 K::AssignStmt => stmts.push(self.assign(statement)),
                 _ if last => result = Some(self.expr(statement)),
                 _ => stmts.push(Stmt::Expr(self.expr(statement))),
@@ -224,11 +224,6 @@ impl Lower<'_> {
                 dicts,
                 value,
             };
-        }
-        if self.typing.lazy_lets.contains(&decl.range()) {
-            let init = self.lazy_let(decl, parts.body);
-            let unique = self.bind(&name, at);
-            return self.lazy_state(unique, init);
         }
         let value = self.definition(decl);
         let unique = self.bind(&name, at);

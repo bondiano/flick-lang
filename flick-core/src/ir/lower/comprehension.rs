@@ -102,9 +102,9 @@ impl Lower<'_> {
                 ExprKind::If(Box::new(condition), Box::new(body), Box::new(unit(at)))
             }
             K::LetDecl => {
-                let stmt = self.local_let(first);
+                let stmts = self.local_let_stmts(first);
                 let body = self.clauses(rest, element, looping, span);
-                ExprKind::Block(vec![stmt], Box::new(body))
+                ExprKind::Block(stmts, Box::new(body))
             }
             _ => return self.clauses(rest, element, looping, span),
         };

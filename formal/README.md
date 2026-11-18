@@ -119,11 +119,12 @@ signature and golden certificates.
   term. `T7_pure` derives purity from T2a; `T7_regions` derives safety by
   use from T4′. It does not claim the old holding-based region guarantee.
   `let lazy` (`Formal/LetMut/Lazy.lean`, `lazy.md` §4) is a `var` of its state,
-  an `await` a `br` whose other arm runs the initializer and `set`s the state:
-  `MutOk.lzDecl`, `MutOk.lzAwait` and `MutOk.lzWrite` are derived rules, over
-  the Prelude's `Option` and `Result` (`LzSig`, which the witness has), so T7
-  covers them. `Tm.rename_redirect`: an assignment does not change what an
-  initializer that reads no variable reads.
+  an `await` a `br` whose other arm runs the initializer, in place or by a call
+  of a function of the declaration, and `set`s the state: `MutOk.lzDecl`,
+  `MutOk.lzDeclFn`, `MutOk.lzAwaitOf`, `MutOk.lzAwait`, `MutOk.lzAwaitFn` and `MutOk.lzWrite` are
+  derived rules, over the Prelude's `Option` and `Result` (`LzSig`, which the
+  witness has), so T7 covers them. `Tm.rename_redirect`: an assignment does not
+  change what an initializer that reads no variable reads.
 - **Local control** (`Formal/LocalControl.lean`): completion carries state
   through normal return, break, continue and typed error. Assignment commits
   only a successful RHS, handlers see the current store, and finite iteration
@@ -204,7 +205,8 @@ signature and golden certificates.
 `hdl_err_live` lists only `propext`. `Formal/Axioms.lean` pins what `#print axioms` prints
 for `T1`, `T1_regions`, `T2a`, `T2b`, `T2b_await`, `T3`, `lemma_6`, `T4'`, `hdl_err_live`,
 `T6a`, `T6b`, `T6a_core`, `T6b_core`, `Lazy.L1`, `Lazy.L1_once`, `Lazy.L2`, `R9`, `T7`,
-`MutOk.lzAwait`, `Tm.rename_redirect` (only `propext` and `Quot.sound`) and
+`MutOk.lzDecl`, `MutOk.lzDeclFn`, `MutOk.lzAwaitOf`, `MutOk.lzAwait`, `MutOk.lzAwaitFn`,
+`MutOk.lzWrite`, `Tm.rename_redirect` (only `propext` and `Quot.sound`) and
 `Elab.Witness.lzSig` with `#guard_msgs`, so
 `lake build` fails on a
 `sorry` or a new axiom.
@@ -301,7 +303,7 @@ operation, and `c.at i` ranges over the main thread and the children of live reg
 | (T-Lazy), (T-Force); a cell of the store and its location | `Typ.lazy`, `Typ.force`, `Typ.lazyLoc`, `Typ.settle` (`Rules.lean`); `Ty.lazyCell`, `Typ.value_not_cell`, `canonical_lazy` (`CanonForms.lean`) |
 | `lazy.md` §3 steps | `RHead.lazy`, `.forcePending`, `.forceDone`, `.forceRunning`, `.settleVal`, `.settleRaise`, `.settleUnw`, `settleCell`, `resetCell` (`Semantics.lean`); their preservation: `lazy_new`, `force_pending`, `force_done`, `settle_val`, `settle_raise`, `settle_unw` (`PresLazy.lean`) |
 | `lazy.md` L1, L2 | `Lazy.L1`, `Lazy.L1_once`, `Lazy.L2` (`Lazy.lean`) |
-| `lazy.md` §4 `let lazy` | `lzDecl`, `lzAwait`, `lzWrite`, `LzSig`, `MutOk.lzDecl`, `MutOk.lzAwait`, `MutOk.lzWrite`, `Tm.rename_redirect` (`LetMut/Lazy.lean`); `Elab.Witness.lzSig` (`LetMut/LazyWitness.lean`) |
+| `lazy.md` §4 `let lazy` | `lzDecl`, `lzDeclFn`, `lzAwaitOf`, `lzAwait`, `lzCall`, `lzWrite`, `LzSig`, `MutOk.lzDecl`, `MutOk.lzDeclFn`, `MutOk.lzAwaitOf`, `MutOk.lzAwait`, `MutOk.lzAwaitFn`, `MutOk.lzWrite`, `Tm.rename_redirect` (`LetMut/Lazy.lean`); `Elab.Witness.lzSig` (`LetMut/LazyWitness.lean`) |
 | `core.md` §3.2 contexts; the handler of an operation; the frame `inside π E` | `Frame`, `plug`, `handlerOf` (`EvalCtx.lean`) |
 | `core.md` §3.3 `→ₚ`; §3.4–3.5 steps; `regions.md` §3.2–§3.3 | `PHead`, `RHead`, `Step`, `Steps` (`Semantics.lean`) |
 | `regions.md` §3.1 `Λ`, children step at any time | `Rgn`, `Cfg`, `CStep`, `CSteps` (`Semantics.lean`) |

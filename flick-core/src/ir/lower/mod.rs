@@ -151,10 +151,10 @@ struct Lower<'a> {
     /// The owner local of each source `scope` used by a call or value plan.
     owners: HashMap<Range, String>,
     entry_owners: HashMap<StageKey, String>,
-    /// The initializer of each `let lazy` of the current definition, by its
-    /// unique name, lowered where it is declared, and how many `await`s
-    /// copied it.
-    lazies: HashMap<String, (Expr, u32)>,
+    /// What each `await` of a `let lazy` of the current definition runs for
+    /// the outcome of its initializer, by the unique name of the `let lazy`:
+    /// `attempt e`, or a call of the local function that holds it.
+    lazies: HashMap<String, Expr>,
     /// The constructors over a record written in their declaration, with
     /// its labels (`Module::records`).
     records: BTreeMap<String, Vec<String>>,

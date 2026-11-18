@@ -85,8 +85,9 @@ pub struct Typing {
     pub suspended: Vec<(String, Vec<usize>)>,
     /// Arguments passed unstarted to a parameter marked `~`: the task of each.
     pub suspends: HashSet<Range>,
-    /// `await`s of a `let lazy`, which read the variable of its state.
-    pub read_lazy: HashSet<Range>,
+    /// `await`s of a `let lazy`, which read the variable of its state, with
+    /// where the name of that `let lazy` is written.
+    pub read_lazy: HashMap<Range, u32>,
     /// `let lazy` declarations: a variable of their function, whose state is
     /// `None` until an `await` runs the initializer.
     pub lazy_lets: HashSet<Range>,

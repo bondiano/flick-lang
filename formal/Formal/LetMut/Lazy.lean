@@ -15,16 +15,22 @@ back: the value, or the error raised again (`lzOut`, the body of `from_result`).
   the new outcome;
 - `lzWrite x v k`: `set x (Some (Ok v)) k`.
 
-Each is `MutOk` when its parts are typed (`MutOk.lzDecl`, `MutOk.lzAwait`, `MutOk.lzWrite`):
-they are derived rules of `MutOk`, so **T7** holds of every block written with them. Its
-translation is a core term of the block's type at the block's stage, and `T7_pure` and
-`T7_regions` hold of it too. A signal or a defect leaves `e` before the `set`, so the state
-stays `None`, as the reset of lazy.md §3 leaves a cell pending.
+The lowering writes the initializer once. With one `await`, it runs `lzAttempt e` in place
+(`lzAwait`). With more, the declaration is `lzDeclFn`: a `let` of the function
+`λ_. lzAttempt e` before the state, and each `await` takes the outcome from `lzCall f`, the
+call of that function (`lzAwaitOf`, `MutOk.lzAwaitFn`).
 
-`e` is written at each `await`, as the lowering copies it there. It reads no variable of the
-block (`FLICK-G005`), so a `set` between the declaration and the `await` does not change what
-it reads. `tr` renames each term after `set x` by `redirect x`, which is the plain shift on a
-term without `x` (`Tm.rename_redirect`): `e` reads the values it had at the declaration.
+Each is `MutOk` when its parts are typed (`MutOk.lzDecl`, `MutOk.lzDeclFn`, `MutOk.lzAwaitOf`,
+`MutOk.lzAwait`, `MutOk.lzAwaitFn`, `MutOk.lzWrite`): they are derived rules of `MutOk`, so **T7** holds of
+every block written with them. Its translation is a core term of the block's type at the
+block's stage, and `T7_pure` and `T7_regions` hold of it too. A signal or a defect leaves `e`
+before the `set`, so the state stays `None`, as the reset of lazy.md §3 leaves a cell pending.
+
+The initializer reads the values of the declaration. The function is a value made there, and
+`f` is no variable of the block. An initializer run in place reads no variable of the block
+(`FLICK-G005`), so a `set` between the declaration and the `await` does not change what it
+reads: `tr` renames each term after `set x` by `redirect x`, which is the plain shift on a
+term without `x` (`Tm.rename_redirect`).
 
 The constructors are the Prelude's `Option` and `Result`, with the fields of their
 declarations (`LzSig`).
@@ -70,13 +76,24 @@ def lzOut (o : Tm) : Tm :=
 /-- `let lazy x = e in b`: the variable `x`, `None`. -/
 def lzDecl (b : Blk) : Blk := .var lzNone b
 
-/-- `let y = await x in k` of the `let lazy` `x` whose initializer is `e`. -/
-def lzAwait (x : Nat) (e : Tm) (k : Blk) : Blk :=
+/-- `let y = await x in k` of the `let lazy` `x`, where `o` gives the outcome of its
+initializer. -/
+def lzAwaitOf (x : Nat) (o : Tm) (k : Blk) : Blk :=
   .br (.var x) (pvars "Some" 1) (.ret (lzOut (.var 0)))
-    (.let_ (lzAttempt e) (.set (x + 1) (lzSome (.var 0)) (.ret (lzOut (.var 0))))) k
+    (.let_ o (.set (x + 1) (lzSome (.var 0)) (.ret (lzOut (.var 0))))) k
+
+/-- `let y = await x in k` of the `let lazy` `x` whose initializer `e` runs in place. -/
+def lzAwait (x : Nat) (e : Tm) (k : Blk) : Blk := lzAwaitOf x (lzAttempt e) k
 
 /-- `x = v` of a `let lazy mut`. -/
 def lzWrite (x : Nat) (v : Tm) (k : Blk) : Blk := .set x (lzSome (lzOk v)) k
+
+/-- `let lazy x = e in b` whose initializer several `await`s run: `fn` is the function
+`λ_. lzAttempt e` of the declaration, bound before the state. -/
+def lzDeclFn (fn : Tm) (b : Blk) : Blk := .let_ fn (lzDecl b)
+
+/-- The call `f ()` that gives an `await` the outcome of the initializer held by `f`. -/
+def lzCall (f : Nat) : Tm := .app (.var f) (.lit .unit)
 
 variable {S : Sig}
 
@@ -147,18 +164,52 @@ theorem MutOk.lzDecl (h : LzSig S) {Ψ Θ Γ ms b a ε t φ}
     MutOk S Ψ Θ Γ ms (lzDecl b) t φ :=
   .var h.typ_none hb
 
-/-- `let y = await x in k`: the kept outcome, or the outcome of `e`, kept. `e` runs at the stage
-of its `Lazy`, and the outcome given back raises its errors. -/
+/-- `let y = await x in k`: the kept outcome, or the outcome `o` gives, kept. The outcome
+given back raises its errors. -/
+theorem MutOk.lzAwaitOf (h : LzSig S) {Ψ Θ Γ ms x o k a ε t φ} (hx : x ∈ ms)
+    (hΓ : Γ[x]? = some (.mono (lzT a ε))) (ho : Typ S Ψ Θ Γ o (.ex (resT (.errors ε) a) φ))
+    (hε : (Stage.rt Row.none ε).le φ)
+    (hk : MutOk S Ψ Θ (.mono a :: Γ) (ms.map (· + 1)) k t φ) :
+    MutOk S Ψ Θ Γ ms (Flick.lzAwaitOf x o k) t φ := by
+  have hp : PatTy S true (pvars "Some" 1) (lzT a ε) [resT (.errors ε) a] :=
+    pat_one h.ctorSome h.resSome rfl (by simp [Ty.substT, instT])
+  refine .br (Typ.var_mono hΓ) hp (.ret (h.typ_out (Typ.var_mono rfl) hε))
+    (.let_ ho (.set (List.mem_map_of_mem hx) (by simpa using hΓ)
+      (h.typ_some (Typ.var_mono rfl)) (.ret (h.typ_out (Typ.var_mono rfl) hε)))) hk
+
+/-- `let y = await x in k` with the initializer `e` run in place: `e` runs at the stage of
+its `Lazy`. -/
 theorem MutOk.lzAwait (h : LzSig S) {Ψ Θ Γ ms x e k a r ε t φ} (hx : x ∈ ms)
     (hΓ : Γ[x]? = some (.mono (lzT a ε))) (he : Typ S Ψ Θ Γ e (.ex a (.rt r ε)))
     (hr : (Stage.rt r Row.none).le φ) (hε : (Stage.rt Row.none ε).le φ)
     (hk : MutOk S Ψ Θ (.mono a :: Γ) (ms.map (· + 1)) k t φ) :
-    MutOk S Ψ Θ Γ ms (lzAwait x e k) t φ := by
-  have hp : PatTy S true (pvars "Some" 1) (lzT a ε) [resT (.errors ε) a] :=
-    pat_one h.ctorSome h.resSome rfl (by simp [Ty.substT, instT])
-  refine .br (Typ.var_mono hΓ) hp (.ret (h.typ_out (Typ.var_mono rfl) hε))
-    (.let_ (h.typ_attempt he hr) (.set (List.mem_map_of_mem hx) (by simpa using hΓ)
-      (h.typ_some (Typ.var_mono rfl)) (.ret (h.typ_out (Typ.var_mono rfl) hε)))) hk
+    MutOk S Ψ Θ Γ ms (Flick.lzAwait x e k) t φ :=
+  .lzAwaitOf h hx hΓ (h.typ_attempt he hr) hε hk
+
+/-- `let lazy x = e in b` with the initializer in the function `fn` of the declaration, which
+gives its outcome. -/
+theorem MutOk.lzDeclFn (h : LzSig S) {Ψ Θ Γ ms fn b a ε ψ C t φ}
+    (hf : Typ S Ψ Θ Γ fn (.ex (.arrow (.base .unit) ψ (resT (.errors ε) a) C) φ))
+    (hb : MutOk S Ψ Θ
+      (.mono (lzT a ε) :: .mono (.arrow (.base .unit) ψ (resT (.errors ε) a) C) :: Γ)
+      (0 :: (ms.map (· + 1)).map (· + 1)) b t φ) :
+    MutOk S Ψ Θ Γ ms (Flick.lzDeclFn fn b) t φ :=
+  .let_ hf (.lzDecl h hb)
+
+/-- The call of a function of `Unit` runs it at the stage of its arrow. -/
+theorem Typ.lzCall {Ψ Θ Γ f ψ u C φ} {S : Sig}
+    (hf : Γ[f]? = some (.mono (.arrow (.base .unit) ψ u C)))
+    (hψ : (Stage.use ψ C).le φ) : Typ S Ψ Θ Γ (Flick.lzCall f) (.ex u φ) :=
+  .app (Typ.var_mono hf) .lit hψ LeLive.refl
+
+/-- `let y = await x in k` of a `let lazy` whose initializer is in the function `f`. -/
+theorem MutOk.lzAwaitFn (h : LzSig S) {Ψ Θ Γ ms x f k a ψ C ε t φ} (hx : x ∈ ms)
+    (hΓ : Γ[x]? = some (.mono (lzT a ε)))
+    (hf : Γ[f]? = some (.mono (.arrow (.base .unit) ψ (resT (.errors ε) a) C)))
+    (hψ : (Stage.use ψ C).le φ) (hε : (Stage.rt Row.none ε).le φ)
+    (hk : MutOk S Ψ Θ (.mono a :: Γ) (ms.map (· + 1)) k t φ) :
+    MutOk S Ψ Θ Γ ms (Flick.lzAwaitOf x (Flick.lzCall f) k) t φ :=
+  .lzAwaitOf h hx hΓ (.lzCall hf hψ) hε hk
 
 /-- `x = v` of a `let lazy mut` sets the state to `Some (Ok v)`. -/
 theorem MutOk.lzWrite (h : LzSig S) {Ψ Θ Γ ms x v k a ε t φ} (hx : x ∈ ms)

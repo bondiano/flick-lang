@@ -4,12 +4,12 @@
 //! unstarted to a parameter marked `~`.
 
 use super::Lower;
-use crate::ir::{Arm, Expr, ExprKind, ExprLang, Handler, Lit, Pat, Stage, Stmt};
-use crate::opt::rename;
+use crate::ir::{Arm, Expr, ExprKind, ExprLang, Handler, Lit, Param, Pat, Stage, Stmt};
 use crate::source::Span;
 use crate::syntax::cst::Node;
+use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::{self, Lang};
-use crate::types::{Constructor, Rep, StageKey};
+use crate::types::{Constructor, Rep, StageKey, let_parts};
 
 impl Lower<'_> {
     /// An argument, or the task of one passed unstarted to a parameter
@@ -46,21 +46,92 @@ impl Lower<'_> {
         self.owner_entry(key, body)
     }
 
-    /// `let lazy x = e` as the variable `x` of its state: `None` until an
-    /// `await` settles it to `Some outcome`. `e`, lowered here with the
-    /// names in scope here, runs at that `await`; it reads no `let mut`
-    /// (`FLICK-G005`), so it reads the values it would read here.
-    pub(super) fn lazy_state(&mut self, unique: String, init: Expr) -> Stmt {
+    /// The statements of a local `let`: those of a `let lazy`, or the one of
+    /// any other.
+    pub(super) fn local_let_stmts(&mut self, decl: &Node) -> Vec<Stmt> {
+        let parts = let_parts(decl, self.text);
+        let Some(name) = parts.name.clone() else {
+            return vec![self.local_let(decl)];
+        };
+        if !self.typing.lazy_lets.contains(&decl.range()) {
+            return vec![self.local_let(decl)];
+        }
+        let at =
+            (decl.nodes().find(|n| n.kind == K::VarPat)).map_or(decl.range().0, |n| n.range().0);
+        let init = self.lazy_let(decl, parts.body);
+        let unique = self.bind(&name, at);
+        self.lazy_state(unique, at, init)
+    }
+
+    /// `let lazy x = e`, written at `at`, as the variable `x` of its state:
+    /// `None` until an `await` settles it to `Some outcome`. `e` is lowered
+    /// once, here, with the names in scope here, as `attempt e`, which gives
+    /// its outcome. The one `await` of `x` runs it in place; with several,
+    /// it is the body of a local function of the declaration that each of
+    /// them calls, so its code is not repeated. `e` reads no `let mut`
+    /// (`FLICK-G005`), so where it runs it reads the values it would read here.
+    fn lazy_state(&mut self, unique: String, at: u32, init: Expr) -> Vec<Stmt> {
         let span = init.span;
-        self.lazies.insert(unique.clone(), (init, 0));
-        self.vars.insert(unique.clone());
-        Stmt::Var(
-            unique,
-            Expr::new(
-                ExprKind::Con(constructor(Lang::None, Lang::Option, 0)),
+        let awaits = (self.typing.read_lazy.values())
+            .filter(|&&binder| binder == at)
+            .count();
+        let attempt = self.attempt(init);
+        let mut stmts = Vec::new();
+        let run = if awaits > 1 {
+            let function = self.hidden(&format!("{unique}$init"));
+            let params = vec![Param {
+                pat: Pat::Wild,
+                stage: Stage::Runtime,
+                ty: None,
+            }];
+            let value = Expr::new(
+                ExprKind::Lambda {
+                    params,
+                    body: Box::new(attempt),
+                },
                 span,
-            ),
-        )
+            );
+            stmts.push(Stmt::Fun {
+                name: function.clone(),
+                rec: false,
+                dicts: Vec::new(),
+                value,
+            });
+            Expr::new(
+                ExprKind::App {
+                    func: Box::new(Expr::new(ExprKind::Local(function), span)),
+                    arg: Box::new(Expr::new(ExprKind::Lit(Lit::Unit), span)),
+                    stage: Stage::Runtime,
+                    arg_first: false,
+                },
+                span,
+            )
+        } else {
+            attempt
+        };
+        self.lazies.insert(unique.clone(), run);
+        self.vars.insert(unique.clone());
+        let none = constructor(Lang::None, Lang::Option, 0);
+        stmts.push(Stmt::Var(unique, Expr::new(ExprKind::Con(none), span)));
+        stmts
+    }
+
+    /// `attempt e`: `try Ok e with | err -> Err err`, the outcome of `e`.
+    fn attempt(&mut self, init: Expr) -> Expr {
+        let span = init.span;
+        let error = self.hidden("$error");
+        let caught = Expr::new(ExprKind::Local(error.clone()), span);
+        let handler = Handler {
+            effects: Vec::new(),
+            body: ok(init),
+            ret: None,
+            errors: vec![Arm {
+                pat: Pat::Bind(error),
+                guard: None,
+                body: apply(constructor(Lang::Err, Lang::Result, 1), caught),
+            }],
+        };
+        Expr::new(ExprKind::Handle(Box::new(handler)), span)
     }
 
     /// `await x` of a `let lazy`: the kept outcome, or the outcome of its
@@ -69,28 +140,21 @@ impl Lower<'_> {
     /// ```text
     /// match x with
     /// | Some o -> from_result o
-    /// | _ -> let o = try Ok e with | err -> Err err in x = Some o; from_result o
+    /// | _ -> let o = attempt e in x = Some o; from_result o
     /// ```
     ///
     /// A signal or a defect leaves `e` before `x` is written, so `x` stays
-    /// `None`. Each `await` after the first runs a copy of `e` whose locals
-    /// are renamed, so the locals of the definition stay unique.
+    /// `None`.
     pub(super) fn lazy_await(&mut self, operand: &Expr, span: Span) -> ExprKind {
         let (ExprKind::Var(x) | ExprKind::Local(x)) = &operand.kind else {
             panic!("the checker read `await` of a `let lazy` name")
         };
         let x = x.clone();
-        let (init, copies) = self.lazies.get_mut(&x).unwrap_or_else(|| {
+        let attempt = self.lazies.get(&x).cloned().unwrap_or_else(|| {
             panic!("`{x}` is a `let lazy` the lowering declared before its `await`")
         });
-        let mut init = init.clone();
-        if *copies > 0 {
-            rename(&mut init, &format!("$force{copies}"));
-        }
-        *copies += 1;
         let at = |kind| Expr::new(kind, span);
         let outcome = self.hidden("$outcome");
-        let error = self.hidden("$error");
         let local = |name: &str| at(ExprKind::Local(name.to_owned()));
         let give = |o: Expr| {
             at(ExprKind::App {
@@ -100,16 +164,6 @@ impl Lower<'_> {
                 arg_first: false,
             })
         };
-        let attempt = at(ExprKind::Handle(Box::new(Handler {
-            effects: Vec::new(),
-            body: ok(init),
-            ret: None,
-            errors: vec![Arm {
-                pat: Pat::Bind(error.clone()),
-                guard: None,
-                body: apply(constructor(Lang::Err, Lang::Result, 1), local(&error)),
-            }],
-        })));
         let run = at(ExprKind::Block(
             vec![
                 Stmt::Let(Pat::Bind(outcome.clone()), attempt),

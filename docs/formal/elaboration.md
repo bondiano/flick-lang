@@ -456,6 +456,8 @@ control and errors (`tests/run/codegen/loops*.fl`).
 `let lazy x = e` is a `let mut` of its state, `None` until an `await x` runs `e`
 and keeps its outcome as `Some (Ok v)` or `Some (Err err)`; `await x` gives the
 outcome back with `from_result`. `x = v` of a `let lazy mut` is `Some (Ok v)`.
+`attempt e` is written once: in place for one `await`, or as the body of a
+local function of the declaration that each of several `await`s calls.
 [`lazy.md`](lazy.md) §4 gives the translation. Its forms are derived rules of
 the typing of blocks, so T7 covers them (`formal/Formal/LetMut/Lazy.lean`).
 
