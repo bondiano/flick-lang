@@ -48,7 +48,7 @@ theorem LeLive.reach {a b : Ty} (h : LeLive S a b) : Caps.Sub a.reach b.reach :=
 
 theorem LeLive.arrow_left {a φ t C T} (h : LeLive S (.arrow a φ t C) T) :
     ∃ a' φ' t' C', T = .arrow a' φ' t' C' ∧ LeLive S a' a ∧
-      (Stage.use φ C).le (Stage.use φ' C') ∧ LeLive S t t' ∧
+      (Stage.use φ.asStage C).le (Stage.use φ'.asStage C') ∧ LeLive S t t' ∧
       Caps.Sub (Ty.arrow a φ t C).reach T.reach := by
   cases h with
   | refl => exact ⟨_, _, _, _, rfl, .refl, Stage.le_refl _, .refl, Caps.Sub.refl _⟩
@@ -56,14 +56,14 @@ theorem LeLive.arrow_left {a φ t C T} (h : LeLive S (.arrow a φ t C) T) :
   | equiv he =>
     cases he.form with
     | rows hr _ => cases hr
-    | arrow ha ht => exact ⟨_, _, _, _, rfl, .equiv ha.symm, Stage.le_refl _,
+    | arrow ha hφ ht => exact ⟨_, _, _, _, rfl, .equiv ha.symm, hφ.asStage ▸ Stage.le_refl _,
         .equiv ht, fun x hx => Eq.mp (congrFun he.reach x) hx⟩
   | hide _ _ _ _ ha => exact absurd ha Ty.arrow_ne_tcon
   | data _ _ _ _ _ ha => exact absurd ha Ty.arrow_ne_tcon
 
 theorem LeLive.arrow_right {a φ t C T} (h : LeLive S T (.arrow a φ t C)) :
     ∃ a' φ' t' C', T = .arrow a' φ' t' C' ∧ LeLive S a a' ∧
-      (Stage.use φ' C').le (Stage.use φ C) ∧ LeLive S t' t ∧
+      (Stage.use φ'.asStage C').le (Stage.use φ.asStage C) ∧ LeLive S t' t ∧
       Caps.Sub T.reach (Ty.arrow a φ t C).reach := by
   cases h with
   | refl => exact ⟨_, _, _, _, rfl, .refl, Stage.le_refl _, .refl, Caps.Sub.refl _⟩
@@ -71,14 +71,14 @@ theorem LeLive.arrow_right {a φ t C T} (h : LeLive S T (.arrow a φ t C)) :
   | equiv he =>
     cases he.form with
     | rows _ hr => cases hr
-    | arrow ha ht => exact ⟨_, _, _, _, rfl, .equiv ha.symm, Stage.le_refl _,
+    | arrow ha hφ ht => exact ⟨_, _, _, _, rfl, .equiv ha.symm, hφ.asStage ▸ Stage.le_refl _,
         .equiv ht, fun x hx => Eq.mp (congrFun he.reach x) hx⟩
   | hide _ _ _ _ _ hb => exact absurd hb Ty.arrow_ne_tcon
   | data _ _ _ _ _ _ hb => exact absurd hb Ty.arrow_ne_tcon
 
 theorem LeLive.eff_left {r ε t C T} (h : LeLive S (.eff r ε t C) T) :
     ∃ r' ε' t' C', T = .eff r' ε' t' C' ∧
-      (Stage.use (.rt r ε) C).le (Stage.use (.rt r' ε') C') ∧
+      (Stage.use (.rt r.asRow ε.asRow) C).le (Stage.use (.rt r'.asRow ε'.asRow) C') ∧
       LeLive S t t' ∧ Caps.Sub (Ty.eff r ε t C).reach T.reach := by
   cases h with
   | refl => exact ⟨_, _, _, _, rfl, Stage.le_refl _, .refl, Caps.Sub.refl _⟩
@@ -86,14 +86,14 @@ theorem LeLive.eff_left {r ε t C T} (h : LeLive S (.eff r ε t C) T) :
   | equiv he =>
     cases he.form with
     | rows hr _ => cases hr
-    | eff ht => exact ⟨_, _, _, _, rfl, Stage.le_refl _, .equiv ht,
+    | eff hr hε ht => exact ⟨_, _, _, _, rfl, hr.asRow ▸ hε.asRow ▸ Stage.le_refl _, .equiv ht,
         fun x hx => Eq.mp (congrFun he.reach x) hx⟩
   | hide _ _ _ _ ha => exact absurd ha Ty.eff_ne_tcon
   | data _ _ _ _ _ ha => exact absurd ha Ty.eff_ne_tcon
 
 theorem LeLive.eff_right {r ε t C T} (h : LeLive S T (.eff r ε t C)) :
     ∃ r' ε' t' C', T = .eff r' ε' t' C' ∧
-      (Stage.use (.rt r' ε') C').le (Stage.use (.rt r ε) C) ∧
+      (Stage.use (.rt r'.asRow ε'.asRow) C').le (Stage.use (.rt r.asRow ε.asRow) C) ∧
       LeLive S t' t ∧ Caps.Sub T.reach (Ty.eff r ε t C).reach := by
   cases h with
   | refl => exact ⟨_, _, _, _, rfl, Stage.le_refl _, .refl, Caps.Sub.refl _⟩
@@ -101,7 +101,7 @@ theorem LeLive.eff_right {r ε t C T} (h : LeLive S T (.eff r ε t C)) :
   | equiv he =>
     cases he.form with
     | rows _ hr => cases hr
-    | eff ht => exact ⟨_, _, _, _, rfl, Stage.le_refl _, .equiv ht,
+    | eff hr hε ht => exact ⟨_, _, _, _, rfl, hr.asRow ▸ hε.asRow ▸ Stage.le_refl _, .equiv ht,
         fun x hx => Eq.mp (congrFun he.reach x) hx⟩
   | hide _ _ _ _ _ hb => exact absurd hb Ty.eff_ne_tcon
   | data _ _ _ _ _ _ hb => exact absurd hb Ty.eff_ne_tcon

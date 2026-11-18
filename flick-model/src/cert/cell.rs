@@ -62,7 +62,7 @@ impl Cx<'_> {
             ),
         };
         let proof = format!(
-            "(Typ.const (c := .{name}) (ι := ⟨{}, .base .unit, {}, Row.none, Row.none⟩) (by cell_ok) (by le_live))",
+            "(Typ.const (c := .{name}) (ι := ⟨{}, .base .unit, {}, .cnil, .cnil⟩) (by cell_ok) (by le_live))",
             self.ty(&t)?,
             caps(&capacity, &self.env)?
         );

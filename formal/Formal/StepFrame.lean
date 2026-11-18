@@ -33,7 +33,7 @@ must hold its effect. -/
 def PerformStuck (S : Sig) (root : Roots) (e : Tm) (D : Row) : Prop :=
   ∃ E Ef o c v a b, OkE E ∧ Value v ∧ e = plug E (.app (.const (.perform Ef o c)) v) ∧
     S.op Ef o = some (c, a, b) ∧ (∀ F ∈ E, F.handles Ef o c = none) ∧ ¬ RootAnswers root Ef o c ∧
-    D (.nm Ef)
+    D (.nm₀ Ef)
 
 /-- The non-value outcomes of Progress: `raise v`, a step, an operation nothing answers, a
 redex that blocks, or unwinding to a handler. -/
@@ -170,9 +170,9 @@ theorem Blocked.frame {Λ e} (h : Blocked Λ e) {F : Frame} (hF : F.ok) : Blocke
 
 /-- An operation the frame around handles steps; one it does not stays stuck. -/
 theorem PerformStuck.frame {root Λ μ e D D'} (h : PerformStuck S root e D) {F : Frame} (hF : F.ok)
-    (hD : ∀ N : Name, D (.nm N) → F.dom (.nm N) ∨ D' (.nm N))
+    (hD : ∀ N : Name, D (.nm₀ N) → F.dom (.nm₀ N) ∨ D' (.nm₀ N))
     (hpart : ∀ N o c, (∃ a b, S.op N o = some (c, a, b)) → F.installs N → F.handles N o c = none →
-      D (.nm N) → D' (.nm N)) :
+      D (.nm₀ N) → D' (.nm₀ N)) :
     (∃ l o, Step root l Λ μ (F.plug e) o) ∨ PerformStuck S root (F.plug e) D' ∨ Blocked Λ (F.plug e) := by
   obtain ⟨E, Ef, o, c, v, a, b, hE, hv, rfl, hop, hh, hna, hN⟩ := h
   cases hF' : F.handles Ef o c with
@@ -211,10 +211,10 @@ theorem PerformStuck.frame {root Λ μ e D D'} (h : PerformStuck S root e D) {F 
 
 /-- Lift the non-value outcomes over a frame that is neither `try` nor `inside`. -/
 theorem NV.frame {root Λ μ e D D'} (h : NV S root Λ μ e D) {F : Frame} (hF : F.ok)
-    (hnt : ¬ F.isTry) (hni : ¬ F.isInside) (hD : ∀ N : Name, D (.nm N) → F.dom (.nm N) ∨ D' (.nm N))
+    (hnt : ¬ F.isTry) (hni : ¬ F.isInside) (hD : ∀ N : Name, D (.nm₀ N) → F.dom (.nm₀ N) ∨ D' (.nm₀ N))
     (hk : F.Parks := by trivial)
     (hpart : ∀ N o c, (∃ a b, S.op N o = some (c, a, b)) → F.installs N →
-      F.handles N o c = none → D (.nm N) → D' (.nm N) := by
+      F.handles N o c = none → D (.nm₀ N) → D' (.nm₀ N) := by
       intro N o _ _ h; simp [Frame.installs] at h) :
     NV S root Λ μ (F.plug e) D' := by
   cases h with

@@ -37,7 +37,9 @@ theorem trTT_dicts_cnil (qs : List Cn) (t : TTy) :
     trTT N (dicts .cnil qs t) = Flick.Ty.arrows (qs.map (trD N)) (trTT N t) := by
   induction qs with
   | nil => rfl
-  | cons q qs ih => simp only [dicts, List.foldr_cons, List.map_cons, Flick.Ty.arrows] at ih ⊢; simp [trTT, ih]; rfl
+  | cons q qs ih =>
+    simp only [dicts, List.foldr_cons, List.map_cons, Flick.Ty.arrows] at ih ⊢
+    simp [trTT, trStageT, ih]; rfl
 
 theorem arrows_append (as bs : List Flick.Ty) (r : Flick.Ty) :
     Flick.Ty.arrows (as ++ bs) r = Flick.Ty.arrows as (Flick.Ty.arrows bs r) := by

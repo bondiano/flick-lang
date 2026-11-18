@@ -1,0 +1,23 @@
+// `suite` and `test` blocks: the module's `tests`, which it exports without
+// naming them, in the order written; a value named `test` stays a name.
+module App.BlocksTest exposing (check)
+
+/// A test of its own name, beside the blocks.
+check : String -> Test.Test
+let check name = Test.test name (fun () -> Test.Pass)
+
+suite "Strings" {
+  test "trims" {
+    let text = String.trim "  Ada  "
+    Test.expect (Test.equal "Ada" text)
+  }
+
+  suite.skip "later" {
+    test "keeps" {}
+  }
+}
+
+test.only "alone" { Test.expect (Test.equal 2 (1 + 1)) }
+
+listed : List Test.Test
+let listed = tests ++ [check "by hand"]

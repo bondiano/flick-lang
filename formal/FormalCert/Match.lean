@@ -145,15 +145,15 @@ theorem exh_record {R : Ty} {l : Label} {q : Pat} {ps : List Pat} (hR : (R.field
 /-! ## The errors the arms of a `try` catch -/
 
 /-- An arm `E p̄` that covers `E` catches it. -/
-theorem catches_ctor {ε₀ H' : Row} {p : Pat} {E : Name} (hx : Exh S (.adt E) [p]) :
-    ∀ n, (fun x => x = .nm E ∨ H' x) n → Catches S ε₀ p (.adt E) n ∨ H' n := by
+theorem catches_ctor {ε₀ : Ty} {H' : Row} {p : Pat} {E : Name} (hx : Exh S (.adt E) [p]) :
+    ∀ n, (fun x => x = .nm₀ E ∨ H' x) n → Catches S ε₀ p (.adt E) n ∨ H' n := by
   rintro n (rfl | h)
   · exact .inl (.inr ⟨rfl, hx⟩)
   · exact .inr h
 
 /-- An arm `x` or `_` catches every error of the body. -/
-theorem catches_all {ε₀ H' : Row} {p : Pat} :
-    ∀ n, ε₀ n → Catches S ε₀ p (.errors ε₀) n ∨ H' n := by
+theorem catches_all {ε₀ : Ty} {H' : Row} {p : Pat} :
+    ∀ n, ε₀.asRow n → Catches S ε₀ p (.errors ε₀) n ∨ H' n := by
   intro n h; left; cases n <;> simp [Catches, h]
 
 end Flick.Cert

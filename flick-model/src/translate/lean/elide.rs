@@ -2,9 +2,11 @@
 //! of the Lean core (`formal/Formal/Live/ElideSchemes.lean`): each scheme
 //! and its reading by `check::elided` printed as core types, de Bruijn, with
 //! `K` the binders of kind `Region` and `CaptureRow`, which the model's
-//! `shown` counts. A capture row is a set of atoms, a row a set of elements,
-//! both as predicates; `Live C` in a row is the atoms of `C`, `Scope ϱ` the
-//! atom `ϱ`. A value bound `a^c` on a variable of the scheme is the fact
+//! `shown` counts. A capture row is a set of atoms, as a predicate; a row is
+//! a row term, each name at itself, each variable, and its atoms in one
+//! `caps`: `Live C` in a row is the atoms of `C`, `Scope ϱ` the atom `ϱ`.
+//! Each theorem compares by `Ty.Reads`, rows and stages by what they stand
+//! for, as the model keeps a row as a set. A value bound `a^c` on a variable of the scheme is the fact
 //! `Facts.bnd a ⟦c⟧` of the scheme and `a` in its type, as rule 1 of the
 //! scheme translation reads it; `∀v. a^v → …` of a parameter is `v := a`,
 //! as rule 2 reads it. What the core has no form for is skipped, with its
@@ -16,13 +18,14 @@ use std::rc::Rc;
 
 use flick_core::types::{builtins, show_type};
 
-use crate::check::{elided, live_service, scope_service};
+use crate::check::elided;
 use crate::decls::Decls;
 use crate::syntax::Path;
 use crate::translate::types::scheme;
-use crate::types::{Caps, Kind, PROVIDED, Row, Scheme, Stage, Type, Var, provided};
+use crate::types::{Caps, Kind, Scheme, Stage, Type, Var};
 use data::data;
 pub(crate) use data::{Types, hidden_at, hidden_by, hides};
+pub(crate) use rows::{row, row_pred, stage, stage_pred};
 
 /// The value bounds a translation meets, by their variable.
 type Bounds = Rc<RefCell<Vec<(String, Caps)>>>;
@@ -100,61 +103,6 @@ pub(crate) fn caps(c: &Caps, env: &Env) -> Result<String, String> {
     Ok(disjunction(&atoms, "Caps.none"))
 }
 
-pub(crate) fn row(r: &Row, env: &Env) -> Result<String, String> {
-    let mut parts = Vec::new();
-    for (name, args) in &r.elems {
-        if *name == live_service() || *name == scope_service() {
-            let c = match &args[..] {
-                [Type::Captured(_, c)] => c.clone(),
-                [Type::Var(v)] => Caps::atom(v.clone()),
-                _ => return Err(format!("`{name}` with arguments the core does not write")),
-            };
-            for a in c.atoms.iter().chain(&c.vars) {
-                parts.push(format!("x = .atm (.v {})", env.index_of(a)?));
-            }
-        } else if *name == provided() {
-            // `Provided {r} ϱ` of a scheme: an obligation for each service of `r`
-            let [Type::Tag(r), s] = &args[..] else {
-                return Err(format!("`{name}` with arguments the core does not write"));
-            };
-            let a = region(s, env)?;
-            for n in r.elems.keys() {
-                parts.push(format!("x = .ob \"{n}\" (.v {a})"));
-            }
-            for v in env.kept(r.vars.iter()) {
-                parts.push(format!(
-                    "x = .obv (.v {}) (fun _ => False) (.v {a})",
-                    env.index_of(v)?
-                ));
-            }
-        } else if &*name.module == PROVIDED {
-            // `{Provided {S} ϱ}`, split by service
-            let [s] = &args[..] else {
-                return Err(format!("`{name}` with arguments the core does not write"));
-            };
-            parts.push(format!(
-                "x = .ob \"{}\" (.v {})",
-                name.name,
-                region(s, env)?
-            ));
-        } else if args.is_empty() {
-            parts.push(format!("x = .nm \"{name}\""));
-        } else {
-            return Err(format!("the element `{name}` with arguments"));
-        }
-    }
-    for v in env.kept(r.vars.iter()) {
-        if let Some(n) = r.less_of(v).next() {
-            return Err(format!("the row variable `{v}` without `{}`", n.name));
-        }
-        parts.push(format!(
-            "x = .rv (.v {}) (fun _ => False)",
-            env.index_of(v)?
-        ));
-    }
-    Ok(disjunction(&parts, "Row.none"))
-}
-
 /// The type of a scheme and its facts in the core, in `env`, whose variables
 /// start with the scheme's: each `Outlives C s` as `Facts.single`, and each
 /// value bound `a^c` on a variable as `Facts.bnd`, rule 1.
@@ -173,21 +121,6 @@ pub(crate) fn scheme_facts(s: &Scheme, env: &Env) -> Result<(String, String), St
         .reduce(|a, b| format!("Facts.union ({a}) ({b})"))
         .unwrap_or_else(|| "Facts.none".into());
     Ok((cs, t))
-}
-
-/// The atom of the region an obligation is about.
-fn region(s: &Type, env: &Env) -> Result<usize, String> {
-    match s {
-        Type::Var(v) => env.index_of(v),
-        other => Err(format!("an obligation about `{other}`, no region")),
-    }
-}
-
-pub(crate) fn stage(s: &Stage, env: &Env) -> Result<String, String> {
-    Ok(match s {
-        Stage::Pure => ".pure".into(),
-        Stage::Runtime(r, e) => format!("(.rt {} {})", row(r, env)?, row(e, env)?),
-    })
 }
 
 fn con(p: &Path) -> String {
@@ -381,8 +314,9 @@ pub(crate) fn facts(bounds: &[(String, Caps)], env: &Env) -> Result<Option<Strin
         .reduce(|a, b| format!("Facts.union ({a}) ({b})")))
 }
 
-/// The theorem of one scheme: `Ty.elide K ⟦σ⟧ Caps.none = ⟦elided σ⟧`, or
-/// of a scheme with value bounds `Scheme.elide K ⟨k, Θ, ⟦σ⟧⟩ = ⟨k, Θ, ⟦elided σ⟧⟩`.
+/// The theorem of one scheme: `Ty.Reads (Ty.elide K ⟦σ⟧ Caps.none) ⟦elided σ⟧`, or of a
+/// scheme with value bounds `Scheme.Reads (Scheme.elide K ⟨k, Θ, ⟦σ⟧⟩) ⟨k, Θ, ⟦elided σ⟧⟩`:
+/// the model keeps a row as a set, so each row and stage is compared by what it stands for.
 pub(super) fn theorem(
     name: &str,
     doc: &str,
@@ -413,7 +347,10 @@ pub(super) fn theorem(
     });
     match facts {
         None => {
-            let _ = write!(text, "    Ty.elide {k} {src} Caps.none =\n      {out}");
+            let _ = write!(
+                text,
+                "    Ty.Reads (Ty.elide {k} {src} Caps.none)\n      {out}"
+            );
         }
         // the model's elision keeps the bound live after its parameter, `Ty.elide` the variable
         Some(_) if runtime => {
@@ -423,7 +360,7 @@ pub(super) fn theorem(
             let n = s.vars.len();
             let _ = write!(
                 text,
-                "    Scheme.elide {k} ⟨{n}, {facts},\n      {src}⟩ =\n      ⟨{n}, {facts},\n      {out}⟩"
+                "    Scheme.Reads (Scheme.elide {k} ⟨{n}, {facts},\n      {src}⟩)\n      ⟨{n}, {facts},\n      {out}⟩"
             );
         }
     }
@@ -444,7 +381,8 @@ pub fn elide_schemes() -> String {
          # The model's elision is `Ty.elide`\n\n\
          Each export of `Prelude`, `Seq`, `Option`, `Result` and `List` the core can write, as the model\n\
          takes it (`flick-model/src/translate/types.rs`) and as the model reads it (`check::elided`):\n\
-         `Ty.elide K` of the first is the second, `K` the binders of kind `Region` and `CaptureRow`\n\
+         `Ty.elide K` of the first reads as the second (`Ty.Reads`: each row and stage by what it\n\
+         stands for), `K` the binders of kind `Region` and `CaptureRow`\n\
          (`flick-model/src/translate/lean/elide.rs`). A value bound `a^c` on a variable of the scheme\n\
          is the fact `Facts.bnd a c`, which `Scheme.elide` keeps. The exports the core cannot write\n\
          close the file.\n\
@@ -487,5 +425,6 @@ pub fn elide_schemes() -> String {
 }
 
 mod data;
+mod rows;
 #[cfg(test)]
 mod tests;

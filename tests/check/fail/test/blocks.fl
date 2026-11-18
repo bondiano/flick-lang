@@ -1,0 +1,36 @@
+// The shape of `suite` and `test` blocks: a name and braces, cases in a
+// suite, one name per case of a level, and a module's tests declared once.
+module App.BlocksTest
+
+suite {
+  test "a" {}
+}
+//~ std/T001 @5:1-7:2 names its case and holds its tests in braces
+
+test.later "b" {}
+//~ std/T001 @10:1-10:18 names its case and holds its body in braces
+
+suite "c" {
+  let x = 1
+//~ std/T001 @14:3-14:6 a suite holds `test "name" { … }`
+}
+
+suite "d" {
+  test "e" {}
+  test "e" { Test.expect (Test.equal 1 1) }
+//~ std/T002 @19:8-19:11 another case at this level is named "e" too
+//~ std/T002 @20:8-20:11 another case at this level is named "e" too
+}
+
+test "f" {}
+//~ std/T002 @25:6-25:9 another case at this level is named "f" too
+
+test "f" { Test.expect (Test.equal 2 2) }
+//~ std/T002 @28:6-28:9 another case at this level is named "f" too
+
+test "g" { Test.expect (Test.equal 1 "uno") }
+//~ FLICK-T003 @31:38-31:43 expected `Int`, found `String`
+
+tests : List Test.Test
+let tests = []
+//~ FLICK-R008 @35:5-35:10 declares `tests` by hand and its `suite` and `test` blocks declare them too

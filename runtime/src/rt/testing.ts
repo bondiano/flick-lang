@@ -26,8 +26,10 @@ export {
   genPair,
   genString,
   testGroup,
+  testOnly,
   testProperty,
   testPure,
+  testSkip,
 } from "../core/testing.ts";
 
 /** A task: a function of nothing that runs when called. */

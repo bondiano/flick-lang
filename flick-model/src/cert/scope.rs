@@ -4,7 +4,7 @@
 use std::iter;
 
 use crate::syntax::{Name, Term};
-use crate::translate::lean::elide::{row, stage};
+use crate::translate::lean::elide::{row_pred, stage_pred};
 use crate::types::{Stage, Type};
 
 use super::Unsupported;
@@ -38,9 +38,9 @@ impl Cx<'_> {
         let region = node.region.clone().ok_or("a `scope` without its region")?;
         let errors = match &own {
             Stage::Pure => "Row.none".to_owned(),
-            Stage::Runtime(_, e) => row(e, &self.env)?,
+            Stage::Runtime(_, e) => row_pred(e, &self.env)?,
         };
-        let (outside, r) = (self.ty(t)?, row(&out, &self.env)?);
+        let (outside, r) = (self.ty(t)?, row_pred(&out, &self.env)?);
         // what is outside outlives the region: the fact (Scope) lets the body
         // assume, for the work its region keeps
         let outer: Vec<String> = (1..=self.env.vars.len())
@@ -57,7 +57,7 @@ impl Cx<'_> {
         let env = self.env.clone();
         self.env.vars.insert(0, region.to_string());
         let inside = self.ty(t);
-        let phi = stage(&own, &self.env);
+        let phi = stage_pred(&own, &self.env);
         let pb = self.under(s, |c| c.typing(body, t, col + 2));
         self.env = env;
         let (inside, phi, pb) = (inside?, phi?, pb?);

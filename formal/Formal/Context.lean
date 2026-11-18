@@ -31,10 +31,10 @@ private theorem Typ.frameCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       have hp : σ (.r p) = .rg p := hσ.1 _ (.inr (.inl rfl))
       have h₁ := hal.sx (hσ.sub fun _ h => .inr (.inr (.inl h))) X
       simp only [Flick.J.substT, Ty.substT, hp] at h₁
-      exact .hwith (by simpa [Ty.substT, Stage.substT] using cell_sx (σ := σ) hℓ X) h₁ (hrf.sx (hσ.sub fun _ h => .inr (.inr (.inr (.inl h)))) X) (by simpa only [Stage.use_substT] using Stage.le_substT σ hψ) h'
-        (Stage.le_rt_sub (by simpa [Stage.substT] using Stage.le_substT σ hφ₀)
-          (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl))))
-        ⟨hc.1, fun h => .inl (hc.2 h)⟩ (Stage.le_substT σ hφ) (hT.substT σ)
+      exact .hwith (by simpa [Ty.substT, Ty.isStage] using cell_sx (σ := σ) hℓ X) h₁ (hrf.sx_rt (hσ.sub fun _ h => .inr (.inr (.inr (.inl h)))) X) (by simpa_substT Stage.le_substT σ hψ) h'
+        (Stage.le_rt_sub (by simpa_substT Stage.le_substT σ hφ₀)
+          (Row.hP_substT_asRow hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl))))
+        (hc.substT σ) (by simpa_substT Stage.le_substT σ hφ) (hT.substT σ)
         (Stage.substT_svc_atm hp hat)
     all_goals cases hterm
   | @hctl _ _ _ _ _ _ _ _ p _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ tl hℓ hal hrf hψ hop hc htl hE hk hp' hφ₀ ha hl hcm hφ hT hat =>
@@ -55,17 +55,17 @@ private theorem Typ.frameCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       simp only [Flick.J.substT, Ty.substT, hp] at h₁
       have h₃ := hp'.sx (hσ.sub fun _ h => .inr (.inr (.inr (.inr (.inr
         (plug_has_of_nosite (by simp [Tm.Has]) h)))))) X
-      refine .hctl (by simpa [Ty.substT, Stage.substT] using cell_sx (σ := σ) hℓ X) h₁ (hrf.sx (hσ.sub fun _ h => .inr (.inr (.inr (.inl h)))) X) (by simpa only [Stage.use_substT] using Stage.le_substT σ hψ)
-        hop hc htl hE rfl h₃ (Stage.le_rt_sub (by simpa [Stage.substT] using Stage.le_substT σ hφ₀)
-          (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl)))) ?_
-        (fun h => ?_) ⟨hcm.1, fun h => .inl (hcm.2 h)⟩ (Stage.le_substT σ hφ) (hT.substT σ)
+      refine .hctl (by simpa [Ty.substT, Ty.isStage] using cell_sx (σ := σ) hℓ X) h₁ (hrf.sx_rt (hσ.sub fun _ h => .inr (.inr (.inr (.inl h)))) X) (by simpa_substT Stage.le_substT σ hψ)
+        hop hc htl hE rfl h₃ (Stage.le_rt_sub (by simpa_substT Stage.le_substT σ hφ₀)
+          (Row.hP_substT_asRow hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl)))) ?_
+        (fun h => ?_) (hcm.substT σ) (by simpa_substT Stage.le_substT σ hφ) (hT.substT σ)
         (Stage.substT_svc_atm hp hat)
       · rw [Stage.use_substT_eq _ (Caps.substT_if_rg hp)] at h'
-        cases tl <;> simpa [hb] using h'
+        cases tl <;> simpa [hb, Row.substT_asRow] using h'
       · obtain ⟨C', hl₁, hl₂⟩ := hl h
         refine ⟨C'.substT σ, ?_, ⟨_, hl₂, by simp [hp]⟩⟩
         rw [List.getElem?_append_left (by simpa using getElem?_lt hl₁), List.getElem?_map, hl₁]
-        simp [Ty.substT, Stage.substT, hb]
+        simp [Ty.substT, Ty.isStage, hb]
     all_goals cases hterm
   | @hkeep _ _ _ _ _ _ _ _ q _ _ _ _ _ _ _ _ hℓ hal he hφ₀ hc hnt hle hφ hT =>
     intro r F t φ hctx hterm hjudge hr hok
@@ -77,11 +77,11 @@ private theorem Typ.frameCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       have hp : σ (.r q) = .rg q := hσ.1 _ (.inr (.inl rfl))
       have h₁ := hal.sx (hσ.sub fun _ h => .inr (.inr (.inl h))) X
       simp only [Flick.J.substT, Ty.substT, hp] at h₁
-      exact .hkeep (by simpa [Ty.substT, Stage.substT] using cell_sx (σ := σ) hℓ X) h₁ h'
-        (Stage.le_rt_sub (by simpa [Stage.substT] using Stage.le_substT σ hφ₀)
+      exact .hkeep (by simpa [Ty.substT, Ty.isStage] using cell_sx (σ := σ) hℓ X) h₁ h'
+        (Stage.le_rt_sub (by simpa_substT Stage.le_substT σ hφ₀)
           (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl))))
-        ⟨hc.1, fun h => .inl (hc.2 h)⟩ (fun h => .inl (hnt h))
-        (by simpa [Stage.substT] using Stage.le_substT σ hle) (Stage.le_substT σ hφ) (hT.substT σ)
+        (hc.substR σ) (hnt.substR σ)
+        (by simpa_substT Stage.le_substT σ hle) (Stage.le_substT σ hφ) (hT.substT σ)
     all_goals cases hterm
   | @hkarm _ _ _ _ _ _ _ _ q _ _ _ _ _ _ _ _ _ _ _ _ _ hℓ hal hop hE hk hp' hφ₀ hc hnt ha hle hφ hT =>
     intro r F t φ hctx hterm hjudge hr hok
@@ -97,13 +97,13 @@ private theorem Typ.frameCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       simp only [Flick.J.substT, Ty.substT, hp] at h₁
       have h₃ := hp'.sx (hσ.sub fun _ h => .inr (.inr (.inr (.inr
         (plug_has_of_nosite (by simp [Tm.Has]) h))))) X
-      exact .hkarm (by simpa [Ty.substT, Stage.substT] using cell_sx (σ := σ) hℓ X) h₁ hop hE rfl h₃
-        (Stage.le_rt_sub (by simpa [Stage.substT] using Stage.le_substT σ hφ₀)
+      exact .hkarm (by simpa [Ty.substT, Ty.isStage] using cell_sx (σ := σ) hℓ X) h₁ hop hE rfl h₃
+        (Stage.le_rt_sub (by simpa_substT Stage.le_substT σ hφ₀)
           (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl))))
-        ⟨hc.1, fun h => .inl (hc.2 h)⟩ (fun h => .inl (hnt h)) (by simpa [hb] using h')
-        (by simpa [Stage.substT] using Stage.le_substT σ hle) (Stage.le_substT σ hφ) (hT.substT σ)
+        (hc.substR σ) (hnt.substR σ) (by simpa [hb, Row.substT_asRow] using h')
+        (by simpa_substT Stage.le_substT σ hle) (Stage.le_substT σ hφ) (hT.substT σ)
     all_goals cases hterm
-  | @hres _ _ _ _ _ _ _ _ p _ _ _ _ _ _ _ hℓ hb hA ha hp' hl hcp hφ hT =>
+  | @hres _ _ _ _ _ _ p _ _ _ _ _ _ _ _ _ hℓ hb hA ha hp' hl hcp hφ hT =>
     intro r F t φ hctx hterm hjudge hr hok
     cases hctx; cases hjudge
     cases F <;> simp only [Frame.plug] at hterm
@@ -121,10 +121,11 @@ private theorem Typ.frameCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
         · simp only [Tm.Has] at h; rcases h with h | h
           · subst h; exact .inr (.inl rfl)
           · exact h.elim) X
-      simp only [Flick.J.substT, Stage.use_substT_rg _ hp] at h₂
-      exact .hres (by simpa [Ty.substT, Stage.substT] using cell_sx (σ := σ) hℓ X) h' hA rfl h₂
+      simp only [Flick.J.substT, Stage.use_substT_rg _ hp, Stage.substT_rt, Row.substT_asRow] at h₂
+      exact .hres (by simpa [Ty.substT, Ty.isStage] using cell_sx (σ := σ) hℓ X) (by simpa_substT h') hA rfl h₂
         (by rw [List.getElem?_append_left (by simpa using getElem?_lt hl), List.getElem?_map, hl]; rfl)
-        (by exact ⟨.r _, hcp, by rw [hp]; rfl⟩) (Stage.le_substT σ hφ) (hT.substT σ)
+        (by exact ⟨.r _, hcp, by rw [hp]; rfl⟩) (by simpa_substT Stage.le_substT σ hφ)
+        (hT.substT σ)
     all_goals cases hterm
   | @hdone _ _ _ _ _ _ p ha =>
     intro r F t φ hctx hterm hjudge hr hok
@@ -145,11 +146,11 @@ private theorem Typ.frameCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     cases F <;> simp only [Frame.plug] at hterm
     case appL =>
       cases hterm.symm
-      exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun σ hσ X _ h' => .app h' (h₂.sx (hσ.sub fun _ h => .inr h) X) (by simpa only [Stage.use_substT] using Stage.le_substT σ hψ)
+      exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun σ hσ X _ h' => .app h' (h₂.sx (hσ.sub fun _ h => .inr h) X) (by simpa_substT Stage.le_substT σ hψ)
         (hT.substT σ)⟩
     case appR =>
       cases hterm.symm
-      exact .mk0 ⟨_, _, h₂, .of_le (Stage.le_refl _), fun σ hσ X _ h' => .app (h₁.sx (hσ.sub fun _ h => .inl h) X) h' (by simpa only [Stage.use_substT] using Stage.le_substT σ hψ)
+      exact .mk0 ⟨_, _, h₂, .of_le (Stage.le_refl _), fun σ hσ X _ h' => .app (h₁.sx (hσ.sub fun _ h => .inl h) X) h' (by simpa_substT Stage.le_substT σ hψ)
         (hT.substT σ)⟩
     all_goals cases hterm
   | let_ h₁ h₂ =>
@@ -232,7 +233,7 @@ private theorem Typ.frameCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     cases F <;> simp only [Frame.plug] at hterm
     case await =>
       cases hterm.symm
-      exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun σ _ _ _ h' => .await h' (by simpa only [Stage.use_substT] using Stage.le_substT σ hφ) (hT.substT σ)⟩
+      exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun σ _ _ _ h' => .await h' (by simpa_substT Stage.le_substT σ hφ) (hT.substT σ)⟩
     all_goals cases hterm
   | force h₁ hφ hT =>
     intro r F t φ hctx hterm hjudge hr hok
@@ -240,7 +241,7 @@ private theorem Typ.frameCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     cases F <;> simp only [Frame.plug] at hterm
     case force =>
       cases hterm.symm
-      exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun σ _ _ _ h' => .force h' (by simpa only [Stage.use_substT] using Stage.le_substT σ hφ) (hT.substT σ)⟩
+      exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun σ _ _ _ h' => .force h' (by simpa_substT Stage.le_substT σ hφ) (hT.substT σ)⟩
     all_goals cases hterm
   | settle hl h₁ hψ hφ hT =>
     intro r F t φ hctx hterm hjudge hr hok
@@ -250,8 +251,8 @@ private theorem Typ.frameCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       cases hterm.symm
       exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_trans hψ hφ), fun σ _ X _ h' =>
         .settle (by simpa [Ty.substT] using cell_sx (σ := σ) hl X) h'
-          (by simpa only [Stage.use_substT] using Stage.le_substT σ hψ)
-          (by simpa only [Stage.use_substT] using Stage.le_substT σ hφ) (hT.substT σ)⟩
+          (by simpa_substT Stage.le_substT σ hψ)
+          (by simpa_substT Stage.le_substT σ hφ) (hT.substT σ)⟩
     all_goals cases hterm
   | raise h₁ hφ =>
     intro r F t φ hctx hterm hjudge hr hok
@@ -260,7 +261,7 @@ private theorem Typ.frameCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     case raise =>
       cases hterm.symm
       exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun σ _ _ _ h' => .raise h'
-        (by simpa [Stage.substT] using Stage.le_substT σ hφ)⟩
+        (by simpa_substT Stage.le_substT σ hφ)⟩
     all_goals cases hterm
   | raiseAdt h₁ hU hφ =>
     intro r F t φ hctx hterm hjudge hr hok
@@ -280,8 +281,8 @@ private theorem Typ.frameCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       obtain ⟨_, _, rfl, hr', _⟩ := Stage.rt_le hφ
       refine .mk0 ⟨_, _, h₁, ⟨fun n hn => .inl (Row.le_modNames (hr' n hn)), fun h => (h trivial).elim,
         fun hp => (by cases hp), fun h => (h trivial).elim⟩,
-        fun σ hσ X _ h' => .tryR h' (h₂.sx (hσ.sub fun _ h => .inr h) X) (Stage.le_substT σ hφ)
-          (hs.back_substT σ)⟩
+        fun σ hσ X _ h' => .tryR (by simpa_substT h') (h₂.sx (hσ.sub fun _ h => .inr h) X)
+          (Stage.le_substT σ hφ) (by have := hs.back_substT σ; rwa [Row.substT_asRow] at this)⟩
     all_goals cases hterm
   | tryP h₁ h₂ =>
     intro r F t φ hctx hterm hjudge hr hok
@@ -292,7 +293,7 @@ private theorem Typ.frameCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       refine .mk0 ⟨_, _, h₁, ⟨fun _ h => h.elim, fun h => (h trivial).elim, fun _ => rfl,
         fun h => (h trivial).elim⟩, fun σ hσ X _ h' => .tryP h' (by
           have := h₂.sx (hσ.sub fun _ h => .inr h) X
-          simp only [Flick.J.substT, Row.none_substT] at this; exact this)⟩
+          simp only [Flick.J.substT] at this; exact this)⟩
     all_goals cases hterm
   | @inside _ p _ _ _ _ _ _ _ _ _ _ hF h₁ hφ' ht hε hφ hT =>
     intro r F t φ hctx hterm hjudge hr hok
@@ -317,7 +318,9 @@ private theorem Typ.frameCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       · have hp : σ (.r p) = .rg p := hσ.1 _ (.inl rfl)
         have hav := hσ.2.1 (.inr (.inl rfl))
         rw [List.map_up_zero, liftT_zero, Facts.union_substT] at h'
-        refine .inside ?_ h' ?_ (fun h => ht ?_) (Ty.no_rg_substT (t := .errors _) hav hε)
+        refine .inside ?_ h' ?_ (fun h => ht ?_) (fun h => by
+            obtain ⟨b, hb, h'⟩ := (Row.substT_reach σ _ (.r p)).mp h
+            rw [hav b _ h'] at hb; exact hε hb)
           (Stage.le_substT σ hφ) (hT.substT σ)
         · rintro C s ⟨C₀, s₀, h₀, rfl, rfl⟩
           obtain ⟨rfl, hC⟩ := hF C₀ s₀ h₀

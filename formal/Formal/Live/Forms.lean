@@ -13,7 +13,7 @@ namespace Flick
 
 /-- The cell of the handler of region `q`: its arms' row names only ancestors of `q`. -/
 def LCell (Ψ : List Ty) (anc : Nat → Nat → Prop) (q ℓ : Nat) : Prop :=
-  ∃ r ε t, Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t Caps.none) ∧ ∀ x, r (.atm (.r x)) → anc q x
+  ∃ r ε t, Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t Caps.none) ∧ ∀ x, r.asRow (.atm (.r x)) → anc q x
 
 section
 variable (Ψ : List Ty) (anc : Nat → Nat → Prop)

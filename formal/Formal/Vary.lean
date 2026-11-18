@@ -13,16 +13,16 @@ namespace Flick
 
 variable {S : Sig}
 
-theorem Ty.NoV.arrow {i : Nat} {a b : Ty} {φ : Stage} {C : Caps} (ha : a.NoV i)
+theorem Ty.NoV.arrow {i : Nat} {a b φ : Ty} {C : Caps} (ha : a.NoV i)
     (hφ : φ.NoV i) (hb : b.NoV i) (hC : (Ty.caps C).NoV i) : (Ty.arrow a φ b C).NoV i := by
-  simp only [Ty.NoV, Ty.substT] at ha hb hC ⊢
+  simp only [Ty.NoV, Ty.substT] at ha hφ hb hC ⊢
   simp only [Ty.caps.injEq] at hC
-  rw [ha, hφ, hb, hC]
+  rw [ha, hφ, hb, hC, ite_self]
 
-theorem Ty.NoV.eff {i : Nat} {r e : Row} {t : Ty} {C : Caps} (hr : (Ty.row r).NoV i)
-    (he : (Ty.row e).NoV i) (ht : t.NoV i) (hC : (Ty.caps C).NoV i) :
+theorem Ty.NoV.eff {i : Nat} {r e t : Ty} {C : Caps} (hr : r.NoV i)
+    (he : e.NoV i) (ht : t.NoV i) (hC : (Ty.caps C).NoV i) :
     (Ty.eff r e t C).NoV i := by
-  simp only [Ty.NoV, Ty.substT, Ty.row.injEq, Ty.caps.injEq] at hr he ht hC ⊢
+  simp only [Ty.NoV, Ty.substT, Ty.caps.injEq] at hr he ht hC ⊢
   rw [hr, he, ht, hC]
 
 theorem Ty.NoV.rcons {i : Nat} {l : Label} {t r : Ty} (ht : t.NoV i) (hr : r.NoV i) :
@@ -141,10 +141,7 @@ theorem field_vary {i : Nat} {s : Variance} {q : Bool} {f : Ty} (hf : Ty.Pol S.v
         simpa only [Ty.substT, hφ.substT_eq hσ] using this
   | @eff q r e t C hr' he hPt hC iht =>
     simp only [Ty.substT]
-    have er := hr'.substT_eq hσ
-    have ee := he.substT_eq hσ
-    simp only [Ty.substT, Ty.row.injEq] at er ee
-    rw [er, ee]
+    rw [hr'.substT_eq hσ, he.substT_eq hσ]
     refine ⟨fun hq => ?_, fun hq => ?_⟩
     · subst hq
       refine .eff (Stage.use_mono (Stage.le_refl _) (Caps.substT_widen hpw))
@@ -162,7 +159,7 @@ theorem field_vary {i : Nat} {s : Variance} {q : Bool} {f : Ty} (hf : Ty.Pol S.v
         · exact .inr (Caps.substT_widen hw x hx)
       · have hN := (Ty.Pol.eff hr' he hPt hC).noV (Variance.noV_cond hsn)
         have := same hN
-        simpa only [Ty.substT, er, ee] using this
+        simpa only [Ty.substT, hr'.substT_eq hσ, he.substT_eq hσ] using this
   | rcons _ _ iht ihr =>
     exact ⟨fun hq => .rcons' (iht.1 hq) (ihr.1 hq), fun hq => .rcons' (iht.2 hq) (ihr.2 hq)⟩
   | @data q t T us hPp hng hPn hin hbi ht ihp ihn =>

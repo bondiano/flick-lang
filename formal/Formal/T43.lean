@@ -18,7 +18,7 @@ variable {S : Sig}
 
 /-- A stage of effects the root answers, or with an operation that is not `tail`. -/
 def Stage.Cov (S : Sig) (root : Roots) (φ : Stage) : Prop :=
-  ∀ N, φ.svc (.nm N) → (root.svc N).isSome ∨ S.HasNonTail N
+  ∀ N c, φ.svc (.nm N c) → (root.svc N).isSome ∨ S.HasNonTail N
 
 /-- The children and finalizers of the regions have typings of such stages. -/
 def KidCov (S : Sig) (root : Roots) (Ψ : List Ty) (Λ : List Rgn) : Prop :=
@@ -26,10 +26,10 @@ def KidCov (S : Sig) (root : Roots) (Ψ : List Ty) (Λ : List Rgn) : Prop :=
     ∃ t φ, Typ S Ψ Facts.age [] k (.ex t φ) ∧ φ.Cov S root
 
 theorem Stage.Cov.kill {root : Roots} {φ : Stage} (h : φ.Cov S root) (n : Nat) : (φ.substT (kill n)).Cov S root := by
-  intro N hN
+  intro N c hN
   cases φ with
   | pure => exact hN.elim
-  | rt r e => exact h N (Row.kill_sub r n _ hN)
+  | rt r e => obtain ⟨_, hc⟩ := Row.kill_nm hN; exact h N _ hc
 
 theorem KidCov.weaken {root Ψ Λ} (h : KidCov S root Ψ Λ) (X : List Ty) : KidCov S root (Ψ ++ X) Λ :=
   fun r g hg k hk => let ⟨t, φ, ht, hn⟩ := h r g hg k hk; ⟨t, φ, ht.weakenStore X, hn⟩
@@ -85,9 +85,9 @@ theorem KidCov.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {e : Tm} {l : 
     obtain ⟨t', R', ε', hk', -, h2⟩ := withs_typing (o := p)
       (fun h' hΘ => fin_await h' hc hΘ hv) (fun h' => fin_not_pure h' hc) hnv _ hE he
       (Entails.refl _) hAE
-    refine ⟨t', _, hk', fun N hN => ?_⟩
-    rcases (h2 N hN).1 with h₁ | ⟨hn, -⟩
-    · exact hφ N h₁
+    refine ⟨t', _, hk', fun N c hN => ?_⟩
+    rcases (h2 N c hN).1 with h₁ | ⟨hn, -⟩
+    · exact hφ N c h₁
     · exact .inr hn
   cases hs with
   | rt hE hh =>
@@ -109,7 +109,7 @@ theorem KidCov.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {e : Tm} {l : 
       · simp at hk'; subst hk'
         -- `op (cap p)` at the stage of its owner: the live `op` needs its region there
         rename_i p _ _
-        have hcov : ∀ q, (Stage.rt (Row.scope (.rg q)) Row.none).Cov S root := fun _ N h => by
+        have hcov : ∀ q, (Stage.rt (Row.scope (.rg q)) Row.none).Cov S root := fun _ N _ h => by
           simp [Stage.svc, Row.scope, Row.ofCaps] at h
         exact .inr ⟨_, .rt (Row.scope (.rg p)) Row.none,
           .app (.const (ι := { (default : CArg) with s := .rg p }) trivial .refl) .cap

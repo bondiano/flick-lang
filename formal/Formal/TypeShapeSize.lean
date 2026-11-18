@@ -14,7 +14,7 @@ def Ty.shapeSize : Ty → Nat
   | .arrow a _ b _ | .tapp a b | .rcons _ a b => 1 + a.shapeSize + b.shapeSize
   | .ref a | .eff _ _ a _ | .hnd a | .owner a | .dict _ a | .all _ a => 1 + a.shapeSize
   | .rt r e => 1 + r.shapeSize + e.shapeSize
-  | .caps _ | .row _ | .cnil | .rnm .. | .run .. | .rless .. => 0
+  | .caps _ | .cnil | .rnm .. | .run .. | .rless .. => 0
   | _ => 1
 
 theorem Ty.RowForm.shapeSize {r : Ty} (h : r.RowForm) : r.shapeSize = 0 := by

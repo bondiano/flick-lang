@@ -141,22 +141,23 @@ theorem Shp.full_of {U T e} {us : List Ty} (h : Shp S false U e) (hl : LeLive S 
         rw [hh] at hh'; cases hh'
         exact Sig.builds_vary ⟨hlen, hr, hp, hn, hi⟩ hB
     exact key _ hl rfl
-  | cons _ _ => exact .hidden (hl.opaque (by simp [Ty.arrows, Ty.substT, Ty.Opaque, Ty.hd]))
+  | cons _ _ => exact .hidden (hl.opaque (by simp [Ty.arrows, Ty.Opaque, Ty.hd]))
 
 /-- The spine clause of `Typ.shape`: a constructor spine has the shape of its
 declaration, at an instance below its type, or is an error at `Errors ε`. -/
 def SpineShp (S : Sig) (Ψ : List Ty) (Θ : Facts) (Γ : List Scheme) (e : Tm) (T : Ty)
     (φ : Stage) : Prop :=
   (∃ U us, LeLive S (U.substT (instT us)) T ∧ Shp S false U e) ∨
-    ∃ ε E U, T = .errors ε ∧ ε (.nm E) ∧ U.hd = .adt E ∧ Shp S true U e ∧
-      Typ S Ψ Θ Γ e (.ex U φ) ∧ Row.Sub (Row.err E U) ε
+    ∃ ε E U, T = .errors ε ∧ U.hd = .adt E ∧ Shp S true U e ∧
+      Typ S Ψ Θ Γ e (.ex U φ) ∧ Row.Sub (Row.err E U) ε.asRow
 
 theorem SpineShp.equiv {Ψ Θ Γ e a b φ} (h : SpineShp S Ψ Θ Γ e a φ)
     (he : Ty.Equiv a b) : SpineShp S Ψ Θ Γ e b φ := by
-  rcases h with ⟨U, us, hl, hs⟩ | ⟨ε, E, U, ha, hE, hU, hs, ht, hr⟩
+  rcases h with ⟨U, us, hl, hs⟩ | ⟨ε, E, U, ha, hU, hs, ht, hr⟩
   · exact .inl ⟨U, us, hl.trans (.equiv he), hs⟩
   · rw [ha] at he
-    exact .inr ⟨ε, E, U, he.symm.errors_right, hE, hU, hs, ht, hr⟩
+    obtain ⟨ε', rfl, hε⟩ := he.symm.errors_right
+    exact .inr ⟨ε', E, U, rfl, hU, hs, ht, by rw [hε.asRow]; exact hr⟩
 
 theorem Typ.shape {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T φ}, J = .ex T φ →
     Shp S true T e ∧ (∀ K, e.head = .ctor K → ¬ T.isAll → SpineShp S Ψ Θ Γ e T φ) := by
@@ -192,7 +193,7 @@ theorem Typ.shape {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
   | errVal hv' h' hU hE ih =>
     intro _ _ _ hJ; cases hJ
     refine ⟨.hidden (by simp [Ty.Opaque, Ty.hd]),
-      fun K hK _ => .inr ⟨_, _, _, rfl, hE _ (.inl rfl), hU, (ih hv' rfl).1, h', hE⟩⟩
+      fun K hK _ => .inr ⟨_, _, _, rfl, hU, (ih hv' rfl).1, h', hE⟩⟩
   | app hf _ _ hT ih₁ ih₂ =>
     intro hv _ _ hJ; cases hJ
     cases hv with
@@ -206,7 +207,7 @@ theorem Typ.shape {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
           have := hU.kind
           rw [Ty.tcon_kind] at this; cases this
         | cons g ts'' =>
-          simp only [Ty.arrows, Ty.substT, Stage.substT, Caps.none_substT] at hU
+          simp only [Ty.arrows, Ty.substT, Caps.none_substT] at hU
           obtain ⟨_, _, _, _, he, la, _, lt, -⟩ := hU.arrow_left
           cases he
           have hfield : Shp S true g _ := Shp.of_substT (Shp.le la (ih₂ hve rfl).1)

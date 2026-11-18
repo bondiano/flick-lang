@@ -4,9 +4,10 @@ import Formal
 # Tactics of a certificate
 
 A certificate (`docs/formal/certificates.md`) types a closed program of the model's generator
-with every type written out: rows and capture rows are finite sets, written as predicates
-`fun x => x = e₁ ∨ …`. Its side conditions are inclusions and equalities of such sets, under
-substitution too (`Row.substT`, `Caps.substT` are existentials). These tactics close them the
+with every type written out: capture rows are finite sets, written as predicates
+`fun x => x = e₁ ∨ …`, the rows of a type row terms, and those of a judgment the predicates
+they stand for (`Ty.asRow`). Its side conditions are inclusions and equalities of such sets,
+under substitution too (`Row.substT`, `Caps.substT` are existentials). These tactics close them the
 way `elide_eq` does (`Live/Elide.lean`): split an element by its constructor, an atom into
 `.v n` or `.r p`, and leave the rest to `simp_all` and `omega`. Each is kernel-checked: a
 tactic that fails is a certificate that fails, never an assumption.
@@ -53,15 +54,16 @@ namespace Flick.Cert
 
 /-- The simp set of the finite sets of a certificate: elements, atoms, reach, substitution. -/
 macro "cert_simp" : tactic => `(tactic| (simp_all [Row.union, Row.ofCaps, Row.plain, Row.single,
-  Row.none, Row.substT, Caps.substT, Caps.none, Ty.reach, instT, liftT, Ty.up, Ty.ren, Atom.up,
-  Atom.ty, Ty.asRow, Row.err, Row.scope, Row.disch, Row.back, shiftV, and_assoc] <;> omega))
+  Row.inst, Elem.nm₀, Row.none, Row.substT, Ty.substT, Caps.substT, Caps.none, Ty.reach, instT,
+  liftT, Ty.up, Ty.ren, Atom.up, Atom.ty, Ty.asRow, Ty.asStage, Row.err, Row.scope, Row.disch,
+  Row.back, Row.nameClose, Row.less, Row.obs, shiftV, and_assoc] <;> omega))
 
 /-- `h : x ∈ A` of a finite set `A`, split into one goal for each element `A` names. Only a
 disjunction is split: `rcases` of an `∃` over atoms would split the witness, its `Nat`, and so
 on without end. -/
 macro "split_mem " h:ident : tactic => `(tactic| (
-  (try simp only [Row.union, Row.ofCaps, Row.single, Row.none, Caps.none, Ty.reach, Row.scope,
-    Row.disch] at $h:ident)
+  (try simp only [Row.union, Row.ofCaps, Row.single, Row.inst, Elem.nm₀, Row.none, Caps.none,
+    Ty.reach, Row.scope, Row.disch, Ty.asRow] at $h:ident)
   repeat' (obtain $h:ident | $h:ident := ($h:ident : _ ∨ _))))
 
 /-- `C = C'` or `C ⊆ C'` of finite sets of atoms. -/
@@ -72,16 +74,17 @@ macro "caps_set" : tactic => `(tactic| first
 /-- `r = r'` or `r ⊆ r'` of finite rows. -/
 macro "row_set" : tactic => `(tactic| first
   | (funext x
-     rcases x with _ | a | ⟨_, a⟩ | ⟨a, _⟩ | ⟨v, _, a⟩ <;> (try cases a) <;> (try cases v) <;> cert_simp)
+     rcases x with ⟨_, _⟩ | a | ⟨_, _, a⟩ | ⟨a, _⟩ | ⟨v, _, a⟩ <;> (try cases a) <;> (try cases v) <;>
+       cert_simp)
   | (simp only [Row.Sub]
      intro x hx
-     rcases x with _ | a | ⟨_, a⟩ | ⟨a, _⟩ | ⟨v, _, a⟩ <;> (try cases a) <;> (try cases v) <;> split_mem hx <;>
-       cert_simp))
+     rcases x with ⟨_, _⟩ | a | ⟨_, _, a⟩ | ⟨a, _⟩ | ⟨v, _, a⟩ <;> (try cases a) <;> (try cases v) <;>
+       split_mem hx <;> cert_simp))
 
 /-- `φ ≤ φ'` of concrete stages, `Stage.use` unfolded. -/
 macro "stage_le" : tactic => `(tactic| first
   | exact Stage.le_refl _
-  | (simp only [Stage.use, Stage.le, Stage.use_none] <;>
+  | (simp only [Ty.asStage, Stage.use, Stage.le, Stage.use_none] <;>
      first
      | trivial
      | exact Stage.le_refl _
@@ -90,8 +93,8 @@ macro "stage_le" : tactic => `(tactic| first
 /-- `σ.inst ts = T` of a concrete scheme at a concrete instance. -/
 macro "inst_eq" : tactic => `(tactic| (
   simp only [Scheme.inst, Scheme.mono, Scheme.up, Scheme.substT, liftT_zero, Ty.up_def, Ty.substT,
-    Stage.substT, Ty.spine, Lit.base]
-  try simp [instT, liftT, Ty.up, Ty.ren, Ty.substT, Stage.substT, Ty.spine, shiftV, Lit.base]
+    Ty.isStage, if_true, Ty.spine, Lit.base]
+  try simp [instT, liftT, Ty.up, Ty.ren, Ty.substT, Ty.isStage, Ty.spine, shiftV, Lit.base]
   all_goals first
     | caps_set
     | row_set
@@ -102,12 +105,14 @@ on it, rows and capture rows compared point by point, its facts by their parts. 
 macro "closed_tac" : tactic => `(tactic| (
   intro σ σ' hσ
   refine ⟨?_, ?_⟩
-  · simp [Ty.substT, Ty.spine, Stage.substT, hσ]
+  · simp [Ty.substT, Ty.isStage, Ty.spine, hσ]
     all_goals first
       | (funext x
-         rcases x with _ | a | ⟨_, a⟩ | a | ⟨v, a⟩ <;> simp [Row.substT, Caps.substT, hσ, and_assoc])
+         rcases x with ⟨_, _⟩ | a | ⟨_, _, a⟩ | ⟨a, _⟩ | ⟨v, _, a⟩ <;>
+           simp [Row.substT, Caps.substT, hσ, and_assoc])
       | ((repeat' apply And.intro) <;> funext x <;>
-         rcases x with _ | a | ⟨_, a⟩ | a | ⟨v, a⟩ <;> simp [Row.substT, Caps.substT, hσ, and_assoc])
+         rcases x with ⟨_, _⟩ | a | ⟨_, _, a⟩ | ⟨a, _⟩ | ⟨v, _, a⟩ <;>
+           simp [Row.substT, Caps.substT, hσ, and_assoc])
   · simp only [Facts.single_substT, Facts.bnd_substT, Facts.union_substT, Facts.none_substT]
     repeat' (first | apply Facts.union_congr | apply Facts.single_congr)
     all_goals first
@@ -175,7 +180,7 @@ macro_rules
   | `(tactic| le_live) => `(tactic| first
     | exact LeLive.refl
     | (unfold Sig.ctorTy
-       simp only [Ty.arrows, Ty.tcon, List.map, List.foldl, Ty.substT, Stage.substT]
+       simp only [Ty.arrows, Ty.tcon, List.map, List.foldl, Ty.substT, Ty.isStage, if_true]
        le_live)
     | (refine LeLive.arrow ?_ ?_ ?_ ?_ <;> first | le_live | stage_le | caps_set)
     | (refine LeLive.eff ?_ ?_ ?_ <;> first | le_live | stage_le | caps_set)
@@ -185,10 +190,23 @@ macro_rules
        repeat' (first | apply And.intro | intro _)
        all_goals first | trivial | exact Caps.Sub.refl _ | rfl | le_live | caps_set | var_absurd))
 
+theorem le_of_eq {S : Sig} {a b : Ty} (h : a = b) : LeLive S a b := h ▸ .refl
+
+/-- `LeLive S (σ.inst ts) T` of a concrete scheme at a concrete instance: the instance is `T`
+(`inst_eq`), or else it is written out and compared as `le_live` does, rows and stages by what
+they stand for. -/
+macro "inst_le" : tactic => `(tactic| first
+  | (apply Cert.le_of_eq; inst_eq)
+  | (simp only [Scheme.inst, Scheme.mono, Scheme.up, Scheme.substT, liftT_zero, Ty.up_def,
+      Ty.substT, Ty.isStage, if_true, Ty.spine, Lit.base, instT, liftT, Ty.up, Ty.ren, shiftV,
+      List.length_cons, List.length_nil, Nat.reduceAdd, Nat.reduceSub, Nat.reduceLT,
+      Nat.lt_irrefl, dite_true, dite_false, List.getElem_cons_zero, List.getElem_cons_succ,
+      Bool.false_eq_true, ↓reduceIte, ↓reduceDIte]; le_live))
+
 /-- `φ₀.ObOut o` of a concrete stage with no obligation about `o`. -/
 macro "ob_out" : tactic => `(tactic| (
-  refine ⟨fun N a h => ?_, fun v G a h => ?_⟩ <;>
-    simp_all [Stage.svc, Row.Named, Row.single, Row.none, Row.union]))
+  refine ⟨fun N c a h => ?_, fun v G a h => ?_⟩ <;>
+    simp_all [Stage.svc, Row.Named, Row.single, Row.inst, Row.none, Row.union]))
 
 /-- `Outl Θ C s` of concrete sets: each atom of `C` is reached by `s` or is in a fact about
 `s` of `Θ`. -/

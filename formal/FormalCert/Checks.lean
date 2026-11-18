@@ -14,9 +14,9 @@ open Flick Flick.Cert
 
 /-- A constructor's type with a function field, written out (`le_live`); its reach goes
 through `split_mem`, which once split the witness of an `∃` without end. -/
-example : LeLive S (Sig.ctorTy [(.arrow (.base .unit) (.rt Row.none Row.none) (.base .unit) Caps.none)]
+example : LeLive S (Sig.ctorTy [(.arrow (.base .unit) (.rt .cnil .cnil) (.base .unit) Caps.none)]
       "K" [])
-    (.arrow (.arrow (.base .unit) (.rt Row.none Row.none) (.base .unit) Caps.none) .pure (.adt "K")
+    (.arrow (.arrow (.base .unit) (.rt .cnil .cnil) (.base .unit) Caps.none) .pure (.adt "K")
       Caps.none) := by
   le_live
 
@@ -30,7 +30,7 @@ is expected (`le_live` through `LeLive.data_of`, the other variances refuted by 
 example (_ : GenSig S) :
     LeLive S (.tapp (.adt "Prelude.List") (.arrow (.base .unit) .pure (.base .unit) Caps.none))
       (.tapp (.adt "Prelude.List")
-        (.arrow (.base .unit) (.rt Row.none Row.none) (.base .unit) Caps.none)) := by
+        (.arrow (.base .unit) (.rt .cnil .cnil) (.base .unit) Caps.none)) := by
   le_live
 
 /-- A tuple compares each of its two arguments. -/
@@ -38,12 +38,12 @@ example (_ : GenSig S) :
     LeLive S (.tapp (.tapp (.adt "Tuple") (.base .int))
         (.arrow (.base .unit) .pure (.base .unit) Caps.none))
       (.tapp (.tapp (.adt "Tuple") (.base .int))
-        (.arrow (.base .unit) (.rt Row.none Row.none) (.base .unit) Caps.none)) := by
+        (.arrow (.base .unit) (.rt .cnil .cnil) (.base .unit) Caps.none)) := by
   le_live
 
 /-- A fact whose capture row is empty at the instance (`outl` with `Caps.none`). -/
 example : (Scheme.mk 3 (Facts.single (fun x => x = .v 1) (.tvar 2)) (.base .unit)).Holds Facts.none
-    [(.row (fun x => x = .nm "L")), (.caps Caps.none), (.tvar 0)] := by
+    [(.rnm "L" (.adt "L")), (.caps Caps.none), (.tvar 0)] := by
   holds
 
 /-- A fact of the scheme around, after the shifted facts outside it (`outl` through `∨`). -/
@@ -53,9 +53,9 @@ example : Outl (Facts.union ((Facts.single (fun x => x = .v 1) (.tvar 0)).substT
 
 /-- The instance of a scheme shifted under a binder (`inst_eq` through `liftT`). -/
 example : (Scheme.up 1 ⟨1, Facts.none,
-      .rcons "go" (.arrow (.tvar 0) (.rt (fun x => x = .atm (.v 1)) Row.none) (.base .unit) Caps.none)
+      .rcons "go" (.arrow (.tvar 0) (.rt (.caps fun x => x = .v 1) .cnil) (.base .unit) Caps.none)
         .rnil⟩).inst [.base .unit] =
-    .rcons "go" (.arrow (.base .unit) (.rt (fun x => x = .atm (.v 1)) Row.none) (.base .unit) Caps.none)
+    .rcons "go" (.arrow (.base .unit) (.rt (.caps fun x => x = .v 1) .cnil) (.base .unit) Caps.none)
       .rnil := by
   inst_eq
 

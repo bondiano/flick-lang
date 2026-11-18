@@ -81,6 +81,8 @@ interface types {
     lines(span),
     /// `(a ++ b ++ …)`: texts or lists joined, at least two.
     concat(list<node-id>),
+    /// `task { body }`: the task that runs `body`, a body as of a `fun`.
+    task(node-id),
     /// `match scrutinee with | p when g -> e …`, at least one arm.
     %match(match-on),
     /// `if condition then then else otherwise`.

@@ -31,7 +31,7 @@ theorem Typ.ctor_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
 theorem Typ.app_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ f x T φ, e = .app f x → J = .ex T φ → ¬ T.isAll → T.kind ≠ 7 →
       ∃ a ψ t C, Typ S Ψ Θ Γ f (.ex (.arrow a ψ t C) φ) ∧
-        Typ S Ψ Θ Γ x (.ex a φ) ∧ (Stage.use ψ C).le φ ∧ LeLive S t T := by
+        Typ S Ψ Θ Γ x (.ex a φ) ∧ (Stage.use ψ.asStage C).le φ ∧ LeLive S t T := by
   induction h with
   | conv _ he ih =>
     intro f x T φ hv hJ hA hk; cases hJ
@@ -49,7 +49,7 @@ theorem Typ.app_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
 theorem Typ.app_nonvalue {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ f x T φ, e = .app f x → J = .ex T φ → ¬ Value (.app f x) →
       ∃ a ψ t C, Typ S Ψ Θ Γ f (.ex (.arrow a ψ t C) φ) ∧
-        Typ S Ψ Θ Γ x (.ex a φ) ∧ (Stage.use ψ C).le φ ∧ LeLive S t T := by
+        Typ S Ψ Θ Γ x (.ex a φ) ∧ (Stage.use ψ.asStage C).le φ ∧ LeLive S t T := by
   induction h with
   | conv _ he ih =>
     intro f x T φ hv hJ hn; cases hJ

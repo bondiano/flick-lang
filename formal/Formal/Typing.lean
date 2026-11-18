@@ -202,21 +202,22 @@ def Covers (t : Ty) (ps : List Pat) (e : Tm) : Prop :=
 
 /-- Patterns of a `try` arm (core.md §2.3 (Try)): `x` or `_` at `Errors ε_b`,
 or a constructor pattern `E p̄` at the error type `E`. -/
-inductive HPat (εb : Row) : Pat → Ty → List Ty → Prop
+inductive HPat (εb : Ty) : Pat → Ty → List Ty → Prop
   | wild : HPat εb .wild (.errors εb) []
   | var : HPat εb .var (.errors εb) [.errors εb]
   | ctor : PatTy S false p (.adt T) Δ → HPat εb p (.adt T) Δ
 
 /-- The errors an arm without `when` removes: the set `H` of (Try). An `x` or `_` arm
-removes all of `ε_b`, its row variables and atoms too; a constructor arm the name of its
-error type. -/
-def Catches (εb : Row) (p : Pat) (θ : Ty) : Elem → Prop
-  | .nm n => (θ = .errors εb ∧ εb n) ∨ (θ = .adt n ∧ Exh S (.adt n) [p])
-  | x => θ = .errors εb ∧ εb x
+removes all of `ε_b`, its row variables and atoms too; a constructor arm its error type
+at every argument, as matching a constructor ignores them. -/
+def Catches (εb : Ty) (p : Pat) (θ : Ty) : Elem → Prop
+  | .nm n c => (θ = .errors εb ∧ εb.asRow (.nm n c)) ∨ (θ = .adt n ∧ Exh S (.adt n) [p])
+  | x => θ = .errors εb ∧ εb.asRow x
 
-/-- The error type of the raised value `v` is removed by the arms or let
-through: the value form of `ε_b ⊆ H + ε'`. -/
-def HCov (v : Tm) (H ε' : Row) : Prop :=
-  ∀ K k ts T, v.head = .ctor K → S.ctor K = some (k, ts, T) → H T ∨ ε' T
+/-- The raised error of the type `U = E ū` is removed by the arms or let through: the
+value form of `ε_b ⊆ H + ε'`. An arm that removes `E` at some argument matches the value
+whatever its argument. -/
+def HCov (H ε' : Row) (E : Name) (U : Ty) : Prop :=
+  H.nameClose (.nm E U.classOf) ∨ ε' (.nm E U.classOf)
 
 end Flick

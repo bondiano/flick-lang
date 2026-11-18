@@ -97,11 +97,9 @@ pub(super) fn data(t: &Type, c: Option<&Caps>, env: &Env) -> Result<String, Stri
         _ => None,
     };
     for (i, a) in args.into_iter().enumerate() {
-        // a row parameter (`Failure e`) takes a row, as the core instantiates it
+        // a row parameter (`Failure e`) takes a row term, as the core instantiates it
         let a = match (a, kinds.and_then(|k| k.get(i))) {
-            (Type::Errors(r), Some(Kind::Errors | Kind::Services)) => {
-                format!("(.row {})", row(r, env)?)
-            }
+            (Type::Errors(r), Some(Kind::Errors | Kind::Services)) => row(r, env)?,
             (a, _) => ty(a, env)?,
         };
         out = format!("(.tapp {out} {a})");
