@@ -73,24 +73,24 @@ theorem Typ.weakenStore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) (X : List Ty) :
     rw [List.map_append]; exact ih₁ _
   | dproj _ hc hk hl hts hH hT ih => exact .dproj (ih X) hc hk hl hts hH hT
   | glob hg hts hH hT => exact .glob hg hts hH hT
-  | perform hop hT => exact .perform hop hT
+  | perform hus hop hT => exact .perform hus hop hT
   | hanil => exact .hanil
-  | hatail hop _ _ ih₁ ih₂ => exact .hatail hop (ih₁ X) (ih₂ X)
-  | haabort hop _ _ ih₁ ih₂ => exact .haabort hop (ih₁ X) (ih₂ X)
-  | hactl hop _ _ ih₁ ih₂ => exact .hactl hop (ih₁ X) (ih₂ X)
-  | hdl _ hn _ hψ _ hφ₀ hOb hc hφ hT ih₁ ih₂ ih₃ =>
-    refine .hdl ?_ hn (ih₂ X) hψ (ih₃ X) hφ₀ hOb hc hφ hT
+  | hatail hus hop _ _ ih₁ ih₂ => exact .hatail hus hop (ih₁ X) (ih₂ X)
+  | haabort hus hop _ _ ih₁ ih₂ => exact .haabort hus hop (ih₁ X) (ih₂ X)
+  | hactl hus hop _ _ ih₁ ih₂ => exact .hactl hus hop (ih₁ X) (ih₂ X)
+  | hdl hus _ hn _ hψ _ hφ₀ hOb hc hφ hT ih₁ ih₂ ih₃ =>
+    refine .hdl hus ?_ hn (ih₂ X) hψ (ih₃ X) hφ₀ hOb hc hφ hT
     rw [List.map_append]; exact ih₁ _
-  | hwith hℓ _ _ hψ _ hφ₀ hc hφ hT ha ih₁ ih₂ ih₃ =>
-    exact .hwith (getElem?_ext hℓ) (ih₁ X) (ih₂ X) hψ (ih₃ X) hφ₀ hc hφ hT ha
-  | hctl hℓ _ _ hψ hop hc htl hE hk _ hφ₀ _ hl hcm hφ hT ha ih₁ ih₂ ih₃ ih₄ =>
-    exact .hctl (getElem?_ext hℓ) (ih₁ X) (ih₂ X) hψ hop hc htl hE hk (ih₃ X) hφ₀ (ih₄ X)
+  | hwith hus hℓ _ _ hψ _ hφ₀ hc hφ hT ha ih₁ ih₂ ih₃ =>
+    exact .hwith hus (getElem?_ext hℓ) (ih₁ X) (ih₂ X) hψ (ih₃ X) hφ₀ hc hφ hT ha
+  | hctl hus hℓ _ _ hψ hop hc htl hE hk hno _ hφ₀ _ hl hcm hφ hT ha ih₁ ih₂ ih₃ ih₄ =>
+    exact .hctl hus (getElem?_ext hℓ) (ih₁ X) (ih₂ X) hψ hop hc htl hE hk hno (ih₃ X) hφ₀ (ih₄ X)
       (fun h => let ⟨C', h₁, h₂⟩ := hl h
         ⟨C', by rw [List.getElem?_append_left (getElem?_lt h₁)]; exact h₁, h₂⟩) hcm hφ hT ha
-  | hkeep hℓ _ _ hφ₀ hc hnt hle hφ hT ih₁ ih₂ =>
-    exact .hkeep (getElem?_ext hℓ) (ih₁ X) (ih₂ X) hφ₀ hc hnt hle hφ hT
-  | hkarm hℓ _ hop hE hk _ hφ₀ hc hnt _ hle hφ hT ih₁ ih₂ ih₃ =>
-    exact .hkarm (getElem?_ext hℓ) (ih₁ X) hop hE hk (ih₂ X) hφ₀ hc hnt (ih₃ X) hle hφ hT
+  | hkeep hus hℓ _ _ hφ₀ hc hle hφ hT ih₁ ih₂ =>
+    exact .hkeep hus (getElem?_ext hℓ) (ih₁ X) (ih₂ X) hφ₀ hc hle hφ hT
+  | hkarm hus hℓ _ hop hE hk hno _ hφ₀ hc _ hle hφ hT ih₁ ih₂ ih₃ =>
+    exact .hkarm hus (getElem?_ext hℓ) (ih₁ X) hop hE hk hno (ih₂ X) hφ₀ hc (ih₃ X) hle hφ hT
   | hres hℓ _ hA ha _ hl hcp hφ hT ih₁ ih₂ =>
     exact .hres (getElem?_ext hℓ) (ih₁ X) hA ha (ih₂ X) (by rw [List.getElem?_append_left (getElem?_lt hl)]; exact hl) hcp hφ hT
   | hdone _ ih => exact .hdone (ih X)
@@ -237,35 +237,35 @@ theorem Typ.rename {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | dnil => intro _ _ _; exact .dnil
   | dcons _ _ ih₁ ih₂ => intro _ _ hξ; exact .dcons (ih₁ (hξ.up _)) (ih₂ hξ)
   | dproj _ hc hk hl hts hH hT ih => intro _ _ hξ; exact .dproj (ih hξ) hc hk hl hts hH hT
-  | perform hop hT => intro _ _ _; exact .perform hop hT
+  | perform hus hop hT => intro _ _ _; exact .perform hus hop hT
   | hanil => intro _ _ _; exact .hanil
-  | hatail hop _ _ ih₁ ih₂ => intro _ _ hξ; exact .hatail hop (ih₁ (hξ.lift [_] rfl)) (ih₂ hξ)
-  | haabort hop _ _ ih₁ ih₂ => intro _ _ hξ; exact .haabort hop (ih₁ (hξ.lift [_] rfl)) (ih₂ hξ)
-  | hactl hop _ _ ih₁ ih₂ => intro _ _ hξ; exact .hactl hop (ih₁ (hξ.lift [_, _] rfl)) (ih₂ hξ)
-  | hdl _ hn _ hψ _ hφ₀ hOb hc hφ hT ih₁ ih₂ ih₃ =>
+  | hatail hus hop _ _ ih₁ ih₂ => intro _ _ hξ; exact .hatail hus hop (ih₁ (hξ.lift [_] rfl)) (ih₂ hξ)
+  | haabort hus hop _ _ ih₁ ih₂ => intro _ _ hξ; exact .haabort hus hop (ih₁ (hξ.lift [_] rfl)) (ih₂ hξ)
+  | hactl hus hop _ _ ih₁ ih₂ => intro _ _ hξ; exact .hactl hus hop (ih₁ (hξ.lift [_, _] rfl)) (ih₂ hξ)
+  | hdl hus _ hn _ hψ _ hφ₀ hOb hc hφ hT ih₁ ih₂ ih₃ =>
     intro _ ξ hξ
-    exact .hdl (ih₁ (hξ.up 1)) (hn.rename ξ) (ih₂ hξ) hψ (ih₃ hξ) hφ₀ hOb ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
+    exact .hdl hus (ih₁ (hξ.up 1)) (hn.rename ξ) (ih₂ hξ) hψ (ih₃ hξ) hφ₀ hOb ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
       rw [Tm.armOf_rename]; exact hc' o c a b ho⟩ hφ hT
-  | hwith hℓ _ _ hψ _ hφ₀ hc hφ hT ha ih₁ ih₂ ih₃ =>
+  | hwith hus hℓ _ _ hψ _ hφ₀ hc hφ hT ha ih₁ ih₂ ih₃ =>
     intro _ ξ hξ
-    exact .hwith hℓ (ih₁ hξ) (ih₂ hξ) hψ (ih₃ hξ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
+    exact .hwith hus hℓ (ih₁ hξ) (ih₂ hξ) hψ (ih₃ hξ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
       rw [Tm.armOf_rename]; exact hc' o c a b ho⟩ hφ hT ha
-  | hctl hℓ _ _ hψ hop hc htl hE hk hp hφ₀ _ hl hcm hφ hT ha ih₁ ih₂ _ ih₄ =>
+  | hctl hus hℓ _ _ hψ hop hc htl hE hk hno hp hφ₀ _ hl hcm hφ hT ha ih₁ ih₂ _ ih₄ =>
     intro _ ξ hξ
     subst hk
     rw [Tm.rename, (plug_hole_closed hp).rename]
-    exact .hctl hℓ (ih₁ hξ) (ih₂ hξ) hψ hop hc htl hE rfl hp hφ₀ (ih₄ hξ) hl ⟨hcm.1, fun h => hcm.2 fun hc' => h fun o c a b ho => by
+    exact .hctl hus hℓ (ih₁ hξ) (ih₂ hξ) hψ hop hc htl hE rfl hno hp hφ₀ (ih₄ hξ) hl ⟨hcm.1, fun h => hcm.2 fun hc' => h fun o c a b ho => by
       rw [Tm.armOf_rename]; exact hc' o c a b ho⟩ hφ hT ha
-  | hkeep hℓ _ _ hφ₀ hc hnt hle hφ hT ih₁ ih₂ =>
+  | hkeep hus hℓ _ _ hφ₀ hc hle hφ hT ih₁ ih₂ =>
     intro _ ξ hξ
-    exact .hkeep hℓ (ih₁ hξ) (ih₂ hξ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
-      rw [Tm.armOf_rename]; exact hc' o c a b ho⟩ hnt hle hφ hT
-  | hkarm hℓ _ hop hE hk hp hφ₀ hc hnt _ hle hφ hT ih₁ _ ih₃ =>
+    exact .hkeep hus hℓ (ih₁ hξ) (ih₂ hξ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
+      rw [Tm.armOf_rename]; exact hc' o c a b ho⟩ hle hφ hT
+  | hkarm hus hℓ _ hop hE hk hno hp hφ₀ hc _ hle hφ hT ih₁ _ ih₃ =>
     intro _ ξ hξ
     subst hk
     rw [Tm.rename, (plug_hole_closed hp).rename]
-    exact .hkarm hℓ (ih₁ hξ) hop hE rfl hp hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
-      rw [Tm.armOf_rename]; exact hc' o c a b ho⟩ hnt (ih₃ hξ) hle hφ hT
+    exact .hkarm hus hℓ (ih₁ hξ) hop hE rfl hno hp hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
+      rw [Tm.armOf_rename]; exact hc' o c a b ho⟩ (ih₃ hξ) hle hφ hT
   | hres hℓ _ hA ha hp hl hcp hφ hT ih₁ _ =>
     intro _ ξ hξ
     subst ha

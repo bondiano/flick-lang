@@ -140,6 +140,8 @@ structure GenSig (S : Sig) : Prop where
   closed : ∀ K k ts T, S.ctor K = some (k, ts, T) → genAdtCtors T ≠ [] → genCtor K = some (k, ts, T)
   /-- A service of the generator has its operations and no other. -/
   op : ∀ E o, genOps E ≠ [] → S.op E o = genOp E o
+  /-- A service of the generator has no parameters: its operations are of closed types. -/
+  arity : ∀ E, genOps E ≠ [] → S.arity E = 0
   dict : ∀ c, (genDict c).isSome → S.dict c = genDict c
   /-- A type of the generator has the variances the model gives it. -/
   var : ∀ T, genAdtCtors T ≠ [] → ∀ j, S.var T j = genVar T j
@@ -268,13 +270,13 @@ def genSig : Sig where
   ctor_reach := genCtor_reach
   res := genRes
   res_closed := genRes_closed
-  impl_closed _ _ := rfl
+  impl_closed _ _ _ := rfl
   dict := genDict
   glob := genGlob
   dict_closed := genDict_closed
   glob_closed := genGlob_closed
   op := genOp
-  op_closed := genOp_closed
+  op_closed E o c a b σ h _ := genOp_closed E o c a b σ h
   op_impl _ _ _ _ _ _ _ := rfl
   op_field _ _ _ _ _ h := (h rfl).elim
   var := genVar
@@ -283,7 +285,7 @@ def genSig : Sig where
 /-- The assumption of a certificate holds of a signature. -/
 theorem GenSig.inhabited : ∃ S, GenSig S :=
   ⟨genSig, fun _ _ => rfl, fun _ _ => rfl, fun _ _ => rfl, fun _ _ _ _ h _ => h, fun _ _ _ => rfl,
-    fun _ _ => rfl, fun _ _ _ => rfl⟩
+    fun _ _ => rfl, fun _ _ => rfl, fun _ _ _ => rfl⟩
 
 end Flick.Cert
 

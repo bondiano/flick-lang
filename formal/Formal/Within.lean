@@ -190,22 +190,24 @@ theorem Tm.Within.frame {q : Nat} : ∀ {e : Tm} {A : Nat → Prop}, e.Within Ψ
   induction e with
   | hkeep p ℓ E' al e _ ih =>
     intro A h hs
-    rcases hs with hs | hs | hs | hs
+    rcases hs with hs | hs | hs | hs | hs
     · cases hs
     · cases hs
     · exact absurd (Tm.has_frame_ins hs) h.2.2.2.1
     · obtain ⟨h₁, h₂, h₃, h₄⟩ := ih h.2.2.1 hs
-      exact ⟨h₁, h₂, h₃, fun x hx => (h₄ x hx).imp_right fun h => .inr (.inr (.inr h))⟩
+      exact ⟨h₁, h₂, h₃, fun x hx => (h₄ x hx).imp_right fun h => .inr (.inr (.inr (.inl h)))⟩
+    · cases hs
   | hkarm p ℓ E' al a k _ ih₁ ih₂ =>
     intro A h hs
-    rcases hs with hs | hs | hs | hs | hs
+    rcases hs with hs | hs | hs | hs | hs | hs
     · cases hs
     · cases hs
     · exact absurd (Tm.has_frame_ins hs) h.2.2.2.2.1
     · obtain ⟨h₁, h₂, h₃, h₄⟩ := ih₁ h.2.2.1 hs
       exact ⟨h₁, h₂, h₃, fun x hx => (h₄ x hx).imp_right fun h => .inr (.inr (.inr (.inl h)))⟩
     · obtain ⟨h₁, h₂, h₃, h₄⟩ := ih₂ h.2.2.2.1 hs
-      exact ⟨h₁, h₂, h₃, fun x hx => (h₄ x hx).imp_right fun h => .inr (.inr (.inr (.inr h)))⟩
+      exact ⟨h₁, h₂, h₃, fun x hx => (h₄ x hx).imp_right fun h => .inr (.inr (.inr (.inr (.inl h))))⟩
+    · cases hs
   | _ => intro A h hs; simp only [Tm.Within, Tm.Has] at h hs ⊢ <;> grind
 
 /-- A term stays at its place when the ancestors of its `inside` forms and its
@@ -365,11 +367,12 @@ theorem WithinE.frameAnc {A : Nat → Prop} {q : Nat} :
       grind
     | hkeep p ℓ E' al =>
       simp only [Frame.plug, Tm.Has, Frame.Within] at h hF
-      rcases h with h | h | h | h
+      rcases h with h | h | h | h | h
       · cases h
       · cases h
       · exact absurd (Tm.has_frame_ins h) hF.2.2.1
       · exact h.elim
+      · cases h
     | hkarmA p ℓ E' al k =>
       simp only [Frame.Within] at hF
       refine part hF.2.2.1 ?_ fun x hx => by simp [Frame.plug, Tm.Has, hx]

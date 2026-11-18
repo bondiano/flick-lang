@@ -24,7 +24,7 @@ theorem LNest.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
       (c = .addFin ∨ c = .spawn) → holeE (baseOf anc i) E p)
     (hcell : ∀ E Ef al rf e₀, OkE E → e = plug E (.hdl Ef al rf e₀) →
       e' = plug E (.inside Λ.length (.hwith Λ.length μ.length Ef al rf e₀)) →
-      ∃ r ε t, (Ψ ++ X)[μ.length]? = some (.arrow (.base .unit) (.rt r ε) t Caps.none) ∧
+      ∃ u r ε t, (Ψ ++ X)[μ.length]? = some (.arrow u (.rt r ε) t Caps.none) ∧
         ∀ x, r.asRow (.atm (.r x)) → holeE (baseOf anc i) E x ∨ x = Λ.length)
     (hs : Step root l Λ μ e (.cfg Λ' μ' e')) :
     ∃ anc' home', LNest (Ψ ++ X) ((⟨Λ', μ', m⟩ : Cfg).put i e') anc' home' ∧

@@ -1,4 +1,4 @@
-import Formal.CfgTyped
+import Formal.MainKept
 
 /-!
 # T1: type safety (core.md §4) with regions
@@ -95,15 +95,30 @@ theorem root_answers {root Ef o c a b w} (hroot : RootTy S root) (hw : root.svc 
   obtain ⟨⟨f, hf⟩, _⟩ := (hwt.shape hwv rfl).1.field rfl (S.op_field _ _ _ _ hop hne)
   exact ⟨rfl, w, f, hw, hf⟩
 
+/-- Steps keep the main thread without a kept handler: only a child has one. -/
+theorem steps_kept {root c c'} (hroot : RootTy S root) (hs : CSteps root c c') :
+    ∀ {Ψ t φ}, t.YF 0 → φ.substT (kill 0) = φ → CfgTy S Ψ c t φ → ¬ c.main.Has .kept →
+      ¬ c'.main.Has .kept := by
+  induction hs with
+  | refl => intro _ _ _ _ _ _ h; exact h
+  | step h₁ _ ih =>
+    intro _ _ _ ht hφ hc hk
+    obtain ⟨X, hc', -⟩ := cstep_typed hroot ht hφ hc h₁
+    refine ih ht hφ hc' ?_
+    cases h₁ with
+    | main hs => exact fun h => hk (hs.kept hroot.below hc.2.2.2.2.2.1.mem h)
+    | kid => exact hk
+
 /-- **T1.** A program `· ⊢ e₀ : τ ! φ₀` (a term without run-time regions, at a type and
 a stage without them) whose services `Σ₀` provides (G3) reaches
 only configurations whose main thread is a value, `raise v` with `v : Errors ε₀`,
 makes a step, or is blocked (waits for a child of a region it closes, or uses a
 region that is not live); every child of a live region is finished, makes a step,
-performs an operation no handler and no root answers, or is blocked. An
-operation nothing answers is not an outcome of the main thread, for `Σ₀` has a function
-for each operation of an effect of the stage, and it does not unwind past its top: every
-signal is under the frame of its handler (`CfgCaught`). -/
+performs an operation no handler and no root answers, or one that is not `tail` at a handler
+it keeps, or is blocked. Neither operation is an outcome of the main thread: `Σ₀` has a
+function for each operation of an effect of the stage, and only a child keeps a handler
+(`steps_kept`). Nor does it unwind past its top: every signal is under the frame of its
+handler (`CfgCaught`). -/
 theorem T1 {root e₀ t φ₀ c} (hroot : RootTy S root)
     (hcov : ∀ N c, φ₀.svc (.nm N c) → (root.svc N).isSome) (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ₀))
     (hp : e₀.Below 0) (ht : t.YF 0) (hφ : φ₀.substT (kill 0) = φ₀)
@@ -116,6 +131,8 @@ theorem T1 {root e₀ t φ₀ c} (hroot : RootTy S root)
       Final k ∨ (∃ l o, Step root l c.rgs c.mem k o) ∨ (∃ D, PerformStuck S root k D) ∨
         Blocked c.rgs k := by
   obtain ⟨Ψ, hμ, h, hΛ, -, -, -, _, _, hcg⟩ := steps_typed hroot hs ht hφ (CfgTy.init h₀ hp)
+  have hkept := steps_kept hroot hs ht hφ (CfgTy.init h₀ hp) fun h =>
+    let ⟨p, hp'⟩ := (Tm.kept_ins h).2; Nat.not_lt_zero _ (hp p hp')
   simp only [List.nil_append] at hμ h hΛ
   refine ⟨?_, fun p g hg _ k hk => ?_⟩
   · rcases progress (Λ := c.rgs) (root := root) hroot h hμ.1 rfl rfl with hv | hn
@@ -127,9 +144,11 @@ theorem T1 {root e₀ t φ₀ c} (hroot : RootTy S root)
       exact .inr (.inl ⟨v, he, Ψ, ε, hε, hv'⟩)
     | step hstep => exact .inr (.inr (.inl hstep))
     | perform h' =>
-      obtain ⟨_, Ef, o, c', _, a, b, _, _, _, hop, _, hna, hD⟩ := h'
-      obtain ⟨w, hw⟩ := Option.isSome_iff_exists.mp (hcov Ef _ hD)
-      exact (hna (root_answers hroot hw hop)).elim
+      rcases h' with ⟨_, Ef, o, c', _, a, b, _, _, _, hop, _, hna, _, hD⟩ |
+        ⟨E, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, he⟩
+      · obtain ⟨w, hw⟩ := Option.isSome_iff_exists.mp (hcov Ef _ hD)
+        exact (hna (root_answers hroot hw hop)).elim
+      · exact (hkept (he ▸ plug_has E (by simp [Tm.Has]))).elim
     | blocked hb => exact .inr (.inr (.inr hb))
     | unw h' =>
       obtain ⟨_, _, _, he⟩ := h'

@@ -27,7 +27,7 @@ def J.substT (σ : Atom → Ty) : J → J
   | .alts t t' φ => .alts (t.substT σ) (t'.substT σ) (φ.substT σ)
   | .halts ε H t φ => .halts (ε.substT σ) (H.substT σ) (t.substT σ) (φ.substT σ)
   | .dfs fs => .dfs (fs.map fun f => (f.1, f.2.substT σ))
-  | .harms E t φ s => .harms E (t.substT σ) (φ.substS σ) (s.substT σ)
+  | .harms E us t φ s => .harms E (us.map (Ty.substT σ)) (t.substT σ) (φ.substS σ) (s.substT σ)
 
 theorem Fits.sub {σ : Atom → Ty} {e e' : Tm} (h : Fits σ e) (hs : ∀ s, e'.Has s → e.Has s) :
     Fits σ e' :=
@@ -128,8 +128,8 @@ theorem Stage.up_comm (φ : Stage) (k : Nat) (σ : Atom → Ty) :
     (φ.substT (shiftV k)).substT (liftT k σ) = (φ.substT σ).substT (shiftV k) := by
   cases φ <;> simp [Stage.substT, Row.up_comm]
 
-theorem Const.ty_substT (S : Sig) (c : Const) (ι : CArg) (σ : Atom → Ty) :
-    (c.ty S ι).substT σ = c.ty S (ι.substT σ) := by
+theorem Const.ty_substT (c : Const) (ι : CArg) (σ : Atom → Ty) :
+    (c.ty ι).substT σ = c.ty (ι.substT σ) := by
   cases c
   case scopeRun =>
     have hC : (ι.C.substT (shiftV 1)).substT (liftT 1 σ) = (ι.C.substT σ).substT (shiftV 1) := by
@@ -137,33 +137,11 @@ theorem Const.ty_substT (S : Sig) (c : Const) (ι : CArg) (σ : Atom → Ty) :
     simp [Const.ty, Ty.substT, Ty.isStage, CArg.substT, Ty.up_comm, hC, liftT, Ty.reach_caps]
   case addFin | spawn | open_ | op =>
     simp [Const.ty, Ty.substT, Ty.isStage, CArg.substT, Ty.reach_caps]
-  case perform E o _ =>
-    rcases h : S.op E o with _ | ⟨c, a, b⟩
-    · simp [Const.ty, h, Ty.substT]
-    · obtain ⟨ha, hb⟩ := S.op_closed E o c a b σ h
-      cases c <;> simp [Const.ty, h, Ty.substT, CArg.substT, ha, hb]
   all_goals simp [Const.ty, Ty.substT, CArg.substT]
 
 theorem Row.err_substT (E : Name) (U : Ty) (σ : Atom → Ty) :
     (Row.err E U).substT σ = Row.err E (U.substT σ) := by
   simp [Row.err, Row.ofCaps_substT, Ty.reach_caps]
-
-theorem Sig.Handles.substT {E : Name} {al : Tm} {r : Ty} (σ : Atom → Ty)
-    (h : S.Handles E al r.asRow) : S.Handles E al (r.substT σ).asRow :=
-  ⟨h.1, fun hc => by rw [Ty.asRow_substT]; exact .inl ⟨_, h.2 hc, rfl⟩⟩
-
-theorem Sig.Handles.substR {E : Name} {al : Tm} {r : Row} (σ : Atom → Ty)
-    (h : S.Handles E al r) : S.Handles E al (r.substT σ) :=
-  ⟨h.1, fun hc => .inl ⟨_, h.2 hc, rfl⟩⟩
-
-theorem Sig.NonTail.substR {E : Name} {r : Row} (σ : Atom → Ty) (h : S.NonTail E r) :
-    S.NonTail E (r.substT σ) :=
-  fun hc => .inl ⟨_, h hc, rfl⟩
-
-theorem Row.hP_substT_asRow {Θ : Facts} {q : Nat} {E : Name} {r : Ty} {σ : Atom → Ty}
-    (hq : σ (.r q) = .rg q) (hat : ∀ b a, (σ b).reach a → σ b = a.ty) (hn : NoNames σ) :
-    Row.Sub ((Row.hP Θ q E r.asRow).substT σ) (Row.hP (Θ.substT σ) q E (r.substT σ).asRow) := by
-  rw [Ty.asRow_substT]; exact Row.hP_substT hq hat hn
 
 theorem Tm.NoIns.of_has {e e' : Tm} (h : e.NoIns) (hs : ∀ s, e'.Has s → e.Has s) : e'.NoIns :=
   fun h' => h (hs _ h')

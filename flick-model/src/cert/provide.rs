@@ -97,7 +97,7 @@ impl Cx<'_> {
             b.clone(),
         );
         let proof = format!(
-            "(Cert.typ_op (E := {svc:?}) (o := {:?}) ((hS.op _ _ (by decide)).trans rfl) (by le_live))",
+            "(Cert.typ_op (E := {svc:?}) (o := {:?}) (hS.arity _ (by decide)) ((hS.op _ _ (by decide)).trans rfl) (by le_live))",
             o.to_string()
         );
         Ok((proof, at))
@@ -140,7 +140,7 @@ impl Cx<'_> {
         };
         let pb = self.under(&"$w".into(), |c| c.typing(body, t, col + 2))?;
         Ok(format!(
-            "(Cert.typ_provide (E := {svc:?}) (o := {:?}) (R := {}) (t := {}) (r := {}) (ε := {errors}) (φ₀ := {}){pad}((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl{pad}{w}{pad}{pb}{pad}(by stage_le) (by ob_out) (by stage_le) (by le_live))",
+            "(Cert.typ_provide (E := {svc:?}) (o := {:?}) (R := {}) (t := {}) (r := {}) (ε := {errors}) (φ₀ := {}){pad}(hS.arity _ (by decide)) ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl{pad}{w}{pad}{pb}{pad}(by stage_le) (by ob_out) (by stage_le) (by le_live))",
             op.name.to_string(),
             self.ty(&record)?,
             self.ty(t)?,

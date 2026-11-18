@@ -51,7 +51,7 @@ theorem PHead.has {e e' : Tm} (h : PHead e e') {s : Site} (hs : e'.Has s) : e.Ha
     subst hk
     have := plug_has_inv (r := .hole p) (r' := w) (s := s) Ei
     simp only [Tm.Has] at hs ⊢; grind
-  | hkeepVal => exact .inr (.inr (.inr hs))
+  | hkeepVal => exact .inr (.inr (.inr (.inl hs)))
   | @hkarmVal k q w ℓ E al Ei _ hk _ =>
     subst hk
     have := plug_has_inv (r := .hole q) (r' := w) (s := s) Ei
@@ -256,39 +256,45 @@ theorem plug_below {E : List Frame} {r r' : Tm} {n : Nat} (h : (plug E r).Below 
     (plug E r').Below n := fun p hp =>
   (plug_has_inv E hp).elim (fun h₁ => h p h₁) (fun h₁ => h' p h₁)
 
-/-- What the handlers of a context hold, the context holds. -/
+/-- What the handlers of a context hold, the context holds; they are kept handlers. -/
 theorem withs_has {r x : Tm} {p : Nat} {s : Site} :
-    ∀ (E : List Frame), (withs p E x).Has s → (plug E r).Has s ∨ x.Has s
-  | [], h => .inr h
+    ∀ (E : List Frame), (withs p E x).Has s → (plug E r).Has s ∨ x.Has s ∨ s = .kept
+  | [], h => .inr (.inl h)
   | F :: E, h => by
-    rcases withs_has (x := F.wrap p x) (r := F.plug r) E h with h | h
+    rcases withs_has (x := F.wrap p x) (r := F.plug r) E h with h | h | h
     · exact .inl h
+    rotate_left
+    · exact .inr (.inr h)
     · cases F with
       | hwith q ℓ E' al rf =>
         simp only [Frame.wrap] at h
         split at h
         · simp only [Tm.Has] at h
-          rcases h with h | h | h | h
+          rcases h with h | h | h | h | h
           · exact .inl (plug_has E (.inl h))
           · exact .inl (plug_has E (.inr (.inl h)))
           · exact .inl (plug_has E (.inr (.inr (.inl h))))
-          · exact .inr h
-        · exact .inr h
+          · exact .inr (.inl h)
+          · exact .inr (.inr h)
+        · exact .inr (.inl h)
       | hkeep q ℓ E' al =>
         simp only [Frame.wrap] at h
         split at h
         · simp only [Tm.Has] at h
-          rcases h with h | h | h | h
+          rcases h with h | h | h | h | h
           · exact .inl (plug_has E (.inl h))
           · exact .inl (plug_has E (.inr (.inl h)))
           · exact .inl (plug_has E (.inr (.inr (.inl h))))
-          · exact .inr h
-        · exact .inr h
-      | _ => exact .inr h
+          · exact .inr (.inl h)
+          · exact .inr (.inr h)
+        · exact .inr (.inl h)
+      | _ => exact .inr (.inl h)
 
 theorem withs_below {E : List Frame} {r x : Tm} {p n : Nat} (h : (plug E r).Below n) (hx : x.Below n) :
     (withs p E x).Below n := fun q hq =>
-  (withs_has E hq).elim (fun h₁ => h q h₁) (fun h₁ => hx q h₁)
+  match withs_has E hq with
+  | .inl h₁ => h q h₁
+  | .inr (.inl h₁) => hx q h₁
 
 /-- A step writes only regions that exist after it. -/
 theorem Step.below {root l Λ μ e Λ' μ' e'} (hroot : RootBelow root)
