@@ -133,20 +133,22 @@ theorem withs_fw {base A : Nat → Prop} {p : Nat} {x : Tm} (hle : ∀ q y, anc 
       | hwith q ℓ E' al rf =>
         simp only [Frame.wrap]
         split
-        · rintro (h | h | h | h)
+        · rintro (h | h | h | h | h)
           · cases h
           · cases h
           · exact absurd (Tm.has_frame_ins h) hF.2.2.2.1
           · exact hf q' h
+          · cases h
         · exact hf q'
       | hkeep q ℓ E' al =>
         simp only [Frame.wrap]
         split
-        · rintro (h | h | h | h)
+        · rintro (h | h | h | h | h)
           · cases h
           · cases h
           · exact absurd (Tm.has_frame_ins h) hF.2.2.1
           · exact hf q' h
+          · cases h
         · exact hf q'
       | _ => exact hf q'
 

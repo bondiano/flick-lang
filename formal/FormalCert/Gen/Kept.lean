@@ -252,7 +252,7 @@ theorem program1929 (S : Sig) (hS : GenSig S) :
             (by stage_le) (by le_live))
           (.tryR (r := Row.none) (ε₀ := .cnil) (H := (fun x => x = .nm₀ "Fixture.Oops" ∨ (fun x => x = .nm₀ "Fixture.Bad" ∨ Row.none x) x)) (ε' := Row.none)
             (Cert.typ_provide (E := "Fixture.Log") (o := "log") (R := (.rcons "log" (.arrow (.base .string) (.rt .cnil .cnil) (.base .unit) Caps.none) .rnil)) (t := (.tapp (.tapp (.adt "Tuple") (.base .bool)) (.tapp (.adt "Prelude.Option") (.base .string)))) (r := .cnil) (ε := .cnil) (φ₀ := (.rt Row.none Row.none))
-              ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
+              (hS.arity _ (by decide)) ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
               (.rcons (R := .rnil) trivial (by decide)
                 (.lam (a := (.base .string)) (ψ := (.rt .cnil .cnil)) (t := (.base .unit)) (C := Caps.none)
                   .lit

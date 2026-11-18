@@ -36,16 +36,19 @@ theorem holds_none {k : Nat} {t : Ty} (ts : List Ty) : (Scheme.mk k Facts.none t
 handler, implements: `o x → w.o x`. -/
 abbrev recArm (o : Name) : Tm := .acons (Pat.spine o [.var]) (.app (.proj (.var 1) o) (.var 0)) .anil
 
-/-- An operation `o` of `E` called, at its arrow `a →{E} b`. -/
-theorem typ_op {E o : Name} {a b T : Ty} {φ : Stage} (h : S.op E o = some (.tail, a, b))
+/-- An operation `o` of a service `E` without parameters called, at its arrow `a →{E} b`. -/
+theorem typ_op {E o : Name} {a b T : Ty} {φ : Stage} (h0 : S.arity E = 0)
+    (h : S.op E o = some (.tail, a, b))
     (hT : LeLive S (.arrow a (.rt (.rnm E (.adt E)) .cnil) b Caps.none) T) :
-    Typ S Ψ Θ Γ (.const (.perform E o .tail)) (.ex T φ) :=
-  .perform (t := b) h hT
+    Typ S Ψ Θ Γ (.const (.perform E o .tail)) (.ex T φ) := by
+  obtain ⟨ha, hb⟩ := S.op_closed E o .tail a b (instT []) h fun _ hi => by omega
+  exact .perform (t := b) (us := []) h0.symm h (by rw [ha, hb]; exact hT)
 
 /-- `provide (Layer.succeed E w) e` as the core writes it: `let w = … in hdl E (o x → w.o x) (λv. v) e`;
 the record may hold anything, as the arm reads it through a variable. The rows outside, `r` and
-`ε`, are row terms: the handler's value and its arms are typed at them. -/
-theorem typ_provide {E o : Name} {a b R t T r ε : Ty} {w e : Tm} {φ₀ φ : Stage}
+`ε`, are row terms: the handler's value and its arms are typed at them. `E` has no parameters,
+so the handler answers each of its arguments. -/
+theorem typ_provide {E o : Name} {a b R t T r ε : Ty} {w e : Tm} {φ₀ φ : Stage} (h0 : S.arity E = 0)
     (hop : S.op E o = some (.tail, a, b)) (hc : S.Complete E (recArm o))
     (hR : R.field o = some (.arrow a (.rt .cnil .cnil) b Caps.none))
     (hw : Typ S Ψ Θ Γ w (.ex R φ))
@@ -53,15 +56,23 @@ theorem typ_provide {E o : Name} {a b R t T r ε : Ty} {w e : Tm} {φ₀ φ : St
     (hle : φ₀.le (.rt (Row.union (Row.single E) r.asRow) ε.asRow))
     (hob : φ₀.ObOut (Row.single E)) (hφ : (Stage.rt r.asRow ε.asRow).le φ) (hT : LeLive S t T) :
     Typ S Ψ Θ Γ (.let_ w (.hdl E (recArm o) (.lam (.var 0)) e)) (.ex T φ) := by
-  obtain ⟨ha, hb⟩ := S.op_closed E o .tail a b (shiftV 1) hop
+  obtain ⟨ha, hb⟩ := S.op_closed E o .tail a b (shiftV 1) hop fun _ hi => by omega
+  obtain ⟨ha₀, hb₀⟩ := S.op_closed E o .tail a b (instT []) hop fun _ hi => by omega
+  have hU : ∀ c, S.answers E [] c := fun _ => .inl h0
   have hf : (R.up 1).field o = some (.arrow a (.rt .cnil .cnil) b Caps.none) := by
     rw [Ty.up_def]
     have := Ty.field_substT (shiftV 1) hR
     simpa [Ty.substT, Ty.isStage, ha, hb, Caps.none_substT] using this
-  refine .let_ hw (.hdl (ψ := .pure) (C := t.reach) (t' := t) ?_ ?_ id_typ trivial he
-    (Stage.le_rt_sub hle fun x hx => hx.imp (Row.le_nameClose _ x) (Row.le_back _ _ x)) hob
-    ⟨⟨o, _, _, _, hop⟩, fun hn => (hn hc).elim⟩ hφ hT)
-  · refine .hatail hop ?_ .hanil
+  have hB : Row.Sub (Row.union (Row.single E) r.asRow) (Row.hBody E (S.answers E []) r.asRow) := by
+    intro x hx
+    rcases hx with hx | hx
+    · cases x <;> simp [Row.single, Row.inst] at hx
+      exact .inl ⟨hx.1, hU _⟩
+    · exact Row.hBody_of hU hx
+  refine .let_ hw (.hdl (ψ := .pure) (C := t.reach) (t' := t) (us := []) h0.symm ?_ ?_ id_typ trivial
+    he (Stage.le_rt_sub hle hB) hob ⟨⟨o, _, _, _, hop⟩, fun hn => (hn hc).elim⟩ hφ hT)
+  · refine .hatail (us := []) h0.symm hop ?_ .hanil
+    simp only [ha₀, hb₀]
     refine .app (a := a) (ψ := .rt .cnil .cnil) (t := b) (C := Caps.none) ?_ ?_ ?_ .refl
     · refine .proj (R := R.up 1) ?_ hf .refl
       refine typ_var (ts := []) (T' := R.up 1) rfl rfl ?_ ?_ .refl

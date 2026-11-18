@@ -18,7 +18,7 @@ def DeadUse (Λ : List Rgn) (r : Tm) : Prop :=
     (∃ t, r = .app (.app (.const .addFin) (.own p)) t) ∨
     (∃ t, r = .app (.app (.const .spawn) (.own p)) t) ∨ (∃ w, r = .inside p w ∧ Final w) ∨
     ∃ ℓ Ef al Ei o v, r = .hkeep p ℓ Ef al (plug Ei (.app (.const (.perform Ef o .tail)) v)) ∧
-      OkE Ei ∧ ∀ G ∈ Ei, G.handles Ef o .tail = none)
+      OkE Ei ∧ ∀ G ∈ Ei, G.handles Ef o = none)
 
 /-- A finished region body that waits for a child. -/
 def Waits (Λ : List Rgn) (e : Tm) : Prop :=
