@@ -329,7 +329,7 @@ wasm:
     node tools/wasm-dedup/index.mjs target/wasm32-unknown-unknown/release/flick_wasm.wasm
     @wasm=target/wasm32-unknown-unknown/release/flick_wasm.wasm; \
     echo "flick_wasm.wasm: $(wc -c < $wasm) bytes, $(gzip -6c $wasm | wc -c) gzipped"; \
-    test $(wc -c < $wasm) -le 4200000 # reason: T.prove (#594): contracts, path facts, intervals and interface invariants grew the playground compiler ~39 KB (~4.194 MB after wasm-opt)
+    test $(wc -c < $wasm) -le 4500000 # reason: proof declarations (#641): the logic kernel took ~68 KB (4.198 → 4.266 MB after wasm-opt); headroom for its next phases
 
 # Build the playground's compiler: the wasm module and its JS bindings
 docs-wasm: wasm

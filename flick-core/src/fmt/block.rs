@@ -166,6 +166,27 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// `proof name params where goal = proof`: on one line when it fits,
+    /// else `where` starts the next line at the declaration's column and the
+    /// proof follows its `=` as the body of a `let` does.
+    pub fn proof(&mut self, n: &'a Node) -> Doc<'a> {
+        let a = self.a;
+        let (Some(at), Some(eq), Some(block)) = (
+            position(n, K::WhereKw),
+            position(n, K::Eq),
+            node_position(n, K::Block),
+        ) else {
+            return self.generic(n);
+        };
+        let head = self.elements(n, &n.children[..at]);
+        let goal = self.elements(n, &n.children[at..=eq]);
+        let Element::Node(body) = &n.children[block] else {
+            unreachable!("a node position")
+        };
+        let goal = self.body(goal, Value::Block(body), body.range().1, &[]);
+        docvec![a, head, a.break_("", " "), goal].group(a)
+    }
+
     /// `pattern <- value` in `do` and `for`.
     pub fn bind(&mut self, n: &'a Node) -> Doc<'a> {
         let (Some(arrow), Some(value)) = (position(n, K::LArrow), nodes(n).get(1).copied()) else {

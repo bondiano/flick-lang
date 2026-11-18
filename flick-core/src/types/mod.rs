@@ -72,6 +72,8 @@ mod expression_fact;
 mod origin;
 mod patterns;
 mod pipes;
+mod proof_data;
+mod proof_decls;
 mod proofs;
 mod qualified;
 mod question;
@@ -138,6 +140,7 @@ pub use patterns::is_pattern;
 pub use pipes::{
     applied_order, composed_key, composition, param_key, result_key, right_application,
 };
+pub use proof_decls::{GoalSyntax, GoalType, ProofInfo, goal_syntax};
 pub use question::Question;
 pub use ranges::range_list;
 pub use schemas::companion_name;
@@ -538,6 +541,8 @@ struct ItemCx {
     /// A name was taken on trust: a class constraint left open has no type
     /// to choose an instance by, and no error of its own.
     trusted: bool,
+    /// The proof being checked, where its rules are names.
+    proof: Option<Range>,
     /// Locals applied before their type was known, each with the pure arrow
     /// taken for it, its name and where it is bound.
     assumed_pure: Vec<(Type, String, u32)>,

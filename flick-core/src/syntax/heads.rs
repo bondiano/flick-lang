@@ -29,6 +29,10 @@ pub const CHECKED_BY: &str = "@checked$by";
 /// operation that proves one: `@invariant$of check value prove`.
 pub const INVARIANT_OF: &str = "@invariant$of";
 
+/// The names a proof reads as its goals and rules where no binder of the
+/// proof has them: `equal l r`, `refl`, `trans m p q` …
+pub const PROOF_WORDS: [&str; 7] = ["equal", "holds", "refl", "symm", "trans", "cong", "funext"];
+
 /// The heads whose blocks need no body even where no import exposes them,
 /// as the compiler read them before: `server fn f x = …` and `server f`.
 pub const BARE: [&str; 1] = ["server"];

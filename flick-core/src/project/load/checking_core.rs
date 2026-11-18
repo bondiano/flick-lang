@@ -303,6 +303,10 @@ impl Checking<'_> {
             });
         }
         diagnostics.extend(checked);
+        // a module that checked is the only one whose proofs are about something
+        if clean {
+            diagnostics.extend(ir::check_proofs(&module, &typing));
+        }
         let declarations = typing.declarations.clone();
         let mut ir = self.lower_if_clean(
             loaded,

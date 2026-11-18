@@ -291,7 +291,7 @@ pub const PROVIDED: &str = "Fiber.Provided";
 
 impl Type {
     /// `t` with `Provided r s` in the row of its last runtime arrow, the
-    /// one its call performs; unchanged without one.
+    /// one its call performs, or of the task it is; unchanged without one.
     #[must_use]
     pub fn with_provided(&self, r: &Row, s: &Type) -> Type {
         match self {
@@ -307,6 +307,12 @@ impl Type {
                 sr.elems
                     .insert(provided(), Rc::from([Type::Tag(r.clone()), s.clone()]));
                 Type::Fun(p.clone(), Stage::Runtime(sr, e.clone()), res.clone())
+            }
+            Type::Eff(row, e, a) => {
+                let mut row = row.clone();
+                row.elems
+                    .insert(provided(), Rc::from([Type::Tag(r.clone()), s.clone()]));
+                Type::Eff(row, e.clone(), a.clone())
             }
             Type::Captured(t, c) => Type::Captured(Rc::new(t.with_provided(r, s)), c.clone()),
             other => other.clone(),

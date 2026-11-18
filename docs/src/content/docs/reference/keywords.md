@@ -33,7 +33,8 @@ See [modules.md](../modules/).
 | `assert` | `let assert` binds a pattern that may not match, and fails when it does not | `let assert [x, ..._] = xs as "no items"` |
 | `type` | declares an ADT, `type alias` a transparent alias | `type Shape = Circle Float \| Empty` |
 | `opaque` | hides a type's representation outside its module | `opaque type alias UserId = String` |
-| `where` | the predicate of a `refined` type; a filter in `sql { … }` | `where user.id == params.id` |
+| `where` | the predicate of a `refined` type; the goal of a `proof`; a filter in `sql { … }` | `where user.id == params.id` |
+| `proof` | contextual: before a name at the start of a declaration, states a property of the module's definitions and proves it; the compiler checks the proof and erases the declaration; a name elsewhere | `proof same where same_type a a = refl` |
 | `kind` | declares a kind with its type-level constructors | `kind Nullability = NonNull \| Nullable` |
 | `error` | `type error` declares an expected error with a nominal identity | `type error NotFound = NotFound UserId` |
 | `service` | declares the operations of a service, looked up at run time | `service Clock = now : Unit ->{} Float` |

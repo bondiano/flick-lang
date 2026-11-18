@@ -1,0 +1,24 @@
+---
+title: "FLICK-T083"
+---
+
+The body of a `proof` is a certificate: `refl`, a rule applied to its
+arguments, a `match` that splits a variable of the statement into every
+one of its cases, a premise, or a `let` that names a proof. Here the
+body is none of these, or a rule is used where it does not apply: a
+split misses a case, or `cong` is given a proof whose equation is not
+written down.
+
+```flick fail T083
+proof wrapped (x : Bool) (y : Bool)
+where equal (Some x) (Some y) =
+  cong (fun z -> Some z) refl
+```
+
+is
+
+```flick
+proof wrapped (x : Bool) (y : Bool) (h : equal x y)
+where equal (Some x) (Some y) =
+  cong (fun z -> Some z) h
+```
