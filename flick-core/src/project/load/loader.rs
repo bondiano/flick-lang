@@ -4,6 +4,21 @@ use super::{
 };
 
 impl Loader<'_> {
+    /// The directory a module of `root` names itself from.
+    fn root_dir(&self, root: &Root) -> Option<PathBuf> {
+        match (root, self.project) {
+            (Root::Source, Some(p)) => Some(p.source_root()),
+            (Root::Test, Some(p)) => Some(p.test_root()),
+            (Root::Proof, Some(p)) => Some(p.proof_root()),
+            (Root::Package(name), _) => self
+                .package_sources()
+                .into_iter()
+                .find(|(n, _)| n == name)
+                .map(|(_, dir)| dir),
+            _ => None,
+        }
+    }
+
     pub(super) fn load(&mut self, path: &Path) -> io::Result<Option<usize>> {
         if self.modules.iter().any(|m| m.path == path) {
             return Ok(None);
@@ -13,16 +28,7 @@ impl Loader<'_> {
         self.diagnostics.extend(utf8);
         let loader = self.loader_of(path);
         let mut root = self.root_of(path);
-        let root_dir = match (&root, self.project) {
-            (Root::Source, Some(p)) => Some(p.source_root()),
-            (Root::Test, Some(p)) => Some(p.test_root()),
-            (Root::Package(name), _) => self
-                .package_sources()
-                .into_iter()
-                .find(|(n, _)| n == name)
-                .map(|(_, dir)| dir),
-            _ => None,
-        };
+        let root_dir = self.root_dir(&root);
         let expected = (root_dir.as_ref()).map(|dir| expected_name(path, dir, loader.is_some()));
         let named = expected.as_ref().and_then(|e| e.as_deref());
         let (parse, syntax) = self.syntax_of(path, file, loader.is_some(), named);
