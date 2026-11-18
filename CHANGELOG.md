@@ -9,8 +9,8 @@ break programs.
 - **Breaking: `suite` and `test` blocks.** `suite "name" { … }` holds
   `test "name" { body }` and nested suites, and a top-level `test "name" {
   … }` stands alone; either may be `.skip` or `.only`. Std's plugin expands
-  them into calls of `Test` (`Test.group`, the new `Test.case`, `Test.skip`
-  and `Test.only`), each top-level block a case of the module's `tests` in
+  them into calls of `Test` (`Test.group`, `Test.effect_test` of a `task`,
+  and the new `Test.skip` and `Test.only`), each top-level block a case of the module's `tests` in
   the order written, which the module exports without naming it, so
   `flick test` finds it as before. A body is an effectful test, as
   `Test.effect_test` runs one. `suite` and `test` are now reserved heads at
@@ -25,7 +25,8 @@ break programs.
   a test marked `only`. While a test of the run is marked `only`, the run
   keeps only such tests, and a skipped test is reported as `skipped`: in the
   summary, and in the JSON report with a `skipped` count when there is one.
-  `flick new` writes its test as a `suite`.
+  `flick new` writes its test as a `suite`. The plugin interface gains
+  `Expr::Task`, `task { body }` in a plugin's code.
 
 - **Fixed: a re-exported type keeps its companions.** A module that
   re-exports a type (`import App.Ports exposing (Port)` with

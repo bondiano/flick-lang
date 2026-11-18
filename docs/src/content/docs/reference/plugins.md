@@ -162,7 +162,7 @@ and with the span of the block it stands for:
 
 | Kind | Nodes |
 | - | - |
-| expression | name, number, text, boolean, unit, application, lambda, record, field, list, tuple, annotation, hole, concatenation (`a ++ b`), `match` with guards, `if`, a block of statements and its value, a body with a module open |
+| expression | name, number, text, boolean, unit, application, lambda, record, field, list, tuple, annotation, hole, concatenation (`a ++ b`), `match` with guards, `if`, `task { … }`, a block of statements and its value, a body with a module open |
 | type | name, application, record, function, tuple, type-level text (`"name"`), `_`, `forall`, row, hole, a type of the signature |
 | pattern | variable, wildcard, constructor, record, tuple, hole |
 | declaration | `let`, signature, `type alias`, `type` with constructors and `deriving`, maybe `unboxed`, `instance` with members, a group of several or none, documentation of one, a function with the value that reads a constant given to it, hole |

@@ -160,9 +160,7 @@ impl Printer<'_> {
             }
             Expr::Record(fields) => self.record(fields, " = ", Role::Expr, d)?,
             Expr::Get { record, label } => {
-                self.push("(");
-                self.node(*record, Role::Expr, d)?;
-                self.push(").");
+                self.around("(", *record, Role::Expr, ").", d)?;
                 self.name(label, Names::Label)?;
             }
             Expr::Items(items) => self.sequence("[", items, "]", Role::Expr, d)?,
@@ -194,6 +192,7 @@ impl Printer<'_> {
                 }
                 self.push(")");
             }
+            Expr::Task(body) => self.around("(task { ", *body, Role::Body, " })", d)?,
             Expr::Match { scrutinee, arms } => self.match_on(*scrutinee, arms, d)?,
             Expr::If {
                 condition,
@@ -411,6 +410,21 @@ impl Printer<'_> {
                 span.start, span.end
             ))
         }
+    }
+
+    /// The node `id` as `role` between `before` and `after`.
+    fn around(
+        &mut self,
+        before: &str,
+        id: NodeId,
+        role: Role,
+        after: &str,
+        depth: u32,
+    ) -> Result<(), String> {
+        self.push(before);
+        self.node(id, role, depth)?;
+        self.push(after);
+        Ok(())
     }
 
     fn name(&mut self, name: &str, names: Names) -> Result<(), String> {

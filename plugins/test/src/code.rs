@@ -1,6 +1,7 @@
 //! The code a block stands for: a suite is `Test.group name [cases]`, a
-//! test `Test.case name (fun _ -> body)`, and a modifier wraps the case in
-//! `Test.skip` or `Test.only`. The module's `tests` lists the case of each
+//! test `Test.effect_test name (task { body })`, as one is written by hand,
+//! and a modifier wraps the case in `Test.skip` or `Test.only`. The
+//! module's `tests` lists the case of each
 //! block in the order written: a module of one block declares it alone; of
 //! several, each block declares its case as `tests$i`, which no source can
 //! name, and the first also `tests`, which names them all.
@@ -44,7 +45,8 @@ fn case(b: &mut Builder, item: &Item) -> NodeId {
             } else {
                 flick!(b @ at, ())
             };
-            flick!(b @ at, Test.case #at (fun _ -> #body))
+            let task = b.at(at).expr(Expr::Task(body));
+            flick!(b @ at, Test.effect_test #at #task)
         }
         Kind::Suite(items) => {
             let cases: Vec<NodeId> = items.iter().map(|i| self::case(b, i)).collect();

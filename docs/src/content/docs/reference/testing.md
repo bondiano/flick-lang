@@ -26,8 +26,9 @@ test "counts" { Test.expect (Test.equal 3 (List.length [1, 2, 3])) }
 
 The blocks are the plugin of the `std` package (see [plugins](../plugins/)),
 which every module has without an import. They expand into calls of `Test`:
-a suite is `Test.group`, a test `Test.case`, so `flick expand` shows the
-code each block stands for.
+a suite is `Test.group`, a test `Test.effect_test name (task { body })`, as
+one is written by hand, so `flick expand` shows the code each block stands
+for.
 
 ## Blocks
 

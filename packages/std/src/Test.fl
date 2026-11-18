@@ -63,15 +63,6 @@ effect_test :
   Test
 foreign pure effect_test from "flick:rt" "testEffect"
 
-/// The test of a block `test "name" { body }`: an `effect_test` whose
-/// task calls `body`.
-case :
-  forall e.
-  String ->
-  (forall s. Fiber.Provided {...Host.Live} s => Unit ->{Async, Scope s, ...Host.Live; e} Unit) ->
-  Test
-let case name body = effect_test name (task { body () })
-
 /// A test reported as skipped and never run; of a group or a suite, each
 /// test in it.
 skip : Test -> Test

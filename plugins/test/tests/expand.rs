@@ -34,20 +34,20 @@ fn a_suite_is_a_group_of_its_cases_and_a_test_a_case_of_its_body() {
     ), @r#"
     let tests : (List Test.Test) = [
       (Test.group "Users" [
-        (Test.case "creates one" (fun _ -> (Test.expect (Test.equal "Ada" "Ada")))),
+        (Test.effect_test "creates one" (task { (Test.expect (Test.equal "Ada" "Ada")) })),
         (Test.skip
           (Test.group "names" [
-            (Test.only (Test.case "trims" (fun _ -> (Test.expect (Test.equal 1 1))))),
-            (Test.case "empty" (fun _ -> ())),
+            (Test.only (Test.effect_test "trims" (task { (Test.expect (Test.equal 1 1)) }))),
+            (Test.effect_test "empty" (task { () })),
           ])),
       ]),
     ]
     "#);
-    // a body on lines of its own is the body of the function
+    // a body on lines of its own is the body of the task
     let lines = code(
         "test \"lines\" {\n  let user = { name = \"Ada\" }\n  Test.expect (Test.equal \"Ada\" user.name)\n}",
     );
-    assert!(lines.contains("(fun _ -> (let user = { name = \"Ada\" }\n  Test.expect (Test.equal \"Ada\" user.name)))"), "{lines}");
+    assert!(lines.contains("(task { (let user = { name = \"Ada\" }\n  Test.expect (Test.equal \"Ada\" user.name)) })"), "{lines}");
 }
 
 #[test]
@@ -57,12 +57,12 @@ fn the_module_s_tests_are_its_blocks_in_order() {
     insta::assert_snapshot!(code(
         "test \"first\" { Test.expect (Test.equal 1 1) }\n\nsuite.only \"second\" {}\n\ntest.skip \"third\" {}"
     ), @r#"
-    let tests$0 = (Test.case "first" (fun _ -> (Test.expect (Test.equal 1 1))))
+    let tests$0 = (Test.effect_test "first" (task { (Test.expect (Test.equal 1 1)) }))
     let tests : (List Test.Test) = [tests$0, tests$1, tests$2]
     ---
     let tests$1 = (Test.only (Test.group "second" []))
     ---
-    let tests$2 = (Test.skip (Test.case "third" (fun _ -> ())))
+    let tests$2 = (Test.skip (Test.effect_test "third" (task { () })))
     "#);
     // a wrong block is no case of the module's `tests`
     let found = all("test \"first\" {}\n\ntest {}\n\ntest \"third\" {}");
@@ -70,12 +70,12 @@ fn the_module_s_tests_are_its_blocks_in_order() {
     assert_eq!(
         found[0].as_deref(),
         Ok(
-            "let tests$0 = (Test.case \"first\" (fun _ -> ()))\nlet tests : (List Test.Test) = [tests$0, tests$1]"
+            "let tests$0 = (Test.effect_test \"first\" (task { () }))\nlet tests : (List Test.Test) = [tests$0, tests$1]"
         )
     );
     assert_eq!(
         found[2].as_deref(),
-        Ok("let tests$1 = (Test.case \"third\" (fun _ -> ()))")
+        Ok("let tests$1 = (Test.effect_test \"third\" (task { () }))")
     );
 }
 

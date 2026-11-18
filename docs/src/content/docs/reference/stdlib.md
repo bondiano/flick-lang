@@ -226,7 +226,6 @@ let tests =
 | `Test.effect_test name task` | the task runs in a scope of its own, which owns what it acquires, with the live host services, which outlive that scope: what it acquires may use them when it is released; `Test.expect` fails it on an assertion |
 | `Test.clock_test name task` | as `effect_test`, on a clock of its own that starts at 0 and moves only by `Test.adjust duration` and `Test.set_time millis`: a sleep, a timeout or a retry schedule waits for virtual time, so a test of an hour's backoff runs at once |
 | `Test.property name gen check` | `check` on 100 values of `gen`, drawn from the run's seed; `Gen.function result` (for a `Hash` argument) draws pure functions, as a law over functions needs |
-| `Test.case name body` | `effect_test` of a task that calls `body ()`: what a `test` block stands for |
 | `Test.group name tests` | `name >` before the names of `tests` |
 | `Test.skip test`, `Test.only test` | the test, and each test in it, skipped or marked `only` (see [testing](../testing/#full-names-skip-and-only)) |
 | `Test.suite name layer specs` | tests that share what `layer` makes: built once, before the first of them that runs, and released after the last, the `beforeAll` and `afterAll` of the suite; each spec, `Test.it name task`, is an `effect_test` with the layer's services, and a failed build fails each of them |
