@@ -21,7 +21,7 @@ pub use regions::Lambda;
 
 use crate::native::{settled, structural_dict};
 use crate::subst::{matches, subst};
-use crate::syntax::{Arm, Const, Env, Head, Lit, Path, Term};
+use crate::syntax::{Arm, Const, Env, GETTER, Head, Lit, Name, Path, Term};
 
 /// The top-level values of a program, by name.
 #[derive(Default)]

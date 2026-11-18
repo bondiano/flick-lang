@@ -206,6 +206,11 @@ impl Head {
 /// `θ`: implementations of services by name.
 pub type Env = BTreeMap<Path, Term>;
 
+/// The binder of a default method's field in an instance dictionary,
+/// `λ$get. default_C_m (I δ̄) d̄`: projecting the field runs the body, as
+/// the getter of a lazy field does on both targets (`docs/formal/elaboration.md` §2.5).
+pub const GETTER: &str = "$get";
+
 #[derive(Clone, Debug)]
 pub enum Term {
     Var(Name),

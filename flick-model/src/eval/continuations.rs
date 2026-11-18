@@ -40,10 +40,7 @@ impl Machine<'_> {
                 self.fields(done, &rest)
             }
             Frame::Field(l) => match &v {
-                Term::Record(fs) => match fs.iter().find(|(m, _)| *m == l) {
-                    Some((_, x)) => Control::Ret(x.clone()),
-                    None => return Err(stuck(format!("no field `{l}`"))),
-                },
+                Term::Record(fs) => return read_field(fs, &l),
                 _ => return Err(stuck(format!("`.{l}` of {v:?}"))),
             },
             Frame::UpdateRecord(l, e) => {
@@ -257,5 +254,15 @@ impl Machine<'_> {
             },
             (c, args) => return Err(stuck(format!("{c:?} of {args:?}"))),
         })
+    }
+}
+
+/// The field `l` of a record value: a default's getter runs its body there,
+/// as a lazy field of a dictionary does on both targets.
+fn read_field(fs: &[(Name, Term)], l: &Name) -> Step {
+    match fs.iter().find(|(m, _)| m == l) {
+        Some((_, Term::Lam(get, body))) if &**get == GETTER => Ok(Control::Eval((**body).clone())),
+        Some((_, x)) => Ok(Control::Ret(x.clone())),
+        None => Err(stuck(format!("no field `{l}`"))),
     }
 }

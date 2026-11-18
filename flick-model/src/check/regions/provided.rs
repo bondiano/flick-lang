@@ -26,7 +26,7 @@ fn key(service: &str) -> Path {
 
 impl Checker<'_> {
     /// The call splits `{Provided R ϱ}` of the row it performs by the
-    /// services of `R`, but `Scope` and the obligations; an unsolved tail
+    /// services of `R`, but `Scope`, `Async` and the obligations; an unsolved tail
     /// of `R` is the least, none.
     pub(in crate::check) fn split_provided(&mut self, r: &Row) -> Check<Row> {
         let mut r = self.zonk_row(r);
@@ -41,9 +41,12 @@ impl Checker<'_> {
         let services = wanted
             .elems
             .keys()
+            // `Async` is the root's: no `provide` younger than the owner
+            // gives it, as flick-core's `settle_want` reads it
             .filter(|s| {
                 **s != scope_service()
                     && **s != live_service()
+                    && **s != Path::new("Prelude", "Async")
                     && **s != provided()
                     && &*s.module != PROVIDED
             })
