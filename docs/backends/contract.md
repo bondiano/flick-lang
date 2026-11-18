@@ -110,8 +110,8 @@ separate integration work.
 `just js-component` remaps checkout, registry and standard-library source
 paths to canonical roots. The Rust root uses the pinned compiler's full
 commit hash, so installing `rust-src` does not change embedded panic paths.
-`just update-js-component` refreshes the distributed bytes and SHA together;
-`just check-js-component` requires exact bytes and the matching identity pin.
+`just update-component js` refreshes the distributed bytes and SHA together;
+`just check-component js` requires exact bytes and the matching identity pin.
 
 The host prepares `.d.ts` and Promise facades with the same projection
 implementation as the native baseline and reserves their output paths.

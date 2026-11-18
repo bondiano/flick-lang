@@ -83,7 +83,10 @@ let served url =
   String.join "" chunks
 
 /// Opens the server's page for `url` and mounts the client on it.
-visit : String -> (Unit ->{Host.Console, Async, Atom.Write} Unit) ->{Host.Console, Async} Unit
+visit :
+  String ->
+  (Unit ->{Host.Console, Async, Atom.Write} Unit) ->{Host.Clock, Host.Random, Host.Console, Async}
+  Unit
 let visit url after =
   open url (served url)
   Platform.stdout_line (url ++ " served, loads " ++ show (loads ()))
@@ -98,7 +101,7 @@ let visit url after =
     }
   }
 
-main : Unit ->{Host.Console, Async; AppError} Unit
+main : Unit ->{Host.Clock, Host.Random, Host.Console, Async; AppError} Unit
 let main () =
   visit "http://localhost/user/42" (fun () ->
     Atom.set page (User 7)

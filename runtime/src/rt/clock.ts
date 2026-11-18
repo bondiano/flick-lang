@@ -28,10 +28,14 @@ const live: Clock = {
 /** The key of the clock in the evidence. */
 export const CLOCK: object = /*#__PURE__*/ Object.freeze({ key: "effect/Clock" });
 
-/** The clock of what runs now. */
+/** Whether `found` is a clock; only a test puts one in the evidence. */
+const isClock = (found: unknown): found is Clock =>
+  typeof found === "object" && found !== null && typeof Reflect.get(found, "timer") === "function";
+
+/** The clock of what runs now. It does not name `TestClock`, so a bundle that runs no test drops it. */
 export const clock = (): Clock => {
   const found = lookup(CLOCK);
-  return found instanceof TestClock ? found : live;
+  return isClock(found) ? found : live;
 };
 
 const BUSY =

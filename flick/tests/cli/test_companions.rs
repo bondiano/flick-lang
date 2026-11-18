@@ -38,7 +38,8 @@ suite "private helpers" {
 test "greet" { Test.expect (Test.equal "Hello, Ms Ada!" (greet " Ada")) }
 "#;
 
-const BY_EXPORTS: &str = r#"module Lib.UsersTest
+// named `…_test` as Go names a test file: its Go file must stay in the build
+const BY_EXPORTS: &str = r#"module Lib.Users_test
 
 import Lib.Users exposing (greet)
 
@@ -49,11 +50,11 @@ fn library(name: &str, companion: Option<&str>) -> PathBuf {
     let mut files = vec![
         (
             "flick.toml",
-            "schema-version = 1\n\n[project]\nkind = \"lib\"\n",
+            "schema-version = 1\n\n[tools]\n\"flick/go\" = [\"go\"]\n\n[project]\nkind = \"lib\"\n",
         ),
         ("package.json", "{ \"name\": \"@acme/users\" }\n"),
         ("src/Lib/Users.fl", USERS),
-        ("test/Lib/UsersTest.fl", BY_EXPORTS),
+        ("test/Lib/Users_test.fl", BY_EXPORTS),
     ];
     files.extend(companion.map(|text| ("src/Lib/Users.test.fl", text)));
     project(name, &files)
@@ -129,7 +130,7 @@ fn a_companion_tests_what_its_module_keeps_on_every_target() {
             "Lib.Users > private helpers > trim",
             "Lib.Users > private helpers > title",
             "Lib.Users > greet",
-            "Lib.UsersTest > greets",
+            "Lib.Users_test > greets",
         ] {
             assert!(stdout.contains(name), "{flags:?}: {name} in {stdout}");
         }
@@ -140,7 +141,7 @@ fn a_companion_tests_what_its_module_keeps_on_every_target() {
     }
     // a module of the test root sees only the exports
     let private = BY_EXPORTS.replace("(greet \"Bo\")", "(Lib.Users.trim \"Bo\")");
-    fs::write(dir.join("test/Lib/UsersTest.fl"), private).expect("write");
+    fs::write(dir.join("test/Lib/Users_test.fl"), private).expect("write");
     let out = flick_in(&dir, &["test", "--emit", "js"]);
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(out.status.code(), Some(1), "{out:?}");

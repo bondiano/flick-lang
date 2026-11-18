@@ -3,9 +3,10 @@ title: "User interfaces"
 ---
 
 `Ui` (see [Type-level programming and eDSLs](../../spec/08-type-programming-and-edsl/)) describes a user interface and the handlers of
-its events. A handler's task writes atoms (`Atom.Write`) and nothing else:
-it provides any other service itself and handles its own errors, so a
-`Ui` carries no rows. Building one is pure: it runs no
+its events. A handler's task writes atoms (`Atom.Write`) and uses the
+browser's host services (`Host.BrowserLive`), which the root asks of its
+caller; it provides any other service itself and handles its own errors,
+so a `Ui` carries no rows. Building one is pure: it runs no
 handler, reads no state and touches no DOM. `Ui.Dom.mount` renders it with
 React 19 (`react-dom/client`) and runs each event as a task.
 
@@ -486,16 +487,20 @@ still interrupts and joins them.
 ```flick
 mount :
   forall c r.
-  Ui.Dom.Container -> (Failure none ->{r; none} Unit)^c -> Ui^c ->{Async, Atom.Registry, Atom.Write | r; none} Never
+  Ui.Dom.Container ->
+  (Failure none ->{r; none} Unit)^c ->
+  Ui^c ->{Async, Atom.Registry, Atom.Write, ...Host.BrowserLive | r; none} Never
 # let mount = Ui.Dom.mount
 ```
 
 `Ui.Dom.mount container supervisor ui` renders `ui` once; the views in it
 render again when the atoms they read change. The initial DOM mount is
 synchronous, later renders are React 19's to schedule and coalesce. Each
-task writes atoms with the `Atom.Write` of the `mount` call, the
+task writes atoms with the `Atom.Write` of the `mount` call and uses its
+`Host.BrowserLive` (`Host.Console`, `Host.Clock`, `Host.Random`), the
 supervisor gets its defects, and the registry is the one the program
-provides:
+provides. A `main` that mounts a root names those host services, so its
+runner, or the launcher of a `main` without one, provides them:
 
 ```flick
 # count : Atom.Writable Float
@@ -504,7 +509,7 @@ provides:
 # report : Failure none ->{} Unit
 # let report _ = ()
 #
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Async, ...Host.BrowserLive; AppError} Unit
 let main () =
   match Ui.Dom.container "app" with
   | None -> App.fail "missing root"

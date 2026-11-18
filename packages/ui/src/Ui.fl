@@ -16,8 +16,9 @@ import Ui.Safe exposing (SafeUrl, SanitizedHtml, safe_url, trusted_html)
 /// What handles DOM events with snapshot `s`: a task per event under a
 /// concurrency policy. Only `Ui.Event.exhaust`, `latest`, `queue` and
 /// `concurrent` and their `Action` forms make one, so no handler is
-/// fire-and-forget. A handler's task writes atoms and nothing else: it
-/// provides any other service itself and handles its own errors.
+/// fire-and-forget. A handler's task writes atoms and uses the browser's
+/// host services, which `Ui.Dom.mount` asks of its caller; it provides any
+/// other service itself and handles its own errors.
 type Handler s
 
 /// A click, as an inert copy of the DOM event: the mouse button (0 the main
@@ -265,7 +266,10 @@ foreign pure component from "flick:ui/react" "uiComponent"
 /// `Ui.Dom.mount` with a renderer factory, called when this call starts,
 /// instead of a DOM container. The elements here are still DOM ones.
 mount_with :
-  Renderer -> (Failure none ->{r} Unit)^c -> Ui^c ->{Async, Atom.Registry, Atom.Write | r} Never
+  Renderer ->
+  (Failure none ->{r} Unit)^c ->
+  Ui^c ->{Async, Atom.Registry, Atom.Write, ...Host.BrowserLive | r}
+  Never
 foreign effect mount_with from "flick:ui/react" "uiMountWith"
   retention call
 
@@ -374,7 +378,7 @@ foreign pure stateful from "flick:ui/react" "uiStateful"
 /// `task` as work of an instance of region `s`: it starts after the
 /// instance mounts, and its unmount interrupts it, so what it uses
 /// outlives `s`. It runs with the browser's host services, those the
-/// runner provides the root.
+/// caller of `Ui.Dom.mount` provides the root.
 mounted :
   Fiber.Outlives c s =>
   (Eff {Async, Atom.Write, Document, ...Host.BrowserLive} none Unit)^c -> (Lifecycle s)^c

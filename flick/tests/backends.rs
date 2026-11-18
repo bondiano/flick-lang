@@ -2,6 +2,9 @@
 
 mod common;
 #[cfg(feature = "wasm-backends")]
+#[path = "backends/go.rs"]
+mod go;
+#[cfg(feature = "wasm-backends")]
 #[path = "backends/review.rs"]
 mod review;
 #[cfg(all(feature = "wasm-backends", unix))]

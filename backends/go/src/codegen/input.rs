@@ -4,8 +4,8 @@
 use std::collections::BTreeMap;
 
 use super::Bindings;
-use crate::codegen::Known;
-use crate::ir::Module;
+use flick_backend_support::Known;
+use flick_ir::Module;
 
 /// What a program is made of.
 pub struct Input<'a> {

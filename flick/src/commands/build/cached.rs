@@ -1,5 +1,4 @@
 use crate::artifact::{Artifact, validate_destination_paths};
-use flick_core::build;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::Project;
 use tracing::debug;
@@ -35,17 +34,7 @@ impl BuildCommand {
         let paths = super::publication::paths(&output, &artifacts);
         let current = validate_destination_paths(&output.out_dir, paths.iter().map(String::as_str))
             .is_ok()
-            && cache::artifacts_current(&output.out_dir, &artifacts)
-            && (!output.go
-                || output.backend.is_component()
-                || output.entries.iter().all(|(name, _)| {
-                    cache::go_current(
-                        &project.root,
-                        key,
-                        &output.out_dir,
-                        &build::go::executable(name),
-                    )
-                }));
+            && cache::artifacts_current(&output.out_dir, &artifacts);
         progress.stage("Restoring cached artifacts");
         self.record(&output, None, &output.entries, &artifacts);
         if current && !self.generation {
@@ -69,16 +58,6 @@ impl BuildCommand {
             diagnostics: Vec::new(),
         };
         self.publish(Some(project), &output, &mut emitted, None, progress);
-        if output.go && emitted.diagnostics.is_empty() {
-            for (name, _) in &output.entries {
-                cache::mark_go(
-                    &project.root,
-                    key,
-                    &output.out_dir,
-                    &build::go::executable(name),
-                );
-            }
-        }
         Some(emitted.diagnostics)
     }
 

@@ -107,4 +107,6 @@ pub fn example(example: &str, name: &str) -> path::PathBuf {
 
 /// An app project's `flick.toml`.
 #[allow(dead_code, reason = "not every test file uses it")]
-pub const APP: &str = "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n";
+/// A project that may build for Go: only `[tools]` lets the Go backend run
+/// `go build`. The table comes first, so text appended goes to `[project]`.
+pub const APP: &str = "schema-version = 1\n\n[tools]\n\"flick/go\" = [\"go\"]\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n";

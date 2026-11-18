@@ -14,10 +14,10 @@ use super::arith::Native;
 use super::layout::{Code, INDENT, block, call, param_list, single, statement};
 use super::shape::Types;
 use super::{Gen, names};
-use crate::codegen::tail::{
+use flick_backend_support::tail::{
     Calls, Target, binds, cycles, function, has_tail_call, jumpable, members, passed_on, self_call,
 };
-use crate::ir::{BinOp, Expr, Item, Lit, Param, Pat, Stage};
+use flick_ir::{BinOp, Expr, Item, Lit, Param, Pat, Stage};
 
 /// Where a tail call jumps: the members of the loop with their arity, the
 /// loop variables, and the local each parameter of the running member

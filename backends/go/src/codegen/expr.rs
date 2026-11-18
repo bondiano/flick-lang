@@ -3,7 +3,7 @@
 
 use std::mem;
 
-use crate::codegen::loops;
+use flick_backend_support::loops;
 
 use flick_pretty::{Document, docvec};
 
@@ -11,8 +11,8 @@ use super::arith::Native;
 use super::closures::poly;
 use super::layout::{Code, call, if_else, list, statement};
 use super::{Gen, names};
-use crate::codegen::tail::{Callee, Target};
-use crate::ir::{BinOp, Expr, ExprKind, Lit, Pat, Stage, Stmt};
+use flick_backend_support::tail::{Callee, Target};
+use flick_ir::{BinOp, Expr, ExprKind, Lit, Pat, Stage, Stmt};
 use flick_ir::{EnumLit, Lift};
 
 /// A literal as Go: numbers typed as the runtime holds them.

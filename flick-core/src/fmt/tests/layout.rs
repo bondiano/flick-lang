@@ -399,3 +399,15 @@ fn keeps_the_braces_of_an_if_branch() {
     let g r = if r.x > 0 then ({ r with x = 0 }) else r
     "#);
 }
+
+/// A loop label touches its colon, before `for`, `while` and `loop` alike.
+#[test]
+fn keeps_a_loop_label_against_its_colon() {
+    let src = "let f xs =\n  'outer  :  for i <- 1 .. 3 do {\n    'w:while true do { continue 'w }\n    'l :loop { break 'outer }\n  }\n";
+    insta::assert_snapshot!(fmt(src), @r#"
+    let f xs = 'outer: for i <- 1..3 do {
+      'w: while true do { continue 'w }
+      'l: loop { break 'outer }
+    }
+    "#);
+}

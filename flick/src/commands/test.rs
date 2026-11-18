@@ -12,7 +12,6 @@ use std::time::{Duration, SystemTime};
 use std::{fs, thread};
 
 use crate::artifact::{Artifact, resolve_root, validate_root};
-use flick_core::build::go;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::{Backend, Emit};
 use flick_core::project::{self, ModuleCache, Project};
@@ -247,13 +246,6 @@ fn prepare(
         store(&emitted.artifacts);
         drop(progress);
         return Ok(Runner::component(out, &backend));
-    }
-    if go {
-        if store(&emitted.artifacts) {
-            cache::mark_go(&project.root, &key, &out, &go::executable(go::TEST));
-        }
-        drop(progress);
-        return Ok(Runner::native(out.join(go::executable(go::TEST))));
     }
     let runner = out.join("test.js");
     store(&emitted.artifacts);
