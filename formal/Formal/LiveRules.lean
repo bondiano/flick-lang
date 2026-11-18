@@ -191,11 +191,12 @@ example : Const.ok Facts.none .spawn
 example : ¬ Const.ok Facts.none .addFin { (default : CArg) with s := .rg 0, C := region } :=
   fun h => h.2.2 (.atm (.r 0)) rfl
 /-- A control arm may use its own resume, without leaking the handler's region into its outer row. -/
-example (S : Sig) (hop : S.op "E" "op" = some (.control, .base .unit, .base .unit)) :
+example (S : Sig) (hS : S.arity "E" = 0)
+    (hop : S.op "E" "op" = some (.control, .base .unit, .base .unit)) :
     Typ S [] Facts.none []
       (.acons (Pat.spine "op" [.var, .var]) (.app (.var 1) (.lit .unit)) .anil)
-      (.harms "E" (.base .unit) emptyStage (.tvar 0)) := by
-  refine .hactl hop ?_ .hanil
+      (.harms "E" [] (.base .unit) emptyStage (.tvar 0)) := by
+  refine .hactl (by simp [hS]) hop ?_ .hanil
   exact .app (.var (T := .arrow (.base .unit) emptyStage (.base .unit) (Ty.tvar 0).reach)
       (ts := []) rfl rfl (fun _ _ h => h.elim) (by rw [Scheme.inst_mono]; exact .refl)) .lit
     ⟨fun _ h => h, fun _ h => h⟩ .refl

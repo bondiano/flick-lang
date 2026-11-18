@@ -101,7 +101,7 @@ theorem Sig.ctorTy_shows (S : Sig) {K k ts T} (hK : S.ctor K = some (k, ts, T)) 
   exact key ts (List.Subset.refl _)
 
 /-- What a constant with one argument shows of it. -/
-theorem Const.shows_first (c : Const) (ι : CArg) (S : Sig) (hc : c.arity = 2) :
+theorem Const.shows_first (c : Const) (ι : CArg) (hc : c.arity = 2) :
     ∃ a t, c.ty ι = .arrow a .pure t Caps.none ∧ Caps.Sub a.reach t.reach := by
   cases c <;> simp [Const.arity] at hc <;>
     refine ⟨_, _, rfl, ?_⟩ <;> intro x h <;>
