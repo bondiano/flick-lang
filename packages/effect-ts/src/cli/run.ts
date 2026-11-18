@@ -214,8 +214,8 @@ const services = (settings: Settings) =>
   );
 
 interface HostConsole {
-  readonly stdout_line: (text: string) => Effect.Effect<unknown>;
-  readonly stderr_line: (text: string) => Effect.Effect<unknown>;
+  readonly stdout_line: (text: string) => unknown;
+  readonly stderr_line: (text: string) => unknown;
 }
 
 const HOST_CONSOLE = /*#__PURE__*/ service<HostConsole>("Host.Console");
@@ -225,10 +225,15 @@ const throughHostConsole = <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effec
   Effect.flatMap(Effect.context(), (context) => {
     const host = Context.getOrUndefined(context, HOST_CONSOLE);
     if (host === undefined) return self;
+    // an operation of a service of Flick's own runtime gives a value or a
+    // call of the kernel, as the bridge has it, not an Effect
     const write =
-      (line: (text: string) => Effect.Effect<unknown>) =>
+      (line: (text: string) => unknown) =>
       (...args: ReadonlyArray<unknown>): void => {
-        Effect.runSyncWith(context)(line(args.map(String).join(" ")));
+        const written = line(args.map(String).join(" "));
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- what the operation needs is in `context`, the services it was found in
+        const task = (Effect.isEffect(written) ? written : callEffect(() => written)) as Effect.Effect<unknown>;
+        Effect.runSyncWith(context)(task);
       };
     const out = write(host.stdout_line);
     const err = write(host.stderr_line);
