@@ -61,8 +61,7 @@ fn one_step_is_left_alone() {
     assert_eq!(fixed(&text, "FLICK-T035"), None);
 }
 
-const LOOK: &str =
-    "look : Float ->{Host.Console} Option Float\nlet look n =\n  Platform.stdout_line \"look\"\n  Some n\n\n";
+const LOOK: &str = "look : Float ->{Host.Console} Option Float\nlet look n =\n  Platform.stdout_line \"look\"\n  Some n\n\n";
 
 #[test]
 fn a_runtime_call_in_a_do_is_bound_before_it() {

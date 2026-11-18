@@ -52,7 +52,9 @@ fn original_bootstrap_app_fail_raises_the_native_record_not_a_string() {
     );
     for result in results {
         let mut heap = Heap::new();
-        let counted = result.expect("lowers").expect("both profile programs lower");
+        let counted = result
+            .expect("lowers")
+            .expect("both profile programs lower");
         let report = counted.execute(&mut heap, 100_000);
         assert_eq!(report.stdout, "before\n");
         let ProgramOutcome::Raised(payload) = report.outcome else {

@@ -238,7 +238,11 @@ impl CountedMain {
 }
 
 /// Lowers `main` of `modules` and its root layer for the counted executor.
-pub fn counted_main(modules: &[Compiled], main: &Path, release: bool) -> Result<CountedMain, String> {
+pub fn counted_main(
+    modules: &[Compiled],
+    main: &Path,
+    release: bool,
+) -> Result<CountedMain, String> {
     let ir: Vec<_> = modules
         .iter()
         .map(|module| {
