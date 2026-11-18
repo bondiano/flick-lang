@@ -15,9 +15,10 @@ break programs.
   `.d.ts`, the API docs and `flick pack` leave them out, so a build's
   output is the same with or without them. Under `flick test` a
   module with a companion exports to it all it declares, and the
-  companion's view is cached apart from the module's public interface. A Go
-  file of a module whose name ends in `_test` no longer drops out of the
-  build.
+  companion's view is cached apart from the module's public interface. A
+  module whose Go file name ended in a lower-case part that Go reads as a
+  build constraint, `_test`, `_linux` or `_386`, no longer drops out of the
+  Go build.
 
 - **Breaking: a `server fn` call outside a browser takes its server from
   `Server.with_origin`.** The new `Server.with_origin origin task` sends
