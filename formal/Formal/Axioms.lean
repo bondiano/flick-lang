@@ -85,9 +85,9 @@ prints, and `#guard_msgs` turns the difference into an error.
 #guard_msgs in
 #print axioms Flick.MutOk.lzDecl
 
-/-- info: 'Flick.MutOk.lzAwaitOf' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+/-- info: 'Flick.LzSig.typ_run' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
-#print axioms Flick.MutOk.lzAwaitOf
+#print axioms Flick.LzSig.typ_run
 
 /-- info: 'Flick.MutOk.lzAwait' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
@@ -96,18 +96,6 @@ prints, and `#guard_msgs` turns the difference into an error.
 /-- info: 'Flick.MutOk.lzWrite' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Flick.MutOk.lzWrite
-
-/-- info: 'Flick.MutOk.lzDeclFn' depends on axioms: [propext, Classical.choice, Quot.sound] -/
-#guard_msgs in
-#print axioms Flick.MutOk.lzDeclFn
-
-/-- info: 'Flick.MutOk.lzAwaitFn' depends on axioms: [propext, Classical.choice, Quot.sound] -/
-#guard_msgs in
-#print axioms Flick.MutOk.lzAwaitFn
-
-/-- info: 'Flick.Tm.rename_redirect' depends on axioms: [propext, Quot.sound] -/
-#guard_msgs in
-#print axioms Flick.Tm.rename_redirect
 
 /-- info: 'Flick.Elab.Witness.lzSig' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in

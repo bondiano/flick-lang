@@ -41,13 +41,12 @@ impl Checker<'_> {
         self.typing.forced.insert(node.range());
         let span = self.span(node);
         // a `let lazy` is its function's alone: nothing else can be forcing it
-        let local = node
+        let shared = !node
             .nodes()
             .next()
-            .and_then(|operand| self.lazy_local(operand));
-        let shared = local.is_none();
-        if let Some(at) = local {
-            self.typing.read_lazy.insert(node.range(), at);
+            .is_some_and(|operand| self.lazy_local(operand));
+        if !shared {
+            self.typing.read_lazy.insert(node.range());
         }
         if self.runtime_allowed(span) && shared {
             let label = Elem::named(&lang::item(Lang::Async).label);

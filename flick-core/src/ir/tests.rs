@@ -126,11 +126,10 @@ fn ir_makes_stages_dictionaries_and_lifts_explicit() {
     insta::assert_snapshot!(super::print(&ir));
 }
 
-/// A `let lazy` is a variable of its function, `None` until an `await`
-/// keeps the outcome of its initializer: no cell. The initializer of `x`,
-/// which two `await`s run, is a local function they call; the one of `y`,
-/// with one `await`, runs in place. A write to a `let lazy mut` is
-/// `Some (Ok v)`.
+/// A `let lazy` is a variable of its function: no cell. It holds the task
+/// `task (attempt e)`, and each `await` runs it, then makes it a task that
+/// gives the outcome back. A write to a `let lazy mut` makes it
+/// `task (Ok v)`.
 #[test]
 fn a_let_lazy_lowers_to_a_variable_of_its_function() {
     let ir = lower_text(
@@ -148,8 +147,7 @@ fn a_let_lazy_lowers_to_a_variable_of_its_function() {
 }
 
 /// A `let lazy` lowers its initializer once, however many `await`s run it
-/// and however deep it is in the initializer of another: with more than one
-/// `await`, each calls a local function of the declaration.
+/// and however deep it is in the initializer of another.
 #[test]
 fn a_let_lazy_initializer_is_lowered_once() {
     let ir = lower_text(

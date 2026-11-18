@@ -243,11 +243,9 @@ impl Lower<'_> {
                 match node.child_tokens().next().map(|t| t.kind) {
                     Some(K::NotKw) => ExprKind::Not(operand),
                     Some(K::IgnoreKw) => ExprKind::Ignore(operand),
-                    Some(K::AwaitKw) if self.typing.read_lazy.contains_key(&node.range()) => {
-                        self.lazy_await(&operand, span)
-                    }
                     Some(K::AwaitKw) if self.typing.forced.contains(&node.range()) => {
-                        super::lazy::force(*operand, span)
+                        let local = self.typing.read_lazy.contains(&node.range());
+                        self.force(*operand, span, local)
                     }
                     Some(K::AwaitKw) => {
                         let span = self.span(node);

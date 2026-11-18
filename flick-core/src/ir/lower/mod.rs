@@ -65,7 +65,6 @@ pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Di
         reuse: None,
         owners: HashMap::new(),
         entry_owners: HashMap::new(),
-        lazies: HashMap::new(),
         records: BTreeMap::new(),
         diagnostics: Vec::new(),
     };
@@ -151,10 +150,6 @@ struct Lower<'a> {
     /// The owner local of each source `scope` used by a call or value plan.
     owners: HashMap<Range, String>,
     entry_owners: HashMap<StageKey, String>,
-    /// What each `await` of a `let lazy` of the current definition runs for
-    /// the outcome of its initializer, by the unique name of the `let lazy`:
-    /// `attempt e`, or a call of the local function that holds it.
-    lazies: HashMap<String, Expr>,
     /// The constructors over a record written in their declaration, with
     /// its labels (`Module::records`).
     records: BTreeMap<String, Vec<String>>,
@@ -247,7 +242,6 @@ impl Lower<'_> {
         self.scope.clear();
         self.used.clear();
         self.vars.clear();
-        self.lazies.clear();
     }
 
     fn item(&mut self, decl: &Node, items: &mut Vec<Item>) {

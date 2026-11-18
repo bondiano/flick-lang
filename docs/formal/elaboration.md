@@ -453,11 +453,11 @@ control and errors (`tests/run/codegen/loops*.fl`).
 
 ### 3.6 `let lazy`
 
-`let lazy x = e` is a `let mut` of its state, `None` until an `await x` runs `e`
-and keeps its outcome as `Some (Ok v)` or `Some (Err err)`; `await x` gives the
-outcome back with `from_result`. `x = v` of a `let lazy mut` is `Some (Ok v)`.
-`attempt e` is written once: in place for one `await`, or as the body of a
-local function of the declaration that each of several `await`s calls.
+`let lazy x = e` is a `let mut` of its state, a task that gives the outcome of
+`e`: first `task (attempt e)`, which runs `e` and gives `Ok v` or `Err err`,
+written once at the declaration. `await x` runs it, makes the state `task o`
+for its outcome `o`, and gives `o` back with `from_result`. `x = v` of a
+`let lazy mut` makes it `task (Ok v)`.
 [`lazy.md`](lazy.md) §4 gives the translation. Its forms are derived rules of
 the typing of blocks, so T7 covers them (`formal/Formal/LetMut/Lazy.lean`).
 
