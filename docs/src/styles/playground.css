@@ -156,13 +156,6 @@ main:has(#flick-playground):not(:has(.tour-lesson)) .sl-container { max-width: n
 .fp-lesson ol, .fp-lesson ul { max-width: 66ch; margin: 0.5rem 0; padding-left: 1.25rem; }
 .fp .fp-lesson-actions button { border: 1px solid var(--fp-rule); background: var(--sl-color-bg); }
 .fp .fp-lesson-actions button:hover { border-color: var(--sl-color-text-accent); }
-.fp-goal { max-width: 66ch; margin: 0.75rem 0; padding: 0.625rem 0.75rem; border-left: 3px solid var(--sl-color-text-accent); background: var(--sl-color-bg); }
-.fp-lesson .fp-goal h3 { margin: 0 0 0.25rem; font-size: 0.875rem; }
-.fp-lesson .fp-goal ul { margin: 0; padding: 0; list-style: none; }
-.fp-goal li { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: 0 0.75rem; }
-.fp-goal-label { color: var(--sl-color-gray-2); }
-.fp-goal-value { overflow-wrap: anywhere; font-variant-ligatures: none; }
-.fp-lesson .fp-goal p { margin: 0.375rem 0 0; color: var(--sl-color-gray-2); font-size: 0.8125rem; }
 .fp-status {
   display: inline-flex;
   align-items: center;
@@ -243,7 +236,7 @@ main:has(#flick-playground):not(:has(.tour-lesson)) .sl-container { max-width: n
 
 .fp-file { font-weight: 600; }
 .fp .fp-file { padding: 0; border: 0; background: none; color: inherit; font: inherit; font-weight: 600; cursor: text; }
-.fp-file, .fp-pane-note, .fp-pane-footer, .fp-diagnostic-code, .fp-diagnostic-at, .fp-goal-value {
+.fp-file, .fp-pane-note, .fp-pane-footer, .fp-diagnostic-code, .fp-diagnostic-at {
   font-family: var(--__sl-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-variant-numeric: tabular-nums;
 }
@@ -539,7 +532,6 @@ main:has(.tour-lesson) .sl-container { max-width: none; }
   .fp-pane-header { padding-inline: 0.75rem; }
   .fp textarea, .fp-generated-code, .fp .fp-output { padding: 1rem; }
   .fp-pane-footer { font-size: 0.625rem; }
-  .fp-goal li { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (prefers-reduced-motion: reduce) {
