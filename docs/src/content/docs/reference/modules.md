@@ -512,9 +512,10 @@ Importing a module, a library's included, runs nothing else.
 An app names its entry modules in `flick.toml`, `entry` or `entries` (see
 [Entry points](../project/#entry-points)). Each exports `main`, its own or
 re-exported. A pure `main : Unit -> Unit` is called directly; a runtime
-`main` takes and returns `Unit`, needs no service and fails only with
-`AppError` (`FLICK-P026` otherwise), so it provides its layers and handles
-other errors itself.
+`main` takes and returns `Unit`, needs no service but those its entry
+provides, such as `Host.Console`, and fails only with `AppError`
+(`FLICK-P026` otherwise), so it provides its other layers and handles other
+errors itself.
 
 An entry marked `target = "client"` runs in a browser: nothing its `main`
 reaches may need `Server` (`FLICK-E009`, with the path to it), so its bundle
