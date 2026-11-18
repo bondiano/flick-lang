@@ -45,6 +45,17 @@ let snapshot text =
   current = "changed"
   if Email.check saved then Some (Email.prove saved) else None
 
+// a snapshot checked before a later assignment keeps its fact
+later : String -> Option Email
+let later text =
+  let mut current = text
+  let saved = current
+  if Email.check saved then {
+    current = "changed"
+    Some (Email.prove saved)
+  } else
+    None
+
 refined type Title = String where Checks.non_empty
 
 // a value of a refined type holds its check: `Name.value` is non-empty

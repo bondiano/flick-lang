@@ -52,6 +52,15 @@ let mutable text =
   if Email.check current then Some (Email.prove current) else None
 //                                  ^^^^^^^^^^^^^^^^^^^ FLICK-T077 `Checks.email current`
 
+// the check of a snapshot says nothing of the variable it was taken from
+from_the_variable : String -> Option Email
+let from_the_variable text =
+  let mut current = text
+  let saved = current
+  current = current ++ "!"
+  if Email.check saved then Some (Email.prove current) else None
+//                                ^^^^^^^^^^^^^^^^^^^ FLICK-T077 `Checks.email current`
+
 alone : String -> Email
 let alone = Email.prove
 //          ^^^^^^^^^^^ FLICK-T079 `Email.prove` makes a value only applied to one
@@ -68,3 +77,27 @@ let wrapper text = Email.prove text
 from_a_name : Name -> Email
 let from_a_name name = Email.prove (Name.value name)
 //                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-T077 `Checks.email (Name.value name)`
+
+// the condition of a `while` held of `current` before the body changed it
+in_a_loop : String -> Option Email
+let in_a_loop text =
+  let mut current = text
+  let mut found = None
+  while Email.check current do {
+    current = current ++ " "
+    found = Some (Email.prove current)
+    //            ^^^^^^^^^^^^^^^^^^^ FLICK-T077 `Checks.email current`
+  }
+  found
+
+// a check of the element before says nothing of the next one
+next_element : List String -> Option Email
+let next_element texts =
+  let mut found = None
+  let mut previous = ""
+  for t <- texts do {
+    if Email.check previous then found = Some (Email.prove t)
+    //                                         ^^^^^^^^^^^^^ FLICK-T077 `Checks.email t`
+    previous = t
+  }
+  found
