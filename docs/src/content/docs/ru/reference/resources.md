@@ -1,6 +1,6 @@
 ---
 title: "Ресурсы и их освобождение"
-source_hash: f98f330dca231099
+source_hash: e2b30d4d6138e8be
 ---
 
 `scope` владеет тем, что получено в нём, и освобождает это, когда его тело
@@ -16,8 +16,8 @@ source_hash: f98f330dca231099
 # import Resource exposing (Closing)
 #
 class Close a =
-  close : Closing t -> a ->{Async} Unit
-  close_exit : Closing t -> Exit e b -> a ->{Async} Unit
+  close : forall t. Closing t -> a ->{Async} Unit
+  close_exit : forall t e b. Closing t -> Exit e b -> a ->{Async} Unit
   let close_exit token _ value = close token value
 ```
 
