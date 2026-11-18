@@ -6,6 +6,22 @@ break programs.
 
 ## Unreleased
 
+- **Changed: a pool takes an item back by how its lease ended.** When the
+  scope of `Pool.get`, or the function of `Pool.use`, ends with a defect or
+  an interruption, which may have broken the item, the pool releases it and
+  acquires another, on the Effect adapter, Flick's own runtime and Go.
+  After a success or a typed error the item goes back as before, and
+  `Pool.invalidate` still drops one by hand.
+
+- **Fixed: cleanup off the normal path cuts a `control` operation off.**
+  When the body of `Effect.ensuring`, `on_exit`, `on_interrupt` or
+  `Resource.bracket` is interrupted, or an `abort` unwinds through it, a
+  `control` operation its cleanup performs for a handler around it is no
+  longer answered: the cleanup stops there and the interruption or the
+  unwind goes on. On Go such an arm ran and could drop the interruption,
+  and on both runtimes it could run the code an unwind leaves. On Go,
+  `on_exit` now runs its cleanup on an unwind too.
+
 - **Callback binders of capture rows may be left out.** A capture row of a
   signature, `^v`, that only one callback mentions, not on the callback's
   own qualifier, and that bounds a parameter of it is bound on that
