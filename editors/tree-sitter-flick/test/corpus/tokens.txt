@@ -401,3 +401,33 @@ let h = f <| g >> k << m |> n
   (identifier)
   (operator)
   (identifier))
+
+==================
+Proofs
+==================
+
+proof same where same_type a a = refl
+let proof = 1
+let p = trans proof h
+
+---
+
+(source_file
+  (keyword)
+  (identifier)
+  (keyword)
+  (identifier)
+  (identifier)
+  (identifier)
+  (operator)
+  (identifier)
+  (keyword)
+  (identifier)
+  (operator)
+  (number)
+  (keyword)
+  (identifier)
+  (operator)
+  (identifier)
+  (identifier)
+  (identifier))

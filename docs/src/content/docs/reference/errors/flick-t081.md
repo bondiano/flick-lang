@@ -1,0 +1,23 @@
+---
+title: "FLICK-T081"
+---
+
+A `proof` states that its two sides are equal. Here the rule at this
+place does not make them equal: after computing, the two sides still
+differ, and the message shows what is left. The statement may still be
+true; it needs a different proof. Split a variable with `match` so each
+case computes further, or use `funext` for functions.
+
+```flick fail T081
+proof constant (f : Bool -> Bool)
+where equal (f true) (f false) =
+  refl
+```
+
+is
+
+```flick
+proof applied (f : Bool -> Bool) (x : Bool)
+where equal ((fun y -> f y) x) (f x) =
+  refl
+```

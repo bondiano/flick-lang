@@ -105,6 +105,7 @@ stdlib/effect/string_locale
 stdlib/effect/void
 stdlib/hash_order
 stdlib/monoids
+stdlib/option_ap_strictness
 stdlib/seq
 stdlib/seqs
 codegen/services

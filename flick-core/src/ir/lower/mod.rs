@@ -22,6 +22,7 @@ mod numeric;
 mod owner_descriptors;
 mod owners;
 mod pattern;
+pub mod proofs;
 mod question;
 mod ranges;
 mod wire;
@@ -51,23 +52,7 @@ pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Di
     if !pending.is_empty() {
         return Err(pending);
     }
-    let mut lower = Lower {
-        module: module.name,
-        text: module.text,
-        file: module.file,
-        generated: module.generated,
-        typing,
-        scope: Vec::new(),
-        used: HashMap::new(),
-        vars: HashSet::new(),
-        loops: Vec::new(),
-        consumed: HashSet::new(),
-        reuse: None,
-        owners: HashMap::new(),
-        entry_owners: HashMap::new(),
-        records: BTreeMap::new(),
-        diagnostics: Vec::new(),
-    };
+    let mut lower = Lower::new(module, typing);
     let mut items = Vec::new();
     for decl in module.tree.nodes() {
         lower.item(decl, &mut items);
@@ -107,6 +92,28 @@ pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Di
         })
     } else {
         Err(lower.diagnostics)
+    }
+}
+
+impl<'a> Lower<'a> {
+    fn new(module: &'a resolve::Module, typing: &'a Typing) -> Self {
+        Lower {
+            module: module.name,
+            text: module.text,
+            file: module.file,
+            generated: module.generated,
+            typing,
+            scope: Vec::new(),
+            used: HashMap::new(),
+            vars: HashSet::new(),
+            loops: Vec::new(),
+            consumed: HashSet::new(),
+            reuse: None,
+            owners: HashMap::new(),
+            entry_owners: HashMap::new(),
+            records: BTreeMap::new(),
+            diagnostics: Vec::new(),
+        }
     }
 }
 

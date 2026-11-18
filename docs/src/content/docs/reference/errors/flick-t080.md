@@ -1,0 +1,23 @@
+---
+title: "FLICK-T080"
+---
+
+A `proof` states that its two sides are equal for every value of its
+parameters. Here the checker computed both sides and found two different
+values: different constructors or different literals. The statement is
+false, so no proof can close it. Check that the statement says what you
+mean.
+
+```flick fail T080
+proof always_some (x : Bool)
+where equal (Some x) None =
+  refl
+```
+
+is
+
+```flick
+proof always_some (x : Bool)
+where equal (Some x) (Some x) =
+  refl
+```

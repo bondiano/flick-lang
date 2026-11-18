@@ -1,0 +1,46 @@
+// Proofs the checker does not accept, each for the reason its code names:
+// a statement that is false or not proved by its proof, a statement
+// outside the domain, a body that is no certificate and a proof that
+// runs out of its budget.
+module App.Refuted exposing (..)
+
+// two type variables may stand for different types
+proof different where same_type a b = refl
+//                                    ^^^^ FLICK-T081 does not close the goal `a = b`
+
+proof constant (f : Bool -> Bool)
+where equal (f true) (f false) =
+  refl
+//^^^^ FLICK-T081 the goal `f true = f false`
+
+proof always_some (x : Bool)
+where equal (Some x) None =
+  refl
+//^^^^ FLICK-T080 `Some x` and `None` are different values
+
+// the payload's type is left open
+proof open where equal None None = refl
+
+proof sum (x : Int)
+where equal (x + 0) x =
+//           ^^^^^ FLICK-T082 a primitive operation is outside the domain
+  refl
+
+proof method (v : Option Int)
+where equal (map identity v) v =
+//           ^^^ FLICK-T082 `map` is a method
+  refl
+
+// `refl` does not say which equation `cong` lifts
+proof wrapped (x : Bool) (y : Bool)
+where equal (Some x) (Some y) =
+  cong (fun z -> Some z) refl
+//                       ^^^^ FLICK-T083 what this proof proves is not written here
+
+// nine doublings apply `f` 512 times
+proof costly (f : Bool -> Bool) (x : Bool)
+where equal ((fun t -> t (t (t (t (t (t (t (t (t f))))))))) (fun g y -> g (g y)) x) (f x) =
+  refl
+//^^^^ FLICK-T084 ran out of its budget
+
+//~ FLICK-T082 @22:1-22:40 its type is not fully known

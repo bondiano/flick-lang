@@ -343,3 +343,26 @@ fn keeps_the_return_arm_of_a_handler() {
       | return () -> []
     ");
 }
+
+/// A proof that does not fit its line puts `where` and its goal on the next
+/// line, at the declaration's column, and lays its proof out as a `let`
+/// body; a short one stays on one line.
+#[test]
+fn breaks_a_proof_before_its_goal() {
+    let src = "proof right_identity (v : Option a) where equal (flat_map pure v) v =\n  match v with\n  | None -> refl\n  | Some x -> refl\nproof same\nwhere same_type a a =\n  refl\nproof step (x : Bool) (h:equal x true)\nwhere holds x = h\n";
+    insta::assert_snapshot!(fmt(src), @r"
+    proof right_identity (v : Option a)
+    where equal (flat_map pure v) v =
+      match v with
+      | None -> refl
+      | Some x -> refl
+    proof same where same_type a a = refl
+    proof step (x : Bool) (h : equal x true) where holds x = h
+    ");
+    let src = "module M exposing (x) =\n  proof long_one (xs : List Int) where equal (List.reverse (List.reverse xs)) xs = trans (List.reverse_reverse xs) refl\n";
+    insta::assert_snapshot!(fmt(src), @r"
+    module M exposing (x) =
+      proof long_one (xs : List Int)
+      where equal (List.reverse (List.reverse xs)) xs = trans (List.reverse_reverse xs) refl
+    ");
+}
