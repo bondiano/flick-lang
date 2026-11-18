@@ -35,6 +35,7 @@ struct Raw {
     js: Option<Spanned<RawJs>>,
     package: Option<Spanned<RawPackage>>,
     plugins: Option<Spanned<BTreeMap<String, Spanned<RawGrants>>>>,
+    tools: Option<Spanned<BTreeMap<String, Vec<String>>>>,
     workspace: Option<RawWorkspace>,
     #[serde(default)]
     scripts: BTreeMap<String, Spanned<RawScript>>,
@@ -162,6 +163,7 @@ pub fn parse_manifest(text: &str, file: FileId) -> Result<Manifest, Diagnostic> 
             ("js.dependencies", raw.js.map(|j| j.span())),
             ("package", raw.package.map(|p| p.span())),
             ("plugins", raw.plugins.map(|p| p.span())),
+            ("tools", raw.tools.map(|t| t.span())),
         ];
         if let Some((table, at)) = settings.into_iter().find_map(|(t, at)| Some((t, at?))) {
             return Err(Diagnostic::error(
@@ -319,6 +321,7 @@ fn config(
         no_let_assert: lint.no_let_assert,
         thresholds,
         plugins,
+        tools: raw.tools.map(Spanned::into_inner).unwrap_or_default(),
     })
 }
 

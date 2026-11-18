@@ -185,7 +185,8 @@ impl Checker<'_> {
                     if !self.discharge_tail(tail, &want.owner, &want.at) =>
                 {
                     let (service, region) = (self.show_exact(tail), self.show_exact(&want.owner));
-                    self.unprovided(&service, &region, want.span);
+                    let named = self.signed(tail) && self.signed(&want.owner);
+                    self.unprovided(&service, &region, named, want.span);
                 }
                 _ => {}
             }
@@ -297,11 +298,15 @@ impl Checker<'_> {
         let row = self.store.normalize(&at.services);
         for (label, ty) in entries {
             if row.get(&label).is_none() {
-                let (service, region) = match ty.spine().1[..] {
-                    [service, owner] => (self.show_exact(service), self.show_exact(owner)),
+                let (service, region, named) = match ty.spine().1[..] {
+                    [service, owner] => (
+                        self.show_exact(service),
+                        self.show_exact(owner),
+                        self.signed(owner),
+                    ),
                     _ => continue,
                 };
-                self.unprovided(service.trim_matches(['{', '}', ' ']), &region, span);
+                self.unprovided(service.trim_matches(['{', '}', ' ']), &region, named, span);
             }
         }
     }
@@ -329,27 +334,38 @@ impl Checker<'_> {
         );
     }
 
+    /// Whether `ty` is a variable of a top-level signature being checked,
+    /// which a constraint added to it can name; the region of a `forall`
+    /// in an argument's type, as that of `Layer.from_build`, is not.
+    pub fn signed(&self, ty: &Type) -> bool {
+        matches!(self.store.resolve(ty), Type::Skolem(s) if self.cx.regions.signed.contains(&s))
+    }
+
     /// An obligation that reached a signature, or a row variable none
-    /// settles.
-    pub fn unprovided(&mut self, service: &str, region: &str, span: Span) {
+    /// settles. Only when the signature `named` the region and the row is
+    /// there a constraint to add to it.
+    pub fn unprovided(&mut self, service: &str, region: &str, named: bool, span: Span) {
         // a row variable is the row itself; a service is an element of one
         let row = if service.starts_with(char::is_lowercase) {
             service.to_owned()
         } else {
             format!("{{{service}}}")
         };
-        let constraint = format!("Fiber.Provided {row} {region}");
-        let edits = self.constraint_edits(&constraint, span);
-        self.diagnostics.push(
-            Diagnostic::error(
-                codes::G003,
-                format!(
-                    "this keeps work that uses `{service}` until `{region}` closes, but the service comes from the caller, which may release it earlier"
-                ),
-                span,
-            )
-            .with_fix(|| (format!("add `{constraint}` to the signature"), edits)),
+        let diagnostic = Diagnostic::error(
+            codes::G003,
+            format!(
+                "this keeps work that uses `{service}` until `{region}` closes, but the service comes from the caller, which may release it earlier"
+            ),
+            span,
         );
+        let diagnostic = if named {
+            let constraint = format!("Fiber.Provided {row} {region}");
+            let edits = self.constraint_edits(&constraint, span);
+            diagnostic.with_fix(|| (format!("add `{constraint}` to the signature"), edits))
+        } else {
+            diagnostic
+        };
+        self.diagnostics.push(diagnostic);
     }
 
     /// The edits that add `constraint` to the signature of the top-level

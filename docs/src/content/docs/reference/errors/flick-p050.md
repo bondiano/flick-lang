@@ -1,0 +1,14 @@
+---
+title: "FLICK-P050"
+---
+
+A backend or a plugin asked the compiler to run a host tool, as `node` or
+`go`, and the tool failed: it exited with an error, a declared output is
+missing or is not a regular file, or the build was cancelled while it ran.
+The message names the step and keeps the end of the tool's output.
+
+The compiler runs each step in a directory of its own beside the output
+directory, with only the step's declared inputs. Nothing is published
+until every step succeeds, so the files of the last successful build stay
+as they were. Fix what the tool's output reports, or report a failure on
+generated input to the backend's authors.

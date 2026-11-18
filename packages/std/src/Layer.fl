@@ -3,6 +3,8 @@
 /// combine and build layers as values. The span layers are in `Layer.Trace`.
 module Layer exposing (..)
 
+import Fiber
+
 /// Built services: the implementations of the services of `r`, as a layer
 /// builds them (`build`) or as `Context` puts them together.
 type Context (r : ServiceRow)
@@ -136,12 +138,13 @@ launch : Layer ri e ro ->{Async | ri; e} Never
 foreign effect launch from "flick:Layer" "launch"
 
 /// Builds `layer` into the owner of region `s`, which releases what it
-/// acquired when it closes.
-build : Layer ri e ro ->{Scope s | ri; e} Context ro
+/// acquired when it closes. The providers of its inputs `ri` must outlive
+/// `s`: what it acquired may use them when it is released.
+build : Fiber.Provided ri s => Layer ri e ro ->{Scope s | ri; e} Context ro
 foreign effect build from "flick:Layer" "build"
 
 /// `build` sharing what `memo` already built.
-build_with_memo_map : MemoMap -> Layer ri e ro ->{Scope s | ri; e} Context ro
+build_with_memo_map : Fiber.Provided ri s => MemoMap -> Layer ri e ro ->{Scope s | ri; e} Context ro
 foreign effect build_with_memo_map from "flick:Layer" "flickBuildWithMemoMap"
   arity 1
 
@@ -159,10 +162,13 @@ current_memo_map : Unit ->{} MemoMap
 foreign effect current_memo_map from "flick:Layer" "flickCurrentMemoMap"
 
 /// A layer whose build is `f`: it gets the memo map of the build and runs
-/// in the owner the services are built into.
-from_build : (forall s. MemoMap ->{Scope s | ri; e} Context ro) -> Layer ri e ro
+/// in the owner the services are built into. Its inputs `ri` outlive that
+/// owner, so what it acquires may use them when it is released.
+from_build :
+  (forall s. Fiber.Provided ri s => MemoMap ->{Scope s | ri; e} Context ro) -> Layer ri e ro
 foreign pure from_build from "flick:Layer" "flickFromBuild"
 
 /// `from_build`, built once per memo map like any other layer.
-from_build_memo : (forall s. MemoMap ->{Scope s | ri; e} Context ro) -> Layer ri e ro
+from_build_memo :
+  (forall s. Fiber.Provided ri s => MemoMap ->{Scope s | ri; e} Context ro) -> Layer ri e ro
 foreign pure from_build_memo from "flick:Layer" "flickFromBuildMemo"

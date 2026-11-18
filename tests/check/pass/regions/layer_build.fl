@@ -1,0 +1,66 @@
+// A layer of `Layer.from_build` may use its inputs in the finalizers it
+// registers: wherever it is built, their providers outlive the region it is
+// built into (`docs/formal/regions.md`, `Fiber.Provided`).
+module App.LayerBuild exposing (..)
+
+service Greeter =
+  greet : String ->{} String
+
+service Box =
+  value : Unit ->{} String
+
+greeter : Layer none none {Greeter}
+let greeter = Layer.succeed Greeter { greet = fun name -> name }
+
+box : Layer {Greeter} none {Box}
+let box =
+  Layer.from_build (fun memo ->
+    Scope.add_finalizer (task { ignore (Greeter.greet "release") })
+    Layer.build_with_memo_map memo (Layer.succeed Box { value = fun () -> "box" })
+  )
+
+memo_box : Layer {Greeter} none {Box}
+let memo_box =
+  Layer.from_build_memo (fun memo ->
+    Scope.add_finalizer (task { ignore (Greeter.greet "release") })
+    Layer.build_with_memo_map memo (Layer.succeed Box { value = fun () -> "box" })
+  )
+
+// a `provide` builds it into a region of its own, inside every provider
+provided : Unit ->{Greeter} String
+let provided () = provide box { Box.value () }
+
+composed : Unit ->{} String
+let composed () = provide (Layer.provide_ greeter box) { Box.value () }
+
+launched : Unit ->{Async, Greeter} Never
+let launched () = Layer.launch memo_box
+
+// a `scope` inside the provider of the input
+built : Unit ->{} String
+let built () = provide greeter { scope { (Context.get Box (Layer.build box)).value () } }
+
+// the input comes from the caller, which runs the whole function
+from_caller : Unit ->{Greeter} Unit
+let from_caller () = scope {
+  ignore (Layer.build memo_box)
+  ignore (LayerRef.make box { idleTimeToLive = None; preload = false })
+  ignore (LayerMap.make (fun (_ : Int) -> box) { idleTimeToLive = None; preloadKeys = None })
+}
+
+// the caller settles the obligation the signature names
+into_caller : Fiber.Provided {Greeter} s => Unit ->{Scope s, Greeter} Unit
+let into_caller () = ignore (Layer.build box)
+
+uses_into : Unit ->{} Unit
+let uses_into () = provide greeter { scope { into_caller () } }
+
+// the inputs of a layer without a signature are those its build uses
+inferred : Unit ->{Greeter} String
+let inferred () =
+  let local =
+    Layer.from_build (fun memo ->
+      Scope.add_finalizer (task { ignore (Greeter.greet "release") })
+      Layer.build_with_memo_map memo (Layer.succeed Box { value = fun () -> "box" })
+    )
+  provide local { Box.value () }

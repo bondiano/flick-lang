@@ -4,24 +4,22 @@
 
 use std::collections::HashSet;
 use std::fs;
-use std::io;
 use std::path::{Component, Path};
 
 use crate::artifact::{Artifact, validate_ancestors};
 use flick_core::build::go::FILES;
 
-use crate::cache::remove_empty_parents;
-
-/// Removes from `out_dir` what the lists on disk name and
-/// `artifacts` no longer has. Only a listed path inside the module of its
-/// list goes: a file nobody listed, or a list edited to name others, keeps
-/// every file it does not own.
-pub(super) fn remove(out_dir: &Path, artifacts: &[Artifact]) -> io::Result<()> {
+/// What the lists on disk in `out_dir` name and `artifacts` no longer has,
+/// for the publication to remove. Only a listed path inside the module of
+/// its list goes: a file nobody listed, or a list edited to name others,
+/// keeps every file it does not own.
+pub(super) fn stale(out_dir: &Path, artifacts: &[Artifact]) -> Vec<String> {
     let written: HashSet<&str> = artifacts.iter().map(|a| a.path.as_str()).collect();
     let lists = artifacts
         .iter()
         .map(|a| Path::new(&a.path))
         .filter(|path| path.file_name().is_some_and(|name| name == FILES));
+    let mut stale = Vec::new();
     for list in lists {
         let Ok(listed) = fs::read_to_string(out_dir.join(list)) else {
             continue;
@@ -31,18 +29,15 @@ pub(super) fn remove(out_dir: &Path, artifacts: &[Artifact]) -> io::Result<()> {
             let path = Path::new(line);
             let inside = path.starts_with(module)
                 && (path.components()).all(|c| matches!(c, Component::Normal(_)));
-            if !inside || validate_ancestors(out_dir, path).is_err() {
-                continue;
-            }
-            let path = out_dir.join(path);
-            match fs::remove_file(&path) {
-                Ok(()) => remove_empty_parents(&path, out_dir),
-                Err(err) if err.kind() == io::ErrorKind::NotFound => {}
-                Err(err) => return Err(err),
+            if inside
+                && validate_ancestors(out_dir, path).is_ok()
+                && fs::symlink_metadata(out_dir.join(path)).is_ok()
+            {
+                stale.push(line.to_owned());
             }
         }
     }
-    Ok(())
+    stale
 }
 
 #[cfg(test)]
@@ -51,7 +46,8 @@ mod tests {
 
     use crate::artifact::Artifact;
 
-    use super::remove;
+    use super::stale;
+    use crate::publish::commit;
 
     fn artifact(path: &str, contents: &str) -> Artifact {
         Artifact::source(path.to_owned(), contents.to_owned())
@@ -81,7 +77,7 @@ mod tests {
             artifact("go/main/m_A.go", ""),
             artifact("go/main/.flick-files", "go/main/m_A.go\n"),
         ];
-        remove(&out, &now).expect("removes");
+        commit(&out, &now, &stale(&out, &now), None).expect("removes");
         let left: Vec<&str> = (files.iter().copied())
             .filter(|f| out.join(f).exists())
             .collect();
@@ -115,7 +111,8 @@ mod tests {
             "go/main/redirect/kept.go\n",
         )
         .expect("old list");
-        remove(&out, &[artifact("go/main/.flick-files", "")]).expect("remove stale files");
+        let now = [artifact("go/main/.flick-files", "")];
+        commit(&out, &now, &stale(&out, &now), None).expect("remove stale files");
         assert_eq!(
             fs::read(outside.join("kept.go")).expect("outside file remains"),
             b"owned elsewhere"

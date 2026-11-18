@@ -4,13 +4,18 @@ use super::{component::Package, failure};
 use flick_backend::BackendPin;
 use flick_core::diagnostics::Diagnostic;
 use flick_core::project::config::BackendPackage;
+use std::collections::BTreeMap;
 use std::path::Path;
 
 const JS: &[u8] = include_bytes!("../../../backends/js/package/component.wasm");
 const PIN: &str = include_str!("../../../backends/js/package/backend.json");
 
-pub(super) fn javascript(root: &Path, rt: bool) -> Result<Package, Diagnostic> {
-    Package::from_bytes(root, pin()?, JS, rt)
+pub(super) fn javascript(
+    root: &Path,
+    rt: bool,
+    tools: &BTreeMap<String, Vec<String>>,
+) -> Result<Package, Diagnostic> {
+    Package::from_bytes(root, pin()?, JS, rt, tools)
 }
 
 pub(super) fn pin() -> Result<BackendPin, Diagnostic> {
