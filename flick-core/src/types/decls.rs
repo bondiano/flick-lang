@@ -50,26 +50,7 @@ impl Checker<'_> {
                 *hidden = true;
             }
         }
-        let mut bodies: Vec<Body> = pending.iter().map(|_| Body::None).collect();
-        for i in self.conversion_order(&pending) {
-            let p = &pending[i];
-            bodies[i] = self.with_params(&p.params, |this| this.body(p));
-            if let Some(def) = self.env.type_def_mut(&p.name) {
-                match &bodies[i] {
-                    Body::ModuleContract(requirements) => {
-                        def.form = Form::ModuleContract {
-                            requirements: requirements.clone(),
-                        }
-                    }
-                    Body::ModuleSignature(signature) => {
-                        def.form = Form::ModuleSignature {
-                            signature: Box::new(signature.clone()),
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
+        let mut bodies = self.convert_bodies(&pending);
         // Generated implementation aliases must be complete before checking
         // alias cycles or expanding a constructor's scheme. Their headers,
         // like the service headers, were available during body conversion.

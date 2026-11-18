@@ -217,6 +217,18 @@ impl<'a> Gen<'a> {
                 (self.construct(c, carried), Vec::new(), c.arity, 0)
             }
             ExprKind::Global { module, name } => self.direct(module, name, Vec::new()),
+            // an operation that runs here once it has its arguments
+            ExprKind::Perform {
+                effect: service,
+                op: name,
+                stages,
+            } if self.fiber.is_some()
+                && stages.iter().any(|&s| s != Stage::Pure)
+                && args.len() + usize::from(first.is_some()) >= operation_arity(stages) =>
+            {
+                let arity = operation_arity(stages);
+                (self.perform(service, name), Vec::new(), arity, 0)
+            }
             ExprKind::Dicts(inner, dicts) if matches!(inner.kind, ExprKind::Global { .. }) => {
                 let ExprKind::Global { module, name } = &inner.kind else {
                     unreachable!("a global, as the guard tested");

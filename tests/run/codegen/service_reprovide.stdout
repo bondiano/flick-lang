@@ -1,0 +1,18 @@
+turn 0 greets loop
+call 0 greets loop
+outer greets between
+turn 1 greets loop
+call 1 greets loop
+outer greets between
+turn 2 greets loop
+call 2 greets loop
+outer greets between
+outer greets outer
+middle greets middle
+inner greets inner
+middle greets middle again
+outer greets outer again
+aborted greets before the throw
+thrown
+outer greets after the throw
+outer greets last

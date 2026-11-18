@@ -1,8 +1,9 @@
 impl Checker<'_> {
-    /// The order bodies are converted in: aliases first, each after the aliases
-    /// it names, so that every later declaration sees what an alias stands for.
-    /// `= {}` keeps its place: the uses before it decide whether it is a record.
-    fn conversion_order(&self, pending: &[Pending]) -> Vec<usize> {
+    /// The order bodies are converted in, and how many of them are the aliases
+    /// it starts with: aliases first, each after the aliases it names, so that
+    /// every later declaration sees what an alias stands for. `= {}` keeps its
+    /// place: the uses before it decide whether it is a record.
+    fn conversion_order(&self, pending: &[Pending]) -> (Vec<usize>, usize) {
         let module = &self.env.module;
         let converted_early = |p: &Pending| {
             matches!(
@@ -30,8 +31,40 @@ impl Checker<'_> {
                 self.after_named(i, pending, &aliases, &mut seen, &mut order);
             }
         }
+        let early = order.len();
         order.extend((0..pending.len()).filter(|&i| !seen[i]));
-        order
+        (order, early)
+    }
+
+    /// Converts every body in [`Self::conversion_order`]. An operation's
+    /// parameters are walked through the aliases they name, so source alias
+    /// cycles break once the aliases are in; generated ones break later.
+    fn convert_bodies(&mut self, pending: &[Pending]) -> Vec<Body> {
+        let mut bodies: Vec<Body> = pending.iter().map(|_| Body::None).collect();
+        let (order, aliases) = self.conversion_order(pending);
+        for (step, i) in order.into_iter().enumerate() {
+            if step == aliases {
+                self.break_alias_cycles(pending);
+            }
+            let p = &pending[i];
+            bodies[i] = self.with_params(&p.params, |this| this.body(p));
+            if let Some(def) = self.env.type_def_mut(&p.name) {
+                match &bodies[i] {
+                    Body::ModuleContract(requirements) => {
+                        def.form = Form::ModuleContract {
+                            requirements: requirements.clone(),
+                        }
+                    }
+                    Body::ModuleSignature(signature) => {
+                        def.form = Form::ModuleSignature {
+                            signature: Box::new(signature.clone()),
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        bodies
     }
 
     /// Adds alias `i` after the aliases it names; a cycle, which name resolution

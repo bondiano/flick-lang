@@ -114,6 +114,7 @@ codegen/service_dictionary
 codegen/service_place
 codegen/scope_run
 codegen/service_child
+codegen/service_reprovide
 runtime/scope_close
 runtime/arena_scope
 runtime/arena_layer_scope

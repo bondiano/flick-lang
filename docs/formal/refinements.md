@@ -161,11 +161,11 @@ An exported type with an active contract publishes it in `.iface`:
 - the base;
 - the summary, with atoms as canonical entities.
 
-It also passes on the contracts it learned, as instances travel, so a re-export carries them (`Interface.invariants`, `iface-version` 28). The fingerprint covers the contract, so a changed check invalidates its dependents.
+It also passes on the contracts it learned, as instances travel, so a re-export carries them (`Interface.invariants`, since `iface-version` 28; the companions a re-export needs since 29). The fingerprint covers the contract, so a changed check invalidates its dependents.
 
 An importer (`proofs/exported.rs`) validates each contract against the exports it sees: the type is opaque, the constructor has `$`, `check : Base -> Bool` and `value : T -> Base` with a scalar base. One that does not match gives nothing. An interface that lost declarations (`incomplete`) gives none, and a module with errors publishes none of its own. `T.prove` of an imported type records the hidden unboxed constructor; a module alias or a re-export names the same canonical entity.
 
-Checked by: `plugins_tests/invariants.rs` (imports, aliases, a re-export, a second check from the kept interfaces, and an edit of the check alone that breaks exactly the proofs that needed it), `proofs/exported.rs` (a check reads back as written, a malformed one is opaque), `tests/run/schema/prove_imported.fl` on JS, Go, the model and Flick's runtime.
+Checked by: `plugins_tests/invariants.rs` (imports, aliases, a re-export alone and two deep, a second check from the kept interfaces, an edit of the check alone that breaks exactly the proofs that needed it, a module with an unrelated error, whose types give their importers no `prove`, and a re-exporter with one, which still passes on what it learned), `proofs/exported.rs` (a check reads back as written, a malformed one is opaque), `tests/run/schema/prove_imported.fl` on JS, Go, the model and Flick's runtime.
 
 ## 7. Trust boundary
 

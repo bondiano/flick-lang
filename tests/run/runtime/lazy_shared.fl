@@ -1,8 +1,11 @@
 // Fibers that force one lazy at once share one run of its task. An owner
 // interrupted while running it leaves no outcome behind: the next `await`
-// runs the task again, and the waiters see no interruption.
+// runs the task again, and the waiters see no interruption. The slow task
+// waits on a gate that opens only after the cut, so the order of the output
+// does not depend on how soon a timer fires.
 module App.Main exposing (main)
 
+import Deferred
 import Duration
 import Effect
 
@@ -22,12 +25,14 @@ let main () =
   }
   let (a, b) = parallel (task { await shared }) (task { await shared })
   Platform.stdout_line "together: \{a} \{b}, runs: \{Ref.get runs}"
+  let gate : Deferred.Deferred none Unit = Deferred.make ()
   let slow_runs = Ref.make 0
   let slow = lazy {
     Ref.set slow_runs (Ref.get slow_runs + 1)
-    nap 50
+    Deferred.await_ gate
     1
   }
   let cut = timeout_option 5 (task { await slow })
+  ignore (Deferred.succeed () gate)
   let after = await slow
   Platform.stdout_line "cut: \{show cut}, after: \{after}, runs: \{Ref.get slow_runs}"

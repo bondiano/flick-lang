@@ -299,7 +299,10 @@ impl Checker<'_> {
             }
             _ => return Type::Error,
         };
-        self.expect_kind(&kind, expected, node);
+        if !self.expect_kind(&kind, expected, node) {
+            // an ill-kinded type kept in a row would grow that row without end
+            return Type::Error;
+        }
         self.rows_settled(ty, &kind, node)
     }
 
@@ -323,18 +326,21 @@ impl Checker<'_> {
         }
     }
 
-    pub fn expect_kind(&mut self, found: &Kind, expected: &Kind, node: &Node) {
-        if let Err((found, expected)) = self.kinds.unify(found, expected) {
-            let text = self.text_of(node);
-            self.error(
-                codes::T002,
-                self.span(node),
-                format!(
-                    "`{text}` has kind {found}, but {} is expected here",
-                    with_article(&expected)
-                ),
-            );
-        }
+    /// Reports a kind mismatch; false when the kinds differ.
+    pub fn expect_kind(&mut self, found: &Kind, expected: &Kind, node: &Node) -> bool {
+        let Err((found, expected)) = self.kinds.unify(found, expected) else {
+            return true;
+        };
+        let text = self.text_of(node);
+        self.error(
+            codes::T002,
+            self.span(node),
+            format!(
+                "`{text}` has kind {found}, but {} is expected here",
+                with_article(&expected)
+            ),
+        );
+        false
     }
 
     fn forall(&mut self, node: &Node, children: &[&Node], expected: &Kind, free: Free) -> Type {
