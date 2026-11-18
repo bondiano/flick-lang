@@ -73,7 +73,7 @@ test("a todo in an expression type-checks with T022 but fails the check when it 
   const goal = page.locator(".fp-goal");
   await expect(goal).not.toContainText("T022");
   await replaceSource(page, "module Main exposing (main, half)\n\nhalf : Float -> Float\nlet half x = todo\n\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show (half 7.0))\n");
-  await expect(goal).toContainText("A todo in an expression is a placeholder of the type its place needs", { timeout: 30_000 });
+  await expect(goal).toContainText("A todo in an expression takes the type its place needs", { timeout: 30_000 });
   await expect(page.locator(".fp-status")).toContainText("Type-checked");
   await page.getByRole("button", { name: "Check answer", exact: true }).click();
   await expect(page.locator(".fp-lesson")).toContainText("The output does not match the task.", { timeout: 30_000 });
@@ -102,10 +102,11 @@ for (const colorScheme of ["light", "dark"] as const) {
     test(`the goal is readable and leaves the editor's actions free at ${width}px (${colorScheme})`, async ({ page }) => {
       await page.emulateMedia({ colorScheme });
       await page.setViewportSize({ width, height: 900 });
-      await page.goto("/flick-lang/course/values-02/");
+      // a signature todo adds its note to the goal once the compiler checks the starter
+      await page.goto("/flick-lang/course/values-03/");
       await ready(page);
       const goal = page.locator(".fp-goal");
-      await expect(goal).toBeVisible();
+      await expect(goal.locator("p")).toBeVisible({ timeout: 30_000 });
       const box = await goal.boundingBox();
       if (box === null) throw new Error("missing goal");
       expect(box.x).toBeGreaterThanOrEqual(0);

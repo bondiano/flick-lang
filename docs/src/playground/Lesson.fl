@@ -82,22 +82,16 @@ let goal_view m =
             (tr m.locale "Export (.d.ts)" "Экспорт (.d.ts)")
             (m.lesson_export ++ ": " ++ arguments ++ result))
           (goal_row (tr m.locale "Expected output" "Ожидаемый вывод") output)
-          (paragraph
-            (text
-              (tr
-                m.locale
-                "Check answer compares these with the .d.ts of your code and what it prints."
-                "«Проверить» сравнивает их с .d.ts вашего кода и тем, что он печатает.")))
           (todo_note
             m
             "FLICK-T024"
-            "A todo in a signature is error T024, a type still to write: the error names the type the compiler infers, and its fix, when offered, writes it in."
-            "todo в сигнатуре — ошибка T024, тип, который ещё предстоит написать: ошибка называет тип, выведенный компилятором, а её исправление, если оно предложено, вписывает его.")
+            "A todo in a signature is error T024: it names the inferred type, and its fix writes it in."
+            "todo в сигнатуре — ошибка T024: она называет выведенный тип, а её исправление вписывает его.")
           (todo_note
             m
             "FLICK-T022"
-            "A todo in an expression is a placeholder of the type its place needs: the code type-checks with warning T022, but the program fails when it reaches it."
-            "todo в выражении — заглушка того типа, который нужен на её месте: типы проверяются с предупреждением T022, но программа завершается ошибкой, дойдя до неё."))
+            "A todo in an expression takes the type its place needs: it type-checks with warning T022 and fails when it runs."
+            "todo в выражении принимает нужный на его месте тип: типы сходятся с предупреждением T022, а при выполнении — ошибка."))
     }
 
 /// The hints shown so far, in order, and the button that shows the next.
