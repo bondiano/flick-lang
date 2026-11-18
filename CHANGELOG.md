@@ -6,6 +6,14 @@ break programs.
 
 ## Unreleased
 
+- **Fixed: two constructors of one name in a `match`.** The Go and
+  JavaScript backends told the arms of a `match` apart by the constructor's
+  name alone, so with `HttpApi.ServeError` and `Rpc.ServeError` in one
+  `match` or `try` one of the arms was never reached. On Go, an arm of a
+  `try` for an error of a library before one for an error of the program
+  stopped the program with a failed type assertion when the error of the
+  program came.
+
 - **Callback binders of capture rows may be left out.** A capture row of a
   signature, `^v`, that only one callback mentions, not on the callback's
   own qualifier, and that bounds a parameter of it is bound on that
