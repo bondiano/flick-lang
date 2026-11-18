@@ -13,11 +13,19 @@ namespace Flick
 
 variable {S : Sig}
 
-theorem Sig.impl_reach (S : Sig) (N : Name) (a : Atom) : ¬ (S.impl N).reach a := by
-  intro h
-  rw [← S.impl_closed N (fun _ => .base .unit), Ty.reach_substT] at h
-  obtain ⟨_, _, h⟩ := h
-  exact h
+/-- The record of a service reaches only its parameters. -/
+theorem Sig.impl_reach (S : Sig) (N : Name) (a : Atom) (h : (S.impl N).reach a) :
+    ∃ i, i < S.arity N ∧ a = .v i := by
+  let σ : Atom → Ty := fun
+    | .v i => if i < S.arity N then .tvar i else .base .unit
+    | .r _ => .base .unit
+  rw [← S.impl_closed N σ (fun i hi => by simp [σ, hi]), Ty.reach_substT] at h
+  obtain ⟨b, -, h⟩ := h
+  rcases b with i | p
+  · by_cases hi : i < S.arity N
+    · exact ⟨i, hi, by simpa [σ, hi] using h⟩
+    · exact absurd h (by simp [σ, hi, Ty.reach, Caps.none])
+  · exact absurd h (by simp [σ, Ty.reach, Caps.none])
 
 /-- The result after all stages of an arrow. -/
 def Ty.res : Ty → Ty
@@ -93,8 +101,8 @@ theorem Sig.ctorTy_shows (S : Sig) {K k ts T} (hK : S.ctor K = some (k, ts, T)) 
   exact key ts (List.Subset.refl _)
 
 /-- What a constant with one argument shows of it. -/
-theorem Const.shows_first (c : Const) (ι : CArg) (S : Sig) (hc : c.arity = 2) :
-    ∃ a t, c.ty S ι = .arrow a .pure t Caps.none ∧ Caps.Sub a.reach t.reach := by
+theorem Const.shows_first (c : Const) (ι : CArg) (hc : c.arity = 2) :
+    ∃ a t, c.ty ι = .arrow a .pure t Caps.none ∧ Caps.Sub a.reach t.reach := by
   cases c <;> simp [Const.arity] at hc <;>
     refine ⟨_, _, rfl, ?_⟩ <;> intro x h <;>
     simp_all [Ty.reach, Caps.none]
@@ -188,14 +196,8 @@ theorem LeLive.arrow_res {a φ t C T : _}
     ∃ a' φ' t' C', T = .arrow a' φ' t' C' ∧ LeLive S t t' := by
   obtain ⟨_, _, _, _, he, _, _, ht, -⟩ := LeLive.arrow_left h; exact ⟨_, _, _, _, he, ht⟩
 
-theorem Const.ty_isArrow (c : Const) (ι : CArg) (S : Sig) :
-    ∃ a φ t C, c.ty S ι = .arrow a φ t C := by
-  cases c
-  case perform E o _ =>
-    simp only [Const.ty]
-    split <;> exact ⟨_, _, _, _, rfl⟩
-  case op => exact ⟨_, _, _, _, rfl⟩
-  all_goals exact ⟨_, _, _, _, rfl⟩
+theorem Const.ty_isArrow (c : Const) (ι : CArg) : ∃ a φ t C, c.ty ι = .arrow a φ t C := by
+  cases c <;> exact ⟨_, _, _, _, rfl⟩
 
 /-- The result of a constructor spine is not a binder, unless the value itself is one. -/
 theorem Typ.spine_notAll {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :

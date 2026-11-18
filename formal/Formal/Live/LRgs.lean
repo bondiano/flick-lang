@@ -97,8 +97,8 @@ def Place (Ψ : List Ty) (anc : Nat → Nat → Prop) (φ : Stage) (E : List Fra
     (H : Nat → Prop) : Prop :=
   Chain anc H ∧ (∀ x, φ.svc (.atm (.r x)) → H x) ∧
     (∀ F ∈ E, ∀ x, (F = .inside x ∨ F.rgn = some x) → H x) ∧
-    ∀ F ∈ E, ∀ q ℓ, F.cell = some (q, ℓ) → H q ∧ ∀ r ε t,
-      Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t Caps.none) → ∀ x, r.asRow (.atm (.r x)) → anc q x
+    ∀ F ∈ E, ∀ q ℓ, F.cell = some (q, ℓ) → H q ∧ ∀ u r ε t,
+      Ψ[ℓ]? = some (.arrow u (.rt r ε) t Caps.none) → ∀ x, r.asRow (.atm (.r x)) → anc q x
 
 /-- A child or a finalizer registered at a place runs at a stage of ancestors of its owner. -/
 theorem kid_live {Ψ anc E c p w t φ H} (hE : OkE E) (hc : c = .addFin ∨ c = .spawn) (hv : Value w)
@@ -115,10 +115,10 @@ theorem kid_live {Ψ anc E c p w t φ H} (hE : OkE E) (hc : c = .addFin ∨ c = 
   have hancp := hch p hp
   refine ⟨t', _, hk, fun x hx => ?_⟩
   rw [hancp]
-  rcases hat x hx with ⟨hxp, hin⟩ | ⟨F, hF, q, ℓ, r, ε, t₂, hcF, hqp, hℓ, hr'⟩
+  rcases hat x hx with ⟨hxp, hin⟩ | ⟨F, hF, q, ℓ, u, r, ε, t₂, hcF, hqp, hℓ, hr'⟩
   · exact ⟨inH x hin, hxp⟩
   · obtain ⟨hq, hrow⟩ := hcl F hF q ℓ hcF
-    have hx' := hrow r ε t₂ hℓ x hr'
+    have hx' := hrow u r ε t₂ hℓ x hr'
     rw [hch q hq] at hx'
     exact ⟨hx'.1, Nat.le_trans hx'.2 hqp⟩
 

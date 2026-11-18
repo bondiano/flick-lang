@@ -167,7 +167,7 @@ theorem Typ.shape {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
     obtain ⟨hs, hsp⟩ := ih hv rfl
     exact ⟨hs.equiv he, fun K hK hA =>
       (hsp K hK (fun h => hA (he.isAll.mp h))).equiv he⟩
-  | lam _ _ hT | fix _ _ hT | task _ _ _ hT | perform _ hT | kont _ _ hT =>
+  | lam _ _ hT | fix _ _ hT | task _ _ _ hT | perform _ _ hT | kont _ _ hT =>
     intro _ _ _ hJ; cases hJ
     exact ⟨.hidden (hT.opaque (by simp [Ty.Opaque, Ty.hd])), by simp [Tm.head]⟩
   | const _ hT =>

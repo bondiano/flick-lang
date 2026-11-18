@@ -66,15 +66,15 @@ theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.le
   · exact .inl (.ctorApp hvf hK hve)
   · cases c with
     | perform E o cl =>
-      obtain ⟨_, _, _, hop, hT'⟩ := hf.perform_arrow
+      obtain ⟨us, _, _, _, _, hop, hT'⟩ := hf.perform_arrow
       obtain ⟨-, hψ', -⟩ := LeLive.arrow_inv hT'
       by_cases hra : RootAnswers root E o cl
       · obtain ⟨rfl, _, _, hr, hf⟩ := hra
         exact step (Step.performRoot (E := []) OkE.nil (fun _ h => by cases h) hr hf hve)
-      · have hrow : Stage.le (Stage.rt (Ty.rnm E (.adt E)).asRow Row.none) φ := by
+      · have hrow : Stage.le (Stage.rt (Ty.rnm E (Ty.tcon E us)).asRow Row.none) φ := by
           simpa only [Stage.use_none] using Stage.le_trans hψ' hψ
-        exact .inr (.perform ⟨[], _, _, _, _, _, _, OkE.nil, hve, rfl, hop, fun _ h => (by cases h),
-          hra, Stage.le_svc hrow _ (.inl rfl)⟩)
+        exact .inr (.perform (.inl ⟨[], _, _, _, _, _, _, OkE.nil, hve, rfl, hop, fun _ h => (by cases h),
+          hra, _, Stage.le_svc hrow _ (.inl rfl)⟩))
     | scopeRun => exact step (Step.ofR (.scopeRun hve))
     | refMake => exact step (Step.ofR (.refMake hve))
     | refGet =>

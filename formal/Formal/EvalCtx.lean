@@ -95,12 +95,12 @@ holds it: the nearest frame where `resume` of `p` stops is that arm. -/
 def Resumable (E : List Frame) (p ℓ : Nat) : Prop :=
   ∃ A E' ℓh Ef al r k, E = A ++ .hctlA p ℓh ℓ false Ef al r k :: E' ∧ ∀ G ∈ A, ¬ G.resumes p
 
-/-- The handler of `E` with an arm for `o` of the class `c` that a frame installs, with its
-region. -/
-def Frame.handles (E o : Name) (c : OpClass) : Frame → Option Nat
+/-- The handler of `E` with an arm for `o` that a frame installs, with its region. A kept
+handler is the nearest handler of every operation it has an arm for, but runs only the `tail`
+ones: the rest of a body is the parent's, so an operation that is not `tail` is stuck there. -/
+def Frame.handles (E o : Name) : Frame → Option Nat
   | .hwith p _ E' al _ => if E' = E ∧ (al.armOf o).isSome then some p else none
-  -- a child keeps a handler for its `tail` operations: the rest of a body is the parent's
-  | .hkeep q _ E' al => if c = .tail ∧ E' = E ∧ (al.armOf o).isSome then some q else none
+  | .hkeep q _ E' al => if E' = E ∧ (al.armOf o).isSome then some q else none
   | _ => none
 
 /-- The effect a handler frame handles in its body. -/
@@ -109,11 +109,11 @@ def Frame.installs : Frame → Name → Prop
   | _, _ => False
 
 /-- The handler of an operation in a context: its region, if a frame answers it. -/
-def handlerOf : List Frame → Name → Name → OpClass → Option Nat
-  | [], _, _, _ => none
-  | F :: E, Ef, o, c => match F.handles Ef o c with
+def handlerOf : List Frame → Name → Name → Option Nat
+  | [], _, _ => none
+  | F :: E, Ef, o => match F.handles Ef o with
     | some q => some q
-    | none => handlerOf E Ef o c
+    | none => handlerOf E Ef o
 
 /-- `E[e]`; the list starts at the innermost frame. -/
 def plug : List Frame → Tm → Tm
@@ -194,14 +194,17 @@ row of its body. -/
 def Sig.Complete (S : Sig) (E : Name) (al : Tm) : Prop :=
   ∀ o c a b, S.op E o = some (c, a, b) → (al.armOf o).isSome
 
-/-- An effect with an operation that is not `tail` stays in the row `r` around a kept handler:
-a child does not run such an arm. -/
-def Sig.NonTail (S : Sig) (E : Name) (r : Row) : Prop :=
-  (∃ o c a b, S.op E o = some (c, a, b) ∧ c ≠ .tail) → r (.nm₀ E)
+/-- The arguments at which a handler of `E` with arms at `us` answers it. A handler answers by
+name at run time, so it may answer only arguments at which the operations of `E` have the types
+of its arms: every one when `E` has no parameters, otherwise `E us` itself. -/
+def Sig.answers (S : Sig) (E : Name) (us : List Ty) (c : TyClass) : Prop :=
+  S.arity E = 0 ∨ c = (Ty.tcon E us).classOf
 
-/-- A handler handles a declared effect, which leaves the row `r` outside unless the
-handler has an arm for every operation. -/
-def Sig.Handles (S : Sig) (E : Name) (al : Tm) (r : Row) : Prop :=
-  (∃ o c a b, S.op E o = some (c, a, b)) ∧ (¬ S.Complete E al → r (.nm₀ E))
+/-- A handler handles a declared effect at the arguments `us`, which leaves the row `r` outside
+unless the handler has an arm for every operation. The operations of an effect are the same at
+every argument (`Sig.Complete`); their types are those of `us` (`J.harms`). -/
+def Sig.Handles (S : Sig) (E : Name) (us : List Ty) (al : Tm) (r : Row) : Prop :=
+  (∃ o c a b, S.op E o = some (c, a, b)) ∧
+    (¬ S.Complete E al → r (.nm E (Ty.tcon E us).classOf))
 
 end Flick

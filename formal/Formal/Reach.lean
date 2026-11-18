@@ -19,6 +19,8 @@ inductive Site
   | loc (l : Nat)
   | ins
   | frame (p : Nat)
+  /-- A kept handler: only a child or a finalizer has one. -/
+  | kept
 
 def Tm.Has : Tm → Site → Prop
   | .var _, _ => False
@@ -63,8 +65,8 @@ def Tm.Has : Tm → Site → Prop
   | .kont p _, s => s = .rgn p
   -- a run-time form: only where a body or an arm a handler parks evaluates
   | .hole p, s => s = .ins ∨ s = .rgn p
-  | .hkeep q _ _ al e, s => s = .ins ∨ s = .rgn q ∨ al.Has s ∨ e.Has s
-  | .hkarm q _ _ al a k, s => s = .ins ∨ s = .rgn q ∨ al.Has s ∨ a.Has s ∨ k.Has s
+  | .hkeep q _ _ al e, s => s = .ins ∨ s = .rgn q ∨ al.Has s ∨ e.Has s ∨ s = .kept
+  | .hkarm q _ _ al a k, s => s = .ins ∨ s = .rgn q ∨ al.Has s ∨ a.Has s ∨ k.Has s ∨ s = .kept
   | .settle _ e, s => e.Has s
 
 /-- No `inside` form: values and unevaluated code. -/

@@ -20,7 +20,7 @@ theorem raise_any {Ψ Θ w} : AnyTy S Ψ Θ (.raise w) := by
 
 theorem unw_any {Ψ Θ q ℓ a} : AnyTy S Ψ Θ (.unw q ℓ a) := by
   intro _ _ _ h
-  obtain ⟨_, _, _, hl, ha, hφ⟩ := h.unw_type _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, hl, ha, hφ⟩ := h.unw_type _ _ _ _ _ rfl rfl
   exact .unw hl ha hφ
 
 /-- The handler catches its signal and runs what it holds. In the live discipline the
@@ -28,8 +28,8 @@ region of the handler is live where the answer is used. -/
 theorem hwith_catch {Ψ Θ p ℓ E al r a t φ}
     (h : Typ S Ψ Θ [] (.hwith p ℓ E al r (.unw p ℓ a)) (.ex t φ)) :
     Typ S Ψ Θ [] a (.ex t φ) := by
-  obtain ⟨_, _, _, _, _, _, _, hℓ, _, _, _, he, _, _, hφ, hT, hat⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
-  obtain ⟨_, _, _, hℓ', ha, _⟩ := he.unw_type _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, _, _, _, _, _, hℓ, _, _, _, he, _, _, hφ, hT, hat⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, hℓ', ha, _⟩ := he.unw_type _ _ _ _ _ rfl rfl
   rw [hℓ] at hℓ'
   simp only [Option.some.injEq, Ty.arrow.injEq] at hℓ'
   obtain ⟨-, ⟨rfl, rfl⟩, rfl, -⟩ := hℓ'
@@ -40,10 +40,10 @@ theorem hctl_signal {Ψ Θ p ℓ κ tl E al r x k t φ} {Ei : List Frame} (hEi :
     (hk : k = plug Ei (.hole p)) (hx : ∀ {Θ'}, AnyTy S Ψ Θ' x)
     (h : Typ S Ψ Θ [] (.hctl p ℓ κ tl E al r x k) (.ex t φ)) :
     Typ S Ψ Θ [] (.hwith p ℓ E al r (plug Ei (.unw p ℓ x))) (.ex t φ) := by
-  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, hℓ, hal, hrf, hψ, hop, _, _, hE, hk', hp, hφ₀, ha, _, hcm, hφ, hT, hat⟩ := h.hctl_type _ _ _ _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, hus, hℓ, hal, hrf, hψ, hop, _, _, hE, hk', hno, hp, hφ₀, ha, _, hcm, hφ, hT, hat⟩ := h.hctl_type _ _ _ _ _ _ _ _ _ _ _ rfl rfl
   obtain ⟨rfl, -⟩ := plug_hole_inj hEi hE (hk.symm.trans hk')
-  refine .hwith hℓ hal hrf hψ (refill_app hE perform_not_value hp (perform_fn hop) perform_up
-    fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hcm hφ hT hat
+  refine .hwith hus hℓ hal hrf hψ (refill_app hE perform_not_value hp (perform_fn hop hus) perform_up
+    (answered_hole hop hno (Stage.answered_hP hφ₀)) fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hcm hφ hT hat
   exact .unw hℓ ((hx (ha.cut hΘ.entails)).sub
     (J' := .ex _ (Stage.use (.rt _ _) (Ty.rg p).reach))
     ⟨LeLive.refl, Stage.use_ctl_le tl _ _ _⟩)
@@ -54,10 +54,10 @@ theorem hkarm_raise {Ψ Θ q ℓ E al w k t φ} {Ei : List Frame} (hEi : OkE Ei)
     (hk : k = plug Ei (.hole q))
     (h : Typ S Ψ Θ [] (.hkarm q ℓ E al (.raise w) k) (.ex t φ)) :
     Typ S Ψ Θ [] (.hkeep q ℓ E al (plug Ei (.unw q ℓ (.raise w)))) (.ex t φ) := by
-  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, hℓ, hal, hop, hE, hk', hp, hφ₀, hc, hnt, ha, hle, hφ, hT⟩ := h.hkarm_type _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, hus, hℓ, hal, hop, hE, hk', hno, hp, hφ₀, hc, ha, hle, hφ, hT⟩ := h.hkarm_type _ _ _ _ _ _ _ _ rfl rfl
   obtain ⟨rfl, -⟩ := plug_hole_inj hEi hE (hk.symm.trans hk')
-  refine .hkeep hℓ hal (refill_app hE perform_not_value hp (perform_fn hop) perform_up
-    fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hc hnt hle hφ hT
+  refine .hkeep hus hℓ hal (refill_app hE perform_not_value hp (perform_fn hop hus) perform_up
+    (answered_hole hop hno (Stage.answered_hP hφ₀)) fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hc hle hφ hT
   exact .unw hℓ ((raise_any (ha.cut hΘ.entails)).sub
     (J' := .ex _ (Stage.use (.rt _ _) (Ty.rg q).reach))
     ⟨LeLive.refl, Stage.le_use _ _⟩)
@@ -68,11 +68,11 @@ theorem hkarm_unw {Ψ Θ q ℓ E al q' ℓ' a k t φ} {Ei : List Frame} (hEi : O
     (hk : k = plug Ei (.hole q))
     (h : Typ S Ψ Θ [] (.hkarm q ℓ E al (.unw q' ℓ' a) k) (.ex t φ)) :
     Typ S Ψ Θ [] (.hkeep q ℓ E al (plug Ei (.unw q' ℓ' a))) (.ex t φ) := by
-  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, hℓ, hal, hop, hE, hk', hp, hφ₀, hc, hnt, ha, hle, hφ, hT⟩ := h.hkarm_type _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, hus, hℓ, hal, hop, hE, hk', hno, hp, hφ₀, hc, ha, hle, hφ, hT⟩ := h.hkarm_type _ _ _ _ _ _ _ _ rfl rfl
   obtain ⟨rfl, -⟩ := plug_hole_inj hEi hE (hk.symm.trans hk')
-  refine .hkeep hℓ hal (refill_app hE perform_not_value hp (perform_fn hop) perform_up
-    fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hc hnt hle hφ hT
-  obtain ⟨_, _, _, hℓ', ha', _⟩ := ha.unw_type _ _ _ _ _ rfl rfl
+  refine .hkeep hus hℓ hal (refill_app hE perform_not_value hp (perform_fn hop hus) perform_up
+    (answered_hole hop hno (Stage.answered_hP hφ₀)) fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hc hle hφ hT
+  obtain ⟨_, _, _, _, hℓ', ha', _⟩ := ha.unw_type _ _ _ _ _ rfl rfl
   exact .unw hℓ' (ha'.cut hΘ.entails) (Stage.none_le (Stage.rt_ne_pure hψ₀))
 
 /-- A signal of a resumed body lets the parked arm go. -/
@@ -80,27 +80,27 @@ theorem hres_signal {Ψ Θ p ℓ a x t φ} {A : List Frame} (hA : OkE A) (ha : a
     (hx : ∀ {Θ'}, AnyTy S Ψ Θ' x)
     (h : Typ S Ψ Θ [] (.hres p ℓ a x) (.ex t φ)) :
     Typ S Ψ Θ [] (.hdone p (plug A x)) (.ex t φ) := by
-  obtain ⟨_, _, _, _, _, _, _, _, hb, hA', ha', hp, hl, hcp, hφ, hT⟩ := h.hres_type _ _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, _, _, _, _, _, hb, hA', ha', hp, hl, hcp, hφ, hT⟩ := h.hres_type _ _ _ _ _ _ rfl rfl
   obtain ⟨rfl, -⟩ := plug_hole_inj hA hA' (ha.symm.trans ha')
   have h₁ := refill_app hA' kont_not_value hp (kont_fn_rg hl hcp) (fun _ _ h l => h.trans l)
-    fun T φ' hΘ hψ₀ _ _ => hx ((hb.cut hΘ.entails).sub (J' := .ex _ φ')
+    (fun _ _ _ _ => trivial) fun T φ' hΘ hψ₀ _ _ => hx ((hb.cut hΘ.entails).sub (J' := .ex _ φ')
       ⟨LeLive.refl, hψ₀⟩)
   exact .hdone (h₁.sub ⟨hT, Stage.use_mono hφ (Caps.Sub.refl _)⟩)
 
 /-- The arms of a new handler, in its run-time region `n`: the regions not yet created are
 renamed out, and `n` is put for the region of `resume`. -/
-theorem arms_body {Ψ Θ E al} {t' r ε : Ty} {n : Nat} (hn : al.NoIns) (hb : al.Below n)
-    (hΨ : ∀ u ∈ Ψ, u.YF n) (hidem : Θ.substT (kill n) = Θ)
+theorem arms_body {Ψ Θ E al} {us : List Ty} {t' r ε : Ty} {n : Nat} (hn : al.NoIns)
+    (hb : al.Below n) (hΨ : ∀ u ∈ Ψ, u.YF n) (hidem : Θ.substT (kill n) = Θ)
     (h : Typ S (Ψ.map (Ty.up 1)) (Θ.substT (shiftV 1)) [] al
-      (.harms E (t'.up 1) ((Ty.rt r ε).substT (shiftV 1)) (.tvar 0))) :
-    Typ S Ψ Θ [] al (.harms E (t'.substT (kill n)) (.rt (r.substT (kill n)) (ε.substT (kill n)))
-      (.rg n)) := by
+      (.harms E (us.map (Ty.up 1)) (t'.up 1) ((Ty.rt r ε).substT (shiftV 1)) (.tvar 0))) :
+    Typ S Ψ Θ [] al (.harms E (us.map (Ty.substT (kill n))) (t'.substT (kill n))
+      (.rt (r.substT (kill n)) (ε.substT (kill n))) (.rg n)) := by
   have hΨ' : Ψ.map (Ty.substT (kill n)) = Ψ := by
     conv => rhs; rw [← List.map_id Ψ]
     exact List.map_congr_left fun u hu => hΨ u hu
   have h₁ := h.substT (liftT 1 (kill n)) ((Fits.kill hb).lift 1)
   simp only [Flick.J.substT, List.map_nil] at h₁
-  rw [shift_comm, Facts.up_comm, Ty.up_comm, hΨ', hidem] at h₁
+  rw [shift_comm, shift_comm, Facts.up_comm, Ty.up_comm, hΨ', hidem] at h₁
   simp only [Ty.substS, Ty.substT, Ty.isStage, if_true, Ty.substT_shift_comm, liftT,
     Nat.zero_lt_one] at h₁
   have h₂ := h₁.substT (instT [.rg n]) (Fits.noIns hn fun _ => rfl)
@@ -109,14 +109,16 @@ theorem arms_body {Ψ Θ E al} {t' r ε : Ty} {n : Nat} (hn : al.NoIns) (hb : al
   simpa [Ty.substT, Ty.isStage, instT, ← Ty.up_def] using h₂
 
 /-- A handler is installed in the region `n` with its cell at the end of the store. -/
-theorem hdl_install {Ψ Θ E al rf e₀ T φ n t ψ C φ₀} {r ε : Ty} {t' : Ty}
+theorem hdl_install {Ψ Θ E al rf e₀ T φ n t ψ C φ₀} {us : List Ty} {r ε : Ty} {t' : Ty}
+    (hus : us.length = S.arity E)
     (hal : Typ S (Ψ.map (Ty.up 1)) (Θ.substT (shiftV 1)) [] al
-      (.harms E (t'.up 1) ((Ty.rt r ε).substT (shiftV 1)) (.tvar 0))) (hn : al.NoIns)
+      (.harms E (us.map (Ty.up 1)) (t'.up 1) ((Ty.rt r ε).substT (shiftV 1)) (.tvar 0)))
+    (hn : al.NoIns)
     (hrf : Typ S Ψ Θ [] rf (.ex (.arrow t ψ t' C) (.rt r.asRow ε.asRow)))
     (hψ : (Stage.use ψ.asStage C).le (.rt r.asRow ε.asRow))
     (he : Typ S Ψ Θ [] e₀ (.ex t φ₀))
-    (hφ₀ : φ₀.le (.rt (Row.union (Row.single E).nameClose (r.asRow.back (Row.single E))) ε.asRow))
-    (hOb : φ₀.ObOut (Row.single E)) (hc : S.Handles E al r.asRow)
+    (hφ₀ : φ₀.le (.rt (Row.hBody E (S.answers E us) r.asRow) ε.asRow))
+    (hOb : φ₀.ObOut (Row.single E)) (hc : S.Handles E us al r.asRow)
     (hφ' : (Stage.rt r.asRow ε.asRow).le φ) (hT : LeLive S t' T)
     (hbl : (Tm.hdl E al rf e₀).Below n) (hΨ : ∀ u ∈ Ψ, u.YF n) (hidem : Θ.substT (kill n) = Θ)
     (ht : T.YFMod n) (hφ : φ.substT (kill n) = φ) :
@@ -131,18 +133,18 @@ theorem hdl_install {Ψ Θ E al rf e₀ T φ n t ψ C φ₀} {r ε : Ty} {t' : T
   have h₃ := he.substT (kill n) (fk.sub fun _ h => .inr (.inr h))
   rw [hΨ', hidem] at h₂ h₃
   simp only [Flick.J.substT, Stage.substT_rt, Row.substT_asRow, List.map_nil] at h₂ h₃
-  let c : Ty := .arrow (.base .unit) (.rt (r.substT (kill n)) (ε.substT (kill n))) (t'.substT (kill n))
-    Caps.none
+  let c : Ty := .arrow (Ty.tcon E (us.map (Ty.substT (kill n))))
+    (.rt (r.substT (kill n)) (ε.substT (kill n))) (t'.substT (kill n)) Caps.none
   refine ⟨c, ?_, lam_todo, ?_⟩
-  · have := Ty.yf_kill n (.arrow (.base .unit) (.rt r ε) t' Caps.none)
-    simpa [Ty.substT, Ty.isStage] using this
+  · have := Ty.yf_kill n (.arrow (Ty.tcon E us) (.rt r ε) t' Caps.none)
+    simpa [Ty.substT, Ty.isStage, Ty.tcon_substT] using this
   · have hw : Typ S (Ψ ++ [c]) Θ [] (.hwith n Ψ.length E al rf e₀)
         (.ex (t'.substT (kill n))
           (.rt (Row.union (Row.scope (.rg n)) (r.substT (kill n)).asRow) (ε.substT (kill n)).asRow)) :=
-      .hwith (by simp [c]) (h₁.weakenStore _) (h₂.weakenStore _)
+      .hwith (by simpa using hus) (by simp [c]) (h₁.weakenStore _) (h₂.weakenStore _)
         (by simpa_substT Stage.le_substT (kill n) hψ)
         (h₃.weakenStore _)
-        (Stage.hP_of_out (by simpa only [Row.substT_asRow] using Stage.le_back_substT (kill n) hφ₀)
+        (Stage.hP_of_out (by simpa only [Row.substT_asRow] using Stage.le_hBody_substT (kill n) hφ₀)
           (by simpa [Row.single_substT] using hOb.substT (kill n)))
         (hc.substT (kill n))
         (Stage.le_rt_sub (Stage.le_refl _) (fun _ h => Or.inr h)) .refl
