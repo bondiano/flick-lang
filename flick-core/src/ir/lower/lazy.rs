@@ -9,8 +9,8 @@ use super::numeric::apply;
 use crate::ir::{Arm, Expr, ExprKind, ExprLang, Handler, Lit, Pat, Stage, Stmt};
 use crate::source::Span;
 use crate::syntax::cst::Node;
+use crate::types::StageKey;
 use crate::types::lang::Lang;
-use crate::types::{Constructor, StageKey};
 
 impl Lower<'_> {
     /// An argument, or the task of one passed unstarted to a parameter
@@ -124,21 +124,14 @@ fn arm(pat: Pat, body: Expr) -> Arm {
 
 /// `Ok arg` or `Err arg` of the Prelude's `Result`.
 fn result(name: Lang, arg: Expr) -> Expr {
-    con(native(name, Lang::Result), arg)
-}
-
-fn con(c: Constructor, arg: Expr) -> Expr {
     let span = arg.span;
-    apply(Expr::new(ExprKind::Con(c), span), [Box::new(arg)], span)
+    let con = ExprKind::Con(native(name, Lang::Result));
+    apply(Expr::new(con, span), [Box::new(arg)], span)
 }
 
 fn runtime_call(function: Lang, arg: Expr, span: Span) -> ExprKind {
-    runtime_app(Expr::new(ExprKind::lang(function), span), arg)
-}
-
-fn runtime_app(func: Expr, arg: Expr) -> ExprKind {
     ExprKind::App {
-        func: Box::new(func),
+        func: Box::new(Expr::new(ExprKind::lang(function), span)),
         arg: Box::new(arg),
         stage: Stage::Runtime,
         arg_first: false,
