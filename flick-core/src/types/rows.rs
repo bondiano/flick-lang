@@ -55,7 +55,7 @@ impl Checker<'_> {
         }
         self.merge_same_names(&mut left_norm)?;
         self.merge_same_names(&mut right_norm)?;
-        self.unify_live(&mut left_norm, &mut right_norm);
+        self.unify_live(&mut left_norm, &mut right_norm)?;
         let (left, right) = (left_norm, right_norm);
         let (mut only_left, mut only_right) = (Vec::new(), Vec::new());
         let (mut i, mut j) = (0, 0);

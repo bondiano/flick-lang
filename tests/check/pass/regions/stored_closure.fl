@@ -1,0 +1,39 @@
+// What may still be stored in a cell next to a region of the signature: a
+// closure that uses nothing of it, though it holds what was read from it,
+// a closure or a task in a cell made here, whose type records the region,
+// and a closure in a cell whose type keeps the region live.
+module App.StoredClosure exposing (..)
+
+type Handle (s : Region) = Handle
+
+read_handle : Handle s ->{} String
+let read_handle _ = ""
+
+fresh : Unit ->{} String
+let fresh () = ""
+
+unused : Handle s -> Ref (Option (Unit ->{} String)) ->{} Unit
+let unused h cell =
+  let name = read_handle h
+  Ref.set cell (Some (fun () -> fresh () ++ name))
+
+local_cell : Handle s ->{} String
+let local_cell h =
+  let cell = Ref.make None
+  Ref.set cell (Some (fun () -> read_handle h))
+  Ref.set cell (Some (fun () -> read_handle h))
+  match Ref.get cell with
+  | Some k -> k ()
+  | None -> ""
+
+local_task : Handle s ->{} String
+let local_task h =
+  let cell = Ref.make (task { read_handle h })
+  Ref.set cell (task { read_handle h })
+  await (Ref.get cell)
+
+keeps_region : Handle s -> Ref ((Unit ->{} String)^{s}) ->{} Unit
+let keeps_region h cell = Ref.set cell (fun () -> read_handle h)
+
+keeps_region_task : Handle s -> Ref ((Eff none none String)^{s}) ->{} Unit
+let keeps_region_task h cell = Ref.set cell (task { read_handle h })

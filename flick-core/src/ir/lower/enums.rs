@@ -110,7 +110,7 @@ pub fn methods(module: &str, ty: &str, span: Span) -> Vec<(String, Expr)> {
 }
 
 /// The constructor `lang` of the type `ty`, both lang items, of one field.
-fn native(lang: Lang, ty: Lang) -> Constructor {
+pub(super) fn native(lang: Lang, ty: Lang) -> Constructor {
     let item = lang::item(lang);
     Constructor {
         module: item.module.clone(),
