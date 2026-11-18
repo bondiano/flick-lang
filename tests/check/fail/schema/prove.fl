@@ -52,6 +52,15 @@ let mutable text =
   if Email.check current then Some (Email.prove current) else None
 //                                  ^^^^^^^^^^^^^^^^^^^ FLICK-T077 `Checks.email current`
 
+// the check of a snapshot says nothing of the variable it was taken from
+from_the_variable : String -> Option Email
+let from_the_variable text =
+  let mut current = text
+  let saved = current
+  current = current ++ "!"
+  if Email.check saved then Some (Email.prove current) else None
+//                                ^^^^^^^^^^^^^^^^^^^ FLICK-T077 `Checks.email current`
+
 alone : String -> Email
 let alone = Email.prove
 //          ^^^^^^^^^^^ FLICK-T079 `Email.prove` makes a value only applied to one

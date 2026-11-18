@@ -135,3 +135,18 @@ fn an_edited_check_invalidates_what_importers_proved() {
         ]
     );
 }
+
+#[test]
+fn a_function_called_prove_of_a_module_is_no_proof() {
+    // `Port.prove` names the function of the module `Port`, not the proof
+    let main = "module App.Main exposing (..)\n\nimport App.Ports exposing (Port)\nimport App.Port as Port\n\nbumped : Float -> Float\nlet bumped n = Port.prove n\n";
+    let host = super::host(main);
+    let files = [
+        ("/p/src/App/Ports.fl", PORTS),
+        (
+            "/p/src/App/Port.fl",
+            "module App.Port exposing (prove)\n\nprove : Float -> Float\nlet prove n = n + 1\n",
+        ),
+    ];
+    assert_eq!(checks(&host, &files), [""; 0]);
+}
