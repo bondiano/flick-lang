@@ -8,6 +8,7 @@ let inspect () =
   let time = Host.Clock.current_time_millis ()
   let draw = Host.Random.next ()
   let mode = Host.Environment.env "MODE"
+  let vars = Host.Environment.vars ()
   let args = Host.Arguments.args ()
   let nanos = Host.Clock.current_time_nanos ()
   let monotonic = Host.Clock.monotonic_time_nanos ()
@@ -17,6 +18,7 @@ let inspect () =
       && monotonic == 7n
       && draw == 0.25
       && mode == Some "test"
+      && vars == [("MODE", "test")]
       && args == ["fixture"]
   Host.Console.stdout_line (if correct then "mocked" else "wrong")
   Host.Console.stderr_line "stderr"
@@ -37,6 +39,7 @@ let main () =
         (Layer.merge
           (Layer.succeed Host.Environment {
             env = fun name -> if name == "MODE" then Some "test" else None
+            vars = fun () -> [("MODE", "test")]
           })
           (Layer.merge
             (Layer.succeed Host.Arguments { args = fun () -> ["fixture"] })
@@ -48,11 +51,12 @@ let main () =
   // A task constructed outside the boundary reads its services when run.
   let later = task { inspect () }
   provide fake { await later }
-  provide (Layer.succeed Host.Environment { env = fun _ -> Some "outer" }) {
+  provide (Layer.succeed Host.Environment { env = fun _ -> Some "outer"; vars = fun () -> [] }) {
     let outer = Host.Environment.env "MODE"
-    let inner = provide (Layer.succeed Host.Environment { env = fun _ -> Some "inner" }) {
-      Host.Environment.env "MODE"
-    }
+    let inner = provide (Layer.succeed Host.Environment {
+      env = fun _ -> Some "inner"
+      vars = fun () -> []
+    }) { Host.Environment.env "MODE" }
     Platform.stdout_line
       (show
         (outer == Some "outer"
@@ -62,6 +66,9 @@ let main () =
   Platform.stdout_line (show (Ref.get output == ["mocked", "stderr", "partial"]))
   let live = provide Host.environment { Host.Environment.env "PATH" }
   Platform.stdout_line (show (live == Platform.env "PATH"))
+  // the live variables are listed, PATH among them under its host's spelling
+  let listed = provide Host.environment { Host.Environment.vars () }
+  Platform.stdout_line (show (List.any (fun (_, value) -> live == Some value) listed))
   let now = provide Host.clock { Host.Clock.current_time_millis () }
   Platform.stdout_line (show (now > 0))
   let args = provide Host.arguments { Host.Arguments.args () }

@@ -52,6 +52,7 @@ natives! {
     RT, "stderrLine", 1 => host::stderr_line;
     RT, "stdoutWrite", 1 => host::stdout_write;
     RT, "platformEnv", 1 => host::env;
+    RT, "platformVars", 1 => host::vars;
     RT, "platformArgs", 1 => host::args;
     "flick:Clock", "flickCurrentTimeMillis", 1 => host::current_time_millis;
     "flick:Clock", "flickCurrentTimeNanos", 1 => host::current_time_nanos;

@@ -48,6 +48,10 @@ pub(super) fn args(_: &[Term], _: &mut String) -> Result<Term, String> {
     Ok(Term::List([].into()))
 }
 
+pub(super) fn vars(_: &[Term], _: &mut String) -> Result<Term, String> {
+    Ok(Term::List([].into()))
+}
+
 pub(super) fn current_time_millis(_: &[Term], _: &mut String) -> Result<Term, String> {
     Ok(Term::Lit(Lit::Float(MILLIS)))
 }

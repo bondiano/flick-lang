@@ -2,7 +2,6 @@ package flickrt
 
 import (
 	"math"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,20 +12,20 @@ import (
 
 // cliTraced traces a handler: under `--trace` the handler of command `name`
 // runs as a span of that name, sending to OTEL_EXPORTER_OTLP_ENDPOINT as
-// service OTEL_SERVICE_NAME. Sampled spans go to /v1/traces as they end,
+// service OTEL_SERVICE_NAME, both of the fiber's `Host.Environment`. Sampled spans go to /v1/traces as they end,
 // every 5 s; log records to /v1/logs through a logger added to the fiber's,
 // every second; the metrics to /v1/metrics, every 10 s. What is left is
 // sent as the command ends, each within 3 s. Log messages also reach the
 // spans as the tracer logger's events.
 func cliTraced(fb *Fiber, name string, run func(*Fiber) Value) Value {
-	endpoint, service := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"), os.Getenv("OTEL_SERVICE_NAME")
+	endpoint, service := hostEnv(fb, "OTEL_EXPORTER_OTLP_ENDPOINT"), hostEnv(fb, "OTEL_SERVICE_NAME")
 	if endpoint == "" {
 		endpoint = "http://localhost:4318"
 	}
 	if service == "" {
 		service = name
 	}
-	resource := otlpResource(service)
+	resource := otlpResource(service, hostEnv(fb, "OTEL_SERVICE_VERSION"))
 	traces := newOtlpExporter(joinSegments(endpoint, "/v1/traces"), "OtlpTracer", 5*time.Second, 1000, false, func(spans []string) string {
 		return `{"resourceSpans":[{"resource":` + resource + `,"scopeSpans":[{"scope":` + otlpScope +
 			`,"spans":[` + strings.Join(spans, ",") + `]}]}]}`

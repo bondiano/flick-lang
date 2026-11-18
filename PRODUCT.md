@@ -21,7 +21,7 @@ Say in one line why Flick exists, teach it through a book, a tour and a course, 
 - **Support:** A language for whole apps: browser, server and CLI. The signature says what a function needs and how it can fail, the compiler holds the body to it, and the code still reads like plain code.
 - **Further sections, in this order:** one app and one language with checked seams; code you did not write; what is proved in Lean; the host's libraries.
 
-Every claim has a row in `docs/research/claims.md` with its evidence and its limit. Today's main limit: an empty row is not a sandbox. The standard library names the host services it uses (`Host.Console`, `Host.Clock`, `Host.Random`, `Host.Environment`, `Host.Arguments`, `Host.Process`), but a `foreign` binding, `ConfigProvider.from_env` and `Host.raw_*` reach the host whatever their row says. Say so beside the claim.
+Every claim has a row in `docs/research/claims.md` with its evidence and its limit. Today's main limit: an empty row is not a sandbox. The standard library names the host services it uses (`Host.Console`, `Host.Clock`, `Host.Random`, `Host.Environment`, `Host.Arguments`, `Host.Process`), but a `foreign` binding and `Host.raw_*` reach the host whatever their row says. Say so beside the claim.
 
 Comparisons show equivalent tasks and recognize what the other tool does well. On JavaScript, effects run on Effect for now; say that as a status, not as the reason to use Flick.
 

@@ -321,6 +321,8 @@ pub enum HostPrimitive {
     StdoutWrite,
     /// The host's environment variable of a name, as an `Option String`.
     Env,
+    /// The host's environment variables of Unit, as a `List (String, String)`.
+    Vars,
     /// The host's arguments of Unit, as a `List String`.
     Args,
     /// The host's wall clock of Unit, in milliseconds as a Float.

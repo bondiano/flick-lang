@@ -24,15 +24,14 @@ type alias ArrayOptions = { separator : Option String }
 type alias RecordOptions = { separator : Option String; keyValueSeparator : Option String }
 
 /// Reads the configuration from the current provider: the one a
-/// `ConfigProvider.layer` made, or else the environment variables
-/// `Host.Environment` reads, each at its path joined with `_`.
+/// `ConfigProvider.layer` made, or else `ConfigProvider.from_env` of the
+/// variables `Host.Environment` lists.
 get : Config a ->{Host.Environment; ConfigError} a
-let get config = get_with (fun name -> Host.Environment.env name) config
+let get config =
+  get_with (fun () -> ConfigProvider.from_env { preserveEmptyStrings = false }) config
 
-/// `get`, with `lookup` reading the variables when no provider is current.
-/// It reads a variable by its name only, so no record or array is made of
-/// the names of the variables.
-get_with : (String ->{r} Option String)^c -> Config a ->{r; ConfigError} a
+/// `get`, with the provider `fallback` makes when no provider is current.
+get_with : (Unit ->{r} ConfigProvider.ConfigProvider)^c -> Config a ->{r; ConfigError} a
 foreign effect get_with from "flick:Config" "flickGetWith"
   arity 2
   retention call

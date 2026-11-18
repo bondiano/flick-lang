@@ -3,7 +3,7 @@
 import { BigInt as BI, type Option, type Result } from "effect";
 
 import { type Tagged, err, none, ok, some } from "../data.ts";
-import { args, env, writeStdout } from "../host.ts";
+import { args, env, vars, writeStdout } from "../host.ts";
 import { tag } from "@flick-lang/runtime/tags";
 
 export const stdoutWrite = (text: string): void => writeStdout(text);
@@ -14,6 +14,8 @@ export const platformEnv = (name: string): Option.Option<string> => {
   const value = env(name);
   return value === undefined ? none : some(value);
 };
+
+export const platformVars = (): Array<[string, string]> => vars();
 
 export {
   stringSplit,

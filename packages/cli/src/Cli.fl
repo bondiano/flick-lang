@@ -135,8 +135,9 @@ between : Int -> Int -> Multi a (List a)
 foreign pure between from "flick:cli" "multiBetween"
   arity 2
 
-/// One value, read from `config` when absent; a config that does not read
-/// is `CliError`.
+/// One value, read from `config` when absent, by the current
+/// `ConfigProvider` or else the variables `Host.Environment` lists; a
+/// config that does not read is `CliError`.
 from_config : Config.Config a -> Multi a a
 foreign pure from_config from "flick:cli" "multiConfig"
 
@@ -380,19 +381,29 @@ let settings = { version = "0.0.0"; builtIns = builtins; formatter = None }
 /// Parses `args` and runs the handler of the command they name, in the
 /// current fiber, after the whole line parsed. The built-in flags print to
 /// stdout through `Host.Console` and run no handler; invalid input is
-/// `CliError` with the text shown for it.
-run_with : Settings -> (Command r e)^c -> List String ->{Async, Host.Console | r; CliError | e} Unit
+/// `CliError` with the text shown for it. `Host.Environment` gives a missing
+/// value's config without a current `ConfigProvider`, the colors
+/// (`NO_COLOR`, `FORCE_COLOR`, `TERM`) and the settings of `--trace`.
+run_with :
+  Settings ->
+  (Command r e)^c ->
+  List String ->{Async, Host.Console, Host.Environment | r; CliError | e}
+  Unit
 foreign effect run_with from "flick:cli" "cliRunWith"
   arity 3
   retention call
 
 /// `run_with` the `settings` with `version`.
 run_version :
-  String -> (Command r e)^c -> List String ->{Async, Host.Console | r; CliError | e} Unit
+  String ->
+  (Command r e)^c ->
+  List String ->{Async, Host.Console, Host.Environment | r; CliError | e}
+  Unit
 foreign effect run_version from "flick:cli" "cliRunVersion"
   arity 3
   retention call
 
 /// `run_version "0.0.0"`.
-run : (Command r e)^c -> List String ->{Async, Host.Console | r; CliError | e} Unit
+run :
+  (Command r e)^c -> List String ->{Async, Host.Console, Host.Environment | r; CliError | e} Unit
 let run command args = run_version "0.0.0" command args

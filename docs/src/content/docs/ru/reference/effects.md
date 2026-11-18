@@ -1,6 +1,6 @@
 ---
 title: "Эффекты, ошибки и сервисы"
-source_hash: c8ff2220f15d38d4
+source_hash: 9c21d204c5017064
 ---
 
 Компилятор проверяет, где допустимы эффектные вызовы, какие сервисы им нужны
@@ -656,7 +656,8 @@ let mode () = Host.Environment.env "MODE"
 
 selected : Unit ->{} Option String
 let selected () =
-  let environment = Layer.succeed Host.Environment { env = fun _ -> Some "test" }
+  let environment =
+    Layer.succeed Host.Environment { env = fun _ -> Some "test"; vars = fun () -> [] }
   provide environment { mode () }
 ```
 
@@ -722,7 +723,6 @@ let selected () =
 
 - привязка `foreign` принимается на доверии: `now : Unit ->{} Float`,
   привязанная к `Date.now`, читает часы при пустой строке;
-- `ConfigProvider.from_env` читает переменные окружения при пустой строке;
 - `Host.raw_*` и сделанные из них живые слои — обычные значения: любая функция
   может вызвать первые или предоставить вторые, какой бы ни была её строка:
 

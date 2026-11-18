@@ -17,14 +17,20 @@ break programs.
   `Platform.stdout_line`, `stderr_line` and `stdout_write` and the five
   levels of `Console` need `Host.Console`, and `Log.console` is a layer made
   of the live `Host.console`, which needs nothing; `Platform.args`
-  `Host.Arguments`; `Platform.env` and the default provider of `Config.get`
-  `Host.Environment`, which reads a variable by its name only, so the
-  default provider no longer makes a record or an array of the names of the
-  variables (`ConfigProvider.layer (ConfigProvider.from_env options)` still
-  does); `Clock`, `DateTime.now`, `DateTime.is_past` and
-  `DateTime.is_future` `Host.Clock`; `Random` `Host.Random`, whose every
+  `Host.Arguments`; `Platform.env` and `ConfigProvider.from_env`, the
+  default provider of `Config.get`, `Host.Environment`, which reads a
+  variable with `env` and lists them all with `vars`; `Clock`,
+  `DateTime.now`, `DateTime.is_past` and `DateTime.is_future`
+  `Host.Clock`; `Random` `Host.Random`, whose every
   operation is now made of `Host.Random.next` draws, so a fake fixes them,
-  while `Random.with_seed` keeps the same draws. A new service
+  while `Random.with_seed` keeps the same draws. What else reads the
+  environment when no `ConfigProvider` is current reads it through
+  `Host.Environment` too: `ConfigProvider.layer_add` and every `Otlp`
+  exporter (`layer`, `traces`, `logs`, `metrics`, their `_with` forms and
+  `from_config`) take it as an input of their layer and `Otlp.tracer` in
+  its row, and `Cli.run`, `run_with` and `run_version` read through it a
+  missing value's `Cli.from_config`, the colors (`NO_COLOR`,
+  `FORCE_COLOR`, `TERM`) and the settings of `--trace`. A new service
   `Host.Process` starts child processes: `ChildProcess.spawn`, `string`,
   `lines` and `exit_code` need it, `Host.Live` and `Host.live` include it,
   and every Node and Go root provides it. The built-in flags of
@@ -36,9 +42,11 @@ break programs.
   console extras of `Console` (`current`, `with_console`, `to_stderr`,
   `trace`, `assert`, `clear`, `count`, `dir`, `table`, `group`, `time` and
   their variants) and `Log.write_console`. New:
-  `DateTime.unsafe_from_epoch_millis`, `Config.get_with` and
-  `ChildProcess.output_string` and `output_lines`, the text of a spawned
-  process, which `string` and `lines` read. `flick check --fix --only E002`
+  `Host.Environment.vars`, `DateTime.unsafe_from_epoch_millis`,
+  `Config.get_with` (`get` with a provider of its own when none is
+  current) and `ChildProcess.output_string` and `output_lines`, the text
+  of a spawned process, which `string` and `lines` read.
+  `flick check --fix --only E002`
   adds the services a program now needs to its rows; a function whose arrow
   is pure, or a callback whose row another module closes, needs editing by
   hand. A fix that adds a service to `->{none; E}` now writes `->{S; E}`.

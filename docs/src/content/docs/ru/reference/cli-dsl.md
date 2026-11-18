@@ -1,6 +1,6 @@
 ---
 title: "Приложения командной строки"
-source_hash: aaf0151dbe7e9e55
+source_hash: c28540c49ac4c448
 ---
 
 `Cli.Command r e` описывает флаги, позиционные аргументы, подкоманды
@@ -105,7 +105,7 @@ let greet =
 | Комбинатор | Значение |
 | - | - |
 | `Cli.at_least n`, `Cli.at_most n`, `Cli.between m n` | `List` с указанным количеством значений |
-| `Cli.from_config config` | читает одно значение из `Config.Config`, если оно не передано |
+| `Cli.from_config config` | читает одно значение из `Config.Config`, если оно не передано, через текущий `ConfigProvider` или иначе переменные, которые перечисляет `Host.Environment` |
 | `Cli.from_prompt prompt` | запрашивает одно значение через `Cli.Prompt.Prompt`, если оно не передано |
 | `Cli.hidden`, `Cli.metavar name` | применяются к описанию кратности: скрывают его из справки или задают имя значения в ней |
 | `Cli.optional_value text` | флаг без значения получает `text` |
@@ -143,7 +143,7 @@ let greet =
 ```flick
 # import App.Greet exposing (greet)
 #
-main : Unit ->{Host.Arguments, Host.Console, Async; AppError} Unit
+main : Unit ->{Host.Environment, Host.Arguments, Host.Console, Async; AppError} Unit
 let main () =
   try Cli.run greet (Platform.args ()) with
   | Cli.CliError message -> App.fail message
@@ -157,6 +157,9 @@ let main () =
 спаны, логи и метрики по OTLP на `OTEL_EXPORTER_OTLP_ENDPOINT`
 (по умолчанию `http://localhost:4318`) как сервис `OTEL_SERVICE_NAME`
 (по умолчанию имя команды); без флага экспортёр не загружается.
+Эти переменные, переменные цвета `NO_COLOR`, `FORCE_COLOR` и `TERM`
+и конфигурацию недостающего значения `Cli.run` читает через
+`Host.Environment`.
 `Cli.run_with` с `builtIns` без `Cli.TraceFlag` убирает флаг. При неверном вводе — неизвестном флаге,
 пропущенном аргументе или значении, отклонённом `Cli.Value`, — выводится
 справка команды, а вызов завершается ошибкой `Cli.CliError` с сообщением.

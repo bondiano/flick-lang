@@ -22,6 +22,10 @@ export const writeStderr = (text: string): void => {
 
 export const env = (name: string): string | undefined => host()?.env[name];
 
+/** Every variable that is set, as pairs of its name and value. */
+export const vars = (): Array<[string, string]> =>
+  Object.entries(host()?.env ?? {}).filter((entry): entry is [string, string] => entry[1] !== undefined);
+
 /** The variable `name`, removed so that the processes and workers this one starts do not inherit it. */
 export const takeEnv = (name: string): string | undefined => {
   const p = host();

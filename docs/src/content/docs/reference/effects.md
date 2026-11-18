@@ -624,7 +624,8 @@ let mode () = Host.Environment.env "MODE"
 
 selected : Unit ->{} Option String
 let selected () =
-  let environment = Layer.succeed Host.Environment { env = fun _ -> Some "test" }
+  let environment =
+    Layer.succeed Host.Environment { env = fun _ -> Some "test"; vars = fun () -> [] }
   provide environment { mode () }
 ```
 
@@ -687,7 +688,6 @@ whatever its row says:
 
 - a `foreign` binding is taken on trust: `now : Unit ->{} Float` bound to
   `Date.now` reads the clock with an empty row;
-- `ConfigProvider.from_env` reads the environment variables with an empty row;
 - `Host.raw_*` and the live layers made of them are ordinary values: any
   function may call the first or provide the second, whatever its own row:
 

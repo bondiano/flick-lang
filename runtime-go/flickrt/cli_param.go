@@ -230,7 +230,7 @@ func cliConfigFallback(config Value) func(*Fiber, *cliError) (Value, *cliError) 
 func cliPromptFallback(prompt Value) func(*Fiber, *cliError) (Value, *cliError) {
 	return func(fb *Fiber, missingErr *cliError) (Value, *cliError) {
 		// skipped when the terminal cannot prompt
-		if !cliTerminal().canPrompt {
+		if !cliTerminal(fb).canPrompt {
 			return nil, missingErr
 		}
 		if v, ok := promptFallback(fb, prompt); ok {

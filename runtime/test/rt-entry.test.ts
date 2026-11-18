@@ -33,12 +33,14 @@ test("main gets the live host services the launcher passes as its root", async (
   t.mock.method(process.stderr, "write", (s: string) => written.push(["err", s]) > 0);
   process.env["FLICK_HOST_ROOT"] = "set";
   const seen: Array<unknown> = [];
+  let listed: unknown;
   try {
     await runMain(withHost(hostLiveServices, () => {
       perform("Host.Console", "stdout_line", "from the root");
       perform("Host.Console", "stderr_line", "to stderr");
       perform("Host.Console", "stdout_write", "partial");
       seen.push(perform("Host.Environment", "env", "FLICK_HOST_ROOT"));
+      listed = perform("Host.Environment", "vars", undefined);
       seen.push(Array.isArray(perform("Host.Arguments", "args", undefined)));
       seen.push(typeof perform("Host.Clock", "current_time_millis", undefined));
       seen.push(typeof perform("Host.Clock", "monotonic_time_nanos", undefined));
@@ -56,6 +58,7 @@ test("main gets the live host services the launcher passes as its root", async (
   ]);
   assert.deepEqual(seen.slice(1), [true, "number", "bigint", "number"]);
   assert.equal(Reflect.get(Object(seen[0]), "_tag"), "Some");
+  assert.ok(Array.isArray(listed) && listed.some(([name, value]) => name === "FLICK_HOST_ROOT" && value === "set"));
 });
 
 test("a main that names only Host.Console gets no clock or random source", async (t) => {
