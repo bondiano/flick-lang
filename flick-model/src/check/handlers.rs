@@ -22,6 +22,7 @@ impl Checker<'_> {
         expected: Option<&Type>,
     ) -> Check<Type> {
         let t = self.infer(e)?;
+        let t = self.errors_of_arms(e, &t, arms)?;
         let result = match expected {
             Some(r) => r.clone(),
             None => self.fresh(),
@@ -205,7 +206,7 @@ impl Checker<'_> {
             let theta = match strip(&arm.pat) {
                 Pat::Var(_) | Pat::Wild => {
                     all |= arm.guard.is_none();
-                    Type::Errors(raised.clone())
+                    Type::Errors(self.caught_row(raised))
                 }
                 Pat::Con(c, _) if self.decls.errors.contains(&c.ty) => {
                     let ctor = self.constructor(&c.ty.module, &c.name)?;

@@ -6,6 +6,18 @@ break programs.
 
 ## Unreleased
 
+- **`match` on the errors of a row.** A value of `Errors {E1, E2, …}`, the
+  `x` of a `try` arm, is taken apart by a `match` with an arm for each error
+  of its row (`| NotFound id -> … | Conflict _ -> …`), with no `try` over
+  `from_result (Err e)` again. The arms cover every error of a closed row,
+  or the `match` is `FLICK-T009`, whose fix adds the missing arms, by a
+  qualified name for an error of another module; a row with a variable needs
+  an arm for the rest, and an arm for an error outside a closed row is
+  `FLICK-T003`. When the errors of the value are not known yet, as for the
+  `x` of a `try`, the arms tell them, unless an arm matches every error
+  (`FLICK-T057`). The `match` is pure and removes no error from a row; the
+  reference model and the Lean proofs cover it.
+
 - **Fixed: two constructors of one name in a `match`.** The Go and
   JavaScript backends told the arms of a `match` apart by the constructor's
   name alone, so with `HttpApi.ServeError` and `Rpc.ServeError` in one

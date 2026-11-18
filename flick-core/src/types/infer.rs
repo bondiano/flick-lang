@@ -782,6 +782,7 @@ impl<'c> Checker<'c> {
         let scrutinee = nodes.next().map_or(Type::Error, |s| self.infer(s));
         let result = expected.cloned().unwrap_or_else(|| self.fresh());
         let errors = self.diagnostics.len();
+        self.errors_of_arms(node, &scrutinee);
         // an inferred `match` takes the type of its first arm
         let open = expected.is_none();
         let mut first = None;

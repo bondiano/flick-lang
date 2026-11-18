@@ -290,7 +290,7 @@ struct Caught {
 
 /// A handler pattern that matches every error: a variable or `_`, maybe in
 /// parentheses or annotated.
-fn catch_all(pattern: &Node) -> bool {
+pub(super) fn catch_all(pattern: &Node) -> bool {
     match pattern.kind {
         K::VarPat | K::WildcardPat => true,
         K::ParenPat | K::AnnotPat => pattern

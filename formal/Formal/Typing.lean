@@ -52,11 +52,11 @@ def Ty.isAll : Ty → Prop
   | .all .. => True
   | _ => False
 
-/-- Types whose values patterns cannot inspect: all but base types, records and
-nominal data, read at the head of an application. -/
+/-- Types whose values patterns cannot inspect: all but base types, records,
+nominal data, read at the head of an application, and the errors of a row. -/
 def Ty.Opaque (t : Ty) : Prop :=
   match t.hd with
-  | .base _ | .adt _ | .rnil | .rcons .. => False
+  | .base _ | .adt _ | .rnil | .rcons .. | .errors _ => False
   | _ => True
 
 theorem Ty.reach_tcon_arg {T : Name} {us : List Ty} {u : Ty} (hu : u ∈ us) :
@@ -135,6 +135,8 @@ inductive PatTy : Bool → Pat → Ty → List Ty → Prop
   | rfield : R.field l = some t → PatTy true p t Δ₁ → PatTy true r R Δ₂ →
       PatTy true (.rfield l p r) R (Δ₁ ++ Δ₂)
   | or : PatTy true p t Δ → PatTy true q t Δ → PatTy true (.or p q) t Δ
+  /-- (Match-Err): a pattern of an error `E` without parameters at `Errors ε`, for `E ∈ ε`. -/
+  | err : PatTy false p (.adt T) Δ → ε.asRow (.nm₀ T) → PatTy true p (.errors ε) Δ
 
 /-- A substitution that fits a term: it keeps the regions the term writes, and if the term has a run-time form, it brings
 in no run-time region, sends each atom to an atom or to a type without one and brings no
@@ -191,6 +193,12 @@ inductive Shp : Bool → Ty → Tm → Prop
   | app : Shp false (.arrow a .pure t Caps.none) f → Shp true a e → Shp false t (.app f e)
   | adt : Shp false U v → U.hd = .adt T → T'.hd = .adt T → (∀ K, v.head = .ctor K → S.Builds K T') →
       Shp true T' v
+  /-- A value of `Errors ε` is an error whose name is in `ε`, at any argument: matching a
+  constructor ignores the arguments. -/
+  | err : Shp true U v → U.hd = .adt E → (∃ c, ε.asRow (.nm E c)) → Shp true (.errors ε) v
+  /-- A row with a variable may stand for any error, so patterns see no shape of its values:
+  only a catch-all covers them, as for an opaque type. -/
+  | errOpen : (∃ a G, ε.asRow (.rv a G)) → Shp true (.errors ε) v
 
 /-- `Exh(τ, Π)` of core.md §2.4. -/
 def Exh (t : Ty) (ps : List Pat) : Prop :=

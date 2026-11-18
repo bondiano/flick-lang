@@ -286,6 +286,7 @@ operation, and `c.at i` ranges over the main thread and the children of live reg
 | `core.md` §2.3, §3.6 rules; `regions.md` §2.3–§2.5, §3.4 | `Typ` (`Rules.lean`) |
 | (Sub) | admissible: `Typ.sub` (`SubAdm.lean`) |
 | §2.4 patterns, `Exh`; (Match-Val), [Match-Val: a value needs only its own coverage](../docs/formal/core.md#the-residual-match-after-a-false-guard-fails-exh) | `PatTy`, `Shp`, `Exh`, `Covers` (`Typing.lean`) |
+| §2.4 (Match-Err): a `match` on `Errors ε` by the errors of `ε`, errors without parameters | `PatTy.err`, `Shp.err`, `Shp.errOpen` (`Typing.lean`); `PatTy.err_match` (`Patterns.lean`); `exh_errs` (`FormalCert/Match.lean`) |
 | §2.4 constructors of a GADT: the arguments of the type they build, fields that reach no more than the type built, (Branch-GADT) under every unifier ([not the most general one](../docs/formal/core.md#the-most-general-unifier-is-not-kept-by-substitution), [the free names of a dead branch](../docs/formal/core.md#a-dead-branch-keeps-no-typing-of-its-body)); `Exh` without the constructors that build no value | `Sig.res`, `Sig.ctorTyR` (`Syntax.lean`, `TyOps.lean`); `Sig.Holds`, `Sig.Inj`, `PatsTy`, `Sig.Builds` (`Typing.lean`); `Typ.aref` (`Rules.lean`); `Typ.aref_substT` (`TySubstBase.lean`), `Typ.aref_subst` (`SubstArm.lean`), `aref_match` (`SpineMatch.lean`) |
 | the checker's arm under the most general unifier, and a dropped dead arm | `Mgu`, `Typ.aref_mgu`, `Typ.aref_dead` (`ArefMgu.lean`) |
 | §1.4 `provide S impl`, `provide layer` | `recArms`, `T6c_tail`; `KnownLayer`, `chain`, `layer_typ`, `layer_answers` (`RecordHandler.lean`) |
@@ -439,7 +440,8 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
    record type (`Ty.IsRec`). Record patterns are always open (`{…, ..}`), as in `core.md`.
 5. **`Exh` over shapes.** `Exh(τ, Π)` quantifies over `Shp τ v`, the closed values of `τ`
    as far as patterns see them (variables, functions, references, computations,
-   errors, capabilities and owners are opaque), not over typed
+   capabilities and owners are opaque; a value of `Errors ε` is an error named in `ε`,
+   or any value when `ε` has a variable: `Shp.err`, `Shp.errOpen`), not over typed
    values: the typed version would put `Typ` in a negative position of its own
    definition. The fields of a constructor have the types of its declaration, so a field
    of a parameter type is opaque: exhaustiveness through type arguments is not modeled.

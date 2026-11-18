@@ -189,7 +189,7 @@ Constructors:
 - `Errors none ≡ Never`;
 - `Errors {E τ̄} ≡ E τ̄` (`unify.rs` `project`, `unify_errors`).
 
-With two or more elements, or with a row variable, `Errors ρ` is opaque in the source language. Its values appear only in the `x`/`_` branch of a `try` and flow into `raise` or into generic code (see [`Errors` of a row with two or more elements](#errors-of-a-row-with-two-or-more-elements)).
+With two or more elements, or with a row variable, `Errors ρ` has no other type it equals. Its values appear only in the `x`/`_` branch of a `try` and flow into `raise`, into generic code, or into a `match` that takes them apart by the errors of `ρ`: (Match-Err) of §2.4 (see [`Errors` of a row with two or more elements](#errors-of-a-row-with-two-or-more-elements)).
 
 ### 1.6 Dictionaries (provisional)
 
@@ -443,6 +443,26 @@ With no such `θ` the branch is dead: no value of `T ῡ` is built by `K`, and i
 
 - `Exh(T ῡ, Π)` counts only the constructors that can build `T ῡ`, those whose `T ρ̄` unifies with `T ῡ` under some instance, regions included. The parts of a value share its rigid variables: what a constructor fixes in one part holds in the others, so `Exh((Tagged a, Tagged a), Π)` counts no pair of different constructors (`types/gadt/columns.rs` `columns_after`). This deadness differs on purpose from that of a branch, which keeps the regions the body writes. A constructor left out of `Exh` builds no value of the type at all. A dead branch has to stay dead under the substitutions of the regions around it (scopes, `kill`), which may move the regions it does not write.
 
+A `match` on a value of `Errors ε` takes it apart by the errors of `ε`. The type of a pattern comes from its head, as in (Try):
+
+```text
+Γ ⊢ e : Errors ε ! φ
+for every branch i:   pᵢ = Eᵢ p̄ with Eᵢ ῡᵢ ∈ ε and ⊢ pᵢ : Eᵢ ῡᵢ ⇒ Δᵢ,   or pᵢ ∈ {x, _} with ⊢ pᵢ : Errors ε ⇒ Δᵢ
+                      Γ, Δᵢ ⊢ gᵢ : Bool ! ψᵢ     Γ, Δᵢ ⊢ eᵢ : τ ! φᵢ
+for every E ῡ ∈ ε:    Exh(E ῡ, {pᵢ = E p̄ | branch i has no when}), or a branch x or _ has no when
+──────────────────────────────────────────────────────────────── (Match-Err)
+Γ ⊢ match e with p₁ [when g₁] → e₁ | … : τ ! φ ⊔ ⊔ᵢ (ψᵢ ⊔ φᵢ)
+```
+
+- The match is pure and removes no error from a row: it is not `try (raise e)`. A branch `E p̄` matches every value of the error `E`, whatever its arguments.
+- The constructors of the column are the elements of `ε`. A row with a variable may stand for more errors, so only a branch `x` or `_` covers it, as for an opaque type; `Exh` and `Covers` need no premise that `ε` is closed.
+- Inference: if `ε` is still an unknown variable, as for the `x` of a `try` (whose row the checker leaves open, `raised ⊆ caught`), and no branch `x` or `_` without `when` is there, `ε` becomes exactly the errors the branches are headed by. That is its only solution, so the typing stays principal. With such a branch the branches do not tell `ε`: it has to be known already, `FLICK-T057`.
+- An element of a closed `ε` without a branch is `FLICK-T009`, whose fix adds the missing branches (an error of another module by its qualified name); a branch of an error outside a closed `ε` is `FLICK-T003`.
+
+Lean covers errors without parameters, as `HPat.ctor`: `PatTy.err` types `E p̄` at `Errors ε` from `E p̄` at `E` and `E ∈ ε`; the shapes of the values of `Errors ε` are `Shp.err`, an error whose name is in `ε`, and `Shp.errOpen`, any value when `ε` has a variable (`formal/Formal/Typing.lean`). `Ty.Opaque` no longer holds of `Errors ε`. `Typ.shape` gives a value of `Errors ε` its `Shp.err` (`Shapes.lean`), `PatTy.typ_match` types a match by `PatTy.err_match`, which `HPat.inst` shares (`Patterns.lean`), `Shp.of_substT` and `PatTy.substT` keep both under substitution (`SubstPat.lean`), and `match_progress` and the match step of preservation (`PresPure.lean`) need no change: progress reads the shape, preservation `PatTy.inst`. T2b is unchanged, since the match adds no error. `exh_errs` (`formal/FormalCert/Match.lean`) is `Exh` of a closed row covered by its errors, which the certificates of generated programs use.
+
+Checker: `types/error_match.rs` (`error_element` for `constructor_pattern`, `errors_of_arms` for `infer.rs` `match_expr`, `row_constructors` for `exhaust.rs` `constructors`, `error_column` for `gadt/columns.rs`), `exhaust.rs` `show_pat` with `written_constructor`. Model: `check/match_errors.rs`, `check/pattern.rs` `signature` and `con_fields`; the generator writes such a `match` in the `x` branch of a `try` (`generate/handle.rs` `match_errors`).
+
 Row equations learned in one part also constrain later parts during `Exh`.
 Every constructor occurrence has its own existential residuals; equal names
 in two constructor schemes do not identify their witnesses. For example,
@@ -676,7 +696,7 @@ E : ∀ᾱ. τ̄ →P E ᾱ    Γ ⊢ w̄ : τ̄[ᾱ := ῡ] ! P    E ῡ ∈ ε
 
 (Handle) does not require the whole row `ε_b ⊆ H + ε'`, only the error of `v` itself: after a failed branch the remainder has a smaller `H` (see [(Handle) after a failed branch](#handle-required-the-whole-error-row-after-a-failed-branch)). Coming from `try (raise v)`, the premise follows from `ε_b ⊆ H + ε'` of (Try).
 
-(Errors-Val) types values only. In the source language, a value of `Errors ρ` with two or more elements is introduced only by an `x`/`_` branch (see [`Errors` of a row with two or more elements](#errors-of-a-row-with-two-or-more-elements)).
+(Errors-Val) types values only. In the source language, a value of `Errors ρ` with two or more elements is introduced only by an `x`/`_` branch, and (Match-Err) of §2.4 takes it apart (see [`Errors` of a row with two or more elements](#errors-of-a-row-with-two-or-more-elements)).
 
 The remainder of a `match` after a false guard may not cover the type of the scrutinee. For `match Some 1 with | None → a | Some x when p → b | Some _ → c` the remainder `match Some 1 with | Some _ → c` fails `Exh(Option Int, …)`. For a value it is enough to cover the value itself (see [the residual match](#the-residual-match-after-a-false-guard-fails-exh)):
 
@@ -688,7 +708,7 @@ The remainder of a `match` after a false guard may not cover the type of the scr
 
 (Match-Val) does not apply to source programs: `match 1 with | 1 → …` is still rejected.
 
-The flick-core checker never sees runtime forms. The reference checker types them in `flick-model/src/check/runtime.rs` (`check_config`), and (Match-Val) in `handlers.rs` `match_`, only when checking a configuration.
+The flick-core checker never sees runtime forms. The reference checker types them in `flick-model/src/check/runtime.rs` (`check_config`), and (Match-Val) in `handlers.rs` `match_`, only when checking a configuration. Two more readings hold there only, for (Match-Err) of §2.4: once the body of a `try` has stepped past what it raised, (Try) still types it at the row it had, as (Sub) lets it, so the `x` of an arm takes a row above the body's (`check/match_errors.rs` `caught_row`); and once the arm has run, the scrutinee of its `match` is the error raised, a value `E w̄`, which (Errors-Val) types at the row of `E` and the errors the arms name (`errors_of_arms`).
 
 ### 3.7 Handlers of effects
 
@@ -919,9 +939,9 @@ let poke () =
 ### `Errors` of a row with two or more elements
 
 - Spec: spec/03 "Notation and joining of rows" called such a type "a sum of the nominal errors".
-- Checker: a projection exists only for `none` and for a single element. `match e with | A _ -> … | B _ -> …` with `e : Errors {A, B}` is `FLICK-T003`.
-- The model does not need the sum: in the source language values of `Errors ρ` come only from an `x`/`_` branch, and for the proof (Errors-Val) on runtime values suffices.
-- Resolution (spec, spec/03 "Notation and joining of rows"): "`Errors ρ` with two or more elements or with a variable is an opaque type. Its value comes from the `x`/`_` branch of a `try` and flows into `from_result`, `Failure.rethrow` and generic code. To take it apart by error, use a `try` with error branches over `from_result (Err e)`." A sum with patterns on elements is a possible extension: an introduction rule and a pattern on an element of a closed row.
+- Checker: a projection existed only for `none` and for a single element. `match e with | A _ -> … | B _ -> …` with `e : Errors {A, B}` was `FLICK-T003`, so handlers translating several errors repeated `try` branches over `from_result (Err e)`.
+- Resolution (spec, checker, model, Lean): the pattern of an element, (Match-Err) of §2.4, without an introduction rule: values of `Errors ρ` still come only from an `x`/`_` branch, and (Errors-Val) on runtime values still suffices for the proof. spec/03 "Notation and joining of rows" states the rule. Fixtures: `tests/check/pass/effects/errors.fl`, `tests/check/fail/effects/handlers.fl`, `tests/run/codegen/error_match.fl`.
+- Not covered: errors with parameters in Lean, which waits for the arguments of named row elements in the core (#433). The model types the `x` of a `try` at the least row of its body, where the checker takes any row above it, as (Try) with (Sub) does: `try raise (A 1) with | e -> match e with | A _ -> … | B _ -> …` checks, and the model reports `B` as outside `{A}`. The generator names only errors its `try` raises.
 
 ### A callee of unknown type is a pure arrow
 

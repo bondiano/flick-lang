@@ -22,6 +22,7 @@ theorem exh_bool : Exh S (.base .bool) [.lit (.bool true), .lit (.bool false)] :
     | rnil => cases hT
     | rcons => cases hT
     | adt _ _ h => subst hT; simp [Ty.hd] at h
+    | err | errOpen => cases hT
   obtain ⟨b, rfl⟩ := this hs rfl rfl
   cases b <;> simp [matchP]
 

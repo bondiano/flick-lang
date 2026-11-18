@@ -122,3 +122,33 @@ every_failure : String ->{} Int
 let every_failure reason =
   try gone reason with
   | Fail.fail _ -> 0
+
+// a `match` takes a value of `Errors e` apart by the errors of its row
+explain : Errors {NotFound, DbUnavailable} -> String
+let explain e =
+  match e with
+  | NotFound id -> "missing " ++ show id
+  | DbUnavailable why -> why
+
+// errors with arguments, and an arm for the rest of a row that is known
+retry_after : Errors {Failed String, Timeout, Conflict} -> Float
+let retry_after e =
+  match e with
+  | Timeout -> 1
+  | Failed _ -> 2
+  | _ -> 0
+
+// the arms tell the errors of a variable that takes every error of a body
+explained : UserId ->{Users} String
+let explained id =
+  try (find_user id).name with
+  | e ->
+    match e with
+    | NotFound _ | DbUnavailable _ -> "unavailable"
+
+// the row of a parameter that is open has an arm for the rest of it
+first_known : Errors {NotFound | e} -> String
+let first_known e =
+  match e with
+  | NotFound _ -> "missing"
+  | _ -> "other"

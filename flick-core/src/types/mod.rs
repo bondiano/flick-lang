@@ -37,6 +37,7 @@ mod effects;
 mod elem;
 mod enums;
 mod env;
+mod error_match;
 mod exhaust;
 mod exports;
 mod facts;

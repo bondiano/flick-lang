@@ -304,6 +304,34 @@ let checked result =
   from_result result
 ```
 
+A `match` takes a value of `Errors e` apart by the errors of its row: an arm
+`NotFound id` matches the `NotFound` of the row. The arms without a guard
+cover every error of a closed row, or the `match` is `FLICK-T009`, whose fix
+adds the missing arms; a row with a variable also needs an arm for the rest,
+and an arm for an error outside a closed row is `FLICK-T003`. The `match` is
+pure and removes no error from a row. When the errors of the value are not
+known yet, as for the variable of a `try`, the arms tell them, unless an
+arm matches every error (`FLICK-T057`):
+
+```flick
+# type alias UserId = String
+# type error NotFound = NotFound UserId
+# type error DbUnavailable = DbUnavailable
+# service Users =
+#   get : UserId ->{; NotFound, DbUnavailable} String
+#
+problem : Errors {NotFound, DbUnavailable} -> String
+let problem e =
+  match e with
+  | NotFound id -> "no user " ++ id
+  | DbUnavailable -> "try again later"
+
+name_or_problem : UserId ->{Users} String
+let name_or_problem id =
+  try Users.get id with
+  | e -> problem e
+```
+
 `Fail.fail` fails with an error directly. The second row of an arrow is the
 effect `Fail`: `->{Fail {NotFound}; }` is `->{; NotFound}`, and an arm of a
 `try` catches it, written `| NotFound _ ->` or, in full,

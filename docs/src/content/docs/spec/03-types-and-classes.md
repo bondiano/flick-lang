@@ -1,6 +1,6 @@
 ---
 title: "Types and classes"
-source_hash: 4198521c66509090
+source_hash: 1fed1211bf44c81f
 ---
 
 ## Computations and kinds
@@ -33,7 +33,7 @@ In the position of a single row, the following are used: `none`, a variable `r`,
 
 `r1 + r2` and `e1 + e2` denote the union of rows of one kind, for example `Eff (r1 + r2) (e1 + e2) a`. This is a built-in operation of the row solver, not a user type family. A signature gives an upper bound: an implementation may require fewer services or allow fewer errors. Extending a row does not turn a runtime arrow into a pure one.
 
-`Errors e` turns an error row into an ordinary type of values: `Errors none = Never`, `Errors {NotFound} = NotFound`. With two or more elements, or with a row variable, `Errors e` is an opaque type: its value comes only from the `x`/`_` branch of `try` and goes to `from_result`, `Failure.rethrow` or generic code; to take it apart by error, write a `try` with error branches over `Fail.fail e`. This is a fixed projection of the checker. An arbitrary type cannot be automatically turned back into a row: a generic bridge needs a saved row `e` or an annotation, and for a single declared error a singleton row is available.
+`Errors e` turns an error row into an ordinary type of values: `Errors none = Never`, `Errors {NotFound} = NotFound`. With two or more elements, or with a row variable, a value of `Errors e` comes only from the `x`/`_` branch of `try` and goes to `from_result`, `Failure.rethrow` or generic code. A `match` takes it apart by the errors of the row: a branch `E p` matches the element `E` of the row, the branches without `when` cover every error of a closed row, an open row also needs a branch for the rest, and a branch for an error outside a closed row is a type error. When the row of the value is not known yet, as for the variable of a `try` branch, and no branch matches every error, the row is the errors the branches start with; with such a branch the row has to be known already. The `match` is pure and removes no error from a row. This is a fixed projection of the checker. An arbitrary type cannot be automatically turned back into a row: a generic bridge needs a saved row `e` or an annotation, and for a single declared error a singleton row is available.
 
 ## An HKT example
 

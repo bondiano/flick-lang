@@ -400,6 +400,28 @@ fn a_scope_in_a_child_is_inside_the_region_of_its_owner() {
     assert!(checked.is_ok(), "{checked:?}\n{source}");
 }
 
+/// (Match-Err): an arm `x` of a `try` takes the errors of the body apart
+/// by a `match` over the row the body raises. The body raises `Oops`, so
+/// the `match` runs on that error, which a configuration types at the row
+/// (Errors-Val). The choices are a short run that ends in this form.
+#[test]
+fn a_try_arm_takes_its_errors_apart_by_their_row() {
+    let c = [
+        1, 0, 1, 5, 3, 2, 5, 1, 5, 1, 4, 1, 0, 2, 5, 5, 1, 1, 0, 3, 0,
+    ];
+    let p = generate::program(&c);
+    let source = generate::source(&p);
+    assert!(
+        source.contains("(match x1 with\n          | Bad y2 ->"),
+        "{source}"
+    );
+    assert!(source.contains("(match true with"), "{source}");
+    assert!(model(&p).is_ok(), "{source}");
+    assert!(core(&source).is_empty(), "{source}");
+    let checked = GEN.with(|(d, globals)| progress_and_preservation(globals, d, &p));
+    assert!(checked.is_ok(), "{checked:?}\n{source}");
+}
+
 proptest! {
     // a failure becomes a case of `tests/check`, not a file of seeds
     // (the programs with a hole of TypeScript are not run, below)

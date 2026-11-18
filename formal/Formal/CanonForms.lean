@@ -212,6 +212,7 @@ theorem Shp.field {fl R v l t} (h : Shp S fl R v) (hf : fl = true) (hR : R.field
   | lit => simp [Ty.field] at hR
   | rnil => simp [Ty.field] at hR
   | adt _ _ h => cases ‹Ty› <;> first | (simp [Ty.hd] at h; done) | (simp [Ty.field] at hR; done)
+  | err | errOpen => simp [Ty.field] at hR
 
 /-- L1 for errors: a value of `Errors ε` is a constructor of an error in `ε`, at a
 type whose `⌈·⌉` is within the atoms of `ε`. -/
@@ -244,6 +245,6 @@ theorem canonical_errors {Ψ Θ Γ v ε φ} (hv : Value v) (h : Typ S Ψ Θ Γ v
         simp only [Ty.arrows, Ty.tcon_hd] at hU₁; cases hU₁
         exact ⟨K, k, ts, _, U, hK, hS, hsub _ (.inl rfl), hUE, hty.valueAny hv _, hsub⟩
       | cons => simp [Ty.arrows, Ty.hd] at hU₁
-    | lit | rnil | rcons => simp [Ty.hd] at hUE
+    | lit | rnil | rcons | err | errOpen => simp [Ty.hd] at hUE
 
 end Flick

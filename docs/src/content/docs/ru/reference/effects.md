@@ -1,6 +1,6 @@
 ---
 title: "Эффекты, ошибки и сервисы"
-source_hash: 03fdd37fd498abc4
+source_hash: de1621a94988f6ee
 ---
 
 Компилятор проверяет, где допустимы эффектные вызовы, какие сервисы им нужны
@@ -324,6 +324,34 @@ let find_optional id =
 checked : Result NotFound User ->{; NotFound} User
 let checked result =
   from_result result
+```
+
+`match` разбирает значение `Errors e` по ошибкам его строки: ветвь
+`NotFound id` сопоставляется с `NotFound` из строки. Ветви без условия
+покрывают каждую ошибку закрытой строки, иначе `match` вызывает `FLICK-T009`,
+а исправление добавляет недостающие ветви; строке с переменной нужна ещё ветвь
+для остальных ошибок, а ветвь с ошибкой вне закрытой строки вызывает
+`FLICK-T003`. `match` чист и не убирает ошибок из строки. Если ошибки значения
+ещё не известны, как у переменной `try`, их задают ветви, если только ни одна
+ветвь не сопоставляется с любой ошибкой (`FLICK-T057`):
+
+```flick
+# type alias UserId = String
+# type error NotFound = NotFound UserId
+# type error DbUnavailable = DbUnavailable
+# service Users =
+#   get : UserId ->{; NotFound, DbUnavailable} String
+#
+problem : Errors {NotFound, DbUnavailable} -> String
+let problem e =
+  match e with
+  | NotFound id -> "no user " ++ id
+  | DbUnavailable -> "try again later"
+
+name_or_problem : UserId ->{Users} String
+let name_or_problem id =
+  try Users.get id with
+  | e -> problem e
 ```
 
 `Fail.fail` завершает вычисление с ошибкой напрямую. Вторая строка стрелки —

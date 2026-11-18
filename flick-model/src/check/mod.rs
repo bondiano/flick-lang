@@ -21,6 +21,7 @@ mod expr;
 mod generalize;
 mod handle;
 mod handlers;
+mod match_errors;
 mod pattern;
 mod regions;
 mod row_facts;

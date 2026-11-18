@@ -45,3 +45,33 @@ let annotated () =
 //~ FLICK-E002 @27:5-27:6 the expected type `Errors {A, B}` does not allow error `C`, which this needs
 //~ FLICK-E002 @35:5-35:6 the expected type `Errors {A}` does not allow errors `B`, `C`, which this needs
 //~ FLICK-E002 @43:5-43:24 the expected type `Errors {A, B}` does not allow error `C`, which this needs
+
+// a `match` on `Errors {A, B}` has an arm for each error of the row, and
+// none for an error outside it
+missing_arm : Errors {A, B} -> String
+let missing_arm e =
+  match e with
+  | A _ -> "a"
+//~ FLICK-T009 @53:3-53:10 `match` does not cover every value: `B _` is not matched
+
+outside_row : Errors {A, B} -> String
+let outside_row e =
+  match e with
+  | A _ -> "a"
+  | B _ -> "b"
+  | C _ -> "c"
+//  ^^^ FLICK-T003 `C` is not one of the errors of `Errors {A, B}`
+
+// an arm for every error tells nothing of the errors of `e`, which then
+// have to be known
+unknown_row : Unit ->{; A, B, C} String
+let unknown_row () =
+  try
+    raise_any true
+    "ok"
+  with
+  | e ->
+    match e with
+    | A _ -> "a"
+    | _ -> "other"
+//    ^ FLICK-T057 this arm matches every error, so the arms do not tell the errors of the value

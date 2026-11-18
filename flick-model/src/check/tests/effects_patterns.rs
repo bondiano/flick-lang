@@ -273,3 +273,40 @@ fn never_has_no_pattern_cases_but_inhabited_types_do() {
         "Match",
     );
 }
+
+/// (Match-Err): a `match` takes a value of `Errors {A, B}` apart by the
+/// errors of the row, each arm at its element; an arm missing fails
+/// `Exh`, and an error outside the row is no pattern of it.
+#[test]
+fn a_match_takes_errors_apart_by_their_row() {
+    let row = |es: &[&str]| {
+        let mut r = Row::none();
+        for e in es {
+            r.elems.insert(Path::new(T, e), Rc::from([]));
+        }
+        Type::Errors(r)
+    };
+    let on = |e: &str| arm(Pat::Con(con(e, e, 1), Rc::from([Pat::Wild])), Term::unit());
+    let f = |arms| Term::lam("e", match_(var("e"), arms));
+    let of = |es: &[&str]| mono(Type::fun(row(es), Stage::Pure, ty("Unit")));
+    assert!(check(&f(vec![on("B"), on("A")]), &of(&["A", "B"])).is_ok());
+    rejected_by(check(&f(vec![on("A")]), &of(&["A", "B"])), "Match");
+    // `FLICK-T003`
+    rejected_by(check(&f(vec![on("A"), on("B")]), &of(&["A"])), "Pattern");
+}
+
+/// (Match-Err) of a row not known yet: without an arm for every error the
+/// arms tell it; with one they do not, and the row has to be known.
+#[test]
+fn the_arms_tell_a_row_not_known_yet() {
+    let on = |e: &str| arm(Pat::Con(con(e, e, 1), Rc::from([Pat::Wild])), Term::unit());
+    // `raise x` makes `x : Errors ρ` before the `match` reads it
+    let f = |arms| {
+        let body = let_("u", raise(var("x")), match_(var("x"), arms));
+        let_("f", Term::lam("x", body), Term::unit())
+    };
+    assert!(check(&f(vec![on("A"), on("B")]), &mono(ty("Unit"))).is_ok());
+    let any = arm(Pat::Wild, Term::unit());
+    // `FLICK-T057`
+    rejected_by(check(&f(vec![on("A"), any]), &mono(ty("Unit"))), "Match");
+}
