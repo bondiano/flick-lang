@@ -164,9 +164,16 @@ impl Checker<'_> {
         self.cx.stage.calls = inner.calls;
         if self.cx.stage.pure.is_none() {
             self.live_install([&entry], span);
+            // as for a layer, an instance leaves no other in the tail
+            let tail = self.cx.stage.services.clone();
+            let tail = if label.is_instance(&entry) {
+                super::ty::without(tail, slice::from_ref(&label))
+            } else {
+                tail
+            };
             let rest = Type::Row(Row {
                 entries: vec![(label, entry)],
-                tail: Some(Box::new(self.cx.stage.services.clone())),
+                tail: Some(Box::new(tail)),
                 ..Row::default()
             });
             let site = self.cx.stage.site;

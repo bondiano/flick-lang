@@ -5,6 +5,7 @@
 
 use crate::types::Elem;
 use std::mem;
+use std::slice;
 
 use super::Checker;
 use super::effects::Site;
@@ -202,9 +203,21 @@ impl Checker<'_> {
             let row = Type::Row(Row::closed(partial));
             self.perform(&row, &Type::empty_row(), span);
         }
+        // an effect with arguments is answered by its name: the body may need
+        // no other instance of it, which only the outside could give
+        let instances: Vec<Elem> = (handled.iter())
+            .filter(|h| h.label.is_instance(&h.entry))
+            .map(|h| h.label.clone())
+            .collect();
+        let tail = self.cx.stage.services.clone();
+        let tail = if instances.is_empty() {
+            tail
+        } else {
+            super::ty::without(tail, &instances)
+        };
         let rest = Type::Row(Row {
             entries,
-            tail: Some(Box::new(self.cx.stage.services.clone())),
+            tail: Some(Box::new(tail)),
             ..Row::default()
         });
         let site = self.cx.stage.site;
