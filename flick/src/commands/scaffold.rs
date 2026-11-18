@@ -176,7 +176,7 @@ const CLI_MAIN: &str = "module App.Main exposing (main)
 
 import App.Greeting exposing (greet)
 
-command : Cli.Command none none
+command : Cli.Command {Host.Console} none
 let command = cli \"NAME\" {
   description \"Prints a greeting\"
   /// Print in capitals
@@ -188,7 +188,7 @@ let command = cli \"NAME\" {
     Platform.stdout_line (if loud then String.to_upper text else text)
 }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Arguments, Host.Console, Async; AppError} Unit
 let main () =
   try Cli.run_version \"0.1.0\" command (Platform.args ()) with
   | Cli.CliError message -> App.fail message

@@ -9,7 +9,7 @@ use flick_core::build::runner_path;
 use flick_wasm::Session;
 use serde_json::Value;
 
-const MODULE: &str = "module Main exposing (total, main)\n\nimport List\n\ntotal : List Float -> Float\nlet total xs = List.fold_left (fun acc x -> acc + x) 0 xs\n\nmain : Unit ->{none; AppError} Unit\nlet main () =\n  Platform.stdout_line (Float.to_string (total [1, 2, 3]))\n";
+const MODULE: &str = "module Main exposing (total, main)\n\nimport List\n\ntotal : List Float -> Float\nlet total xs = List.fold_left (fun acc x -> acc + x) 0 xs\n\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () =\n  Platform.stdout_line (Float.to_string (total [1, 2, 3]))\n";
 
 fn json(text: &str) -> Value {
     serde_json::from_str(text).expect("json")
@@ -217,7 +217,7 @@ fn what_the_dts_leaves_out_is_kept_apart() {
 #[test]
 fn reexport_declarations_are_available_on_demand() {
     let session = session(
-        "module Main exposing (main, length)\nimport String exposing (length)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (length \"Flick\"))\n",
+        "module Main exposing (main, length)\nimport String exposing (length)\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show (length \"Flick\"))\n",
     );
     let emitted = json(&session.emit_declarations("debug"));
     assert_eq!(emitted["declaration_entry"], "Main.d.ts");

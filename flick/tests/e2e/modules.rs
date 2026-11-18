@@ -23,7 +23,7 @@ fn abstract_class_requirement_method_runs_on_js_and_go() {
         ),
         (
             "Main.fl",
-            "module App.Main exposing (main)\nimport App.Parent.Chosen exposing (answer)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (if answer == false then \"ok\" else \"wrong\")\n",
+            "module App.Main exposing (main)\nimport App.Parent.Chosen exposing (answer)\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (if answer == false then \"ok\" else \"wrong\")\n",
         ),
     ] {
         fs::write(source.join(name), text).expect("write source");
@@ -85,7 +85,7 @@ fn unpack_uses_its_packed_dictionary_on_js_and_go() {
         ),
         (
             "Main.fl",
-            "module App.Main exposing (main)\nimport App.Contracts exposing (Policy)\nimport App.Argument as Argument\npacked : Module Policy\nlet packed = pack Argument as Policy\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (unpack packed as K in eq \"A\" \"A\"))\n",
+            "module App.Main exposing (main)\nimport App.Contracts exposing (Policy)\nimport App.Argument as Argument\npacked : Module Policy\nlet packed = pack Argument as Policy\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show (unpack packed as K in eq \"A\" \"A\"))\n",
         ),
     ] {
         fs::write(source.join(name), text).expect("write source");
@@ -153,7 +153,7 @@ fn existential_module_result_opens_on_js_and_go() {
         ),
         (
             "Main.fl",
-            "module App.Main exposing (main)\nimport App.Use exposing (answer)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show answer)\n",
+            "module App.Main exposing (main)\nimport App.Use exposing (answer)\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show answer)\n",
         ),
     ] {
         fs::write(source.join(name), text).expect("write source");
@@ -231,7 +231,7 @@ let box = Child.Box 3
 
 import App.Parent exposing (Describe(..), pair, box)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (describe pair ++ \" \" ++ show pair ++ \" \" ++ describe box)
 ";
     fs::write(source.join("Parent.fl"), parent).expect("write source");

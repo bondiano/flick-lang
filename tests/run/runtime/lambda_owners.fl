@@ -3,8 +3,10 @@
 // has grown to name the region, and still gets that owner.
 module App.Main exposing (main)
 
+/// Prints through the trusted host adapter: a finalizer that prints may
+/// outlive the caller's provider of `Host.Console` (`FLICK-G003`).
 say : String ->{} Unit
-let say line = Platform.stdout_line line
+let say line = Host.raw_stdout_line line
 
 open_res : String ->{Scope s} String
 let open_res name =

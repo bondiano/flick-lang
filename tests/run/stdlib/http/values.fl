@@ -7,7 +7,7 @@ let reason failure =
   match failure with
   | Http.Cookies.CookiesError r -> show r
 
-params : Unit ->{} Unit
+params : Unit ->{Host.Console} Unit
 let params () =
   let input : Http.UrlParams.Input = [("a", "1"), ("b", "x y"), ("a", "2"), ("sig", "s3cret")]
   let p = Http.UrlParams.make input
@@ -40,7 +40,7 @@ let params () =
   Platform.stdout_line
     ("eq: " ++ (show (Http.UrlParams.from_input input == p, p == Http.UrlParams.empty)))
 
-urls : Unit ->{} Unit
+urls : Unit ->{Host.Console} Unit
 let urls () =
   match Http.Url.from_string "https://example.com/a?x=1#top" with
   | Ok url ->
@@ -73,7 +73,7 @@ let urls () =
   | Ok url -> Platform.stdout_line ("make: " ++ (Http.Url.href url))
   | Err e -> Platform.stdout_line ("make: " ++ (show e))
 
-cookies : Unit ->{; Http.Cookies.CookiesError} Unit
+cookies : Unit ->{Host.Console; Http.Cookies.CookiesError} Unit
 let cookies () =
   let attributes : Http.Cookies.Attributes = {
     Http.Cookies.attributes with
@@ -184,7 +184,7 @@ let seconds n =
   | Ok d -> d
   | Err _ -> Duration.zero
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   params ()
   urls ()

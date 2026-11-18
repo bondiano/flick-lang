@@ -16,7 +16,7 @@ use crate::types::Elem;
 use crate::types::env::Form;
 use crate::types::kinds::Kind;
 use crate::types::lang::{self, Lang};
-use crate::types::ty::{self, Norm, Row, Type, Written};
+use crate::types::ty::{self, Norm, Row, Shape, Type, Written};
 
 /// One side of `;`, before anything is taken out of it.
 pub(super) struct Slot<'n> {
@@ -117,7 +117,16 @@ impl Checker<'_> {
             && spreads.is_empty()
             && single_row(item)
         {
-            let row = take_fails(self.ty(item, kind, free), &mut fails);
+            let row = match take_fails(self.ty(item, kind, free), &mut fails) {
+                // `none` in braces: what a fix adds replaces it there
+                Type::Row(mut r) => {
+                    if let Some((span, Shape::None)) = r.written.0 {
+                        r.written = Written(Some((span, Shape::NoneInBraces)));
+                    }
+                    Type::Row(r)
+                }
+                other => other,
+            };
             return Slot {
                 row,
                 fails,

@@ -2,7 +2,7 @@
 title: Область владения ресурсами в сигнатурах
 description: Требование области владения ресурсами указывается в сигнатуре функции.
 tableOfContents: false
-source_hash: d6b0784f4221cf58
+source_hash: 3b81f8e4ea7e526b
 ---
 
 import TourLesson from "../../../../components/TourLesson.astro";
@@ -10,10 +10,11 @@ import TourLesson from "../../../../components/TourLesson.astro";
 <TourLesson locale="ru" id="scope-type">
 
 Вызову `open_res` нужна область владения ресурсами. Это требование указано
-в сигнатуре: `open_res : String ->{Scope s} String`. Здесь `s` обозначает
-регион этой области.
+в сигнатуре: `Scope s` в ряду `open_res`. Здесь `s` обозначает регион этой
+области. Освобождение ресурса печатает, когда `s` закрывается, поэтому
+функции нужен и `Host.Console`, живущий не меньше: `Fiber.Provided {Host.Console} s`.
 
-Функция `both` также требует `Scope s`, поскольку вызывает `open_res`.
+Функция `both` также требует `Scope s` и консоль, поскольку вызывает `open_res`.
 В `main` блок `scope { … }` создаёт область владения: после завершения
 `both ()` оба ресурса освобождаются.
 

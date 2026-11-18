@@ -8,7 +8,7 @@ let ms50 = Result.with_default Duration.zero (Duration.millis 50)
 plain : FileSystem.WriteOptions
 let plain = { flag = None; mode = None }
 
-line : (String, String) ->{} Unit
+line : (String, String) ->{Host.Console} Unit
 let line (label, value) = Platform.stdout_line (label ++ ": " ++ value)
 
 whole : Stream.ReadOptions
@@ -36,7 +36,7 @@ let created_c e =
   | Stream.Create path -> String.ends_with "c.txt" path && String.starts_with "sub" path
   | _ -> false
 
-files : String ->{Async, FileSystem.FileSystem; PlatformError.PlatformError} Unit
+files : String ->{Host.Console, Async, FileSystem.FileSystem; PlatformError.PlatformError} Unit
 let files dir =
   let a = dir ++ "/a.txt"
   FileSystem.write_file_string plain a "one\ntwo\nthree"
@@ -116,7 +116,7 @@ let opened path = scope {
       handles)
 }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   line ("decode_text", (Stream.mk_string (Stream.decode_text (Stream.make [[104, 195], [169]]))))
   line ("encode_text", (show (Stream.mk_bytes (Stream.encode_text (Stream.make ["é", "!"])))))

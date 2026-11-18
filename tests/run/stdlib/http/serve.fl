@@ -15,7 +15,7 @@ type error Boom = Boom
 call : String -> String -> String ->{Async} String
 foreign call from "./wire.mjs" "call"
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 item : Codec none none Json Item
@@ -65,7 +65,7 @@ let base server =
   | Http.Server.UnixAddress path -> path
 
 serving :
-  Unit ->{Async, Http.Platform.HttpPlatform, Http.Etag.Generator; Http.ServerError.ServeError}
+  Unit ->{Host.Console, Async, Http.Platform.HttpPlatform, Http.Etag.Generator; Http.ServerError.ServeError}
   String
 let serving () = scope s {
   let url = base (Http.Server.serve options (app ()))
@@ -112,7 +112,7 @@ let interrupted () =
       })
   Ref.get url
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let outcome = provide Http.Server.layer_services {
     try

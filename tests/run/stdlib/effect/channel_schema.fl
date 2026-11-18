@@ -11,7 +11,7 @@ let point = Codec.general (Codec.json Point.schema)
 text : Codec none none Json String
 let text = Codec.general String.json
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 issues : SchemaError -> String
@@ -26,7 +26,7 @@ flat :
   List a
 let flat channel = List.concat (Channel.run_collect (Channel.map NonEmpty.to_list channel))
 
-round_trips : Unit ->{; SchemaError} Unit
+round_trips : Unit ->{Host.Console; SchemaError} Unit
 let round_trips () =
   let wire = points |> Channel.pipe_to (ChannelSchema.encode point)
   say ("encode: " ++ show (List.map Json.stringify (flat wire)))
@@ -47,7 +47,7 @@ let round_trips () =
       (ChannelSchema.duplex_unknown { inputSchema = point; outputSchema = point } reencoded)
   say ("duplex_unknown: " ++ show (flat through))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   try
     round_trips ()

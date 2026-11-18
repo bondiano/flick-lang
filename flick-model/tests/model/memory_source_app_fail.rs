@@ -39,23 +39,23 @@ fn program(source: &str, entry: &Name, release: bool) -> Program {
 #[test]
 fn original_bootstrap_app_fail_raises_the_native_record_not_a_string() {
     let source = include_str!("../../../tests/run/bootstrap/app_fail.fl");
-    let entry = Name::new("App.Main", "main");
+    let modules = run::compile_source(source).expect("genuine source checks");
+    let main = run::main_of(&modules).expect("main export");
     // Both independent profiles are attempted before asserting RED, so the
-    // baseline records semantic unsupported lowering rather than preflight.
-    let results = [false, true].map(|release| catch_unwind(|| program(source, &entry, release)));
+    // baseline records semantic unsupported lowering rather than preflight;
+    // `main` prints through the live `Host` services of its root.
+    let results =
+        [false, true].map(|release| catch_unwind(|| run::counted_main(&modules, &main, release)));
     assert!(
-        results.iter().all(Result::is_ok),
+        results.iter().all(|r| matches!(r, Ok(Ok(_)))),
         "both profiles must lower App.fail"
     );
     for result in results {
         let mut heap = Heap::new();
-        let report = execute_program_outcome(
-            &mut heap,
-            &result.expect("both profile programs lower"),
-            &entry,
-            vec![Value::Unit],
-            100_000,
-        );
+        let counted = result
+            .expect("lowers")
+            .expect("both profile programs lower");
+        let report = counted.execute(&mut heap, 100_000);
         assert_eq!(report.stdout, "before\n");
         let ProgramOutcome::Raised(payload) = report.outcome else {
             panic!(
@@ -249,7 +249,7 @@ let callback_caught () =
 fn a_user_app_module_keeps_its_own_fail_binding() {
     let source = r#"module App exposing (main, fail)
 fail : String ->{} Unit
-let fail message = Platform.stdout_line ("user " ++ message)
+let fail message = Host.raw_stdout_line ("user " ++ message)
 main : Unit ->{} Unit
 let main () = fail "binding"
 "#;

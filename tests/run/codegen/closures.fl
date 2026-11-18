@@ -20,7 +20,7 @@ let counter start =
 safe_div : Int -> Int -> Result String Int
 let safe_div a b = if b == 0 then Err "division by zero" else Ok (a / b)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   add_one_times : Int -> Int -> Int
   let add_one_times = add3 1

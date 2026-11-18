@@ -2,9 +2,39 @@
 /// live layers an application needs at its entry boundary, or substitute records
 /// in tests. No service here has an implicit default inside a program: only the
 /// runner of an entry provides the live ones, to `main`, as its root.
-module Host exposing (..)
+module Host exposing (
+  Console,
+  Clock,
+  Random,
+  Environment,
+  Arguments,
+  Command,
+  Child,
+  Process,
+  raw_stdout_line,
+  raw_stderr_line,
+  raw_stdout_write,
+  raw_current_time_millis,
+  raw_current_time_nanos,
+  raw_monotonic_time_nanos,
+  raw_next,
+  raw_env,
+  raw_args,
+  raw_spawn,
+  console,
+  clock,
+  random,
+  environment,
+  arguments,
+  process,
+  Live,
+  BrowserLive,
+  browser_live,
+  live,
+)
 
 import Layer
+import PlatformError
 
 service Console =
   stdout_line : String ->{} Unit
@@ -25,6 +55,16 @@ service Environment =
 
 service Arguments =
   args : Unit ->{} List String
+
+/// A program to run, as `ChildProcess.make` describes it.
+type Command
+
+/// A running child process of region `s`.
+type Child (s : Region)
+
+/// Starts child processes; `ChildProcess` runs its commands through it.
+service Process =
+  spawn : forall s. Command ->{Scope s; PlatformError.PlatformError} Child s
 
 raw_stdout_line : String ->{} Unit
 foreign raw_stdout_line from "flick:rt" "stdoutLine"
@@ -58,6 +98,9 @@ raw_args : Unit ->{} List String
 foreign raw_args from "flick:rt" "platformArgs"
   arity 0
 
+raw_spawn : Command ->{Scope s; PlatformError.PlatformError} Child s
+foreign effect raw_spawn from "flick:rt" "processSpawn"
+
 /// Trusted adapters to ambient host APIs; constructing a layer performs no I/O.
 console : Layer none none {Console}
 let console =
@@ -84,17 +127,30 @@ let environment = Layer.succeed Environment { env = raw_env }
 arguments : Layer none none {Arguments}
 let arguments = Layer.succeed Arguments { args = raw_args }
 
-/// The five host services of an app running on a host with a process and files.
-type alias Live = {Console, Clock, Random, Environment, Arguments}
+process : Layer none none {Process}
+let process = Layer.succeed Process { spawn = raw_spawn }
+
+/// The six host services of an app running on a host with a process and files.
+type alias Live = {Console, Clock, Random, Environment, Arguments, Process}
 
 /// The three host services available in a browser environment.
 type alias BrowserLive = {Console, Clock, Random}
 
+// each merge is a top-level value of its own: a bundle drops the ones a
+// program does not use, as a nested call would keep them
+clock_random : Layer none none {Clock, Random}
+let clock_random = Layer.merge clock random
+
 /// The live browser services: console, clock, and random.
 browser_live : Layer none none BrowserLive
-let browser_live = Layer.merge console (Layer.merge clock random)
+let browser_live = Layer.merge console clock_random
 
-/// All five live services. Prefer individual layers for narrower boundaries.
+arguments_process : Layer none none {Arguments, Process}
+let arguments_process = Layer.merge arguments process
+
+process_host : Layer none none {Environment, Arguments, Process}
+let process_host = Layer.merge environment arguments_process
+
+/// All six live services. Prefer individual layers for narrower boundaries.
 live : Layer none none Live
-let live =
-  Layer.merge console (Layer.merge clock (Layer.merge random (Layer.merge environment arguments)))
+let live = Layer.merge browser_live process_host

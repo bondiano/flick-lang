@@ -11,5 +11,5 @@ let fizzbuzz n =
   else
     show n
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (String.join " " (List.map fizzbuzz (List.range 1 16)))

@@ -165,8 +165,10 @@ pub enum Shape {
     TailOnly,
     /// The row `{}`.
     EmptyRow,
-    /// The row `none`, which the services replace.
+    /// The row `none`, which the services replace in braces of their own.
     None,
+    /// `none` in braces, as in `->{none; E}`, which the services replace.
+    NoneInBraces,
 }
 
 impl Written {
@@ -174,7 +176,9 @@ impl Written {
     pub fn adding(self, services: &str) -> Option<(Span, String)> {
         let (at, shape) = self.0?;
         let text = match shape {
-            Shape::Empty | Shape::NoServices | Shape::EmptyRow => services.to_owned(),
+            Shape::Empty | Shape::NoServices | Shape::EmptyRow | Shape::NoneInBraces => {
+                services.to_owned()
+            }
             Shape::Items => format!("{services}, "),
             Shape::TailOnly => format!("{services} | "),
             Shape::None => format!("{{{services}}}"),

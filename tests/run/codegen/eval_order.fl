@@ -2,7 +2,7 @@
 // fields in the order written.
 module App.Main exposing (main)
 
-trace : String -> Float ->{} Float
+trace : String -> Float ->{Host.Console} Float
 let trace label n =
   Platform.stdout_line label
   n
@@ -10,7 +10,7 @@ let trace label n =
 pair : Float -> Float -> Float
 let pair a b = a * 10 + b
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let (x, y) = (trace "t1" 1, trace "t2" 2)
   let r = { b = trace "rb" 3; a = trace "ra" 4 }

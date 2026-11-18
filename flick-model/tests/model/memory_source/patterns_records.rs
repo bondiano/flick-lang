@@ -6,12 +6,12 @@ type Pair = Pair Int Int
 
 input : Unit ->{} Pair
 let input () =
-  Platform.stdout_line "scrutinee"
+  Host.raw_stdout_line "scrutinee"
   Pair 1 2
 
 test : Int ->{} Bool
 let test n =
-  Platform.stdout_line ("guard " ++ show n)
+  Host.raw_stdout_line ("guard " ++ show n)
   n > 1
 
 select : Pair ->{} String
@@ -73,12 +73,12 @@ fn immutable_record_update_preserves_aliases_and_written_effect_order() {
 
 base : Unit ->{} { left : String; right : String }
 let base () =
-  Platform.stdout_line "base"
+  Host.raw_stdout_line "base"
   { left = "old"; right = "keep" }
 
 noted : String -> String ->{} String
 let noted label value =
-  Platform.stdout_line label
+  Host.raw_stdout_line label
   value
 
 answer : Unit ->{} String

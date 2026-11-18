@@ -4,7 +4,9 @@
 module Test exposing (..)
 
 import Duration
+import Fiber
 import Gen
+import Host
 
 type Test
 
@@ -50,8 +52,14 @@ test : String -> (Unit -> Assertion) -> Test
 foreign pure test from "flick:rt" "testPure"
 
 /// An effectful test: it passes when the task succeeds and its scope, which
-/// owns what the task acquires, closes cleanly.
-effect_test : forall e. String -> (forall s. Eff {Async, Scope s} e Unit) -> Test
+/// owns what the task acquires, closes cleanly. It runs with the live host
+/// services, as a `main` of `Runner.Node` does; they outlive its scope, so
+/// what it acquires may use them when it is released.
+effect_test :
+  forall e.
+  String ->
+  (forall s. Fiber.Provided {...Host.Live} s => Eff {Async, Scope s, ...Host.Live} e Unit) ->
+  Test
 foreign pure effect_test from "flick:rt" "testEffect"
 
 /// Virtual time: the clock a `clock_test` runs on, which moves only when
@@ -61,7 +69,14 @@ service VirtualTime
 /// An effectful test on a clock of its own that starts at 0 and moves only
 /// by `adjust` and `set_time`: a sleep, a timeout or a retry schedule waits
 /// for virtual time, not real time. Each test has its own clock.
-clock_test : forall e. String -> (forall s. Eff {Async, Scope s, VirtualTime} e Unit) -> Test
+clock_test :
+  forall e.
+  String ->
+  (forall s. Fiber.Provided {VirtualTime, ...Host.Live} s => Eff
+    {Async, Scope s, VirtualTime, ...Host.Live}
+    e
+    Unit) ->
+  Test
 foreign pure clock_test from "flick:rt" "testClock"
 
 /// Moves the clock forward by `duration`, running what was waiting for it.
@@ -87,9 +102,14 @@ type Spec (o : ServiceRow)
 /// Tests that share what `layer` makes: it is built once, before the first
 /// of them that runs, and released after the last, the `beforeAll` and
 /// `afterAll` of the suite. A failed build fails each of its tests.
-suite : String -> Layer {Async} e o -> List (Spec o) -> Test
+suite : String -> Layer {Async, ...Host.Live} e o -> List (Spec o) -> Test
 foreign pure suite from "flick:rt" "testSuite"
 
-/// An effectful test of a suite: `effect_test` with the suite's services.
-it : forall o e. String -> (forall s. Eff {Async, Scope s | o} e Unit) -> Spec o
+/// An effectful test of a suite: `effect_test` with the suite's services,
+/// which outlive its scope too.
+it :
+  forall o e.
+  String ->
+  (forall s. Fiber.Provided {...Host.Live | o} s => Eff {Async, Scope s, ...Host.Live | o} e Unit) ->
+  Spec o
 foreign pure it from "flick:rt" "testEffect"

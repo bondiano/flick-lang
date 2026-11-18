@@ -5,7 +5,7 @@ module App.Main exposing (main)
 folded : String -> Float
 let folded s = Int.to_float (String.length s)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let names = HashSet.insert "b" (HashSet.insert "a" HashSet.empty)
   Platform.stdout_line

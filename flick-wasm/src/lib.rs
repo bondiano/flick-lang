@@ -259,18 +259,19 @@ impl Session {
         } else {
             None
         };
-        let declarations: serde_json::Map<String, Value> = if include_declarations {
-            artifacts
-                .iter()
-                .filter(|a| {
-                    a.path.ends_with(".d.ts")
-                        && Some(a.path.as_str()) != declaration_entry.as_deref()
-                })
-                .map(|a| (a.path.clone(), Value::String(a.contents.clone())))
-                .collect()
-        } else {
-            serde_json::Map::default()
-        };
+        // `extend`, not `collect`: collecting into a map compiles a sort of
+        // its own into this module, where the map's `insert` is already there
+        let mut declarations = serde_json::Map::new();
+        if include_declarations {
+            declarations.extend(
+                (artifacts.iter())
+                    .filter(|a| {
+                        a.path.ends_with(".d.ts")
+                            && Some(a.path.as_str()) != declaration_entry.as_deref()
+                    })
+                    .map(|a| (a.path.clone(), Value::String(a.contents.clone()))),
+            );
+        }
         let contents = |path: &str| {
             (artifacts.iter())
                 .find(|a| a.path == path)
@@ -286,11 +287,12 @@ impl Session {
         let entry = (artifacts.iter())
             .any(|a| a.path == runner)
             .then(|| Value::String(runner.to_owned()));
-        let files: serde_json::Map<String, Value> = artifacts
-            .into_iter()
-            .filter(|a| Path::new(&a.path).extension().is_some_and(|e| e == "js"))
-            .map(|a| (a.path, Value::String(a.contents)))
-            .collect();
+        let mut files = serde_json::Map::new();
+        files.extend(
+            (artifacts.into_iter())
+                .filter(|a| Path::new(&a.path).extension().is_some_and(|e| e == "js"))
+                .map(|a| (a.path, Value::String(a.contents))),
+        );
         let mut output = json!({
             "js": js,
             "dts": dts,
@@ -501,7 +503,7 @@ mod tests {
 
     #[test]
     fn playground_compiles_and_queries_an_inline_module() {
-        let source = "module Main exposing (main)\nmodule Child exposing (answer) =\n  let answer = 42\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show Child.answer)\n";
+        let source = "module Main exposing (main)\nmodule Child exposing (answer) =\n  let answer = 42\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show Child.answer)\n";
         let mut session = Session::new();
         let diagnostics: Value = serde_json::from_str(&session.update(source)).expect("JSON");
         assert_eq!(diagnostics, serde_json::json!([]));
@@ -525,7 +527,7 @@ mod tests {
     #[test]
     fn a_playground_program_runs_on_flicks_own_runtime() {
         let mut session = Session::new();
-        session.update("module Main exposing (main)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line \"hi\"\n");
+        session.update("module Main exposing (main)\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line \"hi\"\n");
         let built: Value = serde_json::from_str(&session.emit("debug")).expect("JSON");
         let runner = built["files"]["flick-main.js"].as_str().expect("a runner");
         assert!(

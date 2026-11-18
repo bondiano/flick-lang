@@ -27,7 +27,7 @@ ce831b060f823d82  03c-generalization-and-monads:59  fresh_cell : forall a. Eff n
 3cbab87c79864e89  04-higher-order:68  pair_optional : Option a -> Option b -> Option (a, b)
 7de9a4451432fdcb  05-errors-and-concurrency:12  type UserId = UserId String
 69046810023fdf5d  05-errors-and-concurrency:34  type error RetryExhausted e = RetryExhausted e Float
-e1a65497b7577f4f  05-errors-and-concurrency:63  service Time =
+f5ce2e29dd858ae1  05-errors-and-concurrency:63  service Time =
 8d02c2ef73032167  05-errors-and-concurrency:89  type UserId = UserId String
 8649bca288383d5a  05-errors-and-concurrency:122  effect Emit a =
 17b6a846ff453f2c  05-errors-and-concurrency:174  type UserId = UserId String
@@ -43,7 +43,7 @@ d7add3cdb4017b53  05-errors-and-concurrency:301  import File exposing (File, Pat
 fc0a2efdd9333217  06-typescript-and-ffi:172  import JsError exposing (JsError)
 d80e7a9e80161f46  06-typescript-and-ffi:204  import File exposing (Path)
 969c35e8a198d3e4  06-typescript-and-ffi:273  unboxed type UserId = UserId String
-14c2e16a876fa9da  06-typescript-and-ffi:297  type Emitter
+cab36df2bfcc70c7  06-typescript-and-ffi:297  type Emitter
 ecfe40849e18cf97  07-schema:69  refined type Email = String where Checks.email
 0027637b2b681c4e  07-schema:112  type alias Preferences = {
 16ddba9438dc4858  07-schema:159  type Tree a =
@@ -52,4 +52,4 @@ db39cdea80dbbc7c  07-schema:280  class Eq a => Hash a =
 390af6801f184082  08-type-programming-and-edsl:33  import Sql exposing (Pg, EncodeError, DbError, DecodeError)
 248a96779deeafd3  08-type-programming-and-edsl:93  type alias SaveButtonProps c = {
 9a1a5476d5603d8b  08-type-programming-and-edsl:121  component counter (start : Float) =
-b312045395eb5882  08-type-programming-and-edsl:156  import Cli
+c604707b0399741b  08-type-programming-and-edsl:156  import Cli

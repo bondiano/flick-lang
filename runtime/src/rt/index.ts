@@ -2,7 +2,9 @@
 // `core`, whose throwing stubs these names replace, on the kernel.
 export * from "../core/index.ts";
 export { runMain } from "./entry.ts";
-export { hostArguments, hostClock, hostConsole, hostEnvironment, hostRandom, withHost } from "./runner/host.ts";
+export {
+  hostArguments, hostClock, hostConsole, hostEnvironment, hostProcess, hostRandom, processSpawn, withHost,
+} from "./runner/host.ts";
 export { eventsQueue, eventsListen, eventsAttach } from "./events.ts";
 export {
   chunkEmpty, chunkFromList, chunkToList, chunkAppend, chunkConcat, chunkSize, chunkGet, chunkMap,

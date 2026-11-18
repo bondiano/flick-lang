@@ -3,7 +3,7 @@ module App.Tool exposing (tool)
 
 import Cli
 
-greet : Cli.Command none none
+greet : Cli.Command {Host.Console} none
 let greet = cli "greet" {
   description "Prints a greeting"
   /// Print in capitals
@@ -20,7 +20,7 @@ let greet = cli "greet" {
     Platform.stdout_line (String.join "\n" (List.repeat times line))
 }
 
-copy : Cli.Command none none
+copy : Cli.Command {Host.Console} none
 let copy = cli "copy" {
   flag dry_run "d" : Bool
   arg target : String
@@ -28,7 +28,7 @@ let copy = cli "copy" {
   handle fun { dry_run; target; sources } -> Platform.stdout_line target
 }
 
-tool : Cli.Command none none
+tool : Cli.Command {Host.Console} none
 let tool = cli "tool" {
   description "Project tools"
   /// Verbose output

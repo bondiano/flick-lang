@@ -64,7 +64,7 @@ let summarize pokemon = {
   types = List.map (fun item -> item.info.name) pokemon.types
 }
 
-main : Unit ->{Async} Unit
+main : Unit ->{Host.Console, Async} Unit
 let main () =
   try
     let (first, second) = provide Http.FetchClient.layer {

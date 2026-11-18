@@ -10,6 +10,7 @@ import * as Core from "@flick-lang/runtime/core/testing";
 import { service } from "../effects.ts";
 import { buildInto } from "../layer.ts";
 import { Owner, close, inside, ownedExits } from "../owner.ts";
+import { provideNodeServices } from "../runner/host.ts";
 
 export {
   genBool,
@@ -166,17 +167,20 @@ const runLeaf = (name: string, test: Leaf, seed: number, suites: ReadonlyArray<S
 /** The tests on Effect: a fiber of `Effect.forEach`, whose interruption releases the suites. */
 const engine: Engine<Task, AnyLayer> = (selected, seed, jobs, hooks) => {
   const runs = suiteRuns(selected);
+  // the tests and their suites run with the live host services, as a `main` of `Runner.Node`
   const fiber = Effect.runFork(
-    Effect.forEach(
-      selected,
-      (t, index) =>
-        hooks
-          ? Effect.suspend(() => {
-              hooks.started(index, t.name);
-              return Effect.tap(runOne(t, seed, runs), (result) => Effect.sync(() => hooks.finished(index, result)));
-            })
-          : runOne(t, seed, runs),
-      { concurrency: jobs },
+    provideNodeServices(
+      Effect.forEach(
+        selected,
+        (t, index) =>
+          hooks
+            ? Effect.suspend(() => {
+                hooks.started(index, t.name);
+                return Effect.tap(runOne(t, seed, runs), (result) => Effect.sync(() => hooks.finished(index, result)));
+              })
+            : runOne(t, seed, runs),
+        { concurrency: jobs },
+      ),
     ),
   );
   const ended = (async () => {

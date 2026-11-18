@@ -17,7 +17,7 @@ let degrees f =
 half : Int -> Float
 let half n = into n / 2.0
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line (show (half 7))
   Platform.stdout_line (show (degrees (into (Celsius 100.0))))

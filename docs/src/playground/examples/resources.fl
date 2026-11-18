@@ -1,13 +1,13 @@
 // A resource opened in a scope is closed when the scope ends, in reverse order.
 module Main exposing (main)
 
-open : String -> Eff none none String
+open : String -> Eff {Host.Console} none String
 let open name = task {
   Platform.stdout_line "open \{name}"
   name
 }
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let result = scope s {
     let a = Resource.acquire_release (open "file") (fun _ -> Platform.stdout_line "close file")

@@ -5,7 +5,7 @@ module App.Main exposing (main)
 effect Throw =
   abort throw : forall a. String ->{} a
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 quiet : Failure e ->{} Unit
@@ -14,7 +14,7 @@ let quiet _ = ()
 ping : Deferred.Deferred none Unit ->{} Unit
 let ping d = ignore (Deferred.succeed () d)
 
-with_child : Unit ->{Async} String
+with_child : Unit ->{Host.Console, Async} String
 let with_child () =
   try
     scope owner {
@@ -40,7 +40,7 @@ let with_child () =
     say "arm runs"
     why
 
-ensuring : Unit ->{} String
+ensuring : Unit ->{Host.Console} String
 let ensuring () =
   try
     Effect.ensuring
@@ -51,7 +51,7 @@ let ensuring () =
     say "arm runs"
     why
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   say (with_child ())
   say "--"

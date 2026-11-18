@@ -34,7 +34,7 @@ let hello _ =
   let name = Option.with_default "nobody" (Http.Router.param "name")
   Http.ServerResponse.text ("hello " ++ name) Http.ServerResponse.defaults
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let handlers : Handlers none = {
     double = fun n -> n * 2

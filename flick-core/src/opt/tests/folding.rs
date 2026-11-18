@@ -5,7 +5,7 @@ use crate::opt::js_number;
 fn show_of_a_literal_folds_into_the_string() {
     let js = release(
         "module App exposing (main)\n\n\
-         main : Unit ->{; AppError} Unit\n\
+         main : Unit ->{Host.Console; AppError} Unit\n\
          let main () =\n  let test = 2 + 3\n  Platform.stdout_line (\"Hello from Flick\" ++ show test)\n",
     );
     assert!(js.contains("stdout_line(\"Hello from Flick5\")"), "{js}");

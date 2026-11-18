@@ -21,16 +21,22 @@ func procSlow() Value {
 	return procShell("sleep 30")
 }
 
+// procRun spawns the command in a scope of its own, as `ChildProcess.string`,
+// `lines` and `exit_code` do, gives `use` its process, and closes the scope.
+func procRun(fb *Fiber, command Value, use func(fb *Fiber, p Value) Value) Value {
+	return owned(fb, func(fb *Fiber, _ *Owner) Value { return use(fb, ChildProcessSpawn(fb, command)) })
+}
+
 func TestChildProcessExitCodeOutputAndPipeline(t *testing.T) {
 	fb := rootFiber()
-	if got := ChildProcessExitCode(fb, procShell("exit 3")); got != int32(3) {
+	if got := procRun(fb, procShell("exit 3"), ChildProcessWait); got != int32(3) {
 		t.Fatalf("exit code %v", got)
 	}
-	lines := ChildProcessLines(fb, ChildProcessPipeTo(ChildProcessMake("sort", []Value{}), procShell("echo b&& echo a")))
+	lines := procRun(fb, ChildProcessPipeTo(ChildProcessMake("sort", []Value{}), procShell("echo b&& echo a")), ChildProcessOutputLines)
 	if got := Format(lines); got != `["a","b"]` {
 		t.Fatalf("pipeline gave %s", got)
 	}
-	text := ChildProcessString(fb, ChildProcessSetStdin("x1\n", procShell(map[bool]string{true: "findstr x", false: "cat"}[runtime.GOOS == "windows"])))
+	text := procRun(fb, ChildProcessSetStdin("x1\n", procShell(map[bool]string{true: "findstr x", false: "cat"}[runtime.GOOS == "windows"])), ChildProcessOutputString)
 	if got := text.(string); got != "x1\n" && got != "x1\r\n" {
 		t.Fatalf("stdin echoed %q", got)
 	}
@@ -93,7 +99,7 @@ func TestChildProcessKillAwaitsTheLeaderNotItsPipes(t *testing.T) {
 
 func TestChildProcessMissingProgramIsNotFound(t *testing.T) {
 	_, cause := catch(func() Value {
-		return ChildProcessExitCode(rootFiber(), ChildProcessMake("flick-no-such-program", []Value{}))
+		return procRun(rootFiber(), ChildProcessMake("flick-no-such-program", []Value{}), ChildProcessWait)
 	})
 	if cause == nil || cause.kind != causeFail {
 		t.Fatalf("no failure: %v", cause)

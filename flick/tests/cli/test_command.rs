@@ -28,7 +28,7 @@ type error Boom = Boom String
 crash : String ->{} Unit
 foreign crash from global "JSON.parse"
 
-note : String ->{} Unit
+note : String ->{Host.Console} Unit
 let note text = Platform.stderr_line text
 
 broken : forall e. Failure e ->{} Unit

@@ -51,7 +51,7 @@ test("native declarations resolve a primitive String re-export", async () => {
   const dir = path.join(repo, "target/tmp/docs-lesson/reexport");
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
-  writeFileSync(path.join(dir, "Main.fl"), 'module Main exposing (main, length)\nimport String exposing (length)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (length "Flick"))\n');
+  writeFileSync(path.join(dir, "Main.fl"), 'module Main exposing (main, length)\nimport String exposing (length)\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show (length "Flick"))\n');
   assert.equal(await evaluateExercise({ export: "length", argument_types: ["string"], return_type: "number", output: "5" }, nativeOperations(dir)), "passed");
 });
 

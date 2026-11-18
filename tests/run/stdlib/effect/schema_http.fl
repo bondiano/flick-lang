@@ -22,7 +22,7 @@ let round show_value text c =
       | Ok wire -> show_value value ++ " -> " ++ Json.stringify wire
       | Err _ -> show_value value ++ " -> encoding failed"
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line
     ("headers: "

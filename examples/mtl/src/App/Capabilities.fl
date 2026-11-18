@@ -78,7 +78,7 @@ let eff_run input =
   if Ref.get counter != 1 then App.fail "lifted base action did not run exactly once"
   observed
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line "identity \{format (identity_run 2)}"
   Platform.stdout_line "identity \{format (identity_run (0 - 1))}"

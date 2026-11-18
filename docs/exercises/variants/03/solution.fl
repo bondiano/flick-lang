@@ -12,5 +12,5 @@ let label status =
 describe : String -> String
 let describe name = label (if name == "r" then Running else if name == "p" then Paused else Done)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (String.join " " (List.map describe ["r", "p", "d"]))

@@ -63,10 +63,10 @@ and `Monad`.
 | `Jwt` | JSON Web Tokens signed with HMAC-SHA256 (`alg` `HS256`): `sign` and `verify` over a JSON codec of the claims; `verify` refuses another `alg`, a wrong signature and an `exp` the clock has passed with `JwtError` (`Malformed`, `BadSignature`, `Expired`); `now` and `expires_in` give `iat` and `exp` in seconds since the epoch |
 | `EqHash`, `HashSet`, `HashMap` | hash collections that keep their witness |
 | `Loop` | `loop` over a `Step` and `Trampoline`, for stack-safe pure recursion |
-| `Platform` | `stdout_line`, `stderr_line`, `stdout_write`, `args`, `env` |
-| `Log` | the `Log` service with `info`, `warn`, `error`, `debug`, and `Log.console` |
+| `Platform` | `stdout_line`, `stderr_line`, `stdout_write` through `Host.Console`, `args` through `Host.Arguments`, `env` through `Host.Environment` |
+| `Log` | the `Log` service with `info`, `warn`, `error`, `debug`, and `Log.console` over `Host.console` |
 | `File` | the `FileSystem` service: `open_scoped`, `read_all`, `read_text`, `write_text`, and `File.node` |
-| `ChildProcess` | child processes: a `Command` (`make`, `set_cwd`, `set_env`, `set_stdin`, `prefix`, `pipe_to`, `inherit_output`) run to its end by `string`, `lines` and `exit_code`, or started by `spawn` as a `Process` of a scope, with `stdout`, `stderr`, `wait`, `is_running`, `kill` and `kill_with` |
+| `ChildProcess` | child processes: a `Command` (`make`, `set_cwd`, `set_env`, `set_stdin`, `prefix`, `pipe_to`, `inherit_output`) run to its end by `string`, `lines` and `exit_code`, or started by `spawn` as a `Process` of a scope, all through `Host.Process`, with `stdout`, `stderr`, `output_string`, `output_lines`, `wait`, `is_running`, `kill` and `kill_with` |
 | `Resource` | `acquire_release` into a scope's owner, and `bracket` |
 | `Events` | `queue` policies and the `log_failures` supervisor |
 | `Ui`, `Ui.Event` | user interfaces rendered with React, see [ui.md](../ui/) |
@@ -89,8 +89,8 @@ For example, `Clock` is in `std`, `Stream` in `stream`, and `HttpApi` in `http`:
 
 | Module | Contents |
 | - | - |
-| `Clock`, `Random` | the fiber's sources of time and randomness; default services, so reading them needs no service row |
-| `Console`, `Logger`, `LogLevel`, `ErrorReporter` | the fiber's console, what happens to each log message, log levels ordered by severity, and where unhandled failures are reported |
+| `Clock`, `Random` | reads of the time through `Host.Clock`, and draws through `Host.Random`; `Random.with_seed` repeats the draws of a task |
+| `Console`, `Logger`, `LogLevel`, `ErrorReporter` | `log`, `info` and `debug` to stdout and `warn` and `error` to stderr through `Host.Console`, what happens to each log message, log levels ordered by severity, and where unhandled failures are reported |
 | `Cause` | build, combine and read how a computation failed, over Flick's opaque `Failure e` |
 | `Cron` | sets of times, optionally in a time zone; `Schedule.cron` runs by one |
 | `ByteSize` | an exact, non-negative number of bytes in decimal or binary units |
@@ -177,14 +177,14 @@ Cases:
 
 ```flick
 // a. spawn, then only wait: 1 MiB nobody reads
-waits : Unit ->{Async; PlatformError.PlatformError} Int
+waits : Unit ->{Host.Process, Async; PlatformError.PlatformError} Int
 let waits () = scope {
   let p = ChildProcess.spawn (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"])
   ChildProcess.wait p // JS: 0; Go: 0 (drains unread output)
 }
 
 // b. exit_code of a command with much output: the same
-chatty : Unit ->{Async; PlatformError.PlatformError} Int
+chatty : Unit ->{Host.Process, Async; PlatformError.PlatformError} Int
 let chatty () =
   ChildProcess.exit_code (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"]) // JS: 0; Go: 0
 
@@ -218,7 +218,7 @@ let tests =
 | Function | Test |
 | - | - |
 | `Test.test name check` | pure: `check ()` is an `Assertion` |
-| `Test.effect_test name task` | the task runs in a scope of its own, which owns what it acquires; `Test.expect` fails it on an assertion |
+| `Test.effect_test name task` | the task runs in a scope of its own, which owns what it acquires, with the live host services, which outlive that scope: what it acquires may use them when it is released; `Test.expect` fails it on an assertion |
 | `Test.clock_test name task` | as `effect_test`, on a clock of its own that starts at 0 and moves only by `Test.adjust duration` and `Test.set_time millis`: a sleep, a timeout or a retry schedule waits for virtual time, so a test of an hour's backoff runs at once |
 | `Test.property name gen check` | `check` on 100 values of `gen`, drawn from the run's seed; `Gen.function result` (for a `Hash` argument) draws pure functions, as a law over functions needs |
 | `Test.group name tests` | `name >` before the names of `tests` |

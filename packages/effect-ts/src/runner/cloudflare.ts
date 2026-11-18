@@ -59,12 +59,14 @@ export const run = (main: unknown) => {
   };
 };
 
-/** `wait_until`: the task runs on its own, as the response no longer waits for it. */
+/** `wait_until`: the task runs on its own, with the browser host services, as the response no longer waits for it. */
 export const waitUntil = (context: Context, task: Effect.Effect<unknown>): Effect.Effect<void> =>
   Effect.sync(() =>
     context.waitUntil(
       Effect.runPromise(
-        Effect.catchCause(task, (cause) => Effect.sync(() => writeStderr(`error: ${pretty(cause)}\n`))),
+        provideBrowserServices(
+          Effect.catchCause(task, (cause) => Effect.sync(() => writeStderr(`error: ${pretty(cause)}\n`))),
+        ),
       ),
     ),
   );

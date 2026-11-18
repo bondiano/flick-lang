@@ -31,7 +31,7 @@ fn released_source_packages_are_fetched_pinned_and_run_offline_without_the_adapt
         )
         .expect("manifest string");
     }
-    let main = "module App.Main exposing (main)\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (Http.Method.to_string Http.Method.POST ++ \":\" ++ show (List.length Http.Method.all))\n";
+    let main = "module App.Main exposing (main)\n\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (Http.Method.to_string Http.Method.POST ++ \":\" ++ show (List.length Http.Method.all))\n";
     let app = project(
         "std-tarball-app",
         &[("flick.toml", &manifest), ("src/App/Main.fl", main)],
@@ -90,7 +90,7 @@ fn released_source_packages_are_fetched_pinned_and_run_offline_without_the_adapt
     .expect("mixed consumer");
     fs::write(
         app.join("src/App/Main.fl"),
-        "module App.Main exposing (main)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (Stream.run_collect (Stream.from_list [2, 3, 5])))\n",
+        "module App.Main exposing (main)\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show (Stream.run_collect (Stream.from_list [2, 3, 5])))\n",
     )
     .expect("moved streaming program");
     let mixed = released(&app, &store, &["run"]);

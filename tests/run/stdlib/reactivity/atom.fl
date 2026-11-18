@@ -32,7 +32,7 @@ describe : AsyncResult.AsyncResult Float none -> String
 let describe result =
   AsyncResult.fold "initial" (fun n -> "success " ++ show n) (fun _ -> "failure") result
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () = provide Atom.layer {
   Platform.stdout_line (show (read_doubled ()))
   Atom.set count 5

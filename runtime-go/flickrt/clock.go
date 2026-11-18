@@ -46,12 +46,6 @@ func clockOf(fb *Fiber) Clock {
 	return systemClock
 }
 
-func ClockWith(fb *Fiber, f Value) Value { return Run(fb, Apply(fb, f, clockOf(fb))) }
-
-func ClockMillisOf(c Value) Value         { return c.(Clock).millis() }
-func ClockNanosOf(c Value) Value          { return c.(Clock).nanos() }
-func ClockMonotonicNanosOf(c Value) Value { return c.(Clock).monotonic() }
-
 func ClockCurrentTimeMillis(fb *Fiber) Value  { return clockOf(fb).millis() }
 func ClockCurrentTimeNanos(fb *Fiber) Value   { return clockOf(fb).nanos() }
 func ClockMonotonicTimeNanos(fb *Fiber) Value { return clockOf(fb).monotonic() }

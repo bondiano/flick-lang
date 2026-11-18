@@ -27,5 +27,5 @@ let roman n =
   }
   text
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line "\{roman 4} \{roman 9} \{roman 2026}"

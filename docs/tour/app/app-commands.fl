@@ -29,7 +29,7 @@ let memory store =
     books = fun () -> Ref.get store
   }
 
-report : Unit ->{Shelf} Unit
+report : Unit ->{Host.Console, Shelf} Unit
 let report () =
   let books = Shelf.books ()
   List.each_effect (fun book -> Platform.stdout_line (Books.line book)) books
@@ -43,7 +43,7 @@ let pages_of text =
   | Some n -> n
   | None -> Fail.fail (BadCommand "not a number: \{text}")
 
-run : String ->{Shelf; BadCommand} Unit
+run : String ->{Host.Console, Shelf; BadCommand} Unit
 let run command =
   match String.split " " command with
   | ["add", title, pages] -> Shelf.add title (pages_of pages)
@@ -51,7 +51,7 @@ let run command =
   | ["report"] -> report ()
   | _ -> Fail.fail (BadCommand "unknown command: \{command}")
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let script = [
     "add Dune 412",

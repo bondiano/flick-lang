@@ -3,5 +3,5 @@ module Main exposing (main, average)
 average : Int -> Int -> Float
 let average a b = Int.to_float (a + b / 2)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (show (average 3 4))

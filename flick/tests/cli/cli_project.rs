@@ -22,7 +22,7 @@ use flick_core::build::runner_path;
 use flick_core::diagnostics::codes::REGISTRY;
 use flick_core::implicit_packages::IMPLICIT_PACKAGES;
 
-const MAIN: &str = "module App.Main exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"hi\"\n";
+const MAIN: &str = "module App.Main exposing (main)\n\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () = Platform.stdout_line \"hi\"\n";
 
 fn code(out: &Output) -> Option<i32> {
     out.status.code()
@@ -125,7 +125,7 @@ fn explain_reads_a_plugins_code_in_its_package() {
 
 #[test]
 fn expand_prints_the_code_of_each_plugin_block() {
-    let main = "module App.Main exposing (main)\n\nimport Cli\n\ntool : Cli.Command none none\nlet tool = cli \"tool\" {\n  flag loud : Bool\n  handle fun { loud } -> Platform.stdout_line (show loud)\n}\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"hi\"\n";
+    let main = "module App.Main exposing (main)\n\nimport Cli\n\ntool : Cli.Command {Host.Console} none\nlet tool = cli \"tool\" {\n  flag loud : Bool\n  handle fun { loud } -> Platform.stdout_line (show loud)\n}\n\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () = Platform.stdout_line \"hi\"\n";
     let dir = project(
         "cli_expand",
         &[("flick.toml", APP), ("src/App/Main.fl", main)],
@@ -443,7 +443,7 @@ fn module_store_persists_plugin_blocks_and_derives_across_cli_runs() {
     let schema = "module App.Schema exposing (Users, User, user_json)\n\nimport Codec\n\nsql table Users \"users\" {\n  id : bigint primary key as BigInt\n  name : text not null as String\n}\n\ntype alias User = { name : String } deriving Schema\n\nuser_json : PureCodec Json User\nlet user_json = codec User.schema {\n  name = field \"name\" String.json\n}\n";
     let ui = "module App.View exposing (badge)\n\nimport Ui\n\nbadge : String -> Ui\nlet badge label = ui { text label }\n";
     let api = "module App.Api exposing (Public)\n\nimport HttpApi.Derive exposing (..)\n\ntype alias Public = {\n  ping : Get \"/ping\" {} Unit {};\n} deriving HttpApi\n";
-    let main = "module App.Main exposing (main, greet, query, check_api)\n\nimport App.Api exposing (Public)\nimport App.Schema exposing (Users)\nimport App.View exposing (badge)\n\ncheck_api : Public -> Public\nlet check_api p = p\n\nlet query = sql {\n  from u in Users\n  select { id = u.id; name = u.name }\n}\n\ngreet : Cli.Command none none\nlet greet = cli \"greet\" {\n  handle fun {} -> Platform.stdout_line \"hi\"\n}\n\nmain : Unit ->{; AppError} Unit\nlet main () =\n  let _ = badge \"ok\"\n  Platform.stdout_line \"ok\"\n";
+    let main = "module App.Main exposing (main, greet, query, check_api)\n\nimport App.Api exposing (Public)\nimport App.Schema exposing (Users)\nimport App.View exposing (badge)\n\ncheck_api : Public -> Public\nlet check_api p = p\n\nlet query = sql {\n  from u in Users\n  select { id = u.id; name = u.name }\n}\n\ngreet : Cli.Command {Host.Console} none\nlet greet = cli \"greet\" {\n  handle fun {} -> Platform.stdout_line \"hi\"\n}\n\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () =\n  let _ = badge \"ok\"\n  Platform.stdout_line \"ok\"\n";
     let dir = project(
         "cli_module_store_plugins",
         &[

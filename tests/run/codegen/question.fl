@@ -31,7 +31,7 @@ let summed a b =
   try show (sum a b) with
   | Invalid s -> "invalid " ++ s
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (show (quarter 8))
   Platform.stdout_line (show (quarter 6))

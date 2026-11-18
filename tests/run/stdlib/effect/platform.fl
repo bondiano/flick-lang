@@ -14,7 +14,7 @@ let failure_of failure =
   | PlatformError.PlatformError (PlatformError.Bad r) -> "bad " ++ r.module_ ++ "." ++ r.method
   | PlatformError.PlatformError (PlatformError.System r) -> "system " ++ show r.tag
 
-paths : Unit ->{Path.Path; PlatformError.PlatformError} Unit
+paths : Unit ->{Host.Console, Path.Path; PlatformError.PlatformError} Unit
 let paths () =
   Platform.stdout_line ("sep " ++ Path.sep ())
   Platform.stdout_line ("join " ++ Path.join ["a", "b", "../c.txt"])
@@ -40,13 +40,15 @@ let paths () =
     | failure -> failure_of failure
   Platform.stdout_line ("from_file_url " ++ bad)
 
+/// The operations' rows are closed: `display` prints through the trusted
+/// host adapter.
 fake_terminal : Layer none none {Terminal.Terminal}
 let fake_terminal =
   Layer.succeed Terminal {
     columns = fun () -> 80
     rows = fun () -> 24
     read_line = fun () -> "typed"
-    display = fun text -> Platform.stdout_write ("[" ++ text ++ "]\n")
+    display = fun text -> Host.raw_stdout_write ("[" ++ text ++ "]\n")
   }
 
 quit_on_q : Terminal.UserInput -> Bool
@@ -54,7 +56,7 @@ let quit_on_q input =
   let key : Terminal.Key = input.key
   key.name == "q" || key.ctrl
 
-terminal : Unit ->{Async, Terminal.Terminal; PlatformError.PlatformError} Unit
+terminal : Unit ->{Host.Console, Async, Terminal.Terminal; PlatformError.PlatformError} Unit
 let terminal () =
   Platform.stdout_line ("size " ++ show (Terminal.columns (), Terminal.rows ()))
   Terminal.display "displayed\n"
@@ -63,7 +65,7 @@ let terminal () =
     | Terminal.QuitError -> "quit"
   Platform.stdout_line ("read_line " ++ read)
 
-stdio : Unit ->{Stdio.Stdio; PlatformError.PlatformError} Unit
+stdio : Unit ->{Host.Console, Stdio.Stdio; PlatformError.PlatformError} Unit
 let stdio () =
   Platform.stdout_line ("args " ++ show (Stdio.args ()))
   Platform.stdout_line
@@ -72,7 +74,7 @@ let stdio () =
   Stdio.write_stdout "written to stdout\n"
   Stdio.write_stderr "written to stderr\n"
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let outcome =
     try

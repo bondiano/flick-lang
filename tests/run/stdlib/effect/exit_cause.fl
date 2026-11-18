@@ -95,7 +95,7 @@ let other_text o =
 failed : Failure {Boom}
 let failed = Cause.fail (Boom 1)
 
-exits : Unit ->{} Unit
+exits : Unit ->{Host.Console} Unit
 let exits () =
   let ok : Ex = Exit.succeed 1
   let bad : Ex = Exit.fail (Boom 2)
@@ -175,7 +175,7 @@ let ids f =
   | Ok xs -> show xs
   | Err _ -> "none"
 
-causes : Unit ->{} Unit
+causes : Unit ->{Host.Console} Unit
 let causes () =
   let died : Failure {Boom} = Cause.die "broken"
   let stopped : Failure {Boom} = Cause.interrupt (Some 3)
@@ -215,7 +215,7 @@ let causes () =
         (List.map (fun r -> Option.is_some (Cause.reason_stack_trace r)) (Cause.reasons died)))
 
 /// A stack frame of a traced failure, annotated on another one.
-frames : Unit ->{} Unit
+frames : Unit ->{Host.Console} Unit
 let frames () =
   let traced : Exit {Boom} Unit =
     Effect.exit (task { Tracer.with_span "outer" span_options (task { Fail.fail (Boom 9) }) })
@@ -246,7 +246,7 @@ let handled t =
   | TimeoutError -> "timed out"
 
 /// Errors of `Cause` raised and handled as Flick errors.
-errors : Unit ->{Async} Unit
+errors : Unit ->{Host.Console, Async} Unit
 let errors () =
   let raised = [
     task { Fail.fail (Cause.NoSuchElementError "empty") },
@@ -257,13 +257,13 @@ let errors () =
   Platform.stdout_line ("errors: " ++ show (List.map_effect handled raised))
 
 /// `Failure.rethrow` fails with the whole cause again.
-rethrown : Unit ->{} Unit
+rethrown : Unit ->{Host.Console} Unit
 let rethrown () =
   let again : Exit {Boom} Unit =
     Effect.exit (task { Failure.rethrow (Cause.combine (Cause.die "x") failed) })
   Platform.stdout_line ("rethrow: " ++ show (Option.map flags (Exit.failure again)))
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   exits ()
   causes ()

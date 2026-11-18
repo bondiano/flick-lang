@@ -16,7 +16,7 @@ let render_impl = {
 twice : Show a => a ->{Render} String
 let twice x = Render.render x ++ Render.render [x]
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = provide (Layer.succeed Render render_impl) {
   Platform.stdout_line (Render.render 42)
   Platform.stdout_line (Render.render "text")

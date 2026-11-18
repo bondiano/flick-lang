@@ -72,14 +72,14 @@ let uncaught seed =
   let layer = Layer.succeed Read { read = fun () -> seed }
   Layer.run layer (fun unit ->
     ignore unit
-    Platform.stdout_line "before"
+    Host.raw_stdout_line "before"
     let value = scope {
       let arena = Arena.make ()
       let view = Arena.alloc arena (Read.read ())
       let cell = Ref.make (Arena.get view)
       Ref.get cell
     }
-    Platform.stdout_line "inside"
+    Host.raw_stdout_line "inside"
     from_result (Err (Gone value))
   )
 

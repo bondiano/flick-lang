@@ -14,7 +14,7 @@ rec {
   let is_odd n = if n == 0 then Loop.done Odd else Loop.suspend (fun () -> is_even (n - 1))
 }
 
-line : String -> String ->{} Unit
+line : String -> String ->{Host.Console} Unit
 let line label text = Platform.stdout_line (label ++ ": " ++ text)
 
 decode : PureCodec Json Int -> String -> String
@@ -26,21 +26,22 @@ let decode int text =
     | Ok n -> "Ok " ++ show n
     | Err e -> "Err " ++ show e
 
-listening : Unit ->{; AppError} Unit
+listening : Unit ->{Host.Console; AppError} Unit
 let listening () =
   scope s {
     let listener : Events.Listener s Int =
       Events.listen s (Events.queue 4) (fun _ -> Platform.stdout_line "supervised") (fun n -> task {
         Platform.stdout_line ("event " ++ show n)
       })
-    Events.attach listener (fun _ -> Platform.stdout_line "added") (fun _ ->
-      Platform.stdout_line "removed"
+    // the hooks' rows are closed: they print through the trusted host adapter
+    Events.attach listener (fun _ -> Host.raw_stdout_line "added") (fun _ ->
+      Host.raw_stdout_line "removed"
     )
     Platform.stdout_line "attached"
   }
   Platform.stdout_line "closed"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   line "trampoline" (show (Loop.run (is_even 100001), Loop.run (is_odd 10), Loop.run (Loop.done 3)))
   let total =

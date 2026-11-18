@@ -13,7 +13,7 @@ The block `cli "name" { … }` is the plugin `cli` of the `std` package (see
 ```flick
 import Cli
 
-greet : Cli.Command none none
+greet : Cli.Command {Host.Console} none
 let greet =
   cli "greet" {
     description "Prints a greeting"
@@ -78,7 +78,7 @@ first, so the handler is checked against the options its clauses make. A
 pipeline written by hand reads as well:
 
 ```flick
-greet : Cli.Command none none
+greet : Cli.Command {Host.Console} none
 let greet =
   Cli.command "greet"
     |> Cli.description "Prints a greeting"
@@ -128,7 +128,7 @@ of help and version as well.
 ```flick
 # import App.Greet exposing (greet)
 #
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Arguments, Host.Console, Async; AppError} Unit
 let main () =
   try Cli.run greet (Platform.args ()) with
   | Cli.CliError message -> App.fail message

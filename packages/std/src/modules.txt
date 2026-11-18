@@ -1,5 +1,4 @@
 # Modules of std, in dependency order; imports name their source dependencies.
-Platform
 Generic
 App
 Layer
@@ -22,9 +21,11 @@ EqHash
 HashSet
 HashMap
 Loop
+PlatformError
+Host
+Platform
 Clock
 Random
-Host
 Context
 Log
 File
@@ -110,7 +111,6 @@ Arbitrary
 JsonSchema
 Differ
 Net
-PlatformError
 Path
 LogLevel
 Console

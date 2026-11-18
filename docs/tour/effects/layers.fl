@@ -9,7 +9,7 @@ let greeting () = if Clock.hour () < 12 then "Good morning" else "Good afternoon
 at : Int -> Layer {} none {Clock}
 let at hour = Layer.succeed Clock { hour = fun () -> hour }
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line (provide (at 9) { greeting () })
   Platform.stdout_line (provide (at 15) { greeting () })

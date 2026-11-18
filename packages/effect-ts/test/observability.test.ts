@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 
-test("observability converts objects without process and keeps stderr consoles Node-only", () => {
+test("observability converts objects without process", () => {
   const result = spawnSync(
     process.execPath,
     [
@@ -22,8 +22,7 @@ test("observability converts objects without process and keeps stderr consoles N
         });
         Reflect.deleteProperty(globalThis, "process");
         // Dynamic imports exercise loading only after the process-less host and rejection hook are installed.
-        const { Cause, Effect } = await import("effect");
-        const Console = await import("@flick-lang/effect-ts/effect/Console");
+        const { Cause, Console, Effect } = await import("effect");
         const Logger = await import("@flick-lang/effect-ts/effect/Logger");
         const Tracer = await import("@flick-lang/effect-ts/effect/Tracer");
         const ErrorReporter = await import("@flick-lang/effect-ts/effect/ErrorReporter");
@@ -52,15 +51,9 @@ test("observability converts objects without process and keeps stderr consoles N
         });
         assert.equal(reports[0].message, "broken");
         assert.deepEqual(reports[0].attributes, [["object", expected], ["text", "unchanged"]]);
-        assert.throws(() => Console.flickToStderr(), /node:console is available only on Node.js/);
         hooks.deregister();
         globalThis.process = nodeProcess;
-        const { Console: NodeConsole } = await import("node:console");
-        const stderrConsole = Console.flickToStderr();
-        assert.ok(stderrConsole instanceof NodeConsole);
-        stderrConsole.log("stderr log");
         assert.deepEqual(logger.log(logOptions).message, ["message", "{ answer: 42 }"]);
-        stderrConsole.error("stderr error");
       `,
     ],
     { cwd: new URL("..", import.meta.url), encoding: "utf8" },
@@ -68,5 +61,5 @@ test("observability converts objects without process and keeps stderr consoles N
   assert.ifError(result.error);
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout, "portable log\n");
-  assert.equal(result.stderr, "stderr log\nstderr error\n");
+  assert.equal(result.stderr, "");
 });

@@ -1,6 +1,6 @@
 ---
 title: "Типизированные RPC"
-source_hash: ace67baf6c20bc35
+source_hash: bc135ee2f4725e76
 ---
 
 Опишите процедуру один раз и используйте это описание по обе стороны
@@ -61,7 +61,7 @@ let handlers =
     count_to = fun n -> Stream.from_list (List.map Int.to_float (List.range 1 (Int.truncate n + 1)));
   }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   try
     scope s {
@@ -201,7 +201,7 @@ let main () =
 # hello : ServerRequest ->{RouteContext} ServerResponse
 # let hello _ = Http.ServerResponse.text "hello" Http.ServerResponse.defaults
 #
-serve_both : Http.Server.ServeOptions -> Handlers none ->{Async, 
+serve_both : Http.Server.ServeOptions -> Handlers none ->{Host.Console, Async, 
   Http.Platform.HttpPlatform,
   Http.Etag.Generator;
   Http.ServerError.ServeError

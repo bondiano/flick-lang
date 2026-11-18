@@ -26,7 +26,7 @@ let handlers =
 serving : Rpc.Serialization -> Rpc.ServeOptions
 let serving serialization = { Rpc.defaults with serialization = serialization }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   provide (Layer.merge Server.node Http.Server.layer_services) {
     try

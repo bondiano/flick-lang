@@ -14,7 +14,7 @@ let unwrapped () =
         (fun x -> Some ((if x == 2 then None else Some x)? + 1))
         (for x <- [1, 2, 3] yield x)))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let xs = [1, 2, 3, 4]
   // map, filter and to_list into one strict loop

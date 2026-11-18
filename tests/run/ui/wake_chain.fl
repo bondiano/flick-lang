@@ -41,14 +41,14 @@ shown : Int -> String
 let shown n = if n == 0 then "o" else "x"
 
 /// `said` when the page shows `page`, else what it shows.
-expect : String -> String ->{} Unit
+expect : String -> String ->{Host.Console} Unit
 let expect said page = Platform.stdout_line (if text () == page then said else text ())
 
-report : Failure e ->{} Unit
+report : Failure e ->{Host.Console} Unit
 let report failure =
   Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   setup ()
   match Ui.Dom.container "app" with

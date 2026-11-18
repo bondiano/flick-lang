@@ -163,9 +163,10 @@ delay and the console. Passing a different identifier does not replace
 either dependency.
 
 The runtime arrow `->{Async; NotFound}` says the call may suspend and fail
-with `NotFound`. It does **not** describe every external capability: foreign
-calls and host operations such as console output are not all named in
-Flick's effect rows yet. An empty service row is not a sandbox. See
+with `NotFound`. It does **not** describe every external capability: the
+standard library names its host operations, such as console output
+(`Host.Console`), but a foreign call is taken on trust. An empty service row
+is not a sandbox. See
 [where the promise stops](../../start/why/#where-the-promise-stops).
 
 ## Name the operations the program needs
@@ -511,7 +512,7 @@ let describe raw =
   try (load_view (user_id raw)).title with
   | NotFound id -> "not found: \{show id}"
 
-program : Unit ->{Async, Users, Log} Unit
+program : Unit ->{Host.Console, Async, Users, Log} Unit
 let program () =
   let both =
     try
@@ -522,7 +523,7 @@ let program () =
   Platform.stdout_line both
   Platform.stdout_line (describe "u3")
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () = provide Layer.merge users_live log_live { program () }
 ```
 

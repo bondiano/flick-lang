@@ -8,7 +8,7 @@ let counted runs n =
   Ref.set runs (Ref.get runs + 1)
   n
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let runs = Ref.make 0
   let lazy answer = counted runs 42

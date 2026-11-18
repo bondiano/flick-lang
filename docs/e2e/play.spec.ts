@@ -8,7 +8,7 @@ test("interpolated strings keep code colours through themes, sizes and edits", a
   await ready(page);
   const source = String.raw`module Main exposing (main)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let pokemon = { name = "Pikachu"; id = 25 }
   Platform.stdout_line "Pokémon \{pokemon.name} (#\{pokemon.id}): \{String.join ", " ["electric"]} done"
@@ -70,7 +70,7 @@ test("an inline module compiles and runs in the browser", async ({ page }) => {
   await ready(page);
   await page.locator(".cm-content").click();
   await page.keyboard.press("ControlOrMeta+A");
-  await page.keyboard.insertText("module Main exposing (main)\n\nmodule Child exposing (answer) =\n  let answer = 42\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show Child.answer)\n");
+  await page.keyboard.insertText("module Main exposing (main)\n\nmodule Child exposing (answer) =\n  let answer = 42\n\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show Child.answer)\n");
   await expect(page.locator(".fp-status")).toContainText("Type-checked", { timeout: 30_000 });
   await page.getByRole("button", { name: "Run", exact: true }).click();
   await expect(page.locator(".fp-output")).toContainText("42", { timeout: 60_000 });
@@ -81,7 +81,7 @@ test("higher-order signatures retain dependent type names in browser hover", asy
   await ready(page);
   await page.locator(".cm-content").click();
   await page.keyboard.press("ControlOrMeta+A");
-  await page.keyboard.insertText("module Main exposing (main, Factory)\n\ntype module Input =\n  type Key\n\ntype module Output =\n  type Value\n\ntype module Factory = (K : Input) -> Output with type Value = K.Key\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line \"42\"\n");
+  await page.keyboard.insertText("module Main exposing (main, Factory)\n\ntype module Input =\n  type Key\n\ntype module Output =\n  type Value\n\ntype module Factory = (K : Input) -> Output with type Value = K.Key\n\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line \"42\"\n");
   await expect(page.locator(".fp-status")).toContainText("Type-checked", { timeout: 30_000 });
   await hoverWord(page, "type module Factory", "Factory");
   await expect(page.locator(".cm-tooltip-hover")).toContainText("K.Key");
@@ -93,7 +93,7 @@ test("higher-order signatures retain dependent type names in browser hover", asy
 test("a higher-order module captures one prefix and updates after an edit", async ({ page }) => {
   await page.goto("/flick-lang/play/");
   await ready(page);
-  const source = "module Main exposing (main)\n\ntype module Input =\n  identity : forall a. a -> a\n\ntype module Output =\n  answer : Int\n\noffset : Int\nlet offset = 1\n\nmodule Make(K : Input) : Output =\n  answer : Int\n  let answer = K.identity (41 + offset)\n\nmodule Chosen = Make(Prelude)\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show Chosen.answer)\n";
+  const source = "module Main exposing (main)\n\ntype module Input =\n  identity : forall a. a -> a\n\ntype module Output =\n  answer : Int\n\noffset : Int\nlet offset = 1\n\nmodule Make(K : Input) : Output =\n  answer : Int\n  let answer = K.identity (41 + offset)\n\nmodule Chosen = Make(Prelude)\n\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show Chosen.answer)\n";
   for (const [text, expected] of [[source, "42"], [source.replace("offset = 1", "offset = 2"), "43"]] as const) {
     await page.locator(".cm-content").click();
     await page.keyboard.press("ControlOrMeta+A");
@@ -299,7 +299,7 @@ for (const locale of ["en", "ru"]) {
     await expect(lesson).toContainText(ru ? "Сначала исправьте ошибки" : "Fix the compiler errors", { timeout: 30_000 });
     await page.getByRole("button", { name: ru ? "Показать решение" : "Show solution" }).click();
     await expect(lesson).not.toContainText(ru ? "Урок пройден" : "Lesson completed");
-    await replaceSource(page, 'module Main exposing (main, size_of)\n\nsize_of : String -> Int\nlet size_of text = String.length text\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line "5"\n');
+    await replaceSource(page, 'module Main exposing (main, size_of)\n\nsize_of : String -> Int\nlet size_of text = String.length text\n\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line "5"\n');
     await check.click();
     await expect(lesson).toContainText(ru ? "Вывод не совпадает" : "The output does not match", { timeout: 30_000 });
     await page.getByRole("button", { name: ru ? "Показать решение" : "Show solution" }).click();
@@ -324,7 +324,7 @@ test("exercise checks resolve a re-export through the worker declaration graph",
     exercise.check.export = "length";
     element.textContent = JSON.stringify(exercise);
   });
-  await replaceSource(page, 'module Main exposing (main, length)\nimport String exposing (length)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (length "Flick"))\n');
+  await replaceSource(page, 'module Main exposing (main, length)\nimport String exposing (length)\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show (length "Flick"))\n');
   await expect(page.locator(".fp-status")).toContainText("Type-checked", { timeout: 30_000 });
   await page.getByRole("button", { name: "Check answer" }).click();
   await expect(page.locator(".fp-lesson")).toContainText("Correct. The signature and output match.", { timeout: 30_000 });
@@ -337,7 +337,7 @@ test("local mutation, loops and typed errors run in the browser", async ({ page 
 
 type error Missing = Missing
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let mut i = 0
   while i < 3 do i = i + 1

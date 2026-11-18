@@ -5,10 +5,10 @@ module App.Main exposing (main)
 effect Throw =
   abort throw : forall a. String ->{} a
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
-nested : Unit ->{} String
+nested : Unit ->{Host.Console} String
 let nested () =
   try
     scope {
@@ -24,7 +24,7 @@ let nested () =
     say "arm runs"
     why
 
-around : Unit ->{} String
+around : Unit ->{Host.Console} String
 let around () = scope {
   Scope.add_finalizer (task { say "around, when its scope ends" })
   let why =
@@ -41,7 +41,7 @@ let around () = scope {
   why
 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   say (nested ())
   say "--"

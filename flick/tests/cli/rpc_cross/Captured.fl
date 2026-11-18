@@ -19,7 +19,7 @@ let group = Rpc.group |> Rpc.add me
 handlers : Handlers
 let handlers = { me = fun () -> Session.name () }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   provide (Layer.merge Http.Server.layer_services (Layer.succeed Session { name = fun () -> "mounted" })) {
     try

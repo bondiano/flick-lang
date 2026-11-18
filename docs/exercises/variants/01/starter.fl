@@ -15,6 +15,6 @@ let parse name = if name == "green" then Green else if name == "yellow" then Yel
 next_light : String -> String
 let next_light name = show (next (parse name))
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line (String.join " " (List.map next_light ["green", "yellow", "red"]))

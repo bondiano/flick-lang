@@ -105,7 +105,7 @@ fn program(cases: &[Case]) -> (String, String) {
     text.push_str("  deriving Generic, Eq\n\n");
     let _ = write!(
         text,
-        "main : Unit ->{{; AppError}} Unit\nlet main () =\n  let values : List T = [{}]\n  Platform.stdout_line (show (List.map (fun v -> ((from_rep (to_rep v) : T) == v, count v)) values))\n",
+        "main : Unit ->{{Host.Console; AppError}} Unit\nlet main () =\n  let values : List T = [{}]\n  Platform.stdout_line (show (List.map (fun v -> ((from_rep (to_rep v) : T) == v, count v)) values))\n",
         values.join(", ")
     );
     let expected: Vec<String> = cases

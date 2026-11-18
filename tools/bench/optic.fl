@@ -61,5 +61,5 @@ let rec rounds left acc =
   else
     rounds (left - 1) (acc + List.fold_left (fun sum shape -> sum + one shape) 0 (shapes left))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () = Platform.stdout_line (show (rounds 3 0))

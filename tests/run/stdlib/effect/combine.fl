@@ -8,7 +8,7 @@ type alias Stats = { hits : Float; tags : List String }
 sum : Combiner.Combiner Float
 let sum = Combiner.make (fun a b -> a + b)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line
     ("option: "

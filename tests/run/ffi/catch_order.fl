@@ -15,7 +15,7 @@ let early = fail
 to_broken : JsValue -> Broken
 let to_broken _ = Broken "mapped"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   try
     early "boom"

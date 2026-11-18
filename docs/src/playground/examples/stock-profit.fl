@@ -16,7 +16,7 @@ let max_profit prices =
     }
     best
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line (show (max_profit [7, 1, 5, 3, 6, 4]))
   Platform.stdout_line (show (max_profit [7, 6, 4, 3, 1]))

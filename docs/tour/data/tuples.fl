@@ -6,7 +6,7 @@ let min_max values = (
   Option.with_default 0 (List.maximum values),
 )
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let (low, high) = min_max [3, 9, 1, 4]
   Platform.stdout_line "from \{low} to \{high}"

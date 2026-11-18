@@ -14,7 +14,7 @@ landing : HashRing.HashRing Server -> List String -> List String
 let landing ring inputs =
   List.map (fun input -> Option.with_default "-" (Option.map name (HashRing.get input ring))) inputs
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let empty = HashRing.make { baseWeight = None } name
   Platform.stdout_line ("empty: " ++ show (HashRing.get "x" empty, HashRing.get_shards 2 empty))

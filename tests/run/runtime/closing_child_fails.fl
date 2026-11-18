@@ -7,7 +7,7 @@ module App.Main exposing (main)
 type error Oops = Oops String
   deriving Show
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 ping : Deferred.Deferred none Unit ->{} Unit
@@ -33,14 +33,14 @@ let close_signal closing =
   Deferred.await_ started
 
 /// The body's value comes back: a child's failure belongs to its supervisor.
-masked_failure : Unit ->{Async} String
+masked_failure : Unit ->{Host.Console, Async} String
 let masked_failure () = scope owner {
   let closing : Deferred.Deferred none Unit = Deferred.make ()
   let entered : Deferred.Deferred none Unit = Deferred.make ()
   close_signal closing
   Scope.add_finalizer (task { say "owner finalizer, after the supervisor" })
   // not which reasons: the request of C2 may reach the child before it fails
-  sup : Failure {Oops} ->{} Unit
+  sup : Failure {Oops} ->{Host.Console} Unit
   let sup f = say ("supervised, a defect: " ++ show (Cause.has_dies f))
   let _child =
     Fiber.spawn
@@ -61,11 +61,11 @@ let masked_failure () = scope owner {
 }
 
 /// The failure comes from the child's own finalizer, under the request of C2.
-finalizer_failure : Unit ->{Async} String
+finalizer_failure : Unit ->{Host.Console, Async} String
 let finalizer_failure () = scope owner {
   let started : Deferred.Deferred none Unit = Deferred.make ()
   Scope.add_finalizer (task { say "owner finalizer, after the supervisor" })
-  sup : Failure none ->{} Unit
+  sup : Failure none ->{Host.Console} Unit
   let sup f = say ("supervised, a defect: " ++ show (Cause.has_dies f))
   let _child =
     Fiber.spawn
@@ -87,10 +87,10 @@ let finalizer_failure () = scope owner {
 }
 
 /// A failing body keeps its own cause; the child's is its supervisor's.
-failing_body : Unit ->{Async; Oops} String
+failing_body : Unit ->{Host.Console, Async; Oops} String
 let failing_body () = scope owner {
   let started : Deferred.Deferred none Unit = Deferred.make ()
-  sup : Failure none ->{} Unit
+  sup : Failure none ->{Host.Console} Unit
   let sup f = say ("supervised, a defect: " ++ show (Cause.has_dies f))
   let _child =
     Fiber.spawn
@@ -108,7 +108,7 @@ let failing_body () = scope owner {
   Fail.fail (Oops "the body's")
 }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   say (masked_failure ())
   say (finalizer_failure ())

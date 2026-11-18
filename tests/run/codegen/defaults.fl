@@ -16,7 +16,7 @@ instance Pretty Bool =
   let pretty b = if b then "yes" else "no"
   let verbose b = "the answer is " ++ pretty b
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (verbose 1)
   Platform.stdout_line (verbose true)

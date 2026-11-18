@@ -68,7 +68,7 @@ fn a_wasm_plugin_rewrites_what_flick_build_writes() {
 fn a_wasm_plugin_rewrites_the_ir_a_build_compiles() {
     let main = |text: &str| {
         format!(
-            "module App.Main exposing (main)\n\nmain : Unit ->{{; AppError}} Unit\nlet main () = Platform.stdout_line \"{text}\"\n"
+            "module App.Main exposing (main)\n\nmain : Unit ->{{Host.Console; AppError}} Unit\nlet main () = Platform.stdout_line \"{text}\"\n"
         )
     };
     let root = app("plugins-ir", &main("hello"));

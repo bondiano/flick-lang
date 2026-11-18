@@ -2,5 +2,5 @@
 // in every other row, as the harness times whole processes.
 module App.Main exposing (main)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () = Platform.stdout_line "ok"

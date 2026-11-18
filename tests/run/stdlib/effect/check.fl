@@ -41,12 +41,12 @@ let str check = Check.apply check String.json
 num : Check.Check Float -> PureCodec Json Float
 let num check = Check.apply check Float.json_finite
 
-both : String -> String -> String -> Check.Check String ->{} Unit
+both : String -> String -> String -> Check.Check String ->{Host.Console} Unit
 let both name good bad check =
   let c = str check
   Platform.stdout_line (name ++ ": " ++ dec good c ++ " | " ++ dec bad c)
 
-nums : String -> String -> String -> Check.Check Float ->{} Unit
+nums : String -> String -> String -> Check.Check Float ->{Host.Console} Unit
 let nums name good bad check =
   let c = num check
   Platform.stdout_line (name ++ ": " ++ dec good c ++ " | " ++ dec bad c)
@@ -72,7 +72,7 @@ let size text check =
     | Err (SchemaError issues) -> "err " ++ String.join "; " (List.map (fun i -> i.message) issues)
   | Err _ -> "not JSON"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   both "min_length" "\"ab\"" "\"a\"" (Check.min_length 2)
   both "max_length" "\"ab\"" "\"abc\"" (Check.max_length 2)

@@ -56,7 +56,7 @@ let post server base text =
   try (HttpApi.Inject.call server base Notes.endpoints.post request).text with
   | HttpApi.ClientError e -> "client error " ++ show e.status
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   server : Handler
   let server = app ()

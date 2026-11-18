@@ -171,7 +171,8 @@ func makeZonedFromString(s string) (*DateTime, bool) {
 	return z, !failed
 }
 
-func DateTimeNow(fb *Fiber) Value { return &DateTime{ms: clockOf(fb).millis()} }
+// DateTimeUnsafeFromEpochMillis is unchecked, as a clock reads a valid time.
+func DateTimeUnsafeFromEpochMillis(ms Value) Value { return &DateTime{ms: ms.(float64)} }
 
 func DateTimeIsUtc(d Value) Value   { return dateTime(d).zone == nil }
 func DateTimeIsZoned(d Value) Value { return dateTime(d).zone != nil }

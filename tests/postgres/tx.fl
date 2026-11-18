@@ -98,7 +98,7 @@ let account name =
     | _ -> 0n
   | _ -> 0n
 
-run : Unit ->{Async, Database; EncodeError, DbError, DecodeError} Unit
+run : Unit ->{Host.Console, Async, Database; EncodeError, DbError, DecodeError} Unit
 let run () =
   // the second write breaks the check: the first goes too
   let a = account "atomic"
@@ -158,7 +158,7 @@ let run () =
   Platform.stdout_line ("balance " ++ balance c)
 
 /// Twenty sleepers interrupted on a pool of two: none keeps a backend.
-cancelled : Unit ->{Async, Database; EncodeError, DbError, DecodeError} Unit
+cancelled : Unit ->{Host.Console, Async, Database; EncodeError, DbError, DecodeError} Unit
 let cancelled () =
   let stopped =
     parallel_all
@@ -171,7 +171,7 @@ let cancelled () =
   | [count] -> Platform.stdout_line ("still sleeping: " ++ show count.n)
   | _ -> Platform.stdout_line "no count"
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Environment, Host.Console, Async; AppError} Unit
 let main () =
   match Platform.env "DATABASE_URL" with
   | None -> App.fail "DATABASE_URL is not set"

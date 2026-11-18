@@ -6,6 +6,35 @@ break programs.
 
 ## Unreleased
 
+- **Breaking: the standard library names the host services it uses.**
+  `Platform.stdout_line`, `stderr_line` and `stdout_write`, the five levels
+  of `Console` and `Log.console` need `Host.Console`; `Platform.args`
+  `Host.Arguments`; `Platform.env` and the default provider of `Config.get`
+  `Host.Environment`, which reads a variable by its name only, so the
+  default provider no longer makes a record or an array of the names of the
+  variables (`ConfigProvider.layer (ConfigProvider.from_env options)` still
+  does); `Clock`, `DateTime.now`, `DateTime.is_past` and
+  `DateTime.is_future` `Host.Clock`; `Random` `Host.Random`, whose every
+  operation is now made of `Host.Random.next` draws, so a fake fixes them,
+  while `Random.with_seed` keeps the same draws. A new service
+  `Host.Process` starts child processes: `ChildProcess.spawn`, `string`,
+  `lines` and `exit_code` need it, `Host.Live` and `Host.live` include it,
+  and every Node and Go root provides it. The built-in flags of
+  `Cli.run_with` print through `Host.Console`, and tests run with
+  `Host.Live` (`Test.effect_test`, `clock_test`, `suite` and `it`), as UI
+  tasks run with `Host.BrowserLive` (`Ui.mounted`, `on_mount`, `watched`,
+  `watch`, `Ui.Event`, `Action` and `Runner.Cloudflare.wait_until`).
+  Removed: the `Clock` value with `clock_with` and the `*_of` reads, the JS
+  console extras of `Console` (`current`, `with_console`, `to_stderr`,
+  `trace`, `assert`, `clear`, `count`, `dir`, `table`, `group`, `time` and
+  their variants) and `Log.write_console`. New:
+  `DateTime.unsafe_from_epoch_millis`, `Config.get_with` and
+  `ChildProcess.output_string` and `output_lines`, the text of a spawned
+  process, which `string` and `lines` read. `flick check --fix --only E002`
+  adds the services a program now needs to its rows; a function whose arrow
+  is pure, or a callback whose row another module closes, needs editing by
+  hand. A fix that adds a service to `->{none; E}` now writes `->{S; E}`.
+
 - **`T.prove` for refined types:** `T.prove v` makes a `T` with no
   `Result` and without running the check again, where the compiler proves
   the check holds for `v` from the facts of its path: the condition of an

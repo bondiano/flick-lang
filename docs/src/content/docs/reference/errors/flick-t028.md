@@ -11,7 +11,7 @@ deletes it; `flick check --fix` deletes all of them. Turn the warning off with
 # verbose : Bool
 # let verbose = false
 # import Console
-# warn : String ->{} Unit
+# warn : String ->{Host.Console} Unit
 let warn msg =
   if verbose then
     Console.log msg

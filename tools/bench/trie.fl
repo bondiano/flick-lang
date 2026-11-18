@@ -29,7 +29,7 @@ let word i = spell (i % 6 + 3) (next (i * 7919 + 13)) ""
 words : List String
 let words = List.map word (List.range 0 size)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let trie =
     List.fold_left (fun acc key -> Trie.insert key (String.length key) acc) Trie.empty words

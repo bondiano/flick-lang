@@ -9,7 +9,7 @@ module Child exposing (answer) =
 packed : Module AnswerSig
 let packed = pack Child as AnswerSig
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let answer =
     unpack packed as K in K.answer

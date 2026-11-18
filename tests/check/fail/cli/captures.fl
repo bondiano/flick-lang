@@ -13,7 +13,7 @@ read_file : File s ->{} String
 foreign read_file from "./files.js" "read"
   retention call
 
-leak : Unit ->{} Cli.Command none none
+leak : Unit ->{} Cli.Command {Host.Console} none
 let leak () = scope {
   let file = open_file "config"
   cli "show" {

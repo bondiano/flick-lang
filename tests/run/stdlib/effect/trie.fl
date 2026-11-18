@@ -4,7 +4,7 @@ module App.Main exposing (main)
 words : Trie.Trie Float
 let words = Trie.from_list [("she", 1), ("shells", 2), ("sea", 3), ("sells", 4)]
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line ("entries: " ++ show (Trie.entries words))
   Platform.stdout_line ("keys: " ++ show (Trie.keys words))

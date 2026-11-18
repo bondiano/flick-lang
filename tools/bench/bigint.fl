@@ -8,5 +8,5 @@ let step x = (x * 6364136223846793005n + 1442695040888963407n) % 184467440737095
 run : Int -> BigInt -> BigInt -> BigInt
 let rec run left x sum = if left == 0 then sum else run (left - 1) (step x) (sum + x % 1000n)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () = Platform.stdout_line (BigInt.to_string (run 400000 1n 0n))

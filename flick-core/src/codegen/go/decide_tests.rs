@@ -14,7 +14,7 @@ fn the_arms_of_one_constructor_test_it_once() {
         "{SHAPE}name : Shape -> String\nlet name s =\n  match s with\n  \
          | Pair Dot _ -> \"dot first\"\n  | Pair (Line n) _ -> show n\n  \
          | Pair (Pair _ _) Dot -> \"nested\"\n  | _ -> \"other\"\n\n\
-         main : Unit ->{{; AppError}} Unit\nlet main () = Platform.stdout_line (name Dot)\n"
+         main : Unit ->{{Host.Console; AppError}} Unit\nlet main () = Platform.stdout_line (name Dot)\n"
     ));
     // one test of `Pair` for its three arms, then of its first field
     assert_eq!(go.matches("Is_T_App__Pair(l_s)").count(), 1, "{go}");
@@ -38,7 +38,7 @@ fn a_match_too_big_for_a_graph_tries_its_arms_in_turn() {
     let go = app(&format!(
         "{SHAPE}many : ({shapes}) -> Int\n\
          let many t =\n  match t with\n  | ({all}) -> 1\n  | _ -> 2\n\n\
-         main : Unit ->{{; AppError}} Unit\n\
+         main : Unit ->{{Host.Console; AppError}} Unit\n\
          let main () = Platform.stdout_line (show (many ({dots})))\n"
     ));
     // an or-pattern tried as a function, as the arms one by one test it
@@ -51,7 +51,7 @@ fn an_arm_on_several_branches_is_written_once_and_gone_to() {
     let go = app(&format!(
         "{SHAPE}first : Shape -> Int\nlet first s =\n  match s with\n  \
          | Line n | Pair (Line n) _ when n > 0 -> n\n  | _ -> 0\n\n\
-         main : Unit ->{{; AppError}} Unit\nlet main () = Platform.stdout_line (show (first Dot))\n"
+         main : Unit ->{{Host.Console; AppError}} Unit\nlet main () = Platform.stdout_line (show (first Dot))\n"
     ));
     // the guard under `Line` and under `Pair`, one body
     assert_eq!(go.matches("goto arm_").count(), 2, "{go}");

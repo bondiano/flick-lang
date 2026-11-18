@@ -1,10 +1,10 @@
 // Headers, methods and status codes; secret headers are masked by `show`.
 module App.Main exposing (main)
 
-line : String -> String ->{} Unit
+line : String -> String ->{Host.Console} Unit
 let line label value = Platform.stdout_line (label ++ ": " ++ value)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let input : Http.Headers.Input = [
     ("Content-Type", "text/plain"),

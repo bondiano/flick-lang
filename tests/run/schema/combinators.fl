@@ -141,7 +141,7 @@ let same what derived written =
   else
     what ++ " differ: " ++ derived ++ " / " ++ written
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let p = { x = 3; label = Some "a" }
   Platform.stdout_line (same "point" (json Point.schema p) (json point p))

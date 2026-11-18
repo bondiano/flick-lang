@@ -47,7 +47,7 @@ let same = { nodeIdentity = None; edgeIdentity = None }
 shape : String -> Graph.MermaidNodeShape
 let shape n = if n == "A" then Graph.circle else Graph.rectangle
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line ("counts: " ++ show (Graph.node_count sample, Graph.edge_count sample))
   Platform.stdout_line

@@ -4,20 +4,20 @@ module App.Main exposing (main)
 
 type Pair = Pair Int Int
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
-input : Unit ->{} Pair
+input : Unit ->{Host.Console} Pair
 let input () =
   say "scrutinee"
   Pair 1 2
 
-accept : Int ->{} Bool
+accept : Int ->{Host.Console} Bool
 let accept n =
   say ("guard " ++ show n)
   n > 1
 
-select : Pair ->{} String
+select : Pair ->{Host.Console} String
 let select pair =
   match pair with
   | Pair x _ | Pair _ x when accept x -> "yes"
@@ -33,12 +33,12 @@ let pick items =
     | _ -> "many"
   | _ -> "other"
 
-base : Unit ->{} { left : String; right : String }
+base : Unit ->{Host.Console} { left : String; right : String }
 let base () =
   say "base"
   { left = "old"; right = "keep" }
 
-noted : String -> String ->{} String
+noted : String -> String ->{Host.Console} String
 let noted label value =
   say label
   value
@@ -79,7 +79,7 @@ let zero value =
   | -0.0 -> "zero"
   | _ -> "nonzero"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   say (select (input ()))
   say (pick [0, 2, 9] ++ ", " ++ pick [0, 1] ++ ", " ++ pick [0, 1, 8, 7])

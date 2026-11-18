@@ -32,5 +32,7 @@ pub(super) fn run(
             heap.literal(&Lit::BigInt(MONOTONIC_NANOS.to_string()))
         }
         HostPrimitive::RandomNext => Ok(Value::Float(DRAW)),
+        // the model's host has no processes to start
+        HostPrimitive::ProcessSpawn => Err(Error::UnsupportedOperation("a child process")),
     }
 }

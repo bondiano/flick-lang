@@ -3,7 +3,7 @@
 // whose hashes are equal; replacing a key keeps its place.
 module App.Main exposing (main)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let numbers = HashSet.from_list EqHash.canonical (List.range 0 40)
   Platform.stdout_line (show (HashSet.to_list numbers))

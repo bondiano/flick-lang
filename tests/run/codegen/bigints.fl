@@ -21,7 +21,7 @@ let radix n =
   | 0b100000000n -> "256"
   | _ -> "other"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (show (multiply 18446744073709551616n 18446744073709551616n))
   Platform.stdout_line (show (divide (-7n) 2n))

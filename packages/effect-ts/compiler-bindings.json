@@ -45,10 +45,6 @@
       "@flick-lang/runtime/rt/effect/Combiner"
     ],
     [
-      "flick:Console",
-      "@flick-lang/runtime/rt/effect/Console"
-    ],
-    [
       "flick:Crypto",
       "@flick-lang/runtime/rt/effect/Crypto"
     ],

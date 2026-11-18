@@ -11,7 +11,7 @@ let rest xs =
   | [_, ...others] -> others
   | _ -> []
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let n = 4
   Platform.stdout_line (show [1..5])

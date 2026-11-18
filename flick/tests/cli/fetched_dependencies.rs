@@ -388,7 +388,7 @@ const GREET_MAIN: &str = "module App.Main exposing (main)
 
 import Lib.Greet
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (Lib.Greet.hi \"there\")
 ";
 

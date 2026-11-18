@@ -25,7 +25,7 @@ let name_of id =
   with
   | JsError { message } -> message
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   Platform.stdout_line (name_of "1")
   Platform.stdout_line (name_of "2")
@@ -272,7 +272,7 @@ fn identity_binding(
             "module App.Main exposing (main)\n\n\
              import Ffi.{part}.Generated as Generated\n\
              import Ffi.Reviewed as Reviewed\n\n\
-             main : Unit ->{{; AppError}} Unit\n\
+             main : Unit ->{{Host.Console; AppError}} Unit\n\
              let main () = Platform.stdout_line (show (Generated.answer (), Reviewed.answer ()))\n"
         ),
     )

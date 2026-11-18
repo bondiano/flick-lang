@@ -13,5 +13,5 @@ let spread text =
   let (low, high, mid) = min_max numbers
   high - low
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (show (spread "3,9,1"))

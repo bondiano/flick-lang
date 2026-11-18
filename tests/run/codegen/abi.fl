@@ -22,7 +22,7 @@ foreign pure raw from "./abi.mjs" "raw"
 js_type : JsValue -> String
 foreign pure js_type from "./abi.mjs" "kind"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let id = UserId "ada"
   Platform.stdout_line (js_type (raw id))

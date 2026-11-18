@@ -26,7 +26,7 @@ let options = {
   disablePropagation = false
 }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let port = start ()
   let devtools = { url = "ws://127.0.0.1:" ++ show port; headers = [("x-token", "secret")] }

@@ -9,7 +9,7 @@ let twice computation =
   let second : Unit = await computation
   (first, second)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line ("await: " ++ show (twice empty))
   Platform.stdout_line ("zip: " ++ show (Effect.zip empty empty))

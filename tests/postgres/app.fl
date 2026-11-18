@@ -205,7 +205,7 @@ let one (template, params, fallback) =
   | _ -> fallback
 
 /// Runs the queries; returns an account that stays open.
-run : Unit ->{Async, Database; EncodeError, DbError, DecodeError} BigInt
+run : Unit ->{Host.Console, Async, Database; EncodeError, DbError, DecodeError} BigInt
 let run () =
   let ada =
     (one (add_user, { name = "Ada"; email = Some "ada@example.org" }, { id = UserId 0n })).id
@@ -244,7 +244,7 @@ let refused account =
   try show (Database.query (Sql.bind deposit { account = account; amount = negative })) with
   | DbError e -> "DbError " ++ e.code ++ " " ++ show e.constraint
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Environment, Host.Console, Async; AppError} Unit
 let main () =
   match Platform.env "DATABASE_URL" with
   | None -> App.fail "DATABASE_URL is not set"

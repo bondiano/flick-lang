@@ -125,7 +125,7 @@ let records = [
   ("dns_txt_record", Net.dns_txt_record, "{\"_tag\": \"A\", \"address\": \"192.0.2.1\"}"),
 ]
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (case "ByteSize.json" "\"1.5 KiB\"" ByteSize.json)
   Platform.stdout_line (case "ByteSize.json" "\"lots\"" ByteSize.json)

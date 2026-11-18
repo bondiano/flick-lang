@@ -488,17 +488,7 @@ impl Checker<'_> {
                 // a row variable it lacks has no label
                 && e.labels.len() == e.services.len()
                 && e.labels.iter().all(|l| {
-                    lang::label(Lang::Async) == l.name()
-                        || matches!(
-                            l.name(),
-                            Some(
-                                "Host.Console"
-                                    | "Host.Clock"
-                                    | "Host.Random"
-                                    | "Host.Environment"
-                                    | "Host.Arguments"
-                            )
-                        )
+                    lang::label(Lang::Async) == l.name() || l.name().is_some_and(lang::is_host_service)
                 });
             let fix = || (format!("add {list} to {bound}"), edits);
             diagnostic = if is_runner_service {

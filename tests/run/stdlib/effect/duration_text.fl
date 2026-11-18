@@ -31,13 +31,13 @@ let encode c d =
   | Ok wire -> Json.stringify wire
   | Err e -> issues e
 
-line : String -> String ->{} Unit
+line : String -> String ->{Host.Console} Unit
 let line name text = Platform.stdout_line (name ++ ": " ++ text)
 
 ms : Float -> Duration.Duration
 let ms n = Result.with_default Duration.zero (Duration.millis n)
 
-each : List String -> (String ->{} Unit) ->{} Unit
+each : List String -> (String ->{Host.Console} Unit) ->{Host.Console} Unit
 let rec each xs f =
   match xs with
   | [] -> ()
@@ -45,7 +45,7 @@ let rec each xs f =
     f x
     each rest f
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   each ["\"2000000\"", "\"0\"", "\"1500000\"", "\"-5\"", "\"1.5\"", "5", "\"abc\""] (fun s ->
     line ("nanos " ++ s) (round s Duration.json_nanos)

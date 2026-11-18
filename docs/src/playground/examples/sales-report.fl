@@ -19,7 +19,7 @@ let totals orders =
   |> HashMap.to_list
   |> List.sort_by (fun (a, _) (b, _) -> compare a b)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let orders = [
     { category = "books"; cents = 1200; paid = true },

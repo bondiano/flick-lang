@@ -7,11 +7,11 @@ module App.Main exposing (main)
 
 type Shape = Dot | Line Int | Pair Shape Shape
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 /// A guard that says when it runs.
-check : String -> Bool ->{} Bool
+check : String -> Bool ->{Host.Console} Bool
 let check name answer =
   say ("  " ++ name)
   answer
@@ -23,7 +23,7 @@ let describe shape =
   | Line n -> "line " ++ show n
   | Pair _ _ -> "pair"
 
-name : Shape ->{} String
+name : Shape ->{Host.Console} String
 let name shape =
   match shape with
   | Pair Dot Dot -> "two dots"
@@ -36,7 +36,7 @@ let name shape =
   | Pair left _ when check "any pair" true -> "pair from " ++ describe left
   | other -> "other " ++ describe other
 
-sizes : List Int ->{} String
+sizes : List Int ->{Host.Console} String
 let sizes items =
   match items with
   | [] -> "none"
@@ -80,7 +80,7 @@ let scaled r =
   | { shape = Line n } -> n
   | { scale = s } -> s
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   say (name (Pair Dot Dot))
   say (name (Pair (Line 3) Dot))

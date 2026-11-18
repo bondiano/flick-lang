@@ -22,7 +22,7 @@ let rack i =
   | Some node -> node.rack
   | None -> 0
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let landed = List.fold_left (fun acc i -> acc + rack i) 0 (List.range 0 100000)
   let spread =

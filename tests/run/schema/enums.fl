@@ -20,7 +20,7 @@ type alias Call = { method : Method; status : Status; level : Level }
 type Api = Calls Method | Code Status Float
   deriving Eq, Show, Schema, Url
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 encoded : Schema a -> a -> String
@@ -44,7 +44,7 @@ let exported name s =
   | Ok text -> text
   | Err _ -> "no JSON Schema"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   say (encoded Call.schema { method = Post; status = Missing; level = High })
   for text <- [

@@ -36,7 +36,7 @@ foreign effect forever from \"./forever.mjs\" \"forever\"
 crash : String ->{{}} Unit
 foreign crash from global \"JSON.parse\"
 
-main : Unit ->{{; AppError}} Unit
+main : Unit ->{{Host.Console; AppError}} Unit
 let main () =
   scope {{
     Resource.acquire_release (task {{ Platform.stdout_line \"started {version}\" }}) (fun _ -> {release})
@@ -95,7 +95,7 @@ fn expect_line(rx: &mpsc::Receiver<String>, wanted: &str) {
 #[ignore = "needs Node and the installed runtime"]
 fn run_builds_javascript_even_for_a_typescript_project() {
     let config = format!("{APP}\n[build]\nemit = \"ts\"\n");
-    let main = "module App.Main exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line (show (Platform.args ()))\n";
+    let main = "module App.Main exposing (main)\n\nmain : Unit ->{Host.Arguments, Host.Console; AppError} Unit\nlet main () = Platform.stdout_line (show (Platform.args ()))\n";
     let dir = project(
         "run_ts",
         &[("flick.toml", &config), ("src/App/Main.fl", main)],
@@ -167,7 +167,7 @@ fn exit_codes_follow_the_outcome_and_cleanup() {
 #[test]
 #[ignore = "needs Node and the installed runtime"]
 fn json_diagnostics_own_the_whole_stderr() {
-    let main = "module App.Main exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () =\n  Platform.stderr_line \"\\u{1b}[31mred\\u{1b}[0m\"\n  App.fail \"nope\"\n";
+    let main = "module App.Main exposing (main)\n\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () =\n  Platform.stderr_line \"\\u{1b}[31mred\\u{1b}[0m\"\n  App.fail \"nope\"\n";
     let dir = project(
         "run_json",
         &[("flick.toml", APP), ("src/App/Main.fl", main)],
@@ -322,7 +322,7 @@ foreign linger from \"./linger.mjs\" \"linger\"
   arity 0
   cancel signal
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   scope {
     Resource.acquire_release (task { Platform.stdout_line \"started v1\" }) (fun _ -> Platform.stdout_line \"cleanup v1\")
@@ -425,7 +425,7 @@ fn pack_writes_the_sources_of_a_library() {
 #[test]
 #[ignore = "needs Node and the installed runtime"]
 fn json_reporter_and_json_diagnostics_keep_their_streams() {
-    let suite = "module Test.Noisy exposing (tests)\n\nnote : String ->{} Unit\nlet note text = Platform.stderr_line text\n\ntests : List Test.Test\nlet tests = [Test.effect_test \"logs\" (task { note \"to stderr\" })]\n";
+    let suite = "module Test.Noisy exposing (tests)\n\nnote : String ->{Host.Console} Unit\nlet note text = Platform.stderr_line text\n\ntests : List Test.Test\nlet tests = [Test.effect_test \"logs\" (task { note \"to stderr\" })]\n";
     let config = "schema-version = 1\n\n[project]\nkind = \"lib\"\n";
     let dir = project(
         "test_streams",

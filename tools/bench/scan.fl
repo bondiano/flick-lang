@@ -25,5 +25,5 @@ let rec count i acc =
     let text = "12345678" ++ show i
     count (i - 1) (acc + (if by_chars text then 1 else 0) + (if by_places text then 1 else 0))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () = Platform.stdout_line (show (count 1000000 0))

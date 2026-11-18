@@ -12,7 +12,7 @@ let as_even n = if Even.check n then Some (Even.prove n) else None
 half : Int -> Option Int
 let half n = Option.map (fun e -> Even.value e / 2) (as_even n)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line (show (as_even 4))
   Platform.stdout_line (show (as_even 3))

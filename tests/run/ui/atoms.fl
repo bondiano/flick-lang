@@ -52,11 +52,11 @@ let doubled_view =
     "App.Main.doubled_view"
     (Ui.view (fun () -> ui { text (" doubled " ++ show (Atom.get doubled)) }))
 
-report : Failure e ->{} Unit
+report : Failure e ->{Host.Console} Unit
 let report failure =
   Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   setup ()
   match Ui.Dom.container "app" with

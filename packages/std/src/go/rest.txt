@@ -11,7 +11,6 @@ trampolineDone TrampolineDone
 trampolineSuspend TrampolineSuspend
 trampolineRun *TrampolineRun
 eventsAttach *EventsAttach
-logConsole LogConsole
 listFoldEffect *ListFoldEffect
 numberSafeInteger NumberSafeInteger
 codecInt CodecInt

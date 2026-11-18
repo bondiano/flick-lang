@@ -122,7 +122,7 @@ let forget base =
   with
   | HttpApi.ClientError e -> "client error " ++ e.message
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let options : HttpApi.ServeOptions = {
     host = "127.0.0.1"

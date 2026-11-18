@@ -22,7 +22,7 @@ let small n =
 twice : Numeric a => a -> a
 let twice x = x * 2
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (show 0xff)
   Platform.stdout_line (show 1_000_000)

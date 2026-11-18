@@ -131,7 +131,7 @@ let plain = { flag = None; mode = None }
 run :
   String ->
   Option String ->
-  String ->{Async, FileSystem.FileSystem, Path.Path; AppError, PlatformError.PlatformError}
+  String ->{Host.Console, Async, FileSystem.FileSystem, Path.Path; AppError, PlatformError.PlatformError}
   Unit
 let run version package_dir root =
   let dir =

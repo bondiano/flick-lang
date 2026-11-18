@@ -4,6 +4,7 @@ import { Effect } from "effect";
 
 import { stderrLine, stdoutLine } from "../builtins.ts";
 import { flickCurrentTimeMillis, flickCurrentTimeNanos, flickMonotonicTimeNanos } from "../effect/Clock.ts";
+import { flickSpawn } from "../effect/ChildProcess.ts";
 import { flickNext } from "../effect/Random.ts";
 import { type ServiceImpl, service } from "../effects.ts";
 import { platformArgs, platformEnv, stdoutWrite } from "../stdlib/text.ts";
@@ -38,13 +39,18 @@ export const hostEnvironment: HostService = [
 
 export const hostArguments: HostService = ["Host.Arguments", { args: () => Effect.sync(() => platformArgs()) }];
 
+/** `Host.Process.spawn` of the live service: Node's spawner, in the caller's scope. */
+export const processSpawn = flickSpawn;
+
+export const hostProcess: HostService = ["Host.Process", { spawn: processSpawn }];
+
 /**
  * Provides `services` around a program: what the launcher of a `main` without
  * a runner passes `runMain` as the root, the services that `main` names.
  */
 export const provideHost =
   (services: ReadonlyArray<HostService>) =>
-  (program: Effect.Effect<unknown, unknown>): Effect.Effect<unknown, unknown> =>
+  <A, E>(program: Effect.Effect<A, E>): Effect.Effect<A, E> =>
     services.reduce((eff, [key, impl]) => Effect.provideService(eff, service(key), impl), program);
 
 export const provideBrowserServices = /*#__PURE__*/ provideHost([hostConsole, hostClock, hostRandom]);
@@ -55,4 +61,5 @@ export const provideNodeServices = /*#__PURE__*/ provideHost([
   hostRandom,
   hostEnvironment,
   hostArguments,
+  hostProcess,
 ]);

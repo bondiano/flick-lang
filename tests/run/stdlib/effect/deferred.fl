@@ -16,7 +16,7 @@ let pause = Result.with_default Duration.zero (Duration.millis 20)
 wait_long : Duration.Duration
 let wait_long = Result.with_default Duration.zero (Duration.millis 60)
 
-unexpected : Failure e ->{} Unit
+unexpected : Failure e ->{Host.Console} Unit
 let unexpected failure = Platform.stdout_line "unexpected failure"
 
 /// How awaiting `d` ends.
@@ -39,7 +39,7 @@ let completed complete =
   let again = Deferred.succeed 0 d
   show (first, again) ++ " " ++ outcome d
 
-deferreds : Unit ->{Async} Unit
+deferreds : Unit ->{Host.Console, Async} Unit
 let deferreds () =
   Platform.stdout_line ("succeed: " ++ completed (Deferred.succeed 1))
   Platform.stdout_line ("fail: " ++ completed (Deferred.fail (Boom 2)))
@@ -100,7 +100,7 @@ let deferreds () =
   }
   Platform.stdout_line waited
 
-latches : Unit ->{Async} Unit
+latches : Unit ->{Host.Console, Async} Unit
 let latches () =
   let latch = Latch.make false
   let log = Ref.make []
@@ -131,7 +131,7 @@ let latches () =
   }
   Platform.stdout_line ("latch: " ++ show (Ref.get log))
 
-semaphores : Unit ->{Async} Unit
+semaphores : Unit ->{Host.Console, Async} Unit
 let semaphores () =
   let sem = Semaphore.make 2
   let running = Ref.make 0
@@ -163,7 +163,7 @@ let semaphores () =
 capacity_of : PartitionedSemaphore.PartitionedSemaphore k -> Int
 let capacity_of sem = PartitionedSemaphore.capacity sem
 
-partitions : Unit ->{Async} Unit
+partitions : Unit ->{Host.Console, Async} Unit
 let partitions () =
   let sem : PartitionedSemaphore.Partitioned String = PartitionedSemaphore.make { permits = 2 }
   let total = capacity_of sem
@@ -176,7 +176,7 @@ let partitions () =
   let one = PartitionedSemaphore.with_permit sem "c" (task { PartitionedSemaphore.available sem })
   Platform.stdout_line ("partitioned: " ++ show (total, before, none_left, back, keyed, one))
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   deferreds ()
   latches ()

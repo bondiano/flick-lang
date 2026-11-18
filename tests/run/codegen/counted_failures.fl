@@ -7,7 +7,7 @@ type error Again = Again String
 start : Int ->{; First, Again} String
 let start value = if value == 0 then Fail.fail (First 1) else Fail.fail (Again "body")
 
-gate : Int ->{; Again} Bool
+gate : Int ->{Host.Console; Again} Bool
 let gate value =
   Platform.stdout_line ("guard " ++ show value)
   Fail.fail (Again "guard")
@@ -18,7 +18,7 @@ let handler_fails () =
   | First value -> Fail.fail (Again ("handler " ++ show value))
   | Again text -> "wrong inner " ++ text
 
-guard_fails : Unit ->{; Again} String
+guard_fails : Unit ->{Host.Console; Again} String
 let guard_fails () =
   try start 0 with
   | First value when gate value -> "wrong guard"
@@ -30,7 +30,7 @@ let unmatched () =
   try start 1 with
   | First _ -> "wrong match"
 
-answer : Unit ->{} String
+answer : Unit ->{Host.Console} String
 let answer () =
   let handled =
     try handler_fails () with
@@ -43,5 +43,5 @@ let answer () =
     | Again text -> "outer " ++ text
   handled ++ " | " ++ guarded ++ " | " ++ propagated
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () = Platform.stdout_line (answer ())

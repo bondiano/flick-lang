@@ -42,7 +42,7 @@ let handlers = {
 serve : Unit ->{Async} Unit
 let serve () = Rpc.serve_node_worker group handlers
 
-call : Unit ->{Async; AppError} Unit
+call : Unit ->{Host.Console, Async; AppError} Unit
 let call () =
   try
     scope s {
@@ -60,7 +60,7 @@ let call () =
   | Rpc.ClientError message -> Platform.stdout_line ("client: " ++ message)
   | NotFound e -> Platform.stdout_line ("not found " ++ show e.id)
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Host.Arguments, Async; AppError} Unit
 let main () =
   match Platform.args () with
   | ["worker"] -> serve ()

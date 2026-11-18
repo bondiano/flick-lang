@@ -139,7 +139,7 @@ fn modules_with_plugin_blocks_derives_and_watchers_are_saved_and_restored() {
         ),
         (
             "cli",
-            "module App.Main exposing (greet)\n\ngreet : Cli.Command none none\nlet greet = cli \"greet\" {\n  handle fun {} -> Platform.stdout_line \"hi\"\n}\n",
+            "module App.Main exposing (greet)\n\ngreet : Cli.Command {Host.Console} none\nlet greet = cli \"greet\" {\n  handle fun {} -> Platform.stdout_line \"hi\"\n}\n",
         ),
         (
             "codec_and_schema",

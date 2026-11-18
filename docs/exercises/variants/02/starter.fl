@@ -11,5 +11,5 @@ let area shape =
 square_area : Int -> Int
 let square_area side = area (Square side)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line "\{square_area 4} \{area (Rect 3)}"

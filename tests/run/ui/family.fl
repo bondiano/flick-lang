@@ -5,7 +5,7 @@ module App.Main exposing (main)
 drafts : Atom.Family Float (Atom.Writable String)
 let drafts = Atom.family (fun id -> Atom.make ("draft " ++ show id))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () = provide Atom.layer {
   Atom.set (Atom.at drafts 1) "edited"
   Platform.stdout_line (Atom.current (Atom.at drafts 1) ++ ", " ++ Atom.current (Atom.at drafts 2))

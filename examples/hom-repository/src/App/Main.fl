@@ -8,7 +8,7 @@ import App.Instances.Alias as Alias
 
 type error BodyError = BodyError
 
-report : String -> Driver.State ->{} Unit
+report : String -> Driver.State ->{Host.Console} Unit
 let report name state =
   let released = List.length state.closed
   let unique = List.length (List.dedupe state.closed) == released
@@ -19,7 +19,7 @@ logging : Ref (List String) -> Layer none none {Log.Log}
 let logging messages =
   Layer.succeed Log.Log { write = fun _ message -> Ref.update messages (fun xs -> xs ++ [message]) }
 
-success : Unit ->{} Unit
+success : Unit ->{Host.Console} Unit
 let success () =
   let state = Ref.make Driver.initial
   let messages = Ref.make []
@@ -36,7 +36,7 @@ let success () =
   Platform.stdout_line "logs=\{String.join "|" (Ref.get messages)}"
   report "success" (Ref.get state)
 
-failure : Int -> String ->{} Unit
+failure : Int -> String ->{Host.Console} Unit
 let failure mode name =
   let state = Ref.make Driver.initial
   let outcome =
@@ -45,7 +45,7 @@ let failure mode name =
   Platform.stdout_line "\{name} failed=\{Exit.is_failure outcome}"
   report name (Ref.get state)
 
-interruption : Unit ->{} Unit
+interruption : Unit ->{Host.Console} Unit
 let interruption () =
   let state = Ref.make Driver.initial
   let outcome =
@@ -63,7 +63,7 @@ let interruption () =
   Platform.stdout_line "interrupted=\{interrupted}"
   report "interruption" (Ref.get state)
 
-overlap : Unit ->{Async} Unit
+overlap : Unit ->{Host.Console, Async} Unit
 let overlap () =
   let state = Ref.make Driver.initial
   let first = Deferred.make ()
@@ -92,7 +92,7 @@ let overlap () =
   Platform.stdout_line "overlap success=\{Exit.is_success outcome}"
   report "overlap" (Ref.get state)
 
-main : Unit ->{Async} Unit
+main : Unit ->{Host.Console, Async} Unit
 let main () =
   success ()
   failure 0 "body failure"

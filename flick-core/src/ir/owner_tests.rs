@@ -173,7 +173,7 @@ fn lower_retained(declarations: &str, call: &str) -> String {
          acquire : Unit ->{{Scope s}} Arena.Value s String\n\
          let acquire () = Arena.alloc (Arena.make ()) \"owned\"\n\
          {declarations}\n\
-         main : Unit ->{{}} Unit\n\
+         main : Unit ->{{Host.Console}} Unit\n\
          let main () = scope {{\n\
            let layer = Layer.succeed Read {{ read = fun () -> \"unused\" }}\n\
            let retained = {call}\n\

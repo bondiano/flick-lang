@@ -230,3 +230,4 @@ complete -c greet -n 'not string match -q -- "-*" (commandline -ct); and not __f
 complete -c greet -n 'not string match -q -- "-*" (commandline -ct); and not __fish_contains_opt -s c color' -f -a '--color' -d 'The color of the text'
 
 ###-end-greet-completions-###
+kept: ["$ --version", "greet v0.0.0"]

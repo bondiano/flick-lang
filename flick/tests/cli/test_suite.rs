@@ -15,11 +15,12 @@ const SUITE: &str = r#"module Test.Sample exposing (tests)
 service Box =
   value : Unit ->{} String
 
-box : Layer none none {Box}
+box : Layer {Host.Console} none {Box}
 let box =
   Layer.from_build (fun memo ->
     Platform.stdout_line "acquire"
-    Scope.add_finalizer (task { Platform.stdout_line "release" })
+    // the finalizer may run after the given Console is released: it prints through the host
+    Scope.add_finalizer (task { Host.raw_stdout_line "release" })
     Layer.build_with_memo_map memo (Layer.succeed Box { value = fun () -> "shared" })
   )
 

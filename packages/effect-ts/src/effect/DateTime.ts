@@ -124,7 +124,8 @@ export const flickZoneMakeNamed = (id: string): Checked<DateTime.TimeZone> =>
 export const flickZoneFromString = (s: string): Checked<DateTime.TimeZone> =>
   Option.match(DateTime.zoneFromString(s), { onNone: () => fail(`invalid time zone: ${JSON.stringify(s)}`), onSome: ok });
 
-export const flickNow = (): typeof DateTime.now => DateTime.now;
+/** `DateTime.unsafe_from_epoch_millis`: unchecked, as a clock reads a valid time. */
+export const flickUnsafeFromEpochMillis = (millis: number): DateTime.Utc => DateTime.makeUnsafe(millis);
 
 /** The time between the two, whichever comes first: Flick durations are never negative. */
 export const flickDistance = (other: DateTime.DateTime, self: DateTime.DateTime): Duration.Duration =>

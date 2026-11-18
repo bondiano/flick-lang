@@ -71,7 +71,7 @@ let visited base cookie =
     (Http.Client.execute
       (Http.ClientRequest.set_header "cookie" cookie (Http.ClientRequest.get (base ++ "/page"))))
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () = provide (Layer.merge
   Server.node
   (Layer.merge Http.FetchClient.layer Http.Server.layer_services)) {

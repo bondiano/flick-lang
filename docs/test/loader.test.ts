@@ -31,7 +31,7 @@ test("a string that reads like an import is not linked", () => {
   mkdirSync(dir, { recursive: true });
   writeFileSync(
     path.join(dir, "Main.fl"),
-    'module Main exposing (main)\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line "from \\{1} to \\{2}"\n',
+    'module Main exposing (main)\n\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line "from \\{1} to \\{2}"\n',
   );
   execFileSync(flick, ["build", "Main.fl", "--out-dir", "out"], { cwd: dir });
   const out = execFileSync("node", [path.join(here, "run-linked.ts"), path.join(dir, "out"), "flick-main.js"], { cwd: here, encoding: "utf8" });
@@ -44,7 +44,7 @@ test("a linked build runs as `flick build` output does", () => {
   mkdirSync(dir, { recursive: true });
   writeFileSync(
     path.join(dir, "Main.fl"),
-    "module Main exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () =\n  Platform.stdout_line (show (List.map (fun x -> x * 2) [1, 2, 3]))\n",
+    "module Main exposing (main)\n\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () =\n  Platform.stdout_line (show (List.map (fun x -> x * 2) [1, 2, 3]))\n",
   );
   execFileSync(flick, ["build", "Main.fl", "--out-dir", "out"], { cwd: dir });
   const out = execFileSync("node", [path.join(here, "run-linked.ts"), path.join(dir, "out"), "flick-main.js"], { cwd: here, encoding: "utf8" });
@@ -58,7 +58,7 @@ test("source-map text survives a compiled and linked release build", () => {
   const text = "//# sourceMappingURL=payload";
   writeFileSync(
     path.join(dir, "Main.fl"),
-    `module Main exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line ${JSON.stringify(text)}\n`,
+    `module Main exposing (main)\n\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () = Platform.stdout_line ${JSON.stringify(text)}\n`,
   );
   execFileSync(flick, ["build", "Main.fl", "--profile", "release", "--out-dir", "out"], { cwd: dir });
   const out = execFileSync("node", [path.join(here, "run-linked.ts"), path.join(dir, "out"), "flick-main.js"], { cwd: here, encoding: "utf8" });

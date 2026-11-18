@@ -28,9 +28,10 @@ let answer entry =
   let id = id_of entry
   if id < 10 then Request.succeed ("user" ++ show id) entry else Request.fail (NotFound id) entry
 
+/// A resolver's row is closed: its batches print through the trusted host adapter.
 answer_all : NonEmpty.NonEmpty UserEntry ->{; NotFound} Unit
 let answer_all entries =
-  Platform.stdout_line ("batch of " ++ show (NonEmpty.length entries))
+  Host.raw_stdout_line ("batch of " ++ show (NonEmpty.length entries))
   List.each_effect answer (NonEmpty.to_list entries)
 
 describe : Result NotFound String -> String
@@ -74,7 +75,7 @@ let with_options =
     delay = Effect.void
     collectWhile = fun entries -> List.length entries < 10
     runAll = fun entries key ->
-      Platform.stdout_line ("key " ++ show key ++ " batch of " ++ show (NonEmpty.length entries))
+      Host.raw_stdout_line ("key " ++ show key ++ " batch of " ++ show (NonEmpty.length entries))
       List.each_effect answer (NonEmpty.to_list entries)
   }
 
@@ -83,7 +84,7 @@ let by_parity =
   RequestResolver.make_grouped {
     key = fun entry -> id_of entry < 3
     resolver = fun entries small ->
-      Platform.stdout_line
+      Host.raw_stdout_line
         ("small " ++ show small ++ " batch of " ++ show (NonEmpty.length entries))
       List.each_effect answer (NonEmpty.to_list entries)
   }
@@ -107,19 +108,19 @@ let traced =
   RequestResolver.make (fun entries ->
     match Tracer.parent_span () with
     | Some span ->
-      Platform.stdout_line
+      Host.raw_stdout_line
         ("span "
           ++ show (Tracer.attributes span)
           ++ " links "
           ++ show (List.length (Tracer.links span)))
-    | None -> Platform.stdout_line "no span"
+    | None -> Host.raw_stdout_line "no span"
     List.each_effect answer (NonEmpty.to_list entries)
   )
 
 twice : (c ->{Async; e} String) -> c ->{Async; e} String
 let twice get cache = get cache ++ " " ++ get cache
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   Platform.stdout_line ("payload " ++ show (Request.payload (ask 1)))
   Platform.stdout_line ("make " ++ run_all batched [1, 2, 3, 12])
@@ -143,7 +144,7 @@ let main () =
     batched |> RequestResolver.set_delay (Result.with_default Duration.zero (Duration.millis 1))
   Platform.stdout_line ("set_delay " ++ run_all delayed [4, 5])
   let delayed_effect =
-    batched |> RequestResolver.set_delay_effect (task { Platform.stdout_line "delay ran" })
+    batched |> RequestResolver.set_delay_effect (task { Host.raw_stdout_line "delay ran" })
   Platform.stdout_line ("set_delay_effect " ++ run_all delayed_effect [6])
   // `after` runs once the requests are answered, alongside their callers
   let after : Deferred.Deferred {} Int = Deferred.make ()

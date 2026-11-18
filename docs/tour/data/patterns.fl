@@ -9,7 +9,7 @@ let describe numbers =
   | [first, ...rest] when List.length rest > 2 -> "long, from \{first}"
   | [first, ..._] -> "starts with \{first}"
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let samples = [[], [7], [1, 2], [5, 6, 7, 8], [5, 6]]
   List.each_effect (fun numbers -> Platform.stdout_line (describe numbers)) samples

@@ -7,17 +7,17 @@ hang : Unit ->{Async} Unit
 foreign hang from "./timers.mjs" "hang"
   cancel signal
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
-waiting : Unit ->{Async} String
+waiting : Unit ->{Host.Console, Async} String
 let waiting () = scope {
   Resource.acquire_release (task { say "open" }) (fun _ -> say "close")
   hang ()
   "never"
 }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let outcome =
     try timeout 20 (task { waiting () }) with

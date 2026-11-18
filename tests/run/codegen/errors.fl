@@ -21,7 +21,7 @@ let outer id =
   try lookup id with
   | Denied reason -> "denied: " ++ reason
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (outer 1)
   Platform.stdout_line (outer 2)

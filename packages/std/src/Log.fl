@@ -20,13 +20,6 @@ let error message = Log.write "error" message
 debug : String ->{Log} Unit
 let debug message = Log.write "debug" message
 
-write_console : String -> String ->{} Unit
-foreign write_console from "flick:rt" "logConsole"
-
-/// Info and debug to stdout, warnings and errors to stderr, with the level.
-console : Layer none none {Log}
-let console = Layer.succeed Log { write = write_console }
-
 /// Adapts a `Host.Console` layer into a `Log` layer: info and debug to stdout,
 /// warnings and errors to stderr, prefixed with the level.
 from_console : Layer none none {Host.Console} -> Layer none none {Log}
@@ -41,3 +34,8 @@ let from_console layer =
       }
     )
     layer
+
+/// `from_console Host.console`: info and debug to stdout, warnings and errors
+/// to stderr, prefixed with the level.
+console : Layer none none {Log}
+let console = from_console Host.console

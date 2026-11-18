@@ -29,7 +29,7 @@ let page _ =
     (Stream.provide_ Reactivity.Atom.layer (Ui.Server.stream "app" (Ui.render greeting ())))
     { Http.ServerResponse.defaults with contentType = Some "text/html" }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () = provide Http.Server.layer_services {
   try
     scope s {

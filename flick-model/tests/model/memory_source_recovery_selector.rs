@@ -43,16 +43,16 @@ let choose value seed =
   let guard value =
     try from_result (Err (Denied value)) with
     | Denied _ ->
-      Platform.stdout_line "nested"
+      Host.raw_stdout_line "nested"
       false
   try
 {effect_body}    from_result (Err (Denied "shadow"))
   with
 {effect_arm}  | Denied seed | Denied seed when guard seed ->
-    Platform.stdout_line "wrong first body"
+    Host.raw_stdout_line "wrong first body"
     "wrong first body"
   | Denied _ ->
-    Platform.stdout_line "body"
+    Host.raw_stdout_line "body"
     label value ++ "/" ++ Ref.get cell ++ "/" ++ seed
 "#
         );

@@ -8,7 +8,7 @@ let size = 10000
 key : Int -> String
 let key i = "key-" ++ show i
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let filled =
     List.fold_left (fun m i -> HashMap.insert (key i) i m) HashMap.empty (List.range 0 size)

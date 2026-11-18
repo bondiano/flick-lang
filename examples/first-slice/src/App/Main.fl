@@ -10,7 +10,7 @@ let describe raw =
   try (load_view (user_id raw)).title with
   | NotFound id -> "not found: \{show id}"
 
-program : Unit ->{Async, Users, Log} Unit
+program : Unit ->{Host.Console, Async, Users, Log} Unit
 let program () =
   let both =
     try
@@ -21,5 +21,5 @@ let program () =
   Platform.stdout_line both
   Platform.stdout_line (describe "u3")
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () = provide Layer.merge users_live log_live { program () }

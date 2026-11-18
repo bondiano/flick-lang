@@ -24,14 +24,14 @@ foreign emit from "./bindings.mjs" "emit"
 sleep : Float ->{Async} Unit
 foreign sleep from "../runtime/timers.mjs" "sleep"
 
-report : Failure none ->{} Unit
+report : Failure none ->{Host.Console} Unit
 let report failure =
   Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
 
-handle : Float -> Eff none none Unit
+handle : Float -> Eff {Host.Console} none Unit
 let handle n = task { Platform.stdout_line ("handled " ++ show n) }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let source = emitter ()
   scope s {

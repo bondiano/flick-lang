@@ -39,6 +39,7 @@ let binding name = Env.binding name
 
 /// Keeps the Worker alive until `task` ends, after the response is sent;
 /// its failure is reported on the console. It outlives the request, so it
-/// holds nothing of the request's scopes.
-wait_until : Context -> Eff none none Unit ->{} Unit
+/// holds nothing of the request's scopes; it runs with the live browser
+/// host services.
+wait_until : Context -> Eff {...Host.BrowserLive} none Unit ->{} Unit
 foreign effect wait_until from "flick:runner/cloudflare" "waitUntil"

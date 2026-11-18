@@ -7,12 +7,12 @@ module App.Main exposing (main)
 type Shape = Circle Float | Square Float
   deriving Eq, Hash, Show
 
-noisy : Float ->{} Float
+noisy : Float ->{Host.Console} Float
 let noisy n =
   Platform.stdout_line ("argument " ++ show n)
   n
 
-first_stage : Float ->{} (Float -> Float)
+first_stage : Float ->{Host.Console} (Float -> Float)
 let first_stage x =
   Platform.stdout_line ("first stage " ++ show x)
   fun y -> x + y
@@ -44,7 +44,7 @@ let distinct shapes =
     )
   (canonical, by_size)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let total = first_stage 1 (noisy 2)
   Platform.stdout_line (show total)

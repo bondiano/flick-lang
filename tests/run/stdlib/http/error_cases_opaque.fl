@@ -23,7 +23,7 @@ let register =
   |> HttpApi.with_errors
     (HttpApi.errors |> HttpApi.error_case 409 conflict |> HttpApi.error_case 422 unprocessable)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line "made"
   ignore (HttpApi.url "http://127.0.0.1" register () ())

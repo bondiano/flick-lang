@@ -12,7 +12,7 @@ const WEIGHT: &str = "module App exposing (main)\n\n\
 #[test]
 fn a_method_of_a_known_instance_is_a_function_called_directly() {
     let go = app(&format!(
-        "{WEIGHT}main : Unit ->{{; AppError}} Unit\n\
+        "{WEIGHT}main : Unit ->{{Host.Console; AppError}} Unit\n\
          let main () = Platform.stdout_line (show (weight Green) ++ show Red)\n"
     ));
     // a method written in the instance, a derived one and one of the core
@@ -28,8 +28,10 @@ fn a_method_of_a_known_instance_is_a_function_called_directly() {
         go.contains("F_App__Show_x20_Color_x24_show(fb, K_App__"),
         "{go}"
     );
+    // the call may break over lines, as wide as its arguments are
+    let flat = go.replace(char::is_whitespace, "");
     assert!(
-        go.contains("F_Instances__Show_x20_Int_x24_show(fb, F_App__Weight"),
+        flat.contains("F_Instances__Show_x20_Int_x24_show(fb,F_App__Weight"),
         "{go}"
     );
     // generic code reaches the same function through the dictionary,
@@ -51,7 +53,7 @@ fn a_dictionary_the_checker_does_not_know_is_looked_up() {
         "{WEIGHT}heavy : Weight a => a -> Bool\nlet heavy x = weight x > 1\n\n\
          type Held =\n  | Weight b => Held b : Held\n\n\
          held : Held -> Int\nlet held h =\n  match h with\n  | Held x -> weight x\n\n\
-         main : Unit ->{{; AppError}} Unit\n\
+         main : Unit ->{{Host.Console; AppError}} Unit\n\
          let main () =\n  \
          Platform.stdout_line (show (heavy Red, held (Held Red)))\n  \
          Platform.stdout_line (label Red)\n"
@@ -83,7 +85,7 @@ fn a_method_of_an_instance_with_a_context_takes_its_dictionaries() {
          let weight o =\n    match o with\n    | None -> 0\n    | Some x -> weight x\n  \
          let label _ = \"option\"\n\n\
          heavy : Weight a => a -> Bool\nlet heavy x = weight (Some x) > 1\n\n\
-         main : Unit ->{{; AppError}} Unit\n\
+         main : Unit ->{{Host.Console; AppError}} Unit\n\
          let main () = Platform.stdout_line (show (weight (Some Green), heavy (Some Red)))\n"
     ));
     let function = "F_App__Weight_x20__x28_Option_x20_a_x29__x24_weight";
@@ -117,7 +119,7 @@ fn an_instance_with_a_context_that_computes_a_method_is_built() {
         "{WEIGHT}instance Weight a => Weight (Option a) =\n  \
          let weight =\n    let base = String.length \"four\"\n    fun _ -> base\n  \
          let label _ = \"option\"\n\n\
-         main : Unit ->{{; AppError}} Unit\n\
+         main : Unit ->{{Host.Console; AppError}} Unit\n\
          let main () = Platform.stdout_line (label (Some Green))\n"
     ));
     // building it computes `weight`, which a direct call of `label` would skip
@@ -133,7 +135,7 @@ fn a_computed_method_of_an_instance_without_a_context_is_a_variable() {
     let go = app(&format!(
         "{WEIGHT}type Tag = Tag\n\n\
          instance Weight Tag =\n  let weight =\n    let base = String.length \"four\"\n    fun _ -> base\n\n\
-         main : Unit ->{{; AppError}} Unit\n\
+         main : Unit ->{{Host.Console; AppError}} Unit\n\
          let main () = Platform.stdout_line (show (weight Tag))\n"
     ));
     let var = "V_App__Weight_x20_Tag_x24_weight";

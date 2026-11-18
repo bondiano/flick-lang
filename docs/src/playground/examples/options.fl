@@ -8,7 +8,7 @@ let age text =
   | Some _ -> Err "an age is not negative"
   | None -> Err "not a number: \{text}"
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line (show (age "36"))
   Platform.stdout_line (show (age "-1"))

@@ -55,7 +55,7 @@ let count query =
   | _ -> -1
 
 /// What a run of `steps` applied, or why it was refused.
-migrate : String -> List Migration ->{Async, Database; EncodeError, DecodeError} Unit
+migrate : String -> List Migration ->{Host.Console, Async, Database; EncodeError, DecodeError} Unit
 let migrate label steps =
   let outcome =
     try "applied " ++ show (Database.Migrate.run steps) with
@@ -63,7 +63,7 @@ let migrate label steps =
     | DbError e -> "failed " ++ e.code
   Platform.stdout_line (label ++ ": " ++ outcome)
 
-run : Unit ->{Async, Database; MigrationError, EncodeError, DbError, DecodeError} Unit
+run : Unit ->{Host.Console, Async, Database; MigrationError, EncodeError, DbError, DecodeError} Unit
 let run () =
   migrate "first" [users, seed]
   migrate "again" [users, seed]
@@ -80,7 +80,7 @@ let run () =
   migrate "out of order" [seed, users]
   migrate "behind the database" [users]
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Environment, Host.Console, Async; AppError} Unit
 let main () =
   let url = Option.with_default "" (Platform.env "DATABASE_URL")
   provide (Database.pg (Database.config url)) {

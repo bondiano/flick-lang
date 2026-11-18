@@ -8,7 +8,7 @@ import Http.ServerResponse exposing (ServerResponse)
 handler : ServerRequest ->{RouteContext} ServerResponse
 let handler _ = Http.ServerResponse.text (show (Http.Router.params ())) Http.ServerResponse.defaults
 
-attempt : String -> String ->{} Unit
+attempt : String -> String ->{Host.Console} Unit
 let attempt pattern path =
   app : ServerRequest ->{; HttpServerError} ServerResponse
   let app =
@@ -26,7 +26,7 @@ let attempt pattern path =
   with
   | e -> Platform.stdout_line (label ++ show (Http.ServerError.status e))
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   attempt "/x/:id([0-9]+)" "/x/abc"
   attempt "/x/:id([0-9]+)" "/x/123"

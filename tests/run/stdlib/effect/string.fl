@@ -2,7 +2,7 @@
 // `locale_compare`, which needs Intl's collation, is in `string_locale`.
 module App.Main exposing (main)
 
-line : String -> String -> Unit ->{} Unit
+line : String -> String -> Unit ->{Host.Console} Unit
 let line label value () = Platform.stdout_line (label ++ ": " ++ value)
 
 opt : Option String -> String
@@ -21,7 +21,7 @@ describe : RegExp.Match -> String
 let describe m =
   m.matched ++ "@" ++ show m.index ++ "[" ++ String.join "," (List.map opt m.captures) ++ "]"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   line
     "trim"

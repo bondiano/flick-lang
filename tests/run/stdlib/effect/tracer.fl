@@ -27,7 +27,7 @@ let names () =
     show (Tracer.span_name span, parent, Tracer.sampled span)
   | None -> "no span"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line ("outside " ++ names ())
   let outer =

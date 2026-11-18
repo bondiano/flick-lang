@@ -62,8 +62,8 @@ fn explicit_module_result_keeps_client_server_reachability_diagnostics() {
 /// directory names them. Files no build wrote stay.
 #[test]
 fn a_module_that_drops_out_leaves_no_js_file_behind() {
-    let with = "module A exposing (main)\nimport B\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line (Int.to_string (B.twice 21))\n";
-    let without = "module A exposing (main)\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line (Int.to_string 42)\n";
+    let with = "module A exposing (main)\nimport B\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () = Platform.stdout_line (Int.to_string (B.twice 21))\n";
+    let without = "module A exposing (main)\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () = Platform.stdout_line (Int.to_string 42)\n";
     let b = "module B exposing (twice)\ntwice : Int -> Int\nlet twice x = x * 2\n";
     for emit in ["js", "ts"] {
         let root = project(

@@ -5,7 +5,7 @@ module App.Main exposing (main)
 type error Boom = Boom Float
   deriving Show
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 nap : Float ->{Async} Unit
@@ -23,7 +23,7 @@ let ended exit = Exit.match_ (fun v -> "value " ++ show v) (fun f -> "failed " +
 quiet : Failure e ->{} Unit
 let quiet _ = ()
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let exits = parallel_exits [task { 1 }, task { Fail.fail (Boom 2) }]
   say (show (List.map ended exits))

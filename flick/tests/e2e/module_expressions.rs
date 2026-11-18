@@ -6,14 +6,14 @@ fn anonymous_nested_and_returned_parameterized_modules_execute_on_js_and_go() {
         let source = dir.join("App");
         write_hom_expression_sources(&source, factory, instances);
         if matches!(case, "outer_type_capture" | "dependent_factory_member") {
-            fs::write(source.join("Main.fl"), "module App.Main exposing (main)\nimport App.Instances.Chosen as Chosen\nanswer : Int\nlet answer = Chosen.value + 1\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show answer)\n").expect("consumer of the dependent value");
+            fs::write(source.join("Main.fl"), "module App.Main exposing (main)\nimport App.Instances.Chosen as Chosen\nanswer : Int\nlet answer = Chosen.value + 1\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show answer)\n").expect("consumer of the dependent value");
         }
         match case {
             "private_generic" => {
-                fs::write(source.join("Main.fl"), "module App.Main exposing (main)\nimport App.Instances.Chosen as Chosen\nbox : Chosen.Box Int\nlet box = Chosen.box\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (Chosen.unbox box + 1))\n").expect("consumer of the inferred type constructor");
+                fs::write(source.join("Main.fl"), "module App.Main exposing (main)\nimport App.Instances.Chosen as Chosen\nbox : Chosen.Box Int\nlet box = Chosen.box\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show (Chosen.unbox box + 1))\n").expect("consumer of the inferred type constructor");
             }
             "private_nominals" => {
-                fs::write(source.join("Main.fl"), "module App.Main exposing (main)\nimport App.Instances.Chosen as Chosen\nimport App.Instances.Checked as Checked\nmain : Unit ->{} Unit\nlet main () =\n  let layer = Layer.succeed Chosen.Clock { now = fun () -> 41 }\n  let value = provide layer { Chosen.read () }\n  Platform.stdout_line (show (value + Checked.answer))\n").expect("consumer of inferred nominal members");
+                fs::write(source.join("Main.fl"), "module App.Main exposing (main)\nimport App.Instances.Chosen as Chosen\nimport App.Instances.Checked as Checked\nmain : Unit ->{Host.Console} Unit\nlet main () =\n  let layer = Layer.succeed Chosen.Clock { now = fun () -> 41 }\n  let value = provide layer { Chosen.read () }\n  Platform.stdout_line (show (value + Checked.answer))\n").expect("consumer of inferred nominal members");
             }
             _ => {}
         }
@@ -166,7 +166,7 @@ fn write_hom_expression_sources(source: &Path, factory: &str, instances: &str) {
         ("Instances.fl", instances),
         (
             "Main.fl",
-            "module App.Main exposing (main)\nimport App.Instances.Chosen as Chosen\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show Chosen.answer)\n",
+            "module App.Main exposing (main)\nimport App.Instances.Chosen as Chosen\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show Chosen.answer)\n",
         ),
     ] {
         fs::write(source.join(name), text).expect("source");
@@ -250,7 +250,7 @@ fn higher_order_dictionary_scopes_execute_locally_on_js_and_go() {
         ),
         (
             "Main.fl",
-            "module App.Main exposing (main)\nimport App.Instances.Curried as Curried\nimport App.Instances.Nested as Nested\nimport App.Instances.Captured as Captured\nimport App.Instances.CapturedOther as CapturedOther\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show Curried.answer ++ \" \" ++ show Nested.answer ++ \" \" ++ show Captured.answer ++ \" \" ++ show CapturedOther.answer ++ \" \" ++ show (eq \"x\" \"x\"))\n",
+            "module App.Main exposing (main)\nimport App.Instances.Curried as Curried\nimport App.Instances.Nested as Nested\nimport App.Instances.Captured as Captured\nimport App.Instances.CapturedOther as CapturedOther\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show Curried.answer ++ \" \" ++ show Nested.answer ++ \" \" ++ show Captured.answer ++ \" \" ++ show CapturedOther.answer ++ \" \" ++ show (eq \"x\" \"x\"))\n",
         ),
     ] {
         fs::write(source.join(name), text).expect("source");
@@ -322,7 +322,7 @@ fn nested_static_parameter_contract_dictionaries_execute_on_js_ts_and_go() {
         ),
         (
             "Main.fl",
-            "module App.Main exposing (main)\nmodule Chosen = App.Make(App.Container)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (if Chosen.answer then \"42\" else \"0\")\n",
+            "module App.Main exposing (main)\nmodule Chosen = App.Make(App.Container)\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (if Chosen.answer then \"42\" else \"0\")\n",
         ),
     ] {
         fs::write(source.join(name), text).expect("source");

@@ -12,7 +12,7 @@ let fibs = Seq.unfold (fun (a, b) -> Some (a, (b, a + b))) (0, 1)
 halve : Int -> Option (Int, Int)
 let halve n = if n == 0 then None else Some (n, n / 2)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let naturals = Seq.from 1
   let squares = Seq.map (fun n -> n * n) naturals

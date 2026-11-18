@@ -44,7 +44,7 @@ let pair = (acquire "tuple", "keep")
 prepare : Unit ->{Scope s} Unit ->{Scope s} Arena.Value s String
 let prepare () () = acquire "stage" ()
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = scope {
   let direct =
     Layer.run layer (fun () ->

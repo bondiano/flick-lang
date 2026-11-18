@@ -1,13 +1,13 @@
 // Real FileSystem.node operations and an indirect call through a stored task.
 module App.Main exposing (main)
 
-line : String -> String ->{} Unit
+line : String -> String ->{Host.Console} Unit
 let line label text = Platform.stdout_line (label ++ ": " ++ text)
 
 plain : FileSystem.WriteOptions
 let plain = { flag = None; mode = None }
 
-work : String ->{Async, FileSystem.FileSystem; PlatformError.PlatformError} Unit
+work : String ->{Host.Console, Async, FileSystem.FileSystem; PlatformError.PlatformError} Unit
 let work dir =
   let a = dir ++ "/a.txt"
   let b = dir ++ "/b.txt"
@@ -67,7 +67,7 @@ let work dir =
   await later
   line "indirect" "true"
 
-main : Unit ->{Async} Unit
+main : Unit ->{Host.Console, Async} Unit
 let main () =
   try
     provide FileSystem.node {

@@ -16,7 +16,7 @@ let is_palindrome n =
     // For an odd digit count, drop the middle digit from the reversed half.
     remaining == reversed || remaining == reversed / 10
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line (show (is_palindrome 121))
   Platform.stdout_line (show (is_palindrome 1221))

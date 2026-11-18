@@ -12,7 +12,7 @@ let nap millis =
   | Ok d -> Effect.sleep d
   | Err _ -> ()
 
-main : Unit ->{Async} Unit
+main : Unit ->{Host.Console, Async} Unit
 let main () =
   let runs = Ref.make 0
   let shared = lazy {

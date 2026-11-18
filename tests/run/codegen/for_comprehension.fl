@@ -26,7 +26,7 @@ let scaled factor xs = for {
   if y > 5
 } yield y
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (line (Seq.take 3 pythagorean))
   Platform.stdout_line (show (evens_squared [1, 2, 3, 4, 5, 6]))

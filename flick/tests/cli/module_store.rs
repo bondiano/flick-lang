@@ -24,7 +24,7 @@ const MAIN: &str = "module App.Main exposing (main)
 
 import App.Base exposing (x)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () = Platform.stdout_line (show (x + 1.0))
 ";
 

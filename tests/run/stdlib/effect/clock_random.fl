@@ -1,8 +1,9 @@
-// The default `Clock` and `Random`: reads are runtime calls. The
-// clock is checked by properties; random draws under `with_seed` repeat.
+// `Clock` and `Random` through `Host.Clock` and `Host.Random`. The live
+// clock is checked by properties; random draws under `with_seed` repeat,
+// and each operation is made of `Host.Random.next` draws, which a fake fixes.
 module App.Main exposing (main)
 
-draws : Unit ->{} (Float, Bool, Int, Float, Int, List Float, String)
+draws : Unit ->{Host.Random} (Float, Bool, Int, Float, Int, List Float, String)
 let draws () =
   let x = Random.next ()
   let b = Random.next_boolean ()
@@ -14,13 +15,17 @@ let draws () =
   (x, b, i, between, die, order, pick)
 
 /// Whether the clock reads no earlier than the readings before.
-later : Clock.Clock -> Float -> BigInt -> BigInt ->{} Bool
-let later clock millis nanos mono =
-  Clock.millis_of clock >= millis
-    && Clock.nanos_of clock >= nanos
-    && Clock.monotonic_nanos_of clock >= mono
+later : Float -> BigInt -> BigInt ->{Host.Clock} Bool
+let later millis nanos mono =
+  Clock.current_time_millis () >= millis
+    && Clock.current_time_nanos () >= nanos
+    && Clock.monotonic_time_nanos () >= mono
 
-main : Unit ->{Async; AppError} Unit
+/// Every draw in the middle of [0, 1).
+halves : Layer none none {Host.Random}
+let halves = Layer.succeed Host.Random { next = fun () -> 0.5 }
+
+main : Unit ->{Host.Clock, Host.Console, Host.Random, Async; AppError} Unit
 let main () =
   let millis = Clock.current_time_millis ()
   let nanos = Clock.current_time_nanos ()
@@ -30,8 +35,7 @@ let main () =
   Platform.stdout_line
     ("clock: "
       ++ show (millis > 1700000000000, nanos > 1700000000000000000n, stop - start >= 1000000n))
-  let same = Clock.clock_with (fun clock -> later clock millis nanos stop)
-  Platform.stdout_line ("clock_with: " ++ show same)
+  Platform.stdout_line ("later: " ++ show (later millis nanos stop))
   let first = Random.with_seed 42 (task { draws () })
   let again = Random.with_seed 42 (task { draws () })
   let other = Random.with_seed 7 (task { draws () })
@@ -64,3 +68,4 @@ let main () =
       })
   Platform.stdout_line ("half open: " ++ show (List.all (fun n -> n == 0 || n == 1) open_die))
   Platform.stdout_line ("seeded: " ++ show first)
+  Platform.stdout_line ("halves: " ++ show (provide halves { draws () }))

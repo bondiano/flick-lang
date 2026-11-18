@@ -3,7 +3,7 @@
 // channel that ends with a value and its leftovers.
 module App.Main exposing (main)
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 note : Ref (List String) -> String ->{} Unit
@@ -32,7 +32,7 @@ let ended sink stream =
     Stream.to_channel stream |> Channel.pipe_to (Sink.to_channel sink) |> Channel.run_drain
   (value, Option.map NonEmpty.to_list leftover)
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let five = Stream.from_list [1, 2, 3, 4, 5]
   say ("from_list chunks: " ++ show (chunked five))

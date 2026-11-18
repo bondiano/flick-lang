@@ -4,7 +4,7 @@ import App.Hom.Instances.Chosen as Chosen
 import App.Hom.Instances.Anonymous as Anonymous
 import App.Hom.Instances.Alias as Alias
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line
     (show Chosen.answer

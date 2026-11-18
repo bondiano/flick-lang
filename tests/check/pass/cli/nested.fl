@@ -3,7 +3,7 @@ module App.Nested exposing (tool)
 
 import Cli
 
-tool : Cli.Command none none
+tool : Cli.Command {Host.Console} none
 let tool = cli "tool" {
   description "Project tools"
   subcommand cli "greet" {

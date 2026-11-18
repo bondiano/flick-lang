@@ -127,7 +127,7 @@ fn shared_browser_and_sql_programs_compile_without_server_modules() {
         view : Ui\nlet view = Ui.text \"browser\"\n\
         fetch : String ->{Async, Http.Client.HttpClient; Http.ClientError.HttpClientError} Http.ClientResponse.ClientResponse\n\
         let fetch url = Http.Client.get url\n\
-        main : Unit ->{} Unit\nlet main () = Platform.stdout_line \"ok\"\n";
+        main : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line \"ok\"\n";
     let sql = "module Main exposing (query)\n\
         import Sql\n\
         sql table Users \"users\" { id : bigint primary key as BigInt }\n\

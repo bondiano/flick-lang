@@ -6,7 +6,7 @@
 module App.Main exposing (main)
 
 /// Where the collector listens.
-endpoint : Unit ->{; Config.ConfigError} String
+endpoint : Unit ->{Host.Environment; Config.ConfigError} String
 let endpoint () =
   Config.get
     (Config.with_default "http://localhost:4318" (Config.string "OTEL_EXPORTER_OTLP_ENDPOINT"))
@@ -39,7 +39,7 @@ let checkout user =
       Metric.update 1 orders
     })
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Environment, Host.Console; AppError} Unit
 let main () =
   let url =
     try endpoint () with

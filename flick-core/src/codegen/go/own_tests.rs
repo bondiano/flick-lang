@@ -19,7 +19,7 @@ type Flag =
 equal : Flag -> Flag -> Bool
 let equal left right = left == right
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () = Platform.stdout_line (show (equal Flag OtherFlag))
 ");
     // Evidence is part of the constructor's storage, not a request to
@@ -50,7 +50,7 @@ let allowed box =
   match box with
   | Box value -> allow value
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () = Platform.stdout_line (show (allowed (constructor () 1)))
 ");
     assert!(!go.contains("flickrt.Inst("), "{go}");
@@ -65,7 +65,7 @@ fn a_constructor_with_fields_of_the_program_has_a_go_type_of_its_own() {
          type Shape = Dot | Circle Float | Rect Float Float\n\n\
          area : Shape -> Float\n\
          let area shape =\n  match shape with\n  | Dot -> 0.0\n  | Circle r -> r\n  | Rect w h -> w * h\n\n\
-         main : Unit ->{; AppError} Unit\n\
+         main : Unit ->{Host.Console; AppError} Unit\n\
          let main () = Platform.stdout_line (show (area (Rect 2.0 3.0), area (Circle 1.0), Some 1))\n",
     );
     assert!(out.diagnostics.is_empty(), "{:?}", out.diagnostics);
@@ -111,7 +111,7 @@ fn a_record_under_a_constructor_lies_in_its_value() {
          let area shape =\n  match shape with\n  | Dot -> 0\n  | Box { w; h } -> w * h\n\n\
          wider : Shape -> Shape\n\
          let wider shape =\n  match shape with\n  | Dot -> Dot\n  | Box box -> Box { box with h = box.h + 1 }\n\n\
-         main : Unit ->{; AppError} Unit\n\
+         main : Unit ->{Host.Console; AppError} Unit\n\
          let main () =\n  let r = { w = 1; h = 1; name = \"r\" }\n  \
          Platform.stdout_line (show (area (wider (Box { name = \"a\"; h = 2; w = 3 })), area (Box r)))\n",
     );

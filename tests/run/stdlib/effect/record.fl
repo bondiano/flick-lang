@@ -1,13 +1,13 @@
 // `Record`: dictionaries and records.
 module App.Main exposing (main)
 
-line : String -> String ->{} Unit
+line : String -> String ->{Host.Console} Unit
 let line label text = Platform.stdout_line (label ++ ": " ++ text)
 
 half : Float -> Result String Float
 let half n = if n - 2 * Float.floor (n / 2) == 0 then Ok (n / 2) else Err ("odd " ++ show n)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let d = Record.from_entries [("a", 1), ("b", 2), ("c", 3)]
   let nothing : Record.ReadonlyRecord Float = Record.empty ()

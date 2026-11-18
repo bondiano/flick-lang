@@ -270,7 +270,7 @@ fn debug_imports_a_module_by_its_own_name_unless_taken() {
     let js = compile(
         "module App.Main exposing (..)\n\n\
          type Shape = Option Float | Dot\n\n\
-         line : Unit ->{} Unit\nlet line _ = Platform.stdout_line (show (Option.with_default 0 (Some 1)))\n",
+         line : Unit ->{Host.Console} Unit\nlet line _ = Platform.stdout_line (show (Option.with_default 0 (Some 1)))\n",
     );
     assert!(js.contains("import * as Platform from"), "{js}");
     assert!(js.contains("Platform.stdout_line("), "{js}");

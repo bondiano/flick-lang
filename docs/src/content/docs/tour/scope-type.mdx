@@ -9,9 +9,11 @@ import TourLesson from "../../../components/TourLesson.astro";
 <TourLesson locale="en" id="scope-type">
 
 A function that opens a resource in its caller's scope says so:
-`open_res : String ->{Scope s} String` needs a scope `s` from whoever calls
-it. `both` passes that need on, and `main` provides the scope, which closes
-both resources once `both ()` is done.
+`Scope s` in the row of `open_res` needs a scope `s` from whoever calls it.
+Its release prints when `s` closes, so it also asks for a `Host.Console`
+that lasts as long: `Fiber.Provided {Host.Console} s`. `both` passes these
+needs on, and `main` provides the scope, which closes both resources once
+`both ()` is done.
 
 This is how a signature tells you that a function opens something that has
 to be closed.

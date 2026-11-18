@@ -36,7 +36,7 @@ fn higher_order_templates_run_offline_without_package_sources_on_js_and_go() {
                 fs::write(path, source).expect("package module");
             }
             fs::write(root.join("app/src/App/Instances.fl"), "module App.Instances exposing (Chosen)\nmodule Chosen = Geo.Published.Selected(App.Argument)\n").expect("application");
-            fs::write(root.join("app/src/App/Main.fl"), "module App.Main exposing (main)\nimport App.Instances.Chosen as Chosen\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show Chosen.answer ++ \" \" ++ show (eq \"x\" \"x\"))\n").expect("entry");
+            fs::write(root.join("app/src/App/Main.fl"), "module App.Main exposing (main)\nimport App.Instances.Chosen as Chosen\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show Chosen.answer ++ \" \" ++ show (eq \"x\" \"x\"))\n").expect("entry");
             for (stage, seed, expected) in [("warm", 41, "42 true\n"), ("offline", 5, "6 true\n")] {
                 if stage == "offline" {
                     fs::remove_dir_all(&package).expect("remove original package sources");

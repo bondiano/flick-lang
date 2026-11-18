@@ -14,7 +14,7 @@ let shell windows script =
   else
     ChildProcess.make "sh" ["-c", script]
 
-line : String -> String ->{} Unit
+line : String -> String ->{Host.Console} Unit
 let line label value = Platform.stdout_line (label ++ ": " ++ value)
 
 /// The tag of a failed system call.
@@ -30,7 +30,10 @@ text_lines :
   List String
 let text_lines bytes = Stream.run_collect (Stream.split_lines (Stream.decode_text bytes))
 
-run : Bool -> String ->{Async, FileSystem.FileSystem; PlatformError.PlatformError} Unit
+run :
+  Bool ->
+  String ->{Host.Process, Host.Console, Async, FileSystem.FileSystem; PlatformError.PlatformError}
+  Unit
 let run windows dir =
   line "lines" (show (ChildProcess.lines (shell windows "echo one&& echo two")))
   line "exit_code" (show (ChildProcess.exit_code (shell windows "exit 3")))
@@ -84,8 +87,18 @@ let run windows dir =
     try show (ChildProcess.exit_code (ChildProcess.make "flick-no-such-program" [])) with
     | e -> reason e
   line "missing" missing
+  // commands start through `Host.Process`: a fake one refuses each of them
+  let refusal = { module_ = "Fake"; method = "spawn"; description = None }
+  let refusing =
+    Layer.succeed Host.Process {
+      spawn = fun _ -> Fail.fail (PlatformError.PlatformError (PlatformError.Bad refusal))
+    }
+  let faked =
+    try provide refusing { show (ChildProcess.exit_code (shell windows "exit 0")) } with
+    | e -> reason e
+  line "fake" faked
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Process, Host.Environment, Host.Console, Async; AppError} Unit
 let main () =
   let windows = Platform.env "OS" == Some "Windows_NT"
   let outcome =

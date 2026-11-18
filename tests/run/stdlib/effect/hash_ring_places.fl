@@ -2,7 +2,7 @@
 // after a node leaves or changes its weight, and at the least weights.
 module App.Main exposing (main)
 
-line : String -> String ->{} Unit
+line : String -> String ->{Host.Console} Unit
 let line label text = Platform.stdout_line (label ++ ": " ++ text)
 
 type alias Server = { name : String; zone : Float }
@@ -40,7 +40,7 @@ let shards count ring =
   | Some nodes -> String.join "" (List.map (fun s -> s.name) nodes)
   | None -> "-"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let empty = ring_of None []
   let three = ring_of None [("a", None), ("b", Some 2), ("c", Some 0.5)]

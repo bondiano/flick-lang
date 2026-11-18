@@ -61,27 +61,26 @@ fn one_step_is_left_alone() {
     assert_eq!(fixed(&text, "FLICK-T035"), None);
 }
 
-const LOOK: &str =
-    "look : Float ->{} Option Float\nlet look n =\n  Platform.stdout_line \"look\"\n  Some n\n\n";
+const LOOK: &str = "look : Float ->{Host.Console} Option Float\nlet look n =\n  Platform.stdout_line \"look\"\n  Some n\n\n";
 
 #[test]
 fn a_runtime_call_in_a_do_is_bound_before_it() {
     assert_fix(
         &format!(
-            "{LOOK}h : Float ->{{}} Option Float\nlet h n =\n  do {{\n    x <- Some n\n    y <- look 2\n    pure (x + y)\n  }}\n"
+            "{LOOK}h : Float ->{{Host.Console}} Option Float\nlet h n =\n  do {{\n    x <- Some n\n    y <- look 2\n    pure (x + y)\n  }}\n"
         ),
         "FLICK-E001",
         &format!(
-            "{LOOK}h : Float ->{{}} Option Float\nlet h n =\n  let result = look 2\n  do {{\n    x <- Some n\n    y <- result\n    pure (x + y)\n  }}\n"
+            "{LOOK}h : Float ->{{Host.Console}} Option Float\nlet h n =\n  let result = look 2\n  do {{\n    x <- Some n\n    y <- result\n    pure (x + y)\n  }}\n"
         ),
     );
     assert_fix(
         &format!(
-            "{LOOK}h : Float ->{{}} Option Float\nlet h n =\n  do {{\n    x <- Some n\n    Platform.stdout_line \"no\"\n    pure x\n  }}\n"
+            "{LOOK}h : Float ->{{Host.Console}} Option Float\nlet h n =\n  do {{\n    x <- Some n\n    Platform.stdout_line \"no\"\n    pure x\n  }}\n"
         ),
         "FLICK-E001",
         &format!(
-            "{LOOK}h : Float ->{{}} Option Float\nlet h n =\n  Platform.stdout_line \"no\"\n  do {{\n    x <- Some n\n    pure x\n  }}\n"
+            "{LOOK}h : Float ->{{Host.Console}} Option Float\nlet h n =\n  Platform.stdout_line \"no\"\n  do {{\n    x <- Some n\n    pure x\n  }}\n"
         ),
     );
 }

@@ -61,7 +61,7 @@ let below_five n = n < 5
 small : Float ->{; TooBig} Bool
 let small n = if n > 3 then Fail.fail (TooBig n) else true
 
-run : Unit ->{; Arbitrary.SampleError} Unit
+run : Unit ->{Host.Console; Arbitrary.SampleError} Unit
 let run () =
   let all_digits = Arbitrary.sample (seeded 20) digits
   Platform.stdout_line
@@ -166,12 +166,12 @@ let run () =
   reports ()
   linked ()
 
-report : Arbitrary.CheckResult e a ->{} Unit
+report : Arbitrary.CheckResult e a ->{Host.Console} Unit
 let report result =
   Platform.stdout_line (Option.with_default "passed" (Arbitrary.format_check_failure result))
 
 /// Reports of falsified checks, with their values.
-reports : Unit ->{} Unit
+reports : Unit ->{Host.Console} Unit
 let reports () =
   report (Arbitrary.check checking (fun p -> p.x < 5) (Arbitrary.from_schema Point.schema))
   report
@@ -193,7 +193,7 @@ let reports () =
     (Arbitrary.check checking (fun s -> String.length s < 2) (Arbitrary.from_schema Schema.string))
 
 /// Values generated through the link of their declaration.
-linked : Unit ->{; Arbitrary.SampleError} Unit
+linked : Unit ->{Host.Console; Arbitrary.SampleError} Unit
 let linked () =
   Platform.stdout_line
     ("durations: " ++ show (Arbitrary.sample (seeded 6) (Arbitrary.from_schema Schema.duration)))
@@ -208,7 +208,7 @@ let linked () =
   Platform.stdout_line
     ("zones: " ++ show (List.map DateTime.zone_to_string (Arbitrary.sample (seeded 4) zones)))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   try run () with
   | Arbitrary.SampleError _ -> App.fail "a sample ran out of values"

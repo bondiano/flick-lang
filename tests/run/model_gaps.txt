@@ -116,7 +116,7 @@ stdlib/effect/clock_random # no native for `zero` (flick:rt durationZero)
 stdlib/effect/codec # no native for `literal` (flick:Schema Literal)
 stdlib/effect/combine # the row primitive `Map Combiner { hits : Float; tags : List String } { hits : Combiner Float; tags : Combiner (List String) }`
 stdlib/effect/config # no native for `string` (flick:Config String)
-stdlib/effect/console # no native for `log` (flick:Console log)
+stdlib/effect/console # no native for `sort_by` (flick:rt listSortBy)
 stdlib/effect/cron # no native for `zone_make_offset` (flick:DateTime zoneMakeOffset)
 stdlib/effect/cron_more # no native for `zone_make_offset` (flick:DateTime zoneMakeOffset)
 stdlib/effect/crypto # no native for `system_random_bytes` (flick:Crypto flickRandomBytes)
@@ -238,7 +238,6 @@ stdlib/rpc/worker # `Record.label` has no λFlick form
 stdlib/seq # no native for `from` (flick:rt seqFrom)
 stdlib/seqs # a `for` or a `Seq` has no λFlick form
 stdlib/server/auth # no native for `ran` (./auth.mjs ran)
-stdlib/server/node # no native for `log` (flick:Console log)
 stdlib/server/origin # the row primitive `Lacks "greet" {}`
 stdlib/server/server_fn # the model's (⊆) rejects `App.Main.place$procedure`
 stdlib/server/streamed # no native for `later` (./streamed.mjs later)

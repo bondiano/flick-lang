@@ -54,6 +54,19 @@ fn the_fix_adds_the_service_after_the_brace() {
 }
 
 #[test]
+fn the_fix_replaces_none_in_the_braces_of_an_arrow() {
+    let program = "let f x = Log.line x";
+    assert_eq!(
+        fixed("f : String ->{none; NotFound} Unit", program),
+        "f : String ->{Log; NotFound} Unit"
+    );
+    assert_eq!(
+        fixed("f : String ->{none} Unit", program),
+        "f : String ->{Log} Unit"
+    );
+}
+
+#[test]
 fn a_row_of_a_variable_gets_the_service_before_it() {
     let program = "let f x = Log.line x";
     assert_eq!(

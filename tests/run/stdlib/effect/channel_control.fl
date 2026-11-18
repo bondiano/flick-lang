@@ -12,7 +12,7 @@ service Greeter =
 greeter : Greeter.Impl
 let greeter = { greet = fun name -> "hi " ++ name }
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 nums : Channel.Channel none none i Float Unit ie id
@@ -56,7 +56,7 @@ let options = {
   disablePropagation = false
 }
 
-failures : Unit ->{Async; Boom} Unit
+failures : Unit ->{Host.Console, Async; Boom} Unit
 let failures () =
   say ("fail: " ++ outcome broken)
   say ("fail_sync: " ++ outcome (Channel.fail_sync (fun () -> Boom "later")))
@@ -134,7 +134,7 @@ let failures () =
   let paced = Channel.schedule (Schedule.map (fun _ -> ()) (Schedule.recurs 1)) nums
   say ("schedule: " ++ show (Channel.run_collect paced))
 
-merging : Unit ->{Async; Boom} Unit
+merging : Unit ->{Host.Console, Async; Boom} Unit
 let merging () =
   let both = Channel.halt_both
   say
@@ -165,7 +165,7 @@ let merging () =
         Ref.get side,
       ))
 
-services : Unit ->{Async; Boom} Unit
+services : Unit ->{Host.Console, Async; Boom} Unit
 let services () =
   let greeted = Channel.map_effect (fun n -> Greeter.greet n) (Channel.from_list ["ada"])
   say
@@ -186,7 +186,7 @@ let services () =
   let named = Channel.from_effect (task { Option.bind Tracer.span_name (Tracer.parent_span ()) })
   say ("with_span: " ++ show (Channel.run_collect (Channel.with_span "pipeline" options named)))
 
-running : Unit ->{Async; Boom} Unit
+running : Unit ->{Host.Console, Async; Boom} Unit
 let running () =
   say
     ("run_count, run_head, run_last: "
@@ -251,7 +251,7 @@ let running () =
   }
   say ("run_into_pubsub, run_into_pubsub_array: " ++ show (replayed, ended))
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   try
     failures ()

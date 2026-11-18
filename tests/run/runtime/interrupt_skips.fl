@@ -7,7 +7,7 @@ module App.Main exposing (main)
 type error A = A Float
   deriving Eq, Show
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 nap : Float ->{Async} Unit
@@ -39,7 +39,10 @@ let view f =
   List.map label (Cause.reasons f)
 
 /// Runs `body` in a child that is interrupted once `late` tells it is masked.
-probe : String -> (Deferred.Deferred none Unit -> Eff {Async} none Unit) ->{Async} Unit
+probe :
+  String ->
+  (Deferred.Deferred none Unit -> Eff {Host.Console, Async} none Unit) ->{Host.Console, Async}
+  Unit
 let probe name body =
   let entered : Deferred.Deferred none Unit = Deferred.make ()
   let exits = scope owner {
@@ -56,7 +59,7 @@ let probe name body =
     )
     exits
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   probe "exit" (fun entered -> task {
     let ex = Effect.exit (task { late entered })

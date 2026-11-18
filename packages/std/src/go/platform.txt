@@ -25,29 +25,6 @@ flickNode StdioNode
 [flick:Terminal]
 flickNode TerminalNode
 
-[flick:Console]
-flickCurrent *ConsoleCurrent
-flickWithConsole *ConsoleWithConsole
-flickToStderr ConsoleToStderr
-log *ConsoleLog
-info *ConsoleInfo
-debug *ConsoleDebug
-warn *ConsoleWarn
-error *ConsoleError
-trace *ConsoleTrace
-assert *ConsoleAssert
-flickClear *ConsoleClear
-count *ConsoleCount
-countReset *ConsoleCountReset
-dir *ConsoleDir
-dirxml *ConsoleDirxml
-flickTable *ConsoleTable
-flickGroup *ConsoleGroup
-flickWithGroup *ConsoleWithGroup
-time *ConsoleTimeScoped
-timeLog *ConsoleTimeLog
-withTime *ConsoleWithTime
-
 [flick:LogLevel]
 values LogLevelValues
 getOrdinal LogLevelOrdinal

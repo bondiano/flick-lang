@@ -7,5 +7,5 @@ count_long : Int -> Int
 let count_long size =
   count (fun word -> String.length word > size + 2) ["flick", "is", "a", "language"]
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (show (count_long 3))

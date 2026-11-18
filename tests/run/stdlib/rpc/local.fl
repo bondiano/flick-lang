@@ -76,7 +76,7 @@ let handlers = {
       })
 }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let local =
     try show (Rpc.call_local group handlers double 21) with

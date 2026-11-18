@@ -9,7 +9,7 @@ let bump cell =
   Ref.set cell (Ref.get cell + 1)
   Ref.get cell
 
-main : Unit ->{Async} Unit
+main : Unit ->{Host.Console, Async} Unit
 let main () =
   let cell = Ref.make 0
   let kept = Effect.or_die (bump cell)

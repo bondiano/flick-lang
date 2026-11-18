@@ -14,5 +14,5 @@ let reader path = scope {
   fun () -> Files.read file
 }
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line "never runs"

@@ -11,5 +11,5 @@ let balanced text =
   }
   ok && depth == 0
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line "\{balanced "(())"} \{balanced "(()"} \{balanced ")("}"

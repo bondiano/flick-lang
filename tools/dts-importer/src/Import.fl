@@ -107,7 +107,7 @@ let surface request resolved file =
         ]))
 
 /// Answers the request on stdin.
-run : Unit ->{Stdio.Stdio, Path.Path; AppError, PlatformError.PlatformError} Unit
+run : Unit ->{Host.Console, Stdio.Stdio, Path.Path; AppError, PlatformError.PlatformError} Unit
 let run () =
   let text = Stream.mk_string (Stream.decode_text Stream.stdin)
   let request =

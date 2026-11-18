@@ -331,6 +331,8 @@ pub enum HostPrimitive {
     MonotonicTimeNanos,
     /// A draw of the host's random source of Unit, a Float in [0, 1).
     RandomNext,
+    /// A child process the host starts for a command, in the caller's scope.
+    ProcessSpawn,
 }
 
 impl Intrinsic {

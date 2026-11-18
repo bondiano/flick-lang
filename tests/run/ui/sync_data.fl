@@ -2,7 +2,7 @@
 // await runs it.
 module App.Main exposing (main)
 
-job : Atom.Writable (Eff {} none Float)
+job : Atom.Writable (Eff {Host.Console} none Float)
 let job =
   Atom.make
     (task {
@@ -10,7 +10,7 @@ let job =
       41
     })
 
-held : Atom.Atom (Eff {} none Float)
+held : Atom.Atom (Eff {Host.Console} none Float)
 let held = Atom.derived (fun () -> Atom.value job)
 
 page : Ui.View Unit
@@ -20,7 +20,7 @@ let page =
     ui { text "read" }
   )
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () = provide Atom.layer {
   Platform.stdout_line (Ui.Server.render (Ui.render page ()))
   let n = await (Atom.current job)

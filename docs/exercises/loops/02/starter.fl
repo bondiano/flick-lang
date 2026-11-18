@@ -10,5 +10,5 @@ let digit_sum n =
   }
   total
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (show (digit_sum 2026))

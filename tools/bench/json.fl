@@ -39,5 +39,5 @@ let round_trip round =
       | Ok back -> (String.length text, List.length back)
       | Err _ -> (String.length text, 0)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () = Platform.stdout_line (show (List.map round_trip [1, 2, 3, 4, 5]))

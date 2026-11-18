@@ -1,7 +1,7 @@
 // `echo` shows a value with its place and returns it; `todo` fails there.
 module App.Main exposing (main)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let doubled = echo (21 * 2)
   Platform.stdout_line (show doubled)

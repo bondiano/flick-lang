@@ -113,24 +113,14 @@ func processError(tag, method string, description Value, cmd *procCommand) Value
 		"syscall", None, "pathOrDescriptor", Some(cmd.text()))))
 }
 
-// runProcess spawns the command in a scope of its own, gives `use` its
-// process, and closes the scope after.
-func runProcess(fb *Fiber, command Value, use func(fb *Fiber, p *process) Value) Value {
-	return owned(fb, func(fb *Fiber, _ *Owner) Value {
-		return use(fb, ChildProcessSpawn(fb, command).(*process))
-	})
+// ChildProcessOutputString is the text the process writes to stdout until
+// it closes it; its stderr is dropped.
+func ChildProcessOutputString(fb *Fiber, p Value) Value {
+	proc := processOf(p)
+	proc.err.drain()
+	return decodeUTF8(proc.out.all(fb))
 }
 
-func ChildProcessString(fb *Fiber, command Value) Value {
-	return runProcess(fb, command, func(fb *Fiber, p *process) Value { return decodeUTF8(p.out.all(fb)) })
-}
-
-func ChildProcessLines(fb *Fiber, command Value) Value {
-	return runProcess(fb, command, func(fb *Fiber, p *process) Value {
-		return StreamRunCollect(fb, StreamSplitLines(StreamSucceed(decodeUTF8(p.out.all(fb)))))
-	})
-}
-
-func ChildProcessExitCode(fb *Fiber, command Value) Value {
-	return runProcess(fb, command, func(fb *Fiber, p *process) Value { return p.wait(fb) })
+func ChildProcessOutputLines(fb *Fiber, p Value) Value {
+	return StreamRunCollect(fb, StreamSplitLines(StreamSucceed(ChildProcessOutputString(fb, p))))
 }

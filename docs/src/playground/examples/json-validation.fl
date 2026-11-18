@@ -18,7 +18,7 @@ let rewrite text =
     )
     json
 
-print_result : Result SchemaError String ->{} Unit
+print_result : Result SchemaError String ->{Host.Console} Unit
 let print_result result =
   match result with
   | Ok json -> Platform.stdout_line json
@@ -26,7 +26,7 @@ let print_result result =
     Platform.stdout_line "Invalid field: \{issue.path}"
   }
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   print_result
     (rewrite

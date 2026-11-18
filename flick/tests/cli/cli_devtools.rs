@@ -91,7 +91,7 @@ fn run_on_flicks_own_runtime_sends_the_spans_to_the_devtools() {
 fn run_on_flicks_own_runtime_without_devtools_listening_runs_as_without_them() {
     let main = "module App.Main exposing (main)
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   Effect.sleep (Result.with_default Duration.zero (Duration.millis 1))
   Platform.stdout_line \"on the kernel\"

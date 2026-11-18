@@ -4,7 +4,7 @@ module App.Main exposing (main)
 
 type error Boom = Boom String
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 lists : Channel.Channel r e i (NonEmpty.NonEmpty a) d none Unit ->{r; e} List (List a)
@@ -16,7 +16,7 @@ let feed numbers queue =
   let _ = Queue.offer_all numbers queue
   Queue.end queue
 
-values : Unit ->{Async; Boom} Unit
+values : Unit ->{Host.Console, Async; Boom} Unit
 let values () =
   say ("from_list: " ++ show (Channel.run_collect (Channel.from_list [1, 2, 3])))
   say ("from_list_chunked: " ++ show (lists (Channel.from_list_chunked 2 [1, 2, 3, 4, 5])))
@@ -57,7 +57,7 @@ let values () =
   say ("identity: " ++ show (Channel.run_collect echoed))
   say ("from_schedule: " ++ show (Channel.run_collect (Channel.from_schedule (Schedule.recurs 2))))
 
-queues : Unit ->{Async; Boom} Unit
+queues : Unit ->{Host.Console, Async; Boom} Unit
 let queues () =
   let q : Queue.Queue {Boom} Float = Queue.unbounded ()
   let _ = feed [1, 2, 3] q
@@ -92,7 +92,7 @@ let queues () =
     Channel.callback_array { bufferSize = Some 8; strategy = Some Queue.Sliding } (feed [3, 4])
   say ("callback_array: " ++ show (lists fed_chunks))
 
-resources : Unit ->{Async; Boom} Unit
+resources : Unit ->{Host.Console, Async; Boom} Unit
 let resources () =
   let log = Ref.make []
   let acquired =
@@ -109,7 +109,7 @@ let resources () =
       )
   say ("acquire_use_release: " ++ show (Channel.run_collect used) ++ " " ++ show (Ref.get log))
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   try
     values ()

@@ -69,7 +69,7 @@ let view =
     Ui.text (show (Atom.value page) ++ ": " ++ Atom.ready profile)
   )
 
-report : Failure e ->{} Unit
+report : Failure e ->{Host.Console} Unit
 let report failure =
   Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
 
@@ -83,7 +83,7 @@ let served url =
   String.join "" chunks
 
 /// Opens the server's page for `url` and mounts the client on it.
-visit : String -> (Unit ->{Async, Atom.Write} Unit) ->{Async} Unit
+visit : String -> (Unit ->{Host.Console, Async, Atom.Write} Unit) ->{Host.Console, Async} Unit
 let visit url after =
   open url (served url)
   Platform.stdout_line (url ++ " served, loads " ++ show (loads ()))
@@ -98,7 +98,7 @@ let visit url after =
     }
   }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   visit "http://localhost/user/42" (fun () ->
     Atom.set page (User 7)

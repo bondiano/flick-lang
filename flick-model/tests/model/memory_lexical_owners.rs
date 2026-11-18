@@ -2,11 +2,8 @@
 use std::fs;
 use std::path::Path;
 
-use flick_core::build;
 use flick_core::ir::Lit;
-use flick_core::ir::memory::Name;
-use flick_core::opt::perceus;
-use flick_model::memory::{Error, Heap, ProgramOutcome, Value, execute_main_program_outcome};
+use flick_model::memory::{Error, Heap, ProgramOutcome, Value};
 use flick_model::run;
 
 #[test]
@@ -49,22 +46,11 @@ fn lexical_owner_adapters_release_their_captures_at_every_fuel_cut() {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/run/runtime/arena_layer_scope.fl");
     let modules = run::compile(&file).expect("valid lexical Scope acquisition");
     let main = run::main_of(&modules).expect("main export");
-    let entry = Name::new(&main.module, &main.name);
     let expected = fs::read_to_string(file.with_extension("stdout")).expect("specified stdout");
 
     for release in [false, true] {
-        let ir: Vec<_> = modules
-            .iter()
-            .map(|module| {
-                if release {
-                    build::optimized(&modules, module, false)
-                } else {
-                    module.ir.clone()
-                }
-            })
-            .collect();
-        let program = perceus::lower(ir.iter().chain(build::builtin_modules()), &entry)
-            .expect("counted owner adapters");
+        // `main` runs with its root, the live `Host` services it prints through
+        let counted = run::counted_main(&modules, &main, release).expect("counted owner adapters");
         let mut completed = false;
         let mut partial_stdout = false;
         for fuel in 0..=4096 {
@@ -72,7 +58,7 @@ fn lexical_owner_adapters_release_their_captures_at_every_fuel_cut() {
             let external = heap
                 .literal(&Lit::String("outside".into()))
                 .expect("independent caller root");
-            let report = execute_main_program_outcome(&mut heap, &program, &entry, fuel);
+            let report = counted.execute(&mut heap, fuel);
             let detail = format!("release={release} fuel={fuel}: {report:?}");
             let correct = match report.outcome {
                 ProgramOutcome::Returned(value) => {

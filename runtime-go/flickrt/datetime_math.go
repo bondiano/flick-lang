@@ -255,11 +255,6 @@ func DateTimeIsGreaterThanOrEqualTo(that, self Value) Value {
 	return greaterEq(dateTimeOrder, that, self)
 }
 
-func DateTimeIsFuture(fb *Fiber, self Value) Value { return less(dateTimeOrder, self, DateTimeNow(fb)) }
-func DateTimeIsPast(fb *Fiber, self Value) Value {
-	return greater(dateTimeOrder, self, DateTimeNow(fb))
-}
-
 func DateTimeFormatIso(d Value) Value { return newJsDate(dateTime(d).ms).isoString() }
 
 func DateTimeFormatIsoDate(d Value) Value { return dateTime(d).toDate().isoString()[:10] }

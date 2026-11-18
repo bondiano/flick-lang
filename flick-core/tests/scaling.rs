@@ -309,7 +309,7 @@ fn settings(entries: &[(String, String)]) -> Settings<'_> {
 fn long_program(lines: usize) -> String {
     let function = long_function(lines).replace("App.Long exposing (run)", "Main exposing (main)");
     format!(
-        "{function}\nmain : Unit ->{{}} Unit\nlet main () = Platform.stdout_line (show (run 1))\n"
+        "{function}\nmain : Unit ->{{Host.Console}} Unit\nlet main () = Platform.stdout_line (show (run 1))\n"
     )
 }
 

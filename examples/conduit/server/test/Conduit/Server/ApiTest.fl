@@ -24,7 +24,7 @@ import Conduit.Server.Session exposing (Keys)
 
 /// What the server runs with: the database of the suite, a key and the
 /// system's cryptography.
-services : Layer {Async} none {Database, Keys, Crypto.Crypto, Host.Clock}
+services : Layer {Host.Process, Async} none {Database, Keys, Crypto.Crypto, Host.Clock}
 let services =
   Layer.merge
     Postgres.layer

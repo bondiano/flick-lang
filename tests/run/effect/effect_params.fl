@@ -21,7 +21,7 @@ let recover work =
 later : Unit ->{; Missing Int, Later} Int
 let later () = Fail.fail Later
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line (show (with_answer 41 (fun () -> Ask.ask () + 1)))
   Platform.stdout_line (with_answer "hello" (fun () -> Ask.ask () ++ "!"))

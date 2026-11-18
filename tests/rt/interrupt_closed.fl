@@ -10,7 +10,7 @@ let rec empty_loop n = empty_loop (n + 1)
 tail_loop : Int ->{Probe} Int
 let rec tail_loop n = tail_loop (n + 1)
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let finalizers = Ref.make 0
   let done = task { Ref.update finalizers (fun n -> n + 1) }

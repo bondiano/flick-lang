@@ -7,7 +7,7 @@ effect Tick =
 loop : Int -> Int ->{Tick} Int
 let rec loop acc i = if i == 0 then acc else loop (Tick.tick acc) (i - 1)
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let r =
     try loop 0 1000000 with

@@ -27,5 +27,5 @@ let source =
     "<img src=x onerror=alert(1)> & \"quotes\"",
   ]
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () = Platform.stdout_line (Markdown.to_html source)

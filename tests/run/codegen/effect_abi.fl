@@ -19,7 +19,7 @@ foreign pure bits from "./effect_abi.mjs" "bits"
 add : Float -> Float -> Float
 let add x y = x * 10 + y
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let doubled = task { add 4 2 }
   Platform.stdout_line (show (is_effect doubled, run_sync doubled))

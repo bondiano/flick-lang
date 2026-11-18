@@ -2,7 +2,7 @@
 // `Bool`, `Predicate`, `Filter` and `Function`.
 module App.Main exposing (main)
 
-line : String -> String ->{} Unit
+line : String -> String ->{Host.Console} Unit
 let line label text = Platform.stdout_line (label ++ ": " ++ text)
 
 even : Predicate.Predicate Float
@@ -26,7 +26,7 @@ let checked limit = Filter.make_effect (fun n -> if n <= Ref.get limit then Ok n
 table : (Bool -> Bool -> Bool) -> List Bool
 let table op = [op true true, op true false, op false true, op false false]
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   line "not" (show (Bool.not_ true, Bool.not_ false))
   line "and" (show (table Bool.and, table Bool.nand))

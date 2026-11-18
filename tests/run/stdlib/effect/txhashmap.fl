@@ -12,7 +12,7 @@ let sorted xs = List.sort_by (fun (a, _) (b, _) -> compare a b) xs
 entries_of : TxHashMap.TxHashMap w String Float ->{Tx.Transaction} List (String, Float)
 let entries_of m = sorted (TxHashMap.entries m)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let scores : Scores = TxHashMap.make EqHash.canonical [("ann", 1), ("bob", 2)]
   let basics =

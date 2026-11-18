@@ -21,7 +21,9 @@ export {
   hostClock,
   hostConsole,
   hostEnvironment,
+  hostProcess,
   hostRandom,
+  processSpawn,
   provideHost,
 } from "./runner/host.ts";
 export * from "./layer.ts";

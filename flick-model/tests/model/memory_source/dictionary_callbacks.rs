@@ -127,8 +127,8 @@ let answer () =
         ExprKind::App {
             func: Box::new(Expr::new(
                 ExprKind::Global {
-                    module: "Platform".into(),
-                    name: "stdout_line".into(),
+                    module: "Host".into(),
+                    name: "raw_stdout_line".into(),
                 },
                 span,
             )),

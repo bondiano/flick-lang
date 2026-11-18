@@ -44,7 +44,7 @@ let rec total left seed tree sum =
   else
     total (left - 1) (next seed) tree (sum + Option.with_default 0 (find seed tree))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let tree = build 300000 7 Leaf
   Platform.stdout_line (show (total 300000 7 tree 0))

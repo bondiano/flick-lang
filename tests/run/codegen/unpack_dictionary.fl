@@ -26,7 +26,7 @@ let packed = pack Hashed as Shown
 shown : Show a => a -> String
 let shown x = "<" ++ show x ++ ">"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let local =
     unpack packed as K in show 5 ++ " " ++ shown 6 ++ " " ++ show (Some 5)

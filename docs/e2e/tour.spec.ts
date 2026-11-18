@@ -48,7 +48,7 @@ test("an edit runs again once typing pauses", async ({ page }) => {
   await shows(page, entry as Lesson);
   await page.locator(".cm-content").click();
   await page.keyboard.press("ControlOrMeta+a");
-  await page.keyboard.insertText('module Main exposing (main)\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line "edited"\n');
+  await page.keyboard.insertText('module Main exposing (main)\n\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line "edited"\n');
   await expect(page.locator(".fp-output")).toContainText("edited", { timeout: 30_000 });
 });
 
@@ -61,7 +61,7 @@ test("an edit made on the JavaScript tab runs on the way back to the output", as
   await page.getByRole("button", { name: "JavaScript", exact: true }).click();
   await page.locator(".cm-content").click();
   await page.keyboard.press("ControlOrMeta+a");
-  await page.keyboard.insertText('module Main exposing (main)\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line "behind a tab"\n');
+  await page.keyboard.insertText('module Main exposing (main)\n\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line "behind a tab"\n');
   await expect(page.locator(".fp-status")).toContainText("Type-checked", { timeout: 30_000 });
   await page.waitForTimeout(1_000);
   await page.getByRole("button", { name: "Output", exact: true }).click();
@@ -75,7 +75,7 @@ test("code from a link waits for Run on a page of the tour", async ({ page }) =>
   await ready(page);
   await page.locator(".cm-content").click();
   await page.keyboard.press("ControlOrMeta+a");
-  await page.keyboard.insertText('module Main exposing (main)\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line "from a link"\n');
+  await page.keyboard.insertText('module Main exposing (main)\n\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line "from a link"\n');
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.getByRole("button", { name: "Share", exact: true }).click();
   await expect(page).toHaveURL(/#code=/);

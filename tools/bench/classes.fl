@@ -13,7 +13,7 @@ let point i = { x = i % 97; y = i % 31; label = if i % 2 == 0 then "even" else "
 option : Int -> Option Int
 let option i = if i % 3 == 0 then None else Some (i % 1000)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let numbers = List.range 0 size
   let options = List.map option numbers

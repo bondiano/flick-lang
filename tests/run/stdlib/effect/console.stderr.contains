@@ -1,8 +1,2 @@
 warn to stderr
 error to stderr
-Trace: traced
-Assertion failed: written to stderr
-timer: 
-is running
-with_time: 
-to stderr

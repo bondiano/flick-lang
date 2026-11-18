@@ -35,7 +35,7 @@ import Geo exposing (origin, shifted)
 start : Float
 let start = (shifted origin).x
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () = Platform.stdout_line (show start)
 ";
 
@@ -238,7 +238,7 @@ fn installed_private_module_public_facade_runs_on_js_and_go() {
             )
             .expect("public facade");
             let main = "module App.Main exposing (main)\nimport Geo exposing (by)\n\
-                        main : Unit ->{; AppError} Unit\n\
+                        main : Unit ->{Host.Console; AppError} Unit\n\
                         let main () = Platform.stdout_line (show (by 41.0))\n";
             let main_path = root.join("app/src/App/Main.fl");
             for (cache, out) in [("cache", "cold"), ("cache", "saved"), ("fresh", "fresh")] {

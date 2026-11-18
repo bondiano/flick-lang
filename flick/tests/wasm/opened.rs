@@ -7,7 +7,7 @@ use super::{app, flick};
 
 #[test]
 fn a_wasm_plugin_opens_a_module_around_the_users_code() {
-    let main = "module App.Main exposing (main, next)\n\nimport Pairs exposing (plugin opens)\n\nnext : Float\nlet next = opens { version + 1.0 }\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line (show next)\n";
+    let main = "module App.Main exposing (main, next)\n\nimport Pairs exposing (plugin opens)\n\nnext : Float\nlet next = opens { version + 1.0 }\n\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () = Platform.stdout_line (show next)\n";
     let root = app("plugins-opens", main);
     let checked = flick(&root, &["check"]);
     assert!(checked.status.success(), "{checked:?}");

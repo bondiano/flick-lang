@@ -69,7 +69,7 @@ impl project::Host for Text {
 
 pub(super) fn prepared_prefix() -> Prepared {
     let text = Text(
-        "module App.Main exposing (main)\nseed : Int\nlet seed = 41\nmodule Narrow : App.Contracts.Output = App.Child\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (Narrow.value + seed))\n",
+        "module App.Main exposing (main)\nseed : Int\nlet seed = 41\nmodule Narrow : App.Contracts.Output = App.Child\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show (Narrow.value + seed))\n",
     );
     let mut sources = SourceMap::default();
     let (diagnostics, compilation) = project::compile(
@@ -260,7 +260,7 @@ fn javascript_facts_preserve_entry_rules_and_physical_source_paths() {
             name: "main".into(),
             module: "App.Main".into(),
             pure: false,
-            host: vec![],
+            host: vec!["Host.Console".into()],
         }]
     );
     assert!(facts.files.iter().any(|f| f.module.contains("$lexical$")));

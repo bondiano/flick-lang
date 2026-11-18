@@ -13,8 +13,10 @@ service Left =
 service Right =
   right : Unit ->{} String
 
+/// Prints through the trusted host adapter: a finalizer that prints may
+/// outlive the caller's provider of `Host.Console` (`FLICK-G003`).
 say : String ->{} Unit
-let say line = Platform.stdout_line line
+let say line = Host.raw_stdout_line line
 
 /// Tells how many consumers it has outlived, from `released`, as it goes.
 base_layer : Ref Float -> Layer {Async, Scope s} none {Base}

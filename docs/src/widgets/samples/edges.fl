@@ -30,7 +30,10 @@ live_users : Layer none none {Users}
 let live_users = Layer.succeed Users { get = fun id -> { id = id; name = "from the database" } }
 
 live_log : Layer none none {Log}
-let live_log = Layer.succeed Log { info = fun line -> Platform.stdout_line line }
+let live_log =
+  Layer.flat_map
+    (fun ctx -> Layer.succeed Log { info = (Context.get Host.Console ctx).stdout_line })
+    Host.console
 
 first : UserId
 let first = "u1"

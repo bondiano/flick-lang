@@ -6,7 +6,7 @@ type Suit = Hearts | Spades
 type Card = Card Suit Int
   deriving Eq, Ord, Show
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let hand = [Card Spades 3, Card Hearts 12, Card Hearts 2]
   Platform.stdout_line (show (List.sort hand))

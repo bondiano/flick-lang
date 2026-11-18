@@ -125,14 +125,14 @@ let handled () =
   | Ask.ask () -> 20
 
 /// Between runtime calls of a runtime function.
-counted : Unit ->{; AppError} Unit
+counted : Unit ->{Host.Console; AppError} Unit
 let counted () =
   let mut n = 1
   Platform.stdout_line "n = \{n}"
   n = n * 7
   Platform.stdout_line "n = \{n}"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (classify 5)
   Platform.stdout_line (classify 50)

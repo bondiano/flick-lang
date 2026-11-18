@@ -20,8 +20,8 @@ fn run(dir: &Path, args: &[&str]) -> Output {
 #[ignore = "needs Node, pnpm and the installed runtime"]
 fn entries_run_by_name_and_pack_as_bins() {
     let config = "schema-version = 1\n\n[project]\nkind = \"app\"\nentries = { server = \"App.Server\", cli = \"App.Cli\" }\n";
-    let server = "module App.Server exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"serving\"\n";
-    let cli = "module App.Cli exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"cli\"\n";
+    let server = "module App.Server exposing (main)\n\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () = Platform.stdout_line \"serving\"\n";
+    let cli = "module App.Cli exposing (main)\n\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () = Platform.stdout_line \"cli\"\n";
     let manifest = "{ \"name\": \"@acme/tools\", \"version\": \"1.0.0\" }\n";
     let dir = project(
         "run_entries",

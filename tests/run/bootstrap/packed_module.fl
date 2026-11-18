@@ -6,7 +6,7 @@ type module IdentityModule =
 packed : Module IdentityModule
 let packed = pack Prelude as IdentityModule
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let answer =
     unpack packed as I in I.identity 42

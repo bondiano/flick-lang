@@ -1,15 +1,24 @@
-// The default `Clock`: reads are runtime calls, through the clock or
-// through the service, and sleeps and `DateTime.now` follow it.
+// `Clock` reads `Host.Clock`: the live clock is the fiber's, so sleeps and
+// `DateTime.now` follow it, and a fake one fixes every read.
 module App.Main exposing (main)
 
 /// Whether the clock reads no earlier than the readings before.
-later : Clock.Clock -> Float -> BigInt -> BigInt ->{} Bool
-let later clock millis nanos mono =
-  Clock.millis_of clock >= millis
-    && Clock.nanos_of clock >= nanos
-    && Clock.monotonic_nanos_of clock >= mono
+later : Float -> BigInt -> BigInt ->{Host.Clock} Bool
+let later millis nanos mono =
+  Clock.current_time_millis () >= millis
+    && Clock.current_time_nanos () >= nanos
+    && Clock.monotonic_time_nanos () >= mono
 
-main : Unit ->{Async; AppError} Unit
+/// A clock stopped at one second past the epoch.
+stopped : Layer none none {Host.Clock}
+let stopped =
+  Layer.succeed Host.Clock {
+    current_time_millis = fun () -> 1000
+    current_time_nanos = fun () -> 1000000000n
+    monotonic_time_nanos = fun () -> 7n
+  }
+
+main : Unit ->{Host.Clock, Host.Console, Async; AppError} Unit
 let main () =
   let millis = Clock.current_time_millis ()
   let nanos = Clock.current_time_nanos ()
@@ -20,7 +29,17 @@ let main () =
   Platform.stdout_line
     ("clock: "
       ++ show (millis > 1700000000000, nanos > 1700000000000000000n, stop - start >= 1000000n))
-  let same = Clock.clock_with (fun clock -> later clock millis nanos stop)
-  Platform.stdout_line ("clock_with: " ++ show same)
+  Platform.stdout_line ("later: " ++ show (later millis nanos stop))
+  let read = provide stopped {
+    (
+      Clock.current_time_millis (),
+      Clock.current_time_nanos (),
+      Clock.monotonic_time_nanos (),
+      DateTime.to_epoch_millis (DateTime.now ()),
+      DateTime.is_past (DateTime.unsafe_from_epoch_millis 999),
+      DateTime.is_future (DateTime.unsafe_from_epoch_millis 1000),
+    )
+  }
+  Platform.stdout_line ("stopped: " ++ show read)
   let now = DateTime.to_epoch_millis (DateTime.now ())
   Platform.stdout_line ("date-time: " ++ show (now >= millis, now <= Clock.current_time_millis ()))

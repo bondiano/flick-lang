@@ -17,6 +17,5 @@ flickKill *ChildProcessKill
 flickKillWith *ChildProcessKillWith
 flickStdout ChildProcessStdout
 flickStderr ChildProcessStderr
-flickString *ChildProcessString
-flickLines *ChildProcessLines
-flickExitCode *ChildProcessExitCode
+flickOutputString *ChildProcessOutputString
+flickOutputLines *ChildProcessOutputLines

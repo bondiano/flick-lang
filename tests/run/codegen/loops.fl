@@ -27,7 +27,7 @@ let sum xs =
   }
   total
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line (show (count 0, count 4, find 3))
   Platform.stdout_line (show (sum [1, -2, 3, 20, 5]))

@@ -8,17 +8,17 @@ module App.Main exposing (main)
 effect Emit =
   control emit : Int ->{} Unit
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
-report : Failure e ->{} Unit
+report : Failure e ->{Host.Console} Unit
 let report f = say ("supervised, an interruption: " ++ show (Cause.has_interrupts f))
 
 ping : Deferred.Deferred none Unit ->{} Unit
 let ping d = ignore (Deferred.succeed () d)
 
 /// A child of the abandoned scope stops before its finalizers run.
-with_child : Unit ->{Async} Int
+with_child : Unit ->{Host.Console, Async} Int
 let with_child () =
   try
     scope owner {
@@ -45,7 +45,7 @@ let with_child () =
   | Emit.emit x -> x
 
 /// An `ensuring` in the body runs too.
-ensuring : Unit ->{} Int
+ensuring : Unit ->{Host.Console} Int
 let ensuring () =
   try
     Effect.ensuring
@@ -58,7 +58,7 @@ let ensuring () =
   | Emit.emit x -> x
 
 /// A fiber stopped in an arm closes the scopes of the body it holds, once.
-stopped_in_arm : Unit ->{Async} Unit
+stopped_in_arm : Unit ->{Host.Console, Async} Unit
 let stopped_in_arm () =
   scope owner {
     let in_arm : Deferred.Deferred none Unit = Deferred.make ()
@@ -84,7 +84,7 @@ let stopped_in_arm () =
   say "the fiber stopped"
 
 /// A second resume is a defect, and the body's scopes still close once.
-twice : Unit ->{} Unit
+twice : Unit ->{Host.Console} Unit
 let twice () =
   let ex : Exit none Int =
     Effect.exit
@@ -100,7 +100,7 @@ let twice () =
       })
   say ("a second resume is a defect: " ++ show (Exit.has_dies ex))
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   say (show (with_child ()))
   say "--"

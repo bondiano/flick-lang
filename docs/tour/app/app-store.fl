@@ -29,13 +29,13 @@ let memory store =
     books = fun () -> Ref.get store
   }
 
-report : Unit ->{Shelf} Unit
+report : Unit ->{Host.Console, Shelf} Unit
 let report () =
   let books = Shelf.books ()
   List.each_effect (fun book -> Platform.stdout_line (Books.line book)) books
   Platform.stdout_line "pages left: \{Books.pages_left books}"
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = provide (memory (Ref.make [])) {
   Shelf.add "Dune" 412
   Shelf.add "Emma" 474

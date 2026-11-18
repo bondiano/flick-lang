@@ -10,7 +10,7 @@ module App.Main exposing (main)
 type error A = A Float
   deriving Eq, Show
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
 /// The atoms: 0–2 a typed failure, 3–5 a defect, 6–7 an interruption by a
@@ -145,7 +145,7 @@ let describe result =
   | Arbitrary.Passed r -> "passed " ++ show r.runs
   | other -> Option.with_default "?" (Arbitrary.format_check_failure other)
 
-law : String -> Arbitrary.CheckResult e a ->{} Unit
+law : String -> Arbitrary.CheckResult e a ->{Host.Console} Unit
 let law name result = say (name ++ ": " ++ describe result)
 
 one : (List Float ->{} Bool) ->{} Arbitrary.CheckResult none (List Float)
@@ -181,7 +181,7 @@ let late entered =
       Fail.fail (A 1)
     })
 
-guarded : Deferred.Deferred none Unit ->{Async} String
+guarded : Deferred.Deferred none Unit ->{Host.Console, Async} String
 let guarded entered =
   try late entered with
   | A _ ->
@@ -192,7 +192,7 @@ quiet : Failure e ->{} Unit
 let quiet _ = ()
 
 /// The handler is skipped: the fiber ends with its interruption alone.
-skipped : Unit ->{Async} Unit
+skipped : Unit ->{Host.Console, Async} Unit
 let skipped () =
   let entered : Deferred.Deferred none Unit = Deferred.make ()
   let exits = scope owner {
@@ -209,7 +209,7 @@ let skipped () =
     )
     exits
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   law "⧺ keeps every reason" (one (fun xs -> view (free xs) == expected false xs))
   law "⊕ is nub of ⧺" (one (fun xs -> view (nf xs) == expected false (List.dedupe xs)))

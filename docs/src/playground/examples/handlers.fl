@@ -7,7 +7,7 @@ effect Ask =
 total : Unit ->{Ask} Int
 let total () = Ask.ask "apples" + Ask.ask "pears"
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let counted =
     try total () with

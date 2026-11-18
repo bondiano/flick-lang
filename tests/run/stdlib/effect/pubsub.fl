@@ -2,10 +2,10 @@
 // subscriptions that belong to a `scope`.
 module App.Main exposing (main)
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say line = Platform.stdout_line line
 
-hubs : Unit ->{Async} Unit
+hubs : Unit ->{Host.Console, Async} Unit
 let hubs () =
   let hub : PubSub.PubSub String = PubSub.bounded { capacity = 4; replay = None }
   let got = scope s {
@@ -47,5 +47,5 @@ let hubs () =
   PubSub.await_shutdown closing
   say ("shutdown: " ++ show (before, PubSub.is_shutdown closing))
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () = hubs ()

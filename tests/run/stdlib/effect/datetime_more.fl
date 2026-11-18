@@ -15,7 +15,7 @@ let text r =
 iso : Result DateTime.DateTimeError DateTime.DateTime -> String
 let iso r = text (Result.map DateTime.format_iso_offset r)
 
-at : String ->{} DateTime.DateTime
+at : String ->{Host.Clock} DateTime.DateTime
 let at s =
   match DateTime.make s with
   | Ok t -> t
@@ -32,7 +32,7 @@ in_zone : DateTime.DateTime -> String -> DateTime.DateTime
 let in_zone t zone = Result.with_default t (DateTime.set_zone_named keep zone t)
 
 /// The date-time in UTC in the locale's styles.
-in_locale : DateTime.DateTime -> String ->{} Unit
+in_locale : DateTime.DateTime -> String ->{Host.Console} Unit
 let in_locale t locale =
   Platform.stdout_line
     (locale
@@ -44,7 +44,7 @@ let in_locale t locale =
         text (DateTime.format_utc (styled locale "" "") t),
       ])
 
-tags : DateTime.DateTime ->{} Unit
+tags : DateTime.DateTime ->{Host.Console} Unit
 let tags t =
   Platform.stdout_line
     ("tags: "
@@ -59,7 +59,7 @@ let tags t =
       ])
 
 /// The names of the date-time's zone in time styles.
-zone_names : String -> DateTime.DateTime ->{} Unit
+zone_names : String -> DateTime.DateTime ->{Host.Console} Unit
 let zone_names what d =
   Platform.stdout_line
     (what
@@ -71,7 +71,7 @@ let zone_names what d =
         text (DateTime.format (styled "de" "short" "full") d),
       ])
 
-zones : Unit ->{} Unit
+zones : Unit ->{Host.Clock, Host.Console} Unit
 let zones () =
   let winter = at "2024-01-15T09:30:00Z"
   offset : Float -> DateTime.DateTime
@@ -111,7 +111,7 @@ let zones () =
         iso (DateTime.set_zone_named keep "-03" (at "2024-07-04T21:05:09.250Z")),
       ])
 
-transitions : Unit ->{} Unit
+transitions : Unit ->{Host.Clock, Host.Console} Unit
 let transitions () =
   wall : DateTime.Disambiguation -> DateTime.ZoneOptions
   let wall d = { adjustForTimeZone = Some true; disambiguation = Some d }
@@ -140,7 +140,7 @@ let transitions () =
             (at "2024-11-03T01:30:00Z")),
       ])
 
-calendar : DateTime.DateTime ->{} Unit
+calendar : DateTime.DateTime ->{Host.Clock, Host.Console} Unit
 let calendar t =
   let paris = in_zone (at "2024-03-30T12:00:00Z") "Europe/Paris"
   Platform.stdout_line
@@ -156,7 +156,7 @@ let calendar t =
         DateTime.format_iso (DateTime.start_of { weekStartsOn = None } DateTime.Year paris),
       ])
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Clock, Host.Console; AppError} Unit
 let main () =
   let t = at "2024-07-04T21:05:09.250Z"
   List.each_effect (in_locale t) [

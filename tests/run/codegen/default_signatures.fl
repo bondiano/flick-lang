@@ -26,7 +26,7 @@ instance Describe Opaque =
 both : Describe a => a -> a -> String
 let both x y = describe x ++ " " ++ tagged "and" y
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (describe (Box 1))
   Platform.stdout_line (both 2.5 (3 : Float))

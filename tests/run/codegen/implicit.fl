@@ -20,7 +20,7 @@ let value (Feet n) = n
 convert : Meters -> Feet
 let convert x = x
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let distance : Feet = Meters 2.0
   Platform.stdout_line (show (value distance))

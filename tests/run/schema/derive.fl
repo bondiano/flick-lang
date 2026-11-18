@@ -42,7 +42,7 @@ let decode text s =
     | Ok _ -> "ok"
     | Err (SchemaError issues) -> show (List.map (fun i -> i.path ++ ": " ++ i.message) issues)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let numbers = tree_schema Schema.number
   Platform.stdout_line (round_trip numbers (Branch [Leaf 1, Branch [Leaf 2, Leaf 3]]))

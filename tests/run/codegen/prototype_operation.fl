@@ -4,7 +4,7 @@ module App.Main exposing (main)
 effect Proto =
   __proto__ : Unit ->{} Int
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let value =
     try Proto.__proto__ () with

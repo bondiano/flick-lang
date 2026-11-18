@@ -7,7 +7,7 @@ service Greeter =
 welcome : String ->{Greeter} String
 let welcome name = "\{Greeter.greet name}!"
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let polite = Layer.succeed Greeter { greet = fun name -> "Good day, \{name}" }
   let casual = Layer.succeed Greeter { greet = fun name -> "Hi, \{name}" }

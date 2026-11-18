@@ -106,7 +106,8 @@ impl<'d> Gen<'_, 'd> {
             ItemKind::Service { name, key } => {
                 let a = self.a;
                 let service = self.rt("service");
-                let value = call(a, service, &[self.string(key)]);
+                // a tag is a value of its key alone, so a bundle drops one nothing uses
+                let value = self.pure(call(a, service, &[self.string(key)]));
                 let doc = docvec![
                     a,
                     "export const ",

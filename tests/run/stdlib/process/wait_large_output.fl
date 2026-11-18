@@ -11,7 +11,7 @@ let shell windows script =
   else
     ChildProcess.make "sh" ["-c", script]
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Environment, Host.Console, Host.Process, Async; AppError} Unit
 let main () =
   let windows = Platform.env "OS" == Some "Windows_NT"
   let script =

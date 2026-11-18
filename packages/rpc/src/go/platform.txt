@@ -2,7 +2,7 @@
 
 
 [flick:Config]
-flickGet *ConfigGet
+flickGetWith *ConfigGetWith
 flickParse *ConfigParse
 map ConfigMap
 flatMap ConfigFlatMap

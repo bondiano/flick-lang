@@ -27,14 +27,14 @@ let untraced = {
   disablePropagation = false
 }
 
-say : String ->{} Unit
+say : String ->{Host.Console} Unit
 let say s = Platform.stdout_line s
 
 failure_of : Exit {Boom} a -> Failure {Boom}
 let failure_of x = Option.with_default Cause.empty (Exit.failure x)
 
 /// The text of `Cause.pretty` and `Cause.pretty_errors`.
-pretty : Unit ->{} Unit
+pretty : Unit ->{Host.Console} Unit
 let pretty () =
   let failed : Failure {Boom} = Cause.fail (Boom 1)
   let died : Failure {Boom} = Cause.die "broken"
@@ -66,7 +66,7 @@ let pretty () =
       ))
 
 /// Inert reports of failures and of the causes they hold.
-reports : Unit ->{} Unit
+reports : Unit ->{Host.Console} Unit
 let reports () =
   let both : Failure {Boom} = Cause.combine (Cause.die "broken") (Cause.fail (Boom 1))
   say ("inspect: " ++ RawCause.describe (Failure.inspect both))
@@ -78,7 +78,7 @@ let reports () =
   say ("first_success_of []: " ++ RawCause.describe (Failure.inspect (failure_of none_left)))
 
 /// The cause each message is logged with, as a logger made by `make` gets it.
-logged : Unit ->{Async} Unit
+logged : Unit ->{Host.Console, Async} Unit
 let logged () =
   let seen = Ref.make []
   let collect = {
@@ -107,7 +107,7 @@ let logged () =
   say ("structured: " ++ show (Ref.get texts))
 
 /// Handlers in the forms the first case does not take.
-handlers : Unit ->{} Unit
+handlers : Unit ->{Host.Console} Unit
 let handlers () =
   let replaced : Exit {Boom} String =
     Effect.exit
@@ -142,7 +142,7 @@ even : Float ->{; Boom} Float
 let even n = if n % 2 == 0 then n * 10 else Fail.fail (Boom n)
 
 /// Collections run by the other concurrencies.
-collections : Unit ->{} Unit
+collections : Unit ->{Host.Console} Unit
 let collections () =
   let xs = [1, 2, 3, 4]
   let (passes, fails) = Effect.partition Effect.Unbounded even xs
@@ -165,7 +165,7 @@ let collections () =
   say ("for_each: " ++ show (Effect.for_each Effect.Sequential (fun n -> n + 1) xs))
   say ("replicate_effect: " ++ show (Effect.replicate_effect (Effect.Bounded 2) 3 (task { 7 })))
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   pretty ()
   reports ()

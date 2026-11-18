@@ -17,11 +17,11 @@ text : Unit ->{} String
 foreign text from "./dom.mjs" "text"
   arity 0
 
-report : Failure e ->{} Unit
+report : Failure e ->{Host.Console} Unit
 let report failure =
   Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   setup ()
   let name_gate : Deferred.Deferred none String = Deferred.make ()

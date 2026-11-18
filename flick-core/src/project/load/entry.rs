@@ -22,18 +22,8 @@ pub enum MainKind {
     Effect,
 }
 
-/// The services of `Host.Live`, which an entry without a runner provides.
-const HOST_SERVICES: [&str; 5] = [
-    "Host.Console",
-    "Host.Clock",
-    "Host.Random",
-    "Host.Environment",
-    "Host.Arguments",
-];
-
 fn is_runner_service(elem: &Elem) -> bool {
-    lang::label(Lang::Async) == elem.name()
-        || elem.name().is_some_and(|n| HOST_SERVICES.contains(&n))
+    lang::label(Lang::Async) == elem.name() || elem.name().is_some_and(lang::is_host_service)
 }
 
 /// The `Host` services the row of `main : t` names, in order: those a
@@ -54,7 +44,7 @@ pub fn host_services(t: &Type) -> Vec<String> {
         return Vec::new();
     };
     let named = |name: &str| row.entries.iter().any(|(l, _)| l.name() == Some(name));
-    (HOST_SERVICES.into_iter())
+    (lang::HOST_SERVICES.into_iter())
         .filter(|n| named(n))
         .map(str::to_owned)
         .collect()

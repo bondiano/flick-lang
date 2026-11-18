@@ -22,7 +22,7 @@ let check headers =
       Fail.fail Server.Unauthorized
   | None -> Fail.fail Server.Unauthorized
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Environment, Host.Console, Async; AppError} Unit
 let main () =
   let port = Option.with_default 3000 (Option.bind String.to_number (Platform.env "PORT"))
   let store = Layer.succeed App.Store.Store (App.Store.memory ())

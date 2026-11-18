@@ -17,7 +17,7 @@ let rec eval e =
   | Less x y -> eval x < eval y
   | If c t f -> if eval c then eval t else eval f
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let sum = Add (Num 1) (Num 2)
   Platform.stdout_line (show (eval sum))

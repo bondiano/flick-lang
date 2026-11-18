@@ -6,5 +6,5 @@ let divide a b = if b == 0 then None else Some (a / b)
 safe_div : Int -> Int -> String
 let safe_div a b = show (divide a b)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line "\{safe_div 7 2} \{safe_div 1 0}"

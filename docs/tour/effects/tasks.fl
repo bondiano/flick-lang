@@ -1,6 +1,6 @@
 module Main exposing (main)
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let runs = Ref.make 0
   let counted : Eff none none Int = task {

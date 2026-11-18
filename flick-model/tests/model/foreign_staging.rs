@@ -9,7 +9,7 @@ fn unknown_foreign_uses_host_arity_instead_of_source_arrow_count() {
 external : String -> String -> String
 foreign pure external from "./unknown.mjs" "external"
   arity {arity}
-main : Unit ->{{}} Unit
+main : Unit ->{{Host.Console}} Unit
 let main () =
   let f = external
   Platform.stdout_line "looked up"
@@ -50,7 +50,7 @@ fn an_unsupported_call_inside_a_task_stays_cold_until_awaited() {
 external : Unit ->{{}} Unit
 foreign external from "./unknown.mjs" "external"
   arity 0
-main : Unit ->{{}} Unit
+main : Unit ->{{Host.Console}} Unit
 let main () =
   let cold = task {{ external () }}
   Platform.stdout_line "constructed"

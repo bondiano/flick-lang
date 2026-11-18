@@ -6,5 +6,5 @@ import Server exposing (Server)
 query : String ->{Server} String
 let query key = "row " ++ key
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () = provide Server.node { Console.log (query "1") }

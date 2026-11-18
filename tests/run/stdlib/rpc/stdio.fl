@@ -42,7 +42,7 @@ let handlers = {
 serve : Unit ->{Async} Unit
 let serve () = provide Stdio.node { Rpc.serve_stdio Rpc.ndjson group handlers }
 
-call : Unit ->{Async; AppError} Unit
+call : Unit ->{Host.Console, Async; AppError} Unit
 let call () =
   let result =
     try
@@ -73,7 +73,7 @@ let call () =
   Platform.stdout_line "still running"
   result
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Host.Arguments, Async; AppError} Unit
 let main () =
   match Platform.args () with
   | ["server"] -> serve ()

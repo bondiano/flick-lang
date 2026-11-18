@@ -41,7 +41,7 @@ import Conduit.Server.Validate as Validate
 type alias Reading = {...Authorized; NotFound}
 
 /// The time now, as the database keeps it.
-now : Unit ->{} String
+now : Unit ->{Host.Clock} String
 let now () = DateTime.format_iso (DateTime.now ())
 
 /// The article as the reader sees it, with its tags.
@@ -88,7 +88,8 @@ let get_article request = { article = shown (found (Route.Slug.value request.pat
 
 /// Publishes an article: its slug is made from its title.
 create_article :
-  Request Unit Unit NewArticleBody ->{...Authorized, Crypto.Crypto | r; Unprocessable} ArticleBody
+  Request Unit Unit NewArticleBody ->{Host.Clock, ...Authorized, Crypto.Crypto | r; Unprocessable}
+  ArticleBody
 let create_article request =
   let draft = Accounts.valid (Validate.draft request.payload.article)
   let suffix = String.slice 0 8 (Effect.or_die (Crypto.random_uuid_v4 ()))
@@ -102,7 +103,7 @@ let create_article request =
 
 /// Changes an article of the reader: a new title gives a new slug.
 update_article :
-  Request ArticlePath Unit UpdateArticleBody ->{...Reading | r; Forbidden, Unprocessable}
+  Request ArticlePath Unit UpdateArticleBody ->{Host.Clock, ...Reading | r; Forbidden, Unprocessable}
   ArticleBody
 let update_article request =
   let row = found (Route.Slug.value request.path.slug)
@@ -147,7 +148,8 @@ let list_comments request =
   { comments = List.map Present.comment (Comments.of_article (Auth.reader ()) row.id) }
 
 /// Adds the reader's comment to the article.
-add_comment : Request ArticlePath Unit NewCommentBody ->{...Reading | r; Unprocessable} CommentBody
+add_comment :
+  Request ArticlePath Unit NewCommentBody ->{Host.Clock, ...Reading | r; Unprocessable} CommentBody
 let add_comment request =
   let row = found (Route.Slug.value request.path.slug)
   let body = Accounts.valid (Validate.comment request.payload.comment.body)

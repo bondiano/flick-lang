@@ -517,7 +517,7 @@ fn a_built_in_module_expands_a_head_of_std_without_an_import_and_says_what_it_ca
         let codes: Vec<String> = diagnostics.iter().map(|d| d.code.to_string()).collect();
         (expansion.is_some(), codes)
     };
-    let one = "module Tool exposing (tool)\n\ntool : Cli.Command none none\nlet tool = cli \"tool\" { handle fun {} -> Platform.stdout_line \"hi\" }\n";
+    let one = "module Tool exposing (tool)\n\ntool : Cli.Command {Host.Console} none\nlet tool = cli \"tool\" { handle fun {} -> Platform.stdout_line \"hi\" }\n";
     assert_eq!(expand(one), (true, vec![]));
     // a block in the code of another expands in a later round, up to ROUNDS deep
     let nested = |depth: usize| {

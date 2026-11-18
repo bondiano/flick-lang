@@ -3,7 +3,7 @@
 // input becomes the Flick error `Cli.CliError` with Effect's text; the
 // handler runs only after the whole command line parsed.
 
-import { Console, Effect, Layer, Option } from "effect";
+import { Console, Context, Effect, Layer, Option } from "effect";
 import * as TestConsole from "effect/testing/TestConsole";
 import {
   CliConfig,
@@ -22,6 +22,7 @@ import { env, nodeModule } from "../host.ts";
 import { constructorName, tag } from "@flick-lang/runtime/tags";
 import { type FlickFormatter, type FlickHelpDoc, fromEffectDoc, toEffectFormatter, withHelp } from "./output.ts";
 import { callEffect } from "../bridge.ts";
+import { service } from "../effects.ts";
 import type { Command as Spec, Param, Source, ValueResult } from "./spec.ts";
 
 /** `Cli.CliError`. */
@@ -212,6 +213,34 @@ const services = (settings: Settings) =>
     ),
   );
 
+interface HostConsole {
+  readonly stdout_line: (text: string) => unknown;
+  readonly stderr_line: (text: string) => unknown;
+}
+
+const HOST_CONSOLE = /*#__PURE__*/ service<HostConsole>("Host.Console");
+
+/** `self` printing what Effect's CLI writes, the built-in flags' text, through the program's `Host.Console`. */
+const throughHostConsole = <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+  Effect.flatMap(Effect.context(), (context) => {
+    const host = Context.getOrUndefined(context, HOST_CONSOLE);
+    if (host === undefined) return self;
+    // an operation of a service of Flick's own runtime gives a value or a
+    // call of the kernel, as the bridge has it, not an Effect
+    const write =
+      (line: (text: string) => unknown) =>
+      (...args: ReadonlyArray<unknown>): void => {
+        const written = line(args.map(String).join(" "));
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- what the operation needs is in `context`, the services it was found in
+        const task = (Effect.isEffect(written) ? written : callEffect(() => written)) as Effect.Effect<unknown>;
+        Effect.runSyncWith(context)(task);
+      };
+    const out = write(host.stdout_line);
+    const err = write(host.stderr_line);
+    const console: Console.Console = { ...globalThis.console, log: out, info: out, debug: out, warn: err, error: err };
+    return Effect.provideService(self, Console.Console, console);
+  });
+
 /** `Cli.run_with settings command args`. */
 export const cliRunWith = (
   settings: Settings,
@@ -224,6 +253,7 @@ export const cliRunWith = (
   })(args).pipe(
     Effect.catchIf(CliError.isCliError, (error) => Effect.fail(cliError(error))),
     Effect.provide(services(settings)),
+    throughHostConsole,
   );
 
 const ALL = /*#__PURE__*/ [...Object.keys(BUILT_INS), TRACE_FLAG].map((name) => ({ _tag: tag(`Cli.BuiltIn.${name}`) }));

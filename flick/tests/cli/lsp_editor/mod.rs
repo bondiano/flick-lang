@@ -261,12 +261,12 @@ fn builtin_module_and_member_navigation() {
 fn hover_covers_private_functions_and_ignore() {
     let source = r#"module App.Main exposing (main)
 /// Reports a background failure.
-report : Failure e ->{} Unit
+report : Failure e ->{Host.Console} Unit
 let report failure = Platform.stderr_line (RawCause.describe (Failure.inspect failure))
 view : Atom.Writable Float -> Float -> Ui
 let view model m = Ui.text (show m)
 let seed = 0.0
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   match Ui.Dom.container "playground" with
   | None -> App.fail "missing root"
@@ -291,7 +291,7 @@ let main () =
         "{diagnostics:?}"
     );
     for (needle, expected) in [
-        ("report (Ui", "report : Failure e ->{} Unit"),
+        ("report (Ui", "report : Failure e ->{Host.Console} Unit"),
         (
             "view model (Atom",
             "view : Atom.Writable Float -> Float -> Ui",

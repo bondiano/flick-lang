@@ -32,7 +32,7 @@ let summary pages = if pages == 0 then "all read" else "\{pages} pages to go"
 pages_left : Unit ->{} Int
 let pages_left () = Books.pages_left (Shelf.books ())
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let left = provide (memory (Ref.make [])) {
     Shelf.add "Dune" 412

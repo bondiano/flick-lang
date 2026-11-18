@@ -36,7 +36,7 @@ let rec joined items =
   | [last] -> describe last
   | [first, ...rest] -> describe first ++ ", " ++ joined rest
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let items = [Showable 1, Showable "two", Showable [3.5], Showable (Some true)]
   Platform.stdout_line (joined items)

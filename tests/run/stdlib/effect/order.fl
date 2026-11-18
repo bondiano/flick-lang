@@ -19,7 +19,7 @@ let people = [{ name = "bo"; age = 30 }, { name = "al"; age = 30 }, { name = "cy
 same_length : Equivalence.Equivalence String
 let same_length = Equivalence.map_input String.length (Equivalence.make (fun a b -> a == b))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   age_then_name : Order.Order Person
   let age_then_name = by_age |> Order.combine by_name

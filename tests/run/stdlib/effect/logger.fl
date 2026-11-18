@@ -1,6 +1,6 @@
 // `Logger`: the `Log` service through its loggers, custom and
 // built-in formats, batches and a log file. Loggers whose lines carry the
-// time write to a console on stderr.
+// time write to stderr: `Logger.with_log_to_stderr` and `with_console_error`.
 module App.Main exposing (main)
 
 ms : Float -> Duration.Duration
@@ -19,7 +19,7 @@ let logged loggers body = provide (Layer.merge loggers Logger.effect_log) { body
 contains : String -> String -> Bool
 let contains part whole = String.contains part whole
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   logged (Logger.layer replace [Logger.with_console_log simple]) (fun () ->
     Log.info "hello"
@@ -60,8 +60,8 @@ let main () =
   logged (Logger.batched keep replace structured) (fun () -> Log.info "formatted")
   Platform.stdout_line ("formats " ++ show (Ref.get formats))
   let pretty_date = Some (fun _ -> "DATE")
-  Console.with_console
-    (Console.to_stderr ())
+  Logger.with_log_to_stderr
+    true
     (task {
       logged
         (Logger.layer replace [
@@ -72,13 +72,29 @@ let main () =
             mode = Logger.Tty
           },
           Logger.console_pretty_tty { colors = false; formatDate = None },
+          // `console_logfmt`, `console_structured` and `console_json` write
+          // to stdout whatever the flag says, with the time: their formats
+          // go to stderr here
+          Logger.with_console_error Logger.format_logfmt,
+          Logger.with_console_error Logger.format_structured,
+          Logger.with_console_error Logger.format_json,
+          Logger.tracer_logger,
+        ])
+        (fun () -> Log.info "every console logger")
+    })
+  // the console loggers whose lines go to stdout with the time: installed,
+  // under a minimum level that holds the message back
+  References.with_minimum_log_level
+    LogLevel.Error
+    (task {
+      logged
+        (Logger.layer replace [
           Logger.console_pretty_browser { colors = false; formatDate = None },
           Logger.console_logfmt,
           Logger.console_structured,
           Logger.console_json,
-          Logger.tracer_logger,
         ])
-        (fun () -> Log.info "every console logger")
+        (fun () -> Log.info "held back")
     })
   logged (Logger.layer { mergeWithExisting = true } []) (fun () ->
     Logger.with_log_to_stderr true (task { Log.info "default logger on stderr" })

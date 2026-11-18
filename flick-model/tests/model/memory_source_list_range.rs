@@ -72,7 +72,7 @@ bounds : Int -> Int -> List Int
 let bounds start stop = List.range start stop
 argument : String -> Int ->{} Int
 let argument label value =
-  Platform.stdout_line label
+  Host.raw_stdout_line label
   value
 eager : Unit ->{} List Int
 let eager () = List.range (argument "left" 4) (argument "right" 2)

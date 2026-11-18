@@ -34,13 +34,14 @@ type Scoped (r : ServiceRow) =
 
 closed : Unit ->{} Unit
 let closed () = scope s {
+  // the finalizer prints through the trusted host adapter, as the row is exact
   let packed : Scoped {Scope s} =
-    Scoped (task { Scope.add_finalizer (task { Platform.stdout_line "closed" }) })
+    Scoped (task { Scope.add_finalizer (task { Host.raw_stdout_line "closed" }) })
   match packed with
   | Scoped work -> await work
 }
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line (show (execute (Value 42)))
   let read = provide (Layer.succeed Db { get = fun key -> key + 100 }) { execute (Read 7) }

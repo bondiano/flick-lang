@@ -5,7 +5,7 @@ module App.Main exposing (main)
 line : Bool -> String
 let line b = show b
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let nan = 0.0 / 0.0
   let zero = 0.0

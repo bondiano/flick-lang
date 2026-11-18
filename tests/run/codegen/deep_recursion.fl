@@ -64,7 +64,7 @@ let rec sum_list acc xs =
   | [] -> acc
   | [x, ...rest] -> sum_list (acc + x) rest
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line (show (sum_to 0 depth))
   Platform.stdout_line (show (steps depth "a") ++ " " ++ show (steps depth 1.5))

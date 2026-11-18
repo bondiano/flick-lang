@@ -14,7 +14,7 @@ type alias DeployOptions = {
   target : String
 }
 
-run_deploy : DeployOptions ->{} Unit
+run_deploy : DeployOptions ->{Host.Console} Unit
 let run_deploy o =
   let token =
     match o.token with
@@ -26,11 +26,11 @@ let run_deploy o =
   Platform.stdout_line
     ("  color " ++ o.color ++ " at " ++ show at ++ " tags " ++ show o.tags ++ " owner " ++ o.owner)
 
-license : Cli.ActionContext ->{} Unit
+license : Cli.ActionContext ->{Host.Console} Unit
 let license context =
   Platform.stdout_line ("MIT, " ++ String.join " " context.commandPath ++ " " ++ context.version)
 
-deploy : Cli.Command none none
+deploy : Cli.Command {Host.Console} none
 let deploy =
   Cli.command "deploy"
   |> Cli.description "Deploys a build"
@@ -74,7 +74,7 @@ type alias FilesOptions = {
   rest : List String
 }
 
-run_files : FilesOptions ->{} Unit
+run_files : FilesOptions ->{Host.Console} Unit
 let run_files o =
   Platform.stdout_line
     ("files dir "
@@ -87,7 +87,7 @@ let run_files o =
   Platform.stdout_line
     ("  out " ++ show out ++ " any " ++ show (List.length o.any) ++ " rest " ++ show o.rest)
 
-files : Cli.Command none none
+files : Cli.Command {Host.Console} none
 let files =
   Cli.command "files"
   |> Cli.flag
@@ -110,15 +110,15 @@ let files =
   |> Cli.arg (Record.label : Record.Label "rest") "More words" (Cli.at_least 1)
   |> Cli.handle run_files
 
-secret : Cli.Command none none
+secret : Cli.Command {Host.Console} none
 let secret =
   Cli.command "secret" |> Cli.unlisted |> Cli.handle (fun {} -> Platform.stdout_line "secret ran")
 
-tool : Cli.Command none none
+tool : Cli.Command {Host.Console} none
 let tool =
   Cli.command "tool" |> Cli.subcommand deploy "Deploys" |> Cli.subcommand secret "" |> Cli.group
 
-attempt : Cli.Command none none -> List String ->{Async} Unit
+attempt : Cli.Command {Host.Console} none -> List String ->{Host.Console, Async} Unit
 let attempt command args =
   Platform.stdout_line ("$ " ++ String.join " " args)
   try Cli.run command args with
@@ -141,7 +141,7 @@ let parsed text = Cli.parse text
 
 /// `attempt`, printing the temporary directory `dir` as `$TMP` and a
 /// Windows separator as `/`.
-attempt_in : String -> Cli.Command none none -> List String ->{Async} Unit
+attempt_in : String -> Cli.Command {Host.Console} none -> List String ->{Host.Console, Async} Unit
 let attempt_in dir command args =
   portable : String -> String
   let portable text = String.replace_all "\\" "/" (String.replace_all dir "$TMP" text)
@@ -186,7 +186,7 @@ let only_help = {
   formatter = Some custom
 }
 
-with_settings : List String ->{Async} Unit
+with_settings : List String ->{Host.Console, Async} Unit
 let with_settings args =
   Platform.stdout_line ("$ " ++ String.join " " args)
   try Cli.run_with only_help deploy args with
@@ -207,7 +207,7 @@ let custom = {
   formatVersion = fun name version -> name ++ "@" ++ version
 }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   attempt deploy [
     "-e",

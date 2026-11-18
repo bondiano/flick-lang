@@ -27,7 +27,7 @@ let options = {
   disablePropagation = false
 }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let port = start ()
   provide (DevTools.layer ("ws://127.0.0.1:" ++ show port)) {

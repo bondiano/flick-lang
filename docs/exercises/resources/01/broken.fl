@@ -15,7 +15,7 @@ let open_res log name =
     })
     (fun n -> note log "release \{n}")
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let log = Ref.make []
   let used = scope { open_res log (label "db") }

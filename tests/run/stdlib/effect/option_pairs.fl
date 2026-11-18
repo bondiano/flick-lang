@@ -2,7 +2,7 @@
 // pair of them: the Effect library gives the same under the same names.
 module App.Main exposing (main)
 
-line : String -> String ->{} Unit
+line : String -> String ->{Host.Console} Unit
 let line label text = Platform.stdout_line (label ++ ": " ++ text)
 
 half : Float -> Result String Float
@@ -25,7 +25,7 @@ let pairs f = show (List.flat_map (fun self -> List.map (fun that -> f that self
 described : Option Float -> String
 let described = Option.match_ { onNone = fun () -> "none"; onSome = fun n -> "some " ++ show n }
 
-singles : Unit ->{} Unit
+singles : Unit ->{Host.Console} Unit
 let singles () =
   line "as" (each (Option.as_ "b"))
   line "as_void" (each Option.as_void)
@@ -45,7 +45,7 @@ let singles () =
   line "lift_predicate" (show (List.map (Option.lift_predicate (fun n -> n > 0)) [-1, 0, 2]))
   line "compose_k" (show (List.map (Option.compose_k positive positive) [1, 0, -1]))
 
-doubles : Unit ->{} Unit
+doubles : Unit ->{Host.Console} Unit
 let doubles () =
   line "product" (pairs Option.product)
   line "zip_left" (pairs Option.zip_left)
@@ -54,7 +54,7 @@ let doubles () =
   line "lift2" (pairs (Option.lift2 (fun a b -> a - b)))
   line "or_else" (pairs Option.or_else)
 
-lists : Unit ->{} Unit
+lists : Unit ->{Host.Console} Unit
 let lists () =
   let empty : List (Option Float) = []
   line
@@ -84,7 +84,7 @@ let lists () =
     "product_many of none"
     (each (Option.product_many empty) ++ " " ++ each (Option.product_many [Some 2, None]))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   singles ()
   doubles ()

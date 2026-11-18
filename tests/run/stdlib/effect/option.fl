@@ -1,7 +1,7 @@
 // `Option` and `Result`: options and results.
 module App.Main exposing (main)
 
-line : String -> String ->{} Unit
+line : String -> String ->{Host.Console} Unit
 let line label text = Platform.stdout_line (label ++ ": " ++ text)
 
 half : Float -> Result String Float
@@ -10,7 +10,7 @@ let half n = if n - 2 * Float.floor (n / 2) == 0 then Ok (n / 2) else Err ("odd 
 positive : Float -> Option Float
 let positive n = if n > 0 then Some n else None
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let some = Some 4
   let nothing : Option Float = None

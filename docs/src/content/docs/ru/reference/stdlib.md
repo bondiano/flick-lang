@@ -1,6 +1,6 @@
 ---
 title: "Стандартная библиотека"
-source_hash: 1c1b7b82313da2b9
+source_hash: 6032489473f2970f
 ---
 
 Стандартная библиотека написана на Flick и использует адаптер среды выполнения
@@ -66,10 +66,10 @@ source_hash: 1c1b7b82313da2b9
 | `Jwt` | JSON Web Token с подписью HMAC-SHA256 (`alg` `HS256`): `sign` и `verify` над JSON-кодеком утверждений; `verify` отвергает другой `alg`, неверную подпись и просроченный токен (по значению `exp`) ошибкой `JwtError` (`Malformed`, `BadSignature`, `Expired`); `now` и `expires_in` дают `iat` и `exp` в секундах от эпохи |
 | `EqHash`, `HashSet`, `HashMap` | хеш-коллекции, сохраняющие своё свидетельство |
 | `Loop` | `loop` над `Step` и `Trampoline` для чистой рекурсии без переполнения стека |
-| `Platform` | `stdout_line`, `stderr_line`, `stdout_write`, `args`, `env` |
-| `Log` | сервис `Log` с `info`, `warn`, `error`, `debug` и `Log.console` |
+| `Platform` | `stdout_line`, `stderr_line`, `stdout_write` через `Host.Console`, `args` через `Host.Arguments`, `env` через `Host.Environment` |
+| `Log` | сервис `Log` с `info`, `warn`, `error`, `debug` и `Log.console` поверх `Host.console` |
 | `File` | сервис `FileSystem`: `open_scoped`, `read_all`, `read_text`, `write_text` и `File.node` |
-| `ChildProcess` | дочерние процессы: команда `Command` (`make`, `set_cwd`, `set_env`, `set_stdin`, `prefix`, `pipe_to`, `inherit_output`) выполняется до конца через `string`, `lines` и `exit_code` или запускается `spawn` как `Process` scope'а, с `stdout`, `stderr`, `wait`, `is_running`, `kill` и `kill_with` |
+| `ChildProcess` | дочерние процессы: команда `Command` (`make`, `set_cwd`, `set_env`, `set_stdin`, `prefix`, `pipe_to`, `inherit_output`) выполняется до конца через `string`, `lines` и `exit_code` или запускается `spawn` как `Process` scope'а, всё через `Host.Process`, с `stdout`, `stderr`, `output_string`, `output_lines`, `wait`, `is_running`, `kill` и `kill_with` |
 | `Resource` | `acquire_release` с передачей ресурса владельцу области и `bracket` |
 | `Events` | политики `queue` и супервизор `log_failures` |
 | `Ui`, `Ui.Event` | пользовательские интерфейсы, отображаемые с помощью React, см. [пользовательские интерфейсы](../ui/) |
@@ -92,8 +92,8 @@ source_hash: 1c1b7b82313da2b9
 
 | Модуль | Содержимое |
 | - | - |
-| `Clock`, `Random` | источники времени и случайности файбера; это сервисы по умолчанию, поэтому чтение не требует строки сервисов |
-| `Console`, `Logger`, `LogLevel`, `ErrorReporter` | консоль файбера, обработка каждого сообщения лога, уровни лога, упорядоченные по важности, и куда сообщаются необработанные сбои |
+| `Clock`, `Random` | чтение времени через `Host.Clock` и случайные числа через `Host.Random`; `Random.with_seed` повторяет числа задачи |
+| `Console`, `Logger`, `LogLevel`, `ErrorReporter` | `log`, `info` и `debug` в stdout, `warn` и `error` в stderr через `Host.Console`, обработка каждого сообщения лога, уровни лога, упорядоченные по важности, и куда сообщаются необработанные сбои |
 | `Cause` | построение, комбинирование и разбор причины сбоя поверх непрозрачного `Failure e` |
 | `Cron` | множества моментов времени, при необходимости в часовом поясе; `Schedule.cron` работает по ним |
 | `ByteSize` | точное неотрицательное число байт в десятичных или двоичных единицах |
@@ -187,14 +187,14 @@ let case_blind =
 
 ```flick
 // a. spawn и только wait: 1 МиБ, который никто не читает
-waits : Unit ->{Async; PlatformError.PlatformError} Int
+waits : Unit ->{Host.Process, Async; PlatformError.PlatformError} Int
 let waits () = scope {
   let p = ChildProcess.spawn (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"])
   ChildProcess.wait p // JS: 0; Go: 0 (непрочитанный вывод дренируется)
 }
 
 // b. exit_code команды с большим выводом: так же
-chatty : Unit ->{Async; PlatformError.PlatformError} Int
+chatty : Unit ->{Host.Process, Async; PlatformError.PlatformError} Int
 let chatty () =
   ChildProcess.exit_code (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"]) // JS: 0; Go: 0
 
@@ -228,7 +228,7 @@ let tests =
 | Функция | Тест |
 | - | - |
 | `Test.test name check` | чистый тест: `check ()` возвращает `Assertion` |
-| `Test.effect_test name task` | выполняет задачу в собственной области, которая владеет полученными ресурсами; `Test.expect` завершает задачу с ошибкой, если утверждение не выполнено |
+| `Test.effect_test name task` | выполняет задачу в собственной области, которая владеет полученными ресурсами, с живыми сервисами хоста, которые переживают эту область: полученные ресурсы могут пользоваться ими при освобождении; `Test.expect` завершает задачу с ошибкой, если утверждение не выполнено |
 | `Test.clock_test name task` | как `effect_test`, но на собственных часах, которые начинаются с 0 и идут только от `Test.adjust duration` и `Test.set_time millis`: сон, таймаут или расписание повторов ждут виртуального времени, так что тест часового backoff проходит сразу |
 | `Test.property name gen check` | выполняет `check` на 100 значениях `gen`, полученных из начального значения генератора данного запуска; `Gen.function result` (для аргумента с `Hash`) порождает чистые функции, нужные законам над функциями |
 | `Test.group name tests` | добавляет `name >` перед именами из `tests` |

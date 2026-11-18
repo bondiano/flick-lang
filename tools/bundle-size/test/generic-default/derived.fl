@@ -34,7 +34,7 @@ instance Default String =
 type Point = Point Float Float
   deriving Default
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   let Point x y = (default : Point)
   Platform.stdout_line (show (x + y))

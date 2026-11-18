@@ -2,8 +2,10 @@
 // a value: it is polymorphic in the region, whose owner it receives.
 module App.Main exposing (main)
 
+/// Prints through the trusted host adapter: the finalizers that print may
+/// outlive the caller's provider of `Host.Console` (`FLICK-G003`).
 log : String -> Eff none none Unit
-let log line = task { Platform.stdout_line line }
+let log line = task { Host.raw_stdout_line line }
 
 with_region : (forall s. Fiber.Owner s ->{Scope s} String) ->{} String
 let with_region body = Scope.run body
@@ -17,14 +19,14 @@ let closes owner =
 nested : Unit ->{} String
 let nested () = scope outer {
   scope inner {
-    ignore (Resource.acquire_release (log "acquired") (fun _ -> Platform.stdout_line "released"))
+    ignore (Resource.acquire_release (log "acquired") (fun _ -> Host.raw_stdout_line "released"))
     ignore inner
     ignore outer
     "nested"
   }
 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line
     (Scope.run (fun owner ->

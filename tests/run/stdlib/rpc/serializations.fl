@@ -35,7 +35,7 @@ let handlers = {
   count_to = fun n -> Stream.from_list (List.map Int.to_float (List.range 1 (Int.truncate n + 1)))
 }
 
-round_trip : String -> Rpc.Serialization ->{Async; AppError} Unit
+round_trip : String -> Rpc.Serialization ->{Host.Console, Async; AppError} Unit
 let round_trip name serialization =
   let result =
     try
@@ -57,7 +57,7 @@ let round_trip name serialization =
     | NotFound e -> Platform.stdout_line (name ++ " not found " ++ show e.id)
   result
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   round_trip "ndjson" Rpc.ndjson
   round_trip "json" Rpc.json

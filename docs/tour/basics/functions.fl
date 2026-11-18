@@ -6,5 +6,5 @@ let square n = n * n
 hypotenuse_squared : Int -> Int -> Int
 let hypotenuse_squared a b = square a + square b
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = Platform.stdout_line (show (hypotenuse_squared 3 4))

@@ -8,15 +8,15 @@ same_owner : Fiber.Owner s ->{} Bool
 foreign same_owner from "./owner_channel.mjs" "sameOwner"
   retention call
 
-report : Fiber.Owner s ->{} Unit
+report : Fiber.Owner s ->{Host.Console} Unit
 let report owner = Platform.stdout_line (if same_owner owner then "outer" else "provider")
 
-acquire : Fiber.Owner t -> Unit ->{Scope s} Unit
+acquire : Fiber.Owner t -> Unit ->{Host.Console, Scope s} Unit
 let acquire owner () =
   let _arena = Arena.make ()
   report owner
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () = scope outer {
   let layer = Layer.succeed Read { read = fun () -> "unused" }
   Layer.run layer (fun () ->

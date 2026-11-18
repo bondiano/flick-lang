@@ -16,7 +16,7 @@ let summed a b =
   try show (sum a b) with
   | Invalid text -> "not a number: \{text}"
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line (summed "1" "2.5")
   Platform.stdout_line (summed "1" "two")

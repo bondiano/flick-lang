@@ -21,7 +21,7 @@ type alias Point = { x : Float }
 type error Boom = Boom
   deriving Show
 
-line : String -> String ->{} Unit
+line : String -> String ->{Host.Console} Unit
 let line label value = Platform.stdout_line (label ++ ": " ++ value)
 
 ok : Http.ServerResponse.Options
@@ -46,7 +46,7 @@ let status_and response names =
     ++ show
       (List.map (fun n -> (n, Http.Headers.get n (Http.ServerResponse.headers response))) names)
 
-requests : Unit ->{Async; HttpServerError, SchemaError} Unit
+requests : Unit ->{Host.Console, Async; HttpServerError, SchemaError} Unit
 let requests () =
   let client =
     Http.ClientRequest.post "http://example.com/items/7?q=x&q=y"
@@ -138,7 +138,7 @@ body_text : ServerResponse -> String
 let body_text response =
   Option.with_default "" (Http.Body.to_text (Http.ServerResponse.body response))
 
-routes : Unit ->{; HttpServerError, SchemaError} Unit
+routes : Unit ->{Host.Console; HttpServerError, SchemaError} Unit
 let routes () =
   item : ServerRequest ->{RouteContext; SchemaError} ServerResponse
   let item request =
@@ -207,7 +207,8 @@ let routes () =
   with
   | e -> Platform.stdout_line ("case sensitive: " ++ (show (Http.ServerError.status e)))
 
-responses : Unit ->{; Http.Body.HttpBodyError, SchemaError, Http.Cookies.CookiesError} Unit
+responses :
+  Unit ->{Host.Console; Http.Body.HttpBodyError, SchemaError, Http.Cookies.CookiesError} Unit
 let responses () =
   let attrs = { Http.Cookies.attributes with secure = true }
   let made = [
@@ -276,7 +277,7 @@ let responses () =
     ("from_client_response: "
       ++ (show (Http.ServerResponse.status (Http.ServerResponse.from_client_response client))))
 
-failures : Unit ->{} Unit
+failures : Unit ->{Host.Console} Unit
 let failures () =
   let exits = parallel_exits [task { Http.ServerResponse.text "fine" ok }, task { Fail.fail Boom }]
   Platform.stdout_line
@@ -303,13 +304,18 @@ let failures () =
 
 /// Handles the request as a server would, printing the response's status
 /// and headers as sent, after the pre-response handlers.
-observe : String -> List String -> Http.Middleware.Handler none none -> ServerRequest ->{Async} Unit
+observe :
+  String ->
+  List String ->
+  Http.Middleware.Handler none none ->
+  ServerRequest ->{Host.Console, Async}
+  Unit
 let observe label names handler request =
-  send : ServerRequest -> ServerResponse ->{} Unit
+  send : ServerRequest -> ServerResponse ->{Host.Console} Unit
   let send _ response = line label (status_and response names)
   Http.Middleware.to_handled send handler request
 
-middlewares : Unit ->{Async; HttpServerError} Unit
+middlewares : Unit ->{Host.Console, Async; HttpServerError} Unit
 let middlewares () =
   let r = Http.ClientRequest.get "http://example.com/m"
   wrapped : Http.Middleware.Handler none none
@@ -398,10 +404,10 @@ let middlewares () =
   let appending req =
     Http.Middleware.append_pre_response_handler late req
     hello req
-  send : ServerRequest -> ServerResponse ->{} Unit
+  send : ServerRequest -> ServerResponse ->{Host.Console} Unit
   let send _ response =
     Platform.stdout_line ("to_handled: " ++ (status_and response ["x-pre", "x-late"]))
-  handled : ServerRequest ->{Async} Unit
+  handled : ServerRequest ->{Host.Console, Async} Unit
   let handled =
     Http.Middleware.to_handled send (Http.Middleware.with_pre_response_handler pre appending)
   handled (Http.ServerRequest.from_client_request r)
@@ -425,7 +431,7 @@ let middlewares () =
       ("logger: " ++ (status_and (logged (Http.ServerRequest.from_client_request r)) []))
   }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   try
     requests ()

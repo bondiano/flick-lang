@@ -32,7 +32,7 @@ let outcome exit =
     | None -> "no typed error"
   | _ -> "?"
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let (a, b) = parallel (after 20 "slow") (after 1 "fast")
   Platform.stdout_line (a ++ " " ++ b)

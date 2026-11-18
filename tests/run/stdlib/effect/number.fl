@@ -2,7 +2,7 @@
 // `BigDecimal`, and redacted values from `Redacted`.
 module App.Main exposing (main)
 
-line : String -> String -> Unit ->{} Unit
+line : String -> String -> Unit ->{Host.Console} Unit
 let line label value () = Platform.stdout_line (label ++ ": " ++ value)
 
 num : Option Float -> String
@@ -32,7 +32,7 @@ let checked r =
   | Ok d -> BigDecimal.to_string d
   | Err (BigDecimal.DecimalError message) -> "error: " ++ message
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   line
     "arith"
