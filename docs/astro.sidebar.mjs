@@ -56,14 +56,14 @@ export const sidebar = [
       {
         label: "Language",
         translations: { ru: "Язык" },
-        items: ["types", "type-equality", "row-indices", "numbers", "operators", "bindings", "gadts", "effects", "classes", "regions", "modules", "grammar", "keywords"].map(reference),
+        items: ["syntax", "types", "numbers", "bindings", "gadts", "classes", "effects", "services", "regions", "modules"].map(reference),
       },
       { slug: "reference/errors" },
       { label: "Package API", translations: { ru: "API пакета" }, items: [{ slug: "api" }] },
       {
         label: "Runtime",
         translations: { ru: "Среда выполнения" },
-        items: ["stdlib", "effect-surface", "runtime"].map(reference),
+        items: ["stdlib", "runtime"].map(reference),
       },
       {
         label: "Specification",

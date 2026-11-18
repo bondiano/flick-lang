@@ -109,10 +109,14 @@ fn text_mate() -> BTreeSet<String> {
     out
 }
 
-/// The `` `word` ``s of the first column of the reference's tables.
-fn reference(path: &str) -> BTreeSet<String> {
+/// The `` `word` ``s of the first column of the tables of the reference's
+/// section under `heading`, up to the next section.
+fn reference(path: &str, heading: &str) -> BTreeSet<String> {
     let text = read(path);
     text.lines()
+        .skip_while(|l| *l != heading)
+        .skip(1)
+        .take_while(|l| !l.starts_with("## "))
         .filter(|l| l.starts_with("| `"))
         .filter_map(|l| l.split('|').nth(1))
         .flat_map(|cell| cell.split('`').skip(1).step_by(2))
@@ -135,13 +139,13 @@ fn disagreement(source: &str, shown: &BTreeSet<String>) -> Option<String> {
 
 #[test]
 fn the_editors_and_the_reference_show_the_reserved_words() {
-    let reference_en = "docs/src/content/docs/reference/keywords.md";
-    let reference_ru = "docs/src/content/docs/ru/reference/keywords.md";
+    let reference_en = "docs/src/content/docs/reference/syntax.md";
+    let reference_ru = "docs/src/content/docs/ru/reference/syntax.md";
     let wrong: Vec<_> = [
         disagreement("tree-sitter", &tree_sitter()),
         disagreement("TextMate", &text_mate()),
-        disagreement(reference_en, &reference(reference_en)),
-        disagreement(reference_ru, &reference(reference_ru)),
+        disagreement(reference_en, &reference(reference_en, "## Keywords")),
+        disagreement(reference_ru, &reference(reference_ru, "## Ключевые слова")),
     ]
     .into_iter()
     .flatten()

@@ -330,8 +330,8 @@ signature names when the owner is a local scope. `Fiber.Outlives c s` states
 it; the compiler decides it and a program declares no instance of it. A
 child that uses a shorter region is `FLICK-G003`. The child runs with the
 services of the place that spawned it, so they must outlive the owner as
-well: `Fiber.Provided r s` (see [Effects](../effects/), "Layers
-and `provide`").
+well: `Fiber.Provided r s` (see [layers and
+`provide`](../services/#layers-and-provide)).
 
 A child acquires into its owner's region: a task that acquires names
 `Scope s` of its owner, and one that names another region is

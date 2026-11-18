@@ -4,7 +4,7 @@ title: "Classes and instances"
 
 Classes are resolved by the checker after types are inferred: every
 constraint gets exactly one dictionary, chosen by the instances the module
-can see. Service operations are not class methods ([effects.md](../effects/)).
+can see. Service operations are not class methods ([services](../services/#services)).
 
 ## Classes
 

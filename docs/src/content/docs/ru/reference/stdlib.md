@@ -1,6 +1,6 @@
 ---
 title: "Стандартная библиотека"
-source_hash: 7d27a7717c12bfcc
+source_hash: 3754de6b3383f0b8
 ---
 
 Стандартная библиотека написана на Flick и использует адаптер среды выполнения
@@ -66,7 +66,7 @@ source_hash: 7d27a7717c12bfcc
 | `Jwt` | JSON Web Token с подписью HMAC-SHA256 (`alg` `HS256`): `sign` и `verify` над JSON-кодеком утверждений; `verify` отвергает другой `alg`, неверную подпись и просроченный токен (по значению `exp`) ошибкой `JwtError` (`Malformed`, `BadSignature`, `Expired`); `now` и `expires_in` дают `iat` и `exp` в секундах от эпохи |
 | `EqHash`, `HashSet`, `HashMap` | хеш-коллекции, сохраняющие своё свидетельство |
 | `Loop` | `loop` над `Step` и `Trampoline` для чистой рекурсии без переполнения стека |
-| `Host` | шесть сервисов хоста `Console`, `Clock`, `Random`, `Environment`, `Arguments` и `Process`, их наборы `Live` (все шесть) и `BrowserLive` (первые три) и доверенные живые слои `console`, `clock`, `random`, `environment`, `arguments`, `process`, `live` и `browser_live`, которые выбирает вход; см. [Явные зависимости от хоста](../effects/#явные-зависимости-от-хоста) |
+| `Host` | шесть сервисов хоста `Console`, `Clock`, `Random`, `Environment`, `Arguments` и `Process`, их наборы `Live` (все шесть) и `BrowserLive` (первые три) и доверенные живые слои `console`, `clock`, `random`, `environment`, `arguments`, `process`, `live` и `browser_live`, которые выбирает вход; см. [Явные зависимости от хоста](../services/#явные-зависимости-от-хоста) |
 | `Platform` | `stdout_line`, `stderr_line`, `stdout_write` через `Host.Console`, `args` через `Host.Arguments`, `env` через `Host.Environment` |
 | `Log` | сервис `Log` с `info`, `warn`, `error`, `debug`; `from_console` делает слой `Log` из слоя `Host.Console`, а `Log.console`, сделанному из `Host.console`, ничего не нужно |
 | `File` | сервис `FileSystem`: `open_scoped`, `read_all`, `read_text`, `write_text` и `File.node` |
@@ -123,7 +123,7 @@ source_hash: 7d27a7717c12bfcc
 
 У каждого экспорта закреплённой версии Effect есть обёртка или другое
 явно записанное решение в манифесте. Это проверяет линтер;
-см. [покрытие Effect](../effect-surface/).
+см. [покрытие Effect](../runtime/#покрытие-effect).
 
 ## Числа
 

@@ -1,5 +1,5 @@
 ---
-title: "Flick grammar"
+title: "Syntax"
 ---
 
 This is the surface syntax accepted by `flick check` and `flick fmt`; the
@@ -31,40 +31,6 @@ UTF-8 byte ranges; layout columns count characters.
 
 Qualified names are written without spaces around `.`: `Users.get`,
 `Ui.Event.exhaust`, `Sql.Template`. `user.name` is field access.
-
-### Keywords
-
-```text
-module exposing import as let mut rec fun match with try if then else task await
-scope provide ignore todo echo type opaque where kind error service class
-instance deriving foreign from forall not none true false
-in when for yield do break continue
-```
-
-Contextual words are ordinary names everywhere except in one position:
-
-- `loop` before `{` and `while` before a condition followed by `do`;
-- `unboxed` and `untagged` right before `type` (see `codegen.md`);
-- foreign modes `pure`, `effect`, `blocked` and the source
-  `global`;
-- foreign metadata `arity`, `this`, `catch`, `cancel`, `nullable`,
-  `retention`, `optional`, `variadic`, `reviewed` (unknown metadata is
-  `FLICK-S011`);
-- `sql` before a body, a name and a body, `table` or `migration`: a block of
-  the plugin of `std`, which reads its clauses, its columns and its DDL (see
-  [sql.md](../sql/));
-- `cli` before a string and `{`: a block of the plugin of `std`, which reads
-  its clauses (see [command-line applications](../cli-dsl/));
-- `codec` before a schema and `{`, `server` before `fn` or a name, and
-  `component` before the name of a top-level declaration: blocks of the plugin
-  of `std` (see [the codec DSL](../schema/#the-codec-dsl),
-  [server functions](../server-fn/) and [ui.md](../ui/#components)). Every
-  module has these blocks of `std` without an import;
-- `and` between the bindings of a `do` group, `x <- a and y <- b`;
-- `effect` before the name of an effect declaration, `tail`, `abort` and
-  `control` before an operation of a service or an effect, and `return`
-  before the pattern of an arm of `try` (see
-  [effects.md](../effects/#effects-and-handlers)).
 
 ### Float literals
 
@@ -136,6 +102,164 @@ let examples =
 |> <| >> << || && == != < <= > >= ++ + - * / % ** not
 ```
 
+## Keywords
+
+Every reserved word of Flick is listed below with what it introduces and
+where it is described in full. A keyword cannot be used as a name.
+
+```text
+module exposing import as let mut rec fun match with try if then else task await
+scope provide ignore todo echo type opaque where kind error service class
+instance deriving foreign from forall not none true false
+in when for yield do break continue
+```
+
+Contextual words are ordinary names everywhere except in one position:
+
+- `loop` before `{` and `while` before a condition followed by `do`;
+- `unboxed` and `untagged` right before `type` (see `codegen.md`);
+- foreign modes `pure`, `effect`, `blocked` and the source
+  `global`;
+- foreign metadata `arity`, `this`, `catch`, `cancel`, `nullable`,
+  `retention`, `optional`, `variadic`, `reviewed` (unknown metadata is
+  `FLICK-S011`);
+- `sql` before a body, a name and a body, `table` or `migration`: a block of
+  the plugin of `std`, which reads its clauses, its columns and its DDL (see
+  [sql.md](../sql/));
+- `cli` before a string and `{`: a block of the plugin of `std`, which reads
+  its clauses (see [command-line applications](../cli-dsl/));
+- `codec` before a schema and `{`, `server` before `fn` or a name, and
+  `component` before the name of a top-level declaration: blocks of the plugin
+  of `std` (see [the codec DSL](../schema/#the-codec-dsl),
+  [server functions](../server-fn/) and [ui.md](../ui/#components)). Every
+  module has these blocks of `std` without an import;
+- `and` between the bindings of a `do` group, `x <- a and y <- b`;
+- `effect` before the name of an effect declaration, `tail`, `abort` and
+  `control` before an operation of a service or an effect, and `return`
+  before the pattern of an arm of `try` (see
+  [effects.md](../effects/#effects-and-handlers)).
+
+### In modules
+
+| Keyword | Meaning | Example |
+| - | - | - |
+| `module` | names the module of the file | `module App.Main exposing (run)` |
+| `private` | limits a file module to its own package when placed before `module`; a name elsewhere | `private module App.Internal exposing (helper)` |
+| `exposing` | the names a module exports, or an import brings in unqualified | `import App.Domain exposing (User, greet)` |
+| `import` | uses another module | `import Effect.Log as Log` |
+| `as` | a local name for an imported module; the Flick type of a `sql table` column | `import Effect.Log as Log` |
+
+See [modules.md](../modules/).
+
+### In declarations
+
+| Keyword | Meaning | Example |
+| - | - | - |
+| `let` | binds a value or a function, at the top level or in a block | `let total = a + b` |
+| `mut` | `let mut` declares a variable of a function, which `name = value` assigns | `let mut total = 0` |
+| `loop` | contextual: repeats a block until `break value` returns its result | `loop { break 42 }` |
+| `while` | contextual: repeats a `Unit` body while its condition is true | `while i < n do i = i + 1` |
+| `break` | exits the nearest loop; only `loop` accepts a value | `break 42` |
+| `continue` | skips the rest of the current iteration | `continue` |
+| `rec` | `let rec` lets a function call itself; `rec { … }` groups mutually recursive functions | `let rec go n = …` |
+| `assert` | `let assert` binds a pattern that may not match, and fails when it does not | `let assert [x, ..._] = xs as "no items"` |
+| `type` | declares an ADT, `type alias` a transparent alias | `type Shape = Circle Float \| Empty` |
+| `opaque` | hides a type's representation outside its module | `opaque type alias UserId = String` |
+| `where` | the predicate of a `refined` type; a filter in `sql { … }` | `where user.id == params.id` |
+| `kind` | declares a kind with its type-level constructors | `kind Nullability = NonNull \| Nullable` |
+| `error` | `type error` declares an expected error with a nominal identity | `type error NotFound = NotFound UserId` |
+| `service` | declares the operations of a service, looked up at run time | `service Clock = now : Unit ->{} Float` |
+| `class` | declares a type class | `class Named a = name : a -> String` |
+| `instance` | implements a class for a type | `instance Named User = let name u = u.name` |
+| `deriving` | asks the compiler for instances | `deriving Eq, Show, Schema` |
+| `foreign` | binds a JavaScript value with a Flick signature | `foreign read_text from "./fs.js" "readText"` |
+| `from` | the source of a `foreign`; a table in `sql { … }` | `from user in Users` |
+| `forall` | quantifies type variables explicitly | `keep : forall s. Path ->{Scope s} File s` |
+
+See [types.md](../types/), [classes.md](../classes/), [effects.md](../effects/), [services.md](../services/)
+and [ffi.md](../ffi/).
+
+### In expressions
+
+| Keyword | Meaning | Example |
+| - | - | - |
+| `fun` | an anonymous function | `fun x -> x + 1` |
+| `if` `then` `else` | a conditional expression; without `else` it is `Unit` | `if n == 0 then 1 else n` |
+| `match` `with` | pattern matching | `match shape with \| Circle r -> r` |
+| `when` | a guard on a match arm | `\| Rect w h when w == h -> "square"` |
+| `with` | also the handlers of `try` and a record update | `{ user with name = "Ada" }` |
+| `try` | handles the expected errors of its body | `try find id with \| NotFound _ -> None` |
+| `not` | boolean negation; `not null` on a `sql table` column | `not done` |
+| `true` `false` | the two `Bool` values | `if ok then true else false` |
+| `none` | the empty row in a type | `a ->{none; NotFound} b` |
+| `in` | binds a row in a SQL `from` or `join` clause | `join account in Accounts` |
+| `do` | statements sequenced through `Monad`: `x <- e` binds, `if c` guards | `do { x <- left; y <- right; pure (x, y) }` |
+| `for` `yield` | a lazy `Seq` of the elements `yield` gives, one generator; `[for …]` is a strict `List`; `for … do body` runs the body for each element | `[for x <- xs if x > 0 yield x * 2]` |
+
+### Effects and resources
+
+| Keyword | Meaning | Example |
+| - | - | - |
+| `task` | builds an `Eff r e a` from its block without running it | `task { Users.get id }` |
+| `await` | runs an `Eff` once in the current fiber and gives its result, or forces a `Lazy` | `await request` |
+| `lazy` | builds a `Lazy r e a`, which runs its block at most once, at its first `await`; `let lazy x = e` binds one of its function | `lazy { Config.load () }` |
+| `scope` | runs its block in a fresh region and releases what the block acquired when it ends | `scope { File.read_all (File.open_scoped path) }` |
+| `provide` | runs its block with the services a layer builds | `provide live { run user }` |
+| `ignore` | discards the value of an intermediate statement | `ignore (Store.save user)` |
+
+`ignore` evaluates its operand and throws the value away. An `Eff` it
+discards is not run: write `ignore (await t)` to run `t` and drop its result.
+
+See [effects.md](../effects/#task-and-await), [`lazy`](../effects/#lazy) and [regions.md](../regions/).
+
+### Debugging
+
+| Keyword | Meaning | Example |
+| - | - | - |
+| `todo` | code not written yet: any type, fails when it runs | `todo "parse the header"` |
+| `echo` | writes a value and its place to stderr, and returns it | `echo (total rows)`, `rows \|> echo` |
+
+Both check anywhere and leave a warning (`FLICK-T022`, `FLICK-T023`);
+`flick pack` refuses a package that still has them (`FLICK-P024`). `echo`
+is not an effect: it is for debugging, like a breakpoint. Both stay usable
+as record labels: `{ echo = … }`.
+
+### Embedded languages
+
+| Block | Meaning | Example |
+| - | - | - |
+| `ui` | a UI block: its code with the names of `Ui` in sight | `ui { … }` |
+| `refined` | a type whose values pass a check, with `parse`, `value` and `check` | `refined type Port = Float where fun n -> n > 0` |
+
+See [schema.md](../schema/) and [ui.md](../ui/). A UI block, a component,
+`component counter () = …`, a command-line interface, `cli "deploy" { … }`,
+and a typed SQL query, `sql { from u in Users; select u }`, are blocks of
+the plugin of `std`, not keywords: each word starts a block where a block
+may start, and is a name elsewhere. See
+[cli-dsl.md](../cli-dsl/) and [sql.md](../sql/). So are `suite "name" { … }`
+and `test "name" { … }`, only at the start of a top-level declaration (see
+[testing.md](../testing/)).
+
+### In the editor
+
+Hovering a keyword that opens an expression shows the type of the whole
+expression, the type an ML language server shows for an expression, together
+with what the keyword does:
+
+| Hover on | Shows |
+| - | - |
+| `task` | `task { … } : Eff {Store} {StoreError} Float`: the computation the block builds |
+| `lazy` | `lazy { … } : Lazy {Store} {StoreError} Float`: the lazy the block builds |
+| `scope` | `scope { … } : Float`: the value the block returns once its resources are released |
+| `provide`, `try` | the value of the block, with the services or errors it removes |
+| `match`, `if` | `match … with : String`: the value of the arm or branch taken |
+| `fun` | `fun … -> … : Float -> Float`: the function |
+| `sql`, `ui` | the value the block builds, such as `sql { … } : Template Pg {} { label : String }` |
+| `await` | `await … : Float`: the result, with the `Eff` it runs |
+| `ignore` | `ignore : Eff {Store} {StoreError} Float -> Unit`: the type of what is discarded, with a warning when it is an `Eff` that is not run |
+
+Other keywords show nothing on hover; the names around them show their types.
+
 ## Operator table
 
 There are no user-defined operators. From weakest to strongest:
@@ -162,7 +286,7 @@ There are no user-defined operators. From weakest to strongest:
 `f <| g <| x + 1` is `f (g (x + 1))`, and `f a <| x` is the call `f a x`;
 `List.map f >> List.filter p` composes two applications, and `await f >> g`
 is `await (f >> g)`. What the operators mean is in [Numbers and
-operators](../types/#numbers-and-operators).
+operators](../numbers/#operators).
 A range is a `Seq Float`: `a..b` counts from `a` up to `b` inclusive
 (`Seq.range_to`), `a..<b` stops before `b` (`Seq.range`), and `a..` never
 ends (`Seq.from`). Alone in brackets, `[a..b]` is the `List` of the same

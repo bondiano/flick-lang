@@ -63,7 +63,7 @@ and `Monad`.
 | `Jwt` | JSON Web Tokens signed with HMAC-SHA256 (`alg` `HS256`): `sign` and `verify` over a JSON codec of the claims; `verify` refuses another `alg`, a wrong signature and an `exp` the clock has passed with `JwtError` (`Malformed`, `BadSignature`, `Expired`); `now` and `expires_in` give `iat` and `exp` in seconds since the epoch |
 | `EqHash`, `HashSet`, `HashMap` | hash collections that keep their witness |
 | `Loop` | `loop` over a `Step` and `Trampoline`, for stack-safe pure recursion |
-| `Host` | the six host services `Console`, `Clock`, `Random`, `Environment`, `Arguments` and `Process`, their sets `Live` (all six) and `BrowserLive` (the first three), and the trusted live layers `console`, `clock`, `random`, `environment`, `arguments`, `process`, `live` and `browser_live` an entry chooses; see [Explicit host dependencies](../effects/#explicit-host-dependencies) |
+| `Host` | the six host services `Console`, `Clock`, `Random`, `Environment`, `Arguments` and `Process`, their sets `Live` (all six) and `BrowserLive` (the first three), and the trusted live layers `console`, `clock`, `random`, `environment`, `arguments`, `process`, `live` and `browser_live` an entry chooses; see [Explicit host dependencies](../services/#explicit-host-dependencies) |
 | `Platform` | `stdout_line`, `stderr_line`, `stdout_write` through `Host.Console`, `args` through `Host.Arguments`, `env` through `Host.Environment` |
 | `Log` | the `Log` service with `info`, `warn`, `error`, `debug`; `from_console` makes a `Log` layer of a `Host.Console` layer, and `Log.console`, made of `Host.console`, needs nothing |
 | `File` | the `FileSystem` service: `open_scoped`, `read_all`, `read_text`, `write_text`, and `File.node` |
@@ -119,7 +119,7 @@ For example, `Clock` is in `std`, `Stream` in `stream`, and `HttpApi` in `http`:
 | `Version` | the release of Effect the program runs on |
 
 Every export of the pinned Effect is wrapped or decided in a manifest that
-a linter checks, see [effect-surface.md](../effect-surface/).
+a linter checks, see [Effect coverage](../runtime/#effect-coverage).
 
 ## Numbers
 

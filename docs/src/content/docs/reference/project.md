@@ -110,7 +110,7 @@ from the launcher, which imports only those, so a `main` that names none
 carries none; on the Go target it gets all six. What `main` provides itself
 wins over them. The playground's are the same, with no environment variables
 and no arguments, and a child process cannot start there (see
-[who provides them](../effects/#who-provides-them)). Provide other required
+[who provides them](../services/#who-provides-them)). Provide other required
 layers and handle other errors inside `main`, not in the launcher.
 
 A pure `main` is called directly. Normally its launcher imports no runtime;

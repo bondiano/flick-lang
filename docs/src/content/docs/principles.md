@@ -153,7 +153,7 @@ may still fail with a defect or never terminate.
 **Architectural consequences.** Treat foreign declarations as explicit
 boundaries of trust, validate external data where needed and use adapters to
 access host libraries. Document which behavior signatures capture. For
-example, [`Host` services](../reference/effects/#explicit-host-dependencies) identify
+example, [`Host` services](../reference/services/#explicit-host-dependencies) identify
 console, clock, randomness, environment, argument and process dependencies and
 allow tests to replace them. A foreign declaration is trusted, so an empty row
 does not prove that foreign code reaches no external capability. Keep the scope and assumptions of
