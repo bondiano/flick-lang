@@ -24,6 +24,17 @@ def Row.hBody (E : Name) (A : TyClass → Prop) (r : Row) : Row
       (∀ n, G n → G' n ∨ n = E ∧ ∀ c, A c) ∧ ((¬ ∀ c, A c) → G' E)
   | x => r x
 
+/-- A handler that answers every argument lets its body do all the row outside does. -/
+theorem Row.hBody_of {E : Name} {A : TyClass → Prop} {r : Row} {x : Elem} (hU : ∀ c, A c)
+    (h : r x) : Row.hBody E A r x := by
+  cases x with
+  | nm N c =>
+    by_cases hN : N = E
+    · exact .inl ⟨hN, hU c⟩
+    · exact .inr ⟨hN, h⟩
+  | rv a G => exact ⟨G, h, fun _ hn => .inl hn, fun _ hn => .inl hn, fun hu => (hu hU).elim⟩
+  | _ => exact h
+
 /-- What a handler of `E` of the region `q` gives its body: as `Row.hBody`, and it discharges
 an obligation `Provided {E} ϱ` when `q` outlives `ϱ`, at every argument, as it answers by name
 whatever operation of `E` reaches it. -/

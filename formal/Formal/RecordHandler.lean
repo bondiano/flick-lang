@@ -110,8 +110,11 @@ def outputs : List Binding → Ty
   | b :: bs => .run (.rnm b.1 (.adt b.1)) (outputs bs)
 
 /-- A binding of a root's worth of record: closed, typed, with an arm for each operation of an
-effect of `tail` operations. -/
+effect of `tail` operations. A known layer binds services without parameters, so the outputs of
+a layer name each at itself (`outputs`); a service with parameters is provided by a handler at
+its arguments (`Typ.hdl`, `recArms_typ`). -/
 structure Binding.Ok (S : Sig) (b : Binding) : Prop where
+  arity : S.arity b.1 = 0
   val : Value b.2.2
   closed : b.2.2.Closed
   typ : Typ S [] Facts.none [] b.2.2 (.ex (S.impl b.1) .pure)
@@ -128,18 +131,22 @@ theorem Binding.Ok.typAt {b : Binding} (h : b.Ok S) (Ψ : List Ty) (Θ : Facts) 
   rw [h.closed.rename] at h₂
   simpa using h₂.sub (J' := .ex _ φ) ⟨.refl, Stage.pure_le _⟩
 
-/-- The arms of a record are typed at any stage. -/
-theorem recArms_typ {E : Name} {w : Tm} {Ψ Θ Γ t s} {r ε : Ty}
-    (hw : ∀ a, Typ S Ψ Θ (.mono a :: Γ) w (.ex (S.impl E) (.rt r.asRow ε.asRow)))
+/-- The arms of a record of the service at the arguments `us` are typed at any stage. -/
+theorem recArms_typ {E : Name} {us : List Ty} {w : Tm} {Ψ Θ Γ t s} {r ε : Ty}
+    (hus : us.length = S.arity E)
+    (hw : ∀ a, Typ S Ψ Θ (.mono a :: Γ) w
+      (.ex ((S.impl E).substT (instT us)) (.rt r.asRow ε.asRow)))
     (hne : S.impl E ≠ .errors .cnil) :
     ∀ {os : List Name}, (∀ o ∈ os, ∃ x y, S.op E o = some (.tail, x, y)) →
-      Typ S Ψ Θ Γ (recArms w os) (.harms E t (.rt r ε) s)
+      Typ S Ψ Θ Γ (recArms w os) (.harms E us t (.rt r ε) s)
   | [], _ => .hanil
   | o :: os, h => by
     obtain ⟨x, y, hop⟩ := h o (by simp)
-    refine .hatail hop ?_ (recArms_typ hw hne fun o' ho' => h o' (by simp [ho']))
+    refine .hatail hus hop ?_ (recArms_typ hus hw hne fun o' ho' => h o' (by simp [ho']))
+    have hfield := Ty.field_substT (instT us) (S.op_field _ _ _ _ hop hne)
+    simp only [Ty.substT, Ty.isStage, if_true, Caps.none_substT] at hfield
     exact .app (C := Caps.none) (ψ := .rt .cnil .cnil)
-      (.proj (hw x) (S.op_field _ _ _ _ hop hne) .refl)
+      (.proj (hw _) hfield .refl)
       (.var (ts := []) rfl rfl (fun _ _ h => h.elim) (by rw [Scheme.inst_mono]; exact .refl))
       (by rw [Ty.asStage_rt, Stage.use_none]; exact ⟨fun _ h => h.elim, fun _ h => h.elim⟩) .refl
 
@@ -187,20 +194,24 @@ theorem layer_typ {Ψ Θ Γ t} {r ε : Ty} : ∀ (bs : List Binding) {e : Tm} {�
       exact ⟨fun x hx => (hle.1 x hx).elim (fun h => h.elim) id, hle.2⟩
   | b :: bs, e, φ₀, hall, he, hle, hO => by
     have hb := hall b (by simp)
+    have hU : ∀ c, S.answers b.1 [] c := fun _ => .inl hb.arity
     have hh : Typ S Ψ Θ Γ (b.hdl e) (.ex t (.rt (Ty.run (outputs bs) r).asRow ε.asRow)) := by
-      refine .hdl (ψ := .pure) (C := t.reach) (t' := t) ?_ (recArms_noIns (hb.typ.noIns hb.val)) id_typ
-        trivial he ?_ ?_ ⟨hb.decl, fun hn => (hn fun o c x y hop => ?_).elim⟩ (Stage.le_refl _) .refl
-      · simp only [Ty.substT]
-        exact recArms_typ (fun a => hb.typAt _ _ _ _) hb.ne hb.has
+      refine .hdl (us := []) (ψ := .pure) (C := t.reach) (t' := t) (by simp [hb.arity]) ?_
+        (recArms_noIns (hb.typ.noIns hb.val)) id_typ trivial he ?_ ?_
+        ⟨hb.decl, fun hn => (hn fun o c x y hop => ?_).elim⟩ (Stage.le_refl _) .refl
+      · simp only [Ty.substT, List.map_nil]
+        exact recArms_typ (by simp [hb.arity]) (fun a => by
+          rw [S.impl_closed _ _ fun i hi => by simp [hb.arity] at hi]; exact hb.typAt _ _ _ _)
+          hb.ne hb.has
       · cases φ₀ with
         | pure => trivial
         | rt r₀ e₀ =>
           refine ⟨fun x hx => ?_, hle.2⟩
           rcases hle.1 x hx with ((h | h) | h) | h
-          · cases h; exact .inl ⟨_, rfl⟩
+          · cases h; exact .inl ⟨rfl, hU _⟩
           · exact absurd h (by cases x <;> simp [Row.ofCaps, Ty.reach, Caps.none])
-          · exact .inr (Row.le_back _ _ _ (.inl h))
-          · exact .inr (Row.le_back _ _ _ (.inr h))
+          · exact Row.hBody_of hU (.inl h)
+          · exact Row.hBody_of hU (.inr h)
       · refine ⟨fun N c a h => ⟨fun v _ h' => (by cases h'), fun c' h' => by
             cases h'; exact (hO.1 _ c a h).2 _ (.inl (.inl rfl))⟩,
           fun v G a h => ⟨fun w _ h' => (by cases h'), fun N c h' => by
