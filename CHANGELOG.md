@@ -16,7 +16,14 @@ break programs.
   `DateTime.now`, `DateTime.is_past` and `DateTime.is_future`
   `Host.Clock`; `Random` `Host.Random`, whose every
   operation is now made of `Host.Random.next` draws, so a fake fixes them,
-  while `Random.with_seed` keeps the same draws. A new service
+  while `Random.with_seed` keeps the same draws. What else reads the
+  environment when no `ConfigProvider` is current reads it through
+  `Host.Environment` too: `ConfigProvider.layer_add` and every `Otlp`
+  exporter (`layer`, `traces`, `logs`, `metrics`, their `_with` forms and
+  `from_config`) take it as an input of their layer and `Otlp.tracer` in
+  its row, and `Cli.run`, `run_with` and `run_version` read through it a
+  missing value's `Cli.from_config`, the colors (`NO_COLOR`,
+  `FORCE_COLOR`, `TERM`) and the settings of `--trace`. A new service
   `Host.Process` starts child processes: `ChildProcess.spawn`, `string`,
   `lines` and `exit_code` need it, `Host.Live` and `Host.live` include it,
   and every Node and Go root provides it. The built-in flags of

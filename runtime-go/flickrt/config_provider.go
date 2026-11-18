@@ -459,11 +459,13 @@ func notFound(c *Cause) bool {
 	return ok && e.Tag == platformErrorTag && isNotFound(e)
 }
 
+// currentProvider is the provider a layer made current, or else the
+// variables the fiber's `Host.Environment` lists.
 func currentProvider(fb *Fiber) provider {
 	if p, ok := fb.env.get(configProviderKey); ok {
 		return p.(provider)
 	}
-	return ConfigProviderFromEnvRecord(Rec("preserveEmptyStrings", false), PlatformVars()).(provider)
+	return ConfigProviderFromEnvRecord(Rec("preserveEmptyStrings", false), hostVars(fb)).(provider)
 }
 
 // ConfigProviderLayer makes the provider the one of the body.

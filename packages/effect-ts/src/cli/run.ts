@@ -1,9 +1,11 @@
 // `Cli.run`: a command of the standard library as Effect's CLI command, run
 // on the arguments with the Node.js services Effect's CLI needs. Invalid
 // input becomes the Flick error `Cli.CliError` with Effect's text; the
-// handler runs only after the whole command line parsed.
+// handler runs only after the whole command line parsed. What the run reads
+// of the environment, a missing value's config, the terminal's colors and
+// `--trace`'s settings, it reads through `Host.Environment`.
 
-import { Console, Context, Effect, Layer, Option } from "effect";
+import { ConfigProvider, Console, Context, Effect, Layer, Option } from "effect";
 import * as TestConsole from "effect/testing/TestConsole";
 import {
   CliConfig,
@@ -15,10 +17,12 @@ import {
   type HelpDoc,
   Param as EffectParam,
   Primitive,
+  TerminalCapabilities,
 } from "effect/cli";
 
 import type { Tagged } from "../data.ts";
-import { env, nodeModule } from "../host.ts";
+import { nodeModule } from "../host.ts";
+import { hasProvider, hostEnv, hostProvider } from "../hostEnvironment.ts";
 import { constructorName, tag } from "@flick-lang/runtime/tags";
 import { type FlickFormatter, type FlickHelpDoc, fromEffectDoc, toEffectFormatter, withHelp } from "./output.ts";
 import { callEffect } from "../bridge.ts";
@@ -124,25 +128,30 @@ const traced = (name: string, handler: Effect.Effect<unknown, unknown, unknown>)
   Effect.flatMap(Effect.serviceOption(TRACE), (trace) =>
     Option.getOrElse(trace, () => false)
       ? Effect.flatMap(
-          Effect.promise(() => import("../effect/observability/Otlp.ts")),
-          ({ otlpLayer }) =>
+          Effect.all([
+            Effect.promise(() => import("../effect/observability/Otlp.ts")),
+            hostEnv("OTEL_EXPORTER_OTLP_ENDPOINT"),
+            hostEnv("OTEL_SERVICE_NAME"),
+          ]),
+          ([{ otlpLayer }, url, serviceName]) =>
             Effect.provide(
               Effect.asVoid(Effect.withSpan(handler, name)),
-              otlpLayer({
-                url: env("OTEL_EXPORTER_OTLP_ENDPOINT") ?? "http://localhost:4318",
-                service_name: env("OTEL_SERVICE_NAME") ?? name,
-              }),
+              otlpLayer({ url: url ?? "http://localhost:4318", service_name: serviceName ?? name }),
             ),
         )
       : Effect.asVoid(handler),
   );
+
+/** The handler, without the provider the run made of `Host.Environment` for the parse when `fromHost`. */
+const asCalled = <A, E, R>(handler: Effect.Effect<A, E, R>, fromHost: boolean): Effect.Effect<A, E, R> =>
+  fromHost ? Effect.updateContext(handler, Context.omit(ConfigProvider.ConfigProvider)) : handler;
 
 /**
  * Effect's command of a Flick command, its subcommands included. The flags
  * of a command with subcommands are shared flags: Effect parses them before
  * the subcommand's name, and they are seen only by this command's handler.
  */
-const command = (spec: Spec): Command.Command.Any => {
+const command = (spec: Spec, fromHost = false): Command.Command.Any => {
   const config: Record<string, AnyParam<EffectParam.ParamKind>> = {};
   const flags: Record<string, AnyParam<"flag">> = {};
   for (const p of spec.params) {
@@ -165,7 +174,7 @@ const command = (spec: Spec): Command.Command.Any => {
     if (spec.subcommands.length === 0) return c;
     const shared = Command.withSharedFlags(c, flags);
     const subcommands = spec.subcommands.map((s) => {
-      const sub = command(s.command);
+      const sub = command(s.command, fromHost);
       // the help of `subcommand` lists it, unless it has a short description of its own
       return s.help !== "" && s.command.shortDescription === "" ? Command.withShortDescription(sub, s.help) : sub;
     });
@@ -173,7 +182,7 @@ const command = (spec: Spec): Command.Command.Any => {
   };
   const handler = spec.handler;
   if (handler === null) return finish(Command.make(spec.name, config));
-  return finish(Command.make(spec.name, config, (options) => traced(spec.name, handler(options))));
+  return finish(Command.make(spec.name, config, (options) => asCalled(traced(spec.name, handler(options)), fromHost)));
 };
 
 /** What went wrong: Effect asks for the help of a command with the errors that caused it. */
@@ -193,8 +202,8 @@ const BUILT_INS: Readonly<Record<string, CliConfig.CliConfig.Service["builtIns"]
 const TRACE_FLAG = "TraceFlag";
 
 /** The command of `spec` with `--trace`, a flag of Flick's rather than Effect's, when `trace`. */
-const root = (spec: Spec, trace: boolean): Command.Command.Any =>
-  trace ? Command.withGlobalFlags(command(spec), [TRACE]) : command(spec);
+const root = (spec: Spec, trace: boolean, fromHost = false): Command.Command.Any =>
+  trace ? Command.withGlobalFlags(command(spec, fromHost), [TRACE]) : command(spec, fromHost);
 
 /** `Cli.Settings`. */
 export interface Settings {
@@ -203,11 +212,18 @@ export interface Settings {
   readonly formatter: Option.Option<FlickFormatter>;
 }
 
+/** Effect's terminal capabilities, whose `NO_COLOR`, `FORCE_COLOR` and `TERM` are those of `Host.Environment`. */
+const terminal = /*#__PURE__*/ Layer.unwrap(
+  Effect.map(hostProvider, (provider) =>
+    Layer.provide(TerminalCapabilities.layer, Layer.succeed(ConfigProvider.ConfigProvider, provider)),
+  ),
+);
+
 /** The layers of Effect's CLI the settings choose, with the Node.js services. */
 const services = (settings: Settings) =>
   Layer.suspend(() =>
     Layer.mergeAll(
-      nodeModule("@effect/platform-node/NodeServices").layer,
+      Layer.provideMerge(terminal, nodeModule("@effect/platform-node/NodeServices").layer),
       CliConfig.layer({ builtIns: settings.builtIns.flatMap((b) => BUILT_INS[constructorName(b._tag)] ?? []) }),
       Option.isSome(settings.formatter) ? CliOutput.layer(toEffectFormatter(settings.formatter.value)) : Layer.empty,
     ),
@@ -241,20 +257,28 @@ const throughHostConsole = <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effec
     return Effect.provideService(self, Console.Console, console);
   });
 
-/** `Cli.run_with settings command args`. */
+/**
+ * `Cli.run_with settings command args`. Without a current provider, the
+ * parse reads a missing value's config from the variables `Host.Environment`
+ * lists, and the handler runs without that provider, as it was called.
+ */
 export const cliRunWith = (
   settings: Settings,
   spec: Spec,
   args: ReadonlyArray<string>,
 ): Effect.Effect<void, unknown, unknown> =>
-  Command.runWith(root(spec, settings.builtIns.some((b) => constructorName(b._tag) === TRACE_FLAG)), {
-    version: settings.version,
-    renderErrors: false,
-  })(args).pipe(
-    Effect.catchIf(CliError.isCliError, (error) => Effect.fail(cliError(error))),
-    Effect.provide(services(settings)),
-    throughHostConsole,
-  );
+  Effect.flatMap(Effect.context(), (context) => {
+    const fromHost = !hasProvider(context);
+    const trace = settings.builtIns.some((b) => constructorName(b._tag) === TRACE_FLAG);
+    const run = Command.runWith(root(spec, trace, fromHost), { version: settings.version, renderErrors: false })(args).pipe(
+      Effect.catchIf(CliError.isCliError, (error) => Effect.fail(cliError(error))),
+      Effect.provide(services(settings)),
+      throughHostConsole,
+    );
+    return fromHost
+      ? Effect.flatMap(hostProvider, (provider) => Effect.provideService(run, ConfigProvider.ConfigProvider, provider))
+      : run;
+  });
 
 const ALL = /*#__PURE__*/ [...Object.keys(BUILT_INS), TRACE_FLAG].map((name) => ({ _tag: tag(`Cli.BuiltIn.${name}`) }));
 

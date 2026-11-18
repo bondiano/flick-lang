@@ -247,6 +247,17 @@ let main () =
     with
     | Config.ConfigError m -> [m]
   Platform.stdout_line ("layer_add " ++ show added)
+  // without a current provider, `layer_add` adds to the variables `Host.Environment` lists
+  let added_to_host =
+    try
+      provide host_env {
+        provide (ConfigProvider.layer_add { asPrimary = false } own) {
+          Config.get (Config.all [Config.string "NAME", Config.string "MODE"])
+        }
+      }
+    with
+    | Config.ConfigError m -> [m]
+  Platform.stdout_line ("layer_add to the host " ++ show added_to_host)
   let process = ConfigProvider.from_env { preserveEmptyStrings = false }
   Platform.stdout_line
     ("from_env "

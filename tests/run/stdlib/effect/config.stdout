@@ -51,5 +51,6 @@ host ["missing true"] from the host
 host array [80, 443] record [("TEAM", "core"), ("TIER", "web")]
 get_with localhost own
 layer_add ["own", "localhost"]
+layer_add to the host ["own", "from the host"]
 from_env missing
 files dot tree

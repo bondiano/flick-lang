@@ -89,6 +89,7 @@ sql/queries # no native for `codec` (flick:sql sqlCodec)
 stdlib/cli/cli # the row primitive `Lacks "name" { color : Option Color; loud : Bool; times : Float }`
 stdlib/cli/cli_exit # the row primitive `Lacks "times" {}`
 stdlib/cli/file_parse # the row primitive `Lacks "data" {}`
+stdlib/cli/from_host # the row primitive `Lacks "region" {}`
 stdlib/cli/prompt # no native for `chars` (flick:rt stringChars)
 stdlib/cli/surface # the row primitive `Lacks "env" {}`
 stdlib/cli/trace # no native for `received` (../observability/receiver.mjs received)

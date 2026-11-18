@@ -118,8 +118,9 @@ foreign effect from_dir from "flick:ConfigProvider" "flickFromDir"
 layer : ConfigProvider -> Layer none none none
 foreign pure layer from "flick:ConfigProvider" "layer"
 
-/// Adds the provider to the current one: as a fallback, or as the primary
+/// Adds the provider to the current one, or else to `from_env` of the
+/// variables `Host.Environment` lists: as a fallback, or as the primary
 /// source when `asPrimary` holds.
-layer_add : { asPrimary : Bool } -> ConfigProvider -> Layer none none none
+layer_add : { asPrimary : Bool } -> ConfigProvider -> Layer {Host.Environment} none none
 foreign pure layer_add from "flick:ConfigProvider" "flickLayerAdd"
   arity 2

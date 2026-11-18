@@ -92,7 +92,7 @@ For example, `Clock` is in `std`, `Stream` in `stream`, and `HttpApi` in `http`:
 | - | - |
 | `Clock`, `Random` | reads of the time through `Host.Clock`, from the fiber's clock, which `Test.clock_test` makes virtual, and draws through `Host.Random`; `Random.with_seed` repeats the draws of a task |
 | `DateTime` | instants in UTC or in a time zone, with checked constructors; `now`, `is_past` and `is_future` read `Host.Clock`, `now_in_current_zone` also `CurrentTimeZone` |
-| `Config`, `ConfigProvider` | configuration read by path: `Config.get` reads the current `ConfigProvider` (from `ConfigProvider.layer`) or else `ConfigProvider.from_env` over the variables `Host.Environment.vars` lists, and `get_with` takes that fallback provider from a function of your own |
+| `Config`, `ConfigProvider` | configuration read by path: `Config.get` reads the current `ConfigProvider` (from `ConfigProvider.layer`) or else `ConfigProvider.from_env` over the variables `Host.Environment.vars` lists, as `ConfigProvider.layer_add`, `Cli.run` and the `Otlp` exporters do, and `get_with` takes that fallback provider from a function of your own |
 | `Console`, `Logger`, `LogLevel`, `ErrorReporter` | `log`, `info` and `debug` to stdout and `warn` and `error` to stderr through `Host.Console`, what happens to each log message, log levels ordered by severity, and where unhandled failures are reported |
 | `Cause` | build, combine and read how a computation failed, over Flick's opaque `Failure e` |
 | `Cron` | sets of times, optionally in a time zone; `Schedule.cron` runs by one |

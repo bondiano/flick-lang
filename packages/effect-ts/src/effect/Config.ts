@@ -4,6 +4,7 @@
 import { Config, ConfigProvider, Context, Effect, Option, Schema } from "effect";
 
 import { tag } from "@flick-lang/runtime/tags";
+import { hasProvider } from "../hostEnvironment.ts";
 
 export * from "effect/Config";
 
@@ -20,7 +21,7 @@ export const flickGetWith = <A>(
 ): Effect.Effect<A, unknown> =>
   Effect.flatMap(Effect.context(), (context) =>
     Effect.flatMap(
-      context.mapUnsafe.has(ConfigProvider.ConfigProvider.key)
+      hasProvider(context)
         ? Effect.succeed(Context.get(context, ConfigProvider.ConfigProvider))
         : fallback(undefined),
       (provider) => Effect.mapError(config.parse(provider), toFlick),

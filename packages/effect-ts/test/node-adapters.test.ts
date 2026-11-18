@@ -43,7 +43,11 @@ test("portable adapters work without process and Node layers fail only when buil
         const prompt = Cli.promptText({ message: "Name", default: Option.none(), validate: Option.none() });
         assert.equal(Cli.multiPrompt(prompt).prompt, prompt);
         const command = Cli.specHandle(() => Effect.void, Cli.specCommand("portable"));
-        const run = Cli.cliRunVersion("1.0.0", command, []);
+        // the variables of a host without a process, as a browser's Host.Environment would list them
+        const run = Effect.provideService(Cli.cliRunVersion("1.0.0", command, []), Context.Service("Host.Environment"), {
+          env: () => Effect.succeed(Option.none()),
+          vars: () => Effect.succeed([]),
+        });
         await assert.rejects(
           Effect.runPromise(run),
           /@effect\\/platform-node\\/NodeServices is available only on Node.js/,

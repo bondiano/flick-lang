@@ -3,3 +3,5 @@ without an exporter, sent: false
 "checkout": true
 "shop": true
 "store": true
+"from-host": true
+"9.8.7": true

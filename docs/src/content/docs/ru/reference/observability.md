@@ -1,6 +1,6 @@
 ---
 title: "Наблюдаемость"
-source_hash: 6717032af929bc23
+source_hash: 82c8264ada5ea450
 ---
 
 Трасса отвечает на вопрос «где запрос потратил время?», запись журнала —
@@ -105,7 +105,7 @@ ID запроса), иначе число рядов будет расти вм�
 ```flick
 # import App.Telemetry exposing (span_options, checkouts)
 #
-observe_checkout : Unit ->{} Unit
+observe_checkout : Unit ->{Host.Environment} Unit
 let observe_checkout () =
   provide (Otlp.traces { url = "http://localhost:4318/v1/traces"; service_name = "shop" }) {
     Tracer.with_span "checkout" span_options (task { Metric.update 1 checkouts })
@@ -134,7 +134,7 @@ protobuf вместо `Otlp.json`; этот сериализатор попад�
 ```flick
 # import App.Telemetry exposing (span_options)
 #
-audit : Unit ->{} Unit
+audit : Unit ->{Host.Environment} Unit
 let audit () =
   scope {
     let tracer = Otlp.tracer { url = "http://localhost:4318/v1/traces"; service_name = "audit" }
@@ -145,7 +145,8 @@ let audit () =
 ### Конфигурация развёртывания
 
 `Otlp.from_config None` читает текущий `ConfigProvider` (по умолчанию —
-окружение процесса) и экспортирует JSON. Сигнал включается **только**
+переменные, которые перечисляет `Host.Environment`, как и у любого
+экспортёра `Otlp`) и экспортирует JSON. Сигнал включается **только**
 когда его `OTEL_TRACES_EXPORTER`, `OTEL_LOGS_EXPORTER` или
 `OTEL_METRICS_EXPORTER` называет `otlp`: одного адреса коллектора
 недостаточно.
@@ -156,7 +157,8 @@ let audit () =
 параметры ресурса `OTEL_SERVICE_NAME`, `OTEL_SERVICE_VERSION`
 и `OTEL_RESOURCE_ATTRIBUTES`. `Otlp.from_config (Some "shop")`
 переопределяет имя сервиса из конфигурации. В тестах предоставляйте
-отдельный `ConfigProvider`, а не меняйте окружение всего процесса.
+отдельный `ConfigProvider` или поддельный `Host.Environment`, а не меняйте
+окружение всего процесса.
 
 ## Prometheus
 

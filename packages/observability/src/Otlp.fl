@@ -1,11 +1,15 @@
 /// Exporters of OpenTelemetry's protocol over HTTP: a program provides one,
 /// and its spans, log records or metrics are sent to the collector in
 /// batches, the rest when the layer's scope closes. `Options` sends JSON
-/// with the defaults; `Settings` and the `_with` layers say the rest. The
-/// module is experimental.
+/// with the defaults; `Settings` and the `_with` layers say the rest. What
+/// an exporter reads of the `OTEL_` configuration, the resource's
+/// attributes and version among it, comes from the current
+/// `ConfigProvider`, or else from the variables `Host.Environment` lists.
+/// The module is experimental.
 module Otlp exposing (..)
 
 import Duration
+import Host
 import Tracer
 
 /// Where the exporter sends and the service it names in what it sends.
@@ -13,19 +17,19 @@ type alias Options = { url : String; service_name : String }
 
 /// Traces, logs and metrics, sent under `url` (`http://localhost:4318`) to
 /// `/v1/traces`, `/v1/logs` and `/v1/metrics`.
-layer : Options -> Layer none none none
+layer : Options -> Layer {Host.Environment} none none
 foreign pure layer from "flick:observability/Otlp" "otlpLayer"
 
 /// Spans, sent to `url` (`http://localhost:4318/v1/traces`).
-traces : Options -> Layer none none none
+traces : Options -> Layer {Host.Environment} none none
 foreign pure traces from "flick:observability/Otlp" "otlpTraces"
 
 /// Log records, sent to `url` (`http://localhost:4318/v1/logs`).
-logs : Options -> Layer none none none
+logs : Options -> Layer {Host.Environment} none none
 foreign pure logs from "flick:observability/Otlp" "otlpLogs"
 
 /// Metrics, sent to `url` (`http://localhost:4318/v1/metrics`).
-metrics : Options -> Layer none none none
+metrics : Options -> Layer {Host.Environment} none none
 foreign pure metrics from "flick:observability/Otlp" "otlpMetrics"
 
 /// How the exporters write what they send.
@@ -74,26 +78,26 @@ let settings url service_name = {
 }
 
 /// `layer` as `settings` say.
-layer_with : Settings -> Layer none none none
+layer_with : Settings -> Layer {Host.Environment} none none
 foreign pure layer_with from "flick:observability/Otlp" "otlpLayerWith"
 
 /// `traces` as `settings` say.
-traces_with : Settings -> Layer none none none
+traces_with : Settings -> Layer {Host.Environment} none none
 foreign pure traces_with from "flick:observability/Otlp" "otlpTracesWith"
 
 /// `logs` as `settings` say.
-logs_with : Settings -> Layer none none none
+logs_with : Settings -> Layer {Host.Environment} none none
 foreign pure logs_with from "flick:observability/Otlp" "otlpLogsWith"
 
 /// `metrics` as `settings` say; `max_batch_size` does not apply.
-metrics_with : Settings -> Layer none none none
+metrics_with : Settings -> Layer {Host.Environment} none none
 foreign pure metrics_with from "flick:observability/Otlp" "otlpMetricsWith"
 
 /// A tracer sending spans to `url` (`http://localhost:4318/v1/traces`) in
 /// batches, for `Tracer.with_tracer`: unlike `traces`, only the tasks given
 /// it trace there. It holds region `s`, and the spans left are sent when
 /// the scope owning it closes.
-tracer : Options ->{Scope s} Tracer.Tracer^{s}
+tracer : Options ->{Scope s, Host.Environment} Tracer.Tracer^{s}
 foreign effect tracer from "flick:observability/Otlp" "otlpTracer"
 
 /// Traces, logs and metrics as the current configuration says, in JSON:
@@ -103,8 +107,6 @@ foreign effect tracer from "flick:observability/Otlp" "otlpTracer"
 /// `_HEADERS`, `_COMPRESSION` and `_TIMEOUT`, the batch settings
 /// `OTEL_BSP_*`, `OTEL_BLRP_*` and `OTEL_METRIC_EXPORT_*`, and the resource
 /// `OTEL_SERVICE_NAME`, `OTEL_SERVICE_VERSION` and `OTEL_RESOURCE_ATTRIBUTES`
-/// apply. `service`, when given, names the service instead. The
-/// configuration is the provided `ConfigProvider`, the process's
-/// environment by default.
-from_config : Option String -> Layer none none none
+/// apply. `service`, when given, names the service instead.
+from_config : Option String -> Layer {Host.Environment} none none
 foreign pure from_config from "flick:observability/Otlp" "otlpFromConfig"

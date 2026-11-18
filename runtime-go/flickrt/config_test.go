@@ -85,3 +85,30 @@ func TestConfigGetListsTheEnvironmentIntoArraysAndRecords(t *testing.T) {
 		t.Fatalf("record from the environment: %v", got)
 	}
 }
+
+// hostFiber is a root fiber with the live host services, as `Main` runs one.
+func hostFiber() *Fiber {
+	fb := rootFiber()
+	fb.env = liveHostEnv(fb.env)
+	return fb
+}
+
+func TestTheDefaultProviderListsTheFibersHostEnvironment(t *testing.T) {
+	t.Setenv("FLICKTESTFAKE_PORTS_0", "from the process")
+	t.Setenv("FORCE_COLOR", "1")
+	fake := Rec(
+		"env", Fn(func(_ *Fiber, _ Value) Value { return Eff(func(*Fiber) Value { return None }) }),
+		"vars", Fn(func(_ *Fiber, _ Value) Value {
+			return Eff(func(*Fiber) Value { return []Value{[]Value{"FLICKTESTFAKE_PORTS_0", "80"}} })
+		}),
+	)
+	fb := rootFiber()
+	fb.env = fb.env.withHandler("Host.Environment", record(fake))
+	ports := ConfigNested("FLICKTESTFAKE", ConfigArray(Rec("separator", None), SchemaString, "PORTS"))
+	if got := Format(ConfigParse(fb, currentProvider(fb), ports)); got != `["80"]` {
+		t.Fatalf("the default provider did not list the fake environment: %v", got)
+	}
+	if got := cliTerminal(fb); got.canColor && !fileIsTerminal(os.Stdout) {
+		t.Fatalf("the process forced color, not the fake environment: %+v", got)
+	}
+}
