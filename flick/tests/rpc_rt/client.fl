@@ -25,7 +25,7 @@ let boom =
   |> Rpc.with_payload (Codec.json Schema.number)
   |> Rpc.with_success (Codec.json Schema.number)
 
-calls : String -> Rpc.CallOptions ->{Async; Rpc.ClientError, NotFound} Unit
+calls : String -> Rpc.CallOptions ->{Host.Console, Async; Rpc.ClientError, NotFound} Unit
 let calls url options =
   let ada = Rpc.call_with options url get_user 1
   Platform.stdout_line ("got " ++ ada.name)
@@ -36,7 +36,7 @@ let calls url options =
   Rpc.call_with options url ping ()
   Platform.stdout_line "ping answered"
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Environment, Host.Console, Async; AppError} Unit
 let main () =
   let lines = Option.with_default "" (Platform.env "RPC_NDJSON")
   let json = Option.with_default "" (Platform.env "RPC_JSON")

@@ -36,7 +36,7 @@ let users = Rpc.group |> Rpc.add get_user |> Rpc.add ping |> Rpc.add boom
 minute : Duration.Duration
 let minute = Result.with_default Duration.zero (Duration.millis 60000)
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
   let handlers : Handlers none = {
     get_user = fun id ->

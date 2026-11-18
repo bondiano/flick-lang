@@ -66,5 +66,5 @@ let round seed =
 rounds : Int -> Int -> Int
 let rec rounds left acc = if left == 0 then acc else rounds (left - 1) (acc + round left)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () = Platform.stdout_line (show (rounds 3 0))

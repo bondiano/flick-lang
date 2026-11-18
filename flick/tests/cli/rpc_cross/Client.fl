@@ -5,10 +5,10 @@ module App.Main exposing (main)
 
 import App.Api exposing (..)
 
-port_ : String ->{Async} String
+port_ : String ->{Host.Environment, Async} String
 let port_ name = Option.with_default "0" (Platform.env name)
 
-numbers_over : String -> Rpc.CallOptions -> String ->{Async} Unit
+numbers_over : String -> Rpc.CallOptions -> String ->{Host.Console, Async} Unit
 let numbers_over name options url =
   let doubled =
     try show (Rpc.call_with options url double 21) with
@@ -39,16 +39,16 @@ let as_user options url token =
   | Unauthorized -> "refused"
   | Rpc.ClientError m -> "client: " ++ m
 
-http : String ->{Async} String
+http : String ->{Host.Environment, Async} String
 let http p = "http://127.0.0.1:" ++ port_ p ++ "/rpc"
 
-ws : String ->{Async} String
+ws : String ->{Host.Environment, Async} String
 let ws p = "ws://127.0.0.1:" ++ port_ p ++ "/rpc"
 
 over : Rpc.Serialization -> Rpc.Transport -> Rpc.CallOptions
 let over serialization transport = { serialization = serialization; transport = transport }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Environment, Host.Console, Async; AppError} Unit
 let main () =
   numbers_over "http ndjson" Rpc.call_defaults (http "P0")
   numbers_over "http binary" (over Rpc.binary Rpc.http) (http "P1")

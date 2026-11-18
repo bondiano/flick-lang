@@ -12,5 +12,5 @@ sum : Int -> Float -> Float
 let rec sum left acc =
   if left == 0 then acc else sum (left - 1) (mix (Int.to_float (left % 100)) acc % 1000.0)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () = Platform.stdout_line (show (fib 32, Float.floor (sum 3000000 0.0)))

@@ -28,6 +28,6 @@ let one i =
     + (if half |> ByteSize.is_less_than made then 1 else 0)
     + (if ByteSize.to_unit ByteSize.MiB read > 1 then 2 else 0)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (show (List.fold_left (fun acc i -> acc + one i) 0 (List.range 0 size)))
