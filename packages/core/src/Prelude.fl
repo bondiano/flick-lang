@@ -159,7 +159,7 @@ class Into a b =
 /// Containers whose elements a pure function maps. A container may apply
 /// the function later, so the result keeps the captures of both.
 class Functor (f : Type -> Type) =
-  map : forall c d a b. (forall v. a^v -> b)^c -> (f a)^d -> (f b)^(c + d)
+  map : forall c d a b. (a^v -> b)^c -> (f a)^d -> (f b)^(c + d)
 
 /// Containers folded from the first element to the last.
 class Foldable (f : Type -> Type) =
@@ -178,11 +178,11 @@ class Functor f => Applicative (f : Type -> Type) =
   pure : forall c a. a^c -> (f a)^c
   @lang map2
   /// `f` of the values of both, in order: for `List`, every pair.
-  map2 : forall c d a b x. (forall u v. a^u -> b^v -> x)^c -> (f a)^d -> (f b)^d -> (f x)^(c + d)
+  map2 : forall c d a b x. (a^u -> b^v -> x)^c -> (f a)^d -> (f b)^d -> (f x)^(c + d)
 
 class Applicative m => Monad (m : Type -> Type) =
   @lang flat_map
-  flat_map : forall c d a b. (forall v. a^v -> (m b)^(c + v))^c -> (m a)^d -> (m b)^(c + d)
+  flat_map : forall c d a b. (a^v -> (m b)^(c + v))^c -> (m a)^d -> (m b)^(c + d)
 
 /// Applicative containers with a choice: `nothing` holds no value, and
 /// `or_else` keeps the first that holds one (`List` keeps both).

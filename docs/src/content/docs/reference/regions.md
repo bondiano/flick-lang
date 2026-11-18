@@ -259,9 +259,15 @@ foreign map_effect from "./list.js" "mapEffect"
 
 Prelude's `map`, `map2` and `flat_map` callbacks quantify an input bound
 **per invocation**, independently of the container's bound `d`:
-`(forall v. a^v -> b)^c` for `map`,
-`(forall u v. a^u -> (b^v -> x)^(c + u))^c` for `map2`, and
-`(forall v. a^v -> (m b)^(c + v))^c` for `flat_map`. What such a callback
+`(a^v -> b)^c` for `map`,
+`(a^u -> (b^v -> x)^(c + u))^c` for `map2`, and
+`(a^v -> (m b)^(c + v))^c` for `flat_map`. A capture row such as `v` that
+only one callback mentions, and that bounds a parameter of it, belongs to
+that callback: `(a^v -> b)^c` reads as `(forall v. a^v -> b)^c`, which may
+also be written. A row mentioned anywhere else, or only on the callback's
+own qualifier, belongs to the whole signature, as `c` does here. A region
+binder stays written, `(forall t. a^{t} ->{r; e} b)^c` of `ScopedRef.use`:
+it names the region of the lease the callback is given. What such a callback
 returns holds nothing of its input, so `Option.map` gives `(Option b)^c`;
 a lazy `Seq.map`, an `Eff` and `Result.map`, which passes its error on, keep
 their source and give `^(c + d)`. `pure : forall c a. a^c -> (f a)^c` preserves its
