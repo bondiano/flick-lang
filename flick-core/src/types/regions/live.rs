@@ -138,25 +138,37 @@ impl Checker<'_> {
         (!atoms.entries.is_empty() || !atoms.tails.is_empty()).then_some(atoms)
     }
 
-    /// What a value checked against `expected` may use: of value bounds
-    /// `(τ^C₁)^C₂` the innermost, the capacity its storage keeps, so the
-    /// cell `Ref.set` takes gets no region its own capacity lacks.
+    /// What a value checked against `expected` may use. A value bound says
+    /// what a value reaches, not what using it needs: only a function or a
+    /// task whose type is still inferred may use it, since its own rows then
+    /// record the bound. Of value bounds `(τ^C₁)^C₂` that is the innermost,
+    /// the capacity its storage keeps, so the cell `Ref.set` takes gets no
+    /// region its own capacity lacks. Against a known type, what its hidden
+    /// qualifiers hold: `Some (fun () -> …)` stored in a cell of
+    /// `Option (Unit ->{} String)` uses nothing.
     fn expected_live(&self, expected: &Type) -> Option<Norm> {
         let mut t = self.qualified_head(expected);
         let mut innermost = None;
+        let mut hidden: Option<Type> = None;
         for _ in 0..64 {
             match t {
                 Type::Bounded { ty, captures } => {
                     innermost = Some(*captures);
                     t = self.qualified_head(&ty);
                 }
-                Type::Captured { ty, .. } => t = self.qualified_head(&ty),
+                Type::Captured { ty, captures, .. } => {
+                    hidden = Some(match hidden {
+                        Some(outer) => Type::Union(Box::new(outer), captures),
+                        None => *captures,
+                    });
+                    t = self.qualified_head(&ty);
+                }
                 _ => break,
             }
         }
         match innermost {
-            Some(captures) => self.atoms_live(&captures),
-            None => self.qualifier_live(expected),
+            Some(captures) if matches!(t, Type::Meta(_)) => self.atoms_live(&captures),
+            _ => self.atoms_live(&hidden?),
         }
     }
 

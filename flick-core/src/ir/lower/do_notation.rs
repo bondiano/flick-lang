@@ -5,7 +5,7 @@
 
 use super::Lower;
 use super::expr::with_dicts;
-use crate::ir::{Expr, ExprKind, Lit, Param, Pat, Stage, Stmt};
+use crate::ir::{Expr, ExprKind, Lit, Param, Pat, Stage};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -36,9 +36,10 @@ impl Lower<'_> {
                 self.let_assert(first, span, |l| l.do_rest(rest, span))
             }
             K::LetDecl => {
-                let stmt: Stmt = self.local_let(first);
+                let mut stmts = Vec::new();
+                self.local_let(first, &mut stmts);
                 let body = self.do_rest(rest, span);
-                Expr::new(ExprKind::Block(vec![stmt], Box::new(body)), span)
+                Expr::new(ExprKind::Block(stmts, Box::new(body)), span)
             }
             K::GuardStmt => {
                 let condition = match first.nodes().next() {

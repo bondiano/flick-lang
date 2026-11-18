@@ -192,7 +192,7 @@ impl Lower<'_> {
                     result = Some(self.let_assert(statement, span, |l| l.statements(rest, span)));
                     break;
                 }
-                K::LetDecl => stmts.push(self.local_let(statement)),
+                K::LetDecl => self.local_let(statement, &mut stmts),
                 K::AssignStmt => stmts.push(self.assign(statement)),
                 _ if last => result = Some(self.expr(statement)),
                 _ => stmts.push(Stmt::Expr(self.expr(statement))),
@@ -205,7 +205,16 @@ impl Lower<'_> {
         Expr::new(ExprKind::Block(stmts, Box::new(result)), span)
     }
 
-    pub(super) fn local_let(&mut self, decl: &Node) -> Stmt {
+    /// The statements of a local `let`: those of a `let lazy`, or one.
+    pub(super) fn local_let(&mut self, decl: &Node, stmts: &mut Vec<Stmt>) {
+        if self.typing.lazy_lets.contains(&decl.range()) {
+            self.lazy_state(decl, stmts);
+        } else {
+            stmts.push(self.local_let_stmt(decl));
+        }
+    }
+
+    fn local_let_stmt(&mut self, decl: &Node) -> Stmt {
         let parts = let_parts(decl, self.text);
         let Some(name) = parts.name.clone() else {
             let value = self.definition(decl);
@@ -225,11 +234,7 @@ impl Lower<'_> {
                 value,
             };
         }
-        let value = if self.typing.lazy_lets.contains(&decl.range()) {
-            self.lazy_let(decl, parts.body)
-        } else {
-            self.definition(decl)
-        };
+        let value = self.definition(decl);
         let unique = self.bind(&name, at);
         if decl.has_token(K::MutKw) {
             self.vars.insert(unique.clone());
@@ -263,7 +268,7 @@ impl Lower<'_> {
             None => Expr::new(ExprKind::Lit(Lit::Unit), self.span(node)),
         };
         let value = if self.typing.lazy_sets.contains(&node.range()) {
-            super::lazy::done(value, self.span(node))
+            super::lazy::written(value)
         } else {
             value
         };

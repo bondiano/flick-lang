@@ -95,6 +95,8 @@ import Formal.T43
 import Formal.T43Main
 import Formal.Effects
 import Formal.LetMut
+import Formal.LetMut.Lazy
+import Formal.LetMut.LazyWitness
 import Formal.Generalization
 import Formal.Lazy
 import Formal.Refine

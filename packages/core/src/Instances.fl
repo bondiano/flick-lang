@@ -349,7 +349,10 @@ instance Traversable Option =
 
 instance Applicative Option =
   let pure x = Some x
-  let map2 f = map2_option f
+  let map2 f left right =
+    match (left, right) with
+    | (Some l, Some r) -> Some (f l r)
+    | _ -> None
 
 instance Monad Option =
   let flat_map f value =
