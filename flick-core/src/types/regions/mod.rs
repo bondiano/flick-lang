@@ -88,6 +88,9 @@ pub struct State {
     pub lent: Vec<u32>,
     /// Kinds of rigid signature variables, including nested `forall`s.
     pub rigid_kinds: Vec<(u32, Kind)>,
+    /// The rigid variables of the top-level signatures being checked: the
+    /// only ones a constraint a fix adds to such a signature can name.
+    pub signed: Vec<u32>,
     /// What the type variable elements of error rows, `{t | e}`, were
     /// instantiated to, and where: each must be an error type.
     pub error_elements: Vec<(Type, Span)>,

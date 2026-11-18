@@ -51,11 +51,9 @@ let layer =
         "postgres:17-alpine",
       ]
       let id = String.trim (ChildProcess.string (docker run))
-      // the container outlives the caller's `Host.Process`, so it stops with
-      // the live one
       Scope.add_finalizer
         (task {
-          try provide Host.process { ignore (ChildProcess.exit_code (docker ["stop", id])) } with
+          try ignore (ChildProcess.exit_code (docker ["stop", id])) with
           | PlatformError.PlatformError _ -> ()
         })
       ready id 200
