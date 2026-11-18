@@ -28,6 +28,16 @@ break programs.
   `flick new` writes its test as a `suite`. The plugin interface gains
   `Expr::Task`, `task { body }` in a plugin's code.
 
+- **Added: a scope owns a value of `Close`.** `Resource.own value` makes the
+  innermost `scope` the owner of a value of the new class `Resource.Close`
+  and gives it back with the scope's region: when the scope ends,
+  `close_exit` runs once with how its body ended (an `Exit` of errors and a
+  value it cannot read; by default it calls `close`), last owned first,
+  after the children of the scope ended, on the Effect adapter, Flick's own
+  runtime and Go. A close takes a `Closing` token only `own` makes, so no
+  other code can close an owned value, and `own` takes only a value that
+  holds no region. See the [resources reference](docs/src/content/docs/reference/resources.md).
+
 - **Breaking, fixed: two region checks the formal rules ask for.** An
   instance method may use a region of its head only where the class
   signature keeps it live (`FLICK-G002`): a closure that called such a
@@ -35,6 +45,11 @@ break programs.
   variable bounds the whole value it stands for, so `a^{}` rejects a
   `File s` or data that holds a scope's value (`FLICK-G001`), as
   `docs/formal/regions.md` states.
+
+- **Changed: what an acquisition registers may use its services.** The
+  acquisition of `Resource.manual` and `Effect.resource_auto` assumes
+  `Fiber.Provided` for its own region, so a release it registers there may
+  use the services it runs with instead of `FLICK-G003`.
 
 - **Fixed: a re-exported type keeps its companions.** A module that
   re-exports a type (`import App.Ports exposing (Port)` with

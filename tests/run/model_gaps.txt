@@ -63,6 +63,7 @@ runtime/interrupt_after_close # no native for `make` (flick:Deferred make)
 runtime/interrupt_in_finalizer # no native for `make` (flick:Deferred make)
 runtime/interrupt_skips # no native for `make` (flick:Deferred make)
 runtime/leases # no native for `from_acquire` (flick:ScopedRef flickFromAcquire)
+runtime/owned_close # no native for `add_close` (flick:Scope flickAddClose)
 runtime/owners # no native for `open_res` (./resources.mjs open)
 runtime/parallel # the model's (≡) rejects `App.Main.main`
 runtime/paths # no native for `node_write_file` (flick:rt fileWrite)

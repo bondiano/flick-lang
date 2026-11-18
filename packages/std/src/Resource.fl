@@ -1,6 +1,53 @@
-/// Resources owned by a `scope`, and `Resource`: a value acquired again on
+/// Resources owned by a `scope`: values of `Close` it owns through `own`,
+/// what `acquire_release` registers, and `Resource`, a value acquired again on
 /// `refresh`, released when its `scope` closes.
-module Resource exposing (acquire_release, bracket, Resource, manual, use, refresh)
+module Resource exposing (
+  Close(..),
+  Closing,
+  own,
+  acquire_release,
+  bracket,
+  Resource,
+  manual,
+  use,
+  refresh,
+)
+
+import Fiber
+
+/// The right to close a value of `Close`. Only `own` makes one, for the
+/// close it runs when the `scope` that owns the value ends: no other code
+/// can close an owned value. It names a region that only that close keeps
+/// live, so a close cannot keep it for later.
+opaque type Closing (t : Region) = Closing
+
+/// Values a `scope` closes when it ends, once, after what was acquired into
+/// it later is released: `own` makes the scope their owner.
+class Close a =
+  /// Releases `value`.
+  close : forall t. Closing t -> a ->{Async} Unit
+  /// `close`, seeing how the body of the `scope` ended: succeeded, failed
+  /// or was interrupted (`Exit.is_success`, `Exit.has_interrupts`). The
+  /// value and the errors of the body stay opaque.
+  close_exit : forall t e b. Closing t -> Exit e b -> a ->{Async} Unit
+  let close_exit token _ value = close token value
+
+/// Makes the innermost `scope` (or the one of region `s`) the owner of
+/// `value`, which holds no region: when that scope ends, `close_exit` of its
+/// `Close` runs once with how the body ended, after what was acquired into
+/// the scope later is released and its children ended. The value holds
+/// region `s`, so it cannot leave that scope, nor be owned again.
+own : Close a => a^{} ->{Async, Scope s} a^{s}
+let own value =
+  let token : Closing s = Closing
+  add_close (fun exit -> close_exit token exit value)
+  value
+
+// Not exposed: what `own` registers, which sees the outcome of the body as
+// an `Exit` of any errors and value, so it cannot read either.
+add_close : (forall e b. Exit e b ->{r} Unit)^c ->{Scope s | r} Unit
+foreign effect add_close from "flick:Scope" "flickAddClose"
+  retention owner
 
 /// A value of `a` of region `s` that its acquisition, failing with `e`,
 /// may give anew.
@@ -21,8 +68,11 @@ foreign effect bracket from "flick:rt" "bracket"
 
 /// A resource owned by the innermost `scope` (or the one of region `s`),
 /// acquired now by `acquire`, which runs with the services of this call and
-/// acquires into a region `t` of its own; `refresh` acquires it again.
-manual : (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r} Resource s e a
+/// acquires into a region `t` of its own; `refresh` acquires it again. What
+/// `acquire` registers there may use those services: their providers
+/// outlive `t` as they outlive `s`.
+manual :
+  (forall t. Fiber.Provided r t => Eff {Scope t | r} e a^{t})^c ->{Scope s | r} Resource s e a
 foreign effect manual from "flick:Resource" "flickManual"
   retention owner
 
