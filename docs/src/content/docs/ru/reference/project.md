@@ -1,6 +1,6 @@
 ---
 title: "Проект"
-source_hash: eba9b806a4a8dacb
+source_hash: 5e9ea4c8a4e691f4
 ---
 
 Проект — каталог с `flick.toml` (см. [CLI компилятора](../cli/)).
@@ -51,7 +51,7 @@ max-params = 5
 | `project.runner` | модуль, который запускает каждый вход без своего runner'а: экспортирует `type alias Main` — тип, который должен иметь `main` (иначе `FLICK-P026`), — и `run`, который принимает `main`; раннер экспортирует его результат как `default`; встроены `"Runner.Node"`, `"Runner.Browser"` и `"Runner.Cloudflare"` — Worker, чей `fetch` передаёт `main : Runner.Cloudflare.Fetch ->{Runner.Cloudflare.Env; AppError} Http.ServerResponse.ServerResponse` запрос и контекст (`wait_until`), а привязки предоставляет сервисом `Env` (`Runner.Cloudflare.var`, `binding`) вместе с живыми браузерными сервисами `Host.BrowserLive`; так runner может предоставлять сервисы, и `main` может требовать любые из тех, что названы в его `Main`; другой может дать пакет; без него чистый `main` вызывается, а эффект выполняется как на Node | — |
 | `build.out-dir` | базовый каталог для артефактов сборки; не корень проекта, не каталог исходников или тестов и не каталог над ними (`FLICK-P028`, до любой записи) | `"dist"` |
 | `build.profile` | `"debug"` или `"release"` (см. [генерацию кода](../codegen/)); `--profile` у `build` и `test` переопределяет это значение | `"debug"` |
-| `build.emit` | `"js"`, `"ts"` или `"go"`: Go-модуль на каждый вход в `go/<entry>/`, который `go build` собирает в исполняемый файл `flick-<entry>`; Go должен быть в `PATH` (`FLICK-P029`), импорт модуля только для js (`Ui`, `Atom`, `Action`, `Otlp`, `DevTools`, `Js`, runner'ы `Node`/`Browser`/`Cloudflare`) или пакета, собранного не для go, — `FLICK-P030` уже в `flick check`, а то, что Go-target ещё не компилирует, — `FLICK-P012` (см. [Go-target](../codegen/#go-target)) | `"js"` |
+| `build.emit` | `"js"`, `"ts"` или `"go"`: Go-модуль на каждый вход в `go/<entry>/`, который `go build` собирает в исполняемый файл `flick-<entry>`; Go должен быть в `PATH` и разрешён в `[tools]` как `"flick/go" = ["go"]` (`FLICK-P029`), импорт модуля только для js (`Ui`, `Atom`, `Action`, `Otlp`, `DevTools`, `Js`, runner'ы `Node`/`Browser`/`Cloudflare`) или пакета, собранного не для go, — `FLICK-P030` уже в `flick check`, а то, что Go-target ещё не компилирует, — `FLICK-P012` (см. [Go-target](../codegen/#go-target)) | `"js"` |
 | `build.environment` | пара backend/platform, например `"js/node"`, `"js/browser"` или `"go/native"`; при заданном значении `flick check`, редактор и сборка делят предварительную проверку окружения: достижимый ограниченный эффект без корневого обработчика для этой пары — `FLICK-E020` (`unhandled effect Db on js/browser` на месте использования). Неиспользуемый неподдерживаемый код не ломает проверку по достижимости; публичные экспорты библиотеки проверяются. Без значения check остаётся только переносимой типизацией. Отсутствие инструментов — по-прежнему `FLICK-P015` / `FLICK-P029`. Это не обещает корректность произвольного IR или emit-плагинов | совместимый псевдоним выбранного бэкенда по умолчанию |
 | `build.emit-dts` | логическое значение | `false` |
 | `build.promise-facade` | логическое значение | `false` |

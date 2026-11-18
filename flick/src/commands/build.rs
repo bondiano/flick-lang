@@ -291,13 +291,8 @@ impl Command for BuildCommand {
             progress.stage("Saving build cache");
             let key = self.key(p, &roots, &output);
             let read = (&roots[..], &*host.cwd, &sources);
-            let stored = initial_key.as_ref().is_some_and(|before| {
-                cache::store_built(p, read, before, &key, &emitted.artifacts)
-            });
-            if stored && output.go {
-                for (name, _) in &output.entries {
-                    cache::mark_go(&p.root, &key, &output.out_dir, &build::go::executable(name));
-                }
+            if let Some(before) = &initial_key {
+                cache::store_built(p, read, before, &key, &emitted.artifacts);
             }
         }
         Outcome {

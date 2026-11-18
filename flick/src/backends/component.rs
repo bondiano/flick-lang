@@ -60,7 +60,7 @@ impl Package {
         if bytes.len() > limit {
             return Err(failure("backend component exceeds its file size limit"));
         }
-        Self::from_bytes(&project.root, pin, &bytes, rt, &project.config.tools)
+        Self::from_bytes(&project.root, pin, &bytes, rt, Some(&project.config.tools))
     }
 
     pub(super) fn from_bytes(
@@ -68,7 +68,7 @@ impl Package {
         pin: BackendPin,
         bytes: &[u8],
         rt: bool,
-        allowed: &BTreeMap<String, Vec<String>>,
+        allowed: Option<&BTreeMap<String, Vec<String>>>,
     ) -> Result<Self, Diagnostic> {
         let backend = WasmBackend::load_with_cancellation(
             component::engine().map_err(failure)?,
@@ -83,7 +83,11 @@ impl Package {
                 pin.identity.id, pin.identity.version, pin.sha256
             ))
         })?;
-        let allowed = allowed.get(&pin.identity.id).cloned().unwrap_or_default();
+        // outside a project only `--allow-tool` grants a tool
+        let allowed = allowed.map_or_else(
+            || super::allowed_tools().to_vec(),
+            |tools| tools.get(&pin.identity.id).cloned().unwrap_or_default(),
+        );
         // a launch runs on Node without `[tools]`; a step needs its tool allowed
         let ids = (allowed.iter().map(String::as_str))
             .filter(|&id| id != "node")

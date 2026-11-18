@@ -1,4 +1,5 @@
 // The distributed guest uses canonical source paths on every build machine.
+// usage: build.mjs <backend>, the crate flick-backend-<backend>
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -7,6 +8,8 @@ import { fileURLToPath } from "node:url";
 import { guestEnvironment, nativeEnvironment } from "./environment.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const backend = process.argv[2];
+if (!/^[a-z]+$/.test(backend ?? "")) throw new Error("usage: build.mjs <backend>");
 const channel = /^channel = "([^"]+)"/m.exec(readFileSync(join(root, "rust-toolchain.toml"), "utf8"))?.[1];
 if (!channel) throw new Error("rust-toolchain.toml must pin a compiler channel");
 const cargoHome = resolve(process.env.CARGO_HOME ?? join(homedir(), ".cargo"));
@@ -28,7 +31,7 @@ if (bootstrap.status !== 0) process.exit(bootstrap.status ?? 1);
 const wrapper = join(native.CARGO_TARGET_DIR, "debug", `flick-guest-rustc${process.platform === "win32" ? ".exe" : ""}`);
 const env = guestEnvironment({ root, cargoHome, cargo, rustc, wrapper, rustcVersion: version.stdout, environment: process.env });
 for (const [command, extra] of [["build", ["--release"]], ["clippy", ["--", "-D", "warnings"]]]) {
-  const result = spawnSync(cargo, [command, "-p", "flick-backend-js", "--features", "guest", "--target", "wasm32-unknown-unknown", ...extra], { cwd: root, env, stdio: "inherit" });
+  const result = spawnSync(cargo, [command, "-p", `flick-backend-${backend}`, "--features", "guest", "--target", "wasm32-unknown-unknown", ...extra], { cwd: root, env, stdio: "inherit" });
   if (result.error) throw result.error;
   if (result.status !== 0) process.exit(result.status ?? 1);
 }

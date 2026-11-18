@@ -37,8 +37,18 @@ any of the missing component inputs below.
 
 The entry points are `flick/src/commands/build.rs` (`artifacts`),
 `flick-core/src/build/javascript/{mod,module}.rs` (`emit`, `compiled_module`, `builtins`) and
-`flick-core/src/build/go.rs` (`emit`). Build/run/test reuse those paths; their
-existing cache, package and CLI behavior must survive the extraction.
+`flick-core/src/build/go.rs` (`emit`, now the development adapter of the Go
+emitter). Build/run/test reuse those paths; their existing cache, package and
+CLI behavior must survive the extraction.
+
+The Go emitter lives in `backends/go/src/codegen` and its component in
+`backends/go/src/component`. It receives the whole program in one request:
+the IR, a `flick.go@0.1.0` projection per own module (its exported values
+and the path its `//line` directives give), each foreign `.go` file as a
+`flick.go-ffi@0.1.0` binding, and the binding tables of the implicit packages
+as resource inputs under `go/bindings/`. It returns the Go modules with the
+embedded runtime as artifacts and one `go build` step per program, whose
+executable output is the program's launch.
 
 The Rust JS emitter now lives in `backends/js/src/codegen`; its dependencies
 contain neither the checker nor the project driver. `flick-core::codegen`

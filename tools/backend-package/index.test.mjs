@@ -18,6 +18,7 @@ function fixture(t) {
   mkdirSync(join(root, "target/backends"), { recursive: true });
   mkdirSync(join(root, "backends/js/package"), { recursive: true });
   copyFileSync(new URL("./index.mjs", import.meta.url), script);
+  writeFileSync(join(root, "backends/js/Cargo.toml"), 'version = "0.1.0"\n');
   const built = join(root, "target/backends/js.wasm");
   const distributed = join(root, "backends/js/package/component.wasm");
   const manifest = join(root, "backends/js/package/backend.json");
@@ -30,7 +31,7 @@ function fixture(t) {
   writeFileSync(manifest, JSON.stringify(metadata));
   return {
     built, distributed, manifest, metadata,
-    check: () => spawnSync(process.execPath, [script, "check"], { encoding: "utf8" }),
+    check: () => spawnSync(process.execPath, [script, "check", "js"], { encoding: "utf8" }),
   };
 }
 

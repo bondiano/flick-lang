@@ -66,6 +66,8 @@ fn run_program(name: &str, emit: &str, url: &str) {
         out.to_str().expect("utf-8 path"),
         "--emit",
         emit,
+        "--allow-tool",
+        if emit == "go" { "go" } else { "node" },
     ]);
     assert!(build.status.success(), "build: {build:?}");
     let mut program = if emit == "go" {

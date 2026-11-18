@@ -680,6 +680,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "flick-backend-go"
+version = "0.1.0"
+dependencies = [
+ "ciborium",
+ "flick-backend",
+ "flick-backend-support",
+ "flick-ir",
+ "flick-pretty",
+]
+
+[[package]]
 name = "flick-backend-js"
 version = "0.1.0"
 dependencies = [
@@ -712,6 +723,7 @@ name = "flick-core"
 version = "0.1.0"
 dependencies = [
  "annotate-snippets",
+ "flick-backend-go",
  "flick-backend-js",
  "flick-backend-support",
  "flick-ir",

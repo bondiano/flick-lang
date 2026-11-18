@@ -24,3 +24,6 @@ max-function-lines = 60
 max-nesting = 3
 max-complexity = 8
 max-params = 4
+
+[tools]
+"flick/go" = ["go"]

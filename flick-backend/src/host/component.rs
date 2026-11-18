@@ -31,7 +31,8 @@ pub struct Budget {
 impl Default for Budget {
     fn default() -> Self {
         Self {
-            fuel: 1_000_000_000,
+            // a whole-program emitter, as Go's, spends billions on a large module
+            fuel: 10_000_000_000,
             memory: 64 << 20,
             output: 128 << 20,
             inputs: 256 << 20,

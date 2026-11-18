@@ -1,17 +1,24 @@
-//! Temporary native baseline for projects without a component pin.
+//! The native emitters, linked for development and parity only: a release
+//! build always runs a backend component.
 
 #[cfg(any(test, feature = "native-backends-development"))]
+use super::Purpose;
+#[cfg(any(test, feature = "native-backends-development"))]
 use super::js_artifacts::js_artifacts;
-use super::{BuildPlan, Emission, Purpose};
+use super::{BuildPlan, Emission};
+#[cfg(any(test, feature = "native-backends-development"))]
 use crate::artifact::Artifact;
 #[cfg(not(any(test, feature = "native-backends-development")))]
 use crate::backends::failure;
 use crate::sources::FsHost;
-use flick_core::build::{self, Settings};
+#[cfg(any(test, feature = "native-backends-development"))]
+use flick_core::build;
+use flick_core::build::Settings;
 #[cfg(any(test, feature = "native-backends-development"))]
 use flick_core::project::js;
 use flick_core::project::{Compilation, Project};
 use flick_core::source::SourceMap;
+#[cfg(any(test, feature = "native-backends-development"))]
 use std::fs;
 
 pub fn artifacts(
@@ -34,6 +41,7 @@ fn artifacts_with(
     output: &BuildPlan,
     settings: &Settings<'_>,
 ) -> Emission {
+    #[cfg(any(test, feature = "native-backends-development"))]
     if output.go {
         let (artifacts, diagnostics) = build::go::emit(
             compilation,
@@ -50,11 +58,11 @@ fn artifacts_with(
     }
     #[cfg(not(any(test, feature = "native-backends-development")))]
     {
-        let _ = (host, project);
+        let _ = (host, sources, project, compilation, output, settings);
         Emission {
             artifacts: vec![],
             diagnostics: vec![failure(
-                "direct Rust JavaScript emission is available only for development/parity",
+                "direct Rust emission is available only for development/parity",
             )],
         }
     }

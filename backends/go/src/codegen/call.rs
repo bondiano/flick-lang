@@ -11,9 +11,9 @@ use super::expr::enum_literal;
 use super::layout::{Code, block, call, closure, signature, single};
 use super::shape::Types;
 use super::{Gen, Shape, names, own};
-use crate::codegen::tail::Target;
-use crate::ir::{Expr, ExprKind, Lit, Param, Pat, Stage, operation_arity};
+use flick_backend_support::tail::Target;
 use flick_ir::{Constructor, Dict, Rep};
+use flick_ir::{Expr, ExprKind, Lit, Param, Pat, Stage, operation_arity};
 
 impl<'a> Gen<'a> {
     /// Builds a value of the constructor `c` from its fields, holding the

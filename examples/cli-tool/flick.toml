@@ -10,3 +10,6 @@ test-dir = "test"
 out-dir = "dist"
 emit = "js"
 effect = "effect"
+
+[tools]
+"flick/go" = ["go"]

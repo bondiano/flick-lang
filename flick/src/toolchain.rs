@@ -2,10 +2,8 @@
 
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
-use std::{env, fs, io, process};
+use std::{env, fs, io};
 
-use flick_core::build;
-use flick_core::codegen::go::PACKAGES;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 
 pub const COMPILER: &str = env!("CARGO_PKG_VERSION");
@@ -189,64 +187,4 @@ pub fn check_runtime(root: &Path, rt: bool) -> Option<Diagnostic> {
         }
     }
     None
-}
-
-/// Runs `go build` on the Go module of the entry `name` under `out_dir`,
-/// writing its executable beside the module; `P029` when Go is missing or
-/// the build fails.
-pub fn go_build(out_dir: &Path, name: &str) -> Option<Diagnostic> {
-    let dir = out_dir.join(build::go::module_dir(name));
-    let mut command = process::Command::new("go");
-    // without -trimpath the directory of a package keys Go's build cache: each
-    // run generation and e2e case would compile the runtime anew and keep it
-    command
-        .args(["build", "-trimpath", "-o"])
-        .arg(out_dir.join(build::go::executable(name)))
-        .arg(".")
-        .current_dir(&dir)
-        // only optional packages (the PostgreSQL driver, …) require modules, which go downloads once
-        .env("GOFLAGS", "-mod=mod")
-        .env("GOTOOLCHAIN", "local");
-    // the runtime needs no C: a static executable, built without a C compiler
-    if env::var_os("CGO_ENABLED").is_none() {
-        command.env("CGO_ENABLED", "0");
-    }
-    let output = command.output();
-    let message = match output {
-        Err(err) if err.kind() == io::ErrorKind::NotFound => {
-            "the go target needs Go: `go` is not on PATH; install Go 1.23 or later".to_owned()
-        }
-        Err(err) => format!("cannot run `go build`: {err}"),
-        Ok(out) if out.status.success() => return None,
-        Ok(out) if missing_module(&dir, &out.stderr).is_some() => {
-            let (package, module) = missing_module(&dir, &out.stderr).expect("matched");
-            let stderr = String::from_utf8_lossy(&out.stderr);
-            format!(
-                "`{package}` of the runtime needs {module}, which `go build` could not download: build once with network access, or fill Go's module cache with `go mod download` in `{}`\n{}",
-                dir.display(),
-                stderr.trim_end()
-            )
-        }
-        Ok(out) => {
-            let stderr = String::from_utf8_lossy(&out.stderr);
-            let lines: Vec<&str> = stderr.lines().collect();
-            let tail = lines[lines.len().saturating_sub(20)..].join("\n");
-            format!(
-                "`go build` failed in `{}`, a bug of the compiler:\n{tail}",
-                dir.display()
-            )
-        }
-    };
-    Some(Diagnostic::new(codes::P029, Severity::Error, message))
-}
-
-/// The optional package of the runtime in the Go module `dir` and the
-/// module of it that `go build` names in `stderr`: one it could not fetch.
-fn missing_module(dir: &Path, stderr: &[u8]) -> Option<(&'static str, &'static str)> {
-    let stderr = String::from_utf8_lossy(stderr);
-    PACKAGES
-        .iter()
-        .filter(|p| dir.join(p.name).is_dir())
-        .flat_map(|p| p.modules.lines().map(move |m| (p.name, m)))
-        .find(|(_, module)| stderr.contains(module))
 }

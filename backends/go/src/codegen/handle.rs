@@ -6,7 +6,7 @@ use flick_pretty::docvec;
 
 use super::Gen;
 use super::layout::{Code, call, list};
-use crate::ir::Handler;
+use flick_ir::Handler;
 use flick_ir::OpClass;
 
 impl<'a> Gen<'a> {

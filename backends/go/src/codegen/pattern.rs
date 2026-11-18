@@ -8,7 +8,7 @@ use super::arith::Native;
 use super::expr::enum_literal;
 use super::layout::{block, call, conjunction, inline, statement};
 use super::{Gen, names, own};
-use crate::ir::{Arm, Expr, Lit, Pat};
+use flick_ir::{Arm, Expr, Lit, Pat};
 use flick_ir::{Constructor, Rep};
 
 #[derive(Default)]
