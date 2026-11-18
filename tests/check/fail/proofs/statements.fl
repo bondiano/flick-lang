@@ -26,10 +26,11 @@ where equal (x + 0) x =
 //           ^^^^^ FLICK-T082 a primitive operation is outside the domain
   refl
 
+// a method unfolds, but its `match` on `v` waits for a split of `v`
 proof method (v : Option Int)
 where equal (map identity v) v =
-//           ^^^ FLICK-T082 `map` is a method
   refl
+//^^^^ FLICK-T081 does not close the goal
 
 // `refl` does not say which equation `cong` lifts
 proof wrapped (x : Bool) (y : Bool)
@@ -47,4 +48,4 @@ where equal ((fun t -> t (t (t (t (t (t (t (t (t f))))))))) (fun g y -> g (g y))
 proof typed (h : same_type a a) where equal true true = refl
 
 //~ FLICK-T082 @22:1-22:40 its type is not fully known
-//~ FLICK-T082 @47:1-47:61 a premise is an equation of values
+//~ FLICK-T082 @48:1-48:61 a premise is an equation of values

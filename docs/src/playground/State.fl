@@ -51,6 +51,11 @@ type alias Configuration = {
   lesson_choices : List String
   lesson_choices_ru : List String
   lesson_answer : Int
+  lesson_export : String
+  lesson_arguments : List String
+  lesson_returns : String
+  lesson_runs : Bool
+  lesson_output : String
   solution : String
   done : Bool
   /// Whether a clean source runs by itself once typing pauses, as on a page of the tour.
@@ -128,6 +133,14 @@ type alias Model = {
   lesson_answer : Int
   /// The choice picked, or -1.
   lesson_choice : Int
+  /// What the check compares, from the exercise: the export, its argument
+  /// and result types as the `.d.ts` declares them, whether it runs (`->{}`),
+  /// and what the program prints.
+  lesson_export : String
+  lesson_arguments : List String
+  lesson_returns : String
+  lesson_runs : Bool
+  lesson_output : String
   lesson_solution : String
   lesson_result : String
   lesson_done : Bool
@@ -239,6 +252,11 @@ let initial_model config = {
   lesson_choices_ru = config.lesson_choices_ru
   lesson_answer = config.lesson_answer
   lesson_choice = -1
+  lesson_export = config.lesson_export
+  lesson_arguments = config.lesson_arguments
+  lesson_returns = config.lesson_returns
+  lesson_runs = config.lesson_runs
+  lesson_output = config.lesson_output
   lesson_solution = config.solution
   lesson_result = ""
   lesson_done = config.done

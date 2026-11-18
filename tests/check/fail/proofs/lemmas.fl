@@ -1,0 +1,28 @@
+// A lemma is used exactly: its instance names the same definitions as the
+// goal, a definition with the same body is another one, and only a proof
+// checked before, and checked successfully, is a lemma.
+module App.Lemmas exposing (..)
+
+bind : (a -> Option b) -> Option a -> Option b
+let bind f v =
+  match v with
+  | None -> None
+  | Some x -> f x
+
+proof right_identity (v : Option a)
+where equal (flat_map pure v) v =
+  match v with
+  | None -> refl
+  | Some x -> refl
+
+proof same_body (w : Option Int)
+where equal (bind pure w) w =
+  right_identity w
+//^^^^^^^^^^^^^^^^ FLICK-T081 `right_identity` proves `flat_map pure w = w` of exactly the definitions it names
+
+// a proof that fails is no lemma
+proof false_lemma (x : Bool) where equal x true = refl
+//                                                ^^^^ FLICK-T081 does not close the goal
+
+proof uses_false (x : Bool) where equal x true = false_lemma x
+//                                               ^^^^^^^^^^^^^ FLICK-T083 `false_lemma` is no proof checked before this one

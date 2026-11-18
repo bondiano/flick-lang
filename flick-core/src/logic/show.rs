@@ -42,6 +42,7 @@ fn write(nf: &Nf, out: &mut String, argument: bool, depth: u32) {
     }
     match nf {
         Nf::Sym(x) => out.push_str(source_name(x)),
+        Nf::Def(d) => out.push_str(&d.shown()),
         Nf::Bound(n) => {
             let _ = write!(out, "x{n}");
         }
