@@ -1,6 +1,6 @@
 ---
 title: "Эффекты, ошибки и сервисы"
-source_hash: cbb4ecfb6a01d4c4
+source_hash: fa82cd37a1cc1e73
 ---
 
 Компилятор проверяет, где допустимы эффектные вызовы, какие сервисы им нужны
@@ -332,8 +332,9 @@ let checked result =
 а исправление добавляет недостающие ветви; строке с переменной нужна ещё ветвь
 для остальных ошибок, а ветвь с ошибкой вне закрытой строки вызывает
 `FLICK-T003`. `match` чист и не убирает ошибок из строки. Если ошибки значения
-ещё не известны, как у переменной `try`, их задают ветви, если только ни одна
-ветвь не сопоставляется с любой ошибкой (`FLICK-T057`):
+ещё не известны, как у переменной `try`, их задают образцы, в начале ветви или
+внутри неё: в строку входят названные ими ошибки, а для остальных она остаётся
+открытой, если ветвь без условия сопоставляется с любой ошибкой:
 
 ```flick
 # type alias UserId = String
@@ -352,6 +353,33 @@ name_or_problem : UserId ->{Users} String
 let name_or_problem id =
   try Users.get id with
   | e -> problem e
+```
+
+Значение одной ошибки подходит туда, где ожидаются ошибки строки, в которой
+она есть: в ветви `match`, в результате функции или в аргументе. Так функция
+переводит одну строку ошибок в другую, как это нужно `Exit.map_error` и
+`Layer.catch`. Это правило о значении, а не о построенных из него типах:
+функция, возвращающая `NotFound`, не становится функцией, возвращающей
+`Errors {NotFound, DbUnavailable}`, поэтому там пишут `fun x -> f x`. Если
+ожидаемая строка ещё не известна, первая ошибка делает её строкой из одной
+этой ошибки; строку значения, которое может быть одной из нескольких ошибок,
+пишут явно:
+
+```flick
+# type alias UserId = String
+# type error NotFound = NotFound UserId
+# type error DbUnavailable = DbUnavailable
+# type error Http404 = Http404 UserId
+# type error Http503
+#
+to_http : Errors {NotFound, DbUnavailable} -> Errors {Http404, Http503}
+let to_http e =
+  match e with
+  | NotFound id -> Http404 id
+  | DbUnavailable -> Http503
+
+mapped : Exit {NotFound, DbUnavailable} String -> Exit {Http404, Http503} String
+let mapped exit = Exit.map_error to_http exit
 ```
 
 `Fail.fail` завершает вычисление с ошибкой напрямую. Вторая строка стрелки —

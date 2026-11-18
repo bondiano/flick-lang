@@ -75,6 +75,9 @@ Each certificate depends only on the axioms `propext`, `Classical.choice` and
   error of a closed row matched at `Errors ε` (`exh_errs`, the pattern
   `PatTy.err`); and a record pattern `{ℓ = x, ..}`. A `try` arm catches all of the body's errors with `x` or `_`,
   or the error `E` with an arm `E x̄` (`catches_all`, `catches_ctor`).
+- **(Errors-In).** A term the check gave the errors of a row from its error
+  type `E` is `.errVal` of its typing at `E`, with `E` in the row by `row_set`
+  (`cert/raise.rs` `errors_in`); the term need not be a value.
 
 - **Lists.** The core has no list. A literal `[x, y]` is the spine
   `Cons x (Cons y Nil)` of constructors only the signature has.

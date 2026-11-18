@@ -14,9 +14,21 @@ break programs.
   qualified name for an error of another module; a row with a variable needs
   an arm for the rest, and an arm for an error outside a closed row is
   `FLICK-T003`. When the errors of the value are not known yet, as for the
-  `x` of a `try`, the arms tell them, unless an arm matches every error
-  (`FLICK-T057`). The `match` is pure and removes no error from a row; the
-  reference model and the Lean proofs cover it.
+  `x` of a `try`, the patterns tell them, at the top of an arm or inside it:
+  the row holds the errors they name, and stays open for the others behind
+  an arm that matches every error. The `match` is pure and removes no error
+  from a row; the reference model and the Lean proofs cover it.
+
+- **A value of one error is a value of the errors of a row.** Where
+  `Errors {NotFound, Timeout}` is expected, `Timeout` or `NotFound id` fits:
+  in an arm of a `match`, as a result or as an argument. A function can so
+  turn one row of errors into another, as `Exit.map_error` and `Layer.catch`
+  take, and a value of one error is passed where several are expected. The
+  rule types the value, not the types built of it: a function returning
+  `Timeout` is no function returning `Errors {NotFound, Timeout}`, and an
+  error outside the row is `FLICK-T003`. The arms of a `try`'s `x` may name
+  an error its body does not raise. The reference model, its certificates
+  and the Lean proofs cover the rule.
 
 - **Fixed: two constructors of one name in a `match`.** The Go and
   JavaScript backends told the arms of a `match` apart by the constructor's
