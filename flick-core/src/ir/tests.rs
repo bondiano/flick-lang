@@ -126,6 +126,60 @@ fn ir_makes_stages_dictionaries_and_lifts_explicit() {
     insta::assert_snapshot!(super::print(&ir));
 }
 
+/// A `let lazy` is a variable of its function: no cell. The declaration makes
+/// the task `x$run = task (attempt e)` and the state `x = None`; an `await`
+/// runs the task while the state is `None` and keeps `Some o`. A write to a
+/// `let lazy mut` makes the state `Some (Ok v)`.
+#[test]
+fn a_let_lazy_lowers_to_a_variable_of_its_function() {
+    let ir = lower_text(
+        "App",
+        "module App exposing (..)\n\
+         type error Boom = Boom\n\
+         load : Int ->{; Boom} Int\nlet load n = if n < 0 then Fail.fail Boom else n\n\
+         run : Bool ->{; Boom} Int\n\
+         let run flag =\n  let lazy x =\n    let t = load 1\n    t + 1\n  \
+         let lazy mut y = load 2\n  y = 3\n  \
+         if flag then await x + await y else await x\n",
+    )
+    .expect("lowers");
+    insta::assert_snapshot!(super::print(&ir));
+}
+
+/// A `let lazy` lowers its initializer once, however many `await`s run it
+/// and however deep it is in the initializer of another.
+#[test]
+fn a_let_lazy_initializer_is_lowered_once() {
+    let ir = lower_text(
+        "App",
+        "module App exposing (..)\n\
+         mark : Int ->{} Int\nlet mark n = n\n\
+         run : Unit ->{} Int\n\
+         let run () =\n  let lazy top =\n    let lazy v2 =\n      let lazy v1 = mark 7\n      \
+         await v1 + await v1\n    await v2 + await v2\n  await top\n",
+    )
+    .expect("lowers");
+    let printed = super::print(&ir);
+    assert_eq!(printed.matches("App.mark 7").count(), 1, "{printed}");
+}
+
+/// Only the declaration of a `let lazy` makes a task: an `await` of it is a
+/// `match` on its state, so no force allocates one, in a loop or not.
+#[test]
+fn an_await_of_a_let_lazy_makes_no_task() {
+    let ir = lower_text(
+        "App",
+        "module App exposing (..)\n\
+         mark : Int ->{} Int\nlet mark n = n\n\
+         run : Bool ->{} Int\n\
+         let run flag =\n  let lazy x = mark 7\n  let mut sum = 0\n  \
+         for i <- [1, 2, 3] do sum = sum + i * await x\n  if flag then await x else sum\n",
+    )
+    .expect("lowers");
+    let printed = super::print(&ir);
+    assert_eq!(printed.matches("(task ").count(), 1, "{printed}");
+}
+
 #[test]
 #[ignore = "prints the IR of a file: DUMP_FILE=path"]
 fn dump() {

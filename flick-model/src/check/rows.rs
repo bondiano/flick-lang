@@ -291,8 +291,9 @@ impl Checker<'_> {
     fn subsume_bare(&mut self, actual: &Type, expected: &Type) -> Check<()> {
         // under `regions/live.rs` a qualifier on a function or a task is
         // the `Live` its use needs
-        // each qualifier of the expected type bounds the `Live` of its use
-        let (qa, mut qes) = (self.qualifier(actual), self.qualifiers(expected));
+        // each hidden qualifier of the expected type bounds the `Live` of its
+        // use; a value bound allows no use
+        let (qa, mut qes) = (self.qualifier(actual), self.hidden_qualifiers(expected));
         if qes.is_empty() {
             qes.push(Caps::default());
         }
@@ -333,6 +334,21 @@ impl Checker<'_> {
                 Ok(())
             }
             (a @ Type::App(..), b @ Type::App(..)) => self.subsume_data(&a, &b),
+            // a function or a task that a bounded variable takes may need the
+            // innermost bound, the capacity of a cell `Ref.make` makes: its
+            // type records it, as the bound allows its use nothing more
+            (Type::Fun(p, s, r), b @ Type::Var(Var::Meta(_))) => {
+                let s = self
+                    .innermost_bound(expected)
+                    .map_or(s.clone(), |c| live_stage(&s, &c));
+                self.unify(&Type::Fun(p, s, r), &b)
+            }
+            (Type::Eff(r, e, t), b @ Type::Var(Var::Meta(_))) => {
+                let r = self
+                    .innermost_bound(expected)
+                    .map_or(r.clone(), |c| add_live(&r, &c));
+                self.unify(&Type::Eff(r, e, t), &b)
+            }
             (a, b) => self.unify(&a, &b),
         }
     }

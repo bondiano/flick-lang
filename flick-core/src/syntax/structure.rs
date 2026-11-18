@@ -76,8 +76,7 @@ fn is_lookup(matched: &Node) -> bool {
         .nodes()
         .filter(|n| n.kind == K::MatchArm)
         .all(|arm| {
-            !arm.nodes().any(|n| n.kind == K::Guard)
-                && arm.nodes().last().is_some_and(constant)
+            !arm.nodes().any(|n| n.kind == K::Guard) && arm.nodes().last().is_some_and(constant)
         })
 }
 
