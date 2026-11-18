@@ -1,6 +1,6 @@
 ---
 title: "Добавленные команды"
-source_hash: 79f98a59943ba3d5
+source_hash: c249a217f195cd0f
 ---
 
 Бэкенд проекта и плагины его зависимостей могут добавлять команды в
@@ -11,7 +11,8 @@ source_hash: 79f98a59943ba3d5
 
 Добавленная команда запускается по своему имени, `flick pairs-hello you`,
 если ни один другой контрибьютор не добавляет то же имя. Полная форма
-`flick <контрибьютор>:<команда>` работает всегда. Часть контрибьютора —
+`flick <контрибьютор>:<команда>` работает для каждой команды, которую
+контрибьютору можно добавлять. Часть контрибьютора —
 это пакет плагина или последняя часть id бэкенда, так что `test/literal`
 становится `literal`:
 
@@ -41,7 +42,9 @@ flick literal:literal-hello you --out greetings
 ## Как написать команду
 
 Плагин реализует методы команд `flick_plugin::Plugin`, а бэкенд — те же
-методы `flick_backend::Backend`:
+методы `flick_backend::Backend`. У плагина они появляются с фичей
+`commands` крейта `flick-plugin`, которую включает его фича `guest`,
+собирающая компонент:
 
 ```rust
 use flick_plugin::command::{Descriptor, Diagnostic, File, Invocation, Parameter, Plan, Style, ValueKind};

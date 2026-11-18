@@ -10,7 +10,8 @@ backend or plugin that adds them.
 
 A contributed command runs under its name, `flick pairs-hello you`, when
 no other contributor adds the same name. The qualified form
-`flick <contributor>:<command>` always works. The contributor's part is the
+`flick <contributor>:<command>` works for every command the contributor
+may add. The contributor's part is the
 package of a plugin or the last part of a backend's id, so `test/literal`
 becomes `literal`:
 
@@ -40,7 +41,9 @@ every contributor the store has seen.
 ## Writing one
 
 A plugin implements the command methods of `flick_plugin::Plugin`, and a
-backend those of `flick_backend::Backend`. The methods are the same:
+backend those of `flick_backend::Backend`. The methods are the same. For a
+plugin they come with the `commands` feature of `flick-plugin`, which its
+`guest` feature, the one that builds the component, turns on:
 
 ```rust
 use flick_plugin::command::{Descriptor, Diagnostic, File, Invocation, Parameter, Plan, Style, ValueKind};

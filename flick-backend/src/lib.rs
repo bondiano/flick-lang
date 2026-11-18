@@ -59,7 +59,7 @@ pub mod command {
     /// The answer of a contributor that has no command `name`.
     pub fn unknown(name: &str) -> Vec<Diagnostic> {
         vec![Diagnostic {
-            code: "P012".into(),
+            code: "P052".into(),
             severity: Severity::Error,
             message: format!("this contributor has no command `{name}`"),
             notes: vec![],
