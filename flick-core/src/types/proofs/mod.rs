@@ -10,6 +10,7 @@
 
 mod contract;
 mod discharge;
+mod exported;
 mod formula;
 mod interval;
 mod logic;
@@ -26,8 +27,10 @@ use formula::{Raw, Value};
 use logic::Formula;
 
 use super::Checker;
+use super::Rep;
 use super::sugar_lints::unparen;
-use super::typing::{Range, Ref, range};
+use super::ty::Type;
+use super::typing::{Constructor, Range, Ref, range};
 use crate::diagnostics::codes;
 use crate::iface::{Entity, Namespace};
 use crate::numeric::Num;
@@ -51,6 +54,11 @@ pub(super) struct Contract<'a> {
     at: Span,
     /// The body of `let T$check = …`.
     body: Option<&'a Node>,
+    /// The check of an imported invariant, as its interface gives it.
+    summary: Option<Formula<formula::Atom>>,
+    /// The base of an imported invariant: its constructor is hidden, so
+    /// `T.prove` is typed from it.
+    base: Option<Type>,
 }
 
 /// An application of a constructor whose check must hold.
@@ -175,12 +183,7 @@ impl Checker<'_> {
 
     /// `T.prove`: the constructor of `T` where `T` has an invariant whose
     /// member it is. Not a use of it applied yet.
-    pub(super) fn prove_member(
-        &mut self,
-        ty: &Entity,
-        member: &str,
-        span: Span,
-    ) -> Option<super::ty::Type> {
+    pub(super) fn prove_member(&mut self, ty: &Entity, member: &str, span: Span) -> Option<Type> {
         let contract = (self.proofs.contracts.iter())
             .find(|c| c.module == ty.module && c.ty == ty.name && c.prove == member)?;
         if !contract.active {
@@ -189,16 +192,38 @@ impl Checker<'_> {
                 ty.name, ty.name
             );
             self.error(codes::T077, span, message);
-            return Some(super::ty::Type::Error);
+            return Some(Type::Error);
         }
         let entity = Entity {
             module: contract.module.clone(),
             namespace: Namespace::Constructor,
             name: contract.constructor.clone(),
         };
+        self.proofs.spelled.insert(range(span));
+        // an imported type's constructor is hidden: `Base -> T`, unboxed
+        if let Some(base) = contract.base.clone() {
+            let (module, ty) = (contract.module.clone(), contract.ty.clone());
+            let made = Type::pure_fun(
+                base,
+                Type::Con {
+                    module: module.clone(),
+                    name: ty.clone(),
+                },
+            );
+            self.note_constructor(&module, &entity.name, span);
+            let constructor = Constructor {
+                module,
+                ty,
+                name: entity.name,
+                arity: 1,
+                rep: Rep::Unboxed,
+                dicts: 0,
+            };
+            self.record_name(span, Ref::Constructor(constructor));
+            return Some(made);
+        }
         let scheme = self.env.value(&entity).cloned()?;
         let t = self.instantiate(&self.live_scheme(&scheme), span);
-        self.proofs.spelled.insert(range(span));
         self.record_entity(&entity, &t, span);
         Some(t)
     }

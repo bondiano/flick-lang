@@ -1,6 +1,6 @@
 ---
 title: "Schema and standard data types"
-source_hash: 8a612413030f5f29
+source_hash: 4ab8e6c371dbe058
 ---
 
 ## The boundary between the language core and the library
@@ -54,7 +54,7 @@ A partially applied function keeps the codec, and a later runtime stage needs li
 
 ## Types and Schema from one declaration
 
-The grammar is `refined type`, `deriving Schema`, the witness `T.schema` and std's plugin `codec witness { ... }`. A refinement is a nominal type with a closed constructor, a pure predicate, a safe `parse` and access to the underlying value. The predicate returns Bool and does not normalize the value; false is a validation failure, and an unexpected defect remains a defect. Trim/lowercase/parse live in the codec transformation. `Checks.email` is a concrete library check, not a promise to validate every email address.
+The grammar is `refined type`, `deriving Schema`, the witness `T.schema` and std's plugin `codec witness { ... }`. A refinement is a nominal type with a closed constructor, a pure predicate, a safe `parse` and access to the underlying value. `T.prove v` makes a value without a `Result` where the compiler proves the predicate from the facts of the path to it, without running the predicate; without such a proof it is a compile error. A type of another module is proved the same way: the interface of its module carries the predicate. The predicate returns Bool and does not normalize the value; false is a validation failure, and an unexpected defect remains a defect. Trim/lowercase/parse live in the codec transformation. `Checks.email` is a concrete library check, not a promise to validate every email address.
 
 ```flick
 refined type Email = String where Checks.email

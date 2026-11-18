@@ -153,6 +153,7 @@ schema/route_nested
 schema/combinators
 schema/enums
 schema/prove
+schema/prove_imported
 stdlib/http/headers
 stdlib/http/values
 stdlib/effect/codec
