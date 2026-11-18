@@ -316,6 +316,8 @@ fn a_re_exported_type_keeps_its_companions_on_js_and_go() {
             .arg(&out)
             .arg("--emit")
             .arg(emit)
+            // outside a project, only the flag lets the Go backend run `go build`
+            .args(if emit == "go" { &["--allow-tool", "go"][..] } else { &[] })
             .output()
             .expect("build runs");
         assert!(
