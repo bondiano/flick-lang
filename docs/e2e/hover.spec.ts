@@ -4,7 +4,7 @@ import { hoverWord, ready, replaceSource } from "./helpers.ts";
 test("hovers render Markdown and highlight signatures and documented code", async ({ page }) => {
   await page.goto("/flick-lang/play/");
   await ready(page);
-  await replaceSource(page, 'module Main exposing (main)\n\n/// A **friendly** greeting using `name`.\n///\n/// - Keeps the name.\n/// - Returns a greeting.\n///\n/// [Reference][reference]\n///\n/// > [reference]: https://example.com/reference\n///\n/// ```flick\n/// let example = greet "Flick"\n/// ```\ngreet : String -> String\nlet greet name = name\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (greet "Flick")\n');
+  await replaceSource(page, 'module Main exposing (main)\n\n/// A **friendly** greeting using `name`.\n///\n/// - Keeps the name.\n/// - Returns a greeting.\n///\n/// [Reference][reference]\n///\n/// > [reference]: https://example.com/reference\n///\n/// ```flick\n/// let example = greet "Flick"\n/// ```\ngreet : String -> String\nlet greet name = name\n\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (greet "Flick")\n');
   await hoverWord(page, "let greet", "greet");
   const hover = page.locator(".fp-hover");
   await expect(hover.locator("pre code").first()).toHaveText("greet : String -> String");
@@ -21,7 +21,7 @@ test("hovers render Markdown and highlight signatures and documented code", asyn
 test("mutable local hovers update after an edit", async ({ page }) => {
   await page.goto("/flick-lang/play/");
   await ready(page);
-  const mutable = "module Main exposing (main)\n// 🦔\nmain : Unit ->{} Unit\nlet main () =\n  let mut total : Int = 1\n  total = total + 1\n  Platform.stdout_line (show total)\n";
+  const mutable = "module Main exposing (main)\n// 🦔\nmain : Unit ->{Host.Console} Unit\nlet main () =\n  let mut total : Int = 1\n  total = total + 1\n  Platform.stdout_line (show total)\n";
   const immutable = mutable.replace("let mut total", "let total").replace("  total = total + 1\n", "");
   for (const [source, expected, lines] of [
     [mutable, "mut total : Int", ["let mut total", "total = total + 1", "Platform.stdout_line"]],
@@ -41,7 +41,7 @@ test("mutable local hovers update after an edit", async ({ page }) => {
 test("diagnostic hovers format inline code too", async ({ page }) => {
   await page.goto("/flick-lang/play/");
   await ready(page);
-  await replaceSource(page, "module Main exposing (main)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line missing\n");
+  await replaceSource(page, "module Main exposing (main)\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line missing\n");
   await page.locator(".cm-lintRange-error").first().hover();
   await expect(page.locator(".cm-diagnostic code")).toHaveText("missing");
   await expect(page.locator(".cm-diagnostic")).not.toContainText("`missing`");
