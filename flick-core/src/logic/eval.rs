@@ -6,7 +6,7 @@
 use std::rc::Rc;
 
 use super::defs::Admitted;
-use super::term::{Arm, Ctor, Literal, Pat, Term};
+use super::term::{Arm, Ctor, Def, Literal, Pat, Term};
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -22,6 +22,8 @@ pub enum Value {
     App(Rc<Value>, Rc<Value>),
     /// A match on an unknown value.
     Match(Rc<Value>, Env, Rc<[Arm]>),
+    /// A definition left folded.
+    Def(Rc<Def>),
 }
 
 /// The values of the local variables in scope.
@@ -55,6 +57,7 @@ pub enum Nf {
     Lam(Box<Nf>),
     App(Box<Nf>, Box<Nf>),
     Match(Box<Nf>, Vec<(NfPat, Nf)>),
+    Def(Rc<Def>),
 }
 
 /// A pattern of a normal form: its binders are numbered by depth.
@@ -87,6 +90,9 @@ pub struct Machine<'a> {
     pub refined: &'a [(Rc<str>, Value)],
     /// The admitted definitions, which evaluation unfolds.
     defs: &'a Admitted,
+    /// Whether definitions unfold: a lemma's instance is compared with them
+    /// folded, so it is about exactly the definitions it names.
+    pub unfold: bool,
     pub steps: u64,
     depth: u32,
 }
@@ -102,6 +108,7 @@ impl<'a> Machine<'a> {
         Machine {
             refined,
             defs,
+            unfold: true,
             steps,
             depth: 0,
         }
@@ -143,6 +150,7 @@ impl<'a> Machine<'a> {
                 let s = self.eval(s, env)?;
                 self.case(s, env, arms)?
             }
+            Term::Def(d) if !self.unfold => Value::Def(d.clone()),
             Term::Def(d) => match self.defs.body(d) {
                 Some(body) => self.eval(body, &Env::default())?,
                 None => return Err(Stop::Unadmitted),
@@ -223,6 +231,7 @@ impl<'a> Machine<'a> {
         self.enter()?;
         let nf = match self.whnf(v) {
             Value::Sym(x) => Nf::Sym(x),
+            Value::Def(d) => Nf::Def(d),
             Value::Bound(n) => Nf::Bound(n),
             Value::Lit(l) => Nf::Lit(l),
             Value::Con(c, args) => Nf::Con(

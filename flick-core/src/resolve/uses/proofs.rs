@@ -11,7 +11,7 @@ impl Walker<'_> {
     /// proof, and a premise's goal over the parameters before it.
     pub(super) fn proof_decl(&mut self, node: &Node) {
         let mark = self.locals.len();
-        self.proof = true;
+        self.proof.0 = true;
         for param in node
             .nodes()
             .filter(|n| n.kind == K::Params)
@@ -38,13 +38,20 @@ impl Walker<'_> {
             self.walk(child);
         }
         self.release(mark);
-        self.proof = false;
+        self.proof.0 = false;
+        // a later proof may use this one as a lemma
+        let name = node
+            .nodes()
+            .find(|n| n.kind == K::VarPat)
+            .map(|n| n.text(self.text));
+        self.proof.1.extend(name.map(|n| n.trim().to_owned()));
     }
 
-    /// Whether `name`, unqualified, is a rule of the proof being walked.
+    /// Whether `name`, unqualified, is a rule of the proof being walked or
+    /// a proof before it.
     pub(super) fn is_rule(&self, name: &str, generated: bool) -> bool {
-        self.proof
-            && PROOF_WORDS.contains(&name)
+        self.proof.0
+            && (PROOF_WORDS.contains(&name) || self.proof.1.iter().any(|p| p == name))
             && !self
                 .locals
                 .iter()

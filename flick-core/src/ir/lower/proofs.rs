@@ -132,15 +132,25 @@ pub fn check_proofs(
         imported: imported(),
     };
     let mut out = Vec::new();
+    // the proofs checked so far, in order: what a later one may use
+    let mut lemmas = Vec::new();
     for lowered in lower_proofs(module, typing) {
         let Some(info) = typing.proofs.iter().find(|i| i.at == lowered.at) else {
             continue;
         };
-        if let Err(failure) = statement(&lowered, info).and_then(|(s, body)| {
-            let cert = logic::cert(body)?;
-            logic::prove(&s, &cert, &info.data, &program)
-        }) {
-            out.push(failure.diagnostic(&info.name));
+        let checked = statement(&lowered, info).and_then(|(s, body)| {
+            let cert = logic::cert(body, &lemmas)?;
+            logic::prove(&s, &cert, &info.data, &program, &lemmas).map(|()| s)
+        });
+        match checked {
+            Ok(statement) => lemmas.push(logic::Lemma {
+                statement,
+                order: (lowered.params.iter())
+                    .zip(&lowered.premise)
+                    .map(|(x, p)| (x.as_str().into(), *p))
+                    .collect(),
+            }),
+            Err(failure) => out.push(failure.diagnostic(&info.name)),
         }
     }
     out

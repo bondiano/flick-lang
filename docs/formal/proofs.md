@@ -14,7 +14,7 @@ References as in [`core.md`](core.md). Paths are relative to `flick-core/src/`.
 | `refl`, `symm`, `trans`, `cong`, `funext`, `match`, a premise, `let` | the rules | §4 |
 | T080–T084 | how a proof fails | §5 |
 
-Not yet: lemmas, law bundles, proof modules and `flick prove`, `.iface` payloads.
+Not yet: law bundles, proof modules and `flick prove`, lemmas across modules, `.iface` payloads.
 
 ## 1. Proofs are opt-in and erased
 
@@ -80,9 +80,11 @@ The body elaborates to a finite certificate (`logic/cert.rs`). The checker decid
 | `funext (fun x -> p)` | `f = g` at `A -> B` | `p` proves `f x = g x` for a fresh `x : A` |
 | `match v with \| C xs -> p …` | the goal | `v` is a variable of the statement of a data type or `Bool` and not split yet; each constructor has one arm, or a final `_` arm covers the rest; in each arm `v` is `C xs` for fresh `xs` |
 | `h` | `l = r` | `h` is a premise, or a proof a `let` named, of the same normal forms |
-| `let h = p` then `q` | the goal | `p`'s equation is written by its rules (a premise, `symm`, `trans`), and `q` proves the goal with `h` |
+| `let h = p` then `q` | the goal | `p`'s equation is written by its rules (a premise, a lemma, `symm`, `trans`), and `q` proves the goal with `h` |
+| `name args` | the lemma's goal of `args` | `name` is a proof of this module before this one, which checked; `args` give a value for each parameter and a proof of each premise, in its order; its instance is the goal with definitions folded (exact subject) |
 
 - There is no η in normal forms: `fun x -> f x` and `f` are equal only by `funext`.
+- **Lemmas are exact.** A lemma's instance is compared with the goal by β, ζ and ι with every definition folded. So a lemma about `flat_map` of `Monad Option` closes no goal about another definition, even one with the same body (`tests/check/fail/proofs/lemmas.fl`). A proof names only proofs before it, and one that failed is no lemma: the proofs of a module form no cycle.
 - `refl` reads no claim: a certificate is the tree of these rules, and the checker trusts no part it did not check.
 
 ## 5. Outcomes

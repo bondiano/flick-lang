@@ -98,6 +98,8 @@ fn refuse<T>(span: Span, why: impl Into<String>) -> Result<T, Refused> {
 
 /// The module rules of a proof are written in: no source spells it.
 pub const RULES: &str = "$proof";
+/// The module of the proofs a later proof uses as lemmas.
+pub const LEMMAS: &str = "$lemma";
 
 /// `e` as a term of the domain.
 pub fn term(e: &Expr) -> Result<Term, Refused> {
