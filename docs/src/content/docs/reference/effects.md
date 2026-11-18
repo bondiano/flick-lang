@@ -448,6 +448,7 @@ let timed layer work = quiet layer work
 Without `provide`, the body of `quiet` would need `Log` whenever `r` holds it,
 which the signature does not allow (`FLICK-E002`). Errors work the same after
 `;`, as in `->{; -NotFound | e}` over a `try` that handles `NotFound`.
+The tour has a runnable [example](../../tour/sets/).
 
 A handler finds a service by its name, not by its arguments. `provide` of a
 layer of `Store Int` answers every `Store` operation in its body, so the body
@@ -617,6 +618,7 @@ implementation inside a program. The layers that provide them, `Host.console`,
 `Host.process`, with `Host.live` for all six and `Host.browser_live` for the
 first three, are trusted adapters over the host's APIs. They are chosen at an
 entry: the launcher or the runner of `main`, a test runner, or a `provide`.
+The tour has a runnable [example](../../tour/host/).
 
 ```flick
 mode : Unit ->{Host.Environment} Option String

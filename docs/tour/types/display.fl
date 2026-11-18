@@ -1,0 +1,14 @@
+module Main exposing (main)
+
+type Temperature = Celsius Float
+  deriving Show
+
+instance Display Temperature =
+  let display (Celsius degrees) = "\{degrees} °C"
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  let today = Celsius 21.5
+  Platform.stdout_line "Today: \{today}"
+  Platform.stdout_line (display (Celsius 30.0))
+  Platform.stdout_line (show today)
