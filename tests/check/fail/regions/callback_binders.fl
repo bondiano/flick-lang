@@ -1,0 +1,18 @@
+// A capture row that only a callback mentions is bound on the callback, so the
+// callback must take whatever the function gives it: one that takes only what
+// holds `c` is rejected as when the binder is written.
+module App.CallbackBinders exposing (..)
+
+short : ((Float -> Float)^v -> Float)^c -> (Float -> Float)^d -> Float
+let short k f = k f
+
+long : (forall v. (Float -> Float)^v -> Float)^c -> (Float -> Float)^d -> Float
+let long k f = k f
+
+pinned : (Float -> Float)^c -> (Float -> Float)^d -> Float
+let pinned f g =
+  h : (Float -> Float)^c -> Float
+  let h k = k 1.0
+  short h g + long h f
+//      ^ FLICK-G001 this value holds `v`, but the expected type `(Float -> Float)^c` allows only `c`
+//                 ^ FLICK-G001 this value holds `v`, but the expected type `(Float -> Float)^c` allows only `c`

@@ -105,6 +105,11 @@ fn a_forall_stays_where_it_says_something() {
     );
     // nothing would bind the variable without it
     assert_eq!(shown("forall a. Int"), "forall a. Int");
+    // without it a callback would bind the row as its own
+    assert_eq!(
+        shown("forall v c a. (a^v -> a)^c -> a"),
+        "forall v c a. (a^v -> a)^c -> a"
+    );
 }
 
 #[test]
