@@ -1,6 +1,6 @@
 ---
 title: "Командная строка"
-source_hash: 4118653f1d677817
+source_hash: b853cd3c16e645fc
 ---
 
 `flick` — исполняемый файл с командами компилятора. Все команды принимают
@@ -20,8 +20,8 @@ source_hash: 4118653f1d677817
 
 | Команда | Действие |
 | - | - |
-| `new <dir> [--template app\|cli\|fullstack\|lib\|plugin]` | создаёт проект: `flick.toml`, `package.json`, пример модуля и его тест; `cli` делает `main` [блоком `cli`](../cli-dsl/); `plugin` — библиотека с [плагином](../plugins/), его крейт в `plugin/` и `flick run plugin` для сборки; `fullstack` — серверный вход и страница браузера (`target = "client"`), общие вызовы модуля [`server fn`](../server-fn/), запись под `Server.authenticated`, Vite для страницы |
-| `init [--template app\|cli\|fullstack\|lib]` | создаёт те же файлы в рабочем каталоге; перед записью сообщает обо всех файлах, которые уже существуют (`FLICK-P019`) |
+| `new <dir> [--template app\|cli\|fullstack\|lib\|plugin]` | создаёт проект: `flick.toml`, `package.json`, пример модуля и его тест, а также `AGENTS.md` — где агентам для кода искать сведения о Flick и какие проверки проходить; `cli` делает `main` [блоком `cli`](../cli-dsl/); `plugin` — библиотека с [плагином](../plugins/), его крейт в `plugin/` и `flick run plugin` для сборки; `fullstack` — серверный вход и страница браузера (`target = "client"`), общие вызовы модуля [`server fn`](../server-fn/), запись под `Server.authenticated`, Vite для страницы |
+| `init [--template app\|cli\|fullstack\|lib]` | создаёт те же файлы в рабочем каталоге; перед записью сообщает обо всех файлах, которые уже существуют (`FLICK-P019`), кроме `AGENTS.md`: существующий остаётся как есть |
 | `check [paths] [--watch] [--fix [--only codes]]` | проверяет код; если пути не указаны, проверяет корневые каталоги исходников и тестов; `--fix` применяет к этим файлам исправления, не меняющие смысла программы (например, убирает избыточную аннотацию типа, `FLICK-T021`), и сообщает об оставшихся проблемах; `--only E002,F001` применяет только исправления этих кодов — для миграции, которая больше ничего не меняет |
 | `build [paths] [--profile] [--labels all\|components\|none] [--emit js\|ts\|go] [--emit-dts] [--promise-facade] [--emit-ir[=json\|cbor]] [--schema-aot] [--out-dir] [--watch]` | записывает ESM, карты исходников и файлы `.iface` (`--emit go` — исполняемый файл Go для каждого входа, см. [Go-target](../codegen/#go-target)); `--emit-dts` добавляет файлы `.d.ts`, а `--promise-facade` — Promise-фасады `A/B.promise.js` (см. [TypeScript](../codegen/#typescript)); `--emit-ir` добавляет `program.ir.json` (или `program.ir.cbor`) — IR, который получает бэкенд, оптимизированный в release-сборке, с версией IR, в которой он записан; показывает в stderr этапы сборки, затем число модулей и раннеры входов либо число и расположение ошибок; `--silent`/`--quiet` и `--diagnostics json` отключают прогресс и итог |
 | `build [paths] --inputs` | выводит консервативный JSON-инвентарь входов (`key`, `files`, `roots`, `modules`), не записывая артефакты и кеш |

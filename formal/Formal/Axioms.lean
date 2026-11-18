@@ -4,6 +4,7 @@ import Formal.Elab.Coherence
 import Formal.Elab.CoreT6a
 import Formal.Elab.CoreRun
 import Formal.LetMut
+import Formal.LetMut.LazyWitness
 import Formal.Live.T4Live
 import Formal.Live.T1Regions
 import Formal.Live.Install
@@ -79,6 +80,26 @@ prints, and `#guard_msgs` turns the difference into an error.
 /-- info: 'Flick.T7' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Flick.T7
+
+/-- info: 'Flick.MutOk.lzDecl' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.MutOk.lzDecl
+
+/-- info: 'Flick.LzSig.typ_run' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.LzSig.typ_run
+
+/-- info: 'Flick.MutOk.lzAwait' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.MutOk.lzAwait
+
+/-- info: 'Flick.MutOk.lzWrite' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.MutOk.lzWrite
+
+/-- info: 'Flick.Elab.Witness.lzSig' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Elab.Witness.lzSig
 
 /-- info: 'Flick.Ty.Equiv.substT' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
