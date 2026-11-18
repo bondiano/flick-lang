@@ -8,7 +8,7 @@ use std::rc::Rc;
 use super::expr::mono;
 use super::generalize::{Inst, params, substitute, substitute_caps};
 use super::{Check, Checker, error};
-use crate::syntax::{Name, Path, Term};
+use crate::syntax::{GETTER, Name, Path, Term};
 use crate::types::{Fields, Kind, Row, Scheme, Type, Var};
 
 /// An operation of `S τ̄`: the first variables of its scheme are the
@@ -89,12 +89,10 @@ impl Checker<'_> {
         };
         let map = params(&class.params, args);
         if let Some(sup) = l.strip_prefix('$') {
-            return match class
-                .supers
-                .iter()
-                .find(|s| matches!(s, Type::Dict(p, _) if &*p.name == sup))
+            return match (0..class.supers.len())
+                .find(|&i| class.super_slot(i).as_deref() == Some(sup))
             {
-                Some(s) => Ok(mono(substitute(s, &map))),
+                Some(i) => Ok(mono(substitute(&class.supers[i], &map))),
                 None => error("Field", format!("`{}` has no superclass `{sup}`", c.name)),
             };
         }
@@ -158,7 +156,11 @@ impl Checker<'_> {
         }
         for (l, x) in fields {
             let s = self.method(c, args, l)?;
-            self.check_forall(x, &s)?;
+            match x {
+                // the field of a default is its getter's body
+                Term::Lam(get, body) if &**get == GETTER => self.check_forall(body, &s)?,
+                _ => self.check_forall(x, &s)?,
+            }
         }
         Ok(())
     }
