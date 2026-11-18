@@ -149,4 +149,16 @@ fn a_function_called_prove_of_a_module_is_no_proof() {
         ),
     ];
     assert_eq!(checks(&host, &files), [""; 0]);
+    // without the module, the same spelling is the proof, with its obligation
+    host.write(
+        "/p/src/App/Main.fl",
+        &main.replace("import App.Port as Port\n", ""),
+    );
+    let found = checks(&host, &[]);
+    assert!(
+        found
+            .iter()
+            .any(|d| d.starts_with("FLICK-T077 `Port.prove n`")),
+        "{found:?}"
+    );
 }
