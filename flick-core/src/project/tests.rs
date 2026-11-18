@@ -519,6 +519,7 @@ fn a_companion_stands_for_the_module_file_beside_it() {
         module("src/App/Users.test.fl"),
         Some(PathBuf::from("src/App/Users.fl"))
     );
+    assert!(is_companion(Path::new("src/App/Users.test.fl")));
     assert_eq!(module("src/App/Users.fl"), None);
     // a bare `.test.fl` names no module
     for bare in [".test.fl", "src/App/.test.fl"] {
