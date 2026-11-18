@@ -1,0 +1,20 @@
+module App.RowTailKinds exposing (main)
+
+effect Emit a =
+  control emit : a ->{} Unit
+
+collect : (Unit ->{Emit a | r; e} Unit) ->{r; e} List a
+let collect body =
+  try body () with
+  | Emit.emit x -> [x] ++ resume ()
+  | return () -> []
+
+// a type joined to a row: the handler's row must not grow by it without end
+three : Unit ->{r + Int} Unit
+let three () =
+  Emit.emit 1
+
+main : Unit ->{} List Int
+let main () = collect three
+
+//~ FLICK-T002 @13:21-13:24 `Int` has kind Type, but a ServiceRow is expected here
