@@ -24,8 +24,10 @@ export {
   genPair,
   genString,
   testGroup,
+  testOnly,
   testProperty,
   testPure,
+  testSkip,
 } from "@flick-lang/runtime/core/testing";
 export type { Assertion, Gen, Rng } from "@flick-lang/runtime/core/testing";
 export { parseTestArgs } from "@flick-lang/runtime/core/suites";

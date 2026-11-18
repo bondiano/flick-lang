@@ -1,6 +1,7 @@
-/// Tests. A module of the test root exports `tests : List Test`; `flick test`
-/// runs each test in a scope of its own and reports assertions, typed
-/// failures, defects and failed cleanup apart.
+/// Tests. A module of the test root exports `tests : List Test`, which its
+/// `suite` and `test` blocks declare, or which it builds by hand with this
+/// module; `flick test` runs each test in a scope of its own and reports
+/// assertions, typed failures, defects and failed cleanup apart.
 module Test exposing (..)
 
 import Duration
@@ -61,6 +62,26 @@ effect_test :
   (forall s. Fiber.Provided {...Host.Live} s => Eff {Async, Scope s, ...Host.Live} e Unit) ->
   Test
 foreign pure effect_test from "flick:rt" "testEffect"
+
+/// The test of a block `test "name" { body }`: an `effect_test` whose
+/// task calls `body`.
+case :
+  forall e.
+  String ->
+  (forall s. Fiber.Provided {...Host.Live} s => Unit ->{Async, Scope s, ...Host.Live; e} Unit) ->
+  Test
+let case name body = effect_test name (task { body () })
+
+/// A test reported as skipped and never run; of a group or a suite, each
+/// test in it.
+skip : Test -> Test
+foreign pure skip from "flick:rt" "testSkip"
+
+/// A test marked for a run of only the marked tests, as is each test in a
+/// marked group or suite: while a test of the run is marked, the others are
+/// reported as skipped. `flick test --forbid-only` fails a run with one.
+only : Test -> Test
+foreign pure only from "flick:rt" "testOnly"
 
 /// Virtual time: the clock a `clock_test` runs on, which moves only when
 /// the test moves it.

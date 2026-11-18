@@ -237,14 +237,8 @@ impl<'a> Scope<'a> {
     /// The interface the module's `exposing` list describes.
     pub fn exports(&self, diagnostics: &mut Vec<Diagnostic>) -> Interface {
         let mut exports: Vec<Export> = Vec::new();
-        let items = self
-            .module
-            .syntax
-            .header
-            .as_ref()
-            .and_then(|h| h.exposing.as_deref())
-            .unwrap_or_default();
-        for item in items {
+        let declared = |name: &str| self.defs.iter().any(|d| d.name == name);
+        for item in self.module.syntax.exported(declared) {
             match item.kind {
                 ItemKind::All => {
                     let opaque = |parent: &Option<String>| {

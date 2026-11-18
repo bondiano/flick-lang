@@ -1,3 +1,4 @@
+use super::tests::{errors, sexp};
 use super::*;
 use crate::fmt;
 use crate::source::SourceMap;
@@ -332,4 +333,22 @@ fn a_line_that_goes_on_with_an_expression_is_no_child() {
         "{}",
         shape(&lines.tree)
     );
+}
+
+#[test]
+fn a_suite_and_a_test_are_blocks_only_where_a_top_level_declaration_starts() {
+    assert_eq!(
+        sexp("suite \"Users\" { test \"a\" {} }\ntest.skip \"b\" {}\n"),
+        "(PluginDecl suite \"Users\" { (Block test \"a\" { }) })\n\
+         (PluginDecl test . skip \"b\" { (Block ) })"
+    );
+    // a signature of a value of that name stays one, and the words stay names
+    // in expressions, where `Test.test` and a local `test` are called
+    assert_eq!(
+        errors(
+            "test : String -> Int\nlet test name = 1\nlet a = test \"x\"\nlet b = Test.test \"x\" (fun () -> Test.Pass)\nlet c = suite \"y\" { x = 1 }\n"
+        ),
+        Vec::<String>::new()
+    );
+    assert!(sexp("let c = suite \"y\" { x = 1 }\n").contains("RecordExpr"));
 }

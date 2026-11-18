@@ -115,7 +115,8 @@ pub fn resolve(
     imported: &dyn Fn(&str) -> Option<Interface>,
 ) -> (Interface, Vec<Diagnostic>) {
     let all = defs::collect(module.tree, module.text, module.file);
-    let mut diagnostics = defs::duplicates(&all);
+    let tests = module.syntax.tests.as_ref().map(|i| i.span);
+    let mut diagnostics = defs::duplicates(&all, module.generated, tests);
     let defs = defs::defined(all.clone());
     diagnostics.extend(defs::alias_cycles(module.tree, module.text, module.file));
     diagnostics.extend(defs::module_signature_cycles(
@@ -127,10 +128,12 @@ pub fn resolve(
     let mut interface = scope.exports(&mut diagnostics);
     interface.private = module.syntax.header.as_ref().is_some_and(|h| h.private);
     let mut docs = doc::comments(module.text);
-    interface.docs = (interface.exports.iter())
-        .filter(|e| e.entity.module == interface.module)
-        .filter_map(|e| Some((e.entity.name.clone(), docs.remove(&e.entity.name)?)))
-        .collect();
+    // `extend` inserts one by one, as other maps of names do, where `collect`
+    // would compile a sort and a bulk build of its own
+    let own = (interface.exports.iter()).filter(|e| e.entity.module == interface.module);
+    interface
+        .docs
+        .extend(own.filter_map(|e| Some((e.entity.name.clone(), docs.remove(&e.entity.name)?))));
     let (references, unused) = uses::references(module);
     for reference in &references {
         scope.check_use(reference, &mut diagnostics);

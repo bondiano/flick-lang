@@ -455,10 +455,12 @@ fn std_round(
             return Vec::new();
         }
     };
-    let published: BTreeMap<String, Vec<u8>> = (published.into_iter())
-        .filter(|p| p.module == module)
-        .map(|p| (p.name, p.data))
-        .collect();
+    // `extend` inserts one by one, as the loader's map of what a module sees
+    // does, where `collect` would compile a sort and a bulk build of its own
+    let mut seen = BTreeMap::new();
+    let own = published.into_iter().filter(|p| p.module == module);
+    seen.extend(own.map(|p| (p.name, p.data)));
+    let published = seen;
     let published = Arc::new(published);
     let mut out = Vec::new();
     for ((node, mut source), block) in round.into_iter().zip(&read) {

@@ -201,12 +201,15 @@ greet : String -> String
 let greet name = \"Hello, \" ++ name ++ \"!\"
 ";
 
-const TEST: &str = "module Lib.GreetingTest exposing (tests)
+const TEST: &str = "module Lib.GreetingTest
 
 import Lib.Greeting exposing (greet)
 
-tests : List Test.Test
-let tests = [Test.test \"greets\" (fun () -> Test.equal \"Hello, Ada!\" (greet \"Ada\"))]
+suite \"greet\" {
+  test \"greets by name\" {
+    Test.expect (Test.equal \"Hello, Ada!\" (greet \"Ada\"))
+  }
+}
 ";
 
 impl Command for ScaffoldCommand {
