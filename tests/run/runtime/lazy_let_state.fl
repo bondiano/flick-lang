@@ -39,9 +39,11 @@ let main () =
   let inside = scope { await once + await once }
   Platform.stdout_line "in a scope: \{inside}, runs: \{Ref.get counted}"
   let lazy mut cached = step runs 5
-  let before = try await cached with
+  let before =
+    try await cached with
     | Boom _ -> 0
   cached = 9
-  let after = try await cached with
+  let after =
+    try await cached with
     | Boom _ -> 0
   Platform.stdout_line "write after read: \{before} \{after}, runs: \{Ref.get runs}"
