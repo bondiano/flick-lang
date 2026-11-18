@@ -1,13 +1,14 @@
 ---
 title: "Пользовательские интерфейсы"
-source_hash: e0f6610287d479a2
+source_hash: b4928c4ebdc1423c
 ---
 
 `Ui` описывает пользовательский интерфейс и обработчики его событий
 (см. [Программирование на уровне типов и eDSL](../../spec/08-type-programming-and-edsl/)).
-Задача обработчика только изменяет атомы (`Atom.Write`): другие сервисы
-она предоставляет себе сама и свои ошибки обрабатывает сама, поэтому
-у `Ui` нет строк эффектов.
+Задача обработчика изменяет атомы (`Atom.Write`) и пользуется сервисами
+браузера (`Host.BrowserLive`), которые корень требует от вызывающего;
+другие сервисы она предоставляет себе сама и свои ошибки обрабатывает сама,
+поэтому у `Ui` нет строк эффектов.
 Построение `Ui` — чистая операция: оно не запускает обработчики, не читает
 состояние и не обращается к DOM. `Ui.Dom.mount` отображает интерфейс
 через React 19 (`react-dom/client`) и выполняет каждый обработчик события
@@ -514,7 +515,9 @@ let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 
 ```flick
 mount :
   forall c r.
-  Ui.Dom.Container -> (Failure none ->{r; none} Unit)^c -> Ui^c ->{Async, Atom.Registry, Atom.Write | r; none} Never
+  Ui.Dom.Container ->
+  (Failure none ->{r; none} Unit)^c ->
+  Ui^c ->{Async, Atom.Registry, Atom.Write, ...Host.BrowserLive | r; none} Never
 # let mount = Ui.Dom.mount
 ```
 
@@ -522,8 +525,11 @@ mount :
 в него представления перерисовываются, когда меняются прочитанные ими атомы.
 Первое монтирование DOM синхронно, последующие рендеры планирует
 и объединяет React 19. Каждая задача изменяет атомы через `Atom.Write`
-вызова `mount`, её дефекты получает супервизор, а реестр предоставляет
-программа:
+вызова `mount` и пользуется его `Host.BrowserLive` (`Host.Console`,
+`Host.Clock`, `Host.Random`), её дефекты получает супервизор, а реестр
+предоставляет программа. `main`, монтирующий корень, называет эти сервисы,
+поэтому их предоставляет его runner, а без runner'а — раннер, который его
+запускает:
 
 ```flick
 # count : Atom.Writable Float
@@ -532,7 +538,7 @@ mount :
 # report : Failure none ->{} Unit
 # let report _ = ()
 #
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Async, ...Host.BrowserLive; AppError} Unit
 let main () =
   match Ui.Dom.container "app" with
   | None -> App.fail "missing root"

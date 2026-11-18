@@ -325,6 +325,7 @@ ui/element
 ui/email
 ui/family
 ui/form
+ui/host
 ui/host_field
 ui/hydrate
 ui/navigate

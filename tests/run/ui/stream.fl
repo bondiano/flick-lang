@@ -66,7 +66,7 @@ report : Failure e ->{Host.Console} Unit
 let report failure =
   Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
 
-main : Unit ->{Host.Console, Async; AppError} Unit
+main : Unit ->{Host.Clock, Host.Random, Host.Console, Async; AppError} Unit
 let main () =
   let chunks = provide Atom.layer {
     Atom.set count 5

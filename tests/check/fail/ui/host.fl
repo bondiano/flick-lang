@@ -1,0 +1,23 @@
+// A root runs the tasks of its handlers and instances with the browser's
+// host services, so `Ui.Dom.mount` and `Ui.mount_with` ask their caller for
+// them: a `main` without a runner that mounts a root names them, and its
+// launcher provides them.
+module App.Host exposing (..)
+
+report : Failure e ->{} Unit
+let report _ = ()
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  match Ui.Dom.container "app" with
+  | None -> App.fail "no container"
+  | Some root -> provide Atom.layer { ignore (Ui.Dom.mount root report (Ui.text "app")) }
+//~ FLICK-E002 @14:18-14:25 does not allow services `Clock`, `Console`, `Random`, which its body needs
+
+with_renderer : Ui.Renderer ->{Async, Atom.Registry, Atom.Write, Host.Console} Never
+let with_renderer renderer = Ui.mount_with renderer report (Ui.text "app")
+//~ FLICK-E002 @18:30-18:75 does not allow services `Clock`, `Random`, which its body needs
+
+// the alias names all three
+named : Ui.Dom.Container ->{Async, Atom.Registry, Atom.Write, ...Host.BrowserLive} Never
+let named root = Ui.Dom.mount root report (Ui.text "app")
