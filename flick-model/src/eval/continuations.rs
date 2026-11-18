@@ -98,12 +98,26 @@ impl Machine<'_> {
                 (a, b) => return Err(stuck(format!("join of {a:?} and {b:?}"))),
             },
             Frame::Inside(pi, s) => self.close(pi, s, Ok(v)),
+            Frame::Settle(l) => self.settle(l, Ok(v)),
             f @ (Frame::Handler(..) | Frame::Resume(_) | Frame::Discontinue(..)) => {
                 self.ret_handler(f, v)
             }
             // what a child or a finalizer gives is dropped
             Frame::Close(pi, s, ended) => self.close(pi, s, ended),
         })
+    }
+
+    /// The initializer of the lazy cell `l` ended with `ended`, which goes
+    /// on: a value or an error settles the cell, a handler's signal makes it
+    /// pending again.
+    fn settle(&mut self, l: usize, ended: Result<Term, Term>) -> Control {
+        if let Some(state) = settled(&self.mem[l], ended.as_ref()) {
+            self.mem[l] = state;
+        }
+        match ended {
+            Ok(v) => Control::Ret(v),
+            Err(v) => Control::Raise(v),
+        }
     }
 
     /// `f v`.
@@ -180,6 +194,7 @@ impl Machine<'_> {
                     }
                 }
                 Frame::Inside(pi, s) => return Ok(self.close(pi, s, Err(v))),
+                Frame::Settle(l) => return Ok(self.settle(l, Err(v))),
                 // shortcut: a child or a finalizer that fails stops the machine, its supervisor and the order of failures are λRT's (`runtime.md`); run the supervisor once a generated child can fail
                 Frame::Close(pi, ..) => {
                     return Err(stuck(format!("a child or finalizer of π{pi} raised {v:?}")));

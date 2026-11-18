@@ -1,0 +1,39 @@
+// A signal of a handler that leaves an initializer, here an `abort` caught
+// around the `await`, caches nothing: the lazy is pending again, and the next
+// `await` runs the initializer again. The attempt that ends with a value keeps
+// it, so the third `await` runs nothing. A `let lazy` does the same.
+module App.Main exposing (main)
+
+effect Stop =
+  abort stop : forall a. String ->{} a
+
+attempt : Ref Int -> Int ->{Stop} Int
+let attempt runs n =
+  Ref.set runs (Ref.get runs + 1)
+  if Ref.get runs < 2 then Stop.stop "attempt \{Ref.get runs} stopped" else n * 2
+
+forced : Lazy {Stop} {} Int ->{Async} String
+let forced l =
+  try show (await l) with
+  | Stop.stop why -> why
+
+main : Unit ->{Host.Console, Async} Unit
+let main () =
+  let runs = Ref.make 0
+  let doubled = lazy { attempt runs 21 }
+  let first = forced doubled
+  let second = forced doubled
+  let third = forced doubled
+  Platform.stdout_line "\{first} / \{second} / \{third}, runs: \{Ref.get runs}"
+  let again = Ref.make 0
+  let lazy twice = attempt again 7
+  let a =
+    try show (await twice) with
+    | Stop.stop why -> why
+  let b =
+    try show (await twice) with
+    | Stop.stop why -> why
+  let c =
+    try show (await twice) with
+    | Stop.stop why -> why
+  Platform.stdout_line "\{a} / \{b} / \{c}, runs: \{Ref.get again}"

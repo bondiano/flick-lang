@@ -59,7 +59,7 @@ The core (`core.md`) gains one type former, two term forms and one runtime frame
 τ  ::= … | Lazy ρ ε τ
 e  ::= … | lazy e | force e
 v  ::= … | ℓ                        ℓ a location whose cell holds a lazy state
-μ(ℓ) ::= … | Pending e | Running | Done o
+μ(ℓ) ::= … | Pending e | Running e | Done o
 o  ::= ok v | err v | defect
 E  ::= … | force E | settle ℓ E     -- settle is a runtime-only frame
 ```
@@ -68,30 +68,33 @@ Steps (`core.md` §3.4):
 
 ```text
 ⟨μ, E[lazy e]⟩                        →  ⟨μ[ℓ ↦ Pending e], E[ℓ]⟩          ℓ ∉ dom μ
-⟨μ, E[force ℓ]⟩, μ(ℓ) = Pending e     →  ⟨μ[ℓ ↦ Running],   E[settle ℓ e]⟩
-⟨μ, E[settle ℓ v]⟩                    →  ⟨μ[ℓ ↦ Done (ok v)],  E[v]⟩           if μ(ℓ) = Running
-⟨μ, E[settle ℓ (raise v)]⟩            →  ⟨μ[ℓ ↦ Done (err v)], E[raise v]⟩     if μ(ℓ) = Running
+⟨μ, E[force ℓ]⟩, μ(ℓ) = Pending e     →  ⟨μ[ℓ ↦ Running e], E[settle ℓ e]⟩
+⟨μ, E[settle ℓ v]⟩                    →  ⟨μ[ℓ ↦ Done (ok v)],  E[v]⟩           if μ(ℓ) = Running e
+⟨μ, E[settle ℓ (raise v)]⟩            →  ⟨μ[ℓ ↦ Done (err v)], E[raise v]⟩     if μ(ℓ) = Running e
+⟨μ, E[settle ℓ (unw p ℓ' a)]⟩         →  ⟨μ[ℓ ↦ Pending e],    E[unw p ℓ' a]⟩  if μ(ℓ) = Running e
 ⟨μ, E[settle ℓ die]⟩                  →  ⟨μ[ℓ ↦ Done defect],  E[die]⟩
 ⟨μ, E[force ℓ]⟩, μ(ℓ) = Done (ok v)   →  ⟨μ, E[v]⟩
 ⟨μ, E[force ℓ]⟩, μ(ℓ) = Done (err v)  →  ⟨μ, E[raise v]⟩
 ⟨μ, E[force ℓ]⟩, μ(ℓ) = Done defect   →  ⟨μ, E[die]⟩
-⟨μ, E[force ℓ]⟩, μ(ℓ) = Running       →  ⟨μ, E[die]⟩            -- self-force: one thread forcing its own initializer
+⟨μ, E[force ℓ]⟩, μ(ℓ) = Running e     →  ⟨μ, E[die]⟩            -- self-force: one thread forcing its own initializer
 ⟨μ, E[Ref.get ℓ]⟩, ℓ a lazy cell      →  ⟨μ, E[die]⟩            -- not reachable: no `Ref` term reaches a lazy cell
 ```
 
 - `settle ℓ □` is transparent to operations: a `perform` inside the initializer is answered by the handlers of `E`, i.e. of the fiber that forces it (no fork, spec/02).
 - `raise` and `die` propagate *through* `settle` after recording the outcome. A `try` inside `e` is inside `settle`, so a caught error is not an outcome.
-- An outcome is written only into a `Running` cell, which is the state of the cell at every `settle ℓ` a program reaches. With the condition, L1 and L2 hold of every typed configuration, not only of the reachable ones. In one thread `die` ends the thread, so the `Done defect` that `settle ℓ die` writes is not observed; the step is the step of `die` through the frame.
+- An outcome, or a reset, is written only into a `Running` cell, which is the state of the cell at every `settle ℓ` a program reaches. With the condition, L1 and L2 hold of every typed configuration, not only of the reachable ones. In one thread `die` ends the thread, so the `Done defect` that `settle ℓ die` writes is not observed; the step is the step of `die` through the frame.
 - A force of a cell that holds neither `Pending` nor `Done` is a defect: `Running` above, or a cell that holds no lazy, which no typed term forces. A `Ref.get` of a lazy cell is a defect. The last two keep progress independent of the typing of the store and preservation independent of a premise on (Loc), which also types the location of a lazy cell as a `Ref`.
-- A signal of a handler (an `abort`, or a `control` arm that lets the body go) passes `settle ℓ` and leaves the cell `Running` (§8).
-- Store typing: `Σ(ℓ) = Cell ρ ε τ`, a type of the store only, and `Σ ⊢ ℓ : Lazy ρ ε τ`. No value has the type `Cell ρ ε τ`, so no `Ref` cell has it and `Ref.set` never writes a lazy cell; with `Σ(ℓ) = Lazy ρ ε τ` a `Ref (Lazy ρ ε τ)` cell and a lazy cell would share the type. A cell in `Running` has the type of its frame.
+- A signal of a handler (an `abort`, or a `control` arm that lets the body go) passes `settle ℓ` and resets the cell: `Running e` keeps the initializer, the cell is `Pending e` again, and the next force runs `e` again. A signal is no outcome, as an interruption is none in λRT (§5 (d)).
+- Store typing: `Σ(ℓ) = Cell ρ ε τ`, a type of the store only, and `Σ ⊢ ℓ : Lazy ρ ε τ`. No value has the type `Cell ρ ε τ`, so no `Ref` cell has it and `Ref.set` never writes a lazy cell; with `Σ(ℓ) = Lazy ρ ε τ` a `Ref (Lazy ρ ε τ)` cell and a lazy cell would share the type. A cell in `Running e` keeps the typing of its initializer, which a reset gives back to `Pending e`.
 
 **Laws** (core, one thread):
 
-- **L1 (once).** On any path, `settle ℓ` occurs at most once for each `ℓ`.
+- **L1 (once per attempt).** On any path the starts of `ℓ` (a force of `Pending e`) and its resets (a signal through `settle ℓ`) alternate: between two resets the initializer starts at most once. A reset happens only from `Running e`, on a signal; a value or an error settles the cell.
 - **L2 (final).** After `μ(ℓ) = Done o`, `μ(ℓ)` never changes, and every later `force ℓ` reduces to the term of `o` without changing `μ`.
 
-Lean: the core gains `Ty.lazy` and the store type `Ty.lazyCell` (`formal/Formal/TyBase.lean`; `Lazy ρ ε τ` carries the hidden qualifier `C` of its initializer, as `Eff`), `Tm.lazy`, `Tm.force`, `Tm.settle` and the states of a cell `Tm.running`, `Tm.done` (`Syntax.lean`), the frames `Frame.force`, `Frame.settle` (`EvalCtx.lean`), (T-Lazy) `Typ.lazy`, (T-Force) `Typ.force`, (LazyLoc) `Typ.lazyLoc` and (Settle) `Typ.settle` (`Rules.lean`), the store typing `CellTy`, `StoreTy` (`StoreTy.lean`), and the steps `RHead.lazy`, `.forcePending`, `.forceDone`, `.forceRunning`, `.settleVal`, `.settleRaise`, `.settleUnw`, `.refGetCell` with `settleCell` (`Semantics.lean`). Every lemma over terms, types, frames and steps covers them, `Subst*`, `Reach`, `Regions`, `Live` and `Elab` included; preservation of the new steps is `lazy_new`, `force_pending`, `force_done`, `settle_val`, `settle_raise`, `settle_unw` (`PresLazy.lean`), progress is `progress` (`ProgressMain.lean`), and `T1`, `T2a`, `T2b`, `T3`, `T4'`, `T1_regions` hold with them. L1 is `Lazy.L1` and L2 is `Lazy.L2` (`formal/Formal/Lazy.lean`). No `sorry`, no new axioms (`lake build --wfail`; `Formal/Axioms.lean` pins them).
+Lean: the core gains `Ty.lazy` and the store type `Ty.lazyCell` (`formal/Formal/TyBase.lean`; `Lazy ρ ε τ` carries the hidden qualifier `C` of its initializer, as `Eff`), `Tm.lazy`, `Tm.force`, `Tm.settle` and the states of a cell `Tm.running`, `Tm.done` (`Syntax.lean`), the frames `Frame.force`, `Frame.settle` (`EvalCtx.lean`), (T-Lazy) `Typ.lazy`, (T-Force) `Typ.force`, (LazyLoc) `Typ.lazyLoc` and (Settle) `Typ.settle` (`Rules.lean`), the store typing `CellTy`, `StoreTy` (`StoreTy.lean`), and the steps `RHead.lazy`, `.forcePending`, `.forceDone`, `.forceRunning`, `.settleVal`, `.settleRaise`, `.settleUnw`, `.refGetCell` with `settleCell` and `resetCell` (`Semantics.lean`). Every lemma over terms, types, frames and steps covers them, `Subst*`, `Reach`, `Regions`, `Live` and `Elab` included; preservation of the new steps is `lazy_new`, `force_pending`, `force_done`, `settle_val`, `settle_raise`, `settle_unw` (`PresLazy.lean`), progress is `progress` (`ProgressMain.lean`), and `T1`, `T2a`, `T2b`, `T3`, `T4'`, `T1_regions` hold with them. L1 is `Lazy.L1` with `Lazy.L1_once` and `Step.pending` (a cell is pending again only after a `Resets` step), and L2 is `Lazy.L2` (`formal/Formal/Lazy.lean`). No `sorry`, no new axioms (`lake build --wfail`; `Formal/Axioms.lean` pins them).
+
+Checked by: `tests/run/runtime/lazy_once.fl` (an outcome is kept) and `tests/run/runtime/lazy_abort.fl` (an `abort` through the initializer resets the cell, and the next `await` runs it again) on JS, TS, Go, the rt runtime and the model, whose natives run the initializer in a frame `settle ℓ` of their own (`flick-model/src/native/lazy.rs`).
 
 ## 4. `let lazy` and `let lazy mut`
 
@@ -132,7 +135,7 @@ A `Lazy` cell is shared between fibers. Its states are refined to `Pending e | R
 
 Typed failures and defects are cached (b). Interruption is not cached (d).
 
-Lean: `formal/Formal/RT/LazyCell.lean` proves R9 as a property of the protocol over atomic transitions, alongside R7: `R9`, over every interleaving `LReach` of the steps `LStep` of a cell `LSt`, with the bookkeeping of attempts `LInv`; its parts are `LInv.runs` (a), `R9b`, `R9c`, `R9d`, `R9_cached` and `R9e`. `Step` and `Inv` gain no constructor, and T5 does not include R9. A running cell keeps its initializer `e`, which the reset of (d) gives back; an outcome is cached only without an interruption (`Cached`).
+Lean: `formal/Formal/RT/LazyCell.lean` proves R9 as a property of the protocol over atomic transitions, alongside R7: `R9`, over every interleaving `LReach` of the steps `LStep` of a cell `LSt`, with the bookkeeping of attempts `LInv`; its parts are `LInv.runs` (a), `R9b`, `R9c`, `R9d`, `R9_cached` and `R9e`. `Step` and `Inv` gain no constructor, and T5 does not include R9. A running cell keeps its initializer `e`, which the reset of (d) gives back; an outcome is cached only without an interruption (`Cached`). The one-thread core of §3 resets a cell in the same way when a signal passes `settle ℓ`.
 
 Runtimes:
 
@@ -177,6 +180,5 @@ Effect.or_die job                               -- an `Eff` passes as before
 1. The defect message and code for self-force (§3, R9e).
 2. Whether `Lazy` gets an `Inspectable`-style debug `Show` (shows only the state, not the value).
 3. Whether `~` is also allowed on parameters of class methods.
-4. In the core of §3 a signal of a handler passes `settle ℓ` and leaves the cell `Running`, so a later force in the same thread is a defect; (d) of §5 resets the cell to `Pending e` instead. The core would need `Running` to keep `e` to match (d).
-5. `Ty.elide` (the reading of a signature in the live discipline) leaves `Lazy` as it is: a `Lazy` in a signature gets no `Live` of the parameters before it, as `Eff` does.
-6. `let lazy` is lowered to a confined cell (§4), not to the threaded state `x$`; T7 does not cover it yet.
+4. `Ty.elide` (the reading of a signature in the live discipline) leaves `Lazy` as it is: a `Lazy` in a signature gets no `Live` of the parameters before it, as `Eff` does.
+5. `let lazy` is lowered to a confined cell (§4), not to the threaded state `x$`; T7 does not cover it yet.

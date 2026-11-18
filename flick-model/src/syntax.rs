@@ -285,6 +285,10 @@ pub enum Term {
     Cont(Cont),
     /// What unwinds a body to its handler (only at run time, raised).
     Signal(Rc<Signal>),
+    /// `settle ℓ e`: the initializer `e` of the lazy cell `ℓ` runs, and how
+    /// it ends settles or resets the cell (`docs/formal/lazy.md` §3; only at
+    /// run time).
+    Settle(usize, Rc<Term>),
 }
 
 /// `p → e` or `p when g → e`.

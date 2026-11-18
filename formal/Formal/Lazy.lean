@@ -9,10 +9,13 @@ The terms, types and steps of lazy cells are those of the core: `Ty.lazy` and th
 typing (`Rules`, `StoreTy`) and their steps (`Semantics`); preservation and progress cover them
 (`PresLazy`, `ProgressMain`). Here are the two laws of one thread.
 
-**L1 (once).** On any path the initializer of a cell starts at most once (`Lazy.L1`): the
-only step that starts it is the force of the pending cell, which puts the initializer in the
-frame `settle ℓ` and leaves the cell running (`Starts`), and no step makes a cell pending
-again (`Step.pending`).
+**L1 (once per attempt).** On any path the starts and the resets of a cell alternate
+(`Lazy.L1`): between two resets the initializer of a cell starts at most once
+(`Lazy.L1_once`). The only step that starts it is the force of the pending cell, which puts the
+initializer in the frame `settle ℓ` and leaves the cell running with it (`Starts`); the only step
+that makes a cell pending again is a reset (`Step.pending`): a signal of a handler — an `abort`,
+or a `control` arm that lets the body go — leaves the frame `settle ℓ` of the running cell, which
+gets its initializer back (`Resets`). A raised error and a value are outcomes and settle it.
 
 **L2 (final).** On any path from a typed configuration a settled cell keeps its outcome, and
 a later force of it steps to the term of that outcome and leaves the store (`Lazy.L2`). The
@@ -28,93 +31,194 @@ variable {S : Sig}
 /-- The cell `ℓ` is pending. -/
 def Pending (μ : List Tm) (l : Nat) : Prop := ∃ e, μ[l]? = some (.lazy e)
 
+/-- The cell `ℓ` is running. -/
+def Running (μ : List Tm) (l : Nat) : Prop := ∃ e, μ[l]? = some (.running e)
+
 /-- A step that starts the initializer of the cell `ℓ`: it forces the pending cell, puts the
-initializer in the frame `settle ℓ`, and leaves the cell running. -/
+initializer in the frame `settle ℓ`, and leaves the cell running with it. -/
 def Starts (l : Nat) (μ : List Tm) (e : Tm) (μ' : List Tm) (e' : Tm) : Prop :=
   ∃ E x, OkE E ∧ μ[l]? = some (.lazy x) ∧ e = plug E (.force (.loc l)) ∧
-    e' = plug E (.settle l x) ∧ μ' = μ.set l .running
+    e' = plug E (.settle l x) ∧ μ' = μ.set l (.running x)
 
-/-- What a step does to the store: nothing, a new cell, a value written into a cell, the start
-of an initializer, or an outcome written into a running cell. -/
+/-- A step that resets the cell `ℓ`: a signal leaves the frame `settle ℓ` of the running cell,
+which is pending again with its initializer. -/
+def Resets (l : Nat) (μ : List Tm) (e : Tm) (μ' : List Tm) (e' : Tm) : Prop :=
+  ∃ E x p ℓ a, OkE E ∧ μ[l]? = some (.running x) ∧ e = plug E (.settle l (.unw p ℓ a)) ∧
+    e' = plug E (.unw p ℓ a) ∧ μ' = μ.set l (.lazy x)
+
+/-- What a step does to the store: nothing, a new cell that is not running, a value written into
+a cell, the start of an initializer, the reset of a running cell, or an outcome written into a
+running cell. -/
 theorem Step.cells {root lbl Λ μ e Λ' μ' e'} (h : Step root lbl Λ μ e (.cfg Λ' μ' e')) :
-    μ' = μ ∨ (∃ c, μ' = μ ++ [c]) ∨ (∃ l v, Value v ∧ μ' = μ.set l v) ∨
-      (∃ l, Starts l μ e μ' e') ∨ ∃ l o, μ' = settleCell μ l o := by
+    μ' = μ ∨ (∃ c, μ' = μ ++ [c] ∧ ∀ x, c ≠ .running x) ∨ (∃ l v, Value v ∧ μ' = μ.set l v) ∨
+      (∃ l, Starts l μ e μ' e') ∨ (∃ l, Resets l μ e μ' e') ∨ ∃ l o, μ' = settleCell μ l o := by
   cases h with
   | rt hE hh =>
     cases hh with
-    | refMake | lazy | hdl => exact .inr (.inl ⟨_, rfl⟩)
+    | refMake hv => exact .inr (.inl ⟨_, rfl, fun _ h => by subst h; cases hv⟩)
+    | lazy | hdl => exact .inr (.inl ⟨_, rfl, fun _ h => by cases h⟩)
     | refSet hv => exact .inr (.inr (.inl ⟨_, _, hv, rfl⟩))
     | forcePending hl => exact .inr (.inr (.inr (.inl ⟨_, _, _, hE, hl, rfl, rfl, rfl⟩)))
-    | settleVal | settleRaise => exact .inr (.inr (.inr (.inr ⟨_, _, rfl⟩)))
+    | settleUnw =>
+      unfold resetCell
+      split
+      · rename_i x hx
+        exact .inr (.inr (.inr (.inr (.inl ⟨_, _, x, _, _, _, hE, hx, rfl, rfl, rfl⟩))))
+      · exact .inl rfl
+    | settleVal | settleRaise => exact .inr (.inr (.inr (.inr (.inr ⟨_, _, rfl⟩))))
     | _ => exact .inl rfl
-  | performCtl => exact .inr (.inl ⟨_, rfl⟩)
+  | performCtl => exact .inr (.inl ⟨_, rfl, fun _ h => by cases h⟩)
   | _ => exact .inl rfl
 
 theorem Step.length_le {root lbl Λ μ e Λ' μ' e'} (h : Step root lbl Λ μ e (.cfg Λ' μ' e')) :
     μ.length ≤ μ'.length := by
-  rcases h.cells with rfl | ⟨_, rfl⟩ | ⟨_, _, _, rfl⟩ | ⟨_, _, _, _, _, _, _, rfl⟩ | ⟨_, _, rfl⟩ <;>
-    simp
+  rcases h.cells with rfl | ⟨_, rfl, -⟩ | ⟨_, _, _, rfl⟩ | ⟨_, _, _, _, _, _, _, rfl⟩ |
+    ⟨_, _, _, _, _, _, _, _, _, _, rfl⟩ | ⟨_, _, rfl⟩ <;> simp
 
-/-- No step makes a cell of the store pending. -/
+/-- **A reset only from a running cell.** A step after which a cell of the store is pending
+leaves it pending, or resets it: a signal leaves the frame of the running cell. -/
 theorem Step.pending {root lbl Λ μ e Λ' μ' e' l} (h : Step root lbl Λ μ e (.cfg Λ' μ' e'))
-    (hl : l < μ.length) (hp : Pending μ' l) : Pending μ l := by
+    (hl : l < μ.length) (hp : Pending μ' l) : Pending μ l ∨ Resets l μ e μ' e' := by
   obtain ⟨x, hx⟩ := hp
-  rcases h.cells with rfl | ⟨_, rfl⟩ | ⟨_, _, hv, rfl⟩ | ⟨_, _, _, _, _, _, _, rfl⟩ | ⟨_, _, rfl⟩
-  · exact ⟨x, hx⟩
-  · rw [List.getElem?_append_left hl] at hx; exact ⟨x, hx⟩
+  rcases h.cells with rfl | ⟨_, rfl, -⟩ | ⟨_, _, hv, rfl⟩ | ⟨_, _, _, _, _, _, _, rfl⟩ |
+    ⟨l₀, hr⟩ | ⟨_, _, rfl⟩
+  · exact .inl ⟨x, hx⟩
+  · rw [List.getElem?_append_left hl] at hx; exact .inl ⟨x, hx⟩
   · rcases mem_set_get hx with hx | ⟨-, rfl⟩
-    · exact ⟨x, hx⟩
+    · exact .inl ⟨x, hx⟩
     · cases hv
   · rcases mem_set_get hx with hx | ⟨-, h⟩
-    · exact ⟨x, hx⟩
+    · exact .inl ⟨x, hx⟩
+    · cases h
+  · have hr₀ := hr
+    obtain ⟨_, _, _, _, _, _, _, _, _, rfl⟩ := hr₀
+    rcases mem_set_get hx with hx | ⟨rfl, -⟩
+    · exact .inl ⟨x, hx⟩
+    · exact .inr hr
+  · rcases settleCell_get hx with hx | ⟨-, h⟩
+    · exact .inl ⟨x, hx⟩
+    · cases h
+
+/-- A step after which a cell is running leaves it running, or starts it. -/
+theorem Step.running {root lbl Λ μ e Λ' μ' e' l} (h : Step root lbl Λ μ e (.cfg Λ' μ' e'))
+    (hr : Running μ' l) : Running μ l ∨ Starts l μ e μ' e' := by
+  obtain ⟨x, hx⟩ := hr
+  rcases h.cells with rfl | ⟨c, rfl, hc⟩ | ⟨_, _, hv, rfl⟩ | ⟨l₀, hs⟩ |
+    ⟨_, _, _, _, _, _, _, _, _, _, rfl⟩ | ⟨_, _, rfl⟩
+  · exact .inl ⟨x, hx⟩
+  · by_cases hl : l < μ.length
+    · rw [List.getElem?_append_left hl] at hx; exact .inl ⟨x, hx⟩
+    · rw [List.getElem?_append_right (by omega)] at hx
+      cases hj : l - μ.length with
+      | zero => simp [hj] at hx; exact (hc x hx).elim
+      | succ => simp [hj] at hx
+  · rcases mem_set_get hx with hx | ⟨-, rfl⟩
+    · exact .inl ⟨x, hx⟩
+    · cases hv
+  · have hs₀ := hs
+    obtain ⟨_, _, _, _, _, _, rfl⟩ := hs₀
+    rcases mem_set_get hx with hx | ⟨rfl, -⟩
+    · exact .inl ⟨x, hx⟩
+    · exact .inr hs
+  · rcases mem_set_get hx with hx | ⟨-, h⟩
+    · exact .inl ⟨x, hx⟩
     · cases h
   · rcases settleCell_get hx with hx | ⟨-, h⟩
-    · exact ⟨x, hx⟩
+    · exact .inl ⟨x, hx⟩
     · cases h
 
-/-- A path, with the number of its steps that start the initializer of `ℓ`. -/
+/-- A path, with the number of its steps that start the initializer of `ℓ` and of those that
+reset `ℓ`. -/
 inductive StartsN (root : Roots) (l : Nat) :
-    List Rgn → List Tm → Tm → List Rgn → List Tm → Tm → Nat → Prop
-  | refl : StartsN root l Λ μ e Λ μ e 0
+    List Rgn → List Tm → Tm → List Rgn → List Tm → Tm → Nat → Nat → Prop
+  | refl : StartsN root l Λ μ e Λ μ e 0 0
   | start {lb : Lbl} : Step root lb Λ μ e (.cfg Λ₁ μ₁ e₁) → Starts l μ e μ₁ e₁ →
-      StartsN root l Λ₁ μ₁ e₁ Λ' μ' e' n → StartsN root l Λ μ e Λ' μ' e' (n + 1)
+      StartsN root l Λ₁ μ₁ e₁ Λ' μ' e' n m → StartsN root l Λ μ e Λ' μ' e' (n + 1) m
+  | reset {lb : Lbl} : Step root lb Λ μ e (.cfg Λ₁ μ₁ e₁) → Resets l μ e μ₁ e₁ →
+      StartsN root l Λ₁ μ₁ e₁ Λ' μ' e' n m → StartsN root l Λ μ e Λ' μ' e' n (m + 1)
   | other {lb : Lbl} : Step root lb Λ μ e (.cfg Λ₁ μ₁ e₁) → ¬ Starts l μ e μ₁ e₁ →
-      StartsN root l Λ₁ μ₁ e₁ Λ' μ' e' n → StartsN root l Λ μ e Λ' μ' e' n
+      ¬ Resets l μ e μ₁ e₁ → StartsN root l Λ₁ μ₁ e₁ Λ' μ' e' n m →
+      StartsN root l Λ μ e Λ' μ' e' n m
 
 theorem StartsN.cons {root : Roots} {l : Nat} {lb : Lbl} {Λ Λ₁ Λ' : List Rgn} {μ μ₁ μ' : List Tm}
-    {e e₁ e' : Tm} {n : Nat} (h₁ : Step root lb Λ μ e (.cfg Λ₁ μ₁ e₁))
-    (h : StartsN root l Λ₁ μ₁ e₁ Λ' μ' e' n) : ∃ m, StartsN root l Λ μ e Λ' μ' e' m := by
+    {e e₁ e' : Tm} {n m : Nat} (h₁ : Step root lb Λ μ e (.cfg Λ₁ μ₁ e₁))
+    (h : StartsN root l Λ₁ μ₁ e₁ Λ' μ' e' n m) : ∃ n m, StartsN root l Λ μ e Λ' μ' e' n m := by
   by_cases hs : Starts l μ e μ₁ e₁
-  · exact ⟨n + 1, .start h₁ hs h⟩
-  · exact ⟨n, .other h₁ hs h⟩
+  · exact ⟨_, _, .start h₁ hs h⟩
+  by_cases hr : Resets l μ e μ₁ e₁
+  · exact ⟨_, _, .reset h₁ hr h⟩
+  · exact ⟨_, _, .other h₁ hs hr h⟩
 
-/-- Every path counts its starts. -/
+/-- Every path counts its starts and its resets. -/
 theorem Steps.startsN {root Q Λ μ e Λ' μ' e'} (h : Steps root Q Λ μ e Λ' μ' e') (l : Nat) :
-    ∃ n, StartsN root l Λ μ e Λ' μ' e' n := by
+    ∃ n m, StartsN root l Λ μ e Λ' μ' e' n m := by
   induction h with
-  | refl => exact ⟨0, .refl⟩
-  | step h₁ _ _ ih => obtain ⟨n, hn⟩ := ih; exact StartsN.cons h₁ hn
+  | refl => exact ⟨0, 0, .refl⟩
+  | step h₁ _ _ ih => obtain ⟨n, m, hn⟩ := ih; exact StartsN.cons h₁ hn
 
-private theorem startsN_zero {root l Λ μ e Λ' μ' e' n} (h : StartsN root l Λ μ e Λ' μ' e' n)
-    (hl : l < μ.length) (hp : ¬ Pending μ l) : n = 0 := by
-  induction h with
-  | refl => rfl
-  | start _ hs _ _ => obtain ⟨_, x, -, hx, -⟩ := hs; exact (hp ⟨x, hx⟩).elim
-  | other h₁ _ _ ih =>
-    exact ih (Nat.lt_of_lt_of_le hl h₁.length_le) fun hp' => hp (h₁.pending hl hp')
+theorem Starts.pending {l μ e μ' e'} (h : Starts l μ e μ' e') : Pending μ l ∧ Running μ' l := by
+  obtain ⟨_, x, -, hx, -, -, rfl⟩ := h
+  exact ⟨⟨x, hx⟩, x, List.getElem?_set_self (getElem?_lt hx)⟩
 
-/-- **L1 (once).** On any path, the initializer of a lazy cell starts at most once: after the
-step that starts it the cell is running, and it is never pending again. -/
-theorem Lazy.L1 {root l Λ μ e Λ' μ' e' n} (h : StartsN root l Λ μ e Λ' μ' e' n) : n ≤ 1 := by
+theorem Resets.running {l μ e μ' e'} (h : Resets l μ e μ' e') : Running μ l ∧ Pending μ' l := by
+  obtain ⟨_, x, _, _, _, -, hx, -, -, rfl⟩ := h
+  exact ⟨⟨x, hx⟩, x, List.getElem?_set_self (getElem?_lt hx)⟩
+
+theorem not_pending_running {μ : List Tm} {l : Nat} (hp : Pending μ l) (hr : Running μ l) : False := by
+  obtain ⟨_, hp⟩ := hp
+  obtain ⟨_, hr⟩ := hr
+  rw [hp] at hr; cases hr
+
+/-- The count of starts `n` and resets `m` of a path from the store `μ`, by the state of `ℓ`. -/
+private def Alt (μ : List Tm) (l n m : Nat) : Prop :=
+  (Running μ l → n ≤ m ∧ m ≤ n + 1) ∧ (¬ Running μ l → m ≤ n ∧ n ≤ m + 1) ∧
+    (l < μ.length → ¬ Running μ l → ¬ Pending μ l → n = 0 ∧ m = 0)
+
+private theorem Alt.other {root lb Λ μ e Λ₁ μ₁ e₁ l n m}
+    (h₁ : Step root lb Λ μ e (.cfg Λ₁ μ₁ e₁)) (hs : ¬ Starts l μ e μ₁ e₁)
+    (hr : ¬ Resets l μ e μ₁ e₁) (ih : Alt μ₁ l n m) : Alt μ l n m := by
+  have keep : ¬ Running μ l → ¬ Running μ₁ l := fun h h' => (h₁.running h').elim h hs
+  refine ⟨fun hrun => ?_, fun hn => ih.2.1 (keep hn), fun hl hn hp => ?_⟩
+  · by_cases hrun' : Running μ₁ l
+    · exact ih.1 hrun'
+    · obtain ⟨_, hx⟩ := hrun
+      have hl := getElem?_lt hx
+      have := ih.2.2 (Nat.lt_of_lt_of_le hl h₁.length_le) hrun' fun hp' =>
+        (h₁.pending hl hp').elim (fun hp => not_pending_running hp ⟨_, hx⟩) hr
+      omega
+  · exact ih.2.2 (Nat.lt_of_lt_of_le hl h₁.length_le) (keep hn) fun hp' =>
+      (h₁.pending hl hp').elim hp hr
+
+private theorem startsN_alt {root l Λ μ e Λ' μ' e' n m} (h : StartsN root l Λ μ e Λ' μ' e' n m) :
+    Alt μ l n m := by
   induction h with
-  | refl => omega
-  | start _ hs h' _ =>
-    obtain ⟨_, x, -, hx, -, -, rfl⟩ := hs
-    have hl := getElem?_lt hx
-    have := startsN_zero h' (by simpa using hl) fun ⟨y, hy⟩ => by
-      rw [List.getElem?_set_self hl] at hy; cases hy
-    omega
-  | other _ _ _ ih => exact ih
+  | refl => exact ⟨fun _ => by omega, fun _ => by omega, fun _ _ _ => by omega⟩
+  | start _ hs _ ih =>
+    obtain ⟨hp, hr⟩ := hs.pending
+    have := ih.1 hr
+    exact ⟨fun h => (not_pending_running hp h).elim, fun _ => by omega,
+      fun _ _ h => (h hp).elim⟩
+  | reset _ hs _ ih =>
+    obtain ⟨hr, hp⟩ := hs.running
+    have := ih.2.1 fun h => not_pending_running hp h
+    exact ⟨fun _ => by omega, fun h => (h hr).elim, fun _ h => (h hr).elim⟩
+  | other h₁ hs hr _ ih => exact Alt.other h₁ hs hr ih
+
+/-- **L1 (once per attempt).** On any path, the starts and the resets of the initializer of a
+lazy cell alternate: from a cell that is not running, there are as many resets as starts or one
+start more; from a running cell, as many starts as resets or one reset more. A start needs the
+cell pending and leaves it running; only a reset makes a cell pending again (`Step.pending`). -/
+theorem Lazy.L1 {root l Λ μ e Λ' μ' e' n m} (h : StartsN root l Λ μ e Λ' μ' e' n m) :
+    (¬ Running μ l → m ≤ n ∧ n ≤ m + 1) ∧ (Running μ l → n ≤ m ∧ m ≤ n + 1) :=
+  ⟨(startsN_alt h).2.1, (startsN_alt h).1⟩
+
+/-- Between two resets, the initializer of a lazy cell starts at most once: a path with no reset
+of the cell starts it at most once. -/
+theorem Lazy.L1_once {root l Λ μ e Λ' μ' e' n} (h : StartsN root l Λ μ e Λ' μ' e' n 0) :
+    n ≤ 1 := by
+  by_cases hr : Running μ l
+  · have := ((Lazy.L1 h).2 hr).1; omega
+  · have := ((Lazy.L1 h).1 hr).2; omega
 
 theorem Value.not_cell {v : Tm} (hv : Value v) : ¬ v.IsCell := by
   cases hv <;> simp [Tm.IsCell]
@@ -125,7 +229,8 @@ theorem Step.done_stays {root : Roots} {lbl : Lbl} {Ψ X : List Ty} {Λ Λ' : Li
     (hμ' : StoreTy S (Ψ ++ X) μ') (h : Step root lbl Λ μ e (.cfg Λ' μ' e'))
     (hd : μ[l]? = some (.done o)) : μ'[l]? = some (.done o) := by
   have hl := getElem?_lt hd
-  rcases h.cells with rfl | ⟨_, rfl⟩ | ⟨l₀, v, hv, rfl⟩ | ⟨l₀, _, x, -, hx, -, -, rfl⟩ | ⟨l₀, x, rfl⟩
+  rcases h.cells with rfl | ⟨_, rfl, -⟩ | ⟨l₀, v, hv, rfl⟩ | ⟨l₀, _, x, -, hx, -, -, rfl⟩ |
+    ⟨l₀, _, x, _, _, _, -, hx, -, -, rfl⟩ | ⟨l₀, x, rfl⟩
   · exact hd
   · rw [List.getElem?_append_left hl]; exact hd
   · by_cases he : l₀ = l
@@ -140,9 +245,11 @@ theorem Step.done_stays {root : Roots} {lbl : Lbl} {Ψ X : List Ty} {Λ Λ' : Li
       · exact hv.not_cell hc.isCell
     · rw [List.getElem?_set_ne he]; exact hd
   · rw [List.getElem?_set_ne fun he => by subst he; rw [hd] at hx; cases hx]; exact hd
+  · rw [List.getElem?_set_ne fun he => by subst he; rw [hd] at hx; cases hx]; exact hd
   · unfold settleCell
     split
     · rename_i hr
+      obtain ⟨_, hr⟩ := hr
       rw [List.getElem?_set_ne fun he => by subst he; rw [hd] at hr; cases hr]; exact hd
     · exact hd
 

@@ -98,7 +98,9 @@ signature and golden certificates.
 - **Lazy cells** (`Formal/Lazy.lean`, [`lazy.md`](../docs/formal/lazy.md) §3): `Lazy ρ ε τ`
   (`Ty.lazy`), `lazy e`, `force e` and the run-time frame `settle ℓ e` are part of the core
   above, so `T1`, `T2a`, `T2b`, `T3`, `T4'` and `T1_regions` cover them. `Lazy.L1`: on any
-  path the initializer of a cell starts at most once (`StartsN`, `Starts`). `Lazy.L2`: on any
+  path the starts and the resets of a cell alternate, so between two resets the initializer
+  starts at most once (`Lazy.L1_once`, `StartsN`, `Starts`, `Resets`); a reset is a signal that
+  leaves the frame of the running cell (`Step.pending`). `Lazy.L2`: on any
   path from a typed configuration a settled cell keeps its outcome, and a later force of it
   steps to the term of that outcome without changing the store (`Step.done_stays`,
   `Step.force_done`).

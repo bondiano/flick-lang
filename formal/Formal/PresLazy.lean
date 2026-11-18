@@ -24,7 +24,7 @@ theorem CellTy.weakenStore {Ψ r ε t C c} (h : CellTy S Ψ r ε t C c) (X : Lis
     CellTy S (Ψ ++ X) r ε t C c := by
   cases h with
   | pending he hψ hn => exact .pending (he.weakenStore X) hψ hn
-  | running => exact .running
+  | running he hψ hn => exact .running (he.weakenStore X) hψ hn
   | ok hv h => exact .ok hv (h.weakenStore X)
   | err hv h => exact .err hv (h.weakenStore X)
   | defect => exact .defect
@@ -78,6 +78,19 @@ theorem StoreTy.set {Ψ μ l v t₀} (hμ : StoreTy S Ψ μ) (hl : Ψ[l]? = some
 theorem StoreTy.setCell {Ψ μ l c r ε t C} (hμ : StoreTy S Ψ μ)
     (hl : Ψ[l]? = some (.lazyCell r ε t C)) (hc : CellTy S Ψ r ε t C c) : StoreTy S Ψ (μ.set l c) :=
   hμ.put hl (.inr ⟨_, _, _, _, rfl, hc⟩)
+
+/-- A running cell made pending again keeps its initializer, and with it its type. -/
+theorem StoreTy.reset {Ψ μ} (hμ : StoreTy S Ψ μ) (l : Nat) : StoreTy S Ψ (resetCell μ l) := by
+  unfold resetCell
+  split
+  · rename_i e he
+    obtain ⟨t₀, ht⟩ : ∃ t₀, Ψ[l]? = some t₀ :=
+      ⟨_, List.getElem?_eq_getElem (hμ.1 ▸ getElem?_lt he)⟩
+    rcases hμ.2 _ _ _ he ht with ⟨hv, -⟩ | ⟨_, _, _, _, rfl, hc⟩
+    · cases hv
+    cases hc with
+    | running he hψ hn => exact hμ.setCell ht (.pending he hψ hn)
+  · exact hμ
 
 theorem StoreTy.settle {Ψ μ l o r ε t C} (hμ : StoreTy S Ψ μ)
     (hl : Ψ[l]? = some (.lazyCell r ε t C)) (hc : CellTy S Ψ r ε t C (.done o)) :
@@ -146,21 +159,21 @@ theorem force_pending {Ψ : List Ty} {Θ : Facts} {Λ : List Rgn} {μ : List Tm}
     (hcRt : RtCtx Ψ Θ Λ.length) (hμb : ∀ (l : Nat) (v : Tm), μ[l]? = some v → v.Below Λ.length)
     (he : Typ S Ψ Θ [] (.loc l) (.ex (.lazy r ε t C) φ)) (hφ : (Stage.use (.rt r ε) C).le φ)
     (hT : LeLive S t T) (hl : μ[l]? = some (.lazy e₀)) {n : Nat} :
-    ∃ X, StoreTy S (Ψ ++ X) (μ.set l .running) ∧
+    ∃ X, StoreTy S (Ψ ++ X) (μ.set l (.running e₀)) ∧
       Typ S (Ψ ++ X) Θ [] (.settle l e₀) (.ex T φ) ∧ ∀ u ∈ X, u.YF n := by
   obtain ⟨u, hl', hu⟩ := he.loc_lazy _ _ _ _ _ _ rfl rfl
   rcases hμ.2 _ _ _ hl hl' with ⟨hv, -⟩ | ⟨_, _, _, _, heq, hc⟩
   · cases hv
   cases heq
   cases hc with
-  | pending he₀ hψ _ =>
+  | pending he₀ hψ hn =>
     obtain ⟨hr, hε, htk, hC⟩ := cell_yf hcRt hl'
     have hk := store_read hcRt hμb hl he₀ fun _ h => h
     simp only [Flick.J.substT, htk] at hk
     have hψ' := Stage.le_substT (kill Λ.length) hψ
     rw [Stage.use_substT, hC,
       show (Stage.rt r ε).substT (kill Λ.length) = .rt r ε by simp [Stage.substT, hr, hε]] at hψ'
-    exact ⟨[], by simpa using hμ.setCell hl' .running,
+    exact ⟨[], by simpa using hμ.setCell hl' (.running he₀ hψ hn),
       by simpa using Typ.settle hl' hk hψ' hφ ((LeLive.equiv hu).trans hT), by simp⟩
 
 /-- Forcing a settled cell gives its outcome and leaves the store. -/
@@ -210,10 +223,12 @@ theorem settle_raise {Ψ Θ n μ l v r ε t C ψ T φ} (hμ : StoreTy S Ψ μ) (
     by simpa using Typ.raise (hv'.valueAny hv φ) (Stage.le_trans hε' (Stage.le_trans hψ hφ)),
     by simp⟩
 
-/-- A signal leaves the frame of a cell, which stays running. -/
-theorem settle_unw {Ψ Θ p ℓ a t ψ r ε C T φ} (he : Typ S Ψ Θ [] (.unw p ℓ a) (.ex t ψ))
-    (hφ : (Stage.use (.rt r ε) C).le φ) : Typ S Ψ Θ [] (.unw p ℓ a) (.ex T φ) := by
+/-- A signal leaves the frame of a cell, which is pending again. -/
+theorem settle_unw {Ψ Θ n μ l p ℓ a t ψ r ε C T φ} (hμ : StoreTy S Ψ μ)
+    (he : Typ S Ψ Θ [] (.unw p ℓ a) (.ex t ψ)) (hφ : (Stage.use (.rt r ε) C).le φ) :
+    ∃ X, StoreTy S (Ψ ++ X) (resetCell μ l) ∧ Typ S (Ψ ++ X) Θ [] (.unw p ℓ a) (.ex T φ) ∧
+      ∀ u ∈ X, u.YF n := by
   obtain ⟨_, _, _, h₁, h₂, _⟩ := he.unw_type _ _ _ _ _ rfl rfl
-  exact .unw h₁ h₂ (Stage.none_le (Stage.use_rt_le_ne_pure hφ))
+  exact (hμ.reset l).same (.unw h₁ h₂ (Stage.none_le (Stage.use_rt_le_ne_pure hφ)))
 
 end Flick
