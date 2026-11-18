@@ -78,3 +78,28 @@ fn a_try_arm_row_holds_an_error_its_body_no_longer_raises() {
     let checked = GEN.with(|(d, globals)| progress_and_preservation(globals, d, &p));
     assert!(checked.is_ok(), "{checked:?}\n{source}");
 }
+
+/// A pattern of one error in a `let` misses the other errors of the row it
+/// is matched at: `let Oops z18 = w15` with `w15 : Errors {Bad, Oops}`, a
+/// `match` of the (Errors-In) form a change left with one arm. flick-core
+/// judged the pattern by the type of `Oops` alone and accepted it, where
+/// the model's (Match) did not. A case `checkers_agree` found.
+///
+/// The choices are the picks of the case proptest printed: each below the
+/// number of forms then, so forms added later at the end keep the program.
+#[test]
+fn a_let_of_one_error_misses_the_others_of_its_row() {
+    let c = [
+        2, 0, 0, 1, 0, 0, 0, 3, 4, 5, 3, 0, 1, 4, 3, 2, 0, 1, 0, 1, 0, 1, 0, 1, 5, 7, 1, 13, 9, 19,
+        7, 6, 1, 8, 3, 4, 0, 0, 0, 1, 1, 6, 0, 0, 1, 0, 0, 2, 3, 5, 0, 0, 0, 0, 1, 13, 0, 3, 0, 0,
+        0, 0, 10, 0, 0, 0, 0, 1, 1, 8, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 7, 0, 6, 4, 3, 3, 9, 18,
+        2, 0, 0, 3, 6, 4, 4, 4, 0, 1, 0, 0, 2, 2, 5, 2, 3, 3, 4, 7, 1, 0, 0, 0, 0, 14, 0, 0, 2, 0,
+        0, 0, 6,
+    ];
+    let p = generate::mutate(&generate::program(&c), &[2459191009, 1627429535]);
+    let source = generate::source(&p);
+    assert!(source.contains("let Oops z18 =\n"), "{source}");
+    let core = core(&source);
+    assert!(model(&p).is_err(), "{source}");
+    assert!(!core.is_empty(), "{source}");
+}

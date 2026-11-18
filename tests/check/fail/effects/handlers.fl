@@ -85,3 +85,15 @@ let not_in_row = C "c"
 widened : (Unit -> A) -> Unit -> Errors {A, B}
 let widened f = f
 //              ^ FLICK-T003 expected `Unit -> Errors {A, B}`, found `Unit -> A`: a term of `A` has the type `Errors {A, B}`, but a type built of `A` is not one built of it: build the value again, as `fun x -> f x`
+
+// a pattern of one error does not match every value of a row of several,
+// in a `let` or a parameter as in a `match`
+let_one_error : Errors {A, B} -> Float
+let let_one_error e =
+  let A x = e
+//    ^^^ FLICK-T009 this pattern does not match `B _`; use `match` to handle every case
+  x
+
+param_one_error : Errors {A, B} -> Float
+let param_one_error = fun (A x) -> x
+//                        ^^^^^ FLICK-T009 this pattern does not match `B _`; use `match` to handle every case

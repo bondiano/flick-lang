@@ -16,8 +16,10 @@ break programs.
   `FLICK-T003`. When the errors of the value are not known yet, as for the
   `x` of a `try`, the patterns tell them, at the top of an arm or inside it:
   the row holds the errors they name, and stays open for the others behind
-  an arm that matches every error. The `match` is pure and removes no error
-  from a row; the reference model and the Lean proofs cover it.
+  an arm that matches every error. A `let` or a parameter with the pattern
+  of one error, `let NotFound id = e`, is `FLICK-T009` at a row of several.
+  The `match` is pure and removes no error from a row; the reference model
+  and the Lean proofs cover it.
 
 - **A value of one error is a value of the errors of a row.** Where
   `Errors {NotFound, Timeout}` is expected, `Timeout` or `NotFound id` fits:

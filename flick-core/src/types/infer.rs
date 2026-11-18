@@ -645,7 +645,7 @@ impl<'c> Checker<'c> {
             };
             if let Some(param) = param {
                 let pat = self.bind_pattern(param, &ty);
-                self.irrefutable(&pat, param, None);
+                self.irrefutable(&pat, &ty, param, None);
             }
             stages.push((ty, effects));
         }
