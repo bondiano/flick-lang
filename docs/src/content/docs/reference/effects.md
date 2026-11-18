@@ -569,12 +569,17 @@ signature, an `Eff`, or the row given to a type such as `Handlers none`.
 
 ## Explicit host dependencies
 
-`Host` provides six ordinary services: `Host.Console` (standard streams),
+Code that touches the host names the `Host` service it uses in its row.
+`Host` declares six ordinary services: `Host.Console` (standard streams),
 `Host.Clock` (wall and monotonic time reads), `Host.Random` (a draw in `[0, 1)`),
-`Host.Environment`, `Host.Arguments` and `Host.Process` (starting child
-processes). None has an implicit implementation. Provide `Host.console`,
-`Host.clock`, `Host.random`, `Host.environment`, `Host.arguments` or
-`Host.process` at the entry boundary; `Host.live` combines all six.
+`Host.Environment` (environment variables), `Host.Arguments` (the program's
+arguments) and `Host.Process` (starting child processes). `Host.Live` is the
+set of all six and `Host.BrowserLive` that of the first three. None has an
+implementation inside a program. The layers that provide them, `Host.console`,
+`Host.clock`, `Host.random`, `Host.environment`, `Host.arguments` and
+`Host.process`, with `Host.live` for all six and `Host.browser_live` for the
+first three, are trusted adapters over the host's APIs. They are chosen at an
+entry: the launcher or the runner of `main`, a test runner, or a `provide`.
 
 ```flick
 mode : Unit ->{Host.Environment} Option String
@@ -589,22 +594,88 @@ let selected () =
 Service implementations are records, so tests can capture output, fix time and
 draws, or supply arguments without changing process globals. Tasks read their
 services where they run; an inner provider restores the outer one when it ends.
-The live clock reads the ambient fiber clock; replace scheduling time with
-`Test.clock_test`, rather than expecting a custom `Host.Clock` to drive timers.
 
-The standard library reaches the host through these services: `Platform`,
-`Console` and `Log.console` through `Host.Console`, `Platform.args` through
-`Host.Arguments`, `Platform.env` and the default of `Config.get` through
-`Host.Environment`, `Clock`, `DateTime.now` and `Jwt` through `Host.Clock`,
-`Random` through `Host.Random` (a fake one fixes every draw), and
-`ChildProcess` through `Host.Process`, so their rows name what they use.
-`Host.raw_*` remain the trusted adapters the live layers are made of. Missing runner host services
-are classified by the effect solver as safe fixes, automatically suggested by
-the checker and language server. Application runners (`Runner.Node`,
-`Runner.Browser` and `Runner.Cloudflare`) provide `Host.Live` or
-`Host.BrowserLive` at the root entry boundary, and an entry without a runner
-gets there the services of `Host.Live` its `main` names (see
-[entry points](../project/#entry-points)).
+The standard library reaches the host through these services, so the rows of
+its functions name what they use:
+
+- `Platform.stdout_line`, `stderr_line` and `stdout_write`, the five levels of
+  `Console` and the built-in flags of `Cli.run` use `Host.Console`;
+- `Platform.args` uses `Host.Arguments`;
+- `Platform.env`, and `Config.get`, whose default provider reads the
+  environment, use `Host.Environment`;
+- `Clock`, `DateTime.now`, `is_past` and `is_future`, and `Jwt` use
+  `Host.Clock`;
+- `Random` uses `Host.Random`, so a fake one fixes every draw;
+- `ChildProcess.spawn`, `string`, `lines` and `exit_code` use `Host.Process`.
+
+`Log.console` is a layer made of `Host.console` and needs nothing: providing
+it chooses the live console, as an entry does.
+
+### Who provides them
+
+Each place a program runs provides some of the `Host` services at its root:
+
+| Where | `Host` services |
+| - | - |
+| Node | all six: `Runner.Node` provides `Host.Live`, and the launcher of an entry without a runner the ones `main` names |
+| Go (`emit = "go"`) | all six, whatever `main` names |
+| `Runner.Browser`, `Runner.Cloudflare` | `Host.BrowserLive`: `Console`, `Clock` and `Random`; Cloudflare provides its `Env` beside them |
+| the [playground](../../play/) | the ones `main` names, with no environment variables and no arguments; a child process cannot start there |
+| `flick test` | `Host.Live`, to `Test.effect_test`, `clock_test`, `suite` and `it` |
+| the reference model | `Host.live` on a fixed host: no environment variables or arguments, a wall clock stopped at 1 700 000 000 000 ms, every draw 0.5 and no processes |
+
+A runner's `Main` says which services `main` may need (see
+[entry points](../project/#entry-points)), and a layer `main` provides itself
+wins over the root. UI tasks (`Ui.mounted`, `on_mount`, `watched`, `watch`, the
+handlers of `Ui.Event` and `Action`) and `Runner.Cloudflare.wait_until` may
+use `Host.BrowserLive`.
+
+### Where a missing service is caught
+
+A body that uses a `Host` service its signature does not name is
+`FLICK-E002`, as for any service. Its safe fix adds the service where the row
+is written: an editor offers it, and `flick check --fix --only E002` applies
+it across a program. A pure arrow, or a callback whose row another module
+closes, has to be edited by hand.
+
+At an entry, a `main` that needs a service no runner provides is
+`FLICK-P026`: a service outside `Host`, or one its runner's `Main` does not
+name, such as `Host.Environment` under `Runner.Browser`.
+
+### What an empty row does not promise
+
+A row names the host access that goes through the `Host` services. It is not a
+sandbox against code you did not write, since some code reaches the host
+whatever its row says:
+
+- a `foreign` binding is taken on trust: `now : Unit ->{} Float` bound to
+  `Date.now` reads the clock with an empty row;
+- `ConfigProvider.from_env` reads the environment variables with an empty row;
+- `Host.raw_*` and the live layers made of them are ordinary values: any
+  function may call the first or provide the second, whatever its own row:
+
+```flick
+printed_anyway : Unit ->{} Unit
+let printed_anyway () =
+  provide Host.console { Platform.stdout_line "no row names this" }
+```
+
+Review foreign bindings and the uses of the `Host` layers as you review any
+trusted code. One more limit: a finalizer that `Layer.from_build` adds cannot
+use a service the layer is given, such as `Host.Console`, since the caller
+provides that service and may release it first (`FLICK-G003`).
+
+### Reading the time and waiting
+
+`Host.Clock` reads the time; it does not make anything wait. `Effect.sleep`
+(`Duration ->{Async} Unit`), `delay` and the schedules of `Effect.retry` wait
+on the scheduler and need no `Host.Clock`. The live `Host.Clock` reads the
+clock of the fiber, the one the scheduler waits on. `Test.clock_test` replaces
+that clock with virtual time, which starts at 0 and moves only by
+`Test.adjust` and `Test.set_time`, which need its `VirtualTime`: a sleep waits
+for virtual time, and `Clock.current_time_millis` and `DateTime.now` read it.
+A `Host.Clock` you provide yourself changes only what the reads return; timers
+still follow the fiber's clock.
 
 ## Effects and handlers
 

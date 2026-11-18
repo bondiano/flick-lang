@@ -37,13 +37,14 @@ let message greeting =
   | Hello name -> "Hello, \{name}!"
   | Goodbye -> "See you soon!"
 
-main : Unit ->{} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   Platform.stdout_line (message (Hello "Flick"))
 ```
 
 `message` is pure: its arrow is a plain `->`. `main` runs in the runtime, so its
-arrow has braces, which would name the services it needs and how it can fail.
+arrow has braces: they name the services it needs, here the console it prints
+to, and after a `;` how it can fail.
 Generated programs are ordinary ES modules.
 
 ## Install

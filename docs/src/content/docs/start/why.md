@@ -73,6 +73,11 @@ let read_later path =
 - **`foreign` is taken on trust.** The compiler believes the signature of a
   foreign binding. `flick ffi check` compares it only with the package's
   `.d.ts`.
+- **An empty row is not a sandbox.** The standard library names the console,
+  the clock, randomness, the environment, the arguments and child processes
+  as `Host` services, but a foreign binding, `ConfigProvider.from_env` and
+  `Host.raw_*` reach the host whatever the row says (see
+  [what an empty row does not promise](../../reference/effects/#what-an-empty-row-does-not-promise)).
 - **The proofs cover the core, not the whole compiler.** The core calculus is
   proved in Lean under stated hypotheses, and the known differences from the
   checker are written down. See [`formal/`](https://github.com/bondiano/flick-lang/tree/main/formal).

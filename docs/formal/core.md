@@ -516,7 +516,7 @@ Checker:
 A program is:
 
 - a closed `e₀` (usually `main ()`) with `· ⊢ e₀ : τ ! φ₀` and closed rows in `φ₀ ⊑ R⟨r₀; ε₀⟩`;
-- a root environment `Σ₀`: for every `S` in `r₀` there is `Σ₀(S)` with `· ⊢ Σ₀(S) : S.Impl ! P`. The runner assembles it.
+- a root environment `Σ₀`: for every `S` in `r₀` there is `Σ₀(S)` with `· ⊢ Σ₀(S) : S.Impl ! P`. The runner or the launcher assembles it from the `Host` services `main` names and those its runner adds (G3).
 
 ## 3. Dynamics
 
@@ -741,7 +741,7 @@ Hypotheses:
 
   What else at the TypeScript boundary rests on this hypothesis is listed in `ts-holes.md` §3.
 - **G2 (code generation).** The generated JS and Go implement the steps of §3, and the `Lift` node in them is the identity of the model. This is checked by differential tests, not by proof.
-- **G3 (runner).** `Σ₀` covers `r₀`; `Async ∈ dom Σ₀`, which the scheduler handles.
+- **G3 (runner).** `Σ₀` covers `r₀`; `Async ∈ dom Σ₀`, which the scheduler handles. The runner or the launcher builds the rest of `Σ₀` from the live `Host` layers, at least for the `Host` services `main` names (`Host.Live` for `Runner.Node` and the Go target, `Host.BrowserLive` for `Runner.Browser` and `Runner.Cloudflare`), and from the services its runner's `Main` adds, such as `Env` of `Runner.Cloudflare`; `FLICK-P026` rejects a `main` whose `r₀` needs any other. The live layers are trusted adapters over `Host.raw_*`: that they implement `S.Impl` is assumed, not proved. The model builds `Σ₀` from `Host.live` on a fixed host (`flick-model/src/native/host.rs`).
 
 Lemmas:
 
