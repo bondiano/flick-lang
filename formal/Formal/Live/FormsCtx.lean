@@ -117,11 +117,12 @@ theorem FwE.frameAnc {A : Nat → Prop} {q : Nat} :
       grind
     | hkeep p ℓ E' al =>
       simp only [Frame.plug, Tm.Has, Frame.Fw] at h hF
-      rcases h with h | h | h | h
+      rcases h with h | h | h | h | h
       · cases h
       · cases h
       · exact absurd (Tm.has_frame_ins h) hF.2.2.1
       · exact h.elim
+      · cases h
     | hkarmA p ℓ E' al k =>
       simp only [Frame.Fw] at hF
       refine part hF.2.2.1 ?_ fun x hx => by simp [Frame.plug, Tm.Has, hx]

@@ -21,12 +21,12 @@ theorem Frame.rgn_reg {F : Frame} {x : Nat} (h : F.rgn = some x) : F.reg = some 
 theorem Frame.cell_reg {F : Frame} {q ℓ : Nat} (h : F.cell = some (q, ℓ)) : F.reg = some q := by
   cases F <;> simp_all [Frame.cell, Frame.reg]
 
-theorem handlerOf_reg {Ef o : Name} {c : OpClass} {q : Nat} :
-    ∀ {E : List Frame}, handlerOf E Ef o c = some q → ∃ F ∈ E, F.reg = some q
+theorem handlerOf_reg {Ef o : Name} {q : Nat} :
+    ∀ {E : List Frame}, handlerOf E Ef o = some q → ∃ F ∈ E, F.reg = some q
   | [], h => by simp [handlerOf] at h
   | F :: E, h => by
     simp only [handlerOf] at h
-    cases hF : F.handles Ef o c with
+    cases hF : F.handles Ef o with
     | some p =>
       rw [hF] at h; cases h
       refine ⟨F, by simp, ?_⟩
@@ -45,8 +45,8 @@ theorem LNest.place {c home i E r ψ} (hn : LNest Ψ c anc home) (hi : c.at i = 
   · rcases hx with rfl | hx
     · exact holeE_iff.mpr (.inr hF)
     · exact hn.frame_reg hi hE F hF (Frame.rgn_reg hx)
-  · intro r' ε' t' hℓ x hx
-    obtain ⟨r₀, ε₀, t₀, h₀, ha⟩ := hn.frame_cell hi hE F hF hc
+  · intro u' r' ε' t' hℓ x hx
+    obtain ⟨u₀, r₀, ε₀, t₀, h₀, ha⟩ := hn.frame_cell hi hE F hF hc
     rw [hℓ] at h₀; cases h₀
     exact ha x hx
 
@@ -86,7 +86,7 @@ theorem LNest.not_dead {c home i E r t} {ψ : Stage} (hn : LNest Ψ c anc home)
 /-- An operation of a thread is answered by a handler of a live region (T4.3). -/
 theorem LNest.handler_live {c home i E Ef o k v q} (hn : LNest Ψ c anc home)
     (hi : c.at i = some (plug E (.app (.const (.perform Ef o k)) v))) (hE : OkE E)
-    (hq : handlerOf E Ef o k = some q) : Live c.rgs q := by
+    (hq : handlerOf E Ef o = some q) : Live c.rgs q := by
   obtain ⟨F, hF, hr⟩ := handlerOf_reg hq
   exact hn.hole_live hi (hn.frame_reg hi hE F hF hr)
 

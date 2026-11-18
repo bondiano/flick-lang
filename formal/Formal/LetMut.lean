@@ -100,7 +100,7 @@ theorem T7_regions {root b t φ₀ c} (hroot : RootTy S root) (h : MutOk S [] Fa
     (∀ (p : Nat) (g : Rgn), c.rgs[p]? = some g → g.live = true → ∀ k ∈ g.kids, ∀ E r, OkE E → k = plug E r →
       ¬ DeadUse c.rgs r) ∧
     ∀ i e E Ef o k v q, c.at i = some e → OkE E → e = plug E (.app (.const (.perform Ef o k)) v) →
-      handlerOf E Ef o k = some q → Live c.rgs q :=
+      handlerOf E Ef o = some q → Live c.rgs q :=
   T4' hroot (tr none [] b) t φ₀ c (T7 h hins)
     (tr_below fun p h => absurd h (hp p)) ht hφ hs
 

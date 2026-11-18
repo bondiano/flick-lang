@@ -70,13 +70,15 @@ theorem T2a {root Ψ Λ μ e t Λ' μ' e'} (hroot : RootTy S root) (hμ : StoreT
       · exact hX u hu) (by simpa [Stage.substT] using h')
     exact ⟨.step h₁ hl hs', rfl, rfl, hr⟩
 
-/-- An operation answered by `Σ₀` from a term with services `r` has its effect in `r`. -/
+/-- An operation answered by `Σ₀` from a term with services `r` has its effect in `r`, at some
+arguments. -/
 theorem step_root {root Ψ Θ Λ μ e t r ε N o} (h : Typ S Ψ Θ [] e (.ex t (.rt r ε)))
-    (hs : Step root (.root N) Λ μ e o) : r (.nm₀ N) := by
+    (hs : Step root (.root N) Λ μ e o) : ∃ c, r (.nm N c) := by
   cases hs with
   | performRoot hE hh =>
     obtain ⟨_, _, _, _, hr, -⟩ := ctx_typing _ hE perform_not_value h
-    exact perform_out (r := .app _ _) perform_svc perform_not_value (perform_op' hr) _ hE hh h
+    exact perform_out (r := .app _ _) (fun h => let ⟨_, _, h⟩ := perform_svc h; ⟨_, h⟩)
+      perform_not_value (perform_op' hr) _ hE hh h
 
 /-- Renaming out the regions not yet created keeps a name of a row, at some argument. -/
 theorem Row.kill_nm {ε : Row} {n : Nat} {N : Name} {c : TyClass} (hx : ε.substT (kill n) (.nm N c)) :
@@ -132,7 +134,7 @@ theorem T2b {root Ψ Λ μ e t r ε Λ' μ' e'} (hroot : RootTy S root) (hμ : S
       rcases List.mem_append.mp hu with hu | hu
       · exact (hΨ u hu).mono hl
       · exact (hX u hu).mono hl) (by simpa only [Stage.substT] using h')
-    refine ⟨.step h₁ (fun N hl => by subst hl; exact ⟨_, step_root h h₁⟩)
+    refine ⟨.step h₁ (fun N hl => by subst hl; exact step_root h h₁)
       (hs'.mono fun _ hq N hl => let ⟨_, hc⟩ := hq N hl; Row.kill_nm hc), fun v he hv => ?_⟩
     obtain ⟨Ψ', E, U, hU, ht, hsub⟩ := hr v he hv
     exact ⟨Ψ', E, U, hU, ht, Row.err_kill hsub⟩

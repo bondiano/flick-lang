@@ -222,7 +222,7 @@ inductive Step (root : Roots) : Lbl → List Rgn → List Tm → Tm → Out → 
       Step root .rt Λ μ (plug E (.app (.app (.const .spawn) (.own p)) t))
         (.cfg (setRgn Λ p ⟨g.live, g.kids ++ [withs p E (.await t)], g.fins⟩) μ (plug E (.lit .unit)))
   -- an operation no handler answers is `Σ₀`'s, if its record has a function for it
-  | performRoot {Ef : Name} {w f : Tm} : OkE E → (∀ G ∈ E, G.handles Ef o .tail = none) →
+  | performRoot {Ef : Name} {w f : Tm} : OkE E → (∀ G ∈ E, G.handles Ef o = none) →
       root.svc Ef = some w → w.field o = some f → Value v →
       Step root (.root Ef) Λ μ (plug E (.app (.const (.perform Ef o .tail)) v))
         (.cfg Λ μ (plug E (.app f v)))
@@ -233,22 +233,22 @@ inductive Step (root : Roots) : Lbl → List Rgn → List Tm → Tm → Out → 
       Step root .rt Λ μ (plug E (F.plug (.unw p ℓ a))) (.cfg Λ μ (plug E (.unw p ℓ a)))
   -- an operation runs the arm of the nearest handler with one for it: `abort` after
   -- the body unwinds to the handler, `tail` and `control` while the body waits there
-  | performAbort {Ei : List Frame} {Ef : Name} {al : Tm} : OkE E → OkE Ei → (∀ G ∈ Ei, G.handles Ef o .abort = none) → al.armOf o = some b →
+  | performAbort {Ei : List Frame} {Ef : Name} {al : Tm} : OkE E → OkE Ei → (∀ G ∈ Ei, G.handles Ef o = none) → al.armOf o = some b →
       Value v →
       Step root .rt Λ μ (plug E (.hwith p ℓ Ef al r (plug Ei (.app (.const (.perform Ef o .abort)) v))))
         (.cfg Λ μ (plug E (.hwith p ℓ Ef al r (plug Ei (.unw p ℓ (b.subst (inst [v])))))))
-  | performTail {Ei : List Frame} {Ef : Name} {al : Tm} : OkE E → OkE Ei → (∀ G ∈ Ei, G.handles Ef o .tail = none) → al.armOf o = some b →
+  | performTail {Ei : List Frame} {Ef : Name} {al : Tm} : OkE E → OkE Ei → (∀ G ∈ Ei, G.handles Ef o = none) → al.armOf o = some b →
       Value v →
       Step root .rt Λ μ (plug E (.hwith p ℓ Ef al r (plug Ei (.app (.const (.perform Ef o .tail)) v))))
         (.cfg Λ μ (plug E (.hctl p ℓ 0 true Ef al r (b.subst (inst [v])) (plug Ei (.hole p)))))
   -- a `tail` operation of a child runs the arm of a handler kept from where it started, while
   -- the region of that handler is live
-  | performKept {Ei : List Frame} {Ef : Name} {al : Tm} : OkE E → OkE Ei → (∀ G ∈ Ei, G.handles Ef o .tail = none) → al.armOf o = some b →
+  | performKept {Ei : List Frame} {Ef : Name} {al : Tm} : OkE E → OkE Ei → (∀ G ∈ Ei, G.handles Ef o = none) → al.armOf o = some b →
       Value v → Live Λ q →
       Step root .rt Λ μ (plug E (.hkeep q ℓ Ef al (plug Ei (.app (.const (.perform Ef o .tail)) v))))
         (.cfg Λ μ (plug E (.hkarm q ℓ Ef al (b.subst (inst [v])) (plug Ei (.hole q)))))
   -- `resume` of a `control` arm is `kont p κ`: its type is that of the new cell `κ`
-  | performCtl {Ei : List Frame} {Ef : Name} {al : Tm} : OkE E → OkE Ei → (∀ G ∈ Ei, G.handles Ef o .control = none) → al.armOf o = some b →
+  | performCtl {Ei : List Frame} {Ef : Name} {al : Tm} : OkE E → OkE Ei → (∀ G ∈ Ei, G.handles Ef o = none) → al.armOf o = some b →
       Value v →
       Step root .rt Λ μ (plug E (.hwith p ℓ Ef al r (plug Ei (.app (.const (.perform Ef o .control)) v))))
         (.cfg Λ (μ ++ [.lam .todo]) (plug E (.hctl p ℓ μ.length false Ef al r

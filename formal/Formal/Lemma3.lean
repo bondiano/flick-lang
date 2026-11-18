@@ -33,25 +33,36 @@ theorem liftT_add (K k : Nat) (σ : Atom → Ty) : liftT k (liftT K σ) = liftT 
         congr 3; omega
   | r p => simp [liftT, Ty.up_up]
 
+/-- The instances of an effect that the frames of a context pass to its hole: when none of them
+answers the operation `o` of `Ef`, what the handler around answers holds of the hole. -/
+def EInst (S : Sig) (E : List Frame) (φ' φ : Stage) : Prop :=
+  ∀ Ef o cl a b us, S.op Ef o = some (cl, a, b) → (∀ F ∈ E, F.handles Ef o = none) →
+    Stage.Answered S Ef us φ → Stage.Answered S Ef us φ'
+
 /-- **L3.** The hole of a well-typed context is well-typed, its stage is bounded
-as in `ERel`, and any term of its type can replace it. Under `K` frames of
-(Let-Gen) right-hand sides the hole is `K` variables deep, with the facts of
-their schemes, and pure; otherwise it has the facts of the context. -/
+as in `ERel`, any term of its type can replace it, and it performs an effect only at
+arguments the handler around answers (`EInst`). Under `K` frames of (Let-Gen) right-hand
+sides the hole is `K` variables deep, with the facts of their schemes, and pure; otherwise
+it has the facts of the context. -/
 theorem ctx_typing {Ψ Θ} :
     ∀ (E : List Frame) {r t φ}, OkE E → ¬ Value r → Typ S Ψ Θ [] (plug E r) (.ex t φ) →
       ∃ K Θ' t' φ', Typ S (Ψ.map (Ty.up K)) Θ' [] r (.ex t' φ') ∧ ERel E φ' φ ∧
-        (φ' = .pure ∨ K = 0 ∧ Ext Θ Θ') ∧ Refill S Ψ Θ K Θ' t' φ' (plug E) t φ r
+        (φ' = .pure ∨ K = 0 ∧ Ext Θ Θ') ∧ Refill S Ψ Θ K Θ' t' φ' (plug E) t φ r ∧
+        EInst S E φ' φ
   | [], _, _, _, _, _, h =>
     ⟨0, Θ, _, _, by simpa using h, ⟨fun n hn => .inl (Row.le_modNames hn), fun _ _ h => h, fun h => h⟩,
       .inr ⟨rfl, Ext.refl _⟩,
-      fun _ _ _ _ h' => by rw [List.map_up_zero, liftT_zero] at h'; exact h'⟩
+      fun _ _ _ _ h' => by rw [List.map_up_zero, liftT_zero] at h'; exact h',
+      fun _ _ _ _ _ _ _ _ h => h⟩
   | F :: E, r, _, _, hE, hr, h => by
     obtain ⟨hF, hE'⟩ := hE.cons
-    obtain ⟨K₁, Θ₁, t₁, φ₁, h₁, rel₁, p₁, back₁⟩ := ctx_typing E hE' (not_value_plug hr F) h
-    obtain ⟨k, Θ', t', φ', h', rel, p, backF⟩ := frame_typing hr F hF h₁
+    obtain ⟨K₁, Θ₁, t₁, φ₁, h₁, rel₁, p₁, back₁, inst₁⟩ := ctx_typing E hE' (not_value_plug hr F) h
+    obtain ⟨k, Θ', t', φ', h', rel, p, backF, instF⟩ := frame_typing hr F hF h₁
     rw [List.map_up_up] at h'
     refine ⟨K₁ + k, Θ', t', φ', h', ⟨fun n hn => ?_, fun hT => ?_, fun hp => rel.pure (rel₁.pure hp)⟩,
-      ?_, fun σ hσ X r' hr' => back₁ σ hσ X (F.plug r') ?_⟩
+      ?_, fun σ hσ X r' hr' => back₁ σ hσ X (F.plug r') ?_,
+      fun Ef o cl a b us hop hno hφ => instF.carry rel hop (hno F (by simp))
+        (inst₁ Ef o cl a b us hop (fun G hG => hno G (by simp [hG])) hφ)⟩
     · rcases rel.svc n hn with h | h
       · rcases Row.modNames_union (Row.modNames_mono rel₁.svc n h) with h | h
         · exact .inl (Row.modNames_idem h)
