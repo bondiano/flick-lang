@@ -164,6 +164,8 @@ fn build_case(case: &Path, out_dir: &Path, emit: &str, profile: &str, flags: &[&
         .arg(out_dir)
         .arg("--emit")
         .arg(emit)
+        // outside a project, only the flag lets the Go backend run `go build`
+        .args(if emit == "go" { &["--allow-tool", "go"][..] } else { &[] })
         .arg("--profile")
         .arg(profile)
         .args(flags)

@@ -14,9 +14,9 @@ use super::arith::Native;
 use super::expr::enum_literal;
 use super::layout::{block, call, statement};
 use super::{Gen, names, own};
-use crate::ir::{Arm, Expr, Lit};
 use flick_backend_support::decision::{self, Graph, Node, NodeId, Place, Step, Test};
 use flick_ir::JsClass;
+use flick_ir::{Arm, Expr, Lit};
 
 /// What the emitter knows of the graph it writes.
 struct Walk<'g, 'a> {

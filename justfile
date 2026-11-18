@@ -5,6 +5,9 @@ export FLICK_STD_PATH := justfile_directory() + "/packages/std"
 # The compiler the e2e suites run, built in the `e2e` profile
 flick := justfile_directory() + "/target/e2e/flick"
 
+# The official backend components
+import 'just/backends.just'
+
 # Show available recipes
 [private]
 default:
@@ -290,24 +293,9 @@ wasm-plugins: wasm-backends
     pnpm -C packages/effect-ts build
     FLICK_BIN="$PWD/target/e2e/flick" node examples/typed-dsl/check.mjs
 
-# No WASI adapter: an official backend imports only the compiler input interface.
-js-component:
-    node --test tools/backend-package/*.test.mjs
-    node tools/backend-package/build.mjs
-    mkdir -p target/backends
-    cargo run -p flick-component-build -- target/backend-guest/wasm32-unknown-unknown/release/flick_backend_js.wasm target/backends/js.wasm
-
-# Update the exact component distributed with every compiler binary.
-update-js-component: js-component
-    node tools/backend-package/index.mjs update
-
-# Release/CI checks reproduce the checked-in artifact without updating its pin.
-check-js-component: js-component
-    node tools/backend-package/index.mjs check
-
 # Ignored backend tests also run in e2e-tests now that their host is enabled
 # by default. Both runners need these images in a fresh checkout.
-backend-fixtures: js-component
+backend-fixtures: js-component go-component
     cargo build -p flick-test-backend --features guest --target wasm32-wasip2 --release
 
 # A real third-party backend fixture through the separate component world.
@@ -316,7 +304,8 @@ wasm-backends: backend-fixtures
     pnpm -C runtime build
     pnpm -C packages/effect-ts build
     cargo clippy -p flick-test-backend --features guest --target wasm32-wasip2 -- -D warnings
-    just check-js-component
+    just check-component js
+    just check-component go
     cargo clippy -p flick-backend --features host --all-targets -- -D warnings
     cargo test -p flick-backend --profile e2e --features host --test component_host -- --include-ignored
     cargo clippy -p flick --features wasm-backends --all-targets -- -D warnings

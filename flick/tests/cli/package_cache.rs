@@ -18,6 +18,9 @@ use serde_json::{Value, json};
 
 const APP: &str = "schema-version = 1
 
+[tools]
+\"flick/go\" = [\"go\"]
+
 [project]
 kind = \"app\"
 entry = \"App.Main\"

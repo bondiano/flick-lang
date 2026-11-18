@@ -3,7 +3,7 @@ use std::fmt::Write as _;
 
 use super::{Input, Output, RUNTIME, go};
 use crate::build::builtin_modules;
-use crate::build::go::bindings;
+use crate::build::go::{bindings, unsupported};
 use crate::codegen::Known;
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::ir::tests::lower_text;
@@ -30,7 +30,11 @@ pub(super) fn build(text: &str) -> Output {
 
 /// The target diagnostics of `text` with the built-in modules.
 fn compile(text: &str) -> Vec<Diagnostic> {
-    build(text).diagnostics
+    build(text)
+        .diagnostics
+        .into_iter()
+        .map(unsupported)
+        .collect()
 }
 
 /// The Go file of the module `App` of `text`.
@@ -268,7 +272,7 @@ fn only_a_program_that_reaches_an_optional_package_imports_it() {
 
 #[test]
 fn optional_packages_are_the_runtime_s() {
-    let mut named: Vec<&str> = super::main_file::OPTIONAL
+    let mut named: Vec<&str> = super::OPTIONAL
         .iter()
         .map(|&(package, _, _)| package)
         .collect();

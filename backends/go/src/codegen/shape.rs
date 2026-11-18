@@ -6,9 +6,9 @@ use std::iter;
 
 use super::Input;
 use super::arith::Native;
-use crate::ir::reach::Key;
-use crate::ir::{Expr, ExprKind, Item, ItemKind, Param, Pat, Stage};
+use flick_backend_support::reach::Key;
 use flick_ir::{Dict, InstanceInfo, default_method};
+use flick_ir::{Expr, ExprKind, Item, ItemKind, Param, Pat, Stage};
 
 /// How a top-level name is held in Go.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -31,7 +31,7 @@ pub(super) enum Shape {
 /// returned by it is then no value made for the call. A function of more
 /// parameters than a word holds has none.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub(super) struct Types(u64);
+pub struct Types(u64);
 
 impl Types {
     pub(super) fn of(result: Option<Native>, params: &[Option<Native>]) -> Types {

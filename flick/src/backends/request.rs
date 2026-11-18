@@ -3,6 +3,7 @@
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
+use std::env;
 
 use flick_backend::{
     Abi, BackendPin, BuildRequest, Capability, Entry, Environment, Input, InputKind, Mode,
@@ -31,6 +32,7 @@ mod assets;
 mod assets_tests;
 #[cfg(test)]
 mod component_tests;
+mod go;
 mod javascript;
 mod javascript_facts;
 #[cfg(test)]
@@ -98,11 +100,7 @@ impl Prepared {
         output: &BuildPlan,
         pin: BackendPin,
     ) -> Self {
-        let (program, files) = program(
-            sources,
-            compilation,
-            project::stages_by_class(project, output.extras.rt),
-        );
+        let (program, files) = program(sources, compilation, by_class(project, output));
         let package = project.and_then(|p| project::project_name(host, &p.root));
         let mut data = Self {
             request: BuildRequest {
@@ -223,7 +221,7 @@ impl Prepared {
         }
         // Built-ins have explicit lowered bodies and the actual texts used
         // during lowering. They never alias the project's source identities.
-        for interface in types::builtins_of(project::stages_by_class(project, output.extras.rt)) {
+        for interface in types::builtins_of(by_class(project, output)) {
             if self
                 .request
                 .modules
@@ -245,7 +243,9 @@ impl Prepared {
                 interface: Some(input),
             });
         }
-        if !output.go {
+        if self.request.target.environment.backend == "go" {
+            self.go(host, project, compilation, output);
+        } else {
             self.javascript(host, sources, project, compilation, output, &interfaces);
         }
     }
@@ -315,6 +315,12 @@ impl Prepared {
     }
 }
 
+/// The built-in modules a build compiles: the go target's are always those
+/// of the non-class stages, as its runtime implements them.
+fn by_class(project: Option<&Project>, output: &BuildPlan) -> bool {
+    !output.go && project::stages_by_class(project, output.extras.rt)
+}
+
 fn target(project: Option<&Project>, output: &BuildPlan) -> TargetRequest {
     let environment = project
         .and_then(|p| p.config.build.environment.as_ref())
@@ -329,6 +335,27 @@ fn target(project: Option<&Project>, output: &BuildPlan) -> TargetRequest {
             },
         );
     let extras = output.extras;
+    let option = |key: &str, value: &str| OptionValue {
+        key: key.into(),
+        value: value.into(),
+    };
+    let command = option(
+        "command",
+        match output.purpose {
+            Purpose::Test => "test",
+            Purpose::Run => "run",
+            Purpose::Build => "build",
+        },
+    );
+    let options = if environment.backend == "go" {
+        vec![command, option("host.os", env::consts::OS)]
+    } else {
+        vec![
+            command,
+            option("js.runtime", if extras.rt { "rt" } else { "effect" }),
+            option("labels", &format!("{:?}", extras.labels).to_lowercase()),
+        ]
+    };
     let mut capabilities = vec![];
     for (needed, name) in [
         (output.typescript, "typescript"),
@@ -359,24 +386,6 @@ fn target(project: Option<&Project>, output: &BuildPlan) -> TargetRequest {
         },
         mode: Mode::WholeProgram,
         required_capabilities: capabilities,
-        options: vec![
-            OptionValue {
-                key: "command".into(),
-                value: match output.purpose {
-                    Purpose::Test => "test",
-                    Purpose::Run => "run",
-                    Purpose::Build => "build",
-                }
-                .into(),
-            },
-            OptionValue {
-                key: "js.runtime".into(),
-                value: if extras.rt { "rt" } else { "effect" }.into(),
-            },
-            OptionValue {
-                key: "labels".into(),
-                value: format!("{:?}", extras.labels).to_lowercase(),
-            },
-        ],
+        options,
     }
 }

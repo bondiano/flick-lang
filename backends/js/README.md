@@ -38,8 +38,8 @@ exports are computed from reference IR and these facts, with explicit
 `Program.lang`; the frontend retains its typing and diagnostic rules.
 
 `package/component.wasm` and `package/backend.json` hold the compiler's exact
-distributed image and pin. `just update-js-component` updates them deliberately;
-`just check-js-component` rebuilds and checks byte-for-byte reproducibility.
+distributed image and pin. `just update-component js` updates them deliberately;
+`just check-component js` rebuilds and checks byte-for-byte reproducibility.
 Guest builds normalize workspace and Cargo source paths, with fixed guest Rust
 flags, so panic locations do not embed a build machine's directory names.
 They invoke the pinned Rust toolchain directly, without compiler-cache wrappers,

@@ -10,3 +10,6 @@ out-dir = "dist"
 profile = "release"
 emit = "js"
 effect = "effect"
+
+[tools]
+"flick/go" = ["go"]

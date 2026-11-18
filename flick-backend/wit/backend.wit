@@ -116,6 +116,10 @@ interface types {
         entries: list<javascript-entry>,
         files: list<javascript-file>,
     }
+    /// Schema flick.go@0.1.0, one per own module: the values importers see,
+    /// for release optimization, and the path `//line` directives give its
+    /// source, relative to the directory of a Go module of the build.
+    record go-projection { exports: list<string>, line-path: string }
     record package-target { %package: string, environments: list<environment> }
     record root-handler { environment: environment, service: symbol, handler: symbol }
     record build-request {

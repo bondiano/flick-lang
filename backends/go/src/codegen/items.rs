@@ -12,10 +12,10 @@ use super::layout::{
 };
 use super::shape::Types;
 use super::{Gen, RUNTIME_PACKAGE, Shape, loops, names};
-use crate::codegen::names as js_names;
-use crate::codegen::tail::{Callee, Target};
-use crate::ir::{Expr, ExprKind, Item, ItemKind, Module};
-use crate::source::Span;
+use flick_backend_support::names as js_names;
+use flick_backend_support::tail::{Callee, Target};
+use flick_ir::Span;
+use flick_ir::{Expr, ExprKind, Item, ItemKind, Module};
 
 /// The declarations of a module, each with whether it holds a `//line`
 /// directive; the statements of its init function.

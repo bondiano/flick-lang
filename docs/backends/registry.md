@@ -25,7 +25,9 @@ ranges, missing fields, unknown fields and malformed digests are errors.
 are different targets. Without it the compatibility default is `js/node`
 for JS/TS output and `go/native` for Go. The existing `js`, `ts`, `go` output
 choices remain compatible. Unpinned JS/TS selects the distributed `flick/js`
-component; Go retains its temporary native baseline. Environment support is
+component and Go the distributed `flick/go` component, whose `go build` step
+needs `[tools]` `"flick/go" = ["go"]` (or `--allow-tool go` outside a
+project). Environment support is
 checked against the selected backend before a cache hit is reused.
 The JS runtime setting `[build] effect = "rt"`
 or `"effect"` remains independent of component identity.
@@ -97,9 +99,8 @@ remain open. Full typing/effect facts and UI metadata are
 not assumed to exist in `Program`. See the [dependency inventory](baseline.md).
 
 Projects without an explicit pin use the distributed JS component for JS/TS
-and the temporary native Go baseline. The browser loader, generic host tool
-steps, atomic publication, the Go extraction and
-full conformance/performance gates remain required. This integration does
+and the distributed Go component for Go. The browser loader and full
+conformance/performance gates remain required. This integration does
 not close R3 or R4 or freeze IR 1.0.
 
 The exact distributed JS pin is approved for compiler-owned DevTools and

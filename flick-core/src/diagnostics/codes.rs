@@ -269,7 +269,7 @@ codes! {
     P026 = Project 26, "entry `main` has a type no runner starts";
     P027 = Project 27, "package built only without Effect";
     P028 = Project 28, "output directory holds the project's files";
-    P029 = Project 29, "Go toolchain cannot build the program";
+    P029 = Project 29, "the Go backend has no `go` to run";
     P030 = Project 30, "module not available on the go target";
     P031 = Project 31, "invalid workspace or path dependency";
     P032 = Project 32, "invalid dependency or package";
