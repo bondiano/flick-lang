@@ -6,6 +6,13 @@ break programs.
 
 ## Unreleased
 
+- **Fixed: a re-exported type keeps its companions.** A module that
+  re-exports a type (`import App.Ports exposing (Port)` with
+  `exposing (Port)`) now exports its `parse`, `value`, `check`, `prove` and
+  the other companions too, so `A.Port.parse` and `A.Port.prove` work through
+  the re-exporter alone, and the invariant it passes on proves. Interfaces
+  are `iface-version` 29.
+
 - **Breaking: the standard library names the host services it uses.**
   `Platform.stdout_line`, `stderr_line` and `stdout_write`, the five levels
   of `Console` and `Log.console` need `Host.Console`; `Platform.args`

@@ -160,7 +160,9 @@ A module may re-export a name it imports. A re-export is the same entity, not
 a copy: importing `User` both from `App.Domain` and from a module that
 re-exports it is not ambiguous, and a re-exported service is reached
 through the re-exporter's path as through its own: `M.S` in a row, `M.S.op`,
-`M.S.Impl` and `M.S` as a value. A re-exported `main` makes the module an entry point too, its runner
+`M.S.Impl` and `M.S` as a value. A re-exported type keeps its companions,
+so `M.Port.parse`, `M.Port.value` and `M.Port.prove` work through the
+re-exporter alone. A re-exported `main` makes the module an entry point too, its runner
 importing `main` from where it is defined; a re-exported `tests` does not
 make it a test module.
 
