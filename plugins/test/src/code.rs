@@ -1,8 +1,9 @@
 //! The code a block stands for: a suite is `Test.group name [cases]`, a
 //! test `Test.case name (fun _ -> body)`, and a modifier wraps the case in
 //! `Test.skip` or `Test.only`. The module's `tests` lists the case of each
-//! block in the order written: the first block declares it, each block
-//! after it a value `tests$i` it names.
+//! block in the order written: a module of one block declares it alone; of
+//! several, each block declares its case as `tests$i`, which no source can
+//! name, and the first also `tests`, which names them all.
 
 use flick_plugin::{Arena, Block, Builder, Expr, NodeId, flick};
 
