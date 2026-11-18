@@ -142,7 +142,7 @@ theorem tail_pres {Ψ Θ n p ℓ Ef al rf o v b t φ} {Ei : List Frame} (hc : Rt
   have hb := (hal.arm_inv hop ha).1 rfl
   have hx := hole_arg hEi perform_not_value hv he (perform_fn hop hus)
     (answered_hole hop hno (Stage.answered_hP hφ₀)) hc hbv (cell_op_fixed hc hℓ hop hus).1
-  refine .hctl hus hℓ hal hrf hψ hop (by decide) (by simp) hEi rfl
+  refine .hctl hus hℓ hal hrf hψ hop (by decide) (by simp) hEi rfl hno
     (refill_todo hEi perform_not_value he) hφ₀ ?_ (fun h => by cases h) hc' hφ hT hat
   rw [if_pos rfl]
   exact (hb.inst (Δ := [_]) (.cons hv hx .nil)).sub
@@ -159,7 +159,7 @@ theorem kept_pres {Ψ Θ n q ℓ Ef al o v b t φ} {Ei : List Frame} (hc : RtCtx
   have hb := (hal.arm_inv hop ha).1 rfl
   have hx := hole_arg hEi perform_not_value hv he (perform_fn hop hus)
     (answered_hole hop hno (Stage.answered_hP hφ₀)) hc hbv (cell_op_fixed hc hℓ hop hus).1
-  exact .hkarm hus hℓ hal hop hEi rfl (refill_todo hEi perform_not_value he) hφ₀ hc' hnt
+  exact .hkarm hus hℓ hal hop hEi rfl hno (refill_todo hEi perform_not_value he) hφ₀ hc' hnt
     (hb.inst (Δ := [_]) (.cons hv hx .nil)) hle hφ hT
 
 /-- `control`: the arm runs at the handler with `resume`, a new cell of the type of the rest
@@ -179,7 +179,7 @@ theorem ctl_pres {Ψ Θ n p ℓ Ef al rf o v b t φ} {Ei : List Frame} (hc : RtC
     (answered_hole hop hno (Stage.answered_hP hφ₀)) hc hbv (cell_op_fixed hc hℓ hop hus).1
   refine ⟨_, ctl_cell_yf hc hℓ (cell_op_fixed hc hℓ hop hus).2 hp, lam_todo, ?_⟩
   refine .hctl hus (getElem?_ext hℓ) (hal.weakenStore _) (hrf.weakenStore _) hψ hop (by decide) (by simp)
-    hEi rfl ((refill_todo hEi perform_not_value he).weakenStore _) hφ₀ ?_
+    hEi rfl hno ((refill_todo hEi perform_not_value he).weakenStore _) hφ₀ ?_
     (fun _ => ⟨_, List.getElem?_concat_length, rfl⟩) hc' hφ hT hat
   rw [if_neg (by decide)]
   exact (hb.weakenStore _).inst (Δ := [_, _])
