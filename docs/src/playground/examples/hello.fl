@@ -1,4 +1,4 @@
-// The smallest program. `->{}` says that `main` runs and asks for no services.
+// The smallest program. `->{Host.Console}` says that `main` runs and uses the console.
 module Main exposing (main)
 
 main : Unit ->{Host.Console} Unit
