@@ -54,7 +54,7 @@ namespace Flick.Cert
 
 /-- The simp set of the finite sets of a certificate: elements, atoms, reach, substitution. -/
 macro "cert_simp" : tactic => `(tactic| (simp_all [Row.union, Row.ofCaps, Row.plain, Row.single,
-  Row.inst, Elem.nm₀, Row.none, Row.substT, Ty.substT, Caps.substT, Caps.none, Ty.reach, instT,
+  Row.inst, Ty.tcon, Elem.nm₀, Row.none, Row.substT, Ty.substT, Caps.substT, Caps.none, Ty.reach, instT,
   liftT, Ty.up, Ty.ren, Atom.up, Atom.ty, Ty.asRow, Ty.asStage, Row.err, Row.scope, Row.disch,
   Row.back, Row.nameClose, Row.less, Row.obs, shiftV, and_assoc] <;> omega))
 
@@ -202,6 +202,14 @@ macro "inst_le" : tactic => `(tactic| first
       List.length_cons, List.length_nil, Nat.reduceAdd, Nat.reduceSub, Nat.reduceLT,
       Nat.lt_irrefl, dite_true, dite_false, List.getElem_cons_zero, List.getElem_cons_succ,
       Bool.false_eq_true, ↓reduceIte, ↓reduceDIte]; le_live))
+
+/-- The row outside a handler of `E ū` fits its body (`Row.hBody`): `E` in it only at `ū`, its
+variables without `E`. -/
+macro "body_row" : tactic => `(tactic| (
+  intro x hx
+  rcases x with ⟨_, _⟩ | a | ⟨_, _, a⟩ | ⟨a, _⟩ | ⟨v, _, a⟩ <;> (try cases a) <;> (try cases v) <;>
+    split_mem hx <;> simp_all [Row.hBody, Sig.answers, Ty.tcon, Ty.asRow, Row.union, Row.inst,
+      Row.ofCaps, Row.none, Caps.none]))
 
 /-- `φ₀.ObOut o` of a concrete stage with no obligation about `o`. -/
 macro "ob_out" : tactic => `(tactic| (

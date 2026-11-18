@@ -38,8 +38,10 @@ pub struct Sig {
     pub(crate) ctors: BTreeMap<String, Ctor>,
     /// Each global with its index and scheme.
     pub(crate) globs: Vec<(Key, Scheme)>,
-    /// The operations of each service without parameters, all `tail`.
+    /// The operations of each service, all `tail`.
     pub(crate) ops: BTreeMap<String, Vec<Op>>,
+    /// The number of parameters of each service with operations.
+    pub(crate) arity: BTreeMap<String, usize>,
     /// The classes of the generator, by the index of their dictionaries.
     pub(crate) classes: Vec<String>,
     /// Each class's number of parameters and fields, `$S` of a superclass
@@ -56,6 +58,8 @@ pub struct Sig {
 /// An operation `o : a ->{} b` of a service.
 pub(crate) struct Op {
     pub(crate) name: Name,
+    /// The service's parameters, which `ty` is over.
+    pub(crate) vars: Vec<Name>,
     /// `a ->{} b`, as the model types it.
     pub(crate) ty: Type,
     pub(crate) a: String,
@@ -98,9 +102,10 @@ fn dict(
     Some((params.len(), fields))
 }
 
-/// The operations of a service, if each is `a ->{} b` of types the core
-/// writes.
-fn ops(schemes: &[(Name, Scheme)], types: &Rc<Types>) -> Option<Vec<Op>> {
+/// The operations of a service of `params` parameters, if each is `a ->{} b`
+/// of types the core writes, over the parameters only: the variables of an
+/// operation's scheme are the service's, `.tvar i` the `i`-th.
+fn ops(schemes: &[(Name, Scheme)], params: usize, types: &Rc<Types>) -> Option<Vec<Op>> {
     schemes
         .iter()
         .map(|(name, s)| {
@@ -109,12 +114,15 @@ fn ops(schemes: &[(Name, Scheme)], types: &Rc<Types>) -> Option<Vec<Op>> {
                 return None;
             };
             let none = Env {
+                vars: s.vars.iter().map(|(v, _)| v.to_string()).collect(),
                 types: Some(types.clone()),
                 ..Env::default()
             };
-            (s.vars.is_empty() && r.is_none() && e.is_none()).then_some(())?;
+            let own = s.vars.iter().all(|(_, k)| *k != Kind::Captures);
+            (s.vars.len() == params && own && r.is_none() && e.is_none()).then_some(())?;
             Some(Op {
                 name: name.clone(),
+                vars: s.vars.iter().map(|(v, _)| v.clone()).collect(),
                 ty: t.clone(),
                 a: ty(bare(a), &none).ok()?,
                 b: ty(bare(b), &none).ok()?,
@@ -336,20 +344,57 @@ impl Sig {
         for (p, s) in instances {
             globs.push((Key::Value(p.clone()), elided(decls, s)));
         }
-        let ops = (decls.services.iter())
+        let params = |p: &Path| decls.service_params.get(p).copied().unwrap_or(0);
+        let ops: BTreeMap<String, Vec<Op>> = (decls.services.iter())
             .filter(|(p, _)| &*p.module == module)
-            .filter_map(|(p, schemes)| Some((p.to_string(), ops(schemes, &types)?)))
+            .filter_map(|(p, schemes)| Some((p.to_string(), ops(schemes, params(p), &types)?)))
+            .collect();
+        let arity = (decls.services.keys())
+            .filter(|p| ops.contains_key(&p.to_string()))
+            .map(|p| (p.to_string(), params(p)))
             .collect();
         let vars = signs(decls, &ctors, &types);
         Sig {
             ctors,
             globs,
             ops,
+            arity,
             classes,
             dicts,
             types,
             vars,
         }
+    }
+
+    /// `genOps`, `genOp` and `genArity`: the operations of each service and
+    /// its number of parameters.
+    fn gen_ops(&self, out: &mut String) {
+        out.push_str("def genOps : Name → List Name\n");
+        for (svc, ops) in &self.ops {
+            let names: Vec<String> = ops
+                .iter()
+                .map(|o| format!("{:?}", o.name.to_string()))
+                .collect();
+            let _ = writeln!(out, "  | {svc:?} => [{}]", names.join(", "));
+        }
+        out.push_str("  | _ => []\n\ndef genOp : Name → Name → Option (OpClass × Ty × Ty)\n");
+        for (svc, ops) in &self.ops {
+            for o in ops {
+                let _ = writeln!(
+                    out,
+                    "  | {svc:?}, {:?} => some (.tail, {}, {})",
+                    o.name.to_string(),
+                    o.a,
+                    o.b
+                );
+            }
+        }
+        out.push_str("  | _, _ => none\n\n");
+        out.push_str("def genArity : Name → Nat\n");
+        for (svc, n) in self.arity.iter().filter(|(_, n)| **n > 0) {
+            let _ = writeln!(out, "  | {svc:?} => {n}");
+        }
+        out.push_str("  | _ => 0\n\n");
     }
 
     /// `genVar`, the variances of the types of the constructors, and the
@@ -435,27 +480,7 @@ impl Sig {
             }
         }
         out.push_str("  | _ => none\n\n");
-        out.push_str("def genOps : Name → List Name\n");
-        for (svc, ops) in &self.ops {
-            let names: Vec<String> = ops
-                .iter()
-                .map(|o| format!("{:?}", o.name.to_string()))
-                .collect();
-            let _ = writeln!(out, "  | {svc:?} => [{}]", names.join(", "));
-        }
-        out.push_str("  | _ => []\n\ndef genOp : Name → Name → Option (OpClass × Ty × Ty)\n");
-        for (svc, ops) in &self.ops {
-            for o in ops {
-                let _ = writeln!(
-                    out,
-                    "  | {svc:?}, {:?} => some (.tail, {}, {})",
-                    o.name.to_string(),
-                    o.a,
-                    o.b
-                );
-            }
-        }
-        out.push_str("  | _, _ => none\n\n");
+        self.gen_ops(&mut out);
         out.push_str("def genDict : Nat → Option (Nat × List (Label × Scheme))\n");
         let mut most = 1;
         for (i, (k, fields)) in self.dicts.iter().enumerate() {
