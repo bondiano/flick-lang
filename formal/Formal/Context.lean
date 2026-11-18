@@ -21,7 +21,7 @@ private theorem Typ.frameCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro r F t φ _ hterm _ hr _
     rw [hterm] at hv
     exact (not_value_plug hr F hv).elim
-  | @hwith _ _ _ _ _ _ _ _ p _ _ _ _ _ _ _ _ _ hℓ hal hrf hψ he hφ₀ hc hφ hT hat =>
+  | @hwith _ _ _ _ _ _ _ _ p _ _ _ _ _ _ _ _ _ _ hus hℓ hal hrf hψ he hφ₀ hc hφ hT hat =>
     intro r F t φ hctx hterm hjudge hr hok
     cases hctx; cases hjudge
     cases F <;> simp only [Frame.plug] at hterm
@@ -31,13 +31,13 @@ private theorem Typ.frameCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       have hp : σ (.r p) = .rg p := hσ.1 _ (.inr (.inl rfl))
       have h₁ := hal.sx (hσ.sub fun _ h => .inr (.inr (.inl h))) X
       simp only [Flick.J.substT, Ty.substT, hp] at h₁
-      exact .hwith (by simpa [Ty.substT, Ty.isStage] using cell_sx (σ := σ) hℓ X) h₁ (hrf.sx_rt (hσ.sub fun _ h => .inr (.inr (.inr (.inl h)))) X) (by simpa_substT Stage.le_substT σ hψ) h'
+      exact .hwith (by simpa using hus) (by simpa [Ty.substT, Ty.isStage] using cell_sx (σ := σ) hℓ X) h₁ (hrf.sx_rt (hσ.sub fun _ h => .inr (.inr (.inr (.inl h)))) X) (by simpa_substT Stage.le_substT σ hψ) h'
         (Stage.le_rt_sub (by simpa_substT Stage.le_substT σ hφ₀)
           (Row.hP_substT_asRow hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl))))
         (hc.substT σ) (by simpa_substT Stage.le_substT σ hφ) (hT.substT σ)
         (Stage.substT_svc_atm hp hat)
     all_goals cases hterm
-  | @hctl _ _ _ _ _ _ _ _ p _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ tl hℓ hal hrf hψ hop hc htl hE hk hp' hφ₀ ha hl hcm hφ hT hat =>
+  | @hctl _ _ _ _ _ _ _ _ p _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ tl _ hus hℓ hal hrf hψ hop hc htl hE hk hp' hφ₀ ha hl hcm hφ hT hat =>
     intro r F t φ hctx hterm hjudge hr hok
     cases hctx; cases hjudge
     cases F <;> simp only [Frame.plug] at hterm
@@ -49,13 +49,13 @@ private theorem Typ.frameCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
         | false => exact .inr ⟨p, rfl, congrArg Elem.atm hx⟩)
         (Stage.use_mono hφ (Caps.Sub.refl _)), fun σ hσ X _ h' => ?_⟩
       subst hk
-      obtain ⟨-, hb⟩ := S.op_closed _ _ _ _ _ σ hop
+      obtain ⟨-, hb⟩ := S.op_inst_substT hop hus σ
       have hp : σ (.r p) = .rg p := hσ.1 _ (.inr (.inl rfl))
       have h₁ := hal.sx (hσ.sub fun _ h => .inr (.inr (.inl h))) X
       simp only [Flick.J.substT, Ty.substT, hp] at h₁
       have h₃ := hp'.sx (hσ.sub fun _ h => .inr (.inr (.inr (.inr (.inr
         (plug_has_of_nosite (by simp [Tm.Has]) h)))))) X
-      refine .hctl (by simpa [Ty.substT, Ty.isStage] using cell_sx (σ := σ) hℓ X) h₁ (hrf.sx_rt (hσ.sub fun _ h => .inr (.inr (.inr (.inl h)))) X) (by simpa_substT Stage.le_substT σ hψ)
+      refine .hctl (by simpa using hus) (by simpa [Ty.substT, Ty.isStage] using cell_sx (σ := σ) hℓ X) h₁ (hrf.sx_rt (hσ.sub fun _ h => .inr (.inr (.inr (.inl h)))) X) (by simpa_substT Stage.le_substT σ hψ)
         hop hc htl hE rfl h₃ (Stage.le_rt_sub (by simpa_substT Stage.le_substT σ hφ₀)
           (Row.hP_substT_asRow hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl)))) ?_
         (fun h => ?_) (hcm.substT σ) (by simpa_substT Stage.le_substT σ hφ) (hT.substT σ)
@@ -67,7 +67,7 @@ private theorem Typ.frameCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
         rw [List.getElem?_append_left (by simpa using getElem?_lt hl₁), List.getElem?_map, hl₁]
         simp [Ty.substT, Ty.isStage, hb]
     all_goals cases hterm
-  | @hkeep _ _ _ _ _ _ _ _ q _ _ _ _ _ _ _ _ hℓ hal he hφ₀ hc hnt hle hφ hT =>
+  | @hkeep _ _ _ _ _ _ _ _ q _ _ _ _ _ _ _ _ _ hus hℓ hal he hφ₀ hc hnt hle hφ hT =>
     intro r F t φ hctx hterm hjudge hr hok
     cases hctx; cases hjudge
     cases F <;> simp only [Frame.plug] at hterm
@@ -77,13 +77,14 @@ private theorem Typ.frameCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       have hp : σ (.r q) = .rg q := hσ.1 _ (.inr (.inl rfl))
       have h₁ := hal.sx (hσ.sub fun _ h => .inr (.inr (.inl h))) X
       simp only [Flick.J.substT, Ty.substT, hp] at h₁
-      exact .hkeep (by simpa [Ty.substT, Ty.isStage] using cell_sx (σ := σ) hℓ X) h₁ h'
-        (Stage.le_rt_sub (by simpa_substT Stage.le_substT σ hφ₀)
-          (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl))))
+      exact .hkeep (by simpa using hus) (by simpa [Ty.substT, Ty.isStage] using cell_sx (σ := σ) hℓ X)
+        h₁ h' (Stage.le_rt_sub (by simpa_substT Stage.le_substT σ hφ₀)
+          (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl))
+            (fun _ => Sig.answers_substT σ) (Sig.answers_all_substT σ)))
         (hc.substR σ) (hnt.substR σ)
         (by simpa_substT Stage.le_substT σ hle) (Stage.le_substT σ hφ) (hT.substT σ)
     all_goals cases hterm
-  | @hkarm _ _ _ _ _ _ _ _ q _ _ _ _ _ _ _ _ _ _ _ _ _ hℓ hal hop hE hk hp' hφ₀ hc hnt ha hle hφ hT =>
+  | @hkarm _ _ _ _ _ _ _ _ q _ _ _ _ _ _ _ _ _ _ _ _ _ _ hus hℓ hal hop hE hk hp' hφ₀ hc hnt ha hle hφ hT =>
     intro r F t φ hctx hterm hjudge hr hok
     cases hctx; cases hjudge
     cases F <;> simp only [Frame.plug] at hterm
@@ -91,15 +92,16 @@ private theorem Typ.frameCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       cases hterm.symm
       refine .mk0 ⟨_, _, ha, .of_le (Stage.le_trans hle hφ), fun σ hσ X _ h' => ?_⟩
       subst hk
-      obtain ⟨-, hb⟩ := S.op_closed _ _ _ _ _ σ hop
+      obtain ⟨-, hb⟩ := S.op_inst_substT hop hus σ
       have hp : σ (.r q) = .rg q := hσ.1 _ (.inr (.inl rfl))
       have h₁ := hal.sx (hσ.sub fun _ h => .inr (.inr (.inl h))) X
       simp only [Flick.J.substT, Ty.substT, hp] at h₁
       have h₃ := hp'.sx (hσ.sub fun _ h => .inr (.inr (.inr (.inr
         (plug_has_of_nosite (by simp [Tm.Has]) h))))) X
-      exact .hkarm (by simpa [Ty.substT, Ty.isStage] using cell_sx (σ := σ) hℓ X) h₁ hop hE rfl h₃
-        (Stage.le_rt_sub (by simpa_substT Stage.le_substT σ hφ₀)
-          (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl))))
+      exact .hkarm (by simpa using hus) (by simpa [Ty.substT, Ty.isStage] using cell_sx (σ := σ) hℓ X)
+        h₁ hop hE rfl h₃ (Stage.le_rt_sub (by simpa_substT Stage.le_substT σ hφ₀)
+          (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl))
+            (fun _ => Sig.answers_substT σ) (Sig.answers_all_substT σ)))
         (hc.substR σ) (hnt.substR σ) (by simpa [hb, Row.substT_asRow] using h')
         (by simpa_substT Stage.le_substT σ hle) (Stage.le_substT σ hφ) (hT.substT σ)
     all_goals cases hterm
