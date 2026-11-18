@@ -78,6 +78,7 @@ codegen/task_twice
 stdlib/cli/cli
 stdlib/cli/cli_exit
 stdlib/cli/file_parse
+stdlib/cli/from_host
 stdlib/cli/prompt
 stdlib/cli/surface
 stdlib/cli/trace

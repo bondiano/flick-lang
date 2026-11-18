@@ -1,8 +1,9 @@
 // Effect's `ConfigProvider` for the bindings of the standard library, and the
 // adapters where a Flick value differs from what Effect takes.
-import { ConfigProvider, Effect, FileSystem, Option, Path } from "effect";
+import { ConfigProvider, Effect, FileSystem, Layer, Option, Path } from "effect";
 
 import { tag } from "@flick-lang/runtime/tags";
+import { currentProvider } from "../hostEnvironment.ts";
 import { effectFileSystem } from "./FileSystem.ts";
 
 export * from "effect/ConfigProvider";
@@ -73,6 +74,10 @@ export const flickFromDir = (options: {
     }).pipe(Effect.provideService(FileSystem.FileSystem, fs), Effect.provide(Path.layer)),
   );
 
-/** `ConfigProvider.layer_add`. */
+/** `ConfigProvider.layer_add`: added to the current provider, or else to the variables `Host.Environment` lists. */
 export const flickLayerAdd = (options: { readonly asPrimary: boolean }, provider: ConfigProvider.ConfigProvider) =>
-  ConfigProvider.layerAdd(provider, options);
+  Layer.effect(ConfigProvider.ConfigProvider)(
+    Effect.map(currentProvider, (current) =>
+      options.asPrimary ? ConfigProvider.orElse(provider, current) : ConfigProvider.orElse(current, provider),
+    ),
+  );

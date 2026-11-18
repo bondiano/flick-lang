@@ -222,7 +222,7 @@ impl Lower<'_> {
 fn fresh_result(kind: Intrinsic) -> bool {
     matches!(
         kind,
-        Intrinsic::Host(HostPrimitive::Env | HostPrimitive::Args)
+        Intrinsic::Host(HostPrimitive::Env | HostPrimitive::Vars | HostPrimitive::Args)
     )
 }
 

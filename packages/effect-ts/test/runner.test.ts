@@ -43,11 +43,13 @@ test("the browser runner provides Host.Clock and Host.Random", async () => {
 
 test("the node runner host layer provides Host.Environment and Host.Arguments", async () => {
   let envResult: unknown;
+  let varsResult: unknown;
   let argsResult: unknown;
   const fiber = start(
     () =>
       Effect.gen(function* () {
         envResult = yield* callOp("Host.Environment", "env", ["PATH"]);
+        varsResult = yield* callOp("Host.Environment", "vars", [undefined]);
         argsResult = yield* callOp("Host.Arguments", "args", [undefined]);
       }),
     undefined,
@@ -55,5 +57,6 @@ test("the node runner host layer provides Host.Environment and Host.Arguments", 
   );
   await new Promise((resolve) => fiber.addObserver(resolve));
   assert.ok(Option.isOption(envResult) && Option.isSome(envResult));
+  assert.ok(Array.isArray(varsResult) && varsResult.some(([, value]) => value === process.env["PATH"]));
   assert.ok(Array.isArray(argsResult));
 });

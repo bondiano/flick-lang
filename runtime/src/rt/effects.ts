@@ -7,7 +7,7 @@ import { fromNullable } from "../core/data.ts";
 import { seq } from "../core/seq.ts";
 import { fail, raise } from "./cause.ts";
 import { type Ctx, Instruction, type Run, currentCtx, inCtx, isRun } from "./fiber.ts";
-import { args, env, writeStderr, writeStdout } from "./host.ts";
+import { args, env, vars, writeStderr, writeStdout } from "./host.ts";
 
 function* then(call: unknown, f: (value: unknown) => unknown): Run {
   return f(yield call);
@@ -115,3 +115,4 @@ export const stderrLine = (text: string): void => writeStderr(`${text}\n`);
 export const stdoutWrite = (text: string): void => writeStdout(text);
 export const platformArgs = (): Array<string> => args();
 export const platformEnv = (name: string): unknown => fromNullable(env(name));
+export const platformVars = (): Array<[string, string]> => vars();

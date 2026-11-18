@@ -3,7 +3,6 @@ package flickrt
 import (
 	"math"
 	"math/big"
-	"os"
 	"strconv"
 	"strings"
 )
@@ -11,14 +10,14 @@ import (
 // The log records and metrics `--trace` sends, in OTLP's JSON, the metrics
 // cumulative.
 
-// otlpResource is the OTLP resource of the service, its version
-// OTEL_SERVICE_VERSION.
+// otlpResource is the OTLP resource of the service, of the version
+// OTEL_SERVICE_VERSION gives when it is not "".
 //
 // shortcut: OTEL_RESOURCE_ATTRIBUTES is not read; read a record of it when a program sets it
-func otlpResource(service string) string {
+func otlpResource(service, serviceVersion string) string {
 	version := ""
-	if v := os.Getenv("OTEL_SERVICE_VERSION"); v != "" {
-		version = `,{"key":"service.version","value":{"stringValue":` + QuoteJSON(v) + `}}`
+	if serviceVersion != "" {
+		version = `,{"key":"service.version","value":{"stringValue":` + QuoteJSON(serviceVersion) + `}}`
 	}
 	return `{"attributes":[{"key":"telemetry.sdk.name","value":{"stringValue":"effect"}},` +
 		`{"key":"telemetry.sdk.language","value":{"stringValue":"go"}},{"key":"telemetry.sdk.version","value":{"stringValue":"4.1.2"}},` +

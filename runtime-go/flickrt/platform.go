@@ -70,6 +70,41 @@ func PlatformEnv(name Value) Value {
 	return None
 }
 
+// PlatformVars is every environment variable, as pairs of its name and
+// value.
+func PlatformVars() Value {
+	env := os.Environ()
+	out := make([]Value, 0, len(env))
+	for _, kv := range env {
+		if k, v, ok := strings.Cut(kv, "="); ok {
+			out = append(out, []Value{k, v})
+		}
+	}
+	return out
+}
+
+// hostEnvironment is the fiber's `Host.Environment`: what a std function
+// reads of the environment by default goes through it, so a fake one
+// answers.
+func hostEnvironment(fb *Fiber) *Record {
+	impl, ok := fb.env.get("Host.Environment")
+	if !ok {
+		panic(Defect{"Service not found: Host.Environment"})
+	}
+	return record(impl)
+}
+
+// hostEnv is `Host.Environment.env name`, "" when the variable is unset.
+func hostEnv(fb *Fiber, name string) string {
+	if v := Run(fb, Apply(fb, hostEnvironment(fb).Get("env"), name)); isSome(v) {
+		return value(v).(string)
+	}
+	return ""
+}
+
+// hostVars is `Host.Environment.vars ()`.
+func hostVars(fb *Fiber) Value { return Run(fb, Apply(fb, hostEnvironment(fb).Get("vars"), Unit)) }
+
 // Todo is `todo`: code not written yet fails when it runs.
 func Todo(message Value) Value { panic(Defect{"Error: " + message.(string)}) }
 
@@ -147,6 +182,9 @@ func liveHostEnv(e *env) *env {
 	envRec := Rec(
 		"env", Fn(func(_ *Fiber, name Value) Value {
 			return Eff(func(_ *Fiber) Value { return PlatformEnv(name) })
+		}),
+		"vars", Fn(func(_ *Fiber, _ Value) Value {
+			return Eff(func(_ *Fiber) Value { return PlatformVars() })
 		}),
 	)
 	argsRec := Rec(

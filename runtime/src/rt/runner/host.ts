@@ -2,7 +2,7 @@
 // export per service, so a launcher imports only those its `main` names.
 import { flickCurrentTimeMillis, flickCurrentTimeNanos, flickMonotonicTimeNanos } from "../effect/Clock.ts";
 import { flickNext } from "../effect/Random.ts";
-import { platformArgs, platformEnv, stderrLine, stdoutLine, stdoutWrite } from "../effects.ts";
+import { platformArgs, platformEnv, platformVars, stderrLine, stdoutLine, stdoutWrite } from "../effects.ts";
 import { Under, currentCtx, extend, readOwnerEvidence } from "../fiber.ts";
 import { service } from "../handle.ts";
 import { type Services } from "../layer.ts";
@@ -27,7 +27,10 @@ export const hostClock: HostService = [
 
 export const hostRandom: HostService = [/*#__PURE__*/ service("Host.Random"), { next: flickNext }];
 
-export const hostEnvironment: HostService = [/*#__PURE__*/ service("Host.Environment"), { env: platformEnv }];
+export const hostEnvironment: HostService = [
+  /*#__PURE__*/ service("Host.Environment"),
+  { env: platformEnv, vars: platformVars },
+];
 
 export const hostArguments: HostService = [/*#__PURE__*/ service("Host.Arguments"), { args: platformArgs }];
 
