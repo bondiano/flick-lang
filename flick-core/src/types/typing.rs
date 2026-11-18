@@ -85,11 +85,12 @@ pub struct Typing {
     pub suspended: Vec<(String, Vec<usize>)>,
     /// Arguments passed unstarted to a parameter marked `~`: the task of each.
     pub suspends: HashSet<Range>,
-    /// `await`s of a `let lazy`, which read it with `lazy_read`.
+    /// `await`s of a `let lazy`, which read the variable of its state.
     pub read_lazy: HashSet<Range>,
-    /// `let lazy` declarations, whose value is the cell of their task.
+    /// `let lazy` declarations: a variable of their function, which holds
+    /// the initializer until an `await` runs it.
     pub lazy_lets: HashSet<Range>,
-    /// Assignments to a `let lazy mut`, whose value is a cell already done.
+    /// Assignments to a `let lazy mut`, which set its state to the value.
     pub lazy_sets: HashSet<Range>,
     /// Lazy `for`s whose body makes Sync calls: each step runs with the
     /// services of the stage that built the sequence.

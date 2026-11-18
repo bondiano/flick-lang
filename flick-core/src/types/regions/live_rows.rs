@@ -16,6 +16,7 @@ use crate::types::Elem;
 use crate::types::effects::Site;
 use crate::types::kinds::Kind;
 use crate::types::ty::{Norm, Row, Type};
+use crate::types::unify::Unified;
 
 impl Checker<'_> {
     /// The regions the services of the bound `services` keep live: `Scope
@@ -68,24 +69,38 @@ impl Checker<'_> {
 
     /// Unification of service rows: `Live` that one side has and the other,
     /// a closed row, lacks, is left out while it needs no region known yet,
-    /// as of a cell's capacity a generic signature names.
-    pub(in crate::types) fn unify_live(&self, left: &mut Norm, right: &mut Norm) {
+    /// as of a cell's capacity a generic signature names. Its capture rows
+    /// not inferred yet are then empty: a region they gained later would be
+    /// a use the other row does not keep live, as `Some (fun () -> …)`
+    /// stored in a cell of `Option (Unit ->{} String)`.
+    pub(in crate::types) fn unify_live(&mut self, left: &mut Norm, right: &mut Norm) -> Unified {
         let lacks = |n: &Norm| {
             n.get(&Elem::Live).is_none() && !n.tails.iter().any(|t| matches!(t, Type::Meta(_)))
         };
-        let unknown = |this: &Self, t: &Type| {
-            (this.live_atoms(t, &[]).entries.iter())
-                .all(|(_, a)| matches!(this.store.resolve(a), Type::Meta(_)))
-        };
         if lacks(right) {
-            left.entries
-                .retain(|(l, t)| !matches!(l, Elem::Live) || !unknown(self, t));
+            self.leave_out_live(left)?;
         }
         if lacks(left) {
-            right
-                .entries
-                .retain(|(l, t)| !matches!(l, Elem::Live) || !unknown(self, t));
+            self.leave_out_live(right)?;
         }
+        Ok(())
+    }
+
+    /// `row` without its `Live` that needs no region known yet, whose capture
+    /// rows not inferred yet are empty. Unification merged it into one entry.
+    fn leave_out_live(&mut self, row: &mut Norm) -> Unified {
+        let Some(at) = (row.entries.iter()).position(|(l, _)| matches!(l, Elem::Live)) else {
+            return Ok(());
+        };
+        let atoms = self.live_atoms(&row.entries[at].1, &[]);
+        if !(atoms.entries.iter()).all(|(_, a)| matches!(self.store.resolve(a), Type::Meta(_))) {
+            return Ok(());
+        }
+        row.entries.remove(at);
+        for tail in &atoms.tails {
+            self.unify(tail, &Type::empty_row())?;
+        }
+        Ok(())
     }
 
     /// The end of `scope` of `region`: its region is live no further.
