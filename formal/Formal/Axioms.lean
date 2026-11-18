@@ -81,9 +81,17 @@ prints, and `#guard_msgs` turns the difference into an error.
 #guard_msgs in
 #print axioms Flick.T7
 
+/-- info: 'Flick.MutOk.lzDecl' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.MutOk.lzDecl
+
 /-- info: 'Flick.MutOk.lzAwait' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Flick.MutOk.lzAwait
+
+/-- info: 'Flick.MutOk.lzWrite' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.MutOk.lzWrite
 
 /-- info: 'Flick.Tm.rename_redirect' depends on axioms: [propext, Quot.sound] -/
 #guard_msgs in

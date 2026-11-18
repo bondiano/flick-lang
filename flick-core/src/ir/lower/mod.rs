@@ -247,6 +247,7 @@ impl Lower<'_> {
         self.scope.clear();
         self.used.clear();
         self.vars.clear();
+        self.lazies.clear();
     }
 
     fn item(&mut self, decl: &Node, items: &mut Vec<Item>) {
