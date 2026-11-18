@@ -200,6 +200,7 @@ stdlib/http/api_bodies # the row primitive `Lacks "bodies" {}`
 stdlib/http/auth # the row primitive `Lacks "users" {}`
 stdlib/http/client # the model's (⊆) rejects `App.Main.combinators`
 stdlib/http/derive # the row primitive `Lacks "forget" { profile : { headers : Unit; path : { name : String }; payload : Unit; query : Unit } ->{r; NotFound} { name : String } }`
+stdlib/http/drain_outcomes # the row primitive `Lacks "work" {}`
 stdlib/http/error_cases # the row primitive `Lacks "users" {}`
 stdlib/http/error_cases_opaque # `Record.label` has no λFlick form
 stdlib/http/forms # no native for `post` (flick:http/HttpClientRequest post)

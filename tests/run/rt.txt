@@ -277,6 +277,7 @@ stdlib/http/handlers
 stdlib/http/headers
 stdlib/http/inject
 stdlib/http/lifecycle
+stdlib/http/drain_outcomes
 stdlib/http/redaction_context
 stdlib/http/router_patterns
 stdlib/http/serve
