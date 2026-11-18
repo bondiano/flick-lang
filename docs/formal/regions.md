@@ -410,7 +410,7 @@ Provided R ϱ         constraint (like Outlives, §2.4): the provider of each se
 
 The scheme of every constant with `retention owner` (G4) requires `Fiber.Provided r s` and `Detached r` for the row of the retained task or finalizer, as it requires `Fiber.Outlives c s` for captures; with one region in the signature the checker adds them (`ffi.rs` `with_owner_constraints`), and a foreign function otherwise without them is `FLICK-F002` (`ffi.rs` `owner_retention`).
 
-The call site splits `Provided r ϱ` into the services `S ∈ r` (except `Scope` and the obligations themselves) and discharges each in the stage `X` that contains the call, lexically, like `Scope ϱ` (`regions/scopes.rs` `lexical_owner`):
+The call site splits `Provided r ϱ` into the services `S ∈ r` (except `Scope`, `Async`, which the root gives every fiber and no owner provides, and the obligations themselves) and discharges each in the stage `X` that contains the call, lexically, like `Scope ϱ` (`regions/scopes.rs` `lexical_owner`):
 
 ```text
 S is given by a provide ϱₚ inside X, the nearest to the call:   discharged if ϱₚ ≥ ϱ; otherwise FLICK-G003
@@ -1002,6 +1002,8 @@ let group () =
 - a list literal against `List τ` checks each element against `τ`, so (Sub) may widen it (`[text "x"] : List (Ui^c)`);
 - the `Scope` region of a step outside the `scope`s of its λ or task is the one the stage names ([leases](#leases-instead-of-early-close)), and in a task argument it waits for the end of the call ([after the call](#scope-region-of-a-task-argument-is-resolved-after-the-call));
 - work two owners keep that uses one service is kept by the outer owner when one `scope` encloses the other: the provider outlives both (§2.7).
+- `Async` of work an owner keeps makes no `Provided` obligation: the root gives it to every fiber, as the checker reads it (§2.7); the model had rejected `Resource.own`, whose close runs with `{Async}`.
+- a `Fiber.Provided` constraint over a task, `forall t. Fiber.Provided r t => Eff {Scope t | r} e a^{t}` of `Resource.manual`, is given to the task as to the body of a λ; the model had dropped it, as it placed the constraint only in the row of a runtime arrow (`Type::with_provided`).
 
 Fixtures: the cases of `accepted.rs`; `flick-model/tests/model/live.rs` `live_on_std` lists the std values the model still cannot type.
 
