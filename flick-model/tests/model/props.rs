@@ -33,7 +33,7 @@ use proptest::prelude::*;
 thread_local! {
     /// What the checker knows of `Gen.fl` and the built-in modules, and
     /// their values the machine runs.
-    static GEN: (Decls, eval::Program) = {
+    pub(crate) static GEN: (Decls, eval::Program) = {
         let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/generate/Gen.fl");
         let modules = run::compile(&file).expect("Gen.fl compiles");
         (run::decls(&modules), run::program(&modules))
@@ -49,7 +49,7 @@ fn choices() -> impl Strategy<Value = Vec<u32>> {
 }
 
 /// The model's verdict on `p`: (Let-Sig) of `program : σ` at the top.
-fn model(p: &Program) -> Result<(), String> {
+pub(crate) fn model(p: &Program) -> Result<(), String> {
     GEN.with(|(d, _)| {
         Checker::new(d)
             .check_top(&p.term, &p.scheme)
@@ -58,7 +58,7 @@ fn model(p: &Program) -> Result<(), String> {
 }
 
 /// flick-core's errors on `source`; one of syntax is a bug of the printer.
-fn core(source: &str) -> Vec<String> {
+pub(crate) fn core(source: &str) -> Vec<String> {
     let mut sources = SourceMap::default();
     let file = sources.add("Gen.fl", source);
     let errors: Vec<String> = flick_core::check(&sources, file)
@@ -97,7 +97,11 @@ fn runnable(p: &Program) -> (Term, Type) {
 /// Runs `p`; each state must have the program's type at a stage within
 /// the first one's (Preservation), and the run must not get stuck
 /// (Progress); an error it ends with must be one of `ε₀` (T1).
-fn progress_and_preservation(decls: &eval::Program, d: &Decls, p: &Program) -> Result<(), String> {
+pub(crate) fn progress_and_preservation(
+    decls: &eval::Program,
+    d: &Decls,
+    p: &Program,
+) -> Result<(), String> {
     let (e0, t0) = runnable(p);
     let phi0 =
         check_config(d, &[], &Lambda::default(), &e0, &t0).map_err(|e| format!("e₀: {e}"))?;
@@ -396,49 +400,6 @@ fn a_scope_in_a_child_is_inside_the_region_of_its_owner() {
     assert_eq!(source.matches("Fiber.spawn s1").count(), 2, "{source}");
     assert!(source.contains("Fiber.spawn s4"), "{source}");
     assert!(model(&p).is_ok(), "{source}");
-    let checked = GEN.with(|(d, globals)| progress_and_preservation(globals, d, &p));
-    assert!(checked.is_ok(), "{checked:?}\n{source}");
-}
-
-/// (Match-Err): an arm `x` of a `try` takes the errors of the body apart
-/// by a `match` over the row the body raises. The body raises `Oops`, so
-/// the `match` runs on that error, which a configuration types at the row
-/// (Errors-In). The choices are a short run that ends in this form.
-#[test]
-fn a_try_arm_takes_its_errors_apart_by_their_row() {
-    let c = [
-        1, 0, 1, 5, 3, 2, 5, 1, 5, 1, 4, 1, 0, 2, 5, 5, 1, 1, 0, 3, 0,
-    ];
-    let p = generate::program(&c);
-    let source = generate::source(&p);
-    assert!(
-        source.contains("(match x1 with\n          | Bad y2 ->"),
-        "{source}"
-    );
-    assert!(source.contains("(match true with"), "{source}");
-    assert!(model(&p).is_ok(), "{source}");
-    assert!(core(&source).is_empty(), "{source}");
-    let checked = GEN.with(|(d, globals)| progress_and_preservation(globals, d, &p));
-    assert!(checked.is_ok(), "{checked:?}\n{source}");
-}
-
-/// (Errors-In) and the row of a `try` arm above its body's: the body
-/// raises `Oops` only, the `match` on `x1` names `Bad` too, and its arm
-/// `Oops` gives `Oops y2`, a term of one error, the errors of the row
-/// `{Bad, Oops}` and takes it apart again. Both checkers accept it, and
-/// each state of its run is typed (`docs/formal/core.md` §2.4).
-#[test]
-fn an_error_is_a_term_of_the_errors_of_its_row() {
-    let c = [
-        4, 1, 2, 5, 1, 4, 5, 4, 3, 4, 3, 1, 1, 0, 1, 3, 0, 2, 3, 2, 5, 3, 3, 0, 4, 1,
-    ];
-    let p = generate::program(&c);
-    let source = generate::source(&p);
-    assert!(source.contains("let w4 : Errors {Bad, Oops} ="), "{source}");
-    assert!(source.contains("| Bad y3 ->"), "{source}");
-    assert!(!source.contains("(Bad "), "{source}");
-    assert!(model(&p).is_ok(), "{source}");
-    assert!(core(&source).is_empty(), "{source}");
     let checked = GEN.with(|(d, globals)| progress_and_preservation(globals, d, &p));
     assert!(checked.is_ok(), "{checked:?}\n{source}");
 }
