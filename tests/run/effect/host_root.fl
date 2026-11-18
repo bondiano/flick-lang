@@ -2,6 +2,13 @@ module App.Main exposing (main)
 
 import Host
 
+/// Whether `vars` has a variable `name`.
+lists : String -> List (String, String) -> Bool
+let rec lists name vars =
+  match vars with
+  | [] -> false
+  | [(key, _), ...rest] -> key == name || lists name rest
+
 // No runner and no `provide` around these calls: the entry gives a
 // runner-less `main` the live host services as its root.
 main :
@@ -18,6 +25,7 @@ let main () =
   Host.Console.stdout_line (show (millis > 0 && nanos > 0n && monotonic >= 0n))
   Host.Console.stdout_line (show (draw >= 0 && draw < 1))
   Host.Console.stdout_line (show (Host.Environment.env "FLICK_HOST_ROOT_UNSET"))
+  Host.Console.stdout_line (show (lists "FLICK_HOST_ROOT_UNSET" (Host.Environment.vars ())))
   Host.Console.stdout_line (show (Host.Arguments.args ()))
   // what `main` provides itself is inner, so it wins over the root
   let told = Ref.make []

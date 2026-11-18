@@ -5,7 +5,6 @@ package flickrt
 // length, where a record or an array may have a value too.
 
 import (
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -250,18 +249,6 @@ func ConfigProviderFromEnvRecord(options, pairs Value) Value {
 	return fromEnvMap(names, env, preserveEmpty(options))
 }
 
-func ConfigProviderFromEnv(options Value) Value {
-	env := map[string]string{}
-	var names []string
-	for _, kv := range os.Environ() {
-		if k, v, ok := strings.Cut(kv, "="); ok {
-			names = append(names, k)
-			env[k] = v
-		}
-	}
-	return fromEnvMap(names, env, preserveEmpty(options))
-}
-
 // ConfigProviderFromUnknown is `ConfigProvider.from_unknown` of a JSON value.
 func ConfigProviderFromUnknown(options, root Value) Value {
 	preserve := preserveEmpty(options)
@@ -476,7 +463,7 @@ func currentProvider(fb *Fiber) provider {
 	if p, ok := fb.env.get(configProviderKey); ok {
 		return p.(provider)
 	}
-	return ConfigProviderFromEnv(Rec("preserveEmptyStrings", false)).(provider)
+	return ConfigProviderFromEnvRecord(Rec("preserveEmptyStrings", false), PlatformVars()).(provider)
 }
 
 // ConfigProviderLayer makes the provider the one of the body.

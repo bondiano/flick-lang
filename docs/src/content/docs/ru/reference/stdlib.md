@@ -1,6 +1,6 @@
 ---
 title: "Стандартная библиотека"
-source_hash: e9ccb63ff998fc44
+source_hash: 1482cde931bee684
 ---
 
 Стандартная библиотека написана на Flick и использует адаптер среды выполнения
@@ -95,7 +95,7 @@ source_hash: e9ccb63ff998fc44
 | - | - |
 | `Clock`, `Random` | чтение времени через `Host.Clock` по часам файбера, которые `Test.clock_test` делает виртуальными, и случайные числа через `Host.Random`; `Random.with_seed` повторяет числа задачи |
 | `DateTime` | моменты времени в UTC или в часовом поясе с проверяемыми конструкторами; `now`, `is_past` и `is_future` читают `Host.Clock`, `now_in_current_zone` — ещё и `CurrentTimeZone` |
-| `Config`, `ConfigProvider` | конфигурация, читаемая по имени: `Config.get` читает текущий `ConfigProvider` (из `ConfigProvider.layer`), а без него — окружение через `Host.Environment`, а `get_with` делает то же с собственной функцией поиска; `ConfigProvider.from_env` читает окружение процесса при пустой строке |
+| `Config`, `ConfigProvider` | конфигурация, читаемая по пути: `Config.get` читает текущий `ConfigProvider` (из `ConfigProvider.layer`), а без него — `ConfigProvider.from_env` над переменными, которые перечисляет `Host.Environment.vars`; `get_with` берёт этот запасной провайдер из собственной функции |
 | `Console`, `Logger`, `LogLevel`, `ErrorReporter` | `log`, `info` и `debug` в stdout, `warn` и `error` в stderr через `Host.Console`, обработка каждого сообщения лога, уровни лога, упорядоченные по важности, и куда сообщаются необработанные сбои |
 | `Cause` | построение, комбинирование и разбор причины сбоя поверх непрозрачного `Failure e` |
 | `Cron` | множества моментов времени, при необходимости в часовом поясе; `Schedule.cron` работает по ним |

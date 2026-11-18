@@ -48,6 +48,8 @@ map_input prod
 or_else localhost
 layer prod
 host ["missing true"] from the host
+host array [80, 443] record [("TEAM", "core"), ("TIER", "web")]
+get_with localhost own
 layer_add ["own", "localhost"]
 from_env missing
 files dot tree

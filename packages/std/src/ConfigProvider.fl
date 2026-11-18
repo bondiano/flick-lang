@@ -3,6 +3,7 @@
 module ConfigProvider exposing (..)
 
 import FileSystem
+import Host
 import PlatformError
 
 /// A source of configuration values.
@@ -79,9 +80,10 @@ from_env_record : Options -> List (String, String) -> ConfigProvider
 foreign pure from_env_record from "flick:ConfigProvider" "flickFromEnvRecord"
   arity 2
 
-/// The environment variables of the process.
-from_env : Options ->{} ConfigProvider
-foreign from_env from "flick:ConfigProvider" "fromEnv"
+/// The environment variables `Host.Environment` lists, as `from_env_record`
+/// reads them.
+from_env : Options ->{Host.Environment} ConfigProvider
+let from_env options = from_env_record options (Host.Environment.vars ())
 
 /// Values from the text of a `.env` file.
 from_dot_env_contents : DotEnvOptions -> String -> ConfigProvider

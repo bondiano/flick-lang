@@ -70,6 +70,19 @@ func PlatformEnv(name Value) Value {
 	return None
 }
 
+// PlatformVars is every environment variable, as pairs of its name and
+// value.
+func PlatformVars() Value {
+	env := os.Environ()
+	out := make([]Value, 0, len(env))
+	for _, kv := range env {
+		if k, v, ok := strings.Cut(kv, "="); ok {
+			out = append(out, []Value{k, v})
+		}
+	}
+	return out
+}
+
 // Todo is `todo`: code not written yet fails when it runs.
 func Todo(message Value) Value { panic(Defect{"Error: " + message.(string)}) }
 
@@ -147,6 +160,9 @@ func liveHostEnv(e *env) *env {
 	envRec := Rec(
 		"env", Fn(func(_ *Fiber, name Value) Value {
 			return Eff(func(_ *Fiber) Value { return PlatformEnv(name) })
+		}),
+		"vars", Fn(func(_ *Fiber, _ Value) Value {
+			return Eff(func(_ *Fiber) Value { return PlatformVars() })
 		}),
 	)
 	argsRec := Rec(
