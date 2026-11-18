@@ -17,6 +17,7 @@ mod expr;
 mod fragment;
 mod pattern;
 mod plugin;
+mod proofs;
 mod report;
 mod types;
 
@@ -140,7 +141,7 @@ fn continues(kind: SyntaxKind) -> bool {
         || kind.is_closer()
         || matches!(
             kind,
-            K::Pipe | K::ThenKw | K::ElseKw | K::WithKw | K::YieldKw
+            K::Pipe | K::ThenKw | K::ElseKw | K::WithKw | K::YieldKw | K::WhereKw
         )
 }
 
@@ -615,5 +616,7 @@ mod exposing_tests;
 mod operator_tests;
 #[cfg(test)]
 mod plugin_tests;
+#[cfg(test)]
+mod proof_tests;
 #[cfg(test)]
 mod tests;

@@ -24,6 +24,9 @@
 //!   precedence, one level in; a pipeline of `|>` or `<|` breaks one step
 //!   per line, its operators under the first operand when the pipeline
 //!   starts its line;
+//! - a `proof` stays on one line when it fits, else `where` and its goal
+//!   start the next line at the declaration's column, then its proof
+//!   follows `=` as the value of a `let` does;
 //! - `if c then a else b` stays on one line or puts each branch on its own
 //!   lines; `match` and `try` put each arm on its own line, under `match`;
 //! - lists, tuples and `exposing (…)` stay on one line or put one item per

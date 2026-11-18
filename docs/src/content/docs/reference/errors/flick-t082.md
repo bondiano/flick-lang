@@ -1,0 +1,24 @@
+---
+title: "FLICK-T082"
+---
+
+A `proof` is about the pure, total domain `PureTotalV1`: every value it
+names is computed by a terminating program without effects. Here the
+statement or its proof names something outside that domain: a type
+with effects, a recursive type, a primitive operation, or a definition
+the checker does not admit. The program itself is not wrong; only this
+proof cannot be checked.
+
+```flick fail T082
+proof sum (x : Int)
+where equal (x + 0) x =
+  refl
+```
+
+is
+
+```flick
+proof same (x : Int)
+where equal x x =
+  refl
+```

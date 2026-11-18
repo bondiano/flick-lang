@@ -43,6 +43,7 @@ fn top_decl(p: &mut Parser) {
         K::ForeignKw => foreign_decl(p),
         // `effect Name`: the word is a name everywhere else
         K::Ident if p.at_word("effect") && p.nth(1) == K::Con => service_decl(p),
+        K::Ident if super::proofs::at_proof(p) => super::proofs::proof_decl(p),
         K::Ident if super::plugin::at_declaration(p) => super::plugin::declaration(p),
         _ => member(p),
     }

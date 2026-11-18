@@ -1,6 +1,6 @@
 ---
 title: "Синтаксис"
-source_hash: 336f8340516059bb
+source_hash: 7e46a99ee0b286e9
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -155,7 +155,8 @@ in when for yield do break continue
 - `and` между связками группы `do`, `x <- a and y <- b`;
 - `effect` перед именем объявления эффекта, `tail`, `abort` и `control` перед
   операцией сервиса или эффекта и `return` перед образцом ветки `try` (см.
-  [effects.md](../effects/#эффекты-и-handlers)).
+  [effects.md](../effects/#эффекты-и-handlers));
+- `proof` перед именем в начале объявления (см. [Объявления](#объявления)).
 
 ### В модулях
 
@@ -181,7 +182,8 @@ in when for yield do break continue
 | `assert` | `let assert` связывает образец, который может не подойти, и завершается с ошибкой, если он не подошёл | `let assert [x, ..._] = xs as "no items"` |
 | `type` | Объявляет алгебраический тип данных, а в сочетании `type alias` — прозрачный псевдоним типа | `type Shape = Circle Float \| Empty` |
 | `opaque` | Скрывает представление типа за пределами его модуля | `opaque type alias UserId = String` |
-| `where` | Задаёт условие уточняющего типа или фильтр в `sql { … }` | `where user.id == params.id` |
+| `where` | Задаёт условие уточняющего типа, цель `proof` или фильтр в `sql { … }` | `where user.id == params.id` |
+| `proof` | Контекстное слово: перед именем в начале объявления формулирует свойство определений модуля и доказывает его; компилятор проверяет доказательство и стирает объявление; в других местах остаётся именем | `proof same where same_type a a = refl` |
 | `kind` | Объявляет кинд и его конструкторы на уровне типов | `kind Nullability = NonNull \| Nullable` |
 | `error` | В сочетании `type error` объявляет ожидаемую ошибку с номинальной идентичностью | `type error NotFound = NotFound UserId` |
 | `service` | Объявляет операции сервиса, реализация которого выбирается при выполнении | `service Clock = now : Unit ->{} Float` |
@@ -347,10 +349,10 @@ in when for yield do break continue
      скобках, как после `do` и `loop`; запись на этом месте пишется в
      круглых скобках (`FLICK-T074`).
 3. Строка в столбце блока продолжает инструкцию, если начинается
-   с инфиксного оператора, кроме `-`, с `|`, `then`, `else`, `with`
+   с инфиксного оператора, кроме `-`, с `|`, `then`, `else`, `with`, `where`
    или с закрывающего разделителя. Поэтому конвейеры `|>` и `<|`, ветви
-   `match` и ветви `else` могут начинаться в том же столбце, что и их
-   выражение.
+   `match`, ветви `else` и цель `proof` могут начинаться в том же столбце,
+   что и их выражение или объявление.
 4. В записях, типах записей и блоках `{ … }` элементы выравниваются
    по первому элементу, даже если он идёт сразу после `{` на той же строке.
    Элементы разделяются переводами строк или `;`.
@@ -428,7 +430,7 @@ item        = name | Con | Con "(..)" | ".." | "plugin" name   // см. plugins.
 ModulePath  = Con { "." Con }
 
 decl        = signature | let | rec_group | type_decl | kind_decl | error_decl
-            | service | class | instance | foreign | module_contract | inline_module
+            | service | class | instance | foreign | module_contract | inline_module | proof
             | head { head_arg } ("{" { token } "}" | { token })   // плагина, до следующего decl
 attribute   = "@" name { name | String }   // перед объявлением, членом или вариантом
 inline_module = "module" Con ["exposing" exposing] "=" indented { import | decl }
@@ -462,7 +464,16 @@ foreign     = "foreign" [mode] name "from" ("global" String | String String) [me
             | "foreign" "blocked" name String
 mode        = "pure" | "effect"
 metadata    = indented lines: meta_name { atom }
+proof       = "proof" name { atom_pattern | premise } "where" goal "=" block
+premise     = "(" name ":" goal ")"
+goal        = "same_type" atom atom | expr   // two atomic types, or an expression
 ```
+
+`proof` формулирует свойство определений модуля — цель после `where` —
+и доказывает его после `=`: `proof same where same_type a a = refl`.
+Компилятор проверяет доказательство и стирает объявление: во время
+выполнения у него нет значения. `equal`, `holds`, `same_type` и `refl` —
+имена, а не ключевые слова.
 
 `module_application` объявляется только на уровне файла. Внутри
 `inline_module` он вызывает `FLICK-R019`; `module_contract` там разрешён.

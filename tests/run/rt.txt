@@ -294,6 +294,7 @@ stdlib/observability/otlp
 stdlib/observability/prometheus
 stdlib/observability/settings
 stdlib/observability/tracer
+stdlib/option_ap_strictness
 stdlib/process/child_process
 stdlib/process/wait_large_output
 stdlib/reactivity/atom

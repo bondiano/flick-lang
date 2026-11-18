@@ -1,0 +1,32 @@
+// Applicative composition for `Option` holds of total functions: with
+// `fs = None` the left side never applies `g`, and the right side applies
+// `g x` before it reaches `fs`. A `g` that fails tells the two apart, so a
+// proof of the law is about total functions and says nothing of this one.
+module App.Main exposing (main)
+
+say : String ->{Host.Console} Unit
+let say line = Platform.stdout_line line
+
+ap : Option (a -> b) -> Option a -> Option b
+let ap fs xs = map2 (fun f x -> f x) fs xs
+
+compose : (b -> c) -> (a -> b) -> a -> c
+let compose f g x = f (g x)
+
+/// Fails at 0.
+inverse : Int -> Int
+let inverse n = Int.unsafe_div 1 n
+
+shown : Option Int -> String
+let shown v =
+  match v with
+  | None -> "None"
+  | Some n -> "Some " ++ show n
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () =
+  let fs : Option (Int -> Int) = None
+  let gs = Some inverse
+  let xs = Some 0
+  say ("left: " ++ shown (ap (ap (ap (pure compose) fs) gs) xs))
+  say ("right: " ++ shown (ap fs (ap gs xs)))

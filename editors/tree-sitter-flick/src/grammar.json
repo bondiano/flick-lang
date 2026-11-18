@@ -30,6 +30,15 @@
           "name": "_case"
         },
         {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_proof"
+          },
+          "named": true,
+          "value": "keyword"
+        },
+        {
           "type": "SYMBOL",
           "name": "attribute"
         },
@@ -1437,6 +1446,10 @@
     {
       "type": "SYMBOL",
       "name": "multiline_string"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_proof"
     }
   ],
   "inline": [],

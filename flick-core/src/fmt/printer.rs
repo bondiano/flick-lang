@@ -141,6 +141,7 @@ impl<'a> Printer<'a> {
             K::IfExpr => self.if_(n),
             K::MatchExpr | K::TryExpr => self.match_(n),
             K::LetDecl | K::AssignStmt => self.let_(n),
+            K::ProofDecl => self.proof(n),
             K::BindStmt => self.bind(n),
             K::BindGroup => self.bind_group(n),
             K::Block => self.block(n),

@@ -133,6 +133,9 @@ syntax_kinds! {
         /// `return` before the pattern of a handler's branch for the value of
         /// its body, a keyword only there.
         ReturnKw,
+        /// `proof` before the name of a proof declaration, a keyword only
+        /// there.
+        ProofKw,
 
         // punctuation and operators
         LParen,
@@ -254,6 +257,14 @@ syntax_kinds! {
         ForeignSource,
         ForeignMeta,
         MetaItem,
+        /// `proof name params where goal = proof`: a checked, erased statement.
+        ProofDecl,
+        /// The goal of a proof or of a premise: an expression, `equal l r`.
+        Goal,
+        /// `same_type A B`: a goal of two types.
+        SameTypeGoal,
+        /// `(h : goal)`: a parameter of a proof that is a proof itself.
+        Premise,
         Error,
 
         // nodes: expressions
