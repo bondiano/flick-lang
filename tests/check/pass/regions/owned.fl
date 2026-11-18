@@ -1,0 +1,58 @@
+// A scope owns a value of `Close` through `Resource.own`: the value holds
+// the region of the scope, a helper generic in the region owns into the
+// scope of its caller, and a close may see how the body ended.
+module App.Owned exposing (..)
+
+import Resource exposing (Close(..), own)
+
+type Raw
+
+make_raw : String ->{} Raw
+foreign effect make_raw from "./conn.js" "make"
+
+close_raw : Raw^c ->{} Unit
+foreign effect close_raw from "./conn.js" "close"
+  retention call
+
+commit : Raw^c ->{Async} Unit
+foreign effect commit from "./conn.js" "commit"
+  retention call
+
+rollback : Raw^c ->{Async} Unit
+foreign effect rollback from "./conn.js" "rollback"
+  retention call
+
+instance Close Raw =
+  let close _ raw = close_raw raw
+
+/// A transaction on a connection no scope owns: it commits when the body
+/// succeeds, and rolls back otherwise.
+type Tx = Tx Raw
+
+instance Close Tx =
+  let close _ (Tx raw) = rollback raw
+  let close_exit _ exit (Tx raw) = if Exit.is_success exit then commit raw else rollback raw
+
+open : String ->{Async, Scope s} Raw^{s}
+let open name = own (make_raw name)
+
+used : Unit ->{Async} Unit
+let used () = scope {
+  let conn = open "db"
+  close_raw conn
+}
+
+transaction : Unit ->{Async} Unit
+let transaction () = scope {
+  let _tx = own (Tx (make_raw "db"))
+  ()
+}
+
+// a closure that holds an owned value and never uses it may leave the scope
+held : Unit ->{Async} (Unit ->{} Unit)
+let held () = scope {
+  let conn = open "db"
+  fun () ->
+    let _kept = conn
+    ()
+}

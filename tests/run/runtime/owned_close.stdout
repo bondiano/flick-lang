@@ -1,0 +1,29 @@
+open a
+open b
+open c
+inner body
+close c: succeeded
+outer body
+close plain
+close b: succeeded
+close a: succeeded
+open parent
+open child
+body ends
+close child: interrupted
+close parent: succeeded
+open f
+close f: failed
+body failed
+open t
+close t: interrupted
+timed out
+close slow begins
+close slow ends
+timed out after the close
+open first
+open last
+close last: succeeded
+close broken
+close first: succeeded
+broken: died
