@@ -30,6 +30,7 @@ pub mod bindings {
         world: "backend",
         path: "wit",
         generate_unused_types: true,
+        generate_all,
         additional_derives: [serde::Serialize, serde::Deserialize, PartialEq, Eq],
         pub_export_macro: true,
         export_macro_name: "export_component",
@@ -38,6 +39,71 @@ pub mod bindings {
 }
 
 pub use bindings::flick::backend::types::*;
+
+/// The records of the command interface a backend or a plugin implements.
+pub mod command {
+    pub use crate::bindings::flick::command::types::*;
+
+    impl Plan {
+        /// A plan that does nothing.
+        pub fn empty() -> Self {
+            Self {
+                files: vec![],
+                steps: vec![],
+                diagnostics: vec![],
+                stdout: vec![],
+            }
+        }
+    }
+
+    /// The answer of a contributor that has no command `name`.
+    pub fn unknown(name: &str) -> Vec<Diagnostic> {
+        vec![Diagnostic {
+            code: "P012".into(),
+            severity: Severity::Error,
+            message: format!("this contributor has no command `{name}`"),
+            notes: vec![],
+        }]
+    }
+}
+
+/// Exports the command interface of a component through the [`Backend`]
+/// value `$backend`, beside the component's other exports.
+#[macro_export]
+macro_rules! export_commands {
+    ($component:ty, $backend:expr) => {
+        impl $crate::bindings::exports::flick::command::command::Guest for $component {
+            fn describe() -> ::std::vec::Vec<$crate::command::Descriptor> {
+                $crate::Backend::commands(&$backend)
+            }
+            fn run(
+                invocation: $crate::command::Invocation,
+            ) -> ::std::result::Result<
+                $crate::command::Plan,
+                ::std::vec::Vec<$crate::command::Diagnostic>,
+            > {
+                $crate::Backend::run(&$backend, &invocation)
+            }
+            fn open(
+                invocation: $crate::command::Invocation,
+            ) -> ::std::result::Result<
+                ::std::vec::Vec<u8>,
+                ::std::vec::Vec<$crate::command::Diagnostic>,
+            > {
+                $crate::Backend::open(&$backend, &invocation)
+            }
+            fn handle(
+                state: ::std::vec::Vec<u8>,
+                request: ::std::vec::Vec<u8>,
+            ) -> ::std::result::Result<$crate::command::Handled, ::std::string::String> {
+                $crate::Backend::handle(&$backend, state, request)
+            }
+            fn close(state: ::std::vec::Vec<u8>) -> $crate::command::Plan {
+                $crate::Backend::close(&$backend, state)
+            }
+        }
+    };
+}
 
 /// The same operations as the component world, using the same records.
 /// This trait is an implementation convenience, not a native public ABI.
@@ -64,6 +130,31 @@ pub trait Backend {
         request: &BuildRequest,
         inputs: &mut dyn Inputs,
     ) -> Result<BuildResult, Vec<Diagnostic>>;
+    /// The commands the backend adds to `flick`.
+    fn commands(&self) -> Vec<command::Descriptor> {
+        Vec::new()
+    }
+    /// The plan of the plan command `invocation.name`.
+    fn run(
+        &self,
+        invocation: &command::Invocation,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        Err(command::unknown(&invocation.name))
+    }
+    /// The state of a new session of the session command `invocation.name`.
+    fn open(&self, invocation: &command::Invocation) -> Result<Vec<u8>, Vec<command::Diagnostic>> {
+        Err(command::unknown(&invocation.name))
+    }
+    /// The answer to one request of a session.
+    fn handle(&self, state: Vec<u8>, request: Vec<u8>) -> Result<command::Handled, String> {
+        let _ = (state, request);
+        Err("this contributor has no session command".into())
+    }
+    /// The plan of a session that ends.
+    fn close(&self, state: Vec<u8>) -> command::Plan {
+        let _ = state;
+        command::Plan::empty()
+    }
 }
 
 /// Deterministic CBOR of a request, including the backend digest and all side

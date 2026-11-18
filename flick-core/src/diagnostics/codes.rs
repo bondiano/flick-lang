@@ -292,6 +292,10 @@ codes! {
     P049 = Project 49, "the invariant a plugin gave does not hold together";
     P050 = Project 50, "a host tool step failed";
     P051 = Project 51, "`[tools]` does not allow this host tool";
+    P052 = Project 52, "flick has no command of this name";
+    P053 = Project 53, "several contributors add a command of this name";
+    P054 = Project 54, "a contributor adds a command of flick itself";
+    P055 = Project 55, "a command's plan does not keep to what it declares";
 }
 
 #[cfg(test)]

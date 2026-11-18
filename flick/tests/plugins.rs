@@ -99,6 +99,7 @@ mod wasm {
     use super::{APP, LIB, MAIN, PAIRS};
 
     mod block_derive;
+    mod commands;
     mod compiled;
     mod invariant;
     mod opened;

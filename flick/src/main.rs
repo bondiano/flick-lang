@@ -1,9 +1,12 @@
 use std::env;
+use std::ffi::OsString;
 use std::process::ExitCode;
 use std::thread;
 use std::time::Duration;
 
 use clap::Parser;
+#[cfg(feature = "wasm-backends")]
+use clap::{CommandFactory, FromArgMatches};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::pnpm;
 use flick_core::source::SourceMap;
@@ -83,7 +86,7 @@ fn dependency_command(cmd: Commands, offline: bool) -> pnpm::Command {
 }
 
 fn main() -> ExitCode {
-    let args = CommandArguments::parse();
+    let args = parse();
     builtins::keep_modules();
     let global = args.global.clone();
     // the language server sets its own subscriber for its log
@@ -93,6 +96,22 @@ fn main() -> ExitCode {
     let code = run(args);
     timings::report(&global);
     code
+}
+
+/// The arguments; the top-level help lists the commands the project's
+/// backend and plugins add, read from their cached descriptors.
+fn parse() -> CommandArguments {
+    #[cfg(feature = "wasm-backends")]
+    {
+        let argv: Vec<OsString> = env::args_os().skip(1).collect();
+        if matches!(argv.as_slice(), [a] if a == "--help" || a == "-h" || a == "help") {
+            let sections = commands::contributed::help();
+            let command = CommandArguments::command().after_help(sections);
+            return CommandArguments::from_arg_matches(&command.get_matches())
+                .unwrap_or_else(|e| e.exit());
+        }
+    }
+    CommandArguments::parse()
 }
 
 /// Runs the command of `args` on its project, or on each member of its workspace.
@@ -114,6 +133,7 @@ fn run(args: CommandArguments) -> ExitCode {
             | Commands::Plugins
             | Commands::Explain(_)
             | Commands::Doctor
+            | Commands::External(_)
     );
     if needs_std && let Err(message) = stdlib::prepare(args.global.project.as_deref()) {
         let diagnostic = Diagnostic::new(codes::P034, Severity::Error, message);
@@ -140,6 +160,7 @@ fn run(args: CommandArguments) -> ExitCode {
             | Commands::Plugins
             | Commands::Explain(_)
             | Commands::Doctor
+            | Commands::External(_)
             // after its logging starts
             | Commands::Lsp(_)
     ) && let Err(diagnostic) = builtins::prepare()
@@ -256,5 +277,30 @@ fn dispatch(args: CommandArguments) -> ExitCode {
             Some(paths) => mapper::declarations(&paths),
             None => mapper::serve(),
         },
+        Commands::External(words) => external(&words, global),
     }
+}
+
+/// A command a backend or a plugin of the project adds.
+#[cfg(feature = "wasm-backends")]
+fn external(words: &[OsString], global: &GlobalArguments) -> ExitCode {
+    commands::contributed::run(words, global)
+}
+
+#[cfg(not(feature = "wasm-backends"))]
+fn external(words: &[OsString], global: &GlobalArguments) -> ExitCode {
+    let name = (words.first()).map(|w| w.to_string_lossy().into_owned());
+    let diagnostic = Diagnostic::new(
+        codes::P052,
+        Severity::Error,
+        format!(
+            "flick has no command `{}`: this build adds no contributed commands",
+            name.unwrap_or_default()
+        ),
+    );
+    let outcome = Outcome {
+        sources: SourceMap::default(),
+        diagnostics: vec![diagnostic],
+    };
+    report(outcome, global)
 }
