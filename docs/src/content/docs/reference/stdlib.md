@@ -63,8 +63,9 @@ and `Monad`.
 | `Jwt` | JSON Web Tokens signed with HMAC-SHA256 (`alg` `HS256`): `sign` and `verify` over a JSON codec of the claims; `verify` refuses another `alg`, a wrong signature and an `exp` the clock has passed with `JwtError` (`Malformed`, `BadSignature`, `Expired`); `now` and `expires_in` give `iat` and `exp` in seconds since the epoch |
 | `EqHash`, `HashSet`, `HashMap` | hash collections that keep their witness |
 | `Loop` | `loop` over a `Step` and `Trampoline`, for stack-safe pure recursion |
+| `Host` | the six host services `Console`, `Clock`, `Random`, `Environment`, `Arguments` and `Process`, their sets `Live` (all six) and `BrowserLive` (the first three), and the trusted live layers `console`, `clock`, `random`, `environment`, `arguments`, `process`, `live` and `browser_live` an entry chooses; see [Explicit host dependencies](../effects/#explicit-host-dependencies) |
 | `Platform` | `stdout_line`, `stderr_line`, `stdout_write` through `Host.Console`, `args` through `Host.Arguments`, `env` through `Host.Environment` |
-| `Log` | the `Log` service with `info`, `warn`, `error`, `debug`, and `Log.console` over `Host.console` |
+| `Log` | the `Log` service with `info`, `warn`, `error`, `debug`; `from_console` makes a `Log` layer of a `Host.Console` layer, and `Log.console`, made of `Host.console`, needs nothing |
 | `File` | the `FileSystem` service: `open_scoped`, `read_all`, `read_text`, `write_text`, and `File.node` |
 | `ChildProcess` | child processes: a `Command` (`make`, `set_cwd`, `set_env`, `set_stdin`, `prefix`, `pipe_to`, `inherit_output`) run to its end by `string`, `lines` and `exit_code`, or started by `spawn` as a `Process` of a scope, all through `Host.Process`, with `stdout`, `stderr`, `output_string`, `output_lines`, `wait`, `is_running`, `kill` and `kill_with` |
 | `Resource` | `acquire_release` into a scope's owner, and `bracket` |
@@ -89,7 +90,9 @@ For example, `Clock` is in `std`, `Stream` in `stream`, and `HttpApi` in `http`:
 
 | Module | Contents |
 | - | - |
-| `Clock`, `Random` | reads of the time through `Host.Clock`, and draws through `Host.Random`; `Random.with_seed` repeats the draws of a task |
+| `Clock`, `Random` | reads of the time through `Host.Clock`, from the fiber's clock, which `Test.clock_test` makes virtual, and draws through `Host.Random`; `Random.with_seed` repeats the draws of a task |
+| `DateTime` | instants in UTC or in a time zone, with checked constructors; `now`, `is_past` and `is_future` read `Host.Clock`, `now_in_current_zone` also `CurrentTimeZone` |
+| `Config`, `ConfigProvider` | configuration read by name: `Config.get` reads the current `ConfigProvider` (from `ConfigProvider.layer`) or else the environment through `Host.Environment`, and `get_with` does the same with a lookup of your own; `ConfigProvider.from_env` reads the process environment under an empty row |
 | `Console`, `Logger`, `LogLevel`, `ErrorReporter` | `log`, `info` and `debug` to stdout and `warn` and `error` to stderr through `Host.Console`, what happens to each log message, log levels ordered by severity, and where unhandled failures are reported |
 | `Cause` | build, combine and read how a computation failed, over Flick's opaque `Failure e` |
 | `Cron` | sets of times, optionally in a time zone; `Schedule.cron` runs by one |
