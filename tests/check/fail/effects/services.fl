@@ -49,6 +49,20 @@ let run_early id = with_users users_layer (prepare id)
 
 type error Late = Late String (Ref Float)
 
+service Store a =
+  get : Unit ->{} a
+
+// an instance stays the one a variable is substituted with: under a cell,
+// and at each use of a polymorphic argument
+keep : Ref (Unit ->{Store a} Int) -> (Unit ->{Store a} Int) ->{} Unit
+let keep cell work = Ref.set cell work
+
+crossed : Ref (Unit ->{Store Int} Int) -> (Unit ->{Store Bool} Int) ->{} Unit
+let crossed cell work = keep cell work
+
+ranked : (forall a. Unit ->{Store a} a) ->{Store Int} Int
+let ranked work = if work () then 1 else 0
+
 //~ FLICK-E006 @10:3-10:16 service operation `value` must be a runtime function: running it looks its handl
 //~ FLICK-E005 @12:21-12:39 the payload of error `Broken` holds `Ref Float`, a live value; an error carries
 //~ FLICK-E005 @14:21-14:47 the payload of error `Hidden` holds `Unknown`, a live value; an error carries da
@@ -58,3 +72,5 @@ type error Late = Late String (Ref Float)
 //~ FLICK-T003 @34:46-34:47 expected `Unit ->{} Float`, found `Int`
 //~ FLICK-E003 @48:43-48:55 this argument runs a runtime call before `with_users` is applied, although `with
 //~ FLICK-E005 @50:19-50:42 the payload of error `Late` holds `Ref Float`, a live value; an error carries d
+//~ FLICK-T003 @61:35-61:39 expected `Store Int`, found `Store Bool`: `Bool` is not `Int`
+//~ FLICK-T003 @64:22-64:29 expected `Store Int`, found `Store Bool`: `Bool` is not `Int`

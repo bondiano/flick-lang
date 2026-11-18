@@ -75,6 +75,8 @@ def genGlob : Nat → Option Scheme
   | 14 => some ⟨0, Facts.none, (.arrow (.adt "Fixture.Shape") (.rt .cnil .cnil) (.base .string) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "shape_of" })
   | 15 => some ⟨0, Facts.none, (.arrow (.adt "Prelude.JsValue") .pure (.adt "Fixture.Shape") Caps.none)⟩
+  -- Value(Path { module: "Fixture", name: "touch" })
+  | 16 => some ⟨1, Facts.none, (.arrow (.base .unit) (.rt (.rnm "Fixture.Within" (.tapp (.adt "Fixture.Within") (.tvar 0))) .cnil) (.base .unit) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "use" })
   | 17 => some ⟨1, Facts.none, (.arrow (.tapp (.adt "Fixture.Handle") (.tvar 0)) (.rt (.caps (fun x => x = .v 0)) .cnil) (.base .unit) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "use_conn" })
@@ -102,14 +104,23 @@ def genGlob : Nat → Option Scheme
   | _ => none
 
 def genOps : Name → List Name
+  | "Fixture.Box" => ["take"]
   | "Fixture.Counter" => ["next"]
   | "Fixture.Log" => ["log"]
+  | "Fixture.Within" => ["get"]
   | _ => []
 
 def genOp : Name → Name → Option (OpClass × Ty × Ty)
+  | "Fixture.Box", "take" => some (.tail, (.base .unit), (.tvar 0))
   | "Fixture.Counter", "next" => some (.tail, (.base .unit), (.base .int))
   | "Fixture.Log", "log" => some (.tail, (.base .string), (.base .unit))
+  | "Fixture.Within", "get" => some (.tail, (.base .unit), (.tapp (.adt "Fixture.Handle") (.tvar 0)))
   | _, _ => none
+
+def genArity : Name → Nat
+  | "Fixture.Box" => 1
+  | "Fixture.Within" => 1
+  | _ => 0
 
 def genDict : Nat → Option (Nat × List (Label × Scheme))
   | 0 => some (1, [("describe", ⟨0, Facts.none, (.arrow (.tvar 0) .pure (.base .string) Caps.none)⟩)])
@@ -140,11 +151,16 @@ structure GenSig (S : Sig) : Prop where
   closed : ∀ K k ts T, S.ctor K = some (k, ts, T) → genAdtCtors T ≠ [] → genCtor K = some (k, ts, T)
   /-- A service of the generator has its operations and no other. -/
   op : ∀ E o, genOps E ≠ [] → S.op E o = genOp E o
-  /-- A service of the generator has no parameters: its operations are of closed types. -/
-  arity : ∀ E, genOps E ≠ [] → S.arity E = 0
+  /-- A service of the generator has its parameters, which its operations are over. -/
+  arity : ∀ E, genOps E ≠ [] → S.arity E = genArity E
   dict : ∀ c, (genDict c).isSome → S.dict c = genDict c
   /-- A type of the generator has the variances the model gives it. -/
   var : ∀ T, genAdtCtors T ≠ [] → ∀ j, S.var T j = genVar T j
+
+/-- The arguments of an instance of a service of the generator, as many as its parameters. -/
+theorem GenSig.arity_of {S : Sig} (hS : GenSig S) {E : Name} {us : List Ty} (hE : genOps E ≠ [])
+    (h : us.length = genArity E) : us.length = S.arity E :=
+  h.trans (hS.arity E hE).symm
 
 theorem GenSig.var_of {S : Sig} (hS : GenSig S) {T : Name} {j : Nat} {v : Variance}
     (h : S.var T j = v) (hT : genAdtCtors T ≠ []) : genVar T j = v :=
@@ -243,10 +259,10 @@ theorem genGlob_closed : ∀ g s, genGlob g = some s → s.Closed s.k := by
   split at h <;> cases h <;> closed_tac
 
 theorem genOp_closed : ∀ E o c a b σ, genOp E o = some (c, a, b) →
-    a.substT σ = a ∧ b.substT σ = b := by
-  intro E o c a b σ h
+    (∀ i, i < genArity E → σ (.v i) = .tvar i) → a.substT σ = a ∧ b.substT σ = b := by
+  intro E o c a b σ h hσ
   unfold genOp at h
-  split at h <;> cases h <;> simp [Ty.substT]
+  split at h <;> cases h <;> simp_all [Ty.substT, genArity]
 
 theorem genOp_mem : ∀ E o x, genOp E o = some x → o ∈ genOps E := by
   intro E o x h
@@ -276,7 +292,8 @@ def genSig : Sig where
   dict_closed := genDict_closed
   glob_closed := genGlob_closed
   op := genOp
-  op_closed E o c a b σ h _ := genOp_closed E o c a b σ h
+  arity := genArity
+  op_closed := genOp_closed
   op_impl _ _ _ _ _ _ _ := rfl
   op_field _ _ _ _ _ h := (h rfl).elim
   var := genVar
@@ -288,7 +305,3 @@ theorem GenSig.inhabited : ∃ S, GenSig S :=
     fun _ _ => rfl, fun _ _ => rfl, fun _ _ _ => rfl⟩
 
 end Flick.Cert
-
-/-! ## Skipped -/
-
--- skip Value(Path { module: "Fixture", name: "touch" }): the element `Fixture.Within` with arguments

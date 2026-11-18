@@ -107,15 +107,17 @@ let load_two first_id second_id =
   parallel first second
 ```
 
-0.2 adds local mutable variables and loops: `let mut`, `loop` and `while`. A
-function that mutates its own variables stays pure from the outside.
+Local mutable variables and loops read the same way: `let mut`, `loop` and
+`while`, with labels for `break` and `continue`. A function that mutates its
+own variables stays pure from the outside.
 
 ## One language for the whole app
 
 The same modules build for two targets. JavaScript gives ES modules for the
-browser and Node: `ui` views render with React, and effects run on
-[Effect](https://effect.website/). In 0.2 they run on a small runtime of
-Flick's own, and Effect becomes a package. Go gives one executable that needs no
+browser and Node: `ui` views render with React, and effects run on a small
+runtime of Flick's own. Streams, the command line and parts of HTTP and RPC
+still run on [Effect](https://effect.website/) through an adapter package (see
+[the runtime](../../reference/runtime/)). Go gives one executable that needs no
 Node. `just language` compares the behaviour of both targets in CI.
 
 Pure code is written once and shared. In the
@@ -146,10 +148,12 @@ and `--diagnostics json` gives tools one event per line.
 
 The source is about as long as the same app in Go and React.
 [`tools/tokens`](https://github.com/bondiano/flick-lang/blob/main/tools/tokens/index.mjs)
-counts `examples/conduit` against the RealWorld reference of the same app. With
-GPT's `o200k_base` the two are about even: 30,174 tokens against 29,778, a ratio
-of 1.01. With Claude's tokenizer the ratio was 0.93 when last measured. It is
-one app, so treat these as a sanity check.
+counts `examples/conduit` against the RealWorld reference of the same app:
+`node tools/tokens/index.mjs` repeats the count. With GPT's `o200k_base` the two
+are about even: 29,979 tokens against 29,778 on 2026-11-18, a ratio of 1.01.
+With Claude's tokenizer the ratio was 0.93 on 2026-11-05; the tool counts that
+too when `ANTHROPIC_API_KEY` is set. It is one app, so treat these as a sanity
+check.
 
 ## Who Flick is not for yet
 
@@ -157,14 +161,16 @@ one app, so treat these as a sanity check.
   release may break programs before 1.0.
 - **Teams that expect a large ecosystem.** Beyond the standard library there are
   few Flick packages.
-- **Pages that must ship little JavaScript.** A UI program carries the Effect
-  runtime and React: the UI programs this repository tracks are held to budgets
-  of 117–126 KB gzipped.
-- **Other platforms.** There is no mobile or desktop target. WebAssembly
-  comes in 0.2.
+- **Pages that must ship little JavaScript.** A UI program carries React and
+  Flick's runtime. Measured with `just bundle-size` on 2026-11-18, the UI
+  programs this repository tracks were 80–92 KB gzipped, and 116–128 KB with
+  the Effect adapter.
+- **Other platforms.** There is no mobile or desktop target. A WebAssembly
+  target is planned and not on `main` yet.
 - **Teams already productive with TypeScript and Effect.** On JavaScript, Flick
-  runs on the same Effect, so adopting it is a choice of source language, not of
-  runtime. [Effect coverage](../../reference/runtime/#effect-coverage) lists what of
+  runs on its own runtime by default, or on the same Effect through an adapter
+  (`effect = "effect"`), where adopting it is a choice of source language, not
+  of runtime. [Effect coverage](../../reference/runtime/#effect-coverage) lists what of
   Effect Flick reaches.
 
 ## Next

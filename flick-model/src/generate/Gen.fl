@@ -31,6 +31,10 @@ service Within (s : Region) =
 touch : Unit ->{Within s} Unit
 let touch _ = use (Within.get ())
 
+// A service with a type parameter, provided and asked at one instance.
+service Box a =
+  take : Unit ->{} a
+
 // Data that stores only its parameter, and data that hides what it holds.
 type Wrapper s = Wrapper (Handle s)
 

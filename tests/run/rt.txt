@@ -37,6 +37,7 @@ codegen/default_signatures
 codegen/defaults
 codegen/defect
 codegen/derive_default
+codegen/value_defaults
 codegen/do_notation
 codegen/effect_abi
 codegen/effect_sets
@@ -92,6 +93,7 @@ codegen/service_reprovide
 codegen/services
 effect/service_params
 effect/effect_params
+effect/effect_instances
 effect/host_root
 codegen/stage_order
 codegen/strings_utf16
