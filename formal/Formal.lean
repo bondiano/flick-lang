@@ -76,6 +76,7 @@ import Formal.CaughtStep
 import Formal.CaughtCfg
 import Formal.CfgTyped
 import Formal.MainKept
+import Formal.InstanceHandlers
 import Formal.Soundness
 import Formal.Lemma4
 import Formal.Within
