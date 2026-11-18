@@ -1,6 +1,6 @@
 ---
 title: "Type-level programming and eDSLs"
-source_hash: 5ab4e5ebe932331f
+source_hash: 8efc55b40d919e0e
 ---
 
 Flick's SQL, UI and CLI DSLs — `sql params { … }`, `ui { … }` with `component` declarations, and `cli "name" { … }` — are libraries over one type core: rows, labels, finite kinds, HKT and multiparameter classes with functional dependencies. Their backends are PostgreSQL, React (in the browser and on the server) and Effect CLI.
@@ -139,7 +139,7 @@ A handler field has the opaque type `Ui.Handler snapshot`, which only a policy m
 
 `capacity` and `limit` are positive integers: a constant that is not one is `FLICK-U001`, a computed one is checked when the handler is made. A rejected event is an infrastructure defect for the supervisor, never an error of the typed row. The handler gets an inert snapshot taken inside the DOM callback; `Ui.Event.prevent_default decide h` decides the default action synchronously with the pure `decide`.
 
-`Ui.Dom.mount container supervisor ui` renders `ui` with the provided atom registry (`Atom.layer`); the initial DOM mount is synchronous, later renders are React 19's to schedule. The supervisor receives `Failure none`: task failures and rejected events. Closing has two phases: React cleanup stops taking events and unmounts the tree, then the handler tasks are interrupted and joined, and only then does `mount` end, so the scope releases its resources after the tasks have stopped. `Ui.mount_with renderer supervisor ui` has the same contract with an opaque `Ui.Renderer` instead of a DOM container.
+`Ui.Dom.mount container supervisor ui` renders `ui` with the provided atom registry (`Atom.layer`); the initial DOM mount is synchronous, later renders are React 19's to schedule. The supervisor receives `Failure none`: task failures and rejected events. The tasks of handlers and instances run with the caller's `Host.BrowserLive`, so it is in the row of `mount`, and a `main` that mounts a root names those services. Closing has two phases: React cleanup stops taking events and unmounts the tree, then the handler tasks are interrupted and joined, and only then does `mount` end, so the scope releases its resources after the tasks have stopped. `Ui.mount_with renderer supervisor ui` has the same contract with an opaque `Ui.Renderer` instead of a DOM container.
 
 `Ui.Server.render ui` renders the markup of an initial view on the server, its views reading atoms from a registry of the request; handlers do not run there. A container marked `data-flick-ssr` is hydrated by `Ui.Dom.mount` instead of being cleared. See [Server-rendered initial views](../../reference/ui/#server-rendered-initial-views).
 

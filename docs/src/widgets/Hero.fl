@@ -211,7 +211,7 @@ let initial_view ru =
 report : Failure e ->{Host.Console} Unit
 let report failure = Platform.stderr_line (RawCause.describe (Failure.inspect failure))
 
-main : Unit ->{Host.Console, Async; AppError} Unit
+main : Unit ->{Host.Clock, Host.Random, Host.Console, Async; AppError} Unit
 let main () =
   let initial = initial_model (is_russian ())
   match Ui.Dom.container "flick-hero" with

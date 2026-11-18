@@ -437,6 +437,12 @@ impl Checker<'_> {
 }
 
 impl Typing {
+    /// Where a dictionary is passed, known once the module is solved and
+    /// before `finish_typing` sorts the dictionaries into `dicts`.
+    pub(super) fn dictionary_sites(&self) -> HashSet<Range> {
+        self.pending_dicts.iter().map(|(at, _, _)| *at).collect()
+    }
+
     pub(crate) fn pending_foreign_diagnostics(&self) -> Vec<Diagnostic> {
         self.pending_foreigns
             .iter()

@@ -40,7 +40,7 @@ component reading_list () = ui {
     paragraph (text "pages left: \{Books.pages_left books}")
 }
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Host.Clock, Host.Console, Host.Random, Async; AppError} Unit
 let main () =
   match Ui.Dom.container "app" with
   | None -> App.fail "the page has no #app"

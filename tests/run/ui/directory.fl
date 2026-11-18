@@ -103,7 +103,7 @@ let closed failure =
     ("root closed: " ++ RawCause.describe (Failure.inspect failure) ++ ", page [" ++ text () ++ "]")
   release ()
 
-main : Unit ->{Host.Console, Async; AppError} Unit
+main : Unit ->{Host.Clock, Host.Random, Host.Console, Async; AppError} Unit
 let main () =
   setup ()
   let model = Atom.make None
