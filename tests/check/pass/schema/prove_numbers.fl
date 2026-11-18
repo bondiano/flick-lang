@@ -45,6 +45,10 @@ let nested n =
 otherwise : Int -> Option Digit
 let otherwise n = if n < 0 then None else if n > 9 then None else Some (Digit.prove n)
 
+// the false conditions before an `else if` leave its own condition its proof
+after_else : Float -> Option Positive
+let after_else n = if n <= 0 then None else if n > 0 then Some (Positive.prove n) else None
+
 // a snapshot of arithmetic, checked before it is used
 next : Int -> Option Digit
 let next n =
