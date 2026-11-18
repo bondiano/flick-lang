@@ -1,7 +1,9 @@
 // The performance baseline: the time to check the check corpus, the
 // language server's hover latency, the throughput of the load servers of
-// tools/load at concurrency 16 and the size of the Go one, and the resident
-// memory of the language server and those servers at their peak. Writes
+// tools/load at concurrency 16 and the size of the Go one, the resident
+// memory of the language server and those servers at their peak, and the
+// time tools/bench/console.fl takes, as a Go executable and on Flick's own
+// runtime, to print its lines through a service operation. Writes
 // target/perf.json and a table (also to $GITHUB_STEP_SUMMARY) and fails
 // when a metric is past its budget in budgets.json; a budget of null is
 // only reported. A metric that beats its budget by a factor of more than
@@ -37,6 +39,8 @@ export const METRICS = {
   "load.ssr.rss.peak": { unit: "MiB", better: "lower" },
   "load.json.go.cold_start": { unit: "ms", better: "lower" },
   "load.ssr.cold_start": { unit: "ms", better: "lower" },
+  "console.go": { unit: "ms", better: "lower" },
+  "console.rt": { unit: "ms", better: "lower" },
 };
 
 /** The peak in MiB that tools/load and tools/lsp-bench print. */
@@ -127,6 +131,18 @@ const soak = (flick) => {
   return Number(/^RSS, MiB: growth ([\d.]+)/m.exec(out)?.[1]);
 };
 
+/** The median wall time in ms of `3 * RUNS` fresh processes of `command`, its stdout discarded, after a warm-up. */
+export const processTime = (command, args = []) => {
+  const once = () => {
+    const started = performance.now();
+    const { status } = spawnSync(command, args, { cwd: root, stdio: "ignore" });
+    if (status !== 0) throw new Error(`${command} ${args.join(" ")} exited with ${status}`);
+    return performance.now() - started;
+  };
+  once();
+  return Math.round(median(Array.from({ length: RUNS * 3 }, once)) * 10) / 10;
+};
+
 /** Spawn to the first successful HTTP response; fresh processes, no warm-up. */
 export const coldStart = async (command, { port, path: route, env = {} }, runs = RUNS) =>
   Math.round(median(await startupTimes(command, {
@@ -202,6 +218,13 @@ const main = async () => {
     const json = await throughput([go], { port: 3930, path: "/item/{id}", expect: '"item {id}"', client: "http" });
     values["load.json.go.rps"] = json.rps;
     values["load.json.go.rss.peak"] = json.rss;
+
+    // a service operation per line: the Go executable, and Flick's own runtime on Node
+    const bench = ["tools/bench/console.fl", "--profile", "release"];
+    build(".", [...bench, "--emit", "go", "--out-dir", "target/perf/console/go"], withGo);
+    values["console.go"] = processTime(path.join(root, "target/perf/console/go/flick-main"));
+    build(".", [...bench, "--emit", "js", "--rt", "--out-dir", "target/perf/console/rt"]);
+    values["console.rt"] = processTime("node", ["target/perf/console/rt/flick-main.js"]);
 
     build("tools/load/ssr", []);
     execFileSync("node", ["tools/load/bundle.mjs", "tools/load/ssr/dist/flick-client.js", "tools/load/ssr/dist/client.js"], {

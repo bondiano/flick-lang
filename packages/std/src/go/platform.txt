@@ -9,7 +9,6 @@ constantCase ConfigProviderConstantCase
 nested ConfigProviderNested
 flickFromUnknown ConfigProviderFromUnknown
 flickFromEnvRecord ConfigProviderFromEnvRecord
-fromEnv ConfigProviderFromEnv
 flickFromDotEnvContents ConfigProviderFromDotEnvContents
 flickFromDir *ConfigProviderFromDir
 layer ConfigProviderLayer

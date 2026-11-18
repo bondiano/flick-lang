@@ -27,6 +27,7 @@ export {
   mapped,
   platformArgs,
   platformEnv,
+  platformVars,
   seqEachEffect,
   seqFoldEffect,
   seqIn,

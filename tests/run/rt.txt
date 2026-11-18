@@ -88,6 +88,7 @@ codegen/scope_run
 codegen/service_child
 codegen/service_dictionary
 codegen/service_place
+codegen/service_reprovide
 codegen/services
 effect/service_params
 effect/effect_params
@@ -156,6 +157,7 @@ sql/queries
 stdlib/cli/cli
 stdlib/cli/cli_exit
 stdlib/cli/file_parse
+stdlib/cli/from_host
 stdlib/cli/prompt
 stdlib/cli/surface
 stdlib/cli/trace

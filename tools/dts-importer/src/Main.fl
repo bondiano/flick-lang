@@ -53,15 +53,15 @@ let tool = cli "dts-importer" {
 
 /// Runs the task with the Node.js services, a platform error failing the app.
 with_node :
-  (Unit ->{Host.Arguments, Host.Console, Async, FileSystem.FileSystem, Path.Path, Stdio.Stdio; AppError, PlatformError.PlatformError}
+  (Unit ->{Host.Environment, Host.Arguments, Host.Console, Async, FileSystem.FileSystem, Path.Path, Stdio.Stdio; AppError, PlatformError.PlatformError}
     Unit) ->
-  Unit ->{Host.Arguments, Host.Console, Async; AppError}
+  Unit ->{Host.Environment, Host.Arguments, Host.Console, Async; AppError}
   Unit
 let with_node act () =
   try provide FileSystem.node { provide Path.layer { provide Stdio.node { act () } } } with
   | PlatformError.PlatformError reason -> App.fail (show reason)
 
-main : Unit ->{Host.Arguments, Host.Console, Async; AppError} Unit
+main : Unit ->{Host.Environment, Host.Arguments, Host.Console, Async; AppError} Unit
 let main () =
   with_node
     (fun () ->
@@ -71,5 +71,5 @@ let main () =
     ()
 
 /// The import mode alone, as `flick ffi import` runs it: no arguments.
-import_main : Unit ->{Host.Arguments, Host.Console, Async; AppError} Unit
+import_main : Unit ->{Host.Environment, Host.Arguments, Host.Console, Async; AppError} Unit
 let import_main () = with_node (fun () -> Import.run ()) ()

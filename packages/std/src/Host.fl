@@ -19,6 +19,7 @@ module Host exposing (
   raw_monotonic_time_nanos,
   raw_next,
   raw_env,
+  raw_vars,
   raw_args,
   raw_spawn,
   console,
@@ -52,6 +53,8 @@ service Random =
 
 service Environment =
   env : String ->{} Option String
+  /// Every variable, as pairs of its name and value.
+  vars : Unit ->{} List (String, String)
 
 service Arguments =
   args : Unit ->{} List String
@@ -94,6 +97,10 @@ foreign effect raw_next from "flick:Random" "flickNext"
 raw_env : String ->{} Option String
 foreign raw_env from "flick:rt" "platformEnv"
 
+raw_vars : Unit ->{} List (String, String)
+foreign raw_vars from "flick:rt" "platformVars"
+  arity 0
+
 raw_args : Unit ->{} List String
 foreign raw_args from "flick:rt" "platformArgs"
   arity 0
@@ -122,7 +129,7 @@ random : Layer none none {Random}
 let random = Layer.succeed Random { next = raw_next }
 
 environment : Layer none none {Environment}
-let environment = Layer.succeed Environment { env = raw_env }
+let environment = Layer.succeed Environment { env = raw_env; vars = raw_vars }
 
 arguments : Layer none none {Arguments}
 let arguments = Layer.succeed Arguments { args = raw_args }

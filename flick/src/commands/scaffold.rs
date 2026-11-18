@@ -188,7 +188,7 @@ let command = cli \"NAME\" {
     Platform.stdout_line (if loud then String.to_upper text else text)
 }
 
-main : Unit ->{Host.Arguments, Host.Console, Async; AppError} Unit
+main : Unit ->{Host.Arguments, Host.Console, Host.Environment, Async; AppError} Unit
 let main () =
   try Cli.run_version \"0.1.0\" command (Platform.args ()) with
   | Cli.CliError message -> App.fail message

@@ -32,7 +32,7 @@ func TestCliTraceExports(t *testing.T) {
 	t.Setenv("OTEL_SERVICE_NAME", "shop")
 	orders := newCounter("cli_otlp_test_orders", Some("Orders placed"), nil, true)
 	_, cause := catch(func() Value {
-		return cliTraced(rootFiber(), "checkout", func(fb *Fiber) Value {
+		return cliTraced(hostFiber(), "checkout", func(fb *Fiber) Value {
 			orders.update(metricContextOf(fb), 2.0)
 			logMessage(fb, "Warn", "low stock")
 			return TracerWithSpan(fb, "pay", Rec("parent", None, "root", false), Eff(func(*Fiber) Value { return Fail("declined") }))
@@ -71,7 +71,7 @@ func TestCliTraceShutdownTimeout(t *testing.T) {
 	defer close(release)
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", collector.URL)
 	started := time.Now()
-	cliTraced(rootFiber(), "stuck", func(*Fiber) Value { return Unit })
+	cliTraced(hostFiber(), "stuck", func(*Fiber) Value { return Unit })
 	if took := time.Since(started); took < otlpShutdownTimeout || took > otlpShutdownTimeout+time.Second {
 		t.Errorf("the command ended after %v, want the shutdown timeout %v", took, otlpShutdownTimeout)
 	}

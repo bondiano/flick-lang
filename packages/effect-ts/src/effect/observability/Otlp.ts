@@ -1,7 +1,9 @@
 // Effect's `effect/observability` OTLP exporters for the standard library:
 // each layer brings the fetch client and the JSON serialization it sends
-// with, so a Flick program provides it as it is.
-import { type Duration, Effect, Layer, Option } from "effect";
+// with, so a Flick program provides it as it is. What Effect reads of the
+// `OTEL_` configuration, the resource's attributes and version among it,
+// comes from the current provider, or else from `Host.Environment`.
+import { ConfigProvider, type Duration, Effect, Layer, Option } from "effect";
 import { FetchHttpClient } from "effect/http";
 import * as Otlp from "effect/observability/Otlp";
 import * as OtlpExporter from "effect/observability/OtlpExporter";
@@ -9,6 +11,8 @@ import * as OtlpLogger from "effect/observability/OtlpLogger";
 import * as OtlpMetrics from "effect/observability/OtlpMetrics";
 import * as OtlpSerialization from "effect/observability/OtlpSerialization";
 import * as OtlpTracer from "effect/observability/OtlpTracer";
+
+import { configured, currentProvider } from "../../hostEnvironment.ts";
 
 export * from "effect/observability/Otlp";
 
@@ -24,26 +28,28 @@ const resource = (options: Options) => ({ serviceName: options.service_name });
 
 /** `Otlp.layer`: traces, logs and metrics, sent under `url` (`/v1/traces`, …). */
 export const otlpLayer = (options: Options) =>
-  Layer.provide(Otlp.layer({ baseUrl: options.url, resource: resource(options) }), transport);
+  configured(Layer.provide(Otlp.layer({ baseUrl: options.url, resource: resource(options) }), transport));
 
 /** `Otlp.traces`: spans, sent to `url`. */
 export const otlpTraces = (options: Options) =>
-  Layer.provide(OtlpTracer.layer({ url: options.url, resource: resource(options) }), transport);
+  configured(Layer.provide(OtlpTracer.layer({ url: options.url, resource: resource(options) }), transport));
 
 /** `Otlp.tracer`: a tracer sending spans to `url`, flushed when the current scope closes. */
 export const otlpTracer = (options: Options) =>
-  Effect.provide(
-    OtlpTracer.make({ url: options.url, resource: resource(options) }),
-    Layer.merge(transport, OtlpExporter.layerFlusher),
+  Effect.flatMap(currentProvider, (provider) =>
+    Effect.provide(
+      OtlpTracer.make({ url: options.url, resource: resource(options) }),
+      Layer.mergeAll(transport, OtlpExporter.layerFlusher, Layer.succeed(ConfigProvider.ConfigProvider, provider)),
+    ),
   );
 
 /** `Otlp.logs`: log records, sent to `url`. */
 export const otlpLogs = (options: Options) =>
-  Layer.provide(OtlpLogger.layer({ url: options.url, resource: resource(options) }), transport);
+  configured(Layer.provide(OtlpLogger.layer({ url: options.url, resource: resource(options) }), transport));
 
 /** `Otlp.metrics`: metrics, sent to `url`. */
 export const otlpMetrics = (options: Options) =>
-  Layer.provide(OtlpMetrics.layer({ url: options.url, resource: resource(options) }), transport);
+  configured(Layer.provide(OtlpMetrics.layer({ url: options.url, resource: resource(options) }), transport));
 
 /** `Otlp.Serialization`: how the exporters write, as the layer of Effect's. */
 export type Serialization = Layer.Layer<OtlpSerialization.OtlpSerialization>;
@@ -93,42 +99,48 @@ export const otlpLayerWith = (settings: Settings) => {
     loggerExportInterval: interval,
     metricsExportInterval: interval,
   });
-  return Layer.provide(layer, sending(settings));
+  return configured(Layer.provide(layer, sending(settings)));
 };
 
 /** `Otlp.traces_with`. */
 export const otlpTracesWith = (settings: Settings) =>
-  Layer.provide(
-    OtlpTracer.layer({
-      url: settings.url,
-      ...common(settings),
-      maxBatchSize: Option.getOrUndefined(settings.max_batch_size),
-      exportInterval: Option.getOrUndefined(settings.export_interval),
-    }),
-    sending(settings),
+  configured(
+    Layer.provide(
+      OtlpTracer.layer({
+        url: settings.url,
+        ...common(settings),
+        maxBatchSize: Option.getOrUndefined(settings.max_batch_size),
+        exportInterval: Option.getOrUndefined(settings.export_interval),
+      }),
+      sending(settings),
+    ),
   );
 
 /** `Otlp.logs_with`. */
 export const otlpLogsWith = (settings: Settings) =>
-  Layer.provide(
-    OtlpLogger.layer({
-      url: settings.url,
-      ...common(settings),
-      maxBatchSize: Option.getOrUndefined(settings.max_batch_size),
-      exportInterval: Option.getOrUndefined(settings.export_interval),
-    }),
-    sending(settings),
+  configured(
+    Layer.provide(
+      OtlpLogger.layer({
+        url: settings.url,
+        ...common(settings),
+        maxBatchSize: Option.getOrUndefined(settings.max_batch_size),
+        exportInterval: Option.getOrUndefined(settings.export_interval),
+      }),
+      sending(settings),
+    ),
   );
 
 /** `Otlp.metrics_with`. */
 export const otlpMetricsWith = (settings: Settings) =>
-  Layer.provide(
-    OtlpMetrics.layer({
-      url: settings.url,
-      ...common(settings),
-      exportInterval: Option.getOrUndefined(settings.export_interval),
-    }),
-    sending(settings),
+  configured(
+    Layer.provide(
+      OtlpMetrics.layer({
+        url: settings.url,
+        ...common(settings),
+        exportInterval: Option.getOrUndefined(settings.export_interval),
+      }),
+      sending(settings),
+    ),
   );
 
 /**
@@ -137,7 +149,9 @@ export const otlpMetricsWith = (settings: Settings) =>
  * `OTEL_<SIGNAL>_EXPORTER` names `otlp`.
  */
 export const otlpFromConfig = (service: Option.Option<string>) =>
-  Layer.provide(
-    Otlp.layerFromConfig(Option.isSome(service) ? { resource: { serviceName: service.value } } : undefined),
-    transport,
+  configured(
+    Layer.provide(
+      Otlp.layerFromConfig(Option.isSome(service) ? { resource: { serviceName: service.value } } : undefined),
+      transport,
+    ),
   );

@@ -870,6 +870,7 @@
 @flick-lang/runtime/rt parallelResults
 @flick-lang/runtime/rt platformArgs
 @flick-lang/runtime/rt platformEnv
+@flick-lang/runtime/rt platformVars
 @flick-lang/runtime/rt powInt
 @flick-lang/runtime/rt processSpawn
 @flick-lang/runtime/rt promiseFacade

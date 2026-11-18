@@ -25,7 +25,7 @@ pub(super) fn run(
             heap.string(value)?;
             heap.construct("Prelude.Option.None", vec![])
         }
-        HostPrimitive::Args => heap.construct("$list", vec![]),
+        HostPrimitive::Vars | HostPrimitive::Args => heap.construct("$list", vec![]),
         HostPrimitive::CurrentTimeMillis => Ok(Value::Float(MILLIS)),
         HostPrimitive::CurrentTimeNanos => heap.literal(&Lit::BigInt(NANOS.to_string())),
         HostPrimitive::MonotonicTimeNanos => {

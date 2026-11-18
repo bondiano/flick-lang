@@ -3,7 +3,10 @@ package flickrt
 // Services and layers. A service is its key, `Module.S`; an operation looks
 // its service up in the environment of the fiber it runs in.
 
-import "sync"
+import (
+	"sync"
+	"sync/atomic"
+)
 
 // Operation is `S.op`: a function of the operation's arguments up to its
 // first effectful stage, whose task applies the implementation to them.
@@ -46,6 +49,54 @@ func (e *env) operation(key, name string) Value {
 		return impl.Get(name)
 	}
 	panic(Defect{"Service not found: " + key})
+}
+
+// An Op is `S.op` as Perform runs it: a package variable of the code
+// that applies it to all its arguments up to its first effectful stage.
+type Op struct {
+	key, name string
+	slot      uint32 // its entry in an opCache
+}
+
+var opSlots atomic.Uint32
+
+// NewOp is the Op of the operation `name` of the service `key`.
+func NewOp(key, name string) *Op {
+	return &Op{key: key, name: name, slot: (opSlots.Add(1) - 1) % uint32(len(opCache{}))}
+}
+
+// Perform is `S.op` applied to all its arguments up to its first effectful
+// stage and run, as Run(fb, Apply(fb, Operation(…), args…)) is, without the
+// function and the task Operation makes for each call.
+func Perform(fb *Fiber, op *Op, args ...Value) Value {
+	Check(fb)
+	f := fb.state.ops.find(fb.env, op)
+	for _, a := range args {
+		f = Apply(fb, f, a)
+	}
+	return Run(fb, f)
+}
+
+// An opCache holds, by Op, the implementation an operation of the fiber
+// found last and the environment it was found in. An environment is never
+// changed once made, and the entry keeps it alive, so no other one is made
+// at its address: the same environment finds the same implementation, and
+// a `provide` or a handler, which make a new one, look it up again. Only
+// the goroutine that runs the fiber touches it, as `mask`.
+type opCache [4]struct {
+	op   *Op
+	env  *env
+	impl Value
+}
+
+func (c *opCache) find(e *env, op *Op) Value {
+	entry := &c[op.slot]
+	if entry.op == op && entry.env == e {
+		return entry.impl
+	}
+	impl := e.operation(op.key, op.name)
+	entry.op, entry.env, entry.impl = op, e, impl
+	return impl
 }
 
 func operation(key, name string, arity int, dicts []Value) Value {

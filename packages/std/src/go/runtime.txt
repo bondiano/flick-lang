@@ -187,6 +187,7 @@ stderrLine StderrLine
 stdoutWrite StdoutWrite
 platformArgs PlatformArgs
 platformEnv PlatformEnv
+platformVars PlatformVars
 processSpawn *ChildProcessSpawn
 flickTodo Todo
 flickAssert Assert

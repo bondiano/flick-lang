@@ -262,6 +262,7 @@ fn foreign_intrinsic(value: &Foreign) -> Option<Intrinsic> {
             Some(Host(HostPrimitive::StdoutWrite))
         }
         (Some("flick:rt"), "platformEnv", ForeignMode::Sync) => Some(Host(HostPrimitive::Env)),
+        (Some("flick:rt"), "platformVars", ForeignMode::Sync) => Some(Host(HostPrimitive::Vars)),
         (Some("flick:rt"), "platformArgs", ForeignMode::Sync) => Some(Host(HostPrimitive::Args)),
         (Some("flick:Clock"), "flickCurrentTimeMillis", ForeignMode::Effect) => {
             Some(Host(HostPrimitive::CurrentTimeMillis))

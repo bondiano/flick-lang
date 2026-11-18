@@ -1,5 +1,6 @@
 // A child sees the handlers around where it started: `tail` operations run in
-// it, and the handler of `abort` is that of the task it runs.
+// it, and the handler of `abort` is that of the task it runs. A provider a
+// child gets for itself is its own, and the one around it stays its parent's.
 module App.Main exposing (main)
 
 service Greeter =
@@ -14,6 +15,18 @@ let greeter = { greet = fun name -> "hello " ++ name }
 children : Unit ->{} (String, String)
 let children () = provide Greeter greeter {
   parallel (task { Greeter.greet "a" }) (task { Greeter.greet "b" })
+}
+
+named : String -> Greeter.Impl
+let named who = { greet = fun name -> who ++ " " ++ name }
+
+reprovided : Unit ->{} (String, String, String)
+let reprovided () = provide Greeter greeter {
+  let (left, right) =
+    parallel
+      (task { provide Greeter (named "left") { Greeter.greet "a" } })
+      (task { provide Greeter (named "right") { Greeter.greet "b" } })
+  (left, right, Greeter.greet "c")
 }
 
 arms : Unit ->{} (String, String)
@@ -39,5 +52,6 @@ let caught () =
 main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (show (children ()))
+  Platform.stdout_line (show (reprovided ()))
   Platform.stdout_line (show (arms ()))
   Platform.stdout_line (show (caught ()))

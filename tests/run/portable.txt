@@ -78,6 +78,7 @@ codegen/task_twice
 stdlib/cli/cli
 stdlib/cli/cli_exit
 stdlib/cli/file_parse
+stdlib/cli/from_host
 stdlib/cli/prompt
 stdlib/cli/surface
 stdlib/cli/trace
@@ -114,6 +115,7 @@ codegen/service_dictionary
 codegen/service_place
 codegen/scope_run
 codegen/service_child
+codegen/service_reprovide
 runtime/scope_close
 runtime/arena_scope
 runtime/arena_layer_scope

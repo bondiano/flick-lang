@@ -32,25 +32,14 @@ func (c *config) parse(fb *Fiber, p provider) Value {
 	return v
 }
 
-// ConfigGetWith is `Config.get_with lookup c`: the provider a layer made
-// current, or else the variables `lookup` reads by the path joined with
-// `_`, an empty one missing.
-func ConfigGetWith(fb *Fiber, lookup, c Value) Value {
+// ConfigGetWith is `Config.get_with fallback c`: the provider a layer made
+// current, or else the one `fallback` makes.
+func ConfigGetWith(fb *Fiber, fallback, c Value) Value {
 	Check(fb)
 	if p, ok := fb.env.get(configProviderKey); ok {
 		return cfg(c).parse(fb, p.(provider))
 	}
-	return cfg(c).parse(fb, &source{get: func(fb *Fiber, path []Value) (*cfgNode, *string) {
-		parts := make([]string, len(path))
-		for i, seg := range path {
-			parts[i] = segmentText(seg)
-		}
-		v := Run(fb, Apply(fb, lookup, strings.Join(parts, "_")))
-		if !isSome(v) || value(v).(string) == "" {
-			return nil, nil
-		}
-		return valueNode(value(v).(string)), nil
-	}})
+	return cfg(c).parse(fb, Run(fb, Apply(fb, fallback, Unit)).(provider))
 }
 
 func ConfigParse(fb *Fiber, p, c Value) Value { return cfg(c).parse(fb, p.(provider)) }

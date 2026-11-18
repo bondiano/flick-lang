@@ -7,7 +7,7 @@ import { flickCurrentTimeMillis, flickCurrentTimeNanos, flickMonotonicTimeNanos 
 import { flickSpawn } from "../effect/ChildProcess.ts";
 import { flickNext } from "../effect/Random.ts";
 import { type ServiceImpl, service } from "../effects.ts";
-import { platformArgs, platformEnv, stdoutWrite } from "../stdlib/text.ts";
+import { platformArgs, platformEnv, platformVars, stdoutWrite } from "../stdlib/text.ts";
 
 /** A live service: its key and its implementation. */
 export type HostService = readonly [string, ServiceImpl];
@@ -34,7 +34,7 @@ export const hostRandom: HostService = ["Host.Random", { next: flickNext }];
 
 export const hostEnvironment: HostService = [
   "Host.Environment",
-  { env: (name: string) => Effect.sync(() => platformEnv(name)) },
+  { env: (name: string) => Effect.sync(() => platformEnv(name)), vars: () => Effect.sync(() => platformVars()) },
 ];
 
 export const hostArguments: HostService = ["Host.Arguments", { args: () => Effect.sync(() => platformArgs()) }];

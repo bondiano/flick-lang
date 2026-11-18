@@ -30,6 +30,7 @@ effect/effect_params
 effect/host_root
 codegen/service_dictionary
 codegen/service_place
+codegen/service_reprovide
 codegen/scope_run
 codegen/higher_rank
 codegen/functor

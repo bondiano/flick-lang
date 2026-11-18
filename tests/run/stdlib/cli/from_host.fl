@@ -1,0 +1,41 @@
+// `Cli.run` reads through `Host.Environment`: a missing value's
+// `Cli.from_config` comes from the variables a fake one lists, while the
+// handler reads `Config.get` from the environment around it, not from what
+// the parse read.
+module App.Main exposing (main)
+
+type alias Options = { region : String }
+
+/// A fake `Host.Environment` of the pairs.
+fake : List (String, String) -> Layer none none {Host.Environment}
+let fake pairs =
+  Layer.succeed Host.Environment {
+    env = fun name ->
+      List.find (fun (key, _) -> key == name) pairs |> Option.map (fun (_, value) -> value)
+    vars = fun () -> pairs
+  }
+
+deploy : Cli.Command {Host.Console} none
+let deploy =
+  Cli.command "deploy"
+  |> Cli.flag
+    (Record.label : Record.Label "region")
+    []
+    "Region"
+    (Cli.from_config (Config.string "REGION"))
+  |> Cli.handle (fun (o : Options) ->
+    let inner =
+      try provide (fake [("REGION", "us")]) { Config.get (Config.string "REGION") } with
+      | Config.ConfigError m -> m
+    Platform.stdout_line ("region " ++ o.region ++ ", the handler reads " ++ inner)
+  )
+
+attempt : List (String, String) ->{Host.Console, Async} Unit
+let attempt pairs =
+  try provide (fake pairs) { Cli.run deploy [] } with
+  | Cli.CliError message -> Platform.stdout_line ("CliError: " ++ message)
+
+main : Unit ->{Host.Console, Async; AppError} Unit
+let main () =
+  attempt [("REGION", "eu")]
+  attempt []
