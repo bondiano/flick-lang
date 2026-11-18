@@ -34,9 +34,10 @@ impl Checker<'_> {
                 &late
             }
             Visible::Now(labels) => labels,
+            Visible::Regions => &Vec::new(),
         };
         out.entries.retain(|(label, _)| !visible.contains(label));
-        if matches!(hold.visible, Visible::Refined(_)) {
+        if matches!(hold.visible, Visible::Refined(_) | Visible::Regions) {
             out.entries
                 .retain(|(_, atom)| self.atom_kind(atom, &[]) == Some(Kind::Region));
             out.tails.clear();
@@ -82,6 +83,7 @@ impl Checker<'_> {
         Summary {
             visible: match &hold.visible {
                 Visible::Now(labels) => labels.clone(),
+                Visible::Regions => Vec::new(),
                 Visible::Late(ty) | Visible::Refined(ty) => self.shown_by(ty),
             },
             bound,
@@ -378,10 +380,19 @@ impl Checker<'_> {
                 } else {
                     format!("allows only {}", allowed.join(", "))
                 };
-                let what = format!("the expected type `{}`", self.show_exact(expected));
+                // the bound of a variable is of the whole value, not of its type
+                let whole = matches!(hold.visible, Visible::Regions);
+                let shown = if whole {
+                    self.whnf_captured(expected).0
+                } else {
+                    expected.clone()
+                };
+                let what = format!("the expected type `{}`", self.show_exact(&shown));
                 let mut edits = Vec::new();
                 let advice = if reader {
                     "build a list with `[for …]`, or iterate the sequence in the function that builds it".to_owned()
+                } else if whole {
+                    "the qualifier of a type variable bounds the whole value it stands for: pass a value that holds no more".to_owned()
                 } else if !self.is_region(atom, &[]) {
                     let what = match self.atom_kind(atom, &[]) {
                         Some(Kind::ErrorRow) => "the error row",

@@ -151,6 +151,10 @@ pub enum Visible {
     /// Those of an expected type as written, before the value's type is
     /// unified into it: `a^c` shows nothing of what `a` stands for.
     Now(Vec<Elem>),
+    /// None of the regions of the value: a bound on a variable bounds the
+    /// whole value it stands for (`docs/formal/regions.md` (Inst)), while a
+    /// type variable in it is no use of what it stands for.
+    Regions,
 }
 
 /// What a value holds must fit the qualifier `bound`.
@@ -201,6 +205,17 @@ pub(super) const HOLD_NOTHING: [Lang; 6] = [
 ];
 
 impl Checker<'_> {
+    /// What a value held under the bound of `ty^c` shows: what the bounded
+    /// type shows, as `a` of `List a`, is no hold, as a type argument carries
+    /// its own qualifier; a bound on a variable bounds the whole value it
+    /// stands for, `a^{}` with `a := File s` too (`regions.md` (Inst)).
+    pub(super) fn bounded_visible(&self, ty: &Type) -> Visible {
+        match self.store.resolve(ty) {
+            Type::Meta(_) | Type::Var(_) | Type::Skolem(_) => Visible::Regions,
+            _ => Visible::Late(ty.clone()),
+        }
+    }
+
     pub fn hold(&mut self, hold: Hold) {
         let givens = self.equalities_in_scope();
         self.cx.regions.holds.push(DeferredHold { hold, givens });

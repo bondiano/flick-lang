@@ -124,6 +124,7 @@ runtime/interrupt_in_finalizer
 runtime/interrupt_skips
 runtime/leases
 runtime/owners
+runtime/owned_close
 runtime/parallel
 runtime/paths
 runtime/ref_linearizable

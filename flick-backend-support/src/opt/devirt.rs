@@ -87,19 +87,22 @@ impl<'a> Lookup<'a> {
     }
 
     /// The code of `method` of the instance `dict`, its context given: its
-    /// own, or the default it takes; that of another module at `at`, as its
-    /// spans are of its file.
+    /// own, or the default it takes; code of another module, the instance's
+    /// or the class's of the default, at `at`, as its spans are of its file.
     fn method(&self, dict: &Dict, method: &str, at: Span) -> Option<Expr> {
         let Dict::Instance { module, name, args } = dict else {
             return None;
         };
         let key = (name.clone(), method.to_owned());
-        let (context, mut code) = if *module != self.module {
+        // the code of a default is of the class's module, whatever the instance's
+        let mut elsewhere = *module != self.module;
+        let (context, mut code) = if elsewhere {
             (self.generics)(module, &format!("{name}#{method}"))?
         } else if let Some(own) = self.own.get(&key) {
             own.clone()
         } else {
             let taken = self.taken.get(&key)?;
+            elsewhere = taken.class.0 != self.module;
             (taken.context.clone(), self.default(dict, method, taken)?)
         };
         // a method with constraints of its own takes their dictionaries
@@ -108,7 +111,7 @@ impl<'a> Lookup<'a> {
         }
         let given: Vec<(&str, &Dict)> = context.iter().map(String::as_str).zip(args).collect();
         instantiate(&mut code, &given, self.lang);
-        if *module != self.module {
+        if elsewhere {
             respan(&mut code, at);
         }
         Some(code)
