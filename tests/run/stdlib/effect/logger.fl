@@ -72,15 +72,29 @@ let main () =
             mode = Logger.Tty
           },
           Logger.console_pretty_tty { colors = false; formatDate = None },
-          // `console_pretty_browser`, `console_logfmt`, `console_structured`
-          // and `console_json` write to stdout whatever the flag says, with
-          // the time: the formats go to stderr here
+          // `console_logfmt`, `console_structured` and `console_json` write
+          // to stdout whatever the flag says, with the time: their formats
+          // go to stderr here
           Logger.with_console_error Logger.format_logfmt,
           Logger.with_console_error Logger.format_structured,
           Logger.with_console_error Logger.format_json,
           Logger.tracer_logger,
         ])
         (fun () -> Log.info "every console logger")
+    })
+  // the console loggers whose lines go to stdout with the time: installed,
+  // under a minimum level that holds the message back
+  References.with_minimum_log_level
+    LogLevel.Error
+    (task {
+      logged
+        (Logger.layer replace [
+          Logger.console_pretty_browser { colors = false; formatDate = None },
+          Logger.console_logfmt,
+          Logger.console_structured,
+          Logger.console_json,
+        ])
+        (fun () -> Log.info "held back")
     })
   logged (Logger.layer { mergeWithExisting = true } []) (fun () ->
     Logger.with_log_to_stderr true (task { Log.info "default logger on stderr" })
