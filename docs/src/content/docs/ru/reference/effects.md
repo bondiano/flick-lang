@@ -1,6 +1,6 @@
 ---
 title: "Эффекты, ошибки и сервисы"
-source_hash: 3ef14b8b1560ecf2
+source_hash: c8ff2220f15d38d4
 ---
 
 Компилятор проверяет, где допустимы эффектные вызовы, какие сервисы им нужны
@@ -575,8 +575,9 @@ let start owner = ignore (Fiber.spawn owner report (task { Greeter.greet "child"
 регион, который переживает каждый поставщик его входов. `Layer.build`,
 `Layer.build_with_memo_map`, `LayerRef.make`, `LayerMap.make` и
 `LayerMap.from_record` собирают его в регион вызывающего, поэтому требуют там
-`Fiber.Provided ri s`, и сборка внутри `provide` одного из входов — это
-`FLICK-G003`:
+`Fiber.Provided ri s`. Сборка в `scope` внутри `provide` одного из входов
+проходит проверку; сборка в `scope` вокруг этого `provide`, который его
+переживает, — это `FLICK-G003`:
 
 ```flick fail G003
 # service Greeter =

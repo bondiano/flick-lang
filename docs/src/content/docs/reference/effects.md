@@ -546,8 +546,9 @@ use them. A `provide` and `Layer.launch` build a layer into a region of their
 own, which every provider of its inputs outlives. `Layer.build`,
 `Layer.build_with_memo_map`, `LayerRef.make`, `LayerMap.make` and
 `LayerMap.from_record` build it into a region of their caller, so they require
-`Fiber.Provided ri s` there, and a build inside the `provide` of an input is
-`FLICK-G003`:
+`Fiber.Provided ri s` there. A build into a `scope` inside the `provide` of an
+input checks; a build into a `scope` around that `provide`, which outlives it,
+is `FLICK-G003`:
 
 ```flick fail G003
 # service Greeter =

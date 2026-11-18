@@ -283,6 +283,8 @@ impl Checker<'_> {
                 }
                 None if label == regions::scope() => self.no_owner(ty, &c),
                 None if matches!(label, Elem::Provided(_)) => {
+                    // the element names one service (`regions::provided`
+                    // `obligation`), never a row variable: only its owner can be unsigned
                     if let [service, owner] = ty.spine().1[..] {
                         let (service, named) = (self.show(service), self.signed(owner));
                         let owner = self.show(owner);

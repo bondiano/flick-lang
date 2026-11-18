@@ -464,6 +464,47 @@ fn the_fix_of_g003_names_only_a_region_of_the_signature() {
 }
 
 #[test]
+fn the_fix_of_g003_names_the_region_of_its_own_item() {
+    // each top-level item names its own regions: the second gets `t`, and
+    // the third, whose region is that of `Scope.run`, none of the others'
+    let text = "module Probe exposing (..)\n\
+        service Log =\n  line : String ->{} Unit\n\
+        f : Unit ->{Scope s, Log} Unit\n\
+        let f () = Scope.add_finalizer (task { Log.line \"f\" })\n\
+        g : Unit ->{Scope t, Log} Unit\n\
+        let g () = Scope.add_finalizer (task { Log.line \"g\" })\n\
+        h : Unit ->{Log} Int\n\
+        let h () = Scope.run (fun _ ->\n  Scope.add_finalizer (task { Log.line \"h\" })\n  1\n)\n";
+    let mut sources = SourceMap::default();
+    let file = sources.add("Probe.fl", text.to_owned());
+    let diagnostics = crate::check(&sources, file);
+    let g003: Vec<_> = (diagnostics.iter())
+        .filter(|d| d.code == codes::G003)
+        .collect();
+    assert_eq!(g003.len(), 3, "{diagnostics:?}");
+    let mut edits: Vec<_> = (g003.iter())
+        .flat_map(|d| &d.fixes)
+        .flat_map(|f| &f.edits)
+        .collect();
+    assert_eq!(edits.len(), 2, "{g003:?}");
+    edits.sort_by_key(|e| Reverse(e.span.start));
+    let mut out = text.to_owned();
+    for e in edits {
+        out.replace_range(e.span.range(), &e.replacement);
+    }
+    let signatures: Vec<_> = out.lines().filter(|l| l.contains(" : ")).collect();
+    assert_eq!(
+        signatures,
+        [
+            "  line : String ->{} Unit",
+            "f : Fiber.Provided {Log} s => Unit ->{Scope s, Log} Unit",
+            "g : Fiber.Provided {Log} t => Unit ->{Scope t, Log} Unit",
+            "h : Unit ->{Log} Int",
+        ]
+    );
+}
+
+#[test]
 fn the_fix_of_g001_adds_the_region_to_a_written_qualifier() {
     let text = |signature: &str| {
         format!(
