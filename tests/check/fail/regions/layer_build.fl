@@ -1,0 +1,78 @@
+// A layer is built into a region whose end its finalizers wait for, so the
+// providers of its inputs must outlive that region: building it inside the
+// `provide` of an input, or into a region of the caller without the
+// constraint, is rejected (`docs/formal/regions.md`, `Fiber.Provided`).
+module App.LayerBuild exposing (..)
+
+service Greeter =
+  greet : String ->{} String
+
+service Other =
+  other : Unit ->{} Unit
+
+service Box =
+  value : Unit ->{} String
+
+greeter : Layer none none {Greeter}
+let greeter = Layer.succeed Greeter { greet = fun name -> name }
+
+box : Layer {Greeter} none {Box}
+let box =
+  Layer.from_build (fun memo ->
+    Scope.add_finalizer (task { ignore (Greeter.greet "release") })
+    Layer.build_with_memo_map memo (Layer.succeed Box { value = fun () -> "box" })
+  )
+
+inside : Unit ->{} Unit
+let inside () = scope { provide greeter { ignore (Layer.build box) } }
+
+inside_memo : Unit ->{} Unit
+let inside_memo () = scope {
+  let memo = Layer.make_memo_map ()
+  provide greeter { ignore (Layer.build_with_memo_map memo box) }
+}
+
+inside_ref : Unit ->{} Unit
+let inside_ref () = scope {
+  provide greeter { ignore (LayerRef.make box { idleTimeToLive = None; preload = false }) }
+}
+
+inside_map : Unit ->{} Unit
+let inside_map () = scope {
+  provide greeter {
+    ignore (LayerMap.make (fun (_ : Int) -> box) { idleTimeToLive = None; preloadKeys = None })
+  }
+}
+
+not_given : Unit ->{Scope s, Greeter} Unit
+let not_given () = ignore (Layer.build box)
+
+awaited_inside : Unit ->{} Unit
+let awaited_inside () = scope {
+  let start = task { ignore (Layer.build box) }
+  provide greeter { await start }
+}
+
+// the build assumes only its inputs outlive its region
+provided_in_build : Layer none none {Box}
+let provided_in_build =
+  Layer.from_build (fun memo ->
+    provide greeter { Scope.add_finalizer (task { ignore (Greeter.greet "release") }) }
+    Layer.build_with_memo_map memo (Layer.succeed Box { value = fun () -> "box" })
+  )
+
+// a service its finalizer uses is an input of the layer, which its type names
+not_an_input : Layer {Greeter} none {Box}
+let not_an_input =
+  Layer.from_build (fun memo ->
+    Scope.add_finalizer (task { Other.other () })
+    Layer.build_with_memo_map memo (Layer.succeed Box { value = fun () -> "box" })
+  )
+//~ FLICK-G003 @27:51-27:62 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @32:29-32:54 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @37:29-37:42 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @43:13-43:26 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @48:28-48:39 the service comes from the caller
+//~ FLICK-G003 @52:30-52:41
+//~ FLICK-G003 @60:23-60:42 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-E002 @67:3-70:4 does not allow service `Other`

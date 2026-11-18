@@ -210,6 +210,7 @@ stdlib/effect/hmac
 stdlib/effect/json_schema
 stdlib/effect/jwt
 stdlib/effect/layer
+stdlib/effect/layer_finalizer_services
 stdlib/effect/layer_map
 stdlib/effect/logger
 stdlib/effect/metric

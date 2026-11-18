@@ -1,6 +1,6 @@
 ---
 title: "Эффекты, ошибки и сервисы"
-source_hash: 842d47d2c4da8b65
+source_hash: 3ef14b8b1560ecf2
 ---
 
 Компилятор проверяет, где допустимы эффектные вызовы, какие сервисы им нужны
@@ -566,6 +566,42 @@ let leaked () = scope outer {
 #
 start : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter} Unit
 let start owner = ignore (Fiber.spawn owner report (task { Greeter.greet "child" }))
+```
+
+Сборка `Layer.from_build f` и `Layer.from_build_memo f` выполняется во владельце
+региона `s`, в который собирается слой, и `f` предполагает
+`Fiber.Provided ri s` для входов слоя `ri`: зарегистрированный ею финализатор
+может ими пользоваться. `provide` и `Layer.launch` собирают слой в собственный
+регион, который переживает каждый поставщик его входов. `Layer.build`,
+`Layer.build_with_memo_map`, `LayerRef.make`, `LayerMap.make` и
+`LayerMap.from_record` собирают его в регион вызывающего, поэтому требуют там
+`Fiber.Provided ri s`, и сборка внутри `provide` одного из входов — это
+`FLICK-G003`:
+
+```flick fail G003
+# service Greeter =
+#   greet : String ->{} String
+# service Box =
+#   value : Unit ->{} String
+# greeter : Layer none none {Greeter}
+# let greeter = Layer.succeed Greeter { greet = fun name -> name }
+#
+box : Layer {Greeter} none {Box}
+let box =
+  Layer.from_build (fun memo ->
+    Scope.add_finalizer (task { ignore (Greeter.greet "released") })
+    Layer.build_with_memo_map memo (Layer.succeed Box { value = fun () -> "box" })
+  )
+
+built : Unit ->{} Unit
+let built () = provide greeter { scope { ignore (Layer.build box) } }
+
+leaked : Unit ->{} Unit
+let leaked () = scope {
+  // FLICK-G003: финализатор `box` выполнялся бы при закрытии `scope`,
+  // после того как `provide` освободил `Greeter`
+  provide greeter { ignore (Layer.build box) }
+}
 ```
 
 ## Что может приостановиться: `Async`
