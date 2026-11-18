@@ -4,9 +4,8 @@
 // mounted in this process, a call made here (rendering a page on the
 // server) runs in memory instead. Serving is `./FunctionsNode.ts`, which
 // needs Node.
-import { type Context, Effect } from "effect";
+import { Context, Effect } from "effect";
 
-import { env } from "../../host.ts";
 import { rpcCallNdjson } from "../../rpc/client.ts";
 import {
   clientError,
@@ -49,11 +48,22 @@ export const serverNoErrors: ReadonlyArray<AnySchema> = Object.freeze([]);
 export const serverError = (witness: AnySchema, errors: ReadonlyArray<AnySchema>): ReadonlyArray<AnySchema> =>
   Object.freeze([witness, ...errors]);
 
-/** Where the calls go: the page's origin in a browser, `FLICK_SERVER_URL` elsewhere. */
-const base = (): string | undefined => {
+/** The origin of the innermost `Server.with_origin`. */
+const ServerOrigin = /*#__PURE__*/ Context.Reference<string | undefined>("flick/server/Origin", {
+  defaultValue: () => undefined,
+});
+
+/** `Server.with_origin origin task`: the calls of `task` go to `origin`. */
+export const serverWithOrigin =
+  (origin: string) =>
+  <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+    Effect.provideService(self, ServerOrigin, origin);
+
+/** Where the calls go without `Server.with_origin`: the page's origin in a browser. */
+const pageOrigin = (): string | undefined => {
   const location: unknown = Reflect.get(globalThis, "location");
   const origin: unknown = typeof location === "object" && location !== null ? Reflect.get(location, "origin") : undefined;
-  return typeof origin === "string" && origin !== "null" ? origin : env("FLICK_SERVER_URL");
+  return typeof origin === "string" && origin !== "null" ? origin : undefined;
 };
 
 /** A call of a procedure made in memory. */
@@ -75,10 +85,12 @@ export const serverCall = (procedure: Procedure, payload: unknown): Effect.Effec
   Effect.suspend(() => {
     const here = local.get(procedure.name);
     if (here !== undefined) return here(payload);
-    const url = base();
-    return url === undefined
-      ? Effect.fail(clientError(`no server for ${procedure.name}: set FLICK_SERVER_URL`))
-      : rpcCallNdjson(new URL(PATH, url).href, procedure, payload);
+    return Effect.flatMap(Effect.service(ServerOrigin), (origin) => {
+      const url = origin ?? pageOrigin();
+      return url === undefined
+        ? Effect.fail(clientError(`no server for ${procedure.name}: call it within Server.with_origin`))
+        : rpcCallNdjson(new URL(PATH, url).href, procedure, payload);
+    });
   });
 
 /** `Server.authenticated tag check functions`: each run with the service `check` makes from its call's headers. */

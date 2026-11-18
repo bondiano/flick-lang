@@ -2,7 +2,6 @@ package flickrt
 
 import (
 	"net/url"
-	"os"
 	"sync"
 )
 
@@ -13,7 +12,10 @@ import (
 // the headers of the request being served, and what crosses written and
 // read by its codecs.
 
-const serverPath = "/_flick/fn"
+const (
+	serverPath      = "/_flick/fn"
+	serverOriginKey = "flick/server/Origin"
+)
 
 // serverFn is `Server.Function r`: an implementation with its procedure.
 type serverFn struct {
@@ -135,8 +137,13 @@ func (l *inProcess) call(fb *Fiber, payload Value) Value {
 	return across(fb, p.success, out)
 }
 
+// ServerWithOrigin runs `task` with its calls of `server fn` going to `origin`.
+func ServerWithOrigin(fb *Fiber, origin, task Value) Value {
+	return withEnv(fb, serverOriginKey, origin, task)
+}
+
 // ServerCall is a call of the procedure: in memory while a handler of it
-// is mounted here, otherwise a POST to FLICK_SERVER_URL.
+// is mounted here, otherwise a POST to the origin of `Server.with_origin`.
 func ServerCall(fb *Fiber, proc, payload Value) Value {
 	p := rpcProcOf(proc)
 	localMu.Lock()
@@ -145,10 +152,11 @@ func ServerCall(fb *Fiber, proc, payload Value) Value {
 	if here != nil {
 		return here.call(fb, payload)
 	}
-	base, ok := os.LookupEnv("FLICK_SERVER_URL")
+	origin, ok := fb.env.get(serverOriginKey)
+	base, _ := origin.(string)
 	u, err := url.Parse(base)
 	if !ok || err != nil {
-		return Fail(rpcClientError("no server for " + p.name + ": set FLICK_SERVER_URL"))
+		return Fail(rpcClientError("no server for " + p.name + ": call it within Server.with_origin"))
 	}
 	target := u.ResolveReference(&url.URL{Path: serverPath}).String()
 	return RpcCall(fb, callDefaults, target, p, payload)
