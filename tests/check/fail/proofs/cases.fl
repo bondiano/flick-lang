@@ -1,0 +1,9 @@
+// A split of a variable covers each of its constructors: the check of
+// `match` says which one a proof misses.
+module App.Cases exposing (..)
+
+proof missing (v : Option a)
+where equal v v =
+  match v with
+//^^^^^^^ FLICK-T009 `Some _` is not matched
+  | None -> refl

@@ -68,6 +68,35 @@ fn is_function(node: &Node) -> bool {
     node.kind == K::LetDecl && node.nodes().any(|n| n.kind == K::Params)
 }
 
+/// A `match` that is a table: every arm is one expression of constants and
+/// names, with no guard, `if`, nested `match` or other branch in it. Such a
+/// match maps a value to a name; its arms are data, not decisions.
+fn is_lookup(matched: &Node) -> bool {
+    matched
+        .nodes()
+        .filter(|n| n.kind == K::MatchArm)
+        .all(|arm| {
+            !arm.nodes().any(|n| n.kind == K::Guard) && arm.nodes().last().is_some_and(constant)
+        })
+}
+
+/// Whether `node` is a constant expression: a literal, a name, or an
+/// application, list, tuple or field of constants. Any construct that
+/// branches makes it false.
+fn constant(node: &Node) -> bool {
+    match node.kind {
+        K::Literal | K::NameExpr | K::Path | K::UnitExpr => true,
+        K::Block => {
+            let mut bodies = node.nodes();
+            matches!((bodies.next(), bodies.next()), (Some(body), None) if constant(body))
+        }
+        K::ParenExpr | K::AppExpr | K::FieldExpr | K::ListExpr | K::TupleExpr => {
+            node.nodes().all(constant)
+        }
+        _ => false,
+    }
+}
+
 pub(crate) fn branches(node: &Node) -> u32 {
     let mut total = 0;
     let mut pending = vec![node];
@@ -75,6 +104,7 @@ pub(crate) fn branches(node: &Node) -> u32 {
         for child in node.nodes().filter(|c| !is_function(c)) {
             total += match child.kind {
                 K::IfExpr | K::Guard | K::GuardStmt => 1,
+                K::MatchExpr if is_lookup(child) => 0,
                 K::MatchExpr => {
                     u32::try_from(child.nodes().filter(|a| a.kind == K::MatchArm).count())
                         .map_or(0, |n| n.saturating_sub(1))

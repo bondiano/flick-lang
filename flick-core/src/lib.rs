@@ -17,6 +17,7 @@ pub mod ide;
 pub mod iface;
 pub mod implicit_packages;
 pub mod ir;
+pub mod logic;
 pub mod manifest;
 pub mod markdown;
 pub mod numeric;

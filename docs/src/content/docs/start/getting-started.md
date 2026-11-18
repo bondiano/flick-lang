@@ -111,6 +111,10 @@ JavaScript to `dist/`, `flick test` runs the tests of the test root and
 `flick dev` rebuilds and restarts on every change. The [CLI reference](../../reference/cli/)
 has every command.
 
+The project's `AGENTS.md` is for coding agents: it shows where to look up
+Flick's syntax and APIs and asks for `flick fmt`,
+`flick check --warnings-as-errors` and `flick test` before finishing.
+
 Next, [design a program with effects](../../handbook/designing-with-effects/):
 separate user lookup logic from external calls and provide different services
 in the application and its tests.

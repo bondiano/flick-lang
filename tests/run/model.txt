@@ -85,5 +85,6 @@ runtime/lazy_once
 runtime/lazy_abort
 runtime/suspended
 runtime/lazy_let
+runtime/lazy_let_state
 schema/prove
 schema/prove_imported

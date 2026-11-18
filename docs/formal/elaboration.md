@@ -440,7 +440,8 @@ closes a scope normally. They are not source variables or part of the reference
 model's typed state. JS and Go use the same control lowering.
 
 T7 (`formal/Formal/LetMut.lean`) proves typed elaboration for the original block
-fragment: bindings, assignments, scope and two-armed match. `T7_pure` applies T2a,
+fragment: bindings, assignments, scope and two-armed match, and the `let lazy`
+forms of §3.6 written with them. `T7_pure` applies T2a,
 and `T7_regions` applies T4′ (safety by use). `Formal/LocalControl.lean` states
 completion independently: successful assignment commits, failed assignment does
 not, error handlers receive the current store, and break/continue skip suffixes.
@@ -449,6 +450,16 @@ preserved by its body; fuel exhaustion is not a terminating loop. These theorems
 do not establish Rust compiler or backend equivalence. The model typechecks and
 runs the shared corpus against independently specified output, including local
 control and errors (`tests/run/codegen/loops*.fl`).
+
+### 3.6 `let lazy`
+
+`let lazy x = e` is the task `x$run = task (attempt e)`, made once at the
+declaration, and a `let mut` of its state, `None` until an `await x` runs the
+task and keeps its outcome as `Some (Ok v)` or `Some (Err err)`. `await x`
+gives the outcome back with `from_result`; a force after the first only reads
+the state. `x = v` of a `let lazy mut` is `Some (Ok v)`.
+[`lazy.md`](lazy.md) §4 gives the translation. Its forms are derived rules of
+the typing of blocks, so T7 covers them (`formal/Formal/LetMut/Lazy.lean`).
 
 ## 4. Coherence and T6
 

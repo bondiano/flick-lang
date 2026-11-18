@@ -83,6 +83,12 @@ impl Checker<'_> {
             self.gadt.declared = self.declared_local(i);
             return self.use_local(i, span);
         }
+        if namespace == Namespace::Value
+            && self.cx.proof.is_some()
+            && let Some(ty) = self.proof_rule(name, range(span))
+        {
+            return ty;
+        }
         if let Some(module) = self.opened_with(namespace, name) {
             return self.qualified(&module, namespace, name, span);
         }

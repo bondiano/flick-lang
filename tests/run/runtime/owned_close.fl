@@ -1,0 +1,132 @@
+// `Resource.own` makes a scope the owner of a value of `Close`: the scope
+// closes it when it ends, last owned first, once, after its children ended,
+// and the close sees how the body ended. An interruption does not cut a
+// close, and a close that fails keeps the body's cause while the other
+// closes still run.
+module App.Main exposing (main)
+
+import Resource exposing (Close(..), own)
+
+type error Oops = Oops String
+
+/// Prints through the trusted host adapter, which a close may use.
+say : String ->{} Unit
+let say line = Host.raw_stdout_line line
+
+nap : Float ->{Async} Unit
+let nap millis =
+  match Duration.millis millis with
+  | Ok d -> Effect.sleep d
+  | Err _ -> ()
+
+/// A connection that knows its name, closed by the scope that owns it.
+type Conn = Conn String
+
+/// How a body ended, as a close sees it.
+ended : Exit e b -> String
+let ended exit =
+  if Exit.is_success exit then
+    "succeeded"
+  else if Exit.has_interrupts exit then
+    "interrupted"
+  else
+    "failed"
+
+instance Close Conn =
+  let close _ (Conn name) = say ("close " ++ name)
+  let close_exit _ exit (Conn name) = say ("close " ++ name ++ ": " ++ ended exit)
+
+/// A value whose close takes `close`, the default of `close_exit`.
+type Plain = Plain String
+
+instance Close Plain =
+  let close _ (Plain name) = say ("close " ++ name)
+
+/// A value whose close dies.
+type Broken = Broken
+
+instance Close Broken =
+  let close _ _ =
+    say "close broken"
+    Effect.die "close failed"
+
+/// A value whose close takes a while: an interruption does not cut it.
+type Slow = Slow
+
+instance Close Slow =
+  let close _ _ =
+    say "close slow begins"
+    nap 20
+    say "close slow ends"
+
+open : String ->{Async, Scope s} Conn^{s}
+let open name =
+  say ("open " ++ name)
+  own (Conn name)
+
+nested : Unit ->{Async} Unit
+let nested () = scope {
+  let _a = open "a"
+  let _b = open "b"
+  ignore (own (Plain "plain"))
+  scope {
+    let _c = open "c"
+    say "inner body"
+  }
+  say "outer body"
+}
+
+children : Unit ->{Async} Unit
+let children () = scope owner {
+  let _parent = open "parent"
+  ignore (Fiber.spawn
+    owner
+    (fun _ -> ())
+    (task {
+      scope {
+        let _child = open "child"
+        nap 10000
+      }
+    }))
+  nap 5
+  say "body ends"
+}
+
+failing : Unit ->{Async; Oops} Unit
+let failing () = scope {
+  let _f = open "f"
+  Fail.fail (Oops "body failed")
+}
+
+slow : Unit ->{Async} Unit
+let slow () = scope {
+  let _t = open "t"
+  nap 10000
+}
+
+broken : Unit ->{Async} Float
+let broken () = scope {
+  let _first = open "first"
+  ignore (own Broken)
+  let _last = open "last"
+  1
+}
+
+slow_close : Unit ->{Async} Unit
+let slow_close () = scope {
+  ignore (own Slow)
+  nap 10000
+}
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  nested ()
+  children ()
+  try failing () with
+  | Oops text -> say text
+  try timeout 5 (task { slow () }) with
+  | TimeoutError -> say "timed out"
+  try timeout 5 (task { slow_close () }) with
+  | TimeoutError -> say "timed out after the close"
+  let outcome = Effect.exit (task { broken () })
+  say ("broken: " ++ (if Exit.has_dies outcome then "died" else "kept its value"))

@@ -128,6 +128,7 @@ Sources:
 
 - `open_H`, `op_H` are the scheme for `File.open`, `File.read_handle` (`builtins/File.fl`) and any `foreign` binding with `Scope s` in its row. Acquisition registers the release with the owner of `s`, and only closing `s` releases the capability (G4). The `retention` annotation speaks about the arguments, not the result: for `File.node_open` it is `call`.
 - `Fiber.spawn` is in `builtins/Fiber.fl`, `Scope.add_finalizer` in `builtins/Scope.fl`. The finalizer's `Outlives c s` is required because [owner retention requires `Outlives`](#owner-retention-requires-outlives); the child's rows name `Scope s` because [children acquire in the region of their owner](#children-acquire-in-the-region-of-their-owner).
+- `Resource.own : Close a => a^{} ->{Async, Scope s} a^{s}` of std adds no constant: it is Flick code over `add_close`, a foreign of `flick:Scope` that `Resource.fl` declares and does not expose, which registers a finalizer as `Scope.add_finalizer` does, with `retention owner`, but parametric in the outcome `Exit e b` of the body. It registers `close_exit token exit value` with the token `Closing s`, whose constructor only `Resource` sees and which a `Close` instance receives at a region of its own (`forall t. Closing t -> …`), so it cannot keep it. Its argument holds no region by (Inst), so what the finalizer holds is `s`, and `Outlives {s} s`.
 - `Ref.*` are in `builtins/Ref.fl`: the capacity `c` sits inside the invariant argument of `Ref`, so it cannot be widened through the outer bound of the reference.
 
 Lean: `Const.ty`, `Const.ok` (`formal/Formal/Syntax.lean`). A cell type is `Ref τ` with `τ` the contents, as in `core.md`, and the capacity `c` is the instance `ι.C` of the constant, fixed for each use: `Const.ok` of `Ref.*` is the premise (Inst) of the bound `α^c`, `⌈τ⌉ ⊆ c` up to the facts, and the arrow `Ref.set ℓ` has the qualifier `c`, so storing needs the capacity live. `LiveRules.lean` checks both: `Ref.make` rejects a capacity smaller than its contents, and `refSet_needs_capacity`.
@@ -307,7 +308,7 @@ for each occurrence αᵢ^D in τ:   ⌈τᵢ⌉ ⊆ D[c̄ := C̄]
 
 A value bound bounds the whole substituted value. `a^{}` with `a := File s` is rejected at the call site: `FLICK-G001` "the expected type `File s` holds no captures".
 
-Checker: `unify.rs` `Checker::instantiate`; the bound condition is a `Hold` from `subsume_bound` with `Visible::Now`; `Outlives` constraints are `classes/mod.rs` `want`.
+Checker: `unify.rs` `Checker::instantiate`; the bound condition is a `Hold` from `regions/data.rs` `subsume_bound`, which holds every region of the value for a bound on a variable (`Visible::Regions`, [a bound on a variable bounds the whole value](#a-bound-on-a-variable-bounds-the-whole-value)); `Outlives` constraints are `classes/mod.rs` `want`.
 
 Lean: (Var), a global and the projection of a dictionary field ask `Scheme.Holds`, the facts of the scheme at the instance; a bound is the fact `Facts.bnd i D`, so this is the premise `⌈τᵢ⌉ ⊆ D[c̄ := C̄]` (`Scheme.holds_bnd`). (Let-Gen), a global and a field of a dictionary assume the facts of their scheme in its body. `Examples.lean` types a generic `let` whose body makes a cell under the bound `α^{≤c}`, and shows an instance beyond the bound rejected.
 
@@ -411,7 +412,7 @@ Provided R ϱ         constraint (like Outlives, §2.4): the provider of each se
 
 The scheme of every constant with `retention owner` (G4) requires `Fiber.Provided r s` and `Detached r` for the row of the retained task or finalizer, as it requires `Fiber.Outlives c s` for captures; with one region in the signature the checker adds them (`ffi.rs` `with_owner_constraints`), and a foreign function otherwise without them is `FLICK-F002` (`ffi.rs` `owner_retention`).
 
-The call site splits `Provided r ϱ` into the services `S ∈ r` (except `Scope` and the obligations themselves) and discharges each in the stage `X` that contains the call, lexically, like `Scope ϱ` (`regions/scopes.rs` `lexical_owner`):
+The call site splits `Provided r ϱ` into the services `S ∈ r` (except `Scope`, `Async`, which the root gives every fiber and no owner provides, and the obligations themselves) and discharges each in the stage `X` that contains the call, lexically, like `Scope ϱ` (`regions/scopes.rs` `lexical_owner`):
 
 ```text
 S is given by a provide ϱₚ inside X, the nearest to the call:   discharged if ϱₚ ≥ ϱ; otherwise FLICK-G003
@@ -424,7 +425,7 @@ In the second case `S` comes from the row of `X`, hence from whoever runs `X`, a
 
 A row has one `Provided {S}` element per service: two obligations for the same service under different owners in one stage unify the owners into one region, otherwise `FLICK-T003`. This is incompleteness, not a hole: the program is rejected.
 
-Layers use the same constraint, in the schemes of the standard library rather than in a rule. The body of `Layer.from_build` and `from_build_memo` has the type `forall s. Fiber.Provided ri s => MemoMap ->{Scope s | ri; e} Context ro`: its region is rigid, so an obligation `{Provided {S} s}` of a finalizer it registers could not move into the row `ri` of the layer, and the constraint is given instead. Whatever builds a layer into a region `s` of its caller needs `Fiber.Provided ri s` there: `Layer.build`, `build_with_memo_map`, `LayerRef.make`, `LayerMap.make` and `from_record`. `provide L { e }` (`Layer.run`) and `Layer.launch` build into a region of their own, younger than every provider of the `ri` of their call, so for them the constraint holds by the second case and their schemes do not state it. The fix of `FLICK-G003` adds `Fiber.Provided` only to a signature that names its region (`regions/provided.rs` `signed`), not for the region of a `forall` in an argument's type.
+Layers use the same constraint, in the schemes of the standard library rather than in a rule. The body of `Layer.from_build` and `from_build_memo` has the type `forall s. Fiber.Provided ri s => MemoMap ->{Scope s | ri; e} Context ro`: its region is rigid, so an obligation `{Provided {S} s}` of a finalizer it registers could not move into the row `ri` of the layer, and the constraint is given instead. Whatever builds a layer into a region `s` of its caller needs `Fiber.Provided ri s` there: `Layer.build`, `build_with_memo_map`, `LayerRef.make`, `LayerMap.make` and `from_record`. `provide L { e }` (`Layer.run`) and `Layer.launch` build into a region of their own, younger than every provider of the `ri` of their call, so for them the constraint holds by the second case and their schemes do not state it. The fix of `FLICK-G003` adds `Fiber.Provided` only to a signature that names its region (`regions/provided.rs` `signed`), not for the region of a `forall` in an argument's type. The acquisition of `Resource.manual` and `Effect.resource_auto` assumes `Fiber.Provided r t` in the same way for its region `t`, of a sub-owner of the resource that closes no later than `s`, so a release it registers there may use the services `r` of the call, whose `Provided r s` the scheme of the foreign function gives (§5.1, G4).
 
 Checker:
 
@@ -524,7 +525,7 @@ The table of spec/05 "Static regions and captures": the model rule, the countere
 | Module interfaces | a top-level signature is mandatory for functions and is checked as written; `.iface` stores qualifiers | a call of `reader` from another module that escapes the `scope` | `tests/check/projects/regions` (`FLICK-G001`, `FLICK-G002`); outside the Lean model, which has no modules (`core.md` §2.6) |
 | Existential and opaque packaging | (Con), (Proj) | `Sealed (File s)`; `opaque type Sealed = Sealed (Unit ->{} Unit)` around a closure over `h` | `escape.fl` `sealed`; a probe (`FLICK-G002`) |
 | Through a helper generic in an argument of data with hidden storage | §2.2: the hidden row only widens, and what the other arguments show does not stand in for it; §1.4: a bare result row is what the earlier parameters reach | `compose (G (fun f -> File.read_all f)) (G (fun _ -> file))` returned from the `scope` that opened `file` ([the hidden row of data is not what its arguments show](#the-hidden-row-of-data-is-not-what-its-arguments-show)) | `hidden_through_helper.fl`: `through_run` and `through_c2` are `FLICK-G001` at the value of the `scope`; the body of `compose2` is `FLICK-G002` where `c2` takes the functions taken out of the data; `through_function` is `FLICK-G002` |
-| Write to an outer `Ref` or cache | invariance of `Ref (α^c)`; the cell type is closed at allocation | `Ref.set cell (Some file)`; `Ref (Unit ->{} String)` against `Ref ((Unit ->{} String)^{s})`; a top-level atom | `escape.fl` `outer_cell`, `outer_callback`; `qualifiers.fl` `invariant` (`FLICK-T003`); `ref_capacity.fl`; `instance.fl` |
+| Write to an outer `Ref` or cache | invariance of `Ref (α^c)`; the cell type is closed at allocation | `Ref.set cell (Some file)`; `Ref (Unit ->{} String)` against `Ref ((Unit ->{} String)^{s})`; a closure that uses a region of the signature stored in a cell the caller passes; a top-level atom | `escape.fl` `outer_cell`, `outer_callback`; `qualifiers.fl` `invariant` (`FLICK-T003`); `ref_capacity.fl`; `instance.fl`; `stored_closure.fl` ([a value bound allows no use](#a-value-bound-allows-no-use)) |
 | Assignment to a `let mut` variable from outside | the variable's type is fixed where it is declared, outside the region (`elaboration.md` §3.5); T7 reads a `scope` that assigns as one whose value holds the variables | `last = Some file`, `reader = fun () -> path_of file` inside `scope` | `let_mut.fl` `outer_file` (`FLICK-G002`), `outer_callback`, `written_callback` (holding without use is allowed); `T7_regions` |
 | Error, `Exit`, diagnostics | (Err-Decl), (Err-Raise); `Failure`, `RawCause` are inert | `Wrapped file` under `try` inside `scope`; `type error Leak (s : Region)`; a generic `boom : ∀a. a →R⟨none;{Wrapped a}⟩ Unit` with a handle | `escape.fl` `raised`; `qualifiers.fl` `Leak` (`FLICK-E005`); a probe |
 | Child and finalizer | (Spawn), §2.4 | a child of an outer owner holds an inner region; a given `c` without `Outlives` | `qualifiers.fl` `spawn_outer`, `spawn_given` (`FLICK-G003`); `retention.fl` ([owner retention](#owner-retention-requires-outlives)); `children.fl` ([children acquire in the region of their owner](#children-acquire-in-the-region-of-their-owner)); a probe |
@@ -978,6 +979,18 @@ let leak () =
 - Symptom: the model's checkers, captures and live, accepted the program, and its machine stopped with "use after close". `Ref.set` takes `α^c` with `α` the cell's content `τ^{c₀}`, so the task was checked against `(τ^{c₀})^c`. (Lam), (Task) and (≤-Cap) took only `c`, which is free and grew to `s`; `c₀`, the capacity the cell was made with, was never asked. flick-core rejects the program in both modes.
 - Model hole, not a hole of the document or of Lean, where `Ref.set` takes exactly the cell's type. Resolution, model: a value checked against nested qualifiers is within each (`qualifiers`, `layers`, `close_within` in `check/regions/mod.rs`), so `c₀` grows to `s` and `s` would leave its `scope` (`FLICK-G002`). Found while porting the live discipline to flick-core. Test: `flick-model/tests/model/live_core.rs` `live_core_rejects_a_task_in_an_outer_cell`.
 
+### A value bound allows no use
+
+Divergence: the checker and the model let a function or a task use what a value bound of its position allows.
+
+```flick
+stash : Handle s -> Ref (Option (Unit ->{} Unit)) ->{} Unit
+let stash h cell = Ref.set cell (Some (fun () -> use h))
+```
+
+- Symptom: the checker accepted `stash`. Called inside `scope s` with a cell made outside it, the closure read from the cell after the `scope` used the closed region (#660, `USE AFTER CLOSE` on Node). The closure was inferred against the bound `^c` of `Some`, so its row needed `Live c`; unifying that row with the closed `{}` of the cell's arrow left the `Live` out while `c` was not known, and `c` then grew to `s`. Written directly, `Ref.set cell (fun () -> use h)` and `Ref.set cell (task { use h })` into a cell of `Unit ->{} Unit` or `Eff none none Unit` were checked against the type of the cell under the bound `c` of `Ref.set`, and took `c`, which nothing bounds, as what they may use. The model rejected `stash` by (Con), but accepted the direct writes, and its machine stopped with "use after close".
+- Checker and model hole, not a hole of the document or of Lean: a value bound is a fact `⌈τ⌉ ⊆ c` of the scheme and the body of the scheme writes `α` ([value bounds in the core](#value-bounds-in-the-core)), and (Lam) and (Task) check a body at the use stage of its own arrow or `Eff`, so `Ref.set` stores in a cell of `Unit →R Unit` only a function that uses nothing. Resolution, checker: a function or a task checked against a value bound uses it only while its own type is inferred, whose rows then record it (`regions/live.rs` `expected_live`); a `Live` that unification leaves out against a closed row without it empties its capture rows not inferred yet, so a region they would gain is reported where it is used (`regions/live_rows.rs` `unify_live`). Model: (Lam), (Task) and (≤-Cap) take only the hidden qualifiers of the expected type as what a use may need (`hidden_qualifiers` in `check/regions/mod.rs`), and a function or a task that a bounded variable takes records the innermost bound in its row, as the checker's inferred one does (`subsume_bare` in `check/rows.rs`), so a cell made from one closure still takes another that uses the cell's capacity (`tests/run/runtime/arena_finalizers.fl`). Tests: `tests/check/fail/regions/stored_closure.fl` (`FLICK-G002`), `tests/check/pass/regions/stored_closure.fl`; `flick-model/tests/model/live_core.rs` `live_core_rejects_a_use_in_a_typed_cell`.
+
 ### Scope keeps its region live
 
 Divergence: typing by use in the model and in flick-core kept `Live C` as a row element of its own, apart from `Scope s`.
@@ -1003,6 +1016,8 @@ let group () =
 - a list literal against `List τ` checks each element against `τ`, so (Sub) may widen it (`[text "x"] : List (Ui^c)`);
 - the `Scope` region of a step outside the `scope`s of its λ or task is the one the stage names ([leases](#leases-instead-of-early-close)), and in a task argument it waits for the end of the call ([after the call](#scope-region-of-a-task-argument-is-resolved-after-the-call));
 - work two owners keep that uses one service is kept by the outer owner when one `scope` encloses the other: the provider outlives both (§2.7).
+- `Async` of work an owner keeps makes no `Provided` obligation: the root gives it to every fiber, as the checker reads it (§2.7); the model had rejected `Resource.own`, whose close runs with `{Async}`.
+- a `Fiber.Provided` constraint over a task, `forall t. Fiber.Provided r t => Eff {Scope t | r} e a^{t}` of `Resource.manual`, is given to the task as to the body of a λ; the model had dropped it, as it placed the constraint only in the row of a runtime arrow (`Type::with_provided`).
 
 Fixtures: the cases of `accepted.rs`; `flick-model/tests/model/live.rs` `live_on_std` lists the std values the model still cannot type.
 
@@ -1152,6 +1167,51 @@ Divergence: inferring the variance of a parameter from the fields alone makes a 
 
 - Symptom: with `Tag` of [§2.2.1](#221-variance-of-data-arguments), `a` occurs in no field, so the fields give it `bi`. `Pure` typed `Tag ((Unit -> Unit)^{s})` reaches `match t with | Pure -> f`, the branch refines `a` to the pure `Unit -> Unit`, and returns `f`, a callback using `s`, as a pure function out of its `scope`.
 - Resolution, document: a parameter some constructor fixes keeps a sign only when `res K[j]` is closed in that direction, otherwise it is `inv` ([§2.2.1](#221-variance-of-data-arguments)). Lean: the closure lemma of the index, with `Tag` a regression of `LiveRules.lean`.
+
+### A region of an instance's head was taken for a type variable
+
+Divergence: an instance method used a region of its head that the class signature keeps no live, and a closure that called the method read a handle after its `scope`.
+
+```flick
+type Handle (s : Region) = Handle Raw
+
+class Read a =
+  read : a ->{} String
+
+instance Read (Handle s) =
+  let read (Handle raw) = name_of raw
+
+leak : Unit ->{} String
+let leak () =
+  let f = scope s {
+    let h = Handle (Resource.acquire_release (task { make_conn "x" }) close_conn)
+    fun () -> read h
+  }
+  f ()
+```
+
+- Symptom: accepted; Node printed `close x`, then `USE AFTER CLOSE x`. A generic `later : Read a => a -> (Unit ->{} String)` around the method leaked the same way.
+- Cause: `instances.rs` `instance_methods` made the skolems of the instance's variables without their kinds (`rigid_kinds`), so `live_atoms` read the region `s` as a type variable, which is no use (§1.4), and the body, checked against the class signature elided before the instance's types replace its parameters ([found while porting](#rules-of-typing-by-use-found-while-porting)), used `s` with nothing live.
+- Resolution, checker: the skolems of an instance carry their kinds, so a method uses a region of its head only where the class signature keeps it live (`FLICK-G002`). The rule is the first of [the rules found while porting](#rules-of-typing-by-use-found-while-porting), so the model and Lean, where a dictionary field has the type of the class signature at the instance (`elaboration.md`), are unchanged. Fixtures: `tests/check/fail/regions/instance_regions.fl`, `tests/check/pass/regions/instance_regions.fl`.
+
+### A bound on a variable bounds the whole value
+
+Divergence: (Inst) bounds the whole value substituted for a variable (§2.3), but the checker took what the value's type shows for visible, not held.
+
+```flick
+free : a^{} -> Unit
+let free _ = ()
+
+shown : String ->{Async, FileSystem; OpenError} Unit
+let shown path = scope {
+  let file = File.open_scoped path
+  free file
+}
+```
+
+- Symptom: accepted, as was `free (Holder conn)` for data `Holder` over a value `conn` its `scope` owns. `Resource.own`, which takes `a^{}` so that a scope owns only a value that holds no region, accepted such a `Holder` in an inner `scope`, whose end closed the outer one's value while the outer one still used it.
+- Cause: `regions/data.rs` `subsume_bound_at` read every value bound with `Visible::Late` of the bounded type, which for a variable is what the variable comes to stand for.
+- Resolution, checker: a bound on a variable holds every region of the value, while a type variable in it stays no use (`Visible::Regions`); a bound on a type that is not a variable, `(List a)^c`, keeps what its type shows visible, as a type argument carries its own qualifier. Lean and the model ask `⌈τᵢ⌉ ⊆ D` (`Scheme.holds_bnd`) as before. Fixtures: `tests/check/fail/regions/value_bound.fl`, `tests/check/pass/regions/value_bound.fl`, `tests/check/fail/regions/close_token.fl`.
 
 ### Rules of typing by use found while porting
 

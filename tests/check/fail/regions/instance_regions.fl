@@ -1,0 +1,30 @@
+// A region of an instance's head is no type variable: a method uses it only
+// where the class signature its callers see keeps it live, so neither the
+// method nor a closure it returns reads a handle after the handle's scope
+// ends (`docs/formal/regions.md`, instance methods).
+module App.InstanceRegions exposing (..)
+
+type Raw
+
+name_of : forall c. Raw^c ->{} String
+foreign effect name_of from "./conn.js" "name"
+  retention call
+
+type Handle (s : Region) = Handle Raw
+
+read_handle : Handle s ->{} String
+let read_handle (Handle raw) = name_of raw
+
+class Read a =
+  read : a ->{} String
+
+instance Read (Handle s) =
+  let read h = read_handle h
+
+class Later a =
+  later : a -> (Unit ->{} String)
+
+instance Later (Handle s) =
+  let later h = fun () -> read_handle h
+//~ FLICK-G002 @22:16-22:29 this uses `s`, which the signature of `read` does not keep live
+//~ FLICK-G002 @28:27-28:40 this uses `s`, which the expected type `Unit ->{} String` does not keep live

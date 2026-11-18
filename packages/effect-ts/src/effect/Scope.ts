@@ -2,8 +2,9 @@
 // added to the scope of the owner a call runs in.
 import { Effect, Exit, Option, Scope } from "effect";
 
-import { RawCause } from "../cause.ts";
+import { type FlickExit, RawCause } from "../cause.ts";
 import { traceFinalizer } from "../owner.ts";
+import { flickExit } from "../stdlib/outcome.ts";
 
 export * from "effect/Scope";
 
@@ -32,6 +33,20 @@ export const flickAddFinalizerExit = <R>(
               context,
             ),
           ),
+        ),
+      ),
+    ),
+  );
+
+/** What `Resource.own` adds: `finalizer` sees how the scope's body ended, as Flick's `Exit`. */
+export const flickAddClose = <R>(
+  finalizer: (exit: FlickExit<unknown>) => Effect.Effect<void, never, R>,
+): Effect.Effect<void, never, R | Scope.Scope> =>
+  Effect.flatMap(Effect.context<R>(), (context) =>
+    Effect.flatMap(Effect.scope, (scope) =>
+      Effect.flatMap(traceFinalizer(scope), (ran) =>
+        Scope.addFinalizerExit(scope, (exit) =>
+          Effect.andThen(ran, Effect.provideContext(finalizer(flickExit(exit)), context)),
         ),
       ),
     ),
