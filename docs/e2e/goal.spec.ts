@@ -15,8 +15,8 @@ for (const [locale, words] of [
     const goal = page.getByRole("group", { name: words.goal, exact: true });
     const shows = async (signature: string, output: string): Promise<void> => {
       await expect(goal.getByRole("heading", { level: 3 })).toHaveText(words.goal);
-      await expect(goal.locator("li").nth(0)).toHaveText(`${words.export}${signature}`);
-      await expect(goal.locator("li").nth(1)).toHaveText(`${words.output}${output}`);
+      await expect(goal.locator(".fp-goal-row").nth(0)).toHaveText(`${words.export}${signature}`);
+      await expect(goal.locator(".fp-goal-row").nth(1)).toHaveText(`${words.output}${output}`);
     };
     await page.goto(`/flick-lang/${locale}course/values-01/`);
     await ready(page);
@@ -44,7 +44,7 @@ for (const [locale, words] of [
 test("a running export's goal is an Effect, and a page without an exercise has no goal", async ({ page }) => {
   await page.goto("/flick-lang/tour/failures/");
   await ready(page);
-  await expect(page.locator(".fp-goal li").nth(0)).toHaveText("Export (.d.ts)total_age: (string) => Effect<number, never, never>");
+  await expect(page.locator(".fp-goal .fp-goal-row").nth(0)).toHaveText("Export (.d.ts)total_age: (string) => Effect<number, never, never>");
   await page.goto("/flick-lang/tour/program/");
   await ready(page);
   await expect(page.locator(".fp-goal")).toHaveCount(0);

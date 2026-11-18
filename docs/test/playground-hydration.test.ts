@@ -77,7 +77,7 @@ test("an exercise's goal renders from its check, and a page without an exercise 
     'export = "total"', 'argument_types = ["string", "number"]', 'return_type = "number"', "runs = true", 'output = ""',
     'title = "Total"', 'title_ru = "Сумма"', 'task = "Sum."', 'task_ru = "Сложите."', 'hint = "Add."', 'hint_ru = "Сложите."',
   ].join("\n"), "test/01"));
-  const rows = (element: Element | null): Array<string | null> => [...element?.querySelectorAll("li") ?? []].map((row) => row.textContent);
+  const rows = (element: Element | null): Array<string | null> => [...element?.querySelectorAll(".fp-goal-row") ?? []].map((row) => row.textContent);
   assert.deepEqual(rows(await goal({ ...lesson, ...exercise })), ["Export (.d.ts)total: (string) => (number) => Effect<number, never, never>", "Expected outputnothing"]);
   assert.deepEqual(rows(await goal({ ...lesson, ...exercise, locale: "ru" })), ["Экспорт (.d.ts)total: (string) => (number) => Effect<number, never, never>", "Ожидаемый выводничего"]);
   // a page whose playground holds no exercise has empty metadata

@@ -43,9 +43,10 @@ let question_view model m =
           (div { class_name = "fp-lesson-choices" } (List.map_indexed choice choices)))
     }
 
+// rows, not list items: the lesson's only list is its hints
 goal_row : String -> String -> Ui
 let goal_row name value = ui {
-  item
+  div { class_name = "fp-goal-row" }
     (span { class_name = "fp-goal-label" } (text name))
     (span { class_name = "fp-goal-value" } (text value))
 }
@@ -77,11 +78,10 @@ let goal_view m =
         (div
           { class_name = "fp-goal" }
           (heading_at H3 (text label))
-          (list
-            (goal_row
-              (tr m.locale "Export (.d.ts)" "Экспорт (.d.ts)")
-              (m.lesson_export ++ ": " ++ arguments ++ result))
-            (goal_row (tr m.locale "Expected output" "Ожидаемый вывод") output))
+          (goal_row
+            (tr m.locale "Export (.d.ts)" "Экспорт (.d.ts)")
+            (m.lesson_export ++ ": " ++ arguments ++ result))
+          (goal_row (tr m.locale "Expected output" "Ожидаемый вывод") output)
           (paragraph
             (text
               (tr
