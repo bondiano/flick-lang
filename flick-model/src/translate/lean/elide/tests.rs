@@ -122,3 +122,36 @@ fn data_with_hidden_storage_shows_what_its_value_hides() {
         Ok("(.tapp (.adt \"Fixture.Sealed\") (.caps Caps.none))".into())
     );
 }
+
+/// A stage whose obligations are `Provided` of the rest of its row is `rtob`, the obligation of
+/// a rigid tail `~ρ` included; a judgment's row writes it as one over the variable.
+#[test]
+fn obligations_of_the_rest_of_a_row_are_an_rtob_stage() {
+    use std::rc::Rc;
+
+    use crate::syntax::Path;
+    use crate::types::{PROVIDED, Row, Stage, Type, Var};
+
+    let var = |n: &str| Var::Named(n.into());
+    let mut r = Row::var(var("r"));
+    r.elems
+        .insert(Path::new(PROVIDED, "~r"), Rc::from([Type::Var(var("s"))]));
+    let env = super::Env {
+        vars: vec!["r".into(), "s".into()],
+        ..super::Env::default()
+    };
+    let s = Stage::Runtime(r.clone(), Row::none());
+    assert_eq!(
+        super::stage(&s, &env),
+        Ok("(.rtob (.tvar 0) (.tvar 1) .cnil)".into())
+    );
+    assert_eq!(
+        super::row_pred(&r, &env),
+        Ok(
+            "(fun x => x = .obv (.v 0) (fun _ => False) (.v 1) ∨ x = .rv (.v 0) (fun _ => False))"
+                .into()
+        )
+    );
+    r.elems.insert(Path::new("Fixture", "Log"), Rc::from([]));
+    assert!(super::stage(&Stage::Runtime(r, Row::none()), &env).is_err());
+}

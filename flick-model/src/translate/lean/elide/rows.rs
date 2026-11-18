@@ -4,7 +4,7 @@
 
 use crate::check::{live_service, scope_service};
 use crate::syntax::Path;
-use crate::types::{Caps, PROVIDED, Row, Stage, Type, provided};
+use crate::types::{Caps, PROVIDED, Row, Stage, Type, Var, provided};
 
 use super::{Env, disjunction};
 
@@ -85,13 +85,15 @@ pub(crate) fn row_pred(r: &Row, env: &Env) -> Result<String, String> {
                 ));
             }
         } else if &*name.module == PROVIDED {
-            // `{Provided {S} ϱ}`, split by service
+            // `{Provided {S} ϱ}`, split by service or by the rigid tail `~ρ`
             let [s] = &args[..] else {
                 return Err(format!("`{name}` with arguments the core does not write"));
             };
-            let n = &name.name;
             let a = region(s, env)?;
-            parts.push(format!("x = .ob \"{n}\" (Ty.adt \"{n}\").classOf (.v {a})"));
+            parts.push(match split_key(&name.name, env)? {
+                Owed::Service(n) => format!("x = .ob \"{n}\" (Ty.adt \"{n}\").classOf (.v {a})"),
+                Owed::Var(i) => format!("x = .obv (.v {i}) (fun _ => False) (.v {a})"),
+            });
         } else if args.is_empty() {
             parts.push(format!("x = .nm₀ \"{name}\""));
         } else {
@@ -108,6 +110,20 @@ pub(crate) fn row_pred(r: &Row, env: &Env) -> Result<String, String> {
         ));
     }
     Ok(disjunction(&parts, "Row.none"))
+}
+
+/// What a split obligation `{Provided {k} ϱ}` is owed for.
+enum Owed<'a> {
+    Service(&'a str),
+    Var(usize),
+}
+
+/// The key `k` of a split obligation: a service, or `~ρ` for the rigid tail `ρ`.
+fn split_key<'a>(k: &'a str, env: &Env) -> Result<Owed<'a>, String> {
+    match k.strip_prefix('~') {
+        Some(v) => Ok(Owed::Var(env.index_of(&Var::Named(v.into()))?)),
+        None => Ok(Owed::Service(k)),
+    }
 }
 
 /// The atom of the region an obligation is about.
@@ -169,7 +185,11 @@ fn split_obligations(r: &Row, env: &Env) -> Result<(Row, Vec<(String, usize)>), 
             let [s] = &args[..] else {
                 return Err(format!("`{name}` with arguments the core does not write"));
             };
-            held.push((name.name.to_string(), region(s, env)?));
+            let owed = match split_key(&name.name, env)? {
+                Owed::Service(n) => n.to_owned(),
+                Owed::Var(i) => format!("v{i}"),
+            };
+            held.push((owed, region(s, env)?));
             rest.elems.remove(name);
         }
     }
