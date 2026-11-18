@@ -42,6 +42,11 @@ impl Checker<'_> {
             .map(|v| (v.name.clone(), self.store.skolem(&v.name)))
             .collect();
         for (v, (name, ty)) in instance.vars.iter().zip(&skolems) {
+            // a region of the head is no type variable: a method that uses it
+            // needs it live, as the class signature its callers see says
+            if let Type::Skolem(s) = ty {
+                self.cx.regions.rigid_kinds.push((*s, v.kind.clone()));
+            }
             self.cx.tyvars.push(TyVar {
                 name: name.clone(),
                 ty: ty.clone(),

@@ -162,11 +162,12 @@ foreign effect when_ from "flick:Effect" "when"
 
 /// A resource of the value `task` gives, refreshed automatically: it is
 /// acquired now and again by the schedule, and released when the innermost
-/// `scope` (or the one of region `s`) closes.
+/// `scope` (or the one of region `s`) closes. What `task` registers in its
+/// region `t` may use the services it runs with, as in `Resource.manual`.
 resource_auto :
   Fiber.Provided r2 s =>
   Schedule.Schedule r2 e2 i o ->
-  (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r + r2}
+  (forall t. Fiber.Provided r t => Eff {Scope t | r} e a^{t})^c ->{Scope s | r + r2}
   Resource.Resource s e a
 foreign effect resource_auto from "flick:Effect" "flickResourceAuto"
   arity 1

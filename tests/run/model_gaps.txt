@@ -51,18 +51,19 @@ runtime/cause_lists # no native for `fail` (flick:Cause flickFail)
 runtime/close_phases # no native for `open_res` (./resources.mjs open)
 runtime/closed_owner # no native for `make` (flick:Deferred make)
 runtime/closing_causes # no native for `exit` (flick:Effect flickExit)
-runtime/closing_child_fails # the model's (⊆) rejects `App.Main.close_signal`
-runtime/closing_hooks # the model's (⊆) rejects `App.Main.group`
+runtime/closing_child_fails # the model's (≡) rejects `App.Main.main`
+runtime/closing_hooks # no native for `make` (flick:Deferred make)
 runtime/concurrency # the model's (≡) rejects `App.Main.main`
 runtime/discontinued_fiber # no native for `make` (flick:Deferred make)
 runtime/exits # no native for `parallel_exits` (flick:rt parallelExits)
-runtime/group_in_closing # the model's (⊆) rejects `App.Main.late_group`
+runtime/group_in_closing # no native for `make` (flick:FiberSet flickMake)
 runtime/handoff # no native for `make` (flick:Deferred make)
 runtime/hung_io # no native for `hang` (./timers.mjs hang)
 runtime/interrupt_after_close # no native for `make` (flick:Deferred make)
 runtime/interrupt_in_finalizer # no native for `make` (flick:Deferred make)
 runtime/interrupt_skips # no native for `make` (flick:Deferred make)
 runtime/leases # no native for `from_acquire` (flick:ScopedRef flickFromAcquire)
+runtime/owned_close # no native for `add_close` (flick:Scope flickAddClose)
 runtime/owners # no native for `open_res` (./resources.mjs open)
 runtime/parallel # the model's (≡) rejects `App.Main.main`
 runtime/paths # no native for `node_write_file` (flick:rt fileWrite)
