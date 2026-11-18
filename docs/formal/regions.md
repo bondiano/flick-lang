@@ -1180,7 +1180,7 @@ let leak () =
 
 - Symptom: accepted; Node printed `close x`, then `USE AFTER CLOSE x`. A generic `later : Read a => a -> (Unit ->{} String)` around the method leaked the same way.
 - Cause: `instances.rs` `instance_methods` made the skolems of the instance's variables without their kinds (`rigid_kinds`), so `live_atoms` read the region `s` as a type variable, which is no use (§1.4), and the body, checked against the class signature elided before the instance's types replace its parameters ([found while porting](#rules-of-typing-by-use-found-while-porting)), used `s` with nothing live.
-- Resolution, checker: the skolems of an instance carry their kinds, so a method uses a region of its head only where the class signature keeps it live (`FLICK-G002`). The rule is the one of the first bullet below, so the model and Lean, where a dictionary field has the type of the class signature at the instance (`elaboration.md`), are unchanged. Fixtures: `tests/check/fail/regions/instance_regions.fl`, `tests/check/pass/regions/instance_regions.fl`.
+- Resolution, checker: the skolems of an instance carry their kinds, so a method uses a region of its head only where the class signature keeps it live (`FLICK-G002`). The rule is the first of [the rules found while porting](#rules-of-typing-by-use-found-while-porting), so the model and Lean, where a dictionary field has the type of the class signature at the instance (`elaboration.md`), are unchanged. Fixtures: `tests/check/fail/regions/instance_regions.fl`, `tests/check/pass/regions/instance_regions.fl`.
 
 ### A bound on a variable bounds the whole value
 

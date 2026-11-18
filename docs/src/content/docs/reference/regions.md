@@ -171,8 +171,8 @@ A type variable is no use of what it stands for: generic code cannot take a
 value of `a` apart, and a type argument carries its own qualifier, so
 `List a` holds an `a` without saying so. A qualifier written on a type
 variable bounds the whole value it stands for: `a^{}` takes no value that
-holds a region, as [`Resource.own`](../resources/) relies on, and a value
-of another type variable bounded the same. `Ref.make : forall c a. a^c ->{}
+holds a region, as [`Resource.own`](../resources/) relies on, while it
+still takes a value of another type variable bounded the same way. `Ref.make : forall c a. a^c ->{}
 Ref (a^c)` keeps the capacity of a cell in its invariant payload type:
 widening an alias of the cell cannot let a shorter-lived replacement in.
 The distinction survives [`.iface` schema 2](../iface/#types-and-kinds).
