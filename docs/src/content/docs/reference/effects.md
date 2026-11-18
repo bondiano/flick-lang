@@ -629,7 +629,9 @@ A runner's `Main` says which services `main` may need (see
 [entry points](../project/#entry-points)), and a layer `main` provides itself
 wins over the root. UI tasks (`Ui.mounted`, `on_mount`, `watched`, `watch`, the
 handlers of `Ui.Event` and `Action`) and `Runner.Cloudflare.wait_until` may
-use `Host.BrowserLive`.
+use `Host.BrowserLive`. `Ui.Dom.mount` and `Ui.mount_with`, which run the UI
+tasks with their caller's services, need it, so a `main` that mounts a root
+names it.
 
 ### Where a missing service is caught
 

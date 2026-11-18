@@ -50,7 +50,7 @@ let page =
     Ui.render list_view todos,
   ]
 
-main : Unit ->{Async; AppError} Unit
+main : Unit ->{Async, ...Host.BrowserLive; AppError} Unit
 let main () =
   match Ui.Dom.container "app" with
   | None -> App.fail "the page has no #app"

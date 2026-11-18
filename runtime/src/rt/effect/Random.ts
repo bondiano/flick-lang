@@ -3,21 +3,14 @@
 import { currentCtx, extend, lookup, Under } from "../fiber.ts";
 import { isaac } from "../isaac.ts";
 
-interface Generator { nextIntUnsafe(): number; nextDoubleUnsafe(): number }
+// every operation of `Host.Random` is made of `next` draws, so a source only draws doubles
+interface Generator { nextDoubleUnsafe(): number }
 const RANDOM: object = /*#__PURE__*/ Object.freeze({ key: "rt/random" });
-const live: Generator = {
-  nextIntUnsafe: () => Math.floor(Math.random() * 0x20000000000000) - Number.MAX_SAFE_INTEGER,
-  nextDoubleUnsafe: () => Math.random(),
-};
 const isGenerator = (source: unknown): source is Generator =>
-  typeof source === "object" && source !== null
-  && typeof Reflect.get(source, "nextIntUnsafe") === "function"
-  && typeof Reflect.get(source, "nextDoubleUnsafe") === "function";
-const generator = (): Generator => {
+  typeof source === "object" && source !== null && typeof Reflect.get(source, "nextDoubleUnsafe") === "function";
+export const flickNext = (): number => {
   const source = lookup(RANDOM);
-  return isGenerator(source) ? source : live;
+  return isGenerator(source) ? source.nextDoubleUnsafe() : Math.random();
 };
-const draw = (): number => generator().nextDoubleUnsafe();
-export const flickNext = (): number => draw();
 export const withSeed = (seed: number) => (task: () => unknown): Under =>
   new Under(extend(currentCtx(), RANDOM, isaac(seed)), task);

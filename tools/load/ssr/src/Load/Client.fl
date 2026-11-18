@@ -7,7 +7,7 @@ import Load.Page
 report : Failure e ->{Host.Console} Unit
 let report failure = Console.log ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
 
-main : Unit ->{Host.Console, Async; AppError} Unit
+main : Unit ->{Host.Clock, Host.Random, Host.Console, Async; AppError} Unit
 let main () =
   match Ui.Dom.container "app" with
   | None -> App.fail "no container"

@@ -6,6 +6,16 @@ break programs.
 
 ## Unreleased
 
+- **Breaking: a UI root asks its caller for the host services of its
+  tasks.** `Ui.Dom.mount` and `Ui.mount_with` need `Host.BrowserLive`
+  (`Host.Console`, `Host.Clock` and `Host.Random`), with which the root
+  runs the tasks of `Ui.mounted`, `on_mount`, `watched`, `watch`,
+  `Ui.Event` and `Action`. A `main` that mounts a root now names them, so
+  the launcher of a `main` without a runner provides them; before, such a
+  `main` checked without them and its tasks died for want of a service.
+  `flick check --fix --only E002` adds them to the rows.
+  `Ui.Server.render`, `stream` and `to_html` start no task and need none.
+
 - **Fixed: a re-exported type keeps its companions.** A module that
   re-exports a type (`import App.Ports exposing (Port)` with
   `exposing (Port)`) now exports its `parse`, `value`, `check`, `prove` and
