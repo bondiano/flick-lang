@@ -1,5 +1,6 @@
 //! A verified package invocation. No component failure calls native codegen.
 
+use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -7,7 +8,8 @@ use std::process::Command;
 
 use flick_backend::host::{Budget, WasmBackend};
 use flick_backend::{
-    Backend, BackendId, BackendPin, BuildRequest, Failure, Limits, Policy, RuntimeDependency,
+    Backend, BackendId, BackendPin, BuildRequest, Failure, Generated, Limits, Policy,
+    RuntimeDependency,
 };
 use flick_core::build::{go::FILES, schema_aot_file};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
@@ -16,7 +18,8 @@ use flick_core::project::{Compilation, Project, js};
 use flick_core::source::{FileId, SourceMap, Span};
 
 use super::request::Prepared;
-use super::{failure, launch};
+use super::tools::{self, Tool};
+use super::{execute, failure, launch};
 use crate::artifact::Artifact;
 use crate::commands::build::Purpose;
 use crate::commands::build::{BuildPlan, Emission};
@@ -27,7 +30,9 @@ pub(crate) struct Package {
     pin: BackendPin,
     root: PathBuf,
     backend: WasmBackend,
-    tools: Vec<launch::Tool>,
+    tools: Vec<Tool>,
+    /// The tools `[tools]` lets the steps of this backend run.
+    allowed: Vec<String>,
     runtimes: Vec<flick_backend::RuntimeDependency>,
 }
 
@@ -55,7 +60,7 @@ impl Package {
         if bytes.len() > limit {
             return Err(failure("backend component exceeds its file size limit"));
         }
-        Self::from_bytes(&project.root, pin, &bytes, rt)
+        Self::from_bytes(&project.root, pin, &bytes, rt, &project.config.tools)
     }
 
     pub(super) fn from_bytes(
@@ -63,12 +68,14 @@ impl Package {
         pin: BackendPin,
         bytes: &[u8],
         rt: bool,
+        allowed: &BTreeMap<String, Vec<String>>,
     ) -> Result<Self, Diagnostic> {
-        let backend = WasmBackend::load(
+        let backend = WasmBackend::load_with_cancellation(
             component::engine().map_err(failure)?,
             pin.clone(),
             bytes,
             Budget::default(),
+            component::cancellation().map_err(failure)?.clone(),
         )
         .map_err(|why| {
             failure(format!(
@@ -76,13 +83,19 @@ impl Package {
                 pin.identity.id, pin.identity.version, pin.sha256
             ))
         })?;
-        let tools = launch::Tool::node(None).into_iter().collect();
+        let allowed = allowed.get(&pin.identity.id).cloned().unwrap_or_default();
+        // a launch runs on Node without `[tools]`; a step needs its tool allowed
+        let ids = (allowed.iter().map(String::as_str))
+            .filter(|&id| id != "node")
+            .chain(["node"]);
+        let tools = ids.filter_map(|id| Tool::find(id, None).ok()).collect();
         let runtimes = super::dependencies::installed_for(root, !rt).map_err(failure)?;
         Ok(Self {
             pin,
             root: root.to_path_buf(),
             backend,
             tools,
+            allowed,
             runtimes,
         })
     }
@@ -115,7 +128,7 @@ impl Package {
             .iter()
             .find(|t| t.pin.id == "node")
             .ok_or("schema AOT requires Node")?;
-        Ok(launch::Tool::node(Some(&expected.pin))?.command())
+        Ok(Tool::find("node", Some(&expected.pin))?.command())
     }
 
     fn preflight(
@@ -181,13 +194,15 @@ impl Package {
         };
         prepared.request.toolchains = self.tools.iter().map(|t| t.pin.clone()).collect();
         let reserved = reserved_outputs(&prepared, output, project);
+        let environment = tools::settable();
         let policy = Policy {
             toolchains: &prepared.request.toolchains,
-            environment: &[],
+            environment: &environment,
             reserved_paths: &reserved,
             limits: Limits::default(),
-            authorize_step: &|_| Err("no host tool adapter is enabled for this backend".into()),
+            authorize_step: &tools::authorize,
         };
+        component::cancel_on_signals();
         let mut emission = match flick_backend::generate(
             &self.backend,
             &prepared.request,
@@ -196,33 +211,15 @@ impl Package {
             true,
         ) {
             Ok(generated) => {
-                let result = generated.result();
-                let require_runs = !(output.purpose == Purpose::Build
-                    && self.tools.is_empty()
-                    && self.supports_host("host-source-build"));
-                if let Err(why) = required_launches(result, output, require_runs) {
+                if let Err(diagnostic) = self.outputs(&generated, &mut prepared, output) {
                     return Emission {
                         artifacts: vec![],
-                        diagnostics: vec![failure(why)],
+                        diagnostics: vec![*diagnostic],
                     };
                 }
-                match launch::artifact(&self.pin, result) {
-                    Ok(manifest) => prepared.shared.push(manifest),
-                    Err(why) => {
-                        return Emission {
-                            artifacts: vec![],
-                            diagnostics: vec![failure(why)],
-                        };
-                    }
-                }
-                prepared
-                    .shared
-                    .extend(result.artifacts.iter().cloned().map(Artifact::from));
                 Emission {
                     artifacts: prepared.shared,
-                    diagnostics: result
-                        .diagnostics
-                        .iter()
+                    diagnostics: (generated.result().diagnostics.iter())
                         .map(|d| self.diagnostic(d, &prepared.files))
                         .collect(),
                 }
@@ -245,6 +242,74 @@ impl Package {
         }
         emission.diagnostics.splice(0..0, prepared.diagnostics);
         emission
+    }
+
+    /// Adds the launch manifest, the artifacts of a generation and the
+    /// outputs of its steps to the shared files.
+    fn outputs(
+        &self,
+        generated: &Generated,
+        prepared: &mut Prepared,
+        output: &BuildPlan,
+    ) -> Result<(), Box<Diagnostic>> {
+        let result = generated.result();
+        let require_runs = !(output.purpose == Purpose::Build
+            && self.tools.is_empty()
+            && self.supports_host("host-source-build"));
+        required_launches(result, output, require_runs).map_err(|why| Box::new(failure(why)))?;
+        let manifest = launch::artifact(&self.pin, result).map_err(|why| Box::new(failure(why)))?;
+        let outputs = self.steps(generated, &prepared.bytes, output)?;
+        prepared.shared.push(manifest);
+        (prepared.shared).extend(result.artifacts.iter().cloned().map(Artifact::from));
+        prepared.shared.extend(outputs);
+        Ok(())
+    }
+
+    /// Runs the steps of a generation once every tool they name is allowed.
+    fn steps(
+        &self,
+        generated: &Generated,
+        sources: &BTreeMap<String, Vec<u8>>,
+        output: &BuildPlan,
+    ) -> Result<Vec<Artifact>, Box<Diagnostic>> {
+        let result = generated.result();
+        let cancel = component::cancellation().map_err(|why| Box::new(failure(why)))?;
+        let id = &self.pin.identity.id;
+        if let Some(step) = (result.steps.iter()).find(|s| !self.allowed.contains(&s.toolchain.id))
+        {
+            let tool = &step.toolchain.id;
+            return Err(Box::new(
+                Diagnostic::new(
+                    codes::P051,
+                    Severity::Error,
+                    format!(
+                        "backend `{id}` runs `{tool}` in step `{}`, which `[tools]` does not allow",
+                        step.id
+                    ),
+                )
+                .with_fix(|| {
+                    (
+                        format!("allow it in `flick.toml`: `[tools]` `\"{id}\" = [\"{tool}\"]`"),
+                        Vec::new(),
+                    )
+                }),
+            ));
+        }
+        execute::run(
+            result,
+            generated.execution_order(),
+            sources,
+            &self.tools,
+            &output.out_dir,
+            cancel,
+        )
+        .map_err(|failure| {
+            let message = match failure {
+                execute::Failure::Cancelled => "the build was cancelled".to_owned(),
+                execute::Failure::Step(why) => why,
+            };
+            Box::new(Diagnostic::new(codes::P050, Severity::Error, message))
+        })
     }
 
     fn runtime_dependencies(

@@ -128,6 +128,7 @@ fn walk(e: &Term, s: &Subst, opened: Opened) -> Term {
         Term::Raise(v) => Term::Raise(go(v)),
         // the name of a region that runs: its body names the region itself
         Term::Inside(p, r, e) => Term::Inside(*p, r.clone(), go(e)),
+        Term::Settle(l, e) => Term::Settle(*l, go(e)),
         Term::Handler(h) => Term::Handler(Rc::new(
             h.map(|t| walk(t, s, opened), |a| arms_subst(a, s, opened)),
         )),
@@ -248,6 +249,7 @@ pub fn any(e: &Term, f: &dyn Fn(&Term) -> bool) -> bool {
         | Term::Bind(_, b)
         | Term::With(_, b)
         | Term::Raise(b)
+        | Term::Settle(_, b)
         | Term::Inside(_, _, b) => any(b, f),
         Term::Let(_, _, a, b)
         | Term::LetRec(_, _, a, b)
@@ -352,6 +354,7 @@ fn free(e: &Term, bound: &mut Vec<Name>, out: &mut BTreeSet<Name>) {
         | Term::Bind(_, x)
         | Term::With(_, x)
         | Term::Raise(x)
+        | Term::Settle(_, x)
         | Term::Inside(_, _, x) => free(x, bound, out),
         Term::Global(_)
         | Term::Lit(_)

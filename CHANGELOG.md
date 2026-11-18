@@ -73,6 +73,20 @@ break programs.
   is pure, or a callback whose row another module closes, needs editing by
   hand. A fix that adds a service to `->{none; E}` now writes `->{S; E}`.
 
+- **Breaking: a layer's build may use its inputs when it is released.**
+  The build of `Layer.from_build` and `Layer.from_build_memo` assumes
+  `Fiber.Provided ri s` for the region `s` it is built into, so a finalizer
+  it registers may use the layer's inputs `ri` instead of `FLICK-G003`.
+  `Layer.build`, `Layer.build_with_memo_map`, `LayerRef.make`,
+  `LayerMap.make` and `LayerMap.from_record` require `Fiber.Provided ri s`
+  of their caller: a build inside the `provide` of one of its inputs, or
+  into a region a function's signature names without the constraint, is now
+  `FLICK-G003`, as a lazy build of `LayerRef` or `LayerMap` after that
+  `provide` ended could use a released service. `provide` and `Layer.launch`
+  are unchanged. The fix of a `FLICK-G003` that would add `Fiber.Provided`
+  to a signature is offered only when that signature names the region, not
+  for the region of a `forall` in an argument such as a `from_build` body.
+
 - **`T.prove` for refined types:** `T.prove v` makes a `T` with no
   `Result` and without running the check again, where the compiler proves
   the check holds for `v` from the facts of its path: the condition of an

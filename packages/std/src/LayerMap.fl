@@ -3,6 +3,7 @@
 module LayerMap exposing (..)
 
 import Duration
+import Fiber
 
 /// Keys of `k` to the services `ro` of a layer failing with `e`, owned by
 /// the scope of region `s`.
@@ -16,12 +17,15 @@ type alias Options k = { idleTimeToLive : Option Duration.Duration; preloadKeys 
 /// built at once.
 type alias RecordOptions = { idleTimeToLive : Option Duration.Duration; preload : Bool }
 
-/// A map building the layer `lookup key` for each key it is asked for.
-make : (k -> Layer ri e ro) -> Options k ->{Scope s | ri; e} LayerMap s k e ro
+/// A map building the layer `lookup key` for each key it is asked for,
+/// with the inputs `ri` of the call: their providers must outlive `s`.
+make :
+  Fiber.Provided ri s => (k -> Layer ri e ro) -> Options k ->{Scope s | ri; e} LayerMap s k e ro
 foreign effect make from "flick:LayerMap" "flickMake"
 
 /// A map of the layers of `layers`, by name.
 from_record :
+  Fiber.Provided ri s =>
   List (String, Layer ri e ro) -> RecordOptions ->{Scope s | ri; e} LayerMap s String e ro
 foreign effect from_record from "flick:LayerMap" "flickFromRecord"
 

@@ -212,6 +212,7 @@ stdlib/effect/hmac
 stdlib/effect/json_schema
 stdlib/effect/jwt
 stdlib/effect/layer
+stdlib/effect/layer_finalizer_services
 stdlib/effect/layer_map
 stdlib/effect/logger
 stdlib/effect/metric
@@ -357,6 +358,7 @@ effect/row_without
 
 runtime/counted_layer_merge
 runtime/lazy_once
+runtime/lazy_abort
 runtime/lazy_shared
 runtime/suspended
 runtime/suspended_std

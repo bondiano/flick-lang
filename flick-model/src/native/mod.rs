@@ -15,6 +15,8 @@ mod lazy;
 mod numbers;
 mod show;
 
+pub(crate) use lazy::settled;
+
 use std::fmt;
 use std::rc::Rc;
 

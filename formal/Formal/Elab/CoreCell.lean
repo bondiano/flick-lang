@@ -5,9 +5,8 @@ import Formal.Elab.CoreRel
 
 A step of a lazy cell reads the outer form of its content (`Tm.IsCell`). Related contents have
 the same outer form when no base pair has a lazy cell's form on either side (`BNoCell`): a
-pending cell is related to a pending one, a settled cell to a settled one, and a running cell,
-which holds `anil`, only to itself, since no base pair has a list of alternatives on either side.
-The base pairs of dictionaries have no such form (`DP.noCell`).
+pending cell is related to a pending one, a running cell to a running one, and a settled cell to
+a settled one. The base pairs of dictionaries have no such form (`DP.noCell`).
 -/
 
 namespace Flick.Elab
@@ -24,7 +23,7 @@ theorem _root_.Flick.Typ.not_cell_pure {S : Sig} {Ψ Θ Γ e J} (h : Typ S Ψ Θ
   | conv _ _ ih => intro t hJ; cases hJ; exact ih _ rfl
   | allI hv | errVal hv => intro t _ hc; cases hv <;> simp [Flick.Tm.IsCell] at hc
   | lazy _ _ _ hφ => intro t hJ; cases hJ; exact fun _ => hφ
-  | await _ hφ _ => intro t hJ; cases hJ; exact fun _ => Stage.use_rt_le_ne_pure hφ rfl
+  | await _ hφ _ | force _ hφ _ => intro t hJ; cases hJ; exact fun _ => Stage.use_rt_le_ne_pure hφ rfl
   | _ => intro t hJ hc; cases hJ <;> simp [Flick.Tm.IsCell] at hc
 
 theorem DP.noCell {S : Sig} {root : Roots} : BNoCell (DP S root) := by
@@ -60,17 +59,17 @@ theorem Cg.done_right (hL : BNoCell B) {c o₂ : Flick.Tm} (h : Cg B false c (.d
   | await => exact ⟨_, rfl⟩
   | base hb => exact ((hL _ _ hb).2 trivial).elim
 
-theorem Cg.running_left (hA : BNoAlts B) {c₂ : Flick.Tm} (h : Cg B false .running c₂) :
-    c₂ = .running := by
+theorem Cg.running_left (hL : BNoCell B) {e c₂ : Flick.Tm} (h : Cg B false (.running e) c₂) :
+    ∃ e₂, c₂ = .running e₂ ∧ Cg B false e e₂ := by
   cases h with
-  | anil => rfl
-  | base hb => exact (hA _ _ hb trivial).elim
+  | force he => exact ⟨_, rfl, he⟩
+  | base hb => exact ((hL _ _ hb).1 trivial).elim
 
-theorem Cg.running_right (hP : BPlain B) {c : Flick.Tm} (h : Cg B false c .running) :
-    c = .running := by
+theorem Cg.running_right (hL : BNoCell B) {c e₂ : Flick.Tm} (h : Cg B false c (.running e₂)) :
+    ∃ e, c = .running e := by
   cases h with
-  | anil => rfl
-  | base hb => exact ((hP _ _ hb).2.2 trivial).elim
+  | force => exact ⟨_, rfl⟩
+  | base hb => exact ((hL _ _ hb).2 trivial).elim
 
 theorem All2.getElem?' {α β : Type} {R : α → β → Prop} {l : List α} {l' : List β} (h : All2 R l l')
     {i : Nat} {b : β} (hb : l'[i]? = some b) : ∃ a, l[i]? = some a ∧ R a b := by
@@ -82,18 +81,41 @@ theorem All2.getElem?' {α β : Type} {R : α → β → Prop} {l : List α} {l'
     | succ i => exact ih (by simpa using hb)
 
 /-- Related stores settle a cell alike: it is running on both sides or on neither. -/
-theorem All2.settleCell (hA : BNoAlts B) (hP : BPlain B) {μ μ₂ : List Flick.Tm}
+theorem All2.settleCell (hL : BNoCell B) {μ μ₂ : List Flick.Tm}
     (h : All2 (Cg B false) μ μ₂) (l : Nat) {o o₂ : Flick.Tm} (ho : Cg B false (.done o) (.done o₂)) :
     All2 (Cg B false) (Flick.settleCell μ l o) (Flick.settleCell μ₂ l o₂) := by
   unfold Flick.settleCell
   split <;> split
   · exact h.set l ho
   · rename_i h₁ h₂
+    obtain ⟨_, h₁⟩ := h₁
     obtain ⟨c₂, hc₂, r⟩ := h.getElem? h₁
-    exact (h₂ (by rw [hc₂, r.running_left hA])).elim
+    obtain ⟨e₂, rfl, -⟩ := r.running_left hL
+    exact (h₂ ⟨e₂, hc₂⟩).elim
   · rename_i h₁ h₂
+    obtain ⟨_, h₂⟩ := h₂
     obtain ⟨c, hc, r⟩ := h.getElem?' h₂
-    exact (h₁ (by rw [hc, r.running_right hP])).elim
+    obtain ⟨e, rfl⟩ := r.running_right hL
+    exact (h₁ ⟨e, hc⟩).elim
+  · exact h
+
+/-- Related stores reset a cell alike, each to its own initializer. -/
+theorem All2.resetCell (hL : BNoCell B) {μ μ₂ : List Flick.Tm}
+    (h : All2 (Cg B false) μ μ₂) (l : Nat) :
+    All2 (Cg B false) (Flick.resetCell μ l) (Flick.resetCell μ₂ l) := by
+  rcases Flick.resetCell_cases μ l with ⟨e, h₁, r₁⟩ | ⟨h₁, r₁⟩ <;>
+    rcases Flick.resetCell_cases μ₂ l with ⟨e₂, h₂, r₂⟩ | ⟨h₂, r₂⟩ <;> rw [r₁, r₂]
+  · obtain ⟨c₂, hc₂, r⟩ := h.getElem? h₁
+    rw [h₂] at hc₂; cases hc₂
+    cases r with
+    | force he => exact h.set l (.lazy he)
+    | base hb => exact ((hL _ _ hb).1 trivial).elim
+  · obtain ⟨c₂, hc₂, r⟩ := h.getElem? h₁
+    obtain ⟨e₂, rfl, -⟩ := r.running_left hL
+    exact (h₂ e₂ hc₂).elim
+  · obtain ⟨c, hc, r⟩ := h.getElem?' h₂
+    obtain ⟨e, rfl⟩ := r.running_right hL
+    exact (h₁ e hc).elim
   · exact h
 
 end Flick.Elab

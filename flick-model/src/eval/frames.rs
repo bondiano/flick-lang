@@ -69,6 +69,8 @@ pub enum Frame {
     KeptHandler(usize, Rc<Handler>),
     /// `inside π □` (`regions.md` §3.2), its types naming the region `Name`.
     Inside(usize, Name),
+    /// `settle ℓ □`: the initializer of the lazy cell `ℓ` runs.
+    Settle(usize),
     /// `inside π □` while `π` closes (§3.3): `□` is a child or a
     /// finalizer, and the body ended with what it keeps.
     Close(usize, Name, Ended),
@@ -160,6 +162,7 @@ impl Frame {
             Frame::JoinRight(a) => Term::Join(Rc::new(a.clone()), e),
             Frame::With(env) | Frame::Kept(env) => Term::With(env.clone(), e),
             Frame::Inside(pi, s) => Term::Inside(*pi, s.clone(), e),
+            Frame::Settle(l) => Term::Settle(*l, e),
             // inside π (let _ = □ in w)
             Frame::Close(pi, s, ended) => {
                 let w = match ended {

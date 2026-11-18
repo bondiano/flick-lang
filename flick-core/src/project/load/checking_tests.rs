@@ -131,6 +131,7 @@ fn library(sources: &mut SourceMap) -> Project {
             no_let_assert: false,
             thresholds: Thresholds::default(),
             plugins: BTreeMap::new(),
+            tools: BTreeMap::new(),
         },
     }
 }

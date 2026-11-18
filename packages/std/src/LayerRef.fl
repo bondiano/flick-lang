@@ -3,6 +3,7 @@
 module LayerRef exposing (..)
 
 import Duration
+import Fiber
 
 /// The services `ro` of a layer failing with `e`, owned by the scope of
 /// region `s`.
@@ -12,8 +13,9 @@ type LayerRef (s : Region) (e : ErrorRow) (ro : ServiceRow)
 /// is released), and whether they are built at once.
 type alias Options = { idleTimeToLive : Option Duration.Duration; preload : Bool }
 
-/// A ref of the services `layer` builds.
-make : Layer ri e ro -> Options ->{Scope s | ri; e} LayerRef s e ro
+/// A ref of the services `layer` builds, with the inputs `ri` of the
+/// call: their providers must outlive `s`.
+make : Fiber.Provided ri s => Layer ri e ro -> Options ->{Scope s | ri; e} LayerRef s e ro
 foreign effect make from "flick:LayerRef" "flickMake"
 
 /// The services as a layer: a `provide` of it shares those already built.

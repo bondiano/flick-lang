@@ -79,13 +79,37 @@ impl Checker<'_> {
         // Common service arguments above can solve the owner of a pending
         // Provided obligation (for example Scope ?s against Scope s). Only
         // now can an existing, same-owner given discharge that obligation.
+        let mut b = b;
         if defer {
+            // a given over the row `ρ'` grows into, as the build of
+            // `Layer.from_build` has over its inputs, names the services
+            // `ρ'` grows by here once they are in it: they go in first
+            let mut obligations = Row::none();
+            extra.elems.retain(|name, args| {
+                let obligation = &*name.module == PROVIDED;
+                if obligation {
+                    obligations.elems.insert(name.clone(), args.clone());
+                }
+                !obligation
+            });
+            let open = b.vars.iter().any(|v| matches!(v, Var::Meta(_)));
+            if open && !obligations.is_none() && !extra.is_none() {
+                self.grow(mem::take(&mut extra), &b)?;
+                b = self.zonk_row(&b);
+            }
+            extra.elems.append(&mut obligations.elems);
             self.settle_given(&mut extra);
             self.defer_provided(&mut extra, &b);
         }
         if extra.is_none() {
             return Ok(());
         }
+        self.grow(extra, &b)
+    }
+
+    /// `ρ'` with what `ρ ⊆ ρ'` found it lacks, `extra`: in its meta, unless
+    /// it was taken without one of them.
+    fn grow(&mut self, extra: Row, b: &Row) -> Check<()> {
         let tail = b.vars.iter().find_map(|v| match v {
             Var::Meta(m) => Some(*m),
             Var::Named(_) => None,
@@ -105,7 +129,7 @@ impl Checker<'_> {
                 grown.vars.insert(Var::Meta(self.meta()));
                 self.bind_row(m, grown)
             }
-            None if self.infer_row_upper(&extra, &b) => Ok(()),
+            None if self.infer_row_upper(&extra, b) => Ok(()),
             None => error("⊆", format!("the row `{b}` does not allow `{extra}`")),
         }
     }
