@@ -56,9 +56,9 @@ theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
     intro _ _ _ hJ _; cases hJ
     simp only [VKind, Tm.head]; rw [← hT.kind]; unfold Sig.ctorTyR
     rcases Ty.arrows_kind _ _ _ with h | h <;> rw [h] <;> simp
-  | errVal hv' _ hU _ ih =>
-    intro _ _ _ hJ _; cases hJ
-    have ih' := ih hv' rfl (Ty.not_all_of_hd hU)
+  | errVal _ hU _ ih =>
+    intro hv _ _ hJ _; cases hJ
+    have ih' := ih hv rfl (Ty.not_all_of_hd hU)
     rw [Ty.kind_of_hd hU] at ih'
     revert ih'
     simp only [VKind, Ty.kind]

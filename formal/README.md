@@ -292,6 +292,7 @@ operation, kept or not, and `c.at i` ranges over the main thread and the childre
 | (Sub) | admissible: `Typ.sub` (`SubAdm.lean`) |
 | §2.4 patterns, `Exh`; (Match-Val), [Match-Val: a value needs only its own coverage](../docs/formal/core.md#the-residual-match-after-a-false-guard-fails-exh) | `PatTy`, `Shp`, `Exh`, `Covers` (`Typing.lean`) |
 | §2.4 (Match-Err): a `match` on `Errors ε` by the errors of `ε`, errors without parameters | `PatTy.err`, `Shp.err`, `Shp.errOpen` (`Typing.lean`); `PatTy.err_match` (`Patterns.lean`); `exh_errs` (`FormalCert/Match.lean`) |
+| §2.4 (Errors-In): a term of an error at the errors of a row that holds it | `Typ.errVal` (`Rules.lean`); `LeOut`, `LeOut.typ` (`ErrorsIn.lean`); `FrameTy.errVal` (`FrameTy.lean`); `Ty.YFMod.of_err` (`FreshEquivalence.lean`) |
 | §2.4 constructors of a GADT: the arguments of the type they build, fields that reach no more than the type built, (Branch-GADT) under every unifier ([not the most general one](../docs/formal/core.md#the-most-general-unifier-is-not-kept-by-substitution), [the free names of a dead branch](../docs/formal/core.md#a-dead-branch-keeps-no-typing-of-its-body)); `Exh` without the constructors that build no value | `Sig.res`, `Sig.ctorTyR` (`Syntax.lean`, `TyOps.lean`); `Sig.Holds`, `Sig.Inj`, `PatsTy`, `Sig.Builds` (`Typing.lean`); `Typ.aref` (`Rules.lean`); `Typ.aref_substT` (`TySubstBase.lean`), `Typ.aref_subst` (`SubstArm.lean`), `aref_match` (`SpineMatch.lean`) |
 | the checker's arm under the most general unifier, and a dropped dead arm | `Mgu`, `Typ.aref_mgu`, `Typ.aref_dead` (`ArefMgu.lean`) |
 | §1.4 `provide S impl`, `provide layer` | `recArms`, `T6c_tail`; `KnownLayer`, `chain`, `layer_typ`, `layer_answers` (`RecordHandler.lean`) |
@@ -461,7 +462,8 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
    `raise` is a term former, not a first-class constant; `λx. raise x` recovers the
    constant. It takes `Errors ε` (with stage `R⟨none; ε⟩`) or a value of an error type
    `E ῡ` (with `R⟨none; {E} + ⌈E ῡ⌉⟩`, `Row.err`), which is the `Errors {E ῡ} ≡ E ῡ` of
-   §1.5 at the only place the core needs it. (Errors-Val) types values only, as in §3.6.
+   §1.5 at the only place the core needs it. (Errors-In) of §2.4, `Typ.errVal`, types any
+   term of an error `E ῡ` at the errors of a row that holds it, value or not.
 7. **`try` arms** are `x`/`_` at `Errors ε_b` or a constructor pattern `E p̄` at an error
    type `E` without parameters. `H` is a judgment index: each arm without `when` may add
    what it catches (`Catches`): an `x`/`_` arm all of `ε_b`, its row variables and atoms

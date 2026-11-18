@@ -190,10 +190,10 @@ theorem Typ.shape {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
   | allI =>
     intro _ _ _ hJ; cases hJ
     exact ⟨.hidden (by simp [Ty.Opaque, Ty.hd]), fun _ _ h => (h trivial).elim⟩
-  | errVal hv' h' hU hE ih =>
-    intro _ _ _ hJ; cases hJ
-    refine ⟨.err (ih hv' rfl).1 hU ⟨_, hE _ (.inl rfl)⟩,
-      fun K hK _ => .inr ⟨_, _, _, rfl, hU, (ih hv' rfl).1, h', hE⟩⟩
+  | errVal h' hU hE ih =>
+    intro hv _ _ hJ; cases hJ
+    refine ⟨.err (ih hv rfl).1 hU ⟨_, hE _ (.inl rfl)⟩,
+      fun K hK _ => .inr ⟨_, _, _, rfl, hU, (ih hv rfl).1, h', hE⟩⟩
   | app hf _ _ hT ih₁ ih₂ =>
     intro hv _ _ hJ; cases hJ
     cases hv with

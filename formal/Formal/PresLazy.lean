@@ -228,7 +228,7 @@ theorem settle_raise {Ψ Θ n μ l v t C ψ T φ} {r ε : Ty} (hμ : StoreTy S �
   have hsub : Row.Sub ε'.asRow ε.asRow := fun x hx => by
     simpa using Stage.le_err hψ x (Stage.le_err hε' x hx)
   obtain ⟨_, _, _, _, U, _, _, _, hU, ht, hs⟩ := canonical_errors hv hv'
-  exact ⟨[], by simpa using hμ.settle hl (.err hv ((Typ.errVal hv ht hU (hs.trans hsub)).cut hcRt.outΘ)),
+  exact ⟨[], by simpa using hμ.settle hl (.err hv ((Typ.errVal ht hU (hs.trans hsub)).cut hcRt.outΘ)),
     by simpa using Typ.raise (hv'.valueAny hv φ) (Stage.le_trans hε' (Stage.le_trans hψ hφ)),
     by simp⟩
 

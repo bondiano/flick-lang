@@ -17,7 +17,11 @@ private theorem Typ.frameCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     have ht := (ih r F _ _ hctx hterm rfl hr hok).conv he
     cases hjudge
     exact ht
-  | allI hv | errVal hv =>
+  | errVal _ hU hE ih =>
+    intro r F t φ hctx hterm hjudge hr hok
+    cases hjudge
+    exact (ih r F _ _ hctx hterm rfl hr hok).errVal hU hE
+  | allI hv =>
     intro r F t φ _ hterm _ hr _
     rw [hterm] at hv
     exact (not_value_plug hr F hv).elim

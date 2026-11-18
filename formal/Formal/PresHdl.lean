@@ -76,7 +76,7 @@ theorem refill_app {Ψ Θ E f x t₀ φ₀ a₀ w ψ₀ B P} (hE : OkE E) (hn : 
   · obtain ⟨ha, hψ₀, hbt⟩ := hb rfl
     simp only [List.map_up_zero] at hx
     simpa using Refill.id back [] w (by
-      simpa using hw _ _ hΘ (Stage.le_trans hψ₀ hψ) (hB _ _ hbt hT)
+      simpa using hT.typ fun _ hT₀ => hw _ _ hΘ (Stage.le_trans hψ₀ hψ) (hB _ _ hbt hT₀)
         (hx.sub ⟨ha, Stage.le_refl _⟩))
 
 /-- The arguments of an effect answered by a handler at a stage below one that answers them. -/

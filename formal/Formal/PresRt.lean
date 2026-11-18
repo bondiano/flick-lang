@@ -59,7 +59,13 @@ private theorem Typ.rtStepCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     obtain ⟨X, hstore, hbody, hfresh⟩ := ih Λ μ _ _ Λ' μ' e' hΓ rfl hμ hcRt hbl hμb
       (ht.equiv he.symm) hφfixed hh
     exact ⟨X, hstore, hbody.conv he, hfresh⟩
-  | allI hv | errVal hv =>
+  | errVal _ hU hE ih =>
+    intro Λ μ t φ Λ' μ' e' hΓ hJ hμ hcRt hbl hμb ht hφfixed hh
+    cases hJ
+    obtain ⟨X, hstore, hbody, hfresh⟩ := ih Λ μ _ _ Λ' μ' e' hΓ rfl hμ hcRt hbl hμb
+      (ht.of_err hE) hφfixed hh
+    exact ⟨X, hstore, hbody.errVal hU hE, hfresh⟩
+  | allI hv =>
     intro _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ hh
     exact (hh.not_value hv).elim
   | app hf ha hψ hT =>
@@ -178,7 +184,7 @@ private theorem Typ.rtStepCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | handle hv hvU hU hE hA hc ha hφ =>
     intro Λ μ t φ Λ' μ' e' hΓ hJ hμ hcRt hbl hμb ht hφfixed hh
     cases hΓ; cases hJ
-    have hv' := Typ.errVal hv hvU hU hE
+    have hv' := Typ.errVal hvU hU hE
     cases hh with
     | handleYes hv hm =>
       cases hA with
