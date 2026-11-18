@@ -217,7 +217,7 @@ pub(super) fn capture(p: &mut Parser) -> Option<Done> {
     Some(base)
 }
 
-fn atom(p: &mut Parser) -> Option<Done> {
+pub(super) fn atom(p: &mut Parser) -> Option<Done> {
     if !p.enter() {
         return None;
     }

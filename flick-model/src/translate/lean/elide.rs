@@ -226,15 +226,16 @@ fn qualified(t: &Type, q: Option<&Caps>, env: &Env) -> Result<String, String> {
             };
             format!("(.dict {class} (Ty.spine [{}]))", args.join(", "))
         }
-        Type::Forall(s) => forall(s, env)?,
+        Type::Forall(s) => forall(s, q, env)?,
         other => return Err(format!("no core form for `{other}`")),
     })
 }
 
 /// A `∀` of a parameter: rule 2 instantiates `v` of `a^v`; a binder of kind
 /// `Region` or `CaptureRow` that stays is one the model's `elide` counts and
-/// `Ty.elide` under `.all` does not.
-fn forall(s: &Scheme, env: &Env) -> Result<String, String> {
+/// `Ty.elide` under `.all` does not. The qualifier `q` of the whole is that
+/// of its body, read under the binders that stay.
+fn forall(s: &Scheme, q: Option<&Caps>, env: &Env) -> Result<String, String> {
     let mut inner = env.clone();
     let mut kept = Vec::new();
     for (v, k) in &s.vars {
@@ -252,7 +253,7 @@ fn forall(s: &Scheme, env: &Env) -> Result<String, String> {
         .cloned()
         .chain(env.vars.iter().cloned())
         .collect();
-    let body = ty(&s.body, &inner)?;
+    let body = qualified(&s.body, q, &inner)?;
     Ok(if kept.is_empty() {
         body
     } else {

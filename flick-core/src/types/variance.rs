@@ -13,9 +13,11 @@ use super::env::Form;
 use super::kinds::Kind;
 use super::lang::Lang;
 use super::regions::{Hold, Visible};
+use super::report::uncaptured;
 use super::ty::Type;
 use super::unify::Unified;
 use crate::iface::{Entity, Namespace};
+use crate::logic::RULES;
 use crate::source::Span;
 
 /// `+`, `−`, `inv` or `bi` (unused).
@@ -394,6 +396,12 @@ impl Checker<'_> {
                     s.get(label)
                         .map_or(Ok(()), |y| self.subsume(x, &y.clone(), span))
                 })
+            }
+            // a proof is of values, whose captures its logic does not read
+            (Type::App { head, .. }, Type::App { .. }) if matches!(&**head, Type::Con { module, .. } if module == RULES) =>
+            {
+                let (x, y) = (self.zonk(actual), self.zonk(expected));
+                self.unify(&uncaptured(&x), &uncaptured(&y))
             }
             (Type::App { .. }, Type::App { .. }) => {
                 let ((head, args), (other_head, expected_args)) =

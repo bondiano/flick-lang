@@ -210,6 +210,35 @@ component badge (render : String) = ui { text render }
 }
 
 #[test]
+fn proof_is_a_keyword_there_only_and_a_proof_folds() {
+    let text = "module App.Main exposing (proof)
+
+let proof = 1
+
+proof stays (x : Bool)
+where equal x x =
+  refl
+";
+    let f = fixture_of(&[("src/App/Main.fl", text)]);
+    let ide = f.ide();
+    let main = f.file("App.Main");
+    let tokens = ide.semantic_tokens(main);
+    let at = |needle: &str| u32::try_from(text.find(needle).expect("occurs")).expect("small");
+    let kind_at = |offset: u32| {
+        (tokens.iter())
+            .find(|t| t.0 == offset)
+            .map(|t| TOKEN_TYPES[t.2 as usize])
+    };
+    assert_eq!(kind_at(at("proof stays")), Some("keyword"));
+    assert_ne!(kind_at(at("proof = 1")), Some("keyword"));
+    let folds = ide.folding_ranges(main);
+    assert!(
+        folds.iter().any(|(s, _)| *s == at("proof stays")),
+        "{folds:?}"
+    );
+}
+
+#[test]
 fn inlay_hints_show_what_each_function_of_a_left_pipe_gives() {
     let source = "module App.Hints exposing (..)\n\
                   leading : List Int -> String\n\
