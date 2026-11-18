@@ -1,6 +1,6 @@
 ---
 title: "Errors, services, resources and concurrency"
-source_hash: 2254dbfbea3bc252
+source_hash: 002c93afab1e4d98
 ---
 
 ## Expected errors
