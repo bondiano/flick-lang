@@ -88,6 +88,10 @@ fn a_try_arm_row_holds_an_error_its_body_no_longer_raises() {
 /// The choices are the picks of the case proptest printed: each below the
 /// number of forms then, so forms added later at the end keep the program.
 #[test]
+#[allow(
+    clippy::unreadable_literal,
+    reason = "the choices of the change as proptest printed them"
+)]
 fn a_let_of_one_error_misses_the_others_of_its_row() {
     let c = [
         2, 0, 0, 1, 0, 0, 0, 3, 4, 5, 3, 0, 1, 4, 3, 2, 0, 1, 0, 1, 0, 1, 0, 1, 5, 7, 1, 13, 9, 19,
