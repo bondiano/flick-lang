@@ -1,6 +1,6 @@
 ---
 title: "Синтаксис"
-source_hash: a1e782cdfc66bcd1
+source_hash: 336f8340516059bb
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -111,7 +111,7 @@ let examples =
 ### Операторы и пунктуация
 
 ```text
-( ) [ ] { } , ; : . .. ..< = -> <- => | ^ _ ?
+( ) [ ] { } , ; : . .. ..< = -> <- => | ^ _ ? @
 |> <| >> << || && == != < <= > >= ++ + - * / % ** not
 ```
 
@@ -121,16 +121,22 @@ let examples =
 и где прочитать подробности. Такие слова нельзя использовать как имена.
 
 ```text
-module exposing import as let mut rec fun match with try if then else task await
-scope provide ignore todo echo type opaque where kind error service class
-instance deriving foreign from forall not none true false
+module exposing import as let mut rec assert fun match with try if then else
+task await lazy scope provide ignore todo echo type opaque where kind error
+service class instance deriving foreign from forall not none true false
 in when for yield do break continue
 ```
 
 Контекстные слова считаются обычными именами, кроме следующих позиций:
 
 - `loop` перед `{` и `while` перед условием, за которым идёт `do`;
-- `unboxed` и `untagged` непосредственно перед `type` (см. `codegen.md`);
+- `private` перед `module` в заголовке файла (см. [модули](../modules/)) и
+  `plugin` перед головой в списке `exposing` (см.
+  [плагины](../plugins/#как-подключить-плагин));
+- `alias` сразу после `type`, а `unboxed` и `untagged` непосредственно перед
+  ним (см. [генерацию кода](../codegen/));
+- `pack` и `unpack` перед модулем и `as`, а `exists` перед именем и `:` в
+  типе (см. [упакованные модули](../modules/#упакованные-модули-и-экзистенциальные-результаты));
 - режимы внешних функций `pure`, `effect`, `blocked` и источник
   `global`;
 - метаданные внешних функций `arity`, `this`, `catch`, `cancel`, `nullable`,
@@ -160,6 +166,8 @@ in when for yield do break continue
 | `exposing` | Перечисляет экспортируемые имена или имена, импортируемые без префикса модуля | `import App.Domain exposing (User, greet)` |
 | `import` | Подключает другой модуль | `import Effect.Log as Log` |
 | `as` | Задаёт локальное имя импортированного модуля; в `sql table` указывает тип столбца во Flick | `import Effect.Log as Log` |
+| `pack` | Контекстное слово: модуль как значение `Module Sig` | `pack Argument as Source` |
+| `unpack` | Контекстное слово: открывает упакованный модуль в собственной области | `unpack packed as K in K.value` |
 
 Подробнее — в разделе [Модули и имена](../modules/).
 
@@ -169,10 +177,6 @@ in when for yield do break continue
 | - | - | - |
 | `let` | Связывает имя со значением или функцией на уровне модуля либо внутри блока | `let total = a + b` |
 | `mut` | `let mut` объявляет переменную функции, которой присваивает `name = value` | `let mut total = 0` |
-| `loop` | Контекстное слово: повторяет блок до возврата результата через `break value` | `loop { break 42 }` |
-| `while` | Контекстное слово: повторяет тело типа `Unit`, пока условие истинно | `while i < n do i = i + 1` |
-| `break` | Выходит из ближайшего цикла; значение принимает только `loop` | `break 42` |
-| `continue` | Пропускает остаток текущей итерации | `continue` |
 | `rec` | В `let rec` разрешает функции вызывать себя; блок `rec { … }` объединяет взаимно рекурсивные функции | `let rec go n = …` |
 | `assert` | `let assert` связывает образец, который может не подойти, и завершается с ошибкой, если он не подошёл | `let assert [x, ..._] = xs as "no items"` |
 | `type` | Объявляет алгебраический тип данных, а в сочетании `type alias` — прозрачный псевдоним типа | `type Shape = Circle Float \| Empty` |
@@ -205,9 +209,17 @@ in when for yield do break continue
 | `not` | Отрицает логическое значение; в `sql table` входит в ограничение `not null` | `not done` |
 | `true` `false` | Два значения типа `Bool` | `if ok then true else false` |
 | `none` | Обозначает пустую строку в типе | `a ->{none; NotFound} b` |
-| `in` | Связывает имя со строкой таблицы в конструкции SQL `from` или `join` | `join account in Accounts` |
+| `in` | Связывает имя со строкой таблицы в конструкции SQL `from` или `join`; начинает тело `unpack … as K in` | `join account in Accounts` |
 | `do` | Последовательность инструкций через `Monad`: `x <- e` связывает результат с именем `x`, `if c` фильтрует | `do { x <- left; y <- right; pure (x, y) }` |
 | `for` `yield` | Ленивый `Seq` элементов, которые даёт `yield`, — один генератор; `[for …]` — строгий `List`; `for … do body` выполняет тело для каждого элемента | `[for x <- xs if x > 0 yield x * 2]` |
+| `loop` | Контекстное слово: повторяет блок до возврата результата через `break value` | `loop { break 42 }` |
+| `while` | Контекстное слово: повторяет тело типа `Unit`, пока условие истинно | `while i < n do i = i + 1` |
+| `break` | Выходит из ближайшего цикла или из объемлющего, чью метку называет; значение принимает только `loop` | `break 42`, `break 'outer` |
+| `continue` | Пропускает остаток текущей итерации ближайшего цикла или цикла с меткой | `continue 'outer` |
+
+У цикла может быть метка, `'outer: for x <- xs do …`; `break` и `continue`
+называют её, чтобы выйти из объемлющего цикла или продолжить его (см.
+[локальные циклы](../bindings/#локальные-циклы)).
 
 ### Эффекты и ресурсы
 
@@ -303,9 +315,9 @@ in when for yield do break continue
 `List.map f >> List.filter p` — композиция двух применений, а `await f >> g`
 означает `await (f >> g)`. Что делают операторы, описано в разделе [Числа и
 операторы](../numbers/#операторы).
-Побитовые операции — функции `Float.bit_*`.
+Побитовые операции — функции `Int.bit_*` и `Int.shift_*`.
 
-Диапазон — это `Seq Float`: `a..b` считает от `a` до `b` включительно
+Диапазон — это `Seq Int`: `a..b` считает от `a` до `b` включительно
 (`Seq.range_to`), `a..<b` останавливается перед `b` (`Seq.range`), а `a..`
 не заканчивается (`Seq.from`). Единственный в скобках, `[a..b]` — `List` тех же
 чисел; `[a..]` — ошибка. Число перед `..` на нём заканчивается: `1..5` —
@@ -407,7 +419,9 @@ let between x =
 
 ```text
 file        = [module_header] { import } { decl | module_application }
-module_header = "module" ModulePath ["exposing" exposing]
+module_header = ["private"] "module" ModulePath { module_params } [":" contract] ["exposing" exposing]
+module_params = "(" Con ":" contract { "," Con ":" contract } ")"   // параметризованный модуль
+contract    = ModulePath | module_params "->" contract ["with" "type" …]
 import      = "import" ModulePath ["as" Con] ["exposing" exposing]
 exposing    = "(" item { "," item } [","] ")"
 item        = name | Con | Con "(..)" | ".." | "plugin" name   // см. plugins.md
@@ -416,6 +430,7 @@ ModulePath  = Con { "." Con }
 decl        = signature | let | rec_group | type_decl | kind_decl | error_decl
             | service | class | instance | foreign | module_contract | inline_module
             | head { head_arg } ("{" { token } "}" | { token })   // плагина, до следующего decl
+attribute   = "@" name { name | String }   // перед объявлением, членом или вариантом
 inline_module = "module" Con ["exposing" exposing] "=" indented { import | decl }
 module_contract = "type" "module" Con "=" indented { module_member }
 module_application = "module" Con "=" ModulePath "(" ModulePath { "," ModulePath } ")"
@@ -527,10 +542,36 @@ rec {
 }
 ```
 
+## Атрибуты
+
+Атрибут — строка `@name`, возможно с аргументами, перед объявлением, членом
+или конструктором. Это метаданные для компилятора или плагина, а не имя:
+его ничто не разрешает, и программа не может объявить новый.
+
+```flick
+@label gauge
+type Gauge = Gauge Float
+```
+
+| Атрибут | Перед чем | Что сообщает | Подробнее |
+| - | - | - | - |
+| `@implicit` | экземпляр | экземпляр преобразует один тип в другой там, где ожидаемый тип известен | [неявные преобразования](../classes/#неявные-преобразования) |
+| `@derive` | класс | его выводит плагин: плагин пакета класса или названного пакета, `@derive std` | [вывод экземпляров](../classes/#автоматический-вывод-экземпляров-классов) |
+| `@ts` | тип или сервис | его форма в TypeScript, `none` или `import` типа из пакета | [форма типа](../codegen/#форма-типа) |
+| `@stores` | тип без конструкторов и тела | его значения хранят переданные им функции | [квалификаторы](../regions/#квалификаторы) |
+| `@label` | тип | его значения верхнего уровня несут свои имена во время выполнения; вид, `@label atom`, определяет, какие сборки их сохраняют | [наблюдаемость](../observability/#действия-ui-и-записи-атомов) |
+| `@cell`, `@maker`, `@owner` | тип; значение; сервис | каждое значение типа хранит одно значение; значение создаёт атом, действие или представление; обработчик сервиса владеет тем, что создано под ним | [проверки вызовов](../plugins/#проверки-вызовов) |
+| `@lang`, `@sync` | объявление; сервис | только во встроенных модулях: элемент, который компилятор знает по роли; сервис, операции которого выполняются сразу | [прямые вызовы](../../spec/01-direct-calls/) |
+
+Неизвестный атрибут, атрибут не на своём месте или с недопустимыми
+аргументами вызывает `FLICK-S014`. При наведении на атрибут редактор
+показывает, что он сообщает.
+
 ## Типы, строки и кинды
 
 ```text
 type        = "forall" name { name } "." type
+            | "exists" Con ":" contract "." type    // свидетель `unpack`
             | union "=>" type                  // constraint(s): `Show a =>`, `(Show a, Eq a) =>`
             | ["~"] union ["->" [effects] type] // right associative; `~` marks a suspended parameter
 effects     = "{" [row] [";" [row]] "}"     // written `->{` with no space
@@ -602,6 +643,7 @@ expr        = "fun" atom_pattern { atom_pattern } "->" block
             | "match" expr "with" arm { arm }
             | "try" block "with" handler_arm { handler_arm }
             | "if" expr "then" block [ "else" (if_expr | block) ]
+            | "pack" ModulePath "as" contract | "unpack" expr "as" Con ["," name] "in" block
             | "lazy" expr                    // binds as `await`: `lazy f x` is `lazy (f x)`
             | operator expression over application (see the operator table)
 arm         = "|" or_pattern ["when" expr] "->" block

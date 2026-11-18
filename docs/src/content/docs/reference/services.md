@@ -133,6 +133,9 @@ let timed layer work = quiet layer work
 Without `provide`, the body of `quiet` would need `Log` whenever `r` holds it,
 which the signature does not allow (`FLICK-E002`). Errors work the same after
 `;`, as in `->{; -NotFound | e}` over a `try` that handles `NotFound`.
+Taking a name out is the one way a signature keeps a service or an error out
+of a row variable; another constraint on open rows waits for a program this
+cannot express ([E15, #438](https://github.com/bondiano/flick-lang/issues/438)).
 
 A handler finds a service by its name, not by its arguments. `provide` of a
 layer of `Store Int` answers every `Store` operation in its body, so the body
@@ -337,7 +340,9 @@ closes, has to be edited by hand.
 
 At an entry, a `main` that needs a service no runner provides is
 `FLICK-P026`: a service outside `Host`, or one its runner's `Main` does not
-name, such as `Host.Environment` under `Runner.Browser`.
+name, such as `Host.Environment` under `Runner.Browser`. `FLICK-P026` needs
+an entry: a support profile of each target, which would report in a library
+and in the editor what an environment cannot provide, is follow-up work ([T2, #445](https://github.com/bondiano/flick-lang/issues/445)).
 
 ### What an empty row does not promise
 
@@ -357,9 +362,7 @@ let printed_anyway () =
 ```
 
 Review foreign bindings and the uses of the `Host` layers as you review any
-trusted code. One more limit: a finalizer that `Layer.from_build` adds cannot
-use a service the layer is given, such as `Host.Console`, since the caller
-provides that service and may release it first (`FLICK-G003`).
+trusted code.
 
 ### Reading the time and waiting
 
@@ -378,4 +381,3 @@ still follow the fiber's clock.
 | Construct | Today |
 | - | - |
 | `Layer.merge` used other than applied to both layers | conflicts are not reported |
-| a service named as a value with a module qualifier | not accepted; name it unqualified |

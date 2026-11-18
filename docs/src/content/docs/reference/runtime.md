@@ -54,11 +54,12 @@ or `Http.ServerResponse.stream_async` / `stream_text_async`.
 Projects with `effect = "effect"` use `@flick-lang/effect-ts` (see [Errors,
 services, resources and concurrency](../../spec/05-errors-and-concurrency/),
 [Compiler architecture](../../contributing/implementation-decisions/#compiler-architecture)).
-This adapter targets Effect `4.1.2` and preserves the contracts below.
+This adapter targets the Effect release `packages/effect-ts/package.json`
+pins and preserves the contracts below.
 
 ## Effect release
 
-The adapter was verified against exactly Effect `4.1.2`. The entry runner
+The adapter is verified against exactly the pinned Effect release. The entry runner
 checks the installed release before `main` starts; another release ends
 the run with exit code `2`. The capability matrix of the Effect operations
 the adapter relies on is checked by the runtime's tests and by
@@ -293,7 +294,7 @@ capability matrix lacks, and moves the pins (`packages/effect-ts/package.json`,
 
 ### Unstable modules
 
-Effect marks `effect/reactivity` `@stability unstable` in 4.1.2, and so are
+Effect marks `effect/reactivity` `@stability unstable` in the pinned release, and so are
 its bindings: `Reactivity.Atom` (atoms, the service `Registry` that holds
 their values, and its `layer`) and `Reactivity.AsyncResult` (the value of an
 atom a task computes). Their API may change with any Effect release; the UI

@@ -40,6 +40,16 @@ cell) but no `Hash`. `Display` (`display : a -> String`) is what a hole
 the type `into` gives is the one its place expects; without one it is
 `FLICK-C002`. A program declares `Into` for its own types like any class.
 
+Over type constructors `Prelude` declares `Functor` (`map`), `Foldable`
+(`fold`, `fold_map`), `Traversable` (`traverse`, a runtime function mapped
+in order), `Applicative` (`pure`, `map2`), `Monad` (`flat_map`),
+`Alternative` (`nothing`, `or_else`) and `Iterable` (`iter`, the sources of
+`x <- source` in `for`, a closed class), and over values `Semigroup`
+(`combine`) and `Monoid` (`empty`). `do` goes through `Monad`, `Applicative`
+and `Alternative`, and `for` through `Iterable` (see
+[expressions](../syntax/#expressions)). What their callbacks hold is in
+[qualifiers](../regions/#qualifiers).
+
 ## Implicit conversions
 
 `@implicit` before an instance opts it into automatic conversion: where a

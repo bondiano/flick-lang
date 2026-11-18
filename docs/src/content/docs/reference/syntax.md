@@ -98,7 +98,7 @@ let examples =
 ### Operators and punctuation
 
 ```text
-( ) [ ] { } , ; : . .. ..< = -> <- => | ^ _ ?
+( ) [ ] { } , ; : . .. ..< = -> <- => | ^ _ ? @
 |> <| >> << || && == != < <= > >= ++ + - * / % ** not
 ```
 
@@ -108,16 +108,22 @@ Every reserved word of Flick is listed below with what it introduces and
 where it is described in full. A keyword cannot be used as a name.
 
 ```text
-module exposing import as let mut rec fun match with try if then else task await
-scope provide ignore todo echo type opaque where kind error service class
-instance deriving foreign from forall not none true false
+module exposing import as let mut rec assert fun match with try if then else
+task await lazy scope provide ignore todo echo type opaque where kind error
+service class instance deriving foreign from forall not none true false
 in when for yield do break continue
 ```
 
 Contextual words are ordinary names everywhere except in one position:
 
 - `loop` before `{` and `while` before a condition followed by `do`;
-- `unboxed` and `untagged` right before `type` (see `codegen.md`);
+- `private` before `module` in a file's header (see [modules](../modules/)),
+  and `plugin` before a head in an `exposing` list (see
+  [plugins](../plugins/#using-a-plugin));
+- `alias` right after `type`, and `unboxed` and `untagged` right before it
+  (see [code generation](../codegen/));
+- `pack` and `unpack` before a module and `as`, and `exists` before a name
+  and `:` in a type (see [packed modules](../modules/#packed-modules-and-existential-results));
 - foreign modes `pure`, `effect`, `blocked` and the source
   `global`;
 - foreign metadata `arity`, `this`, `catch`, `cancel`, `nullable`,
@@ -148,6 +154,8 @@ Contextual words are ordinary names everywhere except in one position:
 | `exposing` | the names a module exports, or an import brings in unqualified | `import App.Domain exposing (User, greet)` |
 | `import` | uses another module | `import Effect.Log as Log` |
 | `as` | a local name for an imported module; the Flick type of a `sql table` column | `import Effect.Log as Log` |
+| `pack` | contextual: a module as a value of `Module Sig` | `pack Argument as Source` |
+| `unpack` | contextual: opens a packed module in a scope of its own | `unpack packed as K in K.value` |
 
 See [modules.md](../modules/).
 
@@ -157,10 +165,6 @@ See [modules.md](../modules/).
 | - | - | - |
 | `let` | binds a value or a function, at the top level or in a block | `let total = a + b` |
 | `mut` | `let mut` declares a variable of a function, which `name = value` assigns | `let mut total = 0` |
-| `loop` | contextual: repeats a block until `break value` returns its result | `loop { break 42 }` |
-| `while` | contextual: repeats a `Unit` body while its condition is true | `while i < n do i = i + 1` |
-| `break` | exits the nearest loop; only `loop` accepts a value | `break 42` |
-| `continue` | skips the rest of the current iteration | `continue` |
 | `rec` | `let rec` lets a function call itself; `rec { … }` groups mutually recursive functions | `let rec go n = …` |
 | `assert` | `let assert` binds a pattern that may not match, and fails when it does not | `let assert [x, ..._] = xs as "no items"` |
 | `type` | declares an ADT, `type alias` a transparent alias | `type Shape = Circle Float \| Empty` |
@@ -192,9 +196,17 @@ and [ffi.md](../ffi/).
 | `not` | boolean negation; `not null` on a `sql table` column | `not done` |
 | `true` `false` | the two `Bool` values | `if ok then true else false` |
 | `none` | the empty row in a type | `a ->{none; NotFound} b` |
-| `in` | binds a row in a SQL `from` or `join` clause | `join account in Accounts` |
+| `in` | binds a row in a SQL `from` or `join` clause; starts the body of `unpack … as K in` | `join account in Accounts` |
 | `do` | statements sequenced through `Monad`: `x <- e` binds, `if c` guards | `do { x <- left; y <- right; pure (x, y) }` |
 | `for` `yield` | a lazy `Seq` of the elements `yield` gives, one generator; `[for …]` is a strict `List`; `for … do body` runs the body for each element | `[for x <- xs if x > 0 yield x * 2]` |
+| `loop` | contextual: repeats a block until `break value` returns its result | `loop { break 42 }` |
+| `while` | contextual: repeats a `Unit` body while its condition is true | `while i < n do i = i + 1` |
+| `break` | exits the nearest loop, or the enclosing one its label names; only `loop` takes a value | `break 42`, `break 'outer` |
+| `continue` | skips the rest of the current iteration of the nearest loop, or of the labeled one | `continue 'outer` |
+
+A loop may carry a label, `'outer: for x <- xs do …`, which `break` and
+`continue` name to leave or continue an enclosing loop (see
+[local loops](../bindings/#local-loops)).
 
 ### Effects and resources
 
@@ -287,11 +299,12 @@ There are no user-defined operators. From weakest to strongest:
 `List.map f >> List.filter p` composes two applications, and `await f >> g`
 is `await (f >> g)`. What the operators mean is in [Numbers and
 operators](../numbers/#operators).
-A range is a `Seq Float`: `a..b` counts from `a` up to `b` inclusive
+A range is a `Seq Int`: `a..b` counts from `a` up to `b` inclusive
 (`Seq.range_to`), `a..<b` stops before `b` (`Seq.range`), and `a..` never
 ends (`Seq.from`). Alone in brackets, `[a..b]` is the `List` of the same
 numbers; `[a..]` is an error. The number before `..` ends there: `1..5` is
-a range, `1.5` a number. Bitwise operations are the functions `Float.bit_*`.
+a range, `1.5` a number. Bitwise operations are the functions `Int.bit_*` and
+`Int.shift_*`.
 
 ## Layout
 
@@ -381,7 +394,9 @@ let between x =
 
 ```text
 file        = [module_header] { import } { decl | module_application }
-module_header = "module" ModulePath ["exposing" exposing]
+module_header = ["private"] "module" ModulePath { module_params } [":" contract] ["exposing" exposing]
+module_params = "(" Con ":" contract { "," Con ":" contract } ")"   // a parameterized module
+contract    = ModulePath | module_params "->" contract ["with" "type" …]
 import      = "import" ModulePath ["as" Con] ["exposing" exposing]
 exposing    = "(" item { "," item } [","] ")"
 item        = name | Con | Con "(..)" | ".." | "plugin" name   // see plugins.md
@@ -390,6 +405,7 @@ ModulePath  = Con { "." Con }
 decl        = signature | let | rec_group | type_decl | kind_decl | error_decl
             | service | class | instance | foreign | module_contract | inline_module
             | head { head_arg } ("{" { token } "}" | { token })   // a plugin's, to the next decl
+attribute   = "@" name { name | String }   // before a declaration, a member or a variant
 inline_module = "module" Con ["exposing" exposing] "=" indented { import | decl }
 module_contract = "type" "module" Con "=" indented { module_member }
 module_application = "module" Con "=" ModulePath "(" ModulePath { "," ModulePath } ")"
@@ -498,10 +514,35 @@ rec {
 }
 ```
 
+## Attributes
+
+An attribute is a line `@name`, maybe with arguments, before a declaration,
+a member or a constructor. It is metadata for the compiler or a plugin, not a
+name: nothing resolves it, and a program cannot declare another.
+
+```flick
+@label gauge
+type Gauge = Gauge Float
+```
+
+| Attribute | Before | Says | See |
+| - | - | - | - |
+| `@implicit` | an instance | the instance converts between two types where the expected type is known | [implicit conversions](../classes/#implicit-conversions) |
+| `@derive` | a class | a plugin derives it: that of the class's package, or of the package named, `@derive std` | [deriving](../classes/#deriving) |
+| `@ts` | a type or a service | its TypeScript form, `none`, or `import` of a type of a package | [the form of a type](../codegen/#the-form-of-a-type) |
+| `@stores` | a type without constructors or a body | its values keep the functions they are given | [qualifiers](../regions/#qualifiers) |
+| `@label` | a type | its top-level values carry their names where the program runs; the kind, `@label atom`, says which builds keep them | [observability](../observability/#ui-actions-and-atom-writes) |
+| `@cell`, `@maker`, `@owner` | a type; a value; a service | each value of the type holds one value; the value makes an atom, an action or a view; the service's handler owns what is made under it | [checks of calls](../plugins/#checks-of-calls) |
+| `@lang`, `@sync` | a declaration; a service | built-in modules only: a lang item the compiler knows by its role; a service whose operations run at once | [direct calls](../../spec/01-direct-calls/) |
+
+An unknown attribute, a misplaced one, or one with arguments it does not take
+is `FLICK-S014`. Hovering an attribute in the editor shows what it says.
+
 ## Types, rows and kinds
 
 ```text
 type        = "forall" name { name } "." type
+            | "exists" Con ":" contract "." type    // the witness of an `unpack`
             | union "=>" type                  // constraint(s): `Show a =>`, `(Show a, Eq a) =>`
             | ["~"] union ["->" [effects] type] // right associative; `~` marks a suspended parameter
 effects     = "{" [row] [";" [row]] "}"     // written `->{` with no space
@@ -570,6 +611,7 @@ expr        = "fun" atom_pattern { atom_pattern } "->" block
             | "match" expr "with" arm { arm }
             | "try" block "with" handler_arm { handler_arm }
             | "if" expr "then" block [ "else" (if_expr | block) ]
+            | "pack" ModulePath "as" contract | "unpack" expr "as" Con ["," name] "in" block
             | "lazy" expr                    // binds as `await`: `lazy f x` is `lazy (f x)`
             | operator expression over application (see the operator table)
 arm         = "|" or_pattern ["when" expr] "->" block

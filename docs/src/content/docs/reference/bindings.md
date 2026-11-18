@@ -69,6 +69,22 @@ let count n =
   i
 ```
 
+`break 'outer` leaves both loops at the first pair that adds up to the
+target, so `first_sum 10 [1, 4, 7] [9, 3, 6]` is `1`:
+
+```flick
+first_sum : Int -> List Int -> List Int -> Int
+let first_sum target xs ys =
+  let mut found = -1
+  'outer: for x <- xs do
+    for y <- ys do
+      if x + y == target then {
+        found = x
+        break 'outer
+      }
+  found
+```
+
 ## Recursion
 
 Top-level declarations may use each other in any order, but recursion is
@@ -103,7 +119,7 @@ top-level value whose type stays unknown. Type variables of an enclosing
 signature, or of a value already in scope, are never generalized, and mutable
 containers are invariant. A row of calls still unknown when a binding is
 generalized becomes `none`, as at the end of a declaration
-([effects](../effects/)); it is not quantified.
+([empty rows](../effects/#empty-rows-none)); it is not quantified.
 
 ```flick
 make_empty : forall a. Unit ->{} Ref (Option a)
@@ -119,6 +135,10 @@ Classes and instances: [classes.md](../classes/).
 
 ## Not checked yet
 
+The checker covers every construct of this page, the code of plugin blocks
+included. The formal development covers less of it:
+
 | Construct | Today |
 | - | - |
-| `sql`, `ui`, `codec`, `schema` blocks | any type |
+| `let mut` | `formal/Formal/LetMut.lean` (T7) translates straight-line blocks with assignments, branches and `scope` into the typed core and derives purity and region safety from that; loops are outside the translation |
+| loops, labels, `break`, `continue` | `formal/Formal/LocalControl.lean` proves laws of their completions: every exit carries the current variables, a failed right-hand side assigns nothing, a handler sees the variables as they are, an invariant each iteration keeps holds on every finite exit, a labeled exit leaves every loop up to its target, and the scopes it leaves run their finalizers newest first. These are laws of that algebra, not of the typed core: fixtures run the compiled loops on JS and Go, and no proof relates them to the compiler or a backend |

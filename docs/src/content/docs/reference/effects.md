@@ -245,7 +245,14 @@ let banner verbose =
   if verbose then await config else "quiet"
 ```
 
-`docs/formal/lazy.md` gives the formal rules.
+`docs/formal/lazy.md` gives the formal rules. In Lean, `lazy` and `await` of
+a `Lazy` are part of the typed core, so its soundness theorems cover them, and
+`formal/Formal/Lazy.lean` proves that an initializer starts at most once
+between two resets and that a settled cell keeps its outcome.
+`formal/Formal/RT/LazyCell.lean` proves the single flight of the list above
+(R9) over every interleaving of a cell's steps. `let lazy` and `~`
+parameters are outside those proofs, and none of them proves the compiler or
+a runtime.
 
 ## Expected errors
 
@@ -476,5 +483,5 @@ variable there is `FLICK-E018`, unless the row of the operation declares it
 or a handler inside the arm catches it.
 
 Handlers run on both targets. A `control` arm needs the body to wait as a
-coroutine: the Go build runs it, the JavaScript build reports `FLICK-P012`
-until its runtime has such a body of its own.
+coroutine: the Go build and Flick's own JavaScript runtime run it, and a build
+with the Effect adapter (`effect = "effect"`) reports `FLICK-P012`.

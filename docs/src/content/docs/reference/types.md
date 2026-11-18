@@ -13,12 +13,12 @@ import, and a local definition of the same name hides them.
 
 | Type | Kind |
 | - | - |
-| `Unit`, `Never`, `Bool`, `Int`, `Float`, `BigInt`, `String`, `Unknown`, `Ordering` | `Type` |
-| `List`, `Option`, `Ref`, `Redacted`, `Schema` | `Type -> Type` |
+| `Unit`, `Never`, `Bool`, `Int`, `Float`, `BigInt`, `String`, `Unknown`, `JsValue`, `Ordering`, `Ui` | `Type` |
+| `List`, `Seq`, `Option`, `Ref`, `Redacted`, `Schema`, `Url`, `Form` | `Type -> Type` |
 | `Result`, `PureCodec` | `Type -> Type -> Type` |
 | `ServiceTag`, `ServiceImpl` | `ServiceRow -> Type` |
 | `Scope` (a service) | `Region -> Service` |
-| `Eff` | `ServiceRow -> ErrorRow -> Type -> Type` |
+| `Eff`, `Lazy` | `ServiceRow -> ErrorRow -> Type -> Type` |
 | `Layer` | `ServiceRow -> ErrorRow -> ServiceRow -> Type` |
 | `Codec` | `ServiceRow -> ServiceRow -> Type -> Type -> Type` |
 | `Errors` | `ErrorRow -> Type` |
@@ -31,8 +31,8 @@ are used qualified without an import: `Ref.make`, `Ref.get`, `Ref.set`,
 `Ref.modify`, `String.trim`, `Platform.stdout_line`, `Platform.stderr_line`,
 `App.fail`, `Layer.succeed`, `Layer.merge`, `Layer.override`, the row
 primitives of `Record`, and `Fiber.spawn` with the types `Fiber.Owner`,
-`Fiber.Fiber` and `Failure` ([regions.md](../regions/)). The classes `Eq`, `Ord`, `Hash` and `Show` are in
-`Prelude` too ([classes.md](../classes/)).
+`Fiber.Fiber` and `Failure` ([regions.md](../regions/)). The classes `Eq`, `Ord`, `Hash`, `Show`, `Display`, `Into`,
+`Functor`, `Applicative`, `Monad` and the others of [classes.md](../classes/#classes) are in `Prelude` too.
 
 ## Kinds
 

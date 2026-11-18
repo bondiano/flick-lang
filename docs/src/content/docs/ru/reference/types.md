@@ -1,6 +1,6 @@
 ---
 title: "Кинды и типы"
-source_hash: dc0eccef475e3b7e
+source_hash: 70581e30916cdbd2
 ---
 
 После разрешения имён компилятор проверяет типы в каждом модуле без
@@ -17,12 +17,12 @@ source_hash: dc0eccef475e3b7e
 
 | Тип | Кинд |
 | - | - |
-| `Unit`, `Never`, `Bool`, `Int`, `Float`, `BigInt`, `String`, `Unknown`, `Ordering` | `Type` |
-| `List`, `Option`, `Ref`, `Redacted`, `Schema` | `Type -> Type` |
+| `Unit`, `Never`, `Bool`, `Int`, `Float`, `BigInt`, `String`, `Unknown`, `JsValue`, `Ordering`, `Ui` | `Type` |
+| `List`, `Seq`, `Option`, `Ref`, `Redacted`, `Schema`, `Url`, `Form` | `Type -> Type` |
 | `Result`, `PureCodec` | `Type -> Type -> Type` |
 | `ServiceTag`, `ServiceImpl` | `ServiceRow -> Type` |
 | `Scope` (сервис) | `Region -> Service` |
-| `Eff` | `ServiceRow -> ErrorRow -> Type -> Type` |
+| `Eff`, `Lazy` | `ServiceRow -> ErrorRow -> Type -> Type` |
 | `Layer` | `ServiceRow -> ErrorRow -> ServiceRow -> Type` |
 | `Codec` | `ServiceRow -> ServiceRow -> Type -> Type -> Type` |
 | `Errors` | `ErrorRow -> Type` |
@@ -36,8 +36,8 @@ source_hash: dc0eccef475e3b7e
 `Platform.stdout_line`, `Platform.stderr_line`, `App.fail`, `Layer.succeed`,
 `Layer.merge`, `Layer.override`, примитивы строк модуля `Record`
 и `Fiber.spawn` с типами `Fiber.Owner`, `Fiber.Fiber` и `Failure`
-([регионы](../regions/)). Классы `Eq`, `Ord`, `Hash` и `Show` тоже объявлены
-в `Prelude` ([классы](../classes/)).
+([регионы](../regions/)). Классы `Eq`, `Ord`, `Hash`, `Show`, `Display`, `Into`,
+`Functor`, `Applicative`, `Monad` и остальные из раздела [классы](../classes/#классы) тоже объявлены в `Prelude`.
 
 ## Кинды
 

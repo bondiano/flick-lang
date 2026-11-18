@@ -317,3 +317,10 @@ and the [limits](#limits) below are the other constraints on a refining branch.
   [Service, error and capture row indices](#row-indices) can be refined.
 - TypeScript has no refinement: in a `.d.ts` file each constructor is a case of
   every instance of its type, and a type it hides is `unknown`.
+- Lean proves the row-index rules by examples
+  (`formal/Formal/GadtRowExamples.lean`): membership from absorption,
+  inclusion for every residual, exclusion by subtraction, transport of capture
+  equality, and that choosing the empty residual would lose a solution. There
+  is no general soundness proof for parameterized row indices, and the
+  examples do not certify the checker's algorithm, which tests compare with
+  the reference model (`docs/formal/gadt-rows.md`).
