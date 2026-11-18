@@ -25,11 +25,11 @@ opaque type Closing (t : Region) = Closing
 /// it later is released: `own` makes the scope their owner.
 class Close a =
   /// Releases `value`.
-  close : forall t. Closing t -> a ->{Async} Unit
+  close : Closing t -> a ->{Async} Unit
   /// `close`, seeing how the body of the `scope` ended: succeeded, failed
   /// or was interrupted (`Exit.is_success`, `Exit.has_interrupts`). The
   /// value and the errors of the body stay opaque.
-  close_exit : forall t e b. Closing t -> Exit e b -> a ->{Async} Unit
+  close_exit : Closing t -> Exit e b -> a ->{Async} Unit
   let close_exit token _ value = close token value
 
 /// Makes the innermost `scope` (or the one of region `s`) the owner of
@@ -43,8 +43,8 @@ let own value =
   add_close (fun exit -> close_exit token exit value)
   value
 
-// Not exposed: what `own` registers, which sees the outcome of the body as
-// an `Exit` of any errors and value, so it cannot read either.
+/// What `own` registers, not exposed: it sees the outcome of the body as an
+/// `Exit` of any errors and value, so it cannot read either.
 add_close : (forall e b. Exit e b ->{r} Unit)^c ->{Scope s | r} Unit
 foreign effect add_close from "flick:Scope" "flickAddClose"
   retention owner

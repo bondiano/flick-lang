@@ -392,7 +392,7 @@ impl Checker<'_> {
                 let advice = if reader {
                     "build a list with `[for …]`, or iterate the sequence in the function that builds it".to_owned()
                 } else if whole {
-                    "the qualifier of a type variable bounds the whole value it stands for: pass a value that holds no more".to_owned()
+                    "pass a value that holds no more".to_owned()
                 } else if !self.is_region(atom, &[]) {
                     let what = match self.atom_kind(atom, &[]) {
                         Some(Kind::ErrorRow) => "the error row",
