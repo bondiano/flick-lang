@@ -17,5 +17,7 @@
   "load.ssr.cold_start": {"budget": 500, "tolerance": 0.25, "runners": {
     "AMD EPYC 7763": {"budget": 600, "reason": "nightlies on this CPU measure 579-614 ms for the code that starts in 375 ms on a Xeon 6975P (11-11 to 11-17)"}
   }},
-  "lsp.soak.rss.growth": {"budget": 1, "tolerance": 0.5}
+  "lsp.soak.rss.growth": {"budget": 1, "tolerance": 0.5},
+  "console.go": {"budget": 15, "tolerance": 0.5},
+  "console.rt": {"budget": null, "tolerance": 0.25}
 }
