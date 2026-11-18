@@ -149,6 +149,7 @@ schema/enums
 schema/json_wire
 schema/policies
 schema/prove
+schema/prove_imported
 schema/route
 schema/route_nested
 sql/queries

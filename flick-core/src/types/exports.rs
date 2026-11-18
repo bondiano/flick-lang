@@ -18,6 +18,7 @@ impl Checker<'_> {
         // built-in instances are known to every module without an interface
         interface.instances = self.env.own_instances().cloned().collect();
         self.export_companions(interface);
+        self.export_invariants(interface);
         let exported: Vec<&str> = interface
             .exports
             .iter()

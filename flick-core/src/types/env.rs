@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use super::kinds::Kind;
 use super::services::Operation;
 use super::ty::{Binder, Type};
-use crate::iface::{Entity, Export, Interface, Namespace, support as iface_support};
+use crate::iface::{Entity, Export, Interface, Invariant, Namespace, support as iface_support};
 use crate::resolve::{ItemKind, ModuleSyntax};
 
 mod shared;
@@ -302,6 +302,9 @@ pub struct Env<'b> {
     /// The instances this module sees beyond the built-in ones: of the
     /// modules it depends on, however they are imported, and its own.
     instances: Vec<Instance>,
+    /// The invariants of the modules it depends on, from complete
+    /// interfaces.
+    pub(super) invariants: Vec<Invariant>,
     pub(super) support_errors: Vec<String>,
     support_authorities: HashSet<Entity>,
     support_roles: HashMap<Entity, support::CompanionRole>,
