@@ -83,8 +83,8 @@ struct Std;
 fn cli(block: &Block) -> bool {
     !matches!(
         block.head.as_str(),
-        "server" | "codec" | "sql" | "component" | "ui" | "refined" | "suite" | "test"
-    )
+        "server" | "codec" | "sql" | "component" | "ui" | "refined"
+    ) && !test_head(&block.head)
 }
 
 /// The state of `sql` and that of the tests, which follows it after a zero
@@ -179,7 +179,7 @@ impl Plugin for Std {
         match block.head.as_str() {
             "codec" => codec::hover(block, offset, facts),
             "sql" => Sql.hover(block, split(state).0, offset, facts),
-            head if test_head(head) => Test.hover(block, state, offset, facts),
+            head if test_head(head) => Test.hover(block, split(state).1, offset, facts),
             "component" => component::hover(block, offset),
             "ui" => ui_block::hover(block, offset),
             "refined" => refined::hover(block, offset),
@@ -192,7 +192,7 @@ impl Plugin for Std {
         if cli(block) {
             Cli.highlight(block, state)
         } else if test_head(&block.head) {
-            Test.highlight(block, state)
+            Test.highlight(block, split(state).1)
         } else {
             Vec::new()
         }
@@ -207,7 +207,7 @@ impl Plugin for Std {
         match block.head.as_str() {
             "codec" => codec::format(block, compiler),
             "sql" => Sql.format(block, split(state).0, compiler),
-            head if test_head(head) => Test.format(block, state, compiler),
+            head if test_head(head) => Test.format(block, split(state).1, compiler),
             "component" => component::format(block, compiler),
             "ui" => ui_block::format(block, compiler),
             "refined" => refined::format(block, compiler),
