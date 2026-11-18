@@ -166,6 +166,10 @@ impl<'p> Machine<'p> {
                 Control::Eval((*owner).clone())
             }
             Term::Scope(s, body) => self.open_scope(s, &body),
+            Term::Settle(l, body) => {
+                self.push(Frame::Settle(l));
+                Control::Eval((*body).clone())
+            }
             Term::Handler(h) => self.install(&h),
             other => return Err(stuck(format!("no rule for {other:?}"))),
         })

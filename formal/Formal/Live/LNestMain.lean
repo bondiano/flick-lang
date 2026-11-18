@@ -160,7 +160,7 @@ theorem LNest.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
         (fun _ _ h => h) (fun _ => Tm.Fw.of_noIns fun h => hcn h) fun l' w hw => ?_)
       rcases mem_set_get hw with hw | ⟨-, rfl⟩
       · exact hn.cells l' w hw
-      · simp [Tm.NoIns, Tm.Has]
+      · exact fun h => hcn h
     | forceDone hl =>
       rw [nil rfl, List.append_nil]
       have hcn := hn.cells _ _ hl
@@ -177,8 +177,11 @@ theorem LNest.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
       · exact hn.cells l' w hw
       · exact fun h => hvn h
     | settleUnw =>
-      rw [nil rfl, List.append_nil]
-      exact keep (hn.redex' hi hE hnv (fun _ _ => Iff.rfl) id)
+      rw [nil (by simp), List.append_nil]
+      exact keep (hn.redexMem hi hE hnv (fun _ _ => Iff.rfl) id fun l' w hw => by
+        rcases resetCell_get hw with hw | ⟨-, _, hx, rfl⟩
+        · exact hn.cells l' w hw
+        · exact fun h => hn.cells _ _ hx h)
     | scopeRun hv =>
       rw [nil rfl, List.append_nil]
       exact keep (hn.sub hi hE hnv (fun h => h.elim (fun h => by cases h) (hv.noInsF hrW.2.1))

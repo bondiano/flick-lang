@@ -83,7 +83,7 @@ theorem rhead_sim (hV : BNoVal B) (hR : BNoRaise B) (hA : BNoAlts B) (hC : BClos
       | loc =>
         obtain ⟨c₂, hc₂, r⟩ := hμ.getElem? hl
         obtain ⟨e₂, rfl, he⟩ := r.lazy_left hL
-        exact .inr ⟨_, _, _, .forcePending hc₂, .settle he, hΛ, hμ.set _ .anil⟩
+        exact .inr ⟨_, _, _, .forcePending hc₂, .settle he, hΛ, hμ.set _ (.force he)⟩
       | base hb => exact (nb hb .loc).elim
   | forceDone hl =>
     cases h with
@@ -110,7 +110,7 @@ theorem rhead_sim (hV : BNoVal B) (hR : BNoRaise B) (hA : BNoAlts B) (hC : BClos
     cases h with
     | base hb => exact .inl hb
     | settle h₁ =>
-      exact .inr ⟨_, _, _, .settleVal (Cg.value hV hv h₁).1, h₁, hΛ, hμ.settleCell hA hP _ (.await h₁)⟩
+      exact .inr ⟨_, _, _, .settleVal (Cg.value hV hv h₁).1, h₁, hΛ, hμ.settleCell hL _ (.await h₁)⟩
   | settleRaise hv =>
     cases h with
     | base hb => exact .inl hb
@@ -118,14 +118,14 @@ theorem rhead_sim (hV : BNoVal B) (hR : BNoRaise B) (hA : BNoAlts B) (hC : BClos
       cases h₁ with
       | raise h₂ =>
         exact .inr ⟨_, _, _, .settleRaise (Cg.value hV hv h₂).1, .raise h₂, hΛ,
-          hμ.settleCell hA hP _ (.await (.raise h₂))⟩
+          hμ.settleCell hL _ (.await (.raise h₂))⟩
       | base hb => exact (hR.1 _ _ hb).elim
   | settleUnw =>
     cases h with
     | base hb => exact .inl hb
     | settle h₁ =>
       cases h₁ with
-      | unw h₂ => exact .inr ⟨_, _, _, .settleUnw, .unw h₂, hΛ, hμ⟩
+      | unw h₂ => exact .inr ⟨_, _, _, .settleUnw, .unw h₂, hΛ, hμ.resetCell hL _⟩
       | base hb => exact (hR.2 _ _ _ _ hb).elim
   | refSet hv hl =>
     cases h with

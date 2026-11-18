@@ -173,15 +173,16 @@ inductive Tm
   | settle (ℓ : Nat) (e : Tm)
 
 /-- The states of a lazy cell as the store holds them (lazy.md §3): `Pending e` is `lazy e`,
-`Running` is `running`, and `Done o` is `done o` with the term of the outcome `o`: `v`,
-`raise v` or `todo`. No value has these forms (`IsCell`), so no `Ref` cell holds one; and they
-are kept apart by their outer form, which a relation of terms keeps (`Formal/Elab`). -/
-abbrev Tm.running : Tm := .anil
+`Running e` is `running e`, which keeps the initializer for a signal that resets the cell, and
+`Done o` is `done o` with the term of the outcome `o`: `v`, `raise v` or `todo`. No value has
+these forms (`IsCell`), so no `Ref` cell holds one; and they are kept apart by their outer form,
+which a relation of terms keeps (`Formal/Elab`). -/
+@[match_pattern] abbrev Tm.running (e : Tm) : Tm := .force e
 
 abbrev Tm.done (o : Tm) : Tm := .await o
 
 def Tm.IsCell : Tm → Prop
-  | .lazy _ | .await _ | .anil => True
+  | .lazy _ | .await _ | .force _ => True
   | _ => False
 
 def Tm.head : Tm → Tm

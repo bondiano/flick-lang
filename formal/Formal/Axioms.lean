@@ -116,6 +116,10 @@ prints, and `#guard_msgs` turns the difference into an error.
 #guard_msgs in
 #print axioms Flick.Lazy.L1
 
+/-- info: 'Flick.Lazy.L1_once' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Lazy.L1_once
+
 /-- info: 'Flick.Lazy.L2' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Flick.Lazy.L2

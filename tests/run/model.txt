@@ -81,6 +81,7 @@ stdlib/server/node
 runtime/counted_layer_merge
 codegen/loops_owners
 runtime/lazy_once
+runtime/lazy_abort
 runtime/suspended
 runtime/lazy_let
 schema/prove

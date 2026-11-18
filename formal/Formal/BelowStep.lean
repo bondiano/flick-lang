@@ -139,14 +139,18 @@ theorem RHead.below {Λ μ e Λ' μ' e'} (hh : RHead Λ μ e Λ' μ' e') (h : Cf
     refine ⟨⟨fun p hp => h.mem _ _ hl p hp, fun i w hw => ?_, h.rgs⟩, Nat.le_refl _⟩
     rcases mem_set_get hw with hw | ⟨-, rfl⟩
     · exact h.mem i w hw
-    · exact Tm.Below.empty fun p => by simp [Tm.Has]
+    · exact fun p hp => h.mem _ _ hl p hp
   | forceDone hl => exact same fun p hp => h.mem _ _ hl p hp
   | settleVal _ | settleRaise _ =>
     refine ⟨⟨sub fun _ h => h, fun i w hw => ?_, h.rgs⟩, Nat.le_refl _⟩
     rcases settleCell_get hw with hw | ⟨-, rfl⟩
     · exact h.mem i w hw
     · exact sub fun _ h => h
-  | settleUnw => exact same (sub fun _ h => h)
+  | settleUnw =>
+    refine ⟨⟨sub fun _ h => h, fun i w hw => ?_, h.rgs⟩, Nat.le_refl _⟩
+    rcases resetCell_get hw with hw | ⟨-, _, hx, rfl⟩
+    · exact h.mem i w hw
+    · exact fun p hp => h.mem _ _ hx p hp
   | @refSet v l₀ _ _ hv hlt =>
     refine ⟨⟨Tm.Below.empty fun p => by simp [Tm.Has], fun l v hv' => ?_, h.rgs⟩, Nat.le_refl _⟩
     by_cases hi : l₀ = l
