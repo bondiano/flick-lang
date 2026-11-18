@@ -1,7 +1,7 @@
 // A signal of a handler that leaves an initializer, here an `abort` caught
 // around the `await`, caches nothing: the lazy is pending again, and the next
-// `await` runs its value again. The attempt that ends with a value keeps it.
-// A `let lazy` does the same.
+// `await` runs the initializer again. The attempt that ends with a value keeps
+// it, so the third `await` runs nothing. A `let lazy` does the same.
 module App.Main exposing (main)
 
 effect Stop =
