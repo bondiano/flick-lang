@@ -1,0 +1,147 @@
+//! A proof as a finite certificate, read from the IR of its body: each node
+//! is one rule. A body of any other form is no certificate.
+
+use std::rc::Rc;
+
+use flick_ir::{Expr, ExprKind, Pat as IrPat, Stmt};
+
+use super::Failure;
+use super::term::{Pat, RULES, Term, pat, term};
+use crate::source::Span;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Cert {
+    pub kind: Rule,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Rule {
+    Refl,
+    Symm(Box<Cert>),
+    /// `trans m p q`: `p` proves `l = m`, `q` proves `m = r`.
+    Trans(Term, Box<Cert>, Box<Cert>),
+    /// `cong (fun x -> e) p`: `p` proves `a = b`, so `e[a/x] = e[b/x]`.
+    Cong(Rc<str>, Term, Box<Cert>),
+    /// `funext (fun x -> p)`: `p` proves `f x = g x` for a fresh `x`.
+    Funext(Rc<str>, Box<Cert>),
+    /// `match v with …`: one proof for each constructor of `v`'s type.
+    Case(Rc<str>, Vec<(Pat, Cert)>),
+    /// A premise or a proof a `let` named.
+    Fact(Rc<str>),
+    /// `let h = p` before the rest of the proof.
+    Let(Rc<str>, Box<Cert>, Box<Cert>),
+}
+
+fn invalid<T>(span: Span, why: impl Into<String>) -> Result<T, Failure> {
+    Err(Failure::Invalid {
+        span,
+        why: why.into(),
+    })
+}
+
+/// The certificate the body `e` of a proof spells.
+pub fn cert(e: &Expr) -> Result<Cert, Failure> {
+    let span = e.span;
+    let kind = match &e.kind {
+        ExprKind::Local(h) => Rule::Fact(h.as_str().into()),
+        ExprKind::Match(scrutinee, arms) => {
+            let ExprKind::Local(v) = &scrutinee.kind else {
+                return invalid(
+                    scrutinee.span,
+                    "a proof splits a variable: `match v with …`",
+                );
+            };
+            let arms = arms
+                .iter()
+                .map(|a| {
+                    if a.guard.is_some() {
+                        return invalid(a.body.span, "an arm of a proof has no guard");
+                    }
+                    Ok((
+                        pat(&a.pat, a.body.span).map_err(Failure::Refused)?,
+                        cert(&a.body)?,
+                    ))
+                })
+                .collect::<Result<_, _>>()?;
+            Rule::Case(v.as_str().into(), arms)
+        }
+        ExprKind::Block(stmts, rest) => {
+            let mut out = cert(rest)?;
+            for stmt in stmts.iter().rev() {
+                let Stmt::Let(IrPat::Bind(h), p) = stmt else {
+                    return invalid(span, "a `let` in a proof names a proof: `let h = …`");
+                };
+                out = Cert {
+                    kind: Rule::Let(h.as_str().into(), Box::new(cert(p)?), Box::new(out)),
+                    span: p.span,
+                };
+            }
+            return Ok(out);
+        }
+        _ => rule(e)?,
+    };
+    Ok(Cert { kind, span })
+}
+
+/// A rule applied to its arguments.
+fn rule(e: &Expr) -> Result<Rule, Failure> {
+    let mut args = Vec::new();
+    let mut head = e;
+    while let ExprKind::App { func, arg, .. } = &head.kind {
+        args.push(&**arg);
+        head = func;
+    }
+    args.reverse();
+    let ExprKind::Global { module, name } = &head.kind else {
+        return invalid(
+            e.span,
+            "this is no proof: a proof is `refl`, a rule applied, a `match` on a variable or a premise",
+        );
+    };
+    if module != RULES {
+        return invalid(
+            e.span,
+            format!("`{name}` is no rule of a proof; a proof uses no lemma yet"),
+        );
+    }
+    let boxed = |e: &Expr| cert(e).map(Box::new);
+    Ok(match (name.as_str(), args.as_slice()) {
+        ("refl", []) => Rule::Refl,
+        ("symm", [p]) => Rule::Symm(boxed(p)?),
+        ("trans", [m, p, q]) => {
+            Rule::Trans(term(m).map_err(Failure::Refused)?, boxed(p)?, boxed(q)?)
+        }
+        ("cong", [context, p]) => {
+            let (x, body) = binder(context)?;
+            Rule::Cong(x, term(body).map_err(Failure::Refused)?, boxed(p)?)
+        }
+        ("funext", [p]) => {
+            let (x, body) = binder(p)?;
+            Rule::Funext(x, boxed(body)?)
+        }
+        (rule, _) => return invalid(e.span, format!("`{rule}` {}", arity(rule))),
+    })
+}
+
+/// `fun x -> body` of one parameter.
+fn binder(e: &Expr) -> Result<(Rc<str>, &Expr), Failure> {
+    match &e.kind {
+        ExprKind::Lambda { params, body } if params.len() == 1 => match &params[0].pat {
+            IrPat::Bind(x) => Ok((x.as_str().into(), body)),
+            _ => invalid(e.span, "the parameter of this rule is a name"),
+        },
+        _ => invalid(e.span, "this rule takes `fun x -> …` of one parameter"),
+    }
+}
+
+fn arity(rule: &str) -> &'static str {
+    match rule {
+        "refl" => "takes no argument",
+        "symm" => "takes one proof",
+        "trans" => "takes the middle value and two proofs",
+        "cong" => "takes `fun x -> e` and one proof",
+        "funext" => "takes `fun x -> proof`",
+        _ => "is no rule of a proof",
+    }
+}

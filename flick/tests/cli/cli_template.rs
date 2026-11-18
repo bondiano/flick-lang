@@ -1,5 +1,6 @@
-//! `flick new --template cli`: a project whose `main` is a `cli` block, and
-//! `--template plugin`: a library with a plugin.
+//! `flick new --template cli`: a project whose `main` is a `cli` block,
+//! `--template plugin`: a library with a plugin, and the `AGENTS.md` of
+//! every template.
 //! Running it needs Node and the workspace's runtime: that test is ignored
 //! by default and part of `just e2e`.
 
@@ -82,4 +83,30 @@ fn the_plugin_template_checks_and_pins_this_compiler() {
     ] {
         assert!(dir.join(file).exists(), "no {file}");
     }
+    let agents = fs::read_to_string(dir.join("AGENTS.md")).expect("agents");
+    assert!(agents.contains("flick run plugin"), "{agents}");
+}
+
+#[test]
+fn agents_md_names_the_checks_and_init_keeps_a_repositorys_own() {
+    let dir = cli_project("agents_md_new");
+    let agents = fs::read_to_string(dir.join("AGENTS.md")).expect("agents");
+    for check in [
+        "flick fmt",
+        "flick check --warnings-as-errors",
+        "flick test",
+        "flick doc --std",
+    ] {
+        assert!(agents.contains(check), "no `{check}` in {agents}");
+    }
+    assert!(!agents.contains("flick run plugin"), "{agents}");
+
+    let repo = project("agents_md_init", &[("AGENTS.md", "ours\n")]);
+    let out = flick_in(&repo, &["init", "--template", "lib"]);
+    assert!(out.status.success(), "{out:?}");
+    assert!(repo.join("flick.toml").exists(), "the project is written");
+    assert_eq!(
+        fs::read_to_string(repo.join("AGENTS.md")).expect("kept"),
+        "ours\n"
+    );
 }

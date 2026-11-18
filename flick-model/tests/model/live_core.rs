@@ -14,6 +14,7 @@ use std::rc::Rc;
 use flick_model::eval::Outcome;
 use flick_model::generate;
 use flick_model::syntax::{Const, Term};
+use flick_model::types::{Row, Scheme, Stage, Type};
 
 use live_support::{core, g, open_in, probe, run, thunk_program, v, verdict};
 
@@ -189,6 +190,71 @@ fn live_core_rejects_a_task_in_an_outer_cell() {
         );
         assert!(
             !errors.iter().any(|e| e.starts_with("FLICK-T003")),
+            "{name}: {errors:?}"
+        );
+    }
+}
+
+/// A function or a task that uses a region, stored in a cell whose written
+/// type keeps nothing live and read after the region's `scope`: a use after
+/// close. `Ref.set` bounds its argument by `^c`, which nothing bounds; that
+/// value bound says what the value reaches, not what using it needs, so
+/// the stored value may use only what the cell's arrow or `Eff` keeps live.
+#[test]
+fn live_core_rejects_a_use_in_a_typed_cell() {
+    let unit = || Type::con("Prelude", "Unit");
+    let runtime = || Stage::Runtime(Row::none(), Row::none());
+    let thunk = Type::fun(unit(), runtime(), unit());
+    let typed = |name: &str, ty: Type, value: Term, rest: Term| {
+        Term::Let(
+            name.into(),
+            Some(Rc::new(Scheme::new(Vec::new(), ty))),
+            Rc::new(value),
+            Rc::new(rest),
+        )
+    };
+    let in_cell = |content: Type, init: Term, stored: Term, read: Term| {
+        let cell = typed(
+            "cell",
+            Type::Ref(Rc::new(content.clone())),
+            Term::app(Term::konst(Const::RefMake), v("init")),
+            Term::Let(
+                "_".into(),
+                None,
+                Rc::new(open_in(
+                    "s",
+                    Term::apps(Term::konst(Const::RefSet), [v("cell"), stored]),
+                )),
+                Rc::new(read),
+            ),
+        );
+        thunk_program(typed("init", content, init, cell))
+    };
+    let get = || Term::app(Term::konst(Const::RefGet), v("cell"));
+    let use_h = || Term::app(g("use"), v("h"));
+    let task = |e: Term| Term::Task(Rc::new(e));
+    let closure = in_cell(
+        thunk.clone(),
+        Term::lam("u", Term::unit()),
+        Term::lam("u", use_h()),
+        Term::app(get(), Term::unit()),
+    );
+    let deferred = in_cell(
+        Type::Eff(Row::none(), Row::none(), Rc::new(unit())),
+        task(Term::unit()),
+        task(use_h()),
+        Term::Await(Rc::new(get())),
+    );
+    for (name, p) in [
+        ("closure in a typed cell", closure),
+        ("task in a typed cell", deferred),
+    ] {
+        let (live, outcome) = probe(name, &p);
+        assert!(matches!(outcome, Outcome::Stuck(w) if w.starts_with("use after")));
+        assert!(live.is_err(), "{name}: the model accepts a use after close");
+        let errors = core(&p);
+        assert!(
+            errors.iter().any(|e| e.starts_with("FLICK-G002")),
             "{name}: {errors:?}"
         );
     }

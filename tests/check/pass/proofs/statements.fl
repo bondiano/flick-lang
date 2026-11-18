@@ -1,0 +1,47 @@
+// Proofs over the variables of their statement: a type equal to itself,
+// a function equal to its eta-expansion by its values, a split of an
+// `Option` and of a `Bool` into their cases, and premises lifted through a
+// context, turned and chained.
+module App.Proved exposing (..)
+
+proof same where same_type a a = refl
+
+proof eta (f : a -> b) where equal (fun x -> f x) f = funext (fun y -> refl)
+
+proof rebuilt (v : Option a)
+where equal
+  (
+    match v with
+    | None -> None
+    | Some x -> Some x
+  )
+  v =
+  match v with
+  | None -> refl
+  | Some y -> refl
+
+proof beta (x : a) where equal ((fun y -> Some y) x) (Some x) = refl
+
+proof lifted (x : a) (y : a) (h : equal x y)
+where equal (Some x) (Some y) = cong (fun z -> Some z) h
+
+proof turned (x : a) (y : a) (h : equal x y)
+where equal (Some y) (Some x) = symm (cong (fun z -> Some z) h)
+
+proof stepped (x : a) (y : a) (h : equal x y) where equal ((fun z -> z) x) y = trans x refl h
+
+proof either (b : Bool)
+where holds
+  (
+    match b with
+    | true -> true
+    | false -> true
+  ) =
+  match b with
+  | true -> refl
+  | false -> refl
+
+proof named (x : a) (y : a) (h : equal x y)
+where equal (Some y) (Some x) =
+  let back = symm h
+  cong (fun z -> Some z) back

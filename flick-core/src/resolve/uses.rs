@@ -33,6 +33,8 @@ pub(super) struct Unused {
     pub written: bool,
 }
 
+mod proofs;
+
 pub(super) fn references(module: &Module) -> (Vec<Reference>, Vec<Unused>) {
     let mut walker = Walker {
         text: module.text,
@@ -44,6 +46,7 @@ pub(super) fn references(module: &Module) -> (Vec<Reference>, Vec<Unused>) {
         unused: Vec::new(),
         used: Vec::new(),
         top: 0,
+        proof: false,
     };
     for (i, decl) in module.tree.nodes().enumerate() {
         walker.top = i;
@@ -89,6 +92,8 @@ struct Walker<'a> {
     /// Where each binder that was used is written.
     used: Vec<u32>,
     top: usize,
+    /// In a proof: rules are no references, binders need no use.
+    proof: bool,
 }
 
 impl Walker<'_> {
@@ -153,10 +158,8 @@ impl Walker<'_> {
             }
             K::NameExpr | K::ConPat => self.reference(node, Namespace::Constructor),
             K::NameType => self.reference(node, Namespace::Type),
-            K::DerivingClause => {
-                self.deriving(node);
-                return;
-            }
+            K::DerivingClause => return self.deriving(node),
+            K::ProofDecl => return self.proof_decl(node),
             K::LetDecl => {
                 // a top-level or member `let`: its names are not locals
                 self.let_decl(node);
@@ -358,6 +361,7 @@ impl Walker<'_> {
             }
             if let (Some((token, punned)), false) = (local.binder, local.used)
                 && !local.name.starts_with('_')
+                && !self.proof
             {
                 self.unused.push(Unused {
                     name: local.name.to_owned(),
@@ -511,6 +515,9 @@ impl Walker<'_> {
             Namespace::Value
         };
         if qualifier.is_empty() {
+            if self.is_rule(name, first.start >= self.generated) {
+                return;
+            }
             // every binder of the name in scope counts as used: the branches
             // of an or-pattern bind it once each
             let mut found = false;

@@ -1,0 +1,28 @@
+// A method may use a region of its instance's head where the class
+// signature keeps it live: here the owner of the region comes first, so the
+// later stage needs the region live, as its callers see.
+module App.InstanceRegions exposing (..)
+
+type Raw
+
+name_of : Raw^c ->{} String
+foreign effect name_of from "./conn.js" "name"
+  retention call
+
+type Handle (s : Region) = Handle Raw
+
+read_handle : Handle s ->{} String
+let read_handle (Handle raw) = name_of raw
+
+class ReadAt (s : Region) a =
+  read_at : Fiber.Owner s -> a ->{} String
+
+instance ReadAt s (Handle s) =
+  let read_at _ h = read_handle h
+
+// an instance that does not use the region of its head needs nothing
+class Name a =
+  name : a ->{} String
+
+instance Name (Handle s) =
+  let name _ = "handle"

@@ -1701,6 +1701,7 @@
 @flick-lang/runtime/rt/effect/Schema flickIsPropertyNames
 @flick-lang/runtime/rt/effect/Schema flickToType
 @flick-lang/runtime/rt/effect/Schema toDifferJsonPatch
+@flick-lang/runtime/rt/effect/Scope flickAddClose
 @flick-lang/runtime/rt/effect/Scope flickAddFinalizer
 @flick-lang/runtime/rt/effect/Scope flickAddFinalizerExit
 @flick-lang/runtime/rt/effect/String ReducerConcat

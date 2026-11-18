@@ -1,0 +1,32 @@
+// A `match` that gives each constructor its own name is a table, not a
+// chain of decisions: it is long, and its complexity does not grow with it.
+module App.LookupMatch exposing (..)
+
+type Shape =
+  | Circle
+  | Square
+  | Dot
+  | Line
+  | Point
+  | Arc
+  | Ray
+  | Box
+  | Star
+  | Cross
+  | Pill
+  | Ring
+
+name : Shape -> String
+let name shape = match shape with
+  | Circle -> "circle"
+  | Square -> "square"
+  | Dot -> "dot"
+  | Line -> "line"
+  | Point -> "point"
+  | Arc -> "arc"
+  | Ray -> "ray"
+  | Box -> "box"
+  | Star -> "star"
+  | Cross -> "cross"
+  | Pill -> "pill"
+  | Ring -> "ring"

@@ -9,10 +9,10 @@
 #define LANGUAGE_VERSION 15
 #define STATE_COUNT 74
 #define LARGE_STATE_COUNT 60
-#define SYMBOL_COUNT 150
+#define SYMBOL_COUNT 151
 #define ALIAS_COUNT 0
-#define TOKEN_COUNT 124
-#define EXTERNAL_TOKEN_COUNT 3
+#define TOKEN_COUNT 125
+#define EXTERNAL_TOKEN_COUNT 4
 #define FIELD_COUNT 0
 #define MAX_ALIAS_SEQUENCE_LENGTH 3
 #define MAX_RESERVED_WORD_SET_SIZE 0
@@ -143,32 +143,33 @@ enum ts_symbol_identifiers {
   sym_block_comment = 121,
   sym_raw_string = 122,
   sym_multiline_string = 123,
-  sym_source_file = 124,
-  sym__token = 125,
-  sym_parens = 126,
-  sym_brackets = 127,
-  sym_braces = 128,
-  sym__newline = 129,
-  sym__loop = 130,
-  sym__while = 131,
-  sym__case = 132,
-  sym__condition_token = 133,
-  sym_keyword = 134,
-  sym__foreign = 135,
-  sym__from = 136,
-  sym__component = 137,
-  sym__plugin = 138,
-  sym__server_fn = 139,
-  sym__private_module = 140,
-  sym__type_refinement_and = 141,
-  sym_boolean = 142,
-  sym_operator = 143,
-  sym_identifier = 144,
-  sym_string = 145,
-  sym_interpolation = 146,
-  aux_sym_source_file_repeat1 = 147,
-  aux_sym__while_repeat1 = 148,
-  aux_sym_string_repeat1 = 149,
+  sym__proof = 124,
+  sym_source_file = 125,
+  sym__token = 126,
+  sym_parens = 127,
+  sym_brackets = 128,
+  sym_braces = 129,
+  sym__newline = 130,
+  sym__loop = 131,
+  sym__while = 132,
+  sym__case = 133,
+  sym__condition_token = 134,
+  sym_keyword = 135,
+  sym__foreign = 136,
+  sym__from = 137,
+  sym__component = 138,
+  sym__plugin = 139,
+  sym__server_fn = 140,
+  sym__private_module = 141,
+  sym__type_refinement_and = 142,
+  sym_boolean = 143,
+  sym_operator = 144,
+  sym_identifier = 145,
+  sym_string = 146,
+  sym_interpolation = 147,
+  aux_sym_source_file_repeat1 = 148,
+  aux_sym__while_repeat1 = 149,
+  aux_sym_string_repeat1 = 150,
 };
 
 static const char * const ts_symbol_names[] = {
@@ -296,6 +297,7 @@ static const char * const ts_symbol_names[] = {
   [sym_block_comment] = "block_comment",
   [sym_raw_string] = "raw_string",
   [sym_multiline_string] = "multiline_string",
+  [sym__proof] = "keyword",
   [sym_source_file] = "source_file",
   [sym__token] = "_token",
   [sym_parens] = "parens",
@@ -449,6 +451,7 @@ static const TSSymbol ts_symbol_map[] = {
   [sym_block_comment] = sym_block_comment,
   [sym_raw_string] = sym_raw_string,
   [sym_multiline_string] = sym_multiline_string,
+  [sym__proof] = sym_keyword,
   [sym_source_file] = sym_source_file,
   [sym__token] = sym__token,
   [sym_parens] = sym_parens,
@@ -971,6 +974,10 @@ static const TSSymbolMetadata ts_symbol_metadata[] = {
     .named = true,
   },
   [sym_multiline_string] = {
+    .visible = true,
+    .named = true,
+  },
+  [sym__proof] = {
     .visible = true,
     .named = true,
   },
@@ -2633,34 +2640,34 @@ static const TSLexerMode ts_lex_modes[STATE_COUNT] = {
   [43] = {.lex_state = 15, .external_lex_state = 1},
   [44] = {.lex_state = 15, .external_lex_state = 1},
   [45] = {.lex_state = 15, .external_lex_state = 1},
-  [46] = {.lex_state = 15, .external_lex_state = 1},
-  [47] = {.lex_state = 15, .external_lex_state = 1},
-  [48] = {.lex_state = 15, .external_lex_state = 1},
-  [49] = {.lex_state = 15, .external_lex_state = 1},
-  [50] = {.lex_state = 15, .external_lex_state = 1},
-  [51] = {.lex_state = 15, .external_lex_state = 1},
-  [52] = {.lex_state = 15, .external_lex_state = 1},
-  [53] = {.lex_state = 15, .external_lex_state = 1},
-  [54] = {.lex_state = 15, .external_lex_state = 1},
-  [55] = {.lex_state = 15, .external_lex_state = 1},
-  [56] = {.lex_state = 15, .external_lex_state = 1},
-  [57] = {.lex_state = 15, .external_lex_state = 1},
-  [58] = {.lex_state = 15, .external_lex_state = 1},
-  [59] = {.lex_state = 15, .external_lex_state = 1},
-  [60] = {.lex_state = 0, .external_lex_state = 2},
-  [61] = {.lex_state = 1, .external_lex_state = 2},
-  [62] = {.lex_state = 0, .external_lex_state = 2},
-  [63] = {.lex_state = 1, .external_lex_state = 2},
-  [64] = {.lex_state = 1, .external_lex_state = 2},
-  [65] = {.lex_state = 1, .external_lex_state = 2},
-  [66] = {.lex_state = 1, .external_lex_state = 2},
-  [67] = {.lex_state = 1, .external_lex_state = 2},
-  [68] = {.lex_state = 1, .external_lex_state = 2},
-  [69] = {.lex_state = 15, .external_lex_state = 2},
-  [70] = {.lex_state = 0, .external_lex_state = 2},
-  [71] = {.lex_state = 0, .external_lex_state = 2},
-  [72] = {.lex_state = 0, .external_lex_state = 2},
-  [73] = {.lex_state = 0, .external_lex_state = 2},
+  [46] = {.lex_state = 15, .external_lex_state = 2},
+  [47] = {.lex_state = 15, .external_lex_state = 2},
+  [48] = {.lex_state = 15, .external_lex_state = 2},
+  [49] = {.lex_state = 15, .external_lex_state = 2},
+  [50] = {.lex_state = 15, .external_lex_state = 2},
+  [51] = {.lex_state = 15, .external_lex_state = 2},
+  [52] = {.lex_state = 15, .external_lex_state = 2},
+  [53] = {.lex_state = 15, .external_lex_state = 2},
+  [54] = {.lex_state = 15, .external_lex_state = 2},
+  [55] = {.lex_state = 15, .external_lex_state = 2},
+  [56] = {.lex_state = 15, .external_lex_state = 2},
+  [57] = {.lex_state = 15, .external_lex_state = 2},
+  [58] = {.lex_state = 15, .external_lex_state = 2},
+  [59] = {.lex_state = 15, .external_lex_state = 2},
+  [60] = {.lex_state = 0, .external_lex_state = 3},
+  [61] = {.lex_state = 1, .external_lex_state = 3},
+  [62] = {.lex_state = 0, .external_lex_state = 3},
+  [63] = {.lex_state = 1, .external_lex_state = 3},
+  [64] = {.lex_state = 1, .external_lex_state = 3},
+  [65] = {.lex_state = 1, .external_lex_state = 3},
+  [66] = {.lex_state = 1, .external_lex_state = 3},
+  [67] = {.lex_state = 1, .external_lex_state = 3},
+  [68] = {.lex_state = 1, .external_lex_state = 3},
+  [69] = {.lex_state = 15, .external_lex_state = 3},
+  [70] = {.lex_state = 0, .external_lex_state = 3},
+  [71] = {.lex_state = 0, .external_lex_state = 3},
+  [72] = {.lex_state = 0, .external_lex_state = 3},
+  [73] = {.lex_state = 0, .external_lex_state = 3},
 };
 
 static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
@@ -2788,6 +2795,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(1),
     [sym_multiline_string] = ACTIONS(1),
+    [sym__proof] = ACTIONS(1),
   },
   [STATE(1)] = {
     [sym_source_file] = STATE(72),
@@ -2920,6 +2928,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(17),
     [sym_multiline_string] = ACTIONS(17),
+    [sym__proof] = ACTIONS(17),
   },
   [STATE(2)] = {
     [sym__token] = STATE(2),
@@ -3054,6 +3063,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(63),
     [sym_multiline_string] = ACTIONS(63),
+    [sym__proof] = ACTIONS(63),
   },
   [STATE(3)] = {
     [sym__token] = STATE(6),
@@ -3185,6 +3195,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(113),
     [sym_multiline_string] = ACTIONS(113),
+    [sym__proof] = ACTIONS(113),
   },
   [STATE(4)] = {
     [sym__token] = STATE(2),
@@ -3316,6 +3327,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(117),
     [sym_multiline_string] = ACTIONS(117),
+    [sym__proof] = ACTIONS(117),
   },
   [STATE(5)] = {
     [sym__token] = STATE(2),
@@ -3447,6 +3459,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(117),
     [sym_multiline_string] = ACTIONS(117),
+    [sym__proof] = ACTIONS(117),
   },
   [STATE(6)] = {
     [sym__token] = STATE(2),
@@ -3578,6 +3591,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(117),
     [sym_multiline_string] = ACTIONS(117),
+    [sym__proof] = ACTIONS(117),
   },
   [STATE(7)] = {
     [sym__token] = STATE(2),
@@ -3709,6 +3723,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(117),
     [sym_multiline_string] = ACTIONS(117),
+    [sym__proof] = ACTIONS(117),
   },
   [STATE(8)] = {
     [sym__token] = STATE(7),
@@ -3840,6 +3855,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(127),
     [sym_multiline_string] = ACTIONS(127),
+    [sym__proof] = ACTIONS(127),
   },
   [STATE(9)] = {
     [sym__token] = STATE(11),
@@ -3971,6 +3987,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(131),
     [sym_multiline_string] = ACTIONS(131),
+    [sym__proof] = ACTIONS(131),
   },
   [STATE(10)] = {
     [sym__token] = STATE(5),
@@ -4102,6 +4119,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(135),
     [sym_multiline_string] = ACTIONS(135),
+    [sym__proof] = ACTIONS(135),
   },
   [STATE(11)] = {
     [sym__token] = STATE(2),
@@ -4233,6 +4251,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(117),
     [sym_multiline_string] = ACTIONS(117),
+    [sym__proof] = ACTIONS(117),
   },
   [STATE(12)] = {
     [sym__token] = STATE(15),
@@ -4364,6 +4383,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(141),
     [sym_multiline_string] = ACTIONS(141),
+    [sym__proof] = ACTIONS(141),
   },
   [STATE(13)] = {
     [sym__token] = STATE(16),
@@ -4495,6 +4515,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(145),
     [sym_multiline_string] = ACTIONS(145),
+    [sym__proof] = ACTIONS(145),
   },
   [STATE(14)] = {
     [sym__token] = STATE(17),
@@ -4626,6 +4647,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(149),
     [sym_multiline_string] = ACTIONS(149),
+    [sym__proof] = ACTIONS(149),
   },
   [STATE(15)] = {
     [sym__token] = STATE(2),
@@ -4757,6 +4779,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(117),
     [sym_multiline_string] = ACTIONS(117),
+    [sym__proof] = ACTIONS(117),
   },
   [STATE(16)] = {
     [sym__token] = STATE(2),
@@ -4888,6 +4911,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(117),
     [sym_multiline_string] = ACTIONS(117),
+    [sym__proof] = ACTIONS(117),
   },
   [STATE(17)] = {
     [sym__token] = STATE(2),
@@ -5019,6 +5043,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(117),
     [sym_multiline_string] = ACTIONS(117),
+    [sym__proof] = ACTIONS(117),
   },
   [STATE(18)] = {
     [sym_parens] = STATE(47),
@@ -5140,6 +5165,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(185),
     [sym_multiline_string] = ACTIONS(185),
+    [sym__proof] = ACTIONS(157),
   },
   [STATE(19)] = {
     [ts_builtin_sym_end] = ACTIONS(191),
@@ -5258,6 +5284,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(191),
     [sym_multiline_string] = ACTIONS(191),
+    [sym__proof] = ACTIONS(191),
   },
   [STATE(20)] = {
     [sym_string] = STATE(27),
@@ -5374,6 +5401,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(157),
     [sym_multiline_string] = ACTIONS(157),
+    [sym__proof] = ACTIONS(157),
   },
   [STATE(21)] = {
     [sym_braces] = STATE(26),
@@ -5488,6 +5516,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(157),
     [sym_multiline_string] = ACTIONS(157),
+    [sym__proof] = ACTIONS(157),
   },
   [STATE(22)] = {
     [ts_builtin_sym_end] = ACTIONS(205),
@@ -5602,6 +5631,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(205),
     [sym_multiline_string] = ACTIONS(205),
+    [sym__proof] = ACTIONS(205),
   },
   [STATE(23)] = {
     [ts_builtin_sym_end] = ACTIONS(211),
@@ -5715,6 +5745,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(211),
     [sym_multiline_string] = ACTIONS(211),
+    [sym__proof] = ACTIONS(211),
   },
   [STATE(24)] = {
     [ts_builtin_sym_end] = ACTIONS(215),
@@ -5828,6 +5859,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(215),
     [sym_multiline_string] = ACTIONS(215),
+    [sym__proof] = ACTIONS(215),
   },
   [STATE(25)] = {
     [ts_builtin_sym_end] = ACTIONS(219),
@@ -5941,6 +5973,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(219),
     [sym_multiline_string] = ACTIONS(219),
+    [sym__proof] = ACTIONS(219),
   },
   [STATE(26)] = {
     [ts_builtin_sym_end] = ACTIONS(223),
@@ -6054,6 +6087,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(223),
     [sym_multiline_string] = ACTIONS(223),
+    [sym__proof] = ACTIONS(223),
   },
   [STATE(27)] = {
     [ts_builtin_sym_end] = ACTIONS(227),
@@ -6167,6 +6201,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(227),
     [sym_multiline_string] = ACTIONS(227),
+    [sym__proof] = ACTIONS(227),
   },
   [STATE(28)] = {
     [ts_builtin_sym_end] = ACTIONS(231),
@@ -6280,6 +6315,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(231),
     [sym_multiline_string] = ACTIONS(231),
+    [sym__proof] = ACTIONS(231),
   },
   [STATE(29)] = {
     [ts_builtin_sym_end] = ACTIONS(235),
@@ -6393,6 +6429,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(235),
     [sym_multiline_string] = ACTIONS(235),
+    [sym__proof] = ACTIONS(235),
   },
   [STATE(30)] = {
     [ts_builtin_sym_end] = ACTIONS(239),
@@ -6506,6 +6543,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(239),
     [sym_multiline_string] = ACTIONS(239),
+    [sym__proof] = ACTIONS(239),
   },
   [STATE(31)] = {
     [ts_builtin_sym_end] = ACTIONS(243),
@@ -6619,6 +6657,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(243),
     [sym_multiline_string] = ACTIONS(243),
+    [sym__proof] = ACTIONS(243),
   },
   [STATE(32)] = {
     [ts_builtin_sym_end] = ACTIONS(247),
@@ -6732,6 +6771,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(247),
     [sym_multiline_string] = ACTIONS(247),
+    [sym__proof] = ACTIONS(247),
   },
   [STATE(33)] = {
     [ts_builtin_sym_end] = ACTIONS(251),
@@ -6845,6 +6885,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(251),
     [sym_multiline_string] = ACTIONS(251),
+    [sym__proof] = ACTIONS(251),
   },
   [STATE(34)] = {
     [ts_builtin_sym_end] = ACTIONS(255),
@@ -6958,6 +6999,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(255),
     [sym_multiline_string] = ACTIONS(255),
+    [sym__proof] = ACTIONS(255),
   },
   [STATE(35)] = {
     [ts_builtin_sym_end] = ACTIONS(259),
@@ -7071,6 +7113,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(259),
     [sym_multiline_string] = ACTIONS(259),
+    [sym__proof] = ACTIONS(259),
   },
   [STATE(36)] = {
     [ts_builtin_sym_end] = ACTIONS(263),
@@ -7184,6 +7227,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(263),
     [sym_multiline_string] = ACTIONS(263),
+    [sym__proof] = ACTIONS(263),
   },
   [STATE(37)] = {
     [ts_builtin_sym_end] = ACTIONS(267),
@@ -7297,6 +7341,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(267),
     [sym_multiline_string] = ACTIONS(267),
+    [sym__proof] = ACTIONS(267),
   },
   [STATE(38)] = {
     [ts_builtin_sym_end] = ACTIONS(271),
@@ -7410,6 +7455,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(271),
     [sym_multiline_string] = ACTIONS(271),
+    [sym__proof] = ACTIONS(271),
   },
   [STATE(39)] = {
     [ts_builtin_sym_end] = ACTIONS(275),
@@ -7523,6 +7569,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(275),
     [sym_multiline_string] = ACTIONS(275),
+    [sym__proof] = ACTIONS(275),
   },
   [STATE(40)] = {
     [ts_builtin_sym_end] = ACTIONS(279),
@@ -7636,6 +7683,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(279),
     [sym_multiline_string] = ACTIONS(279),
+    [sym__proof] = ACTIONS(279),
   },
   [STATE(41)] = {
     [ts_builtin_sym_end] = ACTIONS(283),
@@ -7749,6 +7797,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(283),
     [sym_multiline_string] = ACTIONS(283),
+    [sym__proof] = ACTIONS(283),
   },
   [STATE(42)] = {
     [ts_builtin_sym_end] = ACTIONS(157),
@@ -7862,6 +7911,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(157),
     [sym_multiline_string] = ACTIONS(157),
+    [sym__proof] = ACTIONS(157),
   },
   [STATE(43)] = {
     [ts_builtin_sym_end] = ACTIONS(287),
@@ -7975,6 +8025,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(287),
     [sym_multiline_string] = ACTIONS(287),
+    [sym__proof] = ACTIONS(287),
   },
   [STATE(44)] = {
     [ts_builtin_sym_end] = ACTIONS(291),
@@ -8088,6 +8139,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(291),
     [sym_multiline_string] = ACTIONS(291),
+    [sym__proof] = ACTIONS(291),
   },
   [STATE(45)] = {
     [ts_builtin_sym_end] = ACTIONS(295),
@@ -8201,6 +8253,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_block_comment] = ACTIONS(5),
     [sym_raw_string] = ACTIONS(295),
     [sym_multiline_string] = ACTIONS(295),
+    [sym__proof] = ACTIONS(295),
   },
   [STATE(46)] = {
     [sym_parens] = STATE(46),
@@ -9856,21 +9909,29 @@ enum ts_external_scanner_symbol_identifiers {
   ts_external_token_block_comment = 0,
   ts_external_token_raw_string = 1,
   ts_external_token_multiline_string = 2,
+  ts_external_token__proof = 3,
 };
 
 static const TSSymbol ts_external_scanner_symbol_map[EXTERNAL_TOKEN_COUNT] = {
   [ts_external_token_block_comment] = sym_block_comment,
   [ts_external_token_raw_string] = sym_raw_string,
   [ts_external_token_multiline_string] = sym_multiline_string,
+  [ts_external_token__proof] = sym__proof,
 };
 
-static const bool ts_external_scanner_states[3][EXTERNAL_TOKEN_COUNT] = {
+static const bool ts_external_scanner_states[4][EXTERNAL_TOKEN_COUNT] = {
   [1] = {
     [ts_external_token_block_comment] = true,
     [ts_external_token_raw_string] = true,
     [ts_external_token_multiline_string] = true,
+    [ts_external_token__proof] = true,
   },
   [2] = {
+    [ts_external_token_block_comment] = true,
+    [ts_external_token_raw_string] = true,
+    [ts_external_token_multiline_string] = true,
+  },
+  [3] = {
     [ts_external_token_block_comment] = true,
   },
 };

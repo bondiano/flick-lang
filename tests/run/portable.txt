@@ -105,6 +105,7 @@ stdlib/effect/string_locale
 stdlib/effect/void
 stdlib/hash_order
 stdlib/monoids
+stdlib/option_ap_strictness
 stdlib/seq
 stdlib/seqs
 codegen/services
@@ -117,6 +118,7 @@ codegen/scope_run
 codegen/service_child
 codegen/service_reprovide
 runtime/scope_close
+runtime/owned_close
 runtime/arena_scope
 runtime/arena_layer_scope
 runtime/arena_owner_list
@@ -303,3 +305,4 @@ runtime/lazy_shared
 runtime/suspended
 runtime/suspended_std
 runtime/lazy_let
+runtime/lazy_let_state

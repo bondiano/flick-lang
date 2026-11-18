@@ -374,3 +374,12 @@ func AddFinalizerExit(fb *Fiber, finalizer Value) Value {
 	}, true)
 	return Unit
 }
+
+// AddClose is what `Resource.own` adds: the finalizer sees how the body of
+// the owner ended, as an `Exit` whose value it cannot read.
+func AddClose(fb *Fiber, finalizer Value) Value {
+	fb.owner.addTraced(fb, func(fb *Fiber, exit *Cause) Value {
+		return Run(fb, Apply(fb, finalizer, &Exit{value: Unit, cause: exit}))
+	}, true)
+	return Unit
+}

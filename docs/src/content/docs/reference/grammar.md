@@ -64,7 +64,9 @@ Contextual words are ordinary names everywhere except in one position:
 - `effect` before the name of an effect declaration, `tail`, `abort` and
   `control` before an operation of a service or an effect, and `return`
   before the pattern of an arm of `try` (see
-  [effects.md](../effects/#effects-and-handlers)).
+  [effects.md](../effects/#effects-and-handlers));
+- `proof` before a name at the start of a declaration (see
+  [Declarations](#declarations)).
 
 ### Float literals
 
@@ -188,10 +190,10 @@ blocks of `task`, `scope`, `provide`, `sql`, `ui`, `rec` and plugins.
    - after `then` and `else`, `{` opens a brace block of statements, as after
      `do` and `loop`; a record there goes in parentheses (`FLICK-T074`).
 3. A line that starts at the block column with an infix operator other than
-   `-`, with `|`, `then`, `else`, `with`, or with a closing delimiter continues
-   the statement instead of starting a new one. This is what lets `|>` and
-   `<|` pipelines, `match` arms and `else` branches line up with their
-   expression.
+   `-`, with `|`, `then`, `else`, `with`, `where`, or with a closing delimiter
+   continues the statement instead of starting a new one. This is what lets
+   `|>` and `<|` pipelines, `match` arms, `else` branches and the goal of a
+   `proof` line up with their expression or declaration.
 4. Inside `{ … }` of a record, record type or brace block the items align on
    the first item, which may follow `{` on the same line; items are separated
    by line breaks or `;`. `;` separates statements only inside braces.
@@ -264,7 +266,7 @@ item        = name | Con | Con "(..)" | ".." | "plugin" name   // see plugins.md
 ModulePath  = Con { "." Con }
 
 decl        = signature | let | rec_group | type_decl | kind_decl | error_decl
-            | service | class | instance | foreign | module_contract | inline_module
+            | service | class | instance | foreign | module_contract | inline_module | proof
             | head { head_arg } ("{" { token } "}" | { token })   // a plugin's, to the next decl
 inline_module = "module" Con ["exposing" exposing] "=" indented { import | decl }
 module_contract = "type" "module" Con "=" indented { module_member }
@@ -297,7 +299,16 @@ foreign     = "foreign" [mode] name "from" ("global" String | String String) [me
             | "foreign" "blocked" name String
 mode        = "pure" | "effect"
 metadata    = indented lines: meta_name { atom }
+proof       = "proof" name { atom_pattern | premise } "where" goal "=" block
+premise     = "(" name ":" goal ")"
+goal        = "same_type" atom atom | expr   // two atomic types, or an expression
 ```
+
+A `proof` states a property of the module's definitions, its goal after
+`where`, and proves it after `=`: `proof same where same_type a a = refl`.
+The compiler checks the proof and erases the declaration, which has no value
+at run time. `equal`, `holds`, `same_type` and `refl` are names, not
+keywords.
 
 `module_application` is a file-level declaration. Writing it inside an
 `inline_module` reports `FLICK-R019`; a `module_contract` is allowed there.
