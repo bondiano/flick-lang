@@ -17,7 +17,7 @@ def JLe (S : Sig) : J → J → Prop
   | .alts t r φ, .alts t' r' φ' => t = t' ∧ LeLive S r r' ∧ φ.le φ'
   | .halts ε H r φ, .halts ε' H' r' φ' => ε = ε' ∧ H = H' ∧ LeLive S r r' ∧ φ.le φ'
   | .dfs fs, .dfs fs' => fs = fs'
-  | .harms E t φ s, .harms E' t' φ' s' => E = E' ∧ t = t' ∧ φ = φ' ∧ s = s'
+  | .harms E us t φ s, .harms E' us' t' φ' s' => E = E' ∧ us = us' ∧ t = t' ∧ φ = φ' ∧ s = s'
   | _, _ => False
 
 theorem JLe.ex {t φ J'} (h : JLe S (.ex t φ) J') :
@@ -194,16 +194,16 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe S J J' �
     intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .perform hus hop (hT.trans h₁)
   | hanil =>
     intro J' hJ; cases J' <;> simp only [JLe] at hJ
-    obtain ⟨rfl, rfl, rfl, rfl⟩ := hJ; exact .hanil
+    obtain ⟨rfl, rfl, rfl, rfl, rfl⟩ := hJ; exact .hanil
   | hatail hop hb hr =>
     intro J' hJ; cases J' <;> simp only [JLe] at hJ
-    obtain ⟨rfl, rfl, rfl, rfl⟩ := hJ; exact .hatail hop hb hr
+    obtain ⟨rfl, rfl, rfl, rfl, rfl⟩ := hJ; exact .hatail hop hb hr
   | haabort hop hb hr =>
     intro J' hJ; cases J' <;> simp only [JLe] at hJ
-    obtain ⟨rfl, rfl, rfl, rfl⟩ := hJ; exact .haabort hop hb hr
+    obtain ⟨rfl, rfl, rfl, rfl, rfl⟩ := hJ; exact .haabort hop hb hr
   | hactl hop hb hr =>
     intro J' hJ; cases J' <;> simp only [JLe] at hJ
-    obtain ⟨rfl, rfl, rfl, rfl⟩ := hJ; exact .hactl hop hb hr
+    obtain ⟨rfl, rfl, rfl, rfl, rfl⟩ := hJ; exact .hactl hop hb hr
   | hdl hus hal hn hrf hψ he hφ₀ hOb hc hφ hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .hdl hus hal hn hrf hψ he hφ₀ hOb hc (Stage.le_trans hφ h₂) (hT.trans h₁)

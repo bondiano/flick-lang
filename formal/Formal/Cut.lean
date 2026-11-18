@@ -85,11 +85,11 @@ theorem Scheme.Holds.mono {Θ₁ Θ₂ : Facts} {s : Scheme} {ts : List Ty} (h :
   fun C r hc => hΘ _ _ (h C r hc)
 
 /-- Facts that follow from the context may be dropped. -/
-theorem Row.hP_mono {Θ₁ Θ₂ : Facts} {q : Nat} {E : Name} {r : Row} (hΘ : Entails Θ₁ Θ₂) :
-    Row.Sub (Row.hP Θ₁ q E r) (Row.hP Θ₂ q E r) := by
+theorem Row.hP_mono {Θ₁ Θ₂ : Facts} {q : Nat} {E : Name} {A : TyClass → Prop} {r : Row}
+    (hΘ : Entails Θ₁ Θ₂) : Row.Sub (Row.hP Θ₁ q E A r) (Row.hP Θ₂ q E A r) := by
   intro x hx
   cases x with
-  | ob N a => exact ⟨fun h => hΘ _ _ (hx.1 h), hx.2⟩
+  | ob N c a => exact ⟨fun h => hΘ _ _ (hx.1 h), hx.2⟩
   | _ => exact hx
 
 theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Entails Θ₁ Θ₂ → Typ S Ψ Θ₂ Γ e J := by
