@@ -1,0 +1,13 @@
+module App.AliasCyclesInOperations exposing (..)
+
+type alias A = List B
+//         ^ FLICK-R007 type alias `A` is cyclic: A -> B -> A
+type alias B = { a : A }
+
+// an operation may take a cyclic alias: it is nominal by then, so walking
+// what the parameter holds ends
+service Store =
+  put : A ->{} Unit
+
+effect Feed =
+  control feed : B ->{} Unit
