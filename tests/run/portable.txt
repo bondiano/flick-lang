@@ -27,6 +27,7 @@ codegen/deep_recursion
 codegen/defaults
 codegen/derive_default
 codegen/default_signatures
+codegen/value_defaults
 codegen/defect
 codegen/do_notation
 codegen/enums
