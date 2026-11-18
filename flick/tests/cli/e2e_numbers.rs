@@ -77,7 +77,7 @@ fn numbers_match_js() {
     fs::write(
         &source,
         format!(
-            "module App.Main exposing (main)\n\nmain : Unit ->{{none; AppError}} Unit\nlet main () =\n{}\n",
+            "module App.Main exposing (main)\n\nmain : Unit ->{{Host.Console; AppError}} Unit\nlet main () =\n{}\n",
             flick.join("\n")
         ),
     )

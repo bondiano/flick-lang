@@ -6,7 +6,7 @@ use super::{app, flick};
 
 #[test]
 fn a_wasm_plugin_declares_a_type_with_an_invariant() {
-    let main = "module App.Main exposing (main)\n\nimport Pairs exposing (plugin kept)\n\nkept Positive { Checks.positive }\n\nmade : Float -> Option Positive\nlet made x = if Positive.check x then Some (Positive.prove x) else None\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line (show (Option.map Positive.value (made 2.0)))\n";
+    let main = "module App.Main exposing (main)\n\nimport Pairs exposing (plugin kept)\n\nkept Positive { Checks.positive }\n\nmade : Float -> Option Positive\nlet made x = if Positive.check x then Some (Positive.prove x) else None\n\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () = Platform.stdout_line (show (Option.map Positive.value (made 2.0)))\n";
     let root = app("plugins-invariant", main);
     let checked = flick(&root, &["check"]);
     assert!(checked.status.success(), "{checked:?}");
