@@ -88,6 +88,10 @@ has no `T.prove`. The guarantee holds within Flick's own code: a `foreign`
 function or an `unsafe` schema can still make a value that fails the
 check.
 
+A module that imports `T` proves `T.prove` the same way: the interface of
+the module of `T` carries the check, so an edit of the check is checked
+again wherever `T` is proved.
+
 ## Deriving
 
 `deriving Schema` defines the witness `T.schema`. The plugin of `std` writes
