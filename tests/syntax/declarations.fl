@@ -120,3 +120,13 @@ effect Emit a =
   control emit : a ->{} Unit
   abort stop : forall b. Unit ->{} b
   tail : Unit ->{} a
+
+proof right_identity (v : Option a)
+where equal (flat_map pure v) v =
+  match v with
+  | None -> refl
+  | Some x -> refl
+
+proof same where same_type a a = refl
+
+proof step (x : Bool) (h : equal x true) where holds x = h

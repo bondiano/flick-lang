@@ -21,6 +21,7 @@ pub use flick_ir::{
     TypeName, memory, operation_arity,
 };
 pub use lower::lower;
+pub use lower::proofs::{LoweredProof, check_proofs, lower_proofs};
 pub use print::print;
 
 use flick_ir::Namespace as IrNamespace;

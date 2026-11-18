@@ -209,6 +209,8 @@ pub struct Typing {
     pub(super) owner_stages: HashMap<StageKey, OwnerStage>,
     pub(super) owner_stack: Vec<OwnerStage>,
     pending_dicts: Vec<(Range, u32, Dict)>,
+    /// The proof declarations, as the checker settled them.
+    pub proofs: Vec<super::proof_decls::ProofInfo>,
 }
 
 impl Typing {

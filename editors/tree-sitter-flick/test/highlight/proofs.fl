@@ -1,0 +1,13 @@
+proof same where same_type a a = refl
+// <- keyword
+//    ^ function
+
+let proof = trans proof h
+//  ^ function
+//                ^ variable
+
+proof right_identity (v : Option a)
+where equal (flat_map pure v) v =
+  match v with
+  | None -> refl
+  | Some x -> refl

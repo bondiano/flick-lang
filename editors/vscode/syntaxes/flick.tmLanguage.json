@@ -208,6 +208,14 @@
           }
         },
         {
+          "comment": "`proof name` at the start of a line declares a proof; elsewhere the word is a name",
+          "match": "^[ \\t]*(proof)[ \\t]+([a-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.other.flick" },
+            "2": { "name": "entity.name.function.flick" }
+          }
+        },
+        {
           "match": "(?<![.\\w])(type)[ \\t]+(alias)\\b(?=[ \\t]+[A-Z][A-Za-z0-9_]*\\b)",
           "captures": {
             "1": { "name": "keyword.other.flick" },
