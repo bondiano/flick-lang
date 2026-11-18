@@ -28,7 +28,7 @@ region of the handler is live where the answer is used. -/
 theorem hwith_catch {Ψ Θ p ℓ E al r a t φ}
     (h : Typ S Ψ Θ [] (.hwith p ℓ E al r (.unw p ℓ a)) (.ex t φ)) :
     Typ S Ψ Θ [] a (.ex t φ) := by
-  obtain ⟨_, _, _, _, _, _, _, hℓ, _, _, _, he, _, _, hφ, hT, hat⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, _, _, _, _, _, hℓ, _, _, _, he, _, _, hφ, hT, hat⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
   obtain ⟨_, _, _, hℓ', ha, _⟩ := he.unw_type _ _ _ _ _ rfl rfl
   rw [hℓ] at hℓ'
   simp only [Option.some.injEq, Ty.arrow.injEq] at hℓ'
@@ -40,7 +40,7 @@ theorem hctl_signal {Ψ Θ p ℓ κ tl E al r x k t φ} {Ei : List Frame} (hEi :
     (hk : k = plug Ei (.hole p)) (hx : ∀ {Θ'}, AnyTy S Ψ Θ' x)
     (h : Typ S Ψ Θ [] (.hctl p ℓ κ tl E al r x k) (.ex t φ)) :
     Typ S Ψ Θ [] (.hwith p ℓ E al r (plug Ei (.unw p ℓ x))) (.ex t φ) := by
-  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, hℓ, hal, hrf, hψ, hop, _, _, hE, hk', hp, hφ₀, ha, _, hcm, hφ, hT, hat⟩ := h.hctl_type _ _ _ _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, hℓ, hal, hrf, hψ, hop, _, _, hE, hk', hp, hφ₀, ha, _, hcm, hφ, hT, hat⟩ := h.hctl_type _ _ _ _ _ _ _ _ _ _ _ rfl rfl
   obtain ⟨rfl, -⟩ := plug_hole_inj hEi hE (hk.symm.trans hk')
   refine .hwith hℓ hal hrf hψ (refill_app hE perform_not_value hp (perform_fn hop) perform_up
     fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hcm hφ hT hat
@@ -54,7 +54,7 @@ theorem hkarm_raise {Ψ Θ q ℓ E al w k t φ} {Ei : List Frame} (hEi : OkE Ei)
     (hk : k = plug Ei (.hole q))
     (h : Typ S Ψ Θ [] (.hkarm q ℓ E al (.raise w) k) (.ex t φ)) :
     Typ S Ψ Θ [] (.hkeep q ℓ E al (plug Ei (.unw q ℓ (.raise w)))) (.ex t φ) := by
-  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, hℓ, hal, hop, hE, hk', hp, hφ₀, hc, hnt, ha, hle, hφ, hT⟩ := h.hkarm_type _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, hℓ, hal, hop, hE, hk', hp, hφ₀, hc, hnt, ha, hle, hφ, hT⟩ := h.hkarm_type _ _ _ _ _ _ _ _ rfl rfl
   obtain ⟨rfl, -⟩ := plug_hole_inj hEi hE (hk.symm.trans hk')
   refine .hkeep hℓ hal (refill_app hE perform_not_value hp (perform_fn hop) perform_up
     fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hc hnt hle hφ hT
@@ -68,7 +68,7 @@ theorem hkarm_unw {Ψ Θ q ℓ E al q' ℓ' a k t φ} {Ei : List Frame} (hEi : O
     (hk : k = plug Ei (.hole q))
     (h : Typ S Ψ Θ [] (.hkarm q ℓ E al (.unw q' ℓ' a) k) (.ex t φ)) :
     Typ S Ψ Θ [] (.hkeep q ℓ E al (plug Ei (.unw q' ℓ' a))) (.ex t φ) := by
-  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, hℓ, hal, hop, hE, hk', hp, hφ₀, hc, hnt, ha, hle, hφ, hT⟩ := h.hkarm_type _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, hℓ, hal, hop, hE, hk', hp, hφ₀, hc, hnt, ha, hle, hφ, hT⟩ := h.hkarm_type _ _ _ _ _ _ _ _ rfl rfl
   obtain ⟨rfl, -⟩ := plug_hole_inj hEi hE (hk.symm.trans hk')
   refine .hkeep hℓ hal (refill_app hE perform_not_value hp (perform_fn hop) perform_up
     fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hc hnt hle hφ hT

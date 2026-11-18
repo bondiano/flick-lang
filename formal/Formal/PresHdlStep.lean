@@ -19,17 +19,17 @@ theorem List.map_kill_YF {Ψ : List Ty} {n : Nat} (h : ∀ u ∈ Ψ, u.YF n) :
 
 theorem hwith_not_pure {Ψ Θ p ℓ E al r e t} (h : Typ S Ψ Θ [] (.hwith p ℓ E al r e) (.ex t .pure)) :
     False := by
-  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, hφ, _, _⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, hφ, _, _⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
   exact hφ
 
 theorem hkeep_not_pure {Ψ Θ q ℓ E al e t} (h : Typ S Ψ Θ [] (.hkeep q ℓ E al e) (.ex t .pure)) :
     False := by
-  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, hφ, _⟩ := h.hkeep_type _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, hφ, _⟩ := h.hkeep_type _ _ _ _ _ _ _ rfl rfl
   exact hφ
 
 theorem hctl_not_pure {Ψ Θ p ℓ κ tl E al r a k t}
     (h : Typ S Ψ Θ [] (.hctl p ℓ κ tl E al r a k) (.ex t .pure)) : False := by
-  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, hφ, _, _⟩ := h.hctl_type _ _ _ _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, hφ, _, _⟩ := h.hctl_type _ _ _ _ _ _ _ _ _ _ _ rfl rfl
   exact hφ
 
 theorem unw_not_value {p ℓ a} : ¬ Value (.unw p ℓ a) := fun h => by cases h
@@ -108,7 +108,7 @@ theorem abort_pres {Ψ Θ p ℓ Ef al rf o v b t φ} {Ei : List Frame} (hEi : Ok
     (ha : al.armOf o = some b) (hv : Value v)
     (h : Typ S Ψ Θ [] (.hwith p ℓ Ef al rf (plug Ei (.app (.const (.perform Ef o .abort)) v))) (.ex t φ)) :
     Typ S Ψ Θ [] (.hwith p ℓ Ef al rf (plug Ei (.unw p ℓ (b.subst (inst [v]))))) (.ex t φ) := by
-  obtain ⟨_, _, _, _, _, _, _, hℓ, hal, hrf, hψ, he, hφ₀, hc, hφ, hT, hat⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, _, _, _, _, _, hℓ, hal, hrf, hψ, he, hφ₀, hc, hφ, hT, hat⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
   obtain ⟨a₀, b₀, hop⟩ := perform_op hEi he
   have hb := (hal.arm_inv hop ha).2.1 rfl
   refine .hwith hℓ hal hrf hψ (refill_app hEi perform_not_value he (perform_fn hop) perform_up
@@ -123,7 +123,7 @@ theorem tail_pres {Ψ Θ n p ℓ Ef al rf o v b t φ} {Ei : List Frame} (hc : Rt
     (hbv : v.Below n) (hEi : OkE Ei) (ha : al.armOf o = some b) (hv : Value v)
     (h : Typ S Ψ Θ [] (.hwith p ℓ Ef al rf (plug Ei (.app (.const (.perform Ef o .tail)) v))) (.ex t φ)) :
     Typ S Ψ Θ [] (.hctl p ℓ 0 true Ef al rf (b.subst (inst [v])) (plug Ei (.hole p))) (.ex t φ) := by
-  obtain ⟨_, _, _, _, _, _, _, hℓ, hal, hrf, hψ, he, hφ₀, hc', hφ, hT, hat⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, _, _, _, _, _, hℓ, hal, hrf, hψ, he, hφ₀, hc', hφ, hT, hat⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
   obtain ⟨a₀, b₀, hop⟩ := perform_op hEi he
   have hb := (hal.arm_inv hop ha).1 rfl
   have hx := hole_arg hEi perform_not_value hv he (perform_fn hop) hc hbv
@@ -139,7 +139,7 @@ theorem kept_pres {Ψ Θ n q ℓ Ef al o v b t φ} {Ei : List Frame} (hc : RtCtx
     (hbv : v.Below n) (hEi : OkE Ei) (ha : al.armOf o = some b) (hv : Value v)
     (h : Typ S Ψ Θ [] (.hkeep q ℓ Ef al (plug Ei (.app (.const (.perform Ef o .tail)) v))) (.ex t φ)) :
     Typ S Ψ Θ [] (.hkarm q ℓ Ef al (b.subst (inst [v])) (plug Ei (.hole q))) (.ex t φ) := by
-  obtain ⟨_, _, _, _, _, _, _, hℓ, hal, he, hφ₀, hc', hnt, hle, hφ, hT⟩ := h.hkeep_type _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, _, _, _, _, _, hℓ, hal, he, hφ₀, hc', hnt, hle, hφ, hT⟩ := h.hkeep_type _ _ _ _ _ _ _ rfl rfl
   obtain ⟨a₀, b₀, hop⟩ := perform_op hEi he
   have hb := (hal.arm_inv hop ha).1 rfl
   have hx := hole_arg hEi perform_not_value hv he (perform_fn hop) hc hbv
@@ -156,7 +156,7 @@ theorem ctl_pres {Ψ Θ n p ℓ Ef al rf o v b t φ} {Ei : List Frame} (hc : RtC
     ∃ c, c.YF n ∧ Typ S Ψ Facts.age [] (.lam .todo) (.ex c .pure) ∧
       Typ S (Ψ ++ [c]) Θ [] (.hctl p ℓ Ψ.length false Ef al rf (b.subst (inst [v, .kont p Ψ.length]))
         (plug Ei (.hole p))) (.ex t φ) := by
-  obtain ⟨_, _, _, _, _, _, _, hℓ, hal, hrf, hψ, he, hφ₀, hc', hφ, hT, hat⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, _, _, _, _, _, hℓ, hal, hrf, hψ, he, hφ₀, hc', hφ, hT, hat⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
   obtain ⟨a₀, b₀, hop⟩ := perform_op hEi he
   have hb := (hal.arm_inv hop ha).2.2 rfl
   have hx := hole_arg hEi perform_not_value hv he (perform_fn hop) hc hbv
@@ -178,7 +178,7 @@ theorem resume_pres {Ψ Θ n p ℓh ℓ Ef al rf u k t φ} {A Ei : List Frame} (
     (hbu : u.Below n) (hA : OkE A) (hEi : OkE Ei) (hk : k = plug Ei (.hole p)) (hu : Value u)
     (h : Typ S Ψ Θ [] (.hctl p ℓh ℓ false Ef al rf (plug A (.app (.kont p ℓ) u)) k) (.ex t φ)) :
     Typ S Ψ Θ [] (.hres p ℓh (plug A (.hole p)) (.hwith p ℓh Ef al rf (plug Ei u))) (.ex t φ) := by
-  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, hℓh, hal, hrf, hψ, hop, hc', _, hE, hk', hp, hφ₀, ha, hl, hcm, hφ, hT, _⟩ := h.hctl_type _ _ _ _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, hℓh, hal, hrf, hψ, hop, hc', _, hE, hk', hp, hφ₀, ha, hl, hcm, hφ, hT, _⟩ := h.hctl_type _ _ _ _ _ _ _ _ _ _ _ rfl rfl
   obtain ⟨rfl, -⟩ := plug_hole_inj hEi hE (hk.symm.trans hk')
   obtain ⟨C', hl₁, hcp⟩ := hl rfl
   rw [if_neg (by decide)] at ha

@@ -119,24 +119,24 @@ theorem FrameTy.conv {Ψ Θ F r a b φ} (h : FrameTy S Ψ Θ F r a φ)
 
 /-- A frame that handles `E` in its hole: the hole may also need `E`, and obligations about
 it. -/
-theorem FRel.installs {F : Frame} {E : Name} {φ₀ φ : Stage} {r ε : Row}
+theorem FRel.installs {F : Frame} {E : Name} {A : TyClass → Prop} {φ₀ φ : Stage} {r ε : Row}
     {Θ : Facts} {q : Nat}
-    (hE : F.installs E) (h₀ : φ₀.le (.rt (Row.hP Θ q E r) ε)) (h : (Stage.rt r ε).le φ) :
+    (hE : F.installs E) (h₀ : φ₀.le (.rt (Row.hP Θ q E A r) ε)) (h : (Stage.rt r ε).le φ) :
     FRel F φ₀ φ := by
   obtain ⟨_, _, rfl, hr, he⟩ := Stage.rt_le h
   refine ⟨fun n hn => ?_, fun _ => (Stage.le_err h₀).trans he, fun hp => (by cases hp),
     fun _ _ h => (by cases h)⟩
   have h₁ := Stage.le_svc h₀ n hn
   cases n with
-  | nm N =>
-    rcases h₁ with rfl | h₁
+  | nm N c =>
+    rcases h₁ with ⟨rfl, -⟩ | ⟨-, h₁⟩
     · exact .inr (Frame.provides_of hE)
     · exact .inl (hr _ h₁)
-  | ob N a =>
+  | ob N c a =>
     by_cases hN : N = E
     · subst hN; exact .inr (Frame.provides_of (.inl hE))
     · exact .inl (hr _ (h₁.2 hN))
-  | atm a | obv v a => exact .inl (hr _ h₁)
+  | atm a | obv v G a => exact .inl (hr _ h₁)
   | rv a G' => obtain ⟨G, h₁, -⟩ := h₁; exact .inl ⟨G, hr _ h₁⟩
 
 end Flick

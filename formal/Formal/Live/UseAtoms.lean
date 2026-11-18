@@ -127,7 +127,7 @@ theorem hwith_cell {Ψ Θ E n ℓ Ef al rf e₀ t φ} (hE : OkE E)
       ∀ x, r.asRow (.atm (.r x)) → φ.svc (.atm (.r x)) ∨ x = n ∨ ∃ F ∈ E, F = .inside x ∨ F.rgn = some x := by
   have h' : Typ S Ψ Θ [] (plug (.inside n :: E) (.hwith n ℓ Ef al rf e₀)) (.ex t φ) := h
   obtain ⟨K, Θ', t', ψ, hr, hp, hat⟩ := hole_atm (OkE.cons' (F := .inside n) hE trivial) (fun hv => by cases hv) h'
-  obtain ⟨_, _, _, _, _, _, _, hℓ, _, _, _, _, _, _, hφ, _, _⟩ := hr.hwith_type _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, _, _, _, _, _, hℓ, _, _, _, _, _, _, hφ, _, _⟩ := hr.hwith_type _ _ _ _ _ _ _ _ rfl rfl
   rcases hp with rfl | ⟨rfl, -⟩
   · exact absurd hφ (fun h => by simp [Stage.le] at h)
   · rw [List.map_up_zero] at hℓ

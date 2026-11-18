@@ -82,7 +82,7 @@ theorem withs_typing_atm {x r : Tm} {o : Nat} (Q : Prop) (Old : Atom → Prop)
       · exact .inr (hk.mono fun _ => mem')
     cases G with
     | hwith q ℓ E' al rf =>
-      obtain ⟨_, _, _, _, _, _, _, hℓ, hal, _, _, hb, hrow, hc, hφ, _⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
+      obtain ⟨_, _, _, _, _, _, _, _, _, hℓ, hal, _, _, hb, hrow, hc, hφ, _⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
       obtain ⟨t', R', ε', hw, hk, hat⟩ := ih hE₀ hb hΘ hA₀
       have up : ∀ y, _ → φ.svc y := fun y h => Stage.le_svc hφ y h
       have hl := lift (fun a h' => .inl (up _ (Stage.le_svc hrow _ h'))) hat
@@ -101,7 +101,7 @@ theorem withs_typing_atm {x r : Tm} {o : Nat} (Q : Prop) (Old : Atom → Prop)
       · rename_i hq
         exact ⟨t', R', ε', hw, kid_dropped (G := .hwith q ℓ E' al rf) hΘ rfl trivial hA hq hrow up hk, hl⟩
     | hkeep q ℓ E' al =>
-      obtain ⟨_, _, _, _, _, _, _, hℓ, hal, hb, hrow, hc, hnt, hle, hφ, _⟩ := h.hkeep_type _ _ _ _ _ _ _ rfl rfl
+      obtain ⟨_, _, _, _, _, _, _, _, _, hℓ, hal, hb, hrow, hc, hnt, hle, hφ, _⟩ := h.hkeep_type _ _ _ _ _ _ _ rfl rfl
       obtain ⟨t', R', ε', hw, hk, hat⟩ := ih hE₀ hb hΘ hA₀
       have up : ∀ y, _ → φ.svc y := fun y h => Stage.le_svc hφ y h
       have hl := lift (fun a h' => .inl (up _ (Stage.le_svc hrow _ h'))) hat
@@ -298,12 +298,12 @@ theorem perform_out {Ef o : Name} {c : OpClass} {r : Tm}
       have h₂ := Frame.provides_nonatm (fun _ h => by cases h) h₂
       cases G <;> simp only [Frame.dom, Frame.installs] at h₂
       · subst h₂
-        obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, hc, hφ, _⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
+        obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, hc, hφ, _⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
         refine Stage.le_svc hφ _ (hc.2 fun hcomp => ?_)
         have h₁ := hcomp o c a b hop
         simp [Frame.handles, h₁] at hhG
       · subst h₂
-        obtain ⟨_, _, _, _, _, _, _, _, _, _, _, hc, hnt, _, hφ, _⟩ := h.hkeep_type _ _ _ _ _ _ _ rfl rfl
+        obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, hc, hnt, _, hφ, _⟩ := h.hkeep_type _ _ _ _ _ _ _ rfl rfl
         refine Stage.le_svc hφ _ ?_
         by_cases hct : c = .tail
         · subst hct

@@ -99,10 +99,10 @@ theorem installs_op {Ψ' Θ x t φ} {F : Frame} {N : Name}
     (hi : F.installs N) : ∃ o c a b, S.op N o = some (c, a, b) := by
   cases F <;> simp only [Frame.installs] at hi
   · subst hi
-    obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, hc, _, _, _⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
+    obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, hc, _, _, _⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
     exact hc.1
   · subst hi
-    obtain ⟨_, _, _, _, _, _, _, _, _, _, _, hc, _, _, _, _⟩ := h.hkeep_type _ _ _ _ _ _ _ rfl rfl
+    obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, hc, _, _, _, _⟩ := h.hkeep_type _ _ _ _ _ _ _ rfl rfl
     exact hc.1
 
 /-- The row of the work under a kept handler of `E`: what the work needs besides `E` and what
