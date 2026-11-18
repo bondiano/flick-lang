@@ -305,7 +305,10 @@ impl Checking<'_> {
         diagnostics.extend(checked);
         // a module that checked is the only one whose proofs are about something
         if clean {
-            diagnostics.extend(ir::check_proofs(&module, &typing));
+            let stages = self.stages_by_class;
+            diagnostics.extend(ir::check_proofs(&module, &typing, &|| {
+                builtin_modules_of(stages)
+            }));
         }
         let declarations = typing.declarations.clone();
         let mut ir = self.lower_if_clean(

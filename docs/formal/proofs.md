@@ -1,6 +1,6 @@
 # Proofs: statements over the pure, total domain
 
-Status: **contract** (RFC #647, #641). Phase 1 is implemented: §1–§5 hold in the checker for statements over the variables of a proof. Admission of definitions (§6), proofs across modules (§7) and the Lean development (§9) land in the phases RFC #647 lists. Each rule says where it is checked.
+Status: **contract** (RFC #647, #641). Phases 1 and 2 are implemented: §1–§6 hold in the checker, for statements over the variables of a proof and the definitions it names. Proofs across modules (§7) and the Lean development (§9) land in the phases RFC #647 lists. Each rule says where it is checked.
 
 References as in [`core.md`](core.md). Paths are relative to `flick-core/src/`.
 
@@ -14,7 +14,7 @@ References as in [`core.md`](core.md). Paths are relative to `flick-core/src/`.
 | `refl`, `symm`, `trans`, `cong`, `funext`, `match`, a premise, `let` | the rules | §4 |
 | T080–T084 | how a proof fails | §5 |
 
-Not in phase 1: admission of definitions and methods, lemmas, law bundles, proof modules and `flick prove`, `.iface` payloads.
+Not yet: law bundles, proof modules and `flick prove`, lemmas across modules, `.iface` payloads.
 
 ## 1. Proofs are opt-in and erased
 
@@ -61,7 +61,9 @@ A statement is about the values of this domain: computations that end, without e
   - constructors, `match` without guards, `if`;
   - `let` of a name.
 
-  Every other form is refused with its reason, never read as something else: a definition or method (phase 1), a primitive operation, a mutable variable, a loop, a runtime computation.
+  - a definition or a method the statement names, once admitted (§6).
+
+  Every other form is refused with its reason, never read as something else: a primitive operation, a mutable variable, a loop, a runtime computation.
 - **Function parameters** stand for total functions of the domain at every stage. This is the interpretation of the statement, not a claim about the program's own functions.
 - **Equality** is logical: the same constructor with equal fields, equal literals, and functions equal at every argument (§4, `funext`). It is not `Eq`, `==`, `TypeEq` or identity of representation.
 
@@ -78,9 +80,11 @@ The body elaborates to a finite certificate (`logic/cert.rs`). The checker decid
 | `funext (fun x -> p)` | `f = g` at `A -> B` | `p` proves `f x = g x` for a fresh `x : A` |
 | `match v with \| C xs -> p …` | the goal | `v` is a variable of the statement of a data type or `Bool` and not split yet; each constructor has one arm, or a final `_` arm covers the rest; in each arm `v` is `C xs` for fresh `xs` |
 | `h` | `l = r` | `h` is a premise, or a proof a `let` named, of the same normal forms |
-| `let h = p` then `q` | the goal | `p`'s equation is written by its rules (a premise, `symm`, `trans`), and `q` proves the goal with `h` |
+| `let h = p` then `q` | the goal | `p`'s equation is written by its rules (a premise, a lemma, `symm`, `trans`), and `q` proves the goal with `h` |
+| `name args` | the lemma's goal of `args` | `name` is a proof of this module before this one, which checked; `args` give a value for each parameter and a proof of each premise, in its order; its instance is the goal with definitions folded (exact subject) |
 
 - There is no η in normal forms: `fun x -> f x` and `f` are equal only by `funext`.
+- **Lemmas are exact.** A lemma's instance is compared with the goal by β, ζ and ι with every definition folded. So a lemma about `flat_map` of `Monad Option` closes no goal about another definition, even one with the same body (`tests/check/fail/proofs/lemmas.fl`). A proof names only proofs before it, and one that failed is no lemma: the proofs of a module form no cycle.
 - `refl` reads no claim: a certificate is the tree of these rules, and the checker trusts no part it did not check.
 
 ## 5. Outcomes
@@ -98,9 +102,23 @@ A split that misses a constructor is usually reported first by the ordinary chec
 
 Checked by: `logic/tests.rs` (each rule and each failure on hand-built statements), `tests/check/pass/proofs/`, `tests/check/fail/proofs/`.
 
-## 6. Definitions (phase 2)
+## 6. Definitions
 
-A statement will unfold the definitions and instance methods it names (δ), with the dictionaries the checker resolved at each use, once they are admitted: closed under what they name, without recursion, foreign code, effects or `todo`. Until then a definition or method in a statement is `FLICK-T082`.
+A statement may name the definitions of its module and of the built-in modules, and the methods of their instances. Each one is admitted before any proof is checked (`logic/defs.rs`):
+
+- **Bodies.** A body is read from the IR the module is compiled to (`ir::lower` of the module; the built-in bundle for the core). It goes through the same strict extraction as a statement (§3). For a method, this is the method of the instance its dictionary resolves to: the instance the checker chose at that use, or a superclass field of one, followed through `InstanceInfo.supers`.
+- **Closure.** Admission covers everything the statement, its premises and its proof name, and everything those bodies name in turn. It does so whether or not a computation reaches it. A cycle anywhere in that closure is refused: direct recursion, a `rec` group, a helper that calls back.
+- **Refused:**
+  - foreign code, including `foreign pure`;
+  - a definition that takes dictionaries;
+  - an instance with a context;
+  - a default method;
+  - a definition another project module compiles (phase 4).
+
+  Each reports the definition and the reason (`FLICK-T082`).
+- **Unfolding.** Normalization unfolds an admitted definition where it is evaluated (δ).
+
+So `equal (map identity v) v` is proved by a split of `v` against the real `Functor Option`. A diverging definition never enters a proof, even as an argument a function ignores: `(fun _ -> None) (forever ())` is refused, not reduced to `None` (`tests/check/fail/proofs/definitions.fl`). Defining such functions stays legal; only the proofs that name them fail.
 
 ## 7. Modules (phase 4)
 
