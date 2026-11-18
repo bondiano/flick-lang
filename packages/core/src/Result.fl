@@ -26,7 +26,7 @@ module Result exposing (
 )
 
 /// `Ok (f x)` for `Ok x`.
-map : (forall v. a^v -> b)^c -> (Result e a)^d -> (Result e b)^(c + d)
+map : (a^v -> b)^c -> (Result e a)^d -> (Result e b)^(c + d)
 let map f result =
   match result with
   | Err e -> Err e

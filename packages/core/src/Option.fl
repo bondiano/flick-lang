@@ -38,7 +38,7 @@ module Option exposing (
 import List.Core
 
 /// `Some (f x)` for `Some x`.
-map : (forall v. a^v -> b)^c -> (Option a)^d -> (Option b)^c
+map : (a^v -> b)^c -> (Option a)^d -> (Option b)^c
 let map f value =
   match value with
   | None -> None

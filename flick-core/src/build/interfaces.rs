@@ -22,27 +22,25 @@ pub fn published_interfaces<'a>(
             .find(|module| module.name == name)
             .map(|module| module.interface.clone())
     };
-    let published_interfaces: BTreeMap<&str, Interface> = modules
-        .iter()
-        .map(|module| {
-            let mut published = interface(
-                &module.ir,
-                &module.interface,
-                module.package.as_deref().or(package),
-                &[],
-                &checked_interfaces,
-            );
-            if let Some(targets) = targets {
-                published.targets = targets.to_vec();
-            }
-            published.source = root
-                .and_then(|root| module.path.strip_prefix(root).ok())
-                .map(|p| p.to_string_lossy().replace('\\', "/"));
-            (module.name.as_str(), published)
-        })
-        .collect();
-    #[cfg(feature = "native-project")]
-    let mut published_interfaces = published_interfaces;
+    // `extend`, not `collect`: collecting compiles a sort of these large
+    // entries into the wasm compiler
+    let mut published_interfaces: BTreeMap<&str, Interface> = BTreeMap::new();
+    published_interfaces.extend(modules.iter().map(|module| {
+        let mut published = interface(
+            &module.ir,
+            &module.interface,
+            module.package.as_deref().or(package),
+            &[],
+            &checked_interfaces,
+        );
+        if let Some(targets) = targets {
+            published.targets = targets.to_vec();
+        }
+        published.source = root
+            .and_then(|root| module.path.strip_prefix(root).ok())
+            .map(|p| p.to_string_lossy().replace('\\', "/"));
+        (module.name.as_str(), published)
+    }));
     #[cfg(feature = "native-project")]
     {
         // Hash only finalized ABI, including backend availability, exactly as published.

@@ -22,6 +22,7 @@ use std::path::Path;
 use std::process::Command;
 #[cfg(feature = "wasm-backends")]
 use std::sync::Arc;
+use std::sync::OnceLock;
 
 use crate::sources::FsHost;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
@@ -109,25 +110,31 @@ impl Selected {
         go: bool,
         rt: bool,
     ) -> Result<Self, Diagnostic> {
+        if project.is_some() && !allowed_tools().is_empty() {
+            return Err(Diagnostic::new(
+                codes::P051,
+                Severity::Error,
+                "`--allow-tool` grants a tool outside a project; a project allows its tools in `[tools]`",
+            ));
+        }
         let Some((project, package)) =
             project.and_then(|p| Some((p, p.config.build.backend.as_ref()?)))
         else {
-            if go {
-                return Ok(Self::Native);
-            }
             #[cfg(feature = "wasm-backends")]
-            return official::javascript(
-                project.map_or(host.cwd.as_path(), |p| p.root.as_path()),
-                rt,
-                &project.map(|p| p.config.tools.clone()).unwrap_or_default(),
-            )
-            .map(|p| Self::Component(Arc::new(p)));
+            {
+                let root = project.map_or(host.cwd.as_path(), |p| p.root.as_path());
+                let tools = project.map(|p| &p.config.tools);
+                let package = if go {
+                    official::go(root, tools)
+                } else {
+                    official::javascript(root, rt, tools)
+                };
+                return package.map(|p| Self::Component(Arc::new(p)));
+            }
             #[cfg(not(feature = "wasm-backends"))]
             {
-                let _ = (host, rt);
-                return Err(failure(
-                    "JavaScript builds require WebAssembly backend support",
-                ));
+                let _ = (host, go, rt);
+                return Err(failure("builds require WebAssembly backend support"));
             }
         };
         #[cfg(feature = "wasm-backends")]
@@ -204,6 +211,17 @@ impl Selected {
     pub(crate) fn is_component(&self) -> bool {
         !matches!(self, Self::Native)
     }
+}
+
+static ALLOWED: OnceLock<Vec<String>> = OnceLock::new();
+
+/// The tools `--allow-tool` grants the selected backend outside a project.
+pub(crate) fn allow_tools(tools: Vec<String>) {
+    let _ = ALLOWED.set(tools);
+}
+
+fn allowed_tools() -> &'static [String] {
+    ALLOWED.get().map_or(&[], Vec::as_slice)
 }
 
 pub(crate) fn failure(why: impl Into<String>) -> Diagnostic {

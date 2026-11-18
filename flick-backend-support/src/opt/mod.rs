@@ -30,6 +30,7 @@ mod inline;
 mod known;
 mod specialize;
 mod sroa;
+pub mod tuple_match;
 mod walk;
 pub use walk::{Arity, arity, rename};
 

@@ -57,7 +57,7 @@ foreign pure append from "flick:rt" "seqAppend"
   retention call
 
 @lang seq_map
-map : (forall v. a^v -> b)^c -> (Seq a)^d -> (Seq b)^(c + d)
+map : (a^v -> b)^c -> (Seq a)^d -> (Seq b)^(c + d)
 foreign pure map from "flick:rt" "seqMap"
   arity 2
   retention call
@@ -74,7 +74,7 @@ foreign pure filter_map from "flick:rt" "seqFilterMap"
   retention call
 
 @lang seq_flat_map
-flat_map : (forall v. a^v -> (Seq b)^(c + v))^c -> (Seq a)^d -> (Seq b)^(c + d)
+flat_map : (a^v -> (Seq b)^(c + v))^c -> (Seq a)^d -> (Seq b)^(c + d)
 foreign pure flat_map from "flick:rt" "seqFlatMap"
   arity 2
   retention call

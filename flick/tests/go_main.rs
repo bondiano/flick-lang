@@ -65,7 +65,6 @@ fn unchanged_go_build_reuses_and_restores_its_executable() {
         .expect("mtime");
     let repeated = flick_in(&dir, &["build", "--emit", "go"]);
     assert!(repeated.status.success(), "{repeated:?}");
-    assert!(!String::from_utf8_lossy(&repeated.stderr).contains("Building Go executable"));
     assert_eq!(
         fs::metadata(&binary)
             .expect("binary")
@@ -74,9 +73,10 @@ fn unchanged_go_build_reuses_and_restores_its_executable() {
         before
     );
     fs::remove_file(&binary).expect("remove binary");
+    // the executable is an artifact of the cached build, not built again
     let restored = flick_in(&dir, &["build", "--emit", "go"]);
     assert!(restored.status.success(), "{restored:?}");
-    assert!(String::from_utf8_lossy(&restored.stderr).contains("Building Go executable"));
+    assert!(String::from_utf8_lossy(&restored.stderr).contains("Restoring cached artifacts"));
     assert!(binary.is_file());
 }
 
@@ -314,7 +314,19 @@ fn a_module_that_drops_out_leaves_no_go_file_behind() {
             (mine[1], "mine"),
         ],
     );
-    let build = || flick_in(&dir, &["build", "A.fl", "--emit", "go", "--out-dir", "out"]);
+    let build = || {
+        let args = [
+            "build",
+            "A.fl",
+            "--emit",
+            "go",
+            "--out-dir",
+            "out",
+            "--allow-tool",
+            "go",
+        ];
+        flick_in(&dir, &args)
+    };
     let first = build();
     assert!(first.status.success(), "{first:?}");
     let dropped = dir.join("out/go/main/m_B.go");

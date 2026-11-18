@@ -1,7 +1,7 @@
 # Reproducing the JavaScript guest
 
-`just check-js-component` rebuilds the guest and requires exact equality with
-its distributed component and digest. `just update-js-component` is the explicit
+`just check-component js` rebuilds the guest and requires exact equality with
+its distributed component and digest. `just update-component js` is the explicit
 artifact update; the check never updates or accepts a different binary.
 
 The pinned compiler and source-path remaps are necessary but insufficient for
