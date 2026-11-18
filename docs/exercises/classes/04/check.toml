@@ -1,0 +1,11 @@
+export = "forecast"
+argument_types = ["number"]
+return_type = "string"
+output = "Tomorrow: 18.5 °C"
+starter_error = "FLICK-C001"
+title = "A type in a string"
+title_ru = "Тип в строке"
+task = "forecast puts a Temperature into a string, but Temperature has no Display instance. Give it one that writes the degrees and then °C, as in 18.5 °C."
+task_ru = "forecast подставляет Temperature в строку, но у Temperature нет экземпляра Display. Напишите его: градусы, затем °C, как в 18.5 °C."
+hints = ["\\{…} needs an instance of Display: display : a -> String.", "Under the type: instance Display Temperature =, and indented below it let display (Celsius degrees) = …"]
+hints_ru = ["\\{…} требует экземпляр Display: display : a -> String.", "Под типом: instance Display Temperature =, а ниже с отступом let display (Celsius degrees) = …"]

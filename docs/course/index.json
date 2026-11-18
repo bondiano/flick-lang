@@ -79,7 +79,8 @@
           "exercises": [
             "loops/01",
             "loops/02",
-            "loops/03"
+            "loops/03",
+            "loops/04"
           ]
         },
         {
@@ -134,7 +135,8 @@
           "exercises": [
             "classes/01",
             "classes/02",
-            "classes/03"
+            "classes/03",
+            "classes/04"
           ]
         },
         {
