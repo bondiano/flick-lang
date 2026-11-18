@@ -49,7 +49,9 @@ gives the value of.
 The compiler comes with the plugin of `std`, whose heads are `cli` (see
 [command-line applications](../cli-dsl/)), `server` (see
 [server functions](../server-fn/)) and `codec` (see
-[the codec DSL](../schema/#the-codec-dsl)), and `sql`. Every module has these
+[the codec DSL](../schema/#the-codec-dsl)), `sql`, and `suite` and `test` (see
+[testing](../testing/)), which are heads only at the start of a top-level
+declaration. Every module has these
 heads without an import: `cli "x" { … }`, with its body, and `server fn f x =
 …` or `server f` are blocks of `std`'s plugin, and the words stay ordinary
 names elsewhere. Only a block without `{`, such as `cli Main`, needs `import
