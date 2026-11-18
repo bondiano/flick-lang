@@ -1,0 +1,77 @@
+// Only `Resource.own` closes a value of `Close`, once, when the scope that
+// owns it ends: a program makes no `Closing` of its own to close one early,
+// keeps none it is given for a later close, and owns no value a scope owns
+// already or that holds one.
+module App.CloseToken exposing (..)
+
+import Resource exposing (Close(..), Closing, own)
+
+type Raw
+
+make_raw : String ->{} Raw
+foreign effect make_raw from "./conn.js" "make"
+
+close_raw : forall c. Raw^c ->{} Unit
+foreign effect close_raw from "./conn.js" "close"
+  retention call
+
+instance Close Raw =
+  let close _ raw = close_raw raw
+
+// closing before the scope ends: no code but `own` makes a token
+early : Unit ->{Async} Unit
+let early () = scope {
+  let conn = own (make_raw "db")
+  close Resource.Closing conn
+}
+
+// owning again what a scope owns: it would be closed twice
+twice : Unit ->{Async} Unit
+let twice () = scope {
+  let conn = own (make_raw "db")
+  ignore (own conn)
+}
+
+type Holder = Holder Raw
+
+instance Close Holder =
+  let close token (Holder raw) = close token raw
+
+// owning a value that holds one an outer scope owns: the inner scope would
+// close it while the outer one still uses it
+foreign_close : Unit ->{Async} Unit
+let foreign_close () = scope {
+  let conn = own (make_raw "db")
+  scope {
+    ignore (own (Holder conn))
+  }
+  close_raw conn
+}
+
+// a token packed away by a close, for one after it
+type Packed =
+  | Pack (Closing t) : Packed
+
+type Keep = Keep (Ref (Option Packed))
+
+instance Close Keep =
+  let close token (Keep cell) = Ref.set cell (Some (Pack token))
+
+later : Ref (Option Packed) -> Raw ->{Async} Unit
+let later cell raw =
+  match Ref.get cell with
+  | Some (Pack token) -> close token raw
+  | None -> ()
+
+// a token stored as it is: its region is the close's own, which no cell
+// made before it names
+type Stored (s : Region) = Stored (Ref (Option (Closing s)))
+
+instance Close (Stored s) =
+  let close token (Stored cell) = Ref.set cell (Some token)
+//~ FLICK-T001 @25:9-25:25 is a type, not a constructor
+//~ FLICK-G001 @32:15-32:19 the expected type `Raw` holds no captures
+//~ FLICK-G001 @46:18-46:29 the expected type `Holder` holds no captures
+//~ FLICK-G002 @63:26-63:41 this uses `t`
+//~ FLICK-G002 @71:35-71:60 this uses `s`, which the signature of `close` does not keep live
+//~ FLICK-T008 @71:49-71:59 found `Option (Closing t)`

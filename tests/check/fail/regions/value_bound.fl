@@ -1,0 +1,41 @@
+// A qualifier on a type variable bounds the whole value it stands for
+// (`docs/formal/regions.md`, (Inst)): `a^{}` takes no value that holds a
+// region, whether its type shows the region or its data holds it.
+module App.ValueBound exposing (..)
+
+import File exposing (FileSystem, OpenError)
+
+type Raw
+
+make_raw : String ->{} Raw
+foreign effect make_raw from "./conn.js" "make"
+
+close_raw : forall c. Raw^c ->{} Unit
+foreign effect close_raw from "./conn.js" "close"
+  retention call
+
+free : a^{} -> Unit
+let free _ = ()
+
+shown : String ->{Async, FileSystem; OpenError} Unit
+let shown path = scope {
+  let file = File.open_scoped path
+  free file
+}
+
+type Holder = Holder Raw
+
+held : Unit ->{} Unit
+let held () = scope {
+  let conn = Resource.acquire_release (task { make_raw "db" }) close_raw
+  free (Holder conn)
+}
+
+listed : String ->{Async, FileSystem; OpenError} Unit
+let listed path = scope {
+  let file = File.open_scoped path
+  free [file]
+}
+//~ FLICK-G001 @23:8-23:12 the expected type `File s` holds no captures
+//~ FLICK-G001 @31:9-31:20 the expected type `Holder` holds no captures
+//~ FLICK-G001 @37:8-37:14 the expected type `List (File s)` holds no captures

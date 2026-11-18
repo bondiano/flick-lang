@@ -1,4 +1,6 @@
-use super::tests::release;
+use super::optimize;
+use super::tests::{builtin_arity, builtin_generic, release};
+use crate::ir::tests::check_text;
 
 /// `Default` of `derive_default.fl`, with `GDefault` over `Generic` and the
 /// instance of `Float`, and `Point` after it.
@@ -123,4 +125,31 @@ fn settling_data_does_not_expand_a_recursive_method_function() {
     assert!(!methods(&mut value, &lookup, &mut 0, 0));
     assert_eq!(value, original);
     assert_eq!(lookups.get(), 1);
+}
+
+/// A default of a class of another module, which an instance here takes,
+/// is taken apart here with the spans of this module's file: Go's line
+/// directives and the IR's files read every span of a module as its own.
+#[test]
+fn a_default_of_another_module_takes_the_spans_of_this_one() {
+    let (mut ir, interface) = check_text(
+        "App",
+        "module App exposing (..)\n\nimport Resource exposing (Close(..))\n\n\
+         type Plain = Plain String\n\n\
+         instance Close Plain =\n  let close _ (Plain name) = Host.raw_stdout_line name\n",
+    )
+    .expect("lowers");
+    let own = ir.items[0].span.file;
+    optimize(
+        &mut ir,
+        &|name: &str| interface.exports_value(name),
+        &builtin_generic,
+        &builtin_arity,
+    );
+    let mut files = Vec::new();
+    ir.each_span_mut(&mut |span| files.push(span.file));
+    assert!(
+        files.iter().all(|f| *f == own),
+        "spans of {files:?}, all of {own:?} expected"
+    );
 }

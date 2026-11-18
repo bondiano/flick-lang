@@ -9,7 +9,7 @@ use crate::ir::{Expr, lang_items};
 use crate::types::builtins;
 
 /// A generic function of a built-in module, as a build offers it.
-fn builtin_generic(module: &str, name: &str) -> Option<(Vec<String>, Expr)> {
+pub(super) fn builtin_generic(module: &str, name: &str) -> Option<(Vec<String>, Expr)> {
     let ir = builtin_modules().iter().find(|m| m.name == module)?;
     let interface = builtins().iter().find(|i| i.module == module)?;
     super::names_only(ir, name, &|n| interface.exports_value(n))
