@@ -192,6 +192,15 @@
           }
         },
         {
+          "comment": "`suite \"name\"` and `test \"name\"`, maybe `.skip` or `.only`, at the start of a line: a case of the test DSL",
+          "match": "^[ \\t]*(suite|test)(?:(\\.)(skip|only))?(?=[ \\t]+\")",
+          "captures": {
+            "1": { "name": "keyword.other.flick" },
+            "2": { "name": "punctuation.accessor.flick" },
+            "3": { "name": "keyword.other.flick" }
+          }
+        },
+        {
           "match": "^[ \\t]*(component)[ \\t]+([a-z_][A-Za-z0-9_]*)",
           "captures": {
             "1": { "name": "keyword.other.flick" },

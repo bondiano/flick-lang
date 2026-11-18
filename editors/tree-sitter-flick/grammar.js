@@ -24,7 +24,7 @@ module.exports = grammar({
 
   word: $ => $._identifier,
 
-  conflicts: $ => [[$._loop, $.identifier], [$._while, $.identifier]],
+  conflicts: $ => [[$._loop, $.identifier], [$._while, $.identifier], [$._case, $.identifier]],
 
   rules: {
     source_file: $ => repeat($._token),
@@ -33,6 +33,7 @@ module.exports = grammar({
       $._newline,
       $._loop,
       $._while,
+      $._case,
       $.attribute,
       $.label,
       $._foreign,
@@ -64,6 +65,13 @@ module.exports = grammar({
     _newline: _ => '\n',
     _loop: $ => prec.dynamic(1, seq(alias('loop', $.keyword), $.braces)),
     _while: $ => prec.dynamic(1, seq(alias('while', $.keyword), repeat1($._condition_token), alias('do', $.keyword))),
+    // `suite "name"` and `test "name"`, maybe `.skip` or `.only`, start a case
+    // of the test DSL; elsewhere the words are names
+    _case: $ => prec.dynamic(1, seq(
+      alias(choice('suite', 'test'), $.keyword),
+      optional(alias(choice('.skip', '.only'), $.keyword)),
+      $.string,
+    )),
     _condition_token: $ => choice(
       $.parens, $.brackets, $.braces, $.label, $.identifier, $.constructor, $.boolean,
       $.number, $.string, $.raw_string, $.multiline_string, $.member,
@@ -96,7 +104,7 @@ module.exports = grammar({
     member: _ => token(seq('.', /[a-z_][A-Za-z0-9_]*/)),
 
     _identifier: _ => /[a-z_][A-Za-z0-9_]*/,
-    identifier: $ => choice($._identifier, 'loop', 'while'),
+    identifier: $ => choice($._identifier, 'loop', 'while', 'suite', 'test'),
     constructor: _ => /[A-Z][A-Za-z0-9_]*/,
 
     number: _ => token(choice(
