@@ -44,6 +44,11 @@ back : Positive -> Port
 let back p = Port.prove (Positive.value p)
 //           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-T077 nothing here establishes `Positive.value p < 65536`
 
+// the conversion stays explicit: a `Port` is no `Positive`
+same : Port -> Positive
+let same p = p
+//           ^ FLICK-T003 expected `Positive`, found `Port`
+
 // `||` that held does not say which side did
 either : Float -> Option Port
 let either n = if n > 0 || n < 65536 then Some (Port.prove n) else None
