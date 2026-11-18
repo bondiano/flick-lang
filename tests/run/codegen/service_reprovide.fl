@@ -1,0 +1,63 @@
+// Each run of an operation finds the innermost provider where it runs, not
+// one an earlier run found: a `provide` per turn of a loop, providers nested
+// around a function that performs it, and one inside a handler that aborts.
+module App.Main exposing (main)
+
+service Greeter =
+  greet : String ->{} String
+
+effect Throw =
+  abort throw : forall a. String ->{} a
+
+named : String -> Greeter.Impl
+let named who = { greet = fun name -> who ++ " greets " ++ name }
+
+say : String ->{Host.Console} Unit
+let say line = Platform.stdout_line line
+
+/// The operation in a function of its own, run under each provider.
+greeting : String ->{Greeter} String
+let greeting name = Greeter.greet name
+
+/// A provider per turn, and the one around the loop between them.
+looped : Unit ->{Greeter, Host.Console} Unit
+let looped () =
+  let mut i = 0
+  while i < 3 do
+    say (provide Greeter (named ("turn " ++ show i)) { Greeter.greet "loop" })
+    say (provide Greeter (named ("call " ++ show i)) { greeting "loop" })
+    say (Greeter.greet "between")
+    i = i + 1
+
+/// Providers nested around the same function, and the outer one after them.
+nested : Unit ->{Greeter, Host.Console} Unit
+let nested () =
+  say (greeting "outer")
+  provide Greeter (named "middle") {
+    say (greeting "middle")
+    provide Greeter (named "inner") { say (greeting "inner") }
+    say (greeting "middle again")
+  }
+  say (greeting "outer again")
+
+/// A provider inside a handler that aborts, then the outer one again.
+aborted : Unit ->{Greeter, Host.Console} Unit
+let aborted () =
+  let why =
+    try
+      provide Greeter (named "aborted") {
+        say (greeting "before the throw")
+        Throw.throw "thrown"
+      }
+    with
+    | Throw.throw why -> why
+  say why
+  say (greeting "after the throw")
+
+main : Unit ->{Host.Console} Unit
+let main () = provide Greeter (named "outer") {
+  looped ()
+  nested ()
+  aborted ()
+  say (greeting "last")
+}

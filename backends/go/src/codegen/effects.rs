@@ -5,6 +5,7 @@ use std::mem;
 
 use flick_pretty::{Document, Documentable, docvec};
 
+use super::closures::Call;
 use super::layout::{Code, block, call, single, statement};
 use super::{Gen, names};
 use flick_ir::{Arm, Expr, Stage};
@@ -157,5 +158,25 @@ impl<'a> Gen<'a> {
             arity.to_doc(self.a),
         ];
         call(self.a, "flickrt.Operation", args).into()
+    }
+
+    /// How `S.op` given all its arguments up to its first effectful stage
+    /// is called, when that stage runs here: one `flickrt.Perform` of the
+    /// operation's package variable, which looks the implementation up
+    /// where it runs, as the task of `flickrt.Operation` would.
+    pub(super) fn perform(&mut self, service: &str, name: &str) -> Call<'a> {
+        let a = self.a;
+        let made = format!(
+            "flickrt.NewOp({}, {})",
+            names::string(service),
+            names::string(name)
+        );
+        let op = self.once(&made);
+        Box::new(move |fb, args: &[Code<'a>]| {
+            let args = [a.text(fb), a.text(op)]
+                .into_iter()
+                .chain(args.iter().map(|arg| arg.doc));
+            call(a, "flickrt.Perform", args).into()
+        })
     }
 }

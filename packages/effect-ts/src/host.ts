@@ -11,7 +11,7 @@ import type * as NodeStdio from "@effect/platform-node/NodeStdio";
 import type * as NodeTerminal from "@effect/platform-node/NodeTerminal";
 import { format } from "effect/Formatter";
 
-export { args, env, nodeFs, offSignal, onSignal, setExitCode, takeEnv, writeStderr, writeStdout } from "@flick-lang/runtime/rt/host";
+export { args, env, nodeFs, offSignal, onSignal, setExitCode, takeEnv, vars, writeStderr, writeStdout } from "@flick-lang/runtime/rt/host";
 
 const builtin = (): NodeJS.Process["getBuiltinModule"] | undefined =>
   (globalThis as { process?: Pick<NodeJS.Process, "getBuiltinModule"> }).process?.getBuiltinModule;

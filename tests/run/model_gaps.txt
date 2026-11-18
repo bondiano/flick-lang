@@ -38,7 +38,7 @@ codegen/service_child # no native for `parallel` (flick:rt parallel)
 codegen/strings_utf16 # no native for `length` (flick:String length)
 codegen/tags # no native for `tag_of` (./tags.mjs tagOf)
 codegen/unpack_dictionary # the model's (Field) rejects `App.Main.main`
-effect/host_services # no native for `with_seed` (flick:Random withSeed)
+effect/host_services # no native for `any` (flick:rt listAny)
 ffi/catch_order # no native for `fail` (./bindings.mjs fail)
 ffi/copy # no native for `callback_arg` (./bindings.mjs copyDeepCallbackArg)
 ffi/defect # no native for `fail_sync` (./bindings.mjs fail)
@@ -89,6 +89,7 @@ sql/queries # no native for `codec` (flick:sql sqlCodec)
 stdlib/cli/cli # the row primitive `Lacks "name" { color : Option Color; loud : Bool; times : Float }`
 stdlib/cli/cli_exit # the row primitive `Lacks "times" {}`
 stdlib/cli/file_parse # the row primitive `Lacks "data" {}`
+stdlib/cli/from_host # the row primitive `Lacks "region" {}`
 stdlib/cli/prompt # no native for `chars` (flick:rt stringChars)
 stdlib/cli/surface # the row primitive `Lacks "env" {}`
 stdlib/cli/trace # no native for `received` (../observability/receiver.mjs received)
@@ -143,6 +144,7 @@ stdlib/effect/hmac # no native for `from_string` (flick:Crypto flickUtf8Encode)
 stdlib/effect/json_schema # no native for `meta_schema_uri_draft_04` (flick:JsonSchema META_SCHEMA_URI_DRAFT_04)
 stdlib/effect/jwt # no native for `from_base64url` (flick:Crypto flickBase64UrlDecode)
 stdlib/effect/layer # the model's (⊆) rejects `App.Main.contexts`
+stdlib/effect/layer_finalizer_services # no native for `from_build` (flick:Layer flickFromBuild)
 stdlib/effect/layer_map # no native for `make` (flick:LayerMap flickMake)
 stdlib/effect/logger # no native for `make` (flick:Logger flickMake)
 stdlib/effect/metric # no native for `counter` (flick:Metric flickCounter)

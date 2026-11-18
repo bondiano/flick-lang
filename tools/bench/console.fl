@@ -1,0 +1,10 @@
+// 100 000 lines printed through the Host.Console service, each one run of
+// its operation: what a service operation costs on each target.
+module App.Main exposing (main)
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  let mut i = 0
+  while i < 100000 do
+    Platform.stdout_line "line"
+    i = i + 1

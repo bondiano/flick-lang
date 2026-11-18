@@ -96,7 +96,7 @@ Only the combinators reach these:
 | Combinator | Meaning |
 | - | - |
 | `Cli.at_least n`, `Cli.at_most n`, `Cli.between m n` | a `List` of that many values |
-| `Cli.from_config config` | one value, read from a `Config.Config` when absent |
+| `Cli.from_config config` | one value, read from a `Config.Config` when absent, by the current `ConfigProvider` or else the variables `Host.Environment` lists |
 | `Cli.from_prompt prompt` | one value, asked with a `Cli.Prompt.Prompt` when absent |
 | `Cli.hidden`, `Cli.metavar name` | applied to a multiplicity: left out of help, or the name of the value there |
 | `Cli.optional_value text` | a flag written alone takes `text` |
@@ -128,7 +128,7 @@ of help and version as well.
 ```flick
 # import App.Greet exposing (greet)
 #
-main : Unit ->{Host.Arguments, Host.Console, Async; AppError} Unit
+main : Unit ->{Host.Environment, Host.Arguments, Host.Console, Async; AppError} Unit
 let main () =
   try Cli.run greet (Platform.args ()) with
   | Cli.CliError message -> App.fail message
@@ -142,6 +142,8 @@ runs the handler as a span named after its command and sends its spans,
 logs and metrics over OTLP to `OTEL_EXPORTER_OTLP_ENDPOINT`
 (`http://localhost:4318` by default) as the service `OTEL_SERVICE_NAME`
 (the command's name by default); without it nothing loads the exporter.
+`Cli.run` reads these variables, the colors' `NO_COLOR`, `FORCE_COLOR`
+and `TERM`, and a missing value's config through `Host.Environment`.
 `Cli.run_with` with `builtIns` leaving out `Cli.TraceFlag` removes it. Invalid input — an unknown flag, a missing argument, a value
 `Cli.Value` refuses — prints the command's help and fails with
 `Cli.CliError` and its message; no handler runs, and `App.fail` turns it

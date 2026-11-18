@@ -282,3 +282,66 @@ let main () = Platform.stdout_line (describe pair ++ \" \" ++ show pair ++ \" \"
         );
     }
 }
+
+#[test]
+#[ignore = "needs Node and Go; run `just e2e`"]
+fn a_re_exported_type_keeps_its_companions_on_js_and_go() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("re_exported_companions");
+    let source = dir.join("App");
+    fs::create_dir_all(&source).expect("source directory");
+    for (name, text) in [
+        (
+            "Ports.fl",
+            "module App.Ports exposing (Port)\nrefined type Port = Float where fun n -> n > 0 && n < 65536\n  deriving Show\n",
+        ),
+        (
+            "Again.fl",
+            "module App.Again exposing (Port)\nimport App.Ports exposing (Port)\n",
+        ),
+        // `Port` reaches the main module only through `Again`
+        (
+            "Main.fl",
+            "module App.Main exposing (main)\nimport App.Again as A\nas_port : Float -> Option A.Port\nlet as_port n = if n > 0 && n < 65536 then Some (A.Port.prove n) else None\nparsed : Float -> Option A.Port\nlet parsed n = match A.Port.parse n with\n  | Ok p -> Some p\n  | Err _ -> None\nmain : Unit ->{Host.Console} Unit\nlet main () =\n  Platform.stdout_line (show (as_port 8080))\n  Platform.stdout_line (show (parsed 70000))\n  Platform.stdout_line (show (Option.map A.Port.value (parsed 443)))\n",
+        ),
+    ] {
+        fs::write(source.join(name), text).expect("write source");
+    }
+    let main = source.join("Main.fl");
+    for emit in ["js", "go"] {
+        let out = dir.join(format!("out-{emit}"));
+        let build = Command::new(env!("CARGO_BIN_EXE_flick"))
+            .arg("build")
+            .arg(&main)
+            .arg("--out-dir")
+            .arg(&out)
+            .arg("--emit")
+            .arg(emit)
+            .output()
+            .expect("build runs");
+        assert!(
+            build.status.success(),
+            "{emit}: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        let output = if emit == "js" {
+            Command::new("node")
+                .arg(out.join(runner_path(false)))
+                .output()
+                .expect("Node runs")
+        } else {
+            Command::new(out.join(executable(MAIN_ENTRY)))
+                .output()
+                .expect("Go executable runs")
+        };
+        assert!(
+            output.status.success(),
+            "{emit}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&output.stdout),
+            "Some 8080\nNone\nSome 443\n",
+            "{emit}"
+        );
+    }
+}

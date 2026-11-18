@@ -539,6 +539,43 @@ start : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter} Unit
 let start owner = ignore (Fiber.spawn owner report (task { Greeter.greet "child" }))
 ```
 
+The build of `Layer.from_build f` and `Layer.from_build_memo f` runs in the
+owner of the region `s` the layer is built into, and `f` assumes
+`Fiber.Provided ri s` for the layer's inputs `ri`: a finalizer it registers may
+use them. A `provide` and `Layer.launch` build a layer into a region of their
+own, which every provider of its inputs outlives. `Layer.build`,
+`Layer.build_with_memo_map`, `LayerRef.make`, `LayerMap.make` and
+`LayerMap.from_record` build it into a region of their caller, so they require
+`Fiber.Provided ri s` there. A build into a `scope` inside the `provide` of an
+input checks; a build into a `scope` around that `provide`, which outlives it,
+is `FLICK-G003`:
+
+```flick fail G003
+# service Greeter =
+#   greet : String ->{} String
+# service Box =
+#   value : Unit ->{} String
+# greeter : Layer none none {Greeter}
+# let greeter = Layer.succeed Greeter { greet = fun name -> name }
+#
+box : Layer {Greeter} none {Box}
+let box =
+  Layer.from_build (fun memo ->
+    Scope.add_finalizer (task { ignore (Greeter.greet "released") })
+    Layer.build_with_memo_map memo (Layer.succeed Box { value = fun () -> "box" })
+  )
+
+built : Unit ->{} Unit
+let built () = provide greeter { scope { ignore (Layer.build box) } }
+
+leaked : Unit ->{} Unit
+let leaked () = scope {
+  // FLICK-G003: the finalizer of `box` would run when the `scope` closes,
+  // after the `provide` released `Greeter`
+  provide greeter { ignore (Layer.build box) }
+}
+```
+
 ## What may suspend: `Async`
 
 A function that waits for time, input or output or another fiber says so
@@ -587,7 +624,8 @@ let mode () = Host.Environment.env "MODE"
 
 selected : Unit ->{} Option String
 let selected () =
-  let environment = Layer.succeed Host.Environment { env = fun _ -> Some "test" }
+  let environment =
+    Layer.succeed Host.Environment { env = fun _ -> Some "test"; vars = fun () -> [] }
   provide environment { mode () }
 ```
 
@@ -650,7 +688,6 @@ whatever its row says:
 
 - a `foreign` binding is taken on trust: `now : Unit ->{} Float` bound to
   `Date.now` reads the clock with an empty row;
-- `ConfigProvider.from_env` reads the environment variables with an empty row;
 - `Host.raw_*` and the live layers made of them are ordinary values: any
   function may call the first or provide the second, whatever its own row:
 

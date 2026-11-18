@@ -19,7 +19,7 @@ pub use frames::Frame;
 pub use prim::{atom, equal};
 pub use regions::Lambda;
 
-use crate::native::structural_dict;
+use crate::native::{settled, structural_dict};
 use crate::subst::{matches, subst};
 use crate::syntax::{Arm, Const, Env, Head, Lit, Path, Term};
 

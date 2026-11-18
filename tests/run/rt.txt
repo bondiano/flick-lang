@@ -88,6 +88,7 @@ codegen/scope_run
 codegen/service_child
 codegen/service_dictionary
 codegen/service_place
+codegen/service_reprovide
 codegen/services
 effect/service_params
 effect/effect_params
@@ -156,6 +157,7 @@ sql/queries
 stdlib/cli/cli
 stdlib/cli/cli_exit
 stdlib/cli/file_parse
+stdlib/cli/from_host
 stdlib/cli/prompt
 stdlib/cli/surface
 stdlib/cli/trace
@@ -210,6 +212,7 @@ stdlib/effect/hmac
 stdlib/effect/json_schema
 stdlib/effect/jwt
 stdlib/effect/layer
+stdlib/effect/layer_finalizer_services
 stdlib/effect/layer_map
 stdlib/effect/logger
 stdlib/effect/metric
@@ -355,6 +358,7 @@ effect/row_without
 
 runtime/counted_layer_merge
 runtime/lazy_once
+runtime/lazy_abort
 runtime/lazy_shared
 runtime/suspended
 runtime/suspended_std

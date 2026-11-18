@@ -145,16 +145,26 @@ theorem LNest.sub {c : Cfg} {home i E r r'} (hn : LNest Ψ c anc home) (hi : c.a
   hn.redex hi hE hv hr.frame (fun _ h => hr (Tm.has_frame_ins (hs _ h))) (fun _ _ h => h)
     (fun _ => Tm.Fw.of_noIns fun h => hr (hs _ h)) hn.cells
 
+/-- A redex replaced by one with the same `inside` forms, at the place of its hole, and the
+store by one whose cells hold no run-time form. -/
+theorem LNest.redexMem {c : Cfg} {μ' : List Tm} {home i E r r'} (hn : LNest Ψ c anc home)
+    (hi : c.at i = some (plug E r)) (hE : OkE E) (hv : ¬ Value r)
+    (hfr : r.Fw Ψ anc (holeE (baseOf anc i) E) → ∀ q, r'.Has (.frame q) ↔ r.Has (.frame q))
+    (h' : r.Fw Ψ anc (holeE (baseOf anc i) E) → r'.Fw Ψ anc (holeE (baseOf anc i) E))
+    (hc : ∀ (l : Nat) (v : Tm), μ'[l]? = some v → v.NoIns) :
+    LNest Ψ ((⟨c.rgs, μ', c.main⟩ : Cfg).put i (plug E r')) anc home := by
+  have hw := (hn.thread i _ hi).1
+  obtain ⟨-, hrW⟩ := fw_of_plug hv hE hw
+  refine hn.put_local hi (fun _ _ h => h)
+    (hw.replug hv hE (h' hrW) fun x hx => .inl ((hfr hrW x).mp hx)) (fun q => ?_) hc
+  rw [plug_has_iff, plug_has_iff (x := r), hfr hrW]
+
 /-- A redex replaced by one with the same `inside` forms, at the place of its hole. -/
 theorem LNest.redex' {c : Cfg} {home i E r r'} (hn : LNest Ψ c anc home) (hi : c.at i = some (plug E r))
     (hE : OkE E) (hv : ¬ Value r)
     (hfr : r.Fw Ψ anc (holeE (baseOf anc i) E) → ∀ q, r'.Has (.frame q) ↔ r.Has (.frame q))
     (h' : r.Fw Ψ anc (holeE (baseOf anc i) E) → r'.Fw Ψ anc (holeE (baseOf anc i) E)) :
-    LNest Ψ ((⟨c.rgs, c.mem, c.main⟩ : Cfg).put i (plug E r')) anc home := by
-  have hw := (hn.thread i _ hi).1
-  obtain ⟨-, hrW⟩ := fw_of_plug hv hE hw
-  refine hn.put_local hi (fun _ _ h => h)
-    (hw.replug hv hE (h' hrW) fun x hx => .inl ((hfr hrW x).mp hx)) (fun q => ?_) hn.cells
-  rw [plug_has_iff, plug_has_iff (x := r), hfr hrW]
+    LNest Ψ ((⟨c.rgs, c.mem, c.main⟩ : Cfg).put i (plug E r')) anc home :=
+  hn.redexMem hi hE hv hfr h' hn.cells
 
 end Flick

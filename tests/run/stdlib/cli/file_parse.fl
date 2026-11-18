@@ -16,14 +16,14 @@ let data =
     (Cli.required |> Cli.file_parse None)
   |> Cli.handle (fun (o : DataOptions) -> Platform.stdout_line o.data)
 
-attempt_in : String -> List String ->{Host.Console, Async} Unit
+attempt_in : String -> List String ->{Host.Environment, Host.Console, Async} Unit
 let attempt_in dir args =
   Platform.stdout_line ("$ " ++ String.replace_all dir "$TMP" (String.join " " args))
   try Cli.run data args with
   | Cli.CliError message ->
     Platform.stdout_line ("CliError: " ++ String.replace_all dir "$TMP" message)
 
-main : Unit ->{Host.Console, Async; AppError} Unit
+main : Unit ->{Host.Environment, Host.Console, Async; AppError} Unit
 let main () =
   let files = [
     (

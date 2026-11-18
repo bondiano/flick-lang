@@ -78,6 +78,7 @@ codegen/task_twice
 stdlib/cli/cli
 stdlib/cli/cli_exit
 stdlib/cli/file_parse
+stdlib/cli/from_host
 stdlib/cli/prompt
 stdlib/cli/surface
 stdlib/cli/trace
@@ -114,6 +115,7 @@ codegen/service_dictionary
 codegen/service_place
 codegen/scope_run
 codegen/service_child
+codegen/service_reprovide
 runtime/scope_close
 runtime/arena_scope
 runtime/arena_layer_scope
@@ -131,6 +133,7 @@ stdlib/effect/deferred
 stdlib/effect/ref
 stdlib/effect/fibers
 stdlib/effect/layer
+stdlib/effect/layer_finalizer_services
 stdlib/effect/layer_map
 runtime/hung_io
 runtime/concurrency
@@ -295,6 +298,7 @@ stdlib/server/auth
 stdlib/server/node
 runtime/counted_layer_merge
 runtime/lazy_once
+runtime/lazy_abort
 runtime/lazy_shared
 runtime/suspended
 runtime/suspended_std

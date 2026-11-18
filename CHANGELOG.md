@@ -6,18 +6,31 @@ break programs.
 
 ## Unreleased
 
+- **Fixed: a re-exported type keeps its companions.** A module that
+  re-exports a type (`import App.Ports exposing (Port)` with
+  `exposing (Port)`) now exports its `parse`, `value`, `check`, `prove` and
+  the other companions too, so `A.Port.parse` and `A.Port.prove` work through
+  the re-exporter alone, and the invariant it passes on proves. Interfaces
+  are `iface-version` 29.
+
 - **Breaking: the standard library names the host services it uses.**
   `Platform.stdout_line`, `stderr_line` and `stdout_write` and the five
   levels of `Console` need `Host.Console`, and `Log.console` is a layer made
   of the live `Host.console`, which needs nothing; `Platform.args`
-  `Host.Arguments`; `Platform.env` and the default provider of `Config.get`
-  `Host.Environment`, which reads a variable by its name only, so the
-  default provider no longer makes a record or an array of the names of the
-  variables (`ConfigProvider.layer (ConfigProvider.from_env options)` still
-  does); `Clock`, `DateTime.now`, `DateTime.is_past` and
-  `DateTime.is_future` `Host.Clock`; `Random` `Host.Random`, whose every
+  `Host.Arguments`; `Platform.env` and `ConfigProvider.from_env`, the
+  default provider of `Config.get`, `Host.Environment`, which reads a
+  variable with `env` and lists them all with `vars`; `Clock`,
+  `DateTime.now`, `DateTime.is_past` and `DateTime.is_future`
+  `Host.Clock`; `Random` `Host.Random`, whose every
   operation is now made of `Host.Random.next` draws, so a fake fixes them,
-  while `Random.with_seed` keeps the same draws. A new service
+  while `Random.with_seed` keeps the same draws. What else reads the
+  environment when no `ConfigProvider` is current reads it through
+  `Host.Environment` too: `ConfigProvider.layer_add` and every `Otlp`
+  exporter (`layer`, `traces`, `logs`, `metrics`, their `_with` forms and
+  `from_config`) take it as an input of their layer and `Otlp.tracer` in
+  its row, and `Cli.run`, `run_with` and `run_version` read through it a
+  missing value's `Cli.from_config`, the colors (`NO_COLOR`,
+  `FORCE_COLOR`, `TERM`) and the settings of `--trace`. A new service
   `Host.Process` starts child processes: `ChildProcess.spawn`, `string`,
   `lines` and `exit_code` need it, `Host.Live` and `Host.live` include it,
   and every Node and Go root provides it. The built-in flags of
@@ -29,12 +42,28 @@ break programs.
   console extras of `Console` (`current`, `with_console`, `to_stderr`,
   `trace`, `assert`, `clear`, `count`, `dir`, `table`, `group`, `time` and
   their variants) and `Log.write_console`. New:
-  `DateTime.unsafe_from_epoch_millis`, `Config.get_with` and
-  `ChildProcess.output_string` and `output_lines`, the text of a spawned
-  process, which `string` and `lines` read. `flick check --fix --only E002`
+  `Host.Environment.vars`, `DateTime.unsafe_from_epoch_millis`,
+  `Config.get_with` (`get` with a provider of its own when none is
+  current) and `ChildProcess.output_string` and `output_lines`, the text
+  of a spawned process, which `string` and `lines` read.
+  `flick check --fix --only E002`
   adds the services a program now needs to its rows; a function whose arrow
   is pure, or a callback whose row another module closes, needs editing by
   hand. A fix that adds a service to `->{none; E}` now writes `->{S; E}`.
+
+- **Breaking: a layer's build may use its inputs when it is released.**
+  The build of `Layer.from_build` and `Layer.from_build_memo` assumes
+  `Fiber.Provided ri s` for the region `s` it is built into, so a finalizer
+  it registers may use the layer's inputs `ri` instead of `FLICK-G003`.
+  `Layer.build`, `Layer.build_with_memo_map`, `LayerRef.make`,
+  `LayerMap.make` and `LayerMap.from_record` require `Fiber.Provided ri s`
+  of their caller: a build inside the `provide` of one of its inputs, or
+  into a region a function's signature names without the constraint, is now
+  `FLICK-G003`, as a lazy build of `LayerRef` or `LayerMap` after that
+  `provide` ended could use a released service. `provide` and `Layer.launch`
+  are unchanged. The fix of a `FLICK-G003` that would add `Fiber.Provided`
+  to a signature is offered only when that signature names the region, not
+  for the region of a `forall` in an argument such as a `from_build` body.
 
 - **`T.prove` for refined types:** `T.prove v` makes a `T` with no
   `Result` and without running the check again, where the compiler proves

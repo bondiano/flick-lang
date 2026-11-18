@@ -118,7 +118,8 @@ tool : Cli.Command {Host.Console} none
 let tool =
   Cli.command "tool" |> Cli.subcommand deploy "Deploys" |> Cli.subcommand secret "" |> Cli.group
 
-attempt : Cli.Command {Host.Console} none -> List String ->{Host.Console, Async} Unit
+attempt :
+  Cli.Command {Host.Console} none -> List String ->{Host.Environment, Host.Console, Async} Unit
 let attempt command args =
   Platform.stdout_line ("$ " ++ String.join " " args)
   try Cli.run command args with
@@ -141,7 +142,11 @@ let parsed text = Cli.parse text
 
 /// `attempt`, printing the temporary directory `dir` as `$TMP` and a
 /// Windows separator as `/`.
-attempt_in : String -> Cli.Command {Host.Console} none -> List String ->{Host.Console, Async} Unit
+attempt_in :
+  String ->
+  Cli.Command {Host.Console} none ->
+  List String ->{Host.Environment, Host.Console, Async}
+  Unit
 let attempt_in dir command args =
   portable : String -> String
   let portable text = String.replace_all "\\" "/" (String.replace_all dir "$TMP" text)
@@ -186,7 +191,7 @@ let only_help = {
   formatter = Some custom
 }
 
-with_settings : List String ->{Host.Console, Async} Unit
+with_settings : List String ->{Host.Environment, Host.Console, Async} Unit
 let with_settings args =
   Platform.stdout_line ("$ " ++ String.join " " args)
   try Cli.run_with only_help deploy args with
@@ -207,7 +212,7 @@ let custom = {
   formatVersion = fun name version -> name ++ "@" ++ version
 }
 
-main : Unit ->{Host.Console, Async; AppError} Unit
+main : Unit ->{Host.Environment, Host.Console, Async; AppError} Unit
 let main () =
   attempt deploy [
     "-e",

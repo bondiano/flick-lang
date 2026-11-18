@@ -104,7 +104,7 @@ exporting the counter as well requires `Otlp.layer` or a metrics layer.
 ```flick
 # import App.Telemetry exposing (span_options, checkouts)
 #
-observe_checkout : Unit ->{} Unit
+observe_checkout : Unit ->{Host.Environment} Unit
 let observe_checkout () =
   provide (Otlp.traces { url = "http://localhost:4318/v1/traces"; service_name = "shop" }) {
     Tracer.with_span "checkout" span_options (task { Metric.update 1 checkouts })
@@ -133,7 +133,7 @@ collector.
 ```flick
 # import App.Telemetry exposing (span_options)
 #
-audit : Unit ->{} Unit
+audit : Unit ->{Host.Environment} Unit
 let audit () =
   scope {
     let tracer = Otlp.tracer { url = "http://localhost:4318/v1/traces"; service_name = "audit" }
@@ -143,8 +143,9 @@ let audit () =
 
 ### Deployment configuration
 
-`Otlp.from_config None` reads the current `ConfigProvider` (the process
-environment by default) and exports in JSON. A signal is enabled **only**
+`Otlp.from_config None` reads the current `ConfigProvider` (by default the
+variables `Host.Environment` lists, as for every `Otlp` exporter) and
+exports in JSON. A signal is enabled **only**
 when its `OTEL_TRACES_EXPORTER`, `OTEL_LOGS_EXPORTER` or
 `OTEL_METRICS_EXPORTER` names `otlp`; setting an endpoint alone does not
 enable export.
@@ -154,8 +155,9 @@ The configuration also reads `OTEL_EXPORTER_OTLP_ENDPOINT`, per-signal
 batch settings `OTEL_BSP_*`, `OTEL_BLRP_*` and `OTEL_METRIC_EXPORT_*`; and
 resource settings `OTEL_SERVICE_NAME`, `OTEL_SERVICE_VERSION` and
 `OTEL_RESOURCE_ATTRIBUTES`. `Otlp.from_config (Some "shop")` overrides the
-configured service name. Use a supplied `ConfigProvider` for isolated
-configuration in tests rather than mutating the process environment.
+configured service name. Use a supplied `ConfigProvider` or a fake
+`Host.Environment` for isolated configuration in tests rather than mutating
+the process environment.
 
 ## Prometheus
 

@@ -50,6 +50,7 @@ type fiberState struct {
 	cohort    *cohort                // a forked fiber's until it first suspends (startup.go)
 	forks     atomic.Pointer[cohort] // the cohort its forks join until it suspends (startup.go)
 	coro      *coroutine             // the body of a `control` handler the fiber runs now, if any (handle.go)
+	ops       opCache                // the implementations its operations found last (service.go)
 }
 
 var fibers atomic.Int64

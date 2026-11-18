@@ -190,10 +190,19 @@ let main () =
     try provide (ConfigProvider.layer env) { Config.get (Config.string "MODE") } with
     | Config.ConfigError m -> m
   Platform.stdout_line ("layer " ++ provided)
-  // without a provider, `get` reads the variables through `Host.Environment`
+  // without a provider, `get` reads the variables `Host.Environment` lists
+  let host_vars = [
+    ("MODE", "from the host"),
+    ("PORTS_0", "80"),
+    ("PORTS_1", "443"),
+    ("LABELS_TEAM", "core"),
+    ("LABELS_TIER", "web"),
+  ]
   let host_env =
     Layer.succeed Host.Environment {
-      env = fun name -> if name == "MODE" then Some "from the host" else None
+      env = fun name ->
+        List.find (fun (key, _) -> key == name) host_vars |> Option.map (fun (_, value) -> value)
+      vars = fun () -> host_vars
     }
   let from_host =
     try
@@ -204,6 +213,30 @@ let main () =
     try provide host_env { Config.get (Config.with_default "unset" (Config.string "MODE")) } with
     | Config.ConfigError m -> m
   Platform.stdout_line ("host " ++ show from_host ++ " " ++ read_mode)
+  let ports =
+    try
+      provide host_env { Config.get (Config.array { separator = None } Schema.number "PORTS") }
+    with
+    | Config.ConfigError _ -> []
+  let labels =
+    try
+      provide host_env {
+        Config.get
+          (Config.record { separator = None; keyValueSeparator = None } Schema.string "LABELS")
+      }
+    with
+    | Config.ConfigError m -> [("error", m)]
+  Platform.stdout_line ("host array " ++ show ports ++ " record " ++ show labels)
+  // `get_with` falls back to the provider its callback makes only without a current one
+  let fallen_back =
+    try Config.get_with (fun () -> env) (Config.string "HOST") with
+    | Config.ConfigError m -> m
+  let current =
+    try
+      provide (ConfigProvider.layer own) { Config.get_with (fun () -> env) (Config.string "NAME") }
+    with
+    | Config.ConfigError m -> m
+  Platform.stdout_line ("get_with " ++ fallen_back ++ " " ++ current)
   let added =
     try
       provide (ConfigProvider.layer env) {
@@ -214,6 +247,17 @@ let main () =
     with
     | Config.ConfigError m -> [m]
   Platform.stdout_line ("layer_add " ++ show added)
+  // without a current provider, `layer_add` adds to the variables `Host.Environment` lists
+  let added_to_host =
+    try
+      provide host_env {
+        provide (ConfigProvider.layer_add { asPrimary = false } own) {
+          Config.get (Config.all [Config.string "NAME", Config.string "MODE"])
+        }
+      }
+    with
+    | Config.ConfigError m -> [m]
+  Platform.stdout_line ("layer_add to the host " ++ show added_to_host)
   let process = ConfigProvider.from_env { preserveEmptyStrings = false }
   Platform.stdout_line
     ("from_env "

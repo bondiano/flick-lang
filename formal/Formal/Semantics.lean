@@ -68,7 +68,14 @@ def setRgn (Λ : List Rgn) (p : Nat) (g : Rgn) : List Rgn := Λ.set p g
 /-- `μ` with the lazy cell `ℓ` settled to the outcome `o`, if it is running: a settled cell
 stays settled (L2), also in a configuration no program reaches. -/
 noncomputable def settleCell (μ : List Tm) (l : Nat) (o : Tm) : List Tm :=
-  open Classical in if μ[l]? = some .running then μ.set l (.done o) else μ
+  open Classical in if ∃ e, μ[l]? = some (.running e) then μ.set l (.done o) else μ
+
+/-- `μ` with the lazy cell `ℓ` pending again, if it is running: a signal that leaves the
+initializer caches nothing, and the next force runs the initializer again. -/
+def resetCell (μ : List Tm) (l : Nat) : List Tm :=
+  match μ[l]? with
+  | some (.running e) => μ.set l (.lazy e)
+  | _ => μ
 
 theorem mem_set_get {μ : List Tm} {l i : Nat} {v w : Tm} (h : (μ.set l v)[i]? = some w) :
     μ[i]? = some w ∨ (i = l ∧ w = v) := by
@@ -91,6 +98,27 @@ theorem settleCell_get {μ : List Tm} {l i : Nat} {o w : Tm} (h : (settleCell μ
     (settleCell μ l o).length = μ.length := by
   unfold settleCell; split <;> simp
 
+theorem resetCell_get {μ : List Tm} {l i : Nat} {w : Tm} (h : (resetCell μ l)[i]? = some w) :
+    μ[i]? = some w ∨ (i = l ∧ ∃ e, μ[l]? = some (.running e) ∧ w = .lazy e) := by
+  unfold resetCell at h
+  split at h
+  · rename_i e he
+    rcases mem_set_get h with h | ⟨rfl, rfl⟩
+    · exact .inl h
+    · exact .inr ⟨rfl, e, he, rfl⟩
+  · exact .inl h
+
+theorem resetCell_cases (μ : List Tm) (l : Nat) :
+    (∃ e, μ[l]? = some (.running e) ∧ resetCell μ l = μ.set l (.lazy e)) ∨
+      ((∀ e, μ[l]? ≠ some (.running e)) ∧ resetCell μ l = μ) := by
+  unfold resetCell
+  split
+  · rename_i e he; exact .inl ⟨e, he, rfl⟩
+  · rename_i h; exact .inr ⟨h, rfl⟩
+
+@[simp] theorem resetCell_length (μ : List Tm) (l : Nat) : (resetCell μ l).length = μ.length := by
+  unfold resetCell; split <;> simp
+
 /-- Runtime steps of core.md §3.4–3.5 and regions.md §3.2–§3.3 at the redex,
 except operations and the propagation of `raise`, which need the context. An
 acquisition registers the use that releases it as a finalizer. A finalizer runs
@@ -107,17 +135,18 @@ inductive RHead : List Rgn → List Tm → Tm → List Rgn → List Tm → Tm �
   /-- A lazy cell (lazy.md §3): `lazy e` allocates it `Pending e`; the first force runs `e` in
   the frame `settle ℓ`, which records its outcome; a force after it gives the outcome. A force
   of any other cell is a defect: of a running one, by its own initializer, or of one that
-  holds no lazy. A raised error and a signal leave the frame by steps of their own; a defect
-  ends the thread (`Step.todo`). -/
+  holds no lazy. A raised error and a signal leave the frame by steps of their own: the error
+  is the outcome, the signal makes the cell pending again; a defect ends the thread
+  (`Step.todo`). -/
   | lazy : RHead Λ μ (.lazy e) Λ (μ ++ [.lazy e]) (.loc μ.length)
   | forcePending : μ[l]? = some (.lazy e) →
-      RHead Λ μ (.force (.loc l)) Λ (μ.set l .running) (.settle l e)
+      RHead Λ μ (.force (.loc l)) Λ (μ.set l (.running e)) (.settle l e)
   | forceDone : μ[l]? = some (.done o) → RHead Λ μ (.force (.loc l)) Λ μ o
   | forceRunning : μ[l]? = some c → (∀ e, c ≠ .lazy e) → (∀ o, c ≠ .done o) →
       RHead Λ μ (.force (.loc l)) Λ μ .todo
   | settleVal : Value v → RHead Λ μ (.settle l v) Λ (settleCell μ l v) v
   | settleRaise : Value v → RHead Λ μ (.settle l (.raise v)) Λ (settleCell μ l (.raise v)) (.raise v)
-  | settleUnw : RHead Λ μ (.settle l (.unw p ℓ a)) Λ μ (.unw p ℓ a)
+  | settleUnw : RHead Λ μ (.settle l (.unw p ℓ a)) Λ (resetCell μ l) (.unw p ℓ a)
   | tryRaise : Value v → RHead Λ μ (.try_ (.raise v) A) Λ μ (.handle v A)
   | handleYes : Value v → matchP p v = some δ →
       RHead Λ μ (.handle v (.acons p b r)) Λ μ (b.subst (inst δ))
