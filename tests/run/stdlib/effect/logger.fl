@@ -1,6 +1,6 @@
 // `Logger`: the `Log` service through its loggers, custom and
 // built-in formats, batches and a log file. Loggers whose lines carry the
-// time write to stderr, with `Logger.with_log_to_stderr`.
+// time write to stderr: `Logger.with_log_to_stderr` and `with_console_error`.
 module App.Main exposing (main)
 
 ms : Float -> Duration.Duration
@@ -72,10 +72,12 @@ let main () =
             mode = Logger.Tty
           },
           Logger.console_pretty_tty { colors = false; formatDate = None },
-          Logger.console_pretty_browser { colors = false; formatDate = None },
-          Logger.console_logfmt,
-          Logger.console_structured,
-          Logger.console_json,
+          // `console_pretty_browser`, `console_logfmt`, `console_structured`
+          // and `console_json` write to stdout whatever the flag says, with
+          // the time: the formats go to stderr here
+          Logger.with_console_error Logger.format_logfmt,
+          Logger.with_console_error Logger.format_structured,
+          Logger.with_console_error Logger.format_json,
           Logger.tracer_logger,
         ])
         (fun () -> Log.info "every console logger")
