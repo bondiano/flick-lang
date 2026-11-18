@@ -91,6 +91,11 @@ let unannotated shape =
   let name = {unannotated}
   name
 
+deferred : Shape ->{Log; NotFound} Unit
+let deferred shape =
+  let later = fun id -> fetch id
+  Log.info (describe shape)
+
 matched : Shape -> Float
 let matched shape =
   match shape with
@@ -226,6 +231,10 @@ fn completion_ranks_candidates_that_fit_the_place_first() {
     let unknown = fits("let name = sha", "sha");
     assert!(unknown.contains(&"describe".to_owned()), "{unknown:?}");
     assert!(!unknown.contains(&"fetch".to_owned()), "{unknown:?}");
+    // a `fun` decides its own rows: `fetch` needs `Users`, which the
+    // signature around it does not give, and stays where it was
+    let inside = fits("-> fetch id", "fetch id");
+    assert!(inside.contains(&"fetch".to_owned()), "{inside:?}");
     // an auto-import of a constructor is the constructor, not the type it
     // shares its name with
     let other = f.file("App.Other");
