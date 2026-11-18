@@ -250,12 +250,12 @@ private theorem Typ.rtStepCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
         exact hμ.same (.unw h₁ h₂ (Stage.none_le (Stage.rt_ne_pure hφ)))
     | finRun =>
       exact hμ.same h
-  | hdl _ hal hn hrf hψ he hφ₀ hOb hc' hφ' hT =>
+  | hdl hus hal hn hrf hψ he hφ₀ hOb hc' hφ' hT =>
     intro Λ μ t φ Λ' μ' e' hΓ hJ hμ hcRt hbl hμb ht hφfixed hh
     cases hΓ; cases hJ
     cases hh with
     | hdl =>
-      obtain ⟨c, hcy, hcl, hb⟩ := hdl_install hal hn hrf hψ he hφ₀ hOb hc' hφ' hT hbl hcRt.yf hcRt.idem ht hφfixed
+      obtain ⟨c, hcy, hcl, hb⟩ := hdl_install hus hal hn hrf hψ he hφ₀ hOb hc' hφ' hT hbl hcRt.yf hcRt.idem ht hφfixed
       exact ⟨[c], hμ.alloc .lam hcl, by rw [hμ.1]; exact hb, by simpa using hcy⟩
   | hctl hus hℓ hal hrf hψ hop hc htl hE hk hno hp hφ₀ ha hl hcm hφ hT hat =>
     intro Λ μ t φ Λ' μ' e' hΓ hJ hμ hcRt hbl hμb ht hφfixed hh
