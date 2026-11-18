@@ -68,3 +68,27 @@ let wrapper text = Email.prove text
 from_a_name : Name -> Email
 let from_a_name name = Email.prove (Name.value name)
 //                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-T077 `Checks.email (Name.value name)`
+
+// the condition of a `while` held of `current` before the body changed it
+in_a_loop : String -> Option Email
+let in_a_loop text =
+  let mut current = text
+  let mut found = None
+  while Email.check current do {
+    current = current ++ " "
+    found = Some (Email.prove current)
+    //            ^^^^^^^^^^^^^^^^^^^ FLICK-T077 `Checks.email current`
+  }
+  found
+
+// a check of the element before says nothing of the next one
+next_element : List String -> Option Email
+let next_element texts =
+  let mut found = None
+  let mut previous = ""
+  for t <- texts do {
+    if Email.check previous then found = Some (Email.prove t)
+    //                                         ^^^^^^^^^^^^^ FLICK-T077 `Checks.email t`
+    previous = t
+  }
+  found
