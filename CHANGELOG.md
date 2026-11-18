@@ -46,6 +46,12 @@ break programs.
   `File s` or data that holds a scope's value (`FLICK-G001`), as
   `docs/formal/regions.md` states.
 
+- **Fixed: a taken default keeps the spans of the module that takes it.**
+  In a release build, an instance that takes a default of a class of
+  another module got the default's code with that module's spans, so Go's
+  line directives read the wrong file, and with a class of std the Go
+  build panicked; the code now has the spans of where it is taken.
+
 - **Changed: what an acquisition registers may use its services.** The
   acquisition of `Resource.manual` and `Effect.resource_auto` assumes
   `Fiber.Provided` for its own region, so a release it registers there may

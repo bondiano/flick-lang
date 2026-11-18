@@ -148,5 +148,8 @@ fn a_default_of_another_module_takes_the_spans_of_this_one() {
     );
     let mut files = Vec::new();
     ir.each_span_mut(&mut |span| files.push(span.file));
-    assert!(files.iter().all(|f| *f == own), "{files:?}");
+    assert!(
+        files.iter().all(|f| *f == own),
+        "spans of {files:?}, all of {own:?} expected"
+    );
 }
