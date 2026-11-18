@@ -225,11 +225,12 @@ impl Lower<'_> {
                 value,
             };
         }
-        let value = if self.typing.lazy_lets.contains(&decl.range()) {
-            self.lazy_let(decl, parts.body)
-        } else {
-            self.definition(decl)
-        };
+        if self.typing.lazy_lets.contains(&decl.range()) {
+            let init = self.lazy_let(decl, parts.body);
+            let unique = self.bind(&name, at);
+            return self.lazy_state(unique, init);
+        }
+        let value = self.definition(decl);
         let unique = self.bind(&name, at);
         if decl.has_token(K::MutKw) {
             self.vars.insert(unique.clone());
@@ -263,7 +264,7 @@ impl Lower<'_> {
             None => Expr::new(ExprKind::Lit(Lit::Unit), self.span(node)),
         };
         let value = if self.typing.lazy_sets.contains(&node.range()) {
-            super::lazy::done(value, self.span(node))
+            super::lazy::forced(super::lazy::ok(value))
         } else {
             value
         };

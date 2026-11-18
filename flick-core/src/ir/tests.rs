@@ -126,6 +126,26 @@ fn ir_makes_stages_dictionaries_and_lifts_explicit() {
     insta::assert_snapshot!(super::print(&ir));
 }
 
+/// A `let lazy` is a variable of its function, `None` until an `await`
+/// keeps the outcome of its initializer: no cell. The second `await` runs a
+/// copy of the initializer with its locals renamed, and a write to a `let
+/// lazy mut` is `Some (Ok v)`.
+#[test]
+fn a_let_lazy_lowers_to_a_variable_of_its_function() {
+    let ir = lower_text(
+        "App",
+        "module App exposing (..)\n\
+         type error Boom = Boom\n\
+         load : Int ->{; Boom} Int\nlet load n = if n < 0 then Fail.fail Boom else n\n\
+         run : Bool ->{; Boom} Int\n\
+         let run flag =\n  let lazy x =\n    let t = load 1\n    t + 1\n  \
+         let lazy mut y = load 2\n  y = 3\n  \
+         if flag then await x + await y else await x\n",
+    )
+    .expect("lowers");
+    insta::assert_snapshot!(super::print(&ir));
+}
+
 #[test]
 #[ignore = "prints the IR of a file: DUMP_FILE=path"]
 fn dump() {

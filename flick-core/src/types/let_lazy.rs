@@ -1,8 +1,9 @@
 //! `let lazy x = e` and `let lazy mut x = e` (`docs/formal/lazy.md` §4): a
 //! binding of its function, as `let mut` is, forced with `await x` at most
 //! once. Nothing but its own function reaches it, so no other fiber can be
-//! forcing it: `await x` needs no `Async`. A `let lazy mut` written before
-//! it is read never runs `e`.
+//! forcing it: `await x` needs no `Async`, and the lowering keeps its state in
+//! a variable of the function (`ir::lower::lazy`). A `let lazy mut` written
+//! before it is read never runs `e`.
 
 use super::Checker;
 use super::bindings::LetParts;
@@ -35,7 +36,8 @@ impl Checker<'_> {
             }
             None => Type::Error,
         };
-        // building it is a runtime call, as `lazy { … }` is
+        // the declaration keeps the runtime stage of `lazy { … }`, though it
+        // lowers to a variable of the function, not to a cell
         let cell = Effects::new(Type::empty_row(), Type::empty_row());
         self.call_effects(&cell, self.span(decl));
         self.typing.lazy_lets.insert(decl.range());

@@ -1,6 +1,6 @@
 # Lazy computations: `Lazy r e a`, `let lazy`, and suspended parameters
 
-Status: **contract** (RFC #563, #548). The core primitive of §3 and R9 of §5 are proved in Lean; the rest is not yet implemented. This page fixes the semantics that the checker, the model, the Lean core, both runtimes and the optimizer must agree on. Each rule lists where it will be checked.
+Status: **contract** (RFC #563, #548). The core primitive of §3, `let lazy` of §4 (T7) and R9 of §5 are proved in Lean and implemented; the optimizations of §6 are not yet. This page fixes the semantics that the checker, the model, the Lean core, both runtimes and the optimizer must agree on. Each rule lists where it will be checked.
 
 References as in [`core.md`](core.md): `spec/NN`, `reference/X`; checker paths are relative to `flick-core/src/types/`.
 
@@ -103,23 +103,28 @@ A `let lazy` binding belongs to its function, as `let mut` does (`mutation.rs`, 
 - using `x` from a `fun`, a local function, a `task`, a lazy `for` or a handler arm is `FLICK-G005`. Share a lazy with `lazy { … }` instead (the help says so);
 - `x` is used only as `await x`; a bare `x` is `FLICK-T003` ("a `let lazy` is forced with `await`").
 
-Elaboration (`elaboration.md` new §3.6), with the SSA threading of `let mut` (§3.5, Lean T7):
+Elaboration (`elaboration.md` §3.6), with the SSA threading of `let mut` (§3.5, Lean T7). The state `x$ : Option (Result (Errors ε) a)` is `None` until a force, then `Some o`:
 
 ```text
-let lazy x = e in b       ⇝  let mut x$ = Unforced in b′
+let lazy x = e in b       ⇝  let mut x$ = None in b′
 await x                   ⇝  match x$ with
-                               | Forced o → out o
-                               | Unforced → let o = attempt e in x$ = Forced o; out o
-x = v      (lazy mut)     ⇝  x$ = Forced (ok v)          -- before or after the first force
+                               | Some o → out o
+                               | _ → let o = attempt e in x$ = Some o; out o
+x = v      (lazy mut)     ⇝  x$ = Some (Ok v)            -- before or after the first force
+attempt e                 =  try Ok e with | err → Err err
+out o                     =  from_result o               -- the value, or the error raised again
 ```
 
-- `attempt e` runs `e` and gives its outcome. `out o` gives back the value, re-raises the error or the defect. Lexical values of `e` are those at the declaration, as for `task`.
+- `attempt e` runs `e` and gives its outcome. A signal of a handler or a defect leaves `e` before `x$` is written, so `x$` stays `None` and a later `await x` runs `e` again, as the reset of §3 leaves a cell `Pending`. A defect ends the fiber, and with it the function that holds `x$`, so a defect needs no outcome.
+- `e` reads the values it had at the declaration, as a `task` does. It reads no `let mut` (`FLICK-G005`), so no assignment between the declaration and an `await` changes what it reads.
 - No cell, no `Async`, no synchronization: the state is a local variable, threaded as the state of `let mut` is.
 - `let lazy mut` written before its first read never runs `e` (RFC). A write after a read replaces the cached outcome.
 
-The compiler does not thread `x$` yet. It lowers `let lazy x = e` to a cell that only its function reaches: `lazy_make` at the declaration, `await x` to `lazy_read` (the force of `Lazy.force` with the row `{r}; e`, without `Async`), and `x = v` to a new cell `lazy_done v`. G005 keeps the cell from a second fiber, which is the condition of O3 (§6), so it has the outcomes of the threaded form: `e` runs at the first `await x`, once, and a write before it means `e` never runs. The model runs the same lowering.
+The compiler lowers it so (`flick-core/src/ir/lower/lazy.rs`). `x$` is a `Stmt::Var`, and `await x` is the `match` above. `e` is lowered once, at the declaration, with the names in scope there. Each `await` after the first runs a copy of it whose locals are renamed (`opt::rename`), so the locals of the function stay unique. The model translates the same IR, as for any `let mut`.
 
-Checked by: `tests/check/fail/lazy/let_lazy.fl` (G005, T003, S016) and `tests/run/runtime/lazy_let.fl` on JS, TS, Go, the rt runtime and the model. The elaboration to `x$` and Lean T7 for it are open (§8).
+Lean: the forms are blocks of `Formal/LetMut/Core.lean`: `lzDecl` is a `var`, `lzAwait` a `br` whose other arm runs `lzAttempt e` and `set`s the state, `lzWrite` a `set` (`Formal/LetMut/Lazy.lean`). They are derived rules of `MutOk` (`MutOk.lzDecl`, `MutOk.lzAwait`, `MutOk.lzWrite`, given the Prelude's `Option` and `Result` in the signature, `LzSig`, which the witness signature has: `Elab.Witness.lzSig`), so T7, `T7_pure` and `T7_regions` hold of a block written with them. `e` is written at each `await`. `tr` reads the terms after an assignment `x = …` through the renaming `redirect x`, which on a term that does not read `x` is the plain shift (`Tm.rename_redirect`): the initializer reads the declaration's values.
+
+Checked by: `tests/check/fail/lazy/let_lazy.fl` (G005, T003, S016), `tests/run/runtime/lazy_let.fl`, `lazy_let_state.fl` (a kept error, `await` in a loop, in branches and in a `scope`, a write after a read) and `lazy_abort.fl` (an `abort` through the initializer), on JS, TS, Go, the rt runtime and the model, and the IR snapshot `ir::tests::a_let_lazy_lowers_to_a_variable_of_its_function`.
 
 ## 5. λRT: many fibers (law R9)
 
@@ -181,4 +186,3 @@ Effect.or_die job                               -- an `Eff` passes as before
 2. Whether `Lazy` gets an `Inspectable`-style debug `Show` (shows only the state, not the value).
 3. Whether `~` is also allowed on parameters of class methods.
 4. `Ty.elide` (the reading of a signature in the live discipline) leaves `Lazy` as it is: a `Lazy` in a signature gets no `Live` of the parameters before it, as `Eff` does.
-5. `let lazy` is lowered to a confined cell (§4), not to the threaded state `x$`; T7 does not cover it yet.

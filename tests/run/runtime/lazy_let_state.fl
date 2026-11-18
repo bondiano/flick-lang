@@ -1,0 +1,47 @@
+// A `let lazy` keeps its state in a variable of its function. An error of the
+// initializer is kept like a value. A local of the initializer is bound
+// again by each copy of it. An `await` in a loop or in a branch runs it once, and so does
+// one inside a `scope`. A write to a `let lazy mut` after a read replaces
+// what the read kept.
+module App.Main exposing (main)
+
+type error Boom = Boom String
+
+step : Ref Int -> Int ->{; Boom} Int
+let step runs n =
+  Ref.set runs (Ref.get runs + 1)
+  if n < 0 then Fail.fail (Boom "negative \{n}") else n
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  let runs = Ref.make 0
+  let lazy bad = step runs (-1)
+  let first =
+    try show (await bad) with
+    | Boom m -> m
+  let second =
+    try show (await bad) with
+    | Boom m -> m
+  Platform.stdout_line "kept error: \{first} / \{second}, runs: \{Ref.get runs}"
+  let base = 1
+  let lazy shifted =
+    let t = base + 10
+    t * 2
+  let later = 100
+  let mut sum = 0
+  for i <- [1, 2, 3] do sum = sum + i * await shifted
+  let branch = if later > 10 then await shifted else 0 - await shifted
+  Platform.stdout_line "loop and branch: \{sum} \{branch} \{later}"
+  let counted = Ref.make 0
+  let lazy once =
+    Ref.set counted (Ref.get counted + 1)
+    7
+  let inside = scope { await once + await once }
+  Platform.stdout_line "in a scope: \{inside}, runs: \{Ref.get counted}"
+  let lazy mut cached = step runs 5
+  let before = try await cached with
+    | Boom _ -> 0
+  cached = 9
+  let after = try await cached with
+    | Boom _ -> 0
+  Platform.stdout_line "write after read: \{before} \{after}, runs: \{Ref.get runs}"
