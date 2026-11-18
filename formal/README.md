@@ -91,7 +91,9 @@ signature and golden certificates.
   `control`, with `resume` at most once: type soundness `T1` (Progress and
   Preservation over every reachable configuration), `T2a` (a pure computation makes only
   pure steps) and `T2b` (a runtime computation reaches the root only for the effects and raises
-  only the errors of its row), `lemma_3_1` and `T3` (generalization and the store typing),
+  only the errors of its row, both by name: the name of the raised error type is in the row at
+  some argument and what the value reaches is in it too, as renaming out the regions not yet
+  created may change an argument), `lemma_3_1` and `T3` (generalization and the store typing),
   `lemma_6` (the types of old cells), `T4'` (T4′, below) and `T1_regions` (`T1` with
   `op_H`, without the blocked outcome of a step that needs a region that is not live, which
   `T4'` rules out).
