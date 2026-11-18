@@ -1,14 +1,14 @@
 module App.LabeledLoops exposing (..)
 
 nested_break : Unit -> Int
-let nested_break () = 'outer : loop { 'inner : loop { break 'outer 42 } }
+let nested_break () = 'outer: loop { 'inner: loop { break 'outer 42 } }
 
 nested_while : Unit -> Int
 let nested_while () =
   let mut i = 0
-  'outer : while i < 10 do {
+  'outer: while i < 10 do {
     let mut j = 0
-    'inner : while j < 10 do {
+    'inner: while j < 10 do {
       j = j + 1
       if j == 5 then break 'outer
     }
@@ -19,8 +19,8 @@ let nested_while () =
 nested_for : Unit -> Int
 let nested_for () =
   let mut total = 0
-  'outer : for x <- [1, 2, 3] do {
-    'inner : for y <- [4, 5, 6] do {
+  'outer: for x <- [1, 2, 3] do {
+    'inner: for y <- [4, 5, 6] do {
       if y == 5 then continue 'outer
       total = total + x + y
     }
@@ -28,7 +28,7 @@ let nested_for () =
   total
 
 reuse_label_inside_comprehension : Unit -> Unit
-let reuse_label_inside_comprehension () = 'outer : for x <- [1, 2] do {
-  let _xs = [for y <- [x] yield 'outer : loop { break 'outer y }]
+let reuse_label_inside_comprehension () = 'outer: for x <- [1, 2] do {
+  let _xs = [for y <- [x] yield 'outer: loop { break 'outer y }]
   ()
 }

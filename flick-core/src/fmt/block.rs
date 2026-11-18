@@ -325,7 +325,8 @@ impl<'a> Printer<'a> {
                 }
                 Element::Token(token) if token.kind.is_trivia() => {}
                 Element::Token(token) => {
-                    let space = if docs.is_empty() {
+                    // the colon after a loop label touches it
+                    let space = if docs.is_empty() || token.kind == K::Colon {
                         a.empty()
                     } else {
                         a.text(" ")
