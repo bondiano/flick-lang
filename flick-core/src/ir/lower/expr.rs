@@ -244,11 +244,8 @@ impl Lower<'_> {
                     Some(K::NotKw) => ExprKind::Not(operand),
                     Some(K::IgnoreKw) => ExprKind::Ignore(operand),
                     Some(K::AwaitKw) if self.typing.forced.contains(&node.range()) => {
-                        super::lazy::force(
-                            *operand,
-                            span,
-                            self.typing.read_lazy.contains(&node.range()),
-                        )
+                        let local = self.typing.read_lazy.contains(&node.range());
+                        self.force(*operand, span, local)
                     }
                     Some(K::AwaitKw) => {
                         let span = self.span(node);
