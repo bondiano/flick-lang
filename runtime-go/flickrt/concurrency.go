@@ -455,7 +455,7 @@ func InterruptibleMask(fb *Fiber, f Value) Value   { return regionMask(fb, 0, f)
 // EffectEnsuring runs `finalizer`, uninterruptibly, however `task` ends.
 func EffectEnsuring(fb *Fiber, finalizer, task Value) Value {
 	v, c := catch(func() Value { return Run(fb, task) })
-	_, f := catch(func() Value { return uninterruptible(fb, finalizer) })
+	f := cleanupAfter(fb, c, func() Value { return uninterruptible(fb, finalizer) })
 	if c = finalized(c, f); c != nil {
 		panic(&Failure{c})
 	}

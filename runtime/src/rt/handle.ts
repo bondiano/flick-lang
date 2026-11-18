@@ -5,7 +5,24 @@
 // captures the frames between the operation and the handler: it holds them
 // through `resume`, which puts them back once; if it ends without doing so, they
 // are discontinued, a failure thrown into them that closes their scopes.
-import { type Cause, Raise, Signal, causeOf, dies, fail, hasDies, hasFails, raise, signalOf, unwinds } from "./cause.ts";
+import {
+  type Cause,
+  type Exit,
+  Raise,
+  Signal,
+  causeOf,
+  dies,
+  fail,
+  failed,
+  fromReasons,
+  hasDies,
+  hasFails,
+  hasInterrupts,
+  raise,
+  signalOf,
+  succeeded,
+  unwinds,
+} from "./cause.ts";
 import {
   type Ctx,
   type Fiber,
@@ -13,8 +30,10 @@ import {
   Instruction,
   type Run,
   Under,
+  asExit,
   currentCtx,
   currentFiber,
+  exitOf,
   extend,
   evidenced,
   inCtx,
@@ -186,9 +205,13 @@ class Segment {
   }
 }
 
+/** How many handlers have started: each one's number orders them. */
+let prompts = 0;
+
 /** A handler while it runs. */
 class Prompt {
   readonly token: object = {};
+  readonly seq: number = ++prompts;
   readonly fiber: Fiber;
   readonly ctx: Ctx;
   /** The mask depth to return to when the body ends: the handler's, or the resuming arm's. */
@@ -212,6 +235,11 @@ class Control extends Instruction {
   exec(fiber: Fiber): boolean {
     if (fiber !== this.prompt.fiber) {
       throw new Error("a `control` operation ran in a fiber other than its handler's");
+    }
+    if (this.prompt.seq <= fiber.cut) {
+      fiber.mode = 1;
+      fiber.value = new Raise(fail(cut));
+      return false;
     }
     const top = fiber.top;
     let bottom = top;
@@ -270,6 +298,31 @@ class Discontinue extends Instruction {
     fiber.mode = 1;
     fiber.value = new Raise(fail(new Signal(this.prompt.token, undefined, undefined, true)));
     return false;
+  }
+}
+
+/** What a cut-off `control` operation throws: it unwinds the cleanup and adds nothing to the cause. */
+const cut = /*#__PURE__*/ new Signal({}, undefined, undefined, true);
+
+/**
+ * How `cleanup` ends after a body that ended with `exit`. A body that was
+ * interrupted, or unwinds to a handler, did not end normally: a `control`
+ * operation of a handler older than the cleanup is then cut off, its arm does
+ * not run and the cleanup stops there, so the interruption or the unwind goes
+ * on as it was (docs/formal/runtime.md, cleanup off the normal path).
+ */
+export function* cleanupAfter(exit: Exit, cleanup: () => unknown): Run {
+  if (exit.cause === undefined || !(hasInterrupts(exit.cause) || unwinds(exit.cause))) return yield exitOf(cleanup);
+  const fiber = currentFiber();
+  const outer = fiber.cut;
+  fiber.cut = prompts;
+  try {
+    const ended = asExit(yield exitOf(cleanup));
+    if (ended.cause === undefined) return ended;
+    const rest = ended.cause.reasons.filter((r) => !(r._tag === "Fail" && r.error === cut));
+    return rest.length === 0 ? succeeded(undefined) : failed(fromReasons(rest));
+  } finally {
+    fiber.cut = outer;
   }
 }
 

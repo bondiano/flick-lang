@@ -5,3 +5,4 @@
 # skips them on that target.
 js runtime/discontinued_body # FLICK-P012: `control` arms do not run on the Effect adapter
 js runtime/discontinued_fiber # FLICK-P012: `control` arms do not run on the Effect adapter
+js runtime/cleanup_control # FLICK-P012: `control` arms do not run on the Effect adapter

@@ -1,6 +1,9 @@
 package flickrt
 
-import "iter"
+import (
+	"iter"
+	"sync/atomic"
+)
 
 // Handlers of effects: `try … with` with arms for operations, and `provide
 // S impl`. Each effect is a service whose implementation is the arms, as
@@ -105,11 +108,46 @@ type coroutine struct {
 	yield  func(*request) bool
 }
 
-// controller is a handler with `control` arms while it runs.
+// controller is a handler with `control` arms while it runs; `seq` orders
+// it among the handlers that have started.
 type controller struct {
 	token *handlerToken
 	state *fiberState
 	co    *coroutine
+	seq   uint64
+}
+
+var controllers atomic.Uint64
+
+// cut is what a cut-off `control` operation throws: it unwinds the cleanup
+// and adds nothing to the cause.
+var cut = &handlerSignal{token: &handlerToken{}, discontinue: true}
+
+// cleanupAfter is how `cleanup` ends after a body that ended with `cause`
+// (nil on success). A body that was interrupted, or unwinds to a handler,
+// did not end normally: a `control` operation of a handler older than the
+// cleanup is then cut off, its arm does not run and the cleanup stops there,
+// so the interruption or the unwind goes on as it was
+// (docs/formal/runtime.md, cleanup off the normal path).
+func cleanupAfter(fb *Fiber, cause *Cause, cleanup func() Value) *Cause {
+	if cause == nil || !(cause.has(causeInterrupt) || unwinds(cause)) {
+		_, c := catch(cleanup)
+		return c
+	}
+	outer := fb.state.cut
+	fb.state.cut = controllers.Load()
+	defer func() { fb.state.cut = outer }()
+	_, c := catch(cleanup)
+	if c == nil {
+		return nil
+	}
+	var rest *Cause
+	for _, r := range c.reasons() {
+		if r.kind != causeFail || r.err != cut {
+			rest = concat(rest, r)
+		}
+	}
+	return rest
 }
 
 // perform hands `req` to the handler from the body: at once when the body
@@ -119,6 +157,9 @@ func (h *controller) perform(performer *Fiber, req *request) Value {
 	cur := performer.state.coro
 	if performer.state != h.state || cur == nil {
 		panic(Defect{"a `control` operation ran in a fiber other than its handler's"})
+	}
+	if h.seq <= performer.state.cut {
+		return unwind(cut)
 	}
 	if cur != h.co {
 		inner := req
@@ -159,7 +200,7 @@ func Handle(fb *Fiber, installs []Install, body Value, ret Value, errors func(*F
 			for _, c := range in.Controls {
 				if c.Name == name {
 					if h == nil {
-						h = &controller{token: token, state: fb.state}
+						h = &controller{token: token, state: fb.state, seq: controllers.Add(1)}
 					}
 					impl.put(name, controlled(arms.vals[i], c.Arity, func(arm Value) Value {
 						return Eff(func(performer *Fiber) Value {
