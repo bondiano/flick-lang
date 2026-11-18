@@ -107,14 +107,18 @@ theorem RHead.asc {Λ μ r Λ' μ' r'} {n : Nat} {e : Tm} (hh : RHead Λ μ r Λ
     refine ⟨Tm.Asc.of_noIns fun h => hc.mem _ _ hl h, fun e' he => ⟨he, hc.rgs, fun i w hw => ?_⟩⟩
     rcases mem_set_get hw with hw | ⟨-, rfl⟩
     · exact hc.mem i w hw
-    · simp [Tm.NoIns, Tm.Has]
+    · exact fun h => hc.mem _ _ hl h
   | forceDone hl => exact noins fun h => hc.mem _ _ hl h
   | settleVal hv | settleRaise hv =>
     refine ⟨hr, fun e' he => ⟨he, hc.rgs, fun i w hw => ?_⟩⟩
     rcases settleCell_get hw with hw | ⟨-, rfl⟩
     · exact hc.mem i w hw
     · exact fun h => vn hv hr h
-  | settleUnw => exact same hr
+  | settleUnw =>
+    refine ⟨hr, fun e' he => ⟨he, hc.rgs, fun i w hw => ?_⟩⟩
+    rcases resetCell_get hw with hw | ⟨-, _, hx, rfl⟩
+    · exact hc.mem i w hw
+    · exact fun h => hc.mem _ _ hx h
   | @refSet v l₀ _ _ hv hlt =>
     refine ⟨Tm.Asc.of_noIns (by simp [Tm.NoIns, Tm.Has]), fun e' he => ⟨he, hc.rgs, fun l v' hv' => ?_⟩⟩
     by_cases hi : l₀ = l

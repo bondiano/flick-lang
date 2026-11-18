@@ -242,6 +242,7 @@ fn fresh_children(
         Term::Bind(p, a) => Term::Bind(p.clone(), go(a)),
         Term::With(env, a) => Term::With(env.clone(), go(a)),
         Term::Inside(p, n, a) => Term::Inside(*p, n.clone(), go(a)),
+        Term::Settle(l, a) => Term::Settle(*l, go(a)),
         Term::Tuple(xs) => {
             Term::Tuple(xs.iter().map(|x| freshen(x, value, avoid, fresh)).collect())
         }

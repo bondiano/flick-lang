@@ -163,7 +163,7 @@ private theorem Typ.rtStepCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     cases hh with
     | settleVal hv => exact settle_val hμ hcRt hl he hψ hφ hT hv
     | settleRaise hv => exact settle_raise hμ hcRt hl he hψ hφ hv
-    | settleUnw => exact hμ.same (settle_unw he hφ)
+    | settleUnw => exact settle_unw hμ he hφ
   | tryR hb hA hφ hs =>
     intro Λ μ t φ Λ' μ' e' hΓ hJ hμ hcRt hbl hμb ht hφfixed hh
     cases hΓ; cases hJ

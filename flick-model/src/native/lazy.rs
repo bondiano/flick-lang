@@ -1,12 +1,19 @@
 //! `lazy_make` and `lazy_force` (`docs/formal/lazy.md` §3) as terms over a
-//! `Ref` cell: on the core's one thread an initializer runs at most once and
-//! its outcome is kept. A cell holds `(0, task)` while pending, `(1, ())`
-//! while running and `(2, outcome)` once done; an outcome is `(0, value)` or
-//! `(1, error)`. A defect stops the machine, so none is kept.
+//! `Ref` cell: on the core's one thread an initializer runs at most once per
+//! attempt and its outcome is kept. A cell holds `(0, task)` while pending,
+//! `(1, task)` while running and `(2, outcome)` once done; an outcome is
+//! `(0, value)` or `(1, error)`. The task runs in the frame `settle ℓ`, which
+//! records how it ends: a value or an error is the outcome, a handler's
+//! signal makes the cell pending again. A defect stops the machine, so none
+//! is kept.
 
 use std::rc::Rc;
 
 use crate::syntax::{Arm, Const, Lit, Pat, Term};
+
+const PENDING: i32 = 0;
+const RUNNING: i32 = 1;
+const DONE: i32 = 2;
 
 fn int(n: i32) -> Term {
     Term::Lit(Lit::Int(n))
@@ -37,22 +44,41 @@ fn seq(first: Term, rest: Term) -> Term {
 pub(super) fn lazy_make(args: &[Term], _: &mut String) -> Result<Term, String> {
     Ok(Term::app(
         Term::konst(Const::RefMake),
-        tagged(0, args[0].clone()),
+        tagged(PENDING, args[0].clone()),
     ))
 }
 
 /// `Ref.make (2, (0, value))`: a cell already done with `value`.
 pub(super) fn lazy_done(args: &[Term], _: &mut String) -> Result<Term, String> {
-    let done = tagged(2, tagged(0, args[0].clone()));
+    let done = tagged(DONE, tagged(0, args[0].clone()));
     Ok(Term::app(Term::konst(Const::RefMake), done))
 }
 
-/// The outcome of a pending cell, after running its task; the kept one of a
-/// done cell; a defect for a running one, which only its own initializer can
+/// The state of a running cell whose task ended with `ended`: the outcome,
+/// or pending again after a handler's signal. `None` for a cell that does not
+/// run.
+pub(crate) fn settled(state: &Term, ended: Result<&Term, &Term>) -> Option<Term> {
+    let Term::Tuple(state) = state else {
+        return None;
+    };
+    let [Term::Lit(Lit::Int(RUNNING)), task] = &**state else {
+        return None;
+    };
+    Some(match ended {
+        Ok(v) => tagged(DONE, tagged(0, v.clone())),
+        Err(Term::Signal(_)) => tagged(PENDING, task.clone()),
+        Err(e) => tagged(DONE, tagged(1, e.clone())),
+    })
+}
+
+/// A pending cell runs its task in `settle ℓ`; a done one gives its kept
+/// outcome; a running one is a defect, which only its own initializer can
 /// force on one thread.
 pub(super) fn lazy_force(args: &[Term], _: &mut String) -> Result<Term, String> {
-    let cell = || Term::Var("$cell".into());
-    let set = |value: Term| Term::apps(Term::konst(Const::RefSet), [cell(), value]);
+    let Term::Loc(l) = args[0] else {
+        return Err(format!("`await` of {:?}, which is no lazy", args[0]));
+    };
+    let task = || Term::Var("$task".into());
     let out = |outcome: Term| {
         Term::Match(
             Rc::new(outcome),
@@ -65,41 +91,24 @@ pub(super) fn lazy_force(args: &[Term], _: &mut String) -> Result<Term, String> 
             ]),
         )
     };
-    let attempt = Term::Try(
-        Rc::new(tagged(0, Term::Await(Rc::new(Term::Var("$task".into()))))),
-        Rc::from([arm(
-            Pat::Var("$failure".into()),
-            tagged(1, Term::Var("$failure".into())),
-        )]),
+    let start = Term::apps(
+        Term::konst(Const::RefSet),
+        [args[0].clone(), tagged(RUNNING, task())],
     );
     let run = seq(
-        set(tagged(1, Term::Lit(Lit::Unit))),
-        Term::Let(
-            "$outcome".into(),
-            None,
-            Rc::new(attempt),
-            Rc::new(seq(
-                set(tagged(2, Term::Var("$outcome".into()))),
-                out(Term::Var("$outcome".into())),
-            )),
-        ),
+        start,
+        Term::Settle(l, Rc::new(Term::Await(Rc::new(task())))),
     );
-    let state = Term::app(Term::konst(Const::RefGet), cell());
-    let force = Term::Match(
+    let state = Term::app(Term::konst(Const::RefGet), args[0].clone());
+    Ok(Term::Match(
         Rc::new(state),
         Rc::from([
-            arm(tag_pat(Some(0), "$task"), run),
-            arm(tag_pat(Some(2), "$kept"), out(Term::Var("$kept".into()))),
+            arm(tag_pat(Some(PENDING), "$task"), run),
+            arm(tag_pat(Some(DONE), "$kept"), out(Term::Var("$kept".into()))),
             arm(
                 Pat::Wild,
                 Term::Die("lazy forced during its own initialization".into()),
             ),
         ]),
-    );
-    Ok(Term::Let(
-        "$cell".into(),
-        None,
-        Rc::new(args[0].clone()),
-        Rc::new(force),
     ))
 }

@@ -596,24 +596,24 @@ undefined in all other cases
 ⟨μ, E[perform_{S.o} v]⟩           →  ⟨μ, E[f v]⟩                 no handler in E answers it, f = Σ₀(S).o
 ```
 
-Lazy cells ([`lazy.md`](lazy.md) §3). A cell holds `Pending e`, `Running` or `Done o`, with `o ::= ok v | err v | defect`; the term of `o` is `v`, `raise v` or `todo`:
+Lazy cells ([`lazy.md`](lazy.md) §3). A cell holds `Pending e`, `Running e` or `Done o`, with `o ::= ok v | err v | defect`; the term of `o` is `v`, `raise v` or `todo`:
 
 ```text
 ⟨μ, E[lazy e]⟩                         →  ⟨μ[ℓ ↦ Pending e], E[ℓ]⟩          ℓ ∉ dom μ
-⟨μ, E[force ℓ]⟩, μ(ℓ) = Pending e      →  ⟨μ[ℓ ↦ Running], E[settle ℓ e]⟩
+⟨μ, E[force ℓ]⟩, μ(ℓ) = Pending e      →  ⟨μ[ℓ ↦ Running e], E[settle ℓ e]⟩
 ⟨μ, E[force ℓ]⟩, μ(ℓ) = Done o         →  ⟨μ, E[o]⟩                        o the term of the outcome
 ⟨μ, E[force ℓ]⟩, μ(ℓ) is neither       →  die                              a running cell: forced by its own initializer
-⟨μ, E[settle ℓ v]⟩                     →  ⟨μ[ℓ ↦ Done (ok v)], E[v]⟩        if μ(ℓ) = Running
-⟨μ, E[settle ℓ (raise v)]⟩             →  ⟨μ[ℓ ↦ Done (err v)], E[raise v]⟩ if μ(ℓ) = Running
-⟨μ, E[settle ℓ (unw p ℓ' a)]⟩          →  ⟨μ, E[unw p ℓ' a]⟩
+⟨μ, E[settle ℓ v]⟩                     →  ⟨μ[ℓ ↦ Done (ok v)], E[v]⟩        if μ(ℓ) = Running e
+⟨μ, E[settle ℓ (raise v)]⟩             →  ⟨μ[ℓ ↦ Done (err v)], E[raise v]⟩ if μ(ℓ) = Running e
+⟨μ, E[settle ℓ (unw p ℓ' a)]⟩          →  ⟨μ[ℓ ↦ Pending e], E[unw p ℓ' a]⟩ if μ(ℓ) = Running e
 ⟨μ, E[Ref.get ℓ]⟩, ℓ a lazy cell       →  die
 ```
 
-- `settle ℓ □` is transparent to operations. A raised error leaves it by its own step, which records it; a signal of a handler (§3.7) passes it and leaves the cell `Running`. A defect ends the thread, so `settle ℓ die` is the step of `todo` through the frame: the cell's `Done defect` is not observed in one thread.
-- The outcome is written only into a running cell, which every `settle ℓ` of a program finds; with the condition the laws L1 and L2 of [`lazy.md`](lazy.md) hold of every typed configuration, not only of the reachable ones (§4).
+- `settle ℓ □` is transparent to operations. A raised error leaves it by its own step, which records it; a signal of a handler (§3.7) passes it and makes the cell `Pending e` again, so the next force runs `e` again. A defect ends the thread, so `settle ℓ die` is the step of `todo` through the frame: the cell's `Done defect` is not observed in one thread.
+- The outcome, or the reset, is written only into a running cell, which every `settle ℓ` of a program finds; with the condition the laws L1 and L2 of [`lazy.md`](lazy.md) hold of every typed configuration, not only of the reachable ones (§4).
 - A force of a cell that holds neither `Pending` nor `Done`, and `Ref.get` of a lazy cell, are defects. Of these only a force of a running cell is reachable: a force by the initializer of its own cell. The others keep progress free of the typing of the store and preservation free of a premise on (Loc), which types the location of a lazy cell as `Ref (Cell ρ ε τ)` too.
 
-Lean: `RHead.lazy`, `.forcePending`, `.forceDone`, `.forceRunning`, `.settleVal`, `.settleRaise`, `.settleUnw`, `.refGetCell`, `settleCell` (`formal/Formal/Semantics.lean`). The store holds a state as a term that is no value (`Tm.IsCell`): `Pending e` is `lazy e`, `Running` is `anil`, `Done o` is `await o`.
+Lean: `RHead.lazy`, `.forcePending`, `.forceDone`, `.forceRunning`, `.settleVal`, `.settleRaise`, `.settleUnw`, `.refGetCell`, `settleCell`, `resetCell` (`formal/Formal/Semantics.lean`). The store holds a state as a term that is no value (`Tm.IsCell`): `Pending e` is `lazy e`, `Running e` is `force e`, `Done o` is `await o`.
 
 What this shows:
 
@@ -648,7 +648,7 @@ How it works:
 
 Ψ is a store typing: `Loc ⇀ τ` with monotypes. Their free type variables are free inference variables of the configuration's derivation; (Let-Gen) does not generalize them (see [store typing](#a-store-typing-of-closed-types-is-not-preserved)).
 
-`⊢ μ : Ψ` ⇔ `dom μ = dom Ψ` and, for every `ℓ`, `·;Ψ ⊢ μ(ℓ) : Ψ(ℓ) ! P`, or `Ψ(ℓ) = Cell ρ ε τ` and `μ(ℓ)` is a state of a lazy of `Lazy ρ ε τ`: `Pending e` with `·;Ψ ⊢ e : τ ! ψ` and `ψ ⊑ R⟨ρ;ε⟩`, `Running`, `Done (ok v)` with `v : τ`, `Done (err v)` with `v : Errors ε`, or `Done defect`. `Cell ρ ε τ` is a type of the store only: no value has it, so no `Ref` cell has it and `Ref.set` never writes a lazy cell.
+`⊢ μ : Ψ` ⇔ `dom μ = dom Ψ` and, for every `ℓ`, `·;Ψ ⊢ μ(ℓ) : Ψ(ℓ) ! P`, or `Ψ(ℓ) = Cell ρ ε τ` and `μ(ℓ)` is a state of a lazy of `Lazy ρ ε τ`: `Pending e` or `Running e` with `·;Ψ ⊢ e : τ ! ψ` and `ψ ⊑ R⟨ρ;ε⟩`, `Done (ok v)` with `v : τ`, `Done (err v)` with `v : Errors ε`, or `Done defect`. `Cell ρ ε τ` is a type of the store only: no value has it, so no `Ref` cell has it and `Ref.set` never writes a lazy cell.
 
 The rules of §2 are read with `Ψ` in the context. In addition:
 
@@ -672,7 +672,7 @@ E : ∀ᾱ. τ̄ →P E ᾱ    Γ ⊢ w̄ : τ̄[ᾱ := ῡ] ! P    E ῡ ∈ ε
 Γ;Ψ ⊢ ℓ : Lazy ρ ε τ ! P               Γ ⊢ settle ℓ e : τ ! φ
 ```
 
-`R⟨ρ;ε⟩` is read with the hidden qualifier of the lazy, as for (Await). A cell in `Running` has the type of its frame. Lean: `Typ.lazyLoc`, `Typ.settle` (`formal/Formal/Rules.lean`), `Ty.lazyCell`, `CellTy`, `StoreTy` (`formal/Formal/StoreTy.lean`); (T-Lazy) and (T-Force) of [`lazy.md`](lazy.md) §2 are `Typ.lazy` and `Typ.force`.
+`R⟨ρ;ε⟩` is read with the hidden qualifier of the lazy, as for (Await). A cell in `Running e` keeps the typing of its initializer, which a reset gives back to `Pending e`. Lean: `Typ.lazyLoc`, `Typ.settle` (`formal/Formal/Rules.lean`), `Ty.lazyCell`, `CellTy`, `StoreTy` (`formal/Formal/StoreTy.lean`); (T-Lazy) and (T-Force) of [`lazy.md`](lazy.md) §2 are `Typ.lazy` and `Typ.force`.
 
 (Handle) does not require the whole row `ε_b ⊆ H + ε'`, only the error of `v` itself: after a failed branch the remainder has a smaller `H` (see [(Handle) after a failed branch](#handle-required-the-whole-error-row-after-a-failed-branch)). Coming from `try (raise v)`, the premise follows from `ε_b ⊆ H + ε'` of (Try).
 
@@ -801,7 +801,7 @@ Progress and Preservation are checked on the reference checker by the property `
 
 **The laws of a lazy cell** ([`lazy.md`](lazy.md) §3, one thread):
 
-- **L1 (once).** On any path, the initializer of a cell starts at most once: only the force of a pending cell starts it, and no step makes a cell pending again. Lean: `Lazy.L1`, `StartsN`, `Starts`, `Step.pending` (`formal/Formal/Lazy.lean`).
+- **L1 (once per attempt).** On any path, the starts and the resets of a cell alternate, so between two resets the initializer starts at most once: only the force of a pending cell starts it, and only a reset makes a cell pending again, a signal leaving `settle ℓ` of the running cell. Lean: `Lazy.L1`, `Lazy.L1_once`, `StartsN`, `Starts`, `Resets`, `Step.pending` (`formal/Formal/Lazy.lean`).
 - **L2 (final).** On any path from a typed configuration, a settled cell keeps its outcome, and a force of it in a later configuration steps to the term of the outcome without changing the store. Lean: `Lazy.L2`, `Step.done_stays`, `Step.force_done` (`formal/Formal/Lazy.lean`). A `Ref.set` cannot write the cell, whose type no value has, and a `settle ℓ` writes only a running cell.
 
 These are distinct from the lemmas L1–L3 above.
