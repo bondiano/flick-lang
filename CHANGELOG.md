@@ -14,8 +14,9 @@ break programs.
   are `iface-version` 29.
 
 - **Breaking: the standard library names the host services it uses.**
-  `Platform.stdout_line`, `stderr_line` and `stdout_write`, the five levels
-  of `Console` and `Log.console` need `Host.Console`; `Platform.args`
+  `Platform.stdout_line`, `stderr_line` and `stdout_write` and the five
+  levels of `Console` need `Host.Console`, and `Log.console` is a layer made
+  of the live `Host.console`, which needs nothing; `Platform.args`
   `Host.Arguments`; `Platform.env` and the default provider of `Config.get`
   `Host.Environment`, which reads a variable by its name only, so the
   default provider no longer makes a record or an array of the names of the

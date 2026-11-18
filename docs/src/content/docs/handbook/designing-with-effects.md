@@ -535,8 +535,9 @@ Catching an expected lookup error here lets the domain code keep it typed.
 `Layer.merge users_live log_live` supplies both services.
 `provide ... { program () }` makes them available for the body, so `main`
 no longer requires `Users` or `Log`. `Async` remains: supplying services
-does not remove suspension. `AppError` is allowed by the entry signature;
-this body does not need to raise one.
+does not remove suspension. `Host.Console` remains too: the entry provides
+it, as it provides each `Host` service `main` names. `AppError` is allowed by
+the entry signature; this body does not need to raise one.
 
 This is the place to choose the live implementations for this application.
 The two `Platform.stdout_line` calls also belong here: they decide how to

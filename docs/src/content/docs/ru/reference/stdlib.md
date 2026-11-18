@@ -1,6 +1,6 @@
 ---
 title: "Стандартная библиотека"
-source_hash: 6032489473f2970f
+source_hash: e9ccb63ff998fc44
 ---
 
 Стандартная библиотека написана на Flick и использует адаптер среды выполнения
@@ -66,8 +66,9 @@ source_hash: 6032489473f2970f
 | `Jwt` | JSON Web Token с подписью HMAC-SHA256 (`alg` `HS256`): `sign` и `verify` над JSON-кодеком утверждений; `verify` отвергает другой `alg`, неверную подпись и просроченный токен (по значению `exp`) ошибкой `JwtError` (`Malformed`, `BadSignature`, `Expired`); `now` и `expires_in` дают `iat` и `exp` в секундах от эпохи |
 | `EqHash`, `HashSet`, `HashMap` | хеш-коллекции, сохраняющие своё свидетельство |
 | `Loop` | `loop` над `Step` и `Trampoline` для чистой рекурсии без переполнения стека |
+| `Host` | шесть сервисов хоста `Console`, `Clock`, `Random`, `Environment`, `Arguments` и `Process`, их наборы `Live` (все шесть) и `BrowserLive` (первые три) и доверенные живые слои `console`, `clock`, `random`, `environment`, `arguments`, `process`, `live` и `browser_live`, которые выбирает вход; см. [Явные зависимости от хоста](../effects/#явные-зависимости-от-хоста) |
 | `Platform` | `stdout_line`, `stderr_line`, `stdout_write` через `Host.Console`, `args` через `Host.Arguments`, `env` через `Host.Environment` |
-| `Log` | сервис `Log` с `info`, `warn`, `error`, `debug` и `Log.console` поверх `Host.console` |
+| `Log` | сервис `Log` с `info`, `warn`, `error`, `debug`; `from_console` делает слой `Log` из слоя `Host.Console`, а `Log.console`, сделанному из `Host.console`, ничего не нужно |
 | `File` | сервис `FileSystem`: `open_scoped`, `read_all`, `read_text`, `write_text` и `File.node` |
 | `ChildProcess` | дочерние процессы: команда `Command` (`make`, `set_cwd`, `set_env`, `set_stdin`, `prefix`, `pipe_to`, `inherit_output`) выполняется до конца через `string`, `lines` и `exit_code` или запускается `spawn` как `Process` scope'а, всё через `Host.Process`, с `stdout`, `stderr`, `output_string`, `output_lines`, `wait`, `is_running`, `kill` и `kill_with` |
 | `Resource` | `acquire_release` с передачей ресурса владельцу области и `bracket` |
@@ -92,7 +93,9 @@ source_hash: 6032489473f2970f
 
 | Модуль | Содержимое |
 | - | - |
-| `Clock`, `Random` | чтение времени через `Host.Clock` и случайные числа через `Host.Random`; `Random.with_seed` повторяет числа задачи |
+| `Clock`, `Random` | чтение времени через `Host.Clock` по часам файбера, которые `Test.clock_test` делает виртуальными, и случайные числа через `Host.Random`; `Random.with_seed` повторяет числа задачи |
+| `DateTime` | моменты времени в UTC или в часовом поясе с проверяемыми конструкторами; `now`, `is_past` и `is_future` читают `Host.Clock`, `now_in_current_zone` — ещё и `CurrentTimeZone` |
+| `Config`, `ConfigProvider` | конфигурация, читаемая по имени: `Config.get` читает текущий `ConfigProvider` (из `ConfigProvider.layer`), а без него — окружение через `Host.Environment`, а `get_with` делает то же с собственной функцией поиска; `ConfigProvider.from_env` читает окружение процесса при пустой строке |
 | `Console`, `Logger`, `LogLevel`, `ErrorReporter` | `log`, `info` и `debug` в stdout, `warn` и `error` в stderr через `Host.Console`, обработка каждого сообщения лога, уровни лога, упорядоченные по важности, и куда сообщаются необработанные сбои |
 | `Cause` | построение, комбинирование и разбор причины сбоя поверх непрозрачного `Failure e` |
 | `Cron` | множества моментов времени, при необходимости в часовом поясе; `Schedule.cron` работает по ним |

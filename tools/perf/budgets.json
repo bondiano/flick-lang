@@ -1,7 +1,7 @@
 {
   "check.corpus": {"budget": 3400, "tolerance": 0.25},
   "lsp.hover.p95": {"budget": 1, "tolerance": 0.5},
-  "lsp.hover_after_edit.p95": {"budget": 40, "tolerance": 0.5},
+  "lsp.hover_after_edit.p95": {"budget": 55, "tolerance": 0.25, "reason": "includes the 15 ms analysis debounce of flick/src/lsp/worker.rs (#573, #446): main measured 64.1 ms with 25 ms on a Xeon 8573C, and 15 ms takes 10 ms off locally (p95 53 -> 43 ms)"},
   "lsp.completion_after_dot.p95": {"budget": 450, "tolerance": 0.5},
   "lsp.hover_after_interface_edit.p95": {"budget": 400, "tolerance": 0.5},
   "load.json.go.rps": {"budget": 8500, "tolerance": 0.25},

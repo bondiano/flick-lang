@@ -2,16 +2,16 @@
 title: Привет
 description: Минимальная программа и первая ошибка компиляции.
 tableOfContents: false
-source_hash: 4afcb2ec23dc6daf
+source_hash: 115627efbbae6069
 ---
 
 import TourLesson from "../../../../components/TourLesson.astro";
 
 <TourLesson locale="ru" id="hello">
 
-В каждой программе есть функция `main`. Сигнатура `Unit ->{} Unit`
+В каждой программе есть функция `main`. Сигнатура `Unit ->{Host.Console} Unit`
 указывает, что она принимает и возвращает `()`, единственное значение типа
-`Unit`.
+`Unit`, и пользуется консолью, `Host.Console`.
 
 `Platform.stdout_line` выводит строку. Строковый литерал записывается в
 двойных кавычках, а комментарий начинается с `//` и продолжается до конца строки.

@@ -1,6 +1,6 @@
 ---
 title: "Errors, services, resources and concurrency"
-source_hash: 0e6ad4878cc2a95e
+source_hash: c0cd8894bdae6712
 ---
 
 ## Expected errors
@@ -110,6 +110,8 @@ let application id =
 If `load_name` requires `{Users, Log}` and allows `{NotFound}`, then after providing `users_live` the requirements `{Config, Log}`, the errors `{NotFound, ConnectError}` and the same result `String` remain.
 
 Providing a layer removes the services it supplies, but adds the dependencies and errors of its construction. For an ordinary function, the argument must be `task { ... }` instead of a special block, so that strict evaluation order does not start the body before the environment is established. [Effect Layers](https://effect.website/docs/v4/requirements-management/layers).
+
+The entry assembles the root environment of `main`: its runner or launcher provides live `Host` services, at least those the row of `main` names, and the services its runner's `Main` adds, such as `Env` of `Runner.Cloudflare`; `main` provides any other service itself ([which services each place has](../../reference/effects/#who-provides-them)).
 
 ## Effects of the program and handlers
 

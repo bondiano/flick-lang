@@ -8,8 +8,9 @@ import TourLesson from "../../../components/TourLesson.astro";
 
 <TourLesson locale="en" id="hello">
 
-Every program has a `main`. Its signature, `Unit ->{} Unit`, says that it
-takes `()`, the one value of the type `Unit`, and gives back `()`.
+Every program has a `main`. Its signature, `Unit ->{Host.Console} Unit`, says
+that it takes `()`, the one value of the type `Unit`, gives back `()` and uses
+the console, `Host.Console`.
 
 `Platform.stdout_line` prints a line. A string is written in double quotes,
 and a comment runs from `//` to the end of its line.
