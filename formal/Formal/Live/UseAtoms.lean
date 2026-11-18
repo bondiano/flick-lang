@@ -123,15 +123,15 @@ theorem kid_stage {Ψ Θ E c p w t φ b} (hE : OkE E) (hc : c = .addFin ∨ c = 
 the frames, or of the handler's own region. -/
 theorem hwith_cell {Ψ Θ E n ℓ Ef al rf e₀ t φ} (hE : OkE E)
     (h : Typ S Ψ Θ [] (plug E (.inside n (.hwith n ℓ Ef al rf e₀))) (.ex t φ)) :
-    ∃ r ε t', Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) ∧
+    ∃ u r ε t', Ψ[ℓ]? = some (.arrow u (.rt r ε) t' Caps.none) ∧
       ∀ x, r.asRow (.atm (.r x)) → φ.svc (.atm (.r x)) ∨ x = n ∨ ∃ F ∈ E, F = .inside x ∨ F.rgn = some x := by
   have h' : Typ S Ψ Θ [] (plug (.inside n :: E) (.hwith n ℓ Ef al rf e₀)) (.ex t φ) := h
   obtain ⟨K, Θ', t', ψ, hr, hp, hat⟩ := hole_atm (OkE.cons' (F := .inside n) hE trivial) (fun hv => by cases hv) h'
-  obtain ⟨_, _, _, _, _, _, _, hℓ, _, _, _, _, _, _, hφ, _, _⟩ := hr.hwith_type _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, _, _, _, _, _, hℓ, _, _, _, _, _, _, hφ, _, _⟩ := hr.hwith_type _ _ _ _ _ _ _ _ rfl rfl
   rcases hp with rfl | ⟨rfl, -⟩
   · exact absurd hφ (fun h => by simp [Stage.le] at h)
   · rw [List.map_up_zero] at hℓ
-    refine ⟨_, _, _, hℓ, fun x hx => ?_⟩
+    refine ⟨_, _, _, _, hℓ, fun x hx => ?_⟩
     rcases hat x (Stage.le_svc hφ _ hx) with h₁ | ⟨F, hF, hd⟩
     · exact .inl h₁
     · rcases List.mem_cons.mp hF with rfl | hF

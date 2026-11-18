@@ -712,23 +712,24 @@ The flick-core checker never sees runtime forms. The reference checker types the
 
 ### 3.7 Handlers of effects
 
-An effect `E` declares operations `o : a → b` of a class `c`: `tail` (the arm's value is the operation's), `abort` (the arm's value is the handler's, the body does not come back) or `control` (the arm's value is the handler's, with the rest of the body as `resume`, at most once). Effects take no parameters, as services. `perform_{E.o}` is a constant; `hdl E al r e` handles `E` in `e`, `al` the arms, `r` the function of the body's value. A handler's arms for errors are a `try` around it: errors pass `hdl`.
+An effect `E` declares operations `o : a → b` of a class `c`: `tail` (the arm's value is the operation's), `abort` (the arm's value is the handler's, the body does not come back) or `control` (the arm's value is the handler's, with the rest of the body as `resume`, at most once). An effect has `n` type parameters, as a service: `a` and `b` are over them, and `E ū` with `|ū| = n` is an instance. `perform_{E.o}` is a constant; `hdl E al r e` handles `E` in `e`, `al` the arms, `r` the function of the body's value. A handler's arms for errors are a `try` around it: errors pass `hdl`.
 
 ```text
-S.op E o = (c, a, b)
-────────────────────────────────────────────────────── (Perform)
-Γ ⊢ perform_{E.o} : a →R⟨{E};∅⟩ (c = abort ? τ : b) ! φ
+S.op E o = (c, a, b)    |ū| = n
+────────────────────────────────────────────────────────────── (Perform)
+Γ ⊢ perform_{E.o} : a[ū] →R⟨{E ū};∅⟩ (c = abort ? τ : b[ū]) ! φ
 
-Γ↑, ϱ ⊢ al : arms E (τ' at R⟨r;ε⟩, resume over ϱ)    Γ ⊢ r : τ →ψ τ' ! R⟨r;ε⟩    ψ ⊑ R⟨r;ε⟩
-Γ ⊢ e : τ ! φ₀    φ₀ ⊑ R⟨{E} ∪ r; ε⟩    no {Provided {E} _} or {Provided v _} in φ₀
-E ∈ r unless every operation of E has an arm without a guard
+Γ↑, ϱ ⊢ al : arms E ū (τ' at R⟨r;ε⟩, resume over ϱ)    Γ ⊢ r : τ →ψ τ' ! R⟨r;ε⟩    ψ ⊑ R⟨r;ε⟩
+Γ ⊢ e : τ ! φ₀    φ₀ ⊑ R⟨{E ū} ∪ r; ε⟩    no {Provided {E} _} or {Provided v _} in φ₀
+E in φ₀ only at ū, and each row variable of φ₀ without E, unless n = 0
+E ū ∈ r unless every operation of E has an arm without a guard
 ──────────────────────────────────────────────────────────────────────────────────────────── (Handle-E)
 Γ ⊢ hdl E al r e : τ' ! R⟨r;ε⟩
 ```
 
-The arm of a `tail` operation has `x : a` and the type `b`; of `abort`, `x : a` and `τ'`; of `control`, `x : a`, `resume : b →R⟨r;ε⟩ τ'` holding `ϱ`, and `τ'`. `ϱ` is a region variable of the handler, as the region of a `scope`: `resume` stays in the arms.
+The arms are typed at `ū`: the arm of a `tail` operation has `x : a[ū]` and the type `b[ū]`; of `abort`, `x : a[ū]` and `τ'`; of `control`, `x : a[ū]`, `resume : b[ū] →R⟨r;ε⟩ τ'` holding `ϱ`, and `τ'`. `ϱ` is a region variable of the handler, as the region of a `scope`: `resume` stays in the arms. A handler answers by name at run time, whatever the arguments of the operation, so its body may perform `E` only at the arguments its arms are typed for: at `ū`, or at any when `E` has no parameters; a row variable of the body is taken without `E`, so no other instance comes in through it after a substitution. An operation without an arm goes on to the handler around, at `ū`. Whether the handler has an arm for every operation does not depend on `ū`, as `E` has the same operations at every argument (`Sig.Complete`).
 
-Run-time forms. Installing a handler opens the region `p = |Λ|` and allocates the cell `ℓ = |μ|`, whose type `Unit →R⟨r;ε⟩ τ'` holds the stage and the type of the handler's value:
+Run-time forms. Installing a handler opens the region `p = |Λ|` and allocates the cell `ℓ = |μ|`, whose type `E ū →R⟨r;ε⟩ τ'` holds the instance the handler answers, its stage and the type of its value:
 
 - `hwith p ℓ E al r e`, inside `inside p`: the handler running its body;
 - `hctl p ℓ κ tl E al r a k`: the arm `a` runs while the body waits, parked at `hole p` in `k`; for `control`, `resume` is `kont p κ` with a new cell `κ` of its type;
@@ -740,16 +741,16 @@ Steps. An operation runs the arm of the innermost handler with one for it, the f
 A child or a finalizer keeps the handlers of the place that registered it, those older than its owner: `hkeep q ℓ E al e` around its work.
 
 ```text
-Ψ(ℓ) = Unit →R⟨r;ε⟩ τ'    Γ ⊢ al : arms E (τ' at R⟨r;ε⟩, resume over q)    Γ ⊢ e : τ ! φ₀
-φ₀ ⊑ R⟨E ∪ r₁; ε₁⟩, its {Provided {E} a} with q ≥ a    R⟨r;ε⟩ ⊑ R⟨r₁;ε₁⟩ ⊑ φ
-E ∈ r₁ if an operation of E has no arm without a guard, or is not tail
+Ψ(ℓ) = E ū →R⟨r;ε⟩ τ'    Γ ⊢ al : arms E ū (τ' at R⟨r;ε⟩, resume over q)    Γ ⊢ e : τ ! φ₀
+φ₀ ⊑ R⟨E ū ∪ r₁; ε₁⟩ as in (Handle-E), its {Provided {E} a} with q ≥ a    R⟨r;ε⟩ ⊑ R⟨r₁;ε₁⟩ ⊑ φ
+E ū ∈ r₁ if an operation of E has no arm without a guard
 ──────────────────────────────────────────────────────────────────────── (Keep)
 Γ ⊢ hkeep q ℓ E al e : τ ! φ
 ```
 
-It answers the `tail` operations of `E` with an arm while the region `q` is live: the arm runs at the frame, while the rest of the child waits, as `hkarm q ℓ E al a k`, and its value goes back to the operation. A kept handler runs no `return`: a value passes it. It catches no signal: an arm that raises lets the rest of the child go, closing its regions, and the child ends with the signal, as it would with the error. Other operations pass it. An `abort` or `control` operation of a child that reaches no frame of its handler is stuck; the checker rejects `control` there (`classes/detached.rs`), and these rules do not.
+A kept handler is the nearest handler of every operation of `E` it has an arm for, as the handler it keeps was. It runs the arm of a `tail` operation while the region `q` is live: the arm runs at the frame, while the rest of the child waits, as `hkarm q ℓ E al a k`, and its value goes back to the operation. An `abort` or `control` operation with an arm is stuck at the frame: its arm would unwind to, or capture up to, the handler in the thread that installed it, which the child is not. So such an operation leaves the row of the work as one the handler answers does, and (Keep) keeps `E` in `r₁` only for an operation without an arm, which goes on to the handler around or the root. The checker rejects `control` there (`classes/detached.rs`, `E017`), not `abort`: T1 lists an `abort` operation stuck at a kept handler as an outcome of a child, where Lean has it (`KeptStuck`). Only a child or a finalizer has a kept handler: `spawn` and `addFin` wrap the work and register it with a region, and no step moves it into the main thread (`steps_kept`). A kept handler runs no `return`: a value passes it. It catches no signal: an arm that raises lets the rest of the child go, closing its regions, and the child ends with the signal, as it would with the error.
 
-Statements (Lean): Progress and Preservation cover every step above; T2b holds with the row `{E}` of an operation removed by its handler; the main thread is never a signal at its top (`Caught`); the regions of a handler nest as those of a scope, and what a resumed body gives back names no region younger than its handler (see [what a resumed body gives back enters the scopes of the arm](#what-a-resumed-body-gives-back-enters-the-scopes-of-the-arm)). A spawned task does not reach the handlers around the place that spawned it: an operation only they handle is stuck in the task, as an `ask_S` that nothing answers.
+Statements (Lean): Progress and Preservation cover every step above; T2b holds with the row `{E}` of an operation removed by its handler; the main thread is never a signal at its top (`Caught`); the regions of a handler nest as those of a scope, and what a resumed body gives back names no region younger than its handler (see [what a resumed body gives back enters the scopes of the arm](#what-a-resumed-body-gives-back-enters-the-scopes-of-the-arm)). A spawned task does not reach the handlers around the place that spawned it: an operation only they handle is stuck in the task, as an `ask_S` that nothing answers. T1 has the main thread a value, a raised error, a step or blocked, and a child of a live region also finished or stuck at a kept handler on an operation that is not `tail`.
 
 ## 4. Theorems
 

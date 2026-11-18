@@ -61,7 +61,7 @@ private theorem Typ.constResult {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | const _ hT =>
     intro c a ψ t C φ hc hArity hJ; cases hc; cases hJ
     have key : ∀ (c : Const) ι, c.arity = 2 →
-        ∃ x y, c.ty S ι = .arrow x .pure y Caps.none ∧ ¬ y.isAll := by
+        ∃ x y, c.ty ι = .arrow x .pure y Caps.none ∧ ¬ y.isAll := by
       intro c _ hc
       cases c <;> simp [Const.arity] at hc <;> exact ⟨_, _, rfl, by simp [Ty.isAll]⟩
     obtain ⟨_, _, hxy, hy⟩ := key _ _ hArity
@@ -87,12 +87,12 @@ private theorem Typ.allInvCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     | rows hr _ => cases hr
     | all ht => exact (ih hv _ _ _ rfl).conv ht.symm
   | allI _ ht => intro _ k t φ hJ; cases hJ; exact ht
-  | lam _ _ hT | fix _ _ hT | perform _ hT | kont _ _ hT =>
+  | lam _ _ hT | fix _ _ hT | perform _ _ hT | kont _ _ hT =>
     intro _ k t φ hJ; cases hJ; exact (noArrow hT trivial).elim
   | task _ _ _ hT => intro _ k t φ hJ; cases hJ; exact (noEff hT trivial).elim
   | const _ hT =>
     intro _ k t φ hJ; cases hJ
-    obtain ⟨_, _, _, _, hx⟩ := Const.ty_isArrow _ _ S
+    obtain ⟨_, _, _, _, hx⟩ := Const.ty_isArrow _ _
     rw [hx] at hT; exact (noArrow hT trivial).elim
   | ctor _ _ _ hT =>
     intro _ k t φ hJ; cases hJ

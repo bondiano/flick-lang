@@ -63,7 +63,7 @@ theorem Typ.fix_arrow {Ψ Θ Γ b a ψ t C φ}
 private theorem Typ.constCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ c T φ, e = .const c → J = .ex T φ → ¬ T.isAll → T.kind ≠ 7 →
       (∀ E o cl, c ≠ .perform E o cl) →
-      ∃ ι, c.ok Θ ι ∧ LeLive S (c.ty S ι) T := by
+      ∃ ι, c.ok Θ ι ∧ LeLive S (c.ty ι) T := by
   induction h with
   | conv _ he ih =>
     intro c T φ hc hJ hA hk hn; cases hJ
@@ -79,20 +79,22 @@ private theorem Typ.constCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
 theorem Typ.const_arrow {Ψ Θ Γ c a ψ t C φ}
     (h : Typ S Ψ Θ Γ (.const c) (.ex (.arrow a ψ t C) φ))
     (hn : ∀ E o cl, c ≠ .perform E o cl) :
-    ∃ ι, c.ok Θ ι ∧ LeLive S (c.ty S ι) (.arrow a ψ t C) :=
+    ∃ ι, c.ok Θ ι ∧ LeLive S (c.ty ι) (.arrow a ψ t C) :=
   h.constCore c _ φ rfl rfl (by simp [Ty.isAll]) (by simp [Ty.kind]) hn
 
 private theorem Typ.performCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ E o cl T φ, e = .const (.perform E o cl) → J = .ex T φ → ¬ T.isAll → T.kind ≠ 7 →
-      ∃ a b u, S.op E o = some (cl, a, b) ∧
-        LeLive S (.arrow a (.rt (.rnm E (.adt E)) .cnil) (if cl = .abort then u else b) Caps.none) T := by
+      ∃ us a b u, us.length = S.arity E ∧ S.op E o = some (cl, a, b) ∧
+        LeLive S (.arrow (a.substT (instT us)) (.rt (.rnm E (Ty.tcon E us)) .cnil)
+          (if cl = .abort then u else b.substT (instT us)) Caps.none) T := by
   induction h with
   | conv _ he ih =>
     intro E o cl T φ hc hJ hA hk; cases hJ
-    obtain ⟨a, b, u, hop, ht⟩ := ih E o cl _ _ hc rfl
+    obtain ⟨us, a, b, u, hus, hop, ht⟩ := ih E o cl _ _ hc rfl
       (by rw [he.isAll]; exact hA) (by rw [he.kind]; exact hk)
-    exact ⟨a, b, u, hop, ht.trans (.equiv he)⟩
-  | perform hop ht => intro E o cl T φ hc hJ _ _; cases hc; cases hJ; exact ⟨_, _, _, hop, ht⟩
+    exact ⟨us, a, b, u, hus, hop, ht.trans (.equiv he)⟩
+  | perform hus hop ht =>
+    intro E o cl T φ hc hJ _ _; cases hc; cases hJ; exact ⟨_, _, _, _, hus, hop, ht⟩
   | const hi _ => intro E o cl T φ hc _ _ _; cases hc; exact hi.elim
   | allI => intro E o cl T φ _ hJ hA _; cases hJ; exact (hA trivial).elim
   | errVal => intro E o cl T φ _ hJ _ hk; cases hJ; exact (hk rfl).elim
@@ -100,20 +102,18 @@ private theorem Typ.performCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
 
 theorem Typ.perform_arrow {Ψ Θ Γ E o cl a ψ t C φ}
     (h : Typ S Ψ Θ Γ (.const (.perform E o cl)) (.ex (.arrow a ψ t C) φ)) :
-    ∃ a₀ b₀ u, S.op E o = some (cl, a₀, b₀) ∧
-      LeLive S (.arrow a₀ (.rt (.rnm E (.adt E)) .cnil) (if cl = .abort then u else b₀) Caps.none)
-        (.arrow a ψ t C) :=
+    ∃ us a₀ b₀ u, us.length = S.arity E ∧ S.op E o = some (cl, a₀, b₀) ∧
+      LeLive S (.arrow (a₀.substT (instT us)) (.rt (.rnm E (Ty.tcon E us)) .cnil)
+        (if cl = .abort then u else b₀.substT (instT us)) Caps.none) (.arrow a ψ t C) :=
   h.performCore E o cl _ φ rfl rfl (by simp [Ty.isAll]) (by simp [Ty.kind])
 
-/-- Every function constant has an instance of its signature below the requested arrow. -/
+/-- Every function constant but an operation, which (Perform) types (`Typ.perform_arrow`), has
+an instance of its signature below the requested arrow. -/
 theorem Typ.const_witness {Ψ Θ Γ c a ψ t C φ}
-    (h : Typ S Ψ Θ Γ (.const c) (.ex (.arrow a ψ t C) φ)) :
-    ∃ ι, LeLive S (c.ty S ι) (.arrow a ψ t C) := by
+    (h : Typ S Ψ Θ Γ (.const c) (.ex (.arrow a ψ t C) φ)) (hp : ∀ E o cl, c ≠ .perform E o cl) :
+    ∃ ι, LeLive S (c.ty ι) (.arrow a ψ t C) := by
   cases c with
-  | perform E o cl =>
-    obtain ⟨_, _, u, hop, ht⟩ := h.perform_arrow
-    refine ⟨{ (default : CArg) with t := u }, ?_⟩
-    cases cl <;> simpa [Const.ty, hop] using ht
+  | perform E o cl => exact (hp E o cl rfl).elim
   | _ =>
     obtain ⟨ι, _, ht⟩ := h.const_arrow (by intro E o cl h; cases h)
     exact ⟨ι, ht⟩

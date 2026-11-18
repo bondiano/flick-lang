@@ -216,15 +216,15 @@ def SafeUse (root : Roots) (Ok : Tm → Ty → Stage → Prop) : Prop :=
     (∀ (p : Nat) (g : Rgn), c.rgs[p]? = some g → g.live = true → ∀ k ∈ g.kids, ∀ E r,
       OkE E → k = plug E r → ¬ DeadUse c.rgs r) ∧
     (∀ i e E Ef o k v q, c.at i = some e → OkE E → e = plug E (.app (.const (.perform Ef o k)) v) →
-      handlerOf E Ef o k = some q → Live c.rgs q)
+      handlerOf E Ef o = some q → Live c.rgs q)
 
 theorem T4' {root : Roots} (hroot : RootTy S root) :
     SafeUse root (fun e t φ => Typ S [] Facts.none [] e (.ex t φ))
 ```
 
 Here `DeadUse` is a step that needs a region that is not live (`Regions.lean`),
-`handlerOf E Ef o k` is the region of the innermost handler of `E` with an arm for the
-operation, and `c.at i` ranges over the main thread and the children of live regions.
+`handlerOf E Ef o` is the region of the innermost handler of `E` with an arm for the
+operation, kept or not, and `c.at i` ranges over the main thread and the children of live regions.
 
 ## Handlers of effects
 
@@ -235,7 +235,10 @@ operation, and `c.at i` ranges over the main thread and the children of live reg
   In a child or a finalizer, `hkeep q ℓ` is a handler kept from where it started and `hkarm q ℓ`
   its arm running.
 - **Typing** (`Rules.lean`). `perform`, `hdl`, the arms (`J.harms`: `hatail`, `haabort`,
-  `hactl`), `hwith`, `hctl`, `hres`, `hdone`, `unw`, `kont`. A parked body is typed with the
+  `hactl`), `hwith`, `hctl`, `hres`, `hdone`, `unw`, `kont`. An effect has `Sig.arity`
+  parameters; a handler's arms are typed at one instance `E ū`, which its cell records, and its
+  body performs `E` only at the arguments it answers (`Sig.answers`, `Row.hBody`); a frame
+  carries what it answers to its hole (`Frame.Inst`, `EInst`). A parked body is typed with the
   operation at its hole and the argument left out; the cells give the types of a signal and of
   `resume`.
 - **Steps** (`Semantics.lean`). `RHead.hdl` (region and cell), `Step.performAbort`,
@@ -248,7 +251,9 @@ operation, and `c.at i` ranges over the main thread and the children of live reg
   `root E`), whose record has a function for each operation of an effect of `tail` operations.
   One `Σ₀` does not answer either is an outcome, `PerformStuck`, with its effect in the services
   of the stage; at the top of the main thread it does not happen, as `T1` assumes `Σ₀` covers
-  the stage (`root_answers`).
+  the stage (`root_answers`). An operation that is not `tail` whose nearest handler is a kept
+  one is stuck there (`KeptStuck`); only a child has a kept handler (`steps_kept`,
+  `MainKept.lean`).
 - **Signals** (`Caught.lean`, `CaughtStep.lean`, `CaughtCfg.lean`). `Tm.Caught hs cell e H`: every
   `unw p ℓ` of `e` is under the frame of its handler, `H` the handlers around; `hs p` and
   `cell p` are what the handler `p` was installed with. It is part of a typed configuration
@@ -549,19 +554,20 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
     The second notion is weaker on purpose; the two agree in the checker, which refines no
     region (`Unsupported(Region)`).
 
-- **Effects take no parameters.** An effect with an operation that is not `tail` has `impl`
-  `Errors ∅`, which has no value, so `Σ₀` gives it nothing (`Sig.op_impl`, `root_answers`).
+- **`Σ₀` answers only `tail` operations.** An effect with an operation that is not `tail` has
+  `impl` `Errors ∅`, which has no value, so `Σ₀` gives it nothing (`Sig.op_impl`,
+  `root_answers`).
 - **A child keeps the handlers older than its owner.** `flick-model` keeps every handler around
   the registration; here `withs` leaves out one younger than the owner, whose region may close
   while the child runs and whose arms it could not use (`T4'`). Nothing observes the difference
   in a typed program: the obligation of the work keeps such an effect out of its row
   (`kid_dropped`).
-- **A child or a finalizer runs only `tail` arms.** An `abort` or `control` operation in one with no frame
-  of its handler stays an outcome, `PerformStuck`, in `T1` and `T1_regions`: such an effect is
-  named in the row of the work (`Sig.NonTail`), and no rule of this calculus rejects it; the
-  checker rejects `control` there (`classes/detached.rs`). A
-  `tail` operation of an effect all of whose operations are `tail` is always answered
-  (`T1_regions`).
+- **A child or a finalizer runs only `tail` arms.** An `abort` or `control` operation whose
+  nearest handler is one a child keeps is stuck at that frame (`Frame.handles`, `KeptStuck`), an
+  outcome of a child in `T1` and `T1_regions`; it leaves the row of the work as an operation
+  the handler answers does, and no rule of this calculus rejects it; the checker rejects
+  `control` there (`classes/detached.rs`), not `abort`. Every other operation of a child is
+  answered, by a handler it keeps or by `Σ₀` (`T1_regions`).
 - **A signal may end a child.** An arm of a kept handler that raises lets the rest of the child
   go, closing its regions, and the child ends as a signal, not as `raise v`: the core drops
   how a child ends either way.
@@ -703,7 +709,7 @@ Simplifications of λRT:
     `G11` is about the answering entry only: `Act.use π` names the owner whose handler answers
     the operation, and at such a step `π` is live. A child may carry
     an entry of a closed `provide` that it never asks ([the answering provide must be live](../docs/formal/runtime.md#the-provide-liveness-premise-is-stronger-than-typing-gives)). The core development gives it as the third conjunct of `T4'`: the
-    region `q` that `handlerOf E Ef o k` finds for an operation is `Live`.
+    region `q` that `handlerOf E Ef o` finds for an operation is `Live`.
     A layer's build code runs in the providing fiber with the area `σ` as current owner; a
     failed build closes `σ` and makes the `provide` fail.
 12. **R7** is `Hist GoodRef`: each `Ref.modify ℓ` read the value of the latest `make` or

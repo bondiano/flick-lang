@@ -1,6 +1,6 @@
 ---
 title: "Errors, services, resources and concurrency"
-source_hash: c0cd8894bdae6712
+source_hash: 002c93afab1e4d98
 ---
 
 ## Expected errors
@@ -154,7 +154,7 @@ Retry, schedules, streams, queues, cache, tracing and HTTP are a typed standard 
 
 `deriving Schema` and codecs for external formats are part of the language. Generics, recursion, refinements, field policies and effectful transformations are covered in [Schema and standard data types](../07-schema/).
 
-The handlers of a program's effects are one-shot: a continuation resumes at most once, never several times. Services and `provide layer` still rely on the mechanisms of Effect, and on the Go target on the same mechanisms of `runtime-go/flickrt`; `control` arms compile for Go, and for JavaScript once it has a runtime of its own.
+The handlers of a program's effects are one-shot: a continuation resumes at most once, never several times. Services and `provide layer` still rely on the mechanisms of Effect, and on the Go target on the same mechanisms of `runtime-go/flickrt`; `control` arms run on Go and on Flick's own JavaScript runtime (`effect = "rt"`), not on the Effect adapter (`effect = "effect"`).
 
 ## Execution and static lifetime contracts
 

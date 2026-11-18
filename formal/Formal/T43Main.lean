@@ -9,12 +9,12 @@ namespace Flick
 variable {S : Sig}
 
 /-- The region of the handler of an operation is written in the context. -/
-theorem handlerOf_has {r : Tm} {Ef o : Name} {c : OpClass} {q : Nat} :
-    ∀ {E : List Frame}, handlerOf E Ef o c = some q → (plug E r).Has (.rgn q)
+theorem handlerOf_has {r : Tm} {Ef o : Name} {q : Nat} :
+    ∀ {E : List Frame}, handlerOf E Ef o = some q → (plug E r).Has (.rgn q)
   | [], h => by simp [handlerOf] at h
   | F :: E, h => by
     simp only [handlerOf] at h
-    cases hF : F.handles Ef o c with
+    cases hF : F.handles Ef o with
     | some p =>
       rw [hF] at h; cases h
       cases F with
@@ -32,10 +32,5 @@ theorem handlerOf_has {r : Tm} {Ef o : Name} {c : OpClass} {q : Nat} :
         · cases hF
       | _ => simp [Frame.handles] at hF
     | none => rw [hF] at h; exact handlerOf_has (r := F.plug r) h
-
-/-- The effects with an operation that is not `tail`, as a row. -/
-def Row.nonTail (S : Sig) : Row
-  | .nm N _ => S.HasNonTail N
-  | _ => False
 
 end Flick

@@ -64,8 +64,13 @@ names (`Row.nameClose`), and `Catches` and `Frame.dom` answer by name. A
 `handle` whose value has the error type `U = E ū` covers that instance
 (`HCov`). The rules over a substitution stay stable because a substitution
 maps a name at one argument to the same name at the substituted argument
-(`Row.nameClose_substT`). Handlers and signatures are by name in this core:
-services and effects have no parameters (`Sig.impl_closed`).
+(`Row.nameClose_substT`). Services and effects take parameters (`Sig.arity`),
+and the types of their operations are over them (`Sig.op_closed`). A handler
+too acts by name, but its arms are typed at one instance `E ū`, so its body
+performs `E` only at the arguments it answers (`Sig.answers`): `ū`, or any
+when `E` has no parameters; a row variable of the body is taken without `E`
+(`Row.hBody`). Whether it has an arm for every operation is by name
+(`Sig.Complete`), as `E` has the same operations at every argument.
 
 The definitions are in `formal/Formal/TypeEquality.lean`; algebra,
 substitution and constructor inversion are in `TypeEquiv*.lean`.

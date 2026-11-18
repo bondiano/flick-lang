@@ -48,7 +48,7 @@ theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
   | const _ hT =>
     intro _ _ _ hJ _; cases hJ
     simp only [VKind, Tm.head]; rw [← hT.kind, Const.ty_kind _ _]
-  | perform _ hT =>
+  | perform _ _ hT =>
     intro _ _ _ hJ _; cases hJ
     simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
   | kont _ _ hT => intro _ _ _ hJ _; cases hJ; simp only [VKind, Tm.head]; rw [← hT.kind]; rfl

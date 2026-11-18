@@ -297,13 +297,17 @@ structure Sig where
   res : Name → List Ty
   res_closed : ∀ K k ts T σ, ctor K = some (k, ts, T) →
     (∀ i, i < k → σ (.v i) = .tvar i) → (res K).map (Ty.substT σ) = res K
-  impl_closed : ∀ N σ, (impl N).substT σ = impl N
+  /-- The parameters of an effect or a service `E`: its operations and its record are over the
+  variables `0 … arity E - 1`, which an instance `E ū` fills. -/
+  arity : Name → Nat := fun _ => 0
+  impl_closed : ∀ N σ, (∀ i, i < arity N → σ (.v i) = .tvar i) → (impl N).substT σ = impl N
   dict : Nat → Option (Nat × List (Label × Scheme))
   glob : Nat → Option Scheme
-  /-- The operation `o` of the effect `E`: its class, argument and result, closed;
-  an `abort` one returns any type. -/
+  /-- The operation `o` of the effect `E`: its class, argument and result, over the parameters
+  of `E`; an `abort` one returns any type. -/
   op : Name → Name → Option (OpClass × Ty × Ty)
-  op_closed : ∀ E o c a b σ, op E o = some (c, a, b) → a.substT σ = a ∧ b.substT σ = b
+  op_closed : ∀ E o c a b σ, op E o = some (c, a, b) → (∀ i, i < arity E → σ (.v i) = .tvar i) →
+    a.substT σ = a ∧ b.substT σ = b
   /-- An effect with an operation that is not `tail` has no root: its record has no
   value (E016). -/
   op_impl : ∀ E o c a b, op E o = some (c, a, b) → c ≠ .tail → impl E = .errors .cnil
@@ -353,7 +357,7 @@ def Row.scope (s : Ty) : Row := Row.ofCaps s.reach
 /-- The type of a constant at an instance. A spawned child and a finalizer are
 `Eff` with qualifier `C`; their owner is `s`. A cell stores `t`, and `C` is its capacity,
 the bound `α^c` of `Ref.*`: storing into a cell needs the capacity live. -/
-def Const.ty (S : Sig) : Const → CArg → Ty
+def Const.ty : Const → CArg → Ty
   | .refMake, ι => .arrow ι.t (.rt .cnil .cnil) (.ref ι.t) Caps.none
   | .refGet, ι => .arrow (.ref ι.t) (.rt .cnil .cnil) ι.t Caps.none
   | .refSet, ι =>
@@ -374,10 +378,8 @@ def Const.ty (S : Sig) : Const → CArg → Ty
         (.rtob (.run (.caps (Ty.tvar 0).reach) r) (.tvar 0) (ι.e.up 1))
         (ι.t.up 1) (ι.C.substT (shiftV 1))))
       (.rt ι.r ι.e) ι.t Caps.none
-  | .perform E o _, ι => match S.op E o with
-    | some (.abort, a, _) => .arrow a (.rt (.rnm E (.adt E)) .cnil) ι.t Caps.none
-    | some (_, a, b) => .arrow a (.rt (.rnm E (.adt E)) .cnil) b Caps.none
-    | none => .arrow (.base .unit) (.rt (.rnm E (.adt E)) .cnil) (.base .unit) Caps.none
+  -- an operation is typed by (Perform) at the arguments of its effect, never by (Const)
+  | .perform E _ _, _ => .arrow (.base .unit) (.rt (.rnm E (.adt E)) .cnil) (.base .unit) Caps.none
 
 /-- Regions required by a work row must outlive the owner that keeps that work.
 Row variables are included: instantiating one may introduce a Live atom. -/

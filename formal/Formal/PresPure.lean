@@ -148,43 +148,46 @@ private theorem Typ.pureStepCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     cases hh with
     | tryVal hv =>
       exact h₁.valueAny hv _
-  | hwith _ _ hrf hψ he _ _ hφ hT =>
+  | hwith _ _ _ hrf hψ he _ _ hφ hT =>
     intro t φ e' hΓ hJ hh
     cases hΓ; cases hJ
     cases hh with
     | hwithVal hv =>
       exact .app (hrf.sub ⟨LeLive.refl, hφ⟩) (he.valueAny hv _)
         (Stage.le_trans hψ hφ) hT
-  | hctl hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha _ hcm hφ hT hat =>
+  | hctl hus hℓ hal hrf hψ hop hc htl hE hk hno hp hφ₀ ha _ hcm hφ hT hat =>
     intro t φ e' hΓ hJ hh
     cases hΓ; cases hJ
     cases hh with
     | hctlTail hE' hk' hv =>
       obtain ⟨rfl, -⟩ := plug_hole_inj hE' hE (hk'.symm.trans hk)
-      refine .hwith hℓ hal hrf hψ (refill_app hE perform_not_value hp (perform_fn hop) perform_up
+      refine .hwith hus hℓ hal hrf hψ (refill_app hE perform_not_value hp (perform_fn hop hus)
+        perform_up (answered_hole hop hno (Stage.answered_hP hφ₀))
         fun T φ' hΘ _ hb _ => ?_) hφ₀ hcm hφ hT hat
       exact (((by simpa using ha : Typ S _ _ [] _ (.ex _ _)).valueAny hv φ').sub (J' := .ex T φ')
         ⟨hb hc, Stage.le_refl _⟩).cut hΘ.entails
     | hctlDisc hE' hk' hv =>
       obtain ⟨rfl, -⟩ := plug_hole_inj hE' hE (hk'.symm.trans hk)
-      refine .hwith hℓ hal hrf hψ (refill_app hE perform_not_value hp (perform_fn hop) perform_up
+      refine .hwith hus hℓ hal hrf hψ (refill_app hE perform_not_value hp (perform_fn hop hus)
+        perform_up (answered_hole hop hno (Stage.answered_hP hφ₀))
         fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hcm hφ hT hat
       exact .unw hℓ ((by simpa using ha : Typ S _ _ [] _ (.ex _ _)).cut hΘ.entails)
           (Stage.none_le (Stage.rt_ne_pure hψ₀))
-  | hkeep _ _ he _ _ _ _ hφ hT =>
+  | hkeep _ _ _ he _ _ _ hφ hT =>
     intro t φ e' hΓ hJ hh
     cases hΓ; cases hJ
     cases hh with
     | hkeepVal hv =>
       exact (he.valueAny hv _).sub ⟨hT, Stage.pure_le _⟩
-  | hkarm hℓ hal hop hE hk hp hφ₀ hc hnt ha hle hφ hT =>
+  | hkarm hus hℓ hal hop hE hk hno hp hφ₀ hc ha hle hφ hT =>
     intro t φ e' hΓ hJ hh
     cases hΓ; cases hJ
     cases hh with
     | hkarmVal hE' hk' hv =>
       obtain ⟨rfl, -⟩ := plug_hole_inj hE' hE (hk'.symm.trans hk)
-      refine .hkeep hℓ hal (refill_app hE perform_not_value hp (perform_fn hop) perform_up
-        fun T φ' hΘ _ hb _ => ?_) hφ₀ hc hnt hle hφ hT
+      refine .hkeep hus hℓ hal (refill_app hE perform_not_value hp (perform_fn hop hus) perform_up
+        (answered_hole hop hno (Stage.answered_hP hφ₀))
+        fun T φ' hΘ _ hb _ => ?_) hφ₀ hc hle hφ hT
       exact ((ha.valueAny hv φ').sub (J' := .ex T φ')
         ⟨hb (by decide), Stage.le_refl _⟩).cut hΘ.entails
   | hres _ hb hA ha hp hl hcp hφ hT =>
@@ -194,7 +197,7 @@ private theorem Typ.pureStepCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     | hresVal hA' ha' hv =>
       obtain ⟨rfl, -⟩ := plug_hole_inj hA' hA (ha'.symm.trans ha)
       have h₁ := refill_app hA kont_not_value hp (kont_fn hl) (fun _ _ h l => h.trans l)
-        fun T φ' hΘ _ hb' _ =>
+        (fun _ _ _ _ => trivial) fun T φ' hΘ _ hb' _ =>
           ((hb.valueAny hv φ').sub (J' := .ex T φ') ⟨hb', Stage.le_refl _⟩).cut hΘ.entails
       exact .hdone (h₁.sub ⟨hT, Stage.use_mono hφ (Caps.Sub.refl _)⟩)
   | hdone ha =>

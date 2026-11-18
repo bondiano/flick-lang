@@ -237,7 +237,7 @@ theorem settle_unw {Ψ Θ n μ l p ℓ a t ψ C T φ} {r ε : Ty} (hμ : StoreTy
     (he : Typ S Ψ Θ [] (.unw p ℓ a) (.ex t ψ)) (hφ : (Stage.use (.rt r.asRow ε.asRow) C).le φ) :
     ∃ X, StoreTy S (Ψ ++ X) (resetCell μ l) ∧ Typ S (Ψ ++ X) Θ [] (.unw p ℓ a) (.ex T φ) ∧
       ∀ u ∈ X, u.YF n := by
-  obtain ⟨_, _, _, h₁, h₂, _⟩ := he.unw_type _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, h₁, h₂, _⟩ := he.unw_type _ _ _ _ _ rfl rfl
   exact (hμ.reset l).same (.unw h₁ h₂ (Stage.none_le (Stage.use_rt_le_ne_pure hφ)))
 
 end Flick

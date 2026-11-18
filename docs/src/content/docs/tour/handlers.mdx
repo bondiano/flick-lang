@@ -16,8 +16,7 @@ everything.
 
 So one function runs under different handlers, which suits tests and
 interpreters. An effect can also stop the rest of the body or go on with it,
-with `abort` and `control` operations; `control` compiles only to Go for now,
-so it is not in this tour.
+with `abort` and `control` operations, which this tour leaves out.
 
 **Try:** delete the arm `| Ask.ask _ -> 4`. The compiler reports
 `FLICK-E002`: the question about pears is not handled, so `Ask` stays in the
