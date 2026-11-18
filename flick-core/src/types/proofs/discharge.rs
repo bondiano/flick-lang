@@ -24,6 +24,7 @@ impl Checker<'_> {
         if self.proofs.contracts.is_empty() {
             return;
         }
+        self.proofs.given = self.typing.dictionary_sites();
         self.validate_contracts();
         for (at, span, index) in mem::take(&mut self.proofs.uses) {
             // a contract that does not hold is reported, and gives nothing
@@ -130,15 +131,7 @@ impl Checker<'_> {
     /// that takes a dictionary depends on more than its argument.
     fn settle_fact(&self, fact: &Formula<Raw>) -> Formula<Atom> {
         fact.map(&mut |raw: &Raw| match &raw.atom {
-            Atom::Call { .. }
-                if self
-                    .typing
-                    .dicts
-                    .get(&raw.at)
-                    .is_some_and(|d| !d.is_empty()) =>
-            {
-                Formula::Opaque
-            }
+            Atom::Call { .. } if self.proofs.given.contains(&raw.at) => Formula::Opaque,
             // a comparison an `Ord` decides, or of a constant the type does not
             // hold, is none the logic reads
             Atom::Compare { value, op, bound } => {
