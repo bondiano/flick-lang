@@ -88,9 +88,10 @@ test "trims a name" { Test.expect (Test.equal "Ada" (trim "  Ada ")) }
 The module never sees its companion, and no other module can import it.
 Its cases are named after the module, `App.Users > trims a name`, and run in
 the same `flick test` as those of the test root. Only `flick test` and
-`flick fmt` read companions: `flick build`, `flick check`, the published
-`.iface` and `.d.ts`, the API docs and `flick pack` leave them out, so the
-output of a build is the same with or without them. Under `flick test`, the
+`flick fmt` read companions, and `flick check` one that a path names:
+`flick build`, any other `flick check`, the published `.iface` and `.d.ts`,
+the API docs and `flick pack` leave them out, so the output of a build is the
+same with or without them. Under `flick test`, the
 code of a module with a companion exports to it all it declares, and the
 companion's view of the module is cached apart from the module's public
 interface. A companion of a file that is not a module of the source root,

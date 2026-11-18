@@ -89,7 +89,7 @@ fn prepare(
     let Some(project) = project else {
         return Err(());
     };
-    // the test companions beside the sources, which only this command reads
+    // the test companions beside the sources, which only this command runs
     let mut roots = roots;
     let mut companions = Vec::new();
     if project.source_root().is_dir() {

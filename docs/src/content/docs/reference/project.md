@@ -347,11 +347,11 @@ that fails, with its exit code. Arguments after `--` are each step's `"$@"`.
 
 ## `flick check`
 
-Without paths `flick check` checks every module of the source and test roots,
-but the test companions beside the sources, which only `flick test` reads
-(see [testing](../testing/#test-companions)).
-With paths it checks those files and directories, together with every module
-they import, transitively. Outside a project paths are required.
+Without paths `flick check` checks every module of the source and test roots
+except the test companions beside the sources (see
+[testing](../testing/#test-companions)). With paths it checks those files and
+directories, together with every module they import, transitively; of the
+companions, only one that a path names. Outside a project paths are required.
 
 ## Packages
 
