@@ -155,3 +155,37 @@ fn obligations_of_the_rest_of_a_row_are_an_rtob_stage() {
     r.elems.insert(Path::new("Fixture", "Log"), Rc::from([]));
     assert!(super::stage(&Stage::Runtime(r, Row::none()), &env).is_err());
 }
+
+/// The qualifier of a callback that starts with `∀` stays on its arrow, under the binders the
+/// `∀` keeps, as on a callback without one.
+#[test]
+fn a_callback_that_starts_with_forall_keeps_its_qualifier() {
+    use std::rc::Rc;
+
+    use crate::types::{Caps, Kind, Scheme, Stage, Type, Var};
+
+    let var = |n: &str| Rc::new(Type::Var(Var::Named(n.into())));
+    let callback = |vars: Vec<(&str, Kind)>, param: Rc<Type>| {
+        let vars = vars.into_iter().map(|(v, k)| (v.into(), k)).collect();
+        let body = Type::Fun(param, Stage::Pure, var("b"));
+        Type::Captured(
+            Rc::new(Type::Forall(Rc::new(Scheme::new(vars, body)))),
+            Caps::var(Var::Named("c".into())),
+        )
+    };
+    let env = super::Env {
+        vars: vec!["a".into(), "b".into(), "c".into()],
+        ..super::Env::default()
+    };
+    // `(∀v. a^v -> b)^c`: rule 2 instantiates `v`, so no binder stays
+    let bounded = Rc::new(Type::Bounded(var("a"), Caps::var(Var::Named("v".into()))));
+    assert_eq!(
+        super::ty(&callback(vec![("v", Kind::Captures)], bounded), &env),
+        Ok("(.arrow (.tvar 0) .pure (.tvar 1) (fun x => x = .v 2))".into())
+    );
+    // `(∀d. d -> b)^c`: `d` stays a binder, and `c` is one index further out
+    assert_eq!(
+        super::ty(&callback(vec![("d", Kind::Type)], var("d")), &env),
+        Ok("(.all 1 (.arrow (.tvar 0) .pure (.tvar 2) (fun x => x = .v 3)))".into())
+    );
+}
