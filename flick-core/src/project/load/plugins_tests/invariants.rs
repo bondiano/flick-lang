@@ -189,3 +189,34 @@ fn a_function_called_prove_of_a_module_is_no_proof() {
         "{found:?}"
     );
 }
+
+/// A module that reaches `Port` only through re-exports, one and two deep.
+const THROUGH: &str = "module App.Main exposing (..)\n\nimport App.Again as A\nimport App.Third as T\n\nagain : Float -> Option A.Port\nlet again n = if n > 0 && n < 65536 then Some (A.Port.prove n) else None\n\nthird : Float -> Option T.Port\nlet third n = if T.Port.check n then Some (T.Port.prove n) else None\n\nparsed : Float -> Option A.Port\nlet parsed n = match A.Port.parse n with\n  | Ok p -> Some p\n  | Err _ -> None\n\nraw : T.Port -> Float\nlet raw p = T.Port.value p\n";
+
+const THIRD: &str = "module App.Third exposing (Port)\n\nimport App.Again exposing (Port)\n";
+
+#[test]
+fn a_re_export_alone_carries_the_companions_and_the_invariant() {
+    let host = super::host(THROUGH);
+    let files = [
+        ("/p/src/App/Ports.fl", PORTS),
+        ("/p/src/App/Again.fl", AGAIN),
+        ("/p/src/App/Third.fl", THIRD),
+    ];
+    assert_eq!(checks(&host, &files), [""; 0]);
+    // the interfaces kept from the first check carry them too
+    assert_eq!(checks(&host, &[]), [""; 0]);
+}
+
+#[test]
+fn a_module_with_errors_passes_on_the_invariants_it_learned() {
+    let host = super::host(THROUGH);
+    let broken = format!("{AGAIN}{BROKEN}");
+    let files = [
+        ("/p/src/App/Ports.fl", PORTS),
+        ("/p/src/App/Again.fl", broken.as_str()),
+        ("/p/src/App/Third.fl", THIRD),
+    ];
+    // `Ports` has no errors, so what `Again` learned from it still proves
+    assert_eq!(checks(&host, &files), ITS_ERRORS);
+}
