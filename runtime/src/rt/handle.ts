@@ -109,28 +109,37 @@ const dictsApplied = (f: unknown, given: ReadonlyArray<unknown>): unknown => {
   return applied;
 };
 
+/** `S.op` given its last argument: the implementation `impl` the evidence has for it now, applied. */
+const performed = (impl: unknown, tag: object, name: string, dicts: ReadonlyArray<unknown>, args: ReadonlyArray<unknown>): unknown => {
+  if (impl === undefined) {
+    const fromHost = bridgeHooks.operation?.(tag);
+    if (fromHost !== undefined) {
+      const value = applyAll(dictsApplied(Reflect.get(Object(fromHost), name), dicts), args);
+      return bridgeHooks.ran(value);
+    }
+    throw new Error(`no handler of \`${String(Reflect.get(tag, "key"))}\` is in effect`);
+  }
+  if (impl instanceof Served) return impl.call(name, dicts, args);
+  return applyAll(dictsApplied(Reflect.get(Object(impl), name), dicts), args);
+};
+
 /**
  * `S.op`: a function of the operation's arguments that looks the implementation
  * up when the last one is given, in the evidence at that moment. What it gives
- * is a value, or a call for the caller to run.
+ * is a value, or a call for the caller to run. One of one argument and no
+ * dictionaries, the most common, collects nothing into an array.
  */
 export const operation = (tag: object, name: string, arity: number, dicts: ReadonlyArray<unknown> = []): unknown => {
-  const call = (args: ReadonlyArray<unknown>): unknown => {
-    const impl = operationImplementation(tag, name);
-    if (impl === undefined) {
-      const fromHost = bridgeHooks.operation?.(tag);
-      if (fromHost !== undefined) {
-        const value = applyAll(dictsApplied(Reflect.get(Object(fromHost), name), dicts), args);
-        return bridgeHooks.ran(value);
-      }
-      throw new Error(`no handler of \`${String(Reflect.get(tag, "key"))}\` is in effect`);
-    }
-    if (impl instanceof Served) return impl.call(name, dicts, args);
-    return applyAll(dictsApplied(Reflect.get(Object(impl), name), dicts), args);
-  };
+  if (arity === 1 && dicts.length === 0) {
+    return (a: unknown): unknown => {
+      const impl = operationImplementation(tag, name);
+      if (impl === undefined || impl instanceof Served) return performed(impl, tag, name, dicts, [a]);
+      return apply(Reflect.get(Object(impl), name), a);
+    };
+  }
   const collect = (args: ReadonlyArray<unknown>): unknown =>
-    args.length === arity ? call(args) : (a: unknown) => collect([...args, a]);
-  return arity === 0 ? call([]) : collect([]);
+    args.length === arity ? performed(operationImplementation(tag, name), tag, name, dicts, args) : (a: unknown) => collect([...args, a]);
+  return arity === 0 ? performed(operationImplementation(tag, name), tag, name, dicts, []) : collect([]);
 };
 
 /** A failure of a `tail` arm is the handler's, not that of the body in between. */
