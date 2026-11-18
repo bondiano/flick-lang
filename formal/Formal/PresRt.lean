@@ -257,19 +257,19 @@ private theorem Typ.rtStepCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     | hdl =>
       obtain ⟨c, hcy, hcl, hb⟩ := hdl_install hal hn hrf hψ he hφ₀ hOb hc' hφ' hT hbl hcRt.yf hcRt.idem ht hφfixed
       exact ⟨[c], hμ.alloc .lam hcl, by rw [hμ.1]; exact hb, by simpa using hcy⟩
-  | hctl hus hℓ hal hrf hψ hop hc htl hE hk _ hp hφ₀ ha hl hcm hφ hT hat =>
+  | hctl hus hℓ hal hrf hψ hop hc htl hE hk hno hp hφ₀ ha hl hcm hφ hT hat =>
     intro Λ μ t φ Λ' μ' e' hΓ hJ hμ hcRt hbl hμb ht hφfixed hh
     cases hΓ; cases hJ
-    have h := Typ.hctl hus hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha hl hcm hφ hT hat
+    have h := Typ.hctl hus hℓ hal hrf hψ hop hc htl hE hk hno hp hφ₀ ha hl hcm hφ hT hat
     cases hh with
     | hctlRaise hEi hk _ =>
       exact hμ.same (hctl_signal hEi hk raise_any h)
     | hctlUnw hEi hk =>
       exact hμ.same (hctl_signal hEi hk unw_any h)
-  | hkarm hus hℓ hal hop hE hk _ hp hφ₀ hc hnt ha hle hφ hT =>
+  | hkarm hus hℓ hal hop hE hk hno hp hφ₀ hc hnt ha hle hφ hT =>
     intro Λ μ t φ Λ' μ' e' hΓ hJ hμ hcRt hbl hμb ht hφfixed hh
     cases hΓ; cases hJ
-    have h := Typ.hkarm hus hℓ hal hop hE hk hp hφ₀ hc hnt ha hle hφ hT
+    have h := Typ.hkarm hus hℓ hal hop hE hk hno hp hφ₀ hc hnt ha hle hφ hT
     cases hh with
     | hkarmRaise hEi hk _ =>
       exact hμ.same (hkarm_raise hEi hk h)

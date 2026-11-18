@@ -157,21 +157,21 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro _ σ hσ
     exact .hwith hus hℓ (ih₁ hσ) (ih₂ hσ) hψ (ih₃ hσ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
       rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hφ hT hat
-  | hctl hus hℓ hal _ hψ hop hc htl hE hk _ hp hφ₀ _ hl hcm hφ hT hat ih₁ ih₂ _ ih₄ =>
+  | hctl hus hℓ hal _ hψ hop hc htl hE hk hno hp hφ₀ _ hl hcm hφ hT hat ih₁ ih₂ _ ih₄ =>
     intro _ σ hσ
     subst hk
     rw [Tm.subst, (plug_hole_closed hp).subst]
-    exact .hctl hus hℓ (ih₁ hσ) (ih₂ hσ) hψ hop hc htl hE rfl hp hφ₀ (ih₄ hσ) hl ⟨hcm.1, fun h => hcm.2 fun hc' => h fun o c a b ho => by
+    exact .hctl hus hℓ (ih₁ hσ) (ih₂ hσ) hψ hop hc htl hE rfl hno hp hφ₀ (ih₄ hσ) hl ⟨hcm.1, fun h => hcm.2 fun hc' => h fun o c a b ho => by
       rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hφ hT hat
   | hkeep hus hℓ hal _ hφ₀ hc hnt hle hφ hT ih₁ ih₂ =>
     intro _ σ hσ
     exact .hkeep hus hℓ (ih₁ hσ) (ih₂ hσ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
       rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hnt hle hφ hT
-  | hkarm hus hℓ hal hop hE hk _ hp hφ₀ hc hnt _ hle hφ hT ih₁ _ ih₃ =>
+  | hkarm hus hℓ hal hop hE hk hno hp hφ₀ hc hnt _ hle hφ hT ih₁ _ ih₃ =>
     intro _ σ hσ
     subst hk
     rw [Tm.subst, (plug_hole_closed hp).subst]
-    exact .hkarm hus hℓ (ih₁ hσ) hop hE rfl hp hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
+    exact .hkarm hus hℓ (ih₁ hσ) hop hE rfl hno hp hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
       rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hnt (ih₃ hσ) hle hφ hT
   | hres hℓ _ hA ha hp hl hcp hφ hT ih₁ _ =>
     intro _ σ hσ
