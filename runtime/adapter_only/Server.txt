@@ -6,3 +6,4 @@ Server.Derive.procedure
 Server.Derive.with_error
 Server.authenticated
 Server.handler
+Server.with_origin
