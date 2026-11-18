@@ -1,0 +1,35 @@
+// What the acquisition of a `Resource` registers in its own region may use
+// the services the acquisition runs with: their providers outlive that
+// region as they outlive the resource's (`Fiber.Provided`).
+module App.AcquisitionServices exposing (..)
+
+service Greeter =
+  greet : String ->{} String
+
+greeter : Layer none none {Greeter}
+let greeter = Layer.succeed Greeter { greet = fun name -> name }
+
+released : Unit ->{Async} Unit
+let released () = provide greeter {
+  scope {
+    let res =
+      Resource.manual
+        (task {
+          Resource.acquire_release (task { "value" }) (fun _ -> ignore (Greeter.greet "release"))
+        })
+    Resource.refresh res
+  }
+}
+
+refreshed : Unit ->{Async} Unit
+let refreshed () = provide greeter {
+  scope {
+    let res =
+      Effect.resource_auto
+        Schedule.forever
+        (task {
+          Resource.acquire_release (task { "value" }) (fun _ -> ignore (Greeter.greet "release"))
+        })
+    Resource.refresh res
+  }
+}
