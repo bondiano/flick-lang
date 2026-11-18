@@ -648,8 +648,8 @@ theorem program12 (S : Sig) (hS : GenSig S) :
                 .lit
                 (by stage_le) (by le_live))
               (.match_
-                (Cert.typ_provide (E := "Fixture.Log") (o := "log") (R := (.rcons "log" (.arrow (.base .string) (.rt .cnil .cnil) (.base .unit) Caps.none) .rnil)) (t := (.tapp (.adt "Prelude.Option") (.base .unit))) (r := .cnil) (ε := .cnil) (φ₀ := .pure)
-                  (hS.arity _ (by decide)) ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
+                (Cert.typ_provide (E := "Fixture.Log") (o := "log") (us := []) (a' := (.base .string)) (b' := (.base .unit)) (R := (.rcons "log" (.arrow (.base .string) (.rt .cnil .cnil) (.base .unit) Caps.none) .rnil)) (t := (.tapp (.adt "Prelude.Option") (.base .unit))) (r := .cnil) (ε := .cnil) (φ₀ := .pure)
+                  (hS.arity_of (by decide) rfl) ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) (by inst_eq) (by inst_eq) rfl
                   (.await (r := .cnil) (ε := .cnil) (t := (.rcons "log" (.arrow (.base .string) (.rt .cnil .cnil) (.base .unit) Caps.none) .rnil)) (C := Caps.none)
                     (.task (r := .cnil) (ε := .cnil) (t := (.rcons "log" (.arrow (.base .string) (.rt .cnil .cnil) (.base .unit) Caps.none) .rnil)) (C := Caps.none)
                       (.let_ (a := (.base .unit))
@@ -662,7 +662,7 @@ theorem program12 (S : Sig) (hS : GenSig S) :
                       (Stage.le_refl _) (by simp [Tm.NoIns, Tm.Has]) (by le_live))
                     (by stage_le) (by le_live))
                   (Typ.ctor_plain S (K := "Prelude.None") (us := [(.base .unit)]) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl (by le_live))
-                  (by stage_le) (by ob_out) (by stage_le) (by le_live))
+                  (by stage_le) (Cert.body_none ((hS.arity _ (by decide)).trans rfl)) (by ob_out) (by stage_le) (by le_live))
                 (.acons (.adt (.app (PatTy.head_plain S (K := "Prelude.Some") (ts := [(.tvar 0)]) (T := "Prelude.Option") (us := [(.base .unit)]) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl) .var) rfl)
                 (.let_ (a := (.eff (.rnm "Fixture.Counter" (.adt "Fixture.Counter")) (.rnm "Fixture.Oops" (.adt "Fixture.Oops")) (.eff (.rnm "Fixture.Log" (.adt "Fixture.Log")) (.run (.rnm "Fixture.Bad" (.adt "Fixture.Bad")) (.rnm "Fixture.Oops" (.adt "Fixture.Oops"))) (.base .int) Caps.none) Caps.none))
                   (.task (r := (.rnm "Fixture.Counter" (.adt "Fixture.Counter"))) (ε := (.rnm "Fixture.Oops" (.adt "Fixture.Oops"))) (t := (.eff (.rnm "Fixture.Log" (.adt "Fixture.Log")) (.run (.rnm "Fixture.Bad" (.adt "Fixture.Bad")) (.rnm "Fixture.Oops" (.adt "Fixture.Oops"))) (.base .int) Caps.none)) (C := Caps.none)
