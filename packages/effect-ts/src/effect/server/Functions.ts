@@ -80,6 +80,15 @@ export const registerLocal = (name: string, call: Local): (() => void) => {
   };
 };
 
+/** The URL of the server functions at `origin`, or `undefined` when `origin` is not a URL. */
+const endpoint = (origin: string): string | undefined => {
+  try {
+    return new URL(PATH, origin).href;
+  } catch {
+    return undefined;
+  }
+};
+
 /** `Server.Derive.call procedure payload`. */
 export const serverCall = (procedure: Procedure, payload: unknown): Effect.Effect<unknown, unknown, unknown> =>
   Effect.suspend(() => {
@@ -87,9 +96,13 @@ export const serverCall = (procedure: Procedure, payload: unknown): Effect.Effec
     if (here !== undefined) return here(payload);
     return Effect.flatMap(Effect.service(ServerOrigin), (origin) => {
       const url = origin ?? pageOrigin();
-      return url === undefined
-        ? Effect.fail(clientError(`no server for ${procedure.name}: call it within Server.with_origin`))
-        : rpcCallNdjson(new URL(PATH, url).href, procedure, payload);
+      if (url === undefined) {
+        return Effect.fail(clientError(`no server for ${procedure.name}: call it within Server.with_origin`));
+      }
+      const target = endpoint(url);
+      return target === undefined
+        ? Effect.fail(clientError(`no server for ${procedure.name}: ${JSON.stringify(url)} is not an origin`))
+        : rpcCallNdjson(target, procedure, payload);
     });
   });
 
