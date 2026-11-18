@@ -28,6 +28,14 @@ break programs.
   `flick new` writes its test as a `suite`. The plugin interface gains
   `Expr::Task`, `task { body }` in a plugin's code.
 
+- **Breaking, fixed: two region checks the formal rules ask for.** An
+  instance method may use a region of its head only where the class
+  signature keeps it live (`FLICK-G002`): a closure that called such a
+  method could read a handle after its `scope`. And a qualifier on a type
+  variable bounds the whole value it stands for, so `a^{}` rejects a
+  `File s` or data that holds a scope's value (`FLICK-G001`), as
+  `docs/formal/regions.md` states.
+
 - **Fixed: a re-exported type keeps its companions.** A module that
   re-exports a type (`import App.Ports exposing (Port)` with
   `exposing (Port)`) now exports its `parse`, `value`, `check`, `prove` and

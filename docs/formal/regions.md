@@ -306,7 +306,7 @@ for each occurrence αᵢ^D in τ:   ⌈τᵢ⌉ ⊆ D[c̄ := C̄]
 
 A value bound bounds the whole substituted value. `a^{}` with `a := File s` is rejected at the call site: `FLICK-G001` "the expected type `File s` holds no captures".
 
-Checker: `unify.rs` `Checker::instantiate`; the bound condition is a `Hold` from `subsume_bound` with `Visible::Now`; `Outlives` constraints are `classes/mod.rs` `want`.
+Checker: `unify.rs` `Checker::instantiate`; the bound condition is a `Hold` from `regions/data.rs` `subsume_bound`, which holds every region of the value for a bound on a variable (`Visible::Regions`, [a bound on a variable bounds the whole value](#a-bound-on-a-variable-bounds-the-whole-value)); `Outlives` constraints are `classes/mod.rs` `want`.
 
 Lean: (Var), a global and the projection of a dictionary field ask `Scheme.Holds`, the facts of the scheme at the instance; a bound is the fact `Facts.bnd i D`, so this is the premise `⌈τᵢ⌉ ⊆ D[c̄ := C̄]` (`Scheme.holds_bnd`). (Let-Gen), a global and a field of a dictionary assume the facts of their scheme in its body. `Examples.lean` types a generic `let` whose body makes a cell under the bound `α^{≤c}`, and shows an instance beyond the bound rejected.
 
@@ -1151,6 +1151,51 @@ Divergence: inferring the variance of a parameter from the fields alone makes a 
 
 - Symptom: with `Tag` of [§2.2.1](#221-variance-of-data-arguments), `a` occurs in no field, so the fields give it `bi`. `Pure` typed `Tag ((Unit -> Unit)^{s})` reaches `match t with | Pure -> f`, the branch refines `a` to the pure `Unit -> Unit`, and returns `f`, a callback using `s`, as a pure function out of its `scope`.
 - Resolution, document: a parameter some constructor fixes keeps a sign only when `res K[j]` is closed in that direction, otherwise it is `inv` ([§2.2.1](#221-variance-of-data-arguments)). Lean: the closure lemma of the index, with `Tag` a regression of `LiveRules.lean`.
+
+### A region of an instance's head was taken for a type variable
+
+Divergence: an instance method used a region of its head that the class signature keeps no live, and a closure that called the method read a handle after its `scope`.
+
+```flick
+type Handle (s : Region) = Handle Raw
+
+class Read a =
+  read : a ->{} String
+
+instance Read (Handle s) =
+  let read (Handle raw) = name_of raw
+
+leak : Unit ->{} String
+let leak () =
+  let f = scope s {
+    let h = Handle (Resource.acquire_release (task { make_conn "x" }) close_conn)
+    fun () -> read h
+  }
+  f ()
+```
+
+- Symptom: accepted; Node printed `close x`, then `USE AFTER CLOSE x`. A generic `later : Read a => a -> (Unit ->{} String)` around the method leaked the same way.
+- Cause: `instances.rs` `instance_methods` made the skolems of the instance's variables without their kinds (`rigid_kinds`), so `live_atoms` read the region `s` as a type variable, which is no use (§1.4), and the body, checked against the class signature elided before the instance's types replace its parameters ([found while porting](#rules-of-typing-by-use-found-while-porting)), used `s` with nothing live.
+- Resolution, checker: the skolems of an instance carry their kinds, so a method uses a region of its head only where the class signature keeps it live (`FLICK-G002`). The rule is the one of the first bullet below, so the model and Lean, where a dictionary field has the type of the class signature at the instance (`elaboration.md`), are unchanged. Fixtures: `tests/check/fail/regions/instance_regions.fl`, `tests/check/pass/regions/instance_regions.fl`.
+
+### A bound on a variable bounds the whole value
+
+Divergence: (Inst) bounds the whole value substituted for a variable (§2.3), but the checker took what the value's type shows for visible, not held.
+
+```flick
+free : a^{} -> Unit
+let free _ = ()
+
+shown : String ->{Async, FileSystem; OpenError} Unit
+let shown path = scope {
+  let file = File.open_scoped path
+  free file
+}
+```
+
+- Symptom: accepted, as was `free (Holder conn)` for data `Holder` over a value `conn` its `scope` owns. `Resource.own`, which takes `a^{}` so that a scope owns only a value that holds no region, accepted such a `Holder` in an inner `scope`, whose end closed the outer one's value while the outer one still used it.
+- Cause: `regions/data.rs` `subsume_bound_at` read every value bound with `Visible::Late` of the bounded type, which for a variable is what the variable comes to stand for.
+- Resolution, checker: a bound on a variable holds every region of the value, while a type variable in it stays no use (`Visible::Regions`); a bound on a type that is not a variable, `(List a)^c`, keeps what its type shows visible, as a type argument carries its own qualifier. Lean and the model ask `⌈τᵢ⌉ ⊆ D` (`Scheme.holds_bnd`) as before. Fixtures: `tests/check/fail/regions/value_bound.fl`, `tests/check/pass/regions/value_bound.fl`, `tests/check/fail/regions/close_token.fl`.
 
 ### Rules of typing by use found while porting
 
