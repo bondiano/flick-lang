@@ -87,21 +87,19 @@ let examples_view model m =
     div { class_name = "fp-examples" }
       attributes
         [("popoverTarget", gallery)]
-        (Ui.with_host
-          {
-            Ui.host with
-            class_name = Some "fp-gallery-button"
-            aria_label = Some (examples ++ ": " ++ current)
-          }
+        Ui.with_host {
+          Ui.host with
+          class_name = Some "fp-gallery-button"
+          aria_label = Some (examples ++ ": " ++ current)
+        }
           (button
             { disabled = false; on_click = Ui.Event.latest (fun _ -> task { () }) }
             (text current)
-            chevron))
+            chevron)
       attributes
         [("popover", "auto")]
-        (Ui.with_host
-          { Ui.host with id = Some gallery; aria_label = Some examples }
-          (div { class_name = "fp-gallery" } (List.map (group_view model m) (groups m.examples))))
+        Ui.with_host { Ui.host with id = Some gallery; aria_label = Some examples }
+          div { class_name = "fp-gallery" } (List.map (group_view model m) (groups m.examples))
   }
 
 run_button : Atom.Writable Model -> Model -> Ui
@@ -148,31 +146,30 @@ let view model m = ui {
       Ui.text (tr m.locale "Download .fl" "Скачать .fl")
     Ui.button
       { disabled = false; on_click = Ui.Event.exhaust (fun _ -> task { discard_draft model }) }
-      (Ui.text (tr m.locale "Clear draft" "Удалить черновик"))
+      Ui.text (tr m.locale "Clear draft" "Удалить черновик")
     if m.storage_notice != "" then
       Ui.with_host
         { Ui.host with role = Some "status"; aria_live = Some Ui.Polite }
-        (span { class_name = "fp-storage-notice" } (text m.storage_notice))
+        span { class_name = "fp-storage-notice" } (text m.storage_notice)
     else
       empty
     Ui.with_host
       { Ui.host with role = Some "status"; aria_live = Some Ui.Polite }
-      (span
-        {
-          class_name =
-            if m.loading || m.checking then
-              "fp-status fp-status-loading"
-            else if m.version == "" || m.compile_error != "" || errors m > 0 then
-              "fp-status fp-bad"
-            else
-              "fp-status fp-status-ready"
-        }
-        (text (status m)))
+      span {
+        class_name =
+          if m.loading || m.checking then
+            "fp-status fp-status-loading"
+          else if m.version == "" || m.compile_error != "" || errors m > 0 then
+            "fp-status fp-bad"
+          else
+            "fp-status fp-status-ready"
+      }
+        text (status m)
     Ui.with_host
       {
         Ui.host with
         role = Some "group"
         aria_label = Some (tr m.locale "Build profile" "Профиль сборки")
       }
-      (div { class_name = "fp-profiles" } (set_profile model m Debug) (set_profile model m Release))
+      div { class_name = "fp-profiles" } (set_profile model m Debug) (set_profile model m Release)
 }

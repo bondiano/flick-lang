@@ -81,8 +81,7 @@ component page (user : User) =
   ui {
     div { class_name = "settings-page" }
       div { class_name = "container page" }
-        (div
-          { class_name = "row" }
+        div { class_name = "row" }
           (div
             { class_name = "col-md-6 offset-md-3 col-xs-12" }
             (View.classed "text-xs-center" (heading_at H1 (text "Your Settings")))
@@ -100,7 +99,5 @@ component page (user : User) =
             hr
             (View.classed
               "btn btn-outline-danger"
-              (button
-                { disabled = false; on_click = sign_out }
-                (text "Or click here to logout.")))))
+              (button { disabled = false; on_click = sign_out } (text "Or click here to logout."))))
   }

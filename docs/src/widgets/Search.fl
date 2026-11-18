@@ -58,28 +58,27 @@ let view model m =
   ui {
     div { class_name = "search-widget" }
       div { class_name = "search-heading" }
-        (span
-          { class_name = "search-dialog-title" }
-          (text (if m.ru then "Найти в документации" else "Find it in the docs")))
-        (attributes
-          [("aria-label", if m.ru then "Закрыть поиск" else "Close search")]
-          (button
-            { disabled = false; on_click = Ui.Event.latest (fun _ -> task { close_search () }) }
-            (Elements.icon "close")))
+        span { class_name = "search-dialog-title" }
+          text (if m.ru then "Найти в документации" else "Find it in the docs")
+        attributes [("aria-label", if m.ru then "Закрыть поиск" else "Close search")]
+          button {
+            disabled = false
+            on_click = Ui.Event.latest (fun _ -> task { close_search () })
+          }
+            Elements.icon "close"
 
       div { class_name = "search-field" }
-        (Elements.icon "search")
-        (attributes
-          [
-            ("aria-label", if m.ru then "Поисковый запрос" else "Search query"),
-            ("id", "flick-search-input"),
-            ("type", "search"),
-          ]
-          (input {
+        Elements.icon "search"
+        attributes [
+          ("aria-label", if m.ru then "Поисковый запрос" else "Search query"),
+          ("id", "flick-search-input"),
+          ("type", "search"),
+        ]
+          input {
             value = m.query
             placeholder = if m.ru then "Эффекты, типы, сервисы…" else "Effects, types, services…"
             on_input = Ui.Event.latest (fun event -> task { find model event.value })
-          }))
+          }
 
       attributes
         [("aria-live", "polite"), ("aria-atomic", "true")]

@@ -26,7 +26,7 @@ let finish_button title = ui {
       disabled = false
       on_click = Ui.Event.exhaust (fun _ -> task { Atom.update shelf (Books.finish title) })
     }
-    (text "finish")
+    text "finish"
 }
 
 component book_row (book : Books.Book) = ui {

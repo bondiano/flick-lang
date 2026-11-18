@@ -64,7 +64,7 @@ profile_tab : Bool -> Page -> String -> Ui
 let profile_tab active target label = ui {
   View.classed
     "nav-item"
-    (item (View.anchor (if active then "nav-link active" else "nav-link") target (text label)))
+    item (View.anchor (if active then "nav-link active" else "nav-link") target (text label))
 }
 
 /// The tabs of a profile's articles.
@@ -73,9 +73,9 @@ let article_tabs name favorites = ui {
   div { class_name = "articles-toggle" }
     View.classed
       "nav nav-pills outline-active"
-      (list
-        (profile_tab (not favorites) (Profile name None) "My Articles")
-        (profile_tab favorites (Profile name (Some Favorites)) "Favorited Articles"))
+      list
+        profile_tab (not favorites) (Profile name None) "My Articles"
+        profile_tab favorites (Profile name (Some Favorites)) "Favorited Articles"
 }
 
 /// The articles of a profile's tab.
@@ -103,14 +103,12 @@ component user_info (props : { profile : Profile; reader : Option User }) = ui {
   let profile = props.profile
   div { class_name = "user-info" }
     div { class_name = "container" }
-      (div
-        { class_name = "row" }
-        (div
-          { class_name = "col-xs-12 col-md-10 offset-md-1" }
-          (View.avatar "user-img" profile.image)
-          (heading_at H4 (text profile.username))
-          (paragraph (text (Option.with_default "" profile.bio)))
-          (action profile props.reader)))
+      div { class_name = "row" }
+        div { class_name = "col-xs-12 col-md-10 offset-md-1" }
+          View.avatar "user-img" profile.image
+          heading_at H4 (text profile.username)
+          paragraph (text (Option.with_default "" profile.bio))
+          action profile props.reader
 }
 
 /// The profile of `name`, on its tab of favored articles when `favorites`.
@@ -122,12 +120,10 @@ component page (props : { name : String; favorites : Bool }) = ui {
     div { class_name = "profile-page" }
       render user_info { profile = profile; reader = Session.signed_in () }
       div { class_name = "container" }
-        (div
-          { class_name = "row" }
-          (div
-            { class_name = "col-xs-12 col-md-10 offset-md-1" }
-            (article_tabs profile.username props.favorites)
-            (render articles (Listed jwt profile.username props.favorites))))
+        div { class_name = "row" }
+          div { class_name = "col-xs-12 col-md-10 offset-md-1" }
+            article_tabs profile.username props.favorites
+            render articles (Listed jwt profile.username props.favorites)
 
   | Atom.Loading ->
     div { class_name = "profile-page" }
