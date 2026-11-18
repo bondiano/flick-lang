@@ -1,6 +1,6 @@
 ---
 title: "Errors, services, resources and concurrency"
-source_hash: 065224bb222d2280
+source_hash: 79e17f02be1ad9c8
 ---
 
 ## Expected errors
@@ -71,7 +71,7 @@ let time_layer =
   Layer.succeed Time time_impl
 ```
 
-`Clock.current_time_millis` is the standard library's reading of the fiber's clock through `Host.Clock`, which the row of `now` therefore names. `Time.now` requires the service `Time`. `Time.Impl` is the record of the operations with their types as declared; a layer that needs a resource acquires it while it is built (`Layer.effect`). Service methods do not become class instances. The details are in [Effects, errors and services](../../reference/services/#services). [Effect services](https://effect.website/docs/v4/requirements-management/services).
+`Clock.current_time_millis` is the standard library's reading of the fiber's clock through `Host.Clock`, which the row of `now` therefore names. `Time.now` requires the service `Time`. `Time.Impl` is the record of the operations with their types as declared; a layer that needs a resource acquires it while it is built (`Layer.effect`). Service methods do not become class instances. The details are in [Services](../../reference/services/#services). [Effect services](https://effect.website/docs/v4/requirements-management/services).
 
 ## Providing the environment
 
@@ -130,7 +130,7 @@ let collect body =
   | return () -> []
 ```
 
-A handler is deep: `resume` goes on with the body under the same handler and gives back its value. `resume` runs at most once, a second call is a defect; an arm that does not call it lets the rest of the body go, and its scopes close. `resume` holds the handler's region, so it does not leave the arms. A task in a fiber of its own (`spawn`, `parallel`, the races) cannot carry an effect with a `control` operation: its handler stayed in the parent's fiber. `provide S impl { … }` handles a service with a record `S.Impl`. The details are in [Effects, errors and services](../../reference/effects/#effects-and-handlers).
+A handler is deep: `resume` goes on with the body under the same handler and gives back its value. `resume` runs at most once, a second call is a defect; an arm that does not call it lets the rest of the body go, and its scopes close. `resume` holds the handler's region, so it does not leave the arms. A task in a fiber of its own (`spawn`, `parallel`, the races) cannot carry an effect with a `control` operation: its handler stayed in the parent's fiber. `provide S impl { … }` handles a service with a record `S.Impl`. The details are in [Effects and errors](../../reference/effects/#effects-and-handlers).
 
 ## Resources
 
