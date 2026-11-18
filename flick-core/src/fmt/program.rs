@@ -2,9 +2,8 @@
 //! trivia-free AST, with the spellings the formatter is free to change made
 //! the same.
 
-use std::{mem, ptr};
+use std::ptr;
 
-use crate::plugin::head_token;
 use crate::source::FileId;
 use crate::syntax::ast::{Ast, lower};
 use crate::syntax::cst::{Element, Node};
@@ -19,7 +18,7 @@ pub(super) struct Lines<'h> {
     /// The plugin heads of the file.
     pub heads: &'h [&'h str],
     /// The heads of the blocks whose bodies are such lines.
-    pub bodies: &'h [String],
+    pub bodies: &'h [&'h str],
 }
 
 /// The AST of `node`, with `;` between statements and members dropped (a
@@ -41,31 +40,73 @@ fn plugin_block(n: &Node, text: &str, lines: &Lines) -> Option<Ast> {
     if lines.bodies.is_empty() || !matches!(n.kind, K::PluginExpr | K::PluginDecl) {
         return None;
     }
-    let own = head_token(n).is_some_and(|h| lines.bodies.iter().any(|b| b == h.text(text)));
     let mut block = n.clone();
-    for child in &mut block.children {
-        let Element::Node(raw) = child else {
-            continue;
-        };
-        if !matches!(raw.kind, K::Block | K::PluginRest | K::PluginArgs) {
-            continue;
-        }
-        match (own && raw.kind == K::Block).then(|| body(raw, text, lines)) {
-            Some(Some(body)) => *raw = body,
-            _ => raw.children = blocks_in(&raw.children, text, lines),
-        }
-    }
-    let inner = |m: &Node| (!ptr::eq(m, &block)).then(|| plugin_block(m, text, lines))?;
+    parse_bodies(&mut block, text, lines);
+    let inner = |m: &Node| (!ptr::eq(m, &raw const block)).then(|| plugin_block(m, text, lines))?;
     Some(lower(&block, text, &inner))
 }
 
-/// The tokens of a body of lines, parsed: a block of its lines.
-fn body(raw: &Node, text: &str, lines: &Lines) -> Option<Node> {
-    let fragment = parse_lines_at(text, lines.file, &raw.tokens(), lines.heads)?;
-    if !fragment.diagnostics.is_empty() || fragment.end != raw.range().1 {
+/// Parses the body of each `head { … }` among the tokens of `n`, and of its
+/// parts kept as tokens, whose body is lines: the code of a hole reads it so.
+fn parse_bodies(n: &mut Node, text: &str, lines: &Lines) {
+    let mut i = 0;
+    while i < n.children.len() {
+        match &mut n.children[i] {
+            Element::Node(raw) => parse_bodies(raw, text, lines),
+            Element::Token(t) if lines.bodies.contains(&t.text(text)) => {
+                if let Some((open, close)) = braced(&n.children, i)
+                    && let Some(body) = body(&n.children[open + 1..close], text, lines)
+                {
+                    n.children.drain(open + 2..close);
+                    i = open + 1;
+                    n.children[i] = Element::Node(body);
+                }
+            }
+            Element::Token(_) => {}
+        }
+        i += 1;
+    }
+}
+
+/// The `{` after the head at `at` and its matching `}`.
+fn braced(children: &[Element], at: usize) -> Option<(usize, usize)> {
+    let mut open = None;
+    let mut depth = 0u32;
+    for (j, child) in children.iter().enumerate().skip(at + 1) {
+        match child {
+            Element::Token(t) if t.kind == K::LBrace => {
+                open = open.or(Some(j));
+                depth += 1;
+            }
+            Element::Token(t) if t.kind == K::RBrace && depth > 0 => {
+                depth -= 1;
+                if depth == 0 {
+                    return open.map(|open| (open, j));
+                }
+            }
+            Element::Token(t) if t.kind.is_trivia() => {}
+            _ if open.is_none() => return None,
+            _ => {}
+        }
+    }
+    None
+}
+
+/// `raw`, the tokens of a body, parsed as lines: a block of statements, a
+/// line one of one.
+fn body(raw: &[Element], text: &str, lines: &Lines) -> Option<Node> {
+    let mut tokens = Vec::new();
+    for element in raw {
+        match element {
+            Element::Token(t) => tokens.push(*t),
+            Element::Node(n) => tokens.extend(n.tokens()),
+        }
+    }
+    let end = tokens.iter().rev().find(|t| !t.kind.is_trivia())?.end;
+    let fragment = parse_lines_at(text, lines.file, &tokens, lines.heads)?;
+    if !fragment.diagnostics.is_empty() || fragment.end != end {
         return None;
     }
-    // one line is a block of one statement
     Some(if fragment.tree.kind == K::Block {
         fragment.tree
     } else {
@@ -74,61 +115,6 @@ fn body(raw: &Node, text: &str, lines: &Lines) -> Option<Node> {
             children: vec![Element::Node(fragment.tree)],
         }
     })
-}
-
-/// The tokens of another block, with each `head { … }` in them whose body
-/// is lines made a block, as the code of a hole of that block reads it.
-fn blocks_in(tokens: &[Element], text: &str, lines: &Lines) -> Vec<Element> {
-    let kind = |i: usize| match tokens.get(i) {
-        Some(Element::Token(t)) => Some(t.kind),
-        _ => None,
-    };
-    let mut out = Vec::with_capacity(tokens.len());
-    let mut i = 0;
-    while i < tokens.len() {
-        let head = match &tokens[i] {
-            Element::Token(t) if t.kind == K::Ident => t.text(text),
-            _ => "",
-        };
-        if !lines.bodies.iter().any(|b| b == head) {
-            out.push(tokens[i].clone());
-            i += 1;
-            continue;
-        }
-        let open = (i + 1..tokens.len()).find(|&j| !kind(j).is_some_and(|k| k.is_trivia()));
-        let open = open.filter(|&j| kind(j) == Some(K::LBrace));
-        let close = open.and_then(|open| {
-            let mut depth = 0u32;
-            (open..tokens.len()).find(|&j| {
-                match kind(j) {
-                    Some(K::LBrace) => depth += 1,
-                    Some(K::RBrace) => depth -= 1,
-                    _ => {}
-                }
-                depth == 0
-            })
-        });
-        match (open, close) {
-            (Some(open), Some(close)) => {
-                let mut children = tokens[i..=open].to_vec();
-                children.push(Element::Node(Node {
-                    kind: K::Block,
-                    children: tokens[open + 1..close].to_vec(),
-                }));
-                children.push(tokens[close].clone());
-                out.push(Element::Node(Node {
-                    kind: K::PluginExpr,
-                    children,
-                }));
-                i = close + 1;
-            }
-            _ => {
-                out.push(tokens[i].clone());
-                i += 1;
-            }
-        }
-    }
-    out
 }
 
 fn normalize(ast: Ast) -> Ast {
@@ -156,16 +142,14 @@ fn normalize(ast: Ast) -> Ast {
 /// The lines under a call as its last arguments, and a call in parentheses
 /// as an argument without them: both are only grouping.
 fn arguments(children: &mut Vec<Ast>) {
-    if let Some(Ast::Node(K::Children, lines)) = children.last_mut() {
-        let lines = mem::take(lines);
-        children.pop();
+    if let Some(Ast::Node(K::Children, _)) = children.last()
+        && let Some(Ast::Node(_, lines)) = children.pop()
+    {
         children.extend(lines);
     }
     for argument in children.iter_mut().skip(1) {
         if let Ast::Node(K::ParenExpr, inner) = argument
-            && let [open, Ast::Node(K::AppExpr, _), close] = inner.as_slice()
-            && is_token(open, K::LParen)
-            && is_token(close, K::RParen)
+            && let [_, Ast::Node(K::AppExpr, _), _] = inner.as_slice()
         {
             *argument = inner.swap_remove(1);
         }

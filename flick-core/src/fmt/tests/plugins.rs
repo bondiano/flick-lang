@@ -127,7 +127,7 @@ fn meaning(text: &str) -> Ast {
     let tree = parse(text, file).tree;
     let heads = heads(&tree, text, file);
     let heads: Vec<&str> = heads.iter().map(String::as_str).collect();
-    let bodies = ["ui".to_owned()];
+    let bodies = ["ui"];
     let lines = Lines {
         file,
         heads: &heads,

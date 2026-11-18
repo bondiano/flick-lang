@@ -2,7 +2,6 @@
 //! as its plugin says, the user's code in its holes laid out as any other;
 //! another stays as written, the lines after its first moving with its head.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::{mem, slice};
 
@@ -38,8 +37,9 @@ pub(super) struct Layout {
     braced: Option<HoleKind>,
 }
 
-/// The layout of each block of a file, by its range.
-pub(super) type Layouts = HashMap<(u32, u32), Layout>;
+/// The layout of each block of a file, by its range: a file has few blocks,
+/// and a list costs the browser's compiler less than another map.
+pub(super) type Layouts = Vec<((u32, u32), Layout)>;
 
 /// The heads of plugin blocks the imports of `tree` expose.
 pub(super) fn heads(tree: &Node, text: &str, file: FileId) -> Arc<[String]> {
@@ -49,31 +49,29 @@ pub(super) fn heads(tree: &Node, text: &str, file: FileId) -> Arc<[String]> {
 /// The layouts the plugins of the blocks of `tree` give, those of blocks
 /// inside the holes of others too, the heads of the blocks whose body is
 /// lines, and `P036` on each block whose plugin failed to lay it out.
-pub(super) fn layouts(
+pub(super) fn layouts<'t>(
     tree: &Node,
-    text: &str,
+    text: &'t str,
     file: FileId,
     plugin_of: PluginOf,
-) -> (Layouts, Vec<String>, Vec<Diagnostic>) {
+) -> (Layouts, Vec<&'t str>, Vec<Diagnostic>) {
     let syntax = resolve::module_syntax(tree, text, file);
-    let modules: HashMap<&str, &str> = (syntax.imports.iter())
-        .flat_map(|i| {
-            i.plugins
-                .iter()
-                .map(|p| (p.name.as_str(), i.module.as_str()))
+    // the module of a head: std's own, else the last import exposing it
+    let module = |head: &str| {
+        let own = first_party::HEADS.iter().find(|(h, _)| *h == head);
+        own.map(|&(_, m)| m).or_else(|| {
+            (syntax.imports.iter().rev())
+                .find(|i| i.plugins.iter().any(|p| p.name == head))
+                .map(|i| i.module.as_str())
         })
-        .chain(first_party::HEADS.iter().copied())
-        .collect();
+    };
     let plugin = |head: &str| {
-        plugin_of(head).or_else(|| {
-            let module = modules.get(head)?;
-            implicit_package_of(module).and_then(first_party::plugin)
-        })
+        plugin_of(head).or_else(|| implicit_package_of(module(head)?).and_then(first_party::plugin))
     };
     let shared: Arc<str> = Arc::from(text);
     let heads = syntax.heads();
     let mut out = Layouts::new();
-    let mut lines: Vec<String> = Vec::new();
+    let mut lines = Vec::new();
     let mut failed = Vec::new();
     let mut blocks = Vec::new();
     blocks_under(tree, &mut blocks);
@@ -102,9 +100,9 @@ pub(super) fn layouts(
         });
         if let Some(layout) = laid_out {
             if let Some(head) = head.filter(|_| layout.braced == Some(HoleKind::Lines))
-                && !lines.iter().any(|l| l == head.text(text))
+                && !lines.contains(&head.text(text))
             {
-                lines.push(head.text(text).to_owned());
+                lines.push(head.text(text));
             }
             for hole in &layout.holes {
                 if matches!(hole.kind, K::PluginExpr | K::PluginDecl) {
@@ -115,7 +113,7 @@ pub(super) fn layouts(
                     pending.extend(inner.into_iter().cloned());
                 }
             }
-            out.insert(node.range(), layout);
+            out.push((node.range(), layout));
         }
     }
     (out, lines, failed)
@@ -170,8 +168,9 @@ fn layout(
 impl<'a> Printer<'a> {
     /// A plugin block: as its plugin lays it out, else as written.
     pub fn plugin_block(&mut self, n: &'a Node) -> Doc<'a> {
-        match self.layouts.get(&n.range()) {
-            Some(layout) => self.laid_out(n, layout),
+        let range = n.range();
+        match self.layouts.iter().find(|(r, _)| *r == range) {
+            Some((_, layout)) => self.laid_out(n, layout),
             None => self.shifted(n),
         }
     }

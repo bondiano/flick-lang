@@ -222,15 +222,17 @@ impl<'a> Printer<'a> {
         // the lines are laid out once more, without comments to take twice
         let kept = docs.len() - moved;
         let (read, misplaced) = (self.comments.save(), self.comments.misplaced);
-        let lines: Vec<Doc<'a>> = (args[kept..].iter().zip(&docs[kept..]).enumerate())
-            .filter_map(|(i, (arg, &(_, paren)))| {
-                let last = kept + i + 1 == docs.len();
-                Some(self.bare(child(arg)?, if last { suffix } else { &[] }, paren))
-            })
-            .collect();
+        let mut lines = Vec::with_capacity(2 * moved);
+        for i in kept..docs.len() {
+            let last = if i + 1 == docs.len() { suffix } else { &[] };
+            if let Some(call) = child(args[i]) {
+                lines.push(a.line());
+                lines.push(self.bare(call, last, docs[i].1));
+            }
+        }
         self.comments.restore(read);
         self.comments.misplaced = misplaced;
-        let lines = docvec![a, a.line(), a.join(lines, a.line())].nest(a, INDENT);
+        let lines = a.concat(lines).nest(a, INDENT);
         // only this layout measures its first line, up to where it hugs
         let broken = docvec![a, line(kept, a.empty(), false), lines];
         let broken = fallback.map_or(broken, |other| a.either(broken, other));
