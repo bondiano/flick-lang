@@ -157,6 +157,7 @@ stdlib/effect/option_pairs # no native for `floor` (global Math.floor)
 stdlib/effect/order # no native for `sort_by` (flick:rt listSortBy)
 stdlib/effect/password # no native for `from_string` (flick:Crypto flickUtf8Encode)
 stdlib/effect/platform # no native for `layer_of` (flick:Path flickLayer)
+stdlib/effect/pool_outcomes # no native for `make` (flick:Pool flickMake)
 stdlib/effect/pubsub # no native for `bounded` (flick:PubSub flickBounded)
 stdlib/effect/queue # no native for `bounded` (flick:Queue bounded)
 stdlib/effect/record # the row primitive `Project { admin : Bool; age : Float; name : String } { age : Float; name : String }`

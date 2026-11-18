@@ -1,0 +1,12 @@
+success: item 1
+after a success: item 1
+typed error: item 1
+after a typed error: item 1
+defect: item 1
+after a defect: item 2
+interrupted: item 2
+after an interruption: item 3
+invalidated by hand: item 3
+after invalidate: item 4
+use: item 4
+use after a defect: item 5

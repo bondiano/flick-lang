@@ -91,6 +91,7 @@ stdlib/effect/combine
 stdlib/effect/duration
 stdlib/effect/duration_text
 stdlib/effect/function
+stdlib/effect/pool_outcomes
 stdlib/effect/hash_map
 stdlib/effect/hash_set
 stdlib/effect/json_schema
