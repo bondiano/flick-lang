@@ -87,7 +87,7 @@ private theorem Typ.allInvCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     | rows hr _ => cases hr
     | all ht => exact (ih hv _ _ _ rfl).conv ht.symm
   | allI _ ht => intro _ k t φ hJ; cases hJ; exact ht
-  | lam _ _ hT | fix _ _ hT | perform _ hT | kont _ _ hT =>
+  | lam _ _ hT | fix _ _ hT | perform _ _ hT | kont _ _ hT =>
     intro _ k t φ hJ; cases hJ; exact (noArrow hT trivial).elim
   | task _ _ _ hT => intro _ k t φ hJ; cases hJ; exact (noEff hT trivial).elim
   | const _ hT =>
