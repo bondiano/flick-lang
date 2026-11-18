@@ -649,7 +649,7 @@ theorem program12 (S : Sig) (hS : GenSig S) :
                 (by stage_le) (by le_live))
               (.match_
                 (Cert.typ_provide (E := "Fixture.Log") (o := "log") (R := (.rcons "log" (.arrow (.base .string) (.rt .cnil .cnil) (.base .unit) Caps.none) .rnil)) (t := (.tapp (.adt "Prelude.Option") (.base .unit))) (r := .cnil) (ε := .cnil) (φ₀ := .pure)
-                  ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
+                  (hS.arity _ (by decide)) ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
                   (.await (r := .cnil) (ε := .cnil) (t := (.rcons "log" (.arrow (.base .string) (.rt .cnil .cnil) (.base .unit) Caps.none) .rnil)) (C := Caps.none)
                     (.task (r := .cnil) (ε := .cnil) (t := (.rcons "log" (.arrow (.base .string) (.rt .cnil .cnil) (.base .unit) Caps.none) .rnil)) (C := Caps.none)
                       (.let_ (a := (.base .unit))
