@@ -149,7 +149,7 @@ regions of the place of the handler and the new region. -/
 theorem LNest.hdl {c : Cfg} {home i E Ef al rf e₀} {X : List Ty} (hn : LNest Ψ c anc home)
     (hi : c.at i = some (plug E (.hdl Ef al rf e₀))) (hE : OkE E)
     (hcell : ∃ r ε t, (Ψ ++ X)[c.mem.length]? = some (.arrow (.base .unit) (.rt r ε) t Caps.none) ∧
-      ∀ x, r (.atm (.r x)) → holeE (baseOf anc i) E x ∨ x = c.rgs.length) :
+      ∀ x, r.asRow (.atm (.r x)) → holeE (baseOf anc i) E x ∨ x = c.rgs.length) :
     ∃ anc' home', LNest (Ψ ++ X) ((⟨c.rgs ++ [Rgn.new], c.mem ++ [.lam .todo], c.main⟩ : Cfg).put i
       (plug E (.inside c.rgs.length (.hwith c.rgs.length c.mem.length Ef al rf e₀)))) anc' home' ∧
       ∀ q, q ≠ c.rgs.length → anc' q = anc q := by

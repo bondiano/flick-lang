@@ -66,12 +66,12 @@ theorem steps_typed {root c c'} (hroot : RootTy S root)
     obtain ⟨X₂, h''⟩ := ih ht hφ h'
     exact ⟨X₁ ++ X₂, by simpa using h''⟩
 
-/-- A raised value has a type of errors of the stage. -/
+/-- A raised value has a type of errors within those of the stage. -/
 theorem raise_errors {Ψ Θ v t φ} (hv : Value v) (h : Typ S Ψ Θ [] (.raise v) (.ex t φ)) :
-    Typ S Ψ Θ [] v (.ex (.errors φ.err) .pure) := by
+    ∃ ε, Row.Sub ε.asRow φ.err ∧ Typ S Ψ Θ [] v (.ex (.errors ε) .pure) := by
   obtain ⟨ε, hv', hε⟩ := raise_inv hv h
   obtain ⟨_, _, _, _, U, _, _, _, hU, ht, hsub⟩ := canonical_errors hv hv'
-  exact .errVal hv ht hU (hsub.trans (Stage.le_err hε))
+  exact ⟨.rnm _ U, hsub.trans (Stage.le_err hε), .errVal hv ht hU (Row.Sub.refl _)⟩
 
 /-- The initial configuration of a program. -/
 theorem CfgTy.init {e₀ t φ₀} (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ₀)) (hb : e₀.Below 0) :
@@ -86,7 +86,7 @@ has no root. -/
 theorem root_answers {root Ef o c a b w} (hroot : RootTy S root) (hw : root.svc Ef = some w)
     (hop : S.op Ef o = some (c, a, b)) : RootAnswers root Ef o c := by
   obtain ⟨hwv, hwt⟩ := hroot.svc _ _ hw
-  have hne : S.impl Ef ≠ .errors Row.none := fun he => by
+  have hne : S.impl Ef ≠ .errors .cnil := fun he => by
     rw [he] at hwt
     obtain ⟨_, _, _, _, _, _, _, hN, _⟩ := canonical_errors hwv hwt
     exact hN.elim
@@ -105,11 +105,12 @@ operation nothing answers is not an outcome of the main thread, for `Σ₀` has 
 for each operation of an effect of the stage, and it does not unwind past its top: every
 signal is under the frame of its handler (`CfgCaught`). -/
 theorem T1 {root e₀ t φ₀ c} (hroot : RootTy S root)
-    (hcov : ∀ N, φ₀.svc (.nm N) → (root.svc N).isSome) (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ₀))
+    (hcov : ∀ N c, φ₀.svc (.nm N c) → (root.svc N).isSome) (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ₀))
     (hp : e₀.Below 0) (ht : t.YF 0) (hφ : φ₀.substT (kill 0) = φ₀)
     (hs : CSteps root ⟨[], [], e₀⟩ c) :
     ((Value c.main ∧ ∃ Ψ, StoreTy S Ψ c.mem ∧ Typ S Ψ Facts.age [] c.main (.ex t .pure)) ∨
-      (∃ v, c.main = .raise v ∧ ∃ Ψ, Typ S Ψ Facts.age [] v (.ex (.errors φ₀.err) .pure)) ∨
+      (∃ v, c.main = .raise v ∧ ∃ Ψ ε, Row.Sub ε.asRow φ₀.err ∧
+        Typ S Ψ Facts.age [] v (.ex (.errors ε) .pure)) ∨
       (∃ l o, Step root l c.rgs c.mem c.main o) ∨ Blocked c.rgs c.main) ∧
     ∀ (p : Nat) (g : Rgn), c.rgs[p]? = some g → g.live = true → ∀ k ∈ g.kids,
       Final k ∨ (∃ l o, Step root l c.rgs c.mem k o) ∨ (∃ D, PerformStuck S root k D) ∨
@@ -120,11 +121,14 @@ theorem T1 {root e₀ t φ₀ c} (hroot : RootTy S root)
   · rcases progress (Λ := c.rgs) (root := root) hroot h hμ.1 rfl rfl with hv | hn
     · exact .inl ⟨hv, Ψ, hμ, h.valueAny hv _⟩
     cases hn with
-    | raise h' => obtain ⟨v, hv, he⟩ := h'; exact .inr (.inl ⟨v, he, Ψ, raise_errors hv (he ▸ h)⟩)
+    | raise h' =>
+      obtain ⟨v, hv, he⟩ := h'
+      obtain ⟨ε, hε, hv'⟩ := raise_errors hv (he ▸ h)
+      exact .inr (.inl ⟨v, he, Ψ, ε, hε, hv'⟩)
     | step hstep => exact .inr (.inr (.inl hstep))
     | perform h' =>
       obtain ⟨_, Ef, o, c', _, a, b, _, _, _, hop, _, hna, hD⟩ := h'
-      obtain ⟨w, hw⟩ := Option.isSome_iff_exists.mp (hcov Ef hD)
+      obtain ⟨w, hw⟩ := Option.isSome_iff_exists.mp (hcov Ef _ hD)
       exact (hna (root_answers hroot hw hop)).elim
     | blocked hb => exact .inr (.inr (.inr hb))
     | unw h' =>

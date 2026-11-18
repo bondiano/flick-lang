@@ -56,13 +56,13 @@ theorem Shp.of_substT {σ : Atom → Ty} :
       rcases Ty.hd_of_substT σ hT with h | h
       · exact .adt hs hU h fun K hh => (hB K hh).of_substT
       · exact .hidden h
-  | .tvar _, _, _ | .rg _, _, _ | .caps _, _, _ | .row _, _, _ | .arrow .., _, _ | .ref _, _, _
+  | .tvar _, _, _ | .rg _, _, _ | .caps _, _, _ | .arrow .., _, _ | .ref _, _, _
   | .eff .., _, _ | .errors _, _, _ | .hnd _, _, _
   | .owner _, _, _ | .dict .., _, _ | .all .., _, _ | .bare, _, _ | .lazy .., _, _
   | .lazyCell .., _, _ =>
     .hidden (by simp [Ty.Opaque, Ty.hd])
   | .cnil, _, _ | .rnm .., _, _ | .run .., _, _ | .rless .., _, _
-  | .pure, _, _ | .rt .., _, _ =>
+  | .pure, _, _ | .rt .., _, _ | .rtob .., _, _ =>
     .hidden (by simp [Ty.Opaque, Ty.hd])
 
 theorem Covers.substT {t ps e} (σ : Atom → Ty) (h : Covers S t ps e) :
@@ -102,46 +102,53 @@ theorem Ty.no_rg_substT {t : Ty} {σ : Atom → Ty} {p : Nat}
   rw [hav b _ h'] at hb; exact ht hb
 
 /-- What a `handle` lets through: all but the names of the raised row. -/
-theorem Row.passes_substT {ε₀ ε' : Row} (σ : Atom → Ty) (h : ∀ x, ε₀ x → (∃ N, x = .nm N) ∨ ε' x) :
-    ∀ x, ε₀.substT σ x → (∃ N, x = .nm N) ∨ ε'.substT σ x := by
-  have hn : Row.substT σ (fun x => ∃ N, x = .nm N) = fun x => ∃ N, x = .nm N := by
-    funext x; apply propext; cases x <;> simp [Row.substT]
+theorem Row.passes_substT {ε₀ ε' : Row} (σ : Atom → Ty)
+    (h : ∀ x, ε₀ x → (∃ N c, x = .nm N c) ∨ ε' x) :
+    ∀ x, ε₀.substT σ x → (∃ N c, x = .nm N c) ∨ ε'.substT σ x := by
+  have hn : ∀ x, Row.substT σ (fun x => ∃ N c, x = .nm N c) x → ∃ N c, x = .nm N c := by
+    intro x hx; cases x <;> simp [Row.substT] at hx ⊢
   intro x hx
-  have := Row.Sub.substT σ (r' := Row.union (fun x => ∃ N, x = .nm N) ε') h x hx
-  rwa [Row.union_substT, hn] at this
+  have := Row.Sub.substT σ (r' := Row.union (fun x => ∃ N c, x = .nm N c) ε') h x hx
+  rw [Row.union_substT] at this
+  exact this.imp_left (hn x)
 
-theorem Catches.substT {ε₀ : Row} {p : Pat} {θ : Ty} {H H' : Row} (σ : Atom → Ty)
+theorem Catches.substT {ε₀ : Ty} {p : Pat} {θ : Ty} {H H' : Row} (σ : Atom → Ty)
     (h : ∀ n, H n → Catches S ε₀ p θ n ∨ H' n) :
     ∀ n, H.substT σ n → Catches S (ε₀.substT σ) p (θ.substT σ) n ∨ H'.substT σ n := by
   intro n hn
   cases n with
-  | nm N =>
-    rcases hn with hn | ⟨b, G, hb, hG, h'⟩
+  | nm N c =>
+    simp only [Catches, Ty.asRow_substT]
+    rcases hn with ⟨c₀, hn, rfl⟩ | ⟨b, G, hb, hG, h'⟩
     · rcases h _ hn with (⟨rfl, h'⟩ | ⟨rfl, h'⟩) | h'
-      · exact .inl (.inl ⟨rfl, .inl h'⟩)
+      · exact .inl (.inl ⟨rfl, .inl ⟨c₀, h', rfl⟩⟩)
       · exact .inl (.inr ⟨rfl, h'⟩)
-      · exact .inr (.inl h')
+      · exact .inr (.inl ⟨c₀, h', rfl⟩)
     · rcases h _ hb with h | h
       · obtain ⟨rfl, hc⟩ := h; exact .inl (.inl ⟨rfl, .inr ⟨b, G, hc, hG, h'⟩⟩)
       · exact .inr (.inr ⟨b, G, h, hG, h'⟩)
   | atm a =>
+    simp only [Catches, Ty.asRow_substT]
     rcases hn with ⟨b, hb, h'⟩ | ⟨b, G, hb, h'⟩ <;> rcases h _ hb with h | h
     · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, .inl ⟨b, hc, h'⟩⟩
     · exact .inr (.inl ⟨b, h, h'⟩)
     · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, .inr ⟨b, G, hc, h'⟩⟩
     · exact .inr (.inr ⟨b, G, h, h'⟩)
-  | ob N a =>
-    rcases hn with ⟨b, hb, h'⟩ | ⟨v, G, b, hb, hG, hv, h'⟩ <;> rcases h _ hb with h | h
-    · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, .inl ⟨b, hc, h'⟩⟩
-    · exact .inr (.inl ⟨b, h, h'⟩)
+  | ob N c a =>
+    simp only [Catches, Ty.asRow_substT]
+    rcases hn with ⟨c₀, b, hb, hc₀, h'⟩ | ⟨v, G, b, hb, hG, hv, h'⟩ <;> rcases h _ hb with h | h
+    · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, .inl ⟨c₀, b, hc, hc₀, h'⟩⟩
+    · exact .inr (.inl ⟨c₀, b, h, hc₀, h'⟩)
     · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, .inr ⟨v, G, b, hc, hG, hv, h'⟩⟩
     · exact .inr (.inr ⟨v, G, b, h, hG, hv, h'⟩)
   | obv w H a =>
+    simp only [Catches, Ty.asRow_substT]
     obtain ⟨v, G, b, hb, hv, h'⟩ := hn
     rcases h _ hb with h | h
     · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, ⟨v, G, b, hc, hv, h'⟩⟩
     · exact .inr ⟨v, G, b, h, hv, h'⟩
   | rv a H =>
+    simp only [Catches, Ty.asRow_substT]
     obtain ⟨b, G, hb, h'⟩ := hn
     rcases h _ hb with h | h
     · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, ⟨b, G, hc, h'⟩⟩

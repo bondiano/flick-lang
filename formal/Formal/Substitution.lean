@@ -117,9 +117,9 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | errVal hv _ hU hE ih => intro _ _ hσ; exact .errVal hv.subst (ih hσ) hU hE
   | tryR _ _ hφ hs ih₁ ih₂ => intro _ _ hσ; exact .tryR (ih₁ hσ) (ih₂ hσ) hφ hs
   | tryP _ _ ih₁ ih₂ => intro _ _ hσ; exact .tryP (ih₁ hσ) (ih₂ hσ)
-  | handle hv _ _ hc ha hφ ih₁ ih₂ =>
+  | handle hv _ hU hE _ hc ha hφ ih₁ ih₂ =>
     intro _ σ hσ
-    exact .handle hv.subst (ih₁ hσ) (ih₂ hσ) (hc.map (Homo.subst σ) hv) ha hφ
+    exact .handle hv.subst (ih₁ hσ) hU hE (ih₂ hσ) hc ha hφ
   | hnil hH => intro _ _ _; exact .hnil hH
   | hcons hp _ _ hH ih₁ ih₂ =>
     intro _ _ hσ; exact .hcons hp (ih₁ (SubOk.lift hσ _ (by simpa using hp.binds))) (ih₂ hσ) hH

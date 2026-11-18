@@ -23,10 +23,10 @@ inductive LeLive (S : Sig) : Ty → Ty → Prop
   /-- Equality of row terms is available in invariant positions too. -/
   | equiv : Ty.Equiv a b → LeLive S a b
   | arrow : LeLive S a' a →
-      (Stage.use φ C).le (Stage.use φ' C') → LeLive S t t' →
+      (Stage.use φ.asStage C).le (Stage.use φ'.asStage C') → LeLive S t t' →
       Caps.Sub (Ty.arrow a φ t C).reach (Ty.arrow a' φ' t' C').reach →
       LeLive S (.arrow a φ t C) (.arrow a' φ' t' C')
-  | eff : (Stage.use (.rt r e) C).le (Stage.use (.rt r' e') C') →
+  | eff : (Stage.use (.rt r.asRow e.asRow) C).le (Stage.use (.rt r'.asRow e'.asRow) C') →
       LeLive S t t' →
       Caps.Sub (Ty.eff r e t C).reach (Ty.eff r' e' t' C').reach →
       LeLive S (.eff r e t C) (.eff r' e' t' C')
@@ -98,37 +98,36 @@ inductive LeLiveI (S : Sig) : Ty → Ty → Prop
 
 theorem LeLiveI.refl : LeLiveI S t t := .le .refl
 
+theorem Stage.use_le_self (φ : Stage) (C : Caps) : (Stage.use φ C).le (Stage.use φ C) := by
+  cases φ with
+  | pure => trivial
+  | rt _ _ => exact ⟨fun _ h => h, fun _ h => h⟩
+
 /-- Subtyping cannot erase the stage needed to call a qualified function. -/
 theorem LeLive.arrow_use {a ψ t C a' ψ' t' C'}
     (h : LeLive S (.arrow a ψ t C) (.arrow a' ψ' t' C')) :
-    (Stage.use ψ C).le (Stage.use ψ' C') := by
+    (Stage.use ψ.asStage C).le (Stage.use ψ'.asStage C') := by
   cases h with
-  | refl =>
-    cases ψ with
-    | pure => trivial
-    | rt _ _ => exact ⟨fun _ h => h, fun _ h => h⟩
+  | refl => exact Stage.use_le_self _ _
   | arrow _ hψ _ _ => exact hψ
   | equiv he =>
     cases he.form with
     | rows hr _ => cases hr
-    | arrow =>
-      cases ψ with
-      | pure => trivial
-      | rt _ _ => exact ⟨fun _ h => h, fun _ h => h⟩
+    | arrow _ hψ _ => rw [← hψ.asStage]; exact Stage.use_le_self _ _
   | hide _ _ _ _ ha => exact absurd ha Ty.arrow_ne_tcon
   | data _ _ _ _ _ ha => exact absurd ha Ty.arrow_ne_tcon
 
 /-- The same obligation is kept when a qualified task is widened. -/
 theorem LeLive.eff_use {r ε t C r' ε' t' C'}
     (h : LeLive S (.eff r ε t C) (.eff r' ε' t' C')) :
-    (Stage.use (.rt r ε) C).le (Stage.use (.rt r' ε') C') := by
+    (Stage.use (.rt r.asRow ε.asRow) C).le (Stage.use (.rt r'.asRow ε'.asRow) C') := by
   cases h with
-  | refl => exact ⟨fun _ h => h, fun _ h => h⟩
+  | refl => exact Stage.use_le_self _ _
   | eff hψ _ _ => exact hψ
   | equiv he =>
     cases he.form with
     | rows hr _ => cases hr
-    | eff => exact ⟨fun _ h => h, fun _ h => h⟩
+    | eff hr hε _ => rw [← hr.asRow, ← hε.asRow]; exact Stage.use_le_self _ _
   | hide _ _ _ _ ha => exact absurd ha Ty.eff_ne_tcon
   | data _ _ _ _ _ ha => exact absurd ha Ty.eff_ne_tcon
 

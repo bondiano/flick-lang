@@ -36,6 +36,7 @@ def N : Names where
   prim _ _ := 3
   some := "Some"
   ctor _ := "Ctor"
+  errors := "Errors"
 
 def listT (t : Flick.Ty) : Flick.Ty := .tapp (.adt "List") t
 
@@ -233,8 +234,8 @@ theorem glob_closed : ∀ g s, globF g = some s → s.Closed s.k := by
       · cases h
         intro σ σ' _
         refine ⟨?_, by simp⟩
-        simp [strctTy, dicts, trTT, trD, trT, tyInt, tyRec, cEq, Flick.Ty.substT, Flick.Ty.spine,
-          Flick.Ty.reach, Flick.Stage.substT]
+        simp [strctTy, dicts, trTT, trD, trT, trStageT, tyInt, tyRec, cEq, Flick.Ty.substT,
+          Flick.Ty.spine, Flick.Ty.reach]
       · cases h
 
 /-- The witness's constructors are ordinary: each builds `T α₀ … αₖ₋₁`. -/

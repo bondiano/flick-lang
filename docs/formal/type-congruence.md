@@ -21,10 +21,51 @@ pure/runtime distinction remain observable type structure.
 
 The row unit and idempotence laws require `Ty.RowForm`. A bare unkinded type
 variable is not a row form: substitution must not turn a row law into an
-equality between an ordinary value type and a row. `Ty.asIndexedRow` retains
-nominal arguments modulo congruence. The older `Ty.asRow` projection used by
-liveness records names and reachability; it does not independently establish
-equality of nominal arguments.
+equality between an ordinary value type and a row.
+
+## Named row elements keep their arguments
+
+Every row and stage of a type is a term: `cnil`, a named element `rnm N a`, a
+union `run`, a subtraction `rless G`, `caps C` for atoms, a variable, and the
+stages `pure`, `rt r e` and `rtob r s e`. The last one is `R⟨r ∪ Provided r s; e⟩`:
+the obligations of a stage are written through it, never inside a row.
+The argument of a named element is the nominal type it stands for, so a
+closed service or error `N` is `rnm N N` and `Store Int` is
+`rnm Store (Store Int)`. The judgments read these terms as predicate rows
+(`Ty.asRow`, `Ty.asStage`). In a predicate row a named element is its name at
+its argument up to congruence: `Elem.nm N c` with `c : TyClass`, the quotient
+of types by `Ty.Equiv`.
+
+Types cannot hold predicate rows. If `Ty` contained `Elem → Prop` and `Elem`
+contained `Ty` arguments, `Ty` would contain the subsets of a set that
+contains `Ty`. So a type keeps the syntax of a row, and only the judgments
+use the predicate it stands for. `Ty.substT` substitutes inside the arguments,
+and lifts under binders. Only stage terms are substituted for a stage
+variable (`Ty.isStage`), so `Ty.asStage_substS` needs no kinds.
+
+`IndexedRows.lean` proves the consequences:
+
+- `Ty.Equiv.rnm_iff`: two named elements are congruent exactly when their
+  arguments are. `Ty.rnm_int_not_bool` and `Ty.nm1_int_not_bool`: `Store Int`
+  and `Store Bool` are not congruent.
+- `Ty.Equiv.row_int_not_bool`: `Store Int ∪ ρ` is not congruent to
+  `Store Bool ∪ ρ` when `ρ` does not hold `Store Int`.
+- `Ty.ref_int_not_bool`: they stay apart inside the invariant `Ref`, as the
+  stages of the functions it holds.
+- `Ty.bound_int_not_bool`: they stay apart after a substitution, under a
+  binder that lifted substitution protects.
+- `Ty.rless_removes_all`: `-S` removes `S` at every argument, before and after
+  a substitution.
+
+Removal is by name. `Row.less G` removes each instance of each name of `G`.
+At run time an arm that catches a constructor, and a handler of an effect,
+act by name whatever the arguments. So the rows they remove are closed under
+names (`Row.nameClose`), and `Catches` and `Frame.dom` answer by name. A
+`handle` whose value has the error type `U = E ū` covers that instance
+(`HCov`). The rules over a substitution stay stable because a substitution
+maps a name at one argument to the same name at the substituted argument
+(`Row.nameClose_substT`). Handlers and signatures are by name in this core:
+services and effects have no parameters (`Sig.impl_closed`).
 
 The definitions are in `formal/Formal/TypeEquality.lean`; algebra,
 substitution and constructor inversion are in `TypeEquiv*.lean`.
@@ -87,7 +128,7 @@ valid measure after row idempotence and subtraction.
 
 ## Checks and limits
 
-`Formal.ConversionExamples` includes a closed index problem whose two sides
+`Formal.IndexedRows` checks the named elements above. `Formal.ConversionExamples` includes a closed index problem whose two sides
 are unequal syntax under every substitution but whose identity substitution
 is a most general unifier modulo congruence. It also checks conversion of a
 completed pattern and the resulting binding. `Live.ConversionExamples`,

@@ -144,12 +144,13 @@ theorem trStage_use_le {ψ φ : Stage} {q : Ty} (h : ψ.Applies φ q) :
       · exact hx.elim
       · exact hx
       · exact hx.elim
-    | ob n a => rcases hx with hx | hx <;> exact hx.elim
-    | obv v a => rcases hx with hx | hx <;> exact hx.elim
+    | ob n c a => rcases hx with hx | hx <;> first | exact hx.elim | exact (Flick.Ty.asRow_ob _ _ _ _ hx).elim
+    | obv v G a => rcases hx with hx | hx <;> first | exact hx.elim | exact (Flick.Ty.asRow_obv _ _ _ _ hx).elim
 
 /-- A row `⟦t⟧` holds no obligation. -/
-theorem trT_asRow_ob (t : Flick.Ty) (n : Flick.Name) (a : Atom) : ¬ t.asRow (.ob n a) := by
-  exact Flick.Ty.asRow_ob t n a
+theorem trT_asRow_ob (t : Flick.Ty) (n : Flick.Name) (c : TyClass) (a : Atom) :
+    ¬ t.asRow (.ob n c a) := by
+  exact Flick.Ty.asRow_ob t n c a
 
 theorem trT_asRow_obv (t : Flick.Ty) (v a : Atom) (G : Flick.Name → Prop) :
     ¬ t.asRow (.obv v G a) := by
@@ -164,7 +165,7 @@ theorem trStage_use_live (r e c : Ty) :
   rcases hx with hx | hx
   · refine .inl ?_
     cases x with
-    | ob n a => exact (trT_asRow_ob _ n a hx).elim
+    | ob n c a => exact (trT_asRow_ob _ n c a hx).elim
     | obv v G a => exact (trT_asRow_obv _ v a G hx).elim
     | atm a => exact .inr hx
     | nm n => exact .inr hx

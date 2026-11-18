@@ -124,7 +124,7 @@ the frames, or of the handler's own region. -/
 theorem hwith_cell {Ψ Θ E n ℓ Ef al rf e₀ t φ} (hE : OkE E)
     (h : Typ S Ψ Θ [] (plug E (.inside n (.hwith n ℓ Ef al rf e₀))) (.ex t φ)) :
     ∃ r ε t', Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) ∧
-      ∀ x, r (.atm (.r x)) → φ.svc (.atm (.r x)) ∨ x = n ∨ ∃ F ∈ E, F = .inside x ∨ F.rgn = some x := by
+      ∀ x, r.asRow (.atm (.r x)) → φ.svc (.atm (.r x)) ∨ x = n ∨ ∃ F ∈ E, F = .inside x ∨ F.rgn = some x := by
   have h' : Typ S Ψ Θ [] (plug (.inside n :: E) (.hwith n ℓ Ef al rf e₀)) (.ex t φ) := h
   obtain ⟨K, Θ', t', ψ, hr, hp, hat⟩ := hole_atm (OkE.cons' (F := .inside n) hE trivial) (fun hv => by cases hv) h'
   obtain ⟨_, _, _, _, _, _, _, hℓ, _, _, _, _, _, _, hφ, _, _⟩ := hr.hwith_type _ _ _ _ _ _ _ _ rfl rfl

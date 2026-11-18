@@ -127,15 +127,15 @@ theorem withs_typing_atm {x r : Tm} {o : Nat} (Q : Prop) (Old : Atom → Prop)
       obtain ⟨_, _, _, _, _, hF, hb, hrow, _, _, hφ, _⟩ := h.inside_type _ _ _ _ rfl rfl
       obtain ⟨t', R', ε', hw, ⟨h1, h2⟩, hat⟩ := ih hE₀ hb (hΘ.inside_age hF) hA₀
       have up : ∀ y, _ → φ.svc y := fun y h => Stage.le_svc hφ y h
-      refine ⟨t', R', ε', hw, ⟨fun N a hy => ?_, fun N hy => ?_⟩, lift (fun a h' => ?_) hat⟩
-      · rcases h1 N a hy with h' | ⟨p', rfl, hp⟩ | ⟨F, hF', x⟩
+      refine ⟨t', R', ε', hw, ⟨fun N c a hy => ?_, fun N c hy => ?_⟩, lift (fun a h' => ?_) hat⟩
+      · rcases h1 N c a hy with h' | ⟨p', rfl, hp⟩ | ⟨F, hF', x⟩
         · rcases Stage.le_svc hrow _ h' with h₁ | h₁ | h₁
           · exact h₁.elim
           · exact .inl (up _ h₁)
           · exact .inr (.inl ⟨p, h₁.1, by simp⟩)
         · exact .inr (.inl ⟨p', rfl, mem hp⟩)
         · exact .inr (.inr ⟨F, mem' hF', x⟩)
-      · obtain ⟨a₁, a₂⟩ := h2 N hy
+      · obtain ⟨a₁, a₂⟩ := h2 N c hy
         refine ⟨?_, ?_⟩
         · rcases a₁ with a₁ | ⟨hn, F, hF', hI⟩
           · rcases Stage.le_svc hrow _ a₁ with h' | h' | h'
@@ -165,12 +165,12 @@ theorem withs_typing_atm {x r : Tm} {o : Nat} (Q : Prop) (Old : Atom → Prop)
           (rel.svc _ h').resolve_right fun h₂ => by
             have h₃ := Frame.provides_nonatm hy h₂
             cases y <;> simp [Frame.dom, Frame.installs] at h₃
-        refine ⟨t', R', ε', hw, ⟨fun N a hy => ?_, fun N hy => ?_⟩, lift (fun a h' => rel.svc _ h') hat⟩
-        · rcases h1 N a hy with h' | ⟨p, rfl, hp⟩ | ⟨F, hF', x⟩
+        refine ⟨t', R', ε', hw, ⟨fun N c a hy => ?_, fun N c hy => ?_⟩, lift (fun a h' => rel.svc _ h') hat⟩
+        · rcases h1 N c a hy with h' | ⟨p, rfl, hp⟩ | ⟨F, hF', x⟩
           · exact .inl (up _ h' fun _ h => by cases h)
           · exact .inr (.inl ⟨p, rfl, mem hp⟩)
           · exact .inr (.inr ⟨F, mem' hF', x⟩)
-        · obtain ⟨a₁, a₂⟩ := h2 N hy
+        · obtain ⟨a₁, a₂⟩ := h2 N c hy
           refine ⟨?_, ?_⟩
           · rcases a₁ with a₁ | ⟨hn, F, hF', hI⟩
             · exact .inl (up _ a₁ fun _ h => by cases h)
@@ -211,24 +211,26 @@ theorem fin_await_atm {Θ : Facts} {c : Const} {p : Nat} {w : Tm} {T : Ty} {φ :
     obtain ⟨_, _, _, _, h, la, lφ, _, -⟩ := (lt.trans hT₁).arrow_left
     cases h
     obtain ⟨r', e', t', C', rfl, hle, -, -⟩ := LeLive.eff_right la
-    obtain ⟨R, ε, hR⟩ := Stage.use_rt r' e' C'
+    obtain ⟨R, ε, hR⟩ := Stage.use_rt r'.asRow e'.asRow C'
     have hr' := fun (y : Elem) (hy : ∀ a, y ≠ .atm a) (h : R y) =>
       Stage.use_le_rows hle y hy (Stage.use_eq_rows hR y hy h)
     have up := fun y h => Stage.le_svc (Stage.le_trans (Stage.le_use _ _)
       (Stage.le_trans lφ hψ)) y h
     have hk : Typ S Ψ Facts.age [] (.await w) (.ex t' (.rt R ε)) := by
       rw [← hR]; exact .await ((hw.valueAny hv _).cut hΘ) (Stage.le_refl _) LeLive.refl
-    refine ⟨_, R, ε, hk, ⟨fun N a ha => .inl (up _ (.inr (.inl (hr' _ (fun _ h => by cases h) ha)))),
-      fun N ha => ⟨.inl (up _ (.inr (.inl (hr' _ (fun _ h => by cases h) ha)))),
-        .inl (up _ (.inr (.inr ⟨hr' _ (fun _ h => by cases h) ha, by rw [hs]; rfl⟩)))⟩⟩, fun a ha => ?_⟩
+    refine ⟨_, R, ε, hk, ⟨fun N c a ha =>
+        (Ty.asRow_ob _ _ _ _ (hr' _ (fun _ h => by cases h) ha)).elim,
+      fun N c ha => ⟨.inl (up _ (.inl (.inr (hr' _ (fun _ h => by cases h) ha)))),
+        .inl (up _ (.inr ⟨.inr (hr' _ (fun _ h => by cases h) ha), by rw [hs]; rfl⟩))⟩⟩,
+      fun a ha => ?_⟩
     obtain ⟨-, hkeep, hsub⟩ := hok
     rw [hs] at hkeep
-    have h₁ : (Stage.use (.rt r' e') C').svc (.atm a) := by rw [hR]; exact ha
+    have h₁ : (Stage.use (.rt r'.asRow e'.asRow) C').svc (.atm a) := by rw [hR]; exact ha
     rcases Stage.use_svc _ _ (Stage.le_svc hle _ h₁) with h₂ | ⟨b, hb, he⟩
-    · exact ⟨keep_old hΘ hkeep h₂, up _ (.inr (.inl h₂))⟩
+    · exact ⟨keep_old hΘ hkeep h₂, up _ (.inl (.inr h₂))⟩
     · cases he
       have hr := hsub (.atm _) hb
-      exact ⟨keep_old hΘ hkeep hr, up _ (.inr (.inl hr))⟩
+      exact ⟨keep_old hΘ hkeep hr, up _ (.inl (.inr hr))⟩
   · obtain ⟨_, _, _, _, h, la₀, _, lt, -⟩ := hT'.arrow_left
     cases h
     obtain ⟨q, hq, hs⟩ := canonical_owner .own (ho.conv (LeLive.eq_owner la₀))
@@ -236,26 +238,26 @@ theorem fin_await_atm {Θ : Facts} {c : Const} {p : Nat} {w : Tm} {T : Ty} {φ :
     obtain ⟨_, _, _, _, h, la, lφ, _, -⟩ := (lt.trans hT₁).arrow_left
     cases h
     obtain ⟨r', e', t', C', rfl, hle, -, -⟩ := LeLive.eff_right la
-    obtain ⟨R, ε, hR⟩ := Stage.use_rt r' e' C'
+    obtain ⟨R, ε, hR⟩ := Stage.use_rt r'.asRow e'.asRow C'
     have hr' := fun (y : Elem) (hy : ∀ a, y ≠ .atm a) (h : R y) =>
       Stage.use_le_rows hle y hy (Stage.use_eq_rows hR y hy h)
     have up := fun y h => Stage.le_svc (Stage.le_trans (Stage.le_use _ _)
       (Stage.le_trans lφ hψ)) y h
     have hk : Typ S Ψ Facts.age [] (.await w) (.ex t' (.rt R ε)) := by
       rw [← hR]; exact .await ((hw.valueAny hv _).cut hΘ) (Stage.le_refl _) LeLive.refl
-    refine ⟨_, R, ε, hk, ⟨fun N a ha => ?_, fun N ha => ?_⟩, fun a ha => ?_⟩
+    refine ⟨_, R, ε, hk, ⟨fun N c a ha => ?_, fun N c ha => ?_⟩, fun a ha => ?_⟩
     · rcases hr' _ (fun _ h => by cases h) ha with h' | h'
-      · simp [Row.scope, Row.ofCaps] at h'
-      · exact .inl (up _ (.inl h'))
+      · simp [Ty.asRow, Row.ofCaps] at h'
+      · exact (Ty.asRow_ob _ _ _ _ h').elim
     · rcases hr' _ (fun _ h => by cases h) ha with h' | h'
-      · simp [Row.scope, Row.ofCaps] at h'
+      · simp [Ty.asRow, Row.ofCaps] at h'
       · exact ⟨.inl (up _ (.inl h')), .inl (up _ (.inr ⟨h', by rw [hs]; rfl⟩))⟩
     · obtain ⟨-, hkeep, hsub⟩ := hok
       rw [hs] at hkeep
-      have h₁ : (Stage.use (.rt r' e') C').svc (.atm a) := by rw [hR]; exact ha
+      have h₁ : (Stage.use (.rt r'.asRow e'.asRow) C').svc (.atm a) := by rw [hR]; exact ha
       rcases Stage.use_svc _ _ (Stage.le_svc hle _ h₁) with h₂ | ⟨b, hb, he⟩
       · rcases h₂ with h₂ | h₂
-        · have ha' : a = .r p := by simpa [Row.scope, Row.ofCaps, hs, Ty.reach] using h₂
+        · have ha' : a = .r p := by simpa [Ty.asRow, Row.ofCaps, hs, Ty.reach] using h₂
           subst ha'
           exact ⟨.inl rfl, Stage.le_svc (Stage.le_trans lφ hψ) _ (by rw [hs]; exact Or.inr rfl)⟩
         · exact ⟨keep_old hΘ hkeep h₂, up _ (.inl h₂)⟩
@@ -274,10 +276,10 @@ theorem fin_await {Θ : Facts} {c : Const} {p : Nat} {w : Tm} {T : Ty} {φ : Sta
 /-- An operation at the hole of a context that no frame answers has its effect in the stage of
 the context: a handler without an arm for it leaves its effect in the row outside. -/
 theorem perform_out {Ef o : Name} {c : OpClass} {r : Tm}
-    (hask : ∀ {Ψ' Θ' t' φ'}, Typ S Ψ' Θ' [] r (.ex t' φ') → φ'.svc (.nm Ef)) (hv : ¬ Value r)
+    (hask : ∀ {Ψ' Θ' t' φ'}, Typ S Ψ' Θ' [] r (.ex t' φ') → φ'.svc (.nm₀ Ef)) (hv : ¬ Value r)
     (hop : ∃ a b, S.op Ef o = some (c, a, b)) :
     ∀ (E : List Frame) {Ψ : List Ty} {Θ : Facts} {t : Ty} {φ : Stage}, OkE E →
-      (∀ F ∈ E, F.handles Ef o c = none) → Typ S Ψ Θ [] (plug E r) (.ex t φ) → φ.svc (.nm Ef) := by
+      (∀ F ∈ E, F.handles Ef o c = none) → Typ S Ψ Θ [] (plug E r) (.ex t φ) → φ.svc (.nm₀ Ef) := by
   refine list_rev_ind ?_ ?_
   · intro Ψ Θ t φ _ _ h
     exact hask h

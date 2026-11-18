@@ -154,17 +154,18 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe S J J' �
     intro _ hJ; obtain ⟨_, _, rfl, _, h₂⟩ := hJ.ex
     exact .raiseAdt (ih (.st h₂)) hU (Stage.le_trans hφ h₂)
   | errVal hv _ hU hE ih =>
-    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex; obtain rfl := (h₁.eq_plain rfl).errors_right;
-      exact .errVal hv (ih (.st h₂)) hU hE
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
+    obtain ⟨_, rfl, he⟩ := (h₁.eq_plain rfl).errors_right
+    exact .errVal hv (ih (.st h₂)) hU (by rw [he.asRow]; exact hE)
   | tryR _ _ hφ hs ih₁ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .tryR (ih₁ ⟨h₁, Stage.le_refl _⟩) (ih₂ ⟨rfl, rfl, h₁, h₂⟩) (Stage.le_trans hφ h₂) hs
   | tryP _ _ ih₁ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .tryP (ih₁ ⟨h₁, Stage.le_refl _⟩) (ih₂ ⟨rfl, rfl, h₁, h₂⟩)
-  | handle hv hv' _ hc ha hφ _ ih₂ =>
+  | handle hv hv' hU hE _ hc ha hφ _ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
-    exact .handle hv hv' (ih₂ ⟨rfl, rfl, h₁, h₂⟩) hc ha (Stage.le_trans hφ h₂)
+    exact .handle hv hv' hU hE (ih₂ ⟨rfl, rfl, h₁, h₂⟩) hc ha (Stage.le_trans hφ h₂)
   | hnil hH => intro _ hJ; obtain ⟨_, _, rfl, _, _⟩ := hJ.halts; exact .hnil hH
   | hcons hp _ _ hH ih₁ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.halts
