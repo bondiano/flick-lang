@@ -10,7 +10,10 @@ break programs.
   `Platform.stdout_line`, `stderr_line` and `stdout_write`, the five levels
   of `Console` and `Log.console` need `Host.Console`; `Platform.args`
   `Host.Arguments`; `Platform.env` and the default provider of `Config.get`
-  `Host.Environment`; `Clock`, `DateTime.now`, `DateTime.is_past` and
+  `Host.Environment`, which reads a variable by its name only, so the
+  default provider no longer makes a record or an array of the names of the
+  variables (`ConfigProvider.layer (ConfigProvider.from_env options)` still
+  does); `Clock`, `DateTime.now`, `DateTime.is_past` and
   `DateTime.is_future` `Host.Clock`; `Random` `Host.Random`, whose every
   operation is now made of `Host.Random.next` draws, so a fake fixes them,
   while `Random.with_seed` keeps the same draws. A new service
