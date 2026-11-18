@@ -8,9 +8,9 @@ use flick_pretty::{Document, DocumentArena, docvec};
 
 use super::Gen;
 use super::layout::{Code, block, call, statement};
-use crate::codegen::Known;
-use crate::ir::{BinOp, Expr, ExprKind, Lit, TypeName};
-use crate::numeric::{Arith, Num};
+use flick_backend_support::Known;
+use flick_ir::{Arith, Num};
+use flick_ir::{BinOp, Expr, ExprKind, Lit, TypeName};
 
 /// A type whose values are Go's own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

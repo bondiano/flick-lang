@@ -47,6 +47,8 @@ fn named_parameterized_module_result_runs_from_two_importers_on_js_and_go() {
                 .arg(&out)
                 .arg("--emit")
                 .arg(emit)
+                // outside a project, only the flag lets the Go backend run `go build`
+                .args(if emit == "go" { &["--allow-tool", "go"][..] } else { &[] })
                 .arg("--profile")
                 .arg(profile)
                 .output()
@@ -129,6 +131,8 @@ fn case_insensitive_set_keeps_its_policy_across_importers_on_js_and_go() {
                 .arg(&out)
                 .arg("--emit")
                 .arg(emit)
+                // outside a project, only the flag lets the Go backend run `go build`
+                .args(if emit == "go" { &["--allow-tool", "go"][..] } else { &[] })
                 .arg("--profile")
                 .arg(profile)
                 .output()
@@ -259,6 +263,8 @@ fn parameterized_module_uses_its_argument_dictionary_on_js_and_go() {
                 .arg(&out)
                 .arg("--emit")
                 .arg(emit)
+                // outside a project, only the flag lets the Go backend run `go build`
+                .args(if emit == "go" { &["--allow-tool", "go"][..] } else { &[] })
                 .arg("--profile")
                 .arg("debug")
                 .output()
@@ -342,6 +348,8 @@ fn higher_order_factory_with_partial_application_runs_on_js_and_go() {
                 .arg(&out)
                 .arg("--emit")
                 .arg(emit)
+                // outside a project, only the flag lets the Go backend run `go build`
+                .args(if emit == "go" { &["--allow-tool", "go"][..] } else { &[] })
                 .arg("--profile")
                 .arg(profile)
                 .output()

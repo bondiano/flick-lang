@@ -7,7 +7,7 @@ use flick_pretty::{Document, Documentable, docvec};
 
 use super::layout::{Code, block, call, single, statement};
 use super::{Gen, names};
-use crate::ir::{Arm, Expr, Stage};
+use flick_ir::{Arm, Expr, Stage};
 
 impl<'a> Gen<'a> {
     /// A task: a Go function of the fiber that runs `body` in it.

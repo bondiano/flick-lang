@@ -9,7 +9,8 @@ use std::sync::OnceLock;
 
 use super::{Artifact, Settings, builtin_modules, optimized, specifier};
 use crate::codegen::Known;
-use crate::codegen::go::{self, Bindings, GO_MOD, GO_SUM, Input, PACKAGES, Package, RUNTIME};
+pub use crate::codegen::go::go_mod;
+use crate::codegen::go::{self, Bindings, GO_SUM, Input, PACKAGES, Package, RUNTIME, Unsupported};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::ir::{self, ItemKind};
 use crate::project::{Compilation, normalize};
@@ -102,7 +103,7 @@ pub fn emit(
             bindings: bindings(),
             lang: &known,
         });
-        diagnostics.extend(output.diagnostics);
+        diagnostics.extend(output.diagnostics.into_iter().map(unsupported));
         let packages: Vec<&Package> = PACKAGES
             .iter()
             .filter(|p| output.packages.contains(&p.name))
@@ -140,10 +141,17 @@ pub fn emit(
     (out, diagnostics)
 }
 
+/// The path the `//line` directives of a Go module of the build give the
+/// source of `module`: relative to the module, as a source map's, so no
+/// build path ships. Every Go module is at the same depth.
+pub fn line_path(settings: &Settings, module: &Path) -> String {
+    specifier(&settings.out_dir.join(module_dir("_")), &normalize(module))
+}
+
 /// The Go file beside each foreign JS module a module of `compilation` names
 /// relative to it: by the module and the specifier, its name in the Go module
 /// and its text, which `read` gives.
-fn foreign_files(
+pub fn foreign_files(
     compilation: &Compilation,
     settings: &Settings,
     read: &dyn Fn(&Path) -> Option<String>,
@@ -182,6 +190,15 @@ fn foreign_files(
     foreign
 }
 
+/// What the go target cannot compile yet, as a diagnostic.
+pub(crate) fn unsupported(u: Unsupported) -> Diagnostic {
+    let d = Diagnostic::new(codes::P012, Severity::Error, u.message);
+    match u.span {
+        Some(span) => d.with_span(span),
+        None => d,
+    }
+}
+
 /// The Go functions of the runtime the tables of the implicit packages bind
 /// JS exports to, read once.
 pub(crate) fn bindings() -> &'static Bindings {
@@ -201,45 +218,4 @@ fn listing(dir: &str, out: &[Artifact]) -> Artifact {
         path: format!("{prefix}{FILES}"),
         contents,
     }
-}
-
-/// The `go.mod` of a program with `packages`: the runtime's, requiring only
-/// the modules of those packages, so a program without one builds offline
-/// and a package's version skew never makes Go load the others.
-pub fn go_mod(packages: &[&Package]) -> String {
-    if packages.is_empty() {
-        return "module flick.app\n\ngo 1.23\n".to_owned();
-    }
-    let needed: Vec<&str> = packages.iter().flat_map(|p| p.modules.lines()).collect();
-    let mut header = String::new();
-    let mut requires = String::new();
-    let mut block = false;
-    for line in GO_MOD.lines() {
-        let line = line.trim();
-        let require = if block {
-            block = line != ")";
-            line
-        } else if line == "require (" {
-            block = true;
-            continue;
-        } else if let Some(rest) = line.strip_prefix("require ") {
-            rest
-        } else {
-            if line.starts_with("module ") || line.starts_with("go ") {
-                header.push_str(line);
-                header.push_str("\n\n");
-            }
-            continue;
-        };
-        if require
-            .split_whitespace()
-            .next()
-            .is_some_and(|m| needed.contains(&m))
-        {
-            requires.push('\t');
-            requires.push_str(require);
-            requires.push('\n');
-        }
-    }
-    format!("{header}require (\n{requires})\n")
 }

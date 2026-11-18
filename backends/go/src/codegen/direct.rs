@@ -25,9 +25,9 @@ use flick_pretty::{Document, docvec};
 use super::layout::{Code, block, call, statement};
 use super::shape::{self, Shape};
 use super::{Gen, Input, names};
-use crate::ir::reach::Key;
-use crate::ir::{Expr, ExprKind, ItemKind};
+use flick_backend_support::reach::Key;
 use flick_ir::Dict;
+use flick_ir::{Expr, ExprKind, ItemKind};
 
 /// The top-level name of the function of `method` of `instance`: an
 /// instance's name has a space between its class and types, which no

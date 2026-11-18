@@ -1,12 +1,12 @@
 //! Compiler adapters for portable optimizer passes; semantic rules live in support.
 
 pub mod perceus;
-pub mod tuple_match;
 
 use crate::codegen::Known;
 use crate::ir::{self, Expr, Module};
 use crate::types;
 use flick_backend_support::opt as portable;
+pub use flick_backend_support::opt::tuple_match;
 pub use flick_backend_support::opt::{Arity, arity, js_number, json_string, names_only, rename};
 
 pub use portable::Generics;

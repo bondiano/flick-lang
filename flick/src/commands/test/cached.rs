@@ -4,7 +4,7 @@ use super::super::build::{BuildPlan, Emission, Purpose, publication_paths, publi
 use super::Runner;
 use crate::progress::Progress;
 use crate::{backends::Selected, cache};
-use flick_core::build::{Extras, go};
+use flick_core::build::Extras;
 use flick_core::project::Project;
 use std::path::Path;
 use tracing::debug;
@@ -23,26 +23,16 @@ pub(super) fn cached_prepare(
     if !backend.accepts_cached(&artifacts) {
         return None;
     }
-    let go = !backend.is_component() && artifacts.iter().any(|a| a.path == "go/test/go.mod");
-    let runner = out.join(if go {
-        go::executable(go::TEST)
-    } else {
-        "test.js".to_owned()
-    });
-    let current = cache::artifacts_current(out, &artifacts)
-        && (!go || cache::go_current(&project.root, key, out, &go::executable(go::TEST)));
+    let runner = out.join("test.js");
+    let current = cache::artifacts_current(out, &artifacts);
     let output = BuildPlan {
         purpose: Purpose::Test,
         backend: backend.clone(),
         out_dir: out.to_path_buf(),
         entries: Vec::new(),
         typescript: false,
-        go,
-        suites: if go {
-            vec!["cached".to_owned()]
-        } else {
-            Vec::new()
-        },
+        go: false,
+        suites: Vec::new(),
         extras: Extras::default(),
         release: false,
     };
@@ -62,9 +52,6 @@ pub(super) fn cached_prepare(
     };
     publish_artifacts(&output, &mut emitted, progress, Some(&project.root));
     if emitted.diagnostics.is_empty() {
-        if go {
-            cache::mark_go(&project.root, key, out, &go::executable(go::TEST));
-        }
         Some(if backend.is_component() {
             Runner::component(out.to_path_buf(), backend)
         } else {

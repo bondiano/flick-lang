@@ -11,8 +11,8 @@ use super::expr::literal;
 use super::layout::{Code, call};
 use super::shape::builds_settled;
 use super::{Gen, names};
-use crate::ir::{Expr, Lit};
 use flick_ir::Dict;
+use flick_ir::{Expr, Lit};
 
 /// How the Go of a value made on first use begins.
 const LAZY: &str = "flickrt.Lazy(";

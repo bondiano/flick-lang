@@ -9,7 +9,7 @@ use super::arith::Native;
 use super::layout::{Code, call};
 use super::shape::Types;
 use super::{Gen, names};
-use crate::ir::{Expr, ExprKind, Stage};
+use flick_ir::{Expr, ExprKind, Stage};
 
 impl<'a> Gen<'a> {
     /// The Go function the head of an application names, its Go types and

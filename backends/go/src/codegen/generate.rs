@@ -10,7 +10,7 @@ use flick_pretty::docvec;
 use super::Gen;
 use super::arith::Native;
 use super::layout::{Code, block, call, if_else, single, statement};
-use crate::ir::{Expr, ExprKind, Lit, Pat};
+use flick_ir::{Expr, ExprKind, Lit, Pat};
 
 /// Where the elements of the `for` being emitted go.
 #[derive(Clone, Copy)]

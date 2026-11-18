@@ -181,6 +181,11 @@ pub struct GlobalArguments {
     /// for plugins too.
     #[arg(long, global = true)]
     pub offline: bool,
+
+    /// Let the selected backend run this host tool, as `go`, in a build
+    /// outside a project; a project allows its tools in `[tools]`.
+    #[arg(long = "allow-tool", global = true, value_name = "TOOL")]
+    pub allow_tool: Vec<String>,
 }
 
 #[derive(Args)]

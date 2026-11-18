@@ -113,3 +113,102 @@ fn foreign_zero_arity_async_passes_context() {
     let go = app_with_foreign(code, &[("App", "./receiver.mjs", "package main\n")]);
     assert!(go.contains("start(ctx)"), "{go}");
 }
+
+mod bindings_tests {
+    use crate::codegen::go::Bindings;
+    use crate::ir::ItemKind;
+    use crate::ir::tests::lower_text;
+
+    #[test]
+    fn staged_bindings_return_the_remaining_functions_and_others_still_flatten() {
+        let ir = lower_text("App", "module App exposing (..)\nmount : Int -> Int -> Int\nforeign pure mount from \"mounts\" \"mount\"\n  arity 1\nflat : Int -> Int -> Int\nforeign pure flat from \"mounts\" \"flat\"\n  arity 1\n").expect("lowers");
+        let bindings = Bindings::parse(["[mounts]\nmount *Mount@1\nflat Flat\n"]);
+        let mut checked = 0;
+        for item in &ir.items {
+            if let ItemKind::Foreign(f) = &item.kind {
+                assert_eq!(
+                    bindings.parameters("App", f),
+                    if f.name == "mount" { 1 } else { 2 }
+                );
+                if f.name == "mount" {
+                    let mut global = f.clone();
+                    global.name = "local".to_owned();
+                    global.binding.from = None;
+                    global.binding.name = "external".to_owned();
+                    let globals = Bindings::parse(["[global App]\nlocal Global@1\n"]);
+                    assert_eq!(globals.parameters("App", &global), 1);
+                    assert!(globals.lookup("App", "local", None, "external").is_some());
+                }
+                checked += 1;
+            }
+        }
+        assert_eq!(checked, 2);
+        assert_eq!(
+            bindings
+                .lookup("App", "mount", Some("mounts"), "mount")
+                .map(|(target, _)| target),
+            Some("*flickrt.Mount")
+        );
+    }
+}
+
+mod owner_identity_tests {
+    use crate::codegen::go::{Bindings, Types};
+    use crate::ir::ItemKind;
+    use crate::ir::tests::lower_text;
+
+    #[test]
+    fn raw_owner_shim_retains_global_foreign_table_identity() {
+        let module = lower_text("Test", "module Test exposing (acquire)\nacquire : Unit ->{Scope s} Float\nforeign effect acquire from global \"Object.acquire\"\n").expect("global scoped foreign");
+        let raw = module
+            .items
+            .iter()
+            .find_map(|item| match &item.kind {
+                ItemKind::Foreign(f) => Some(f),
+                _ => None,
+            })
+            .expect("raw item");
+        assert_ne!(raw.name, "acquire");
+        assert_eq!(raw.source_name.as_deref(), Some("acquire"));
+        assert_eq!(raw.binding.from, None);
+        assert_eq!(raw.binding.name, "Object.acquire");
+        let bindings = Bindings::parse(["[global Test]\nacquire NativeAcquire(float64) float64\n"]);
+        assert_ne!(
+            bindings.types("Test", raw),
+            Types::default(),
+            "lookup must use original source name, not emitted raw symbol"
+        );
+        let staged = Bindings::parse(["[global Test]\nacquire NativeAcquire@0\n"]);
+        assert_eq!(staged.parameters("Test", raw), 0);
+    }
+
+    #[test]
+    fn flattened_raw_owner_shim_uses_the_flattened_source_identity() {
+        let module = lower_text("Test", "module Test exposing (make)\nmake : Unit ->{Scope s} Float\nforeign effect make from global \"Object.make\"\n").expect("scoped foreign");
+        let mut raw = module
+            .items
+            .iter()
+            .find_map(|item| match &item.kind {
+                ItemKind::Foreign(foreign) => Some(foreign.clone()),
+                _ => None,
+            })
+            .expect("raw item");
+        raw.name = format!("Inner${}", raw.name);
+        raw.source_name = Some("Inner$make".to_owned());
+        let bindings = Bindings::parse([
+            "[global Test]\nmake ParentMake(string) string\nInner$make InnerMake(float64) float64\n",
+        ]);
+        let inner = bindings.types("Test", &raw);
+        raw.source_name = Some("make".to_owned());
+        assert_ne!(inner, Types::default());
+        assert_ne!(
+            inner,
+            bindings.types("Test", &raw),
+            "inline source identity must not select a parent homonym"
+        );
+        assert_eq!(
+            raw.binding.name, "Object.make",
+            "relocation leaves the host binding unchanged"
+        );
+    }
+}

@@ -39,6 +39,8 @@ fn abstract_class_requirement_method_runs_on_js_and_go() {
                 .arg(&out)
                 .arg("--emit")
                 .arg(emit)
+                // outside a project, only the flag lets the Go backend run `go build`
+                .args(if emit == "go" { &["--allow-tool", "go"][..] } else { &[] })
                 .arg("--profile")
                 .arg(profile)
                 .output()
@@ -100,6 +102,8 @@ fn unpack_uses_its_packed_dictionary_on_js_and_go() {
             .arg(&out)
             .arg("--emit")
             .arg(emit)
+            // outside a project, only the flag lets the Go backend run `go build`
+            .args(if emit == "go" { &["--allow-tool", "go"][..] } else { &[] })
             .arg("--profile")
             .arg("debug")
             .output()
@@ -168,6 +172,8 @@ fn existential_module_result_opens_on_js_and_go() {
             .arg(&out)
             .arg("--emit")
             .arg(emit)
+            // outside a project, only the flag lets the Go backend run `go build`
+            .args(if emit == "go" { &["--allow-tool", "go"][..] } else { &[] })
             .arg("--profile")
             .arg("debug")
             .output()
@@ -241,6 +247,8 @@ let main () = Platform.stdout_line (describe pair ++ \" \" ++ show pair ++ \" \"
         let build = Command::new(env!("CARGO_BIN_EXE_flick"))
             .arg("build")
             .arg(source.join("Main.fl"))
+            // outside a project, only the flag lets the Go backend run `go build`
+            .args(if emit == "go" { &["--allow-tool", "go"][..] } else { &[] })
             .args(["--emit", emit, "--out-dir"])
             .arg(&out)
             .output()

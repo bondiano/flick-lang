@@ -41,7 +41,7 @@ fn project() -> PathBuf {
     fs::create_dir_all(dir.join("src")).expect("dir");
     fs::write(
         dir.join("flick.toml"),
-        "schema-version = 1\n\n[project]\nkind = \"lib\"\n",
+        "schema-version = 1\n\n[tools]\n\"flick/go\" = [\"go\"]\n\n[project]\nkind = \"lib\"\n",
     )
     .expect("write");
     fs::write(dir.join("package.json"), "{ \"name\": \"@acme/suite\" }\n").expect("write");

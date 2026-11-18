@@ -3,12 +3,12 @@
 
 use std::collections::HashSet;
 
-use crate::effects::bindings;
+use flick_backend_support::effects::bindings;
 use flick_pretty::{Document, DocumentArena, docvec};
 
 use super::RUNTIME_PACKAGE;
 use super::layout::{self, block, statement};
-use crate::ir::{ItemKind, Module};
+use flick_ir::{ItemKind, Module};
 
 /// The optional packages of the runtime (`PACKAGES`) and the bindings that
 /// need one: a program that reaches a binding imports the package, which
