@@ -44,8 +44,9 @@ The call needs no service, so a client entry may reach it
 is a task like any other: `Atom.task (task { place order })`, or the body of
 an action. A declared error comes back as itself; `Rpc.ClientError` says
 the call did not reach the server or its answer did not decode. A call goes
-to the page's origin in a browser and to `FLICK_SERVER_URL` elsewhere, at
-`Server.path` (`/_flick/fn`).
+to `Server.path` (`/_flick/fn`) at the origin of the innermost
+`Server.with_origin`, and without one at the page's origin in a browser
+(see [Outside a browser](#outside-a-browser)).
 
 Secrets stay on the server the same way: `Config.redacted` needs
 `Server.Server`, so a client entry that would read a password or a key is
@@ -56,6 +57,36 @@ in that process, as a page rendered on the server makes, runs in memory:
 with the handler's services, the headers of the request being served, and
 what crosses written and read by its codecs, as over HTTP. A task an atom
 runs while the page renders is part of the request's trace too.
+
+## Outside a browser
+
+A program that is not a page, such as a command-line client or a test,
+has no origin of its own. `Server.with_origin` gives the calls of a task one,
+and outside it such a call fails with `Rpc.ClientError`. Because the
+call reads nothing from the environment, a program that takes the
+server from a variable reads it itself and names `Host.Environment` in its row:
+
+```flick
+# import Server
+# type alias Order = { item : String; count : Float }
+# type error OutOfStock = OutOfStock String
+#
+# place : Order ->{; Rpc.ClientError, OutOfStock} String
+# let place order = order.item
+#
+main : Unit ->{Host.Environment, Host.Console, Async; AppError} Unit
+let main () =
+  let origin = Option.with_default "http://127.0.0.1:3000" (Platform.env "FLICK_SERVER_URL")
+  let placed =
+    try Server.with_origin origin (task { place { item = "tea"; count = 1 } }) with
+    | OutOfStock item -> "out of stock: " ++ item
+    | Rpc.ClientError message -> message
+  Platform.stdout_line placed
+```
+
+In a browser `Server.with_origin` sends the calls to another origin than
+the page's, which then needs CORS (see [On the go target](#on-the-go-target)).
+A call that runs in memory stays in memory within it.
 
 ## Serving
 
@@ -155,8 +186,8 @@ would be left to whoever serves it.
 
 A server entry built with `emit = "go"` serves `server fn` as one built
 for the js target does: `Server.handler` answers the same POSTs of
-`Server.path`, calls made in its process run in memory, and the calls of
-other programs go to `FLICK_SERVER_URL`. So a Go backend serves a
+`Server.path`, calls made in its process run in memory, and its other
+calls go to the origin of `Server.with_origin`. So a Go backend serves a
 frontend built for the js target from the same modules: build the client
 entry for js and the server entry for go, each with its own `flick.toml`.
 

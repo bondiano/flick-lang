@@ -24,10 +24,6 @@ names : Unit ->{} String
 foreign names from "./traces.mjs" "names"
   arity 0
 
-set_env : String -> String ->{} Unit
-foreign set_env from "../cli/env.mjs" "set"
-  arity 2
-
 options : Tracer.SpanOptions
 let options = {
   attributes = []
@@ -96,7 +92,6 @@ let main () =
           }
           let server = Http.Server.serve server_options app
           let base = Http.Server.format_address (Http.Server.address server)
-          set_env "FLICK_SERVER_URL" base
           Tracer.with_span
             "visit"
             options
@@ -108,7 +103,7 @@ let main () =
             "call"
             options
             (task {
-              let _ = stock "cake"
+              let _ = Server.with_origin base (task { stock "cake" })
               ()
             })
         }

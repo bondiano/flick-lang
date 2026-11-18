@@ -29,6 +29,7 @@ use crate::ir;
 use crate::plugin::calls as plugin_calls;
 use crate::plugin::expansion::Expansion;
 use crate::plugin::first_party;
+use crate::project::builtins::builtin_modules_of;
 #[cfg(feature = "native-project")]
 use crate::project::cache::Key as Hashed;
 use crate::project::config::{Checked, Config};
@@ -351,19 +352,6 @@ impl Loader<'_> {
         }
         known.interfaces[i] = Some(output.exported);
     }
-}
-
-/// What a test companion sees of its module: its exports and every other
-/// top-level declaration, constructors of exported types included.
-fn private_view(exported: &Interface, declarations: &Interface) -> Interface {
-    let mut view = exported.clone();
-    for export in &declarations.exports {
-        if !view.exports.iter().any(|e| e.entity == export.entity) {
-            view.exports.push(export.clone());
-        }
-    }
-    view.hidden.clear();
-    view
 }
 
 /// What a cached output does with a module's IR: an editor reads its

@@ -23,6 +23,29 @@ pub struct Class {
     pub methods: Vec<Name>,
 }
 
+impl Class {
+    /// The field of superclass `i`: its class's name, numbered by its
+    /// position when another superclass has the same name, as flick-core's
+    /// `super_slot` names it (`docs/formal/elaboration.md` §2.1).
+    pub fn super_slot(&self, i: usize) -> Option<String> {
+        let name = |t: &Type| match t {
+            Type::Dict(p, _) => Some(p.name.clone()),
+            _ => None,
+        };
+        let own = name(self.supers.get(i)?)?;
+        let same = self
+            .supers
+            .iter()
+            .filter(|s| name(s).as_ref() == Some(&own))
+            .count();
+        Some(if same > 1 {
+            format!("{own}{i}")
+        } else {
+            own.to_string()
+        })
+    }
+}
+
 #[derive(Default)]
 pub struct Decls {
     pub values: HashMap<Path, Scheme>,

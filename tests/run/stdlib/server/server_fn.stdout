@@ -1,6 +1,7 @@
-no server
+no server for App.Main.place: call it within Server.with_origin
+closed origin, over HTTP: true
 placed 2 tea
 out of stock: cake
 jam x4
 over HTTP: true
-unmounted: no server
+unmounted: no server for App.Main.place: call it within Server.with_origin

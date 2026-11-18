@@ -1,7 +1,7 @@
 ---
 title: Начало работы
 description: Установите инструменты, создайте приложение и запустите его.
-source_hash: 90daf3c42bf6cf18
+source_hash: 7c2b9a77c8991469
 ---
 
 ## Установка
@@ -82,8 +82,8 @@ let main () =
 
 ## Проект
 
-Flick создаёт ES-модули JavaScript. Они используют среду выполнения Flick
-и Effect 4.1.2; зависимости устанавливаются через pnpm.
+Flick создаёт ES-модули JavaScript. Они работают на собственной среде
+выполнения Flick, `@flick-lang/runtime`; зависимости устанавливаются через pnpm.
 Создайте проект и запустите его:
 
 ```sh
@@ -93,8 +93,8 @@ flick install
 flick run
 ```
 
-`flick new` создаёт `flick.toml`, `package.json` с закреплёнными версиями
-среды выполнения и Effect, `src/App/Main.fl`, импортируемый им модуль
+`flick new` создаёт `flick.toml`, `package.json` с закреплённой версией
+среды выполнения, `src/App/Main.fl`, импортируемый им модуль
 `src/App/Greeting.fl` и его тест `test/App/GreetingTest.fl`:
 
 ```flick
@@ -102,13 +102,18 @@ module App.Main exposing (main)
 
 import App.Greeting exposing (greet)
 
-main : Unit ->{Host.Arguments, Host.Console; AppError} Unit
-let main () =
-  let name = Platform.args () |> List.head |> Option.with_default "world"
-  Platform.stdout_line (greet name)
+run : Unit ->{Host.Arguments, Host.Console} Unit
+let run () =
+  let name = Host.Arguments.args () |> List.head |> Option.with_default "world"
+  Host.Console.stdout_line (greet name)
+
+main : Unit ->{; AppError} Unit
+let main () = provide (Layer.merge Host.arguments Host.console) { run () }
 ```
 
-`flick run -- Ada` выводит `Hello, Ada!`.
+`run` называет сервисы `Host`, которые использует, а `main` предоставляет их
+живые слои, поэтому тест может вызвать `run` со своими. `flick run -- Ada`
+выводит `Hello, Ada!`.
 
 Для проверки типов без запуска выполните `flick check`. Команда
 `flick build` сохраняет JavaScript в `dist/`, а `flick test` запускает

@@ -114,7 +114,7 @@ At run time a dictionary is an object:
 - methods are its fields;
 - superclasses and default methods are lazy fields (a getter `get $S()` in JS, `d.Lazy("$S", …)` in Go).
 
-Laziness is invisible to the model: a field is a pure value, and the recursion of instance dictionaries through superclasses is finite because the superclass graph is acyclic. Code generator: `js/items.rs` `instance`, `go/items.rs` `instance`.
+For a superclass, laziness is invisible to the model: the field is a pure value, and the recursion of instance dictionaries through superclasses is finite because the superclass graph is acyclic. A default takes the dictionary it belongs to, `I δ̄`, so the model keeps its field lazy as well: a getter `λ$get. default_C_m (I δ̄) d̄ₖ` whose body runs where the field is read, so a value default stays a value (`flick-model` `translate/mod.rs` `instance`, `check/dicts.rs` `dictionary`). Code generator: `js/items.rs` `instance`, `go/items.rs` `instance`.
 
 ### 2.2 Judgments
 

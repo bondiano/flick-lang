@@ -5,6 +5,7 @@
 
 mod cert;
 mod check;
+mod defs;
 mod eval;
 mod show;
 mod term;
@@ -15,8 +16,9 @@ use std::rc::Rc;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::Span;
 
-pub use cert::{Cert, Rule, cert};
-pub use term::{Ctor, Literal, Pat, RULES, Refused, Term, term};
+pub use cert::{Arg, Cert, Rule, cert};
+pub use defs::Program;
+pub use term::{Ctor, Def, LEMMAS, Literal, Pat, RULES, Refused, Term, term};
 
 /// The domain every statement is about, and the version of its checker.
 pub const DOMAIN: &str = "PureTotalV1";
@@ -158,6 +160,15 @@ pub struct Statement {
     pub goal: Goal,
 }
 
+/// A proof checked before, which a later proof may use.
+#[derive(Debug, Clone)]
+pub struct Lemma {
+    pub statement: Statement,
+    /// Its parameters in the order declared, each with whether it is a
+    /// premise.
+    pub order: Vec<(Rc<str>, bool)>,
+}
+
 /// Why a proof gives no certificate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Failure {
@@ -228,8 +239,14 @@ impl Failure {
 }
 
 /// Checks the certificate of `statement`.
-pub fn prove(statement: &Statement, proof: &Cert, data: &Data) -> Result<(), Failure> {
-    check::prove(statement, proof, data)
+pub fn prove(
+    statement: &Statement,
+    proof: &Cert,
+    data: &Data,
+    program: &dyn Program,
+    lemmas: &[Lemma],
+) -> Result<(), Failure> {
+    check::prove(statement, proof, data, program, lemmas)
 }
 
 #[cfg(test)]

@@ -12,7 +12,7 @@ use super::lang::Lang;
 use super::ty::Type;
 use super::typing::{Range, Ref};
 use crate::diagnostics::codes;
-use crate::logic::{self, RULES};
+use crate::logic::{self, LEMMAS, RULES};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
@@ -193,18 +193,33 @@ impl Checker<'_> {
         let (a, b) = (self.store.fresh(), self.store.fresh());
         let p = proof_type;
         let fun = Type::pure_fun;
-        let ty = match name {
-            "refl" => p(a),
-            "symm" => fun(p(a.clone()), p(a)),
-            "trans" => fun(a.clone(), fun(p(a.clone()), fun(p(a.clone()), p(a)))),
-            "cong" => fun(fun(a.clone(), b.clone()), fun(p(a), p(b))),
-            "funext" => fun(fun(a.clone(), p(b.clone())), p(fun(a, b))),
-            _ => return None,
+        let (module, ty) = match name {
+            "refl" => (RULES, p(a)),
+            "symm" => (RULES, fun(p(a.clone()), p(a))),
+            "trans" => (
+                RULES,
+                fun(a.clone(), fun(p(a.clone()), fun(p(a.clone()), p(a)))),
+            ),
+            "cong" => (RULES, fun(fun(a.clone(), b.clone()), fun(p(a), p(b)))),
+            "funext" => (RULES, fun(fun(a.clone(), p(b.clone())), p(fun(a, b)))),
+            _ => {
+                // a proof before this one: a function of its parameters; the
+                // logic checks what its arguments and its instance are
+                let arity = self
+                    .typing
+                    .proofs
+                    .iter()
+                    .find(|p| p.name == name)?
+                    .params
+                    .len();
+                let ty = (0..arity).fold(p(a), |ty, _| fun(self.store.fresh(), ty));
+                (LEMMAS, ty)
+            }
         };
         self.typing.names.insert(
             at,
             Ref::Value {
-                module: RULES.into(),
+                module: module.into(),
                 name: name.into(),
             },
         );

@@ -34,6 +34,14 @@ Russian page). State and actions live in Flick. Drafts
 and completion use per-exercise local storage keys; existing signatures/01 keys
 remain compatible. Showing a solution does not mark it complete.
 
+The goal beside the editor comes from the same `check.toml` fields: the
+export with its type as the `.d.ts` declares it (an Effect for `runs`), and
+the expected output. It shows nothing the check does not compare. When the
+checker reports a `todo`, the goal says what it is: in an expression, a
+placeholder of the required type (warning T022) that fails when it runs; in a
+signature, error T024, whose fix writes in the inferred type. Neither is an
+expression hole that shows its inferred type: the goal does not infer holes.
+
 
 ## Limits of the rules
 
