@@ -18,7 +18,7 @@ use std::time::{Duration, Instant};
 use super::{Caches, Context, Snapshot, analyze};
 
 /// How long changes to the same document are collected before analyzing.
-const DEBOUNCE: Duration = Duration::from_millis(25);
+const DEBOUNCE: Duration = Duration::from_millis(15);
 
 /// One revision of one document to analyze, over the open buffers.
 pub(super) struct Job {
