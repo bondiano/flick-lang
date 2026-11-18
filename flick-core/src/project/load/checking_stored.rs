@@ -198,7 +198,12 @@ impl Checking<'_> {
         }
         key.add("modules", modules);
         for (n, import) in loaded.syntax.imports.iter().enumerate() {
-            let digest = self.import_digest(&import.module, digests)?;
+            // a test companion reads all its module declares
+            let digest = if companion_of(&loaded.name) == Some(import.module.as_str()) {
+                exported_digest(self.privates.get(&import.module)?)?
+            } else {
+                self.import_digest(&import.module, digests)?
+            };
             key.add(format!("import {n}"), format!("{} {digest}", import.module));
         }
         Some(key.signed())

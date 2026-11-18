@@ -6,6 +6,18 @@ break programs.
 
 ## Unreleased
 
+- **Test companions.** `src/App/Users.test.fl` beside `src/App/Users.fl`
+  begins with `module App.Users`, without `exposing`, and sees every
+  top-level declaration of the module, private ones included, without an
+  import; its cases are named after the module. Only `flick test` and
+  `flick fmt` read companions: `flick build`, `flick check`, the published
+  `.iface` and `.d.ts`, the API docs and `flick pack` leave them out, so a
+  build's output is the same with or without them. Under `flick test` a
+  module with a companion exports to it all it declares, and the
+  companion's view is cached apart from the module's public interface. A Go
+  file of a module whose name ends in `_test` no longer drops out of the
+  build.
+
 - **Breaking: `suite` and `test` blocks.** `suite "name" { … }` holds
   `test "name" { body }` and nested suites, and a top-level `test "name" {
   … }` stands alone; either may be `.skip` or `.only`. Std's plugin expands

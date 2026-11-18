@@ -45,7 +45,7 @@ pub use target::stages_by_class;
 
 #[cfg(feature = "native-project")]
 use super::packages::{Packages, project_name};
-use super::{Host, Project, module_path, normalize};
+use super::{Host, Project, companion_of, module_path, normalize};
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
 use crate::iface::{
     BindingOrigin, CalleeOrigin, ExpansionFrame, LexicalScope, StaticArgument, StaticBinding,
@@ -160,6 +160,9 @@ struct Loader<'a> {
     /// The plugins that watch names of the modules, each with the names its
     /// package declares; filled while the blocks expand.
     watchers: plugins::Watchers,
+    /// What a test companion sees of its module, by the module's name: all
+    /// it declares. Only a run that loads the companion makes one.
+    privates: BTreeMap<String, Interface>,
 }
 
 /// A module's IR and what the reference model reads of it.
@@ -171,7 +174,7 @@ fn compiled(m: &Loaded, (ir, declarations): Lowered, interface: Interface) -> Co
         name: m.name.clone(),
         path: m.path.clone(),
         file: m.file,
-        test: m.root == Root::Test,
+        test: m.root == Root::Test || companion_of(&m.name).is_some(),
         package: match &m.root {
             Root::Package(name) => Some(name.clone()),
             _ => None,
@@ -391,6 +394,7 @@ fn run_in(
         ide: (mode == Mode::Analyze).then(Vec::new),
         cache,
         watchers: plugins::Watchers::default(),
+        privates: BTreeMap::new(),
     };
     let mut roots: Vec<(Root, PathBuf)> = roots
         .iter()
@@ -454,7 +458,10 @@ fn run_in(
     };
     let fresh = loader.finish_packages(&mut compiled, mode, saved.is_some() && !failed);
     for c in &mut compiled {
-        c.ir.exports = ir::exports(&c.name, &c.interface);
+        // the code of a module with a loaded test companion exports to it all
+        // it declares; a build never loads a companion, nor makes this code
+        let interface = loader.privates.get(&c.name).unwrap_or(&c.interface);
+        c.ir.exports = ir::exports(&c.name, interface);
     }
     // a module's package names the tags of its constructors: its source
     // package, else the project's
@@ -521,32 +528,6 @@ impl Loader<'_> {
         diagnostics
     }
 
-    fn root_of(&self, path: &Path) -> Root {
-        match self.project {
-            Some(p) if path.starts_with(p.source_root()) => Root::Source,
-            Some(p) if path.starts_with(p.test_root()) => Root::Test,
-            _ => self
-                .package_sources()
-                .into_iter()
-                .find(|(_, dir)| path.starts_with(dir))
-                .map_or(Root::Other(None), |(name, _)| Root::Package(name)),
-        }
-    }
-
-    /// The source directory of each source package the project depends on.
-    #[cfg_attr(not(feature = "native-project"), allow(clippy::unused_self))]
-    fn package_sources(&self) -> Vec<(String, PathBuf)> {
-        #[cfg(feature = "native-project")]
-        return self
-            .packages
-            .sources()
-            .map(|(name, dir)| (name.to_owned(), dir.to_path_buf()))
-            .collect();
-        #[cfg(not(feature = "native-project"))]
-        Vec::new()
-    }
-
-    /// Loads and registers a module file once; `Ok(None)` if it is already loaded.
     /// The parse of a module, from an earlier run while its text stays the same.
     fn parsed(&mut self, path: &Path, file: FileId) -> (Arc<Parse>, Arc<ModuleSyntax>) {
         let text = &self.sources.get(file).text;

@@ -9,7 +9,7 @@ use std::{env, fs, io};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::plugin::Expander;
 use flick_core::plugin::reach::Outside;
-use flick_core::project::Host;
+use flick_core::project::{Host, is_companion};
 use flick_core::source::{FileId, SourceMap};
 
 use crate::plugins;
@@ -84,8 +84,24 @@ fn added((file, utf8): (FileId, Option<Diagnostic>)) -> Result<FileId, Diagnosti
     utf8.map_or(Ok(file), Err)
 }
 
-/// `.fl` files under `path` in a stable order; a file path is kept as given.
+/// `.fl` files under `path` in a stable order, but test companions
+/// (`Users.test.fl`), which only `flick test` and `flick fmt` read; a file
+/// path is kept as given.
 pub fn source_files(path: &str, out: &mut Vec<String>) {
+    walk(path, out, &|p| !is_companion(p));
+}
+
+/// [`source_files`] with the test companions.
+pub fn all_files(path: &str, out: &mut Vec<String>) {
+    walk(path, out, &|_| true);
+}
+
+/// The test companions under `path`, in a stable order.
+pub fn companions(path: &str, out: &mut Vec<String>) {
+    walk(path, out, &is_companion);
+}
+
+fn walk(path: &str, out: &mut Vec<String>, keep: &dyn Fn(&Path) -> bool) {
     let Ok(entries) = fs::read_dir(path) else {
         out.push(path.to_owned());
         return;
@@ -95,8 +111,8 @@ pub fn source_files(path: &str, out: &mut Vec<String>) {
     for entry in entries {
         let name = entry.file_name().and_then(|n| n.to_str()).unwrap_or("");
         if entry.is_dir() && !name.starts_with('.') && name != "node_modules" {
-            source_files(&entry.to_string_lossy(), out);
-        } else if entry.extension().is_some_and(|e| e == "fl") {
+            walk(&entry.to_string_lossy(), out, keep);
+        } else if entry.extension().is_some_and(|e| e == "fl") && keep(&entry) {
             out.push(entry.to_string_lossy().into_owned());
         }
     }

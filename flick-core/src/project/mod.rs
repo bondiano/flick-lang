@@ -198,6 +198,27 @@ pub fn normalize(path: &Path) -> PathBuf {
     out
 }
 
+pub use flick_backend_support::suites::{COMPANION, companion_of, suite_name};
+
+/// Whether a run reads test companions: only a project on disk, which
+/// `flick test` runs, has them, and the browser compiler leaves them out.
+pub const COMPANIONS: bool = cfg!(feature = "native-project");
+
+/// The file name a test companion ends with.
+const COMPANION_FILE: &str = ".test.fl";
+
+/// Whether `path` is a test companion, `Users.test.fl`, by its name.
+pub fn is_companion(path: &Path) -> bool {
+    path.to_str().is_some_and(|p| p.ends_with(COMPANION_FILE))
+}
+
+/// The module file of the test companion `path`: `Users.fl` of
+/// `Users.test.fl`.
+pub fn companion_module(path: &Path) -> Option<PathBuf> {
+    let module = path.to_str()?.strip_suffix(COMPANION_FILE)?;
+    Some(PathBuf::from(format!("{module}.fl")))
+}
+
 /// `App/Users.fl` → `App.Users`; `None` unless every part is a capitalized name.
 pub fn module_name(relative: &Path) -> Option<String> {
     let stem = relative.with_extension("");

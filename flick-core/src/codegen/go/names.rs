@@ -67,7 +67,11 @@ pub fn item_init(module: &str, index: usize) -> String {
 
 /// The file of a module's code.
 pub fn file(module: &str) -> String {
-    format!("m_{}.go", mangle(&module.replace('.', "_")))
+    let stem = mangle(&module.replace('.', "_"));
+    // `go build` leaves out a file whose name ends in `_test`, as a test
+    // `go test` runs: a test companion `App.Users$test`, or `App.Users_test`
+    let end = if stem.ends_with("_test") { "_" } else { "" };
+    format!("m_{stem}{end}.go")
 }
 
 pub fn local(name: &str) -> String {
@@ -108,5 +112,12 @@ mod tests {
         );
         assert_eq!(local("x'"), "l_x_x27_");
         assert_eq!(string("a\"\n\u{1F30D}"), "\"a\\\"\\u000a\\U0001f30d\"");
+    }
+
+    #[test]
+    fn no_file_of_a_module_is_a_test_go_build_leaves_out() {
+        assert_eq!(file("App.Users"), "m_App_Users.go");
+        assert_eq!(file("App.Users$test"), "m_App_Users_x24_test_.go");
+        assert_eq!(file("App.Users_test"), "m_App_Users_test_.go");
     }
 }

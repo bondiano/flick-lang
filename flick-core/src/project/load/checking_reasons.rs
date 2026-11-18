@@ -138,8 +138,10 @@ impl Checking<'_> {
                 .iter()
                 .chain(&loaded.syntax.inline_imports)
                 .map(|i| {
+                    // a test companion reads all its module declares
+                    let private = companion_of(&loaded.name) == Some(i.module.as_str());
                     let interface =
-                        if self
+                        if private || self
                             .raw_interface(interfaces, &i.module)
                             .is_some_and(|raw| {
                                 raw.member_of

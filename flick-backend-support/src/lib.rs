@@ -9,6 +9,7 @@ pub mod loops;
 pub mod names;
 pub mod order;
 pub mod reach;
+pub mod suites;
 pub mod tail;
 
 pub use bridge::EffectBridge;

@@ -46,6 +46,7 @@ use super::order::post_order;
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::ir::{ItemKind, Module, reach};
 use crate::source::Span;
+use flick_backend_support::suites::suite_name;
 use layout::{Code, block, call, directive, list, statement};
 use reach::Key;
 use shape::{Shape, shape};
@@ -110,7 +111,10 @@ pub fn go(input: &Input) -> Output {
 /// What a test program runs: `flickrt.RunTests` on the `tests` of each suite.
 fn tests_start<'a>(a: &'a DocumentArena<'a>, suites: &[String]) -> Document<'a> {
     let suites = suites.iter().map(|m| {
-        let suite = [format!("{m:?}").to_doc(a), names::var(m, "tests").to_doc(a)];
+        let suite = [
+            format!("{:?}", suite_name(m)).to_doc(a),
+            names::var(m, "tests").to_doc(a),
+        ];
         list(a, "{", suite, "}")
     });
     let suites = list(a, "[]flickrt.Suite{", suites, "}");

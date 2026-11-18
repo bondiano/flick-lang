@@ -119,6 +119,8 @@ pub fn input_files(project: &Project, roots: &[PathBuf]) -> Vec<PathBuf> {
     for root in [project.source_root(), project.test_root()] {
         files_under(&root, &mut files);
     }
+    // a test companion is an input only of a run that selects it, `flick test`
+    files.retain(|path| !project::is_companion(path));
     files.extend(roots.iter().cloned());
     // a module outside the project's roots imports its siblings, which the loader finds
     let project_roots = [project.source_root(), project.test_root()];

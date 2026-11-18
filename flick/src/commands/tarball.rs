@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use flate2::Compression;
 use flate2::write::GzEncoder;
-use flick_core::project::{CONFIG_FILE, Project};
+use flick_core::project::{CONFIG_FILE, Project, is_companion};
 use sha2::{Digest, Sha256};
 
 use crate::cache::files_under;
@@ -26,6 +26,8 @@ pub fn write(
     let root = &project.root;
     let mut files = vec![root.join(CONFIG_FILE)];
     files_under(&project.source_root(), &mut files);
+    // a package ships its sources, not the tests beside them
+    files.retain(|path| !is_companion(path));
     for entry in fs::read_dir(root)? {
         let path = entry?.path();
         let upper = path

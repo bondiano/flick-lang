@@ -5,6 +5,11 @@ impl Checking<'_> {
         interfaces: &'i [Option<Interface>],
         name: &str,
     ) -> Option<&'i Interface> {
+        if companion_of(&loaded.name) == Some(name)
+            && let Some(view) = self.privates.get(name)
+        {
+            return Some(view);
+        }
         let raw = self.raw_interface(interfaces, name)?;
         if let Some(member) = &raw.member_of
             && !loaded.can_access_member(member)

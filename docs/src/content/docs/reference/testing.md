@@ -67,6 +67,35 @@ A module without blocks builds `tests` by hand with `Test` as before (see
 [the standard library](../stdlib/#tests)): both kinds of module run in the
 same `flick test`.
 
+## Test companions
+
+A module of the test root sees only what the modules it imports export. To
+test what a module keeps to itself, write its tests in a companion beside
+it: `src/App/Users.test.fl` next to `src/App/Users.fl`. The companion
+begins with the module's own header, without `exposing`, and sees every
+top-level declaration of the module, private values, types and
+constructors included, without an import:
+
+```flick
+module App.Users
+
+# trim : String -> String
+# let trim name = String.trim name
+#
+test "trims a name" { Test.expect (Test.equal "Ada" (trim "  Ada ")) }
+```
+
+The module never sees its companion, and no other module can import it.
+Its cases are named after the module, `App.Users > trims a name`, and run in
+the same `flick test` as those of the test root. Only `flick test` and
+`flick fmt` read companions: `flick build`, `flick check`, the published
+`.iface` and `.d.ts`, the API docs and `flick pack` leave them out, so the
+output of a build is the same with or without them. Under `flick test`, the
+code of a module with a companion exports to it all it declares, and the
+companion's view of the module is cached apart from the module's public
+interface. A companion of a file that is not a module of the source root,
+or with another module's header, is an error.
+
 ## Full names, skip and only
 
 A case's full name is its module's name, its suites' names and its own:
