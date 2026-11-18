@@ -91,7 +91,7 @@ private theorem Typ.frameCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
         · exact (hn rfl).elim
       · cases hE
         refine Stage.le_svc hφ (.nm _ _) (hc.2 fun hcm => ?_)
-        simp [Frame.handles, hcm o _ a b hop] at hno
+        simp [Frame.handles, hcm o cl a b hop] at hno
       have hp : σ (.r q) = .rg q := hσ.1 _ (.inr (.inl rfl))
       have h₁ := hal.sx (hσ.sub fun _ h => .inr (.inr (.inl h))) X
       simp only [Flick.J.substT, Ty.substT, hp] at h₁
