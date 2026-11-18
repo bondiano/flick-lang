@@ -84,10 +84,12 @@ fn dict(
         ..Env::default()
     };
     let mut fields = Vec::new();
-    for sup in &class.supers {
-        let Type::Dict(c, _) = sup else { return None };
+    for (i, sup) in class.supers.iter().enumerate() {
         let t = ty(sup, &env(&[])).ok()?;
-        fields.push((format!("${}", c.name), format!("⟨0, Facts.none, {t}⟩")));
+        fields.push((
+            format!("${}", class.super_slot(i)?),
+            format!("⟨0, Facts.none, {t}⟩"),
+        ));
     }
     for m in &class.methods {
         let (_, s) = decls.method(p, m)?;
