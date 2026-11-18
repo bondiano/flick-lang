@@ -9,8 +9,8 @@ use super::regions::visible;
 
 use super::term::{Cx, extend};
 use super::{
-    Gen, MODULE, SERVICES, boolean, error_con, implementation, int, mono, payload, service, string,
-    unit,
+    ERRORS, Gen, MODULE, SERVICES, boolean, error_con, implementation, int, mono, payload, service,
+    string, unit,
 };
 use crate::syntax::{Arm, Const, Lit, Name, Pat, Path, Term};
 use crate::types::{Row, Stage, Type};
@@ -64,8 +64,10 @@ impl Gen<'_> {
     }
 
     /// (Match-Err): an arm `x` takes every error of the body, which raises
-    /// each error of `raised` after a test, so that `x : Errors raised` in
-    /// both checkers; a `match` takes `x` apart by them.
+    /// each error of `raised` after a test; a `match` takes `x` apart by
+    /// them, and may name an error the body does not raise, which the row
+    /// of `x` then holds too. (Errors-In): an arm may give its error the
+    /// errors of the `match`'s row, signed, and take it apart again.
     fn match_errors(
         &mut self,
         cx: &Cx,
@@ -92,15 +94,46 @@ impl Gen<'_> {
             );
         }
         let x = self.fresh("x");
+        let mut heads = names.clone();
+        if let Some(e) = ERRORS.iter().find(|e| !names.iter().any(|n| **n == ***e))
+            && self.one_in(2)
+        {
+            heads.push((*e).into());
+        }
         let mut arms = Vec::new();
-        for e in &names {
+        let mut bound = Vec::new();
+        for e in &heads {
             let y = self.fresh("y");
-            let bound = extend(cx, &y, mono(payload(e)));
+            let inner = extend(cx, &y, mono(payload(e)));
             arms.push(Arm {
-                pat: Pat::Con(error_con(e), Rc::from([Pat::Var(y)])),
+                pat: Pat::Con(error_con(e), Rc::from([Pat::Var(y.clone())])),
                 guard: None,
-                body: self.term(&bound, t, budget, s, true),
+                body: self.term(&inner, t, budget, s, true),
             });
+            bound.push((inner, y));
+        }
+        if self.one_in(2) {
+            let i = self.pick(arms.len());
+            let (inner, y) = &bound[i];
+            let mut row = Row::none();
+            for e in &heads {
+                row.elems.insert(Path::new(MODULE, e), Rc::from([]));
+            }
+            let w = self.fresh("w");
+            let mut again = Vec::new();
+            for e in &heads {
+                let z = self.fresh("z");
+                let at = extend(inner, &z, mono(payload(e)));
+                again.push(Arm {
+                    pat: Pat::Con(error_con(e), Rc::from([Pat::Var(z)])),
+                    guard: None,
+                    body: self.term(&at, t, budget, s, true),
+                });
+            }
+            let error = Term::app(Term::konst_con(error_con(&heads[i])), Term::Var(y.clone()));
+            let matched = Term::Match(Rc::new(Term::Var(w.clone())), again.into());
+            let sig = Rc::new(mono(Type::Errors(row)));
+            arms[i].body = Term::Let(w, Some(sig), Rc::new(error), Rc::new(matched));
         }
         let handler = Term::Match(Rc::new(Term::Var(x.clone())), arms.into());
         let arm = Arm {

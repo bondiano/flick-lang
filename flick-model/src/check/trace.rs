@@ -28,6 +28,8 @@ pub struct Node {
     pub(crate) own: Option<(Stage, Row)>,
     /// The region the body of a `scope` runs in, as the check named it.
     pub(crate) region: Option<Name>,
+    /// The error type of a term (Errors-In) gave the errors of a row.
+    pub(crate) errors_in: Option<Type>,
 }
 
 /// The nodes of a check, by [`key`].
@@ -74,6 +76,7 @@ impl Checker<'_> {
                         .as_ref()
                         .map(|(s, r)| (self.zonk_stage(s), self.zonk_row(r))),
                     region: n.region.clone(),
+                    errors_in: n.errors_in.as_ref().map(|t| self.zonk(t)),
                 };
                 (*k, node)
             })

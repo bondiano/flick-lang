@@ -357,6 +357,7 @@ fn ty(t: &Type) -> String {
         Type::Captured(x, c) | Type::Bounded(x, c) => format!("{}^{}", ty_atom(x), caps(c)),
         Type::Fun(p, s, r) => format!("{} {} {}", ty_atom(p), stage(s), ty(r)),
         Type::Eff(r, e, a) => format!("Eff {} {} {}", row_arg(r), row_arg(e), ty_atom(a)),
+        Type::Errors(r) => format!("Errors {}", row_arg(r)),
         Type::App(f, x) => format!("{} {}", ty(f), ty_atom(x)),
         Type::Ref(a) => format!("Ref {}", ty_atom(a)),
         _ => ty_atom(t),

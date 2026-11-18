@@ -36,6 +36,7 @@ impl Checker<'_> {
             1
         };
         let mut checked = Ok(());
+        let outer = self.error_rows.replace(Vec::new());
         for first in 0..firsts {
             let saved = (first + 1 < firsts).then(|| self.clone());
             let order = iter::once(first).chain((0..arms.len()).filter(|&i| i != first));
@@ -47,12 +48,14 @@ impl Checker<'_> {
                 _ => break,
             }
         }
+        let rows = mem::replace(&mut self.error_rows, outer).unwrap_or_default();
         checked?;
         let unguarded: Vec<&Pat> = arms
             .iter()
             .filter(|a| a.guard.is_none())
             .map(|a| &a.pat)
             .collect();
+        self.close_error_rows(rows, &t, &unguarded)?;
         // (Match-Val): in a configuration, the rest of a `match` after a
         // guard that failed covers the value it holds, not its type
         let covers_value =
@@ -100,6 +103,14 @@ impl Checker<'_> {
 
     fn arm_under(&mut self, arm: &Arm, scrutinee: &Type, result: &Type) -> Check<()> {
         let bound = self.pattern(&arm.pat, scrutinee)?;
+        // only the pattern of a `match` arm tells the rows it meets
+        let rows = self.error_rows.take();
+        let checked = self.arm_body(arm, bound, result);
+        self.error_rows = rows;
+        checked
+    }
+
+    fn arm_body(&mut self, arm: &Arm, bound: Vec<(Name, Type)>, result: &Type) -> Check<()> {
         let depth = self.locals.len();
         self.locals
             .extend(bound.into_iter().map(|(x, t)| (x, mono(t))));
@@ -202,11 +213,14 @@ impl Checker<'_> {
     pub(super) fn error_arms(&mut self, arms: &[Arm], raised: &Row, t: &Type) -> Check<Row> {
         let mut handled = Row::none();
         let mut all = false;
+        let mut caught = Vec::new();
         for arm in arms {
             let theta = match strip(&arm.pat) {
                 Pat::Var(_) | Pat::Wild => {
                     all |= arm.guard.is_none();
-                    Type::Errors(self.caught_row(raised))
+                    let row = self.caught_row();
+                    caught.push(row.clone());
+                    Type::Errors(row)
                 }
                 Pat::Con(c, _) if self.decls.errors.contains(&c.ty) => {
                     let ctor = self.constructor(&c.ty.module, &c.name)?;
@@ -222,6 +236,9 @@ impl Checker<'_> {
                 _ => return error("Try", "a handler pattern is not an error (`FLICK-E007`)"),
             };
             self.arm(arm, &theta, t)?;
+        }
+        for row in &caught {
+            self.within(raised, row)?;
         }
         if all {
             Ok(Row::none())

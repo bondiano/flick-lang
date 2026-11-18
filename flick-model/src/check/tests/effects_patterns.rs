@@ -144,7 +144,8 @@ fn try_takes_off_what_an_unguarded_arm_covers() {
 }
 
 /// A `try` arm typed by its use (`docs/formal/core.md`): an arm `e` whose use asks for `A` is not a full arm when the body
-/// also raises `B`.
+/// also raises `B`: the use makes the row of `e` `{A}`, which does not hold
+/// what the body raises (`raised ⊆ caught`).
 #[test]
 fn try_arm_variable_is_errors_of_the_body() {
     let payload = Term::lam(
@@ -177,7 +178,7 @@ fn try_arm_variable_is_errors_of_the_body() {
         ))
     };
     assert!(check(&body(false), &mono(eff(ty("Unit")))).is_ok());
-    rejected_by(check(&body(true), &mono(eff(ty("Unit")))), "≡");
+    rejected_by(check(&body(true), &mono(eff(ty("Unit")))), "⊆");
 }
 
 /// (Provide), and a record checked as `S.Impl` field by field: the pure
@@ -295,8 +296,9 @@ fn a_match_takes_errors_apart_by_their_row() {
     rejected_by(check(&f(vec![on("A"), on("B")]), &of(&["A"])), "Pattern");
 }
 
-/// (Match-Err) of a row not known yet: without an arm for every error the
-/// arms tell it; with one they do not, and the row has to be known.
+/// (Match-Err) of a row not known yet: the patterns of a `match` tell it.
+/// Without an arm for every error they close it; with one it stays open
+/// for the rest of the program, here what the body of a `try` raises.
 #[test]
 fn the_arms_tell_a_row_not_known_yet() {
     let on = |e: &str| arm(Pat::Con(con(e, e, 1), Rc::from([Pat::Wild])), Term::unit());
@@ -307,6 +309,45 @@ fn the_arms_tell_a_row_not_known_yet() {
     };
     assert!(check(&f(vec![on("A"), on("B")]), &mono(ty("Unit"))).is_ok());
     let any = arm(Pat::Wild, Term::unit());
-    // `FLICK-T057`
-    rejected_by(check(&f(vec![on("A"), any]), &mono(ty("Unit"))), "Match");
+    assert!(check(&f(vec![on("A"), any.clone()]), &mono(ty("Unit"))).is_ok());
+    let caught = |arms| {
+        let x = arm(Pat::Var("x".into()), match_(var("x"), arms));
+        task(Term::Try(Rc::new(raise(b_err())), Rc::from([x])))
+    };
+    assert!(check(&caught(vec![on("A"), any]), &mono(eff(ty("Unit")))).is_ok());
+    rejected_by(check(&caught(vec![on("A")]), &mono(eff(ty("Unit")))), "⊆");
+}
+
+/// The `x` of a `try` takes a row above its body's, as (Try) with (Sub)
+/// types the body: a `match` on it may name an error the body does not
+/// raise (`docs/formal/core.md`, "`Errors` of a row with two or more
+/// elements").
+#[test]
+fn a_try_arm_takes_a_row_above_its_body() {
+    let on = |e: &str| arm(Pat::Con(con(e, e, 1), Rc::from([Pat::Wild])), Term::unit());
+    let x = arm(Pat::Var("x".into()), match_(var("x"), vec![on("A"), on("B")]));
+    let t = task(Term::Try(Rc::new(raise(a_err())), Rc::from([x])));
+    assert!(check(&t, &mono(eff(ty("Unit")))).is_ok());
+}
+
+/// (Errors-In): a term of an error, a value or not, has the type of the
+/// errors of a row that names it; a row of one other error is that error,
+/// and the rule types a term, not the types built of it.
+#[test]
+fn a_term_of_an_error_has_the_errors_of_its_row() {
+    let row = |es: &[&str]| {
+        let mut r = Row::none();
+        for e in es {
+            r.elems.insert(Path::new(T, e), Rc::from([]));
+        }
+        Type::Errors(r)
+    };
+    let both = row(&["A", "B"]);
+    assert!(check(&a_err(), &mono(both.clone())).is_ok());
+    assert!(check(&let_("y", b_err(), var("y")), &mono(both.clone())).is_ok());
+    assert!(check(&b_err(), &mono(row(&["A"]))).is_err());
+    let widen = Term::lam("f", var("f"));
+    let a_to = |t: Type| Type::fun(ty("Unit"), Stage::Pure, t);
+    let of = mono(Type::fun(a_to(Type::con(T, "A")), Stage::Pure, a_to(both)));
+    assert!(check(&widen, &of).is_err());
 }

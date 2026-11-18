@@ -1532,23 +1532,27 @@ theorem program25 (S : Sig) (_ : GenSig S) :
 --               | x15 ->
 --                 (match x15 with
 --                   | Bad y16 ->
---                     false
+--                     let w18 : Errors {Bad, Oops} =
+--                       (Bad y16)
+--                     (match w18 with
+--                       | Bad z19 ->
+--                         false
+--                       | Oops z20 ->
+--                         true)
 --                   | Oops y17 ->
 --                     false))
 --           with
---           | Bad x18 when ({ a = false; b = () }).a ->
---             false
---           | Bad x18 ->
+--           | Bad x21 ->
 --             false) ->
 --           { a = (shape_of (js_of "a")); b = () }
 --         | Bad x14 ->
 --           { a = (shape_of (js_of "a")); b = () })
---     | Bad x19 ->
+--     | Bad x22 ->
 --       { a = (shape_of (js_of "a")); b = () })).a with
 --     | _ ->
 --       (shape_of (js_of "a")))
 theorem program26 (S : Sig) (hS : GenSig S) :
-    Typ S [] Facts.none [] (.lam (.match_ (.proj (.try_ (.let_ (.app (.const .refMake) (.let_ (.raise (.app (.ctor "Fixture.Bad") (.lit (.str "a")))) (.var 0))) (.let_ (.app (.const .refMake) (.let_ (.match_ (.lit (.int 2)) (.acons (.lit (.int 0)) (.lam (.app (.glob 9) (.lit (.str "a")))) (.acons .var (.lam (.app (.glob 9) (.lit (.str "a")))) .anil))) (.var 0))) (.let_ (.await (.task (.let_ (.lit .unit) (.rcons "log" (.lam (.lit .unit)) .rnil)))) (.hdl "Fixture.Log" (recArm "log") (.lam (.var 0)) (.rcons "a" (.app (.glob 15) (.app (.glob 9) (.lit (.str "a")))) (.rcons "b" (.lit .unit) .rnil)))))) (.acons (.app (.ctor "Fixture.Oops") .var) (.try_ (.scope (.let_ (.app (.glob 11) (.lit (.str "x"))) (.raise (.app (.ctor "Fixture.Bad") (.lit (.str "")))))) (.acons (.app (.ctor "Fixture.Oops") .var) (.update (.rcons "a" (.app (.glob 15) (.app (.glob 9) (.lit (.str "a")))) (.rcons "b" (.lit .unit) .rnil)) "a" (.scope (.let_ (.app (.glob 11) (.lit (.str "x"))) (.app (.glob 15) (.app (.glob 9) (.lit (.str "a"))))))) (.aguard (.app (.ctor "Fixture.Bad") .var) (.try_ (.try_ (.match_ (.lit (.bool false)) (.acons (.lit (.bool true)) (.raise (.app (.ctor "Fixture.Bad") (.var 0))) (.acons (.lit (.bool false)) (.match_ (.lit (.bool true)) (.acons (.lit (.bool true)) (.raise (.app (.ctor "Fixture.Oops") (.var 1))) (.acons (.lit (.bool false)) (.lit (.bool true)) .anil))) .anil))) (.acons .var (.match_ (.var 0) (.acons (.app (.ctor "Fixture.Bad") .var) (.lit (.bool false)) (.acons (.app (.ctor "Fixture.Oops") .var) (.lit (.bool false)) .anil))) .anil)) (.aguard (.app (.ctor "Fixture.Bad") .var) (.proj (.rcons "a" (.lit (.bool false)) (.rcons "b" (.lit .unit) .rnil)) "a") (.lit (.bool false)) (.acons (.app (.ctor "Fixture.Bad") .var) (.lit (.bool false)) .anil))) (.rcons "a" (.app (.glob 15) (.app (.glob 9) (.lit (.str "a")))) (.rcons "b" (.lit .unit) .rnil)) (.acons (.app (.ctor "Fixture.Bad") .var) (.rcons "a" (.app (.glob 15) (.app (.glob 9) (.lit (.str "a")))) (.rcons "b" (.lit .unit) .rnil)) .anil)))) (.acons (.app (.ctor "Fixture.Bad") .var) (.rcons "a" (.app (.glob 15) (.app (.glob 9) (.lit (.str "a")))) (.rcons "b" (.lit .unit) .rnil)) .anil))) "a") (.acons .wild (.app (.glob 15) (.app (.glob 9) (.lit (.str "a")))) .anil)))
+    Typ S [] Facts.none [] (.lam (.match_ (.proj (.try_ (.let_ (.app (.const .refMake) (.let_ (.raise (.app (.ctor "Fixture.Bad") (.lit (.str "a")))) (.var 0))) (.let_ (.app (.const .refMake) (.let_ (.match_ (.lit (.int 2)) (.acons (.lit (.int 0)) (.lam (.app (.glob 9) (.lit (.str "a")))) (.acons .var (.lam (.app (.glob 9) (.lit (.str "a")))) .anil))) (.var 0))) (.let_ (.await (.task (.let_ (.lit .unit) (.rcons "log" (.lam (.lit .unit)) .rnil)))) (.hdl "Fixture.Log" (recArm "log") (.lam (.var 0)) (.rcons "a" (.app (.glob 15) (.app (.glob 9) (.lit (.str "a")))) (.rcons "b" (.lit .unit) .rnil)))))) (.acons (.app (.ctor "Fixture.Oops") .var) (.try_ (.scope (.let_ (.app (.glob 11) (.lit (.str "x"))) (.raise (.app (.ctor "Fixture.Bad") (.lit (.str "")))))) (.acons (.app (.ctor "Fixture.Oops") .var) (.update (.rcons "a" (.app (.glob 15) (.app (.glob 9) (.lit (.str "a")))) (.rcons "b" (.lit .unit) .rnil)) "a" (.scope (.let_ (.app (.glob 11) (.lit (.str "x"))) (.app (.glob 15) (.app (.glob 9) (.lit (.str "a"))))))) (.aguard (.app (.ctor "Fixture.Bad") .var) (.try_ (.try_ (.match_ (.lit (.bool false)) (.acons (.lit (.bool true)) (.raise (.app (.ctor "Fixture.Bad") (.var 0))) (.acons (.lit (.bool false)) (.match_ (.lit (.bool true)) (.acons (.lit (.bool true)) (.raise (.app (.ctor "Fixture.Oops") (.var 1))) (.acons (.lit (.bool false)) (.lit (.bool true)) .anil))) .anil))) (.acons .var (.match_ (.var 0) (.acons (.app (.ctor "Fixture.Bad") .var) (.let_ (.app (.ctor "Fixture.Bad") (.var 0)) (.match_ (.var 0) (.acons (.app (.ctor "Fixture.Bad") .var) (.lit (.bool false)) (.acons (.app (.ctor "Fixture.Oops") .var) (.lit (.bool true)) .anil)))) (.acons (.app (.ctor "Fixture.Oops") .var) (.lit (.bool false)) .anil))) .anil)) (.acons (.app (.ctor "Fixture.Bad") .var) (.lit (.bool false)) .anil)) (.rcons "a" (.app (.glob 15) (.app (.glob 9) (.lit (.str "a")))) (.rcons "b" (.lit .unit) .rnil)) (.acons (.app (.ctor "Fixture.Bad") .var) (.rcons "a" (.app (.glob 15) (.app (.glob 9) (.lit (.str "a")))) (.rcons "b" (.lit .unit) .rnil)) .anil)))) (.acons (.app (.ctor "Fixture.Bad") .var) (.rcons "a" (.app (.glob 15) (.app (.glob 9) (.lit (.str "a")))) (.rcons "b" (.lit .unit) .rnil)) .anil))) "a") (.acons .wild (.app (.glob 15) (.app (.glob 9) (.lit (.str "a")))) .anil)))
       (.ex (.arrow (.base .unit) (.rt .cnil .cnil) (.adt "Fixture.Shape") Caps.none) .pure) :=
   (.lam (a := (.base .unit)) (ψ := (.rt .cnil .cnil)) (t := (.adt "Fixture.Shape")) (C := Caps.none)
     (.match_
@@ -1692,7 +1696,21 @@ theorem program26 (S : Sig) (hS : GenSig S) :
                 (.match_
                   (Cert.typ_var (ts := []) (T' := (.errors (.run (.rnm "Fixture.Bad" (.adt "Fixture.Bad")) (.rnm "Fixture.Oops" (.adt "Fixture.Oops"))))) rfl rfl (by holds) (by inst_le) (by le_live))
                   (.acons (.err (.app (PatTy.head_plain S (K := "Fixture.Bad") (ts := [(.base .string)]) (T := "Fixture.Bad") (us := []) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl) .var) (by cert_simp))
-                  .lit
+                  (.let_ (a := (.errors (.run (.rnm "Fixture.Bad" (.adt "Fixture.Bad")) (.rnm "Fixture.Oops" (.adt "Fixture.Oops")))))
+                    (.errVal (U := (.adt "Fixture.Bad")) (E := "Fixture.Bad")
+                      (.app (a := (.base .string)) (ψ := .pure) (t := (.adt "Fixture.Bad")) (C := Caps.none)
+                        (Typ.ctor_plain S (K := "Fixture.Bad") (us := []) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl (by le_live))
+                        (Cert.typ_var (ts := []) (T' := (.base .string)) rfl rfl (by holds) (by inst_le) (by le_live))
+                        (by stage_le) (by le_live))
+                      rfl (by row_set))
+                    (.match_
+                      (Cert.typ_var (ts := []) (T' := (.errors (.run (.rnm "Fixture.Bad" (.adt "Fixture.Bad")) (.rnm "Fixture.Oops" (.adt "Fixture.Oops"))))) rfl rfl (by holds) (by inst_le) (by le_live))
+                      (.acons (.err (.app (PatTy.head_plain S (K := "Fixture.Bad") (ts := [(.base .string)]) (T := "Fixture.Bad") (us := []) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl) .var) (by cert_simp))
+                      .lit
+                      (.acons (.err (.app (PatTy.head_plain S (K := "Fixture.Oops") (ts := [(.base .int)]) (T := "Fixture.Oops") (us := []) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl) .var) (by cert_simp))
+                      .lit
+                      .anil))
+                      (.inl (exh_errs hS ["Fixture.Bad", "Fixture.Oops"] (by intro E c h; split_mem h <;> cert_simp) (by intro a G h; split_mem h <;> cert_simp) (by decide) (by decide)))))
                   (.acons (.err (.app (PatTy.head_plain S (K := "Fixture.Oops") (ts := [(.base .int)]) (T := "Fixture.Oops") (us := []) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl) .var) (by cert_simp))
                   .lit
                   .anil))
@@ -1700,20 +1718,10 @@ theorem program26 (S : Sig) (hS : GenSig S) :
                 (.hnil (fun _ h => h))
                 catches_all)
                 (by stage_le) (by row_set))
-              (.hguard (H' := (fun x => x = .nm₀ "Fixture.Bad" ∨ Row.none x)) (.ctor (.app (PatTy.head_plain S (K := "Fixture.Bad") (ts := [(.base .string)]) (T := "Fixture.Bad") (us := []) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl) .var))
-              (.proj (R := (.rcons "a" (.base .bool) (.rcons "b" (.base .unit) .rnil))) (t := (.base .bool))
-                (.rcons (R := (.rcons "b" (.base .unit) .rnil)) trivial (by decide)
-                  .lit
-                  (.rcons (R := .rnil) trivial (by decide)
-                  .lit
-                  .rnil))
-                rfl (by le_live))
-              .lit
               (.hcons (H' := Row.none) (.ctor (.app (PatTy.head_plain S (K := "Fixture.Bad") (ts := [(.base .string)]) (T := "Fixture.Bad") (us := []) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl) .var))
               .lit
               (.hnil (fun _ h => h))
               (catches_ctor (exh_gen hS (T := "Fixture.Bad") (us := []) (by decide) (by decide))))
-              (fun _ h => h))
               (by stage_le) (by row_set))
             (.rcons (R := (.rcons "b" (.base .unit) .rnil)) trivial (by decide)
               (.app (a := (.adt "Prelude.JsValue")) (ψ := .pure) (t := (.adt "Fixture.Shape")) (C := Caps.none)

@@ -55,6 +55,7 @@ runtime/closing_child_fails # the model's (≡) rejects `App.Main.main`
 runtime/closing_hooks # no native for `make` (flick:Deferred make)
 runtime/concurrency # the model's (≡) rejects `App.Main.main`
 runtime/discontinued_fiber # no native for `make` (flick:Deferred make)
+runtime/error_map # no native for `map_error` (flick:Exit flickMapError)
 runtime/exits # no native for `parallel_exits` (flick:rt parallelExits)
 runtime/group_in_closing # no native for `make` (flick:FiberSet flickMake)
 runtime/handoff # no native for `make` (flick:Deferred make)
@@ -201,19 +202,19 @@ stdlib/http/derive # the row primitive `Lacks "forget" { profile : { headers : U
 stdlib/http/error_cases # the row primitive `Lacks "users" {}`
 stdlib/http/error_cases_opaque # `Record.label` has no λFlick form
 stdlib/http/forms # no native for `post` (flick:http/HttpClientRequest post)
-stdlib/http/handlers # the model's (≡) rejects `App.Main.requests`
+stdlib/http/handlers # no native for `post` (flick:http/HttpClientRequest post)
 stdlib/http/headers # no native for `from_input` (flick:http/Headers fromInput)
 stdlib/http/inject # the row primitive `Lacks "post" { profile : { headers : Unit; path : { name : String }; payload : Unit; query : Unit } ->{r; NotFound} { name : String } }`
 stdlib/http/lifecycle # the row primitive `Lacks "work" {}`
 stdlib/http/redaction_context # a `for` or a `Seq` has no λFlick form
-stdlib/http/router_patterns # the model's (≡) rejects `App.Main.attempt`
+stdlib/http/router_patterns # no native for `route` (flick:http/HttpRouter flickRoute)
 stdlib/http/serve # no native for `call` (./wire.mjs call)
 stdlib/http/server # no native for `layer_of` (flick:http/FetchHttpClient flickLayer)
 stdlib/http/shutdown_masked # no native for `start` (./raw.mjs start)
 stdlib/http/shutdown_stream # no native for `start` (./raw.mjs start)
 stdlib/http/shutdown_timeout # no native for `start` (./raw.mjs start)
 stdlib/http/spa # the row primitive `Lacks "greet" {}`
-stdlib/http/spans # the model's (≡) rejects `App.Main.main`
+stdlib/http/spans # no native for `get` (flick:http/HttpClientRequest get)
 stdlib/http/streams # no native for `from_list` (flick:Stream fromArray)
 stdlib/http/types # no native for `empty` (flick:http/HttpClientRequest empty)
 stdlib/http/values # no native for `make` (flick:http/UrlParams make)
