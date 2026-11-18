@@ -202,9 +202,11 @@ fn control(expr: &Expr, diagnostics: &mut Vec<Diagnostic>) {
             .iter()
             .any(|h| h.operations.iter().any(|o| o.class == OpClass::Control))
     {
-        let mut diagnostic =
-            failure("handlers of `control` operations are checked, but compiled only to Go yet")
-                .remove(0);
+        let mut diagnostic = failure(
+            "the Effect adapter (`effect = \"effect\"`) does not run handlers of `control` \
+             operations; Flick's own runtime (`effect = \"rt\"`) and Go do",
+        )
+        .remove(0);
         diagnostic.span = Some(flick_backend::Span {
             file: expr.span.file.index(),
             start: expr.span.start,
