@@ -230,7 +230,7 @@ theorem _root_.Flick.PStep.noIns {x x₁ : Flick.Tm} (hs : PStep root x x₁) (h
 theorem pstep_typed (hroot : RootTy S root) {Θ : Facts} {t : Flick.Ty} {x x₁ : Flick.Tm}
     (ht : Typ S [] Θ [] x (.ex t .pure)) (hs : PStep root x x₁) : Typ S [] Θ [] x₁ (.ex t .pure) := by
   obtain ⟨E, e, e', hE, he, rfl, rfl, hh⟩ := hs.inv
-  obtain ⟨K, Θ', t', φ', hr, -, -, back⟩ := ctx_typing E hE he.1 ht
+  obtain ⟨K, Θ', t', φ', hr, -, -, back, -⟩ := ctx_typing E hE he.1 ht
   simp only [List.map_nil] at hr
   have := back.id [] e'
   simp only [List.nil_append, List.map_nil] at this

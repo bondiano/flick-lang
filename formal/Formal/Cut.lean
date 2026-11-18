@@ -155,11 +155,11 @@ theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Ent
     intro _ hΘ; exact .hdl hus (ih₁ (hΘ.substT _)) hn (ih₂ hΘ) hψ (ih₃ hΘ) hφ₀ hOb hc hφ hT
   | hwith hus hℓ _ _ hψ _ hφ₀ hc hφ hT ha ih₁ ih₂ ih₃ =>
     intro _ hΘ; exact .hwith hus hℓ (ih₁ hΘ) (ih₂ hΘ) hψ (ih₃ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) hc hφ hT ha
-  | hctl hus hℓ _ _ hψ hop hc htl hE hk _ hφ₀ _ hl hcm hφ hT ha ih₁ ih₂ ih₃ ih₄ =>
+  | hctl hus hℓ _ _ hψ hop hc htl hE hk _ _ hφ₀ _ hl hcm hφ hT ha ih₁ ih₂ ih₃ ih₄ =>
     intro _ hΘ; exact .hctl hus hℓ (ih₁ hΘ) (ih₂ hΘ) hψ hop hc htl hE hk (ih₃ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) (ih₄ hΘ) hl hcm hφ hT ha
   | hkeep hus hℓ _ _ hφ₀ hc hnt hle hφ hT ih₁ ih₂ =>
     intro _ hΘ; exact .hkeep hus hℓ (ih₁ hΘ) (ih₂ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) hc hnt hle hφ hT
-  | hkarm hus hℓ _ hop hE hk _ hφ₀ hc hnt _ hle hφ hT ih₁ ih₂ ih₃ =>
+  | hkarm hus hℓ _ hop hE hk _ _ hφ₀ hc hnt _ hle hφ hT ih₁ ih₂ ih₃ =>
     intro _ hΘ; exact .hkarm hus hℓ (ih₁ hΘ) hop hE hk (ih₂ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) hc hnt (ih₃ hΘ) hle hφ hT
   | hres hℓ _ hA ha _ hl hcp hφ hT ih₁ ih₂ => intro _ hΘ; exact .hres hℓ (ih₁ hΘ) hA ha (ih₂ hΘ) hl hcp hφ hT
   | hdone _ ih => intro _ hΘ; exact .hdone (ih hΘ)

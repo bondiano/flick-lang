@@ -253,7 +253,7 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
       exact hr _ (hc.2 fun hcomp => by
         have h₁ := hcomp o c a b hop
         simp [Frame.handles, h₁] at hh)
-  | hctl _ _ _ _ _ _ _ _ hE hk _ _ _ _ _ hφ _ _ _ _ _ ih =>
+  | hctl _ _ _ _ _ _ _ _ hE hk _ _ _ _ _ _ hφ _ _ _ _ _ ih =>
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih hμ hΓ rfl with hv | hn
     · obtain ⟨_, hh⟩ := hctl_progress hE hk hv
@@ -288,7 +288,7 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
         have h₁ := hcomp o _ a b hop
         simp [Frame.handles, h₁] at hh
     · exact hnt ⟨o, c, a, b, hop, hct⟩
-  | hkarm _ _ _ _ hE hk _ _ _ _ _ hle hφ _ _ _ ih =>
+  | hkarm _ _ _ _ hE hk _ _ _ _ _ _ hle hφ _ _ _ ih =>
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih hμ hΓ rfl with hv | hn
     · exact step (Step.ofP (.hkarmVal hE hk hv))

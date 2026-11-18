@@ -186,9 +186,9 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
       S.Handles E us al r.asRow → (Stage.rt r.asRow ε.asRow).le φ → LeLive S t' T →
       Typ Ψ Θ Γ (.hdl E al rf e) (.ex T φ)
   /-- The run-time forms of a handler, whose region is `p`; the cell `ℓ` holds the type and
-  the stage of its value. -/
+  the stage of its value, and the arguments `us` of its arms as `E us`. -/
   | hwith {al rf : Tm} {us : List Ty} : us.length = S.arity E →
-      Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
+      Ψ[ℓ]? = some (.arrow (Ty.tcon E us) (.rt r ε) t' Caps.none) →
       Typ Ψ Θ Γ al (.harms E us t' (.rt r ε) (.rg p)) →
       Typ Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r.asRow ε.asRow)) →
       (Stage.use ψ.asStage C).le (.rt r.asRow ε.asRow) →
@@ -196,16 +196,17 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
       S.Handles E us al r.asRow → (Stage.rt r.asRow ε.asRow).le φ → LeLive S t' T →
       φ.svc (.atm (.r p)) →
       Typ Ψ Θ Γ (.hwith p ℓ E al rf e) (.ex T φ)
-  /-- While an arm runs, the body is parked where it performed the operation `o`: it is
-  typed with the operation at the hole, the argument left out. A `tail` arm gives that
+  /-- While an arm runs, the body is parked where it performed the operation `o`, which no frame
+  of it answers: it is typed with the operation at the hole, the argument left out. A `tail` arm gives that
   operation its value, a `control` arm the handler its value, with `resume` the cell `κ`. -/
   | hctl {Ei : List Frame} {al rf : Tm} {tl : Bool} {us : List Ty} : us.length = S.arity E →
-      Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
+      Ψ[ℓ]? = some (.arrow (Ty.tcon E us) (.rt r ε) t' Caps.none) →
       Typ Ψ Θ Γ al (.harms E us t' (.rt r ε) (.rg p)) →
       Typ Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r.asRow ε.asRow)) →
       (Stage.use ψ.asStage C).le (.rt r.asRow ε.asRow) →
       S.op E o = some (c, a₀, b₀) → c ≠ .abort → (tl = true ↔ c = .tail) →
-      OkE Ei → k = plug Ei (.hole p) → Typ Ψ Θ [] (plug Ei (.app (.const (.perform E o c)) .todo)) (.ex t φ₀) →
+      OkE Ei → k = plug Ei (.hole p) → (∀ G ∈ Ei, G.handles E o c = none) →
+      Typ Ψ Θ [] (plug Ei (.app (.const (.perform E o c)) .todo)) (.ex t φ₀) →
       φ₀.le (.rt (Row.hP Θ p E (S.answers E us) r.asRow) ε.asRow) →
       Typ Ψ Θ Γ a (.ex (if tl then b₀.substT (instT us) else t')
         (Stage.use (.rt r.asRow ε.asRow) (if tl then Caps.none else (Ty.rg p).reach))) →
@@ -215,7 +216,7 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
       Typ Ψ Θ Γ (.hctl p ℓ κ tl E al rf a k) (.ex T φ)
   /-- While the resumed body runs, the arm is parked where it called `resume`, the
   argument left out. -/
-  | hres {A : List Frame} : Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
+  | hres {A : List Frame} {u : Ty} : Ψ[ℓ]? = some (.arrow u (.rt r ε) t' Caps.none) →
       Typ Ψ Θ Γ b (.ex t' (Stage.use (.rt r.asRow ε.asRow) (Ty.rg p).reach)) →
       OkE A → a = plug A (.hole p) → Typ Ψ Θ [] (plug A (.app (.kont p κ) .todo))
         (.ex t' (Stage.use (.rt r.asRow ε.asRow) (Ty.rg p).reach)) →
@@ -225,14 +226,14 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
       Typ Ψ Θ Γ (.hdone p a) (.ex t φ)
   /-- Unwinding to the handler of the cell `ℓ`, which then runs `a` with the type of its
   value; unwinding itself has any type. -/
-  | unw : Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
+  | unw {u : Ty} : Ψ[ℓ]? = some (.arrow u (.rt r ε) t' Caps.none) →
       Typ Ψ Θ Γ a (.ex t' (Stage.use (.rt r.asRow ε.asRow) (Ty.rg p).reach)) →
       (Stage.rt Row.none Row.none).le φ → Typ Ψ Θ Γ (.unw p ℓ a) (.ex t φ)
   /-- A handler kept around a child: `ℓ` and the arms are those of the handler it keeps. The
   child runs the arms, so its stage holds theirs; an operation the kept handler does not answer
   goes on to the handler around, or the root. -/
   | hkeep {al : Tm} {us : List Ty} : us.length = S.arity E →
-      Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
+      Ψ[ℓ]? = some (.arrow (Ty.tcon E us) (.rt r ε) t' Caps.none) →
       Typ Ψ Θ Γ al (.harms E us t' (.rt r ε) (.rg q)) →
       Typ Ψ Θ Γ e (.ex t φ₀) → φ₀.le (.rt (Row.hP Θ q E (S.answers E us) r₁) ε₁) →
       S.Handles E us al r₁ → S.NonTail E us r₁ → (Stage.rt r.asRow ε.asRow).le (.rt r₁ ε₁) →
@@ -240,9 +241,10 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   /-- While an arm of a kept handler runs, the body is parked where it performed the operation
   `o`, as for `hctl` of a `tail` operation. -/
   | hkarm {Ei : List Frame} {al : Tm} {us : List Ty} : us.length = S.arity E →
-      Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
+      Ψ[ℓ]? = some (.arrow (Ty.tcon E us) (.rt r ε) t' Caps.none) →
       Typ Ψ Θ Γ al (.harms E us t' (.rt r ε) (.rg q)) →
       S.op E o = some (.tail, a₀, b₀) → OkE Ei → k = plug Ei (.hole q) →
+      (∀ G ∈ Ei, G.handles E o .tail = none) →
       Typ Ψ Θ [] (plug Ei (.app (.const (.perform E o .tail)) .todo)) (.ex t φ₀) →
       φ₀.le (.rt (Row.hP Θ q E (S.answers E us) r₁) ε₁) → S.Handles E us al r₁ →
       S.NonTail E us r₁ → Typ Ψ Θ Γ a (.ex (b₀.substT (instT us)) (.rt r.asRow ε.asRow)) → (Stage.rt r.asRow ε.asRow).le (.rt r₁ ε₁) →

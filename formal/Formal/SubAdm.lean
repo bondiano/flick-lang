@@ -211,14 +211,14 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe S J J' �
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .hwith hus hℓ hal hrf hψ he hφ₀ hc (Stage.le_trans hφ h₂) (hT.trans h₁)
       (Stage.atom_le h₂ hat)
-  | hctl hus hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha hl hcm hφ hT hat =>
+  | hctl hus hℓ hal hrf hψ hop hc htl hE hk _ hp hφ₀ ha hl hcm hφ hT hat =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .hctl hus hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha hl hcm (Stage.le_trans hφ h₂) (hT.trans h₁)
       (Stage.atom_le h₂ hat)
   | hkeep hus hℓ hal he hφ₀ hc hnt hle hφ hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .hkeep hus hℓ hal he hφ₀ hc hnt hle (Stage.le_trans hφ h₂) (hT.trans h₁)
-  | hkarm hus hℓ hal hop hE hk hp hφ₀ hc hnt ha hle hφ hT =>
+  | hkarm hus hℓ hal hop hE hk _ hp hφ₀ hc hnt ha hle hφ hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .hkarm hus hℓ hal hop hE hk hp hφ₀ hc hnt ha hle (Stage.le_trans hφ h₂) (hT.trans h₁)
   | hres hℓ hb hA ha hp hl hcp hφ hT =>

@@ -157,7 +157,7 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro _ σ hσ
     exact .hwith hus hℓ (ih₁ hσ) (ih₂ hσ) hψ (ih₃ hσ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
       rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hφ hT hat
-  | hctl hus hℓ hal _ hψ hop hc htl hE hk hp hφ₀ _ hl hcm hφ hT hat ih₁ ih₂ _ ih₄ =>
+  | hctl hus hℓ hal _ hψ hop hc htl hE hk _ hp hφ₀ _ hl hcm hφ hT hat ih₁ ih₂ _ ih₄ =>
     intro _ σ hσ
     subst hk
     rw [Tm.subst, (plug_hole_closed hp).subst]
@@ -167,7 +167,7 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro _ σ hσ
     exact .hkeep hus hℓ (ih₁ hσ) (ih₂ hσ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
       rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hnt hle hφ hT
-  | hkarm hus hℓ hal hop hE hk hp hφ₀ hc hnt _ hle hφ hT ih₁ _ ih₃ =>
+  | hkarm hus hℓ hal hop hE hk _ hp hφ₀ hc hnt _ hle hφ hT ih₁ _ ih₃ =>
     intro _ σ hσ
     subst hk
     rw [Tm.subst, (plug_hole_closed hp).subst]

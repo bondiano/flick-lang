@@ -14,7 +14,7 @@ variable {S : Sig}
 theorem Typ.hwith_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ p ℓ E al rf body T φ, e = .hwith p ℓ E al rf body → J = .ex T φ →
       ∃ us t' r ε t ψ C φ₀, us.length = S.arity E ∧
-        Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) ∧
+        Ψ[ℓ]? = some (.arrow (Ty.tcon E us) (.rt r ε) t' Caps.none) ∧
         Typ S Ψ Θ Γ al (.harms E us t' (.rt r ε) (.rg p)) ∧
         Typ S Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r.asRow ε.asRow)) ∧ (Stage.use ψ.asStage C).le (.rt r.asRow ε.asRow) ∧
         Typ S Ψ Θ Γ body (.ex t φ₀) ∧ φ₀.le (.rt (Row.hP Θ p E (S.answers E us) r.asRow) ε.asRow) ∧
@@ -33,23 +33,23 @@ theorem Typ.hwith_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
 
 theorem Typ.unw_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ p ℓ a T φ, e = .unw p ℓ a → J = .ex T φ →
-      ∃ t r ε, Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t Caps.none) ∧
+      ∃ u t r ε, Ψ[ℓ]? = some (.arrow u (.rt r ε) t Caps.none) ∧
         Typ S Ψ Θ Γ a (.ex t (Stage.use (.rt r.asRow ε.asRow) (Ty.rg p).reach)) ∧
         (Stage.rt Row.none Row.none).le φ := by
   induction h with
   | conv _ _ ih => intro p ℓ a T φ hv hJ; cases hJ; exact ih p ℓ a _ _ hv rfl
-  | unw hl ha hφ => intro p ℓ a T φ hv hJ; cases hv; cases hJ; exact ⟨_, _, _, hl, ha, hφ⟩
+  | unw hl ha hφ => intro p ℓ a T φ hv hJ; cases hv; cases hJ; exact ⟨_, _, _, _, hl, ha, hφ⟩
   | allI hv | errVal hv => intro p ℓ a T φ he _; cases he; cases hv
   | _ => intro p ℓ a T φ hv _; cases hv
 
 theorem Typ.hctl_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ p ℓ κ tl E al rf a k T φ, e = .hctl p ℓ κ tl E al rf a k → J = .ex T φ →
       ∃ us t' r ε t ψ C o c a₀ b₀ φ₀ Ei, us.length = S.arity E ∧
-        Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) ∧
+        Ψ[ℓ]? = some (.arrow (Ty.tcon E us) (.rt r ε) t' Caps.none) ∧
         Typ S Ψ Θ Γ al (.harms E us t' (.rt r ε) (.rg p)) ∧
         Typ S Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r.asRow ε.asRow)) ∧ (Stage.use ψ.asStage C).le (.rt r.asRow ε.asRow) ∧
         S.op E o = some (c, a₀, b₀) ∧ c ≠ .abort ∧ (tl = true ↔ c = .tail) ∧
-        OkE Ei ∧ k = plug Ei (.hole p) ∧
+        OkE Ei ∧ k = plug Ei (.hole p) ∧ (∀ G ∈ Ei, G.handles E o c = none) ∧
         Typ S Ψ Θ [] (plug Ei (.app (.const (.perform E o c)) .todo)) (.ex t φ₀) ∧
         φ₀.le (.rt (Row.hP Θ p E (S.answers E us) r.asRow) ε.asRow) ∧
         Typ S Ψ Θ Γ a (.ex (if tl = true then b₀.substT (instT us) else t')
@@ -61,22 +61,22 @@ theorem Typ.hctl_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | conv _ he ih =>
     intro p ℓ κ tl E al rf a k T φ hv hJ; cases hJ
     obtain ⟨us, t', r, ε, t, ψ, C, o, c, a₀, b₀, φ₀, Ei,
-      hus, hl, hal, hrf, hψ, hop, hc, htl, hE, hk, hp, hφ₀, ha, hκ, hcm, hφ, ht, hsvc⟩ :=
+      hus, hl, hal, hrf, hψ, hop, hc, htl, hE, hk, hno, hp, hφ₀, ha, hκ, hcm, hφ, ht, hsvc⟩ :=
       ih p ℓ κ tl E al rf a k _ _ hv rfl
     exact ⟨us, t', r, ε, t, ψ, C, o, c, a₀, b₀, φ₀, Ei,
-      hus, hl, hal, hrf, hψ, hop, hc, htl, hE, hk, hp, hφ₀, ha, hκ, hcm, hφ, ht.trans (.equiv he),
+      hus, hl, hal, hrf, hψ, hop, hc, htl, hE, hk, hno, hp, hφ₀, ha, hκ, hcm, hφ, ht.trans (.equiv he),
       hsvc⟩
-  | hctl hus hl hal hrf hψ hop hc htl hE hk hp hφ₀ ha hκ hcm hφ ht hsvc =>
+  | hctl hus hl hal hrf hψ hop hc htl hE hk hno hp hφ₀ ha hκ hcm hφ ht hsvc =>
     intro p ℓ κ tl E al rf a k T φ hv hJ; cases hv; cases hJ
     exact ⟨_, _, _, _, _, _, _, _, _, _, _, _, _,
-      hus, hl, hal, hrf, hψ, hop, hc, htl, hE, hk, hp, hφ₀, ha, hκ, hcm, hφ, ht, hsvc⟩
+      hus, hl, hal, hrf, hψ, hop, hc, htl, hE, hk, hno, hp, hφ₀, ha, hκ, hcm, hφ, ht, hsvc⟩
   | allI hv | errVal hv => intro p ℓ κ tl E al rf a k T φ he _; cases he; cases hv
   | _ => intro p ℓ κ tl E al rf a k T φ hv _; cases hv
 
 theorem Typ.hkeep_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ q ℓ E al body T φ, e = .hkeep q ℓ E al body → J = .ex T φ →
       ∃ us t' r ε t φ₀ r₁ ε₁, us.length = S.arity E ∧
-        Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) ∧
+        Ψ[ℓ]? = some (.arrow (Ty.tcon E us) (.rt r ε) t' Caps.none) ∧
         Typ S Ψ Θ Γ al (.harms E us t' (.rt r ε) (.rg q)) ∧
         Typ S Ψ Θ Γ body (.ex t φ₀) ∧ φ₀.le (.rt (Row.hP Θ q E (S.answers E us) r₁) ε₁) ∧
         S.Handles E us al r₁ ∧ S.NonTail E us r₁ ∧ (Stage.rt r.asRow ε.asRow).le (.rt r₁ ε₁) ∧
@@ -96,9 +96,10 @@ theorem Typ.hkeep_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
 theorem Typ.hkarm_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ q ℓ E al a k T φ, e = .hkarm q ℓ E al a k → J = .ex T φ →
       ∃ us t' r ε o a₀ b₀ t φ₀ r₁ ε₁ Ei, us.length = S.arity E ∧
-        Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) ∧
+        Ψ[ℓ]? = some (.arrow (Ty.tcon E us) (.rt r ε) t' Caps.none) ∧
         Typ S Ψ Θ Γ al (.harms E us t' (.rt r ε) (.rg q)) ∧
         S.op E o = some (.tail, a₀, b₀) ∧ OkE Ei ∧ k = plug Ei (.hole q) ∧
+        (∀ G ∈ Ei, G.handles E o .tail = none) ∧
         Typ S Ψ Θ [] (plug Ei (.app (.const (.perform E o .tail)) .todo)) (.ex t φ₀) ∧
         φ₀.le (.rt (Row.hP Θ q E (S.answers E us) r₁) ε₁) ∧ S.Handles E us al r₁ ∧
         S.NonTail E us r₁ ∧ Typ S Ψ Θ Γ a (.ex (b₀.substT (instT us)) (.rt r.asRow ε.asRow)) ∧ (Stage.rt r.asRow ε.asRow).le (.rt r₁ ε₁) ∧
@@ -107,20 +108,20 @@ theorem Typ.hkarm_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | conv _ he ih =>
     intro q ℓ E al a k T φ hv hJ; cases hJ
     obtain ⟨us, t', r, ε, o, a₀, b₀, t, φ₀, r₁, ε₁, Ei,
-      hus, hl, hal, hop, hE, hk, hp, hφ₀, hc, hn, ha, hle, hφ, ht⟩ := ih q ℓ E al a k _ _ hv rfl
+      hus, hl, hal, hop, hE, hk, hno, hp, hφ₀, hc, hn, ha, hle, hφ, ht⟩ := ih q ℓ E al a k _ _ hv rfl
     exact ⟨us, t', r, ε, o, a₀, b₀, t, φ₀, r₁, ε₁, Ei,
-      hus, hl, hal, hop, hE, hk, hp, hφ₀, hc, hn, ha, hle, hφ, ht.trans (.equiv he)⟩
-  | hkarm hus hl hal hop hE hk hp hφ₀ hc hn ha hle hφ ht =>
+      hus, hl, hal, hop, hE, hk, hno, hp, hφ₀, hc, hn, ha, hle, hφ, ht.trans (.equiv he)⟩
+  | hkarm hus hl hal hop hE hk hno hp hφ₀ hc hn ha hle hφ ht =>
     intro q ℓ E al a k T φ hv hJ; cases hv; cases hJ
-    exact ⟨_, _, _, _, _, _, _, _, _, _, _, _, hus, hl, hal, hop, hE, hk, hp, hφ₀, hc, hn, ha, hle,
+    exact ⟨_, _, _, _, _, _, _, _, _, _, _, _, hus, hl, hal, hop, hE, hk, hno, hp, hφ₀, hc, hn, ha, hle,
       hφ, ht⟩
   | allI hv | errVal hv => intro q ℓ E al a k T φ he _; cases he; cases hv
   | _ => intro q ℓ E al a k T φ hv _; cases hv
 
 theorem Typ.hres_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ p ℓ a b T φ, e = .hres p ℓ a b → J = .ex T φ →
-      ∃ t' r ε κ b₀ C' A,
-        Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) ∧
+      ∃ u t' r ε κ b₀ C' A,
+        Ψ[ℓ]? = some (.arrow u (.rt r ε) t' Caps.none) ∧
         Typ S Ψ Θ Γ b (.ex t' (Stage.use (.rt r.asRow ε.asRow) (Ty.rg p).reach)) ∧
         OkE A ∧ a = plug A (.hole p) ∧
         Typ S Ψ Θ [] (plug A (.app (.kont p κ) .todo))
@@ -130,12 +131,12 @@ theorem Typ.hres_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   induction h with
   | conv _ he ih =>
     intro p ℓ a b T φ hv hJ; cases hJ
-    obtain ⟨t', r, ε, κ, b₀, C', A, hl, hb, hA, ha, hp, hκ, hcp, hφ, ht⟩ :=
+    obtain ⟨u, t', r, ε, κ, b₀, C', A, hl, hb, hA, ha, hp, hκ, hcp, hφ, ht⟩ :=
       ih p ℓ a b _ _ hv rfl
-    exact ⟨t', r, ε, κ, b₀, C', A, hl, hb, hA, ha, hp, hκ, hcp, hφ, ht.trans (.equiv he)⟩
+    exact ⟨u, t', r, ε, κ, b₀, C', A, hl, hb, hA, ha, hp, hκ, hcp, hφ, ht.trans (.equiv he)⟩
   | hres hl hb hA ha hp hκ hcp hφ ht =>
     intro p ℓ a b T φ hv hJ; cases hv; cases hJ
-    exact ⟨_, _, _, _, _, _, _, hl, hb, hA, ha, hp, hκ, hcp, hφ, ht⟩
+    exact ⟨_, _, _, _, _, _, _, _, hl, hb, hA, ha, hp, hκ, hcp, hφ, ht⟩
   | allI hv | errVal hv => intro p ℓ a b T φ he _; cases he; cases hv
   | _ => intro p ℓ a b T φ hv _; cases hv
 

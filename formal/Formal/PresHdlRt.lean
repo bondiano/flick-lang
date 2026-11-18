@@ -20,7 +20,7 @@ theorem raise_any {Ψ Θ w} : AnyTy S Ψ Θ (.raise w) := by
 
 theorem unw_any {Ψ Θ q ℓ a} : AnyTy S Ψ Θ (.unw q ℓ a) := by
   intro _ _ _ h
-  obtain ⟨_, _, _, hl, ha, hφ⟩ := h.unw_type _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, hl, ha, hφ⟩ := h.unw_type _ _ _ _ _ rfl rfl
   exact .unw hl ha hφ
 
 /-- The handler catches its signal and runs what it holds. In the live discipline the
@@ -29,7 +29,7 @@ theorem hwith_catch {Ψ Θ p ℓ E al r a t φ}
     (h : Typ S Ψ Θ [] (.hwith p ℓ E al r (.unw p ℓ a)) (.ex t φ)) :
     Typ S Ψ Θ [] a (.ex t φ) := by
   obtain ⟨_, _, _, _, _, _, _, _, _, hℓ, _, _, _, he, _, _, hφ, hT, hat⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
-  obtain ⟨_, _, _, hℓ', ha, _⟩ := he.unw_type _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, hℓ', ha, _⟩ := he.unw_type _ _ _ _ _ rfl rfl
   rw [hℓ] at hℓ'
   simp only [Option.some.injEq, Ty.arrow.injEq] at hℓ'
   obtain ⟨-, ⟨rfl, rfl⟩, rfl, -⟩ := hℓ'
@@ -40,7 +40,7 @@ theorem hctl_signal {Ψ Θ p ℓ κ tl E al r x k t φ} {Ei : List Frame} (hEi :
     (hk : k = plug Ei (.hole p)) (hx : ∀ {Θ'}, AnyTy S Ψ Θ' x)
     (h : Typ S Ψ Θ [] (.hctl p ℓ κ tl E al r x k) (.ex t φ)) :
     Typ S Ψ Θ [] (.hwith p ℓ E al r (plug Ei (.unw p ℓ x))) (.ex t φ) := by
-  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, hℓ, hal, hrf, hψ, hop, _, _, hE, hk', hp, hφ₀, ha, _, hcm, hφ, hT, hat⟩ := h.hctl_type _ _ _ _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, hℓ, hal, hrf, hψ, hop, _, _, hE, hk', _, hp, hφ₀, ha, _, hcm, hφ, hT, hat⟩ := h.hctl_type _ _ _ _ _ _ _ _ _ _ _ rfl rfl
   obtain ⟨rfl, -⟩ := plug_hole_inj hEi hE (hk.symm.trans hk')
   refine .hwith hℓ hal hrf hψ (refill_app hE perform_not_value hp (perform_fn hop) perform_up
     fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hcm hφ hT hat
@@ -54,7 +54,7 @@ theorem hkarm_raise {Ψ Θ q ℓ E al w k t φ} {Ei : List Frame} (hEi : OkE Ei)
     (hk : k = plug Ei (.hole q))
     (h : Typ S Ψ Θ [] (.hkarm q ℓ E al (.raise w) k) (.ex t φ)) :
     Typ S Ψ Θ [] (.hkeep q ℓ E al (plug Ei (.unw q ℓ (.raise w)))) (.ex t φ) := by
-  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, hℓ, hal, hop, hE, hk', hp, hφ₀, hc, hnt, ha, hle, hφ, hT⟩ := h.hkarm_type _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, hℓ, hal, hop, hE, hk', _, hp, hφ₀, hc, hnt, ha, hle, hφ, hT⟩ := h.hkarm_type _ _ _ _ _ _ _ _ rfl rfl
   obtain ⟨rfl, -⟩ := plug_hole_inj hEi hE (hk.symm.trans hk')
   refine .hkeep hℓ hal (refill_app hE perform_not_value hp (perform_fn hop) perform_up
     fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hc hnt hle hφ hT
@@ -68,11 +68,11 @@ theorem hkarm_unw {Ψ Θ q ℓ E al q' ℓ' a k t φ} {Ei : List Frame} (hEi : O
     (hk : k = plug Ei (.hole q))
     (h : Typ S Ψ Θ [] (.hkarm q ℓ E al (.unw q' ℓ' a) k) (.ex t φ)) :
     Typ S Ψ Θ [] (.hkeep q ℓ E al (plug Ei (.unw q' ℓ' a))) (.ex t φ) := by
-  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, hℓ, hal, hop, hE, hk', hp, hφ₀, hc, hnt, ha, hle, hφ, hT⟩ := h.hkarm_type _ _ _ _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, hℓ, hal, hop, hE, hk', _, hp, hφ₀, hc, hnt, ha, hle, hφ, hT⟩ := h.hkarm_type _ _ _ _ _ _ _ _ rfl rfl
   obtain ⟨rfl, -⟩ := plug_hole_inj hEi hE (hk.symm.trans hk')
   refine .hkeep hℓ hal (refill_app hE perform_not_value hp (perform_fn hop) perform_up
     fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hc hnt hle hφ hT
-  obtain ⟨_, _, _, hℓ', ha', _⟩ := ha.unw_type _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, hℓ', ha', _⟩ := ha.unw_type _ _ _ _ _ rfl rfl
   exact .unw hℓ' (ha'.cut hΘ.entails) (Stage.none_le (Stage.rt_ne_pure hψ₀))
 
 /-- A signal of a resumed body lets the parked arm go. -/
@@ -80,7 +80,7 @@ theorem hres_signal {Ψ Θ p ℓ a x t φ} {A : List Frame} (hA : OkE A) (ha : a
     (hx : ∀ {Θ'}, AnyTy S Ψ Θ' x)
     (h : Typ S Ψ Θ [] (.hres p ℓ a x) (.ex t φ)) :
     Typ S Ψ Θ [] (.hdone p (plug A x)) (.ex t φ) := by
-  obtain ⟨_, _, _, _, _, _, _, _, hb, hA', ha', hp, hl, hcp, hφ, hT⟩ := h.hres_type _ _ _ _ _ _ rfl rfl
+  obtain ⟨_, _, _, _, _, _, _, _, _, hb, hA', ha', hp, hl, hcp, hφ, hT⟩ := h.hres_type _ _ _ _ _ _ rfl rfl
   obtain ⟨rfl, -⟩ := plug_hole_inj hA hA' (ha.symm.trans ha')
   have h₁ := refill_app hA' kont_not_value hp (kont_fn_rg hl hcp) (fun _ _ h l => h.trans l)
     fun T φ' hΘ hψ₀ _ _ => hx ((hb.cut hΘ.entails).sub (J' := .ex _ φ')

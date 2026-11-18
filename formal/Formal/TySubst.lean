@@ -274,7 +274,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       (hc.substT σ)
       (by simpa_substT Stage.le_substT σ hφ) (hT.substT σ)
       (Stage.substT_svc_atm hp hat)
-  | hctl hus hℓ _ _ hψ hop hc htl hE hk _ hφ₀ _ hl hcm hφ hT hat ih₁ ih₂ ih₃ ih₄ =>
+  | hctl hus hℓ _ _ hψ hop hc htl hE hk _ _ hφ₀ _ hl hcm hφ hT hat ih₁ ih₂ ih₃ ih₄ =>
     intro σ hσ
     subst hk
     obtain ⟨-, hb⟩ := S.op_inst_substT hop hus σ
@@ -307,7 +307,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
           (fun _ => Sig.answers_substT σ) (Sig.answers_all_substT σ)))
       (hc.substR σ) (hnt.substR σ)
       (by simpa [Stage.substT_rt, Row.substT_asRow] using Stage.le_substT σ hle) (by simpa_substT Stage.le_substT σ hφ) (hT.substT σ)
-  | hkarm hus hℓ _ hop hE hk _ hφ₀ hc hnt _ hle hφ hT ih₁ ih₂ ih₃ =>
+  | hkarm hus hℓ _ hop hE hk _ _ hφ₀ hc hnt _ hle hφ hT ih₁ ih₂ ih₃ =>
     intro σ hσ
     subst hk
     obtain ⟨-, hb⟩ := S.op_inst_substT hop hus σ

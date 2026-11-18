@@ -154,7 +154,7 @@ private theorem Typ.pureStepCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     | hwithVal hv =>
       exact .app (hrf.sub ⟨LeLive.refl, hφ⟩) (he.valueAny hv _)
         (Stage.le_trans hψ hφ) hT
-  | hctl _ hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha _ hcm hφ hT hat =>
+  | hctl _ hℓ hal hrf hψ hop hc htl hE hk _ hp hφ₀ ha _ hcm hφ hT hat =>
     intro t φ e' hΓ hJ hh
     cases hΓ; cases hJ
     cases hh with
@@ -176,7 +176,7 @@ private theorem Typ.pureStepCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     cases hh with
     | hkeepVal hv =>
       exact (he.valueAny hv _).sub ⟨hT, Stage.pure_le _⟩
-  | hkarm _ hℓ hal hop hE hk hp hφ₀ hc hnt ha hle hφ hT =>
+  | hkarm _ hℓ hal hop hE hk _ hp hφ₀ hc hnt ha hle hφ hT =>
     intro t φ e' hΓ hJ hh
     cases hΓ; cases hJ
     cases hh with
