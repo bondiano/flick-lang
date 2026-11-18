@@ -1,8 +1,9 @@
 //! `flick new` and `flick init`: the files of a project pinning the
 //! compiler, the runtime and pnpm. Templates that still need the Effect adapter
 //! pin it explicitly. `init` never overwrites: every
-//! file that exists is reported before anything is written. Neither
-//! installs anything; that is `flick install`.
+//! file that exists is reported before anything is written, except
+//! `AGENTS.md`, which a repository keeps as it is. Neither installs
+//! anything; that is `flick install`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -65,6 +66,13 @@ const PLUGIN: [(&str, &str); 6] = [
 /// `flick run plugin` builds is the package's plugin.
 const PLUGIN_PACKAGE: &str = "[package]\nname = \"NAME\"\nversion = \"0.1.0\"\nplugin = \"plugin.wasm\"\n\n[scripts]\nplugin = [\n  \"cargo build --manifest-path plugin/Cargo.toml --features guest --target wasm32-wasip2 --release\",\n  \"cp plugin/target/wasm32-wasip2/release/CRATE.wasm plugin.wasm\",\n]\n\n";
 
+/// Guidance for coding agents: where to look Flick up and which checks to
+/// pass.
+const AGENTS: &str = include_str!("templates/AGENTS.md.template");
+
+/// What `AGENTS.md` adds for the `plugin` template.
+const PLUGIN_AGENTS: &str = "- `flick run plugin` rebuilds `plugin.wasm` after a change in `plugin/`;\n  the compiler runs the component, not the Rust sources.\n";
+
 pub struct ScaffoldCommand {
     pub dir: PathBuf,
     pub template: Template,
@@ -122,9 +130,11 @@ fn files(name: &str, template: Template) -> Vec<(&'static str, String)> {
             ".gitignore",
             "node_modules/\ndist/\n.flick/*\n!.flick/plugin-snapshots/\n".to_owned(),
         ),
+        ("AGENTS.md", AGENTS.to_owned()),
     ];
     if template == Template::Plugin {
         out[2].1.push_str("plugin/target/\n");
+        out[3].1.push_str(PLUGIN_AGENTS);
         out.extend(PLUGIN.iter().map(|(path, text)| {
             (
                 *path,
@@ -231,7 +241,7 @@ impl Command for ScaffoldCommand {
         let files = files(&name, self.template);
         let existing: Vec<Diagnostic> = files
             .iter()
-            .filter(|(path, _)| self.dir.join(path).exists())
+            .filter(|(path, _)| *path != "AGENTS.md" && self.dir.join(path).exists())
             .map(|(path, _)| {
                 Diagnostic::new(
                     codes::P019,
@@ -247,7 +257,12 @@ impl Command for ScaffoldCommand {
             };
         }
         for (path, contents) in &files {
-            if let Err(err) = write(&self.dir.join(path), contents) {
+            let target = self.dir.join(path);
+            // only `AGENTS.md` can exist here: the repository's own stays
+            if target.exists() {
+                continue;
+            }
+            if let Err(err) = write(&target, contents) {
                 return error(codes::P004, format!("cannot write `{path}`: {err}"));
             }
         }
