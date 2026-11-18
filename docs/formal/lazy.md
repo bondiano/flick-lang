@@ -103,44 +103,46 @@ A `let lazy` binding belongs to its function, as `let mut` does (`mutation.rs`, 
 - using `x` from a `fun`, a local function, a `task`, a lazy `for` or a handler arm is `FLICK-G005`. Share a lazy with `lazy { … }` instead (the help says so);
 - `x` is used only as `await x`; a bare `x` is `FLICK-T003` ("a `let lazy` is forced with `await`").
 
-Elaboration (`elaboration.md` §3.6), with the SSA threading of `let mut` (§3.5, Lean T7). The state `x$ : Eff r none (Result (Errors ε) a)` is a task that gives the outcome of the initializer. At first it is `task (attempt e)`, which runs it; after a force it is a task that gives the kept outcome back:
+Elaboration (`elaboration.md` §3.6), with the SSA threading of `let mut` (§3.5, Lean T7). The declaration makes the task of the initializer once. The state `x$ : Option (Result (Errors ε) a)` is `None` until a force, then `Some o`:
 
 ```text
-let lazy x = e in b       ⇝  let mut x$ = task (attempt e) in b′
-await x                   ⇝  let o = await x$ in x$ = task o; out o
-x = v      (lazy mut)     ⇝  let w = v in x$ = task (Ok w)           -- before or after the first force
+let lazy x = e in b       ⇝  let x$run = task (attempt e)              -- immutable, made once
+                              let mut x$ = None in b′
+await x                   ⇝  match x$ with
+                               | Some o → out o
+                               | _ → let o = await x$run in x$ = Some o; out o
+x = v      (lazy mut)     ⇝  x$ = Some (Ok v)            -- before or after the first force
 attempt e                 =  try Ok e with | err → Err err
 out o                     =  from_result o               -- the value, or the error raised again
 ```
 
-- `attempt e` runs `e` and gives its outcome. A signal of a handler or a defect leaves `await x$` before `x$` is written, so `x$` still holds `task (attempt e)` and a later `await x` runs `e` again, as the reset of §3 leaves a cell `Pending`. A defect ends the fiber, and with it the function that holds `x$`, so a defect needs no outcome.
+- `attempt e` runs `e` and gives its outcome. A signal of a handler or a defect leaves `await x$run` before `x$` is written, so `x$` stays `None` and a later `await x` runs `e` again, as the reset of §3 leaves a cell `Pending`. A defect ends the fiber, and with it the function that holds `x$`, so a defect needs no outcome.
 - These are the states of the cell of §3 without `Running`. One fiber holds `x$`, and `e` cannot read `x` (`FLICK-G005`), so nothing can find it running.
-- `e` reads the values it had at the declaration, as a `task` does. The task is made at the declaration and holds them, and `e` reads no `let mut` (`FLICK-G005`).
+- `e` reads the values it had at the declaration, as a `task` does. `x$run` is made at the declaration and holds them, and `e` reads no `let mut` (`FLICK-G005`).
 - No cell, no `Async`, no synchronization: the state is a local variable, threaded as the state of `let mut` is.
 - `let lazy mut` written before its first read never runs `e` (RFC). A write after a read replaces the cached outcome.
 
-The compiler lowers it so (`flick-core/src/ir/lower/lazy.rs`). `x$` is a `Stmt::Var` holding a `Task`, and `await x` is an `Await` of it, an assignment and `from_result`.
-- `e` is written once, at the declaration, with the names in scope there, however many `await`s run it and however deep it is in another initializer. An earlier version copied `e` at each `await`, and code grew as 2^d with the nesting depth d.
-- Once forced, the state no longer holds the initializer, so its captures are freed (O3's freeing, for free).
-- A task in the variable is the form both the reference model and the WASM budget accept:
-  - A function value in the variable is about as small, but the model rejects it under `try` and in loops: it does not thread a callable through a `let mut` there.
-  - An `Option` state with a separate local function `x$init` passes the model, but needs a `match` at each `await`. It is 952 bytes over the WASM compiler's budget (`just wasm`, 4.2 MB); the task form is 171 bytes under.
-- The cost: each `await` makes the small task `task o`. One `await` is not inlined; folding it into a plain `let` is O2b (§6).
+The compiler lowers it so (`flick-core/src/ir/lower/lazy.rs`). `x$run` is a `Stmt::Let` of a `Task`, `x$` a `Stmt::Var`, and `await x` the `match` above.
+- `e` is written once, in `x$run`, with the names in scope at the declaration, however many `await`s run it and however deep it is in another initializer. An earlier version copied `e` at each `await`, and code grew as 2^d with the nesting depth d.
+- The declaration makes one task. The first force runs it and makes `Some o`; a force after that is only a `match`, so it makes nothing, in a loop or not.
+- A task, not a function: `Await` of a task is the IR's own run of an `Eff`.
+- The task is immutable, so the model threads only data through the `let mut`. With a callable in the variable, the model rejects the program under `try` and in loops.
 
 The model translates the same IR, as for any `let mut`.
 
 Lean: the forms are blocks of `Formal/LetMut/Core.lean` (`Formal/LetMut/Lazy.lean`):
-- `lzDecl run b` is a `var` of the first state, `run = task (lzAttempt e)` (`LzSig.typ_run`);
-- `lzAwait x k` is a `let` of `await x`, a `set` of the state to `task o` and a `let` of `lzOut o`;
-- `lzWrite x v k` is a `let` of `v` and a `set` of the state to `task (Ok v)`.
+- `lzDecl run b` is a `let` of the task `run = task (lzAttempt e)` (`LzSig.typ_run`) and a `var` of `None`;
+- `lzAwait x f k` is a `br` on the state whose other arm runs `await f`, `set`s the state to `Some o` and gives `lzOut o`;
+- `lzWrite x v k` is a `set` of `Some (Ok v)`.
 
-They are derived rules of `MutOk` (`MutOk.lzDecl`, `MutOk.lzAwait`, `MutOk.lzWrite`), given the Prelude's `Result` in the signature (`LzSig`, which the witness signature has: `Elab.Witness.lzSig`). So T7, `T7_pure` and `T7_regions` hold of a block written with them. The first state is a value made at the declaration, and no `set` of another variable changes it, so the initializer reads the declaration's values.
+They are derived rules of `MutOk` (`MutOk.lzDecl`, `MutOk.lzAwait`, `MutOk.lzWrite`), given the Prelude's `Option` and `Result` in the signature (`LzSig`, which the witness signature has: `Elab.Witness.lzSig`). So T7, `T7_pure` and `T7_regions` hold of a block written with them. The task is a value made at the declaration and bound by a `let`, which no `set` changes, so the initializer reads the declaration's values.
 
 Checked by:
 - `tests/check/fail/lazy/let_lazy.fl` (G005, T003, S016);
 - on JS, TS, Go, the rt runtime and the model: `tests/run/runtime/lazy_let.fl`; `lazy_let_state.fl` (a kept error, `await` in a loop, in branches and in a `scope`, a `let lazy` in another's initializer, a write after a read); and `lazy_abort.fl` (an `abort` through the initializer);
 - the IR snapshot `ir::tests::a_let_lazy_lowers_to_a_variable_of_its_function`;
-- `ir::tests::a_let_lazy_initializer_is_lowered_once`: initializers nested three deep, each `await`ed twice, are each written once.
+- `ir::tests::a_let_lazy_initializer_is_lowered_once`: initializers nested three deep, the inner two each `await`ed twice, are each written once;
+- `ir::tests::an_await_of_a_let_lazy_makes_no_task`: the only task is the declaration's, with `await`s in a loop and in a branch.
 
 ## 5. λRT: many fibers (law R9)
 

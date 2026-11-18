@@ -4,14 +4,19 @@ import Formal.Elab.Witness.Sig
 /-!
 # The witness signature has the constructors of a `let lazy`
 
-`LzSig` holds of the signature `Sg` of the witness program, whose `Result` is the Prelude's, so the derived rules of `Formal.LetMut.Lazy` apply to a signature that exists.
+`LzSig` holds of the signature `Sg` of the witness program, whose `Option` and `Result` are the
+Prelude's, so the derived rules of `Formal.LetMut.Lazy` apply to a signature that exists.
 -/
 
 namespace Flick.Elab.Witness
 
 theorem lzSig : LzSig Sg where
+  ctorNone := rfl
+  ctorSome := rfl
   ctorErr := rfl
   ctorOk := rfl
+  resNone := sg_plain rfl
+  resSome := sg_plain rfl
   resErr := sg_plain rfl
   resOk := sg_plain rfl
   result K k ts h := by

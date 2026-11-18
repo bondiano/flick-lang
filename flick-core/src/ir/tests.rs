@@ -126,10 +126,10 @@ fn ir_makes_stages_dictionaries_and_lifts_explicit() {
     insta::assert_snapshot!(super::print(&ir));
 }
 
-/// A `let lazy` is a variable of its function: no cell. It holds the task
-/// `task (attempt e)`, and each `await` runs it, then makes it a task that
-/// gives the outcome back. A write to a `let lazy mut` makes it
-/// `task (Ok v)`.
+/// A `let lazy` is a variable of its function: no cell. The declaration makes
+/// the task `x$run = task (attempt e)` and the state `x = None`; an `await`
+/// runs the task while the state is `None` and keeps `Some o`. A write to a
+/// `let lazy mut` makes the state `Some (Ok v)`.
 #[test]
 fn a_let_lazy_lowers_to_a_variable_of_its_function() {
     let ir = lower_text(
@@ -161,6 +161,23 @@ fn a_let_lazy_initializer_is_lowered_once() {
     .expect("lowers");
     let printed = super::print(&ir);
     assert_eq!(printed.matches("App.mark 7").count(), 1, "{printed}");
+}
+
+/// Only the declaration of a `let lazy` makes a task: an `await` of it is a
+/// `match` on its state, so no force allocates one, in a loop or not.
+#[test]
+fn an_await_of_a_let_lazy_makes_no_task() {
+    let ir = lower_text(
+        "App",
+        "module App exposing (..)\n\
+         mark : Int ->{} Int\nlet mark n = n\n\
+         run : Bool ->{} Int\n\
+         let run flag =\n  let lazy x = mark 7\n  let mut sum = 0\n  \
+         for i <- [1, 2, 3] do sum = sum + i * await x\n  if flag then await x else sum\n",
+    )
+    .expect("lowers");
+    let printed = super::print(&ir);
+    assert_eq!(printed.matches("(task ").count(), 1, "{printed}");
 }
 
 #[test]

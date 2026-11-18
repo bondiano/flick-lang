@@ -9,8 +9,9 @@ use super::numeric::apply;
 use crate::ir::{Arm, Expr, ExprKind, ExprLang, Handler, Lit, Pat, Stage, Stmt};
 use crate::source::Span;
 use crate::syntax::cst::Node;
-use crate::types::StageKey;
+use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::Lang;
+use crate::types::{Constructor, StageKey, let_parts};
 
 impl Lower<'_> {
     /// An argument, or the task of one passed unstarted to a parameter
@@ -35,17 +36,19 @@ impl Lower<'_> {
         runtime_call(Lang::LazyMake, task, span)
     }
 
-    /// `task { attempt e }` of `let lazy name = e`, the first state of the
-    /// variable: `attempt e`, the outcome of `e`, is `try Ok e with | err ->
-    /// Err err`. `e` is lowered once, here, with the names in scope here,
-    /// and reads the owner of where it runs, as the task of `lazy { e }`
-    /// does. The task captures the values those names have here, which no
-    /// `let mut` of `e` can change (`FLICK-G005`).
-    pub(super) fn lazy_run(&mut self, decl: &Node, body: Option<&Node>) -> Expr {
+    /// `let lazy x = e`: the task `x$run = task (attempt e)`, made once here,
+    /// and the variable `x` of its state, `None` until an `await` keeps the
+    /// outcome as `Some o`. `attempt e`, the outcome of `e`, is `try Ok e with
+    /// | err -> Err err`. `e` is lowered once, here, with the names in scope
+    /// here, and reads the owner of where it runs, as the task of
+    /// `lazy { e }` does. The task captures the values those names have here,
+    /// which no `let mut` of `e` can change (`FLICK-G005`).
+    pub(super) fn lazy_state(&mut self, decl: &Node, stmts: &mut Vec<Stmt>) {
         let span = self.span(decl);
+        let parts = let_parts(decl, self.text);
         let key = StageKey::Task { node: decl.range() };
         self.register_owner_entry(key);
-        let init = body.map_or_else(
+        let init = (parts.body).map_or_else(
             || Expr::new(ExprKind::Lit(Lit::Unit), span),
             |b| self.expr(b),
         );
@@ -58,22 +61,33 @@ impl Lower<'_> {
             errors: vec![arm(Pat::Bind(error), result(Lang::Err, caught))],
         };
         let attempt = Expr::new(ExprKind::Handle(Box::new(attempt)), span);
-        Expr::new(
+        let run = Expr::new(
             ExprKind::Task(Box::new(self.owner_entry(key, attempt))),
             span,
-        )
+        );
+        let at = (decl.nodes().find(|n| n.kind == K::VarPat)).map_or(span.start, |n| n.range().0);
+        let unique = self.bind(&parts.name.unwrap_or_default(), at);
+        stmts.push(Stmt::Let(Pat::Bind(format!("{unique}$run")), run));
+        self.vars.insert(unique.clone());
+        let none = Constructor {
+            arity: 0,
+            ..native(Lang::None, Lang::Option)
+        };
+        stmts.push(Stmt::Var(unique, Expr::new(ExprKind::Con(none), span)));
     }
 
-    /// `await` of a `Lazy`: `lazy_force` of it; or, of a `let lazy` `x`, a
-    /// run of its state: the first time the initializer, and after that a
-    /// task that gives the outcome back, which the state becomes.
+    /// `await` of a `Lazy`: `lazy_force` of it; or, of a `let lazy` `x`, the
+    /// outcome its state keeps, or the one of a run of `x$run`, kept. Only
+    /// the first force runs anything or makes a value, `Some o`.
     ///
     /// ```text
-    /// let o = await x in x = task { o }; from_result o
+    /// from_result (match x with
+    ///   | Some o -> o
+    ///   | _ -> let o = await x$run in x = Some o; o)
     /// ```
     ///
-    /// A signal or a defect leaves `await x` before `x` is written, so `x`
-    /// still holds the initializer.
+    /// A signal or a defect leaves the `await` before `x` is written, so `x`
+    /// stays `None`.
     pub(super) fn force(&mut self, operand: Expr, span: Span, local: bool) -> ExprKind {
         // the checker read the operand of a local force as the name of a
         // `let lazy`, a variable
@@ -81,37 +95,27 @@ impl Lower<'_> {
             return runtime_call(Lang::LazyForce, operand, span);
         };
         let x = x.clone();
+        let kept = self.hidden("$kept");
         let outcome = self.hidden("$outcome");
-        let given = Expr::new(ExprKind::Local(outcome.clone()), span);
-        let stmts = vec![
+        let run = Expr::new(ExprKind::Local(format!("{x}$run")), span);
+        let local = |name: &String| Expr::new(ExprKind::Local(name.clone()), span);
+        let start = vec![
             Stmt::Let(
-                Pat::Bind(outcome),
-                Expr::new(ExprKind::Await(Box::new(operand)), span),
+                Pat::Bind(outcome.clone()),
+                Expr::new(ExprKind::Await(Box::new(run)), span),
             ),
-            Stmt::Assign(x, task(given.clone())),
+            Stmt::Assign(x.clone(), some(local(&outcome))),
         ];
-        let give = Expr::new(runtime_call(Lang::FromResult, given, span), span);
-        ExprKind::Block(stmts, Box::new(give))
+        let start = Expr::new(ExprKind::Block(start, Box::new(local(&outcome))), span);
+        let kept_pat = Pat::Con(
+            native(Lang::Some, Lang::Option),
+            vec![Pat::Bind(kept.clone())],
+        );
+        let arms = vec![arm(kept_pat, local(&kept)), arm(Pat::Wild, start)];
+        let state = Expr::new(ExprKind::Var(x), span);
+        let outcome = Expr::new(ExprKind::Match(Box::new(state), arms), span);
+        runtime_call(Lang::FromResult, outcome, span)
     }
-
-    /// `x = v` of a `let lazy mut`: the state becomes a task that gives
-    /// `Ok v`, `v` evaluated here.
-    pub(super) fn lazy_write(&mut self, value: Expr) -> Expr {
-        let span = value.span;
-        let name = self.hidden("$written");
-        let written = Expr::new(ExprKind::Local(name.clone()), span);
-        let state = task(result(Lang::Ok, written));
-        Expr::new(
-            ExprKind::Block(vec![Stmt::Let(Pat::Bind(name), value)], Box::new(state)),
-            span,
-        )
-    }
-}
-
-/// `task { body }`: a state of a `let lazy`.
-fn task(body: Expr) -> Expr {
-    let span = body.span;
-    Expr::new(ExprKind::Task(Box::new(body)), span)
 }
 
 fn arm(pat: Pat, body: Expr) -> Arm {
@@ -120,6 +124,18 @@ fn arm(pat: Pat, body: Expr) -> Arm {
         guard: None,
         body,
     }
+}
+
+/// `Some (Ok v)`: the state of a `let lazy mut` written `v`.
+pub(super) fn written(value: Expr) -> Expr {
+    some(result(Lang::Ok, value))
+}
+
+/// `Some o`: the state of a `let lazy` that keeps the outcome `o`.
+fn some(outcome: Expr) -> Expr {
+    let span = outcome.span;
+    let con = ExprKind::Con(native(Lang::Some, Lang::Option));
+    apply(Expr::new(con, span), [Box::new(outcome)], span)
 }
 
 /// `Ok arg` or `Err arg` of the Prelude's `Result`.
