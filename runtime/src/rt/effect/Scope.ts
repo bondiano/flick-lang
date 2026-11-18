@@ -8,3 +8,6 @@ export const flickAddFinalizer = (finalizer: () => unknown): unknown => addFinal
 
 export const flickAddFinalizerExit = (finalizer: (cause: unknown) => unknown): unknown =>
   addFinalizerExit((exit: Exit) => finalizer(exit.cause === undefined ? none : some(new RawCause(exit.cause))));
+
+/** What `Resource.own` adds: the finalizer sees how the owner's body ended, as Flick's `Exit`. */
+export const flickAddClose = (finalizer: (exit: Exit) => unknown): unknown => addFinalizerExit(finalizer);
