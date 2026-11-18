@@ -369,9 +369,10 @@ not extra runtime arguments:
   allows the result to retain both. In `pure`, `c` instead names the input value's
   bound. Letters are local names, not fixed meanings across all signatures.
 - `a^v` bounds the captures of the actual value passed to the callback.
-  `(forall v. a^v -> (m b)^(c + v))^c`, the shape used by `flat_map`, is a
-  **rank-2 callback**: the inner `forall` requires the callback to work for each
-  invocation's input capture row. Its returned action may retain both that input
+  `(a^v -> (m b)^(c + v))^c`, the shape used by `flat_map`, is a
+  **rank-2 callback**: `v` appears only in the callback and bounds its input, so
+  the callback binds it, as `(forall v. a^v -> (m b)^(c + v))^c` would. It
+  requires the callback to work for each invocation's input capture row. Its returned action may retain both that input
   and the callback's own captures.
 - The invocation row `v` is independent of the stored computation row `d`.
   A State action may receive state, or a Reader action its environment, only

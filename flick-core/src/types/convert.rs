@@ -18,12 +18,14 @@ use crate::syntax::literal;
 use crate::types::lang::Lang;
 
 mod arrows;
+pub(super) mod callbacks;
 mod kinds;
 mod omit;
 mod rows;
 mod set_names;
 mod sets;
 
+use callbacks::localize_callback_rows;
 pub use kinds::is_type;
 use kinds::with_article;
 use rows::{place_braces, written_none};
@@ -70,10 +72,11 @@ impl Checker<'_> {
             .iter()
             .map(|v| Binder {
                 name: v.name.clone(),
-                kind: v.kind.clone(),
+                kind: self.kinds.resolve(&v.kind),
             })
             .collect();
         self.cx.tyvars.truncate(mark);
+        let (ty, new) = localize_callback_rows(ty, new);
         let explicit = node.kind == K::ForallType && new.is_empty();
         let ty = match (new.is_empty(), ty) {
             (true, ty) => ty,

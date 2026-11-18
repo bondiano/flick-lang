@@ -6,6 +6,7 @@
 
 use std::collections::BTreeSet;
 
+use super::convert::callbacks::owner;
 use super::kinds::Kind;
 use super::lang::Lang;
 use super::regions::HOLD_NOTHING;
@@ -30,7 +31,9 @@ pub(super) fn short_form(t: &Type, store: &Store) -> Type {
                 .map(|v| (v.name.clone(), v.kind.clone()))
                 .collect();
             let short = stages(body, &mut kinds.clone(), &none);
-            let vars = if implicit(vars, constraints, body, store) {
+            // a row of the outer `forall` that a callback would take as its own
+            let stays = || vars.iter().all(|v| owner(constraints, &short, v).is_none());
+            let vars = if implicit(vars, constraints, body, store) && stays() {
                 Vec::new()
             } else {
                 vars.clone()

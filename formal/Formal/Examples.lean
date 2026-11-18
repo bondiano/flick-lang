@@ -137,7 +137,7 @@ example (L C : Name) (hC : C ≠ L) (c : TyClass) :
 def thunkTy (r : Ty) : Ty := .arrow (.base .unit) (.rt r .cnil) (.base .unit) Caps.none
 
 /-- `app : ∀ρ. (Unit →R⟨ρ;∅⟩ Unit) →R⟨ρ;∅⟩ Unit`, used at `ρ := {S}`, a service. -/
-example (S : Sig) (hop : S.op "S" "op" = some (.tail, .base .unit, .base .unit)) :
+example (S : Sig) (hS₀ : S.arity "S" = 0) (hop : S.op "S" "op" = some (.tail, .base .unit, .base .unit)) :
     Typ S [] Facts.none [] (.let_ (.lam (.app (.var 0) (.lit .unit)))
       (.app (.var 0) (.lam (.let_ (.app (.const (.perform "S" "op" .tail)) (.lit .unit)) (.lit .unit)))))
       (.ex (.base .unit) (.rt (Row.single "S") Row.none)) := by
@@ -157,7 +157,7 @@ example (S : Sig) (hop : S.op "S" "op" = some (.tail, .base .unit, .base .unit))
     · simp only [Scheme.inst, Ty.substT, thunkTy, Ty.isStage, if_true, instT, Caps.none_substT]
       exact .refl
     · refine .lam (ψ := .rt (.rnm "S" (.adt "S")) .cnil) (.let_ (a := .base .unit)
-        (.app (.perform (t := .base .unit) hop .refl) .lit
+        (.app (.perform (t := .base .unit) (us := []) hS₀.symm hop .refl) .lit
           (by rw [Stage.use_none, hS]; exact Stage.le_refl _) .refl) (by rw [Stage.use_none, hS]; exact .lit))
         (fun h => by simp [Tm.Has] at h) .refl
 

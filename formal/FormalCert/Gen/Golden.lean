@@ -209,7 +209,7 @@ theorem program8 (S : Sig) (hS : GenSig S) :
   (.task (r := .cnil) (ε := (.rnm "Fixture.Oops" (.adt "Fixture.Oops"))) (t := (.eff (.rnm "Fixture.Log" (.adt "Fixture.Log")) (.run (.rnm "Fixture.Bad" (.adt "Fixture.Bad")) (.rnm "Fixture.Oops" (.adt "Fixture.Oops"))) (.tapp (.tapp (.adt "Tuple") (.base .bool)) (.base .bool)) Caps.none)) (C := Caps.none)
     (.task (r := (.rnm "Fixture.Log" (.adt "Fixture.Log"))) (ε := (.run (.rnm "Fixture.Bad" (.adt "Fixture.Bad")) (.rnm "Fixture.Oops" (.adt "Fixture.Oops")))) (t := (.tapp (.tapp (.adt "Tuple") (.base .bool)) (.base .bool))) (C := Caps.none)
       (Cert.typ_provide (E := "Fixture.Log") (o := "log") (R := (.rcons "log" (.arrow (.base .string) (.rt .cnil .cnil) (.base .unit) Caps.none) .rnil)) (t := (.tapp (.tapp (.adt "Tuple") (.base .bool)) (.base .bool))) (r := .cnil) (ε := (.rnm "Fixture.Bad" (.adt "Fixture.Bad"))) (φ₀ := (.rt Row.none (fun x => x = .nm₀ "Fixture.Bad")))
-        ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
+        (hS.arity _ (by decide)) ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
         (.rcons (R := .rnil) trivial (by decide)
           (.lam (a := (.base .string)) (ψ := (.rt .cnil .cnil)) (t := (.base .unit)) (C := Caps.none)
             (.let_ (a := (.ref (.tapp (.adt "Prelude.Option") (.base .unit))))
@@ -262,7 +262,7 @@ theorem program8 (S : Sig) (hS : GenSig S) :
             (.app (a := (.base .string)) (ψ := .pure) (t := (.adt "Fixture.Bad")) (C := Caps.none)
               (Typ.ctor_plain S (K := "Fixture.Bad") (us := []) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl (by le_live))
               (Cert.typ_provide (E := "Fixture.Log") (o := "log") (R := (.rcons "log" (.arrow (.base .string) (.rt .cnil .cnil) (.base .unit) Caps.none) .rnil)) (t := (.base .string)) (r := .cnil) (ε := .cnil) (φ₀ := .pure)
-                ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
+                (hS.arity _ (by decide)) ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
                 (.await (r := .cnil) (ε := .cnil) (t := (.rcons "log" (.arrow (.base .string) (.rt .cnil .cnil) (.base .unit) Caps.none) .rnil)) (C := Caps.none)
                   (.task (r := .cnil) (ε := .cnil) (t := (.rcons "log" (.arrow (.base .string) (.rt .cnil .cnil) (.base .unit) Caps.none) .rnil)) (C := Caps.none)
                     (.let_ (a := (.base .unit))
@@ -332,12 +332,12 @@ theorem program9 (S : Sig) (hS : GenSig S) :
     (.tryR (r := Row.none) (ε₀ := .cnil) (H := (fun x => x = .nm₀ "Fixture.Bad" ∨ Row.none x)) (ε' := Row.none)
       (.let_ (a := (.base .unit))
         (Cert.typ_provide (E := "Fixture.Log") (o := "log") (R := (.rcons "log" (.arrow (.base .string) (.rt .cnil .cnil) (.base .unit) Caps.none) .rnil)) (t := (.base .unit)) (r := .cnil) (ε := .cnil) (φ₀ := (.rt Row.none Row.none))
-          ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
+          (hS.arity _ (by decide)) ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
           (.rcons (R := .rnil) trivial (by decide)
             (.lam (a := (.base .string)) (ψ := (.rt .cnil .cnil)) (t := (.base .unit)) (C := Caps.none)
               (.match_
                 (Cert.typ_provide (E := "Fixture.Log") (o := "log") (R := (.rcons "log" (.arrow (.base .string) (.rt .cnil .cnil) (.base .unit) Caps.none) .rnil)) (t := (.tapp (.tapp (.adt "Tuple") (.base .bool)) (.base .bool))) (r := .cnil) (ε := .cnil) (φ₀ := .pure)
-                  ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
+                  (hS.arity _ (by decide)) ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
                   (.await (r := .cnil) (ε := .cnil) (t := (.rcons "log" (.arrow (.base .string) (.rt .cnil .cnil) (.base .unit) Caps.none) .rnil)) (C := Caps.none)
                     (.task (r := .cnil) (ε := .cnil) (t := (.rcons "log" (.arrow (.base .string) (.rt .cnil .cnil) (.base .unit) Caps.none) .rnil)) (C := Caps.none)
                       (.let_ (a := (.base .unit))
@@ -383,7 +383,7 @@ theorem program9 (S : Sig) (hS : GenSig S) :
         (.match_
           (.proj (R := (.rcons "a" (.tapp (.tapp (.adt "Tuple") (.tapp (.tapp (.adt "Tuple") (.base .int)) (.base .string))) (.tapp (.adt "Prelude.Option") (.base .unit))) (.rcons "b" (.adt "Fixture.Shape") .rnil))) (t := (.tapp (.tapp (.adt "Tuple") (.tapp (.tapp (.adt "Tuple") (.base .int)) (.base .string))) (.tapp (.adt "Prelude.Option") (.base .unit))))
             (Cert.typ_provide (E := "Fixture.Counter") (o := "next") (R := (.rcons "next" (.arrow (.base .unit) (.rt .cnil .cnil) (.base .int) Caps.none) .rnil)) (t := (.rcons "a" (.tapp (.tapp (.adt "Tuple") (.tapp (.tapp (.adt "Tuple") (.base .int)) (.base .string))) (.tapp (.adt "Prelude.Option") (.base .unit))) (.rcons "b" (.adt "Fixture.Shape") .rnil))) (r := .cnil) (ε := .cnil) (φ₀ := (.rt Row.none Row.none))
-              ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
+              (hS.arity _ (by decide)) ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
               (.rcons (R := .rnil) trivial (by decide)
                 (.lam (a := (.base .unit)) (ψ := (.rt .cnil .cnil)) (t := (.base .int)) (C := Caps.none)
                   (.let_ (a := (.base .unit))
@@ -1032,7 +1032,7 @@ theorem program20 (S : Sig) (hS : GenSig S) :
   (.task (r := (.run (.rnm "Fixture.Counter" (.adt "Fixture.Counter")) (.rnm "Fixture.Log" (.adt "Fixture.Log")))) (ε := (.run (.rnm "Fixture.Bad" (.adt "Fixture.Bad")) (.rnm "Fixture.Oops" (.adt "Fixture.Oops")))) (t := (.arrow (.base .string) .pure (.adt "Fixture.Shape") Caps.none)) (C := Caps.none)
     (.match_
       (Cert.typ_provide (E := "Fixture.Counter") (o := "next") (R := (.rcons "next" (.arrow (.base .unit) (.rt .cnil .cnil) (.base .int) Caps.none) .rnil)) (t := (.tapp (.tapp (.adt "Tuple") (.base .unit)) (.base .string))) (r := .cnil) (ε := .cnil) (φ₀ := .pure)
-        ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
+        (hS.arity _ (by decide)) ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
         (.rcons (R := .rnil) trivial (by decide)
           (.lam (a := (.base .unit)) (ψ := (.rt .cnil .cnil)) (t := (.base .int)) (C := Caps.none)
             .lit
@@ -1260,12 +1260,12 @@ theorem program23 (S : Sig) (hS : GenSig S) :
         (by stage_le) (by le_live))
       (.acons (.adt (.app (.app (PatTy.head_plain S (K := "Tuple") (ts := [(.tvar 0), (.tvar 1)]) (T := "Tuple") (us := [(.tapp (.tapp (.adt "Tuple") (.base .int)) (.adt "Fixture.Shape")), (.tapp (.adt "Prelude.Option") (.base .unit))]) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl) .var) .var) rfl)
       (Cert.typ_provide (E := "Fixture.Log") (o := "log") (R := (.rcons "log" (.arrow (.base .string) (.rt .cnil .cnil) (.base .unit) Caps.none) .rnil)) (t := (.eff (.rnm "Fixture.Log" (.adt "Fixture.Log")) (.run (.rnm "Fixture.Bad" (.adt "Fixture.Bad")) (.rnm "Fixture.Oops" (.adt "Fixture.Oops"))) (.adt "Prelude.JsValue") Caps.none)) (r := .cnil) (ε := .cnil) (φ₀ := .pure)
-        ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
+        (hS.arity _ (by decide)) ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
         (.await (r := (.rnm "Fixture.Log" (.adt "Fixture.Log"))) (ε := (.rnm "Fixture.Bad" (.adt "Fixture.Bad"))) (t := (.rcons "log" (.arrow (.base .string) (.rt .cnil .cnil) (.base .unit) Caps.none) .rnil)) (C := Caps.none)
           (.task (r := (.rnm "Fixture.Log" (.adt "Fixture.Log"))) (ε := (.rnm "Fixture.Bad" (.adt "Fixture.Bad"))) (t := (.rcons "log" (.arrow (.base .string) (.rt .cnil .cnil) (.base .unit) Caps.none) .rnil)) (C := Caps.none)
             (.let_ (a := (.base .unit))
               (Cert.typ_provide (E := "Fixture.Counter") (o := "next") (R := (.rcons "next" (.arrow (.base .unit) (.rt .cnil .cnil) (.base .int) Caps.none) .rnil)) (t := (.base .unit)) (r := .cnil) (ε := .cnil) (φ₀ := .pure)
-                ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
+                (hS.arity _ (by decide)) ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
                 (.await (r := (.rnm "Fixture.Log" (.adt "Fixture.Log"))) (ε := (.rnm "Fixture.Bad" (.adt "Fixture.Bad"))) (t := (.rcons "next" (.arrow (.base .unit) (.rt .cnil .cnil) (.base .int) Caps.none) .rnil)) (C := Caps.none)
                   (.task (r := (.rnm "Fixture.Log" (.adt "Fixture.Log"))) (ε := (.rnm "Fixture.Bad" (.adt "Fixture.Bad"))) (t := (.rcons "next" (.arrow (.base .unit) (.rt .cnil .cnil) (.base .int) Caps.none) .rnil)) (C := Caps.none)
                     (.let_ (a := (.base .unit))
@@ -1284,7 +1284,7 @@ theorem program23 (S : Sig) (hS : GenSig S) :
                         (.acons (.adt (.app (PatTy.head_plain S (K := "Prelude.Some") (ts := [(.tvar 0)]) (T := "Prelude.Option") (us := [(.base .string)]) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl) .var) rfl)
                         (.let_ (a := (.base .unit))
                           (.app (a := (.base .string)) (ψ := (.rt (.rnm "Fixture.Log" (.adt "Fixture.Log")) .cnil)) (t := (.base .unit)) (C := Caps.none)
-                            (Cert.typ_op (E := "Fixture.Log") (o := "log") ((hS.op _ _ (by decide)).trans rfl) (by le_live))
+                            (Cert.typ_op (E := "Fixture.Log") (o := "log") (hS.arity _ (by decide)) ((hS.op _ _ (by decide)).trans rfl) (by le_live))
                             (Cert.typ_var (ts := []) (T' := (.base .string)) rfl rfl (by holds) (by inst_le) (by le_live))
                             (by stage_le) (by le_live))
                           (.match_
@@ -1319,7 +1319,7 @@ theorem program23 (S : Sig) (hS : GenSig S) :
                         (.lam (a := (.base .unit)) (ψ := (.rt .cnil .cnil)) (t := (.base .int)) (C := Caps.none)
                           (.await (r := .cnil) (ε := .cnil) (t := (.base .int)) (C := Caps.none)
                             (Cert.typ_provide (E := "Fixture.Counter") (o := "next") (R := (.rcons "next" (.arrow (.base .unit) (.rt .cnil .cnil) (.base .int) Caps.none) .rnil)) (t := (.eff .cnil .cnil (.base .int) Caps.none)) (r := .cnil) (ε := .cnil) (φ₀ := .pure)
-                              ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
+                              (hS.arity _ (by decide)) ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
                               (.await (r := .cnil) (ε := .cnil) (t := (.rcons "next" (.arrow (.base .unit) (.rt .cnil .cnil) (.base .int) Caps.none) .rnil)) (C := Caps.none)
                                 (.task (r := .cnil) (ε := .cnil) (t := (.rcons "next" (.arrow (.base .unit) (.rt .cnil .cnil) (.base .int) Caps.none) .rnil)) (C := Caps.none)
                                   (.let_ (a := (.base .unit))
@@ -1526,7 +1526,7 @@ theorem program26 (S : Sig) (hS : GenSig S) :
                   (Cert.typ_var (ts := []) (T' := (.arrow (.tapp (.tapp (.adt "Tuple") (.adt "Fixture.Shape")) (.base .bool)) .pure (.adt "Prelude.JsValue") Caps.none)) rfl rfl (by holds) (by inst_le) (by le_live)))
                 (by stage_le) (by le_live))
               (Cert.typ_provide (E := "Fixture.Log") (o := "log") (R := (.rcons "log" (.arrow (.base .string) (.rt .cnil .cnil) (.base .unit) Caps.none) .rnil)) (t := (.rcons "a" (.adt "Fixture.Shape") (.rcons "b" (.base .unit) .rnil))) (r := .cnil) (ε := .cnil) (φ₀ := .pure)
-                ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
+                (hS.arity _ (by decide)) ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
                 (.await (r := .cnil) (ε := .cnil) (t := (.rcons "log" (.arrow (.base .string) (.rt .cnil .cnil) (.base .unit) Caps.none) .rnil)) (C := Caps.none)
                   (.task (r := .cnil) (ε := .cnil) (t := (.rcons "log" (.arrow (.base .string) (.rt .cnil .cnil) (.base .unit) Caps.none) .rnil)) (C := Caps.none)
                     (.let_ (a := (.base .unit))
@@ -1989,7 +1989,7 @@ theorem program31 (S : Sig) (hS : GenSig S) :
       (.ex (.arrow (.base .unit) (.rt .cnil (.run (.rnm "Fixture.Bad" (.adt "Fixture.Bad")) (.rnm "Fixture.Oops" (.adt "Fixture.Oops")))) (.arrow (.tapp (.tapp (.adt "Tuple") (.adt "Fixture.Shape")) (.base .bool)) (.rt (.rnm "Fixture.Counter" (.adt "Fixture.Counter")) (.run (.rnm "Fixture.Bad" (.adt "Fixture.Bad")) (.rnm "Fixture.Oops" (.adt "Fixture.Oops")))) (.tapp (.adt "Prelude.Option") (.base .unit)) Caps.none) Caps.none) .pure) :=
   (.lam (a := (.base .unit)) (ψ := (.rt .cnil (.run (.rnm "Fixture.Bad" (.adt "Fixture.Bad")) (.rnm "Fixture.Oops" (.adt "Fixture.Oops"))))) (t := (.arrow (.tapp (.tapp (.adt "Tuple") (.adt "Fixture.Shape")) (.base .bool)) (.rt (.rnm "Fixture.Counter" (.adt "Fixture.Counter")) (.run (.rnm "Fixture.Bad" (.adt "Fixture.Bad")) (.rnm "Fixture.Oops" (.adt "Fixture.Oops")))) (.tapp (.adt "Prelude.Option") (.base .unit)) Caps.none)) (C := Caps.none)
     (Cert.typ_provide (E := "Fixture.Counter") (o := "next") (R := (.rcons "next" (.arrow (.base .unit) (.rt .cnil .cnil) (.base .int) Caps.none) .rnil)) (t := (.arrow (.tapp (.tapp (.adt "Tuple") (.adt "Fixture.Shape")) (.base .bool)) (.rt (.rnm "Fixture.Counter" (.adt "Fixture.Counter")) (.run (.rnm "Fixture.Bad" (.adt "Fixture.Bad")) (.rnm "Fixture.Oops" (.adt "Fixture.Oops")))) (.tapp (.adt "Prelude.Option") (.base .unit)) Caps.none)) (r := .cnil) (ε := .cnil) (φ₀ := .pure)
-      ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
+      (hS.arity _ (by decide)) ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
       (.rcons (R := .rnil) trivial (by decide)
         (.lam (a := (.base .unit)) (ψ := (.rt .cnil .cnil)) (t := (.base .int)) (C := Caps.none)
           (.let_ (a := (.ref (.adt "Prelude.JsValue")))

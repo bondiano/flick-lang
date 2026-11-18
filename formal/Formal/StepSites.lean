@@ -109,18 +109,19 @@ theorem kept_has {q ℓ : Nat} {Ef o : Name} {al b v : Tm} {Ei : List Frame} {s 
     (h : (Tm.hkarm q ℓ Ef al (b.subst (inst [v])) (plug Ei (.hole q))).Has s) :
     (Tm.hkeep q ℓ Ef al (plug Ei (.app (.const (.perform Ef o .tail)) v))).Has s := by
   simp only [Tm.Has] at h ⊢
-  rcases h with h | h | h | h | h
+  rcases h with h | h | h | h | h | h
   · exact .inl h
   · exact .inr (.inl h)
   · exact .inr (.inr (.inl h))
   · rcases subst_inst_has h with h | ⟨w, hw, h⟩
     · exact .inr (.inr (.inl (Tm.armOf_has ha h)))
-    · simp at hw; rw [hw] at h; exact .inr (.inr (.inr (plug_has _ (.inr h))))
+    · simp at hw; rw [hw] at h; exact .inr (.inr (.inr (.inl (plug_has _ (.inr h)))))
   · rcases plug_has_iff.mp h with h | h
-    · exact .inr (.inr (.inr (plug_has_iff.mpr (.inl h))))
+    · exact .inr (.inr (.inr (.inl (plug_has_iff.mpr (.inl h)))))
     · simp only [Tm.Has] at h
       rcases h with h | h
       · exact .inl h
       · exact .inr (.inl h)
+  · exact .inr (.inr (.inr (.inr h)))
 
 end Flick

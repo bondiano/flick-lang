@@ -19,7 +19,7 @@ def Blocks (Λ : List Rgn) (r : Tm) : Prop :=
       (∃ t, r = .app (.app (.const .addFin) (.own p)) t) ∨
       (∃ t, r = .app (.app (.const .spawn) (.own p)) t) ∨ (∃ w, r = .inside p w ∧ Final w) ∨
       ∃ ℓ Ef al Ei o v, r = .hkeep p ℓ Ef al (plug Ei (.app (.const (.perform Ef o .tail)) v)) ∧
-        OkE Ei ∧ ∀ G ∈ Ei, G.handles Ef o .tail = none)
+        OkE Ei ∧ ∀ G ∈ Ei, G.handles Ef o = none)
 
 /-- A term whose redex blocks. -/
 def Blocked (Λ : List Rgn) (e : Tm) : Prop := ∃ E r, OkE E ∧ e = plug E r ∧ Blocks Λ r
@@ -28,12 +28,24 @@ def Blocked (Λ : List Rgn) (e : Tm) : Prop := ∃ E r, OkE E ∧ e = plug E r �
 def RootAnswers (root : Roots) (Ef o : Name) (c : OpClass) : Prop :=
   c = .tail ∧ ∃ w f, root.svc Ef = some w ∧ w.field o = some f
 
-/-- An operation of a declared effect that no handler of its context and no root answers; `D`
-must hold its effect. -/
+/-- An operation of a declared effect that is not `tail`, whose nearest handler is a kept one:
+a child does not run its arm, so the operation is stuck at that frame. -/
+def KeptStuck (S : Sig) (e : Tm) : Prop :=
+  ∃ E Ei q ℓ Ef al o c v a b, OkE E ∧ OkE Ei ∧ Value v ∧ S.op Ef o = some (c, a, b) ∧ c ≠ .tail ∧
+    (al.armOf o).isSome ∧ (∀ G ∈ Ei, G.handles Ef o = none) ∧
+    e = plug E (.hkeep q ℓ Ef al (plug Ei (.app (.const (.perform Ef o c)) v)))
+
+/-- An operation of a declared effect that no handler of its context and no root answers, where
+`D` holds its effect at some arguments, or that is stuck at a kept handler. -/
 def PerformStuck (S : Sig) (root : Roots) (e : Tm) (D : Row) : Prop :=
-  ∃ E Ef o c v a b, OkE E ∧ Value v ∧ e = plug E (.app (.const (.perform Ef o c)) v) ∧
-    S.op Ef o = some (c, a, b) ∧ (∀ F ∈ E, F.handles Ef o c = none) ∧ ¬ RootAnswers root Ef o c ∧
-    D (.nm₀ Ef)
+  (∃ E Ef o c v a b, OkE E ∧ Value v ∧ e = plug E (.app (.const (.perform Ef o c)) v) ∧
+    S.op Ef o = some (c, a, b) ∧ (∀ F ∈ E, F.handles Ef o = none) ∧ ¬ RootAnswers root Ef o c ∧
+    ∃ c, D (.nm Ef c)) ∨ KeptStuck S e
+
+theorem KeptStuck.frame {e : Tm} (h : KeptStuck S e) {F : Frame} (hF : F.ok) : KeptStuck S (F.plug e) := by
+  obtain ⟨E, Ei, q, ℓ, Ef, al, o, c, v, a, b, hE, hEi, hv, hop, hc, ha, hh, rfl⟩ := h
+  exact ⟨E ++ [F], Ei, q, ℓ, Ef, al, o, c, v, a, b, hE.append hF, hEi, hv, hop, hc, ha, hh,
+    by rw [plug_append]; rfl⟩
 
 /-- The non-value outcomes of Progress: `raise v`, a step, an operation nothing answers, a
 redex that blocks, or unwinding to a handler. -/
@@ -77,7 +89,7 @@ theorem live_or_dead (Λ : List Rgn) (p : Nat) :
 
 /-- A `tail` operation a kept handler answers steps while its region is live. -/
 theorem kept_answer {root Λ μ q ℓ Ef al E o v b} (hE : OkE E)
-    (hh : ∀ G ∈ E, G.handles Ef o .tail = none) (hb : al.armOf o = some b) (hv : Value v) :
+    (hh : ∀ G ∈ E, G.handles Ef o = none) (hb : al.armOf o = some b) (hv : Value v) :
     (∃ l' o', Step root l' Λ μ (.hkeep q ℓ Ef al (plug E (.app (.const (.perform Ef o .tail)) v))) o') ∨
       Blocked Λ (.hkeep q ℓ Ef al (plug E (.app (.const (.perform Ef o .tail)) v))) := by
   rcases live_or_dead Λ q with ⟨g, hg, hl⟩ | hd
@@ -87,11 +99,11 @@ theorem kept_answer {root Λ μ q ℓ Ef al E o v b} (hE : OkE E)
 
 /-- An operation of `Σ₀` under one more frame: that frame may be its handler. -/
 theorem Step.frame_root {root Λ μ E Ef o v w f} {F : Frame} (hF : F.ok) (hE : OkE E)
-    (hh : ∀ G ∈ E, G.handles Ef o .tail = none) (hr : root.svc Ef = some w) (hf : w.field o = some f)
+    (hh : ∀ G ∈ E, G.handles Ef o = none) (hr : root.svc Ef = some w) (hf : w.field o = some f)
     (hv : Value v) :
     (∃ l' o', Step root l' Λ μ (F.plug (plug E (.app (.const (.perform Ef o .tail)) v))) o') ∨
       Blocked Λ (F.plug (plug E (.app (.const (.perform Ef o .tail)) v))) := by
-  cases hF' : F.handles Ef o .tail with
+  cases hF' : F.handles Ef o with
   | none =>
     have := Step.performRoot (root := root) (Λ := Λ) (μ := μ) (hE.append hF) (fun G hG => by
       rcases List.mem_append.mp hG with hG | hG
@@ -112,7 +124,7 @@ theorem Step.frame_root {root Λ μ E Ef o v w f} {F : Frame} (hF : F.ok) (hE : 
       simp only [Frame.handles] at hF'
       split at hF'
       · rename_i hc
-        obtain ⟨-, rfl, hs⟩ := hc
+        obtain ⟨rfl, hs⟩ := hc
         obtain ⟨b', hb'⟩ := Option.isSome_iff_exists.mp hs
         exact kept_answer hE hh hb' hv
       · cases hF'
@@ -170,21 +182,23 @@ theorem Blocked.frame {Λ e} (h : Blocked Λ e) {F : Frame} (hF : F.ok) : Blocke
 
 /-- An operation the frame around handles steps; one it does not stays stuck. -/
 theorem PerformStuck.frame {root Λ μ e D D'} (h : PerformStuck S root e D) {F : Frame} (hF : F.ok)
-    (hD : ∀ N : Name, D (.nm₀ N) → F.dom (.nm₀ N) ∨ D' (.nm₀ N))
-    (hpart : ∀ N o c, (∃ a b, S.op N o = some (c, a, b)) → F.installs N → F.handles N o c = none →
-      D (.nm₀ N) → D' (.nm₀ N)) :
+    (hD : ∀ (N : Name) cl, D (.nm N cl) → F.dom (.nm N cl) ∨ D' (.nm N cl))
+    (hpart : ∀ N o c cl, (∃ a b, S.op N o = some (c, a, b)) → F.installs N → F.handles N o = none →
+      D (.nm N cl) → ∃ cl', D' (.nm N cl')) :
     (∃ l o, Step root l Λ μ (F.plug e) o) ∨ PerformStuck S root (F.plug e) D' ∨ Blocked Λ (F.plug e) := by
-  obtain ⟨E, Ef, o, c, v, a, b, hE, hv, rfl, hop, hh, hna, hN⟩ := h
-  cases hF' : F.handles Ef o c with
+  obtain ⟨E, Ef, o, c, v, a, b, hE, hv, rfl, hop, hh, hna, cl, hN⟩ | h := h
+  rotate_left
+  · exact .inr (.inl (.inr (h.frame hF)))
+  cases hF' : F.handles Ef o with
   | none =>
-    refine .inr (.inl ⟨E ++ [F], Ef, o, c, v, a, b, hE.append hF, hv, by rw [plug_append]; rfl, hop,
-      fun G hG => ?_, hna, ?_⟩)
+    refine .inr (.inl (.inl ⟨E ++ [F], Ef, o, c, v, a, b, hE.append hF, hv, by rw [plug_append]; rfl, hop,
+      fun G hG => ?_, hna, ?_⟩))
     · rcases List.mem_append.mp hG with hG | hG
       · exact hh G hG
       · simp at hG; subst hG; exact hF'
-    · rcases hD _ hN with h | h
-      · exact hpart Ef o c ⟨a, b, hop⟩ h hF' hN
-      · exact h
+    · rcases hD _ _ hN with h | h
+      · exact hpart Ef o c cl ⟨a, b, hop⟩ h hF' hN
+      · exact ⟨cl, h⟩
   | some p =>
     cases F with
     | hwith p' ℓ' E' al r =>
@@ -203,19 +217,24 @@ theorem PerformStuck.frame {root Λ μ e D D'} (h : PerformStuck S root e D) {F 
       simp only [Frame.handles] at hF'
       split at hF'
       · rename_i hc
-        obtain ⟨rfl, rfl, hs⟩ := hc
-        obtain ⟨b', hb'⟩ := Option.isSome_iff_exists.mp hs
-        exact (kept_answer hE hh hb' hv).imp id .inr
+        obtain ⟨rfl, hs⟩ := hc
+        by_cases ht : c = .tail
+        · subst ht
+          obtain ⟨b', hb'⟩ := Option.isSome_iff_exists.mp hs
+          exact (kept_answer hE hh hb' hv).imp id .inr
+        · exact .inr (.inl (.inr ⟨[], E, q', ℓ', E', al, o, c, v, a, b, OkE.nil, hE, hv, hop, ht, hs, hh,
+            rfl⟩))
       · cases hF'
     | _ => simp [Frame.handles] at hF'
 
 /-- Lift the non-value outcomes over a frame that is neither `try` nor `inside`. -/
 theorem NV.frame {root Λ μ e D D'} (h : NV S root Λ μ e D) {F : Frame} (hF : F.ok)
-    (hnt : ¬ F.isTry) (hni : ¬ F.isInside) (hD : ∀ N : Name, D (.nm₀ N) → F.dom (.nm₀ N) ∨ D' (.nm₀ N))
+    (hnt : ¬ F.isTry) (hni : ¬ F.isInside)
+    (hD : ∀ (N : Name) cl, D (.nm N cl) → F.dom (.nm N cl) ∨ D' (.nm N cl))
     (hk : F.Parks := by trivial)
-    (hpart : ∀ N o c, (∃ a b, S.op N o = some (c, a, b)) → F.installs N →
-      F.handles N o c = none → D (.nm₀ N) → D' (.nm₀ N) := by
-      intro N o _ _ h; simp [Frame.installs] at h) :
+    (hpart : ∀ N o c cl, (∃ a b, S.op N o = some (c, a, b)) → F.installs N →
+      F.handles N o = none → D (.nm N cl) → ∃ cl', D' (.nm N cl') := by
+      intro N o _ _ _ h; simp [Frame.installs] at h) :
     NV S root Λ μ (F.plug e) D' := by
   cases h with
   | raise h =>
@@ -260,6 +279,6 @@ theorem NV.frame {root Λ μ e D D'} (h : NV S root Λ μ e D) {F : Frame} (hF :
 /-- The common case: the frame keeps the stage. -/
 theorem NV.frame' {root Λ μ e D} (h : NV S root Λ μ e D) {F : Frame} (hF : F.ok)
     (hnt : ¬ F.isTry) (hni : ¬ F.isInside) (hk : F.Parks := by trivial) : NV S root Λ μ (F.plug e) D :=
-  h.frame hF hnt hni (fun _ h => .inr h) hk (fun _ _ _ _ _ _ h => h)
+  h.frame hF hnt hni (fun _ _ h => .inr h) hk (fun _ _ _ cl _ _ _ h => ⟨cl, h⟩)
 
 end Flick

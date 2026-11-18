@@ -148,7 +148,7 @@ theorem LNest.resume {c : Cfg} {home i E p ℓh κ Ef al rf u} {A Ei : List Fram
 regions of the place of the handler and the new region. -/
 theorem LNest.hdl {c : Cfg} {home i E Ef al rf e₀} {X : List Ty} (hn : LNest Ψ c anc home)
     (hi : c.at i = some (plug E (.hdl Ef al rf e₀))) (hE : OkE E)
-    (hcell : ∃ r ε t, (Ψ ++ X)[c.mem.length]? = some (.arrow (.base .unit) (.rt r ε) t Caps.none) ∧
+    (hcell : ∃ u r ε t, (Ψ ++ X)[c.mem.length]? = some (.arrow u (.rt r ε) t Caps.none) ∧
       ∀ x, r.asRow (.atm (.r x)) → holeE (baseOf anc i) E x ∨ x = c.rgs.length) :
     ∃ anc' home', LNest (Ψ ++ X) ((⟨c.rgs ++ [Rgn.new], c.mem ++ [.lam .todo], c.main⟩ : Cfg).put i
       (plug E (.inside c.rgs.length (.hwith c.rgs.length c.mem.length Ef al rf e₀)))) anc' home' ∧
@@ -165,7 +165,7 @@ theorem LNest.hdl {c : Cfg} {home i E Ef al rf e₀} {X : List Ty} (hn : LNest �
   obtain ⟨-, hrW⟩ := fw_of_plug (by intro h; cases h) hE (hn'.thread i _ hi').1
   have hnr : (Tm.hdl Ef al rf e₀).NoIns := by
     simp only [Tm.NoIns, Tm.Has, not_or]; exact ⟨hrW.2.2.2.1, hrW.2.2.2.2.1, hrW.2.2.2.2.2⟩
-  obtain ⟨r, ε, t, hℓ, hr⟩ := hcell
+  obtain ⟨u, r, ε, t, hℓ, hr⟩ := hcell
   refine hn'.fresh hi' hE (by intro h; cases h) hnr (fun q h => ?_) fun anc' ha _ => ?_
   · simp only [Tm.Has] at h
     rcases h with h | h | h | h | h
@@ -176,6 +176,6 @@ theorem LNest.hdl {c : Cfg} {home i E Ef al rf e₀} {X : List Ty} (hn : LNest �
     · exact hrW.2.2.2.2.2.frame q h
   · exact ⟨.inr rfl, Tm.Fw.of_noIns hrW.2.2.2.1, Tm.Fw.of_noIns hrW.2.2.2.2.1,
       Tm.Fw.of_noIns hrW.2.2.2.2.2, hrW.2.2.2.1, hrW.2.2.2.2.1, fun x => by rw [ha],
-      r, ε, t, hℓ, fun x hx => by rw [ha]; exact hr x hx⟩
+      u, r, ε, t, hℓ, fun x hx => by rw [ha]; exact hr x hx⟩
 
 end Flick

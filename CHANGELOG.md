@@ -19,6 +19,17 @@ break programs.
   file of a module whose name ends in `_test` no longer drops out of the
   build.
 
+- **Callback binders of capture rows may be left out.** A capture row of a
+  signature, `^v`, that only one callback mentions, not on the callback's
+  own qualifier, and that bounds a parameter of it is bound on that
+  callback: `(a^v -> (m b)^(c + v))^c -> (m a)^d -> (m b)^(c + d)` means
+  `(forall v. a^v -> (m b)^(c + v))^c -> …`, so a body may give the callback
+  what it holds. Before, such a row was quantified over the whole signature,
+  where only the caller chose it. A row mentioned anywhere else keeps its
+  meaning, and a region binder `forall t.` is still written. Prelude, `Option`,
+  `Result`, `Seq`, `Validation` and the `mtl` example drop their written
+  `forall v.`; their types and interfaces are unchanged.
+
 - **Breaking: `suite` and `test` blocks.** `suite "name" { … }` holds
   `test "name" { body }` and nested suites, and a top-level `test "name" {
   … }` stands alone; either may be `.skip` or `.only`. Std's plugin expands
