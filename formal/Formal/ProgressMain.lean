@@ -90,7 +90,7 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
     intro hμ hΓ _ _ hJ; cases hJ; subst hΓ
     rcases ih₁ (by simpa using hμ) rfl rfl with hv | hn
     · exact step (Step.ofP (.let_ hv))
-    · exact .inr (hn.frame (F := .let_ _) trivial (nt id) (ni id) fun _ h => h.elim)
+    · exact .inr (hn.frame (F := .let_ _) trivial (nt id) (ni id) fun _ _ h => h.elim)
   | let_ _ _ ih₁ _ =>
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih₁ hμ hΓ rfl with hv | hn
@@ -282,13 +282,12 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
         · exact .inl (Frame.provides_nm h'))
       (hpart := fun N o c _ ⟨a, b, hop⟩ hN hh _ => ?_))
     cases hN
-    refine ⟨_, hr _ ?_⟩
     by_cases hct : c = .tail
     · subst hct
-      exact hc.2 fun hcomp => by
+      exact ⟨_, hr _ (hc.2 fun hcomp => by
         have h₁ := hcomp o _ a b hop
-        simp [Frame.handles, h₁] at hh
-    · exact hnt ⟨o, c, a, b, hop, hct⟩
+        simp [Frame.handles, h₁] at hh)⟩
+    · exact ⟨_, hr _ (hnt ⟨o, c, a, b, hop, hct⟩)⟩
   | hkarm _ _ _ _ hE hk _ _ _ _ _ _ hle hφ _ _ _ ih =>
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih hμ hΓ rfl with hv | hn
@@ -302,6 +301,6 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
     rcases ih hμ hΓ rfl with hv | hn
     · exact step (Step.ofP (.hdoneVal hv))
     · exact .inr (hn.frame (F := .hdone _) trivial (nt id) (ni id)
-        (fun N h => .inr (Stage.use_svc_nm h)))
+        (fun _ _ h => .inr (Stage.use_svc_nm h)))
 
 end Flick
