@@ -179,10 +179,17 @@ fn execute(
             }
         }
     };
+    // what the tool started ends with it, and with it the pipes it holds
+    end_group(&child);
     if status.success() {
         return Ok(());
     }
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while tails.iter().any(|t| !t.is_finished()) && Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(10));
+    }
     let output: Vec<String> = (tails.into_iter())
+        .filter(thread::JoinHandle::is_finished)
         .map(|t| t.join().unwrap_or_default())
         .map(|bytes| String::from_utf8_lossy(&bytes).trim_end().to_owned())
         .filter(|text| !text.is_empty())
@@ -212,7 +219,20 @@ fn tail(stream: Option<Box<dyn Read + Send>>) -> thread::JoinHandle<Vec<u8>> {
     })
 }
 
+/// Ends what is left of the process group of a tool that has exited.
+fn end_group(child: &Child) {
+    #[cfg(unix)]
+    {
+        use rustix::process::{Pid, Signal, kill_process_group};
+        let _ = kill_process_group(Pid::from_child(child), Signal::KILL);
+    }
+    // shortcut: no process groups off Unix, so a descendant of a tool may outlive it; end it through a job object if a Windows host needs that
+    #[cfg(not(unix))]
+    let _ = child;
+}
+
 /// Asks the tool's process group to end, and ends it after two seconds.
+/// Off Unix only the tool itself ends (see [`end_group`]).
 fn stop(child: &mut Child) {
     #[cfg(unix)]
     {

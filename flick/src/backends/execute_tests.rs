@@ -14,7 +14,8 @@ use crate::backends::tools::Tool;
 use crate::backends::tools::tests::script;
 use crate::{artifact, component};
 
-/// A fake `node`: `copy IN OUT`, `fail OUT`, `link OUT`, `wait PIDFILE`.
+/// A fake `node`: `copy IN OUT`, `fail OUT`, `link OUT`, `wait PIDFILE`,
+/// `orphan PIDFILE`, which fails and leaves a child holding its output.
 const NODE: &str = r#"#!/bin/sh
 case "$1" in
 --version) echo v1.0.0 ;;
@@ -22,6 +23,7 @@ copy) cat "$2" > "$3" ;;
 fail) echo partial > "$2"; echo boom >&2; exit 3 ;;
 link) ln -s /etc/hostname "$2" ;;
 wait) sleep 30 & echo $! > "$2"; wait ;;
+orphan) sleep 30 & echo $! > "$2"; echo boom >&2; exit 3 ;;
 esac
 "#;
 
@@ -123,6 +125,7 @@ fn a_step_sees_its_declared_inputs_and_gives_its_declared_outputs() {
             &token(),
         )
         .unwrap_or_else(|_| panic!("the step runs"));
+    assert_eq!(made.len(), 1);
     assert_eq!(made[0].path, "a.out");
     assert_eq!(made[0].contents, b"from an artifact");
     let side = case
@@ -136,6 +139,7 @@ fn a_step_sees_its_declared_inputs_and_gives_its_declared_outputs() {
             &token(),
         )
         .unwrap_or_else(|_| panic!("the step runs"));
+    assert_eq!(side.len(), 1);
     assert_eq!(side[0].contents, b"from a side input");
     let undeclared = case.run(
         vec![step(&pin, &["copy", "src/a.txt", "c.out"], vec![], "c.out")],
@@ -181,7 +185,9 @@ fn cancellation_ends_the_tool_and_what_it_started() {
     let stopper = cancel.clone();
     let watched = pid_file.clone();
     let canceller = thread::spawn(move || {
-        while !watched.exists() || fs::read_to_string(&watched).is_ok_and(|p| p.trim().is_empty()) {
+        let deadline = Instant::now() + Duration::from_secs(30);
+        while !fs::read_to_string(&watched).is_ok_and(|p| !p.trim().is_empty()) {
+            assert!(Instant::now() < deadline, "the step started its child");
             thread::sleep(Duration::from_millis(10));
         }
         stopper.cancel();
@@ -209,5 +215,41 @@ fn cancellation_ends_the_tool_and_what_it_started() {
     }
     assert!(!alive(&pid), "the tool's own child ends too");
     assert!(case.clean());
+    fs::remove_dir_all(&case.root).expect("cleanup");
+}
+
+#[test]
+fn a_failed_step_returns_although_its_child_keeps_the_output_open() {
+    let case = case("orphan");
+    let pid_file = case.root.join("orphan.pid");
+    let pin = case.tool.pin.clone();
+    let started = Instant::now();
+    let path = pid_file.to_string_lossy().into_owned();
+    let result = case.run(
+        vec![step(&pin, &["orphan", &path], vec![], "a.out")],
+        &token(),
+    );
+    assert!(
+        started.elapsed() < Duration::from_secs(10),
+        "{:?}",
+        started.elapsed()
+    );
+    let Err(Failure::Step(why)) = result else {
+        panic!("a failed step");
+    };
+    assert!(why.contains("boom"), "{why}");
+    let pid = fs::read_to_string(&pid_file).expect("pid");
+    let alive = || {
+        Command::new("kill")
+            .args(["-0", pid.trim()])
+            .status()
+            .is_ok_and(|s| s.success())
+    };
+    // a killed orphan lingers until init reaps it
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while alive() && Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(20));
+    }
+    assert!(!alive(), "the orphan ends with its step");
     fs::remove_dir_all(&case.root).expect("cleanup");
 }

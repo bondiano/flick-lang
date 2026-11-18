@@ -209,11 +209,9 @@ pub(crate) fn command_with_import(
             return Err(format!("no host runtime adapter for `{}`", runtime.id));
         }
         let mut command = Tool::find("node", Some(runtime))?.command();
-        if runtime.id == "node" {
-            command.arg("--enable-source-maps");
-            if let Some(import) = import {
-                command.args(["--import", import]);
-            }
+        command.arg("--enable-source-maps");
+        if let Some(import) = import {
+            command.args(["--import", import]);
         }
         command.arg(artifact);
         command

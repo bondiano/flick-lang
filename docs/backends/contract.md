@@ -205,6 +205,10 @@ Cancellation reaches every part: SIGINT or SIGTERM, once backend work has
 begun, cancels the guest call through the engine epoch, the input snapshot,
 and the running tool. Each tool runs in its own process group, which gets
 SIGTERM and, two seconds later, SIGKILL, so what the tool started ends too.
+When a tool exits, whatever it left running in its group is killed, so no
+descendant writes into a step directory or holds the tool's output open.
+Off Unix there are no process groups: cancellation ends the tool itself,
+and a descendant it started may outlive it.
 
 Diagnostic spans address the supplied UTF-8 source bytes, including boundary
 checks. Each referenced source is loaded and UTF-8-validated once per
