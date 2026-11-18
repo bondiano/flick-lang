@@ -266,7 +266,7 @@ let report failure = Platform.stderr_line (RawCause.describe (Failure.inspect fa
 view : Atom.Writable Float -> Float -> Ui
 let view model m = Ui.text (show m)
 let seed = 0.0
-main : Unit ->{Host.Console, Async; AppError} Unit
+main : Unit ->{Host.Clock, Host.Random, Host.Console, Async; AppError} Unit
 let main () =
   match Ui.Dom.container "playground" with
   | None -> App.fail "missing root"

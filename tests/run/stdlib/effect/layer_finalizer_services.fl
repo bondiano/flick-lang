@@ -1,0 +1,49 @@
+// A layer of `Layer.from_build` uses its inputs in a finalizer it registers:
+// their providers outlive the region it is built into, a `provide` or a
+// `scope` inside them, so the finalizer runs before they are released.
+module App.Main exposing (main)
+
+service Journal =
+  write : String ->{Host.Console} Unit
+
+service Box =
+  value : Unit ->{} String
+
+/// Released when the `provide` of it ends.
+journal : Layer {Host.Console} none {Journal}
+let journal =
+  Layer.from_build (fun memo ->
+    Scope.add_finalizer (task { Platform.stdout_line "journal released" })
+    Layer.build_with_memo_map
+      memo
+      (Layer.succeed Journal { write = fun line -> Platform.stdout_line ("journal: " ++ line) })
+  )
+
+/// Writes to the journal when it is built and when it is released.
+box : Layer {Host.Console, Journal} none {Box}
+let box =
+  Layer.from_build (fun memo ->
+    Journal.write "box acquired"
+    Scope.add_finalizer (task { Journal.write "box released" })
+    Layer.build_with_memo_map memo (Layer.succeed Box { value = fun () -> "box" })
+  )
+
+/// Prints when the owner it is built into closes.
+printed : Layer {Host.Console} none {Box}
+let printed =
+  Layer.from_build_memo (fun memo ->
+    Scope.add_finalizer (task { Platform.stdout_line "printed released" })
+    Layer.build_with_memo_map memo (Layer.succeed Box { value = fun () -> "printed" })
+  )
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  provide journal {
+    provide box { Platform.stdout_line ("provided " ++ Box.value ()) }
+    Platform.stdout_line "box closed"
+  }
+  scope {
+    ignore (Layer.build printed)
+    Platform.stdout_line "printed built"
+  }
+  Platform.stdout_line "scope closed"

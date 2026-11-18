@@ -223,7 +223,6 @@ theorem PatTy.typ_match {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ) :
       obtain ⟨ws, hw1, hww⟩ := hres.tcon hr
       obtain ⟨_, _, _, _, hf, he, hψ, hT⟩ :=
         hv.app_type _ _ _ _ rfl rfl (Ty.not_all_of_res_tcon hw1) hk7
-      obtain rfl := Stage.eq_pure (Stage.le_trans (Stage.le_use _ _) hψ)
       have hvf : Value f ∧ Value e := by
         cases hvv with
         | ctorApp hf' _ he' => exact ⟨hf', he'⟩

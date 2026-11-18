@@ -329,7 +329,8 @@ fn space((a, a_parent): (K, K), (b, b_parent): (K, K)) -> bool {
             | K::Dot
             | K::Question,
         )
-        | (K::LBrace, K::RBrace) => false,
+        | (K::LBrace, K::RBrace)
+        | (K::Label, K::Colon) => false,
         (K::Dot, _) => matches!(a_parent, K::ForallType | K::ExistsType),
         (K::DotDot | K::DotDotLt, _) if a_parent == K::RangeExpr => false,
         (_, K::DotDot | K::DotDotLt) if b_parent == K::RangeExpr => false,

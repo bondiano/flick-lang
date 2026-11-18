@@ -114,6 +114,8 @@ type test struct {
 	check Value
 	group []Value
 	layer Value // suite
+	// "skip" or "only", of Test.skip and Test.only: for it and each test in it
+	mode string
 }
 
 func TestPure(name, body Value) Value   { return &test{name: name.(string), body: body} }
@@ -142,20 +144,23 @@ type named struct {
 	test *test
 	// the suites it is in, outermost first
 	suites []*test
+	// whether it or a group it is in is skipped, or marked only
+	skip, only bool
 }
 
 // flatten is the tests with their full names, `Module > group > name`.
-func flatten(prefix string, tests []Value, out []named, suites []*test) []named {
+func flatten(prefix string, tests []Value, out []named, suites []*test, skip, only bool) []named {
 	for _, v := range tests {
 		t := v.(*test)
 		name := prefix + " > " + t.name
+		skip, only := skip || t.mode == "skip", only || t.mode == "only"
 		switch {
 		case t.layer != nil:
-			out = flatten(name, t.group, out, append(suites[:len(suites):len(suites)], t))
+			out = flatten(name, t.group, out, append(suites[:len(suites):len(suites)], t), skip, only)
 		case t.group != nil:
-			out = flatten(name, t.group, out, suites)
+			out = flatten(name, t.group, out, suites, skip, only)
 		default:
-			out = append(out, named{name, t, suites})
+			out = append(out, named{name, t, suites, skip, only})
 		}
 	}
 	return out
@@ -461,50 +466,6 @@ func runLeaf(fb *Fiber, t named, seed int64, runs map[*test]*suiteRun) testResul
 	return testResult{Name: t.name, Status: "failed", Kind: kind, Message: text, Cleanup: cleanup}
 }
 
-// testOptions are the options of `flick test`, from the runner's arguments.
-type testOptions struct {
-	filter, reporter string
-	jobs             int
-	seed             int64
-	seeded, watched  bool
-	color, progress  bool
-}
-
-func parseTestArgs(args []string) testOptions {
-	o := testOptions{reporter: "human", jobs: 1}
-	for i := 0; i < len(args); i++ {
-		value := ""
-		if i+1 < len(args) {
-			value = args[i+1]
-		}
-		switch args[i] {
-		case "--filter":
-			o.filter = value
-		case "--jobs":
-			if n, err := strconv.Atoi(value); err == nil && n > 0 {
-				o.jobs = n
-			}
-		case "--seed":
-			if n, err := strconv.ParseInt(value, 10, 64); err == nil {
-				o.seed, o.seeded = n, true
-			}
-		case "--reporter":
-			o.reporter = value
-		case "--color":
-			o.color = value == "always"
-		case "--progress":
-			o.progress = value == "live"
-		case "--watched":
-			o.watched = true
-			continue
-		default:
-			continue
-		}
-		i++
-	}
-	return o
-}
-
 // writeTestResult writes and flushes a complete result with outMu held by the caller.
 func writeTestResult(r testResult, completed, total int, elapsed time.Duration, color bool) {
 	marker := "✓"
@@ -528,7 +489,7 @@ func writeTestResult(r testResult, completed, total int, elapsed time.Duration, 
 	stdout.Flush()
 }
 
-func reportTests(results []testResult, seed int64, reporter string, color bool, elapsed time.Duration) int {
+func reportTests(results, skipped []testResult, seed int64, reporter string, color bool, elapsed time.Duration) int {
 	failed := 0
 	for _, r := range results {
 		if r.Status == "failed" {
@@ -538,10 +499,15 @@ func reportTests(results []testResult, seed int64, reporter string, color bool, 
 	passed := len(results) - failed
 	if reporter == "json" {
 		var tests []string
-		for _, r := range results {
+		for _, r := range append(results[:len(results):len(results)], skipped...) {
 			tests = append(tests, jsonOf(r))
 		}
-		fmt.Fprintf(stdout, "{\"seed\":%d,\"passed\":%d,\"failed\":%d,\"tests\":[%s]}\n", seed, passed, failed, strings.Join(tests, ","))
+		// a run without skipped tests reports as before they existed
+		counts := fmt.Sprintf("\"seed\":%d,\"passed\":%d,\"failed\":%d", seed, passed, failed)
+		if len(skipped) > 0 {
+			counts += fmt.Sprintf(",\"skipped\":%d", len(skipped))
+		}
+		fmt.Fprintf(stdout, "{%s,\"tests\":[%s]}\n", counts, strings.Join(tests, ","))
 		return failed
 	}
 	passColor, failColor, dim, reset := "", "", "", ""
@@ -555,7 +521,15 @@ func reportTests(results []testResult, seed int64, reporter string, color bool, 
 			failColor = "\x1b[31m"
 		}
 	}
-	fmt.Fprintf(stdout, "\n  Tests  %s%d%s passed · %s%d%s failed · %d total\n", passColor, passed, reset, failColor, failed, reset, len(results))
+	also := ""
+	if len(skipped) > 0 {
+		fmt.Fprintln(stdout)
+		for _, r := range skipped {
+			fmt.Fprintf(stdout, "  %s- %s  (skipped)%s\n", dim, r.Name, reset)
+		}
+		also = fmt.Sprintf(" · %s%d%s skipped", dim, len(skipped), reset)
+	}
+	fmt.Fprintf(stdout, "\n  Tests  %s%d%s passed · %s%d%s failed%s · %d total\n", passColor, passed, reset, failColor, failed, reset, also, len(results)+len(skipped))
 	fmt.Fprintf(stdout, "  Time   %s%d ms%s\n", dim, elapsed.Milliseconds(), reset)
 	if failed > 0 {
 		fmt.Fprintf(stdout, "seed: %d (rerun with --seed %d)\n", seed, seed)
@@ -590,14 +564,7 @@ func RunTests(fb *Fiber, suites []Suite) {
 	if !o.seeded {
 		seed = rand.Int64N(1 << 31)
 	}
-	var selected []named
-	for _, s := range suites {
-		for _, t := range flatten(s.Module, List(s.Tests), nil, nil) {
-			if strings.Contains(t.name, o.filter) {
-				selected = append(selected, t)
-			}
-		}
-	}
+	selected, skipped := selectTests(suites, o)
 	if o.watched {
 		// a watcher stops the run by closing stdin, which works on every platform
 		go func() {
@@ -726,7 +693,7 @@ func RunTests(fb *Fiber, suites []Suite) {
 	if fb.state.requested.Load() {
 		fmt.Fprintln(stdout, "interrupted: every running test closed its scope")
 		code = 130
-	} else if reportTests(results, seed, o.reporter, o.color, elapsed) > 0 {
+	} else if reportTests(results, skipped, seed, o.reporter, o.color, elapsed) > 0 {
 		code = 1
 	}
 	stdout.Flush()

@@ -87,10 +87,11 @@ place left out; its effects reach the place, or are effects with an operation on
 runs, and they reach it with the obligation for the owner `o`, or under the region of `o` or a
 kept handler older than `o`, which every handler around is older than too. -/
 def KidRow (S : Sig) (o : Nat) (φ : Stage) (E : List Frame) (R : Row) : Prop :=
-  (∀ N a, R (.ob N a) → φ.svc (.ob N a) ∨ (∃ p, a = .r p ∧ .inside p ∈ E) ∨
+  (∀ N c a, R (.ob N c a) → φ.svc (.ob N c a) ∨ (∃ p, a = .r p ∧ .inside p ∈ E) ∨
     ∃ F ∈ E, ∃ q, F.isHandler ∧ F.bump = some q ∧ Outl Facts.age (· = .r q) a.ty) ∧
-  (∀ N, R (.nm N) → (φ.svc (.nm N) ∨ S.HasNonTail N ∧ ∃ F ∈ E, F.installs N) ∧
-    (φ.svc (.ob N (.r o)) ∨ .inside o ∈ E ∨ ∃ F ∈ E, ∃ q, F.isHandler ∧ F.bump = some q ∧ q ≤ o))
+  (∀ N c, R (.nm N c) → (φ.svc (.nm N c) ∨ S.HasNonTail N ∧ ∃ F ∈ E, F.installs N) ∧
+    (φ.svc (.ob N c (.r o)) ∨ .inside o ∈ E ∨
+      ∃ F ∈ E, ∃ q, F.isHandler ∧ F.bump = some q ∧ q ≤ o))
 
 /-- A handler handles an effect. -/
 theorem installs_op {Ψ' Θ x t φ} {F : Frame} {N : Name}
@@ -107,22 +108,22 @@ theorem installs_op {Ψ' Θ x t φ} {F : Frame} {N : Name}
 /-- The row of the work under a kept handler of `E`: what the work needs besides `E` and what
 the handler's arms and the operations it does not answer need. -/
 def Row.kid (S : Sig) (E : Name) (R' rout : Row) : Row
-  | .nm N => (N ≠ E ∧ R' (.nm N)) ∨ rout (.nm N) ∨ (N = E ∧ S.HasNonTail E)
-  | .ob N a => (N ≠ E ∧ R' (.ob N a)) ∨ rout (.ob N a)
+  | .nm N c => (N ≠ E ∧ R' (.nm N c)) ∨ rout (.nm N c) ∨ (N = E ∧ S.HasNonTail E)
+  | .ob N c a => (N ≠ E ∧ R' (.ob N c a)) ∨ rout (.ob N c a)
   | x => R' x ∨ rout x
 
 theorem Row.kid_out {E : Name} {R' rout : Row} : ∀ y, rout y → Row.kid S E R' rout y
-  | .nm _, h => .inr (.inl h)
-  | .ob _ _, h => .inr h
+  | .nm _ _, h => .inr (.inl h)
+  | .ob _ _ _, h => .inr h
   | .atm _, h | .rv _ _, h | .obv _ _ _, h => .inr h
 
 /-- An obligation about the effect of a handler that the work holds is discharged by it. -/
 theorem kid_outl {Θ : Facts} {φ₀ : Stage} {E : Name} {q b : Nat} {G : Frame} {E₀ : List Frame} {R' rout ε₀ : Row}
-    {a : Atom} (hΘ : Entails Θ Facts.age) (hG : G.bump = some q) (hA : AscE b (E₀ ++ [G]))
-    (hrow : φ₀.le (.rt (Row.hP Θ q E rout) ε₀))
-    (h : R' (.ob E a) → φ₀.svc (.ob E a) ∨ (∃ p, a = .r p ∧ .inside p ∈ E₀) ∨
+    {a : Atom} {c : TyClass} (hΘ : Entails Θ Facts.age) (hG : G.bump = some q)
+    (hA : AscE b (E₀ ++ [G])) (hrow : φ₀.le (.rt (Row.hP Θ q E rout) ε₀))
+    (h : R' (.ob E c a) → φ₀.svc (.ob E c a) ∨ (∃ p, a = .r p ∧ .inside p ∈ E₀) ∨
       ∃ F ∈ E₀, ∃ q₂, F.isHandler ∧ F.bump = some q₂ ∧ Outl Facts.age (· = .r q₂) a.ty)
-    (hy : R' (.ob E a)) : Outl Facts.age (· = .r q) a.ty := by
+    (hy : R' (.ob E c a)) : Outl Facts.age (· = .r q) a.ty := by
   rcases h hy with h' | ⟨p, rfl, hp⟩ | ⟨F, hF, q₂, hi, hb, hO⟩
   · exact hΘ _ _ ((Stage.le_svc hrow _ h').1 rfl)
   · exact Outl.age_lt (AscE.under (p := p) hG hA hp (.inl rfl))
@@ -140,29 +141,29 @@ theorem kid_kept {o b q : Nat} {Θ : Facts} {φ₀ φ : Stage} {E : Name} {G : F
   have mem' : ∀ {F}, F ∈ E₀ → F ∈ E₀ ++ [G] := fun h => List.mem_append_left _ h
   have self : G ∈ E₀ ++ [G] := by simp
   have mem : ∀ {p}, .inside p ∈ E₀ → .inside p ∈ E₀ ++ [G] := fun h => mem' h
-  refine ⟨fun y hy => ?_, fun N a hy => ?_, fun N hy => ?_⟩
+  refine ⟨fun y hy => ?_, fun N c a hy => ?_, fun N c hy => ?_⟩
   · cases y with
-    | nm N =>
+    | nm N c =>
       by_cases hN : N = E
       · exact .inl hN
       · exact .inr (.inl ⟨hN, hy⟩)
-    | ob N a =>
+    | ob N c a =>
       refine ⟨fun hN => ?_, fun hN => .inl ⟨hN, hy⟩⟩
       subst hN
-      exact kid_outl hΘ hG hA hrow (h1 N a) hy
+      exact kid_outl hΘ hG hA hrow (h1 N c a) hy
     | atm a | obv _ a => exact .inl hy
     | rv a G => exact Row.le_back (Row.kid S E R' rk) _ (.rv a G) (Or.inl hy)
   · rcases hy with ⟨hN, hy⟩ | hy
-    · rcases h1 N a hy with h' | ⟨p, rfl, hp⟩ | ⟨F, hF, x⟩
+    · rcases h1 N c a hy with h' | ⟨p, rfl, hp⟩ | ⟨F, hF, x⟩
       · exact .inl (up _ (hsub _ (fun _ h => by cases h) ((Stage.le_svc hrow _ h').2 hN)))
       · exact .inr (.inl ⟨p, rfl, mem hp⟩)
       · exact .inr (.inr ⟨F, mem' hF, x⟩)
     · exact .inl (up _ hy)
-  · have own : φ.svc (.ob N (.r o)) ∨ .inside o ∈ E₀ ++ [G] ∨
+  · have own : φ.svc (.ob N c (.r o)) ∨ .inside o ∈ E₀ ++ [G] ∨
         ∃ F ∈ E₀ ++ [G], ∃ q, F.isHandler ∧ F.bump = some q ∧ q ≤ o :=
       .inr (.inr ⟨G, self, q, hi, hG, hq⟩)
     rcases hy with ⟨hN, hy⟩ | hy | ⟨rfl, hnt⟩
-    · obtain ⟨a₁, -⟩ := h2 N hy
+    · obtain ⟨a₁, -⟩ := h2 N c hy
       refine ⟨?_, own⟩
       rcases a₁ with a₁ | ⟨hn, F, hF, hI⟩
       · rcases Stage.le_svc hrow _ a₁ with h' | h'
@@ -181,15 +182,15 @@ theorem kid_dropped {o b q : Nat} {Θ : Facts} {φ₀ φ : Stage} {E : Name} {G 
   have mem' : ∀ {F}, F ∈ E₀ → F ∈ E₀ ++ [G] := fun h => List.mem_append_left _ h
   have self : G ∈ E₀ ++ [G] := by simp
   have mem : ∀ {p}, .inside p ∈ E₀ → .inside p ∈ E₀ ++ [G] := fun h => mem' h
-  refine ⟨fun N a hy => ?_, fun N hy => ?_⟩
+  refine ⟨fun N c a hy => ?_, fun N c hy => ?_⟩
   · by_cases hN : N = E
     · subst hN
-      exact .inr (.inr ⟨G, self, q, hi, hG, kid_outl hΘ hG hA hrow (h1 N a) hy⟩)
-    · rcases h1 N a hy with h' | ⟨p, rfl, hp⟩ | ⟨F, hF, x⟩
+      exact .inr (.inr ⟨G, self, q, hi, hG, kid_outl hΘ hG hA hrow (h1 N c a) hy⟩)
+    · rcases h1 N c a hy with h' | ⟨p, rfl, hp⟩ | ⟨F, hF, x⟩
       · exact .inl (up _ ((Stage.le_svc hrow _ h').2 hN))
       · exact .inr (.inl ⟨p, rfl, mem hp⟩)
       · exact .inr (.inr ⟨F, mem' hF, x⟩)
-  · obtain ⟨a₁, a₂⟩ := h2 N hy
+  · obtain ⟨a₁, a₂⟩ := h2 N c hy
     have hNE : N ≠ E := by
       rintro rfl
       apply hq
@@ -218,19 +219,19 @@ def Frame.cell : Frame → Option (Nat × Nat)
 of `o` keeps of it. -/
 def KeptAtm (Ψ : List Ty) (o : Nat) (E : List Frame) (a : Atom) : Prop :=
   ∃ F ∈ E, ∃ q ℓ r ε t, F.cell = some (q, ℓ) ∧ q ≤ o ∧
-    Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t Caps.none) ∧ r (.atm a)
+    Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t Caps.none) ∧ r.asRow (.atm a)
 
 theorem KeptAtm.mono {o : Nat} {E E' : List Frame} {a : Atom} (h : ∀ F, F ∈ E → F ∈ E')
     (hk : KeptAtm Ψ o E a) : KeptAtm Ψ o E' a :=
   let ⟨F, hF, rest⟩ := hk; ⟨F, h F hF, rest⟩
 
 /-- What work an owner keeps uses is the owner or older than it. -/
-theorem keep_old {Θ : Facts} {r : Row} {p : Nat} (hΘ : Entails Θ Facts.age)
-    (hk : Row.Outlives Θ r (.rg p)) {a : Atom} (ha : r (.atm a)) :
+theorem keep_old {Θ : Facts} {r : Ty} {p : Nat} (hΘ : Entails Θ Facts.age)
+    (hk : Row.Outlives Θ r (.rg p)) {a : Atom} (ha : r.asRow (.atm a)) :
     a = .r p ∨ ∀ x, a = .r x → x < p := by
   have ho := hΘ _ _ hk
   simp only [Outl, Facts.age_close] at ho
-  rcases ho a (.inl ha) with h | ⟨C', h₁, h₂⟩
+  rcases ho a ((Ty.reach_asRow r a).mpr (.inl ha)) with h | ⟨C', h₁, h₂⟩
   · exact .inl h
   · exact .inr fun x hx => h₁ x p (hx ▸ h₂) rfl
 

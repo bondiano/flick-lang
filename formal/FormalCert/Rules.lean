@@ -11,17 +11,20 @@ namespace Flick.Cert
 
 variable {S : Sig} {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme}
 
-/-- (Var) at an instance the certificate writes out: `σ.inst ts` is `T'`, a subtype of `T`. -/
+/-- (Var) at an instance the certificate writes out: `σ.inst ts` is a subtype of `T'`, the type
+the model gives the instance, a subtype of `T`. The model keeps rows as sets, so `T'` writes a
+row the instance writes as a union with an instantiated variable, `ρ[ρ := ∅] ∪ C`, as `C`;
+the two read alike, and live subtyping compares rows by what they stand for. -/
 theorem typ_var {i : Nat} {σ : Scheme} {ts : List Ty} {T' T : Ty} {φ : Stage}
     (h : Γ[i]? = some σ) (hk : ts.length = σ.k) (hH : σ.Holds Θ ts)
-    (he : σ.inst ts = T') (hl : LeLive S T' T) : Typ S Ψ Θ Γ (.var i) (.ex T φ) :=
-  .var h hk hH (he ▸ .le hl)
+    (he : LeLive S (σ.inst ts) T') (hl : LeLive S T' T) : Typ S Ψ Θ Γ (.var i) (.ex T φ) :=
+  .var h hk hH (.le (he.trans hl))
 
-/-- (Glob) at an instance the certificate writes out. -/
+/-- (Glob) at an instance the certificate writes out, as (Var). -/
 theorem typ_glob {g : Nat} {σ : Scheme} {ts : List Ty} {T' T : Ty} {φ : Stage}
     (h : S.glob g = some σ) (hk : ts.length = σ.k) (hH : σ.Holds Θ ts)
-    (he : σ.inst ts = T') (hl : LeLive S T' T) : Typ S Ψ Θ Γ (.glob g) (.ex T φ) :=
-  .glob h hk hH (he ▸ hl)
+    (he : LeLive S (σ.inst ts) T') (hl : LeLive S T' T) : Typ S Ψ Θ Γ (.glob g) (.ex T φ) :=
+  .glob h hk hH (he.trans hl)
 
 /-- A scheme without facts holds at every instance. -/
 theorem holds_none {k : Nat} {t : Ty} (ts : List Ty) : (Scheme.mk k Facts.none t).Holds Θ ts :=
@@ -35,39 +38,41 @@ abbrev recArm (o : Name) : Tm := .acons (Pat.spine o [.var]) (.app (.proj (.var 
 
 /-- An operation `o` of `E` called, at its arrow `a →{E} b`. -/
 theorem typ_op {E o : Name} {a b T : Ty} {φ : Stage} (h : S.op E o = some (.tail, a, b))
-    (hT : LeLive S (.arrow a (.rt (Row.single E) Row.none) b Caps.none) T) :
+    (hT : LeLive S (.arrow a (.rt (.rnm E (.adt E)) .cnil) b Caps.none) T) :
     Typ S Ψ Θ Γ (.const (.perform E o .tail)) (.ex T φ) :=
   .perform (t := b) h hT
 
 /-- `provide (Layer.succeed E w) e` as the core writes it: `let w = … in hdl E (o x → w.o x) (λv. v) e`;
-the record may hold anything, as the arm reads it through a variable. -/
-theorem typ_provide {E o : Name} {a b R t T : Ty} {w e : Tm} {r ε : Row} {φ₀ φ : Stage}
+the record may hold anything, as the arm reads it through a variable. The rows outside, `r` and
+`ε`, are row terms: the handler's value and its arms are typed at them. -/
+theorem typ_provide {E o : Name} {a b R t T r ε : Ty} {w e : Tm} {φ₀ φ : Stage}
     (hop : S.op E o = some (.tail, a, b)) (hc : S.Complete E (recArm o))
-    (hR : R.field o = some (.arrow a (.rt Row.none Row.none) b Caps.none))
+    (hR : R.field o = some (.arrow a (.rt .cnil .cnil) b Caps.none))
     (hw : Typ S Ψ Θ Γ w (.ex R φ))
-    (he : Typ S Ψ Θ (.mono R :: Γ) e (.ex t φ₀)) (hle : φ₀.le (.rt (Row.union (Row.single E) r) ε))
-    (hob : φ₀.ObOut (Row.single E)) (hφ : (Stage.rt r ε).le φ) (hT : LeLive S t T) :
+    (he : Typ S Ψ Θ (.mono R :: Γ) e (.ex t φ₀))
+    (hle : φ₀.le (.rt (Row.union (Row.single E) r.asRow) ε.asRow))
+    (hob : φ₀.ObOut (Row.single E)) (hφ : (Stage.rt r.asRow ε.asRow).le φ) (hT : LeLive S t T) :
     Typ S Ψ Θ Γ (.let_ w (.hdl E (recArm o) (.lam (.var 0)) e)) (.ex T φ) := by
   obtain ⟨ha, hb⟩ := S.op_closed E o .tail a b (shiftV 1) hop
-  have hf : (R.up 1).field o = some (.arrow a (.rt Row.none Row.none) b Caps.none) := by
+  have hf : (R.up 1).field o = some (.arrow a (.rt .cnil .cnil) b Caps.none) := by
     rw [Ty.up_def]
     have := Ty.field_substT (shiftV 1) hR
-    simpa [Ty.substT, Stage.substT, ha, hb, Row.none_substT, Caps.none_substT] using this
+    simpa [Ty.substT, Ty.isStage, ha, hb, Caps.none_substT] using this
   refine .let_ hw (.hdl (ψ := .pure) (C := t.reach) (t' := t) ?_ ?_ id_typ trivial he
-    (Stage.le_rt_sub hle fun x hx => hx.imp id (Row.le_back r _ x)) hob
+    (Stage.le_rt_sub hle fun x hx => hx.imp (Row.le_nameClose _ x) (Row.le_back _ _ x)) hob
     ⟨⟨o, _, _, _, hop⟩, fun hn => (hn hc).elim⟩ hφ hT)
   · refine .hatail hop ?_ .hanil
-    refine .app (a := a) (ψ := .rt Row.none Row.none) (t := b) (C := Caps.none) ?_ ?_ ?_ .refl
+    refine .app (a := a) (ψ := .rt .cnil .cnil) (t := b) (C := Caps.none) ?_ ?_ ?_ .refl
     · refine .proj (R := R.up 1) ?_ hf .refl
       refine typ_var (ts := []) (T' := R.up 1) rfl rfl ?_ ?_ .refl
       · intro C s h
         obtain ⟨_, _, h, _⟩ := h
         exact h.elim
-      · simp [Scheme.up, Ty.up_def]
-    · exact typ_var (ts := []) (T' := a) rfl rfl (holds_none _) (Scheme.inst_mono a) .refl
-    · simp only [Stage.use, Stage.le, Stage.substT, Row.Sub]
-      exact ⟨fun n h => by simp [Row.union, Row.none, Row.ofCaps, Caps.none] at h; cases n <;> simp_all,
-        fun _ h => h.elim⟩
+      · exact le_of_eq (by simp [Scheme.up, Ty.up_def])
+    · exact typ_var (ts := []) (T' := a) rfl rfl (holds_none _) (le_of_eq (Scheme.inst_mono a)) .refl
+    · simp only [Ty.asStage, Stage.use, Stage.le, Row.Sub]
+      refine ⟨fun n h => ?_, fun n h => ?_⟩ <;> cases n <;>
+        simp [Row.union, Ty.asRow, Row.none, Row.ofCaps, Caps.none] at h
   · simp [Tm.NoIns, Tm.Has]
 /-! ## Dictionaries -/
 

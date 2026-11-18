@@ -21,7 +21,7 @@ def Ty.kind : Ty → Nat
   | .errors _ => 7
   | .hnd _ => 10
   | .owner _ => 11
-  | .rg _ | .caps _ | .row _ | .bare | .cnil | .rnm .. | .run .. | .rless .. | .pure | .rt .. => 12
+  | .rg _ | .caps _ | .bare | .cnil | .rnm .. | .run .. | .rless .. | .pure | .rt .. | .rtob .. => 12
   | .dict .. => 13
   | .all .. => 14
   | .lazy .. => 15

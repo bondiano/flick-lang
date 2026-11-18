@@ -68,7 +68,7 @@ theorem const_typ {c s b} (hc : constSch c = some s) (hb : constBody c = some b)
       · rename_i h1
         cases hc
         simp only [constBody, if_neg h2, if_pos h1, Option.some.injEq] at hb; subst hb
-        exact ⟨frBody_has, typ_frBody fun _ h => .inr h⟩
+        exact ⟨frBody_has, typ_frBody⟩
       · cases hc
   all_goals cases hc <;> simp only [constBody, Option.some.injEq] at hb <;> subst hb
   · exact ⟨fun _ h => by simp [pairB, Flick.Tm.Has] at h,

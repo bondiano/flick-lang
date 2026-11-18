@@ -139,7 +139,10 @@ fn binary_metadata_remains_opaque_to_text_emit_hooks() {
 fn cached_executable_artifacts_can_be_launched_after_restoration() {
     use crate::cache::{Signed, load, store};
     use flick_core::project::cache::Key;
+    use std::io::ErrorKind;
     use std::process::Command;
+    use std::thread;
+    use std::time::Duration;
 
     let output = plan("executable");
     let root = output.out_dir.parent().expect("root");
@@ -160,13 +163,19 @@ fn cached_executable_artifacts_can_be_launched_after_restoration() {
     };
     write_artifacts(&output, &mut emitted, &Progress::new(Mode::Hidden));
     assert!(emitted.diagnostics.is_empty(), "{:?}", emitted.diagnostics);
-    assert_eq!(
-        Command::new(output.out_dir.join("program"))
-            .status()
-            .expect("launch executable")
-            .code(),
-        Some(7)
-    );
+    // a test forking meanwhile keeps the writable descriptor until it execs
+    let status = (0..100)
+        .map(|_| Command::new(output.out_dir.join("program")).status())
+        .find(|status| {
+            let busy = matches!(status, Err(e) if e.kind() == ErrorKind::ExecutableFileBusy);
+            if busy {
+                thread::sleep(Duration::from_millis(10));
+            }
+            !busy
+        })
+        .expect("an attempt")
+        .expect("launch executable");
+    assert_eq!(status.code(), Some(7));
     fs::remove_dir_all(root).expect("cleanup");
 }
 

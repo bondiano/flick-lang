@@ -8,8 +8,8 @@ import Formal.Closed
 `unc n` is built by a Lean function of `n` (`uncB`): `unc 1 f t = f t`, and
 `unc (n+1) f t = match t with (t', x) → unc n f t' x`, `unc n` taken at the result
 `aₙ₊₁ →^c r`. Its typing is an induction on `n` (`typ_uncB`). `from_result` matches
-`Ok x → x | Err e → raise e`; `⟦R⟧` lets it raise `Errors e`: its name is in `allNames`, and what
-it reaches, the atom `e`, in `errRow` (`docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`).
+`Ok x → x | Err e → raise e`; `⟦R⟧` lets it raise `Errors e`: the element `Errors ⟦e⟧` is in the
+error row of a translated stage (`errT`, `docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`).
 The structural `eq` of `Rec = MkRec Int` compares the one field by the `eq` of the slot
 dictionary `D_{Eq Int}` (`docs/formal/elaboration.md#equivalence-did-not-relate-structural-slots-to-superclass-dictionaries`), so its `&&` over the fields is that one comparison.
 -/
@@ -129,25 +129,18 @@ theorem hall_res : ∀ K k ts, Sg.ctor K = some (k, ts, "Result") →
   intro K k ts h; simp only [Sg] at h; unfold ctorF at h
   split at h <;> simp at h <;> (obtain ⟨rfl, rfl⟩ := h; simp)
 
-theorem typ_frBody {E A : Flick.Ty} {C0 : Caps} {e : Ty} {φ}
-    (hE : ∀ x, E.reach x → errRow (trT N e) (.atm x)) :
-    Typ Sg Ψ Θ [] frBody (.ex (.arrow (tc "Result" [tc "Errors" [E], A]) (trStage N (.R .cnil e)) A
-      C0) φ) :=
-  .lam (.match_ (typ_var_mono rfl)
-      (.acons (.adt (.app (.head (K := "Ok") (ts := [.tvar 1]) (us := [tc "Errors" [E], A]) rfl Sig.inj_plain rfl)
-          .var) (tcon_hd _ _))
+theorem typ_frBody {e : Ty} {A : Flick.Ty} {C0 : Caps} {φ} :
+    Typ Sg Ψ Θ [] frBody (.ex (.arrow (tc "Result" [tc "Errors" [trT N e], A])
+      (trStageT N (.R .cnil e)) A C0) φ) :=
+  .lam (ψ := trStageT N (.R .cnil e)) (C := C0) (.match_ (typ_var_mono rfl)
+      (.acons (.adt (.app (.head (K := "Ok") (ts := [.tvar 1]) (us := [tc "Errors" [trT N e], A]) rfl
+          Sig.inj_plain rfl) .var) (tcon_hd _ _))
         (typ_var_mono rfl)
-        (.acons (.adt (.app (.head (K := "Err") (ts := [.tvar 0]) (us := [tc "Errors" [E], A]) rfl Sig.inj_plain rfl)
-          .var) (tcon_hd _ _))
-          (.raiseAdt (typ_var_mono rfl) (tcon_hd _ _) (by
-            refine ⟨fun _ h => h.elim, fun x hx => ?_⟩
-            cases x with
-            | atm a =>
-              simp [Row.err, Row.union, Row.single, Row.ofCaps, Flick.Ty.substT, instT] at hx
-              rcases hx with h | h
-              · exact h.elim
-              · exact .inl (hE _ h)
-            | _ => simp [Row.err, Row.union, Row.single, Row.ofCaps, allNames] at hx ⊢)) .anil))
+        (.acons (.adt (.app (.head (K := "Err") (ts := [.tvar 0]) (us := [tc "Errors" [trT N e], A]) rfl
+          Sig.inj_plain rfl) .var) (tcon_hd _ _))
+          (.raiseAdt (typ_var_mono rfl) (tcon_hd _ _)
+            ⟨fun _ h => h.elim, fun x hx => .inr (by simpa [instT, Flick.Ty.substT] using hx)⟩)
+          .anil))
       (.inl (exh_ctors hall_res _)))
     (fun h => by simp [Flick.Tm.Has] at h) .refl
 

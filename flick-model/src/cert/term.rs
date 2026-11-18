@@ -261,7 +261,7 @@ impl<'t> Cx<'t> {
     pub(super) fn inst(&self, i: &Inst) -> Result<String, Unsupported> {
         Ok(match i {
             Inst::Type(t) => self.ty(t)?,
-            Inst::Row(r) => format!("(.row {})", row(r, &self.env)?),
+            Inst::Row(r) => row(r, &self.env)?,
             Inst::Caps(c) => format!("(.caps {})", caps(c, &self.env)?),
             Inst::Tail(_) => return Err("an open record".into()),
         })
@@ -367,7 +367,7 @@ impl<'t> Cx<'t> {
         let (_, ts) = self.instance(e)?;
         let instance = self.ty(&self.inferred(e)?)?;
         Ok(format!(
-            "(Cert.typ_glob (ts := [{}]) (T' := {instance}) ((hS.glob {g} rfl).trans rfl) rfl (by holds) (by inst_eq) (by le_live))",
+            "(Cert.typ_glob (ts := [{}]) (T' := {instance}) ((hS.glob {g} rfl).trans rfl) rfl (by holds) (by inst_le) (by le_live))",
             ts.join(", ")
         ))
     }

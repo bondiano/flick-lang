@@ -102,8 +102,8 @@ fn build_progress_preserves_stream_contracts() {
             "Preparing compiler",
             "Compiling Flick modules",
             "Emitting JavaScript",
+            // the manifest of outputs is part of the one publication
             "Writing artifacts",
-            "Recording build outputs",
             "Saving build cache",
         ][..],
         // a hit restores what it built and never reads the built-in modules

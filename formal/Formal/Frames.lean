@@ -28,12 +28,12 @@ theorem OkE.append' {E E' : List Frame} (h : OkE E) (h' : OkE E') : OkE (E ++ E'
 theorem OkE.cons {E : List Frame} {F : Frame} (h : OkE (F :: E)) : F.ok ∧ OkE E :=
   ⟨h F (by simp), fun G hG => h G (by simp [hG])⟩
 
-/-- What a frame provides its hole: the effect of a handler and `Scope π` of `inside π`; the
-obligations it may discharge. -/
+/-- What a frame provides its hole: the effect of a handler, at every argument as a handler
+answers by name, and `Scope π` of `inside π`; the obligations it may discharge. -/
 def Frame.dom (F : Frame) : Row
-  | .nm N => F.installs N
+  | .nm N _ => F.installs N
   | .atm a => ∃ p, F = .inside p ∧ a = .r p
-  | .ob N a => F.installs N ∨ ∃ p, F = .inside p ∧ a = .r p
+  | .ob N _ a => F.installs N ∨ ∃ p, F = .inside p ∧ a = .r p
   | .obv _ _ a => ∃ p, F = .inside p ∧ a = .r p
   | .rv _ _ => False
 
@@ -53,7 +53,8 @@ def Frame.provides (F : Frame) : Row := fun n => F.dom n ∨ ∃ p, F.rgn = some
 theorem Frame.provides_of {F : Frame} {n : Elem} (h : F.dom n) : F.provides n := .inl h
 
 /-- At a name, a frame provides what `Frame.dom` does: the rest are region atoms. -/
-theorem Frame.provides_nm {F : Frame} {N : Name} (h : F.provides (.nm N)) : F.dom (.nm N) := by
+theorem Frame.provides_nm {F : Frame} {N : Name} {c : TyClass} (h : F.provides (.nm N c)) :
+    F.dom (.nm N c) := by
   rcases h with h | ⟨p, -, h'⟩
   · exact h
   · cases h'

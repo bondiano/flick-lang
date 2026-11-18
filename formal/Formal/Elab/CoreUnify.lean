@@ -107,7 +107,7 @@ theorem CUnif.arr {φ : Stage} {q a b a' b' : Ty} {E : Eqs} {θ' : Atom → Flic
   simp only [Flick.Ty.substT] at h₁
   cases h₁.form with
   | rows hr _ => cases hr
-  | arrow ha hb => exact CUnif.cons.mpr ⟨ha, CUnif.cons.mpr ⟨hb, h₂⟩⟩
+  | arrow ha _ hb => exact CUnif.cons.mpr ⟨ha, CUnif.cons.mpr ⟨hb, h₂⟩⟩
 
 /-- **The most general unifier in the core**: each unifier `θ'` of the translated equations
 is `⟦θ⟧` followed by `θ'`. -/
@@ -149,7 +149,7 @@ theorem trT_con_ne_tapp (c : Nat) (f a : Flick.Ty) : trT N (.con c) ≠ .tapp f 
   · simp
   · split <;> simp
 
-theorem trT_con_ne_arrow (c : Nat) (a : Flick.Ty) (φ : Flick.Stage) (b : Flick.Ty) (C : Caps) :
+theorem trT_con_ne_arrow (c : Nat) (a : Flick.Ty) (φ : Flick.Ty) (b : Flick.Ty) (C : Caps) :
     trT N (.con c) ≠ .arrow a φ b C := by
   simp only [trT]
   split

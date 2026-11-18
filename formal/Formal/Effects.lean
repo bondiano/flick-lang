@@ -72,30 +72,36 @@ theorem T2a {root Ψ Λ μ e t Λ' μ' e'} (hroot : RootTy S root) (hμ : StoreT
 
 /-- An operation answered by `Σ₀` from a term with services `r` has its effect in `r`. -/
 theorem step_root {root Ψ Θ Λ μ e t r ε N o} (h : Typ S Ψ Θ [] e (.ex t (.rt r ε)))
-    (hs : Step root (.root N) Λ μ e o) : r (.nm N) := by
+    (hs : Step root (.root N) Λ μ e o) : r (.nm₀ N) := by
   cases hs with
   | performRoot hE hh =>
     obtain ⟨_, _, _, _, hr, -⟩ := ctx_typing _ hE perform_not_value h
     exact perform_out (r := .app _ _) perform_svc perform_not_value (perform_op' hr) _ hE hh h
 
-theorem Row.kill_sub (ε : Row) (n : Nat) : Row.Sub (ε.substT (kill n)) ε := by
-  intro x hx
-  cases x with
-  | nm => rcases hx with hx | ⟨b, _, _, _, hb⟩
-          · exact hx
-          · cases kill_asRow hb
-  | atm a =>
-    rcases hx with ⟨b, hb, h⟩ | ⟨b, _, _, hb⟩
-    · obtain ⟨rfl, _⟩ := kill_reach h; exact hb
-    · cases kill_asRow hb
-  | ob _ a =>
-    rcases hx with ⟨b, hb, h⟩ | ⟨_, _, _, _, _, hv, _⟩
-    · obtain ⟨rfl, _⟩ := kill_reach h; exact hb
-    · cases kill_asRow hv
-  | rv a H => obtain ⟨b, G, hb, H', h, rfl⟩ := hx; cases kill_asRow h; simpa using hb
-  | obv w H a =>
-    obtain ⟨v, G, b, hb, ⟨H', hv, rfl⟩, h⟩ := hx
-    cases kill_asRow hv; obtain ⟨rfl, _⟩ := kill_reach h; simpa using hb
+/-- Renaming out the regions not yet created keeps a name of a row, at some argument. -/
+theorem Row.kill_nm {ε : Row} {n : Nat} {N : Name} {c : TyClass} (hx : ε.substT (kill n) (.nm N c)) :
+    ∃ c₀, ε (.nm N c₀) := by
+  rcases hx with ⟨c₀, hx, -⟩ | ⟨b, _, _, _, hb⟩
+  · exact ⟨c₀, hx⟩
+  · cases kill_asRow hb
+
+/-- Renaming out the regions not yet created adds no atom to a row. -/
+theorem Row.kill_atm {ε : Row} {n : Nat} {a : Atom} (hx : ε.substT (kill n) (.atm a)) : ε (.atm a) := by
+  rcases hx with ⟨b, hb, h⟩ | ⟨b, _, _, hb⟩
+  · obtain ⟨rfl, _⟩ := kill_reach h; exact hb
+  · cases kill_asRow hb
+
+/-- The errors of a raised value, within those of a row up to the arguments of its names, stay
+so when the regions not yet created are renamed out of the row. -/
+theorem Row.err_kill {E : Name} {U : Ty} {ε : Row} {n : Nat}
+    (h : Row.Sub (Row.err E U) (ε.substT (kill n)).nameClose) : Row.Sub (Row.err E U) ε.nameClose := by
+  rintro x (hx | hx)
+  · cases hx
+    obtain ⟨c, hc⟩ := h _ (.inl rfl)
+    exact Row.kill_nm hc
+  · cases x with
+    | atm a => exact Row.kill_atm (h _ (.inr hx))
+    | _ => exact hx.elim
 
 theorem Steps.mono {root : Roots} {Q Q' : Lbl → Prop} {Λ μ e Λ' μ' e'}
     (h : Steps root Q Λ μ e Λ' μ' e') (hQ : ∀ l, Q l → Q' l) : Steps root Q' Λ μ e Λ' μ' e' := by
@@ -109,10 +115,16 @@ theorem T2b {root Ψ Λ μ e t r ε Λ' μ' e'} (hroot : RootTy S root) (hμ : S
     (hb : CfgBelow Λ μ e) (hΨ : ∀ u ∈ Ψ, u.YF Λ.length)
     (h : Typ S Ψ Facts.age [] e (.ex t (.rt r ε)))
     (hs : Steps root (fun _ => True) Λ μ e Λ' μ' e') :
-    Steps root (fun l => ∀ N, l = .root N → r (.nm N)) Λ μ e Λ' μ' e' ∧
-      ∀ v, e' = .raise v → Value v → ∃ Ψ', Typ S Ψ' Facts.age [] v (.ex (.errors ε) .pure) := by
+    Steps root (fun l => ∀ N, l = .root N → ∃ c, r (.nm N c)) Λ μ e Λ' μ' e' ∧
+      ∀ v, e' = .raise v → Value v → ∃ Ψ' E U, U.hd = .adt E ∧ Typ S Ψ' Facts.age [] v (.ex U .pure) ∧
+        Row.Sub (Row.err E U) ε.nameClose := by
   induction hs generalizing Ψ t r ε with
-  | refl => exact ⟨.refl, fun v he hv => ⟨Ψ, by subst he; exact raise_errors hv h⟩⟩
+  | refl =>
+    refine ⟨.refl, fun v he hv => ?_⟩
+    subst he
+    obtain ⟨ε', hv', hε⟩ := raise_inv hv h
+    obtain ⟨_, _, _, _, U, _, _, _, hU, ht, hsub⟩ := canonical_errors hv hv'
+    exact ⟨Ψ, _, U, hU, ht, fun x hx => Row.le_nameClose _ x (Stage.le_err hε x (hsub x hx))⟩
   | step h₁ _ _ ih =>
     obtain ⟨X, hμ', h', hX⟩ := preservation hroot h hμ hb.main hb.mem hΨ h₁
     obtain ⟨hb', hl⟩ := h₁.below hroot.below hb
@@ -120,11 +132,10 @@ theorem T2b {root Ψ Λ μ e t r ε Λ' μ' e'} (hroot : RootTy S root) (hμ : S
       rcases List.mem_append.mp hu with hu | hu
       · exact (hΨ u hu).mono hl
       · exact (hX u hu).mono hl) (by simpa only [Stage.substT] using h')
-    refine ⟨.step h₁ (fun N hl => by subst hl; exact step_root h h₁)
-      (hs'.mono fun _ hq N hl => Row.kill_sub _ _ _ (hq N hl)), fun v he hv => ?_⟩
-    obtain ⟨Ψ', hv'⟩ := hr v he hv
-    obtain ⟨_, _, _, _, U, _, _, _, hU, ht, hsub⟩ := canonical_errors hv hv'
-    exact ⟨Ψ', .errVal hv ht hU (hsub.trans (Row.kill_sub _ _))⟩
+    refine ⟨.step h₁ (fun N hl => by subst hl; exact ⟨_, step_root h h₁⟩)
+      (hs'.mono fun _ hq N hl => let ⟨_, hc⟩ := hq N hl; Row.kill_nm hc), fun v he hv => ?_⟩
+    obtain ⟨Ψ', E, U, hU, ht, hsub⟩ := hr v he hv
+    exact ⟨Ψ', E, U, hU, ht, Row.err_kill hsub⟩
 
 /-- T2(b) for `await v` with `v : Eff r ε τ`: awaiting runs at the stage that uses the
 task's qualifier `C`, whose effects are still those of `r` (`Stage.use_svc_nm`). -/
@@ -132,16 +143,17 @@ theorem T2b_await {root Ψ Λ μ v r ε t C Λ' μ' e'} (hroot : RootTy S root) 
     (hb : CfgBelow Λ μ (.await v)) (hΨ : ∀ u ∈ Ψ, u.YF Λ.length)
     (h : Typ S Ψ Facts.age [] v (.ex (.eff r ε t C) .pure))
     (hs : Steps root (fun _ => True) Λ μ (.await v) Λ' μ' e') :
-    Steps root (fun l => ∀ N, l = .root N → r (.nm N)) Λ μ (.await v) Λ' μ' e' ∧
-      ∀ w, e' = .raise w → Value w → ∃ Ψ', Typ S Ψ' Facts.age [] w (.ex (.errors ε) .pure) := by
-  obtain ⟨r', ε', hu⟩ := Stage.use_rt r ε C
-  have hε : ε' = ε := by simpa [hu, Stage.err] using Stage.use_err (.rt r ε) C
+    Steps root (fun l => ∀ N, l = .root N → ∃ c, r.asRow (.nm N c)) Λ μ (.await v) Λ' μ' e' ∧
+      ∀ w, e' = .raise w → Value w → ∃ Ψ' E U, U.hd = .adt E ∧
+        Typ S Ψ' Facts.age [] w (.ex U .pure) ∧ Row.Sub (Row.err E U) ε.asRow.nameClose := by
+  obtain ⟨r', ε', hu⟩ := Stage.use_rt r.asRow ε.asRow C
+  have hε : ε' = ε.asRow := by simpa [hu, Stage.err] using Stage.use_err (.rt r.asRow ε.asRow) C
   rw [hε] at hu
-  have ha : Typ S Ψ Facts.age [] (.await v) (.ex t (.rt r' ε)) :=
+  have ha : Typ S Ψ Facts.age [] (.await v) (.ex t (.rt r' ε.asRow)) :=
     .await (h.sub ⟨.refl, Stage.pure_le _⟩) (hu ▸ Stage.le_refl _) .refl
   obtain ⟨hs', hr⟩ := T2b hroot hμ hb hΨ ha hs
   refine ⟨hs'.mono fun _ hq N hl => ?_, hr⟩
-  have := hq N hl
-  exact Stage.use_svc_nm (φ := .rt r ε) (C := C) (by rw [hu]; exact this)
+  obtain ⟨c, hc⟩ := hq N hl
+  exact ⟨c, Stage.use_svc_nm (φ := .rt r.asRow ε.asRow) (C := C) (by rw [hu]; exact hc)⟩
 
 end Flick

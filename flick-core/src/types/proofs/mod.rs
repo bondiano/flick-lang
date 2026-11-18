@@ -86,6 +86,8 @@ pub(super) struct Proofs<'a> {
     aliases: Vec<(u32, Value)>,
     /// The primitive comparisons, by their range, and the type they compare.
     compared: HashMap<Range, Num>,
+    /// Where a dictionary is passed, read when the module is solved.
+    given: HashSet<Range>,
 }
 
 impl Proofs<'_> {

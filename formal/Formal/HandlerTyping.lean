@@ -16,9 +16,9 @@ theorem Typ.hwith_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       ∃ t' r ε t ψ C φ₀,
         Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) ∧
         Typ S Ψ Θ Γ al (.harms E t' (.rt r ε) (.rg p)) ∧
-        Typ S Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r ε)) ∧ (Stage.use ψ C).le (.rt r ε) ∧
-        Typ S Ψ Θ Γ body (.ex t φ₀) ∧ φ₀.le (.rt (Row.hP Θ p E r) ε) ∧
-        S.Handles E al r ∧ (Stage.rt r ε).le φ ∧ LeLive S t' T ∧ φ.svc (.atm (.r p)) := by
+        Typ S Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r.asRow ε.asRow)) ∧ (Stage.use ψ.asStage C).le (.rt r.asRow ε.asRow) ∧
+        Typ S Ψ Θ Γ body (.ex t φ₀) ∧ φ₀.le (.rt (Row.hP Θ p E r.asRow) ε.asRow) ∧
+        S.Handles E al r.asRow ∧ (Stage.rt r.asRow ε.asRow).le φ ∧ LeLive S t' T ∧ φ.svc (.atm (.r p)) := by
   induction h with
   | conv _ he ih =>
     intro p ℓ E al rf body T φ hv hJ; cases hJ
@@ -34,7 +34,7 @@ theorem Typ.hwith_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
 theorem Typ.unw_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ p ℓ a T φ, e = .unw p ℓ a → J = .ex T φ →
       ∃ t r ε, Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t Caps.none) ∧
-        Typ S Ψ Θ Γ a (.ex t (Stage.use (.rt r ε) (Ty.rg p).reach)) ∧
+        Typ S Ψ Θ Γ a (.ex t (Stage.use (.rt r.asRow ε.asRow) (Ty.rg p).reach)) ∧
         (Stage.rt Row.none Row.none).le φ := by
   induction h with
   | conv _ _ ih => intro p ℓ a T φ hv hJ; cases hJ; exact ih p ℓ a _ _ hv rfl
@@ -47,15 +47,15 @@ theorem Typ.hctl_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       ∃ t' r ε t ψ C o c a₀ b₀ φ₀ Ei,
         Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) ∧
         Typ S Ψ Θ Γ al (.harms E t' (.rt r ε) (.rg p)) ∧
-        Typ S Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r ε)) ∧ (Stage.use ψ C).le (.rt r ε) ∧
+        Typ S Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r.asRow ε.asRow)) ∧ (Stage.use ψ.asStage C).le (.rt r.asRow ε.asRow) ∧
         S.op E o = some (c, a₀, b₀) ∧ c ≠ .abort ∧ (tl = true ↔ c = .tail) ∧
         OkE Ei ∧ k = plug Ei (.hole p) ∧
         Typ S Ψ Θ [] (plug Ei (.app (.const (.perform E o c)) .todo)) (.ex t φ₀) ∧
-        φ₀.le (.rt (Row.hP Θ p E r) ε) ∧
+        φ₀.le (.rt (Row.hP Θ p E r.asRow) ε.asRow) ∧
         Typ S Ψ Θ Γ a (.ex (if tl = true then b₀ else t')
-          (Stage.use (.rt r ε) (if tl = true then Caps.none else (Ty.rg p).reach))) ∧
+          (Stage.use (.rt r.asRow ε.asRow) (if tl = true then Caps.none else (Ty.rg p).reach))) ∧
         (tl = false → ∃ C', Ψ[κ]? = some (.arrow b₀ (.rt r ε) t' C') ∧ C' (.r p)) ∧
-        S.Handles E al r ∧ (Stage.rt r ε).le φ ∧ LeLive S t' T ∧ φ.svc (.atm (.r p)) := by
+        S.Handles E al r.asRow ∧ (Stage.rt r.asRow ε.asRow).le φ ∧ LeLive S t' T ∧ φ.svc (.atm (.r p)) := by
   induction h with
   | conv _ he ih =>
     intro p ℓ κ tl E al rf a k T φ hv hJ; cases hJ
@@ -77,7 +77,7 @@ theorem Typ.hkeep_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
         Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) ∧
         Typ S Ψ Θ Γ al (.harms E t' (.rt r ε) (.rg q)) ∧
         Typ S Ψ Θ Γ body (.ex t φ₀) ∧ φ₀.le (.rt (Row.hP Θ q E r₁) ε₁) ∧
-        S.Handles E al r₁ ∧ S.NonTail E r₁ ∧ (Stage.rt r ε).le (.rt r₁ ε₁) ∧
+        S.Handles E al r₁ ∧ S.NonTail E r₁ ∧ (Stage.rt r.asRow ε.asRow).le (.rt r₁ ε₁) ∧
         (Stage.rt r₁ ε₁).le φ ∧ LeLive S t T := by
   induction h with
   | conv _ he ih =>
@@ -99,7 +99,7 @@ theorem Typ.hkarm_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
         S.op E o = some (.tail, a₀, b₀) ∧ OkE Ei ∧ k = plug Ei (.hole q) ∧
         Typ S Ψ Θ [] (plug Ei (.app (.const (.perform E o .tail)) .todo)) (.ex t φ₀) ∧
         φ₀.le (.rt (Row.hP Θ q E r₁) ε₁) ∧ S.Handles E al r₁ ∧ S.NonTail E r₁ ∧
-        Typ S Ψ Θ Γ a (.ex b₀ (.rt r ε)) ∧ (Stage.rt r ε).le (.rt r₁ ε₁) ∧
+        Typ S Ψ Θ Γ a (.ex b₀ (.rt r.asRow ε.asRow)) ∧ (Stage.rt r.asRow ε.asRow).le (.rt r₁ ε₁) ∧
         (Stage.rt r₁ ε₁).le φ ∧ LeLive S t T := by
   induction h with
   | conv _ he ih =>
@@ -118,12 +118,12 @@ theorem Typ.hres_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ p ℓ a b T φ, e = .hres p ℓ a b → J = .ex T φ →
       ∃ t' r ε κ b₀ C' A,
         Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) ∧
-        Typ S Ψ Θ Γ b (.ex t' (Stage.use (.rt r ε) (Ty.rg p).reach)) ∧
+        Typ S Ψ Θ Γ b (.ex t' (Stage.use (.rt r.asRow ε.asRow) (Ty.rg p).reach)) ∧
         OkE A ∧ a = plug A (.hole p) ∧
         Typ S Ψ Θ [] (plug A (.app (.kont p κ) .todo))
-          (.ex t' (Stage.use (.rt r ε) (Ty.rg p).reach)) ∧
+          (.ex t' (Stage.use (.rt r.asRow ε.asRow) (Ty.rg p).reach)) ∧
         Ψ[κ]? = some (.arrow b₀ (.rt r ε) t' C') ∧ C' (.r p) ∧
-        (Stage.rt r ε).le φ ∧ LeLive S t' T := by
+        (Stage.rt r.asRow ε.asRow).le φ ∧ LeLive S t' T := by
   induction h with
   | conv _ he ih =>
     intro p ℓ a b T φ hv hJ; cases hJ
@@ -142,7 +142,7 @@ theorem Typ.inside_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
         (∀ C s, F C s → s = .rg p ∧ ∀ q, C (.r q) → q < p) ∧
         Typ S Ψ (Facts.union Θ F) Γ body (.ex t φ₀) ∧
         φ₀.le (.rt (Row.union (Row.scope (.rg p)) (Row.union r (Row.disch (.r p) r))) ε) ∧
-        ¬ t.reach (.r p) ∧ ¬ (Ty.errors ε).reach (.r p) ∧
+        ¬ t.reach (.r p) ∧ ¬ ε.reach (.r p) ∧
         (Stage.rt r ε).le φ ∧ LeLive S t T := by
   induction h with
   | conv _ he ih =>

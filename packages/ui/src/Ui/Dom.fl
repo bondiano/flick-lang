@@ -3,6 +3,7 @@
 module Ui.Dom exposing (..)
 
 import Atom
+import Host
 
 /// The DOM element a root renders into.
 type Container
@@ -16,12 +17,16 @@ foreign container from "flick:ui" "uiContainer"
 /// Renders `ui` into `container` with React. The views in it read atoms
 /// from the provided registry, and each renders again only when an atom it
 /// read changes. Each event runs a task of its handler, which writes atoms
-/// with the `Atom.Write` provided here; a defect goes to `supervisor`, and
+/// with the `Atom.Write` and uses the `Host.BrowserLive` provided here, as
+/// the tasks of instances do; a defect goes to `supervisor`, and
 /// so does an event a full policy rejects. It runs until the fiber running
 /// it is interrupted: then events stop at once, React unmounts, the handler
 /// tasks are interrupted and joined, and only then it ends. A failure of `supervisor` itself ends it
 /// as a defect. Markup a server rendered into `container` is hydrated.
 mount :
-  Container -> (Failure none ->{r} Unit)^c -> Ui^c ->{Async, Atom.Registry, Atom.Write | r} Never
+  Container ->
+  (Failure none ->{r} Unit)^c ->
+  Ui^c ->{Async, Atom.Registry, Atom.Write, ...Host.BrowserLive | r}
+  Never
 foreign effect mount from "flick:ui" "uiMount"
   retention call

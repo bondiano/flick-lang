@@ -125,6 +125,22 @@ prints, and `#guard_msgs` turns the difference into an error.
 #guard_msgs in
 #print axioms Flick.Ty.rnm_int_not_bool
 
+/-- info: 'Flick.Ty.Equiv.row_int_not_bool' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Ty.Equiv.row_int_not_bool
+
+/-- info: 'Flick.Ty.ref_int_not_bool' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Ty.ref_int_not_bool
+
+/-- info: 'Flick.Ty.bound_int_not_bool' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Ty.bound_int_not_bool
+
+/-- info: 'Flick.Ty.rless_removes_all' depends on axioms: [propext] -/
+#guard_msgs in
+#print axioms Flick.Ty.rless_removes_all
+
 /-- info: 'Flick.Ty.Equiv.kind' depends on axioms: [propext] -/
 #guard_msgs in
 #print axioms Flick.Ty.Equiv.kind

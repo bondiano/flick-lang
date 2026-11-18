@@ -35,7 +35,7 @@ theorem Typ.constArrow_kind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro c a ψ t C φ hc hArity hJ; cases hJ
     cases he.symm.form with
     | rows hr _ => cases hr
-    | arrow _ ht => rw [ht.kind]; exact ih c _ _ _ _ _ hc hArity rfl
+    | arrow _ _ ht => rw [ht.kind]; exact ih c _ _ _ _ _ hc hArity rfl
   | const _ hT =>
     intro c a ψ t C φ hc hArity hJ; cases hc; cases hJ
     exact Const.res_kind hArity hT .refl

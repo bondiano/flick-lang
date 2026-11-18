@@ -10,7 +10,7 @@
 //! elsewhere.
 
 use super::{K, Parser, SyntaxKind};
-use crate::syntax::heads::{BARE, DECLARATIONS, HEADS, NAMED};
+use crate::syntax::heads::{BARE, DECLARATIONS, HEADS, NAMED, TOP};
 
 /// Whether an exposed item `plugin head` starts here.
 pub(super) fn at_head(p: &Parser) -> bool {
@@ -34,7 +34,7 @@ pub(super) fn at_block(p: &Parser) -> bool {
     let head = p.text_of(p.raw());
     let imported = p.plugin_heads.contains(&head)
         || BARE.contains(&head) && matches!(p.nth(1), K::Ident | K::Con);
-    if !imported && !HEADS.iter().any(|(h, _)| *h == head) {
+    if !imported && (!HEADS.iter().any(|(h, _)| *h == head) || TOP.contains(&head)) {
         return false;
     }
     let mut depth = 0u32;
@@ -92,11 +92,13 @@ fn arguments(p: &mut Parser) {
 
 /// Whether a declaration of a plugin starts here: a head an import exposed
 /// at the start of a declaration, not its signature; one of
-/// [`DECLARATIONS`] before its word; or one of [`NAMED`] before a name.
+/// [`DECLARATIONS`] before its word; one of [`NAMED`] before a name; or one
+/// of [`TOP`].
 pub(super) fn at_declaration(p: &Parser) -> bool {
     let head = p.text_of(p.raw());
     let own = (DECLARATIONS.iter()).any(|(h, w)| *h == head && super::decl::word_at(p, 1, w))
-        || NAMED.contains(&head) && p.nth(1) == K::Ident;
+        || NAMED.contains(&head) && p.nth(1) == K::Ident
+        || TOP.contains(&head);
     (p.plugin_heads.contains(&head) || own) && p.nth(1) != K::Colon
 }
 

@@ -29,8 +29,9 @@ fn validate_removals(out: &Path, files: &[String]) -> io::Result<()> {
     Ok(())
 }
 
-/// Validate stale paths before any current build files are published.
-pub fn validate_record(root: &Path, out: &Path, files: &[String]) -> io::Result<()> {
+/// The recorded outputs of `out` that `files` no longer has, validated
+/// before any current build file is published.
+pub fn validate_record(root: &Path, out: &Path, files: &[String]) -> io::Result<Vec<String>> {
     let resolved = resolve_root(root, out);
     let trusted = resolve_root(root, root);
     let (root, out) = (trusted.as_path(), resolved.as_path());
@@ -38,21 +39,22 @@ pub fn validate_record(root: &Path, out: &Path, files: &[String]) -> io::Result<
         .map_err(io::Error::other)?;
     let dir = out.strip_prefix(root).unwrap_or(out).to_string_lossy();
     let manifest = manifest(root);
-    if let Some((_, previous)) = manifest.outputs.iter().find(|(output, _)| output == &dir) {
-        let current: HashSet<&str> = files.iter().map(String::as_str).collect();
-        let stale: Vec<_> = previous
-            .iter()
-            .filter(|file| !current.contains(file.as_str()))
-            .cloned()
-            .collect();
-        validate_output_paths(
-            files.iter().chain(&stale).map(String::as_str),
-            Limits::default(),
-        )
-        .map_err(io::Error::other)?;
-        validate_removals(out, &stale)?;
-    }
-    Ok(())
+    let Some((_, previous)) = manifest.outputs.iter().find(|(output, _)| output == &dir) else {
+        return Ok(Vec::new());
+    };
+    let current: HashSet<&str> = files.iter().map(String::as_str).collect();
+    let stale: Vec<_> = previous
+        .iter()
+        .filter(|file| !current.contains(file.as_str()))
+        .cloned()
+        .collect();
+    validate_output_paths(
+        files.iter().chain(&stale).map(String::as_str),
+        Limits::default(),
+    )
+    .map_err(io::Error::other)?;
+    validate_removals(out, &stale)?;
+    Ok(stale)
 }
 
 /// Preflight the entire manifest, including later output directories.

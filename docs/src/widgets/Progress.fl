@@ -38,7 +38,7 @@ let view input done =
 report : Failure e ->{Host.Console} Unit
 let report failure = Platform.stderr_line (RawCause.describe (Failure.inspect failure))
 
-mount : Input ->{Host.Console, Async; AppError} Unit
+mount : Input ->{Host.Clock, Host.Random, Host.Console, Async; AppError} Unit
 let mount input =
   match Ui.Dom.container input.id with
   | None -> App.fail "Missing course progress container"

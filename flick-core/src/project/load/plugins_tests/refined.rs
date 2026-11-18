@@ -123,3 +123,33 @@ fn what_a_refined_declaration_lacks_is_said_where_it_is_missing() {
         ["FLICK-T003 `n + 1`: expected `Bool`, found `Float`"]
     );
 }
+
+#[test]
+fn a_call_given_a_dictionary_proves_no_check() {
+    // `ok n` decides `n` only with the dictionary it is given: a local one
+    // inside `unpack` says nothing of the check, which the global one decides
+    let rules = "module App.Rules exposing (..)\n\nclass Picky a =\n  picky : a -> Bool\n\ninstance Picky Int =\n  let picky n = n > 0\n\nok : Picky a => a -> Bool\nlet ok x = picky x\n";
+    let main = "module App.Main exposing (..)\n\nimport App.Rules exposing (Picky(..), ok)\n\nrefined type Good = Int where ok\n\ntype module Lenient =\n  type Item = Int\n  class Picky = App.Rules.Picky\n  lenient : Picky.Dict Item\n  instance Picky Item from lenient\n\nmodule Loose exposing (Item, Picky(..), lenient) =\n  import App.Rules exposing (Picky(..))\n\n  type alias Item = Int\n\n  lenient : Picky.Dict Item\n  let lenient = Picky.dictionary { picky = fun _ -> true }\n\npacked : Module Lenient\nlet packed = pack Loose as Lenient\n\nforged : Int -> Option Good\nlet forged n = unpack packed as K in if ok n then Some (Good.prove n) else None\n\ndirect : Int -> Option Good\nlet direct n = if ok n then Some (Good.prove n) else None\n";
+    let host = host(main);
+    host.write("/p/src/App/Rules.fl", rules);
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let found: Vec<_> = check(&host, &mut sources, Some(&project), &roots())
+        .iter()
+        .map(|d| {
+            (
+                d.code,
+                sources.get(d.span.expect("a span").file).text[d.span.expect("a span").range()]
+                    .to_owned(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        found,
+        [
+            (codes::T077, "Good.prove n".to_owned()),
+            (codes::T077, "Good.prove n".to_owned())
+        ],
+        "{found:?}"
+    );
+}

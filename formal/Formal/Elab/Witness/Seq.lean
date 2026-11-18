@@ -68,7 +68,7 @@ theorem typ_snil {Q A φ} : Typ Sg Ψ Θ Γ snil (.ex (seqT Q A) φ) := typ_con0
 itself. -/
 theorem typ_fix {a ψ r f φ} {C : Caps}
     (hf : Typ Sg Ψ Θ (.mono a :: .mono (.arrow a ψ r C) :: Γ) f
-      (.ex r (Stage.use ψ C))) (hn : ∀ s, ¬ f.Has s) :
+      (.ex r (Stage.use ψ.asStage C))) (hn : ∀ s, ¬ f.Has s) :
     Typ Sg Ψ Θ Γ (.fix f) (.ex (.arrow a ψ r C) φ) :=
   .fix hf (hn .ins) .refl
 
@@ -110,7 +110,7 @@ theorem typ_seqToList {D A C0 φ} :
 
 /-- The loop at the later stage `ψ'` with the qualifier `C'`, where what `f x` needs live, its
 stage `ψ` with `C`, holds. -/
-theorem typ_seqEach_at {A D C C' C0 ψ ψ' φ} (h : (Stage.use ψ C).le (Stage.use ψ' C')) :
+theorem typ_seqEach_at {A D C C' C0 ψ ψ' φ} (h : (Stage.use ψ.asStage C).le (Stage.use ψ'.asStage C')) :
     Typ Sg Ψ Θ [] seqEach (.ex (.arrow (.arrow A ψ (tc "Unit" []) C) .pure
       (.arrow (seqT D A) ψ' (tc "Unit" []) C') C0) φ) := by
   exact typ_lam (typ_fix (typ_caseSeq (typ_var_mono rfl)

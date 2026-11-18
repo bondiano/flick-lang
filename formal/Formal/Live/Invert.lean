@@ -13,7 +13,7 @@ namespace Flick
 the source's, the source's use stage is below the target's, and so is its result. -/
 theorem LeLive.arrow_inv {A φ₀ t₀ C₀ a φ t C}
     (h : LeLive S (.arrow A φ₀ t₀ C₀) (.arrow a φ t C)) :
-    LeLive S a A ∧ (Stage.use φ₀ C₀).le (Stage.use φ C) ∧ LeLive S t₀ t := by
+    LeLive S a A ∧ (Stage.use φ₀.asStage C₀).le (Stage.use φ.asStage C) ∧ LeLive S t₀ t := by
   obtain ⟨_, _, _, _, he, ha, hφ, ht, _⟩ := h.arrow_left
   cases he; exact ⟨ha, hφ, ht⟩
 

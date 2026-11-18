@@ -6,6 +6,38 @@ break programs.
 
 ## Unreleased
 
+- **Breaking: `suite` and `test` blocks.** `suite "name" { … }` holds
+  `test "name" { body }` and nested suites, and a top-level `test "name" {
+  … }` stands alone; either may be `.skip` or `.only`. Std's plugin expands
+  them into calls of `Test` (`Test.group`, `Test.effect_test` of a `task`,
+  and the new `Test.skip` and `Test.only`), each top-level block a case of the module's `tests` in
+  the order written, which the module exports without naming it, so
+  `flick test` finds it as before. A body is an effectful test, as
+  `Test.effect_test` runs one. `suite` and `test` are now reserved heads at
+  the start of a top-level declaration: a top-level declaration may no
+  longer start with a value named `suite` or `test` (a signature `test : T`
+  still declares one). Elsewhere the words stay names, so `Test.test "x"
+  (fun () -> …)` is unchanged and modules that build `tests` by hand run as
+  before; a module with blocks and a hand-written `tests` is `FLICK-R008`.
+  A malformed block is `std/T001` and two cases of one full name
+  `std/T002`. `flick test --list` prints the full names a run would run,
+  `Module > suite > test`, and runs none; `--forbid-only` fails a run with
+  a test marked `only`. While a test of the run is marked `only`, the run
+  keeps only such tests, and a skipped test is reported as `skipped`: in the
+  summary, and in the JSON report with a `skipped` count when there is one.
+  `flick new` writes its test as a `suite`. The plugin interface gains
+  `Expr::Task`, `task { body }` in a plugin's code.
+
+- **Breaking: a UI root asks its caller for the host services of its
+  tasks.** `Ui.Dom.mount` and `Ui.mount_with` need `Host.BrowserLive`
+  (`Host.Console`, `Host.Clock` and `Host.Random`), with which the root
+  runs the tasks of `Ui.mounted`, `on_mount`, `watched`, `watch`,
+  `Ui.Event` and `Action`. A `main` that mounts a root now names them, so
+  the launcher of a `main` without a runner provides them; before, such a
+  `main` checked without them and its tasks died for want of a service.
+  `flick check --fix --only E002` adds them to the rows.
+  `Ui.Server.render`, `stream` and `to_html` start no task and need none.
+
 - **Fixed: a re-exported type keeps its companions.** A module that
   re-exports a type (`import App.Ports exposing (Port)` with
   `exposing (Port)`) now exports its `parse`, `value`, `check`, `prove` and
@@ -50,6 +82,20 @@ break programs.
   adds the services a program now needs to its rows; a function whose arrow
   is pure, or a callback whose row another module closes, needs editing by
   hand. A fix that adds a service to `->{none; E}` now writes `->{S; E}`.
+
+- **Breaking: a layer's build may use its inputs when it is released.**
+  The build of `Layer.from_build` and `Layer.from_build_memo` assumes
+  `Fiber.Provided ri s` for the region `s` it is built into, so a finalizer
+  it registers may use the layer's inputs `ri` instead of `FLICK-G003`.
+  `Layer.build`, `Layer.build_with_memo_map`, `LayerRef.make`,
+  `LayerMap.make` and `LayerMap.from_record` require `Fiber.Provided ri s`
+  of their caller: a build inside the `provide` of one of its inputs, or
+  into a region a function's signature names without the constraint, is now
+  `FLICK-G003`, as a lazy build of `LayerRef` or `LayerMap` after that
+  `provide` ended could use a released service. `provide` and `Layer.launch`
+  are unchanged. The fix of a `FLICK-G003` that would add `Fiber.Provided`
+  to a signature is offered only when that signature names the region, not
+  for the region of a `forall` in an argument such as a `from_build` body.
 
 - **`T.prove` for refined types:** `T.prove v` makes a `T` with no
   `Result` and without running the check again, where the compiler proves

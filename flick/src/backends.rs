@@ -6,11 +6,15 @@ mod component;
 #[cfg(feature = "wasm-backends")]
 mod dependencies;
 #[cfg(feature = "wasm-backends")]
+mod execute;
+#[cfg(feature = "wasm-backends")]
 pub(crate) mod launch;
 #[cfg(feature = "wasm-backends")]
 mod official;
 #[cfg(feature = "wasm-backends")]
 mod request;
+#[cfg(feature = "wasm-backends")]
+mod tools;
 
 use crate::artifact::Artifact;
 use crate::toolchain;
@@ -115,6 +119,7 @@ impl Selected {
             return official::javascript(
                 project.map_or(host.cwd.as_path(), |p| p.root.as_path()),
                 rt,
+                &project.map(|p| p.config.tools.clone()).unwrap_or_default(),
             )
             .map(|p| Self::Component(Arc::new(p)));
             #[cfg(not(feature = "wasm-backends"))]

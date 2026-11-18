@@ -1,4 +1,4 @@
-import Formal.Rules
+import Formal.Roots
 import Formal.Order
 
 /-!
@@ -85,8 +85,8 @@ theorem Stage.use_substT_rg (φ : Stage) {p : Nat} {σ : Atom → Ty}
 
 /-- A named effect of a use stage is one of the stage used: typing by use adds only
 region atoms to a row. -/
-theorem Stage.use_svc_nm {φ : Stage} {C : Caps} {N : Name}
-    (h : (Stage.use φ C).svc (.nm N)) : φ.svc (.nm N) := by
+theorem Stage.use_svc_nm {φ : Stage} {C : Caps} {N : Name} {c : TyClass}
+    (h : (Stage.use φ C).svc (.nm N c)) : φ.svc (.nm N c) := by
   cases φ with
   | pure => exact h
   | rt r ε =>

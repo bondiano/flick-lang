@@ -1,0 +1,68 @@
+//! The plugin of `std` for `suite "name" { … }` and `test "name" { … }`:
+//! the cases of a module as calls of `Test`, which `flick test` runs. Each
+//! top-level block is a case of the module's `tests`, in the order written.
+
+mod code;
+mod editor;
+mod layout;
+mod read;
+mod state;
+
+use flick_plugin::{Arena, Block, Compiler, Diagnostic, Fact, Highlight, Hover, Piece, Plugin};
+
+use crate::read::Bodies;
+
+pub struct Test;
+
+impl Plugin for Test {
+    fn collect(&self, blocks: &[Block], _: &mut dyn Compiler) -> Vec<u8> {
+        state::collect(blocks)
+    }
+
+    fn expand(
+        &self,
+        block: &Block,
+        state: &[u8],
+        compiler: &mut dyn Compiler,
+    ) -> Result<Arena, Vec<Diagnostic>> {
+        let item = read::block(block, compiler, Bodies::Lenient)?;
+        let (index, count, named) = state::place(state, block);
+        if named {
+            return Err(vec![read::duplicate(block, item.name)]);
+        }
+        Ok(code::arena(block, &item, index, count))
+    }
+
+    fn hover(&self, block: &Block, _: &[u8], offset: u32, _: &[Fact]) -> Option<Hover> {
+        editor::hover(block, offset)
+    }
+
+    fn highlight(&self, block: &Block, _: &[u8]) -> Vec<Highlight> {
+        editor::highlight(block)
+    }
+
+    fn format(&self, block: &Block, _: &[u8], compiler: &mut dyn Compiler) -> Option<Vec<Piece>> {
+        layout::format(block, compiler)
+    }
+}
+
+/// Whether `head` is one of this plugin's.
+pub fn owns(head: &str) -> bool {
+    read::WORDS.contains(&head)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use crate::read::{DUPLICATE, MALFORMED};
+
+    #[test]
+    fn std_explains_every_code_of_the_plugin() {
+        let explain = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packages/std/explain");
+        for code in [MALFORMED, DUPLICATE] {
+            let path = explain.join(format!("{code}.md"));
+            assert!(path.exists(), "no {}", path.display());
+        }
+    }
+}

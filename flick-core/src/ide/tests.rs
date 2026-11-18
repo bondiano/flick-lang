@@ -175,6 +175,7 @@ pub(super) fn fixture_with_dependencies(
             no_let_assert: false,
             thresholds: Thresholds::default(),
             plugins: BTreeMap::new(),
+            tools: BTreeMap::new(),
         },
     };
     let last = files.last().expect("a file").0;

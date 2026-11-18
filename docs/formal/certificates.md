@@ -53,7 +53,12 @@ Each certificate depends only on the axioms `propext`, `Classical.choice` and
 - **Explicit instances.** A certificate gives every instance, every arrow at a λ
   or a call, and every row of a `try`. Lean then infers the contexts and the
   stages, and the tactics close the side conditions: row and capture-row
-  inclusions, `LeLive`, and `Scheme.inst`.
+  inclusions, `LeLive`, and `Scheme.inst`. A type writes its rows as row terms
+  and a judgment their predicates (`Ty.asRow`); a stage with obligations
+  `Provided ρ ϱ` of the rest `ρ` of its row is the term `rtob ρ ϱ ε`. The type
+  the model gives an instance writes a row as a set: where the scheme instance
+  is `ρ[ρ := ∅] ∪ C`, it writes `C`. `inst_le` proves the instance a live
+  subtype of that type: equal, or the same up to what its rows stand for.
 - **Open metas** are printed as the least instance of their kind (`Env::ground`):
   `Unit` for a type, empty for a row, a capture row or the rest of a record. A
   typing holds at every instance of the metas it leaves open, and Lean checks it

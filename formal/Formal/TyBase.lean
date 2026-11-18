@@ -23,81 +23,6 @@ abbrev Caps := Atom → Prop
 
 def Caps.none : Caps := fun _ => False
 
-/-- An element of a row: a named service or error type, or an atom. In a row of
-services the atom `ϱ` is `Scope ϱ`; in a row of errors the atoms bound what the
-errors reach, `⌈Errors ε⌉` (regions.md §2.1). A row of services also carries the
-obligations `{Provided {S} ϱ}` not yet discharged (`ob S ϱ`, regions.md §2.7) and those
-`{Provided r ϱ}` over a row variable `r` (`obv r G ϱ`). `rv a G` is the row variable `a`
-without the names `G`: `G` is empty for `a` itself, and the tail of `{-S | a}` is `a`
-without `S`. A substitution replaces it with the row that `σ a` stands for (`Ty.asRow`)
-less the names of `G` (`Row.less`); an obligation is over a row variable in the same way. -/
-inductive Elem
-  | nm (N : Name)
-  | atm (a : Atom)
-  | ob (N : Name) (a : Atom)
-  | rv (a : Atom) (G : Name → Prop)
-  | obv (v : Atom) (G : Name → Prop) (a : Atom)
-
-instance : Coe Name Elem := ⟨Elem.nm⟩
-
-/-- A row of services or errors, possibly with row variables. Equality of rows is
-extensional, which is `≡` of core.md §1.2. -/
-abbrev Row := Elem → Prop
-
-def Row.none : Row := fun _ => False
-def Row.single (S : Name) : Row := fun n => n = .nm S
-def Row.union (r r' : Row) : Row := fun n => r n ∨ r' n
-/-- A row without row variables. -/
-def Row.Named (r : Row) : Prop := ∀ a G, ¬ r (.rv a G)
-
-/-- `ρ ⊆ ρ'`. -/
-def Row.Sub (r r' : Row) : Prop := ∀ n, r n → r' n
-
-/-- `ρ` less the names of `G`: its names out of `G`, its atoms, and each of its variables
-without `G` too. No obligation comes in through a row variable. -/
-def Row.less (G : Name → Prop) (r : Row) : Row
-  | .nm n => ¬ G n ∧ r (.nm n)
-  | .atm a => r (.atm a)
-  | .rv c H => ∃ H', r (.rv c H') ∧ H = fun n => G n ∨ H' n
-  | _ => False
-
-/-- `ρ` beside the names of `H`, which give back what its variables are taken without:
-beside `H`, a variable `a` without `G` is `a` without the names of `G` that `H` lacks,
-`H + (a − G) ≡ H + (a − (G − H))`. A handler of `H` leaves `ρ` to its surroundings when
-its body is within `H + ρ.back H`, so a body of the row `a` leaves `a − H`. -/
-def Row.back (r H : Row) : Row
-  | .rv a G' => ∃ G, r (.rv a G) ∧ (∀ n, G' n → G n) ∧ ∀ n, G n → G' n ∨ H (.nm n)
-  | x => r x
-/-- `ρ` up to the names its variables are taken without: what of a row passes a `handle`,
-which removes a name by the error value it holds, not by the row. -/
-def Row.modNames (r : Row) : Row
-  | .rv a _ => ∃ G, r (.rv a G)
-  | x => r x
-
-/-- The atoms of a set as row elements: `Scope ϱ` for a region `ϱ`. -/
-def Row.ofCaps (C : Caps) : Row
-  | .atm a => C a
-  | _ => False
-
-/-- Stages `φ` of core.md §1.2: pure `P` or runtime `R⟨r; ε⟩`. -/
-inductive Stage
-  | pure
-  | rt (r e : Row)
-
-def Stage.svc : Stage → Row
-  | .pure => Row.none
-  | .rt r _ => r
-
-def Stage.err : Stage → Row
-  | .pure => Row.none
-  | .rt _ e => e
-
-/-- `φ ⊑ φ'` of core.md §2.1. -/
-def Stage.le : Stage → Stage → Prop
-  | .pure, _ => True
-  | .rt _ _, .pure => False
-  | .rt r e, .rt r' e' => Row.Sub r r' ∧ Row.Sub e e'
-
 /-- Built-in base types: `Unit`, `Bool`, `Int`. -/
 inductive Base
   | unit
@@ -125,34 +50,39 @@ A record type is a spine `rcons ℓ τ (… rnil)`; field order is fixed. A nomi
 type `T ā` is a spine `tapp (… (tapp (adt T) a₁) …) aₙ`. A region is `tvar n` or
 `rg π`; a capture row is `tvar n` or `caps C`. The hidden qualifier `C` of a
 function or a computation is part of `arrow` and `eff`; that of data with hidden
-storage is a parameter of kind `CRow` of its type. A row of services or errors is `tvar n`
-or `row r`. `hnd ϱ` is `H ϱ`. `dict c ā` is the
+storage is a parameter of kind `CRow` of its type. `hnd ϱ` is `H ϱ`. `dict c ā` is the
 dictionary record `D_C ā` of λFlick⁺ (elaboration.md §0.1), its arguments a spine
 `Ty.spine`; it reaches nothing. `all k t` is `∀ α₀ … αₖ₋₁. t`: the indices below `k` of `t` are
-its variables, the others those around it, shifted by `k`. -/
+its variables, the others those around it, shifted by `k`.
+
+Rows of services and errors are types too: a row variable `tvar n` (or a region `rg π`),
+the atoms `caps C` (`Scope ϱ` is `caps ⌈ϱ⌉`), the empty row `cnil`, a named element
+`rnm N a` whose argument `a` is the nominal type `N ā` it stands for, a union `run`, and a
+row less every instance of some names, `rless G r`. A stage is `pure`, `rt r e`, or
+`rtob r s e`: `rt` whose services also hold the obligations `Provided r s` of its own row,
+one for each of its names and variables about each atom `s` reaches. Types hold no predicate over row elements, so an element can keep its
+arguments (`Elem.nm` in `Rows.lean`); what a row or a stage stands for is `Ty.asRow` and
+`Ty.asStage`. -/
 inductive Ty
   | tvar (n : Nat)
   | rg (p : Nat)
   | caps (C : Caps)
-  | row (r : Row)
-  /-- Syntactic row forms retain the arguments of a named element. The
-  predicate-row projection below is the existing parameter-free core view;
-  switching typing rules to these terms is a separate transition. -/
   | cnil
   | rnm (N : Name) (args : Ty)
   | run (left right : Ty)
   | rless (gone : Name → Prop) (row : Ty)
   | pure
   | rt (services errors : Ty)
+  | rtob (services owner errors : Ty)
   | base (b : Base)
-  | arrow (a : Ty) (φ : Stage) (b : Ty) (C : Caps)
+  | arrow (a : Ty) (φ : Ty) (b : Ty) (C : Caps)
   | ref (t : Ty)
   | adt (T : Name)
   | tapp (f a : Ty)
   | rnil
   | rcons (l : Label) (t rest : Ty)
-  | eff (r e : Row) (t : Ty) (C : Caps)
-  | errors (e : Row)
+  | eff (r e : Ty) (t : Ty) (C : Caps)
+  | errors (e : Ty)
   | hnd (s : Ty)
   | owner (s : Ty)
   | dict (c : Nat) (args : Ty)
@@ -162,22 +92,29 @@ inductive Ty
   it. It reaches nothing, but it is not the written `caps ∅`. -/
   | bare
   /-- `Lazy ρ ε τ` (lazy.md §2), with the hidden qualifier `C` of its initializer, as `eff`. -/
-  | lazy (r e : Row) (t : Ty) (C : Caps)
+  | lazy (r e : Ty) (t : Ty) (C : Caps)
   /-- The type the store gives a lazy cell of `Lazy ρ ε τ` (lazy.md §3): no value has it, so
   a lazy cell is never a `Ref` cell. -/
-  | lazyCell (r e : Row) (t : Ty) (C : Caps)
+  | lazyCell (r e : Ty) (t : Ty) (C : Caps)
+
+/-- A stage term. In the stage position of an arrow anything else is no stage: it reads as
+`pure` (`Ty.asStage`) and a substitution leaves it as it is, so that what an arrow's stage
+stands for commutes with every substitution although kinds are not checked. -/
+def Ty.isStage : Ty → Bool
+  | .pure | .rt .. | .rtob .. => true
+  | _ => false
+
 def Atom.up (k : Nat) : Atom → Atom
   | .v n => .v (n + k)
   | .r p => .r p
 
 /-- `⌈τ⌉` of regions.md §2.1: the atoms a value of type `τ` may reach. Rows of
 services are not in it; a row of errors contributes its atoms and its variables, which
-bound what the errors of an unknown row reach. -/
+bound what the errors of an unknown row reach: as a type, a row reaches just these. -/
 def Ty.reach : Ty → Caps
   | .tvar n => fun a => a = .v n
   | .rg p => fun a => a = .r p
   | .caps C => C
-  | .row r => fun a => r (.atm a) ∨ ∃ G, r (.rv a G)
   | .rnm _ args => args.reach
   | .run left right => fun a => left.reach a ∨ right.reach a
   | .rless _ r => r.reach
@@ -186,50 +123,16 @@ def Ty.reach : Ty → Caps
   | .tapp f a => fun x => f.reach x ∨ a.reach x
   | .rcons _ t r => fun x => t.reach x ∨ r.reach x
   | .eff _ _ t C => fun x => t.reach x ∨ C x
-  | .errors e => fun x => e (.atm x) ∨ ∃ G, e (.rv x G)
+  | .errors e => e.reach
   | .hnd s => s.reach
   | .owner s => s.reach
   | .all k t => fun a => t.reach (a.up k)
   -- a lazy keeps the outcome it caches: an error too
-  | .lazy _ e t C | .lazyCell _ e t C => fun x => t.reach x ∨ (e (.atm x) ∨ ∃ G, e (.rv x G)) ∨ C x
+  | .lazy _ e t C | .lazyCell _ e t C => fun x => t.reach x ∨ e.reach x ∨ C x
   | _ => Caps.none
 
 /-- A set of atoms after a substitution: each atom becomes `⌈σ a⌉`. -/
 def Caps.substT (σ : Atom → Ty) (C : Caps) : Caps := fun a => ∃ b, C b ∧ (σ b).reach a
-
-/-- The names, atoms and variables of a row: obligations never come in through a row
-variable. -/
-def Row.plain (r : Row) : Row
-  | .ob .. | .obv .. => False
-  | x => r x
-
-/-- What a type stands for as the instance of a row variable: a variable is itself, a
-`row r` the plain part of `r`, any other type the atoms it reaches. -/
-def Ty.asRow : Ty → Row
-  | .tvar n => fun x => x = .rv (.v n) fun _ => False
-  | .rg p => fun x => x = .rv (.r p) fun _ => False
-  | .row r => r.plain
-  | .cnil => Row.none
-  | .rnm N args => Row.union (Row.single N) (Row.ofCaps args.reach)
-  | .run left right => Row.union left.asRow right.asRow
-  | .rless gone r => r.asRow.less gone
-  | t => Row.ofCaps t.reach
-
-/-- A row after a substitution: a name stays, an atom `a` (also of an obligation)
-becomes the atoms of `⌈σ a⌉`, a row variable `b` without `G` the row `σ b` stands for
-less the names of `G`, and so does the row variable of an obligation: `Provided v ϱ`
-becomes one for each name and variable of that row. -/
-def Row.substT (σ : Atom → Ty) (r : Row) : Row
-  | .nm n => r (.nm n) ∨ ∃ b G, r (.rv b G) ∧ ¬ G n ∧ (σ b).asRow (.nm n)
-  | .atm a => (∃ b, r (.atm b) ∧ (σ b).reach a) ∨ ∃ b G, r (.rv b G) ∧ (σ b).asRow (.atm a)
-  | .ob n a => (∃ b, r (.ob n b) ∧ (σ b).reach a) ∨
-      ∃ v G b, r (.obv v G b) ∧ ¬ G n ∧ (σ v).asRow (.nm n) ∧ (σ b).reach a
-  | .obv w H a => ∃ v G b, r (.obv v G b) ∧ (σ v).asRow.less G (.rv w H) ∧ (σ b).reach a
-  | .rv c H => ∃ b G, r (.rv b G) ∧ (σ b).asRow.less G (.rv c H)
-
-def Stage.substT (σ : Atom → Ty) : Stage → Stage
-  | .pure => .pure
-  | .rt r e => .rt (r.substT σ) (e.substT σ)
 
 /-- An atom as a type. -/
 def Atom.ty : Atom → Ty
@@ -241,34 +144,36 @@ def liftA (k : Nat) (ξ : Atom → Atom) : Atom → Atom
   | .v i => if i < k then .v i else (ξ (.v (i - k))).up k
   | .r p => (ξ (.r p)).up k
 
-/-- A renaming of atoms: what a substitution under a binder shifts by. -/
+/-- A renaming of atoms: what a substitution under a binder shifts by. An arrow's stage is
+renamed only if it is a stage term (`Ty.isStage`). -/
 def Ty.ren (ξ : Atom → Atom) : Ty → Ty
   | .tvar n => (ξ (.v n)).ty
   | .rg p => (ξ (.r p)).ty
   | .caps C => .caps (C.substT fun a => (ξ a).ty)
-  | .row r => .row (r.substT fun a => (ξ a).ty)
   | .cnil => .cnil
   | .rnm N args => .rnm N (args.ren ξ)
   | .run left right => .run (left.ren ξ) (right.ren ξ)
   | .rless gone r => .rless gone (r.ren ξ)
   | .pure => .pure
   | .rt r e => .rt (r.ren ξ) (e.ren ξ)
+  | .rtob r s e => .rtob (r.ren ξ) (s.ren ξ) (e.ren ξ)
   | .base b => .base b
-  | .arrow a φ b C => .arrow (a.ren ξ) (φ.substT fun a => (ξ a).ty) (b.ren ξ) (C.substT fun a => (ξ a).ty)
+  | .arrow a φ b C =>
+    .arrow (a.ren ξ) (if φ.isStage then φ.ren ξ else φ) (b.ren ξ) (C.substT fun a => (ξ a).ty)
   | .ref t => .ref (t.ren ξ)
   | .adt T => .adt T
   | .tapp f a => .tapp (f.ren ξ) (a.ren ξ)
   | .rnil => .rnil
   | .rcons l t r => .rcons l (t.ren ξ) (r.ren ξ)
-  | .eff r e t C => .eff (r.substT fun a => (ξ a).ty) (e.substT fun a => (ξ a).ty) (t.ren ξ) (C.substT fun a => (ξ a).ty)
-  | .errors e => .errors (e.substT fun a => (ξ a).ty)
+  | .eff r e t C => .eff (r.ren ξ) (e.ren ξ) (t.ren ξ) (C.substT fun a => (ξ a).ty)
+  | .errors e => .errors (e.ren ξ)
   | .hnd s => .hnd (s.ren ξ)
   | .owner s => .owner (s.ren ξ)
   | .dict c a => .dict c (a.ren ξ)
   | .all k t => .all k (t.ren (liftA k ξ))
   | .bare => .bare
-  | .lazy r e t C => .lazy (r.substT fun a => (ξ a).ty) (e.substT fun a => (ξ a).ty) (t.ren ξ) (C.substT fun a => (ξ a).ty)
-  | .lazyCell r e t C => .lazyCell (r.substT fun a => (ξ a).ty) (e.substT fun a => (ξ a).ty) (t.ren ξ) (C.substT fun a => (ξ a).ty)
+  | .lazy r e t C => .lazy (r.ren ξ) (e.ren ξ) (t.ren ξ) (C.substT fun a => (ξ a).ty)
+  | .lazyCell r e t C => .lazyCell (r.ren ξ) (e.ren ξ) (t.ren ξ) (C.substT fun a => (ξ a).ty)
 
 /-- The renaming `i ↦ i + k` as a substitution; run-time regions stay. -/
 def shiftV (k : Nat) : Atom → Ty
@@ -283,20 +188,22 @@ def liftT (k : Nat) (σ : Atom → Ty) : Atom → Ty
   | .v i => if i < k then .tvar i else (σ (.v (i - k))).up k
   | .r p => (σ (.r p)).up k
 
-/-- Parallel substitution of variables and run-time regions. -/
+/-- Parallel substitution of variables and run-time regions. It is homomorphic, except that
+an arrow's stage is substituted into only if it is a stage term (`Ty.isStage`). -/
 def Ty.substT (σ : Atom → Ty) : Ty → Ty
   | .tvar n => σ (.v n)
   | .rg p => σ (.r p)
   | .caps C => .caps (C.substT σ)
-  | .row r => .row (r.substT σ)
   | .cnil => .cnil
   | .rnm N args => .rnm N (args.substT σ)
   | .run left right => .run (left.substT σ) (right.substT σ)
   | .rless gone r => .rless gone (r.substT σ)
   | .pure => .pure
   | .rt r e => .rt (r.substT σ) (e.substT σ)
+  | .rtob r s e => .rtob (r.substT σ) (s.substT σ) (e.substT σ)
   | .base b => .base b
-  | .arrow a φ b C => .arrow (a.substT σ) (φ.substT σ) (b.substT σ) (C.substT σ)
+  | .arrow a φ b C =>
+    .arrow (a.substT σ) (if φ.isStage then φ.substT σ else φ) (b.substT σ) (C.substT σ)
   | .ref t => .ref (t.substT σ)
   | .adt T => .adt T
   | .tapp f a => .tapp (f.substT σ) (a.substT σ)
@@ -311,6 +218,23 @@ def Ty.substT (σ : Atom → Ty) : Ty → Ty
   | .bare => .bare
   | .lazy r e t C => .lazy (r.substT σ) (e.substT σ) (t.substT σ) (C.substT σ)
   | .lazyCell r e t C => .lazyCell (r.substT σ) (e.substT σ) (t.substT σ) (C.substT σ)
+
+/-- An arrow's stage after a substitution. -/
+abbrev Ty.substS (σ : Atom → Ty) (φ : Ty) : Ty := if φ.isStage then φ.substT σ else φ
+
+@[simp] theorem Ty.substT_arrow (σ : Atom → Ty) (a φ b : Ty) (C : Caps) :
+    (Ty.arrow a φ b C).substT σ = .arrow (a.substT σ) (φ.substS σ) (b.substT σ) (C.substT σ) := rfl
+
+@[simp] theorem Ty.substS_pure (σ : Atom → Ty) : Ty.pure.substS σ = .pure := rfl
+
+@[simp] theorem Ty.substS_rt (σ : Atom → Ty) (r e : Ty) :
+    (Ty.rt r e).substS σ = .rt (r.substT σ) (e.substT σ) := rfl
+
+@[simp] theorem Ty.substS_rtob (σ : Atom → Ty) (r s e : Ty) :
+    (Ty.rtob r s e).substS σ = .rtob (r.substT σ) (s.substT σ) (e.substT σ) := rfl
+
+theorem Ty.isStage_substS (σ : Atom → Ty) (φ : Ty) : (φ.substS σ).isStage = φ.isStage := by
+  cases φ <;> rfl
 
 /-- The identity substitution. -/
 def Ty.ident : Atom → Ty

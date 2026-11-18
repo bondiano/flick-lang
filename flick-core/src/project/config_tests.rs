@@ -453,3 +453,34 @@ fn a_project_grants_a_plugin_files_hosts_and_variables() {
         assert_eq!(refused.code, codes::P005, "{wrong}: {}", refused.message);
     }
 }
+
+#[test]
+fn a_project_names_the_host_tools_each_backend_may_run() {
+    let config = parse_text(
+        "schema-version = 1\n[project]\nkind = \"lib\"\n[tools]\n\"flick/go\" = [\"go\"]\n\"acme/x\" = []\n",
+    )
+    .expect("valid");
+    assert_eq!(config.tools["flick/go"], ["go"]);
+    assert!(config.tools["acme/x"].is_empty());
+    assert!(
+        parse_text("schema-version = 1\n[project]\nkind = \"lib\"\n")
+            .expect("valid")
+            .tools
+            .is_empty()
+    );
+    let wrong = parse_text(
+        "schema-version = 1\n[project]\nkind = \"lib\"\n[tools]\n\"flick/go\" = \"go\"\n",
+    )
+    .expect_err("a list of tools");
+    assert_eq!(wrong.code, codes::P005);
+    let Err(root) = manifest(
+        "schema-version = 1\n[workspace]\nmembers = [\"a\"]\n[tools]\n\"flick/go\" = [\"go\"]\n",
+    ) else {
+        panic!("a workspace root grants nothing");
+    };
+    assert!(
+        root.message.contains("`[tools]` belongs to a project"),
+        "{}",
+        root.message
+    );
+}

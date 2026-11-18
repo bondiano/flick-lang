@@ -167,6 +167,9 @@ pub struct Config {
     pub thresholds: Thresholds,
     /// `[plugins.<package>]`: what the plugin of each package may reach.
     pub plugins: BTreeMap<String, Grants>,
+    /// `[tools]`: the host tools, as `node` or `go`, that the steps of a
+    /// backend or a plugin may run, by its id or package.
+    pub tools: BTreeMap<String, Vec<String>>,
 }
 
 /// An entry point of an app: its name and the module whose `main` it runs.

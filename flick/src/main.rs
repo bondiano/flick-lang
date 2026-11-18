@@ -30,6 +30,7 @@ mod mapper;
 mod package_cache;
 mod plugins;
 mod progress;
+mod publish;
 mod report;
 mod saved;
 mod sources;
@@ -45,8 +46,12 @@ fn watch(command: &impl Command, global: &GlobalArguments) -> ExitCode {
         let before = commands::settled_snapshot(&paths);
         run_command(command, global);
         timings::report(global);
-        while commands::watch_snapshot(&paths) == before {
+        // once a build has used a backend, a signal cancels it instead of ending `flick`
+        while !child::interrupted() && commands::watch_snapshot(&paths) == before {
             thread::sleep(Duration::from_millis(200));
+        }
+        if child::interrupted() {
+            return ExitCode::from(130);
         }
         report::log(global, "a file changed: running again");
     }

@@ -197,11 +197,11 @@ def Sig.Complete (S : Sig) (E : Name) (al : Tm) : Prop :=
 /-- An effect with an operation that is not `tail` stays in the row `r` around a kept handler:
 a child does not run such an arm. -/
 def Sig.NonTail (S : Sig) (E : Name) (r : Row) : Prop :=
-  (∃ o c a b, S.op E o = some (c, a, b) ∧ c ≠ .tail) → r (.nm E)
+  (∃ o c a b, S.op E o = some (c, a, b) ∧ c ≠ .tail) → r (.nm₀ E)
 
 /-- A handler handles a declared effect, which leaves the row `r` outside unless the
 handler has an arm for every operation. -/
 def Sig.Handles (S : Sig) (E : Name) (al : Tm) (r : Row) : Prop :=
-  (∃ o c a b, S.op E o = some (c, a, b)) ∧ (¬ S.Complete E al → r (.nm E))
+  (∃ o c a b, S.op E o = some (c, a, b)) ∧ (¬ S.Complete E al → r (.nm₀ E))
 
 end Flick

@@ -4,7 +4,7 @@
 /// The heads of the plugins linked into the compiler and the module that
 /// exposes each. Every module has them without an import: `cli "x" { … }`
 /// is a block of std's plugin, and no other plugin may give the head.
-pub const HEADS: [(&str, &str); 7] = [
+pub const HEADS: [(&str, &str); 9] = [
     ("cli", "Cli"),
     ("server", "Server"),
     ("codec", "Codec"),
@@ -12,6 +12,8 @@ pub const HEADS: [(&str, &str); 7] = [
     ("component", "Ui"),
     ("ui", "Ui"),
     ("refined", "Checks"),
+    ("suite", "Test"),
+    ("test", "Test"),
 ];
 
 /// The word of generated code before the module a body opens: `open$module
@@ -45,3 +47,9 @@ pub const DECLARATIONS: [(&str, &str); 4] = [
 /// The heads that declare a name right after them, whatever word it is:
 /// `component counter (start : Float) = …`.
 pub const NAMED: [&str; 1] = ["component"];
+
+/// The heads that start a block only at the start of a top-level
+/// declaration, whatever follows them but the `:` of a signature:
+/// `suite "name" { … }`, `test.skip "name" { … }`. Elsewhere the word is a
+/// name, so `Test.test "x" (fun () -> …)` stays a call.
+pub const TOP: [&str; 2] = ["suite", "test"];

@@ -290,6 +290,8 @@ codes! {
     P047 = Project 47, "the IR a plugin gave does not hold together";
     P048 = Project 48, "a plugin rewrote the IR of the build";
     P049 = Project 49, "the invariant a plugin gave does not hold together";
+    P050 = Project 50, "a host tool step failed";
+    P051 = Project 51, "`[tools]` does not allow this host tool";
 }
 
 #[cfg(test)]

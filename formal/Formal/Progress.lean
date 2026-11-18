@@ -53,7 +53,7 @@ theorem ni {F : Frame} (h : F.isInside → False) : ¬ F.isInside := h
 /-- Progress of an application of two values. -/
 theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.length)
     (hvf : Value f) (hve : Value e) (hf : Typ S Ψ Θ [] f (.ex (.arrow a ψ t C) φ))
-    (he : Typ S Ψ Θ [] e (.ex a φ)) (hψ : (Stage.use ψ C).le φ) :
+    (he : Typ S Ψ Θ [] e (.ex a φ)) (hψ : (Stage.use ψ.asStage C).le φ) :
     Value (.app f e) ∨ NV S root Λ μ (.app f e) φ.svc := by
   have step : ∀ {l o}, Step root l Λ μ (.app f e) o →
       Value (.app f e) ∨ NV S root Λ μ (.app f e) φ.svc := fun h => .inr (.step ⟨_, _, h⟩)
@@ -71,10 +71,10 @@ theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.le
       by_cases hra : RootAnswers root E o cl
       · obtain ⟨rfl, _, _, hr, hf⟩ := hra
         exact step (Step.performRoot (E := []) OkE.nil (fun _ h => by cases h) hr hf hve)
-      · have hrow : Stage.le (Stage.rt (Row.single E) Row.none) φ := by
+      · have hrow : Stage.le (Stage.rt (Ty.rnm E (.adt E)).asRow Row.none) φ := by
           simpa only [Stage.use_none] using Stage.le_trans hψ' hψ
         exact .inr (.perform ⟨[], _, _, _, _, _, _, OkE.nil, hve, rfl, hop, fun _ h => (by cases h),
-          hra, Stage.le_svc hrow _ rfl⟩)
+          hra, Stage.le_svc hrow _ (.inl rfl)⟩)
     | scopeRun => exact step (Step.ofR (.scopeRun hve))
     | refMake => exact step (Step.ofR (.refMake hve))
     | refGet =>

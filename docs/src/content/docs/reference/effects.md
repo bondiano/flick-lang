@@ -539,6 +539,43 @@ start : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter} Unit
 let start owner = ignore (Fiber.spawn owner report (task { Greeter.greet "child" }))
 ```
 
+The build of `Layer.from_build f` and `Layer.from_build_memo f` runs in the
+owner of the region `s` the layer is built into, and `f` assumes
+`Fiber.Provided ri s` for the layer's inputs `ri`: a finalizer it registers may
+use them. A `provide` and `Layer.launch` build a layer into a region of their
+own, which every provider of its inputs outlives. `Layer.build`,
+`Layer.build_with_memo_map`, `LayerRef.make`, `LayerMap.make` and
+`LayerMap.from_record` build it into a region of their caller, so they require
+`Fiber.Provided ri s` there. A build into a `scope` inside the `provide` of an
+input checks; a build into a `scope` around that `provide`, which outlives it,
+is `FLICK-G003`:
+
+```flick fail G003
+# service Greeter =
+#   greet : String ->{} String
+# service Box =
+#   value : Unit ->{} String
+# greeter : Layer none none {Greeter}
+# let greeter = Layer.succeed Greeter { greet = fun name -> name }
+#
+box : Layer {Greeter} none {Box}
+let box =
+  Layer.from_build (fun memo ->
+    Scope.add_finalizer (task { ignore (Greeter.greet "released") })
+    Layer.build_with_memo_map memo (Layer.succeed Box { value = fun () -> "box" })
+  )
+
+built : Unit ->{} Unit
+let built () = provide greeter { scope { ignore (Layer.build box) } }
+
+leaked : Unit ->{} Unit
+let leaked () = scope {
+  // FLICK-G003: the finalizer of `box` would run when the `scope` closes,
+  // after the `provide` released `Greeter`
+  provide greeter { ignore (Layer.build box) }
+}
+```
+
 ## What may suspend: `Async`
 
 A function that waits for time, input or output or another fiber says so
@@ -629,7 +666,9 @@ A runner's `Main` says which services `main` may need (see
 [entry points](../project/#entry-points)), and a layer `main` provides itself
 wins over the root. UI tasks (`Ui.mounted`, `on_mount`, `watched`, `watch`, the
 handlers of `Ui.Event` and `Action`) and `Runner.Cloudflare.wait_until` may
-use `Host.BrowserLive`.
+use `Host.BrowserLive`. `Ui.Dom.mount` and `Ui.mount_with`, which run the UI
+tasks with their caller's services, need it, so a `main` that mounts a root
+names it.
 
 ### Where a missing service is caught
 

@@ -46,6 +46,7 @@ flick-plugin-cli = { path = "../plugins/cli" }
 flick-plugin-derive = { path = "../plugins/derive" }
 flick-plugin-refined = { path = "../plugins/refined" }
 flick-plugin-sql = { path = "../plugins/sql" }
+flick-plugin-test = { path = "../plugins/test" }
 flick-plugin-ui = { path = "../plugins/ui" }
 flick-pretty = { path = "../flick-pretty" }
 semver = { version = "1.0.26", optional = true }

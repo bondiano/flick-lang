@@ -71,7 +71,7 @@ let delivered = Atom.mutation ["orders", "stock"] (fun () -> ())
 report : Failure e ->{} Unit
 let report _ = ()
 
-main : Unit ->{Host.Console, Async; AppError} Unit
+main : Unit ->{Host.Clock, Host.Random, Host.Console, Async; AppError} Unit
 let main () =
   setup ()
   match Ui.Dom.container "app" with

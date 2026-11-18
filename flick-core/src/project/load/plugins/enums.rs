@@ -16,8 +16,9 @@ impl Loader<'_> {
     /// The enums `m` sees, each with its base type, `String` or `Int`.
     pub(super) fn enums_seen(&self, m: &Loaded) -> BTreeMap<String, String> {
         let text = &self.sources.get(m.file).text;
-        let mut seen: BTreeMap<String, String> =
-            declared(&m.parse.tree, text).into_iter().collect();
+        // inserted one by one, as below: `collect` would compile a sort of its own
+        let mut seen = BTreeMap::new();
+        seen.extend(declared(&m.parse.tree, text));
         for import in &m.syntax.imports {
             let theirs = self.enums_of(&import.module);
             for (name, base) in &theirs {

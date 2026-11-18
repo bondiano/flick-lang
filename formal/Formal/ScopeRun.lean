@@ -16,23 +16,30 @@ theorem Row.obs_ty (a : Atom) (r : Row) : Row.obs r a.ty = Row.disch a r := by
   funext x; apply propext
   cases x <;> simp [Row.obs, Row.disch, Atom.ty_reach, and_comm]
 
+/-- The stage `Scope.run` gives its function, `R⟨Scope s | r + Provided r s; e⟩`, is the bound of
+the body of a `scope` (Scope): its obligations are those the end of the region discharges. -/
+theorem scopeRun_stage (r ε : Ty) :
+    (Ty.rtob (.run (.caps (Ty.tvar 0).reach) (r.up 1)) (.tvar 0) (ε.up 1)).asStage =
+      .rt (Row.union (Row.scope (.tvar 0)) (Row.union (r.asRow.substT (shiftV 1))
+        (Row.disch (.v 0) (r.asRow.substT (shiftV 1))))) (ε.asRow.substT (shiftV 1)) := by
+  simp only [Ty.asStage, Ty.up_def, Row.substT_asRow, Stage.rt.injEq, and_true]
+  funext x; apply propext
+  cases x <;> simp [Ty.asRow, Row.union, Row.obs, Row.disch, Row.scope, Row.ofCaps, Ty.reach] <;>
+    grind
+
 /-- The step of `Scope.run f` keeps the type, for a closed value `f`. In the live discipline
 the qualifier of `f` is live in the rows around the scope (`Const.ok` of `.scopeRun`). -/
-theorem scopeRun_body {Ψ Θ f t T φ φ₀} {r ε : Row} {C : Caps} (hv : Value f)
+theorem scopeRun_body {Ψ Θ f t T φ φ₀} {r ε : Ty} {C : Caps} (hv : Value f)
     (h : Typ S Ψ Θ [] f (.ex (.all 1 (.arrow (.owner (.tvar 0))
-      (.rt (Row.union (Row.scope (.tvar 0)) (Row.union (r.substT (shiftV 1))
-        (Row.obs (r.substT (shiftV 1)) (.tvar 0)))) (ε.substT (shiftV 1)))
+      (.rtob (.run (.caps (Ty.tvar 0).reach) (r.up 1)) (.tvar 0) (ε.up 1))
       (t.up 1) (C.substT (shiftV 1)))) φ₀))
-    (hφ : (Stage.rt r ε).le φ) (hT : LeLive S t T)
-    (hC : Row.Sub (Row.ofCaps C) r) :
+    (hφ : (Stage.rt r.asRow ε.asRow).le φ) (hT : LeLive S t T)
+    (hC : Row.Sub (Row.ofCaps C) r.asRow) :
     Typ S Ψ Θ [] (.scope (.app (f.rename (· + 1)) (.var 0))) (.ex T φ) := by
   have hr := (Typ.allInv hv h).rename (Γ' := [.mono (.owner (.tvar 0))]) (ξ := (· + 1))
     fun _ _ hj => by simp at hj
-  have hobs := Row.obs_ty (.v 0) (r.substT (shiftV 1))
-  simp only [Atom.ty] at hobs
-  refine .scope (F := Facts.none) (φ' := .rt (Row.union (Row.scope (.tvar 0))
-    (Row.union (r.substT (shiftV 1)) (Row.obs (r.substT (shiftV 1)) (.tvar 0)))) (ε.substT (shiftV 1)))
-    ?_ (fun _ _ h => h.elim) ?_ ?_ hφ hT
+  refine .scope (F := Facts.none) (φ' := (Ty.rtob (.run (.caps (Ty.tvar 0).reach) (r.up 1))
+    (.tvar 0) (ε.up 1)).asStage) ?_ (fun _ _ h => h.elim) ?_ ?_ hφ hT
   · rintro (h' | h')
     · exact (h.noIns hv).rename _ h'
     · cases h'
@@ -42,8 +49,9 @@ theorem scopeRun_body {Ψ Θ f t T φ φ₀} {r ε : Row} {C : Caps} (hv : Value
       (Entails.union_left _ _)
     have hs := hC.substT (shiftV 1)
     rw [Row.ofCaps_substT] at hs
+    rw [scopeRun_stage]
     exact ⟨fun x hx => hx.elim id fun h' => .inr (.inl (hs x h')), fun _ h' => h'⟩
-  · rw [← hobs]; exact Stage.le_refl _
+  · rw [scopeRun_stage]; exact Stage.le_refl _
 
 /-- `Scope.run (λ. b)` and `scope b` run the same way: each creates the region at the end of
 the regions, leaves the store alone and runs `b` with its owner, inside the region. -/
@@ -65,16 +73,15 @@ theorem scopeRun_agrees {root : Roots} {Q : Lbl → Prop} (hrt : Q .rt) (hp : Q 
 
 /-- A `scope` with no facts about its region types as `Scope.run` of a lambda. A body that uses
 a fact has no such typing: an instance of the binder may be any region. -/
-theorem Typ.scopeRun_of_scope {Ψ Θ Γ b t T φ φ'} {r ε : Row} (hn : b.NoIns)
+theorem Typ.scopeRun_of_scope {Ψ Θ Γ b t T φ φ'} {r ε : Ty} (hn : b.NoIns)
     (hb : Typ S (Ψ.map (Ty.up 1)) (Facts.union (Θ.substT (shiftV 1)) Facts.none)
       (.mono (.owner (.tvar 0)) :: Γ.map (Scheme.up 1)) b (.ex (t.up 1) φ'))
     (hφ' : φ'.le (.rt (Row.union (Row.scope (.tvar 0))
-      (Row.union (r.substT (shiftV 1)) (Row.disch (.v 0) (r.substT (shiftV 1))))) (ε.substT (shiftV 1))))
-    (hφ : (Stage.rt r ε).le φ) (hT : LeLive S t T) :
+      (Row.union (r.asRow.substT (shiftV 1)) (Row.disch (.v 0) (r.asRow.substT (shiftV 1)))))
+        (ε.asRow.substT (shiftV 1))))
+    (hφ : (Stage.rt r.asRow ε.asRow).le φ) (hT : LeLive S t T) :
     Typ S Ψ Θ Γ (.app (.const .scopeRun) (.lam b)) (.ex T φ) := by
-  have hobs := Row.obs_ty (.v 0) (r.substT (shiftV 1))
-  simp only [Atom.ty] at hobs
-  rw [← hobs] at hφ'
+  rw [← scopeRun_stage] at hφ'
   -- the lambda uses nothing but its rows: its qualifier is empty
   refine .app (.const (c := .scopeRun) (ι := ⟨t, .base .unit, Caps.none, r, ε⟩)
     (fun x h => by cases x <;> exact h.elim) .refl) (.allI .lam (.lam ((hb.cut Entails.union_none).sub
@@ -99,7 +106,7 @@ theorem Typ.scope_of_scopeRun {Ψ Θ Γ b T φ} (h : Typ S Ψ Θ Γ (.app (.cons
   obtain ⟨_, _, _, _, h, la', lψ', lt', -⟩ := hL.arrow_left
   cases h
   obtain rfl := (la'.eq_plain rfl).owner_v_right
-  rw [show ∀ x, Row.obs x (.tvar 0) = Row.disch (.v 0) x from Row.obs_ty (.v 0)] at lψ'
+  rw [scopeRun_stage] at lψ'
   exact .scope (F := Facts.none) hn (fun _ _ h => h.elim)
     ((hb.sub (J' := .ex _ _) ⟨lt', Stage.le_refl _⟩).cut (Entails.union_left _ _))
     (Stage.le_trans lψ' ⟨fun x hx => hx.elim id fun h' => .inr (.inl (hs x h')), fun _ h' => h'⟩)

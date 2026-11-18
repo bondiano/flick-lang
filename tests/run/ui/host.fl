@@ -1,0 +1,52 @@
+// A root started by the launcher of a `main` without a runner: the task of
+// an instance and that of an action print through `Host.Console`, and read
+// `Host.Clock` and `Host.Random`. `Ui.Dom.mount` asks its caller for the
+// browser's host services, so `main` names them and the launcher provides
+// them.
+module App.Main exposing (main)
+
+setup : Unit ->{} Unit
+foreign setup from "./dom.mjs" "setup"
+  arity 0
+
+click : String ->{} Unit
+foreign click from "./dom.mjs" "click"
+  arity 1
+
+settle : Unit ->{Async} Unit
+foreign settle from "./dom.mjs" "settle"
+  arity 0
+
+// 2020-01-01T00:00:00Z
+let after_2020 = 1577836800000.0
+
+greet : Action.Action Ui.ClickSnapshot
+let greet =
+  Action.exhaust (fun _ -> task {
+    Platform.stdout_line "clicked after 2020: \{show (Clock.current_time_millis () > after_2020)}"
+  })
+
+component app () =
+  let _drawn =
+    Ui.on_mount
+      (task { Platform.stdout_line "mounted, drew below 1: \{show (Random.next () < 1.0)}" })
+  ui { button { disabled = false; on_click = greet } (text "greet") }
+
+report : Failure e ->{Host.Console} Unit
+let report failure =
+  Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
+
+main : Unit ->{Async, ...Host.BrowserLive; AppError} Unit
+let main () =
+  setup ()
+  match Ui.Dom.container "app" with
+  | None -> Platform.stdout_line "no container"
+  | Some root -> provide Atom.layer {
+    scope s {
+      let _ui = Fiber.spawn s report (task { Ui.Dom.mount root report (Ui.render app ()) })
+      settle ()
+      click "greet"
+      settle ()
+    }
+    Platform.stdout_line "unmounted"
+  }

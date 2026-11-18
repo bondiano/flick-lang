@@ -124,7 +124,7 @@ func TestASupervisorThatFailsFailsItsTest(t *testing.T) {
 		})
 	})
 	before := len(rootDefects.causes)
-	got := runOne(rootFiber(), named{"dies", &test{name: "dies", task: task}, nil}, 0, nil)
+	got := runOne(rootFiber(), named{name: "dies", test: &test{name: "dies", task: task}}, 0, nil)
 	if got.Status != "failed" || got.Kind != "defect" {
 		t.Errorf("the test fails with the supervisor's defect: %+v", got)
 	}
@@ -153,7 +153,7 @@ func TestSuiteSharesItsLayer(t *testing.T) {
 		})
 	}
 	suite := TestSuite("suite", layer, []Value{TestEffect("a", read("a")), TestEffect("b", read("b"))})
-	selected := flatten("M", []Value{suite}, nil, nil)
+	selected := flatten("M", []Value{suite}, nil, nil, false, false)
 	runs := suiteRuns(rootFiber(), selected)
 	for _, n := range selected {
 		if got := runOne(rootFiber(), n, 0, runs); got.Status != "passed" {

@@ -75,7 +75,7 @@ export const sidebar = [
   {
     label: "Guides",
     translations: { ru: "Задачи" },
-    items: ["ui", "cli-dsl", "http-api", "rpc", "server-fn", "route", "form", "observability", "schema", "sql", "ffi"].map(reference),
+    items: ["ui", "cli-dsl", "testing", "http-api", "rpc", "server-fn", "route", "form", "observability", "schema", "sql", "ffi"].map(reference),
   },
   {
     label: "Tools",
