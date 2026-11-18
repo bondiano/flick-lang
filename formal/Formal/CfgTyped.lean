@@ -55,7 +55,8 @@ theorem await_arg {Ψ Θ c w t₀ T φ} (h : Typ S Ψ Θ [] (.app (.app (.const 
     | ctorApp _ hK _ => simp [Tm.head] at hK
   obtain ⟨_, _, _, _, hf, ht, _, _⟩ := h.app_nonvalue _ _ _ _ rfl rfl hn
   obtain ⟨_, _, _, _, hc', _, _, hT₁⟩ := hf.app_arrow
-  obtain ⟨ι, hT'⟩ := hc'.const_witness
+  obtain ⟨ι, hT'⟩ := hc'.const_witness fun E o cl he => by
+    subst he; obtain ⟨_, _, _, _, _, _, _, _, hx⟩ := hc default; cases hx
   obtain ⟨_, _, _, _, _, _, _, _, hx⟩ := hc ι
   rw [hx] at hT'
   obtain ⟨_, _, _, _, h, _, _, lt, -⟩ := hT'.arrow_left
