@@ -158,7 +158,7 @@ fn a_server_of_one_target_answers_a_client_of_the_other() {
             call.env(format!("P{i}"), port);
         }
         let out = call
-            .env("FLICK_SERVER_URL", &running.base)
+            .env("SERVER", &running.base)
             .output()
             .expect("the client runs");
         assert_eq!(

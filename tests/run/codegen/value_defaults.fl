@@ -1,0 +1,50 @@
+// A default that is a value, not a function: computed where an instance
+// that does not define it reads it, with no dictionary of its own or with
+// those of its default signature; an instance's own definition replaces it.
+// A default task runs at each `await`, as any task does.
+module App.Main exposing (main)
+
+class Counter a =
+  start : a
+  next : a -> a
+  count : a -> Int
+  third : a
+  let third = next (next start)
+  labelled : (a, String)
+  labelled : Show a => (a, String)
+  let labelled =
+    let first = start
+    (first, show first)
+  counted : Eff {Host.Console} none a
+  let counted = task {
+    Platform.stdout_line "counting"
+    next start
+  }
+
+type Steps = Steps Int
+  deriving Show
+
+instance Counter Steps =
+  let start = Steps 1
+  let next s =
+    match s with
+    | Steps n -> Steps (n + 1)
+  let count s =
+    match s with
+    | Steps n -> n
+
+instance Counter Int =
+  let start = 10
+  let next n = n - 1
+  let count n = n
+  let third = 0
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  Platform.stdout_line (show (third : Steps))
+  Platform.stdout_line (show (labelled : (Steps, String)))
+  Platform.stdout_line (show (third : Int))
+  Platform.stdout_line (show (labelled : (Int, String)))
+  let steps : Eff {Host.Console} none Steps = counted
+  Platform.stdout_line (show (count (await steps) + count (await steps)))
+  Platform.stdout_line (show (await (counted : Eff {Host.Console} none Int)))

@@ -7,6 +7,7 @@
 use std::iter;
 use std::rc::Rc;
 
+use crate::check::{Inst, substitute};
 use crate::syntax::{Const, Head, Name, Term};
 use crate::translate::lean::elide::{row, stage_pred};
 use crate::types::{Fields, Row, Stage, Type};
@@ -72,16 +73,37 @@ pub(super) fn provide_tm(
 }
 
 impl Cx<'_> {
-    /// (Perform) of an operation called, at its arrow `a ->{S} b`: the
-    /// model types it `a ->{} b` and asks for `S` where it runs.
+    /// The instance `S ū` a constant of a service took at `head` (`ask`,
+    /// `Layer.succeed`, `Layer.effect`): `ū`, printed, and the type of the
+    /// operation `op` at it, `a[ū] ->{} b[ū]`.
+    fn at_instance(&self, head: &Term, op: &Op) -> Result<(Vec<Type>, String, Type), Unsupported> {
+        let insts: &[Inst] = (self.node(head)?.instance.as_ref()).map_or(&[], |(_, i)| i);
+        let insts =
+            (insts.get(..op.vars.len())).ok_or("a service's constant without its instance")?;
+        let args = (insts.iter())
+            .map(|i| match i {
+                Inst::Type(t) => Ok(t.clone()),
+                _ => Err("a service at an argument of no type".to_owned()),
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let us = (insts.iter())
+            .map(|i| self.inst(i))
+            .collect::<Result<Vec<_>, _>>()?;
+        let map = op.vars.iter().cloned().zip(insts.iter().cloned()).collect();
+        Ok((
+            args,
+            format!("[{}]", us.join(", ")),
+            substitute(&op.ty, &map),
+        ))
+    }
+
+    /// (Perform) of an operation called, at its arrow `a[ū] ->{S ū} b[ū]`:
+    /// the model types it `a[ū] ->{} b[ū]` and asks for `S ū` where it runs.
     pub(super) fn operation(&self, e: &Term) -> Result<(String, Type), Unsupported> {
         let (svc, o) = operation(e).ok_or("no operation")?;
         let op = (single(self.sig, &svc)?.name == *o)
             .then(|| single(self.sig, &svc))
             .ok_or("an operation not in the signature")??;
-        let Type::Fun(a, _, b) = &op.ty else {
-            return Err("an operation of no arrow".into());
-        };
         let Term::Field(r, _) = e else {
             return Err("no operation".into());
         };
@@ -91,14 +113,18 @@ impl Cx<'_> {
         let Term::Apply(Head::Const(Const::Ask(path)), _) = &**ask else {
             return Err("no operation".into());
         };
-        let at = Type::Fun(
-            a.clone(),
-            Stage::Runtime(Row::one(path.clone()), Row::none()),
-            b.clone(),
-        );
+        let (args, us, at_op) = self.at_instance(ask, op)?;
+        let Type::Fun(a, _, b) = &at_op else {
+            return Err("an operation of no arrow".into());
+        };
+        let mut wants = Row::none();
+        wants.elems.insert(path.clone(), args.into());
+        let at = Type::Fun(a.clone(), Stage::Runtime(wants, Row::none()), b.clone());
         let proof = format!(
-            "(Cert.typ_op (E := {svc:?}) (o := {:?}) (hS.arity _ (by decide)) ((hS.op _ _ (by decide)).trans rfl) (by le_live))",
-            o.to_string()
+            "(Cert.typ_op (E := {svc:?}) (o := {:?}) (us := {us}) (a' := {}) (b' := {}) (hS.arity_of (by decide) rfl) ((hS.op _ _ (by decide)).trans rfl) (by inst_eq) (by inst_eq) (by le_live))",
+            o.to_string(),
+            self.ty(a)?,
+            self.ty(b)?
         );
         Ok((proof, at))
     }
@@ -115,10 +141,23 @@ impl Cx<'_> {
         let pad = format!("\n{}", " ".repeat(col + 2));
         let (svc, imp, effect) = layer(l)?;
         let op = single(self.sig, &svc)?;
+        let Term::App(head, _) = l else {
+            return Err("a layer of no `succeed` or `effect`".into());
+        };
+        let (_, us, at_op) = self.at_instance(head, op)?;
+        let Type::Fun(a, _, b) = &at_op else {
+            return Err("an operation of no arrow".into());
+        };
         let record = Type::Record(Fields {
-            fields: [(op.name.clone(), op.ty.clone())].into(),
+            fields: [(op.name.clone(), at_op.clone())].into(),
             tail: None,
         });
+        // the row outside fits the body: at once when the service has no parameters
+        let fits = if self.sig.arity.get(&svc).copied().unwrap_or(0) == 0 {
+            "(Cert.body_none ((hS.arity _ (by decide)).trans rfl))"
+        } else {
+            "(by body_row)"
+        };
         let (own, rest) = (self.node(body)?.own.clone()).ok_or("a `provide` without its stage")?;
         // the rows outside as row terms: the handler's value and arms are typed at them
         let errors = match &own {
@@ -140,8 +179,10 @@ impl Cx<'_> {
         };
         let pb = self.under(&"$w".into(), |c| c.typing(body, t, col + 2))?;
         Ok(format!(
-            "(Cert.typ_provide (E := {svc:?}) (o := {:?}) (R := {}) (t := {}) (r := {}) (ε := {errors}) (φ₀ := {}){pad}(hS.arity _ (by decide)) ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl{pad}{w}{pad}{pb}{pad}(by stage_le) (by ob_out) (by stage_le) (by le_live))",
+            "(Cert.typ_provide (E := {svc:?}) (o := {:?}) (us := {us}) (a' := {}) (b' := {}) (R := {}) (t := {}) (r := {}) (ε := {errors}) (φ₀ := {}){pad}(hS.arity_of (by decide) rfl) ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) (by inst_eq) (by inst_eq) rfl{pad}{w}{pad}{pb}{pad}(by stage_le) {fits} (by ob_out) (by stage_le) (by le_live))",
             op.name.to_string(),
+            self.ty(a)?,
+            self.ty(b)?,
             self.ty(&record)?,
             self.ty(t)?,
             row(&rest, &self.env)?,

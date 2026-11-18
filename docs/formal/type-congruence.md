@@ -57,6 +57,14 @@ variable (`Ty.isStage`), so `Ty.asStage_substS` needs no kinds.
 - `Ty.rless_removes_all`: `-S` removes `S` at every argument, before and after
   a substitution.
 
+`InstanceHandlers.lean` proves what a handler of `Store Int` gives its body:
+`Store Int` (`Row.hBody_store_int`) and not `Store Bool`, whatever the row
+outside holds (`Row.hBody_store_bool`, from `Ty.store_bool_not_int`); a row
+variable of its body is taken without `Store` (`Row.hBody_var_without`), so a
+generic body cannot hide another instance in the tail it does not know; and a
+substitution keeps what it answers, at the substituted arguments
+(`Row.hBody_store_substT`).
+
 Removal is by name. `Row.less G` removes each instance of each name of `G`.
 At run time an arm that catches a constructor, and a handler of an effect,
 act by name whatever the arguments. So the rows they remove are closed under
@@ -133,7 +141,8 @@ valid measure after row idempotence and subtraction.
 
 ## Checks and limits
 
-`Formal.IndexedRows` checks the named elements above. `Formal.ConversionExamples` includes a closed index problem whose two sides
+`Formal.IndexedRows` checks the named elements above, and `Formal.InstanceHandlers`
+the handler of one instance. `Formal.ConversionExamples` includes a closed index problem whose two sides
 are unequal syntax under every substitution but whose identity substitution
 is a most general unifier modulo congruence. It also checks conversion of a
 completed pattern and the resulting binding. `Live.ConversionExamples`,

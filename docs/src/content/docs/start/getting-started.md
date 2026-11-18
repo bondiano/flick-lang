@@ -79,8 +79,9 @@ binding is still taken on trust:
 
 ## A project
 
-Flick compiles to ES modules that run with the Flick runtime and
-Effect 4.1.2. Packages are installed with pnpm. Create a project and run it:
+Flick compiles to ES modules that run on Flick's own runtime,
+`@flick-lang/runtime`. Packages are installed with pnpm. Create a project and
+run it:
 
 ```sh
 flick new my-app
@@ -89,22 +90,27 @@ flick install
 flick run
 ```
 
-`flick new` writes `flick.toml`, `package.json` with the pinned runtime and
-Effect, `src/App/Main.fl`, the module `src/App/Greeting.fl` it imports and
-its test `test/App/GreetingTest.fl`:
+`flick new` writes `flick.toml`, `package.json` with the pinned runtime,
+`src/App/Main.fl`, the module `src/App/Greeting.fl` it imports and its test
+`test/App/GreetingTest.fl`:
 
 ```flick
 module App.Main exposing (main)
 
 import App.Greeting exposing (greet)
 
-main : Unit ->{Host.Arguments, Host.Console; AppError} Unit
-let main () =
-  let name = Platform.args () |> List.head |> Option.with_default "world"
-  Platform.stdout_line (greet name)
+run : Unit ->{Host.Arguments, Host.Console} Unit
+let run () =
+  let name = Host.Arguments.args () |> List.head |> Option.with_default "world"
+  Host.Console.stdout_line (greet name)
+
+main : Unit ->{; AppError} Unit
+let main () = provide (Layer.merge Host.arguments Host.console) { run () }
 ```
 
-`flick run -- Ada` prints `Hello, Ada!`.
+`run` names the `Host` services it uses, and `main` provides their live
+layers, so a test can call `run` with its own. `flick run -- Ada` prints
+`Hello, Ada!`.
 
 `flick check` type-checks without running anything, `flick build` writes the
 JavaScript to `dist/`, `flick test` runs the tests of the test root and

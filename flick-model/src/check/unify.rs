@@ -355,7 +355,8 @@ impl Checker<'_> {
     }
 
     /// `Errors ρ ≡ τ` for `τ` not a row projection: `Errors {E} ≡ E`,
-    /// `Errors none ≡ Never` (§1.5); an unknown `ρ` becomes that row.
+    /// `Errors none ≡ Never` (§1.5); an unknown `ρ` becomes that row, and
+    /// an unknown tail of `{E | ?m}` is none, the only way it projects.
     fn project(&mut self, r: &Row, t: &Type) -> Check<()> {
         let r = self.zonk_row(r);
         let never = Type::con("Prelude", "Never");
@@ -363,6 +364,10 @@ impl Checker<'_> {
         let vars: Vec<_> = r.vars.iter().collect();
         match (elems.as_slice(), vars.as_slice()) {
             ([(e, args)], []) => self.unify(&error_type(e, args), t),
+            ([(e, args)], [Var::Meta(m)]) if self.error_of(t).is_some_and(|(p, _)| p == **e) => {
+                self.bind_row(*m, Row::none())?;
+                self.unify(&error_type(e, args), t)
+            }
             ([], []) => self.unify(&never, t),
             ([], [Var::Meta(m)]) => {
                 let t = self.zonk(t);

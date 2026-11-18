@@ -1,0 +1,48 @@
+// Handlers of two instances of one effect run in one program, each answering
+// its own instance: through a generic handler, a polymorphic function, a
+// polymorphic argument, a handler inside another's body, and a function
+// whose row takes out every instance. A mix-up prints something else.
+module App.Main exposing (main)
+
+effect Store a =
+  get : Unit ->{} a
+
+with_store : a -> (Unit ->{Store a | r; e} b) ->{r; e} b
+let with_store value body =
+  try body () with
+  | Store.get () -> value
+
+read : Unit ->{Store a} a
+let read () = Store.get ()
+
+both_ways : (forall a. Unit ->{Store a} a) ->{} (Int, String)
+let both_ways work = (with_store 7 work, with_store "seven" work)
+
+pair :
+  (Unit ->{Store Int | r; e} Int) -> (Unit ->{Store String | r; e} String) ->{-Store | r; e} String
+let pair count name =
+  let n =
+    try count () with
+    | Store.get () -> 2
+  let s =
+    try name () with
+    | Store.get () -> "two"
+  s ++ " " ++ show n
+
+/// Its body sees `Store String` only, wherever it is called.
+texts : (Unit ->{Store String | r; e} String) ->{-Store | r; e} String
+let texts body = with_store "inner" body
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  Platform.stdout_line (show (with_store 41 (fun () -> read () + 1)))
+  Platform.stdout_line (with_store "hello" (fun () -> read () ++ "!"))
+  let (n, s) = both_ways read
+  Platform.stdout_line (show n ++ " " ++ s)
+  Platform.stdout_line (pair (fun () -> read () * 10) (fun () -> read () ++ "!"))
+  Platform.stdout_line
+    (with_store 3 (fun () ->
+      let before = read ()
+      let inner = texts (fun () -> read () ++ "!")
+      show before ++ " " ++ inner ++ " " ++ show (read () + 1)
+    ))
