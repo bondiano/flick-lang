@@ -21,6 +21,9 @@ rec {
 later : Unit -> Bool
 let later () = todo
 
+flip : Bool -> Bool
+foreign pure flip from "./flip.mjs" "flip"
+
 proof direct (n : Int) where equal (countdown n) (countdown n) = refl
 
 proof hidden (b : Bool) where equal (ping b) (ping b) = refl
@@ -32,16 +35,12 @@ proof unfinished where equal (later ()) true = refl
 proof partial_inside
 where equal (Some (fun n -> countdown n)) (Some (fun n -> countdown n)) = refl
 
-proof through_ffi (v : Option a)
-where equal (map2 (fun f x -> f x) (pure identity) v) v =
-  match v with
-  | None -> refl
-  | Some x -> refl
+proof through_ffi (b : Bool) where equal (flip (flip b)) b = refl
 
 //~ FLICK-T022 @22:16-22:20 `todo` is left in the code
-//~ FLICK-T082 @24:1-24:70 `App.Diverging.countdown` names itself
-//~ FLICK-T082 @26:1-26:61 `App.Diverging.ping` → `App.Diverging.pong` names itself
-//~ FLICK-T082 @28:1-28:69 `App.Diverging.forever` names itself
 //~ FLICK-T082 @22:16-22:20 this form is outside the domain
-//~ FLICK-T082 @32:1-33:79 `App.Diverging.countdown` names itself
-//~ FLICK-T082 @35:1-39:19 `Instances.map2_option` is foreign code
+//~ FLICK-T082 @27:1-27:70 `App.Diverging.countdown` names itself
+//~ FLICK-T082 @29:1-29:61 `App.Diverging.ping` → `App.Diverging.pong` names itself
+//~ FLICK-T082 @31:1-31:69 `App.Diverging.forever` names itself
+//~ FLICK-T082 @35:1-36:79 `App.Diverging.countdown` names itself
+//~ FLICK-T082 @38:1-38:66 `App.Diverging.flip` is foreign code
