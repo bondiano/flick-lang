@@ -259,18 +259,19 @@ impl Session {
         } else {
             None
         };
-        let declarations: serde_json::Map<String, Value> = if include_declarations {
-            artifacts
-                .iter()
-                .filter(|a| {
-                    a.path.ends_with(".d.ts")
-                        && Some(a.path.as_str()) != declaration_entry.as_deref()
-                })
-                .map(|a| (a.path.clone(), Value::String(a.contents.clone())))
-                .collect()
-        } else {
-            serde_json::Map::default()
-        };
+        // `extend`, not `collect`: collecting into a map compiles a sort of
+        // its own into this module, where the map's `insert` is already there
+        let mut declarations = serde_json::Map::new();
+        if include_declarations {
+            declarations.extend(
+                (artifacts.iter())
+                    .filter(|a| {
+                        a.path.ends_with(".d.ts")
+                            && Some(a.path.as_str()) != declaration_entry.as_deref()
+                    })
+                    .map(|a| (a.path.clone(), Value::String(a.contents.clone()))),
+            );
+        }
         let contents = |path: &str| {
             (artifacts.iter())
                 .find(|a| a.path == path)
@@ -286,11 +287,12 @@ impl Session {
         let entry = (artifacts.iter())
             .any(|a| a.path == runner)
             .then(|| Value::String(runner.to_owned()));
-        let files: serde_json::Map<String, Value> = artifacts
-            .into_iter()
-            .filter(|a| Path::new(&a.path).extension().is_some_and(|e| e == "js"))
-            .map(|a| (a.path, Value::String(a.contents)))
-            .collect();
+        let mut files = serde_json::Map::new();
+        files.extend(
+            (artifacts.into_iter())
+                .filter(|a| Path::new(&a.path).extension().is_some_and(|e| e == "js"))
+                .map(|a| (a.path, Value::String(a.contents))),
+        );
         let mut output = json!({
             "js": js,
             "dts": dts,
