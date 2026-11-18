@@ -49,7 +49,7 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
       Typ Ψ Θ Γ (.fix f) (.ex T φ)
   | lit : Typ Ψ Θ Γ (.lit l) (.ex (.base l.base) φ)
   | loc : Ψ[l]? = some t → Typ Ψ Θ Γ (.loc l) (.ex (.ref t) φ)
-  | const : c.ok Θ ι → LeLive S (c.ty S ι) T → Typ Ψ Θ Γ (.const c) (.ex T φ)
+  | const : c.ok Θ ι → LeLive S (c.ty ι) T → Typ Ψ Θ Γ (.const c) (.ex T φ)
   | ctor {ts us : List Ty} : S.ctor K = some (k, ts, T₀) → us.length = k →
       Sig.Holds ts T₀ (S.res K) us → LeLive S (Sig.ctorTyR ts T₀ (S.res K) us) T →
       Typ Ψ Θ Γ (.ctor K) (.ex T φ)

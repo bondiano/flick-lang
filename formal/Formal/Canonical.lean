@@ -39,17 +39,17 @@ theorem Sig.ctorTyR_pureSpine (ts : List Ty) (T : Name) (rs us : List Ty) :
   Ty.arrows_pureSpine _ _ (Ty.tcon_pureSpine T _)
 
 theorem Const.ty_first {c : Const} {ι : CArg} (h : c.arity = 2) :
-    ∃ x y, c.ty S ι = .arrow x .pure y Caps.none := by
+    ∃ x y, c.ty ι = .arrow x .pure y Caps.none := by
   cases c <;> simp [Const.arity] at h <;> exact ⟨_, _, rfl⟩
 
-theorem Const.ty_arrow (c : Const) (ι : CArg) : ∃ x φ y C, c.ty S ι = .arrow x φ y C :=
+theorem Const.ty_arrow (c : Const) (ι : CArg) : ∃ x φ y C, c.ty ι = .arrow x φ y C :=
   Const.ty_isArrow c ι S
 
 /-- What `Value.pure` gives. -/
 def PureTy (S : Sig) (Ψ : List Ty) (Θ : Facts) (Γ : List Scheme) (e : Tm) (T : Ty) : Prop :=
   ∃ T₀, LeLive S T₀ T ∧ Typ S Ψ Θ Γ e (.ex T₀ .pure) ∧
     (∀ K, e.head = .ctor K → T₀.PureSpine) ∧
-    (∀ c, e = .const c → ¬ T.isAll → ∃ ι, T₀ = c.ty S ι)
+    (∀ c, e = .const c → ¬ T.isAll → ∃ ι, T₀ = c.ty ι)
 
 theorem Typ.pureTy {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     Value e → ∀ {T φ}, J = .ex T φ → PureTy S Ψ Θ Γ e T := by

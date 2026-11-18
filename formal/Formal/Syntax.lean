@@ -357,7 +357,7 @@ def Row.scope (s : Ty) : Row := Row.ofCaps s.reach
 /-- The type of a constant at an instance. A spawned child and a finalizer are
 `Eff` with qualifier `C`; their owner is `s`. A cell stores `t`, and `C` is its capacity,
 the bound `α^c` of `Ref.*`: storing into a cell needs the capacity live. -/
-def Const.ty (S : Sig) : Const → CArg → Ty
+def Const.ty : Const → CArg → Ty
   | .refMake, ι => .arrow ι.t (.rt .cnil .cnil) (.ref ι.t) Caps.none
   | .refGet, ι => .arrow (.ref ι.t) (.rt .cnil .cnil) ι.t Caps.none
   | .refSet, ι =>
@@ -378,10 +378,8 @@ def Const.ty (S : Sig) : Const → CArg → Ty
         (.rtob (.run (.caps (Ty.tvar 0).reach) r) (.tvar 0) (ι.e.up 1))
         (ι.t.up 1) (ι.C.substT (shiftV 1))))
       (.rt ι.r ι.e) ι.t Caps.none
-  | .perform E o _, ι => match S.op E o with
-    | some (.abort, a, _) => .arrow a (.rt (.rnm E (.adt E)) .cnil) ι.t Caps.none
-    | some (_, a, b) => .arrow a (.rt (.rnm E (.adt E)) .cnil) b Caps.none
-    | none => .arrow (.base .unit) (.rt (.rnm E (.adt E)) .cnil) (.base .unit) Caps.none
+  -- an operation is typed by (Perform) at the arguments of its effect, never by (Const)
+  | .perform E _ _, _ => .arrow (.base .unit) (.rt (.rnm E (.adt E)) .cnil) (.base .unit) Caps.none
 
 /-- Regions required by a work row must outlive the owner that keeps that work.
 Row variables are included: instantiating one may introduce a Live atom. -/

@@ -138,7 +138,7 @@ example (S : Sig) :
 
 /-- `op` cannot be coerced to a function whose use has an empty row. -/
 example (S : Sig) :
-    ¬ LeLive S (Const.op.ty S { (default : CArg) with s := .rg 0 }) unqualified := by
+    ¬ LeLive S (Const.op.ty { (default : CArg) with s := .rg 0 }) unqualified := by
   intro h
   exact (h.arrow_use.1 (.atm (.r 0)) (Or.inl rfl)).elim id id
 
@@ -237,7 +237,7 @@ example : Const.ok Facts.none .refMake { hndCell with C := region } :=
 /-- `Ref.set` needs its capacity live: storing into a cell that may hold a capability of
 region 0 is a call whose stage keeps region 0 live, whatever its row says. -/
 theorem refSet_needs_capacity (S : Sig) (ι : CArg) (hok : Const.ok Facts.none .refSet ι)
-    (ht : ι.t = .hnd (.rg 0)) {T : Ty} (hT : Const.ty S .refSet ι = .arrow (.ref ι.t) .pure T Caps.none) :
+    (ht : ι.t = .hnd (.rg 0)) {T : Ty} (hT : Const.ty .refSet ι = .arrow (.ref ι.t) .pure T Caps.none) :
     ¬ LeLive S T (.arrow ι.t emptyStage (.base .unit) Caps.none) := by
   injection hT with _ _ hT; subst hT
   intro h

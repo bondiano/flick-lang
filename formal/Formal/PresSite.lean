@@ -23,7 +23,7 @@ theorem raise_not_pure {Ψ Θ e t} (h : Typ S Ψ Θ [] (.raise e) (.ex t .pure))
 
 /-- The stage of an application of a constant whose type has a runtime stage. -/
 theorem const_app_rt {Ψ Θ c w t} (h : Typ S Ψ Θ [] (.app (.const c) w) (.ex t .pure))
-    (hc : ∀ ι, ∃ a r e b C, c.ty S ι = .arrow a (.rt r e) b C) : False := by
+    (hc : ∀ ι, ∃ a r e b C, c.ty ι = .arrow a (.rt r e) b C) : False := by
   have hn : ¬ Value (.app (.const c) w) := by
     intro hv
     cases hv with
@@ -39,7 +39,7 @@ theorem const_app_rt {Ψ Θ c w t} (h : Typ S Ψ Θ [] (.app (.const c) w) (.ex 
   exact Stage.use_rt_le_ne_pure (Stage.le_trans lψ hψ) rfl
 
 theorem const_app2_rt {Ψ Θ c w₁ w₂ t} (h : Typ S Ψ Θ [] (.app (.app (.const c) w₁) w₂) (.ex t .pure))
-    (hc : ∀ ι, ∃ a b φ d C C', c.ty S ι = .arrow a .pure (.arrow b φ d C) C' ∧
+    (hc : ∀ ι, ∃ a b φ d C C', c.ty ι = .arrow a .pure (.arrow b φ d C) C' ∧
       ∃ r e, φ.asStage = .rt r e) : False := by
   have hn : ¬ Value (.app (.app (.const c) w₁) w₂) := by
     intro hv
@@ -58,7 +58,7 @@ theorem const_app2_rt {Ψ Θ c w₁ w₂ t} (h : Typ S Ψ Θ [] (.app (.app (.co
   exact Stage.use_rt_le_ne_pure (Stage.le_trans lψ hψ) rfl
 
 theorem perform_arrow {E o c} {ι : CArg} :
-    ∃ a r e b C, (Const.perform E o c).ty S ι = .arrow a (.rt r e) b C := by
+    ∃ a r e b C, (Const.perform E o c).ty ι = .arrow a (.rt r e) b C := by
   simp only [Const.ty]
   split <;> exact ⟨_, _, _, _, _, rfl⟩
 
@@ -78,7 +78,7 @@ theorem perform_op' {Ψ Θ E o c w t φ} (h : Typ S Ψ Θ [] (.app (.const (.per
   obtain ⟨a, b, _, hop, _⟩ := hf.perform_arrow
   exact ⟨a, b, hop⟩
 
-theorem op_rt (ι : CArg) : ∃ a r e b C, Const.ty S .op ι = .arrow a (.rt r e) b C := by
+theorem op_rt (ι : CArg) : ∃ a r e b C, Const.ty .op ι = .arrow a (.rt r e) b C := by
   exact ⟨_, _, _, _, _, rfl⟩
 
 private theorem Typ.runtimeStage {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :

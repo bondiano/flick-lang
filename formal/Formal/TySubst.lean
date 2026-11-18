@@ -1,4 +1,4 @@
-import Formal.TySubstBase
+import Formal.AnswerSubst
 
 /-!
 # Type substitution preserves typing: the lemma

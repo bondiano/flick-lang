@@ -47,7 +47,7 @@ theorem RgsTy.append {Ψ Λ} (h : RgsTy S Ψ Λ) : RgsTy S Ψ (Λ ++ [Rgn.new]) 
 
 /-- The computation a child or a finalizer runs has a type. -/
 theorem await_arg {Ψ Θ c w t₀ T φ} (h : Typ S Ψ Θ [] (.app (.app (.const c) w) t₀) (.ex T φ))
-    (hv : Value t₀) (hc : ∀ ι, ∃ a b r e τ C₁ C₂ ψ, c.ty S ι = .arrow a .pure (.arrow (.eff r e τ C₁) ψ b C₂) Caps.none) :
+    (hv : Value t₀) (hc : ∀ ι, ∃ a b r e τ C₁ C₂ ψ, c.ty ι = .arrow a .pure (.arrow (.eff r e τ C₁) ψ b C₂) Caps.none) :
     ∃ t φ, Typ S Ψ Θ [] (.await t₀) (.ex t φ) := by
   have hn : ¬ Value (.app (.app (.const c) w) t₀) := by
     intro hv'

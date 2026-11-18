@@ -19,11 +19,11 @@ theorem LeLive.arrow_inv {A φ₀ t₀ C₀ a φ t C}
 
 /-- The constant `op` asks for the region of its capability in the live discipline. -/
 theorem Const.ty_op_arrow (S : Sig) (ι : CArg) :
-    ∃ r, Const.ty S .op ι = .arrow (.hnd ι.s) r (.base .unit) Caps.none := by
+    ∃ r, Const.ty .op ι = .arrow (.hnd ι.s) r (.base .unit) Caps.none := by
   exact ⟨_, rfl⟩
 /-- The first argument of `op` is the capability of its region. -/
 theorem LeLive.op_dom {S : Sig} {ι : CArg} {a ψ t C}
-    (h : LeLive S (Const.ty S .op ι) (.arrow a ψ t C)) : LeLive S a (.hnd ι.s) := by
+    (h : LeLive S (Const.ty .op ι) (.arrow a ψ t C)) : LeLive S a (.hnd ι.s) := by
   obtain ⟨r, hr⟩ := Const.ty_op_arrow S ι
   rw [hr] at h
   exact (LeLive.arrow_inv h).1

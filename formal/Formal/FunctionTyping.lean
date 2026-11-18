@@ -63,7 +63,7 @@ theorem Typ.fix_arrow {Ψ Θ Γ b a ψ t C φ}
 private theorem Typ.constCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ c T φ, e = .const c → J = .ex T φ → ¬ T.isAll → T.kind ≠ 7 →
       (∀ E o cl, c ≠ .perform E o cl) →
-      ∃ ι, c.ok Θ ι ∧ LeLive S (c.ty S ι) T := by
+      ∃ ι, c.ok Θ ι ∧ LeLive S (c.ty ι) T := by
   induction h with
   | conv _ he ih =>
     intro c T φ hc hJ hA hk hn; cases hJ
@@ -79,7 +79,7 @@ private theorem Typ.constCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
 theorem Typ.const_arrow {Ψ Θ Γ c a ψ t C φ}
     (h : Typ S Ψ Θ Γ (.const c) (.ex (.arrow a ψ t C) φ))
     (hn : ∀ E o cl, c ≠ .perform E o cl) :
-    ∃ ι, c.ok Θ ι ∧ LeLive S (c.ty S ι) (.arrow a ψ t C) :=
+    ∃ ι, c.ok Θ ι ∧ LeLive S (c.ty ι) (.arrow a ψ t C) :=
   h.constCore c _ φ rfl rfl (by simp [Ty.isAll]) (by simp [Ty.kind]) hn
 
 private theorem Typ.performCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
@@ -108,7 +108,7 @@ theorem Typ.perform_arrow {Ψ Θ Γ E o cl a ψ t C φ}
 /-- Every function constant has an instance of its signature below the requested arrow. -/
 theorem Typ.const_witness {Ψ Θ Γ c a ψ t C φ}
     (h : Typ S Ψ Θ Γ (.const c) (.ex (.arrow a ψ t C) φ)) :
-    ∃ ι, LeLive S (c.ty S ι) (.arrow a ψ t C) := by
+    ∃ ι, LeLive S (c.ty ι) (.arrow a ψ t C) := by
   cases c with
   | perform E o cl =>
     obtain ⟨_, _, u, hop, ht⟩ := h.perform_arrow

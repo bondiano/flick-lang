@@ -61,7 +61,7 @@ private theorem Typ.constResult {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | const _ hT =>
     intro c a ψ t C φ hc hArity hJ; cases hc; cases hJ
     have key : ∀ (c : Const) ι, c.arity = 2 →
-        ∃ x y, c.ty S ι = .arrow x .pure y Caps.none ∧ ¬ y.isAll := by
+        ∃ x y, c.ty ι = .arrow x .pure y Caps.none ∧ ¬ y.isAll := by
       intro c _ hc
       cases c <;> simp [Const.arity] at hc <;> exact ⟨_, _, rfl, by simp [Ty.isAll]⟩
     obtain ⟨_, _, hxy, hy⟩ := key _ _ hArity

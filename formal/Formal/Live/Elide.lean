@@ -180,7 +180,7 @@ def CArg.Fixed (ι : CArg) : Prop :=
 
 /-- The live type of a constant that the core types is kept by elision. -/
 theorem Const.ty_kept {S : Sig} {Θ : Facts} {c : Const} {ι : CArg} {K : Caps}
-    (hc : c.ok Θ ι) (hι : ι.Fixed) : (c.ty S ι).Kept S K := by
+    (hc : c.ok Θ ι) (hι : ι.Fixed) : (c.ty ι).Kept S K := by
   obtain ⟨ht, hup⟩ := hι
   have hk := ht K
   cases c with
@@ -215,13 +215,13 @@ theorem Const.ty_kept {S : Sig} {Θ : Facts} {c : Const} {ι : CArg} {K : Caps}
 /-- The elided reading of a constant is a live supertype of its live type. -/
 theorem Const.ty_le_elide {S : Sig} {Θ : Facts} {c : Const} {ι : CArg} {K : Caps}
     (hc : c.ok Θ ι) (hι : ι.Fixed) (H : Caps) :
-    LeLive S (c.ty S ι) ((c.ty S ι).elide K H) :=
+    LeLive S (c.ty ι) ((c.ty ι).elide K H) :=
   (Const.ty_kept hc hι).le_elide H
 
 /-- The core types a constant at each supertype of its elided reading. -/
 theorem Typ.const_elided {S : Sig} {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {c : Const}
     {ι : CArg} {K : Caps} {T : Ty} {φ : Stage} (hc : c.ok Θ ι) (hι : ι.Fixed) (H : Caps)
-    (hT : LeLive S ((c.ty S ι).elide K H) T) : Typ S Ψ Θ Γ (.const c) (.ex T φ) :=
+    (hT : LeLive S ((c.ty ι).elide K H) T) : Typ S Ψ Θ Γ (.const c) (.ex T φ) :=
   .const hc ((Const.ty_le_elide hc hι H).trans hT)
 
 /-- Whether a type is `bare`. -/

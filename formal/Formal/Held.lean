@@ -102,7 +102,7 @@ theorem Sig.ctorTy_shows (S : Sig) {K k ts T} (hK : S.ctor K = some (k, ts, T)) 
 
 /-- What a constant with one argument shows of it. -/
 theorem Const.shows_first (c : Const) (ι : CArg) (S : Sig) (hc : c.arity = 2) :
-    ∃ a t, c.ty S ι = .arrow a .pure t Caps.none ∧ Caps.Sub a.reach t.reach := by
+    ∃ a t, c.ty ι = .arrow a .pure t Caps.none ∧ Caps.Sub a.reach t.reach := by
   cases c <;> simp [Const.arity] at hc <;>
     refine ⟨_, _, rfl, ?_⟩ <;> intro x h <;>
     simp_all [Ty.reach, Caps.none]
@@ -197,7 +197,7 @@ theorem LeLive.arrow_res {a φ t C T : _}
   obtain ⟨_, _, _, _, he, _, _, ht, -⟩ := LeLive.arrow_left h; exact ⟨_, _, _, _, he, ht⟩
 
 theorem Const.ty_isArrow (c : Const) (ι : CArg) (S : Sig) :
-    ∃ a φ t C, c.ty S ι = .arrow a φ t C := by
+    ∃ a φ t C, c.ty ι = .arrow a φ t C := by
   cases c
   case perform E o _ =>
     simp only [Const.ty]
