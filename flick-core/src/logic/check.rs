@@ -6,7 +6,7 @@ use std::rc::Rc;
 use super::defs::{Admitted, Program, admit};
 use super::eval::{Env, Machine, Nf, STEPS, Stop, Value, distinct};
 use super::show::show;
-use super::term::{Pat, Refused, Term};
+use super::term::{Pat, Refused, TUPLES, Term};
 use super::{Arg, Cert, Data, Equation, Failure, Goal, Lemma, Rule, Statement, Ty};
 use crate::source::Span;
 
@@ -169,6 +169,10 @@ impl Checker<'_> {
     }
 
     fn admit_data(&self, module: &str, name: &str, span: Span) -> Result<(), Failure> {
+        // a tuple is data of its elements, whose types are admitted apart
+        if module == TUPLES {
+            return Ok(());
+        }
         match self.data.get(&(module.to_owned(), name.to_owned())) {
             Some(d) if d.recursive => refused(
                 span,

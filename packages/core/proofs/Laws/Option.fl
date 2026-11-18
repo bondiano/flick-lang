@@ -1,0 +1,98 @@
+/// The laws of the `Functor`, `Applicative` and `Monad` instances of
+/// `Option`, proved of their definitions in `Instances`: every law holds for
+/// every payload and every total function. `flick prove` checks them; no
+/// import of `Option` reads this module.
+module Laws.Option exposing (..)
+
+/// `fs` applied to `xs`: the `ap` of the laws, written with `map2`.
+ap : Option (a -> b) -> Option a -> Option b
+let ap fs xs = map2 (fun f x -> f x) fs xs
+
+/// F1
+proof map_identity (v : Option a)
+where equal (map identity v) v =
+  match v with
+  | None -> refl
+  | Some x -> refl
+
+/// F2
+proof map_composition (g : b -> c) (f : a -> b) (v : Option a)
+where equal (map (fun x -> g (f x)) v) (map g (map f v)) =
+  match v with
+  | None -> refl
+  | Some x -> refl
+
+/// A1
+proof ap_identity (v : Option a)
+where equal (ap (pure identity) v) v =
+  match v with
+  | None -> refl
+  | Some x -> refl
+
+/// A2
+proof ap_composition (fs : Option (b -> c)) (gs : Option (a -> b)) (xs : Option a)
+where equal (ap (ap (ap (pure (fun f g x -> f (g x))) fs) gs) xs) (ap fs (ap gs xs)) =
+  match fs with
+  | None -> refl
+  | Some f ->
+    match gs with
+    | None -> refl
+    | Some g ->
+      match xs with
+      | None -> refl
+      | Some x -> refl
+
+/// A3
+proof ap_homomorphism (f : a -> b) (x : a)
+where equal (ap (pure f) (pure x)) (pure (f x)) =
+  refl
+
+/// A4
+proof ap_interchange (fs : Option (a -> b)) (x : a)
+where equal (ap fs (pure x)) (ap (pure (fun f -> f x)) fs) =
+  match fs with
+  | None -> refl
+  | Some f -> refl
+
+/// A5
+proof map_is_ap (f : a -> b) (v : Option a)
+where equal (map f v) (ap (pure f) v) =
+  match v with
+  | None -> refl
+  | Some x -> refl
+
+/// M1
+proof left_identity (f : a -> Option b) (x : a)
+where equal (flat_map f (pure x)) (f x) =
+  refl
+
+/// M2
+proof right_identity (v : Option a)
+where equal (flat_map pure v) v =
+  match v with
+  | None -> refl
+  | Some x -> refl
+
+/// M3
+proof associativity (g : b -> Option c) (f : a -> Option b) (v : Option a)
+where equal (flat_map g (flat_map f v)) (flat_map (fun x -> flat_map g (f x)) v) =
+  match v with
+  | None -> refl
+  | Some x -> refl
+
+/// C1
+proof map_is_flat_map (f : a -> b) (v : Option a)
+where equal (map f v) (flat_map (fun x -> pure (f x)) v) =
+  match v with
+  | None -> refl
+  | Some x -> refl
+
+/// C2
+proof map2_is_flat_map (h : a -> b -> c) (va : Option a) (vb : Option b)
+where equal (map2 h va vb) (flat_map (fun a -> map (fun b -> h a b) vb) va) =
+  match va with
+  | None -> refl
+  | Some a ->
+    match vb with
+    | None -> refl
+    | Some b -> refl
