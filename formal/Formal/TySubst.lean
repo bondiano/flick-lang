@@ -267,7 +267,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     have h₂ := ih₂ σ (hσ.sub fun _ h => .inr (.inr (.inr (.inl h))))
     have h₃ := ih₃ σ (hσ.sub fun _ h => .inr (.inr (.inr (.inr h))))
     simp only [Flick.J.substT, Ty.substT, Stage.substT_rt, Row.substT_asRow, hp] at h₁ h₂ h₃
-    exact .hwith (by simpa using hus) (by simp [hℓ, Ty.substT, Ty.isStage]) h₁ h₂
+    exact .hwith (by simpa using hus) (by simp [hℓ, Ty.substT, Ty.isStage, Ty.tcon_substT]) h₁ h₂
       (by simpa_substT Stage.le_substT σ hψ) h₃
       (Stage.le_rt_sub (by simpa [Stage.substT_rt, Row.substT_asRow] using Stage.le_substT σ hφ₀)
         (Row.hP_substT_asRow hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl))))
@@ -285,7 +285,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       (plug_has_of_nosite (by simp [Tm.Has]) h))))))
     have h₄ := ih₄ σ (hσ.sub fun _ h => .inr (.inr (.inr (.inr (.inl h)))))
     simp only [Flick.J.substT, Ty.substT, Stage.substT_rt, Row.substT_asRow, hp] at h₁ h₂ h₃ h₄
-    refine .hctl (by simpa using hus) (by simp [hℓ, Ty.substT, Ty.isStage]) h₁ h₂ (by simpa_substT Stage.le_substT σ hψ) hop hc htl hE rfl hno h₃ ?_ ?_ (fun h => ?_) (hcm.substT σ)
+    refine .hctl (by simpa using hus) (by simp [hℓ, Ty.substT, Ty.isStage, Ty.tcon_substT]) h₁ h₂ (by simpa_substT Stage.le_substT σ hψ) hop hc htl hE rfl hno h₃ ?_ ?_ (fun h => ?_) (hcm.substT σ)
       (by simpa_substT Stage.le_substT σ hφ) (hT.substT σ)
       (Stage.substT_svc_atm hp hat)
     · exact Stage.le_rt_sub (by simpa [Stage.substT_rt, Row.substT_asRow] using Stage.le_substT σ hφ₀)
@@ -301,7 +301,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     have h₁ := ih₁ σ (hσ.sub fun _ h => .inr (.inr (.inl h)))
     have h₂ := ih₂ σ (hσ.sub fun _ h => .inr (.inr (.inr h)))
     simp only [Flick.J.substT, Ty.substT, hp] at h₁ h₂
-    exact .hkeep (by simpa using hus) (by simp [hℓ, Ty.substT, Ty.isStage]) h₁ h₂
+    exact .hkeep (by simpa using hus) (by simp [hℓ, Ty.substT, Ty.isStage, Ty.tcon_substT]) h₁ h₂
       (Stage.le_rt_sub (by simpa [Stage.substT_rt, Row.substT_asRow] using Stage.le_substT σ hφ₀)
         (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl))
           (fun _ => Sig.answers_substT σ) (Sig.answers_all_substT σ)))
@@ -317,7 +317,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       (plug_has_of_nosite (by simp [Tm.Has]) h)))))
     have h₄ := ih₃ σ (hσ.sub fun _ h => .inr (.inr (.inr (.inl h))))
     simp only [Flick.J.substT, Ty.substT, Stage.substT_rt, Row.substT_asRow, hp, hb] at h₁ h₃ h₄
-    exact .hkarm (by simpa using hus) (by simp [hℓ, Ty.substT, Ty.isStage]) h₁ hop hE rfl hno h₃
+    exact .hkarm (by simpa using hus) (by simp [hℓ, Ty.substT, Ty.isStage, Ty.tcon_substT]) h₁ hop hE rfl hno h₃
       (Stage.le_rt_sub (by simpa [Stage.substT_rt, Row.substT_asRow] using Stage.le_substT σ hφ₀)
         (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl))
           (fun _ => Sig.answers_substT σ) (Sig.answers_all_substT σ)))
@@ -336,7 +336,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
         · exact h.elim)
     simp only [Flick.J.substT, Stage.use_substT] at h₁ h₂
     simp only [Stage.substT_rt, Row.substT_asRow, Ty.reach_caps, Ty.substT, hp] at h₁ h₂
-    exact .hres (by simp [hℓ, Ty.substT, Ty.isStage]) h₁ hA rfl h₂ (by rw [List.getElem?_map, hl]; rfl)
+    exact .hres (by simp [hℓ, Ty.substT, Ty.isStage] <;> rfl) h₁ hA rfl h₂ (by rw [List.getElem?_map, hl]; rfl)
       (by exact ⟨.r _, hcp, by rw [hp]; rfl⟩) (by simpa_substT Stage.le_substT σ hφ) (hT.substT σ)
   | hdone _ ih =>
     intro σ hσ
@@ -350,7 +350,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     have h₁ := ih σ (hσ.sub fun _ h => .inr (.inr h))
     simp only [Flick.J.substT, Stage.use_substT] at h₁
     simp only [Stage.substT_rt, Row.substT_asRow, Ty.reach_caps, Ty.substT, hp] at h₁
-    exact .unw (by simp [hℓ, Ty.substT, Ty.isStage]) h₁ (by simpa [Stage.substT_rt, Row.substT_asRow] using Stage.le_substT σ hφ)
+    exact .unw (by simp [hℓ, Ty.substT, Ty.isStage] <;> rfl) h₁ (by simpa [Stage.substT_rt, Row.substT_asRow] using Stage.le_substT σ hφ)
   | kont hl hC hT =>
     intro σ hσ
     have hp : σ (.r _) = .rg _ := hσ.1 _ rfl
