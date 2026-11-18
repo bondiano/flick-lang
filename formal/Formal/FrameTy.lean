@@ -80,7 +80,12 @@ theorem Typ.sx {Ψ Θ e J} (h : Typ S Ψ Θ [] e J) {σ : Atom → Ty} (hσ : Fi
     Typ S (Ψ.map (Ty.substT σ) ++ X) (Θ.substT σ) [] e (J.substT σ) := by
   simpa using (h.substT σ hσ).weakenStore X
 
-
+/-- `Typ.sx` of a term at a runtime stage whose rows are what row terms stand for. -/
+theorem Typ.sx_rt {Ψ Θ e T} {r ε : Ty} (h : Typ S Ψ Θ [] e (.ex T (.rt r.asRow ε.asRow)))
+    {σ : Atom → Ty} (hσ : Fits σ e) (X : List Ty) :
+    Typ S (Ψ.map (Ty.substT σ) ++ X) (Θ.substT σ) [] e
+      (.ex (T.substT σ) (.rt (r.substT σ).asRow (ε.substT σ).asRow)) := by
+  simpa only [Flick.J.substT, Stage.substT_rt, Row.substT_asRow] using h.sx hσ X
 
 theorem cell_sx {Ψ : List Ty} {σ : Atom → Ty} {ℓ : Nat} {T : Ty} (h : Ψ[ℓ]? = some T) (X : List Ty) :
     (Ψ.map (Ty.substT σ) ++ X)[ℓ]? = some (T.substT σ) := by

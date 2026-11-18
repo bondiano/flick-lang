@@ -35,7 +35,7 @@ theorem handlerOf_has {r : Tm} {Ef o : Name} {c : OpClass} {q : Nat} :
 
 /-- The effects with an operation that is not `tail`, as a row. -/
 def Row.nonTail (S : Sig) : Row
-  | .nm N => S.HasNonTail N
+  | .nm N _ => S.HasNonTail N
   | _ => False
 
 end Flick

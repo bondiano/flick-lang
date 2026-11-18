@@ -98,7 +98,7 @@ def Place (Ψ : List Ty) (anc : Nat → Nat → Prop) (φ : Stage) (E : List Fra
   Chain anc H ∧ (∀ x, φ.svc (.atm (.r x)) → H x) ∧
     (∀ F ∈ E, ∀ x, (F = .inside x ∨ F.rgn = some x) → H x) ∧
     ∀ F ∈ E, ∀ q ℓ, F.cell = some (q, ℓ) → H q ∧ ∀ r ε t,
-      Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t Caps.none) → ∀ x, r (.atm (.r x)) → anc q x
+      Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t Caps.none) → ∀ x, r.asRow (.atm (.r x)) → anc q x
 
 /-- A child or a finalizer registered at a place runs at a stage of ancestors of its owner. -/
 theorem kid_live {Ψ anc E c p w t φ H} (hE : OkE E) (hc : c = .addFin ∨ c = .spawn) (hv : Value w)

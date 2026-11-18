@@ -186,6 +186,10 @@ test("contextual effect, sql, and control keywords receive expected TextMate sco
   assert.ok(scopesFor("  server fn ping x = x", "server").includes("keyword.other.flick"));
   assert.ok(scopesFor("  server fn ping x = x", "fn").includes("keyword.other.flick"));
   assert.ok(scopesFor("  component counter () =", "component").includes("keyword.other.flick"));
+  assert.ok(scopesFor('suite "Users" {', "suite").includes("keyword.other.flick"));
+  assert.ok(scopesFor('  test.skip "trims" {', "test").includes("keyword.other.flick"));
+  assert.ok(scopesFor('  test.skip "trims" {', "skip").includes("keyword.other.flick"));
+  assert.ok(scopesFor('test.only "alone" {}', "only").includes("keyword.other.flick"));
   assert.ok(scopesFor("for x <- xs do { break }", "for").includes("keyword.control.flick"));
   assert.ok(scopesFor("for x <- xs yield x", "yield").includes("keyword.control.flick"));
   assert.ok(scopesFor("'outer: loop { continue 'outer }", "continue").includes("keyword.control.flick"));
@@ -202,6 +206,8 @@ test("word boundaries prevent spurious keyword matches on partial identifiers an
     ["let effect_id = 1", "effect_id"],
     ["let my_sql = sql_query { 1 }", "sql_query"],
     ["let x = row.sql", "sql"],
+    ["let test = suite", "test"],
+    ["let x = Test.test \"a\" check", "test"],
     ["let x = item.effect", "effect"],
     ["let x = state.abort", "abort"],
     ["let x = state.control", "control"],

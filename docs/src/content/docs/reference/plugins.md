@@ -49,7 +49,9 @@ gives the value of.
 The compiler comes with the plugin of `std`, whose heads are `cli` (see
 [command-line applications](../cli-dsl/)), `server` (see
 [server functions](../server-fn/)) and `codec` (see
-[the codec DSL](../schema/#the-codec-dsl)), and `sql`. Every module has these
+[the codec DSL](../schema/#the-codec-dsl)), `sql`, and `suite` and `test` (see
+[testing](../testing/)), which are heads only at the start of a top-level
+declaration. Every module has these
 heads without an import: `cli "x" { … }`, with its body, and `server fn f x =
 …` or `server f` are blocks of `std`'s plugin, and the words stay ordinary
 names elsewhere. Only a block without `{`, such as `cli Main`, needs `import
@@ -160,7 +162,7 @@ and with the span of the block it stands for:
 
 | Kind | Nodes |
 | - | - |
-| expression | name, number, text, boolean, unit, application, lambda, record, field, list, tuple, annotation, hole, concatenation (`a ++ b`), `match` with guards, `if`, a block of statements and its value, a body with a module open |
+| expression | name, number, text, boolean, unit, application, lambda, record, field, list, tuple, annotation, hole, concatenation (`a ++ b`), `match` with guards, `if`, `task { … }`, a block of statements and its value, a body with a module open |
 | type | name, application, record, function, tuple, type-level text (`"name"`), `_`, `forall`, row, hole, a type of the signature |
 | pattern | variable, wildcard, constructor, record, tuple, hole |
 | declaration | `let`, signature, `type alias`, `type` with constructors and `deriving`, maybe `unboxed`, `instance` with members, a group of several or none, documentation of one, a function with the value that reads a constant given to it, hole |

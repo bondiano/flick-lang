@@ -6,6 +6,28 @@ break programs.
 
 ## Unreleased
 
+- **Breaking: `suite` and `test` blocks.** `suite "name" { … }` holds
+  `test "name" { body }` and nested suites, and a top-level `test "name" {
+  … }` stands alone; either may be `.skip` or `.only`. Std's plugin expands
+  them into calls of `Test` (`Test.group`, `Test.effect_test` of a `task`,
+  and the new `Test.skip` and `Test.only`), each top-level block a case of the module's `tests` in
+  the order written, which the module exports without naming it, so
+  `flick test` finds it as before. A body is an effectful test, as
+  `Test.effect_test` runs one. `suite` and `test` are now reserved heads at
+  the start of a top-level declaration: a top-level declaration may no
+  longer start with a value named `suite` or `test` (a signature `test : T`
+  still declares one). Elsewhere the words stay names, so `Test.test "x"
+  (fun () -> …)` is unchanged and modules that build `tests` by hand run as
+  before; a module with blocks and a hand-written `tests` is `FLICK-R008`.
+  A malformed block is `std/T001` and two cases of one full name
+  `std/T002`. `flick test --list` prints the full names a run would run,
+  `Module > suite > test`, and runs none; `--forbid-only` fails a run with
+  a test marked `only`. While a test of the run is marked `only`, the run
+  keeps only such tests, and a skipped test is reported as `skipped`: in the
+  summary, and in the JSON report with a `skipped` count when there is one.
+  `flick new` writes its test as a `suite`. The plugin interface gains
+  `Expr::Task`, `task { body }` in a plugin's code.
+
 - **Fixed: a re-exported type keeps its companions.** A module that
   re-exports a type (`import App.Ports exposing (Port)` with
   `exposing (Port)`) now exports its `parse`, `value`, `check`, `prove` and

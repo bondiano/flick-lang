@@ -193,6 +193,30 @@ Ranges
   (number))
 
 ==================
+Test cases
+==================
+
+suite "Users" {
+  test.skip "trims" {}
+}
+let test = suite
+
+---
+
+(source_file
+  (keyword)
+  (string)
+  (braces
+    (keyword)
+    (keyword)
+    (string)
+    (braces))
+  (keyword)
+  (identifier)
+  (operator)
+  (identifier))
+
+==================
 Components
 ==================
 

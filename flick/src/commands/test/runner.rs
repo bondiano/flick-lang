@@ -71,6 +71,12 @@ pub(super) fn runner_command(
     if let Some(filter) = &options.filter {
         command.args(["--filter", filter]);
     }
+    if options.list {
+        command.arg("--list");
+    }
+    if options.forbid_only {
+        command.arg("--forbid-only");
+    }
     command.args(["--jobs", &options.jobs.to_string()]);
     if let Some(seed) = options.seed {
         command.args(["--seed", &seed.to_string()]);

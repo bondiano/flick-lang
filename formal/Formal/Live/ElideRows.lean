@@ -17,7 +17,7 @@ namespace Flick.LiveChecks
 def GB (u v : Ty) : Ty := Ty.tcon "G" [.bare, u, v]
 
 /-- The stage of `compose`: it runs `FileSystem`. -/
-def fsStage : Stage := .rt (fun x => x = .nm "FileSystem") Row.none
+def fsStage : Ty := .rt (.rnm "FileSystem" (.adt "FileSystem")) .cnil
 
 /-- `compose : G a b -> G s a ->{FileSystem} G s b`, `a b s` the binders `0 1 2`. -/
 def composeBare : Scheme :=
@@ -33,10 +33,11 @@ def composeRead : Scheme :=
   ⟨5, Facts.none,
     .arrow (Ty.tcon "G" [.tvar 3, .tvar 0, .tvar 1]) .pure
       (.arrow (Ty.tcon "G" [.tvar 4, .tvar 2, .tvar 0])
-        (.rt (fun x => x = .nm "FileSystem" ∨ x = .atm (.v 3) ∨ x = .atm (.v 4)) Row.none)
+        (.rt (.run (.rnm "FileSystem" (.adt "FileSystem")) (.caps fun x => x = .v 3 ∨ x = .v 4))
+          .cnil)
         composeResult Caps.none) Caps.none⟩
 
-theorem compose_reads_hidden_rows : Scheme.elide Caps.none composeBare = composeRead := by
+theorem compose_reads_hidden_rows : Scheme.Reads (Scheme.elide Caps.none composeBare) composeRead := by
   simp only [composeBare, composeRead, composeResult, GB, GT, fsStage, Ty.tcon, List.foldl]
   elide_eq
 
@@ -97,15 +98,9 @@ def onMissingRead : Scheme :=
     (.arrow (Ty.tcon "FieldCodec" [.tvar 2, .tvar 0]) .pure onMissingResult Caps.none) Caps.none⟩
 
 theorem on_missing_reads_hidden_rows :
-    Scheme.elide (fun x => x = .v 1) onMissingBare = onMissingRead := by
+    Scheme.Reads (Scheme.elide (fun x => x = .v 1) onMissingBare) onMissingRead := by
   simp only [onMissingBare, onMissingRead, onMissingResult, FB, Ty.tcon, List.foldl]
   elide_eq
-  -- the default's qualifier names a binder of the scheme, which the fresh row leaves in place
-  all_goals
-    funext x
-    rcases x with n | p <;>
-      simp [Caps.substT, liftT, shiftV, Ty.reach, Caps.none, Caps.fresh, Atom.shiftFrom] <;>
-      omega
 
 /-- A codec whose default holds the region `v 0` of a `scope` holds it too, so it has no type
 `t.up 1` that leaves the `scope`: the compiler reports `FLICK-G001` there. -/

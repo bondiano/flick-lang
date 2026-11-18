@@ -31,7 +31,7 @@ def Ty.Shows : Ty → Prop
 
 theorem Ty.res_reach (t : Ty) : Caps.Sub t.res.reach t.reach := by
   induction t with
-  | arrow _ _ _ _ _ ih => exact fun a h => .inr (.inl (ih a h))
+  | arrow _ _ _ _ _ _ ih => exact fun a h => .inr (.inl (ih a h))
   | _ => exact Caps.Sub.refl _
 
 theorem Ty.arrows_res (fs : List Ty) (r : Ty) (hr : ∀ a φ t C, r ≠ .arrow a φ t C) :
@@ -128,10 +128,10 @@ theorem Ty.RowForm.res {a : Ty} (h : a.RowForm) : a.res = a := by
 
 theorem Ty.Equiv.res {a b : Ty} (h : Ty.Equiv a b) : Ty.Equiv a.res b.res := by
   induction a generalizing b with
-  | arrow a φ t C _ ih =>
+  | arrow a φ t C _ _ ih =>
     cases h.form with
     | rows hr _ => cases hr
-    | arrow _ ht => simpa only [Ty.res] using ih ht
+    | arrow _ _ ht => simpa only [Ty.res] using ih ht
   | _ =>
     cases h.form with
     | rows ha hb => rw [ha.res, hb.res]; exact h

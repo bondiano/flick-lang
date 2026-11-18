@@ -131,7 +131,8 @@ theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Ent
   | errVal hv _ hU hE ih => intro _ hΘ; exact .errVal hv (ih hΘ) hU hE
   | tryR _ _ hφ hs ih₁ ih₂ => intro _ hΘ; exact .tryR (ih₁ hΘ) (ih₂ hΘ) hφ hs
   | tryP _ _ ih₁ ih₂ => intro _ hΘ; exact .tryP (ih₁ hΘ) (ih₂ hΘ)
-  | handle hv _ _ hc ha hφ ih₁ ih₂ => intro _ hΘ; exact .handle hv (ih₁ hΘ) (ih₂ hΘ) hc ha hφ
+  | handle hv _ hU hE _ hc ha hφ ih₁ ih₂ =>
+    intro _ hΘ; exact .handle hv (ih₁ hΘ) hU hE (ih₂ hΘ) hc ha hφ
   | hnil hH => intro _ _; exact .hnil hH
   | hcons hp _ _ hH ih₁ ih₂ => intro _ hΘ; exact .hcons hp (ih₁ hΘ) (ih₂ hΘ) hH
   | hguard hp _ _ _ hH ih₁ ih₂ ih₃ => intro _ hΘ; exact .hguard hp (ih₁ hΘ) (ih₂ hΘ) (ih₃ hΘ) hH

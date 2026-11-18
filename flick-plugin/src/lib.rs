@@ -179,6 +179,8 @@ pub enum Expr {
     Lines(Span),
     /// `(a ++ b ++ …)`: texts or lists joined, at least two.
     Concat(Vec<NodeId>),
+    /// `task { body }`: the task that runs `body`, a body as of a `fun`.
+    Task(NodeId),
     // shortcut: `flick!` writes no `match`, `if` or block, which `Builder` builds;
     // add the syntax when plugins write them by hand often
     /// `match scrutinee with | p when g -> e …`, at least one arm.

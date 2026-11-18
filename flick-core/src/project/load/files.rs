@@ -139,6 +139,7 @@ impl Loader<'_> {
             inline_imports: Vec::new(),
             applications: Vec::new(),
             bodiless: Vec::new(),
+            tests: None,
         };
         (Arc::new(syntax::parse("", file)), Arc::new(syntax))
     }

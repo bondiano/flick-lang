@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 
-use crate::plugin::blocks_under;
-use crate::plugin::first_party::{BARE, DECLARATIONS, HEADS};
+use crate::plugin::first_party::{BARE, DECLARATIONS, HEADS, TOP};
+use crate::plugin::{blocks_under, head_token};
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
@@ -20,6 +20,9 @@ pub struct ModuleSyntax {
     /// The heads of std's plugin its imports expose that a block of it
     /// writes as only an import lets it, without `{`: `cli Main`.
     pub bodiless: Vec<String>,
+    /// `tests` at the head of its first top-level `suite` or `test` block:
+    /// the blocks declare the module's `tests`, which it exports unnamed.
+    pub tests: Option<Item>,
 }
 
 #[derive(Debug, Clone)]
@@ -72,6 +75,18 @@ pub struct Import {
 }
 
 impl ModuleSyntax {
+    /// The items of its `exposing`, then `tests` when its blocks declared it,
+    /// which `flick test` finds by the export.
+    pub fn exported(&self, declared: impl Fn(&str) -> bool) -> impl Iterator<Item = &Item> {
+        let header = self.header.as_ref();
+        let items = header
+            .and_then(|h| h.exposing.as_deref())
+            .unwrap_or_default();
+        items
+            .iter()
+            .chain(self.tests.iter().filter(move |i| declared(&i.name)))
+    }
+
     /// The heads of plugin blocks its imports expose.
     pub fn heads(&self) -> Arc<[String]> {
         (self.imports.iter())
@@ -420,6 +435,7 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
         inline_imports,
         applications,
         bodiless,
+        tests: test_blocks(tree, text, file),
     }
 }
 

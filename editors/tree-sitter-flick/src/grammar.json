@@ -27,6 +27,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "_case"
+        },
+        {
+          "type": "SYMBOL",
           "name": "attribute"
         },
         {
@@ -231,6 +235,63 @@
             },
             "named": true,
             "value": "keyword"
+          }
+        ]
+      }
+    },
+    "_case": {
+      "type": "PREC_DYNAMIC",
+      "value": 1,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "ALIAS",
+            "content": {
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "STRING",
+                  "value": "suite"
+                },
+                {
+                  "type": "STRING",
+                  "value": "test"
+                }
+              ]
+            },
+            "named": true,
+            "value": "keyword"
+          },
+          {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "ALIAS",
+                "content": {
+                  "type": "CHOICE",
+                  "members": [
+                    {
+                      "type": "STRING",
+                      "value": ".skip"
+                    },
+                    {
+                      "type": "STRING",
+                      "value": ".only"
+                    }
+                  ]
+                },
+                "named": true,
+                "value": "keyword"
+              },
+              {
+                "type": "BLANK"
+              }
+            ]
+          },
+          {
+            "type": "SYMBOL",
+            "name": "string"
           }
         ]
       }
@@ -1165,6 +1226,14 @@
         {
           "type": "STRING",
           "value": "while"
+        },
+        {
+          "type": "STRING",
+          "value": "suite"
+        },
+        {
+          "type": "STRING",
+          "value": "test"
         }
       ]
     },
@@ -1348,6 +1417,10 @@
     ],
     [
       "_while",
+      "identifier"
+    ],
+    [
+      "_case",
       "identifier"
     ]
   ],

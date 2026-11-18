@@ -87,10 +87,7 @@ theorem field_widen {i : Nat} {f : Ty} (hf : f.CovRow S.hidden i) {σ σ' : Atom
     · exact .inr (.inl hx)
     · exact .inr (.inr (hC x hx))
   · simp only [Ty.substT]
-    have er := hr'.substT_eq hσ
-    have ee := he.substT_eq hσ
-    simp only [Ty.substT, Ty.row.injEq] at er ee
-    rw [er, ee, ht.substT_eq hσ]
+    rw [hr'.substT_eq hσ, he.substT_eq hσ, ht.substT_eq hσ]
     have hC := Caps.substT_widen (C := C) hp
     refine .eff (Stage.use_mono (Stage.le_refl _) hC) .refl fun x hx => ?_
     rcases hx with hx | hx

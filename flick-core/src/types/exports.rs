@@ -1,6 +1,6 @@
 //! The types and kinds of a module's exports, as `.iface` stores them.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use super::Checker;
 use super::env::{Abi, Form, ModuleSignature, TypeDef};
@@ -34,10 +34,14 @@ impl Checker<'_> {
         let makers = tagged(&self.typing.makers, &exported, |_| Vec::new());
         let servers = tagged(&self.typing.servers, &exported, Vec::clone);
         let tags = [(iface::MAKER, makers), (iface::SERVER, servers)];
-        interface.tags = (tags.into_iter())
-            .filter(|(_, marked)| !marked.is_empty())
-            .map(|(tag, marked)| (tag.to_owned(), marked))
-            .collect();
+        // inserted one by one, as the tags below are: `collect` would compile a
+        // sort and a bulk build of its own
+        interface.tags = BTreeMap::new();
+        interface.tags.extend(
+            (tags.into_iter())
+                .filter(|(_, marked)| !marked.is_empty())
+                .map(|(tag, marked)| (tag.to_owned(), marked)),
+        );
         for export in &mut interface.exports {
             let entity = &export.entity;
             if entity.module != self.env.module {

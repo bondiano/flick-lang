@@ -19,8 +19,10 @@ import {
   testClock,
   testEffect,
   testGroup,
+  testOnly,
   testProperty,
   testPure,
+  testSkip,
   testSuite,
 } from "@flick-lang/runtime/rt/testing";
 import type { TestResult } from "@flick-lang/runtime/core/suites";
@@ -115,4 +117,50 @@ test("outcomes are reported apart", async () => {
 test("hash is Effect's, so that a seed draws the same Gen.function", () => {
   const values = ["", 0, -0, 1.5, Number.NaN, 7n, true, "héllo😀", [1, "a"], { _tag: "X", _0: 1, _1: "b" }];
   assert.deepEqual(values.map(hash), values.map((v) => Hash.hash(v)));
+});
+
+test("a skipped test never runs, only keeps the run to its tests, and both select before a run", async () => {
+  let ran: Array<string> = [];
+  const effect = (name: string) => testEffect(name, () => void ran.push(name));
+  const modules: Parameters<typeof runTests>[0] = [
+    ["M", [effect("a"), testSkip(testGroup("later", [effect("b")])), testGroup("g", [effect("c")])]],
+  ];
+  const { code, json } = await run(modules);
+  assert.equal(code, 0);
+  assert.deepEqual(ran, ["a", "c"]);
+  assert.deepEqual(json.tests, [
+    { name: "M > a", status: "passed" },
+    { name: "M > g > c", status: "passed" },
+    { name: "M > later > b", status: "skipped" },
+  ]);
+  assert.equal(Reflect.get(json, "skipped"), 1);
+  // `only` keeps the run to the marked tests; a skipped one stays skipped
+  ran = [];
+  const marked: Parameters<typeof runTests>[0] = [
+    ["M", [effect("a"), testOnly(testGroup("g", [effect("c"), testSkip(effect("d"))]))]],
+  ];
+  const only = await run(marked);
+  assert.deepEqual(ran, ["c"]);
+  assert.deepEqual(
+    only.json.tests.map((t) => [t.name, t.status]),
+    [["M > g > c", "passed"], ["M > a", "skipped"], ["M > g > d", "skipped"]],
+  );
+  // `--list` prints the names a run would run and runs none; `--forbid-only` fails before running
+  for (const [options, printed, exit] of [
+    [{ list: true }, "M > g > c\n", 0],
+    [{ forbidOnly: true }, "--forbid-only: 2 tests are marked only\n  M > g > c\n  M > g > d\n", 1],
+  ] as const) {
+    ran = [];
+    let out = "";
+    const before = process.exitCode;
+    try {
+      // oxlint-disable-next-line no-await-in-loop -- each run sets the process's one exit code
+      await runTests(marked, { ...options, write: (text) => void (out += text) });
+      assert.equal(process.exitCode, exit);
+    } finally {
+      process.exitCode = before;
+    }
+    assert.equal(out, printed);
+    assert.deepEqual(ran, []);
+  }
 });

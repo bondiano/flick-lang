@@ -726,7 +726,15 @@
     "named": false
   },
   {
+    "type": "suite",
+    "named": false
+  },
+  {
     "type": "task",
+    "named": false
+  },
+  {
+    "type": "test",
     "named": false
   },
   {

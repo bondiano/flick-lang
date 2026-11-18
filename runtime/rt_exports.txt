@@ -553,8 +553,10 @@
 @flick-lang/runtime/core/testing isAssertionFailed
 @flick-lang/runtime/core/testing random
 @flick-lang/runtime/core/testing testGroup
+@flick-lang/runtime/core/testing testOnly
 @flick-lang/runtime/core/testing testProperty
 @flick-lang/runtime/core/testing testPure
+@flick-lang/runtime/core/testing testSkip
 @flick-lang/runtime/core/text bigintAbs
 @flick-lang/runtime/core/text bigintDivide
 @flick-lang/runtime/core/text bigintFromNumber
@@ -1015,9 +1017,11 @@
 @flick-lang/runtime/rt testClock
 @flick-lang/runtime/rt testEffect
 @flick-lang/runtime/rt testGroup
+@flick-lang/runtime/rt testOnly
 @flick-lang/runtime/rt testProperty
 @flick-lang/runtime/rt testPure
 @flick-lang/runtime/rt testSetTime
+@flick-lang/runtime/rt testSkip
 @flick-lang/runtime/rt testSuite
 @flick-lang/runtime/rt timeout
 @flick-lang/runtime/rt timeoutOption

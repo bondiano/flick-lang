@@ -75,7 +75,7 @@ theorem LNest.new_cell {c home i E Ef al rf e₀ n ℓ t' Ψ'} {ψ : Stage} (hn 
     (h : Typ S Ψ' Facts.age [] (plug E (.inside n (.hwith n ℓ Ef al rf e₀))) (.ex t' ψ))
     (hψ : ∀ x, ψ.svc (.atm (.r x)) → baseOf anc i x) :
     ∃ r ε t, Ψ'[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t Caps.none) ∧
-      ∀ x, r (.atm (.r x)) → holeE (baseOf anc i) E x ∨ x = n := by
+      ∀ x, r.asRow (.atm (.r x)) → holeE (baseOf anc i) E x ∨ x = n := by
   obtain ⟨r, ε, t, hℓ, hx⟩ := hwith_cell hE h
   refine ⟨r, ε, t, hℓ, fun x hr => ?_⟩
   rcases hx x hr with h₁ | h₁ | ⟨F, hF, h₁ | h₁⟩

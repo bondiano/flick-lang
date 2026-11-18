@@ -116,12 +116,13 @@ theorem canonical_ref {Ψ Θ Γ v t φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.e
 /-- L1 for lazies. -/
 theorem canonical_lazy {Ψ Θ Γ v r ε t C φ} (hv : Value v)
     (h : Typ S Ψ Θ Γ v (.ex (.lazy r ε t C) φ)) :
-    ∃ l u, v = .loc l ∧ Ψ[l]? = some (.lazyCell r ε u C) ∧ Ty.Equiv u t := by
+    ∃ l r' ε' u, v = .loc l ∧ Ψ[l]? = some (.lazyCell r' ε' u C) ∧ Ty.Equiv r' r ∧
+      Ty.Equiv ε' ε ∧ Ty.Equiv u t := by
   have hk := h.vkind hv rfl (by simp [Ty.isAll])
   cases hv with
   | loc =>
-    obtain ⟨u, hu, he⟩ := h.loc_lazy _ _ _ _ _ _ rfl rfl
-    exact ⟨_, u, rfl, hu, he⟩
+    obtain ⟨r', ε', u, hu, hr, hε, he⟩ := h.loc_lazy _ _ _ _ _ _ rfl rfl
+    exact ⟨_, r', ε', u, rfl, hu, hr, hε, he⟩
   | ctorApp _ hf _ => simp [VKind, Tm.head, hf, Ty.kind] at hk
   | constApp => simp [VKind, Tm.head, Ty.kind] at hk
   | _ => simp [VKind, Tm.head, Ty.kind] at hk
@@ -137,7 +138,8 @@ theorem Typ.value_not_cell {Ψ Θ Γ v r ε t C φ} (hv : Value v)
 /-- L1 for computations. -/
 theorem canonical_eff {Ψ Θ Γ v r ε t C φ} (hv : Value v)
     (h : Typ S Ψ Θ Γ v (.ex (.eff r ε t C) φ)) :
-    ∃ e t₀ ψ, v = .task e ∧ Typ S Ψ Θ Γ e (.ex t₀ ψ) ∧ ψ.le (Stage.use (.rt r ε) C) ∧ LeLive S t₀ t := by
+    ∃ e t₀ ψ, v = .task e ∧ Typ S Ψ Θ Γ e (.ex t₀ ψ) ∧ ψ.le (Stage.use (.rt r.asRow ε.asRow) C) ∧
+      LeLive S t₀ t := by
   have hk := h.vkind hv rfl (by simp [Ty.isAll])
   cases hv with
   | task =>
@@ -214,8 +216,8 @@ theorem Shp.field {fl R v l t} (h : Shp S fl R v) (hf : fl = true) (hR : R.field
 /-- L1 for errors: a value of `Errors ε` is a constructor of an error in `ε`, at a
 type whose `⌈·⌉` is within the atoms of `ε`. -/
 theorem canonical_errors {Ψ Θ Γ v ε φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.errors ε) φ)) :
-    ∃ K k ts T U, v.head = .ctor K ∧ S.ctor K = some (k, ts, T) ∧ ε (.nm T) ∧ U.hd = .adt T ∧
-      Typ S Ψ Θ Γ v (.ex U .pure) ∧ Row.Sub (Row.err T U) ε := by
+    ∃ K k ts T U, v.head = .ctor K ∧ S.ctor K = some (k, ts, T) ∧ ε.asRow (.nm T U.classOf) ∧
+      U.hd = .adt T ∧ Typ S Ψ Θ Γ v (.ex U .pure) ∧ Row.Sub (Row.err T U) ε.asRow := by
   have hk := h.vkind hv rfl (by simp [Ty.isAll])
   have hs := (h.shape hv rfl).2
   obtain ⟨K, hK⟩ : ∃ K, v.head = .ctor K := by
@@ -225,7 +227,7 @@ theorem canonical_errors {Ψ Θ Γ v ε φ} (hv : Value v) (h : Typ S Ψ Θ Γ v
     | constApp =>
       simp [VKind, Tm.head, Ty.kind] at hk
     | _ => simp [VKind, Tm.head, Ty.kind] at hk
-  rcases hs K hK (by simp [Ty.isAll]) with ⟨U, us, hU, hs'⟩ | ⟨_, E, U, he, hE, hUE, hs', hty, hsub⟩
+  rcases hs K hK (by simp [Ty.isAll]) with ⟨U, us, hU, hs'⟩ | ⟨_, E, U, he, hUE, hs', hty, hsub⟩
   · obtain ⟨K', k, _, T₀, ts', _, _, rfl⟩ := hs'.false_arrows
     simp only [Ty.arrows_substT, Ty.tcon_substT] at hU
     have h₁ := Ty.arrows_kind (ts'.map (Ty.substT (instT us))) T₀ ((S.res K').map (Ty.substT (instT us)))
@@ -240,7 +242,7 @@ theorem canonical_errors {Ψ Θ Γ v ε φ} (hv : Value v) (h : Typ S Ψ Θ Γ v
       cases ts' with
       | nil =>
         simp only [Ty.arrows, Ty.tcon_hd] at hU₁; cases hU₁
-        exact ⟨K, k, ts, _, U, hK, hS, hE, hUE, hty.valueAny hv _, hsub⟩
+        exact ⟨K, k, ts, _, U, hK, hS, hsub _ (.inl rfl), hUE, hty.valueAny hv _, hsub⟩
       | cons => simp [Ty.arrows, Ty.hd] at hU₁
     | lit | rnil | rcons => simp [Ty.hd] at hUE
 

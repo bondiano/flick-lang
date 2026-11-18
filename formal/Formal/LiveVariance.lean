@@ -99,7 +99,7 @@ theorem vVar_ok : ∀ T i, vVar T i ≠ .inv → ∀ K k ts, vCtor K = some (k, 
 
 def vSig : Sig where
   ctor := vCtor
-  impl _ := .errors Row.none
+  impl _ := .errors .cnil
   ctor_closed := by
     intro K k ts T σ hK hσ
     unfold vCtor at hK
@@ -119,7 +119,7 @@ def vSig : Sig where
     intro i hi
     simp only [Function.comp, Ty.substT]
     exact hσ i (List.mem_range.mp hi)
-  impl_closed _ _ := by simp [Ty.substT, Row.none_substT]
+  impl_closed _ _ := by simp [Ty.substT]
   dict _ := none
   glob _ := none
   dict_closed _ _ _ h := nomatch h

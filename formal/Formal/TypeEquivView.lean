@@ -14,18 +14,21 @@ inductive Ty.SameForm : Ty → Ty → Prop
   | tvar (n) : Ty.SameForm (.tvar n) (.tvar n)
   | rg (p) : Ty.SameForm (.rg p) (.rg p)
   | base (b) : Ty.SameForm (.base b) (.base b)
-  | arrow {a a' b b' φ C} : Ty.Equiv a a' → Ty.Equiv b b' →
-      Ty.SameForm (.arrow a φ b C) (.arrow a' φ b' C)
+  | arrow {a a' b b' φ φ' C} : Ty.Equiv a a' → Ty.Equiv φ φ' → Ty.Equiv b b' →
+      Ty.SameForm (.arrow a φ b C) (.arrow a' φ' b' C)
   | ref {a b} : Ty.Equiv a b → Ty.SameForm (.ref a) (.ref b)
   | adt (N) : Ty.SameForm (.adt N) (.adt N)
   | tapp {f f' a a'} : Ty.Equiv f f' → Ty.Equiv a a' → Ty.SameForm (.tapp f a) (.tapp f' a')
   | rnil : Ty.SameForm .rnil .rnil
   | rcons {l a a' r r'} : Ty.Equiv a a' → Ty.Equiv r r' →
       Ty.SameForm (.rcons l a r) (.rcons l a' r')
-  | eff {r e a b C} : Ty.Equiv a b → Ty.SameForm (.eff r e a C) (.eff r e b C)
-  | lazy {r e a b C} : Ty.Equiv a b → Ty.SameForm (.lazy r e a C) (.lazy r e b C)
-  | lazyCell {r e a b C} : Ty.Equiv a b → Ty.SameForm (.lazyCell r e a C) (.lazyCell r e b C)
-  | errors (e) : Ty.SameForm (.errors e) (.errors e)
+  | eff {r r' e e' a b C} : Ty.Equiv r r' → Ty.Equiv e e' → Ty.Equiv a b →
+      Ty.SameForm (.eff r e a C) (.eff r' e' b C)
+  | lazy {r r' e e' a b C} : Ty.Equiv r r' → Ty.Equiv e e' → Ty.Equiv a b →
+      Ty.SameForm (.lazy r e a C) (.lazy r' e' b C)
+  | lazyCell {r r' e e' a b C} : Ty.Equiv r r' → Ty.Equiv e e' → Ty.Equiv a b →
+      Ty.SameForm (.lazyCell r e a C) (.lazyCell r' e' b C)
+  | errors {e e'} : Ty.Equiv e e' → Ty.SameForm (.errors e) (.errors e')
   | hnd {a b} : Ty.Equiv a b → Ty.SameForm (.hnd a) (.hnd b)
   | owner {a b} : Ty.Equiv a b → Ty.SameForm (.owner a) (.owner b)
   | dict {c a b} : Ty.Equiv a b → Ty.SameForm (.dict c a) (.dict c b)
@@ -33,23 +36,25 @@ inductive Ty.SameForm : Ty → Ty → Prop
   | bare : Ty.SameForm .bare .bare
   | pure : Ty.SameForm .pure .pure
   | rt {r r' e e'} : Ty.Equiv r r' → Ty.Equiv e e' → Ty.SameForm (.rt r e) (.rt r' e')
+  | rtob {r r' s s' e e'} : Ty.Equiv r r' → Ty.Equiv s s' → Ty.Equiv e e' →
+      Ty.SameForm (.rtob r s e) (.rtob r' s' e')
 
 theorem Ty.SameForm.refl (t : Ty) : t.SameForm t := by
   cases t with
-  | caps | row | cnil | rnm | run | rless => exact .rows (by constructor) (by constructor)
+  | caps | cnil | rnm | run | rless => exact .rows (by constructor) (by constructor)
   | tvar n => exact .tvar n
   | rg p => exact .rg p
   | base b => exact .base b
-  | arrow => exact .arrow .refl .refl
+  | arrow => exact .arrow .refl .refl .refl
   | ref => exact .ref .refl
   | adt N => exact .adt N
   | tapp => exact .tapp .refl .refl
   | rnil => exact .rnil
   | rcons => exact .rcons .refl .refl
-  | eff => exact .eff .refl
-  | lazy => exact .lazy .refl
-  | lazyCell => exact .lazyCell .refl
-  | errors e => exact .errors e
+  | eff => exact .eff .refl .refl .refl
+  | lazy => exact .lazy .refl .refl .refl
+  | lazyCell => exact .lazyCell .refl .refl .refl
+  | errors => exact .errors .refl
   | hnd => exact .hnd .refl
   | owner => exact .owner .refl
   | dict => exact .dict .refl
@@ -57,31 +62,34 @@ theorem Ty.SameForm.refl (t : Ty) : t.SameForm t := by
   | bare => exact .bare
   | pure => exact .pure
   | rt => exact .rt .refl .refl
+  | rtob => exact .rtob .refl .refl .refl
 
 theorem Ty.SameForm.symm {a b : Ty} (h : a.SameForm b) : b.SameForm a := by
   cases h with
   | rows ha hb => exact .rows hb ha
-  | arrow ha hb => exact .arrow ha.symm hb.symm
+  | arrow ha hφ hb => exact .arrow ha.symm hφ.symm hb.symm
   | ref h => exact .ref h.symm
   | tapp hf ha => exact .tapp hf.symm ha.symm
   | rcons ha hr => exact .rcons ha.symm hr.symm
-  | eff h => exact .eff h.symm
-  | lazy h => exact .lazy h.symm
-  | lazyCell h => exact .lazyCell h.symm
+  | eff h₁ h₂ h₃ => exact .eff h₁.symm h₂.symm h₃.symm
+  | lazy h₁ h₂ h₃ => exact .lazy h₁.symm h₂.symm h₃.symm
+  | lazyCell h₁ h₂ h₃ => exact .lazyCell h₁.symm h₂.symm h₃.symm
+  | errors h => exact .errors h.symm
   | hnd h => exact .hnd h.symm
   | owner h => exact .owner h.symm
   | dict h => exact .dict h.symm
   | all h => exact .all h.symm
   | rt hr he => exact .rt hr.symm he.symm
+  | rtob h₁ h₂ h₃ => exact .rtob h₁.symm h₂.symm h₃.symm
   | _ => exact .refl _
 
 theorem Ty.SameForm.trans {a b c : Ty} (h : a.SameForm b) (h' : b.SameForm c) :
     a.SameForm c := by
   cases h with
   | rows ha hb => cases hb <;> cases h' with | rows _ hc => exact .rows ha hc
-  | arrow ha hb => cases h' with
+  | arrow ha hφ hb => cases h' with
     | rows h _ => cases h
-    | arrow ha' hb' => exact .arrow (ha.trans ha') (hb.trans hb')
+    | arrow ha' hφ' hb' => exact .arrow (ha.trans ha') (hφ.trans hφ') (hb.trans hb')
   | ref h => cases h' with
     | rows h _ => cases h
     | ref h' => exact .ref (h.trans h')
@@ -91,15 +99,18 @@ theorem Ty.SameForm.trans {a b c : Ty} (h : a.SameForm b) (h' : b.SameForm c) :
   | rcons ha hr => cases h' with
     | rows h _ => cases h
     | rcons ha' hr' => exact .rcons (ha.trans ha') (hr.trans hr')
-  | eff h => cases h' with
+  | eff h₁ h₂ h₃ => cases h' with
     | rows h _ => cases h
-    | eff h' => exact .eff (h.trans h')
-  | lazy h => cases h' with
+    | eff h₁' h₂' h₃' => exact .eff (h₁.trans h₁') (h₂.trans h₂') (h₃.trans h₃')
+  | lazy h₁ h₂ h₃ => cases h' with
     | rows h _ => cases h
-    | lazy h' => exact .lazy (h.trans h')
-  | lazyCell h => cases h' with
+    | lazy h₁' h₂' h₃' => exact .lazy (h₁.trans h₁') (h₂.trans h₂') (h₃.trans h₃')
+  | lazyCell h₁ h₂ h₃ => cases h' with
     | rows h _ => cases h
-    | lazyCell h' => exact .lazyCell (h.trans h')
+    | lazyCell h₁' h₂' h₃' => exact .lazyCell (h₁.trans h₁') (h₂.trans h₂') (h₃.trans h₃')
+  | errors h => cases h' with
+    | rows h _ => cases h
+    | errors h' => exact .errors (h.trans h')
   | hnd h => cases h' with
     | rows h _ => cases h
     | hnd h' => exact .hnd (h.trans h')
@@ -115,7 +126,10 @@ theorem Ty.SameForm.trans {a b c : Ty} (h : a.SameForm b) (h' : b.SameForm c) :
   | rt hr he => cases h' with
     | rows h _ => cases h
     | rt hr' he' => exact .rt (hr.trans hr') (he.trans he')
-  | tvar | rg | base | adt | rnil | errors | bare | pure =>
+  | rtob h₁ h₂ h₃ => cases h' with
+    | rows h _ => cases h
+    | rtob h₁' h₂' h₃' => exact .rtob (h₁.trans h₁') (h₂.trans h₂') (h₃.trans h₃')
+  | tvar | rg | base | adt | rnil | bare | pure =>
     cases h' with
     | rows h _ => cases h
     | _ => exact .refl _
@@ -125,18 +139,20 @@ theorem Ty.Equiv.form {a b : Ty} (h : Ty.Equiv a b) : a.SameForm b := by
   | refl => exact .refl _
   | symm _ ih => exact ih.symm
   | trans _ _ ih₁ ih₂ => exact ih₁.trans ih₂
-  | arrow ha hb => exact .arrow ha hb
+  | arrow ha hφ hb => exact .arrow ha hφ hb
   | ref h => exact .ref h
   | tapp hf ha => exact .tapp hf ha
   | rcons ha hr => exact .rcons ha hr
-  | eff h => exact .eff h
-  | lazy h => exact .lazy h
-  | lazyCell h => exact .lazyCell h
+  | eff h₁ h₂ h₃ => exact .eff h₁ h₂ h₃
+  | errors h => exact .errors h
+  | lazy h₁ h₂ h₃ => exact .lazy h₁ h₂ h₃
+  | lazyCell h₁ h₂ h₃ => exact .lazyCell h₁ h₂ h₃
   | hnd h => exact .hnd h
   | owner h => exact .owner h
   | dict h => exact .dict h
   | all h => exact .all h
   | rt hr he => exact .rt hr he
+  | rtob h₁ h₂ h₃ => exact .rtob h₁ h₂ h₃
   | run_idem r hr | run_nil r hr | rless_none r hr => exact .rows (by constructor) hr
   | _ => exact .rows (by constructor) (by constructor)
 
@@ -160,10 +176,11 @@ theorem Ty.Equiv.rnil_right {a : Ty} (h : Ty.Equiv a .rnil) : a = .rnil := by
   | rows _ hr => cases hr
   | rnil => rfl
 
-theorem Ty.Equiv.errors_right {a : Ty} {e} (h : Ty.Equiv a (.errors e)) : a = .errors e := by
+theorem Ty.Equiv.errors_right {a : Ty} {e} (h : Ty.Equiv a (.errors e)) :
+    ∃ e', a = .errors e' ∧ Ty.Equiv e' e := by
   cases h.form with
   | rows _ hr => cases hr
-  | errors => rfl
+  | errors he => exact ⟨_, rfl, he⟩
 
 theorem Ty.Equiv.hnd_rg_right {a : Ty} {p} (h : Ty.Equiv a (.hnd (.rg p))) :
     a = .hnd (.rg p) := by
@@ -178,16 +195,16 @@ theorem Ty.Equiv.owner_rg_right {a : Ty} {p} (h : Ty.Equiv a (.owner (.rg p))) :
   | owner hr => cases hr.rg_right; rfl
 
 theorem Ty.Equiv.lazyCell_left {r e t C} {b : Ty} (h : Ty.Equiv (.lazyCell r e t C) b) :
-    ∃ u, b = .lazyCell r e u C ∧ Ty.Equiv t u := by
+    ∃ r' e' u, b = .lazyCell r' e' u C ∧ Ty.Equiv r r' ∧ Ty.Equiv e e' ∧ Ty.Equiv t u := by
   cases h.form with
   | rows hr _ => cases hr
-  | lazyCell hu => exact ⟨_, rfl, hu⟩
+  | lazyCell hr he hu => exact ⟨_, _, _, rfl, hr, he, hu⟩
 
 theorem Ty.Equiv.lazy_left {r e t C} {b : Ty} (h : Ty.Equiv (.lazy r e t C) b) :
-    ∃ u, b = .lazy r e u C ∧ Ty.Equiv t u := by
+    ∃ r' e' u, b = .lazy r' e' u C ∧ Ty.Equiv r r' ∧ Ty.Equiv e e' ∧ Ty.Equiv t u := by
   cases h.form with
   | rows hr _ => cases hr
-  | lazy hu => exact ⟨_, rfl, hu⟩
+  | lazy hr he hu => exact ⟨_, _, _, rfl, hr, he, hu⟩
 
 theorem Ty.Equiv.owner_v_right {a : Ty} {n} (h : Ty.Equiv a (.owner (.tvar n))) :
     a = .owner (.tvar n) := by

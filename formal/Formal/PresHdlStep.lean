@@ -94,13 +94,13 @@ theorem refill_todo {Ψ Θ E f x t₀ φ₀} (hE : OkE E) (hn : ¬ Value (.app f
   simpa using Refill.id back [] (.app f .todo) (by simpa using Typ.app hf' .todo hψ hT)
 
 /-- The cell of `resume` has no region not yet created. -/
-theorem ctl_cell_yf {Ψ : List Ty} {Θ n} {ℓ p : Nat} {r ε : Row} {t' b₀ : Ty} (hc : RtCtx Ψ Θ n)
+theorem ctl_cell_yf {Ψ : List Ty} {Θ n} {ℓ p : Nat} {r ε : Ty} {t' b₀ : Ty} (hc : RtCtx Ψ Θ n)
     (hℓ : Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none)) (hb₀ : b₀.substT (kill n) = b₀)
     (hp : p < n) : (Ty.arrow b₀ (.rt r ε) t' (Ty.rg p).reach).YF n := by
   have hcy := hc.yf _ (List.mem_of_getElem? hℓ)
-  simp only [Ty.YF, Ty.substT, Stage.substT, Ty.arrow.injEq, Stage.rt.injEq] at hcy
+  simp only [Ty.YF, Ty.substT, Ty.isStage, if_true, Ty.arrow.injEq, Ty.rt.injEq] at hcy
   obtain ⟨-, ⟨hr, hε⟩, ht', -⟩ := hcy
-  simp only [Ty.YF, Ty.substT, Stage.substT, hr, hε, ht', hb₀]
+  simp only [Ty.YF, Ty.substT, Ty.isStage, if_true, hr, hε, ht', hb₀]
   rw [Caps.kill_fixed fun q hq => by cases hq; exact hp]
 
 /-- `abort`: the arm goes with the signal that unwinds the body. -/

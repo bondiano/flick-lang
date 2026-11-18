@@ -51,11 +51,12 @@ theorem Caps.kill_fixed {C : Caps} {n : Nat} (h : ∀ q, C (.r q) → q < n) : C
 theorem Ty.kill_fresh (t : Ty) (n : Nat) : ¬ (t.substT (kill n)).reach (.r n) :=
   fun h => Nat.lt_irrefl n (Ty.reach_kill h)
 
-theorem Row.kill_fresh (ε : Row) (n : Nat) : ¬ (Ty.errors (ε.substT (kill n))).reach (.r n) :=
-  Ty.kill_fresh (.errors ε) n
+theorem Row.kill_fresh (ε : Row) (n : Nat) : ¬ (ε.substT (kill n)).reach (.r n) := fun h => by
+  obtain ⟨b, -, hb⟩ := (Row.substT_reach (kill n) ε (.r n)).mp h
+  exact Nat.lt_irrefl n (Ty.reach_kill (t := b.ty) (by rwa [Atom.ty_substT]))
 
 theorem instT_rg_noNames (n : Nat) : NoNames (instT [.rg n]) := by
-  intro b N h
+  intro b N c h
   cases b with
   | v i => cases i <;> simp [instT, Ty.asRow_rg, Ty.asRow_tvar] at h
   | r p => simp [instT, Ty.asRow_rg] at h

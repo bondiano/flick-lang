@@ -94,12 +94,13 @@ theorem Typ.context_equiv {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | lazyLoc hl =>
     intro _ _ _ hΨ _
     obtain ⟨t', hl', he⟩ := hΨ.lookup hl
-    obtain ⟨u, rfl, hu⟩ := he.lazyCell_left
-    exact (Typ.lazyLoc hl').conv (.lazy hu.symm)
+    obtain ⟨_, _, u, rfl, hr, hε, hu⟩ := he.lazyCell_left
+    exact (Typ.lazyLoc hl').conv (.lazy hr.symm hε.symm hu.symm)
   | settle hl _ hψ hφ ht ih =>
     intro _ _ hn hΨ hΓ
     obtain ⟨t', hl', he⟩ := hΨ.lookup hl
-    obtain ⟨u, rfl, hu⟩ := he.lazyCell_left
+    obtain ⟨_, _, u, rfl, hr, hε, hu⟩ := he.lazyCell_left
+    rw [hr.asRow, hε.asRow] at hψ hφ
     exact .settle hl' ((ih hn hΨ hΓ).conv hu) hψ hφ ((LeLive.equiv hu.symm).trans ht)
   | raise _ hφ ih => intro _ _ hn hΨ hΓ; exact .raise (ih hn hΨ hΓ) hφ
   | raiseAdt _ hU hφ ih => intro _ _ hn hΨ hΓ; exact .raiseAdt (ih hn hΨ hΓ) hU hφ
@@ -110,9 +111,9 @@ theorem Typ.context_equiv {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | tryP _ _ ihe iha =>
     intro _ _ hn hΨ hΓ
     exact .tryP (ihe (hn.sub Or.inl) hΨ hΓ) (iha (hn.sub Or.inr) hΨ hΓ)
-  | handle hv _ _ hc ha hφ ihv iha =>
+  | handle hv _ hU hE _ hc ha hφ ihv iha =>
     intro _ _ hn hΨ hΓ
-    exact .handle hv (ihv (hn.sub Or.inl) hΨ hΓ) (iha (hn.sub Or.inr) hΨ hΓ) hc ha hφ
+    exact .handle hv (ihv (hn.sub Or.inl) hΨ hΓ) hU hE (iha (hn.sub Or.inr) hΨ hΓ) hc ha hφ
   | hnil hH => intros; exact .hnil hH
   | hcons hp _ _ hH ihb ihr =>
     intro _ _ hn hΨ hΓ

@@ -1,6 +1,7 @@
 import Formal.EvalCtx
 import Formal.RuleRows
 import Formal.Live.Mode
+import Formal.Judgment
 
 /-!
 # Typing rules of λFlick (core.md §2.3, §3.6; regions.md §2.3–§2.5, §3.4)
@@ -18,17 +19,6 @@ does the same with one variable, its region `s`, which is then not in `fr(Γ)`,
 
 namespace Flick
 
-/-- Judgment forms: an expression, `match` arms, `try` arms. For `try` arms,
-`ε₀` is the error row of the body and `H` the errors the arms remove. The fields of a
-dictionary record have the schemes `fs`. The arms of a handler of the effect `E` give
-the handler's type `t` at its stage `φ`; `resume` holds the region `s` of the handler. -/
-inductive J
-  | ex (t : Ty) (φ : Stage)
-  | alts (t t' : Ty) (φ : Stage)
-  | halts (ε₀ H : Row) (t : Ty) (φ : Stage)
-  | dfs (fs : List (Label × Scheme))
-  | harms (E : Name) (t : Ty) (φ : Stage) (s : Ty)
-
 variable (S : Sig)
 
 inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
@@ -39,19 +29,22 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
       Typ Ψ Θ Γ e (.ex (.all k t) φ)
   /-- A variable of a scheme without facts, as a value of its polymorphic type. -/
   | allVar : Γ[i]? = some σ → 0 < σ.k → (∀ C s, ¬ σ.cs C s) → Typ Ψ Θ Γ (.var i) (.ex (.all σ.k σ.t) φ)
-  | lam : Typ Ψ Θ (.mono a :: Γ) b (.ex t (Stage.use ψ C)) → b.NoIns →
+  | lam : Typ Ψ Θ (.mono a :: Γ) b (.ex t (Stage.use ψ.asStage C)) → b.NoIns →
       LeLive S (.arrow a ψ t C) T →
       Typ Ψ Θ Γ (.lam b) (.ex T φ)
-  | app : Typ Ψ Θ Γ f (.ex (.arrow a ψ t C) φ) → Typ Ψ Θ Γ e (.ex a φ) → (Stage.use ψ C).le φ → LeLive S t T →
+  | app : Typ Ψ Θ Γ f (.ex (.arrow a ψ t C) φ) → Typ Ψ Θ Γ e (.ex a φ) → (Stage.use ψ.asStage C).le φ →
+      LeLive S t T →
       Typ Ψ Θ Γ (.app f e) (.ex T φ)
   | let_ : Typ Ψ Θ Γ e (.ex a φ) → Typ Ψ Θ (.mono a :: Γ) b (.ex t φ) →
       Typ Ψ Θ Γ (.let_ e b) (.ex t φ)
   | letGen : Typ (Ψ.map (Ty.up k)) (Facts.union (Θ.substT (shiftV k)) Φ) (Γ.map (Scheme.up k)) e
         (.ex a .pure) →
       Typ Ψ Θ (⟨k, Φ, a⟩ :: Γ) b (.ex t φ) → Typ Ψ Θ Γ (.let_ e b) (.ex t φ)
-  | letrec : Typ Ψ Θ (.mono a :: .mono (.arrow a ψ r C) :: Γ) f (.ex r (Stage.use ψ C)) → f.NoIns →
+  | letrec : Typ Ψ Θ (.mono a :: .mono (.arrow a ψ r C) :: Γ) f (.ex r (Stage.use ψ.asStage C)) →
+      f.NoIns →
       Typ Ψ Θ (.mono (.arrow a ψ r C) :: Γ) b (.ex t φ) → Typ Ψ Θ Γ (.letrec f b) (.ex t φ)
-  | fix : Typ Ψ Θ (.mono a :: .mono (.arrow a ψ r C) :: Γ) f (.ex r (Stage.use ψ C)) → f.NoIns →
+  | fix : Typ Ψ Θ (.mono a :: .mono (.arrow a ψ r C) :: Γ) f (.ex r (Stage.use ψ.asStage C)) →
+      f.NoIns →
       LeLive S (.arrow a ψ r C) T →
       Typ Ψ Θ Γ (.fix f) (.ex T φ)
   | lit : Typ Ψ Θ Γ (.lit l) (.ex (.base l.base) φ)
@@ -93,30 +86,33 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
           (.ex ((t'.up k).substT θ) ((φ.substT (shiftV k)).substT θ))) →
       Typ Ψ Θ Γ r (.alts t t' φ) → Typ Ψ Θ Γ (.acons (Pat.spine K qs) b r) (.alts t t' φ)
   | todo : Typ Ψ Θ Γ .todo (.ex t φ)
-  | task : Typ Ψ Θ Γ e (.ex t ψ) → ψ.le (Stage.use (.rt r ε) C) → e.NoIns →
+  | task : Typ Ψ Θ Γ e (.ex t ψ) → ψ.le (Stage.use (.rt r.asRow ε.asRow) C) → e.NoIns →
       LeLive S (.eff r ε t C) T →
       Typ Ψ Θ Γ (.task e) (.ex T φ)
-  | await : Typ Ψ Θ Γ e (.ex (.eff r ε t C) φ) → (Stage.use (.rt r ε) C).le φ → LeLive S t T →
-      Typ Ψ Θ Γ (.await e) (.ex T φ)
+  | await : Typ Ψ Θ Γ e (.ex (.eff r ε t C) φ) → (Stage.use (.rt r.asRow ε.asRow) C).le φ →
+      LeLive S t T → Typ Ψ Θ Γ (.await e) (.ex T φ)
   /-- (T-Lazy) of lazy.md §2: the initializer is typed as the body of a `task`; making the
   cell is a runtime step, as `Ref.make`. (T-Force): forcing runs it as `await` runs a task. -/
-  | lazy : Typ Ψ Θ Γ e (.ex t ψ) → ψ.le (Stage.use (.rt r ε) C) → e.NoIns →
+  | lazy : Typ Ψ Θ Γ e (.ex t ψ) → ψ.le (Stage.use (.rt r.asRow ε.asRow) C) → e.NoIns →
       (Stage.rt Row.none Row.none).le φ → Typ Ψ Θ Γ (.lazy e) (.ex (.lazy r ε t C) φ)
-  | force : Typ Ψ Θ Γ e (.ex (.lazy r ε t C) φ) → (Stage.use (.rt r ε) C).le φ → LeLive S t T →
-      Typ Ψ Θ Γ (.force e) (.ex T φ)
-  | raise : Typ Ψ Θ Γ e (.ex (.errors ε) φ) → (Stage.rt Row.none ε).le φ →
+  | force : Typ Ψ Θ Γ e (.ex (.lazy r ε t C) φ) → (Stage.use (.rt r.asRow ε.asRow) C).le φ →
+      LeLive S t T → Typ Ψ Θ Γ (.force e) (.ex T φ)
+  | raise : Typ Ψ Θ Γ e (.ex (.errors ε) φ) → (Stage.rt Row.none ε.asRow).le φ →
       Typ Ψ Θ Γ (.raise e) (.ex t φ)
   | raiseAdt : Typ Ψ Θ Γ e (.ex U φ) → U.hd = .adt E → (Stage.rt Row.none (Row.err E U)).le φ →
       Typ Ψ Θ Γ (.raise e) (.ex t φ)
-  | errVal : Value e → Typ Ψ Θ Γ e (.ex U φ) → U.hd = .adt E → Row.Sub (Row.err E U) ε →
+  | errVal : Value e → Typ Ψ Θ Γ e (.ex U φ) → U.hd = .adt E → Row.Sub (Row.err E U) ε.asRow →
       Typ Ψ Θ Γ e (.ex (.errors ε) φ)
-  | tryR : Typ Ψ Θ Γ e (.ex t (.rt r ε₀)) → Typ Ψ Θ Γ A (.halts ε₀ H t φ) →
-      (Stage.rt r ε').le φ → Row.Sub ε₀ (Row.union H (ε'.back H)) →
+  /-- An arm that catches a name catches it at every argument (`Row.nameClose`). -/
+  | tryR : Typ Ψ Θ Γ e (.ex t (.rt r ε₀.asRow)) → Typ Ψ Θ Γ A (.halts ε₀ H t φ) →
+      (Stage.rt r ε').le φ → Row.Sub ε₀.asRow (Row.union H.nameClose (ε'.back H)) →
       Typ Ψ Θ Γ (.try_ e A) (.ex t φ)
-  | tryP : Typ Ψ Θ Γ e (.ex t .pure) → Typ Ψ Θ Γ A (.halts Row.none H t φ) →
+  | tryP : Typ Ψ Θ Γ e (.ex t .pure) → Typ Ψ Θ Γ A (.halts .cnil H t φ) →
       Typ Ψ Θ Γ (.try_ e A) (.ex t φ)
-  | handle : Value v → Typ Ψ Θ Γ v (.ex (.errors ε₀) .pure) → Typ Ψ Θ Γ A (.halts ε₀ H t φ) →
-      HCov S v H ε' → (∀ x, ε₀ x → (∃ N, x = .nm N) ∨ Row.union H ε'.modNames x) →
+  /-- The arms on a raised value `v` of the error type `U = E ū`, one of `ε₀`. -/
+  | handle : Value v → Typ Ψ Θ Γ v (.ex U .pure) → U.hd = .adt E → Row.Sub (Row.err E U) ε₀.asRow →
+      Typ Ψ Θ Γ A (.halts ε₀ H t φ) → HCov H ε' E U →
+      (∀ x, ε₀.asRow x → (∃ N c, x = .nm N c) ∨ Row.union H ε'.modNames x) →
       (Stage.rt Row.none ε').le φ →
       Typ Ψ Θ Γ (.handle v A) (.ex t φ)
   | hnil : (∀ n, ¬ H n) → Typ Ψ Θ Γ .anil (.halts ε₀ H t φ)
@@ -135,7 +131,7 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   | inside : (∀ C s, F C s → s = .rg p ∧ ∀ q, C (.r q) → q < p) →
       Typ Ψ (Facts.union Θ F) Γ e (.ex t φ') →
       φ'.le (.rt (Row.union (Row.scope (.rg p)) (Row.union r (Row.disch (.r p) r))) ε) →
-      ¬ t.reach (.r p) → ¬ (Ty.errors ε).reach (.r p) → (Stage.rt r ε).le φ → LeLive S t T →
+      ¬ t.reach (.r p) → ¬ ε.reach (.r p) → (Stage.rt r ε).le φ → LeLive S t T →
       Typ Ψ Θ Γ (.inside p e) (.ex T φ)
   | cap : Typ Ψ Θ Γ (.cap p) (.ex (.hnd (.rg p)) φ)
   | own : Typ Ψ Θ Γ (.own p) (.ex (.owner (.rg p)) φ)
@@ -154,37 +150,40 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   /-- An operation of a declared effect: its value needs the effect; an `abort`
   operation never returns, so its result has any type. -/
   | perform : S.op E o = some (c, a, b) →
-      LeLive S (.arrow a (.rt (Row.single E) Row.none) (if c = .abort then t else b) Caps.none) T →
+      LeLive S (.arrow a (.rt (.rnm E (.adt E)) .cnil) (if c = .abort then t else b) Caps.none) T →
       Typ Ψ Θ Γ (.const (.perform E o c)) (.ex T φ)
   /-- The arms of a handler, `x` the operation's argument and, for `control`, `k` its
   `resume`, which runs the rest of the body under the handler and holds its region. -/
   | hanil : Typ Ψ Θ Γ .anil (.harms E t φ s)
-  | hatail : S.op E o = some (.tail, a, b) → Typ Ψ Θ (.mono a :: Γ) e (.ex b φ) →
+  | hatail : S.op E o = some (.tail, a, b) → Typ Ψ Θ (.mono a :: Γ) e (.ex b φ.asStage) →
       Typ Ψ Θ Γ r (.harms E t φ s) → Typ Ψ Θ Γ (.acons (Pat.spine o [.var]) e r) (.harms E t φ s)
-  | haabort : S.op E o = some (.abort, a, b) → Typ Ψ Θ (.mono a :: Γ) e (.ex t φ) →
+  | haabort : S.op E o = some (.abort, a, b) → Typ Ψ Θ (.mono a :: Γ) e (.ex t φ.asStage) →
       Typ Ψ Θ Γ r (.harms E t φ s) → Typ Ψ Θ Γ (.acons (Pat.spine o [.var]) e r) (.harms E t φ s)
   | hactl : S.op E o = some (.control, a, b) →
       -- The handler's own region is live while its control arm calls resume.
-      Typ Ψ Θ (.mono a :: .mono (.arrow b φ t s.reach) :: Γ) e (.ex t (Stage.use φ s.reach)) →
+      Typ Ψ Θ (.mono a :: .mono (.arrow b φ t s.reach) :: Γ) e (.ex t (Stage.use φ.asStage s.reach)) →
       Typ Ψ Θ Γ r (.harms E t φ s) → Typ Ψ Θ Γ (.acons (Pat.spine o [.var, .var]) e r) (.harms E t φ s)
   /-- (Handle): the body may perform `E`; the arms run at the handler's stage, `resume`
   over a region variable of the handler, as the region of a `scope`; `rf` makes the
   handler's value of the body's. Without an arm for every operation, the body's other
   operations of `E` go on to the handler around. -/
   | hdl {al rf : Tm} : Typ (Ψ.map (Ty.up 1)) (Θ.substT (shiftV 1)) (Γ.map (Scheme.up 1)) al
-        (.harms E (t'.up 1) ((Stage.rt r ε).substT (shiftV 1)) (.tvar 0)) → al.NoIns →
-      Typ Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r ε)) → (Stage.use ψ C).le (.rt r ε) →
-      Typ Ψ Θ Γ e (.ex t φ₀) → φ₀.le (.rt (Row.union (Row.single E) (r.back (Row.single E))) ε) →
+        (.harms E (t'.up 1) ((Ty.rt r ε).substT (shiftV 1)) (.tvar 0)) → al.NoIns →
+      Typ Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r.asRow ε.asRow)) →
+      (Stage.use ψ.asStage C).le (.rt r.asRow ε.asRow) →
+      Typ Ψ Θ Γ e (.ex t φ₀) →
+      φ₀.le (.rt (Row.union (Row.single E).nameClose (r.asRow.back (Row.single E))) ε.asRow) →
       φ₀.ObOut (Row.single E) →
-      S.Handles E al r → (Stage.rt r ε).le φ → LeLive S t' T →
+      S.Handles E al r.asRow → (Stage.rt r.asRow ε.asRow).le φ → LeLive S t' T →
       Typ Ψ Θ Γ (.hdl E al rf e) (.ex T φ)
   /-- The run-time forms of a handler, whose region is `p`; the cell `ℓ` holds the type and
   the stage of its value. -/
   | hwith {al rf : Tm} : Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
       Typ Ψ Θ Γ al (.harms E t' (.rt r ε) (.rg p)) →
-      Typ Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r ε)) → (Stage.use ψ C).le (.rt r ε) →
-      Typ Ψ Θ Γ e (.ex t φ₀) → φ₀.le (.rt (Row.hP Θ p E r) ε) →
-      S.Handles E al r → (Stage.rt r ε).le φ → LeLive S t' T →
+      Typ Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r.asRow ε.asRow)) →
+      (Stage.use ψ.asStage C).le (.rt r.asRow ε.asRow) →
+      Typ Ψ Θ Γ e (.ex t φ₀) → φ₀.le (.rt (Row.hP Θ p E r.asRow) ε.asRow) →
+      S.Handles E al r.asRow → (Stage.rt r.asRow ε.asRow).le φ → LeLive S t' T →
       φ.svc (.atm (.r p)) →
       Typ Ψ Θ Γ (.hwith p ℓ E al rf e) (.ex T φ)
   /-- While an arm runs, the body is parked where it performed the operation `o`: it is
@@ -193,30 +192,31 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   | hctl {Ei : List Frame} {al rf : Tm} {tl : Bool} :
       Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
       Typ Ψ Θ Γ al (.harms E t' (.rt r ε) (.rg p)) →
-      Typ Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r ε)) → (Stage.use ψ C).le (.rt r ε) →
+      Typ Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r.asRow ε.asRow)) →
+      (Stage.use ψ.asStage C).le (.rt r.asRow ε.asRow) →
       S.op E o = some (c, a₀, b₀) → c ≠ .abort → (tl = true ↔ c = .tail) →
       OkE Ei → k = plug Ei (.hole p) → Typ Ψ Θ [] (plug Ei (.app (.const (.perform E o c)) .todo)) (.ex t φ₀) →
-      φ₀.le (.rt (Row.hP Θ p E r) ε) →
+      φ₀.le (.rt (Row.hP Θ p E r.asRow) ε.asRow) →
       Typ Ψ Θ Γ a (.ex (if tl then b₀ else t')
-        (Stage.use (.rt r ε) (if tl then Caps.none else (Ty.rg p).reach))) →
+        (Stage.use (.rt r.asRow ε.asRow) (if tl then Caps.none else (Ty.rg p).reach))) →
       (tl = false → ∃ C', Ψ[κ]? = some (.arrow b₀ (.rt r ε) t' C') ∧ C' (.r p)) →
-      S.Handles E al r → (Stage.rt r ε).le φ → LeLive S t' T →
+      S.Handles E al r.asRow → (Stage.rt r.asRow ε.asRow).le φ → LeLive S t' T →
       φ.svc (.atm (.r p)) →
       Typ Ψ Θ Γ (.hctl p ℓ κ tl E al rf a k) (.ex T φ)
   /-- While the resumed body runs, the arm is parked where it called `resume`, the
   argument left out. -/
   | hres {A : List Frame} : Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
-      Typ Ψ Θ Γ b (.ex t' (Stage.use (.rt r ε) (Ty.rg p).reach)) →
+      Typ Ψ Θ Γ b (.ex t' (Stage.use (.rt r.asRow ε.asRow) (Ty.rg p).reach)) →
       OkE A → a = plug A (.hole p) → Typ Ψ Θ [] (plug A (.app (.kont p κ) .todo))
-        (.ex t' (Stage.use (.rt r ε) (Ty.rg p).reach)) →
-      Ψ[κ]? = some (.arrow b₀ (.rt r ε) t' C') → C' (.r p) → (Stage.rt r ε).le φ →
+        (.ex t' (Stage.use (.rt r.asRow ε.asRow) (Ty.rg p).reach)) →
+      Ψ[κ]? = some (.arrow b₀ (.rt r ε) t' C') → C' (.r p) → (Stage.rt r.asRow ε.asRow).le φ →
       LeLive S t' T → Typ Ψ Θ Γ (.hres p ℓ a b) (.ex T φ)
   | hdone : Typ Ψ Θ Γ a (.ex t (Stage.use φ (Ty.rg p).reach)) →
       Typ Ψ Θ Γ (.hdone p a) (.ex t φ)
   /-- Unwinding to the handler of the cell `ℓ`, which then runs `a` with the type of its
   value; unwinding itself has any type. -/
   | unw : Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
-      Typ Ψ Θ Γ a (.ex t' (Stage.use (.rt r ε) (Ty.rg p).reach)) →
+      Typ Ψ Θ Γ a (.ex t' (Stage.use (.rt r.asRow ε.asRow) (Ty.rg p).reach)) →
       (Stage.rt Row.none Row.none).le φ → Typ Ψ Θ Γ (.unw p ℓ a) (.ex t φ)
   /-- A handler kept around a child: `ℓ` and the arms are those of the handler it keeps. The
   child runs the arms, so its stage holds theirs; an operation the kept handler does not answer
@@ -224,7 +224,7 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   | hkeep {al : Tm} : Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
       Typ Ψ Θ Γ al (.harms E t' (.rt r ε) (.rg q)) →
       Typ Ψ Θ Γ e (.ex t φ₀) → φ₀.le (.rt (Row.hP Θ q E r₁) ε₁) →
-      S.Handles E al r₁ → S.NonTail E r₁ → (Stage.rt r ε).le (.rt r₁ ε₁) →
+      S.Handles E al r₁ → S.NonTail E r₁ → (Stage.rt r.asRow ε.asRow).le (.rt r₁ ε₁) →
       (Stage.rt r₁ ε₁).le φ → LeLive S t T → Typ Ψ Θ Γ (.hkeep q ℓ E al e) (.ex T φ)
   /-- While an arm of a kept handler runs, the body is parked where it performed the operation
   `o`, as for `hctl` of a `tail` operation. -/
@@ -233,7 +233,7 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
       S.op E o = some (.tail, a₀, b₀) → OkE Ei → k = plug Ei (.hole q) →
       Typ Ψ Θ [] (plug Ei (.app (.const (.perform E o .tail)) .todo)) (.ex t φ₀) →
       φ₀.le (.rt (Row.hP Θ q E r₁) ε₁) → S.Handles E al r₁ → S.NonTail E r₁ →
-      Typ Ψ Θ Γ a (.ex b₀ (.rt r ε)) → (Stage.rt r ε).le (.rt r₁ ε₁) →
+      Typ Ψ Θ Γ a (.ex b₀ (.rt r.asRow ε.asRow)) → (Stage.rt r.asRow ε.asRow).le (.rt r₁ ε₁) →
       (Stage.rt r₁ ε₁).le φ → LeLive S t T → Typ Ψ Θ Γ (.hkarm q ℓ E al a k) (.ex T φ)
   /-- `resume`: the type of its cell, which holds the handler's region. -/
   | kont : Ψ[ℓ]? = some (.arrow a ψ t C) → C (.r p) → LeLive S (.arrow a ψ t C) T →
@@ -242,37 +242,10 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   initializer runs. -/
   | lazyLoc : Ψ[l]? = some (.lazyCell r ε t C) → Typ Ψ Θ Γ (.loc l) (.ex (.lazy r ε t C) φ)
   | settle : Ψ[l]? = some (.lazyCell r ε t C) → Typ Ψ Θ Γ e (.ex t ψ) →
-      ψ.le (Stage.use (.rt r ε) C) → (Stage.use (.rt r ε) C).le φ → LeLive S t T →
+      ψ.le (Stage.use (.rt r.asRow ε.asRow) C) → (Stage.use (.rt r.asRow ε.asRow) C).le φ →
+      LeLive S t T →
       Typ Ψ Θ Γ (.settle l e) (.ex T φ)
   /-- Row equations are type equality even below invariant constructors. -/
   | conv : Typ Ψ Θ Γ e (.ex a φ) → Ty.Equiv a b → Typ Ψ Θ Γ e (.ex b φ)
-
-
-/-- The facts of a running configuration: a region outlives every region created
-after it. A scope gives its region facts about everything outside it, which
-exists before the region; with the regions not yet created renamed out, they hold
-of this order (regions.md §3.4). -/
-def Facts.age : Facts := fun C s => ∀ q p, C (.r q) → s.reach (.r p) → q < p
-
-/-- The root environment `Σ₀` of core.md §2.6 and the bodies of the globals of λFlick⁺. -/
-structure Roots where
-  svc : Name → Option Tm
-  glob : Nat → Option Tm
-
-/-- `Σ₀` has closed values of `S.Impl`. The body of a global is closed source code,
-typed at the scheme of the global; each declared global has a body. -/
-structure RootTy (root : Roots) : Prop where
-  svc : ∀ N v, root.svc N = some v → Value v ∧ Typ S [] Facts.none [] v (.ex (S.impl N) .pure)
-  glob : ∀ g v, root.glob g = some v → (∀ x, ¬ v.Has x) ∧
-    ∃ s, S.glob g = some s ∧ Typ S [] s.cs [] v (.ex s.t .pure)
-  globs : ∀ g s, S.glob g = some s → (root.glob g).isSome
-  /-- A root is source code: it names no run-time region. -/
-  svcBelow : ∀ N v, root.svc N = some v → ∀ p, ¬ v.Has (.rgn p)
-
-/-- An ordinary constructor at `T us`. -/
-theorem Typ.ctor_plain {Ψ Θ Γ K k ts T₀ us T φ} (hK : S.ctor K = some (k, ts, T₀))
-    (hres : S.res K = idTs k) (hk : us.length = k) (hT : LeLive S (Sig.ctorTy ts T₀ us) T) :
-    Typ S Ψ Θ Γ (.ctor K) (.ex T φ) :=
-  .ctor hK hk (S.holds_plain hK hres hk) (by rw [Sig.ctorTyR_plain hres hk]; exact hT)
 
 end Flick

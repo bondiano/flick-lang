@@ -315,13 +315,24 @@ pub struct FmtArguments {
 }
 
 #[derive(Args)]
+#[allow(clippy::struct_excessive_bools, reason = "one per command-line flag")]
 pub struct TestArguments {
     /// Test files to run; by default every module of the test root.
     pub paths: Vec<String>,
 
-    /// Run only the tests whose full name contains this text.
+    /// Run only the tests whose full name, `Module > suite > test`,
+    /// contains this text.
     #[arg(long, value_name = "TEXT")]
     pub filter: Option<String>,
+
+    /// Print the full name of each test the run would run, and run none.
+    #[arg(long, conflicts_with = "watch")]
+    pub list: bool,
+
+    /// Fail, before running any test, when a test of the run is marked
+    /// `only`: for CI, where a forgotten `test.only` would skip the rest.
+    #[arg(long)]
+    pub forbid_only: bool,
 
     /// How many tests run at a time.
     #[arg(long, default_value_t = 1, value_parser = clap::value_parser!(u32).range(1..))]
