@@ -1,0 +1,25 @@
+// A function or a task that uses a region of the signature cannot be stored
+// where its type keeps nothing live: a value bound such as the `a^c` of
+// `Some` or `Ref.set` says what a value reaches, not what calling it needs.
+module App.StoredClosure exposing (..)
+
+type Handle (s : Region) = Handle
+
+read_handle : Handle s ->{} String
+let read_handle _ = ""
+
+stash : Handle s -> Ref (Option (Unit ->{} String)) ->{} Unit
+let stash h cell = Ref.set cell (Some (fun () -> read_handle h))
+
+stash_direct : Handle s -> Ref (Unit ->{} String) ->{} Unit
+let stash_direct h cell = Ref.set cell (fun () -> read_handle h)
+
+stash_task : Handle s -> Ref (Eff none none String) ->{} Unit
+let stash_task h cell = Ref.set cell (task { read_handle h })
+
+stash_list : Handle s -> Ref (List (Unit ->{} String)) ->{} Unit
+let stash_list h cell = Ref.set cell [fun () -> read_handle h]
+//~ FLICK-G002 @12:50-12:63 this uses `s`, which the type of this function does not keep live
+//~ FLICK-G002 @15:51-15:64 this uses `s`, which the expected type `Unit ->{} String` does not keep live
+//~ FLICK-G002 @18:46-18:59 this uses `s`
+//~ FLICK-G002 @21:49-21:62 this uses `s`, which the expected type `Unit ->{} String` does not keep live
