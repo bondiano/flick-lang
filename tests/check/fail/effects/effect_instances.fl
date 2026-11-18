@@ -1,0 +1,109 @@
+// An effect with arguments has an instance per argument: `Store Int` is not
+// `Store Bool` however it is reached, `-` takes out instances by the name
+// only, and a handler of one instance answers no other that may come
+// through a row variable.
+module App.EffectInstances exposing (..)
+
+effect Store a =
+  get : Unit ->{} a
+
+read : Unit ->{Store a} a
+let read () = Store.get ()
+
+/// A polymorphic function instantiated at `Bool` needs `Store Bool`.
+flag : Unit ->{Store Int} Bool
+let flag () = read ()
+
+/// Under a cell the instance stays the one `a` was substituted with.
+keep : Ref (Unit ->{Store a} Int) -> (Unit ->{Store a} Int) ->{} Unit
+let keep cell work = Ref.set cell work
+
+crossed : Ref (Unit ->{Store Int} Int) -> (Unit ->{Store Bool} Int) ->{} Unit
+let crossed cell work = keep cell work
+
+/// So it does under data that uses its parameter both ways.
+type Slot a = Slot (a -> a)
+
+same : Slot (Unit ->{Store a} Int) -> Slot (Unit ->{Store a} Int) -> Unit
+let same _ _ = ()
+
+mixed : Slot (Unit ->{Store Int} Int) -> Slot (Unit ->{Store Bool} Int) -> Unit
+let mixed ints flags = same ints flags
+
+/// A generalized local function is instantiated anew at each use.
+local : Unit ->{Store Int} Int
+let local () =
+  get_it : Unit ->{Store a} a
+  let get_it () = Store.get ()
+  let n = get_it ()
+  if get_it () then n else 0
+
+/// A polymorphic argument is used at `Bool` here...
+ranked : (forall a. Unit ->{Store a} a) ->{Store Int} Int
+let ranked work = if work () then 1 else 0
+
+with_store : a -> (Unit ->{Store a | r; e} b) ->{r; e} b
+let with_store value body =
+  try body () with
+  | Store.get () -> value
+
+both_ways : (forall a. Unit ->{Store a} a) ->{} (Int, Bool)
+let both_ways work = (with_store 3 work, with_store true work)
+
+ints_only : Unit ->{Store Int} Int
+let ints_only () = Store.get ()
+
+/// ...and a function of one instance is no polymorphic argument.
+fixed : Unit ->{} (Int, Bool)
+let fixed () = both_ways ints_only
+
+/// `-` takes an element out by its name: an instance cannot be taken out.
+typed : (Unit ->{r; e} Int) ->{-Store Int | r; e} Int
+let typed body =
+  try body () with
+  | Store.get () -> 1
+
+/// `-Store` takes out every instance, so the one not handled is owed.
+leaks : (Unit ->{Store Int | r; e} Int) ->{-Store | r; e} Int
+let leaks count =
+  let n =
+    try count () with
+    | Store.get () -> 1
+  if Store.get () then n else 0
+
+/// A handler of `Store Int` would answer a `Store Bool` coming through `r`.
+hidden : (Unit ->{r; e} Int) ->{-Store | r; e} Int
+let hidden body =
+  try body () with
+  | Store.get () -> 1
+
+/// A named instance keeps every other out of `r`.
+named : (Unit ->{Store Int | r; e} Int) ->{r; e} Int
+let named body =
+  try body () with
+  | Store.get () -> 1
+
+flags : Unit ->{Store Bool} Int
+let flags () = named (fun () -> if Store.get () then 1 else 0)
+
+/// A body taken out of every instance may not ask for the one handled.
+apart : (Unit ->{-Store | r; e} Int) ->{r; e} Int
+let apart body =
+  try body () with
+  | Store.get () -> 1
+
+asks : Unit ->{} Int
+let asks () = apart (fun () -> Store.get () + 1)
+
+//~ FLICK-T003 @15:15-15:22 expected `Store Int`, found `Store Bool`: `Bool` is not `Int`
+//~ FLICK-T003 @22:35-22:39 expected `Store Int`, found `Store Bool`: `Bool` is not `Int`
+//~ FLICK-T003 @31:34-31:39 expected `Slot (Unit ->{Store Int} Int)`, found `Slot (Unit ->{Store Bool} Int)`: `Bool` is not `Int`
+//~ FLICK-T003 @39:6-39:15 expected `Store Int`, found `Store Bool`: `Bool` is not `Int`
+//~ FLICK-T003 @43:22-43:29 expected `Store Int`, found `Store Bool`: `Bool` is not `Int`
+//~ FLICK-T008 @58:26-58:35 expected `Unit ->{Store a} a`, found `Unit ->{Store Int} Int`: `a` stands for any type the caller chooses, so it cannot be `Int`
+//~ FLICK-T008 @58:26-58:35 expected `Store a`, found `Store Int`: `a` stands for any type the caller chooses, so it cannot be `Int`
+//~ FLICK-T002 @61:32-61:42 `-` takes an element out of a row variable by its name, and `Store Int` has arguments: take every instance out, `-Store`
+//~ FLICK-E002 @72:6-72:18 the signature of `leaks` does not allow service `Store Bool`, which its body needs
+//~ FLICK-E019 @77:3-77:6 `r` may hold `Store` at other arguments, and `Store Int` here would answer for it
+//~ FLICK-T003 @87:36-87:48 expected `Store Int`, found `Store Bool`: `Bool` is not `Int`
+//~ FLICK-E002 @96:32-96:44 the expected type `Unit ->{} Int` does not allow service `Store Int`, which this needs
