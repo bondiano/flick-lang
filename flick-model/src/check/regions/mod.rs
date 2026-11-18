@@ -298,6 +298,42 @@ impl Checker<'_> {
         out
     }
 
+    /// The hidden qualifiers of `t`, outermost first: what a function or a
+    /// task of type `t` may use. A value bound `τ^{≤C}` says what the value
+    /// reaches, not what using it needs: a closure that `Ref.set` stores in
+    /// a cell of `Unit →R String` uses nothing.
+    pub(super) fn hidden_qualifiers(&self, t: &Type) -> Vec<Caps> {
+        let mut out = Vec::new();
+        let mut t = self.follow(t);
+        loop {
+            t = match &t {
+                Type::Captured(inner, c) => {
+                    out.push(self.zonk_caps(c));
+                    self.follow(inner)
+                }
+                Type::Bounded(inner, _) => self.follow(inner),
+                _ => return out,
+            };
+        }
+    }
+
+    /// The innermost value bound of `t`: of `(τ^{≤C})^{≤D}` that `Ref.set`
+    /// takes into a cell `Ref.make` made, the cell's capacity `C`.
+    pub(super) fn innermost_bound(&self, t: &Type) -> Option<Caps> {
+        let mut bound = None;
+        let mut t = self.follow(t);
+        loop {
+            t = match &t {
+                Type::Bounded(inner, c) => {
+                    bound = Some(self.zonk_caps(c));
+                    self.follow(inner)
+                }
+                Type::Captured(inner, _) => self.follow(inner),
+                _ => return bound,
+            };
+        }
+    }
+
     /// `t` once for each of its qualifiers, about the bare type: what is
     /// within `(τ^{≤C})^{≤D}` is within `τ^{≤C}` and within `τ^{≤D}`, not
     /// within what the two reach together.
@@ -325,8 +361,9 @@ impl Checker<'_> {
     }
 
     /// The premise of (Lam) and (Task) against `expected`, for each of its
-    /// qualifiers: the body's stage `inner` within `stage` with its `Live`.
-    /// What the body holds is no bound: a qualifier is what its use needs.
+    /// hidden qualifiers: the body's stage `inner` within `stage` with its
+    /// `Live`. What the body holds is no bound: a qualifier is what its use
+    /// needs.
     pub(super) fn close_within(
         &mut self,
         ty: &Type,
@@ -334,7 +371,7 @@ impl Checker<'_> {
         stage: &Stage,
         expected: Option<&Type>,
     ) -> Check<Type> {
-        let mut each = expected.map_or_else(Vec::new, |t| self.qualifiers(t));
+        let mut each = expected.map_or_else(Vec::new, |t| self.hidden_qualifiers(t));
         if each.is_empty() {
             each.push(Caps::default());
         }
