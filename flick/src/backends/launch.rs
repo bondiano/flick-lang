@@ -2,18 +2,17 @@
 //! chooses artifact ids; only the host resolves tools to executable paths.
 
 use std::collections::BTreeSet;
-use std::ffi::OsStr;
+use std::fs;
 use std::iter;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
-use std::{env, fs, io};
 
 use flick_backend::{
     ArtifactKind, BackendPin, BuildResult, LaunchKind, Limits, RuntimeDependency, Toolchain,
 };
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
+use super::tools::Tool;
 use crate::artifact::Artifact;
 
 pub(super) const FILE: &str = ".flick-backend.cbor";
@@ -35,96 +34,18 @@ struct Launch {
     arguments: Vec<String>,
 }
 
-pub(super) struct Tool {
-    pub pin: Toolchain,
-    path: PathBuf,
-}
-
-impl Tool {
-    pub(super) fn command(&self) -> Command {
-        Command::new(&self.path)
-    }
-    pub(super) fn node(expected: Option<&Toolchain>) -> Result<Self, String> {
-        let paths = env::var_os("PATH").unwrap_or_default();
-        Self::node_on_path(&paths, expected)
-    }
-
-    fn node_on_path(paths: &OsStr, expected: Option<&Toolchain>) -> Result<Self, String> {
-        let name = if cfg!(windows) { "node.exe" } else { "node" };
-        let path = env::split_paths(paths)
-            .map(|dir| dir.join(name))
-            .find(|path| executable(path))
-            .ok_or("cannot find Node.js on PATH")?;
-        Self::at_node(&path, expected)
-    }
-
-    fn at_node(path: &Path, expected: Option<&Toolchain>) -> Result<Self, String> {
-        let path = fs::canonicalize(path).map_err(|e| e.to_string())?;
-        let mut hash = Sha256::new();
-        io::copy(
-            &mut fs::File::open(&path).map_err(|e| e.to_string())?,
-            &mut hash,
-        )
-        .map_err(|e| e.to_string())?;
-        let digest = format!("{:x}", hash.finalize());
-        if expected.is_some_and(|pin| pin.id != "node" || pin.sha256 != digest) {
-            return Err("launch runtime differs from its pinned version and digest".into());
-        }
-        let version = Command::new(&path)
-            .arg("--version")
-            .output()
-            .map_err(|e| e.to_string())?;
-        if !version.status.success() {
-            return Err("cannot query Node.js version".into());
-        }
-        let version =
-            String::from_utf8(version.stdout).map_err(|_| "Node.js version is not UTF-8")?;
-        let version = version
-            .trim()
-            .strip_prefix('v')
-            .ok_or("invalid Node.js version")?
-            .to_owned();
-        let tool = Self {
-            pin: Toolchain {
-                id: "node".into(),
-                version,
-                sha256: digest,
-            },
-            path,
-        };
-        if expected.is_some_and(|expected| expected != &tool.pin) {
-            return Err("launch runtime differs from its pinned version and digest".into());
-        }
-        Ok(tool)
-    }
-}
-
-fn executable(path: &Path) -> bool {
-    if !path.is_file() {
-        return false;
-    }
-    #[cfg(unix)]
-    {
-        use rustix::fs::{Access, AtFlags, CWD, accessat};
-        accessat(CWD, path, Access::EXEC_OK, AtFlags::EACCESS).is_ok()
-    }
-    #[cfg(not(unix))]
-    {
-        true
-    }
-}
-
 pub(super) fn artifact(pin: &BackendPin, result: &BuildResult) -> Result<Artifact, String> {
     let launches = result
         .launches
         .iter()
         .map(|launch| {
-            let path = result
-                .artifacts
-                .iter()
-                .find(|a| a.id == launch.artifact)
-                .map(|a| a.path.clone())
-                .ok_or("backend launch requires an unavailable tool output")?;
+            let outputs = result.steps.iter().flat_map(|s| &s.outputs);
+            let path = (result.artifacts.iter())
+                .map(|a| (&a.id, &a.path))
+                .chain(outputs.map(|o| (&o.id, &o.path)))
+                .find(|(id, _)| **id == launch.artifact)
+                .map(|(_, path)| path.clone())
+                .ok_or("backend launch names an unknown artifact")?;
             Ok(Launch {
                 name: launch.name.clone(),
                 kind: launch.kind,
@@ -284,14 +205,10 @@ pub(crate) fn command_with_import(
         .ok_or_else(|| format!("backend supplied no {kind:?} launch named `{name}`"))?;
     let artifact = root.join(&launch.path);
     let mut command = if let Some(runtime) = &launch.runtime {
-        let tool = match runtime.id.as_str() {
-            "node" => Tool::node(Some(runtime))?,
-            _ => return Err(format!("no host runtime adapter for `{}`", runtime.id)),
-        };
-        if tool.pin != *runtime {
-            return Err("launch runtime differs from its pinned version and digest".into());
+        if runtime.id != "node" {
+            return Err(format!("no host runtime adapter for `{}`", runtime.id));
         }
-        let mut command = Command::new(tool.path);
+        let mut command = Tool::find("node", Some(runtime))?.command();
         if runtime.id == "node" {
             command.arg("--enable-source-maps");
             if let Some(import) = import {
@@ -363,6 +280,51 @@ mod tests {
     }
 
     #[test]
+    fn a_launch_may_run_the_output_of_a_step() {
+        let pin = BackendPin {
+            identity: BackendId {
+                id: "test/steps".into(),
+                version: "1.0.0".into(),
+            },
+            sha256: sha256(b"component"),
+        };
+        let result = BuildResult {
+            artifacts: vec![],
+            steps: vec![flick_backend::ToolchainStep {
+                id: "link".into(),
+                dependencies: vec![],
+                toolchain: flick_backend::Toolchain {
+                    id: "go".into(),
+                    version: "1.23.0".into(),
+                    sha256: "0".repeat(64),
+                },
+                arguments: vec![],
+                environment: vec![],
+                inputs: vec![],
+                outputs: vec![flick_backend::StepOutput {
+                    id: "exe:main".into(),
+                    path: "flick-main".into(),
+                    kind: flick_backend::ArtifactKind::Executable,
+                }],
+            }],
+            runtime_dependencies: vec![],
+            launches: vec![Launch {
+                name: "main".into(),
+                kind: LaunchKind::Run,
+                artifact: "exe:main".into(),
+                runtime: None,
+                arguments: vec![],
+            }],
+            diagnostics: vec![],
+        };
+        let manifest = artifact(&pin, &result).expect("a launch of a step output");
+        assert_eq!(
+            super::run_paths(&[manifest], &pin),
+            [("main".to_owned(), "flick-main".to_owned())]
+        );
+    }
+
+    #[test]
     fn runtime_pins_are_checked_from_nested_importers() {
         let root = env::temp_dir().join(format!("flick-launch-shadow-{}", process::id()));
         let _ = fs::remove_dir_all(&root);
@@ -415,79 +377,4 @@ mod tests {
         assert!(error.contains("runtime dependency"), "{error}");
         fs::remove_dir_all(root).expect("cleanup");
     }
-}
-
-// A parallel test can fork while this process writes a fixture and retain its
-// writable descriptor until exec, making execution fail with ETXTBSY. Like
-// tests/common::write_script, let a separate process write the final inode.
-#[cfg(all(test, unix))]
-fn node_script(path: &Path, contents: &[u8], mode: u32) {
-    use std::os::unix::fs::PermissionsExt;
-
-    let draft = path.with_extension("draft");
-    fs::write(&draft, contents).expect("script draft");
-    assert!(
-        Command::new("cp")
-            .arg(&draft)
-            .arg(path)
-            .status()
-            .expect("cp runs")
-            .success()
-    );
-    fs::remove_file(draft).expect("remove script draft");
-    fs::set_permissions(path, fs::Permissions::from_mode(mode)).expect("script permissions");
-}
-
-#[cfg(all(test, unix))]
-#[test]
-fn a_mismatched_node_pin_is_rejected_without_executing_the_candidate() {
-    use flick_backend::sha256;
-    use std::process;
-
-    let root = env::temp_dir().join(format!("flick-node-pin-{}", process::id()));
-    let _ = fs::remove_dir_all(&root);
-    fs::create_dir_all(&root).expect("directory");
-    let path = root.join("node");
-    let script = b"#!/bin/sh\nprintf x > \"$0.called\"\nprintf 'v1.2.3\\n'\n";
-    node_script(&path, script, 0o755);
-    let mut pin = Toolchain {
-        id: "node".into(),
-        version: "1.2.3".into(),
-        sha256: sha256(b"other executable"),
-    };
-    assert!(Tool::at_node(&path, Some(&pin)).is_err());
-    assert!(
-        !root.join("node.called").exists(),
-        "unapproved candidate must not execute"
-    );
-    pin.sha256 = sha256(script);
-    let tool = Tool::at_node(&path, Some(&pin)).expect("matching pin");
-    assert_eq!(tool.pin, pin);
-    assert!(
-        root.join("node.called").exists(),
-        "approved version query executes"
-    );
-    fs::remove_dir_all(root).expect("cleanup");
-}
-
-#[cfg(all(test, unix))]
-#[test]
-fn node_resolution_skips_nonexecutable_path_candidates() {
-    use std::process;
-    let root = env::temp_dir().join(format!("flick-node-path-{}", process::id()));
-    let _ = fs::remove_dir_all(&root);
-    for (directory, mode) in [("first", 0o644), ("second", 0o755)] {
-        let directory = root.join(directory);
-        fs::create_dir_all(&directory).expect("directory");
-        let path = directory.join("node");
-        node_script(&path, b"#!/bin/sh\nprintf 'v1.2.3\\n'\n", mode);
-    }
-    let paths = env::join_paths([root.join("first"), root.join("second")]).expect("PATH");
-    let node = Tool::node_on_path(&paths, None).expect("executable Node later on PATH");
-    assert_eq!(
-        node.path,
-        fs::canonicalize(root.join("second/node")).expect("real node")
-    );
-    assert_eq!(node.pin.version, "1.2.3");
-    fs::remove_dir_all(root).expect("cleanup");
 }

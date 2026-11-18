@@ -164,23 +164,54 @@ duplicates within one kind are rejected.
 Step outputs must name their producer as a direct dependency when consumed.
 The validator sorts the graph; input order need not be topological. Tool
 versions and digests must match both the request and actual project policy.
-The host must additionally authorize each complete command through a tool
-adapter, covering argument grammar, declared file access and network policy.
-That authorization is a side-effect-free check. The host executes approved
-steps; a guest receives no process API. A backend may return a finished binary
-executable directly or ask a pinned host tool to produce one. Merely building
-or publishing it does not execute it; launching is an explicit host action.
-Tool adapters materialize only declared content and use explicit, fixed
-environment values. Every input that can affect their output belongs in the
-request and its cache key.
+The host executes approved steps; a guest receives no process API. A backend
+may return a finished binary executable directly or ask a pinned host tool to
+produce one. Merely building or publishing it does not execute it; launching
+is an explicit host action.
+
+### Host tools and their authority
+
+The project grants tools, not the backend: `[tools]` in `flick.toml` lists,
+for each backend id or plugin package, the tools its steps may run, as
+`"flick/go" = ["go"]`. The official components get no exception. A step
+whose tool is not granted is `FLICK-P051` before any step runs. A launch
+runtime, Node for `flick run`, needs no grant; its pin is still checked.
+
+The host knows each tool through an adapter (`flick/src/backends/tools.rs`):
+`node` and `go`. It finds the first executable on `PATH`, hashes it and
+refuses a digest that differs from the pin before the candidate ever runs,
+then queries the version with the adapter's own command. Only granted tools
+and Node appear in `BuildRequest.toolchains`. Before each step the host
+hashes the executable again, so a binary replaced during the build fails
+its step. The grant is the authorization of arguments: the host does not
+parse a tool's command line. An adapter decides which variables a step
+inherits (the home, cache, temporary and proxy variables, and for `go` its
+module settings) and which it may set (`GOFLAGS`, `GOTOOLCHAIN`,
+`CGO_ENABLED`); every other variable is cleared.
+
+Each step runs in a fresh directory beside the output directory, at the
+same depth, so relative paths resolve as they do from the output. The
+directory holds only the step's declared inputs: artifacts and earlier
+outputs at their paths, side inputs at `.flick-inputs/<id>`. Afterwards
+the host reads back only the declared outputs, each a regular file within
+the artifact limit; a symlink, a directory, a missing output or a failing
+exit is `FLICK-P050` with the end of the tool's output. Undeclared files are
+dropped with the directory. Step outputs join the build's artifacts, so the
+build cache, keyed by the request, the component, tool and runtime pins and
+every input, reuses them; a changed input, component or tool runs the
+steps again.
+
+Cancellation reaches every part: SIGINT or SIGTERM, once backend work has
+begun, cancels the guest call through the engine epoch, the input snapshot,
+and the running tool. Each tool runs in its own process group, which gets
+SIGTERM and, two seconds later, SIGKILL, so what the tool started ends too.
 
 Diagnostic spans address the supplied UTF-8 source bytes, including boundary
 checks. Each referenced source is loaded and UTF-8-validated once per
 diagnostic validation pass, even when many diagnostics reference it.
 Payload, total serialization, file, step, diagnostic and string limits
-are host limits. A failure rejects the whole generation. A publication layer
-must stage all files and host steps, honor cancellation, validate final outputs
-and publish atomically; the generation driver performs no artifact writes.
+are host limits. A failure rejects the whole generation. The generation
+driver performs no artifact writes; publication is the host's.
 
 The driver validates all of this before returning a `Generated` value. Its
 cache key includes the complete ordered request, component digest, options,
@@ -207,8 +238,26 @@ as normalized absolute paths. Current and stale outputs cannot be portable alias
 path before deleting any file. IR dumps are recorded for clean and stay outside
 the ordinary build cache. Text emit hooks see
 source/declaration/metadata text while opaque object, executable and resource
-artifacts retain their bytes. Tool execution and directory publication still
-need the transactional integration described above.
+artifacts retain their bytes.
+
+### Atomic publication
+
+A build publishes its files, the removal of stale ones and the project's
+output manifest as one transaction (`flick/src/publish.rs`). The files are
+staged in `<out>/.flick-publish/`, which no artifact may name; a journal
+records the paths; earlier files move into the journal and staged ones into
+place, each by a rename on the output's filesystem. A marker file is the
+commit point. A failure before it moves every earlier file back; after it,
+the manifest is written and the journal removed. A publication that a crash
+interrupted is finished or undone by the next one into that directory, which
+takes a lock in the cache so two processes never publish into one output at
+once. Unchanged files are not rewritten. Host tools that make files from the
+build itself, the native Go executable and schema AOT, run on a copy beside
+the output, so their results join the same transaction.
+
+The guarantee covers failures and crashes, not readers: a process reading
+the output during the commit can see some files new and others old. It does
+not cover files the build does not own: they are never moved.
 
 ## Native component host
 
