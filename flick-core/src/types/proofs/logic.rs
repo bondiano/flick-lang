@@ -8,6 +8,8 @@
 
 use std::rc::Rc;
 
+use super::interval::{Bound, Interval, Op};
+
 /// A Boolean expression in the order the program evaluates it.
 #[derive(Clone)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -53,14 +55,26 @@ impl<A> Formula<A> {
 /// unknown, never accepted for lack of time.
 const BUDGET: u32 = 10_000;
 
-/// What facts establish: the result each atom gave when it ran.
-pub struct Knowledge<A> {
-    /// A handful: a list costs less code than a map.
+/// What the logic reads of an atom beyond its identity.
+pub trait Atomic: Clone + PartialEq {
+    /// What an atom compares with a constant.
+    type Subject: Clone + PartialEq;
+    /// `subject op bound`, when the atom is such a comparison.
+    fn comparison(&self) -> Option<(&Self::Subject, Op, Bound)>;
+    /// The result the atom gives by itself: one of constants alone.
+    fn constant(&self) -> Option<bool>;
+}
+
+/// What facts establish: the result each atom gave when it ran, and the
+/// values each compared subject may still have. A handful of each: lists
+/// cost less code than maps.
+pub struct Knowledge<A: Atomic> {
     atoms: Vec<(A, bool)>,
+    intervals: Vec<(A::Subject, Interval)>,
     steps: u32,
 }
 
-impl<A: Clone + PartialEq> Knowledge<A> {
+impl<A: Atomic> Knowledge<A> {
     /// What `facts`, formulas each with the result it ran to, establish.
     /// `unfold` gives the definition of an atom that is a call of a check
     /// the logic reads: it ran, with the result of the call, where the call
@@ -68,6 +82,7 @@ impl<A: Clone + PartialEq> Knowledge<A> {
     pub fn of(facts: &[(Rc<Formula<A>>, bool)], unfold: &dyn Fn(&A) -> Option<Formula<A>>) -> Self {
         let mut knowledge = Knowledge {
             atoms: Vec::new(),
+            intervals: Vec::new(),
             steps: 0,
         };
         // one fact can make another tell more: `p || q` once `p` is false
@@ -101,6 +116,17 @@ impl<A: Clone + PartialEq> Knowledge<A> {
                     return;
                 }
                 self.atoms.push((atom.clone(), result));
+                if let Some((subject, op, bound)) = atom.comparison() {
+                    if let Some((_, interval)) =
+                        self.intervals.iter_mut().find(|(s, _)| s == subject)
+                    {
+                        interval.learn(op, bound, result);
+                    } else {
+                        let mut interval = Interval::of(bound);
+                        interval.learn(op, bound, result);
+                        self.intervals.push((subject.clone(), interval));
+                    }
+                }
                 if let Some(definition) = unfold(atom) {
                     self.assume(&definition, result, unfold);
                 }
@@ -133,7 +159,7 @@ impl<A: Clone + PartialEq> Knowledge<A> {
     pub fn holds(&self, formula: &Formula<A>) -> Option<bool> {
         match formula {
             Formula::Const(b) => Some(*b),
-            Formula::Atom(atom) => self.atoms.iter().find(|(a, _)| a == atom).map(|(_, b)| *b),
+            Formula::Atom(atom) => self.atom(atom),
             Formula::Not(x) => self.holds(x).map(|b| !b),
             // the second runs only after the first gave its result; a first
             // that gives `false` to `&&`, `true` to `||`, decides alone
@@ -147,6 +173,22 @@ impl<A: Clone + PartialEq> Knowledge<A> {
             }
             Formula::Opaque => None,
         }
+    }
+
+    /// The result `atom` gives: as it gave it, by itself, or as every value
+    /// its subject may have compares.
+    fn atom(&self, atom: &A) -> Option<bool> {
+        let known = self.atoms.iter().find(|(a, _)| a == atom).map(|(_, b)| *b);
+        if let Some(known) = known.or_else(|| atom.constant()) {
+            return Some(known);
+        }
+        let (subject, op, bound) = atom.comparison()?;
+        let interval = (self.intervals.iter())
+            .find(|(s, _)| s == subject)
+            .map(|(_, i)| *i);
+        interval
+            .unwrap_or_else(|| Interval::of(bound))
+            .decide(op, bound)
     }
 
     /// The first part of `formula`, in the order it runs, that stops a proof
@@ -175,7 +217,17 @@ impl<A: Clone + PartialEq> Knowledge<A> {
 mod tests {
     use std::rc::Rc;
 
-    use super::{Formula, Knowledge};
+    use super::{Atomic, Bound, Formula, Knowledge, Op};
+
+    impl Atomic for &'static str {
+        type Subject = ();
+        fn comparison(&self) -> Option<(&(), Op, Bound)> {
+            None
+        }
+        fn constant(&self) -> Option<bool> {
+            None
+        }
+    }
 
     type F = Formula<&'static str>;
 

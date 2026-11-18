@@ -1,0 +1,51 @@
+// `T.prove` of a number: the bounds of the condition around it, the
+// invariant of another refined type, or a constant within the check.
+module App.Bounded exposing (..)
+
+refined type Port = Float where fun n -> n > 0 && n < 65536
+
+refined type Positive = Float where fun n -> n > 0
+
+refined type Digit = Int where fun n -> n >= 0 && n <= 9
+
+as_port : Float -> Option Port
+let as_port n = if n > 0 && n < 65536 then Some (Port.prove n) else None
+
+// a fraction inside the range is a port: the check says no more
+half : Port
+let half = Port.prove 0.5
+
+constant : Port
+let constant = Port.prove 8080
+
+positive_port : Port -> Positive
+let positive_port p = Positive.prove (Port.value p)
+
+// `Port.check` gave `true`, so both of its bounds hold
+checked : Float -> Option Positive
+let checked n = if Port.check n then Some (Positive.prove n) else None
+
+// stronger bounds than the check's
+narrower : Float -> Option Port
+let narrower n = if n >= 1 && n <= 1024 then Some (Port.prove n) else None
+
+// an `Int` above -1 is at least 0
+digit : Int -> Option Digit
+let digit n = if n > -1 && n < 10 then Some (Digit.prove n) else None
+
+nested : Float -> Option Port
+let nested n =
+  if n > 0 then
+    if n < 65536 then Some (Port.prove n) else None
+  else
+    None
+
+// both branches of `else if` see the conditions before them as false
+otherwise : Float -> Option Positive
+let otherwise n = if n <= 0 then None else if n > 0 then Some (Positive.prove n) else None
+
+// a snapshot of arithmetic, checked before it is used
+next : Int -> Option Digit
+let next n =
+  let m = n + 1
+  if m >= 0 && m <= 9 then Some (Digit.prove m) else None

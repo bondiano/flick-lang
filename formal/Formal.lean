@@ -96,6 +96,8 @@ import Formal.Effects
 import Formal.LetMut
 import Formal.Generalization
 import Formal.Lazy
+import Formal.Refine
+import Formal.Refine.Numbers
 import Formal.RecordHandler
 import Formal.Examples
 import Formal.RowEquivExamples

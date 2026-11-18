@@ -127,6 +127,14 @@ impl Checker<'_> {
                     .numeric
                     .insert(super::typing::range(op.span), num);
             }
+            // a comparison the logic of `T.prove` reads: primitive, on `Int` or `Float`
+            if op.domain == Domain::Ordered
+                && let Some(num) = [Num::Int, Num::Float]
+                    .into_iter()
+                    .find(|n| self.whnf(&ty).is_lang(n.lang()))
+            {
+                self.note_compared(super::typing::range(op.span), num);
+            }
             if op.op == "++" && ty.spine().0.is_lang(Lang::List) {
                 self.typing
                     .list_concat
