@@ -118,6 +118,7 @@ codegen/scope_run
 codegen/service_child
 codegen/service_reprovide
 runtime/scope_close
+runtime/owned_close
 runtime/arena_scope
 runtime/arena_layer_scope
 runtime/arena_owner_list

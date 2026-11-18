@@ -279,11 +279,9 @@ impl Checker<'_> {
             let mut allowed = Norm::default();
             while let Type::Bounded { ty, captures } = base {
                 self.capture_row(&captures, &mut allowed);
-                // what the bounded type shows, as `a` of `List a`, is no hold:
-                // a type argument carries its own qualifier
                 self.hold(Hold {
                     held: vec![(None, actual.clone())],
-                    visible: Visible::Late((*ty).clone()),
+                    visible: self.bounded_visible(&ty),
                     bound: *captures.clone(),
                     expected: Some(expected.clone()),
                     written: !matches!(self.store.resolve(&captures), Type::Meta(_)),
