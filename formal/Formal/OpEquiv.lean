@@ -60,7 +60,7 @@ theorem Sig.answers_equiv {E : Name} {us vs : List Ty} (hus : us.length = S.arit
     exact .refl
   · exact Ty.classOf_eq.mp h
 
-theorem Ty.tcon_inj {E : Name} {us vs : List Ty} (h : Ty.tcon E us = Ty.tcon E vs) : us = vs := by
+theorem Ty.tcon_injective {E : Name} {us vs : List Ty} (h : Ty.tcon E us = Ty.tcon E vs) : us = vs := by
   have key : ∀ xs ys : List Ty,
       xs.reverse.foldl Ty.tapp (Ty.adt E) = ys.reverse.foldl Ty.tapp (Ty.adt E) → xs = ys := by
     intro xs
@@ -80,7 +80,7 @@ theorem Ty.tcon_inj {E : Name} {us vs : List Ty} (h : Ty.tcon E us = Ty.tcon E v
 /-- The arguments of an instance a type fixed by a substitution names are fixed by it. -/
 theorem Ty.tcon_fixed {E : Name} {us : List Ty} {σ : Atom → Ty}
     (h : (Ty.tcon E us).substT σ = Ty.tcon E us) : us.map (Ty.substT σ) = us :=
-  Ty.tcon_inj (by rw [← Ty.tcon_substT]; exact h)
+  Ty.tcon_injective (by rw [← Ty.tcon_substT]; exact h)
 
 /-- The types of an operation at arguments a substitution fixes are fixed by it. -/
 theorem Sig.op_inst_fixed {E o : Name} {c : OpClass} {a b : Ty} {us : List Ty} {σ : Atom → Ty}

@@ -29,11 +29,11 @@ def RootAnswers (root : Roots) (Ef o : Name) (c : OpClass) : Prop :=
   c = .tail ∧ ∃ w f, root.svc Ef = some w ∧ w.field o = some f
 
 /-- An operation of a declared effect that no handler of its context and no root answers; `D`
-must hold its effect. -/
+must hold its effect, at some arguments. -/
 def PerformStuck (S : Sig) (root : Roots) (e : Tm) (D : Row) : Prop :=
   ∃ E Ef o c v a b, OkE E ∧ Value v ∧ e = plug E (.app (.const (.perform Ef o c)) v) ∧
     S.op Ef o = some (c, a, b) ∧ (∀ F ∈ E, F.handles Ef o c = none) ∧ ¬ RootAnswers root Ef o c ∧
-    D (.nm₀ Ef)
+    ∃ c, D (.nm Ef c)
 
 /-- The non-value outcomes of Progress: `raise v`, a step, an operation nothing answers, a
 redex that blocks, or unwinding to a handler. -/
@@ -170,11 +170,11 @@ theorem Blocked.frame {Λ e} (h : Blocked Λ e) {F : Frame} (hF : F.ok) : Blocke
 
 /-- An operation the frame around handles steps; one it does not stays stuck. -/
 theorem PerformStuck.frame {root Λ μ e D D'} (h : PerformStuck S root e D) {F : Frame} (hF : F.ok)
-    (hD : ∀ N : Name, D (.nm₀ N) → F.dom (.nm₀ N) ∨ D' (.nm₀ N))
-    (hpart : ∀ N o c, (∃ a b, S.op N o = some (c, a, b)) → F.installs N → F.handles N o c = none →
-      D (.nm₀ N) → D' (.nm₀ N)) :
+    (hD : ∀ (N : Name) cl, D (.nm N cl) → F.dom (.nm N cl) ∨ D' (.nm N cl))
+    (hpart : ∀ N o c cl, (∃ a b, S.op N o = some (c, a, b)) → F.installs N → F.handles N o c = none →
+      D (.nm N cl) → ∃ cl', D' (.nm N cl')) :
     (∃ l o, Step root l Λ μ (F.plug e) o) ∨ PerformStuck S root (F.plug e) D' ∨ Blocked Λ (F.plug e) := by
-  obtain ⟨E, Ef, o, c, v, a, b, hE, hv, rfl, hop, hh, hna, hN⟩ := h
+  obtain ⟨E, Ef, o, c, v, a, b, hE, hv, rfl, hop, hh, hna, cl, hN⟩ := h
   cases hF' : F.handles Ef o c with
   | none =>
     refine .inr (.inl ⟨E ++ [F], Ef, o, c, v, a, b, hE.append hF, hv, by rw [plug_append]; rfl, hop,
@@ -182,9 +182,9 @@ theorem PerformStuck.frame {root Λ μ e D D'} (h : PerformStuck S root e D) {F 
     · rcases List.mem_append.mp hG with hG | hG
       · exact hh G hG
       · simp at hG; subst hG; exact hF'
-    · rcases hD _ hN with h | h
-      · exact hpart Ef o c ⟨a, b, hop⟩ h hF' hN
-      · exact h
+    · rcases hD _ _ hN with h | h
+      · exact hpart Ef o c cl ⟨a, b, hop⟩ h hF' hN
+      · exact ⟨cl, h⟩
   | some p =>
     cases F with
     | hwith p' ℓ' E' al r =>
@@ -211,11 +211,12 @@ theorem PerformStuck.frame {root Λ μ e D D'} (h : PerformStuck S root e D) {F 
 
 /-- Lift the non-value outcomes over a frame that is neither `try` nor `inside`. -/
 theorem NV.frame {root Λ μ e D D'} (h : NV S root Λ μ e D) {F : Frame} (hF : F.ok)
-    (hnt : ¬ F.isTry) (hni : ¬ F.isInside) (hD : ∀ N : Name, D (.nm₀ N) → F.dom (.nm₀ N) ∨ D' (.nm₀ N))
+    (hnt : ¬ F.isTry) (hni : ¬ F.isInside)
+    (hD : ∀ (N : Name) cl, D (.nm N cl) → F.dom (.nm N cl) ∨ D' (.nm N cl))
     (hk : F.Parks := by trivial)
-    (hpart : ∀ N o c, (∃ a b, S.op N o = some (c, a, b)) → F.installs N →
-      F.handles N o c = none → D (.nm₀ N) → D' (.nm₀ N) := by
-      intro N o _ _ h; simp [Frame.installs] at h) :
+    (hpart : ∀ N o c cl, (∃ a b, S.op N o = some (c, a, b)) → F.installs N →
+      F.handles N o c = none → D (.nm N cl) → ∃ cl', D' (.nm N cl') := by
+      intro N o _ _ _ h; simp [Frame.installs] at h) :
     NV S root Λ μ (F.plug e) D' := by
   cases h with
   | raise h =>
@@ -260,6 +261,6 @@ theorem NV.frame {root Λ μ e D D'} (h : NV S root Λ μ e D) {F : Frame} (hF :
 /-- The common case: the frame keeps the stage. -/
 theorem NV.frame' {root Λ μ e D} (h : NV S root Λ μ e D) {F : Frame} (hF : F.ok)
     (hnt : ¬ F.isTry) (hni : ¬ F.isInside) (hk : F.Parks := by trivial) : NV S root Λ μ (F.plug e) D :=
-  h.frame hF hnt hni (fun _ h => .inr h) hk (fun _ _ _ _ _ _ h => h)
+  h.frame hF hnt hni (fun _ _ h => .inr h) hk (fun _ _ _ cl _ _ _ h => ⟨cl, h⟩)
 
 end Flick
