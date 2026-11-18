@@ -33,6 +33,7 @@ codegen/enums
 codegen/call_site
 codegen/errors
 codegen/error_match
+codegen/error_intro
 codegen/effect_sets
 codegen/fail
 codegen/eval_order
@@ -132,6 +133,7 @@ runtime/scope_owners
 runtime/lambda_owners
 runtime/handoff
 runtime/exits
+runtime/error_map
 stdlib/effect/deferred
 stdlib/effect/ref
 stdlib/effect/fibers

@@ -43,6 +43,7 @@ codegen/effect_sets
 codegen/enums
 codegen/errors
 codegen/error_match
+codegen/error_intro
 codegen/eval_order
 codegen/exports
 codegen/fail
@@ -116,6 +117,7 @@ runtime/closing_hooks
 runtime/concurrency
 runtime/discontinued_body
 runtime/discontinued_fiber
+runtime/error_map
 runtime/exits
 runtime/group_in_closing
 runtime/handoff
