@@ -491,7 +491,7 @@ fn dump_explanations() {
     let only = env::var("TRIAGE_CODE").ok();
     let mut files = Vec::new();
     md_files(
-        &root().join("flick-core/src/diagnostics/explain"),
+        &root().join("flick-diagnostics/src/diagnostics/explain"),
         &mut files,
     );
     files.sort();

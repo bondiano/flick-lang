@@ -1,5 +1,5 @@
 ---
-source: flick-core/src/diagnostics/render/tests.rs
+source: flick-diagnostics/src/diagnostics/render/tests.rs
 expression: "render_human(&sources, &diagnostics, false)"
 ---
 error[FLICK-S002]: unsupported expression

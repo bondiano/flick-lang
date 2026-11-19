@@ -20,7 +20,7 @@ diagnostics; TypeScript never decides a Flick type.
 
 | Component | Where | Responsibility |
 | - | - | - |
-| Parser | `flick-core/src/syntax` | the layout-aware parser builds a lossless CST and its AST; `fmt` formats the CST |
+| Parser | `flick-syntax/src/syntax` | the layout-aware parser builds a lossless CST and its AST; `fmt` formats the CST |
 | Resolver | `flick-core/src/resolve` | modules, imports, exports and names; unused-code warnings |
 | Checker | `flick-core/src/types` | kinds; bidirectional types with higher rank; record and effect rows; services and layers; classes, instances and `deriving`; regions and captures; the `sql` and `ui` blocks |
 | Typed IR | `flick-core/src/ir` | the checked module with application stages, dictionaries, lifts and source ranges made explicit; `ir/lower` elaborates `do`, comprehensions and `sql` |
@@ -31,7 +31,7 @@ diagnostics; TypeScript never decides a Flick type.
 | Go backend | `flick-core/src/codegen/go`, `flick-core/src/build/go.rs`, `runtime-go/flickrt` | `[build] emit = "go"`: a Go module per entry over the runtime package `flickrt`, compiled by `go build` (see [Go target](../../reference/codegen/#go-target)) |
 | TypeScript emitter | `flick-core/src/codegen/ts` | the types of `--emit ts`, the `.d.ts` of `--emit-dts` and the Promise façades of `--promise-facade`; a type without a TypeScript form is refused, never written as `any` |
 | Interfaces | `flick-core/src/iface.rs`, `flick-core/src/build` | the versioned JSON `.iface` of each module, with the data and dictionary ABI and fingerprints from a build (see [Interfaces](../../reference/iface/)) |
-| FFI importer | `flick-core/src/ffi`, `tools/dts-importer` | `flick ffi import` and `ffi check` over the surface the Node helper reads from `.d.ts` with TypeScript |
+| FFI importer | `flick-ffi/src/ffi`, `tools/dts-importer` | `flick ffi import` and `ffi check` over the surface the Node helper reads from `.d.ts` with TypeScript |
 | Editor | `flick-core/src/ide`, `flick-core/src/projection.rs`, `flick/src/lsp`, `flick/src/mapper.rs` | hover, definition, references, completion, rename and code actions over one analysis; `flick lsp --stdio` serves them and `flick content-mapper` the TypeScript projection with its span maps (see [Editors](../../reference/editor/)) |
 
 The JS emitter builds independently of `flick-core` from portable IR and

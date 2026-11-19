@@ -1,6 +1,6 @@
 ---
 title: "Тестирование"
-source_hash: 65d724eb0621ec5a
+source_hash: 0dd3ba84199d80ab
 ---
 
 Установите инструмент проверки зависимостей, используемый локально и в CI:
@@ -63,7 +63,7 @@ let x : Float = "hi"
 (`FLICK-R012`–`R014`) учитываются только в файлах, где упомянут их код:
 фикстуры других правил связывают имена, которые не используют.
 Коды должны быть зарегистрированы
-в `flick-core/src/diagnostics/codes.rs`.
+в `flick-diagnostics/src/diagnostics/codes.rs`.
 
 ## Сквозные программы — `tests/run/`
 
@@ -221,7 +221,7 @@ CPU, версию Node и методику рядом с результатам�
 | семантика `Float` в debug, release и при свёртке констант | `flick/tests/cli/e2e_numbers.rs`, `tests/run/codegen/numbers.fl`, `flick-core/tests/compiler/consteval_node.rs` |
 | проходы оптимизатора | `flick-core/src/opt/tests.rs`, `tests/run/codegen/release.fl` |
 | `deriving Schema`, политики кодеков, строгий экспорт, OpenAPI | `tests/{check,run}/**/schema/`, `packages/effect-ts/test/{schema,httpapi}.test.ts`, `flick/tests/cli/schema_export.rs` |
-| обратные вызовы FFI, импорт `.d.ts` и проверенные привязки | `tests/run/ffi/`, `packages/effect-ts/test/callbacks.test.ts`, `flick-core/src/ffi/tests.rs`, `flick/tests/ffi_command.rs`, `tools/dts-importer/test/` |
+| обратные вызовы FFI, импорт `.d.ts` и проверенные привязки | `tests/run/ffi/`, `packages/effect-ts/test/callbacks.test.ts`, `flick-ffi/src/ffi/tests.rs`, `flick/tests/ffi_command.rs`, `tools/dts-importer/test/` |
 | SQL | `tests/check/{pass,fail}/sql/`, `tests/run/sql/`, `packages/effect-ts/test/sql.test.ts`, `flick/tests/sql_postgres.rs` над `tests/postgres/` |
 | UI | `tests/check/{pass,fail}/ui/`, `tests/run/ui/`, `packages/effect-ts/test/ui-*.test.ts` |
 | блок `cli` | `tests/check/{pass,fail}/cli/`, `tests/run/stdlib/cli/`, `flick-core/src/project/load/plugins_tests.rs` (вызовы, которые он означает), `flick/tests/cli/lsp_editor/cli.rs` |

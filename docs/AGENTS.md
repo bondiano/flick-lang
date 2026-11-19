@@ -24,7 +24,7 @@ site, its doctest markers and its locales.
   under `spec/` the Russian page is the original, so stamp
   `docs/src/content/docs/spec/<page>.md`.
 - Pages under `reference/errors/` are generated: edit
-  `flick-core/src/diagnostics/explain/<CODE>.md` and
+  `flick-diagnostics/src/diagnostics/explain/<CODE>.md` and
   `src/error-translations/<CODE>.md`, then run
   `node docs/scripts/errors.mjs --write`.
 - `ru/spec/` code blocks are pinned in `tests/syntax/spec_examples.txt`,

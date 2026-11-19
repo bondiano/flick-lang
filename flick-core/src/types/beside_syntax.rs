@@ -14,7 +14,7 @@ pub fn beside_syntax_errors(tree: &Node, checked: Vec<Diagnostic>) -> Vec<Diagno
     errors(tree, &mut broken);
     // a type the checker could not finish is no news while code is missing
     let unfinished = |text: &str| text.contains("?`") || text.contains("? ");
-    let guessed = |d: &Diagnostic| d.code == codes::T013 || unfinished(&d.message) || d.incomplete;
+    let guessed = |d: &Diagnostic| d.code == codes::T013 || unfinished(&d.message) || d.incomplete();
     checked
         .into_iter()
         .filter(|d| {

@@ -5,7 +5,11 @@ queries. `flick`, `flick-wasm`, `flick-model` and `flick-backend` link it.
 
 ## Layout
 
-- `src/diagnostics/` — the `codes!` registry and `explain/<CODE>.md`.
+- `crate::source`, `crate::diagnostics`, `crate::syntax` and `crate::ffi`
+  re-export the crates `flick-diagnostics` (the `codes!` registry and
+  `explain/<CODE>.md`), `flick-syntax` and `flick-ffi`. Their tests that
+  run the checker, the formatter or the lowering are in
+  `src/frontend_tests/`.
 - `src/codegen/` — re-exports the emitters of `backends/js` and
   `backends/go`; owns the TypeScript projection (`ts.rs`, `ts/`).
 - `src/ide/` — queries shared by `flick lsp` and the playground.
@@ -17,10 +21,10 @@ queries. `flick`, `flick-wasm`, `flick-model` and `flick-backend` link it.
   only from its layer or lower ones. Outside `ts`, `src/codegen/` reads
   only the IR and build input: no `types`, `iface`, `opt`, `project`,
   `build`, `syntax` or `std::fs`.
-- `build.rs` compiles `source.rs`, `builtin_source.rs`,
-  `implicit_packages.rs`, `syntax/{kind.rs,lexer/}` and
-  `diagnostics/{codes,model}.rs` on their own: keep their `crate::`
-  imports within that set.
+- `build.rs` compiles `builtin_source.rs`, `implicit_packages.rs`,
+  `source.rs` and `diagnostics/{codes,model}.rs` of `flick-diagnostics`
+  and `syntax/{kind.rs,lexer/}` of `flick-syntax` on their own: keep
+  their `crate::` imports within that set.
 - A new code needs a `codes!` entry, `explain/<CODE>.md`, its Russian
   `docs/src/error-translations/<CODE>.md`, then
   `node docs/scripts/errors.mjs --write`. Never reuse a number; mark a

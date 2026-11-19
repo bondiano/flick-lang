@@ -8,7 +8,8 @@ impl super::Parse {
     /// A qualified file declaration with `= <members>` has the same static
     /// scope as a header followed by declarations. Keep token positions and
     /// leave the parser's lossless representation available to formatters.
-    pub(crate) fn into_module(mut self) -> Self {
+    #[must_use]
+    pub fn into_module(mut self) -> Self {
         let Some(first) = self.tree.nodes().next() else {
             return self;
         };
@@ -49,7 +50,7 @@ impl super::Parse {
     }
 }
 
-pub(crate) fn measure(body: &Node, text: &str, limits: Thresholds) -> Structure {
+pub fn measure(body: &Node, text: &str, limits: Thresholds) -> Structure {
     let (start, end) = body.range();
     let mut nesting = Vec::new();
     depths(body, 0, limits.nesting, &mut nesting);
@@ -97,7 +98,7 @@ fn constant(node: &Node) -> bool {
     }
 }
 
-pub(crate) fn branches(node: &Node) -> u32 {
+pub fn branches(node: &Node) -> u32 {
     let mut total = 0;
     let mut pending = vec![node];
     while let Some(node) = pending.pop() {
@@ -168,46 +169,5 @@ impl Default for Thresholds {
             complexity: 10,
             params: 5,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::source::SourceMap;
-
-    #[test]
-    fn a_file_structure_keeps_tokens_and_original_declaration_positions() {
-        let text = "module App.Example exposing (answer) =\n  // kept at its source offset\n  answer : Int\n  let answer = 42\n";
-        let mut sources = SourceMap::default();
-        let file = sources.add("Example.fl", text);
-        let raw = super::super::parse(text, file);
-        assert!(raw.diagnostics.is_empty(), "{:?}", raw.diagnostics);
-        assert_eq!(
-            raw.tree.nodes().next().expect("file declaration").kind,
-            K::InlineModuleDecl
-        );
-        let semantic = raw.into_module();
-        assert_eq!(semantic.tree.text(text), text);
-        assert_eq!(
-            semantic
-                .tree
-                .nodes()
-                .next()
-                .expect("normalized header")
-                .kind,
-            K::ModuleHeader
-        );
-        let declaration = semantic
-            .tree
-            .nodes()
-            .find(|n| n.kind == K::LetDecl)
-            .expect("lifted value declaration");
-        assert_eq!(
-            declaration.range().0 as usize,
-            text.find("let answer").expect("original declaration")
-        );
-        let diagnostics = crate::check(&sources, file);
-        assert!(diagnostics.is_empty(), "{diagnostics:?}");
     }
 }
