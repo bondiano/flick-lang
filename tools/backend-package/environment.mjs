@@ -40,7 +40,9 @@ export const guestEnvironment = ({ root, cargoHome, cargo, rustc, wrapper, rustc
     CARGO_TARGET_DIR: join(root, "target/backend-guest"),
     // Cargo does not invalidate artifacts when only RUSTC_WRAPPER changes.
     // Bump this cfg with the wrapper's identity schema to rebuild old guests.
-    CARGO_ENCODED_RUSTFLAGS: ["--cfg=flick_guest_metadata_v1", ...[...paths].map(([from, to]) => `--remap-path-prefix=${from}=${to}`)].join("\x1f"),
+    // The guest's stack in linear memory: release optimization of a
+    // 2000-line function recurses deeper than the linker's 1 MiB.
+    CARGO_ENCODED_RUSTFLAGS: ["--cfg=flick_guest_metadata_v1", "-Clink-arg=-zstack-size=4194304", ...[...paths].map(([from, to]) => `--remap-path-prefix=${from}=${to}`)].join("\x1f"),
     FLICK_GUEST_ROOT: canonical(root),
     FLICK_GUEST_CARGO_HOME: canonical(cargoHome),
     FLICK_GUEST_COMPILER_COMMIT: commit,
