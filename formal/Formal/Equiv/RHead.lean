@@ -27,12 +27,12 @@ theorem _root_.Flick.Value.not_cell {v : Tm} (h : Value v) : ¬ v.IsCell := by
 theorem HAns.one {μ μ₂ : List Tm} {r₂ r' W₁ μ₂a r₂a r₂'}
     (hj : RJ W μ₂ r₂ W₁ μ₂a r₂a) (hs : ∀ Λ, RHead Λ μ₂a r₂a Λ μ₂a r₂') (h : Sim W₁ .any r' r₂')
     (hst : StR W μ μ₂) : HAns W μ₂ r₂ μ μ r' :=
-  ⟨W₁, μ₂a, r₂a, W₁, μ₂a, r₂', hj, HSeq.one hs, World.le.refl _, h, hj.st _ hst, fun _ _ => rfl⟩
+  ⟨W₁, μ₂a, r₂a, W₁, μ₂a, r₂', hj, HSeqP.one hs, World.le.refl _, h, hj.st _ hst, fun _ _ => rfl⟩
 
 theorem HAns.pure {μ μ₂ : List Tm} {r₂ r' W₁ μ₂a r₂a r₂'}
     (hj : RJ W μ₂ r₂ W₁ μ₂a r₂a) (hs : PHead r₂a r₂') (h : Sim W₁ .any r' r₂')
     (hst : StR W μ μ₂) : HAns W μ₂ r₂ μ μ r' :=
-  ⟨W₁, μ₂a, r₂a, W₁, μ₂a, r₂', hj, .pure hs .refl, World.le.refl _, h, hj.st _ hst, fun _ _ => rfl⟩
+  ⟨W₁, μ₂a, r₂a, W₁, μ₂a, r₂', hj, .inr (.inl ⟨_, hs, .refl⟩), World.le.refl _, h, hj.st _ hst, fun _ _ => rfl⟩
 
 /-- **A runtime head step** that keeps the regions. Neither side takes a dead arm: what the
 step gives has no lazy cell where a pattern reads (`hzl`, `hzr`). -/
@@ -45,7 +45,7 @@ theorem rhead_sim {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {r r' r₂ : Tm}
     obtain ⟨f', v', rfl, h₁, h₂⟩ := h.inv_app
     rw [h₁.inv_const]
     have hv' := h₂.top_value rfl hv
-    refine ⟨W, μ₂, _, _, _, _, RJ.refl _ _, HSeq.one (fun _ => .refMake hv'), World.le_addL _ _ _ .sym,
+    refine ⟨W, μ₂, _, _, _, _, RJ.refl _ _, HSeqP.one (fun _ => .refMake hv'), World.le_addL _ _ _ .sym,
       .loc (k := .sym) (.inr ⟨rfl, rfl, rfl⟩), hst.alloc (h₂.mono (World.le_addL _ _ _ _)),
       fun n hn => getElem?_append_old (hst.j₁ n hn).1⟩
   | refGet hc hnc =>
@@ -85,14 +85,14 @@ theorem rhead_sim {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {r r' r₂ : Tm}
     obtain ⟨l', k, rfl, hl⟩ := h₄.inv_loc
     have hv' := h₂.top_value rfl hv
     have hnj : ∀ n, W.J₁ n → n ≠ l := fun n hn e => hst.not_j₁ hl (e ▸ hn)
-    refine ⟨W, μ₂, _, W, _, _, RJ.refl _ _, HSeq.one (fun _ => .refSet hv' (hst.lt₂ hl)), World.le.refl _,
+    refine ⟨W, μ₂, _, W, _, _, RJ.refl _ _, HSeqP.one (fun _ => .refSet hv' (hst.lt₂ hl)), World.le.refl _,
       .lit, hst.set hl ?_, fun n hn => getElem?_set_of_ne (hnj n hn)⟩
     cases k with
     | sym => exact h₂
     | born v₀ v₀' =>
       obtain ⟨c, c', -, -, hcr⟩ := hst.cell _ _ _ hl
       exact ⟨hcr.val, hcr.val', hcr.cl, hcr.cl', hcr.noIns, hcr.rel,
-        .inr ⟨hv.not_cell, hv'.not_cell, h₂⟩⟩
+        .inr ⟨hv.not_cell, hv'.not_cell, h₂⟩, hcr.flag⟩
   | await =>
     obtain ⟨e', rfl, h₁⟩ := h.inv_await
     obtain ⟨W₁, μ₁, v', r₁, hv', s₁⟩ := vcu_frame h₁ rfl .task μ₂ (F := .await) trivial
@@ -100,7 +100,7 @@ theorem rhead_sim {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {r r' r₂ : Tm}
     exact HAns.one r₁ (fun _ => .await) he hst
   | lazy =>
     obtain ⟨e', rfl, h₁⟩ := h.inv_lazy
-    refine ⟨W, μ₂, _, _, _, _, RJ.refl _ _, HSeq.one (fun _ => .lazy), World.le_addL _ _ _ .sym,
+    refine ⟨W, μ₂, _, _, _, _, RJ.refl _ _, HSeqP.one (fun _ => .lazy), World.le_addL _ _ _ .sym,
       .loc (k := .sym) (.inr ⟨rfl, rfl, rfl⟩), hst.alloc (.lazy (h₁.mono (World.le_addL _ _ _ _))),
       fun n hn => getElem?_append_old (hst.j₁ n hn).1⟩
   | forcePending hc =>
@@ -117,7 +117,7 @@ theorem rhead_sim {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {r r' r₂ : Tm}
     obtain ⟨W₁, μ₁, v', r₁, hv', s₁⟩ := vcu_frame h₁ rfl hv μ₂ (F := .settle l') trivial
     have hst₁ := r₁.st _ hst
     have hl₁ := r₁.le.L _ _ _ hl
-    exact ⟨W₁, μ₁, _, W₁, _, _, r₁, HSeq.one (fun _ => .settleVal hv'), World.le.refl _, s₁,
+    exact ⟨W₁, μ₁, _, W₁, _, _, r₁, HSeqP.one (fun _ => .settleVal hv'), World.le.refl _, s₁,
       hst₁.settleSym hl₁ s₁,
       fun n hn => settleCell_other (fun e => hst.not_j₁ hl (e ▸ hn))⟩
   | @settleRaise v _ _ l hv =>
@@ -125,7 +125,7 @@ theorem rhead_sim {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {r r' r₂ : Tm}
     obtain ⟨W₁, μ₁, v', r₁, hv', s₁⟩ := rcu_frame h₁ rfl rfl hv μ₂ (F := .settle l') trivial
     have hst₁ := r₁.st _ hst
     have hl₁ := r₁.le.L _ _ _ hl
-    exact ⟨W₁, μ₁, _, W₁, _, _, r₁, HSeq.one (fun _ => .settleRaise hv'), World.le.refl _, .raise s₁,
+    exact ⟨W₁, μ₁, _, W₁, _, _, r₁, HSeqP.one (fun _ => .settleRaise hv'), World.le.refl _, .raise s₁,
       hst₁.settleSym hl₁ (.raise s₁),
       fun n hn => settleCell_other (fun e => hst.not_j₁ hl (e ▸ hn))⟩
   | @settleUnw _ _ l p ℓ a =>
@@ -133,7 +133,7 @@ theorem rhead_sim {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {r r' r₂ : Tm}
     obtain ⟨W₁, μ₁, ℓ', k, a', r₁, hlk, s₁⟩ := ucu_frame h₁ rfl rfl μ₂ (F := .settle l') trivial
     have hst₁ := r₁.st _ hst
     have hl₁ := r₁.le.L _ _ _ hl
-    exact ⟨W₁, μ₁, _, W₁, _, _, r₁, HSeq.one (fun _ => .settleUnw), World.le.refl _, .unw hlk s₁,
+    exact ⟨W₁, μ₁, _, W₁, _, _, r₁, HSeqP.one (fun _ => .settleUnw), World.le.refl _, .unw hlk s₁,
       hst₁.resetSym hl₁, fun n hn => resetCell_other (fun e => hst.not_j₁ hl (e ▸ hn))⟩
   | @tryRaise v _ _ A hv =>
     obtain ⟨e', al', rfl, h₁, h₂⟩ := h.inv_try

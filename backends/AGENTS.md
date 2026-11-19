@@ -11,8 +11,10 @@ host's projections, never `flick-core`.
 - `<name>/src/codegen/` — the emitter.
 - `<name>/src/component/` — the world's exports: request data, optimize,
   emit.
-- `<name>/package/` — `component.wasm` and its pin `backend.json`, which
-  `flick/src/backends/official.rs` embeds.
+- `<name>/package/` — `component.wasm` and its pin `backend.json` with the
+  ranges its descriptor accepts. A compiler built from this checkout reads
+  them (`flick/src/backends/official.rs`); a release resolves them from the
+  release a tag `backend-<name>-v<version>` publishes (`backends.yml`).
 - `flick/src/backends/request/` — the projections the host sends.
 - `flick-core/src/codegen/` — emitter tests, linking these crates natively.
 

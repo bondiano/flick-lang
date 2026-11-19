@@ -4,11 +4,8 @@ import Formal.Equiv.Slot
 # Contextual equivalence: runs of configurations
 
 Two configurations are related (`CfgR`) when their main threads, their stores and their regions
-are. A step of the left one is answered by steps of the right one (`cstep_sim`): a step of the
-main thread by `thread_sim`, a step of a child by `thread_sim` in its slot (`Step.reslot`), and
-a child that finishes on the left is caught up on the right (`Sim.fcu`), as a region ends only
-once its children are finished. So is a run (`csteps_sim`), and a left main thread that ends with
-a literal is answered by a right one that ends with it (`lit_sim`).
+are. The right side answers a step of the main thread, and of a child in its slot
+(`Step.reslot`), by steps of its own (`Formal/Equiv/CfgStep.lean`).
 
 The threads of both runs are closed and have no lazy cell where a pattern reads, wherever the
 runs go (`Reach`). Typing gives both (`Formal/Equiv/Context.lean`).
@@ -178,81 +175,5 @@ theorem TAns.kid {root : Roots} {Λ₂ Λ' : List Rgn} {μ₂ μ'' : List Tm} {k
     have := CStep.kid (e := e₂) hg' hl₂ hk' s'
     rw [setKid_setKid'] at this
     exact .step this .refl
-
-/-- **A step of a configuration** of the left side is answered by the right side. -/
-theorem cstep_sim {root : Roots} (hroot : root.Src) {l : Lbl} {c₁ c₁' c₂ : Cfg}
-    (hr : CfgR W c₁ c₂) (hcl₁ : Reach root c₁) (hcl₂ : Reach root c₂)
-    (hs : CStep root l c₁ c₁') : ∃ W' c₂', W.le W' ∧ CSteps root c₂ c₂' ∧ CfgR W' c₁' c₂' := by
-  obtain ⟨Λ₂, μ₂, e₂⟩ := c₂
-  obtain ⟨ht, hst, hrg⟩ := hr
-  have h₁ := hcl₁ _ .refl
-  have h₁' := hcl₁ _ (.step hs .refl)
-  cases hs with
-  | main hs =>
-    obtain ⟨W', Λ₂', μ₂', t₂', hW, hT, ht', hst', -, hrg'⟩ :=
-      thread_sim hroot ht hst h₁.1 (fun _ _ h => (hcl₂ _ (h.main Λ₂)).1) hrg
-        (fun _ _ h => nomatch h) hs h₁'.2.1 (fun _ _ _ h => (hcl₂ _ h.main).2.1)
-    exact ⟨W', ⟨Λ₂', μ₂', t₂'⟩, hW, hT.main, ht', hst', hrg'⟩
-  | @kid Λ p g j k μ l Λ' μ' k' e hg hl hk hs =>
-    obtain ⟨g₂, hg₂, hR⟩ := hrg.get hg
-    obtain ⟨k₂, hk₂⟩ : ∃ k₂, g₂.kids[j]? = some k₂ := by
-      have : j < g₂.kids.length := hR.len ▸ Flick.Elab.lt_of_getElem? hk
-      exact ⟨_, List.getElem?_eq_getElem this⟩
-    have hl₂ : g₂.live = true := hR.live ▸ hl
-    have right : ∀ Λ' μ'' t'', TAns root Λ₂ μ₂ k₂ Λ' μ'' t'' → t''.Closed ∧ ¬ t''.LzTop .any :=
-      fun _ _ _ h => by
-        obtain ⟨hc, g', hg', hm⟩ := h.kid e₂ hg₂ hl₂ hk₂
-        exact (hcl₂ _ hc).2.2 p g' hg' _ hm
-    have left : ¬ k'.LzTop .any := by
-      obtain ⟨g₀, hg₀, hle⟩ := hs.kids hg
-      obtain ⟨g', hg', hm⟩ := slot_mem hg₀ (Nat.lt_of_lt_of_le (Flick.Elab.lt_of_getElem? hk) hle) k'
-      exact (h₁'.2.2 p g' hg' k' hm).2
-    obtain ⟨W', Λ₂', μ₂', t₂', hW, hT, ht', hst', hko, hrg'⟩ :=
-      thread_sim hroot (hR.kids j k k₂ (by simp) hk hk₂) hst
-        (h₁.2.2 p g hg k (List.mem_of_getElem? hk)).1
-        (fun _ _ h => (right _ _ _ ⟨_, _, h, .inl ⟨rfl, rfl, rfl⟩⟩).1) (hrg.any _)
-        (fun _ _ h => by cases h; exact ⟨g, hg, hk⟩) hs left (fun _ _ _ h => (right _ _ _ h).2)
-    -- the right child's steps, back in its slot
-    have run : CSteps root ⟨Λ₂, μ₂, e₂⟩ ⟨setKid Λ₂' p j t₂', μ₂', e₂⟩ := (hT.kid e₂ hg₂ hl₂ hk₂).1
-    have hmain : ThR W' μ' none e e₂ :=
-      ht.keep hW fun n a ho ha => hko n none a (by simp) ho ha
-    -- a child the left side finishes in a live region is caught up on the right
-    by_cases hfin : Final k' ∧ ∃ g', Λ'[p]? = some g' ∧ g'.live = true ∧ j < g'.kids.length
-    · obtain ⟨hf, g', hg', hl', hj⟩ := hfin
-      obtain ⟨g₂', hg₂', hR'⟩ := hrg'.get hg'
-      have hj₂ : j < g₂'.kids.length := hR'.len ▸ hj
-      obtain ⟨W'', μ₂'', k₂', r, hf₂, ht'', hst''⟩ := ht'.fcu hf hst'
-      have hcu := r.ksteps.kid (root := root) e₂ (Flick.Elab.setKid_get hg₂')
-        (by simp only; rw [← hR'.live, hl']) (List.getElem?_set_self hj₂)
-      rw [setKid_setKid'] at hcu
-      exact ⟨W'', ⟨setKid Λ₂' p j k₂', μ₂'', e₂⟩, hW.trans r.le, run.trans hcu, hmain.mono r.le,
-        hst'', (hrg'.keep r.le keepO_refl).reslot ht'' fun _ _ _ _ _ => hf₂⟩
-    · refine ⟨W', ⟨setKid Λ₂' p j t₂', μ₂', e₂⟩, hW, run, hmain, hst', hrg'.reslot ht' ?_⟩
-      intro g' hg' hl' hj hf
-      exact (hfin ⟨hf, g', hg', hl', hj⟩).elim
-
-/-- **A run of configurations** of the left side is answered by a run of the right side. -/
-theorem csteps_sim {root : Roots} (hroot : root.Src) {c₁ c₁' : Cfg} (hs : CSteps root c₁ c₁') :
-    ∀ {W c₂}, CfgR W c₁ c₂ → Reach root c₁ → Reach root c₂ →
-      ∃ W' c₂', W.le W' ∧ CSteps root c₂ c₂' ∧ CfgR W' c₁' c₂' := by
-  induction hs with
-  | refl => exact fun hr _ _ => ⟨_, _, World.le.refl _, .refl, hr⟩
-  | step s hs ih =>
-    intro W c₂ hr h₁ h₂
-    obtain ⟨W₁, c₂₁, hW, hs₂, hr₁⟩ := cstep_sim hroot hr h₁ h₂ s
-    obtain ⟨W', c₂', hW', hs₂', hr'⟩ := ih hr₁ (h₁.step (.step s .refl)) (h₂.step hs₂)
-    exact ⟨W', c₂', hW.trans hW', hs₂.trans hs₂', hr'⟩
-
-/-- **A main thread that ends with a literal** on the left ends with it on the right. -/
-theorem lit_sim {root : Roots} {Λ : List Rgn} {μ : List Tm} {o : Lit} {c₂ : Cfg}
-    (hr : CfgR W ⟨Λ, μ, .lit o⟩ c₂) : ∃ Λ₂ μ₂, CSteps root c₂ ⟨Λ₂, μ₂, .lit o⟩ := by
-  obtain ⟨Λ₂, μ₂, e₂⟩ := c₂
-  obtain ⟨ht, -, -⟩ := hr
-  rcases ht with ht | ht
-  · obtain ⟨W', μ₂', v, r, hv, s⟩ := ht.vcu rfl .lit W μ₂ (World.le.refl _)
-    have := (s.value_any .lit hv .top).inv_lit
-    subst this
-    exact ⟨Λ₂, μ₂', r.ksteps.main Λ₂⟩
-  · exact (ht.not_final (.inl .lit)).elim
 
 end Flick.Equiv

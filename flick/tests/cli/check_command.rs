@@ -269,3 +269,59 @@ fn code_after_the_body_of_a_one_line_ui_block_is_refused_not_dropped() {
         "{stderr}"
     );
 }
+
+#[test]
+fn fix_writes_the_children_of_a_root_fragment_as_the_lines_of_its_ui_block() {
+    let text = r#"module App.Page exposing (..)
+
+under : Ui
+let under = ui {
+  let shown = "x"
+  fragment
+    heading (text shown)
+    // a comment stays
+    paragraph
+      text "one"
+      text "two"
+}
+
+inline : Ui
+let inline = ui {
+  fragment (text "a") (heading (text "b"))
+}
+
+one_line : Ui
+let one_line = ui { fragment (text "a") (text "b") }
+
+// one child and one list are left as they are
+single : Ui
+let single = ui { fragment (text "a") }
+
+listed : List Ui -> Ui
+let listed rows = ui { fragment rows }
+"#;
+    let files = [
+        (
+            "flick.toml",
+            "schema-version = 1\n[project]\nkind = \"lib\"\n",
+        ),
+        ("src/App/Page.fl", text),
+    ];
+    let dir = common::project("check_fix_fragment", &files);
+    let out = common::flick_in(&dir, &["check", "--fix", "--only", "T086"]);
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    assert!(out.stderr.is_empty(), "nothing left to report: {out:?}");
+    let fixed = fs::read_to_string(dir.join("src/App/Page.fl")).expect("source");
+    let under = "  fragment\n    heading (text shown)\n    // a comment stays\n    paragraph\n      text \"one\"\n      text \"two\"\n";
+    let lines = "  heading (text shown)\n  // a comment stays\n  paragraph\n    text \"one\"\n    text \"two\"\n";
+    let want = (text.replace(under, lines))
+        .replace(
+            "  fragment (text \"a\") (heading (text \"b\"))\n",
+            "  text \"a\"\n  heading (text \"b\")\n",
+        )
+        .replace(
+            "ui { fragment (text \"a\") (text \"b\") }",
+            "ui { text \"a\"; text \"b\" }",
+        );
+    assert_eq!(fixed, want);
+}

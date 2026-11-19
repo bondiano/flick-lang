@@ -98,6 +98,22 @@ fn clone(url: &str, tag: &str, dir: &Path) -> Result<String, String> {
     Ok(commit)
 }
 
+/// The bytes at `url`: downloaded over HTTP(S), or read when it names a file.
+pub fn bytes(url: &str) -> Result<Vec<u8>, String> {
+    if !(url.starts_with("http://") || url.starts_with("https://")) {
+        return fs::read(url).map_err(|e| format!("cannot read `{url}`: {e}"));
+    }
+    let response = ureq::get(url)
+        .call()
+        .map_err(|e| format!("cannot download `{url}`: {e}"))?;
+    let mut bytes = Vec::new();
+    response
+        .into_reader()
+        .read_to_end(&mut bytes)
+        .map_err(|e| format!("cannot download `{url}`: {e}"))?;
+    Ok(bytes)
+}
+
 /// Downloads the tarball at `url`, checks it against `sha256` and unpacks it
 /// into `dir`, without the one directory it may wrap its files in.
 fn download(url: &str, sha256: &str, dir: &Path) -> Result<(), String> {

@@ -35,9 +35,13 @@ docs-fix:
 # Run the test suites; the reference model has its own recipe, `model`
 test: unit feature-test
 
-# The tests of the workspace crates but the reference model
-unit:
-    cargo test --workspace --exclude flick-model
+# The tests of the workspace crates but the model, or of `packages`
+unit *packages="--workspace --exclude flick-model":
+    cargo test {{packages}}
+
+# `flick`'s tests under nextest: all, or the part `k/n`
+unit-flick part="":
+    cargo nextest run -p flick --profile ci {{ if part == "" { "" } else { "--partition count:" + part } }}
 
 # The reference model of λFlick: its unit tests, the cases of
 # tests/run/model.txt checked and run against their `.stdout`, the other

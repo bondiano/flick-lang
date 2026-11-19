@@ -30,6 +30,7 @@ structure BornInv (W : World) (v v' c c' : Tm) : Prop where
   rel : Sim W .any v v'
   state : ((c = .lazy v ∨ c = .running v ∨ c = .done v) ∧ (c' = .lazy v' ∨ c' = .done v')) ∨
     (¬ c.IsCell ∧ ¬ c'.IsCell ∧ Sim W .top c c')
+  flag : W.B
 
 /-- Related cells of a kind. -/
 def CellR (W : World) : Kd → Tm → Tm → Prop
@@ -48,8 +49,8 @@ structure StR (W : World) (μ₁ μ₂ : List Tm) : Prop where
 
 theorem BornInv.mono {W' : World} (hW : W.le W') {v v' c c' : Tm} (h : BornInv W v v' c c') :
     BornInv W' v v' c c' := by
-  obtain ⟨h₁, h₂, h₃, h₄, h₅, h₆, h₇⟩ := h
-  refine ⟨h₁, h₂, h₃, h₄, h₅, h₆.mono hW, ?_⟩
+  obtain ⟨h₁, h₂, h₃, h₄, h₅, h₆, h₇, h₈⟩ := h
+  refine ⟨h₁, h₂, h₃, h₄, h₅, h₆.mono hW, ?_, hW.B.1 h₈⟩
   rcases h₇ with h₇ | ⟨a, b, c⟩
   · exact .inl h₇
   · exact .inr ⟨a, b, c.mono hW⟩
@@ -85,16 +86,16 @@ def World.addO (W : World) (n : Nat) (τ : Option (Nat × Nat)) : World :=
   { W with J₁ := fun a => W.J₁ a ∨ a = n, O := fun a τ' => W.O a τ' ∨ (a = n ∧ τ' = τ) }
 
 theorem World.le_addL (W : World) (l l' : Nat) (k : Kd) : W.le (W.addL l l' k) :=
-  ⟨fun _ _ _ h => .inl h, fun _ h => h, fun _ h => h, fun _ _ h => h⟩
+  ⟨fun _ _ _ h => .inl h, fun _ h => h, fun _ h => h, fun _ _ h => h, Iff.rfl⟩
 
 theorem World.le_addJ₁ (W : World) (n : Nat) : W.le (W.addJ₁ n) :=
-  ⟨fun _ _ _ h => h, fun _ h => .inl h, fun _ h => h, fun _ _ h => h⟩
+  ⟨fun _ _ _ h => h, fun _ h => .inl h, fun _ h => h, fun _ _ h => h, Iff.rfl⟩
 
 theorem World.le_addJ₂ (W : World) (n : Nat) : W.le (W.addJ₂ n) :=
-  ⟨fun _ _ _ h => h, fun _ h => h, fun _ h => .inl h, fun _ _ h => h⟩
+  ⟨fun _ _ _ h => h, fun _ h => h, fun _ h => .inl h, fun _ _ h => h, Iff.rfl⟩
 
 theorem World.le_addO (W : World) (n : Nat) (τ : Option (Nat × Nat)) : W.le (W.addO n τ) :=
-  ⟨fun _ _ _ h => h, fun _ h => .inl h, fun _ h => h, fun _ _ h => .inl h⟩
+  ⟨fun _ _ _ h => h, fun _ h => .inl h, fun _ h => h, fun _ _ h => .inl h, Iff.rfl⟩
 
 theorem getElem?_append_old {μ : List Tm} {c : Tm} {l : Nat} (h : l < μ.length) :
     (μ ++ [c])[l]? = μ[l]? := List.getElem?_append_left h
