@@ -68,7 +68,7 @@ fn standard_library_sources_have_one_dependency_ordered_package_owner() {
     }
     assert_eq!(
         all.len(),
-        207,
+        208,
         "the source split preserves every standard-library module"
     );
 }
