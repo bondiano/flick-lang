@@ -65,6 +65,8 @@ use precompiled::Precompiled;
 enum Root {
     Source,
     Test,
+    /// The project's proof root, which only `flick prove` selects.
+    Proof,
     /// The source directory of the named source package.
     Package(String),
     /// A file outside the project roots; the directory its module path
@@ -75,7 +77,9 @@ enum Root {
 impl Root {
     fn same_package(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Source | Self::Test, Self::Source | Self::Test) => true,
+            (Self::Source | Self::Test | Self::Proof, Self::Source | Self::Test | Self::Proof) => {
+                true
+            }
             (Self::Package(a), Self::Package(b)) => a == b,
             (Self::Other(a), Self::Other(b)) => a == b,
             _ => false,
@@ -525,6 +529,7 @@ impl Loader<'_> {
         match self.project {
             Some(p) if path.starts_with(p.source_root()) => Root::Source,
             Some(p) if path.starts_with(p.test_root()) => Root::Test,
+            Some(p) if path.starts_with(p.proof_root()) => Root::Proof,
             _ => self
                 .package_sources()
                 .into_iter()

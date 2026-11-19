@@ -1,11 +1,12 @@
 //! Completion: after `x.` the fields of a record (open rows too), after
 //! `M.` the exports of a module or the operations of a service; otherwise
 //! the locals in scope, the module's own names, imported names and the
-//! Prelude's, constructors included.
+//! Prelude's, constructors included, those that fit the place first.
 
 use std::collections::BTreeMap;
 use std::iter;
 
+use super::expect::{Expected, MISFIT, hole};
 use super::hover::companions::companion_note;
 use super::{Ide, locals, tree};
 use crate::diagnostics::Edit;
@@ -41,7 +42,8 @@ pub struct Completion {
     /// A snippet to insert instead of the label, `$1`-style placeholders
     /// for the arguments of a function.
     pub snippet: Option<String>,
-    /// Where the item goes in the list: locals first, auto-imports last.
+    /// Where the item goes in the list: locals first, auto-imports last,
+    /// and where the place expects a type, after every item that fits it.
     pub sort: u8,
     /// The module that defines a top-level name.
     pub module: Option<String>,
@@ -91,35 +93,56 @@ impl Ide<'_> {
         let mut items = if dotted {
             self.after_dot(file, offset)
         } else {
-            let mut items = self.complete_names(file, offset);
-            items.extend(self.auto_imports(file, offset, &items));
+            let expected = self.expected(file, offset);
+            let mut items = self.complete_names(file, offset, expected.as_ref());
+            items.extend(self.auto_imports(file, offset, &items, expected.as_ref()));
             items
         };
         self.enrich(&mut items);
         items
     }
 
-    pub(super) fn complete_names(&self, file: FileId, offset: u32) -> Vec<Completion> {
+    pub(super) fn complete_names(
+        &self,
+        file: FileId,
+        offset: u32,
+        expected: Option<&Expected>,
+    ) -> Vec<Completion> {
         let Some(m) = self.module(file) else {
             return Vec::new();
         };
         let text = &self.sources.get(file).text;
         let mut out: BTreeMap<String, Completion> = BTreeMap::new();
-        let mut add = |sort: u8, c: Completion| {
-            out.entry(c.label.clone())
-                .or_insert(Completion { sort, ..c });
+        let mut add = |sort: u8, c: Completion, ty: Option<&Type>| {
+            let fits = expected.is_none_or(|x| x.misfit(self, c.kind, ty) == 0);
+            // the first of a name is shown; the name of a type is also its
+            // constructor's, as of a `type error`, and one that fits moves it up
+            let new = !out.contains_key(&c.label);
+            let shown = out.entry(c.label.clone()).or_insert(Completion {
+                sort: sort + MISFIT,
+                ..c
+            });
+            if fits && shown.sort >= MISFIT && (new || shown.kind == CompletionKind::Type) {
+                shown.sort -= MISFIT;
+            }
         };
-        for (name, binder) in locals::in_scope(&m.tree, offset, text).into_iter().rev() {
+        // a hole after a space, as at the end of `f x `, is in the scope of `x`
+        let scope = hole(text, offset).unwrap_or(offset);
+        for (name, binder) in locals::in_scope(&m.tree, scope, text).into_iter().rev() {
             let ty = m
                 .typing
                 .types
                 .iter()
                 .find(|(r, _)| r.0 == binder.0)
-                .map(|(_, t)| show_signature(t));
-            add(LOCAL, item(&name, CompletionKind::Local, ty));
+                .map(|(_, t)| t);
+            add(
+                LOCAL,
+                item(&name, CompletionKind::Local, ty.map(show_signature)),
+                ty,
+            );
         }
-        for c in exports(&m.interface) {
-            add(OWN, c);
+        for e in visible(&m.interface) {
+            add(OWN, completion(e), e.scheme.as_ref());
         }
         for d in declarations(&m.tree, text, file) {
             let kind = match d.namespace {
@@ -127,12 +150,17 @@ impl Ide<'_> {
                 Namespace::Constructor => CompletionKind::Constructor,
                 Namespace::Type => CompletionKind::Type,
             };
+            // what the module does not export is typed among its declarations
+            let ty = expected
+                .and_then(|_| m.typing.declarations.find(d.namespace, &d.name))
+                .and_then(|e| e.scheme.as_ref());
             add(
                 OWN,
                 Completion {
                     module: Some(m.name.clone()),
                     ..item(&d.name, kind, None)
                 },
+                ty,
             );
         }
         for import in m.tree.nodes().filter(|n| n.kind == K::ImportDecl) {
@@ -146,14 +174,14 @@ impl Ide<'_> {
             // `import Conduit.Server.Session as Auth` is `Auth` here
             let name = tree::name_of(import, K::Con, text)
                 .unwrap_or_else(|| module.rsplit('.').next().unwrap_or(&module));
-            add(IMPORTED, item(name, CompletionKind::Module, None));
+            add(IMPORTED, item(name, CompletionKind::Module, None), None);
             for e in exposed(import, interface, text) {
-                add(IMPORTED, completion(e));
+                add(IMPORTED, completion(e), e.scheme.as_ref());
             }
         }
         if let Some(prelude) = self.interface(lang::prelude()) {
-            for c in exports(prelude) {
-                add(PRELUDE_NAMES, c);
+            for e in visible(prelude) {
+                add(PRELUDE_NAMES, completion(e), e.scheme.as_ref());
             }
         }
         out.into_values().collect()
@@ -165,17 +193,13 @@ impl Ide<'_> {
         };
         let text = &self.sources.get(file).text;
         // `M.` or `M.N.`: a module, or a service's operations
-        let qualifier: String = text[..offset as usize]
-            .chars()
-            .rev()
-            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '.')
-            .collect::<String>()
-            .chars()
-            .rev()
-            .collect();
+        let before = &text[..offset as usize];
+        let qualifier = &before[before
+            .trim_end_matches(|c: char| c.is_ascii_alphanumeric() || c == '_' || c == '.')
+            .len()..];
         if qualifier.starts_with(|c: char| c.is_ascii_uppercase()) {
             if let Some(interface) =
-                self.completion_interface(&self.unalias(m, qualifier.clone()), m)
+                self.completion_interface(&self.unalias(m, qualifier.to_owned()), m)
             {
                 return exports(interface);
             }
@@ -185,13 +209,13 @@ impl Ide<'_> {
                     owner,
                     self.completion_interface(&self.unalias(m, module.to_owned()), m),
                 ),
-                None => (qualifier.as_str(), Some(&m.interface)),
+                None => (qualifier, Some(&m.interface)),
             };
             let companions = interface.map(|i| companions(i, owner)).unwrap_or_default();
             if !companions.is_empty() {
                 return companions;
             }
-            if let Some(ops) = local_operations(&m.tree, text, &qualifier) {
+            if let Some(ops) = local_operations(&m.tree, text, qualifier) {
                 return ops;
             }
             let service = iter::once(&m.interface)
@@ -203,9 +227,9 @@ impl Ide<'_> {
                         .filter(|x| !x.interface.private || x.package == m.package)
                         .map(|x| &x.interface),
                 )
-                .find_map(|i| i.find(Namespace::Type, &qualifier)?.definition.clone());
+                .find_map(|i| i.find(Namespace::Type, qualifier)?.definition.as_ref());
             if let Some(def) = service
-                && let Form::Service { operations, .. } = def.form
+                && let Form::Service { operations, .. } = &def.form
             {
                 return operations
                     .iter()
@@ -229,39 +253,11 @@ impl Ide<'_> {
             return Vec::new();
         };
         let mut fields = Vec::new();
-        self.fields(ty, &mut fields, 0);
+        self.record_fields(file, ty, &mut fields, 0);
         fields
             .into_iter()
             .map(|(label, t)| item(&label, CompletionKind::Field, Some(show_type(&t))))
             .collect()
-    }
-
-    /// The known fields of a record type, through transparent aliases.
-    fn fields(&self, ty: &Type, out: &mut Vec<(String, Type)>, depth: u32) {
-        let mut ty = ty;
-        while let Type::Captured { ty: inner, .. } | Type::Bounded { ty: inner, .. } = ty {
-            ty = inner;
-        }
-        match ty {
-            Type::Record(row) => {
-                out.extend(row.entries.iter().map(|(l, t)| (l.to_string(), t.clone())));
-            }
-            Type::App { .. } | Type::Con { .. } if depth < 8 => {
-                let (head, args) = ty.spine();
-                let Type::Con { module, name } = head else {
-                    return;
-                };
-                let def = self
-                    .interface(module)
-                    .and_then(|i| i.find(Namespace::Type, name)?.definition.clone());
-                if let Some(Form::Alias { params, body, .. }) = def.map(|d| d.form) {
-                    let subst: Vec<(String, Type)> =
-                        params.into_iter().zip(args.into_iter().cloned()).collect();
-                    self.fields(&body.substitute(&subst), out, depth + 1);
-                }
-            }
-            _ => {}
-        }
     }
 }
 
@@ -295,12 +291,11 @@ pub(super) fn exposed<'i>(
 /// The values, constructors and types an interface exports, without the
 /// companions of types.
 pub(super) fn exports(interface: &Interface) -> Vec<Completion> {
-    interface
-        .exports
-        .iter()
-        .filter(|e| !e.entity.name.contains('$'))
-        .map(completion)
-        .collect()
+    visible(interface).map(completion).collect()
+}
+
+fn visible(interface: &Interface) -> impl Iterator<Item = &Export> {
+    (interface.exports.iter()).filter(|e| !e.entity.name.contains('$'))
 }
 
 /// The companions of the type `owner`, such as `api` of `Public`, under
@@ -323,7 +318,7 @@ fn companions(interface: &Interface, owner: &str) -> Vec<Completion> {
         .collect()
 }
 
-fn completion(e: &Export) -> Completion {
+pub(super) fn completion(e: &Export) -> Completion {
     let kind = match e.entity.namespace {
         Namespace::Value => CompletionKind::Value,
         Namespace::Constructor => CompletionKind::Constructor,

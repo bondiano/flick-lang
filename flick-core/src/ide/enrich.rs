@@ -4,7 +4,8 @@
 use std::collections::{HashMap, HashSet};
 
 use super::Ide;
-use super::complete::{Completion, CompletionKind, exports};
+use super::complete::{Completion, CompletionKind, completion};
+use super::expect::Expected;
 use crate::diagnostics::Edit;
 use crate::iface::{Entity, Namespace};
 use crate::source::{FileId, Span};
@@ -66,6 +67,7 @@ impl Ide<'_> {
         file: FileId,
         offset: u32,
         in_scope: &[Completion],
+        expected: Option<&Expected>,
     ) -> Vec<Completion> {
         let Some(m) = self.module(file) else {
             return Vec::new();
@@ -121,7 +123,6 @@ impl Ide<'_> {
             {
                 continue;
             }
-            let items = exports(interface);
             for e in &interface.exports {
                 let name = &e.entity.name;
                 if !name.starts_with(word)
@@ -132,16 +133,16 @@ impl Ide<'_> {
                 {
                     continue;
                 }
-                let Some(mut c) = items.iter().find(|c| c.label == *name).cloned() else {
-                    continue;
-                };
+                // the constructor itself, not the type it shares a name with
+                let mut c = completion(e);
                 let qualified = format!("{module}.{name}");
                 c.detail = Some(
                     c.detail
                         .map_or(qualified.clone(), |t| format!("{qualified} : {t}")),
                 );
                 c.snippet = Some(qualified);
-                c.sort = ELSEWHERE;
+                c.sort =
+                    ELSEWHERE + expected.map_or(0, |x| x.misfit(self, c.kind, e.scheme.as_ref()));
                 if needs_import {
                     c.edits.push(import_edit(&m.tree, file, &module));
                 }

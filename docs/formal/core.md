@@ -1007,12 +1007,12 @@ let run job =
 Unknown call rows inside a generalized binding are closed with `none`, whereas `Gen` would quantify them.
 
 - This is the choice of the least solution and incompleteness relative to the model. The model accepts it as a narrowing of `Gen` (§2.5, item 5).
-- Resolution (spec): a sentence in `reference/types.md` "Generalization", analogous to what `reference/effects.md` already says about the end of a declaration.
+- Resolution (spec): a sentence in `reference/bindings.md` "Generalization", analogous to what `reference/effects.md` already says about the end of a declaration.
 
 ### The type of `Some 42` in spec/03
 
 - Spec: "`Some 42` fixes the cell's content as `Option Float`" and "`numbers` … stores only `Option Float`".
-- In fact an integer literal without context is `Int` (`reference/types.md` "Numbers and operators"), and the fixture expects "expected `String`, found `Int`".
+- In fact an integer literal without context is `Int` (`reference/numbers.md` "Numeric types"), and the fixture expects "expected `String`, found `Int`".
 - Resolution (spec): `Option Int` in both places, in the English and the Russian versions.
 
 ### Which example spec/03 rejects under variance

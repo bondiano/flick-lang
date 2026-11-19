@@ -448,6 +448,7 @@ fn rt_project() -> Project {
         kind: Kind::Lib,
         source_dir: ".".to_owned(),
         test_dir: "test".to_owned(),
+        proof_dir: "proofs".to_owned(),
         entries: Vec::new(),
         dependencies: Vec::new(),
         js_dependencies: Vec::new(),

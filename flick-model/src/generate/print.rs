@@ -1,5 +1,5 @@
 //! A program of the generator as Flick source
-//! (`docs/src/content/docs/reference/grammar.md`): `Gen.fl`, then
+//! (`docs/src/content/docs/reference/syntax.md`): `Gen.fl`, then
 //! `program : σ` and its `let`. Only the forms the generator makes are
 //! written. Layout: a block on lines of its own, two columns deeper than
 //! the line it belongs to; the arms of `match` and `try` two columns

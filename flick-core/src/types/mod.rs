@@ -6,7 +6,8 @@
 //! layers; classes, instances, row primitives and `deriving`; regions and
 //! the captures of closures. Rules:
 //! `docs/src/content/docs/reference/types.md`, `docs/src/content/docs/reference/effects.md`,
-//! `docs/src/content/docs/reference/classes.md`, `docs/src/content/docs/reference/regions.md`.
+//! `docs/src/content/docs/reference/services.md`, `docs/src/content/docs/reference/classes.md`,
+//! `docs/src/content/docs/reference/regions.md`.
 //!
 //! The checker reads the concrete tree after name resolution; other modules
 //! are known only through their [`Interface`], which this phase fills with

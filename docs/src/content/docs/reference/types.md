@@ -13,12 +13,12 @@ import, and a local definition of the same name hides them.
 
 | Type | Kind |
 | - | - |
-| `Unit`, `Never`, `Bool`, `Int`, `Float`, `BigInt`, `String`, `Unknown`, `Ordering` | `Type` |
-| `List`, `Option`, `Ref`, `Redacted`, `Schema` | `Type -> Type` |
+| `Unit`, `Never`, `Bool`, `Int`, `Float`, `BigInt`, `String`, `Unknown`, `JsValue`, `Ordering`, `Ui` | `Type` |
+| `List`, `Seq`, `Option`, `Ref`, `Redacted`, `Schema`, `Url`, `Form` | `Type -> Type` |
 | `Result`, `PureCodec` | `Type -> Type -> Type` |
 | `ServiceTag`, `ServiceImpl` | `ServiceRow -> Type` |
 | `Scope` (a service) | `Region -> Service` |
-| `Eff` | `ServiceRow -> ErrorRow -> Type -> Type` |
+| `Eff`, `Lazy` | `ServiceRow -> ErrorRow -> Type -> Type` |
 | `Layer` | `ServiceRow -> ErrorRow -> ServiceRow -> Type` |
 | `Codec` | `ServiceRow -> ServiceRow -> Type -> Type -> Type` |
 | `Errors` | `ErrorRow -> Type` |
@@ -31,8 +31,8 @@ are used qualified without an import: `Ref.make`, `Ref.get`, `Ref.set`,
 `Ref.modify`, `String.trim`, `Platform.stdout_line`, `Platform.stderr_line`,
 `App.fail`, `Layer.succeed`, `Layer.merge`, `Layer.override`, the row
 primitives of `Record`, and `Fiber.spawn` with the types `Fiber.Owner`,
-`Fiber.Fiber` and `Failure` ([regions.md](../regions/)). The classes `Eq`, `Ord`, `Hash` and `Show` are in
-`Prelude` too ([classes.md](../classes/)).
+`Fiber.Fiber` and `Failure` ([regions.md](../regions/)). The classes `Eq`, `Ord`, `Hash`, `Show`, `Display`, `Into`,
+`Functor`, `Applicative`, `Monad` and the others of [classes.md](../classes/#classes) are in `Prelude` too.
 
 ## Kinds
 
@@ -189,7 +189,7 @@ A branch learns what the type of the matched value is: in the `IntLit` branch
 type `a` there as `Int (= a)`. The result of a constructor is its own type
 applied to all of the type's parameters (`FLICK-T056`); an argument is a type,
 a member of a `kind` or a `Symbol`, and parameters of regions and record rows are
-passed as variables. [Service, error and capture row indices](../row-indices/)
+passed as variables. [Service, error and capture row indices](../gadts/#row-indices)
 can be fixed or related by the constructor.
 
 A `match` needs no arm for a constructor that builds no value of the matched
@@ -220,7 +220,7 @@ branch (`FLICK-T007`). What a field holds, the value holds, so a scoped
 resource hidden in a value cannot leave its scope either. Only an arm of a
 `match` refines or hides types: the pattern of a `let`, of a parameter or an
 alternative of an or-pattern does not (`FLICK-T058`). Regions retain their
-identities; [row indices](../row-indices/) can be refined.
+identities; [row indices](../gadts/#row-indices) can be refined.
 
 `TypeEq a b` of the core module `TypeEq` is evidence that two types are one:
 `Refl : TypeEq a a`, and `TypeEq.cast : TypeEq a b -> a -> b`.
@@ -248,31 +248,3 @@ let coerce a b x =
 
 TypeScript has no refinement: in a `.d.ts` file each constructor of a GADT is
 a case of every instance of its type, and a type it hides is `unknown`.
-
-## Numbers and operators
-
-See [numbers and operators](../operators/#numbers-and-operators).
-
-## Blocks
-
-See [bindings and local execution](../bindings/#blocks).
-
-## Variables
-
-See [bindings and local execution](../bindings/#variables).
-
-## Local loops
-
-See [bindings and local execution](../bindings/#local-loops).
-
-## Recursion
-
-See [bindings and local execution](../bindings/#recursion).
-
-## Generalization
-
-See [bindings and local execution](../bindings/#generalization).
-
-## Not checked yet
-
-See [bindings and local execution](../bindings/#not-checked-yet).

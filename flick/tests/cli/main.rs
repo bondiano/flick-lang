@@ -42,6 +42,7 @@ pub mod package_cache;
 pub mod package_js;
 pub mod package_ts;
 pub mod project_check;
+pub mod prove_command;
 pub mod rpc_cross;
 pub mod rpc_rt;
 pub mod rt_stages;
