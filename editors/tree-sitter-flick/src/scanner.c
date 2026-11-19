@@ -75,9 +75,9 @@ static bool multiline_string(TSLexer *lexer) {
 
 static bool is_lower(int32_t c) { return (c >= 'a' && c <= 'z') || c == '_'; }
 
-// `proof name`, the token ending after `proof`.
-static bool proof(TSLexer *lexer) {
-  for (const char *c = "proof"; *c; c++) {
+// `proof name` or `law name`, the token ending after `word`.
+static bool proof(TSLexer *lexer, const char *word) {
+  for (const char *c = word; *c; c++) {
     if (lexer->lookahead != *c) return false;
     advance(lexer);
   }
@@ -104,7 +104,9 @@ bool tree_sitter_flick_external_scanner_scan(void *payload, TSLexer *lexer, cons
   }
   switch (lexer->lookahead) {
     case 'p':
-      return valid_symbols[PROOF] && (newline || lexer->get_column(lexer) == blanks) && proof(lexer);
+      return valid_symbols[PROOF] && (newline || lexer->get_column(lexer) == blanks) && proof(lexer, "proof");
+    case 'l':
+      return valid_symbols[PROOF] && (newline || lexer->get_column(lexer) == blanks) && proof(lexer, "law");
     case '/': return valid_symbols[BLOCK_COMMENT] && block_comment(lexer);
     case 'r': return valid_symbols[RAW_STRING] && raw_string(lexer);
     case '"': return valid_symbols[MULTILINE_STRING] && multiline_string(lexer);

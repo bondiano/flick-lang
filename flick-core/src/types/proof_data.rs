@@ -36,6 +36,17 @@ impl Checker<'_> {
                     return Ty::Bool;
                 }
                 let (head, args) = t.spine();
+                if let Type::Skolem(s) = head
+                    && self.cx.law.contains(s)
+                {
+                    let name = self.store.skolem_name(*s).to_owned();
+                    let args = args.iter().map(|a| self.logic_of(a, data)).collect();
+                    return Ty::Data {
+                        module: logic::CLASS.into(),
+                        name,
+                        args,
+                    };
+                }
                 let Type::Con { module, name } = head else {
                     return Ty::Refused("an applied type variable is outside the domain".into());
                 };

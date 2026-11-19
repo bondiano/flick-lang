@@ -48,3 +48,32 @@ fn a_proof_without_its_goal_or_its_proof_says_what_it_lacks() {
     let found = errors("proof p where equal 1 1\n");
     assert_eq!(found.len(), 1, "{found:?}");
 }
+
+#[test]
+fn a_class_states_its_laws_and_a_bundle_names_the_dictionary() {
+    let tree = sexp(
+        "class Functor (f : Type -> Type) =\n  map : (a -> b) -> f a -> f b\n  law identity (v : f a) where equal (map identity v) v\n",
+    );
+    assert!(
+        tree.contains("(LawDecl law (VarPat identity) (Params"),
+        "{tree}"
+    );
+    let tree = sexp("proof option where lawful Monad Option = { right_identity = m2 }\n");
+    assert!(
+        tree.contains("(LawfulGoal lawful (AppType (NameType Monad) (NameType Option)))"),
+        "{tree}"
+    );
+    let tree = sexp("proof local where lawful Monad Option from bad = { right_identity = m2 }\n");
+    assert!(tree.contains("from (NameExpr bad)"), "{tree}");
+}
+
+#[test]
+fn the_word_law_stays_a_name() {
+    assert!(!sexp("let law = 1\nlet use law = law + 1\n").contains("LawDecl"));
+    // in a class, a method named `law` is a signature
+    let tree = sexp("class C a =\n  law : a -> a\n");
+    assert!(
+        !tree.contains("LawDecl") && tree.contains("Signature"),
+        "{tree}"
+    );
+}

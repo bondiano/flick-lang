@@ -33,6 +33,16 @@ example (_ : GenSig S) :
         (.arrow (.base .unit) (.rt .cnil .cnil) (.base .unit) Caps.none)) := by
   le_live
 
+/-- A local generalized over the capture row of data with hidden storage, at `Caps.none`:
+the instance writes the invariant argument `Caps.substT σ C`, the set it comes to
+(`inst_le` through `congrArg Ty.caps`). -/
+example (_ : GenSig S) :
+    LeLive S ((Scheme.mk 1 Facts.none (.arrow (.tapp (.adt "Fixture.Sealed") (.caps (fun x => x = .v 0)))
+        (.rt (.caps (fun x => x = .v 0)) .cnil) (.base .unit) Caps.none)).inst [.caps Caps.none])
+      (.arrow (.tapp (.adt "Fixture.Sealed") (.caps Caps.none)) (.rt .cnil .cnil) (.base .unit)
+        Caps.none) := by
+  inst_le
+
 /-- A tuple compares each of its two arguments. -/
 example (_ : GenSig S) :
     LeLive S (.tapp (.tapp (.adt "Tuple") (.base .int))

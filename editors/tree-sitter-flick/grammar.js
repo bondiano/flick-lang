@@ -18,7 +18,7 @@ const OPERATORS = [
 module.exports = grammar({
   name: 'flick',
 
-  // `proof` first on its line before a name: the scanner sees the line
+  // `proof` or `law` first on its line before a name: the scanner sees the line
   externals: $ => [$.block_comment, $.raw_string, $.multiline_string, $._proof],
 
   extras: $ => [/[ \t\r]/, $.doc_comment, $.line_comment, $.block_comment],

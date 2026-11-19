@@ -24,9 +24,10 @@ const GOLDEN: usize = 32;
 
 /// Programs of the fixed run whose certificates were once wrong, which
 /// `Kept.lean` keeps: 435 and 1929 put a closure over a region into the
-/// opaque `Fixture.Sealed`, data with hidden storage, and 570 matches the `x`
-/// of a `try` by an error its body does not raise.
-const KEPT: [usize; 3] = [435, 570, 1929];
+/// opaque `Fixture.Sealed`, data with hidden storage, 570 matches the `x`
+/// of a `try` by an error its body does not raise, and 1090 calls a local
+/// generalized over the capture row such data takes, at an instance.
+const KEPT: [usize; 4] = [435, 570, 1090, 1929];
 
 fn repo() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("..")

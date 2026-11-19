@@ -221,7 +221,7 @@ const main = async () => {
 
     // a service operation per line: the Go executable, and Flick's own runtime on Node
     const bench = ["tools/bench/console.fl", "--profile", "release"];
-    build(".", [...bench, "--emit", "go", "--out-dir", "target/perf/console/go"], withGo);
+    build(".", [...bench, "--emit", "go", "--allow-tool", "go", "--out-dir", "target/perf/console/go"], withGo);
     values["console.go"] = processTime(path.join(root, "target/perf/console/go/flick-main"));
     build(".", [...bench, "--emit", "js", "--rt", "--out-dir", "target/perf/console/rt"]);
     values["console.rt"] = processTime("node", ["target/perf/console/rt/flick-main.js"]);
