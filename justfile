@@ -50,6 +50,10 @@ model:
 formal-schemes:
     FLICK_FORMAL_SCHEMES=1 cargo test -p flick-model --lib translate::lean
 
+# Regenerate formal/FormalCert/Gen/Proofs.lean, the Lean replay of core's Option proofs, from the compiler's kernel
+formal-proofs:
+    FLICK_STD_PATH="$PWD/packages/std" FLICK_FORMAL_PROOFS=1 cargo test -p flick-core --lib ir::lower::proofs::replay
+
 # Regenerate formal/FormalCert/GenSig.lean and the golden certificates from the model
 formal-certs:
     FLICK_FORMAL_CERTS=1 cargo test -p flick-model --test certs the_certificates_are_fresh

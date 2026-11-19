@@ -6,3 +6,4 @@ import FormalCert.Match
 import FormalCert.Gen.Golden
 import FormalCert.Gen.Kept
 import FormalCert.Gen.Instances
+import FormalCert.Gen.Proofs

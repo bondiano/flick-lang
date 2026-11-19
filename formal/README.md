@@ -116,6 +116,25 @@ signature and golden certificates.
   ordered comparison finds false; `intNum` and `Interval.int_side` cover `Int`'s closed ends.
   `unobserved_or_true` and `or_true_decides_neither` pin definedness. Separate from the core:
   it proves the decision procedure, not the Rust checker or IEEE arithmetic of a runtime.
+- **The logic of `proof`** (`Formal/Proofs/`, [`proofs.md`](../docs/formal/proofs.md)): λPT,
+  the total calculus a statement is about, has rigid type variables, `unit`, products, sums,
+  functions, `let`, `case` and the globals of an acyclic environment, with by-value big-step
+  evaluation (`Typing.lean`). A data type that does not contain itself is a sum of products of
+  its fields. The logical equality `R` relates functions that take related arguments to related
+  results (funext), and is a partial equivalence (`Rel.lean`). `fundamental`: a typed term is
+  related to itself under every instance of its type variables and every related
+  substitutions, so every typed term terminates (`terminates`). Each reduction step, under
+  binders too, is an equality (`Step.sound`, `Reduce.lean`), as erasing annotations is.
+  `check_sound`: every statement the certificate checker accepts, with `refl` by erased
+  normal forms, `symm`, `trans`, `cong`, `funext`, splits of a unit, a pair or a sum, premises
+  and lemmas without premises, holds; `checkAll_sound` for a list checked in order
+  (`CheckSound.lean`). `Examples.lean` replays the identity law of `map` at `Option` by
+  `decide`. `FormalCert/Gen/Proofs.lean`, which `just formal-proofs` writes from the compiler's
+  kernel, replays all twelve laws of `packages/core/proofs/Laws/Option.fl` over the five
+  definitions they unfold (`Flick.PT.Gen.Option.sound`); a test of `flick-core` fails when the
+  proofs or the definitions change and the file is not written again, and a broken `map2`
+  makes `decide` refute the replay. It proves the calculus and its checker, not the Rust kernel
+  or the translation of Flick's terms into λPT.
 - **T7, local mutation** (`Formal/LetMut.lean`): the straight-line block
   fragment with assignments, branches and scope translates to a typed core
   term. `T7_pure` derives purity from T2a; `T7_regions` derives safety by

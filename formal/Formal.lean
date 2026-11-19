@@ -102,6 +102,8 @@ import Formal.Generalization
 import Formal.Lazy
 import Formal.Refine
 import Formal.Refine.Numbers
+import Formal.Proofs.CheckSound
+import Formal.Proofs.Examples
 import Formal.RecordHandler
 import Formal.Examples
 import Formal.RowEquivExamples
