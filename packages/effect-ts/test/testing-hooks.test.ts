@@ -27,8 +27,8 @@ const assertionFailed = (message: string) => ({ _tag: tag("Test.AssertionFailed.
 const isResults = (v: unknown): v is { tests: ReadonlyArray<TestResult> } =>
   typeof v === "object" && v !== null && Array.isArray(Reflect.get(v, "tests"));
 
-/** The results of a run, each as its name, status, kind and message. */
-const run = async (modules: Parameters<typeof runTests>[0], timeout?: number) => {
+/** The results of a run, each as its name, status, kind and message, and its cleanup with `cleanup`. */
+const run = async (modules: Parameters<typeof runTests>[0], timeout?: number, cleanup = false) => {
   let out = "";
   const before = process.exitCode;
   try {
@@ -38,7 +38,7 @@ const run = async (modules: Parameters<typeof runTests>[0], timeout?: number) =>
   }
   const json: unknown = JSON.parse(out);
   assert.ok(isResults(json), out);
-  return json.tests.map((t) => [t.name, t.status, t.kind, t.message]);
+  return json.tests.map((t) => (cleanup ? [t.name, t.status, t.kind, t.message, t.cleanup] : [t.name, t.status, t.kind, t.message]));
 };
 
 /** What a test of both levels runs, around its `body`. */
@@ -134,3 +134,30 @@ test("a test out of time is interrupted, cleaned up and reported as such", async
   ]);
   assert.deepEqual(log, ["after_each", "after_each"]);
 });
+
+test("a hook out of its suite's time is interrupted, reported, and the run goes on", async () => {
+  const log: Array<string> = [];
+  const note = (text: string) => Effect.sync(() => void log.push(text));
+  // `--timeout` gives the suites without a timeout of their own theirs too
+  const results = await run(
+    [
+      [
+        "M",
+        [
+          testGroup("setup", [testBeforeAll(Effect.never), testAfterAll(note("after_all setup")), testEffect("a", note("a"))]),
+          testGroup("cleanup", [testAfterEach(Effect.never), testAfterAll(Effect.never), testEffect("b", note("b"))]),
+          testEffect("after", note("after")),
+        ],
+      ],
+    ],
+    20,
+    true,
+  );
+  assert.deepEqual(results, [
+    ["M > setup > a", "failed", "setup", "before_all timed out after 20 ms", undefined],
+    ["M > cleanup > b", "failed", "cleanup", "fail after_each timed out after 20 ms", "fail after_all timed out after 20 ms"],
+    ["M > after", "passed", undefined, undefined, undefined],
+  ]);
+  assert.deepEqual(log, ["after_all setup", "b", "after"]);
+});
+

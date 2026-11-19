@@ -165,10 +165,11 @@ type marks struct {
 
 // flatten is the tests with their full names, `Module > group > name`; the
 // hooks of a list make it, the module's or a group's, a suite of the tests
-// under it.
+// under it, whose timeout, its own or the one around it, its hooks have too.
 func flatten(prefix string, tests []Value, out []named, suites []*test, m marks) []named {
 	if h := hooksOf(tests); h != nil {
-		suites = append(suites[:len(suites):len(suites)], &test{name: prefix, hooks: h})
+		level := &test{name: prefix, hooks: h, timeout: m.timeout, timed: m.timed}
+		suites = append(suites[:len(suites):len(suites)], level)
 	}
 	for _, v := range tests {
 		t := v.(*test)

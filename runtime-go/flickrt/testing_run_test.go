@@ -14,7 +14,11 @@ func runAll(tests []Value, m marks) []string {
 	var out []string
 	for _, n := range selected {
 		r := runOne(rootFiber(), n, 0, runs)
-		out = append(out, fmt.Sprintf("%s %s %s %s", r.Name, r.Status, r.Kind, r.Message))
+		line := fmt.Sprintf("%s %s %s %s", r.Name, r.Status, r.Kind, r.Message)
+		if r.Cleanup != "" && r.Cleanup != r.Message {
+			line += " | " + r.Cleanup
+		}
+		out = append(out, line)
 	}
 	return out
 }
@@ -116,5 +120,32 @@ func TestATestOutOfTimeIsInterruptedAndCleanedUp(t *testing.T) {
 	}
 	if time.Since(started) > 10*time.Second {
 		t.Errorf("the run waited for the sleeps")
+	}
+}
+
+// A hook out of its suite's time, here the run's, is interrupted: a
+// before_all fails its suite's setup, an after_each or after_all the
+// cleanup of its test, and the run goes on.
+func TestAHookOutOfTimeIsReportedAndTheRunGoesOn(t *testing.T) {
+	var log []string
+	note := func(text string) Value {
+		return Eff(func(*Fiber) Value { log = append(log, text); return Unit })
+	}
+	hang := Eff(func(fb *Fiber) Value { return EffectSleep(fb, fromMillis(3_600_000)) })
+	got := runAll([]Value{
+		TestGroup("setup", []Value{TestBeforeAll(hang), TestAfterAll(note("after_all setup")), TestEffect("a", note("a"))}),
+		TestGroup("cleanup", []Value{TestAfterEach(hang), TestAfterAll(hang), TestEffect("b", note("b"))}),
+		TestEffect("after", note("after")),
+	}, marks{timeout: 20, timed: true})
+	want := []string{
+		"M > setup > a failed setup before_all timed out after 20 ms",
+		"M > cleanup > b failed cleanup fail after_each timed out after 20 ms | fail after_all timed out after 20 ms",
+		"M > after passed  ",
+	}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("results %q, want %q", got, want)
+	}
+	if fmt.Sprint(log) != "[after_all setup b after]" {
+		t.Errorf("ran %v", log)
 	}
 }

@@ -1,7 +1,7 @@
 //! The hooks of a suite and the timeouts of its cases under `flick test`:
 //! the order hooks run in around the selected cases, a failed setup, a case
-//! out of time and an interrupted run, whose cleanup still runs, alike on
-//! Flick's runtime, through the Effect adapter and on Go.
+//! or a hook out of time and an interrupted run, whose cleanup still runs,
+//! alike on Flick's runtime, through the Effect adapter and on Go.
 
 use crate::common;
 
@@ -52,6 +52,25 @@ suite "slow" {
   test "own" timeout 20 { Effect.sleep (minutes 60) }
   test "the run's" { Effect.sleep (minutes 60) }
 }
+
+minutes : Float -> Duration.Duration
+let minutes n = Result.with_default Duration.zero (Duration.minutes n)
+"#;
+
+const HUNG: &str = r#"module App.Test
+
+suite "setup" {
+  before_all { Effect.sleep (minutes 60) }
+  after_all { Platform.stdout_line "after_all setup" }
+  test "never runs" { Platform.stdout_line "never" }
+}
+
+suite "cleanup" {
+  after_each { Effect.sleep (minutes 60) }
+  test "runs" { Platform.stdout_line "runs" }
+}
+
+test "after" { Platform.stdout_line "after" }
 
 minutes : Float -> Duration.Duration
 let minutes n = Result.with_default Duration.zero (Duration.minutes n)
@@ -166,6 +185,64 @@ fn hooks_run_around_the_selected_cases_on_every_engine() {
                 "App.Test > slow > own | failed | timeout | timed out after 20 ms",
                 "App.Test > slow > the run's | failed | timeout | timed out after 50 ms",
                 "App.Test > outer > skipped > four | skipped |  | ",
+            ],
+            "{name}"
+        );
+    }
+}
+
+/// The lines a run printed before its JSON report, and each result as its
+/// name, status, kind, message and cleanup.
+fn report(name: &str, stdout: &str) -> (Vec<String>, Vec<String>) {
+    let (printed, report) = stdout
+        .trim_end()
+        .rsplit_once('\n')
+        .expect("lines and a report");
+    let json: Value =
+        serde_json::from_str(report).unwrap_or_else(|e| panic!("{name}: {e}: {report}"));
+    let results = (json["tests"].as_array().expect("tests").iter())
+        .map(|t| {
+            let field = |key: &str| t[key].as_str().unwrap_or_default().to_owned();
+            let fields = [
+                field("name"),
+                field("status"),
+                field("kind"),
+                field("message"),
+                field("cleanup"),
+            ];
+            fields.join(" | ")
+        })
+        .collect();
+    (printed.lines().map(str::to_owned).collect(), results)
+}
+
+#[test]
+#[ignore = "needs Node, pnpm install and Go"]
+fn a_hung_hook_times_out_under_the_run_s_timeout_on_every_engine() {
+    for (name, effect, emit) in ENGINES {
+        let dir = library(&format!("test_hooks_hung_{name}"), effect, HUNG);
+        let out = flick_in(
+            &dir,
+            &[
+                "test",
+                "--emit",
+                emit,
+                "--reporter",
+                "json",
+                "--timeout",
+                "50ms",
+            ],
+        );
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        assert_eq!(out.status.code(), Some(1), "{name}: {out:?}");
+        let (printed, results) = report(name, &stdout);
+        assert_eq!(printed, ["after_all setup", "runs", "after"], "{name}");
+        assert_eq!(
+            results,
+            [
+                "App.Test > setup > never runs | failed | setup | before_all timed out after 50 ms | ",
+                "App.Test > cleanup > runs | failed | cleanup | fail after_each timed out after 50 ms | fail after_each timed out after 50 ms",
+                "App.Test > after | passed |  |  | ",
             ],
             "{name}"
         );

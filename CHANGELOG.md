@@ -16,7 +16,10 @@ break programs.
   run. `timeout <millis>` after a case's or a suite's name, `Test.timeout`
   by hand, and `flick test --timeout <duration>` limit a case's
   `before_each` hooks and body; a case out of time is interrupted, cleaned
-  up and reported as `timeout`. `Test.before_all` and the other hooks add
+  up and reported as `timeout`. A suite's `before_all`, `after_each` and
+  `after_all` hooks have the suite's time, or the run's: out of time, a
+  `before_all` fails its cases' setup and a cleanup hook their cleanup, and
+  the run goes on. `Test.before_all` and the other hooks add
   them to a group built by hand. Alike on Flick's runtime, through the
   Effect adapter and on Go.
 

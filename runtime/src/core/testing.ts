@@ -219,7 +219,8 @@ type Marks = Readonly<{ skip: boolean; only: boolean; timeout?: number | undefin
 
 /**
  * Tests with their full names, `Module > group > name`; the hooks of a list
- * make it, the module's or a group's, a suite of the tests under it.
+ * make it, the module's or a group's, a suite of the tests under it, whose
+ * timeout, its own or the one around it, its hooks have too.
  */
 export const flatten = <Task, L>(
   prefix: string,
@@ -229,7 +230,13 @@ export const flatten = <Task, L>(
   marks: Marks = { skip: false, only: false },
 ): Array<Named<Task, L>> => {
   const hooks = hooksOf(tests);
-  const suites = hooks ? [...outer, Object.freeze({ kind: "suite" as const, name: prefix, hooks, tests })] : outer;
+  let suites = outer;
+  if (hooks) {
+    const { timeout } = marks;
+    const level: Suite<Task, L> =
+      timeout === undefined ? { kind: "suite", name: prefix, hooks, tests } : { kind: "suite", name: prefix, hooks, tests, timeout };
+    suites = [...outer, Object.freeze(level)];
+  }
   for (const t of tests) {
     if (t.kind === "hook") continue;
     const name = `${prefix} > ${t.name}`;

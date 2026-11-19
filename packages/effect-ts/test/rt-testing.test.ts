@@ -272,3 +272,35 @@ test("a test out of time is interrupted, cleaned up and reported as such", async
   assert.deepEqual(log, ["after_each", "after_each"]);
 });
 
+/** A hook that never ends in a test's time. */
+function* hang(): Run {
+  yield sleep(new Duration(HOUR));
+  return undefined;
+}
+
+test("a hook out of its suite's time is interrupted, reported, and the run goes on", async () => {
+  const log: Array<string> = [];
+  const note = (text: string) => () => void log.push(text);
+  // `--timeout` gives the suites without a timeout of their own theirs too
+  const { json } = await run(
+    [
+      [
+        "M",
+        [
+          testGroup("setup", [testBeforeAll(hang), testAfterAll(note("after_all setup")), testEffect("a", note("a"))]),
+          testGroup("cleanup", [testAfterEach(hang), testAfterAll(hang), testEffect("b", note("b"))]),
+          testEffect("after", note("after")),
+        ],
+      ],
+    ],
+    7,
+    { timeout: 20 },
+  );
+  assert.deepEqual(json.tests.map((t) => [t.name, t.status, t.kind, t.message, t.cleanup]), [
+    ["M > setup > a", "failed", "setup", "before_all timed out after 20 ms", undefined],
+    ["M > cleanup > b", "failed", "cleanup", "fail after_each timed out after 20 ms", "fail after_all timed out after 20 ms"],
+    ["M > after", "passed", undefined, undefined, undefined],
+  ]);
+  assert.deepEqual(log, ["after_all setup", "b", "after"]);
+});
+

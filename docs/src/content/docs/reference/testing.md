@@ -176,7 +176,16 @@ its `before_each` hooks and its body, and after a suite's name gives them to
 each case inside without its own. A case out of time is interrupted, its
 scope closes, its `after_*` hooks run, and it is reported as `timeout`.
 `--timeout` gives the cases without one theirs; by default a case has no
-time limit. A `before_all` is not part of any case's time.
+time limit.
+
+A suite's hooks have its time too, its own `timeout` or the one around it,
+the run's `--timeout` included: each `before_all`, `after_each` and
+`after_all` hook, which is part of no case's time. A `before_all` out of
+time reports each selected case of the suite as `setup` (`before_all timed
+out after 50 ms`), and the suite's `after_*` hooks still run; an `after_*`
+hook out of time is the `cleanup` failure of its case, or of the suite's
+last case, and the run goes on. A hung hook therefore cannot hang a run
+that has a timeout.
 
 ```flick
 module App.SlowTest

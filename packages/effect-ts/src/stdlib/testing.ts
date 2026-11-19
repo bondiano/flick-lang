@@ -74,13 +74,22 @@ export const testSetTime = (millis: number): Effect.Effect<void> => TestClock.se
 export const testSuite = (name: string, layer: AnyLayer, tests: ReadonlyArray<Test>): Test =>
   Object.freeze({ kind: "suite", name, layer, tests });
 
-/** A `before_*` hook that failed with `cause`: the setup of a test. */
+/** A `before_*` hook that failed with `cause`, or ran out of time as `cause` says: the setup of a test. */
 class Setup {
-  readonly cause: Cause.Cause<unknown>;
-  constructor(cause: Cause.Cause<unknown>) {
+  readonly cause: Cause.Cause<unknown> | string;
+  constructor(cause: Cause.Cause<unknown> | string) {
     this.cause = cause;
   }
 }
+
+const timedOut = (what: string, millis: number): string => `${what} timed out after ${millis} ms`;
+
+/**
+ * `task` within `millis`: `None` when they run out first, which interrupts
+ * it, also where interruption is masked, as in a finalizer.
+ */
+const within = <A>(task: Effect.Effect<A, unknown>, millis: number): Effect.Effect<Option.Option<A>, unknown> =>
+  Effect.timeoutOption(Effect.interruptible(task), millis);
 
 /** A test whose `before_each` hooks and body ran out of their `millis`. */
 class TimedOut {
@@ -105,31 +114,42 @@ interface SuiteRun {
   readonly built: Effect.Effect<Exit.Exit<Built, unknown>>;
 }
 
-/** The hooks `tasks` run in order: a `Setup` of the first that fails. */
-const runHooks = (tasks: ReadonlyArray<Task>): Effect.Effect<Setup | undefined, unknown> =>
+/** The hooks `tasks` run in order, each within `millis` if any: a `Setup` of the first that fails. */
+const runHooks = (tasks: ReadonlyArray<Task>, what: string, millis?: number): Effect.Effect<Setup | undefined, unknown> =>
   Effect.gen(function* () {
     for (const task of tasks) {
-      const exit = yield* Effect.exit(task);
+      const exit = yield* Effect.exit(millis === undefined ? Effect.asSome(task) : within(task, millis));
       // an interrupted hook interrupts the test, a failed one fails its setup
       if (Exit.isFailure(exit)) return Cause.hasInterruptsOnly(exit.cause) ? yield* Effect.failCause(exit.cause) : new Setup(exit.cause);
+      if (millis !== undefined && Option.isNone(exit.value)) return new Setup(timedOut(what, millis));
     }
     return undefined;
   });
 
-/** A hook as a finalizer of the scope around: what it fails with is the scope's cleanup failure. */
-// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a failed finalizer fails the closing of its scope
-const finalizer = (task: Task): Effect.Effect<void, never, Scope.Scope> => flickAddFinalizer(task as Effect.Effect<void>);
+/**
+ * A hook as a finalizer of the scope around, within `millis` if any: what it
+ * fails with, or that it ran out of time, is the scope's cleanup failure.
+ */
+const finalizer = (task: Task, what: string, millis: number | undefined): Effect.Effect<void, never, Scope.Scope> => {
+  const bounded =
+    millis === undefined
+      ? task
+      : Effect.flatMap(within(task, millis), (done) => (Option.isSome(done) ? Effect.void : Effect.fail(timedOut(what, millis))));
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a failed finalizer fails the closing of its scope
+  return flickAddFinalizer(bounded as Effect.Effect<void>);
+};
 
 /**
  * The setup of a suite, in its owner: its `after_all` hooks are finalizers,
- * whatever its `before_all` hooks do, then those run, then its layer is built.
+ * whatever its `before_all` hooks do, then those run, then its layer is
+ * built; its hooks have its timeout, if it has one.
  */
-const setUp = ({ hooks: own, layer }: Suite, owner: Owner): Effect.Effect<Built, unknown> =>
+const setUp = ({ hooks: own, layer, timeout }: Suite, owner: Owner): Effect.Effect<Built, unknown> =>
   inside(
     owner,
     Effect.gen(function* () {
-      for (const task of own?.after_all ?? []) yield* finalizer(task);
-      const setup = yield* runHooks(own?.before_all ?? []);
+      for (const task of own?.after_all ?? []) yield* finalizer(task, "after_all", timeout);
+      const setup = yield* runHooks(own?.before_all ?? [], "before_all", timeout);
       if (setup !== undefined || layer === undefined) return setup;
       return yield* buildInto(layer, owner.resources);
     }),
@@ -172,8 +192,9 @@ const runCase = <A>(
     }
     const each = Effect.gen(function* () {
       for (const { suite } of runs) {
-        for (const task of suite.hooks?.after_each ?? []) yield* finalizer(task);
-        const setup = yield* runHooks(suite.hooks?.before_each ?? []);
+        for (const task of suite.hooks?.after_each ?? []) yield* finalizer(task, "after_each", suite.timeout);
+        // the test's timeout bounds its `before_each` hooks and its body together
+        const setup = yield* runHooks(suite.hooks?.before_each ?? [], "before_each");
         if (setup !== undefined) return setup;
       }
       return yield* services.reduceRight<Effect.Effect<A, unknown>>((inner, s) => Effect.provideContext(inner, s), body);
@@ -206,7 +227,10 @@ type Problem = Readonly<{ kind: NonNullable<TestResult["kind"]>; message: string
 const outcome = (exit: Exit.Exit<string | Setup | TimedOut | undefined, unknown>): Problem | undefined => {
   if (Exit.isSuccess(exit)) {
     const { value } = exit;
-    if (value instanceof Setup) return { kind: "setup", message: outcome(Exit.failCause(value.cause))?.message ?? "" };
+    if (value instanceof Setup) {
+      const why = value.cause;
+      return { kind: "setup", message: typeof why === "string" ? why : (outcome(Exit.failCause(why))?.message ?? "") };
+    }
     if (value instanceof TimedOut) return { kind: "timeout", message: `timed out after ${value.millis} ms` };
     return value === undefined ? undefined : { kind: "assertion", message: value };
   }

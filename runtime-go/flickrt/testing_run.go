@@ -64,25 +64,81 @@ func TestTimeout(millis, t Value) Value {
 	return &copied
 }
 
-// runHooks runs `tasks` in order in `fb`: the cause of the first that
-// fails. An interrupted hook interrupts the test.
-func runHooks(fb *Fiber, tasks []Value) *Cause {
+// setupFailure is a failed before_* hook: the cause it failed with, or
+// the text of one that ran out of time.
+type setupFailure struct {
+	cause *Cause
+	text  string
+}
+
+func (s *setupFailure) message() string {
+	if s.cause == nil {
+		return s.text
+	}
+	_, text := outcome("", false, s.cause)
+	return text
+}
+
+func hookTimedOut(what string, millis float64) string {
+	return fmt.Sprintf("%s timed out after %s ms", what, ShowNumber(millis))
+}
+
+// hookWithin runs the hook `task` in `fb`, within `millis` when `timed`: false
+// when they ran out, which interrupted it. It runs on a state of its own,
+// which a finalizer's mask does not keep from the interruption.
+func hookWithin(fb *Fiber, task Value, millis float64, timed bool) bool {
+	if !timed {
+		Run(fb, task)
+		return true
+	}
+	hook := *fb
+	hook.state = newState()
+	var out atomic.Bool
+	timer := time.AfterFunc(time.Duration(millis*float64(time.Millisecond)), func() {
+		out.Store(true)
+		hook.state.interrupt(0)
+	})
+	defer timer.Stop()
+	_, cause := catch(func() Value { return Run(&hook, task) })
+	switch {
+	case cause == nil:
+		return true
+	case out.Load() && !cause.has(causeFail) && !cause.has(causeDie):
+		return false
+	}
+	panic(&Failure{cause})
+}
+
+// runHooks runs `tasks` in order in `fb`, each within `millis` when
+// `timed`: the failure of the first that fails. An interrupted hook
+// interrupts the test.
+func runHooks(fb *Fiber, tasks []Value, what string, millis float64, timed bool) *setupFailure {
 	for _, task := range tasks {
-		if _, cause := catch(func() Value { return Run(fb, task) }); cause != nil {
-			if !cause.has(causeFail) && !cause.has(causeDie) {
-				panic(&Failure{cause})
-			}
-			return cause
+		done := false
+		_, cause := catch(func() Value { done = hookWithin(fb, task, millis, timed); return Unit })
+		switch {
+		case cause != nil && !cause.has(causeFail) && !cause.has(causeDie):
+			panic(&Failure{cause})
+		case cause != nil:
+			return &setupFailure{cause: cause}
+		case !done:
+			return &setupFailure{text: hookTimedOut(what, millis)}
 		}
 	}
 	return nil
 }
 
 // finalize makes the hooks `tasks` finalizers of the owner of `fb`, which
-// runs them in the reverse order.
-func finalize(fb *Fiber, tasks []Value) {
+// runs them in the reverse order, each within `millis` when `timed`: one out
+// of time fails the owner's cleanup.
+func finalize(fb *Fiber, tasks []Value, what string, millis float64, timed bool) {
 	for _, task := range tasks {
-		fb.owner.add(fb, func(fb *Fiber, _ *Cause) Value { return Run(fb, task) })
+		fb.owner.add(fb, func(fb *Fiber, _ *Cause) Value {
+			if !hookWithin(fb, task, millis, timed) {
+				Fail(hookTimedOut(what, millis))
+			}
+			return Unit
+		})
 	}
 }
 
@@ -93,9 +149,10 @@ type suiteRun struct {
 	fiber    Fiber
 	services Services
 	// what failed its layer, and what failed a before_all hook
-	failure, setup *Cause
-	mu             sync.Mutex
-	remaining      int
+	failure   *Cause
+	setup     *setupFailure
+	mu        sync.Mutex
+	remaining int
 }
 
 // suiteRuns is the run of each suite of the selected tests.
@@ -116,11 +173,11 @@ func suiteRuns(fb *Fiber, selected []named) map[*test]*suiteRun {
 
 // setUp is the setup of suite `s`, in its owner: its after_all hooks are
 // finalizers, whatever its before_all hooks do, then those run, then its
-// layer is built.
+// layer is built; its hooks have its timeout, if it has one.
 func (r *suiteRun) setUp(s *test) {
 	if s.hooks != nil {
-		finalize(&r.fiber, s.hooks.afterAll)
-		if r.setup = runHooks(&r.fiber, s.hooks.beforeAll); r.setup != nil {
+		finalize(&r.fiber, s.hooks.afterAll, "after_all", s.timeout, s.timed)
+		if r.setup = runHooks(&r.fiber, s.hooks.beforeAll, "before_all", s.timeout, s.timed); r.setup != nil {
 			return
 		}
 	}
@@ -136,9 +193,9 @@ func (r *suiteRun) setUp(s *test) {
 }
 
 // enter is the fiber `inner` with the services of these suites, each set
-// up on first use, or the cause of a failed before_all hook; a failed
-// build fails the test.
-func enter(inner *Fiber, suites []*test, runs map[*test]*suiteRun) (*Fiber, *Cause) {
+// up on first use, or a failed before_all hook; a failed build fails the
+// test.
+func enter(inner *Fiber, suites []*test, runs map[*test]*suiteRun) (*Fiber, *setupFailure) {
 	for _, s := range suites {
 		run := runs[s]
 		run.once.Do(func() { run.setUp(s) })
@@ -155,16 +212,16 @@ func enter(inner *Fiber, suites []*test, runs map[*test]*suiteRun) (*Fiber, *Cau
 }
 
 // eachHooks runs the before_each hooks of these suites, outermost first, once
-// their after_each hooks are finalizers of the test's owner: the cause of
-// the first that fails.
-func eachHooks(fb *Fiber, suites []*test) *Cause {
+// their after_each hooks are finalizers of the test's owner: the first that
+// fails. The test's timeout bounds them and its body together.
+func eachHooks(fb *Fiber, suites []*test) *setupFailure {
 	for _, s := range suites {
 		if s.hooks == nil {
 			continue
 		}
-		finalize(fb, s.hooks.afterEach)
-		if cause := runHooks(fb, s.hooks.beforeEach); cause != nil {
-			return cause
+		finalize(fb, s.hooks.afterEach, "after_each", s.timeout, s.timed)
+		if failed := runHooks(fb, s.hooks.beforeEach, "before_each", 0, false); failed != nil {
+			return failed
 		}
 	}
 	return nil
@@ -231,8 +288,8 @@ func runLeaf(fb *Fiber, t named, seed int64, runs map[*test]*suiteRun) testResul
 	}()
 	var message string
 	var bad bool
-	var setup *Cause
-	var timedOut atomic.Bool
+	var setup *setupFailure
+	var outOfTime atomic.Bool
 	_, exit := catch(func() Value {
 		fiber, failed := enter(&inner, t.suites, runs)
 		if setup = failed; failed != nil {
@@ -241,7 +298,7 @@ func runLeaf(fb *Fiber, t named, seed int64, runs map[*test]*suiteRun) testResul
 		// the timeout is of the before_each hooks and the body, not of the suites' setup
 		if t.timed {
 			timer := time.AfterFunc(time.Duration(t.timeout*float64(time.Millisecond)), func() {
-				timedOut.Store(true)
+				outOfTime.Store(true)
 				inner.state.interrupt(0)
 			})
 			defer timer.Stop()
@@ -261,9 +318,8 @@ func runLeaf(fb *Fiber, t named, seed int64, runs map[*test]*suiteRun) testResul
 	kind, text := outcome(message, bad, exit)
 	switch {
 	case kind == "" && setup != nil:
-		_, text = outcome("", false, setup)
-		kind = "setup"
-	case kind == "interrupted" && timedOut.Load():
+		kind, text = "setup", setup.message()
+	case kind == "interrupted" && outOfTime.Load():
 		kind, text = "timeout", fmt.Sprintf("timed out after %s ms", ShowNumber(t.timeout))
 	}
 	cleanup := ""

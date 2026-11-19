@@ -3,7 +3,7 @@
 // failed cleanup apart, as the runner on Effect does.
 import { type Engine, type Suites as SuitesOf, type TestOptions, type TestResult, parseTestArgs, runTestsWith } from "../core/suites.ts";
 import * as Core from "../core/testing.ts";
-import { type Cause, type Exit, combine, failed, hasDies, hasInterruptsOnly, isFail, raise, succeeded } from "./cause.ts";
+import { type Cause, type Exit, combine, fail, failed, hasDies, hasInterruptsOnly, isFail, raise, succeeded } from "./cause.ts";
 import { CLOCK, TestClock, currentTestClock } from "./clock.ts";
 import { allOf, timeoutOption } from "./concurrency.ts";
 import { describeReport, report } from "./describe.ts";
@@ -69,13 +69,32 @@ export const testSuite = (name: string, layer: Layer, tests: ReadonlyArray<Test>
 
 const describeCause = (cause: Cause): string => describeReport(report(cause));
 
-/** A `before_*` hook that failed with `cause`: the setup of a test. */
+/** A `before_*` hook that failed with `cause`, or ran out of time as `cause` says: the setup of a test. */
 class Setup {
-  readonly cause: Cause;
-  constructor(cause: Cause) {
+  readonly cause: Cause | string;
+  constructor(cause: Cause | string) {
     this.cause = cause;
   }
 }
+
+/** Whether `value` is `Some` of an `Option`, as `timeout_option` gives. */
+const isSome = (value: unknown): value is Readonly<{ value: unknown }> =>
+  typeof value === "object" && value !== null && Reflect.get(value, "_tag") === "Some";
+
+const timedOut = (what: string, millis: number): string => `${what} timed out after ${millis} ms`;
+
+/**
+ * The hook `task`, within `millis` when there are some: one out of time is
+ * interrupted and fails with what timed out, the cleanup failure of a
+ * finalizer.
+ */
+const bounded = (task: Task, what: string, millis: number | undefined): Task =>
+  millis === undefined
+    ? task
+    : function* (): Run {
+        const done: unknown = yield timeoutOption(millis, task);
+        return isSome(done) ? undefined : raise(fail(timedOut(what, millis)));
+      };
 
 /** A test whose `before_each` hooks and body ran out of their `millis`. */
 class TimedOut {
@@ -108,23 +127,25 @@ const suiteRuns = (selected: ReadonlyArray<Named>): Map<Suite, SuiteRun> => {
   return runs;
 };
 
-/** The hooks `tasks` run in order: a `Setup` of the first that fails. */
-function* runHooks(tasks: ReadonlyArray<Task>): Run {
+/** The hooks `tasks` run in order, each within `millis` if any: a `Setup` of the first that fails. */
+function* runHooks(tasks: ReadonlyArray<Task>, what: string, millis?: number): Run {
   for (const task of tasks) {
-    const exit = asExit(yield exitOf(task));
+    const exit = asExit(yield exitOf(millis === undefined ? task : () => timeoutOption(millis, task)));
     // an interrupted hook interrupts the test, a failed one fails its setup
     if (exit.cause !== undefined) return hasInterruptsOnly(exit.cause) ? raise(exit.cause) : new Setup(exit.cause);
+    if (millis !== undefined && !isSome(exit.value)) return new Setup(timedOut(what, millis));
   }
   return undefined;
 }
 
 /**
  * The setup of a suite, in its owner: its `after_all` hooks are finalizers,
- * whatever its `before_all` hooks do, then those run, then its layer is built.
+ * whatever its `before_all` hooks do, then those run, then its layer is
+ * built; its hooks have its timeout, if it has one.
  */
-function* setUp({ suite: { hooks: own, layer }, owner }: SuiteRun): Run {
-  for (const task of own?.after_all ?? []) addFinalizer(task);
-  const setup = yield runHooks(own?.before_all ?? []);
+function* setUp({ suite: { hooks: own, layer, timeout }, owner }: SuiteRun): Run {
+  for (const task of own?.after_all ?? []) addFinalizer(bounded(task, "after_all", timeout));
+  const setup = yield runHooks(own?.before_all ?? [], "before_all", timeout);
   if (setup instanceof Setup || layer === undefined) return setup;
   return yield buildWith(layer, new MemoMap(undefined), owner);
 }
@@ -146,18 +167,16 @@ function* runCase(body: Task, runs: ReadonlyArray<SuiteRun>, timeout: number | u
   }
   function* each(): Run {
     for (const { suite } of runs) {
-      for (const task of suite.hooks?.after_each ?? []) addFinalizer(task);
-      const setup = yield runHooks(suite.hooks?.before_each ?? []);
+      for (const task of suite.hooks?.after_each ?? []) addFinalizer(bounded(task, "after_each", suite.timeout));
+      // the test's timeout bounds its `before_each` hooks and its body together
+      const setup = yield runHooks(suite.hooks?.before_each ?? [], "before_each");
       if (setup instanceof Setup) return setup;
     }
     return yield services.reduceRight<Task>((inner, s) => () => withServices(s, inner), body)();
   }
   if (timeout === undefined) return yield each();
   const done: unknown = yield timeoutOption(timeout, each);
-  // `Some` of the test's value when it ended in time
-  if (typeof done !== "object" || done === null || Reflect.get(done, "_tag") !== "Some") return new TimedOut(timeout);
-  const value: unknown = Reflect.get(done, "value");
-  return value;
+  return isSome(done) ? done.value : new TimedOut(timeout);
 }
 
 type Problem = Readonly<{ kind: NonNullable<TestResult["kind"]>; message: string }>;
@@ -167,14 +186,17 @@ const outcome = (exit: Exit): Problem | undefined => {
   const { cause } = exit;
   if (cause === undefined) {
     const { value } = exit;
-    if (value instanceof Setup) return { kind: "setup", message: outcome(failed(value.cause))?.message ?? "" };
+    if (value instanceof Setup) {
+      const why = value.cause;
+      return { kind: "setup", message: typeof why === "string" ? why : (outcome(failed(why))?.message ?? "") };
+    }
     if (value instanceof TimedOut) return { kind: "timeout", message: `timed out after ${value.millis} ms` };
     return typeof value === "string" ? { kind: "assertion", message: value } : undefined;
   }
   if (hasDies(cause)) return { kind: "defect", message: describeCause(cause) };
   if (hasInterruptsOnly(cause)) return { kind: "interrupted", message: "interrupted" };
-  const fail = cause.reasons.find(isFail);
-  if (fail && Core.isAssertionFailed(fail.error)) return { kind: "assertion", message: fail.error._0 };
+  const reason = cause.reasons.find(isFail);
+  if (reason && Core.isAssertionFailed(reason.error)) return { kind: "assertion", message: reason.error._0 };
   return { kind: "failure", message: describeCause(cause) };
 };
 
