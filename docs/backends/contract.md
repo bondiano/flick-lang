@@ -295,6 +295,11 @@ configured by the host. Output accounting runs during canonical ABI lifting,
 so aliased guest buffers cannot first allocate an unbounded Rust reply.
 Wasmtime engine/JIT and other embedder allocations are separate from the
 store's memory budget and still require process-level measurement.
+A call may use 4 MiB of Wasm call stack, and exhausting it reports that the
+backend ran out of its stack. A guest's stack in its own linear memory is
+fixed when it is linked and counts toward its memory budget. The official
+backends link with 4 MiB (`-zstack-size`), which a release build of a
+2000-line function needs.
 
 Cancellation uses engine epochs with a separate token for each build.
 Canceling one build stops its active guest execution and refuses later

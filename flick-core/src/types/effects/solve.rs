@@ -52,7 +52,7 @@ struct Excess {
 mod excess;
 mod tails;
 
-use tails::{allows, less, owed, unknown};
+use tails::{growth_allows, less, owed, unknown};
 
 impl Checker<'_> {
     /// Grows unknown declared rows until nothing changes.
@@ -156,7 +156,16 @@ impl Checker<'_> {
             }
         }
         for tail in &actual.tails {
-            if matches!(tail, Type::Error) || unknown(tail).is_some() || allows(&declared, tail) {
+            if matches!(tail, Type::Error) || unknown(tail).is_some() {
+                continue;
+            }
+            // a variable the declared row holds, less some names, is allowed,
+            // or is owed names that growing the open variable would leave
+            // owed too: that would add it again and again, so what it lacks
+            // is reported instead
+            if let Some(names) = owed(&declared, tail)
+                && (names.is_empty() || !growth_allows(&declared, tail, &never))
+            {
                 continue;
             }
             if let Some(variable) = open.as_ref() {

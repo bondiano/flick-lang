@@ -37,6 +37,7 @@ test("guest isolates wrappers, output and flags from development builds", () => 
   assert.equal(env.RUSTFLAGS, undefined);
   assert.ok(!env.CARGO_ENCODED_RUSTFLAGS.includes("inherited-flags"));
   assert.ok(env.CARGO_ENCODED_RUSTFLAGS.split("\x1f").includes("--cfg=flick_guest_metadata_v1"));
+  assert.ok(env.CARGO_ENCODED_RUSTFLAGS.split("\x1f").includes("-Clink-arg=-zstack-size=4194304"));
   assert.equal(env.FLICK_GUEST_ROOT, root);
   assert.equal(env.FLICK_GUEST_CARGO_HOME, cargoHome);
   assert.equal(env.FLICK_GUEST_COMPILER_COMMIT, commit);

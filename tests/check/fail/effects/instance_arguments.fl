@@ -1,0 +1,26 @@
+// A function of an open row given where one of `{Store Int | r}` is
+// expected: the row variable may hold `Store` at other arguments, which the
+// instance would answer for. The check reports it, for a service and for an
+// effect, and ends: once the expected row holds the variable, less the
+// name, growing it again cannot help.
+module App.InstanceArguments exposing (..)
+
+service Store a =
+  get : Unit ->{} a
+
+effect Ask a =
+  ask : Unit ->{} a
+
+stored : (Unit ->{Store Int | r} Int) -> Unit
+let stored _ = ()
+
+passes : (Unit ->{r} Int) -> Unit
+let passes body = stored body
+//                       ^^^^ FLICK-E019 `r` may hold `Store` at other arguments
+
+asked : (Unit ->{Ask Int | r} Int) -> Unit
+let asked _ = ()
+
+forwards : (Unit ->{r} Int) -> Unit
+let forwards body = asked body
+//                        ^^^^ FLICK-E019 `r` may hold `Ask` at other arguments
