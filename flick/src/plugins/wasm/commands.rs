@@ -44,12 +44,14 @@ impl Contributor for Wasm {
         &self,
         state: Vec<u8>,
         outputs: Vec<command::File>,
+        answers: Vec<command::Answer>,
     ) -> Result<command::Plan, Vec<command::Diagnostic>> {
         let wire: Vec<_> = outputs.iter().map(commands::file_wire).collect();
+        let answers: Vec<_> = answers.iter().map(commands::answer_wire).collect();
         let (result, _) = self.run(BlockSource::default(), |plugin, store| {
             plugin
                 .flick_command_command()
-                .call_resume(store, &state, &wire)
+                .call_resume(store, &state, &wire, &answers)
         });
         match result {
             Ok(Ok(plan)) => Ok(commands::plan(plan)),
@@ -61,13 +63,16 @@ impl Contributor for Wasm {
         }
     }
 
-    fn open(&self, invocation: &command::Invocation) -> Result<Vec<u8>, Vec<command::Diagnostic>> {
+    fn open(
+        &self,
+        invocation: &command::Invocation,
+    ) -> Result<command::Opened, Vec<command::Diagnostic>> {
         let wire = commands::invocation(invocation);
         let (result, _) = self.run(BlockSource::default(), |plugin, store| {
             plugin.flick_command_command().call_open(store, &wire)
         });
         match result {
-            Ok(Ok(state)) => Ok(state),
+            Ok(Ok(opened)) => Ok(commands::opened(opened)),
             Ok(Err(diagnostics)) => Err(commands::diagnostics(diagnostics)),
             Err(why) => Err(command::unknown(&format!("{}: {why}", invocation.name))),
         }
@@ -78,12 +83,14 @@ impl Contributor for Wasm {
         &self,
         state: Vec<u8>,
         request: Vec<u8>,
+        answers: &[command::Answer],
         _: &Cancellation,
     ) -> Result<command::Handled, String> {
+        let answers: Vec<_> = answers.iter().map(commands::answer_wire).collect();
         let (result, _) = self.run(BlockSource::default(), |plugin, store| {
             plugin
                 .flick_command_command()
-                .call_handle(store, &state, &request)
+                .call_handle(store, &state, &request, &answers)
         });
         match result {
             Ok(Ok(handled)) => Ok(commands::handled(handled)),

@@ -40,9 +40,13 @@ use flick_core::project;
 use flick_core::project::config;
 use flick_core::project::{Compilation, Project};
 use flick_core::source::SourceMap;
+#[cfg(feature = "wasm-backends")]
+use flick_ir::FileId;
 use flick_ir::Program;
 #[cfg(feature = "wasm-backends")]
 use std::collections::BTreeMap;
+#[cfg(feature = "wasm-backends")]
+use std::fmt::Write as _;
 
 #[derive(Clone, Default)]
 pub(crate) enum Selected {
@@ -315,6 +319,25 @@ static ALLOWED: OnceLock<Vec<String>> = OnceLock::new();
 /// The tools `--allow-tool` grants the selected backend outside a project.
 pub(crate) fn allow_tools(tools: Vec<String>) {
     let _ = ALLOWED.set(tools);
+}
+
+/// The project of a command run outside any: the working directory, its
+/// backend the default one, granting the official backends only what
+/// `--allow-tool` allows.
+#[cfg(feature = "wasm-backends")]
+pub(crate) fn outside_project(dir: &Path) -> Result<Project, Diagnostic> {
+    let allowed: Vec<String> = allowed_tools().iter().map(|t| format!("{t:?}")).collect();
+    let mut text = String::from("schema-version = 1\n\n[project]\nkind = \"lib\"\n\n[tools]\n");
+    for (id, _) in officials() {
+        let _ = writeln!(text, "{id:?} = [{}]", allowed.join(", "));
+    }
+    let file = FileId::new(0);
+    Ok(Project {
+        root: dir.to_path_buf(),
+        config: config::parse(&text, file)?,
+        config_file: file,
+        workspace: None,
+    })
 }
 
 fn allowed_tools() -> &'static [String] {

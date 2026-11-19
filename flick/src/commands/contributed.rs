@@ -5,6 +5,7 @@
 mod inputs;
 mod plan;
 mod preview;
+mod projection;
 mod session;
 
 pub(crate) use preview::preview;
@@ -37,12 +38,14 @@ pub(crate) trait Contributor: Send + Sync {
         &self,
         state: Vec<u8>,
         outputs: Vec<command::File>,
+        answers: Vec<command::Answer>,
     ) -> Result<command::Plan, Vec<command::Diagnostic>>;
-    fn open(&self, invocation: &Invocation) -> Result<Vec<u8>, Vec<command::Diagnostic>>;
+    fn open(&self, invocation: &Invocation) -> Result<command::Opened, Vec<command::Diagnostic>>;
     fn handle(
         &self,
         state: Vec<u8>,
         request: Vec<u8>,
+        answers: &[command::Answer],
         cancel: &Cancellation,
     ) -> Result<command::Handled, String>;
     fn close(&self, state: Vec<u8>) -> command::Plan;
@@ -268,7 +271,12 @@ pub(crate) fn run(words: &[OsString], global: &GlobalArguments) -> ExitCode {
         report::render(global, &SourceMap::default(), &[diagnostic]);
         ExitCode::from(2)
     };
-    let Ok(project) = find_project(global) else {
+    // outside a project, the official backends' commands run in the working directory
+    let found = find_project(global).ok().or_else(|| {
+        let cwd = env::current_dir().ok()?;
+        backends::outside_project(&cwd).ok()
+    });
+    let Some(project) = found else {
         return fail(unknown(&words, &cached_everywhere()));
     };
     let (found, warnings) = contributed(&project);
@@ -449,7 +457,13 @@ fn arguments(
             (_, true) => ArgAction::Append,
             (_, false) => ArgAction::Set,
         };
-        Arg::new(p.name.clone()).help(p.help.clone()).action(action)
+        let arg = Arg::new(p.name.clone()).help(p.help.clone()).action(action);
+        // several values after one option, or a positional that takes the rest
+        if p.multiple && p.kind != ValueKind::Flag {
+            arg.num_args(1..)
+        } else {
+            arg
+        }
     };
     for p in &descriptor.positionals {
         command = command.arg(arg(p).required(p.required));

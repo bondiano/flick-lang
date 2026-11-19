@@ -1,6 +1,6 @@
 ---
 title: "Командная строка"
-source_hash: b9eb59cb2e9f1408
+source_hash: c0be39af4a1439d1
 ---
 
 `flick` — исполняемый файл с командами компилятора. Все команды принимают
@@ -52,7 +52,7 @@ source_hash: b9eb59cb2e9f1408
 | `doctor` | показывает сведения о компиляторе, Node.js, pnpm, git, Content Mapper для TypeScript, установленной среде выполнения и Effect, о необязательных адаптерах и о Go, если он установлен; всё, кроме компилятора, Node.js и pnpm, — заметка, а не ошибка |
 | `inspect <M> --emit ast\|typed-ir\|js\|ts\|iface\|mapping` | выводит одно представление модуля |
 | `lsp --stdio` | запускает [языковой сервер](../editor/#языковой-сервер); stdio — его единственный транспорт |
-| `content-mapper [--declarations <paths>…]` | обслуживает через stdio запросы [Content Mapper](../editor/#content-mapper) TypeScript для файлов `.fl`; его запускает `@flick-lang/content-mapper`; с `--declarations` вместо этого записывает проекцию каждого файла `.fl` из указанных путей рядом с ним как `Name.d.fl.ts` и завершается |
+| `content-mapper [--declarations <paths>…]` | сессионная команда JavaScript-бэкенда (`js:content-mapper`): обслуживает через stdio запросы [Content Mapper](../editor/#content-mapper) TypeScript для файлов `.fl`; его запускает `@flick-lang/content-mapper`; с `--declarations` вместо этого записывает проекцию каждого файла `.fl` из указанных путей рядом с ним как `Name.d.fl.ts` и завершается |
 
 В корне workspace без `[project]` команды `check`, `build`, `test`, `fmt` и
 `clean` без путей, а также `install` выполняются для каждого участника,

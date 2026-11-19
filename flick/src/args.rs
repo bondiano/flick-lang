@@ -1,8 +1,6 @@
 //! Command-line arguments: options shared by all commands and one argument
 //! struct per command.
 
-use std::path::PathBuf;
-
 use std::ffi::OsString;
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
@@ -81,21 +79,10 @@ pub enum Commands {
     Inspect(InspectArguments),
     /// Run the language server.
     Lsp(LspArguments),
-    /// Serve TypeScript's Content Mapper requests for `.fl` files on
-    /// stdio; `@flick-lang/content-mapper` starts it.
-    ContentMapper(ContentMapperArguments),
     /// A command the project's backend or one of its plugins adds, flat or
     /// as `contributor:command`.
     #[command(external_subcommand)]
     External(Vec<OsString>),
-}
-
-#[derive(Args)]
-pub struct ContentMapperArguments {
-    /// Instead of serving, write the declarations of each `.fl` file under
-    /// these paths beside it as `Name.d.fl.ts`, and exit.
-    #[arg(long, num_args = 1.., value_name = "PATHS")]
-    pub declarations: Option<Vec<PathBuf>>,
 }
 
 #[derive(Args, Clone)]

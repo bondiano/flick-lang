@@ -32,7 +32,7 @@ diagnostics; TypeScript never decides a Flick type.
 | TypeScript emitter | `flick-core/src/codegen/ts` | the types of `--emit ts`, the `.d.ts` of `--emit-dts` and the Promise façades of `--promise-facade`; a type without a TypeScript form is refused, never written as `any` |
 | Interfaces | `flick-core/src/iface.rs`, `flick-core/src/build` | the versioned JSON `.iface` of each module, with the data and dictionary ABI and fingerprints from a build (see [Interfaces](../../reference/iface/)) |
 | FFI importer | `flick-ffi/src/ffi`, `tools/dts-importer` | `flick ffi import` and `ffi check` over the surface the Node helper reads from `.d.ts` with TypeScript |
-| Editor | `flick-core/src/ide`, `flick-core/src/projection.rs`, `flick/src/lsp`, `flick/src/mapper.rs` | hover, definition, references, completion, rename and code actions over one analysis; `flick lsp --stdio` serves them and `flick content-mapper` the TypeScript projection with its span maps (see [Editors](../../reference/editor/)) |
+| Editor | `flick-core/src/ide`, `flick-core/src/projection.rs`, `flick/src/lsp`, `flick/src/commands/contributed/projection.rs`, `backends/js/src/component/mapper.rs` | hover, definition, references, completion, rename and code actions over one analysis; `flick lsp --stdio` serves them, and the JavaScript backend's session `content-mapper` turns the projections the host answers with into TypeScript's span maps (see [Editors](../../reference/editor/)) |
 
 The JS emitter builds independently of `flick-core` from portable IR and
 plain options/TypeScript projections. Its native adapter remains in

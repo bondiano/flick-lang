@@ -49,17 +49,27 @@ pub(super) fn slashed(path: &Path) -> String {
 }
 
 /// The paths `patterns` names: each a path, `$name` for the values of the
-/// path argument `name`, or `$sources` for the source root.
+/// path argument `name`, `$name/..` for the directories they are in, or
+/// `$sources` for the source root.
 pub(super) fn expand(patterns: &[String], invocation: &Invocation) -> Result<Vec<String>, String> {
     let mut paths = Vec::new();
     for pattern in patterns {
         match pattern.strip_prefix('$') {
             Some("sources") => paths.push(invocation.sources.clone()),
-            Some(name) => paths.extend(
-                (invocation.arguments.iter())
+            Some(name) => {
+                // `$name/..`: the directory each value of `name` is in
+                let (name, parent) = name
+                    .strip_suffix("/..")
+                    .map_or((name, false), |n| (n, true));
+                let values = (invocation.arguments.iter())
                     .filter(|a| a.name == name)
-                    .flat_map(|a| a.values.iter().cloned()),
-            ),
+                    .flat_map(|a| a.values.iter());
+                paths.extend(values.map(|v| match v.rsplit_once('/') {
+                    Some((dir, _)) if parent => dir.to_owned(),
+                    None if parent => String::new(),
+                    _ => v.clone(),
+                }));
+            }
             None => paths.push(pattern.clone()),
         }
     }
