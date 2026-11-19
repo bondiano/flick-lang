@@ -35,7 +35,11 @@ theorem _root_.Flick.Typ.lazy_stage {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   induction h with
   | lazy _ _ _ hφ => intro _ _; exact ⟨_, _, rfl, hφ⟩
   | allI hv => intro _ he; subst he; exact (not_value_lazy hv).elim
-  | errVal hv => intro _ he; subst he; exact (not_value_lazy hv).elim
+  | errVal _ _ _ ih =>
+    intro _ he
+    obtain ⟨_, _, he', hφ⟩ := ih he
+    cases he'
+    exact ⟨_, _, rfl, hφ⟩
   | conv _ _ ih =>
     intro _ he
     obtain ⟨_, _, he', hφ⟩ := ih he
@@ -55,7 +59,11 @@ theorem _root_.Flick.Typ.let_lazy_stage {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) 
     obtain ⟨_, _, he', hφ⟩ := h₁.lazy_stage rfl
     cases he'; exact (rt_not_pure hφ).elim
   | allI hv => intro _ _ he; subst he; cases hv
-  | errVal hv => intro _ _ he; subst he; cases hv
+  | errVal _ _ _ ih =>
+    intro _ _ he
+    obtain ⟨_, _, he', hφ⟩ := ih he
+    cases he'
+    exact ⟨_, _, rfl, hφ⟩
   | conv _ _ ih =>
     intro _ _ he
     obtain ⟨_, _, he', hφ⟩ := ih he
@@ -71,7 +79,11 @@ theorem _root_.Flick.Typ.force_lazy_stage {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J
     obtain ⟨_, _, he', hφ⟩ := h₁.lazy_stage rfl
     cases he'; exact ⟨_, _, rfl, hφ⟩
   | allI hv => intro _ he; subst he; cases hv
-  | errVal hv => intro _ he; subst he; cases hv
+  | errVal _ _ _ ih =>
+    intro _ he
+    obtain ⟨_, _, he', hφ⟩ := ih he
+    cases he'
+    exact ⟨_, _, rfl, hφ⟩
   | conv _ _ ih =>
     intro _ he
     obtain ⟨_, _, he', hφ⟩ := ih he
@@ -92,7 +104,7 @@ theorem noLzTop_aux {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   induction h with
   | allI _ h₁ ih => exact fun _ {_} _ => ih h₁ (fun _ => rfl)
   | conv h₁ _ ih => exact fun _ {_} hx => ih h₁ hx
-  | errVal _ h₁ _ _ ih => exact fun _ {_} hx => ih h₁ hx
+  | errVal h₁ _ _ ih => exact fun _ {_} hx => ih h₁ hx
   | _ =>
     intro hty x hx hz
     cases hz
