@@ -214,10 +214,11 @@ let greet name = \"Hello, \" ++ name ++ \"!\"
 const TEST: &str = "module Lib.GreetingTest
 
 import Lib.Greeting exposing (greet)
+import Test exposing (expect, to)
 
 suite \"greet\" {
   test \"greets by name\" {
-    Test.check (Test.equal \"Hello, Ada!\" (greet \"Ada\"))
+    expect (greet \"Ada\") |> to.equal \"Hello, Ada!\"
   }
 }
 ";

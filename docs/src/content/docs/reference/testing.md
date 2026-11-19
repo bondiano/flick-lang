@@ -10,18 +10,20 @@ test in a scope of its own.
 ```flick
 module App.UsersTest
 
+import Test exposing (expect, to)
+
 suite "names" {
   test "trims the name" {
     let name = String.trim "  Ada  "
-    Test.check (Test.equal "Ada" name)
+    expect name |> to.equal "Ada"
   }
 
   suite "empty" {
-    test "stays empty" { Test.check (Test.equal "" (String.trim "  ")) }
+    test "stays empty" { expect (String.trim "  ") |> to.equal "" }
   }
 }
 
-test "counts" { Test.check (Test.equal 3 (List.length [1, 2, 3])) }
+test "counts" { expect (List.length [1, 2, 3]) |> to.equal 3 }
 ```
 
 The blocks are the plugin of the `std` package (see [plugins](../plugins/)),
@@ -45,8 +47,9 @@ call. A top-level declaration may not start with a value named `suite` or
 A test's body is an effectful test, as `Test.effect_test` runs one: it runs
 in a scope of its own, which owns what the body acquires, with the live host
 services (`Host.Live`), which outlive that scope. It passes when it ends and
-its scope closes cleanly; `Test.check` fails it on a failed assertion, and
-a typed failure, a defect or a failed cleanup fails it too.
+its scope closes cleanly; a matcher (see [assertions](#assertions)) fails it
+on a failed assertion, and a typed failure, a defect or a failed cleanup
+fails it too.
 
 The cases of a module are its `tests : List Test.Test`, the case of each
 top-level block in the order written. The module exports `tests` without
@@ -66,6 +69,47 @@ test "a block" {}
 A module without blocks builds `tests` by hand with `Test` as before (see
 [the standard library](../stdlib/#tests)): both kinds of module run in the
 same `flick test`.
+
+## Assertions
+
+`expect actual` names the value an assertion checks, and a matcher of `to`
+checks it: `expect total |> to.equal 3`. A matcher that does not match fails
+the test with `Test.AssertionFailed`, whose message is the test's
+`assertion` failure.
+
+| Matcher | Passes when |
+| - | - |
+| `to.equal expected` | the value equals `expected` (`Eq`, `Show`) |
+| `to.be_true` | the `Bool` is `true` |
+| `to.be_greater_than bound` | the value is greater than `bound` (`Ord`, `Show`) |
+| `to.contain item` | the `List` holds `item` |
+| `to.fail_with error` | the task, which it runs, fails with `error` |
+
+A failed `to.equal` says what it expected and what it got, `expected 3, got
+4`. When either value, as `show` writes it, is long or has several lines,
+it shows their lines as a diff instead: the lines both start and end with as
+they are, and between them each line it expected after `- ` and each it got
+after `+ `.
+
+```flick
+module App.LookupTest
+
+import Test exposing (expect, to)
+
+type error NotFound = NotFound String
+  deriving Eq, Show
+
+find : String ->{; NotFound} Int
+let find name = if name == "ada" then 1 else Fail.fail (NotFound name)
+
+test "finds ada" { expect (find "ada") |> to.equal 1 }
+
+test "misses bob" { expect (task { find "bob" }) |> to.fail_with (NotFound "bob") }
+```
+
+`Test.check assertion` fails the test when an `Assertion` built by hand,
+such as `Test.equal expected actual`, failed. It was `Test.expect` before
+`expect` took a subject; `assert` is a keyword.
 
 ## Test companions
 
