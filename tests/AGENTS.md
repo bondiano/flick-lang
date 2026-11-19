@@ -23,7 +23,8 @@ which behavior are in the
 - Give a new `run/` case a `.stdout` derived from the contract, and list
   it in `run/portable.txt` when Go must run it. `just model` then requires
   it in `run/model.txt` (a subset of `portable.txt`) or in
-  `run/model_gaps.txt` with the reason it prints; `just conformance-rt`
+  `run/model_gaps.txt` (`stdlib/` cases in `run/model_gaps_stdlib.txt`)
+  with the reason it prints; `just conformance-rt`
   reports one that passes on Flick's runtime for `run/rt.txt`.
 - `run/known_gaps.txt` cases must fail on their target; drop a line once
   the case passes there.
