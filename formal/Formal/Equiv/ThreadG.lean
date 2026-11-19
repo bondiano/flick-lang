@@ -28,7 +28,9 @@ theorem kept_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ :
     (ht : Sim W .any (plug E (.hkeep q ℓℓ Ef al (plug Ei (.app (.const (.perform Ef o .tail)) v))))
       t₂) (hst : StR W μ μ₂)
     (hcl₁ : (plug E (.hkeep q ℓℓ Ef al (plug Ei (.app (.const (.perform Ef o .tail)) v)))).Closed)
-    (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed) (hrg : RgsR W μ τ Λ Λ₂) :
+    (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed) (hrg : RgsR W μ τ Λ Λ₂)
+    (hzl : ¬ (plug E (.hkarm q ℓℓ Ef al (b.subst (inst [v])) (plug Ei (.hole q)))).LzTop .any)
+    (hzr : ∀ Λ' μ'' t'', TAns root Λ₂ μ₂ t₂ Λ' μ'' t'' → ¬ t''.LzTop .any) :
     TRes root W τ Λ₂ μ₂ t₂ μ Λ μ
       (plug E (.hkarm q ℓℓ Ef al (b.subst (inst [v])) (plug Ei (.hole q)))) := by
   have hs₀ := Step.performKept (root := root) (μ := μ) (ℓ := ℓℓ) hE hEi hh ha hv hq
@@ -49,6 +51,10 @@ theorem kept_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ :
     rw [show plug B₂ (.hkeep q ℓ' Ef al₂ (plug A₂ (.app (.const (.perform Ef o .tail)) v₂))) =
       plug (A₂ ++ .hkeep q ℓ' Ef al₂ :: B₂) (.app (.const (.perform Ef o .tail)) v₂) by
         rw [plug_append]; rfl] at hs₂
+    rcases hbb with hbb | ⟨hd | hd, -⟩
+    rotate_left
+    · exact (hzl ((Tm.LzTop.hkarm (hd.subst _)).plug E)).elim
+    · exact (hzr _ _ _ ⟨_, _, hj.ksteps, .inr ⟨_, hs₂⟩⟩ ((Tm.LzTop.hkarm (hd.subst _)).plug B₂)).elim
     exact TRes.last hj hs₂ (World.le.refl _) (.inl (hB.plugs (.hkarm hl hal
       (hbb.subst _ _ (SubR.inst (.cons (h₂.sub hv hv₂) .nil))) (hA.plugsP hEi hA₂ trivial .hole))))
       (hj.st _ hst) keepO_refl (hrg.keep hj.le keepO_refl)

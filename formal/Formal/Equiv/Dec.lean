@@ -123,7 +123,7 @@ theorem Sim.dec_base {x : Pos} {r t : Tm} (h : Sim W x r t) (hx : x = .any) (hrv
       (r₂.frame (F := .appR f₁) v₁), .nil, OkE.nil,
       .app (by decide) ((s₁.mono r₂.le).value_any hf v₁ .top) (s₂.value_any ha v₂ .top)⟩)
   | rcons => exact (hrc _ _ _ rfl).elim
-  | acons | aguard => exact (hal trivial).elim
+  | acons | aconsD | aguard => exact (hal trivial).elim
   | appK | appV | rconsK | rconsV | updK | updV => cases hx
   | dropC hb hn _ ih =>
     intro W' μ hW; subst hb

@@ -179,7 +179,10 @@ signature and golden certificates.
   for attempt `n + 1` without caching anything, and a force by the owner is a defect (`R9`).
 - **O1, lazy cells a program need not make** (`Formal/Equiv/`, `lazy.md` §6): contextual
   equivalence of the core (`CtxEquiv`, `Equiv/Context.lean`): every two typed programs one
-  context of the source language builds around two terms may end with the same literals.
+  context of the source language, with holes anywhere, builds around two terms may end with
+  the same literals. Typing keeps a term that makes a lazy cell away from where a pattern reads
+  (`Typ.noLzTop`, `Equiv/TopTyped.lean`), and a dead arm of a GADT, which typing does not
+  reach, is related whatever its bodies (`Sim.aconsD`).
   `Equiv.o1a` (a cell nothing names), `Equiv.o1b` (`lazy v` and a cell born done) and
   `Equiv.o1c` (`force (lazy e)` and `e`) are proved by a simulation of runs each way (`Sim`,
   `thread_sim`, `cstep_sim`, `csteps_sim`, `lit_sim`, `ctxEquiv_of_sim`).

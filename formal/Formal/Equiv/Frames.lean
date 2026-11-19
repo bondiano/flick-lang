@@ -116,13 +116,25 @@ theorem FrS.catches (hB : W.Bij) {F F' : Frame} (h : FrS W F F') {p ℓ ℓ' : N
     rw [hB _ _ _ _ _ _ hl' hl]
   | _ => simp [Frame.catches]
 
+/-- Two arms: related, or no run takes them (`Sim.aconsD`). -/
+def ArmR (W : World) (b b' : Tm) : Prop :=
+  Sim W .any b b' ∨ ((b.LzTop .any ∨ b'.LzTop .any) ∧ b'.NoIns)
+
+theorem ArmR.mono {W' : World} (hW : W.le W') {b b' : Tm} (h : ArmR W b b') : ArmR W' b b' :=
+  h.imp (·.mono hW) id
+
 theorem armOf_eq {o : Name} {x : Pos} {al al' : Tm} (h : Sim W x al al') (hx : x = .top) :
-    ORel (Sim W .any) (al.armOf o) (al'.armOf o) := by
+    ORel (ArmR W) (al.armOf o) (al'.armOf o) := by
   induction h with
   | @acons _ p _ _ _ _ hb _ _ ihr =>
     simp only [Tm.armOf]
     by_cases hc : p.headName = some o
-    · simp only [hc, if_true]; exact hb
+    · simp only [hc, if_true]; exact .inl hb
+    · simp only [hc, if_false]; exact ihr hx
+  | @aconsD _ p _ _ _ _ hd hn _ ihr =>
+    simp only [Tm.armOf]
+    by_cases hc : p.headName = some o
+    · simp only [hc, if_true]; exact .inr ⟨hd, hn⟩
     · simp only [hc, if_false]; exact ihr hx
   | jL hx' | jR hx' => exact (hx' hx).elim
   | dropA | dropB | dropC | forceA | forceC | bornA | bornB | bornS | bornV | dead => cases hx

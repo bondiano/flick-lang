@@ -124,6 +124,7 @@ theorem Sim.lower {x : Pos} {a b : Tm} (h : Sim W x a b) : Sim W .any a b := by
   | bornS hl hc hs => exact .bornS hl hc hs
   | bornV hl hc hc' hn => exact .bornV hl hc hc' hn
   | dead hn => exact .dead hn
+  | aconsD hd hn _ ih => exact .aconsD hd hn ih
   | _ => constructor <;> first | assumption | decide
 
 theorem Sim.mono {W' : World} (hW : W.le W') {x : Pos} {a b : Tm} (h : Sim W x a b) :
@@ -156,6 +157,7 @@ theorem Sim.mono {W' : World} (hW : W.le W') {x : Pos} {a b : Tm} (h : Sim W x a
   | rconsV hv _ _ ih₁ ih₂ => exact .rconsV hv ih₁ ih₂
   | updK hs _ _ ih₁ ih₂ => exact .updK hs ih₁ ih₂
   | updV hv _ _ ih₁ ih₂ => exact .updV hv ih₁ ih₂
+  | aconsD hd hn _ ih => exact .aconsD hd hn ih
   | _ => constructor <;> assumption
 
 theorem FrS.mono {W' : World} (hW : W.le W') {F F' : Frame} (h : FrS W F F') : FrS W' F F' := by

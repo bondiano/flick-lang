@@ -248,4 +248,35 @@ theorem _root_.Flick.Step.not_final {root : Roots} {l : Lbl} {Λ : List Rgn} {μ
     · cases hf
     all_goals cases h
 
+/-- A step keeps every region, with its children at least. -/
+theorem _root_.Flick.Step.kids {root : Roots} {l : Lbl} {Λ Λ' : List Rgn} {μ μ' : List Tm}
+    {t t' : Tm} (hs : Step root l Λ μ t (.cfg Λ' μ' t')) {p : Nat} {g : Rgn}
+    (hg : Λ[p]? = some g) : ∃ g', Λ'[p]? = some g' ∧ g.kids.length ≤ g'.kids.length := by
+  have same : ∃ g', Λ[p]? = some g' ∧ g.kids.length ≤ g'.kids.length := ⟨g, hg, Nat.le_refl _⟩
+  have app : ∀ x : Rgn, ∃ g', (Λ ++ [x])[p]? = some g' ∧ g.kids.length ≤ g'.kids.length :=
+    fun _ => ⟨g, by rw [List.getElem?_append_left (Flick.Elab.lt_of_getElem? hg), hg], Nat.le_refl _⟩
+  have set : ∀ q (g₀ g₁ : Rgn), Λ[q]? = some g₀ → g₀.kids.length ≤ g₁.kids.length →
+      ∃ g', (setRgn Λ q g₁)[p]? = some g' ∧ g.kids.length ≤ g'.kids.length := by
+    intro q g₀ g₁ hq hle
+    by_cases hpq : q = p
+    · subst hpq; rw [hg] at hq; cases hq
+      exact ⟨g₁, by rw [setRgn, List.getElem?_set_self (Flick.Elab.lt_of_getElem? hg)], hle⟩
+    · exact ⟨g, by rw [setRgn, List.getElem?_set_ne hpq, hg], Nat.le_refl _⟩
+  cases hs with
+  | rt hE hh =>
+    rename_i e e'
+    by_cases hreg : e.Reg
+    · cases hh with
+      | scope => exact app _
+      | hdl => exact app _
+      | op => exact same
+      | open_ hq _ => exact set _ _ _ hq (Nat.le_refl _)
+      | finRun hq _ _ _ _ => exact set _ _ _ hq (by simp)
+      | close hq _ _ _ _ => exact set _ _ _ hq (Nat.le_refl _)
+      | _ => simp [Tm.Reg] at hreg
+    · obtain rfl := hh.keep hreg; exact same
+  | addFin _ hq => exact set _ _ _ hq (Nat.le_refl _)
+  | spawn _ hq => exact set _ _ _ hq (by simp)
+  | _ => exact same
+
 end Flick.Equiv

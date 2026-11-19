@@ -27,7 +27,7 @@ theorem perform_right {W' : World} {Ef o : Name} {c : OpClass} {v r₂ : Tm} (hv
   exact ⟨v₂, rfl, h₂.top_value rfl hv, h₂⟩
 
 theorem armOf_right {W' : World} {al al₂ b : Tm} {o : Name} (h : Sim W' .top al al₂)
-    (ha : al.armOf o = some b) : ∃ b₂, al₂.armOf o = some b₂ ∧ Sim W' .any b b₂ :=
+    (ha : al.armOf o = some b) : ∃ b₂, al₂.armOf o = some b₂ ∧ ArmR W' b b₂ :=
   (armOf_eq (o := o) h rfl).some_left ha
 
 /-- **An operation a handler aborts.** -/
@@ -37,7 +37,9 @@ theorem abort_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ 
     (ht : Sim W .any (plug E (.hwith pp ℓℓ Ef al r (plug Ei (.app (.const (.perform Ef o .abort)) v))))
       t₂) (hst : StR W μ μ₂)
     (hcl₁ : (plug E (.hwith pp ℓℓ Ef al r (plug Ei (.app (.const (.perform Ef o .abort)) v)))).Closed)
-    (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed) (hrg : RgsR W μ τ Λ Λ₂) :
+    (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed) (hrg : RgsR W μ τ Λ Λ₂)
+    (hzl : ¬ (plug E (.hwith pp ℓℓ Ef al r (plug Ei (.unw pp ℓℓ (b.subst (inst [v])))))).LzTop .any)
+    (hzr : ∀ Λ' μ'' t'', TAns root Λ₂ μ₂ t₂ Λ' μ'' t'' → ¬ t''.LzTop .any) :
     TRes root W τ Λ₂ μ₂ t₂ μ Λ μ
       (plug E (.hwith pp ℓℓ Ef al r (plug Ei (.unw pp ℓℓ (b.subst (inst [v])))))) := by
   have hs₀ := Step.performAbort (root := root) (Λ := Λ) (μ := μ) (p := pp) (ℓ := ℓℓ) (r := r)
@@ -59,6 +61,10 @@ theorem abort_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ 
     rw [show plug B₂ (.hwith pp ℓ' Ef al₂ r₂' (plug A₂ (.app (.const (.perform Ef o .abort)) v₂))) =
       plug (A₂ ++ .hwith pp ℓ' Ef al₂ r₂' :: B₂) (.app (.const (.perform Ef o .abort)) v₂) by
         rw [plug_append]; rfl] at hs₂
+    rcases hbb with hbb | ⟨hd | hd, -⟩
+    rotate_left
+    · exact (hzl ((Tm.LzTop.hwith ((Tm.LzTop.unw (hd.subst _)).plug Ei)).plug E)).elim
+    · exact (hzr _ _ _ ⟨_, _, hj.ksteps, .inr ⟨_, hs₂⟩⟩ ((Tm.LzTop.hwith ((Tm.LzTop.unw (hd.subst _)).plug A₂)).plug B₂)).elim
     exact TRes.last hj hs₂ (World.le.refl _) (.inl (hB.plugs (.hwith hl hal hr (hA.plugs
       (.unw hl (hbb.subst _ _ (SubR.inst (.cons (h₂.sub hv hv₂) .nil))))))))
       (hj.st _ hst) keepO_refl (hrg.keep hj.le keepO_refl)
@@ -70,7 +76,9 @@ theorem tail_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ :
     (ht : Sim W .any (plug E (.hwith pp ℓℓ Ef al r (plug Ei (.app (.const (.perform Ef o .tail)) v))))
       t₂) (hst : StR W μ μ₂)
     (hcl₁ : (plug E (.hwith pp ℓℓ Ef al r (plug Ei (.app (.const (.perform Ef o .tail)) v)))).Closed)
-    (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed) (hrg : RgsR W μ τ Λ Λ₂) :
+    (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed) (hrg : RgsR W μ τ Λ Λ₂)
+    (hzl : ¬ (plug E (.hctl pp ℓℓ 0 true Ef al r (b.subst (inst [v])) (plug Ei (.hole pp)))).LzTop .any)
+    (hzr : ∀ Λ' μ'' t'', TAns root Λ₂ μ₂ t₂ Λ' μ'' t'' → ¬ t''.LzTop .any) :
     TRes root W τ Λ₂ μ₂ t₂ μ Λ μ
       (plug E (.hctl pp ℓℓ 0 true Ef al r (b.subst (inst [v])) (plug Ei (.hole pp)))) := by
   have hs₀ := Step.performTail (root := root) (Λ := Λ) (μ := μ) (p := pp) (ℓ := ℓℓ) (r := r)
@@ -92,6 +100,10 @@ theorem tail_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ :
     rw [show plug B₂ (.hwith pp ℓ' Ef al₂ r₂' (plug A₂ (.app (.const (.perform Ef o .tail)) v₂))) =
       plug (A₂ ++ .hwith pp ℓ' Ef al₂ r₂' :: B₂) (.app (.const (.perform Ef o .tail)) v₂) by
         rw [plug_append]; rfl] at hs₂
+    rcases hbb with hbb | ⟨hd | hd, -⟩
+    rotate_left
+    · exact (hzl ((Tm.LzTop.hctl (hd.subst _)).plug E)).elim
+    · exact (hzr _ _ _ ⟨_, _, hj.ksteps, .inr ⟨_, hs₂⟩⟩ ((Tm.LzTop.hctl (hd.subst _)).plug B₂)).elim
     exact TRes.last hj hs₂ (World.le.refl _) (.inl (hB.plugs (.hctl hl (.inl ⟨rfl, rfl⟩) hal hr
       (hbb.subst _ _ (SubR.inst (.cons (h₂.sub hv hv₂) .nil))) (hA.plugsP hEi hA₂ trivial .hole))))
       (hj.st _ hst) keepO_refl (hrg.keep hj.le keepO_refl)
@@ -103,7 +115,10 @@ theorem ctl_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ : 
     (ht : Sim W .any (plug E (.hwith pp ℓℓ Ef al r (plug Ei (.app (.const (.perform Ef o .control)) v))))
       t₂) (hst : StR W μ μ₂)
     (hcl₁ : (plug E (.hwith pp ℓℓ Ef al r (plug Ei (.app (.const (.perform Ef o .control)) v)))).Closed)
-    (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed) (hrg : RgsR W μ τ Λ Λ₂) :
+    (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed) (hrg : RgsR W μ τ Λ Λ₂)
+    (hzl : ¬ (plug E (.hctl pp ℓℓ μ.length false Ef al r (b.subst (inst [v, .kont pp μ.length]))
+        (plug Ei (.hole pp)))).LzTop .any)
+    (hzr : ∀ Λ' μ'' t'', TAns root Λ₂ μ₂ t₂ Λ' μ'' t'' → ¬ t''.LzTop .any) :
     TRes root W τ Λ₂ μ₂ t₂ μ Λ (μ ++ [.lam .todo])
       (plug E (.hctl pp ℓℓ μ.length false Ef al r (b.subst (inst [v, .kont pp μ.length]))
         (plug Ei (.hole pp)))) := by
@@ -126,6 +141,10 @@ theorem ctl_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ : 
     rw [show plug B₂ (.hwith pp ℓ' Ef al₂ r₂' (plug A₂ (.app (.const (.perform Ef o .control)) v₂))) =
       plug (A₂ ++ .hwith pp ℓ' Ef al₂ r₂' :: B₂) (.app (.const (.perform Ef o .control)) v₂) by
         rw [plug_append]; rfl] at hs₂
+    rcases hbb with hbb | ⟨hd | hd, -⟩
+    rotate_left
+    · exact (hzl ((Tm.LzTop.hctl (hd.subst _)).plug E)).elim
+    · exact (hzr _ _ _ ⟨_, _, hj.ksteps, .inr ⟨_, hs₂⟩⟩ ((Tm.LzTop.hctl (hd.subst _)).plug B₂)).elim
     have hst' := hj.st _ hst
     have hW := World.le_addL W' μ.length μ₂'.length .sym
     have hκ : (World.addL W' μ.length μ₂'.length .sym).L μ.length μ₂'.length .sym := .inr ⟨rfl, rfl, rfl⟩

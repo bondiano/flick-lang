@@ -20,8 +20,11 @@ theorem vcu_frame {x : Pos} {a b : Tm} (h : Sim W x a b) (hx : x = .any) (ha : V
   obtain ⟨W', μ', b', r, v, s⟩ := h.vcu hx ha W μ (World.le.refl _)
   exact ⟨W', μ', b', r.frame hF, v, s⟩
 
-/-- **A pure head step** of related terms. -/
-theorem phead_sim {r r' r₂ : Tm} (hh : PHead r r') (h : Sim W .top r r₂) (μ : List Tm) :
+/-- **A pure head step** of related terms. Neither side takes a dead arm (`Sim.aconsD`): what
+the step gives has no lazy cell where a pattern reads (`hzl`, `hzr`). -/
+theorem phead_sim {r r' r₂ : Tm} (hh : PHead r r') (h : Sim W .top r r₂) (μ : List Tm)
+    (hzl : ¬ r'.LzTop .any)
+    (hzr : ∀ μ' a r₂', AStar μ r₂ μ' a → PHead a r₂' → ¬ r₂'.LzTop .any) :
     ∃ W' μ' a₂ r₂', RJ W μ r₂ W' μ' a₂ ∧ PHead a₂ r₂' ∧ Sim W' .any r' r₂' := by
   cases hh with
   | @beta v b hv =>
@@ -63,7 +66,10 @@ theorem phead_sim {r r' r₂ : Tm} (hh : PHead r r') (h : Sim W .top r r₂) (μ
     obtain ⟨b', r', rfl, hb, hr⟩ := h₂.inv_acons
     obtain ⟨W₁, μ₁, v', r₁, hv', s₁⟩ := vcu_frame h₁ rfl hv μ (F := .match_ (.acons p b' r')) trivial
     obtain ⟨δ₂, hm', hδ⟩ := (s₁.value_any hv hv' .top).matchP_sub hv' hm
-    exact ⟨W₁, μ₁, _, _, r₁, .matchYes hv' hm', (hb.mono r₁.le).subst _ _ hδ⟩
+    rcases hb with hb | ⟨hd | hd, -⟩
+    · exact ⟨W₁, μ₁, _, _, r₁, .matchYes hv' hm', (hb.mono r₁.le).subst _ _ hδ⟩
+    · exact (hzl (hd.subst _)).elim
+    · exact (hzr _ _ _ r₁.steps (.matchYes hv' hm') (hd.subst _)).elim
   | @matchNo v p b rest hv hm =>
     obtain ⟨e', al', rfl, h₁, h₂⟩ := h.inv_match
     obtain ⟨b', r', rfl, hb, hr⟩ := h₂.inv_acons

@@ -64,14 +64,18 @@ theorem oneshot_sim {root : Roots} {l : Lbl} {Λ Λ' : List Rgn} {μ μ' μ₂ :
 theorem pure_sim {root : Roots} {μ μ₂ : List Tm} {τ : Option (Nat × Nat)}
     {E : List Frame} {r r' t₂ : Tm} (hE : OkE E) (hh : PHead r r')
     (ht : Sim W .any (plug E r) t₂) (hst : StR W μ μ₂) (hcl₁ : (plug E r).Closed)
-    (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed) :
+    (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed)
+    (hzl : ¬ (plug E r').LzTop .any)
+    (hzr : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → ¬ t''.LzTop .any) :
     KAns root W τ μ₂ t₂ μ μ (plug E r') := by
   have hr := hh.redex
   rcases ht.dec hr.1 (fun _ _ he => Redex.app hr he) (fun _ _ _ he => by subst he; cases hh)
       (fun ha => by cases hh <;> exact ha) _ _ rfl hE μ₂ with hd | ⟨W', μ₂', E₂, r₂, hj, hfr, hE₂, hs⟩ |
     ⟨W', μ₂', E₂, n, a, b, hj, hfr, hE₂, rfl, hn, hs⟩
   · exact (dec_act (τ := τ) (Λ := []) hE hst hcl₁ hcl₂ (.pure hE hh) hd).2
-  · obtain ⟨W₁, μ₁, a₂, r₂', hj₁, hh₂, hs₂⟩ := phead_sim hh hs μ₂'
+  · obtain ⟨W₁, μ₁, a₂, r₂', hj₁, hh₂, hs₂⟩ := phead_sim hh hs μ₂' (fun h => hzl (h.plug E))
+      (fun _ _ _ ha hp hz => hzr _ _ (hj.ksteps.trans ((ha.plug hE₂).ksteps.trans
+        (.step (fun _ => ⟨_, .pure hE₂ hp⟩) .refl))) (hz.plug E₂))
     exact ⟨W₁, μ₁, plug E₂ r₂', hj.le.trans hj₁.le,
       hj.ksteps.trans ((hj₁.plug hE₂).ksteps.trans (.step (fun _ => ⟨_, .pure hE₂ hh₂⟩) .refl)),
       .inl ((hfr.mono hj₁.le).plugs hs₂), hj₁.st _ (hj.st _ hst), fun _ _ _ _ _ h => h⟩
@@ -86,7 +90,9 @@ theorem _root_.Flick.RHead.keep {Λ Λ' : List Rgn} {μ μ' : List Tm} {r r' : T
 theorem rt_sim {root : Roots} {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {τ : Option (Nat × Nat)}
     {E : List Frame} {r r' t₂ : Tm} (hE : OkE E) (hh : RHead Λ μ r Λ' μ' r') (hreg : ¬ r.Reg)
     (ht : Sim W .any (plug E r) t₂) (hst : StR W μ μ₂) (hcl₁ : (plug E r).Closed)
-    (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed) :
+    (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed)
+    (hzl : ¬ (plug E r').LzTop .any)
+    (hzr : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → ¬ t''.LzTop .any) :
     Λ' = Λ ∧ KAns root W τ μ₂ t₂ μ μ' (plug E r') := by
   have hΛ := hh.keep hreg
   have happ : ∀ f a, r = .app f a → Value f ∧ Value a := by
@@ -100,7 +106,9 @@ theorem rt_sim {root : Roots} {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {τ :
     ⟨W', μ₂', E₂, n, a, b, hj, hfr, hE₂, rfl, hn, hs⟩
   · exact dec_act hE hst hcl₁ hcl₂ (.rt hE hh) hd
   · obtain ⟨W₁, μ₁, r₁, W'', μ₂'', r₂', hj₁, hq, hW, hs₂, hst', hjk⟩ :=
-      rhead_sim hh hreg hs (hj.st _ hst)
+      rhead_sim hh hreg hs (hj.st _ hst) (fun h => hzl (h.plug E))
+        (fun _ hr hz => hzr _ _ (hj.ksteps.trans (.step (fun Λ => ⟨_, .rt hE₂ (hr Λ)⟩) .refl))
+          (hz.plug E₂))
     refine ⟨hΛ, W'', μ₂'', plug E₂ r₂', hj.le.trans (hj₁.le.trans hW),
       hj.ksteps.trans ((hj₁.plug hE₂).ksteps.trans (hq.ksteps hE₂)),
       .inl ((hfr.mono (hj₁.le.trans hW)).plugs hs₂), hst', ?_⟩

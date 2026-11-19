@@ -1,5 +1,4 @@
-import Formal.Elab.CoreSim
-import Formal.SubstArm
+import Formal.Equiv.Top
 
 /-!
 # Contextual equivalence: related terms of two runs
@@ -80,23 +79,6 @@ def _root_.Flick.Tm.Spine : Tm → Prop
   | .hctl _ _ _ _ _ _ _ a _ | .hkarm _ _ _ _ a _ | .hres _ _ _ a => a.Spine
   | _ => False
 
-/-- Where a term stands. `top`: the spine of a dictionary record, where no special pair stands at
-the top, as a pattern reads there without evaluating (the `true` of `Formal/Elab/CoreCg.lean`),
-and a list of alternatives, which a match and a handler read.
-`park`: the spine of a body or an arm parked at its hole, where both sides have the same frames
-around the hole, up to the frames of cells only one side has, and the values of the frames are
-related by `top`, so the right one is a value too. -/
-inductive Pos
-  | any
-  | top
-  | park
-  deriving DecidableEq
-
-/-- The position of the part of a frame that is evaluated in it. -/
-@[reducible] def Pos.fr : Pos → Pos
-  | .park => .park
-  | _ => .any
-
 /-- Related terms of two runs. -/
 inductive Sim (W : World) : Pos → Tm → Tm → Prop
   | var {x i} : x ≠ .park → Sim W x (.var i) (.var i)
@@ -135,6 +117,10 @@ inductive Sim (W : World) : Pos → Tm → Tm → Prop
       Sim W x (.acons p b r) (.acons p b' r')
   | aguard {x p g g' b b' r r'} : Sim W .any g g' → Sim W .any b b' → Sim W x r r' →
       Sim W x (.aguard p g b r) (.aguard p g' b' r')
+  /-- An arm no run takes: a body makes a lazy cell where a pattern reads (`Tm.LzTop`), which
+  typing keeps out of every arm a run takes; the bodies are not compared. -/
+  | aconsD {x p b b' r r'} : (b.LzTop .any ∨ b'.LzTop .any) → b'.NoIns → Sim W x r r' →
+      Sim W x (.acons p b r) (.acons p b' r')
   | todo {x} : Sim W x .todo .todo
   | task {x e e'} : Sim W .any e e' → e'.NoIns → Sim W x (.task e) (.task e')
   | await {x e e'} : Sim W x.fr e e' → Sim W x (.await e) (.await e')

@@ -1,24 +1,26 @@
-import Formal.Equiv.Cfg
+import Formal.Equiv.TopTyped
 import Formal.Soundness
 
 /-!
 # Contextual equivalence of terms of the core
 
-Two terms are contextually equivalent (`CtxEquiv`) when every typed program built around them
-by one context, a term of the source language with any number of holes (`Ctx`), may end with the
-same literals (`Ends`) whichever of the two fills the holes. A filling stays under the binders
-of the context, which bind its free variables.
+Two terms are contextually equivalent (`CtxEquiv`) when every two typed programs one context
+builds around them, a term of the source language with any number of holes anywhere (`Ctx`),
+may end with the same literals (`Ends`). A filling stays under the binders of the context, which
+bind its free variables.
 
-A hole stands where a term runs or is bound, not at the top of a dictionary record, of the value
-a handler matches or of a list of alternatives (`Pos.top`): a pattern reads a term there without
-running it. Typing gives these places the pure stage or no term judgment at all, and a term
-that makes a lazy cell has the stage `rt` at least (`Typ.lazy`); so no typed program has such a
-term there, but in a dead arm of a GADT, which typing does not reach.
+The rewrites of O1 make or force a lazy cell at their top (`Tm.LzShape`). Where a pattern reads a
+term without running it they are no pair of `Sim` (`Pos.top`), but typing keeps them away from
+there (`Typ.noLzTop`): such a place has the pure stage, or no term judgment, while a term that
+makes a cell has the stage `rt` at least. Typing reaches every place but the body of a dead arm of
+a GADT; an arm whose body has such a term is related whatever the bodies (`Sim.aconsD`), and no
+run takes it, as what a run reaches is typed.
 
 Two terms related by `Sim` both ways in every world are contextually equivalent
 (`ctxEquiv_of_sim`): the context relates the two programs (`Ctx.sim`), typing makes their threads
-closed wherever their runs go (`Prog.reach`), and the simulation of runs answers a left run
-that ends with a literal by a right one that ends with it (`csteps_sim`, `lit_sim`).
+closed and keeps lazy cells away from patterns wherever their runs go (`Prog.reach`), and the
+simulation of runs answers a left run that ends with a literal by a right one that ends with it
+(`csteps_sim`, `lit_sim`).
 -/
 
 namespace Flick.Equiv
@@ -26,97 +28,130 @@ namespace Flick.Equiv
 open Flick.Elab (All2)
 
 /-- Two programs with holes: one context of the source language, with `e₁` and `e₂` in its
-holes; the index is where the term stands, as in `Sim`. -/
-inductive Ctx (e₁ e₂ : Tm) : Pos → Tm → Tm → Prop
-  | hole : Ctx e₁ e₂ .any e₁ e₂
-  | var {x i} : Ctx e₁ e₂ x (.var i) (.var i)
-  | lit {x l} : Ctx e₁ e₂ x (.lit l) (.lit l)
-  | const {x c} : Ctx e₁ e₂ x (.const c) (.const c)
-  | ctor {x K} : Ctx e₁ e₂ x (.ctor K) (.ctor K)
-  | rnil {x} : Ctx e₁ e₂ x .rnil .rnil
-  | anil {x} : Ctx e₁ e₂ x .anil .anil
-  | todo {x} : Ctx e₁ e₂ x .todo .todo
-  | glob {x g} : Ctx e₁ e₂ x (.glob g) (.glob g)
-  | lam {x b b'} : Ctx e₁ e₂ .any b b' → Ctx e₁ e₂ x (.lam b) (.lam b')
-  | fix {x b b'} : Ctx e₁ e₂ .any b b' → Ctx e₁ e₂ x (.fix b) (.fix b')
-  | task {x b b'} : Ctx e₁ e₂ .any b b' → Ctx e₁ e₂ x (.task b) (.task b')
-  | await {x b b'} : Ctx e₁ e₂ .any b b' → Ctx e₁ e₂ x (.await b) (.await b')
-  | lazy {x b b'} : Ctx e₁ e₂ .any b b' → Ctx e₁ e₂ x (.lazy b) (.lazy b')
-  | force {x b b'} : Ctx e₁ e₂ .any b b' → Ctx e₁ e₂ x (.force b) (.force b')
-  | raise {x b b'} : Ctx e₁ e₂ .any b b' → Ctx e₁ e₂ x (.raise b) (.raise b')
-  | scope {x b b'} : Ctx e₁ e₂ .any b b' → Ctx e₁ e₂ x (.scope b) (.scope b')
-  | proj {x b b' l} : Ctx e₁ e₂ .any b b' → Ctx e₁ e₂ x (.proj b l) (.proj b' l)
-  | drec {x c r r'} : Ctx e₁ e₂ .top r r' → Ctx e₁ e₂ x (.drec c r) (.drec c r')
-  | app {x f f' a a'} : Ctx e₁ e₂ x f f' → Ctx e₁ e₂ x a a' → Ctx e₁ e₂ x (.app f a) (.app f' a')
-  | let_ {x a a' b b'} : Ctx e₁ e₂ .any a a' → Ctx e₁ e₂ .any b b' →
-      Ctx e₁ e₂ x (.let_ a b) (.let_ a' b')
-  | letrec {x a a' b b'} : Ctx e₁ e₂ .any a a' → Ctx e₁ e₂ .any b b' →
-      Ctx e₁ e₂ x (.letrec a b) (.letrec a' b')
-  | rcons {x l a a' r r'} : Ctx e₁ e₂ x a a' → Ctx e₁ e₂ x r r' →
-      Ctx e₁ e₂ x (.rcons l a r) (.rcons l a' r')
-  | update {x l a a' b b'} : Ctx e₁ e₂ .any a a' → Ctx e₁ e₂ .any b b' →
-      Ctx e₁ e₂ x (.update a l b) (.update a' l b')
-  | match_ {x a a' al al'} : Ctx e₁ e₂ .any a a' → Ctx e₁ e₂ .top al al' →
-      Ctx e₁ e₂ x (.match_ a al) (.match_ a' al')
-  | acons {x p b b' r r'} : Ctx e₁ e₂ .any b b' → Ctx e₁ e₂ x r r' →
-      Ctx e₁ e₂ x (.acons p b r) (.acons p b' r')
-  | aguard {x p g g' b b' r r'} : Ctx e₁ e₂ .any g g' → Ctx e₁ e₂ .any b b' → Ctx e₁ e₂ x r r' →
-      Ctx e₁ e₂ x (.aguard p g b r) (.aguard p g' b' r')
-  | try_ {x a a' al al'} : Ctx e₁ e₂ .any a a' → Ctx e₁ e₂ .top al al' →
-      Ctx e₁ e₂ x (.try_ a al) (.try_ a' al')
-  | handle {x v v' al al'} : Ctx e₁ e₂ .top v v' → Ctx e₁ e₂ .top al al' →
-      Ctx e₁ e₂ x (.handle v al) (.handle v' al')
-  | hdl {x E al al' r r' b b'} : Ctx e₁ e₂ .top al al' → Ctx e₁ e₂ .any r r' →
-      Ctx e₁ e₂ .any b b' → Ctx e₁ e₂ x (.hdl E al r b) (.hdl E al' r' b')
+holes, which may stand anywhere. -/
+inductive Ctx (e₁ e₂ : Tm) : Tm → Tm → Prop
+  | hole : Ctx e₁ e₂ e₁ e₂
+  | var {i} : Ctx e₁ e₂ (.var i) (.var i)
+  | lit {l} : Ctx e₁ e₂ (.lit l) (.lit l)
+  | const {c} : Ctx e₁ e₂ (.const c) (.const c)
+  | ctor {K} : Ctx e₁ e₂ (.ctor K) (.ctor K)
+  | rnil : Ctx e₁ e₂ .rnil .rnil
+  | anil : Ctx e₁ e₂ .anil .anil
+  | todo : Ctx e₁ e₂ .todo .todo
+  | glob {g} : Ctx e₁ e₂ (.glob g) (.glob g)
+  | lam {b b'} : Ctx e₁ e₂ b b' → Ctx e₁ e₂ (.lam b) (.lam b')
+  | fix {b b'} : Ctx e₁ e₂ b b' → Ctx e₁ e₂ (.fix b) (.fix b')
+  | task {b b'} : Ctx e₁ e₂ b b' → Ctx e₁ e₂ (.task b) (.task b')
+  | await {b b'} : Ctx e₁ e₂ b b' → Ctx e₁ e₂ (.await b) (.await b')
+  | lazy {b b'} : Ctx e₁ e₂ b b' → Ctx e₁ e₂ (.lazy b) (.lazy b')
+  | force {b b'} : Ctx e₁ e₂ b b' → Ctx e₁ e₂ (.force b) (.force b')
+  | raise {b b'} : Ctx e₁ e₂ b b' → Ctx e₁ e₂ (.raise b) (.raise b')
+  | scope {b b'} : Ctx e₁ e₂ b b' → Ctx e₁ e₂ (.scope b) (.scope b')
+  | proj {b b' l} : Ctx e₁ e₂ b b' → Ctx e₁ e₂ (.proj b l) (.proj b' l)
+  | drec {c r r'} : Ctx e₁ e₂ r r' → Ctx e₁ e₂ (.drec c r) (.drec c r')
+  | app {f f' a a'} : Ctx e₁ e₂ f f' → Ctx e₁ e₂ a a' → Ctx e₁ e₂ (.app f a) (.app f' a')
+  | let_ {a a' b b'} : Ctx e₁ e₂ a a' → Ctx e₁ e₂ b b' → Ctx e₁ e₂ (.let_ a b) (.let_ a' b')
+  | letrec {a a' b b'} : Ctx e₁ e₂ a a' → Ctx e₁ e₂ b b' →
+      Ctx e₁ e₂ (.letrec a b) (.letrec a' b')
+  | rcons {l a a' r r'} : Ctx e₁ e₂ a a' → Ctx e₁ e₂ r r' →
+      Ctx e₁ e₂ (.rcons l a r) (.rcons l a' r')
+  | update {l a a' b b'} : Ctx e₁ e₂ a a' → Ctx e₁ e₂ b b' →
+      Ctx e₁ e₂ (.update a l b) (.update a' l b')
+  | match_ {a a' al al'} : Ctx e₁ e₂ a a' → Ctx e₁ e₂ al al' →
+      Ctx e₁ e₂ (.match_ a al) (.match_ a' al')
+  | acons {p b b' r r'} : Ctx e₁ e₂ b b' → Ctx e₁ e₂ r r' →
+      Ctx e₁ e₂ (.acons p b r) (.acons p b' r')
+  | aguard {p g g' b b' r r'} : Ctx e₁ e₂ g g' → Ctx e₁ e₂ b b' → Ctx e₁ e₂ r r' →
+      Ctx e₁ e₂ (.aguard p g b r) (.aguard p g' b' r')
+  | try_ {a a' al al'} : Ctx e₁ e₂ a a' → Ctx e₁ e₂ al al' →
+      Ctx e₁ e₂ (.try_ a al) (.try_ a' al')
+  | handle {v v' al al'} : Ctx e₁ e₂ v v' → Ctx e₁ e₂ al al' →
+      Ctx e₁ e₂ (.handle v al) (.handle v' al')
+  | hdl {E al al' r r' b b'} : Ctx e₁ e₂ al al' → Ctx e₁ e₂ r r' → Ctx e₁ e₂ b b' →
+      Ctx e₁ e₂ (.hdl E al r b) (.hdl E al' r' b')
 
 variable {e₁ e₂ : Tm}
 
-theorem Ctx.symm {x : Pos} {C₁ C₂ : Tm} (h : Ctx e₁ e₂ x C₁ C₂) : Ctx e₂ e₁ x C₂ C₁ := by
+theorem Ctx.symm {C₁ C₂ : Tm} (h : Ctx e₁ e₂ C₁ C₂) : Ctx e₂ e₁ C₂ C₁ := by
   induction h <;> constructor <;> assumption
 
-theorem Ctx.src {x : Pos} {C₁ C₂ : Tm} (h : Ctx e₁ e₂ x C₁ C₂) (he : e₂.Src) : C₂.Src := by
+theorem Ctx.src {C₁ C₂ : Tm} (h : Ctx e₁ e₂ C₁ C₂) (he : e₂.Src) : C₂.Src := by
   induction h <;> simp_all [Tm.Src]
 
 theorem Pos.fr_any {x : Pos} (hx : x ≠ .park) : x.fr = .any := by
   cases x <;> simp_all
 
-/-- **The context relates the two programs.** -/
-theorem Ctx.sim {W : World} (h₀ : Sim W .any e₁ e₂) (he : e₂.Src) {x : Pos} {C₁ C₂ : Tm}
-    (h : Ctx e₁ e₂ x C₁ C₂) (hx : x ≠ .park) : Sim W x C₁ C₂ := by
+/-- **The context relates the two programs**: where a pattern reads, a hole would put a lazy cell
+there, so it stands only where a term runs or is bound, or in a dead arm. -/
+theorem Ctx.sim {W : World} (h₀ : Sim W .any e₁ e₂) (hz : e₁.LzShape ∨ e₂.LzShape)
+    (he : e₂.Src) {C₁ C₂ : Tm} (h : Ctx e₁ e₂ C₁ C₂) :
+    ∀ {x : Pos}, x ≠ .park → ¬ C₁.LzTop x → ¬ C₂.LzTop x → Sim W x C₁ C₂ := by
   have any : Pos.any ≠ .park := by decide
   have top : Pos.top ≠ .park := by decide
-  have fr := Pos.fr_any hx
   induction h with
-  | hole => exact h₀
-  | var => exact .var hx
-  | lit => exact .lit
-  | const => exact .const
-  | ctor => exact .ctor
-  | rnil => exact .rnil
-  | anil => exact .anil
-  | todo => exact .todo
-  | glob => exact .glob
-  | lam h ih => exact .lam (ih any rfl) (h.src he).noIns
-  | fix h ih => exact .fix (ih any rfl) (h.src he).noIns
-  | task h ih => exact .task (ih any rfl) (h.src he).noIns
-  | await _ ih => exact .await (fr ▸ ih any rfl)
-  | lazy _ ih => exact .lazy (ih any rfl)
-  | force _ ih => exact .force (fr ▸ ih any rfl)
-  | raise _ ih => exact .raise (fr ▸ ih any rfl)
-  | scope _ ih => exact .scope (ih any rfl)
-  | proj _ ih => exact .proj (fr ▸ ih any rfl)
-  | drec h ih => exact .drec (ih top rfl) (h.src he).noIns
-  | app _ _ ih₁ ih₂ => exact .app hx (ih₁ hx fr) (ih₂ hx fr)
-  | let_ _ _ ih₁ ih₂ => exact .let_ (fr ▸ ih₁ any rfl) (ih₂ any rfl)
-  | letrec h₁ _ ih₁ ih₂ => exact .letrec (ih₁ any rfl) (h₁.src he).noIns (ih₂ any rfl)
-  | rcons _ _ ih₁ ih₂ => exact .rcons hx (ih₁ hx fr) (ih₂ hx fr)
-  | update _ _ ih₁ ih₂ => exact .update hx (ih₁ any rfl) (ih₂ any rfl)
-  | match_ _ _ ih₁ ih₂ => exact .match_ (fr ▸ ih₁ any rfl) (ih₂ top rfl)
-  | acons _ _ ih₁ ih₂ => exact .acons (ih₁ any rfl) (ih₂ hx fr)
-  | aguard _ _ _ ih₁ ih₂ ih₃ => exact .aguard (ih₁ any rfl) (ih₂ any rfl) (ih₃ hx fr)
-  | try_ _ _ ih₁ ih₂ => exact .try_ (fr ▸ ih₁ any rfl) (ih₂ top rfl)
-  | handle _ _ ih₁ ih₂ => exact .handle (ih₁ top rfl) (ih₂ top rfl)
-  | hdl _ _ _ ih₁ ih₂ ih₃ => exact .hdl (ih₁ top rfl) (ih₂ any rfl) (ih₃ any rfl)
+  | hole =>
+    intro x hx h₁ h₂
+    cases x
+    · exact h₀
+    · exact (hz.elim (fun hs => h₁ (.here hs)) (fun hs => h₂ (.here hs))).elim
+    · exact (hx rfl).elim
+  | var => exact fun hx _ _ => .var hx
+  | lit => exact fun _ _ _ => .lit
+  | const => exact fun _ _ _ => .const
+  | ctor => exact fun _ _ _ => .ctor
+  | rnil => exact fun _ _ _ => .rnil
+  | anil => exact fun _ _ _ => .anil
+  | todo => exact fun _ _ _ => .todo
+  | glob => exact fun _ _ _ => .glob
+  | lam h ih => exact fun _ h₁ h₂ => .lam (ih any (h₁ ∘ .lam) (h₂ ∘ .lam)) (h.src he).noIns
+  | fix h ih => exact fun _ h₁ h₂ => .fix (ih any (h₁ ∘ .fix) (h₂ ∘ .fix)) (h.src he).noIns
+  | task h ih => exact fun _ h₁ h₂ => .task (ih any (h₁ ∘ .task) (h₂ ∘ .task)) (h.src he).noIns
+  | await _ ih =>
+    exact fun hx h₁ h₂ => .await ((Pos.fr_any hx).symm ▸ ih any (h₁ ∘ .await) (h₂ ∘ .await))
+  | lazy _ ih => exact fun _ h₁ h₂ => .lazy (ih any (h₁ ∘ .lazy) (h₂ ∘ .lazy))
+  | force _ ih =>
+    exact fun hx h₁ h₂ => .force ((Pos.fr_any hx).symm ▸ ih any (h₁ ∘ .force) (h₂ ∘ .force))
+  | raise _ ih =>
+    exact fun hx h₁ h₂ => .raise ((Pos.fr_any hx).symm ▸ ih any (h₁ ∘ .raise) (h₂ ∘ .raise))
+  | scope _ ih => exact fun _ h₁ h₂ => .scope (ih any (h₁ ∘ .scope) (h₂ ∘ .scope))
+  | proj _ ih =>
+    exact fun hx h₁ h₂ => .proj ((Pos.fr_any hx).symm ▸ ih any (h₁ ∘ .proj) (h₂ ∘ .proj))
+  | drec h ih => exact fun _ h₁ h₂ => .drec (ih top (h₁ ∘ .drec) (h₂ ∘ .drec)) (h.src he).noIns
+  | app _ _ ih₁ ih₂ =>
+    exact fun hx h₁ h₂ => .app hx (ih₁ hx (h₁ ∘ .appL) (h₂ ∘ .appL)) (ih₂ hx (h₁ ∘ .appR) (h₂ ∘ .appR))
+  | let_ _ _ ih₁ ih₂ =>
+    exact fun hx h₁ h₂ => .let_ ((Pos.fr_any hx).symm ▸ ih₁ any (h₁ ∘ .letL) (h₂ ∘ .letL))
+      (ih₂ any (h₁ ∘ .letR) (h₂ ∘ .letR))
+  | letrec h₁ _ ih₁ ih₂ =>
+    exact fun _ k₁ k₂ => .letrec (ih₁ any (k₁ ∘ .letrecL) (k₂ ∘ .letrecL)) (h₁.src he).noIns
+      (ih₂ any (k₁ ∘ .letrecR) (k₂ ∘ .letrecR))
+  | rcons _ _ ih₁ ih₂ =>
+    exact fun hx h₁ h₂ => .rcons hx (ih₁ hx (h₁ ∘ .rconsL) (h₂ ∘ .rconsL))
+      (ih₂ hx (h₁ ∘ .rconsR) (h₂ ∘ .rconsR))
+  | update _ _ ih₁ ih₂ =>
+    exact fun hx h₁ h₂ => .update hx (ih₁ any (h₁ ∘ .updL) (h₂ ∘ .updL))
+      (ih₂ any (h₁ ∘ .updR) (h₂ ∘ .updR))
+  | match_ _ _ ih₁ ih₂ =>
+    exact fun hx h₁ h₂ => .match_ ((Pos.fr_any hx).symm ▸ ih₁ any (h₁ ∘ .matchL) (h₂ ∘ .matchL))
+      (ih₂ top (h₁ ∘ .matchR) (h₂ ∘ .matchR))
+  | @acons p b b' r r' hb _ ihb ihr =>
+    intro x hx h₁ h₂
+    by_cases hd : b.LzTop .any ∨ b'.LzTop .any
+    · exact .aconsD hd (hb.src he).noIns (ihr hx (h₁ ∘ .acons) (h₂ ∘ .acons))
+    · exact .acons (ihb any (fun h => hd (.inl h)) (fun h => hd (.inr h)))
+        (ihr hx (h₁ ∘ .acons) (h₂ ∘ .acons))
+  | aguard _ _ _ ih₁ ih₂ ih₃ =>
+    exact fun hx h₁ h₂ => .aguard (ih₁ any (h₁ ∘ .aguardG) (h₂ ∘ .aguardG))
+      (ih₂ any (h₁ ∘ .aguardB) (h₂ ∘ .aguardB)) (ih₃ hx (h₁ ∘ .aguardR) (h₂ ∘ .aguardR))
+  | try_ _ _ ih₁ ih₂ =>
+    exact fun hx h₁ h₂ => .try_ ((Pos.fr_any hx).symm ▸ ih₁ any (h₁ ∘ .tryL) (h₂ ∘ .tryL))
+      (ih₂ top (h₁ ∘ .tryR) (h₂ ∘ .tryR))
+  | handle _ _ ih₁ ih₂ =>
+    exact fun _ h₁ h₂ => .handle (ih₁ top (h₁ ∘ .handleV) (h₂ ∘ .handleV))
+      (ih₂ top (h₁ ∘ .handleA) (h₂ ∘ .handleA))
+  | hdl _ _ _ ih₁ ih₂ ih₃ =>
+    exact fun _ h₁ h₂ => .hdl (ih₁ top (h₁ ∘ .hdlA) (h₂ ∘ .hdlA)) (ih₂ any (h₁ ∘ .hdlR) (h₂ ∘ .hdlR))
+      (ih₃ any (h₁ ∘ .hdlE) (h₂ ∘ .hdlE))
 
 /-- The world of two runs that have not started. -/
 def World.empty : World := ⟨fun _ _ _ => False, fun _ => False, fun _ => False, fun _ _ => False⟩
@@ -138,7 +173,7 @@ def Ends (root : Roots) (e : Tm) (o : Lit) : Prop :=
 /-- **Contextual equivalence**: every two typed programs one context builds around `e₁` and
 `e₂` may end with the same literals. -/
 def CtxEquiv (S : Sig) (e₁ e₂ : Tm) : Prop :=
-  ∀ root C₁ C₂, Ctx e₁ e₂ .any C₁ C₂ → Prog S root C₁ → Prog S root C₂ →
+  ∀ root C₁ C₂, Ctx e₁ e₂ C₁ C₂ → Prog S root C₁ → Prog S root C₂ →
     ∀ o, Ends root C₁ o ↔ Ends root C₂ o
 
 theorem closed_of_typ {S : Sig} {Ψ : List Ty} {Θ : Facts} {e : Tm} {j : J}
@@ -146,15 +181,19 @@ theorem closed_of_typ {S : Sig} {Ψ : List Ty} {Θ : Facts} {e : Tm} {j : J}
   have := h.frees i hi
   simp at this
 
-/-- **Typing closes the threads** of every configuration a program reaches. -/
+/-- **Typing closes the threads** of every configuration a program reaches, and keeps lazy cells
+away from where patterns read. -/
 theorem Prog.reach {S : Sig} {root : Roots} {e : Tm} (h : Prog S root e) :
     Reach root ⟨[], [], e⟩ := by
   obtain ⟨hroot, -, hb, t, φ, h₀, ht, hφ⟩ := h
   intro c hs
   obtain ⟨X, _, hm, hΛ, -⟩ := steps_typed hroot hs ht hφ (CfgTy.init h₀ hb)
-  refine ⟨closed_of_typ hm, fun p g hg k hk => ?_⟩
+  refine ⟨closed_of_typ hm, hm.noLzTop (fun h => nomatch h), fun p g hg k hk => ?_⟩
   obtain ⟨t', φ', hk'⟩ := (hΛ p g hg).1 k hk
-  exact closed_of_typ hk'
+  exact ⟨closed_of_typ hk', hk'.noLzTop (fun h => nomatch h)⟩
+
+theorem Prog.noLzTop {S : Sig} {root : Roots} {e : Tm} (h : Prog S root e) : ¬ e.LzTop .any :=
+  (h.reach _ .refl).2.1
 
 /-- A program simulated by another one from the start ends with a literal it ends with. -/
 theorem Ends.sim {S : Sig} {root : Roots} {C₁ C₂ : Tm} {o : Lit}
@@ -167,11 +206,14 @@ theorem Ends.sim {S : Sig} {root : Roots} {C₁ C₂ : Tm} {o : Lit}
   obtain ⟨Λ₂, μ₂, hs₃⟩ := lit_sim (root := root) hr'
   exact ⟨Λ₂, μ₂, hs₂.trans hs₃⟩
 
-/-- **Terms related both ways are contextually equivalent.** -/
+/-- **Terms related both ways are contextually equivalent**, when one makes or forces a lazy cell
+at its top. -/
 theorem ctxEquiv_of_sim {S : Sig} (h₁₂ : Sim World.empty .any e₁ e₂)
-    (h₂₁ : Sim World.empty .any e₂ e₁) (s₁ : e₁.Src) (s₂ : e₂.Src) : CtxEquiv S e₁ e₂ :=
+    (h₂₁ : Sim World.empty .any e₂ e₁) (hz : e₁.LzShape ∨ e₂.LzShape) (s₁ : e₁.Src)
+    (s₂ : e₂.Src) : CtxEquiv S e₁ e₂ :=
   fun _ _ _ hc p₁ p₂ _ =>
-    ⟨Ends.sim (hc.sim h₁₂ s₂ (by decide)) p₁ p₂, Ends.sim (hc.symm.sim h₂₁ s₁ (by decide)) p₂ p₁⟩
+    ⟨Ends.sim (hc.sim h₁₂ hz s₂ (by decide) p₁.noLzTop p₂.noLzTop) p₁ p₂,
+      Ends.sim (hc.symm.sim h₂₁ hz.symm s₁ (by decide) p₂.noLzTop p₁.noLzTop) p₂ p₁⟩
 
 theorem _root_.Flick.Tm.Src.rename : ∀ {e : Tm}, e.Src → ∀ ξ, (e.rename ξ).Src := by
   intro e
@@ -181,16 +223,16 @@ theorem _root_.Flick.Tm.Src.rename : ∀ {e : Tm}, e.Src → ∀ ξ, (e.rename �
 theorem o1a {S : Sig} {e c : Tm} (he : e.Src) (hc : c.Src) :
     CtxEquiv S (.let_ (.lazy e) (c.rename (· + 1))) c :=
   ctxEquiv_of_sim (.dropA rfl (Sim.refl hc _ (by decide)))
-    (.dropC rfl hc.noIns (Sim.refl hc _ (by decide))) ⟨he, hc.rename _⟩ hc
+    (.dropC rfl hc.noIns (Sim.refl hc _ (by decide))) (.inl trivial) ⟨he, hc.rename _⟩ hc
 
 /-- **O1b**: a cell of a value is made done. -/
 theorem o1b {S : Sig} {v : Tm} (hv : Value v) (hs : v.Src) : CtxEquiv S (.lazy v) (born v) :=
   ctxEquiv_of_sim (.bornA hv hv (Sim.refl hs _ (by decide)))
-    (.bornB hv hv (Sim.refl hs _ (by decide))) hs (by simp [born, Tm.Src, hs])
+    (.bornB hv hv (Sim.refl hs _ (by decide))) (.inl trivial) hs (by simp [born, Tm.Src, hs])
 
 /-- **O1c**: a cell forced where it is made is not made. -/
 theorem o1c {S : Sig} {e : Tm} (he : e.Src) : CtxEquiv S (.force (.lazy e)) e :=
   ctxEquiv_of_sim (.forceA (Sim.refl he _ (by decide)))
-    (.forceC he.noIns (Sim.refl he _ (by decide))) he he
+    (.forceC he.noIns (Sim.refl he _ (by decide))) (.inl trivial) he he
 
 end Flick.Equiv

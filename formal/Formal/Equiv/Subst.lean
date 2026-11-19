@@ -172,6 +172,9 @@ theorem Sim.rename {x : Pos} {a b : Tm} (h : Sim W x a b) :
   | rconsV hv _ _ ih₁ ih₂ => intro ξ; exact .rconsV hv.rename (ih₁ ξ) (ih₂ ξ)
   | updK hs _ _ ih₁ ih₂ => intro ξ; exact .updK (hs.rename ξ) (ih₁ ξ) (ih₂ ξ)
   | updV hv _ _ ih₁ ih₂ => intro ξ; exact .updV hv.rename (ih₁ ξ) (ih₂ ξ)
+  | aconsD hd hn _ ih =>
+    intro ξ; simp only [Tm.rename]
+    exact .aconsD (hd.imp (·.rename _) (·.rename _)) (Tm.NoIns.rename _ hn) (ih ξ)
   | _ =>
     intro ξ; simp only [Tm.rename]
     constructor <;> first | assumption | exact Tm.NoIns.rename _ ‹_› | apply_assumption
@@ -213,6 +216,9 @@ theorem Sim.subst {x : Pos} {a b : Tm} (h : Sim W x a b) :
   | rconsV hv _ _ ih₁ ih₂ => intro σ σ' hσ; exact .rconsV hv.subst (ih₁ _ _ hσ) (ih₂ _ _ hσ)
   | updK hs _ _ ih₁ ih₂ => intro σ σ' hσ; exact .updK (hs.subst σ) (ih₁ _ _ hσ) (ih₂ _ _ hσ)
   | updV hv _ _ ih₁ ih₂ => intro σ σ' hσ; exact .updV hv.subst (ih₁ _ _ hσ) (ih₂ _ _ hσ)
+  | aconsD hd hn _ ih =>
+    intro σ σ' hσ; simp only [Tm.subst]
+    exact .aconsD (hd.imp (·.subst _) (·.subst _)) (Tm.NoIns.subst hn (hσ.lift _).noIns) (ih _ _ hσ)
   | _ =>
     intro σ σ' hσ; simp only [Tm.subst]
     constructor <;> first

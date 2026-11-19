@@ -34,9 +34,11 @@ theorem HAns.pure {μ μ₂ : List Tm} {r₂ r' W₁ μ₂a r₂a r₂'}
     (hst : StR W μ μ₂) : HAns W μ₂ r₂ μ μ r' :=
   ⟨W₁, μ₂a, r₂a, W₁, μ₂a, r₂', hj, .pure hs .refl, World.le.refl _, h, hj.st _ hst, fun _ _ => rfl⟩
 
-/-- **A runtime head step** that keeps the regions. -/
+/-- **A runtime head step** that keeps the regions. Neither side takes a dead arm: what the
+step gives has no lazy cell where a pattern reads (`hzl`, `hzr`). -/
 theorem rhead_sim {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {r r' r₂ : Tm}
-    (hh : RHead Λ μ r Λ' μ' r') (hreg : ¬ r.Reg) (h : Sim W .top r r₂) (hst : StR W μ μ₂) :
+    (hh : RHead Λ μ r Λ' μ' r') (hreg : ¬ r.Reg) (h : Sim W .top r r₂) (hst : StR W μ μ₂)
+    (hzl : ¬ r'.LzTop .any) (hzr : ∀ r₂', (∀ Λ, RHead Λ μ₂ r₂ Λ μ₂ r₂') → ¬ r₂'.LzTop .any) :
     HAns W μ₂ r₂ μ μ' r' := by
   cases hh with
   | @refMake v _ _ hv =>
@@ -142,7 +144,10 @@ theorem rhead_sim {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {r r' r₂ : Tm}
     obtain ⟨b', r', rfl, hb, hr⟩ := h₂.inv_acons
     have hv' := h₁.top_value rfl hv
     obtain ⟨δ₂, hm', hδ⟩ := h₁.matchP_sub hv' hm
-    exact HAns.one (.refl _ _) (fun _ => .handleYes hv' hm') (hb.subst _ _ hδ) hst
+    rcases hb with hb | ⟨hd | hd, -⟩
+    · exact HAns.one (.refl _ _) (fun _ => .handleYes hv' hm') (hb.subst _ _ hδ) hst
+    · exact (hzl (hd.subst _)).elim
+    · exact (hzr _ (fun _ => .handleYes hv' hm') (hd.subst _)).elim
   | handleNo hv hm =>
     obtain ⟨v', al', rfl, h₁, h₂⟩ := h.inv_handle
     obtain ⟨b', r', rfl, hb, hr⟩ := h₂.inv_acons

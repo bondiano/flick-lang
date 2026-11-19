@@ -84,11 +84,13 @@ theorem Sim.inv_match {e : Tm} {al : Tm} {r₂ : Tm} (h : Sim W .top (.match_ e 
   | _ => first | (cases hx; done) | (subst hx; contradiction)
 
 theorem Sim.inv_acons {p : Pat} {b : Tm} {r : Tm} {r₂ : Tm} (h : Sim W .top (.acons p b r) r₂) :
-    ∃ b' r', r₂ = (.acons p b' r') ∧ Sim W .any b b' ∧ Sim W .top r r' := by
+    ∃ b' r', r₂ = (.acons p b' r') ∧ ArmR W b b' ∧ Sim W .top r r' := by
   generalize hx : Pos.top = x at h
   cases h with
   | acons =>
-    subst hx; exact ⟨_, _, rfl, ‹_›, ‹_›⟩
+    subst hx; exact ⟨_, _, rfl, .inl ‹_›, ‹_›⟩
+  | aconsD hd hn =>
+    subst hx; exact ⟨_, _, rfl, .inr ⟨hd, hn⟩, ‹_›⟩
   | _ => first | (cases hx; done) | (subst hx; contradiction)
 
 theorem Sim.inv_aguard {p : Pat} {g : Tm} {b : Tm} {r : Tm} {r₂ : Tm} (h : Sim W .top (.aguard p g b r) r₂) :
