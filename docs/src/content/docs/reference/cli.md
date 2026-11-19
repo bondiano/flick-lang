@@ -41,8 +41,8 @@ of their own. `flick --help` lists them by contributor, and they run as
 | `plugins` | the plugins of the project's path, git and url dependencies, the compiler's own first: where each comes from, the hash of its component and whether `flick.lock` pins that build |
 | `pack --out-dir <dir>` | a release build and its npm tarball; refuses `todo` and `echo` (`FLICK-P024`), and warns when the public API breaks importers since the latest tag |
 | `diff [ref]` | the public API changes since a git revision (the latest tag by default), each `MAJOR` (removed or changed) or `MINOR` (added), and the version they call for from `package.json` |
-| `ffi import <pkg> --out <dir> [--select a,b]` | reads the `.d.ts` of an installed package and writes `<dir>/<Pkg>/Generated.fl` with a coverage report; `--select` imports only the named exports (see [Importing a package's `.d.ts`](../ffi/#importing-a-packages-dts)) |
-| `ffi check [paths]` | checks generated and reviewed bindings and their policies against the installed packages; without paths the source root |
+| `ffi import <pkg> --out <dir> [--select a,b]` | a command of the JavaScript backend (`js:ffi import`): reads the `.d.ts` of an installed package and writes `<dir>/<Pkg>/Generated.fl` with a coverage report; `--select` imports only the named exports (see [Importing a package's `.d.ts`](../ffi/#importing-a-packages-dts)) |
+| `ffi check [paths]` | a command of the JavaScript backend: checks generated and reviewed bindings and their policies against the installed packages; without paths the source root |
 | `schema export <M.codec> --target json-schema-2020-12 --out <file>` | the strict JSON Schema of a `PureCodec Json a` |
 | `schema export <M.api> --target openapi-3.1 --out <file>` | an `HttpApi.Api` value as an OpenAPI 3.1 document, the same document `HttpApi.openapi` makes (see [Clients and documents](../http-api/#clients-and-documents)) |
 | `doc --out-dir <dir> [--source-base-url <url>] [--check-examples] [--std]` | Markdown pages of the public API: types, kinds, constraints, effects, captures |

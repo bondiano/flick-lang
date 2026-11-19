@@ -9,7 +9,7 @@ use flick_backend::{
     Artifact, ArtifactKind, BuildResult, InputRef, StepOutput, Toolchain, ToolchainStep,
 };
 
-use super::{Failure, run};
+use super::{Failure, Reads, run};
 use crate::backends::tools::Tool;
 use crate::backends::tools::tests::script;
 use crate::{artifact, component};
@@ -91,6 +91,7 @@ impl Case {
             &result,
             &order,
             &sources,
+            &Reads::new(),
             slice::from_ref(&self.tool),
             &self.out,
             cancel,

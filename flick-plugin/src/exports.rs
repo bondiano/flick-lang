@@ -144,6 +144,19 @@ pub trait Plugin {
     ) -> Result<command::Plan, Vec<command::Diagnostic>> {
         Err(command::unknown(&invocation.name))
     }
+    /// The rest of a plan whose steps have run, `outputs` holding their files.
+    #[cfg(feature = "commands")]
+    fn resume(
+        &self,
+        state: Vec<u8>,
+        outputs: Vec<command::File>,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        let _ = (state, outputs);
+        Err(vec![command::Diagnostic::error(
+            "P055",
+            "this contributor resumes no plan".into(),
+        )])
+    }
     /// The state of a new session of the session command `invocation.name`.
     #[cfg(feature = "commands")]
     fn open(&self, invocation: &command::Invocation) -> Result<Vec<u8>, Vec<command::Diagnostic>> {

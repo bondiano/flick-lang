@@ -36,7 +36,7 @@ pub(super) fn serve(
 ) -> ExitCode {
     let mut state = match contributor.open(invocation) {
         Ok(state) => state,
-        Err(diagnostics) => return finish(global, &diagnostics, &[]),
+        Err(diagnostics) => return finish(global, invocation, &diagnostics, &[]),
     };
     let Ok(engine) = component::engine() else {
         return ExitCode::from(1);
@@ -108,16 +108,12 @@ pub(super) fn serve(
         }
     }
     let plan = contributor.close(state);
+    let done = carry_out(project, contributor, descriptor, invocation, plan, tools);
     // stdout is the protocol's: what the session prints goes to stderr
-    if !plan.stdout.is_empty() {
-        eprint!("{}", String::from_utf8_lossy(&plan.stdout));
+    if !done.stdout.is_empty() {
+        eprint!("{}", String::from_utf8_lossy(&done.stdout));
     }
-    let refused = carry_out(project, descriptor, invocation, &plan, tools);
-    finish(
-        global,
-        &plan.diagnostics,
-        &refused.err().into_iter().collect::<Vec<_>>(),
-    )
+    finish(global, invocation, &done.diagnostics, &done.refused)
 }
 
 fn cancels(message: &Value, id: Option<&Value>) -> bool {
