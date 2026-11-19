@@ -65,9 +65,16 @@ pub fn item_init(module: &str, index: usize) -> String {
     format!("{}__item_{index}", init(module))
 }
 
-/// The file of a module's code.
+/// The file of a module's code. `go build` reads the last `_` part of a file
+/// name in lower case as a constraint, `_test` as a test `go test` runs and
+/// `_linux` or `_386` as a platform, so such a name ends in `-`, which no
+/// mangled name has: a test companion `App.Users$test`, or `App.Users_linux`.
 pub fn file(module: &str) -> String {
-    format!("m_{}.go", mangle(&module.replace('.', "_")))
+    let stem = mangle(&module.replace('.', "_"));
+    let last = stem.rsplit('_').next().unwrap_or_default();
+    let constraint =
+        !last.is_empty() && (last.bytes()).all(|b| b.is_ascii_lowercase() || b.is_ascii_digit());
+    format!("m_{stem}{}.go", if constraint { "-" } else { "" })
 }
 
 pub fn local(name: &str) -> String {
@@ -108,5 +115,17 @@ mod tests {
         );
         assert_eq!(local("x'"), "l_x_x27_");
         assert_eq!(string("a\"\n\u{1F30D}"), "\"a\\\"\\u000a\\U0001f30d\"");
+    }
+
+    #[test]
+    fn no_file_of_a_module_is_one_go_build_leaves_out() {
+        assert_eq!(file("App.Users"), "m_App_Users.go");
+        assert_eq!(file("App.Users$test"), "m_App_Users_x24_test-.go");
+        assert_eq!(file("App.Users_test"), "m_App_Users_test-.go");
+        assert_eq!(file("test"), "m_test-.go");
+        assert_eq!(file("App.Users_linux"), "m_App_Users_linux-.go");
+        assert_eq!(file("App.Users_386"), "m_App_Users_386-.go");
+        // two modules never share a file
+        assert_eq!(file("App.Users_test_"), "m_App_Users_test_.go");
     }
 }

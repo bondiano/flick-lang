@@ -42,6 +42,10 @@ impl FmtCommand {
             match super::check::select(&host, &mut outcome.sources, self.project.as_deref(), &[]) {
                 Ok((project, roots)) => {
                     paths.extend(roots.iter().map(|r| r.to_string_lossy().into_owned()));
+                    // the test companions beside the sources are formatted too
+                    if let Some(p) = &project {
+                        sources::companions(&p.source_root().to_string_lossy(), &mut paths);
+                    }
                     project
                 }
                 Err(d) => {
@@ -54,7 +58,7 @@ impl FmtCommand {
         };
         let mut plugins = FormatPlugins::new(&host, &mut outcome.sources, project.as_ref());
         for path in &self.options.paths {
-            sources::source_files(path, &mut paths);
+            sources::all_files(path, &mut paths);
         }
         for path in paths {
             let file = match sources::load(&mut outcome.sources, &path) {

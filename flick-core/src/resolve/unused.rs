@@ -2,6 +2,8 @@
 
 use std::collections::BTreeSet;
 
+use flick_backend_support::suites::companion_of;
+
 use super::scope::Scope;
 use super::syntax::{Import, Item, ItemKind};
 use super::uses::{Reference, Unused};
@@ -130,6 +132,10 @@ impl Scope<'_> {
         names.extend(qualifiers.iter().filter(|q| !q.contains('.')));
         for (import, interface) in self.imports() {
             if import.module.starts_with("$scope:") || import.module.starts_with("$lexical:") {
+                continue;
+            }
+            // a test companion's import of its module has no source to remove
+            if companion_of(module.name) == Some(import.module.as_str()) {
                 continue;
             }
             // A module expression's synthetic binding import has no source

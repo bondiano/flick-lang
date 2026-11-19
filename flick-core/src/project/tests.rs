@@ -6,7 +6,10 @@ use std::path::{Path, PathBuf};
 use super::config::{Build, Config, Kind};
 #[cfg(feature = "native-project")]
 use super::discover;
-use super::{Host, Project, check, compile, is_module_name, module_name, module_path, normalize};
+use super::{
+    Host, Project, check, companion_module, compile, is_companion, is_module_name, module_name,
+    module_path, normalize,
+};
 use crate::diagnostics::{Severity, codes};
 use crate::source::SourceMap;
 use crate::types::Thresholds;
@@ -507,5 +510,21 @@ fn main_may_need_the_services_its_runner_provides() {
             matches!(&diagnostics[..], [d] if d.starts_with("FLICK-P026 src/App/Main.fl `main`: entry `main` is not a `Runner.Cloudflare.Main`")),
             "{services}: {diagnostics:?}"
         );
+    }
+}
+
+#[test]
+fn a_companion_stands_for_the_module_file_beside_it() {
+    let module = |p: &str| companion_module(Path::new(p));
+    assert_eq!(
+        module("src/App/Users.test.fl"),
+        Some(PathBuf::from("src/App/Users.fl"))
+    );
+    assert!(is_companion(Path::new("src/App/Users.test.fl")));
+    assert_eq!(module("src/App/Users.fl"), None);
+    // a bare `.test.fl` names no module
+    for bare in [".test.fl", "src/App/.test.fl"] {
+        assert_eq!(module(bare), None, "{bare}");
+        assert!(!is_companion(Path::new(bare)), "{bare}");
     }
 }

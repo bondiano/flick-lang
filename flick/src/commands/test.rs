@@ -24,7 +24,7 @@ use crate::backends::{self, Selected};
 use crate::package_cache;
 use crate::progress::{Mode, Progress};
 use crate::sources::FsHost;
-use crate::{builtins, cache, child, report, timings};
+use crate::{builtins, cache, child, report, sources, timings};
 use flick_core::build::Extras;
 
 mod cached;
@@ -88,6 +88,13 @@ fn prepare(
     let Some(project) = project else {
         return Err(());
     };
+    // the test companions beside the sources, which only this command runs
+    let mut roots = roots;
+    let mut companions = Vec::new();
+    if project.source_root().is_dir() {
+        sources::companions(&project.source_root().to_string_lossy(), &mut companions);
+    }
+    roots.extend(companions.into_iter().map(PathBuf::from));
     let wanted: Vec<PathBuf> = options
         .paths
         .iter()

@@ -56,6 +56,8 @@ include!("checking_tests_stored.rs");
 include!("checking_tests_reasons.rs");
 #[cfg(feature = "ide")]
 include!("checking_tests_visibility.rs");
+#[cfg(all(feature = "ide", feature = "native-project"))]
+include!("checking_tests_companions.rs");
 include!("checking_tests_relocate.rs");
 #[cfg(feature = "ide")]
 include!("checking_tests_broken.rs");

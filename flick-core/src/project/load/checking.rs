@@ -30,11 +30,11 @@ use crate::ir;
 use crate::plugin::calls as plugin_calls;
 use crate::plugin::expansion::Expansion;
 use crate::plugin::first_party;
-use crate::project::Project;
 use crate::project::builtins::builtin_modules_of;
 #[cfg(feature = "native-project")]
 use crate::project::cache::Key as Hashed;
 use crate::project::config::{Checked, Config};
+use crate::project::{COMPANIONS, Project, companion_of};
 use crate::resolve::{self, Interface, ModuleSyntax};
 use crate::resolve::{Header, Import, Item, ItemKind};
 use crate::source::Span;
@@ -99,6 +99,7 @@ pub(crate) fn check_file(
         cache: None,
         watching: &watching,
         watched: &watched,
+        privates: &BTreeMap::new(),
     };
     let builtin = |name: &str| {
         types::builtins()
@@ -310,11 +311,23 @@ impl Loader<'_> {
             lower_packages_only: self.lower_packages_only,
             precompiled: &self.precompiled,
             cache: self.cache.as_deref(),
+            privates: &self.privates,
         }
     }
 
     fn apply(&mut self, i: usize, (output, key, digest, reason): Outcome, known: &mut Known) {
         known.digests[i] = digest;
+        // a module whose test companion is loaded shows it all it declares
+        let name = &self.modules[i].name;
+        if COMPANIONS
+            && self
+                .modules
+                .iter()
+                .any(|m| companion_of(&m.name) == Some(name))
+        {
+            let view = private_view(&output.exported, &output.declarations);
+            self.privates.insert(name.clone(), view);
+        }
         if let Some(cache) = &mut self.cache
             && cache.explain
             && self.modules[i].scope_of.is_none()
@@ -392,6 +405,8 @@ struct Checking<'a> {
     watching: &'a [super::plugins::Watching],
     /// Every name they watch, which the checker collects.
     watched: &'a types::Watched,
+    /// What each test companion sees of its module, by the module's name.
+    privates: &'a BTreeMap<String, Interface>,
 }
 
 include!("checking_core.rs");

@@ -5,6 +5,7 @@ use crate::args::{Color, GlobalArguments, Reporter, TestArguments};
 use crate::backends;
 use crate::backends::Selected;
 use crate::progress::Mode;
+use flick_core::project::suite_name;
 use std::env;
 use std::fmt::Write;
 use std::io::{self, IsTerminal};
@@ -26,7 +27,7 @@ pub(super) fn runner_source(suites: &[(String, String)], rt: bool) -> String {
     let list: Vec<String> = suites
         .iter()
         .enumerate()
-        .map(|(i, (name, _))| format!("[{name:?}, $s{i}.tests]"))
+        .map(|(i, (name, _))| format!("[{:?}, $s{i}.tests]", suite_name(name)))
         .collect();
     let _ = write!(out, "\nawait runTests([{}]);\n", list.join(", "));
     out

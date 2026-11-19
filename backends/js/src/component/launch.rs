@@ -6,6 +6,7 @@ use crate::codegen::{
     runner::{Start, named_runner},
 };
 use flick_backend::{Artifact, ArtifactKind, BuildRequest, Diagnostic, Launch, LaunchKind};
+use flick_backend_support::suites::suite_name;
 use std::fmt::Write;
 
 pub(super) fn generate(
@@ -91,7 +92,10 @@ pub(super) fn generate(
         let list: Vec<_> = roots
             .iter()
             .enumerate()
-            .map(|(i, root)| format!("[{:?}, $s{i}.{}]", root.module, ident(&root.name)))
+            .map(|(i, root)| {
+                let module = suite_name(&root.module);
+                format!("[{module:?}, $s{i}.{}]", ident(&root.name))
+            })
             .collect();
         let _ = writeln!(contents, "\nawait runTests([{}]);", list.join(", "));
         let output = artifact("test.js".into(), ArtifactKind::Source, contents);

@@ -26,7 +26,7 @@ mod target_preflight_tests;
 #[cfg(feature = "native-project")]
 pub mod workspace;
 
-use std::path::{Component, Path, PathBuf};
+use std::path::{Component, Path, PathBuf, is_separator};
 use std::sync::Arc;
 
 pub use config::Config;
@@ -200,6 +200,34 @@ pub fn normalize(path: &Path) -> PathBuf {
         }
     }
     out
+}
+
+pub use flick_backend_support::suites::{COMPANION, companion_of, suite_name};
+
+/// Whether a run reads test companions: only a project on disk, which
+/// `flick test` runs and `flick fmt` formats, has them, and the browser
+/// compiler leaves them out.
+pub const COMPANIONS: bool = cfg!(feature = "native-project");
+
+/// The file name a test companion ends with.
+const COMPANION_FILE: &str = ".test.fl";
+
+/// The path of a test companion without its `.test.fl`: `src/Users` of
+/// `src/Users.test.fl`, never of a bare `src/.test.fl`, which no module has.
+fn companion_stem(path: &Path) -> Option<&str> {
+    let stem = path.to_str()?.strip_suffix(COMPANION_FILE)?;
+    (!stem.is_empty() && !stem.ends_with(is_separator)).then_some(stem)
+}
+
+/// Whether `path` is a test companion, `Users.test.fl`, by its name.
+pub fn is_companion(path: &Path) -> bool {
+    companion_stem(path).is_some()
+}
+
+/// The module file of the test companion `path`: `Users.fl` of
+/// `Users.test.fl`.
+pub fn companion_module(path: &Path) -> Option<PathBuf> {
+    companion_stem(path).map(|stem| PathBuf::from(format!("{stem}.fl")))
 }
 
 /// `App/Users.fl` → `App.Users`; `None` unless every part is a capitalized name.

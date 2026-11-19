@@ -384,6 +384,7 @@ fn pack_writes_the_sources_of_a_library() {
                 "test/Lib/GreetingTest.fl",
                 "module Lib.GreetingTest exposing ()\n",
             ),
+            ("src/Lib/Greeting.test.fl", "module Lib.Greeting\n"),
         ],
     );
     let out = run(&dir, &["pack", "--out-dir", "artifacts"]);
