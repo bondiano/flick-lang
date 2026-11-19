@@ -20,6 +20,11 @@
 //!   argument that is a function in parentheses, a list, a record, a tuple
 //!   or a block in braces hugs the call when what precedes its first break
 //!   fits: `f a (fun x ->`, the body, then `)` on its own line;
+//! - where the lines under a call are its arguments, as in a `ui` body, a
+//!   call keeps its arguments on its line; when it does not fit, the calls
+//!   of names in parentheses that end them go on lines of their own under
+//!   it, without the parentheses, and a call in parentheses alone on such a
+//!   line loses them where its first line fits;
 //! - an operator chain breaks before each operator of its weakest
 //!   precedence, one level in; a pipeline of `|>` or `<|` breaks one step
 //!   per line, its operators under the first operand when the pipeline
@@ -74,6 +79,7 @@ mod conditional;
 mod decl;
 mod expr;
 pub(crate) mod foralls;
+mod lines;
 mod plugins;
 mod printer;
 mod program;
@@ -82,9 +88,10 @@ mod types;
 
 use comments::Comments;
 use foralls::drop_redundant_foralls;
+use plugins::Layouts;
 pub use plugins::PluginOf;
 use printer::{Printer, nodes};
-use program::program;
+use program::{Lines, program};
 
 /// The line width the layout aims at.
 pub const WIDTH: usize = 100;
@@ -121,16 +128,24 @@ fn format_reporting(
     // This syntax rewrite is narrower than AST normalization: explicit
     // `forall` changes polymorphic recursion and may shadow an outer variable.
     drop_redundant_foralls(&mut parsed.tree, text);
-    let expected = program(&parsed.tree, text);
-    drop_empty_rows(&mut parsed.tree);
-    let (out, kept, failed) = source_file(&parsed.tree, text, file, plugin_of);
+    let (layouts, bodies, failed) = plugins::layouts(&parsed.tree, text, file, plugin_of);
     // a plugin that failed leaves its block as written, and the file with it
     if !failed.is_empty() {
         return Err(failed);
     }
+    let heads = plugins::heads(&parsed.tree, text, file);
+    let heads: Vec<&str> = heads.iter().map(String::as_str).collect();
+    let lines = Lines {
+        file,
+        heads: &heads,
+        bodies: &bodies,
+    };
+    let expected = program(&parsed.tree, text, &lines);
+    drop_empty_rows(&mut parsed.tree);
+    let (out, kept) = source_file(&parsed.tree, text, &layouts, &lines);
     let again = parse(&out, file);
     let same = again.diagnostics.is_empty()
-        && program(&again.tree, &out) == expected
+        && program(&again.tree, &out, &lines) == expected
         && comments(&again.tree, &out) == comments(&parsed.tree, text);
     if !same {
         return Err(vec![Diagnostic::new(
@@ -142,17 +157,9 @@ fn format_reporting(
     Ok((out, kept))
 }
 
-fn source_file(
-    tree: &Node,
-    text: &str,
-    file: FileId,
-    plugin_of: PluginOf,
-) -> (String, Kept, Vec<Diagnostic>) {
-    let (layouts, failed) = plugins::layouts(tree, text, file, plugin_of);
-    let heads = plugins::heads(tree, text, file);
-    let heads: Vec<&str> = heads.iter().map(String::as_str).collect();
+fn source_file(tree: &Node, text: &str, layouts: &Layouts, lines: &Lines) -> (String, Kept) {
     let arena = DocumentArena::new();
-    let mut p = Printer::new(&arena, text, Comments::new(tree, text), &layouts);
+    let mut p = Printer::new(&arena, text, Comments::new(tree, text), layouts);
     let declarations = nodes(tree);
     let mut out = String::with_capacity(text.len() + text.len() / 8);
     let mut kept = Vec::new();
@@ -167,7 +174,7 @@ fn source_file(
         let saved = p.comments.save();
         let laid_out = p.node(declaration).to_pretty_string(WIDTH);
         let misplaced = p.comments.misplaced || p.comments.any_before(end);
-        if !misplaced && verify(declaration, text, &laid_out, file, &heads) {
+        if !misplaced && verify(declaration, text, &laid_out, lines) {
             out.push_str(&laid_out);
         } else {
             p.comments.restore(saved);
@@ -188,7 +195,7 @@ fn source_file(
     if !out.is_empty() {
         out.push('\n');
     }
-    (out, kept, failed)
+    (out, kept)
 }
 
 /// Ends the current line, if any, leaving a blank line when asked.
@@ -201,13 +208,13 @@ fn separate(out: &mut String, blank: bool) {
     }
 }
 
-/// Whether `laid_out`, parsed alone with the plugin heads `heads` of its
-/// file, is the declaration it was made from.
-fn verify(declaration: &Node, text: &str, laid_out: &str, file: FileId, heads: &[&str]) -> bool {
-    let again = parse_with_heads(laid_out, file, heads);
+/// Whether `laid_out`, parsed alone with the plugin heads of its file, is
+/// the declaration it was made from.
+fn verify(declaration: &Node, text: &str, laid_out: &str, lines: &Lines) -> bool {
+    let again = parse_with_heads(laid_out, lines.file, lines.heads);
     let items = nodes(&again.tree);
     again.diagnostics.is_empty()
-        && matches!(items.as_slice(), [one] if program(one, laid_out) == program(declaration, text))
+        && matches!(items.as_slice(), [one] if program(one, laid_out, lines) == program(declaration, text, lines))
         && comments(&again.tree, laid_out) == comments(declaration, text)
 }
 

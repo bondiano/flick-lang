@@ -806,7 +806,9 @@ statements becomes a line break, and so does `;` between the fields of a
 broken record, a broken bracket gets a trailing `,`, a broken variant list starts with
 `|`, and empty rows of an arrow are dropped, which are the same type:
 `->{none; E}` becomes `->{; E}`, `->{R; none}` becomes `->{R}`, and
-`->{none; none}` becomes `->{}`. `Eff none none a` stays as written. The formatter re-parses
+`->{none; none}` becomes `->{}`. `Eff none none a` stays as written. A call
+in parentheses and the same call on a line of its own under the call it is an
+argument of are the same program, as rule 8 reads them. The formatter re-parses
 each declaration and the whole file and refuses with `FLICK-P003` if the AST
 or the comments would change.
 
@@ -827,6 +829,14 @@ fits; otherwise it breaks, outermost construct first:
   stays on its line and only the argument breaks:
   `Ref.modify counter (fun current ->`, the body, then `)` on its own line. A
   call in parentheses stays hugged by them;
+- in a body whose lines under a call are its arguments (rule 8), as in
+  `ui { … }`, a call keeps its arguments on its line. When it does not fit,
+  the calls in parentheses that end its arguments go on lines of their own
+  under it, one level in, without the parentheses: `div props (p a) (p b)`
+  becomes `div props`, then `p a` and `p b`. A call in parentheses alone on
+  such a line loses them where its first line fits. Only a call of a name
+  moves, not `(-x)`, `if`, `match` or `fun`; calls with a comment among
+  them and anything inside brackets stay as they are;
 - an operator chain breaks before each operator of its weakest precedence,
   continuations one level in; a pipeline of `|>` or `<|` breaks one step per
   line, its operators under the first operand when the pipeline starts its

@@ -81,10 +81,9 @@ let navbar user = ui {
     ]
   nav { class_name = "navbar navbar-light" }
     div { class_name = "container" }
-      (anchor "navbar-brand" Route.home (text "conduit"))
-      (classed
-        "nav navbar-nav pull-xs-right"
-        (list (List.map (fun l -> classed "nav-item" (item l)) links)))
+      anchor "navbar-brand" Route.home (text "conduit")
+      classed "nav navbar-nav pull-xs-right"
+        list (List.map (fun l -> classed "nav-item" (item l)) links)
 }
 
 /// The footer of every page.
@@ -92,10 +91,9 @@ page_footer : Ui
 let page_footer = ui {
   footer { class_name = "" }
     div { class_name = "container" }
-      (anchor "logo-font" Route.home (text "conduit"))
-      (span
-        { class_name = "attribution" }
-        (text " An interactive learning project from Thinkster, written in Flick."))
+      anchor "logo-font" Route.home (text "conduit")
+      span { class_name = "attribution" }
+        text " An interactive learning project from Thinkster, written in Flick."
 }
 
 /// Each problem of a form as `field message`, in `ul.error-messages`.
@@ -123,7 +121,7 @@ tag_list : List String -> Ui
 let tag_list tags = ui {
   classed
     "tag-list"
-    (list (List.map (fun t -> classed "tag-default tag-pill tag-outline" (item (text t))) tags))
+    list (List.map (fun t -> classed "tag-default tag-pill tag-outline" (item (text t))) tags)
 }
 
 /// The author and the date of an article.
@@ -176,10 +174,9 @@ let favorite_button place label article = ui {
     if article.favorited then "btn btn-sm btn-primary" else "btn btn-sm btn-outline-primary"
   classed
     "\{style} \{place}"
-    (button
-      { disabled = false; on_click = Action.with favorite article }
-      (icon { class_name = "ion-heart" })
-      (text " \{label}\{article.favoritesCount}"))
+    button { disabled = false; on_click = Action.with favorite article }
+      icon { class_name = "ion-heart" }
+      text " \{label}\{article.favoritesCount}"
 }
 
 /// An article in a feed: its meta, title, description and tags.
@@ -187,10 +184,10 @@ component preview (article : ArticlePreview) = ui {
   div { class_name = "article-preview" }
     meta article.author article.createdAt (favorite_button "pull-xs-right" "" article)
     anchor "preview-link" (Article article.slug)
-      (heading_at H1 (text article.title))
-      (paragraph (text article.description))
-      (span { class_name = "" } (text "Read more..."))
-      (tag_list article.tagList)
+      heading_at H1 (text article.title)
+      paragraph (text article.description)
+      span { class_name = "" } (text "Read more...")
+      tag_list article.tagList
 }
 
 /// The link to page `n` of a list, `active` when it is the one shown.
