@@ -130,6 +130,7 @@ import Formal.RT.Layers
 import Formal.RT.Layers2
 import Formal.RT.RefLin
 import Formal.RT.LazyCell
+import Formal.Equiv.Context
 import Formal.RT.T5
 import Formal.Decomp
 import Formal.Closed
