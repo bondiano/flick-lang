@@ -321,12 +321,28 @@ func (p *pool) waitForItem(fb *Fiber, outer int) {
 	}
 }
 
+// giveBack hands `item` back after a lease that ended with `exit` (nil on
+// success): after a defect or an interruption, which may have broken it, the
+// pool drops it and acquires another.
+func (p *pool) giveBack(fb *Fiber, item *poolItem, exit *Cause) {
+	if exit.has(causeDie) || exit.has(causeInterrupt) {
+		p.mu.Lock()
+		if !p.shuttingDown && p.has(item) {
+			item.disableReclaim = true
+			p.invalidatedSet[item] = true
+			p.removeAvailable(item)
+		}
+		p.mu.Unlock()
+	}
+	p.release(fb, item)
+}
+
 // PoolGet is an item, held by the innermost scope until it closes.
 func PoolGet(fb *Fiber, self Value) Value {
 	p := poolOf(self)
 	return registering(fb, func(outer int) Value {
 		item := p.take(fb, outer)
-		fb.owner.add(fb, func(fb *Fiber, _ *Cause) Value { p.release(fb, item); return Unit })
+		fb.owner.add(fb, func(fb *Fiber, exit *Cause) Value { p.giveBack(fb, item, exit); return Unit })
 		return item.exit.value
 	})
 }
@@ -339,7 +355,7 @@ func PoolUse(fb *Fiber, f, self Value) Value {
 		out, cause := catch(func() Value {
 			return masked(fb, outer, func() Value { return Run(fb, Apply(fb, f, item.exit.value)) })
 		})
-		_, released := catch(func() Value { p.release(fb, item); return Unit })
+		_, released := catch(func() Value { p.giveBack(fb, item, cause); return Unit })
 		if cause = finalized(cause, released); cause != nil { // then the failure of the release
 			panic(&Failure{cause})
 		}

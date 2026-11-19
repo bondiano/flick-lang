@@ -1,0 +1,6 @@
+succeeded: balance 11
+failed, rolled back: balance 11
+died: balance 11
+interrupted: true, balance 11
+its connection dropped: true
+done

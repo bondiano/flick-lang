@@ -42,6 +42,7 @@ import {
   raiseOf,
   uninterruptible,
 } from "./fiber.ts";
+import { cleanupAfter } from "./handle.ts";
 import { traceEvent, traceId, tracing } from "./trace.ts";
 import { Failure } from "./outcome.ts";
 import type { Arena } from "../core/Arena.ts";
@@ -318,7 +319,7 @@ export function* bracket(acquire: () => unknown, use: (resource: unknown) => unk
   try {
     const resource: unknown = yield acquire();
     const used = asExit(yield exitOf(() => atMask(depth, () => use(resource))));
-    const released = asExit(yield exitOf(() => release(resource)));
+    const released = asExit(yield cleanupAfter(used, () => release(resource)));
     return raiseOf(finalize(used, released));
   } finally {
     fiber.mask = depth;

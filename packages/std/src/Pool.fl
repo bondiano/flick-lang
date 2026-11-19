@@ -43,12 +43,15 @@ make_with_ttl :
 foreign effect make_with_ttl from "flick:Pool" "flickMakeWithTtl"
 
 /// An item, waiting for one to be free; the innermost `scope` (or the one
-/// of region `t`) holds it until it closes.
+/// of region `t`) holds it until it closes. When that scope ends with a
+/// defect or an interruption, which may have broken the item, the pool
+/// releases it and acquires another; otherwise it lends the item again.
 get : Pool s e a ->{Scope t; e} a^{t}
 foreign effect get from "flick:Pool" "get"
   retention call
 
-/// Runs `f` with an item, given back when `f` ends.
+/// Runs `f` with an item, given back when `f` ends; released instead when
+/// `f` ends with a defect or an interruption, as with `get`.
 use : (a ->{r; e2} b)^c -> Pool s e a ->{r; e + e2} b
 foreign effect use from "flick:Pool" "use"
   arity 1
