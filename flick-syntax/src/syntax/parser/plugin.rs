@@ -72,18 +72,20 @@ fn is_argument(kind: SyntaxKind) -> bool {
 /// tokens.
 pub(super) fn block(p: &mut Parser) -> SyntaxKind {
     p.bump();
-    arguments(p);
+    arguments(p, false);
     if p.at(K::LBrace) && !p.no_brace {
         raw_braces(p);
     }
     K::PluginExpr
 }
 
-/// The arguments of a head on its line, `( … )` kept as tokens.
-fn arguments(p: &mut Parser) {
+/// The arguments of a head on its line, `( … )`, and `[ … ]` when
+/// `brackets`, kept as tokens.
+fn arguments(p: &mut Parser, brackets: bool) {
     loop {
         match p.current() {
             K::LParen => raw_group(p, K::LParen, K::RParen, K::PluginArgs),
+            K::LBracket if brackets => raw_group(p, K::LBracket, K::RBracket, K::PluginArgs),
             k if is_argument(k) => p.bump(),
             _ => break,
         }
@@ -106,8 +108,10 @@ pub(super) fn at_declaration(p: &Parser) -> bool {
 /// the next one, all kept as tokens.
 pub(super) fn declaration(p: &mut Parser) {
     let m = p.start();
+    // the rows of a `test.each`, a list, may stand among a test block's arguments
+    let rows = TOP.contains(&p.text_of(p.raw()));
     p.bump();
-    arguments(p);
+    arguments(p, rows);
     if p.at(K::LBrace) {
         raw_braces(p);
         if !at_end(p) {

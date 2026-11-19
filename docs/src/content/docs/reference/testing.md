@@ -285,6 +285,36 @@ that holds a region, so even `SynchronizedRef.get (await names)` would be
 `Test.fixture`, `Test.shared` and `Test.share` are what the blocks expand
 into: `flick expand` shows them.
 
+## A case for each row
+
+`test.each rows "name" (pattern) { body }` is a case for each row of
+`rows`, a list: the pattern takes the row apart for the body, and the case
+is named `name [0]`, `name [1]` and so on, or, when the name has `{0}` to
+`{n}`, with each replaced by that part of the row as `show` writes it, the
+parts being those of the pattern's tuple. The cases stand where the
+`test.each` does, beside the other cases of the suite, and each has its own
+scope, fixtures and full name, which `--filter` and `--list` see.
+
+```flick
+module App.MathTest
+
+rows : List (Int, Int)
+let rows = [(1, 2), (2, 3)]
+
+suite "math" {
+  test.each [(1, 2), (2, 3)] "adds one to {0} to get {1}" (a, b) {
+    Test.expect (Test.equal b (a + 1))
+  }
+
+  test.each rows "is ordered" ((a, b)) { Test.expect (Test.is_true "ordered" (a < b)) }
+}
+```
+
+The rows are a list, a name or an expression in parentheses, built once,
+when the module's tests are: a pure value, so the cases a run selects do not
+depend on effects. Rows that need effects belong in a `before_all`, or in a
+property test.
+
 ## Running
 
 `flick test` builds the project with its test root into `.flick/test/` and
@@ -319,7 +349,7 @@ The exit code is `0` when every case that ran passed, `1` otherwise, and
 
 | Problem | Diagnostic |
 | - | - |
-| a block without a name or braces, an unknown modifier, a `timeout` without its milliseconds, a hook with a name, a fixture without its name or expression, or a suite holding something other than cases, hooks and fixtures | `std/T001` |
+| a block without a name or braces, an unknown modifier, a `timeout` without its milliseconds, a `test.each` without its rows or pattern, a hook with a name, a fixture without its name or expression, or a suite holding something other than cases, hooks and fixtures | `std/T001` |
 | two cases of one suite, two blocks of one module, or two fixtures of one suite, with the same name | `std/T002` |
 | a fixture that uses itself or one declared after it, a shared fixture or a `before_all`/`after_all` hook that uses one each case makes anew | `std/T003` |
 | a shared fixture of a `parallel` suite that is not `concurrent` | `std/T004` |

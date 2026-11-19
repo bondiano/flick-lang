@@ -48,6 +48,19 @@ let expect assertion =
   | Pass -> ()
   | Failed message -> Fail.fail (AssertionFailed message)
 
+/// The name of the case `index` of a `test.each "name"`: `name [index]`,
+/// or, when `parts`, the parts of its row as `show` writes them, are given
+/// for the name's `{0}` to `{n}`, the name with each replaced by its part.
+case_name : String -> Int -> List String -> String
+let case_name name index parts =
+  if List.is_empty parts then
+    name ++ " [" ++ show index ++ "]"
+  else
+    List.fold_left
+      (fun text (k, part) -> String.replace_all ("{" ++ show k ++ "}") part text)
+      name
+      (List.map_indexed (fun k part -> (k, part)) parts)
+
 /// A pure test.
 test : String -> (Unit -> Assertion) -> Test
 foreign pure test from "flick:rt" "testPure"

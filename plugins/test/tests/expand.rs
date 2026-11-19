@@ -57,12 +57,12 @@ fn the_module_s_tests_are_its_blocks_in_order() {
     insta::assert_snapshot!(code(
         "test \"first\" { Test.expect (Test.equal 1 1) }\n\nsuite.only \"second\" {}\n\ntest.skip \"third\" {}"
     ), @r#"
-    let tests$0 = (Test.effect_test "first" (task { (Test.expect (Test.equal 1 1)) }))
-    let tests : (List Test.Test) = [tests$0, tests$1, tests$2]
+    let tests$0 = [(Test.effect_test "first" (task { (Test.expect (Test.equal 1 1)) }))]
+    let tests : (List Test.Test) = (List.concat [tests$0, tests$1, tests$2])
     ---
-    let tests$1 = (Test.only (Test.group "second" []))
+    let tests$1 = [(Test.only (Test.group "second" []))]
     ---
-    let tests$2 = (Test.skip (Test.effect_test "third" (task { () })))
+    let tests$2 = [(Test.skip (Test.effect_test "third" (task { () })))]
     "#);
     // a wrong block is no case of the module's `tests`
     let found = all("test \"first\" {}\n\ntest {}\n\ntest \"third\" {}");
@@ -70,19 +70,19 @@ fn the_module_s_tests_are_its_blocks_in_order() {
     assert_eq!(
         found[0].as_deref(),
         Ok(
-            "let tests$0 = (Test.effect_test \"first\" (task { () }))\nlet tests : (List Test.Test) = [tests$0, tests$1]"
+            "let tests$0 = [(Test.effect_test \"first\" (task { () }))]\nlet tests : (List Test.Test) = (List.concat [tests$0, tests$1])"
         )
     );
     assert_eq!(
         found[2].as_deref(),
-        Ok("let tests$1 = (Test.effect_test \"third\" (task { () }))")
+        Ok("let tests$1 = [(Test.effect_test \"third\" (task { () }))]")
     );
 }
 
 #[test]
 fn a_block_names_its_case_and_holds_cases_or_a_body() {
     insta::assert_snapshot!(errors("suite { test \"a\" {} }"), @r#"T001 on the block: a `suite` block starts a top-level declaration, names its case and holds its tests in braces: `suite "name" { … }`, maybe `suite.skip` or `suite.only`, `parallel` before the name and `timeout millis` after it"#);
-    insta::assert_snapshot!(errors("test.later \"a\" {}"), @r#"T001 on the block: a `test` block starts a top-level declaration, names its case and holds its body in braces: `test "name" { … }`, maybe `test.skip` or `test.only`, and `timeout millis` after the name"#);
+    insta::assert_snapshot!(errors("test.later \"a\" {}"), @r#"T001 on the block: a `test` block starts a top-level declaration, names its case and holds its body in braces: `test "name" { … }`, maybe `test.skip` or `test.only`, and `timeout millis` after the name; or a case for each row: `test.each rows "name" (pattern) { … }`"#);
     // a block of an expression, which an import of the head allows
     let expression = expand(
         &Test,
@@ -92,9 +92,9 @@ fn a_block_names_its_case_and_holds_cases_or_a_body() {
         matches!(&expression[..], [Err(e)] if e[0].contains("starts a top-level declaration")),
         "{expression:?}"
     );
-    insta::assert_snapshot!(errors("test \"a\""), @r#"T001 on the block: a `test` block starts a top-level declaration, names its case and holds its body in braces: `test "name" { … }`, maybe `test.skip` or `test.only`, and `timeout millis` after the name"#);
-    insta::assert_snapshot!(errors("suite \"a\" {\n  let x = 1\n}"), @r#"T001 `let`: a suite holds `test "name" { … }`, `suite "name" { … }`, maybe with `.skip` or `.only` and `timeout millis`, the hooks `before_all`, `before_each`, `after_each` and `after_all { … }`, and `fixture name = expression`"#);
-    insta::assert_snapshot!(errors("suite \"a\" {\n  test {}\n}"), @r#"T001 `test`: a suite holds `test "name" { … }`, `suite "name" { … }`, maybe with `.skip` or `.only` and `timeout millis`, the hooks `before_all`, `before_each`, `after_each` and `after_all { … }`, and `fixture name = expression`"#);
+    insta::assert_snapshot!(errors("test \"a\""), @r#"T001 on the block: a `test` block starts a top-level declaration, names its case and holds its body in braces: `test "name" { … }`, maybe `test.skip` or `test.only`, and `timeout millis` after the name; or a case for each row: `test.each rows "name" (pattern) { … }`"#);
+    insta::assert_snapshot!(errors("suite \"a\" {\n  let x = 1\n}"), @r#"T001 `let`: a suite holds `test "name" { … }`, `suite "name" { … }`, maybe with `.skip` or `.only` and `timeout millis`, `test.each rows "name" (pattern) { … }`, the hooks `before_all`, `before_each`, `after_each` and `after_all { … }`, and `fixture name = expression`"#);
+    insta::assert_snapshot!(errors("suite \"a\" {\n  test {}\n}"), @r#"T001 `test`: a suite holds `test "name" { … }`, `suite "name" { … }`, maybe with `.skip` or `.only` and `timeout millis`, `test.each rows "name" (pattern) { … }`, the hooks `before_all`, `before_each`, `after_each` and `after_all { … }`, and `fixture name = expression`"#);
 }
 
 #[test]
@@ -125,9 +125,9 @@ fn hooks_are_cases_of_their_suite_s_group_and_a_timeout_wraps_its_case() {
 
 #[test]
 fn a_hook_has_no_name_and_a_timeout_its_milliseconds() {
-    insta::assert_snapshot!(errors("suite \"a\" {\n  before_each \"x\" {}\n}"), @r#"T001 `before_each`: a suite holds `test "name" { … }`, `suite "name" { … }`, maybe with `.skip` or `.only` and `timeout millis`, the hooks `before_all`, `before_each`, `after_each` and `after_all { … }`, and `fixture name = expression`"#);
-    insta::assert_snapshot!(errors("test \"a\" timeout {}"), @r#"T001 on the block: a `test` block starts a top-level declaration, names its case and holds its body in braces: `test "name" { … }`, maybe `test.skip` or `test.only`, and `timeout millis` after the name"#);
-    insta::assert_snapshot!(errors("test \"a\" later 5 {}"), @r#"T001 on the block: a `test` block starts a top-level declaration, names its case and holds its body in braces: `test "name" { … }`, maybe `test.skip` or `test.only`, and `timeout millis` after the name"#);
+    insta::assert_snapshot!(errors("suite \"a\" {\n  before_each \"x\" {}\n}"), @r#"T001 `before_each`: a suite holds `test "name" { … }`, `suite "name" { … }`, maybe with `.skip` or `.only` and `timeout millis`, `test.each rows "name" (pattern) { … }`, the hooks `before_all`, `before_each`, `after_each` and `after_all { … }`, and `fixture name = expression`"#);
+    insta::assert_snapshot!(errors("test \"a\" timeout {}"), @r#"T001 on the block: a `test` block starts a top-level declaration, names its case and holds its body in braces: `test "name" { … }`, maybe `test.skip` or `test.only`, and `timeout millis` after the name; or a case for each row: `test.each rows "name" (pattern) { … }`"#);
+    insta::assert_snapshot!(errors("test \"a\" later 5 {}"), @r#"T001 on the block: a `test` block starts a top-level declaration, names its case and holds its body in braces: `test "name" { … }`, maybe `test.skip` or `test.only`, and `timeout millis` after the name; or a case for each row: `test.each rows "name" (pattern) { … }`"#);
     // hooks of one kind are no cases, which a full name stands for
     assert_eq!(
         errors("suite \"a\" {\n  before_each {}\n  before_each {}\n  test \"b\" {}\n}"),
@@ -221,5 +221,14 @@ fn an_inner_suite_sees_the_fixtures_around_and_a_parallel_one_runs_at_once() {
 fn a_fixture_is_a_name_and_an_expression_and_only_a_suite_is_parallel() {
     insta::assert_snapshot!(errors("suite \"a\" {\n  fixture = 1\n}"), @"T001 `fixture`: a fixture is `fixture name = expression`, maybe `fixture shared` or `fixture shared concurrent`");
     insta::assert_snapshot!(errors("suite \"a\" {\n  fixture concurrent x = 1\n}"), @"T001 `fixture`: a fixture is `fixture name = expression`, maybe `fixture shared` or `fixture shared concurrent`");
-    insta::assert_snapshot!(errors("suite \"a\" {\n  test parallel \"b\" {}\n}"), @r#"T001 `test`: a suite holds `test "name" { … }`, `suite "name" { … }`, maybe with `.skip` or `.only` and `timeout millis`, the hooks `before_all`, `before_each`, `after_each` and `after_all { … }`, and `fixture name = expression`"#);
+    insta::assert_snapshot!(errors("suite \"a\" {\n  test parallel \"b\" {}\n}"), @r#"T001 `test`: a suite holds `test "name" { … }`, `suite "name" { … }`, maybe with `.skip` or `.only` and `timeout millis`, `test.each rows "name" (pattern) { … }`, the hooks `before_all`, `before_each`, `after_each` and `after_all { … }`, and `fixture name = expression`"#);
+}
+
+#[test]
+fn a_test_each_is_a_case_for_each_row_beside_the_others() {
+    insta::assert_snapshot!(code(
+        "suite \"math\" {\n  test \"first\" {}\n  test.each [(1, 2), (2, 3)] \"adds {0} and {1}\" (a, b) timeout 50 { expect (a + 1) |> to.equal b }\n  test.each names \"named\" (name) {}\n}"
+    ), @r#"let tests : (List Test.Test) = [(Test.group "math" (List.concat [[(Test.effect_test "first" (task { () }))], (List.map_indexed (fun index$0 row$0 -> (Test.timeout 50 (Test.effect_test (Test.case_name "adds {0} and {1}" index$0 (match row$0 with | (part$0, part$1) -> [(show part$0), (show part$1)])) (task { (match row$0 with | ((a, b)) -> (expect (a + 1) |> to.equal b)) })))) ([(1, 2), (2, 3)])), (List.map_indexed (fun index$0 row$0 -> (Test.effect_test (Test.case_name "named" index$0 []) (task { (match row$0 with | (name) -> ()) }))) names)]))]"#);
+    // a block of its own lists its cases
+    insta::assert_snapshot!(code("test.each [1, 2] \"is {0}\" (n) {}"), @r#"let tests : (List Test.Test) = (List.map_indexed (fun index$0 row$0 -> (Test.effect_test (Test.case_name "is {0}" index$0 [(show row$0)]) (task { (match row$0 with | (n) -> ()) }))) ([1, 2]))"#);
 }

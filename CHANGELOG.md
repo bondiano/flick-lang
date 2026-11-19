@@ -6,6 +6,12 @@ break programs.
 
 ## Unreleased
 
+- **`test.each`.** `test.each rows "name" (pattern) { body }` in a suite or
+  on its own is a case for each row of a list, named `name [i]`, or with
+  `{0}`…`{n}` in the name replaced by the parts of the row as `show` writes
+  them. Each case has its own scope, fixtures and full name. A test block's
+  arguments may now hold a bracketed list, the rows. Alike on every engine.
+
 - **Test fixtures.** A `suite` holds `fixture name = expression`, which its
   cases and hooks read with `await name`: made the first time a case awaits
   it, once for that case, or with `fixture shared` once for the run of the
