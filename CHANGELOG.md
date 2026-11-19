@@ -13,6 +13,13 @@ break programs.
   After a success or a typed error the item goes back as before, and
   `Pool.invalidate` still drops one by hand.
 
+- **Fixed: a plugin block repeated in another module is collected for it.**
+  The kept state of a plugin's group was keyed by the text of its blocks
+  alone, so a build whose `sql table` repeated, word for word, one that
+  an earlier build saw in another module took that module's tables, and
+  its queries failed with `std/Q010` ("is not a `sql table`"). The key now
+  holds each block's module, docs, signature and place too.
+
 - **Fixed: cleanup off the normal path cuts a `control` operation off.**
   When the body of `Effect.ensuring`, `on_exit`, `on_interrupt` or
   `Resource.bracket` is interrupted, or an `abort` unwinds through it, a

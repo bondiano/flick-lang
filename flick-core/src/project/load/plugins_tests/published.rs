@@ -112,3 +112,32 @@ fn a_kept_expansion_hears_again_when_what_was_published_changes() {
     assert!(ir(&irs, "App.Main").contains("\"goodbye\""), "{irs:?}");
     assert!(ir(&irs, "App.NotesTest").contains("\"goodbye\""), "{irs:?}");
 }
+
+#[test]
+fn a_module_whose_blocks_repeat_another_modules_publishes_its_own() {
+    let host = noting(NOTES);
+    host.write(
+        "/p/src/App/Copy.fl",
+        &NOTES.replace("App.Notes", "App.Copy"),
+    );
+    host.write(
+        "/p/test/App/CopyTest.fl",
+        &TEST.replace("App.Notes", "App.Copy"),
+    );
+    // an earlier build keeps what the plugin gave for the same block of App.Notes
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let notes = [PathBuf::from("/p/src/App/Notes.fl")];
+    let (diagnostics, _) = compile(&host, &mut sources, Some(&project), &notes);
+    assert!(diagnostics.is_empty());
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let roots = [PathBuf::from("/p/test/App/CopyTest.fl")];
+    let (diagnostics, compilation) = compile(&host, &mut sources, Some(&project), &roots);
+    let found: Vec<String> = diagnostics.iter().map(|d| show(&sources, d)).collect();
+    assert!(found.is_empty(), "{found:?}");
+    let irs: Vec<(String, String)> = (compilation.modules.iter())
+        .map(|m| (m.name.clone(), ir::print(&m.ir)))
+        .collect();
+    assert!(ir(&irs, "App.CopyTest").contains("\"hello\""), "{irs:?}");
+}
