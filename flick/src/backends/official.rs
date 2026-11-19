@@ -24,9 +24,12 @@ pub(super) fn go(
     root: &Path,
     tools: Option<&BTreeMap<String, Vec<String>>>,
 ) -> Result<Package, Diagnostic> {
-    let pin = serde_json::from_str(GO_PIN)
-        .map_err(|e| failure(format!("invalid bundled Go backend pin: {e}")))?;
-    Package::from_bytes(root, pin, GO, false, tools)
+    Package::from_bytes(root, go_pin()?, GO, false, tools)
+}
+
+pub(super) fn go_pin() -> Result<BackendPin, Diagnostic> {
+    serde_json::from_str(GO_PIN)
+        .map_err(|e| failure(format!("invalid bundled Go backend pin: {e}")))
 }
 
 pub(super) fn pin() -> Result<BackendPin, Diagnostic> {

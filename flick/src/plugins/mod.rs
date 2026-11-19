@@ -3,10 +3,23 @@
 //! `FLICK_PLUGIN_TRACE=<file>` appends a line to the file for each call a
 //! plugin answers, which the tests count.
 
+#[cfg(all(feature = "wasm-backends", not(feature = "wasm-plugins")))]
+use crate::commands::contributed::Contributor;
+
 mod cache;
 mod outside;
 #[cfg(feature = "wasm-plugins")]
 mod wasm;
+#[cfg(feature = "wasm-plugins")]
+pub use wasm::contributor;
+
+/// Without the plugin host, no plugin adds commands.
+#[cfg(all(feature = "wasm-backends", not(feature = "wasm-plugins")))]
+pub fn contributor(package: &str, _: &Path) -> Result<Arc<dyn Contributor>, String> {
+    Err(format!(
+        "this flick was built without WebAssembly plugins, so `{package}` adds no commands"
+    ))
+}
 
 use std::env;
 use std::fs::OpenOptions;

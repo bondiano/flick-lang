@@ -1,0 +1,82 @@
+package flick:command@0.1.0;
+
+/// Commands a backend or a library plugin adds to `flick`. A command is a
+/// pure call: it returns a plan of files, host tool steps and diagnostics,
+/// which the host checks and carries out; it never touches the filesystem
+/// or starts a process itself.
+interface types {
+    enum value-kind { flag, text, path }
+    /// A positional argument or an option (`--name`) of a command.
+    record parameter {
+        name: string,
+        kind: value-kind,
+        /// It may be given more than once, or take the rest of the words.
+        multiple: bool,
+        required: bool,
+        help: string,
+    }
+    /// A plan command runs once; a session command answers requests on
+    /// stdin until it ends, through `open`, `handle` and `close`.
+    enum style { plan, session }
+    record descriptor {
+        /// The words of the command, as `ffi import`.
+        name: string,
+        summary: string,
+        positionals: list<parameter>,
+        options: list<parameter>,
+        /// What its plan may write, relative to the project's root: a path,
+        /// or `$name` for the path a parameter of kind `path` gives.
+        writes: list<string>,
+        style: style,
+    }
+    record argument { name: string, values: list<string> }
+    /// A host tool the project allows the contributor, pinned by the host.
+    record tool { id: string, version: string, sha256: string }
+    record invocation {
+        name: string,
+        arguments: list<argument>,
+        tools: list<tool>,
+    }
+    record file { path: string, bytes: list<u8>, executable: bool }
+    record variable { name: string, value: string }
+    /// A run of a host tool in a directory of its own, holding the plan's
+    /// files `inputs` names; it gives back the files `outputs` names, which
+    /// the host writes with the plan's.
+    record tool-step {
+        id: string,
+        tool: tool,
+        arguments: list<string>,
+        environment: list<variable>,
+        inputs: list<string>,
+        outputs: list<string>,
+    }
+    variant step { tool(tool-step) }
+    enum severity { error, warning, note }
+    record diagnostic {
+        code: string,
+        severity: severity,
+        message: string,
+        notes: list<string>,
+    }
+    record plan {
+        files: list<file>,
+        steps: list<step>,
+        diagnostics: list<diagnostic>,
+        /// What the command prints.
+        stdout: list<u8>,
+    }
+    /// The answer to one request of a session and its state after it.
+    record handled { state: list<u8>, response: option<list<u8>> }
+}
+
+interface command {
+    use types.{descriptor, invocation, plan, handled, diagnostic};
+    describe: func() -> list<descriptor>;
+    run: func(invocation: invocation) -> result<plan, list<diagnostic>>;
+    /// The state of a new session.
+    open: func(invocation: invocation) -> result<list<u8>, list<diagnostic>>;
+    /// A request of the session, as the bytes of one message.
+    handle: func(state: list<u8>, request: list<u8>) -> result<handled, string>;
+    /// The plan of a session that ends.
+    close: func(state: list<u8>) -> plan;
+}

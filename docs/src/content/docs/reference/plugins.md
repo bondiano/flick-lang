@@ -616,6 +616,11 @@ diagnostic with a code may be a warning or a note,
 `FLICK-P036`. Warnings about generated code are not reported, and fixes that
 would edit it are dropped.
 
+## Commands
+
+A plugin may also add commands to `flick`, which return plans the host
+checks and carries out: see [Contributed commands](../commands/).
+
 ## Not yet
 
 A plugin warns only from `check` or beside a refusal: `expand` gives code or

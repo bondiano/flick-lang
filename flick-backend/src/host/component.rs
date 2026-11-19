@@ -4,7 +4,9 @@ use std::sync::{Arc, Mutex, PoisonError};
 use wasmtime::component::{Component, HasSelf, Linker};
 use wasmtime::{Engine, Error, Store};
 
+use super::command as commands;
 use super::runtime::{Cancellation, MemoryLimits, memory_limits, prepare, why};
+use crate::command;
 use crate::request::validate_size;
 use crate::{
     Backend, BackendPin, BuildRequest, BuildResult, DeclaredInputs, Descriptor, Diagnostic, Inputs,
@@ -12,7 +14,7 @@ use crate::{
 };
 
 #[allow(clippy::all, clippy::pedantic)]
-mod bindings {
+pub mod bindings {
     wasmtime::component::bindgen!({ world: "backend", path: "wit", imports: { default: trappable } });
 }
 
@@ -106,6 +108,7 @@ impl State {
 }
 
 impl bindings::flick::backend::types::Host for State {}
+impl bindings::flick::command::types::Host for State {}
 
 impl bindings::flick::backend::inputs::Host for State {
     fn read(
@@ -260,6 +263,43 @@ impl WasmBackend {
         self.cancellation.clone()
     }
 
+    /// One request of a session, which `cancel` alone can stop.
+    pub fn handle_cancellable(
+        &self,
+        state: &[u8],
+        request: &[u8],
+        cancel: &Cancellation,
+    ) -> Result<command::Handled, String> {
+        match self.command_call(cancel, |i, store| {
+            i.flick_command_command().call_handle(store, state, request)
+        }) {
+            Ok(Ok(handled)) => Ok(commands::handled(handled)),
+            Ok(Err(error)) | Err(error) => Err(error),
+        }
+    }
+
+    fn command_call<T>(
+        &self,
+        cancel: &Cancellation,
+        call: impl FnOnce(&bindings::Backend, &mut Store<State>) -> wasmtime::Result<T>,
+    ) -> Result<T, String> {
+        let mut no_inputs = DeclaredInputs::new(&[], |_| None)?;
+        let state = State::new(None, &mut no_inputs, self.budget, cancel)?;
+        self.image.call(state, self.budget, cancel, call)
+    }
+
+    fn command_failure(&self, name: &str, error: &str) -> Vec<command::Diagnostic> {
+        vec![command::Diagnostic {
+            code: "P013".into(),
+            severity: command::Severity::Error,
+            message: format!(
+                "backend {}@{}#{} command `{name}`: {error}",
+                self.pin.identity.id, self.pin.identity.version, self.pin.sha256
+            ),
+            notes: vec![],
+        }]
+    }
+
     fn failure(&self, phase: &str, error: &str) -> Vec<Diagnostic> {
         vec![Diagnostic {
             code: "P013".into(),
@@ -287,6 +327,56 @@ impl Backend for WasmBackend {
 
     fn describe(&self) -> Descriptor {
         self.descriptor.clone()
+    }
+
+    fn commands(&self) -> Vec<command::Descriptor> {
+        self.command_call(&self.cancellation, |i, store| {
+            i.flick_command_command().call_describe(store)
+        })
+        .map(commands::descriptors)
+        .unwrap_or_default()
+    }
+
+    fn run(
+        &self,
+        invocation: &command::Invocation,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        let wire = commands::invocation(invocation);
+        match self.command_call(&self.cancellation, |i, store| {
+            i.flick_command_command().call_run(store, &wire)
+        }) {
+            Ok(Ok(plan)) => Ok(commands::plan(plan)),
+            Ok(Err(diagnostics)) => Err(commands::diagnostics(diagnostics)),
+            Err(error) => Err(self.command_failure(&invocation.name, &error)),
+        }
+    }
+
+    fn open(&self, invocation: &command::Invocation) -> Result<Vec<u8>, Vec<command::Diagnostic>> {
+        let wire = commands::invocation(invocation);
+        match self.command_call(&self.cancellation, |i, store| {
+            i.flick_command_command().call_open(store, &wire)
+        }) {
+            Ok(Ok(state)) => Ok(state),
+            Ok(Err(diagnostics)) => Err(commands::diagnostics(diagnostics)),
+            Err(error) => Err(self.command_failure(&invocation.name, &error)),
+        }
+    }
+
+    fn handle(&self, state: Vec<u8>, request: Vec<u8>) -> Result<command::Handled, String> {
+        self.handle_cancellable(&state, &request, &self.cancellation)
+    }
+
+    fn close(&self, state: Vec<u8>) -> command::Plan {
+        match self.command_call(&self.cancellation, |i, store| {
+            i.flick_command_command().call_close(store, &state)
+        }) {
+            Ok(plan) => commands::plan(plan),
+            Err(error) => {
+                let mut plan = command::Plan::empty();
+                plan.diagnostics = self.command_failure("close", &error);
+                plan
+            }
+        }
     }
 
     fn check_target(

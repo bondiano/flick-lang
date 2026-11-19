@@ -3,6 +3,8 @@ mod check;
 mod clean;
 #[cfg(test)]
 mod clean_tests;
+#[cfg(feature = "wasm-backends")]
+pub(crate) mod contributed;
 mod deps;
 mod dev;
 mod diff;
@@ -16,9 +18,9 @@ mod libraries;
 mod manifest;
 mod out_dir;
 mod pack;
-mod plugins;
+pub(crate) mod plugins;
 mod prove;
-mod run;
+pub(crate) mod run;
 mod scaffold;
 mod script;
 mod summary;
