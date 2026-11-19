@@ -3,6 +3,7 @@
 module Fixture exposing (..)
 
 import Fiber
+import Scope
 
 /// `value`, which `release` releases when the scope that made it closes: a
 /// test's for a fixture, its suite's for a shared one. The fixtures of a
