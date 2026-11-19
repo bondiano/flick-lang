@@ -198,8 +198,11 @@ Test cases
 
 suite "Users" {
   test.skip "trims" {}
+  before_each { reset }
+  test "slow" timeout 50 {}
 }
 let test = suite
+let after_all = timeout 5 before_each
 
 ---
 
@@ -210,10 +213,24 @@ let test = suite
     (keyword)
     (keyword)
     (string)
+    (braces)
+    (keyword)
+    (braces
+      (identifier))
+    (keyword)
+    (string)
+    (keyword)
+    (number)
     (braces))
   (keyword)
   (identifier)
   (operator)
+  (identifier)
+  (keyword)
+  (identifier)
+  (operator)
+  (identifier)
+  (number)
   (identifier))
 
 ==================

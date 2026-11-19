@@ -104,9 +104,58 @@ foreign effect set_time from "flick:rt" "testSetTime"
 property : String -> Gen.Gen a -> (a -> Assertion) -> Test
 foreign pure property from "flick:rt" "testProperty"
 
-/// Tests under a common name prefix.
+/// Tests under a common name prefix. The hooks among them run around those
+/// that a run selects: see `before_all`.
 group : String -> List Test -> Test
 foreign pure group from "flick:rt" "testGroup"
+
+/// A hook of the group, or the module, whose list it is in: it runs once
+/// before the first of the group's tests that the run selects, after the
+/// `before_all` hooks of the groups around it. A group none of whose tests
+/// the run selects runs no hooks, and a skipped or filtered test runs none.
+/// When it fails, each selected test of the group is reported as a `setup`
+/// failure and not run, and the group's `after_all` hooks, and those of the
+/// groups around it, still run. It runs in the group's scope, which closes
+/// after the group's last selected test.
+before_all :
+  forall e.
+  (forall s. Fiber.Provided {...Host.Live} s => Eff {Async, Scope s, ...Host.Live} e Unit) -> Test
+foreign pure before_all from "flick:rt" "testBeforeAll"
+
+/// A hook that runs before each selected test of its group, in the test's
+/// scope, after the `before_all` hooks and the `before_each` hooks of the
+/// groups around it, and under the test's `timeout`. When it fails, the
+/// test is reported as a `setup` failure and its body does not run.
+before_each :
+  forall e.
+  (forall s. Fiber.Provided {...Host.Live} s => Eff {Async, Scope s, ...Host.Live} e Unit) -> Test
+foreign pure before_each from "flick:rt" "testBeforeEach"
+
+/// A hook that runs after each selected test of its group, as a finalizer
+/// of the test's scope: also when the test or a `before_each` hook failed,
+/// timed out or was interrupted, before the `after_each` hooks of the groups
+/// around it. When it fails, the test reports its cleanup failed.
+after_each :
+  forall e.
+  (forall s. Fiber.Provided {...Host.Live} s => Eff {Async, Scope s, ...Host.Live} e Unit) -> Test
+foreign pure after_each from "flick:rt" "testAfterEach"
+
+/// A hook that runs once after the last selected test of its group, as a
+/// finalizer of the group's scope, before the `after_all` hooks of the
+/// groups around it: also when a `before_all` hook failed or the run was
+/// interrupted. When it fails, the test that ended the group reports its
+/// cleanup failed.
+after_all :
+  forall e.
+  (forall s. Fiber.Provided {...Host.Live} s => Eff {Async, Scope s, ...Host.Live} e Unit) -> Test
+foreign pure after_all from "flick:rt" "testAfterAll"
+
+/// The test, and each test in it that has no timeout of its own, given
+/// `millis` milliseconds for its `before_each` hooks and its body; when they
+/// run out, the test is interrupted, its scope closes and it is reported as
+/// `timeout`. `flick test --timeout` gives the other tests theirs.
+timeout : Float -> Test -> Test
+foreign pure timeout from "flick:rt" "testTimeout"
 
 /// A test of a suite, which gets the services `o` of its layer.
 type Spec (o : ServiceRow)

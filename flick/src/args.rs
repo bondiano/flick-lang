@@ -355,6 +355,12 @@ pub struct TestArguments {
     #[arg(long)]
     pub seed: Option<u32>,
 
+    /// The time each test without a `timeout` of its own has for its
+    /// `before_each` hooks and its body: `500ms`, `5s`, `2m`, or a number of
+    /// milliseconds. By default a test has no time limit.
+    #[arg(long, value_name = "DURATION", value_parser = millis)]
+    pub timeout: Option<f64>,
+
     /// How results are written.
     #[arg(long, value_enum, default_value_t = Reporter::Human)]
     pub reporter: Reporter,
@@ -377,6 +383,20 @@ pub struct TestArguments {
     /// Only Node has it.
     #[arg(long)]
     pub rt: bool,
+}
+
+/// The milliseconds of a duration written `500ms`, `5s`, `2m` or `500`.
+fn millis(text: &str) -> Result<f64, String> {
+    let (number, unit) = [("ms", 1.0), ("s", 1000.0), ("m", 60_000.0)]
+        .into_iter()
+        .find_map(|(suffix, unit)| Some((text.strip_suffix(suffix)?, unit)))
+        .unwrap_or((text, 1.0));
+    match number.parse::<f64>() {
+        Ok(n) if n.is_finite() && n > 0.0 => Ok(n * unit),
+        _ => Err(format!(
+            "`{text}` is not a duration: write `500ms`, `5s` or `2m`"
+        )),
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]

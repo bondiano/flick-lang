@@ -82,6 +82,9 @@ pub(super) fn runner_command(
     if let Some(seed) = options.seed {
         command.args(["--seed", &seed.to_string()]);
     }
+    if let Some(timeout) = options.timeout {
+        command.args(["--timeout", &timeout.to_string()]);
+    }
     let reporter = match options.reporter {
         Reporter::Human => "human",
         Reporter::Json => "json",

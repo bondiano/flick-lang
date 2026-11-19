@@ -6,6 +6,20 @@ break programs.
 
 ## Unreleased
 
+- **Test hooks and timeouts.** A `suite` holds `before_all`, `before_each`,
+  `after_each` and `after_all { … }`, which run around the cases of the
+  suite that the run selects: setup outer to inner, cleanup inner to outer,
+  `*_each` in each case's scope and `*_all` in the suite's. A suite with no
+  selected case, a skipped case and a filtered-out one run no hooks. A failed
+  `before_*` reports its cases as `setup` failures without running them,
+  and the `after_*` hooks still run, also after a timeout or an interrupted
+  run. `timeout <millis>` after a case's or a suite's name, `Test.timeout`
+  by hand, and `flick test --timeout <duration>` limit a case's
+  `before_each` hooks and body; a case out of time is interrupted, cleaned
+  up and reported as `timeout`. `Test.before_all` and the other hooks add
+  them to a group built by hand. Alike on Flick's runtime, through the
+  Effect adapter and on Go.
+
 - **Test companions.** `src/App/Users.test.fl` beside `src/App/Users.fl`
   begins with `module App.Users`, without `exposing`, and sees every
   top-level declaration of the module, private ones included, without an

@@ -81,8 +81,8 @@ fn the_module_s_tests_are_its_blocks_in_order() {
 
 #[test]
 fn a_block_names_its_case_and_holds_cases_or_a_body() {
-    insta::assert_snapshot!(errors("suite { test \"a\" {} }"), @r#"T001 on the block: a `suite` block starts a top-level declaration, names its case and holds its tests in braces: `suite "name" { … }`, maybe `suite.skip` or `suite.only`"#);
-    insta::assert_snapshot!(errors("test.later \"a\" {}"), @r#"T001 on the block: a `test` block starts a top-level declaration, names its case and holds its body in braces: `test "name" { … }`, maybe `test.skip` or `test.only`"#);
+    insta::assert_snapshot!(errors("suite { test \"a\" {} }"), @r#"T001 on the block: a `suite` block starts a top-level declaration, names its case and holds its tests in braces: `suite "name" { … }`, maybe `suite.skip` or `suite.only`, and `timeout millis` after the name"#);
+    insta::assert_snapshot!(errors("test.later \"a\" {}"), @r#"T001 on the block: a `test` block starts a top-level declaration, names its case and holds its body in braces: `test "name" { … }`, maybe `test.skip` or `test.only`, and `timeout millis` after the name"#);
     // a block of an expression, which an import of the head allows
     let expression = expand(
         &Test,
@@ -92,9 +92,47 @@ fn a_block_names_its_case_and_holds_cases_or_a_body() {
         matches!(&expression[..], [Err(e)] if e[0].contains("starts a top-level declaration")),
         "{expression:?}"
     );
-    insta::assert_snapshot!(errors("test \"a\""), @r#"T001 on the block: a `test` block starts a top-level declaration, names its case and holds its body in braces: `test "name" { … }`, maybe `test.skip` or `test.only`"#);
-    insta::assert_snapshot!(errors("suite \"a\" {\n  let x = 1\n}"), @r#"T001 `let`: a suite holds `test "name" { … }` and `suite "name" { … }`, maybe with `.skip` or `.only`"#);
-    insta::assert_snapshot!(errors("suite \"a\" {\n  test {}\n}"), @r#"T001 `test`: a suite holds `test "name" { … }` and `suite "name" { … }`, maybe with `.skip` or `.only`"#);
+    insta::assert_snapshot!(errors("test \"a\""), @r#"T001 on the block: a `test` block starts a top-level declaration, names its case and holds its body in braces: `test "name" { … }`, maybe `test.skip` or `test.only`, and `timeout millis` after the name"#);
+    insta::assert_snapshot!(errors("suite \"a\" {\n  let x = 1\n}"), @r#"T001 `let`: a suite holds `test "name" { … }`, `suite "name" { … }`, maybe with `.skip` or `.only` and `timeout millis`, and the hooks `before_all`, `before_each`, `after_each` and `after_all { … }`"#);
+    insta::assert_snapshot!(errors("suite \"a\" {\n  test {}\n}"), @r#"T001 `test`: a suite holds `test "name" { … }`, `suite "name" { … }`, maybe with `.skip` or `.only` and `timeout millis`, and the hooks `before_all`, `before_each`, `after_each` and `after_all { … }`"#);
+}
+
+#[test]
+fn hooks_are_cases_of_their_suite_s_group_and_a_timeout_wraps_its_case() {
+    insta::assert_snapshot!(code(
+        "suite \"Db\" timeout 2000 {\n  before_all { Platform.stdout_line \"open\" }\n  before_each { Platform.stdout_line \"begin\" }\n  test \"reads\" timeout 50 {}\n  after_each {}\n  after_all { Platform.stdout_line \"close\" }\n  after_all {}\n}"
+    ), @r#"
+    let tests : (List Test.Test) = [
+      (Test.timeout
+        2000
+        (Test.group "Db" [
+          (Test.before_all (task { (Platform.stdout_line "open") })),
+          (Test.before_each (task { (Platform.stdout_line "begin") })),
+          (Test.timeout 50 (Test.effect_test "reads" (task { () }))),
+          (Test.after_each (task { () })),
+          (Test.after_all (task { (Platform.stdout_line "close") })),
+          (Test.after_all (task { () })),
+        ])),
+    ]
+    "#);
+    // a modifier wraps the timeout
+    insta::assert_snapshot!(code("test.skip \"slow\" timeout (2 * 1000) {}"), @r#"
+    let tests : (List Test.Test) = [
+      (Test.skip (Test.timeout ((2 * 1000)) (Test.effect_test "slow" (task { () })))),
+    ]
+    "#);
+}
+
+#[test]
+fn a_hook_has_no_name_and_a_timeout_its_milliseconds() {
+    insta::assert_snapshot!(errors("suite \"a\" {\n  before_each \"x\" {}\n}"), @r#"T001 `before_each`: a suite holds `test "name" { … }`, `suite "name" { … }`, maybe with `.skip` or `.only` and `timeout millis`, and the hooks `before_all`, `before_each`, `after_each` and `after_all { … }`"#);
+    insta::assert_snapshot!(errors("test \"a\" timeout {}"), @r#"T001 on the block: a `test` block starts a top-level declaration, names its case and holds its body in braces: `test "name" { … }`, maybe `test.skip` or `test.only`, and `timeout millis` after the name"#);
+    insta::assert_snapshot!(errors("test \"a\" later 5 {}"), @r#"T001 on the block: a `test` block starts a top-level declaration, names its case and holds its body in braces: `test "name" { … }`, maybe `test.skip` or `test.only`, and `timeout millis` after the name"#);
+    // hooks of one kind are no cases, which a full name stands for
+    assert_eq!(
+        errors("suite \"a\" {\n  before_each {}\n  before_each {}\n  test \"b\" {}\n}"),
+        ""
+    );
 }
 
 #[test]

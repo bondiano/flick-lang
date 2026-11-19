@@ -192,6 +192,24 @@
           }
         },
         {
+          "comment": "a case of the test DSL with `timeout millis` after its name",
+          "match": "^[ \\t]*(suite|test)(?:(\\.)(skip|only))?[ \\t]+(\"(?:[^\"\\\\]|\\\\.)*\")[ \\t]+(timeout)\\b",
+          "captures": {
+            "1": { "name": "keyword.other.flick" },
+            "2": { "name": "punctuation.accessor.flick" },
+            "3": { "name": "keyword.other.flick" },
+            "4": { "name": "string.quoted.double.flick" },
+            "5": { "name": "keyword.other.flick" }
+          }
+        },
+        {
+          "comment": "`before_all`, `before_each`, `after_each` and `after_all { … }` at the start of a line: a hook of a suite of the test DSL",
+          "match": "^[ \\t]*(before_all|before_each|after_each|after_all)(?=[ \\t]*\\{)",
+          "captures": {
+            "1": { "name": "keyword.other.flick" }
+          }
+        },
+        {
           "comment": "`suite \"name\"` and `test \"name\"`, maybe `.skip` or `.only`, at the start of a line: a case of the test DSL",
           "match": "^[ \\t]*(suite|test)(?:(\\.)(skip|only))?(?=[ \\t]+\")",
           "captures": {

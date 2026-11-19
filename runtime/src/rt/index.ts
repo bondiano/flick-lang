@@ -145,6 +145,10 @@ export {
   genString,
   runTests,
   testAdjust,
+  testAfterAll,
+  testAfterEach,
+  testBeforeAll,
+  testBeforeEach,
   testClock,
   testEffect,
   testGroup,
@@ -154,6 +158,7 @@ export {
   testSkip,
   testSetTime,
   testSuite,
+  testTimeout,
 } from "./testing.ts";
 export { RuntimeFailure, promiseFacade, runPromise } from "./facade.ts";
 

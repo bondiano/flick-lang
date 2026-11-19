@@ -552,11 +552,16 @@
 @flick-lang/runtime/core/testing genString
 @flick-lang/runtime/core/testing isAssertionFailed
 @flick-lang/runtime/core/testing random
+@flick-lang/runtime/core/testing testAfterAll
+@flick-lang/runtime/core/testing testAfterEach
+@flick-lang/runtime/core/testing testBeforeAll
+@flick-lang/runtime/core/testing testBeforeEach
 @flick-lang/runtime/core/testing testGroup
 @flick-lang/runtime/core/testing testOnly
 @flick-lang/runtime/core/testing testProperty
 @flick-lang/runtime/core/testing testPure
 @flick-lang/runtime/core/testing testSkip
+@flick-lang/runtime/core/testing testTimeout
 @flick-lang/runtime/core/text bigintAbs
 @flick-lang/runtime/core/text bigintDivide
 @flick-lang/runtime/core/text bigintFromNumber
@@ -1014,6 +1019,10 @@
 @flick-lang/runtime/rt syncExport
 @flick-lang/runtime/rt syncOperation
 @flick-lang/runtime/rt testAdjust
+@flick-lang/runtime/rt testAfterAll
+@flick-lang/runtime/rt testAfterEach
+@flick-lang/runtime/rt testBeforeAll
+@flick-lang/runtime/rt testBeforeEach
 @flick-lang/runtime/rt testClock
 @flick-lang/runtime/rt testEffect
 @flick-lang/runtime/rt testGroup
@@ -1023,6 +1032,7 @@
 @flick-lang/runtime/rt testSetTime
 @flick-lang/runtime/rt testSkip
 @flick-lang/runtime/rt testSuite
+@flick-lang/runtime/rt testTimeout
 @flick-lang/runtime/rt timeout
 @flick-lang/runtime/rt timeoutOption
 @flick-lang/runtime/rt trampolineDone

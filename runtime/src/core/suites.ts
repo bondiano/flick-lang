@@ -3,7 +3,7 @@
 // the end of a watcher's stdin, and the exit code.
 import { type Named, type Test, flatten } from "./testing.ts";
 
-export type FailureKind = "assertion" | "defect" | "interrupted" | "failure" | "cleanup";
+export type FailureKind = "assertion" | "defect" | "interrupted" | "failure" | "cleanup" | "setup" | "timeout";
 
 /** The result of one test, as the reporters write it. */
 export interface TestResult {
@@ -28,6 +28,8 @@ export interface TestOptions {
   readonly list?: boolean;
   /** Fail a run with a test marked `only` before running any. */
   readonly forbidOnly?: boolean;
+  /** The milliseconds of each test that has no `Test.timeout` of its own. */
+  readonly timeout?: number | undefined;
 }
 
 /** Options of `flick test`, from the runner's arguments. */
@@ -42,6 +44,7 @@ export const parseTestArgs = (argv: ReadonlyArray<string>): TestOptions => {
     progress: boolean;
     list: boolean;
     forbidOnly: boolean;
+    timeout: number | undefined;
   } = {
     filter: "",
     jobs: 1,
@@ -52,6 +55,7 @@ export const parseTestArgs = (argv: ReadonlyArray<string>): TestOptions => {
     progress: false,
     list: false,
     forbidOnly: false,
+    timeout: undefined,
   };
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i];
@@ -62,6 +66,7 @@ export const parseTestArgs = (argv: ReadonlyArray<string>): TestOptions => {
     else if (flag === "--reporter") options.reporter = value;
     else if (flag === "--color") options.color = value === "always";
     else if (flag === "--progress") options.progress = value === "live";
+    else if (flag === "--timeout") options.timeout = Number(value);
     else if (flag === "--watched" || flag === "--list" || flag === "--forbid-only") {
       if (flag === "--watched") options.watched = true;
       else if (flag === "--list") options.list = true;
@@ -172,7 +177,9 @@ export const runTestsWith = async <Task, L>(
   const seed =
     options.seed !== undefined && Number.isInteger(options.seed) ? options.seed : Math.floor(Math.random() * 2 ** 31);
   const jobs = options.jobs !== undefined && Number.isInteger(options.jobs) && options.jobs > 0 ? options.jobs : 1;
-  const all = modules.flatMap(([module, tests]) => flatten(module, tests ?? []));
+  const timeout = options.timeout !== undefined && Number.isFinite(options.timeout) ? options.timeout : undefined;
+  // `--timeout` is the timeout of each test that has none of its own
+  const all = modules.flatMap(([module, tests]) => flatten(module, tests ?? [], [], [], { skip: false, only: false, timeout }));
   const marked = all.filter((t) => t.only);
   if (options.forbidOnly && marked.length > 0) {
     write(`--forbid-only: ${marked.length} test${marked.length === 1 ? " is" : "s are"} marked only\n`);
