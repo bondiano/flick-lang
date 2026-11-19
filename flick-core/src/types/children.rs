@@ -3,20 +3,23 @@
 //! the list element by element. Each argument from that parameter on is an
 //! element, on the line of the call or on a line of its own under it, and
 //! none is the empty list. The call then stands for the function applied to
-//! the list of them, which is what lowering writes.
+//! the list of them, which is what lowering writes. A block that also names
+//! a function of its siblings gives it the list of its expression lines,
+//! when there is more than one.
 
 use std::ptr;
 
-use super::Checker;
 use super::comprehension::comprehension;
 use super::lang::Lang;
 use super::ranges::range_list;
 use super::sugar_lints::unparen;
-use super::ty::{Norm, Type};
+use super::ty::{Effects, Norm, Type};
 use super::ui::Opened;
+use super::{Checker, let_parts};
 use crate::diagnostics::{Diagnostic, Edit, codes};
 use crate::source::Span;
 use crate::syntax::cst::Node;
+use crate::syntax::heads::SIBLINGS;
 use crate::syntax::kind::SyntaxKind as K;
 
 /// Whether `target`, somewhere under `node`, stands inside `( … )`, `[ … ]`,
@@ -68,23 +71,126 @@ impl Checker<'_> {
         let module: Vec<&str> = path.map(|t| t.text(self.text)).collect();
         let child = node.nodes().find(|n| n.kind == K::NameType);
         let child = child.map(|written| self.annotation(written));
-        // the body is the last node; a name before it is the function
-        // values are applied through
-        let mut parts = node.nodes().filter(|n| n.kind != K::NameType);
-        let (first, second) = (parts.next(), parts.next());
-        let (function, body) = match second {
-            Some(body) => (first, Some(body)),
-            None => (None, first),
-        };
-        let through = function.and_then(|written| self.through(written));
+        // the body is the last node; before it the function of its lines
+        // after its word, and before that the function values are applied
+        // through
+        let mut parts: Vec<&Node> = node.nodes().filter(|n| n.kind != K::NameType).collect();
+        let body = parts.pop();
+        let marked =
+            (node.child_tokens()).any(|t| t.kind == K::Ident && t.text(self.text) == SIBLINGS);
+        let siblings = if marked { parts.pop() } else { None };
+        let through = parts.pop().and_then(|written| self.through(written));
         self.opened.push(Opened {
             module: module.join("."),
             child,
             through,
         });
-        let ty = body.map_or(Type::Error, |body| self.infer(body));
+        let ty = match (body, siblings) {
+            (Some(body), Some(function)) => self.siblings(body, function),
+            (Some(body), None) => self.infer(body),
+            (None, _) => Type::Error,
+        };
         self.opened.pop();
         ty
+    }
+
+    /// `body`, the lines of a block that opens a module and names `function`
+    /// of them. More than one expression line, after the statements, is the
+    /// function of the list of them, each line one child; a statement after
+    /// a child is `T085`.
+    fn siblings(&mut self, body: &Node, function: &Node) -> Type {
+        let Some((reference, scheme)) = self.through(function) else {
+            return self.infer(body);
+        };
+        let block = unparen(body);
+        let lines: Vec<&Node> = block.nodes().filter(|n| !is_statement(n.kind)).collect();
+        let Some(first) = lines
+            .first()
+            .filter(|_| block.kind == K::Block && lines.len() > 1)
+        else {
+            return self.infer(body);
+        };
+        let span = self.span(block);
+        let function = self.instantiate(&scheme, span);
+        let Some(parts) = self.of_children(&function) else {
+            return self.infer(body);
+        };
+        let mark = self.cx.locals.len();
+        let statements: Vec<&Node> = block.nodes().collect();
+        let mut i = 0;
+        while i < statements.len() {
+            let statement = statements[i];
+            if statement.range().0 > first.range().0 && is_statement(statement.kind) {
+                self.late_statement(statement, &statements[..i], first);
+            }
+            match statement.kind {
+                K::Signature | K::LetDecl => i += self.local_declaration(&statements, i),
+                K::AssignStmt => self.statement(statement),
+                _ => {}
+            }
+            i += 1;
+        }
+        let ty = self.applied_to_children(&function, &parts, &lines, None, span);
+        self.cx.locals.truncate(mark);
+        self.typing.siblings.insert(block.range(), reference);
+        ty
+    }
+
+    /// `T085` on `statement`, which follows `first`, the first child of its
+    /// block, among `before`. A fix moves a `let` of a name above that child
+    /// where nothing changes meaning: no line between names what it binds,
+    /// which it would then hide, and none binds a name it uses or declares.
+    fn late_statement(&mut self, statement: &Node, before: &[&Node], first: &Node) {
+        let text = self.text;
+        let words = |n: &Node| -> Vec<String> {
+            let names = n.tokens().into_iter().filter(|t| t.kind == K::Ident);
+            names.map(|t| t.text(text).to_owned()).collect()
+        };
+        let bound = |n: &Node| {
+            (n.kind == K::LetDecl)
+                .then(|| let_parts(n, text).name)
+                .flatten()
+        };
+        let between = before.iter().filter(|n| n.range().0 >= first.range().0);
+        let fixable = bound(statement).is_some_and(|name| {
+            let used = words(statement);
+            !between.into_iter().any(|n| {
+                n.kind == K::Signature
+                    || words(n).contains(&name)
+                    || bound(n).is_some_and(|other| used.contains(&other))
+            })
+        });
+        let diagnostic = Diagnostic::error(
+            codes::T085,
+            "a statement after the children of this block: its `let`s and assignments come before the first child",
+            self.span(statement),
+        );
+        // its lines move as they are, before the line of the first child,
+        // when each of the two stands alone on its lines
+        let offset = |at: usize| u32::try_from(at).expect("offsets fit in u32");
+        let line_start = |at: u32| text[..at as usize].rfind('\n').map_or(0, |i| i + 1);
+        let ((start, end), child) = (statement.range(), first.range().0);
+        let to = text[end as usize..].find('\n').map(|i| end as usize + i + 1);
+        let (from, at) = (line_start(start), line_start(child));
+        let alone = to.is_some_and(|to| text[end as usize..to].trim().is_empty())
+            && text[from..start as usize].trim().is_empty()
+            && text[at..child as usize].trim().is_empty();
+        let (Some(to), true, true) = (to, fixable, alone) else {
+            return (self.diagnostics).push(diagnostic);
+        };
+        let at = offset(at);
+        let edits = vec![
+            Edit {
+                span: Span::new(self.file, at, at),
+                replacement: text[from..to].to_owned(),
+            },
+            Edit {
+                span: Span::new(self.file, offset(from), offset(to)),
+                replacement: String::new(),
+            },
+        ];
+        let fix = || ("move it above the first child", edits);
+        (self.diagnostics).push(diagnostic.with_safe_fix(fix));
     }
 
     /// The elements of `written`, a list literal where the children of
@@ -211,6 +317,47 @@ impl Checker<'_> {
         children: &[&Node],
         (at, end): (usize, u32),
     ) -> Option<Type> {
+        let parts = self.of_children(function)?;
+        let (param, effects, result, item) = &parts;
+        // the list of them as it was written before: its elements are the
+        // children, which the fix writes one by one
+        if let [one] = children
+            && let Some(elements) = self.listed(head, one)
+        {
+            for element in &elements {
+                self.check_value(element, item);
+            }
+            return Some(result.clone());
+        }
+        // one argument that is a list is the list of them: a value, a call
+        // or a comprehension, as `List.map row items`
+        let alone = match children {
+            [one] => self.child_or_list(one, param, item),
+            _ => None,
+        };
+        if let Some((argument, true)) = &alone {
+            let span = Span::new(self.file, head.range().0, children[0].range().1);
+            if let Some(effects) = effects {
+                self.call_effects(&self.live_call(function, effects), span);
+            }
+            let result = self.instantiate(result, span);
+            return Some(self.application_result(result, function, argument, false));
+        }
+        let start = head.range().0;
+        // no child leaves the call no text of its own: its place is its end
+        let span = match children.last() {
+            Some(last) => Span::new(self.file, start, last.range().1),
+            None => Span::new(self.file, end, end),
+        };
+        self.typing.gathered.insert((start, end), at);
+        let first = alone.as_ref().map(|(actual, _)| actual);
+        Some(self.applied_to_children(function, &parts, children, first, span))
+    }
+
+    /// The parameter, effects and result of `function` and the type of a
+    /// child, when it is a function of the list of the children a block
+    /// around names, alone.
+    fn of_children(&mut self, function: &Type) -> Option<Children> {
         let child = (self.opened.iter().rev()).find_map(|o| o.child.clone())?;
         let Type::Fun {
             param,
@@ -229,54 +376,46 @@ impl Checker<'_> {
         if !of_child || matches!(self.whnf(&result), Type::Fun { .. }) {
             return None;
         }
-        // the list of them as it was written before: its elements are the
-        // children, which the fix writes one by one
-        if let [one] = children
-            && let Some(elements) = self.listed(head, one)
-        {
-            for element in &elements {
-                self.check_value(element, &item);
-            }
-            return Some(*result);
-        }
-        // one argument that is a list is the list of them: a value, a call
-        // or a comprehension, as `List.map row items`
-        let alone = match children {
-            [one] => self.child_or_list(one, &param, &item),
-            _ => None,
-        };
-        if let Some((argument, true)) = &alone {
-            let span = Span::new(self.file, head.range().0, children[0].range().1);
-            if let Some(effects) = effects {
-                self.call_effects(&self.live_call(function, &effects), span);
-            }
-            let result = self.instantiate(&result, span);
-            return Some(self.application_result(result, function, argument, false));
-        }
+        Some((*param, effects, *result, item))
+    }
+
+    /// `function`, of the parts `of_children` gives, applied at `span` to
+    /// the list of `children`; `first` is the type of the first when the
+    /// caller has checked it.
+    fn applied_to_children(
+        &mut self,
+        function: &Type,
+        (param, effects, result, item): &Children,
+        children: &[&Node],
+        first: Option<&Type>,
+        span: Span,
+    ) -> Type {
         let mut captures = Norm::default();
         for (i, written) in children.iter().enumerate() {
-            let actual = match &alone {
-                Some((actual, _)) if i == 0 => actual.clone(),
-                _ => self.check_value(written, &item),
+            let actual = match first {
+                Some(actual) if i == 0 => actual.clone(),
+                _ => self.check_value(written, item),
             };
             let kept = self.captures_of(&actual);
             captures.entries.extend(kept.entries);
             captures.tails.extend(kept.tails);
         }
-        let start = head.range().0;
-        // no child leaves the call no text of its own: its place is its end
-        let span = match children.last() {
-            Some(last) => Span::new(self.file, start, last.range().1),
-            None => Span::new(self.file, end, end),
-        };
-        let list = Type::app(Type::lang(Lang::List), item);
+        let list = Type::app(Type::lang(Lang::List), item.clone());
         let argument = self.data_value(&list, captures);
-        self.expect(&argument, &param, span);
+        self.expect(&argument, param, span);
         if let Some(effects) = effects {
-            self.call_effects(&self.live_call(function, &effects), span);
+            self.call_effects(&self.live_call(function, effects), span);
         }
-        self.typing.gathered.insert((start, end), at);
-        let result = self.instantiate(&result, span);
-        Some(self.application_result(result, function, &argument, false))
+        let result = self.instantiate(result, span);
+        self.application_result(result, function, &argument, false)
     }
+}
+
+/// What [`Checker::of_children`] finds of a function of children.
+type Children = (Type, Option<Box<Effects>>, Type, Type);
+
+/// Whether a line of a block of this kind is a statement rather than an
+/// expression.
+fn is_statement(kind: K) -> bool {
+    matches!(kind, K::Signature | K::LetDecl | K::AssignStmt)
 }

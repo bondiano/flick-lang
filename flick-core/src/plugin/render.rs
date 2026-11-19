@@ -13,7 +13,7 @@ pub use decl::DECL_PLACEHOLDER;
 
 use super::source::{in_signature, signed};
 use crate::source::FileId;
-use crate::syntax::heads::OPEN;
+use crate::syntax::heads::{OPEN, SIBLINGS};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::lexer::{lex, lex_generated};
 
@@ -207,6 +207,7 @@ impl Printer<'_> {
                 module,
                 child,
                 through,
+                siblings,
                 body,
             } => {
                 // the node ends with its own `)`, so that a span of it is the
@@ -219,17 +220,15 @@ impl Printer<'_> {
                     self.push(" ");
                     self.name(child, Names::Type)?;
                 }
-                // a function by its module: its last part is a lowercase name
                 if let Some(through) = through {
-                    let lower = |part: &str| part.starts_with(|c: char| c.is_ascii_lowercase());
-                    let function = through
-                        .rsplit_once('.')
-                        .is_some_and(|(_, last)| lower(last));
-                    if !function {
-                        return Err(format!("`{through}` is no function of a module"));
-                    }
                     self.push(" ");
-                    self.name(through, Names::Value)?;
+                    self.function(through)?;
+                }
+                if let Some(siblings) = siblings {
+                    self.push(" ");
+                    self.push(SIBLINGS);
+                    self.push(" ");
+                    self.function(siblings)?;
                 }
                 self.push(" (");
                 self.node(*body, Role::Expr, d)?;
@@ -237,6 +236,15 @@ impl Printer<'_> {
             }
         }
         Ok(())
+    }
+
+    /// A function by its module: its last part is a lowercase name.
+    fn function(&mut self, path: &str) -> Result<(), String> {
+        let lower = |part: &str| part.starts_with(|c: char| c.is_ascii_lowercase());
+        if !path.rsplit_once('.').is_some_and(|(_, last)| lower(last)) {
+            return Err(format!("`{path}` is no function of a module"));
+        }
+        self.name(path, Names::Value)
     }
 
     fn ty(&mut self, ty: &Ty, depth: u32) -> Result<(), String> {

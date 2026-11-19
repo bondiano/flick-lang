@@ -1,0 +1,34 @@
+---
+title: "FLICK-T085"
+source_hash: "cad17b41e47b2e24"
+---
+
+# Оператор после детей блока
+
+В блоке, чьи строки — дети одного узла, например `ui { … }`, сначала идут
+операторы, а за ними дети: две и больше строк-выражений — дети одного
+`Ui.fragment`, и `let` или присваивание среди них разделили бы их.
+
+```flick fail T085
+view : Float -> Ui
+let view n = ui {
+  heading (text "count")
+  let shown = show n
+  paragraph (text shown)
+}
+```
+
+это
+
+```flick
+view : Float -> Ui
+let view n = ui {
+  let shown = show n
+  heading (text "count")
+  paragraph (text shown)
+}
+```
+
+`flick check --fix --only T085` переносит такой `let` выше первого ребёнка,
+если ни одна строка между ними не называет то, что он связывает, и не
+связывает имя, которое он использует.

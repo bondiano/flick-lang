@@ -6,6 +6,16 @@ break programs.
 
 ## Unreleased
 
+- **Several children in `ui { … }` without `fragment`.** After its `let`s,
+  two or more lines of a `ui` block are the children of one `Ui.fragment`,
+  as the children of an element already stand one by one; one line is the
+  node itself, as before. Two lines were `FLICK-T011` until now, so no
+  program that compiled changes meaning. A `let` after the first child is
+  the new `FLICK-T085`, whose safe fix moves it above that child when that
+  changes nothing. A branch of `if` or `match` with several nodes is a
+  `ui { … }` of its own, and `fragment` stays the function it was. A
+  plugin's `Open` names the function with its new `siblings` field.
+
 - **Test hooks and timeouts.** A `suite` holds `before_all`, `before_each`,
   `after_each` and `after_all { … }`, which run around the cases of the
   suite that the run selects: setup outer to inner, cleanup inner to outer,

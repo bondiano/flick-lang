@@ -1,5 +1,6 @@
 //! `ui { … }`: the body with the module `Ui` open, so that `text`, `button`
-//! and the rest of the library need no `Ui.` there.
+//! and the rest of the library need no `Ui.` there. Several expression
+//! lines, after the `let`s, are the children of one `Ui.fragment`.
 
 use flick_plugin::{
     Arena, Block, Builder, Compiler, Diagnostic, Expr, Hole, HoleKind, Hover, Piece,
@@ -18,6 +19,8 @@ pub fn expand(block: &Block, compiler: &mut dyn Compiler) -> Result<Arena, Vec<D
         child: Some("Ui".into()),
         // a foreign component takes its props through `Ui.component`
         through: Some("Ui.component".into()),
+        // several lines are the children of one fragment
+        siblings: Some("Ui.fragment".into()),
         body: user,
     });
     Ok(b.finish(root))
