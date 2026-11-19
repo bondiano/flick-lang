@@ -28,7 +28,9 @@ and functional dependencies after `|`: `c -> a` says the types at `c`
 determine the types at `a`. A method's type is
 `forall params own. C params => …`. The superclasses must not lead back to
 the class (`FLICK-C008`). A class without methods only relates its
-parameters and has no `=`.
+parameters and has no `=`. A class may also state laws, `law` members that
+every instance should satisfy and that a bundle proves of an instance
+([proofs](../proofs/#laws-and-bundles)).
 
 `Prelude` declares `Eq`, `Ord` (`compare : a -> a -> Ordering`, with
 `type Ordering = LT | EQ | GT`), `Hash` and `Show`, with instances for the
