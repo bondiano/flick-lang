@@ -51,8 +51,9 @@ jobs:
       - run: node --test .github/actions/setup-flick/install.test.mjs
       - run: node --test .github/scripts/*.test.mjs
 
-  # `just unit` in two parts: the tests of `flick`, its CLI above all, take
-  # as long as those of every other crate together
+  # `just unit` in three parts: the tests of `flick`, its CLI above all, take
+  # as long as those of every other crate together, so nextest runs them in
+  # two halves, each test a process of its own
   test:
     name: test (${{ matrix.part.name }})
     runs-on: ubuntu-26.04
@@ -61,10 +62,12 @@ jobs:
       fail-fast: false
       matrix:
         part:
-          - name: flick
-            packages: -p flick
+          - name: flick 1/2
+            run: just unit-flick 1/2
+          - name: flick 2/2
+            run: just unit-flick 2/2
           - name: crates
-            packages: --workspace --exclude flick-model --exclude flick
+            run: just unit --workspace --exclude flick-model --exclude flick
     steps:
       - uses: actions/checkout@v7
       - run: rustup show active-toolchain || rustup toolchain install
@@ -75,13 +78,13 @@ jobs:
           cache-dependency-path: runtime-go/go.sum
       - uses: taiki-e/install-action@v2
         with:
-          tool: just@1.59.0
+          tool: just@1.59.0,cargo-nextest@0.9.148
       # some tests run pnpm; its version comes from `packageManager`
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version-file: .tool-versions
-      - run: just unit ${{ matrix.part.packages }}
+      - run: ${{ matrix.part.run }}
       - if: matrix.part.name == 'crates'
         run: just effect-coverage >> "$GITHUB_STEP_SUMMARY"
 
