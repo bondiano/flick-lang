@@ -26,6 +26,8 @@ pub struct CommandArguments {
 pub enum Commands {
     /// Check Flick source files and report diagnostics.
     Check(CheckArguments),
+    /// Check the proofs of the project's proof root, with the code they name.
+    Prove(ProveArguments),
     /// Compile the project, or the given files, to ES modules.
     Build(BuildArguments),
     /// Format Flick source files in place.
@@ -213,6 +215,17 @@ pub struct CheckArguments {
     /// such as `E002,F001`: a migration that changes nothing else.
     #[arg(long, requires = "fix", value_delimiter = ',', value_name = "CODES")]
     pub only: Vec<String>,
+}
+
+#[derive(Args)]
+pub struct ProveArguments {
+    /// Proof modules or directories to check, with everything they import;
+    /// by default the project's proof root (`project.proof-dir`).
+    pub paths: Vec<String>,
+
+    /// Check again whenever a source file changes.
+    #[arg(long)]
+    pub watch: bool,
 }
 
 #[derive(Args)]

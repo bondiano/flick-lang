@@ -1,6 +1,6 @@
 ---
 title: "Проект"
-source_hash: 5e9ea4c8a4e691f4
+source_hash: b21fc01cd98f596e
 ---
 
 Проект — каталог с `flick.toml` (см. [CLI компилятора](../cli/)).
@@ -46,6 +46,7 @@ max-params = 5
 | `project.kind` | `"app"` или `"lib"`; обязателен | — |
 | `project.source-dir` | каталог исходных модулей | `"src"` |
 | `project.test-dir` | каталог тестовых модулей | `"test"` |
+| `project.proof-dir` | каталог модулей доказательств, которые проверяет только `flick prove` | `"proofs"` |
 | `project.entry` | модуль, экспортирующий `main`, свой или реэкспортированный: вход `main` с раннером `flick-main.js` | — |
 | `project.entries` | несколько входов, `{ server = "App.Server", cli = "App.Cli" }`: по раннеру `flick-<name>.js` на каждый; вход со своим runner'ом — таблица, `web = { module = "App.Worker", runner = "Runner.Cloudflare" }`; `target = "client"` — вход, который работает в браузере: ничто из достижимого из его `main` не может требовать `Server` (`FLICK-E009` с путём до него), поэтому его бандл не содержит серверных модулей; имена — строчные латинские буквы, цифры и `-`; вместо `entry` | — |
 | `project.runner` | модуль, который запускает каждый вход без своего runner'а: экспортирует `type alias Main` — тип, который должен иметь `main` (иначе `FLICK-P026`), — и `run`, который принимает `main`; раннер экспортирует его результат как `default`; встроены `"Runner.Node"`, `"Runner.Browser"` и `"Runner.Cloudflare"` — Worker, чей `fetch` передаёт `main : Runner.Cloudflare.Fetch ->{Runner.Cloudflare.Env; AppError} Http.ServerResponse.ServerResponse` запрос и контекст (`wait_until`), а привязки предоставляет сервисом `Env` (`Runner.Cloudflare.var`, `binding`) вместе с живыми браузерными сервисами `Host.BrowserLive`; так runner может предоставлять сервисы, и `main` может требовать любые из тех, что названы в его `Main`; другой может дать пакет; без него чистый `main` вызывается, а эффект выполняется как на Node | — |

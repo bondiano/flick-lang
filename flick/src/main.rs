@@ -11,7 +11,10 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::pnpm;
 use flick_core::source::SourceMap;
 
-use crate::args::{CommandArguments, Commands, FfiCommands, GlobalArguments, SchemaCommands};
+use crate::args::{
+    CheckArguments, CommandArguments, Commands, FfiCommands, GlobalArguments, ProveArguments,
+    SchemaCommands,
+};
 use crate::command::{Command, Outcome, finish as report, run_command};
 use crate::commands::{
     BuildCommand, CheckCommand, FfiCheckCommand, FfiImportCommand, FmtCommand, ScaffoldCommand,
@@ -151,6 +154,7 @@ fn run(args: CommandArguments) -> ExitCode {
             | Commands::Clean(_)
             | Commands::Build(_)
             | Commands::Check(_)
+            | Commands::Prove(_)
             | Commands::Test(_)
             | Commands::Install(_)
             | Commands::Add(_)
@@ -193,6 +197,26 @@ fn run(args: CommandArguments) -> ExitCode {
 }
 
 /// Runs the command on its project.
+/// `flick prove`: `flick check` of the proof root, or of the paths given.
+fn prove(options: &ProveArguments, global: &GlobalArguments) -> ExitCode {
+    let Some(paths) = commands::proof_paths(&options.paths, global.project.as_deref()) else {
+        return ExitCode::SUCCESS;
+    };
+    let options = CheckArguments {
+        paths,
+        watch: options.watch,
+        fix: false,
+        only: Vec::new(),
+    };
+    let watching = options.watch;
+    let command = CheckCommand::new(options, global.project.clone());
+    if watching {
+        watch(&command, global)
+    } else {
+        run_command(&command, global)
+    }
+}
+
 fn dispatch(args: CommandArguments) -> ExitCode {
     let global = &args.global;
     let project = global.project.as_deref();
@@ -206,6 +230,7 @@ fn dispatch(args: CommandArguments) -> ExitCode {
                 run_command(&command, global)
             }
         }
+        Commands::Prove(options) => prove(&options, global),
         Commands::Build(options) => {
             let watching = options.watch;
             let command = BuildCommand::new(
