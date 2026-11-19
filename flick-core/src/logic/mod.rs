@@ -24,6 +24,10 @@ pub use term::{Ctor, Def, LEMMAS, Literal, Pat, RULES, Refused, TUPLES, Term, te
 pub const DOMAIN: &str = "PureTotalV1";
 pub const CHECKER: u32 = 1;
 
+/// The module of a class's parameter applied in a law, `f a`: a type the
+/// instance of a bundle fills in.
+pub const CLASS: &str = "$class";
+
 /// A type of the domain.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Ty {
@@ -66,7 +70,8 @@ impl fmt::Display for Ty {
 
 impl Ty {
     /// `self` with each variable of `params` given its argument.
-    fn instantiate(&self, params: &[String], args: &[Ty]) -> Ty {
+    #[must_use]
+    pub fn instantiate(&self, params: &[String], args: &[Ty]) -> Ty {
         match self {
             Ty::Rigid(a) => params
                 .iter()
@@ -77,11 +82,32 @@ impl Ty {
                 module,
                 name,
                 args: own,
-            } => Ty::Data {
-                module: module.clone(),
-                name: name.clone(),
-                args: own.iter().map(|t| t.instantiate(params, args)).collect(),
-            },
+            } => {
+                let own = own.iter().map(|t| t.instantiate(params, args));
+                // a class's parameter applied: the instance's type takes the
+                // arguments after its own
+                let class = (module == CLASS)
+                    .then(|| params.iter().position(|p| p == name))
+                    .flatten()
+                    .and_then(|i| args.get(i));
+                match class {
+                    Some(Ty::Data {
+                        module,
+                        name,
+                        args: first,
+                    }) => Ty::Data {
+                        module: module.clone(),
+                        name: name.clone(),
+                        args: first.iter().cloned().chain(own).collect(),
+                    },
+                    Some(_) => Ty::Refused("a type applied that takes no arguments".into()),
+                    None => Ty::Data {
+                        module: module.clone(),
+                        name: name.clone(),
+                        args: own.collect(),
+                    },
+                }
+            }
             Ty::Fun(a, b) => Ty::Fun(
                 Box::new(a.instantiate(params, args)),
                 Box::new(b.instantiate(params, args)),
@@ -115,6 +141,15 @@ impl Data {
 
     pub fn get_mut(&mut self, key: &(String, String)) -> Option<&mut DataDecl> {
         self.0.iter_mut().find(|(k, _)| k == key).map(|(_, d)| d)
+    }
+
+    /// Adds the data types of `other` this has not.
+    pub fn extend(&mut self, other: &Data) {
+        for (key, decl) in &other.0 {
+            if self.get(key).is_none() {
+                self.insert(key.clone(), decl.clone());
+            }
+        }
     }
 
     pub fn insert(&mut self, key: (String, String), decl: DataDecl) {

@@ -4,6 +4,7 @@
 
 use super::has_metas;
 use crate::types::Elem;
+use crate::types::regions::{has_live, strip_live};
 use crate::types::ty::{Row, Type};
 
 /// Whether a head matches; `Unknown` when only unknown types in the
@@ -33,7 +34,7 @@ pub fn match_type(pattern: &Type, target: &Type, subst: &mut Subst) -> Match {
     match (pattern, target) {
         (_, Type::Error) => Match::Yes,
         (Type::Var(v), _) => match subst.iter().find(|(n, _)| n == v) {
-            Some((_, bound)) if bound == target => Match::Yes,
+            Some((_, bound)) if bound == target || same_but_live(bound, target) => Match::Yes,
             Some((_, bound)) if has_metas(bound) || has_metas(target) => Match::Unknown,
             Some(_) => Match::No,
             None => {
@@ -77,8 +78,14 @@ pub fn match_type(pattern: &Type, target: &Type, subst: &mut Subst) -> Match {
     }
 }
 
-/// Every labelled entry of the pattern is in the target; the pattern's tail
-/// takes the rest.
+/// An instance head names no `Live`: what typing by use records in a row of
+/// the constraint, solved or not, says nothing of which instance applies.
+fn same_but_live(bound: &Type, target: &Type) -> bool {
+    (has_live(bound) || has_live(target)) && strip_live(bound) == strip_live(target)
+}
+
+/// Every labelled entry of the pattern is in the target, but `Live`; the
+/// pattern's tail takes the rest.
 fn match_row(pattern: &Row, target: &Row, subst: &mut Subst) -> Match {
     let open = matches!(target.tail.as_deref(), Some(Type::Meta(_)));
     let mut result = Match::Yes;
@@ -92,7 +99,7 @@ fn match_row(pattern: &Row, target: &Row, subst: &mut Subst) -> Match {
     let rest: Vec<(Elem, Type)> = target
         .entries
         .iter()
-        .filter(|(l, _)| pattern.get(l).is_none())
+        .filter(|(l, _)| !matches!(l, Elem::Live) && pattern.get(l).is_none())
         .cloned()
         .collect();
     result.and(|| match pattern.tail.as_deref() {

@@ -159,7 +159,7 @@ impl Walker<'_> {
             K::NameExpr | K::ConPat => self.reference(node, Namespace::Constructor),
             K::NameType => self.reference(node, Namespace::Type),
             K::DerivingClause => return self.deriving(node),
-            K::ProofDecl => return self.proof_decl(node),
+            K::ProofDecl | K::LawDecl => return self.proof_decl(node),
             K::LetDecl => {
                 // a top-level or member `let`: its names are not locals
                 self.let_decl(node);

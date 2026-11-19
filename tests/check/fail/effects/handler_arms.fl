@@ -149,3 +149,4 @@ let kept () = collect (fun () -> scope { Scope.add_finalizer (task { Emit.emit 1
 kept_row : Eff r none Unit ->{r} Unit
 let kept_row work = scope { Scope.add_finalizer work }
 //~ FLICK-E017 @150:29-150:48 cannot deduce `Detached r` from the constraints
+//~ FLICK-G002 @36:18-36:24 this uses region `resume`, which the expected type `Unit ->{} Int` does not keep live

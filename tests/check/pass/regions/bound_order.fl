@@ -1,0 +1,62 @@
+// A value bound `a^c` that one argument fixes before another fits it: a
+// function or a task that uses nothing and one that uses the region of the
+// signature, in either order, several in a list, or inside `Some`. Fixed by
+// a value that uses nothing, `a` is still a type that keeps `c` live, so the
+// verdict does not depend on which argument comes first.
+module App.BoundOrder exposing (..)
+
+type Handle (s : Region) = Handle
+
+read_handle : Handle s ->{} String
+let read_handle _ = ""
+
+keep2 : List (a^c) -> a^c ->{} List (a^c)
+let keep2 xs x =
+  match xs with
+  | [y, ..._] -> [x, y]
+  | [] -> [x]
+
+fresh : Unit ->{} String
+let fresh () = ""
+
+value_first : Handle s ->{} String
+let value_first h =
+  match keep2 [fresh] (fun () -> read_handle h) with
+  | [k, ..._] -> k ()
+  | [] -> ""
+
+closure_first : Handle s ->{} String
+let closure_first h =
+  match keep2 [fun () -> read_handle h] fresh with
+  | [k, ..._] -> k ()
+  | [] -> ""
+
+task_first : Handle s -> Eff none none String ->{} String
+let task_first h ready =
+  match keep2 [ready] (task { read_handle h }) with
+  | [t, ..._] -> await t
+  | [] -> ""
+
+task_last : Handle s -> Eff none none String ->{} String
+let task_last h ready =
+  match keep2 [task { read_handle h }] ready with
+  | [t, ..._] -> await t
+  | [] -> ""
+
+several : Handle s ->{} String
+let several h =
+  match keep2 [fresh, fun () -> read_handle h, fresh] (fun () -> read_handle h) with
+  | [k, ..._] -> k ()
+  | [] -> ""
+
+wrapped : Handle s ->{} String
+let wrapped h =
+  match keep2 [Some fresh] (Some (fun () -> read_handle h)) with
+  | [Some k, ..._] -> k ()
+  | _ -> ""
+
+wrapped_last : Handle s ->{} String
+let wrapped_last h =
+  match keep2 [Some (fun () -> read_handle h)] (Some fresh) with
+  | [Some k, ..._] -> k ()
+  | _ -> ""

@@ -160,6 +160,9 @@ class Into a b =
 /// the function later, so the result keeps the captures of both.
 class Functor (f : Type -> Type) =
   map : forall c d a b. (a^v -> b)^c -> (f a)^d -> (f b)^(c + d)
+  law identity (v : f a) where equal (map identity v) v
+  law composition (g : b -> c) (h : a -> b) (v : f a)
+  where equal (map (fun x -> g (h x)) v) (map g (map h v))
 
 /// Containers folded from the first element to the last.
 class Foldable (f : Type -> Type) =
@@ -179,10 +182,32 @@ class Functor f => Applicative (f : Type -> Type) =
   @lang map2
   /// `f` of the values of both, in order: for `List`, every pair.
   map2 : forall c d a b x. (a^u -> b^v -> x)^c -> (f a)^d -> (f b)^d -> (f x)^(c + d)
+  // the laws apply with `map2 (fun g x -> g x)`
+  law identity (v : f a) where equal (map2 (fun g x -> g x) (pure identity) v) v
+  law composition (us : f (b -> c)) (vs : f (a -> b)) (ws : f a)
+  where equal
+    (map2
+      (fun g x -> g x)
+      (map2 (fun g x -> g x) (map2 (fun g x -> g x) (pure (fun u v x -> u (v x))) us) vs)
+      ws)
+    (map2 (fun g x -> g x) us (map2 (fun g x -> g x) vs ws))
+  law homomorphism (g : a -> b) (x : a)
+  where equal (map2 (fun g x -> g x) (pure g) (pure x)) (pure (g x) : f b)
+  law interchange (us : f (a -> b)) (x : a)
+  where equal (map2 (fun g x -> g x) us (pure x)) (map2 (fun g x -> g x) (pure (fun u -> u x)) us)
+  law map_is_applied (g : a -> b) (v : f a) where equal (map g v) (map2 (fun g x -> g x) (pure g) v)
 
 class Applicative m => Monad (m : Type -> Type) =
   @lang flat_map
   flat_map : forall c d a b. (a^v -> (m b)^(c + v))^c -> (m a)^d -> (m b)^(c + d)
+  law left_identity (g : a -> m b) (x : a) where equal (flat_map g (pure x)) (g x)
+  law right_identity (v : m a) where equal (flat_map pure v) v
+  law associativity (k : b -> m c) (g : a -> m b) (v : m a)
+  where equal (flat_map k (flat_map g v)) (flat_map (fun x -> flat_map k (g x)) v)
+  law map_is_flat_map (g : a -> b) (v : m a)
+  where equal (map g v) (flat_map (fun x -> pure (g x)) v)
+  law map2_is_flat_map (h : a -> b -> c) (va : m a) (vb : m b)
+  where equal (map2 h va vb) (flat_map (fun x -> map (fun y -> h x y) vb) va)
 
 /// Applicative containers with a choice: `nothing` holds no value, and
 /// `or_else` keeps the first that holds one (`List` keeps both).

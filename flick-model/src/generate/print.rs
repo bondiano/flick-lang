@@ -266,6 +266,13 @@ fn pat(p: &Pat, nested: bool) -> String {
             if nested { format!("({s})") } else { s }
         }
         Pat::Tuple(ps) => format!("({})", list(ps.iter().map(|p| pat(p, false)), ", ")),
+        Pat::List(ps, rest) => {
+            let rest = rest.iter().map(|r| format!("...{}", pat(r, false)));
+            format!(
+                "[{}]",
+                list(ps.iter().map(|p| pat(p, false)).chain(rest), ", ")
+            )
+        }
         Pat::Record(fs) => format!(
             "{{ {} }}",
             list(
@@ -273,7 +280,7 @@ fn pat(p: &Pat, nested: bool) -> String {
                 "; "
             )
         ),
-        other => panic!("the generator makes no pattern {other:?}"),
+        other @ Pat::Or(_) => panic!("the generator makes no pattern {other:?}"),
     }
 }
 

@@ -1,0 +1,42 @@
+// A value bound `a^c` that a function using nothing fixes first still
+// records what the closure fitted into it needs: stored in a cell whose
+// written type keeps nothing live, or kept past the region's `scope`, the
+// list holds a use after close.
+module App.BoundOrder exposing (..)
+
+type Handle (s : Region) = Handle
+
+open_handle : Fiber.Owner s -> String ->{Scope s} Handle s
+let open_handle _ _ = Handle
+
+read_handle : Handle s ->{} String
+let read_handle _ = ""
+
+keep2 : List (a^c) -> a^c ->{} List (a^c)
+let keep2 xs x =
+  match xs with
+  | [y, ..._] -> [x, y]
+  | [] -> [x]
+
+fresh : Unit ->{} String
+let fresh () = ""
+
+stored : Handle s -> Ref (List (Unit ->{} String)) ->{} Unit
+let stored h cell = Ref.set cell (keep2 [fresh] (fun () -> read_handle h))
+
+stored_last : Handle s -> Ref (List (Unit ->{} String)) ->{} Unit
+let stored_last h cell = Ref.set cell (keep2 [fun () -> read_handle h] fresh)
+
+escapes : Unit ->{} String
+let escapes () =
+  let kept = scope s {
+    let h = open_handle s "x"
+    keep2 [fresh] (fun () -> read_handle h)
+  }
+  match kept with
+  | [k, ..._] -> k ()
+  | [] -> ""
+//~ FLICK-G002 @25:60-25:73 this uses `s`, which the expected type `Unit ->{} String` does not keep live
+//~ FLICK-G002 @28:57-28:70 this uses `s`, which the type of this function does not keep live
+//~ FLICK-G002 @33:5-34:44 region `s` ends with its `scope`, so the value cannot leave it
+//~ FLICK-G002 @37:18-37:22 this uses region `s`, which the signature of `escapes` does not keep live

@@ -1,0 +1,91 @@
+module Language.Bytes exposing (tests)
+
+bytes : Bytes.Bytes
+let bytes = Bytes.decode_base64url "AID_" |> Option.with_default Bytes.empty
+
+tests : List Test.Test
+let tests = [
+  Test.group "packed bytes" [
+    Test.test "round-trips lists and reports the first invalid byte" (fun () ->
+      Test.equal
+        [
+          Ok [],
+          Ok [0, 128, 255],
+          Err (Bytes.ByteOutOfRange 1 (-1)),
+          Err (Bytes.ByteOutOfRange 0 256),
+        ]
+        (List.map (fun xs -> Bytes.from_list xs |> Result.map Bytes.to_list) [
+          [],
+          [0, 128, 255],
+          [7, -1, 256],
+          [256, -1],
+        ])
+    ),
+    Test.test "checks length and zero-based indices" (fun () ->
+      Test.equal (0, 3, [None, Some 0, Some 255, None], None) (
+        Bytes.length Bytes.empty,
+        Bytes.length bytes,
+        List.map (fun i -> Bytes.get i bytes) [-1, 0, 2, 3],
+        Bytes.get 0 Bytes.empty,
+      )
+    ),
+    Test.test "checks half-open slices without changing the original" (fun () ->
+      let slice start end = Bytes.slice start end bytes |> Option.map Bytes.to_list
+      let nested =
+        Bytes.slice 1 3 bytes |> Option.bind (Bytes.slice 1 2) |> Option.map Bytes.to_list
+      Test.equal
+        (
+          [Some [0, 128, 255], Some [128, 255], Some [], None, None, None, None],
+          Some [255],
+          [0, 128, 255],
+        )
+        (
+          [slice 0 3, slice 1 3, slice 3 3, slice (-1) 0, slice 2 1, slice 1 4, slice 4 4],
+          nested,
+          Bytes.to_list bytes,
+        )
+    ),
+    Test.test "encodes and decodes UTF-8" (fun () ->
+      let text = "\u{FEFF}é😀"
+      let lone = String.slice 0 1 "😀"
+      Test.equal ([239, 187, 191, 195, 169, 240, 159, 152, 128], Some text, [239, 191, 189], None) (
+        Bytes.to_list (Bytes.encode_utf8 text),
+        Bytes.decode_utf8 (Bytes.encode_utf8 text),
+        Bytes.to_list (Bytes.encode_utf8 lone),
+        Bytes.decode_utf8 bytes,
+      )
+    ),
+    Test.test "accepts padded and unpadded base64url" (fun () ->
+      let decode text = Bytes.decode_base64url text |> Option.map Bytes.to_list
+      Test.equal ("_w", [Some [], Some [255], Some [255], None, None, None, None]) (
+        Bytes.encode_base64url (Bytes.slice 2 3 bytes |> Option.with_default Bytes.empty),
+        List.map decode ["", "_w", "_w==", "_w=", "_w===", "/w==", "_w\n"],
+      )
+    ),
+    Test.test "compares byte contents and length" (fun () ->
+      let same = Bytes.from_list [0, 128, 255] |> Result.with_default Bytes.empty
+      let first_differs = Bytes.from_list [1, 128, 255] |> Result.with_default Bytes.empty
+      let last_differs = Bytes.from_list [0, 128, 254] |> Result.with_default Bytes.empty
+      Test.equal ([true, true, false, false, false], [true, false]) (
+        List.map (Bytes.equal_constant_time bytes) [
+          bytes,
+          same,
+          first_differs,
+          last_differs,
+          Bytes.empty,
+        ],
+        [bytes == same, bytes == first_differs],
+      )
+    ),
+    Test.test "keeps the legacy list APIs" (fun () ->
+      let encoded = Bytes.from_string "é"
+      Test.equal ([195, 169], Some "é", "w6k", Some [195, 169], true) (
+        encoded,
+        Bytes.to_string encoded,
+        Bytes.to_base64url encoded,
+        Bytes.from_base64url "w6k",
+        Bytes.equal encoded [195, 169],
+      )
+    ),
+  ],
+]

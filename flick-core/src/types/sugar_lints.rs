@@ -43,7 +43,7 @@ pub(super) fn is_list_module(module: &str) -> bool {
 impl Checker<'_> {
     pub(super) fn sugar_lints(&mut self, node: &Node) {
         // a proof's goal says what it states: no shorter spelling is the same goal
-        if node.kind == K::ProofDecl {
+        if matches!(node.kind, K::ProofDecl | K::LawDecl) {
             return;
         }
         if node.kind == K::BinExpr {

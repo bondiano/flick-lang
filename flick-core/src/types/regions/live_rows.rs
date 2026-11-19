@@ -142,28 +142,28 @@ impl Checker<'_> {
         if missing.is_empty() {
             return false;
         }
-        let inner = (declared.entries.iter())
+        let inner: Vec<Type> = (declared.entries.iter())
             .filter(|(l, _)| matches!(l, Elem::Live))
-            .find_map(|(_, t)| {
-                self.store
-                    .normalize(t)
-                    .tails
-                    .into_iter()
-                    .find(|ty| ty.inference_meta_root().is_some())
-            });
-        let (variable, grown) = match (inner.as_ref(), open) {
-            (Some(variable), _) => {
+            .flat_map(|(_, t)| self.store.normalize(t).tails)
+            .filter(|ty| ty.inference_meta_root().is_some())
+            .collect();
+        // one that cannot take the region, as the qualifier of a function
+        // made before the region's `scope`, leaves the next to grow
+        if !inner.is_empty() {
+            return inner.iter().any(|variable| {
                 let Some(rest) = self.store.fresh_beside_occurrence(variable) else {
                     return false;
                 };
                 let row = Row {
-                    entries: missing,
+                    entries: missing.clone(),
                     tail: Some(Box::new(rest)),
                     ..Row::default()
                 };
-                (variable.clone(), Type::Row(row))
-            }
-            (None, Some(variable)) => {
+                self.bind_inference(variable, &Type::Row(row)).is_ok()
+            });
+        }
+        let (variable, grown) = match open {
+            Some(variable) => {
                 let Some(rest) = self.store.fresh_beside_occurrence(variable) else {
                     return false;
                 };
@@ -175,7 +175,7 @@ impl Checker<'_> {
                 };
                 (variable.clone(), Type::Row(row))
             }
-            (None, None) => return false,
+            None => return false,
         };
         self.bind_inference(&variable, &grown).is_ok()
     }

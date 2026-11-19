@@ -226,8 +226,8 @@
           }
         },
         {
-          "comment": "`proof name` at the start of a line declares a proof; elsewhere the word is a name",
-          "match": "^[ \\t]*(proof)[ \\t]+([a-z_][A-Za-z0-9_]*)",
+          "comment": "`proof name` at the start of a line declares a proof, `law name` a law of a class; elsewhere the words are names",
+          "match": "^[ \\t]*(proof|law)[ \\t]+([a-z_][A-Za-z0-9_]*)",
           "captures": {
             "1": { "name": "keyword.other.flick" },
             "2": { "name": "entity.name.function.flick" }

@@ -144,7 +144,8 @@ Contextual words are ordinary names everywhere except in one position:
   `control` before an operation of a service or an effect, and `return`
   before the pattern of an arm of `try` (see
   [effects.md](../effects/#effects-and-handlers));
-- `proof` before a name at the start of a declaration (see
+- `proof` before a name at the start of a declaration, and `law` before a
+  name at the start of a member of a class (see
   [Declarations](#declarations)).
 
 ### In modules
@@ -171,8 +172,9 @@ See [modules.md](../modules/).
 | `assert` | `let assert` binds a pattern that may not match, and fails when it does not | `let assert [x, ..._] = xs as "no items"` |
 | `type` | declares an ADT, `type alias` a transparent alias | `type Shape = Circle Float \| Empty` |
 | `opaque` | hides a type's representation outside its module | `opaque type alias UserId = String` |
-| `where` | the predicate of a `refined` type; the goal of a `proof`; a filter in `sql { … }` | `where user.id == params.id` |
+| `where` | the predicate of a `refined` type; the goal of a `proof` or a `law`; a filter in `sql { … }` | `where user.id == params.id` |
 | `proof` | contextual: before a name at the start of a declaration, states a property of the module's definitions and proves it; the compiler checks the proof and erases the declaration; a name elsewhere | `proof same where same_type a a = refl` |
+| `law` | contextual: before a name at the start of a member of a class, states what every instance satisfies; the compiler erases it, and a `lawful` goal proves it of an instance; a name elsewhere | `law identity (v : f a) where equal (map identity v) v` |
 | `kind` | declares a kind with its type-level constructors | `kind Nullability = NonNull \| Nullable` |
 | `error` | `type error` declares an expected error with a nominal identity | `type error NotFound = NotFound UserId` |
 | `service` | declares the operations of a service, looked up at run time | `service Clock = now : Unit ->{} Float` |
@@ -434,24 +436,33 @@ kind_decl   = "kind" Con "=" ["|"] Con { "|" Con }
 error_decl  = "type" "error" Con { param } ["=" variant] [deriving]
 service     = ("service" | "effect") Con { param } [ "=" operations ]
 operations  = block of: [ "tail" | "abort" | "control" ] signature | let | type_decl
-class       = "class" [context "=>"] Con { param } ["|" fundep { "," fundep }] ["=" members]
+class       = "class" [context "=>"] Con { param } ["|" fundep { "," fundep }] ["=" class_members]
 fundep      = { name } "->" { name }
 instance    = "instance" [context "=>"] type ["=" members]
 members     = block of: signature | let | type_decl
+class_members = block of: signature | let | type_decl | law
+law         = "law" name { atom_pattern | premise } "where" goal
 foreign     = "foreign" [mode] name "from" ("global" String | String String) [metadata]
             | "foreign" "blocked" name String
 mode        = "pure" | "effect"
 metadata    = indented lines: meta_name { atom }
 proof       = "proof" name { atom_pattern | premise } "where" goal "=" block
 premise     = "(" name ":" goal ")"
-goal        = "same_type" atom atom | expr   // two atomic types, or an expression
+goal        = "same_type" atom atom | "lawful" type ["from" expr] | expr
 ```
 
 A `proof` states a property of the module's definitions, its goal after
 `where`, and proves it after `=`: `proof same where same_type a a = refl`.
 The compiler checks the proof and erases the declaration, which has no value
-at run time. `equal`, `holds`, `same_type` and `refl` are names, not
-keywords.
+at run time. `equal`, `holds`, `same_type`, `lawful` and `refl` are names,
+not keywords.
+
+A `law` in a class states, as a goal does, what every instance satisfies,
+and has no proof; the compiler erases it. A `proof` whose goal is
+`lawful C T` proves the laws of `C` and of its superclasses of the instance
+`C T` resolves to: its body is a record that names a proof for each law, and
+holds the record of each superclass in the field of that superclass, as a
+dictionary does.
 
 `module_application` is a file-level declaration. Writing it inside an
 `inline_module` reports `FLICK-R019`; a `module_contract` is allowed there.

@@ -35,8 +35,10 @@ impl Checking<'_> {
             output
         };
         // a proof reads the bodies of what it names, which no interface shows:
-        // its module is checked again on every run, never taken from a cache
-        let Some(cache) = self.cache.filter(|_| !loaded.has_proofs()) else {
+        // its module is checked again on every run, never taken from a cache,
+        // as is a module whose laws a bundle of the run may read
+        let fresh = loaded.has_proofs() || (self.proving && loaded.has_laws());
+        let Some(cache) = self.cache.filter(|_| !fresh) else {
             return (check(), None, None, Reason::Changed(Vec::new()));
         };
         #[cfg(feature = "native-project")]
@@ -309,10 +311,12 @@ impl Checking<'_> {
         // a module that checked is the only one whose proofs are about something
         let mut proofs = Vec::new();
         if clean {
+            use crate::project::builtins::builtin_laws;
             let stages = self.stages_by_class;
             let lowered = |name: &str| self.lowered.get(*self.by_name.get(name)?)?.as_ref();
             let run = ir::Run {
                 builtins: &|| builtin_modules_of(stages),
+                builtin_laws: &|| builtin_laws(stages),
                 project: &|name| lowered(name).map(|(ir, _, _)| ir),
                 proven: &|name| lowered(name).map(|(_, _, p)| p.as_slice()),
             };

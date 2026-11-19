@@ -49,6 +49,15 @@ impl Loaded {
         use crate::syntax::kind::SyntaxKind;
         self.root == Root::Proof || (self.parse.tree.nodes()).any(|n| n.kind == SyntaxKind::ProofDecl)
     }
+
+    /// A module with a class that states a law.
+    fn has_laws(&self) -> bool {
+        use crate::syntax::kind::SyntaxKind;
+        (self.parse.tree.nodes())
+            .filter(|n| n.kind == SyntaxKind::ClassDecl)
+            .flat_map(|c| c.nodes().filter(|n| n.kind == SyntaxKind::Members))
+            .any(|m| m.nodes().any(|n| n.kind == SyntaxKind::LawDecl))
+    }
 }
 
 impl Loader<'_> {

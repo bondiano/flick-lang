@@ -426,6 +426,8 @@ Proofs
 proof same where same_type a a = refl
 let proof = 1
 let p = trans proof h
+  law kept (v : f a) where equal v v
+let law = 1
 
 ---
 
@@ -447,4 +449,19 @@ let p = trans proof h
   (operator)
   (identifier)
   (identifier)
-  (identifier))
+  (identifier)
+  (keyword)
+  (identifier)
+  (parens
+    (identifier)
+    (operator)
+    (identifier)
+    (identifier))
+  (keyword)
+  (identifier)
+  (identifier)
+  (identifier)
+  (keyword)
+  (identifier)
+  (operator)
+  (number))
