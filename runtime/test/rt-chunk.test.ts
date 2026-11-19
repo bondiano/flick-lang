@@ -101,6 +101,17 @@ test("foreign copying still receives an isolated flat sequence", () => {
   assert.equal(record.value, 7);
 });
 
+test("foreign copying of a record does not read incidental symbol properties", () => {
+  const chunk = chunkAppend(64, chunkFromList(Array.from({ length: 64 }, (_, index) => index)));
+  const input = new Proxy({ chunk }, {
+    get(target, key, receiver: unknown): unknown {
+      if (typeof key === "symbol") throw new Error("unexpected symbol read");
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  assert.deepEqual(copyData(input), { chunk: Array.from({ length: 65 }, (_, index) => index) });
+});
+
 test("generic formatting preserves the flat representation of a nested chunk", () => {
   const items = Array.from({ length: 64 }, (_, index) => index);
   const chunk = chunkAppend(64, chunkFromList(items));

@@ -1,3 +1,5 @@
+import { equals, hash, iterableHash, runtimeEquals, runtimeHash, runtimeSequence } from "./data.ts";
+
 // Small chunks and bulk constructions use flat leaves. Concatenations share
 // their operands in an AVL tree, weighted by element count for indexing.
 export type Chunk<A> = ReadonlyArray<A> | ChunkBranch<A>;
@@ -21,6 +23,21 @@ export class ChunkBranch<A> implements Iterable<A> {
   // Keep the flat JSON form when a chunk is inspected without a schema.
   toJSON(): Array<A> {
     return Array.from(this);
+  }
+
+  get [runtimeSequence](): true {
+    return true;
+  }
+
+  [runtimeEquals](other: unknown): boolean {
+    if (!(other instanceof ChunkBranch || Array.isArray(other)) || this.length !== other.length) return false;
+    const right = other[Symbol.iterator]();
+    for (const value of this) if (!equals(value, right.next().value)) return false;
+    return true;
+  }
+
+  [runtimeHash](): number {
+    return iterableHash(hash, this);
   }
 
   *[Symbol.iterator](): Iterator<A, undefined> {

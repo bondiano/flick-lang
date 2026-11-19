@@ -1,6 +1,5 @@
 // Runtime validation walks value witnesses; JSON encoding is a separate check.
-import { ChunkBranch } from "../core/chunk.ts";
-import { err, ok, type Result } from "../core/data.ts";
+import { err, isRuntimeSequence, ok, type Result } from "../core/data.ts";
 import type { SchemaError } from "./schema.ts";
 import type { SchemaNode } from "./schema_nodes.ts";
 
@@ -21,7 +20,7 @@ export const structuralValue = (
           const checked = node.item.value(input[i], at(path, i));
           if (checked._tag === "Failure") return checked;
         }
-      } else if (node.kind === "chunk" && input instanceof ChunkBranch) {
+      } else if (node.kind === "chunk" && record(input) && isRuntimeSequence(input)) {
         let index = 0;
         for (const value of input) {
           const checked = node.item.value(value, at(path, index++));
