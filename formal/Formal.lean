@@ -102,6 +102,8 @@ import Formal.Generalization
 import Formal.Lazy
 import Formal.Refine
 import Formal.Refine.Numbers
+import Formal.Proofs.CheckSound
+import Formal.Proofs.Examples
 import Formal.RecordHandler
 import Formal.Examples
 import Formal.RowEquivExamples
@@ -130,6 +132,8 @@ import Formal.RT.Layers
 import Formal.RT.Layers2
 import Formal.RT.RefLin
 import Formal.RT.LazyCell
+import Formal.Equiv.Context
+import Formal.Equiv.All
 import Formal.RT.T5
 import Formal.Decomp
 import Formal.Closed

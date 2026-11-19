@@ -6,7 +6,7 @@
 
 use flick_plugin::{Block, Compiler, Hole, HoleKind, Piece, Span};
 
-use crate::read::{self, Bodies, Item, Kind, before};
+use crate::read::{self, Bodies, Fixture, Item, Kind, before};
 
 /// The pieces of `block`, or none when it is no suite or test.
 pub fn format(block: &Block, compiler: &mut dyn Compiler) -> Option<Vec<Piece>> {
@@ -19,12 +19,21 @@ pub fn format(block: &Block, compiler: &mut dyn Compiler) -> Option<Vec<Piece>> 
 }
 
 /// The pieces of `item` after its word: its modifier, its name, its
-/// timeout and the braces with what is inside; of a hook, the braces.
+/// timeout and the braces with what is inside; of a hook, the braces; of a
+/// fixture, its words, its name and its expression.
 fn rest(block: &Block, item: &Item, out: &mut Vec<Piece>) {
+    if let Kind::Fixture(fixture) = &item.kind {
+        fixture_rest(block, item, fixture, out);
+        return;
+    }
     if !matches!(item.kind, Kind::Hook(_)) {
         if let Some(modifier) = item.modifier {
             text(out, ".");
             text(out, block.text_of(modifier));
+            text(out, " ");
+        }
+        if let Some(parallel) = item.parallel {
+            text(out, block.text_of(parallel));
             text(out, " ");
         }
         text(out, block.text_of(item.name));
@@ -37,7 +46,7 @@ fn rest(block: &Block, item: &Item, out: &mut Vec<Piece>) {
     }
     text(out, " {");
     match &item.kind {
-        Kind::Test(None) | Kind::Hook(None) => {}
+        Kind::Test(None) | Kind::Hook(None) | Kind::Fixture(_) => {}
         // a body written on the line of its `{` is one expression, which stays there
         Kind::Test(Some(body)) | Kind::Hook(Some(body))
             if before(block, body.start) == Some(b'{') =>
@@ -70,7 +79,9 @@ fn rest(block: &Block, item: &Item, out: &mut Vec<Piece>) {
                     out.push(Piece::Line);
                 }
                 text(out, block.text_of(word));
-                if inner.modifier.is_none() && !matches!(inner.kind, Kind::Hook(_)) {
+                if inner.modifier.is_none()
+                    && !matches!(inner.kind, Kind::Hook(_) | Kind::Fixture(_))
+                {
                     text(out, " ");
                 }
                 rest(block, inner, out);
@@ -81,6 +92,32 @@ fn rest(block: &Block, item: &Item, out: &mut Vec<Piece>) {
         }
     }
     text(out, "}");
+}
+
+/// ` shared concurrent name = expression` after the word `fixture`: the
+/// expression on the line of `=` where it was written there, else on the
+/// lines under it.
+fn fixture_rest(block: &Block, item: &Item, fixture: &Fixture, out: &mut Vec<Piece>) {
+    for word in [fixture.shared, fixture.concurrent].into_iter().flatten() {
+        text(out, " ");
+        text(out, block.text_of(word));
+    }
+    text(out, " ");
+    text(out, block.text_of(item.name));
+    text(out, " =");
+    match fixture.expr {
+        None => {}
+        Some(expr) if before(block, expr.start) == Some(b'=') => {
+            text(out, " ");
+            out.push(hole(expr));
+        }
+        Some(expr) => {
+            out.push(Piece::Indent);
+            out.push(Piece::Line);
+            out.push(hole(expr));
+            out.push(Piece::Dedent);
+        }
+    }
 }
 
 fn text(out: &mut Vec<Piece>, text: &str) {

@@ -1,0 +1,27 @@
+// What the lines of a `ui { … }` with several children are not.
+module App.SiblingsFail exposing (..)
+
+// a `let` after a child
+late : Float -> Ui
+let late n = ui {
+  heading (text "count")
+  let shown = show n
+  paragraph (text shown)
+}
+//~ FLICK-T085 @8:3-8:21 a statement after the children of this block
+
+// a line that is no `Ui`
+unit_line : Ui
+let unit_line = ui {
+  ignore 1
+  text "a"
+}
+//~ FLICK-T003 @16:3-16:11 expected `Ui`, found `Unit`
+
+// a list among them
+listed : List String -> Ui
+let listed labels = ui {
+  heading (text "rows")
+  List.map text labels
+}
+//~ FLICK-T003 @25:3-25:23 expected `Ui`, found `List Ui`

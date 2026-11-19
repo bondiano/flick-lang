@@ -174,29 +174,54 @@ impl Lower<'_> {
         let span = self.span(node);
         let mark = self.scope.len();
         let statements: Vec<&Node> = node.nodes().collect();
-        let block = self.statements(&statements, span);
+        let siblings = (self.typing.siblings.get(&node.range()).cloned()).map(|f| (f, node.range()));
+        let block = self.statements(&statements, span, siblings.as_ref());
         self.scope.truncate(mark);
         block
     }
 
     /// The statements of a block; a `let assert` takes the ones after it.
-    pub(super) fn statements(&mut self, statements: &[&Node], span: Span) -> Expr {
+    /// With `siblings`, a function and the range of its block, the
+    /// expression lines are the list it is applied to.
+    fn statements(
+        &mut self,
+        statements: &[&Node],
+        span: Span,
+        siblings: Option<&(Ref, Range)>,
+    ) -> Expr {
         let mut stmts = Vec::new();
         let mut result = None;
+        let mut lines = Vec::new();
         for (i, statement) in statements.iter().enumerate() {
             let last = i + 1 == statements.len();
             match statement.kind {
                 K::Signature => {}
                 K::LetDecl if statement.has_token(K::AssertKw) => {
                     let rest = &statements[i + 1..];
-                    result = Some(self.let_assert(statement, span, |l| l.statements(rest, span)));
+                    let then = |l: &mut Self| l.statements(rest, span, siblings);
+                    result = Some(self.let_assert(statement, span, then));
                     break;
                 }
                 K::LetDecl => self.local_let(statement, &mut stmts),
                 K::AssignStmt => stmts.push(self.assign(statement)),
+                _ if siblings.is_some() => lines.push(self.expr(statement)),
                 _ if last => result = Some(self.expr(statement)),
                 _ => stmts.push(Stmt::Expr(self.expr(statement))),
             }
+        }
+        if let Some((Ref::Value { module, name }, key)) = siblings
+            && result.is_none()
+        {
+            let (module, name) = (module.clone(), name.clone());
+            let function = Expr::new(ExprKind::Global { module, name }, span);
+            let app = ExprKind::App {
+                func: Box::new(function),
+                arg: Box::new(Expr::new(ExprKind::List(lines), span)),
+                stage: self.call_stage(*key),
+                arg_first: false,
+            };
+            let dicts = self.dictionaries(*key);
+            result = Some(with_dicts(self.within(*key, Expr::new(app, span)), dicts));
         }
         let result = result.unwrap_or_else(|| Expr::new(ExprKind::Lit(Lit::Unit), span));
         if stmts.is_empty() {

@@ -295,17 +295,26 @@ macro_rules! export {
             {
                 $crate::Plugin::run(&$plugin, &invocation)
             }
+            fn resume(
+                state: ::std::vec::Vec<u8>,
+                outputs: ::std::vec::Vec<$crate::command::File>,
+                answers: ::std::vec::Vec<$crate::command::Answer>,
+            ) -> ::std::result::Result<$crate::command::Plan, ::std::vec::Vec<$crate::command::Diagnostic>>
+            {
+                $crate::Plugin::resume(&$plugin, state, outputs, answers)
+            }
             fn open(
                 invocation: $crate::command::Invocation,
-            ) -> ::std::result::Result<::std::vec::Vec<u8>, ::std::vec::Vec<$crate::command::Diagnostic>>
+            ) -> ::std::result::Result<$crate::command::Opened, ::std::vec::Vec<$crate::command::Diagnostic>>
             {
                 $crate::Plugin::open(&$plugin, &invocation)
             }
             fn handle(
                 state: ::std::vec::Vec<u8>,
                 request: ::std::vec::Vec<u8>,
+                answers: ::std::vec::Vec<$crate::command::Answer>,
             ) -> ::std::result::Result<$crate::command::Handled, ::std::string::String> {
-                $crate::Plugin::handle(&$plugin, state, request)
+                $crate::Plugin::handle(&$plugin, state, request, answers)
             }
             fn close(state: ::std::vec::Vec<u8>) -> $crate::command::Plan {
                 $crate::Plugin::close(&$plugin, state)

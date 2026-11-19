@@ -24,13 +24,14 @@ it is long, so read it by section.
 - Pin the axioms of a new main theorem in `Formal/Axioms.lean` and list it
   under "What is proved" in the README.
 - Files whose header names `just formal-schemes` or `just formal-certs`
-  come from `flick-model`; rerun that recipe instead of editing them.
+  come from `flick-model`, and one that names `just formal-proofs` from the
+  compiler's kernel; rerun that recipe instead of editing them.
 - The Lake package has no dependencies (no Mathlib); the toolchain is
   pinned in `lean-toolchain`.
 
 ## Checks
 
 - `just lean` (`lake build --wfail` in `formal/`).
-- `just model` with it; after `just formal-schemes` or `just formal-certs`
-  review the generated diff, then rebuild.
+- `just model` with it; after `just formal-schemes`, `just formal-certs` or
+  `just formal-proofs` review the generated diff, then rebuild.
 - `just model-certs` checks a batch of generated certificates with Lean.

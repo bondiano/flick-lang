@@ -68,7 +68,7 @@ and `Monad`.
 | `Log` | the `Log` service with `info`, `warn`, `error`, `debug`; `from_console` makes a `Log` layer of a `Host.Console` layer, and `Log.console`, made of `Host.console`, needs nothing |
 | `File` | the `FileSystem` service: `open_scoped`, `read_all`, `read_text`, `write_text`, and `File.node` |
 | `ChildProcess` | child processes: a `Command` (`make`, `set_cwd`, `set_env`, `set_stdin`, `prefix`, `pipe_to`, `inherit_output`) run to its end by `string`, `lines` and `exit_code`, or started by `spawn` as a `Process` of a scope, all through `Host.Process`, with `stdout`, `stderr`, `output_string`, `output_lines`, `wait`, `is_running`, `kill` and `kill_with` |
-| `Resource` | `own` of a value of `Close`, which its scope closes once with the outcome of the body, see [resources.md](../resources/); `acquire_release` into a scope's owner, and `bracket` |
+| `Resource` | `own` of a value of `Close`, which its scope closes once with the outcome of the body, and `make`, which acquires a value its scope releases with that outcome (with `Scope.defer` for cleanup without a value), see [resources.md](../resources/); `acquire_release` into a scope's owner, and `bracket` |
 | `Events` | `queue` policies and the `log_failures` supervisor |
 | `Ui`, `Ui.Event` | user interfaces rendered with React, see [ui.md](../ui/) |
 | `Sql`, `Database` | typed PostgreSQL queries and the `Database` service, see [sql.md](../sql/) |
@@ -253,6 +253,9 @@ let tests =
 | `Test.skip test`, `Test.only test` | the test, and each test in it, skipped or marked `only` (see [testing](../testing/#full-names-skip-and-only)) |
 | `Test.before_all task`, `before_each`, `after_each`, `after_all` | a hook of the group, or the module, whose list it is in, run around the tests of it that the run selects (see [testing](../testing/#hooks)) |
 | `Test.timeout millis test` | the test, and each test in it without its own, given `millis` for its `before_each` hooks and its body (see [testing](../testing/#timeouts)) |
+| `Test.serial test` | the test, and each test in it, run one at a time, also under `--jobs` |
+| `Test.fixture key init`, `Test.shared key init`, `Test.share fixture`, `Test.use fixture` | a fixture of each test, or shared by the run of the group whose list `share`s it, and its `Lazy` for the code that uses it: what `fixture` of a suite expands into (see [testing](../testing/#fixtures)) |
+| `Fixture.cleanup release value` | `value`, which `release` releases when the scope of the fixture that made it closes |
 | `Test.suite name layer specs` | tests that share what `layer` makes: built once, before the first of them that runs, and released after the last, the `beforeAll` and `afterAll` of the suite; each spec, `Test.it name task`, is an `effect_test` with the layer's services, and a failed build fails each of them |
 
 A suite of end-to-end tests starts what they need once, such as a database

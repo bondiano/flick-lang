@@ -95,8 +95,9 @@ export type Test<Task, L> = (
   | Readonly<{ kind: "property"; name: string; run: (rng: Rng, index: number) => string | undefined }>
   | Readonly<{ kind: "group"; name: string; tests: ReadonlyArray<Test<Task, L>> }>
   | Readonly<{ kind: "hook"; name: string; when: When; task: Task }>
+  | Readonly<{ kind: "share"; name: string; fixture: Fixture<Task> }>
   | Suite<Task, L>
-) & Readonly<{ mode?: Mode; timeout?: number }>;
+) & Readonly<{ mode?: Mode; timeout?: number; serial?: true }>;
 
 /**
  * A suite in a run: `Test.suite`, tests that share the services of `layer`,
@@ -107,12 +108,33 @@ export type Suite<Task, L> = Readonly<{
   name: string;
   layer?: L;
   hooks?: Hooks<Task>;
+  /** The shared fixtures it owns, by the items of its list that `share` them. */
+  shares?: ReadonlySet<Fixture<Task>>;
   tests: ReadonlyArray<Test<Task, L>>;
   mode?: Mode;
   timeout?: number;
+  serial?: true;
 }>;
 
-export type Leaf<Task, L> = Exclude<Test<Task, L>, { kind: "group" | "suite" | "hook" }>;
+export type Leaf<Task, L> = Exclude<Test<Task, L>, { kind: "group" | "suite" | "hook" | "share" }>;
+
+/**
+ * `Test.Fixture`: what `init` makes for each test that uses it, or, shared,
+ * once for each run of the suite that `share`s it; `key` names it.
+ */
+export interface Fixture<Task> {
+  readonly key: string;
+  readonly shared: boolean;
+  readonly init: Task;
+}
+
+/** `Test.fixture` and `Test.shared`: a fixture, made by `init` the first time a test's code uses it. */
+export const testFixture = <Task>(key: string, init: Task): Fixture<Task> => Object.freeze({ key, shared: false, init });
+export const testShared = <Task>(key: string, init: Task): Fixture<Task> => Object.freeze({ key, shared: true, init });
+
+/** `Test.share`: the item that makes its group the owner of the shared `fixture`. */
+export const testShare = <Task, L>(fixture: Fixture<Task>): Test<Task, L> =>
+  Object.freeze({ kind: "share", name: "share", fixture });
 
 export const testPure = <Task, L>(name: string, body: (unit: undefined) => Assertion): Test<Task, L> =>
   Object.freeze({ kind: "pure", name, body });
@@ -124,6 +146,9 @@ export const testSkip = <Task, L>(test: Test<Task, L>): Test<Task, L> => Object.
 
 /** `Test.only`: the test, and each test in it, marked for a run of only the marked tests. */
 export const testOnly = <Task, L>(test: Test<Task, L>): Test<Task, L> => Object.freeze({ ...test, mode: "only" });
+
+/** `Test.serial`: the test, and each test in it, run one at a time. */
+export const testSerial = <Task, L>(test: Test<Task, L>): Test<Task, L> => Object.freeze({ ...test, serial: true });
 
 /** `Test.timeout`: the test, and each test in it without a timeout of its own, given `millis`. */
 export const testTimeout = <Task, L>(millis: number, test: Test<Task, L>): Test<Task, L> =>
@@ -139,6 +164,8 @@ export const testBeforeAll = /*#__PURE__*/ hook("before_all");
 export const testBeforeEach = /*#__PURE__*/ hook("before_each");
 export const testAfterEach = /*#__PURE__*/ hook("after_each");
 export const testAfterAll = /*#__PURE__*/ hook("after_all");
+
+const NO_HOOKS: Hooks<never> = /*#__PURE__*/ Object.freeze({ before_all: [], before_each: [], after_each: [], after_all: [] });
 
 /** The hooks among `tests`, none when there are none. */
 const hooksOf = <Task, L>(tests: ReadonlyArray<Test<Task, L>>): Hooks<Task> | undefined => {
@@ -213,14 +240,17 @@ export interface Named<Task, L> {
   readonly only: boolean;
   /** The milliseconds of its innermost `Test.timeout`, if any. */
   readonly timeout?: number | undefined;
+  /** The outermost `Test.serial` it is in, if any, whose tests run one at a time. */
+  readonly serial?: object | undefined;
 }
 
-type Marks = Readonly<{ skip: boolean; only: boolean; timeout?: number | undefined }>;
+type Marks = Readonly<{ skip: boolean; only: boolean; timeout?: number | undefined; serial?: object | undefined }>;
 
 /**
- * Tests with their full names, `Module > group > name`; the hooks of a list
- * make it, the module's or a group's, a suite of the tests under it, whose
- * timeout, its own or the one around it, its hooks have too.
+ * Tests with their full names, `Module > group > name`; the hooks of a list,
+ * the module's or a group's, and the shared fixtures it owns make it a suite
+ * of the tests under it, whose timeout, its own or the one around it, its
+ * hooks have too.
  */
 export const flatten = <Task, L>(
   prefix: string,
@@ -229,27 +259,50 @@ export const flatten = <Task, L>(
   outer: ReadonlyArray<Suite<Task, L>> = [],
   marks: Marks = { skip: false, only: false },
 ): Array<Named<Task, L>> => {
-  const hooks = hooksOf(tests);
+  const hooks = hooksOf(tests) ?? NO_HOOKS;
+  const shares = new Set(tests.flatMap((t) => (t.kind === "share" ? [t.fixture] : [])));
   let suites = outer;
-  if (hooks) {
+  if (hooks !== NO_HOOKS || shares.size > 0) {
     const { timeout } = marks;
     const level: Suite<Task, L> =
-      timeout === undefined ? { kind: "suite", name: prefix, hooks, tests } : { kind: "suite", name: prefix, hooks, tests, timeout };
+      timeout === undefined
+        ? { kind: "suite", name: prefix, hooks, shares, tests }
+        : { kind: "suite", name: prefix, hooks, shares, tests, timeout };
     suites = [...outer, Object.freeze(level)];
   }
   for (const t of tests) {
-    if (t.kind === "hook") continue;
+    if (t.kind === "hook" || t.kind === "share") continue;
     const name = `${prefix} > ${t.name}`;
     const own = {
       skip: marks.skip || t.mode === "skip",
       only: marks.only || t.mode === "only",
       timeout: t.timeout ?? marks.timeout,
+      serial: marks.serial ?? (t.serial ? t : undefined),
     };
     if (t.kind === "group") flatten(name, t.tests, out, suites, own);
     else if (t.kind === "suite") flatten(name, t.tests, out, [...suites, t], own);
     else out.push({ name, test: t, suites, ...own });
   }
   return out;
+};
+
+/**
+ * The selected tests by job, as indexes: the tests of one `Test.serial` in
+ * one job, run one at a time, where the first of them stands, and each
+ * other test in a job of its own.
+ */
+export const jobsOf = <Task, L>(selected: ReadonlyArray<Named<Task, L>>): Array<Array<number>> => {
+  const jobs: Array<Array<number>> = [];
+  const serial = new Map<object, Array<number>>();
+  for (const [index, { serial: group }] of selected.entries()) {
+    const job = group === undefined ? undefined : serial.get(group);
+    if (job !== undefined) job.push(index);
+    else {
+      jobs.push([index]);
+      if (group !== undefined) serial.set(group, jobs[jobs.length - 1] ?? []);
+    }
+  }
+  return jobs;
 };
 
 /** Whether a typed failure is `Test.AssertionFailed`. */

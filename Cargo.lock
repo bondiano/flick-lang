@@ -697,6 +697,8 @@ dependencies = [
  "ciborium",
  "flick-backend",
  "flick-backend-support",
+ "flick-diagnostics",
+ "flick-ffi",
  "flick-ir",
  "flick-pretty",
  "serde",

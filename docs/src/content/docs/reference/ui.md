@@ -115,6 +115,32 @@ call that does not fit on its line puts the calls in parentheses that end
 its arguments on lines under it, without the parentheses, and a call in
 parentheses alone on a line loses them where its first line fits.
 
+The lines of `ui { … }` itself are children the same way: after its `let`s,
+two or more lines are the children of one `fragment`, and one line is the
+node itself. On the line of `ui {`, `;` separates them, as in braces:
+`ui { text "a"; text "b" }`, which `flick fmt` writes a line each; any
+other code after the body is `std/U010`. A `let` after the first child is
+`FLICK-T085`, which
+`flick check --fix --only T085` moves above it when that changes nothing. A
+branch of `if` or `match` is one expression, so several nodes there are a
+`ui { … }` of their own, or `fragment a b`; `fragment` of one list,
+`fragment rows`, is a node of the list.
+
+```flick
+summary : Float -> Ui
+let summary n = ui {
+  let shown = show n
+  heading (text "count \{shown}")
+  if n > 1 then
+    ui {
+      paragraph (text "many")
+      paragraph (text "of them")
+    }
+  else
+    empty
+}
+```
+
 `text` is `String -> Ui`, so it sits among the children of
 any element. `SafeUrl` comes only from `Ui.safe_url`, which accepts relative
 URLs and the schemes `http`, `https` and `mailto` and refuses control

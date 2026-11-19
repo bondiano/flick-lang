@@ -12,13 +12,10 @@ use flick_core::project::pnpm;
 use flick_core::source::SourceMap;
 
 use crate::args::{
-    CheckArguments, CommandArguments, Commands, FfiCommands, GlobalArguments, ProveArguments,
-    SchemaCommands,
+    CheckArguments, CommandArguments, Commands, GlobalArguments, ProveArguments, SchemaCommands,
 };
 use crate::command::{Command, Outcome, finish as report, run_command};
-use crate::commands::{
-    BuildCommand, CheckCommand, FfiCheckCommand, FfiImportCommand, FmtCommand, ScaffoldCommand,
-};
+use crate::commands::{BuildCommand, CheckCommand, FmtCommand, ScaffoldCommand};
 
 mod args;
 mod artifact;
@@ -32,7 +29,6 @@ mod commands;
 mod component;
 mod fetch;
 mod lsp;
-mod mapper;
 mod package_cache;
 mod plugins;
 mod progress;
@@ -248,14 +244,6 @@ fn dispatch(args: CommandArguments) -> ExitCode {
             run_command(&FmtCommand::new(options, global.project.clone()), global)
         }
         Commands::Test(options) => commands::test(&options, global),
-        Commands::Ffi(FfiCommands::Import(options)) => run_command(
-            &FfiImportCommand::new(options, global.project.clone()),
-            global,
-        ),
-        Commands::Ffi(FfiCommands::Check(options)) => run_command(
-            &FfiCheckCommand::new(options, global.project.clone()),
-            global,
-        ),
         Commands::New(options) => run_command(
             &ScaffoldCommand {
                 dir: options.directory.into(),
@@ -298,10 +286,6 @@ fn dispatch(args: CommandArguments) -> ExitCode {
         Commands::Doctor => report(commands::doctor(global), global),
         Commands::Inspect(o) => report(commands::inspect(&o, project), global),
         Commands::Lsp(_) => lsp::serve(),
-        Commands::ContentMapper(o) => match o.declarations {
-            Some(paths) => mapper::declarations(&paths),
-            None => mapper::serve(),
-        },
         Commands::External(words) => external(&words, global),
     }
 }

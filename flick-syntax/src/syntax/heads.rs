@@ -20,6 +20,11 @@ pub const HEADS: [(&str, &str); 9] = [
 /// Ui (body)`. No source writes a name with `$` in it.
 pub const OPEN: &str = "open$module";
 
+/// The word of generated code before the function an opened body of
+/// several lines is applied to the list of them: `open$module Ui Ui
+/// siblings$by Ui.fragment (body)`.
+pub const SIBLINGS: &str = "siblings$by";
+
 /// The attribute of generated code before a function a constant is given
 /// to, naming the value that reads the constant: `@checked$by Port$check`.
 pub const CHECKED_BY: &str = "@checked$by";

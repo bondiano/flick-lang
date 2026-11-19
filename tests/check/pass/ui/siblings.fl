@@ -1,0 +1,58 @@
+// The lines of a `ui { … }` after its `let`s: one is the node itself, and
+// two or more are the children of one `Ui.fragment`.
+module App.Siblings exposing (..)
+
+title : String -> Ui
+let title shown = ui { heading (text shown) }
+
+counter : Float -> Ui
+let counter n = ui {
+  let shown = show n
+  heading (text "count \{shown}")
+  paragraph
+    text "it is \{shown}"
+    text "today"
+  div { class_name = "spacer" }
+}
+
+// a branch of several nodes is a `ui` of its own
+menu : Bool -> List Ui -> Ui
+let menu open items = ui {
+  if open then
+    ui {
+      heading (text "Menu")
+      nav { class_name = "menu" } items
+    }
+  else
+    empty
+  footer { class_name = "end" } (text "end")
+}
+
+// a list among them is one node through `fragment` or `each`
+rows : List String -> Ui
+let rows labels = ui {
+  heading (text "rows")
+  fragment (List.map text labels)
+  each labels text
+}
+
+// the children keep what their callbacks use live, and so does the fragment
+type alias Actions c = { on_save : (Unit ->{Atom.Write} Unit)^c }
+
+toolbar : Actions c -> Ui^c
+let toolbar actions = ui {
+  button
+    {
+      disabled = false
+      on_click = Ui.Event.exhaust (fun _ -> task { actions.on_save () })
+    }
+    text "Save"
+  text "unsaved"
+}
+
+view : Ui.View Float
+let view =
+  Ui.view (fun n -> ui {
+    title (show n)
+    counter n
+  })

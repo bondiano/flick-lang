@@ -101,20 +101,7 @@ impl Checker<'_> {
             let statement = statements[i];
             let last = i + 1 == statements.len();
             match statement.kind {
-                K::Signature => {
-                    let name = signature_name(statement, self.text);
-                    let next = statements.get(i + 1).copied().filter(|n| {
-                        n.kind == K::LetDecl && let_parts(n, self.text).name.as_deref() == name
-                    });
-                    match next {
-                        Some(decl) => {
-                            self.local_let(decl, Some(statement), &statements[i + 2..]);
-                            i += 1;
-                        }
-                        None => self.lone_signature(statement, false),
-                    }
-                }
-                K::LetDecl => self.local_let(statement, None, &statements[i + 1..]),
+                K::Signature | K::LetDecl => i += self.local_declaration(&statements, i),
                 _ if last && tail.is_some() => {
                     let tail = tail.as_mut().expect("a tail");
                     result = Some(tail(self, expected));
@@ -144,8 +131,30 @@ impl Checker<'_> {
         })
     }
 
+    /// The `let` or the signature `statements[i]` of a block, in sight of the
+    /// statements after it; a signature types the `let` after it of its
+    /// name. How many statements after the `i`-th it took too.
+    pub(super) fn local_declaration(&mut self, statements: &[&Node], i: usize) -> usize {
+        let statement = statements[i];
+        if statement.kind == K::LetDecl {
+            self.local_let(statement, None, &statements[i + 1..]);
+            return 0;
+        }
+        let name = signature_name(statement, self.text);
+        let next = statements
+            .get(i + 1)
+            .copied()
+            .filter(|n| n.kind == K::LetDecl && let_parts(n, self.text).name.as_deref() == name);
+        if let Some(decl) = next {
+            self.local_let(decl, Some(statement), &statements[i + 2..]);
+            return 1;
+        }
+        self.lone_signature(statement, false);
+        0
+    }
+
     /// An expression statement before the last one: its value must be `()`.
-    fn statement(&mut self, node: &Node) {
+    pub(super) fn statement(&mut self, node: &Node) {
         let ty = self.infer(node);
         if self.unify(&ty, &Type::lang(Lang::Unit)).is_err() {
             let shown = self.show(&ty);

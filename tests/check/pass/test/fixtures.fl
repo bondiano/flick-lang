@@ -1,0 +1,50 @@
+// Fixtures of a suite: each test awaits its own, made the first time it
+// does, and a shared one made once for the suite; a fixture may use those
+// declared before it, own a value of `Close` or release one by a cleanup,
+// and the hooks see them as the tests do.
+module App.FixturesTest
+
+type Conn = Conn String
+
+instance Resource.Close Conn =
+  let close _ _ = ()
+
+name_of : Conn^c ->{} String
+let name_of conn =
+  match conn with
+  | Conn name -> name
+
+suite "store" {
+  fixture shared seen = SynchronizedRef.make ([] : List String)
+  fixture shared database = "db" |> Fixture.cleanup (fun _ -> ())
+  fixture conn = Resource.own (Conn (await database))
+  fixture label = name_of (await conn) ++ "-label"
+
+  before_all { SynchronizedRef.set ["opened"] (await seen) }
+  after_each { ignore (name_of (await conn)) }
+  after_all { ignore (SynchronizedRef.get (await seen)) }
+
+  test "reads the shared ref" {
+    let names = SynchronizedRef.get (await seen)
+    Test.expect (Test.equal ["opened"] names)
+  }
+
+  test "stores a copy" {
+    let label = await label
+    SynchronizedRef.update (fun names -> names ++ [label]) (await seen)
+  }
+
+  test "captures in a closure used here" {
+    let c = await conn
+    read : Unit ->{} String
+    let read () = name_of c
+    Test.expect (Test.equal "db" (read ()))
+  }
+
+  suite parallel "at once" {
+    fixture shared concurrent pool = SynchronizedRef.make 0
+
+    test "one" { SynchronizedRef.update (fun n -> n + 1) (await pool) }
+    test "two" { SynchronizedRef.update (fun n -> n + 1) (await pool) }
+  }
+}

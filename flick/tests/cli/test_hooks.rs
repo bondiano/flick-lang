@@ -89,7 +89,7 @@ suite "long" {
 "#;
 
 /// A library whose tests are `test`, run on `effect`'s engine.
-fn library(name: &str, effect: &str, test: &str) -> PathBuf {
+pub fn library(name: &str, effect: &str, test: &str) -> PathBuf {
     let manifest = format!(
         "schema-version = 1\n\n[tools]\n\"flick/go\" = [\"go\"]\n\n[project]\nkind = \"lib\"\n\n[build]\neffect = \"{effect}\"\n"
     );
@@ -104,7 +104,7 @@ fn library(name: &str, effect: &str, test: &str) -> PathBuf {
 }
 
 /// The engines: Flick's runtime and the Effect adapter on Node, and Go.
-const ENGINES: [(&str, &str, &str); 3] = [
+pub const ENGINES: [(&str, &str, &str); 3] = [
     ("rt", "rt", "js"),
     ("effect", "effect", "js"),
     ("go", "rt", "go"),
@@ -193,7 +193,7 @@ fn hooks_run_around_the_selected_cases_on_every_engine() {
 
 /// The lines a run printed before its JSON report, and each result as its
 /// name, status, kind, message and cleanup.
-fn report(name: &str, stdout: &str) -> (Vec<String>, Vec<String>) {
+pub fn report(name: &str, stdout: &str) -> (Vec<String>, Vec<String>) {
     let (printed, report) = stdout
         .trim_end()
         .rsplit_once('\n')

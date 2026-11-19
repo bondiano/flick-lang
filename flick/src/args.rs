@@ -1,8 +1,6 @@
 //! Command-line arguments: options shared by all commands and one argument
 //! struct per command.
 
-use std::path::PathBuf;
-
 use std::ffi::OsString;
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
@@ -34,9 +32,6 @@ pub enum Commands {
     Fmt(FmtArguments),
     /// Run the tests of the project's test root.
     Test(TestArguments),
-    /// Bindings to npm packages from their `.d.ts`.
-    #[command(subcommand)]
-    Ffi(FfiCommands),
     /// Create a project in a new directory.
     New(NewArguments),
     /// Add a project to the working directory; existing files are kept.
@@ -84,51 +79,10 @@ pub enum Commands {
     Inspect(InspectArguments),
     /// Run the language server.
     Lsp(LspArguments),
-    /// Serve TypeScript's Content Mapper requests for `.fl` files on
-    /// stdio; `@flick-lang/content-mapper` starts it.
-    ContentMapper(ContentMapperArguments),
     /// A command the project's backend or one of its plugins adds, flat or
     /// as `contributor:command`.
     #[command(external_subcommand)]
     External(Vec<OsString>),
-}
-
-#[derive(Args)]
-pub struct ContentMapperArguments {
-    /// Instead of serving, write the declarations of each `.fl` file under
-    /// these paths beside it as `Name.d.fl.ts`, and exit.
-    #[arg(long, num_args = 1.., value_name = "PATHS")]
-    pub declarations: Option<Vec<PathBuf>>,
-}
-
-#[derive(Subcommand)]
-pub enum FfiCommands {
-    /// Read the `.d.ts` of an installed package and write
-    /// `<out>/<Pkg>/Generated.fl` with a coverage report.
-    Import(FfiImportArguments),
-    /// Check generated bindings, reviewed bindings and their policies
-    /// against the installed packages.
-    Check(FfiCheckArguments),
-}
-
-#[derive(Args)]
-pub struct FfiImportArguments {
-    /// The npm package, installed in the project.
-    pub package: String,
-
-    /// Directory that gets `<Pkg>/Generated.fl`.
-    #[arg(long, value_name = "DIR")]
-    pub out: String,
-
-    /// Import only these exports.
-    #[arg(long, value_name = "NAMES", value_delimiter = ',')]
-    pub select: Option<Vec<String>>,
-}
-
-#[derive(Args)]
-pub struct FfiCheckArguments {
-    /// Files or directories to check; by default the project's source root.
-    pub paths: Vec<String>,
 }
 
 #[derive(Args, Clone)]
@@ -168,8 +122,8 @@ pub struct GlobalArguments {
     /// The workspace member to run on, the name of its directory; at the
     /// root of a workspace `check`, `build`, `test`, `fmt`, `clean` and
     /// `install` otherwise run on every member.
-    // its own id: `ffi import` has a positional `package` that would
-    // otherwise fill this global too
+    // its own id: a positional `package` of a command would otherwise
+    // fill this global too
     #[arg(
         id = "member",
         long = "package",

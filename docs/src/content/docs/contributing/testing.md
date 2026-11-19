@@ -156,7 +156,9 @@ process and send it signals.
   hang, stays lossless and keeps spans in bounds, and that the checker does
   not panic on inputs that parse. `FLICK_FUZZ_ITERATIONS`
   sets the number of inputs: 20 000 in `just check`, 1 000 000 in the nightly
-  CI job (`just fuzz`).
+  CI job (`just fuzz`). Each input is written to `target/tmp/fuzz-input.fl`
+  before it is parsed, so after an abort that names no input, such as a stack
+  overflow, the file holds it; the nightly job uploads it with its log.
 - `DUMP=out.txt [DUMP_FILE=x.fl] cargo test -p flick-core --test corpus dump -- --ignored`
   writes the trees of the spec examples (or of one file) for inspection.
 

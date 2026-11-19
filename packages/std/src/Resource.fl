@@ -1,10 +1,12 @@
 /// Resources owned by a `scope`: values of `Close` it owns through `own`,
 /// what `acquire_release` registers, and `Resource`, a value acquired again on
-/// `refresh`, released when its `scope` closes.
+/// `refresh`, released when its `scope` closes. `make` acquires a value its
+/// scope releases seeing how the body ended.
 module Resource exposing (
   Close(..),
   Closing,
   own,
+  make,
   acquire_release,
   bracket,
   Resource,
@@ -43,11 +45,35 @@ let own value =
   add_close (fun exit -> close_exit token exit value)
   value
 
-/// What `own` registers, not exposed: it sees the outcome of the body as an
-/// `Exit` of any errors and value, so it cannot read either.
+/// What `own` and `make` register, which `Scope.defer` exposes: it sees the
+/// outcome of the body as an `Exit` of any errors and value, so it cannot
+/// read either.
 add_close : (forall e b. Exit e b ->{r} Unit)^c ->{Scope s | r} Unit
 foreign effect add_close from "flick:Scope" "flickAddClose"
   retention owner
+
+/// Acquires a value with `acquire` and makes the innermost `scope` (or the
+/// one of region `s`) its owner: when that scope ends, `release` runs once
+/// with the value and how the body ended, as a `Scope.defer` registered
+/// here does. An interruption does not come between the acquisition and
+/// that registration, and an acquisition that fails registers nothing. The
+/// value holds region `s`, so it cannot leave that scope.
+make :
+  (Detached r, Fiber.Outlives c s, Fiber.Provided r s) =>
+  (Eff r e a)^c -> (forall e2 b. a -> Exit e2 b ->{r} Unit)^c ->{Scope s | r; e} a^{s}
+let make acquire release =
+  masked
+    (task {
+      let value = await acquire
+      add_close (fun exit -> release value exit)
+      value
+    })
+
+/// `Effect.uninterruptible`, which comes after this module among the
+/// built-in ones: `make` acquires and registers under it.
+masked : (Eff r e a)^c ->{r; e} a
+foreign effect masked from "flick:Effect" "uninterruptible"
+  retention call
 
 /// A value of `a` of region `s` that its acquisition, failing with `e`,
 /// may give anew.

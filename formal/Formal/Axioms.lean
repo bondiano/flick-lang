@@ -16,7 +16,10 @@ import Formal.TypeEquivShape
 import Formal.Lazy
 import Formal.Refine
 import Formal.Refine.Numbers
+import Formal.Proofs.CheckSound
 import Formal.RT.LazyCell
+import Formal.Equiv.Context
+import Formal.Equiv.All
 
 /-!
 # The axioms of the main theorems
@@ -165,3 +168,43 @@ prints, and `#guard_msgs` turns the difference into an error.
 /-- info: 'Flick.Refine.numbers_sound' depends on axioms: [propext, Quot.sound] -/
 #guard_msgs in
 #print axioms Flick.Refine.numbers_sound
+
+/-- info: 'Flick.PT.fundamental' depends on axioms: [propext] -/
+#guard_msgs in
+#print axioms Flick.PT.fundamental
+
+/-- info: 'Flick.PT.terminates' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.PT.terminates
+
+/-- info: 'Flick.PT.check_sound' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.PT.check_sound
+
+/-- info: 'Flick.PT.checkAll_sound' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.PT.checkAll_sound
+
+/-- info: 'Flick.Equiv.o1a' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Equiv.o1a
+
+/-- info: 'Flick.Equiv.o1b' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Equiv.o1b
+
+/-- info: 'Flick.Equiv.o1c' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Equiv.o1c
+
+/-- info: 'Flick.Equiv.o1a_all' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Equiv.o1a_all
+
+/-- info: 'Flick.Equiv.o1c_all' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Equiv.o1c_all
+
+/-- info: 'Flick.Equiv.EverySim.has' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Equiv.EverySim.has

@@ -231,3 +231,47 @@ fn a_session_answers_traps_and_cancellations_and_ends_cleanly() {
     // the trap and the cancellation kept the state: two requests answered
     assert!(stderr.contains("echo answered 2"), "{stderr}");
 }
+
+#[test]
+fn a_command_gets_its_inputs_and_resumes_after_a_step_that_reads_in_place() {
+    let root = project("commands_resume");
+    let app = root.join("app");
+    fs::create_dir_all(app.join("data")).expect("data");
+    fs::write(app.join("data/in.txt"), "from data\n").expect("data file");
+    fs::write(app.join("notes.txt"), "noted\n").expect("notes");
+    let config = fs::read_to_string(app.join("flick.toml")).expect("config");
+    let grant = "\n[tools]\n\"test/literal\" = [\"node\"]\n";
+    fs::write(app.join("flick.toml"), config + grant).expect("grant");
+
+    let out = flick(&root, &["literal-read"]);
+    let (_, stderr) = text(&out);
+    assert!(out.status.success(), "{stderr}");
+    let listed = fs::read_to_string(app.join("read.txt")).expect("read.txt");
+    assert_eq!(
+        listed,
+        format!("notes.txt 6\nsrc/App/Main.fl {}\n", MAIN.len())
+    );
+    assert!(
+        stderr.contains("literal points at its first module"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("src/App/Main.fl:1:1"), "{stderr}");
+    assert!(stderr.contains("literal helps"), "{stderr}");
+
+    let out = flick(&root, &["literal-resume"]);
+    let (_, stderr) = text(&out);
+    assert!(out.status.success(), "{stderr}");
+    let resumed = fs::read_to_string(app.join("resumed.txt")).expect("resumed.txt");
+    assert_eq!(resumed, "resumed r1 copy.txt: from data\n");
+    // the step's output went to `resume`, not into the project
+    assert!(!app.join("copy.txt").exists());
+
+    let out = flick(&root, &["literal-sneak"]);
+    let (_, stderr) = text(&out);
+    assert_eq!(out.status.code(), Some(1), "{stderr}");
+    assert!(
+        stderr.contains("FLICK-P055")
+            && stderr.contains("reads `src`, which the command does not declare"),
+        "{stderr}"
+    );
+}

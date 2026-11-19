@@ -6,7 +6,7 @@ use flick_plugin::{Block, Highlight, HighlightKind, Hover, Span};
 use crate::read::{Item, Kind, structure};
 
 /// What each word of the plugin means, as an editor shows it over the word.
-const HELP: [(&str, &str); 9] = [
+const HELP: [(&str, &str); 13] = [
     (
         "suite",
         "```flick\nsuite \"name\" { … }\n```\n\nTests under a common name: each case inside is `Suite > case`.",
@@ -43,6 +43,22 @@ const HELP: [(&str, &str); 9] = [
         "after_all",
         "```flick\nafter_all { body }\n```\n\nRuns once after the last selected case of the suite, as a finalizer of the suite's scope, also when a `before_all` failed or the run was interrupted.",
     ),
+    (
+        "fixture",
+        "```flick\nfixture name = expression\n```\n\nA `Lazy` the code of the suite reads with `await name`: made the first time a case uses it, once for that case, in a scope that closes after its `after_each` hooks. A fixture may use those declared before it.",
+    ),
+    (
+        "shared",
+        "```flick\nfixture shared name = expression\n```\n\nMade once for the run of the suite, the first time one of its cases uses it, and released after its `after_all` hooks. The cases of a suite with a shared fixture run one at a time, unless it is `parallel`.",
+    ),
+    (
+        "concurrent",
+        "```flick\nfixture shared concurrent name = expression\n```\n\nA shared fixture that cases may use at once, as a pool or read-only data: the only kind a `parallel` suite shares.",
+    ),
+    (
+        "parallel",
+        "```flick\nsuite parallel \"name\" { … }\n```\n\nThe cases of the suite may run at once under `--jobs`, also when it shares fixtures, which must then be `concurrent`.",
+    ),
 ];
 
 /// The plugin's words under `item`: the word of each case inside the block,
@@ -51,10 +67,15 @@ fn words(item: &Item, out: &mut Vec<Span>) {
     out.extend(item.word);
     out.extend(item.modifier);
     out.extend(item.timeout.map(|(word, _)| word));
-    if let Kind::Suite(items) = &item.kind {
-        for inner in items {
-            words(inner, out);
+    out.extend(item.parallel);
+    match &item.kind {
+        Kind::Suite(items) => {
+            for inner in items {
+                words(inner, out);
+            }
         }
+        Kind::Fixture(f) => out.extend(f.shared.into_iter().chain(f.concurrent)),
+        Kind::Test(_) | Kind::Hook(_) => {}
     }
 }
 

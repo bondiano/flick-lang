@@ -193,13 +193,14 @@
         },
         {
           "comment": "a case of the test DSL with `timeout millis` after its name",
-          "match": "^[ \\t]*(suite|test)(?:(\\.)(skip|only))?[ \\t]+(\"(?:[^\"\\\\]|\\\\.)*\")[ \\t]+(timeout)\\b",
+          "match": "^[ \\t]*(suite|test)(?:(\\.)(skip|only))?[ \\t]+(?:(parallel)[ \\t]+)?(\"(?:[^\"\\\\]|\\\\.)*\")[ \\t]+(timeout)\\b",
           "captures": {
             "1": { "name": "keyword.other.flick" },
             "2": { "name": "punctuation.accessor.flick" },
             "3": { "name": "keyword.other.flick" },
-            "4": { "name": "string.quoted.double.flick" },
-            "5": { "name": "keyword.other.flick" }
+            "4": { "name": "keyword.other.flick" },
+            "5": { "name": "string.quoted.double.flick" },
+            "6": { "name": "keyword.other.flick" }
           }
         },
         {
@@ -210,11 +211,21 @@
           }
         },
         {
-          "comment": "`suite \"name\"` and `test \"name\"`, maybe `.skip` or `.only`, at the start of a line: a case of the test DSL",
-          "match": "^[ \\t]*(suite|test)(?:(\\.)(skip|only))?(?=[ \\t]+\")",
+          "comment": "`suite \"name\"` and `test \"name\"`, maybe `.skip` or `.only` and `parallel`, at the start of a line: a case of the test DSL",
+          "match": "^[ \\t]*(suite|test)(?:(\\.)(skip|only))?(?:[ \\t]+(parallel))?(?=[ \\t]+\")",
           "captures": {
             "1": { "name": "keyword.other.flick" },
             "2": { "name": "punctuation.accessor.flick" },
+            "3": { "name": "keyword.other.flick" },
+            "4": { "name": "keyword.other.flick" }
+          }
+        },
+        {
+          "comment": "`fixture name =`, maybe `fixture shared` or `fixture shared concurrent`, at the start of a line: a fixture of a suite of the test DSL",
+          "match": "^[ \\t]*(fixture)(?:[ \\t]+(shared))?(?:[ \\t]+(concurrent))?(?=[ \\t]+[a-z_][A-Za-z0-9_]*[ \\t]*=(?!=))",
+          "captures": {
+            "1": { "name": "keyword.other.flick" },
+            "2": { "name": "keyword.other.flick" },
             "3": { "name": "keyword.other.flick" }
           }
         },

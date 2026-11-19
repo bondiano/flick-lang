@@ -41,7 +41,7 @@ unit:
 
 # The reference model of λFlick: its unit tests, the cases of
 # tests/run/model.txt checked and run against their `.stdout`, the other
-# cases against the reasons of tests/run/model_gaps.txt, and the
+# cases against the reasons of tests/run/model_gaps*.txt, and the
 # model properties on generated programs (`PROPTEST_CASES` sets how many)
 model:
     cargo test -p flick-model -- --include-ignored
@@ -49,6 +49,10 @@ model:
 # Regenerate formal/Formal/Elab/PreludeSchemes.lean and formal/Formal/Live/ElideSchemes.lean from the checker's Prelude
 formal-schemes:
     FLICK_FORMAL_SCHEMES=1 cargo test -p flick-model --lib translate::lean
+
+# Regenerate formal/FormalCert/Gen/Proofs.lean, the Lean replay of core's Option proofs, from the compiler's kernel
+formal-proofs:
+    FLICK_STD_PATH="$PWD/packages/std" FLICK_FORMAL_PROOFS=1 cargo test -p flick-core --lib ir::lower::proofs::replay
 
 # Regenerate formal/FormalCert/GenSig.lean and the golden certificates from the model
 formal-certs:

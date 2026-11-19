@@ -7,6 +7,8 @@ mod cert;
 mod check;
 mod defs;
 mod eval;
+#[cfg(test)]
+pub(crate) mod lean;
 mod show;
 mod term;
 
@@ -17,7 +19,7 @@ use crate::diagnostics::{Diagnostic, codes};
 use crate::source::Span;
 
 pub use cert::{Arg, Cert, Rule, cert};
-pub use defs::Program;
+pub use defs::{Admitted, Program, admit};
 pub use term::{Ctor, Def, LEMMAS, Literal, Pat, RULES, Refused, TUPLES, Term, term};
 
 /// The domain every statement is about, and the version of its checker.

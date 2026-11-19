@@ -2,16 +2,20 @@
 //! project, described from a cache in the store, and run by the host from
 //! the plan or the session they declare.
 
+mod inputs;
 mod plan;
+mod preview;
+mod projection;
 mod session;
 
-use std::collections::BTreeMap;
+pub(crate) use preview::preview;
+
 use std::ffi::OsString;
 use std::fmt::Write as _;
-use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::Arc;
+use std::{env, fs};
 
 use clap::{Arg, ArgAction, CommandFactory};
 use flick_backend::command::{self, Argument, Descriptor, Invocation, Style, ValueKind};
@@ -23,17 +27,25 @@ use sha2::{Digest, Sha256};
 
 use super::run::{find_project, find_project_at};
 use crate::args::{CommandArguments, GlobalArguments};
+use crate::backends::Tool;
 use crate::{backends, fetch, plugins, report, saved};
 
 /// What runs the commands of one backend or plugin.
 pub(crate) trait Contributor: Send + Sync {
     fn describe(&self) -> Result<Vec<Descriptor>, String>;
     fn run(&self, invocation: &Invocation) -> Result<command::Plan, Vec<command::Diagnostic>>;
-    fn open(&self, invocation: &Invocation) -> Result<Vec<u8>, Vec<command::Diagnostic>>;
+    fn resume(
+        &self,
+        state: Vec<u8>,
+        outputs: Vec<command::File>,
+        answers: Vec<command::Answer>,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>>;
+    fn open(&self, invocation: &Invocation) -> Result<command::Opened, Vec<command::Diagnostic>>;
     fn handle(
         &self,
         state: Vec<u8>,
         request: Vec<u8>,
+        answers: &[command::Answer],
         cancel: &Cancellation,
     ) -> Result<command::Handled, String>;
     fn close(&self, state: Vec<u8>) -> command::Plan;
@@ -50,6 +62,9 @@ struct Source {
     /// The digest of its component, which keys its cached descriptors.
     digest: String,
     plugin: Option<PathBuf>,
+    /// An official backend other than the project's, described to name
+    /// who adds a command the project has not.
+    official: bool,
 }
 
 /// Cached descriptors, by the digest of their component.
@@ -83,6 +98,7 @@ fn sources(project: &Project) -> Vec<Source> {
             id,
             digest,
             plugin: None,
+            official: false,
         });
     }
     for (package, path) in super::plugins::components(project) {
@@ -92,6 +108,7 @@ fn sources(project: &Project) -> Vec<Source> {
             id: package,
             digest: fetch::hex(&Sha256::digest(&bytes)),
             plugin: Some(path),
+            official: false,
         });
     }
     sources
@@ -100,8 +117,26 @@ fn sources(project: &Project) -> Vec<Source> {
 fn load(project: &Project, source: &Source) -> Result<Arc<dyn Contributor>, String> {
     match &source.plugin {
         Some(path) => plugins::contributor(&source.id, path),
+        None if source.official => backends::official_contributor(project, &source.id),
         None => backends::contributor(project),
     }
+}
+
+/// Every contributor the store has seen, the official backends described
+/// first if it has not seen them yet.
+fn known(project: &Project) -> Vec<(String, Vec<Descriptor>)> {
+    for (id, digest) in backends::officials() {
+        let short = id.rsplit('/').next().unwrap_or(&id).to_owned();
+        let source = Source {
+            short,
+            id,
+            digest,
+            plugin: None,
+            official: true,
+        };
+        let _ = descriptors(project, &source);
+    }
+    cached_everywhere()
 }
 
 /// The descriptors of `source`, from the cache, else from its component,
@@ -236,12 +271,19 @@ pub(crate) fn run(words: &[OsString], global: &GlobalArguments) -> ExitCode {
         report::render(global, &SourceMap::default(), &[diagnostic]);
         ExitCode::from(2)
     };
-    let Ok(project) = find_project(global) else {
+    // outside a project, the official backends' commands run in the working directory
+    let inside = find_project(global).ok();
+    let outside = inside.is_none();
+    let found = inside.or_else(|| {
+        let cwd = env::current_dir().ok()?;
+        backends::outside_project(&cwd).ok()
+    });
+    let Some(mut project) = found else {
         return fail(unknown(&words, &cached_everywhere()));
     };
     let (found, warnings) = contributed(&project);
     report::render(global, &SourceMap::default(), &warnings);
-    let target = match resolve(&words, &found) {
+    let target = match resolve(&words, &found, &|| known(&project)) {
         Ok(target) => target,
         Err(diagnostic) => return fail(*diagnostic),
     };
@@ -263,11 +305,21 @@ pub(crate) fn run(words: &[OsString], global: &GlobalArguments) -> ExitCode {
             return ExitCode::from(2);
         }
     };
+    // outside a project, the root holds the working directory and every path named
+    if outside {
+        project.root = inputs::common_root(descriptor, &arguments, &project.root);
+    }
     let tools = backends::granted_tools(&project, &source.id);
-    let invocation = Invocation {
-        name: descriptor.name.clone(),
-        arguments,
-        tools: tools.iter().map(|t| plan::tool(&t.pin)).collect(),
+    let cwd = env::current_dir().unwrap_or_else(|_| project.root.clone());
+    let invocation = match invocation(&project, descriptor, arguments, &tools, &cwd) {
+        Ok(invocation) => invocation,
+        Err(why) => {
+            return fail(Diagnostic::new(
+                codes::P055,
+                Severity::Error,
+                format!("`{}` cannot run: {why}", descriptor.name),
+            ));
+        }
     };
     match descriptor.style {
         Style::Plan => plan::run(
@@ -289,12 +341,37 @@ pub(crate) fn run(words: &[OsString], global: &GlobalArguments) -> ExitCode {
     }
 }
 
+/// The call of `descriptor` with `arguments`: their paths relative to the
+/// project's root, and the files the command reads.
+fn invocation(
+    project: &Project,
+    descriptor: &Descriptor,
+    arguments: Vec<Argument>,
+    tools: &[Tool],
+    cwd: &Path,
+) -> Result<Invocation, String> {
+    let root = &project.root;
+    let sources =
+        (project.source_root().strip_prefix(root)).map_or_else(|_| String::new(), inputs::slashed);
+    let mut invocation = Invocation {
+        name: descriptor.name.clone(),
+        arguments: inputs::relative(descriptor, arguments, root, cwd)?,
+        sources,
+        inputs: Vec::new(),
+        tools: tools.iter().map(|t| plan::tool(&t.pin)).collect(),
+    };
+    let paths = inputs::expand(&descriptor.inputs, &invocation)?;
+    invocation.inputs = inputs::read(root, &paths)?;
+    Ok(invocation)
+}
+
 type Target<'a> = (&'a Source, &'a Descriptor, Vec<String>);
 
 /// The command `words` names and the words left for its arguments.
 fn resolve<'a>(
     words: &[String],
     found: &'a [(Source, Contributed)],
+    known: &dyn Fn() -> Vec<(String, Vec<Descriptor>)>,
 ) -> Result<Target<'a>, Box<Diagnostic>> {
     let Some(first) = words.first() else {
         return Err(Box::new(Diagnostic::new(
@@ -328,7 +405,7 @@ fn resolve<'a>(
         }
     }
     match matches.as_slice() {
-        [] => Err(Box::new(unknown(&words, &[]))),
+        [] => Err(Box::new(unknown(&words, &known()))),
         [(source, descriptor, n)] => Ok((source, descriptor, words[*n..].to_vec())),
         many => {
             let names: Vec<String> = (many.iter())
@@ -386,7 +463,13 @@ fn arguments(
             (_, true) => ArgAction::Append,
             (_, false) => ArgAction::Set,
         };
-        Arg::new(p.name.clone()).help(p.help.clone()).action(action)
+        let arg = Arg::new(p.name.clone()).help(p.help.clone()).action(action);
+        // several values after one option, or a positional that takes the rest
+        if p.multiple && p.kind != ValueKind::Flag {
+            arg.num_args(1..)
+        } else {
+            arg
+        }
     };
     for p in &descriptor.positionals {
         command = command.arg(arg(p).required(p.required));
@@ -416,13 +499,6 @@ fn arguments(
         }
     }
     Ok(arguments)
-}
-
-/// The values of `invocation` by parameter name.
-pub(super) fn values(invocation: &Invocation) -> BTreeMap<&str, &[String]> {
-    (invocation.arguments.iter())
-        .map(|a| (a.name.as_str(), a.values.as_slice()))
-        .collect()
 }
 
 #[cfg(test)]

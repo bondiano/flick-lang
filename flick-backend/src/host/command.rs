@@ -13,7 +13,17 @@ pub fn invocation(i: &n::Invocation) -> w::Invocation {
                 values: a.values.clone(),
             })
             .collect(),
+        sources: i.sources.clone(),
+        inputs: i.inputs.iter().map(file_wire).collect(),
         tools: i.tools.iter().map(|t| tool_wire(t.clone())).collect(),
+    }
+}
+
+pub fn file_wire(f: &n::File) -> w::File {
+    w::File {
+        path: f.path.clone(),
+        bytes: f.bytes.clone(),
+        executable: f.executable,
     }
 }
 
@@ -54,6 +64,8 @@ pub fn descriptors(ds: Vec<w::Descriptor>) -> Vec<n::Descriptor> {
             summary: d.summary,
             positionals: d.positionals.into_iter().map(parameter).collect(),
             options: d.options.into_iter().map(parameter).collect(),
+            inputs: d.inputs,
+            reads: d.reads,
             writes: d.writes,
             style: match d.style {
                 w::Style::Plan => n::Style::Plan,
@@ -74,6 +86,12 @@ pub fn diagnostics(ds: Vec<w::Diagnostic>) -> Vec<n::Diagnostic> {
             },
             message: d.message,
             notes: d.notes,
+            span: d.span.map(|s| n::Span {
+                path: s.path,
+                start: s.start,
+                end: s.end,
+            }),
+            help: d.help,
         })
         .collect()
 }
@@ -100,12 +118,52 @@ pub fn plan(p: w::Plan) -> n::Plan {
                         })
                         .collect(),
                     inputs: t.inputs,
+                    reads: t.reads,
                     outputs: t.outputs,
                 }),
             })
             .collect(),
         diagnostics: diagnostics(p.diagnostics),
         stdout: p.stdout,
+        resume: p.resume,
+        needs: p.needs.into_iter().map(need).collect(),
+    }
+}
+
+fn need(n: w::Need) -> n::Need {
+    match n {
+        w::Need::Typescript(s) => n::Need::Typescript(n::Source {
+            path: s.path,
+            text: s.text,
+        }),
+    }
+}
+
+pub fn answer_wire(a: &n::Answer) -> w::Answer {
+    match a {
+        n::Answer::Typescript(module) => w::Answer::Typescript(module.as_ref().map(|m| {
+            w::TypescriptModule {
+                path: m.path.clone(),
+                source: m.source.clone(),
+                text: m.text.clone(),
+                spans: (m.spans.iter())
+                    .map(|s| w::TsSpan {
+                        ts_start: s.ts_start,
+                        ts_end: s.ts_end,
+                        fl_start: s.fl_start,
+                        fl_end: s.fl_end,
+                        exact: s.exact,
+                    })
+                    .collect(),
+            }
+        })),
+    }
+}
+
+pub fn opened(o: w::Opened) -> n::Opened {
+    match o {
+        w::Opened::Session(state) => n::Opened::Session(state),
+        w::Opened::Plan(p) => n::Opened::Plan(plan(p)),
     }
 }
 
@@ -113,5 +171,6 @@ pub fn handled(h: w::Handled) -> n::Handled {
     n::Handled {
         state: h.state,
         response: h.response,
+        needs: h.needs.into_iter().map(need).collect(),
     }
 }

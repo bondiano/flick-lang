@@ -1,6 +1,6 @@
 ---
 title: "Решения по реализации"
-source_hash: da268c528c222bf2
+source_hash: e4fde932b7df67b4
 ---
 
 ## Архитектура компилятора
@@ -33,7 +33,7 @@ source_hash: da268c528c222bf2
 | Генератор TypeScript | `flick-core/src/codegen/ts` | типы для `--emit ts`, `.d.ts` для `--emit-dts` и Promise-фасады для `--promise-facade`; тип без формы в TypeScript отвергается и никогда не записывается как `any` |
 | Интерфейсы | `flick-core/src/iface.rs`, `flick-core/src/build` | версионируемый JSON `.iface` каждого модуля с ABI данных и словарей и отпечатками, которые добавляет сборка (см. [Интерфейсы](../../reference/iface/)) |
 | Импорт FFI | `flick-ffi/src/ffi`, `tools/dts-importer` | `flick ffi import` и `ffi check` над описанием, которое вспомогательная программа на Node читает из `.d.ts` с помощью TypeScript |
-| Редактор | `flick-core/src/ide`, `flick-core/src/projection.rs`, `flick/src/lsp`, `flick/src/mapper.rs` | подсказки, переход к определению, ссылки, автодополнение, переименование и действия над кодом по одному анализу; их обслуживает `flick lsp --stdio`, а `flick content-mapper` — проекцию TypeScript с картами диапазонов (см. [Редакторы](../../reference/editor/)) |
+| Редактор | `flick-core/src/ide`, `flick-core/src/projection.rs`, `flick/src/lsp`, `flick/src/commands/contributed/projection.rs`, `backends/js/src/component/mapper.rs` | подсказки, переход к определению, ссылки, автодополнение, переименование и действия над кодом по одному анализу; их обслуживает `flick lsp --stdio`, а сессия `content-mapper` JavaScript-бэкенда превращает проекции, которые даёт хост, в карты диапазонов TypeScript (см. [Редакторы](../../reference/editor/)) |
 
 JS-emitter собирается независимо от `flick-core`, получая переносимый IR и
 plain-data options/проекции TypeScript. Его native-адаптер остаётся в

@@ -2,14 +2,16 @@
 
 mod data;
 mod emit;
+mod ffi;
 #[cfg(feature = "guest")]
 mod guest;
 mod launch;
+mod mapper;
 mod optimize;
 
 use flick_backend::{
     Backend, BackendId, BuildRequest, BuildResult, Capability, Descriptor, Diagnostic, Environment,
-    Inputs, Mode, NamedRange, Profile, Severity, TargetSupport, VersionRange,
+    Inputs, Mode, NamedRange, Profile, Severity, TargetSupport, VersionRange, command,
 };
 
 /// The same implementation serves the component and development parity tests.
@@ -49,6 +51,56 @@ fn capabilities() -> Vec<Capability> {
 }
 
 impl Backend for Javascript {
+    fn commands(&self) -> Vec<command::Descriptor> {
+        let mut commands = ffi::descriptors();
+        commands.push(mapper::descriptor());
+        commands
+    }
+
+    fn run(
+        &self,
+        invocation: &command::Invocation,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        if ffi::descriptors().iter().any(|d| d.name == invocation.name) {
+            ffi::run(invocation)
+        } else {
+            Err(command::unknown(&invocation.name))
+        }
+    }
+
+    fn resume(
+        &self,
+        state: Vec<u8>,
+        outputs: Vec<command::File>,
+        answers: Vec<command::Answer>,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        match serde_json::from_slice::<mapper::Declarations>(&state) {
+            Ok(declarations) => Ok(mapper::declare(&declarations, &answers)),
+            Err(_) => ffi::resume(&state, &outputs),
+        }
+    }
+
+    fn open(
+        &self,
+        invocation: &command::Invocation,
+    ) -> Result<command::Opened, Vec<command::Diagnostic>> {
+        if invocation.name == mapper::NAME {
+            Ok(mapper::open(invocation))
+        } else {
+            Err(command::unknown(&invocation.name))
+        }
+    }
+
+    fn handle(
+        &self,
+        state: Vec<u8>,
+        request: Vec<u8>,
+        answers: Vec<command::Answer>,
+    ) -> Result<command::Handled, String> {
+        let _ = state;
+        mapper::handle(&request, &answers)
+    }
+
     fn describe(&self) -> Descriptor {
         let range = |minimum: &str, maximum: &str| VersionRange {
             minimum: minimum.into(),

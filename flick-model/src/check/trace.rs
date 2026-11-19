@@ -30,6 +30,9 @@ pub struct Node {
     pub(crate) region: Option<Name>,
     /// The error type of a term (Errors-In) gave the errors of a row.
     pub(crate) errors_in: Option<Type>,
+    /// On the body of a `try`, the rows its arms `x` and `_` take the errors
+    /// at: above what the body raises, as (Try) with (Sub) types it.
+    pub(crate) caught: Vec<Row>,
 }
 
 /// The nodes of a check, by [`key`].
@@ -77,6 +80,7 @@ impl Checker<'_> {
                         .map(|(s, r)| (self.zonk_stage(s), self.zonk_row(r))),
                     region: n.region.clone(),
                     errors_in: n.errors_in.as_ref().map(|t| self.zonk(t)),
+                    caught: n.caught.iter().map(|r| self.zonk_row(r)).collect(),
                 };
                 (*k, node)
             })

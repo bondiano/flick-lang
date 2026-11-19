@@ -23,6 +23,11 @@ pub trait Program {
 pub struct Admitted(Vec<(Rc<Def>, Term)>);
 
 impl Admitted {
+    /// The definitions with their bodies, each naming only those before it.
+    pub fn defs(&self) -> &[(Rc<Def>, Term)] {
+        &self.0
+    }
+
     pub fn body(&self, d: &Def) -> Option<&Term> {
         self.0.iter().find(|(k, _)| **k == *d).map(|(_, t)| t)
     }

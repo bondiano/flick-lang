@@ -1,8 +1,9 @@
 //! `ui { … }`: the body with the module `Ui` open, so that `text`, `button`
-//! and the rest of the library need no `Ui.` there.
+//! and the rest of the library need no `Ui.` there. Several expression
+//! lines, after the `let`s, are the children of one `Ui.fragment`.
 
 use flick_plugin::{
-    Arena, Block, Builder, Compiler, Diagnostic, Expr, Hole, HoleKind, Hover, Piece,
+    Arena, Block, Builder, Compiler, Diagnostic, Expr, Hole, HoleKind, Hover, Piece, Span,
 };
 
 /// What an editor shows on the head.
@@ -10,7 +11,17 @@ const ABOUT: &str = "Describes a user interface; building it runs no handler.";
 
 /// The code of the block: its body with `Ui` open.
 pub fn expand(block: &Block, compiler: &mut dyn Compiler) -> Result<Arena, Vec<Diagnostic>> {
-    let body = block.body().lines(compiler).map_err(|d| vec![d])?;
+    let mut rest = block.body();
+    let body = rest.lines(compiler).map_err(|d| vec![d])?;
+    // the body is all of it: what follows would be lost
+    if let Some(next) = rest.peek() {
+        let span = Span {
+            start: next.span.start,
+            end: rest.rest().last().map_or(next.span.end, |t| t.span.end),
+        };
+        let message = "expected the end of `ui` after its body: `;` separates its lines";
+        return Err(vec![Diagnostic::error(message, span).with_code("U010")]);
+    }
     let mut b = Builder::new(block.whole());
     let user = b.at(body).expr(Expr::Lines(body));
     let root = b.at(block.whole()).expr(Expr::Open {
@@ -18,6 +29,8 @@ pub fn expand(block: &Block, compiler: &mut dyn Compiler) -> Result<Arena, Vec<D
         child: Some("Ui".into()),
         // a foreign component takes its props through `Ui.component`
         through: Some("Ui.component".into()),
+        // several lines are the children of one fragment
+        siblings: Some("Ui.fragment".into()),
         body: user,
     });
     Ok(b.finish(root))

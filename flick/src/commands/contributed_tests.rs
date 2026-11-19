@@ -1,6 +1,9 @@
-use flick_backend::command::{Descriptor, Parameter, Style, ValueKind};
+use std::path::Path;
+
+use flick_backend::command::{Argument, Descriptor, Parameter, Style, ValueKind};
 use flick_core::diagnostics::codes;
 
+use super::inputs::common_root;
 use super::{Contributed, Source, arguments, resolve};
 
 fn descriptor(name: &str) -> Descriptor {
@@ -21,6 +24,8 @@ fn descriptor(name: &str) -> Descriptor {
             required: false,
             help: String::new(),
         }],
+        inputs: vec![],
+        reads: vec![],
         writes: vec![],
         style: Style::Plan,
     }
@@ -30,6 +35,7 @@ fn found(entries: &[(&str, &[&str])]) -> Vec<(Source, Contributed)> {
     (entries.iter())
         .map(|(short, names)| {
             let source = Source {
+                official: false,
                 short: (*short).into(),
                 id: format!("test/{short}"),
                 digest: String::new(),
@@ -51,40 +57,42 @@ fn words(text: &str) -> Vec<String> {
 #[test]
 fn a_command_runs_under_its_flat_and_its_qualified_name() {
     let found = found(&[("literal", &["hello", "ffi import"]), ("pairs", &["greet"])]);
-    let (source, d, rest) = resolve(&words("hello world"), &found).expect("flat");
+    let (source, d, rest) = resolve(&words("hello world"), &found, &Vec::new).expect("flat");
     assert_eq!(
         (source.short.as_str(), d.name.as_str(), rest),
         ("literal", "hello", words("world"))
     );
-    let (source, d, rest) = resolve(&words("literal:ffi import x"), &found).expect("qualified");
+    let (source, d, rest) =
+        resolve(&words("literal:ffi import x"), &found, &Vec::new).expect("qualified");
     assert_eq!(
         (source.short.as_str(), d.name.as_str(), rest),
         ("literal", "ffi import", words("x"))
     );
-    let (_, d, _) = resolve(&words("ffi import"), &found).expect("words of a name");
+    let (_, d, _) = resolve(&words("ffi import"), &found, &Vec::new).expect("words of a name");
     assert_eq!(d.name, "ffi import");
 }
 
 #[test]
 fn a_collision_names_both_and_an_unknown_name_fails() {
     let found = found(&[("literal", &["greet"]), ("pairs", &["greet"])]);
-    let collision = resolve(&words("greet x"), &found).expect_err("a collision");
+    let collision = resolve(&words("greet x"), &found, &Vec::new).expect_err("a collision");
     assert_eq!(collision.code, codes::P053);
     let fix = format!("{:?}", collision.fixes);
     assert!(
         fix.contains("literal:greet") && fix.contains("pairs:greet"),
         "{fix}"
     );
-    let (source, _, _) = resolve(&words("pairs:greet x"), &found).expect("qualified wins");
+    let (source, _, _) =
+        resolve(&words("pairs:greet x"), &found, &Vec::new).expect("qualified wins");
     assert_eq!(source.short, "pairs");
     assert_eq!(
-        resolve(&words("nothing"), &found)
+        resolve(&words("nothing"), &found, &Vec::new)
             .expect_err("unknown")
             .code,
         codes::P052
     );
     assert_eq!(
-        resolve(&words("other:greet"), &found)
+        resolve(&words("other:greet"), &found, &Vec::new)
             .expect_err("no such contributor")
             .code,
         codes::P052
@@ -104,4 +112,23 @@ fn arguments_follow_the_descriptor() {
         [("who", &words("world")[..]), ("loud", &words("true")[..])]
     );
     assert!(arguments(&descriptor("hello"), "literal", &words("--quiet")).is_err());
+}
+
+#[test]
+fn outside_a_project_the_root_holds_the_working_directory_and_each_path() {
+    let mut d = descriptor("content-mapper");
+    d.options.push(Parameter {
+        name: "declarations".into(),
+        kind: ValueKind::Path,
+        multiple: true,
+        required: false,
+        help: String::new(),
+    });
+    let arguments = vec![Argument {
+        name: "declarations".into(),
+        values: vec!["/repo/target/tmp/site/src".into(), "here".into()],
+    }];
+    let cwd = Path::new("/repo/tools/astro");
+    assert_eq!(common_root(&d, &arguments, cwd), Path::new("/repo"));
+    assert_eq!(common_root(&d, &[], cwd), cwd);
 }

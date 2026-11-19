@@ -1,6 +1,6 @@
 # Lazy computations: `Lazy r e a`, `let lazy`, and suspended parameters
 
-Status: **contract** (RFC #563, #548). The core primitive of §3, `let lazy` of §4 (T7) and R9 of §5 are proved in Lean and implemented; the optimizations of §6 are not yet. This page fixes the semantics that the checker, the model, the Lean core, both runtimes and the optimizer must agree on. Each rule lists where it will be checked.
+Status: **contract** (RFC #563, #548). The core primitive of §3, `let lazy` of §4 (T7), R9 of §5 and the O1 rewrites of §6 are proved in Lean and implemented; O2–O4 of §6 are not yet. This page fixes the semantics that the checker, the model, the Lean core, both runtimes and the optimizer must agree on. Each rule lists where it will be checked.
 
 References as in [`core.md`](core.md): `spec/NN`, `reference/X`; checker paths are relative to `flick-core/src/types/`.
 
@@ -170,17 +170,37 @@ Conformance: `tests/run/runtime/lazy_*.fl` on JS, rt and Go.
 
 ## 6. Optimizations, as equivalences
 
-Each is a contextual equivalence (`formal/Formal/ContextEquivalence.lean`) proved for the core of §3, plus an IR pass in `flick-core/src/opt/lazy.rs` with regression tests and the output identity gate.
+Each is a contextual equivalence of the core of §3, plus a pass of the release optimizer (`flick-backend-support/src/opt/lazy.rs`) with regression tests and the output identity gate.
 
-| # | Rewrite | Side condition | Why it is sound |
-| - | - | - | - |
-| O1a | `let l = lazy e in b` ≅ `b` | `l ∉ fv(b)` | allocation is unobservable: `Lazy` has no identity, and `e` never runs |
-| O1b | `lazy v` ≅ `done v` (a cell born `Done (ok v)`) | `v` a value | `force` of either returns `v` (L2) |
-| O1c | `await (lazy e)` ≅ `e` | — | a fresh cell has no other owner or waiter |
-| O2a | `let y = await l in C[await l]` ≅ `let y = await l in C[y]` | the second force runs in the same fiber after the first; `C` does not bind `l` | L2: the first force left `Done o`; if `o` failed, `C` is not reached |
-| O2b | `let lazy x = e` with one `await x`, not under a loop or a closure ≅ `let x = e` at that `await` | the force runs at most once | the state variable is read once (§4) |
-| O3 | an unsynchronized cell | the lazy does not escape into a `task`, a closure, a fork or a field | no second fiber can reach `ℓ`, so R9 holds trivially; Perceus frees the initializer's captures on `Pending → Running` |
-| O4 | hoist `lazy e` out of a loop | `e : Lazy none none τ` (pure, no service, no error), loop-invariant `fv(e)` | sharing is unobservable for a pure initializer; it runs at most once either way |
+**Contextual equivalence** (`formal/Formal/Equiv/Context.lean`). A context is a term of the source language with any number of holes, anywhere (`Ctx`). Filled with `e₁` and with `e₂`, it gives two programs; a filling stays under the binders of the context, which bind its free variables. `e₁ ≅ e₂` (`CtxEquiv`) when, for every context whose two programs are typed (T1's hypotheses, under typed roots of the source language: `Prog`), the main threads of the two programs may end with the same literals (`Ends`). The equivalence is of these may-results. It is not one of every run for O1b: the core of §3 has no waiters, unlike λRT (§5, R9), so a force that meets its cell `Running` is a defect, and two threads that force one `lazy v` at once may die where `born v`, done before anyone can reach it, does not.
+
+**Equivalence of every run** (`formal/Formal/Equiv/All.lean`). A run of a configuration ends in one of four outcomes (`Outcome`, `Formal/Equiv/Every.lean`): the main thread ends with a literal, the main thread steps to a defect, the run never ends, or the run gets stuck on anything else (no thread steps, the main thread does not die and is no literal). `e₁ ≅* e₂` (`CtxEquivAll`) when, for every context whose two programs are typed, the two programs have the same outcomes. It implies `CtxEquiv` (`CtxEquivAll.ctxEquiv`). Where it holds, a rewrite changes nothing a run of the program can do, not only which literals it may give.
+
+Where a pattern reads a term without running it (the top of a field of a dictionary record, of the value a handler matches, of a list of alternatives: `Pos.top` of `Formal/Equiv/Sim.lean`), a pattern could tell `force (lazy e)` from `e`, so the two sides of a rewrite are no pair of `Sim` there. Typing keeps them away (`Typ.noLzTop`, `Formal/Equiv/TopTyped.lean`): such a place has the pure stage, or no term judgment, while a term that makes or forces a cell (`Tm.LzShape`) has the stage `rt` at least. The one place typing does not reach is the body of a dead arm of a GADT. An arm whose body has such a term is related whatever the bodies (`Sim.aconsD`), and no run takes it: every configuration either run reaches is typed (`Prog.reach`), so what a step gives has no such term (`Tm.LzTop`), and a step that takes the arm would give one. So a hole may stand anywhere, and the restriction loses nothing.
+
+The proof relates the runs of two programs by a simulation each way (`Sim`, `Formal/Equiv/Sim.lean`): a congruence up to a partial bijection of the locations of their stores, and the pairs of the rewrites and of the states their runs pass through. `Sim` is kept by substitution (`Subst.lean`), by a step of a thread (`thread_sim`, `ThreadSim.lean`), by a step of a configuration, a child in its slot included (`cstep_sim`, `CfgStep.lean`), and by a run (`csteps_sim`). The right side answers with steps of its own: it allocates or settles the cells the left side does not have (`RJ`, `CatchUp.lean`), and it catches up a child the left side finishes, as a region ends only once its children are finished. A left main thread that ends with a literal is answered by a right one that ends with it (`lit_sim`). Typing gives the closed threads the proof needs, on both sides (`Prog.reach`), and `ctxEquiv_of_sim` turns two simulations into `CtxEquiv`.
+
+For every run, the same simulations must answer each outcome, which `EverySim` (`Formal/Equiv/Every.lean`) states once for any relation of configurations; `EverySim.has` derives that every outcome of the left run is one of the right run, and a later rewrite reuses it with a relation of its own:
+
+- **A step** of the left side is answered by steps of the right side, or by none, and then a potential of the left configuration drops (`cstep_every`, `cpot`, `CfgStep.lean`), so a left run that never ends is answered by a right one that never ends. A step answered by none consumes a form only the left side has: it makes a cell, binds it, forces the cell it has just made, or settles one (`Tm.pot`, `PotTm.lean`). The initializer of a cell a thread has just made waits in the store until the thread forces it (`OneShot`), so the potential of a thread counts it there (`xpot`, `Pot.lean`); a thread related by `Sim` forces no such cell (`Sim.xpot`), and the cells reserved for other threads stay pending (`ThR.xpot_le`, `CPot.lean`).
+- **A main thread that steps to a defect** is answered by a right one that does, after it caught up (`die_sim`, `dies_sim`, `Die.lean`): `todo` is `todo`, and a `resume` the right side could take is one the left side could. This needs the pairs of O1b absent: `dead` relates a left thread that forced its own running cell with a right one that goes on. A world records whether they may stand (`World.B`); O1a and O1c start without them, and no step adds them.
+- **A stuck configuration** is answered by a right run to a stuck one (`stuck_sim`, `StuckCfg.lean`). While the right side steps, the left one does not, so every right step is reflected on the left (`thread_reflect`, `Stuck.lean`; `reflect_focus`, `Refl.lean`): the left thread takes the same step, read through the relation, or one of its children steps alone, or the right side catches up alone, which lowers its potential (`rpot`). The reflection reads the parked bodies of handlers and the absence of lists of alternatives at a focus from the typing of the left thread (`TypInv.lean`).
+
+`everySim` (`All.lean`) instantiates these for the relation of two typed programs' runs without the pairs of O1b, and `ctxEquivAll_of_sim` turns two simulations into `CtxEquivAll`.
+
+| # | Rewrite | Side condition | Why it is sound | Proved |
+| - | - | - | - | - |
+| O1a | `let l = lazy e in b` ≅ `b` | `l ∉ fv(b)` | allocation is unobservable: `Lazy` has no identity, and `e` never runs | every run |
+| O1b | `lazy v` ≅ `born v` = `let l = lazy v in force l; l`, a cell born `Done (ok v)` | `v` a value | `force` of either returns `v` (L2) | literals (may) |
+| O1c | `force (lazy e)` ≅ `e` | — | a fresh cell has no other owner or waiter | every run |
+| O2a | `let y = await l in C[await l]` ≅ `let y = await l in C[y]` | the second force runs in the same fiber after the first; `C` does not bind `l` | L2: the first force left `Done o`; if `o` failed, `C` is not reached | not yet |
+| O2b | `let lazy x = e` with one `await x`, not under a loop or a closure ≅ `let x = e` at that `await` | the force runs at most once | the state variable is read once (§4) | not yet |
+| O3 | an unsynchronized cell | the lazy does not escape into a `task`, a closure, a fork or a field | no second fiber can reach `ℓ`, so R9 holds trivially; Perceus frees the initializer's captures on `Pending → Running` | not yet |
+| O4 | hoist `lazy e` out of a loop | `e : Lazy none none τ` (pure, no service, no error), loop-invariant `fv(e)` | sharing is unobservable for a pure initializer; it runs at most once either way | not yet |
+
+O1a, O1b and O1c are `Equiv.o1a`, `Equiv.o1b` and `Equiv.o1c` (`formal/Formal/Equiv/Context.lean`), for source terms `e`, `b` and values `v`, all three of may-results. O1a and O1c hold of every run as well: `Equiv.o1a_all` and `Equiv.o1c_all` (`formal/Formal/Equiv/All.lean`). O1b holds of no more than the literals (above). The special pairs of `Sim` are their rewrites both ways: `dropA` and `dropC` (O1a, with `dropB` once the left cell is allocated), `bornA` and `bornB` (O1b, with `bornS`, `bornV` and `dead` for the run of `born v` against the allocated `lazy v`), `forceA` and `forceC` (O1c, with `OneShot` for a thread about to force the cell it just allocated, which only it can). No `sorry`, no new axioms (`Formal/Axioms.lean` pins the five, and `EverySim.has`).
+
+The pass rewrites the IR of a release build, where `lazy e` is `lazy_make (task e)` and a force `lazy_force`. O1a drops `let l = lazy_make t` that nothing reads, and a cell made only to be dropped, for `t` a task or a name. O1b writes `lazy_make (task v)` as `lazy_done v` for `v` a literal, a name, a constructor, a function or a tuple, list or record of them. O1c writes `lazy_force (lazy_make t)` as `await t`, which runs `t` where the cell would have run it; in the core, `await (task e)` steps to `e`. Both at once, `lazy_force (lazy_done v)` is `v`. Checked by: the tests of `flick-core/src/opt/lazy_tests.rs`, and `tests/run/runtime/lazy_opt.fl` on JS, TS, Go, the rt runtime and the model.
 
 ## 7. Suspended parameters `~T` (#548)
 
@@ -204,3 +224,4 @@ Effect.or_die job                               -- an `Eff` passes as before
 2. Whether `Lazy` gets an `Inspectable`-style debug `Show` (shows only the state, not the value).
 3. Whether `~` is also allowed on parameters of class methods.
 4. `Ty.elide` (the reading of a signature in the live discipline) leaves `Lazy` as it is: a `Lazy` in a signature gets no `Live` of the parameters before it, as `Eff` does.
+5. O1b holds of the literals only (§6): the core of §3 has no waiters, so two threads that force one `lazy v` at once may die where `born v` does not. Whether to give the core the waiters of λRT (§5, R9), under which this run would not die, so O1b could hold of every run as well.

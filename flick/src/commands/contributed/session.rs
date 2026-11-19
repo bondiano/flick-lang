@@ -3,19 +3,20 @@
 //! the session, and answers a trap or a cancelled request itself, as
 //! JSON-RPC errors, keeping the state the request started from.
 
-use std::io::{self, BufReader};
+use std::io::{self, BufReader, Write};
 use std::process::ExitCode;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
-use flick_backend::command::{Descriptor, Invocation};
+use flick_backend::command::{Descriptor, Handled, Invocation, Opened};
 use flick_backend::host::runtime::Cancellation;
 use flick_core::project::Project;
 use serde_json::{Value, json};
 
 use super::Contributor;
 use super::plan::{carry_out, finish};
+use super::projection::Projections;
 use crate::args::GlobalArguments;
 use crate::backends::Tool;
 use crate::component;
@@ -25,6 +26,8 @@ use crate::lsp::protocol;
 const CANCELLED: i64 = -32800;
 /// JSON-RPC: the server failed on the request.
 const FAILED: i64 = -32603;
+/// How many calls one request may take, answering what each needs.
+const ROUNDS: usize = 16;
 
 pub(super) fn serve(
     project: &Project,
@@ -35,9 +38,16 @@ pub(super) fn serve(
     global: &GlobalArguments,
 ) -> ExitCode {
     let mut state = match contributor.open(invocation) {
-        Ok(state) => state,
-        Err(diagnostics) => return finish(global, &diagnostics, &[]),
+        Ok(Opened::Session(state)) => state,
+        // it runs once instead, as a plan command does
+        Ok(Opened::Plan(plan)) => {
+            let done = carry_out(project, contributor, descriptor, invocation, plan, tools);
+            let _ = io::stdout().write_all(&done.stdout);
+            return finish(global, invocation, &done.diagnostics, &done.refused);
+        }
+        Err(diagnostics) => return finish(global, invocation, &diagnostics, &[]),
     };
+    let mut projections = Projections::default();
     let Ok(engine) = component::engine() else {
         return ExitCode::from(1);
     };
@@ -72,22 +82,26 @@ pub(super) fn serve(
             continue;
         }
         let cancel = Cancellation::new(engine);
-        let answer = thread::scope(|scope| {
-            let call = scope.spawn(|| {
-                let request = message.to_string().into_bytes();
-                contributor.handle(state.clone(), request, &cancel)
-            });
-            // what arrives meanwhile waits, but a cancellation of this request stops it
-            while !call.is_finished() {
-                match inbox.recv_timeout(Duration::from_millis(10)) {
-                    Ok(next) if cancels(&next, id.as_ref()) => cancel.cancel(),
-                    Ok(next) => waiting.insert(0, next),
-                    Err(_) => {}
+        let request = message.to_string().into_bytes();
+        let (mut current, mut answers) = (state.clone(), Vec::new());
+        let mut answer = Err(format!(
+            "the session needed more than {ROUNDS} calls for a request"
+        ));
+        // a call that needs something gets it, answered, in the next one
+        for _ in 0..ROUNDS {
+            let call = || contributor.handle(current.clone(), request.clone(), &answers, &cancel);
+            match call_cancellable(call, &inbox, &mut waiting, &cancel, id.as_ref()) {
+                // the projections keep their caches on this thread
+                Ok(handled) if !handled.needs.is_empty() => {
+                    answers = projections.answer(&project.root, &handled.needs);
+                    current = handled.state;
+                }
+                done => {
+                    answer = done;
+                    break;
                 }
             }
-            call.join()
-                .unwrap_or_else(|_| Err("the session panicked".into()))
-        });
+        }
         let reply = match (answer, &id) {
             (Ok(handled), _) => {
                 state = handled.state;
@@ -108,16 +122,35 @@ pub(super) fn serve(
         }
     }
     let plan = contributor.close(state);
+    let done = carry_out(project, contributor, descriptor, invocation, plan, tools);
     // stdout is the protocol's: what the session prints goes to stderr
-    if !plan.stdout.is_empty() {
-        eprint!("{}", String::from_utf8_lossy(&plan.stdout));
+    if !done.stdout.is_empty() {
+        eprint!("{}", String::from_utf8_lossy(&done.stdout));
     }
-    let refused = carry_out(project, descriptor, invocation, &plan, tools);
-    finish(
-        global,
-        &plan.diagnostics,
-        &refused.err().into_iter().collect::<Vec<_>>(),
-    )
+    finish(global, invocation, &done.diagnostics, &done.refused)
+}
+
+/// The result of `call`, on a thread of its own: what arrives meanwhile
+/// waits, but a cancellation of the request `id` stops it.
+fn call_cancellable(
+    call: impl FnOnce() -> Result<Handled, String> + Send,
+    inbox: &mpsc::Receiver<Value>,
+    waiting: &mut Vec<Value>,
+    cancel: &Cancellation,
+    id: Option<&Value>,
+) -> Result<Handled, String> {
+    thread::scope(|scope| {
+        let call = scope.spawn(call);
+        while !call.is_finished() {
+            match inbox.recv_timeout(Duration::from_millis(10)) {
+                Ok(next) if cancels(&next, id) => cancel.cancel(),
+                Ok(next) => waiting.insert(0, next),
+                Err(_) => {}
+            }
+        }
+        call.join()
+            .unwrap_or_else(|_| Err("the session panicked".into()))
+    })
 }
 
 fn cancels(message: &Value, id: Option<&Value>) -> bool {
