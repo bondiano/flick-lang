@@ -117,7 +117,10 @@ parentheses alone on a line loses them where its first line fits.
 
 The lines of `ui { … }` itself are children the same way: after its `let`s,
 two or more lines are the children of one `fragment`, and one line is the
-node itself. A `let` after the first child is `FLICK-T085`, which
+node itself. On the line of `ui {`, `;` separates them, as in braces:
+`ui { text "a"; text "b" }`, which `flick fmt` writes a line each; any
+other code after the body is `std/U010`. A `let` after the first child is
+`FLICK-T085`, which
 `flick check --fix --only T085` moves above it when that changes nothing. A
 branch of `if` or `match` is one expression, so several nodes there are a
 `ui { … }` of their own, or `fragment a b`; `fragment` of one list,

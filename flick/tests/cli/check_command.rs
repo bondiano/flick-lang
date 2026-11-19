@@ -248,3 +248,24 @@ let hidden = ui {
     let late = "  heading (text \"count\")\n  let shown = show n\n";
     assert_eq!(fixed, text.replace(late, moved));
 }
+
+#[test]
+fn code_after_the_body_of_a_one_line_ui_block_is_refused_not_dropped() {
+    let text = "module App.Page exposing (..)\n\njunk : Ui\nlet junk = ui { text \"a\" = \"b\" }\n";
+    let files = [
+        (
+            "flick.toml",
+            "schema-version = 1\n[project]\nkind = \"lib\"\n",
+        ),
+        ("src/App/Page.fl", text),
+    ];
+    let dir = common::project("check_one_line_ui", &files);
+    let out = common::flick_in(&dir, &["check", "--color", "never"]);
+    assert_eq!(out.status.code(), Some(1), "{out:?}");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("std/U010"), "{stderr}");
+    assert!(
+        stderr.contains("expected the end of `ui` after its body"),
+        "{stderr}"
+    );
+}
