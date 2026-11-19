@@ -153,6 +153,49 @@ after_all :
   (forall s. Fiber.Provided {...Host.Live} s => Eff {Async, Scope s, ...Host.Live} e Unit) -> Test
 foreign pure after_all from "flick:rt" "testAfterAll"
 
+/// A fixture of the tests of a suite, which their code awaits: made by its
+/// initializer the first time code of one of them asks for it, for each
+/// test or, shared, once for each run of its suite.
+type Fixture (e : ErrorRow) a
+
+/// What a `fixture name = expression` of a suite stands for: a fixture
+/// that `init` makes for each test that uses it, in a scope of the test's
+/// own. That scope owns what `init` acquires, the value `Resource.own`s
+/// included, which holds its region `t`, and closes after the test's
+/// `after_each` hooks, releasing it in the reverse order it was acquired.
+fixture :
+  String ->
+  (forall t. Fiber.Provided {...Host.Live} t => Eff {Async, Scope t, ...Host.Live} e a^{t}) ->
+  Fixture e a
+foreign pure fixture from "flick:rt" "testFixture"
+
+/// What a `fixture shared name = expression` stands for: a fixture that
+/// `init` makes once for each run of the suite whose list `share`s it, in
+/// a scope of that run's own, which closes after the suite's `after_all`
+/// hooks, once its last selected test has ended.
+shared :
+  String ->
+  (forall t. Fiber.Provided {...Host.Live} t => Eff {Async, Scope t, ...Host.Live} e a^{t}) ->
+  Fixture e a
+foreign pure shared from "flick:rt" "testShared"
+
+/// The item of a group's list that makes the group the owner of the shared
+/// fixture `fixture`.
+share : Fixture e a -> Test
+foreign pure share from "flick:rt" "testShare"
+
+/// The `Lazy` of `fixture` for the test, or the run of the suite, this code
+/// runs for. Its value holds no region: code that keeps it past the test,
+/// or the suite's last test for a shared one, keeps what may be released.
+use : Fixture e a ->{} Lazy {...Host.Live} e a
+foreign effect use from "flick:rt" "testUse"
+
+/// The test, and each test in it, run one at a time, also under
+/// `flick test --jobs`, while the tests of other groups run beside them: a
+/// group whose tests share a fixture is so.
+serial : Test -> Test
+foreign pure serial from "flick:rt" "testSerial"
+
 /// The test, and each test in it that has no timeout of its own, given
 /// `millis` milliseconds for its `before_each` hooks and its body; when they
 /// run out, the test is interrupted, its scope closes and it is reported as

@@ -234,6 +234,40 @@ let after_all = timeout 5 before_each
   (identifier))
 
 ==================
+Test fixtures
+==================
+
+suite parallel "Db" {
+  fixture shared concurrent pool = make
+  fixture shared = await pool
+}
+let fixture = shared parallel
+
+---
+
+(source_file
+  (keyword)
+  (keyword)
+  (string)
+  (braces
+    (keyword)
+    (keyword)
+    (keyword)
+    (identifier)
+    (operator)
+    (identifier)
+    (keyword)
+    (identifier)
+    (operator)
+    (keyword)
+    (identifier))
+  (keyword)
+  (identifier)
+  (operator)
+  (identifier)
+  (identifier))
+
+==================
 Components
 ==================
 

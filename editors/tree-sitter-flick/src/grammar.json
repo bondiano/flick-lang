@@ -34,6 +34,10 @@
           "name": "_hook"
         },
         {
+          "type": "SYMBOL",
+          "name": "_fixture"
+        },
+        {
           "type": "ALIAS",
           "content": {
             "type": "SYMBOL",
@@ -303,6 +307,23 @@
             ]
           },
           {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "ALIAS",
+                "content": {
+                  "type": "STRING",
+                  "value": "parallel"
+                },
+                "named": true,
+                "value": "keyword"
+              },
+              {
+                "type": "BLANK"
+              }
+            ]
+          },
+          {
             "type": "SYMBOL",
             "name": "string"
           },
@@ -369,6 +390,71 @@
           {
             "type": "SYMBOL",
             "name": "braces"
+          }
+        ]
+      }
+    },
+    "_fixture": {
+      "type": "PREC_DYNAMIC",
+      "value": 1,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "ALIAS",
+            "content": {
+              "type": "STRING",
+              "value": "fixture"
+            },
+            "named": true,
+            "value": "keyword"
+          },
+          {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "ALIAS",
+                "content": {
+                  "type": "STRING",
+                  "value": "shared"
+                },
+                "named": true,
+                "value": "keyword"
+              },
+              {
+                "type": "BLANK"
+              }
+            ]
+          },
+          {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "ALIAS",
+                "content": {
+                  "type": "STRING",
+                  "value": "concurrent"
+                },
+                "named": true,
+                "value": "keyword"
+              },
+              {
+                "type": "BLANK"
+              }
+            ]
+          },
+          {
+            "type": "SYMBOL",
+            "name": "identifier"
+          },
+          {
+            "type": "ALIAS",
+            "content": {
+              "type": "STRING",
+              "value": "="
+            },
+            "named": true,
+            "value": "operator"
           }
         ]
       }
@@ -1331,6 +1417,22 @@
         {
           "type": "STRING",
           "value": "after_all"
+        },
+        {
+          "type": "STRING",
+          "value": "fixture"
+        },
+        {
+          "type": "STRING",
+          "value": "shared"
+        },
+        {
+          "type": "STRING",
+          "value": "concurrent"
+        },
+        {
+          "type": "STRING",
+          "value": "parallel"
         }
       ]
     },
@@ -1525,7 +1627,14 @@
       "identifier"
     ],
     [
+      "_fixture",
+      "identifier"
+    ],
+    [
       "_case"
+    ],
+    [
+      "_fixture"
     ]
   ],
   "precedences": [],

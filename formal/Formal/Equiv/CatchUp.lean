@@ -1,4 +1,5 @@
 import Formal.Equiv.Store
+import Formal.Equiv.PotTm
 
 /-!
 # Contextual equivalence: the right side catches up
@@ -59,51 +60,62 @@ structure RJ (W : World) (μ : List Tm) (b : Tm) (W' : World) (μ' : List Tm) (b
   steps : AStar μ b μ' b'
   le : W.le W'
   st : ∀ μ₁, StR W μ₁ μ → StR W' μ₁ μ'
+  /-- The left cells, and the ones reserved for a force, stay. -/
+  j₁ : ∀ n, W'.J₁ n → W.J₁ n
+  o : ∀ n τ, W'.O n τ → W.O n τ
+  /-- They consume forms only one side has: none, or the potential drops. -/
+  pot : (μ' = μ ∧ b' = b) ∨ b'.pot < b.pot
 
 theorem RJ.refl (μ : List Tm) (b : Tm) : RJ W μ b W μ b :=
-  ⟨.refl, World.le.refl _, fun _ h => h⟩
+  ⟨.refl, World.le.refl _, fun _ h => h, fun _ h => h, fun _ _ h => h, .inl ⟨rfl, rfl⟩⟩
 
 theorem RJ.trans {W₁ W₂ : World} {μ μ₁ μ₂ : List Tm} {b b₁ b₂ : Tm} (h₁ : RJ W μ b W₁ μ₁ b₁)
     (h₂ : RJ W₁ μ₁ b₁ W₂ μ₂ b₂) : RJ W μ b W₂ μ₂ b₂ :=
-  ⟨h₁.steps.trans h₂.steps, h₁.le.trans h₂.le, fun _ h => h₂.st _ (h₁.st _ h)⟩
+  ⟨h₁.steps.trans h₂.steps, h₁.le.trans h₂.le, fun _ h => h₂.st _ (h₁.st _ h),
+    fun _ h => h₁.j₁ _ (h₂.j₁ _ h), fun _ _ h => h₁.o _ _ (h₂.o _ _ h), by
+      rcases h₁.pot with ⟨rfl, rfl⟩ | p₁ <;> rcases h₂.pot with ⟨rfl, rfl⟩ | p₂
+      · exact .inl ⟨rfl, rfl⟩
+      · exact .inr p₂
+      · exact .inr p₁
+      · exact .inr (Nat.lt_trans p₂ p₁)⟩
 
 theorem RJ.plug {W' : World} {μ μ' : List Tm} {b b' : Tm} (h : RJ W μ b W' μ' b')
     {E : List Frame} (hE : OkE E) : RJ W μ (Flick.plug E b) W' μ' (Flick.plug E b') :=
-  ⟨h.steps.plug hE, h.le, h.st⟩
+  ⟨h.steps.plug hE, h.le, h.st, h.j₁, h.o, by
+    rcases h.pot with ⟨rfl, rfl⟩ | h
+    · exact .inl ⟨rfl, rfl⟩
+    · exact .inr (pot_plug_lt E h)⟩
 
 theorem RJ.frame {W' : World} {μ μ' : List Tm} {b b' : Tm} (h : RJ W μ b W' μ' b')
     {F : Frame} (hF : F.ok) : RJ W μ (F.plug b) W' μ' (F.plug b') :=
   h.plug (E := [F]) (OkE.cons' OkE.nil hF)
 
 theorem RJ.head {μ μ' : List Tm} {b b' : Tm} (h : ∀ Λ, RHead Λ μ b Λ μ' b')
-    (hs : ∀ μ₁, StR W μ₁ μ → StR W μ₁ μ') : RJ W μ b W μ' b' :=
-  ⟨.step ⟨[], b, b', OkE.nil, rfl, rfl, .inr h⟩ .refl, World.le.refl _, hs⟩
+    (hs : ∀ μ₁, StR W μ₁ μ → StR W μ₁ μ') (hp : b'.pot < b.pot) : RJ W μ b W μ' b' :=
+  ⟨.step ⟨[], b, b', OkE.nil, rfl, rfl, .inr h⟩ .refl, World.le.refl _, hs, fun _ h => h,
+    fun _ _ h => h, .inr hp⟩
 
-theorem RJ.pure {μ : List Tm} {b b' : Tm} (h : PHead b b') : RJ W μ b W μ b' :=
+theorem RJ.pure {μ : List Tm} {b b' : Tm} (h : PHead b b') (hp : b'.pot < b.pot) : RJ W μ b W μ b' :=
   ⟨.step ⟨[], b, b', OkE.nil, rfl, rfl, .inl ⟨h, rfl⟩⟩ .refl, World.le.refl _,
-    fun _ h => h⟩
+    fun _ h => h, fun _ h => h, fun _ _ h => h, .inr hp⟩
 
 /-- A new right cell only the right side has. -/
 theorem RJ.alloc (μ : List Tm) (e : Tm) :
     RJ W μ (.lazy e) (W.addJ₂ μ.length) (μ ++ [.lazy e]) (.loc μ.length) :=
   ⟨.step ⟨[], _, _, OkE.nil, rfl, rfl, .inr fun _ => RHead.lazy⟩ .refl, World.le_addJ₂ _ _,
-    fun _ h => h.allocJ₂ _⟩
-
-theorem RJ.forceJ {μ : List Tm} {n : Nat} {e : Tm} (hn : W.J₂ n) (hc : μ[n]? = some (.lazy e)) :
-    RJ W μ (.force (.loc n)) W (μ.set n (.running e)) (.settle n e) :=
-  RJ.head (fun _ => .forcePending hc) (fun _ h => h.setJ₂ hn _)
+    fun _ h => h.allocJ₂ _, fun _ h => h, fun _ _ h => h, .inr (by simp [Tm.pot])⟩
 
 theorem RJ.settleV {μ : List Tm} {n : Nat} {v : Tm} (hn : W.J₂ n) (hv : Value v) :
     RJ W μ (.settle n v) W (settleCell μ n v) v :=
-  RJ.head (fun _ => .settleVal hv) (fun _ h => h.settleJ₂ hn _)
+  RJ.head (fun _ => .settleVal hv) (fun _ h => h.settleJ₂ hn _) (by simp [Tm.pot])
 
 theorem RJ.settleR {μ : List Tm} {n : Nat} {v : Tm} (hn : W.J₂ n) (hv : Value v) :
     RJ W μ (.settle n (.raise v)) W (settleCell μ n (.raise v)) (.raise v) :=
-  RJ.head (fun _ => .settleRaise hv) (fun _ h => h.settleJ₂ hn _)
+  RJ.head (fun _ => .settleRaise hv) (fun _ h => h.settleJ₂ hn _) (by simp [Tm.pot])
 
 theorem RJ.settleU {μ : List Tm} {n p ℓ : Nat} {a : Tm} (hn : W.J₂ n) :
     RJ W μ (.settle n (.unw p ℓ a)) W (resetCell μ n) (.unw p ℓ a) :=
-  RJ.head (fun _ => .settleUnw) (fun _ h => h.resetJ₂ hn)
+  RJ.head (fun _ => .settleUnw) (fun _ h => h.resetJ₂ hn) (by simp [Tm.pot])
 
 theorem subst_shift (c v : Tm) : (c.rename (· + 1)).subst (inst [v]) = c := by
   rw [Tm.subst_rename]
@@ -117,6 +129,7 @@ theorem RJ.drop (μ : List Tm) (e c' : Tm) :
   refine h₁.trans ?_
   have h₂ := RJ.pure (W := W.addJ₂ μ.length) (μ := μ ++ [.lazy e])
     (PHead.let_ (v := .loc μ.length) (b := c'.rename (· + 1)) .loc)
+    (by rw [subst_shift]; simp [Tm.pot, Tm.pot_rename])
   rw [subst_shift] at h₂
   exact h₂
 
@@ -124,8 +137,10 @@ theorem RJ.drop (μ : List Tm) (e c' : Tm) :
 theorem RJ.start (μ : List Tm) (e' : Tm) :
     RJ W μ (.force (.lazy e')) (W.addJ₂ μ.length) ((μ ++ [Tm.lazy e']).set μ.length (Tm.running e'))
       (.settle μ.length e') := by
-  have h₁ := (RJ.alloc (W := W) μ e').frame (F := .force) trivial
-  simp only [Frame.plug] at h₁
-  exact h₁.trans (RJ.forceJ (W := W.addJ₂ μ.length) (Or.inr rfl) (by rw [List.getElem?_append_right (Nat.le_refl _)]; simp))
+  have hc : (μ ++ [Tm.lazy e'])[μ.length]? = some (.lazy e') := by simp
+  exact ⟨.step ⟨[.force], _, _, OkE.nil.cons' trivial, rfl, rfl, .inr fun _ => RHead.lazy⟩
+      (.step ⟨[], _, _, OkE.nil, rfl, rfl, .inr fun _ => .forcePending hc⟩ .refl),
+    World.le_addJ₂ _ _, fun _ h => (h.allocJ₂ _).setJ₂ (Or.inr rfl) _, fun _ h => h,
+    fun _ _ h => h, .inr (by simp [Tm.pot])⟩
 
 end Flick.Equiv

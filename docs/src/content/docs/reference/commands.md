@@ -26,8 +26,9 @@ flick literal:literal-hello you --out greetings
 - A name nobody adds is `FLICK-P052`. When an official backend or a
   contributor the store has seen adds it, the message names that one.
 
-Outside a project only the core commands run, since a contributed command
-belongs to the project whose backend or dependency adds it.
+Outside a project the commands of the official backends run, with the
+working directory as their root. Only `--allow-tool` grants them host
+tools there.
 
 ## Help without loading anything
 
@@ -129,9 +130,14 @@ keeps it open, as an editor integration does. The host owns stdio:
 
 - It reads and writes messages with `Content-Length` framing, as the
   language server protocol does.
-- `open` gives the state of a new session.
+- `open` gives the state of a new session, or a plan the command runs once
+  instead, as `content-mapper --declarations` does.
 - `handle` receives each message with the current state and returns the
   answer, if any, and the next state.
+- A `handle` that needs something the host computes, the TypeScript
+  projection of a module, returns `needs` instead of an answer. The host
+  answers them and calls `handle` again with the same message, the state
+  it returned and the answers. A plan asks the same way, for `resume`.
 - A trap in `handle` becomes the JSON-RPC error `-32603`, and the session
   keeps its last state.
 - `$/cancelRequest` stops the request it names: its call is interrupted

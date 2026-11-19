@@ -1,0 +1,16 @@
+/// How the value of a `fixture` of a suite, which its tests and hooks
+/// `await` (see `Test.fixture` and `Test.shared`), is released.
+module Fixture exposing (..)
+
+import Fiber
+import Scope
+
+/// `value`, which `release` releases when the scope that made it closes: a
+/// test's for a fixture, its suite's for a shared one. The fixtures of a
+/// scope are released in the reverse order they were made in, also when a
+/// later one failed to be made.
+cleanup :
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) => (a ->{r} Unit)^c -> a ->{Scope s | r} a
+let cleanup release value =
+  Scope.add_finalizer (task { release value })
+  value

@@ -69,7 +69,7 @@ theorem Sim.vcu {x : Pos} {a b : Tm} (h : Sim W x a b) (hx : x = .any) (ha : Val
     exact ⟨W₁, _, b₁, (r₁.frame (F := .settle n) trivial).trans
       (RJ.settleV (r₁.le.J₂ _ (hW.J₂ _ hn)) v₁), v₁, s₁⟩
   | dropA | dropB | forceA | jL | bornV | dead | bornA | bornB => cases ha
-  | bornS _ _ hs => rcases hs with rfl | rfl | rfl | rfl | rfl <;> cases ha
+  | bornS _ _ _ hs => rcases hs with rfl | rfl | rfl | rfl | rfl <;> cases ha
   | appK | appV | rconsK | rconsV | updK | updV => cases hx
   | _ =>
     intro W' μ hW
@@ -105,7 +105,7 @@ theorem Sim.rcu {x : Pos} {r b : Tm} (h : Sim W x r b) (hx : x = .any) {v : Tm} 
     obtain ⟨W₁, μ₁, b₁, r₁, v₁, s₁⟩ := ih rfl hr W' μ hW
     exact ⟨W₁, _, b₁, (r₁.frame (F := .settle n) trivial).trans
       (RJ.settleR (r₁.le.J₂ _ (hW.J₂ _ hn)) v₁), v₁, s₁⟩
-  | bornS _ _ hs => subst hr; rcases hs with h | h | h | h | h <;> cases h
+  | bornS _ _ _ hs => subst hr; rcases hs with h | h | h | h | h <;> cases h
   | _ => first | cases hr | cases hx | (rename_i h; exact (h rfl).elim)
 
 /-- **The right side reaches a signal** related to one of the left side. -/
@@ -135,7 +135,7 @@ theorem Sim.ucu {x : Pos} {r b : Tm} (h : Sim W x r b) (hx : x = .any) {p ℓ : 
     obtain ⟨W₁, μ₁, ℓ', k, a'', r₁, hl, s₁⟩ := ih rfl hr W' μ hW
     exact ⟨W₁, _, ℓ', k, a'', (r₁.frame (F := .settle n) trivial).trans
       (RJ.settleU (r₁.le.J₂ _ (hW.J₂ _ hn))), hl, s₁⟩
-  | bornS _ _ hs => subst hr; rcases hs with h | h | h | h | h <;> cases h
+  | bornS _ _ _ hs => subst hr; rcases hs with h | h | h | h | h <;> cases h
   | _ => first | cases hr | cases hx | (rename_i h; exact (h rfl).elim)
 
 end Flick.Equiv

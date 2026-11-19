@@ -55,52 +55,54 @@ def genGlob : Nat → Option Scheme
   | 4 => some ⟨1, Facts.none, (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.tvar 0) .pure (.base .string) Caps.none) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "$default_Rank_rank" })
   | 5 => some ⟨1, Facts.none, (.arrow (.dict 1 (Ty.spine [(.tvar 0)])) .pure (.arrow (.tvar 0) .pure (.base .int) Caps.none) Caps.none)⟩
+  -- Value(Path { module: "Fixture", name: "cleanup" })
+  | 6 => some ⟨4, Facts.single (fun x => x = .v 0) (.tvar 1), (.arrow (.arrow (.tvar 3) (.rt (.tvar 2) .cnil) (.base .unit) (fun x => x = .v 0)) .pure (.arrow (.tvar 3) (.rtob (.run (.tvar 2) (.caps (fun x => x = .v 0 ∨ x = .v 1))) (.tvar 1) .cnil) (.tvar 3) Caps.none) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "close_conn" })
-  | 6 => some ⟨1, Facts.none, (.arrow (.adt "Fixture.Raw") (.rt (.caps (fun x => x = .v 0)) .cnil) (.base .unit) Caps.none)⟩
+  | 7 => some ⟨1, Facts.none, (.arrow (.adt "Fixture.Raw") (.rt (.caps (fun x => x = .v 0)) .cnil) (.base .unit) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "describe" })
-  | 7 => some ⟨1, Facts.none, (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.tvar 0) .pure (.base .string) Caps.none) Caps.none)⟩
+  | 8 => some ⟨1, Facts.none, (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.tvar 0) .pure (.base .string) Caps.none) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "is_point" })
-  | 8 => some ⟨0, Facts.none, (.arrow (.adt "Prelude.JsValue") .pure (.base .bool) Caps.none)⟩
+  | 9 => some ⟨0, Facts.none, (.arrow (.adt "Prelude.JsValue") .pure (.base .bool) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "js_of" })
-  | 9 => some ⟨0, Facts.none, (.arrow (.base .string) .pure (.adt "Prelude.JsValue") Caps.none)⟩
+  | 10 => some ⟨0, Facts.none, (.arrow (.base .string) .pure (.adt "Prelude.JsValue") Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "make_conn" })
-  | 10 => some ⟨0, Facts.none, (.arrow (.base .string) (.rt .cnil .cnil) (.adt "Fixture.Raw") Caps.none)⟩
+  | 11 => some ⟨0, Facts.none, (.arrow (.base .string) (.rt .cnil .cnil) (.adt "Fixture.Raw") Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "open_scoped" })
-  | 11 => some ⟨1, Facts.none, (.arrow (.base .string) (.rt (.caps (fun x => x = .v 0)) .cnil) (.tapp (.adt "Fixture.Handle") (.tvar 0)) Caps.none)⟩
+  | 12 => some ⟨1, Facts.none, (.arrow (.base .string) (.rt (.caps (fun x => x = .v 0)) .cnil) (.tapp (.adt "Fixture.Handle") (.tvar 0)) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "rank" })
-  | 12 => some ⟨1, Facts.none, (.arrow (.dict 1 (Ty.spine [(.tvar 0)])) .pure (.arrow (.tvar 0) .pure (.base .int) Caps.none) Caps.none)⟩
+  | 13 => some ⟨1, Facts.none, (.arrow (.dict 1 (Ty.spine [(.tvar 0)])) .pure (.arrow (.tvar 0) .pure (.base .int) Caps.none) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "report" })
-  | 13 => some ⟨1, Facts.none, (.arrow (.tapp (.adt "Prelude.Failure") (.tvar 0)) (.rt .cnil .cnil) (.base .unit) Caps.none)⟩
+  | 14 => some ⟨1, Facts.none, (.arrow (.tapp (.adt "Prelude.Failure") (.tvar 0)) (.rt .cnil .cnil) (.base .unit) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "shape_name" })
-  | 14 => some ⟨0, Facts.none, (.arrow (.adt "Fixture.Shape") (.rt .cnil .cnil) (.base .string) Caps.none)⟩
+  | 15 => some ⟨0, Facts.none, (.arrow (.adt "Fixture.Shape") (.rt .cnil .cnil) (.base .string) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "shape_of" })
-  | 15 => some ⟨0, Facts.none, (.arrow (.adt "Prelude.JsValue") .pure (.adt "Fixture.Shape") Caps.none)⟩
+  | 16 => some ⟨0, Facts.none, (.arrow (.adt "Prelude.JsValue") .pure (.adt "Fixture.Shape") Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "touch" })
-  | 16 => some ⟨1, Facts.none, (.arrow (.base .unit) (.rt (.rnm "Fixture.Within" (.tapp (.adt "Fixture.Within") (.tvar 0))) .cnil) (.base .unit) Caps.none)⟩
+  | 17 => some ⟨1, Facts.none, (.arrow (.base .unit) (.rt (.rnm "Fixture.Within" (.tapp (.adt "Fixture.Within") (.tvar 0))) .cnil) (.base .unit) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "use" })
-  | 17 => some ⟨1, Facts.none, (.arrow (.tapp (.adt "Fixture.Handle") (.tvar 0)) (.rt (.caps (fun x => x = .v 0)) .cnil) (.base .unit) Caps.none)⟩
+  | 18 => some ⟨1, Facts.none, (.arrow (.tapp (.adt "Fixture.Handle") (.tvar 0)) (.rt (.caps (fun x => x = .v 0)) .cnil) (.base .unit) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "use_conn" })
-  | 18 => some ⟨1, Facts.none, (.arrow (.adt "Fixture.Raw") (.rt (.caps (fun x => x = .v 0)) .cnil) (.base .unit) Caps.none)⟩
+  | 19 => some ⟨1, Facts.none, (.arrow (.adt "Fixture.Raw") (.rt (.caps (fun x => x = .v 0)) .cnil) (.base .unit) Caps.none)⟩
   -- Value(Path { module: "List.Core", name: "get" })
-  | 19 => some ⟨1, Facts.none, (.arrow (.base .int) .pure (.arrow (.tapp (.adt "Prelude.List") (.tvar 0)) .pure (.tapp (.adt "Prelude.Option") (.tvar 0)) Caps.none) Caps.none)⟩
+  | 20 => some ⟨1, Facts.none, (.arrow (.base .int) .pure (.arrow (.tapp (.adt "Prelude.List") (.tvar 0)) .pure (.tapp (.adt "Prelude.Option") (.tvar 0)) Caps.none) Caps.none)⟩
   -- Value(Path { module: "Fiber", name: "spawn" })
-  | 20 => some ⟨5, Facts.single (fun x => x = .v 3) (.tvar 0), (.arrow (.owner (.tvar 0)) .pure (.arrow (.arrow (.tapp (.adt "Prelude.Failure") (.tvar 1)) (.rt (.run (.tvar 2) (.caps (fun x => x = .v 0))) .cnil) (.base .unit) (fun x => x = .v 3)) .pure (.arrow (.eff (.run (.tvar 2) (.caps (fun x => x = .v 0))) (.tvar 1) (.tvar 4) (fun x => x = .v 3)) (.rtob (.run (.tvar 2) (.caps (fun x => x = .v 0 ∨ x = .v 3))) (.tvar 0) .cnil) (.tapp (.tapp (.adt "Fiber.Fiber") (.tvar 1)) (.tvar 4)) Caps.none) Caps.none) Caps.none)⟩
+  | 21 => some ⟨5, Facts.single (fun x => x = .v 3) (.tvar 0), (.arrow (.owner (.tvar 0)) .pure (.arrow (.arrow (.tapp (.adt "Prelude.Failure") (.tvar 1)) (.rt (.run (.tvar 2) (.caps (fun x => x = .v 0))) .cnil) (.base .unit) (fun x => x = .v 3)) .pure (.arrow (.eff (.run (.tvar 2) (.caps (fun x => x = .v 0))) (.tvar 1) (.tvar 4) (fun x => x = .v 3)) (.rtob (.run (.tvar 2) (.caps (fun x => x = .v 0 ∨ x = .v 3))) (.tvar 0) .cnil) (.tapp (.tapp (.adt "Fiber.Fiber") (.tvar 1)) (.tvar 4)) Caps.none) Caps.none) Caps.none)⟩
   -- Value(Path { module: "Resource", name: "acquire_release" })
-  | 21 => some ⟨5, Facts.union (Facts.single (fun x => x = .v 3) (.tvar 4)) (Facts.bnd 2 (fun x => x = .v 4)), (.arrow (.eff (.tvar 0) (.tvar 1) (.tvar 2) (fun x => x = .v 3)) .pure (.arrow (.arrow (.tvar 2) (.rt (.tvar 0) .cnil) (.base .unit) (fun x => x = .v 3)) (.rtob (.run (.tvar 0) (.caps (fun x => x = .v 3 ∨ x = .v 4))) (.tvar 4) (.tvar 1)) (.tvar 2) Caps.none) Caps.none)⟩
+  | 22 => some ⟨5, Facts.union (Facts.single (fun x => x = .v 3) (.tvar 4)) (Facts.bnd 2 (fun x => x = .v 4)), (.arrow (.eff (.tvar 0) (.tvar 1) (.tvar 2) (fun x => x = .v 3)) .pure (.arrow (.arrow (.tvar 2) (.rt (.tvar 0) .cnil) (.base .unit) (fun x => x = .v 3)) (.rtob (.run (.tvar 0) (.caps (fun x => x = .v 3 ∨ x = .v 4))) (.tvar 4) (.tvar 1)) (.tvar 2) Caps.none) Caps.none)⟩
   -- Value(Path { module: "Scope", name: "add_finalizer" })
-  | 22 => some ⟨3, Facts.single (fun x => x = .v 1) (.tvar 2), (.arrow (.eff (.tvar 0) .cnil (.base .unit) (fun x => x = .v 1)) (.rtob (.run (.tvar 0) (.caps (fun x => x = .v 1 ∨ x = .v 2))) (.tvar 2) .cnil) (.base .unit) Caps.none)⟩
+  | 23 => some ⟨3, Facts.single (fun x => x = .v 1) (.tvar 2), (.arrow (.eff (.tvar 0) .cnil (.base .unit) (fun x => x = .v 1)) (.rtob (.run (.tvar 0) (.caps (fun x => x = .v 1 ∨ x = .v 2))) (.tvar 2) .cnil) (.base .unit) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "instance Describe (Option a)" })
-  | 23 => some ⟨1, Facts.none, (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.dict 0 (Ty.spine [(.tapp (.adt "Prelude.Option") (.tvar 0))])) Caps.none)⟩
+  | 24 => some ⟨1, Facts.none, (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.dict 0 (Ty.spine [(.tapp (.adt "Prelude.Option") (.tvar 0))])) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "instance Describe Bool" })
-  | 24 => some ⟨0, Facts.none, (.dict 0 (Ty.spine [(.base .bool)]))⟩
+  | 25 => some ⟨0, Facts.none, (.dict 0 (Ty.spine [(.base .bool)]))⟩
   -- Value(Path { module: "Fixture", name: "instance Describe Int" })
-  | 25 => some ⟨0, Facts.none, (.dict 0 (Ty.spine [(.base .int)]))⟩
+  | 26 => some ⟨0, Facts.none, (.dict 0 (Ty.spine [(.base .int)]))⟩
   -- Value(Path { module: "Fixture", name: "instance Describe Oops" })
-  | 26 => some ⟨0, Facts.none, (.dict 0 (Ty.spine [(.adt "Fixture.Oops")]))⟩
+  | 27 => some ⟨0, Facts.none, (.dict 0 (Ty.spine [(.adt "Fixture.Oops")]))⟩
   -- Value(Path { module: "Fixture", name: "instance Rank Bool" })
-  | 27 => some ⟨0, Facts.none, (.dict 1 (Ty.spine [(.base .bool)]))⟩
+  | 28 => some ⟨0, Facts.none, (.dict 1 (Ty.spine [(.base .bool)]))⟩
   -- Value(Path { module: "Fixture", name: "instance Rank Int" })
-  | 28 => some ⟨0, Facts.none, (.dict 1 (Ty.spine [(.base .int)]))⟩
+  | 29 => some ⟨0, Facts.none, (.dict 1 (Ty.spine [(.base .int)]))⟩
   | _ => none
 
 def genOps : Name → List Name

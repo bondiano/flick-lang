@@ -3,8 +3,8 @@ import Formal.Equiv.ThreadA
 /-!
 # Contextual equivalence: steps of a thread that read its context
 
-The focus of a step that reads its context is related at `top` once the right side catches up,
-or a special pair holds it (`focus_cases`). A finalizer or a child registered with an owner
+The focus of a step that reads its context is related at `top` once the right side catches up
+(`focus_cases`): no special pair holds it, as their foci are forms of lazy cells (`Act.simple`). A finalizer or a child registered with an owner
 (`addFin_sim`, `spawn_sim`), an operation `Σ₀` answers (`root_sim`), a global (`glob_sim`), a raised
 error or a signal leaving a frame (`raise_sim`, `unw_sim`): the right side does the same, after it
 leaves the frames of its own cells.
@@ -39,15 +39,16 @@ theorem focus_cases {root : Roots} {l : Lbl} {Λ Λ' Λ₂ : List Rgn} {μ μ' �
     (hr : ∀ f a, r = .app f a → Value f ∧ Value a) (hrc : ∀ l e a, r ≠ .rcons l e a)
     (hal : ¬ IsAlts r) (hns : ∀ n a, r ≠ .settle n a)
     (ht : Sim W .any (plug E r) t₂) (hst : StR W μ μ₂) (hcl₁ : (plug E r).Closed)
-    (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed) (hrg : RgsR W μ τ Λ Λ₂)
+    (_hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed) (_hrg : RgsR W μ τ Λ Λ₂)
     (hs : Step root l Λ μ (plug E r) (.cfg Λ' μ' t'))
     (hcong : ∀ W' μ₂' E₂ r₂, RJ W μ₂ t₂ W' μ₂' (plug E₂ r₂) → FrL W' E E₂ → OkE E₂ →
-      Sim W' .top r r₂ → TRes root W τ Λ₂ μ₂ t₂ μ Λ' μ' t') :
+      Sim W' .top r r₂ → TRes root W τ Λ₂ μ₂ t₂ μ Λ' μ' t')
+    (hsr : ¬ r.Simple := by simp [Tm.Simple]) :
     TRes root W τ Λ₂ μ₂ t₂ μ Λ' μ' t' := by
   rcases ht.dec hrv hr hrc hal _ _ rfl hE μ₂ with hd | ⟨W', μ₂', E₂, r₂, hj, hfr, hE₂, hs'⟩ |
     ⟨W', μ₂', E₂, n, a, b, hj, hfr, hE₂, rfl, hn, hs'⟩
-  · obtain ⟨rfl, hk⟩ := dec_act hE hst hcl₁ hcl₂ hs hd
-    exact hk.res hrg
+  · obtain ⟨W', μ₂', E₀, E₁, a, b, E₂, hj, rfl, rfl, -, -, hact⟩ := hd
+    exact (hsr (hact.simple (hj.st _ hst) hrv rfl)).elim
   · exact hcong W' μ₂' E₂ r₂ hj hfr hE₂ hs'
   · exact (hns _ _ rfl).elim
 

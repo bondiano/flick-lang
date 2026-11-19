@@ -124,6 +124,7 @@ Tracer
 # end of platform and observability
 # context, layers and requests
 Scope
+Fixture
 Layer.Trace
 LayerMap
 LayerRef

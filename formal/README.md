@@ -205,6 +205,18 @@ signature and golden certificates.
   `Equiv.o1a` (a cell nothing names), `Equiv.o1b` (`lazy v` and a cell born done) and
   `Equiv.o1c` (`force (lazy e)` and `e`) are proved by a simulation of runs each way (`Sim`,
   `thread_sim`, `cstep_sim`, `csteps_sim`, `lit_sim`, `ctxEquiv_of_sim`).
+  O1a and O1c hold of every run as well (`CtxEquivAll`, `Equiv/All.lean`): the two programs have
+  the same outcomes (`Outcome`: a literal, a main thread that dies, a run that never ends, a run
+  stuck on anything else). `EverySim.has` (`Equiv/Every.lean`) derives this for any relation of
+  configurations that answers a step by steps, or by none while a potential of the left
+  configuration drops, and answers a literal, a dying main thread and a stuck configuration.
+  The relation of the simulations, without the pairs of O1b (`World.B`), does (`everySim`):
+  `cstep_every` with the potential `cpot` (`Equiv/CfgStep.lean`, `Equiv/CPot.lean`,
+  `Equiv/Pot.lean`), `dies_sim` (`Equiv/Die.lean`), and `stuck_sim` (`Equiv/StuckCfg.lean`),
+  which reflects a step of the right side on the left (`thread_reflect`, `reflect_focus`,
+  `Equiv/Stuck.lean`, `Equiv/Refl.lean`). `Equiv.o1a_all` and `Equiv.o1c_all`. O1b holds of
+  the literals only: the core of `lazy.md` §3 has no waiters, so two threads that force one
+  `lazy v` at once may die where `born v` does not.
 - **T6, the elaboration** (`Formal/Elab/`), with runtime stages `R r e` whose rows take
   variables, and constructors whose values carry the dictionaries of their constraints, with
   arms on them refined by the most general unifier: `T6a` (`Elab/T6a.lean`), an elaborated term is
@@ -236,7 +248,8 @@ signature and golden certificates.
 for `T1`, `T1_regions`, `T2a`, `T2b`, `T2b_await`, `T3`, `lemma_6`, `T4'`, `hdl_err_live`,
 `T6a`, `T6b`, `T6a_core`, `T6b_core`, `Lazy.L1`, `Lazy.L1_once`, `Lazy.L2`, `R9`, `T7`,
 `MutOk.lzDecl`, `LzSig.typ_run`, `MutOk.lzAwait`, `MutOk.lzWrite`,
-`Elab.Witness.lzSig`, `Equiv.o1a`, `Equiv.o1b` and `Equiv.o1c` with `#guard_msgs`, so
+`Elab.Witness.lzSig`, `Equiv.o1a`, `Equiv.o1b`, `Equiv.o1c`, `Equiv.o1a_all`, `Equiv.o1c_all`
+and `Equiv.EverySim.has` with `#guard_msgs`, so
 `lake build` fails on a
 `sorry` or a new axiom.
 
@@ -340,7 +353,8 @@ operation, kept or not, and `c.at i` ranges over the main thread and the childre
 | `lazy.md` §3 steps | `RHead.lazy`, `.forcePending`, `.forceDone`, `.forceRunning`, `.settleVal`, `.settleRaise`, `.settleUnw`, `settleCell`, `resetCell` (`Semantics.lean`); their preservation: `lazy_new`, `force_pending`, `force_done`, `settle_val`, `settle_raise`, `settle_unw` (`PresLazy.lean`) |
 | `lazy.md` L1, L2 | `Lazy.L1`, `Lazy.L1_once`, `Lazy.L2` (`Lazy.lean`) |
 | `lazy.md` §4 `let lazy` | `lzT`, `lzRunT`, `lzDecl`, `lzAwait`, `lzWrite`, `lzAttempt`, `lzOut`, `LzSig`, `LzSig.typ_run`, `MutOk.lzDecl`, `MutOk.lzAwait`, `MutOk.lzWrite` (`LetMut/Lazy.lean`); `Elab.Witness.lzSig` (`LetMut/LazyWitness.lean`) |
-| `lazy.md` §6 contextual equivalence, O1a–O1c | `Ctx`, `Prog`, `Ends`, `CtxEquiv`, `ctxEquiv_of_sim`, `Equiv.o1a`, `Equiv.o1b`, `Equiv.o1c` (`Equiv/Context.lean`); `Sim`, `World` (`Equiv/Sim.lean`); `thread_sim` (`Equiv/ThreadSim.lean`); `CfgR`, `cstep_sim`, `csteps_sim`, `lit_sim` (`Equiv/Cfg.lean`) |
+| `lazy.md` §6 contextual equivalence, O1a–O1c | `Ctx`, `Prog`, `Ends`, `CtxEquiv`, `ctxEquiv_of_sim`, `Equiv.o1a`, `Equiv.o1b`, `Equiv.o1c` (`Equiv/Context.lean`); `Sim`, `World` (`Equiv/Sim.lean`); `thread_sim` (`Equiv/ThreadSim.lean`); `CfgR` (`Equiv/Cfg.lean`); `cstep_every`, `cstep_sim`, `csteps_sim`, `lit_sim` (`Equiv/CfgStep.lean`) |
+| `lazy.md` §6 every run, O1a and O1c | `Outcome`, `Has`, `Diverges`, `Stuck`, `EverySim`, `EverySim.has` (`Equiv/Every.lean`); `Runs`, `CtxEquivAll`, `everySim`, `ctxEquivAll_of_sim`, `Equiv.o1a_all`, `Equiv.o1c_all` (`Equiv/All.lean`); `Tm.pot`, `xpot`, `pot`, `Sim.xpot` (`Equiv/PotTm.lean`, `Equiv/Pot.lean`); `cpot`, `ThR.xpot_le` (`Equiv/CPot.lean`); `die_sim`, `dies_sim` (`Equiv/Die.lean`); `reflect_focus` (`Equiv/Refl.lean`); `thread_reflect`, `Step.die_excl` (`Equiv/Stuck.lean`); `stuck_sim` (`Equiv/StuckCfg.lean`) |
 | `core.md` §3.2 contexts; the handler of an operation; the frame `inside π E` | `Frame`, `plug`, `handlerOf` (`EvalCtx.lean`) |
 | `core.md` §3.3 `→ₚ`; §3.4–3.5 steps; `regions.md` §3.2–§3.3 | `PHead`, `RHead`, `Step`, `Steps` (`Semantics.lean`) |
 | `regions.md` §3.1 `Λ`, children step at any time | `Rgn`, `Cfg`, `CStep`, `CSteps` (`Semantics.lean`) |

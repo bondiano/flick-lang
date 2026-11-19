@@ -196,7 +196,9 @@ TypeScript 7.1 checks a `.ts` or `.tsx` file that imports a Flick module
 against the module's types through a Content Mapper: `@flick-lang/content-mapper`
 (`tools/content-mapper`) starts `flick content-mapper` (`FLICK_BIN`, else
 `flick` on the PATH), which answers each `.fl` file TypeScript reaches with
-its projection, made from the editor's unsaved text.
+its projection, made from the editor's unsaved text. `content-mapper` is a
+session command of the JavaScript backend (`flick js:content-mapper`); it
+also runs outside a project, from the directory TypeScript starts it in.
 
 The package is private to the repository and is not published to npm yet, so
 take it from a checkout of the repository and link it into the project:

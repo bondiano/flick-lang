@@ -123,6 +123,11 @@ type test struct {
 	// the milliseconds of Test.timeout, for it and each test in it without its own
 	timeout float64
 	timed   bool
+	// of Test.serial: it and each test in it run one at a time
+	serial bool
+	// the shared fixture of Test.share; the ones a suite shares
+	share  *fixture
+	shares map[*fixture]bool
 }
 
 func TestPure(name, body Value) Value   { return &test{name: name.(string), body: body} }
@@ -161,23 +166,28 @@ type marks struct {
 	skip, only bool
 	timeout    float64
 	timed      bool
+	// the outermost Test.serial it is in, whose tests run one at a time
+	serial *test
 }
 
 // flatten is the tests with their full names, `Module > group > name`; the
 // hooks of a list make it, the module's or a group's, a suite of the tests
 // under it, whose timeout, its own or the one around it, its hooks have too.
 func flatten(prefix string, tests []Value, out []named, suites []*test, m marks) []named {
-	if h := hooksOf(tests); h != nil {
-		level := &test{name: prefix, hooks: h, timeout: m.timeout, timed: m.timed}
+	if h, shares := hooksOf(tests), sharesOf(tests); h != nil || shares != nil {
+		level := &test{name: prefix, hooks: h, shares: shares, timeout: m.timeout, timed: m.timed}
 		suites = append(suites[:len(suites):len(suites)], level)
 	}
 	for _, v := range tests {
 		t := v.(*test)
-		if t.when != "" {
+		if t.when != "" || t.share != nil {
 			continue
 		}
 		name := prefix + " > " + t.name
-		own := marks{skip: m.skip || t.mode == "skip", only: m.only || t.mode == "only", timeout: m.timeout, timed: m.timed}
+		own := marks{skip: m.skip || t.mode == "skip", only: m.only || t.mode == "only", timeout: m.timeout, timed: m.timed, serial: m.serial}
+		if t.serial && own.serial == nil {
+			own.serial = t
+		}
 		if t.timed {
 			own.timeout, own.timed = t.timeout, true
 		}
@@ -534,7 +544,35 @@ func RunTests(fb *Fiber, suites []Suite) {
 			}
 		}()
 	}
-	for i, t := range selected {
+	runIndex := func(i int) {
+		t := selected[i]
+		var started time.Time
+		if human {
+			started = time.Now()
+		}
+		if live {
+			outMu.Lock()
+			active[i] = t.name
+			draw()
+			outMu.Unlock()
+		}
+		result := runOne(fb, t, seed, runs)
+		results[i] = result
+		if human {
+			elapsed := time.Since(started)
+			outMu.Lock()
+			if live {
+				delete(active, i)
+				clear()
+			}
+			completed++
+			writeTestResult(result, completed, len(selected), elapsed, o.color)
+			draw()
+			outMu.Unlock()
+		}
+	}
+	// the tests of a Test.serial run one after another in a job of their own
+	for _, job := range jobsOf(selected) {
 		slots <- struct{}{}
 		if fb.state.requested.Load() {
 			break
@@ -542,29 +580,8 @@ func RunTests(fb *Fiber, suites []Suite) {
 		wg.Add(1)
 		go func() {
 			defer func() { <-slots; wg.Done() }()
-			var started time.Time
-			if human {
-				started = time.Now()
-			}
-			if live {
-				outMu.Lock()
-				active[i] = t.name
-				draw()
-				outMu.Unlock()
-			}
-			result := runOne(fb, t, seed, runs)
-			results[i] = result
-			if human {
-				elapsed := time.Since(started)
-				outMu.Lock()
-				if live {
-					delete(active, i)
-					clear()
-				}
-				completed++
-				writeTestResult(result, completed, len(selected), elapsed, o.color)
-				draw()
-				outMu.Unlock()
+			for _, i := range job {
+				runIndex(i)
 			}
 		}()
 	}

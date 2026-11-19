@@ -11,6 +11,16 @@ suite "Users" {
 //^ keyword
   test "slow" timeout 50 {}
 //            ^ keyword
+  fixture shared conn = Db.connect ()
+//^ keyword
+//        ^ keyword
+//               ^ variable
+}
+
+suite parallel "Pool" {
+//    ^ keyword
+  fixture shared concurrent pool = Pool.make 4
+//               ^ keyword
 }
 
 let test name = Test.test name (fun () -> Test.Pass)

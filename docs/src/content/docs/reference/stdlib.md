@@ -253,6 +253,9 @@ let tests =
 | `Test.skip test`, `Test.only test` | the test, and each test in it, skipped or marked `only` (see [testing](../testing/#full-names-skip-and-only)) |
 | `Test.before_all task`, `before_each`, `after_each`, `after_all` | a hook of the group, or the module, whose list it is in, run around the tests of it that the run selects (see [testing](../testing/#hooks)) |
 | `Test.timeout millis test` | the test, and each test in it without its own, given `millis` for its `before_each` hooks and its body (see [testing](../testing/#timeouts)) |
+| `Test.serial test` | the test, and each test in it, run one at a time, also under `--jobs` |
+| `Test.fixture key init`, `Test.shared key init`, `Test.share fixture`, `Test.use fixture` | a fixture of each test, or shared by the run of the group whose list `share`s it, and its `Lazy` for the code that uses it: what `fixture` of a suite expands into (see [testing](../testing/#fixtures)) |
+| `Fixture.cleanup release value` | `value`, which `release` releases when the scope of the fixture that made it closes |
 | `Test.suite name layer specs` | tests that share what `layer` makes: built once, before the first of them that runs, and released after the last, the `beforeAll` and `afterAll` of the suite; each spec, `Test.it name task`, is an `effect_test` with the layer's services, and a failed build fails each of them |
 
 A suite of end-to-end tests starts what they need once, such as a database

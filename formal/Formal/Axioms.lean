@@ -19,6 +19,7 @@ import Formal.Refine.Numbers
 import Formal.Proofs.CheckSound
 import Formal.RT.LazyCell
 import Formal.Equiv.Context
+import Formal.Equiv.All
 
 /-!
 # The axioms of the main theorems
@@ -195,3 +196,15 @@ prints, and `#guard_msgs` turns the difference into an error.
 /-- info: 'Flick.Equiv.o1c' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Flick.Equiv.o1c
+
+/-- info: 'Flick.Equiv.o1a_all' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Equiv.o1a_all
+
+/-- info: 'Flick.Equiv.o1c_all' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Equiv.o1c_all
+
+/-- info: 'Flick.Equiv.EverySim.has' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Equiv.EverySim.has

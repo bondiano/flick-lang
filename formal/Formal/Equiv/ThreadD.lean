@@ -19,7 +19,7 @@ theorem TRes.last {root : Roots} {τ : Option (Nat × Nat)} {Λ₂ Λ' Λ₂' : 
     (hj : RJ W μ₂ t₂ W' μ₂a t₂a) (hs : Step root l Λ₂ μ₂a t₂a (.cfg Λ₂' μ₂' t₂'))
     (hW : W'.le W'') (ht : ThR W'' μ' τ t' t₂') (hst : StR W'' μ' μ₂') (hk : KeepO W τ μ μ')
     (hrg : RgsR W'' μ' τ Λ' Λ₂') : TRes root W τ Λ₂ μ₂ t₂ μ Λ' μ' t' :=
-  ⟨W'', Λ₂', μ₂', t₂', hj.le.trans hW, ⟨_, _, hj.ksteps, .inr ⟨l, hs⟩⟩, ht, hst, hk, hrg⟩
+  ⟨W'', Λ₂', μ₂', t₂', hj.le.trans hW, ⟨_, _, l, hj.ksteps, hs⟩, ht, hst, hk, hrg⟩
 
 theorem fin_app {c : Const} {p : Nat} {t : Tm} (hc : c = .addFin ∨ c = .spawn) (ht : Value t) :
     ∀ f a, Tm.app (.app (.const c) (.own p)) t = .app f a → Value f ∧ Value a := by
