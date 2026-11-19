@@ -15,7 +15,7 @@ impl Build<'_> {
         let spine = self.call(Op::Spine, desc, self.list(Vec::new()), self.unit());
         let head = self.name();
         let arguments = self.name();
-        let result = self.nodes(self.local(&head), |this, _, node, _| {
+        let result = self.nodes(self.local(&head), |this, _, node, _, _| {
             let OwnerTypeKind::Con { module, name } = &node.kind else {
                 return fallback.clone();
             };

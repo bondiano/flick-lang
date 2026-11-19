@@ -186,7 +186,7 @@ fn witness_local_scope_occurs(ty: &Type, witness: &str) -> bool {
     scope.changed
 }
 
-fn witness_scope_occurs(ty: &Type, witness: &str) -> bool {
+pub(in crate::types) fn witness_scope_occurs(ty: &Type, witness: &str) -> bool {
     let mut scope = WitnessScope {
         from: witness,
         to: witness,

@@ -1,3 +1,4 @@
+import { closeArenas, ownedArena } from "./arena-owner.ts";
 // Lexical owners (docs/formal/runtime.md §3.3). Each `scope` has one: its
 // children, the foreign calls it waits for, closing hooks and a stack of
 // finalizers. Closing it is a fixed sequence of phases: admission ends (C0),
@@ -43,7 +44,7 @@ import {
 } from "./fiber.ts";
 import { traceEvent, traceId, tracing } from "./trace.ts";
 import { Failure } from "./outcome.ts";
-import { Arena } from "../core/Arena.ts";
+import type { Arena } from "../core/Arena.ts";
 
 /** A finalizer: the evidence it was added with, what it runs, and its place in the trace. */
 interface Finalizer {
@@ -56,27 +57,8 @@ interface Finalizer {
 const reported: Array<Cause> = [];
 export const reportedDefects = (): ReadonlyArray<Cause> => reported;
 
+
 export class Owner {
-  /** Backing storage stays live until every ordinary finalizer has ended. */
-  readonly #arenas: Array<Arena> = [];
-  #arenasClosed = false;
-
-  /** Retirement is checked only when activating, never while transporting evidence. */
-  get closed(): boolean { return this.#arenasClosed; }
-
-  makeArena(): Arena {
-    if (this.#arenasClosed) throw new Error("arena owner is closed");
-    const arena = new Arena();
-    this.#arenas.push(arena);
-    return arena;
-  }
-
-  closeArenas(): void {
-    this.#arenasClosed = true;
-    for (const arena of this.#arenas) arena.close();
-    this.#arenas.length = 0;
-  }
-
   /** C0 not yet: it admits children. */
   open = true;
   readonly children = new Set<Fiber>();
@@ -188,13 +170,13 @@ function* closeSteps(owner: Owner, exit: Exit): Run {
   owner.exit = exit;
   owner.phase("C5");
   let released: Cause = empty;
-  while (owner.finalizers.length > 0) {
+  for (;;) {
     const finalizer = owner.finalizers.pop();
     if (finalizer === undefined) break;
     const ended = asExit(yield exitOf(() => runFinalizer(finalizer, owner, exit)));
     if (ended.cause !== undefined) released = concat(released, ended.cause);
   }
-  owner.closeArenas();
+  closeArenas(owner);
   owner.phase("C6");
   cause = combine(cause, released);
   return cause.reasons.length === 0 ? succeeded(undefined) : failed(cause);
@@ -274,14 +256,14 @@ export const scopeCurrent = (): Owner | undefined => currentCtx().owner;
 export const arenaMake = (): Arena => {
   const owner = currentCtx().owner;
   if (owner === undefined) throw new Error("arena requires a scope owner");
-  return owner.makeArena();
+  return ownedArena(owner);
 };
 
 /** Optional conversion at RAW activation only; evidence transport never calls it. */
 export const ownerHooks: { within?: (owner: object, call: () => unknown) => unknown } = {};
 /** A raw call acquiring into the compiler-selected lexical owner. */
 export const within = (owner: OwnerEvidence, call: () => unknown): unknown => {
-  if (owner instanceof Owner) return inside(owner, call);
+  if (owner instanceof Owner) return currentCtx().owner === owner ? call() : inside(owner, call);
   if (owner !== undefined && ownerHooks.within !== undefined) return ownerHooks.within(owner, call);
   throw new Error("owner evidence is absent or belongs to another runtime");
 };

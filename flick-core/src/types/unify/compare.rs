@@ -7,7 +7,6 @@ use crate::types::{
     elem::Elem,
     env::Form,
     kinds::Kind,
-    module_contract,
     ty::{Row, Type},
 };
 use std::{borrow::Cow, collections::HashSet, ptr};
@@ -184,15 +183,17 @@ impl Checker<'_> {
         let ([tail], true) = (&norm.tails[..], norm.entries.is_empty()) else {
             return None;
         };
-        let m = tail.legacy_meta_root()?;
+        self.store.solver_root(tail)?;
         if matches!(other, Type::Meta(_) | Type::Error) {
             return None;
         }
         if other.is_lang(Lang::Never) {
-            return Some(self.bind(m, &Type::empty_row()));
+            return Some(self.bind_occurrence(tail, &Type::empty_row()));
         }
         Some(match self.error_label(other) {
-            Some(label) => self.bind(m, &Type::Row(Row::closed(vec![(label, other.clone())]))),
+            Some(label) => {
+                self.bind_occurrence(tail, &Type::Row(Row::closed(vec![(label, other.clone())])))
+            }
             None => Err(Mismatch::Types(projection.clone(), other.clone())),
         })
     }
@@ -284,13 +285,14 @@ impl Checker<'_> {
         }
         match (&a, &b) {
             (Type::Error, _) | (_, Type::Error) => Ok(()),
-            (Type::Meta(x), Type::Meta(y)) if x.legacy_root().is_some() && x == y => Ok(()),
-            (Type::Meta(meta), t) if meta.legacy_root().is_some() => {
-                self.bind(meta.legacy_root().expect("legacy binding root"), t)
+            (Type::Meta(x), Type::Meta(y)) if x == y && self.store.valid_occurrence(&a) => Ok(()),
+            (Type::Meta(meta), t) | (t, Type::Meta(meta))
+                if meta.legacy_root().is_some() && self.witness_free_binding(t) =>
+            {
+                self.bind(meta.root(), t)
             }
-            (t, Type::Meta(meta)) if meta.legacy_root().is_some() => {
-                self.bind(meta.legacy_root().expect("legacy binding root"), t)
-            }
+            (Type::Meta(_), t) => self.bind_occurrence(&a, t),
+            (t, Type::Meta(_)) => self.bind_occurrence(&b, t),
             (Type::Skolem(x), Type::Skolem(y)) if x == y => Ok(()),
             (Type::Var(x), Type::Var(y)) | (Type::Symbol(x), Type::Symbol(y)) if x == y => Ok(()),
             (Type::Con { .. }, Type::Con { .. }) if a == b => Ok(()),
@@ -341,13 +343,13 @@ impl Checker<'_> {
             (Type::Record(r1), Type::Record(r2)) => self.unify_rows(r1, r2),
             (
                 Type::Exists {
-                    scope: _,
+                    scope: s1,
                     binder: x,
                     contract: c1,
                     body: b1,
                 },
                 Type::Exists {
-                    scope: _,
+                    scope: s2,
                     binder: y,
                     contract: c2,
                     body: b2,
@@ -365,15 +367,23 @@ impl Checker<'_> {
                     return Err(Mismatch::Types(a.clone(), b.clone()));
                 };
                 let witness = self.fresh_module_witness();
-                if self
+                let issued = self
                     .materialize_existential_witness(&contract, &witness)
-                    .is_err()
-                {
-                    return Err(Mismatch::Types(a.clone(), b.clone()));
-                }
-                let left = module_contract::open_existential_type(b1, x, &witness);
-                let right = module_contract::open_existential_type(b2, y, &witness);
-                self.unify(&left, &right)
+                    .map_err(|_| Mismatch::Types(a.clone(), b.clone()))?;
+                let outer = self.store.witness_context();
+                let context = self
+                    .register_existential_scope(super::super::ty::Scope::default(), &issued)
+                    .map_err(|_| Mismatch::Types(a.clone(), b.clone()))?;
+                let left = self
+                    .open_witness_body(*s1, x, b1, &context)
+                    .map_err(|()| Mismatch::Types(a.clone(), b.clone()))?;
+                let right = self
+                    .open_witness_body(*s2, y, b2, &context)
+                    .map_err(|()| Mismatch::Types(a.clone(), b.clone()))?;
+                self.enter_witness_context(context);
+                let result = self.unify(&left, &right);
+                self.enter_witness_context(outer);
+                result
             }
             (Type::Row(_) | Type::Union(..) | Type::Without { .. }, _)
             | (_, Type::Row(_) | Type::Union(..) | Type::Without { .. }) => {
@@ -426,12 +436,15 @@ impl Checker<'_> {
     }
 
     pub fn bind(&mut self, m: u32, t: &Type) -> Unified {
+        if !self.witness_free_binding(t) {
+            return self.bind_occurrence(&self.store.variable(m), t);
+        }
         self.inference_trial(|this| this.bind_inner(m, t))
     }
 
-    fn bind_inner(&mut self, m: u32, t: &Type) -> Unified {
+    pub(super) fn bind_inner(&mut self, m: u32, t: &Type) -> Unified {
         let t = self.zonk(t);
-        if t.contains(&mut |x| *x == Type::meta(m)) {
+        if t.contains(&mut |x| self.store.solver_root(x) == Some(m)) {
             return Err(Mismatch::Occurs(t));
         }
         if t.contains(&mut |x| matches!(x, Type::Forall { .. })) {

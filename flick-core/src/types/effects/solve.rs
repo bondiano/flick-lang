@@ -13,6 +13,7 @@ use crate::source::Span;
 use crate::types::gadt::row_facts::RowKind;
 use crate::types::lang::{self, Lang};
 use crate::types::ty::{Norm, Row, Type, Written};
+use crate::types::unify::Store;
 use crate::types::{Checker, regions};
 
 /// The row `actual` of a call must be part of `declared`.
@@ -116,8 +117,11 @@ impl Checker<'_> {
         }
         // a row still unknown, maybe less some names: it grows by what the
         // actual row holds, but never by a name it is taken without
-        let unknown_tail = declared.tails.iter().find(|t| unknown(t).is_some());
-        let open = unknown_tail.and_then(unknown);
+        let unknown_tail = declared
+            .tails
+            .iter()
+            .find(|t| unknown(&self.store, t).is_some());
+        let open = unknown_tail.and_then(|tail| unknown(&self.store, tail));
         let never: Vec<Elem> = unknown_tail.map_or_else(Vec::new, |t| less(t).1.to_vec());
         if let Some(m) = open
             && self.grow_scoped_row(&actual, kind, m)
@@ -151,7 +155,10 @@ impl Checker<'_> {
             }
         }
         for tail in &actual.tails {
-            if matches!(tail, Type::Error) || unknown(tail).is_some() || allows(&declared, tail) {
+            if matches!(tail, Type::Error)
+                || unknown(&self.store, tail).is_some()
+                || allows(&declared, tail)
+            {
                 continue;
             }
             if let Some(m) = open {
@@ -172,7 +179,7 @@ impl Checker<'_> {
         let mut close = Vec::new();
         for c in &self.cx.subrows {
             for t in self.store.normalize(&c.actual).tails {
-                if let Some(m) = unknown(&t)
+                if let Some(m) = unknown(&self.store, &t)
                     && self.store.meta_level(m).is_some_and(|l| l > level)
                 {
                     close.push(m);
@@ -209,7 +216,7 @@ impl Checker<'_> {
         for c in &self.cx.subrows {
             for side in [&c.actual, &c.declared] {
                 for t in self.store.normalize(side).tails {
-                    open.extend(unknown(&t));
+                    open.extend(unknown(&self.store, &t));
                 }
             }
         }
@@ -481,11 +488,8 @@ fn less(tail: &Type) -> (&Type, &[Elem]) {
 }
 
 /// The variable of a tail still to be inferred, maybe less some names.
-fn unknown(tail: &Type) -> Option<u32> {
-    match less(tail).0 {
-        Type::Meta(meta) => meta.legacy_root(),
-        _ => None,
-    }
+fn unknown(store: &Store, tail: &Type) -> Option<u32> {
+    store.solver_root(less(tail).0)
 }
 
 /// The names `declared` takes out of the variable of `tail` that neither

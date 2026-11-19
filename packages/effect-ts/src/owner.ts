@@ -1,3 +1,4 @@
+import { closeArenas, ownedArena } from "@flick-lang/runtime/rt/arena-owner";
 // Lexical owners. Each `scope` has one: a child group of the fibers spawned
 // into it, the foreign work it waits for, and a native scope of resource
 // finalizers. Closing it is two-phase: admission ends, children are
@@ -5,7 +6,7 @@
 // promises settle, and only then resource finalizers run, last first.
 // Arena storage remains available through all of them and is retired last.
 import { Cause, Context, Effect, Exit, Fiber, Scope } from "effect";
-import { Arena } from "@flick-lang/runtime/core/Arena";
+import type { Arena } from "@flick-lang/runtime/core/Arena";
 
 import { type OwnerEvidence, withOwnerEvidence } from "./owner_evidence.ts";
 export { readOwnerEvidence, withOwnerEvidence } from "./owner_evidence.ts";
@@ -20,24 +21,8 @@ export const CurrentOwner = /*#__PURE__*/ Context.Reference<Owner | undefined>("
 });
 
 
+
 export class Owner {
-  /** Arena storage is released only after the native finalizer scope. */
-  readonly #arenas: Array<Arena> = [];
-  #arenasClosed = false;
-
-  makeArena(): Arena {
-    if (this.#arenasClosed) throw new Error("arena owner is closed");
-    const arena = new Arena();
-    this.#arenas.push(arena);
-    return arena;
-  }
-
-  closeArenas(): void {
-    this.#arenasClosed = true;
-    for (const arena of this.#arenas) arena.close();
-    this.#arenas.length = 0;
-  }
-
   /** Native scope of the resource finalizers. */
   readonly resources: Scope.Closeable;
   open = true;
@@ -141,7 +126,7 @@ export const closeOwn = <A, E>(owner: Owner, exit: Exit.Exit<A, E>): Effect.Effe
     owner.finalizing = true;
     owner.phase("C5");
     const closed = yield* Effect.exit(Scope.close(owner.resources, exit));
-    owner.closeArenas();
+    closeArenas(owner);
     owner.phase("C6");
     if (Exit.isFailure(closed)) cause = Cause.combine(cause, closed.cause);
     return cause.reasons.length === 0 ? Exit.void : Exit.failCause(cause);
@@ -162,6 +147,17 @@ const resume = <A, E>(exit: Exit.Exit<A, E>): Effect.Effect<A, E> =>
 /** Runs `effect` with `owner` as the owner of what it acquires and spawns. */
 export const inside = <A, E, R>(owner: Owner, effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, Scope.Scope>> =>
   effect.pipe(Effect.provideService(Scope.Scope, owner.resources), Effect.provideService(CurrentOwner, owner));
+
+/** A library's acquisition scope supplies the owner of its rank-polymorphic task. */
+export const inAcquisitionScope = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R | Scope.Scope> =>
+  Effect.gen(function* () {
+    const scope = yield* Scope.Scope;
+    const outer = yield* Effect.service(CurrentOwner);
+    const owner = new Owner(Scope.makeUnsafe(), outer?.defects);
+    yield* Scope.addFinalizerExit(scope, (exit) => Effect.orDie(Effect.flatMap(closeOwn(owner, exit), (cleanup) =>
+      Exit.isFailure(cleanup) ? Effect.failCause(cleanup.cause) : Effect.void)));
+    return yield* inside(owner, withOwnerEvidence(owner, () => effect));
+  });
 
 /**
  * Runs `body(owner, outer)` as the owner of a fresh scope, then closes it;
@@ -226,7 +222,7 @@ export const scopeCurrent = (): Effect.Effect<Owner | undefined> => Effect.servi
 /** `Arena.make ()`, in the lexical owner chosen by the compiler. */
 export const arenaMake = (): Effect.Effect<Arena> => Effect.map(Effect.service(CurrentOwner), (owner) => {
   if (owner === undefined) throw new Error("arena requires a scope owner");
-  return owner.makeArena();
+  return ownedArena(owner);
 });
 
 /** Resolve foreign identity only when a raw scoped operation activates it. */
@@ -235,7 +231,15 @@ export const within = <A, E, R>(owner: OwnerEvidence, effect: Effect.Effect<A, E
   Effect.suspend(() => {
     const active = owner instanceof Owner ? owner : owner === undefined ? undefined : ownerHooks.activate?.(owner);
     if (active === undefined) throw new Error("owner evidence is absent or belongs to another runtime");
-    return inside(active, effect);
+    return Effect.flatMap(Effect.context(), (context) => {
+      if (Context.get(context, CurrentOwner) === active && Context.getOrUndefined(context, Scope.Scope) === active.resources) {
+        // The checked ambient context already supplies Scope. Re-providing it
+        // would restore fiber-local reference changes when the raw call returns.
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Scope was checked above
+        return effect as Effect.Effect<A, E, Exclude<R, Scope.Scope>>;
+      }
+      return inside(active, effect);
+    });
   });
 
 /** `Fiber e a`: a child spawned into an owner. */

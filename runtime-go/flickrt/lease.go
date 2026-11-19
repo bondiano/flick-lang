@@ -31,9 +31,8 @@ func acquireHolder(fb *Fiber, acquire Value, outer int) *holder {
 	if fb.owner != nil {
 		scope.defects = fb.owner.defects
 	}
-	inner := *fb
-	inner.owner = scope
-	v, cause := catch(func() Value { return masked(&inner, outer, func() Value { return Run(&inner, acquire) }) })
+	inner := Within(WithOwnerEvidence(fb, scope), scope)
+	v, cause := catch(func() Value { return masked(inner, outer, func() Value { return Run(inner, acquire) }) })
 	if cause != nil {
 		// lease.ts closes and then fails, outside `onExit`: no election
 		panic(&Failure{Sequential(cause, scope.closeFinalizers(fb, cause))})

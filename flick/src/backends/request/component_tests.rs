@@ -14,10 +14,23 @@ use std::path::Path;
 use std::str;
 
 fn fixture(typescript: bool, release: bool, rt: bool) -> (Prepared, Vec<build::Artifact>) {
+    fixture_at(
+        "tests/run/bootstrap/inline_nested.fl",
+        typescript,
+        release,
+        rt,
+    )
+}
+
+fn fixture_at(
+    path: &str,
+    typescript: bool,
+    release: bool,
+    rt: bool,
+) -> (Prepared, Vec<build::Artifact>) {
     let host = FsHost::new();
     let mut sources = SourceMap::default();
-    let root =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/run/bootstrap/inline_nested.fl");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join(path);
     let (diagnostics, compilation, _) =
         project::compile_with(&host, &mut sources, None, &[root], None, rt, None);
     assert!(
@@ -74,6 +87,27 @@ fn fixture(typescript: bool, release: bool, rt: bool) -> (Prepared, Vec<build::A
         prepared.diagnostics
     );
     (prepared, native)
+}
+
+#[cfg(feature = "wasm-backends")]
+#[test]
+fn official_js_component_emits_deep_owner_policies_with_its_default_budget() {
+    use flick_backend::host::{Budget, WasmBackend};
+    let bytes = include_bytes!("../../../../backends/js/package/component.wasm");
+    for release in [false, true] {
+        let (mut prepared, native) =
+            fixture_at("tests/rt/owner_foreign_policy.fl", false, release, true);
+        prepared.request.backend.sha256 = flick_backend::sha256(bytes);
+        let backend = WasmBackend::load(
+            component::engine().expect("engine"),
+            prepared.request.backend.clone(),
+            bytes,
+            Budget::default(),
+        )
+        .expect("distributed JS component");
+        parity(&Javascript, &prepared, &native);
+        parity(&backend, &prepared, &native);
+    }
 }
 
 fn parity(backend: &dyn Backend, prepared: &Prepared, native: &[build::Artifact]) {

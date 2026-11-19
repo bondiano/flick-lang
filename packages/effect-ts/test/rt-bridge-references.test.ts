@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { Effect, References } from "effect";
-import { currentCtx, fork, awaitFiber, asExit, type Run } from "@flick-lang/runtime/rt/fiber";
-import { scopeRun } from "@flick-lang/runtime/rt/owner";
+import { currentCtx, fork, awaitFiber, asExit, withOwnerEvidence, type Run } from "@flick-lang/runtime/rt/fiber";
+import { scopeRun, within } from "@flick-lang/runtime/rt/owner";
 import * as Deferred from "@flick-lang/runtime/rt/effect/Deferred";
 
 import { fromEffect } from "../src/bridge.ts";
@@ -21,6 +21,17 @@ test("a scoped Effect reference is visible to later native calls and restored at
     });
     const outside = yield annotations();
     return [inside, outside];
+  });
+  assert.deepEqual(result, [{ request: "7" }, {}]);
+});
+
+test("activating the current owner preserves scoped reference changes in the native caller", async () => {
+  const result = await run(function* (): Run {
+    const inside = yield scopeRun((owner) => (function* (): Run {
+      yield withOwnerEvidence(owner, () => within(owner, () => fromEffect(Effect.annotateLogsScoped("request", "7"))));
+      return yield annotations();
+    })());
+    return [inside, yield annotations()];
   });
   assert.deepEqual(result, [{ request: "7" }, {}]);
 });

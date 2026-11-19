@@ -12,6 +12,7 @@ struct KindContext {
 #[derive(Debug)]
 enum KindUndo {
     Binding(u32, Option<Kind>),
+    #[cfg(test)]
     Context(u32, KindContext),
 }
 
@@ -110,6 +111,7 @@ impl KindStore {
         ))
     }
 
+    #[cfg(test)]
     fn write_context(&mut self, root: u32, context: KindContext) {
         if !self.transactions.is_empty() {
             self.undo.push(KindUndo::Context(

@@ -207,6 +207,15 @@ func ReadOwnerEvidence(fb *Fiber) Value {
 // WithOwnerEvidence derives a fiber changing only its lexical candidate.
 // In particular, closed owners can be transported without reopening them.
 func WithOwnerEvidence(fb *Fiber, owner Value) *Fiber {
+	// Opaque host evidence can be non-comparable. Only native owner tokens
+	// and absence participate in the context-preserving fast path.
+	same := owner == nil && fb.candidate == nil
+	if native, ok := owner.(*Owner); ok {
+		same = fb.candidate == native
+	}
+	if same {
+		return fb
+	}
 	inner := *fb
 	inner.candidate = owner
 	return &inner

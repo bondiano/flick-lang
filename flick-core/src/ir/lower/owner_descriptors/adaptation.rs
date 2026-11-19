@@ -3,7 +3,7 @@ impl Build<'_> {
         let head = self.call(Op::Head, desc.clone(), self.list(Vec::new()), self.unit());
         let current = self.name();
         let args = self.name();
-        let result = self.nodes(self.local(&current), |this, _, node, env| {
+        let result = self.nodes(self.local(&current), |this, _, node, env, _| {
             match &node.kind {
                 OwnerTypeKind::Fun { runtime, stage, .. } => {
                     let arg = this.name();

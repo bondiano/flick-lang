@@ -2,6 +2,18 @@ package flickrt
 
 import "testing"
 
+func TestOwnerEvidenceTransportAcceptsNonComparableOpaqueValues(t *testing.T) {
+	fb := rootFiber()
+	evidence := []Value{"inert"}
+	derived := WithOwnerEvidence(fb, evidence)
+	again := WithOwnerEvidence(derived, evidence)
+	evidence[0] = "same token"
+	got := ReadOwnerEvidence(again).([]Value)
+	if got[0] != "same token" || again.owner != fb.owner {
+		t.Fatal("transport must preserve opaque identity and the work owner")
+	}
+}
+
 func assertEvidence(t *testing.T, fb *Fiber, d *Owner, c Value) {
 	t.Helper()
 	if ScopeCurrent(fb, Unit) != d || ReadOwnerEvidence(fb) != c {
@@ -194,4 +206,36 @@ func TestOwnerEvidenceFreshLayerBuild(t *testing.T) {
 			return Unit
 		})
 	}))
+}
+
+func TestOwnerEvidenceFreshResourceAcquisition(t *testing.T) {
+	fb := rootFiber()
+	fb.owner = newOwner()
+	fb = WithOwnerEvidence(fb, fb.owner)
+	released := false
+	h := acquireHolder(fb, Eff(func(at *Fiber) Value {
+		assertEvidence(t, at, at.owner, at.owner)
+		if at.owner == fb.owner {
+			t.Fatal("acquisition must have its own owner")
+		}
+		return AcquireRelease(Within(at, ReadOwnerEvidence(at)), Eff(func(*Fiber) Value { return Unit }), Fn(func(*Fiber, Value) Value {
+			return Eff(func(*Fiber) Value { released = true; return Unit })
+		}))
+	}), 0)
+	h.retire(fb)
+	if !released {
+		t.Fatal("retiring a resource must release it before the enclosing scope closes")
+	}
+	assertEvidence(t, fb, fb.owner, fb.owner)
+}
+
+func TestWithinCurrentOwnerPreservesScopedAnnotations(t *testing.T) {
+	Scope(rootFiber(), func(at *Fiber, owner, _ Value) Value {
+		at = WithOwnerEvidence(at, owner)
+		EffectAnnotateLogsScoped(Within(WithOwnerEvidence(at, owner), owner), "request", "7")
+		if got := logAnnotationsOf(at).Get("request"); got != "7" {
+			t.Fatalf("scoped annotation = %v, want 7", got)
+		}
+		return Unit
+	})
 }

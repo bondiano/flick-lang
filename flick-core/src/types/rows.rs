@@ -8,11 +8,20 @@ use std::cmp::Ordering;
 
 use super::Checker;
 use super::elem::Elem;
+use super::kinds::Kind;
 use super::ty::{Norm, Row, Type, Written};
 use super::unify::{Mismatch, Unified};
 
 impl Checker<'_> {
     pub fn unify_rows(&mut self, left: &Row, right: &Row) -> Unified {
+        for row in [left, right] {
+            if let Some(tail) = &row.tail {
+                for tail in self.store.normalize(tail).tails {
+                    self.store
+                        .note_kind(&tail, &Kind::Row(Box::new(Kind::Type)));
+                }
+            }
+        }
         let (left, right) = (Type::Row(left.clone()), Type::Row(right.clone()));
         self.unify_row_types(&left, &right)
     }
@@ -110,46 +119,48 @@ impl Checker<'_> {
                 missing(&only_left, true)?;
                 missing(&only_right, false)
             }
-            ([a], [b]) if a.legacy_meta_root().is_some() && b.legacy_meta_root().is_some() => {
-                let a = a.legacy_meta_root().expect("legacy row tail");
-                let b = b.legacy_meta_root().expect("legacy row tail");
-                let rest = self.fresh();
+            ([a], [b])
+                if self.store.solver_root(a).is_some() && self.store.solver_root(b).is_some() =>
+            {
+                let first = self.store.solver_root(a).expect("validated row tail");
+                let second = self.store.solver_root(b).expect("validated row tail");
+                let rest = self.store.fresh_row_beside(first);
                 // the shared rest is a row of the kind of the rows it ends
-                if let Some(r) = rest.legacy_meta_root() {
-                    self.store.mark_like(r, a);
-                    self.store.mark_like(r, b);
+                if let Some(r) = self.store.solver_root(&rest) {
+                    self.store.mark_like(r, second);
                 }
-                self.bind(a, &extended(only_right, vec![rest.clone()]))?;
-                self.bind(b, &extended(only_left, vec![rest]))
+                self.bind_occurrence(a, &extended(only_right, vec![rest.clone()]))?;
+                self.bind_occurrence(b, &extended(only_left, vec![rest]))
             }
-            ([tail], _) if tail.legacy_meta_root().is_some() => {
-                let m = tail.legacy_meta_root().expect("legacy row tail");
+            ([tail], _) if self.store.solver_root(tail).is_some() => {
                 missing(&only_left, true)?;
-                self.bind(
-                    m,
+                self.bind_occurrence(
+                    tail,
                     &written(extended(only_right, tails_right), right_written),
                 )
             }
-            (_, [tail]) if tail.legacy_meta_root().is_some() => {
-                let m = tail.legacy_meta_root().expect("legacy row tail");
+            (_, [tail]) if self.store.solver_root(tail).is_some() => {
                 missing(&only_right, false)?;
-                self.bind(m, &written(extended(only_left, tails_left), left_written))
+                self.bind_occurrence(
+                    tail,
+                    &written(extended(only_left, tails_left), left_written),
+                )
             }
             // `?m` less some names against a row: the least `?m` is that row,
             // which then holds none of the names
             ([Type::Without { row, gone }], _) if matches!(**row, Type::Meta(_)) => {
                 missing(&only_left, true)?;
-                let Some(m) = row.legacy_meta_root() else {
+                let Some(_) = self.store.solver_root(row) else {
                     return Err(Mismatch::Types(left.into_type(), right.into_type()));
                 };
-                self.bind(m, &left_out(only_right, tails_right, gone, false)?)
+                self.bind_occurrence(row, &left_out(only_right, tails_right, gone, false)?)
             }
             (_, [Type::Without { row, gone }]) if matches!(**row, Type::Meta(_)) => {
                 missing(&only_right, false)?;
-                let Some(m) = row.legacy_meta_root() else {
+                let Some(_) = self.store.solver_root(row) else {
                     return Err(Mismatch::Types(left.into_type(), right.into_type()));
                 };
-                self.bind(m, &left_out(only_left, tails_left, gone, true)?)
+                self.bind_occurrence(row, &left_out(only_left, tails_left, gone, true)?)
             }
             // `r1 + r2` against what is left empty: each variable is empty
             (metas, []) | ([], metas)

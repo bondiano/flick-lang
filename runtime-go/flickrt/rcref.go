@@ -91,9 +91,9 @@ func (r *rcRef) state(fb *Fiber, outer int) *rcAcquired {
 	q := &rcAcquiring{awaiters: 1}
 	r.acquiring = q
 	scope := newOwner()
-	t := *fb
+	t := WithOwnerEvidence(fb, scope)
 	t.env = r.env
-	q.fiber = fork(&t, scope, Eff(func(fb *Fiber) Value {
+	q.fiber = fork(t, scope, Eff(func(fb *Fiber) Value {
 		v, cause := catch(func() Value { return Run(fb, r.acquire) })
 		var a *rcAcquired
 		r.mu.Lock()

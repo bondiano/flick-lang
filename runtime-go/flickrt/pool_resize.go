@@ -45,9 +45,9 @@ func (p *pool) resize(fb *Fiber) {
 // way its owner is closed.
 func (p *pool) allocate(fb *Fiber) *poolItem {
 	scope := newOwner()
-	t := *fb
-	t.env, t.owner = p.env, scope
-	v, cause := catch(func() Value { return Run(&t, p.acquire) })
+	t := Within(WithOwnerEvidence(fb, scope), scope)
+	t.env = p.env
+	v, cause := catch(func() Value { return Run(t, p.acquire) })
 	item := &poolItem{exit: &Exit{v, cause}, scope: scope, idleSince: p.clock.millis()}
 	return masked(fb, fb.state.mask+1, func() Value {
 		p.mu.Lock()

@@ -1,3 +1,4 @@
+import { arenasClosed } from "@flick-lang/runtime/rt/arena-owner";
 import { OwnerEvidenceContext } from "./owner_evidence.ts";
 // The bridge between the kernel and Effect. Effect's Context travels on
 // the kernel's evidence (`Ctx.host`); the kernel's evidence travels in Effect's
@@ -376,7 +377,7 @@ bridgeKernel.causeFromEffect = causeFromEffect;
 bridgeKernel.causeToEffect = causeToEffect;
   hostOwnerHooks.activate = (owner) => {
     if (!(owner instanceof Owner)) throw new TypeError("not a native owner");
-    if (owner.closed) throw new Error("arena owner is closed");
+    if (arenasClosed(owner)) throw new Error("arena owner is closed");
     return hostOwnerOf(owner);
   };
   ownerHooks.within = (owner, call) => {

@@ -132,6 +132,24 @@ impl Identities for Copy {
 }
 
 impl Context {
+    pub(in crate::types) fn type_dependencies(
+        &self,
+        ty: &Type,
+        expected: &Kind,
+        kinding: &impl Kinding,
+        scoped: &BTreeSet<String>,
+    ) -> Result<BTreeSet<ScopeId>, Incomplete> {
+        let mut collect = Dependencies {
+            context: self,
+            scoped,
+            own: BTreeSet::new(),
+            missing: false,
+            found: BTreeSet::new(),
+        };
+        kinded::map(ty, expected, kinding, &mut collect)?;
+        collect.finish()
+    }
+
     pub(in crate::types) fn issued_origins(&self) -> impl Iterator<Item = &ExistentialWitness> {
         self.0
             .iter()

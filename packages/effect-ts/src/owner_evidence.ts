@@ -7,5 +7,9 @@ export const OwnerEvidenceContext = /*#__PURE__*/ Context.Reference<OwnerEvidenc
   defaultValue: () => undefined,
 });
 export const readOwnerEvidence = (): Effect.Effect<OwnerEvidence> => Effect.service(OwnerEvidenceContext);
-export const withOwnerEvidence = <A, E, R>(owner: OwnerEvidence, thunk: () => Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
-  Effect.provideService(Effect.suspend(thunk), OwnerEvidenceContext, owner);
+export const withOwnerEvidence = <A, E, R>(owner: OwnerEvidence, thunk: () => Effect.Effect<A, E, R>): Effect.Effect<A, E, R> => {
+  const task = Effect.suspend(thunk);
+  return Effect.flatMap(readOwnerEvidence(), (current) => current === owner
+    ? task
+    : Effect.provideService(task, OwnerEvidenceContext, owner));
+};

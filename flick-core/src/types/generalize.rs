@@ -98,7 +98,7 @@ impl Checker<'_> {
             let name = names.next().expect("names are endless");
             vars.push(Binder {
                 name: name.clone(),
-                kind: kind_of(&ty, m, &|h| param_kinds(self, h)),
+                kind: kind_of(&self.store, &ty, m, &|h| param_kinds(self, h)),
             });
             self.store.set(m, Type::Var(name));
         }
@@ -114,11 +114,11 @@ impl Checker<'_> {
     /// name the module can write it with.
     pub fn signature_of(&mut self, ty: &Type) -> Type {
         let ty = self.zonk(ty);
-        let metas = metas_of(&ty);
+        let metas = metas_of(&self.store, &ty);
         let mut constraints: Vec<Type> = Vec::new();
         for w in self.classes.wanted.clone() {
             let c = self.zonk(&w.constraint);
-            let own = metas_of(&c);
+            let own = metas_of(&self.store, &c);
             if own.is_empty() || !own.iter().all(|m| metas.contains(m)) || constraints.contains(&c)
             {
                 continue;
@@ -147,12 +147,17 @@ impl Checker<'_> {
                 None => (m, Type::Var(names.next().expect("names are endless"))),
             })
             .collect();
-        let written = |t: &Type| self.written(&replace_metas(t, &subst));
+        let written = |t: &Type| self.written(&replace_metas(&self.store, t, &subst));
         // a capture row cannot name a type variable, and the written signature
         // implies its projections through the stages' parameters
         let types: Vec<String> = subst
             .iter()
-            .filter(|(m, _)| matches!(kind_of(&ty, *m, &|h| param_kinds(self, h)), Kind::Type))
+            .filter(|(m, _)| {
+                matches!(
+                    kind_of(&self.store, &ty, *m, &|h| param_kinds(self, h)),
+                    Kind::Type
+                )
+            })
             .filter_map(|(_, v)| match v {
                 Type::Var(name) => Some(name.clone()),
                 _ => None,
@@ -280,10 +285,10 @@ fn without_value_row(row: &Type, types: &[&str]) -> Type {
 }
 
 /// The unknowns of `t`, in order of appearance.
-fn metas_of(t: &Type) -> Vec<u32> {
+fn metas_of(store: &super::unify::Store, t: &Type) -> Vec<u32> {
     let mut metas = Vec::new();
     t.visit(&mut |t| {
-        if let Some(m) = t.legacy_meta_root()
+        if let Some(m) = store.solver_root(t)
             && !metas.contains(&m)
         {
             metas.push(m);
@@ -292,13 +297,13 @@ fn metas_of(t: &Type) -> Vec<u32> {
     metas
 }
 
-pub(super) fn replace_metas(t: &Type, subst: &[(u32, Type)]) -> Type {
+pub(super) fn replace_metas(store: &super::unify::Store, t: &Type, subst: &[(u32, Type)]) -> Type {
     match t {
-        Type::Meta(meta) if meta.legacy_root().is_some() => subst
+        Type::Meta(_) if store.solver_root(t).is_some() => subst
             .iter()
-            .find(|(x, _)| Some(*x) == meta.legacy_root())
+            .find(|(x, _)| Some(*x) == store.solver_root(t))
             .map_or_else(|| t.clone(), |(_, v)| v.clone()),
-        _ => t.map_children(&mut |c| replace_metas(c, subst)),
+        _ => t.map_children(&mut |c| replace_metas(store, c, subst)),
     }
 }
 
@@ -319,17 +324,22 @@ fn param_kinds(checker: &Checker<'_>, head: &Type) -> Vec<Kind> {
 /// The kind of a variable by where it occurs: a record tail is a field row,
 /// the rows of a runtime arrow are service and error rows, an argument of a
 /// type has the kind of its parameter (`params` gives them).
-fn kind_of(ty: &Type, m: u32, params: &dyn Fn(&Type) -> Vec<Kind>) -> Kind {
-    fn is(t: &Type, m: u32) -> bool {
+fn kind_of(
+    store: &super::unify::Store,
+    ty: &Type,
+    m: u32,
+    params: &dyn Fn(&Type) -> Vec<Kind>,
+) -> Kind {
+    fn is(store: &super::unify::Store, t: &Type, m: u32) -> bool {
         match t {
-            Type::Meta(meta) => meta.legacy_root() == Some(m),
-            Type::Row(row) => row.tail.as_deref().is_some_and(|t| is(t, m)),
-            Type::Union(a, b) => is(a, m) || is(b, m),
-            Type::Without { row, .. } => is(row, m),
+            Type::Meta(_) => store.solver_root(t) == Some(m),
+            Type::Row(row) => row.tail.as_deref().is_some_and(|t| is(store, t, m)),
+            Type::Union(a, b) => is(store, a, m) || is(store, b, m),
+            Type::Without { row, .. } => is(store, row, m),
             _ => false,
         }
     }
-    let is = |t: &Type| is(t, m);
+    let is = |t: &Type| is(store, t, m);
     let mut kind = Kind::Type;
     ty.visit(&mut |t| match t {
         Type::Record(row) if row.tail.as_deref().is_some_and(is) => {

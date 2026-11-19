@@ -102,7 +102,7 @@ impl Checker<'_> {
         let mut open = Vec::new();
         for c in &wanted {
             c.visit(&mut |t| {
-                if let Some(m) = t.legacy_meta_root()
+                if let Some(m) = self.store.solver_root(t)
                     && self.store.is_numeric(m)
                     && !open.contains(&m)
                 {
@@ -119,12 +119,14 @@ impl Checker<'_> {
                 let ty = Type::lang(num.lang());
                 wanted
                     .iter()
-                    .filter(|c| c.contains(&mut |t| *t == Type::meta(m)))
-                    .all(|c| self.may_have_instance(&replace_metas(c, &[(m, ty.clone())])))
+                    .filter(|c| c.contains(&mut |t| self.store.solver_root(t) == Some(m)))
+                    .all(|c| {
+                        self.may_have_instance(&replace_metas(&self.store, c, &[(m, ty.clone())]))
+                    })
             };
             let fallback = default_num(fractional);
             let num = Num::ALL.iter().find(|n| fits(n)).unwrap_or(&fallback);
-            let _ = self.unify(&Type::meta(m), &Type::lang(num.lang()));
+            let _ = self.unify(&self.store.variable(m), &Type::lang(num.lang()));
         }
         !open.is_empty()
     }

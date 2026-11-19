@@ -328,7 +328,7 @@ wasm-backends: backend-fixtures
 # across Rust crates, preserving imports/exports and wasm-bindgen metadata.
 # With the playground on Flick's own
 # runtime and its bridge to the Effect adapter, and no kept answers of
-# plugins, it is about 4.06 MB raw and 1.33 MB gzip.
+# plugins, Binaryen also optimizes the linked module for size.
 wasm:
     CARGO_PROFILE_RELEASE_OPT_LEVEL=z CARGO_PROFILE_RELEASE_LTO=fat CARGO_PROFILE_RELEASE_STRIP=debuginfo cargo build -p flick-wasm --target wasm32-unknown-unknown --release
     node tools/wasm-dedup/index.mjs target/wasm32-unknown-unknown/release/flick_wasm.wasm

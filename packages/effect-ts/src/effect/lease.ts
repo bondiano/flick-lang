@@ -3,6 +3,7 @@
 // library starts (a replacement, a refresh, an eviction) waits until no lease
 // holds the value, so a value is never released while it is in use.
 import { Effect, Exit, Scope } from "effect";
+import { inAcquisitionScope } from "../owner.ts";
 
 /** A value and the scope of what its acquisition registered. */
 export interface Holder<A> {
@@ -36,7 +37,7 @@ export const acquireHolder = <A, E, R>(
   Effect.uninterruptibleMask((restore) =>
     Effect.gen(function* () {
       const scope = yield* Scope.make();
-      const exit = yield* Effect.exit(restore(outer(Scope.provide(acquire, scope))));
+      const exit = yield* Effect.exit(restore(outer(Scope.provide(inAcquisitionScope(acquire), scope))));
       if (Exit.isFailure(exit)) {
         yield* Scope.close(scope, exit);
         return yield* Effect.failCause(exit.cause);

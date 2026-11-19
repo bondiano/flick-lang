@@ -16,16 +16,16 @@ export type OwnerEvidence = object | undefined;
 
 /** Immutable services and independent default and lexical owner channels. */
 export class Ctx {
-  readonly tag: object | null;
-  readonly impl: unknown;
-  readonly next: Ctx | null;
-  readonly owner: Owner | undefined;
+  declare readonly tag: object | null;
+  declare readonly impl: unknown;
+  declare readonly next: Ctx | null;
+  declare readonly owner: Owner | undefined;
   /** Inert lexical candidate, independent of work/cancellation ownership. */
-  readonly stageOwner: OwnerEvidence;
+  declare readonly stageOwner: OwnerEvidence;
   /** Context supplied by the Effect adapter, when a crossing provides one. */
-  readonly host: unknown;
+  declare readonly host: unknown;
   /** Effect Context derived from this evidence, cached for later crossings. */
-  bridged: unknown = undefined;
+  declare bridged: unknown;
   constructor(tag: object | null, impl: unknown, next: Ctx | null, owner: Owner | undefined, host: unknown = next?.host, ...evidence: [] | [OwnerEvidence]) {
     this.tag = tag;
     this.impl = impl;
@@ -77,12 +77,13 @@ export const owned = (ctx: Ctx, owner: Owner | undefined): Ctx => new Ctx(null, 
 export const hosted = (ctx: Ctx, host: unknown): Ctx => new Ctx(null, undefined, ctx, ctx.owner, host);
 
 /** Replace only lexical evidence, including explicit absence. */
-export const evidenced = (ctx: Ctx, owner: OwnerEvidence): Ctx => new Ctx(null, undefined, ctx, ctx.owner, ctx.host, owner);
+export const evidenced = (ctx: Ctx, owner: OwnerEvidence): Ctx =>
+  ctx.stageOwner === owner ? ctx : new Ctx(null, undefined, ctx, ctx.owner, ctx.host, owner);
 
-export const readOwnerEvidence = (): OwnerEvidence => currentCtx().stageOwner;
+export const readOwnerEvidence = (): OwnerEvidence => context.stageOwner;
 
 export const withOwnerEvidence = (owner: OwnerEvidence, thunk: () => unknown): Under =>
-  new Under(evidenced(currentCtx(), owner), thunk);
+  new Under(evidenced(context, owner), thunk);
 
 /** Calls `f` with `ctx` as the evidence. */
 export const inCtx = <A>(ctx: Ctx, f: () => A): A => {

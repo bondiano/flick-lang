@@ -1,5 +1,5 @@
-// Deduplicate the compiler after linking several Rust crates. Keep every
-// import/export and wasm-bindgen's metadata; no general -O pipeline runs here.
+// Optimize the linked compiler for size, including duplicate functions across
+// Rust crates. Keep every import/export and wasm-bindgen's metadata.
 import { execFileSync } from "node:child_process";
 import { readFileSync, renameSync, rmSync } from "node:fs";
 
@@ -24,7 +24,7 @@ const temporary = `${file}.${process.pid}.dedup`;
 try {
   execFileSync("wasm-opt", [
     file,
-    "--duplicate-function-elimination", "--converge",
+    "-Oz", "--duplicate-function-elimination", "--converge",
     "--strip-debug", "--strip-producers",
     "-o", temporary,
   ], { stdio: "inherit" });
@@ -32,7 +32,7 @@ try {
   if (shape(after) !== shape(before)) throw new Error("WASM deduplication changed imports or exports");
   if (after.length > before.length) throw new Error("WASM deduplication increased the artifact size");
   renameSync(temporary, file);
-  console.log(`WASM duplicate elimination: ${before.length} → ${after.length} bytes (${version})`);
+  console.log(`WASM size optimization: ${before.length} → ${after.length} bytes (${version})`);
 } finally {
   rmSync(temporary, { force: true });
 }

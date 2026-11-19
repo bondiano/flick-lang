@@ -169,7 +169,7 @@ impl NamedWitnesses {
     }
 
     /// Identity inventory only; membership does not issue a scope or lease.
-    fn scoped_modules(&self) -> BTreeSet<String> {
+    pub(in crate::types) fn scoped_modules(&self) -> BTreeSet<String> {
         self.issued
             .values()
             .flatten()

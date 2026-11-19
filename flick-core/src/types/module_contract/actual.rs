@@ -10,8 +10,8 @@ use crate::types::{Elem, ModuleSignature};
 
 pub(super) fn map(
     actual: &Interface,
-    kinding: &impl Kinding,
-    identities: &mut impl Identities,
+    kinding: &dyn Kinding,
+    identities: &mut dyn Identities,
 ) -> Result<Interface, Incomplete> {
     Actual {
         kinding,
@@ -22,19 +22,19 @@ pub(super) fn map(
     .interface(actual)
 }
 
-struct Actual<'a, K, I> {
-    kinding: &'a K,
-    identities: &'a mut I,
+struct Actual<'a> {
+    kinding: &'a dyn Kinding,
+    identities: &'a mut dyn Identities,
     binders: Vec<Binder>,
     modules: Vec<(String, ModuleSignature)>,
 }
 
-struct LocalKinds<'a, K> {
-    inner: &'a K,
+struct LocalKinds<'a> {
+    inner: &'a dyn Kinding,
     modules: &'a [(String, ModuleSignature)],
 }
 
-impl<K: Kinding> Kinding for LocalKinds<'_, K> {
+impl Kinding for LocalKinds<'_> {
     fn observe<'a>(
         &'a self,
         ty: &'a Type,
@@ -78,7 +78,7 @@ impl<K: Kinding> Kinding for LocalKinds<'_, K> {
     }
 }
 
-impl<K: Kinding, I: Identities> Actual<'_, K, I> {
+impl Actual<'_> {
     fn ty(&mut self, ty: &Type, kind: &Kind) -> Result<Type, Incomplete> {
         kinded::map_in(
             ty,
@@ -296,7 +296,7 @@ impl<K: Kinding, I: Identities> Actual<'_, K, I> {
 
 /// Observe a retained carrier without changing identities. Origin references
 /// stay retained separately; this is a fresh proof-time observation only.
-pub(super) fn observe(actual: &Interface, kinding: &impl Kinding) -> Result<Interface, Incomplete> {
+pub(super) fn observe(actual: &Interface, kinding: &dyn Kinding) -> Result<Interface, Incomplete> {
     map(actual, kinding, &mut Preserve)
 }
 

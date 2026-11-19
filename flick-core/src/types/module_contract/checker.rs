@@ -53,27 +53,22 @@ impl super::Checker<'_> {
                 return Type::Error;
             }
         };
+        let scope = Scope::default();
+        let outer = self.store.witness_context();
+        let Ok(context) = self.register_existential_scope(scope, &issued) else {
+            self.error(
+                codes::P010,
+                self.span(source),
+                "invalid existential witness context",
+            );
+            return Type::Error;
+        };
+        self.enter_witness_context(context);
         let view = issued.view();
         let requirements = super::ModuleSignature::instantiate_members(&requirements, view);
         let bindings = Self::witness_bindings(issued.signature(), view, &alias);
-        let subst: Vec<_> = bindings
-            .first()
-            .into_iter()
-            .flat_map(|opened| &opened.types)
-            .map(|(name, ty, _)| (name.clone(), ty.clone()))
-            .collect();
         let local_mark = self.classes.local.len();
-        for requirement in &requirements {
-            if let ModuleRequirement::Dictionary { head, from } = requirement {
-                self.classes.local.push((
-                    head.substitute(&subst),
-                    super::Dict::Opened {
-                        binder: alias.clone(),
-                        field: from.clone(),
-                    },
-                ));
-            }
-        }
+        self.install_witness_dictionaries(&requirements, &bindings, &alias);
         let module_mark = self.opened_modules.len();
         self.opened_modules.extend(bindings);
         let value_mark = self.cx.locals.len();
@@ -82,19 +77,45 @@ impl super::Checker<'_> {
         }
         let result = self.block(body, None);
         let result = self.resolved_witness_type(&result);
+        self.enter_witness_context(outer);
         self.cx.locals.truncate(value_mark);
         self.opened_modules.truncate(module_mark);
         self.classes.local.truncate(local_mark);
         if self.witness_escapes(&result, &witness) {
             self.typing.existential_unpacks.insert(node.range());
             Type::Exists {
-                scope: Scope::default(),
+                scope,
                 binder: alias.clone(),
                 contract: Box::new(Type::con(module, name)),
                 body: Box::new(close_existential_type(&result, &witness, &alias)),
             }
         } else {
             result
+        }
+    }
+
+    fn install_witness_dictionaries(
+        &mut self,
+        requirements: &[ModuleRequirement],
+        bindings: &[Opened],
+        alias: &str,
+    ) {
+        let subst: Vec<_> = bindings
+            .first()
+            .into_iter()
+            .flat_map(|opened| &opened.types)
+            .map(|(name, ty, _)| (name.clone(), ty.clone()))
+            .collect();
+        for requirement in requirements {
+            if let ModuleRequirement::Dictionary { head, from } = requirement {
+                self.classes.local.push((
+                    head.substitute(&subst),
+                    super::Dict::Opened {
+                        binder: alias.to_owned(),
+                        field: from.clone(),
+                    },
+                ));
+            }
         }
     }
 

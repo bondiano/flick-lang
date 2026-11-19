@@ -169,6 +169,7 @@ impl KindStore {
         for change in self.undo.drain(checkpoint.undo..).rev() {
             match change {
                 KindUndo::Binding(root, previous) => self.metas[root as usize] = previous,
+                #[cfg(test)]
                 KindUndo::Context(root, previous) => self.contexts[root as usize] = previous,
             }
         }

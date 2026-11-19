@@ -213,20 +213,22 @@ impl Scopes {
             },
         ))
     }
-
-    pub fn registered_context(&self, scope: ScopeId) -> Option<Context> {
-        self.contexts.get(&scope).cloned()
-    }
-
-    pub fn scope_of_module(&self, module: &str) -> Option<ScopeId> {
-        self.registered
-            .values()
-            .find(|coordinate| coordinate.modules.contains(module))
-            .map(|coordinate| coordinate.id)
-    }
 }
 
 impl Context {
+    pub(in crate::types) fn witness(&self, id: ScopeId) -> Option<&str> {
+        self.0
+            .iter()
+            .find(|coordinate| coordinate.id == id)
+            .map(|coordinate| coordinate.witness.as_str())
+    }
+
+    pub(in crate::types) fn issued(&self) -> bool {
+        self.0
+            .iter()
+            .all(|coordinate| coordinate.paired.origin().is_some())
+    }
+
     pub fn belongs_to(&self, owner: ScopeId) -> bool {
         self.0.iter().all(|coordinate| coordinate.owner == owner)
     }
@@ -432,6 +434,7 @@ impl Embedding {
     }
 
     /// Weakening retains the identities of every source coordinate.
+    #[cfg(test)]
     pub fn weaken(source: &Context, target: &Context) -> Result<Self, Invalid> {
         let image = source
             .ids()
@@ -452,6 +455,7 @@ impl Embedding {
         Self::checked(source.clone(), target.clone(), (0..source.len()).collect())
     }
 
+    #[cfg(test)]
     pub fn compose(&self, next: &Self) -> Result<Self, Invalid> {
         if self.target != next.source {
             return Err(Invalid::Domain);
@@ -495,6 +499,7 @@ impl Embedding {
     }
 
     /// The dependency-closed common image in one ambient telescope.
+    #[cfg(test)]
     pub fn meet(&self, other: &Self) -> Result<(Self, Self), Invalid> {
         if self.target != other.target {
             return Err(Invalid::Domain);
@@ -511,6 +516,7 @@ impl Embedding {
         ))
     }
 
+    #[cfg(test)]
     fn inverse_image_in(&self, other: &Self) -> Result<Self, Invalid> {
         if self.target != other.target {
             return Err(Invalid::Domain);
@@ -538,6 +544,7 @@ impl Embedding {
             .expect("inverse of a checked order embedding")
     }
 
+    #[cfg(test)]
     pub fn transport(&self, ty: &Type) -> Type {
         self.transport_checked(ty)
             .expect("checked witness transport")

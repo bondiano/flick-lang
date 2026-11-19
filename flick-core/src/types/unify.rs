@@ -180,8 +180,8 @@ impl Store {
         let fractional = self.is_fractional(m);
         match t {
             Type::Captured { ty, .. } | Type::Bounded { ty, .. } => self.numeric_fits(m, ty),
-            Type::Meta(meta) if meta.legacy_root().is_some() => {
-                let n = meta.legacy_root().expect("legacy numeric target");
+            Type::Meta(_) if self.solver_root(t).is_some() => {
+                let n = self.solver_root(t).expect("validated numeric target");
                 self.mark(n, Mark::Numeric);
                 if fractional {
                     self.mark(n, Mark::Fractional);
@@ -367,6 +367,7 @@ impl Store {
         let head = self.head(t);
         let t = head.as_ref();
         match t {
+            Type::Exists { .. } => self.zonk_exists(t),
             Type::Meta(_)
             | Type::Skolem(_)
             | Type::Con { .. }
@@ -510,7 +511,7 @@ impl Store {
         let mut escaped = None;
         let mut lower = Vec::new();
         t.visit(&mut |t| match t {
-            Type::Meta(meta) => lower.extend(meta.legacy_root()),
+            Type::Meta(_) => lower.extend(self.solver_root(t)),
             Type::Skolem(s) if self.skolems[*s as usize].level > level => {
                 escaped = Some(*s);
             }
@@ -533,7 +534,7 @@ impl Store {
     pub fn deep_metas(&self, t: &Type) -> Vec<u32> {
         let mut out = Vec::new();
         t.visit(&mut |t| {
-            if let Some(m) = t.legacy_meta_root()
+            if let Some(m) = self.solver_root(t)
                 && self.meta_level(m).is_some_and(|l| l > self.level)
                 && !out.contains(&m)
             {
@@ -558,19 +559,6 @@ impl Store {
     }
 }
 
-/// The current label of a row entry: a capture row entry, and a type
-/// variable of an error row, follow their element.
-fn relabel(label: &Elem, t: &Type) -> Elem {
-    let current = match label {
-        Elem::Capture(_) => super::ty::capture_label(t),
-        Elem::Error(_) => super::ty::error_label(t),
-        Elem::Service(_) => super::ty::service_label(t),
-        Elem::Provided(inner) => Some(Elem::Provided(Box::new(relabel(inner, t)))),
-        Elem::Named(_) | Elem::Live => None,
-    };
-    current.unwrap_or_else(|| label.clone())
-}
-
 mod compare;
 mod instances;
 
@@ -583,3 +571,7 @@ include!("unify/transactions.rs");
 include!("unify/context.rs");
 
 include!("unify/read.rs");
+
+include!("unify/existentials.rs");
+
+include!("unify/labels.rs");

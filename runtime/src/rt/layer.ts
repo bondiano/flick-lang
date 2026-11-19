@@ -6,7 +6,7 @@
 import { type Cause, type Exit, combine, empty, raise } from "./cause.ts";
 import { allOf } from "./concurrency.ts";
 import { mapped } from "./effects.ts";
-import { type Ctx, type Run, Suspend, Under, asExit, currentCtx, exitOf, extend, hosted, lookup, raiseOf, uninterruptible } from "./fiber.ts";
+import { type Ctx, type Run, Suspend, Under, asExit, currentCtx, exitOf, extend, hosted, lookup, raiseOf, uninterruptible, withOwnerEvidence } from "./fiber.ts";
 import { Owner, addTo, closeOwn, finalize, inside, withOwner } from "./owner.ts";
 import { traceEvent, traceLayer, tracing } from "./trace.ts";
 
@@ -156,7 +156,7 @@ export const memoizable = (build: Build): Layer => {
 };
 
 /** Runs `task` acquiring into `scope`. */
-export const scoped = (scope: Owner, task: () => unknown): Under => inside(scope, task);
+export const scoped = (scope: Owner, task: () => unknown): Under => inside(scope, () => withOwnerEvidence(scope, task));
 
 /** Builds `layer` into `scope` through `memo`, which the build and what runs with its services read as the current map. */
 export const buildWith = (layer: Layer, memo: MemoMap, scope: Owner): Under =>

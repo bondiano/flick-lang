@@ -326,6 +326,9 @@ func ScopeCurrent(fb *Fiber, _ Value) Value { return fb.owner }
 // Within is `fb` acquiring into `owner`, an outer region's, not the
 // innermost one's.
 func Within(fb *Fiber, owner Value) *Fiber {
+	if fb.owner == owner.(*Owner) {
+		return fb
+	}
 	inner := *fb
 	inner.owner = owner.(*Owner)
 	return &inner

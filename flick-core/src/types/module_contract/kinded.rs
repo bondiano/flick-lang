@@ -72,8 +72,8 @@ pub(in crate::types) trait Identities {
 pub(in crate::types) fn map(
     ty: &Type,
     expected: &Kind,
-    kinding: &impl Kinding,
-    identities: &mut impl Identities,
+    kinding: &dyn Kinding,
+    identities: &mut dyn Identities,
 ) -> Result<Type, Incomplete> {
     map_in(ty, expected, kinding, identities, &[], &[])
 }
@@ -81,8 +81,8 @@ pub(in crate::types) fn map(
 pub(in crate::types) fn map_in(
     ty: &Type,
     expected: &Kind,
-    kinding: &impl Kinding,
-    identities: &mut impl Identities,
+    kinding: &dyn Kinding,
+    identities: &mut dyn Identities,
     binders: &[Binder],
     bound: &[Bound],
 ) -> Result<Type, Incomplete> {
@@ -95,14 +95,17 @@ pub(in crate::types) fn map_in(
     .ty(ty, expected)
 }
 
-struct Walk<'a, 'b, K, I> {
-    kinding: &'a K,
-    identities: &'b mut I,
+// Keep one positional walker in native and browser compilers. Specializing
+// the full recursive walk for every reader/projection pair duplicates a large
+// amount of code once those readers participate in ordinary inference.
+struct Walk<'a, 'b> {
+    kinding: &'a dyn Kinding,
+    identities: &'b mut dyn Identities,
     binders: Vec<Binder>,
     bound: Vec<Bound>,
 }
 
-impl<K: Kinding, I: Identities> Walk<'_, '_, K, I> {
+impl Walk<'_, '_> {
     fn kind(&mut self, kind: &Kind) -> Result<Kind, Incomplete> {
         let kind = self.kinding.checked_kind(kind)?;
         Ok(match kind {

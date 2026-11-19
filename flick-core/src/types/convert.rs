@@ -258,6 +258,13 @@ impl Checker<'_> {
                         return Type::Error;
                     }
                 };
+                let scope = Scope::default();
+                let outer = self.store.witness_context();
+                let Ok(context) = self.register_existential_scope(scope, &issued) else {
+                    self.error(codes::P010, span, "invalid existential witness context");
+                    return Type::Error;
+                };
+                self.enter_witness_context(context);
                 let mark = self.opened_modules.len();
                 self.opened_modules.extend(Self::witness_bindings(
                     issued.signature(),
@@ -266,10 +273,11 @@ impl Checker<'_> {
                 ));
                 let body = self.ty(body_node, &Kind::Type, free);
                 let body = self.resolved_witness_type(&body);
+                self.enter_witness_context(outer);
                 self.opened_modules.truncate(mark);
                 let body = super::module_contract::close_existential_type(&body, &witness, &binder);
                 return Type::Exists {
-                    scope: Scope::default(),
+                    scope,
                     binder,
                     contract: Box::new(contract),
                     body: Box::new(body),
