@@ -236,7 +236,12 @@ impl<'a> Scope<'a> {
         })
     }
 
-    pub fn check_use(&self, reference: &Reference, diagnostics: &mut Vec<Diagnostic>) {
+    pub fn check_use(
+        &self,
+        reference: &Reference,
+        in_proof: bool,
+        diagnostics: &mut Vec<Diagnostic>,
+    ) {
         let Reference {
             namespace,
             qualifier,
@@ -265,7 +270,8 @@ impl<'a> Scope<'a> {
             let typed = *namespace == Namespace::Constructor
                 && interface.is_some_and(|i| i.find(Namespace::Type, name).is_some());
             // a proof of the module, which a proof uses as a lemma
-            let proof = *namespace == Namespace::Value
+            let proof = in_proof
+                && *namespace == Namespace::Value
                 && interface.is_some_and(|i| i.proofs.iter().any(|p| p == name));
             if let Some(interface) = interface
                 && interface.find(*namespace, name).is_none()

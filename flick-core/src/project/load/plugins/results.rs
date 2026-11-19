@@ -98,16 +98,29 @@ impl Results<'_> {
         make(source)
     }
 
-    /// What `plugin` collects from `blocks`, their heads and texts in order.
+    /// What `plugin` collects from `blocks`, keyed by what it reads of each
+    /// in order: a state names the module of a block, so the same text in
+    /// another module is collected again.
     pub(super) fn collect(
         &mut self,
         plugin: &dyn Expander,
         blocks: &[Block],
         source: &mut BlockSource,
     ) -> Result<Vec<u8>, String> {
-        let shown = blocks
-            .iter()
-            .flat_map(|b| [b.head.as_bytes(), b.text.as_bytes()]);
+        let shown = blocks.iter().flat_map(|b| {
+            [
+                b.head.as_bytes(),
+                b.text.as_bytes(),
+                b.docs.as_bytes(),
+                b.module.as_bytes(),
+                (b.signature.as_ref()).map_or(&[][..], |s| s.text.as_bytes()),
+                if b.place == Place::Declaration {
+                    b"d"
+                } else {
+                    b"e"
+                },
+            ]
+        });
         let id = [
             b"collect".as_slice(),
             VERSION.as_bytes(),

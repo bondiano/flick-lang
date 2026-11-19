@@ -22,13 +22,19 @@ use sha2::{Digest, Sha256};
 use wasmtime::Store;
 use wasmtime::component::{Component, HasSelf, Linker};
 
+use flick_backend::host::bindings::flick::command::types as command_types;
+
 use crate::component::{MemoryLimits, engine, memory_limits, prepare, why};
+
+mod commands;
+pub use commands::contributor;
 
 use crate::fetch;
 
 wasmtime::component::bindgen!({
     world: "plugin",
     path: "../flick-plugin/wit",
+    with: { "flick:command/types@0.1.0": flick_backend::host::bindings::flick::command::types },
 });
 
 flick_plugin::wit_conversions!(flick::plugin::types);
@@ -122,6 +128,8 @@ struct State {
 impl flick::plugin::types::Host for State {}
 
 impl flick::plugin::written::Host for State {}
+
+impl command_types::Host for State {}
 
 impl flick::plugin::compiler::Host for State {
     fn parse_expr(

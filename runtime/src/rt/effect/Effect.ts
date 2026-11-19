@@ -19,6 +19,7 @@ import {
 } from "../fiber.ts";
 import { Failure, RawCause } from "../outcome.ts";
 import { addFinalizerExit, finalize } from "../owner.ts";
+import { cleanupAfter } from "../handle.ts";
 
 export { sleep };
 
@@ -105,7 +106,7 @@ function* finally_(task: () => unknown, finalizer: (exit: Exit) => unknown): Run
   fiber.mask = depth + 1;
   try {
     const exit = asExit(yield exitOf(() => atMask(depth, task)));
-    const ended = asExit(yield exitOf(() => finalizer(exit)));
+    const ended = asExit(yield cleanupAfter(exit, () => finalizer(exit)));
     return raiseOf(finalize(exit, ended));
   } finally {
     fiber.mask = depth;

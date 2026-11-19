@@ -317,17 +317,7 @@ impl Loader<'_> {
 
     fn apply(&mut self, i: usize, (output, key, digest, reason): Outcome, known: &mut Known) {
         known.digests[i] = digest;
-        // a module whose test companion is loaded shows it all it declares
-        let name = &self.modules[i].name;
-        if COMPANIONS
-            && self
-                .modules
-                .iter()
-                .any(|m| companion_of(&m.name) == Some(name))
-        {
-            let view = private_view(&output.exported, &output.declarations);
-            self.privates.insert(name.clone(), view);
-        }
+        self.keep_private_view(i, &output);
         if let Some(cache) = &mut self.cache
             && cache.explain
             && self.modules[i].scope_of.is_none()
@@ -419,6 +409,7 @@ include!("checking_relocate.rs");
 include!("checking_relocate_decls.rs");
 #[cfg(feature = "native-project")]
 include!("checking_stored.rs");
+include!("checking_companions.rs");
 impl Checking<'_> {
     /// Adds to `checked` what the watching plugins find wrong with the places
     /// of `loaded` that call the names each watches, at spans of the module's

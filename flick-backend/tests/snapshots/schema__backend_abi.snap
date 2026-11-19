@@ -322,9 +322,11 @@ interface inputs {
 world backend {
   import types;
   import inputs;
+  import flick:command/types@0.1.0;
   use types.{descriptor, target-request, target-support, build-request, build-result, diagnostic};
 
   export describe: func() -> descriptor;
   export check-target: func(request: build-request) -> result<target-support, list<diagnostic>>;
   export generate: func(request: build-request) -> result<build-result, list<diagnostic>>;
+  export flick:command/command@0.1.0;
 }

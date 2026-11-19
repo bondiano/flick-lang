@@ -4,5 +4,6 @@
 mod memory;
 pub mod runtime;
 
+pub mod command;
 mod component;
-pub use component::{Budget, WasmBackend};
+pub use component::{Budget, WasmBackend, bindings};

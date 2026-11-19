@@ -248,6 +248,23 @@ In both runtimes the following run under a mask:
 - the watcher and the supervisor;
 - `on_exit` and `ensuring` handlers.
 
+#### Cleanup off the normal path
+
+The cleanup of `ensuring`, `on_exit` (`on_exit_if`, `on_exit_filter`, `on_exit_primitive`), `on_interrupt` and the release of `bracket` runs in the fiber of the body, after it, whatever it ended with, an unwind to a handler of effects included. Unlike a finalizer of a region, which needs `Detached` and so performs no `control` operation (`reference/effects.md`, `FLICK-E017`), it may perform one. The rule depends on how the body ended:
+
+```text
+(Clean)      body ended with a value, a typed failure or a defect:
+             the cleanup runs as any code; its operations are answered
+(Clean-Cut)  body interrupted, or ended by an unwind (an `abort`, a `control` arm that let it go):
+             a `control` operation of a handler older than the cleanup is cut off:
+             its arm does not run, the cleanup stops there, the cut adds nothing to the cause,
+             and the body's outcome goes on as it was
+```
+
+A handler the cleanup installs itself answers as usual, and an `abort` in such a cleanup keeps the outcome already. Answering the operation would hand the rest of the cleanup to an arm in the middle of an interruption or an unwind: an arm that let it go would drop the interruption or run the code the unwind leaves ([an interrupted cleanup answered a `control` operation](#go-an-interrupted-cleanup-answered-a-control-operation), [an unwind answered the `control` operation of its cleanup](#an-unwind-answered-the-control-operation-of-its-cleanup)). Implementation: `cleanupAfter` in `runtime/src/rt/handle.ts` and `runtime-go/flickrt/handle.go`, which the combinators call; JS on Effect runs no `control` arm (`FLICK-P012`). Case: `tests/run/runtime/cleanup_control.fl`.
+
+The Lean core has no form of these combinators: its only cleanup is the finalizer of `inside`, under the handlers it keeps, where a `control` operation is stuck (§3.7 of `core.md`, `KeptStuck`). (Clean-Cut) is a rule of the runtime contract, and T5 (R1–R7) is unchanged by it.
+
 ### 3.3 The owner
 
 ```text
@@ -552,6 +569,7 @@ Each law below names the cases that exercise it, under `tests/run/runtime/` unle
 | - | - | - | - |
 | R1 | `scope_close`, `scope_releases`, `abort_closes_scopes`, `interrupt_in_finalizer`, `closed_owner` | both | trace, output |
 | R1, a discontinued body | `discontinued_body`, `discontinued_fiber` | Go and `effect = "rt"`; JS on Effect waits for `control` arms (`FLICK-P012`) | trace, output |
+| (Clean-Cut), cleanup off the normal path | `cleanup_control` | Go and `effect = "rt"`; JS on Effect waits for `control` arms (`FLICK-P012`) | output |
 | R2 | `close_phases`, `scope_owners`, `closing_hooks`, `settling_calls`, `closing_child_fails`, `interrupt_in_finalizer`, `abort_stops_children` | both | trace, output. Group children are not traced: output only |
 | R2, a discontinued body | `discontinued_body`, `discontinued_fiber` | Go and `effect = "rt"`; JS on Effect waits | trace, output |
 | R3 | `parallel`, `close_phases`, `closing_hooks`, `abort_stops_children`; `discontinued_fiber` on Go | both | trace for children and watchers; output for group children and combinator branches, which are not traced |
@@ -652,6 +670,23 @@ let main () =
   The cause itself does not change: `Failure.rethrow`, `inspect` and rendering see the original list.
 
   Fixed in both runtimes (`effect/Cause.ts` `flickReasons`, `mapHead`; `effect/Exit.ts`; Go `mapErrors`, `CauseReasons`). Fixture: `cause_lists.fl` (`Cause.map`, `Exit.map_error` over `Fail B, Fail A`); tests: `packages/effect-ts/test/cause.test.ts`, `cause_test.go` `TestTheTypedViewOfACauseSeesItsHeadOnly`.
+
+### Go: an interrupted cleanup answered a `control` operation
+
+- Divergence: the body of `ensuring`, `on_exit`, `on_interrupt` or `bracket` is interrupted, and its cleanup performs a `control` operation of a handler around it. On Go the arm ran; when it let the rest go, the handler ended with its value, the interruption was gone, and the fiber went on to the code after the handler. The runtime of `effect = "rt"` ran no arm: it runs at the handler's mask, where the interruption is delivered at once.
+- Cause: the arm runs at the mask of the cleanup, and `drive` (`handle.go`) drops the whole cause of a discontinued body, the interruption with it.
+- Resolution — both runtimes: (Clean-Cut) ([cleanup off the normal path](#cleanup-off-the-normal-path)). Case: `tests/run/runtime/cleanup_control.fl`.
+
+### Go: `on_exit` skipped its cleanup on an unwind
+
+- Divergence: an `abort` unwinds through `on_exit`. The runtime of `effect = "rt"` runs the cleanup with the exit; Go did not run it at all.
+- Cause: `withExit` (`exit.go`) took the exit with `exitOf`, which raises an unwind again before the cleanup.
+- Resolution — Go: `withExit` runs its cleanup on an unwind too, as `ensuring` does; `on_interrupt` reads the interruptors without making a `Failure` of the cause. Case: `tests/run/runtime/cleanup_control.fl`.
+
+### An unwind answered the `control` operation of its cleanup
+
+- Divergence: an `abort` unwinds through `ensuring`, `on_exit` or `bracket`, whose cleanup performs a `control` operation of a handler outside the `abort`'s. Both runtimes ran the arm; when it let the rest go, its discontinuing joined the unwind's signal, the `abort`'s handler caught its own signal from the joined cause, and its arm and the code after it ran, though the outer arm had let them go.
+- Resolution — both runtimes: (Clean-Cut). The operation is not answered: the cleanup stops, the unwind reaches the `abort`'s handler, and the outer handler's body goes on. Case: `tests/run/runtime/cleanup_control.fl`.
 
 ### Go: a finalizer added during closing runs at once
 

@@ -15,6 +15,11 @@ its tools in [`[tools]`](../project/#flicktoml), and the flag there is
 `FLICK-P051`) and `--help`; `flick help <command>` prints a command's help and
 `flick --version` the compiler's version (`flick doctor` shows the rest).
 
+The project's backend and the plugins of its dependencies may add commands
+of their own. `flick --help` lists them by contributor, and they run as
+`flick <command>` or `flick <contributor>:<command>` (see
+[Contributed commands](../commands/)).
+
 ## Commands
 
 | Command | What it does |

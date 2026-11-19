@@ -341,12 +341,14 @@ func handledExit(fb *Fiber, task Value) *Exit {
 	return &Exit{v, c}
 }
 
-// withExit runs `task`, then `after` of its exit uninterruptibly; a
-// failure of `after` joins the task's.
+// withExit runs `task`, then `after` of its exit uninterruptibly, an
+// unwind to a handler of effects included; a failure of `after` joins the
+// task's.
 func withExit(fb *Fiber, task Value, after func(*Exit) Value) Value {
-	e := exitOf(fb, task)
+	v, cause := catch(func() Value { return Run(fb, task) })
+	e := &Exit{v, cause}
 	if task := after(e); task != nil {
-		_, c := catch(func() Value { return uninterruptible(fb, task) })
+		c := cleanupAfter(fb, e.cause, func() Value { return uninterruptible(fb, task) })
 		e = &Exit{e.value, finalized(e.cause, c)}
 	}
 	if e.cause != nil {
@@ -364,7 +366,7 @@ func EffectOnInterrupt(fb *Fiber, handler, task Value) Value {
 		if !e.cause.has(causeInterrupt) {
 			return nil
 		}
-		return Apply(fb, handler, CauseInterruptors(failureOf(e.cause)))
+		return Apply(fb, handler, CauseInterruptors(&Supervised{cause: e.cause}))
 	})
 }
 
