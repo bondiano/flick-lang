@@ -58,7 +58,7 @@ and `Monad`.
 | `Redacted` | `make`, `reveal` (runtime); `show` prints `<redacted>` |
 | `BigDecimal` | decimal numbers: `from_string`, exact `add`, `subtract`, checked `multiply`, `divide_to_scale` |
 | `Duration` | lengths of time: checked `nanos`, `millis`, `seconds`, `minutes`, explicit `infinity` |
-| `Bytes` | bytes as lists of numbers from 0 to 255: `from_string` and `to_string` (UTF-8, `None` when not UTF-8), `to_base64url` and `from_base64url`, and `equal`, whose time depends only on the lengths |
+| `Bytes` | [packed, immutable byte sequences](#packed-bytes) and conversions for `List Int` APIs |
 | `Crypto` | the `Crypto` service over Web Crypto (`Crypto.system`): `random_bytes`, `digest` (SHA-1, SHA-256, SHA-384, SHA-512), `hmac` over `digest` (RFC 2104), random numbers, UUIDs and ULIDs; `pbkdf2` (RFC 8018), and `hash_password` / `verify_password`: PBKDF2-HMAC-SHA256 with 600000 rounds and a random salt, stored as `$pbkdf2-sha256$i=<rounds>$<salt>$<hash>` in URL-safe base64 and checked in constant time |
 | `Jwt` | JSON Web Tokens signed with HMAC-SHA256 (`alg` `HS256`): `sign` and `verify` over a JSON codec of the claims; `verify` refuses another `alg`, a wrong signature and an `exp` the clock has passed with `JwtError` (`Malformed`, `BadSignature`, `Expired`); `now` and `expires_in` give `iat` and `exp` in seconds since the epoch |
 | `EqHash`, `HashSet`, `HashMap` | hash collections that keep their witness |
@@ -144,6 +144,29 @@ A zero divisor and a scale that is not a safe integer are `DecimalError`
 too. `Duration.millis (-1)`, `Duration.millis Float.nan` and a conversion
 that overflows are `Err (DurationError …)`; an unbounded duration is
 `Duration.infinity`, and `Duration.to_millis` gives `None` for it.
+
+## Packed bytes
+
+`Bytes.Bytes` stores one byte per element in the JS and Go runtimes.
+`Bytes.empty` is empty and `Bytes.length` counts bytes. `Bytes.get` takes a
+zero-based index. `Bytes.slice start end` takes a half-open byte range.
+Both return `None` for invalid bounds. An empty range within the bounds
+returns `Some Bytes.empty`.
+
+`Bytes.from_list` copies a `List Int` and reports `Err (Bytes.ByteOutOfRange
+index value)` for the first integer outside `0..255`. `Bytes.to_list` makes
+a fresh list. Slices can share private storage, which stays immutable and
+has no public mutable view.
+
+Use `Bytes.encode_utf8` and `Bytes.decode_utf8` with packed bytes. Decoding
+returns `None` for invalid UTF-8 and preserves a byte order mark. Use
+`Bytes.encode_base64url` for unpadded output and `Bytes.decode_base64url`
+for input with optional valid padding. `Bytes.equal_constant_time` visits
+every byte when the lengths match.
+
+`Bytes.from_string`, `Bytes.to_string`, `Bytes.to_base64url`,
+`Bytes.from_base64url` and `Bytes.equal` still take or return `List Int`.
+Use `from_list` and `to_list` at boundaries with existing binary APIs.
 
 ## Hash collections
 

@@ -1,7 +1,82 @@
-/// Bytes as lists of numbers from 0 to 255: the UTF-8 form of text,
-/// URL-safe base64, and a comparison whose time does not depend on where
-/// the bytes differ.
-module Bytes exposing (from_string, to_string, to_base64url, from_base64url, equal)
+/// Packed, immutable bytes, with conversions for the APIs that use `List Int`.
+module Bytes exposing (
+  Bytes,
+  ByteError(..),
+  empty,
+  length,
+  get,
+  slice,
+  from_list,
+  to_list,
+  encode_utf8,
+  decode_utf8,
+  encode_base64url,
+  decode_base64url,
+  equal_constant_time,
+  from_string,
+  to_string,
+  to_base64url,
+  from_base64url,
+  equal,
+)
+
+/// An immutable sequence of bytes, with one byte of storage per element.
+type Bytes
+
+/// The zero-based index and value of the first integer outside `0..255`.
+type ByteError = ByteOutOfRange Int Int
+  deriving Eq, Show
+
+/// The sequence without bytes.
+empty : Bytes
+foreign pure empty from "flick:rt" "bytesEmpty"
+
+/// The number of bytes.
+length : Bytes -> Int
+foreign pure length from "flick:rt" "bytesLength"
+
+/// The byte at the zero-based index, or `None` outside the sequence.
+get : Int -> Bytes -> Option Int
+foreign pure get from "flick:rt" "bytesGet"
+
+/// The bytes in `[start, end)` when `0 <= start <= end <= length bytes`.
+/// A valid empty range yields `Some empty`.
+slice : Int -> Int -> Bytes -> Option Bytes
+foreign pure slice from "flick:rt" "bytesSlice"
+  arity 3
+
+pack_list : List Int -> Result (Int, Int) Bytes
+foreign pure pack_list from "flick:rt" "bytesFromList"
+
+/// Copies the list into packed storage, rejecting the first value outside `0..255`.
+from_list : List Int -> Result ByteError Bytes
+let from_list values =
+  Result.map_err (fun (index, value) -> ByteOutOfRange index value) (pack_list values)
+
+/// Copies the bytes into a list of integers in order.
+to_list : Bytes -> List Int
+foreign pure to_list from "flick:rt" "bytesToList"
+
+/// Encodes text as UTF-8. A lone surrogate is encoded as U+FFFD.
+encode_utf8 : String -> Bytes
+foreign pure encode_utf8 from "flick:rt" "bytesEncodeUtf8"
+
+/// Decodes valid UTF-8 and preserves a byte order mark as U+FEFF.
+/// Invalid UTF-8 yields `None`.
+decode_utf8 : Bytes -> Option String
+foreign pure decode_utf8 from "flick:rt" "bytesDecodeUtf8"
+
+/// Encodes bytes as URL-safe base64 without padding.
+encode_base64url : Bytes -> String
+foreign pure encode_base64url from "flick:rt" "bytesEncodeBase64Url"
+
+/// Decodes URL-safe base64 with optional padding. Invalid input yields `None`.
+decode_base64url : String -> Option Bytes
+foreign pure decode_base64url from "flick:rt" "bytesDecodeBase64Url"
+
+/// Compares every byte when the lengths match, regardless of where they differ.
+equal_constant_time : Bytes -> Bytes -> Bool
+foreign pure equal_constant_time from "flick:rt" "bytesEqualConstantTime"
 
 /// The UTF-8 bytes of the text; a lone surrogate, which has no UTF-8 form,
 /// is written as U+FFFD, as `TextEncoder` writes it.
