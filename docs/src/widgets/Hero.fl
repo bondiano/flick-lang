@@ -114,8 +114,8 @@ let sign lying =
   ui {
     div { class_name = "hero-sign" }
       span { class_name = "sign-head" }
-        (part "sign-name" "load_view")
-        (text " : UserId ")
+        part "sign-name" "load_view"
+        text " : UserId "
 
       span { class_name = "sign-row" } row
   }
@@ -183,21 +183,19 @@ let view model m =
       sign m.lying
       div { class_name = "hero-stem" }
       div { class_name = "hero-press" }
-        (attributes
-          [("aria-pressed", if m.lying then "true" else "false")]
-          (button
-            {
-              disabled = not m.ready || asking
-              on_click = Ui.Event.exhaust (fun _ -> task { press model })
-            }
-            (text label)))
+        attributes [("aria-pressed", if m.lying then "true" else "false")]
+          button {
+            disabled = not m.ready || asking
+            on_click = Ui.Event.exhaust (fun _ -> task { press model })
+          }
+            text label
 
       attributes
         [("role", "status"), ("aria-live", "polite")]
-        (div { class_name = "hero-status" } (status m))
+        div { class_name = "hero-status" } (status m)
       attributes
         [("id", "flick-hero-refresh"), ("hidden", "hidden"), ("tabIndex", "-1")]
-        (button { disabled = false; on_click = Ui.Event.latest (fun _ -> Effect.void) })
+        button { disabled = false; on_click = Ui.Event.latest (fun _ -> Effect.void) }
   }
 
 initial_model : Bool -> Model

@@ -6,7 +6,8 @@
 //! layers; classes, instances, row primitives and `deriving`; regions and
 //! the captures of closures. Rules:
 //! `docs/src/content/docs/reference/types.md`, `docs/src/content/docs/reference/effects.md`,
-//! `docs/src/content/docs/reference/classes.md`, `docs/src/content/docs/reference/regions.md`.
+//! `docs/src/content/docs/reference/services.md`, `docs/src/content/docs/reference/classes.md`,
+//! `docs/src/content/docs/reference/regions.md`.
 //!
 //! The checker reads the concrete tree after name resolution; other modules
 //! are known only through their [`Interface`], which this phase fills with
@@ -37,6 +38,7 @@ mod effects;
 mod elem;
 mod enums;
 mod env;
+mod error_match;
 mod exhaust;
 mod exports;
 mod facts;
@@ -362,6 +364,7 @@ fn checker_in<'a>(
             .any(|(name, _)| *name == module.name),
         sugar: Vec::new(),
         gadt: gadt::branch::State::default(),
+        error_rows: None,
         unfolding: Vec::new(),
     }
 }

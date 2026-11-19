@@ -1,6 +1,6 @@
 ---
 title: "Errors, services, resources and concurrency"
-source_hash: e45dea7d732bea22
+source_hash: f964836a2388936f
 ---
 
 ## Expected errors
@@ -71,7 +71,7 @@ let time_layer =
   Layer.succeed Time time_impl
 ```
 
-`Clock.current_time_millis` is the standard library's reading of the fiber's clock through `Host.Clock`, which the row of `now` therefore names. `Time.now` requires the service `Time`. `Time.Impl` is the record of the operations with their types as declared; a layer that needs a resource acquires it while it is built (`Layer.effect`). Service methods do not become class instances. The details are in [Effects, errors and services](../../reference/effects/#services). [Effect services](https://effect.website/docs/v4/requirements-management/services).
+`Clock.current_time_millis` is the standard library's reading of the fiber's clock through `Host.Clock`, which the row of `now` therefore names. `Time.now` requires the service `Time`. `Time.Impl` is the record of the operations with their types as declared; a layer that needs a resource acquires it while it is built (`Layer.effect`). Service methods do not become class instances. The details are in [Services](../../reference/services/#services). [Effect services](https://effect.website/docs/v4/requirements-management/services).
 
 ## Providing the environment
 
@@ -111,7 +111,7 @@ If `load_name` requires `{Users, Log}` and allows `{NotFound}`, then after provi
 
 Providing a layer removes the services it supplies, but adds the dependencies and errors of its construction. For an ordinary function, the argument must be `task { ... }` instead of a special block, so that strict evaluation order does not start the body before the environment is established. [Effect Layers](https://effect.website/docs/v4/requirements-management/layers).
 
-The entry assembles the root environment of `main`: its runner or launcher provides live `Host` services, at least those the row of `main` names, and the services its runner's `Main` adds, such as `Env` of `Runner.Cloudflare`; `main` provides any other service itself ([which services each place has](../../reference/effects/#who-provides-them)).
+The entry assembles the root environment of `main`: its runner or launcher provides live `Host` services, at least those the row of `main` names, and the services its runner's `Main` adds, such as `Env` of `Runner.Cloudflare`; `main` provides any other service itself ([which services each place has](../../reference/services/#who-provides-them)).
 
 ## Effects of the program and handlers
 
@@ -130,7 +130,7 @@ let collect body =
   | return () -> []
 ```
 
-A handler is deep: `resume` goes on with the body under the same handler and gives back its value. `resume` runs at most once, a second call is a defect; an arm that does not call it lets the rest of the body go, and its scopes close. `resume` holds the handler's region, so it does not leave the arms. A task in a fiber of its own (`spawn`, `parallel`, the races) cannot carry an effect with a `control` operation: its handler stayed in the parent's fiber. `provide S impl { … }` handles a service with a record `S.Impl`. The details are in [Effects, errors and services](../../reference/effects/#effects-and-handlers).
+A handler is deep: `resume` goes on with the body under the same handler and gives back its value. `resume` runs at most once, a second call is a defect; an arm that does not call it lets the rest of the body go, and its scopes close. `resume` holds the handler's region, so it does not leave the arms. A task in a fiber of its own (`spawn`, `parallel`, the races) cannot carry an effect with a `control` operation: its handler stayed in the parent's fiber. `provide S impl { … }` handles a service with a record `S.Impl`. The details are in [Effects and errors](../../reference/effects/#effects-and-handlers).
 
 ## Resources
 
@@ -150,7 +150,7 @@ Several observed failures are kept in the native Cause; the API does not promise
 
 ## The boundary of the language core
 
-Retry, schedules, streams, queues, cache, tracing and HTTP are a typed standard library ([Effect surface](../../reference/effect-surface/)). For re-running and concurrency it accepts descriptions of computations. They have no special syntax.
+Retry, schedules, streams, queues, cache, tracing and HTTP are a typed standard library ([Effect coverage](../../reference/runtime/#effect-coverage)). For re-running and concurrency it accepts descriptions of computations. They have no special syntax.
 
 `deriving Schema` and codecs for external formats are part of the language. Generics, recursion, refinements, field policies and effectful transformations are covered in [Schema and standard data types](../07-schema/).
 

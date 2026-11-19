@@ -4,9 +4,13 @@ use flick_plugin::{Arena, Block, Piece};
 
 use crate::diagnostics::codes;
 use crate::fmt::format_with;
+use crate::fmt::plugins::heads;
+use crate::fmt::program::{Lines, program};
 use crate::plugin::source::BlockSource;
 use crate::plugin::{Expander, Failure};
 use crate::source::SourceMap;
+use crate::syntax::ast::Ast;
+use crate::syntax::parse;
 
 /// A plugin that fails to lay out any block.
 struct Broken;
@@ -69,11 +73,153 @@ fn the_children_of_a_ui_element_keep_their_lines_and_their_comments() {
     assert_eq!(super::fmt(tidy), tidy);
 }
 
+/// A module whose `view` is a `ui` block of these lines.
+fn ui(lines: &str) -> String {
+    format!("module App.V exposing (view)\n\nview : Page -> Ui\nlet view page = ui {{\n{lines}}}\n")
+}
+
 #[test]
-fn a_call_in_a_ui_body_keeps_its_arguments_on_its_line() {
-    // broken over lines, its arguments would be its children
-    let long = "module App.V exposing (view)\n\nview : String -> String -> String -> Ui\nlet view first second third = ui {\n  text (String.join \", \" [first, second, third])\n  classed \"a class name that is long enough to pass the width of a line\" (text first) (text second)\n}\n";
-    assert_eq!(super::fmt(long), long);
+fn a_call_in_a_ui_body_that_does_not_fit_puts_its_calls_on_lines_under_it() {
+    let long = ui(concat!(
+        "  text (String.join \", \" [page.first, page.second])\n",
+        "  classed \"a class name that is long enough to pass the width of a line\" (text page.first) (text page.second)\n",
+    ));
+    let tidy = ui(concat!(
+        "  text (String.join \", \" [page.first, page.second])\n",
+        "  classed \"a class name that is long enough to pass the width of a line\"\n",
+        "    text page.first\n",
+        "    text page.second\n",
+    ));
+    assert_eq!(super::fmt(&long), tidy);
+}
+
+#[test]
+fn a_tree_in_parentheses_becomes_lines() {
+    let nested = ui(concat!(
+        "  div { class_name = \"auth-page\" }\n",
+        "    div { class_name = \"container page\" }\n",
+        "      (div\n",
+        "        { class_name = \"row\" }\n",
+        "        (div\n",
+        "          { class_name = \"col-md-6 offset-md-3 col-xs-12\" }\n",
+        "          (View.classed \"text-xs-center\" (heading_at H1 (text page.heading)))\n",
+        "          (View.classed \"text-xs-center\" (paragraph (page.other)))\n",
+        "          (render View.errors ())\n",
+        "          (form { on_submit = page.submit } (props.fields ++ [send]))))\n",
+    ));
+    let flat = ui(concat!(
+        "  div { class_name = \"auth-page\" }\n",
+        "    div { class_name = \"container page\" }\n",
+        "      div { class_name = \"row\" }\n",
+        "        div { class_name = \"col-md-6 offset-md-3 col-xs-12\" }\n",
+        "          View.classed \"text-xs-center\" (heading_at H1 (text page.heading))\n",
+        "          View.classed \"text-xs-center\" (paragraph (page.other))\n",
+        "          render View.errors ()\n",
+        "          form { on_submit = page.submit } (props.fields ++ [send])\n",
+    ));
+    assert_eq!(super::fmt(&nested), flat);
+}
+
+/// The program `text` means, as the formatter compares it.
+fn meaning(text: &str) -> Ast {
+    let mut sources = SourceMap::default();
+    let file = sources.add("App/V.fl", text);
+    let tree = parse(text, file).tree;
+    let heads = heads(&tree, text, file);
+    let heads: Vec<&str> = heads.iter().map(String::as_str).collect();
+    let bodies = ["ui"];
+    let lines = Lines {
+        file,
+        heads: &heads,
+        bodies: &bodies,
+    };
+    program(&tree, text, &lines)
+}
+
+#[test]
+fn a_line_under_a_call_means_its_argument_in_parentheses() {
+    let nested = meaning(&ui(
+        "  div {} (p {} (text \"a\")) (span {} (text page.b))\n",
+    ));
+    let lines = meaning(&ui(
+        "  div {}\n    p {}\n      text \"a\"\n    span {} (text page.b)\n",
+    ));
+    assert_eq!(nested, lines);
+    // in a component's body too, which is the tokens of its block
+    let component = |body: &str| meaning(&format!("component counter () = ui {{\n{body}}}\n"));
+    assert_eq!(
+        component("  div {} (text \"a\")\n"),
+        component("  div {}\n    text \"a\"\n")
+    );
+    // the same tokens on one line are other arguments
+    assert_ne!(
+        meaning(&ui("  div {} p {} text \"a\"\n")),
+        meaning(&ui("  div {}\n    p {}\n      text \"a\"\n"))
+    );
+    assert_ne!(meaning("let y = f (g x)\n"), meaning("let y = f g x\n"));
+}
+
+#[test]
+fn a_call_with_lines_under_it_puts_its_calls_before_them() {
+    let pad = "a class name that is long enough to pass the width of a line";
+    let text = ui(&format!(
+        "  div {{ class_name = \"{pad}\" }} (text page.first)\n    text page.second\n"
+    ));
+    let tidy = ui(&format!(
+        "  div {{ class_name = \"{pad}\" }}\n    text page.first\n    text page.second\n"
+    ));
+    assert_eq!(super::fmt(&text), tidy);
+}
+
+#[test]
+fn a_call_in_parentheses_on_its_line_keeps_them_where_it_must_break() {
+    let pad = "a class name that is long enough to pass the width of a line";
+    let kept = [
+        // without them its arguments could not break
+        format!("  div {{}}\n    (classed \"{pad}\" (text page.first) page.second)\n"),
+        // a comment in them
+        "  div {}\n    (text /* the first */ page.first)\n".to_owned(),
+    ];
+    for text in kept {
+        let text = ui(&text);
+        let once = super::fmt(&text);
+        assert_eq!(
+            once.matches('(').count(),
+            text.matches('(').count(),
+            "{once}"
+        );
+    }
+    let bare = ui("  div {}\n    (text page.first) // the first\n");
+    assert_eq!(
+        super::fmt(&bare),
+        ui("  div {}\n    text page.first // the first\n")
+    );
+}
+
+#[test]
+fn what_fits_or_cannot_be_a_line_keeps_its_parentheses() {
+    let pad = "a class name that is long enough to pass the width of a line";
+    let kept = [
+        // it fits
+        "  div { class_name = \"row\" } (text page.first) (text page.second)\n".to_owned(),
+        // a comment among them
+        format!("  classed \"{pad}\" (text page.first) /* first */ (text page.second)\n"),
+        // a line starting with `-` would go on with the one before it
+        format!("  classed \"{pad}\" (show (-page.count)) (-page.count)\n"),
+        // `if` would take the lines after it
+        format!("  classed \"{pad}\" (if page.on then text \"on\" else text \"off\")\n"),
+        // inside brackets a line break means nothing
+        format!("  ul {{}} [li {{}} (text \"{pad}\"), li {{}} (text page.second)]\n"),
+    ];
+    for text in kept {
+        let text = ui(&text);
+        let once = super::fmt(&text);
+        assert_eq!(
+            once.matches('(').count(),
+            text.matches('(').count(),
+            "{once}"
+        );
+    }
 }
 
 #[test]

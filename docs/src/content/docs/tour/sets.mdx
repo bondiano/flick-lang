@@ -1,0 +1,26 @@
+---
+title: Sets of services
+description: "A `type alias` names a set of services, and `-` takes one out of a row."
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="sets">
+
+`type alias Lookup = {Log, Store}` names a set of services. `...Lookup` in a
+row merges the set, and a plain name adds one more: `lookup` needs `Log`,
+`Store` and, since logging prints, `Host.Console`.
+
+`quiet` runs any work `Eff r none a`, whatever `r` it needs, and provides
+`Log` to it. Its row `{-Log | r}` is `r` without `Log`: the caller owes
+everything the work needs but the log. So `main` provides `Store` around
+`quiet`, and no `Log`, and nothing is logged for `"year"`.
+
+The [reference](../../reference/services/#sets-of-services-and-errors) has
+the full rules, for errors too.
+
+**Try:** make the body of `quiet` just `await work`. The compiler reports
+`FLICK-E002`: the work may need `Log`, which its row no longer allows.
+
+</TourLesson>

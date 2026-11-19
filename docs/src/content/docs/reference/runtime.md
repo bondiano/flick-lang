@@ -54,11 +54,12 @@ or `Http.ServerResponse.stream_async` / `stream_text_async`.
 Projects with `effect = "effect"` use `@flick-lang/effect-ts` (see [Errors,
 services, resources and concurrency](../../spec/05-errors-and-concurrency/),
 [Compiler architecture](../../contributing/implementation-decisions/#compiler-architecture)).
-This adapter targets Effect `4.1.2` and preserves the contracts below.
+This adapter targets the Effect release `packages/effect-ts/package.json`
+pins and preserves the contracts below.
 
 ## Effect release
 
-The adapter was verified against exactly Effect `4.1.2`. The entry runner
+The adapter is verified against exactly the pinned Effect release. The entry runner
 checks the installed release before `main` starts; another release ends
 the run with exit code `2`. The capability matrix of the Effect operations
 the adapter relies on is checked by the runtime's tests and by
@@ -213,3 +214,156 @@ A failure of the application or of cleanup keeps code `1` even when a signal
 came at the same time. A printed cause lists each failure and defect: an
 `Error` by its stack up to the first frame of the Effect runloop, another
 value by its `message` or as JSON.
+
+## Effect coverage
+
+The standard library wraps the pinned Effect release (see [The boundary of the language core](../../spec/05-errors-and-concurrency/#the-boundary-of-the-language-core)): every public export of the entrypoints `effect`, `effect/cli`, `effect/devtools`,
+`effect/http`, `effect/http-api`, `effect/observability`, `effect/process`, `effect/reactivity` and `effect/rpc` has a typed wrapper or an explicit
+decision, and a linter in `cargo test` checks that nothing is lost when
+Effect moves.
+
+### Snapshot
+
+`packages/effect-ts/coverage/snapshot.json` is the surface of the installed Effect, written
+by `node tools/dts-importer/index.mjs surface > packages/effect-ts/coverage/snapshot.json`
+(a Flick program: `pnpm -C tools/dts-importer build` first):
+every entrypoint of its `package.json`, and for the nine wrapped ones each
+export of each module as `Module.name` with its kind (`value`, `type` or
+`value+type`) and a fingerprint, 16 hex digits of the SHA-256 of its
+declarations printed without comments. A changed doc comment keeps the
+fingerprint; a changed signature does not.
+
+### Manifest
+
+`packages/effect-ts/coverage/surface/entrypoints.toml` decides each entrypoint: its
+modules are classified under a directory, or it is excluded as a whole, so a
+new entrypoint of Effect needs a decision too.
+
+```toml
+"effect" = { modules = "core" }
+"effect/ai" = { excluded = "AI provider clients are outside the 0.1.0 standard library" }
+```
+
+`packages/effect-ts/coverage/surface/<dir>/<Module>.toml` (or `<Module>.<part>.toml` for a
+large module) gives each export of the module exactly one status:
+
+```toml
+[wrapped]
+spaced = "Schedule.spaced 498f22b480d2397e"
+
+[language]
+gen = "a runtime function body: direct calls"
+
+[excluded]
+isSchedule = "TS-only: a type guard; Flick values are typed statically"
+
+[pending]
+cron = "cron expressions need a parser of their own"
+```
+
+| Status | Value | Meaning |
+| - | - | - |
+| `wrapped` | `"<Flick.Name> <fingerprint>"` | a typed symbol of the standard library, reviewed against that fingerprint |
+| `language` | the construct | covered by the language: `Effect.gen` by direct calls, `Context.Service` by `service`, `Data.TaggedError` by `type error`, `Layer.provide` by `provide`, `Match` by `match` |
+| `excluded` | the reason | TypeScript-only (`HKT`, `Types`, type guards, type extractors) or against an invariant (`unsafe*`, `Mutable*`, a fork without an owner, running an effect outside the entry runner, control flow through the error channel) |
+| `pending` | what is missing | temporarily unwrapped |
+
+`"*"` stands for every export of the module without an entry of its own.
+
+### Linter
+
+`packages/effect-ts/tools/surface/tests/coverage.rs` fails, naming `Module.name` and why, on:
+
+- an export or entrypoint without a decision, or a decision for one that
+  does not exist;
+- a `wrapped` export whose fingerprint differs from the reviewed one;
+- a `wrapped` symbol the standard library does not export, or that no test
+  under `tests/run/stdlib/` refers to (resolved by the checker);
+- a `language`, `excluded` or `pending` decision without a reason, a snapshot of another release than
+  `packages/effect-ts/package.json` pins.
+
+`just effect-coverage` prints the counts by status and module; CI adds them
+to the run's summary.
+
+### Moving to another release
+
+`just effect-bump <version>` downloads the release, writes its snapshot,
+prints what was added, removed and changed and what the runtime's
+capability matrix lacks, and moves the pins (`packages/effect-ts/package.json`,
+`packages/effect-ts/src/capabilities.ts`, the runtime's version test). The linter stays red until the manifest agrees with the new snapshot.
+
+### Unstable modules
+
+Effect marks `effect/reactivity` `@stability unstable` in the pinned release, and so are
+its bindings: `Reactivity.Atom` (atoms, the service `Registry` that holds
+their values, and its `layer`) and `Reactivity.AsyncResult` (the value of an
+atom a task computes). Their API may change with any Effect release; the UI
+modules built on them are the stable surface.
+
+`effect/rpc` is unstable too, and so is `Rpc`: procedures described with
+codecs, a group whose type is the record of its handlers, `listen` serving
+it over HTTP until its scope closes, and `call` and `call_stream` calling a
+procedure of the same value. Messages are NDJSON unless `ServeOptions` and
+`call_with` / `call_stream_with` choose `json`, `json_rpc`, `ndjson_rpc` or
+`binary` (Effect's frames, which only a program that names it bundles).
+`listen_websocket` serves the same group over WebSocket, which a client
+reaches with `transport = Rpc.websocket`, and `listen_tcp` over TCP on
+Node, with `Rpc.tcp` and a serialization that frames its messages;
+`serve_stdio` answers calls on stdin and stdout, and `spawn` starts such a
+program and connects to it; `serve_worker`/`worker` do the same for a
+Web Worker and `serve_node_worker`/`node_worker` for a Node worker thread; `with_middleware` runs a hook on the payload
+and headers of each call before the handler, and `with_headers` adds
+headers to the calls of a task; `uninterruptible` makes the server run a
+handler to its end though its client goes; `call_local` and
+`call_stream_local` call a group in memory, for tests;
+`connect` keeps one connection
+that `call_on` and `call_stream_on` share.
+
+`effect/observability` is unstable as well, and so are `Otlp` and
+`Prometheus`. `Otlp.layer`, `traces`, `logs` and `metrics` export spans, log
+records and metrics with OpenTelemetry's protocol over HTTP with JSON, each
+bringing its own fetch client; `Otlp.settings url service` and
+`layer_with`, `traces_with`, `logs_with` and `metrics_with` add the service's
+version and attributes, request headers, gzip, protobuf (`Otlp.protobuf`,
+bundled only where named), export intervals, batch size and shutdown
+timeout. `Otlp.from_config` exports what the `OTEL_` configuration of the
+provided `ConfigProvider` says, a signal only when its
+`OTEL_<SIGNAL>_EXPORTER` names `otlp`. `Prometheus.format` gives the
+recorded metrics in Prometheus's text format, `format_with` with a prefix or
+renamed, and `Prometheus.route path` is an `Http.Router` route answering
+them.
+
+`effect/devtools` is unstable, and so is `DevTools`: `DevTools.layer url`
+sends a program's spans over a WebSocket to the Effect DevTools listening
+at `url`, and `DevTools.layer_with { url; headers }` sends headers with the
+handshake, on Node.
+
+### Bindings
+
+A wrapper binds the export by the key of its module, `flick:<Module>`, which
+names no package of a target. On Effect the key stands for
+`@flick-lang/effect-ts/effect/<Module>`
+(`packages/effect-ts/src/effect/<Module>.ts`), which re-exports the wrapped
+module of Effect, so compiled code still imports only the runtime package. An adapter for what a Flick value cannot pass as is
+(an options record with `Option` fields, an Effect error that becomes a
+Flick `type error`) sits in the same file, named `flick<Name>`.
+
+```flick
+# import Schedule exposing (Schedule)
+#
+/// Recurs forever, each step the duration after the previous one ended.
+spaced : Duration.Duration -> Schedule none none i Float
+foreign pure spaced from "flick:Schedule" "spaced"
+
+retry :
+  forall c r e a r2 e2 o.
+  Schedule.Schedule r2 e2 (Errors e) o -> (Eff r e a)^c ->{Async | r + r2; e + e2} a
+foreign effect retry from "flick:Effect" "retry"
+  arity 1
+  retention call
+```
+
+Names are snake case; the subject comes last, so `task |> Effect.retry
+schedule` reads in order: `arity 1` calls Effect's data-last form, which
+returns the function of the subject. Records that cross to Effect keep its
+field names (`elapsedSincePrevious`).

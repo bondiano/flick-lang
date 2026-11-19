@@ -33,7 +33,7 @@ use proptest::prelude::*;
 thread_local! {
     /// What the checker knows of `Gen.fl` and the built-in modules, and
     /// their values the machine runs.
-    static GEN: (Decls, eval::Program) = {
+    pub(crate) static GEN: (Decls, eval::Program) = {
         let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/generate/Gen.fl");
         let modules = run::compile(&file).expect("Gen.fl compiles");
         (run::decls(&modules), run::program(&modules))
@@ -49,7 +49,7 @@ fn choices() -> impl Strategy<Value = Vec<u32>> {
 }
 
 /// The model's verdict on `p`: (Let-Sig) of `program : σ` at the top.
-fn model(p: &Program) -> Result<(), String> {
+pub(crate) fn model(p: &Program) -> Result<(), String> {
     GEN.with(|(d, _)| {
         Checker::new(d)
             .check_top(&p.term, &p.scheme)
@@ -58,7 +58,7 @@ fn model(p: &Program) -> Result<(), String> {
 }
 
 /// flick-core's errors on `source`; one of syntax is a bug of the printer.
-fn core(source: &str) -> Vec<String> {
+pub(crate) fn core(source: &str) -> Vec<String> {
     let mut sources = SourceMap::default();
     let file = sources.add("Gen.fl", source);
     let errors: Vec<String> = flick_core::check(&sources, file)
@@ -97,7 +97,11 @@ fn runnable(p: &Program) -> (Term, Type) {
 /// Runs `p`; each state must have the program's type at a stage within
 /// the first one's (Preservation), and the run must not get stuck
 /// (Progress); an error it ends with must be one of `ε₀` (T1).
-fn progress_and_preservation(decls: &eval::Program, d: &Decls, p: &Program) -> Result<(), String> {
+pub(crate) fn progress_and_preservation(
+    decls: &eval::Program,
+    d: &Decls,
+    p: &Program,
+) -> Result<(), String> {
     let (e0, t0) = runnable(p);
     let phi0 =
         check_config(d, &[], &Lambda::default(), &e0, &t0).map_err(|e| format!("e₀: {e}"))?;

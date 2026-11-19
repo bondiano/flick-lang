@@ -24,19 +24,28 @@ pub(super) fn unknown(tail: &Type) -> Option<u32> {
 /// `{S a | s - S}` does not.
 pub(super) fn owed(declared: &Norm, tail: &Type) -> Option<Vec<Elem>> {
     let (variable, gone) = less(tail);
-    let gives_back = |l: &Elem| declared.get(l).is_some_and(|t| !l.is_instance(t));
     (declared.tails.iter().map(less))
         .filter(|(held, _)| *held == variable)
         .map(|(_, taken)| {
             (taken.iter())
-                .filter(|l| !gone.contains(l) && !gives_back(l))
+                .filter(|l| !gone.contains(l) && !gives_back(declared, l))
                 .cloned()
                 .collect::<Vec<_>>()
         })
         .min_by_key(Vec::len)
 }
 
-/// Whether `declared` allows all a `tail` stands for.
-pub(super) fn allows(declared: &Norm, tail: &Type) -> bool {
-    owed(declared, tail).is_some_and(|names| names.is_empty())
+/// Whether `declared` holds the name `l` itself without arguments, which
+/// gives it back to a variable taken without it.
+fn gives_back(declared: &Norm, l: &Elem) -> bool {
+    declared.get(l).is_some_and(|t| !l.is_instance(t))
+}
+
+/// Whether adding `tail` to an open variable of `declared` taken without
+/// `never` allows all `tail` stands for: the variable joins `declared` less
+/// `never`, so the names `tail` is not less and `declared` does not give
+/// back stay owed.
+pub(super) fn growth_allows(declared: &Norm, tail: &Type, never: &[Elem]) -> bool {
+    let gone = less(tail).1;
+    (never.iter()).all(|l| gone.contains(l) || gives_back(declared, l))
 }

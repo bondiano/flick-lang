@@ -1,0 +1,11 @@
+export = "factor"
+argument_types = ["number"]
+return_type = "string"
+output = "2 x 6, prime"
+starter_error = "FLICK-T071"
+title = "Stop both loops"
+title_ru = "Остановите оба цикла"
+task = "factor finds the first a x b that makes n, with a from 2 up and b from a up, or says prime. break 'search should end the search, but no loop has that label. Give it to the right loop."
+task_ru = "factor ищет первое a x b, равное n, перебирая a от 2 и b от a, или отвечает prime. break 'search должен завершить поиск, но ни у одного цикла нет такой метки. Поставьте её нужному циклу."
+hints = ["A label goes before the loop it names, as in 'outer: for ….", "break 'search must end the outer loop over a, not only the inner one over b."]
+hints_ru = ["Метка ставится перед циклом, который она называет: 'outer: for ….", "break 'search должен завершить внешний цикл по a, а не только внутренний по b."]

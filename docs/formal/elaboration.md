@@ -89,7 +89,7 @@ s ::= p <- e | p₁ <- e₁ and … and pₙ <- eₙ | let p = e | if e | e
 c ::= p <- e | if e | let p = e
 ```
 
-The last statement of a `do` is an expression. Checker: `do_notation.rs`, `applicative_do.rs`, `comprehension.rs`, `question.rs`. Syntax: `reference/grammar.md` "`do`", "`for`", `?`.
+The last statement of a `do` is an expression. Checker: `do_notation.rs`, `applicative_do.rs`, `comprehension.rs`, `question.rs`. Syntax: `reference/syntax.md` "`do`", "`for`", `?`.
 
 ## 2. Dictionaries
 

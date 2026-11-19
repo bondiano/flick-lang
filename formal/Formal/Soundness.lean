@@ -71,7 +71,7 @@ theorem raise_errors {Ψ Θ v t φ} (hv : Value v) (h : Typ S Ψ Θ [] (.raise v
     ∃ ε, Row.Sub ε.asRow φ.err ∧ Typ S Ψ Θ [] v (.ex (.errors ε) .pure) := by
   obtain ⟨ε, hv', hε⟩ := raise_inv hv h
   obtain ⟨_, _, _, _, U, _, _, _, hU, ht, hsub⟩ := canonical_errors hv hv'
-  exact ⟨.rnm _ U, hsub.trans (Stage.le_err hε), .errVal hv ht hU (Row.Sub.refl _)⟩
+  exact ⟨.rnm _ U, hsub.trans (Stage.le_err hε), .errVal ht hU (Row.Sub.refl _)⟩
 
 /-- The initial configuration of a program. -/
 theorem CfgTy.init {e₀ t φ₀} (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ₀)) (hb : e₀.Below 0) :

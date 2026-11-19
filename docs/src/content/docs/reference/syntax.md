@@ -1,5 +1,5 @@
 ---
-title: "Flick grammar"
+title: "Syntax"
 ---
 
 This is the surface syntax accepted by `flick check` and `flick fmt`; the
@@ -31,42 +31,6 @@ UTF-8 byte ranges; layout columns count characters.
 
 Qualified names are written without spaces around `.`: `Users.get`,
 `Ui.Event.exhaust`, `Sql.Template`. `user.name` is field access.
-
-### Keywords
-
-```text
-module exposing import as let mut rec fun match with try if then else task await
-scope provide ignore todo echo type opaque where kind error service class
-instance deriving foreign from forall not none true false
-in when for yield do break continue
-```
-
-Contextual words are ordinary names everywhere except in one position:
-
-- `loop` before `{` and `while` before a condition followed by `do`;
-- `unboxed` and `untagged` right before `type` (see `codegen.md`);
-- foreign modes `pure`, `effect`, `blocked` and the source
-  `global`;
-- foreign metadata `arity`, `this`, `catch`, `cancel`, `nullable`,
-  `retention`, `optional`, `variadic`, `reviewed` (unknown metadata is
-  `FLICK-S011`);
-- `sql` before a body, a name and a body, `table` or `migration`: a block of
-  the plugin of `std`, which reads its clauses, its columns and its DDL (see
-  [sql.md](../sql/));
-- `cli` before a string and `{`: a block of the plugin of `std`, which reads
-  its clauses (see [command-line applications](../cli-dsl/));
-- `codec` before a schema and `{`, `server` before `fn` or a name, and
-  `component` before the name of a top-level declaration: blocks of the plugin
-  of `std` (see [the codec DSL](../schema/#the-codec-dsl),
-  [server functions](../server-fn/) and [ui.md](../ui/#components)). Every
-  module has these blocks of `std` without an import;
-- `and` between the bindings of a `do` group, `x <- a and y <- b`;
-- `effect` before the name of an effect declaration, `tail`, `abort` and
-  `control` before an operation of a service or an effect, and `return`
-  before the pattern of an arm of `try` (see
-  [effects.md](../effects/#effects-and-handlers));
-- `proof` before a name at the start of a declaration (see
-  [Declarations](#declarations)).
 
 ### Float literals
 
@@ -134,9 +98,182 @@ let examples =
 ### Operators and punctuation
 
 ```text
-( ) [ ] { } , ; : . .. ..< = -> <- => | ^ _ ?
+( ) [ ] { } , ; : . .. ..< = -> <- => | ^ _ ? @
 |> <| >> << || && == != < <= > >= ++ + - * / % ** not
 ```
+
+## Keywords
+
+Every reserved word of Flick is listed below with what it introduces and
+where it is described in full. A keyword cannot be used as a name.
+
+```text
+module exposing import as let mut rec assert fun match with try if then else
+task await lazy scope provide ignore todo echo type opaque where kind error
+service class instance deriving foreign from forall not none true false
+in when for yield do break continue
+```
+
+Contextual words are ordinary names everywhere except in one position:
+
+- `loop` before `{` and `while` before a condition followed by `do`;
+- `private` before `module` in a file's header (see [modules](../modules/)),
+  and `plugin` before a head in an `exposing` list (see
+  [plugins](../plugins/#using-a-plugin));
+- `alias` right after `type`, and `unboxed` and `untagged` right before it
+  (see [code generation](../codegen/));
+- `pack` and `unpack` before a module and `as`, and `exists` before a name
+  and `:` in a type (see [packed modules](../modules/#packed-modules-and-existential-results));
+- foreign modes `pure`, `effect`, `blocked` and the source
+  `global`;
+- foreign metadata `arity`, `this`, `catch`, `cancel`, `nullable`,
+  `retention`, `optional`, `variadic`, `reviewed` (unknown metadata is
+  `FLICK-S011`);
+- `sql` before a body, a name and a body, `table` or `migration`: a block of
+  the plugin of `std`, which reads its clauses, its columns and its DDL (see
+  [sql.md](../sql/));
+- `cli` before a string and `{`: a block of the plugin of `std`, which reads
+  its clauses (see [command-line applications](../cli-dsl/));
+- `codec` before a schema and `{`, `server` before `fn` or a name, and
+  `component` before the name of a top-level declaration: blocks of the plugin
+  of `std` (see [the codec DSL](../schema/#the-codec-dsl),
+  [server functions](../server-fn/) and [ui.md](../ui/#components)). Every
+  module has these blocks of `std` without an import;
+- `and` between the bindings of a `do` group, `x <- a and y <- b`;
+- `effect` before the name of an effect declaration, `tail`, `abort` and
+  `control` before an operation of a service or an effect, and `return`
+  before the pattern of an arm of `try` (see
+  [effects.md](../effects/#effects-and-handlers));
+- `proof` before a name at the start of a declaration (see
+  [Declarations](#declarations)).
+
+### In modules
+
+| Keyword | Meaning | Example |
+| - | - | - |
+| `module` | names the module of the file | `module App.Main exposing (run)` |
+| `private` | limits a file module to its own package when placed before `module`; a name elsewhere | `private module App.Internal exposing (helper)` |
+| `exposing` | the names a module exports, or an import brings in unqualified | `import App.Domain exposing (User, greet)` |
+| `import` | uses another module | `import Effect.Log as Log` |
+| `as` | a local name for an imported module; the Flick type of a `sql table` column | `import Effect.Log as Log` |
+| `pack` | contextual: a module as a value of `Module Sig` | `pack Argument as Source` |
+| `unpack` | contextual: opens a packed module in a scope of its own | `unpack packed as K in K.value` |
+
+See [modules.md](../modules/).
+
+### In declarations
+
+| Keyword | Meaning | Example |
+| - | - | - |
+| `let` | binds a value or a function, at the top level or in a block | `let total = a + b` |
+| `mut` | `let mut` declares a variable of a function, which `name = value` assigns | `let mut total = 0` |
+| `rec` | `let rec` lets a function call itself; `rec { … }` groups mutually recursive functions | `let rec go n = …` |
+| `assert` | `let assert` binds a pattern that may not match, and fails when it does not | `let assert [x, ..._] = xs as "no items"` |
+| `type` | declares an ADT, `type alias` a transparent alias | `type Shape = Circle Float \| Empty` |
+| `opaque` | hides a type's representation outside its module | `opaque type alias UserId = String` |
+| `where` | the predicate of a `refined` type; the goal of a `proof`; a filter in `sql { … }` | `where user.id == params.id` |
+| `proof` | contextual: before a name at the start of a declaration, states a property of the module's definitions and proves it; the compiler checks the proof and erases the declaration; a name elsewhere | `proof same where same_type a a = refl` |
+| `kind` | declares a kind with its type-level constructors | `kind Nullability = NonNull \| Nullable` |
+| `error` | `type error` declares an expected error with a nominal identity | `type error NotFound = NotFound UserId` |
+| `service` | declares the operations of a service, looked up at run time | `service Clock = now : Unit ->{} Float` |
+| `class` | declares a type class | `class Named a = name : a -> String` |
+| `instance` | implements a class for a type | `instance Named User = let name u = u.name` |
+| `deriving` | asks the compiler for instances | `deriving Eq, Show, Schema` |
+| `foreign` | binds a JavaScript value with a Flick signature | `foreign read_text from "./fs.js" "readText"` |
+| `from` | the source of a `foreign`; a table in `sql { … }` | `from user in Users` |
+| `forall` | quantifies type variables explicitly | `keep : forall s. Path ->{Scope s} File s` |
+
+See [types.md](../types/), [classes.md](../classes/), [effects.md](../effects/), [services.md](../services/)
+and [ffi.md](../ffi/).
+
+### In expressions
+
+| Keyword | Meaning | Example |
+| - | - | - |
+| `fun` | an anonymous function | `fun x -> x + 1` |
+| `if` `then` `else` | a conditional expression; without `else` it is `Unit` | `if n == 0 then 1 else n` |
+| `match` `with` | pattern matching | `match shape with \| Circle r -> r` |
+| `when` | a guard on a match arm | `\| Rect w h when w == h -> "square"` |
+| `with` | also the handlers of `try` and a record update | `{ user with name = "Ada" }` |
+| `try` | handles the expected errors of its body | `try find id with \| NotFound _ -> None` |
+| `not` | boolean negation; `not null` on a `sql table` column | `not done` |
+| `true` `false` | the two `Bool` values | `if ok then true else false` |
+| `none` | the empty row in a type | `a ->{none; NotFound} b` |
+| `in` | binds a row in a SQL `from` or `join` clause; starts the body of `unpack … as K in` | `join account in Accounts` |
+| `do` | statements sequenced through `Monad`: `x <- e` binds, `if c` guards | `do { x <- left; y <- right; pure (x, y) }` |
+| `for` `yield` | a lazy `Seq` of the elements `yield` gives, one generator; `[for …]` is a strict `List`; `for … do body` runs the body for each element | `[for x <- xs if x > 0 yield x * 2]` |
+| `loop` | contextual: repeats a block until `break value` returns its result | `loop { break 42 }` |
+| `while` | contextual: repeats a `Unit` body while its condition is true | `while i < n do i = i + 1` |
+| `break` | exits the nearest loop, or the enclosing one its label names; only `loop` takes a value | `break 42`, `break 'outer` |
+| `continue` | skips the rest of the current iteration of the nearest loop, or of the labeled one | `continue 'outer` |
+
+A loop may carry a label, `'outer: for x <- xs do …`, which `break` and
+`continue` name to leave or continue an enclosing loop (see
+[local loops](../bindings/#local-loops)).
+
+### Effects and resources
+
+| Keyword | Meaning | Example |
+| - | - | - |
+| `task` | builds an `Eff r e a` from its block without running it | `task { Users.get id }` |
+| `await` | runs an `Eff` once in the current fiber and gives its result, or forces a `Lazy` | `await request` |
+| `lazy` | builds a `Lazy r e a`, which runs its block at most once, at its first `await`; `let lazy x = e` binds one of its function | `lazy { Config.load () }` |
+| `scope` | runs its block in a fresh region and releases what the block acquired when it ends | `scope { File.read_all (File.open_scoped path) }` |
+| `provide` | runs its block with the services a layer builds | `provide live { run user }` |
+| `ignore` | discards the value of an intermediate statement | `ignore (Store.save user)` |
+
+`ignore` evaluates its operand and throws the value away. An `Eff` it
+discards is not run: write `ignore (await t)` to run `t` and drop its result.
+
+See [effects.md](../effects/#task-and-await), [`lazy`](../effects/#lazy) and [regions.md](../regions/).
+
+### Debugging
+
+| Keyword | Meaning | Example |
+| - | - | - |
+| `todo` | code not written yet: any type, fails when it runs | `todo "parse the header"` |
+| `echo` | writes a value and its place to stderr, and returns it | `echo (total rows)`, `rows \|> echo` |
+
+Both check anywhere and leave a warning (`FLICK-T022`, `FLICK-T023`);
+`flick pack` refuses a package that still has them (`FLICK-P024`). `echo`
+is not an effect: it is for debugging, like a breakpoint. Both stay usable
+as record labels: `{ echo = … }`.
+
+### Embedded languages
+
+| Block | Meaning | Example |
+| - | - | - |
+| `ui` | a UI block: its code with the names of `Ui` in sight | `ui { … }` |
+| `refined` | a type whose values pass a check, with `parse`, `value` and `check` | `refined type Port = Float where fun n -> n > 0` |
+
+See [schema.md](../schema/) and [ui.md](../ui/). A UI block, a component,
+`component counter () = …`, a command-line interface, `cli "deploy" { … }`,
+and a typed SQL query, `sql { from u in Users; select u }`, are blocks of
+the plugin of `std`, not keywords: each word starts a block where a block
+may start, and is a name elsewhere. See
+[cli-dsl.md](../cli-dsl/) and [sql.md](../sql/). So are `suite "name" { … }`
+and `test "name" { … }`, only at the start of a top-level declaration (see
+[testing.md](../testing/)).
+
+### In the editor
+
+Hovering a keyword that opens an expression shows the type of the whole
+expression, the type an ML language server shows for an expression, together
+with what the keyword does:
+
+| Hover on | Shows |
+| - | - |
+| `task` | `task { … } : Eff {Store} {StoreError} Float`: the computation the block builds |
+| `lazy` | `lazy { … } : Lazy {Store} {StoreError} Float`: the lazy the block builds |
+| `scope` | `scope { … } : Float`: the value the block returns once its resources are released |
+| `provide`, `try` | the value of the block, with the services or errors it removes |
+| `match`, `if` | `match … with : String`: the value of the arm or branch taken |
+| `fun` | `fun … -> … : Float -> Float`: the function |
+| `sql`, `ui` | the value the block builds, such as `sql { … } : Template Pg {} { label : String }` |
+| `await` | `await … : Float`: the result, with the `Eff` it runs |
+| `ignore` | `ignore : Eff {Store} {StoreError} Float -> Unit`: the type of what is discarded, with a warning when it is an `Eff` that is not run |
+
+Other keywords show nothing on hover; the names around them show their types.
 
 ## Operator table
 
@@ -164,12 +301,13 @@ There are no user-defined operators. From weakest to strongest:
 `f <| g <| x + 1` is `f (g (x + 1))`, and `f a <| x` is the call `f a x`;
 `List.map f >> List.filter p` composes two applications, and `await f >> g`
 is `await (f >> g)`. What the operators mean is in [Numbers and
-operators](../types/#numbers-and-operators).
-A range is a `Seq Float`: `a..b` counts from `a` up to `b` inclusive
+operators](../numbers/#operators).
+A range is a `Seq Int`: `a..b` counts from `a` up to `b` inclusive
 (`Seq.range_to`), `a..<b` stops before `b` (`Seq.range`), and `a..` never
 ends (`Seq.from`). Alone in brackets, `[a..b]` is the `List` of the same
 numbers; `[a..]` is an error. The number before `..` ends there: `1..5` is
-a range, `1.5` a number. Bitwise operations are the functions `Float.bit_*`.
+a range, `1.5` a number. Bitwise operations are the functions `Int.bit_*` and
+`Int.shift_*`.
 
 ## Layout
 
@@ -259,7 +397,9 @@ let between x =
 
 ```text
 file        = [module_header] { import } { decl | module_application }
-module_header = "module" ModulePath ["exposing" exposing]
+module_header = ["private"] "module" ModulePath { module_params } [":" contract] ["exposing" exposing]
+module_params = "(" Con ":" contract { "," Con ":" contract } ")"   // a parameterized module
+contract    = ModulePath | module_params "->" contract ["with" "type" …]
 import      = "import" ModulePath ["as" Con] ["exposing" exposing]
 exposing    = "(" item { "," item } [","] ")"
 item        = name | Con | Con "(..)" | ".." | "plugin" name   // see plugins.md
@@ -268,6 +408,7 @@ ModulePath  = Con { "." Con }
 decl        = signature | let | rec_group | type_decl | kind_decl | error_decl
             | service | class | instance | foreign | module_contract | inline_module | proof
             | head { head_arg } ("{" { token } "}" | { token })   // a plugin's, to the next decl
+attribute   = "@" name { name | String }   // before a declaration, a member or a variant
 inline_module = "module" Con ["exposing" exposing] "=" indented { import | decl }
 module_contract = "type" "module" Con "=" indented { module_member }
 module_application = "module" Con "=" ModulePath "(" ModulePath { "," ModulePath } ")"
@@ -385,10 +526,35 @@ rec {
 }
 ```
 
+## Attributes
+
+An attribute is a line `@name`, maybe with arguments, before a declaration,
+a member or a constructor. It is metadata for the compiler or a plugin, not a
+name: nothing resolves it, and a program cannot declare another.
+
+```flick
+@label gauge
+type Gauge = Gauge Float
+```
+
+| Attribute | Before | Says | See |
+| - | - | - | - |
+| `@implicit` | an instance | the instance converts between two types where the expected type is known | [implicit conversions](../classes/#implicit-conversions) |
+| `@derive` | a class | a plugin derives it: that of the class's package, or of the package named, `@derive std` | [deriving](../classes/#deriving) |
+| `@ts` | a type or a service | its TypeScript form, `none`, or `import` of a type of a package | [the form of a type](../codegen/#the-form-of-a-type) |
+| `@stores` | a type without constructors or a body | its values keep the functions they are given | [qualifiers](../regions/#qualifiers) |
+| `@label` | a type | its top-level values carry their names where the program runs; the kind, `@label atom`, says which builds keep them | [observability](../observability/#ui-actions-and-atom-writes) |
+| `@cell`, `@maker`, `@owner` | a type; a value; a service | each value of the type holds one value; the value makes an atom, an action or a view; the service's handler owns what is made under it | [checks of calls](../plugins/#checks-of-calls) |
+| `@lang`, `@sync` | a declaration; a service | built-in modules only: a lang item the compiler knows by its role; a service whose operations run at once | [direct calls](../../spec/01-direct-calls/) |
+
+An unknown attribute, a misplaced one, or one with arguments it does not take
+is `FLICK-S014`. Hovering an attribute in the editor shows what it says.
+
 ## Types, rows and kinds
 
 ```text
 type        = "forall" name { name } "." type
+            | "exists" Con ":" contract "." type    // the witness of an `unpack`
             | union "=>" type                  // constraint(s): `Show a =>`, `(Show a, Eq a) =>`
             | ["~"] union ["->" [effects] type] // right associative; `~` marks a suspended parameter
 effects     = "{" [row] [";" [row]] "}"     // written `->{` with no space
@@ -457,6 +623,7 @@ expr        = "fun" atom_pattern { atom_pattern } "->" block
             | "match" expr "with" arm { arm }
             | "try" block "with" handler_arm { handler_arm }
             | "if" expr "then" block [ "else" (if_expr | block) ]
+            | "pack" ModulePath "as" contract | "unpack" expr "as" Con ["," name] "in" block
             | "lazy" expr                    // binds as `await`: `lazy f x` is `lazy (f x)`
             | operator expression over application (see the operator table)
 arm         = "|" or_pattern ["when" expr] "->" block
@@ -639,7 +806,9 @@ statements becomes a line break, and so does `;` between the fields of a
 broken record, a broken bracket gets a trailing `,`, a broken variant list starts with
 `|`, and empty rows of an arrow are dropped, which are the same type:
 `->{none; E}` becomes `->{; E}`, `->{R; none}` becomes `->{R}`, and
-`->{none; none}` becomes `->{}`. `Eff none none a` stays as written. The formatter re-parses
+`->{none; none}` becomes `->{}`. `Eff none none a` stays as written. A call
+in parentheses and the same call on a line of its own under the call it is an
+argument of are the same program, as rule 8 reads them. The formatter re-parses
 each declaration and the whole file and refuses with `FLICK-P003` if the AST
 or the comments would change.
 
@@ -660,6 +829,14 @@ fits; otherwise it breaks, outermost construct first:
   stays on its line and only the argument breaks:
   `Ref.modify counter (fun current ->`, the body, then `)` on its own line. A
   call in parentheses stays hugged by them;
+- in a body whose lines under a call are its arguments (rule 8), as in
+  `ui { … }`, a call keeps its arguments on its line. When it does not fit,
+  the calls in parentheses that end its arguments go on lines of their own
+  under it, one level in, without the parentheses: `div props (p a) (p b)`
+  becomes `div props`, then `p a` and `p b`. A call in parentheses alone on
+  such a line loses them where its first line fits. Only a call of a name
+  moves, not `(-x)`, `if`, `match` or `fun`; calls with a comment among
+  them and anything inside brackets stay as they are;
 - an operator chain breaks before each operator of its weakest precedence,
   continuations one level in; a pipeline of `|>` or `<|` breaks one step per
   line, its operators under the first operand when the pipeline starts its

@@ -63,7 +63,7 @@ let read_later path =
   }
 ```
 
-[Effects, errors and services](../../reference/effects/) and
+[Effects and errors](../../reference/effects/), [services](../../reference/services/) and
 [Regions and captures](../../reference/regions/) have the full rules.
 
 ## Where the promise stops
@@ -77,7 +77,7 @@ let read_later path =
   the clock, randomness, the environment, the arguments and child processes
   as `Host` services, but a foreign binding and `Host.raw_*` reach the host
   whatever the row says (see
-  [what an empty row does not promise](../../reference/effects/#what-an-empty-row-does-not-promise)).
+  [what an empty row does not promise](../../reference/services/#what-an-empty-row-does-not-promise)).
 - **The proofs cover the core, not the whole compiler.** The core calculus is
   proved in Lean under stated hypotheses, and the known differences from the
   checker are written down. See [`formal/`](https://github.com/bondiano/flick-lang/tree/main/formal).
@@ -170,7 +170,7 @@ check.
 - **Teams already productive with TypeScript and Effect.** On JavaScript, Flick
   runs on its own runtime by default, or on the same Effect through an adapter
   (`effect = "effect"`), where adopting it is a choice of source language, not
-  of runtime. [Effect coverage](../../reference/effect-surface/) lists what of
+  of runtime. [Effect coverage](../../reference/runtime/#effect-coverage) lists what of
   Effect Flick reaches.
 
 ## Next

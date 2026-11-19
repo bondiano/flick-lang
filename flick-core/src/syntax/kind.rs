@@ -417,7 +417,7 @@ impl SyntaxKind {
     }
 
     /// Left and right binding powers of a binary operator, weakest first
-    /// (grammar.md); the formatter groups operators of one left power.
+    /// (syntax.md); the formatter groups operators of one left power.
     pub fn binding_power(self) -> Option<(u8, u8)> {
         use SyntaxKind as K;
         Some(match self {

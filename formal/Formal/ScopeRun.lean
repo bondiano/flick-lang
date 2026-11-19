@@ -107,6 +107,7 @@ theorem Typ.scope_of_scopeRun {Ψ Θ Γ b T φ} (h : Typ S Ψ Θ Γ (.app (.cons
   cases h
   obtain rfl := (la'.eq_plain rfl).owner_v_right
   rw [scopeRun_stage] at lψ'
+  refine hT.typ fun _ hT => ?_
   exact .scope (F := Facts.none) hn (fun _ _ h => h.elim)
     ((hb.sub (J' := .ex _ _) ⟨lt', Stage.le_refl _⟩).cut (Entails.union_left _ _))
     (Stage.le_trans lψ' ⟨fun x hx => hx.elim id fun h' => .inr (.inl (hs x h')), fun _ h' => h'⟩)

@@ -1,5 +1,5 @@
 //! A program of the generator as Flick source
-//! (`docs/src/content/docs/reference/grammar.md`): `Gen.fl`, then
+//! (`docs/src/content/docs/reference/syntax.md`): `Gen.fl`, then
 //! `program : σ` and its `let`. Only the forms the generator makes are
 //! written. Layout: a block on lines of its own, two columns deeper than
 //! the line it belongs to; the arms of `match` and `try` two columns
@@ -357,6 +357,7 @@ fn ty(t: &Type) -> String {
         Type::Captured(x, c) | Type::Bounded(x, c) => format!("{}^{}", ty_atom(x), caps(c)),
         Type::Fun(p, s, r) => format!("{} {} {}", ty_atom(p), stage(s), ty(r)),
         Type::Eff(r, e, a) => format!("Eff {} {} {}", row_arg(r), row_arg(e), ty_atom(a)),
+        Type::Errors(r) => format!("Errors {}", row_arg(r)),
         Type::App(f, x) => format!("{} {}", ty(f), ty_atom(x)),
         Type::Ref(a) => format!("Ref {}", ty_atom(a)),
         _ => ty_atom(t),

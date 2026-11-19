@@ -21,6 +21,7 @@ mod expr;
 mod generalize;
 mod handle;
 mod handlers;
+mod match_errors;
 mod pattern;
 mod regions;
 mod row_facts;
@@ -53,7 +54,7 @@ use flick_core::types::PURE_OVER_CAPABILITY;
 use crate::decls::Decls;
 use crate::eval::Program;
 use crate::syntax::{Name, Path, Term};
-use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type};
+use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 
 pub(crate) use constants::prim_scheme;
 pub(crate) use generalize::{Inst, in_regions, substitute};
@@ -146,6 +147,9 @@ pub struct Checker<'d> {
     /// The opaque aliases subsumption is unfolding on both sides: one met
     /// again inside its own unfolding is equal by its arguments.
     unfolding: Vec<Path>,
+    /// While a pattern of a `match` is checked, the rows it added an error
+    /// to, each by the variable that stands for the rest of it.
+    error_rows: Option<Vec<Var>>,
     /// The top-level value being checked and its scheme; once its body is
     /// skolemized, at the regions the body is checked at, through which its
     /// recursive uses go.
@@ -185,6 +189,7 @@ impl<'d> Checker<'d> {
             trace: None,
             instanced: None,
             unfolding: Vec::new(),
+            error_rows: None,
             own: None,
         }
     }

@@ -4,9 +4,11 @@
 
 use std::fmt::Write;
 use std::ops::Range;
+use std::slice;
 
 use super::Checker;
 use super::bindings::let_parts;
+use super::gadt::columns::Coverage;
 use super::patterns::{Ctor, Pat};
 use crate::diagnostics;
 use crate::diagnostics::{Severity, codes};
@@ -17,13 +19,33 @@ use crate::types::lang::Lang;
 use crate::types::ty::Type;
 
 impl Checker<'_> {
-    /// A pattern of `let` or of a parameter must match every value. A local
-    /// `let` comes with the statements after it in its block, for the fixes.
-    pub fn irrefutable(&mut self, pat: &Pat, node: &Node, binding: Option<(&Node, &[&Node])>) {
+    /// A value of `ty` that `pat` misses, as an arm of a `match` on `ty`
+    /// would: a pattern of an error at `Errors ε` misses the other errors
+    /// of `ε`, which the error's own type does not show.
+    fn missed(&self, pat: &Pat, ty: &Type) -> Option<Vec<Pat>> {
+        let rows = [vec![pat.clone()]];
+        self.useful_at(
+            &rows,
+            &[Pat::Wild],
+            slice::from_ref(ty),
+            &Coverage::new(self),
+        )
+    }
+
+    /// A pattern of `let` or of a parameter must match every value of `ty`.
+    /// A local `let` comes with the statements after it in its block, for
+    /// the fixes.
+    pub fn irrefutable(
+        &mut self,
+        pat: &Pat,
+        ty: &Type,
+        node: &Node,
+        binding: Option<(&Node, &[&Node])>,
+    ) {
         if *pat == Pat::Wild {
             return;
         }
-        let Some(witness) = self.useful(&[vec![pat.clone()]], &[Pat::Wild]) else {
+        let Some(witness) = self.missed(pat, ty) else {
             return;
         };
         let shown = self.show_pat(&witness[0], false);
@@ -74,8 +96,15 @@ impl Checker<'_> {
     }
 
     /// `let assert`: only in a block, where a project allows it, and with a
-    /// pattern that may miss. `rest` is `None` at the top level.
-    pub fn let_assert(&mut self, pat: &Pat, pattern: &Node, decl: &Node, rest: Option<&[&Node]>) {
+    /// pattern that may miss a value of `ty`. `rest` is `None` at the top
+    /// level.
+    pub fn let_assert(
+        &mut self,
+        (pat, ty): (&Pat, &Type),
+        pattern: &Node,
+        decl: &Node,
+        rest: Option<&[&Node]>,
+    ) {
         let Some(kw) = decl.child_tokens().find(|t| t.kind == K::AssertKw) else {
             return;
         };
@@ -99,7 +128,7 @@ impl Checker<'_> {
                 diagnostic = diagnostic.with_fix(|| ("use `match`", vec![edit]));
             }
             self.diagnostics.push(diagnostic);
-        } else if self.covers_all(pat) {
+        } else if self.missed(pat, ty).is_none() {
             self.diagnostics.push(
                 diagnostics::Diagnostic::new(
                     codes::T025,

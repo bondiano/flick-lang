@@ -23,6 +23,8 @@ codegen/counted_patterns
 codegen/composition
 codegen/task_twice
 codegen/errors
+codegen/error_match
+codegen/error_intro
 codegen/fail
 codegen/services
 effect/service_params

@@ -30,8 +30,12 @@ fn spec_example_parses_with_defaults() {
     assert_eq!(config.build, Build::default());
     let lib = parse_text("schema-version = 1\n[project]\nkind = \"lib\"\n").expect("valid");
     assert_eq!(
-        (lib.source_dir.as_str(), lib.test_dir.as_str()),
-        ("src", "test")
+        (
+            lib.source_dir.as_str(),
+            lib.test_dir.as_str(),
+            lib.proof_dir.as_str()
+        ),
+        ("src", "test", "proofs")
     );
     assert_eq!(lib.sql_dialect, "postgresql");
     assert!(!lib.no_let_assert);
