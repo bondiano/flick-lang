@@ -1,0 +1,32 @@
+// A handler, or a `provide`, of one instance answers every instance of its
+// effect in its body by name: a row variable of the body that may hold
+// another instance is E019, whatever form the handler takes. flick-core
+// reports none of these; the model and the Lean rules (`Row.hBody`) reject
+// each.
+module App.InstanceTails exposing (..)
+
+effect Store a =
+  get : Unit ->{} a
+
+service Box a =
+  take : Unit ->{} a
+
+// an effect handler of `Store Int` over a body whose row is only `r`
+hidden : (Unit ->{r; e} Int) ->{r; e} Int
+let hidden body =
+  try body () with
+  | Store.get () -> 41
+//~ FLICK-E019 @17:3-17:6 `r` may hold `Store` at other arguments
+
+// `provide` of a record of `Box Int` over a body whose row is only `r`
+boxed : (Unit ->{r; e} Int) ->{r; e} Int
+let boxed body = provide Box ({ take = fun () -> 41 }) { body () }
+//               ^^^^^^^ FLICK-E019 `r` may hold `Box` at other arguments
+
+// `provide` of a named implementation of `Box Int`
+ints : Box.Impl Int
+let ints = { take = fun () -> 41 }
+
+named : (Unit ->{r; e} Int) ->{r; e} Int
+let named body = provide Box ints { body () }
+//               ^^^^^^^ FLICK-E019 `r` may hold `Box` at other arguments
