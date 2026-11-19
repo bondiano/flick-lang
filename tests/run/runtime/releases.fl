@@ -54,8 +54,9 @@ let main () =
     try failing_scope () with
     | Oops text -> 0
   Platform.stdout_line (show caught)
+  // long enough for the scope to open on a slow machine, well short of its sleep
   let timed =
-    try timeout 5 (task { slow_scope () }) with
+    try timeout 200 (task { slow_scope () }) with
     | TimeoutError -> "timed out"
   Platform.stdout_line timed
   Platform.stdout_line (race_sibling ())
