@@ -1,0 +1,26 @@
+---
+title: Собственный тип в строке
+description: "`\\{…}` выводит значение с помощью его экземпляра класса `Display`."
+tableOfContents: false
+source_hash: f90db87daa1ec272
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="display">
+
+Конструкция `\{…}` подставляет в строку текстовое представление значения.
+Его задаёт класс `Display` с функцией `display : a -> String`. Для
+`String`, `Int`, `Float` и `Bool` экземпляры уже есть, а объявление
+`instance Display Temperature` реализует класс для типа из программы.
+
+Функция `show` возвращает запись значения в коде; здесь её реализует
+`deriving Show`. Поэтому `show today` даёт `Celsius 21.5`, а подстановка
+`today` в строку — `21.5 °C`.
+
+Полные правила приведены в [справочнике](../../reference/classes/#классы).
+
+**Попробуйте:** удалите экземпляр. Компилятор сообщит `FLICK-C001`:
+неизвестно, как представить `Temperature` в виде текста.
+
+</TourLesson>

@@ -1,0 +1,26 @@
+---
+title: Implicit conversions
+description: "`@implicit` lets an instance of `Into` convert where a type is expected."
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="implicit">
+
+`@implicit` before an instance of `Into` lets the compiler call it on its
+own. `clearance` takes `Feet`, so `clearance (Meters 4.0)` converts the
+meters first, without an `into`.
+
+A conversion happens only between two named types, such as `Meters` and
+`Feet`, in one step, and only where exactly one implicit instance fits. The
+numbers of the core are never converted implicitly: `into` stays explicit
+for an `Int` that becomes a `Float`.
+
+The [reference](../../reference/classes/#implicit-conversions) has the full
+rules.
+
+**Try:** remove `@implicit`. The compiler reports `FLICK-T003`: `clearance`
+expects `Feet` and finds `Meters`.
+
+</TourLesson>

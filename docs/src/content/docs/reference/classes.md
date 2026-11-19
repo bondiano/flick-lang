@@ -39,6 +39,8 @@ cell) but no `Hash`. `Display` (`display : a -> String`) is what a hole
 `Into Int Float` and `Into Int BigInt`. It has no functional dependency, so
 the type `into` gives is the one its place expects; without one it is
 `FLICK-C002`. A program declares `Into` for its own types like any class.
+The tour has examples of [`Display`](../../tour/display/) and
+[`Into`](../../tour/into/).
 
 Over type constructors `Prelude` declares `Functor` (`map`), `Foldable`
 (`fold`, `fold_map`), `Traversable` (`traverse`, a runtime function mapped
@@ -87,6 +89,7 @@ leave the type mismatch unresolved. Arguments, annotated bindings, return
 positions, branches and list elements can receive a conversion when their
 expected type is known. Explicit method calls such as `into x` still work.
 The core's numeric `Into` instances are **not** implicit.
+The tour has a runnable [example](../../tour/implicit/).
 
 ## Instances
 

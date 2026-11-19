@@ -1,0 +1,43 @@
+---
+title: Переменные в задаче
+description: "`task` и `fun` не могут использовать `let mut`; компилятор подсказывает, что использовать вместо неё."
+tableOfContents: false
+source_hash: 4d6eb27715afd358
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="captures">
+
+Программа намеренно содержит ошибку компиляции. `runs` объявлена через
+`let mut`, а задача `counted` её изменяет. Задача может выполниться позже,
+несколько раз или одновременно со своей функцией, поэтому не может
+использовать переменные этой функции. Компилятор сообщает `FLICK-G005` и
+подсказывает, что делать: чтобы прочитать значение, свяжите его через `let`
+до задачи, а чтобы изменять, храните его в `Ref`, как в уроке о задачах.
+Для `fun` и локальной функции действует то же правило.
+
+Для функции, переданной аргументом, есть своё правило. Параметр без
+указанного типа, который вызывают, как `action` ниже, считается чистой
+функцией. Поэтому ему нельзя передать `say`, которая печатает:
+
+```flick fail FLICK-T003
+say : Unit ->{Host.Console} Unit
+let say () = Platform.stdout_line "hi"
+
+greet : Unit ->{Host.Console} Unit
+let greet () =
+  let run = fun action -> action ()
+  run say
+```
+
+Компилятор сообщает `FLICK-T003` и указывает на `action`: укажите её тип,
+`fun (action : Unit ->{Host.Console} Unit) -> action ()`.
+
+Правила для [переменных](../../reference/bindings/#переменные) приведены в
+справочнике.
+
+**Попробуйте:** сделайте `runs` ячейкой `Ref`: `let runs = Ref.make 0`, а в
+задаче — `Ref.set runs (Ref.get runs + 1)` и `Ref.get runs`.
+
+</TourLesson>
