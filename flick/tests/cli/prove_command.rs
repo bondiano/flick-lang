@@ -97,3 +97,26 @@ fn proofs_read_other_modules_and_recheck_after_a_body_edit() {
     let restored = flick_in(&dir, &["prove"]);
     assert_eq!(restored.status.code(), Some(0), "{restored:?}");
 }
+
+/// Only a proof names another module's proof: in ordinary code `M.name` of
+/// a proof is a name the module does not export.
+#[test]
+fn a_proof_is_no_value_outside_a_proof() {
+    let leak = format!("{USES}\nleaked : Int\nlet leaked = B.unfolded\n");
+    let dir = project(
+        "prove_lemma_outside_a_proof",
+        &[
+            ("flick.toml", LIB),
+            ("src/App/Steps.fl", STEPS),
+            ("proofs/App/Base.fl", BASE),
+            ("proofs/App/Uses.fl", &leak),
+        ],
+    );
+    let refused = flick_in(&dir, &["prove"]);
+    let stderr = String::from_utf8_lossy(&refused.stderr);
+    assert_eq!(refused.status.code(), Some(1), "{stderr}");
+    assert!(
+        stderr.contains("FLICK-R004") && stderr.contains("does not export `unfolded`"),
+        "{stderr}"
+    );
+}
