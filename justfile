@@ -35,9 +35,10 @@ docs-fix:
 # Run the test suites; the reference model has its own recipe, `model`
 test: unit feature-test
 
-# The tests of the workspace crates but the reference model
-unit:
-    cargo test --workspace --exclude flick-model
+# The tests of the workspace crates but the reference model; CI runs those of
+# `flick` (`just unit -p flick`) beside the others, which take as long
+unit *packages="--workspace --exclude flick-model":
+    cargo test {{packages}}
 
 # The reference model of λFlick: its unit tests, the cases of
 # tests/run/model.txt checked and run against their `.stdout`, the other

@@ -51,9 +51,20 @@ jobs:
       - run: node --test .github/actions/setup-flick/install.test.mjs
       - run: node --test .github/scripts/*.test.mjs
 
+  # `just unit` in two parts: the tests of `flick`, its CLI above all, take
+  # as long as those of every other crate together
   test:
+    name: test (${{ matrix.part.name }})
     runs-on: ubuntu-26.04
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        part:
+          - name: flick
+            packages: -p flick
+          - name: crates
+            packages: --workspace --exclude flick-model --exclude flick
     steps:
       - uses: actions/checkout@v7
       - run: rustup show active-toolchain || rustup toolchain install
@@ -70,8 +81,9 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: .tool-versions
-      - run: just unit
-      - run: just effect-coverage >> "$GITHUB_STEP_SUMMARY"
+      - run: just unit ${{ matrix.part.packages }}
+      - if: matrix.part.name == 'crates'
+        run: just effect-coverage >> "$GITHUB_STEP_SUMMARY"
 
   features:
     runs-on: ubuntu-26.04
