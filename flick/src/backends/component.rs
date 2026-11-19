@@ -2,12 +2,14 @@
 
 use std::fs::File;
 use std::io::Read;
+use std::path::{Path, PathBuf};
 
 use flick_backend::host::{Budget, WasmBackend};
 use flick_backend::{BackendId, BackendPin, Failure, Limits, Policy};
+use flick_core::build::go::FILES;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::BackendPackage;
-use flick_core::project::{Compilation, Project};
+use flick_core::project::{Compilation, Project, js};
 use flick_core::source::{FileId, SourceMap, Span};
 
 use super::request::Prepared;
@@ -20,13 +22,18 @@ use crate::sources::FsHost;
 
 pub(crate) struct Package {
     pin: BackendPin,
+    root: PathBuf,
     backend: WasmBackend,
     tools: Vec<launch::Tool>,
     runtimes: Vec<flick_backend::RuntimeDependency>,
 }
 
 impl Package {
-    pub(super) fn load(project: &Project, package: &BackendPackage) -> Result<Self, Diagnostic> {
+    pub(super) fn load(
+        project: &Project,
+        package: &BackendPackage,
+        rt: bool,
+    ) -> Result<Self, Diagnostic> {
         let pin = BackendPin {
             identity: BackendId {
                 id: package.id.clone(),
@@ -34,34 +41,51 @@ impl Package {
             },
             sha256: package.sha256.clone(),
         };
-        let load = || {
-            let limit = Limits::default().artifact_bytes;
-            let mut bytes = Vec::new();
-            File::open(project.root.join(&package.component))
-                .and_then(|f| {
-                    f.take(u64::try_from(limit).unwrap_or(u64::MAX) + 1)
-                        .read_to_end(&mut bytes)
-                })
-                .map_err(|e| format!("cannot read backend component: {e}"))?;
-            if bytes.len() > limit {
-                return Err("backend component exceeds its file size limit".into());
-            }
-            WasmBackend::load(component::engine()?, pin.clone(), &bytes, Budget::default())
-        };
-        let backend = load().map_err(|why| {
+        let limit = Limits::default().artifact_bytes;
+        let mut bytes = Vec::new();
+        File::open(project.root.join(&package.component))
+            .and_then(|f| {
+                f.take(u64::try_from(limit).unwrap_or(u64::MAX) + 1)
+                    .read_to_end(&mut bytes)
+            })
+            .map_err(|e| failure(format!("cannot read backend component: {e}")))?;
+        if bytes.len() > limit {
+            return Err(failure("backend component exceeds its file size limit"));
+        }
+        Self::from_bytes(&project.root, pin, &bytes, rt)
+    }
+
+    pub(super) fn from_bytes(
+        root: &Path,
+        pin: BackendPin,
+        bytes: &[u8],
+        rt: bool,
+    ) -> Result<Self, Diagnostic> {
+        let backend = WasmBackend::load(
+            component::engine().map_err(failure)?,
+            pin.clone(),
+            bytes,
+            Budget::default(),
+        )
+        .map_err(|why| {
             failure(format!(
                 "backend {}@{}#{}: {why}",
-                package.id, package.version, package.sha256
+                pin.identity.id, pin.identity.version, pin.sha256
             ))
         })?;
         let tools = launch::Tool::node().into_iter().collect();
-        let runtimes = super::dependencies::installed(&project.root).map_err(failure)?;
+        let runtimes = super::dependencies::installed_for(root, !rt).map_err(failure)?;
         Ok(Self {
             pin,
+            root: root.to_path_buf(),
             backend,
             tools,
             runtimes,
         })
+    }
+
+    pub(super) fn pin(&self) -> BackendPin {
+        self.pin.clone()
     }
 
     pub(crate) fn artifacts(
@@ -72,6 +96,13 @@ impl Package {
         compilation: &Compilation,
         output: &BuildPlan,
     ) -> Emission {
+        let diagnostics = dependency_checks(host, project, compilation, output.go);
+        if !diagnostics.is_empty() {
+            return Emission {
+                artifacts: vec![],
+                diagnostics,
+            };
+        }
         let mut prepared = Prepared::new(
             host,
             sources,
@@ -90,13 +121,35 @@ impl Package {
                 diagnostics: prepared.diagnostics,
             };
         }
-        prepared
+        let bridge = prepared
             .request
-            .runtime_dependencies
-            .clone_from(&self.runtimes);
+            .target
+            .options
+            .iter()
+            .find(|o| o.key == "js.effect-bridge");
+        let effect = prepared
+            .request
+            .target
+            .options
+            .iter()
+            .any(|o| o.key == "js.runtime" && o.value == "effect")
+            || bridge.is_some_and(|o| o.value != "absent");
+        prepared.request.runtime_dependencies =
+            match super::dependencies::installed_for(&self.root, effect) {
+                Ok(pins) => pins,
+                Err(why) => {
+                    return Emission {
+                        artifacts: vec![],
+                        diagnostics: vec![failure(why)],
+                    };
+                }
+            };
         prepared.request.toolchains = self.tools.iter().map(|t| t.pin.clone()).collect();
         let mut reserved: Vec<_> = prepared.shared.iter().map(|a| a.path.clone()).collect();
         reserved.push(launch::FILE.into());
+        if project.is_none() {
+            reserved.push(FILES.into());
+        }
         let policy = Policy {
             toolchains: &prepared.request.toolchains,
             environment: &[],
@@ -155,6 +208,9 @@ impl Package {
                 ))],
             },
         };
+        if project.is_none() {
+            standalone_files(&mut emission);
+        }
         emission.diagnostics.splice(0..0, prepared.diagnostics);
         emission
     }
@@ -177,7 +233,7 @@ impl Package {
             files,
             &self.pin,
             &self.tools.iter().map(|t| t.pin.clone()).collect::<Vec<_>>(),
-            &self.runtimes,
+            &self.root,
         )
         .is_ok()
     }
@@ -231,4 +287,35 @@ fn required_launches(
         }
     }
     Ok(())
+}
+
+fn dependency_checks(
+    host: &FsHost,
+    project: Option<&Project>,
+    compilation: &Compilation,
+    go: bool,
+) -> Vec<Diagnostic> {
+    let Some(project) = project.filter(|_| !go) else {
+        return vec![];
+    };
+    let mut diagnostics = js::conflicts(host, &project.root, &compilation.js_dependencies);
+    diagnostics.extend(js::unmet(host, &project.root, &compilation.js_dependencies));
+    diagnostics
+}
+
+fn standalone_files(emission: &mut Emission) {
+    if !emission.diagnostics.is_empty() {
+        return;
+    }
+    let files = emission
+        .artifacts
+        .iter()
+        .fold(String::new(), |mut files, artifact| {
+            files.push_str(&artifact.path);
+            files.push('\n');
+            files
+        });
+    emission
+        .artifacts
+        .push(Artifact::source(FILES.into(), files));
 }

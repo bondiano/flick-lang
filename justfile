@@ -293,6 +293,14 @@ js-component:
     mkdir -p target/backends
     cargo run -p flick-component-build -- target/wasm32-unknown-unknown/release/flick_backend_js.wasm target/backends/js.wasm
 
+# Update the exact component distributed with every compiler binary.
+update-js-component: js-component
+    node tools/backend-package/index.mjs update
+
+# Release/CI checks reproduce the checked-in artifact without updating its pin.
+check-js-component: js-component
+    node tools/backend-package/index.mjs check
+
 # A real third-party backend fixture through the separate component world.
 wasm-backends:
     pnpm install --frozen-lockfile
@@ -300,7 +308,7 @@ wasm-backends:
     pnpm -C packages/effect-ts build
     cargo build -p flick-test-backend --features guest --target wasm32-wasip2 --release
     cargo clippy -p flick-test-backend --features guest --target wasm32-wasip2 -- -D warnings
-    just js-component
+    just check-js-component
     cargo clippy -p flick-backend --features host --all-targets -- -D warnings
     cargo test -p flick-backend --profile e2e --features host --test component_host -- --include-ignored
     cargo clippy -p flick --features wasm-backends --all-targets -- -D warnings

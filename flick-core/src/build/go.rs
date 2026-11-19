@@ -46,11 +46,12 @@ pub fn emit(
     sources: &SourceMap,
     settings: &Settings,
     suites: &[String],
+    test: bool,
     read: &dyn Fn(&Path) -> Option<String>,
 ) -> (Vec<Artifact>, Vec<Diagnostic>) {
     let mut diagnostics = Vec::new();
     let tests = [(TEST.to_owned(), String::new())];
-    let programs = if suites.is_empty() {
+    let programs = if !test && suites.is_empty() {
         settings.entries
     } else {
         &tests[..]
@@ -94,6 +95,7 @@ pub fn emit(
             builtins: &builtins,
             entry,
             suites,
+            test,
             paths: &paths,
             lines: &lines,
             foreign: &foreign,

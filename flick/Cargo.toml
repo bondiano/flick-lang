@@ -12,6 +12,9 @@ publish.workspace = true
 workspace = true
 
 [features]
+default = ["wasm-backends"]
+# Direct Rust emission is an explicit development/parity option.
+native-backends-development = []
 # loads plugins built as WebAssembly components; release builds enable it
 wasm-plugins = ["wasm-backends"]
 wasm-backends = ["dep:wasmtime", "flick-backend/host"]

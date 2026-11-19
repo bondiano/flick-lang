@@ -1,11 +1,16 @@
 //! Temporary native baseline for projects without a component pin.
 
+#[cfg(any(test, feature = "native-backends-development"))]
 use super::js_artifacts::js_artifacts;
-use super::{BuildPlan, Emission};
+use super::{BuildPlan, Emission, Purpose};
 use crate::artifact::Artifact;
+#[cfg(not(any(test, feature = "native-backends-development")))]
+use crate::backends::failure;
 use crate::sources::FsHost;
 use flick_core::build::{self, Settings};
-use flick_core::project::{Compilation, Project, js};
+#[cfg(any(test, feature = "native-backends-development"))]
+use flick_core::project::js;
+use flick_core::project::{Compilation, Project};
 use flick_core::source::SourceMap;
 use std::fs;
 
@@ -30,32 +35,49 @@ fn artifacts_with(
     settings: &Settings<'_>,
 ) -> Emission {
     if output.go {
-        let (artifacts, diagnostics) =
-            build::go::emit(compilation, sources, settings, &output.suites, &|path| {
-                fs::read_to_string(path).ok()
-            });
+        let (artifacts, diagnostics) = build::go::emit(
+            compilation,
+            sources,
+            settings,
+            &output.suites,
+            output.purpose == Purpose::Test,
+            &|path| fs::read_to_string(path).ok(),
+        );
         return Emission {
             artifacts: artifacts.into_iter().map(Artifact::from).collect(),
             diagnostics,
         };
     }
-    let mut emission = js_artifacts(sources, compilation, settings);
-    if let Some(project) = project {
-        let wanted = &compilation.js_dependencies;
-        let needs = &mut emission.diagnostics;
-        needs.extend(js::conflicts(host, &project.root, wanted));
-        needs.extend(js::unmet(host, &project.root, wanted));
-    } else {
-        // files built alone have no manifest of the outputs: the list names
-        // them, so the next build removes those it does not write
-        let contents = (emission.artifacts.iter()).fold(String::new(), |mut list, a| {
-            list.push_str(&a.path);
-            list.push('\n');
-            list
-        });
-        emission
-            .artifacts
-            .push(Artifact::source(build::go::FILES.to_owned(), contents));
+    #[cfg(not(any(test, feature = "native-backends-development")))]
+    {
+        let _ = (host, project);
+        Emission {
+            artifacts: vec![],
+            diagnostics: vec![failure(
+                "direct Rust JavaScript emission is available only for development/parity",
+            )],
+        }
     }
-    emission
+    #[cfg(any(test, feature = "native-backends-development"))]
+    {
+        let mut emission = js_artifacts(sources, compilation, settings);
+        if let Some(project) = project {
+            let wanted = &compilation.js_dependencies;
+            let needs = &mut emission.diagnostics;
+            needs.extend(js::conflicts(host, &project.root, wanted));
+            needs.extend(js::unmet(host, &project.root, wanted));
+        } else {
+            // files built alone have no manifest of the outputs: the list names
+            // them, so the next build removes those it does not write
+            let contents = (emission.artifacts.iter()).fold(String::new(), |mut list, a| {
+                list.push_str(&a.path);
+                list.push('\n');
+                list
+            });
+            emission
+                .artifacts
+                .push(Artifact::source(build::go::FILES.to_owned(), contents));
+        }
+        emission
+    }
 }

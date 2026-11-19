@@ -3,8 +3,8 @@
 use crate::args::{Color, GlobalArguments, Reporter, TestArguments};
 #[cfg(feature = "wasm-backends")]
 use crate::backends;
+use crate::backends::Selected;
 use crate::progress::Mode;
-use flick_core::project::Project;
 use std::env;
 use std::fmt::Write;
 use std::io::{self, IsTerminal};
@@ -114,13 +114,13 @@ impl Runner {
             backend: None,
         }
     }
-    pub(super) fn component(out: PathBuf, project: &Project) -> Self {
+    pub(super) fn component(out: PathBuf, selected: &Selected) -> Self {
         #[cfg(not(feature = "wasm-backends"))]
-        let _ = project;
+        let _ = selected;
         Self {
             path: out,
             #[cfg(feature = "wasm-backends")]
-            backend: project.config.build.backend.as_ref().map(backends::pin),
+            backend: selected.pin(),
         }
     }
     pub(super) fn display(&self) -> Display<'_> {

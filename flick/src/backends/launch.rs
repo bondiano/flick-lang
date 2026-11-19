@@ -116,18 +116,14 @@ pub(super) fn validate(
     files: &[Artifact],
     pin: &BackendPin,
     tools: &[Toolchain],
-    runtimes: &[RuntimeDependency],
+    root: &Path,
 ) -> Result<(), String> {
     let file = files
         .iter()
         .find(|f| f.path == FILE)
         .ok_or("component build has no launch manifest")?;
     let manifest = read(&file.contents, pin)?;
-    if manifest
-        .runtime_dependencies
-        .iter()
-        .any(|r| !runtimes.contains(r))
-    {
+    if !super::dependencies::verify(root, &manifest.runtime_dependencies)? {
         return Err("cached runtime dependency differs from its host pin".into());
     }
     for launch in manifest.launches {
@@ -187,6 +183,16 @@ pub(crate) fn command(
     kind: LaunchKind,
     name: &str,
 ) -> Result<Command, String> {
+    command_with_import(root, pin, kind, name, None)
+}
+
+pub(crate) fn command_with_import(
+    root: &Path,
+    pin: &BackendPin,
+    kind: LaunchKind,
+    name: &str,
+    import: Option<&str>,
+) -> Result<Command, String> {
     let path = root.join(FILE);
     let size = fs::metadata(&path)
         .map_err(|e| format!("cannot read launch manifest: {e}"))?
@@ -195,17 +201,8 @@ pub(crate) fn command(
         return Err("launch manifest exceeds its size limit".into());
     }
     let manifest = read(&fs::read(&path).map_err(|e| e.to_string())?, pin)?;
-    if !manifest.runtime_dependencies.is_empty() {
-        let installed = super::dependencies::installed(root)?;
-        if manifest
-            .runtime_dependencies
-            .iter()
-            .any(|r| !installed.contains(r))
-        {
-            return Err(
-                "launch runtime dependency differs from its pinned version and digest".into(),
-            );
-        }
+    if !super::dependencies::verify(root, &manifest.runtime_dependencies)? {
+        return Err("launch runtime dependency differs from its pinned version and digest".into());
     }
     let launch = manifest
         .launches
@@ -224,6 +221,9 @@ pub(crate) fn command(
         let mut command = Command::new(tool.path);
         if runtime.id == "node" {
             command.arg("--enable-source-maps");
+            if let Some(import) = import {
+                command.args(["--import", import]);
+            }
         }
         command.arg(artifact);
         command

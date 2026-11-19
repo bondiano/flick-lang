@@ -123,7 +123,23 @@ pub fn inspect(options: &InspectArguments, explicit: Option<&str>) -> Outcome {
                 Representation::Ts => (format!("{path}.ts"), true),
                 _ => (format!("{path}.iface"), false),
             };
-            let out = output(checked.host.cwd.join("dist"), typescript);
+            let mut out = output(checked.host.cwd.join("dist"), typescript);
+            out.backend = match Selected::load(
+                &checked.host,
+                checked.project.as_ref(),
+                false,
+                checked.project.as_ref().is_some_and(|p| {
+                    p.config.build.effect == flick_core::project::config::Backend::Rt
+                }),
+            ) {
+                Ok(backend) => backend,
+                Err(diagnostic) => {
+                    return Outcome {
+                        sources: checked.sources,
+                        diagnostics: vec![diagnostic],
+                    };
+                }
+            };
             let emission = artifacts(
                 &checked.host,
                 &mut checked.sources,
