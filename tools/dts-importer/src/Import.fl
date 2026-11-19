@@ -99,17 +99,24 @@ let surface request resolved file =
 /// Writes to `out` the shapes of the value exports of the package `name`,
 /// resolved as a module of the project at `root` resolves it.
 run :
-  String -> String -> String ->{Async, FileSystem.FileSystem, Path.Path; AppError, PlatformError.PlatformError}
+  String ->
+  String ->
+  String ->{Async, FileSystem.FileSystem, Path.Path; AppError, PlatformError.PlatformError}
   Unit
 let run root name out =
-  let origin = Path.join [root, "__flick_ffi_import__.mts"]
+  // resolve from where the project's packages really are: through a linked
+  // `node_modules`, TypeScript would name the declarations by both paths
+  let modules = Path.join [root, "node_modules"]
+  let base = if FileSystem.exists modules then Path.dirname (FileSystem.real_path modules) else root
+  let origin = Path.join [base, "__flick_ffi_import__.mts"]
   match Ts.resolve name origin with
-  | None ->
-    App.fail ("cannot resolve the declarations of `" ++ name ++ "` from " ++ root)
+  | None -> App.fail ("cannot resolve the declarations of `" ++ name ++ "` from " ++ root)
   | Some resolved ->
     let file = Ts.resolved_file resolved
     if not (is_declarations file) then
-      App.fail
-        ("`" ++ name ++ "` resolves to " ++ file ++ ", which is not a declaration file")
+      App.fail ("`" ++ name ++ "` resolves to " ++ file ++ ", which is not a declaration file")
     else
-      FileSystem.write_file_string { flag = None; mode = None } out (surface { root = root; name = name } resolved file ++ "\n")
+      FileSystem.write_file_string
+        { flag = None; mode = None }
+        out
+        (surface { root = root; name = name } resolved file ++ "\n")

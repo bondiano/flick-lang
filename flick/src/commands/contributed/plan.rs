@@ -77,13 +77,16 @@ pub(super) fn carry_out(
         refused: Vec::new(),
     };
     let call = (project, contributor, descriptor, invocation, tools);
-    if let Err(refused) = chain(call, plan, &mut done) {
-        done.refused.push(refused);
-    }
+    let published = match chain(call, plan, &mut done) {
+        Ok(Some(files)) => publish(&project.root, &files),
+        Ok(None) => Ok(()),
+        Err(refused) => Err(refused),
+    };
+    done.refused.extend(published.err());
     done
 }
 
-type Call<'a> = (
+pub(super) type Call<'a> = (
     &'a Project,
     &'a dyn Contributor,
     &'a Descriptor,
@@ -91,7 +94,13 @@ type Call<'a> = (
     &'a [Tool],
 );
 
-fn chain(call: Call, mut plan: Plan, done: &mut Done) -> Result<(), Diagnostic> {
+/// What `plan` and the plans resuming it write, carried out up to
+/// publishing; none when the contributor stopped with diagnostics.
+pub(super) fn chain(
+    call: Call,
+    mut plan: Plan,
+    done: &mut Done,
+) -> Result<Option<Vec<Artifact>>, Diagnostic> {
     let (project, contributor, descriptor, invocation, tools) = call;
     let refused = |why: String| {
         Diagnostic::new(
@@ -146,7 +155,7 @@ fn chain(call: Call, mut plan: Plan, done: &mut Done) -> Result<(), Diagnostic> 
         files.extend(result.artifacts.into_iter().map(Artifact::from));
         let Some(state) = plan.resume.take() else {
             files.extend(outputs);
-            return publish(root, &files);
+            return Ok(Some(files));
         };
         if round == ROUNDS {
             break;
@@ -162,7 +171,7 @@ fn chain(call: Call, mut plan: Plan, done: &mut Done) -> Result<(), Diagnostic> 
             Ok(next) => plan = next,
             Err(diagnostics) => {
                 done.diagnostics.extend(diagnostics);
-                return Ok(());
+                return Ok(None);
             }
         }
     }

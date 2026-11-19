@@ -252,6 +252,32 @@ pub(crate) fn contributor(project: &Project) -> Result<Arc<dyn Contributor>, Str
     }
 }
 
+/// The official backends, each by its id and the digest of its component.
+#[cfg(feature = "wasm-backends")]
+pub(crate) fn officials() -> Vec<(String, String)> {
+    ([official::pin(), official::go_pin()].into_iter().flatten())
+        .map(|pin| (pin.identity.id, pin.sha256))
+        .collect()
+}
+
+/// The official backend `id`, loaded for `project` whatever it selects.
+#[cfg(feature = "wasm-backends")]
+pub(crate) fn official_contributor(
+    project: &Project,
+    id: &str,
+) -> Result<Arc<dyn Contributor>, String> {
+    let tools = Some(&project.config.tools);
+    let package = if id == "flick/go" {
+        official::go(&project.root, tools)
+    } else {
+        official::javascript(&project.root, false, tools)
+    };
+    match package {
+        Ok(package) => Ok(Arc::new(package)),
+        Err(diagnostic) => Err(diagnostic.message),
+    }
+}
+
 /// The host tools `[tools]` grants `id` in `project`, found on `PATH`.
 #[cfg(feature = "wasm-backends")]
 pub(crate) fn granted_tools(project: &Project, id: &str) -> Vec<Tool> {
