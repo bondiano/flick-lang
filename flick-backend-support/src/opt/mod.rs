@@ -17,6 +17,8 @@
 //! - [`lazy`]: lazy cells a program need not make: one nothing reads, one of
 //!   a value, made done, and one forced where it is made; and a force of a
 //!   cell an earlier force left done;
+//! - [`lazy_state`]: the state of a `let lazy` read once, by an `await` that
+//!   runs its task;
 //! - [`sroa`]: temporary records and tuples split into their parts;
 //! - dead code: unused pure bindings and private top-level values.
 //!
@@ -33,6 +35,7 @@ mod fuse;
 mod inline;
 mod known;
 mod lazy;
+mod lazy_state;
 mod specialize;
 mod sroa;
 pub mod tuple_match;
@@ -182,6 +185,7 @@ fn pass(e: &mut Expr, arity: Arity, lang: &crate::Known<'_>) -> bool {
         changed |= known::scrutinees(stmts, result);
         changed |= lazy::unnamed(stmts, result, lang);
         changed |= lazy::forced_again(stmts, result, lang);
+        changed |= lazy_state::state_once(stmts, result);
         changed |= flatten(stmts, result);
         changed |= sroa::split(stmts, result);
         changed |= propagate(stmts, result, arity);

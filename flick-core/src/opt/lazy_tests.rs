@@ -98,3 +98,46 @@ fn a_force_of_another_lazy_stays() {
     ));
     assert_eq!(ir.matches("lazy_force").count(), 2, "{ir}");
 }
+
+/// O2b: a `let lazy` read once, in a branch, keeps no state: its `await`
+/// runs the task.
+#[test]
+fn a_let_lazy_read_once_keeps_no_state() {
+    let ir = optimized(&format!(
+        "{MARK}run : Bool -> Unit ->{{Async}} Int\nlet run b () =\n  let lazy x = mark 7\n  \
+         let k = 1\n  if b then await x + k else k\n"
+    ));
+    assert!(!ir.contains("let mut"), "{ir}");
+    assert!(!ir.contains("Some"), "{ir}");
+}
+
+/// O2b leaves a state read twice.
+#[test]
+fn a_let_lazy_read_twice_keeps_its_state() {
+    let ir = optimized(&format!(
+        "{MARK}run : Bool -> Unit ->{{Async}} Int\nlet run b () =\n  let lazy x = mark 7\n  \
+         if b then await x else 0 - await x\n"
+    ));
+    assert!(ir.contains("let mut x"), "{ir}");
+}
+
+/// O2b leaves a state read in a loop, which may read it again.
+#[test]
+fn a_let_lazy_read_in_a_loop_keeps_its_state() {
+    let ir = optimized(&format!(
+        "{MARK}run : Unit ->{{Async}} Int\nlet run () =\n  let lazy x = mark 7\n  let mut sum = 0\n  \
+         for i <- [1, 2, 3] do sum = sum + i * await x\n  sum\n"
+    ));
+    assert!(ir.contains("let mut x"), "{ir}");
+}
+
+/// O2b leaves a state read after a branch that assigns, as LetMut binds its
+/// variables again there.
+#[test]
+fn a_let_lazy_read_after_an_assigning_branch_keeps_its_state() {
+    let ir = optimized(&format!(
+        "{MARK}run : Bool -> Unit ->{{Async}} Int\nlet run b () =\n  let lazy x = mark 7\n  let mut n = 0\n  \
+         if b then n = 1 else ()\n  n + await x\n"
+    ));
+    assert!(ir.contains("let mut x"), "{ir}");
+}

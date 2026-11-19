@@ -5,6 +5,7 @@ import Formal.Elab.CoreT6a
 import Formal.Elab.CoreRun
 import Formal.LetMut
 import Formal.LetMut.LazyWitness
+import Formal.LetMut.LazyOnce
 import Formal.Live.T4Live
 import Formal.Live.T1Regions
 import Formal.Live.Install
@@ -105,6 +106,10 @@ prints, and `#guard_msgs` turns the difference into an error.
 #guard_msgs in
 #print axioms Flick.Elab.Witness.lzSig
 
+/-- info: 'Flick.lzOnce' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.lzOnce
+
 /-- info: 'Flick.Ty.Equiv.substT' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Flick.Ty.Equiv.substT
@@ -164,6 +169,10 @@ prints, and `#guard_msgs` turns the difference into an error.
 /-- info: 'Flick.RT.R9_again' depends on axioms: [propext, Quot.sound] -/
 #guard_msgs in
 #print axioms Flick.RT.R9_again
+
+/-- info: 'Flick.RT.R9_owner' depends on axioms: [propext] -/
+#guard_msgs in
+#print axioms Flick.RT.R9_owner
 
 /-- info: 'Flick.Refine.sound' depends on axioms: [propext] -/
 #guard_msgs in
