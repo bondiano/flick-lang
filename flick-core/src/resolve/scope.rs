@@ -264,9 +264,13 @@ impl<'a> Scope<'a> {
             // `M.S` names a service of the module as a value: the checker tells it from a constructor
             let typed = *namespace == Namespace::Constructor
                 && interface.is_some_and(|i| i.find(Namespace::Type, name).is_some());
+            // a proof of the module, which a proof uses as a lemma
+            let proof = *namespace == Namespace::Value
+                && interface.is_some_and(|i| i.proofs.iter().any(|p| p == name));
             if let Some(interface) = interface
                 && interface.find(*namespace, name).is_none()
                 && !typed
+                && !proof
                 && !interface.incomplete
             {
                 diagnostics.push(not_exported(interface, name, *span));

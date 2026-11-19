@@ -42,3 +42,25 @@ impl Loaded {
             })
     }
 }
+
+impl Loaded {
+    /// A proof module, or one with a proof declaration.
+    fn has_proofs(&self) -> bool {
+        use crate::syntax::kind::SyntaxKind;
+        self.root == Root::Proof || (self.parse.tree.nodes()).any(|n| n.kind == SyntaxKind::ProofDecl)
+    }
+}
+
+impl Loader<'_> {
+    /// Makes room for the IR of every module. A proof reads the IR of the
+    /// modules it names, so a run with proofs lowers them.
+    fn size_lowered(&mut self) {
+        if self.modules.iter().any(Loaded::has_proofs) {
+            self.lowered.get_or_insert_with(Vec::new);
+            self.lower_packages_only = false;
+        }
+        if let Some(lowered) = &mut self.lowered {
+            lowered.resize_with(self.modules.len(), || None);
+        }
+    }
+}

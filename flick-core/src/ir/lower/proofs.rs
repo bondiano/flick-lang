@@ -115,32 +115,59 @@ impl Lower<'_> {
     }
 }
 
+/// A proof as an importer replays it: lowered, with what the checker
+/// settled of it.
+pub type Proven = (LoweredProof, ProofInfo);
+
+/// What a proof reads: the built-in modules, the IR of the modules of the
+/// run, and the proofs of its proof modules.
+pub struct Run<'p> {
+    pub builtins: &'p dyn Fn() -> &'static [Module],
+    pub project: &'p dyn Fn(&str) -> Option<&'p Module>,
+    pub proven: &'p dyn Fn(&str) -> Option<&'p [Proven]>,
+}
+
 /// Each proof of `module`, which checked without errors, checked: what
-/// fails to be a certificate of its goal.
+/// fails to be a certificate of its goal, and the proofs, for importers.
 pub fn check_proofs(
     module: &resolve::Module,
     typing: &Typing,
-    imported: &dyn Fn() -> &'static [Module],
-) -> Vec<Diagnostic> {
+    run: &Run,
+) -> (Vec<Diagnostic>, Vec<Proven>) {
     if typing.proofs.is_empty() {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     }
+    let proofs: Vec<Proven> = (lower_proofs(module, typing).into_iter())
+        .filter_map(|l| {
+            Some((
+                l.clone(),
+                typing.proofs.iter().find(|i| i.at == l.at)?.clone(),
+            ))
+        })
+        .collect();
     // the definitions a proof unfolds: the module's own, then the imported
     let own = super::lower(module, typing).ok();
     let program = Modules {
         own: own.as_ref(),
-        imported: imported(),
+        project: run.project,
+        builtins: (run.builtins)(),
     };
+    let mut lemmas = imported_lemmas(&proofs, run, 0);
+    let diagnostics = prove_each(&proofs, &program, &mut lemmas);
+    (diagnostics, proofs)
+}
+
+/// Checks each proof in order; one that checks is a lemma of the later ones.
+fn prove_each(
+    proofs: &[Proven],
+    program: &dyn logic::Program,
+    lemmas: &mut Vec<logic::Lemma>,
+) -> Vec<Diagnostic> {
     let mut out = Vec::new();
-    // the proofs checked so far, in order: what a later one may use
-    let mut lemmas = Vec::new();
-    for lowered in lower_proofs(module, typing) {
-        let Some(info) = typing.proofs.iter().find(|i| i.at == lowered.at) else {
-            continue;
-        };
-        let checked = statement(&lowered, info).and_then(|(s, body)| {
-            let cert = logic::cert(body, &lemmas)?;
-            logic::prove(&s, &cert, &info.data, &program, &lemmas).map(|()| s)
+    for (lowered, info) in proofs {
+        let checked = statement(lowered, info).and_then(|(s, body)| {
+            let cert = logic::cert(body, lemmas)?;
+            logic::prove(&s, &cert, &info.data, program, lemmas).map(|()| s)
         });
         match checked {
             Ok(statement) => lemmas.push(logic::Lemma {
@@ -154,6 +181,56 @@ pub fn check_proofs(
         }
     }
     out
+}
+
+/// The lemmas `proofs` name of other proof modules, each replayed against
+/// the IR of its module: no success is taken on trust, and one that does not
+/// check again is no lemma.
+fn imported_lemmas(proofs: &[Proven], run: &Run, depth: u32) -> Vec<logic::Lemma> {
+    let mut modules = Vec::new();
+    for (lowered, _) in proofs {
+        lowered
+            .body
+            .iter()
+            .for_each(|b| lemma_modules(b, &mut modules));
+    }
+    modules.sort();
+    modules.dedup();
+    let mut out = Vec::new();
+    // imports are acyclic; the bound only keeps a malformed graph finite
+    if depth > 16 {
+        return out;
+    }
+    for name in modules {
+        let (Some(proofs), Some(ir)) = ((run.proven)(&name), (run.project)(&name)) else {
+            continue;
+        };
+        let program = Modules {
+            own: Some(ir),
+            project: run.project,
+            builtins: (run.builtins)(),
+        };
+        let mut lemmas = imported_lemmas(proofs, run, depth + 1);
+        let imported = lemmas.len();
+        // the module's own diagnostics are its own check's to report
+        let _ = prove_each(proofs, &program, &mut lemmas);
+        out.extend(lemmas.drain(imported..).map(|mut l| {
+            l.statement.name = format!("{name}.{}", l.statement.name);
+            l
+        }));
+    }
+    out
+}
+
+/// The modules of the lemmas `e` names as `M.name`.
+fn lemma_modules(e: &Expr, out: &mut Vec<String>) {
+    if let ExprKind::Global { module, name } = &e.kind
+        && module == logic::LEMMAS
+        && let Some((m, _)) = name.rsplit_once('.')
+    {
+        out.push(m.to_owned());
+    }
+    e.each_child(&mut |c| lemma_modules(c, out));
 }
 
 /// What `lowered` states, with the body that proves it.
@@ -219,21 +296,22 @@ fn statement<'p>(
 }
 
 /// The compiled modules a proof reads definitions from.
-struct Modules<'a> {
+struct Modules<'a, 'p: 'a> {
     own: Option<&'a Module>,
-    imported: &'a [Module],
+    /// The modules of the run checked before this one.
+    project: &'a dyn Fn(&str) -> Option<&'p Module>,
+    builtins: &'static [Module],
 }
 
-impl Modules<'_> {
-    fn module(&self, name: &str) -> Option<&Module> {
-        self.own
-            .into_iter()
-            .chain(self.imported)
-            .find(|m| m.name == name)
+impl<'a> Modules<'a, '_> {
+    fn module(&self, name: &str) -> Option<&'a Module> {
+        (self.own.filter(|m| m.name == name))
+            .or_else(|| (self.project)(name))
+            .or_else(|| self.builtins.iter().find(|m| m.name == name))
     }
 }
 
-impl logic::Program for Modules<'_> {
+impl logic::Program for Modules<'_, '_> {
     fn item(&self, module: &str, name: &str) -> Option<&Item> {
         self.module(module)?.items.iter().find(|i| match &i.kind {
             ItemKind::Value { name: n, .. } => n == name,
