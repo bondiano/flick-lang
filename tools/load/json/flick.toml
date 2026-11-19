@@ -8,3 +8,6 @@ entries = { server = "Load.Json" }
 [build]
 out-dir = "dist"
 profile = "release"
+
+[tools]
+"flick/go" = ["go"]
