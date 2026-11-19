@@ -1,0 +1,115 @@
+// `Resource.make` acquires a value and makes the innermost `scope` release
+// it, and `Scope.defer` registers cleanup there: each runs once when the
+// scope ends, last registered first, after the scope's children ended, and
+// sees how the body ended. An acquisition that fails registers nothing; a
+// body that fails after an acquisition still releases it.
+module App.Main exposing (main)
+
+type error Oops = Oops String
+
+/// Prints through the trusted host adapter, which a release may use.
+say : String ->{} Unit
+let say line = Host.raw_stdout_line line
+
+nap : Float ->{Async} Unit
+let nap millis =
+  match Duration.millis millis with
+  | Ok d -> Effect.sleep d
+  | Err _ -> ()
+
+/// How a body ended, as a release sees it.
+ended : Exit e b -> String
+let ended exit =
+  if Exit.is_success exit then
+    "succeeded"
+  else if Exit.has_interrupts exit then
+    "interrupted"
+  else
+    "failed"
+
+type Conn = Conn String
+
+release : Conn -> Exit e b ->{} Unit
+let release (Conn name) exit = say ("release " ++ name ++ ": " ++ ended exit)
+
+open : String ->{Async, Scope s} Conn^{s}
+let open name =
+  Resource.make
+    (task {
+      say ("open " ++ name)
+      Conn name
+    })
+    release
+
+refused : String ->{Async, Scope s; Oops} Conn^{s}
+let refused name =
+  Resource.make
+    (task {
+      say ("open " ++ name ++ " fails")
+      Fail.fail (Oops name)
+    })
+    release
+
+nested : Unit ->{Async} Unit
+let nested () = scope {
+  let _a = open "a"
+  Scope.defer (fun exit -> say ("deferred: " ++ ended exit))
+  let _b = open "b"
+  scope {
+    let _c = open "c"
+    say "inner body"
+  }
+  say "outer body"
+}
+
+children : Unit ->{Async} Unit
+let children () = scope owner {
+  let _parent = open "parent"
+  ignore (Fiber.spawn
+    owner
+    (fun _ -> ())
+    (task {
+      scope {
+        let _child = open "child"
+        nap 10000
+      }
+    }))
+  nap 5
+  say "body ends"
+}
+
+not_acquired : Unit ->{Async; Oops} Unit
+let not_acquired () = scope {
+  let _kept = open "kept"
+  let _refused = refused "refused"
+  say "not reached"
+}
+
+failing : Unit ->{Async; Oops} Unit
+let failing () = scope {
+  let _f = open "f"
+  Scope.defer (fun exit -> say ("deferred: " ++ ended exit))
+  Fail.fail (Oops "body failed")
+}
+
+slow : Unit ->{Async} Unit
+let slow () = scope {
+  let _t = open "t"
+  nap 10000
+}
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  say "== nested"
+  nested ()
+  say "== children"
+  children ()
+  say "== a failed acquisition"
+  try not_acquired () with
+  | Oops text -> say ("failed: " ++ text)
+  say "== a failing body"
+  try failing () with
+  | Oops text -> say text
+  say "== interrupted"
+  try timeout 5 (task { slow () }) with
+  | TimeoutError -> say "timed out"
