@@ -248,11 +248,14 @@ artifacts retain their bytes.
 
 Both the backend world and the plugin world export `flick:command/command`
 (`flick-backend/wit/deps/command`, copied to `flick-plugin/wit/deps`; a test
-keeps the two identical). A command declares its parameters, the paths it
-writes and its style; it returns a plan of files and tool steps or answers
-session requests. The host checks a plan against the declaration, runs its
-steps with the executor above under the contributor's `[tools]` grant, and
-publishes its files in one transaction under the project's root. Help
+keeps the two identical). A command declares its parameters, the files the
+host reads for it, the paths its steps read in place, the paths it writes
+and its style; it returns a plan of files and tool steps or answers session
+requests. The host checks a plan against the declaration, runs its steps
+with the executor above under the contributor's `[tools]` grant, linking
+each step's reads into its directory, and hands their outputs to `resume`
+when the plan asks for it. It then publishes the files of every plan in one
+transaction under the project's root. Help
 reads the descriptors cached by component digest, never a component. See
 [Contributed commands](../src/content/docs/reference/commands.md).
 

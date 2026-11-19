@@ -13,7 +13,17 @@ pub fn invocation(i: &n::Invocation) -> w::Invocation {
                 values: a.values.clone(),
             })
             .collect(),
+        sources: i.sources.clone(),
+        inputs: i.inputs.iter().map(file_wire).collect(),
         tools: i.tools.iter().map(|t| tool_wire(t.clone())).collect(),
+    }
+}
+
+pub fn file_wire(f: &n::File) -> w::File {
+    w::File {
+        path: f.path.clone(),
+        bytes: f.bytes.clone(),
+        executable: f.executable,
     }
 }
 
@@ -54,6 +64,8 @@ pub fn descriptors(ds: Vec<w::Descriptor>) -> Vec<n::Descriptor> {
             summary: d.summary,
             positionals: d.positionals.into_iter().map(parameter).collect(),
             options: d.options.into_iter().map(parameter).collect(),
+            inputs: d.inputs,
+            reads: d.reads,
             writes: d.writes,
             style: match d.style {
                 w::Style::Plan => n::Style::Plan,
@@ -74,6 +86,12 @@ pub fn diagnostics(ds: Vec<w::Diagnostic>) -> Vec<n::Diagnostic> {
             },
             message: d.message,
             notes: d.notes,
+            span: d.span.map(|s| n::Span {
+                path: s.path,
+                start: s.start,
+                end: s.end,
+            }),
+            help: d.help,
         })
         .collect()
 }
@@ -100,12 +118,14 @@ pub fn plan(p: w::Plan) -> n::Plan {
                         })
                         .collect(),
                     inputs: t.inputs,
+                    reads: t.reads,
                     outputs: t.outputs,
                 }),
             })
             .collect(),
         diagnostics: diagnostics(p.diagnostics),
         stdout: p.stdout,
+        resume: p.resume,
     }
 }
 

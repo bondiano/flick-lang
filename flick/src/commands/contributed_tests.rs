@@ -21,6 +21,8 @@ fn descriptor(name: &str) -> Descriptor {
             required: false,
             help: String::new(),
         }],
+        inputs: vec![],
+        reads: vec![],
         writes: vec![],
         style: Style::Plan,
     }

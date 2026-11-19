@@ -80,10 +80,20 @@ A descriptor declares:
 
 - `name`: one or more words, as `ffi import`.
 - `positionals` and `options`: each a flag, a text or a path, possibly
-  repeated. The host parses the command line by them.
-- `writes`: the paths the command may write, relative to the project's
-  root. `$name` stands for the path the parameter `name` gives.
+  repeated. The host parses the command line by them and gives each path
+  relative to the project's root, `/`-separated. A path outside the
+  project is refused before the command runs.
+- `inputs`: the files the host reads for the command, relative to the
+  project's root, and passes in `invocation.inputs`. A directory stands for
+  the regular files under it, outside `node_modules` and hidden
+  directories. A path that does not exist gives nothing.
+- `reads`: what the plan's tool steps may read in place.
+- `writes`: the paths the command may write.
 - `style`: `plan` or `session`.
+
+In `inputs`, `reads` and `writes`, `$name` stands for the paths the
+parameter `name` gives and `$sources` for the project's source root, which
+`invocation.sources` also holds.
 
 ## Plans
 
@@ -93,16 +103,24 @@ itself: it returns a plan, which the host checks and carries out.
 - **Files** are written under the declared paths.
 - **Tool steps** run a host tool from `invocation.tools`. These are the
   tools the project allows the contributor in `[tools]`, by plugin package
-  or backend id, and the host pins each one by digest and version.
-- **Diagnostics** are reported as the compiler's own.
+  or backend id, and the host pins each one by digest and version. A
+  step's `reads`, within the descriptor's, appear in its directory at the
+  same relative path, linked to the project's files rather than copied.
+- **Diagnostics** are reported as the compiler's own. A `span` points into
+  a file of `invocation.inputs`, and `help` tells the user what to do.
 - **`stdout`** is what the command prints.
+- **`resume`**, when set, is the state the host hands back after the
+  steps have run. The host calls `resume(state, outputs)` with the step
+  outputs instead of writing them. The plan it returns goes on the same
+  way, up to 16 plans in all.
 
 The host refuses a plan with `FLICK-P055` before anything happens when it
 writes outside its declared paths or the project, runs a tool the host did
 not pin, or reads a file the plan does not have. A step runs in a directory
 of its own with only its inputs, as a build step does (see
-[project.md](../project/)). The files and step outputs are then published
-together in one transaction: a failure leaves the project as it was.
+[project.md](../project/)). The files of every plan and the outputs of the
+last plan's steps are then published together in one transaction: a
+failure leaves the project as it was.
 
 ## Sessions
 

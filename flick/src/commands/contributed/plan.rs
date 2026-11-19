@@ -3,8 +3,9 @@
 //! published in one transaction under the project's root.
 
 use std::collections::BTreeMap;
+use std::fs;
 use std::io::{self, Write};
-use std::path::{Component, Path};
+use std::path::Path;
 use std::process::ExitCode;
 
 use flick_backend::command::{self, Descriptor, Invocation, Plan, Step};
@@ -14,12 +15,13 @@ use flick_backend::{
 };
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::Project;
-use flick_core::source::SourceMap;
+use flick_core::source::{FileId, SourceMap, Span};
 
-use super::{Contributor, values};
+use super::Contributor;
+use super::inputs::{expand, normal, under};
 use crate::args::GlobalArguments;
 use crate::artifact::{Artifact, validate_destination_paths};
-use crate::backends::{Tool, authorize, run_steps};
+use crate::backends::{Reads, Tool, authorize, run_steps};
 use crate::{component, publish, report};
 
 pub(crate) fn tool(pin: &Toolchain) -> command::Tool {
@@ -40,26 +42,57 @@ pub(super) fn run(
 ) -> ExitCode {
     let plan = match contributor.run(invocation) {
         Ok(plan) => plan,
-        Err(diagnostics) => return finish(global, &diagnostics, &[]),
+        Err(diagnostics) => return finish(global, invocation, &diagnostics, &[]),
     };
-    let refused = carry_out(project, descriptor, invocation, &plan, tools);
-    let _ = io::stdout().write_all(&plan.stdout);
-    finish(
-        global,
-        &plan.diagnostics,
-        &refused.err().into_iter().collect::<Vec<_>>(),
-    )
+    let done = carry_out(project, contributor, descriptor, invocation, plan, tools);
+    let _ = io::stdout().write_all(&done.stdout);
+    finish(global, invocation, &done.diagnostics, &done.refused)
 }
 
-/// Checks `plan` against `descriptor`, runs its steps and publishes its
-/// files and their outputs; an error leaves the project as it was.
+/// How many plans one command may chain through `resume`.
+const ROUNDS: usize = 16;
+
+/// What a plan and the plans resuming it print and report.
+pub(super) struct Done {
+    pub(super) stdout: Vec<u8>,
+    pub(super) diagnostics: Vec<command::Diagnostic>,
+    /// The host's own diagnostic, when it refused or could not publish.
+    pub(super) refused: Vec<Diagnostic>,
+}
+
+/// Checks `plan` against `descriptor` and runs its steps, then those of
+/// the plans `resume` continues it with, and publishes all their files;
+/// an error leaves the project as it was.
 pub(super) fn carry_out(
     project: &Project,
+    contributor: &dyn Contributor,
     descriptor: &Descriptor,
     invocation: &Invocation,
-    plan: &Plan,
+    plan: Plan,
     tools: &[Tool],
-) -> Result<(), Diagnostic> {
+) -> Done {
+    let mut done = Done {
+        stdout: Vec::new(),
+        diagnostics: Vec::new(),
+        refused: Vec::new(),
+    };
+    let call = (project, contributor, descriptor, invocation, tools);
+    if let Err(refused) = chain(call, plan, &mut done) {
+        done.refused.push(refused);
+    }
+    done
+}
+
+type Call<'a> = (
+    &'a Project,
+    &'a dyn Contributor,
+    &'a Descriptor,
+    &'a Invocation,
+    &'a [Tool],
+);
+
+fn chain(call: Call, mut plan: Plan, done: &mut Done) -> Result<(), Diagnostic> {
+    let (project, contributor, descriptor, invocation, tools) = call;
     let refused = |why: String| {
         Diagnostic::new(
             codes::P055,
@@ -67,70 +100,108 @@ pub(super) fn carry_out(
             format!("the plan of `{}` is refused: {why}", descriptor.name),
         )
     };
-    let writes = writes(descriptor, invocation).map_err(refused)?;
-    let (result, order) = graph(plan, &invocation.tools).map_err(refused)?;
-    let paths = (result.artifacts.iter().map(|a| a.path.as_str())).chain(
-        result
-            .steps
-            .iter()
-            .flat_map(|s| s.outputs.iter().map(|o| o.path.as_str())),
-    );
-    let paths: Vec<&str> = paths.collect();
-    validate_output_paths(paths.iter().copied(), Limits::default()).map_err(refused)?;
-    if let Some(path) = paths.iter().find(|p| !under(p, &writes)) {
-        return Err(refused(format!(
-            "it writes `{path}`, which the command does not declare"
-        )));
-    }
-    for step in &result.steps {
-        authorize(step).map_err(refused)?;
-    }
+    let writes = expand(&descriptor.writes, invocation).map_err(refused)?;
+    let reads = expand(&descriptor.reads, invocation).map_err(refused)?;
     let root = &project.root;
     let cancel = component::cancellation().map_err(refused)?;
     component::cancel_on_signals();
-    // the step directories go beside `.flick/commands`, inside the project
-    let anchor = root.join(".flick").join("commands");
-    let outputs = run_steps(&result, &order, &BTreeMap::new(), tools, &anchor, cancel)
+    let mut files: Vec<Artifact> = Vec::new();
+    for round in 1..=ROUNDS {
+        done.stdout.append(&mut plan.stdout);
+        done.diagnostics.append(&mut plan.diagnostics);
+        let (result, order) = graph(&plan, &invocation.tools).map_err(refused)?;
+        let outputs = (result.steps.iter()).flat_map(|s| s.outputs.iter().map(|o| o.path.as_str()));
+        let paths: Vec<&str> = (result.artifacts.iter().map(|a| a.path.as_str()))
+            .chain(outputs)
+            .collect();
+        validate_output_paths(paths.iter().copied(), Limits::default()).map_err(refused)?;
+        // what `resume` gets is never written, so it need not be declared
+        let written = result.artifacts.len()
+            + if plan.resume.is_some() {
+                0
+            } else {
+                paths.len()
+            };
+        if let Some(path) = paths.iter().take(written).find(|p| !under(p, &writes)) {
+            return Err(refused(format!(
+                "it writes `{path}`, which the command does not declare"
+            )));
+        }
+        for step in &result.steps {
+            authorize(step).map_err(refused)?;
+        }
+        let links = links(&plan, &reads, root).map_err(refused)?;
+        // the step directories go beside `.flick/commands`, inside the project
+        let anchor = root.join(".flick").join("commands");
+        let outputs = run_steps(
+            &result,
+            &order,
+            &BTreeMap::new(),
+            &links,
+            tools,
+            &anchor,
+            cancel,
+        )
         .map_err(|why| Diagnostic::new(codes::P050, Severity::Error, why))?;
-    let files: Vec<Artifact> = (result.artifacts.into_iter().map(Artifact::from))
-        .chain(outputs)
-        .collect();
+        files.extend(result.artifacts.into_iter().map(Artifact::from));
+        let Some(state) = plan.resume.take() else {
+            files.extend(outputs);
+            return publish(root, &files);
+        };
+        if round == ROUNDS {
+            break;
+        }
+        let outputs = (outputs.into_iter())
+            .map(|a| command::File {
+                executable: a.kind == ArtifactKind::Executable,
+                path: a.path,
+                bytes: a.contents,
+            })
+            .collect();
+        match contributor.resume(state, outputs) {
+            Ok(next) => plan = next,
+            Err(diagnostics) => {
+                done.diagnostics.extend(diagnostics);
+                return Ok(());
+            }
+        }
+    }
+    Err(refused(format!("it resumes more than {ROUNDS} times")))
+}
+
+fn publish(root: &Path, files: &[Artifact]) -> Result<(), Diagnostic> {
+    if files.is_empty() {
+        return Ok(());
+    }
+    let refused = |why| Diagnostic::new(codes::P055, Severity::Error, why);
     validate_destination_paths(root, files.iter().map(|f| f.path.as_str())).map_err(refused)?;
-    publish::commit(root, &files, &[], None)
+    publish::commit(root, files, &[], None)
         .map_err(|e| Diagnostic::new(codes::P013, Severity::Error, format!("cannot publish: {e}")))
 }
 
-/// The paths the command may write, relative to the root: what
-/// `descriptor` names, `$name` replaced by that path argument.
-fn writes(descriptor: &Descriptor, invocation: &Invocation) -> Result<Vec<String>, String> {
-    let values = values(invocation);
-    let mut writes = Vec::new();
-    for write in &descriptor.writes {
-        match write.strip_prefix('$') {
-            Some(name) => {
-                writes.extend(values.get(name).into_iter().flat_map(|v| v.iter()).cloned());
+/// What each step of `plan` reads in place, within `reads`, linked to the
+/// project's files.
+fn links(plan: &Plan, reads: &[String], root: &Path) -> Result<Reads, String> {
+    let mut links = Reads::new();
+    for (i, Step::Tool(step)) in plan.steps.iter().enumerate() {
+        for read in &step.reads {
+            if !normal(read) || !under(read, reads) {
+                return Err(format!(
+                    "step `{}` reads `{read}`, which the command does not declare",
+                    step.id
+                ));
             }
-            None => writes.push(write.clone()),
+            let target = root.join(read);
+            if fs::symlink_metadata(&target).is_err() {
+                return Err(format!(
+                    "step `{}` reads `{read}`, which the project has not",
+                    step.id
+                ));
+            }
+            links.entry(i).or_default().push((read.clone(), target));
         }
     }
-    for write in &writes {
-        let normal = Path::new(write)
-            .components()
-            .all(|c| matches!(c, Component::Normal(_)));
-        if !normal {
-            return Err(format!("the declared path `{write}` leaves the project"));
-        }
-    }
-    Ok(writes)
-}
-
-fn under(path: &str, writes: &[String]) -> bool {
-    writes.iter().any(|w| {
-        path == w
-            || path
-                .strip_prefix(w.as_str())
-                .is_some_and(|r| r.starts_with('/'))
-    })
+    Ok(links)
 }
 
 /// The plan as a build result the host's step executor runs: its files as
@@ -216,16 +287,27 @@ fn graph(plan: &Plan, granted: &[command::Tool]) -> Result<(BuildResult, Vec<usi
 /// code an error gives.
 pub(super) fn finish(
     global: &GlobalArguments,
+    invocation: &Invocation,
     diagnostics: &[command::Diagnostic],
     host: &[Diagnostic],
 ) -> ExitCode {
-    let mut all: Vec<Diagnostic> = diagnostics.iter().map(diagnostic).collect();
+    let mut sources = SourceMap::default();
+    let mut files = BTreeMap::new();
+    let mut all: Vec<Diagnostic> = (diagnostics.iter())
+        .map(|d| diagnostic(d, invocation, &mut sources, &mut files))
+        .collect();
     all.extend(host.iter().cloned());
-    report::render(global, &SourceMap::default(), &all);
+    report::render(global, &sources, &all);
     report::exit_code(&all)
 }
 
-fn diagnostic(d: &command::Diagnostic) -> Diagnostic {
+/// The compiler's form of `d`, its span into the input it names.
+fn diagnostic(
+    d: &command::Diagnostic,
+    invocation: &Invocation,
+    sources: &mut SourceMap,
+    files: &mut BTreeMap<String, FileId>,
+) -> Diagnostic {
     let code = codes::lookup(&format!("FLICK-{}", d.code)).map_or(codes::P013, |info| info.code);
     let severity = match d.severity {
         command::Severity::Error => Severity::Error,
@@ -237,5 +319,25 @@ fn diagnostic(d: &command::Diagnostic) -> Diagnostic {
         message.push_str("\nnote: ");
         message.push_str(note);
     }
-    Diagnostic::new(code, severity, message)
+    let mut out = Diagnostic::new(code, severity, message);
+    if let Some(span) = &d.span {
+        let file = files.get(&span.path).copied().or_else(|| {
+            let input = invocation.inputs.iter().find(|f| f.path == span.path)?;
+            let text = String::from_utf8_lossy(&input.bytes).into_owned();
+            let id = sources.add(span.path.clone(), text);
+            files.insert(span.path.clone(), id);
+            Some(id)
+        });
+        let len = file.map_or(0, |f| sources.get(f).text.len());
+        if let Some(file) = file
+            && span.start <= span.end
+            && span.end as usize <= len
+        {
+            out = out.with_span(Span::new(file, span.start, span.end));
+        }
+    }
+    if let Some(help) = &d.help {
+        out = out.with_fix(|| (help.clone(), Vec::new()));
+    }
+    out
 }

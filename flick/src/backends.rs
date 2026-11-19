@@ -16,6 +16,8 @@ mod request;
 #[cfg(feature = "wasm-backends")]
 mod tools;
 #[cfg(feature = "wasm-backends")]
+#[cfg(feature = "wasm-backends")]
+pub(crate) use execute::Reads;
 pub(crate) use tools::Tool;
 
 use crate::artifact::Artifact;
@@ -270,11 +272,13 @@ pub(crate) fn run_steps(
     result: &flick_backend::BuildResult,
     order: &[usize],
     sources: &BTreeMap<String, Vec<u8>>,
+    reads: &execute::Reads,
     tools: &[Tool],
     out: &Path,
     cancel: &Cancellation,
 ) -> Result<Vec<Artifact>, String> {
-    execute::run(result, order, sources, tools, out, cancel).map_err(|failure| match failure {
+    execute::run(result, order, sources, reads, tools, out, cancel).map_err(|failure| match failure
+    {
         execute::Failure::Cancelled => "cancelled".to_owned(),
         execute::Failure::Step(why) => why,
     })

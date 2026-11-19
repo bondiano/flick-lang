@@ -306,6 +306,7 @@ impl Package {
             result,
             generated.execution_order(),
             sources,
+            &execute::Reads::new(),
             &self.tools,
             &output.out_dir,
             cancel,
@@ -407,6 +408,14 @@ impl Contributor for Package {
         invocation: &command::Invocation,
     ) -> Result<command::Plan, Vec<command::Diagnostic>> {
         Backend::run(&self.backend, invocation)
+    }
+
+    fn resume(
+        &self,
+        state: Vec<u8>,
+        outputs: Vec<command::File>,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        Backend::resume(&self.backend, state, outputs)
     }
 
     fn open(&self, invocation: &command::Invocation) -> Result<Vec<u8>, Vec<command::Diagnostic>> {

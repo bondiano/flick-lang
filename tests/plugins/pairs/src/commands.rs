@@ -19,6 +19,8 @@ pub(super) fn commands() -> Vec<Descriptor> {
                 help: "whom to greet".into(),
             }],
             options: vec![],
+            inputs: vec![],
+            reads: vec![],
             writes: vec!["pairs.txt".into()],
             style: Style::Plan,
         })

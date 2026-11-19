@@ -2,16 +2,16 @@
 //! project, described from a cache in the store, and run by the host from
 //! the plan or the session they declare.
 
+mod inputs;
 mod plan;
 mod session;
 
-use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::fmt::Write as _;
-use std::fs;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
+use std::{env, fs};
 
 use clap::{Arg, ArgAction, CommandFactory};
 use flick_backend::command::{self, Argument, Descriptor, Invocation, Style, ValueKind};
@@ -23,12 +23,18 @@ use sha2::{Digest, Sha256};
 
 use super::run::{find_project, find_project_at};
 use crate::args::{CommandArguments, GlobalArguments};
+use crate::backends::Tool;
 use crate::{backends, fetch, plugins, report, saved};
 
 /// What runs the commands of one backend or plugin.
 pub(crate) trait Contributor: Send + Sync {
     fn describe(&self) -> Result<Vec<Descriptor>, String>;
     fn run(&self, invocation: &Invocation) -> Result<command::Plan, Vec<command::Diagnostic>>;
+    fn resume(
+        &self,
+        state: Vec<u8>,
+        outputs: Vec<command::File>,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>>;
     fn open(&self, invocation: &Invocation) -> Result<Vec<u8>, Vec<command::Diagnostic>>;
     fn handle(
         &self,
@@ -264,10 +270,15 @@ pub(crate) fn run(words: &[OsString], global: &GlobalArguments) -> ExitCode {
         }
     };
     let tools = backends::granted_tools(&project, &source.id);
-    let invocation = Invocation {
-        name: descriptor.name.clone(),
-        arguments,
-        tools: tools.iter().map(|t| plan::tool(&t.pin)).collect(),
+    let invocation = match invocation(&project, descriptor, arguments, &tools) {
+        Ok(invocation) => invocation,
+        Err(why) => {
+            return fail(Diagnostic::new(
+                codes::P055,
+                Severity::Error,
+                format!("`{}` cannot run: {why}", descriptor.name),
+            ));
+        }
     };
     match descriptor.style {
         Style::Plan => plan::run(
@@ -287,6 +298,30 @@ pub(crate) fn run(words: &[OsString], global: &GlobalArguments) -> ExitCode {
             global,
         ),
     }
+}
+
+/// The call of `descriptor` with `arguments`: their paths relative to the
+/// project's root, and the files the command reads.
+fn invocation(
+    project: &Project,
+    descriptor: &Descriptor,
+    arguments: Vec<Argument>,
+    tools: &[Tool],
+) -> Result<Invocation, String> {
+    let cwd = env::current_dir().map_err(|e| e.to_string())?;
+    let root = &project.root;
+    let sources =
+        (project.source_root().strip_prefix(root)).map_or_else(|_| String::new(), inputs::slashed);
+    let mut invocation = Invocation {
+        name: descriptor.name.clone(),
+        arguments: inputs::relative(descriptor, arguments, root, &cwd)?,
+        sources,
+        inputs: Vec::new(),
+        tools: tools.iter().map(|t| plan::tool(&t.pin)).collect(),
+    };
+    let paths = inputs::expand(&descriptor.inputs, &invocation)?;
+    invocation.inputs = inputs::read(root, &paths)?;
+    Ok(invocation)
 }
 
 type Target<'a> = (&'a Source, &'a Descriptor, Vec<String>);
@@ -416,13 +451,6 @@ fn arguments(
         }
     }
     Ok(arguments)
-}
-
-/// The values of `invocation` by parameter name.
-pub(super) fn values(invocation: &Invocation) -> BTreeMap<&str, &[String]> {
-    (invocation.arguments.iter())
-        .map(|a| (a.name.as_str(), a.values.as_slice()))
-        .collect()
 }
 
 #[cfg(test)]

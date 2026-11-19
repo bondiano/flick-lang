@@ -1,22 +1,12 @@
-/// `flick ffi import` reads `{"root": "<project dir>", "package": "<name>"}`
-/// on stdin and gets the shapes of the package's value exports as JSON.
+/// The shapes of a package's value exports as JSON, which the `ffi import`
+/// command of the JavaScript backend turns into bindings.
 module Import exposing (run)
 
 import JsonText exposing (Value(..))
 import Shape
 import Ts
-import Codec
 
 type alias Request = { root : String; name : String }
-  deriving Schema
-
-request_json : PureCodec Json Request
-let request_json =
-  ignore_extra_fields
-    (codec Request.schema {
-      root = field "root" String.json
-      name = field "package" String.json
-    })
 
 /// Whether the file is a declaration file: `.d.ts`, `.d.mts` or `.d.cts`.
 is_declarations : String -> Bool
@@ -106,25 +96,20 @@ let surface request resolved file =
           if List.is_empty types then [] else [("types", JArray types)],
         ]))
 
-/// Answers the request on stdin.
-run : Unit ->{Host.Console, Stdio.Stdio, Path.Path; AppError, PlatformError.PlatformError} Unit
-let run () =
-  let text = Stream.mk_string (Stream.decode_text Stream.stdin)
-  let request =
-    match Json.parse text with
-    | Err _ -> App.fail "the request on stdin is not JSON"
-    | Ok input ->
-      match Codec.decode_result request_json input with
-      | Err _ -> App.fail "the request on stdin needs `root` and `package`"
-      | Ok r -> r
-  let origin = Path.join [request.root, "__flick_ffi_import__.mts"]
-  match Ts.resolve request.name origin with
+/// Writes to `out` the shapes of the value exports of the package `name`,
+/// resolved as a module of the project at `root` resolves it.
+run :
+  String -> String -> String ->{Async, FileSystem.FileSystem, Path.Path; AppError, PlatformError.PlatformError}
+  Unit
+let run root name out =
+  let origin = Path.join [root, "__flick_ffi_import__.mts"]
+  match Ts.resolve name origin with
   | None ->
-    App.fail ("cannot resolve the declarations of `" ++ request.name ++ "` from " ++ request.root)
+    App.fail ("cannot resolve the declarations of `" ++ name ++ "` from " ++ root)
   | Some resolved ->
     let file = Ts.resolved_file resolved
     if not (is_declarations file) then
       App.fail
-        ("`" ++ request.name ++ "` resolves to " ++ file ++ ", which is not a declaration file")
+        ("`" ++ name ++ "` resolves to " ++ file ++ ", which is not a declaration file")
     else
-      Platform.stdout_line (surface request resolved file)
+      FileSystem.write_file_string { flag = None; mode = None } out (surface { root = root; name = name } resolved file ++ "\n")

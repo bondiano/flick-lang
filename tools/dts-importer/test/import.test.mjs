@@ -10,13 +10,20 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, "..");
 
-/** What `flick ffi import` reads for the package installed in this directory. */
-const read = (pkg, projectRoot = root) =>
-  execFileSync("node", [path.join(root, "index.mjs")], {
-    input: JSON.stringify({ root: projectRoot, package: pkg }),
-    encoding: "utf8",
-    stdio: ["pipe", "pipe", "pipe"],
-  });
+/** What `ffi import` reads for the package installed in this directory. */
+const read = (pkg, projectRoot = root) => {
+  const dir = mkdtempSync(path.join(tmpdir(), "dts-importer-"));
+  try {
+    const out = path.join(dir, "surface.json");
+    execFileSync("node", [path.join(root, "index.mjs"), "import", "--root", projectRoot, pkg, out], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    return readFileSync(out, "utf8");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+};
 
 for (const pkg of ["delay", "get-port", "p-map"]) {
   test(`import mode prints the shapes of ${pkg}`, () => {
