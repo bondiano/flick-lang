@@ -13,9 +13,12 @@ workspace = true
 
 [features]
 # the glue of a plugin built as a WebAssembly component
-guest = ["dep:wit-bindgen"]
+guest = ["dep:wit-bindgen", "commands"]
+# the commands a plugin adds to `flick`; not in the compiler the browser runs
+commands = ["dep:flick-backend"]
 
 [dependencies]
+flick-backend = { path = "../flick-backend", optional = true }
 flick-plugin-macros = { path = "macros" }
 serde = { version = "1.0.229", features = ["derive", "rc"] }
 wit-bindgen = { version = "0.63.0", optional = true }

@@ -17,6 +17,7 @@ pub mod bindings {
     wit_bindgen::generate!({
         world: "plugin",
         path: "wit",
+        with: { "flick:command/types@0.1.0": flick_backend::bindings::flick::command::types },
         pub_export_macro: true,
         export_macro_name: "export_component",
         default_bindings_module: "flick_plugin::guest::bindings",
@@ -283,6 +284,33 @@ pub fn check_calls(
 macro_rules! export {
     ($plugin:expr) => {
         struct FlickPluginComponent;
+
+        impl $crate::guest::bindings::exports::flick::command::command::Guest for FlickPluginComponent {
+            fn describe() -> ::std::vec::Vec<$crate::command::Descriptor> {
+                $crate::Plugin::commands(&$plugin)
+            }
+            fn run(
+                invocation: $crate::command::Invocation,
+            ) -> ::std::result::Result<$crate::command::Plan, ::std::vec::Vec<$crate::command::Diagnostic>>
+            {
+                $crate::Plugin::run(&$plugin, &invocation)
+            }
+            fn open(
+                invocation: $crate::command::Invocation,
+            ) -> ::std::result::Result<::std::vec::Vec<u8>, ::std::vec::Vec<$crate::command::Diagnostic>>
+            {
+                $crate::Plugin::open(&$plugin, &invocation)
+            }
+            fn handle(
+                state: ::std::vec::Vec<u8>,
+                request: ::std::vec::Vec<u8>,
+            ) -> ::std::result::Result<$crate::command::Handled, ::std::string::String> {
+                $crate::Plugin::handle(&$plugin, state, request)
+            }
+            fn close(state: ::std::vec::Vec<u8>) -> $crate::command::Plan {
+                $crate::Plugin::close(&$plugin, state)
+            }
+        }
 
         impl $crate::guest::bindings::Guest for FlickPluginComponent {
             fn collect(

@@ -1,0 +1,8 @@
+---
+title: "FLICK-P054"
+---
+
+A backend or a plugin declares a command whose name is a command of
+`flick` itself, as `build`. A contributor cannot replace a core command:
+the declaration is ignored and the core command runs as before. Its
+authors should rename it.
