@@ -1,0 +1,16 @@
+// A program the mutating fuzzer made (`front_end_survives_mutated_corpus`):
+// an unknown name in a row beside a handler of one instance. Checking it
+// grew a row without end until the stack overflowed; it reports its errors.
+module App.InstanceMutated exposing (texts)
+
+effect Store a =
+  get : Unit ->{} a
+with_store : a -> (Unit ->{Store a | r; e} b) ->{r; e} b
+let with_store value body =
+  try body () with
+  | Store.get () -> value
+texts : (Unit ->{Se String | r; e} String) ->{-Store | r; e} String
+let texts body = with_store "inner" body
+//~ FLICK-T001 @12:18-12:20 unknown type `Se`
+//~ FLICK-E002 @13:18-13:41 the signature of `texts` does not allow service `Store`
+//~ FLICK-E019 @13:37-13:41 `r` may hold `Store` at other arguments

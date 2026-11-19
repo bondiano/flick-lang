@@ -439,6 +439,15 @@ other calls of it go on to the handler around. The arms run where the
 handler is: what they need is the enclosing stage's, and a failure of a
 `tail` arm is the handler's, which no `try` in the body sees.
 
+An effect may take type arguments, as `Ask a` below. A handler answers one
+instance, the one its arms are typed at: `Ask String` in `with_name`. It
+finds an operation by its name, so the body may perform `Ask` only at that
+instance, and a row variable of the body that may hold `Ask` at other
+arguments is `FLICK-E019`: take it out, `{-Ask | r}`, or name the instance,
+`{Ask String | r}`, as `with_name` does. `Ask Int` and `Ask String` stay
+apart through substitution, under data and in polymorphic arguments, and
+`-Ask Int` is `FLICK-T002`: `-` takes out every instance of a name.
+
 ```flick
 effect Ask a =
   ask : Unit ->{} a

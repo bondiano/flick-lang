@@ -58,7 +58,7 @@ fixed : Unit ->{} (Int, Bool)
 let fixed () = both_ways ints_only
 
 /// `-` takes an element out by its name: an instance cannot be taken out.
-typed : (Unit ->{r; e} Int) ->{-Store Int | r; e} Int
+typed : (Unit ->{Store Int | r; e} Int) ->{-Store Int | r; e} Int
 let typed body =
   try body () with
   | Store.get () -> 1
@@ -102,7 +102,7 @@ let asks () = apart (fun () -> Store.get () + 1)
 //~ FLICK-T003 @43:22-43:29 expected `Store Int`, found `Store Bool`: `Bool` is not `Int`
 //~ FLICK-T008 @58:26-58:35 expected `Unit ->{Store a} a`, found `Unit ->{Store Int} Int`: `a` stands for any type the caller chooses, so it cannot be `Int`
 //~ FLICK-T008 @58:26-58:35 expected `Store a`, found `Store Int`: `a` stands for any type the caller chooses, so it cannot be `Int`
-//~ FLICK-T002 @61:32-61:42 `-` takes an element out of a row variable by its name, and `Store Int` has arguments: take every instance out, `-Store`
+//~ FLICK-T002 @61:44-61:54 `-` takes an element out of a row variable by its name, and `Store Int` has arguments: take every instance out, `-Store`
 //~ FLICK-E002 @72:6-72:18 the signature of `leaks` does not allow service `Store Bool`, which its body needs
 //~ FLICK-E019 @77:3-77:6 `r` may hold `Store` at other arguments, and `Store Int` here would answer for it
 //~ FLICK-T003 @87:36-87:48 expected `Store Int`, found `Store Bool`: `Bool` is not `Int`
