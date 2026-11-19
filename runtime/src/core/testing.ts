@@ -1,6 +1,7 @@
 // Tests and generators as data, whatever runtime runs them: a test is built by
 // pure code, and an effect test holds the task of its runtime.
 import type { HashDict } from "./data.ts";
+import type { SnapshotCase } from "./snapshots.ts";
 import { item } from "../internal.ts";
 import { tag } from "../tags.ts";
 
@@ -242,6 +243,8 @@ export interface Named<Task, L> {
   readonly timeout?: number | undefined;
   /** The outermost `Test.serial` it is in, if any, whose tests run one at a time. */
   readonly serial?: object | undefined;
+  /** Its snapshots, which its body checks, when the run has a snapshot manifest. */
+  readonly snapshot?: SnapshotCase | undefined;
 }
 
 type Marks = Readonly<{ skip: boolean; only: boolean; timeout?: number | undefined; serial?: object | undefined }>;

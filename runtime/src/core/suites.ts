@@ -1,6 +1,7 @@
 // What `flick test` does around the tests whatever runtime runs them: the
 // options of the runner, the selection, the human and JSON reports, SIGINT and
 // the end of a watcher's stdin, and the exit code.
+import { type SnapshotSummary, Snapshots } from "./snapshots.ts";
 import { type Named, type Test, flatten } from "./testing.ts";
 
 export type FailureKind = "assertion" | "defect" | "interrupted" | "failure" | "cleanup" | "setup" | "timeout";
@@ -30,6 +31,10 @@ export interface TestOptions {
   readonly forbidOnly?: boolean;
   /** The milliseconds of each test that has no `Test.timeout` of its own. */
   readonly timeout?: number | undefined;
+  /** The manifest of the snapshot files of the modules (see `snapshots.ts`). */
+  readonly snapshots?: string | undefined;
+  /** Write the snapshots that are missing or differ, and remove obsolete ones. */
+  readonly updateSnapshots?: boolean;
 }
 
 /** Options of `flick test`, from the runner's arguments. */
@@ -45,6 +50,8 @@ export const parseTestArgs = (argv: ReadonlyArray<string>): TestOptions => {
     list: boolean;
     forbidOnly: boolean;
     timeout: number | undefined;
+    snapshots: string | undefined;
+    updateSnapshots: boolean;
   } = {
     filter: "",
     jobs: 1,
@@ -56,6 +63,8 @@ export const parseTestArgs = (argv: ReadonlyArray<string>): TestOptions => {
     list: false,
     forbidOnly: false,
     timeout: undefined,
+    snapshots: undefined,
+    updateSnapshots: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i];
@@ -67,10 +76,12 @@ export const parseTestArgs = (argv: ReadonlyArray<string>): TestOptions => {
     else if (flag === "--color") options.color = value === "always";
     else if (flag === "--progress") options.progress = value === "live";
     else if (flag === "--timeout") options.timeout = Number(value);
-    else if (flag === "--watched" || flag === "--list" || flag === "--forbid-only") {
+    else if (flag === "--snapshots") options.snapshots = value;
+    else if (flag === "--watched" || flag === "--list" || flag === "--forbid-only" || flag === "--update-snapshots") {
       if (flag === "--watched") options.watched = true;
       else if (flag === "--list") options.list = true;
-      else options.forbidOnly = true;
+      else if (flag === "--forbid-only") options.forbidOnly = true;
+      else options.updateSnapshots = true;
       continue;
     } else continue;
     i++;
@@ -108,13 +119,16 @@ const report = (
   write: (text: string) => void,
   color: boolean,
   elapsedMs: number,
+  snapshots: SnapshotSummary | undefined,
 ): number => {
   const failed = results.filter((r) => r.status === "failed").length;
   const passed = results.length - failed;
+  // a run that changed and found no snapshot reports as before they existed
+  const touched = snapshots !== undefined && (snapshots.written > 0 || snapshots.removed > 0 || snapshots.obsolete.length > 0);
   if (reporter === "json") {
     // a run without skipped tests reports as before they existed
     const counts = skipped.length > 0 ? { seed, passed, failed, skipped: skipped.length } : { seed, passed, failed };
-    write(`${JSON.stringify({ ...counts, tests: [...results, ...skipped] })}\n`);
+    write(`${JSON.stringify({ ...counts, ...(touched ? { snapshots } : {}), tests: [...results, ...skipped] })}\n`);
     return failed;
   }
   const reset = color ? "\x1b[0m" : "";
@@ -126,6 +140,13 @@ const report = (
   const also = skipped.length > 0 ? ` · ${dim}${skipped.length}${reset} skipped` : "";
   const total = results.length + skipped.length;
   write(`\n  Tests  ${passedColor}${passed}${reset} passed · ${failedColor}${failed}${reset} failed${also} · ${total} total\n`);
+  if (touched) {
+    const { written, removed, obsolete } = snapshots;
+    const counts = [[written, "written"], [removed, "removed"], [obsolete.length, "obsolete"]] as const;
+    write(`  Snapshots  ${counts.flatMap(([n, what]) => (n > 0 ? [`${n} ${what}`] : [])).join(" · ")}\n`);
+    for (const entry of obsolete) write(`  obsolete snapshot ${entry}\n`);
+    if (obsolete.length > 0) write("  a run with --update-snapshots and without --filter removes them\n");
+  }
   write(`  Time   ${dim}${Math.max(0, Math.floor(elapsedMs))} ms${reset}\n`);
   if (failed > 0) write(`seed: ${seed} (rerun with --seed ${seed})\n`);
   return failed;
@@ -178,8 +199,12 @@ export const runTestsWith = async <Task, L>(
     options.seed !== undefined && Number.isInteger(options.seed) ? options.seed : Math.floor(Math.random() * 2 ** 31);
   const jobs = options.jobs !== undefined && Number.isInteger(options.jobs) && options.jobs > 0 ? options.jobs : 1;
   const timeout = options.timeout !== undefined && Number.isFinite(options.timeout) ? options.timeout : undefined;
+  const store = options.snapshots === undefined || options.list ? undefined : new Snapshots(options.snapshots, options.updateSnapshots ?? false);
   // `--timeout` is the timeout of each test that has none of its own
-  const all = modules.flatMap(([module, tests]) => flatten(module, tests ?? [], [], [], { skip: false, only: false, timeout }));
+  const all = modules.flatMap(([module, tests]) => {
+    const named = flatten(module, tests ?? [], [], [], { skip: false, only: false, timeout });
+    return store === undefined ? named : named.map((t) => ({ ...t, snapshot: store.of(module, t.name) }));
+  });
   const marked = all.filter((t) => t.only);
   if (options.forbidOnly && marked.length > 0) {
     write(`--forbid-only: ${marked.length} test${marked.length === 1 ? " is" : "s are"} marked only\n`);
@@ -255,11 +280,23 @@ export const runTestsWith = async <Task, L>(
   if (options.watched) process.stdin.off("end", stop).destroy();
   if (timer !== undefined) clearInterval(timer);
   clear();
+  let snapshots: SnapshotSummary | undefined;
+  if (store !== undefined) {
+    // a stopped run still writes what it updated, and finds no snapshot obsolete
+    const passed = new Set("failure" in ended ? [] : ended.flatMap((r) => (r.status === "passed" ? [r.name] : [])));
+    try {
+      snapshots = store.finish(new Set(all.flatMap(({ name }) => (passed.has(name) ? [] : [name]))), (options.filter ?? "") !== "");
+    } catch (error) {
+      write(`snapshots: ${error instanceof Error ? error.message : String(error)}\n`);
+      process.exitCode = 1;
+      return;
+    }
+  }
   if ("failure" in ended) {
     write(interrupted ? "interrupted: every running test closed its scope\n" : `${ended.failure}\n`);
     process.exitCode = interrupted ? 130 : 1;
     return;
   }
-  const failed = report(ended, skipped, seed, options.reporter, write, color, human ? performance.now() - started : 0);
+  const failed = report(ended, skipped, seed, options.reporter, write, color, human ? performance.now() - started : 0, snapshots);
   process.exitCode = failed > 0 ? 1 : 0;
 };

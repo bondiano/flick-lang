@@ -161,6 +161,7 @@ export {
   testSetTime,
   testShare,
   testShared,
+  testSnapshot,
   testSuite,
   testUse,
   testTimeout,

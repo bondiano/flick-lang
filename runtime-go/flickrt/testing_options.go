@@ -23,6 +23,10 @@ type testOptions struct {
 	// the milliseconds of each test without a Test.timeout of its own
 	timeout float64
 	timed   bool
+	// the manifest of the snapshot files of the modules, and whether the
+	// run writes them
+	snapshots       string
+	updateSnapshots bool
 }
 
 func parseTestArgs(args []string) testOptions {
@@ -62,6 +66,11 @@ func parseTestArgs(args []string) testOptions {
 		case "--forbid-only":
 			o.forbidOnly = true
 			continue
+		case "--snapshots":
+			o.snapshots = value
+		case "--update-snapshots":
+			o.updateSnapshots = true
+			continue
 		default:
 			continue
 		}
@@ -85,10 +94,13 @@ func marked(t Value, mode string) Value {
 // selectTests is the tests of suites the run runs, and those it reports as
 // skipped. With --forbid-only and a test marked only, or with --list, it
 // prints and exits without running any.
-func selectTests(suites []Suite, o testOptions) (selected []named, skipped []testResult) {
-	var all, marked []named
+func selectTests(suites []Suite, o testOptions, snapshots *snapshotRun) (all, selected []named, skipped []testResult) {
+	var marked []named
 	for _, s := range suites {
-		all = append(all, flatten(s.Module, List(s.Tests), nil, nil, marks{timeout: o.timeout, timed: o.timed})...)
+		for _, t := range flatten(s.Module, List(s.Tests), nil, nil, marks{timeout: o.timeout, timed: o.timed}) {
+			t.snapshot = snapshots.of(s.Module, t.name)
+			all = append(all, t)
+		}
 	}
 	// a test marked only in the selected files keeps the run to such tests
 	onlyMarked := false
@@ -126,5 +138,5 @@ func selectTests(suites []Suite, o testOptions) (selected []named, skipped []tes
 		stdout.Flush()
 		os.Exit(0)
 	}
-	return selected, skipped
+	return all, selected, skipped
 }

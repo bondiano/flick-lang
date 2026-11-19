@@ -347,7 +347,7 @@ func runLeaf(fb *Fiber, t named, seed int64, runs map[*test]*suiteRun) testResul
 			return Unit
 		}
 		if t.test.task != nil {
-			return Run(fiber, withFixtures(&fixtures{test: cells, suites: t.suites, runs: runs}, t.test.task))
+			return Run(fiber, withFixtures(&fixtures{test: cells, suites: t.suites, runs: runs}, withSnapshots(t.snapshot, t.test.task)))
 		}
 		message, bad = t.test.checks(fb, seed)
 		return Unit

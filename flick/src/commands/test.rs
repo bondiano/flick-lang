@@ -30,7 +30,7 @@ use flick_core::build::Extras;
 mod cached;
 mod runner;
 use cached::cached_prepare;
-use runner::{Runner, runner_command, runner_source, start};
+use runner::{Runner, SNAPSHOTS, runner_command, runner_source, snapshot_manifest, start};
 
 /// Where the test build goes, inside the project.
 const OUT_DIR: &str = ".flick/test";
@@ -169,13 +169,21 @@ fn prepare(
             Mode::for_cli(global)
         })
     };
-    let suites: Vec<(String, String)> = compilation
+    let modules: Vec<_> = compilation
         .modules
         .iter()
         .filter(|m| m.test && m.interface.exports_value("tests"))
         .filter(|m| wanted.is_empty() || wanted.contains(&m.path))
+        .collect();
+    let suites: Vec<(String, String)> = modules
+        .iter()
         .map(|m| (m.name.clone(), format!("./{}.js", m.name.replace('.', "/"))))
         .collect();
+    let snapshots = snapshot_manifest(
+        &project.root,
+        OUT_DIR,
+        modules.iter().map(|m| (m.name.as_str(), m.path.as_path())),
+    );
     if go_requested && rt {
         drop(progress);
         let message = "Flick's own runtime has only JavaScript output yet";
@@ -214,6 +222,9 @@ fn prepare(
             runner_source(&suites, rt),
         ));
     }
+    emitted
+        .artifacts
+        .push(Artifact::source(SNAPSHOTS.to_owned(), snapshots));
     if global.warnings_as_errors {
         emitted.diagnostics = report::promote(&emitted.diagnostics);
     }

@@ -9,6 +9,8 @@ import { LazyCell } from "../effect/Lazy.ts";
 import { flickAddFinalizer } from "../effect/Scope.ts";
 import { withOwnerEvidence } from "../owner_evidence.ts";
 import { type Engine, type Suites as SuitesOf, type TestOptions, type TestResult, parseTestArgs, runTestsWith } from "@flick-lang/runtime/core/suites";
+import type { SnapshotCase } from "@flick-lang/runtime/core/snapshots";
+import { withSnapshot } from "./testing_snapshots.ts";
 import * as Core from "@flick-lang/runtime/core/testing";
 import { service } from "../effects.ts";
 import { buildInto } from "../layer.ts";
@@ -339,9 +341,9 @@ const outcome = (exit: Exit.Exit<string | Setup | TimedOut | undefined, unknown>
   return { kind: "failure", message: describeCause(cause) };
 };
 
-const runOne = ({ name, test, suites, timeout }: Named, seed: number, runs: Map<Suite, SuiteRun>): Effect.Effect<TestResult> => {
+const runOne = ({ name, test, suites, timeout, snapshot }: Named, seed: number, runs: Map<Suite, SuiteRun>): Effect.Effect<TestResult> => {
   const mine = suites.flatMap((s) => runs.get(s) ?? []);
-  const result = runLeaf(name, test, seed, mine, timeout);
+  const result = runLeaf(name, test, seed, mine, timeout, snapshot);
   if (mine.length === 0) return result;
   return Effect.flatMap(result, (r) =>
     Effect.map(leave(mine), (failed): TestResult => {
@@ -358,9 +360,12 @@ const runLeaf = (
   seed: number,
   suites: ReadonlyArray<SuiteRun>,
   timeout: number | undefined,
+  snapshot: SnapshotCase | undefined,
 ): Effect.Effect<TestResult> =>
   Effect.map(
-    ownedExits((owner) => runCase(test.kind === "effect" ? Effect.as(test.task, undefined) : checks(test, seed), suites, timeout, owner)),
+    ownedExits((owner) =>
+      runCase(test.kind === "effect" ? withSnapshot(Effect.as(test.task, undefined), snapshot) : checks(test, seed), suites, timeout, owner),
+    ),
     ({ exit, cleanup, defects }): TestResult => {
       // a supervisor that failed during the test fails it, as it fails a program
       const body = outcome(

@@ -325,6 +325,12 @@ pub struct TestArguments {
     #[arg(long, value_enum, default_value_t = Reporter::Human)]
     pub reporter: Reporter,
 
+    /// Write the snapshots of `to.match_snapshot` that are missing or
+    /// differ, and, in a run without `--filter`, remove those no test checks
+    /// any more. Without it, a run never writes a snapshot.
+    #[arg(long)]
+    pub update_snapshots: bool,
+
     /// Run again whenever a source file changes, once the previous run has
     /// closed its scopes.
     #[arg(long)]

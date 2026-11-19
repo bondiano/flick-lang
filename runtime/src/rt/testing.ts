@@ -2,6 +2,8 @@
 // in an owner of its own and reports assertions, typed failures, defects and
 // failed cleanup apart, as the runner on Effect does.
 import { type Engine, type Suites as SuitesOf, type TestOptions, type TestResult, parseTestArgs, runTestsWith } from "../core/suites.ts";
+import { type Option, none, some } from "../core/data.ts";
+import type { SnapshotCase } from "../core/snapshots.ts";
 import * as Core from "../core/testing.ts";
 import { type Cause, type Exit, combine, fail, failed, hasDies, hasInterruptsOnly, interrupt, isFail, raise, succeeded } from "./cause.ts";
 import { CLOCK, TestClock, currentTestClock } from "./clock.ts";
@@ -306,13 +308,27 @@ const resultOf = (name: string, { exit, cleanup, defects }: OwnedExits): TestRes
   return { name, status: "failed", ...(body ?? { kind: "cleanup", message: why }), cleanup: why };
 };
 
+const SNAPSHOTS: object = /*#__PURE__*/ Object.freeze({ key: "Test.snapshots" });
+
+/**
+ * `Test.snapshot`: `None` when the snapshot `name` of the test this code runs
+ * for holds `text`, or the run wrote it; `Some None` when there is none, and
+ * `Some (Some stored)` when it holds another text.
+ */
+export const testSnapshot = (name: string, text: string): Option<Option<string>> => {
+  const check = lookup(SNAPSHOTS);
+  if (typeof check !== "function") throw new Error("a snapshot is checked only in the body of a test that `flick test` runs");
+  const stored = (check as SnapshotCase)(name, text);
+  return stored.kind === "same" ? none : some(stored.kind === "missing" ? none : some(stored.text));
+};
+
 /** Runs one test, then closes the suites it ends, and gives its result to `done`. */
-function* runOne({ name, test, suites, timeout }: Named, seed: number, runs: Map<Suite, SuiteRun>, ctx: Ctx, done: (r: TestResult) => void): Run {
+function* runOne({ name, test, suites, timeout, snapshot }: Named, seed: number, runs: Map<Suite, SuiteRun>, ctx: Ctx, done: (r: TestResult) => void): Run {
   const mine = suites.flatMap((s) => runs.get(s) ?? []);
   const body =
     test.kind === "effect"
       ? function* (): Run {
-          yield test.task();
+          yield snapshot === undefined ? test.task() : new Under(extend(currentCtx(), SNAPSHOTS, snapshot), test.task);
           return undefined;
         }
       : () => Core.checks(test, seed);

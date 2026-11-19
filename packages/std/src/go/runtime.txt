@@ -286,6 +286,7 @@ testFixture TestFixture
 testShared TestShared
 testShare TestShare
 testUse *TestUse
+testSnapshot *TestSnapshot
 testBeforeAll TestBeforeAll
 testBeforeEach TestBeforeEach
 testAfterEach TestAfterEach

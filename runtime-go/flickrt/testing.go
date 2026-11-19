@@ -158,6 +158,8 @@ type named struct {
 	// groups with hooks
 	suites []*test
 	marks
+	// its snapshots, which its body checks, when the run has a manifest
+	snapshot *snapshotCase
 }
 
 // marks are what a test inherits from the groups it is in: whether it or
@@ -197,7 +199,7 @@ func flatten(prefix string, tests []Value, out []named, suites []*test, m marks)
 		case t.group != nil:
 			out = flatten(name, t.group, out, suites, own)
 		default:
-			out = append(out, named{name, t, suites, own})
+			out = append(out, named{name: name, test: t, suites: suites, marks: own})
 		}
 	}
 	return out
@@ -393,7 +395,7 @@ func writeTestResult(r testResult, completed, total int, elapsed time.Duration, 
 	stdout.Flush()
 }
 
-func reportTests(results, skipped []testResult, seed int64, reporter string, color bool, elapsed time.Duration) int {
+func reportTests(results, skipped []testResult, seed int64, reporter string, color bool, elapsed time.Duration, snapshots *snapshotSummary) int {
 	failed := 0
 	for _, r := range results {
 		if r.Status == "failed" {
@@ -411,6 +413,7 @@ func reportTests(results, skipped []testResult, seed int64, reporter string, col
 		if len(skipped) > 0 {
 			counts += fmt.Sprintf(",\"skipped\":%d", len(skipped))
 		}
+		counts += snapshots.json()
 		fmt.Fprintf(stdout, "{%s,\"tests\":[%s]}\n", counts, strings.Join(tests, ","))
 		return failed
 	}
@@ -434,6 +437,7 @@ func reportTests(results, skipped []testResult, seed int64, reporter string, col
 		also = fmt.Sprintf(" · %s%d%s skipped", dim, len(skipped), reset)
 	}
 	fmt.Fprintf(stdout, "\n  Tests  %s%d%s passed · %s%d%s failed%s · %d total\n", passColor, passed, reset, failColor, failed, reset, also, len(results)+len(skipped))
+	snapshots.write()
 	fmt.Fprintf(stdout, "  Time   %s%d ms%s\n", dim, elapsed.Milliseconds(), reset)
 	if failed > 0 {
 		fmt.Fprintf(stdout, "seed: %d (rerun with --seed %d)\n", seed, seed)
@@ -468,7 +472,16 @@ func RunTests(fb *Fiber, suites []Suite) {
 	if !o.seeded {
 		seed = rand.Int64N(1 << 31)
 	}
-	selected, skipped := selectTests(suites, o)
+	var snapshots *snapshotRun
+	if o.snapshots != "" && !o.list {
+		run, err := readSnapshotRun(o.snapshots, o.updateSnapshots)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "snapshots: %v\n", err)
+			os.Exit(1)
+		}
+		snapshots = run
+	}
+	all, selected, skipped := selectTests(suites, o, snapshots)
 	if o.watched {
 		// a watcher stops the run by closing stdin, which works on every platform
 		go func() {
@@ -601,10 +614,11 @@ func RunTests(fb *Fiber, suites []Suite) {
 	outMu.Lock()
 	clear()
 	code := 0
+	summary := snapshots.end(all, results, fb.state.requested.Load(), o.filter != "")
 	if fb.state.requested.Load() {
 		fmt.Fprintln(stdout, "interrupted: every running test closed its scope")
 		code = 130
-	} else if reportTests(results, skipped, seed, o.reporter, o.color, elapsed) > 0 {
+	} else if reportTests(results, skipped, seed, o.reporter, o.color, elapsed, summary) > 0 {
 		code = 1
 	}
 	stdout.Flush()

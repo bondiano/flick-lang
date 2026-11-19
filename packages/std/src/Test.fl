@@ -96,11 +96,14 @@ type alias Matchers = {
   fail_with : forall r e a. (Eq (Errors e), Show (Errors e)) => Errors e ->
     Subject (Eff r e a) ->{r; AssertionFailed}
     Unit
+  match_snapshot : forall a. Show a => String -> Subject a ->{; AssertionFailed} Unit
 }
 
 /// The matchers: `to.equal expected`, `to.be_true`, `to.be_greater_than
-/// bound`, `to.contain item` of a list, and `to.fail_with error` of a task,
-/// which runs it and expects it to fail with `error`.
+/// bound`, `to.contain item` of a list, `to.fail_with error` of a task,
+/// which runs it and expects it to fail with `error`, and
+/// `to.match_snapshot name`, which compares the value, as `show` writes it,
+/// with the test's snapshot `name`.
 to : Matchers
 let to = {
   equal = to_equal
@@ -108,6 +111,7 @@ let to = {
   be_greater_than = to_be_greater_than
   contain = to_contain
   fail_with = to_fail_with
+  match_snapshot = to_match_snapshot
 }
 
 to_equal : (Eq a, Show a) => a -> Subject a ->{; AssertionFailed} Unit
@@ -143,6 +147,26 @@ let to_fail_with expected (Subject run) =
     mismatch
       (wanted
         ++ (if Exit.is_success ended then ", it succeeded" else ", it died or was interrupted"))
+
+to_match_snapshot : Show a => String -> Subject a ->{; AssertionFailed} Unit
+let to_match_snapshot name (Subject actual) =
+  let text = show actual
+  match snapshot name text with
+  | None -> ()
+  | Some None ->
+    mismatch ("no snapshot " ++ show name ++ " of this test; `flick test --update-snapshots` writes it")
+  | Some (Some stored) ->
+    mismatch
+      ("snapshot " ++ show name ++ ": " ++ differ stored text
+        ++ "\n`flick test --update-snapshots` writes the new one")
+
+/// What the snapshot `name` of the running test holds for `text`: `None`
+/// when it holds `text` or the run wrote it, `Some None` when there is none,
+/// `Some (Some stored)` when it holds another text. The snapshots of a test
+/// module are in `__snapshots__/<File>.snap` beside it, which only
+/// `flick test --update-snapshots` writes.
+snapshot : String -> String ->{} Option (Option String)
+foreign effect snapshot from "flick:rt" "testSnapshot"
 
 /// `Effect.exit`, which comes after this module among the built-in ones:
 /// how `task` ends.

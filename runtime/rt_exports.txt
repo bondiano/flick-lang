@@ -488,6 +488,9 @@
 @flick-lang/runtime/core/snapshot SnapshotRefused
 @flick-lang/runtime/core/snapshot snapshotCopy
 @flick-lang/runtime/core/snapshot snapshotReason
+@flick-lang/runtime/core/snapshots Snapshots
+@flick-lang/runtime/core/snapshots parseSnapshots
+@flick-lang/runtime/core/snapshots renderSnapshots
 @flick-lang/runtime/core/stubs Effect
 @flick-lang/runtime/core/stubs bindEff
 @flick-lang/runtime/core/stubs codecBlock
@@ -1073,6 +1076,7 @@
 @flick-lang/runtime/rt testShare
 @flick-lang/runtime/rt testShared
 @flick-lang/runtime/rt testSkip
+@flick-lang/runtime/rt testSnapshot
 @flick-lang/runtime/rt testSuite
 @flick-lang/runtime/rt testTimeout
 @flick-lang/runtime/rt testUse

@@ -47,4 +47,5 @@ export * from "./stdlib/seq.ts";
 export * from "./stdlib/misc.ts";
 export * from "./stdlib/snapshot.ts";
 export * from "./stdlib/testing.ts";
+export { testSnapshot } from "./stdlib/testing_snapshots.ts";
 export * from "./stdlib/text.ts";
