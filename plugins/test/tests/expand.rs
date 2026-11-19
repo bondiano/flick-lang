@@ -30,14 +30,14 @@ fn errors(blocks: &str) -> String {
 #[test]
 fn a_suite_is_a_group_of_its_cases_and_a_test_a_case_of_its_body() {
     insta::assert_snapshot!(code(
-        "suite \"Users\" {\n  test \"creates one\" { Test.expect (Test.equal \"Ada\" \"Ada\") }\n\n  suite.skip \"names\" {\n    test.only \"trims\" { Test.expect (Test.equal 1 1) }\n    test \"empty\" {}\n  }\n}"
+        "suite \"Users\" {\n  test \"creates one\" { Test.check (Test.equal \"Ada\" \"Ada\") }\n\n  suite.skip \"names\" {\n    test.only \"trims\" { Test.check (Test.equal 1 1) }\n    test \"empty\" {}\n  }\n}"
     ), @r#"
     let tests : (List Test.Test) = [
       (Test.group "Users" [
-        (Test.effect_test "creates one" (task { (Test.expect (Test.equal "Ada" "Ada")) })),
+        (Test.effect_test "creates one" (task { (Test.check (Test.equal "Ada" "Ada")) })),
         (Test.skip
           (Test.group "names" [
-            (Test.only (Test.effect_test "trims" (task { (Test.expect (Test.equal 1 1)) }))),
+            (Test.only (Test.effect_test "trims" (task { (Test.check (Test.equal 1 1)) }))),
             (Test.effect_test "empty" (task { () })),
           ])),
       ]),
@@ -45,9 +45,9 @@ fn a_suite_is_a_group_of_its_cases_and_a_test_a_case_of_its_body() {
     "#);
     // a body on lines of its own is the body of the task
     let lines = code(
-        "test \"lines\" {\n  let user = { name = \"Ada\" }\n  Test.expect (Test.equal \"Ada\" user.name)\n}",
+        "test \"lines\" {\n  let user = { name = \"Ada\" }\n  Test.check (Test.equal \"Ada\" user.name)\n}",
     );
-    assert!(lines.contains("(task { (let user = { name = \"Ada\" }\n  Test.expect (Test.equal \"Ada\" user.name)) })"), "{lines}");
+    assert!(lines.contains("(task { (let user = { name = \"Ada\" }\n  Test.check (Test.equal \"Ada\" user.name)) })"), "{lines}");
 }
 
 #[test]
@@ -55,9 +55,9 @@ fn the_module_s_tests_are_its_blocks_in_order() {
     // `tests$i` is a name only generated code writes, which the formatter does
     // not read: the code is shown as rendered
     insta::assert_snapshot!(code(
-        "test \"first\" { Test.expect (Test.equal 1 1) }\n\nsuite.only \"second\" {}\n\ntest.skip \"third\" {}"
+        "test \"first\" { Test.check (Test.equal 1 1) }\n\nsuite.only \"second\" {}\n\ntest.skip \"third\" {}"
     ), @r#"
-    let tests$0 = (Test.effect_test "first" (task { (Test.expect (Test.equal 1 1)) }))
+    let tests$0 = (Test.effect_test "first" (task { (Test.check (Test.equal 1 1)) }))
     let tests : (List Test.Test) = [tests$0, tests$1, tests$2]
     ---
     let tests$1 = (Test.only (Test.group "second" []))

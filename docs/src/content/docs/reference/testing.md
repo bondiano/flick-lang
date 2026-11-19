@@ -13,15 +13,15 @@ module App.UsersTest
 suite "names" {
   test "trims the name" {
     let name = String.trim "  Ada  "
-    Test.expect (Test.equal "Ada" name)
+    Test.check (Test.equal "Ada" name)
   }
 
   suite "empty" {
-    test "stays empty" { Test.expect (Test.equal "" (String.trim "  ")) }
+    test "stays empty" { Test.check (Test.equal "" (String.trim "  ")) }
   }
 }
 
-test "counts" { Test.expect (Test.equal 3 (List.length [1, 2, 3])) }
+test "counts" { Test.check (Test.equal 3 (List.length [1, 2, 3])) }
 ```
 
 The blocks are the plugin of the `std` package (see [plugins](../plugins/)),
@@ -45,7 +45,7 @@ call. A top-level declaration may not start with a value named `suite` or
 A test's body is an effectful test, as `Test.effect_test` runs one: it runs
 in a scope of its own, which owns what the body acquires, with the live host
 services (`Host.Live`), which outlive that scope. It passes when it ends and
-its scope closes cleanly; `Test.expect` fails it on a failed assertion, and
+its scope closes cleanly; `Test.check` fails it on a failed assertion, and
 a typed failure, a defect or a failed cleanup fails it too.
 
 The cases of a module are its `tests : List Test.Test`, the case of each
@@ -82,7 +82,7 @@ module App.Users
 # trim : String -> String
 # let trim name = String.trim name
 #
-test "trims a name" { Test.expect (Test.equal "Ada" (trim "  Ada ")) }
+test "trims a name" { Test.check (Test.equal "Ada" (trim "  Ada ")) }
 ```
 
 The module never sees its companion, and no other module can import it.
@@ -118,7 +118,7 @@ suite.skip "storage" {
   test "keeps a user" {}
 }
 
-test.only "being written" { Test.expect (Test.equal 2 (1 + 1)) }
+test.only "being written" { Test.check (Test.equal 2 (1 + 1)) }
 ```
 
 A skipped case inside a suite marked `only` stays skipped. `Test.skip` and
@@ -216,8 +216,8 @@ suite "users" {
 
   before_all { SynchronizedRef.update (fun all -> all ++ ["Grace"]) (await names) }
 
-  test "counts the names" { Test.expect (Test.equal 2 (await count)) }
-  test "reads them" { Test.expect (Test.equal ["Ada", "Grace"] (SynchronizedRef.get (await names))) }
+  test "counts the names" { Test.check (Test.equal 2 (await count)) }
+  test "reads them" { Test.check (Test.equal ["Ada", "Grace"] (SynchronizedRef.get (await names))) }
 }
 ```
 

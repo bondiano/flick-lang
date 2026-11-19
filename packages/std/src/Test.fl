@@ -42,8 +42,8 @@ let all assertions =
     assertions
 
 /// Fails the effectful test when the assertion failed.
-expect : Assertion ->{; AssertionFailed} Unit
-let expect assertion =
+check : Assertion ->{; AssertionFailed} Unit
+let check assertion =
   match assertion with
   | Pass -> ()
   | Failed message -> Fail.fail (AssertionFailed message)

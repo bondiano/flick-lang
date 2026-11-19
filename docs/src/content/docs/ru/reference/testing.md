@@ -1,6 +1,6 @@
 ---
 title: "Тестирование"
-source_hash: a9002a5c41c10ca5
+source_hash: 557631687ecc31ec
 ---
 
 Модуль тестового корня записывает свои тесты блоками: `suite "name" { … }`
@@ -14,15 +14,15 @@ module App.UsersTest
 suite "names" {
   test "trims the name" {
     let name = String.trim "  Ada  "
-    Test.expect (Test.equal "Ada" name)
+    Test.check (Test.equal "Ada" name)
   }
 
   suite "empty" {
-    test "stays empty" { Test.expect (Test.equal "" (String.trim "  ")) }
+    test "stays empty" { Test.check (Test.equal "" (String.trim "  ")) }
   }
 }
 
-test "counts" { Test.expect (Test.equal 3 (List.length [1, 2, 3])) }
+test "counts" { Test.check (Test.equal 3 (List.length [1, 2, 3])) }
 ```
 
 Блоки принадлежат плагину пакета `std` (см. [плагины](../plugins/)),
@@ -48,7 +48,7 @@ test "counts" { Test.expect (Test.equal 3 (List.length [1, 2, 3])) }
 собственной области, которая владеет тем, что захватило тело, с живыми
 сервисами хоста (`Host.Live`), которые переживают эту область. Тест
 проходит, когда тело завершилось и его область закрылась без ошибок;
-`Test.expect` проваливает его на неверном утверждении, а типизированная
+`Test.check` проваливает его на неверном утверждении, а типизированная
 ошибка, дефект или сбой очистки тоже проваливают тест.
 
 Случаи модуля — его `tests : List Test.Test`, случай каждого блока
@@ -85,7 +85,7 @@ module App.Users
 # trim : String -> String
 # let trim name = String.trim name
 #
-test "trims a name" { Test.expect (Test.equal "Ada" (trim "  Ada ")) }
+test "trims a name" { Test.check (Test.equal "Ada" (trim "  Ada ")) }
 ```
 
 Модуль никогда не видит своего компаньона, и никакой другой модуль не может
@@ -121,7 +121,7 @@ suite.skip "storage" {
   test "keeps a user" {}
 }
 
-test.only "being written" { Test.expect (Test.equal 2 (1 + 1)) }
+test.only "being written" { Test.check (Test.equal 2 (1 + 1)) }
 ```
 
 Пропущенный случай внутри набора с `only` остаётся пропущенным. `Test.skip`
@@ -222,8 +222,8 @@ suite "users" {
 
   before_all { SynchronizedRef.update (fun all -> all ++ ["Grace"]) (await names) }
 
-  test "counts the names" { Test.expect (Test.equal 2 (await count)) }
-  test "reads them" { Test.expect (Test.equal ["Ada", "Grace"] (SynchronizedRef.get (await names))) }
+  test "counts the names" { Test.check (Test.equal 2 (await count)) }
+  test "reads them" { Test.check (Test.equal ["Ada", "Grace"] (SynchronizedRef.get (await names))) }
 }
 ```
 

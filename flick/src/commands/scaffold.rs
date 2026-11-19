@@ -217,7 +217,7 @@ import Lib.Greeting exposing (greet)
 
 suite \"greet\" {
   test \"greets by name\" {
-    Test.expect (Test.equal \"Hello, Ada!\" (greet \"Ada\"))
+    Test.check (Test.equal \"Hello, Ada!\" (greet \"Ada\"))
   }
 }
 ";
