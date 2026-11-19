@@ -17,7 +17,7 @@ default = ["ide", "native-project"]
 ide = []
 # projects on disk: manifests, installed packages, published artifacts,
 # source maps and the docs of the built-in sources
-native-project = ["dep:flick-backend-go", "dep:toml", "dep:semver", "dep:sha2", "flick-backend-js/source-maps", "flick-backend-js/decision-graph", "flick-backend-support/native-project", "flick-ffi/native-project"]
+native-project = ["dep:flick-backend-go", "dep:toml", "dep:semver", "dep:sha2", "flick-backend-js/source-maps", "flick-backend-support/native-project", "flick-ffi/native-project"]
 # std in the binary, for a host with no packages: the playground
 embedded-std = []
 

@@ -560,8 +560,7 @@ the graph reaches from several branches has its body written once: each
 branch assigns the arm's names, declared before the tests, and goes to the
 body with `goto`. The JS target tries such a match arm by arm instead, as it
 does one of more than 16 arms, whose graph would spend the fuel budget of
-the backend component, one on a walked list, and every match in the
-browser compiler, whose size is budgeted. A match whose graph would have more than 32 nodes plus
+the backend component, and one on a walked list. A match whose graph would have more than 32 nodes plus
 16 per arm is compiled arm by arm instead.
 
 Every generated Flick function takes its execution fiber, `*flickrt.Fiber`,
