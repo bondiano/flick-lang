@@ -14,6 +14,12 @@ workspace = true
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+# What the component's descriptor accepts, which the backends index lists;
+# a test keeps the two equal.
+[package.metadata.flick]
+backend-api = { minimum = "0.1.0", maximum-exclusive = "0.2.0" }
+ir = { minimum = "0.12.0", maximum-exclusive = "0.13.0" }
+
 [features]
 component = ["dep:flick-backend", "dep:ciborium", "flick-ir/cbor"]
 guest = ["component"]

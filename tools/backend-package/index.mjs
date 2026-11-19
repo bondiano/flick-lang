@@ -14,9 +14,18 @@ const directory = join(root, `backends/${backend}/package`);
 const version = /^version = "([^"]+)"/m.exec(readFileSync(join(root, `backends/${backend}/Cargo.toml`), "utf8"))?.[1];
 assert.ok(version, `backends/${backend}/Cargo.toml must name a version`);
 const id = `flick/${backend}`;
+// what the descriptor accepts, from `[package.metadata.flick]` of the backend
+const cargo = readFileSync(join(root, `backends/${backend}/Cargo.toml`), "utf8");
+const range = (key) => {
+  const found = new RegExp(`^${key} = \\{ minimum = "([^"]+)", maximum-exclusive = "([^"]+)" \\}`, "m").exec(cargo);
+  assert.ok(found, `backends/${backend}/Cargo.toml must name ${key} in [package.metadata.flick]`);
+  return { minimum: found[1], maximum_exclusive: found[2] };
+};
 const manifest = {
   identity: { id, version },
   sha256: createHash("sha256").update(built).digest("hex"),
+  backend_api: range("backend-api"),
+  ir: range("ir"),
 };
 if (mode === "update") {
   mkdirSync(directory, { recursive: true });
