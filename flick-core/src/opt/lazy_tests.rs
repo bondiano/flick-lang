@@ -304,3 +304,59 @@ fn a_loop_without_lazy_is_unchanged() {
     assert!(!ir.contains("lazy_") && !ir.contains("$lazy"), "{ir}");
     assert!(ir.contains("(control-loop "), "{ir}");
 }
+
+/// O2b: a `let lazy` read once, in a branch, keeps no state: its `await`
+/// runs the task.
+#[test]
+fn a_let_lazy_read_once_keeps_no_state() {
+    let ir = optimized(&format!(
+        "{MARK}run : Bool -> Unit ->{{Async}} Int\nlet run b () =\n  let lazy x = mark 7\n  \
+         let k = 1\n  if b then await x + k else k\n"
+    ));
+    assert!(!ir.contains("let mut"), "{ir}");
+    assert!(!ir.contains("Some"), "{ir}");
+}
+
+/// O2b leaves a state read twice.
+#[test]
+fn a_let_lazy_read_twice_keeps_its_state() {
+    let ir = optimized(&format!(
+        "{MARK}run : Bool -> Unit ->{{Async}} Int\nlet run b () =\n  let lazy x = mark 7\n  \
+         if b then await x else 0 - await x\n"
+    ));
+    assert!(ir.contains("let mut x"), "{ir}");
+}
+
+/// O2b leaves a state read in a loop, which may read it again.
+#[test]
+fn a_let_lazy_read_in_a_loop_keeps_its_state() {
+    let ir = optimized(&format!(
+        "{MARK}run : Unit ->{{Async}} Int\nlet run () =\n  let lazy x = mark 7\n  let mut sum = 0\n  \
+         for i <- [1, 2, 3] do sum = sum + i * await x\n  sum\n"
+    ));
+    assert!(ir.contains("let mut x"), "{ir}");
+}
+
+/// O2b leaves a state read after a branch that assigns, as LetMut binds its
+/// variables again there.
+#[test]
+fn a_let_lazy_read_after_an_assigning_branch_keeps_its_state() {
+    let ir = optimized(&format!(
+        "{MARK}run : Bool -> Unit ->{{Async}} Int\nlet run b () =\n  let lazy x = mark 7\n  let mut n = 0\n  \
+         if b then n = 1 else ()\n  n + await x\n"
+    ));
+    assert!(ir.contains("let mut x"), "{ir}");
+}
+
+/// O2b sees through the body of a `try`, which runs once.
+#[test]
+fn a_let_lazy_read_once_in_a_try_keeps_no_state() {
+    let ir = optimized(&format!(
+        "{MARK}type error Oops = Oops\nrisky : Int ->{{; Oops}} Int\n\
+         let risky n = if n == 0 then Fail.fail Oops else n\n\
+         run : Int ->{{Async}} Int\nlet run n =\n  let lazy x = risky n\n  \
+         try await x with\n  | Oops -> 0\n"
+    ));
+    assert!(!ir.contains("let mut"), "{ir}");
+    assert!(!ir.contains("Some"), "{ir}");
+}
