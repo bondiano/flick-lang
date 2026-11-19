@@ -1,0 +1,11 @@
+---
+title: "FLICK-P053"
+---
+
+Two contributors, as the project's backend and a plugin, add a command of
+the same name, so its flat name says neither. Name the one you mean with
+its contributor, as the message lists them:
+
+```sh
+flick literal:greet world
+```

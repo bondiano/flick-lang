@@ -1,6 +1,7 @@
 //! Test-only backend: a pure Unit main, with explicit unsupported diagnostics.
 //! The same implementation is exercised natively and as a component.
 
+mod commands;
 mod launches;
 mod steps;
 mod tests;
@@ -9,6 +10,7 @@ use std::hint;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::SystemTime;
 
+use flick_backend::command;
 use flick_backend::{
     Artifact, ArtifactKind, Backend, BackendId, BuildRequest, BuildResult, Descriptor, Diagnostic,
     Environment, Inputs, Mode, ModuleRole, NamedRange, Profile, Severity, Span, TargetSupport,
@@ -60,6 +62,40 @@ fn case(request: &BuildRequest) -> &str {
 }
 
 impl Backend for Literal {
+    fn commands(&self) -> Vec<command::Descriptor> {
+        commands::commands()
+    }
+
+    fn run(
+        &self,
+        invocation: &command::Invocation,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        if commands::commands()
+            .iter()
+            .any(|d| d.name == invocation.name)
+        {
+            Ok(commands::run(invocation))
+        } else {
+            Err(commands::unknown(&invocation.name))
+        }
+    }
+
+    fn open(&self, invocation: &command::Invocation) -> Result<Vec<u8>, Vec<command::Diagnostic>> {
+        if invocation.name == "echo" {
+            Ok(vec![0])
+        } else {
+            Err(commands::unknown(&invocation.name))
+        }
+    }
+
+    fn handle(&self, state: Vec<u8>, request: Vec<u8>) -> Result<command::Handled, String> {
+        commands::handle(&state, &request)
+    }
+
+    fn close(&self, state: Vec<u8>) -> command::Plan {
+        commands::close(&state)
+    }
+
     fn describe(&self) -> Descriptor {
         let range = |a: &str, b: &str| VersionRange {
             minimum: a.into(),
@@ -291,4 +327,5 @@ mod guest {
         }
     }
     export_component!(Component);
+    flick_backend::export_commands!(Component, Literal);
 }

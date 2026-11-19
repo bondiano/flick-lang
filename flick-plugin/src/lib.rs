@@ -36,6 +36,9 @@ pub use facts::{
     Argument, Binding, CallSite, Constant, Enclosing, ExpressionFact, ExpressionKind, Fact,
     FactField, FactType, Lacking, Nesting, Refinement, Structure, Tagged,
 };
+/// The records of the commands a plugin adds to `flick`.
+#[cfg(feature = "commands")]
+pub use flick_backend::command;
 pub use flick_plugin_macros::flick;
 pub use literal::{literal_text, string_value};
 pub use reach::{ReachError, Request, Response};

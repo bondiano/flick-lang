@@ -4,6 +4,8 @@
 use std::fmt::Write;
 use std::fs;
 use std::path::Path;
+#[cfg(feature = "wasm-backends")]
+use std::path::PathBuf;
 
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::plugin::first_party;
@@ -71,6 +73,27 @@ pub fn plugins(global: &GlobalArguments) -> Outcome {
     }
     print!("{out}");
     Outcome::default()
+}
+
+/// The packages of the project's dependencies that provide a plugin, with
+/// the path of its component, whether it is there or not.
+#[cfg(feature = "wasm-backends")]
+pub(crate) fn components(project: &Project) -> Vec<(String, PathBuf)> {
+    let Ok(lock) = fetch::lock_of(&project.root) else {
+        return Vec::new();
+    };
+    let store = store::store_dir();
+    (project.config.dependencies.iter())
+        .filter_map(|dependency| {
+            let library =
+                project::library_dir(&project.root, dependency, &lock, store.as_deref()).ok()?;
+            let component = plugin_of(&library)?;
+            Some((
+                dependency.name.clone(),
+                project::normalize(&library.join(component)),
+            ))
+        })
+        .collect()
 }
 
 /// The listing line of the plugin `dependency` provides, if it provides one.

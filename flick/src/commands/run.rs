@@ -130,7 +130,9 @@ pub fn find_project(global: &GlobalArguments) -> Result<Project, (SourceMap, Vec
     find_project_at(global.project.as_deref().map(Path::new))
 }
 
-fn find_project_at(explicit: Option<&Path>) -> Result<Project, (SourceMap, Vec<Diagnostic>)> {
+pub(crate) fn find_project_at(
+    explicit: Option<&Path>,
+) -> Result<Project, (SourceMap, Vec<Diagnostic>)> {
     let host = FsHost::new();
     let mut sources = SourceMap::default();
     match project::discover(&host, &mut sources, &host.cwd, explicit) {

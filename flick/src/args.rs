@@ -3,6 +3,8 @@
 
 use std::path::PathBuf;
 
+use std::ffi::OsString;
+
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
 mod tools;
@@ -85,6 +87,10 @@ pub enum Commands {
     /// Serve TypeScript's Content Mapper requests for `.fl` files on
     /// stdio; `@flick-lang/content-mapper` starts it.
     ContentMapper(ContentMapperArguments),
+    /// A command the project's backend or one of its plugins adds, flat or
+    /// as `contributor:command`.
+    #[command(external_subcommand)]
+    External(Vec<OsString>),
 }
 
 #[derive(Args)]

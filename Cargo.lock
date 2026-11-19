@@ -790,6 +790,7 @@ dependencies = [
 name = "flick-plugin"
 version = "0.1.0"
 dependencies = [
+ "flick-backend",
  "flick-plugin-macros",
  "serde",
  "wit-bindgen",

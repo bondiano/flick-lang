@@ -15,6 +15,8 @@ mod official;
 mod request;
 #[cfg(feature = "wasm-backends")]
 mod tools;
+#[cfg(feature = "wasm-backends")]
+pub(crate) use tools::Tool;
 
 use crate::artifact::Artifact;
 use crate::toolchain;
@@ -24,13 +26,21 @@ use std::process::Command;
 use std::sync::Arc;
 use std::sync::OnceLock;
 
+#[cfg(feature = "wasm-backends")]
+use crate::commands::contributed::Contributor;
 use crate::sources::FsHost;
+#[cfg(feature = "wasm-backends")]
+use flick_backend::host::runtime::Cancellation;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 #[cfg(feature = "wasm-backends")]
 use flick_core::project;
+#[cfg(feature = "wasm-backends")]
+use flick_core::project::config;
 use flick_core::project::{Compilation, Project};
 use flick_core::source::SourceMap;
 use flick_ir::Program;
+#[cfg(feature = "wasm-backends")]
+use std::collections::BTreeMap;
 
 #[derive(Clone, Default)]
 pub(crate) enum Selected {
@@ -211,6 +221,63 @@ impl Selected {
     pub(crate) fn is_component(&self) -> bool {
         !matches!(self, Self::Native)
     }
+}
+
+/// The id and digest of the backend `project` selects, read from its pin
+/// or the distributed one, without loading it.
+#[cfg(feature = "wasm-backends")]
+pub(crate) fn selected_pin(project: &Project) -> Option<(String, String)> {
+    if let Some(package) = &project.config.build.backend {
+        return Some((package.id.clone(), package.sha256.clone()));
+    }
+    let pin = if project.config.build.emit == config::Emit::Go {
+        official::go_pin()
+    } else {
+        official::pin()
+    };
+    pin.ok().map(|pin| (pin.identity.id, pin.sha256))
+}
+
+/// The backend `project` selects, as a contributor of commands.
+#[cfg(feature = "wasm-backends")]
+pub(crate) fn contributor(project: &Project) -> Result<Arc<dyn Contributor>, String> {
+    let go = project.config.build.emit == config::Emit::Go;
+    let rt = project.config.build.effect == config::Backend::Rt;
+    match Selected::load(&FsHost::new(), Some(project), go, rt) {
+        Ok(Selected::Component(package)) => Ok(package),
+        Ok(Selected::Native) => Err("the native development backend adds no commands".into()),
+        Err(diagnostic) => Err(diagnostic.message),
+    }
+}
+
+/// The host tools `[tools]` grants `id` in `project`, found on `PATH`.
+#[cfg(feature = "wasm-backends")]
+pub(crate) fn granted_tools(project: &Project, id: &str) -> Vec<Tool> {
+    (project.config.tools.get(id).into_iter().flatten())
+        .filter_map(|tool| Tool::find(tool, None).ok())
+        .collect()
+}
+
+/// Whether a step sets only the variables of its tool's adapter.
+#[cfg(feature = "wasm-backends")]
+pub(crate) fn authorize(step: &flick_backend::ToolchainStep) -> Result<(), String> {
+    tools::authorize(step)
+}
+
+/// Runs the steps of `result` in `order`, each in a directory beside `out`.
+#[cfg(feature = "wasm-backends")]
+pub(crate) fn run_steps(
+    result: &flick_backend::BuildResult,
+    order: &[usize],
+    sources: &BTreeMap<String, Vec<u8>>,
+    tools: &[Tool],
+    out: &Path,
+    cancel: &Cancellation,
+) -> Result<Vec<Artifact>, String> {
+    execute::run(result, order, sources, tools, out, cancel).map_err(|failure| match failure {
+        execute::Failure::Cancelled => "cancelled".to_owned(),
+        execute::Failure::Step(why) => why,
+    })
 }
 
 static ALLOWED: OnceLock<Vec<String>> = OnceLock::new();
