@@ -192,7 +192,7 @@ type alias Forest a = List (Tree a)
 ```
 
 Functions that call themselves or each other are declared with `let rec` or
-in one `rec { … }` group (see [Recursion](../types/#recursion)).
+in one `rec { … }` group (see [Recursion](../bindings/#recursion)).
 
 <div id="module-contracts-and-named-functors"></div>
 

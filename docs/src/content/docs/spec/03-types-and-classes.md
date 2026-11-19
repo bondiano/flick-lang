@@ -1,6 +1,6 @@
 ---
 title: "Types and classes"
-source_hash: 4198521c66509090
+source_hash: 3243077e0c3ae3be
 ---
 
 ## Computations and kinds
@@ -86,7 +86,7 @@ The details of resolution, the instance rules and their diagnostics are in [Clas
 
 - Higher-rank callbacks with a nested `forall`, checking of full signatures and type inference inside the body.
 - Nominal ADTs, exact structural records with row polymorphism and exhaustive `match`.
-- GADTs: a constructor names the type it builds (`| IntLit Int : Expr Int`) and may hide the types of its fields; a `match` branch learns the type of the matched value under a complete signature, and exhaustiveness asks no branch for an impossible constructor, across all parts of the matched value. Indices include types, finite kinds, `Symbol` and service, error and capture rows. Branch-local row equations constrain every residual; region identities and record rows are not refined ([row indices](../../reference/row-indices/)).
+- GADTs: a constructor names the type it builds (`| IntLit Int : Expr Int`) and may hide the types of its fields; a `match` branch learns the type of the matched value under a complete signature, and exhaustiveness asks no branch for an impossible constructor, across all parts of the matched value. Indices include types, finite kinds, `Symbol` and service, error and capture rows. Branch-local row equations constrain every residual; region identities and record rows are not refined ([row indices](../../reference/gadts/#row-indices)).
 - HKT with type constructors and partial application.
 - Multiparameter classes, superclasses and functional dependencies; the row solver has fixed deterministic primitives.
 - Unique canonical instances without overlap, orphans and local implicit lookup; ownership is determined by the package.

@@ -728,6 +728,6 @@ implementation or make a recovery decision.
 Choose live layers at the application boundary and provide local layers
 in tests. When a layer acquires a resource such as a connection, give it a
 scoped lifetime; `Layer.succeed` is enough here because these layers acquire
-no resource. Continue with [layers and provide](../../reference/effects/#layers-and-provide),
+no resource. Continue with [layers and provide](../../reference/services/#layers-and-provide),
 [regions and captures](../../reference/regions/), or the
 [foreign interface](../../reference/ffi/) for those details.

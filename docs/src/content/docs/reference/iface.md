@@ -9,19 +9,22 @@ native package can instantiate it without the original checkout (see
 [Compiler architecture](../../contributing/implementation-decisions/#compiler-architecture)).
 It is versioned JSON. `.d.ts` is only a projection for TypeScript; `.iface` is the source of truth for Flick importers.
 
-The current schema is `iface-version` 29. It includes module visibility,
+The schema has the version `IFACE_VERSION` of `flick-core/src/iface.rs`.
+The current schema includes module visibility,
 `type module` contracts, nested static modules, higher-order signatures, the
 `exists` type form, implicit conversion instances, the invariants of
 refined types and the companions of re-exported types. Every schema change
-bumps the version; a compiler rejects any other version with `FLICK-P010`. The simplified example below shows the envelope;
+bumps the version; a compiler rejects any other version with `FLICK-P010`,
+naming the version it found and the one it reads. The simplified example below
+shows the envelope, with the two versions a real file holds as placeholders;
 use the current compiler to write an interface for a new package.
 
 ## Example
 
-```json
+```text
 {
-  "iface-version": 29,
-  "compiler": "0.1.0",
+  "iface-version": <IFACE_VERSION>,
+  "compiler": "<version of flick>",
   "module": "App.Shapes",
   "exports": [
     { "module": "App.Shapes", "namespace": "type", "name": "Shape", "decl": "adt" },

@@ -166,11 +166,161 @@ result and nothing happens at run time. You need not declare this type: the
 core module `TypeEq` has it, as `TypeEq a b`, `Refl` and
 [`TypeEq.cast`](../types/#gadts).
 
+## Type equality
+
+Row expressions are compared by their meaning throughout a type, including
+inside invariant containers. Reordering services, repeating the same service
+or grouping unions differently preserves the type.
+
+```flick
+service Log =
+  line : String ->{} Unit
+
+service Clock =
+  now : Unit ->{} Int
+
+same : Ref (Eff {Log, Clock} none Unit) -> Ref (Eff {Clock, Log} none Unit)
+let same cell = cell
+```
+
+The reference still has one content type. Equality does not allow widening
+the requirements or errors of a computation stored in it:
+
+```flick fail T003
+# service Log =
+#   line : String ->{} Unit
+# service Clock =
+#   now : Unit ->{} Int
+widen : Ref (Eff {Log} none Unit) -> Ref (Eff {Log, Clock} none Unit)
+let widen cell = cell
+```
+
+The same distinction applies to nominal arguments and record fields. Type equality preserves service identities and their type
+arguments, pure/runtime stages, regions and foreign contracts. It does not
+make different nominal declarations interchangeable. See [kinds and types](../types/) and
+[effects](../effects/).
+
+A GADT branch's unification problem also uses type equality: a different
+presentation of the same row cannot make a branch impossible. Patterns can
+also [refine service, error and capture row indices](#row-indices).
+Region identities remain rigid.
+
+These are shared language rules for JS and Go. A backend receives the checked
+program; its output representation does not choose a different type equality.
+
+## Row indices
+
+A constructor result can fix or relate indices of kind `ServiceRow`,
+`ErrorRow` or `CaptureRow`. A `match` branch checks its body under those
+equations. The function still needs a complete signature.
+
+```flick
+service Db =
+  get : Int ->{} Int
+
+type Cmd (r : ServiceRow) a =
+  | Value a : Cmd none a
+  | Read Int : Cmd {Db} Int
+
+run : Cmd r a ->{r} a
+let run command =
+  match command with
+  | Value value -> value
+  | Read key -> Db.get key
+```
+
+The equation in the `Read` branch permits `Db`. It preserves the runtime
+stage: even a call whose requirements become empty remains a runtime call.
+Refinement cannot make the same implementation a pure function.
+
+```flick fail E001
+# service Db =
+#   get : Int ->{} Int
+# type Cmd (r : ServiceRow) =
+#   | Read Int : Cmd {Db}
+pure : Cmd r -> Int
+let pure command =
+  match command with
+  | Read key -> Db.get key
+```
+
+An equation can have several residuals. In this example `s` may be empty
+or contain `Db`; the branch proves that every allowed `s` fits `{Db}`.
+It does not choose an empty residual.
+
+```flick
+# service Db =
+#   get : Int ->{} Int
+type Packed (r : ServiceRow) =
+  | Packed (Eff s none Int) : Packed {Db | s}
+
+unpack : Packed {Db} ->{Db} Int
+let unpack packed =
+  match packed with
+  | Packed work -> await work
+```
+
+Exhaustiveness keeps these equations while checking the other parts of a
+tuple. Here the first part proves that `r` contains `Db`, so `Empty` cannot
+occur in the second part:
+
+```flick
+# service Db =
+#   get : Int ->{} Int
+type Includes (r : ServiceRow) (s : ServiceRow) =
+  | Includes : Includes r {Db | r}
+
+type RowCmd (r : ServiceRow) =
+  | Empty : RowCmd none
+  | WithDb Int : RowCmd {Db}
+
+read_value : (Includes r r, RowCmd r) -> Int
+let read_value pair =
+  match pair with
+  | (Includes, WithDb value) -> value
+```
+
+Hidden residuals of separate constructor occurrences remain independent.
+Only their shared outer indices relate the parts of the value.
+
+The same reasoning applies to error rows. Local handlers remove the
+requirements they cover before the surrounding signature is checked.
+Equations stay inside the branch, including checks deferred until the
+declaration ends. Service and error arguments remain invariant: knowing
+that a row contains `Store String` never permits `Store Int`.
+
+Capture indices can relate the permitted captures of values:
+
+```flick
+type Share (c : CaptureRow) (d : CaptureRow) =
+  | Share : Share c c
+
+share : Share c d -> (Unit -> Int)^c -> (Unit -> Int)^d
+let share proof callback =
+  match proof with
+  | Share -> callback
+```
+
+This does not identify distinct regions. Parameters of kind `Region` and
+record-row parameters must still be passed as variables, and patterns do
+not learn a new region identity. Refinement also preserves the existing
+rules for handlers, foreign calls and mutable references.
+
+These rules are shared by JS and Go. [Type equality](#type-equality)
+and the [limits](#limits) below are the other constraints on a refining branch.
+
 ## Limits
 
 - Only an arm of a `match` learns a type. The pattern of a `let`, of a parameter
   or an alternative of an or-pattern does not, and each is `FLICK-T058`.
 - Patterns do not identify different regions (`FLICK-T058`).
-  [Service, error and capture row indices](../row-indices/) can be refined.
+  [Service, error and capture row indices](#row-indices) can be refined.
 - TypeScript has no refinement: in a `.d.ts` file each constructor is a case of
   every instance of its type, and a type it hides is `unknown`.
+- Lean proves the row-index rules by examples
+  (`formal/Formal/GadtRowExamples.lean`): membership from absorption,
+  inclusion for every residual, exclusion by subtraction, transport of capture
+  equality, and that choosing the empty residual would lose a solution. There
+  is no general soundness proof for parameterized row indices, and the
+  examples do not certify the checker's algorithm, which tests compare with
+  the reference model (`docs/formal/gadt-rows.md`).
