@@ -52,18 +52,31 @@ pub mod command {
                 steps: vec![],
                 diagnostics: vec![],
                 stdout: vec![],
+                resume: None,
+            }
+        }
+    }
+
+    impl Diagnostic {
+        /// An error of the contributor, `code` without its `FLICK-` prefix.
+        pub fn error(code: &str, message: String) -> Self {
+            Self {
+                code: code.into(),
+                severity: Severity::Error,
+                message,
+                notes: vec![],
+                span: None,
+                help: None,
             }
         }
     }
 
     /// The answer of a contributor that has no command `name`.
     pub fn unknown(name: &str) -> Vec<Diagnostic> {
-        vec![Diagnostic {
-            code: "P052".into(),
-            severity: Severity::Error,
-            message: format!("this contributor has no command `{name}`"),
-            notes: vec![],
-        }]
+        vec![Diagnostic::error(
+            "P052",
+            format!("this contributor has no command `{name}`"),
+        )]
     }
 }
 
@@ -83,6 +96,15 @@ macro_rules! export_commands {
                 ::std::vec::Vec<$crate::command::Diagnostic>,
             > {
                 $crate::Backend::run(&$backend, &invocation)
+            }
+            fn resume(
+                state: ::std::vec::Vec<u8>,
+                outputs: ::std::vec::Vec<$crate::command::File>,
+            ) -> ::std::result::Result<
+                $crate::command::Plan,
+                ::std::vec::Vec<$crate::command::Diagnostic>,
+            > {
+                $crate::Backend::resume(&$backend, state, outputs)
             }
             fn open(
                 invocation: $crate::command::Invocation,
@@ -140,6 +162,18 @@ pub trait Backend {
         invocation: &command::Invocation,
     ) -> Result<command::Plan, Vec<command::Diagnostic>> {
         Err(command::unknown(&invocation.name))
+    }
+    /// The rest of a plan whose steps have run, `outputs` holding their files.
+    fn resume(
+        &self,
+        state: Vec<u8>,
+        outputs: Vec<command::File>,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        let _ = (state, outputs);
+        Err(vec![command::Diagnostic::error(
+            "P055",
+            "this contributor resumes no plan".into(),
+        )])
     }
     /// The state of a new session of the session command `invocation.name`.
     fn open(&self, invocation: &command::Invocation) -> Result<Vec<u8>, Vec<command::Diagnostic>> {

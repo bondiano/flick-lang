@@ -1,9 +1,13 @@
-//! `flick ffi import` gives an opaque type the form TypeScript names it
+//! `ffi import` gives an opaque type the form TypeScript names it
 //! by, so the declarations of the generated bindings take the values a
 //! TypeScript caller has: an instance of the package's class, a `Date`, an
 //! `Intl.DateTimeFormatOptions`.
 
 use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::symlink;
+#[cfg(windows)]
+use std::os::windows::fs::symlink_dir;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -50,13 +54,19 @@ fn flick(dir: &Path, args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_flick"))
         .args(args)
         .current_dir(dir)
-        .env(
-            "FLICK_DTS_IMPORTER",
-            root().join("tools/dts-importer/index.mjs"),
-        )
         .env("NO_COLOR", "1")
         .output()
         .expect("flick runs")
+}
+
+#[cfg(unix)]
+fn link(target: &Path, at: &Path) {
+    symlink(target, at).expect("link the importer");
+}
+
+#[cfg(windows)]
+fn link(target: &Path, at: &Path) {
+    symlink_dir(target, at).expect("link the importer");
 }
 
 fn text(bytes: &[u8]) -> String {
@@ -71,6 +81,10 @@ fn an_imported_opaque_type_is_the_type_typescript_has() {
     let installed = dir.join("node_modules/typed-handles");
     fs::create_dir_all(&installed).expect("package dir");
     fs::create_dir_all(dir.join("src/Ffi")).expect("ffi dir");
+    // the repository's importer, as `pnpm add -D @flick-lang/dts-importer` installs it
+    let importer = dir.join("node_modules/@flick-lang/dts-importer");
+    fs::create_dir_all(importer.parent().expect("scope")).expect("scope");
+    link(&root().join("tools/dts-importer"), &importer);
     for (file, contents) in [
         ("package.json", PACKAGE),
         ("index.d.ts", DECLARATIONS),
@@ -80,7 +94,7 @@ fn an_imported_opaque_type_is_the_type_typescript_has() {
     }
     fs::write(
         dir.join("flick.toml"),
-        "schema-version = 1\n\n[project]\nkind = \"lib\"\n\n[build]\neffect = \"effect\"\n",
+        "schema-version = 1\n\n[project]\nkind = \"lib\"\n\n[build]\neffect = \"effect\"\n\n[tools]\n\"flick/js\" = [\"node\"]\n",
     )
     .expect("write");
     fs::write(

@@ -16,6 +16,8 @@ mod request;
 #[cfg(feature = "wasm-backends")]
 mod tools;
 #[cfg(feature = "wasm-backends")]
+#[cfg(feature = "wasm-backends")]
+pub(crate) use execute::Reads;
 pub(crate) use tools::Tool;
 
 use crate::artifact::Artifact;
@@ -250,6 +252,32 @@ pub(crate) fn contributor(project: &Project) -> Result<Arc<dyn Contributor>, Str
     }
 }
 
+/// The official backends, each by its id and the digest of its component.
+#[cfg(feature = "wasm-backends")]
+pub(crate) fn officials() -> Vec<(String, String)> {
+    ([official::pin(), official::go_pin()].into_iter().flatten())
+        .map(|pin| (pin.identity.id, pin.sha256))
+        .collect()
+}
+
+/// The official backend `id`, loaded for `project` whatever it selects.
+#[cfg(feature = "wasm-backends")]
+pub(crate) fn official_contributor(
+    project: &Project,
+    id: &str,
+) -> Result<Arc<dyn Contributor>, String> {
+    let tools = Some(&project.config.tools);
+    let package = if id == "flick/go" {
+        official::go(&project.root, tools)
+    } else {
+        official::javascript(&project.root, false, tools)
+    };
+    match package {
+        Ok(package) => Ok(Arc::new(package)),
+        Err(diagnostic) => Err(diagnostic.message),
+    }
+}
+
 /// The host tools `[tools]` grants `id` in `project`, found on `PATH`.
 #[cfg(feature = "wasm-backends")]
 pub(crate) fn granted_tools(project: &Project, id: &str) -> Vec<Tool> {
@@ -270,11 +298,13 @@ pub(crate) fn run_steps(
     result: &flick_backend::BuildResult,
     order: &[usize],
     sources: &BTreeMap<String, Vec<u8>>,
+    reads: &execute::Reads,
     tools: &[Tool],
     out: &Path,
     cancel: &Cancellation,
 ) -> Result<Vec<Artifact>, String> {
-    execute::run(result, order, sources, tools, out, cancel).map_err(|failure| match failure {
+    execute::run(result, order, sources, reads, tools, out, cancel).map_err(|failure| match failure
+    {
         execute::Failure::Cancelled => "cancelled".to_owned(),
         execute::Failure::Step(why) => why,
     })

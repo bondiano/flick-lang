@@ -4,10 +4,13 @@ use flick_core::ffi::{Policy, Surface};
 use super::*;
 
 const LOOKUP: &str = include_str!("../../../../flick-ffi/src/ffi/fixtures/lookup.json");
-/// A `.d.ts` reader that answers every request with the fixture surface.
-const READER: &str = "import { readFileSync } from \"node:fs\";\n\
-    readFileSync(0);\n\
-    process.stdout.write(readFileSync(new URL(\"lookup.json\", import.meta.url)));\n";
+/// A `.d.ts` reader that writes the fixture surface for every request, to
+/// the file its last argument names.
+const READER: &str = "import { readFileSync, writeFileSync } from \"node:fs\";\n\
+    writeFileSync(process.argv.at(-1), readFileSync(new URL(\"lookup.json\", import.meta.url)));\n";
+/// A library that allows the JavaScript backend `node`, which runs the reader.
+const TOOLED: &str =
+    "schema-version = 1\n\n[project]\nkind = \"lib\"\n\n[tools]\n\"flick/js\" = [\"node\"]\n";
 const GENERATED: &str = "src/Ffi/LookupLib/Generated.fl";
 
 fn fresh(select: Option<&[String]>) -> String {
@@ -49,7 +52,7 @@ fn header_regenerates_the_imported_module() {
     let dir = project(
         "lsp_ffi_regenerate",
         &[
-            ("flick.toml", LIB),
+            ("flick.toml", TOOLED),
             ("node_modules/@flick-lang/dts-importer/index.mjs", READER),
             ("node_modules/@flick-lang/dts-importer/lookup.json", LOOKUP),
         ],

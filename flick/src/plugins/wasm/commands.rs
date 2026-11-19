@@ -40,6 +40,27 @@ impl Contributor for Wasm {
         }
     }
 
+    fn resume(
+        &self,
+        state: Vec<u8>,
+        outputs: Vec<command::File>,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        let wire: Vec<_> = outputs.iter().map(commands::file_wire).collect();
+        let (result, _) = self.run(BlockSource::default(), |plugin, store| {
+            plugin
+                .flick_command_command()
+                .call_resume(store, &state, &wire)
+        });
+        match result {
+            Ok(Ok(plan)) => Ok(commands::plan(plan)),
+            Ok(Err(diagnostics)) => Err(commands::diagnostics(diagnostics)),
+            Err(why) => Err(vec![command::Diagnostic::error(
+                "P013",
+                format!("resume: {why}"),
+            )]),
+        }
+    }
+
     fn open(&self, invocation: &command::Invocation) -> Result<Vec<u8>, Vec<command::Diagnostic>> {
         let wire = commands::invocation(invocation);
         let (result, _) = self.run(BlockSource::default(), |plugin, store| {

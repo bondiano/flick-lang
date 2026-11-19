@@ -199,8 +199,11 @@ impl Checker<'_> {
             Stage::Pure => (Row::none(), Row::none()),
             Stage::Runtime(r, e) => (r.clone(), e.clone()),
         };
-        let rest = self.error_arms(arms, &raised, &t)?;
-        self.note(body, |n| n.own = Some((inner.clone(), rest.clone())));
+        let (rest, caught) = self.error_arms(arms, &raised, &t)?;
+        self.note(body, |n| {
+            n.own = Some((inner.clone(), rest.clone()));
+            n.caught = caught;
+        });
         if inner == Stage::Pure {
             return Ok(t);
         }
@@ -209,8 +212,14 @@ impl Checker<'_> {
     }
 
     /// The arms of a `try`, or of a handler for its body's errors, at the
-    /// result `t`: what of `raised` no arm without `when` covers.
-    pub(super) fn error_arms(&mut self, arms: &[Arm], raised: &Row, t: &Type) -> Check<Row> {
+    /// result `t`: what of `raised` no arm without `when` covers, and the
+    /// rows the arms `x` and `_` take the errors at.
+    pub(super) fn error_arms(
+        &mut self,
+        arms: &[Arm],
+        raised: &Row,
+        t: &Type,
+    ) -> Check<(Row, Vec<Row>)> {
         let mut handled = Row::none();
         let mut all = false;
         let mut caught = Vec::new();
@@ -240,11 +249,12 @@ impl Checker<'_> {
         for row in &caught {
             self.within(raised, row)?;
         }
-        if all {
-            Ok(Row::none())
+        let rest = if all {
+            Row::none()
         } else {
-            self.minus(raised, &handled)
-        }
+            self.minus(raised, &handled)?
+        };
+        Ok((rest, caught))
     }
 
     /// (Provide): the layer is built around the body, whose services it

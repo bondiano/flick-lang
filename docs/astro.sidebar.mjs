@@ -56,7 +56,7 @@ export const sidebar = [
       {
         label: "Language",
         translations: { ru: "Язык" },
-        items: ["syntax", "types", "numbers", "bindings", "gadts", "classes", "effects", "services", "regions", "resources", "modules"].map(reference),
+        items: ["syntax", "types", "numbers", "bindings", "gadts", "classes", "proofs", "effects", "services", "regions", "resources", "modules"].map(reference),
       },
       { slug: "reference/errors" },
       { label: "Package API", translations: { ru: "API пакета" }, items: [{ slug: "api" }] },

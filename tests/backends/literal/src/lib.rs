@@ -80,6 +80,14 @@ impl Backend for Literal {
         }
     }
 
+    fn resume(
+        &self,
+        state: Vec<u8>,
+        outputs: Vec<command::File>,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        Ok(commands::resume(&state, &outputs))
+    }
+
     fn open(&self, invocation: &command::Invocation) -> Result<Vec<u8>, Vec<command::Diagnostic>> {
         if invocation.name == "echo" {
             Ok(vec![0])

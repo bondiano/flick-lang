@@ -5,10 +5,15 @@
 
 use std::collections::BTreeMap;
 use std::io::Read;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Stdio};
 use std::time::{Duration, Instant};
 use std::{fs, io, thread};
+
+#[cfg(unix)]
+use std::os::unix::fs::symlink;
+#[cfg(windows)]
+use std::os::windows::fs::{symlink_dir, symlink_file};
 
 use flick_backend::host::runtime::Cancellation;
 use flick_backend::{BuildResult, InputRef, Limits, ToolchainStep, validate_output_paths};
@@ -25,12 +30,17 @@ pub(super) enum Failure {
     Step(String),
 }
 
+/// Paths a step reads in place, by its index: where each appears in the
+/// step's directory and what it links to.
+pub(crate) type Reads = BTreeMap<usize, Vec<(String, PathBuf)>>;
+
 /// The outputs of every step of `result`, run in `order`. `sources` holds
 /// the request's side inputs by id; `out` is the output directory.
 pub(super) fn run(
     result: &BuildResult,
     order: &[usize],
     sources: &BTreeMap<String, Vec<u8>>,
+    reads: &Reads,
     tools: &[Tool],
     out: &Path,
     cancel: &Cancellation,
@@ -45,6 +55,10 @@ pub(super) fn run(
                 input_file(input, result, &produced, sources).map_err(|why| failed(step, &why))?;
             write(&work.path().join(path), bytes).map_err(|e| failed(step, &e.to_string()))?;
         }
+        for (path, target) in reads.get(&i).into_iter().flatten() {
+            link(&work.path().join(path), target)
+                .map_err(|e| failed(step, &format!("cannot give it `{path}` to read: {e}")))?;
+        }
         execute(step, tools, work.path(), cancel)?;
         for output in &step.outputs {
             let file = read_output(work.path(), &output.path).map_err(|why| failed(step, &why))?;
@@ -58,6 +72,23 @@ pub(super) fn run(
         }
     }
     Ok(outputs)
+}
+
+/// Makes `target` appear at `at`, without copying it.
+fn link(at: &Path, target: &Path) -> io::Result<()> {
+    if let Some(dir) = at.parent() {
+        fs::create_dir_all(dir)?;
+    }
+    #[cfg(unix)]
+    return symlink(target, at);
+    // shortcut: a symbolic link needs Developer Mode or an administrator on
+    // Windows; link directories as junctions once someone needs it without.
+    #[cfg(windows)]
+    return if target.is_dir() {
+        symlink_dir(target, at)
+    } else {
+        symlink_file(target, at)
+    };
 }
 
 fn failed(step: &ToolchainStep, why: &str) -> Failure {
