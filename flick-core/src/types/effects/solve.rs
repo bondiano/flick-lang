@@ -12,7 +12,7 @@ use crate::fmt::foralls;
 use crate::source::Span;
 use crate::types::gadt::row_facts::RowKind;
 use crate::types::lang::{self, Lang};
-use crate::types::ty::{Norm, Row, Type, Written};
+use crate::types::ty::{Norm, Row, Type, Written, without};
 use crate::types::{Checker, regions};
 
 /// The row `actual` of a call must be part of `declared`.
@@ -157,6 +157,13 @@ impl Checker<'_> {
         }
         for tail in &actual.tails {
             if matches!(tail, Type::Error) || unknown(tail).is_some() || allows(&declared, tail) {
+                continue;
+            }
+            // a variable taken without names grows by a tail only when that
+            // ends what the tail is owed: `{S a | s - S}` never holds all of `s`
+            let mut grown = declared.clone();
+            grown.tails.push(without(tail.clone(), &never));
+            if !allows(&grown, tail) {
                 continue;
             }
             if let Some(variable) = open.as_ref() {

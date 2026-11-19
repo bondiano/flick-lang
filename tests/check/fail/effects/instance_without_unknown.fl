@@ -1,0 +1,17 @@
+module App.InstanceWithoutUnknown exposing (texts)
+
+effect Store a =
+  get : Unit ->{} a
+
+with_store : a -> (Unit ->{Store a | r; e} b) ->{r; e} b
+let with_store value body =
+  try body () with
+  | Store.get () -> value
+
+// an instance of an unknown type: the row less `Store` that the result
+// declares must not keep growing by `r`, which it never allows
+texts : (Unit ->{Store Missing | r; e} String) ->{-Store | r; e} String
+let texts body = with_store "inner" body
+
+//~ FLICK-T001 @13:24-13:31 unknown type `Missing`
+//~ FLICK-E002 @14:37-14:41 the expected type `Unit ->{Store String; e} String` does not allow service `r`, which this needs
