@@ -6,6 +6,62 @@ break programs.
 
 ## Unreleased
 
+- **UI children on lines:** in a `ui { … }` body, `flick fmt` puts the
+  calls in parentheses that end the arguments of a call that does not fit
+  on its line on lines of their own under it, without the parentheses, and
+  drops them around a call alone on a child line where its first line fits.
+  A tree written `div props (div props (text a) (text b))` comes out as
+  `div props`, `div props` one level in, then a line for each child, with
+  no new syntax: the lines under a call were already its arguments. Only
+  calls of a name move; `(-x)`, `if`, `match`, `fun`, anything with a
+  comment and anything inside brackets keep their parentheses. Run
+  `flick fmt` to update a project.
+
+- **`match` on the errors of a row.** A value of `Errors {E1, E2, …}`, the
+  `x` of a `try` arm, is taken apart by a `match` with an arm for each error
+  of its row (`| NotFound id -> … | Conflict _ -> …`), with no `try` over
+  `from_result (Err e)` again. The arms cover every error of a closed row,
+  or the `match` is `FLICK-T009`, whose fix adds the missing arms, by a
+  qualified name for an error of another module; a row with a variable needs
+  an arm for the rest, and an arm for an error outside a closed row is
+  `FLICK-T003`. When the errors of the value are not known yet, as for the
+  `x` of a `try`, the patterns tell them, at the top of an arm or inside it:
+  the row holds the errors they name, and stays open for the others behind
+  an arm that matches every error. A `let` or a parameter with the pattern
+  of one error, `let NotFound id = e`, is `FLICK-T009` at a row of several.
+  The `match` is pure and removes no error from a row; the reference model
+  and the Lean proofs cover it.
+
+- **A value of one error is a value of the errors of a row.** Where
+  `Errors {NotFound, Timeout}` is expected, `Timeout` or `NotFound id` fits:
+  in an arm of a `match`, as a result or as an argument. A function can so
+  turn one row of errors into another, as `Exit.map_error` and `Layer.catch`
+  take, and a value of one error is passed where several are expected. The
+  rule types the value, not the types built of it: a function returning
+  `Timeout` is no function returning `Errors {NotFound, Timeout}`, and an
+  error outside the row is `FLICK-T003`. The arms of a `try`'s `x` may name
+  an error its body does not raise. The reference model, its certificates
+  and the Lean proofs cover the rule.
+
+- **Fixed: two constructors of one name in a `match`.** The Go and
+  JavaScript backends told the arms of a `match` apart by the constructor's
+  name alone, so with `HttpApi.ServeError` and `Rpc.ServeError` in one
+  `match` or `try` one of the arms was never reached. On Go, an arm of a
+  `try` for an error of a library before one for an error of the program
+  stopped the program with a failed type assertion when the error of the
+  program came.
+
+- **Breaking: a `server fn` call outside a browser takes its server from
+  `Server.with_origin`.** The new `Server.with_origin origin task` sends
+  the calls of `server fn` in `task` to `origin`, at `Server.path`. Outside
+  it a call in a browser goes to the page's origin, as before, and a call
+  elsewhere fails with `Rpc.ClientError "no server for <name>: call it
+  within Server.with_origin"`. Neither Node nor Go reads
+  `FLICK_SERVER_URL` any more: a program that takes the server from the
+  environment reads it with `Platform.env`, naming `Host.Environment` in
+  its row, and passes it to `Server.with_origin`. The call itself still
+  needs no service, so a client entry reaches it as before.
+
 - **Callback binders of capture rows may be left out.** A capture row of a
   signature, `^v`, that only one callback mentions, not on the callback's
   own qualifier, and that bounds a parameter of it is bound on that

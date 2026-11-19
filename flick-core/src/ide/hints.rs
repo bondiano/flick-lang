@@ -4,7 +4,7 @@
 use super::{Ide, Location, Symbol, tree};
 use crate::iface::{Entity, Namespace};
 use crate::source::FileId;
-use crate::syntax::cst::Node;
+use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::{Type, right_application, show_signature, show_type};
 
@@ -89,21 +89,10 @@ impl Ide<'_> {
         let mut out = Vec::new();
         walk(&m.tree, &mut |node, parent| match node.kind {
             K::LetDecl => {
-                let Some(name) = node
-                    .nodes()
-                    .find(|n| n.kind == K::VarPat)
-                    .and_then(|p| p.child_tokens().find(|t| t.kind == K::Ident))
-                else {
+                let Some(name) = binder(node) else {
                     return;
                 };
-                let signed = parent.is_some_and(|p| {
-                    let siblings: Vec<&Node> = p.nodes().collect();
-                    let i = siblings.iter().position(|n| n.range() == node.range());
-                    i.and_then(|i| i.checked_sub(1)).is_some_and(|i| {
-                        siblings[i].kind == K::Signature
-                            && tree::name_of(siblings[i], K::Ident, text) == Some(name.text(text))
-                    })
-                });
+                let signed = parent.is_some_and(|p| signed(p, node, name.text(text), text));
                 if let (false, Some(ty)) = (signed, m.typing.types.get(&(name.start, name.end))) {
                     out.push((name.end, format!(": {}", show_signature(ty))));
                 }
@@ -146,6 +135,26 @@ fn walk<'a>(node: &'a Node, f: &mut dyn FnMut(&'a Node, Option<&'a Node>)) {
         f(child, Some(node));
         walk(child, f);
     }
+}
+
+/// The name a `let` binds, unless it binds a pattern.
+pub(super) fn binder(decl: &Node) -> Option<Token> {
+    (decl.nodes().find(|n| n.kind == K::VarPat))
+        .and_then(|p| p.child_tokens().find(|t| t.kind == K::Ident))
+}
+
+/// Whether the declaration before `decl` among the children of `parent` is
+/// the signature of `name`.
+pub(super) fn signed(parent: &Node, decl: &Node, name: &str, text: &str) -> bool {
+    let mut previous = None;
+    for n in parent.nodes() {
+        if n.range() == decl.range() {
+            break;
+        }
+        previous = Some(n);
+    }
+    previous
+        .is_some_and(|p| p.kind == K::Signature && tree::name_of(p, K::Ident, text) == Some(name))
 }
 
 /// Inspect a type through quantifiers and capture proofs, without changing it.

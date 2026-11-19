@@ -1,0 +1,26 @@
+module Main exposing (main)
+
+service Log =
+  info : String ->{Host.Console} Unit
+
+service Store =
+  get : String ->{} Option String
+
+type alias Lookup = {Log, Store}
+
+lookup : String ->{...Lookup, Host.Console} String
+let lookup key =
+  Log.info "looking up \{key}"
+  Option.with_default "nothing" (Store.get key)
+
+quiet : Eff r none a ->{-Log | r} a
+let quiet work = provide (Layer.succeed Log { info = fun _ -> () }) { await work }
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  let store = Layer.succeed Store { get = fun key -> if key == "lang" then Some "Flick" else None }
+  let log = Layer.succeed Log { info = fun line -> Platform.stdout_line "log: \{line}" }
+  provide store {
+    Platform.stdout_line (provide log { lookup "lang" })
+    Platform.stdout_line (quiet (task { lookup "year" }))
+  }

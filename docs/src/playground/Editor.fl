@@ -36,7 +36,7 @@ let code_pane m label code tokens =
   ui {
     Ui.with_host
       { Ui.host with tab_index = Some 0; aria_label = Some label }
-      (pre { class_name = "fp-generated-code" } (if code == "" then [text hint] else shown))
+      pre { class_name = "fp-generated-code" } (if code == "" then [text hint] else shown)
   }
 
 generated_pane : Model -> Ui

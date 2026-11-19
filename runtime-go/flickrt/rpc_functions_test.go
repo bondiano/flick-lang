@@ -1,6 +1,9 @@
 package flickrt
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -115,5 +118,39 @@ func TestInProcessCallRefusesAClosedMount(t *testing.T) {
 	_, cause := catch(func() Value { return here.call(rootFiber(), "start") })
 	if cause == nil || called {
 		t.Fatal("closed mount admitted an in-process call")
+	}
+}
+
+func TestServerCallGoesOnlyToTheOriginOfWithOrigin(t *testing.T) {
+	proc := ServerProcedure("test/origin", SchemaString, SchemaString, ServerNoErrors)
+	_, cause := catch(func() Value { return ServerCall(rootFiber(), proc, "x") })
+	if cause == nil {
+		t.Fatal("a call without an origin succeeded")
+	}
+	err, _ := typedFailure(cause)
+	want := "no server for test/origin: call it within Server.with_origin"
+	if d, ok := err.(*Data); !ok || d.Tag != rpcClientErrorTag || d.Fields()[0] != want {
+		t.Fatalf("without an origin: %v", err)
+	}
+	t.Setenv("FLICK_SERVER_URL", "http://127.0.0.1:1")
+	arrived := make(chan string, 4)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		arrived <- r.Method + " " + r.URL.Path
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+	owned(rootFiber(), func(fb *Fiber, _ *Owner) Value {
+		catch(func() Value {
+			return ServerWithOrigin(fb, server.URL, Eff(func(fb *Fiber) Value { return ServerCall(fb, proc, "x") }))
+		})
+		return Unit
+	})
+	select {
+	case got := <-arrived:
+		if !strings.HasPrefix(got, "POST "+serverPath) {
+			t.Fatalf("the call arrived as %q", got)
+		}
+	default:
+		t.Fatal("the call did not reach the origin of Server.with_origin")
 	}
 }

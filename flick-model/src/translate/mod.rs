@@ -29,7 +29,7 @@ use self::expr::pat;
 use crate::eval::Program;
 use crate::native;
 use crate::subst::binders;
-use crate::syntax::{Arm, Const, Lit, Name, Path, RegionOp, Term};
+use crate::syntax::{Arm, Const, GETTER, Lit, Name, Path, RegionOp, Term};
 
 fn control(e: &ir::Expr) -> bool {
     if let ir::ExprKind::Handle(h) = &e.kind
@@ -204,10 +204,10 @@ impl Tr {
             let default = Term::Global(Path::new(class_module, &default_method(class, method)));
             // after the class's dictionary, those its default signature needs
             let call = Term::apps(Term::app(default, this.clone()), extra.iter().map(dict));
-            // shortcut: a default without dictionaries of its own is taken to be a function, a value default too; eta-expanded so the dictionary is not built while it is built
+            // a getter, so the dictionary is not built while it is built and
+            // a value default stays a value
             let field = if *own == 0 {
-                let x = self.fresh("x");
-                Term::lam(&x, Term::app(call, Term::Var(x.clone())))
+                Term::lam(GETTER, call)
             } else {
                 let own: Vec<Name> = (0..*own).map(|_| self.fresh("d")).collect();
                 lams(

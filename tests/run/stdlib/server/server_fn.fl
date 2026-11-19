@@ -1,16 +1,13 @@
 // A `server fn` served by `Server.handler` on `Http.Router`, called by its
 // name: the success, a declared error as itself, and `ClientError` when no
 // server answers. While the handler is mounted, a call in its process runs
-// in memory, whatever `FLICK_SERVER_URL` says; others come over HTTP.
+// in memory; others go to the origin of `Server.with_origin`, and outside
+// it a call off the browser has no server.
 module App.Main exposing (main)
 
 import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
 import Server
-
-set_env : String -> String ->{} Unit
-foreign set_env from "../cli/env.mjs" "set"
-  arity 2
 
 type alias Order = { item : String; count : Float }
   deriving Schema
@@ -35,12 +32,13 @@ shown : Order ->{Async} String
 let shown order =
   try place order with
   | OutOfStock item -> "out of stock: " ++ item
-  | Rpc.ClientError _ -> "no server"
+  | Rpc.ClientError message -> message
 
 main : Unit ->{Host.Console, Async; AppError} Unit
 let main () =
-  set_env "FLICK_SERVER_URL" "http://127.0.0.1:1"
   Platform.stdout_line (shown { item = "tea"; count = 1 })
+  let closed = Server.with_origin "http://127.0.0.1:1" (task { shown { item = "tea"; count = 1 } })
+  Platform.stdout_line ("closed origin, over HTTP: " ++ show (String.contains "HttpError" closed))
   provide (Layer.merge Server.node (Layer.merge Http.FetchClient.layer Http.Server.layer_services)) {
     try
       scope s {

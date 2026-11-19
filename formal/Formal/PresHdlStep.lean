@@ -92,7 +92,7 @@ theorem refill_todo {Ψ Θ E f x t₀ φ₀} (hE : OkE E) (hn : ¬ Value (.app f
     (h : Typ S Ψ Θ [] (plug E (.app f x)) (.ex t₀ φ₀)) : Typ S Ψ Θ [] (plug E (.app f .todo)) (.ex t₀ φ₀) := by
   obtain ⟨K, Θ', t', φ', hr, -, -, back, -⟩ := ctx_typing E hE hn h
   obtain ⟨_, _, _, _, hf', _, hψ, hT⟩ := hr.app_nonvalue f x t' φ' rfl rfl hn
-  simpa using Refill.id back [] (.app f .todo) (by simpa using Typ.app hf' .todo hψ hT)
+  simpa using Refill.id back [] (.app f .todo) (by simpa using hT.typ fun _ hT => Typ.app hf' .todo hψ hT)
 
 /-- The arguments of the arms of a handler, which its cell holds, have no region not yet
 created, nor have the types of the operations at them. -/
@@ -122,6 +122,7 @@ theorem abort_pres {Ψ Θ p ℓ Ef al rf o v b t φ} {Ei : List Frame} (hEi : Ok
     (h : Typ S Ψ Θ [] (.hwith p ℓ Ef al rf (plug Ei (.app (.const (.perform Ef o .abort)) v))) (.ex t φ)) :
     Typ S Ψ Θ [] (.hwith p ℓ Ef al rf (plug Ei (.unw p ℓ (b.subst (inst [v]))))) (.ex t φ) := by
   obtain ⟨_, _, _, _, _, _, _, _, hus, hℓ, hal, hrf, hψ, he, hφ₀, hc, hφ, hT, hat⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
+  refine hT.typ fun _ hT => ?_
   obtain ⟨a₀, b₀, hop⟩ := perform_op hEi he
   have hb := (hal.arm_inv hop ha).2.1 rfl
   refine .hwith hus hℓ hal hrf hψ (refill_app hEi perform_not_value he (perform_fn hop hus) perform_up
@@ -138,6 +139,7 @@ theorem tail_pres {Ψ Θ n p ℓ Ef al rf o v b t φ} {Ei : List Frame} (hc : Rt
     (h : Typ S Ψ Θ [] (.hwith p ℓ Ef al rf (plug Ei (.app (.const (.perform Ef o .tail)) v))) (.ex t φ)) :
     Typ S Ψ Θ [] (.hctl p ℓ 0 true Ef al rf (b.subst (inst [v])) (plug Ei (.hole p))) (.ex t φ) := by
   obtain ⟨_, _, _, _, _, _, _, _, hus, hℓ, hal, hrf, hψ, he, hφ₀, hc', hφ, hT, hat⟩ := h.hwith_type _ _ _ _ _ _ _ _ rfl rfl
+  refine hT.typ fun _ hT => ?_
   obtain ⟨a₀, b₀, hop⟩ := perform_op hEi he
   have hb := (hal.arm_inv hop ha).1 rfl
   have hx := hole_arg hEi perform_not_value hv he (perform_fn hop hus)
@@ -155,6 +157,7 @@ theorem kept_pres {Ψ Θ n q ℓ Ef al o v b t φ} {Ei : List Frame} (hc : RtCtx
     (h : Typ S Ψ Θ [] (.hkeep q ℓ Ef al (plug Ei (.app (.const (.perform Ef o .tail)) v))) (.ex t φ)) :
     Typ S Ψ Θ [] (.hkarm q ℓ Ef al (b.subst (inst [v])) (plug Ei (.hole q))) (.ex t φ) := by
   obtain ⟨_, _, _, _, _, _, _, _, hus, hℓ, hal, he, hφ₀, hc', hle, hφ, hT⟩ := h.hkeep_type _ _ _ _ _ _ _ rfl rfl
+  refine hT.typ fun _ hT => ?_
   obtain ⟨a₀, b₀, hop⟩ := perform_op hEi he
   have hb := (hal.arm_inv hop ha).1 rfl
   have hx := hole_arg hEi perform_not_value hv he (perform_fn hop hus)
@@ -178,6 +181,7 @@ theorem ctl_pres {Ψ Θ n p ℓ Ef al rf o v b t φ} {Ei : List Frame} (hc : RtC
   have hx := hole_arg hEi perform_not_value hv he (perform_fn hop hus)
     (answered_hole hop hno (Stage.answered_hP hφ₀)) hc hbv (cell_op_fixed hc hℓ hop hus).1
   refine ⟨_, ctl_cell_yf hc hℓ (cell_op_fixed hc hℓ hop hus).2 hp, lam_todo, ?_⟩
+  refine hT.typ fun _ hT => ?_
   refine .hctl hus (getElem?_ext hℓ) (hal.weakenStore _) (hrf.weakenStore _) hψ hop (by decide) (by simp)
     hEi rfl hno ((refill_todo hEi perform_not_value he).weakenStore _) hφ₀ ?_
     (fun _ => ⟨_, List.getElem?_concat_length, rfl⟩) hc' hφ hT hat
@@ -195,6 +199,7 @@ theorem resume_pres {Ψ Θ n p ℓh ℓ Ef al rf u k t φ} {A Ei : List Frame} (
     (h : Typ S Ψ Θ [] (.hctl p ℓh ℓ false Ef al rf (plug A (.app (.kont p ℓ) u)) k) (.ex t φ)) :
     Typ S Ψ Θ [] (.hres p ℓh (plug A (.hole p)) (.hwith p ℓh Ef al rf (plug Ei u))) (.ex t φ) := by
   obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, hus, hℓh, hal, hrf, hψ, hop, hc', _, hE, hk', hno, hp, hφ₀, ha, hl, hcm, hφ, hT, _⟩ := h.hctl_type _ _ _ _ _ _ _ _ _ _ _ rfl rfl
+  refine hT.typ fun _ hT => ?_
   obtain ⟨rfl, -⟩ := plug_hole_inj hEi hE (hk.symm.trans hk')
   obtain ⟨C', hl₁, hcp⟩ := hl rfl
   rw [if_neg (by decide)] at ha

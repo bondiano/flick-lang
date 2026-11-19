@@ -145,3 +145,59 @@ fn completions_carry_docs_snippets_order_and_imports() {
     assert!(shout["sortText"].as_str().expect("sort").starts_with('4'));
     lsp.close();
 }
+
+#[test]
+fn completion_ranks_by_the_current_text_and_imports_in_utf16() {
+    let helpers = "module App.Helpers exposing (count, shout)\n\ncount : String -> Float\nlet count s = 1\n\nshout : String -> String\nlet shout s = s\n";
+    // the argument after a string of multi-byte characters takes `taken`
+    let main = |import: &str, taken: &str| {
+        format!(
+            "module App.Main exposing (go)\n{import}\npair : String -> {taken} -> String\nlet pair a b = a\n\ngo : Unit -> String\nlet go () =\n  pair \"🦀界д\" co\n"
+        )
+    };
+    let first = main("", "Float");
+    let dir = project(
+        "lsp_completion_ranked",
+        &[
+            ("flick.toml", LIB),
+            ("src/App/Helpers.fl", helpers),
+            ("src/App/Main.fl", &first),
+        ],
+    );
+    let file = dir.join("src/App/Main.fl");
+    let mut lsp = Lsp::start(&dir);
+    lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": first } }));
+    let count = |lsp: &mut Lsp, text: &str| {
+        let reply = lsp.request(
+            "textDocument/completion",
+            &json!({ "textDocument": { "uri": uri(&file) }, "position": position(text, text.len() - 1) }),
+        );
+        let items = reply["result"]
+            .as_array()
+            .unwrap_or_else(|| panic!("{reply}"));
+        let item = |label: &str| items.iter().find(|i| i["label"] == label).cloned();
+        assert!(item("pair").is_some() && item("go").is_some(), "{reply}");
+        item("count").unwrap_or_else(|| panic!("{reply}"))
+    };
+    // `count` gives a `Float`: it fits, and keeps its import
+    let fits = count(&mut lsp, &first);
+    assert_eq!(fits["sortText"], "4count");
+    assert_eq!(fits["insertText"], "App.Helpers.count ${1:s}");
+    assert_eq!(
+        fits["additionalTextEdits"][0]["newText"],
+        "\n\nimport App.Helpers"
+    );
+    // an edit makes the argument a `String`: `count` goes after what fits
+    let second = main("", "String");
+    lsp.notify("textDocument/didChange", &json!({ "textDocument": { "uri": uri(&file), "version": 2 }, "contentChanges": [{ "text": second }] }));
+    let misfit = count(&mut lsp, &second);
+    assert_eq!(misfit["sortText"], "9count");
+    assert_eq!(misfit["additionalTextEdits"], fits["additionalTextEdits"]);
+    // imported, it is the module's name, with no edit, and fits again
+    let third = main("\nimport App.Helpers exposing (count)\n", "Float");
+    lsp.notify("textDocument/didChange", &json!({ "textDocument": { "uri": uri(&file), "version": 3 }, "contentChanges": [{ "text": third }] }));
+    let imported = count(&mut lsp, &third);
+    assert_eq!(imported["sortText"], "2count");
+    assert!(imported.get("additionalTextEdits").is_none(), "{imported}");
+    lsp.close();
+}

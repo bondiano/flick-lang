@@ -1,6 +1,6 @@
 ---
 title: "Generalization and monads"
-source_hash: 7e98f39218fcb96c
+source_hash: da14172ad42382d5
 ---
 
 ## Generalization in the presence of Ref
@@ -36,7 +36,7 @@ let use_separate_cells () =
 
 The value of the function `make_empty` is polymorphic: creating the closure is pure. Each runtime call allocates a new cell; `numbers` itself is monomorphic and stores only `Option Int`, and `names` only `Option String`. This distinction preserves the useful polymorphism of factories without allowing the type of already created state to change.
 
-A `let mut` variable is state of one function, not a cell: an assignment is not a runtime step, and a pure function may assign its variables. It obeys the same rule as a cell: its type is fixed where it is declared, is never generalized, and every assigned value is checked against it, so a write and a read cannot choose different types and a `scope` cannot give the variable its region. No function, task, lazy sequence or arm of an operation handler inside the function reads or assigns the variable, which keeps the function pure from the outside ([Variables](../../reference/types/#variables)).
+A `let mut` variable is state of one function, not a cell: an assignment is not a runtime step, and a pure function may assign its variables. It obeys the same rule as a cell: its type is fixed where it is declared, is never generalized, and every assigned value is checked against it, so a write and a read cannot choose different types and a `scope` cannot give the variable its region. No function, task, lazy sequence or arm of an operation handler inside the function reads or assigns the variable, which keeps the function pure from the outside ([Variables](../../reference/bindings/#variables)).
 
 ### Pure calls and cold descriptions
 

@@ -1,6 +1,6 @@
 # Proofs: statements over the pure, total domain
 
-Status: **contract** (RFC #647, #641). Phase 1 is implemented: §1–§5 hold in the checker for statements over the variables of a proof. Admission of definitions (§6), proofs across modules (§7) and the Lean development (§9) land in the phases RFC #647 lists. Each rule says where it is checked.
+Status: **contract** (RFC #647, #641). Phases 1 and 2 are implemented: §1–§6 hold in the checker, for statements over the variables of a proof and the definitions it names. Proofs across modules (§7) and the Lean development (§9) land in the phases RFC #647 lists. Each rule says where it is checked.
 
 References as in [`core.md`](core.md). Paths are relative to `flick-core/src/`.
 
@@ -14,7 +14,7 @@ References as in [`core.md`](core.md). Paths are relative to `flick-core/src/`.
 | `refl`, `symm`, `trans`, `cong`, `funext`, `match`, a premise, `let` | the rules | §4 |
 | T080–T084 | how a proof fails | §5 |
 
-Not in phase 1: admission of definitions and methods, lemmas, law bundles, proof modules and `flick prove`, `.iface` payloads.
+Not yet: law bundles, definitions and lemmas across project modules, `.iface` payloads.
 
 ## 1. Proofs are opt-in and erased
 
@@ -55,13 +55,17 @@ A statement is about the values of this domain: computations that end, without e
   - `Bool`;
   - data types whose declarations do not name themselves, through their fields or through other types (`types/proof_data.rs`, `recursive`).
 
-  Effects, tuples, records, unknown types (metas), applied type variables and types with errors are refused (`FLICK-T082`).
+  - tuples of types of the domain.
+
+  Effects, records, unknown types (metas), applied type variables and types with errors are refused (`FLICK-T082`).
 - **Terms**, from the checked IR (`logic/term.rs`):
   - variables, literals, `fun`, application at the pure stage;
-  - constructors, `match` without guards, `if`;
+  - constructors, tuples, `match` without guards (tuple patterns too), `if`;
   - `let` of a name.
 
-  Every other form is refused with its reason, never read as something else: a definition or method (phase 1), a primitive operation, a mutable variable, a loop, a runtime computation.
+  - a definition or a method the statement names, once admitted (§6).
+
+  Every other form is refused with its reason, never read as something else: a primitive operation, a mutable variable, a loop, a runtime computation.
 - **Function parameters** stand for total functions of the domain at every stage. This is the interpretation of the statement, not a claim about the program's own functions.
 - **Equality** is logical: the same constructor with equal fields, equal literals, and functions equal at every argument (§4, `funext`). It is not `Eq`, `==`, `TypeEq` or identity of representation.
 
@@ -78,9 +82,11 @@ The body elaborates to a finite certificate (`logic/cert.rs`). The checker decid
 | `funext (fun x -> p)` | `f = g` at `A -> B` | `p` proves `f x = g x` for a fresh `x : A` |
 | `match v with \| C xs -> p …` | the goal | `v` is a variable of the statement of a data type or `Bool` and not split yet; each constructor has one arm, or a final `_` arm covers the rest; in each arm `v` is `C xs` for fresh `xs` |
 | `h` | `l = r` | `h` is a premise, or a proof a `let` named, of the same normal forms |
-| `let h = p` then `q` | the goal | `p`'s equation is written by its rules (a premise, `symm`, `trans`), and `q` proves the goal with `h` |
+| `let h = p` then `q` | the goal | `p`'s equation is written by its rules (a premise, a lemma, `symm`, `trans`), and `q` proves the goal with `h` |
+| `name args` | the lemma's goal of `args` | `name` is a proof of this module before this one, which checked; `args` give a value for each parameter and a proof of each premise, in its order; its instance is the goal with definitions folded (exact subject) |
 
 - There is no η in normal forms: `fun x -> f x` and `f` are equal only by `funext`.
+- **Lemmas are exact.** A lemma's instance is compared with the goal by β, ζ and ι with every definition folded. So a lemma about `flat_map` of `Monad Option` closes no goal about another definition, even one with the same body (`tests/check/fail/proofs/lemmas.fl`). A proof names only proofs before it, and one that failed is no lemma: the proofs of a module form no cycle.
 - `refl` reads no claim: a certificate is the tree of these rules, and the checker trusts no part it did not check.
 
 ## 5. Outcomes
@@ -98,18 +104,57 @@ A split that misses a constructor is usually reported first by the ordinary chec
 
 Checked by: `logic/tests.rs` (each rule and each failure on hand-built statements), `tests/check/pass/proofs/`, `tests/check/fail/proofs/`.
 
-## 6. Definitions (phase 2)
+## 6. Definitions
 
-A statement will unfold the definitions and instance methods it names (δ), with the dictionaries the checker resolved at each use, once they are admitted: closed under what they name, without recursion, foreign code, effects or `todo`. Until then a definition or method in a statement is `FLICK-T082`.
+A statement may name the definitions of its module and of the built-in modules, and the methods of their instances. Each one is admitted before any proof is checked (`logic/defs.rs`):
 
-## 7. Modules (phase 4)
+- **Bodies.** A body is read from the IR the module is compiled to (`ir::lower` of the module; the built-in bundle for the core). It goes through the same strict extraction as a statement (§3). For a method, this is the method of the instance its dictionary resolves to: the instance the checker chose at that use, or a superclass field of one, followed through `InstanceInfo.supers`.
+- **Closure.** Admission covers everything the statement, its premises and its proof name, and everything those bodies name in turn. It does so whether or not a computation reaches it. A cycle anywhere in that closure is refused: direct recursion, a `rec` group, a helper that calls back.
+- **Refused:**
+  - foreign code, including `foreign pure`;
+  - a definition that takes dictionaries;
+  - an instance with a context;
+  - a default method;
+  - a definition another project module compiles (phase 4).
 
-Proof modules under `project.proof-dir`, `flick prove`, lemmas across modules and their `.iface` payloads.
+  Each reports the definition and the reason (`FLICK-T082`).
+- **Unfolding.** Normalization unfolds an admitted definition where it is evaluated (δ).
 
-## 8. Why the domain is total
+So `equal (map identity v) v` is proved by a split of `v` against the real `Functor Option`. A diverging definition never enters a proof, even as an argument a function ignores: `(fun _ -> None) (forever ())` is refused, not reduced to `None` (`tests/check/fail/proofs/definitions.fl`). Defining such functions stays legal; only the proofs that name them fail.
+
+## 7. Proof modules
+
+- **The proof root.** `project.proof-dir` (default `proofs`) holds proof modules. They may import the project's source modules and each other, and a source module never imports one (`project/load/imports.rs`, `Root::Proof`).
+- **What reads it.** Only `flick prove [paths]` selects that root, and the LSP analyzes a proof module that is open. `flick check`, `build`, `test` and `pack` never read it, so a library's proofs cost its users nothing (`flick/tests/cli/prove_command.rs`).
+- **Phase 4b.** A proof module unfolds the definitions of the built-in modules and of its own module. The definitions of other project modules, lemmas across modules and their `.iface` payloads are phase 4b. Until then such a definition is `FLICK-T082`: it is not available to this proof.
+
+## 8. The laws of `Option`
+
+`packages/core/proofs/Laws/Option.fl` proves the laws of the `Functor`, `Applicative` and `Monad` instances of `Option` from their definitions in `Instances`. Here `ap fs xs` is `map2 (fun f x -> f x) fs xs`, and `compose` is written out.
+
+| ID | Law |
+| - | - |
+| F1 | `map identity v = v` |
+| F2 | `map (compose g f) v = map g (map f v)` |
+| A1 | `ap (pure identity) v = v` |
+| A2 | `ap (ap (ap (pure compose) fs) gs) xs = ap fs (ap gs xs)` |
+| A3 | `ap (pure f) (pure x) = pure (f x)` |
+| A4 | `ap fs (pure x) = ap (pure (fun f -> f x)) fs` |
+| A5 | `map f v = ap (pure f) v` |
+| M1 | `flat_map f (pure x) = f x` |
+| M2 | `flat_map pure v = v` |
+| M3 | `flat_map g (flat_map f v) = flat_map (fun x -> flat_map g (f x)) v` |
+| C1 | `map f v = flat_map (fun x -> pure (f x)) v` |
+| C2 | `map2 h va vb = flat_map (fun a -> map (fun b -> h a b) vb) va` |
+
+Each holds for every payload and every total function. `flick prove --project packages/core` checks them (`flick/tests/cli/prove_command.rs`), and no import of `Option` reads that module.
+
+A change to a method breaks the laws it breaks. A `map2` that answers `None` to two `Some` values fails A1, A3, A5 and C2 (T080). It still satisfies A2 and A4, which hold of it.
+
+## 9. Why the domain is total
 
 With `ap fs xs = map2 (fun f x -> f x) fs xs`, the law `ap (ap (ap (pure compose) fs) gs) xs = ap fs (ap gs xs)` fails for a `g` that fails: with `fs = None` the left side never applies `g`, and the right side does (`tests/run/stdlib/option_ap_strictness.fl`). A proof of the law is about total functions only. It makes no claim about this program, and nothing in the program changes.
 
-## 9. Trust boundary
+## 10. Trust boundary
 
 The logic is host code (`logic/`). It runs no Flick program and accepts no success it did not check. The Rust checker, the extraction from IR and the compiler and runtimes that run the program are trusted. The Lean development of the calculus and of the checker's soundness is phase 6 of RFC #647. Until it lands, §4 is a contract the Rust tests check, not a theorem.

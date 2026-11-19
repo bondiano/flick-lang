@@ -1,0 +1,24 @@
+---
+title: Your type in a string
+description: "`\\{…}` shows a value through its instance of `Display`."
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="display">
+
+A hole `\{…}` in a string puts in the text of a value, which the class
+`Display` gives: `display : a -> String`. `String`, `Int`, `Float` and `Bool`
+have instances of their own, and `instance Display Temperature` gives one to
+a type of the program.
+
+`show` gives the form a value has in code instead, here from `deriving Show`:
+`today` shows as `Celsius 21.5`, but displays as `21.5 °C`.
+
+The [reference](../../reference/classes/#classes) has the full rules.
+
+**Try:** remove the instance. The compiler reports `FLICK-C001`: nothing says
+how `Temperature` reads as text.
+
+</TourLesson>

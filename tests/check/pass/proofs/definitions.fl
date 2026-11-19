@@ -1,0 +1,23 @@
+// Proofs that unfold the definitions they name: a function of the module,
+// and the methods of the `Option` instances with the dictionaries the
+// checker resolved for each use.
+module App.Unfolded exposing (..)
+
+twice : (a -> a) -> a -> a
+let twice f x = f (f x)
+
+proof unfolded (f : a -> a) (x : a) where equal (twice f x) (f (f x)) = refl
+
+proof map_identity (v : Option a)
+where equal (map identity v) v =
+  match v with
+  | None -> refl
+  | Some x -> refl
+
+proof right_identity (v : Option a)
+where equal (flat_map pure v) v =
+  match v with
+  | None -> refl
+  | Some x -> refl
+
+proof left_identity (h : a -> Option b) (x : a) where equal (flat_map h (pure x)) (h x) = refl

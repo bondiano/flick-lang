@@ -4,7 +4,7 @@
 
 use std::rc::Rc;
 
-use flick_ir::{Expr, ExprKind, Lit, Pat as IrPat, Stage, Stmt};
+use flick_ir::{Dict, Expr, ExprKind, Lit, Pat as IrPat, Stage, Stmt};
 
 use crate::source::Span;
 
@@ -46,6 +46,26 @@ pub enum Term {
     Con(Rc<Ctor>),
     Match(Rc<Term>, Rc<[Arm]>),
     Let(Rc<str>, Rc<Term>, Rc<Term>),
+    /// A definition the statement names: unfolded once admitted.
+    Def(Rc<Def>),
+}
+
+/// A definition: a top-level value, or the method of an instance by the
+/// dictionary the checker resolved for the use.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Def {
+    Value { module: String, name: String },
+    Method { dict: Dict, name: String },
+}
+
+impl Def {
+    /// How a message names it.
+    pub fn shown(&self) -> String {
+        match self {
+            Def::Value { module, name } => format!("{module}.{name}"),
+            Def::Method { name, .. } => name.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -78,6 +98,21 @@ fn refuse<T>(span: Span, why: impl Into<String>) -> Result<T, Refused> {
 
 /// The module rules of a proof are written in: no source spells it.
 pub const RULES: &str = "$proof";
+/// The module of the proofs a later proof uses as lemmas.
+pub const LEMMAS: &str = "$lemma";
+/// The module of tuples: a tuple of `n` is the constructor `(,)` of `n`
+/// fields of the type `Tuple`.
+pub const TUPLES: &str = "$tuple";
+
+/// The constructor of tuples of `arity` elements.
+pub fn tuple(arity: usize) -> Rc<Ctor> {
+    Rc::new(Ctor {
+        module: TUPLES.into(),
+        ty: "Tuple".into(),
+        name: "(,)".into(),
+        arity,
+    })
+}
 
 /// `e` as a term of the domain.
 pub fn term(e: &Expr) -> Result<Term, Refused> {
@@ -87,18 +122,14 @@ pub fn term(e: &Expr) -> Result<Term, Refused> {
         ExprKind::Global { module, .. } if module == RULES => {
             return refuse(e.span, "a rule of a proof is no value of the statement");
         }
-        ExprKind::Global { module, name } => {
-            return refuse(
-                e.span,
-                format!("`{module}.{name}` is a definition; a proof admits no definition yet"),
-            );
-        }
-        ExprKind::Method { name, .. } => {
-            return refuse(
-                e.span,
-                format!("`{name}` is a method; a proof admits no definition yet"),
-            );
-        }
+        ExprKind::Global { module, name } => Term::Def(Rc::new(Def::Value {
+            module: module.clone(),
+            name: name.clone(),
+        })),
+        ExprKind::Method { dict, name } => Term::Def(Rc::new(Def::Method {
+            dict: dict.clone(),
+            name: name.clone(),
+        })),
         ExprKind::Con(c) => Term::Con(Rc::new(Ctor {
             module: c.module.clone(),
             ty: c.ty.clone(),
@@ -119,7 +150,8 @@ pub fn term(e: &Expr) -> Result<Term, Refused> {
                 }
                 let name: Rc<str> = match &param.pat {
                     IrPat::Bind(n) => n.as_str().into(),
-                    IrPat::Wild => format!("$unused{i}").into(),
+                    // `()` has one value: matching it binds nothing and never fails
+                    IrPat::Wild | IrPat::Lit(Lit::Unit) => format!("$unused{i}").into(),
                     _ => return refuse(e.span, "a parameter pattern is not supported in a proof"),
                 };
                 out = Term::Lam(name, Rc::new(out));
@@ -163,6 +195,11 @@ pub fn term(e: &Expr) -> Result<Term, Refused> {
                 .collect::<Result<Vec<_>, _>>()?;
             Term::Match(Rc::new(term(scrutinee)?), arms.into())
         }
+        ExprKind::Tuple(items) => items
+            .iter()
+            .try_fold(Term::Con(tuple(items.len())), |f, item| {
+                Ok(Term::App(Rc::new(f), Rc::new(term(item)?)))
+            })?,
         ExprKind::App { .. } => {
             return refuse(e.span, "a call with effects is outside the domain");
         }
@@ -185,6 +222,13 @@ pub fn pat(p: &IrPat, span: Span) -> Result<Pat, Refused> {
             fields
                 .iter()
                 .map(|f| pat(f, span))
+                .collect::<Result<_, _>>()?,
+        ),
+        IrPat::Tuple(items) => Pat::Con(
+            tuple(items.len()),
+            items
+                .iter()
+                .map(|p| pat(p, span))
                 .collect::<Result<_, _>>()?,
         ),
         _ => return refuse(span, "this pattern is not supported in a proof"),

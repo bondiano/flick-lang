@@ -1,0 +1,31 @@
+---
+title: Module contracts
+description: "`type module` describes a module, and a parameterized module is made from one."
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="contracts">
+
+`type module Text =` is a contract: what a module must export, and the types.
+`module Loud(T : Text) : Banner =` is a parameterized module. It takes any
+module that meets `Text` and makes a module that meets `Banner`.
+`module Shout = Loud(String)` applies it, while the program is compiled.
+
+`String` meets `Text`: it exports `length` and `to_upper` with those types,
+and more that `Loud` cannot see. In a project, the argument is usually a
+module file of your own; an inline module stays private to its file, so this
+one-file lesson passes `String`.
+
+A contract can also describe a parameterized module: `Style` is one from
+`Text` to `Banner`. `Framed` takes such a module and applies it itself, so
+`Framed(Loud)` frames what `Loud` makes.
+
+The [reference](../../reference/modules/#module-contracts-and-parameterized-modules)
+has the full rules, and examples over several files.
+
+**Try:** add `module Plain(T : Text) : Banner` whose `banner` gives the word
+as it is, then `module Bare = Framed(Plain)`, and print `Bare.banner "flick"`.
+
+</TourLesson>

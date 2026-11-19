@@ -45,17 +45,24 @@ export default defineConfig({
     // Transpile became the playground's JavaScript tab
     "/transpile/": `${base}/play/?tab=js`,
     "/ru/transpile/": `${base}/ru/play/?tab=js`,
-    // pages that gave way to the start pages and the reference
+    // pages that gave way to the start pages and the reference, and reference pages merged into
+    // others: to the section that holds them now, whose anchor the Russian page spells in Russian
     ...Object.fromEntries(
       [
         ["learn/", "start/"],
-        ["learn/syntax/", "reference/grammar/"],
-        ["learn/flick-and-effect/", "reference/effect-surface/"],
+        ["learn/syntax/", "reference/syntax/"],
+        ["learn/flick-and-effect/", "reference/runtime/#effect-coverage", "reference/runtime/#покрытие-effect"],
         ["guides/", "start/"],
         ["ecosystem/", "start/getting-started/"],
-      ].flatMap(([from, to]) => [
+        ["reference/grammar/", "reference/syntax/"],
+        ["reference/keywords/", "reference/syntax/#keywords", "reference/syntax/#ключевые-слова"],
+        ["reference/operators/", "reference/numbers/#operators", "reference/numbers/#операторы"],
+        ["reference/type-equality/", "reference/gadts/#type-equality", "reference/gadts/#равенство-типов"],
+        ["reference/row-indices/", "reference/gadts/#row-indices", "reference/gadts/#индексы-строк"],
+        ["reference/effect-surface/", "reference/runtime/#effect-coverage", "reference/runtime/#покрытие-effect"],
+      ].flatMap(([from, to, ru = to]) => [
         [`/${from}`, `${base}/${to}`],
-        [`/ru/${from}`, `${base}/ru/${to}`],
+        [`/ru/${from}`, `${base}/ru/${ru}`],
       ]),
     ),
   },

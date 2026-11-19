@@ -53,6 +53,16 @@ foreign pure authenticated from "flick:server/Functions" "serverAuthenticated"
 path : String
 let path = "/_flick/fn"
 
+/// Runs `task` with the calls of every `server fn` in it going to
+/// `origin`, at `path`. Outside it, a call in a browser goes to the page's
+/// origin and a call elsewhere fails with `Rpc.ClientError`: a program that
+/// takes its server from the environment reads it with `Platform.env` and
+/// passes it here.
+with_origin : String -> (Eff r e a)^c ->{r; e} a
+foreign effect with_origin from "flick:server/Functions" "serverWithOrigin"
+  arity 1
+  retention call
+
 /// The calls of `functions`, each a POST of its name and payload as
 /// NDJSON, for a route at `path`. It holds region `s`: when the scope
 /// owning it closes, the calls it serves finish and run their finalizers.

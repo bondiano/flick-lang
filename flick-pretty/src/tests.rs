@@ -97,6 +97,28 @@ fn group_fits_or_breaks() {
 }
 
 #[test]
+fn either_is_flat_where_it_fits_and_broken_elsewhere() {
+    let a = &DocumentArena::new();
+    // `f (g x)` on one line, else `f` with `g x` on a line under it
+    let flat = docvec![a, "f (g x)"];
+    let broken = docvec![a, "f", docvec![a, a.line(), "g x"].nest(a, 2)];
+    let either = a.either(flat, broken);
+    assert_eq!(either.to_pretty_string(7), "f (g x)");
+    assert_eq!(either.to_pretty_string(6), "f\n  g x");
+    // a group around it measures the flat layout, then it decides again
+    // where the group put it
+    let assigned = docvec![a, "y =", docvec![a, a.break_("", " "), either].nest(a, 2)].group(a);
+    assert_eq!(assigned.to_pretty_string(11), "y = f (g x)");
+    assert_eq!(assigned.to_pretty_string(10), "y =\n  f (g x)");
+    assert_eq!(assigned.to_pretty_string(8), "y =\n  f\n    g x");
+    // its broken layout breaks its own breaks, as a broken group does
+    let spaced = a.either(a.text("abc"), words(a, &["a", "b"], a.break_("", " ")));
+    assert_eq!(spaced.to_pretty_string(2), "a\nb");
+    assert!(a.either(a.empty(), a.empty()).is_empty());
+    assert!(!a.either(a.text("x"), a.empty()).is_empty());
+}
+
+#[test]
 fn breaks_outside_groups_stay_flat() {
     let a = &DocumentArena::new();
     let doc = words(a, &["aaaa", "bbbb"], a.break_("", " "));

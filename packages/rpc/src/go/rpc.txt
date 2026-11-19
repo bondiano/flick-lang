@@ -46,6 +46,7 @@ rpcHandlerWebsocket *RpcHandlerWebsocket@3
 serverAuthenticated *ServerAuthenticated
 serverProcedure ServerProcedure
 serverCall *ServerCall
+serverWithOrigin *ServerWithOrigin
 serverFunction ServerFunction
 serverNoErrors ServerNoErrors
 serverError ServerError

@@ -101,7 +101,8 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
       Typ Ψ Θ Γ (.raise e) (.ex t φ)
   | raiseAdt : Typ Ψ Θ Γ e (.ex U φ) → U.hd = .adt E → (Stage.rt Row.none (Row.err E U)).le φ →
       Typ Ψ Θ Γ (.raise e) (.ex t φ)
-  | errVal : Value e → Typ Ψ Θ Γ e (.ex U φ) → U.hd = .adt E → Row.Sub (Row.err E U) ε.asRow →
+  /-- (Errors-In): a term of an error `E` is a term of the errors of a row that holds `E`. -/
+  | errVal : Typ Ψ Θ Γ e (.ex U φ) → U.hd = .adt E → Row.Sub (Row.err E U) ε.asRow →
       Typ Ψ Θ Γ e (.ex (.errors ε) φ)
   /-- An arm that catches a name catches it at every argument (`Row.nameClose`). -/
   | tryR : Typ Ψ Θ Γ e (.ex t (.rt r ε₀.asRow)) → Typ Ψ Θ Γ A (.halts ε₀ H t φ) →

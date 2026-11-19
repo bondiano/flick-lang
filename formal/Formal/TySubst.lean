@@ -106,9 +106,9 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro σ hσ
     refine .raiseAdt (ih σ hσ) (Ty.hd_substT σ hU) ?_
     simpa [Stage.substT, Row.err_substT] using Stage.le_substT σ hφ
-  | errVal hv _ hU hE ih =>
+  | errVal _ hU hE ih =>
     intro σ hσ
-    refine .errVal hv (ih σ hσ) (Ty.hd_substT σ hU) ?_
+    refine .errVal (ih σ hσ) (Ty.hd_substT σ hU) ?_
     rw [← Row.err_substT, ← Row.substT_asRow]; exact hE.substT σ
   | tryR _ _ hφ hs ih₁ ih₂ =>
     intro σ hσ

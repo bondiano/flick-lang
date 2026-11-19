@@ -1,0 +1,18 @@
+module Main exposing (main)
+
+unboxed type Meters = Meters Float
+
+unboxed type Feet = Feet Float
+
+@implicit
+instance Into Meters Feet =
+  let into (Meters m) = Feet (m * 3.28)
+
+// A bridge with a clearance of 12 feet.
+clearance : Feet -> String
+let clearance (Feet height) = if height < 12.0 then "fits" else "too tall"
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  Platform.stdout_line (clearance (Feet 10.0))
+  Platform.stdout_line (clearance (Meters 4.0))

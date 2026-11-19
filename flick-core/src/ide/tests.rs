@@ -165,6 +165,7 @@ pub(super) fn fixture_with_dependencies(
             kind: Kind::Lib,
             source_dir: "src".into(),
             test_dir: "test".into(),
+            proof_dir: "proofs".into(),
             entries: Vec::new(),
             dependencies,
             js_dependencies: Vec::new(),

@@ -12,6 +12,7 @@ mod recovery;
 // `pub`, as each was a crate root: what a file exports still counts as used
 pub mod accepted;
 pub mod arena_regions;
+pub mod disagreements;
 pub mod foreign_staging;
 pub mod gadt_rows;
 pub mod generic;
@@ -81,3 +82,4 @@ pub mod owner_evidence;
 pub mod owner_scheme_preservation;
 pub mod partial_handlers;
 pub mod props;
+pub mod props_errors;

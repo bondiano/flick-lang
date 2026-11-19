@@ -1,6 +1,6 @@
 // The client of the cross-target RPC test: calls, typed errors, streams
 // and auth over each transport the server prints, then server functions
-// at FLICK_SERVER_URL.
+// at the origin in `SERVER`.
 module App.Main exposing (main)
 
 import App.Api exposing (..)
@@ -74,13 +74,16 @@ let main () =
   let websocket = over Rpc.ndjson Rpc.websocket
   Platform.stdout_line
     ("auth ws: " ++ as_user websocket (ws "P6") "Bearer ada" ++ ", " ++ as_user websocket (ws "P6") "Bearer eve")
-  let doubled = try twice "ho" with | Rpc.ClientError m -> "client: " ++ m
-  let ada =
-    try Rpc.with_headers [("cookie", "user=ada")] (task { whoami () }) with
-    | Server.Unauthorized -> "refused"
-    | Rpc.ClientError m -> "client: " ++ m
-  let eve =
-    try whoami () with
-    | Server.Unauthorized -> "refused"
-    | Rpc.ClientError m -> "client: " ++ m
-  Platform.stdout_line ("server fn: " ++ doubled ++ ", " ++ ada ++ ", " ++ eve)
+  let origin = Option.with_default "" (Platform.env "SERVER")
+  Server.with_origin origin (task {
+    let doubled = try twice "ho" with | Rpc.ClientError m -> "client: " ++ m
+    let ada =
+      try Rpc.with_headers [("cookie", "user=ada")] (task { whoami () }) with
+      | Server.Unauthorized -> "refused"
+      | Rpc.ClientError m -> "client: " ++ m
+    let eve =
+      try whoami () with
+      | Server.Unauthorized -> "refused"
+      | Rpc.ClientError m -> "client: " ++ m
+    Platform.stdout_line ("server fn: " ++ doubled ++ ", " ++ ada ++ ", " ++ eve)
+  })

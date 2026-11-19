@@ -1,0 +1,14 @@
+// A lemma is applied to a value for each of its parameters, as a function
+// is: a lemma left unapplied is a type error of the proof.
+module App.Arity exposing (..)
+
+proof right_identity (v : Option a)
+where equal (flat_map pure v) v =
+  match v with
+  | None -> refl
+  | Some x -> refl
+
+proof wrong_arity (w : Option Int)
+where equal (flat_map pure w) w =
+  right_identity
+//^^^^^^^^^^^^^^ FLICK-T003 expected `Proof (Option Int)`

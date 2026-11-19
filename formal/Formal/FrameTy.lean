@@ -166,6 +166,14 @@ theorem FrameTy.conv {Ψ Θ F r a b φ} (h : FrameTy S Ψ Θ F r a φ)
   exact ⟨k, Θ', t', φ', ht, hr, hf,
     fun σ hσ X r' h' => (hb σ hσ X r' h').conv (he.substT σ), hi⟩
 
+/-- (Errors-In) of the result leaves the hole and its stage relation unchanged. -/
+theorem FrameTy.errVal {Ψ Θ F r U φ E ε} (h : FrameTy S Ψ Θ F r U φ) (hU : U.hd = .adt E)
+    (hE : Row.Sub (Row.err E U) ε.asRow) : FrameTy S Ψ Θ F r (.errors ε) φ := by
+  obtain ⟨k, Θ', t', φ', ht, hr, hf, hb, hi⟩ := h
+  refine ⟨k, Θ', t', φ', ht, hr, hf, fun σ hσ X r' h' => ?_, hi⟩
+  refine .errVal (hb σ hσ X r' h') (Ty.hd_substT σ hU) ?_
+  rw [← Row.err_substT, ← Row.substT_asRow]; exact hE.substT σ
+
 /-- A frame that handles `E` in its hole: the hole may also need `E`, and obligations about
 it. -/
 theorem FRel.installs {F : Frame} {E : Name} {A : TyClass → Prop} {φ₀ φ : Stage} {r ε : Row}

@@ -128,7 +128,7 @@ theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Ent
   | settle hl _ hψ hφ hT ih => intro _ hΘ; exact .settle hl (ih hΘ) hψ hφ hT
   | raise _ hφ ih => intro _ hΘ; exact .raise (ih hΘ) hφ
   | raiseAdt _ hU hφ ih => intro _ hΘ; exact .raiseAdt (ih hΘ) hU hφ
-  | errVal hv _ hU hE ih => intro _ hΘ; exact .errVal hv (ih hΘ) hU hE
+  | errVal _ hU hE ih => intro _ hΘ; exact .errVal (ih hΘ) hU hE
   | tryR _ _ hφ hs ih₁ ih₂ => intro _ hΘ; exact .tryR (ih₁ hΘ) (ih₂ hΘ) hφ hs
   | tryP _ _ ih₁ ih₂ => intro _ hΘ; exact .tryP (ih₁ hΘ) (ih₂ hΘ)
   | handle hv _ hU hE _ hc ha hφ ih₁ ih₂ =>

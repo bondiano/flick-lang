@@ -1,0 +1,25 @@
+---
+title: Labeled loops
+description: "A label lets `break` and `continue` reach an outer loop."
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="labels">
+
+`continue` skips the rest of one pass of a loop: here, the pairs where `b`
+is not greater than `a`. `break` and `continue` act on the nearest loop, the
+inner `for`.
+
+To stop both loops at once, name the outer one: `'outer:` before `for` is a
+label, and `break 'outer` ends that loop, not the inner one. `continue 'outer`
+would go on with its next pass. A label works on `loop` and `while` as well.
+
+The [reference](../../reference/bindings/#local-loops) has the full rules.
+
+**Try:** write `break` in place of `break 'outer`. Only the inner loop ends,
+the outer one goes on, and `pair 10` finds `(4, 6)` instead. Write
+`break 'other`, and the compiler reports `FLICK-T071`: no loop has that label.
+
+</TourLesson>

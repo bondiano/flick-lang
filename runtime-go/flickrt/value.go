@@ -109,10 +109,14 @@ func NewData(tag string, fields ...Value) Value {
 	return &Data{Tag: tag, more: append([]Value(nil), fields...)}
 }
 
-// IsTag tells whether `v` is a value of the constructor tagged `tag`.
-// It is for a type whose every value is a *Data; of any constructor value
-// the tag is `TagOf`.
-func IsTag(v Value, tag string) bool { return v.(*Data).Tag == tag }
+// IsTag tells whether `v` is a value of the constructor tagged `tag`, of a
+// type whose every value is a *Data; of any constructor value the tag is
+// `TagOf`. An error is tested among errors of every type, in an arm of a
+// `try` or of a `match` on `Errors e`, and one may have a Go type of its own.
+func IsTag(v Value, tag string) bool {
+	d, ok := v.(*Data)
+	return ok && d.Tag == tag
+}
 
 // IsData tells whether `v` is the *Data of the constructor tagged `tag`,
 // when `v` may be a value of another constructor of the type that has a Go

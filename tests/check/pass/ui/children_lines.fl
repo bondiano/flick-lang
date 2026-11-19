@@ -43,7 +43,7 @@ let view =
       match n with
       | 0 -> empty
       | _ -> text "some \{shown}"
-      (title shown)
+      title shown
   })
 
 // two children on the line of the call
@@ -58,7 +58,7 @@ wrapped : Ui
 let wrapped = ui {
   classed
     "wrapped"
-    (text "inside")
+    text "inside"
 }
 
 // outside `ui` the same functions take their list
