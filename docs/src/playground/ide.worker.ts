@@ -29,9 +29,6 @@ onmessage = async (event: MessageEvent<Request>) => {
       case "tokens":
         result = JSON.parse(current.semantic_tokens()) as Result;
         break;
-      case "hints":
-        result = JSON.parse(current.inlay_hints()) as Result;
-        break;
       case "signature":
         result = JSON.parse(current.signature_help(request.at)) as Result;
         break;
