@@ -65,7 +65,13 @@ impl Checker<'_> {
             Namespace::Value
         };
         if !qualifier.is_empty() {
-            return self.qualified(&qualifier.join("."), namespace, name, span);
+            let qualifier = qualifier.join(".");
+            if namespace == Namespace::Value
+                && let Some(lemma) = self.imported_lemma(&qualifier, name, span)
+            {
+                return lemma;
+            }
+            return self.qualified(&qualifier, namespace, name, span);
         }
         if namespace == Namespace::Value
             && let Some(i) = (self.cx.locals.iter())

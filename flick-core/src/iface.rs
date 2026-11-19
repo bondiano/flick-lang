@@ -17,7 +17,7 @@ pub use template::{
 };
 
 /// Bumped for schema changes or incompatible embedded-IR execution contracts.
-pub const IFACE_VERSION: u32 = 29;
+pub const IFACE_VERSION: u32 = 30;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -212,6 +212,10 @@ pub struct Interface {
     /// importer's `T.prove` reads it (`docs/formal/refinements.md` §6).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub invariants: Vec<Invariant>,
+    /// The proofs the module declares, which a proof of an importer may use
+    /// as `M.name` (`docs/formal/proofs.md` §7). A proof is no value.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub proofs: Vec<String>,
     /// How compiled code represents what the module defines; written by a build.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub abi: Option<Abi>,

@@ -34,7 +34,9 @@ impl Checking<'_> {
                 .extend(self.namespace_import_errors(loaded, interfaces));
             output
         };
-        let Some(cache) = self.cache else {
+        // a proof reads the bodies of what it names, which no interface shows:
+        // its module is checked again on every run, never taken from a cache
+        let Some(cache) = self.cache.filter(|_| !loaded.has_proofs()) else {
             return (check(), None, None, Reason::Changed(Vec::new()));
         };
         #[cfg(feature = "native-project")]
@@ -126,6 +128,7 @@ impl Checking<'_> {
             interface: interface.clone(),
             ir: None,
             declarations: Arc::new(interface),
+            proofs: Vec::new(),
         }
     }
 
@@ -304,12 +307,20 @@ impl Checking<'_> {
         }
         diagnostics.extend(checked);
         // a module that checked is the only one whose proofs are about something
+        let mut proofs = Vec::new();
         if clean {
             let stages = self.stages_by_class;
-            diagnostics.extend(ir::check_proofs(&module, &typing, &|| {
-                builtin_modules_of(stages)
-            }));
+            let lowered = |name: &str| self.lowered.get(*self.by_name.get(name)?)?.as_ref();
+            let run = ir::Run {
+                builtins: &|| builtin_modules_of(stages),
+                project: &|name| lowered(name).map(|(ir, _, _)| ir),
+                proven: &|name| lowered(name).map(|(_, _, p)| p.as_slice()),
+            };
+            let (found, proven) = ir::check_proofs(&module, &typing, &run);
+            diagnostics.extend(found);
+            proofs = proven;
         }
+        interface.proofs = typing.proofs.iter().map(|p| p.name.clone()).collect();
         let declarations = typing.declarations.clone();
         let mut ir = self.lower_if_clean(
             loaded,
@@ -375,8 +386,9 @@ impl Checking<'_> {
                 ..exported(&interface, clean)
             },
             interface,
-            ir: ir.filter(|_| self.cache.is_none() || self.cached_ir == CachedIr::Kept),
+            ir: ir.filter(|_| self.cache.is_none() || self.cached_ir == CachedIr::Kept || self.proving),
             declarations,
+            proofs,
         }
     }
 

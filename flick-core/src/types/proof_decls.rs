@@ -10,9 +10,10 @@ use super::convert::TyVar;
 use super::kinds::Kind;
 use super::lang::Lang;
 use super::ty::Type;
-use super::typing::{Range, Ref};
+use super::typing::{Range, Ref, range};
 use crate::diagnostics::codes;
 use crate::logic::{self, LEMMAS, RULES};
+use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
@@ -185,6 +186,32 @@ impl Checker<'_> {
                 (Type::Error, None)
             }
         }
+    }
+
+    /// `M.name` in a proof, of a proof of the imported module `M`: a function
+    /// of its parameters, which the logic checks once it replays the proof.
+    pub(super) fn imported_lemma(
+        &mut self,
+        qualifier: &str,
+        name: &str,
+        span: Span,
+    ) -> Option<Type> {
+        self.cx.proof?;
+        let (module, Some(interface)) = self.env.qualified_module(qualifier)? else {
+            return None;
+        };
+        if !interface.proofs.iter().any(|p| p == name) {
+            return None;
+        }
+        let lemma = format!("{module}.{name}");
+        self.typing.names.insert(
+            range(span),
+            Ref::Value {
+                module: LEMMAS.into(),
+                name: lemma,
+            },
+        );
+        Some(self.store.fresh())
     }
 
     /// A rule of the proof being checked, instantiated: `None` for any

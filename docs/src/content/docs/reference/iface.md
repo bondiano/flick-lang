@@ -63,6 +63,7 @@ later arguments do not enter that lexical environment.
 | `docs` | the `///` comment of each export the module declares, by name, which its `.d.ts` carries as JSDoc; omitted when empty |
 | `instances` | the instances of the module and of every module it depends on, except built-in ones; omitted when empty |
 | `invariants` | the invariant of each exported type with one the compiler proves, such as a refined type, of the module and of every module it depends on: the type, its hidden constructor, its `check` and `value`, the member that proves one, the base and the check as a formula; an importer checks it against the exports before `T.prove` reads it; omitted when empty |
+| `proofs` | the names of the proofs the module declares, which a proof of an importer may use as `M.name`: the importer replays each one before it relies on it, so no success is read from the interface; omitted when empty |
 | `abi` | how the compiled code represents what the module defines, see [ABI](#abi); written by `flick build`, absent from `flick check` |
 | `dependencies` | the fingerprint of each imported module's interface the module was built against; omitted when empty |
 | `source` | the module's source, relative to the root of its package, so editors find declarations in a published package; written by `flick build` |
