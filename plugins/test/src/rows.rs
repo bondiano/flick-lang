@@ -8,12 +8,15 @@ use crate::read::range;
 /// The rows, the pattern and how many parts a row has of a `test.each`.
 pub type Rows = (Span, Span, usize);
 
+/// The name of a `test.each`, its `timeout` word and milliseconds, and its rows.
+pub type Header = (Span, Option<(Span, Span)>, Rows);
+
 /// The header of a `test.each` after `.each`, `rows "name" (pattern)`,
 /// maybe followed by `timeout millis`: the name, the timeout, and the rows,
 /// the pattern and how many parts a row has. The name is the last string
 /// before a parenthesized pattern that ends the header or comes before
 /// `timeout`.
-pub fn header(block: &Block, tokens: &[Token]) -> Option<(Span, Option<(Span, Span)>, Rows)> {
+pub fn header(block: &Block, tokens: &[Token]) -> Option<Header> {
     let text = |i: usize| block.text_of(tokens[i].span);
     let found = (1..tokens.len()).rev().find_map(|k| {
         if tokens[k].kind != TokenKind::String
