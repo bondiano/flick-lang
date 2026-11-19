@@ -170,7 +170,9 @@ impl Checker<'_> {
         let offset = |at: usize| u32::try_from(at).expect("offsets fit in u32");
         let line_start = |at: u32| text[..at as usize].rfind('\n').map_or(0, |i| i + 1);
         let ((start, end), child) = (statement.range(), first.range().0);
-        let to = text[end as usize..].find('\n').map(|i| end as usize + i + 1);
+        let to = text[end as usize..]
+            .find('\n')
+            .map(|i| end as usize + i + 1);
         let (from, at) = (line_start(start), line_start(child));
         let alone = to.is_some_and(|to| text[end as usize..to].trim().is_empty())
             && text[from..start as usize].trim().is_empty()
