@@ -1,25 +1,23 @@
-//! The rewrite of a module `flick ffi import` wrote: on its header line,
-//! the module as the import would write it now, a stub of the header
-//! alone included.
+//! The rewrite of a module `ffi import` wrote: on its header line, the
+//! module as the import would write it now, a stub of the header alone
+//! included. The backend's `ffi import` runs without publishing.
 
 use std::path::Path;
 
-use flick_core::diagnostics::Diagnostic;
 use flick_core::ffi::check::{self, Header};
-use flick_core::ffi::import;
 use flick_core::project;
 use flick_core::source::SourceMap;
 use serde_json::{Map, Value, json};
 
 use super::super::protocol;
-use crate::commands::ffi::{module_prefix, read_policy, read_surface};
+use crate::commands::contributed;
 use crate::sources::FsHost;
 
 /// "Regenerate from <pkg>@<version>" when the range touches the header
 /// and the module differs from a fresh import; disabled, with the reason,
-/// when the declarations cannot be read.
+/// when the import cannot run.
 pub(super) fn regenerate(path: &Path, text: &str, params: &Value) -> Option<Value> {
-    // reading the declarations runs Node: not for the requests of cursor moves
+    // the import runs Node: not for the requests of cursor moves
     let automatic = params["context"]["triggerKind"]
         .as_u64()
         .is_some_and(|k| k != 1);
@@ -39,27 +37,46 @@ pub(super) fn regenerate(path: &Path, text: &str, params: &Value) -> Option<Valu
                 "edit": { "changes": Map::from_iter([(uri.to_owned(), edits)]) },
             }))
         }
-        Err(d) => Some(json!({
+        Err(reason) => Some(json!({
             "title": format!("Regenerate from {}", header.package),
             "kind": "refactor.rewrite",
-            "disabled": { "reason": d.message },
+            "disabled": { "reason": reason },
         })),
     }
 }
 
-/// The package's provenance and what `flick ffi import` writes at `path`:
-/// the module is named after the file, the policy is the one beside it.
-fn generate(path: &Path, header: &Header) -> Result<(String, String), Diagnostic> {
+/// The package's provenance and what `ffi import` writes at `path`, run
+/// for the directory that holds the package's.
+fn generate(path: &Path, header: &Header) -> Result<(String, String), String> {
     let dir = path.parent().unwrap_or(Path::new("."));
-    let project = project::discover(&FsHost::new(), &mut SourceMap::default(), dir, None)?;
-    let root = project.as_ref().map_or(dir, |p| p.root.as_path());
-    let surface = read_surface(root, &header.package)?;
-    let policy = read_policy(dir)?;
-    let stem = path.file_stem().unwrap_or_default().to_string_lossy();
-    let module = match module_prefix(project.as_ref(), dir)? {
-        prefix if prefix.is_empty() => stem.into_owned(),
-        prefix => format!("{prefix}.{stem}"),
+    let found = project::discover(&FsHost::new(), &mut SourceMap::default(), dir, None);
+    let project = found
+        .map_err(|d| d.message)?
+        .ok_or_else(|| "the file belongs to no project".to_owned())?;
+    let relative = |p: &Path| {
+        let parts: Vec<String> = (p.strip_prefix(&project.root).unwrap_or(p).components())
+            .map(|c| c.as_os_str().to_string_lossy().into_owned())
+            .collect();
+        parts.join("/")
     };
-    let generated = import::generate(&surface, &policy, header.select.as_deref(), &module);
-    Ok((surface.provenance(), generated.text))
+    let out = relative(dir.parent().unwrap_or(dir));
+    let mut words = ["ffi", "import", &header.package, "--out", &out]
+        .map(str::to_owned)
+        .to_vec();
+    if let Some(select) = &header.select {
+        words.extend(["--select".to_owned(), select.join(",")]);
+    }
+    let preview = contributed::preview(&project, &words)?;
+    let at = relative(path);
+    let (_, bytes) = (preview.files.into_iter().find(|(p, _)| *p == at))
+        .ok_or_else(|| format!("`ffi import {}` writes no `{at}`", header.package))?;
+    // the import's report begins with the package's provenance
+    let report = String::from_utf8_lossy(&preview.stdout);
+    let provenance = report.lines().next().unwrap_or_default();
+    let provenance = provenance
+        .split(" (")
+        .next()
+        .unwrap_or(provenance)
+        .to_owned();
+    Ok((provenance, String::from_utf8_lossy(&bytes).into_owned()))
 }

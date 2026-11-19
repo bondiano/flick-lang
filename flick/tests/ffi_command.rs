@@ -4,6 +4,10 @@
 //! with `--ignored` (part of `just e2e`).
 
 use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::symlink;
+#[cfg(windows)]
+use std::os::windows::fs::symlink_dir;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -52,10 +56,6 @@ fn flick(dir: &Path, args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_flick"))
         .args(args)
         .current_dir(dir)
-        .env(
-            "FLICK_DTS_IMPORTER",
-            root().join("tools/dts-importer/index.mjs"),
-        )
         .env("NO_COLOR", "1")
         .output()
         .expect("flick runs")
@@ -75,14 +75,14 @@ fn install(dir: &Path, version: &str) {
     }
 }
 
-fn project() -> PathBuf {
-    let dir = root().join("target/tmp/ffi_command/app");
+fn project(name: &str) -> PathBuf {
+    let dir = root().join("target/tmp/ffi_command").join(name);
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(dir.join("src/App")).expect("dir");
     fs::create_dir_all(dir.join("src/Ffi/LookupLib")).expect("dir");
     fs::write(
         dir.join("flick.toml"),
-        "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n",
+        "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n\n[tools]\n\"flick/js\" = [\"node\"]\n",
     )
     .expect("write");
     fs::write(
@@ -93,7 +93,27 @@ fn project() -> PathBuf {
     fs::write(dir.join("src/Ffi/LookupLib/policy.toml"), POLICY).expect("write");
     fs::write(dir.join("src/App/Main.fl"), MAIN).expect("write");
     install(&dir, "1.0.0");
+    importer(&dir);
     dir
+}
+
+/// The repository's `.d.ts` importer, installed in the project at `dir`
+/// as `pnpm add -D @flick-lang/dts-importer` would.
+fn importer(dir: &Path) {
+    let at = dir.join("node_modules/@flick-lang/dts-importer");
+    fs::create_dir_all(at.parent().expect("scope")).expect("scope");
+    let _ = fs::remove_file(&at);
+    link(&root().join("tools/dts-importer"), &at);
+}
+
+#[cfg(unix)]
+fn link(target: &Path, at: &Path) {
+    symlink(target, at).expect("link the importer");
+}
+
+#[cfg(windows)]
+fn link(target: &Path, at: &Path) {
+    symlink_dir(target, at).expect("link the importer");
 }
 
 /// The fingerprint the generated module shows above `export`.
@@ -126,7 +146,7 @@ fn reviewed(provenance: &str, catch: bool) -> String {
 #[test]
 #[ignore = "needs Node and `pnpm install`"]
 fn import_review_update_and_check() {
-    let dir = project();
+    let dir = project("app");
     let out = flick(&dir, &["ffi", "import", "lookup-lib", "--out", "src/Ffi"]);
     assert!(out.status.success(), "{}", text(&out.stderr));
     insta::assert_snapshot!("lookup_report", text(&out.stdout));
@@ -239,6 +259,7 @@ fn identity_binding(
         .join("node_modules")
         .join(module_specifier.split('/').next().expect("fixture package"));
     fs::create_dir_all(&installed).expect("package dir");
+    importer(&dir);
     let fixture = root().join("tests/ffi/import-identity").join(package_name);
     let implementation = declaration.replace(".d.ts", ".js");
     for file in ["package.json", declaration, &implementation] {
@@ -246,7 +267,7 @@ fn identity_binding(
     }
     fs::write(
         dir.join("flick.toml"),
-        "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n",
+        "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n\n[tools]\n\"flick/js\" = [\"node\"]\n",
     )
     .expect("project");
     let dependency = if module_specifier == package_name
@@ -345,21 +366,41 @@ fn npm_alias_package_identity() {
     );
 }
 
+/// A project with the packages the importer's own tests install, and the
+/// importer: its `node_modules` links each of theirs.
+fn corpus_project() -> PathBuf {
+    let dir = root().join("target/tmp/ffi_command/corpus");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(dir.join("src")).expect("dir");
+    fs::write(
+        dir.join("flick.toml"),
+        "schema-version = 1\n\n[project]\nkind = \"lib\"\n\n[tools]\n\"flick/js\" = [\"node\"]\n",
+    )
+    .expect("project");
+    let installed = root().join("tools/dts-importer/node_modules");
+    for entry in fs::read_dir(&installed)
+        .expect("the importer's packages")
+        .flatten()
+    {
+        let name = entry.file_name();
+        if name != "@flick-lang" && name != ".bin" {
+            let at = dir.join("node_modules").join(&name);
+            fs::create_dir_all(at.parent().expect("modules")).expect("modules");
+            link(&entry.path(), &at);
+        }
+    }
+    importer(&dir);
+    dir
+}
+
 /// Imports a selection of a real package; the report is the snapshot.
 fn corpus(package: &str, select: &str) -> String {
-    let out_dir = root().join("target/tmp/ffi_command/corpus");
+    let dir = corpus_project();
     let out = flick(
-        &root().join("tools/dts-importer"),
-        &[
-            "ffi",
-            "import",
-            package,
-            "--out",
-            &out_dir.to_string_lossy(),
-            "--select",
-            select,
-        ],
+        &dir,
+        &["ffi", "import", package, "--out", "src", "--select", select],
     );
+    let out_dir = dir.join("src");
     let generated = out_dir.join(module_part(package)).join("Generated.fl");
     let check = flick(&root(), &["check", &generated.to_string_lossy()]);
     assert!(check.status.success(), "{}", text(&check.stderr));
@@ -377,7 +418,7 @@ fn corpus_of_real_packages() {
         )
     );
     // an opaque type the package exports is that type to TypeScript
-    let generated = root().join("target/tmp/ffi_command/corpus/DateFns/Generated.fl");
+    let generated = root().join("target/tmp/ffi_command/corpus/src/DateFns/Generated.fl");
     let generated = fs::read_to_string(generated).expect("the generated module");
     assert!(
         generated
@@ -393,4 +434,33 @@ fn corpus_of_real_packages() {
         "get_port",
         corpus("get-port", "default,portNumbers,clearLockedPorts")
     );
+}
+
+#[test]
+#[ignore = "needs Node and `pnpm install`"]
+fn the_backend_adds_ffi_and_a_go_project_names_who_does() {
+    let dir = project("backend");
+    let generated = dir.join("src/Ffi/LookupLib/Generated.fl");
+    let flat = flick(&dir, &["ffi", "import", "lookup-lib", "--out", "src/Ffi"]);
+    assert!(flat.status.success(), "{}", text(&flat.stderr));
+    let first = fs::read_to_string(&generated).expect("generated");
+    fs::remove_file(&generated).expect("remove");
+    let qualified = flick(
+        &dir,
+        &["js:ffi", "import", "lookup-lib", "--out", "src/Ffi"],
+    );
+    assert!(qualified.status.success(), "{}", text(&qualified.stderr));
+    assert_eq!(text(&qualified.stdout), text(&flat.stdout));
+    assert_eq!(fs::read_to_string(&generated).expect("generated"), first);
+
+    fs::write(
+        dir.join("flick.toml"),
+        "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n\n[build]\nemit = \"go\"\n",
+    )
+    .expect("a Go project");
+    let out = flick(&dir, &["ffi", "check"]);
+    let stderr = text(&out.stderr);
+    assert_eq!(out.status.code(), Some(2), "{stderr}");
+    assert!(stderr.contains("FLICK-P052"), "{stderr}");
+    assert!(stderr.contains("`flick/js` adds it"), "{stderr}");
 }

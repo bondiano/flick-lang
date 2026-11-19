@@ -289,15 +289,11 @@ impl WasmBackend {
     }
 
     fn command_failure(&self, name: &str, error: &str) -> Vec<command::Diagnostic> {
-        vec![command::Diagnostic {
-            code: "P013".into(),
-            severity: command::Severity::Error,
-            message: format!(
-                "backend {}@{}#{} command `{name}`: {error}",
-                self.pin.identity.id, self.pin.identity.version, self.pin.sha256
-            ),
-            notes: vec![],
-        }]
+        let message = format!(
+            "backend {}@{}#{} command `{name}`: {error}",
+            self.pin.identity.id, self.pin.identity.version, self.pin.sha256
+        );
+        vec![command::Diagnostic::error("P013", message)]
     }
 
     fn failure(&self, phase: &str, error: &str) -> Vec<Diagnostic> {
@@ -348,6 +344,21 @@ impl Backend for WasmBackend {
             Ok(Ok(plan)) => Ok(commands::plan(plan)),
             Ok(Err(diagnostics)) => Err(commands::diagnostics(diagnostics)),
             Err(error) => Err(self.command_failure(&invocation.name, &error)),
+        }
+    }
+
+    fn resume(
+        &self,
+        state: Vec<u8>,
+        outputs: Vec<command::File>,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        let wire: Vec<_> = outputs.iter().map(commands::file_wire).collect();
+        match self.command_call(&self.cancellation, |i, store| {
+            i.flick_command_command().call_resume(store, &state, &wire)
+        }) {
+            Ok(Ok(plan)) => Ok(commands::plan(plan)),
+            Ok(Err(diagnostics)) => Err(commands::diagnostics(diagnostics)),
+            Err(error) => Err(self.command_failure("resume", &error)),
         }
     }
 

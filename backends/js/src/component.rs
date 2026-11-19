@@ -2,6 +2,7 @@
 
 mod data;
 mod emit;
+mod ffi;
 #[cfg(feature = "guest")]
 mod guest;
 mod launch;
@@ -9,7 +10,7 @@ mod optimize;
 
 use flick_backend::{
     Backend, BackendId, BuildRequest, BuildResult, Capability, Descriptor, Diagnostic, Environment,
-    Inputs, Mode, NamedRange, Profile, Severity, TargetSupport, VersionRange,
+    Inputs, Mode, NamedRange, Profile, Severity, TargetSupport, VersionRange, command,
 };
 
 /// The same implementation serves the component and development parity tests.
@@ -49,6 +50,29 @@ fn capabilities() -> Vec<Capability> {
 }
 
 impl Backend for Javascript {
+    fn commands(&self) -> Vec<command::Descriptor> {
+        ffi::descriptors()
+    }
+
+    fn run(
+        &self,
+        invocation: &command::Invocation,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        if ffi::descriptors().iter().any(|d| d.name == invocation.name) {
+            ffi::run(invocation)
+        } else {
+            Err(command::unknown(&invocation.name))
+        }
+    }
+
+    fn resume(
+        &self,
+        state: Vec<u8>,
+        outputs: Vec<command::File>,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        ffi::resume(&state, &outputs)
+    }
+
     fn describe(&self) -> Descriptor {
         let range = |minimum: &str, maximum: &str| VersionRange {
             minimum: minimum.into(),

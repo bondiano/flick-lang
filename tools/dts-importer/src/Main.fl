@@ -1,6 +1,6 @@
 // The `.d.ts` reader of `flick ffi import` and the surface of Effect for
 // the coverage linter, reaching the TypeScript compiler through `Ts`.
-module Main exposing (main, import_main)
+module Main exposing (main)
 
 import Bump
 import Import
@@ -8,10 +8,18 @@ import Surface
 import Cli
 
 import_command :
-  Cli.Command {Host.Console, Path.Path, Stdio.Stdio} {AppError, PlatformError.PlatformError}
+  Cli.Command
+    {Host.Console, Async, FileSystem.FileSystem, Path.Path}
+    {AppError, PlatformError.PlatformError}
 let import_command = cli "import" {
-  description "Reads {\"root\", \"package\"} on stdin and prints the shapes of the package's value exports"
-  handle fun {} -> Import.run ()
+  description "Writes the shapes of the value exports of an installed package to a file, as JSON"
+  /// The project whose installed packages to read
+  flag root : String = "."
+  /// The npm package
+  arg package : String
+  /// The file to write
+  arg out : String
+  handle fun { root; package; out } -> Import.run root package out
 }
 
 surface_command :
@@ -42,7 +50,7 @@ let bump_command = cli "bump" {
 
 tool :
   Cli.Command
-    {Host.Console, Async, FileSystem.FileSystem, Path.Path, Stdio.Stdio}
+    {Host.Console, Async, FileSystem.FileSystem, Path.Path}
     {AppError, PlatformError.PlatformError}
 let tool = cli "dts-importer" {
   description "Reads TypeScript declarations for Flick"
@@ -53,12 +61,12 @@ let tool = cli "dts-importer" {
 
 /// Runs the task with the Node.js services, a platform error failing the app.
 with_node :
-  (Unit ->{Host.Environment, Host.Arguments, Host.Console, Async, FileSystem.FileSystem, Path.Path, Stdio.Stdio; AppError, PlatformError.PlatformError}
+  (Unit ->{Host.Environment, Host.Arguments, Host.Console, Async, FileSystem.FileSystem, Path.Path; AppError, PlatformError.PlatformError}
     Unit) ->
   Unit ->{Host.Environment, Host.Arguments, Host.Console, Async; AppError}
   Unit
 let with_node act () =
-  try provide FileSystem.node { provide Path.layer { provide Stdio.node { act () } } } with
+  try provide FileSystem.node { provide Path.layer { act () } } with
   | PlatformError.PlatformError reason -> App.fail (show reason)
 
 main : Unit ->{Host.Environment, Host.Arguments, Host.Console, Async; AppError} Unit
@@ -69,7 +77,3 @@ let main () =
       | Cli.CliError message -> App.fail message
     )
     ()
-
-/// The import mode alone, as `flick ffi import` runs it: no arguments.
-import_main : Unit ->{Host.Environment, Host.Arguments, Host.Console, Async; AppError} Unit
-let import_main () = with_node (fun () -> Import.run ()) ()

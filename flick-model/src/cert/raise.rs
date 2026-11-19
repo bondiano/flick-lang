@@ -77,10 +77,30 @@ impl Cx<'_> {
             .clone()
             .ok_or("a `try` without its stage")?;
         let pb = self.typing(body, t, col + 2)?;
-        // the errors of the body as a row term, which the arms read (`Catches`)
+        // the errors the arms read (`Catches`), as a row term: those an arm `x` or `_` takes,
+        // above what the body raises as (Try) with (Sub) types it, or else the body's own
+        let caught = (self.node(body)?.caught.iter())
+            .map(|r| row(r, &self.env))
+            .collect::<Result<Vec<_>, _>>()?;
+        if caught.windows(2).any(|w| w[0] != w[1]) {
+            return Err("arms of a `try` that take the errors at different rows".into());
+        }
         let (services, e0) = match &stage {
-            Stage::Pure => (None, ".cnil".to_owned()),
-            Stage::Runtime(r, e) => (Some(row_pred(r, &self.env)?), row(e, &self.env)?),
+            Stage::Pure => {
+                if caught.first().is_some_and(|c| c != ".cnil") {
+                    return Err(
+                        "a pure `try` whose arm takes errors its body does not raise".into(),
+                    );
+                }
+                (None, ".cnil".to_owned())
+            }
+            Stage::Runtime(r, e) => (
+                Some(row_pred(r, &self.env)?),
+                match caught.first() {
+                    Some(c) => c.clone(),
+                    None => row(e, &self.env)?,
+                },
+            ),
         };
         let boolean = Type::con("Prelude", "Bool");
         let mut h = "Row.none".to_owned();

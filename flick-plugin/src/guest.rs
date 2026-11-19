@@ -295,6 +295,13 @@ macro_rules! export {
             {
                 $crate::Plugin::run(&$plugin, &invocation)
             }
+            fn resume(
+                state: ::std::vec::Vec<u8>,
+                outputs: ::std::vec::Vec<$crate::command::File>,
+            ) -> ::std::result::Result<$crate::command::Plan, ::std::vec::Vec<$crate::command::Diagnostic>>
+            {
+                $crate::Plugin::resume(&$plugin, state, outputs)
+            }
             fn open(
                 invocation: $crate::command::Invocation,
             ) -> ::std::result::Result<::std::vec::Vec<u8>, ::std::vec::Vec<$crate::command::Diagnostic>>
