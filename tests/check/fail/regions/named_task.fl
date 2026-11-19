@@ -1,5 +1,5 @@
 // A task stored in a cell made outside its `scope` would use the region
-// after it ends, whether it is named first or passed directly: its row
+// after it ends, named first, passed directly or inside `Some`: its row
 // needs `s` live, which the cell's type cannot keep.
 module App.NamedTask exposing (..)
 
@@ -27,5 +27,18 @@ let direct () =
     Ref.set cell (task { Files.use h })
   }
   await (Ref.get cell)
+
+named_some : Unit ->{Files} Unit
+let named_some () =
+  let cell = Ref.make (Some (task { () }))
+  let _ = scope s {
+    let h = Files.open_scoped "x"
+    let t = task { Files.use h }
+    Ref.set cell (Some t)
+  }
+  match Ref.get cell with
+  | Some t -> await t
+  | None -> ()
 //~ FLICK-G002 @18:18-18:19 this uses region `s`, which the expected type `Eff {Files} none Unit` does not keep live
 //~ FLICK-G002 @27:26-27:37 this uses region `s`
+//~ FLICK-G002 @37:19-37:25 this value needs region `s` live
