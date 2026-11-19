@@ -16,6 +16,8 @@ use flick_core::source::SourceMap;
 use super::libraries;
 use super::run::find_project;
 use crate::args::GlobalArguments;
+#[cfg(feature = "wasm-backends")]
+use crate::backends;
 use crate::child;
 use crate::command::Outcome;
 use crate::fetch;
@@ -110,10 +112,23 @@ fn fetch(project: &Project, command: &Command) -> Option<Outcome> {
             for name in fetched {
                 info!("fetched {name}");
             }
-            None
         }
-        Err(message) => Some(failure(codes::P034, message)),
+        Err(message) => return Some(failure(codes::P034, message)),
     }
+    // `update` with no names, or naming the backend, moves its pin too
+    let moved = matches!(command, Command::Update { packages }
+        if packages.is_empty() || packages.iter().any(|p| p.starts_with("flick/")));
+    #[cfg(feature = "wasm-backends")]
+    if let Err(diagnostic) = backends::pin_official(project, moved, options.locked, options.offline)
+    {
+        return Some(Outcome {
+            sources: SourceMap::default(),
+            diagnostics: vec![diagnostic],
+        });
+    }
+    #[cfg(not(feature = "wasm-backends"))]
+    let _ = moved;
+    None
 }
 
 /// For `install` and `update`, adds what the dependency closure wants of npm
