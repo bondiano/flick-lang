@@ -122,3 +122,85 @@ every_failure : String ->{} Int
 let every_failure reason =
   try gone reason with
   | Fail.fail _ -> 0
+
+// a `match` takes a value of `Errors e` apart by the errors of its row
+explain : Errors {NotFound, DbUnavailable} -> String
+let explain e =
+  match e with
+  | NotFound id -> "missing " ++ show id
+  | DbUnavailable why -> why
+
+// errors with arguments, and an arm for the rest of a row that is known
+retry_after : Errors {Failed String, Timeout, Conflict} -> Float
+let retry_after e =
+  match e with
+  | Timeout -> 1
+  | Failed _ -> 2
+  | _ -> 0
+
+// the arms tell the errors of a variable that takes every error of a body
+explained : UserId ->{Users} String
+let explained id =
+  try (find_user id).name with
+  | e ->
+    match e with
+    | NotFound _ | DbUnavailable _ -> "unavailable"
+
+// the row of a parameter that is open has an arm for the rest of it
+first_known : Errors {NotFound | e} -> String
+let first_known e =
+  match e with
+  | NotFound _ -> "missing"
+  | _ -> "other"
+
+// a term of one error has the type of the errors of a row that holds it
+timed_out : Errors {Failed String, Timeout}
+let timed_out = Timeout
+
+problem_of : Float -> Errors {NotFound, DbUnavailable, Timeout}
+let problem_of code =
+  if code < 0 then Timeout else if code == 0 then DbUnavailable "down" else NotFound code
+
+// a value of one error passed where several are expected
+explain_missing : UserId -> String
+let explain_missing id = explain (NotFound id)
+
+// a function of the errors of one row into those of another, which
+// `Exit.map_error` maps the failure of an exit with
+to_timeouts : Errors {NotFound, DbUnavailable} -> Errors {Failed String, Timeout}
+let to_timeouts e =
+  match e with
+  | NotFound _ -> Failed "no user"
+  | DbUnavailable _ -> Timeout
+
+mapped : Exit {NotFound, DbUnavailable} Float -> Exit {Failed String, Timeout} Float
+let mapped exit = Exit.map_error to_timeouts exit
+
+// an arm for the rest leaves the errors of the variable to the body
+mostly_missing : UserId ->{Users} String
+let mostly_missing id =
+  try (find_user id).name with
+  | e ->
+    match e with
+    | NotFound _ -> "missing"
+    | _ -> "other"
+
+// the arms may name an error the body does not raise: the variable takes
+// a row above the body's
+beyond_raised : UserId ->{Users} String
+let beyond_raised id =
+  try (Users.get id).name with
+  | e ->
+    match e with
+    | NotFound _ -> "missing"
+    | DbUnavailable _ -> "unavailable"
+
+// patterns inside an arm tell the row as those at its top do
+paired : UserId -> Bool ->{Users} String
+let paired id fresh =
+  try (find_user id).name with
+  | e ->
+    match (e, fresh) with
+    | (NotFound _, true) -> "missing now"
+    | (NotFound _, false) -> "missing before"
+    | (DbUnavailable _, _) -> "unavailable"

@@ -37,7 +37,8 @@ A variable belongs to its function. A `fun`, a local function, a `task`, a
 lazy `for`, the rest of a `do` block or an arm of a handler of operations
 inside it may run later, again or at the same time, so none of them reads or
 assigns the variable (`FLICK-G005`): the function stays pure from the outside.
-Bind the value with `let` first and use that name. A `scope`, a `provide`, a
+Bind the value with `let` first and use that name. The tour has an
+[example](../../tour/captures/) of this error. A `scope`, a `provide`, a
 branch and an arm of `match` or of a `try` run in place and may assign. The
 body of `try … with` and sequential loops may also assign. A failed
 right-hand side leaves its target unchanged; a handler sees earlier completed
@@ -58,6 +59,7 @@ continuing. Duplicate labels on enclosing loops and unknown labels are
 `FLICK-T071`. A nested function, task, lazy sequence or operation handler
 cannot exit an outer loop (`FLICK-T071`). `loop` and `while` are contextual
 words: existing names such as `Loop.loop` and `Schedule.while` remain valid.
+The tour has a runnable [example](../../tour/labels/).
 
 ```flick
 module App.Count exposing (count)
@@ -67,6 +69,22 @@ let count n =
   let mut i = 0
   while i < n do i = i + 1
   i
+```
+
+`break 'outer` leaves both loops at the first pair that adds up to the
+target, so `first_sum 10 [1, 4, 7] [9, 3, 6]` is `1`:
+
+```flick
+first_sum : Int -> List Int -> List Int -> Int
+let first_sum target xs ys =
+  let mut found = -1
+  'outer: for x <- xs do
+    for y <- ys do
+      if x + y == target then {
+        found = x
+        break 'outer
+      }
+  found
 ```
 
 ## Recursion
@@ -103,7 +121,7 @@ top-level value whose type stays unknown. Type variables of an enclosing
 signature, or of a value already in scope, are never generalized, and mutable
 containers are invariant. A row of calls still unknown when a binding is
 generalized becomes `none`, as at the end of a declaration
-([effects](../effects/)); it is not quantified.
+([empty rows](../effects/#empty-rows-none)); it is not quantified.
 
 ```flick
 make_empty : forall a. Unit ->{} Ref (Option a)
@@ -119,6 +137,10 @@ Classes and instances: [classes.md](../classes/).
 
 ## Not checked yet
 
+The checker covers every construct of this page, the code of plugin blocks
+included. The formal development covers less of it:
+
 | Construct | Today |
 | - | - |
-| `sql`, `ui`, `codec`, `schema` blocks | any type |
+| `let mut` | `formal/Formal/LetMut.lean` (T7) translates straight-line blocks with assignments, branches and `scope` into the typed core and derives purity and region safety from that; loops are outside the translation |
+| loops, labels, `break`, `continue` | `formal/Formal/LocalControl.lean` proves laws of their completions: every exit carries the current variables, a failed right-hand side assigns nothing, a handler sees the variables as they are, an invariant each iteration keeps holds on every finite exit, a labeled exit leaves every loop up to its target, and the scopes it leaves run their finalizers newest first. These are laws of that algebra, not of the typed core: fixtures run the compiled loops on JS and Go, and no proof relates them to the compiler or a backend |

@@ -1,0 +1,17 @@
+module Main exposing (main, factor)
+
+factor : Int -> String
+let factor n =
+  let mut found = "prime"
+  'search: for a <- List.range 2 n do {
+    for b <- List.range a n do {
+      if a * b == n then {
+        found = "\{a} x \{b}"
+        break 'search
+      }
+    }
+  }
+  found
+
+main : Unit ->{Host.Console} Unit
+let main () = Platform.stdout_line "\{factor 12}, \{factor 7}"

@@ -52,7 +52,7 @@ theorem Typ.weakenStore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) (X : List Ty) :
     exact .settle (by rw [List.getElem?_append_left (getElem?_lt hl)]; exact hl) (ih X) hψ hφ hT
   | raise _ hφ ih => exact .raise (ih X) hφ
   | raiseAdt _ hU hφ ih => exact .raiseAdt (ih X) hU hφ
-  | errVal hv _ hU hE ih => exact .errVal hv (ih X) hU hE
+  | errVal _ hU hE ih => exact .errVal (ih X) hU hE
   | tryR _ _ hφ hs ih₁ ih₂ => exact .tryR (ih₁ X) (ih₂ X) hφ hs
   | tryP _ _ ih₁ ih₂ => exact .tryP (ih₁ X) (ih₂ X)
   | handle hv _ hU hE _ hc ha hφ ih₁ ih₂ => exact .handle hv (ih₁ X) hU hE (ih₂ X) hc ha hφ
@@ -213,7 +213,7 @@ theorem Typ.rename {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | settle hl _ hψ hφ hT ih => intro _ _ hξ; exact .settle hl (ih hξ) hψ hφ hT
   | raise _ hφ ih => intro _ _ hξ; exact .raise (ih hξ) hφ
   | raiseAdt _ hU hφ ih => intro _ _ hξ; exact .raiseAdt (ih hξ) hU hφ
-  | errVal hv _ hU hE ih => intro _ _ hξ; exact .errVal hv.rename (ih hξ) hU hE
+  | errVal _ hU hE ih => intro _ _ hξ; exact .errVal (ih hξ) hU hE
   | tryR _ _ hφ hs ih₁ ih₂ => intro _ _ hξ; exact .tryR (ih₁ hξ) (ih₂ hξ) hφ hs
   | tryP _ _ ih₁ ih₂ => intro _ _ hξ; exact .tryP (ih₁ hξ) (ih₂ hξ)
   | handle hv _ hU hE _ hc ha hφ ih₁ ih₂ =>

@@ -182,6 +182,10 @@ impl Loader<'_> {
                 .into_iter()
                 .chain(packages)
                 .collect(),
+            (Root::Proof, Some(p)) => [p.source_root(), p.proof_root()]
+                .into_iter()
+                .chain(packages)
+                .collect(),
             (Root::Package(_), _) => packages.collect(),
             (Root::Other(dir), _) => dir.iter().cloned().collect(),
             _ => Vec::new(),

@@ -1,6 +1,6 @@
 ---
 title: "Direct effectful calls"
-source_hash: 7a354933a17c4622
+source_hash: 345249a1186b93c4
 ---
 
 An effectful function is called in an ordinary expression, and `let` binds its result. A sequence of operations is written with ordinary expressions and bindings.
@@ -44,7 +44,7 @@ The result of the expression `Users.get id` is a `User`, and the effect of compu
 
 `let` binds the value of the expression without any additional transformation: a value of type `Eff` stays `Eff`, `Option` stays `Option`, `List` stays `List`, `Result` stays `Result`. The effect of the right-hand side is determined by the original signature of the called function.
 
-Function blocks and `match` are delimited by indentation. `in` is not needed; the last expression is the result of the block. A standalone intermediate expression must have type `Unit`; any other result is discarded explicitly with `ignore`. Curly braces delimit records and the blocks of `task`, `scope`, `provide`, `sql`, `ui`, `cli`, `codec`, `do`, `for` and `rec` (see [Layout](../../reference/grammar/#layout)). Inside them, line breaks separate bindings and expressions; `;` is allowed for compact notation. Arguments and fields are evaluated left to right. Self-recursion is marked with `let rec`; mutual recursion of functions uses `rec { ... }`, where each definition has its own full signature. A recursive value that would be evaluated while it is defined is an error (`FLICK-T012`).
+Function blocks and `match` are delimited by indentation. `in` is not needed; the last expression is the result of the block. A standalone intermediate expression must have type `Unit`; any other result is discarded explicitly with `ignore`. Curly braces delimit records and the blocks of `task`, `scope`, `provide`, `sql`, `ui`, `cli`, `codec`, `do`, `for` and `rec` (see [Layout](../../reference/syntax/#layout)). Inside them, line breaks separate bindings and expressions; `;` is allowed for compact notation. Arguments and fields are evaluated left to right. Self-recursion is marked with `let rec`; mutual recursion of functions uses `rec { ... }`, where each definition has its own full signature. A recursive value that would be evaluated while it is defined is an error (`FLICK-T012`).
 
 ## A full signature above every top-level function
 

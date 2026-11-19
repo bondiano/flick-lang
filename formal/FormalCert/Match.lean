@@ -37,6 +37,7 @@ theorem exh_unit : Exh S (.base .unit) [.lit .unit] := by
     | rnil => cases hT
     | rcons => cases hT
     | adt _ _ h => subst hT; simp [Ty.hd] at h
+    | err | errOpen => cases hT
   rw [this hs rfl rfl]
   exact ⟨_, List.mem_singleton_self _, by simp [matchP]⟩
 
@@ -90,7 +91,7 @@ theorem exh_spines {T : Name} {ps : List Pat}
   | hidden ho => subst hX; simp [Ty.Opaque, Ty.tcon_hd] at ho
   | lit => have := congrArg Ty.hd hX; simp [Ty.hd, Ty.tcon_hd] at this
   | rnil => have := congrArg Ty.hd hX; simp [Ty.hd, Ty.tcon_hd] at this
-  | rcons => have := congrArg Ty.hd hX; simp [Ty.hd, Ty.tcon_hd] at this
+  | rcons | err | errOpen => have := congrArg Ty.hd hX; simp [Ty.hd, Ty.tcon_hd] at this
   | adt hs' hU hT =>
     subst hX
     rw [Ty.tcon_hd] at hT; cases hT
@@ -114,6 +115,37 @@ theorem exh_gen (hS : GenSig S) {T : Name} {ps : List Pat} {us : List Ty}
     have := hall _ (genAdtCtors_complete _ _ _ _ (hS.closed _ _ _ _ h hT))
     simpa [covered] using this) us
 
+/-- A type headed by the nominal type `T` is `T` at some arguments. -/
+theorem Ty.tcon_of_hd {U : Ty} {T : Name} (h : U.hd = .adt T) : ∃ us, U = Ty.tcon T us := by
+  induction U with
+  | adt T' => simp only [Ty.hd, Ty.adt.injEq] at h; subst h; exact ⟨[], rfl⟩
+  | tapp f a ih _ =>
+    simp only [Ty.hd] at h
+    obtain ⟨us, rfl⟩ := ih h
+    exact ⟨us ++ [a], by simp [Ty.tcon, List.foldl_append]⟩
+  | _ => simp [Ty.hd] at h
+
+/-- **The errors of a closed row cover it** (Match-Err): the row has no variable, its names
+are among `es`, and each constructor of each of them has an arm of fields any value matches. -/
+theorem exh_errs (hS : GenSig S) {ε : Ty} {ps : List Pat} (es : List Name)
+    (hε : ∀ E c, ε.asRow (.nm E c) → E ∈ es) (hv : ∀ a G, ¬ ε.asRow (.rv a G))
+    (hT : ∀ E ∈ es, genAdtCtors E ≠ [])
+    (hall : ∀ E ∈ es, ∀ c ∈ genAdtCtors E, covered ps c.1 c.2 = true) :
+    Exh S (.errors ε) ps := by
+  intro v hs
+  generalize hX : Ty.errors ε = X at hs
+  cases hs with
+  | hidden ho => subst hX; simp [Ty.Opaque, Ty.hd] at ho
+  | err hU hUh hm =>
+    cases hX
+    obtain ⟨c, hc⟩ := hm
+    have hE := hε _ _ hc
+    obtain ⟨us, rfl⟩ := Ty.tcon_of_hd hUh
+    exact exh_gen hS (hT _ hE) (hall _ hE) v hU
+  | errOpen hm => cases hX; obtain ⟨a, G, h⟩ := hm; exact absurd h (hv a G)
+  | adt _ _ hT' => subst hX; simp [Ty.hd] at hT'
+  | lit | rnil | rcons => cases hX
+
 /-- A record value of a type with field `l` has it, and `..` matches it. -/
 theorem field_of_shp {R : Ty} {v : Tm} {l : Label} (hs : Shp S true R v)
     (hR : (R.field l).isSome) : (∃ x, v.field l = some x) ∧ (matchP .rany v).isSome := by
@@ -132,6 +164,7 @@ theorem field_of_shp {R : Ty} {v : Tm} {l : Label} (hs : Shp S true R v)
   | head => cases hfl
   | app => cases hfl
   | @adt _ _ _ T' _ hT _ _ => cases T' <;> simp_all [Ty.hd, Ty.field]
+  | err | errOpen => simp [Ty.field] at hR
 
 /-- **`{ℓ = q, ..}` covers a record type with field `ℓ`**, `q` any value's pattern. -/
 theorem exh_record {R : Ty} {l : Label} {q : Pat} {ps : List Pat} (hR : (R.field l).isSome)

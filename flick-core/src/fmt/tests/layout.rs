@@ -265,7 +265,7 @@ fn breaks_a_record_in_a_plugin_block_by_lines() {
           disabled = false
           on_click = Ui.Event.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
         }
-        (text "+1")
+        text "+1"
     }
     "#);
 }

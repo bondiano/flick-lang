@@ -100,6 +100,19 @@ fn refuse<T>(span: Span, why: impl Into<String>) -> Result<T, Refused> {
 pub const RULES: &str = "$proof";
 /// The module of the proofs a later proof uses as lemmas.
 pub const LEMMAS: &str = "$lemma";
+/// The module of tuples: a tuple of `n` is the constructor `(,)` of `n`
+/// fields of the type `Tuple`.
+pub const TUPLES: &str = "$tuple";
+
+/// The constructor of tuples of `arity` elements.
+pub fn tuple(arity: usize) -> Rc<Ctor> {
+    Rc::new(Ctor {
+        module: TUPLES.into(),
+        ty: "Tuple".into(),
+        name: "(,)".into(),
+        arity,
+    })
+}
 
 /// `e` as a term of the domain.
 pub fn term(e: &Expr) -> Result<Term, Refused> {
@@ -182,6 +195,11 @@ pub fn term(e: &Expr) -> Result<Term, Refused> {
                 .collect::<Result<Vec<_>, _>>()?;
             Term::Match(Rc::new(term(scrutinee)?), arms.into())
         }
+        ExprKind::Tuple(items) => items
+            .iter()
+            .try_fold(Term::Con(tuple(items.len())), |f, item| {
+                Ok(Term::App(Rc::new(f), Rc::new(term(item)?)))
+            })?,
         ExprKind::App { .. } => {
             return refuse(e.span, "a call with effects is outside the domain");
         }
@@ -204,6 +222,13 @@ pub fn pat(p: &IrPat, span: Span) -> Result<Pat, Refused> {
             fields
                 .iter()
                 .map(|f| pat(f, span))
+                .collect::<Result<_, _>>()?,
+        ),
+        IrPat::Tuple(items) => Pat::Con(
+            tuple(items.len()),
+            items
+                .iter()
+                .map(|p| pat(p, span))
                 .collect::<Result<_, _>>()?,
         ),
         _ => return refuse(span, "this pattern is not supported in a proof"),

@@ -26,15 +26,12 @@ let problem model m diagnostic =
       span { class_name = "fp-diagnostic-at" } (text diagnostic.at)
       attributes
         [("aria-expanded", if open then "true" else "false")]
-        (Ui.with_host
-          { Ui.host with class_name = Some "fp-explain" }
-          (button
-            {
-              disabled = false
-              on_click = Ui.Event.exhaust (fun _ -> task { explain model key code })
-            }
-            (text
-              (if open then tr m.locale "Hide" "Скрыть" else tr m.locale "Explain" "Объяснить"))))
+        Ui.with_host { Ui.host with class_name = Some "fp-explain" }
+          button {
+            disabled = false
+            on_click = Ui.Event.exhaust (fun _ -> task { explain model key code })
+          }
+            text (if open then tr m.locale "Hide" "Скрыть" else tr m.locale "Explain" "Объяснить")
       paragraph (text diagnostic.message)
       if open then pre { class_name = "fp-explanation" } (text m.explanation) else empty
       if String.starts_with "FLICK-" code then
@@ -69,15 +66,14 @@ component problems_pane (props : Problems) =
     div { class_name = "fp-diagnostics" }
       Ui.with_host
         { Ui.host with class_name = Some "fp-filter" }
-        (button
-          { disabled = props.diagnostics == []; on_click = toggle }
+        button { disabled = props.diagnostics == []; on_click = toggle }
           (text
             (
               if only then
                 tr props.m.locale "Show all" "Показать все"
               else
                 tr props.m.locale "Errors only" "Только ошибки"
-            )))
+            ))
       match shown with
       | [] -> paragraph (text (tr props.m.locale "No diagnostics." "Ошибок и предупреждений нет."))
       | items -> list (List.map (problem props.model props.m) items)
@@ -196,16 +192,15 @@ let output_pane model m =
         if m.execution.status == "preview" && m.execution.lines == [] then empty else printed m
         Ui.with_host
           { Ui.host with role = Some "status" }
-          (div
-            {
-              class_name =
-                if m.execution.detail == "0"
-                  && (m.execution.status == "exit" || m.execution.status == "preview") then
-                  "fp-exit"
-                else
-                  "fp-exit fp-bad"
-            }
-            (text (execution_status m ++ " · " ++ profile_name m.ran_profile)))
+          div {
+            class_name =
+              if m.execution.detail == "0"
+                && (m.execution.status == "exit" || m.execution.status == "preview") then
+                "fp-exit"
+              else
+                "fp-exit fp-bad"
+          }
+            text (execution_status m ++ " · " ++ profile_name m.ran_profile)
         if m.execution.status == "failure" then
           pre { class_name = "fp-failure-detail" } (text m.execution.detail)
         else

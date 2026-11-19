@@ -1,7 +1,8 @@
 //! `raise` and `try` in a certificate: (Raise-Adt) of a value of an error
 //! type, and (Try) with the errors each arm catches (`Catches` of
 //! `formal/Formal/Typing.lean`) by the lemmas of
-//! `formal/FormalCert/Match.lean`.
+//! `formal/FormalCert/Match.lean`; (Errors-In) of a term of an error at
+//! the errors of a row.
 
 use crate::syntax::{Arm, Const, Head, Pat, Term};
 use crate::translate::lean::elide::{row, row_pred};
@@ -18,6 +19,31 @@ pub(super) fn is_raise(f: &Term) -> bool {
 }
 
 impl Cx<'_> {
+    /// (Errors-In), `Typ.errVal`, when the check gave `e` the errors of the
+    /// row `t` from its error type: `e` at that type, `E` in the row.
+    pub(super) fn errors_in(
+        &mut self,
+        e: &Term,
+        t: &Type,
+        col: usize,
+    ) -> Result<Option<String>, Unsupported> {
+        let Some(u) = self.node(e)?.errors_in.clone() else {
+            return Ok(None);
+        };
+        if !matches!(t, Type::Errors(_)) {
+            return Ok(None);
+        }
+        let Type::Con(name) = bare(&u) else {
+            return Err(format!("(Errors-In) of `{u}`"));
+        };
+        let pad = format!("\n{}", " ".repeat(col + 2));
+        let pe = self.typing(e, &u, col + 2)?;
+        Ok(Some(format!(
+            "(.errVal (U := {}) (E := \"{name}\"){pad}{pe}{pad}rfl (by row_set))",
+            self.ty(&u)?
+        )))
+    }
+
     /// (Raise-Adt): the value raised is of the error type `E`, the `raise`
     /// of any type `t`.
     pub(super) fn raise(&mut self, a: &Term, t: &Type, col: usize) -> Result<String, Unsupported> {

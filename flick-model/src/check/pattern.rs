@@ -178,6 +178,7 @@ impl Checker<'_> {
     /// rigid variables it fixes are equalities of the arm, and those it
     /// leaves open, the types it hides, are rigid in it.
     fn con_fields(&mut self, c: &Con, t: &Type) -> Check<Vec<Type>> {
+        let t = &self.error_element(c, t)?;
         let Some(scheme) = self
             .decls
             .constructors
@@ -382,20 +383,11 @@ impl Checker<'_> {
             },
             Type::Tuple(ts) => vec![Ctor::Tuple(ts.len())],
             Type::Record(f) => vec![Ctor::Record(f.fields.keys().cloned().collect())],
-            Type::Errors(r) if r.vars.is_empty() && r.elems.len() == 1 => {
-                let (e, _) = r.elems.iter().next().expect("one element");
-                vec![Ctor::Con(Rc::new(Con {
-                    ty: e.clone(),
-                    name: e.name.clone(),
-                    arity: self
-                        .decls
-                        .variants
-                        .get(e)
-                        .and_then(|v| v.first())
-                        .map_or(0, |v| v.1),
-                    dicts: 0,
-                }))]
-            }
+            // (Match-Err): the errors of a closed row
+            Type::Errors(r) => match self.error_constructors(r) {
+                Some(cs) => cs.into_iter().map(Ctor::Con).collect(),
+                None => return Ok(None),
+            },
             _ => return Ok(None),
         }))
     }

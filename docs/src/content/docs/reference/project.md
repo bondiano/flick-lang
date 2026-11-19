@@ -44,6 +44,7 @@ max-params = 5
 | `project.kind` | `"app"` or `"lib"`; required | — |
 | `project.source-dir` | directory of source modules | `"src"` |
 | `project.test-dir` | directory of test modules | `"test"` |
+| `project.proof-dir` | directory of proof modules, which only `flick prove` checks | `"proofs"` |
 | `project.entry` | module that exports `main`, its own or re-exported: the entry `main`, whose runner is `flick-main.js` | — |
 | `project.entries` | several entries, `{ server = "App.Server", cli = "App.Cli" }`: a runner `flick-<name>.js` each; an entry with a runner of its own is a table, `web = { module = "App.Worker", runner = "Runner.Cloudflare" }`; `target = "client"` marks an entry that runs in a browser: nothing its `main` reaches may need `Server` (`FLICK-E009`, with the path to it), so its bundle keeps no server module; names are lower-case letters, digits and `-`; instead of `entry` | — |
 | `project.runner` | the module that starts each entry without a runner of its own: it exports `type alias Main`, the type `main` must have (`FLICK-P026` otherwise), and `run`, which takes `main` and whose result the runner exports as `default`; built in are `"Runner.Node"`, `"Runner.Browser"` and `"Runner.Cloudflare"`, a Worker whose `fetch` gives `main : Runner.Cloudflare.Fetch ->{Runner.Cloudflare.Env; AppError} Http.ServerResponse.ServerResponse` the request and the context (`wait_until`), and provides the bindings as the service `Env` (`Runner.Cloudflare.var`, `binding`) and the live browser services `Host.BrowserLive`; a runner may provide services this way, and `main` may need any of those its `Main` names; a package may provide another; without one, a pure `main` is called and an effect runs as on Node | — |
@@ -110,7 +111,7 @@ from the launcher, which imports only those, so a `main` that names none
 carries none; on the Go target it gets all six. What `main` provides itself
 wins over them. The playground's are the same, with no environment variables
 and no arguments, and a child process cannot start there (see
-[who provides them](../effects/#who-provides-them)). Provide other required
+[who provides them](../services/#who-provides-them)). Provide other required
 layers and handle other errors inside `main`, not in the launcher.
 
 A pure `main` is called directly. Normally its launcher imports no runtime;

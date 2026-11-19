@@ -146,6 +146,8 @@ pub struct Config {
     pub kind: Kind,
     pub source_dir: String,
     pub test_dir: String,
+    /// The directory of proof modules, which only `flick prove` reads.
+    pub proof_dir: String,
     /// The entry points of an app, by name: `entries`, or `entry` as the
     /// one named `main`. Each builds a runner `flick-<name>.js`.
     pub entries: Vec<Entry>,

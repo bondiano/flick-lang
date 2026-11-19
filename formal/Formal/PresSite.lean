@@ -94,7 +94,10 @@ private theorem Typ.runtimeStage {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | conv _ _ ih =>
     intro Λ μ Λ' μ' e' t hΓ hJ hh; cases hJ
     exact ih Λ μ Λ' μ' e' _ hΓ rfl hh
-  | allI hv | errVal hv => intro _ _ _ _ _ _ _ _ hh; exact hh.not_value hv
+  | errVal _ _ _ ih =>
+    intro Λ μ Λ' μ' e' t hΓ hJ hh; cases hJ
+    exact ih Λ μ Λ' μ' e' _ hΓ rfl hh
+  | allI hv => intro _ _ _ _ _ _ _ _ hh; exact hh.not_value hv
   | app hf hx hψ hT =>
     intro Λ μ Λ' μ' e' t hΓ hJ hh; cases hΓ; cases hJ
     have h := Typ.app hf hx hψ hT
@@ -173,6 +176,7 @@ theorem fin_not_value {c : Const} {w₁ w₂ : Tm} (hc : c = .addFin ∨ c = .sp
 theorem fin_unit {Ψ Θ c p w T φ} (h : Typ S Ψ Θ [] (.app (.app (.const c) (.own p)) w) (.ex T φ))
     (hc : c = .addFin ∨ c = .spawn) : Typ S Ψ Θ [] (.lit .unit) (.ex T φ) := by
   obtain ⟨_, _, _, _, hf, _, _, hT⟩ := h.app_nonvalue _ _ _ _ rfl rfl (fin_not_value hc)
+  refine hT.typ fun _ hT => ?_
   obtain ⟨_, _, _, _, hc', _, _, hT₁⟩ := hf.app_arrow
   obtain ⟨_, hT'⟩ := hc'.const_witness fun _ _ _ h => by rcases hc with rfl | rfl <;> cases h
   rcases hc with rfl | rfl <;>
@@ -236,6 +240,7 @@ theorem RtCtx.hole {Ψ : List Ty} {Θ' : Facts} {n : Nat} (hΘ : Ext Facts.age �
 theorem glob_preservation {root Ψ Θ g T φ v} (hroot : RootTy S root)
     (h : Typ S Ψ Θ [] (.glob g) (.ex T φ)) (hg : root.glob g = some v) : Typ S Ψ Θ [] v (.ex T φ) := by
   obtain ⟨_, _, hs, hts, hH, hT⟩ := h.glob_type _ _ _ rfl rfl
+  refine hT.typ fun _ hT => ?_
   obtain ⟨hno, _, hs', ht⟩ := hroot.glob _ _ hg
   rw [hs] at hs'; cases hs'
   refine (Typ.instantiate (Γ := []) hts hH (hno _) ?_).sub ⟨hT, Stage.pure_le _⟩
@@ -252,6 +257,7 @@ theorem root_field {root Ψ Θ Ef o w f c v t φ} (hroot : RootTy S root) (hr₀
     (h : Typ S Ψ Θ [] (.app (.const (.perform Ef o c)) v) (.ex t φ)) :
     Typ S Ψ Θ [] (.app f v) (.ex t φ) := by
   obtain ⟨_, _, _, _, hf', hx, hψ, hT⟩ := h.app_nonvalue _ _ _ _ rfl rfl perform_not_value
+  refine hT.typ fun _ hT => ?_
   obtain ⟨us, _, _, _, hus, hop, hT'⟩ := hf'.perform_arrow
   obtain ⟨hwv, hwt⟩ := hroot.svc _ _ hr₀
   have hne : S.impl Ef ≠ .errors .cnil := fun he => by

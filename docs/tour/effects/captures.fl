@@ -1,0 +1,10 @@
+module Main exposing (main)
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  let mut runs = 0
+  let counted : Eff none none Int = task {
+    runs = runs + 1
+    runs
+  }
+  Platform.stdout_line "first \{await counted}, second \{await counted}"

@@ -153,10 +153,10 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe S J J' �
   | raiseAdt _ hU hφ ih =>
     intro _ hJ; obtain ⟨_, _, rfl, _, h₂⟩ := hJ.ex
     exact .raiseAdt (ih (.st h₂)) hU (Stage.le_trans hφ h₂)
-  | errVal hv _ hU hE ih =>
+  | errVal _ hU hE ih =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     obtain ⟨_, rfl, he⟩ := (h₁.eq_plain rfl).errors_right
-    exact .errVal hv (ih (.st h₂)) hU (by rw [he.asRow]; exact hE)
+    exact .errVal (ih (.st h₂)) hU (by rw [he.asRow]; exact hE)
   | tryR _ _ hφ hs ih₁ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .tryR (ih₁ ⟨h₁, Stage.le_refl _⟩) (ih₂ ⟨rfl, rfl, h₁, h₂⟩) (Stage.le_trans hφ h₂) hs

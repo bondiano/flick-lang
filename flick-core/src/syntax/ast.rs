@@ -14,7 +14,12 @@ pub enum Ast {
     Token(SyntaxKind, String),
 }
 
-pub fn lower(node: &Node, src: &str) -> Ast {
+/// The AST of `node`; `instead` may give the AST of a node of it, which
+/// is then taken as it is.
+pub fn lower(node: &Node, src: &str, instead: &dyn Fn(&Node) -> Option<Ast>) -> Ast {
+    if let Some(ast) = instead(node) {
+        return ast;
+    }
     let trivia = |c: &Element| matches!(c, Element::Token(t) if t.kind.is_trivia());
     let solid: Vec<(usize, &Element)> = node
         .children
@@ -53,7 +58,7 @@ pub fn lower(node: &Node, src: &str) -> Ast {
         .enumerate()
         .filter(|&(i, _)| !trailing(i))
         .map(|(_, (_, child))| match child {
-            Element::Node(n) => lower(n, src),
+            Element::Node(n) => lower(n, src, instead),
             Element::Token(t) => Ast::Token(t.kind, t.text(src).to_owned()),
         })
         .collect();

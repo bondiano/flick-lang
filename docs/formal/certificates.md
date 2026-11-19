@@ -71,9 +71,13 @@ Each certificate depends only on the axioms `propext`, `Classical.choice` and
 - **Coverage.** A `match` proves `Exh` by the shape of its unguarded arms
   (`formal/FormalCert/Match.lean`). Shapes are an arm `_` or `x`; `()`;
   `true | false`; one arm `K x̄` for each constructor of a generator type
-  (`exh_gen`, from the `closed` field of `GenSig`); and a record pattern
-  `{ℓ = x, ..}`. A `try` arm catches all of the body's errors with `x` or `_`,
+  (`exh_gen`, from the `closed` field of `GenSig`); one arm `E x̄` for each
+  error of a closed row matched at `Errors ε` (`exh_errs`, the pattern
+  `PatTy.err`); and a record pattern `{ℓ = x, ..}`. A `try` arm catches all of the body's errors with `x` or `_`,
   or the error `E` with an arm `E x̄` (`catches_all`, `catches_ctor`).
+- **(Errors-In).** A term the check gave the errors of a row from its error
+  type `E` is `.errVal` of its typing at `E`, with `E` in the row by `row_set`
+  (`cert/raise.rs` `errors_in`); the term need not be a value.
 
 - **Lists.** The core has no list. A literal `[x, y]` is the spine
   `Cons x (Cons y Nil)` of constructors only the signature has.

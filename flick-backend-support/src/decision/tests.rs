@@ -31,6 +31,15 @@ fn con(name: &str, arity: usize) -> Constructor {
     }
 }
 
+/// What a value names its constructor by: `K` of `M`, `N.K` of another module `N`.
+fn tag(c: &Constructor) -> String {
+    if c.module == "M" {
+        c.name.clone()
+    } else {
+        format!("{}.{}", c.module, c.name)
+    }
+}
+
 fn c(name: &str, args: Vec<Pat>) -> Pat {
     Pat::Con(con(name, args.len()), args)
 }
@@ -113,7 +122,7 @@ fn matches(p: &Pat, v: &V, binds: &mut Vec<(String, V)>) -> bool {
         }
         (Pat::Con(c, args), v) if c.rep == Rep::Unboxed => matches(&args[0], v, binds),
         (Pat::Con(c, args), V::Con(name, fields)) => {
-            c.name == *name && args.iter().zip(fields).all(|(p, v)| matches(p, v, binds))
+            tag(c) == *name && args.iter().zip(fields).all(|(p, v)| matches(p, v, binds))
         }
         (Pat::Or(alts), v) => alts.iter().any(|alt| {
             let mut own = Vec::new();
@@ -180,7 +189,7 @@ fn at(graph: &Graph, place: Place, v: &V) -> V {
 
 fn passes(test: &Test, v: &V) -> bool {
     match (test, v) {
-        (Test::Tag(c), V::Con(name, _)) => c.name == *name,
+        (Test::Tag(c), V::Con(name, _)) => tag(c) == *name,
         (Test::Lit(Lit::Int(n)), V::Int(m)) => n == m,
         (Test::Len { n, rest }, V::List(items)) => {
             if *rest {
@@ -460,4 +469,28 @@ fn tests_failing_to_one_arm_are_one_test() {
     );
     // the catch-all is written once, where the test fails
     assert_eq!(graph.reached(arms.len()), [1, 1], "{graph:#?}");
+}
+
+/// Errors of one name from two modules, which a `match` on a value of
+/// `Errors ε` meets, are two tests, and their fields two places.
+#[test]
+fn constructors_of_one_name_in_two_modules_are_two_tests() {
+    let not_found = |module: &str| Constructor {
+        module: module.into(),
+        ty: "NotFound".into(),
+        name: "NotFound".into(),
+        arity: 1,
+        rep: Rep::Tagged,
+        dicts: 0,
+    };
+    let arms = [
+        arm(Pat::Con(not_found("Http"), vec![bind("path")]), false),
+        arm(Pat::Con(not_found("Db"), vec![bind("id")]), false),
+    ];
+    let values = [
+        V::Con("Http.NotFound", vec![V::Int(1)]),
+        V::Con("Db.NotFound", vec![V::Int(2)]),
+    ];
+    let graph = agrees(&arms, &values);
+    assert_eq!(graph.places.len(), 3, "{graph:#?}");
 }

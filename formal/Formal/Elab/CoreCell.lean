@@ -21,7 +21,8 @@ theorem _root_.Flick.Typ.not_cell_pure {S : Sig} {Ψ Θ Γ e J} (h : Typ S Ψ Θ
     ∀ t, J = .ex t .pure → ¬ e.IsCell := by
   induction h with
   | conv _ _ ih => intro t hJ; cases hJ; exact ih _ rfl
-  | allI hv | errVal hv => intro t _ hc; cases hv <;> simp [Flick.Tm.IsCell] at hc
+  | errVal _ _ _ ih => intro t hJ; cases hJ; exact ih _ rfl
+  | allI hv => intro t _ hc; cases hv <;> simp [Flick.Tm.IsCell] at hc
   | lazy _ _ _ hφ => intro t hJ; cases hJ; exact fun _ => hφ
   | await _ hφ _ | force _ hφ _ => intro t hJ; cases hJ; exact fun _ => Stage.use_rt_le_ne_pure hφ rfl
   | _ => intro t hJ hc; cases hJ <;> simp [Flick.Tm.IsCell] at hc

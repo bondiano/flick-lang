@@ -62,6 +62,11 @@ pub(crate) enum Node<'a> {
     },
     ForceBroken(Document<'a>),
     NextBreakFits(Document<'a>, NextBreakFitsMode),
+    /// `flat` when it fits, as a group would print it, else `broken`.
+    Either {
+        flat: Document<'a>,
+        broken: Document<'a>,
+    },
     /// Reports the printer's position to the observer under this mark.
     Cursor(usize),
 }
@@ -277,7 +282,8 @@ impl<'a> Document<'a> {
                 Node::Group(inner)
                 | Node::Nest { doc: inner, .. }
                 | Node::ForceBroken(inner)
-                | Node::NextBreakFits(inner, _) => {
+                | Node::NextBreakFits(inner, _)
+                | Node::Either { flat: inner, .. } => {
                     doc = *inner;
                     continue;
                 }
