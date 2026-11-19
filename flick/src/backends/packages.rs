@@ -20,6 +20,7 @@ const ROUNDS: usize = 128;
 
 /// The backend's packages, with each runtime graph pinned.
 pub(crate) struct Report {
+    pub(crate) name: Option<String>,
     pub(crate) sources: Vec<PackageRoot>,
     pub(crate) runtime: Vec<RuntimeDependency>,
     pub(crate) diagnostics: Vec<Diagnostic>,
@@ -34,6 +35,7 @@ pub(crate) fn report(
     let patterns = backend.package_files();
     if patterns.is_empty() {
         return Ok(Report {
+            name: None,
             sources: Vec::new(),
             runtime: Vec::new(),
             diagnostics: Vec::new(),
@@ -53,6 +55,7 @@ pub(crate) fn report(
         if answer.needs.is_empty() {
             let runtime = answer.runtime.iter().map(pin).collect::<Result<_, _>>()?;
             return Ok(Report {
+                name: answer.name,
                 sources: answer.sources,
                 runtime,
                 diagnostics: answer.diagnostics,
@@ -72,6 +75,15 @@ pub(crate) fn report(
         }
     }
     Err(format!("the backend asked for more files {ROUNDS} times"))
+}
+
+/// Whether any file under `root` matches one of `patterns`.
+pub(crate) fn any_match(root: &Path, patterns: &[String]) -> bool {
+    let mut files = Vec::new();
+    patterns.iter().any(|p| {
+        matching(root, Path::new(""), p, &mut files);
+        !files.is_empty()
+    })
 }
 
 /// The file at `path`, asked for as `asked`; an absent one has no path.

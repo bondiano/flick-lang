@@ -422,6 +422,10 @@ fn files(dir: &Path) -> Vec<(PathBuf, Vec<u8>)> {
     while let Some(at) = pending.pop() {
         for entry in fs::read_dir(&at).expect("readable").flatten() {
             let path = entry.path();
+            // compiled backend components, which a check now loads to find packages
+            if path.is_dir() && entry.file_name() == "wasmtime" {
+                continue;
+            }
             if path.is_dir() {
                 pending.push(path);
             } else {

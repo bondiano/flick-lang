@@ -233,6 +233,7 @@ pub(crate) fn command_with_import(
 mod tests {
     use super::{FILE, artifact, command};
     use crate::backends::dependencies;
+    use crate::backends::{packages, runtimes};
     use flick_backend::{BackendId, BackendPin, BuildResult, Launch, LaunchKind, sha256};
     use std::{env, fs, process};
 
@@ -257,7 +258,7 @@ mod tests {
             sha256: sha256(b"component"),
         };
         // the launch verifies with the backend that made the build
-        crate::backends::runtimes::loaded(&pin, &crate::backends::packages::tests::js());
+        runtimes::loaded(&pin, &packages::tests::js());
         let result = BuildResult {
             artifacts: vec![flick_backend::Artifact {
                 id: "main".into(),
@@ -352,7 +353,7 @@ mod tests {
             sha256: sha256(b"component"),
         };
         // the launch verifies with the backend that made the build
-        crate::backends::runtimes::loaded(&pin, &crate::backends::packages::tests::js());
+        runtimes::loaded(&pin, &packages::tests::js());
         let result = BuildResult {
             artifacts: vec![flick_backend::Artifact {
                 id: "entry".into(),

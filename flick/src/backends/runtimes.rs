@@ -19,6 +19,12 @@ pub(super) fn loaded(pin: &BackendPin, backend: &Arc<WasmBackend>) {
     }
 }
 
+/// The backend of `pin`, if this process loaded it.
+pub(super) fn find(pin: &BackendPin) -> Option<Arc<WasmBackend>> {
+    let all = LOADED.lock().unwrap_or_else(PoisonError::into_inner);
+    (all.iter().find(|(p, _)| p == pin)).map(|(_, backend)| Arc::clone(backend))
+}
+
 /// The pins of the runtime packages `names`, as the backend of `pin`,
 /// loaded by this process, resolves them from the directory `dir`.
 pub(super) fn runtime_from(

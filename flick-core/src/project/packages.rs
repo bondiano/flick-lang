@@ -9,8 +9,6 @@
 
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
-
 use super::config::{self, Dependency, JsDependency, Kind, Source};
 use super::lock::{LOCK_FILE, Lock};
 use super::store;
@@ -54,30 +52,9 @@ pub struct Library {
     pub js_dependencies: Vec<JsDependency>,
 }
 
-#[derive(Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct Manifest {
-    name: Option<String>,
-    #[serde(default)]
-    pub(super) dependencies: serde_json::Map<String, serde_json::Value>,
-    #[serde(default)]
-    dev_dependencies: serde_json::Map<String, serde_json::Value>,
-    flick: Option<FlickField>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "kebab-case")]
-struct FlickField {
-    /// Where a source package keeps the modules its dependents compile.
-    source_dir: Option<String>,
-    /// The compiler a project pins; `flick` itself reads it.
-    #[serde(rename = "compiler")]
-    _compiler: Option<String>,
-}
-
-/// The `name` in the project's `package.json`, which owns its modules.
-pub fn project_name(host: &dyn Host, root: &Path) -> Option<String> {
-    manifest(host, &root.join("package.json"), &mut Vec::new())?.name
+/// The project's own name in its backend's ecosystem, which owns its modules.
+pub fn project_name(host: &dyn Host, project: &Project) -> Option<String> {
+    host.foreign(project).name
 }
 
 impl Packages {
@@ -102,32 +79,20 @@ impl Packages {
             diagnostics: &mut *diagnostics,
         }
         .add(root, dependencies);
-        let Some(project) = manifest(host, &root.join("package.json"), diagnostics) else {
-            return Packages { packages };
-        };
-        let names = project
-            .dependencies
-            .keys()
-            .chain(project.dev_dependencies.keys());
-        let installed = names
-            .filter(|name| !packages.iter().any(|p| p.name == **name))
-            .map(|name| {
-                let dir = root.join("node_modules").join(name);
-                let installed = manifest(host, &dir.join("package.json"), diagnostics);
-                let flick = installed.as_ref().and_then(|m| m.flick.as_ref());
-                let source_dir = flick
-                    .and_then(|f| f.source_dir.as_ref())
-                    .map(|s| super::normalize(&dir.join(s)));
-                Package {
-                    name: name.clone(),
-                    installed: installed.is_some(),
-                    source_dir,
-                    library: None,
-                    plugin: None,
-                    load: Vec::new(),
-                    hooks: Vec::new(),
-                    watch: Vec::new(),
-                }
+        // the packages of the backend's ecosystem, as it reports them
+        let foreign = host.foreign(project);
+        diagnostics.extend(foreign.diagnostics);
+        let installed = (foreign.packages.into_iter())
+            .filter(|f| !packages.iter().any(|p| p.name == f.name))
+            .map(|f| Package {
+                name: f.name,
+                installed: f.version.is_some(),
+                source_dir: f.source_dir.map(|dir| super::normalize(&root.join(dir))),
+                library: None,
+                plugin: None,
+                load: Vec::new(),
+                hooks: Vec::new(),
+                watch: Vec::new(),
             });
         packages.extend(installed.collect::<Vec<_>>());
         Packages { packages }
@@ -409,25 +374,5 @@ fn compiles_with(requirement: &str, version: &str) -> bool {
     ) {
         (Ok(requirement), Ok(version)) => requirement.matches(&version),
         _ => false,
-    }
-}
-
-/// `None` when the file is absent; an unreadable manifest is reported.
-pub(super) fn manifest(
-    host: &dyn Host,
-    path: &Path,
-    diagnostics: &mut Vec<Diagnostic>,
-) -> Option<Manifest> {
-    let bytes = host.read(path).ok()?;
-    match serde_json::from_slice(&bytes) {
-        Ok(manifest) => Some(manifest),
-        Err(err) => {
-            diagnostics.push(Diagnostic::new(
-                codes::P005,
-                Severity::Error,
-                format!("invalid `{}`: {err}", host.display(path)),
-            ));
-            Some(Manifest::default())
-        }
     }
 }

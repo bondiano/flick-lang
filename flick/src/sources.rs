@@ -6,9 +6,13 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::{env, fs, io};
 
+#[cfg(feature = "wasm-backends")]
+use crate::backends;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::plugin::Expander;
 use flick_core::plugin::reach::Outside;
+#[cfg(feature = "wasm-backends")]
+use flick_core::project::{Foreign, Project};
 use flick_core::project::{Host, is_companion};
 use flick_core::source::{FileId, SourceMap};
 
@@ -49,6 +53,11 @@ impl Host for FsHost {
 
     fn save(&self, key: &[u8], value: &[u8]) {
         plugins::save(key, value);
+    }
+
+    #[cfg(feature = "wasm-backends")]
+    fn foreign(&self, project: &Project) -> Foreign {
+        backends::foreign(project)
     }
 
     fn outside(&self) -> Option<Arc<dyn Outside>> {

@@ -94,12 +94,17 @@ let main () =
 ";
 
 /// A workspace of the contract package and a dependent `app` that emits
-/// `emit`, the package linked into its `node_modules` as pnpm links one.
+/// `emit`, the package linked into its `node_modules` as pnpm links one. A
+/// Go app names it in `[dependencies]` too: npm packages are the
+/// JavaScript backend's, which reports the Flick sources they ship.
 fn workspace(name: &str, app_main: &str, emit: &str, effect: bool) -> PathBuf {
-    let config = format!(
+    let mut config = format!(
         "{APP}\n[build]\nemit = \"{emit}\"\n{}",
         if effect { "effect = \"effect\"\n" } else { "" }
     );
+    if emit == "go" {
+        config.push_str("\n[dependencies]\ncontract = { path = \"../contract\" }\n");
+    }
     let package = if effect {
         "{ \"name\": \"@acme/app\", \"dependencies\": { \"@acme/contract\": \"workspace:*\", \"@flick-lang/effect-ts\": \"workspace:*\" } }\n"
     } else {

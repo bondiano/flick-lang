@@ -101,7 +101,7 @@ impl Prepared {
         pin: BackendPin,
     ) -> Self {
         let (program, files) = program(sources, compilation, by_class(project, output));
-        let package = project.and_then(|p| project::project_name(host, &p.root));
+        let package = project.and_then(|p| project::project_name(host, p));
         let mut data = Self {
             request: BuildRequest {
                 target: target(project, output),

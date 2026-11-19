@@ -102,7 +102,7 @@ macro_rules! wit_conversions {
             PackageRoot { package, version, root }
             RuntimeNode { name, version, dir, dependencies }
             RuntimeGraph { package, nodes }
-            Packages { sources, runtime, diagnostics, needs }
+            Packages { name, sources, runtime, diagnostics, needs }
             Launch { name, kind, artifact, runtime, arguments }
             BuildResult { artifacts, steps, runtime_dependencies, launches, diagnostics }
             }

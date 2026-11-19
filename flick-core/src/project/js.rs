@@ -4,13 +4,14 @@
 //! so pnpm installs and pins them as the project's own, and a foreign module
 //! of a library, which ships into the project's output, finds them.
 
+use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::path::Path;
 
 use super::config::JsDependency;
-use super::packages::{Packages, manifest};
+use super::packages::Packages;
 use super::{Host, Project};
-use crate::diagnostics::{Diagnostic, codes};
+use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::source::{FileId, SourceMap, Span};
 use crate::types;
 
@@ -297,5 +298,28 @@ mod tests {
             .expect("made");
         let value: serde_json::Value = serde_json::from_str(&made).expect("valid JSON");
         assert_eq!(value["dependencies"]["a"], "1");
+    }
+}
+
+// shortcut: the npm manifest stays here until install moves to the JavaScript backend in this change
+#[derive(Deserialize, Default)]
+struct Manifest {
+    #[serde(default)]
+    dependencies: serde_json::Map<String, serde_json::Value>,
+}
+
+/// `None` when the file is absent; an unreadable manifest is reported.
+fn manifest(host: &dyn Host, path: &Path, diagnostics: &mut Vec<Diagnostic>) -> Option<Manifest> {
+    let bytes = host.read(path).ok()?;
+    match serde_json::from_slice(&bytes) {
+        Ok(manifest) => Some(manifest),
+        Err(err) => {
+            diagnostics.push(Diagnostic::new(
+                codes::P005,
+                Severity::Error,
+                format!("invalid `{}`: {err}", host.display(path)),
+            ));
+            Some(Manifest::default())
+        }
     }
 }

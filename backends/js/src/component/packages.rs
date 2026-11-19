@@ -133,6 +133,7 @@ pub(super) fn packages(files: &[ProjectFile], options: &[OptionValue]) -> Packag
         }
     }
     Packages {
+        name: project["name"].as_str().map(str::to_owned),
         sources,
         runtime,
         diagnostics: Vec::new(),

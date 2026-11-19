@@ -393,7 +393,7 @@ impl BuildCommand {
         } else {
             output.out_dir.clone()
         };
-        let package = project::project_name(&FsHost::new(), &project.root).unwrap_or_default();
+        let package = project::project_name(&FsHost::new(), project).unwrap_or_default();
         let backend = format!("{} {:?}", output.backend.cache_identity(), output.purpose);
         let settings = format!(
             "{} {:?} {} {} {:?} {} {package} {backend}",

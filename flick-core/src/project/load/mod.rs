@@ -471,7 +471,7 @@ fn run_in(
     #[cfg(feature = "native-project")]
     {
         let own = project.filter(|_| !compiled.is_empty());
-        let own = own.and_then(|p| project_name(host, &p.root));
+        let own = own.and_then(|p| project_name(host, p));
         for c in &mut compiled {
             c.ir.package = c.package.clone().or_else(|| own.clone());
         }

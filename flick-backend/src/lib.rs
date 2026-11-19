@@ -164,6 +164,7 @@ pub trait Backend {
     fn packages(&self, files: &[ProjectFile], options: &[OptionValue]) -> Packages {
         let _ = (files, options);
         Packages {
+            name: None,
             sources: Vec::new(),
             runtime: Vec::new(),
             diagnostics: Vec::new(),

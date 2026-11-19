@@ -113,6 +113,7 @@ impl Backend for Literal {
             .into_iter()
             .collect();
         Packages {
+            name: None,
             sources: vec![],
             runtime,
             diagnostics: vec![],

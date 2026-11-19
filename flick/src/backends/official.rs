@@ -77,6 +77,17 @@ pub(super) fn known(id: &str, project: Option<&Project>) -> Option<BackendPin> {
         .map(|entry| pin_of(&entry))
 }
 
+/// The component of the official backend `id` and its pin without the
+/// network: a checkout's own, or the one `flick.lock` pins from the store.
+pub(super) fn local(id: &str, project: &Project) -> Option<(BackendPin, Vec<u8>)> {
+    if let Some(found) = checkout(id) {
+        return Some(found);
+    }
+    let entry = lock_entry(project, id)?;
+    let bytes = fs::read(stored_path(&entry.sha256)?).ok()?;
+    (fetch::hex(&Sha256::digest(&bytes)) == entry.sha256).then(|| (pin_of(&entry), bytes))
+}
+
 /// Whether `package`, a project's own pin, names an official component.
 pub(super) fn matches(package: &BackendPackage, project: &Project) -> bool {
     known(&package.id, Some(project))

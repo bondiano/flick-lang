@@ -9,6 +9,8 @@ mod dependencies;
 #[cfg(feature = "wasm-backends")]
 mod execute;
 #[cfg(feature = "wasm-backends")]
+mod foreign;
+#[cfg(feature = "wasm-backends")]
 pub(crate) mod launch;
 #[cfg(feature = "wasm-backends")]
 mod official;
@@ -22,6 +24,8 @@ mod runtimes;
 mod tools;
 #[cfg(feature = "wasm-backends")]
 pub(crate) use execute::Reads;
+#[cfg(feature = "wasm-backends")]
+pub(crate) use foreign::foreign;
 #[cfg(feature = "wasm-backends")]
 pub(crate) use tools::Tool;
 

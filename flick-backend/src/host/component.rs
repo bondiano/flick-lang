@@ -340,6 +340,7 @@ impl Backend for WasmBackend {
         }) {
             Ok(packages) => convert::packages(packages),
             Err(error) => Packages {
+                name: None,
                 sources: Vec::new(),
                 runtime: Vec::new(),
                 diagnostics: self.failure("packages", &error),

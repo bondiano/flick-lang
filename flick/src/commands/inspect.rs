@@ -7,7 +7,7 @@ pub use doc::doc;
 mod doc_run;
 mod example_host;
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::{Command as Process, Output};
 use std::{fs, io};
 
@@ -15,7 +15,7 @@ use flick_core::build::Extras;
 use flick_core::diagnostics::{Code, Diagnostic, Severity, codes};
 use flick_core::iface::Interface;
 use flick_core::project::config::Backend;
-use flick_core::project::{self, Analysis, Analyzed, Compilation, Host, Project, cache};
+use flick_core::project::{self, Analysis, Analyzed, Compilation, Project, cache};
 use flick_core::projection::Projected;
 use flick_core::source::SourceMap;
 use flick_core::types::builtins;
@@ -183,10 +183,12 @@ fn projected(explicit: Option<&str>, module: &str) -> Option<String> {
     let (project, roots) = select(&host, &mut sources, explicit, &[]).ok()?;
     let analysis = project::analyze(&host, &mut sources, project.as_ref(), &roots);
     let analyzed = analysis.module(module)?;
-    let root = project.as_ref().map(|p| p.root.as_path());
+    let name = project
+        .as_ref()
+        .and_then(|p| project::project_name(&host, p));
     let text = &sources.get(analyzed.file).text;
     let specifier = |m: &str| projection::relative(module, m);
-    let projected = projection_of(&host, &analysis, root, analyzed, text, &specifier);
+    let projected = projection_of(&analysis, name.as_deref(), analyzed, text, &specifier);
     serde_json::to_string_pretty(&projected).ok()
 }
 
@@ -194,20 +196,15 @@ fn projected(explicit: Option<&str>, module: &str) -> Option<String> {
 /// the modules it refers to by their interfaces, its imports at
 /// `specifier`'s paths.
 pub fn projection_of(
-    host: &impl Host,
     analysis: &Analysis,
-    root: Option<&Path>,
+    name: Option<&str>,
     module: &Analyzed,
     text: &str,
     specifier: &dyn Fn(&str) -> String,
 ) -> Projected {
     let fingerprint = project::analysis_fingerprint(&analysis.compilation);
     let lookup = |m: &str| interface_of(analysis, m);
-    let package = |m: &str| {
-        let own = analysis.module(m).is_some();
-        let name = root.and_then(|r| project::project_name(host, r));
-        own.then_some(name).flatten()
-    };
+    let package = |m: &str| analysis.module(m).and(name).map(str::to_owned);
     projection::project(module, text, &fingerprint, &lookup, &package, specifier)
 }
 

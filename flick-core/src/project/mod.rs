@@ -61,8 +61,9 @@ use std::io;
 #[cfg(test)]
 mod tests;
 
+use crate::diagnostics::Diagnostic;
 #[cfg(feature = "native-project")]
-use crate::diagnostics::{Diagnostic, Severity, codes};
+use crate::diagnostics::{Severity, codes};
 use crate::plugin::Expander;
 use crate::plugin::reach::Outside;
 use crate::source::FileId;
@@ -98,6 +99,32 @@ pub trait Host {
     fn outside(&self) -> Option<Arc<dyn Outside>> {
         None
     }
+    /// What the backend of `project` reports of its ecosystem's packages;
+    /// a host without backends reports none.
+    fn foreign(&self, project: &Project) -> Foreign {
+        let _ = project;
+        Foreign::default()
+    }
+}
+
+/// What a backend reports of its ecosystem's packages: the project's own
+/// name there, and the packages it declares, with the directories of the
+/// Flick modules those that ship them hold.
+#[derive(Debug, Clone, Default)]
+pub struct Foreign {
+    pub name: Option<String>,
+    pub packages: Vec<ForeignPackage>,
+    /// What is wrong with them, as the backend reports it.
+    pub diagnostics: Vec<Diagnostic>,
+}
+
+/// A package a project's ecosystem declares: not installed without a
+/// version, and shipping Flick modules from `source_dir`.
+#[derive(Debug, Clone)]
+pub struct ForeignPackage {
+    pub name: String,
+    pub version: Option<String>,
+    pub source_dir: Option<PathBuf>,
 }
 
 #[derive(Debug)]

@@ -185,6 +185,8 @@ interface types {
     /// what is wrong with them. With `needs`, the host reads those paths too,
     /// absolute or relative to the root, and asks again.
     record packages {
+        /// The project's own name in the backend's ecosystem.
+        name: option<string>,
         sources: list<package-root>,
         runtime: list<runtime-graph>,
         diagnostics: list<diagnostic>,
