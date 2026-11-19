@@ -252,7 +252,9 @@ and a typed SQL query, `sql { from u in Users; select u }`, are blocks of
 the plugin of `std`, not keywords: each word starts a block where a block
 may start, and is a name elsewhere. See
 [cli-dsl.md](../cli-dsl/) and [sql.md](../sql/). So are `suite "name" { … }`
-and `test "name" { … }`, only at the start of a top-level declaration (see
+and `test "name" { … }`, only at the start of a top-level declaration, and
+inside them `timeout` after a case's name and the hooks `before_all`,
+`before_each`, `after_each` and `after_all { … }` of a suite (see
 [testing.md](../testing/)).
 
 ### In the editor
