@@ -23,6 +23,17 @@ break programs.
   them to a group built by hand. Alike on Flick's runtime, through the
   Effect adapter and on Go.
 
+- **Added: `Resource.make` and `Scope.defer`, cleanup that sees the
+  outcome.** `Resource.make acquire release` acquires a value under a
+  mask and makes the innermost `scope` release it once, with the value and
+  how the body ended (`Exit.is_success`, `Exit.has_interrupts`); an
+  acquisition that fails registers nothing. `Scope.defer cleanup`
+  registers cleanup the same way without a value. Both run with the
+  scope's other finalizers, last registered first, after its children
+  ended, on the Effect adapter, Flick's own runtime and Go.
+  `Resource.acquire_release` and `Scope.add_finalizer` stay as the
+  low-level API.
+
 - **Test companions.** `src/App/Users.test.fl` beside `src/App/Users.fl`
   begins with `module App.Users`, without `exposing`, and sees every
   top-level declaration of the module, private ones included, without an

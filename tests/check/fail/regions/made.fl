@@ -1,0 +1,55 @@
+// A value `Resource.make` acquires is used only while its `scope` is live:
+// a closure or a task that uses it past the scope is `FLICK-G002`. Work
+// `Scope.defer` keeps runs when the scope ends, so a service it uses must
+// come from a provider that outlives the scope (`FLICK-G003`), and no
+// handler is left to answer a `control` operation (`FLICK-E017`).
+module App.MadeAfterClose exposing (..)
+
+type File (s : Region) = File String
+
+service Files =
+  read : forall s. File s ->{} String
+
+effect Emit =
+  control emit : String ->{} Unit
+
+say : String ->{} Unit
+let say line = Host.raw_stdout_line line
+
+files : Layer none none {Files}
+let files = Layer.succeed Files { read = fun (File name) -> name }
+
+open : String ->{Async, Scope s} File s
+let open name = Resource.make (task { File name }) (fun _ _ -> say "closed")
+
+used : Unit ->{Async} (Unit ->{Files} String)
+let used () = scope {
+  let file = open "f"
+  fun () -> Files.read file
+}
+
+used_task : Unit ->{Async} Eff {Files} none String
+let used_task () = scope {
+  let file = open "f"
+  task { Files.read file }
+}
+
+provided_inside : Unit ->{Async} Unit
+let provided_inside () = scope {
+  let file = open "f"
+  provide files { Scope.defer (fun _ -> say (Files.read file)) }
+}
+
+collect : (Unit ->{Emit} Unit) ->{} List String
+let collect body =
+  try body () with
+  | Emit.emit x -> [x] ++ resume ()
+  | return () -> []
+
+emitting : Unit ->{} List String
+let emitting () = collect (fun () -> scope { Scope.defer (fun _ -> Emit.emit "late") })
+
+//~ FLICK-G002 @28:13-28:28 does not keep live
+//~ FLICK-G002 @34:10-34:25 does not keep live
+//~ FLICK-G003 @40:19-40:30 the `provide` that builds `Files` releases it earlier
+//~ FLICK-E017 @50:46-50:57 `Detached {Emit}` does not hold

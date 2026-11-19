@@ -119,6 +119,7 @@ runtime/closing_hooks
 runtime/concurrency
 runtime/discontinued_body
 runtime/discontinued_fiber
+runtime/defer_make
 runtime/cleanup_control
 runtime/error_map
 runtime/exits
