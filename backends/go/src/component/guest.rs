@@ -25,3 +25,4 @@ impl Guest for Component {
     }
 }
 export_component!(Component);
+flick_backend::export_commands!(Component, Go);

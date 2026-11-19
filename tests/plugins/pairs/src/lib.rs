@@ -13,6 +13,12 @@
 //! outside their blocks are in `reach`, and those that tell other modules
 //! about a name in `published`.
 
+// the commands exist only in the component
+#[cfg(feature = "guest")]
+mod commands;
+
+#[cfg(feature = "guest")]
+use flick_plugin::command;
 mod derive;
 mod forms;
 mod published;
@@ -42,6 +48,19 @@ fn parts(state: &[u8]) -> (&[u8], &[u8]) {
 flick_plugin::export!(Pairs);
 
 impl Plugin for Pairs {
+    #[cfg(feature = "guest")]
+    fn commands(&self) -> Vec<command::Descriptor> {
+        commands::commands()
+    }
+
+    #[cfg(feature = "guest")]
+    fn run(
+        &self,
+        invocation: &command::Invocation,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        commands::run(invocation)
+    }
+
     /// The IR with each string `"hello"` as `"HELLO"`; a string `"break the
     /// IR"` becomes a local nothing binds, a module with a string `"move
     /// the package"` goes to another package, and one with `"hide the

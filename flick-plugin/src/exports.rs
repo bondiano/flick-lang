@@ -1,5 +1,8 @@
 //! The trait a plugin implements: the exports of its component.
 
+#[cfg(feature = "commands")]
+use flick_backend::command;
+
 use crate::{
     Arena, Artifact, Block, CallSite, Compiler, Completion, DeriveTarget, Diagnostic, Fact,
     Highlight, Hover, Piece, Published, Span, Structure,
@@ -127,5 +130,35 @@ pub trait Plugin {
     fn check_calls(&self, calls: &[CallSite], state: &[u8]) -> Vec<Diagnostic> {
         let _ = (calls, state);
         Vec::new()
+    }
+    /// The commands the plugin adds to `flick`.
+    #[cfg(feature = "commands")]
+    fn commands(&self) -> Vec<command::Descriptor> {
+        Vec::new()
+    }
+    /// The plan of the plan command `invocation.name`.
+    #[cfg(feature = "commands")]
+    fn run(
+        &self,
+        invocation: &command::Invocation,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        Err(command::unknown(&invocation.name))
+    }
+    /// The state of a new session of the session command `invocation.name`.
+    #[cfg(feature = "commands")]
+    fn open(&self, invocation: &command::Invocation) -> Result<Vec<u8>, Vec<command::Diagnostic>> {
+        Err(command::unknown(&invocation.name))
+    }
+    /// The answer to one request of a session.
+    #[cfg(feature = "commands")]
+    fn handle(&self, state: Vec<u8>, request: Vec<u8>) -> Result<command::Handled, String> {
+        let _ = (state, request);
+        Err("this plugin has no session command".into())
+    }
+    /// The plan of a session that ends.
+    #[cfg(feature = "commands")]
+    fn close(&self, state: Vec<u8>) -> command::Plan {
+        let _ = state;
+        command::Plan::empty()
     }
 }

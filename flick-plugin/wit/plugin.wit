@@ -422,4 +422,6 @@ world plugin {
   /// found there; `state` is what `collect` learned from that module's
   /// blocks, empty where it has none. It only adds diagnostics.
   export check-calls: func(calls: list<call-site>, state: list<u8>) -> list<diagnostic>;
+  /// The commands the plugin adds to `flick`.
+  export flick:command/command@0.1.0;
 }
