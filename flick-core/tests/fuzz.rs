@@ -3,8 +3,11 @@
 //! diagnostic span must lie inside the input, and inputs without errors must
 //! format idempotently and type-check without panicking. `FLICK_FUZZ_ITERATIONS` sets the number of mutated
 //! inputs (default 20 000; the nightly CI job runs 1 000 000 in release).
-//! The checker runs on the stack the compiler gives it.
+//! The checker runs on the stack the compiler gives it. Each input is written
+//! to `target/tmp/fuzz-input.fl` before it is parsed: after an abort, such as a
+//! stack overflow, which names no iteration, the file holds the input.
 
+use std::io::{Seek, SeekFrom, Write};
 use std::path::Path;
 use std::{env, fs, panic, thread};
 
@@ -140,8 +143,19 @@ fn survive_mutated_corpus() {
     .collect();
     assert!(!seeds.is_empty());
     let mut rng = Rng(0x5eed_f11c_0000_0001);
+    // one handle rewritten in place: reopening the file per input costs more
+    let mut current =
+        fs::File::create(Path::new(env!("CARGO_TARGET_TMPDIR")).join("fuzz-input.fl"))
+            .expect("a file for the current input");
     for i in 0..iterations {
         let input = mutate(&mut rng, &seeds[i % seeds.len()]);
+        current.set_len(0).expect("the current input is written");
+        current
+            .seek(SeekFrom::Start(0))
+            .expect("the current input is written");
+        current
+            .write_all(input.as_bytes())
+            .expect("the current input is written");
         let mut sources = SourceMap::default();
         let file = sources.add("fuzz.fl", input.as_str());
         let parsed = panic::catch_unwind(|| parse(&input, file))

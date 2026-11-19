@@ -25,8 +25,9 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: just@1.59.0
-      # the log keeps the count, the seed and the input a failure names, which
-      # the artifact below carries off the run
+      # the log keeps the count, the seed and the input a failure names; an
+      # abort names none, and target/tmp/fuzz-input.fl holds the input it
+      # stopped on. The artifact below carries both off the run
       - run: |
           set -o pipefail
           just fuzz 1000000 2>&1 | tee fuzz.log
@@ -34,7 +35,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: fuzz
-          path: fuzz.log
+          path: |
+            fuzz.log
+            target/tmp/fuzz-input.fl
           if-no-files-found: error
       - if: ${{ failure() }}
         run: |
@@ -44,6 +47,15 @@ jobs:
             echo '```'
             tail -40 fuzz.log
             echo '```'
+            if [ -f target/tmp/fuzz-input.fl ]; then
+              echo
+              echo "The input it stopped on (\`fuzz-input.fl\` in the artifact):"
+              echo
+              echo '```'
+              cat target/tmp/fuzz-input.fl
+              echo
+              echo '```'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
   # the performance baseline
