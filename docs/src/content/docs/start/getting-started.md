@@ -112,6 +112,9 @@ let main () = provide (Layer.merge Host.arguments Host.console) { run () }
 layers, so a test can call `run` with its own. `flick run -- Ada` prints
 `Hello, Ada!`.
 
+The first build downloads the JavaScript backend, a release asset the compiler
+does not hold, and pins it in `flick.lock`; later builds work offline.
+
 `flick check` type-checks without running anything, `flick build` writes the
 JavaScript to `dist/`, `flick test` runs the tests of the test root and
 `flick dev` rebuilds and restarts on every change. The [CLI reference](../../reference/cli/)

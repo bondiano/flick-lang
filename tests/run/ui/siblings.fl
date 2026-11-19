@@ -1,5 +1,5 @@
 // The lines of a `ui { … }` after its `let`s: two or more are the children
-// of one fragment, as `fragment` of them would be, and a branch of several
+// of one fragment, as `Ui.fragment` of them would be, and a branch of several
 // nodes is a `ui` of its own.
 module App.Main exposing (main)
 
@@ -28,11 +28,7 @@ let implicit = ui {
 }
 
 explicit : Ui
-let explicit = ui {
-  fragment
-    heading (text "a")
-    paragraph (text "b")
-}
+let explicit = Ui.fragment [Ui.heading [Ui.text "a"], Ui.paragraph [Ui.text "b"]]
 
 main : Unit ->{Host.Console, Async; AppError} Unit
 let main () = provide Atom.layer {

@@ -3,10 +3,11 @@ name: Packages
 # A tag `<package>-v<version>`, such as `std-v0.1.0`, releases the package of
 # `packages/<package>`: its source tarball, which a project names by
 # `{ url, sha256 }` or fetches by the tag with `{ git, tag, subdir }`. The
-# compiler's own tags, `v<version>`, do not match.
+# compiler's own tags, `v<version>`, do not match, nor do the backends',
+# `backend-<name>-v<version>`, which backends.yml releases.
 on:
   push:
-    tags: ["*-v*"]
+    tags: ["*-v*", "!backend-*"]
 
 permissions:
   contents: write

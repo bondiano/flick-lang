@@ -20,6 +20,20 @@ pub struct Lock {
     pub packages: Vec<Locked>,
     /// The components of the plugins of the dependencies, as `install` found them.
     pub plugins: Vec<LockedPlugin>,
+    /// The official backend the project builds with when it pins none.
+    pub backends: Vec<LockedBackend>,
+}
+
+/// An official backend component, a release asset kept in the package store
+/// by its digest.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LockedBackend {
+    pub id: String,
+    pub version: String,
+    pub sha256: String,
+    /// Where it was downloaded from.
+    pub url: String,
 }
 
 /// The WebAssembly component of the plugin of a dependency: a local one is
@@ -56,6 +70,8 @@ struct Raw {
     package: Vec<Locked>,
     #[serde(default)]
     plugin: Vec<LockedPlugin>,
+    #[serde(default)]
+    backend: Vec<LockedBackend>,
 }
 
 impl Locked {
@@ -105,6 +121,7 @@ impl Lock {
         Ok(Lock {
             packages: raw.package,
             plugins: raw.plugin,
+            backends: raw.backend,
         })
     }
 
@@ -137,6 +154,18 @@ impl Lock {
                 quote(&p.checksum)
             );
         }
+        let mut backends: Vec<&LockedBackend> = self.backends.iter().collect();
+        backends.sort_by(|a, b| a.id.cmp(&b.id));
+        for b in backends {
+            let _ = write!(
+                out,
+                "\n[[backend]]\nid = {}\nversion = {}\nsha256 = {}\nurl = {}\n",
+                quote(&b.id),
+                quote(&b.version),
+                quote(&b.sha256),
+                quote(&b.url)
+            );
+        }
         out
     }
 }
@@ -161,7 +190,7 @@ fn quote(text: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{Lock, Locked, LockedPlugin};
+    use super::{Lock, Locked, LockedBackend, LockedPlugin};
     use crate::project::config::Source;
     use crate::source::SourceMap;
 
@@ -178,6 +207,12 @@ mod tests {
                 name: "mysql".into(),
                 component: "../plugins/mysql/mysql.wasm".into(),
                 checksum: format!("sha256:{}", "1e".repeat(32)),
+            }],
+            backends: vec![LockedBackend {
+                id: "flick/js".into(),
+                version: "0.1.0".into(),
+                sha256: "2d".repeat(32),
+                url: "https://x/y/component.wasm".into(),
             }],
         };
         let text = lock.render();
