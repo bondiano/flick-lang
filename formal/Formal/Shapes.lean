@@ -28,7 +28,7 @@ theorem Shp.le {a b : Ty} {e : Tm}
       subst ha; subst hb
       exact .adt hU hUh (by rw [Ty.tcon_hd] at hTh ⊢; exact hTh)
         fun K hK => Sig.builds_vary (.of_hide hi hl heq hsub) (hB K hK)
-    | lit | rnil | rcons =>
+    | lit | rnil | rcons | err | errOpen =>
       have := congrArg Ty.kind ha
       rw [Ty.tcon_kind'] at this
       simp [Ty.kind] at this
@@ -41,7 +41,7 @@ theorem Shp.le {a b : Ty} {e : Tm}
       subst ha; subst hb
       exact .adt hU hUh (by rw [Ty.tcon_hd] at hTh ⊢; exact hTh)
         fun K hK => Sig.builds_vary ⟨hl, hr, hp, hn, hi⟩ (hB K hK)
-    | lit | rnil | rcons =>
+    | lit | rnil | rcons | err | errOpen =>
       have := congrArg Ty.kind ha
       rw [Ty.tcon_kind'] at this
       simp [Ty.kind] at this
@@ -190,10 +190,10 @@ theorem Typ.shape {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
   | allI =>
     intro _ _ _ hJ; cases hJ
     exact ⟨.hidden (by simp [Ty.Opaque, Ty.hd]), fun _ _ h => (h trivial).elim⟩
-  | errVal hv' h' hU hE ih =>
-    intro _ _ _ hJ; cases hJ
-    refine ⟨.hidden (by simp [Ty.Opaque, Ty.hd]),
-      fun K hK _ => .inr ⟨_, _, _, rfl, hU, (ih hv' rfl).1, h', hE⟩⟩
+  | errVal h' hU hE ih =>
+    intro hv _ _ hJ; cases hJ
+    refine ⟨.err (ih hv rfl).1 hU ⟨_, hE _ (.inl rfl)⟩,
+      fun K hK _ => .inr ⟨_, _, _, rfl, hU, (ih hv rfl).1, h', hE⟩⟩
   | app hf _ _ hT ih₁ ih₂ =>
     intro hv _ _ hJ; cases hJ
     cases hv with

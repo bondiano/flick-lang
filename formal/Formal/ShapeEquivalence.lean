@@ -128,6 +128,14 @@ private theorem Shp.equivCore {S : Sig} {fl a e} (hs : Shp S fl a e) :
   | adt hU hUh hTh hB _ =>
     intro _ b he
     exact .adt hU hUh (he.hd_adt hTh) fun K hK => (hB K hK).equiv he
+  | err hU hUh hm =>
+    intro _ b he
+    obtain ⟨ε', rfl, hε⟩ := he.symm.errors_right
+    exact .err hU hUh (by rw [hε.asRow]; exact hm)
+  | errOpen hm =>
+    intro _ b he
+    obtain ⟨ε', rfl, hε⟩ := he.symm.errors_right
+    exact .errOpen (by rw [hε.asRow]; exact hm)
 
 /-- Type congruence changes no shape observable by a value pattern. -/
 theorem Shp.equiv {S : Sig} {a b : Ty} {e : Tm} (hs : Shp S true a e)

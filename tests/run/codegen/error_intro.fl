@@ -1,0 +1,66 @@
+// A term of one error has the type of the errors of a row that holds it
+// (Errors-In), so a function gives several errors and a value of one error
+// goes where several are expected. The variable of a `try` takes a row
+// above what its body raises, which the patterns of a `match` tell, at the
+// top of an arm or inside it.
+module App.Main exposing (main)
+
+type error NotFound = NotFound String
+
+type error Timeout = Timeout Float
+
+type error Denied
+
+describe : Errors {NotFound, Timeout, Denied} -> String
+let describe e =
+  match e with
+  | NotFound what -> "no " ++ what
+  | Timeout _ -> "timed out"
+  | Denied -> "denied"
+
+problem_of : Float -> Errors {NotFound, Timeout, Denied}
+let problem_of code =
+  if code == 1 then Denied else if code == 2 then Timeout 30 else NotFound "user"
+
+fetch : Float ->{; NotFound} String
+let fetch n = if n > 1 then Fail.fail (NotFound "page") else "found"
+
+// the arms name an error the body does not raise
+caught : Float ->{} String
+let caught n =
+  try fetch n with
+  | e ->
+    match e with
+    | NotFound what -> "caught " ++ what
+    | Timeout _ -> "caught a timeout"
+
+// an arm for the rest leaves the row open
+rest : Float ->{} String
+let rest n =
+  try fetch n with
+  | e ->
+    match e with
+    | Timeout _ -> "a timeout"
+    | _ -> "something else"
+
+// a pattern inside an arm tells the row too
+paired : Float -> Bool ->{} String
+let paired n loud =
+  try fetch n with
+  | e ->
+    match (e, loud) with
+    | (NotFound what, true) -> "NOT FOUND: " ++ what
+    | (NotFound what, false) -> "not found: " ++ what
+    | (Denied, _) -> "denied"
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  Platform.stdout_line (describe (problem_of 1))
+  Platform.stdout_line (describe (problem_of 2))
+  Platform.stdout_line (describe (problem_of 3))
+  Platform.stdout_line (describe (Timeout 5))
+  Platform.stdout_line (caught 2)
+  Platform.stdout_line (caught 0)
+  Platform.stdout_line (rest 2)
+  Platform.stdout_line (paired 2 true)
+  Platform.stdout_line (paired 2 false)

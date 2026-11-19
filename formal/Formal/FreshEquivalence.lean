@@ -26,4 +26,24 @@ theorem Ty.YFMod.ref {n : Nat} {a : Ty} (h : (Ty.ref a).YFMod n) : a.YFMod n := 
   | rows hr _ => cases hr
   | ref ha => exact ha
 
+/-- An error of a row fixed by `kill n` is fixed by it: the row's elements are what `kill n`
+makes of them, which it fixes. -/
+theorem Ty.YFMod.of_err {n : Nat} {ε U : Ty} {E : Name} (h : (Ty.errors ε).YFMod n)
+    (hE : Row.Sub (Row.err E U) ε.asRow) : U.YFMod n := by
+  unfold Ty.YFMod at h ⊢
+  obtain ⟨_, he, hε⟩ := h.errors_right
+  injection he with he
+  subst he
+  have hm := hE _ (.inl rfl)
+  rw [← hε.asRow, ← Row.substT_asRow] at hm
+  simp only [Row.substT] at hm
+  rcases hm with ⟨c₀, -, hc⟩ | ⟨b, G, -, -, hb⟩
+  · obtain ⟨t₀, rfl⟩ := Quotient.exists_rep c₀
+    have ht := Ty.classOf_eq.mp (show (t₀.substT (kill n)).classOf = U.classOf from hc)
+    have hk : Ty.Equiv ((t₀.substT (kill n)).substT (kill n)) (U.substT (kill n)) :=
+      ht.substT (kill n)
+    rw [Ty.yf_kill n t₀] at hk
+    exact hk.symm.trans ht
+  · cases kill_asRow hb
+
 end Flick

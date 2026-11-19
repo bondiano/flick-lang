@@ -1,0 +1,32 @@
+module Main exposing (main)
+
+// What a module must export to be a `Text`.
+type module Text =
+  length : String -> Int
+  to_upper : String -> String
+
+type module Banner =
+  banner : String -> String
+
+// A module made from any module that meets `Text`.
+module Loud(T : Text) : Banner =
+  banner : String -> String
+  let banner word = "\{T.to_upper word}! (\{T.length word})"
+
+// A contract can describe a parameterized module too.
+type module Style = (T : Text) -> Banner
+
+module Framed(S : Style) : Banner =
+  module Inner = S(String)
+
+  banner : String -> String
+  let banner word = "[\{Inner.banner word}]"
+
+module Shout = Loud(String)
+
+module Boxed = Framed(Loud)
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  Platform.stdout_line (Shout.banner "flick")
+  Platform.stdout_line (Boxed.banner "flick")

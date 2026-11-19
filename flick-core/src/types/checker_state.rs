@@ -32,6 +32,9 @@ struct Checker<'a> {
     /// the GADT branches they are in.
     equalities: Vec<(Type, Span, Vec<Type>)>,
     gadt: gadt::branch::State,
+    /// While a pattern of a `match` is checked, the rows it added an error
+    /// to, each by the variable that stands for the rest of it.
+    error_rows: Option<Vec<Type>>,
     /// The aliases unification and subsumption are unfolding: one met again
     /// inside its own unfolding is compared by its arguments.
     unfolding: Vec<regions::AliasKey>,

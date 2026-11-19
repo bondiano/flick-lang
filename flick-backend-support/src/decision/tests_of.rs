@@ -2,7 +2,7 @@
 //! relate: the same test, or two no value passes both.
 
 use super::{Step, Test};
-use crate::ir::{EnumLit, Lit, Pat, Rep};
+use crate::ir::{Constructor, EnumLit, Lit, Pat, Rep};
 
 /// What `p` tests of its place, or `None` when it accepts anything.
 pub(super) fn test(p: &Pat) -> Option<Test<'_>> {
@@ -31,13 +31,19 @@ pub(super) fn parts(p: &Pat) -> (&[Pat], Option<&Pat>) {
     }
 }
 
-/// Whether two tests of one place are the same; the constructors of a
-/// place are of one type, so their names tell them apart.
+/// Whether two patterns name one constructor. The constructors of a place
+/// may be of several types, the errors of a row, and two of them of one
+/// name: `Http.NotFound` and `Db.NotFound`.
+fn same_con(c: &Constructor, d: &Constructor) -> bool {
+    c.name == d.name && c.ty == d.ty && c.module == d.module
+}
+
+/// Whether two tests of one place are the same.
 pub(super) fn same(a: Test<'_>, b: Test<'_>) -> bool {
     match (a, b) {
         (Test::Tag(x), Test::Tag(y))
         | (Test::Class(x), Test::Class(y))
-        | (Test::Enum(x), Test::Enum(y)) => x.name == y.name,
+        | (Test::Enum(x), Test::Enum(y)) => same_con(x, y),
         (Test::Lit(x), Test::Lit(y)) => x == y,
         (Test::Len { n: x, rest: rx }, Test::Len { n: y, rest: ry }) => x == y && rx == ry,
         _ => false,
@@ -46,7 +52,7 @@ pub(super) fn same(a: Test<'_>, b: Test<'_>) -> bool {
 
 pub(super) fn same_step(one: Step<'_>, other: Step<'_>) -> bool {
     match (one, other) {
-        (Step::Field(c, at), Step::Field(d, to)) => c.name == d.name && at == to,
+        (Step::Field(c, at), Step::Field(d, to)) => same_con(c, d) && at == to,
         (Step::Item(at), Step::Item(to)) | (Step::Rest(at), Step::Rest(to)) => at == to,
         (Step::Label(l), Step::Label(m)) => l == m,
         _ => false,
@@ -56,7 +62,7 @@ pub(super) fn same_step(one: Step<'_>, other: Step<'_>) -> bool {
 /// Whether no value passes both tests, two different ones.
 pub(super) fn exclusive(one: Test<'_>, other: Test<'_>) -> bool {
     match (one, other) {
-        (Test::Tag(c), Test::Tag(d)) => c.name != d.name,
+        (Test::Tag(c), Test::Tag(d)) => !same_con(c, d),
         (Test::Enum(c), Test::Enum(d)) => match (&c.rep, &d.rep) {
             (Rep::Literal(EnumLit::Int(m)), Rep::Literal(EnumLit::Int(n))) => m != n,
             (Rep::Literal(EnumLit::String(m)), Rep::Literal(EnumLit::String(n))) => m != n,

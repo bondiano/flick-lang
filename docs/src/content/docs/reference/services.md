@@ -150,6 +150,7 @@ A set may take parameters, as in `type alias Db s = {Scope s, Log}`.
 A set widens a signature: its callers must provide all of it, and tests must too.
 Use sets at the boundaries of modules, where many functions need the same things.
 Leave a small function its exact row, or let the row be inferred.
+The tour has a runnable [example](../../tour/sets/).
 
 ## Layers and `provide`
 
@@ -277,6 +278,7 @@ implementation inside a program. The layers that provide them, `Host.console`,
 `Host.process`, with `Host.live` for all six and `Host.browser_live` for the
 first three, are trusted adapters over the host's APIs. They are chosen at an
 entry: the launcher or the runner of `main`, a test runner, or a `provide`.
+The tour has a runnable [example](../../tour/host/).
 
 ```flick
 mode : Unit ->{Host.Environment} Option String

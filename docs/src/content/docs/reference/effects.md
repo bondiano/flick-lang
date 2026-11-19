@@ -312,6 +312,61 @@ let checked result =
   from_result result
 ```
 
+A `match` takes a value of `Errors e` apart by the errors of its row: an arm
+`NotFound id` matches the `NotFound` of the row. The arms without a guard
+cover every error of a closed row, or the `match` is `FLICK-T009`, whose fix
+adds the missing arms; a row with a variable also needs an arm for the rest,
+and an arm for an error outside a closed row is `FLICK-T003`. The `match` is
+pure and removes no error from a row. When the errors of the value are not
+known yet, as for the variable of a `try`, the patterns tell them, at the top
+of an arm or inside it: the row holds the errors they name, and stays open
+for the others when an arm without a guard matches every error:
+
+```flick
+# type alias UserId = String
+# type error NotFound = NotFound UserId
+# type error DbUnavailable = DbUnavailable
+# service Users =
+#   get : UserId ->{; NotFound, DbUnavailable} String
+#
+problem : Errors {NotFound, DbUnavailable} -> String
+let problem e =
+  match e with
+  | NotFound id -> "no user " ++ id
+  | DbUnavailable -> "try again later"
+
+name_or_problem : UserId ->{Users} String
+let name_or_problem id =
+  try Users.get id with
+  | e -> problem e
+```
+
+A value of one error goes where the errors of a row that holds it are
+expected: in an arm of a `match`, as the result of a function or as an
+argument. A function can so turn one row of errors into another, as
+`Exit.map_error` and `Layer.catch` take. This holds of the value, not of a
+type built of it: a function returning `NotFound` is no function returning
+`Errors {NotFound, DbUnavailable}`, so write `fun x -> f x` there. Where the
+expected row is not known yet, the first error makes it the row of that
+error alone; write the row where the value may be one of several:
+
+```flick
+# type alias UserId = String
+# type error NotFound = NotFound UserId
+# type error DbUnavailable = DbUnavailable
+# type error Http404 = Http404 UserId
+# type error Http503
+#
+to_http : Errors {NotFound, DbUnavailable} -> Errors {Http404, Http503}
+let to_http e =
+  match e with
+  | NotFound id -> Http404 id
+  | DbUnavailable -> Http503
+
+mapped : Exit {NotFound, DbUnavailable} String -> Exit {Http404, Http503} String
+let mapped exit = Exit.map_error to_http exit
+```
+
 `Fail.fail` fails with an error directly. The second row of an arrow is the
 effect `Fail`: `->{Fail {NotFound}; }` is `->{; NotFound}`, and an arm of a
 `try` catches it, written `| NotFound _ ->` or, in full,

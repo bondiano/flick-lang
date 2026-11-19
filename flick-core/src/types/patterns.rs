@@ -50,7 +50,7 @@ pub enum Ctor {
 
 pub use crate::syntax::patterns::is_pattern;
 
-impl Checker<'_> {
+impl<'c> Checker<'c> {
     /// Checks `node` against `ty` and brings its names into scope. A
     /// data qualifier bounds its fields too, including callback fields.
     #[allow(clippy::too_many_lines)]
@@ -297,7 +297,15 @@ impl Checker<'_> {
                 (label, pat)
             })
             .collect();
-        pats.sort_by(|a, b| a.0.cmp(&b.0));
+        // a few labels, each once: an insertion sort, which spares the
+        // browser compiler a sort of its own for these pairs
+        for i in 1..pats.len() {
+            let mut j = i;
+            while j > 0 && pats[j - 1].0 > pats[j].0 {
+                pats.swap(j - 1, j);
+                j -= 1;
+            }
+        }
         Pat::Record(pats)
     }
 
@@ -317,15 +325,10 @@ impl Checker<'_> {
     }
 
     fn constructor_pattern(&mut self, node: &Node, args: &[&Node], ty: &Type) -> Pat {
-        let parts: Vec<&str> = node
-            .child_tokens()
-            .filter(|t| matches!(t.kind, K::Con | K::Ident))
-            .map(|t| t.text(self.text))
-            .collect();
-        let Some((&name, qualifier)) = parts.split_last() else {
+        let Some((name, entity)) = self.pattern_constructor(node) else {
             return Pat::Wild;
         };
-        let Some(entity) = self.constructor(&qualifier.join("."), name, node) else {
+        let Some(entity) = entity else {
             for arg in args {
                 self.bind_pattern(arg, &Type::Error);
             }
@@ -375,7 +378,11 @@ impl Checker<'_> {
             return Pat::Wild;
         }
         if indexed.is_none() {
-            self.pattern_type(&self.whnf(&current), &self.whnf(ty), node);
+            let built = self.whnf(&current);
+            let matched = self
+                .error_element(&built, ty, node)
+                .unwrap_or_else(|| self.whnf(ty));
+            self.pattern_type(&built, &matched, node);
         }
         let mut args_pats = Vec::new();
         for (arg, param) in args
@@ -410,6 +417,22 @@ impl Checker<'_> {
             ),
             None => Pat::Wild,
         }
+    }
+
+    /// The name of the constructor a pattern names, and its entity: `None`
+    /// after a diagnostic or when its module could not be checked.
+    pub(super) fn pattern_constructor(
+        &mut self,
+        node: &Node,
+    ) -> Option<(&'c str, Option<iface::Entity>)> {
+        let text = self.text;
+        let parts: Vec<&'c str> = node
+            .child_tokens()
+            .filter(|t| matches!(t.kind, K::Con | K::Ident))
+            .map(|t| t.text(text))
+            .collect();
+        let (&name, qualifier) = parts.split_last()?;
+        Some((name, self.constructor(&qualifier.join("."), name, node)))
     }
 
     /// The entity of a constructor; `None` after a diagnostic or when its

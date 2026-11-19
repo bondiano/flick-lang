@@ -176,6 +176,31 @@ theorem PatTy.spine {fl p t Δ} (hp : PatTy S fl p t Δ) (hf : fl = false) :
     | _ => simp [matchP] at h
   | _ => cases hf
 
+/-- A value of `Errors ε` that the pattern of an error `T` without parameters matches has
+the type `T`, and the pattern's bindings, given how the pattern types a match (`ih`). -/
+theorem PatTy.err_match {Ψ Θ Γ p T Δ v δ ε} (hp : PatTy S false p (.adt T) Δ)
+    (ih : ∀ {v δ t'}, Value v → Typ S Ψ Θ Γ v (.ex t' .pure) → matchP p v = some δ →
+      (false = true → t' = .adt T) → (false = false → t'.kind ≠ 7 ∧ ResBelow S t' (.adt T)) →
+      (∃ Z, LeLive S Z t' ∧ SpW S Z (.adt T)) ∧ Inst S Ψ Θ Γ δ Δ)
+    (hvv : Value v) (hv : Typ S Ψ Θ Γ v (.ex (.errors ε) .pure)) (hm : matchP p v = some δ) :
+    Inst S Ψ Θ Γ δ Δ ∧ Typ S Ψ Θ Γ v (.ex (.adt T) .pure) := by
+  obtain ⟨K, k, ts, T, U, hK, hS, _, hU, hv', _⟩ := canonical_errors hvv hv
+  obtain ⟨K', k', ts', T', us, hS', hk', hr, hm'⟩ := hp.spine rfl
+  rw [hm' v δ hm] at hK; cases hK
+  rw [hS] at hS'; cases hS'
+  have hU7 : U.kind ≠ 7 := by rw [Ty.kind_of_hd hU]; decide
+  obtain ⟨_, _, ws, hr', hw⟩ := hv'.spine_res hvv (hm' v δ hm) hS rfl hU7 (Ty.not_all_of_hd hU)
+  -- an error's constructor builds the error type itself
+  obtain ⟨hnil, rfl⟩ := Ty.tcon_eq_adt hr.symm
+  have hrs : S.res K = [] := List.map_eq_nil_iff.mp hnil
+  rw [hrs] at hw
+  obtain rfl : ws = [] := Sig.Vary.nil hw
+  obtain ⟨⟨Z, hZ, hs⟩, i⟩ := ih hvv hv' hm (fun h => by cases h)
+    (fun _ => ⟨hU7, .inl (by rw [hr']; rfl)⟩)
+  rw [SpW.adt hs] at hZ
+  rw [LeLive.adt_eq hZ] at hv'
+  exact ⟨i, hv'⟩
+
 /-- Typing of `match(p, v)`. For a constructor spine (flag `false`) the type of
 the pattern is below the type of the value, at the same instance. -/
 theorem PatTy.typ_match {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ) :
@@ -257,6 +282,10 @@ theorem PatTy.typ_match {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ) :
     rcases matchP_or.mp hm with h | ⟨_, h⟩
     · exact ih₁ hvv hv h ht hk
     · exact ih₂ hvv hv h ht hk
+  | err hp _ ih =>
+    intro _ _ _ hvv hv hm ht _
+    obtain rfl := ht rfl
+    exact ⟨⟨_, LeLive.refl, .refl⟩, (hp.err_match ih hvv hv hm).1⟩
 
 /-- Matching at the type of a value. -/
 theorem PatTy.inst {Ψ Θ Γ p t Δ v δ} (hp : PatTy S true p t Δ) (hvv : Value v)
@@ -270,22 +299,6 @@ theorem HPat.inst {Ψ Θ Γ ε₀ p θ Δ v δ} (hp : HPat S ε₀ p θ Δ) (hvv
   cases hp with
   | wild => simp [matchP] at hm; subst hm; exact ⟨.nil, hv⟩
   | var => simp [matchP] at hm; subst hm; exact ⟨.cons hvv hv .nil, hv⟩
-  | ctor hp =>
-    obtain ⟨K, k, ts, T, U, hK, hS, _, hU, hv', _⟩ := canonical_errors hvv hv
-    obtain ⟨K', k', ts', T', us, hS', hk', hr, hm'⟩ := hp.spine rfl
-    rw [hm' v δ hm] at hK; cases hK
-    rw [hS] at hS'; cases hS'
-    have hU7 : U.kind ≠ 7 := by rw [Ty.kind_of_hd hU]; decide
-    obtain ⟨_, _, ws, hr', hw⟩ := hv'.spine_res hvv (hm' v δ hm) hS rfl hU7 (Ty.not_all_of_hd hU)
-    -- an error's constructor builds the error type itself
-    obtain ⟨hnil, rfl⟩ := Ty.tcon_eq_adt hr.symm
-    have hrs : S.res K = [] := List.map_eq_nil_iff.mp hnil
-    rw [hrs] at hw
-    obtain rfl : ws = [] := Sig.Vary.nil hw
-    obtain ⟨⟨Z, hZ, hs⟩, i⟩ := hp.typ_match hvv hv' hm (fun h => by cases h)
-      (fun _ => ⟨hU7, .inl (by rw [hr']; rfl)⟩)
-    rw [SpW.adt hs] at hZ
-    rw [LeLive.adt_eq hZ] at hv'
-    exact ⟨i, hv'⟩
+  | ctor hp => exact hp.err_match hp.typ_match hvv hv hm
 
 end Flick

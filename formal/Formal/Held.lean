@@ -241,7 +241,8 @@ theorem Typ.noIns {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → e.NoIns 
       rintro (h | h)
       · exact ih₁ hv₁ h
       · exact ih₂ hv₂ h
-  | errVal hv _ _ _ ih | allI hv _ ih => intro _; exact ih hv
+  | errVal _ _ _ ih => exact ih
+  | allI hv _ ih => intro _; exact ih hv
   | app _ _ _ _ ih₁ ih₂ =>
     intro hv
     cases hv with

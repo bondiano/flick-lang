@@ -269,6 +269,9 @@ impl<'t> Cx<'t> {
 
     /// A proof that `e` has type `t` where it stands.
     pub(super) fn typing(&mut self, e: &Term, t: &Type, col: usize) -> Result<String, Unsupported> {
+        if let Some(p) = self.errors_in(e, t, col)? {
+            return Ok(p);
+        }
         let pad = format!("\n{}", " ".repeat(col + 2));
         match e {
             Term::Lit(l) => lit(l).map(|_| ".lit".into()),

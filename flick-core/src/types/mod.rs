@@ -38,6 +38,7 @@ mod effects;
 mod elem;
 mod enums;
 mod env;
+mod error_match;
 mod exhaust;
 mod exports;
 mod facts;
@@ -363,6 +364,7 @@ fn checker_in<'a>(
             .any(|(name, _)| *name == module.name),
         sugar: Vec::new(),
         gadt: gadt::branch::State::default(),
+        error_rows: None,
         unfolding: Vec::new(),
     }
 }

@@ -46,7 +46,11 @@ impl Checker<'_> {
             }
             Type::Meta(_) => Ty::Refused("its type is not fully known".into()),
             Type::Error => Ty::Refused("its type has errors".into()),
-            Type::Tuple(_) => Ty::Refused("a tuple is outside the domain".into()),
+            Type::Tuple(items) => Ty::Data {
+                module: logic::TUPLES.into(),
+                name: "Tuple".into(),
+                args: items.iter().map(|t| self.logic_of(t, data)).collect(),
+            },
             Type::Record(_) => Ty::Refused("a record is outside the domain".into()),
             _ => Ty::Refused("this type is outside the domain".into()),
         }
