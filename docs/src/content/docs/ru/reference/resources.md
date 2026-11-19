@@ -1,12 +1,14 @@
 ---
 title: "Ресурсы и их освобождение"
-source_hash: 2424582952f75105
+source_hash: 6a310451878a7ce1
 ---
 
 `scope` владеет тем, что получено в нём, и освобождает это, когда его тело
 завершается ([регионы](../regions/)). Значение класса `Close` освобождается
 через `Resource.own`: область закрывает его один раз и передаёт закрытию
 исход своего тела, а никакой другой код закрыть его не может.
+`Resource.make` получает значение и регистрирует освобождение, которое
+видит исход, а `Scope.defer` регистрирует очистку, которая его видит.
 `Resource.acquire_release` и `Scope.add_finalizer` остаются
 низкоуровневым способом зарегистрировать освобождение.
 
@@ -74,7 +76,8 @@ close a: succeeded
 
 Область закрывается по фазам ([среда выполнения](../runtime/)): она
 прерывает свои дочерние задачи и ждёт их, затем запускает финализаторы,
-среди них и закрытия, которые зарегистрировал `own`, начиная с последнего.
+начиная с последнего зарегистрированного: среди них закрытия, которые
+регистрирует `own`, и освобождения из `Resource.make` и `Scope.defer`.
 Поэтому:
 
 - каждое значение во владении закрывается ровно один раз — после всего,
@@ -87,7 +90,110 @@ close a: succeeded
   тела; остальные закрытия всё равно выполняются.
 
 То же выполняется и в адаптере Effect, и в собственной среде выполнения
-Flick, и в Go (`tests/run/runtime/owned_close.fl`).
+Flick, и в Go (`tests/run/runtime/owned_close.fl`,
+`tests/run/runtime/defer_make.fl`).
+
+## Получение и отложенная очистка
+
+```flick
+make :
+  forall r s e a c.
+  (Detached r, Fiber.Outlives c s, Fiber.Provided r s) =>
+  (Eff r e a)^c -> (forall e2 b. a -> Exit e2 b ->{r} Unit)^c ->{Scope s | r; e} a^{s}
+# let make = Resource.make
+
+defer :
+  forall r s c.
+  (Detached r, Fiber.Outlives c s, Fiber.Provided r s) =>
+  (forall e b. Exit e b ->{r} Unit)^c ->{Scope s | r} Unit
+# let defer cleanup = Scope.defer cleanup
+```
+
+`Resource.make acquire release` выполняет `acquire` и делает ближайший
+`scope` (или `scope` региона `s`) владельцем значения: когда область
+завершается, `release` выполняется один раз со значением и исходом тела.
+Значение удерживает регион `s`, поэтому покинуть область не может. Между
+получением и этой регистрацией прерывание не вклинивается, а неуспешное
+получение ничего не регистрирует: для значения, которое не было получено,
+освобождение не выполняется, а значения, полученные до него, всё равно
+освобождаются. `Scope.defer cleanup` так же регистрирует `cleanup`, только
+без значения. Оба участвуют в порядке, описанном выше, и их работа видит
+исход так же, как `close_exit`.
+
+Освобождение может использовать регионы и сервисы, которые переживают
+область; более короткий регион или сервис, предоставленный внутри
+области, — это `FLICK-G003`, а операция `control`, на которую к тому
+времени не ответит ни один обработчик, — `FLICK-E017`. Эти ограничения
+компилятор проверяет при каждом вызове; функция, обобщённая по ним,
+указывает их явно, как это делает `make`.
+
+```flick
+type error Refused = Refused String
+
+say : String ->{} Unit
+let say line = Host.raw_stdout_line line
+
+ended : Exit e b -> String
+let ended exit = if Exit.is_success exit then "succeeded" else "failed"
+
+type Conn = Conn String
+
+disconnect : Conn -> Exit e b ->{} Unit
+let disconnect (Conn name) exit = say ("disconnect " ++ name ++ ": " ++ ended exit)
+
+connect : String ->{Async, Scope s} Conn^{s}
+let connect name =
+  Resource.make
+    (task {
+      say ("connect " ++ name)
+      Conn name
+    })
+    disconnect
+
+refuse : String ->{Async, Scope s; Refused} Conn^{s}
+let refuse name = Resource.make (task { Fail.fail (Refused name) }) disconnect
+
+session : Unit ->{Async; Refused} Unit
+let session () = scope {
+  let _a = connect "a"
+  Scope.defer (fun exit -> say ("log flushed: " ++ ended exit))
+  let _b = connect "b"
+  let _c = refuse "c"
+  say "not reached"
+}
+
+main : Unit ->{Async} Unit
+let main () =
+  scope {
+    let _a = connect "a"
+    Scope.defer (fun exit -> say ("deferred: " ++ ended exit))
+    let _b = connect "b"
+    say "body"
+  }
+  try session () with
+  | Refused name -> say ("refused " ++ name)
+```
+
+```text
+connect a
+connect b
+body
+disconnect b: succeeded
+deferred: succeeded
+disconnect a: succeeded
+connect a
+connect b
+disconnect b: failed
+log flushed: failed
+disconnect a: failed
+refused c
+```
+
+Замыкание или задача может удерживать полученное значение после его
+области, пока не использует его там; вызов, который использует его после
+области, например операция сервиса над ним, — это `FLICK-G002`
+([регионы](../regions/)). Проверки: `tests/check/pass/regions/made.fl`,
+`tests/check/fail/regions/made.fl`.
 
 ## Закрывает только владелец
 

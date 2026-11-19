@@ -5,8 +5,10 @@ title: "Resources and disposal"
 A `scope` owns what is acquired into it and releases it when its body ends
 ([regions](../regions/)). A value of a class `Close` is released through
 `Resource.own`: the scope closes it once, with how its body ended, and no
-other code can close it. `Resource.acquire_release` and
-`Scope.add_finalizer` stay as the low-level way to register a release.
+other code can close it. `Resource.make` acquires a value and registers a
+release that sees the outcome, and `Scope.defer` registers cleanup that
+sees it. `Resource.acquire_release` and `Scope.add_finalizer` stay as the
+low-level way to register a release.
 
 ## Owning a value
 
@@ -70,8 +72,9 @@ close a: succeeded
 ## Order and outcome
 
 A scope closes in phases ([runtime](../runtime/)): it interrupts its
-children and waits for them, then runs its finalizers, the closes `own`
-registered among them, last registered first. So:
+children and waits for them, then runs its finalizers, last registered
+first: the closes `own` registers and the releases of `Resource.make` and
+`Scope.defer` are among them. So:
 
 - each owned value is closed exactly once, after everything owned or
   acquired into the scope after it, and after the children of the scope
@@ -83,7 +86,108 @@ registered among them, last registered first. So:
   the scope, which keeps the cause of the body; the other closes still run.
 
 The same holds on the Effect adapter, on Flick's own runtime and in Go
-(`tests/run/runtime/owned_close.fl`).
+(`tests/run/runtime/owned_close.fl`, `tests/run/runtime/defer_make.fl`).
+
+## Acquiring and deferring
+
+```flick
+make :
+  forall r s e a c.
+  (Detached r, Fiber.Outlives c s, Fiber.Provided r s) =>
+  (Eff r e a)^c -> (forall e2 b. a -> Exit e2 b ->{r} Unit)^c ->{Scope s | r; e} a^{s}
+# let make = Resource.make
+
+defer :
+  forall r s c.
+  (Detached r, Fiber.Outlives c s, Fiber.Provided r s) =>
+  (forall e b. Exit e b ->{r} Unit)^c ->{Scope s | r} Unit
+# let defer cleanup = Scope.defer cleanup
+```
+
+`Resource.make acquire release` runs `acquire` and makes the innermost
+`scope` (or the one of region `s`) the owner of the value: when the scope
+ends, `release` runs once with the value and the outcome of the body. The
+value holds region `s`, so it cannot leave the scope. An interruption does
+not come between the acquisition and that registration, and an acquisition
+that fails registers nothing: no release runs for a value that was never
+acquired, while the values acquired before it are still released.
+`Scope.defer cleanup` registers `cleanup` the same way, without a value.
+Both take part in the order above, and their work sees the outcome as
+`close_exit` does.
+
+A release may use the regions and services that outlive the scope; a
+shorter region, or a service provided inside the scope, is `FLICK-G003`,
+and a `control` operation, which no handler would answer by then, is
+`FLICK-E017`. The compiler decides these constraints at each call; a
+function generic in them states them, as `make` does.
+
+```flick
+type error Refused = Refused String
+
+say : String ->{} Unit
+let say line = Host.raw_stdout_line line
+
+ended : Exit e b -> String
+let ended exit = if Exit.is_success exit then "succeeded" else "failed"
+
+type Conn = Conn String
+
+disconnect : Conn -> Exit e b ->{} Unit
+let disconnect (Conn name) exit = say ("disconnect " ++ name ++ ": " ++ ended exit)
+
+connect : String ->{Async, Scope s} Conn^{s}
+let connect name =
+  Resource.make
+    (task {
+      say ("connect " ++ name)
+      Conn name
+    })
+    disconnect
+
+refuse : String ->{Async, Scope s; Refused} Conn^{s}
+let refuse name = Resource.make (task { Fail.fail (Refused name) }) disconnect
+
+session : Unit ->{Async; Refused} Unit
+let session () = scope {
+  let _a = connect "a"
+  Scope.defer (fun exit -> say ("log flushed: " ++ ended exit))
+  let _b = connect "b"
+  let _c = refuse "c"
+  say "not reached"
+}
+
+main : Unit ->{Async} Unit
+let main () =
+  scope {
+    let _a = connect "a"
+    Scope.defer (fun exit -> say ("deferred: " ++ ended exit))
+    let _b = connect "b"
+    say "body"
+  }
+  try session () with
+  | Refused name -> say ("refused " ++ name)
+```
+
+```text
+connect a
+connect b
+body
+disconnect b: succeeded
+deferred: succeeded
+disconnect a: succeeded
+connect a
+connect b
+disconnect b: failed
+log flushed: failed
+disconnect a: failed
+refused c
+```
+
+A closure or a task may keep an acquired value past its scope as long as
+it does not use it there; a call that uses it past the scope, such as an
+operation of a service on it, is `FLICK-G002`
+([regions](../regions/)). Fixtures: `tests/check/pass/regions/made.fl`,
+`tests/check/fail/regions/made.fl`.
 
 ## Only the owner closes
 

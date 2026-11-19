@@ -1,0 +1,47 @@
+// A value `Resource.make` acquires holds the region of its `scope`: a
+// closure or a task that keeps it without using it may leave the scope,
+// and code inside the scope uses it. Work `Scope.defer` keeps may use the
+// value and services whose providers outlive the scope; a function generic
+// in those services states it with `Fiber.Provided`.
+module App.Made exposing (..)
+
+type File (s : Region) = File String
+
+service Files =
+  read : forall s. File s ->{} String
+
+say : String ->{} Unit
+let say line = Host.raw_stdout_line line
+
+open : String ->{Async, Scope s} File s
+let open name =
+  Resource.make (task { File name }) (fun _ exit ->
+    say (if Exit.is_success exit then "closed" else "closed early")
+  )
+
+held : Unit ->{Async} (Unit ->{} Unit)
+let held () = scope {
+  let file = open "f"
+  fun () -> ignore file
+}
+
+held_task : Unit ->{Async} Eff {} none Unit
+let held_task () = scope {
+  let file = open "f"
+  task { ignore file }
+}
+
+inside : Unit ->{Async, Files} String
+let inside () = scope {
+  let file = open "f"
+  Files.read file
+}
+
+deferred : Unit ->{Async, Files} Unit
+let deferred () = scope {
+  let file = open "f"
+  Scope.defer (fun _ -> say (Files.read file))
+}
+
+logged : (Detached r, Fiber.Provided r s) => (Unit ->{r} Unit) ->{Scope s | r} Unit
+let logged log = Scope.defer (fun _ -> log ())

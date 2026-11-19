@@ -2,7 +2,8 @@
 //! printing what the JS and Go builds print: each is in
 //! `tests/run/portable.txt`, whose cases `just e2e` compares on both
 //! targets with the same `.stdout`.
-//! Every other case of `tests/run` is in `tests/run/model_gaps.txt` with what
+//! Every other case of `tests/run` is in `tests/run/model_gaps.txt` (the
+//! `stdlib/` ones in `model_gaps_stdlib.txt`) with what
 //! stops the model, so a case is run here or says why it is not.
 
 use std::path::{Path, PathBuf};
@@ -284,7 +285,8 @@ fn gap(case: &str, portable: bool) -> Option<String> {
     }
 }
 
-/// The cases the model does not run say why, in `tests/run/model_gaps.txt`:
+/// The cases the model does not run say why, in `tests/run/model_gaps.txt`
+/// and, for `stdlib/`, `model_gaps_stdlib.txt`:
 /// a case that begins to run moves to `model.txt`, a new case is run or says
 /// why not, and a reason that changes is written again.
 #[test]
@@ -304,7 +306,9 @@ fn a_case_the_model_does_not_run_says_why() {
             }
         })
         .collect();
-    let text = fs::read_to_string(root().join("model_gaps.txt")).expect("the list of gaps");
+    let text = ["model_gaps.txt", "model_gaps_stdlib.txt"]
+        .map(|name| fs::read_to_string(root().join(name)).expect("a list of gaps"))
+        .join("\n");
     let written: Vec<&str> = text
         .lines()
         .filter(|line| !line.is_empty() && !line.starts_with('#'))
@@ -320,7 +324,7 @@ fn a_case_the_model_does_not_run_says_why() {
         .collect();
     assert!(
         changed.is_empty(),
-        "tests/run/model_gaps.txt is not what the model does:\n{}",
+        "tests/run/model_gaps.txt (stdlib/ in model_gaps_stdlib.txt) is not what the model does:\n{}",
         changed.join("\n")
     );
 }

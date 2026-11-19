@@ -1,7 +1,7 @@
 /// The lexical `scope` as functions: the owner of a region releases what
 /// was acquired into it when the block ends. These add work of its own to
 /// that release.
-module Scope exposing (run, add_finalizer, add_finalizer_exit)
+module Scope exposing (run, add_finalizer, add_finalizer_exit, defer)
 
 import Fiber
 
@@ -29,4 +29,12 @@ foreign effect add_finalizer from "flick:Scope" "flickAddFinalizer"
 /// its body succeeded, the cause otherwise.
 add_finalizer_exit : (Option RawCause ->{r} Unit)^c ->{Scope s | r} Unit
 foreign effect add_finalizer_exit from "flick:Scope" "flickAddFinalizerExit"
+  retention owner
+
+/// Runs `cleanup` once when the owner of region `s` closes, after the
+/// resources acquired later are released and its children ended, with how
+/// the body of the `scope` ended (`Exit.is_success`, `Exit.has_interrupts`);
+/// the errors and the value of the body stay opaque.
+defer : (forall e b. Exit e b ->{r} Unit)^c ->{Scope s | r} Unit
+foreign effect defer from "flick:Scope" "flickAddClose"
   retention owner
