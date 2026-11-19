@@ -64,16 +64,3 @@ impl Checking<'_> {
         errors
     }
 }
-
-/// What a test companion sees of its module: its exports and every other
-/// top-level declaration, constructors of exported types included.
-fn private_view(exported: &Interface, declarations: &Interface) -> Interface {
-    let mut view = exported.clone();
-    for export in &declarations.exports {
-        if !view.exports.iter().any(|e| e.entity == export.entity) {
-            view.exports.push(export.clone());
-        }
-    }
-    view.hidden.clear();
-    view
-}
