@@ -1,0 +1,30 @@
+== nested
+open a
+open b
+open c
+inner body
+release c: succeeded
+outer body
+release b: succeeded
+deferred: succeeded
+release a: succeeded
+== children
+open parent
+open child
+body ends
+release child: interrupted
+release parent: succeeded
+== a failed acquisition
+open kept
+open refused fails
+release kept: failed
+failed: refused
+== a failing body
+open f
+deferred: failed
+release f: failed
+body failed
+== interrupted
+open t
+release t: interrupted
+timed out
