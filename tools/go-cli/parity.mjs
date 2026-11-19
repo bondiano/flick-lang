@@ -10,7 +10,7 @@ const src = new URL("../../packages/effect-ts/src/cli/", import.meta.url);
 const { cliRunVersion, cliHelpDoc } = await import(new URL("run.ts", src).href);
 const { cliDefaultFormatter } = await import(new URL("output.ts", src).href);
 const S = await import(new URL("spec.ts", src).href);
-const { Console, Effect, Exit, Option, Result } = await import("../../packages/effect-ts/node_modules/effect/dist/index.js");
+const { Console, Context, Effect, Exit, Option, Result } = await import("../../packages/effect-ts/node_modules/effect/dist/index.js");
 const TestConsole = await import("../../packages/effect-ts/node_modules/effect/dist/testing/TestConsole.js");
 
 const text = { parse: (t) => Effect.succeed(Result.succeed(t)) };
@@ -98,10 +98,17 @@ const corpus = [
   ["--wizard=maybe", "greet", "Ada"],
 ];
 
+// the CLI reads NO_COLOR and its defaults through Host.Environment: this one holds NO_COLOR only
+const withHost = Effect.provideService(Context.Service("Host.Environment"), {
+  env: (name) => Effect.succeed(name === "NO_COLOR" ? Option.some("1") : Option.none()),
+  vars: () => Effect.succeed([["NO_COLOR", "1"]]),
+});
+
 const run = (effect) =>
   Effect.runPromise(
     Effect.flatMap(TestConsole.make, (console) =>
       effect.pipe(
+        withHost,
         Effect.exit,
         Effect.provideService(Console.Console, console),
         Effect.flatMap((exit) =>
@@ -132,7 +139,7 @@ for (const args of corpus) {
 // `Cli.default_formatter false`
 const plain = cliDefaultFormatter(false);
 for (const path of [[], ["greet"], ["remote", "add"]]) {
-  const doc = await Effect.runPromise(cliHelpDoc(path, tool));
+  const doc = await Effect.runPromise(withHost(cliHelpDoc(path, tool)));
   blocks.push([`help [${path.join(" ")}]`, plain.formatHelpDoc(doc)].join("\n"));
 }
 writeFileSync(new URL("../../runtime-go/flickrt/testdata/cli_parity.txt", import.meta.url), blocks.join("\n\n") + "\n");
