@@ -1,0 +1,28 @@
+// What the fixtures of a suite may use: only those declared before them, a
+// shared one only shared ones, and so may the hooks that run for no test;
+// a `parallel` suite shares only `concurrent` fixtures.
+module App.FixturesTest
+
+suite "order" {
+  fixture first = await first
+  fixture second = await third
+  fixture third = 3
+  fixture third = 4
+  fixture shared total = await third
+
+  before_all { ignore (await third) }
+
+  test "runs" {}
+}
+//~ std/T003 @7:25-7:30 fixture `first` uses itself
+//~ std/T003 @8:26-8:31 fixture `second` uses `third`, declared after it
+//~ std/T002 @10:11-10:16 another fixture of this suite is named `third` too
+//~ std/T003 @11:32-11:37 shared fixture `total` uses `third`, which each test makes anew
+//~ std/T003 @13:30-13:35 `before_all` runs for no test, so it cannot use `third`
+
+suite parallel "at once" {
+  fixture shared pool = 1
+
+  test "runs" { ignore (await pool) }
+}
+//~ std/T004 @24:11-24:17 must say that they may use it at once

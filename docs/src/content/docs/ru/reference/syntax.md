@@ -1,6 +1,6 @@
 ---
 title: "Синтаксис"
-source_hash: 743ceb1713e801ac
+source_hash: 601582615b8131aa
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -270,9 +270,10 @@ in when for yield do break continue
 где блок может начаться, и остаётся именем в остальных местах. См.
 [Приложения командной строки](../cli-dsl/) и [SQL](../sql/). Таковы же
 `suite "name" { … }` и `test "name" { … }`, но только в начале объявления
-верхнего уровня, а внутри них — `timeout` после имени случая и хуки набора
-`before_all`, `before_each`, `after_each` и `after_all { … }` (см.
-[Тестирование](../testing/)).
+верхнего уровня, а внутри них — `timeout` после имени случая, `parallel`
+перед именем набора, хуки набора `before_all`, `before_each`, `after_each`
+и `after_all { … }` и его `fixture name = …`, в том числе `fixture shared`
+и `fixture shared concurrent` (см. [Тестирование](../testing/)).
 
 ### Подсказки в редакторе
 
