@@ -161,6 +161,10 @@ prints, and `#guard_msgs` turns the difference into an error.
 #guard_msgs in
 #print axioms Flick.RT.R9
 
+/-- info: 'Flick.RT.R9_again' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.RT.R9_again
+
 /-- info: 'Flick.Refine.sound' depends on axioms: [propext] -/
 #guard_msgs in
 #print axioms Flick.Refine.sound

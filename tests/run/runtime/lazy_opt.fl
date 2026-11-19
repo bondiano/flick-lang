@@ -1,7 +1,8 @@
 // The cells a release build need not make (`docs/formal/lazy.md` §6) behave
 // as made: a lazy nothing reads never runs its task, nor one a function takes
 // and drops; a lazy of a value gives it to every `await`; a lazy forced
-// where it is made runs its task once, there.
+// where it is made runs its task once, there; an `await` after the first one
+// gives what the first gave.
 module App.Main exposing (main)
 
 counted : Ref Int -> Int ->{} Int
@@ -19,5 +20,9 @@ let main () =
   let kept = dropped (lazy { counted runs 2 }) 3
   let five = lazy { 5 }
   let direct = await (lazy { counted runs 21 })
+  let again = lazy { counted runs 4 }
+  let first = await again
+  let twice = fun () -> await again
   Platform.stdout_line "\{kept} \{await five + await five} \{direct}"
+  Platform.stdout_line "\{first + await again + twice ()}"
   Platform.stdout_line "runs: \{Ref.get runs}"
