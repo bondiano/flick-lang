@@ -1,0 +1,20 @@
+// A `ui { … }` on one line: `;` separates its lines, as in braces, so two
+// children are a fragment of them and a `let` comes before them, and every
+// line is checked. Other code after the body, which `flick fmt` cannot lay
+// out, is refused in `flick/tests/cli/check_command.rs`. Unformatted on
+// purpose: `flick fmt` puts each line on a line of its own.
+module App.OneLine exposing (..)
+
+pair : Ui
+let pair = ui { text "a"; text "b" }
+
+named : String -> Ui
+let named name = ui { let shown = "hi \{name}"; heading (text shown); text "!" }
+
+unknown : Ui
+let unknown = ui { text "a"; no_such_name }
+//                           ^^^^^^^^^^^^ FLICK-T001 cannot find value `no_such_name`
+
+number : Ui
+let number = ui { text "a"; 1 }
+//                          ^ FLICK-T003 expected `Ui`, found `Int`

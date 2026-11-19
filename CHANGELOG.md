@@ -6,6 +6,40 @@ break programs.
 
 ## Unreleased
 
+- **Test fixtures.** A `suite` holds `fixture name = expression`, which its
+  cases and hooks read with `await name`: made the first time a case awaits
+  it, once for that case, or with `fixture shared` once for the run of the
+  suite; one no code awaits is never made. A fixture may use those declared
+  before it (`std/T003` otherwise), a shared one only shared ones, as may
+  `before_all` and `after_all`. Each runs in a scope of its own, released
+  after the case's `after_each` hooks, or the suite's `after_all`, in the
+  reverse order the fixtures were made; `Fixture.cleanup` releases a value
+  then, and a value `Resource.own`s sees how its case ended, so a
+  transaction rolls back when its case fails. A suite with a shared fixture
+  runs its cases one at a time, also under `--jobs`, unless it is `suite
+  parallel`, which shares only `fixture shared concurrent` ones
+  (`std/T004`); `Test.serial` does the same by hand. A fixture's value holds
+  no region. Alike on Flick's runtime, through the Effect adapter and on Go.
+  A `before_all` or `after_all` hook that acquires into its scope now
+  acquires into the suite's, not the scope of the case that set it up, on
+  Flick's runtime and through the Effect adapter.
+
+- **Several children in `ui { … }` without `fragment`.** After its `let`s,
+  two or more lines of a `ui` block are the children of one `Ui.fragment`,
+  as the children of an element already stand one by one; one line is the
+  node itself, as before. Two lines were `FLICK-T011` until now, so no
+  program that compiled changes meaning. A `let` after the first child is
+  the new `FLICK-T085`, whose safe fix moves it above that child when that
+  changes nothing. A branch of `if` or `match` with several nodes is a
+  `ui { … }` of its own, and `fragment` stays the function it was. A
+  plugin's `Open` names the function with its new `siblings` field.
+
+- **A one-line `ui { … }` keeps all its code.** On the line of `ui {`, the
+  body was the longest expression from its first token, and what followed
+  was dropped without a diagnostic: `ui { text "a"; no_such_name }` checked.
+  Now `;` separates its lines, as in braces, so `ui { a; b }` is two
+  children, and any other code after the body is `std/U010`.
+
 - **Test hooks and timeouts.** A `suite` holds `before_all`, `before_each`,
   `after_each` and `after_all { … }`, which run around the cases of the
   suite that the run selects: setup outer to inner, cleanup inner to outer,

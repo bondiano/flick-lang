@@ -509,6 +509,7 @@ fn opens(
         module: "Pairs".into(),
         child: None,
         through,
+        siblings: None,
         body,
     }))
 }

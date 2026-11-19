@@ -584,6 +584,10 @@
     "named": false
   },
   {
+    "type": "concurrent",
+    "named": false
+  },
+  {
     "type": "constructor",
     "named": true
   },
@@ -622,6 +626,10 @@
   },
   {
     "type": "false",
+    "named": false
+  },
+  {
+    "type": "fixture",
     "named": false
   },
   {
@@ -718,6 +726,10 @@
     "named": false
   },
   {
+    "type": "parallel",
+    "named": false
+  },
+  {
     "type": "provide",
     "named": false
   },
@@ -739,6 +751,10 @@
   },
   {
     "type": "service",
+    "named": false
+  },
+  {
+    "type": "shared",
     "named": false
   },
   {

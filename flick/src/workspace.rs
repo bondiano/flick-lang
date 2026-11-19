@@ -21,7 +21,6 @@ pub fn members(args: &CommandArguments) -> Result<Option<Vec<String>>, Outcome> 
     let projectless = matches!(
         args.cmd,
         Commands::Lsp(_)
-            | Commands::ContentMapper(_)
             | Commands::New(_)
             | Commands::Init(_)
             | Commands::Explain(_)

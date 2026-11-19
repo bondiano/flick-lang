@@ -71,6 +71,9 @@ pub struct Typing {
     /// elements of the list their function takes last, by the range of the
     /// application.
     pub gathered: HashMap<Range, usize>,
+    /// The blocks of lines whose expression lines are the list a function
+    /// of them takes, as a `ui` of several: the function, by the block.
+    pub siblings: HashMap<Range, Ref>,
     /// The applications of a value a block applies through a function, as a
     /// foreign component inside `ui`: the function, by its module and name.
     pub through: HashMap<Range, Ref>,

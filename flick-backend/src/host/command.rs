@@ -126,6 +126,44 @@ pub fn plan(p: w::Plan) -> n::Plan {
         diagnostics: diagnostics(p.diagnostics),
         stdout: p.stdout,
         resume: p.resume,
+        needs: p.needs.into_iter().map(need).collect(),
+    }
+}
+
+fn need(n: w::Need) -> n::Need {
+    match n {
+        w::Need::Typescript(s) => n::Need::Typescript(n::Source {
+            path: s.path,
+            text: s.text,
+        }),
+    }
+}
+
+pub fn answer_wire(a: &n::Answer) -> w::Answer {
+    match a {
+        n::Answer::Typescript(module) => w::Answer::Typescript(module.as_ref().map(|m| {
+            w::TypescriptModule {
+                path: m.path.clone(),
+                source: m.source.clone(),
+                text: m.text.clone(),
+                spans: (m.spans.iter())
+                    .map(|s| w::TsSpan {
+                        ts_start: s.ts_start,
+                        ts_end: s.ts_end,
+                        fl_start: s.fl_start,
+                        fl_end: s.fl_end,
+                        exact: s.exact,
+                    })
+                    .collect(),
+            }
+        })),
+    }
+}
+
+pub fn opened(o: w::Opened) -> n::Opened {
+    match o {
+        w::Opened::Session(state) => n::Opened::Session(state),
+        w::Opened::Plan(p) => n::Opened::Plan(plan(p)),
     }
 }
 
@@ -133,5 +171,6 @@ pub fn handled(h: w::Handled) -> n::Handled {
     n::Handled {
         state: h.state,
         response: h.response,
+        needs: h.needs.into_iter().map(need).collect(),
     }
 }

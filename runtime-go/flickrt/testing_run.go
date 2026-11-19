@@ -56,6 +56,34 @@ func TestAfterEach(task Value) Value {
 }
 func TestAfterAll(task Value) Value { return &test{name: "after_all", when: "after_all", task: task} }
 
+// TestSerial is Test.serial: the test, and each test in it, run one at a time.
+func TestSerial(t Value) Value {
+	copied := *t.(*test)
+	copied.serial = true
+	return &copied
+}
+
+// jobsOf is the selected tests by job, as indexes: the tests of one
+// Test.serial in one job, run one at a time, where the first of them
+// stands, and each other test in a job of its own.
+func jobsOf(selected []named) [][]int {
+	var jobs [][]int
+	serial := map[*test]int{}
+	for i, t := range selected {
+		if t.serial == nil {
+			jobs = append(jobs, []int{i})
+			continue
+		}
+		if at, ok := serial[t.serial]; ok {
+			jobs[at] = append(jobs[at], i)
+			continue
+		}
+		serial[t.serial] = len(jobs)
+		jobs = append(jobs, []int{i})
+	}
+	return jobs
+}
+
 // TestTimeout is Test.timeout: the test, and each test in it without one
 // of its own, given `millis`.
 func TestTimeout(millis, t Value) Value {
@@ -153,6 +181,8 @@ type suiteRun struct {
 	setup     *setupFailure
 	mu        sync.Mutex
 	remaining int
+	// its shared fixtures, from its setup on
+	shared *fixtureCells
 }
 
 // suiteRuns is the run of each suite of the selected tests.
@@ -174,10 +204,12 @@ func suiteRuns(fb *Fiber, selected []named) map[*test]*suiteRun {
 // setUp is the setup of suite `s`, in its owner: its after_all hooks are
 // finalizers, whatever its before_all hooks do, then those run, then its
 // layer is built; its hooks have its timeout, if it has one.
-func (r *suiteRun) setUp(s *test) {
+func (r *suiteRun) setUp(s *test, fx *fixtures) {
+	// its shared fixtures close after its after_all hooks, which may use them
+	r.shared = cellsIn(&r.fiber, r.fiber.owner)
 	if s.hooks != nil {
-		finalize(&r.fiber, s.hooks.afterAll, "after_all", s.timeout, s.timed)
-		if r.setup = runHooks(&r.fiber, s.hooks.beforeAll, "before_all", s.timeout, s.timed); r.setup != nil {
+		finalize(&r.fiber, withEach(fx, s.hooks.afterAll), "after_all", s.timeout, s.timed)
+		if r.setup = runHooks(&r.fiber, withEach(fx, s.hooks.beforeAll), "before_all", s.timeout, s.timed); r.setup != nil {
 			return
 		}
 	}
@@ -196,9 +228,10 @@ func (r *suiteRun) setUp(s *test) {
 // up on first use, or a failed before_all hook; a failed build fails the
 // test.
 func enter(inner *Fiber, suites []*test, runs map[*test]*suiteRun) (*Fiber, *setupFailure) {
-	for _, s := range suites {
+	for i, s := range suites {
 		run := runs[s]
-		run.once.Do(func() { run.setUp(s) })
+		// the hooks of a suite see its shared fixtures and those of the suites around it
+		run.once.Do(func() { run.setUp(s, &fixtures{suites: suites[:i+1], runs: runs}) })
 		switch {
 		case run.failure != nil:
 			panic(&Failure{run.failure})
@@ -214,13 +247,14 @@ func enter(inner *Fiber, suites []*test, runs map[*test]*suiteRun) (*Fiber, *set
 // eachHooks runs the before_each hooks of these suites, outermost first, once
 // their after_each hooks are finalizers of the test's owner: the first that
 // fails. The test's timeout bounds them and its body together.
-func eachHooks(fb *Fiber, suites []*test) *setupFailure {
-	for _, s := range suites {
+func eachHooks(fb *Fiber, suites []*test, cells *fixtureCells, runs map[*test]*suiteRun) *setupFailure {
+	for i, s := range suites {
 		if s.hooks == nil {
 			continue
 		}
-		finalize(fb, s.hooks.afterEach, "after_each", s.timeout, s.timed)
-		if failed := runHooks(fb, s.hooks.beforeEach, "before_each", 0, false); failed != nil {
+		fx := &fixtures{test: cells, suites: suites[:i+1], runs: runs}
+		finalize(fb, withEach(fx, s.hooks.afterEach), "after_each", s.timeout, s.timed)
+		if failed := runHooks(fb, withEach(fx, s.hooks.beforeEach), "before_each", 0, false); failed != nil {
 			return failed
 		}
 	}
@@ -303,11 +337,17 @@ func runLeaf(fb *Fiber, t named, seed int64, runs map[*test]*suiteRun) testResul
 			})
 			defer timer.Stop()
 		}
-		if setup = eachHooks(fiber, t.suites); setup != nil {
+		// the fixtures of the test, made the first time its code uses each
+		cells := cellsIn(fiber, owner)
+		if setup = eachHooks(fiber, t.suites, cells, runs); setup != nil {
+			cells.failed = setup.cause
+			if cells.failed == nil {
+				cells.failed = &Cause{kind: causeFail, err: setup.text}
+			}
 			return Unit
 		}
 		if t.test.task != nil {
-			return Run(fiber, t.test.task)
+			return Run(fiber, withFixtures(&fixtures{test: cells, suites: t.suites, runs: runs}, t.test.task))
 		}
 		message, bad = t.test.checks(fb, seed)
 		return Unit

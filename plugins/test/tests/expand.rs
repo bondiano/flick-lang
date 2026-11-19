@@ -81,7 +81,7 @@ fn the_module_s_tests_are_its_blocks_in_order() {
 
 #[test]
 fn a_block_names_its_case_and_holds_cases_or_a_body() {
-    insta::assert_snapshot!(errors("suite { test \"a\" {} }"), @r#"T001 on the block: a `suite` block starts a top-level declaration, names its case and holds its tests in braces: `suite "name" { … }`, maybe `suite.skip` or `suite.only`, and `timeout millis` after the name"#);
+    insta::assert_snapshot!(errors("suite { test \"a\" {} }"), @r#"T001 on the block: a `suite` block starts a top-level declaration, names its case and holds its tests in braces: `suite "name" { … }`, maybe `suite.skip` or `suite.only`, `parallel` before the name and `timeout millis` after it"#);
     insta::assert_snapshot!(errors("test.later \"a\" {}"), @r#"T001 on the block: a `test` block starts a top-level declaration, names its case and holds its body in braces: `test "name" { … }`, maybe `test.skip` or `test.only`, and `timeout millis` after the name"#);
     // a block of an expression, which an import of the head allows
     let expression = expand(
@@ -93,8 +93,8 @@ fn a_block_names_its_case_and_holds_cases_or_a_body() {
         "{expression:?}"
     );
     insta::assert_snapshot!(errors("test \"a\""), @r#"T001 on the block: a `test` block starts a top-level declaration, names its case and holds its body in braces: `test "name" { … }`, maybe `test.skip` or `test.only`, and `timeout millis` after the name"#);
-    insta::assert_snapshot!(errors("suite \"a\" {\n  let x = 1\n}"), @r#"T001 `let`: a suite holds `test "name" { … }`, `suite "name" { … }`, maybe with `.skip` or `.only` and `timeout millis`, and the hooks `before_all`, `before_each`, `after_each` and `after_all { … }`"#);
-    insta::assert_snapshot!(errors("suite \"a\" {\n  test {}\n}"), @r#"T001 `test`: a suite holds `test "name" { … }`, `suite "name" { … }`, maybe with `.skip` or `.only` and `timeout millis`, and the hooks `before_all`, `before_each`, `after_each` and `after_all { … }`"#);
+    insta::assert_snapshot!(errors("suite \"a\" {\n  let x = 1\n}"), @r#"T001 `let`: a suite holds `test "name" { … }`, `suite "name" { … }`, maybe with `.skip` or `.only` and `timeout millis`, the hooks `before_all`, `before_each`, `after_each` and `after_all { … }`, and `fixture name = expression`"#);
+    insta::assert_snapshot!(errors("suite \"a\" {\n  test {}\n}"), @r#"T001 `test`: a suite holds `test "name" { … }`, `suite "name" { … }`, maybe with `.skip` or `.only` and `timeout millis`, the hooks `before_all`, `before_each`, `after_each` and `after_all { … }`, and `fixture name = expression`"#);
 }
 
 #[test]
@@ -125,7 +125,7 @@ fn hooks_are_cases_of_their_suite_s_group_and_a_timeout_wraps_its_case() {
 
 #[test]
 fn a_hook_has_no_name_and_a_timeout_its_milliseconds() {
-    insta::assert_snapshot!(errors("suite \"a\" {\n  before_each \"x\" {}\n}"), @r#"T001 `before_each`: a suite holds `test "name" { … }`, `suite "name" { … }`, maybe with `.skip` or `.only` and `timeout millis`, and the hooks `before_all`, `before_each`, `after_each` and `after_all { … }`"#);
+    insta::assert_snapshot!(errors("suite \"a\" {\n  before_each \"x\" {}\n}"), @r#"T001 `before_each`: a suite holds `test "name" { … }`, `suite "name" { … }`, maybe with `.skip` or `.only` and `timeout millis`, the hooks `before_all`, `before_each`, `after_each` and `after_all { … }`, and `fixture name = expression`"#);
     insta::assert_snapshot!(errors("test \"a\" timeout {}"), @r#"T001 on the block: a `test` block starts a top-level declaration, names its case and holds its body in braces: `test "name" { … }`, maybe `test.skip` or `test.only`, and `timeout millis` after the name"#);
     insta::assert_snapshot!(errors("test \"a\" later 5 {}"), @r#"T001 on the block: a `test` block starts a top-level declaration, names its case and holds its body in braces: `test "name" { … }`, maybe `test.skip` or `test.only`, and `timeout millis` after the name"#);
     // hooks of one kind are no cases, which a full name stands for
@@ -169,4 +169,57 @@ fn the_words_of_cases_are_keywords_and_the_user_s_code_is_not() {
         Test.hover(block, &[], u32::try_from(only).expect("small"), &[])
             .is_none()
     );
+    let source = format!(
+        "{HEADER}suite parallel \"a\" {{\n  fixture shared concurrent pool = make ()\n  fixture shared = 1\n}}\n"
+    );
+    let block = &blocks(&source)[0];
+    let words: Vec<&str> = (Test.highlight(block, &[]).iter())
+        .map(|h| block.text_of(h.span))
+        .collect();
+    // a fixture may be named `shared`
+    assert_eq!(
+        words,
+        ["parallel", "fixture", "shared", "concurrent", "fixture"]
+    );
+    let at = block.text.find("concurrent").expect("concurrent");
+    let found = Test.hover(block, &[], u32::try_from(at).expect("small"), &[]);
+    assert!(found.is_some_and(|h| h.markdown.contains("`parallel` suite")));
+}
+
+#[test]
+fn a_fixture_is_a_value_its_suite_s_code_binds_by_name() {
+    insta::assert_snapshot!(code(
+        "suite \"store\" {\n  fixture shared database = start ()\n  fixture conn = connect (await database)\n  fixture unused = 1\n  before_each { log (await database) }\n  test \"reads\" { read (await conn) (await database) }\n  test \"none\" {}\n}"
+    ), @r#"
+    let tests$0$fixture$0 = (Test.shared "store > database" (task { (start ()) }))
+    let tests$0$fixture$1 = (Test.fixture "store > conn" (task { (match (Test.use tests$0$fixture$0) with | database -> (connect (await database))) }))
+    let tests$0$fixture$2 = (Test.fixture "store > unused" (task { 1 }))
+    let tests : (List Test.Test) = [(Test.serial (Test.group "store" [(Test.share tests$0$fixture$0), (Test.before_each (task { (match (Test.use tests$0$fixture$0) with | database -> (log (await database))) })), (Test.effect_test "reads" (task { (match ((Test.use tests$0$fixture$0), (Test.use tests$0$fixture$1)) with | (database, conn) -> (read (await conn) (await database))) })), (Test.effect_test "none" (task { () }))]))]
+    "#);
+}
+
+#[test]
+fn an_inner_suite_sees_the_fixtures_around_and_a_parallel_one_runs_at_once() {
+    insta::assert_snapshot!(code(
+        "suite \"a\" {\n  fixture shared x = 1\n  suite parallel \"b\" {\n    fixture shared concurrent pool = make (await x).size\n    fixture x = await x + 1\n    test \"c\" { use x pool }\n  }\n}"
+    ), @r#"
+    let tests$0$fixture$0 = (Test.shared "a > x" (task { 1 }))
+    let tests$0$fixture$1 = (Test.shared "a > b > pool" (task { (match (Test.use tests$0$fixture$0) with | x -> (make (await x).size)) }))
+    let tests$0$fixture$2 = (Test.fixture "a > b > x" (task { (match (Test.use tests$0$fixture$0) with | x -> (await x + 1)) }))
+    let tests : (List Test.Test) = [(Test.serial (Test.group "a" [(Test.share tests$0$fixture$0), (Test.group "b" [(Test.share tests$0$fixture$1), (Test.effect_test "c" (task { (match ((Test.use tests$0$fixture$1), (Test.use tests$0$fixture$2)) with | (pool, x) -> (use x pool)) }))])]))]
+    "#);
+    // a shared fixture of an inner suite may not use a per-test one around it
+    insta::assert_snapshot!(errors(
+        "suite \"a\" {\n  fixture x = 1\n  suite \"b\" {\n    fixture shared y = await x\n    after_all { ignore (await x) }\n  }\n}"
+    ), @r"
+    T003 `x`: shared fixture `y` uses `x`, which each test makes anew: a shared fixture may use only shared ones
+    T003 `x`: `after_all` runs for no test, so it cannot use `x`, which each test makes anew: it may use only shared fixtures
+    ");
+}
+
+#[test]
+fn a_fixture_is_a_name_and_an_expression_and_only_a_suite_is_parallel() {
+    insta::assert_snapshot!(errors("suite \"a\" {\n  fixture = 1\n}"), @"T001 `fixture`: a fixture is `fixture name = expression`, maybe `fixture shared` or `fixture shared concurrent`");
+    insta::assert_snapshot!(errors("suite \"a\" {\n  fixture concurrent x = 1\n}"), @"T001 `fixture`: a fixture is `fixture name = expression`, maybe `fixture shared` or `fixture shared concurrent`");
+    insta::assert_snapshot!(errors("suite \"a\" {\n  test parallel \"b\" {}\n}"), @r#"T001 `test`: a suite holds `test "name" { … }`, `suite "name" { … }`, maybe with `.skip` or `.only` and `timeout millis`, the hooks `before_all`, `before_each`, `after_each` and `after_all { … }`, and `fixture name = expression`"#);
 }

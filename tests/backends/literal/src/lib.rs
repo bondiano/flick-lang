@@ -84,19 +84,30 @@ impl Backend for Literal {
         &self,
         state: Vec<u8>,
         outputs: Vec<command::File>,
+        answers: Vec<command::Answer>,
     ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        let _ = answers;
         Ok(commands::resume(&state, &outputs))
     }
 
-    fn open(&self, invocation: &command::Invocation) -> Result<Vec<u8>, Vec<command::Diagnostic>> {
+    fn open(
+        &self,
+        invocation: &command::Invocation,
+    ) -> Result<command::Opened, Vec<command::Diagnostic>> {
         if invocation.name == "echo" {
-            Ok(vec![0])
+            Ok(command::Opened::Session(vec![0]))
         } else {
             Err(commands::unknown(&invocation.name))
         }
     }
 
-    fn handle(&self, state: Vec<u8>, request: Vec<u8>) -> Result<command::Handled, String> {
+    fn handle(
+        &self,
+        state: Vec<u8>,
+        request: Vec<u8>,
+        answers: Vec<command::Answer>,
+    ) -> Result<command::Handled, String> {
+        let _ = answers;
         commands::handle(&state, &request)
     }
 

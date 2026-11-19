@@ -6,6 +6,7 @@ mod ffi;
 #[cfg(feature = "guest")]
 mod guest;
 mod launch;
+mod mapper;
 mod optimize;
 
 use flick_backend::{
@@ -51,7 +52,9 @@ fn capabilities() -> Vec<Capability> {
 
 impl Backend for Javascript {
     fn commands(&self) -> Vec<command::Descriptor> {
-        ffi::descriptors()
+        let mut commands = ffi::descriptors();
+        commands.push(mapper::descriptor());
+        commands
     }
 
     fn run(
@@ -69,8 +72,33 @@ impl Backend for Javascript {
         &self,
         state: Vec<u8>,
         outputs: Vec<command::File>,
+        answers: Vec<command::Answer>,
     ) -> Result<command::Plan, Vec<command::Diagnostic>> {
-        ffi::resume(&state, &outputs)
+        match serde_json::from_slice::<mapper::Declarations>(&state) {
+            Ok(declarations) => Ok(mapper::declare(&declarations, &answers)),
+            Err(_) => ffi::resume(&state, &outputs),
+        }
+    }
+
+    fn open(
+        &self,
+        invocation: &command::Invocation,
+    ) -> Result<command::Opened, Vec<command::Diagnostic>> {
+        if invocation.name == mapper::NAME {
+            Ok(mapper::open(invocation))
+        } else {
+            Err(command::unknown(&invocation.name))
+        }
+    }
+
+    fn handle(
+        &self,
+        state: Vec<u8>,
+        request: Vec<u8>,
+        answers: Vec<command::Answer>,
+    ) -> Result<command::Handled, String> {
+        let _ = state;
+        mapper::handle(&request, &answers)
     }
 
     fn describe(&self) -> Descriptor {

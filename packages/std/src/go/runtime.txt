@@ -281,6 +281,11 @@ testSkip TestSkip
 testOnly TestOnly
 testSuite TestSuite
 testTimeout TestTimeout
+testSerial TestSerial
+testFixture TestFixture
+testShared TestShared
+testShare TestShare
+testUse *TestUse
 testBeforeAll TestBeforeAll
 testBeforeEach TestBeforeEach
 testAfterEach TestAfterEach

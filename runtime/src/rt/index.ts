@@ -151,13 +151,18 @@ export {
   testBeforeEach,
   testClock,
   testEffect,
+  testFixture,
   testGroup,
   testOnly,
   testProperty,
   testPure,
+  testSerial,
   testSkip,
   testSetTime,
+  testShare,
+  testShared,
   testSuite,
+  testUse,
   testTimeout,
 } from "./testing.ts";
 export { RuntimeFailure, promiseFacade, runPromise } from "./facade.ts";
