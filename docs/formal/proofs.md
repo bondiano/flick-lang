@@ -14,7 +14,7 @@ References as in [`core.md`](core.md). Paths are relative to `flick-core/src/`.
 | `refl`, `symm`, `trans`, `cong`, `funext`, `match`, a premise, `let` | the rules | §4 |
 | T080–T084 | how a proof fails | §5 |
 
-Not yet: law bundles, proof modules and `flick prove`, lemmas across modules, `.iface` payloads.
+Not yet: law bundles, definitions and lemmas across project modules, `.iface` payloads.
 
 ## 1. Proofs are opt-in and erased
 
@@ -120,9 +120,11 @@ A statement may name the definitions of its module and of the built-in modules, 
 
 So `equal (map identity v) v` is proved by a split of `v` against the real `Functor Option`. A diverging definition never enters a proof, even as an argument a function ignores: `(fun _ -> None) (forever ())` is refused, not reduced to `None` (`tests/check/fail/proofs/definitions.fl`). Defining such functions stays legal; only the proofs that name them fail.
 
-## 7. Modules (phase 4)
+## 7. Proof modules
 
-Proof modules under `project.proof-dir`, `flick prove`, lemmas across modules and their `.iface` payloads.
+- **The proof root.** `project.proof-dir` (default `proofs`) holds proof modules. They may import the project's source modules and each other, and a source module never imports one (`project/load/imports.rs`, `Root::Proof`).
+- **What reads it.** Only `flick prove [paths]` selects that root, and the LSP analyzes a proof module that is open. `flick check`, `build`, `test` and `pack` never read it, so a library's proofs cost its users nothing (`flick/tests/cli/prove_command.rs`).
+- **Phase 4b.** A proof module unfolds the definitions of the built-in modules and of its own module. The definitions of other project modules, lemmas across modules and their `.iface` payloads are phase 4b. Until then such a definition is `FLICK-T082`: it is not available to this proof.
 
 ## 8. Why the domain is total
 

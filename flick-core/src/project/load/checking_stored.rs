@@ -239,7 +239,7 @@ impl Checking<'_> {
             .as_ref()
             .map_or(&loaded.parse.tree, |e| &e.tree);
         self.cached_ir == CachedIr::Kept
-            && matches!(loaded.root, Root::Source | Root::Test)
+            && matches!(loaded.root, Root::Source | Root::Test | Root::Proof)
             && plain(loaded)
             && loaded.member_of.is_none()
             && loaded.syntax.inline_imports.is_empty()

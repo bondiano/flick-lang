@@ -382,6 +382,7 @@ fn group(root: &Root) -> String {
     match root {
         Root::Source => "source".into(),
         Root::Test => "test".into(),
+        Root::Proof => "proof".into(),
         Root::Package(name) => format!("package {name}"),
         Root::Other(_) => "other".into(),
     }

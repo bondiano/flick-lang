@@ -166,7 +166,9 @@ pub fn analyze(docs: &HashMap<PathBuf, String>, path: &Path, caches: &mut Caches
     };
     let context = Context::of(docs, path);
     let mut roots: Vec<PathBuf> = Vec::new();
-    let directories = found.as_ref().map(|p| [p.source_root(), p.test_root()]);
+    let directories = found
+        .as_ref()
+        .map(|p| [p.source_root(), p.test_root(), p.proof_root()]);
     if let Some(directories) = &directories {
         for root in directories {
             let mut files = Vec::new();

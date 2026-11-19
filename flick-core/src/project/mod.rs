@@ -119,6 +119,10 @@ impl Project {
     pub fn test_root(&self) -> PathBuf {
         normalize(&self.root.join(&self.config.test_dir))
     }
+
+    pub fn proof_root(&self) -> PathBuf {
+        normalize(&self.root.join(&self.config.proof_dir))
+    }
 }
 
 #[cfg(feature = "native-project")]
