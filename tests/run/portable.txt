@@ -315,3 +315,4 @@ runtime/suspended
 runtime/suspended_std
 runtime/lazy_let
 runtime/lazy_let_state
+runtime/lazy_opt
