@@ -722,10 +722,11 @@ dependencies = [
 name = "flick-core"
 version = "0.1.0"
 dependencies = [
- "annotate-snippets",
  "flick-backend-go",
  "flick-backend-js",
  "flick-backend-support",
+ "flick-diagnostics",
+ "flick-ffi",
  "flick-ir",
  "flick-plugin",
  "flick-plugin-cli",
@@ -735,6 +736,7 @@ dependencies = [
  "flick-plugin-test",
  "flick-plugin-ui",
  "flick-pretty",
+ "flick-syntax",
  "flick-test-pairs",
  "flick-test-support",
  "insta",
@@ -743,9 +745,20 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "strsim",
  "toml 1.1.8+spec-1.1.0",
  "tracing",
+]
+
+[[package]]
+name = "flick-diagnostics"
+version = "0.1.0"
+dependencies = [
+ "annotate-snippets",
+ "flick-ir",
+ "insta",
+ "serde",
+ "serde_json",
+ "strsim",
 ]
 
 [[package]]
@@ -763,6 +776,18 @@ name = "flick-example-typed-dsl"
 version = "0.1.0"
 dependencies = [
  "flick-plugin",
+]
+
+[[package]]
+name = "flick-ffi"
+version = "0.1.0"
+dependencies = [
+ "flick-diagnostics",
+ "flick-syntax",
+ "insta",
+ "serde",
+ "serde_json",
+ "toml 1.1.8+spec-1.1.0",
 ]
 
 [[package]]
@@ -861,6 +886,17 @@ version = "0.1.0"
 dependencies = [
  "typed-arena",
  "unicode-segmentation",
+]
+
+[[package]]
+name = "flick-syntax"
+version = "0.1.0"
+dependencies = [
+ "flick-backend-support",
+ "flick-diagnostics",
+ "flick-ir",
+ "flick-plugin",
+ "serde_json",
 ]
 
 [[package]]

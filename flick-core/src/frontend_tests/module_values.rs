@@ -1,3 +1,9 @@
+use super::parse_ok;
+use crate::diagnostics::codes;
+use crate::source::SourceMap;
+use crate::types::{Limits, Options, Thresholds, Watched};
+use crate::{doc, iface, ir, resolve, types};
+
 #[test]
 fn class_dictionary_type_uses_manifest_class_identity() {
     let src = "module App.Contracts exposing (S)\ntype module S =\n  type Key\n  class Equality = Prelude.Eq\n  equality : Equality.Dict Key\n  instance Equality Key from equality\n";

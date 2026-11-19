@@ -9,7 +9,7 @@ compiler build, the browser's too, as one plugin owned by `std`.
 
 - Reach the compiler only through the SDK; SDK changes follow
   [flick-plugin/AGENTS.md](../flick-plugin/AGENTS.md).
-- A new block head goes in `flick-core/src/syntax/heads.rs` and in each
+- A new block head goes in `flick-syntax/src/syntax/heads.rs` and in each
   hook of `Std` in `first_party.rs` that handles it. It is new syntax.
 - Codes show as `std/<code>` and share one namespace across these crates:
   search `plugins/` before taking one. Each needs
@@ -17,7 +17,7 @@ compiler build, the browser's too, as one plugin owned by `std`.
   `sql` and `test` check theirs in `std_explains_every_code_*` tests,
   `refined` (`D006`) and `ui` by review.
 - Codes in `OWN_CODES` of `first_party.rs` stay compiler codes
-  (`FLICK-U001`), explained in `flick-core/src/diagnostics/explain/`.
+  (`FLICK-U001`), explained in `flick-diagnostics/src/diagnostics/explain/`.
 - Keep dependencies buildable for `wasm32-unknown-unknown`; their code
   counts against the `just wasm` budget.
 - Snapshot expansions in `<crate>/tests/` with

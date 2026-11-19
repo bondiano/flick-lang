@@ -1,0 +1,27 @@
+[package]
+name = "flick-ffi"
+description = "Flick bindings generated from TypeScript declarations, and the check of reviewed bindings"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["native-project"]
+# the policy file of a binding, read from TOML
+native-project = ["dep:toml"]
+
+[dependencies]
+flick-diagnostics = { path = "../flick-diagnostics" }
+flick-syntax = { path = "../flick-syntax" }
+serde = { version = "1.0.229", features = ["derive", "rc"] }
+serde_json = { workspace = true }
+toml = { version = "1.1.8", optional = true }
+
+[dev-dependencies]
+insta = "1.49.0"

@@ -55,7 +55,7 @@ substring of the diagnostic message, with each help line appended as
 `: help`. Warnings about unused code (`FLICK-R012`–`R014`) count only in
 files that mention their code: fixtures of other rules bind names they never
 use. Codes must be registered in
-`flick-core/src/diagnostics/codes.rs`.
+`flick-diagnostics/src/diagnostics/codes.rs`.
 
 ## E2E programs — `tests/run/`
 
@@ -206,7 +206,7 @@ Where to look for the tests of a behavior, and where a new one goes:
 | `Float` semantics in debug, release and constant folding | `flick/tests/cli/e2e_numbers.rs`, `tests/run/codegen/numbers.fl`, `flick-core/tests/compiler/consteval_node.rs` |
 | optimizer passes | `flick-core/src/opt/tests.rs`, `tests/run/codegen/release.fl` |
 | `deriving Schema`, codec policies, strict export, OpenAPI | `tests/{check,run}/**/schema/`, `packages/effect-ts/test/{schema,httpapi}.test.ts`, `flick/tests/cli/schema_export.rs` |
-| FFI callbacks, `.d.ts` import and reviewed bindings | `tests/run/ffi/`, `packages/effect-ts/test/callbacks.test.ts`, `flick-core/src/ffi/tests.rs`, `flick/tests/ffi_command.rs`, `tools/dts-importer/test/` |
+| FFI callbacks, `.d.ts` import and reviewed bindings | `tests/run/ffi/`, `packages/effect-ts/test/callbacks.test.ts`, `flick-ffi/src/ffi/tests.rs`, `flick/tests/ffi_command.rs`, `tools/dts-importer/test/` |
 | SQL | `tests/check/{pass,fail}/sql/`, `tests/run/sql/`, `packages/effect-ts/test/sql.test.ts`, `flick/tests/sql_postgres.rs` over `tests/postgres/` |
 | UI | `tests/check/{pass,fail}/ui/`, `tests/run/ui/`, `packages/effect-ts/test/ui-*.test.ts` |
 | the `cli` block | `tests/check/{pass,fail}/cli/`, `tests/run/stdlib/cli/`, `flick-core/src/project/load/plugins_tests.rs` (the calls it stands for), `flick/tests/cli/lsp_editor/cli.rs` |

@@ -107,9 +107,14 @@ impl Diagnostic {
         self
     }
     #[must_use]
-    pub(crate) fn with_incomplete(mut self, incomplete: bool) -> Self {
+    pub fn with_incomplete(mut self, incomplete: bool) -> Self {
         self.incomplete = incomplete;
         self
+    }
+
+    /// Whether the checker relied on an error type while forming it.
+    pub fn incomplete(&self) -> bool {
+        self.incomplete
     }
 
     /// Builds a suggested fix only when diagnostic fixes are enabled.

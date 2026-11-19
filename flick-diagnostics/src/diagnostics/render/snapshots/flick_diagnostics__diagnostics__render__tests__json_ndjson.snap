@@ -1,5 +1,5 @@
 ---
-source: flick-core/src/diagnostics/render/tests.rs
+source: flick-diagnostics/src/diagnostics/render/tests.rs
 expression: out
 ---
 {"schema-version":1,"type":"diagnostic","code":"FLICK-S002","severity":"error","message":"unsupported expression","path":"src/App/Main.fl","range":{"start":48,"end":62},"related":[{"path":"src/App/Main.fl","range":{"start":37,"end":45},"message":"bound here"},{"path":"src/App/Other.fl","range":{"start":4,"end":5},"message":"also declared here"}],"fixes":[{"message":"use `Platform.stdout_line`","edits":[{"path":"src/App/Main.fl","range":{"start":88,"end":93},"replacement":"stdout_line"}]}]}

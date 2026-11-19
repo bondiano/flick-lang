@@ -46,6 +46,9 @@ errors and time-zone names differently.
 | Crate | Purpose |
 | - | - |
 | [`flick-core`](./flick-core/) | Shared compiler and language-server core |
+| [`flick-diagnostics`](./flick-diagnostics/) | Source files, spans and diagnostics: codes, explanations, fixes and their renderings |
+| [`flick-syntax`](./flick-syntax/) | The lexer and parser: a lossless concrete tree and its AST view |
+| [`flick-ffi`](./flick-ffi/) | Bindings generated from `.d.ts` declarations and the check of reviewed bindings |
 | [`flick-backend-js`](./backends/js/) | JavaScript/TypeScript emitter over portable IR and plain projections |
 | [`flick-backend-support`](./flick-backend-support/) | Helpers actually shared by emitters and frontend projections |
 | [`flick`](./flick/) | The `flick` command-line tool |

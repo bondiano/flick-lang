@@ -3,7 +3,7 @@ use flick_core::ffi::{Policy, Surface};
 
 use super::*;
 
-const LOOKUP: &str = include_str!("../../../../flick-core/src/ffi/fixtures/lookup.json");
+const LOOKUP: &str = include_str!("../../../../flick-ffi/src/ffi/fixtures/lookup.json");
 /// A `.d.ts` reader that answers every request with the fixture surface.
 const READER: &str = "import { readFileSync } from \"node:fs\";\n\
     readFileSync(0);\n\
