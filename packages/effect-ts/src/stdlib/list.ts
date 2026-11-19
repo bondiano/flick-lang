@@ -77,7 +77,7 @@ export const chunkFromList = <A>(xs: List<A>): Chunk.Chunk<A> => Chunk.fromItera
 export const chunkToList = <A>(c: Chunk.Chunk<A>): Array<A> => Chunk.toArray(c);
 export const chunkAppend = <A>(x: A, c: Chunk.Chunk<A>): Chunk.Chunk<A> => Chunk.append(c, x);
 export const chunkConcat = <A>(a: Chunk.Chunk<A>, b: Chunk.Chunk<A>): Chunk.Chunk<A> => Chunk.appendAll(a, b);
-export const chunkSize = <A>(c: Chunk.Chunk<A>): number => Chunk.size(c);
+export const chunkSize = <A>(c: Chunk.Chunk<A>): number => Chunk.size(c) | 0;
 export const chunkGet = <A>(i: number, c: Chunk.Chunk<A>): Option.Option<A> =>
   index(i, Chunk.size(c)) ? some(Chunk.getUnsafe(c, i)) : none;
 export const chunkMap = <A, B>(f: (a: A) => B, c: Chunk.Chunk<A>): Chunk.Chunk<B> => Chunk.map(c, (x) => f(x));

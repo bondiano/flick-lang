@@ -62,7 +62,7 @@ func Equals(a, b Value) bool {
 	case *Chunk:
 		// a Chunk equals one with the same elements, by structural equality
 		y, ok := b.(*Chunk)
-		return ok && Equals(x.items, y.items)
+		return ok && x.equals(y)
 	case *Dict:
 		// a dictionary a value of a GADT holds: the fields beside it decide
 		_, ok := b.(*Dict)

@@ -166,6 +166,8 @@
 @flick-lang/runtime/core/bytes bytesLength
 @flick-lang/runtime/core/bytes bytesSlice
 @flick-lang/runtime/core/bytes bytesToList
+@flick-lang/runtime/core/chunk ChunkBranch
+@flick-lang/runtime/core/chunk concatChunks
 @flick-lang/runtime/core/data EQ
 @flick-lang/runtime/core/data GT
 @flick-lang/runtime/core/data LT

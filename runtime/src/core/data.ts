@@ -7,6 +7,7 @@
 // Equality is canonical: structural, SameValueZero on numbers.
 import { item } from "../internal.ts";
 import { constructorName, tag } from "../tags.ts";
+import { ChunkBranch } from "./chunk.ts";
 
 export type Option<A> = Readonly<{ _tag: "None" }> | Readonly<{ _tag: "Some"; value: A }>;
 export type Result<A, E = never> = Readonly<{ _tag: "Success"; success: A }> | Readonly<{ _tag: "Failure"; failure: E }>;
@@ -85,6 +86,13 @@ export const equals = (a: unknown, b: unknown): boolean => {
     const result: unknown = hostEqual.call(a, b);
     return result === true;
   }
+  if (a instanceof ChunkBranch || b instanceof ChunkBranch) {
+    if (!(a instanceof ChunkBranch || Array.isArray(a)) || !(b instanceof ChunkBranch || Array.isArray(b))) return false;
+    if (a.length !== b.length) return false;
+    const right = b[Symbol.iterator]();
+    for (const value of a) if (!equals(value, right.next().value)) return false;
+    return true;
+  }
   if (Array.isArray(a) || Array.isArray(b)) {
     return Array.isArray(a) && Array.isArray(b) && listEquals(equals, a, b);
   }
@@ -132,6 +140,11 @@ export const hash = (a: unknown): number => {
   if (typeof hostHash === "function") {
     const value: unknown = hostHash.call(a);
     if (typeof value === "number") return value;
+  }
+  if (a instanceof ChunkBranch) {
+    let result = 7;
+    for (const value of a) result = combine(result, hash(value));
+    return result;
   }
   if (Array.isArray(a)) return listHash(hash, a);
   return Object.keys(a)
@@ -391,8 +404,8 @@ export const copyThrough = (value: unknown, other: (value: object) => unknown): 
   let result: unknown;
   const visit = (input: unknown, put: (copy: unknown) => void): void => {
     if (typeof input !== "object" || input === null) { put(input); return; }
-    const array = Array.isArray(input);
-    if (!array) {
+    const array = input instanceof ChunkBranch ? [...input] : Array.isArray(input) ? input : undefined;
+    if (array === undefined) {
       const proto: unknown = Object.getPrototypeOf(input);
       if ((proto !== Object.prototype && proto !== null) || Object.isFrozen(input)) { put(other(input)); return; }
     }
@@ -401,8 +414,8 @@ export const copyThrough = (value: unknown, other: (value: object) => unknown): 
     if (active.has(input)) throw new RangeError("Maximum call stack size exceeded");
     active.add(input);
     const finish = (copy: unknown): void => { active.delete(input); put(copy); };
-    if (Array.isArray(input)) {
-      const length = input.length;
+    if (array !== undefined) {
+      const length = array.length;
       const copy: unknown[] = [];
       copy.length = length;
       let index = 0;
@@ -410,8 +423,8 @@ export const copyThrough = (value: unknown, other: (value: object) => unknown): 
         while (index < length) {
           const key = index++;
           // Like Array.map, read an index only after the previous child finishes.
-          if (!(key in input)) continue;
-          const child: unknown = input[key];
+          if (!(key in array)) continue;
+          const child: unknown = array[key];
           work.push(next);
           visit(child, (copied) => { Object.defineProperty(copy, key, { value: copied, writable: true, enumerable: true, configurable: true }); });
           return;
