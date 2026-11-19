@@ -16,6 +16,12 @@ break programs.
   `ui { … }` of its own, and `fragment` stays the function it was. A
   plugin's `Open` names the function with its new `siblings` field.
 
+- **A one-line `ui { … }` keeps all its code.** On the line of `ui {`, the
+  body was the longest expression from its first token, and what followed
+  was dropped without a diagnostic: `ui { text "a"; no_such_name }` checked.
+  Now `;` separates its lines, as in braces, so `ui { a; b }` is two
+  children, and any other code after the body is `std/U010`.
+
 - **Test hooks and timeouts.** A `suite` holds `before_all`, `before_each`,
   `after_each` and `after_all { … }`, which run around the cases of the
   suite that the run selects: setup outer to inner, cleanup inner to outer,

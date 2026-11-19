@@ -53,7 +53,35 @@ pub fn parse_lines_at<'t>(
     tokens: &[Token],
     heads: Heads<'t>,
 ) -> Option<Fragment> {
-    fragment(text, file, tokens, heads, body, true)
+    fragment(text, file, tokens, heads, lines, true)
+}
+
+/// [`body`], whose lines may also stand on the line of its head, separated
+/// by `;` as in braces: `ui { a; b }`.
+fn lines(p: &mut Parser) -> Option<Done> {
+    if p.raw().line_start || !semicolon_ahead(p) {
+        return body(p);
+    }
+    let m = p.start();
+    p.push(Ctx::Aligned { col: p.col() });
+    p.items(expr::stmt, true, |_| false);
+    p.pop();
+    Some(p.complete(m, K::Block))
+}
+
+/// Whether a `;` outside brackets comes before what closes the body.
+fn semicolon_ahead(p: &Parser) -> bool {
+    let mut depth = 0u32;
+    for t in &p.toks[p.pos..] {
+        match t.kind {
+            K::LParen | K::LBracket | K::LBrace => depth += 1,
+            K::RParen | K::RBracket | K::RBrace if depth == 0 => return false,
+            K::RParen | K::RBracket | K::RBrace => depth -= 1,
+            K::Semi if depth == 0 => return true,
+            _ => {}
+        }
+    }
+    false
 }
 
 fn body(p: &mut Parser) -> Option<Done> {
