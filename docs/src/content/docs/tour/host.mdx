@@ -1,0 +1,32 @@
+---
+title: The host
+description: "`Host` services say what a function takes from the host, and a test replaces them."
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="host">
+
+`Host.Console` has been in the signature of every `main`: printing is a
+service. The host gives five more the same way: `Host.Clock` for the time,
+`Host.Random` for random draws, `Host.Environment` for environment
+variables, `Host.Arguments` for the program's arguments, and `Host.Process`
+for child processes. The standard library uses them, so `Random.next_boolean`
+needs `Host.Random` and `Platform.args` needs `Host.Arguments`.
+
+The signature of `greet` says it reads the arguments and flips a coin. A
+`main` that names them gets the real ones from where it runs. This one does
+not: it provides them itself, as a test would. `ada` gives fixed arguments,
+and `heads` and `tails` fix the draw, so the result is known in advance.
+Clock, console and environment are replaced the same way.
+
+The [reference](../../reference/services/#explicit-host-dependencies) lists who
+provides which services.
+
+**Try:** print `greet ()` without `provide`. The compiler reports
+`FLICK-E002`: `main` does not name `Host.Arguments` and `Host.Random`. Add
+them to its row, and the program runs with the real ones: here no
+arguments, and a coin that changes from run to run.
+
+</TourLesson>
