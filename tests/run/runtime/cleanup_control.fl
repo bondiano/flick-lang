@@ -1,0 +1,104 @@
+// A `control` operation in cleanup is answered when the body ended normally,
+// with a value or a typed failure. When the cleanup runs because the body was
+// interrupted, or an `abort` unwinds through it, the operation is cut off: its
+// arm does not run, the cleanup stops there, and the interruption or the
+// unwind goes on. The same holds for `ensuring`, `on_exit`, `on_interrupt` and
+// the release of `bracket`; `on_exit` runs on an unwind too. The JavaScript
+// build reports FLICK-P012 for it until its runtime has such a body of its own.
+module App.Main exposing (main)
+
+type error Oops = Oops
+
+say : String ->{} Unit
+let say line = Host.raw_stdout_line line
+
+nap : Float ->{Async} Unit
+let nap ms =
+  match Duration.millis ms with
+  | Ok d -> Effect.sleep d
+  | Err _ -> ()
+
+effect Emit =
+  control emit : String ->{} Unit
+
+effect Stop =
+  abort stop : forall b. String ->{} b
+
+/// Collects what is emitted: the arm resumes.
+collect : (Unit ->{Emit | r; e} Unit) ->{r; e} List String
+let collect body =
+  try body () with
+  | Emit.emit x -> [x] ++ resume ()
+  | return () -> []
+
+/// The arm lets the rest go.
+drop : (Unit ->{Emit | r; e} Unit) ->{r; e} String
+let drop body =
+  try
+    body ()
+    "finished"
+  with
+  | Emit.emit x -> "dropped at " ++ x
+
+stopping : (Unit ->{Stop | r; e} Unit) ->{r; e} String
+let stopping body =
+  try
+    body ()
+    "no stop"
+  with
+  | Stop.stop why -> "stopped: " ++ why
+
+cleanup : String -> Eff {Emit} none Unit
+let cleanup name = task {
+  say (name ++ ": cleanup begins")
+  Emit.emit name
+  say (name ++ ": cleanup ends")
+}
+
+/// `work` under the cleanup of `name`.
+guarded : String -> Eff {Emit | r} e Unit -> Eff {Emit | r} e Unit
+let guarded name work =
+  if name == "on_exit" then
+    task { Effect.on_exit (fun _ -> await (cleanup name)) work }
+  else if name == "on_interrupt" then
+    task { Effect.on_interrupt (fun _ -> await (cleanup name)) work }
+  else if name == "bracket" then
+    task { Resource.bracket (task { () }) (fun _ -> await work) (fun _ -> await (cleanup name)) }
+  else
+    task { Effect.ensuring (cleanup name) work }
+
+/// The cleanup of `name` while its body is interrupted.
+interrupted : String ->{Async} Unit
+let interrupted name = scope owner {
+  let child =
+    Fiber.spawn
+      owner
+      (fun _ -> ())
+      (task { say ("child: " ++ drop (fun () -> await (guarded name (task { nap 1000 })))) })
+  nap 5
+  Fiber.interrupt child
+  let exit = Fiber.await_ child
+  say (if Exit.has_interrupts exit then "child interrupted" else "child went on")
+}
+
+stop : Eff {Stop} none Unit
+let stop = task { Stop.stop "why" }
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  say "== the body succeeds, the arm resumes"
+  say (show (collect (fun () -> await (guarded "ensuring" (task { say "body" })))))
+  say "== the body succeeds, the arm lets the rest go"
+  say (drop (fun () -> await (guarded "ensuring" (task { say "body" }))))
+  say "== the body fails, the arm resumes"
+  let failed =
+    try show (collect (fun () -> await (guarded "ensuring" (task { Fail.fail Oops })))) with
+    | Oops -> "caught Oops"
+  say failed
+  for name <- ["ensuring", "on_exit", "bracket"] do
+    say ("== an abort unwinds through " ++ name)
+    say (show (collect (fun () -> say (stopping (fun () -> await (guarded name stop))))))
+    say (drop (fun () -> say (stopping (fun () -> await (guarded name stop)))))
+  for name <- ["ensuring", "on_exit", "on_interrupt", "bracket"] do
+    say ("== " ++ name ++ " of an interrupted body")
+    interrupted name

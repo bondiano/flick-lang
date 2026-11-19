@@ -1,0 +1,46 @@
+== the body succeeds, the arm resumes
+body
+ensuring: cleanup begins
+ensuring: cleanup ends
+["ensuring"]
+== the body succeeds, the arm lets the rest go
+body
+ensuring: cleanup begins
+dropped at ensuring
+== the body fails, the arm resumes
+ensuring: cleanup begins
+ensuring: cleanup ends
+caught Oops
+== an abort unwinds through ensuring
+ensuring: cleanup begins
+stopped: why
+[]
+ensuring: cleanup begins
+stopped: why
+finished
+== an abort unwinds through on_exit
+on_exit: cleanup begins
+stopped: why
+[]
+on_exit: cleanup begins
+stopped: why
+finished
+== an abort unwinds through bracket
+bracket: cleanup begins
+stopped: why
+[]
+bracket: cleanup begins
+stopped: why
+finished
+== ensuring of an interrupted body
+ensuring: cleanup begins
+child interrupted
+== on_exit of an interrupted body
+on_exit: cleanup begins
+child interrupted
+== on_interrupt of an interrupted body
+on_interrupt: cleanup begins
+child interrupted
+== bracket of an interrupted body
+bracket: cleanup begins
+child interrupted

@@ -1,0 +1,30 @@
+== success
+handler started
+closing the server
+handler finished
+handler finalizer
+closed
+response 204 
+== typed error
+handler started
+closing the server
+handler finished
+handler finalizer
+the scope did not succeed
+closed
+response 204 
+== defect
+handler started
+closing the server
+handler finished
+handler finalizer
+the scope did not succeed
+closed
+response 204 
+== interruption
+handler started
+closing the server
+handler finished
+handler finalizer
+closed
+response 204 

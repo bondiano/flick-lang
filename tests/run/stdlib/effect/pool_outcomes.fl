@@ -1,0 +1,61 @@
+// A pool takes an item back by how the lease that held it ended: after a
+// success or a typed error it lends the same item again; after a defect or an
+// interruption, which may have broken it, it releases the item and acquires
+// another. `invalidate` still drops an item by hand. Each item is numbered by
+// its acquisition, so a lease that gets a new number got a new item.
+module App.Main exposing (main)
+
+type error Oops = Oops
+
+say : String ->{} Unit
+let say line = Host.raw_stdout_line line
+
+nap : Float ->{Async} Unit
+let nap ms =
+  match Duration.millis ms with
+  | Ok d -> Effect.sleep d
+  | Err _ -> ()
+
+/// A lease of the pool's one item, in a scope that ends as `ending` does.
+lease : Pool.Pool s none Int -> String -> Eff {Async} e Unit ->{Async; e} Unit
+let lease pool name ending = scope {
+  let item = Pool.get pool
+  say (name ++ ": item " ++ show item)
+  await ending
+}
+
+main : Unit ->{Async; AppError} Unit
+let main () = scope owner {
+  let count = Ref.make 0
+  let pool =
+    Pool.make {
+      acquire = task {
+        Ref.set count (Ref.get count + 1)
+        Ref.get count
+      }
+      size = 1
+      concurrency = None
+      targetUtilization = None
+    }
+  lease pool "success" (task { () })
+  lease pool "after a success" (task { () })
+  try lease pool "typed error" (task { Fail.fail Oops }) with
+  | Oops -> ()
+  lease pool "after a typed error" (task { () })
+  ignore (Effect.exit (task { lease pool "defect" (task { Effect.die "broken" }) }))
+  lease pool "after a defect" (task { () })
+  let child =
+    Fiber.spawn owner (fun _ -> ()) (task { lease pool "interrupted" (task { nap 1000 }) })
+  nap 5
+  Fiber.interrupt child
+  lease pool "after an interruption" (task { () })
+  scope {
+    let item = Pool.get pool
+    say ("invalidated by hand: item " ++ show item)
+    Pool.invalidate item pool
+  }
+  lease pool "after invalidate" (task { () })
+  say ("use: item " ++ show (Pool.use (fun item -> item) pool))
+  ignore (Effect.exit (task { Pool.use (fun _ -> Effect.die "broken") pool }))
+  say ("use after a defect: item " ++ show (Pool.use (fun item -> item) pool))
+}
