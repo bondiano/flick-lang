@@ -72,7 +72,7 @@ impl Checker<'_> {
             self.check(ret, &Type::fun(value, outer.clone(), t.clone()))?;
         }
         let rest = self.minus(&needed, &covered)?;
-        let errors = self.error_arms(&h.errors, &raised, &t)?;
+        let (errors, _) = self.error_arms(&h.errors, &raised, &t)?;
         self.stage_within(&Stage::Runtime(rest, errors), &outer)?;
         // a handler of a service a region indexes is installed where it is live
         let live = self.indexed_live(&installed);
