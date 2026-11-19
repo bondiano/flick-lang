@@ -3,15 +3,15 @@
 // failed cleanup apart, as the runner on Effect does.
 import { type Engine, type Suites as SuitesOf, type TestOptions, type TestResult, parseTestArgs, runTestsWith } from "../core/suites.ts";
 import * as Core from "../core/testing.ts";
-import { type Cause, type Exit, combine, failed, hasDies, hasInterruptsOnly, isFail, raise, succeeded } from "./cause.ts";
+import { type Cause, type Exit, combine, fail, failed, hasDies, hasInterruptsOnly, isFail, raise, succeeded } from "./cause.ts";
 import { CLOCK, TestClock, currentTestClock } from "./clock.ts";
-import { allOf } from "./concurrency.ts";
+import { allOf, timeoutOption } from "./concurrency.ts";
 import { describeReport, report } from "./describe.ts";
 import type { Duration } from "./duration.ts";
 import { pretty } from "./entry.ts";
-import { type Ctx, type Fiber, type Run, Under, asExit, awaitFiber, currentCtx, extend, fork } from "./fiber.ts";
-import { type Layer, MemoMap, buildWith, servicesOf, withServices } from "./layer.ts";
-import { Owner, OwnedExits, close, inside, ownedExits } from "./owner.ts";
+import { type Ctx, type Fiber, type Run, Under, asExit, awaitFiber, currentCtx, exitOf, extend, fork } from "./fiber.ts";
+import { type Layer, MemoMap, type Services, buildWith, servicesOf, withServices } from "./layer.ts";
+import { Owner, OwnedExits, addFinalizer, close, inside, ownedExits } from "./owner.ts";
 import { hostLiveServices } from "./runner/host.ts";
 
 export {
@@ -41,6 +41,15 @@ type Named = Core.Named<Task, Layer>;
 
 export const testEffect = (name: string, task: Task): Test => Object.freeze({ kind: "effect", name, task });
 
+/** `Test.before_all` and the other hooks of the group they are in. */
+export const testBeforeAll = (task: Task): Test => Core.testBeforeAll(task);
+export const testBeforeEach = (task: Task): Test => Core.testBeforeEach(task);
+export const testAfterEach = (task: Task): Test => Core.testAfterEach(task);
+export const testAfterAll = (task: Task): Test => Core.testAfterAll(task);
+
+/** `Test.timeout`: the test, and each test in it without a timeout of its own, given `millis`. */
+export const testTimeout = (millis: number, test: Test): Test => Core.testTimeout(millis, test);
+
 /** `Test.clock_test`: an effect test on a test clock of its own, made for each run. */
 export const testClock = (name: string, task: Task): Test =>
   testEffect(name, () => new Under(extend(currentCtx(), CLOCK, new TestClock()), task));
@@ -60,14 +69,48 @@ export const testSuite = (name: string, layer: Layer, tests: ReadonlyArray<Test>
 
 const describeCause = (cause: Cause): string => describeReport(report(cause));
 
+/** A `before_*` hook that failed with `cause`, or ran out of time as `cause` says: the setup of a test. */
+class Setup {
+  readonly cause: Cause | string;
+  constructor(cause: Cause | string) {
+    this.cause = cause;
+  }
+}
+
+/** Whether `value` is `Some` of an `Option`, as `timeout_option` gives. */
+const isSome = (value: unknown): value is Readonly<{ value: unknown }> =>
+  typeof value === "object" && value !== null && Reflect.get(value, "_tag") === "Some";
+
+const timedOut = (what: string, millis: number): string => `${what} timed out after ${millis} ms`;
+
 /**
- * A suite in a run: an owner of its own, into which its layer is built by a
- * fiber of its own before its first selected test, and which closes after its
- * last one.
+ * The hook `task`, within `millis` when there are some: one out of time is
+ * interrupted and fails with what timed out, the cleanup failure of a
+ * finalizer.
+ */
+const bounded = (task: Task, what: string, millis: number | undefined): Task =>
+  millis === undefined
+    ? task
+    : function* (): Run {
+        const done: unknown = yield timeoutOption(millis, task);
+        return isSome(done) ? undefined : raise(fail(timedOut(what, millis)));
+      };
+
+/** A test whose `before_each` hooks and body ran out of their `millis`. */
+class TimedOut {
+  readonly millis: number;
+  constructor(millis: number) {
+    this.millis = millis;
+  }
+}
+
+/**
+ * A suite in a run: an owner of its own, set up by a fiber of its own before
+ * its first selected test, and which closes after its last one.
  */
 interface SuiteRun {
   remaining: number;
-  readonly layer: Layer;
+  readonly suite: Suite;
   readonly owner: Owner;
   build: Fiber | undefined;
 }
@@ -77,25 +120,64 @@ const suiteRuns = (selected: ReadonlyArray<Named>): Map<Suite, SuiteRun> => {
   for (const { suites } of selected) {
     for (const suite of suites) {
       const run = runs.get(suite);
-      if (run === undefined) runs.set(suite, { remaining: 1, layer: suite.layer, owner: new Owner([]), build: undefined });
+      if (run === undefined) runs.set(suite, { remaining: 1, suite, owner: new Owner([]), build: undefined });
       else run.remaining++;
     }
   }
   return runs;
 };
 
-/** `task` with the services of the suites `runs`, outermost first, or the failure of their build. */
-const withSuites = (task: Task, runs: ReadonlyArray<SuiteRun>, ctx: Ctx): Task =>
-  runs.reduceRight<Task>(
-    (body, run) =>
-      function* (): Run {
-        run.build ??= fork(() => inside(run.owner, () => buildWith(run.layer, new MemoMap(undefined), run.owner)), ctx);
-        const built = asExit(yield awaitFiber(run.build));
-        if (built.cause !== undefined) return raise(built.cause);
-        return withServices(servicesOf(built.value), body);
-      },
-    task,
-  );
+/** The hooks `tasks` run in order, each within `millis` if any: a `Setup` of the first that fails. */
+function* runHooks(tasks: ReadonlyArray<Task>, what: string, millis?: number): Run {
+  for (const task of tasks) {
+    const exit = asExit(yield exitOf(millis === undefined ? task : () => timeoutOption(millis, task)));
+    // an interrupted hook interrupts the test, a failed one fails its setup
+    if (exit.cause !== undefined) return hasInterruptsOnly(exit.cause) ? raise(exit.cause) : new Setup(exit.cause);
+    if (millis !== undefined && !isSome(exit.value)) return new Setup(timedOut(what, millis));
+  }
+  return undefined;
+}
+
+/**
+ * The setup of a suite, in its owner: its `after_all` hooks are finalizers,
+ * whatever its `before_all` hooks do, then those run, then its layer is
+ * built; its hooks have its timeout, if it has one.
+ */
+function* setUp({ suite: { hooks: own, layer, timeout }, owner }: SuiteRun): Run {
+  for (const task of own?.after_all ?? []) addFinalizer(bounded(task, "after_all", timeout));
+  const setup = yield runHooks(own?.before_all ?? [], "before_all", timeout);
+  if (setup instanceof Setup || layer === undefined) return setup;
+  return yield buildWith(layer, new MemoMap(undefined), owner);
+}
+
+/**
+ * A test in its scope: the suites it is in set up, outermost first, then,
+ * within its `timeout`, the `before_each` hooks of each, outermost first,
+ * and `body` with their services; the `after_each` hooks are finalizers of
+ * the test's scope.
+ */
+function* runCase(body: Task, runs: ReadonlyArray<SuiteRun>, timeout: number | undefined, ctx: Ctx): Run {
+  const services: Array<Services> = [];
+  for (const run of runs) {
+    run.build ??= fork(() => inside(run.owner, () => setUp(run)), ctx);
+    const built = asExit(yield awaitFiber(run.build));
+    if (built.cause !== undefined) return raise(built.cause);
+    if (built.value instanceof Setup) return built.value;
+    if (run.suite.layer !== undefined) services.push(servicesOf(built.value));
+  }
+  function* each(): Run {
+    for (const { suite } of runs) {
+      for (const task of suite.hooks?.after_each ?? []) addFinalizer(bounded(task, "after_each", suite.timeout));
+      // the test's timeout bounds its `before_each` hooks and its body together
+      const setup = yield runHooks(suite.hooks?.before_each ?? [], "before_each");
+      if (setup instanceof Setup) return setup;
+    }
+    return yield services.reduceRight<Task>((inner, s) => () => withServices(s, inner), body)();
+  }
+  if (timeout === undefined) return yield each();
+  const done: unknown = yield timeoutOption(timeout, each);
+  return isSome(done) ? done.value : new TimedOut(timeout);
+}
 
 type Problem = Readonly<{ kind: NonNullable<TestResult["kind"]>; message: string }>;
 
@@ -103,12 +185,18 @@ type Problem = Readonly<{ kind: NonNullable<TestResult["kind"]>; message: string
 const outcome = (exit: Exit): Problem | undefined => {
   const { cause } = exit;
   if (cause === undefined) {
-    return typeof exit.value === "string" ? { kind: "assertion", message: exit.value } : undefined;
+    const { value } = exit;
+    if (value instanceof Setup) {
+      const why = value.cause;
+      return { kind: "setup", message: typeof why === "string" ? why : (outcome(failed(why))?.message ?? "") };
+    }
+    if (value instanceof TimedOut) return { kind: "timeout", message: `timed out after ${value.millis} ms` };
+    return typeof value === "string" ? { kind: "assertion", message: value } : undefined;
   }
   if (hasDies(cause)) return { kind: "defect", message: describeCause(cause) };
   if (hasInterruptsOnly(cause)) return { kind: "interrupted", message: "interrupted" };
-  const fail = cause.reasons.find(isFail);
-  if (fail && Core.isAssertionFailed(fail.error)) return { kind: "assertion", message: fail.error._0 };
+  const reason = cause.reasons.find(isFail);
+  if (reason && Core.isAssertionFailed(reason.error)) return { kind: "assertion", message: reason.error._0 };
   return { kind: "failure", message: describeCause(cause) };
 };
 
@@ -122,16 +210,16 @@ const resultOf = (name: string, { exit, cleanup, defects }: OwnedExits): TestRes
 };
 
 /** Runs one test, then closes the suites it ends, and gives its result to `done`. */
-function* runOne({ name, test, suites }: Named, seed: number, runs: Map<Suite, SuiteRun>, ctx: Ctx, done: (r: TestResult) => void): Run {
+function* runOne({ name, test, suites, timeout }: Named, seed: number, runs: Map<Suite, SuiteRun>, ctx: Ctx, done: (r: TestResult) => void): Run {
   const mine = suites.flatMap((s) => runs.get(s) ?? []);
-  const owned = yield ownedExits(() =>
+  const body =
     test.kind === "effect"
-      ? (function* (): Run {
-          yield withSuites(test.task, mine, ctx)();
+      ? function* (): Run {
+          yield test.task();
           return undefined;
-        })()
-      : Core.checks(test, seed),
-  );
+        }
+      : () => Core.checks(test, seed);
+  const owned = yield ownedExits(() => runCase(body, mine, timeout, ctx));
   if (!(owned instanceof OwnedExits)) throw new TypeError("not the exits of a test");
   const r = resultOf(name, owned);
   let why: string | undefined;

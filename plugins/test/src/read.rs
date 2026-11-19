@@ -1,6 +1,7 @@
 //! The cases of a block, read from its tokens: `suite "name" { … }` holds
-//! suites and tests, `test "name" { body }` the user's body, which the
-//! compiler parses, and either may be `.skip` or `.only`.
+//! suites, tests and hooks, `test "name" { body }` and `before_each { body }`
+//! the user's body, which the compiler parses, and a case may be `.skip` or
+//! `.only` and have a `timeout`.
 
 use flick_plugin::{Block, Compiler, Diagnostic, Place, Span, Token, TokenKind, string_value};
 
@@ -20,30 +21,46 @@ pub enum Mode {
     Only,
 }
 
-/// A suite or a test, at spans of the block.
+/// A suite, a test or a hook, at spans of the block.
 pub struct Item {
-    /// The word that starts it, `test` or `suite`; none for the block's
-    /// own, its head.
+    /// The word that starts it, `test`, `suite` or a hook's; none for the
+    /// block's own, its head.
     pub word: Option<Span>,
     /// The modifier's word, `skip` of `.skip`, if there is one.
     pub modifier: Option<Span>,
     pub mode: Mode,
-    /// The string token naming it.
+    /// The string token naming it; a hook's word, as a hook has no name.
     pub name: Span,
+    /// The word `timeout` and its milliseconds, the expression after it.
+    pub timeout: Option<(Span, Span)>,
     pub kind: Kind,
     /// Where its `}` ends.
     pub end: u32,
 }
 
 pub enum Kind {
-    /// Its suites and tests in the order written.
+    /// Its suites, tests and hooks in the order written.
     Suite(Vec<Item>),
     /// Its body, none when the braces are empty.
     Test(Option<Span>),
+    /// A hook of the suite it is in, its word one of [`HOOKS`], and its body.
+    Hook(Option<Span>),
 }
 
-/// The words that start an item, as the heads of the blocks.
+/// The words that start a case, as the heads of the blocks.
 pub const WORDS: [&str; 2] = ["suite", "test"];
+
+/// The words that start a hook of a suite, as the functions of `Test`.
+pub const HOOKS: [&str; 4] = ["before_all", "before_each", "after_each", "after_all"];
+
+/// What the tokens after a case's word say of it: its modifier, its name
+/// and its timeout.
+struct Header {
+    modifier: Option<Span>,
+    mode: Mode,
+    name: Span,
+    timeout: Option<(Span, Span)>,
+}
 
 /// How a test's body that does not parse is read.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -76,16 +93,19 @@ pub fn structure(block: &Block) -> Result<Item, Vec<Diagnostic>> {
     let arguments = block.arguments();
     let braced = before(block, block.body) == Some(b'{');
     let header = header(block, arguments).filter(|_| braced);
-    let (modifier, mode, name) = match header {
-        Some(header) if block.place == Place::Declaration => header,
-        _ => {
-            let message = if suite {
-                "a `suite` block starts a top-level declaration, names its case and holds its tests in braces: `suite \"name\" { … }`, maybe `suite.skip` or `suite.only`"
-            } else {
-                "a `test` block starts a top-level declaration, names its case and holds its body in braces: `test \"name\" { … }`, maybe `test.skip` or `test.only`"
-            };
-            return Err(vec![malformed(block.whole(), message)]);
-        }
+    let Some(Header {
+        modifier,
+        mode,
+        name,
+        timeout,
+    }) = header.filter(|_| block.place == Place::Declaration)
+    else {
+        let message = if suite {
+            "a `suite` block starts a top-level declaration, names its case and holds its tests in braces: `suite \"name\" { … }`, maybe `suite.skip` or `suite.only`, and `timeout millis` after the name"
+        } else {
+            "a `test` block starts a top-level declaration, names its case and holds its body in braces: `test \"name\" { … }`, maybe `test.skip` or `test.only`, and `timeout millis` after the name"
+        };
+        return Err(vec![malformed(block.whole(), message)]);
     };
     let body = &block.tokens[arguments.len()..];
     let kind = if suite {
@@ -98,6 +118,7 @@ pub fn structure(block: &Block) -> Result<Item, Vec<Diagnostic>> {
         modifier,
         mode,
         name,
+        timeout,
         kind,
         end: block.whole().end,
     };
@@ -110,27 +131,45 @@ pub fn structure(block: &Block) -> Result<Item, Vec<Diagnostic>> {
     }
 }
 
-/// The body of each test under `item`, its range of tokens parsed by the
-/// compiler as after the `=` of a `let`: its lines, or one expression.
+/// The body of each test and hook under `item`, its range of tokens parsed
+/// by the compiler as after the `=` of a `let`: its lines, or one
+/// expression; and each timeout's expression.
 fn parse(
     block: &Block,
     item: &mut Item,
     compiler: &mut dyn Compiler,
     bodies: Bodies,
 ) -> Result<(), Diagnostic> {
+    if let Some((_, millis)) = &mut item.timeout {
+        let hole = compiler.parse_expr(millis.start, millis.end)?;
+        if hole.span.end < millis.end {
+            let rest = Span {
+                start: hole.span.end,
+                end: millis.end,
+            };
+            return Err(malformed(
+                rest,
+                "expected the `{` after the milliseconds of the timeout",
+            ));
+        }
+        *millis = hole.span;
+    }
     let kind = &mut item.kind;
     match kind {
         Kind::Suite(items) => {
             (items.iter_mut()).try_for_each(|i| parse(block, i, compiler, bodies))
         }
-        Kind::Test(None) => Ok(()),
-        Kind::Test(Some(body)) => {
+        Kind::Test(None) | Kind::Hook(None) => Ok(()),
+        Kind::Test(Some(body)) | Kind::Hook(Some(body)) => {
             let hole = match compiler.parse_body(body.start, body.end) {
                 Ok(hole) => hole,
                 // lines are a block, which the compiler parses whatever they hold, so
                 // it has reported why they do not parse
                 Err(_) if bodies == Bodies::Lenient && before(block, body.start) == Some(b'\n') => {
-                    *kind = Kind::Test(None);
+                    match kind {
+                        Kind::Hook(body) | Kind::Test(body) => *body = None,
+                        Kind::Suite(_) => {}
+                    }
                     return Ok(());
                 }
                 Err(d) => return Err(d),
@@ -168,12 +207,20 @@ fn range(tokens: &[Token]) -> Option<Span> {
     })
 }
 
-/// The modifier and the name of a case, from the tokens after its word:
-/// `"name"`, `.skip "name"` or `.only "name"`.
-fn header(block: &Block, tokens: &[Token]) -> Option<(Option<Span>, Mode, Span)> {
-    let (modifier, name) = match tokens {
-        [name] => (None, name),
-        [dot, word, name] if block.text_of(dot.span) == "." => (Some(word.span), name),
+/// The modifier, the name and the timeout of a case, from the tokens after
+/// its word: `"name"`, `.skip "name"` or `.only "name"`, maybe followed by
+/// `timeout millis`.
+fn header(block: &Block, tokens: &[Token]) -> Option<Header> {
+    let (modifier, rest) = match tokens {
+        [dot, word, rest @ ..] if block.text_of(dot.span) == "." => (Some(word.span), rest),
+        rest => (None, rest),
+    };
+    let (name, rest) = rest.split_first()?;
+    let timeout = match rest {
+        [] => None,
+        [word, millis @ ..] if block.text_of(word.span) == "timeout" => {
+            Some((word.span, range(millis)?))
+        }
         _ => return None,
     };
     let mode = match modifier.map(|m| block.text_of(m)) {
@@ -182,10 +229,15 @@ fn header(block: &Block, tokens: &[Token]) -> Option<(Option<Span>, Mode, Span)>
         Some("only") => Mode::Only,
         Some(_) => return None,
     };
-    (name.kind == TokenKind::String).then_some((modifier, mode, name.span))
+    (name.kind == TokenKind::String).then_some(Header {
+        modifier,
+        mode,
+        name: name.span,
+        timeout,
+    })
 }
 
-/// The suites and tests of a suite's body, `tokens`.
+/// The suites, tests and hooks of a suite's body, `tokens`.
 fn items(block: &Block, tokens: &[Token]) -> Result<Vec<Item>, Diagnostic> {
     let mut out = Vec::new();
     let mut i = 0;
@@ -197,25 +249,37 @@ fn items(block: &Block, tokens: &[Token]) -> Result<Vec<Item>, Diagnostic> {
         }
         // the header runs to the `{` of the body, which the parser balanced
         let open = (tokens[i..].iter()).position(|t| block.text_of(t.span) == "{");
-        let found = open.filter(|_| WORDS.contains(&w)).and_then(|open| {
-            let header = header(block, &tokens[i + 1..i + open])?;
+        let hook = HOOKS.contains(&w);
+        let found = open.and_then(|open| {
+            let after = &tokens[i + 1..i + open];
+            let header = match after {
+                [] if hook => Header {
+                    modifier: None,
+                    mode: Mode::Run,
+                    name: word.span,
+                    timeout: None,
+                },
+                _ if WORDS.contains(&w) => header(block, after)?,
+                _ => return None,
+            };
             Some((header, i + open, closing(block, tokens, i + open)?))
         });
-        let Some(((modifier, mode, name), open, close)) = found else {
-            let message = "a suite holds `test \"name\" { … }` and `suite \"name\" { … }`, maybe with `.skip` or `.only`";
+        let Some((header, open, close)) = found else {
+            let message = "a suite holds `test \"name\" { … }`, `suite \"name\" { … }`, maybe with `.skip` or `.only` and `timeout millis`, and the hooks `before_all`, `before_each`, `after_each` and `after_all { … }`";
             return Err(malformed(word.span, message));
         };
         let inner = &tokens[open + 1..close];
-        let kind = if w == "suite" {
-            Kind::Suite(items(block, inner)?)
-        } else {
-            Kind::Test(range(inner))
+        let kind = match w {
+            "suite" => Kind::Suite(items(block, inner)?),
+            "test" => Kind::Test(range(inner)),
+            _ => Kind::Hook(range(inner)),
         };
         out.push(Item {
             word: Some(word.span),
-            modifier,
-            mode,
-            name,
+            modifier: header.modifier,
+            mode: header.mode,
+            name: header.name,
+            timeout: header.timeout,
             kind,
             end: tokens[close].span.end,
         });
@@ -244,10 +308,11 @@ fn duplicates(block: &Block, item: &Item, out: &mut Vec<Diagnostic>) {
     let Kind::Suite(items) = &item.kind else {
         return;
     };
-    let names: Vec<String> = (items.iter())
+    let cases = || items.iter().filter(|i| !matches!(i.kind, Kind::Hook(_)));
+    let names: Vec<String> = cases()
         .map(|i| string_value(block.text_of(i.name)))
         .collect();
-    for (inner, name) in items.iter().zip(&names) {
+    for (inner, name) in cases().zip(&names) {
         if names.iter().filter(|n| *n == name).count() > 1 {
             out.push(duplicate(block, inner.name));
         }
@@ -271,5 +336,5 @@ fn malformed(span: Span, message: &str) -> Diagnostic {
 /// The name of a top-level block, as its string's value; none for a block
 /// that does not name its case.
 pub fn name_of(block: &Block) -> Option<String> {
-    header(block, block.arguments()).map(|(_, _, name)| string_value(block.text_of(name)))
+    header(block, block.arguments()).map(|h| string_value(block.text_of(h.name)))
 }

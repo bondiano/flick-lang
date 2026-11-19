@@ -539,6 +539,14 @@
     "named": false
   },
   {
+    "type": "after_all",
+    "named": false
+  },
+  {
+    "type": "after_each",
+    "named": false
+  },
+  {
     "type": "as",
     "named": false
   },
@@ -552,6 +560,14 @@
   },
   {
     "type": "await",
+    "named": false
+  },
+  {
+    "type": "before_all",
+    "named": false
+  },
+  {
+    "type": "before_each",
     "named": false
   },
   {
@@ -739,6 +755,10 @@
   },
   {
     "type": "then",
+    "named": false
+  },
+  {
+    "type": "timeout",
     "named": false
   },
   {

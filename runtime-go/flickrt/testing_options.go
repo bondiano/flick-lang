@@ -20,6 +20,9 @@ type testOptions struct {
 	seeded, watched  bool
 	color, progress  bool
 	list, forbidOnly bool
+	// the milliseconds of each test without a Test.timeout of its own
+	timeout float64
+	timed   bool
 }
 
 func parseTestArgs(args []string) testOptions {
@@ -46,6 +49,10 @@ func parseTestArgs(args []string) testOptions {
 			o.color = value == "always"
 		case "--progress":
 			o.progress = value == "live"
+		case "--timeout":
+			if n, err := strconv.ParseFloat(value, 64); err == nil {
+				o.timeout, o.timed = n, true
+			}
 		case "--watched":
 			o.watched = true
 			continue
@@ -81,7 +88,7 @@ func marked(t Value, mode string) Value {
 func selectTests(suites []Suite, o testOptions) (selected []named, skipped []testResult) {
 	var all, marked []named
 	for _, s := range suites {
-		all = append(all, flatten(s.Module, List(s.Tests), nil, nil, false, false)...)
+		all = append(all, flatten(s.Module, List(s.Tests), nil, nil, marks{timeout: o.timeout, timed: o.timed})...)
 	}
 	// a test marked only in the selected files keeps the run to such tests
 	onlyMarked := false

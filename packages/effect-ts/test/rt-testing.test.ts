@@ -16,6 +16,10 @@ import {
   genInt,
   runTests,
   testAdjust,
+  testAfterAll,
+  testAfterEach,
+  testBeforeAll,
+  testBeforeEach,
   testClock,
   testEffect,
   testGroup,
@@ -24,6 +28,7 @@ import {
   testPure,
   testSkip,
   testSuite,
+  testTimeout,
 } from "@flick-lang/runtime/rt/testing";
 import type { TestResult } from "@flick-lang/runtime/core/suites";
 import { tag } from "@flick-lang/runtime/tags";
@@ -40,11 +45,11 @@ interface Report {
 const isReport = (v: unknown): v is Report => typeof v === "object" && v !== null && Array.isArray(Reflect.get(v, "tests"));
 
 /** The JSON report of a run, and the exit code it set. */
-const run = async (modules: Parameters<typeof runTests>[0], seed = 7) => {
+const run = async (modules: Parameters<typeof runTests>[0], seed = 7, options: Parameters<typeof runTests>[1] = {}) => {
   let out = "";
   const before = process.exitCode;
   try {
-    await runTests(modules, { reporter: "json", seed, write: (text) => void (out += text) });
+    await runTests(modules, { ...options, reporter: "json", seed, write: (text) => void (out += text) });
     const json: unknown = JSON.parse(out);
     assert.ok(isReport(json), out);
     return { code: process.exitCode, json };
@@ -164,3 +169,138 @@ test("a skipped test never runs, only keeps the run to its tests, and both selec
     assert.deepEqual(ran, []);
   }
 });
+
+/** What a test of both levels runs, around its `body`. */
+const each = (body: string) => ["before_each outer", "before_each inner", body, "after_each inner", "after_each outer"];
+
+test("hooks run around the selected tests, outer to inner, and their cleanup in reverse", async () => {
+  const log: Array<string> = [];
+  const note = (text: string) => () => void log.push(text);
+  const hooks = (level: string) => [
+    testBeforeAll(note(`before_all ${level}`)),
+    testBeforeEach(note(`before_each ${level}`)),
+    testAfterEach(note(`after_each ${level}`)),
+    testAfterAll(note(`after_all ${level}`)),
+  ];
+  const { code, json } = await run([
+    [
+      "M",
+      [
+        testGroup("outer", [
+          ...hooks("outer"),
+          testGroup("inner", [...hooks("inner"), testEffect("one", note("one")), testEffect("two", note("two"))]),
+          testPure("three", () => (log.push("three"), PASS)),
+          // a group none of whose tests the run selects runs no hooks
+          testSkip(testGroup("skipped", [...hooks("skipped"), testEffect("four", note("four"))])),
+        ]),
+      ],
+    ],
+  ]);
+  assert.equal(code, 0);
+  assert.deepEqual(json.tests.map((t) => [t.name, t.status]), [
+    ["M > outer > inner > one", "passed"],
+    ["M > outer > inner > two", "passed"],
+    ["M > outer > three", "passed"],
+    ["M > outer > skipped > four", "skipped"],
+  ]);
+  assert.deepEqual(log, [
+    "before_all outer",
+    "before_all inner",
+    ...each("one"),
+    ...each("two"),
+    "after_all inner",
+    "before_each outer",
+    "three",
+    "after_each outer",
+    "after_all outer",
+  ]);
+});
+
+test("a failed setup reports its tests as such and still runs what cleans up", async () => {
+  const log: Array<string> = [];
+  const note = (text: string) => () => void log.push(text);
+  const { json } = await run([
+    [
+      "M",
+      [
+        testGroup("all", [
+          testBeforeAll(() => raise(fail(assertionFailed("no database")))),
+          testAfterAll(note("after_all")),
+          testEffect("a", note("a")),
+          testEffect("b", note("b")),
+        ]),
+        testGroup("each", [
+          testAfterEach(note("after_each")),
+          testBeforeEach(() => raise(fail("boom"))),
+          testEffect("c", note("c")),
+        ]),
+      ],
+    ],
+  ]);
+  assert.deepEqual(json.tests.map((t) => [t.name, t.status, t.kind, t.message]), [
+    ["M > all > a", "failed", "setup", "no database"],
+    ["M > all > b", "failed", "setup", "no database"],
+    ["M > each > c", "failed", "setup", "fail boom"],
+  ]);
+  assert.deepEqual(log, ["after_all", "after_each"]);
+});
+
+test("a test out of time is interrupted, cleaned up and reported as such", async () => {
+  const log: Array<string> = [];
+  const slow = (name: string) =>
+    testEffect(name, function* (): Run {
+      yield sleep(new Duration(HOUR));
+      log.push(`${name} woke`);
+      return undefined;
+    });
+  const modules: Parameters<typeof runTests>[0] = [
+    [
+      "M",
+      [
+        testGroup("g", [testAfterEach(() => void log.push("after_each")), testTimeout(20, slow("own")), slow("default")]),
+        testTimeout(5000, testEffect("quick", () => undefined)),
+      ],
+    ],
+  ];
+  // `--timeout` gives the tests without a timeout of their own theirs
+  const { json } = await run(modules, 7, { timeout: 30 });
+  assert.deepEqual(json.tests.map((t) => [t.name, t.status, t.kind, t.message]), [
+    ["M > g > own", "failed", "timeout", "timed out after 20 ms"],
+    ["M > g > default", "failed", "timeout", "timed out after 30 ms"],
+    ["M > quick", "passed", undefined, undefined],
+  ]);
+  assert.deepEqual(log, ["after_each", "after_each"]);
+});
+
+/** A hook that never ends in a test's time. */
+function* hang(): Run {
+  yield sleep(new Duration(HOUR));
+  return undefined;
+}
+
+test("a hook out of its suite's time is interrupted, reported, and the run goes on", async () => {
+  const log: Array<string> = [];
+  const note = (text: string) => () => void log.push(text);
+  // `--timeout` gives the suites without a timeout of their own theirs too
+  const { json } = await run(
+    [
+      [
+        "M",
+        [
+          testGroup("setup", [testBeforeAll(hang), testAfterAll(note("after_all setup")), testEffect("a", note("a"))]),
+          testGroup("cleanup", [testAfterEach(hang), testAfterAll(hang), testEffect("b", note("b"))]),
+          testEffect("after", note("after")),
+        ],
+      ],
+    ],
+    7,
+    { timeout: 20 },
+  );
+  assert.deepEqual(json.tests.map((t) => [t.name, t.status, t.kind, t.message, t.cleanup]), [
+    ["M > setup > a", "failed", "setup", "before_all timed out after 20 ms", undefined],
+    ["M > cleanup > b", "failed", "cleanup", "fail after_each timed out after 20 ms", "fail after_all timed out after 20 ms"],
+    ["M > after", "passed", undefined, undefined, undefined],
+  ]);
+  assert.deepEqual(log, ["after_all setup", "b", "after"]);
+});
+

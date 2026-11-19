@@ -79,25 +79,40 @@ export const random = (seed: number): Rng => {
 /** What `Test.skip` and `Test.only` ask of a test and of each test in it. */
 export type Mode = "skip" | "only";
 
-/** `Test.Test`, whose effect tests hold a `Task` and whose suites a `L`ayer. */
+/** When a hook of a group runs around the group's selected tests. */
+export type When = "before_all" | "before_each" | "after_each" | "after_all";
+
+/** The hooks of a group, each kind in the order written. */
+export type Hooks<Task> = Readonly<Record<When, ReadonlyArray<Task>>>;
+
+/**
+ * `Test.Test`, whose effect tests and hooks hold a `Task` and whose suites a
+ * `L`ayer; `timeout`, of `Test.timeout`, is in milliseconds.
+ */
 export type Test<Task, L> = (
   | Readonly<{ kind: "pure"; name: string; body: (unit: undefined) => Assertion }>
   | Readonly<{ kind: "effect"; name: string; task: Task }>
   | Readonly<{ kind: "property"; name: string; run: (rng: Rng, index: number) => string | undefined }>
   | Readonly<{ kind: "group"; name: string; tests: ReadonlyArray<Test<Task, L>> }>
+  | Readonly<{ kind: "hook"; name: string; when: When; task: Task }>
   | Suite<Task, L>
-) & Readonly<{ mode?: Mode }>;
+) & Readonly<{ mode?: Mode; timeout?: number }>;
 
-/** `Test.suite`: tests that share the services of `layer`, built once for them. */
+/**
+ * A suite in a run: `Test.suite`, tests that share the services of `layer`,
+ * built once for them, or a group with hooks, which run around its tests.
+ */
 export type Suite<Task, L> = Readonly<{
   kind: "suite";
   name: string;
-  layer: L;
+  layer?: L;
+  hooks?: Hooks<Task>;
   tests: ReadonlyArray<Test<Task, L>>;
   mode?: Mode;
+  timeout?: number;
 }>;
 
-export type Leaf<Task, L> = Exclude<Test<Task, L>, { kind: "group" | "suite" }>;
+export type Leaf<Task, L> = Exclude<Test<Task, L>, { kind: "group" | "suite" | "hook" }>;
 
 export const testPure = <Task, L>(name: string, body: (unit: undefined) => Assertion): Test<Task, L> =>
   Object.freeze({ kind: "pure", name, body });
@@ -109,6 +124,33 @@ export const testSkip = <Task, L>(test: Test<Task, L>): Test<Task, L> => Object.
 
 /** `Test.only`: the test, and each test in it, marked for a run of only the marked tests. */
 export const testOnly = <Task, L>(test: Test<Task, L>): Test<Task, L> => Object.freeze({ ...test, mode: "only" });
+
+/** `Test.timeout`: the test, and each test in it without a timeout of its own, given `millis`. */
+export const testTimeout = <Task, L>(millis: number, test: Test<Task, L>): Test<Task, L> =>
+  Object.freeze({ ...test, timeout: millis });
+
+const hook =
+  (when: When) =>
+  <Task, L>(task: Task): Test<Task, L> =>
+    Object.freeze({ kind: "hook", name: when, when, task });
+
+/** `Test.before_all`, `before_each`, `after_each` and `after_all`: hooks of the group they are in. */
+export const testBeforeAll = /*#__PURE__*/ hook("before_all");
+export const testBeforeEach = /*#__PURE__*/ hook("before_each");
+export const testAfterEach = /*#__PURE__*/ hook("after_each");
+export const testAfterAll = /*#__PURE__*/ hook("after_all");
+
+/** The hooks among `tests`, none when there are none. */
+const hooksOf = <Task, L>(tests: ReadonlyArray<Test<Task, L>>): Hooks<Task> | undefined => {
+  const hooks: Record<When, Array<Task>> = { before_all: [], before_each: [], after_each: [], after_all: [] };
+  let any = false;
+  for (const t of tests) {
+    if (t.kind !== "hook") continue;
+    hooks[t.when].push(t.task);
+    any = true;
+  }
+  return any ? hooks : undefined;
+};
 
 /** A BigInt as `<digits>n` and a function as `<function>`, not its source. */
 const replacePreview = (_: string, v: unknown): unknown => {
@@ -164,27 +206,48 @@ export const checks = <Task, L>(test: Exclude<Leaf<Task, L>, { kind: "effect" }>
 export interface Named<Task, L> {
   readonly name: string;
   readonly test: Leaf<Task, L>;
-  /** The suites it is in, outermost first. */
+  /** The suites it is in, outermost first: those of `Test.suite` and the groups with hooks. */
   readonly suites: ReadonlyArray<Suite<Task, L>>;
   /** Whether it or a group it is in is skipped, or marked `only`. */
   readonly skip: boolean;
   readonly only: boolean;
+  /** The milliseconds of its innermost `Test.timeout`, if any. */
+  readonly timeout?: number | undefined;
 }
 
-/** Tests with their full names, `Module > group > name`. */
+type Marks = Readonly<{ skip: boolean; only: boolean; timeout?: number | undefined }>;
+
+/**
+ * Tests with their full names, `Module > group > name`; the hooks of a list
+ * make it, the module's or a group's, a suite of the tests under it, whose
+ * timeout, its own or the one around it, its hooks have too.
+ */
 export const flatten = <Task, L>(
   prefix: string,
   tests: ReadonlyArray<Test<Task, L>>,
   out: Array<Named<Task, L>> = [],
-  suites: ReadonlyArray<Suite<Task, L>> = [],
-  outer: Readonly<{ skip: boolean; only: boolean }> = { skip: false, only: false },
+  outer: ReadonlyArray<Suite<Task, L>> = [],
+  marks: Marks = { skip: false, only: false },
 ): Array<Named<Task, L>> => {
+  const hooks = hooksOf(tests);
+  let suites = outer;
+  if (hooks) {
+    const { timeout } = marks;
+    const level: Suite<Task, L> =
+      timeout === undefined ? { kind: "suite", name: prefix, hooks, tests } : { kind: "suite", name: prefix, hooks, tests, timeout };
+    suites = [...outer, Object.freeze(level)];
+  }
   for (const t of tests) {
+    if (t.kind === "hook") continue;
     const name = `${prefix} > ${t.name}`;
-    const marks = { skip: outer.skip || t.mode === "skip", only: outer.only || t.mode === "only" };
-    if (t.kind === "group") flatten(name, t.tests, out, suites, marks);
-    else if (t.kind === "suite") flatten(name, t.tests, out, [...suites, t], marks);
-    else out.push({ name, test: t, suites, ...marks });
+    const own = {
+      skip: marks.skip || t.mode === "skip",
+      only: marks.only || t.mode === "only",
+      timeout: t.timeout ?? marks.timeout,
+    };
+    if (t.kind === "group") flatten(name, t.tests, out, suites, own);
+    else if (t.kind === "suite") flatten(name, t.tests, out, [...suites, t], own);
+    else out.push({ name, test: t, suites, ...own });
   }
   return out;
 };

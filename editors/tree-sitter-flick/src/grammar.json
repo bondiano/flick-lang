@@ -30,6 +30,10 @@
           "name": "_case"
         },
         {
+          "type": "SYMBOL",
+          "name": "_hook"
+        },
+        {
           "type": "ALIAS",
           "content": {
             "type": "SYMBOL",
@@ -301,6 +305,70 @@
           {
             "type": "SYMBOL",
             "name": "string"
+          },
+          {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "_timeout"
+              },
+              {
+                "type": "BLANK"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "_timeout": {
+      "type": "PREC_DYNAMIC",
+      "value": 1,
+      "content": {
+        "type": "ALIAS",
+        "content": {
+          "type": "STRING",
+          "value": "timeout"
+        },
+        "named": true,
+        "value": "keyword"
+      }
+    },
+    "_hook": {
+      "type": "PREC_DYNAMIC",
+      "value": 1,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "ALIAS",
+            "content": {
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "STRING",
+                  "value": "before_all"
+                },
+                {
+                  "type": "STRING",
+                  "value": "before_each"
+                },
+                {
+                  "type": "STRING",
+                  "value": "after_each"
+                },
+                {
+                  "type": "STRING",
+                  "value": "after_all"
+                }
+              ]
+            },
+            "named": true,
+            "value": "keyword"
+          },
+          {
+            "type": "SYMBOL",
+            "name": "braces"
           }
         ]
       }
@@ -1243,6 +1311,26 @@
         {
           "type": "STRING",
           "value": "test"
+        },
+        {
+          "type": "STRING",
+          "value": "timeout"
+        },
+        {
+          "type": "STRING",
+          "value": "before_all"
+        },
+        {
+          "type": "STRING",
+          "value": "before_each"
+        },
+        {
+          "type": "STRING",
+          "value": "after_each"
+        },
+        {
+          "type": "STRING",
+          "value": "after_all"
         }
       ]
     },
@@ -1431,6 +1519,13 @@
     [
       "_case",
       "identifier"
+    ],
+    [
+      "_hook",
+      "identifier"
+    ],
+    [
+      "_case"
     ]
   ],
   "precedences": [],
