@@ -23,9 +23,10 @@ use flick_model::types::{Row, Scheme, Type};
 const GOLDEN: usize = 32;
 
 /// Programs of the fixed run whose certificates were once wrong, which
-/// `Kept.lean` keeps: both put a closure over a region into the opaque
-/// `Fixture.Sealed`, data with hidden storage.
-const KEPT: [usize; 2] = [435, 1929];
+/// `Kept.lean` keeps: 435 and 1929 put a closure over a region into the
+/// opaque `Fixture.Sealed`, data with hidden storage, and 570 matches the `x`
+/// of a `try` by an error its body does not raise.
+const KEPT: [usize; 3] = [435, 570, 1929];
 
 fn repo() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("..")
