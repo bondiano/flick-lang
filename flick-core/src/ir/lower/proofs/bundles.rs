@@ -95,6 +95,23 @@ impl Checking<'_, '_> {
                 self.out.push(failure);
             }
         }
+        let slots: Vec<&String> = bundle.supers.iter().map(|(s, _)| s).collect();
+        let shared = (slots.iter().enumerate()).find(|(i, s)| slots[..*i].contains(s));
+        if let Some((_, slot)) = shared {
+            // a field names no one superclass, nor its dictionary one instance
+            self.out.push(Failure::Refused(logic::Refused {
+                span: self.span,
+                why: format!(
+                    "two superclasses of `{}` share the dictionary field `{slot}`",
+                    bundle.class
+                ),
+            }));
+            // the fields under it are refused with it, not reported again
+            for (field, used) in self.fields.iter().zip(&mut self.used) {
+                *used |= field.path.len() > path.len() && field.path.starts_with(path);
+            }
+            return;
+        }
         for (slot, inner) in &bundle.supers {
             let dict = Dict::Super {
                 dict: Box::new(dict.clone()),
@@ -120,12 +137,13 @@ impl Checking<'_, '_> {
             self.given(l, dict);
             self.given(r, dict);
         }
+        // the law's own type variables apart from the bundle's, so that the
+        // class's parameters filled in capture none of them
+        let at_bundle = |t: &Ty| apart(t, params).instantiate(params, &bundle.args);
         let mut stated = info.clone();
-        stated.params = (info.params.iter())
-            .map(|t| t.instantiate(params, &bundle.args))
-            .collect();
+        stated.params = info.params.iter().map(at_bundle).collect();
         if let GoalType::Equal(t) = &info.goal {
-            stated.goal = GoalType::Equal(t.instantiate(params, &bundle.args));
+            stated.goal = GoalType::Equal(at_bundle(t));
         }
         let statement = statement(&at, &stated)?;
         let ExprKind::Global { module, name } = &field.value.kind else {
@@ -143,7 +161,19 @@ impl Checking<'_, '_> {
         let order: Vec<bool> = law.premise.clone();
         let types: Vec<&Ty> = statement.params.iter().map(|(_, t)| t).collect();
         let theirs: Vec<&Ty> = lemma.statement.params.iter().map(|(_, t)| t).collect();
+        // the lemma is about values of exactly the law's types: its
+        // parameters, premises and equation, up to a renaming
         let mut renaming = Vec::new();
+        let equations = |s: &logic::Statement| -> Vec<Ty> {
+            let goal = match &s.goal {
+                logic::Goal::Equal(e) => Some(e.ty.clone()),
+                logic::Goal::SameType(..) => None,
+            };
+            (s.premises.iter().map(|(_, e)| e.ty.clone()))
+                .chain(goal)
+                .collect()
+        };
+        let (ours, others) = (equations(&statement), equations(&lemma.statement));
         let fits = lemma
             .order
             .iter()
@@ -153,7 +183,9 @@ impl Checking<'_, '_> {
             && types
                 .iter()
                 .zip(&theirs)
-                .all(|(a, b)| renames(b, a, &mut renaming));
+                .all(|(a, b)| renames(b, a, &mut renaming))
+            && ours.len() == others.len()
+            && (ours.iter().zip(&others)).all(|(a, b)| renames(b, a, &mut renaming));
         if !fits {
             let why = format!(
                 "`{name}` is not stated over the parameters of the law `{}`",
@@ -201,7 +233,8 @@ impl Checking<'_, '_> {
         if let Dict::Instance { module, name, args } = &inner
             && args.is_empty()
             && let Some((info, _)) = self.program.instance(module, name)
-            && let Some((_, own)) = info.supers.iter().find(|(c, _)| *c == class)
+            && let mut found = info.supers.iter().filter(|(c, _)| *c == class)
+            && let (Some((_, own)), None) = (found.next(), found.next())
         {
             return self.canonical(own.clone());
         }
@@ -221,6 +254,21 @@ fn at(d: &Dict, dict: &Dict) -> Dict {
             class: class.clone(),
         },
         other => other.clone(),
+    }
+}
+
+/// `t` with each rigid variable but the class's parameters `keep` renamed
+/// apart from any of a bundle's types.
+fn apart(t: &Ty, keep: &[String]) -> Ty {
+    match t {
+        Ty::Rigid(x) if !keep.contains(x) => Ty::Rigid(format!("{x}$law")),
+        Ty::Data { module, name, args } => Ty::Data {
+            module: module.clone(),
+            name: name.clone(),
+            args: args.iter().map(|a| apart(a, keep)).collect(),
+        },
+        Ty::Fun(a, b) => Ty::Fun(Box::new(apart(a, keep)), Box::new(apart(b, keep))),
+        Ty::Rigid(_) | Ty::Bool | Ty::Refused(_) => t.clone(),
     }
 }
 

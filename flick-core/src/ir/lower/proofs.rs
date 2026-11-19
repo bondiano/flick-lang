@@ -216,13 +216,10 @@ pub fn check_proofs(
     let mut lemmas = imported_lemmas(&proofs, run, 0);
     let of = |m: &str, c: &str| -> Option<Vec<&Proven>> {
         let own = (m == module.name).then_some(&laws[..]);
-        let found = own.or_else(|| {
+        // the module a definition is read from: the run's before a built-in
+        let found = (own.or_else(|| (run.proven)(m))).or_else(|| {
             let builtin = (run.builtins)().iter().any(|b| b.name == m);
-            if builtin {
-                Some((run.builtin_laws)())
-            } else {
-                (run.proven)(m)
-            }
+            builtin.then(|| (run.builtin_laws)())
         });
         let is = |p: &&Proven| {
             p.1.class
@@ -301,10 +298,8 @@ fn prove_each(
 fn imported_lemmas(proofs: &[Proven], run: &Run, depth: u32) -> Vec<logic::Lemma> {
     let mut modules = Vec::new();
     for (lowered, _) in proofs {
-        lowered
-            .body
-            .iter()
-            .for_each(|b| lemma_modules(b, &mut modules));
+        let fields = lowered.fields.iter().map(|f| &f.value);
+        (lowered.body.iter().chain(fields)).for_each(|b| lemma_modules(b, &mut modules));
     }
     modules.sort();
     modules.dedup();
