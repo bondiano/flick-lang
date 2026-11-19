@@ -117,6 +117,7 @@ fn parse() -> CommandArguments {
 fn run(args: CommandArguments) -> ExitCode {
     plugins::set_offline(args.global.offline || env::var_os("CI").is_some());
     backends::allow_tools(args.global.allow_tool.clone());
+    backends::set_offline(args.global.offline);
     // what installs or edits the dependencies, or checks no module, needs no `std`
     let needs_std = !matches!(
         args.cmd,

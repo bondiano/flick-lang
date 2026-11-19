@@ -9,6 +9,7 @@ mod defs;
 mod eval;
 #[cfg(test)]
 pub(crate) mod lean;
+pub mod omega;
 mod show;
 mod term;
 
