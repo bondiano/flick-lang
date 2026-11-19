@@ -25,12 +25,18 @@ var (
 //
 // shortcut: only the common errnos read as Node's; others keep Go's text, extend the table when a test shows one
 var nodeErrors = map[syscall.Errno][2]string{
-	syscall.ENOENT:  {"ENOENT", "no such file or directory"},
-	syscall.EACCES:  {"EACCES", "permission denied"},
-	syscall.EISDIR:  {"EISDIR", "illegal operation on a directory"},
-	syscall.ENOTDIR: {"ENOTDIR", "not a directory"},
-	syscall.EEXIST:  {"EEXIST", "file already exists"},
-	syscall.EBADF:   {"EBADF", "bad file descriptor"},
+	syscall.ENOENT:    {"ENOENT", "no such file or directory"},
+	syscall.EACCES:    {"EACCES", "permission denied"},
+	syscall.EISDIR:    {"EISDIR", "illegal operation on a directory"},
+	syscall.ENOTDIR:   {"ENOTDIR", "not a directory"},
+	syscall.EEXIST:    {"EEXIST", "file already exists"},
+	syscall.EBADF:     {"EBADF", "bad file descriptor"},
+	syscall.EBUSY:     {"EBUSY", "resource busy or locked"},
+	syscall.ELOOP:     {"ELOOP", "too many symbolic links encountered"},
+	syscall.EPERM:     {"EPERM", "operation not permitted"},
+	syscall.EINVAL:    {"EINVAL", "invalid argument"},
+	syscall.EXDEV:     {"EXDEV", "cross-device link not permitted"},
+	syscall.ENOTEMPTY: {"ENOTEMPTY", "directory not empty"},
 }
 
 // nodeError is the code and text Node gives an error; on windows, whose

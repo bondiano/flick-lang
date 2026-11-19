@@ -721,10 +721,4 @@ flickStringTree CodecStringTree
 zero ByteSizeZero
 flickBytes ByteSizeBytes
 
-[@flick-lang/runtime/effect/Logger]
-flickMake LoggerMake
-withConsoleLog LoggerWithConsoleLog
-flickLayer LoggerLayer
 
-[@flick-lang/runtime/effect/Console]
-log *ConsoleLog

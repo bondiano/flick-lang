@@ -13,8 +13,6 @@ import (
 // FileSystem.node as Effect's NodeFileSystem: each operation of the Flick
 // service `FileSystem.FileSystem`, failing with the Flick PlatformError of
 // a system error, tagged by the errno Node reports.
-//
-// shortcut: access, copy, copy_file, chmod, chown, glob, link, open, read_link, real_path, symlink, truncate and utimes die as unsupported; port them when a program calls them
 
 var (
 	platformErrorTag = Tag("PlatformError.PlatformError.PlatformError")
@@ -40,8 +38,10 @@ func systemTagOf(err error) string {
 			return "PermissionDenied"
 		case "EEXIST":
 			return "AlreadyExists"
-		case "EISDIR", "ENOTDIR":
+		case "EISDIR", "ENOTDIR", "ELOOP":
 			return "BadResource"
+		case "EBUSY":
+			return "Busy"
 		}
 	}
 	return "UnknownError"
@@ -50,10 +50,16 @@ func systemTagOf(err error) string {
 // systemError is the PlatformError of a failed call of `method`, as Node's
 // `syscall` on `path` failed.
 func systemError(err error, method, syscall, path string) Value {
+	return systemErrorOf(err, "FileSystem", method, syscall, path)
+}
+
+// systemErrorOf is the PlatformError of a failed system call of a method
+// of a module, about a path or a descriptor.
+func systemErrorOf(err error, module, method, syscall, pathOrDescriptor string) Value {
 	return NewData(platformErrorTag, NewData(systemReasonTag, Rec(
 		"tag", Nullary(Tag("PlatformError.SystemErrorTag."+systemTagOf(err))),
-		"module_", "FileSystem", "method", method, "description", None,
-		"syscall", Some(syscall), "pathOrDescriptor", Some(path))))
+		"module_", module, "method", method, "description", None,
+		"syscall", Some(syscall), "pathOrDescriptor", Some(pathOrDescriptor))))
 }
 
 func isNotFound(platformError Value) bool {
@@ -61,35 +67,51 @@ func isNotFound(platformError Value) bool {
 	return reason.Tag == systemReasonTag && reason.Fields[0].(*Record).Get("tag").(*Data).Tag == Tag("PlatformError.SystemErrorTag.NotFound")
 }
 
-// infoOf is `FileSystem.Info` of what Go's stat gives.
-//
-// shortcut: the fields Go's os.FileInfo does not give on every system (access and birth times, device, inode, links, owner, blocks) are none or zero; read them with per-system files when a program needs them
-func infoOf(fi fs.FileInfo) Value {
+// statInfo is what Node's `stat` tells beside Go's FileInfo: its mode
+// with the type bits of `st_mode`, ids, sizes and times in milliseconds.
+type statInfo struct {
+	mode                    uint32
+	dev, ino, nlink, rdev   *big.Int
+	uid, gid                Value // Options of a Float
+	blksize, blocks         Value // Options of a BigInt
+	atime, mtime, birthtime float64
+}
+
+// infoOf is `FileSystem.Info` of a stat.
+func infoOf(fi fs.FileInfo) Value { return infoWith(fi, nil, "") }
+
+// infoWith is `FileSystem.Info` of a stat of the open file or the path,
+// with the fields the system's stat structure gives.
+func infoWith(fi fs.FileInfo, f *os.File, path string) Value {
 	m := fi.Mode()
 	typ, ok := fileTypeTags[m&(fs.ModeType|fs.ModeCharDevice)]
 	if !ok {
 		typ = "UnknownType"
 	}
-	// Node's mode carries the type bits of `st_mode` beside the permissions
-	bits := uint32(m.Perm())
-	for flag, b := range map[fs.FileMode]uint32{fs.ModeSetuid: 0o4000, fs.ModeSetgid: 0o2000, fs.ModeSticky: 0o1000} {
-		if m&flag != 0 {
-			bits |= b
+	sf, known := statFields(fi, f, path)
+	if !known {
+		// Node's mode carries the type bits of `st_mode` beside the permissions
+		bits := uint32(m.Perm())
+		switch typ {
+		case "RegularFile":
+			bits |= 0o100000
+		case "Directory":
+			bits |= 0o040000
+		case "SymbolicLink":
+			bits |= 0o120000
 		}
-	}
-	switch typ {
-	case "RegularFile":
-		bits |= 0o100000
-	case "Directory":
-		bits |= 0o040000
-	case "SymbolicLink":
-		bits |= 0o120000
+		return Rec(
+			"type_", Nullary(Tag("FileSystem.FileType."+typ)),
+			"mtime", Some(float64(fi.ModTime().UnixMilli())), "atime", None, "birthtime", None,
+			"dev", big.NewInt(0), "ino", None, "mode", int32(bits), "nlink", None, "uid", None, "gid", None,
+			"rdev", None, "size", big.NewInt(fi.Size()), "blksize", None, "blocks", None)
 	}
 	return Rec(
 		"type_", Nullary(Tag("FileSystem.FileType."+typ)),
-		"mtime", Some(float64(fi.ModTime().UnixMilli())), "atime", None, "birthtime", None,
-		"dev", big.NewInt(0), "ino", None, "mode", int32(bits), "nlink", None, "uid", None, "gid", None,
-		"rdev", None, "size", big.NewInt(fi.Size()), "blksize", None, "blocks", None)
+		"mtime", Some(sf.mtime), "atime", Some(sf.atime), "birthtime", Some(sf.birthtime),
+		"dev", sf.dev, "ino", Some(sf.ino), "mode", int32(sf.mode), "nlink", Some(sf.nlink),
+		"uid", sf.uid, "gid", sf.gid, "rdev", Some(sf.rdev), "size", big.NewInt(fi.Size()),
+		"blksize", sf.blksize, "blocks", sf.blocks)
 }
 
 // statPath is the info of the path, or the PlatformError of `method`.
@@ -98,7 +120,7 @@ func statPath(path, method string) (Value, Value) {
 	if err != nil {
 		return nil, systemError(err, method, "stat", path)
 	}
-	return infoOf(fi), nil
+	return infoWith(fi, nil, path), nil
 }
 
 // openFlags are the flags of Node's `OpenFlag` names, by Flick constructor.
@@ -232,16 +254,11 @@ func readDirectory(recursive bool, path string) Value {
 	return out
 }
 
-func fsUnsupported(name string) Value {
-	return Fn(func(Value) Value { panic(Defect{"FileSystem." + name + " is not supported on the go target"}) })
-}
-
 // FileSystemNode is the layer of the service of key `key`.
 func FileSystemNode(key Value) Value {
 	impl := Rec(
-		"access", fsUnsupported("access"), "copy", fsUnsupported("copy"),
-		"copy_file", fsUnsupported("copy_file"), "chmod", fsUnsupported("chmod"),
-		"chown", fsUnsupported("chown"), "glob", fsUnsupported("glob"),
+		"access", Curry2(fsAccess), "copy", Curry3(fsCopy), "copy_file", Curry2(fsCopyFile),
+		"chmod", Curry2(fsChmod), "chown", Curry3(fsChown), "glob", Curry2(fsGlob),
 		"exists", Fn(func(path Value) Value {
 			return Eff(func(*Fiber) Value {
 				_, err := os.Stat(path.(string))
@@ -251,7 +268,7 @@ func FileSystemNode(key Value) Value {
 				return err == nil
 			})
 		}),
-		"link", fsUnsupported("link"),
+		"link", Curry2(fsLink),
 		"make_directory", Fn(func(options Value) Value {
 			return Fn(func(path Value) Value {
 				return Eff(func(*Fiber) Value {
@@ -293,7 +310,7 @@ func FileSystemNode(key Value) Value {
 				return file
 			})
 		}),
-		"open", fsUnsupported("open"),
+		"open", Curry2(fsOpen),
 		"read_directory", Fn(func(recursive Value) Value {
 			return Fn(func(path Value) Value {
 				return Eff(func(*Fiber) Value { return readDirectory(recursive.(bool), path.(string)) })
@@ -317,7 +334,7 @@ func FileSystemNode(key Value) Value {
 				return decodeText(b)
 			})
 		}),
-		"read_link", fsUnsupported("read_link"), "real_path", fsUnsupported("real_path"),
+		"read_link", Fn(fsReadLink), "real_path", Fn(fsRealPath),
 		"remove", Fn(func(options Value) Value {
 			return Fn(func(path Value) Value {
 				return Eff(func(*Fiber) Value { return remove(options, path.(string)) })
@@ -342,8 +359,7 @@ func FileSystemNode(key Value) Value {
 				return info
 			})
 		}),
-		"symlink", fsUnsupported("symlink"), "truncate", fsUnsupported("truncate"),
-		"utimes", fsUnsupported("utimes"),
+		"symlink", Curry2(fsSymlink), "truncate", Curry2(fsTruncate), "utimes", Curry3(fsUtimes),
 		"write_file", Fn(func(options Value) Value {
 			return Fn(func(path Value) Value {
 				return Fn(func(data Value) Value {

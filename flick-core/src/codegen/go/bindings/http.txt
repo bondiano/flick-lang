@@ -242,9 +242,6 @@ flickWithLimits *MultipartWithLimits
 flickDefaultIsFile MultipartDefaultIsFile
 flickDecodeField MultipartDecodeField
 
-[@flick-lang/runtime/effect/FileSystem]
-flickNode FileSystemNode
-
 [@flick-lang/runtime/effect/http/Headers]
 empty HeadersEmpty
 fromInput HeadersFromInput
