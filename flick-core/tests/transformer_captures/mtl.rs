@@ -189,6 +189,19 @@ let leak () =
     }
 }
 
+/// A runtime error fixes `e` with the `Live` typing by use records in its
+/// row; that picks no instance, so `MonadError (ExceptT e m) e` applies.
+#[test]
+fn except_errors_of_runtime_callbacks_find_their_instance() {
+    for error in ["quiet", "fun () -> quiet ()"] {
+        accepts(&format!(
+            "quiet : Unit ->{{}} Float\nlet quiet () = 1\nthrown : Unit ->{{}} Float\n\
+             let thrown () =\n  action : ExceptT (Unit ->{{}} Float) Identity Float\n  \
+             let action = throw_error ({error})\n  ignore action\n  0\n"
+        ));
+    }
+}
+
 #[test]
 fn returned_computations_may_hold_pure_callbacks() {
     for (result, action) in [

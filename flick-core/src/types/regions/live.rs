@@ -15,12 +15,14 @@
 //!   owner, `FLICK-G003` (`live_rows.rs`).
 
 use super::{AliasKey, Unfold, leave_alias};
+use crate::source::Span;
 use crate::types::Checker;
 use crate::types::Elem;
 use crate::types::effects::Stage;
 use crate::types::kinds::Kind;
 use crate::types::lang::Lang;
 use crate::types::ty::{Effects, Norm, Row, Type};
+use crate::types::unify::Unified;
 
 /// `t` without `Live`: as messages, interfaces and the emitted code show it,
 /// since every use of a signature elides it again.
@@ -321,6 +323,37 @@ impl Checker<'_> {
         }
     }
 
+    /// A function or a task `identity` under a value bound fitted into the
+    /// bound's type `base`; `None` for any other value, and where the value
+    /// fixes `base` as unification does. With `base` known it fits as it
+    /// fits that type, by subsumption: one that uses nothing fits where a
+    /// closure fitted before it may use a region. One that fixes `base` gives
+    /// it its own type that keeps live a use row of its own, a widening
+    /// `LeLive.arrow` allows: a closure fitted after it grows that row, and
+    /// a written type without it empties it. Not the bound, which says what
+    /// the value reaches, not what using it needs. Either way the verdict
+    /// does not depend on which argument comes first.
+    pub(in crate::types) fn callable_bound_fits(
+        &mut self,
+        identity: &Type,
+        base: &Type,
+        span: Span,
+    ) -> Option<Unified> {
+        let callable = |t: &Type| {
+            let t = self.whnf(t);
+            matches!(t, Type::Fun { .. }) || self.eff_parts(&t).is_some()
+        };
+        if !callable(identity) {
+            return None;
+        }
+        if matches!(base, Type::Meta(_)) {
+            let uses = self.store.fresh_capture_row();
+            let widened = self.with_live(identity.clone(), Some(&uses));
+            return self.unifies(&widened, base).then_some(Ok(()));
+        }
+        callable(base).then(|| self.subsume(identity, base, span))
+    }
+
     /// The types of a subsumption with a qualifier: using either side needs
     /// its qualifier live, so a qualifier does not hide `Live`.
     pub(in crate::types) fn live_sides(
@@ -328,30 +361,44 @@ impl Checker<'_> {
         (a, ca): (Type, Option<&Type>),
         (e, ce): (Type, Option<&Type>),
     ) -> (Type, Type) {
-        let side = |t: Type, c: Option<&Type>| {
-            let Some(atoms) = c.map(|c| self.live_atoms(c, &[])) else {
-                return t;
-            };
-            match t {
-                Type::Fun {
-                    param,
-                    effects: Some(effects),
-                    result,
-                } => Type::Fun {
-                    param,
-                    effects: Some(Box::new(Effects {
-                        services: add_live(&effects.services, atoms),
-                        ..*effects
-                    })),
-                    result,
-                },
-                other => match self.eff_parts(&other) {
-                    Some((s, e, r)) => super::super::infer::eff(add_live(&s, atoms), e, r),
-                    None => other,
-                },
-            }
+        (self.with_live(a, ca), self.with_live(e, ce))
+    }
+
+    /// `t`, a function or a task, whose row also needs live what `captures`
+    /// holds; under a qualifier, its arrow's row. Any other type as it is.
+    pub(in crate::types) fn with_live(&self, t: Type, captures: Option<&Type>) -> Type {
+        let Some(atoms) = captures.map(|c| self.live_atoms(c, &[])) else {
+            return t;
         };
-        (side(a, ca), side(e, ce))
+        match t {
+            Type::Fun {
+                param,
+                effects: Some(effects),
+                result,
+            } => Type::Fun {
+                param,
+                effects: Some(Box::new(Effects {
+                    services: add_live(&effects.services, atoms),
+                    ..*effects
+                })),
+                result,
+            },
+            Type::Captured {
+                ty,
+                captures: qualifier,
+                value,
+                elided,
+            } => Type::Captured {
+                ty: Box::new(self.with_live(*ty, captures)),
+                captures: qualifier,
+                value,
+                elided,
+            },
+            other => match self.eff_parts(&other) {
+                Some((s, e, r)) => super::super::infer::eff(add_live(&s, atoms), e, r),
+                None => other,
+            },
+        }
     }
 
     /// Whether a closure that holds `held` holds the reader of a lazy `for`.

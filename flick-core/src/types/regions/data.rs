@@ -330,7 +330,8 @@ impl Checker<'_> {
                 }
                 _ => self.capture_identity(&a),
             };
-            return Some(self.unify(&identity, &base));
+            let fits = self.callable_bound_fits(&identity, &base, span);
+            return Some(fits.unwrap_or_else(|| self.unify(&identity, &base)));
         }
         // a position not known yet takes a value bounded by a region with its
         // bound: what it turns out to be may store the region's resource

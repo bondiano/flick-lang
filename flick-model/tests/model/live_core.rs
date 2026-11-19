@@ -13,8 +13,8 @@ use std::rc::Rc;
 
 use flick_model::eval::Outcome;
 use flick_model::generate;
-use flick_model::syntax::{Const, Term};
-use flick_model::types::{Row, Scheme, Stage, Type};
+use flick_model::syntax::{Arm, Const, Pat, Term};
+use flick_model::types::{Caps, Kind, Row, Scheme, Stage, Type, Var};
 
 use live_support::{core, g, open_in, probe, run, thunk_program, v, verdict};
 
@@ -258,4 +258,87 @@ fn live_core_rejects_a_use_in_a_typed_cell() {
             "{name}: {errors:?}"
         );
     }
+}
+
+/// `keep2 : ∀a c. List (a^c) → a^c →{} List (a^c)` given `k`, a function
+/// that uses nothing, and a closure that uses `s`, in either order.
+/// Whichever fixes `a` first, `a` is a function type that keeps `c` live,
+/// so the closure fits and the verdict does not depend on the order of the
+/// arguments. The list kept past the `scope` is a use after close.
+#[test]
+fn live_core_keeps_bounded_functions_in_either_order() {
+    let unit = || Type::con("Prelude", "Unit");
+    let none = || Stage::Runtime(Row::none(), Row::none());
+    let named = |x: &str| Var::Named(x.into());
+    let bounded = || Type::Bounded(Rc::new(Type::Var(named("a"))), Caps::var(named("c")));
+    let list = |t: Type| Type::app(Type::con("Prelude", "List"), t);
+    let keep2 = Scheme::new(
+        vec![("a".into(), Kind::Type), ("c".into(), Kind::Captures)],
+        Type::fun(
+            list(bounded()),
+            Stage::Pure,
+            Type::fun(bounded(), none(), list(bounded())),
+        ),
+    );
+    let k = Scheme::new(Vec::new(), Type::fun(unit(), none(), unit()));
+    let program = |body: Term| {
+        let returns_x = Term::lam("xs", Term::lam("x", Term::List(Rc::from([v("x")]))));
+        let k_body = Term::Let(
+            "k".into(),
+            Some(Rc::new(k.clone())),
+            Rc::new(Term::lam("u", Term::unit())),
+            Rc::new(body),
+        );
+        thunk_program(Term::Let(
+            "keep2".into(),
+            Some(Rc::new(keep2.clone())),
+            Rc::new(returns_x),
+            Rc::new(k_body),
+        ))
+    };
+    let call_head = |xs: Term| {
+        let arms = [
+            Arm {
+                pat: Pat::List(Rc::from([Pat::Var("f".into())]), Some(Rc::new(Pat::Wild))),
+                guard: None,
+                body: Term::app(v("f"), Term::unit()),
+            },
+            Arm {
+                pat: Pat::Wild,
+                guard: None,
+                body: Term::unit(),
+            },
+        ];
+        Term::Match(Rc::new(xs), Rc::from(arms))
+    };
+    let using = || Term::lam("u", Term::app(g("use"), v("h")));
+    let keep = |first: Term, second: Term| Term::apps(v("keep2"), [first, second]);
+    let one = |t: Term| Term::List(Rc::from([t]));
+    let value_first = program(open_in("s", call_head(keep(one(v("k")), using()))));
+    let closure_first = program(open_in("s", call_head(keep(one(using()), v("k")))));
+    let escapes = program(call_head(open_in("s", keep(one(v("k")), using()))));
+    for (name, p) in [
+        ("value first", &value_first),
+        ("closure first", &closure_first),
+    ] {
+        let (live, outcome) = probe(name, p);
+        assert!(
+            !matches!(&outcome, Outcome::Stuck(_)),
+            "{name}: {outcome:?}"
+        );
+        assert!(live.is_ok(), "{name}: the model rejects: {live:?}");
+        let errors = core(p);
+        assert!(errors.is_empty(), "{name}: {errors:?}");
+    }
+    let (live, outcome) = probe("escapes", &escapes);
+    assert!(matches!(outcome, Outcome::Stuck(w) if w.starts_with("use after")));
+    assert!(
+        live.is_err(),
+        "escapes: the model accepts a use after close"
+    );
+    let errors = core(&escapes);
+    assert!(
+        errors.iter().any(|e| e.starts_with("FLICK-G002")),
+        "escapes: {errors:?}"
+    );
 }
