@@ -24,7 +24,7 @@ let save_button props = ui {
       disabled = props.disabled
       on_click = Ui.Event.exhaust (fun _ -> task { props.on_save () })
     }
-    (text props.label)
+    text props.label
 }
 ```
 
@@ -110,7 +110,10 @@ rewrites; a list among other children is not a `Ui` (`FLICK-T003`). Among
 children written one by one, `each items row` is a node for each item. The
 lines under a call that takes no children are its arguments, each line
 one; outside `ui` the functions take their list as any function does:
-`Ui.div props [a, b]`.
+`Ui.div props [a, b]`. `flick fmt` writes children on lines of their own: a
+call that does not fit on its line puts the calls in parentheses that end
+its arguments on lines under it, without the parentheses, and a call in
+parentheses alone on a line loses them where its first line fits.
 
 `text` is `String -> Ui`, so it sits among the children of
 any element. `SafeUrl` comes only from `Ui.safe_url`, which accepts relative

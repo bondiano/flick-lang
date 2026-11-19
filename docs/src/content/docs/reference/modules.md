@@ -192,7 +192,7 @@ type alias Forest a = List (Tree a)
 ```
 
 Functions that call themselves or each other are declared with `let rec` or
-in one `rec { … }` group (see [Recursion](../types/#recursion)).
+in one `rec { … }` group (see [Recursion](../bindings/#recursion)).
 
 <div id="module-contracts-and-named-functors"></div>
 
@@ -201,6 +201,7 @@ in one `rec { … }` group (see [Recursion](../types/#recursion)).
 `type module` declares a structural contract for a module. A required
 `type Key` is abstract to users of the contract; `type Key = String` requires
 that equality. A concrete module may export additional members.
+The tour has a runnable [example](../../tour/contracts/) in one file.
 
 ```text
 type module Source =

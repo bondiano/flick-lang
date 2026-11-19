@@ -71,7 +71,7 @@ let html _ =
           heading (text ("request " ++ n))
           div
             { class_name = "rows" }
-            (List.map (fun r -> paragraph (text ("row " ++ show r))) (List.range 1 51))
+            List.map (fun r -> paragraph (text ("row " ++ show r))) (List.range 1 51)
       }))
 
 client :

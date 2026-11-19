@@ -1,4 +1,4 @@
-import Formal.ValueTyping
+import Formal.ErrorsIn
 
 /-!
 # Typing views of constructor spines
@@ -45,20 +45,25 @@ theorem Typ.app_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | errVal => intro f x T φ _ hJ _ hk; cases hJ; exact (hk rfl).elim
   | _ => intro f x T φ hv _ _ _; cases hv
 
-/-- A running application cannot acquire value-only polymorphic or error wrappers. -/
+/-- A running application cannot acquire the value-only polymorphic wrapper; its result goes
+through (Conv) and (Errors-In) to the type it is given (`LeOut`). -/
 theorem Typ.app_nonvalue {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ f x T φ, e = .app f x → J = .ex T φ → ¬ Value (.app f x) →
       ∃ a ψ t C, Typ S Ψ Θ Γ f (.ex (.arrow a ψ t C) φ) ∧
-        Typ S Ψ Θ Γ x (.ex a φ) ∧ (Stage.use ψ.asStage C).le φ ∧ LeLive S t T := by
+        Typ S Ψ Θ Γ x (.ex a φ) ∧ (Stage.use ψ.asStage C).le φ ∧ LeOut S t T := by
   induction h with
   | conv _ he ih =>
     intro f x T φ hv hJ hn; cases hJ
     obtain ⟨a, ψ, t, C, hf, hx, hφ, ht⟩ := ih f x _ _ hv rfl hn
-    exact ⟨a, ψ, t, C, hf, hx, hφ, ht.trans (.equiv he)⟩
+    exact ⟨a, ψ, t, C, hf, hx, hφ, ht.equiv he⟩
   | app hf hx hφ ht =>
     intro f x T φ hv hJ _; cases hv; cases hJ
-    exact ⟨_, _, _, _, hf, hx, hφ, ht⟩
-  | allI hv | errVal hv => intro f x T φ he _ hn; cases he; exact (hn hv).elim
+    exact ⟨_, _, _, _, hf, hx, hφ, .of ht⟩
+  | errVal _ hU hE ih =>
+    intro f x T φ hv hJ hn; cases hJ
+    obtain ⟨a, ψ, t, C, hf, hx, hφ, ht⟩ := ih f x _ _ hv rfl hn
+    exact ⟨a, ψ, t, C, hf, hx, hφ, ht.errIn hU hE⟩
+  | allI hv => intro f x T φ he _ hn; cases he; exact (hn hv).elim
   | _ => intro f x T φ hv _ _; cases hv
 
 end Flick

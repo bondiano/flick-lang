@@ -1,0 +1,41 @@
+---
+title: Variables in a task
+description: "A `task` or a `fun` cannot use a `let mut`; the compiler says what to use instead."
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="captures">
+
+This program does not compile, on purpose. `runs` is a `let mut`, and the
+task `counted` changes it. A task may run later, more than once or at the
+same time as its function, so it cannot use a variable of that function.
+The compiler reports `FLICK-G005`, and its help says what to do instead:
+to read the value, bind it with `let` before the task; to change it, keep it
+in a `Ref`, as the lesson on tasks did. A `fun` and a local function follow
+the same rule.
+
+A function given as an argument has a rule of its own. A parameter without a
+type that is applied, as `action` below, is taken for a pure function. So it
+cannot be given `say`, which prints:
+
+```flick fail FLICK-T003
+say : Unit ->{Host.Console} Unit
+let say () = Platform.stdout_line "hi"
+
+greet : Unit ->{Host.Console} Unit
+let greet () =
+  let run = fun action -> action ()
+  run say
+```
+
+The compiler reports `FLICK-T003` and points at `action`: write its type,
+`fun (action : Unit ->{Host.Console} Unit) -> action ()`.
+
+The reference has the rules of [variables](../../reference/bindings/#variables).
+
+**Try:** make `runs` a `Ref`: `let runs = Ref.make 0`, then
+`Ref.set runs (Ref.get runs + 1)` and `Ref.get runs` in the task.
+
+</TourLesson>

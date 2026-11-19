@@ -24,7 +24,7 @@ let email order =
     div { class_name = "mail" }
       Ui.with_host
         { Ui.host with data = [("order", "7")]; aria_label = Some "Order \"7\"" }
-        (heading_at H2 (text "Your order"))
+        heading_at H2 (text "Your order")
       Ui.render salutation order.customer
       list (List.map line order.items)
       track

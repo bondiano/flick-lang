@@ -7,6 +7,7 @@ use super::row_facts::{self, Equation};
 use super::scheme::{built, is_hidden_captures};
 use crate::iface::{Entity, Namespace};
 use crate::types::Checker;
+use crate::types::error_match::error_column;
 use crate::types::lang::Lang;
 use crate::types::patterns::Ctor;
 use crate::types::ty::{Binder, Type};
@@ -105,7 +106,13 @@ impl Checker<'_> {
         if *ty == Type::Error {
             return unknown();
         }
-        let t = self.whnf(ty);
+        let t = match self.errors_row(ty) {
+            Some(row) => match error_column(ctor, &row)? {
+                Type::Error => return unknown(),
+                element => self.whnf(&element),
+            },
+            None => self.whnf(ty),
+        };
         match ctor {
             Ctor::Variant { module, name, .. } => {
                 let entity = Entity {

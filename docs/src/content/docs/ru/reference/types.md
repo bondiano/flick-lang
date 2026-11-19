@@ -1,6 +1,6 @@
 ---
 title: "Кинды и типы"
-source_hash: 00b833826f8d1ee0
+source_hash: 70581e30916cdbd2
 ---
 
 После разрешения имён компилятор проверяет типы в каждом модуле без
@@ -17,12 +17,12 @@ source_hash: 00b833826f8d1ee0
 
 | Тип | Кинд |
 | - | - |
-| `Unit`, `Never`, `Bool`, `Int`, `Float`, `BigInt`, `String`, `Unknown`, `Ordering` | `Type` |
-| `List`, `Option`, `Ref`, `Redacted`, `Schema` | `Type -> Type` |
+| `Unit`, `Never`, `Bool`, `Int`, `Float`, `BigInt`, `String`, `Unknown`, `JsValue`, `Ordering`, `Ui` | `Type` |
+| `List`, `Seq`, `Option`, `Ref`, `Redacted`, `Schema`, `Url`, `Form` | `Type -> Type` |
 | `Result`, `PureCodec` | `Type -> Type -> Type` |
 | `ServiceTag`, `ServiceImpl` | `ServiceRow -> Type` |
 | `Scope` (сервис) | `Region -> Service` |
-| `Eff` | `ServiceRow -> ErrorRow -> Type -> Type` |
+| `Eff`, `Lazy` | `ServiceRow -> ErrorRow -> Type -> Type` |
 | `Layer` | `ServiceRow -> ErrorRow -> ServiceRow -> Type` |
 | `Codec` | `ServiceRow -> ServiceRow -> Type -> Type -> Type` |
 | `Errors` | `ErrorRow -> Type` |
@@ -36,8 +36,8 @@ source_hash: 00b833826f8d1ee0
 `Platform.stdout_line`, `Platform.stderr_line`, `App.fail`, `Layer.succeed`,
 `Layer.merge`, `Layer.override`, примитивы строк модуля `Record`
 и `Fiber.spawn` с типами `Fiber.Owner`, `Fiber.Fiber` и `Failure`
-([регионы](../regions/)). Классы `Eq`, `Ord`, `Hash` и `Show` тоже объявлены
-в `Prelude` ([классы](../classes/)).
+([регионы](../regions/)). Классы `Eq`, `Ord`, `Hash`, `Show`, `Display`, `Into`,
+`Functor`, `Applicative`, `Monad` и остальные из раздела [классы](../classes/#классы) тоже объявлены в `Prelude`.
 
 ## Кинды
 
@@ -208,7 +208,7 @@ let rec eval e =
 значение типа `a` как `Int (= a)`. Результат конструктора — его собственный
 тип, применённый ко всем параметрам типа (`FLICK-T056`). Аргумент — тип, член
 `kind` или `Symbol`; параметры регионов и строк записей передаются как
-переменные. [Индексы строк сервисов, ошибок и захватов](../row-indices/)
+переменные. [Индексы строк сервисов, ошибок и захватов](../gadts/#индексы-строк)
 могут фиксироваться или связываться конструктором.
 
 `match` не требует ветви для конструктора, который не строит значений
@@ -239,7 +239,7 @@ let rec size e =
 значении, тоже не выйдет из неё. Уточняет и скрывает типы только ветвь
 `match`: образец `let`, параметра или альтернатива or-образца этого не
 делают (`FLICK-T058`). Регионы сохраняют свою идентичность;
-[индексы строк](../row-indices/) могут уточняться.
+[индексы строк](../gadts/#индексы-строк) могут уточняться.
 
 `TypeEq a b` из core-модуля `TypeEq` — свидетельство того, что два типа
 совпадают: `Refl : TypeEq a a` и `TypeEq.cast : TypeEq a b -> a -> b`.
@@ -267,31 +267,3 @@ let coerce a b x =
 
 В TypeScript уточнения нет: в `.d.ts` каждый конструктор GADT — вариант любого
 экземпляра своего типа, а скрытый им тип — `unknown`.
-
-## Числа и операторы
-
-См. [числа и операторы](../operators/#числа-и-операторы).
-
-## Блоки
-
-См. [связывания и локальное исполнение](../bindings/#блоки).
-
-## Переменные
-
-См. [связывания и локальное исполнение](../bindings/#переменные).
-
-## Локальные циклы
-
-См. [связывания и локальное исполнение](../bindings/#локальные-циклы).
-
-## Рекурсия
-
-См. [связывания и локальное исполнение](../bindings/#рекурсия).
-
-## Обобщение
-
-См. [связывания и локальное исполнение](../bindings/#обобщение).
-
-## Пока не проверяется
-
-См. [связывания и локальное исполнение](../bindings/#пока-не-проверяется).

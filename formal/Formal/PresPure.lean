@@ -22,6 +22,7 @@ theorem exh_bool : Exh S (.base .bool) [.lit (.bool true), .lit (.bool false)] :
     | rnil => cases hT
     | rcons => cases hT
     | adt _ _ h => subst hT; simp [Ty.hd] at h
+    | err | errOpen => cases hT
   obtain ⟨b, rfl⟩ := this hs rfl rfl
   cases b <;> simp [matchP]
 
@@ -50,7 +51,10 @@ private theorem Typ.pureStepCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | conv _ he ih =>
     intro t φ e' hΓ hJ hh; cases hJ
     exact (ih _ _ e' hΓ rfl hh).conv he
-  | allI hv | errVal hv =>
+  | errVal _ hU hE ih =>
+    intro t φ e' hΓ hJ hh; cases hJ
+    exact (ih _ _ e' hΓ rfl hh).errVal hU hE
+  | allI hv =>
     intro _ _ _ _ _ hh
     exact (hh.not_value hv).elim
   | app hf ha hψ hT =>

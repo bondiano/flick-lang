@@ -40,3 +40,13 @@ fn prove_checks_the_proof_root_and_check_leaves_it_alone() {
     assert_eq!(nothing.status.code(), Some(0), "{nothing:?}");
     assert!(String::from_utf8_lossy(&nothing.stdout).contains("no proofs"));
 }
+
+/// The laws of the `Option` instances of the core hold of their definitions:
+/// `flick prove` of `packages/core` checks every one of them.
+#[test]
+fn the_option_laws_hold_of_the_core_instances() {
+    let proved = common::flick(&["prove", "--project", "packages/core"]);
+    let stderr = String::from_utf8_lossy(&proved.stderr);
+    assert_eq!(proved.status.code(), Some(0), "{stderr}");
+    assert!(!stderr.contains("FLICK-"), "{stderr}");
+}

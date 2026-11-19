@@ -29,12 +29,11 @@ let result_pane model m =
     div { class_name = "fp-result" }
       Ui.with_host
         { Ui.host with role = Some "group"; aria_label = Some (tr m.locale "Result" "Результат") }
-        (div
-          { class_name = "fp-pane-header fp-tabs" }
-          (tab Output (tr m.locale "Output" "Вывод"))
-          (tab Problems (diagnostic_label m))
-          (tab Js "JavaScript")
-          (tab Dts ".d.ts"))
+        div { class_name = "fp-pane-header fp-tabs" }
+          tab Output (tr m.locale "Output" "Вывод")
+          tab Problems (diagnostic_label m)
+          tab Js "JavaScript"
+          tab Dts ".d.ts"
       // `compiler.ts` opens a preview here; a tab other than the output hides it, and it keeps running
       Ui.with_host
         {
@@ -42,13 +41,13 @@ let result_pane model m =
           id = Some "fp-frame"
           data = [("title", tr m.locale "Preview of the program" "Предпросмотр программы")]
         }
-        (div {
+        div {
           class_name =
             if m.tab == Output && m.execution.status == "preview" then
               "fp-frame fp-frame-open"
             else
               "fp-frame"
-        })
+        }
       body
   }
 
@@ -71,7 +70,7 @@ let view model m = ui {
         aria_hidden = Some true
         tab_index = Some (-1)
       }
-      (button { disabled = false; on_click = Ui.Event.latest (fun _ -> task { refresh model }) })
+      button { disabled = false; on_click = Ui.Event.latest (fun _ -> task { refresh model }) }
     // and another takes in an edit of CodeMirror, which lives outside the view
     Ui.with_host
       {
@@ -81,7 +80,7 @@ let view model m = ui {
         aria_hidden = Some true
         tab_index = Some (-1)
       }
-      (button { disabled = false; on_click = Ui.Event.latest (fun _ -> task { edited model }) })
+      button { disabled = false; on_click = Ui.Event.latest (fun _ -> task { edited model }) }
     Ui.with_host
       {
         Ui.host with
@@ -90,31 +89,29 @@ let view model m = ui {
         aria_hidden = Some true
         tab_index = Some (-1)
       }
-      (button {
+      button {
         disabled = false
         on_click = Ui.Event.exhaust (fun _ -> task { runtime_messages model })
-      })
+      }
     div { class_name = "fp-workspace" }
       (if m.lesson then Lesson.view model m else empty)
-      (Toolbar.view model m)
+      Toolbar.view model m
       (
         if m.load_error != "" then
           Ui.with_host
             { Ui.host with role = Some "alert" }
-            (div
-              { class_name = "fp-recovery" }
+            div { class_name = "fp-recovery" }
               (notice
                 (tr
                   m.locale
                   "The compiler could not load. Retry, or reload this page after checking your connection."
                   "Не удалось загрузить компилятор. Повторите попытку или проверьте соединение и обновите страницу.")
                 m.load_error)
-              (button
-                {
-                  disabled = m.loading
-                  on_click = Ui.Event.exhaust (fun _ -> task { load_compiler model })
-                }
-                (text (tr m.locale "Retry compiler" "Загрузить снова"))))
+              button {
+                disabled = m.loading
+                on_click = Ui.Event.exhaust (fun _ -> task { load_compiler model })
+              }
+                text (tr m.locale "Retry compiler" "Загрузить снова")
         else
           empty
       )
@@ -122,20 +119,18 @@ let view model m = ui {
         if m.compile_error != "" then
           Ui.with_host
             { Ui.host with role = Some "alert" }
-            (div
-              { class_name = "fp-recovery" }
+            div { class_name = "fp-recovery" }
               (notice
                 (tr
                   m.locale
                   "The compiler failed while checking this source."
                   "Сбой компилятора при проверке кода.")
                 m.compile_error)
-              (button
-                {
-                  disabled = false
-                  on_click = Ui.Event.latest (fun _ -> task { notify "fp-compile" })
-                }
-                (text (tr m.locale "Retry compilation" "Повторить компиляцию"))))
+              button {
+                disabled = false
+                on_click = Ui.Event.latest (fun _ -> task { notify "fp-compile" })
+              }
+                text (tr m.locale "Retry compilation" "Повторить компиляцию")
         else
           empty
       )
@@ -156,14 +151,13 @@ let view model m = ui {
         if m.syntax_error != "" then
           Ui.with_host
             { Ui.host with role = Some "status" }
-            (div
-              { class_name = "fp-recovery" }
+            div { class_name = "fp-recovery" }
               (notice
                 (tr
                   m.locale
                   "The code editor could not load. Editing and compilation still work."
                   "Не удалось загрузить редактор кода. Код по-прежнему можно редактировать и компилировать.")
-                m.syntax_error))
+                m.syntax_error)
         else
           empty
       )

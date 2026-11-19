@@ -1,0 +1,69 @@
+// A `match` takes a value of `Errors ε` apart by the errors of its row, in a
+// pure function or in an arm of a `try`. `HttpApi.ServeError` and
+// `Rpc.ServeError`, errors of one name from two modules, stay apart.
+module App.Main exposing (main)
+
+import HttpApi
+import Rpc
+
+type error Conflict = Conflict String
+
+describe : Errors {HttpApi.ServeError, Rpc.ServeError, Conflict} -> String
+let describe e =
+  match e with
+  | HttpApi.ServeError why -> "api: " ++ why
+  | Rpc.ServeError why -> "rpc: " ++ why
+  | Conflict what -> "conflict over " ++ what
+
+// a row that is known may have an arm for the rest of its errors
+brief : Errors {HttpApi.ServeError, Rpc.ServeError, Conflict} -> String
+let brief e =
+  match e with
+  | HttpApi.ServeError _ -> "api"
+  | Rpc.ServeError _ -> "rpc"
+  | _ -> "other"
+
+fetch : Int ->{; HttpApi.ServeError, Rpc.ServeError, Conflict} String
+let fetch n =
+  if n == 1 then
+    Fail.fail (Rpc.ServeError "down")
+  else if n == 2 then
+    Fail.fail (HttpApi.ServeError "busy")
+  else if n == 3 then
+    Fail.fail (Conflict "the title")
+  else
+    "found"
+
+described : Int ->{} String
+let described n =
+  try fetch n with
+  | e -> describe e ++ ", " ++ brief e
+
+// the arms tell the errors of `e`
+origin : Int ->{} String
+let origin n =
+  try fetch n with
+  | e ->
+    match e with
+    | Rpc.ServeError _ -> "rpc"
+    | HttpApi.ServeError _ -> "api"
+    | Conflict _ -> "conflict"
+
+// the arms of a `try` test errors of every type as well
+caught : Int ->{} String
+let caught n =
+  try fetch n with
+  | Rpc.ServeError why -> "caught rpc: " ++ why
+  | Conflict what -> "caught conflict over " ++ what
+  | HttpApi.ServeError why -> "caught api: " ++ why
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  Platform.stdout_line (described 1)
+  Platform.stdout_line (described 2)
+  Platform.stdout_line (described 3)
+  Platform.stdout_line (described 4)
+  Platform.stdout_line (origin 1)
+  Platform.stdout_line (origin 2)
+  Platform.stdout_line (origin 3)
+  Platform.stdout_line (caught 3)

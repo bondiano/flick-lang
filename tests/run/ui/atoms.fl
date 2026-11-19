@@ -42,7 +42,7 @@ let counter_view =
               disabled = false
               on_click = increment
             }
-            (text "+1")
+            text "+1"
       }
     ))
 

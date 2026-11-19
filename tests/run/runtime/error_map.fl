@@ -1,0 +1,34 @@
+// `Exit.map_error` maps the typed failure of an exit with a function into
+// the errors of a row of several, each arm of its `match` a term of one of
+// them (Errors-In); the failure is read back by a `match` on its row.
+module App.Main exposing (main)
+
+type error NotFound = NotFound String
+
+type error Forbidden
+
+type error Http404 = Http404 String
+
+type error Http403
+
+to_http : Errors {NotFound, Forbidden} -> Errors {Http404, Http403}
+let to_http e =
+  match e with
+  | NotFound what -> Http404 what
+  | Forbidden -> Http403
+
+failed : Errors {NotFound, Forbidden} -> Exit {NotFound, Forbidden} String
+let failed e = Exit.fail e
+
+status : Exit {Http404, Http403} String -> String
+let status ex =
+  match Exit.find_error_option ex with
+  | Some (Http404 what) -> "404 " ++ what
+  | Some Http403 -> "403"
+  | None -> "200"
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  Platform.stdout_line (status (Exit.map_error to_http (failed (NotFound "page"))))
+  Platform.stdout_line (status (Exit.map_error to_http (failed Forbidden)))
+  Platform.stdout_line (status (Exit.map_error to_http (Exit.succeed "ok")))

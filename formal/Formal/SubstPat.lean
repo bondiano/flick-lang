@@ -21,13 +21,13 @@ theorem Ty.hd_of_substT {t : Ty} {T : Name} (σ : Atom → Ty) (h : (t.substT σ
     · exact .inl (by simp [Ty.hd, h])
     · exact .inr (by simpa [Ty.Opaque, Ty.hd] using h)
   | adt T' => simp [Ty.substT, Ty.hd] at h; exact .inl (by simp [Ty.hd, h])
-  | base | rnil | rcons => simp [Ty.substT, Ty.hd] at h
+  | base | rnil | rcons | errors => simp [Ty.substT, Ty.hd] at h
   | _ => exact .inr (by simp [Ty.Opaque, Ty.hd])
 
 theorem Ty.Opaque.of_substT {t : Ty} (σ : Atom → Ty) (h : (t.substT σ).Opaque) : t.Opaque := by
   induction t with
   | tapp f a ih _ => exact ih h
-  | base | adt | rnil | rcons => simp [Ty.Opaque, Ty.hd, Ty.substT] at h
+  | base | adt | rnil | rcons | errors => simp [Ty.Opaque, Ty.hd, Ty.substT] at h
   | _ => simp [Ty.Opaque, Ty.hd]
 
 /-- A constructor that can build an instance can build the type. -/
@@ -56,8 +56,27 @@ theorem Shp.of_substT {σ : Atom → Ty} :
       rcases Ty.hd_of_substT σ hT with h | h
       · exact .adt hs hU h fun K hh => (hB K hh).of_substT
       · exact .hidden h
+  -- a name of the substituted row is one of the row's, or comes from one of its variables
+  | .errors ε, _, h => by
+    simp only [Ty.substT] at h
+    cases h with
+    | hidden ho => simp [Ty.Opaque, Ty.hd] at ho
+    | err hs hU hm =>
+      obtain ⟨c, hc⟩ := hm
+      rw [← Row.substT_asRow] at hc
+      simp only [Row.substT] at hc
+      rcases hc with ⟨c₀, h₀, _⟩ | ⟨b, G, hb, _⟩
+      · exact .err hs hU ⟨c₀, h₀⟩
+      · exact .errOpen ⟨b, G, hb⟩
+    | errOpen hm =>
+      obtain ⟨a, G, ha⟩ := hm
+      rw [← Row.substT_asRow] at ha
+      simp only [Row.substT] at ha
+      obtain ⟨b, G', hb, _⟩ := ha
+      exact .errOpen ⟨b, G', hb⟩
+    | adt _ _ hT => simp [Ty.hd] at hT
   | .tvar _, _, _ | .rg _, _, _ | .caps _, _, _ | .arrow .., _, _ | .ref _, _, _
-  | .eff .., _, _ | .errors _, _, _ | .hnd _, _, _
+  | .eff .., _, _ | .hnd _, _, _
   | .owner _, _, _ | .dict .., _, _ | .all .., _, _ | .bare, _, _ | .lazy .., _, _
   | .lazyCell .., _, _ =>
     .hidden (by simp [Ty.Opaque, Ty.hd])
@@ -85,6 +104,10 @@ theorem PatTy.substT {fl p t Δ} (σ : Atom → Ty) (h : PatTy S fl p t Δ) :
   | rany => exact .rany
   | rfield hR _ _ ih₁ ih₂ => rw [List.map_append]; exact .rfield (Ty.field_substT σ hR) ih₁ ih₂
   | or _ _ ih₁ ih₂ => exact .or ih₁ ih₂
+  | err _ hm ih =>
+    refine .err ih ?_
+    rw [← Row.substT_asRow]; simp only [Row.substT]
+    exact .inl ⟨_, hm, rfl⟩
 
 theorem HPat.substT {ε₀ p θ Δ} (σ : Atom → Ty) (h : HPat S ε₀ p θ Δ) :
     HPat S (ε₀.substT σ) p (θ.substT σ) (Δ.map (Ty.substT σ)) := by
