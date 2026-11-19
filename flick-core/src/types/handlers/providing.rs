@@ -73,7 +73,7 @@ impl Checker<'_> {
             let tail = if instances.is_empty() {
                 tail
             } else {
-                super::ty::without(tail, &instances)
+                without(tail, &instances)
             };
             let rest = Type::Row(Row {
                 entries: provided,
@@ -167,7 +167,7 @@ impl Checker<'_> {
             // as for a layer, an instance leaves no other in the tail
             let tail = self.cx.stage.services.clone();
             let tail = if label.is_instance(&entry) {
-                super::ty::without(tail, slice::from_ref(&label))
+                without(tail, slice::from_ref(&label))
             } else {
                 tail
             };

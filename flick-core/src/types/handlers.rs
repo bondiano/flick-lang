@@ -14,7 +14,7 @@ use super::handle::{Handled, arm_pattern, failed_pattern, operation_path};
 use super::infer::eff;
 use super::patterns::is_pattern;
 use super::services::Operation;
-use super::ty::{Row, Type, Written};
+use super::ty::{Row, Type, Written, without};
 use super::typing::Ref;
 use crate::diagnostics::codes;
 use crate::iface::Entity;
@@ -213,7 +213,7 @@ impl Checker<'_> {
         let tail = if instances.is_empty() {
             tail
         } else {
-            super::ty::without(tail, &instances)
+            without(tail, &instances)
         };
         let rest = Type::Row(Row {
             entries,
