@@ -10,7 +10,7 @@ use crate::command;
 use crate::request::validate_size;
 use crate::{
     Backend, BackendPin, BuildRequest, BuildResult, DeclaredInputs, Descriptor, Diagnostic, Inputs,
-    Limits, Severity, TargetSupport, sha256,
+    Limits, OptionValue, Packages, ProjectFile, Severity, TargetSupport, sha256,
 };
 
 #[allow(clippy::all, clippy::pedantic)]
@@ -326,6 +326,26 @@ impl Backend for WasmBackend {
 
     fn describe(&self) -> Descriptor {
         self.descriptor.clone()
+    }
+
+    fn package_files(&self) -> Vec<String> {
+        self.command_call(&self.cancellation, |i, store| i.call_package_files(store))
+            .unwrap_or_default()
+    }
+
+    fn packages(&self, files: &[ProjectFile], options: &[OptionValue]) -> Packages {
+        let (wire, options) = (convert::files(files), convert::options(options));
+        match self.command_call(&self.cancellation, |i, store| {
+            i.call_packages(store, &wire, &options)
+        }) {
+            Ok(packages) => convert::packages(packages),
+            Err(error) => Packages {
+                sources: Vec::new(),
+                runtime: Vec::new(),
+                diagnostics: self.failure("packages", &error),
+                needs: Vec::new(),
+            },
+        }
     }
 
     fn commands(&self) -> Vec<command::Descriptor> {

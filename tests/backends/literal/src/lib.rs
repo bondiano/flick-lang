@@ -344,6 +344,15 @@ mod guest {
         fn generate(request: BuildRequest) -> Result<BuildResult, Vec<Diagnostic>> {
             Literal.generate(&request, &mut Imports)
         }
+        fn package_files() -> Vec<String> {
+            Literal.package_files()
+        }
+        fn packages(
+            files: Vec<flick_backend::ProjectFile>,
+            options: Vec<flick_backend::OptionValue>,
+        ) -> flick_backend::Packages {
+            Literal.packages(&files, &options)
+        }
     }
     export_component!(Component);
     flick_backend::export_commands!(Component, Literal);

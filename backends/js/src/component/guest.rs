@@ -23,6 +23,15 @@ impl Guest for Component {
     fn generate(request: BuildRequest) -> Result<BuildResult, Vec<Diagnostic>> {
         Javascript.generate(&request, &mut Imports)
     }
+    fn package_files() -> Vec<String> {
+        Javascript.package_files()
+    }
+    fn packages(
+        files: Vec<flick_backend::ProjectFile>,
+        options: Vec<flick_backend::OptionValue>,
+    ) -> flick_backend::Packages {
+        Javascript.packages(&files, &options)
+    }
 }
 export_component!(Component);
 flick_backend::export_commands!(Component, Javascript);

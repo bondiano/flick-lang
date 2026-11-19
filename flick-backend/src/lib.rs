@@ -155,6 +155,21 @@ pub trait Backend {
         request: &BuildRequest,
         inputs: &mut dyn Inputs,
     ) -> Result<BuildResult, Vec<Diagnostic>>;
+    /// The files of a project the backend reads to report its packages.
+    fn package_files(&self) -> Vec<String> {
+        Vec::new()
+    }
+    /// The backend's packages, from the files `package_files` names that
+    /// the project has and those an earlier answer needed.
+    fn packages(&self, files: &[ProjectFile], options: &[OptionValue]) -> Packages {
+        let _ = (files, options);
+        Packages {
+            sources: Vec::new(),
+            runtime: Vec::new(),
+            diagnostics: Vec::new(),
+            needs: Vec::new(),
+        }
+    }
     /// The commands the backend adds to `flick`.
     fn commands(&self) -> Vec<command::Descriptor> {
         Vec::new()

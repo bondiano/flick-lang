@@ -8,10 +8,12 @@ mod guest;
 mod launch;
 mod mapper;
 mod optimize;
+mod packages;
 
 use flick_backend::{
     Backend, BackendId, BuildRequest, BuildResult, Capability, Descriptor, Diagnostic, Environment,
-    Inputs, Mode, NamedRange, Profile, Severity, TargetSupport, VersionRange, command,
+    Inputs, Mode, NamedRange, OptionValue, Packages, Profile, ProjectFile, Severity, TargetSupport,
+    VersionRange, command,
 };
 
 /// The same implementation serves the component and development parity tests.
@@ -51,6 +53,14 @@ fn capabilities() -> Vec<Capability> {
 }
 
 impl Backend for Javascript {
+    fn package_files(&self) -> Vec<String> {
+        packages::files()
+    }
+
+    fn packages(&self, files: &[ProjectFile], options: &[OptionValue]) -> Packages {
+        packages::packages(files, options)
+    }
+
     fn commands(&self) -> Vec<command::Descriptor> {
         let mut commands = ffi::descriptors();
         commands.push(mapper::descriptor());

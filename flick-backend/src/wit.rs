@@ -37,6 +37,14 @@ macro_rules! wit_conversions {
                 type Native = Option<T::Native>;
                 fn into_native(self) -> Self::Native { self.map(IntoNative::into_native) }
             }
+            impl<A: ToWire, B: ToWire> ToWire for (A, B) {
+                type Wire = (A::Wire, B::Wire);
+                fn to_wire(&self) -> Self::Wire { (self.0.to_wire(), self.1.to_wire()) }
+            }
+            impl<A: IntoNative, B: IntoNative> IntoNative for (A, B) {
+                type Native = (A::Native, B::Native);
+                fn into_native(self) -> Self::Native { (self.0.into_native(), self.1.into_native()) }
+            }
             macro_rules! records {
                 ($d($d name:ident { $d($d field:ident),* })*) => {$d(
                     impl ToWire for $crate::$d name {
@@ -90,6 +98,11 @@ macro_rules! wit_conversions {
             StepOutput { id, path, kind }
             ToolchainStep { id, dependencies, toolchain, arguments, environment, inputs, outputs }
             RuntimeDependency { package, version, sha256 }
+            ProjectFile { path, real, bytes }
+            PackageRoot { package, version, root }
+            RuntimeNode { name, version, dir, dependencies }
+            RuntimeGraph { package, nodes }
+            Packages { sources, runtime, diagnostics, needs }
             Launch { name, kind, artifact, runtime, arguments }
             BuildResult { artifacts, steps, runtime_dependencies, launches, diagnostics }
             }
@@ -127,6 +140,9 @@ macro_rules! wit_conversions {
             pub fn diagnostics(diagnostics: Vec<w::Diagnostic>) -> Vec<$crate::Diagnostic> { diagnostics.into_native() }
             pub fn result(result: w::BuildResult) -> $crate::BuildResult { result.into_native() }
             pub fn support(support: w::TargetSupport) -> $crate::TargetSupport { support.into_native() }
+            pub fn files(files: &[$crate::ProjectFile]) -> Vec<w::ProjectFile> { files.iter().map(ToWire::to_wire).collect() }
+            pub fn options(options: &[$crate::OptionValue]) -> Vec<w::OptionValue> { options.iter().map(ToWire::to_wire).collect() }
+            pub fn packages(packages: w::Packages) -> $crate::Packages { packages.into_native() }
         }
     };
 }

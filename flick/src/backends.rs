@@ -12,6 +12,8 @@ pub(crate) mod launch;
 #[cfg(feature = "wasm-backends")]
 mod official;
 #[cfg(feature = "wasm-backends")]
+pub(crate) mod packages;
+#[cfg(feature = "wasm-backends")]
 mod request;
 #[cfg(feature = "wasm-backends")]
 mod tools;
