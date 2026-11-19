@@ -16,9 +16,17 @@ open Flick.Elab (All2 ORel)
 
 variable {W : World}
 
+/-- Head steps of the right side: at least one, or none, for a force of a `born` pair (O1b). -/
+def HSeqP (W : World) (μ : List Tm) (t : Tm) (μ' : List Tm) (t' : Tm) : Prop :=
+  (∃ μ₁ t₁, (∀ Λ, RHead Λ μ t Λ μ₁ t₁) ∧ HSeq μ₁ t₁ μ' t') ∨
+    (∃ t₁, PHead t t₁ ∧ HSeq μ t₁ μ' t') ∨ (W.B ∧ μ' = μ ∧ t' = t)
+
+theorem HSeqP.one {μ μ' : List Tm} {t t' : Tm} (h : ∀ Λ, RHead Λ μ t Λ μ' t') : HSeqP W μ t μ' t' :=
+  .inl ⟨_, _, h, .refl⟩
+
 /-- The answer of the right side to a runtime head step of the left one. -/
 def HAns (W : World) (μ₂ : List Tm) (r₂ : Tm) (μ μ' : List Tm) (r' : Tm) : Prop :=
-  ∃ W₁ μ₂a r₂a W' μ₂' r₂', RJ W μ₂ r₂ W₁ μ₂a r₂a ∧ HSeq μ₂a r₂a μ₂' r₂' ∧ W₁.le W' ∧
+  ∃ W₁ μ₂a r₂a W' μ₂' r₂', RJ W μ₂ r₂ W₁ μ₂a r₂a ∧ HSeqP W₁ μ₂a r₂a μ₂' r₂' ∧ W₁.le W' ∧
     Sim W' .any r' r₂' ∧ StR W' μ' μ₂' ∧ ∀ n, W.J₁ n → μ'[n]? = μ[n]?
 
 theorem rcu_frame {x : Pos} {a b v : Tm} (h : Sim W x a b) (hx : x = .any) (ha : a = .raise v)
@@ -63,40 +71,40 @@ theorem force_sim {Λ : List Rgn} {μ μ' μ₂ : List Tm} {l : Nat} {r' e₂ : 
     | forcePending hc₀ =>
       rw [hc₀] at hc; cases hc
       obtain ⟨e', rfl, he'⟩ := hcr.inv_lazy
-      exact ⟨W₁, μ₁, _, W₁, _, _, r₁, HSeq.one (fun _ => .forcePending hc'), World.le.refl _,
+      exact ⟨W₁, μ₁, _, W₁, _, _, r₁, HSeqP.one (fun _ => .forcePending hc'), World.le.refl _,
         .settle hlk he', hst₁.set hlk (.force he'), fun n hn => getElem?_set_of_ne (hnj n hn)⟩
     | forceDone hc₀ =>
       rw [hc₀] at hc; cases hc
       obtain ⟨o', rfl, ho'⟩ := hcr.inv_await
-      exact ⟨W₁, μ₁, _, W₁, _, _, r₁, HSeq.one (fun _ => .forceDone hc'), World.le.refl _, ho', hst₁,
+      exact ⟨W₁, μ₁, _, W₁, _, _, r₁, HSeqP.one (fun _ => .forceDone hc'), World.le.refl _, ho', hst₁,
         fun _ _ => rfl⟩
     | forceRunning hc₀ hnl hnd =>
       rw [hc₀] at hc; cases hc
       have hsh := hcr.top_cell rfl
-      refine ⟨W₁, μ₁, _, W₁, _, _, r₁, HSeq.one (fun _ => .forceRunning hc' ?_ ?_), World.le.refl _, .todo,
+      refine ⟨W₁, μ₁, _, W₁, _, _, r₁, HSeqP.one (fun _ => .forceRunning hc' ?_ ?_), World.le.refl _, .todo,
         hst₁, fun _ _ => rfl⟩
       · intro e he; obtain ⟨e₀, he₀⟩ := hsh.1.2 ⟨e, he⟩; exact hnl e₀ he₀
       · intro o ho; obtain ⟨o₀, ho₀⟩ := hsh.2.2.2 ⟨o, ho⟩; exact hnd o₀ ho₀
   | born v v' =>
-    obtain ⟨hv, hv', hcl, hcl', hn', hvv, hs⟩ := hcr
+    obtain ⟨hv, hv', hcl, hcl', hn', hvv, hs, hB⟩ := hcr
     have hinv : ∀ {c c' : Tm}, ((c = .lazy v ∨ c = .running v ∨ c = .done v) ∧
         (c' = .lazy v' ∨ c' = .done v')) → CellR W₁ (.born v v') c c' :=
-      fun hcs => ⟨hv, hv', hcl, hcl', hn', hvv, .inl hcs⟩
+      fun hcs => ⟨hv, hv', hcl, hcl', hn', hvv, .inl hcs, hB⟩
     -- the right side reaches `v'`, its cell done
     have reach : (c' = .lazy v' ∨ c' = .done v') →
-        ∃ μ₂', HSeq μ₁ (.force (.loc l')) μ₂' v' ∧ μ₂' = μ₁.set l' (.done v') := by
+        ∃ μ₂', HSeqP W₁ μ₁ (.force (.loc l')) μ₂' v' ∧ μ₂' = μ₁.set l' (.done v') := by
       intro hc''
       rcases hc'' with rfl | rfl
-      · refine ⟨_, .rt (fun _ => .forcePending hc') (.rt (fun _ => .settleVal hv') .refl),
+      · refine ⟨_, .inl ⟨_, _, fun _ => .forcePending hc', .rt (fun _ => .settleVal hv') .refl⟩,
           settleCell_running hl'⟩
-      · exact ⟨_, HSeq.one (fun _ => .forceDone hc'), (Flick.Elab.List.set_of_getElem? hc').symm⟩
+      · exact ⟨_, HSeqP.one (fun _ => .forceDone hc'), (Flick.Elab.List.set_of_getElem? hc').symm⟩
     cases hh with
     | forcePending hc₀ =>
       rw [hc₀] at hc; cases hc
       rcases hs with ⟨hl₁ | hl₁ | hl₁, hr₁⟩ | ⟨hnc, -, -⟩
       · cases hl₁
         obtain ⟨μ₂', hq, rfl⟩ := reach hr₁
-        exact ⟨W₁, μ₁, _, W₁, _, _, r₁, hq, World.le.refl _, .bornV hlk hcl hcl' hn',
+        exact ⟨W₁, μ₁, _, W₁, _, _, r₁, hq, World.le.refl _, .bornV hB hlk hcl hcl' hn',
           hst₁.set hlk (hinv ⟨.inr (.inl rfl), .inr rfl⟩), fun n hn => getElem?_set_of_ne (hnj n hn)⟩
       · cases hl₁
       · cases hl₁
@@ -116,10 +124,10 @@ theorem force_sim {Λ : List Rgn} {μ μ' μ₂ : List Tm} {l : Nat} {r' e₂ : 
       rw [hc₀] at hc; cases hc
       rcases hs with ⟨hl₁ | hl₁ | hl₁, hr₁⟩ | ⟨hnc, hnc', -⟩
       · exact (hnl _ hl₁).elim
-      · exact ⟨W₁, μ₁, _, W₁, _, _, r₁, .refl, World.le.refl _,
-          .dead (by simp [Tm.NoIns, Tm.Has]), hst₁, fun _ _ => rfl⟩
+      · exact ⟨W₁, μ₁, _, W₁, _, _, r₁, .inr (.inr ⟨hB, rfl, rfl⟩), World.le.refl _,
+          .dead hB (by simp [Tm.NoIns, Tm.Has]), hst₁, fun _ _ => rfl⟩
       · exact (hnd _ hl₁).elim
-      · refine ⟨W₁, μ₁, _, W₁, _, _, r₁, HSeq.one (fun _ => .forceRunning hc' ?_ ?_), World.le.refl _, .todo,
+      · refine ⟨W₁, μ₁, _, W₁, _, _, r₁, HSeqP.one (fun _ => .forceRunning hc' ?_ ?_), World.le.refl _, .todo,
           hst₁, fun _ _ => rfl⟩
         · rintro e rfl; exact hnc' trivial
         · rintro o rfl; exact hnc' trivial

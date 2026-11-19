@@ -31,20 +31,25 @@ theorem dec_act {root : Roots} {l : Lbl} {Λ Λ' : List Rgn} {μ μ' μ₂ : Lis
     (hs : Step root l Λ μ (plug E r) (.cfg Λ' μ' t'))
     (hd : ∃ W' μ₂' E₀ E₁ a b E₂, RJ W μ₂ t₂ W' μ₂' (plug E₂ b) ∧ E = E₀ ++ E₁ ∧
       a = plug E₀ r ∧ FrL W' E₁ E₂ ∧ OkE E₂ ∧ Act W' a b) :
-    Λ' = Λ ∧ KAns root W τ μ₂ t₂ μ μ' t' := by
+    Λ' = Λ ∧ KAns root W τ μ₂ t₂ μ μ' (plug E r) t' := by
   obtain ⟨W', μ₂', E₀, E₁, a, b, E₂, hj, rfl, rfl, hfr, hE₂, hact⟩ := hd
-  rw [plug_append] at hs hcl₁
+  rw [plug_append] at hs hcl₁ ⊢
   have hk₀ : KSteps root μ₂ t₂ μ₂' (plug E₂ (b)) := hj.ksteps
   obtain ⟨rfl, W'', μ₂'', t₂'', hW, hk, ht, hst', hko⟩ :=
     act_sim (τ := τ) (fun G hG => hE G (List.mem_append_right _ hG)) hE₂ hfr hact (hj.st _ hst) hcl₁
       (fun μ'' t'' h => hcl₂ μ'' t'' (hk₀.trans h)) hs
-  exact ⟨rfl, W'', μ₂'', t₂'', hj.le.trans hW, hk₀.trans hk, ht, hst', hko.mono hj.le⟩
+  refine ⟨rfl, W'', μ₂'', t₂'', hj.le.trans hW, ?_, ht, hst', hko.mono hj.le⟩
+  rcases hk with hk | ⟨rfl, rfl, hz⟩
+  · exact .inl (hk₀.pos hk)
+  · rcases hk₀.split with ⟨rfl, rfl⟩ | hk₀
+    · exact .inr ⟨rfl, rfl, hz.pre hj⟩
+    · exact .inl hk₀
 
 /-- **A thread about to force its own new cell** forces it; the right side waits. -/
 theorem oneshot_sim {root : Roots} {l : Lbl} {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm}
     {τ : Option (Nat × Nat)} {t t₂ t' : Tm} (h : OneShot W μ τ t t₂) (hst : StR W μ μ₂)
     (hs : Step root l Λ μ t (.cfg Λ' μ' t')) :
-    Λ' = Λ ∧ KAns root W τ μ₂ t₂ μ μ' t' := by
+    Λ' = Λ ∧ KAns root W τ μ₂ t₂ μ μ' t t' := by
   obtain ⟨E, E', n, e, e', rfl, rfl, hE, hE', hfr, ho, hc, hee⟩ := h
   have hn := hst.own _ _ ho
   rcases Step.simple hE (force_redex n) trivial hs with ⟨_, hh, -⟩ | ⟨_, hh, rfl⟩
@@ -52,8 +57,15 @@ theorem oneshot_sim {root : Roots} {l : Lbl} {Λ Λ' : List Rgn} {μ μ' μ₂ :
   · cases hh with
     | forcePending hc' =>
       rw [hc] at hc'; cases hc'
-      refine ⟨rfl, W, μ₂, _, World.le.refl _, .refl,
-        .inl (hfr.plugs (.jL (by decide) hn hee)), hst.setJ₁ hn _, ?_⟩
+      have hr := hfr.plugs (.jL (by decide) hn hee)
+      refine ⟨rfl, W, μ₂, _, World.le.refl _, .inr ⟨rfl, rfl, fun hB => ⟨?_, fun _ _ _ h => h⟩⟩,
+        .inl hr, hst.setJ₁ hn _, ?_⟩
+      · have h₁ := Sim.xpot hr (hst.setJ₁ hn (.running e)) hB
+        have h₂ : xpot W μ (plug E (.force (.loc n))) = e.pot :=
+          xpot_eq (q := (E, n, e)) ⟨hE, rfl, hn, hc⟩
+        have h₃ := pot_plug E (.settle n e) (.force (.loc n))
+        simp only [pot, h₁, h₂, Tm.pot] at h₃ ⊢
+        omega
       intro n' τ' e' hτ ho' he
       have : n' ≠ n := fun e => hτ (hst.ownU _ _ _ (e ▸ ho') ho)
       rw [getElem?_set_of_ne this]; exact he
@@ -67,7 +79,7 @@ theorem pure_sim {root : Roots} {μ μ₂ : List Tm} {τ : Option (Nat × Nat)}
     (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed)
     (hzl : ¬ (plug E r').LzTop .any)
     (hzr : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → ¬ t''.LzTop .any) :
-    KAns root W τ μ₂ t₂ μ μ (plug E r') := by
+    KAns root W τ μ₂ t₂ μ μ (plug E r) (plug E r') := by
   have hr := hh.redex
   rcases ht.dec hr.1 (fun _ _ he => Redex.app hr he) (fun _ _ _ he => by subst he; cases hh)
       (fun ha => by cases hh <;> exact ha) _ _ rfl hE μ₂ with hd | ⟨W', μ₂', E₂, r₂, hj, hfr, hE₂, hs⟩ |
@@ -77,7 +89,7 @@ theorem pure_sim {root : Roots} {μ μ₂ : List Tm} {τ : Option (Nat × Nat)}
       (fun _ _ _ ha hp hz => hzr _ _ (hj.ksteps.trans ((ha.plug hE₂).ksteps.trans
         (.step (fun _ => ⟨_, .pure hE₂ hp⟩) .refl))) (hz.plug E₂))
     exact ⟨W₁, μ₁, plug E₂ r₂', hj.le.trans hj₁.le,
-      hj.ksteps.trans ((hj₁.plug hE₂).ksteps.trans (.step (fun _ => ⟨_, .pure hE₂ hh₂⟩) .refl)),
+      .inl (hj.ksteps.pos ((hj₁.plug hE₂).ksteps.pos ⟨_, _, fun _ => ⟨_, .pure hE₂ hh₂⟩, .refl⟩)),
       .inl ((hfr.mono hj₁.le).plugs hs₂), hj₁.st _ (hj.st _ hst), fun _ _ _ _ _ h => h⟩
   · cases hh
 
@@ -93,7 +105,7 @@ theorem rt_sim {root : Roots} {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {τ :
     (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed)
     (hzl : ¬ (plug E r').LzTop .any)
     (hzr : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → ¬ t''.LzTop .any) :
-    Λ' = Λ ∧ KAns root W τ μ₂ t₂ μ μ' (plug E r') := by
+    Λ' = Λ ∧ KAns root W τ μ₂ t₂ μ μ' (plug E r) (plug E r') := by
   have hΛ := hh.keep hreg
   have happ : ∀ f a, r = .app f a → Value f ∧ Value a := by
     intro f a he
@@ -109,16 +121,27 @@ theorem rt_sim {root : Roots} {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {τ :
       rhead_sim hh hreg hs (hj.st _ hst) (fun h => hzl (h.plug E))
         (fun _ hr hz => hzr _ _ (hj.ksteps.trans (.step (fun Λ => ⟨_, .rt hE₂ (hr Λ)⟩) .refl))
           (hz.plug E₂))
-    refine ⟨hΛ, W'', μ₂'', plug E₂ r₂', hj.le.trans (hj₁.le.trans hW),
-      hj.ksteps.trans ((hj₁.plug hE₂).ksteps.trans (hq.ksteps hE₂)),
+    refine ⟨hΛ, W'', μ₂'', plug E₂ r₂', hj.le.trans (hj₁.le.trans hW), ?_,
       .inl ((hfr.mono (hj₁.le.trans hW)).plugs hs₂), hst', ?_⟩
+    · rcases hq.kpos (root := root) hE₂ with hq | ⟨hB, rfl, rfl⟩
+      · exact .inl (hj.ksteps.pos ((hj₁.plug hE₂).ksteps.pos hq))
+      · exact (hj.ksteps.trans (hj₁.plug hE₂).ksteps).ans ((hj.le.trans hj₁.le).B.2 hB)
     exact KeepO.of_junk hst fun n hn' => hjk n (hj.le.J₁ _ hn')
   · have hst₁ := hj.st _ hst
     have hko : ∀ {μ' : List Tm}, (∀ m e, μ[m]? = some (Tm.lazy e) → μ'[m]? = some (Tm.lazy e)) →
         KeepO W τ μ μ' := fun h _ _ _ _ _ he => h _ _ he
+    -- the frame of a left cell settles: the right side does not step after it caught up
+    have ans : ∀ {μ' : List Tm} {a' : Tm}, Sim W' .any (plug E a') (plug E₂ b) →
+        StR W' μ' μ₂' → a'.pot < (Tm.settle n a).pot →
+        KPos root μ₂ t₂ μ₂' (plug E₂ b) ∨ (μ₂' = μ₂ ∧ plug E₂ b = t₂ ∧
+          Zero W W' τ μ μ' (plug E (.settle n a)) (plug E a')) := fun hr hs' hlt => by
+      rcases hj.ksteps.split with ⟨rfl, e⟩ | hk
+      · exact .inr ⟨rfl, e, Zero.sim hr hs' hj.le (pot_plug_lt E hlt) fun _ _ _ h => hj.o _ _ h⟩
+      · exact .inl hk
     cases hh with
     | settleVal hv =>
-      refine ⟨hΛ, W', μ₂', _, hj.le, hj.ksteps, .inl (hfr.plugs hs), hst₁.settleJ₁ hn _,
+      refine ⟨hΛ, W', μ₂', _, hj.le, ans (hfr.plugs hs) (hst₁.settleJ₁ hn _) (by simp only [Tm.pot]; omega),
+        .inl (hfr.plugs hs), hst₁.settleJ₁ hn _,
         hko fun m e he => ?_⟩
       by_cases hm : m = n
       · subst hm; rcases settleCell_cases μ m _ with ⟨e', he', -⟩ | ⟨-, e₁⟩
@@ -126,7 +149,8 @@ theorem rt_sim {root : Roots} {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {τ :
         · rw [e₁]; exact he
       · rw [settleCell_other hm]; exact he
     | settleRaise hv =>
-      refine ⟨hΛ, W', μ₂', _, hj.le, hj.ksteps, .inl (hfr.plugs hs), hst₁.settleJ₁ hn _,
+      refine ⟨hΛ, W', μ₂', _, hj.le, ans (hfr.plugs hs) (hst₁.settleJ₁ hn _) (by simp only [Tm.pot]; omega),
+        .inl (hfr.plugs hs), hst₁.settleJ₁ hn _,
         hko fun m e he => ?_⟩
       by_cases hm : m = n
       · subst hm; rcases settleCell_cases μ m (.raise _) with ⟨e', he', -⟩ | ⟨-, e₁⟩
@@ -134,7 +158,8 @@ theorem rt_sim {root : Roots} {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {τ :
         · rw [e₁]; exact he
       · rw [settleCell_other hm]; exact he
     | settleUnw =>
-      refine ⟨hΛ, W', μ₂', _, hj.le, hj.ksteps, .inl (hfr.plugs hs), hst₁.resetJ₁ hn,
+      refine ⟨hΛ, W', μ₂', _, hj.le, ans (hfr.plugs hs) (hst₁.resetJ₁ hn) (by simp only [Tm.pot]; omega),
+        .inl (hfr.plugs hs), hst₁.resetJ₁ hn,
         hko fun m e he => ?_⟩
       by_cases hm : m = n
       · subst hm; rcases resetCell_cases μ m with ⟨e', he', -⟩ | ⟨-, e₁⟩

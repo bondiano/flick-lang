@@ -90,8 +90,8 @@ theorem Sim.value_noIns {x : Pos} {a b : Tm} (h : Sim W x a b) : Value b → b.N
     cases hv with
     | rcons h₁ h₂ => have h₁ := ih₁ h₁; have h₂ := ih₂ h₂; simp_all [Tm.NoIns, Tm.Has]
   | dropA _ _ ih | dropB _ _ _ ih | forceA _ ih | jL _ _ _ ih => exact ih
-  | bornV _ _ _ hn => intro _; exact hn
-  | dead hn => intro _; exact hn
+  | bornV _ _ _ _ hn => intro _; exact hn
+  | dead _ hn => intro _; exact hn
   | _ => intro hv; first | (cases hv; done) | simp [Tm.NoIns, Tm.Has]
 
 /-- A value is related to a value only by a congruence, so at any index. -/
@@ -118,7 +118,7 @@ theorem Sim.value_any {x : Pos} {a b : Tm} (h : Sim W x a b) (ha : Value a) (hb 
         · subst hy; exact .rconsV ha₁ (ih₁ ha₁ hb₁ _) (ih₂ ha₂ hb₂ _)
         · exact .rcons hy (ih₁ ha₁ hb₁ y) (ih₂ ha₂ hb₂ y)
   | dropA | dropB | forceA | jL | bornV | dead | bornA | bornB => cases ha
-  | bornS _ _ hs => rcases hs with rfl | rfl | rfl | rfl | rfl <;> cases ha
+  | bornS _ _ _ hs => rcases hs with rfl | rfl | rfl | rfl | rfl <;> cases ha
   | dropC | forceC | jR => cases hb
   | _ => intro y; first | (cases ha; done) | (constructor <;> assumption)
 
@@ -157,15 +157,15 @@ theorem Sim.rename {x : Pos} {a b : Tm} (h : Sim W x a b) :
   | dropC hb hn _ ih =>
     intro ξ; subst hb; simp only [Tm.rename]; exact .dropC (rename_up _ _) (Tm.NoIns.rename ξ hn) (ih ξ)
   | forceC hn _ ih => intro ξ; exact .forceC (Tm.NoIns.rename ξ hn) (ih ξ)
-  | bornA hv hv' _ ih =>
-    intro ξ; simp only [Tm.rename, liftR]; exact .bornA hv.rename hv'.rename (ih ξ)
-  | bornB hv hv' _ ih =>
-    intro ξ; simp only [Tm.rename, liftR]; exact .bornB hv.rename hv'.rename (ih ξ)
-  | bornS hl hc hs =>
-    intro ξ; rw [hs.rename hc]; exact .bornS hl hc hs
-  | bornV hl hc hc' hn =>
-    intro ξ; simp only [Tm.rename]; rw [hc.rename, hc'.rename]; exact .bornV hl hc hc' hn
-  | dead hn => intro ξ; exact .dead (Tm.NoIns.rename ξ hn)
+  | bornA hB hv hv' _ ih =>
+    intro ξ; simp only [Tm.rename, liftR]; exact .bornA hB hv.rename hv'.rename (ih ξ)
+  | bornB hB hv hv' _ ih =>
+    intro ξ; simp only [Tm.rename, liftR]; exact .bornB hB hv.rename hv'.rename (ih ξ)
+  | bornS hB hl hc hs =>
+    intro ξ; rw [hs.rename hc]; exact .bornS hB hl hc hs
+  | bornV hB hl hc hc' hn =>
+    intro ξ; simp only [Tm.rename]; rw [hc.rename, hc'.rename]; exact .bornV hB hl hc hc' hn
+  | dead hB hn => intro ξ; exact .dead hB (Tm.NoIns.rename ξ hn)
   | appK hs _ _ ih₁ ih₂ => intro ξ; exact .appK (hs.rename ξ) (ih₁ ξ) (ih₂ ξ)
   | appV hv _ _ ih₁ ih₂ => intro ξ; exact .appV hv.rename (ih₁ ξ) (ih₂ ξ)
   | rconsK hs _ _ ih₁ ih₂ => intro ξ; exact .rconsK (hs.rename ξ) (ih₁ ξ) (ih₂ ξ)
@@ -201,15 +201,15 @@ theorem Sim.subst {x : Pos} {a b : Tm} (h : Sim W x a b) :
     intro σ σ' hσ; subst hb; simp only [Tm.subst]
     exact .dropC (subst_up _ _) (Tm.NoIns.subst hn hσ.noIns) (ih _ _ hσ)
   | forceC hn _ ih => intro σ σ' hσ; exact .forceC (Tm.NoIns.subst hn hσ.noIns) (ih _ _ hσ)
-  | bornA hv hv' _ ih =>
-    intro σ σ' hσ; simp only [Tm.subst, liftS]; exact .bornA hv.subst hv'.subst (ih _ _ hσ)
-  | bornB hv hv' _ ih =>
-    intro σ σ' hσ; simp only [Tm.subst, liftS]; exact .bornB hv.subst hv'.subst (ih _ _ hσ)
-  | bornS hl hc hs =>
-    intro σ σ' _; rw [hs.subst hc]; exact .bornS hl hc hs
-  | bornV hl hc hc' hn =>
-    intro σ σ' _; simp only [Tm.subst]; rw [hc.subst, hc'.subst]; exact .bornV hl hc hc' hn
-  | dead hn => intro σ σ' hσ; exact .dead (Tm.NoIns.subst hn hσ.noIns)
+  | bornA hB hv hv' _ ih =>
+    intro σ σ' hσ; simp only [Tm.subst, liftS]; exact .bornA hB hv.subst hv'.subst (ih _ _ hσ)
+  | bornB hB hv hv' _ ih =>
+    intro σ σ' hσ; simp only [Tm.subst, liftS]; exact .bornB hB hv.subst hv'.subst (ih _ _ hσ)
+  | bornS hB hl hc hs =>
+    intro σ σ' _; rw [hs.subst hc]; exact .bornS hB hl hc hs
+  | bornV hB hl hc hc' hn =>
+    intro σ σ' _; simp only [Tm.subst]; rw [hc.subst, hc'.subst]; exact .bornV hB hl hc hc' hn
+  | dead hB hn => intro σ σ' hσ; exact .dead hB (Tm.NoIns.subst hn hσ.noIns)
   | appK hs _ _ ih₁ ih₂ => intro σ σ' hσ; exact .appK (hs.subst σ) (ih₁ _ _ hσ) (ih₂ _ _ hσ)
   | appV hv _ _ ih₁ ih₂ => intro σ σ' hσ; exact .appV hv.subst (ih₁ _ _ hσ) (ih₂ _ _ hσ)
   | rconsK hs _ _ ih₁ ih₂ => intro σ σ' hσ; exact .rconsK (hs.subst σ) (ih₁ _ _ hσ) (ih₂ _ _ hσ)
