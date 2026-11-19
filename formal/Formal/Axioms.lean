@@ -17,6 +17,7 @@ import Formal.Lazy
 import Formal.Refine
 import Formal.Refine.Numbers
 import Formal.RT.LazyCell
+import Formal.Equiv.Context
 
 /-!
 # The axioms of the main theorems
@@ -165,3 +166,15 @@ prints, and `#guard_msgs` turns the difference into an error.
 /-- info: 'Flick.Refine.numbers_sound' depends on axioms: [propext, Quot.sound] -/
 #guard_msgs in
 #print axioms Flick.Refine.numbers_sound
+
+/-- info: 'Flick.Equiv.o1a' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Equiv.o1a
+
+/-- info: 'Flick.Equiv.o1b' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Equiv.o1b
+
+/-- info: 'Flick.Equiv.o1c' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Equiv.o1c

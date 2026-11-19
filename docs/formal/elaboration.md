@@ -459,7 +459,9 @@ task and keeps its outcome as `Some (Ok v)` or `Some (Err err)`. `await x`
 gives the outcome back with `from_result`; a force after the first only reads
 the state. `x = v` of a `let lazy mut` is `Some (Ok v)`.
 [`lazy.md`](lazy.md) §4 gives the translation. Its forms are derived rules of
-the typing of blocks, so T7 covers them (`formal/Formal/LetMut/Lazy.lean`).
+the typing of blocks, so T7 covers them (`formal/Formal/LetMut/Lazy.lean`),
+given the Prelude's `Option` and `Result` in the signature (`LzSig`, which
+the witness signature has: `Elab.Witness.lzSig`).
 
 ## 4. Coherence and T6
 
