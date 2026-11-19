@@ -15,12 +15,14 @@
 //!   owner, `FLICK-G003` (`live_rows.rs`).
 
 use super::{AliasKey, Unfold, leave_alias};
+use crate::source::Span;
 use crate::types::Checker;
 use crate::types::Elem;
 use crate::types::effects::Stage;
 use crate::types::kinds::Kind;
 use crate::types::lang::Lang;
 use crate::types::ty::{Effects, Norm, Row, Type};
+use crate::types::unify::Unified;
 
 /// `t` without `Live`: as messages, interfaces and the emitted code show it,
 /// since every use of a signature elides it again.
@@ -321,6 +323,36 @@ impl Checker<'_> {
         }
     }
 
+    /// A function or a task `identity` under a value bound fitted into the
+    /// bound's type `base`, `innermost` the innermost bound; `None` for any
+    /// other value. With `base` known it fits as it fits that type, by
+    /// subsumption: one that uses nothing fits where a closure fitted before
+    /// it may use the bound. One that fixes `base` gives it its arrow with
+    /// the innermost bound in its row, a widening `LeLive.arrow` allows, and
+    /// the holds of the bound keep its qualifier within it; a closure fitted
+    /// after it may then use what the bound allows. Either way the verdict
+    /// does not depend on which argument comes first.
+    pub(in crate::types) fn callable_bound_fits(
+        &mut self,
+        identity: &Type,
+        base: &Type,
+        innermost: Option<&Type>,
+        span: Span,
+    ) -> Option<Unified> {
+        let callable = |t: &Type| {
+            let t = self.whnf(t);
+            matches!(t, Type::Fun { .. }) || self.eff_parts(&t).is_some()
+        };
+        if !callable(identity) {
+            return None;
+        }
+        if matches!(base, Type::Meta(_)) {
+            let widened = self.with_live(self.whnf(identity), innermost);
+            return Some(self.unify(&widened, base));
+        }
+        callable(base).then(|| self.subsume(identity, base, span))
+    }
+
     /// The types of a subsumption with a qualifier: using either side needs
     /// its qualifier live, so a qualifier does not hide `Live`.
     pub(in crate::types) fn live_sides(
@@ -328,30 +360,33 @@ impl Checker<'_> {
         (a, ca): (Type, Option<&Type>),
         (e, ce): (Type, Option<&Type>),
     ) -> (Type, Type) {
-        let side = |t: Type, c: Option<&Type>| {
-            let Some(atoms) = c.map(|c| self.live_atoms(c, &[])) else {
-                return t;
-            };
-            match t {
-                Type::Fun {
-                    param,
-                    effects: Some(effects),
-                    result,
-                } => Type::Fun {
-                    param,
-                    effects: Some(Box::new(Effects {
-                        services: add_live(&effects.services, atoms),
-                        ..*effects
-                    })),
-                    result,
-                },
-                other => match self.eff_parts(&other) {
-                    Some((s, e, r)) => super::super::infer::eff(add_live(&s, atoms), e, r),
-                    None => other,
-                },
-            }
+        (self.with_live(a, ca), self.with_live(e, ce))
+    }
+
+    /// `t`, a function or a task, whose row also needs live what `captures`
+    /// holds. Any other type as it is.
+    pub(in crate::types) fn with_live(&self, t: Type, captures: Option<&Type>) -> Type {
+        let Some(atoms) = captures.map(|c| self.live_atoms(c, &[])) else {
+            return t;
         };
-        (side(a, ca), side(e, ce))
+        match t {
+            Type::Fun {
+                param,
+                effects: Some(effects),
+                result,
+            } => Type::Fun {
+                param,
+                effects: Some(Box::new(Effects {
+                    services: add_live(&effects.services, atoms),
+                    ..*effects
+                })),
+                result,
+            },
+            other => match self.eff_parts(&other) {
+                Some((s, e, r)) => super::super::infer::eff(add_live(&s, atoms), e, r),
+                None => other,
+            },
+        }
     }
 
     /// Whether a closure that holds `held` holds the reader of a lazy `for`.

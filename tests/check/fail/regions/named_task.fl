@@ -27,5 +27,5 @@ let direct () =
     Ref.set cell (task { Files.use h })
   }
   await (Ref.get cell)
-//~ FLICK-G002 @18:18-18:19 this value needs region `s` live
+//~ FLICK-G002 @18:18-18:19 this uses region `s`, which the expected type `Eff {Files} none Unit` does not keep live
 //~ FLICK-G002 @27:26-27:37 this uses region `s`

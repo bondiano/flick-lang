@@ -277,6 +277,7 @@ impl Checker<'_> {
         if matches!(e, Type::Bounded { .. }) {
             let mut base = e;
             let mut allowed = Norm::default();
+            let mut innermost = None;
             while let Type::Bounded { ty, captures } = base {
                 self.capture_row(&captures, &mut allowed);
                 self.hold(Hold {
@@ -288,6 +289,7 @@ impl Checker<'_> {
                     what: "value",
                     span,
                 });
+                innermost = Some(*captures);
                 base = self.bound_head(&ty);
             }
             // a value qualifier the bound already allows says nothing more:
@@ -330,7 +332,8 @@ impl Checker<'_> {
                 }
                 _ => self.capture_identity(&a),
             };
-            return Some(self.unify(&identity, &base));
+            let fits = self.callable_bound_fits(&identity, &base, innermost.as_ref(), span);
+            return Some(fits.unwrap_or_else(|| self.unify(&identity, &base)));
         }
         // a position not known yet takes a value bounded by a region with its
         // bound: what it turns out to be may store the region's resource
