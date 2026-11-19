@@ -132,6 +132,9 @@ export interface Fixture<Task> {
 export const testFixture = <Task>(key: string, init: Task): Fixture<Task> => Object.freeze({ key, shared: false, init });
 export const testShared = <Task>(key: string, init: Task): Fixture<Task> => Object.freeze({ key, shared: true, init });
 
+/** The name of `fixture` in its suite: the last part of its key. */
+export const fixtureName = <Task>({ key }: Fixture<Task>): string => key.slice(key.lastIndexOf(" > ") + 3);
+
 /** `Test.share`: the item that makes its group the owner of the shared `fixture`. */
 export const testShare = <Task, L>(fixture: Fixture<Task>): Test<Task, L> =>
   Object.freeze({ kind: "share", name: "share", fixture });

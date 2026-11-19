@@ -34,8 +34,8 @@ type Fixture = ReturnType<typeof testFixture<Task>>;
 const isResults = (v: unknown): v is { tests: ReadonlyArray<TestResult> } =>
   typeof v === "object" && v !== null && Array.isArray(Reflect.get(v, "tests"));
 
-/** The name, status and cleanup of each test of a run. */
-const run = async (modules: Parameters<typeof runTests>[0], jobs = 1) => {
+/** The name, status and cleanup of each test of a run, or its name, status, kind and message when `full`. */
+const run = async (modules: Parameters<typeof runTests>[0], jobs = 1, full = false) => {
   let out = "";
   const before = process.exitCode;
   try {
@@ -45,7 +45,7 @@ const run = async (modules: Parameters<typeof runTests>[0], jobs = 1) => {
   }
   const json: unknown = JSON.parse(out);
   assert.ok(isResults(json), out);
-  return json.tests.map((t) => [t.name, t.status, t.cleanup]);
+  return json.tests.map((t) => (full ? [t.name, t.status, t.kind, t.message] : [t.name, t.status, t.cleanup]));
 };
 
 /** `finalizer`, added to the scope of the code's own region, as generated code adds one. */
@@ -142,6 +142,37 @@ test("the scope of a test's fixtures closes with how the test ended", async () =
     ],
   );
   assert.deepEqual(log, ["commit", "rollback", "rollback", "rollback"]);
+});
+
+test("a case whose fixture fails to be made fails its setup, with the fixture's error", async () => {
+  const broken = testFixture<Task>("M > s > conn", Effect.fail("no connection"));
+  const db = testShared<Task>("M > s > db", Effect.fail("no database"));
+  const results = await run(
+    [
+      [
+        "M",
+        [
+          testGroup("s", [
+            testShare(db),
+            testEffect("own", force(broken)),
+            // each case that awaits a failed shared fixture fails its setup
+            testEffect("shared", force(db)),
+            testEffect("shared again", force(db)),
+            // a case that handles the failure passes
+            testEffect("handles it", Effect.exit(force(broken))),
+          ]),
+        ],
+      ],
+    ],
+    1,
+    true,
+  );
+  assert.deepEqual(results, [
+    ["M > s > own", "failed", "setup", "fixture conn: fail no connection"],
+    ["M > s > shared", "failed", "setup", "fixture db: fail no database"],
+    ["M > s > shared again", "failed", "setup", "fixture db: fail no database"],
+    ["M > s > handles it", "passed", undefined, undefined],
+  ]);
 });
 
 test("the hooks of a suite run in its scope, so what they acquire is released with it", async () => {

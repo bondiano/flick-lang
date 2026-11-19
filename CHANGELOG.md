@@ -6,6 +6,12 @@ break programs.
 
 ## Unreleased
 
+- **A fixture that fails to be made is a `setup` failure.** A case that
+  awaits a fixture whose expression fails, and does not handle the error,
+  is reported as `setup`, `fixture conn: <the fixture's error>`, as a failed
+  `before_*` hook is; each case that awaits a failed shared fixture is too.
+  Alike on Flick's runtime, through the Effect adapter and on Go.
+
 - **Test fixtures.** A `suite` holds `fixture name = expression`, which its
   cases and hooks read with `await name`: made the first time a case awaits
   it, once for that case, or with `fixture shared` once for the run of the

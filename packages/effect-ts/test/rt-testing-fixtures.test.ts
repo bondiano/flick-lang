@@ -5,7 +5,7 @@ import { test } from "node:test";
 
 import { Duration, sleep } from "@flick-lang/runtime/rt/duration";
 import { lazyForce } from "@flick-lang/runtime/rt/effect/Lazy";
-import { type Run, readOwnerEvidence } from "@flick-lang/runtime/rt/fiber";
+import { type Run, exitOf, readOwnerEvidence } from "@flick-lang/runtime/rt/fiber";
 import { fail, raise } from "@flick-lang/runtime/rt/cause";
 import { addFinalizer, addFinalizerExit, within } from "@flick-lang/runtime/rt/owner";
 import {
@@ -30,8 +30,8 @@ type Fixture = ReturnType<typeof testFixture<() => unknown>>;
 const isResults = (v: unknown): v is { tests: ReadonlyArray<TestResult> } =>
   typeof v === "object" && v !== null && Array.isArray(Reflect.get(v, "tests"));
 
-/** The name and status of each test of a run, and the cleanup of each that failed to clean up. */
-const run = async (modules: Parameters<typeof runTests>[0], jobs = 1) => {
+/** The name, status and cleanup of each test of a run, or its name, status, kind and message when `full`. */
+const run = async (modules: Parameters<typeof runTests>[0], jobs = 1, full = false) => {
   let out = "";
   const before = process.exitCode;
   try {
@@ -41,7 +41,7 @@ const run = async (modules: Parameters<typeof runTests>[0], jobs = 1) => {
   }
   const json: unknown = JSON.parse(out);
   assert.ok(isResults(json), out);
-  return json.tests.map((t) => [t.name, t.status, t.cleanup]);
+  return json.tests.map((t) => (full ? [t.name, t.status, t.kind, t.message] : [t.name, t.status, t.cleanup]));
 };
 
 test("a fixture is made once for each test that uses it, a shared one once for its suite, and released after the hooks", async () => {
@@ -152,6 +152,43 @@ test("the scope of a test's fixtures closes with how the test ended", async () =
     ],
   );
   assert.deepEqual(log, ["commit", "rollback", "rollback", "rollback"]);
+});
+
+/** A test that awaits `fixture`. */
+const awaiting = (name: string, fixture: Fixture) =>
+  testEffect(name, function* (): Run {
+    yield lazyForce(testUse(fixture));
+    return undefined;
+  });
+
+test("a case whose fixture fails to be made fails its setup, with the fixture's error", async () => {
+  const broken = testFixture("M > s > conn", () => raise(fail("no connection")));
+  const db = testShared("M > s > db", () => raise(fail("no database")));
+  const results = await run([
+    [
+      "M",
+      [
+        testGroup("s", [
+          testShare(db),
+          awaiting("own", broken),
+          // each case that awaits a failed shared fixture fails its setup
+          awaiting("shared", db),
+          awaiting("shared again", db),
+          // a case that handles the failure passes
+          testEffect("handles it", function* (): Run {
+            yield exitOf(() => lazyForce(testUse(broken)));
+            return undefined;
+          }),
+        ]),
+      ],
+    ],
+  ], 1, true);
+  assert.deepEqual(results, [
+    ["M > s > own", "failed", "setup", "fixture conn: fail no connection"],
+    ["M > s > shared", "failed", "setup", "fixture db: fail no database"],
+    ["M > s > shared again", "failed", "setup", "fixture db: fail no database"],
+    ["M > s > handles it", "passed", undefined, undefined],
+  ]);
 });
 
 test("the hooks of a suite run in its scope, so what they acquire is released with it", async () => {

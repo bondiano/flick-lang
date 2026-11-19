@@ -93,6 +93,31 @@ func TestTheFixturesOfATestCloseWithHowItEnded(t *testing.T) {
 	}
 }
 
+// A case whose fixture fails to be made fails its setup, with the fixture's
+// error; each case that awaits a failed shared fixture does, and a case that
+// handles the failure passes.
+func TestACaseWhoseFixtureFailsFailsItsSetup(t *testing.T) {
+	broken := TestFixture("M > s > conn", Eff(func(*Fiber) Value { return Fail("no connection") }))
+	db := TestShared("M > s > db", Eff(func(*Fiber) Value { return Fail("no database") }))
+	awaiting := func(name string, f Value) Value {
+		return TestEffect(name, Eff(func(fb *Fiber) Value { return LazyForce(fb, TestUse(fb, f)) }))
+	}
+	handles := TestEffect("handles it", Eff(func(fb *Fiber) Value {
+		catch(func() Value { return LazyForce(fb, TestUse(fb, broken)) })
+		return Unit
+	}))
+	got := runAll([]Value{TestGroup("s", []Value{
+		TestShare(db), awaiting("own", broken), awaiting("shared", db), awaiting("shared again", db), handles,
+	})}, marks{})
+	want := "[M > s > own failed setup fixture conn: fail no connection " +
+		"M > s > shared failed setup fixture db: fail no database " +
+		"M > s > shared again failed setup fixture db: fail no database " +
+		"M > s > handles it passed  ]"
+	if fmt.Sprint(got) != want {
+		t.Errorf("results\n%v\nwant\n%s", got, want)
+	}
+}
+
 // What the hooks of a suite acquire is released with the suite, after its
 // last test, not with the test that set it up.
 func TestTheHooksOfASuiteRunInItsScope(t *testing.T) {

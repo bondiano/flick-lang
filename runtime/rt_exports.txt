@@ -561,6 +561,7 @@
 @flick-lang/runtime/core/suites parseTestArgs
 @flick-lang/runtime/core/suites runTestsWith
 @flick-lang/runtime/core/testing checks
+@flick-lang/runtime/core/testing fixtureName
 @flick-lang/runtime/core/testing flatten
 @flick-lang/runtime/core/testing genBool
 @flick-lang/runtime/core/testing genConstant

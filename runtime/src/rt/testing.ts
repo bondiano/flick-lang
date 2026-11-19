@@ -9,7 +9,7 @@ import { allOf, timeoutOption } from "./concurrency.ts";
 import { describeReport, report } from "./describe.ts";
 import type { Duration } from "./duration.ts";
 import { pretty } from "./entry.ts";
-import { type LazyCell, lazyMake } from "./effect/Lazy.ts";
+import { type LazyCell, lazyForce, lazyMake } from "./effect/Lazy.ts";
 import { type Ctx, type Fiber, type Run, Under, asExit, awaitFiber, currentCtx, exitOf, extend, fork, lookup, withOwnerEvidence } from "./fiber.ts";
 import { type Layer, MemoMap, type Services, buildWith, servicesOf, withServices } from "./layer.ts";
 import { Owner, OwnedExits, addFinalizer, close, closeOwn, inside, ownedExits } from "./owner.ts";
@@ -131,9 +131,18 @@ type Fixture = Core.Fixture<Task>;
  * a scope of their own, which the scope of the test or the suite closes
  * after the hooks that run when it closes, as those may use them.
  */
-type Cells = Readonly<{ cells: Map<Fixture, LazyCell>; owner: Owner }>;
+type Cells = Readonly<{ cells: Map<Fixture, LazyCell>; owner: Owner; broken: { first?: [Fixture, Cause] } }>;
 
-const cellsIn = (outer: Owner): Cells => ({ cells: new Map(), owner: new Owner(outer.defects) });
+const cellsIn = (outer: Owner): Cells => ({ cells: new Map(), owner: new Owner(outer.defects), broken: {} });
+
+/** `task`, the first failure of `fixture`'s initializer noted in `broken`: what makes its case a `setup` failure. */
+const noting = (broken: Cells["broken"], fixture: Fixture, task: Task): Task =>
+  function* (): Run {
+    const exit = asExit(yield exitOf(task));
+    if (exit.cause === undefined) return exit.value;
+    if (!hasInterruptsOnly(exit.cause)) broken.first ??= [fixture, exit.cause];
+    return raise(exit.cause);
+  };
 
 /** The finalizer that closes `cells` with `outcome`: it fails as their finalizers do. */
 const closing = ({ owner }: Cells, outcome: () => Exit = () => succeeded(undefined)) =>
@@ -163,11 +172,11 @@ const withFixtures =
   () =>
     new Under(extend(currentCtx(), FIXTURES, fixtures), task);
 
-/** The cell of `fixture`, made the first time: its initializer runs in the scope of the cells. */
-const cellOf = ({ cells, owner }: Cells, fixture: Fixture): LazyCell => {
+/** The cell of `fixture`, made the first time: `init`, by default its initializer in the scope of the cells. */
+const cellOf = ({ cells, owner, broken }: Cells, fixture: Fixture, init: Task = () => inside(owner, () => withOwnerEvidence(owner, fixture.init))): LazyCell => {
   const found = cells.get(fixture);
   if (found !== undefined) return found;
-  const cell = lazyMake(() => inside(owner, () => withOwnerEvidence(owner, fixture.init)));
+  const cell = lazyMake(noting(broken, fixture, init));
   cells.set(fixture, cell);
   return cell;
 };
@@ -182,7 +191,9 @@ export const testUse = (fixture: Fixture): LazyCell => {
   if (fixture.shared) {
     const run = fixtures.suites.findLast((r) => r.suite.shares?.has(fixture) === true);
     if (run === undefined) throw new Error(`the shared fixture ${fixture.key}, used by code that no suite sharing it runs`);
-    return cellOf(run.shared, fixture);
+    const shared = cellOf(run.shared, fixture);
+    // each test sees the shared cell through one of its own, which notes a failure for it
+    return fixtures.test === undefined ? shared : cellOf(fixtures.test, fixture, () => lazyForce(shared));
   }
   if (fixtures.test === undefined) throw new Error(`the fixture ${fixture.key} of a test, used by code that runs for no test`);
   return cellOf(fixtures.test, fixture);
@@ -251,8 +262,8 @@ function* runCase(body: Task, runs: ReadonlyArray<SuiteRun>, timeout: number | u
   // the fixtures of the test, made the first time its code uses each
   const test = cellsIn(currentCtx().owner ?? new Owner([]));
   // how the case ended, which their scope closes with: what it owns sees whether the case passed
-  let outcome: Exit = succeeded(undefined);
-  addFinalizer(closing(test, () => outcome));
+  let closedWith: Exit = succeeded(undefined);
+  addFinalizer(closing(test, () => closedWith));
   function* each(): Run {
     for (const [level, { suite }] of runs.entries()) {
       const fixtures = new Fixtures(test, runs.slice(0, level + 1));
@@ -266,13 +277,16 @@ function* runCase(body: Task, runs: ReadonlyArray<SuiteRun>, timeout: number | u
   }
   const ran = asExit(yield exitOf(() => (timeout === undefined ? each() : timeoutOption(timeout, each))));
   if (ran.cause !== undefined) {
-    outcome = ran;
-    return raise(ran.cause);
+    closedWith = ran;
+    // a case that failed after a fixture of it failed to be made failed its setup
+    const [fixture, why] = test.broken.first ?? [];
+    if (fixture === undefined || why === undefined || hasInterruptsOnly(ran.cause)) return raise(ran.cause);
+    return new Setup(`fixture ${Core.fixtureName(fixture)}: ${outcome(failed(why))?.message ?? ""}`);
   }
   const done: unknown = ran.value;
   const result = timeout === undefined ? done : isSome(done) ? done.value : new TimedOut(timeout);
-  if (result instanceof TimedOut) outcome = failed(interrupt(undefined));
-  else if (result instanceof Setup) outcome = failed(typeof result.cause === "string" ? fail(result.cause) : result.cause);
+  if (result instanceof TimedOut) closedWith = failed(interrupt(undefined));
+  else if (result instanceof Setup) closedWith = failed(typeof result.cause === "string" ? fail(result.cause) : result.cause);
   return result;
 }
 
