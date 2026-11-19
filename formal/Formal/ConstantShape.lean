@@ -55,7 +55,7 @@ private theorem Typ.constApp_kindCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     rw [← hT.kind]
     exact Typ.constArrow_kind hf _ _ _ _ _ _ rfl hArity rfl
   | allI => intro c w T φ _ _ hJ hA; cases hJ; exact (hA trivial).elim
-  | errVal _ _ hU _ ih =>
+  | errVal _ hU _ ih =>
     intro c w T φ hc hArity hJ _; cases hJ
     have hk := ih c w _ _ hc hArity rfl (Ty.not_all_of_hd hU)
     rw [Ty.kind_of_hd hU] at hk

@@ -1,6 +1,6 @@
 ---
 title: "Эффекты и ошибки"
-source_hash: 4132ec4cf02a66be
+source_hash: 70bc525ad04f8ed3
 ---
 
 Компилятор проверяет, где допустимы эффектные вызовы, какие сервисы и ошибки
@@ -332,6 +332,62 @@ let find_optional id =
 checked : Result NotFound User ->{; NotFound} User
 let checked result =
   from_result result
+```
+
+`match` разбирает значение `Errors e` по ошибкам его строки: ветвь
+`NotFound id` сопоставляется с `NotFound` из строки. Ветви без условия
+покрывают каждую ошибку закрытой строки, иначе `match` вызывает `FLICK-T009`,
+а исправление добавляет недостающие ветви; строке с переменной нужна ещё ветвь
+для остальных ошибок, а ветвь с ошибкой вне закрытой строки вызывает
+`FLICK-T003`. `match` чист и не убирает ошибок из строки. Если ошибки значения
+ещё не известны, как у переменной `try`, их задают образцы, в начале ветви или
+внутри неё: в строку входят названные ими ошибки, а для остальных она остаётся
+открытой, если ветвь без условия сопоставляется с любой ошибкой:
+
+```flick
+# type alias UserId = String
+# type error NotFound = NotFound UserId
+# type error DbUnavailable = DbUnavailable
+# service Users =
+#   get : UserId ->{; NotFound, DbUnavailable} String
+#
+problem : Errors {NotFound, DbUnavailable} -> String
+let problem e =
+  match e with
+  | NotFound id -> "no user " ++ id
+  | DbUnavailable -> "try again later"
+
+name_or_problem : UserId ->{Users} String
+let name_or_problem id =
+  try Users.get id with
+  | e -> problem e
+```
+
+Значение одной ошибки подходит туда, где ожидаются ошибки строки, в которой
+она есть: в ветви `match`, в результате функции или в аргументе. Так функция
+переводит одну строку ошибок в другую, как это нужно `Exit.map_error` и
+`Layer.catch`. Это правило о значении, а не о построенных из него типах:
+функция, возвращающая `NotFound`, не становится функцией, возвращающей
+`Errors {NotFound, DbUnavailable}`, поэтому там пишут `fun x -> f x`. Если
+ожидаемая строка ещё не известна, первая ошибка делает её строкой из одной
+этой ошибки; строку значения, которое может быть одной из нескольких ошибок,
+пишут явно:
+
+```flick
+# type alias UserId = String
+# type error NotFound = NotFound UserId
+# type error DbUnavailable = DbUnavailable
+# type error Http404 = Http404 UserId
+# type error Http503
+#
+to_http : Errors {NotFound, DbUnavailable} -> Errors {Http404, Http503}
+let to_http e =
+  match e with
+  | NotFound id -> Http404 id
+  | DbUnavailable -> Http503
+
+mapped : Exit {NotFound, DbUnavailable} String -> Exit {Http404, Http503} String
+let mapped exit = Exit.map_error to_http exit
 ```
 
 `Fail.fail` завершает вычисление с ошибкой напрямую. Вторая строка стрелки —

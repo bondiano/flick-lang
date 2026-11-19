@@ -1,7 +1,8 @@
 //! `match` in a certificate: the arms' patterns and the proof that they
 //! cover the scrutinee's type, by the lemmas of
 //! `formal/FormalCert/Match.lean`. A pattern of a field binds it or not;
-//! the generator nests no further.
+//! the generator nests no further. A value of `Errors ε` is taken apart by
+//! the errors of `ε` (`PatTy.err`, `exh_errs`).
 
 use crate::syntax::{Arm, Con, Lit, Name, Pat, Term};
 use crate::translate::lean::elide::{caps, hidden_by};
@@ -206,6 +207,10 @@ impl Cx<'_> {
                     field(q)?
                 )
             }
+            Pat::Con(c, _) if matches!(st, Type::Errors(_)) => format!(
+                "(.err {} (by cert_simp))",
+                self.spine_ty(p, &Type::Con(c.ty.clone()))?
+            ),
             p => format!("(.adt {} rfl)", self.spine_ty(p, st)?),
         })
     }
@@ -249,6 +254,17 @@ impl Cx<'_> {
                 "(exh_record (R := {}) (l := \"{l}\") (q := {}) (by decide) (by decide) (by decide))",
                 self.ty(st)?,
                 field(q)?
+            )
+        } else if let Type::Errors(r) = st {
+            let names: Vec<String> = r
+                .elems
+                .keys()
+                .map(|e| format!("{:?}", e.to_string()))
+                .collect();
+            format!(
+                "(exh_errs hS [{}] (by intro E c h; split_mem h <;> cert_simp) \
+                 (by intro a G h; split_mem h <;> cert_simp) (by decide) (by decide))",
+                names.join(", ")
             )
         } else if let Some((k, _)) = ps.first().and_then(|p| spine(p)) {
             let (adt, us) = self.args(&k, st)?;

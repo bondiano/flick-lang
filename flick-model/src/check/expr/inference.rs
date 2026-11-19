@@ -147,7 +147,7 @@ impl Checker<'_> {
             }
             (Term::Apply(Head::Con(c), args), _) if args.len() == c.arity => {
                 let t = self.construct(c, args.iter(), e)?;
-                self.subsume(&t, &full)
+                self.fit(e, &t, &full)
             }
             (Term::Let(x, sig, e1, e2), _) => {
                 self.let_(x, sig.as_deref(), e1, e2, Some(&full)).map(drop)
@@ -189,7 +189,7 @@ impl Checker<'_> {
             }
             _ => {
                 let t = self.infer(e)?;
-                self.subsume(&t, &full)
+                self.fit(e, &t, &full)
             }
         }
     }
