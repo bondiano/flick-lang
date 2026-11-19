@@ -255,7 +255,14 @@ export const schemaUnboxed = (schema: Witness): Witness => schema;
 export const schemaOpaque = (name: string, reason: string): Witness => witness(name,
   (_v, path) => err(schemaError(path, reason)), (_v, path) => err(schemaError(path, reason)), (v) => ok(v),
   { kind: "opaque", reason });
-export const schemaRedacted = (_item: Witness): Witness => schemaOpaque("redacted", "a Redacted value has no JSON form without an explicit policy");
+const redactedItems = /*#__PURE__*/ new WeakMap<Witness, Witness>();
+/** The schema of the value a `Schema.redacted` witness hides. */
+export const redactedItem = (schema: Witness): Witness | undefined => redactedItems.get(schema);
+export const schemaRedacted = (item: Witness): Witness => {
+  const redacted = schemaOpaque("redacted", "a Redacted value has no JSON form without an explicit policy");
+  redactedItems.set(redacted, item);
+  return redacted;
+};
 
 export const schemaLiterals = (_base: Witness, _value: unknown, values: ReadonlyArray<string | number>): Witness => {
   const check: Check = (v, path) => (typeof v === "string" || typeof v === "number") && values.includes(v)

@@ -14,7 +14,7 @@ import { decimalFromString, decimalToString, type Decimal } from "../decimal.ts"
 import { Duration, exactNanos } from "../duration.ts";
 import { type Codec, type SchemaError, type Witness, schemaError, schemaList, schemaNumber, schemaString, schemaTupleOf, withWire, witness } from "../schema.ts";
 
-const durationMillis = /*#__PURE__*/ witness("duration", (input, path) => {
+const durationMillis = (): Witness => witness("duration", (input, path) => {
   const number = schemaNumber.decodeAt(input, path);
   if (number._tag === "Failure") return number;
   return typeof input === "number" && input >= 0 ? ok(new Duration(input))
@@ -28,8 +28,9 @@ const durationMillis = /*#__PURE__*/ witness("duration", (input, path) => {
 }, undefined, { kind: "duration-millis" });
 
 /** Canonical JSON witnesses for the native runtime's value representations. */
-export const flickDuration: Witness = durationMillis;
-export const flickDurationFromMillis: Witness = durationMillis;
+export const flickDuration: Witness = /*#__PURE__*/ durationMillis();
+// a value of its own: Arbitrary generates negative durations of the codec's type, as the adapter does
+export const flickDurationFromMillis: Witness = /*#__PURE__*/ durationMillis();
 
 // The text forms of `Duration.json_nanos` and `Duration.json_string`, as
 // Effect's `Duration.fromInput` reads them and its `toString` writes them.
