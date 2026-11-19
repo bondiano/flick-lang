@@ -1,0 +1,102 @@
+// A server drains however the scope that owns it ends: with a value, a typed
+// error, a defect or an interruption, the request in flight finishes, with its
+// handler's finalizer, before the scope's close returns.
+module App.Main exposing (main)
+
+type error Oops = Oops
+
+start : String ->{} JsValue
+foreign start from "./raw.mjs" "start"
+
+wait : JsValue ->{Async} String
+foreign wait from "./raw.mjs" "wait"
+
+ms : Float -> Duration.Duration
+let ms n = Result.with_default Duration.zero (Duration.millis n)
+
+say : String ->{Host.Console} Unit
+let say line = Platform.stdout_line line
+
+slow : HttpApi.Endpoint "slow" (HttpApi.Request Unit Unit Unit Unit ->{r} Unit)
+let slow = HttpApi.endpoint HttpApi.Get "/slow" (Record.label : Record.Label "slow")
+
+api : HttpApi.Api r { work : { slow : HttpApi.Request Unit Unit Unit Unit ->{r} Unit } }
+let api =
+  HttpApi.api "Work"
+  |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "work") |> HttpApi.add slow)
+
+/// The slow handler; `started` tells the client side it is running.
+handle :
+  Deferred.Deferred {} Unit -> HttpApi.Request Unit Unit Unit Unit ->{Host.Console, Async} Unit
+let handle started _ = scope {
+  Resource.acquire_release
+    (task {
+      say "handler started"
+      ignore (Deferred.succeed () started)
+    })
+    (fun _ -> say "handler finalizer")
+  Effect.sleep (ms 100)
+  say "handler finished"
+}
+
+/// A server whose scope ends as `ending` does once a request is in flight;
+/// `closing` tells when it is about to.
+serving :
+  Ref (Option JsValue) ->
+  Deferred.Deferred {} Unit ->
+  Eff {Host.Console, Async} {Oops} Unit ->{Host.Console, Async; Oops, HttpApi.ServeError}
+  Unit
+let serving request closing ending = scope s {
+  let options = { host = "127.0.0.1"; port = 0; openapi = None; swagger = None; scalar = None }
+  let started : Deferred.Deferred {} Unit = Deferred.make ()
+  let server = HttpApi.listen options api { work = { slow = handle started } }
+  Ref.set request (Some (start ("http://127.0.0.1:" ++ show (HttpApi.port server) ++ "/slow")))
+  Deferred.await_ started
+  say "closing the server"
+  ignore (Deferred.succeed () closing)
+  await ending
+}
+
+/// The response of the request in flight, once the server has closed.
+answered : Ref (Option JsValue) ->{Host.Console, Async} Unit
+let answered request =
+  say "closed"
+  match Ref.get request with
+  | Some r -> say ("response " ++ wait r)
+  | None -> say "no request"
+
+outcome : String -> Eff {Host.Console, Async} {Oops} Unit ->{Host.Console, Async} Unit
+let outcome name ending =
+  say ("== " ++ name)
+  let request = Ref.make None
+  let closing : Deferred.Deferred {} Unit = Deferred.make ()
+  let ended = Effect.exit (task { serving request closing ending })
+  if not (Exit.is_success ended) then say "the scope did not succeed"
+  answered request
+
+interrupted : Unit ->{Host.Console, Async} Unit
+let interrupted () =
+  say "== interruption"
+  let request = Ref.make None
+  let closing : Deferred.Deferred {} Unit = Deferred.make ()
+  scope owner {
+    let server =
+      Fiber.spawn
+        owner
+        (fun _ -> ())
+        (task {
+          try serving request closing (task { Effect.sleep (ms 100000) }) with
+          | Oops -> ()
+          | HttpApi.ServeError _ -> ()
+        })
+    Deferred.await_ closing
+    Fiber.interrupt server
+  }
+  answered request
+
+main : Unit ->{Host.Console, Async; AppError} Unit
+let main () =
+  outcome "success" (task { () })
+  outcome "typed error" (task { Fail.fail Oops })
+  outcome "defect" (task { Effect.die "broken" })
+  interrupted ()

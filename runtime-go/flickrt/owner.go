@@ -346,7 +346,7 @@ func Bracket(fb *Fiber, acquire, use, release Value) Value {
 	inside := fb.state.mask
 	v := masked(fb, inside+1, func() Value { return Run(fb, acquire) })
 	out, cause := catch(func() Value { return Run(fb, Apply(fb, use, v)) })
-	_, released := catch(func() Value {
+	released := cleanupAfter(fb, cause, func() Value {
 		return masked(fb, inside+1, func() Value { return Run(fb, Apply(fb, release, v)) })
 	})
 	if cause = finalized(cause, released); cause != nil { // then the failure of the release

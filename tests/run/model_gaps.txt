@@ -49,6 +49,7 @@ ffi/snapshot # no native for `cyclic` (./bindings.mjs cyclic)
 runtime/abort_stops_children # no native for `make` (flick:Deferred make)
 runtime/cause_laws # no native for `json_finite` (flick:rt codecNumberFinite)
 runtime/cause_lists # no native for `fail` (flick:Cause flickFail)
+runtime/cleanup_control # no native for `ensuring` (flick:Effect ensuring)
 runtime/close_phases # no native for `open_res` (./resources.mjs open)
 runtime/closed_owner # no native for `make` (flick:Deferred make)
 runtime/closing_causes # no native for `exit` (flick:Effect flickExit)
@@ -158,6 +159,7 @@ stdlib/effect/option_pairs # no native for `floor` (global Math.floor)
 stdlib/effect/order # no native for `sort_by` (flick:rt listSortBy)
 stdlib/effect/password # no native for `from_string` (flick:Crypto flickUtf8Encode)
 stdlib/effect/platform # no native for `layer_of` (flick:Path flickLayer)
+stdlib/effect/pool_outcomes # no native for `make` (flick:Pool flickMake)
 stdlib/effect/pubsub # no native for `bounded` (flick:PubSub flickBounded)
 stdlib/effect/queue # no native for `bounded` (flick:Queue bounded)
 stdlib/effect/record # the row primitive `Project { admin : Bool; age : Float; name : String } { age : Float; name : String }`
@@ -200,6 +202,7 @@ stdlib/http/api_bodies # the row primitive `Lacks "bodies" {}`
 stdlib/http/auth # the row primitive `Lacks "users" {}`
 stdlib/http/client # no native for `make` (flick:http/HttpClientRequest flickMake)
 stdlib/http/derive # the row primitive `Lacks "forget" { profile : { headers : Unit; path : { name : String }; payload : Unit; query : Unit } ->{r; NotFound} { name : String } }`
+stdlib/http/drain_outcomes # the row primitive `Lacks "work" {}`
 stdlib/http/error_cases # the row primitive `Lacks "users" {}`
 stdlib/http/error_cases_opaque # `Record.label` has no λFlick form
 stdlib/http/forms # no native for `post` (flick:http/HttpClientRequest post)
