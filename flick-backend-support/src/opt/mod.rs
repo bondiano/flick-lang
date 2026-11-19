@@ -14,6 +14,8 @@
 //! - alias and constant propagation, and moving a pure value that cannot
 //!   throw to its one use;
 //! - [`fuse`]: `Seq` and `List` combinators of a `for` run in its loop;
+//! - [`lazy`]: lazy cells a program need not make: one nothing reads, one of
+//!   a value, made done, and one forced where it is made;
 //! - [`sroa`]: temporary records and tuples split into their parts;
 //! - dead code: unused pure bindings and private top-level values.
 //!
@@ -21,13 +23,15 @@
 //! full applications (`add$2`) and direct methods of canonical instances.
 //! Nothing here reassociates arithmetic, folds `x * 0`, runs or memoizes a
 //! task, merges layers, moves a service lookup across `provide` or drops a
-//! runtime call: only pure code is rewritten.
+//! runtime call: only pure code is rewritten, and the lazy cells of [`lazy`],
+//! each a contextual equivalence of the core.
 
 pub mod devirt;
 mod fold;
 mod fuse;
 mod inline;
 mod known;
+mod lazy;
 mod specialize;
 mod sroa;
 pub mod tuple_match;
@@ -169,11 +173,13 @@ fn pass(e: &mut Expr, arity: Arity, lang: &crate::Known<'_>) -> bool {
     changed |= specialize::operator(e, lang)
         | fold::fold(e, lang)
         | inline::beta(e)
-        | devirt::known_match(e);
+        | devirt::known_match(e)
+        | lazy::cells(e, lang);
     changed |= known::named_again(e);
     if let ExprKind::Block(stmts, result) = &mut e.kind {
         changed |= devirt::known_lets(stmts);
         changed |= known::scrutinees(stmts, result);
+        changed |= lazy::unnamed(stmts, result, lang);
         changed |= flatten(stmts, result);
         changed |= sroa::split(stmts, result);
         changed |= propagate(stmts, result, arity);

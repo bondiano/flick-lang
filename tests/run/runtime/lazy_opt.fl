@@ -1,0 +1,23 @@
+// The cells a release build need not make (`docs/formal/lazy.md` §6) behave
+// as made: a lazy nothing reads never runs its task, nor one a function takes
+// and drops; a lazy of a value gives it to every `await`; a lazy forced
+// where it is made runs its task once, there.
+module App.Main exposing (main)
+
+counted : Ref Int -> Int ->{} Int
+let counted runs n =
+  Ref.set runs (Ref.get runs + 1)
+  n * 2
+
+dropped : Lazy r e Int -> Int -> Int
+let dropped _ n = n
+
+main : Unit ->{Host.Console, Async} Unit
+let main () =
+  let runs = Ref.make 0
+  ignore (lazy { counted runs 1 })
+  let kept = dropped (lazy { counted runs 2 }) 3
+  let five = lazy { 5 }
+  let direct = await (lazy { counted runs 21 })
+  Platform.stdout_line "\{kept} \{await five + await five} \{direct}"
+  Platform.stdout_line "runs: \{Ref.get runs}"

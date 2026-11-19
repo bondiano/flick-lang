@@ -282,6 +282,7 @@ runtime/abort_closes_scopes
 runtime/abort_stops_children
 runtime/discontinued_body
 runtime/discontinued_fiber
+runtime/defer_make
 runtime/cleanup_control
 
 effect/host_services
@@ -314,3 +315,4 @@ runtime/suspended
 runtime/suspended_std
 runtime/lazy_let
 runtime/lazy_let_state
+runtime/lazy_opt

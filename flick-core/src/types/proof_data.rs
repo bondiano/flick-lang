@@ -111,6 +111,10 @@ impl Checker<'_> {
                 types.push(self.logic_field(&param, data));
                 body = *result;
             }
+            // the type a constructor builds, without its capture or bound
+            while let Type::Bounded { ty, .. } | Type::Captured { ty, .. } = body {
+                body = *ty;
+            }
             if params.is_empty() {
                 params = body
                     .spine()
