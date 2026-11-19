@@ -16,7 +16,8 @@ private theorem not_alts_expr {S : Sig} {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) 
     ∀ t φ, J = .ex t φ → IsAlts e → False := by
   induction h with
   | conv _ _ ih => intro t φ hJ ha; cases hJ; exact ih _ _ rfl ha
-  | allI hv | errVal hv => intro t φ _ ha; cases hv <;> simp [IsAlts] at ha
+  | errVal _ _ _ ih => intro t φ hJ ha; cases hJ; exact ih _ _ rfl ha
+  | allI hv => intro t φ _ ha; cases hv <;> simp [IsAlts] at ha
   | _ => intro t φ hJ ha; cases hJ <;> simp [IsAlts] at ha
 
 /-- Lists of alternatives. -/

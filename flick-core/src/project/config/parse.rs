@@ -76,6 +76,8 @@ struct RawProject {
     source_dir: String,
     #[serde(default = "test_dir")]
     test_dir: String,
+    #[serde(default = "proof_dir")]
+    proof_dir: String,
     entry: Option<Spanned<String>>,
     entries: Option<Spanned<BTreeMap<Spanned<String>, Spanned<toml::Value>>>>,
     runner: Option<Spanned<String>>,
@@ -83,6 +85,10 @@ struct RawProject {
 
 fn source_dir() -> String {
     "src".into()
+}
+
+fn proof_dir() -> String {
+    "proofs".into()
 }
 
 fn test_dir() -> String {
@@ -218,6 +224,10 @@ fn scripts(
 }
 
 /// The project of `[project]` with its other tables.
+#[allow(
+    clippy::too_many_lines,
+    reason = "a line for each field of the project"
+)]
 fn config(
     project: Spanned<RawProject>,
     raw: Raw,
@@ -311,6 +321,7 @@ fn config(
         kind: project.kind,
         source_dir: project.source_dir,
         test_dir: project.test_dir,
+        proof_dir: project.proof_dir,
         entries,
         dependencies,
         js_dependencies,

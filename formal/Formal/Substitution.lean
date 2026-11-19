@@ -114,7 +114,7 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | settle hl _ hψ hφ hT ih => intro _ _ hσ; exact .settle hl (ih hσ) hψ hφ hT
   | raise _ hφ ih => intro _ _ hσ; exact .raise (ih hσ) hφ
   | raiseAdt _ hU hφ ih => intro _ _ hσ; exact .raiseAdt (ih hσ) hU hφ
-  | errVal hv _ hU hE ih => intro _ _ hσ; exact .errVal hv.subst (ih hσ) hU hE
+  | errVal _ hU hE ih => intro _ _ hσ; exact .errVal (ih hσ) hU hE
   | tryR _ _ hφ hs ih₁ ih₂ => intro _ _ hσ; exact .tryR (ih₁ hσ) (ih₂ hσ) hφ hs
   | tryP _ _ ih₁ ih₂ => intro _ _ hσ; exact .tryP (ih₁ hσ) (ih₂ hσ)
   | handle hv _ hU hE _ hc ha hφ ih₁ ih₂ =>

@@ -92,7 +92,13 @@ impl Ide<'_> {
 
     /// The fields of a record type, through transparent aliases, the local
     /// ones of `file` too.
-    fn record_fields(&self, file: FileId, ty: &Type, out: &mut Vec<(String, Type)>, depth: u32) {
+    pub(super) fn record_fields(
+        &self,
+        file: FileId,
+        ty: &Type,
+        out: &mut Vec<(String, Type)>,
+        depth: u32,
+    ) {
         let mut ty = ty;
         while let Type::Captured { ty: inner, .. } | Type::Bounded { ty: inner, .. } = ty {
             ty = inner;
@@ -102,36 +108,41 @@ impl Ide<'_> {
                 out.extend(row.entries.iter().map(|(l, t)| (l.to_string(), t.clone())));
             }
             Type::App { .. } | Type::Con { .. } if depth < 8 => {
-                let (Type::Con { module, name }, args) = ty.spine() else {
-                    return;
-                };
-                let Some((params, body)) = self.alias(file, module, name) else {
-                    return;
-                };
-                let subst: Vec<(String, Type)> =
-                    params.into_iter().zip(args.into_iter().cloned()).collect();
-                self.record_fields(file, &body.substitute(&subst), out, depth + 1);
+                if let Some(body) = self.expand_alias(file, ty) {
+                    self.record_fields(file, &body, out, depth + 1);
+                }
             }
             _ => {}
         }
     }
 
-    fn alias(&self, file: FileId, module: &str, name: &str) -> Option<(Vec<String>, Type)> {
+    /// `ty` with the transparent alias at its head, the local ones of
+    /// `file` too, replaced by its body.
+    pub(super) fn expand_alias(&self, file: FileId, ty: &Type) -> Option<Type> {
+        let (Type::Con { module, name }, args) = ty.spine() else {
+            return None;
+        };
         let m = self.module(file)?;
-        if m.name == module
-            && let Some(alias) = m.typing.aliases.get(name)
-        {
-            return Some(alias.clone());
-        }
-        let def = self
-            .interface(module)?
-            .find(Namespace::Type, name)?
-            .definition
-            .clone()?;
-        match def.form {
-            Form::Alias { params, body, .. } => Some((params, body)),
-            _ => None,
-        }
+        let local = (m.name == *module).then(|| m.typing.aliases.get(name));
+        let (params, body) = match local.flatten() {
+            Some((params, body)) => (params, body),
+            None => match &self
+                .interface(module)?
+                .find(Namespace::Type, name)?
+                .definition
+                .as_ref()?
+                .form
+            {
+                Form::Alias { params, body, .. } => (params, body),
+                _ => return None,
+            },
+        };
+        let subst: Vec<(String, Type)> = params
+            .iter()
+            .cloned()
+            .zip(args.into_iter().cloned())
+            .collect();
+        Some(body.substitute(&subst))
     }
 
     /// Where the field `label` of `record` is written. An alias names its

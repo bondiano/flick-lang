@@ -95,10 +95,10 @@ theorem Typ.pureTy {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | allI hv' h =>
     intro _ _ _ hJ; cases hJ
     exact ⟨_, LeLive.refl, .allI hv' h, fun _ _ => trivial, fun _ _ h => (h trivial).elim⟩
-  | errVal hv' _ hU hE ih =>
-    intro _ _ _ hJ; cases hJ
-    obtain ⟨T₀, l, t, _, hc⟩ := ih hv' rfl
-    refine ⟨_, LeLive.refl, .errVal hv' (t.sub ⟨l, Stage.le_refl _⟩) hU hE, fun _ _ => trivial,
+  | errVal _ hU hE ih =>
+    intro hv _ _ hJ; cases hJ
+    obtain ⟨T₀, l, t, _, hc⟩ := ih hv rfl
+    refine ⟨_, LeLive.refl, .errVal (t.sub ⟨l, Stage.le_refl _⟩) hU hE, fun _ _ => trivial,
       fun c hc' _ => ?_⟩
     obtain ⟨⟨_, _, _, _, rfl⟩, -⟩ := hc c hc' (Ty.not_all_of_hd hU)
     obtain ⟨_, _, _, _, rfl, -⟩ := l.arrow_left

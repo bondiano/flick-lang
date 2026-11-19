@@ -43,6 +43,16 @@ func TestAValueOfItsOwnGoTypeIsReadAsAnyConstructorValue(t *testing.T) {
 	}
 }
 
+// An arm of a `try`, or of a `match` on `Errors e`, tests an error of a type
+// whose values are *Data among errors of every type, some of Go types of
+// their own.
+func TestATagTestIsFalseOfAValueOfAnotherGoType(t *testing.T) {
+	own := &ownPair{[2]Value{int32(1), "x"}}
+	if IsTag(own, "ServeError#2") || !IsTag(NewData("ServeError#2", "x"), "ServeError#2") {
+		t.Error("the tag test of an error")
+	}
+}
+
 func TestTheRuntimeBuildsAValueInTheGoTypeOfItsConstructor(t *testing.T) {
 	Owned("Pair#1", func(fields []Value) Value { return &ownPair{[2]Value{fields[0], fields[1]}} })
 	defer delete(builders, "Pair#1")

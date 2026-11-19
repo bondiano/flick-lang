@@ -5,6 +5,7 @@
 mod actions;
 mod complete;
 mod enrich;
+mod expect;
 mod fields;
 mod hints;
 mod hover;
@@ -450,6 +451,8 @@ mod operator_hover_tests;
 mod pattern_tests;
 #[cfg(test)]
 mod privacy_tests;
+#[cfg(test)]
+mod rank_tests;
 #[cfg(test)]
 mod rename_safety_tests;
 #[cfg(test)]

@@ -1,0 +1,9 @@
+module Main exposing (main, forecast)
+
+type Temperature = Celsius Float
+
+forecast : Float -> String
+let forecast degrees = "Tomorrow: \{Celsius degrees}"
+
+main : Unit ->{Host.Console} Unit
+let main () = Platform.stdout_line (forecast 18.5)

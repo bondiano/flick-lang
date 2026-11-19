@@ -1,6 +1,6 @@
 ---
 title: "TypeScript generation and the FFI boundary"
-source_hash: 8f360a0d09b2e2c7
+source_hash: f13255dc371438fa
 ---
 
 The examples of generated code below are the output of the debug profile, the reference lowering; [Code generation](../../reference/codegen/) describes it in full.
@@ -226,7 +226,7 @@ The source is `from global "Math.hypot"` for a global JS value or `from "./fs.js
 
 Removing the physical `Unit` argument does not remove the computation that produced it: `now_millis (Log.info message)` first performs the logging, in source order.
 
-The row of a binding is its author's claim, not a limit on the JavaScript: `now_millis` reads the host's clock with an empty row. The `Host` services name only the host access that goes through them (see [What an empty row does not promise](../../reference/effects/#what-an-empty-row-does-not-promise)).
+The row of a binding is its author's claim, not a limit on the JavaScript: `now_millis` reads the host's clock with an empty row. The `Host` services name only the host access that goes through them (see [What an empty row does not promise](../../reference/services/#what-an-empty-row-does-not-promise)).
 
 `foreign effect` defers the call of the whole JS factory: the TS type of a function with an Effect result does not prove that building it is pure.
 

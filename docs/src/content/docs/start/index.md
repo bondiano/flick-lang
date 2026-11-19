@@ -17,7 +17,7 @@ have what you came for.
    walks through services, layers and tests using a small user lookup.
 5. **Look up language rules.** The reference describes them in full: start with
    [Kinds and types](../reference/types/) and
-   [Effects, errors and services](../reference/effects/).
+   [Effects and errors](../reference/effects/), then [services](../reference/services/).
 
 Moving a project from 0.1 to `main`? [Upgrading to 0.2](../handbook/upgrading/)
 lists what changed and how to update it.

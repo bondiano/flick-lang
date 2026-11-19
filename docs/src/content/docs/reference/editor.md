@@ -19,11 +19,11 @@ on-disk version for dependent requests.
 | Request | Answer |
 | - | - |
 | diagnostics | exactly those of `flick check`, with their `FLICK-` codes, at UTF-16 positions, published when a document is opened, changed or saved; help lines follow the message, related spans (where an expected type came from) are `relatedInformation`, unused code is tagged `Unnecessary` |
-| `textDocument/hover` | source signatures and `///` documentation for public and private values, at declarations and uses; module documentation on qualifiers such as `Sql`; inferred locals and values, SQL aliases, columns and parameters, on a keyword that opens an expression (`task`, `scope`, `match`, `fun` …) the type of the whole expression, on `await` and `ignore` the type of the operand (see [keywords.md](../keywords/#in-the-editor)); on `|>` and `<|` the value after the step, on `>>` and `<<` the function the composition makes, each with what the operator does; declarations distinguish `type error` from `service` |
+| `textDocument/hover` | source signatures and `///` documentation for public and private values, at declarations and uses; module documentation on qualifiers such as `Sql`; inferred locals and values, SQL aliases, columns and parameters, on a keyword that opens an expression (`task`, `scope`, `match`, `fun` …) the type of the whole expression, on `await` and `ignore` the type of the operand (see [keywords in the editor](../syntax/#in-the-editor)); on `|>` and `<|` the value after the step, on `>>` and `<<` the function the composition makes, each with what the operator does; declarations distinguish `type error` from `service` |
 | `textDocument/definition` | across modules; module qualifiers lead to their module header, members to their declaration; built-ins open as real read-only `.fl` files; installed packages use their published `.fl`, else `.iface`; companions lead to their type, class methods at a known instance to that instance |
 | `textDocument/references` | every occurrence in the project and, for a name of a workspace member, in the members that depend on it by path |
 | `textDocument/rename` | the project's own values, types, constructors, class methods and locals, in `.fl` sources only, and in the members of the workspace that depend on the project; names of built-in modules and packages and service operations have no exact mapping and are refused |
-| `textDocument/completion` | items carry their `///` documentation and a snippet of a function's parameters, sorted locals first; a value of a module the file does not import is offered as `Module.name` (built-ins need no import, a project module gets its `import` added); record fields after `x.`, module exports or service operations after `M.`, otherwise names in scope; SQL blocks offer tables, aliases, columns, parameters, clauses and functions; `sql table` columns offer the SQL types of the project's dialect, then the modifiers that are not written yet and do not conflict, after `as` Flick types and after `via` the codecs in scope whose type instantiates to the column's `PureCodec`, imported ones also as `Module.codec` |
+| `textDocument/completion` | items carry their `///` documentation and a snippet of a function's parameters, sorted locals first and, where the place expects something, [what fits it](#completion-order) before the rest; a value of a module the file does not import is offered as `Module.name` (built-ins need no import, a project module gets its `import` added); record fields after `x.`, module exports or service operations after `M.`, otherwise names in scope; SQL blocks offer tables, aliases, columns, parameters, clauses and functions; `sql table` columns offer the SQL types of the project's dialect, then the modifiers that are not written yet and do not conflict, after `as` Flick types and after `via` the codecs in scope whose type instantiates to the column's `PureCodec`, imported ones also as `Module.codec` |
 | `textDocument/codeAction` | quick fixes of diagnostics that carry an edit: the closest name for a misspelt one, removing unused imports and definitions, exporting one unused top-level value, importing a missing class, `_` for an unused variable, the missing arms of a `match`, a `todo` definition of a missing function, the inferred type for a type hole; on `FLICK-T004` it inserts the inferred signature `name : T` right above the `let`, at its indentation, with effect rows, type variables, class constraints and names qualified as the module's imports allow; a binding the checker rejected gets none |
 | `textDocument/codeAction` (refactors) | add the signature of a `let` value; pattern match on a variable that is a block's result; qualify an imported name at every use, or drop a qualifier and import the name; extract the selected expression into a `let`; inline a local `let` into its uses |
 | `textDocument/formatting` | `flick fmt` |
@@ -92,6 +92,27 @@ temporary directory, keyed by content and read-only. Opening them checks
 them as library sources, without adding them to the application's project.
 Both `textDocument/prepareRename` and `textDocument/rename` reject these
 read-only documents rather than returning edits to the cached source.
+
+### Completion order
+
+Completion lists the names that fit their place first and the others after
+them, in the same order; it leaves none out. A place expects a type at an
+argument of a call, also after the space before an argument is written, in
+the body of a `let` with an annotation or a signature, at a statement before
+the last of a block, whose value is dropped and so is a `Unit`, and in an arm
+of `match` or `try`.
+A value fits as it is or applied to some of its arguments. In a pattern the
+constructors of the matched type fit; in an arm of `try`, those of the
+errors its body may raise.
+
+The services and errors a call needs count too, which is Flick's own: in a
+function with a signature a call fits only when they are in the rows of the
+stage its body runs at, and in the body of a pure function or of a module's
+value no runtime call fits. Inside `fun`, `task`, `provide`, a handler or
+the body of a `try` these rows are not known, and nothing is moved for them.
+Members after `x.` and `M.` keep their order. The order only helps to
+choose: the checker accepts and rejects the same programs whatever
+completion offers.
 
 ### Logging
 

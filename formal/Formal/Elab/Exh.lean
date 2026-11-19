@@ -60,7 +60,7 @@ theorem exh_ctors {T : Name} {ps : List Pat}
   | hidden ho => subst hX; simp [Ty.Opaque, Ty.tcon_hd] at ho
   | lit => have := congrArg Ty.hd hX; simp [Ty.hd, Ty.tcon_hd] at this
   | rnil => have := congrArg Ty.hd hX; simp [Ty.hd, Ty.tcon_hd] at this
-  | rcons => have := congrArg Ty.hd hX; simp [Ty.hd, Ty.tcon_hd] at this
+  | rcons | err | errOpen => have := congrArg Ty.hd hX; simp [Ty.hd, Ty.tcon_hd] at this
   | adt hs' hU hT =>
     subst hX
     rw [Ty.tcon_hd] at hT; cases hT

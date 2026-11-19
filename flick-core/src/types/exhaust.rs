@@ -124,7 +124,7 @@ impl Checker<'_> {
 
     /// [`Self::useful`] where the columns have the types `tys`, as far as
     /// they are known.
-    fn useful_at(
+    pub(super) fn useful_at(
         &self,
         rows: &[Vec<Pat>],
         v: &[Pat],
@@ -228,7 +228,7 @@ impl Checker<'_> {
             }
         }
         let all = seen.first().and_then(|c| {
-            let all = list_ctors(seen.iter().copied()).or_else(|| self.constructors(c))?;
+            let all = list_ctors(seen.iter().copied()).or_else(|| self.constructors(c, ty))?;
             // the constructors that build values of the column's type
             Some(
                 all.into_iter()
@@ -291,14 +291,18 @@ impl Checker<'_> {
         Some(iter::once(missing).chain(witness).collect())
     }
 
-    /// Every constructor of the type `ctor` belongs to, with arities; `None`
-    /// for infinitely many (lists, literals) or an unknown set.
-    fn constructors(&self, ctor: &Ctor) -> Option<Vec<(Ctor, usize)>> {
+    /// Every constructor of the type `ctor` belongs to, or of the errors of
+    /// the column's type `ty`, with arities; `None` for infinitely many
+    /// (lists, literals) or an unknown set.
+    fn constructors(&self, ctor: &Ctor, ty: &Type) -> Option<Vec<(Ctor, usize)>> {
         match ctor {
             Ctor::Bool(_) => Some(vec![(Ctor::Bool(false), 0), (Ctor::Bool(true), 0)]),
             Ctor::Unit => Some(vec![(Ctor::Unit, 0)]),
             Ctor::Tuple(n) => Some(vec![(Ctor::Tuple(*n), *n)]),
             Ctor::List(_) | Ctor::ListRest(_) | Ctor::Literal(_) => None,
+            Ctor::Variant { .. } if let Some(row) = self.errors_row(ty) => {
+                self.row_constructors(&row)
+            }
             Ctor::Variant { module, ty, .. } => {
                 let names = match &self.env.type_def(module, ty)?.form {
                     Form::Adt { constructors, .. } => constructors.clone(),
@@ -332,8 +336,8 @@ impl Checker<'_> {
         let wrap = |s: String, args: bool| if nested && args { format!("({s})") } else { s };
         match pat {
             Pat::Wild | Pat::Or(_) => "_".to_owned(),
-            Pat::Ctor(Ctor::Variant { name, .. }, args) => {
-                let mut s = name.clone();
+            Pat::Ctor(Ctor::Variant { module, name, .. }, args) => {
+                let mut s = self.written_constructor(module, name);
                 for arg in args {
                     s.push(' ');
                     s.push_str(&self.show_pat(arg, true));
@@ -370,7 +374,7 @@ impl Checker<'_> {
     }
 }
 
-fn arity(scheme: &Type) -> usize {
+pub(super) fn arity(scheme: &Type) -> usize {
     let mut t = scheme;
     while let Type::Forall { body, .. } = t {
         t = body;

@@ -271,9 +271,9 @@ impl Checker<'_> {
         if let Some(pattern) = parts.pattern {
             let pat = self.bind_pattern(pattern, &ty);
             if parts.assert {
-                self.let_assert(&pat, pattern, decl, rest);
+                self.let_assert((&pat, &ty), pattern, decl, rest);
             } else {
-                self.irrefutable(&pat, pattern, rest.map(|rest| (decl, rest)));
+                self.irrefutable(&pat, &ty, pattern, rest.map(|rest| (decl, rest)));
             }
         }
     }

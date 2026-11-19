@@ -36,6 +36,9 @@ impl Checker<'_> {
     /// Unifies the type an expression has with the one its position expects;
     /// reports a mismatch at `span`. `false` after a diagnostic.
     pub fn expect(&mut self, actual: &Type, expected: &Type, span: Span) -> bool {
+        if let Some(fits) = self.errors_in(actual, expected, span) {
+            return fits;
+        }
         let ground = self.coercion_types(actual, expected);
         let marks = (self.cx.regions.holds.len(), self.cx.subrows.len());
         match self.subsume(actual, expected, span) {
@@ -146,10 +149,25 @@ impl Checker<'_> {
                 "a pure function `->` and a runtime function `->{…}` are different types".to_owned()
             }
             (x, y) if errors(x) || errors(y) => {
-                let other = self.show(if errors(x) { y } else { x });
-                format!(
-                    "`{other}` is not an error; an error row holds types declared with `type error`, so convert the value into one first"
-                )
+                let (row, other) = if errors(x) { (x, y) } else { (y, x) };
+                let shown = self.show(other);
+                let named = |label: &Elem| {
+                    self.errors_row(row)
+                        .is_some_and(|n| n.entries.iter().any(|(l, _)| l == label))
+                };
+                match self.error_label(other) {
+                    None => format!(
+                        "`{shown}` is not an error; an error row holds types declared with `type error`, so convert the value into one first"
+                    ),
+                    // (Errors-In) types a term, not the types built of it
+                    Some(label) if named(&label) => format!(
+                        "a term of `{shown}` has the type `{}`, but a type built of `{shown}` is not one built of it: build the value again, as `fun x -> f x`",
+                        self.show(row)
+                    ),
+                    Some(_) => {
+                        format!("`{shown}` is not one of the errors of `{}`", self.show(row))
+                    }
+                }
             }
             _ => {
                 // here the difference may be the `forall` itself
