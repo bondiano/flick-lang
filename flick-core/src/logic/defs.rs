@@ -159,9 +159,11 @@ impl Admitting<'_> {
                     .program
                     .instance(&module, &name)
                     .map(|(info, _)| &info.supers);
-                match supers.and_then(|s| s.iter().find(|(c, _)| c == class)) {
-                    Some((_, inner)) => self.resolve(inner),
-                    None => refuse(
+                // two superclasses may share a field's name: then it is neither
+                let mut found = supers.into_iter().flatten().filter(|(c, _)| c == class);
+                match (found.next(), found.next()) {
+                    (Some((_, inner)), None) => self.resolve(inner),
+                    _ => refuse(
                         self.span,
                         format!("the `{class}` of `{name}` is not available to this proof"),
                     ),

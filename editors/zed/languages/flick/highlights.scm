@@ -33,7 +33,7 @@
   (#eq? @_component "component"))
 ; captured as `@keyword` again, so the word keeps its colour whichever capture wins
 (_ (keyword) @keyword . (identifier) @function
-  (#eq? @keyword "proof"))
+  (#any-of? @keyword "proof" "law"))
 ; the head of a plugin's blocks, as an import exposes it
 (_ (keyword) @_plugin . (identifier) @function.macro
   (#eq? @_plugin "plugin"))

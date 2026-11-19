@@ -119,6 +119,7 @@ impl<'a> Checker<'a> {
         self.solve_classes(true);
         self.check_instances(&declared);
         self.check_proofs(&decls);
+        self.check_laws(&decls);
         self.solve_rows();
         self.makers(&decls);
         self.servers(&decls);

@@ -1,4 +1,5 @@
-//! `proof name params where goal = proof`: a statement about the module's
+//! `proof name params where goal = proof`, and `law name params where goal`
+//! in a class: a statement about the module's
 //! definitions and its proof, which the compiler checks and erases. The goal
 //! and the proof are ordinary expressions, except a `same_type` goal, whose
 //! two arguments are types, and a premise parameter `(h : goal)`.
@@ -17,6 +18,28 @@ pub(super) fn at_proof(p: &Parser) -> bool {
 pub(super) fn proof_decl(p: &mut Parser) {
     let m = p.start();
     p.bump_as(K::ProofKw);
+    statement(p);
+    if p.expect(K::Eq) {
+        p.body(K::Block, expr::stmt);
+    }
+    p.complete(m, K::ProofDecl);
+}
+
+/// A member of a class: `law name params where goal`, which states what
+/// every instance satisfies, or a member any body has.
+pub(super) fn class_member(p: &mut Parser) {
+    if p.at_word("law") && p.nth(1) == K::Ident {
+        let m = p.start();
+        p.bump_as(K::LawKw);
+        statement(p);
+        p.complete(m, K::LawDecl);
+    } else {
+        super::decl::member(p);
+    }
+}
+
+/// `name params where goal`, the statement of a proof or a law.
+fn statement(p: &mut Parser) {
     let name = p.start();
     p.bump();
     p.complete(name, K::VarPat);
@@ -34,10 +57,6 @@ pub(super) fn proof_decl(p: &mut Parser) {
     if p.expect(K::WhereKw) {
         goal(p);
     }
-    if p.expect(K::Eq) {
-        p.body(K::Block, expr::stmt);
-    }
-    p.complete(m, K::ProofDecl);
 }
 
 fn at_param(p: &Parser) -> bool {
@@ -76,6 +95,16 @@ fn goal(p: &mut Parser) {
         types::atom(p);
         types::atom(p);
         p.complete(m, K::SameTypeGoal);
+    } else if p.at_word("lawful") && p.nth(1) == K::Con {
+        // `lawful C T [from d]`: the laws of `C` for the dictionary of `T`
+        p.bump();
+        // the constraint whose dictionary the bundle is about, as a context
+        // writes it
+        types::type_(p);
+        if p.eat(K::FromKw) {
+            expr::expr(p);
+        }
+        p.complete(m, K::LawfulGoal);
     } else {
         expr::expr(p);
         p.complete(m, K::Goal);

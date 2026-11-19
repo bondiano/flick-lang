@@ -187,6 +187,18 @@ impl<'a> Printer<'a> {
         docvec![a, head, a.break_("", " "), goal].group(a)
     }
 
+    /// `law name params where goal` in a class: as a proof without its
+    /// proof, `where` starting the next line when it does not fit.
+    pub fn law(&mut self, n: &'a Node) -> Doc<'a> {
+        let a = self.a;
+        let Some(at) = position(n, K::WhereKw) else {
+            return self.generic(n);
+        };
+        let head = self.elements(n, &n.children[..at]);
+        let goal = self.elements(n, &n.children[at..]);
+        docvec![a, head, a.break_("", " "), goal].group(a)
+    }
+
     /// `pattern <- value` in `do` and `for`.
     pub fn bind(&mut self, n: &'a Node) -> Doc<'a> {
         let (Some(arrow), Some(value)) = (position(n, K::LArrow), nodes(n).get(1).copied()) else {

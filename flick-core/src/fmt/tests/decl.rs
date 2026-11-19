@@ -366,3 +366,20 @@ fn breaks_a_proof_before_its_goal() {
       where equal (List.reverse (List.reverse xs)) xs = trans (List.reverse_reverse xs) refl
     ");
 }
+
+/// A law of a class lays out as a proof without its proof.
+#[test]
+fn breaks_a_law_before_its_goal() {
+    let src = "class Functor (f : Type -> Type) =
+  map : (a -> b) -> f a -> f b
+  law identity (v:f a) where equal (map (fun x -> x) v) v
+  law composition (g : b -> c) (h : a -> b) (v : f a) where equal (map (fun x -> g (h x)) v) (map g (map h v))
+";
+    insta::assert_snapshot!(fmt(src), @r"
+    class Functor (f : Type -> Type) =
+      map : (a -> b) -> f a -> f b
+      law identity (v : f a) where equal (map (fun x -> x) v) v
+      law composition (g : b -> c) (h : a -> b) (v : f a)
+      where equal (map (fun x -> g (h x)) v) (map g (map h v))
+    ");
+}
