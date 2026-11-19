@@ -2,15 +2,17 @@
 //!
 //! Source of truth: the language specification in `docs/src/content/docs/spec/`.
 
+pub use flick_diagnostics::{diagnostics, source};
+pub use flick_ffi::ffi;
+pub use flick_syntax::syntax;
+
 pub mod api_diff;
 pub mod build;
 mod clock;
 pub mod codegen;
 pub mod consteval;
-pub mod diagnostics;
 pub mod doc;
 pub mod effects;
-pub mod ffi;
 pub mod fmt;
 #[cfg(feature = "ide")]
 pub mod ide;
@@ -27,12 +29,12 @@ pub mod project;
 #[cfg(feature = "ide")]
 pub mod projection;
 pub mod resolve;
-pub mod source;
-pub mod syntax;
 pub mod types;
 
 #[cfg(test)]
 mod builtin_source;
+#[cfg(test)]
+mod frontend_tests;
 #[cfg(test)]
 mod layer_tests;
 /// Version of the compiler; `.iface` files record it.

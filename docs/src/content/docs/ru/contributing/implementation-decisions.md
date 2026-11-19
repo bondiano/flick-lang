@@ -1,6 +1,6 @@
 ---
 title: "Решения по реализации"
-source_hash: 1ac8371dee1dc3c8
+source_hash: da268c528c222bf2
 ---
 
 ## Архитектура компилятора
@@ -21,7 +21,7 @@ source_hash: 1ac8371dee1dc3c8
 
 | Компонент | Где | Ответственность |
 | - | - | - |
-| Парсер | `flick-core/src/syntax` | парсер с учётом раскладки строит CST без потерь и AST поверх него; `fmt` форматирует CST |
+| Парсер | `flick-syntax/src/syntax` | парсер с учётом раскладки строит CST без потерь и AST поверх него; `fmt` форматирует CST |
 | Разрешение имён | `flick-core/src/resolve` | модули, импорты, экспорты и имена; предупреждения о неиспользуемом коде |
 | Проверка | `flick-core/src/types` | кинды; двунаправленная проверка типов с высшими рангами; строки записей и эффектов; сервисы и слои; классы, экземпляры и `deriving`; регионы и захваты; блоки `sql` и `ui` |
 | Типизированный IR | `flick-core/src/ir` | проверенный модуль, в котором явно выражены стадии применения, словари, подъёмы и диапазоны исходного кода; `ir/lower` разворачивает `do`, списковые выражения и `sql` |
@@ -32,7 +32,7 @@ source_hash: 1ac8371dee1dc3c8
 | Go-бэкенд | `flick-core/src/codegen/go`, `flick-core/src/build/go.rs`, `runtime-go/flickrt` | `[build] emit = "go"`: Go-модуль для каждого входа поверх пакета среды выполнения `flickrt`, который компилирует `go build` (см. [Go-target](../../reference/codegen/#go-target)) |
 | Генератор TypeScript | `flick-core/src/codegen/ts` | типы для `--emit ts`, `.d.ts` для `--emit-dts` и Promise-фасады для `--promise-facade`; тип без формы в TypeScript отвергается и никогда не записывается как `any` |
 | Интерфейсы | `flick-core/src/iface.rs`, `flick-core/src/build` | версионируемый JSON `.iface` каждого модуля с ABI данных и словарей и отпечатками, которые добавляет сборка (см. [Интерфейсы](../../reference/iface/)) |
-| Импорт FFI | `flick-core/src/ffi`, `tools/dts-importer` | `flick ffi import` и `ffi check` над описанием, которое вспомогательная программа на Node читает из `.d.ts` с помощью TypeScript |
+| Импорт FFI | `flick-ffi/src/ffi`, `tools/dts-importer` | `flick ffi import` и `ffi check` над описанием, которое вспомогательная программа на Node читает из `.d.ts` с помощью TypeScript |
 | Редактор | `flick-core/src/ide`, `flick-core/src/projection.rs`, `flick/src/lsp`, `flick/src/mapper.rs` | подсказки, переход к определению, ссылки, автодополнение, переименование и действия над кодом по одному анализу; их обслуживает `flick lsp --stdio`, а `flick content-mapper` — проекцию TypeScript с картами диапазонов (см. [Редакторы](../../reference/editor/)) |
 
 JS-emitter собирается независимо от `flick-core`, получая переносимый IR и

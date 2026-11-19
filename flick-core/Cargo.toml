@@ -17,11 +17,12 @@ default = ["ide", "native-project"]
 ide = []
 # projects on disk: manifests, installed packages, published artifacts,
 # source maps and the docs of the built-in sources
-native-project = ["dep:flick-backend-go", "dep:toml", "dep:semver", "dep:sha2", "flick-backend-js/source-maps", "flick-backend-js/decision-graph", "flick-backend-support/native-project"]
+native-project = ["dep:flick-backend-go", "dep:toml", "dep:semver", "dep:sha2", "flick-backend-js/source-maps", "flick-backend-js/decision-graph", "flick-backend-support/native-project", "flick-ffi/native-project"]
 # std in the binary, for a host with no packages: the playground
 embedded-std = []
 
-# the build script compiles src/source.rs, whose spans the IR serializes
+# the build script compiles the source.rs of flick-diagnostics, whose spans
+# the IR serializes
 [build-dependencies]
 flick-ir = { path = "../flick-ir" }
 serde = { version = "1.0.229", features = ["derive"] }
@@ -37,10 +38,11 @@ toml = "1.1.8"
 rustix = { version = "1.1.6", features = ["time"] }
 
 [dependencies]
-annotate-snippets = "0.12.17"
 flick-backend-go = { path = "../backends/go", optional = true }
 flick-backend-js = { path = "../backends/js" }
 flick-backend-support = { path = "../flick-backend-support" }
+flick-diagnostics = { path = "../flick-diagnostics" }
+flick-ffi = { path = "../flick-ffi", default-features = false }
 flick-ir = { path = "../flick-ir" }
 flick-plugin = { path = "../flick-plugin" }
 flick-plugin-cli = { path = "../plugins/cli" }
@@ -50,10 +52,10 @@ flick-plugin-sql = { path = "../plugins/sql" }
 flick-plugin-test = { path = "../plugins/test" }
 flick-plugin-ui = { path = "../plugins/ui" }
 flick-pretty = { path = "../flick-pretty" }
+flick-syntax = { path = "../flick-syntax" }
 semver = { version = "1.0.26", optional = true }
 serde = { version = "1.0.229", features = ["derive", "rc"] }
 serde_json = { workspace = true }
 sha2 = { version = "0.10.9", optional = true }
-strsim = "0.11.1"
 toml = { version = "1.1.8", optional = true }
 tracing = { version = "0.1.44", default-features = false, features = ["std"] }

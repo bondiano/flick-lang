@@ -1,5 +1,5 @@
 ---
-source: flick-core/src/ffi/tests.rs
+source: flick-ffi/src/ffi/tests.rs
 expression: generated.text
 ---
 // flick ffi import lookup-lib

@@ -7,20 +7,20 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-#[path = "src/diagnostics/codes.rs"]
+#[path = "../flick-diagnostics/src/diagnostics/codes.rs"]
 mod codes;
 use codes::Code;
-#[path = "src/diagnostics/model.rs"]
+#[path = "../flick-diagnostics/src/diagnostics/model.rs"]
 mod model;
 mod diagnostics {
     pub(crate) use crate::codes::{self, Code};
     pub(crate) use crate::model::*;
 }
-#[path = "src/syntax/kind.rs"]
+#[path = "../flick-syntax/src/syntax/kind.rs"]
 mod kind;
-#[path = "src/syntax/lexer/mod.rs"]
+#[path = "../flick-syntax/src/syntax/lexer/mod.rs"]
 mod lexer;
-#[path = "src/source.rs"]
+#[path = "../flick-diagnostics/src/source.rs"]
 mod source;
 mod syntax {
     pub(crate) use crate::{kind, lexer};

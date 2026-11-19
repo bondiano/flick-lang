@@ -19,7 +19,10 @@ editing there, and follow it where it is more specific.
 
 | Area | Location |
 | - | - |
-| Parser, resolver, checker | `flick-core/src/{syntax,resolve,types}/` |
+| Sources, spans and diagnostics | `flick-diagnostics/src/` |
+| Lexer and parser | `flick-syntax/src/syntax/` |
+| Resolver, checker | `flick-core/src/{resolve,types}/` |
+| FFI binding import and check | `flick-ffi/src/ffi/` |
 | Lowering and shared IR | `flick-core/src/ir/`, `flick-ir/` |
 | Optimization and backends | `flick-core/src/{opt,codegen}/`, `backends/`, `flick-backend/` |
 | CLI, project execution, LSP | `flick/src/`, `flick-core/src/{project,ide}/` |

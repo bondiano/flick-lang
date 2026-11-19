@@ -1,0 +1,22 @@
+[package]
+name = "flick-diagnostics"
+description = "Source files, spans and the diagnostics of the Flick compiler: codes, explanations, fixes and their renderings"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+annotate-snippets = "0.12.17"
+flick-ir = { path = "../flick-ir" }
+serde = { version = "1.0.229", features = ["derive", "rc"] }
+serde_json = { workspace = true }
+strsim = "0.11.1"
+
+[dev-dependencies]
+insta = "1.49.0"

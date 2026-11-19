@@ -15,7 +15,7 @@ References:
 The importer works in two steps:
 
 1. `tools/dts-importer/src/` translates `.d.ts` into shapes (`Shape.fl`);
-2. `flick-core/src/ffi/` translates shapes into Flick bindings (`convert.rs` `ty`, `import.rs` `generate`).
+2. `flick-ffi/src/ffi/` translates shapes into Flick bindings (`convert.rs` `ty`, `import.rs` `generate`).
 
 ## 0. How a hole is closed
 
@@ -32,7 +32,7 @@ Fixtures:
 
 - `tests/check/fail/types/ts_holes.fl` — one form per definition; below it is referred to by the name of the definition.
 - `tests/check/projects/ts_holes_errors` — errors with the same name in two modules.
-- `tests/ffi/ts-holes` — a `.d.ts` package with forms for the importer. Its tests: `tools/dts-importer/test/import.test.mjs` and `flick-core/src/ffi/tests.rs`.
+- `tests/ffi/ts-holes` — a `.d.ts` package with forms for the importer. Its tests: `tools/dts-importer/test/import.test.mjs` and `flick-ffi/src/ffi/tests.rs`.
 - The hole generator (`flick-model/src/generate/holes.rs`, §4) — the forms of the core's holes in the programs of the model properties (`just model`), and the changes that would open them; both checkers judge each one.
 
 ## 1. The boundary rule: a foreign object is opaque

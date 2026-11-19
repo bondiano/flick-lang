@@ -1,5 +1,5 @@
 ---
-source: flick-core/src/ffi/tests.rs
+source: flick-ffi/src/ffi/tests.rs
 expression: generated.report(&lookup_surface())
 ---
 lookup-lib@1.0.0 (lookup-lib/index.d.ts)

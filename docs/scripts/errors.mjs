@@ -5,13 +5,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
-const explanations = path.join(root, "flick-core/src/diagnostics/explain");
+const explanations = path.join(root, "flick-diagnostics/src/diagnostics/explain");
 const translations = path.join(root, "docs/src/error-translations");
 const content = path.join(root, "docs/src/content/docs");
-const registry = readFileSync(path.join(root, "flick-core/src/diagnostics/codes.rs"), "utf8");
+const registry = readFileSync(path.join(root, "flick-diagnostics/src/diagnostics/codes.rs"), "utf8");
 const entries = [...registry.matchAll(/^\s*([A-Z]\d{3}) = (\w+) \d+, "([^"]+)";/gm)]
   .map(([, short, area, title]) => ({ short, code: `FLICK-${short}`, area, title }));
-// The public index follows `Area::ALL` in `flick-core/src/diagnostics/codes/code.rs`.
+// The public index follows `Area::ALL` in `flick-diagnostics/src/diagnostics/codes/code.rs`.
 // `Area::Plugin` stays out of that array: a plugin code is spelled under its
 // package and has no heading here. An area with no registered code is omitted
 // from both localized indexes.
@@ -148,7 +148,7 @@ export function areaInventoryProblems({ compiler, areas: listed, areaRu: listedR
 
 // The current compiler source, script lists and generated en/ru indexes.
 export function diagnosticAreaProblems() {
-  const source = readFileSync(path.join(root, "flick-core/src/diagnostics/codes/code.rs"), "utf8");
+  const source = readFileSync(path.join(root, "flick-diagnostics/src/diagnostics/codes/code.rs"), "utf8");
   const pages = expectedPages();
   const en = pages.get(path.join(content, "reference/errors/index.md"));
   const ru = pages.get(path.join(content, "ru/reference/errors/index.md"));
