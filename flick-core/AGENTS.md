@@ -5,10 +5,10 @@ queries. `flick`, `flick-wasm`, `flick-model` and `flick-backend` link it.
 
 ## Layout
 
-- `crate::source`, `crate::diagnostics`, `crate::syntax` and `crate::ffi`
-  re-export the crates `flick-diagnostics` (the `codes!` registry and
-  `explain/<CODE>.md`), `flick-syntax` and `flick-ffi`. Their tests that
-  run the checker, the formatter or the lowering are in
+- `crate::source` and `crate::diagnostics` re-export `flick-diagnostics`
+  (the `codes!` registry and `explain/<CODE>.md`), `crate::syntax`
+  re-exports `flick-syntax` and `crate::ffi` re-exports `flick-ffi`. Their
+  tests that run the checker, the formatter or the lowering are in
   `src/frontend_tests/`.
 - `src/codegen/` — re-exports the emitters of `backends/js` and
   `backends/go`; owns the TypeScript projection (`ts.rs`, `ts/`).
