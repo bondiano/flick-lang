@@ -181,6 +181,147 @@ theorem program435 (S : Sig) (hS : GenSig S) :
       (by simp [Tm.NoIns, Tm.Has]) (by le_live))
     (Stage.le_refl _) (by simp [Tm.NoIns, Tm.Has]) (by le_live))
 
+-- program : Eff {Counter} {Bad, Oops} (Eff {Counter} {Bad, Oops} (Int -> Bool))
+-- let program =
+--   (task {
+--     (try
+--         (task {
+--           (fun x1 ->
+--             false) })
+--       with
+--       | Oops x2 ->
+--         let cell13 : Ref (Shape -> (Int, String)) =
+--           (Ref.make ((scope s4 {
+--             let h5 =
+--               (open_scoped "x")
+--             v6 : ((Unit ->{} Unit)^{s4}) ->{} Unit
+--             let v6 f =
+--               (f ())
+--             (v6 (fun x7 ->
+--               (use h5)))
+--             let v8 =
+--               (Sealed (fun x9 ->
+--                 (try
+--                     ()
+--                   with
+--                   | _ ->
+--                     ())))
+--             (match v8 with
+--               | Sealed y ->
+--                 (y ()))
+--             open11 : Sealed ->{} Unit
+--             let open11 k12 =
+--               let Sealed y =
+--                 k12
+--               (y ())
+--             (open11 v8)
+--             ()
+--             (fun x10 ->
+--               (1, "ok")) }) : Shape -> (Int, String)))
+--         (task {
+--           (fun x14 ->
+--             true) })) })
+theorem program1090 (S : Sig) (hS : GenSig S) :
+    Typ S [] Facts.none [] (.task (.try_ (.task (.lam (.lit (.bool false)))) (.acons (.app (.ctor "Fixture.Oops") .var) (.let_ (.app (.const .refMake) (.let_ (.scope (.let_ (.app (.glob 11) (.lit (.str "x"))) (.let_ (.lam (.app (.var 0) (.lit .unit))) (.let_ (.app (.var 0) (.lam (.app (.glob 17) (.var 2)))) (.let_ (.app (.ctor "Fixture.Sealed") (.lam (.try_ (.lit .unit) (.acons .wild (.lit .unit) .anil)))) (.let_ (.match_ (.var 0) (.acons (.app (.ctor "Fixture.Sealed") .var) (.app (.var 0) (.lit .unit)) .anil)) (.let_ (.lam (.match_ (.var 0) (.acons (.app (.ctor "Fixture.Sealed") .var) (.app (.var 0) (.lit .unit)) .anil))) (.let_ (.app (.var 0) (.var 2)) (.let_ (.lit .unit) (.lam (.app (.app (.ctor "Tuple") (.lit (.int 1))) (.lit (.str "ok"))))))))))))) (.var 0))) (.task (.lam (.lit (.bool true))))) .anil)))
+      (.ex (.eff (.rnm "Fixture.Counter" (.adt "Fixture.Counter")) (.run (.rnm "Fixture.Bad" (.adt "Fixture.Bad")) (.rnm "Fixture.Oops" (.adt "Fixture.Oops"))) (.eff (.rnm "Fixture.Counter" (.adt "Fixture.Counter")) (.run (.rnm "Fixture.Bad" (.adt "Fixture.Bad")) (.rnm "Fixture.Oops" (.adt "Fixture.Oops"))) (.arrow (.base .int) .pure (.base .bool) Caps.none) Caps.none) Caps.none) .pure) :=
+  (.task (r := (.rnm "Fixture.Counter" (.adt "Fixture.Counter"))) (ε := (.run (.rnm "Fixture.Bad" (.adt "Fixture.Bad")) (.rnm "Fixture.Oops" (.adt "Fixture.Oops")))) (t := (.eff (.rnm "Fixture.Counter" (.adt "Fixture.Counter")) (.run (.rnm "Fixture.Bad" (.adt "Fixture.Bad")) (.rnm "Fixture.Oops" (.adt "Fixture.Oops"))) (.arrow (.base .int) .pure (.base .bool) Caps.none) Caps.none)) (C := Caps.none)
+    (.tryP (H := (fun x => x = .nm₀ "Fixture.Oops" ∨ Row.none x))
+      (.task (r := (.rnm "Fixture.Counter" (.adt "Fixture.Counter"))) (ε := (.run (.rnm "Fixture.Bad" (.adt "Fixture.Bad")) (.rnm "Fixture.Oops" (.adt "Fixture.Oops")))) (t := (.arrow (.base .int) .pure (.base .bool) Caps.none)) (C := Caps.none)
+        (.lam (a := (.base .int)) (ψ := .pure) (t := (.base .bool)) (C := Caps.none)
+          .lit
+          (by simp [Tm.NoIns, Tm.Has]) (by le_live))
+        (Stage.le_refl _) (by simp [Tm.NoIns, Tm.Has]) (by le_live))
+      (.hcons (H' := Row.none) (.ctor (.app (PatTy.head_plain S (K := "Fixture.Oops") (ts := [(.base .int)]) (T := "Fixture.Oops") (us := []) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl) .var))
+      (.let_ (a := (.ref (.arrow (.adt "Fixture.Shape") .pure (.tapp (.tapp (.adt "Tuple") (.base .int)) (.base .string)) Caps.none)))
+        (.app (a := (.arrow (.adt "Fixture.Shape") .pure (.tapp (.tapp (.adt "Tuple") (.base .int)) (.base .string)) Caps.none)) (ψ := (.rt .cnil .cnil)) (t := (.ref (.arrow (.adt "Fixture.Shape") .pure (.tapp (.tapp (.adt "Tuple") (.base .int)) (.base .string)) Caps.none))) (C := Caps.none)
+          (Typ.const (c := .refMake) (ι := ⟨(.arrow (.adt "Fixture.Shape") .pure (.tapp (.tapp (.adt "Tuple") (.base .int)) (.base .string)) Caps.none), .base .unit, Caps.none, .cnil, .cnil⟩) (by cell_ok) (by le_live))
+          (.let_ (a := (.arrow (.adt "Fixture.Shape") .pure (.tapp (.tapp (.adt "Tuple") (.base .int)) (.base .string)) Caps.none))
+            (Cert.typ_scope (F := Facts.none) (φ' := (.rt (fun x => x = .atm (.v 0) ∨ x = .atm (.v 0)) Row.none)) (r := Row.none) (ε := Row.none) (t := (.arrow (.adt "Fixture.Shape") .pure (.tapp (.tapp (.adt "Tuple") (.base .int)) (.base .string)) Caps.none)) (t' := (.arrow (.adt "Fixture.Shape") .pure (.tapp (.tapp (.adt "Tuple") (.base .int)) (.base .string)) Caps.none))
+              (by simp [Tm.NoIns, Tm.Has]) (fun _ _ h => h.elim)
+              (.let_ (a := (.tapp (.adt "Fixture.Handle") (.tvar 0)))
+                (.app (a := (.base .string)) (ψ := (.rt (.caps (fun x => x = .v 0)) .cnil)) (t := (.tapp (.adt "Fixture.Handle") (.tvar 0))) (C := Caps.none)
+                  (Cert.typ_glob (ts := [(.tvar 0)]) (T' := (.arrow (.base .string) (.rt (.caps (fun x => x = .v 0)) .cnil) (.tapp (.adt "Fixture.Handle") (.tvar 0)) Caps.none)) ((hS.glob 11 rfl).trans rfl) rfl (by holds) (by inst_le) (by le_live))
+                  .lit
+                  (by stage_le) (by le_live))
+                (.let_ (a := (.arrow (.arrow (.base .unit) (.rt .cnil .cnil) (.base .unit) (fun x => x = .v 0)) (.rt (.caps (fun x => x = .v 0)) .cnil) (.base .unit) Caps.none))
+                  (.lam (a := (.arrow (.base .unit) (.rt .cnil .cnil) (.base .unit) (fun x => x = .v 0))) (ψ := (.rt (.caps (fun x => x = .v 0)) .cnil)) (t := (.base .unit)) (C := Caps.none)
+                    (.app (a := (.base .unit)) (ψ := (.rt .cnil .cnil)) (t := (.base .unit)) (C := (fun x => x = .v 0))
+                      (Cert.typ_var (ts := []) (T' := (.arrow (.base .unit) (.rt .cnil .cnil) (.base .unit) (fun x => x = .v 0))) rfl rfl (by holds) (by inst_le) (by le_live))
+                      .lit
+                      (by stage_le) (by le_live))
+                    (by simp [Tm.NoIns, Tm.Has]) (by le_live))
+                  (.let_ (a := (.base .unit))
+                    (.app (a := (.arrow (.base .unit) (.rt .cnil .cnil) (.base .unit) (fun x => x = .v 0))) (ψ := (.rt (.caps (fun x => x = .v 0)) .cnil)) (t := (.base .unit)) (C := Caps.none)
+                      (Cert.typ_var (ts := []) (T' := (.arrow (.arrow (.base .unit) (.rt .cnil .cnil) (.base .unit) (fun x => x = .v 0)) (.rt (.caps (fun x => x = .v 0)) .cnil) (.base .unit) Caps.none)) rfl rfl (by holds) (by inst_le) (by le_live))
+                      (.lam (a := (.base .unit)) (ψ := (.rt .cnil .cnil)) (t := (.base .unit)) (C := (fun x => x = .v 0))
+                        (.app (a := (.tapp (.adt "Fixture.Handle") (.tvar 0))) (ψ := (.rt (.caps (fun x => x = .v 0)) .cnil)) (t := (.base .unit)) (C := Caps.none)
+                          (Cert.typ_glob (ts := [(.tvar 0)]) (T' := (.arrow (.tapp (.adt "Fixture.Handle") (.tvar 0)) (.rt (.caps (fun x => x = .v 0)) .cnil) (.base .unit) Caps.none)) ((hS.glob 17 rfl).trans rfl) rfl (by holds) (by inst_le) (by le_live))
+                          (Cert.typ_var (ts := []) (T' := (.tapp (.adt "Fixture.Handle") (.tvar 0))) rfl rfl (by holds) (by inst_le) (by le_live))
+                          (by stage_le) (by le_live))
+                        (by simp [Tm.NoIns, Tm.Has]) (by le_live))
+                      (by stage_le) (by le_live))
+                    (.let_ (a := (.tapp (.adt "Fixture.Sealed") (.caps Caps.none)))
+                      (.app (a := (.arrow (.base .unit) (.rt .cnil .cnil) (.base .unit) Caps.none)) (ψ := .pure) (t := (.tapp (.adt "Fixture.Sealed") (.caps Caps.none))) (C := Caps.none)
+                        (Typ.ctor_plain S (K := "Fixture.Sealed") (us := [(.caps Caps.none)]) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl (by le_live))
+                        (.lam (a := (.base .unit)) (ψ := (.rt .cnil .cnil)) (t := (.base .unit)) (C := Caps.none)
+                          (.tryP (H := (Ty.asRow .cnil))
+                            .lit
+                            (.hcons (H' := Row.none) .wild
+                            .lit
+                            (.hnil (fun _ h => h))
+                            catches_all))
+                          (by simp [Tm.NoIns, Tm.Has]) (by le_live))
+                        (by stage_le) (by le_live))
+                      (.let_ (a := (.base .unit))
+                        (.match_
+                          (Cert.typ_var (ts := []) (T' := (.tapp (.adt "Fixture.Sealed") (.caps Caps.none))) rfl rfl (by holds) (by inst_le) (by le_live))
+                          (.acons (.adt (.app (PatTy.head_plain S (K := "Fixture.Sealed") (ts := [(.arrow (.base .unit) (.rt .cnil .cnil) (.base .unit) (fun x => x = .v 0))]) (T := "Fixture.Sealed") (us := [(.caps Caps.none)]) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl) .var) rfl)
+                          (.app (a := (.base .unit)) (ψ := (.rt .cnil .cnil)) (t := (.base .unit)) (C := Caps.none)
+                            (Cert.typ_var (ts := []) (T' := (.arrow (.base .unit) (.rt .cnil .cnil) (.base .unit) Caps.none)) rfl rfl (by holds) (by inst_le) (by le_live))
+                            .lit
+                            (by stage_le) (by le_live))
+                          .anil)
+                          (.inl (exh_gen hS (T := "Fixture.Sealed") (us := [(.caps Caps.none)]) (by decide) (by decide))))
+                        (.letGen (k := 1) (Φ := Facts.none) (a := (.arrow (.tapp (.adt "Fixture.Sealed") (.caps (fun x => x = .v 0))) (.rt (.caps (fun x => x = .v 0)) .cnil) (.base .unit) Caps.none))
+                          (.lam (a := (.tapp (.adt "Fixture.Sealed") (.caps (fun x => x = .v 0)))) (ψ := (.rt (.caps (fun x => x = .v 0)) .cnil)) (t := (.base .unit)) (C := Caps.none)
+                            (.match_
+                              (Cert.typ_var (ts := []) (T' := (.tapp (.adt "Fixture.Sealed") (.caps (fun x => x = .v 0)))) rfl rfl (by holds) (by inst_le) (by le_live))
+                              (.acons (.adt (.app (PatTy.head_plain S (K := "Fixture.Sealed") (ts := [(.arrow (.base .unit) (.rt .cnil .cnil) (.base .unit) (fun x => x = .v 0))]) (T := "Fixture.Sealed") (us := [(.caps (fun x => x = .v 0))]) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl) .var) rfl)
+                              (.app (a := (.base .unit)) (ψ := (.rt .cnil .cnil)) (t := (.base .unit)) (C := (fun x => x = .v 0))
+                                (Cert.typ_var (ts := []) (T' := (.arrow (.base .unit) (.rt .cnil .cnil) (.base .unit) (fun x => x = .v 0))) rfl rfl (by holds) (by inst_le) (by le_live))
+                                .lit
+                                (by stage_le) (by le_live))
+                              .anil)
+                              (.inl (exh_gen hS (T := "Fixture.Sealed") (us := [(.caps (fun x => x = .v 0))]) (by decide) (by decide))))
+                            (by simp [Tm.NoIns, Tm.Has]) (by le_live))
+                          (.let_ (a := (.base .unit))
+                            (.app (a := (.tapp (.adt "Fixture.Sealed") (.caps Caps.none))) (ψ := (.rt .cnil .cnil)) (t := (.base .unit)) (C := Caps.none)
+                              (Cert.typ_var (ts := [(.caps Caps.none)]) (T' := (.arrow (.tapp (.adt "Fixture.Sealed") (.caps Caps.none)) (.rt .cnil .cnil) (.base .unit) Caps.none)) rfl rfl (by holds) (by inst_le) (by le_live))
+                              (Cert.typ_var (ts := []) (T' := (.tapp (.adt "Fixture.Sealed") (.caps Caps.none))) rfl rfl (by holds) (by inst_le) (by le_live))
+                              (by stage_le) (by le_live))
+                            (.let_ (a := (.base .unit))
+                              .lit
+                              (.lam (a := (.adt "Fixture.Shape")) (ψ := .pure) (t := (.tapp (.tapp (.adt "Tuple") (.base .int)) (.base .string))) (C := Caps.none)
+                                (.app (a := (.base .string)) (ψ := .pure) (t := (.tapp (.tapp (.adt "Tuple") (.base .int)) (.base .string))) (C := Caps.none)
+                                  (.app (a := (.base .int)) (ψ := .pure) (t := (.arrow (.base .string) .pure (.tapp (.tapp (.adt "Tuple") (.base .int)) (.base .string)) Caps.none)) (C := Caps.none)
+                                  (Typ.ctor_plain S (K := "Tuple") (us := [(.base .int), (.base .string)]) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl (by le_live))
+                                  .lit
+                                  (by stage_le) (by le_live))
+                                  .lit
+                                  (by stage_le) (by le_live))
+                                (by simp [Tm.NoIns, Tm.Has]) (by le_live))))))))))
+              (by inst_eq) (by stage_le) (by stage_le) (by le_live))
+            (Cert.typ_var (ts := []) (T' := (.arrow (.adt "Fixture.Shape") .pure (.tapp (.tapp (.adt "Tuple") (.base .int)) (.base .string)) Caps.none)) rfl rfl (by holds) (by inst_le) (by le_live)))
+          (by stage_le) (by le_live))
+        (.task (r := (.rnm "Fixture.Counter" (.adt "Fixture.Counter"))) (ε := (.run (.rnm "Fixture.Bad" (.adt "Fixture.Bad")) (.rnm "Fixture.Oops" (.adt "Fixture.Oops")))) (t := (.arrow (.base .int) .pure (.base .bool) Caps.none)) (C := Caps.none)
+          (.lam (a := (.base .int)) (ψ := .pure) (t := (.base .bool)) (C := Caps.none)
+            .lit
+            (by simp [Tm.NoIns, Tm.Has]) (by le_live))
+          (Stage.le_refl _) (by simp [Tm.NoIns, Tm.Has]) (by le_live)))
+      (.hnil (fun _ h => h))
+      (catches_ctor (exh_gen hS (T := "Fixture.Oops") (us := []) (by decide) (by decide)))))
+    (Stage.le_refl _) (by simp [Tm.NoIns, Tm.Has]) (by le_live))
+
 -- program : Eff {Counter} {Bad, Oops} (Bool, Option String)
 -- let program =
 --   (task {
