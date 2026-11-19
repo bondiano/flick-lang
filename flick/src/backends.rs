@@ -25,7 +25,7 @@ mod tools;
 #[cfg(feature = "wasm-backends")]
 pub(crate) use execute::Reads;
 #[cfg(feature = "wasm-backends")]
-pub(crate) use foreign::foreign;
+pub(crate) use foreign::{asked, foreign, package_inputs, verify};
 #[cfg(feature = "wasm-backends")]
 pub(crate) use tools::Tool;
 

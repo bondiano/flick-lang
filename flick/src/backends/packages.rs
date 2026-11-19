@@ -8,8 +8,10 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 
+use flick_backend::command::Dependency;
 use flick_backend::{
-    Backend, Diagnostic, OptionValue, PackageRoot, ProjectFile, RuntimeDependency, sha256,
+    Backend, Diagnostic, OptionValue, PackageRoot, ProjectFile, RuntimeDependency, RuntimeGraph,
+    sha256,
 };
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -30,6 +32,7 @@ pub(crate) struct Report {
 pub(crate) fn report(
     backend: &dyn Backend,
     root: &Path,
+    dependencies: &[Dependency],
     options: &[OptionValue],
 ) -> Result<Report, String> {
     let patterns = backend.package_files();
@@ -46,12 +49,16 @@ pub(crate) fn report(
         .iter()
         .filter_map(|p| p.rsplit('/').next())
         .collect();
-    let mut files: Vec<ProjectFile> = Vec::new();
+    let mut found = Vec::new();
     for pattern in &patterns {
-        matching(root, Path::new(""), pattern, &mut files);
+        matching(root, Path::new(""), pattern, &mut found);
     }
+    let mut files: Vec<ProjectFile> = (found.into_iter())
+        .map(|path| read(&root.join(&path), slashed(&path)))
+        .filter(|f| !f.real.is_empty())
+        .collect();
     for _ in 0..ROUNDS {
-        let answer = backend.packages(&files, options);
+        let answer = backend.packages(&files, dependencies, options);
         if answer.needs.is_empty() {
             let runtime = answer.runtime.iter().map(pin).collect::<Result<_, _>>()?;
             return Ok(Report {
@@ -86,6 +93,24 @@ pub(crate) fn any_match(root: &Path, patterns: &[String]) -> bool {
     })
 }
 
+/// The files under `root` that `patterns` name, relative to it, and those a
+/// pattern without `*` names though absent: creating one matters too.
+pub(crate) fn named(root: &Path, patterns: &[String]) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    for pattern in patterns {
+        if pattern.contains('*') {
+            matching(root, Path::new(""), pattern, &mut files);
+        } else {
+            files.push(PathBuf::from(pattern));
+        }
+    }
+    files
+}
+
+fn slashed(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/")
+}
+
 /// The file at `path`, asked for as `asked`; an absent one has no path.
 fn read(path: &Path, asked: String) -> ProjectFile {
     match (fs::read(path), fs::canonicalize(path)) {
@@ -102,9 +127,9 @@ fn read(path: &Path, asked: String) -> ProjectFile {
     }
 }
 
-/// The files under `root` that `pattern` names, `*` standing for any one
-/// name, part of a name with a prefix or suffix, as `@*`.
-fn matching(root: &Path, at: &Path, pattern: &str, out: &mut Vec<ProjectFile>) {
+/// The files under `root` that `pattern` names, relative to it, `*` standing
+/// for any one name, part of a name with a prefix or suffix, as `@*`.
+fn matching(root: &Path, at: &Path, pattern: &str, out: &mut Vec<PathBuf>) {
     let (part, rest) = pattern
         .split_once('/')
         .map_or((pattern, None), |(p, r)| (p, Some(r)));
@@ -125,11 +150,8 @@ fn matching(root: &Path, at: &Path, pattern: &str, out: &mut Vec<ProjectFile>) {
         let path = at.join(&name);
         if let Some(rest) = rest {
             matching(root, &path, rest, out);
-        } else {
-            let file = read(&root.join(&path), path.to_string_lossy().replace('\\', "/"));
-            if !file.real.is_empty() {
-                out.push(file);
-            }
+        } else if root.join(&path).is_file() {
+            out.push(path);
         }
     }
 }
@@ -144,13 +166,13 @@ struct Node {
 
 /// The pin of a runtime graph: its packages' contents and edges, never
 /// their paths.
-fn pin(graph: &flick_backend::RuntimeGraph) -> Result<RuntimeDependency, String> {
+fn pin(graph: &RuntimeGraph) -> Result<RuntimeDependency, String> {
     let mut nodes = Vec::new();
     for node in &graph.nodes {
         nodes.push(Node {
             name: node.name.clone(),
             version: node.version.clone(),
-            content: content(Path::new(&node.dir))?,
+            content: content(Path::new(&node.dir), &graph.skip)?,
             dependencies: (node.dependencies.iter())
                 .map(|(name, index)| (name.clone(), *index as usize))
                 .collect(),
@@ -168,14 +190,13 @@ fn pin(graph: &flick_backend::RuntimeGraph) -> Result<RuntimeDependency, String>
     })
 }
 
-/// The hash of the files of the package at `dir`, outside nested
-/// `node_modules`, by their relative names and sizes.
-pub(crate) fn content(dir: &Path) -> Result<String, String> {
-    let mut files = vec![PathBuf::from("package.json")];
-    collect(dir, Path::new(""), &mut files)
+/// The hash of the files of the package at `dir`, outside the directories
+/// `skip` names and `.git`, by their relative names and sizes.
+pub(crate) fn content(dir: &Path, skip: &[String]) -> Result<String, String> {
+    let mut files = Vec::new();
+    collect(dir, Path::new(""), skip, &mut files)
         .map_err(|e| format!("cannot pin the installed runtime: {e}"))?;
     files.sort();
-    files.dedup();
     let mut hash = Sha256::new();
     for relative in files {
         let name = relative.to_string_lossy().replace('\\', "/");
@@ -193,17 +214,22 @@ pub(crate) fn content(dir: &Path) -> Result<String, String> {
     Ok(format!("{:x}", hash.finalize()))
 }
 
-fn collect(package: &Path, relative: &Path, files: &mut Vec<PathBuf>) -> io::Result<()> {
+fn collect(
+    package: &Path,
+    relative: &Path,
+    skip: &[String],
+    files: &mut Vec<PathBuf>,
+) -> io::Result<()> {
     for entry in fs::read_dir(package.join(relative))? {
         let entry = entry?;
         let kind = entry.file_type()?;
         let name = entry.file_name();
-        if name == "node_modules" || name == ".git" {
+        if name == ".git" || skip.iter().any(|s| name == s.as_str()) {
             continue;
         }
         let path = relative.join(name);
         if kind.is_dir() {
-            collect(package, &path, files)?;
+            collect(package, &path, skip, files)?;
         } else if kind.is_file() {
             files.push(path);
         } else {
@@ -304,7 +330,7 @@ pub(super) mod tests {
                     value: real.clone(),
                 },
             ];
-            let reported = report(&*backend, &root, &options).expect("a report");
+            let reported = report(&*backend, &root, &[], &options).expect("a report");
             let mut pinned = reported.runtime;
             pinned.sort_by(|a, b| a.package.cmp(&b.package));
             let mut before = installed_for(&root, effect).expect("the host's pins");

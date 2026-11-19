@@ -1,11 +1,13 @@
 //! Official backend implementation over the versioned component records.
 
 mod data;
+mod dependencies;
 mod emit;
 mod ffi;
 #[cfg(feature = "guest")]
 mod guest;
 mod launch;
+mod manifest;
 mod mapper;
 mod optimize;
 mod packages;
@@ -57,13 +59,19 @@ impl Backend for Javascript {
         packages::files()
     }
 
-    fn packages(&self, files: &[ProjectFile], options: &[OptionValue]) -> Packages {
-        packages::packages(files, options)
+    fn packages(
+        &self,
+        files: &[ProjectFile],
+        dependencies: &[command::Dependency],
+        options: &[OptionValue],
+    ) -> Packages {
+        packages::packages(files, dependencies, options)
     }
 
     fn commands(&self) -> Vec<command::Descriptor> {
         let mut commands = ffi::descriptors();
         commands.push(mapper::descriptor());
+        commands.extend(dependencies::descriptors());
         commands
     }
 
@@ -73,6 +81,8 @@ impl Backend for Javascript {
     ) -> Result<command::Plan, Vec<command::Diagnostic>> {
         if ffi::descriptors().iter().any(|d| d.name == invocation.name) {
             ffi::run(invocation)
+        } else if dependencies::NAMES.contains(&invocation.name.as_str()) {
+            dependencies::run(invocation)
         } else {
             Err(command::unknown(&invocation.name))
         }

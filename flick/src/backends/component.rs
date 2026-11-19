@@ -17,7 +17,7 @@ use flick_backend::{
 use flick_core::build::{go::FILES, schema_aot_file};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::BackendPackage;
-use flick_core::project::{Compilation, Project, js};
+use flick_core::project::{Compilation, Project};
 use flick_core::source::{FileId, SourceMap, Span};
 
 use super::request::Prepared;
@@ -521,8 +521,10 @@ fn host_preflight(
     let Some(project) = project.filter(|_| !output.go) else {
         return vec![];
     };
-    let mut diagnostics = js::conflicts(host, &project.root, &compilation.js_dependencies);
-    diagnostics.extend(js::unmet(host, &project.root, &compilation.js_dependencies));
+    // the load reported the rest: what is not installed matters to a build
+    let _ = host;
+    let mut diagnostics = super::verify(project, &compilation.target_dependencies, true);
+    diagnostics.retain(|d| d.code == codes::P034);
     diagnostics
 }
 

@@ -333,10 +333,16 @@ impl Backend for WasmBackend {
             .unwrap_or_default()
     }
 
-    fn packages(&self, files: &[ProjectFile], options: &[OptionValue]) -> Packages {
+    fn packages(
+        &self,
+        files: &[ProjectFile],
+        dependencies: &[command::Dependency],
+        options: &[OptionValue],
+    ) -> Packages {
         let (wire, options) = (convert::files(files), convert::options(options));
+        let dependencies: Vec<_> = dependencies.iter().map(commands::dependency_wire).collect();
         match self.command_call(&self.cancellation, |i, store| {
-            i.call_packages(store, &wire, &options)
+            i.call_packages(store, &wire, &dependencies, &options)
         }) {
             Ok(packages) => convert::packages(packages),
             Err(error) => Packages {

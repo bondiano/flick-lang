@@ -8,7 +8,6 @@ use clap::Parser;
 #[cfg(feature = "wasm-backends")]
 use clap::{CommandFactory, FromArgMatches};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
-use flick_core::project::pnpm;
 use flick_core::source::SourceMap;
 
 use crate::args::{
@@ -59,27 +58,25 @@ fn watch(command: &impl Command, global: &GlobalArguments) -> ExitCode {
     }
 }
 
-/// The pnpm command of a dependency command.
-fn dependency_command(cmd: Commands, offline: bool) -> pnpm::Command {
+/// The verb of a dependency command.
+fn dependency_command(cmd: Commands, offline: bool) -> commands::Verb {
+    use commands::Verb;
     match cmd {
-        Commands::Install(o) => pnpm::Command::Install {
+        Commands::Install(o) => Verb::Install {
             locked: o.locked,
             offline,
         },
-        Commands::Add(o) => pnpm::Command::Add {
+        Commands::Add(o) => Verb::Add {
             packages: o.packages,
             dev: o.dev,
         },
-        Commands::Remove(o) => pnpm::Command::Remove {
+        Commands::Remove(o) => Verb::Remove {
             packages: o.packages,
         },
-        Commands::Update(o) => pnpm::Command::Update {
+        Commands::Update(o) => Verb::Update {
             packages: o.packages,
         },
-        Commands::Deps(o) => match o.why {
-            Some(package) => pnpm::Command::Why { package },
-            None => pnpm::Command::List,
-        },
+        Commands::Deps(o) => Verb::Deps { why: o.why },
         _ => unreachable!("only dependency commands"),
     }
 }

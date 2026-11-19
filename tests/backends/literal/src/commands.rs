@@ -82,6 +82,7 @@ fn copy_step(invocation: &Invocation, read: &str) -> Option<Step> {
         inputs: vec![],
         reads: vec![read.into()],
         outputs: vec!["copy.txt".into()],
+        in_place: false,
     }))
 }
 
@@ -146,6 +147,7 @@ pub(super) fn run(invocation: &Invocation) -> Plan {
             inputs: vec![],
             reads: vec![],
             outputs: vec!["made.txt".into()],
+            in_place: false,
         })),
         _ => {}
     }

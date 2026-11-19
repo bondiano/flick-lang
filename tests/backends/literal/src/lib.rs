@@ -68,7 +68,12 @@ impl Backend for Literal {
         vec!["package.json".into()]
     }
 
-    fn packages(&self, files: &[ProjectFile], options: &[OptionValue]) -> Packages {
+    fn packages(
+        &self,
+        files: &[ProjectFile],
+        _: &[command::Dependency],
+        options: &[OptionValue],
+    ) -> Packages {
         // Node's search from the root upward, each candidate asked for in turn
         let root = (options.iter())
             .find(|o| o.key == "root")
@@ -108,6 +113,7 @@ impl Backend for Literal {
                         dir: f.real.rsplit_once('/')?.0.into(),
                         dependencies: vec![],
                     }],
+                    skip: vec!["node_modules".into()],
                 })
             })
             .into_iter()
@@ -408,9 +414,10 @@ mod guest {
         }
         fn packages(
             files: Vec<flick_backend::ProjectFile>,
+            dependencies: Vec<flick_backend::command::Dependency>,
             options: Vec<flick_backend::OptionValue>,
         ) -> flick_backend::Packages {
-            Literal.packages(&files, &options)
+            Literal.packages(&files, &dependencies, &options)
         }
     }
     export_component!(Component);

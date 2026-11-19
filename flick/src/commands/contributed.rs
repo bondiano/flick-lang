@@ -2,12 +2,14 @@
 //! project, described from a cache in the store, and run by the host from
 //! the plan or the session they declare.
 
+mod delegate;
 mod inputs;
 mod plan;
 mod preview;
 mod projection;
 mod session;
 
+pub(crate) use delegate::delegate;
 pub(crate) use preview::preview;
 
 use std::ffi::OsString;
@@ -197,7 +199,10 @@ fn contributed(project: &Project) -> (Vec<(Source, Contributed)>, Vec<Diagnostic
         };
         let (taken, commands): (Vec<_>, Vec<_>) =
             (all.into_iter()).partition(|d| reserved.iter().any(|r| r == first_word(&d.name)));
-        for d in taken {
+        // the backend's own verbs of flick run through those verbs
+        let delegated =
+            |d: &Descriptor| source.plugin.is_none() && delegate::VERBS.contains(&d.name.as_str());
+        for d in taken.into_iter().filter(|d| !delegated(d)) {
             warnings.push(Diagnostic::new(
                 codes::P054,
                 Severity::Warning,
@@ -311,7 +316,7 @@ pub(crate) fn run(words: &[OsString], global: &GlobalArguments) -> ExitCode {
     }
     let tools = backends::granted_tools(&project, &source.id);
     let cwd = env::current_dir().unwrap_or_else(|_| project.root.clone());
-    let invocation = match invocation(&project, descriptor, arguments, &tools, &cwd) {
+    let invocation = match invocation(&project, &source.id, descriptor, arguments, &tools, &cwd) {
         Ok(invocation) => invocation,
         Err(why) => {
             return fail(Diagnostic::new(
@@ -345,6 +350,7 @@ pub(crate) fn run(words: &[OsString], global: &GlobalArguments) -> ExitCode {
 /// project's root, and the files the command reads.
 fn invocation(
     project: &Project,
+    id: &str,
     descriptor: &Descriptor,
     arguments: Vec<Argument>,
     tools: &[Tool],
@@ -353,12 +359,23 @@ fn invocation(
     let root = &project.root;
     let sources =
         (project.source_root().strip_prefix(root)).map_or_else(|_| String::new(), inputs::slashed);
+    // a tool the project allows that the host did not find goes without a pin
+    let missing = (project.config.tools.get(id).into_iter().flatten())
+        .filter(|name| !tools.iter().any(|t| &t.pin.id == *name))
+        .map(|name| command::Tool {
+            id: name.clone(),
+            version: String::new(),
+            sha256: String::new(),
+        });
     let mut invocation = Invocation {
         name: descriptor.name.clone(),
         arguments: inputs::relative(descriptor, arguments, root, cwd)?,
         sources,
         inputs: Vec::new(),
-        tools: tools.iter().map(|t| plan::tool(&t.pin)).collect(),
+        tools: (tools.iter().map(|t| plan::tool(&t.pin)))
+            .chain(missing)
+            .collect(),
+        dependencies: Vec::new(),
     };
     let paths = inputs::expand(&descriptor.inputs, &invocation)?;
     invocation.inputs = inputs::read(root, &paths)?;

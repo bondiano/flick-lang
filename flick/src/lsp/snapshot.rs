@@ -11,9 +11,13 @@ use std::time::Instant;
 
 #[cfg(feature = "wasm-backends")]
 use crate::backends;
+#[cfg(feature = "wasm-backends")]
+use flick_core::diagnostics::Diagnostic;
 use flick_core::plugin::Expander;
 use flick_core::plugin::reach::Outside;
 use flick_core::project::config::Emit;
+#[cfg(feature = "wasm-backends")]
+use flick_core::project::target::Wanted;
 use flick_core::project::{self, Analysis, Analyzed, Compilation, Host, ModuleCache};
 #[cfg(feature = "wasm-backends")]
 use flick_core::project::{Foreign, Project};
@@ -54,6 +58,11 @@ impl Host for Overlay<'_> {
     #[cfg(feature = "wasm-backends")]
     fn foreign(&self, project: &Project) -> Foreign {
         backends::foreign(project)
+    }
+
+    #[cfg(feature = "wasm-backends")]
+    fn verify(&self, project: &Project, wanted: &[Wanted]) -> Vec<Diagnostic> {
+        backends::verify(project, wanted, false)
     }
 
     fn read(&self, path: &Path) -> io::Result<Vec<u8>> {

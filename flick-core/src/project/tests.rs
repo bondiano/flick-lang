@@ -68,7 +68,7 @@ fn library(sources: &mut SourceMap) -> Project {
             proof_dir: "proofs".into(),
             entries: Vec::new(),
             dependencies: Vec::new(),
-            js_dependencies: Vec::new(),
+            target_dependencies: Vec::new(),
             package: None,
             build: Build::default(),
             sql_dialect: Default::default(),

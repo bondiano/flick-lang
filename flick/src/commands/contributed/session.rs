@@ -41,7 +41,15 @@ pub(super) fn serve(
         Ok(Opened::Session(state)) => state,
         // it runs once instead, as a plan command does
         Ok(Opened::Plan(plan)) => {
-            let done = carry_out(project, contributor, descriptor, invocation, plan, tools);
+            let done = carry_out(
+                project,
+                contributor,
+                descriptor,
+                invocation,
+                plan,
+                tools,
+                global,
+            );
             let _ = io::stdout().write_all(&done.stdout);
             return finish(global, invocation, &done.diagnostics, &done.refused);
         }
@@ -122,7 +130,15 @@ pub(super) fn serve(
         }
     }
     let plan = contributor.close(state);
-    let done = carry_out(project, contributor, descriptor, invocation, plan, tools);
+    let done = carry_out(
+        project,
+        contributor,
+        descriptor,
+        invocation,
+        plan,
+        tools,
+        global,
+    );
     // stdout is the protocol's: what the session prints goes to stderr
     if !done.stdout.is_empty() {
         eprint!("{}", String::from_utf8_lossy(&done.stdout));

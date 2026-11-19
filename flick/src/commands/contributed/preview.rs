@@ -28,7 +28,14 @@ pub(crate) fn preview(project: &Project, words: &[String]) -> Result<Preview, St
     let contributor = load(project, source)?;
     let arguments = arguments(descriptor, &source.short, &rest).map_err(|e| e.to_string())?;
     let tools = backends::granted_tools(project, &source.id);
-    let invocation = invocation(project, descriptor, arguments, &tools, &project.root)?;
+    let invocation = invocation(
+        project,
+        &source.id,
+        descriptor,
+        arguments,
+        &tools,
+        &project.root,
+    )?;
     let first = |ds: &[Diagnostic]| {
         ds.iter()
             .find(|d| d.severity == Severity::Error)
@@ -48,6 +55,7 @@ pub(crate) fn preview(project: &Project, words: &[String]) -> Result<Preview, St
         descriptor,
         &invocation,
         tools.as_slice(),
+        None,
     );
     let files = chain(call, plan, &mut done).map_err(|d| d.message)?;
     if let Some(why) = first(&done.diagnostics) {

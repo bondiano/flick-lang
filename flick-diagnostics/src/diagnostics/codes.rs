@@ -304,6 +304,7 @@ codes! {
     P054 = Project 54, "a contributor adds a command of flick itself";
     P055 = Project 55, "a command's plan does not keep to what it declares";
     P056 = Project 56, "official backend cannot be resolved";
+    P057 = Project 57, "the backend has no dependency command for this";
 }
 
 #[cfg(test)]

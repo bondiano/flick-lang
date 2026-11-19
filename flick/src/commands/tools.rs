@@ -140,7 +140,7 @@ pub fn doctor(global: &GlobalArguments) -> Outcome {
     let pinned = root
         .as_ref()
         .and_then(|r| fs::read_to_string(r.join("package.json")).ok())
-        .and_then(|t| project::pnpm::pinned(&t))
+        .and_then(|t| pinned_pnpm(&t))
         .unwrap_or_else(|| PNPM.to_owned());
     match version_of("pnpm") {
         Some(v) => line(
@@ -266,4 +266,14 @@ fn installed(root: Option<&Path>, line: &mut impl FnMut(Option<bool>, &str, Stri
             "none here: runtime and adapters not checked".to_owned(),
         ),
     }
+}
+
+// shortcut: `doctor` still reads the pnpm pin of `package.json`; it moves to the JavaScript backend's doctor plan with the other ecosystem checks
+/// The pnpm version `package.json` pins: `"packageManager": "pnpm@12.14.0"`,
+/// without a `+sha…` suffix.
+fn pinned_pnpm(package_json: &str) -> Option<String> {
+    let value: serde_json::Value = serde_json::from_str(package_json).ok()?;
+    let spec = value.get("packageManager")?.as_str()?;
+    let version = spec.strip_prefix("pnpm@")?;
+    Some(version.split('+').next().unwrap_or(version).to_owned())
 }

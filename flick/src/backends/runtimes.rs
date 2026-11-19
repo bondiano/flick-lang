@@ -49,7 +49,7 @@ pub(super) fn runtime_from(
             value: real.to_string_lossy().replace('\\', "/"),
         },
     ];
-    super::packages::report(&*backend, dir, &options).map(|report| report.runtime)
+    super::packages::report(&*backend, dir, &[], &options).map(|report| report.runtime)
 }
 
 /// The pins of the runtime packages `backend` reports for the project at
@@ -70,5 +70,5 @@ pub(super) fn runtime(
             value: real.to_string_lossy().replace('\\', "/"),
         },
     ];
-    super::packages::report(backend, root, &options).map(|report| report.runtime)
+    super::packages::report(backend, root, &[], &options).map(|report| report.runtime)
 }

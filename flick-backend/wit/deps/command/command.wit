@@ -37,7 +37,13 @@ interface types {
     }
     record argument { name: string, values: list<string> }
     /// A host tool the project allows the contributor, pinned by the host.
+    /// One it allows that the host did not find has an empty version and
+    /// digest, and no step may run it.
     record tool { id: string, version: string, sha256: string }
+    /// A package of the contributor's ecosystem that the project or a
+    /// library of its closure asks for in `[target.<name>.dependencies]`;
+    /// `by` names the library, none the project.
+    record dependency { name: string, version: string, by: option<string> }
     record file { path: string, bytes: list<u8>, executable: bool }
     record invocation {
         name: string,
@@ -48,11 +54,20 @@ interface types {
         /// The files the descriptor's `inputs` name, as they are now.
         inputs: list<file>,
         tools: list<tool>,
+        /// What the closure asks of a backend's ecosystem, for the
+        /// dependency commands it implements; empty for any other command.
+        dependencies: list<dependency>,
     }
     record variable { name: string, value: string }
     /// A run of a host tool in a directory of its own, holding the plan's
     /// files `inputs` names; it gives back the files `outputs` names, which
     /// the host writes with the plan's, or hands to `resume`.
+    ///
+    /// An `in-place` step runs in the project's root instead, once the
+    /// other steps have run and the files so far are published. It reads
+    /// and inputs nothing of the plan; `outputs` names what it changes,
+    /// each within the descriptor's `writes`, and nothing is read back. The
+    /// host cannot undo what it changes: a failure leaves that as it is.
     record tool-step {
         id: string,
         tool: tool,
@@ -64,6 +79,7 @@ interface types {
         /// the step's directory, linked rather than copied.
         reads: list<string>,
         outputs: list<string>,
+        in-place: bool,
     }
     variant step { tool(tool-step) }
     enum severity { error, warning, note }

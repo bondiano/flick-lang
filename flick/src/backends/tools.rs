@@ -20,6 +20,8 @@ struct Adapter {
     inherit: &'static [&'static str],
     /// Variables a step may set.
     settable: &'static [&'static str],
+    /// Variables the tool always runs with, its version query too.
+    fixed: &'static [(&'static str, &'static str)],
 }
 
 /// Variables every tool needs to find its home, caches and network proxy.
@@ -48,6 +50,7 @@ const ADAPTERS: &[Adapter] = &[
         parse: |out| Some(out.trim().strip_prefix('v')?.to_owned()),
         inherit: &[],
         settable: &[],
+        fixed: &[],
     },
     Adapter {
         id: "go",
@@ -73,6 +76,38 @@ const ADAPTERS: &[Adapter] = &[
             "GOINSECURE",
         ],
         settable: &["GOFLAGS", "GOTOOLCHAIN", "CGO_ENABLED"],
+        fixed: &[],
+    },
+    Adapter {
+        id: "pnpm",
+        version: &["--version"],
+        parse: |out| Some(out.trim().to_owned()).filter(|v| !v.is_empty()),
+        inherit: &[
+            "CI",
+            "PNPM_HOME",
+            "COREPACK_HOME",
+            "XDG_DATA_HOME",
+            "XDG_CONFIG_HOME",
+            "XDG_STATE_HOME",
+            "NPM_CONFIG_USERCONFIG",
+            "npm_config_userconfig",
+            "NPM_CONFIG_REGISTRY",
+            "npm_config_registry",
+            "npm_config_store_dir",
+            "NPM_TOKEN",
+            "NODE_AUTH_TOKEN",
+            "NODE_EXTRA_CA_CERTS",
+        ],
+        settable: &[],
+        // the host owns the version gate: no pnpm may fetch or pin another
+        fixed: &[
+            ("npm_config_manage_package_manager_versions", "false"),
+            ("PNPM_CONFIG_PM_ON_FAIL", "ignore"),
+            ("COREPACK_ENABLE_PROJECT_SPEC", "0"),
+            ("COREPACK_ENABLE_AUTO_PIN", "0"),
+            ("COREPACK_ENABLE_NETWORK", "0"),
+            ("COREPACK_DEFAULT_TO_LATEST", "0"),
+        ],
     },
 ];
 
@@ -130,6 +165,7 @@ impl Tool {
         }
         let output = Command::new(&path)
             .args(adapter.version)
+            .envs(adapter.fixed.iter().copied())
             .output()
             .map_err(|e| e.to_string())?;
         let version = (output.status.success())
@@ -177,6 +213,7 @@ impl Tool {
                 command.env(name, value);
             }
         }
+        command.envs(self.adapter.fixed.iter().copied());
         command
     }
 }

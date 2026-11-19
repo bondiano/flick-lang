@@ -451,7 +451,7 @@ fn rt_project() -> Project {
         proof_dir: "proofs".to_owned(),
         entries: Vec::new(),
         dependencies: Vec::new(),
-        js_dependencies: Vec::new(),
+        target_dependencies: Vec::new(),
         package: None,
         build: Build {
             effect: Backend::Rt,

@@ -10,7 +10,7 @@ use super::deps::{RawDependency, RawGrants, RawPackage, dependencies, grants, pa
 use super::workspace::RawWorkspace;
 use super::{Build, Config, Entry, Kind, MAIN_ENTRY, Manifest, Script};
 use crate::diagnostics::{Code, Diagnostic, Severity, codes};
-use crate::manifest::{RawJs, js_dependencies};
+use crate::manifest::{RawTarget, target_dependencies};
 use crate::source::{FileId, Span};
 use crate::types::Thresholds;
 
@@ -32,7 +32,9 @@ struct Raw {
     sql: Option<Spanned<RawSql>>,
     lint: Option<Spanned<RawLint>>,
     dependencies: Option<Spanned<BTreeMap<String, Spanned<RawDependency>>>>,
-    js: Option<Spanned<RawJs>>,
+    /// Only to say where its tables went.
+    js: Option<Spanned<toml::Value>>,
+    target: Option<Spanned<BTreeMap<String, RawTarget>>>,
     package: Option<Spanned<RawPackage>>,
     plugins: Option<Spanned<BTreeMap<String, Spanned<RawGrants>>>>,
     tools: Option<Spanned<BTreeMap<String, Vec<String>>>>,
@@ -143,6 +145,14 @@ pub fn parse_manifest(text: &str, file: FileId) -> Result<Manifest, Diagnostic> 
         }
     }
     let mut raw: Raw = toml::from_str(text).map_err(invalid)?;
+    if let Some(js) = &raw.js {
+        return Err(Diagnostic::error(
+            codes::P005,
+            "`[js]` is no table of `flick.toml`: the packages of a backend's ecosystem are under `[target.<name>]`",
+            span(js.span()),
+        )
+        .with_fix(|| ("rename `[js.dependencies]` to `[target.js.dependencies]`", Vec::new())));
+    }
     let scripts = scripts(mem::take(&mut raw.scripts), &span)?;
     let (members, plugins) = match raw.workspace.take() {
         Some(workspace) => {
@@ -166,7 +176,7 @@ pub fn parse_manifest(text: &str, file: FileId) -> Result<Manifest, Diagnostic> 
             ("sql", raw.sql.map(|s| s.span())),
             ("lint", raw.lint.map(|l| l.span())),
             ("dependencies", raw.dependencies.map(|d| d.span())),
-            ("js.dependencies", raw.js.map(|j| j.span())),
+            ("target", raw.target.map(|t| t.span())),
             ("package", raw.package.map(|p| p.span())),
             ("plugins", raw.plugins.map(|p| p.span())),
             ("tools", raw.tools.map(|t| t.span())),
@@ -294,7 +304,7 @@ fn config(
             .unwrap_or_default(),
         span,
     )?;
-    let js_dependencies = js_dependencies(raw.js.map(Spanned::into_inner), span)?;
+    let target_dependencies = target_dependencies(raw.target.map(Spanned::into_inner), span);
     let package = match raw.package {
         Some(raw) => {
             let at = span(raw.span());
@@ -324,7 +334,7 @@ fn config(
         proof_dir: project.proof_dir,
         entries,
         dependencies,
-        js_dependencies,
+        target_dependencies,
         package,
         build,
         sql_dialect,

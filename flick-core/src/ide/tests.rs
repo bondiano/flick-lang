@@ -168,7 +168,7 @@ pub(super) fn fixture_with_dependencies(
             proof_dir: "proofs".into(),
             entries: Vec::new(),
             dependencies,
-            js_dependencies: Vec::new(),
+            target_dependencies: Vec::new(),
             package: None,
             build: Build::default(),
             sql_dialect: Default::default(),

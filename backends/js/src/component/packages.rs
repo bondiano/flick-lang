@@ -7,7 +7,11 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use flick_backend::{OptionValue, PackageRoot, Packages, ProjectFile, RuntimeGraph, RuntimeNode};
+use flick_backend::command::Dependency;
+use flick_backend::{
+    Diagnostic, OptionValue, PackageRoot, Packages, ProjectFile, RuntimeGraph, RuntimeNode,
+    Severity, Span,
+};
 use serde_json::Value;
 
 /// The package `effect` mode loads beside the runtime.
@@ -76,7 +80,11 @@ fn dir(real: &str) -> &str {
     real.rsplit_once('/').map_or("", |(dir, _)| dir)
 }
 
-pub(super) fn packages(files: &[ProjectFile], options: &[OptionValue]) -> Packages {
+pub(super) fn packages(
+    files: &[ProjectFile],
+    dependencies: &[Dependency],
+    options: &[OptionValue],
+) -> Packages {
     let mut known = Known::new(files);
     let option = |key: &str| {
         (options.iter())
@@ -108,7 +116,6 @@ pub(super) fn packages(files: &[ProjectFile], options: &[OptionValue]) -> Packag
     }
     let root = option("root").unwrap_or_default().to_owned();
     // `packages` names the graphs to resolve, as a launch rechecks those of its build
-    // `packages` names the graphs to resolve, as a launch rechecks those of its build
     let roots: BTreeSet<String> = if let Some(list) = option("packages") {
         (list.split(',').filter(|n| !n.is_empty()))
             .map(str::to_owned)
@@ -129,16 +136,120 @@ pub(super) fn packages(files: &[ProjectFile], options: &[OptionValue]) -> Packag
             runtime.push(RuntimeGraph {
                 package: name,
                 nodes,
+                skip: vec!["node_modules".into()],
             });
         }
     }
+    let installed = option("verify") == Some("installed");
+    let diagnostics = wanted(
+        &project,
+        dependencies,
+        installed.then_some((&mut known, &*root)),
+    );
     Packages {
         name: project["name"].as_str().map(str::to_owned),
         sources,
         runtime,
-        diagnostics: Vec::new(),
+        diagnostics,
         needs: known.needs.into_iter().collect(),
     }
+}
+
+/// What is wrong with the npm packages `dependencies` ask for: a name or a
+/// version that is no package of the registry, a version `package.json`
+/// names otherwise and, with `known`, one that is not installed. What a
+/// fetched library asks for reaches the project's `package.json`, so it
+/// names a package of the registry: no path, no URL, no protocol.
+fn wanted(
+    project: &Value,
+    dependencies: &[Dependency],
+    mut installed: Option<(&mut Known, &str)>,
+) -> Vec<Diagnostic> {
+    let declared = project["dependencies"].as_object();
+    let mut diagnostics = Vec::new();
+    for (i, d) in dependencies.iter().enumerate() {
+        let error = |code: &str, message: String| Diagnostic {
+            code: code.into(),
+            severity: Severity::Error,
+            message,
+            span: u32::try_from(i).ok().map(|file| Span {
+                file,
+                start: 0,
+                end: 0,
+            }),
+            notes: Vec::new(),
+        };
+        let asker =
+            d.by.as_ref()
+                .map_or_else(|| "the project".to_owned(), |by| format!("`{by}`"));
+        if !is_npm_name(&d.name) {
+            let message = format!(
+                "`[target.js.dependencies]`: `{}` is not the name of an npm package",
+                d.name
+            );
+            diagnostics.push(error("P032", message));
+            continue;
+        }
+        if !is_registry_version(&d.version) {
+            let message = format!(
+                "`[target.js.dependencies]`: `{} = \"{}\"` is not a version or range of the registry",
+                d.name, d.version
+            );
+            diagnostics.push(error("P032", message));
+            continue;
+        }
+        let written = declared.and_then(|m| m.get(&d.name));
+        if let Some(version) = written.and_then(Value::as_str)
+            && version != d.version
+        {
+            let mut conflict = error(
+                "P040",
+                format!(
+                    "`package.json` names the npm package `{}` as `{version}`, and {asker} needs `{}`",
+                    d.name, d.version
+                ),
+            );
+            conflict.notes.push(
+                "make them agree on one version, or use versions of the packages that do".into(),
+            );
+            diagnostics.push(conflict);
+            continue;
+        }
+        // as Node finds it from the root; one not known yet is asked for
+        let unmet = installed.as_mut().is_some_and(|(known, root)| {
+            written.is_none() || matches!(resolve(known, root, &d.name, true), Ok(None))
+        });
+        if unmet {
+            diagnostics.push(error(
+                "P034",
+                format!(
+                    "{asker} needs the npm package `{}`, which is not installed: run `flick install`",
+                    d.name
+                ),
+            ));
+        }
+    }
+    diagnostics
+}
+
+/// `name` or `@scope/name`, which cannot leave `node_modules`.
+pub(super) fn is_npm_name(name: &str) -> bool {
+    let part = |p: &str| {
+        !p.is_empty()
+            && !p.starts_with('.')
+            && p.bytes()
+                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~'))
+    };
+    match name.strip_prefix('@') {
+        Some(scoped) => scoped
+            .split_once('/')
+            .is_some_and(|(scope, name)| part(scope) && part(name)),
+        None => part(name),
+    }
+}
+
+pub(super) fn is_registry_version(version: &str) -> bool {
+    !version.trim().is_empty() && !version.contains([':', '/', '\\'])
 }
 
 /// `path` without `.` parts and with each `..` taking off the part before.

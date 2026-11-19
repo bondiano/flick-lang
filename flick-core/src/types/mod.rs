@@ -119,7 +119,7 @@ pub(crate) use builtins::check_sources;
 pub use builtins::read_package;
 pub use builtins::{
     ImplicitPackage, builtin_sources, builtins, builtins_of, check_each, has_implicit_packages,
-    implicit_go_bindings, implicit_js_dependencies, implicit_package_of, install_builtins,
+    implicit_go_bindings, implicit_package_of, implicit_target_dependencies, install_builtins,
     set_implicit_packages, try_builtins,
 };
 pub use class_members::class_defaults;

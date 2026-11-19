@@ -12,9 +12,9 @@ pub(super) fn effect_bridge(
 ) -> EffectBridge {
     let available = project.is_none_or(|p| {
         compilation
-            .js_dependencies
+            .target_dependencies
             .iter()
-            .any(|dependency| dependency.name == "@flick-lang/effect-ts")
+            .any(|d| d.target == "js" && d.name == "@flick-lang/effect-ts")
             || host
                 .read(&p.root.join("package.json"))
                 .ok()

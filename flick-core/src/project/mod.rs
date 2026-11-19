@@ -8,17 +8,15 @@ pub mod cache;
 pub mod config;
 #[cfg(feature = "native-project")]
 mod inherit;
-#[cfg(feature = "native-project")]
-pub mod js;
 mod load;
 #[cfg(feature = "native-project")]
 pub mod lock;
 #[cfg(feature = "native-project")]
 mod packages;
 #[cfg(feature = "native-project")]
-pub mod pnpm;
-#[cfg(feature = "native-project")]
 pub mod store;
+#[cfg(feature = "native-project")]
+pub mod target;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) mod target_preflight;
 #[cfg(all(test, not(target_arch = "wasm32")))]
@@ -104,6 +102,13 @@ pub trait Host {
     fn foreign(&self, project: &Project) -> Foreign {
         let _ = project;
         Foreign::default()
+    }
+    /// What the backend of `project` finds wrong with what the closure asks
+    /// of its ecosystem; a host without backends finds nothing.
+    #[cfg(feature = "native-project")]
+    fn verify(&self, project: &Project, wanted: &[target::Wanted]) -> Vec<Diagnostic> {
+        let _ = (project, wanted);
+        Vec::new()
     }
 }
 

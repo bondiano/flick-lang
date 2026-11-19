@@ -9,7 +9,7 @@
 
 use std::path::{Path, PathBuf};
 
-use super::config::{self, Dependency, JsDependency, Kind, Source};
+use super::config::{self, Dependency, Kind, Source, TargetDependency};
 use super::lock::{LOCK_FILE, Lock};
 use super::store;
 use super::{Host, Project};
@@ -49,7 +49,7 @@ pub struct Library {
     pub checksum: Option<String>,
     pub dependencies: Vec<String>,
     /// The npm packages it needs on the js target.
-    pub js_dependencies: Vec<JsDependency>,
+    pub target_dependencies: Vec<TargetDependency>,
 }
 
 /// The project's own name in its backend's ecosystem, which owns its modules.
@@ -353,7 +353,7 @@ impl Libraries<'_> {
             library: Some(Library {
                 checksum,
                 dependencies,
-                js_dependencies: library.js_dependencies,
+                target_dependencies: library.target_dependencies,
             }),
             plugin: (library.package.as_ref())
                 .and_then(|p| p.plugin.as_ref())

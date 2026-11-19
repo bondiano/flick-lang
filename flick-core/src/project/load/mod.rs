@@ -212,7 +212,8 @@ pub struct Compilation {
     /// The npm packages its dependency closure asks for, which a js build
     /// needs installed.
     #[cfg(feature = "native-project")]
-    pub js_dependencies: Vec<super::js::Wanted>,
+    /// What the closure asks of backends' ecosystems.
+    pub target_dependencies: Vec<super::target::Wanted>,
 }
 
 /// A module that checked cleanly, lowered to the IR.
@@ -358,7 +359,13 @@ fn run_in(
         Packages::load(host, sources, p, &mut diagnostics)
     });
     #[cfg(feature = "native-project")]
-    let js_dependencies = project.map_or_else(Vec::new, |p| super::js::closure(p, &packages));
+    let target_dependencies =
+        project.map_or_else(Vec::new, |p| super::target::closure(p, &packages));
+    #[cfg(feature = "native-project")]
+    if let Some(project) = project {
+        diagnostics.extend(super::target::conflicts(&target_dependencies));
+        diagnostics.extend(host.verify(project, &target_dependencies));
+    }
     #[cfg(feature = "native-project")]
     let libraries: Vec<(String, PathBuf)> = packages
         .libraries()
@@ -484,7 +491,7 @@ fn run_in(
         modules: compiled,
         libraries,
         #[cfg(feature = "native-project")]
-        js_dependencies,
+        target_dependencies,
     };
     #[cfg(not(target_arch = "wasm32"))]
     target::check_environment(&compilation, project, sources, &mut diagnostics);

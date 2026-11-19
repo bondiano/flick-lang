@@ -1,88 +1,50 @@
-//! `install`, `add`, `remove`, `update` and `deps`. `install` and `update`
-//! fetch the Flick dependencies `flick.lock` pins first; the npm packages of
-//! `package.json` go through pnpm, and every command that writes checks
-//! first that the pnpm on `PATH` is the version `package.json` pins, so a
-//! wrong pnpm changes nothing.
+//! `install`, `add`, `remove`, `update` and `deps`. The core does its part
+//! on the Flick libraries of `[dependencies]` and `flick.lock` first:
+//! `install` and `update` fetch what the lock pins, `remove` removes the
+//! libraries it names, `deps` lists them. What is left goes to the plan
+//! command of the same name of the project's backend, which owns the
+//! packages of its ecosystem, with what the closure's
+//! `[target.<name>.dependencies]` ask of it. `add` with a source option
+//! adds a Flick library instead, in `libraries`.
 
-use std::fs;
-use std::path::Path;
-use std::process::Command as Process;
+#[cfg(feature = "wasm-backends")]
+use std::io::{self, Write};
 
+use flick_backend::command::Argument;
 use flick_core::diagnostics::{Code, Diagnostic, Severity, codes};
-use flick_core::project::pnpm::{self, Command};
-use flick_core::project::{self, js};
+use flick_core::project::Project;
+use flick_core::project::config::Emit;
+#[cfg(feature = "wasm-backends")]
+use flick_core::project::target;
 use flick_core::source::SourceMap;
+use tracing::info;
 
 use super::libraries;
 use super::run::find_project;
 use crate::args::GlobalArguments;
 #[cfg(feature = "wasm-backends")]
 use crate::backends;
-use crate::child;
 use crate::command::Outcome;
-use crate::fetch;
+#[cfg(feature = "wasm-backends")]
+use crate::commands::contributed;
+#[cfg(feature = "wasm-backends")]
 use crate::sources::FsHost;
-use crate::stdlib;
-use crate::toolchain;
-use flick_core::project::Project;
-use tracing::info;
+use crate::{fetch, stdlib};
+
+/// A dependency verb of flick.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Verb {
+    Install { locked: bool, offline: bool },
+    Add { packages: Vec<String>, dev: bool },
+    Remove { packages: Vec<String> },
+    Update { packages: Vec<String> },
+    Deps { why: Option<String> },
+}
 
 fn failure(code: Code, message: String) -> Outcome {
     Outcome {
         sources: SourceMap::default(),
         diagnostics: vec![Diagnostic::new(code, Severity::Error, message)],
-    }
-}
-
-/// The pnpm version the project pins, else the one this compiler pins.
-fn pinned(root: &Path) -> String {
-    fs::read_to_string(root.join("package.json"))
-        .ok()
-        .and_then(|t| pnpm::pinned(&t))
-        .unwrap_or_else(|| toolchain::PNPM.to_owned())
-}
-
-// Flick owns the version gate; even `pnpm --version` must not bootstrap or pin pnpm.
-fn pnpm_process(root: &Path) -> Process {
-    let mut process = Process::new("pnpm");
-    process
-        .current_dir(root)
-        .env("npm_config_manage_package_manager_versions", "false")
-        .env("PNPM_CONFIG_PM_ON_FAIL", "ignore")
-        .env("COREPACK_ENABLE_PROJECT_SPEC", "0")
-        .env("COREPACK_ENABLE_AUTO_PIN", "0")
-        .env("COREPACK_ENABLE_NETWORK", "0")
-        .env("COREPACK_DEFAULT_TO_LATEST", "0");
-    process
-}
-
-/// `P016` unless `pnpm --version` is `wanted`, with how to get it: the
-/// project's own `packageManager` pin wins, and only that version writes.
-fn check_pnpm(root: &Path, wanted: &str) -> Option<Outcome> {
-    let found = pnpm_process(root)
-        .arg("--version")
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned());
-    let instruction = format!(
-        "run `corepack prepare pnpm@{wanted} --activate`, or `npm install --global pnpm@{wanted}`"
-    );
-    let next = "nothing was changed (`flick doctor` lists the toolchain versions)";
-    match found {
-        Some(v) if v == wanted => None,
-        Some(v) => Some(failure(
-            codes::P016,
-            format!(
-                "the project pins pnpm {wanted} in `packageManager`, but `pnpm` is {v}: {instruction}; {next}"
-            ),
-        )),
-        None => Some(failure(
-            codes::P016,
-            format!(
-                "`pnpm` is not on PATH and the project pins pnpm {wanted} in `packageManager`: {instruction}; {next}"
-            ),
-        )),
     }
 }
 
@@ -94,16 +56,16 @@ fn done() -> Outcome {
 }
 
 /// Fetches the Flick dependencies for `install` and `update`; the failure.
-fn fetch(project: &Project, command: &Command) -> Option<Outcome> {
-    let (update, options) = match command {
-        Command::Install { locked, offline } => (
+fn fetch(project: &Project, verb: &Verb) -> Option<Outcome> {
+    let (update, options) = match verb {
+        Verb::Install { locked, offline } => (
             Vec::new(),
             fetch::Options {
                 locked: *locked,
                 offline: *offline,
             },
         ),
-        Command::Update { packages } => (packages.clone(), fetch::Options::default()),
+        Verb::Update { packages } => (packages.clone(), fetch::Options::default()),
         _ => return None,
     };
     let dependencies = stdlib::with_implicit(&project.config.dependencies);
@@ -116,7 +78,7 @@ fn fetch(project: &Project, command: &Command) -> Option<Outcome> {
         Err(message) => return Some(failure(codes::P034, message)),
     }
     // `update` with no names, or naming the backend, moves its pin too
-    let moved = matches!(command, Command::Update { packages }
+    let moved = matches!(verb, Verb::Update { packages }
         if packages.is_empty() || packages.iter().any(|p| p.starts_with("flick/")));
     #[cfg(feature = "wasm-backends")]
     if let Err(diagnostic) = backends::pin_official(project, moved, options.locked, options.offline)
@@ -131,48 +93,95 @@ fn fetch(project: &Project, command: &Command) -> Option<Outcome> {
     None
 }
 
-/// For `install` and `update`, adds what the dependency closure wants of npm
-/// to `package.json`, which pnpm then installs; the failure.
-fn add_js_dependencies(command: &Command, global: &GlobalArguments) -> Option<Outcome> {
-    let locked = match command {
-        Command::Install { locked, .. } => *locked,
-        Command::Update { .. } => false,
-        _ => return None,
+/// The verb's name and arguments as the backend's command takes them, or
+/// none when the core did all of it.
+fn backend_part(
+    project: &Project,
+    verb: &Verb,
+) -> Result<Option<(&'static str, Vec<Argument>)>, Outcome> {
+    let flag = |name: &str, on: bool| {
+        on.then(|| Argument {
+            name: name.into(),
+            values: vec!["true".into()],
+        })
     };
+    let list = |name: &str, values: Vec<String>| {
+        (!values.is_empty()).then(|| Argument {
+            name: name.into(),
+            values,
+        })
+    };
+    let (name, arguments) = match verb {
+        Verb::Install { locked, offline } => (
+            "install",
+            [flag("locked", *locked), flag("offline", *offline)].into(),
+        ),
+        Verb::Add { packages, dev } => (
+            "add",
+            [list("packages", packages.clone()), flag("dev", *dev)].into(),
+        ),
+        Verb::Remove { packages } => match libraries::remove(project, packages)? {
+            rest if rest.is_empty() => return Ok(None),
+            rest => ("remove", [list("packages", rest), None].into()),
+        },
+        Verb::Update { packages } => {
+            // the libraries of `[dependencies]` were updated with the lock
+            let rest: Vec<String> = (packages.iter())
+                .filter(|p| !project.config.dependencies.iter().any(|d| &d.name == *p))
+                .cloned()
+                .collect();
+            if !packages.is_empty() && rest.is_empty() {
+                return Ok(None);
+            }
+            ("update", [list("packages", rest), None].into())
+        }
+        Verb::Deps { why } => {
+            if why.is_none() {
+                libraries::print_locked(project);
+            }
+            (
+                "deps",
+                [
+                    why.clone().map(|w| Argument {
+                        name: "why".into(),
+                        values: vec![w],
+                    }),
+                    None,
+                ]
+                .into(),
+            )
+        }
+    };
+    let arguments: [Option<Argument>; 2] = arguments;
+    Ok(Some((name, arguments.into_iter().flatten().collect())))
+}
+
+/// What the closure asks of the backend's ecosystem, checked by it first;
+/// the failure.
+#[cfg(feature = "wasm-backends")]
+fn asked(
+    project: &Project,
+    global: &GlobalArguments,
+) -> Result<Vec<flick_backend::command::Dependency>, Outcome> {
     if let Err(message) = stdlib::prepare(global.project.as_deref()) {
-        return Some(failure(codes::P034, message));
+        return Err(failure(codes::P034, message));
     }
     let host = FsHost::new();
     let mut sources = SourceMap::default();
-    let explicit = global.project.as_deref().map(Path::new);
-    let project = project::discover(&host, &mut sources, &host.cwd, explicit)
-        .ok()
-        .flatten()?;
     let mut diagnostics = Vec::new();
-    let wanted = js::wanted(&host, &mut sources, &project, &mut diagnostics);
-    diagnostics.extend(js::conflicts(&host, &project.root, &wanted));
-    if !diagnostics.is_empty() {
-        return Some(Outcome {
+    let wanted = target::wanted(&host, &mut sources, project, &mut diagnostics);
+    diagnostics.extend(target::conflicts(&wanted));
+    diagnostics.extend(backends::verify(project, &wanted, false));
+    if diagnostics.iter().any(|d| d.severity == Severity::Error) {
+        return Err(Outcome {
             sources,
             diagnostics,
         });
     }
-    let path = project.root.join("package.json");
-    let text = fs::read_to_string(&path).ok();
-    match js::merged_manifest(text.as_deref(), &wanted) {
-        Ok(None) => None,
-        Ok(Some(_)) if locked => Some(failure(
-            codes::P034,
-            "`package.json` lacks npm packages that `[js.dependencies]` name: run `flick install` without `--locked`".to_owned(),
-        )),
-        Ok(Some(merged)) => fs::write(&path, merged).err().map(|e| {
-            failure(codes::P013, format!("cannot write `{}`: {e}", path.display()))
-        }),
-        Err(message) => Some(failure(codes::P005, message)),
-    }
+    Ok(backends::asked(project, &wanted))
 }
 
-pub fn deps(command: &Command, global: &GlobalArguments) -> Outcome {
+pub fn deps(verb: &Verb, global: &GlobalArguments) -> Outcome {
     let project = match find_project(global) {
         Ok(p) => p,
         Err((sources, diagnostics)) => {
@@ -182,75 +191,86 @@ pub fn deps(command: &Command, global: &GlobalArguments) -> Outcome {
             };
         }
     };
-    let root = &project.root;
-    if let Some(failed) = fetch(&project, command).or_else(|| add_js_dependencies(command, global))
-    {
+    if let Some(failed) = fetch(&project, verb) {
         return failed;
     }
-    let npm_remove;
-    let command = match command {
-        Command::Remove { packages } => match libraries::remove(&project, packages) {
-            Ok(rest) if rest.is_empty() => return done(),
-            Ok(rest) => {
-                npm_remove = Command::Remove { packages: rest };
-                &npm_remove
-            }
+    match backend_part(&project, verb) {
+        Ok(Some((name, arguments))) => delegated(&project, verb, name, arguments, global),
+        Ok(None) => done(),
+        Err(failed) => failed,
+    }
+}
+
+/// Runs the backend's command `name` for `verb`.
+#[cfg(feature = "wasm-backends")]
+fn delegated(
+    project: &Project,
+    verb: &Verb,
+    name: &str,
+    arguments: Vec<Argument>,
+    global: &GlobalArguments,
+) -> Outcome {
+    let dependencies = if matches!(verb, Verb::Install { .. } | Verb::Update { .. }) {
+        match asked(project, global) {
+            Ok(asked) => asked,
             Err(failed) => return failed,
-        },
-        Command::List => {
-            libraries::print_locked(&project);
-            command
         }
-        command => command,
-    };
-    // a project without npm packages needs no pnpm
-    if !root.join("package.json").exists()
-        && matches!(
-            command,
-            Command::Install { .. } | Command::Update { .. } | Command::List
-        )
-    {
-        return done();
-    }
-    if pnpm::writes(command) {
-        if let Some(problem) = check_pnpm(root, &pinned(root)) {
-            return problem;
-        }
-        if matches!(command, Command::Install { locked: true, .. })
-            && !root.join("pnpm-lock.yaml").exists()
-        {
-            return failure(
-                codes::P017,
-                "`install --locked` needs `pnpm-lock.yaml`; run `flick install` to create it"
-                    .to_owned(),
-            );
-        }
-    }
-    let mut process = pnpm_process(root);
-    process.args(pnpm::args(command));
-    let status = if pnpm::writes(command) {
-        child::spawn_tool(&mut process, global, "package-manager-output")
-    } else {
-        child::spawn(&mut process, global, "package-manager-output")
-    }
-    .and_then(|running| running.wait(&child::signals()));
-    match status {
-        Ok(s) if s.success() => {}
-        Ok(s) => {
-            return failure(
-                codes::P017,
-                format!("pnpm failed with exit code {}", child::code(s)),
-            );
-        }
-        Err(err) => return failure(codes::P016, format!("cannot run pnpm: {err}")),
-    }
-    let diagnostics = if pnpm::writes(command) {
-        toolchain::check_runtime(root, false).into_iter().collect()
     } else {
         Vec::new()
     };
+    let Some(ran) = contributed::delegate(project, name, arguments, dependencies, global) else {
+        return unsupported(project, verb);
+    };
+    let _ = io::stdout().write_all(&ran.stdout);
+    Outcome {
+        sources: ran.sources,
+        diagnostics: ran.diagnostics,
+    }
+}
+
+/// A build without backends has none to run the command.
+#[cfg(not(feature = "wasm-backends"))]
+fn delegated(
+    project: &Project,
+    verb: &Verb,
+    _: &str,
+    _: Vec<Argument>,
+    _: &GlobalArguments,
+) -> Outcome {
+    unsupported(project, verb)
+}
+
+/// A backend without the command: packages it would add or remove have
+/// nowhere to go, and there is nothing else to do.
+fn unsupported(project: &Project, verb: &Verb) -> Outcome {
+    let named = match verb {
+        Verb::Add { packages, .. } | Verb::Remove { packages } | Verb::Update { packages } => {
+            !packages.is_empty()
+        }
+        _ => false,
+    };
+    if !named {
+        return done();
+    }
+    let official = if project.config.build.emit == Emit::Go {
+        "flick/go"
+    } else {
+        "flick/js"
+    };
+    let backend = (project.config.build.backend.as_ref()).map_or(official, |b| b.id.as_str());
+    let diagnostic = Diagnostic::new(
+        codes::P057,
+        Severity::Error,
+        format!("the backend `{backend}` manages no packages of its own"),
+    )
+    .with_fix(|| {
+        (
+            "name a Flick library with `--git`, `--url` or `--path`".to_owned(),
+            Vec::new(),
+        )
+    });
     Outcome {
         sources: SourceMap::default(),
-        diagnostics,
+        diagnostics: vec![diagnostic],
     }
 }

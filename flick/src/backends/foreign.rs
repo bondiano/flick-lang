@@ -7,14 +7,17 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use flick_backend::command::Dependency;
 use flick_backend::host::{Budget, WasmBackend};
 use flick_backend::{Backend, BackendId, BackendPin, OptionValue};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::Emit;
+use flick_core::project::target::Wanted;
 use flick_core::project::{Foreign, ForeignPackage, Project, store};
+use flick_core::source::{FileId, Span};
 
 use super::{official, packages, runtimes};
-use crate::{component, saved};
+use crate::{cache, component, saved};
 
 pub(crate) fn foreign(project: &Project) -> Foreign {
     let Some((pin, bytes)) = selected(project) else {
@@ -31,12 +34,11 @@ pub(crate) fn foreign(project: &Project) -> Foreign {
         return Foreign::default();
     };
     keep(&pin.sha256, &backend.package_files());
-    let real = fs::canonicalize(&project.root).unwrap_or_else(|_| project.root.clone());
     let options = [OptionValue {
         key: "root".into(),
-        value: real.to_string_lossy().replace('\\', "/"),
+        value: real_root(project),
     }];
-    match packages::report(&*backend, &project.root, &options) {
+    match packages::report(&*backend, &project.root, &[], &options) {
         Ok(report) => Foreign {
             name: report.name,
             packages: (report.sources.into_iter())
@@ -63,6 +65,118 @@ pub(crate) fn foreign(project: &Project) -> Foreign {
             ..Foreign::default()
         },
     }
+}
+
+/// The files a build of `project` depends on through its backend's
+/// packages: those the backend reads, and the modules of the packages
+/// that ship Flick sources.
+pub(crate) fn package_inputs(project: &Project) -> Vec<PathBuf> {
+    let Some((pin, bytes)) = selected(project) else {
+        return Vec::new();
+    };
+    let patterns = match cached(&pin.sha256) {
+        Some(patterns) => patterns,
+        None => {
+            let Some(backend) = load(&pin, &bytes) else {
+                return Vec::new();
+            };
+            let patterns = backend.package_files();
+            keep(&pin.sha256, &patterns);
+            patterns
+        }
+    };
+    let mut files: Vec<PathBuf> = (packages::named(&project.root, &patterns).into_iter())
+        .map(|p| project.root.join(p))
+        .collect();
+    for package in foreign(project).packages {
+        if let Some(dir) = package.source_dir {
+            let mut sources = Vec::new();
+            cache::files_under(&project.root.join(dir), &mut sources);
+            files.extend(
+                (sources.into_iter())
+                    .filter(|p| p.extension().is_some_and(|e| e == "fl" || e == "go")),
+            );
+        }
+    }
+    files
+}
+
+/// The name of the `[target]` of the backend `project` selects: the last
+/// part of its id.
+pub(crate) fn target_name(project: &Project) -> Option<String> {
+    let (id, _) = super::selected_pin(project)?;
+    Some(id.rsplit('/').next().unwrap_or(&id).to_owned())
+}
+
+/// What the closure asks of the ecosystem of the backend `project` selects,
+/// as that backend takes it.
+pub(crate) fn asked(project: &Project, wanted: &[Wanted]) -> Vec<Dependency> {
+    let target = target_name(project);
+    (wanted.iter())
+        .filter(|w| Some(&w.target) == target.as_ref())
+        .map(|w| Dependency {
+            name: w.name.clone(),
+            version: w.version.clone(),
+            by: w.by.clone(),
+        })
+        .collect()
+}
+
+/// What the backend of `project` finds wrong with what `wanted` asks of its
+/// ecosystem and, with `installed`, what of it is not installed.
+pub(crate) fn verify(project: &Project, wanted: &[Wanted], installed: bool) -> Vec<Diagnostic> {
+    let target = target_name(project);
+    let mine: Vec<&Wanted> = (wanted.iter())
+        .filter(|w| Some(&w.target) == target.as_ref())
+        .collect();
+    if mine.is_empty() {
+        return Vec::new();
+    }
+    let unavailable = |why: String| {
+        vec![Diagnostic::new(
+            codes::P013,
+            Severity::Error,
+            format!("cannot check the packages `[target]` asks for: {why}"),
+        )]
+    };
+    let Some(backend) = selected(project).and_then(|(pin, bytes)| load(&pin, &bytes)) else {
+        return unavailable("the project's backend is not available offline".into());
+    };
+    let mut options = vec![OptionValue {
+        key: "root".into(),
+        value: real_root(project),
+    }];
+    if installed {
+        options.push(OptionValue {
+            key: "verify".into(),
+            value: "installed".into(),
+        });
+    }
+    let dependencies = asked(project, wanted);
+    match packages::report(&*backend, &project.root, &dependencies, &options) {
+        Ok(report) => (report.diagnostics.iter())
+            .map(|d| {
+                let code =
+                    codes::lookup(&format!("FLICK-{}", d.code)).map_or(codes::P013, |i| i.code);
+                let mut mapped = Diagnostic::new(code, Severity::Error, d.message.clone());
+                // a diagnostic about one of them names it by its index
+                let at = d.span.and_then(|s| mine.get(s.file as usize));
+                if let Some(w) = at.filter(|w| w.span != Span::new(FileId::default(), 0, 0)) {
+                    mapped = mapped.with_span(w.span);
+                }
+                for note in &d.notes {
+                    mapped = mapped.with_fix(|| (note.clone(), Vec::new()));
+                }
+                mapped
+            })
+            .collect(),
+        Err(why) => unavailable(why),
+    }
+}
+
+fn real_root(project: &Project) -> String {
+    let real = fs::canonicalize(&project.root).unwrap_or_else(|_| project.root.clone());
+    real.to_string_lossy().replace('\\', "/")
 }
 
 /// The component `project` selects and its pin, without the network.

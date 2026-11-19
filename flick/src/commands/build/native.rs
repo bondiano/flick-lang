@@ -15,7 +15,7 @@ use crate::sources::FsHost;
 use flick_core::build;
 use flick_core::build::Settings;
 #[cfg(any(test, feature = "native-backends-development"))]
-use flick_core::project::js;
+use flick_core::project::target;
 use flick_core::project::{Compilation, Project};
 use flick_core::source::SourceMap;
 #[cfg(any(test, feature = "native-backends-development"))]
@@ -70,10 +70,10 @@ fn artifacts_with(
     {
         let mut emission = js_artifacts(sources, compilation, settings);
         if let Some(project) = project {
-            let wanted = &compilation.js_dependencies;
-            let needs = &mut emission.diagnostics;
-            needs.extend(js::conflicts(host, &project.root, wanted));
-            needs.extend(js::unmet(host, &project.root, wanted));
+            // the development emitter checks only what the closure asks itself
+            let _ = (host, project);
+            let wanted = &compilation.target_dependencies;
+            emission.diagnostics.extend(target::conflicts(wanted));
         } else {
             // files built alone have no manifest of the outputs: the list names
             // them, so the next build removes those it does not write

@@ -193,7 +193,7 @@ fn library(sources: &mut SourceMap) -> Project {
                     span: Span::new(FileId::default(), 0, 0),
                 })
                 .collect(),
-            js_dependencies: Vec::new(),
+            target_dependencies: Vec::new(),
             package: None,
             build: Build::default(),
             sql_dialect: Default::default(),

@@ -12,6 +12,8 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::plugin::Expander;
 use flick_core::plugin::reach::Outside;
 #[cfg(feature = "wasm-backends")]
+use flick_core::project::target::Wanted;
+#[cfg(feature = "wasm-backends")]
 use flick_core::project::{Foreign, Project};
 use flick_core::project::{Host, is_companion};
 use flick_core::source::{FileId, SourceMap};
@@ -58,6 +60,11 @@ impl Host for FsHost {
     #[cfg(feature = "wasm-backends")]
     fn foreign(&self, project: &Project) -> Foreign {
         backends::foreign(project)
+    }
+
+    #[cfg(feature = "wasm-backends")]
+    fn verify(&self, project: &Project, wanted: &[Wanted]) -> Vec<Diagnostic> {
+        backends::verify(project, wanted, false)
     }
 
     fn outside(&self) -> Option<Arc<dyn Outside>> {

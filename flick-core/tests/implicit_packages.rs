@@ -26,7 +26,7 @@ fn extra_package() -> PathBuf {
     let files = [
         (
             "flick.toml",
-            "schema-version = 1\n\n[project]\nkind = \"lib\"\n\n[js.dependencies]\nleft-pad = \"^1.3.0\"\n",
+            "schema-version = 1\n\n[project]\nkind = \"lib\"\n\n[target.js.dependencies]\nleft-pad = \"^1.3.0\"\n",
         ),
         (
             "src/modules.txt",
@@ -116,8 +116,8 @@ fn a_second_implicit_package_is_one_more_entry_and_directory() {
     assert!(types::implicit_go_bindings().any(|(file, _)| *file == "extra.txt"));
     assert!(types::implicit_go_bindings().any(|(file, _)| *file == "globals.txt"));
     assert_eq!(
-        types::implicit_js_dependencies().collect::<Vec<_>>(),
-        [("extra", "left-pad", "^1.3.0")]
+        types::implicit_target_dependencies().collect::<Vec<_>>(),
+        [("extra", "js", "left-pad", "^1.3.0")]
     );
 
     // a program qualifies its modules as it does any built-in one

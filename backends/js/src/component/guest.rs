@@ -28,9 +28,10 @@ impl Guest for Component {
     }
     fn packages(
         files: Vec<flick_backend::ProjectFile>,
+        dependencies: Vec<flick_backend::command::Dependency>,
         options: Vec<flick_backend::OptionValue>,
     ) -> flick_backend::Packages {
-        Javascript.packages(&files, &options)
+        Javascript.packages(&files, &dependencies, &options)
     }
 }
 export_component!(Component);

@@ -161,8 +161,13 @@ pub trait Backend {
     }
     /// The backend's packages, from the files `package_files` names that
     /// the project has and those an earlier answer needed.
-    fn packages(&self, files: &[ProjectFile], options: &[OptionValue]) -> Packages {
-        let _ = (files, options);
+    fn packages(
+        &self,
+        files: &[ProjectFile],
+        dependencies: &[command::Dependency],
+        options: &[OptionValue],
+    ) -> Packages {
+        let _ = (files, dependencies, options);
         Packages {
             name: None,
             sources: Vec::new(),
