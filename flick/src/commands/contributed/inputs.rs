@@ -4,7 +4,7 @@
 
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::{Component, Path};
+use std::path::{Component, Path, PathBuf};
 
 use flick_backend::command::{Argument, Descriptor, File, Invocation, Parameter, ValueKind};
 use flick_core::project;
@@ -40,6 +40,26 @@ pub(super) fn relative(
     Ok(out)
 }
 
+/// The deepest directory that holds `cwd` and each value of a `path`
+/// parameter in `arguments`, read against `cwd`.
+pub(super) fn common_root(descriptor: &Descriptor, arguments: &[Argument], cwd: &Path) -> PathBuf {
+    let paths = (descriptor.positionals.iter())
+        .chain(&descriptor.options)
+        .filter(|p| p.kind == ValueKind::Path)
+        .flat_map(|p| arguments.iter().filter(move |a| a.name == p.name))
+        .flat_map(|a| &a.values);
+    let mut root = cwd.to_path_buf();
+    for value in paths {
+        let full = project::normalize(&cwd.join(value));
+        while !full.starts_with(&root) {
+            if !root.pop() {
+                break;
+            }
+        }
+    }
+    root
+}
+
 /// `path` with `/` between its parts.
 pub(super) fn slashed(path: &Path) -> String {
     let parts: Vec<String> = (path.components())
@@ -49,17 +69,27 @@ pub(super) fn slashed(path: &Path) -> String {
 }
 
 /// The paths `patterns` names: each a path, `$name` for the values of the
-/// path argument `name`, or `$sources` for the source root.
+/// path argument `name`, `$name/..` for the directories they are in, or
+/// `$sources` for the source root.
 pub(super) fn expand(patterns: &[String], invocation: &Invocation) -> Result<Vec<String>, String> {
     let mut paths = Vec::new();
     for pattern in patterns {
         match pattern.strip_prefix('$') {
             Some("sources") => paths.push(invocation.sources.clone()),
-            Some(name) => paths.extend(
-                (invocation.arguments.iter())
+            Some(name) => {
+                // `$name/..`: the directory each value of `name` is in
+                let (name, parent) = name
+                    .strip_suffix("/..")
+                    .map_or((name, false), |n| (n, true));
+                let values = (invocation.arguments.iter())
                     .filter(|a| a.name == name)
-                    .flat_map(|a| a.values.iter().cloned()),
-            ),
+                    .flat_map(|a| a.values.iter());
+                paths.extend(values.map(|v| match v.rsplit_once('/') {
+                    Some((dir, _)) if parent => dir.to_owned(),
+                    None if parent => String::new(),
+                    _ => v.clone(),
+                }));
+            }
             None => paths.push(pattern.clone()),
         }
     }

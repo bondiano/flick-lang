@@ -4,6 +4,7 @@
 
 use crate::common;
 
+use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
 
@@ -115,4 +116,49 @@ fn a_transform_projects_the_editors_text_and_maps_names_verbatim() {
     assert!(mapper.wait().expect("exits").success());
     // the built-ins it refers to are real files TypeScript can resolve
     assert!(dir.join(".flick/projections/Prelude.flick.ts").is_file());
+}
+
+#[test]
+fn declarations_are_written_beside_each_module_once_and_the_session_ends() {
+    let module =
+        "module App.Main exposing (greet)\n\ngreet : String -> String\nlet greet name = name\n";
+    let dir = project(
+        "content_mapper_declarations",
+        &[
+            (
+                "flick.toml",
+                "schema-version = 1\n\n[project]\nkind = \"lib\"\nsource-dir = \"src\"\n",
+            ),
+            ("src/App/Main.fl", module),
+            // build output under a path holds no modules of the project
+            ("src/dist/Old.fl", "module Old exposing ()\n"),
+        ],
+    );
+    let declare = || {
+        Command::new(env!("CARGO_BIN_EXE_flick"))
+            .args(["content-mapper", "--declarations", "src"])
+            .current_dir(&dir)
+            .env("NO_COLOR", "1")
+            .output()
+            .expect("flick runs")
+    };
+    let out = declare();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let declared = dir.join("src/App/Main.d.fl.ts");
+    let text = fs::read_to_string(&declared).expect("Main.d.fl.ts");
+    assert!(text.contains("greet"), "{text}");
+    assert!(!dir.join("src/dist/Old.d.fl.ts").exists());
+    // an unchanged declaration is not written again
+    let modified = fs::metadata(&declared)
+        .and_then(|m| m.modified())
+        .expect("time");
+    assert!(declare().status.success());
+    let again = fs::metadata(&declared)
+        .and_then(|m| m.modified())
+        .expect("time");
+    assert_eq!(modified, again);
 }
