@@ -81,6 +81,7 @@ use crate::diagnostics::Diagnostic;
 use crate::doc;
 use crate::source::{FileId, Span};
 use crate::syntax::cst::Node;
+use crate::syntax::kind::SyntaxKind as K;
 
 /// One parsed module to resolve.
 pub struct Module<'a> {
@@ -136,8 +137,13 @@ pub fn resolve(
         .docs
         .extend(own.filter_map(|e| Some((e.entity.name.clone(), docs.remove(&e.entity.name)?))));
     let (references, unused) = uses::references(module);
+    // only a proof names another module's proof, as a lemma
+    let proofs: Vec<bool> = (module.tree.nodes())
+        .map(|n| n.kind == K::ProofDecl)
+        .collect();
     for reference in &references {
-        scope.check_use(reference, &mut diagnostics);
+        let in_proof = proofs.get(reference.top).copied().unwrap_or(false);
+        scope.check_use(reference, in_proof, &mut diagnostics);
     }
     scope.unused_imports(&references, &mut diagnostics);
     diagnostics.extend(dead::dead_values(module, &all, &interface, &references));
