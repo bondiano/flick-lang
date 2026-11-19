@@ -510,3 +510,147 @@ proof box where lawful Functor Box = {
     assert_eq!(code, Some(0), "{stderr}");
     assert!(!stderr.contains("FLICK-"), "{stderr}");
 }
+
+/// `Mixed` binds correctly, but its `Functor` drops every value: the
+/// laws of `Monad` hold of `flat_map` and `pure`, and the hierarchy still
+/// gets no bundle, because each law of a superclass is read at the
+/// superclass's own instance.
+const MIXED: &str = "module App.Mixed exposing (..)
+
+type Mixed a = Gone | Kept a
+
+instance Functor Mixed =
+  let map _ _ = Gone
+
+instance Applicative Mixed =
+  let pure x = Kept x
+  let map2 f left right =
+    match (left, right) with
+    | (Kept l, Kept r) -> Kept (f l r)
+    | _ -> Gone
+
+instance Monad Mixed =
+  let flat_map f value =
+    match value with
+    | Gone -> Gone
+    | Kept x -> f x
+
+/// What `map` should have been.
+kept_map : (a -> b) -> Mixed a -> Mixed b
+let kept_map f value =
+  match value with
+  | Gone -> Gone
+  | Kept x -> Kept (f x)
+";
+
+const MIXED_LAWS: &str = "module App.MixedLaws exposing (..)
+
+import App.Mixed exposing (..)
+
+proof left (g : a -> Mixed b) (x : a) where equal (flat_map g (pure x)) (g x) = refl
+
+proof right (v : Mixed a)
+where equal (flat_map pure v) v =
+  match v with
+  | Gone -> refl
+  | Kept x -> refl
+
+proof assoc (k : b -> Mixed c) (g : a -> Mixed b) (v : Mixed a)
+where equal (flat_map k (flat_map g v)) (flat_map (fun x -> flat_map k (g x)) v) =
+  match v with
+  | Gone -> refl
+  | Kept x -> refl
+
+proof kept_identity (v : Mixed a)
+where equal (kept_map identity v) v =
+  match v with
+  | Gone -> refl
+  | Kept x -> refl
+";
+
+/// The monad laws of a correct bind are lemmas, and a lemma of a correct
+/// `map` is no lemma of the instance's: the bundle of the hierarchy fails
+/// at the superclass, whatever the monad laws.
+#[test]
+fn a_correct_bind_over_a_broken_superclass_gets_no_bundle() {
+    let bundle = "proof mixed where lawful Monad Mixed = {\n  Applicative = {\n    Functor = { identity = kept_identity }\n  }\n  left_identity = left\n  right_identity = right\n  associativity = assoc\n}\n";
+    let laws = format!("{MIXED_LAWS}\n{bundle}");
+    let (code, stderr) = prove_files(
+        "bundle_over_a_broken_superclass",
+        &[
+            ("src/App/Mixed.fl", MIXED),
+            ("proofs/App/MixedLaws.fl", &laws),
+        ],
+    );
+    assert_eq!(code, Some(1), "{stderr}");
+    // the monad's own laws held: no failure names them
+    for law in ["`left`", "`right`", "`assoc`"] {
+        assert!(!stderr.contains(&format!("{law} proves")), "{stderr}");
+    }
+    assert!(stderr.contains("`kept_identity` proves"), "{stderr}");
+    assert!(
+        stderr.contains("no lemma for the law `composition` of `Functor`"),
+        "{stderr}"
+    );
+}
+
+/// An isolated broken method fails the laws that depend on it, as a proof
+/// diagnostic: `map` that drops values fails its identity law, and a
+/// `flat_map` that drops them fails right identity.
+#[test]
+fn a_broken_method_fails_its_laws() {
+    let broken = MIXED.replace(
+        "    | Gone -> Gone\n    | Kept x -> f x",
+        "    | Gone -> Gone\n    | Kept _ -> Gone",
+    );
+    assert_ne!(broken, MIXED, "the bind is broken");
+    let laws = "module App.Broken exposing (..)
+
+import App.Mixed exposing (..)
+
+proof map_identity (v : Mixed a)
+where equal (map identity v) v =
+  match v with
+  | Gone -> refl
+  | Kept x -> refl
+
+proof right (v : Mixed a)
+where equal (flat_map pure v) v =
+  match v with
+  | Gone -> refl
+  | Kept x -> refl
+";
+    let (code, stderr) = prove_files(
+        "a_broken_method",
+        &[
+            ("src/App/Mixed.fl", &broken),
+            ("proofs/App/Broken.fl", laws),
+        ],
+    );
+    assert_eq!(code, Some(1), "{stderr}");
+    assert_eq!(stderr.matches("FLICK-T080").count(), 2, "{stderr}");
+    assert!(
+        stderr.contains("`map_identity` is false") && stderr.contains("`right` is false"),
+        "{stderr}"
+    );
+}
+
+/// A class named through an alias is the class: its bundle is the same.
+#[test]
+fn a_bundle_names_its_class_through_an_alias() {
+    let round = ROUND
+        .replace(
+            "import App.Classes exposing (..)",
+            "import App.Classes as C exposing (Cell, wrap, unwrap)",
+        )
+        .replace("lawful Wrap Cell", "lawful C.Wrap Cell");
+    let (code, stderr) = prove_files(
+        "bundle_through_an_alias",
+        &[
+            ("src/App/Classes.fl", CLASS),
+            ("proofs/App/Round.fl", &round),
+        ],
+    );
+    assert_eq!(code, Some(0), "{stderr}");
+    assert!(!stderr.contains("FLICK-"), "{stderr}");
+}
