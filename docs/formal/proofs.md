@@ -1,6 +1,6 @@
 # Proofs: statements over the pure, total domain
 
-Status: **contract** (RFC #647, #641). Phases 1–5 are implemented: §1–§9 hold in the checker. In phase 6 (#720), the calculus and the soundness of its checker are mechanized in Lean (§11); the replays of the `Option` proofs follow. Each rule says where it is checked.
+Status: **contract** (RFC #647, #641). Phases 1–6 are implemented: §1–§9 hold in the checker, and §11 states what Lean proves of them. Each rule says where it is checked.
 
 References as in [`core.md`](core.md). Paths are relative to `flick-core/src/`.
 
@@ -180,4 +180,11 @@ What stays trusted:
 - **The translation:** of Flick's terms, data types and certificates into λPT.
 - **Execution:** the compiler and runtimes that run the program.
 
-A replay of a Rust certificate in Lean checks that certificate again in the mechanized checker, not the Rust one.
+**Replays.** `just formal-proofs` translates the proofs of `packages/core/proofs/Laws/Option.fl` into λPT: the five definitions they unfold, and each statement with its certificate. It writes the result to `formal/FormalCert/Gen/Proofs.lean`, where `decide` checks all twelve and `Flick.PT.Gen.Option.sound` concludes that they hold (`ir/lower/proofs/replay.rs`, test-only).
+- **Drift:** a test fails when the proofs or the definitions change and the file was not written again.
+- **A broken method:** a `map2` that answers `None` to two `Some` values fails the Rust proofs, and its replay is refuted by `decide`.
+- **What a replay checks:** the certificate again, in the mechanized checker, not the Rust one.
+- **The translation:**
+  - it encodes data types and compiles patterns;
+  - Lean checks every annotation it infers;
+  - it translates `refl`, `symm`, `trans`, splits and premises.

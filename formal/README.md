@@ -129,8 +129,12 @@ signature and golden certificates.
   normal forms, `symm`, `trans`, `cong`, `funext`, splits of a unit, a pair or a sum, premises
   and lemmas without premises, holds; `checkAll_sound` for a list checked in order
   (`CheckSound.lean`). `Examples.lean` replays the identity law of `map` at `Option` by
-  `decide`. It proves the calculus and its checker, not the Rust kernel or the translation of
-  Flick's terms into λPT.
+  `decide`. `FormalCert/Gen/Proofs.lean`, which `just formal-proofs` writes from the compiler's
+  kernel, replays all twelve laws of `packages/core/proofs/Laws/Option.fl` over the five
+  definitions they unfold (`Flick.PT.Gen.Option.sound`); a test of `flick-core` fails when the
+  proofs or the definitions change and the file is not written again, and a broken `map2`
+  makes `decide` refute the replay. It proves the calculus and its checker, not the Rust kernel
+  or the translation of Flick's terms into λPT.
 - **T7, local mutation** (`Formal/LetMut.lean`): the straight-line block
   fragment with assignments, branches and scope translates to a typed core
   term. `T7_pure` derives purity from T2a; `T7_regions` derives safety by
