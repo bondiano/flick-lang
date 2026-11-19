@@ -644,6 +644,7 @@ dependencies = [
  "flick-wasm",
  "insta",
  "rustix",
+ "semver",
  "serde",
  "serde_bytes",
  "serde_json",

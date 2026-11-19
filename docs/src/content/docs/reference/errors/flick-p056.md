@@ -1,0 +1,20 @@
+---
+title: "FLICK-P056"
+---
+
+The project builds with an official backend, `flick/js` or `flick/go`,
+which the compiler does not hold: it is a release asset. Without
+`[build.backend]`, a build takes the one `flick.lock` pins from the package
+store, downloading it once, or else the latest release in the backends
+index that accepts this compiler's backend API and IR, and pins it.
+
+This fails when `--offline` meets a backend the store does not have, when
+the index cannot be read or lists no release this compiler accepts, or when
+the downloaded component is not the digest the lock or index names. No other
+backend is used instead. Build once online, or run `flick install`, to pin
+and store it; `flick update` moves the pin to a newer release.
+
+```sh
+flick install
+flick build --offline
+```
