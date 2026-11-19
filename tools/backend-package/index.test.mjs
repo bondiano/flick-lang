@@ -18,13 +18,18 @@ function fixture(t) {
   mkdirSync(join(root, "target/backends"), { recursive: true });
   mkdirSync(join(root, "backends/js/package"), { recursive: true });
   copyFileSync(new URL("./index.mjs", import.meta.url), script);
-  writeFileSync(join(root, "backends/js/Cargo.toml"), 'version = "0.1.0"\n');
+  writeFileSync(
+    join(root, "backends/js/Cargo.toml"),
+    'version = "0.1.0"\n\n[package.metadata.flick]\nbackend-api = { minimum = "0.1.0", maximum-exclusive = "0.2.0" }\nir = { minimum = "0.12.0", maximum-exclusive = "0.13.0" }\n',
+  );
   const built = join(root, "target/backends/js.wasm");
   const distributed = join(root, "backends/js/package/component.wasm");
   const manifest = join(root, "backends/js/package/backend.json");
   const metadata = {
     identity: { id: "flick/js", version: "0.1.0" },
     sha256: createHash("sha256").update(component).digest("hex"),
+    backend_api: { minimum: "0.1.0", maximum_exclusive: "0.2.0" },
+    ir: { minimum: "0.12.0", maximum_exclusive: "0.13.0" },
   };
   writeFileSync(built, component);
   writeFileSync(distributed, component);

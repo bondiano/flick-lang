@@ -21,14 +21,14 @@ inductive Act (W : World) : Tm → Tm → Prop
   | dropB {n b c c'} : W.J₁ n → b = c.rename (· + 1) → Sim W .any c c' →
       Act W (.let_ (.loc n) b) c'
   | forceA {e e'} : Sim W .any e e' → Act W (.force (.lazy e)) e'
-  | bornA {v v'} : Value v → Value v' → Sim W .any v v' →
+  | bornA {v v'} : W.B → Value v → Value v' → Sim W .any v v' →
       Act W (.lazy v) (.let_ (.lazy v') (.let_ (.force (.var 0)) (.var 1)))
-  | bornB {v v'} : Value v → Value v' → Sim W .any v v' →
+  | bornB {v v'} : W.B → Value v → Value v' → Sim W .any v v' →
       Act W (.let_ (.lazy v) (.let_ (.force (.var 0)) (.var 1))) (.lazy v')
-  | bornS {l l' v v' t} : W.L l l' (.born v v') → v.Closed → BornSt l v t → Act W t (.loc l')
-  | bornV {l l' v v'} : W.L l l' (.born v v') → v.Closed → v'.Closed → v'.NoIns →
+  | bornS {l l' v v' t} : W.B → W.L l l' (.born v v') → v.Closed → BornSt l v t → Act W t (.loc l')
+  | bornV {l l' v v'} : W.B → W.L l l' (.born v v') → v.Closed → v'.Closed → v'.NoIns →
       Act W (.settle l v) v'
-  | dead {b} : b.NoIns → Act W .todo b
+  | dead {b} : W.B → b.NoIns → Act W .todo b
 
 /-- The right side, caught up around the focus `r` in `E` of the left one: a special pair holds
 the focus; or a congruence relates it at `top`; or it is the frame of a left cell around a term
@@ -97,11 +97,11 @@ theorem Act.sim {W' : World} (hW : W.le W') {a b : Tm} (h : Act W a b) : Act W' 
   | dropA hb h => exact .dropA hb (h.mono hW)
   | dropB hn hb h => exact .dropB (hW.J₁ _ hn) hb (h.mono hW)
   | forceA h => exact .forceA (h.mono hW)
-  | bornA hv hv' h => exact .bornA hv hv' (h.mono hW)
-  | bornB hv hv' h => exact .bornB hv hv' (h.mono hW)
-  | bornS hl hc hs => exact .bornS (hW.L _ _ _ hl) hc hs
-  | bornV hl hc hc' hn => exact .bornV (hW.L _ _ _ hl) hc hc' hn
-  | dead hn => exact .dead hn
+  | bornA hB hv hv' h => exact .bornA (hW.B.1 hB) hv hv' (h.mono hW)
+  | bornB hB hv hv' h => exact .bornB (hW.B.1 hB) hv hv' (h.mono hW)
+  | bornS hB hl hc hs => exact .bornS (hW.B.1 hB) (hW.L _ _ _ hl) hc hs
+  | bornV hB hl hc hc' hn => exact .bornV (hW.B.1 hB) (hW.L _ _ _ hl) hc hc' hn
+  | dead hB hn => exact .dead (hW.B.1 hB) hn
 
 theorem Dec.act {μ : List Tm} {E : List Frame} {r a b : Tm} (ha : a = plug E r) (h : Act W a b) :
     Dec W μ b E r :=
@@ -141,11 +141,11 @@ theorem Sim.dec_base {x : Pos} {r t : Tm} (h : Sim W x r t) (hx : x = .any) (hrv
   | jL _ hn h' _ =>
     intro W' μ hW; subst hx
     exact .inr (.inr ⟨W', μ, [], _, _, _, RJ.refl _ _, .nil, OkE.nil, rfl, hW.J₁ _ hn, h'.mono hW⟩)
-  | bornA hv hv' h' _ => intro W' μ hW; exact Dec.act rfl (.bornA hv hv' (h'.mono hW))
-  | bornB hv hv' h' _ => intro W' μ hW; exact Dec.act rfl (.bornB hv hv' (h'.mono hW))
-  | bornS hl hc hs => intro W' μ hW; exact Dec.act rfl (.bornS (hW.L _ _ _ hl) hc hs)
-  | bornV hl hc hc' hn => intro W' μ hW; exact Dec.act rfl (.bornV (hW.L _ _ _ hl) hc hc' hn)
-  | dead hn => intro W' μ hW; exact Dec.act rfl (.dead hn)
+  | bornA hB hv hv' h' _ => intro W' μ hW; exact Dec.act rfl (.bornA (hW.B.1 hB) hv hv' (h'.mono hW))
+  | bornB hB hv hv' h' _ => intro W' μ hW; exact Dec.act rfl (.bornB (hW.B.1 hB) hv hv' (h'.mono hW))
+  | bornS hB hl hc hs => intro W' μ hW; exact Dec.act rfl (.bornS (hW.B.1 hB) (hW.L _ _ _ hl) hc hs)
+  | bornV hB hl hc hc' hn => intro W' μ hW; exact Dec.act rfl (.bornV (hW.B.1 hB) (hW.L _ _ _ hl) hc hc' hn)
+  | dead hB hn => intro W' μ hW; exact Dec.act rfl (.dead (hW.B.1 hB) hn)
   | _ =>
     intro W' μ hW
     subst hx
@@ -211,11 +211,11 @@ theorem Sim.dec_frame {F : Frame} {x : Tm} (hF : F.ok) {E₀ : List Frame} {r : 
   | dropA hb h' _ => intro _ hs W' μ hW; exact act hs (.dropA hb (h'.mono hW))
   | dropB hn hb h' _ => intro _ hs W' μ hW; exact act hs (.dropB (hW.J₁ _ hn) hb (h'.mono hW))
   | forceA h' _ => intro _ hs W' μ hW; exact act hs (.forceA (h'.mono hW))
-  | bornA hv hv' h' _ => intro _ hs W' μ hW; exact act hs (.bornA hv hv' (h'.mono hW))
-  | bornB hv hv' h' _ => intro _ hs W' μ hW; exact act hs (.bornB hv hv' (h'.mono hW))
-  | bornS hl hc hst => intro _ hs W' μ hW; exact act hs (.bornS (hW.L _ _ _ hl) hc hst)
-  | bornV hl hc hc' hn => intro _ hs W' μ hW; exact act hs (.bornV (hW.L _ _ _ hl) hc hc' hn)
-  | dead hn => intro _ hs W' μ hW; exact act hs (.dead hn)
+  | bornA hB hv hv' h' _ => intro _ hs W' μ hW; exact act hs (.bornA (hW.B.1 hB) hv hv' (h'.mono hW))
+  | bornB hB hv hv' h' _ => intro _ hs W' μ hW; exact act hs (.bornB (hW.B.1 hB) hv hv' (h'.mono hW))
+  | bornS hB hl hc hst => intro _ hs W' μ hW; exact act hs (.bornS (hW.B.1 hB) (hW.L _ _ _ hl) hc hst)
+  | bornV hB hl hc hc' hn => intro _ hs W' μ hW; exact act hs (.bornV (hW.B.1 hB) (hW.L _ _ _ hl) hc hc' hn)
+  | dead hB hn => intro _ hs W' μ hW; exact act hs (.dead (hW.B.1 hB) hn)
   | appK | appV | rconsK | rconsV | updK | updV => intro hx; cases hx
   | let_ h₁ h₂ _ _ =>
     intro hx hs W' μ hW

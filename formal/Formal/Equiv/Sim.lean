@@ -41,6 +41,10 @@ structure World where
   J₁ : Nat → Prop
   J₂ : Nat → Prop
   O : Nat → Option (Nat × Nat) → Prop
+  /-- The pairs of O1b may stand in the relation (`bornA`, `bornB`, `bornS`, `bornV`, `dead`).
+  O1a and O1c start without them, so their runs never meet a left thread that dies where the
+  right one does not. -/
+  B : Prop
 
 /-- A world that grows. -/
 structure World.le (W W' : World) : Prop where
@@ -48,13 +52,14 @@ structure World.le (W W' : World) : Prop where
   J₁ : ∀ n, W.J₁ n → W'.J₁ n
   J₂ : ∀ n, W.J₂ n → W'.J₂ n
   O : ∀ n τ, W.O n τ → W'.O n τ
+  B : W.B ↔ W'.B
 
 theorem World.le.refl (W : World) : W.le W :=
-  ⟨fun _ _ _ h => h, fun _ h => h, fun _ h => h, fun _ _ h => h⟩
+  ⟨fun _ _ _ h => h, fun _ h => h, fun _ h => h, fun _ _ h => h, Iff.rfl⟩
 
 theorem World.le.trans {W₁ W₂ W₃ : World} (h₁ : W₁.le W₂) (h₂ : W₂.le W₃) : W₁.le W₃ :=
   ⟨fun _ _ _ h => h₂.L _ _ _ (h₁.L _ _ _ h), fun _ h => h₂.J₁ _ (h₁.J₁ _ h),
-    fun _ h => h₂.J₂ _ (h₁.J₂ _ h), fun _ _ h => h₂.O _ _ (h₁.O _ _ h)⟩
+    fun _ h => h₂.J₂ _ (h₁.J₂ _ h), fun _ _ h => h₂.O _ _ (h₁.O _ _ h), h₁.B.trans h₂.B⟩
 
 /-- `κ` of a `control` arm is a cell, that of a `tail` arm is not used. -/
 def KapR (W : World) (tl : Bool) (κ κ' : Nat) : Prop :=
@@ -172,19 +177,19 @@ inductive Sim (W : World) : Pos → Tm → Tm → Prop
   /-- The frame of a cell on the right only. -/
   | jR {x n a a'} : x ≠ .top → W.J₂ n → Sim W x.fr a a' → Sim W x a (.settle n a')
   /-- O1b: `lazy v` and `born v'`. -/
-  | bornA {v v'} : Value v → Value v' → Sim W .any v v' →
+  | bornA {v v'} : W.B → Value v → Value v' → Sim W .any v v' →
       Sim W .any (.lazy v) (.let_ (.lazy v') (.let_ (.force (.var 0)) (.var 1)))
   /-- O1b the other way round. -/
-  | bornB {v v'} : Value v → Value v' → Sim W .any v v' →
+  | bornB {v v'} : W.B → Value v → Value v' → Sim W .any v v' →
       Sim W .any (.let_ (.lazy v) (.let_ (.force (.var 0)) (.var 1))) (.lazy v')
   /-- The run of `born v` against the allocated `lazy v'`. -/
-  | bornS {l l' v v' t} : W.L l l' (.born v v') → v.Closed → BornSt l v t →
+  | bornS {l l' v v' t} : W.B → W.L l l' (.born v v') → v.Closed → BornSt l v t →
       Sim W .any t (.loc l')
   /-- The left cell of a `born` pair settles; the right one is done. -/
-  | bornV {l l' v v'} : W.L l l' (.born v v') → v.Closed → v'.Closed → v'.NoIns →
+  | bornV {l l' v v'} : W.B → W.L l l' (.born v v') → v.Closed → v'.Closed → v'.NoIns →
       Sim W .any (.settle l v) v'
   /-- A left thread that forced a running cell of a `born` pair: it is stuck, the right one is
   not. -/
-  | dead {b} : b.NoIns → Sim W .any .todo b
+  | dead {b} : W.B → b.NoIns → Sim W .any .todo b
 
 end Flick.Equiv

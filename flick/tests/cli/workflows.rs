@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 /// The workflows this test holds. `release.yml` belongs to the distribution
 /// agent and is only read, below, to pin what the compiler release must do.
 const OWNED: &[&str] = &[
+    "backends.yml",
     "ci.yml",
     "docs.yml",
     "nightly.yml",
@@ -122,6 +123,14 @@ fn a_package_tag_does_not_take_the_latest_release() {
          the `latest` release the installer resolves, and the compiler archive is not there: \
          {packages}"
     );
+    let backends = workflow("backends.yml");
+    let creates = backends.matches("gh release create").count();
+    assert_eq!(
+        creates,
+        backends.matches("--latest=false").count(),
+        "a backend tag and the backends index are no compiler release: each needs `--latest=false`"
+    );
+    assert_eq!(creates, 2, "the component's release and the index's");
     let release = release_create(&workflow("release.yml"));
     assert!(
         !release.contains("--latest=false"),

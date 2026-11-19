@@ -37,6 +37,9 @@ pub(crate) struct Package {
     /// The tools `[tools]` lets the steps of this backend run.
     allowed: Vec<String>,
     runtimes: Vec<flick_backend::RuntimeDependency>,
+    /// An official component, which the compiler's own host integrations
+    /// approve; a third-party descriptor cannot grant itself host authority.
+    official: bool,
 }
 
 impl Package {
@@ -63,7 +66,15 @@ impl Package {
         if bytes.len() > limit {
             return Err(failure("backend component exceeds its file size limit"));
         }
-        Self::from_bytes(&project.root, pin, &bytes, rt, Some(&project.config.tools))
+        let official = super::official::matches(package, project);
+        Self::from_bytes(
+            &project.root,
+            pin,
+            &bytes,
+            rt,
+            Some(&project.config.tools),
+            official,
+        )
     }
 
     pub(super) fn from_bytes(
@@ -72,6 +83,7 @@ impl Package {
         bytes: &[u8],
         rt: bool,
         allowed: Option<&BTreeMap<String, Vec<String>>>,
+        official: bool,
     ) -> Result<Self, Diagnostic> {
         let backend = WasmBackend::load_with_cancellation(
             component::engine().map_err(failure)?,
@@ -104,6 +116,7 @@ impl Package {
             tools,
             allowed,
             runtimes,
+            official,
         })
     }
 
@@ -114,7 +127,7 @@ impl Package {
     /// These compiler-owned host integrations are approved for the exact shipped
     /// image. A third-party descriptor cannot grant itself host tool authority.
     pub(super) fn supports_host(&self, capability: &str) -> bool {
-        super::official::pin().is_ok_and(|pin| pin == self.pin)
+        self.official
             && self
                 .backend
                 .describe()

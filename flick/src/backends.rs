@@ -16,8 +16,8 @@ mod request;
 #[cfg(feature = "wasm-backends")]
 mod tools;
 #[cfg(feature = "wasm-backends")]
-#[cfg(feature = "wasm-backends")]
 pub(crate) use execute::Reads;
+#[cfg(feature = "wasm-backends")]
 pub(crate) use tools::Tool;
 
 use crate::artifact::Artifact;
@@ -27,6 +27,7 @@ use std::process::Command;
 #[cfg(feature = "wasm-backends")]
 use std::sync::Arc;
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 #[cfg(feature = "wasm-backends")]
 use crate::commands::contributed::Contributor;
@@ -61,7 +62,7 @@ pub(crate) enum Selected {
 pub(crate) fn check_runtime(project: &Project, rt: bool) -> Option<Diagnostic> {
     if let Some(package) = &project.config.build.backend {
         #[cfg(feature = "wasm-backends")]
-        if !official::matches(package) {
+        if !official::matches(package, project) {
             return None;
         }
         #[cfg(not(feature = "wasm-backends"))]
@@ -141,9 +142,9 @@ impl Selected {
                 let root = project.map_or(host.cwd.as_path(), |p| p.root.as_path());
                 let tools = project.map(|p| &p.config.tools);
                 let package = if go {
-                    official::go(root, tools)
+                    official::go(root, project, tools)
                 } else {
-                    official::javascript(root, rt, tools)
+                    official::javascript(root, rt, project, tools)
                 };
                 return package.map(|p| Self::Component(Arc::new(p)));
             }
@@ -229,6 +230,26 @@ impl Selected {
     }
 }
 
+/// Pins the official backend `project` builds with, unless it pins its own:
+/// for `flick install` (`locked`, `offline`) and `flick update` (`update`).
+#[cfg(feature = "wasm-backends")]
+pub(crate) fn pin_official(
+    project: &Project,
+    update: bool,
+    locked: bool,
+    offline: bool,
+) -> Result<(), Diagnostic> {
+    if project.config.build.backend.is_some() {
+        return Ok(());
+    }
+    let id = if project.config.build.emit == config::Emit::Go {
+        official::GO
+    } else {
+        official::JS
+    };
+    official::pin(project, id, update, locked, offline)
+}
+
 /// The id and digest of the backend `project` selects, read from its pin
 /// or the distributed one, without loading it.
 #[cfg(feature = "wasm-backends")]
@@ -236,12 +257,12 @@ pub(crate) fn selected_pin(project: &Project) -> Option<(String, String)> {
     if let Some(package) = &project.config.build.backend {
         return Some((package.id.clone(), package.sha256.clone()));
     }
-    let pin = if project.config.build.emit == config::Emit::Go {
-        official::go_pin()
+    let id = if project.config.build.emit == config::Emit::Go {
+        official::GO
     } else {
-        official::pin()
+        official::JS
     };
-    pin.ok().map(|pin| (pin.identity.id, pin.sha256))
+    official::known(id, Some(project)).map(|pin| (pin.identity.id, pin.sha256))
 }
 
 /// The backend `project` selects, as a contributor of commands.
@@ -259,7 +280,8 @@ pub(crate) fn contributor(project: &Project) -> Result<Arc<dyn Contributor>, Str
 /// The official backends, each by its id and the digest of its component.
 #[cfg(feature = "wasm-backends")]
 pub(crate) fn officials() -> Vec<(String, String)> {
-    ([official::pin(), official::go_pin()].into_iter().flatten())
+    (official::IDS.into_iter())
+        .filter_map(|id| official::known(id, None))
         .map(|pin| (pin.identity.id, pin.sha256))
         .collect()
 }
@@ -271,10 +293,10 @@ pub(crate) fn official_contributor(
     id: &str,
 ) -> Result<Arc<dyn Contributor>, String> {
     let tools = Some(&project.config.tools);
-    let package = if id == "flick/go" {
-        official::go(&project.root, tools)
+    let package = if id == official::GO {
+        official::go(&project.root, Some(project), tools)
     } else {
-        official::javascript(&project.root, false, tools)
+        official::javascript(&project.root, false, Some(project), tools)
     };
     match package {
         Ok(package) => Ok(Arc::new(package)),
@@ -315,6 +337,16 @@ pub(crate) fn run_steps(
 }
 
 static ALLOWED: OnceLock<Vec<String>> = OnceLock::new();
+static OFFLINE: AtomicBool = AtomicBool::new(false);
+
+/// Whether this run fetches no official backend.
+pub(crate) fn set_offline(offline: bool) {
+    OFFLINE.store(offline, Ordering::Relaxed);
+}
+
+fn offline() -> bool {
+    OFFLINE.load(Ordering::Relaxed)
+}
 
 /// The tools `--allow-tool` grants the selected backend outside a project.
 pub(crate) fn allow_tools(tools: Vec<String>) {

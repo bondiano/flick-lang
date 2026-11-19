@@ -64,7 +64,10 @@ let main () =
   | Some root ->
     provide Atom.layer {
       scope s {
-        let app = ui { fragment (Ui.render counter_view ()) (Ui.render doubled_view ()) }
+        let app = ui {
+          Ui.render counter_view ()
+          Ui.render doubled_view ()
+        }
         let _mounted = Fiber.spawn s report (task { Ui.Dom.mount root report app })
         settle ()
         Platform.stdout_line (text ())

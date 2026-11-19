@@ -1,4 +1,5 @@
 import Formal.Equiv.TopTyped
+import Formal.Equiv.CfgStep
 import Formal.Soundness
 
 /-!
@@ -153,10 +154,11 @@ theorem Ctx.sim {W : World} (h₀ : Sim W .any e₁ e₂) (hz : e₁.LzShape ∨
     exact fun _ h₁ h₂ => .hdl (ih₁ top (h₁ ∘ .hdlA) (h₂ ∘ .hdlA)) (ih₂ any (h₁ ∘ .hdlR) (h₂ ∘ .hdlR))
       (ih₃ any (h₁ ∘ .hdlE) (h₂ ∘ .hdlE))
 
-/-- The world of two runs that have not started. -/
-def World.empty : World := ⟨fun _ _ _ => False, fun _ => False, fun _ => False, fun _ _ => False⟩
+/-- The world of two runs that have not started; `b`: the pairs of O1b may stand in it. -/
+def World.empty (b : Prop) : World :=
+  ⟨fun _ _ _ => False, fun _ => False, fun _ => False, fun _ _ => False, b⟩
 
-theorem StR.empty : StR World.empty [] [] :=
+theorem StR.empty (b : Prop) : StR (World.empty b) [] [] :=
   ⟨fun _ _ _ h => h.elim, fun _ _ _ _ _ _ h => h.elim, fun _ _ _ _ _ h => h.elim,
     fun _ h => h.elim, fun _ h => h.elim, fun _ _ h => h.elim, fun _ _ _ h => h.elim⟩
 
@@ -196,20 +198,20 @@ theorem Prog.noLzTop {S : Sig} {root : Roots} {e : Tm} (h : Prog S root e) : ¬ 
   (h.reach _ .refl).2.1
 
 /-- A program simulated by another one from the start ends with a literal it ends with. -/
-theorem Ends.sim {S : Sig} {root : Roots} {C₁ C₂ : Tm} {o : Lit}
-    (hs : Sim World.empty .any C₁ C₂) (p₁ : Prog S root C₁) (p₂ : Prog S root C₂)
+theorem Ends.sim {S : Sig} {root : Roots} {C₁ C₂ : Tm} {o : Lit} {b : Prop}
+    (hs : Sim (World.empty b) .any C₁ C₂) (p₁ : Prog S root C₁) (p₂ : Prog S root C₂)
     (h : Ends root C₁ o) : Ends root C₂ o := by
   obtain ⟨Λ, μ, h⟩ := h
-  have hr : CfgR World.empty ⟨[], [], C₁⟩ ⟨[], [], C₂⟩ :=
-    ⟨.inl hs, StR.empty, ⟨rfl, fun _ _ _ h => by simp at h⟩⟩
+  have hr : CfgR (World.empty b) ⟨[], [], C₁⟩ ⟨[], [], C₂⟩ :=
+    ⟨.inl hs, StR.empty b, ⟨rfl, fun _ _ _ h => by simp at h⟩⟩
   obtain ⟨W', c₂, -, hs₂, hr'⟩ := csteps_sim p₁.2.1 h hr p₁.reach p₂.reach
   obtain ⟨Λ₂, μ₂, hs₃⟩ := lit_sim (root := root) hr'
   exact ⟨Λ₂, μ₂, hs₂.trans hs₃⟩
 
 /-- **Terms related both ways are contextually equivalent**, when one makes or forces a lazy cell
 at its top. -/
-theorem ctxEquiv_of_sim {S : Sig} (h₁₂ : Sim World.empty .any e₁ e₂)
-    (h₂₁ : Sim World.empty .any e₂ e₁) (hz : e₁.LzShape ∨ e₂.LzShape) (s₁ : e₁.Src)
+theorem ctxEquiv_of_sim {S : Sig} {b : Prop} (h₁₂ : Sim (World.empty b) .any e₁ e₂)
+    (h₂₁ : Sim (World.empty b) .any e₂ e₁) (hz : e₁.LzShape ∨ e₂.LzShape) (s₁ : e₁.Src)
     (s₂ : e₂.Src) : CtxEquiv S e₁ e₂ :=
   fun _ _ _ hc p₁ p₂ _ =>
     ⟨Ends.sim (hc.sim h₁₂ hz s₂ (by decide) p₁.noLzTop p₂.noLzTop) p₁ p₂,
@@ -222,17 +224,17 @@ theorem _root_.Flick.Tm.Src.rename : ∀ {e : Tm}, e.Src → ∀ ξ, (e.rename �
 /-- **O1a**: a cell nothing names is not made. -/
 theorem o1a {S : Sig} {e c : Tm} (he : e.Src) (hc : c.Src) :
     CtxEquiv S (.let_ (.lazy e) (c.rename (· + 1))) c :=
-  ctxEquiv_of_sim (.dropA rfl (Sim.refl hc _ (by decide)))
+  ctxEquiv_of_sim (b := False) (.dropA rfl (Sim.refl hc _ (by decide)))
     (.dropC rfl hc.noIns (Sim.refl hc _ (by decide))) (.inl trivial) ⟨he, hc.rename _⟩ hc
 
 /-- **O1b**: a cell of a value is made done. -/
 theorem o1b {S : Sig} {v : Tm} (hv : Value v) (hs : v.Src) : CtxEquiv S (.lazy v) (born v) :=
-  ctxEquiv_of_sim (.bornA hv hv (Sim.refl hs _ (by decide)))
-    (.bornB hv hv (Sim.refl hs _ (by decide))) (.inl trivial) hs (by simp [born, Tm.Src, hs])
+  ctxEquiv_of_sim (b := True) (.bornA trivial hv hv (Sim.refl hs _ (by decide)))
+    (.bornB trivial hv hv (Sim.refl hs _ (by decide))) (.inl trivial) hs (by simp [born, Tm.Src, hs])
 
 /-- **O1c**: a cell forced where it is made is not made. -/
 theorem o1c {S : Sig} {e : Tm} (he : e.Src) : CtxEquiv S (.force (.lazy e)) e :=
-  ctxEquiv_of_sim (.forceA (Sim.refl he _ (by decide)))
+  ctxEquiv_of_sim (b := False) (.forceA (Sim.refl he _ (by decide)))
     (.forceC he.noIns (Sim.refl he _ (by decide))) (.inl trivial) he he
 
 end Flick.Equiv

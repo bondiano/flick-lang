@@ -10,6 +10,7 @@ use flick_core::source::SourceMap;
 use serde_json::{Map, Value, json};
 
 use super::super::protocol;
+#[cfg(feature = "wasm-backends")]
 use crate::commands::contributed;
 use crate::sources::FsHost;
 
@@ -45,8 +46,15 @@ pub(super) fn regenerate(path: &Path, text: &str, params: &Value) -> Option<Valu
     }
 }
 
+/// Without backends, no `ffi import` runs.
+#[cfg(not(feature = "wasm-backends"))]
+fn generate(_: &Path, _: &Header) -> Result<(String, String), String> {
+    Err("this build of flick runs no backend".into())
+}
+
 /// The package's provenance and what `ffi import` writes at `path`, run
 /// for the directory that holds the package's.
+#[cfg(feature = "wasm-backends")]
 fn generate(path: &Path, header: &Header) -> Result<(String, String), String> {
     let dir = path.parent().unwrap_or(Path::new("."));
     let found = project::discover(&FsHost::new(), &mut SourceMap::default(), dir, None);

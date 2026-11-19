@@ -69,6 +69,39 @@ theorem HSeq.ksteps {root : Roots} {μ μ' : List Tm} {t t' : Tm}
   | rt hh _ ih => exact .step (fun Λ => ⟨_, .rt hE (hh Λ)⟩) ih
   | pure hh _ ih => exact .step (fun _ => ⟨_, .pure hE hh⟩) ih
 
+/-- At least one step of a thread that keeps the regions. -/
+def KPos (root : Roots) (μ : List Tm) (t : Tm) (μ' : List Tm) (t' : Tm) : Prop :=
+  ∃ μ₁ t₁, (∀ Λ, ∃ l, Step root l Λ μ t (.cfg Λ μ₁ t₁)) ∧ KSteps root μ₁ t₁ μ' t'
+
+theorem KPos.ksteps {root : Roots} {μ μ' : List Tm} {t t' : Tm} (h : KPos root μ t μ' t') :
+    KSteps root μ t μ' t' :=
+  let ⟨_, _, s, k⟩ := h; .step s k
+
+theorem KSteps.pos {root : Roots} {μ μ₁ μ' : List Tm} {t t₁ t' : Tm} (h₁ : KSteps root μ t μ₁ t₁)
+    (h₂ : KPos root μ₁ t₁ μ' t') : KPos root μ t μ' t' := by
+  cases h₁ with
+  | refl => exact h₂
+  | step s k => exact ⟨_, _, s, k.trans h₂.ksteps⟩
+
+theorem KPos.trans {root : Roots} {μ μ₁ μ' : List Tm} {t t₁ t' : Tm} (h₁ : KPos root μ t μ₁ t₁)
+    (h₂ : KSteps root μ₁ t₁ μ' t') : KPos root μ t μ' t' :=
+  let ⟨_, _, s, k⟩ := h₁; ⟨_, _, s, k.trans h₂⟩
+
+/-- Steps that keep the regions: none, or at least one. -/
+theorem KSteps.split {root : Roots} {μ μ' : List Tm} {t t' : Tm} (h : KSteps root μ t μ' t') :
+    (μ' = μ ∧ t' = t) ∨ KPos root μ t μ' t' := by
+  cases h with
+  | refl => exact .inl ⟨rfl, rfl⟩
+  | step s k => exact .inr ⟨_, _, s, k⟩
+
+theorem HSeqP.kpos {root : Roots} {μ μ' : List Tm} {t t' : Tm} (h : HSeqP W μ t μ' t')
+    {E : List Frame} (hE : OkE E) :
+    KPos root μ (plug E t) μ' (plug E t') ∨ (W.B ∧ μ' = μ ∧ t' = t) := by
+  rcases h with ⟨_, _, hh, k⟩ | ⟨_, hh, k⟩ | h
+  · exact .inl ⟨_, _, fun Λ => ⟨_, .rt hE (hh Λ)⟩, k.ksteps hE⟩
+  · exact .inl ⟨_, _, fun _ => ⟨_, .pure hE hh⟩, k.ksteps hE⟩
+  · exact .inr h
+
 /-- The answer of the right side to a step of a thread: steps that keep the regions, then at most
 one step. -/
 def TAns (root : Roots) (Λ : List Rgn) (μ : List Tm) (t : Tm) (Λ' : List Rgn) (μ' : List Tm)

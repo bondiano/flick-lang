@@ -4,7 +4,7 @@
 
 mod download;
 
-pub use download::hex;
+pub use download::{bytes, hex};
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -53,6 +53,8 @@ pub fn install(
         mut lock, fetched, ..
     } = install;
     lock.plugins = plugins(root, dependencies)?;
+    // the backend pin is the backends' to keep or move
+    lock.backends.clone_from(&old.backends);
     let empty = lock.packages.is_empty() && lock.plugins.is_empty();
     let changed = lock.render() != old.render() || !lock_path.exists() && !empty;
     if changed && options.locked {
@@ -119,7 +121,7 @@ pub fn lock_of(root: &Path) -> Result<Lock, String> {
     read_lock(&root.join(LOCK_FILE))
 }
 
-fn read_lock(path: &Path) -> Result<Lock, String> {
+pub(crate) fn read_lock(path: &Path) -> Result<Lock, String> {
     let Ok(text) = fs::read_to_string(path) else {
         return Ok(Lock::default());
     };
