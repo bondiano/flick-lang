@@ -209,3 +209,42 @@ fn fix_only_applies_the_fixes_of_the_codes_given() {
     let fixed = fs::read_to_string(dir.join("src/App/Waits.fl")).expect("source");
     assert!(fixed.contains("nap : Unit ->{Async} Unit"), "{fixed}");
 }
+
+#[test]
+fn fix_moves_a_let_above_the_children_of_a_ui_block_where_nothing_changes() {
+    let text = r#"module App.Page exposing (..)
+
+late : Float -> Ui
+let late n = ui {
+  heading (text "count")
+  let shown = show n
+  paragraph (text shown)
+}
+
+label : String
+let label = "outer"
+
+// above `text label` it would hide the top-level `label` from that line
+hidden : Ui
+let hidden = ui {
+  text label
+  let label = "inner"
+  text label
+}
+"#;
+    let files = [
+        (
+            "flick.toml",
+            "schema-version = 1\n[project]\nkind = \"lib\"\n",
+        ),
+        ("src/App/Page.fl", text),
+    ];
+    let dir = common::project("check_fix_siblings", &files);
+    let out = common::flick_in(&dir, &["check", "--fix", "--only", "T085"]);
+    assert_eq!(out.status.code(), Some(1), "one `let` stays: {out:?}");
+    assert!(String::from_utf8_lossy(&out.stderr).contains("FLICK-T085"));
+    let fixed = fs::read_to_string(dir.join("src/App/Page.fl")).expect("source");
+    let moved = "  let shown = show n\n  heading (text \"count\")\n";
+    let late = "  heading (text \"count\")\n  let shown = show n\n";
+    assert_eq!(fixed, text.replace(late, moved));
+}

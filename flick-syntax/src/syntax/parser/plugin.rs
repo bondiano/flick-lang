@@ -10,7 +10,7 @@
 //! elsewhere.
 
 use super::{K, Parser, SyntaxKind};
-use crate::syntax::heads::{BARE, DECLARATIONS, HEADS, NAMED, TOP};
+use crate::syntax::heads::{BARE, DECLARATIONS, HEADS, NAMED, SIBLINGS, TOP};
 
 /// Whether an exposed item `plugin head` starts here.
 pub(super) fn at_head(p: &Parser) -> bool {
@@ -157,10 +157,11 @@ fn raw_group(p: &mut Parser, open: SyntaxKind, close: SyntaxKind, kind: SyntaxKi
     p.expect_closer(close, opener);
 }
 
-/// `open$module M [Child] [M.through] (body)`, the form generated code
-/// opens a module with: its path, then the type of a child, when calls of
-/// the body give their last list element by element, then the function a
-/// value is applied through, a path that ends in a lowercase name.
+/// `open$module M [Child] [M.through] [siblings$by M.siblings] (body)`, the
+/// form generated code opens a module with: its path, then the type of a
+/// child, when calls of the body give their last list element by element,
+/// then the function a value is applied through, a path that ends in a
+/// lowercase name, then the function of the list of the body's lines.
 pub(super) fn opened(p: &mut Parser) -> SyntaxKind {
     p.bump();
     super::expr::con_path(p);
@@ -172,6 +173,12 @@ pub(super) fn opened(p: &mut Parser) -> SyntaxKind {
         if function {
             break;
         }
+    }
+    if p.at_word(SIBLINGS) {
+        p.bump();
+        let named = p.start();
+        super::expr::con_path(p);
+        p.complete(named, K::NameExpr);
     }
     super::expr::atom(p);
     K::OpenExpr

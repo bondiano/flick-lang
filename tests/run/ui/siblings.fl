@@ -1,0 +1,45 @@
+// The lines of a `ui { … }` after its `let`s: two or more are the children
+// of one fragment, as `fragment` of them would be, and a branch of several
+// nodes is a `ui` of its own.
+module App.Main exposing (main)
+
+count : Atom.Writable Float
+let count = Atom.make 2
+
+page : Ui.View Unit
+let page =
+  Ui.view (fun () -> ui {
+    let shown = show (Atom.value count)
+    heading (text "count \{shown}")
+    if Atom.value count > 1 then
+      ui {
+        paragraph (text "many")
+        paragraph (text "of them")
+      }
+    else
+      empty
+    footer { class_name = "end" } (text "end")
+  })
+
+implicit : Ui
+let implicit = ui {
+  heading (text "a")
+  paragraph (text "b")
+}
+
+explicit : Ui
+let explicit = ui {
+  fragment
+    heading (text "a")
+    paragraph (text "b")
+}
+
+main : Unit ->{Host.Console, Async; AppError} Unit
+let main () = provide Atom.layer {
+  Platform.stdout_line (Ui.Server.render (Ui.render page ()))
+  Atom.set count 1
+  Platform.stdout_line (Ui.Server.render (Ui.render page ()))
+  let shown = Ui.Server.render implicit
+  Platform.stdout_line shown
+  Platform.stdout_line (show (shown == Ui.Server.render explicit))
+}
