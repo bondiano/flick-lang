@@ -1,0 +1,22 @@
+// A proof uses one checked before it, by name: a value for each of its
+// parameters and a proof for each of its premises. Its instance is the
+// goal, or what `symm`, `cong` or a `let` take of it.
+module App.Lemmas exposing (..)
+
+proof right_identity (v : Option a)
+where equal (flat_map pure v) v =
+  match v with
+  | None -> refl
+  | Some x -> refl
+
+proof used (w : Option Int) where equal (flat_map pure w) w = right_identity w
+
+proof turned (w : Option Bool) where equal w (flat_map pure w) = symm (right_identity w)
+
+proof wrapped (w : Option Bool)
+where equal (Some (flat_map pure w)) (Some w) = cong (fun z -> Some z) (right_identity w)
+
+proof lifted (x : a) (y : a) (h : equal x y)
+where equal (Some x) (Some y) = cong (fun z -> Some z) h
+
+proof applied (p : Bool) (q : Bool) (e : equal p q) where equal (Some p) (Some q) = lifted p q e

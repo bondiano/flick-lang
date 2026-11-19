@@ -121,6 +121,7 @@ fn library(sources: &mut SourceMap) -> Project {
             kind: Kind::Lib,
             source_dir: "src".into(),
             test_dir: "test".into(),
+            proof_dir: "proofs".into(),
             entries: Vec::new(),
             dependencies: Vec::new(),
             js_dependencies: Vec::new(),

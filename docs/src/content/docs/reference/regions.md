@@ -175,7 +175,7 @@ holds a region, as [`Resource.own`](../resources/) relies on, while it
 still takes a value of another type variable bounded the same way. `Ref.make : forall c a. a^c ->{}
 Ref (a^c)` keeps the capacity of a cell in its invariant payload type:
 widening an alias of the cell cannot let a shorter-lived replacement in.
-The distinction survives [`.iface` schema 2](../iface/#types-and-kinds).
+The distinction survives in the [interface](../iface/#types-and-kinds) of a module.
 
 Data that stores a function, such as `type G s a = G (s -> a)`, keeps what
 its field uses in a hidden capture row, and that row is an argument of the
@@ -286,7 +286,7 @@ input bound. See the [user-defined transformer instances](../../contributing/imp
 | a cell or binding from outside the scope | its type may not come to mention the region; mutable storage and its qualified element types are invariant (`FLICK-T003`), even when a value bound could otherwise widen |
 | a `let mut` variable from outside the scope | its type is fixed where it is declared; a stored callable retains its use qualifier, so assigning it cannot permit a use after its region ends |
 | an error | its payload holds no region, even when a handler inside the scope catches it (`FLICK-E005`); `type error E (s : Region) = E (File s)` is rejected where it is declared |
-| a foreign function | its signature is its retention contract: what using its result needs is in the result's qualifier; with `retention owner` and one region in the signature, it gets `Fiber.Outlives` for a capture row it keeps and `Fiber.Provided` and `Detached` for the services of kept work; with two regions the signature writes them (`FLICK-F002`) |
+| a foreign function | its signature is its retention contract: what using its result needs is in the result's qualifier; with `retention owner` and one region in the signature, it gets `Fiber.Outlives` for a capture row it keeps and `Fiber.Provided` and `Detached` for the services of kept work; with two regions the signature writes them (`FLICK-F002`); a `pure` one over a type that reaches a region is `FLICK-F009`, as a call after the `scope` could read what it released, so it is a `foreign effect` with a stage, `->{}` when it does nothing else |
 
 ## Leases
 
@@ -339,8 +339,8 @@ signature names when the owner is a local scope. `Fiber.Outlives c s` states
 it; the compiler decides it and a program declares no instance of it. A
 child that uses a shorter region is `FLICK-G003`. The child runs with the
 services of the place that spawned it, so they must outlive the owner as
-well: `Fiber.Provided r s` (see [Effects](../effects/), "Layers
-and `provide`").
+well: `Fiber.Provided r s` (see [layers and
+`provide`](../services/#layers-and-provide)).
 
 A child acquires into its owner's region: a task that acquires names
 `Scope s` of its owner, and one that names another region is
@@ -384,4 +384,3 @@ What it has instead is a region parameter, `forall r. File r -> Unit`.
 | - | - |
 | foreign retention contracts | signatures are written and reviewed by hand; the checker requires `retention`, and derives or requires `Fiber.Outlives` for what `retention owner` keeps, but does not inspect foreign bodies |
 | a region variable unified late with another region in a capture row | the two are kept apart, which may reject a program |
-| a pure foreign function over a resource | accepted, and it can read the resource after its `scope`. Being changed: such a binding needs a runtime stage |

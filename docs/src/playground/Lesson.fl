@@ -42,6 +42,57 @@ let question_view model m =
           div { class_name = "fp-lesson-choices" } (List.map_indexed choice choices)
     }
 
+// rows, not list items: the lesson's only list is its hints
+goal_row : String -> String -> Ui
+let goal_row name value = ui {
+  div { class_name = "fp-goal-row" }
+    (span { class_name = "fp-goal-label" } (text name))
+    (span { class_name = "fp-goal-value" } (text value))
+}
+
+/// What a `todo` the checker reports as `code` is. Neither kind is a hole
+/// that shows the type inferred for it.
+todo_note : Model -> String -> String -> String -> Ui
+let todo_note m code english russian =
+  if List.any (fun d -> d.code == code) m.diagnostics then
+    ui { paragraph (text (tr m.locale english russian)) }
+  else
+    Ui.fragment []
+
+/// What the check compares, from the exercise: the export with its type as
+/// the `.d.ts` tab declares it, and what the program prints.
+goal_view : Model -> Ui
+let goal_view m =
+  if m.lesson_export == "" then
+    Ui.fragment []
+  else
+    let result =
+      if m.lesson_runs then "Effect<" ++ m.lesson_returns ++ ", never, never>" else m.lesson_returns
+    let arguments = String.join "" (List.map (fun t -> "(" ++ t ++ ") => ") m.lesson_arguments)
+    let output = if m.lesson_output == "" then tr m.locale "nothing" "ничего" else m.lesson_output
+    let label = tr m.locale "Goal" "Цель"
+    ui {
+      Ui.with_host
+        { Ui.host with role = Some "group"; aria_label = Some label }
+        (div
+          { class_name = "fp-goal" }
+          (heading_at H3 (text label))
+          (goal_row
+            (tr m.locale "Export (.d.ts)" "Экспорт (.d.ts)")
+            (m.lesson_export ++ ": " ++ arguments ++ result))
+          (goal_row (tr m.locale "Expected output" "Ожидаемый вывод") output)
+          (todo_note
+            m
+            "FLICK-T024"
+            "A todo in a signature is error T024: it names the inferred type, and its fix writes it in."
+            "todo в сигнатуре — ошибка T024: она называет выведенный тип, а её исправление вписывает его.")
+          (todo_note
+            m
+            "FLICK-T022"
+            "A todo in an expression takes the type its place needs: it type-checks with warning T022 and fails when it runs."
+            "todo в выражении принимает нужный на его месте тип: типы сходятся с предупреждением T022, а при выполнении — ошибка."))
+    }
+
 /// The hints shown so far, in order, and the button that shows the next.
 hint_button : Atom.Writable Model -> Model -> Ui
 let hint_button model m =
@@ -97,6 +148,7 @@ let view model m = ui {
   div { class_name = "fp-lesson" }
     heading_at H2 (text (tr m.locale m.lesson_title m.lesson_title_ru))
     paragraph (text (tr m.locale m.lesson_task m.lesson_task_ru))
+    goal_view m
     question_view model m
     div { class_name = "fp-lesson-actions" }
       check_button model m

@@ -96,7 +96,7 @@ let view model m =
                 route (prefix ++ "/start/why/") (if m.ru then "Зачем Flick" else "Why Flick")
                 route
                   (prefix ++ "/reference/effects/")
-                  (if m.ru then "Эффекты, ошибки и сервисы" else "Effects, errors and services")
+                  (if m.ru then "Эффекты и ошибки" else "Effects and errors")
                 route
                   (prefix ++ "/reference/types/")
                   (if m.ru then "Кинды и типы" else "Kinds and types")
