@@ -79,12 +79,11 @@ component shell () =
       match state with
       | Atom.Loaded found -> found
       | _ -> None
-    fragment
-      View.navbar user
-      if loading && waiting page then
-        div { class_name = "container page" } (text "Loading...")
-      else body page user
-      View.page_footer
+    View.navbar user
+    if loading && waiting page then
+      div { class_name = "container page" } (text "Loading...")
+    else body page user
+    View.page_footer
 
   }
 

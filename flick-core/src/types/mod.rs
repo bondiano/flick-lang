@@ -93,6 +93,7 @@ mod server;
 mod services;
 mod settle;
 mod shown;
+mod siblings;
 mod signature_lints;
 mod stub;
 mod sugar_lints;

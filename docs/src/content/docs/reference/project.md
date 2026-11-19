@@ -261,6 +261,15 @@ rather than change the lock, `flick update <name>` fetches a library again,
 `flick add <name> --git URL --tag T [--subdir S]` (or `--url U --sha256 H`,
 or `--path DIR`) adds one and `flick remove <name>` drops it.
 
+The official backend a project builds with when it pins none (`flick/js`,
+or `flick/go` with `emit = "go"`) is not part of the compiler either: it is a
+release asset. The first build, or `flick install`, takes the newest release
+the compiler accepts from the backends index, keeps it in the package store
+and pins it in `flick.lock` under `[[backend]]`; later builds work offline.
+`flick update` moves the pin to a newer release. With `--offline` and no pin
+in the store, or a component whose digest is not the pinned one, the build
+fails with `FLICK-P056` and no other backend is used.
+
 A path library's plugin is built in place, so `flick.lock` also records the
 hash of its component under `[[plugin]]`. A build is not held to it;
 `flick install --locked` fails when the component is another build, and

@@ -9,13 +9,13 @@
 
 use std::ptr;
 
+use super::Checker;
 use super::comprehension::comprehension;
 use super::lang::Lang;
 use super::ranges::range_list;
 use super::sugar_lints::unparen;
 use super::ty::{Effects, Norm, Type};
 use super::ui::Opened;
-use super::{Checker, let_parts};
 use crate::diagnostics::{Diagnostic, Edit, codes};
 use crate::source::Span;
 use crate::syntax::cst::Node;
@@ -92,107 +92,6 @@ impl Checker<'_> {
         };
         self.opened.pop();
         ty
-    }
-
-    /// `body`, the lines of a block that opens a module and names `function`
-    /// of them. More than one expression line, after the statements, is the
-    /// function of the list of them, each line one child; a statement after
-    /// a child is `T085`.
-    fn siblings(&mut self, body: &Node, function: &Node) -> Type {
-        let Some((reference, scheme)) = self.through(function) else {
-            return self.infer(body);
-        };
-        let block = unparen(body);
-        let lines: Vec<&Node> = block.nodes().filter(|n| !is_statement(n.kind)).collect();
-        let Some(first) = lines
-            .first()
-            .filter(|_| block.kind == K::Block && lines.len() > 1)
-        else {
-            return self.infer(body);
-        };
-        let span = self.span(block);
-        let function = self.instantiate(&scheme, span);
-        let Some(parts) = self.of_children(&function) else {
-            return self.infer(body);
-        };
-        let mark = self.cx.locals.len();
-        let statements: Vec<&Node> = block.nodes().collect();
-        let mut i = 0;
-        while i < statements.len() {
-            let statement = statements[i];
-            if statement.range().0 > first.range().0 && is_statement(statement.kind) {
-                self.late_statement(statement, &statements[..i], first);
-            }
-            match statement.kind {
-                K::Signature | K::LetDecl => i += self.local_declaration(&statements, i),
-                K::AssignStmt => self.statement(statement),
-                _ => {}
-            }
-            i += 1;
-        }
-        let ty = self.applied_to_children(&function, &parts, &lines, None, span);
-        self.cx.locals.truncate(mark);
-        self.typing.siblings.insert(block.range(), reference);
-        ty
-    }
-
-    /// `T085` on `statement`, which follows `first`, the first child of its
-    /// block, among `before`. A fix moves a `let` of a name above that child
-    /// where nothing changes meaning: no line between names what it binds,
-    /// which it would then hide, and none binds a name it uses or declares.
-    fn late_statement(&mut self, statement: &Node, before: &[&Node], first: &Node) {
-        let text = self.text;
-        let words = |n: &Node| -> Vec<String> {
-            let names = n.tokens().into_iter().filter(|t| t.kind == K::Ident);
-            names.map(|t| t.text(text).to_owned()).collect()
-        };
-        let bound = |n: &Node| {
-            (n.kind == K::LetDecl)
-                .then(|| let_parts(n, text).name)
-                .flatten()
-        };
-        let between = before.iter().filter(|n| n.range().0 >= first.range().0);
-        let fixable = bound(statement).is_some_and(|name| {
-            let used = words(statement);
-            !between.into_iter().any(|n| {
-                n.kind == K::Signature
-                    || words(n).contains(&name)
-                    || bound(n).is_some_and(|other| used.contains(&other))
-            })
-        });
-        let diagnostic = Diagnostic::error(
-            codes::T085,
-            "a statement after the children of this block: its `let`s and assignments come before the first child",
-            self.span(statement),
-        );
-        // its lines move as they are, before the line of the first child,
-        // when each of the two stands alone on its lines
-        let offset = |at: usize| u32::try_from(at).expect("offsets fit in u32");
-        let line_start = |at: u32| text[..at as usize].rfind('\n').map_or(0, |i| i + 1);
-        let ((start, end), child) = (statement.range(), first.range().0);
-        let to = text[end as usize..]
-            .find('\n')
-            .map(|i| end as usize + i + 1);
-        let (from, at) = (line_start(start), line_start(child));
-        let alone = to.is_some_and(|to| text[end as usize..to].trim().is_empty())
-            && text[from..start as usize].trim().is_empty()
-            && text[at..child as usize].trim().is_empty();
-        let (Some(to), true, true) = (to, fixable, alone) else {
-            return (self.diagnostics).push(diagnostic);
-        };
-        let at = offset(at);
-        let edits = vec![
-            Edit {
-                span: Span::new(self.file, at, at),
-                replacement: text[from..to].to_owned(),
-            },
-            Edit {
-                span: Span::new(self.file, offset(from), offset(to)),
-                replacement: String::new(),
-            },
-        ];
-        let fix = || ("move it above the first child", edits);
-        (self.diagnostics).push(diagnostic.with_safe_fix(fix));
     }
 
     /// The elements of `written`, a list literal where the children of
@@ -359,7 +258,7 @@ impl Checker<'_> {
     /// The parameter, effects and result of `function` and the type of a
     /// child, when it is a function of the list of the children a block
     /// around names, alone.
-    fn of_children(&mut self, function: &Type) -> Option<Children> {
+    pub(super) fn of_children(&mut self, function: &Type) -> Option<Children> {
         let child = (self.opened.iter().rev()).find_map(|o| o.child.clone())?;
         let Type::Fun {
             param,
@@ -384,7 +283,7 @@ impl Checker<'_> {
     /// `function`, of the parts `of_children` gives, applied at `span` to
     /// the list of `children`; `first` is the type of the first when the
     /// caller has checked it.
-    fn applied_to_children(
+    pub(super) fn applied_to_children(
         &mut self,
         function: &Type,
         (param, effects, result, item): &Children,
@@ -414,10 +313,4 @@ impl Checker<'_> {
 }
 
 /// What [`Checker::of_children`] finds of a function of children.
-type Children = (Type, Option<Box<Effects>>, Type, Type);
-
-/// Whether a line of a block of this kind is a statement rather than an
-/// expression.
-fn is_statement(kind: K) -> bool {
-    matches!(kind, K::Signature | K::LetDecl | K::AssignStmt)
-}
+pub(super) type Children = (Type, Option<Box<Effects>>, Type, Type);

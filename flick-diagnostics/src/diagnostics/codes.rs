@@ -159,6 +159,7 @@ codes! {
     T083 = Types 83, "a proof is no valid certificate";
     T084 = Types 84, "a proof ran out of its budget";
     T085 = Types 85, "a statement after the children of a block";
+    T086 = Types 86, "the function of a block's lines written around them";
     E001 = Effects 1, "runtime call in a pure position";
     E002 = Effects 2, "services or errors not allowed by the bound";
     E003 = Effects 3, "argument runs before the function that takes an Eff";
@@ -302,6 +303,7 @@ codes! {
     P053 = Project 53, "several contributors add a command of this name";
     P054 = Project 54, "a contributor adds a command of flick itself";
     P055 = Project 55, "a command's plan does not keep to what it declares";
+    P056 = Project 56, "official backend cannot be resolved";
 }
 
 #[cfg(test)]

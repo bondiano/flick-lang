@@ -24,10 +24,26 @@ ranges, missing fields, unknown fields and malformed digests are errors.
 `environment` is an open backend/platform pair: `js/node` and `js/browser`
 are different targets. Without it the compatibility default is `js/node`
 for JS/TS output and `go/native` for Go. The existing `js`, `ts`, `go` output
-choices remain compatible. Unpinned JS/TS selects the distributed `flick/js`
-component and Go the distributed `flick/go` component, whose `go build` step
+choices remain compatible. Unpinned JS/TS selects the official `flick/js`
+component and Go the official `flick/go` component, whose `go build` step
 needs `[tools]` `"flick/go" = ["go"]` (or `--allow-tool go` outside a
-project). Environment support is
+project).
+
+The compiler holds no component. The official ones are release assets: a tag
+`backend-<name>-v<version>` publishes `component.wasm` and `backend.json`, and
+adds the component to `backends.json` of the rolling release
+`backends-index`, with its digest and the backend API and IR ranges its
+descriptor accepts (`.github/workflows/backends.yml`). An unpinned project
+takes the backend `[[backend]]` of `flick.lock` pins from the package store
+(`<store>/backends/<sha256>.wasm`), downloading it once. Without a lock
+entry it takes the newest release in the index that accepts this compiler's
+backend API and IR, checks its digest and pins it. `--offline` resolves only
+from the lock and the store, `flick install --locked` requires the entry,
+and `flick update` moves it to the newest release; a failure is `P056`,
+before generation, and no other backend is used instead. A compiler built
+from a checkout takes that checkout's `backends/<name>/package` instead, as
+does `FLICK_BACKENDS_PATH=<dir>/<name>/package`'s parent; `FLICK_BACKENDS_INDEX`
+names another index, a URL or a file. Environment support is
 checked against the selected backend before a cache hit is reused.
 The JS runtime setting `[build] effect = "rt"`
 or `"effect"` remains independent of component identity.
