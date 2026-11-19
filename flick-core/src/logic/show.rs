@@ -33,7 +33,7 @@ fn literal(l: &Literal) -> String {
 /// Writes `nf`, under `depth` bound variables, parenthesized as an argument.
 fn write(nf: &Nf, out: &mut String, argument: bool, depth: u32) {
     let compound = match nf {
-        Nf::Con(_, args) => !args.is_empty(),
+        Nf::Con(c, args) => !args.is_empty() && c.name != "(,)",
         Nf::App(..) | Nf::Lam(_) | Nf::Match(..) => true,
         _ => false,
     };
@@ -47,6 +47,16 @@ fn write(nf: &Nf, out: &mut String, argument: bool, depth: u32) {
             let _ = write!(out, "x{n}");
         }
         Nf::Lit(l) => out.push_str(&literal(l)),
+        Nf::Con(c, args) if c.name == "(,)" => {
+            out.push('(');
+            for (i, a) in args.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                write(a, out, false, depth);
+            }
+            out.push(')');
+        }
         Nf::Con(c, args) => {
             out.push_str(&c.name);
             for a in args {

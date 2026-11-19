@@ -55,10 +55,12 @@ A statement is about the values of this domain: computations that end, without e
   - `Bool`;
   - data types whose declarations do not name themselves, through their fields or through other types (`types/proof_data.rs`, `recursive`).
 
-  Effects, tuples, records, unknown types (metas), applied type variables and types with errors are refused (`FLICK-T082`).
+  - tuples of types of the domain.
+
+  Effects, records, unknown types (metas), applied type variables and types with errors are refused (`FLICK-T082`).
 - **Terms**, from the checked IR (`logic/term.rs`):
   - variables, literals, `fun`, application at the pure stage;
-  - constructors, `match` without guards, `if`;
+  - constructors, tuples, `match` without guards (tuple patterns too), `if`;
   - `let` of a name.
 
   - a definition or a method the statement names, once admitted (§6).
@@ -126,10 +128,33 @@ So `equal (map identity v) v` is proved by a split of `v` against the real `Func
 - **What reads it.** Only `flick prove [paths]` selects that root, and the LSP analyzes a proof module that is open. `flick check`, `build`, `test` and `pack` never read it, so a library's proofs cost its users nothing (`flick/tests/cli/prove_command.rs`).
 - **Phase 4b.** A proof module unfolds the definitions of the built-in modules and of its own module. The definitions of other project modules, lemmas across modules and their `.iface` payloads are phase 4b. Until then such a definition is `FLICK-T082`: it is not available to this proof.
 
-## 8. Why the domain is total
+## 8. The laws of `Option`
+
+`packages/core/proofs/Laws/Option.fl` proves the laws of the `Functor`, `Applicative` and `Monad` instances of `Option` from their definitions in `Instances`. Here `ap fs xs` is `map2 (fun f x -> f x) fs xs`, and `compose` is written out.
+
+| ID | Law |
+| - | - |
+| F1 | `map identity v = v` |
+| F2 | `map (compose g f) v = map g (map f v)` |
+| A1 | `ap (pure identity) v = v` |
+| A2 | `ap (ap (ap (pure compose) fs) gs) xs = ap fs (ap gs xs)` |
+| A3 | `ap (pure f) (pure x) = pure (f x)` |
+| A4 | `ap fs (pure x) = ap (pure (fun f -> f x)) fs` |
+| A5 | `map f v = ap (pure f) v` |
+| M1 | `flat_map f (pure x) = f x` |
+| M2 | `flat_map pure v = v` |
+| M3 | `flat_map g (flat_map f v) = flat_map (fun x -> flat_map g (f x)) v` |
+| C1 | `map f v = flat_map (fun x -> pure (f x)) v` |
+| C2 | `map2 h va vb = flat_map (fun a -> map (fun b -> h a b) vb) va` |
+
+Each holds for every payload and every total function. `flick prove --project packages/core` checks them (`flick/tests/cli/prove_command.rs`), and no import of `Option` reads that module.
+
+A change to a method breaks the laws it breaks. A `map2` that answers `None` to two `Some` values fails A1, A3, A5 and C2 (T080). It still satisfies A2 and A4, which hold of it.
+
+## 9. Why the domain is total
 
 With `ap fs xs = map2 (fun f x -> f x) fs xs`, the law `ap (ap (ap (pure compose) fs) gs) xs = ap fs (ap gs xs)` fails for a `g` that fails: with `fs = None` the left side never applies `g`, and the right side does (`tests/run/stdlib/option_ap_strictness.fl`). A proof of the law is about total functions only. It makes no claim about this program, and nothing in the program changes.
 
-## 9. Trust boundary
+## 10. Trust boundary
 
 The logic is host code (`logic/`). It runs no Flick program and accepts no success it did not check. The Rust checker, the extraction from IR and the compiler and runtimes that run the program are trusted. The Lean development of the calculus and of the checker's soundness is phase 6 of RFC #647. Until it lands, §4 is a contract the Rust tests check, not a theorem.
