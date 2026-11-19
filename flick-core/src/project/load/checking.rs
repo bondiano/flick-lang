@@ -15,6 +15,7 @@ use tracing::debug;
 
 #[cfg(feature = "ide")]
 use super::Analyzed;
+use super::Lowered;
 use super::plugins::Watching;
 use super::precompiled::Precompiled;
 use super::{
@@ -90,6 +91,8 @@ pub(crate) fn check_file(
         project: None,
         stages_by_class: false,
         lower: false,
+        lowered: &[],
+        proving: false,
         cached_ir: CachedIr::Dropped,
         lower_packages_only: false,
         precompiled: &precompiled,
@@ -282,6 +285,8 @@ impl Loader<'_> {
             watching: &self.watchers.plugins,
             watched: &self.watchers.watched,
             stages_by_class: self.stages_by_class,
+            lowered: self.lowered.as_deref().unwrap_or(&[]),
+            proving: self.modules.iter().any(Loaded::has_proofs),
             // a failed import leaves names unresolved, and the build fails anyway
             lower: self.lowered.is_some()
                 && !self
@@ -324,7 +329,7 @@ impl Loader<'_> {
         }
         self.diagnostics.extend(output.diagnostics);
         if let (Some(lowered), Some(ir)) = (&mut self.lowered, output.ir) {
-            lowered[i] = Some((ir, output.declarations));
+            lowered[i] = Some((ir, output.declarations, output.proofs));
         }
         #[cfg(feature = "ide")]
         if let Some(ide) = &mut self.ide
@@ -366,6 +371,7 @@ struct Known {
 type Outcome = (Output, Option<Key>, Option<String>, Reason);
 
 /// What checking a module reads of the loader; shared by parallel checks.
+#[allow(clippy::struct_excessive_bools, reason = "one per way a run checks")]
 struct Checking<'a> {
     modules: &'a [Loaded],
     sources: &'a SourceMap,
@@ -374,6 +380,10 @@ struct Checking<'a> {
     project: Option<&'a Project>,
     stages_by_class: bool,
     lower: bool,
+    /// The IR of the modules checked before this level, which proofs read.
+    lowered: &'a [Option<Lowered>],
+    /// The run has proofs: its modules keep their IR for them.
+    proving: bool,
     cached_ir: CachedIr,
     lower_packages_only: bool,
     precompiled: &'a Precompiled,
@@ -449,6 +459,8 @@ struct Output {
     ir: Option<ir::Module>,
     /// Every top-level entity with its type, for the reference model.
     declarations: Arc<Interface>,
+    /// The proofs it declares, which a proof of an importer replays.
+    proofs: Vec<ir::Proven>,
 }
 
 /// What importers see of a module: all of a clean one; of one with errors,

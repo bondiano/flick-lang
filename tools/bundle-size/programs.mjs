@@ -23,8 +23,8 @@ export const PROGRAMS = [
   // the same counter on Flick's own runtime: React and the kernel, no Effect at all
   { name: "counter-rt", source: "tests/run/ui/counter.fl", rt: true, budget: 80, effectFree: true },
   {
-    name: "playground", source: "docs/src/playground/Playground.fl", budget: 129,
-    reason: "The sandboxed preview, saved drafts and shared links, and the first lesson add browser interactions to the playground.",
+    name: "playground", source: "docs/src/playground/Playground.fl", budget: 150,
+    reason: "The exercise goal panel filled the former 129 KB; the owner set 150 KB as headroom for the playground's next browser interactions.",
     unused: ["effect/dist/Graph.js"],
   },
   // the same playground on Flick's own runtime: React and the kernel, no Effect at all
@@ -32,9 +32,9 @@ export const PROGRAMS = [
     name: "playground-rt",
     source: "docs/src/playground/Playground.fl",
     rt: true,
-    budget: 93,
+    budget: 150,
     effectFree: true,
-    reason: "withOwnerEvidence always returns Under so Effect legacy factories stay Instructions",
+    reason: "The exercise goal panel filled the former 93 KB; the owner set 150 KB as headroom for the playground's next browser interactions.",
   },
 
   { name: "atoms", source: "tests/run/ui/atoms.fl", budget: 117, unused: ["effect/dist/Graph.js"] },

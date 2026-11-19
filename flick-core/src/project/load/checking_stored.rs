@@ -131,6 +131,7 @@ impl Checking<'_> {
             interface,
             ir,
             declarations,
+            proofs: Vec::new(),
         }
     }
 

@@ -1,6 +1,6 @@
 # Proofs: statements over the pure, total domain
 
-Status: **contract** (RFC #647, #641). Phases 1 and 2 are implemented: §1–§6 hold in the checker, for statements over the variables of a proof and the definitions it names. Proofs across modules (§7) and the Lean development (§9) land in the phases RFC #647 lists. Each rule says where it is checked.
+Status: **contract** (RFC #647, #641). Phases 1–5a and 4b are implemented: §1–§8 hold in the checker. Law bundles (#719) and the Lean development (§10, #720) land in the phases RFC #647 lists. Each rule says where it is checked.
 
 References as in [`core.md`](core.md). Paths are relative to `flick-core/src/`.
 
@@ -14,7 +14,7 @@ References as in [`core.md`](core.md). Paths are relative to `flick-core/src/`.
 | `refl`, `symm`, `trans`, `cong`, `funext`, `match`, a premise, `let` | the rules | §4 |
 | T080–T084 | how a proof fails | §5 |
 
-Not yet: law bundles, definitions and lemmas across project modules, `.iface` payloads.
+Not yet: law bundles.
 
 ## 1. Proofs are opt-in and erased
 
@@ -126,7 +126,10 @@ So `equal (map identity v) v` is proved by a split of `v` against the real `Func
 
 - **The proof root.** `project.proof-dir` (default `proofs`) holds proof modules. They may import the project's source modules and each other, and a source module never imports one (`project/load/imports.rs`, `Root::Proof`).
 - **What reads it.** Only `flick prove [paths]` selects that root, and the LSP analyzes a proof module that is open. `flick check`, `build`, `test` and `pack` never read it, so a library's proofs cost its users nothing (`flick/tests/cli/prove_command.rs`).
-- **Phase 4b.** A proof module unfolds the definitions of the built-in modules and of its own module. The definitions of other project modules, lemmas across modules and their `.iface` payloads are phase 4b. Until then such a definition is `FLICK-T082`: it is not available to this proof.
+- **Definitions across modules.** A proof unfolds the definitions of every module of the run it names, from the IR that run lowers. A run with proofs lowers every module that checks, and in an editor too it keeps that IR (`project/load/loaded.rs`, `Loader::size_lowered`).
+- **Lemmas across modules.** An interface lists the proofs its module declares (`Interface.proofs`, since `iface-version` 30). A proof of an importer names one as `M.name`, through an alias too. Before using it, the importer replays every proof of that module, in order, against the IR of the module (`ir/lower/proofs.rs`, `imported_lemmas`). A proof that does not check again is no lemma (`FLICK-T083`), and no success is read from the interface.
+- **Rechecking.** A module with proofs is checked again on every run and never taken from a cache, because its proofs read bodies that no interface shows. An edit of a body it names, though the signature stays, is rechecked by `flick prove` and by the editor alike (`flick/tests/cli/prove_command.rs`, `lsp_editor/proofs.rs`). Ordinary modules keep their cache, and their dependents are not recompiled for a proof.
+- **Not covered.** Proof modules of installed packages: a package ships its source root, not its proofs.
 
 ## 8. The laws of `Option`
 

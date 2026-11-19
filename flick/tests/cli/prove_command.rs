@@ -50,3 +50,50 @@ fn the_option_laws_hold_of_the_core_instances() {
     assert_eq!(proved.status.code(), Some(0), "{stderr}");
     assert!(!stderr.contains("FLICK-"), "{stderr}");
 }
+
+const STEPS: &str =
+    "module App.Steps exposing (..)\n\ntwice : (a -> a) -> a -> a\nlet twice f x = f (f x)\n";
+
+const BASE: &str = "module App.Base exposing (..)\n\nimport App.Steps exposing (twice)\n\nproof unfolded (f : a -> a) (x : a) where equal (twice f x) (f (f x)) = refl\n";
+
+const USES: &str = "module App.Uses exposing (..)\n\nimport App.Steps exposing (twice)\nimport App.Base as B\n\nproof again (g : Bool -> Bool) (b : Bool) where equal (twice g b) (g (g b)) = B.unfolded g b\n";
+
+/// A proof unfolds a definition of another module and uses a lemma of
+/// another proof module, which it replays. An edit that keeps the
+/// signature but breaks the law fails both proofs, the lemma's user
+/// because no lemma checked; restoring it proves them again.
+#[test]
+fn proofs_read_other_modules_and_recheck_after_a_body_edit() {
+    let dir = project(
+        "prove_across_modules",
+        &[
+            ("flick.toml", LIB),
+            ("src/App/Steps.fl", STEPS),
+            ("proofs/App/Base.fl", BASE),
+            ("proofs/App/Uses.fl", USES),
+        ],
+    );
+    let proved = flick_in(&dir, &["prove"]);
+    assert_eq!(proved.status.code(), Some(0), "{proved:?}");
+    fs::write(
+        dir.join("src/App/Steps.fl"),
+        STEPS.replace("f (f x)", "f x"),
+    )
+    .expect("edit the body");
+    let broken = flick_in(&dir, &["prove"]);
+    let stderr = String::from_utf8_lossy(&broken.stderr);
+    assert_eq!(broken.status.code(), Some(1), "{stderr}");
+    assert!(
+        stderr.contains("FLICK-T081") && stderr.contains("`unfolded`"),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains("`App.Base.unfolded` is no proof checked before this one"),
+        "{stderr}"
+    );
+    // an ordinary check of the same edit is clean: no proof is its business
+    assert_eq!(flick_in(&dir, &["check"]).status.code(), Some(0));
+    fs::write(dir.join("src/App/Steps.fl"), STEPS).expect("restore the body");
+    let restored = flick_in(&dir, &["prove"]);
+    assert_eq!(restored.status.code(), Some(0), "{restored:?}");
+}

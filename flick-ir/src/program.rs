@@ -9,7 +9,13 @@ use std::collections::BTreeMap;
 use std::{error, fmt};
 
 #[cfg(feature = "cbor")]
-use cbor4ii::serde::from_slice;
+use cbor4ii::core::dec;
+#[cfg(feature = "cbor")]
+use cbor4ii::core::error::Never;
+#[cfg(feature = "cbor")]
+use cbor4ii::serde::{DecodeError, Deserializer};
+#[cfg(feature = "cbor")]
+use ciborium::de::from_reader_with_recursion_limit;
 use serde::{Deserialize, Serialize};
 
 use crate::{FileId, LangItem, Module};
@@ -88,7 +94,8 @@ impl Program {
         // outside the slice decoder's Serde representation.
         let program: Program = match from_slice(bytes) {
             Ok(program) => program,
-            Err(_) => ciborium::from_reader(bytes).map_err(|e| Error::Format(e.to_string()))?,
+            Err(_) => from_reader_with_recursion_limit(bytes, DEPTH)
+                .map_err(|e| Error::Format(e.to_string()))?,
         };
         program.checked()
     }
@@ -143,9 +150,57 @@ impl fmt::Display for Error {
 
 impl error::Error for Error {}
 
+/// How deep the CBOR of a program may nest. The decoders stop at 256
+/// levels by default, which a long chain of statements exceeds; a program
+/// the checker accepts must reach its backend, so only the stack that
+/// decodes it bounds it.
+#[cfg(feature = "cbor")]
+const DEPTH: usize = 1 << 16;
+
+/// `cbor4ii`'s slice reader, but nesting [`DEPTH`] levels deep.
+#[cfg(feature = "cbor")]
+struct DeepSlice<'a> {
+    buf: &'a [u8],
+    left: usize,
+}
+
+#[cfg(feature = "cbor")]
+impl<'de> dec::Read<'de> for DeepSlice<'de> {
+    type Error = Never;
+
+    fn fill<'b>(&'b mut self, want: usize) -> Result<dec::Reference<'de, 'b>, Self::Error> {
+        Ok(dec::Reference::Long(&self.buf[..want.min(self.buf.len())]))
+    }
+
+    fn advance(&mut self, n: usize) {
+        self.buf = &self.buf[n.min(self.buf.len())..];
+    }
+
+    fn step_in(&mut self) -> bool {
+        self.left.checked_sub(1).is_some_and(|left| {
+            self.left = left;
+            true
+        })
+    }
+
+    fn step_out(&mut self) {
+        self.left += 1;
+    }
+}
+
+#[cfg(feature = "cbor")]
+fn from_slice<'a, T: Deserialize<'a>>(bytes: &'a [u8]) -> Result<T, DecodeError<Never>> {
+    let reader = DeepSlice {
+        buf: bytes,
+        left: DEPTH,
+    };
+    T::deserialize(&mut Deserializer::new(reader))
+}
+
 #[cfg(all(test, feature = "json"))]
 mod tests {
     use std::collections::BTreeMap;
+    use std::{mem, thread};
 
     use super::{Error, Program, VERSION, compatible};
     use crate::{Expr, ExprKind, FileId, Item, ItemKind, LangItem, Lit, Module, Namespace, Span};
@@ -207,6 +262,34 @@ mod tests {
             let decoded: Program = super::from_slice(&expected.to_cbor()).expect("writer CBOR");
             assert_eq!(decoded, expected);
         }
+    }
+
+    /// A program the checker accepts reaches a backend however deep its
+    /// expressions nest; the decoders' defaults stop at 256 levels.
+    #[cfg(feature = "cbor")]
+    #[test]
+    fn a_deeply_nested_expression_survives_cbor() {
+        // the compiler checks and lowers such a program on a large stack too
+        let deep = thread::Builder::new().stack_size(64 << 20);
+        deep.spawn(deep_round_trip)
+            .expect("a thread")
+            .join()
+            .expect("deep IR round-trips");
+    }
+
+    #[cfg(feature = "cbor")]
+    fn deep_round_trip() {
+        let mut expected = program(1.0);
+        let ItemKind::Value { body, .. } = &mut expected.modules[0].items[0].kind else {
+            unreachable!("the value of the program");
+        };
+        for _ in 0..1_000 {
+            let span = body.span;
+            let inner = mem::replace(body, Expr::new(ExprKind::Lit(Lit::Unit), span));
+            *body = Expr::new(ExprKind::Yield(Box::new(inner)), span);
+        }
+        let decoded = Program::from_cbor(&expected.to_cbor()).expect("deep IR decodes");
+        assert_eq!(decoded, expected);
     }
 
     #[test]

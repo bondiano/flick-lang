@@ -138,12 +138,14 @@ of a row variable; another constraint on open rows waits for a program this
 cannot express ([E15, #438](https://github.com/bondiano/flick-lang/issues/438)).
 
 A handler finds a service by its name, not by its arguments. `provide` of a
-layer of `Store Int` answers every `Store` operation in its body, so the body
-may need a row variable only where the variable holds no other instance of
-`Store`: one taken out, `Eff {-Store | r} …`, or one beside the instance it
-names, `Eff {Store Int | r} …`, which holds `Store` only as `Store Int`. A
-variable that may hold `Store String` would get the layer's `Store Int` for it,
-and is `FLICK-E019`.
+layer or a record of `Store Int` answers every `Store` operation in its body,
+so the body may need a row variable only where the variable holds no other
+instance of `Store`: one taken out, `Eff {-Store | r} …`, or one beside the
+instance it names, `Eff {Store Int | r} …`, which holds `Store` only as
+`Store Int`. A variable that may hold `Store String` would get the provider's
+`Store Int` for it, and is `FLICK-E019`; so is a function of such a variable
+given where one of `{Store Int | r}` is expected. A handler of an effect with
+arguments works the same ([Effects and handlers](../effects/#effects-and-handlers)).
 
 A set may take parameters, as in `type alias Db s = {Scope s, Log}`.
 

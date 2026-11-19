@@ -111,3 +111,45 @@ fn a_proof_declaration_follows_editor_changes() {
     }
     lsp.close();
 }
+
+/// A proof module follows an edit of the body of a definition it names in
+/// another module, though the signature stays the same.
+#[test]
+fn a_proof_follows_a_body_edit_of_another_module() {
+    let steps =
+        "module App.Steps exposing (..)\n\ntwice : (a -> a) -> a -> a\nlet twice f x = f (f x)\n";
+    let proof = "module App.Laws exposing (..)\n\nimport App.Steps exposing (twice)\n\nproof unfolded (f : a -> a) (x : a) where equal (twice f x) (f (f x)) = refl\n";
+    let dir = project(
+        "lsp_proof_across_modules",
+        &[
+            ("flick.toml", LIB),
+            ("src/App/Steps.fl", steps),
+            ("proofs/App/Laws.fl", proof),
+        ],
+    );
+    let laws = uri(&dir.join("proofs/App/Laws.fl"));
+    let mut lsp = Lsp::start(&dir);
+    lsp.notify(
+        "textDocument/didOpen",
+        &json!({ "textDocument": {
+            "uri": laws, "languageId": "flick", "version": 1, "text": proof,
+        } }),
+    );
+    assert_eq!(codes(&lsp.diagnostics(&laws)), Vec::<String>::new());
+    let source = uri(&dir.join("src/App/Steps.fl"));
+    let broken = steps.replace("f (f x)", "f x");
+    lsp.notify(
+        "textDocument/didOpen",
+        &json!({ "textDocument": {
+            "uri": source, "languageId": "flick", "version": 1, "text": broken,
+        } }),
+    );
+    assert_eq!(codes(&lsp.diagnostics(&laws)), ["FLICK-T081"]);
+    lsp.notify(
+        "textDocument/didChange",
+        &json!({ "textDocument": { "uri": source, "version": 2 },
+            "contentChanges": [{ "text": steps }] }),
+    );
+    assert_eq!(codes(&lsp.diagnostics(&laws)), Vec::<String>::new());
+    lsp.close();
+}

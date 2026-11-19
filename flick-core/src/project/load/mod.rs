@@ -167,10 +167,10 @@ struct Loader<'a> {
 }
 
 /// A module's IR and what the reference model reads of it.
-type Lowered = (ir::Module, Arc<Interface>);
+type Lowered = (ir::Module, Arc<Interface>, Vec<ir::Proven>);
 
 /// The module `m` of the build, lowered.
-fn compiled(m: &Loaded, (ir, declarations): Lowered, interface: Interface) -> Compiled {
+fn compiled(m: &Loaded, (ir, declarations, _): Lowered, interface: Interface) -> Compiled {
     Compiled {
         name: m.name.clone(),
         path: m.path.clone(),
@@ -412,9 +412,7 @@ fn run_in(
     let edges = loader.load_imports();
     loader.import_cycles(&edges);
     loader.expand_plugins();
-    if let Some(lowered) = &mut loader.lowered {
-        lowered.resize_with(loader.modules.len(), || None);
-    }
+    loader.size_lowered();
     let interfaces = loader.resolve_all(&edges);
     if let Some(cache) = &mut loader.cache {
         // modules no longer loaded are dropped
@@ -449,6 +447,7 @@ fn run_in(
                             exports: flick_ir::Exports::default(),
                         },
                         Arc::new(interface.clone()),
+                        Vec::new(),
                     ))
                 })?;
                 Some(compiled(m, lowered, interface))

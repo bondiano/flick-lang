@@ -18,6 +18,10 @@ pub fn engine(cache_dir: Option<&Path>) -> Result<Engine, String> {
     config.consume_fuel(true);
     config.epoch_interruption(true);
     config.cranelift_nan_canonicalization(true);
+    // Release optimization of a 2000-line function recurses deeper than
+    // Wasmtime's default 512 KiB; a call's fiber needs room above that.
+    config.max_wasm_stack(4 << 20);
+    config.async_stack_size(5 << 20);
     config.cache(cache);
     Engine::new(&config).map_err(|e| e.to_string())
 }
@@ -121,6 +125,7 @@ pub fn why(error: &wasmtime::Error) -> String {
     match error.downcast_ref::<Trap>() {
         Some(Trap::OutOfFuel) => "ran out of its fuel".into(),
         Some(Trap::AllocationTooLarge) => "ran out of its memory".into(),
+        Some(Trap::StackOverflow) => "ran out of its stack".into(),
         _ if format!("{error:?}").contains("component memory budget exceeded") => {
             "ran out of its memory".into()
         }
