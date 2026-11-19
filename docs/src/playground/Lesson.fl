@@ -46,8 +46,8 @@ let question_view model m =
 goal_row : String -> String -> Ui
 let goal_row name value = ui {
   div { class_name = "fp-goal-row" }
-    (span { class_name = "fp-goal-label" } (text name))
-    (span { class_name = "fp-goal-value" } (text value))
+    span { class_name = "fp-goal-label" } (text name)
+    span { class_name = "fp-goal-value" } (text value)
 }
 
 /// What a `todo` the checker reports as `code` is. Neither kind is a hole
@@ -74,13 +74,12 @@ let goal_view m =
     ui {
       Ui.with_host
         { Ui.host with role = Some "group"; aria_label = Some label }
-        (div
-          { class_name = "fp-goal" }
-          (heading_at H3 (text label))
+        div { class_name = "fp-goal" }
+          heading_at H3 (text label)
           (goal_row
             (tr m.locale "Export (.d.ts)" "Экспорт (.d.ts)")
             (m.lesson_export ++ ": " ++ arguments ++ result))
-          (goal_row (tr m.locale "Expected output" "Ожидаемый вывод") output)
+          goal_row (tr m.locale "Expected output" "Ожидаемый вывод") output
           (todo_note
             m
             "FLICK-T024"
@@ -90,7 +89,7 @@ let goal_view m =
             m
             "FLICK-T022"
             "A todo in an expression takes the type its place needs: it type-checks with warning T022 and fails when it runs."
-            "todo в выражении принимает нужный на его месте тип: типы сходятся с предупреждением T022, а при выполнении — ошибка."))
+            "todo в выражении принимает нужный на его месте тип: типы сходятся с предупреждением T022, а при выполнении — ошибка.")
     }
 
 /// The hints shown so far, in order, and the button that shows the next.
