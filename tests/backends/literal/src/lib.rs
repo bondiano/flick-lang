@@ -13,8 +13,8 @@ use std::time::SystemTime;
 use flick_backend::command;
 use flick_backend::{
     Artifact, ArtifactKind, Backend, BackendId, BuildRequest, BuildResult, Descriptor, Diagnostic,
-    Environment, Inputs, Mode, ModuleRole, NamedRange, Profile, Severity, Span, TargetSupport,
-    VersionRange,
+    Environment, Inputs, Mode, ModuleRole, NamedRange, OptionValue, Packages, Profile, ProjectFile,
+    RuntimeGraph, RuntimeNode, Severity, Span, TargetSupport, VersionRange,
 };
 use flick_ir::{ExprKind, ItemKind, Lit, Program, Stage};
 
@@ -62,6 +62,64 @@ fn case(request: &BuildRequest) -> &str {
 }
 
 impl Backend for Literal {
+    // the fixture's tests run on Flick's runtime, which it reports itself
+    fn package_files(&self) -> Vec<String> {
+        // what asks the host for a report; the search goes by `root`
+        vec!["package.json".into()]
+    }
+
+    fn packages(&self, files: &[ProjectFile], options: &[OptionValue]) -> Packages {
+        // Node's search from the root upward, each candidate asked for in turn
+        let root = (options.iter())
+            .find(|o| o.key == "root")
+            .map_or("", |o| o.value.as_str());
+        let mut needs = Vec::new();
+        let mut found = None;
+        let mut dir = root;
+        while !dir.is_empty() {
+            if dir.rsplit('/').next() != Some("node_modules") {
+                let path = format!(
+                    "{}/node_modules/@flick-lang/runtime/package.json",
+                    dir.trim_end_matches('/')
+                );
+                match files.iter().find(|f| f.path == path) {
+                    Some(file) if !file.real.is_empty() => {
+                        found = Some(file).filter(|_| needs.is_empty());
+                        break;
+                    }
+                    Some(_) => {}
+                    None => needs.push(path),
+                }
+            }
+            dir = match dir.rsplit_once('/') {
+                Some(("", _)) if dir != "/" => "/",
+                Some((parent, _)) if !parent.is_empty() => parent,
+                _ => "",
+            };
+        }
+        let runtime = found
+            .and_then(|f| {
+                let manifest: serde_json::Value = serde_json::from_slice(&f.bytes).ok()?;
+                Some(RuntimeGraph {
+                    package: "@flick-lang/runtime".into(),
+                    nodes: vec![RuntimeNode {
+                        name: manifest["name"].as_str()?.into(),
+                        version: manifest["version"].as_str()?.into(),
+                        dir: f.real.rsplit_once('/')?.0.into(),
+                        dependencies: vec![],
+                    }],
+                })
+            })
+            .into_iter()
+            .collect();
+        Packages {
+            sources: vec![],
+            runtime,
+            diagnostics: vec![],
+            needs,
+        }
+    }
+
     fn commands(&self) -> Vec<command::Descriptor> {
         commands::commands()
     }

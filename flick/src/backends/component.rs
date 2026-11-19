@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Arc;
 
 use flick_backend::command;
 use flick_backend::host::runtime::Cancellation;
@@ -21,7 +22,7 @@ use flick_core::source::{FileId, SourceMap, Span};
 
 use super::request::Prepared;
 use super::tools::{self, Tool};
-use super::{execute, failure, launch};
+use super::{execute, failure, launch, runtimes};
 use crate::artifact::Artifact;
 use crate::commands::build::Purpose;
 use crate::commands::build::{BuildPlan, Emission};
@@ -32,7 +33,7 @@ use crate::sources::FsHost;
 pub(crate) struct Package {
     pin: BackendPin,
     root: PathBuf,
-    backend: WasmBackend,
+    backend: Arc<WasmBackend>,
     tools: Vec<Tool>,
     /// The tools `[tools]` lets the steps of this backend run.
     allowed: Vec<String>,
@@ -108,7 +109,9 @@ impl Package {
             .filter(|&id| id != "node")
             .chain(["node"]);
         let tools = ids.filter_map(|id| Tool::find(id, None).ok()).collect();
-        let runtimes = super::dependencies::installed_for(root, !rt).map_err(failure)?;
+        let backend = Arc::new(backend);
+        runtimes::loaded(&pin, &backend);
+        let runtimes = runtimes::runtime(&backend, root, !rt).map_err(failure)?;
         Ok(Self {
             pin,
             root: root.to_path_buf(),
@@ -224,7 +227,7 @@ impl Package {
         };
         component::cancel_on_signals();
         let mut emission = match flick_backend::generate(
-            &self.backend,
+            &*self.backend,
             &prepared.request,
             &policy,
             |id| prepared.bytes.get(id).cloned(),
@@ -345,7 +348,7 @@ impl Package {
             .required_capabilities
             .iter()
             .any(|c| c.name == "schema-aot");
-        super::dependencies::installed_for(&self.root, effect).map_err(failure)
+        runtimes::runtime(&self.backend, &self.root, effect).map_err(failure)
     }
 
     fn rejected(&self, diagnostics: &[flick_backend::Diagnostic], files: &[FileId]) -> Emission {
@@ -376,11 +379,15 @@ impl Package {
     }
 
     pub(super) fn accepts_cached(&self, files: &[Artifact]) -> bool {
+        // the effect runtime's graphs hold every package either runtime loads
+        let Ok(installed) = runtimes::runtime(&self.backend, &self.root, true) else {
+            return false;
+        };
         launch::validate(
             files,
             &self.pin,
             &self.tools.iter().map(|t| t.pin.clone()).collect::<Vec<_>>(),
-            &self.root,
+            &installed,
         )
         .is_ok()
     }
@@ -420,7 +427,7 @@ impl Contributor for Package {
         &self,
         invocation: &command::Invocation,
     ) -> Result<command::Plan, Vec<command::Diagnostic>> {
-        Backend::run(&self.backend, invocation)
+        Backend::run(&*self.backend, invocation)
     }
 
     fn resume(
@@ -429,14 +436,14 @@ impl Contributor for Package {
         outputs: Vec<command::File>,
         answers: Vec<command::Answer>,
     ) -> Result<command::Plan, Vec<command::Diagnostic>> {
-        Backend::resume(&self.backend, state, outputs, answers)
+        Backend::resume(&*self.backend, state, outputs, answers)
     }
 
     fn open(
         &self,
         invocation: &command::Invocation,
     ) -> Result<command::Opened, Vec<command::Diagnostic>> {
-        Backend::open(&self.backend, invocation)
+        Backend::open(&*self.backend, invocation)
     }
 
     fn handle(
@@ -451,7 +458,7 @@ impl Contributor for Package {
     }
 
     fn close(&self, state: Vec<u8>) -> command::Plan {
-        Backend::close(&self.backend, state)
+        Backend::close(&*self.backend, state)
     }
 }
 

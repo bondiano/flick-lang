@@ -4,6 +4,7 @@
 #[cfg(feature = "wasm-backends")]
 mod component;
 #[cfg(feature = "wasm-backends")]
+#[cfg(test)]
 mod dependencies;
 #[cfg(feature = "wasm-backends")]
 mod execute;
@@ -15,6 +16,8 @@ mod official;
 pub(crate) mod packages;
 #[cfg(feature = "wasm-backends")]
 mod request;
+#[cfg(feature = "wasm-backends")]
+mod runtimes;
 #[cfg(feature = "wasm-backends")]
 mod tools;
 #[cfg(feature = "wasm-backends")]

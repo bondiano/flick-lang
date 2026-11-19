@@ -14,8 +14,9 @@ use flick_backend::{
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
-/// How many times one report may ask for more files.
-const ROUNDS: usize = 32;
+/// How many times one report may ask for more files: a level of a runtime
+/// graph takes one.
+const ROUNDS: usize = 128;
 
 /// The backend's packages, with each runtime graph pinned.
 pub(crate) struct Report {
@@ -110,13 +111,12 @@ fn matching(root: &Path, at: &Path, pattern: &str, out: &mut Vec<ProjectFile>) {
     names.sort();
     for name in names {
         let path = at.join(&name);
-        match rest {
-            Some(rest) => matching(root, &path, rest, out),
-            None => {
-                let file = read(&root.join(&path), path.to_string_lossy().replace('\\', "/"));
-                if !file.real.is_empty() {
-                    out.push(file);
-                }
+        if let Some(rest) = rest {
+            matching(root, &path, rest, out);
+        } else {
+            let file = read(&root.join(&path), path.to_string_lossy().replace('\\', "/"));
+            if !file.real.is_empty() {
+                out.push(file);
             }
         }
     }
@@ -202,8 +202,9 @@ fn collect(package: &Path, relative: &Path, files: &mut Vec<PathBuf>) -> io::Res
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use std::path::Path;
+    use std::sync::Arc;
     use std::{env, fs, process};
 
     use flick_backend::host::{Budget, WasmBackend};
@@ -213,21 +214,22 @@ mod tests {
     use crate::backends::dependencies::installed_for;
     use crate::component;
 
-    fn js() -> WasmBackend {
+    /// The JavaScript component of this checkout.
+    pub(crate) fn js() -> Arc<WasmBackend> {
         let package = Path::new(env!("CARGO_MANIFEST_DIR")).join("../backends/js/package");
         let pin: BackendPin =
             serde_json::from_slice(&fs::read(package.join("backend.json")).expect("pin"))
                 .expect("JSON");
         let bytes = fs::read(package.join("component.wasm")).expect("component");
         let cancel = component::cancellation().expect("a cancellation").clone();
-        WasmBackend::load_with_cancellation(
+        let backend = WasmBackend::load_with_cancellation(
             component::engine().expect("an engine"),
             pin,
             &bytes,
             Budget::default(),
             cancel,
-        )
-        .expect("the JS component loads")
+        );
+        Arc::new(backend.expect("the JS component loads"))
     }
 
     fn write(path: &Path, text: &str) {
@@ -290,7 +292,7 @@ mod tests {
                     value: real.clone(),
                 },
             ];
-            let reported = report(&backend, &root, &options).expect("a report");
+            let reported = report(&*backend, &root, &options).expect("a report");
             let mut pinned = reported.runtime;
             pinned.sort_by(|a, b| a.package.cmp(&b.package));
             let mut before = installed_for(&root, effect).expect("the host's pins");

@@ -74,14 +74,14 @@ pub(super) fn validate(
     files: &[Artifact],
     pin: &BackendPin,
     tools: &[Toolchain],
-    root: &Path,
+    installed: &[RuntimeDependency],
 ) -> Result<(), String> {
     let file = files
         .iter()
         .find(|f| f.path == FILE)
         .ok_or("component build has no launch manifest")?;
     let manifest = read(&file.contents, pin)?;
-    if !super::dependencies::verify(root, &manifest.runtime_dependencies)? {
+    if !(manifest.runtime_dependencies.iter()).all(|pin| installed.contains(pin)) {
         return Err("cached runtime dependency differs from its host pin".into());
     }
     for launch in manifest.launches {
@@ -152,10 +152,14 @@ fn load_manifest(root: &Path, pin: &BackendPin) -> Result<Manifest, String> {
 }
 
 pub(super) fn verify_runtime(root: &Path, pin: &BackendPin) -> Result<(), String> {
-    verify_runtime_manifest(root, &load_manifest(root, pin)?)
+    verify_runtime_manifest(root, pin, &load_manifest(root, pin)?)
 }
 
-fn verify_runtime_manifest(root: &Path, manifest: &Manifest) -> Result<(), String> {
+fn verify_runtime_manifest(
+    root: &Path,
+    pin: &BackendPin,
+    manifest: &Manifest,
+) -> Result<(), String> {
     if !manifest.runtime_dependencies.is_empty() {
         let directories: BTreeSet<_> = manifest
             .importers
@@ -168,9 +172,12 @@ fn verify_runtime_manifest(root: &Path, manifest: &Manifest) -> Result<(), Strin
             })
             .chain(iter::once(root.to_path_buf()))
             .collect();
-        let mut pins = super::dependencies::Pins::default();
         for directory in directories {
-            if !pins.verify(&directory, &manifest.runtime_dependencies)? {
+            let names: Vec<String> = (manifest.runtime_dependencies.iter())
+                .map(|p| p.package.clone())
+                .collect();
+            let installed = super::runtimes::runtime_from(pin, &directory, &names)?;
+            if !(manifest.runtime_dependencies.iter()).all(|p| installed.contains(p)) {
                 return Err(
                     "launch runtime dependency differs from its pinned version and digest".into(),
                 );
@@ -197,7 +204,7 @@ pub(crate) fn command_with_import(
     import: Option<&str>,
 ) -> Result<Command, String> {
     let manifest = load_manifest(root, pin)?;
-    verify_runtime_manifest(root, &manifest)?;
+    verify_runtime_manifest(root, pin, &manifest)?;
     let launch = manifest
         .launches
         .iter()
@@ -249,6 +256,8 @@ mod tests {
             },
             sha256: sha256(b"component"),
         };
+        // the launch verifies with the backend that made the build
+        crate::backends::runtimes::loaded(&pin, &crate::backends::packages::tests::js());
         let result = BuildResult {
             artifacts: vec![flick_backend::Artifact {
                 id: "main".into(),
@@ -342,6 +351,8 @@ mod tests {
             },
             sha256: sha256(b"component"),
         };
+        // the launch verifies with the backend that made the build
+        crate::backends::runtimes::loaded(&pin, &crate::backends::packages::tests::js());
         let result = BuildResult {
             artifacts: vec![flick_backend::Artifact {
                 id: "entry".into(),

@@ -107,11 +107,20 @@ pub(super) fn packages(files: &[ProjectFile], options: &[OptionValue]) -> Packag
         }
     }
     let root = option("root").unwrap_or_default().to_owned();
-    let mut roots: BTreeSet<String> = ["@flick-lang/runtime".to_owned()].into();
-    if option("runtime") == Some("effect") {
-        roots.insert(ADAPTER.to_owned());
-    }
-    roots.extend(names(&project, &["dependencies", "optionalDependencies"]));
+    // `packages` names the graphs to resolve, as a launch rechecks those of its build
+    // `packages` names the graphs to resolve, as a launch rechecks those of its build
+    let roots: BTreeSet<String> = if let Some(list) = option("packages") {
+        (list.split(',').filter(|n| !n.is_empty()))
+            .map(str::to_owned)
+            .collect()
+    } else {
+        let mut roots: BTreeSet<String> = ["@flick-lang/runtime".to_owned()].into();
+        if option("runtime") == Some("effect") {
+            roots.insert(ADAPTER.to_owned());
+        }
+        roots.extend(names(&project, &["dependencies", "optionalDependencies"]));
+        roots
+    };
     let mut runtime = Vec::new();
     for name in roots {
         if let Ok(Some(file)) = resolve(&mut known, &root, &name, true)
@@ -156,34 +165,35 @@ fn resolve<'a>(
     name: &str,
     project: bool,
 ) -> Result<Option<&'a ProjectFile>, ()> {
+    // every candidate an unknown one leaves open is asked for at once, so a
+    // level of the graph takes one round
+    let mut unknown = false;
     let mut dir = from;
     let mut first = true;
     loop {
         let is_modules = dir.rsplit('/').next() == Some("node_modules");
         if !is_modules {
-            let path = if first && project {
-                format!("node_modules/{name}/package.json")
-            } else {
-                format!(
-                    "{}/node_modules/{name}/package.json",
-                    dir.trim_end_matches('/')
-                )
-            };
-            // the patterns read the project's own node_modules entirely
             let found = if first && project {
+                // the patterns read the project's own node_modules entirely
+                let path = format!("node_modules/{name}/package.json");
                 Ok(known.files.get(path.as_str()).copied().flatten())
             } else {
-                known.get(&path)
+                known.get(&format!(
+                    "{}/node_modules/{name}/package.json",
+                    dir.trim_end_matches('/')
+                ))
             };
-            if let Some(file) = found? {
-                return Ok(Some(file));
+            match found {
+                Ok(Some(file)) if !unknown => return Ok(Some(file)),
+                Ok(_) => {}
+                Err(()) => unknown = true,
             }
         }
         first = false;
         match dir.rsplit_once('/') {
             Some((parent, _)) if !parent.is_empty() => dir = parent,
             Some(_) if dir != "/" => dir = "/",
-            _ => return Ok(None),
+            _ => return if unknown { Err(()) } else { Ok(None) },
         }
     }
 }
