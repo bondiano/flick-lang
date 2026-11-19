@@ -142,10 +142,19 @@ the compiler it is built with.
 ## Importing a package's `.d.ts`
 
 `flick ffi import <package> --out <dir>` reads the declarations of an
-installed package with TypeScript (through the Node helper
-`@flick-lang/dts-importer`, or the script `FLICK_DTS_IMPORTER` names) and
-writes `<dir>/<Pkg>/Generated.fl`, module `<Dir>.<Pkg>.Generated`
+installed package with TypeScript and writes `<dir>/<Pkg>/Generated.fl`,
+module `<Dir>.<Pkg>.Generated`
 (`date-fns` → `DateFns`), with a report of every selected export.
+`ffi` is a command of the JavaScript backend (`flick js:ffi import` names it
+in full; see [Contributed commands](../commands/)). It runs the importer the
+project installs, `pnpm add -D @flick-lang/dts-importer`, with the pinned
+`node`, which the project allows the backend:
+
+```toml
+[tools]
+"flick/js" = ["node"]
+```
+
 Package subpaths and npm aliases remain the exact import specifier supplied
 to the command; resolved package identity supplies version provenance, not
 a replacement import path.

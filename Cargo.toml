@@ -32,6 +32,20 @@ wasmtime = { version = "=48.0.8", default-features = false, features = ["runtime
 [profile.dev]
 debug = "line-tables-only"
 
+# Cranelift compiles a backend component when flick runs. Unoptimized it
+# takes half a minute for an official one, which every test with a fresh
+# cache would pay.
+[profile.dev.package.cranelift-codegen]
+opt-level = 3
+[profile.dev.package.cranelift-frontend]
+opt-level = 3
+[profile.dev.package.regalloc2]
+opt-level = 3
+[profile.dev.package.wasmtime-internal-cranelift]
+opt-level = 3
+[profile.dev.package.wasmparser]
+opt-level = 3
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

@@ -18,11 +18,13 @@ crate-type = ["cdylib", "rlib"]
 source-maps = []
 # a `match` written through its decision graph; without it, arm by arm
 decision-graph = []
-component = ["source-maps", "decision-graph", "dep:flick-backend", "dep:ciborium", "flick-ir/cbor"]
+component = ["source-maps", "decision-graph", "dep:flick-backend", "dep:ciborium", "dep:flick-diagnostics", "dep:flick-ffi", "flick-ir/cbor"]
 guest = ["component"]
 
 [dependencies]
 flick-backend = { path = "../../flick-backend", optional = true }
+flick-diagnostics = { path = "../../flick-diagnostics", optional = true }
+flick-ffi = { path = "../../flick-ffi", optional = true }
 ciborium = { version = "0.2.2", optional = true }
 flick-backend-support = { path = "../../flick-backend-support" }
 flick-ir = { path = "../../flick-ir" }
