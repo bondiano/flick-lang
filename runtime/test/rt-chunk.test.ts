@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { ChunkBranch, type Chunk } from "../src/core/chunk.ts";
-import { copyData, equals, hash } from "../src/core/data.ts";
+import { copyData, equals, hash, runtimeEquals } from "../src/core/data.ts";
 import { chunkAppend, chunkConcat, chunkEmpty, chunkFromList, chunkGet, chunkSize, chunkToList } from "../src/rt/chunk.ts";
 import { appendAll, findLast, findLastIndex, last, prepend, reduce, reduceRight, splitAt } from "../src/rt/effect/Chunk.ts";
 import { flickDiff, flickPatch } from "../src/rt/effect/Differ.ts";
@@ -70,6 +70,19 @@ test("repeated joins preserve order, structural equality and hashes across shape
   const [before, after] = splitAt(333)(right);
   assert.deepEqual(chunkToList(before), items.slice(0, 333));
   assert.deepEqual(chunkToList(after), items.slice(333));
+});
+
+test("flat chunks only delegate equality to branded sequences", () => {
+  const flat = chunkFromList([1]);
+  const unrelated = { [runtimeEquals]: () => true };
+  assert.equal(equals(flat, unrelated), false);
+  const opaque = new Proxy(unrelated, {
+    get(target, key, receiver: unknown): unknown {
+      if (key === runtimeEquals) throw new Error("unexpected equality hook read");
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  assert.equal(equals(flat, opaque), false);
 });
 
 test("chunk schemas validate the original chunk and read and write JSON arrays", () => {

@@ -58,8 +58,8 @@ export const runtimeEquals = /*#__PURE__*/ Symbol.for("@flick-lang/runtime/equal
 export const runtimeHash = /*#__PURE__*/ Symbol.for("@flick-lang/runtime/hash");
 /** A native sequence exposed through iteration instead of array indices. */
 export const runtimeSequence = /*#__PURE__*/ Symbol();
-export const isRuntimeSequence = (value: object, proto: unknown = Object.getPrototypeOf(value)): value is Iterable<unknown> =>
-  isObject(proto) && proto[runtimeSequence] === true;
+export const isRuntimeSequence = (value: object, carrier = value): value is Iterable<unknown> =>
+  runtimeSequence in carrier;
 
 /** A key `$0`, `$1` …: a dictionary a value of a GADT holds, which `==` and `hash` leave out. */
 const held = (k: string): boolean => k.charCodeAt(0) === 36;
@@ -88,7 +88,7 @@ export const equals = (a: unknown, b: unknown): boolean => {
     return hostEqual.call(a, b) === true;
   }
   // A flat chunk can compare with a tree through the tree's equality hook.
-  if (Array.isArray(a)) return Array.isArray(b) ? listEquals(equals, a, b) : equals(b, a);
+  if (Array.isArray(a)) return Array.isArray(b) ? listEquals(equals, a, b) : runtimeSequence in b && equals(b, a);
   if (Array.isArray(b)) return false;
   // Class instances without a Flick equality hook compare by identity.
   const proto: unknown = Object.getPrototypeOf(a);
@@ -403,7 +403,7 @@ export const copyThrough = (value: unknown, other: (value: object) => unknown): 
     if (typeof input !== "object" || input === null) { put(input); return; }
     let array: unknown = input;
     if (!Array.isArray(input)) {
-      const proto: unknown = Object.getPrototypeOf(input);
+      const proto = Reflect.getPrototypeOf(input);
       if (proto !== Object.prototype && proto !== null) {
         if (!isRuntimeSequence(input, proto)) { put(other(input)); return; }
         array = Array.from(input);
