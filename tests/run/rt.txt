@@ -345,6 +345,7 @@ ui/registry
 ui/route
 ui/serializable
 ui/server
+ui/siblings
 ui/stream
 ui/sync
 ui/sync_data
