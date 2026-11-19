@@ -465,3 +465,50 @@ let law = 1
   (identifier)
   (operator)
   (number))
+
+==================
+Contracts
+==================
+
+let dec x
+where
+  require (x > 0)
+  ensure (fun y -> y < x)
+=
+  x - 1
+let require = 1
+let r = r"raw"
+
+---
+
+(source_file
+  (keyword)
+  (identifier)
+  (identifier)
+  (keyword)
+  (keyword)
+  (parens
+    (identifier)
+    (operator)
+    (number))
+  (keyword)
+  (parens
+    (keyword)
+    (identifier)
+    (operator)
+    (identifier)
+    (operator)
+    (identifier))
+  (operator)
+  (identifier)
+  (operator)
+  (number)
+  (keyword)
+  (identifier)
+  (operator)
+  (number)
+  (keyword)
+  (identifier)
+  (operator)
+  (raw_string))
+

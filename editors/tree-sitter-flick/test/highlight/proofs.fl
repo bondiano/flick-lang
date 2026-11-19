@@ -17,3 +17,18 @@ class Functor (f : Type -> Type) =
   law identity (v : f a) where equal (map identity v) v
 //^ keyword
 //    ^ function
+
+dec : Int -> Int
+let dec x
+where
+  require (x > 0)
+//^ keyword
+  ensure (fun y -> y < x)
+//^ keyword
+=
+  x - 1
+
+inc : Int -> Int
+let inc x where ensure (fun y -> y > x) = x + 1
+//              ^ keyword
+

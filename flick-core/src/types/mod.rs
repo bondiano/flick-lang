@@ -70,6 +70,7 @@ pub(crate) use module_contract::{
     Mismatch as ModuleMismatch, check as check_module_contract,
     local_dictionaries as module_local_dictionaries,
 };
+mod contracts;
 mod expression_fact;
 mod origin;
 mod patterns;

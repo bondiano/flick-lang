@@ -138,6 +138,10 @@ syntax_kinds! {
         ProofKw,
         /// `law` before the name of a law in a class, a keyword only there.
         LawKw,
+        /// `require` and `ensure` at the head of an entry of a function's
+        /// contract, keywords only there.
+        RequireKw,
+        EnsureKw,
 
         // punctuation and operators
         LParen,
@@ -273,6 +277,12 @@ syntax_kinds! {
         /// `lawful C T [from d]`: the laws of `C` and its superclasses for a
         /// dictionary.
         LawfulGoal,
+        /// `where` and the entries of a function's contract, before its `=`.
+        Contract,
+        /// `require e`: the contract's precondition, a `Bool` of the parameters.
+        Requires,
+        /// `ensure e`: its postcondition, a function of the result to a `Bool`.
+        Ensures,
         Error,
 
         // nodes: expressions

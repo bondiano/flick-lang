@@ -11,6 +11,7 @@
 
 mod build;
 mod conditional;
+mod contracts;
 mod control;
 mod decl;
 mod expr;
@@ -141,7 +142,7 @@ fn continues(kind: SyntaxKind) -> bool {
         || kind.is_closer()
         || matches!(
             kind,
-            K::Pipe | K::ThenKw | K::ElseKw | K::WithKw | K::YieldKw | K::WhereKw
+            K::Pipe | K::ThenKw | K::ElseKw | K::WithKw | K::YieldKw | K::WhereKw | K::Eq
         )
 }
 
@@ -610,6 +611,8 @@ impl<'t> Parser<'t> {
 mod arrow_tests;
 #[cfg(test)]
 mod branch_tests;
+#[cfg(test)]
+mod contract_tests;
 #[cfg(test)]
 mod exposing_tests;
 #[cfg(test)]

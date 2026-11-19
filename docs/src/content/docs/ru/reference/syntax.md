@@ -1,6 +1,6 @@
 ---
 title: "Синтаксис"
-source_hash: 743ceb1713e801ac
+source_hash: b6b6ae6380f3b3f8
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -157,7 +157,9 @@ in when for yield do break continue
   операцией сервиса или эффекта и `return` перед образцом ветки `try` (см.
   [effects.md](../effects/#эффекты-и-handlers));
 - `proof` перед именем в начале объявления и `law` перед именем в начале
-  члена класса (см. [Объявления](#объявления)).
+  члена класса (см. [Объявления](#объявления));
+- `require` и `ensure` в начале пункта контракта функции, после `where` у
+  `let` (см. [Объявления](#объявления)).
 
 ### В модулях
 
@@ -186,6 +188,8 @@ in when for yield do break continue
 | `where` | Задаёт условие уточняющего типа, цель `proof` или `law` или фильтр в `sql { … }` | `where user.id == params.id` |
 | `proof` | Контекстное слово: перед именем в начале объявления формулирует свойство определений модуля и доказывает его; компилятор проверяет доказательство и стирает объявление; в других местах остаётся именем | `proof same where same_type a a = refl` |
 | `law` | Контекстное слово: перед именем в начале члена класса формулирует то, что выполняет каждый экземпляр; компилятор стирает закон, а цель `lawful` доказывает его для экземпляра; в других местах остаётся именем | `law identity (v : f a) where equal (map identity v) v` |
+| `require` | Контекстное слово: в начале пункта контракта функции задаёт предусловие для её параметров | `require (0 <= used)` |
+| `ensure` | Контекстное слово: в начале пункта контракта функции задаёт постусловие — функцию от результата | `ensure (fun r -> r >= 0)` |
 | `kind` | Объявляет кинд и его конструкторы на уровне типов | `kind Nullability = NonNull \| Nullable` |
 | `error` | В сочетании `type error` объявляет ожидаемую ошибку с номинальной идентичностью | `type error NotFound = NotFound UserId` |
 | `service` | Объявляет операции сервиса, реализация которого выбирается при выполнении | `service Clock = now : Unit ->{} Float` |
@@ -441,7 +445,7 @@ inline_module = "module" Con ["exposing" exposing] "=" indented { import | decl 
 module_contract = "type" "module" Con "=" indented { module_member }
 module_application = "module" Con "=" ModulePath "(" ModulePath { "," ModulePath } ")"
 signature   = name ":" type
-let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] "=" block
+let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] ["where" contract] "=" block
             | "let" "assert" pattern [":" type] "=" block ["as" String]
             | "let" "mut" name [":" type] "=" block            (только в блоке)
 rec_group   = "rec" "{" { signature | let } "}"
@@ -466,6 +470,7 @@ instance    = "instance" [context "=>"] type ["=" members]
 members     = block of: signature | let | type_decl
 class_members = block of: signature | let | type_decl | law
 law         = "law" name { atom_pattern | premise } "where" goal
+contract    = block of: "require" expr | "ensure" expr   // one entry inline
 foreign     = "foreign" [mode] name "from" ("global" String | String String) [metadata]
             | "foreign" "blocked" name String
 mode        = "pure" | "effect"
@@ -487,6 +492,23 @@ goal        = "same_type" atom atom | "lawful" type ["from" expr] | expr
 которому разрешается `C T`: тело — запись, которая называет доказательство
 для каждого закона, а запись каждого суперкласса держит в поле этого
 суперкласса, как словарь.
+
+Контракт функции стоит после `where` между её параметрами и `=`:
+`require e` — `Bool` от параметров, `ensure e` — функция от результата к
+`Bool`; по пункту в строке или один пункт в той же строке. Компилятор
+типизирует контракт по сигнатуре функции в отдельном контексте, поэтому
+контракт ничего не добавляет к типу функции и её словарям и нигде не
+исполняется. Проверяет его `flick prove`.
+
+```flick
+consume : Int -> Int -> Int
+let consume available used
+where
+  require (0 <= used && used <= available)
+  ensure (fun remaining -> 0 <= remaining && remaining + used == available)
+=
+  available - used
+```
 
 `module_application` объявляется только на уровне файла. Внутри
 `inline_module` он вызывает `FLICK-R019`; `module_contract` там разрешён.
