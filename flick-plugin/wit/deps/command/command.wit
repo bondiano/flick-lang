@@ -88,21 +88,56 @@ interface types {
         /// hands it their outputs instead of writing them, and writes the
         /// files of every plan together at the end.
         resume: option<list<u8>>,
+        /// What `resume` also gets, answered.
+        needs: list<need>,
     }
-    /// The answer to one request of a session and its state after it.
-    record handled { state: list<u8>, response: option<list<u8>> }
+    /// What the host reads for a module: `text` stands for its file, the
+    /// file as saved when none. `path` is absolute or relative to the root.
+    record source { path: string, text: option<string> }
+    /// What a command asks the host to compute before it goes on.
+    variant need {
+        /// The TypeScript projection of a module, analyzed as the language
+        /// server analyzes it. It imports the other modules of its project
+        /// as their `.fl` files and the rest from `.flick/projections` of
+        /// its project, which the host writes.
+        typescript(source),
+    }
+    /// Bytes `ts-start` to `ts-end` of a projection stand for bytes
+    /// `fl-start` to `fl-end` of its source; `exact` when they are the
+    /// same name.
+    record ts-span { ts-start: u32, ts-end: u32, fl-start: u32, fl-end: u32, exact: bool }
+    record typescript-module {
+        /// The module's file, absolute.
+        path: string,
+        /// The text it was analyzed with.
+        source: string,
+        text: string,
+        spans: list<ts-span>,
+    }
+    /// The host's answer to a need, in the order of the needs.
+    variant answer {
+        /// None when the file is no module of a project.
+        typescript(option<typescript-module>),
+    }
+    /// The answer to one request of a session and its state after it. With
+    /// `needs`, the host calls `handle` again with the same request, this
+    /// state and their answers.
+    record handled { state: list<u8>, response: option<list<u8>>, needs: list<need> }
+    /// How a session command starts: as a session, or as a plan it runs
+    /// once instead.
+    variant opened { session(list<u8>), plan(plan) }
 }
 
 interface command {
-    use types.{descriptor, invocation, plan, handled, diagnostic, file};
+    use types.{descriptor, invocation, plan, handled, diagnostic, file, answer, opened};
     describe: func() -> list<descriptor>;
     run: func(invocation: invocation) -> result<plan, list<diagnostic>>;
     /// The rest of a plan whose steps have run, with their outputs.
-    resume: func(state: list<u8>, outputs: list<file>) -> result<plan, list<diagnostic>>;
-    /// The state of a new session.
-    open: func(invocation: invocation) -> result<list<u8>, list<diagnostic>>;
+    resume: func(state: list<u8>, outputs: list<file>, answers: list<answer>) -> result<plan, list<diagnostic>>;
+    /// The state of a new session, or the plan it runs instead.
+    open: func(invocation: invocation) -> result<opened, list<diagnostic>>;
     /// A request of the session, as the bytes of one message.
-    handle: func(state: list<u8>, request: list<u8>) -> result<handled, string>;
+    handle: func(state: list<u8>, request: list<u8>, answers: list<answer>) -> result<handled, string>;
     /// The plan of a session that ends.
     close: func(state: list<u8>) -> plan;
 }

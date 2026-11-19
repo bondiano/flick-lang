@@ -179,6 +179,7 @@ pub(super) fn handle(state: &[u8], request: &[u8]) -> Result<Handled, String> {
     Ok(Handled {
         state: vec![count],
         response,
+        needs: vec![],
     })
 }
 

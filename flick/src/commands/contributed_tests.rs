@@ -1,6 +1,9 @@
-use flick_backend::command::{Descriptor, Parameter, Style, ValueKind};
+use std::path::Path;
+
+use flick_backend::command::{Argument, Descriptor, Parameter, Style, ValueKind};
 use flick_core::diagnostics::codes;
 
+use super::inputs::common_root;
 use super::{Contributed, Source, arguments, resolve};
 
 fn descriptor(name: &str) -> Descriptor {
@@ -109,4 +112,23 @@ fn arguments_follow_the_descriptor() {
         [("who", &words("world")[..]), ("loud", &words("true")[..])]
     );
     assert!(arguments(&descriptor("hello"), "literal", &words("--quiet")).is_err());
+}
+
+#[test]
+fn outside_a_project_the_root_holds_the_working_directory_and_each_path() {
+    let mut d = descriptor("content-mapper");
+    d.options.push(Parameter {
+        name: "declarations".into(),
+        kind: ValueKind::Path,
+        multiple: true,
+        required: false,
+        help: String::new(),
+    });
+    let arguments = vec![Argument {
+        name: "declarations".into(),
+        values: vec!["/repo/target/tmp/site/src".into(), "here".into()],
+    }];
+    let cwd = Path::new("/repo/tools/astro");
+    assert_eq!(common_root(&d, &arguments, cwd), Path::new("/repo"));
+    assert_eq!(common_root(&d, &[], cwd), cwd);
 }

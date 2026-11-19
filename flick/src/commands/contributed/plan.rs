@@ -19,6 +19,7 @@ use flick_core::source::{FileId, SourceMap, Span};
 
 use super::Contributor;
 use super::inputs::{expand, normal, under};
+use super::projection::Projections;
 use crate::args::GlobalArguments;
 use crate::artifact::{Artifact, validate_destination_paths};
 use crate::backends::{Reads, Tool, authorize, run_steps};
@@ -115,6 +116,7 @@ pub(super) fn chain(
     let cancel = component::cancellation().map_err(refused)?;
     component::cancel_on_signals();
     let mut files: Vec<Artifact> = Vec::new();
+    let mut projections = Projections::default();
     for round in 1..=ROUNDS {
         done.stdout.append(&mut plan.stdout);
         done.diagnostics.append(&mut plan.diagnostics);
@@ -154,9 +156,13 @@ pub(super) fn chain(
         .map_err(|why| Diagnostic::new(codes::P050, Severity::Error, why))?;
         files.extend(result.artifacts.into_iter().map(Artifact::from));
         let Some(state) = plan.resume.take() else {
+            if !plan.needs.is_empty() {
+                return Err(refused("it needs what it does not resume with".into()));
+            }
             files.extend(outputs);
             return Ok(Some(files));
         };
+        let answers = projections.answer(root, &plan.needs);
         if round == ROUNDS {
             break;
         }
@@ -167,7 +173,7 @@ pub(super) fn chain(
                 bytes: a.contents,
             })
             .collect();
-        match contributor.resume(state, outputs) {
+        match contributor.resume(state, outputs, answers) {
             Ok(next) => plan = next,
             Err(diagnostics) => {
                 done.diagnostics.extend(diagnostics);

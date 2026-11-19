@@ -29,7 +29,6 @@ mod commands;
 mod component;
 mod fetch;
 mod lsp;
-mod mapper;
 mod package_cache;
 mod plugins;
 mod progress;
@@ -287,10 +286,6 @@ fn dispatch(args: CommandArguments) -> ExitCode {
         Commands::Doctor => report(commands::doctor(global), global),
         Commands::Inspect(o) => report(commands::inspect(&o, project), global),
         Commands::Lsp(_) => lsp::serve(),
-        Commands::ContentMapper(o) => match o.declarations {
-            Some(paths) => mapper::declarations(&paths),
-            None => mapper::serve(),
-        },
         Commands::External(words) => external(&words, global),
     }
 }
