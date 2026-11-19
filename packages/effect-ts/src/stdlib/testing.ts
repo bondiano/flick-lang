@@ -29,11 +29,6 @@ export {
   testProperty,
   testPure,
   testSkip,
-  testTimeout,
-  testBeforeAll,
-  testBeforeEach,
-  testAfterEach,
-  testAfterAll,
 } from "@flick-lang/runtime/core/testing";
 export type { Assertion, Gen, Rng } from "@flick-lang/runtime/core/testing";
 export { parseTestArgs } from "@flick-lang/runtime/core/suites";
@@ -49,6 +44,15 @@ type Leaf = Core.Leaf<Task, AnyLayer>;
 type Named = Core.Named<Task, AnyLayer>;
 
 export const testEffect = (name: string, task: Task): Test => Object.freeze({ kind: "effect", name, task });
+
+/** `Test.before_all` and the other hooks of the group they are in. */
+export const testBeforeAll = (task: Task): Test => Core.testBeforeAll(task);
+export const testBeforeEach = (task: Task): Test => Core.testBeforeEach(task);
+export const testAfterEach = (task: Task): Test => Core.testAfterEach(task);
+export const testAfterAll = (task: Task): Test => Core.testAfterAll(task);
+
+/** `Test.timeout`: the test, and each test in it without a timeout of its own, given `millis`. */
+export const testTimeout = (millis: number, test: Test): Test => Core.testTimeout(millis, test);
 
 /** The service `Test.VirtualTime`: a test that may move its clock. */
 const VirtualTime = /*#__PURE__*/ service("Test.VirtualTime");

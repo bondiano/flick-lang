@@ -30,11 +30,6 @@ export {
   testProperty,
   testPure,
   testSkip,
-  testTimeout,
-  testBeforeAll,
-  testBeforeEach,
-  testAfterEach,
-  testAfterAll,
 } from "../core/testing.ts";
 
 /** A task: a function of nothing that runs when called. */
@@ -45,6 +40,15 @@ type Suite = Core.Suite<Task, Layer>;
 type Named = Core.Named<Task, Layer>;
 
 export const testEffect = (name: string, task: Task): Test => Object.freeze({ kind: "effect", name, task });
+
+/** `Test.before_all` and the other hooks of the group they are in. */
+export const testBeforeAll = (task: Task): Test => Core.testBeforeAll(task);
+export const testBeforeEach = (task: Task): Test => Core.testBeforeEach(task);
+export const testAfterEach = (task: Task): Test => Core.testAfterEach(task);
+export const testAfterAll = (task: Task): Test => Core.testAfterAll(task);
+
+/** `Test.timeout`: the test, and each test in it without a timeout of its own, given `millis`. */
+export const testTimeout = (millis: number, test: Test): Test => Core.testTimeout(millis, test);
 
 /** `Test.clock_test`: an effect test on a test clock of its own, made for each run. */
 export const testClock = (name: string, task: Task): Test =>

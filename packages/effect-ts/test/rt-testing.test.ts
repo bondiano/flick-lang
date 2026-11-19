@@ -251,6 +251,7 @@ test("a test out of time is interrupted, cleaned up and reported as such", async
     testEffect(name, function* (): Run {
       yield sleep(new Duration(HOUR));
       log.push(`${name} woke`);
+      return undefined;
     });
   const modules: Parameters<typeof runTests>[0] = [
     [
