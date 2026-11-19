@@ -23,8 +23,8 @@ flick literal:literal-hello you --out greetings
   `FLICK-P053`, which lists the qualified names.
 - A contributor cannot take a name of `flick` itself, as `build`. Such a
   declaration is ignored, with the warning `FLICK-P054`.
-- A name nobody adds is `FLICK-P052`. When a contributor the store has
-  seen adds it, the message names that contributor.
+- A name nobody adds is `FLICK-P052`. When an official backend or a
+  contributor the store has seen adds it, the message names that one.
 
 Outside a project only the core commands run, since a contributed command
 belongs to the project whose backend or dependency adds it.
