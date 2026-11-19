@@ -124,6 +124,25 @@ fn transactions_and_cancellation(emit: &str) {
     assert_eq!(sleeping, "0");
 }
 
+/// `outcomes.fl`: a transaction commits on success, rolls back on a typed
+/// error or a defect, and drops its connection when interrupted.
+fn transaction_outcomes(emit: &str) {
+    let (_container, url) = prepared();
+    run_program("outcomes", emit, &url);
+}
+
+#[test]
+#[ignore = "needs Docker and the installed runtime"]
+fn transaction_outcomes_against_postgres() {
+    transaction_outcomes("js");
+}
+
+#[test]
+#[ignore = "needs Docker and Go"]
+fn transaction_outcomes_against_postgres_on_go() {
+    transaction_outcomes("go");
+}
+
 /// `migrate.fl` on a fresh database: it makes its own schema.
 fn migrations(emit: &str) {
     let (_container, url) = start();

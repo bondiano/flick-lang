@@ -122,3 +122,92 @@ the services of the call, in a region `t` of its own. It assumes
 `Fiber.Provided r t`: a finalizer it registers there, such as the release
 of `Resource.acquire_release`, may use those services, whose providers
 outlive `t` as they outlive the resource's region.
+
+## Pools, transactions and servers
+
+These resources of the standard library decide by how the work that held
+them ended, as a `close_exit` does:
+
+| Resource | Success | Typed error | Defect | Interruption |
+| - | - | - | - | - |
+| an item of `Pool.get` or `Pool.use` | back to the pool | back to the pool | released, the pool acquires another | released, the pool acquires another |
+| `Database.transaction` | committed | rolled back | rolled back | its connection is closed, and the server rolls back |
+| `Http.Server.serve`, `HttpApi.listen` | drained | drained | drained | drained |
+
+A defect or an interruption may leave a pooled item, such as a connection,
+broken in the middle of its work, so the pool does not lend it again;
+`Pool.invalidate` still drops an item by hand. A transaction whose `COMMIT`
+loses its answer fails with the code `"commit_unknown"`
+([sql](../sql/)). However the scope of a server ends, it stops accepting
+connections and waits for the requests in flight and their finalizers, at
+most the graceful shutdown timeout. Run cases:
+`tests/run/stdlib/effect/pool_outcomes.fl`,
+`tests/run/stdlib/http/drain_outcomes.fl` and, against PostgreSQL,
+`tests/postgres/outcomes.fl`.
+
+## Cleanup and control effects
+
+A finalizer of a scope, the release of `Resource.acquire_release` and the
+close of an owned value run when the scope closes, after its handlers may
+have let the body go, so they perform no `control` operation
+(`Detached`, `FLICK-E017`). The cleanup of `Effect.ensuring`,
+`Effect.on_exit`, `Effect.on_interrupt` and the release of
+`Resource.bracket` runs in the fiber of the body, right after it, and may:
+
+- when the body ended with a value, a typed error or a defect, the cleanup
+  runs as any code, and its operations are answered;
+- when the body was interrupted, or an `abort` (or a `control` arm that let
+  it go) unwinds through it, a `control` operation of a handler around the
+  cleanup is cut off: its arm does not run and the cleanup stops there,
+  while the interruption or the unwind goes on as it was. A handler the
+  cleanup installs itself still answers.
+
+```flick
+effect Emit =
+  control emit : String ->{} Unit
+
+effect Stop =
+  abort stop : forall b. String ->{} b
+
+say : String ->{} Unit
+let say line = Host.raw_stdout_line line
+
+collect : forall r e. (Unit ->{Emit | r; e} Unit) ->{r; e} List String
+let collect body =
+  try body () with
+  | Emit.emit x -> [x] ++ resume ()
+  | return () -> []
+
+stopping : forall r e. (Unit ->{Stop | r; e} Unit) ->{r; e} String
+let stopping body =
+  try
+    body ()
+    "no stop"
+  with
+  | Stop.stop why -> "stopped: " ++ why
+
+cleanup : Eff {Emit} none Unit
+let cleanup = task {
+  say "cleanup begins"
+  Emit.emit "cleanup"
+  say "cleanup ends"
+}
+
+main : Unit ->{} Unit
+let main () =
+  say (show (collect (fun () -> Effect.ensuring cleanup (task { say "body" }))))
+  say (show (collect (fun () -> say (stopping (fun () -> Effect.ensuring cleanup (task { Stop.stop "why" }))))))
+```
+
+On Go and Flick's own runtime this prints the following; the Effect adapter
+runs no `control` arm (`FLICK-P012`):
+
+```text
+body
+cleanup begins
+cleanup ends
+["cleanup"]
+cleanup begins
+stopped: why
+[]
+```

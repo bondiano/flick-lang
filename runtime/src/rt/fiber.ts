@@ -155,6 +155,8 @@ export class Fiber {
   mask = 0;
   /** Who asked it to stop, 0 for nobody; sticky. */
   requested = 0;
+  /** The newest handler a cleanup cuts off (`cleanupAfter` in handle.ts). */
+  cut = 0;
   /** While it is suspended, what stops the wait, and whether it waits at all. */
   suspended = false;
   declare cancel: (() => void) | undefined;

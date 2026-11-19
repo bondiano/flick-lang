@@ -1,6 +1,6 @@
 ---
 title: "Ресурсы и их освобождение"
-source_hash: e2b30d4d6138e8be
+source_hash: 2424582952f75105
 ---
 
 `scope` владеет тем, что получено в нём, и освобождает это, когда его тело
@@ -127,3 +127,92 @@ let twice () = scope {
 `Fiber.Provided r t`: финализатор, который оно там регистрирует, например
 освобождение из `Resource.acquire_release`, может использовать эти
 сервисы, поскольку их поставщики переживают `t` так же, как регион ресурса.
+
+## Пулы, транзакции и серверы
+
+Эти ресурсы стандартной библиотеки поступают так, как закончилась работа,
+которая их держала, как это делает `close_exit`:
+
+| Ресурс | Успех | Типизированная ошибка | Дефект | Прерывание |
+| - | - | - | - | - |
+| элемент `Pool.get` или `Pool.use` | возвращается в пул | возвращается в пул | освобождается, пул получает новый | освобождается, пул получает новый |
+| `Database.transaction` | фиксируется | откатывается | откатывается | её соединение закрывается, и сервер её откатывает |
+| `Http.Server.serve`, `HttpApi.listen` | дожидается запросов | дожидается запросов | дожидается запросов | дожидается запросов |
+
+Дефект или прерывание могут оставить элемент пула, например соединение,
+сломанным посреди работы, поэтому пул больше его не выдаёт;
+`Pool.invalidate` по-прежнему убирает элемент вручную. Транзакция, у
+которой потерян ответ на `COMMIT`, завершается ошибкой с кодом
+`"commit_unknown"` ([sql](../sql/)). Как бы ни закончилась область сервера,
+он перестаёт принимать соединения и ждёт выполняющиеся запросы и их
+финализаторы, не дольше времени корректной остановки. Проверки:
+`tests/run/stdlib/effect/pool_outcomes.fl`,
+`tests/run/stdlib/http/drain_outcomes.fl` и, на PostgreSQL,
+`tests/postgres/outcomes.fl`.
+
+## Очистка и эффекты control
+
+Финализатор области, освобождение из `Resource.acquire_release` и
+закрытие значения во владении выполняются при закрытии области, когда её
+обработчики уже могли отпустить тело, поэтому операций `control` они не
+выполняют (`Detached`, `FLICK-E017`). Очистка `Effect.ensuring`,
+`Effect.on_exit`, `Effect.on_interrupt` и освобождение в `Resource.bracket`
+выполняются в файбере тела сразу после него и могут их выполнять:
+
+- если тело завершилось значением, типизированной ошибкой или дефектом,
+  очистка выполняется как обычный код, и на её операции отвечают;
+- если тело прервано или через него раскручивается `abort` (или арм
+  `control`, отпустивший тело), операция `control` обработчика вокруг
+  очистки обрывается: её арм не выполняется и очистка на ней
+  останавливается, а прерывание или раскрутка продолжаются как были.
+  Обработчик, который очистка установила сама, по-прежнему отвечает.
+
+```flick
+effect Emit =
+  control emit : String ->{} Unit
+
+effect Stop =
+  abort stop : forall b. String ->{} b
+
+say : String ->{} Unit
+let say line = Host.raw_stdout_line line
+
+collect : forall r e. (Unit ->{Emit | r; e} Unit) ->{r; e} List String
+let collect body =
+  try body () with
+  | Emit.emit x -> [x] ++ resume ()
+  | return () -> []
+
+stopping : forall r e. (Unit ->{Stop | r; e} Unit) ->{r; e} String
+let stopping body =
+  try
+    body ()
+    "no stop"
+  with
+  | Stop.stop why -> "stopped: " ++ why
+
+cleanup : Eff {Emit} none Unit
+let cleanup = task {
+  say "cleanup begins"
+  Emit.emit "cleanup"
+  say "cleanup ends"
+}
+
+main : Unit ->{} Unit
+let main () =
+  say (show (collect (fun () -> Effect.ensuring cleanup (task { say "body" }))))
+  say (show (collect (fun () -> say (stopping (fun () -> Effect.ensuring cleanup (task { Stop.stop "why" }))))))
+```
+
+В Go и в собственной среде выполнения Flick программа печатает следующее;
+адаптер Effect армы `control` не выполняет (`FLICK-P012`):
+
+```text
+body
+cleanup begins
+cleanup ends
+["cleanup"]
+cleanup begins
+stopped: why
+[]
+```
