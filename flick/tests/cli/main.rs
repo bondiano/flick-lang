@@ -52,6 +52,7 @@ pub mod source_packages;
 pub mod test_blocks;
 pub mod test_command;
 pub mod test_companions;
+pub mod test_hooks;
 pub mod test_suite;
 pub mod wasm_demo;
 pub mod workflows;

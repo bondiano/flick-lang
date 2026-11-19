@@ -174,7 +174,9 @@ syntax "var_absurd" : tactic
 
 /-- `LeLive t t'` of concrete types: the same type, an arrow or a computation whose stage
 and reach widen, a record whose fields do, or data whose arguments do by their variances.
-A constructor's type `Sig.ctorTy` is written out first. -/
+A constructor's type `Sig.ctorTy` is written out first. An invariant argument that is a
+capture row, as the one data with hidden storage takes, is equal by its set: an instance
+writes it `Caps.substT σ C`, the type it is compared with as the set that comes to. -/
 syntax "le_live" : tactic
 macro_rules
   | `(tactic| le_live) => `(tactic| first
@@ -188,7 +190,8 @@ macro_rules
     | (refine LeLive.data_of rfl rfl ?_
        simp only [DataArgs]
        repeat' (first | apply And.intro | intro _)
-       all_goals first | trivial | exact Caps.Sub.refl _ | rfl | le_live | caps_set | var_absurd))
+       all_goals first | trivial | exact Caps.Sub.refl _ | rfl | le_live | caps_set |
+         exact congrArg Ty.caps (by caps_set) | var_absurd))
 
 theorem le_of_eq {S : Sig} {a b : Ty} (h : a = b) : LeLive S a b := h ▸ .refl
 

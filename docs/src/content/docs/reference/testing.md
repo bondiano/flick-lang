@@ -124,6 +124,80 @@ test.only "being written" { Test.expect (Test.equal 2 (1 + 1)) }
 A skipped case inside a suite marked `only` stays skipped. `Test.skip` and
 `Test.only` mark a test built by hand the same way.
 
+## Hooks
+
+A suite's hooks run around the cases of the suite that the run selects, its
+nested suites' included:
+
+| Hook | Runs |
+| - | - |
+| `before_all { … }` | once, in the suite's scope, before its first selected case |
+| `before_each { … }` | in each selected case's scope, before the body |
+| `after_each { … }` | after each selected case, as a finalizer of the case's scope |
+| `after_all { … }` | once, after the suite's last selected case, as a finalizer of the suite's scope |
+
+```flick
+module App.StoreTest
+
+suite "store" {
+  before_all { Platform.stdout_line "open the store" }
+  before_each { Platform.stdout_line "begin" }
+  after_each { Platform.stdout_line "roll back" }
+  after_all { Platform.stdout_line "close the store" }
+
+  test "keeps a user" {}
+
+  suite "names" {
+    before_each { Platform.stdout_line "load the names" }
+    test "trims" {}
+  }
+}
+```
+
+Setup runs outer to inner and cleanup inner to outer: for `store > names >
+trims`, `open the store`, then `begin`, `load the names`, the body and
+`roll back`; `close the store` comes after the suite's last case. A suite
+with no selected case, a skipped case and a filtered-out case run no hooks.
+Hooks of one kind run in the order written, and their cleanup in reverse.
+
+A failed `before_all` reports each selected case of its suite as a `setup`
+failure and runs none of them; a failed `before_each` fails its case's
+`setup` and skips the body. Cleanup still runs: the `after_*` hooks of the
+suite and of those around it, as do the finalizers of the case's scope,
+also after a timeout or an interruption. A failed `after_*` hook is the
+`cleanup` failure of the case, next to its own. A hook's body is a task, as
+a test's is, and `Test.before_all` and the others add a hook to a group
+built by hand.
+
+## Timeouts
+
+`timeout <millis>` after a case's name gives it that many milliseconds for
+its `before_each` hooks and its body, and after a suite's name gives them to
+each case inside without its own. A case out of time is interrupted, its
+scope closes, its `after_*` hooks run, and it is reported as `timeout`.
+`--timeout` gives the cases without one theirs; by default a case has no
+time limit.
+
+A suite's hooks have its time too, its own `timeout` or the one around it,
+the run's `--timeout` included: each `before_all`, `after_each` and
+`after_all` hook, which is part of no case's time. A `before_all` out of
+time reports each selected case of the suite as `setup` (`before_all timed
+out after 50 ms`), and the suite's `after_*` hooks still run; an `after_*`
+hook out of time is the `cleanup` failure of its case, or of the suite's
+last case, and the run goes on. A hung hook therefore cannot hang a run
+that has a timeout.
+
+```flick
+module App.SlowTest
+
+suite "network" timeout 5000 {
+  test "answers" timeout 500 {}
+  test "retries" {}
+}
+```
+
+`Test.timeout` does the same for a test built by hand.
+
 ## Running
 
 `flick test` builds the project with its test root into `.flick/test/` and
@@ -137,6 +211,7 @@ executable (`--emit go`), with the same names and reports on each.
 | `--forbid-only` | fail with exit code `1`, before running any case, when a case of the run is marked `only` |
 | `--jobs <n>` | at most `n` cases at a time, `1` by default |
 | `--seed <n>` | the seed of the generators; a failed run prints the one it used |
+| `--timeout <duration>` | the time of each case without a `timeout` of its own: `500ms`, `5s`, `2m` or milliseconds |
 | `--reporter human\|json` | lines per case and a summary, or one JSON object |
 | `--watch` | run again when a file of the project changes |
 
@@ -148,7 +223,7 @@ flick test --forbid-only
 ```
 
 Each result is `passed`, `failed` with what failed (`assertion`, `failure`,
-`defect`, `cleanup` or `interrupted`), or `skipped`. The summary counts the
+`defect`, `setup`, `timeout`, `cleanup` or `interrupted`), or `skipped`. The summary counts the
 skipped cases, and the JSON report has a `skipped` count when there are any.
 The exit code is `0` when every case that ran passed, `1` otherwise, and
 `130` after SIGINT; skipped cases fail nothing.
@@ -157,7 +232,7 @@ The exit code is `0` when every case that ran passed, `1` otherwise, and
 
 | Problem | Diagnostic |
 | - | - |
-| a block without a name or braces, an unknown modifier, or a suite holding something other than `test` and `suite` blocks | `std/T001` |
+| a block without a name or braces, an unknown modifier, a `timeout` without its milliseconds, a hook with a name, or a suite holding something other than cases and hooks | `std/T001` |
 | two cases of one suite, or two blocks of one module, with the same name | `std/T002` |
 | a module with blocks that declares `tests` by hand | `FLICK-R008` |
 | an error in a test's body | the usual one, at that code |

@@ -1,7 +1,8 @@
-//! The layout of a block: the name and `{`, then each case a line, one
-//! level in, after its `///` lines and a blank line where one was; a test's
-//! body, laid out by the compiler, on the line of its `{` where it was
-//! written there, else on the lines under its name; `{}` for an empty one.
+//! The layout of a block: the name, the timeout and `{`, then each case and
+//! hook a line, one level in, after its `///` lines and a blank line where
+//! one was; a body, laid out by the compiler, on the line of its `{` where
+//! it was written there, else on the lines under its name; `{}` for an
+//! empty one.
 
 use flick_plugin::{Block, Compiler, Hole, HoleKind, Piece, Span};
 
@@ -17,25 +18,35 @@ pub fn format(block: &Block, compiler: &mut dyn Compiler) -> Option<Vec<Piece>> 
     Some(out)
 }
 
-/// The pieces of `item` after its word: its modifier, its name and the
-/// braces with what is inside.
+/// The pieces of `item` after its word: its modifier, its name, its
+/// timeout and the braces with what is inside; of a hook, the braces.
 fn rest(block: &Block, item: &Item, out: &mut Vec<Piece>) {
-    if let Some(modifier) = item.modifier {
-        text(out, ".");
-        text(out, block.text_of(modifier));
-        text(out, " ");
+    if !matches!(item.kind, Kind::Hook(_)) {
+        if let Some(modifier) = item.modifier {
+            text(out, ".");
+            text(out, block.text_of(modifier));
+            text(out, " ");
+        }
+        text(out, block.text_of(item.name));
     }
-    text(out, block.text_of(item.name));
+    if let Some((word, millis)) = item.timeout {
+        text(out, " ");
+        text(out, block.text_of(word));
+        text(out, " ");
+        out.push(hole(millis));
+    }
     text(out, " {");
     match &item.kind {
-        Kind::Test(None) => {}
+        Kind::Test(None) | Kind::Hook(None) => {}
         // a body written on the line of its `{` is one expression, which stays there
-        Kind::Test(Some(body)) if before(block, body.start) == Some(b'{') => {
+        Kind::Test(Some(body)) | Kind::Hook(Some(body))
+            if before(block, body.start) == Some(b'{') =>
+        {
             text(out, " ");
             out.push(hole(*body));
             text(out, " ");
         }
-        Kind::Test(Some(body)) => {
+        Kind::Test(Some(body)) | Kind::Hook(Some(body)) => {
             out.push(Piece::Indent);
             out.push(Piece::Line);
             out.push(hole(*body));
@@ -59,7 +70,7 @@ fn rest(block: &Block, item: &Item, out: &mut Vec<Piece>) {
                     out.push(Piece::Line);
                 }
                 text(out, block.text_of(word));
-                if inner.modifier.is_none() {
+                if inner.modifier.is_none() && !matches!(inner.kind, Kind::Hook(_)) {
                     text(out, " ");
                 }
                 rest(block, inner, out);

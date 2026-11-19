@@ -251,6 +251,8 @@ let tests =
 | `Test.property name gen check` | `check` on 100 values of `gen`, drawn from the run's seed; `Gen.function result` (for a `Hash` argument) draws pure functions, as a law over functions needs |
 | `Test.group name tests` | `name >` before the names of `tests` |
 | `Test.skip test`, `Test.only test` | the test, and each test in it, skipped or marked `only` (see [testing](../testing/#full-names-skip-and-only)) |
+| `Test.before_all task`, `before_each`, `after_each`, `after_all` | a hook of the group, or the module, whose list it is in, run around the tests of it that the run selects (see [testing](../testing/#hooks)) |
+| `Test.timeout millis test` | the test, and each test in it without its own, given `millis` for its `before_each` hooks and its body (see [testing](../testing/#timeouts)) |
 | `Test.suite name layer specs` | tests that share what `layer` makes: built once, before the first of them that runs, and released after the last, the `beforeAll` and `afterAll` of the suite; each spec, `Test.it name task`, is an `effect_test` with the layer's services, and a failed build fails each of them |
 
 A suite of end-to-end tests starts what they need once, such as a database

@@ -231,6 +231,14 @@ fn a_refined_type_is_laid_out_by_its_plugin() {
 }
 
 #[test]
+fn a_hook_lays_out_as_a_case_without_a_name_and_a_timeout_after_the_name() {
+    let messy = "module App.DbTest\n\nsuite \"Db\"   timeout   2000 {\n    before_all {   Platform.stdout_line \"open\" }\n\n  before_each {\n       Platform.stdout_line \"begin\"\n  }\n  test \"reads\"  timeout 50   {}\n  after_all {}\n}\n";
+    let tidy = "module App.DbTest\n\nsuite \"Db\" timeout 2000 {\n  before_all { Platform.stdout_line \"open\" }\n\n  before_each {\n    Platform.stdout_line \"begin\"\n  }\n  test \"reads\" timeout 50 {}\n  after_all {}\n}\n";
+    assert_eq!(super::fmt(messy), tidy);
+    assert_eq!(super::fmt(tidy), tidy);
+}
+
+#[test]
 fn a_suite_lays_out_a_case_a_line_and_a_modifier_after_its_head() {
     let messy = "module App.UsersTest\n\nsuite.skip   \"Users\"   {\n  /// the common case\n    test \"trims\" {   Test.expect (Test.equal 1 1) }\n\n  test.only \"keeps\" {\n       let a = 1\n       Test.expect (Test.equal a 1)\n  }\n  suite \"empty\" { test \"todo\" {} }\n}\n\ntest   \"alone\" {   Test.expect (Test.equal 2 2) }\n\ntest \"lines\" {\n      Test.expect (Test.equal 3 3)\n}\n";
     let tidy = "module App.UsersTest\n\nsuite.skip \"Users\" {\n  /// the common case\n  test \"trims\" { Test.expect (Test.equal 1 1) }\n\n  test.only \"keeps\" {\n    let a = 1\n    Test.expect (Test.equal a 1)\n  }\n  suite \"empty\" {\n    test \"todo\" {}\n  }\n}\n\ntest \"alone\" { Test.expect (Test.equal 2 2) }\n\ntest \"lines\" {\n  Test.expect (Test.equal 3 3)\n}\n";

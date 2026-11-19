@@ -116,6 +116,13 @@ type test struct {
 	layer Value // suite
 	// "skip" or "only", of Test.skip and Test.only: for it and each test in it
 	mode string
+	// the kind of a hook, "before_all", "before_each", "after_each" or
+	// "after_all", whose task is `task`; the hooks of a group with them
+	when  string
+	hooks *groupHooks
+	// the milliseconds of Test.timeout, for it and each test in it without its own
+	timeout float64
+	timed   bool
 }
 
 func TestPure(name, body Value) Value   { return &test{name: name.(string), body: body} }
@@ -142,105 +149,48 @@ func failed(a Value) (string, bool) {
 type named struct {
 	name string
 	test *test
-	// the suites it is in, outermost first
+	// the suites it is in, outermost first: those of Test.suite and the
+	// groups with hooks
 	suites []*test
-	// whether it or a group it is in is skipped, or marked only
-	skip, only bool
+	marks
 }
 
-// flatten is the tests with their full names, `Module > group > name`.
-func flatten(prefix string, tests []Value, out []named, suites []*test, skip, only bool) []named {
+// marks are what a test inherits from the groups it is in: whether it or
+// one of them is skipped, or marked only, and the innermost timeout.
+type marks struct {
+	skip, only bool
+	timeout    float64
+	timed      bool
+}
+
+// flatten is the tests with their full names, `Module > group > name`; the
+// hooks of a list make it, the module's or a group's, a suite of the tests
+// under it, whose timeout, its own or the one around it, its hooks have too.
+func flatten(prefix string, tests []Value, out []named, suites []*test, m marks) []named {
+	if h := hooksOf(tests); h != nil {
+		level := &test{name: prefix, hooks: h, timeout: m.timeout, timed: m.timed}
+		suites = append(suites[:len(suites):len(suites)], level)
+	}
 	for _, v := range tests {
 		t := v.(*test)
+		if t.when != "" {
+			continue
+		}
 		name := prefix + " > " + t.name
-		skip, only := skip || t.mode == "skip", only || t.mode == "only"
+		own := marks{skip: m.skip || t.mode == "skip", only: m.only || t.mode == "only", timeout: m.timeout, timed: m.timed}
+		if t.timed {
+			own.timeout, own.timed = t.timeout, true
+		}
 		switch {
 		case t.layer != nil:
-			out = flatten(name, t.group, out, append(suites[:len(suites):len(suites)], t), skip, only)
+			out = flatten(name, t.group, out, append(suites[:len(suites):len(suites)], t), own)
 		case t.group != nil:
-			out = flatten(name, t.group, out, suites, skip, only)
+			out = flatten(name, t.group, out, suites, own)
 		default:
-			out = append(out, named{name, t, suites, skip, only})
+			out = append(out, named{name, t, suites, own})
 		}
 	}
 	return out
-}
-
-// suiteRun is a suite in a run: an owner of its own, into which its layer
-// is built before its first selected test, and which closes after its last.
-type suiteRun struct {
-	once      sync.Once
-	fiber     Fiber
-	services  Services
-	failure   *Cause
-	mu        sync.Mutex
-	remaining int
-}
-
-// suiteRuns is the run of each suite of the selected tests.
-func suiteRuns(fb *Fiber, selected []named) map[*test]*suiteRun {
-	runs := map[*test]*suiteRun{}
-	for _, t := range selected {
-		for _, s := range t.suites {
-			if runs[s] == nil {
-				owner := newOwner()
-				owner.defects = &defects{}
-				runs[s] = &suiteRun{fiber: Fiber{state: newState(), env: fb.env, owner: owner, candidate: owner}}
-			}
-			runs[s].remaining++
-		}
-	}
-	return runs
-}
-
-// enter is the fiber `inner` with the services of these suites, each built
-// on first use; a failed build fails the test.
-func enter(inner *Fiber, suites []*test, runs map[*test]*suiteRun) *Fiber {
-	for _, s := range suites {
-		run := runs[s]
-		run.once.Do(func() {
-			built, failure := catch(func() Value {
-				return buildWith(&run.fiber, layerOf(s.layer), currentMemo(&run.fiber), run.fiber.owner)
-			})
-			if run.failure = failure; failure == nil {
-				run.services = built.(Services)
-			}
-		})
-		if run.failure != nil {
-			panic(&Failure{run.failure})
-		}
-		inner = provided(inner, run.services)
-	}
-	return inner
-}
-
-// leave closes the suites this test ended; why one failed to close.
-func leave(suites []*test, runs map[*test]*suiteRun) string {
-	failed := ""
-	for i := len(suites) - 1; i >= 0; i-- {
-		if released := runs[suites[i]].release(false); released != nil {
-			failed = describeReasons(released.reasons())
-		}
-	}
-	return failed
-}
-
-// release closes the suite's owner after its last test, or at once when
-// the run stopped early.
-func (r *suiteRun) release(stopped bool) *Cause {
-	r.mu.Lock()
-	if !stopped {
-		r.remaining--
-	}
-	last := r.remaining == 0 || stopped && r.remaining > 0
-	if stopped {
-		r.remaining = 0
-	}
-	r.mu.Unlock()
-	if !last {
-		return nil
-	}
-	return r.fiber.owner.closeFinalizers(&r.fiber, nil)
 }
 
 // testResult is the result of one test, as the reporters write it.
@@ -408,62 +358,6 @@ func outcome(message string, bad bool, cause *Cause) (string, string) {
 		}
 	}
 	return "failure", describeReasons(cause.reasons())
-}
-
-// runOne runs a test in a fiber and an owner of its own.
-func runOne(fb *Fiber, t named, seed int64, runs map[*test]*suiteRun) testResult {
-	result := runLeaf(fb, t, seed, runs)
-	if len(t.suites) == 0 {
-		return result
-	}
-	// the suite's release fails the test that ended it
-	if failed := leave(t.suites, runs); failed != "" {
-		if result.Status == "passed" {
-			result.Kind, result.Message = "cleanup", failed
-		}
-		result.Status, result.Cleanup = "failed", failed
-	}
-	return result
-}
-
-func runLeaf(fb *Fiber, t named, seed int64, runs map[*test]*suiteRun) testResult {
-	owner := newOwner()
-	owner.defects = &defects{}
-	inner := Fiber{state: newState(), env: fb.env, owner: owner, candidate: owner}
-	// stopping the run interrupts each running test
-	done := make(chan struct{})
-	defer close(done)
-	go func() {
-		select {
-		case <-fb.state.signal:
-			inner.state.interrupt(fb.state.id)
-		case <-done:
-		}
-	}()
-	var message string
-	var bad bool
-	_, exit := catch(func() Value {
-		if t.test.task != nil {
-			return Run(enter(&inner, t.suites, runs), t.test.task)
-		}
-		message, bad = t.test.checks(fb, seed)
-		return Unit
-	})
-	released := owner.closeFinalizers(&inner, exit)
-	// a supervisor that failed during the test fails it, as it fails a program
-	exit = Sequential(exit, owner.defects.all())
-	kind, text := outcome(message, bad, exit)
-	cleanup := ""
-	if released != nil {
-		cleanup = describeReasons(released.reasons())
-	}
-	switch {
-	case kind == "" && cleanup == "":
-		return testResult{Name: t.name, Status: "passed"}
-	case kind == "":
-		kind, text = "cleanup", cleanup
-	}
-	return testResult{Name: t.name, Status: "failed", Kind: kind, Message: text, Cleanup: cleanup}
 }
 
 // writeTestResult writes and flushes a complete result with outMu held by the caller.

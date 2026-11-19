@@ -153,7 +153,7 @@ func TestSuiteSharesItsLayer(t *testing.T) {
 		})
 	}
 	suite := TestSuite("suite", layer, []Value{TestEffect("a", read("a")), TestEffect("b", read("b"))})
-	selected := flatten("M", []Value{suite}, nil, nil, false, false)
+	selected := flatten("M", []Value{suite}, nil, nil, marks{})
 	runs := suiteRuns(rootFiber(), selected)
 	for _, n := range selected {
 		if got := runOne(rootFiber(), n, 0, runs); got.Status != "passed" {
