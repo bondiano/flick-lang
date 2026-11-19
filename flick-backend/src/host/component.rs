@@ -268,10 +268,13 @@ impl WasmBackend {
         &self,
         state: &[u8],
         request: &[u8],
+        answers: &[command::Answer],
         cancel: &Cancellation,
     ) -> Result<command::Handled, String> {
+        let answers: Vec<_> = answers.iter().map(commands::answer_wire).collect();
         match self.command_call(cancel, |i, store| {
-            i.flick_command_command().call_handle(store, state, request)
+            i.flick_command_command()
+                .call_handle(store, state, request, &answers)
         }) {
             Ok(Ok(handled)) => Ok(commands::handled(handled)),
             Ok(Err(error)) | Err(error) => Err(error),
@@ -351,10 +354,13 @@ impl Backend for WasmBackend {
         &self,
         state: Vec<u8>,
         outputs: Vec<command::File>,
+        answers: Vec<command::Answer>,
     ) -> Result<command::Plan, Vec<command::Diagnostic>> {
         let wire: Vec<_> = outputs.iter().map(commands::file_wire).collect();
+        let answers: Vec<_> = answers.iter().map(commands::answer_wire).collect();
         match self.command_call(&self.cancellation, |i, store| {
-            i.flick_command_command().call_resume(store, &state, &wire)
+            i.flick_command_command()
+                .call_resume(store, &state, &wire, &answers)
         }) {
             Ok(Ok(plan)) => Ok(commands::plan(plan)),
             Ok(Err(diagnostics)) => Err(commands::diagnostics(diagnostics)),
@@ -362,19 +368,27 @@ impl Backend for WasmBackend {
         }
     }
 
-    fn open(&self, invocation: &command::Invocation) -> Result<Vec<u8>, Vec<command::Diagnostic>> {
+    fn open(
+        &self,
+        invocation: &command::Invocation,
+    ) -> Result<command::Opened, Vec<command::Diagnostic>> {
         let wire = commands::invocation(invocation);
         match self.command_call(&self.cancellation, |i, store| {
             i.flick_command_command().call_open(store, &wire)
         }) {
-            Ok(Ok(state)) => Ok(state),
+            Ok(Ok(opened)) => Ok(commands::opened(opened)),
             Ok(Err(diagnostics)) => Err(commands::diagnostics(diagnostics)),
             Err(error) => Err(self.command_failure(&invocation.name, &error)),
         }
     }
 
-    fn handle(&self, state: Vec<u8>, request: Vec<u8>) -> Result<command::Handled, String> {
-        self.handle_cancellable(&state, &request, &self.cancellation)
+    fn handle(
+        &self,
+        state: Vec<u8>,
+        request: Vec<u8>,
+        answers: Vec<command::Answer>,
+    ) -> Result<command::Handled, String> {
+        self.handle_cancellable(&state, &request, &answers, &self.cancellation)
     }
 
     fn close(&self, state: Vec<u8>) -> command::Plan {
