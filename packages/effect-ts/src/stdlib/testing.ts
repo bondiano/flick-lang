@@ -1,16 +1,18 @@
 // Tests on Effect. A test is data built by pure code; `runTests` runs them,
 // each in an owner of its own, and reports assertions, typed failures,
 // defects and failed cleanup apart.
-import { Cause, type Context, type Duration, Effect, Exit, Fiber, Layer, Option, Scope } from "effect";
+import { Cause, Context, type Duration, Effect, Exit, Fiber, Layer, Option, Scope } from "effect";
 import * as TestClock from "effect/testing/TestClock";
 
 import { describeCause } from "../cause.ts";
+import { LazyCell } from "../effect/Lazy.ts";
 import { flickAddFinalizer } from "../effect/Scope.ts";
+import { withOwnerEvidence } from "../owner_evidence.ts";
 import { type Engine, type Suites as SuitesOf, type TestOptions, type TestResult, parseTestArgs, runTestsWith } from "@flick-lang/runtime/core/suites";
 import * as Core from "@flick-lang/runtime/core/testing";
 import { service } from "../effects.ts";
 import { buildInto } from "../layer.ts";
-import { Owner, close, inside, ownedExits } from "../owner.ts";
+import { Owner, close, closeOwn, inside, ownedExits } from "../owner.ts";
 import { provideNodeServices } from "../runner/host.ts";
 
 export {
@@ -24,10 +26,13 @@ export {
   genOneOf,
   genPair,
   genString,
+  testFixture,
   testGroup,
   testOnly,
   testProperty,
   testPure,
+  testShare,
+  testShared,
   testSkip,
 } from "@flick-lang/runtime/core/testing";
 export type { Assertion, Gen, Rng } from "@flick-lang/runtime/core/testing";
@@ -44,6 +49,9 @@ type Leaf = Core.Leaf<Task, AnyLayer>;
 type Named = Core.Named<Task, AnyLayer>;
 
 export const testEffect = (name: string, task: Task): Test => Object.freeze({ kind: "effect", name, task });
+
+/** `Test.serial`: the test, and each test in it, run one at a time. */
+export const testSerial = (test: Test): Test => Core.testSerial(test);
 
 /** `Test.before_all` and the other hooks of the group they are in. */
 export const testBeforeAll = (task: Task): Test => Core.testBeforeAll(task);
@@ -112,7 +120,72 @@ interface SuiteRun {
   readonly owner: Owner;
   /** The setup, run once, its outcome shared by the suite's tests. */
   readonly built: Effect.Effect<Exit.Exit<Built, unknown>>;
+  /** Its shared fixtures, each made the first time code uses it. */
+  readonly shared: Cells;
 }
+
+type Fixture = Core.Fixture<Task>;
+type Cell = LazyCell<unknown, unknown, unknown>;
+
+/**
+ * The fixtures of a test or a suite's run, and the owner they are made in:
+ * a scope of their own, which the scope of the test or the suite closes
+ * after the hooks that run when it closes, as those may use them.
+ */
+type Cells = Readonly<{ cells: Map<Fixture, Cell>; owner: Owner }>;
+
+const cellsIn = (outer: Owner): Cells => ({ cells: new Map(), owner: new Owner(Effect.runSync(Scope.make()), outer.defects) });
+
+/** The finalizer that closes `cells` with `outcome`: it fails as their finalizers do. */
+const closing = ({ owner }: Cells, outcome: () => Exit.Exit<unknown, unknown> = () => Exit.void): Effect.Effect<void, never, Scope.Scope> =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a failed finalizer fails the closing of its scope
+  flickAddFinalizer(Effect.flatMap(Effect.suspend(() => closeOwn(owner, outcome())), (ended) => ended) as Effect.Effect<void>);
+
+/**
+ * What code finds its fixtures in: those of the test it runs for, if any,
+ * and the suites around it, outermost first, whose shared fixtures it sees.
+ */
+class Fixtures {
+  readonly test: Cells | undefined;
+  readonly suites: ReadonlyArray<SuiteRun>;
+  constructor(test: Fixtures["test"], suites: ReadonlyArray<SuiteRun>) {
+    this.test = test;
+    this.suites = suites;
+  }
+}
+
+const FixturesRef = /*#__PURE__*/ Context.Reference<Fixtures | undefined>("@flick-lang/runtime/Test.fixtures", {
+  defaultValue: () => undefined,
+});
+
+/** `task`, with `fixtures` for the fixtures it uses. */
+const withFixtures = (fixtures: Fixtures, task: Task): Task => Effect.provideService(task, FixturesRef, fixtures);
+
+/** The cell of `fixture`, made the first time: its initializer runs in the scope of the cells. */
+const cellOf = ({ cells, owner }: Cells, fixture: Fixture): Cell => {
+  const found = cells.get(fixture);
+  if (found !== undefined) return found;
+  const cell: Cell = new LazyCell(inside(owner, withOwnerEvidence(owner, () => fixture.init)));
+  cells.set(fixture, cell);
+  return cell;
+};
+
+/**
+ * `Test.use`: the `Lazy` of `fixture` for the test this code runs for, or
+ * for the run of the innermost suite around it that shares it.
+ */
+export const testUse = (fixture: Fixture): Effect.Effect<Cell> =>
+  Effect.flatMap(Effect.service(FixturesRef), (fixtures) => {
+    if (fixtures === undefined) return Effect.die(new Error(`the fixture ${fixture.key} runs only in the code of a test or a suite that \`flick test\` runs`));
+    if (fixture.shared) {
+      const run = fixtures.suites.findLast((r) => r.suite.shares?.has(fixture) === true);
+      if (run === undefined) return Effect.die(new Error(`the shared fixture ${fixture.key}, used by code that no suite sharing it runs`));
+      return Effect.sync(() => cellOf(run.shared, fixture));
+    }
+    const { test } = fixtures;
+    if (test === undefined) return Effect.die(new Error(`the fixture ${fixture.key} of a test, used by code that runs for no test`));
+    return Effect.sync(() => cellOf(test, fixture));
+  });
 
 /** The hooks `tasks` run in order, each within `millis` if any: a `Setup` of the first that fails. */
 const runHooks = (tasks: ReadonlyArray<Task>, what: string, millis?: number): Effect.Effect<Setup | undefined, unknown> =>
@@ -144,28 +217,38 @@ const finalizer = (task: Task, what: string, millis: number | undefined): Effect
  * whatever its `before_all` hooks do, then those run, then its layer is
  * built; its hooks have its timeout, if it has one.
  */
-const setUp = ({ hooks: own, layer, timeout }: Suite, owner: Owner): Effect.Effect<Built, unknown> =>
+const setUp = ({ hooks: own, layer, timeout }: Suite, owner: Owner, shared: Cells, suites: ReadonlyArray<SuiteRun>): Effect.Effect<Built, unknown> =>
+  // the hooks of a suite run in its scope, which their own scopes are in
   inside(
     owner,
-    Effect.gen(function* () {
-      for (const task of own?.after_all ?? []) yield* finalizer(task, "after_all", timeout);
-      const setup = yield* runHooks(own?.before_all ?? [], "before_all", timeout);
-      if (setup !== undefined || layer === undefined) return setup;
-      return yield* buildInto(layer, owner.resources);
-    }),
+    withOwnerEvidence(owner, () =>
+      Effect.gen(function* () {
+        // its shared fixtures close after its `after_all` hooks, which may use them
+        yield* closing(shared);
+        // the hooks of a suite see its shared fixtures and those of the suites around it
+        const fixtures = new Fixtures(undefined, suites);
+        for (const task of own?.after_all ?? []) yield* finalizer(withFixtures(fixtures, task), "after_all", timeout);
+        const setup = yield* runHooks((own?.before_all ?? []).map((task) => withFixtures(fixtures, task)), "before_all", timeout);
+        if (setup !== undefined || layer === undefined) return setup;
+        return yield* buildInto(layer, owner.resources);
+      }),
+    ),
   );
 
 const suiteRuns = (selected: ReadonlyArray<Named>): Map<Suite, SuiteRun> => {
   const runs = new Map<Suite, SuiteRun>();
   for (const { suites } of selected) {
-    for (const suite of suites) {
+    for (const [level, suite] of suites.entries()) {
       const run = runs.get(suite);
       if (run !== undefined) {
         run.remaining++;
         continue;
       }
       const owner = new Owner(Effect.runSync(Scope.make()), []);
-      runs.set(suite, { remaining: 1, suite, owner, built: Effect.runSync(Effect.cached(Effect.exit(setUp(suite, owner)))) });
+      const shared = cellsIn(owner);
+      // the suites around it, itself last, have their runs by the time it is set up
+      const around = Effect.suspend(() => setUp(suite, owner, shared, suites.slice(0, level + 1).flatMap((s) => runs.get(s) ?? [])));
+      runs.set(suite, { remaining: 1, suite, owner, built: Effect.runSync(Effect.cached(Effect.exit(around))), shared });
     }
   }
   return runs;
@@ -181,6 +264,7 @@ const runCase = <A>(
   body: Effect.Effect<A, unknown>,
   runs: ReadonlyArray<SuiteRun>,
   timeout: number | undefined,
+  owner: Owner,
 ): Effect.Effect<A | Setup | TimedOut, unknown, Scope.Scope> =>
   Effect.gen(function* () {
     const services: Array<Context.Context<unknown>> = [];
@@ -190,18 +274,31 @@ const runCase = <A>(
       if (built.value instanceof Setup) return built.value;
       if (built.value !== undefined) services.push(built.value);
     }
+    // the fixtures of the test, made the first time its code uses each
+    const test = cellsIn(owner);
+    // how the case ended, which their scope closes with: what it owns sees whether the case passed
+    let outcome: Exit.Exit<unknown, unknown> = Exit.void;
+    yield* closing(test, () => outcome);
     const each = Effect.gen(function* () {
-      for (const { suite } of runs) {
-        for (const task of suite.hooks?.after_each ?? []) yield* finalizer(task, "after_each", suite.timeout);
+      for (const [level, { suite }] of runs.entries()) {
+        const fixtures = new Fixtures(test, runs.slice(0, level + 1));
+        for (const task of suite.hooks?.after_each ?? []) yield* finalizer(withFixtures(fixtures, task), "after_each", suite.timeout);
         // the test's timeout bounds its `before_each` hooks and its body together
-        const setup = yield* runHooks(suite.hooks?.before_each ?? [], "before_each");
+        const setup = yield* runHooks((suite.hooks?.before_each ?? []).map((task) => withFixtures(fixtures, task)), "before_each");
         if (setup !== undefined) return setup;
       }
-      return yield* services.reduceRight<Effect.Effect<A, unknown>>((inner, s) => Effect.provideContext(inner, s), body);
+      const own = Effect.provideService(body, FixturesRef, new Fixtures(test, runs));
+      return yield* services.reduceRight<Effect.Effect<A, unknown>>((inner, s) => Effect.provideContext(inner, s), own);
     });
-    if (timeout === undefined) return yield* each;
-    const ended = yield* Effect.timeoutOption(each, timeout);
-    return Option.isSome(ended) ? ended.value : new TimedOut(timeout);
+    const ran = yield* Effect.exit(timeout === undefined ? Effect.map(each, Option.some) : Effect.timeoutOption(each, timeout));
+    if (Exit.isFailure(ran)) {
+      outcome = ran;
+      return yield* Effect.failCause(ran.cause);
+    }
+    const result = Option.isSome(ran.value) ? ran.value.value : new TimedOut(timeout ?? 0);
+    if (result instanceof TimedOut) outcome = Exit.interrupt(undefined);
+    else if (result instanceof Setup) outcome = Exit.failCause(typeof result.cause === "string" ? Cause.fail(result.cause) : result.cause);
+    return result;
   });
 
 /** After a test: the suites it ended, closed; why one failed to close. */
@@ -263,7 +360,7 @@ const runLeaf = (
   timeout: number | undefined,
 ): Effect.Effect<TestResult> =>
   Effect.map(
-    ownedExits(() => runCase(test.kind === "effect" ? Effect.as(test.task, undefined) : checks(test, seed), suites, timeout)),
+    ownedExits((owner) => runCase(test.kind === "effect" ? Effect.as(test.task, undefined) : checks(test, seed), suites, timeout, owner)),
     ({ exit, cleanup, defects }): TestResult => {
       // a supervisor that failed during the test fails it, as it fails a program
       const body = outcome(
@@ -284,17 +381,26 @@ const engine: Engine<Task, AnyLayer> = (selected, seed, jobs, hooks) => {
   // the tests and their suites run with the live host services, as a `main` of `Runner.Node`
   const fiber = Effect.runFork(
     provideNodeServices(
-      Effect.forEach(
-        selected,
-        (t, index) =>
-          hooks
+      Effect.suspend(() => {
+        const results: Array<TestResult> = [];
+        const one = (index: number): Effect.Effect<void> => {
+          const t = selected[index];
+          if (t === undefined) return Effect.void;
+          const run = hooks
             ? Effect.suspend(() => {
                 hooks.started(index, t.name);
                 return Effect.tap(runOne(t, seed, runs), (result) => Effect.sync(() => hooks.finished(index, result)));
               })
-            : runOne(t, seed, runs),
-        { concurrency: jobs },
-      ),
+            : runOne(t, seed, runs);
+          return Effect.map(run, (result) => void (results[index] = result));
+        };
+        // the tests of a `Test.serial` run one after another in a job of their own
+        const all = Effect.forEach(Core.jobsOf(selected), (job) => Effect.forEach(job, one, { discard: true }), {
+          concurrency: jobs,
+          discard: true,
+        });
+        return Effect.as(all, results);
+      }),
     ),
   );
   const ended = (async () => {

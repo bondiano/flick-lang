@@ -4,6 +4,7 @@
 
 mod code;
 mod editor;
+mod fixtures;
 mod layout;
 mod read;
 mod state;
@@ -55,12 +56,13 @@ pub fn owns(head: &str) -> bool {
 mod tests {
     use std::path::Path;
 
+    use crate::fixtures::{NOT_CONCURRENT, UNAVAILABLE};
     use crate::read::{DUPLICATE, MALFORMED};
 
     #[test]
     fn std_explains_every_code_of_the_plugin() {
         let explain = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packages/std/explain");
-        for code in [MALFORMED, DUPLICATE] {
+        for code in [MALFORMED, DUPLICATE, UNAVAILABLE, NOT_CONCURRENT] {
             let path = explain.join(format!("{code}.md"));
             assert!(path.exists(), "no {}", path.display());
         }

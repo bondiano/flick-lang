@@ -27,7 +27,7 @@ module.exports = grammar({
 
   conflicts: $ => [
     [$._loop, $.identifier], [$._while, $.identifier], [$._case, $.identifier], [$._hook, $.identifier],
-    [$._case],
+    [$._fixture, $.identifier], [$._case], [$._fixture],
   ],
 
   rules: {
@@ -39,6 +39,7 @@ module.exports = grammar({
       $._while,
       $._case,
       $._hook,
+      $._fixture,
       alias($._proof, $.keyword),
       $.attribute,
       $.label,
@@ -71,12 +72,15 @@ module.exports = grammar({
     _newline: _ => '\n',
     _loop: $ => prec.dynamic(1, seq(alias('loop', $.keyword), $.braces)),
     _while: $ => prec.dynamic(1, seq(alias('while', $.keyword), repeat1($._condition_token), alias('do', $.keyword))),
-    // `suite "name"` and `test "name"`, maybe `.skip` or `.only` and then
-    // `timeout`, start a case of the test DSL, and a hook's word before `{` a
-    // hook of a suite; elsewhere the words are names
+    // `suite "name"` and `test "name"`, maybe `.skip` or `.only`, `parallel`
+    // before the name and `timeout` after it, start a case of the test DSL, a
+    // hook's word before `{` a hook of a suite, and `fixture`, maybe `shared`
+    // and `concurrent`, before a name and `=` a fixture; elsewhere the words
+    // are names
     _case: $ => prec.dynamic(1, seq(
       alias(choice('suite', 'test'), $.keyword),
       optional(alias(choice('.skip', '.only'), $.keyword)),
+      optional(alias('parallel', $.keyword)),
       $.string,
       optional($._timeout),
     )),
@@ -84,6 +88,13 @@ module.exports = grammar({
     _hook: $ => prec.dynamic(1, seq(
       alias(choice('before_all', 'before_each', 'after_each', 'after_all'), $.keyword),
       $.braces,
+    )),
+    _fixture: $ => prec.dynamic(1, seq(
+      alias('fixture', $.keyword),
+      optional(alias('shared', $.keyword)),
+      optional(alias('concurrent', $.keyword)),
+      $.identifier,
+      alias('=', $.operator),
     )),
     _condition_token: $ => choice(
       $.parens, $.brackets, $.braces, $.label, $.identifier, $.constructor, $.boolean,
@@ -119,6 +130,7 @@ module.exports = grammar({
     _identifier: _ => /[a-z_][A-Za-z0-9_]*/,
     identifier: $ => choice(
       $._identifier, 'loop', 'while', 'suite', 'test', 'timeout', 'before_all', 'before_each', 'after_each', 'after_all',
+      'fixture', 'shared', 'concurrent', 'parallel',
     ),
     constructor: _ => /[A-Z][A-Za-z0-9_]*/,
 

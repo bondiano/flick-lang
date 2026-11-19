@@ -197,6 +197,11 @@ test("contextual effect, sql, and control keywords receive expected TextMate sco
   assert.ok(scopesFor('suite.skip "net" timeout 500 {', "skip").includes("keyword.other.flick"));
   assert.ok(scopesFor('  before_each { reset () }', "before_each").includes("keyword.other.flick"));
   assert.ok(scopesFor("  after_all {", "after_all").includes("keyword.other.flick"));
+  assert.ok(scopesFor('suite parallel "pool" {', "parallel").includes("keyword.other.flick"));
+  assert.ok(scopesFor('suite.skip parallel "pool" timeout 50 {', "timeout").includes("keyword.other.flick"));
+  assert.ok(scopesFor("  fixture conn = connect ()", "fixture").includes("keyword.other.flick"));
+  assert.ok(scopesFor("  fixture shared concurrent pool = make 4", "shared").includes("keyword.other.flick"));
+  assert.ok(scopesFor("  fixture shared concurrent pool = make 4", "concurrent").includes("keyword.other.flick"));
   assert.ok(scopesFor("for x <- xs do { break }", "for").includes("keyword.control.flick"));
   assert.ok(scopesFor("for x <- xs yield x", "yield").includes("keyword.control.flick"));
   assert.ok(scopesFor("'outer: loop { continue 'outer }", "continue").includes("keyword.control.flick"));
@@ -216,6 +221,9 @@ test("word boundaries prevent spurious keyword matches on partial identifiers an
     ["let test = suite", "test"],
     ["let x = timeout 500 task", "timeout"],
     ["let before_each = 1", "before_each"],
+    ["  fixture shared = 1", "shared"],
+    ["let fixture = shared parallel", "fixture"],
+    ["let x = parallel concurrent", "concurrent"],
     ["let x = Test.test \"a\" check", "test"],
     ["let x = item.effect", "effect"],
     ["let x = state.abort", "abort"],

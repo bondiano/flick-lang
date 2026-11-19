@@ -198,6 +198,93 @@ suite "network" timeout 5000 {
 
 `Test.timeout` does the same for a test built by hand.
 
+## Fixtures
+
+`fixture name = expression` in a suite is a value its cases and hooks read
+with `await name`. Each case that uses it gets its own, made the first time
+its code awaits it; `fixture shared name = expression` is made once for the
+run of the suite, the first time one of its cases or hooks awaits it. A
+fixture no code uses is never made, and one is made at most once in its
+scope: it is a `Lazy` (see [effects](../effects/#lazy)).
+
+```flick
+module App.UsersTest
+
+suite "users" {
+  fixture shared names = SynchronizedRef.make ["Ada"]
+  fixture count = List.length (SynchronizedRef.get (await names))
+
+  before_all { SynchronizedRef.update (fun all -> all ++ ["Grace"]) (await names) }
+
+  test "counts the names" { Test.expect (Test.equal 2 (await count)) }
+  test "reads them" { Test.expect (Test.equal ["Ada", "Grace"] (SynchronizedRef.get (await names))) }
+}
+```
+
+A fixture's expression is a task, as a test's body is, and may await the
+fixtures declared before it, those of the suites around included; it cannot
+use itself or a later one, so fixtures cannot depend on each other in a
+cycle (`std/T003`). A shared fixture is made for no case in particular, so
+it may use only shared fixtures, and so may the `before_all` and
+`after_all` hooks.
+
+The expression runs in a scope of its own, which owns what it acquires. A
+case's fixtures are released when the case ends, after its `after_each`
+hooks, which may still use them; shared ones after the suite's last
+selected case and its `after_all` hooks. Each scope releases its fixtures
+in the reverse order they were made in, also after a later one failed to be
+made. `|> Fixture.cleanup release` releases a value then, and
+`Resource.own` closes a value of `Close` then, seeing how the case ended:
+whether its body passed, failed, ran out of time or never ran after a failed
+setup. A transaction rolls back that way when its case fails:
+
+```flick
+module App.AccountsTest
+
+import Resource exposing (Close(..), own)
+
+say : String ->{} Unit
+let say line = Host.raw_stdout_line line
+
+/// A transaction: it commits when its case passes and rolls back otherwise.
+type Tx = Tx String
+
+instance Close Tx =
+  let close _ (Tx name) = say ("roll back " ++ name)
+  let close_exit _ exit (Tx name) =
+    say ((if Exit.is_success exit then "commit " else "roll back ") ++ name)
+
+suite "accounts" {
+  fixture tx = own (Tx "accounts")
+
+  test "opens one" { ignore (await tx) }
+}
+```
+
+A fixture whose expression fails fails each case that awaits it, with its
+error; a shared one is not made again for the next case.
+
+A suite with a shared fixture runs its cases one at a time, also under
+`--jobs`, while other suites run beside it. `suite parallel "name"` runs
+its cases at once and shares only fixtures marked `fixture shared
+concurrent`, whose author states that its cases may use them at once, as a
+pool or read-only data: another shared fixture of a `parallel` suite is
+`std/T004`. A `parallel` suite inside one that runs one case at a time still
+runs its cases one at a time. A case's own fixtures are never shared, so a
+per-case transaction over a shared database stays isolated.
+
+A fixture's value holds no region: the types do not stop a case from
+keeping it past its end, in a shared fixture or a fiber that outlives the
+case, after which it may be released. That is the guarantee of
+`Scope.add_finalizer`, not of `Resource.own`. Qualifying the value with the
+region of the code that awaits it, as `own` qualifies its value, would turn
+away most uses: a function that takes a value without a `^c` rejects one
+that holds a region, so even `SynchronizedRef.get (await names)` would be
+`FLICK-G001`.
+
+`Test.fixture`, `Test.shared` and `Test.share` are what the blocks expand
+into: `flick expand` shows them.
+
 ## Running
 
 `flick test` builds the project with its test root into `.flick/test/` and
@@ -232,8 +319,10 @@ The exit code is `0` when every case that ran passed, `1` otherwise, and
 
 | Problem | Diagnostic |
 | - | - |
-| a block without a name or braces, an unknown modifier, a `timeout` without its milliseconds, a hook with a name, or a suite holding something other than cases and hooks | `std/T001` |
-| two cases of one suite, or two blocks of one module, with the same name | `std/T002` |
+| a block without a name or braces, an unknown modifier, a `timeout` without its milliseconds, a hook with a name, a fixture without its name or expression, or a suite holding something other than cases, hooks and fixtures | `std/T001` |
+| two cases of one suite, two blocks of one module, or two fixtures of one suite, with the same name | `std/T002` |
+| a fixture that uses itself or one declared after it, a shared fixture or a `before_all`/`after_all` hook that uses one each case makes anew | `std/T003` |
+| a shared fixture of a `parallel` suite that is not `concurrent` | `std/T004` |
 | a module with blocks that declares `tests` by hand | `FLICK-R008` |
 | an error in a test's body | the usual one, at that code |
 
