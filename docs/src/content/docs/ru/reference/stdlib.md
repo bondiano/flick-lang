@@ -1,6 +1,6 @@
 ---
 title: "Стандартная библиотека"
-source_hash: 5aab17907e599306
+source_hash: b077b1723efafd76
 ---
 
 Стандартная библиотека написана на Flick и использует адаптер среды выполнения
@@ -61,7 +61,7 @@ source_hash: 5aab17907e599306
 | `Redacted` | эффектные `make`, `reveal`; `show` выводит `<redacted>` |
 | `BigDecimal` | десятичные числа: `from_string`, точные `add`, `subtract`, проверяемые `multiply`, `divide_to_scale` |
 | `Duration` | длительности: проверяемые `nanos`, `millis`, `seconds`, `minutes`; для неограниченной длительности — явное `infinity` |
-| `Bytes` | байты как списки чисел от 0 до 255: `from_string` и `to_string` (UTF-8, `None`, если это не UTF-8), `to_base64url` и `from_base64url`, и `equal`, время которого зависит только от длин |
+| `Bytes` | [компактные неизменяемые последовательности байтов](#компактные-байты) и преобразования для API на `List Int` |
 | `Crypto` | сервис `Crypto` поверх Web Crypto (`Crypto.system`): `random_bytes`, `digest` (SHA-1, SHA-256, SHA-384, SHA-512), `hmac` поверх `digest` (RFC 2104), случайные числа, UUID и ULID; `pbkdf2` (RFC 8018), а также `hash_password` / `verify_password`: PBKDF2-HMAC-SHA256 на 600000 раундов со случайной солью, хранится как `$pbkdf2-sha256$i=<раунды>$<соль>$<хеш>` в URL-safe base64, проверка за постоянное время |
 | `Jwt` | JSON Web Token с подписью HMAC-SHA256 (`alg` `HS256`): `sign` и `verify` над JSON-кодеком утверждений; `verify` отвергает другой `alg`, неверную подпись и просроченный токен (по значению `exp`) ошибкой `JwtError` (`Malformed`, `BadSignature`, `Expired`); `now` и `expires_in` дают `iat` и `exp` в секундах от эпохи |
 | `EqHash`, `HashSet`, `HashMap` | хеш-коллекции, сохраняющие своё свидетельство |
@@ -150,6 +150,30 @@ source_hash: 5aab17907e599306
 `Duration.millis Float.nan` и преобразование с переполнением дают
 `Err (DurationError …)`. Неограниченная длительность задаётся как
 `Duration.infinity`; для неё `Duration.to_millis` возвращает `None`.
+
+## Компактные байты
+
+`Bytes.Bytes` занимает один байт на элемент в средах выполнения JS и Go.
+`Bytes.empty` — пустая последовательность, а `Bytes.length` считает байты.
+`Bytes.get` принимает индекс с нуля. `Bytes.slice start end` принимает
+полуоткрытый диапазон байтов. Обе операции возвращают `None` при выходе
+за границы. Пустой диапазон в пределах границ даёт `Some Bytes.empty`.
+
+`Bytes.from_list` копирует `List Int` и возвращает
+`Err (Bytes.ByteOutOfRange index value)` для первого числа вне `0..255`.
+`Bytes.to_list` создаёт новый список. Срезы могут использовать общую закрытую
+память. Она остаётся неизменяемой, и API не даёт к ней изменяемого доступа.
+
+Для UTF-8 используйте `Bytes.encode_utf8` и `Bytes.decode_utf8`. Декодер
+возвращает `None` для некорректного UTF-8 и сохраняет метку порядка байтов.
+`Bytes.encode_base64url` выдаёт текст без заполнителя, а
+`Bytes.decode_base64url` принимает текст с корректным заполнителем или без него.
+`Bytes.equal_constant_time` проверяет каждый байт, если длины совпадают.
+
+`Bytes.from_string`, `Bytes.to_string`, `Bytes.to_base64url`,
+`Bytes.from_base64url` и `Bytes.equal` продолжают принимать или возвращать
+`List Int`. Используйте `from_list` и `to_list` на границах с существующими
+бинарными API.
 
 ## Хеш-коллекции
 

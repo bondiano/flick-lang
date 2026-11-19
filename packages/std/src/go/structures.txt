@@ -19,6 +19,17 @@ flickBase64UrlEncode CryptoBase64UrlEncode
 flickBase64UrlDecode CryptoBase64UrlDecode
 
 [flick:rt]
+bytesEmpty BytesEmpty
+bytesLength BytesLength
+bytesGet BytesGet
+bytesSlice BytesSlice
+bytesFromList BytesFromList
+bytesToList BytesToList
+bytesEncodeUtf8 BytesEncodeUtf8
+bytesDecodeUtf8 BytesDecodeUtf8
+bytesEncodeBase64Url BytesEncodeBase64URL
+bytesDecodeBase64Url BytesDecodeBase64URL
+bytesEqualConstantTime BytesEqualConstantTime
 chunkAppend ChunkAppend
 chunkConcat ChunkConcat
 chunkGet ChunkGet
