@@ -51,7 +51,7 @@ fn top_decl(p: &mut Parser) {
 
 /// Declarations allowed in `class`, `instance`, `service` and `rec` bodies,
 /// and at the top level.
-fn member(p: &mut Parser) {
+pub(super) fn member(p: &mut Parser) {
     match p.current() {
         K::At => attribute(p),
         K::LetKw => let_decl(p),
@@ -548,7 +548,7 @@ fn class_decl(p: &mut Parser) {
             }
         }
         if p.eat(K::Eq) {
-            p.body(K::Members, member);
+            p.body(K::Members, super::proofs::class_member);
         }
     }
     p.complete(m, K::ClassDecl);

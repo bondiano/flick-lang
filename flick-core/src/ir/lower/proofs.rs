@@ -9,8 +9,11 @@ use crate::resolve;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::record as record_of;
 use crate::types::{GoalSyntax, GoalType, ProofInfo, Range, Typing, goal_syntax};
-use flick_ir::InstanceInfo;
+use flick_ir::{Dict, InstanceInfo};
+
+mod bundles;
 
 /// One proof declaration, lowered.
 #[derive(Debug, Clone)]
@@ -26,6 +29,19 @@ pub struct LoweredProof {
     /// goal has none.
     pub sides: Vec<Option<(Expr, Expr)>>,
     pub body: Option<Expr>,
+    /// A bundle's: the dictionary its laws are about, and its lemmas.
+    pub subject: Option<Dict>,
+    pub fields: Vec<Field>,
+}
+
+/// A field of a bundle's record: the lemma `value` for the law `name` of
+/// the class the superclass fields `path` lead to.
+#[derive(Debug, Clone)]
+pub struct Field {
+    pub path: Vec<String>,
+    pub name: String,
+    pub value: Expr,
+    pub span: Span,
 }
 
 /// The proof declarations of `module`, which checked without errors.
@@ -35,6 +51,19 @@ pub fn lower_proofs(module: &resolve::Module, typing: &Typing) -> Vec<LoweredPro
         .tree
         .nodes()
         .filter(|n| n.kind == K::ProofDecl)
+        .map(|decl| lower.proof(decl))
+        .collect()
+}
+
+/// The laws of the classes of `module`, lowered as proofs without a body:
+/// a method of the class is one of the given dictionary's.
+pub fn lower_laws(module: &resolve::Module, typing: &Typing) -> Vec<LoweredProof> {
+    let mut lower = Lower::new(module, typing);
+    (module.tree.nodes())
+        .filter(|n| n.kind == K::ClassDecl)
+        .flat_map(|c| c.nodes().filter(|n| n.kind == K::Members))
+        .flat_map(Node::nodes)
+        .filter(|n| n.kind == K::LawDecl)
         .map(|decl| lower.proof(decl))
         .collect()
 }
@@ -71,13 +100,20 @@ impl Lower<'_> {
             .collect();
         let mut sides = Vec::new();
         let mut body = None;
+        let mut fields = Vec::new();
+        let lawful = decl.nodes().find(|n| n.kind == K::LawfulGoal);
         let lambda = self.function_with(
             &patterns,
             |l| {
                 for goal in &goals {
                     sides.push(l.sides(goal));
                 }
-                body = decl.nodes().find(|n| n.kind == K::Block).map(|b| l.expr(b));
+                let block = decl.nodes().find(|n| n.kind == K::Block);
+                match (lawful, block.and_then(record_of)) {
+                    (Some(_), Some(r)) => l.lemma_fields(r, &mut Vec::new(), &mut fields),
+                    (Some(_), None) => {}
+                    (None, _) => body = block.map(|b| l.expr(b)),
+                }
                 Expr::new(ExprKind::Lit(Lit::Unit), span)
             },
             None,
@@ -100,6 +136,32 @@ impl Lower<'_> {
             premise: patterns_premise,
             sides,
             body,
+            subject: lawful.and_then(|g| self.dictionaries(g.range()).into_iter().next()),
+            fields,
+        }
+    }
+
+    /// The lemmas of a bundle's `record`, under the superclass fields `path`.
+    fn lemma_fields(&mut self, record: &Node, path: &mut Vec<String>, out: &mut Vec<Field>) {
+        for field in record.nodes().filter(|n| n.kind == K::RecordField) {
+            let name = (field.child_tokens())
+                .find(|t| matches!(t.kind, K::Ident | K::Con))
+                .map(|t| t.text(self.text).to_owned());
+            let (Some(name), Some(value)) = (name, field.nodes().last()) else {
+                continue;
+            };
+            if let Some(inner) = record_of(value) {
+                path.push(name);
+                self.lemma_fields(inner, path, out);
+                path.pop();
+            } else {
+                out.push(Field {
+                    path: path.clone(),
+                    name,
+                    value: self.expr(value),
+                    span: self.span(field),
+                });
+            }
         }
     }
 
@@ -123,6 +185,8 @@ pub type Proven = (LoweredProof, ProofInfo);
 /// run, and the proofs of its proof modules.
 pub struct Run<'p> {
     pub builtins: &'p dyn Fn() -> &'static [Module],
+    /// The laws of the built-in classes.
+    pub builtin_laws: &'p dyn Fn() -> &'static [Proven],
     pub project: &'p dyn Fn(&str) -> Option<&'p Module>,
     pub proven: &'p dyn Fn(&str) -> Option<&'p [Proven]>,
 }
@@ -134,17 +198,14 @@ pub fn check_proofs(
     typing: &Typing,
     run: &Run,
 ) -> (Vec<Diagnostic>, Vec<Proven>) {
-    if typing.proofs.is_empty() {
+    if typing.proofs.is_empty() && typing.laws.is_empty() {
         return (Vec::new(), Vec::new());
     }
-    let proofs: Vec<Proven> = (lower_proofs(module, typing).into_iter())
-        .filter_map(|l| {
-            Some((
-                l.clone(),
-                typing.proofs.iter().find(|i| i.at == l.at)?.clone(),
-            ))
-        })
-        .collect();
+    let laws = laws_of(module, typing);
+    if typing.proofs.is_empty() {
+        return (Vec::new(), laws);
+    }
+    let mut proofs = paired(lower_proofs(module, typing), &typing.proofs);
     // the definitions a proof unfolds: the module's own, then the imported
     let own = super::lower(module, typing).ok();
     let program = Modules {
@@ -153,8 +214,38 @@ pub fn check_proofs(
         builtins: (run.builtins)(),
     };
     let mut lemmas = imported_lemmas(&proofs, run, 0);
-    let diagnostics = prove_each(&proofs, &program, &mut lemmas);
+    let of = |m: &str, c: &str| -> Option<Vec<&Proven>> {
+        let own = (m == module.name).then_some(&laws[..]);
+        // the module a definition is read from: the run's before a built-in
+        let found = (own.or_else(|| (run.proven)(m))).or_else(|| {
+            let builtin = (run.builtins)().iter().any(|b| b.name == m);
+            builtin.then(|| (run.builtin_laws)())
+        });
+        let is = |p: &&Proven| {
+            p.1.class
+                .as_ref()
+                .is_some_and(|l| l.module == m && l.class == c)
+        };
+        Some(found?.iter().filter(is).collect())
+    };
+    let diagnostics = prove_each(&proofs, &program, &mut lemmas, Some(&of));
+    proofs.extend(laws.iter().cloned());
     (diagnostics, proofs)
+}
+
+/// The laws of the classes of `module`, which checked without errors.
+pub fn laws_of(module: &resolve::Module, typing: &Typing) -> Vec<Proven> {
+    paired(lower_laws(module, typing), &typing.laws)
+}
+
+/// Each lowered declaration with what the checker settled of it.
+fn paired(lowered: Vec<LoweredProof>, infos: &[ProofInfo]) -> Vec<Proven> {
+    (lowered.into_iter())
+        .filter_map(|l| {
+            let info = infos.iter().find(|i| i.at == l.at)?.clone();
+            Some((l, info))
+        })
+        .collect()
 }
 
 /// Checks each proof in order; one that checks is a lemma of the later ones.
@@ -162,10 +253,28 @@ fn prove_each(
     proofs: &[Proven],
     program: &dyn logic::Program,
     lemmas: &mut Vec<logic::Lemma>,
+    laws: Option<bundles::Laws<'_, '_>>,
 ) -> Vec<Diagnostic> {
     let mut out = Vec::new();
-    for (lowered, info) in proofs {
-        let checked = statement(lowered, info).and_then(|(s, body)| {
+    for proven in proofs {
+        let (lowered, info) = proven;
+        if info.class.is_some() {
+            continue;
+        }
+        if let GoalType::Lawful(bundle) = &info.goal {
+            // a bundle is no lemma: an importer has nothing to replay of it
+            if let Some(laws) = laws {
+                out.extend(bundles::check_bundle(proven, bundle, laws, program, lemmas));
+            }
+            continue;
+        }
+        let checked = statement(lowered, info).and_then(|s| {
+            let body = (lowered.body.as_ref()).ok_or_else(|| {
+                Failure::Refused(logic::Refused {
+                    span: lowered.span,
+                    why: "it has no proof".into(),
+                })
+            })?;
             let cert = logic::cert(body, lemmas)?;
             logic::prove(&s, &cert, &info.data, program, lemmas).map(|()| s)
         });
@@ -189,10 +298,8 @@ fn prove_each(
 fn imported_lemmas(proofs: &[Proven], run: &Run, depth: u32) -> Vec<logic::Lemma> {
     let mut modules = Vec::new();
     for (lowered, _) in proofs {
-        lowered
-            .body
-            .iter()
-            .for_each(|b| lemma_modules(b, &mut modules));
+        let fields = lowered.fields.iter().map(|f| &f.value);
+        (lowered.body.iter().chain(fields)).for_each(|b| lemma_modules(b, &mut modules));
     }
     modules.sort();
     modules.dedup();
@@ -213,7 +320,7 @@ fn imported_lemmas(proofs: &[Proven], run: &Run, depth: u32) -> Vec<logic::Lemma
         let mut lemmas = imported_lemmas(proofs, run, depth + 1);
         let imported = lemmas.len();
         // the module's own diagnostics are its own check's to report
-        let _ = prove_each(proofs, &program, &mut lemmas);
+        let _ = prove_each(proofs, &program, &mut lemmas, None);
         out.extend(lemmas.drain(imported..).map(|mut l| {
             l.statement.name = format!("{name}.{}", l.statement.name);
             l
@@ -233,11 +340,8 @@ fn lemma_modules(e: &Expr, out: &mut Vec<String>) {
     e.each_child(&mut |c| lemma_modules(c, out));
 }
 
-/// What `lowered` states, with the body that proves it.
-fn statement<'p>(
-    lowered: &'p LoweredProof,
-    info: &ProofInfo,
-) -> Result<(logic::Statement, &'p Expr), Failure> {
+/// What `lowered` states.
+fn statement(lowered: &LoweredProof, info: &ProofInfo) -> Result<logic::Statement, Failure> {
     let refused = |span, why: &str| {
         Failure::Refused(logic::Refused {
             span,
@@ -279,12 +383,11 @@ fn statement<'p>(
     let goal = match &info.goal {
         GoalType::Equal(ty) => logic::Goal::Equal(equation(ty, sides.next().unwrap_or(&None))?),
         GoalType::SameType(a, b) => logic::Goal::SameType(a.clone(), b.clone()),
-        GoalType::Malformed => return Err(refused(lowered.span, "its goal is no statement")),
+        GoalType::Outside(why) => return Err(refused(lowered.span, why)),
+        GoalType::Lawful(_) | GoalType::Malformed => {
+            return Err(refused(lowered.span, "its goal is no statement"));
+        }
     };
-    let body = lowered
-        .body
-        .as_ref()
-        .ok_or_else(|| refused(lowered.span, "it has no proof"))?;
     let statement = logic::Statement {
         name: info.name.clone(),
         span: lowered.span,
@@ -292,7 +395,7 @@ fn statement<'p>(
         premises,
         goal,
     };
-    Ok((statement, body))
+    Ok(statement)
 }
 
 /// The compiled modules a proof reads definitions from.

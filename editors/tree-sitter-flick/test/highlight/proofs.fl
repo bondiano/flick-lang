@@ -11,3 +11,9 @@ where equal (flat_map pure v) v =
   match v with
   | None -> refl
   | Some x -> refl
+
+class Functor (f : Type -> Type) =
+  map : (a -> b) -> f a -> f b
+  law identity (v : f a) where equal (map identity v) v
+//^ keyword
+//    ^ function

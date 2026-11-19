@@ -212,6 +212,8 @@ pub struct Typing {
     pending_dicts: Vec<(Range, u32, Dict)>,
     /// The proof declarations, as the checker settled them.
     pub proofs: Vec<super::proof_decls::ProofInfo>,
+    /// The laws of the module's classes, typed as proofs are.
+    pub laws: Vec<super::proof_decls::ProofInfo>,
 }
 
 impl Typing {

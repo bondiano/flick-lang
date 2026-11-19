@@ -136,6 +136,8 @@ syntax_kinds! {
         /// `proof` before the name of a proof declaration, a keyword only
         /// there.
         ProofKw,
+        /// `law` before the name of a law in a class, a keyword only there.
+        LawKw,
 
         // punctuation and operators
         LParen,
@@ -265,6 +267,12 @@ syntax_kinds! {
         SameTypeGoal,
         /// `(h : goal)`: a parameter of a proof that is a proof itself.
         Premise,
+        /// `law name params where goal`: a statement every instance of the
+        /// class satisfies, erased.
+        LawDecl,
+        /// `lawful C T [from d]`: the laws of `C` and its superclasses for a
+        /// dictionary.
+        LawfulGoal,
         Error,
 
         // nodes: expressions

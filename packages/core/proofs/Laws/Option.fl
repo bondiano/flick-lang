@@ -1,12 +1,9 @@
 /// The laws of the `Functor`, `Applicative` and `Monad` instances of
 /// `Option`, proved of their definitions in `Instances`: every law holds for
-/// every payload and every total function. `flick prove` checks them; no
-/// import of `Option` reads this module.
+/// every payload and every total function, each stated as its class states
+/// it, so `option` certifies them all as the bundle of `Monad Option`.
+/// `flick prove` checks them; no import of `Option` reads this module.
 module Laws.Option exposing (..)
-
-/// `fs` applied to `xs`: the `ap` of the laws, written with `map2`.
-ap : Option (a -> b) -> Option a -> Option b
-let ap fs xs = map2 (fun f x -> f x) fs xs
 
 /// F1
 proof map_identity (v : Option a)
@@ -24,14 +21,19 @@ where equal (map (fun x -> g (f x)) v) (map g (map f v)) =
 
 /// A1
 proof ap_identity (v : Option a)
-where equal (ap (pure identity) v) v =
+where equal (map2 (fun g x -> g x) (pure identity) v) v =
   match v with
   | None -> refl
   | Some x -> refl
 
 /// A2
 proof ap_composition (fs : Option (b -> c)) (gs : Option (a -> b)) (xs : Option a)
-where equal (ap (ap (ap (pure (fun f g x -> f (g x))) fs) gs) xs) (ap fs (ap gs xs)) =
+where equal
+  (map2
+    (fun g x -> g x)
+    (map2 (fun g x -> g x) (map2 (fun g x -> g x) (pure (fun u v x -> u (v x))) fs) gs)
+    xs)
+  (map2 (fun g x -> g x) fs (map2 (fun g x -> g x) gs xs)) =
   match fs with
   | None -> refl
   | Some f ->
@@ -43,18 +45,19 @@ where equal (ap (ap (ap (pure (fun f g x -> f (g x))) fs) gs) xs) (ap fs (ap gs 
       | Some x -> refl
 
 /// A3
-proof ap_homomorphism (f : a -> b) (x : a) where equal (ap (pure f) (pure x)) (pure (f x)) = refl
+proof ap_homomorphism (f : a -> b) (x : a)
+where equal (map2 (fun g x -> g x) (pure f) (pure x)) (pure (f x) : Option b) = refl
 
 /// A4
 proof ap_interchange (fs : Option (a -> b)) (x : a)
-where equal (ap fs (pure x)) (ap (pure (fun f -> f x)) fs) =
+where equal (map2 (fun g x -> g x) fs (pure x)) (map2 (fun g x -> g x) (pure (fun u -> u x)) fs) =
   match fs with
   | None -> refl
   | Some f -> refl
 
 /// A5
 proof map_is_ap (f : a -> b) (v : Option a)
-where equal (map f v) (ap (pure f) v) =
+where equal (map f v) (map2 (fun g x -> g x) (pure f) v) =
   match v with
   | None -> refl
   | Some x -> refl
@@ -92,3 +95,25 @@ where equal (map2 h va vb) (flat_map (fun a -> map (fun b -> h a b) vb) va) =
     match vb with
     | None -> refl
     | Some b -> refl
+
+/// Every law of `Monad`, `Applicative` and `Functor` at the instances of
+/// `Option`, by the lemmas above.
+proof option
+where lawful Monad Option = {
+  Applicative = {
+    Functor = {
+      identity = map_identity
+      composition = map_composition
+    }
+    identity = ap_identity
+    composition = ap_composition
+    homomorphism = ap_homomorphism
+    interchange = ap_interchange
+    map_is_applied = map_is_ap
+  }
+  left_identity = left_identity
+  right_identity = right_identity
+  associativity = associativity
+  map_is_flat_map = map_is_flat_map
+  map2_is_flat_map = map2_is_flat_map
+}
