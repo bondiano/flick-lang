@@ -43,9 +43,7 @@ where equal (ap (ap (ap (pure (fun f g x -> f (g x))) fs) gs) xs) (ap fs (ap gs 
       | Some x -> refl
 
 /// A3
-proof ap_homomorphism (f : a -> b) (x : a)
-where equal (ap (pure f) (pure x)) (pure (f x)) =
-  refl
+proof ap_homomorphism (f : a -> b) (x : a) where equal (ap (pure f) (pure x)) (pure (f x)) = refl
 
 /// A4
 proof ap_interchange (fs : Option (a -> b)) (x : a)
@@ -62,9 +60,7 @@ where equal (map f v) (ap (pure f) v) =
   | Some x -> refl
 
 /// M1
-proof left_identity (f : a -> Option b) (x : a)
-where equal (flat_map f (pure x)) (f x) =
-  refl
+proof left_identity (f : a -> Option b) (x : a) where equal (flat_map f (pure x)) (f x) = refl
 
 /// M2
 proof right_identity (v : Option a)
