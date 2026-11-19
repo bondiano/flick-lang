@@ -414,11 +414,15 @@ impl Contributor for Package {
         &self,
         state: Vec<u8>,
         outputs: Vec<command::File>,
+        answers: Vec<command::Answer>,
     ) -> Result<command::Plan, Vec<command::Diagnostic>> {
-        Backend::resume(&self.backend, state, outputs)
+        Backend::resume(&self.backend, state, outputs, answers)
     }
 
-    fn open(&self, invocation: &command::Invocation) -> Result<Vec<u8>, Vec<command::Diagnostic>> {
+    fn open(
+        &self,
+        invocation: &command::Invocation,
+    ) -> Result<command::Opened, Vec<command::Diagnostic>> {
         Backend::open(&self.backend, invocation)
     }
 
@@ -426,9 +430,11 @@ impl Contributor for Package {
         &self,
         state: Vec<u8>,
         request: Vec<u8>,
+        answers: &[command::Answer],
         cancel: &Cancellation,
     ) -> Result<command::Handled, String> {
-        self.backend.handle_cancellable(&state, &request, cancel)
+        self.backend
+            .handle_cancellable(&state, &request, answers, cancel)
     }
 
     fn close(&self, state: Vec<u8>) -> command::Plan {
