@@ -272,11 +272,13 @@ pub(crate) fn run(words: &[OsString], global: &GlobalArguments) -> ExitCode {
         ExitCode::from(2)
     };
     // outside a project, the official backends' commands run in the working directory
-    let found = find_project(global).ok().or_else(|| {
+    let inside = find_project(global).ok();
+    let outside = inside.is_none();
+    let found = inside.or_else(|| {
         let cwd = env::current_dir().ok()?;
         backends::outside_project(&cwd).ok()
     });
-    let Some(project) = found else {
+    let Some(mut project) = found else {
         return fail(unknown(&words, &cached_everywhere()));
     };
     let (found, warnings) = contributed(&project);
@@ -303,6 +305,10 @@ pub(crate) fn run(words: &[OsString], global: &GlobalArguments) -> ExitCode {
             return ExitCode::from(2);
         }
     };
+    // outside a project, the root holds the working directory and every path named
+    if outside {
+        project.root = inputs::common_root(descriptor, &arguments, &project.root);
+    }
     let tools = backends::granted_tools(&project, &source.id);
     let cwd = env::current_dir().unwrap_or_else(|_| project.root.clone());
     let invocation = match invocation(&project, descriptor, arguments, &tools, &cwd) {
