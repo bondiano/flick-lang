@@ -37,6 +37,8 @@ mod gadt_tests;
 #[cfg(test)]
 mod inline_tests;
 #[cfg(test)]
+mod lazy_tests;
+#[cfg(test)]
 mod tests;
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
 ---
 title: "Стандартная библиотека"
-source_hash: 6b5b064f0b75aaa0
+source_hash: 8a565f67e8865d01
 ---
 
 Стандартная библиотека написана на Flick и использует адаптер среды выполнения
@@ -71,7 +71,7 @@ source_hash: 6b5b064f0b75aaa0
 | `Log` | сервис `Log` с `info`, `warn`, `error`, `debug`; `from_console` делает слой `Log` из слоя `Host.Console`, а `Log.console`, сделанному из `Host.console`, ничего не нужно |
 | `File` | сервис `FileSystem`: `open_scoped`, `read_all`, `read_text`, `write_text` и `File.node` |
 | `ChildProcess` | дочерние процессы: команда `Command` (`make`, `set_cwd`, `set_env`, `set_stdin`, `prefix`, `pipe_to`, `inherit_output`) выполняется до конца через `string`, `lines` и `exit_code` или запускается `spawn` как `Process` scope'а, всё через `Host.Process`, с `stdout`, `stderr`, `output_string`, `output_lines`, `wait`, `is_running`, `kill` и `kill_with` |
-| `Resource` | `own` для значения класса `Close`, которое область закрывает один раз с исходом тела, см. [resources.md](../resources/); `acquire_release` с передачей ресурса владельцу области и `bracket` |
+| `Resource` | `own` для значения класса `Close`, которое область закрывает один раз с исходом тела, и `make`, который получает значение, освобождаемое областью с этим исходом (а `Scope.defer` — для очистки без значения), см. [resources.md](../resources/); `acquire_release` с передачей ресурса владельцу области и `bracket` |
 | `Events` | политики `queue` и супервизор `log_failures` |
 | `Ui`, `Ui.Event` | пользовательские интерфейсы, отображаемые с помощью React, см. [пользовательские интерфейсы](../ui/) |
 | `Sql`, `Database` | типизированные запросы PostgreSQL и сервис `Database`, см. [запросы SQL](../sql/) |

@@ -158,6 +158,7 @@ codes! {
     T082 = Types 82, "a proof's statement is outside its domain";
     T083 = Types 83, "a proof is no valid certificate";
     T084 = Types 84, "a proof ran out of its budget";
+    T085 = Types 85, "a statement after the children of a block";
     E001 = Effects 1, "runtime call in a pure position";
     E002 = Effects 2, "services or errors not allowed by the bound";
     E003 = Effects 3, "argument runs before the function that takes an Eff";

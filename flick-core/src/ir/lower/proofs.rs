@@ -14,6 +14,8 @@ use crate::types::{GoalSyntax, GoalType, ProofInfo, Range, Typing, goal_syntax};
 use flick_ir::{Dict, InstanceInfo};
 
 mod bundles;
+#[cfg(test)]
+mod replay;
 
 /// One proof declaration, lowered.
 #[derive(Debug, Clone)]

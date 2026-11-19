@@ -24,6 +24,16 @@ break programs.
   acquires into the suite's, not the scope of the case that set it up, on
   Flick's runtime and through the Effect adapter.
 
+- **Several children in `ui { … }` without `fragment`.** After its `let`s,
+  two or more lines of a `ui` block are the children of one `Ui.fragment`,
+  as the children of an element already stand one by one; one line is the
+  node itself, as before. Two lines were `FLICK-T011` until now, so no
+  program that compiled changes meaning. A `let` after the first child is
+  the new `FLICK-T085`, whose safe fix moves it above that child when that
+  changes nothing. A branch of `if` or `match` with several nodes is a
+  `ui { … }` of its own, and `fragment` stays the function it was. A
+  plugin's `Open` names the function with its new `siblings` field.
+
 - **Test hooks and timeouts.** A `suite` holds `before_all`, `before_each`,
   `after_each` and `after_all { … }`, which run around the cases of the
   suite that the run selects: setup outer to inner, cleanup inner to outer,
@@ -40,6 +50,17 @@ break programs.
   the run goes on. `Test.before_all` and the other hooks add
   them to a group built by hand. Alike on Flick's runtime, through the
   Effect adapter and on Go.
+
+- **Added: `Resource.make` and `Scope.defer`, cleanup that sees the
+  outcome.** `Resource.make acquire release` acquires a value under a
+  mask and makes the innermost `scope` release it once, with the value and
+  how the body ended (`Exit.is_success`, `Exit.has_interrupts`); an
+  acquisition that fails registers nothing. `Scope.defer cleanup`
+  registers cleanup the same way without a value. Both run with the
+  scope's other finalizers, last registered first, after its children
+  ended, on the Effect adapter, Flick's own runtime and Go.
+  `Resource.acquire_release` and `Scope.add_finalizer` stay as the
+  low-level API.
 
 - **Test companions.** `src/App/Users.test.fl` beside `src/App/Users.fl`
   begins with `module App.Users`, without `exposing`, and sees every

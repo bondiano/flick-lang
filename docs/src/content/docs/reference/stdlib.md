@@ -68,7 +68,7 @@ and `Monad`.
 | `Log` | the `Log` service with `info`, `warn`, `error`, `debug`; `from_console` makes a `Log` layer of a `Host.Console` layer, and `Log.console`, made of `Host.console`, needs nothing |
 | `File` | the `FileSystem` service: `open_scoped`, `read_all`, `read_text`, `write_text`, and `File.node` |
 | `ChildProcess` | child processes: a `Command` (`make`, `set_cwd`, `set_env`, `set_stdin`, `prefix`, `pipe_to`, `inherit_output`) run to its end by `string`, `lines` and `exit_code`, or started by `spawn` as a `Process` of a scope, all through `Host.Process`, with `stdout`, `stderr`, `output_string`, `output_lines`, `wait`, `is_running`, `kill` and `kill_with` |
-| `Resource` | `own` of a value of `Close`, which its scope closes once with the outcome of the body, see [resources.md](../resources/); `acquire_release` into a scope's owner, and `bracket` |
+| `Resource` | `own` of a value of `Close`, which its scope closes once with the outcome of the body, and `make`, which acquires a value its scope releases with that outcome (with `Scope.defer` for cleanup without a value), see [resources.md](../resources/); `acquire_release` into a scope's owner, and `bracket` |
 | `Events` | `queue` policies and the `log_failures` supervisor |
 | `Ui`, `Ui.Event` | user interfaces rendered with React, see [ui.md](../ui/) |
 | `Sql`, `Database` | typed PostgreSQL queries and the `Database` service, see [sql.md](../sql/) |

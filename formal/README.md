@@ -116,6 +116,25 @@ signature and golden certificates.
   ordered comparison finds false; `intNum` and `Interval.int_side` cover `Int`'s closed ends.
   `unobserved_or_true` and `or_true_decides_neither` pin definedness. Separate from the core:
   it proves the decision procedure, not the Rust checker or IEEE arithmetic of a runtime.
+- **The logic of `proof`** (`Formal/Proofs/`, [`proofs.md`](../docs/formal/proofs.md)): λPT,
+  the total calculus a statement is about, has rigid type variables, `unit`, products, sums,
+  functions, `let`, `case` and the globals of an acyclic environment, with by-value big-step
+  evaluation (`Typing.lean`). A data type that does not contain itself is a sum of products of
+  its fields. The logical equality `R` relates functions that take related arguments to related
+  results (funext), and is a partial equivalence (`Rel.lean`). `fundamental`: a typed term is
+  related to itself under every instance of its type variables and every related
+  substitutions, so every typed term terminates (`terminates`). Each reduction step, under
+  binders too, is an equality (`Step.sound`, `Reduce.lean`), as erasing annotations is.
+  `check_sound`: every statement the certificate checker accepts, with `refl` by erased
+  normal forms, `symm`, `trans`, `cong`, `funext`, splits of a unit, a pair or a sum, premises
+  and lemmas without premises, holds; `checkAll_sound` for a list checked in order
+  (`CheckSound.lean`). `Examples.lean` replays the identity law of `map` at `Option` by
+  `decide`. `FormalCert/Gen/Proofs.lean`, which `just formal-proofs` writes from the compiler's
+  kernel, replays all twelve laws of `packages/core/proofs/Laws/Option.fl` over the five
+  definitions they unfold (`Flick.PT.Gen.Option.sound`); a test of `flick-core` fails when the
+  proofs or the definitions change and the file is not written again, and a broken `map2`
+  makes `decide` refute the replay. It proves the calculus and its checker, not the Rust kernel
+  or the translation of Flick's terms into λPT.
 - **T7, local mutation** (`Formal/LetMut.lean`): the straight-line block
   fragment with assignments, branches and scope translates to a typed core
   term. `T7_pure` derives purity from T2a; `T7_regions` derives safety by
@@ -177,6 +196,15 @@ signature and golden certificates.
   stays settled and every later force gets its outcome, the interruption of a waiter removes
   only it, the interruption of the owner or the unwind of its handler makes the cell pending
   for attempt `n + 1` without caching anything, and a force by the owner is a defect (`R9`).
+- **O1, lazy cells a program need not make** (`Formal/Equiv/`, `lazy.md` §6): contextual
+  equivalence of the core (`CtxEquiv`, `Equiv/Context.lean`): every two typed programs one
+  context of the source language, with holes anywhere, builds around two terms may end with
+  the same literals. Typing keeps a term that makes a lazy cell away from where a pattern reads
+  (`Typ.noLzTop`, `Equiv/TopTyped.lean`), and a dead arm of a GADT, which typing does not
+  reach, is related whatever its bodies (`Sim.aconsD`).
+  `Equiv.o1a` (a cell nothing names), `Equiv.o1b` (`lazy v` and a cell born done) and
+  `Equiv.o1c` (`force (lazy e)` and `e`) are proved by a simulation of runs each way (`Sim`,
+  `thread_sim`, `cstep_sim`, `csteps_sim`, `lit_sim`, `ctxEquiv_of_sim`).
 - **T6, the elaboration** (`Formal/Elab/`), with runtime stages `R r e` whose rows take
   variables, and constructors whose values carry the dictionaries of their constraints, with
   arms on them refined by the most general unifier: `T6a` (`Elab/T6a.lean`), an elaborated term is
@@ -207,8 +235,8 @@ signature and golden certificates.
 `hdl_err_live` lists only `propext`. `Formal/Axioms.lean` pins what `#print axioms` prints
 for `T1`, `T1_regions`, `T2a`, `T2b`, `T2b_await`, `T3`, `lemma_6`, `T4'`, `hdl_err_live`,
 `T6a`, `T6b`, `T6a_core`, `T6b_core`, `Lazy.L1`, `Lazy.L1_once`, `Lazy.L2`, `R9`, `T7`,
-`MutOk.lzDecl`, `LzSig.typ_run`, `MutOk.lzAwait`, `MutOk.lzWrite` and
-`Elab.Witness.lzSig` with `#guard_msgs`, so
+`MutOk.lzDecl`, `LzSig.typ_run`, `MutOk.lzAwait`, `MutOk.lzWrite`,
+`Elab.Witness.lzSig`, `Equiv.o1a`, `Equiv.o1b` and `Equiv.o1c` with `#guard_msgs`, so
 `lake build` fails on a
 `sorry` or a new axiom.
 
@@ -312,6 +340,7 @@ operation, kept or not, and `c.at i` ranges over the main thread and the childre
 | `lazy.md` §3 steps | `RHead.lazy`, `.forcePending`, `.forceDone`, `.forceRunning`, `.settleVal`, `.settleRaise`, `.settleUnw`, `settleCell`, `resetCell` (`Semantics.lean`); their preservation: `lazy_new`, `force_pending`, `force_done`, `settle_val`, `settle_raise`, `settle_unw` (`PresLazy.lean`) |
 | `lazy.md` L1, L2 | `Lazy.L1`, `Lazy.L1_once`, `Lazy.L2` (`Lazy.lean`) |
 | `lazy.md` §4 `let lazy` | `lzT`, `lzRunT`, `lzDecl`, `lzAwait`, `lzWrite`, `lzAttempt`, `lzOut`, `LzSig`, `LzSig.typ_run`, `MutOk.lzDecl`, `MutOk.lzAwait`, `MutOk.lzWrite` (`LetMut/Lazy.lean`); `Elab.Witness.lzSig` (`LetMut/LazyWitness.lean`) |
+| `lazy.md` §6 contextual equivalence, O1a–O1c | `Ctx`, `Prog`, `Ends`, `CtxEquiv`, `ctxEquiv_of_sim`, `Equiv.o1a`, `Equiv.o1b`, `Equiv.o1c` (`Equiv/Context.lean`); `Sim`, `World` (`Equiv/Sim.lean`); `thread_sim` (`Equiv/ThreadSim.lean`); `CfgR`, `cstep_sim`, `csteps_sim`, `lit_sim` (`Equiv/Cfg.lean`) |
 | `core.md` §3.2 contexts; the handler of an operation; the frame `inside π E` | `Frame`, `plug`, `handlerOf` (`EvalCtx.lean`) |
 | `core.md` §3.3 `→ₚ`; §3.4–3.5 steps; `regions.md` §3.2–§3.3 | `PHead`, `RHead`, `Step`, `Steps` (`Semantics.lean`) |
 | `regions.md` §3.1 `Λ`, children step at any time | `Rgn`, `Cfg`, `CStep`, `CSteps` (`Semantics.lean`) |

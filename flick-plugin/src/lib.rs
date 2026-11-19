@@ -212,12 +212,16 @@ pub enum Expr {
     /// that list element by element: each argument from that parameter on
     /// is one, and none is the empty list. With `through`, a function, a
     /// value there of the type its first parameter has is applied through
-    /// it: `v x` is `through v x`.
+    /// it: `v x` is `through v x`. With `siblings`, a function of a list of
+    /// the child, a body of lines with more than one expression is that
+    /// function of the list of them, each line one, after its statements.
     Open {
         module: String,
         child: Option<String>,
         #[serde(default)]
         through: Option<String>,
+        #[serde(default)]
+        siblings: Option<String>,
         body: NodeId,
     },
 }

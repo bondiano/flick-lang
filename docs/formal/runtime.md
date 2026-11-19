@@ -242,7 +242,7 @@ The model takes the JS points. Go has fewer, so Go admits a subset of the interl
 
 In both runtimes the following run under a mask:
 
-- the acquisition of `acquire_release` together with the registration of the release;
+- the acquisition of `acquire_release` and of `Resource.make` together with the registration of the release;
 - `bracket`: acquisition and release;
 - finalizers, hooks, the whole closing of an owner;
 - the watcher and the supervisor;
@@ -281,10 +281,14 @@ The Lean core has no form of these combinators: its only cleanup is the finalize
 (Fin-Add)       add_finalizer π t,  st(π) ∈ {open, closing}  →  F(π) := t :: F(π)
 (Fin-Now)       add_finalizer π t,  st(π) ∈ {finalizing, closed}  →  mask (t x(π))
 (Acquire)       acquire_release π a rel  →  mask (let v = a in add_finalizer π (rel v); v)
+(Make)          Resource.make π a rel   →  mask (let v = a in add_finalizer π (λx. rel v x); v)
+(Defer)         Scope.defer π t         →  add_finalizer π t
 (Ext)           ext p in f  →  P(π_f) += p;  f waits for p to settle;
                    (Int-Deliver) fails f at once, and p stays in P(π_f)
 (Ext-Settle)    p settled  →  P -= p;  the waiting fiber, if it still waits, gets the value or the failure
 ```
+
+(Make) and (Defer) are derived: both are Flick code of std over the foreign that `Resource.own` registers through (`add_close`, with `retention owner`) and `uninterruptible`, so they add no constant to the core and no step here. Their finalizers take the outcome `x(π)` that (C5) passes to every finalizer, at a type `Exit e b` they cannot read, as `close_exit` does. An `a` that fails or is interrupted leaves the mask before `add_finalizer`, so nothing is registered. Case: `tests/run/runtime/defer_make.fl`.
 
 Closing is a sequence of steps without choice, in a fixed order:
 
@@ -393,7 +397,7 @@ Labels:
 - **[E]** — held by Effect 4.1.2; this is a hypothesis about the library, its item in G7;
 - **[Go]** — held by the Go runtime's own code.
 
-**R1 (exactly once).** Suppose `acquire_release π a rel` returned `v`, or `add_finalizer π t` ran. Then for any outcome of the body of `π` — a value, `fail c` with any reasons, an interruption — `rel v` (`t`) starts exactly once, and before closing `π` ends.
+**R1 (exactly once).** Suppose `acquire_release π a rel` or `Resource.make π a rel` returned `v`, or `add_finalizer π t` or `Scope.defer π t` ran. Then for any outcome of the body of `π` — a value, `fail c` with any reasons, an interruption — `rel v` (`t`) starts exactly once, and before closing `π` ends.
 
 - JS:
   - [E] `Scope.close` moves to `Closed` before the finalizers and does nothing when repeated (G7a); a finalizer added to a closed scope runs at once; acquisition and registration are under one mask (G7b);

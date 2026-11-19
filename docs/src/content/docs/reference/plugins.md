@@ -184,7 +184,11 @@ parameter on is one, none is the empty list, one argument that is a list is
 the list itself, and a list literal is refused (`FLICK-T073`). With a
 function to apply values through, a value in that body whose type is that of
 the function's first parameter is applied through it: `badge props` is
-`Ui.component badge props` inside `ui`. A whole number is
+`Ui.component badge props` inside `ui`. With a function of a list of the
+child, a body of lines with more than one expression line is that function
+applied to the list of them, after the statements, and a statement after
+the first of them is refused (`FLICK-T085`): a `ui` of the lines `a` and
+`b` is `Ui.fragment [a, b]`. A whole number is
 an integer literal, of any numeric type its use asks for; a declaration
 block whose group is empty declares nothing. A function in a
 plugin's code needs no signature: its type is inferred. The arena version is the version of the interface:
