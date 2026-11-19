@@ -6,6 +6,8 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use flick_backend::command;
+use flick_backend::host::runtime::Cancellation;
 use flick_backend::host::{Budget, WasmBackend};
 use flick_backend::{
     Backend, BackendId, BackendPin, BuildRequest, Failure, Generated, Limits, Policy,
@@ -23,6 +25,7 @@ use super::{execute, failure, launch};
 use crate::artifact::Artifact;
 use crate::commands::build::Purpose;
 use crate::commands::build::{BuildPlan, Emission};
+use crate::commands::contributed::Contributor;
 use crate::component;
 use crate::sources::FsHost;
 
@@ -391,6 +394,36 @@ impl Package {
             mapped.span = Some(Span::new(files[span.file as usize], span.start, span.end));
         }
         mapped
+    }
+}
+
+impl Contributor for Package {
+    fn describe(&self) -> Result<Vec<command::Descriptor>, String> {
+        Ok(self.backend.commands())
+    }
+
+    fn run(
+        &self,
+        invocation: &command::Invocation,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        Backend::run(&self.backend, invocation)
+    }
+
+    fn open(&self, invocation: &command::Invocation) -> Result<Vec<u8>, Vec<command::Diagnostic>> {
+        Backend::open(&self.backend, invocation)
+    }
+
+    fn handle(
+        &self,
+        state: Vec<u8>,
+        request: Vec<u8>,
+        cancel: &Cancellation,
+    ) -> Result<command::Handled, String> {
+        self.backend.handle_cancellable(&state, &request, cancel)
+    }
+
+    fn close(&self, state: Vec<u8>) -> command::Plan {
+        Backend::close(&self.backend, state)
     }
 }
 

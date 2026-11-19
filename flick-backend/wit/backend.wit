@@ -193,4 +193,5 @@ world backend {
     export describe: func() -> descriptor;
     export check-target: func(request: build-request) -> result<target-support, list<diagnostic>>;
     export generate: func(request: build-request) -> result<build-result, list<diagnostic>>;
+    export flick:command/command@0.1.0;
 }

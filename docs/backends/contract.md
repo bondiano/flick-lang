@@ -244,6 +244,18 @@ the ordinary build cache. Text emit hooks see
 source/declaration/metadata text while opaque object, executable and resource
 artifacts retain their bytes.
 
+### Commands
+
+Both the backend world and the plugin world export `flick:command/command`
+(`flick-backend/wit/deps/command`, copied to `flick-plugin/wit/deps`; a test
+keeps the two identical). A command declares its parameters, the paths it
+writes and its style; it returns a plan of files and tool steps or answers
+session requests. The host checks a plan against the declaration, runs its
+steps with the executor above under the contributor's `[tools]` grant, and
+publishes its files in one transaction under the project's root. Help
+reads the descriptors cached by component digest, never a component. See
+[Contributed commands](../src/content/docs/reference/commands.md).
+
 ### Atomic publication
 
 A build publishes its files, the removal of stale ones and the project's
