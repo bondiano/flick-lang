@@ -74,6 +74,7 @@ mod expression_fact;
 mod origin;
 mod patterns;
 mod pipes;
+mod proof_bundles;
 mod proof_data;
 mod proof_decls;
 mod proofs;
@@ -142,7 +143,8 @@ pub use patterns::is_pattern;
 pub use pipes::{
     applied_order, composed_key, composition, param_key, result_key, right_application,
 };
-pub use proof_decls::{GoalSyntax, GoalType, ProofInfo, goal_syntax};
+pub use proof_bundles::record;
+pub use proof_decls::{Bundle, GoalSyntax, GoalType, Law, ProofInfo, goal_syntax};
 pub use question::Question;
 pub use ranges::range_list;
 pub use schemas::companion_name;
@@ -546,6 +548,9 @@ struct ItemCx {
     trusted: bool,
     /// The proof being checked, where its rules are names.
     proof: Option<Range>,
+    /// The parameters of the class whose law is being checked: applied,
+    /// each is a type the instance of a bundle fills in.
+    law: Vec<u32>,
     /// Locals applied before their type was known, each with the pure arrow
     /// taken for it, its name and where it is bound.
     assumed_pure: Vec<(Type, String, u32)>,

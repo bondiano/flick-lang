@@ -39,12 +39,12 @@ impl Walker<'_> {
         }
         self.release(mark);
         self.proof.0 = false;
-        // a later proof may use this one as a lemma
-        let name = node
-            .nodes()
-            .find(|n| n.kind == K::VarPat)
-            .map(|n| n.text(self.text));
-        self.proof.1.extend(name.map(|n| n.trim().to_owned()));
+        // a later proof may use this one as a lemma; a law proves nothing
+        let name =
+            (node.nodes().find(|n| n.kind == K::VarPat)).filter(|_| node.kind == K::ProofDecl);
+        self.proof
+            .1
+            .extend(name.map(|n| n.text(self.text).trim().to_owned()));
     }
 
     /// Whether `name`, unqualified, is a rule of the proof being walked or

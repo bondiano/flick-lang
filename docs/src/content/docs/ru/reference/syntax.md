@@ -1,6 +1,6 @@
 ---
 title: "Синтаксис"
-source_hash: bae21aa4507aacdd
+source_hash: 9518d1cbe07d33f7
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -156,7 +156,8 @@ in when for yield do break continue
 - `effect` перед именем объявления эффекта, `tail`, `abort` и `control` перед
   операцией сервиса или эффекта и `return` перед образцом ветки `try` (см.
   [effects.md](../effects/#эффекты-и-handlers));
-- `proof` перед именем в начале объявления (см. [Объявления](#объявления)).
+- `proof` перед именем в начале объявления и `law` перед именем в начале
+  члена класса (см. [Объявления](#объявления)).
 
 ### В модулях
 
@@ -182,8 +183,9 @@ in when for yield do break continue
 | `assert` | `let assert` связывает образец, который может не подойти, и завершается с ошибкой, если он не подошёл | `let assert [x, ..._] = xs as "no items"` |
 | `type` | Объявляет алгебраический тип данных, а в сочетании `type alias` — прозрачный псевдоним типа | `type Shape = Circle Float \| Empty` |
 | `opaque` | Скрывает представление типа за пределами его модуля | `opaque type alias UserId = String` |
-| `where` | Задаёт условие уточняющего типа, цель `proof` или фильтр в `sql { … }` | `where user.id == params.id` |
+| `where` | Задаёт условие уточняющего типа, цель `proof` или `law` или фильтр в `sql { … }` | `where user.id == params.id` |
 | `proof` | Контекстное слово: перед именем в начале объявления формулирует свойство определений модуля и доказывает его; компилятор проверяет доказательство и стирает объявление; в других местах остаётся именем | `proof same where same_type a a = refl` |
+| `law` | Контекстное слово: перед именем в начале члена класса формулирует то, что выполняет каждый экземпляр; компилятор стирает закон, а цель `lawful` доказывает его для экземпляра; в других местах остаётся именем | `law identity (v : f a) where equal (map identity v) v` |
 | `kind` | Объявляет кинд и его конструкторы на уровне типов | `kind Nullability = NonNull \| Nullable` |
 | `error` | В сочетании `type error` объявляет ожидаемую ошибку с номинальной идентичностью | `type error NotFound = NotFound UserId` |
 | `service` | Объявляет операции сервиса, реализация которого выбирается при выполнении | `service Clock = now : Unit ->{} Float` |
@@ -456,24 +458,33 @@ kind_decl   = "kind" Con "=" ["|"] Con { "|" Con }
 error_decl  = "type" "error" Con { param } ["=" variant] [deriving]
 service     = ("service" | "effect") Con { param } [ "=" operations ]
 operations  = block of: [ "tail" | "abort" | "control" ] signature | let | type_decl
-class       = "class" [context "=>"] Con { param } ["|" fundep { "," fundep }] ["=" members]
+class       = "class" [context "=>"] Con { param } ["|" fundep { "," fundep }] ["=" class_members]
 fundep      = { name } "->" { name }
 instance    = "instance" [context "=>"] type ["=" members]
 members     = block of: signature | let | type_decl
+class_members = block of: signature | let | type_decl | law
+law         = "law" name { atom_pattern | premise } "where" goal
 foreign     = "foreign" [mode] name "from" ("global" String | String String) [metadata]
             | "foreign" "blocked" name String
 mode        = "pure" | "effect"
 metadata    = indented lines: meta_name { atom }
 proof       = "proof" name { atom_pattern | premise } "where" goal "=" block
 premise     = "(" name ":" goal ")"
-goal        = "same_type" atom atom | expr   // two atomic types, or an expression
+goal        = "same_type" atom atom | "lawful" type ["from" expr] | expr
 ```
 
 `proof` формулирует свойство определений модуля — цель после `where` —
 и доказывает его после `=`: `proof same where same_type a a = refl`.
 Компилятор проверяет доказательство и стирает объявление: во время
-выполнения у него нет значения. `equal`, `holds`, `same_type` и `refl` —
-имена, а не ключевые слова.
+выполнения у него нет значения. `equal`, `holds`, `same_type`, `lawful` и
+`refl` — имена, а не ключевые слова.
+
+`law` в классе, как и цель, формулирует то, что выполняет каждый экземпляр,
+но не имеет доказательства; компилятор стирает закон. `proof` с целью
+`lawful C T` доказывает законы `C` и его суперклассов для экземпляра, к
+которому разрешается `C T`: тело — запись, которая называет доказательство
+для каждого закона, а запись каждого суперкласса держит в поле этого
+суперкласса, как словарь.
 
 `module_application` объявляется только на уровне файла. Внутри
 `inline_module` он вызывает `FLICK-R019`; `module_contract` там разрешён.

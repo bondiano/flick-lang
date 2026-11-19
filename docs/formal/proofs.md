@@ -1,6 +1,6 @@
 # Proofs: statements over the pure, total domain
 
-Status: **contract** (RFC #647, #641). Phases 1–5a and 4b are implemented: §1–§8 hold in the checker. Law bundles (#719) and the Lean development (§10, #720) land in the phases RFC #647 lists. Each rule says where it is checked.
+Status: **contract** (RFC #647, #641). Phases 1–5 are implemented: §1–§9 hold in the checker. The Lean development (§11, #720) lands in phase 6 of RFC #647. Each rule says where it is checked.
 
 References as in [`core.md`](core.md). Paths are relative to `flick-core/src/`.
 
@@ -13,8 +13,8 @@ References as in [`core.md`](core.md). Paths are relative to `flick-core/src/`.
 | `PureTotalV1` | the values a statement is about | §3 |
 | `refl`, `symm`, `trans`, `cong`, `funext`, `match`, a premise, `let` | the rules | §4 |
 | T080–T084 | how a proof fails | §5 |
-
-Not yet: law bundles.
+| `law name params where goal` | what every instance of a class satisfies | §9 |
+| `proof name where lawful C T = { … }` | the laws of `C` proved of the instance `C T` resolves to | §9 |
 
 ## 1. Proofs are opt-in and erased
 
@@ -133,7 +133,7 @@ So `equal (map identity v) v` is proved by a split of `v` against the real `Func
 
 ## 8. The laws of `Option`
 
-`packages/core/proofs/Laws/Option.fl` proves the laws of the `Functor`, `Applicative` and `Monad` instances of `Option` from their definitions in `Instances`. Here `ap fs xs` is `map2 (fun f x -> f x) fs xs`, and `compose` is written out.
+`packages/core/proofs/Laws/Option.fl` proves the laws of the `Functor`, `Applicative` and `Monad` instances of `Option` from their definitions in `Instances`. Here `ap fs xs` stands for `map2 (fun g x -> g x) fs xs`, and `compose` for its lambda: the laws and the lemmas write both out. Each lemma states its law exactly as its class does (§9), and the bundle `option` of that module certifies all twelve as the laws of `Monad Option`.
 
 | ID | Law |
 | - | - |
@@ -154,10 +154,18 @@ Each holds for every payload and every total function. `flick prove --project pa
 
 A change to a method breaks the laws it breaks. A `map2` that answers `None` to two `Some` values fails A1, A3, A5 and C2 (T080). It still satisfies A2 and A4, which hold of it.
 
-## 9. Why the domain is total
+## 9. Laws and bundles
+
+- **Laws.** `law name params where goal` is a member of a class, typed as a default method is: the class's parameters are rigid, its constraint is given, and a method of the class or of a superclass is the given dictionary's (`types/proof_decls.rs`, `check_laws`). A law has no proof, and the compiler erases it. `Prelude` states F1–C2 of §8 as the laws of `Functor`, `Applicative` and `Monad`.
+- **Bundles.** `proof name where lawful C T = { … }` resolves the constraint `C T` as a call of a method does; its dictionary is the subject of the bundle (`types/proof_bundles.rs`). The record names a lemma, checked before it and local or `M.name`, for each law of `C`, and holds in each superclass's field, as a dictionary does, the record of that superclass's laws. A missing field or one that is no law is `FLICK-T083`.
+- **Exact subject.** Each law is read at the subject: its given dictionary becomes the subject, a superclass of an instance the dictionary that instance's `supers` names, and the class's parameters the types of `T` (`ir/lower/proofs/bundles.rs`). The lemma must take the law's parameters, of the same types up to a renaming of their type variables, and its sides must be the law's with definitions folded. A lemma of another function, type or dictionary proves nothing of the instance (`T081`, `T083`), so a broken method, a broken superclass instance or a local dictionary gets no bundle (`flick/tests/cli/prove_bundles.rs`).
+- **Named dictionaries.** `lawful C T from d` types `d` as a `C.Dict T`, and is outside the domain (`T082`): a bundle is about an instance.
+- **Rechecking.** In a run with proofs, a module with a class that states a law is checked again, never taken from a cache, and the laws of the built-in classes are checked again when a bundle first reads them (`project/builtins.rs`, `builtin_laws`). A class whose laws the run cannot read, one of an installed package for one, gets no bundle (`T082`).
+
+## 10. Why the domain is total
 
 With `ap fs xs = map2 (fun f x -> f x) fs xs`, the law `ap (ap (ap (pure compose) fs) gs) xs = ap fs (ap gs xs)` fails for a `g` that fails: with `fs = None` the left side never applies `g`, and the right side does (`tests/run/stdlib/option_ap_strictness.fl`). A proof of the law is about total functions only. It makes no claim about this program, and nothing in the program changes.
 
-## 10. Trust boundary
+## 11. Trust boundary
 
 The logic is host code (`logic/`). It runs no Flick program and accepts no success it did not check. The Rust checker, the extraction from IR and the compiler and runtimes that run the program are trusted. The Lean development of the calculus and of the checker's soundness is phase 6 of RFC #647. Until it lands, §4 is a contract the Rust tests check, not a theorem.

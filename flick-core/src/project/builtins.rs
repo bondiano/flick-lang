@@ -63,6 +63,26 @@ pub fn keep_builtin_modules(store: BuiltinStore) -> bool {
 
 static DECLARATIONS: OnceLock<Vec<Arc<Interface>>> = OnceLock::new();
 
+/// The laws of the built-in classes, lowered. Only a proof reads them, so
+/// they are checked again when one first does, apart from the bundle a host
+/// keeps.
+pub fn builtin_laws(stages_by_class: bool) -> &'static [ir::Proven] {
+    static LAWS: [OnceLock<Vec<ir::Proven>>; 2] = [OnceLock::new(), OnceLock::new()];
+    LAWS[usize::from(stages_by_class)].get_or_init(|| {
+        let mut laws = Vec::new();
+        types::check_each(
+            types::builtin_sources(),
+            stages_by_class,
+            |module, typing| {
+                if !typing.laws.is_empty() {
+                    laws.extend(ir::laws_of(module, typing));
+                }
+            },
+        );
+        laws
+    })
+}
+
 pub fn builtin_declarations() -> &'static [Arc<Interface>] {
     builtin_modules_of(false);
     DECLARATIONS.get_or_init(|| lower_builtins(false).1)
