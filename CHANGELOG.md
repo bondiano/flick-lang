@@ -22,6 +22,13 @@ break programs.
   Now `;` separates its lines, as in braces, so `ui { a; b }` is two
   children, and any other code after the body is `std/U010`.
 
+- **`FLICK-T086`: a `fragment` around the lines of a `ui` block.** A
+  `fragment` of two or more children written one by one, as the one line
+  of a `ui { … }`, is a warning; its safe fix writes the children as the
+  lines of the block, the same program. `fragment x` and `fragment rows`
+  stay. The examples, the docs and the tests are written so with
+  `flick check --fix --only T086`.
+
 - **Test hooks and timeouts.** A `suite` holds `before_all`, `before_each`,
   `after_each` and `after_all { … }`, which run around the cases of the
   suite that the run selects: setup outer to inner, cleanup inner to outer,
