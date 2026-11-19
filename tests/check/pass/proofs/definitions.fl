@@ -21,3 +21,14 @@ where equal (flat_map pure v) v =
   | Some x -> refl
 
 proof left_identity (h : a -> Option b) (x : a) where equal (flat_map h (pure x)) (h x) = refl
+
+/// A payload of a data type is of the type's argument, whatever the
+/// statement names its variable: the inner `Option` splits too.
+proof flattened (v : Option (Option b))
+where equal (flat_map (fun w -> w) v) (match v with | None -> None | Some w -> w) =
+  match v with
+  | None -> refl
+  | Some w ->
+    match w with
+    | None -> refl
+    | Some x -> refl
