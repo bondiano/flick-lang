@@ -16,6 +16,7 @@ import Formal.TypeEquivShape
 import Formal.Lazy
 import Formal.Refine
 import Formal.Refine.Numbers
+import Formal.Proofs.CheckSound
 import Formal.RT.LazyCell
 
 /-!
@@ -165,3 +166,19 @@ prints, and `#guard_msgs` turns the difference into an error.
 /-- info: 'Flick.Refine.numbers_sound' depends on axioms: [propext, Quot.sound] -/
 #guard_msgs in
 #print axioms Flick.Refine.numbers_sound
+
+/-- info: 'Flick.PT.fundamental' depends on axioms: [propext] -/
+#guard_msgs in
+#print axioms Flick.PT.fundamental
+
+/-- info: 'Flick.PT.terminates' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.PT.terminates
+
+/-- info: 'Flick.PT.check_sound' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.PT.check_sound
+
+/-- info: 'Flick.PT.checkAll_sound' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.PT.checkAll_sound
