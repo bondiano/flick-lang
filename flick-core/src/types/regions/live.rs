@@ -324,19 +324,19 @@ impl Checker<'_> {
     }
 
     /// A function or a task `identity` under a value bound fitted into the
-    /// bound's type `base`, `innermost` the innermost bound; `None` for any
-    /// other value. With `base` known it fits as it fits that type, by
-    /// subsumption: one that uses nothing fits where a closure fitted before
-    /// it may use the bound. One that fixes `base` gives it its arrow with
-    /// the innermost bound in its row, a widening `LeLive.arrow` allows, and
-    /// the holds of the bound keep its qualifier within it; a closure fitted
-    /// after it may then use what the bound allows. Either way the verdict
+    /// bound's type `base`; `None` for any other value, and where the value
+    /// fixes `base` as unification does. With `base` known it fits as it
+    /// fits that type, by subsumption: one that uses nothing fits where a
+    /// closure fitted before it may use a region. One that fixes `base` gives
+    /// it its own type that keeps live a use row of its own, a widening
+    /// `LeLive.arrow` allows: a closure fitted after it grows that row, and
+    /// a written type without it empties it. Not the bound, which says what
+    /// the value reaches, not what using it needs. Either way the verdict
     /// does not depend on which argument comes first.
     pub(in crate::types) fn callable_bound_fits(
         &mut self,
         identity: &Type,
         base: &Type,
-        innermost: Option<&Type>,
         span: Span,
     ) -> Option<Unified> {
         let callable = |t: &Type| {
@@ -347,8 +347,9 @@ impl Checker<'_> {
             return None;
         }
         if matches!(base, Type::Meta(_)) {
-            let widened = self.with_live(self.whnf(identity), innermost);
-            return Some(self.unify(&widened, base));
+            let uses = self.store.fresh_capture_row();
+            let widened = self.with_live(identity.clone(), Some(&uses));
+            return self.unifies(&widened, base).then_some(Ok(()));
         }
         callable(base).then(|| self.subsume(identity, base, span))
     }
@@ -364,7 +365,7 @@ impl Checker<'_> {
     }
 
     /// `t`, a function or a task, whose row also needs live what `captures`
-    /// holds. Any other type as it is.
+    /// holds; under a qualifier, its arrow's row. Any other type as it is.
     pub(in crate::types) fn with_live(&self, t: Type, captures: Option<&Type>) -> Type {
         let Some(atoms) = captures.map(|c| self.live_atoms(c, &[])) else {
             return t;
@@ -381,6 +382,17 @@ impl Checker<'_> {
                     ..*effects
                 })),
                 result,
+            },
+            Type::Captured {
+                ty,
+                captures: qualifier,
+                value,
+                elided,
+            } => Type::Captured {
+                ty: Box::new(self.with_live(*ty, captures)),
+                captures: qualifier,
+                value,
+                elided,
             },
             other => match self.eff_parts(&other) {
                 Some((s, e, r)) => super::super::infer::eff(add_live(&s, atoms), e, r),

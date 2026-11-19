@@ -38,5 +38,5 @@ let escapes () =
   | [] -> ""
 //~ FLICK-G002 @25:60-25:73 this uses `s`, which the expected type `Unit ->{} String` does not keep live
 //~ FLICK-G002 @28:57-28:70 this uses `s`, which the type of this function does not keep live
-//~ FLICK-G002 @33:5-34:44 the value of this `scope` has type `List (Unit ->{} String)^{s | _}`
+//~ FLICK-G002 @33:5-34:44 region `s` ends with its `scope`, so the value cannot leave it
 //~ FLICK-G002 @37:18-37:22 this uses region `s`, which the signature of `escapes` does not keep live
