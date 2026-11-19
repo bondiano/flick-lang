@@ -124,7 +124,9 @@ other code after the body is `std/U010`. A `let` after the first child is
 `flick check --fix --only T085` moves above it when that changes nothing. A
 branch of `if` or `match` is one expression, so several nodes there are a
 `ui { … }` of their own, or `fragment a b`; `fragment` of one list,
-`fragment rows`, is a node of the list.
+`fragment rows`, is a node of the list. A `fragment` of two or more
+children written one by one as the one line of the block is
+`FLICK-T086`, a warning whose fix writes them as its lines.
 
 ```flick
 summary : Float -> Ui
