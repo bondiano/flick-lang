@@ -74,7 +74,10 @@ Each certificate depends only on the axioms `propext`, `Classical.choice` and
   (`exh_gen`, from the `closed` field of `GenSig`); one arm `E x̄` for each
   error of a closed row matched at `Errors ε` (`exh_errs`, the pattern
   `PatTy.err`); and a record pattern `{ℓ = x, ..}`. A `try` arm catches all of the body's errors with `x` or `_`,
-  or the error `E` with an arm `E x̄` (`catches_all`, `catches_ctor`).
+  or the error `E` with an arm `E x̄` (`catches_all`, `catches_ctor`). An arm
+  `x` takes the errors at the row the check gave it, which may name errors the
+  body does not raise when a `match` on `x` does: (Try) is written at that row,
+  and the body at it by (Sub). A pure `try` whose arm takes such errors is a gap.
 - **(Errors-In).** A term the check gave the errors of a row from its error
   type `E` is `.errVal` of its typing at `E`, with `E` in the row by `row_set`
   (`cert/raise.rs` `errors_in`); the term need not be a value.
