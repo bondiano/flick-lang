@@ -147,6 +147,9 @@ fn let_rest(p: &mut Parser, m: super::Marker, assert: bool) {
     if p.eat(K::Colon) {
         types::type_(p);
     }
+    if p.at(K::WhereKw) {
+        super::contracts::contract(p);
+    }
     if p.expect(K::Eq) {
         p.body(K::Block, expr::stmt);
     }

@@ -17,15 +17,15 @@ suite "Strings" {
   test "trims" {
     let text = String.trim "  Ada  "
     Platform.stdout_line "ran trims"
-    Test.expect (Test.equal "Ada" text)
+    Test.check (Test.equal "Ada" text)
   }
 
   suite.skip "later" {
-    test "never" { Test.expect (Test.equal 1 2) }
+    test "never" { Test.check (Test.equal 1 2) }
   }
 
   suite "nested" {
-    test "adds" { Test.expect (Test.equal 2 (1 + 1)) }
+    test "adds" { Test.check (Test.equal 2 (1 + 1)) }
   }
 }
 

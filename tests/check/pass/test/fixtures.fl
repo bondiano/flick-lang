@@ -26,7 +26,7 @@ suite "store" {
 
   test "reads the shared ref" {
     let names = SynchronizedRef.get (await seen)
-    Test.expect (Test.equal ["opened"] names)
+    Test.check (Test.equal ["opened"] names)
   }
 
   test "stores a copy" {
@@ -38,7 +38,7 @@ suite "store" {
     let c = await conn
     read : Unit ->{} String
     let read () = name_of c
-    Test.expect (Test.equal "db" (read ()))
+    Test.check (Test.equal "db" (read ()))
   }
 
   suite parallel "at once" {

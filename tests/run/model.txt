@@ -86,6 +86,7 @@ stdlib/server/node
 
 runtime/counted_layer_merge
 codegen/loops_owners
+codegen/contract_runs_nowhere
 runtime/lazy_once
 runtime/lazy_abort
 runtime/suspended

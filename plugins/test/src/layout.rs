@@ -36,7 +36,18 @@ fn rest(block: &Block, item: &Item, out: &mut Vec<Piece>) {
             text(out, block.text_of(parallel));
             text(out, " ");
         }
+        if let Kind::Each(each) = &item.kind {
+            out.push(hole(each.rows));
+            text(out, " ");
+        }
         text(out, block.text_of(item.name));
+        if let Kind::Each(each) = &item.kind {
+            text(out, " ");
+            out.push(Piece::Hole(Hole {
+                kind: HoleKind::Pat,
+                span: each.pattern,
+            }));
+        }
     }
     if let Some((word, millis)) = item.timeout {
         text(out, " ");
@@ -45,24 +56,27 @@ fn rest(block: &Block, item: &Item, out: &mut Vec<Piece>) {
         out.push(hole(millis));
     }
     text(out, " {");
-    match &item.kind {
-        Kind::Test(None) | Kind::Hook(None) | Kind::Fixture(_) => {}
+    let code = match &item.kind {
+        Kind::Test(code) | Kind::Hook(code) => *code,
+        Kind::Each(each) => each.body,
+        Kind::Fixture(_) | Kind::Suite(_) => None,
+    };
+    match (&item.kind, code) {
+        (Kind::Test(_) | Kind::Hook(_) | Kind::Each(_), None) | (Kind::Fixture(_), _) => {}
         // a body written on the line of its `{` is one expression, which stays there
-        Kind::Test(Some(body)) | Kind::Hook(Some(body))
-            if before(block, body.start) == Some(b'{') =>
-        {
+        (_, Some(body)) if before(block, body.start) == Some(b'{') => {
             text(out, " ");
-            out.push(hole(*body));
+            out.push(hole(body));
             text(out, " ");
         }
-        Kind::Test(Some(body)) | Kind::Hook(Some(body)) => {
+        (_, Some(body)) => {
             out.push(Piece::Indent);
             out.push(Piece::Line);
-            out.push(hole(*body));
+            out.push(hole(body));
             out.push(Piece::Dedent);
             out.push(Piece::Line);
         }
-        Kind::Suite(items) => {
+        (Kind::Suite(items), _) => {
             out.push(Piece::Indent);
             let mut after = None;
             for inner in items {

@@ -6,7 +6,7 @@
 
 use flick_plugin::{Block, Compiler, Diagnostic, Place, Span, Token, TokenKind, string_value};
 
-use crate::fixtures;
+use crate::{fixtures, rows};
 
 /// A block that is not a suite or a test: the code of its errors.
 pub const MALFORMED: &str = "T001";
@@ -52,6 +52,19 @@ pub enum Kind {
     Hook(Option<Span>),
     /// A fixture of the suite it is in, named by the item's name.
     Fixture(Fixture),
+    /// `test.each rows "name" (pattern) { body }`: a case for each row.
+    Each(Each),
+}
+
+/// The rows, the pattern and the body of a `test.each`.
+pub struct Each {
+    /// The expression of the rows.
+    pub rows: Span,
+    /// The pattern each row is matched with, in its parentheses.
+    pub pattern: Span,
+    /// How many parts a row has: the parts of the pattern's tuple, else one.
+    pub parts: usize,
+    pub body: Option<Span>,
 }
 
 /// `fixture [shared [concurrent]] name = expression`.
@@ -81,6 +94,8 @@ struct Header {
     parallel: Option<Span>,
     name: Span,
     timeout: Option<(Span, Span)>,
+    /// The rows, the pattern and its parts of a `test.each`.
+    each: Option<rows::Rows>,
 }
 
 /// How a test's body that does not parse is read.
@@ -120,12 +135,17 @@ pub fn structure(block: &Block) -> Result<Item, Vec<Diagnostic>> {
         parallel,
         name,
         timeout,
-    }) = header.filter(|h| block.place == Place::Declaration && (suite || h.parallel.is_none()))
+        each,
+    }) = header.filter(|h| {
+        block.place == Place::Declaration
+            && (suite || h.parallel.is_none())
+            && (!suite || h.each.is_none())
+    })
     else {
         let message = if suite {
             "a `suite` block starts a top-level declaration, names its case and holds its tests in braces: `suite \"name\" { … }`, maybe `suite.skip` or `suite.only`, `parallel` before the name and `timeout millis` after it"
         } else {
-            "a `test` block starts a top-level declaration, names its case and holds its body in braces: `test \"name\" { … }`, maybe `test.skip` or `test.only`, and `timeout millis` after the name"
+            "a `test` block starts a top-level declaration, names its case and holds its body in braces: `test \"name\" { … }`, maybe `test.skip` or `test.only`, and `timeout millis` after the name; or a case for each row: `test.each rows \"name\" (pattern) { … }`"
         };
         return Err(vec![malformed(block.whole(), message)]);
     };
@@ -133,7 +153,7 @@ pub fn structure(block: &Block) -> Result<Item, Vec<Diagnostic>> {
     let kind = if suite {
         Kind::Suite(items(block, body).map_err(|d| vec![d])?)
     } else {
-        Kind::Test(range(body))
+        case(each, range(body))
     };
     let item = Item {
         word: None,
@@ -178,44 +198,71 @@ fn parse(
         }
         *millis = hole.span;
     }
-    let kind = &mut item.kind;
-    match kind {
+    match &mut item.kind {
         Kind::Suite(items) => {
             (items.iter_mut()).try_for_each(|i| parse(block, i, compiler, bodies))
         }
-        Kind::Test(None) | Kind::Hook(None) | Kind::Fixture(Fixture { expr: None, .. }) => Ok(()),
-        Kind::Test(Some(body))
-        | Kind::Hook(Some(body))
-        | Kind::Fixture(Fixture {
-            expr: Some(body), ..
-        }) => {
-            let hole = match compiler.parse_body(body.start, body.end) {
-                Ok(hole) => hole,
-                // lines are a block, which the compiler parses whatever they hold, so
-                // it has reported why they do not parse
-                Err(_) if bodies == Bodies::Lenient && before(block, body.start) == Some(b'\n') => {
-                    match kind {
-                        Kind::Hook(body)
-                        | Kind::Test(body)
-                        | Kind::Fixture(Fixture { expr: body, .. }) => *body = None,
-                        Kind::Suite(_) => {}
-                    }
-                    return Ok(());
-                }
-                Err(d) => return Err(d),
-            };
-            if hole.span.end < body.end {
-                let rest = Span {
-                    start: hole.span.end,
-                    end: body.end,
-                };
-                let message = "expected the end of the body: its lines, or one expression";
-                return Err(malformed(rest, message));
-            }
-            *body = hole.span;
-            Ok(())
+        Kind::Each(each) => {
+            each.rows = whole(
+                compiler.parse_expr(each.rows.start, each.rows.end)?.span,
+                each.rows,
+                "expected the name of the case after the rows",
+            )?;
+            let pattern = compiler
+                .parse_pat(each.pattern.start, each.pattern.end)?
+                .span;
+            each.pattern = whole(
+                pattern,
+                each.pattern,
+                "expected the `{` after the pattern of the rows",
+            )?;
+            body(block, &mut each.body, compiler, bodies)
+        }
+        Kind::Test(code) | Kind::Hook(code) | Kind::Fixture(Fixture { expr: code, .. }) => {
+            body(block, code, compiler, bodies)
         }
     }
+}
+
+/// `parsed`, the span the compiler parsed of `written`, when it is all of it.
+fn whole(parsed: Span, written: Span, message: &str) -> Result<Span, Diagnostic> {
+    if parsed.end < written.end {
+        let rest = Span {
+            start: parsed.end,
+            end: written.end,
+        };
+        return Err(malformed(rest, message));
+    }
+    Ok(parsed)
+}
+
+/// `code`, the range of a body or a fixture's expression, parsed by the
+/// compiler as after the `=` of a `let`.
+fn body(
+    block: &Block,
+    code: &mut Option<Span>,
+    compiler: &mut dyn Compiler,
+    bodies: Bodies,
+) -> Result<(), Diagnostic> {
+    let Some(span) = *code else {
+        return Ok(());
+    };
+    let hole = match compiler.parse_body(span.start, span.end) {
+        Ok(hole) => hole,
+        // lines are a block, which the compiler parses whatever they hold, so
+        // it has reported why they do not parse
+        Err(_) if bodies == Bodies::Lenient && before(block, span.start) == Some(b'\n') => {
+            *code = None;
+            return Ok(());
+        }
+        Err(d) => return Err(d),
+    };
+    *code = Some(whole(
+        hole.span,
+        span,
+        "expected the end of the body: its lines, or one expression",
+    )?);
+    Ok(())
 }
 
 /// The last byte of `block` before `at` that is no space or tab.
@@ -229,7 +276,7 @@ pub fn before(block: &Block, at: u32) -> Option<u8> {
 
 /// The range of `tokens`, a test's body, from its first token to its last;
 /// none when there are none.
-fn range(tokens: &[Token]) -> Option<Span> {
+pub fn range(tokens: &[Token]) -> Option<Span> {
     let (first, last) = (tokens.first()?, tokens.last()?);
     Some(Span {
         start: first.span.start,
@@ -245,6 +292,9 @@ fn header(block: &Block, tokens: &[Token]) -> Option<Header> {
         [dot, word, rest @ ..] if block.text_of(dot.span) == "." => (Some(word.span), rest),
         rest => (None, rest),
     };
+    if modifier.is_some_and(|m| block.text_of(m) == "each") {
+        return each(block, modifier, rest);
+    }
     let (parallel, rest) = match rest {
         [word, rest @ ..] if block.text_of(word.span) == "parallel" => (Some(word.span), rest),
         rest => (None, rest),
@@ -269,7 +319,34 @@ fn header(block: &Block, tokens: &[Token]) -> Option<Header> {
         parallel,
         name: name.span,
         timeout,
+        each: None,
     })
+}
+
+/// The header of a `test.each` after `.each`, as [`rows::header`] reads it.
+fn each(block: &Block, modifier: Option<Span>, tokens: &[Token]) -> Option<Header> {
+    let (name, timeout, each) = rows::header(block, tokens)?;
+    Some(Header {
+        modifier,
+        mode: Mode::Run,
+        parallel: None,
+        name,
+        timeout,
+        each: Some(each),
+    })
+}
+
+/// A test's kind: a case for each row of `each`, else one case of `body`.
+fn case(each: Option<rows::Rows>, body: Option<Span>) -> Kind {
+    match each {
+        Some((rows, pattern, parts)) => Kind::Each(Each {
+            rows,
+            pattern,
+            parts,
+            body,
+        }),
+        None => Kind::Test(body),
+    }
 }
 
 /// The fixture whose word is `tokens[at]`, and where the next item starts:
@@ -336,7 +413,7 @@ fn items(block: &Block, tokens: &[Token]) -> Result<Vec<Item>, Diagnostic> {
             continue;
         }
         // the header runs to the `{` of the body, which the parser balanced
-        let open = (tokens[i..].iter()).position(|t| block.text_of(t.span) == "{");
+        let open = rows::brace(block, &tokens[i..]);
         let hook = HOOKS.contains(&w);
         let found = open.and_then(|open| {
             let after = &tokens[i + 1..i + open];
@@ -347,22 +424,23 @@ fn items(block: &Block, tokens: &[Token]) -> Result<Vec<Item>, Diagnostic> {
                     parallel: None,
                     name: word.span,
                     timeout: None,
+                    each: None,
                 },
-                _ if WORDS.contains(&w) => {
-                    header(block, after).filter(|h| w == "suite" || h.parallel.is_none())?
-                }
+                _ if WORDS.contains(&w) => header(block, after).filter(|h| {
+                    (w == "suite" || h.parallel.is_none()) && (w == "test" || h.each.is_none())
+                })?,
                 _ => return None,
             };
             Some((header, i + open, closing(block, tokens, i + open)?))
         });
         let Some((header, open, close)) = found else {
-            let message = "a suite holds `test \"name\" { … }`, `suite \"name\" { … }`, maybe with `.skip` or `.only` and `timeout millis`, the hooks `before_all`, `before_each`, `after_each` and `after_all { … }`, and `fixture name = expression`";
+            let message = "a suite holds `test \"name\" { … }`, `suite \"name\" { … }`, maybe with `.skip` or `.only` and `timeout millis`, `test.each rows \"name\" (pattern) { … }`, the hooks `before_all`, `before_each`, `after_each` and `after_all { … }`, and `fixture name = expression`";
             return Err(malformed(word.span, message));
         };
         let inner = &tokens[open + 1..close];
         let kind = match w {
             "suite" => Kind::Suite(items(block, inner)?),
-            "test" => Kind::Test(range(inner)),
+            "test" => case(header.each, range(inner)),
             _ => Kind::Hook(range(inner)),
         };
         out.push(Item {
@@ -400,7 +478,9 @@ fn duplicates(block: &Block, item: &Item, out: &mut Vec<Diagnostic>) {
     let Kind::Suite(items) = &item.kind else {
         return;
     };
-    let cases = || (items.iter()).filter(|i| matches!(i.kind, Kind::Suite(_) | Kind::Test(_)));
+    let cases = || {
+        (items.iter()).filter(|i| matches!(i.kind, Kind::Suite(_) | Kind::Test(_) | Kind::Each(_)))
+    };
     let names: Vec<String> = cases()
         .map(|i| string_value(block.text_of(i.name)))
         .collect();

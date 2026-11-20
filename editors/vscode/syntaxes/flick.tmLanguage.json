@@ -221,6 +221,15 @@
           }
         },
         {
+          "comment": "`test.each` at the start of a line: the cases of a test's rows",
+          "match": "^[ \\t]*(test)(\\.)(each)\\b",
+          "captures": {
+            "1": { "name": "keyword.other.flick" },
+            "2": { "name": "punctuation.accessor.flick" },
+            "3": { "name": "keyword.other.flick" }
+          }
+        },
+        {
           "comment": "`fixture name =`, maybe `fixture shared` or `fixture shared concurrent`, at the start of a line: a fixture of a suite of the test DSL",
           "match": "^[ \\t]*(fixture)(?:[ \\t]+(shared))?(?:[ \\t]+(concurrent))?(?=[ \\t]+[a-z_][A-Za-z0-9_]*[ \\t]*=(?!=))",
           "captures": {
@@ -234,6 +243,13 @@
           "captures": {
             "1": { "name": "keyword.other.flick" },
             "2": { "name": "entity.name.function.flick" }
+          }
+        },
+        {
+          "comment": "`require (` and `ensure (` at the start of a line, or right after `where`, are entries of a function's contract; elsewhere the words are names",
+          "match": "(?:^[ \\t]*|\\bwhere[ \\t]+)(require|ensure)(?=[ \\t]*\\()",
+          "captures": {
+            "1": { "name": "keyword.other.flick" }
           }
         },
         {

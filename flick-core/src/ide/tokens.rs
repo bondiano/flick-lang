@@ -210,6 +210,8 @@ fn contextual_keywords(node: &Node, out: &mut Vec<(u32, u32, u32)>) {
                 | K::ReturnKw
                 | K::ProofKw
                 | K::LawKw
+                | K::RequireKw
+                | K::EnsureKw
         ) {
             out.push((t.start, t.end, KEYWORD));
         }

@@ -41,25 +41,6 @@ impl Session {
         json!({ "types": TOKEN_TYPES, "tokens": tokens }).to_string()
     }
 
-    /// A JSON array of `{ "at", "label" }`: the types the code does not write,
-    /// after the UTF-16 offset `at`.
-    #[must_use]
-    pub fn inlay_hints(&self) -> String {
-        let Some(file) = self.file() else {
-            return Value::Array(Vec::new()).to_string();
-        };
-        let ide = Ide {
-            analysis: &self.analysis,
-            sources: &self.sources,
-        };
-        let hints: Vec<Value> = ide
-            .inlay_hints(file)
-            .into_iter()
-            .map(|(at, label)| json!({ "at": utf16_offset(&self.text, at), "label": label }))
-            .collect();
-        Value::Array(hints).to_string()
-    }
-
     /// `{ "label", "params": [{ "from", "to" }], "active" }` for the call at
     /// the UTF-16 offset `at`; `null` when there is none.
     #[must_use]

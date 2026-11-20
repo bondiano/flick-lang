@@ -44,7 +44,7 @@ suite "store" {
   test "two" {
     Platform.stdout_line "two starts"
     let _tx = await tx
-    Test.expect (Test.equal 1 2)
+    Test.check (Test.equal 1 2)
   }
 }
 "#;
@@ -92,7 +92,7 @@ fn fixtures_are_made_on_first_use_and_released_after_the_hooks_on_every_engine()
 const BROKEN: &str = r#"module App.Test
 
 suite "broken" {
-  fixture conn = Test.expect (Test.equal 1 2)
+  fixture conn = Test.check (Test.equal 1 2)
   test "awaits it" { await conn }
 }
 "#;

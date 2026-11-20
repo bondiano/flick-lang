@@ -236,7 +236,7 @@ tests : List Test.Test
 let tests =
   [
     Test.test "trims" (fun () -> Test.equal "a" (String.trim " a ")),
-    Test.effect_test "reads" (task { Test.expect (Test.equal 1 1) }),
+    Test.effect_test "reads" (task { Test.check (Test.equal 1 1) }),
     Test.property "reverse twice" (Gen.list 10 (Gen.int 0 9)) (fun xs ->
       Test.equal xs (List.reverse (List.reverse xs))),
     Test.group "numbers" [Test.test "adds" (fun () -> Test.equal 2 (1 + 1))],
@@ -246,13 +246,15 @@ let tests =
 | Function | Test |
 | - | - |
 | `Test.test name check` | pure: `check ()` is an `Assertion` |
-| `Test.effect_test name task` | the task runs in a scope of its own, which owns what it acquires, with the live host services, which outlive that scope: what it acquires may use them when it is released; `Test.expect` fails it on an assertion |
+| `Test.expect actual \|> Test.to.equal expected`, `to.be_true`, `to.be_greater_than`, `to.contain`, `to.fail_with` | a matcher of the subject `actual`, which fails the test with `AssertionFailed` when it does not match, `to.equal` with a line diff of long values (see [testing](../testing/#assertions)) |
+| `Test.effect_test name task` | the task runs in a scope of its own, which owns what it acquires, with the live host services, which outlive that scope: what it acquires may use them when it is released; `Test.check` fails it on an assertion |
 | `Test.clock_test name task` | as `effect_test`, on a clock of its own that starts at 0 and moves only by `Test.adjust duration` and `Test.set_time millis`: a sleep, a timeout or a retry schedule waits for virtual time, so a test of an hour's backoff runs at once |
 | `Test.property name gen check` | `check` on 100 values of `gen`, drawn from the run's seed; `Gen.function result` (for a `Hash` argument) draws pure functions, as a law over functions needs |
 | `Test.group name tests` | `name >` before the names of `tests` |
 | `Test.skip test`, `Test.only test` | the test, and each test in it, skipped or marked `only` (see [testing](../testing/#full-names-skip-and-only)) |
 | `Test.before_all task`, `before_each`, `after_each`, `after_all` | a hook of the group, or the module, whose list it is in, run around the tests of it that the run selects (see [testing](../testing/#hooks)) |
 | `Test.timeout millis test` | the test, and each test in it without its own, given `millis` for its `before_each` hooks and its body (see [testing](../testing/#timeouts)) |
+| `Test.case_name name index parts` | the name of the case `index` of a `test.each "name"`: `name [index]`, or with `{0}`…`{n}` replaced by `parts` |
 | `Test.serial test` | the test, and each test in it, run one at a time, also under `--jobs` |
 | `Test.fixture key init`, `Test.shared key init`, `Test.share fixture`, `Test.use fixture` | a fixture of each test, or shared by the run of the group whose list `share`s it, and its `Lazy` for the code that uses it: what `fixture` of a suite expands into (see [testing](../testing/#fixtures)) |
 | `Fixture.cleanup release value` | `value`, which `release` releases when the scope of the fixture that made it closes |
@@ -276,7 +278,7 @@ let tests = [
   Test.suite "the API" services [
     Test.it "signing up answers a token" (task {
       let user = (send (at None () { user = ada }) Api.Public.endpoints.register).user
-      Test.expect (Test.is_true "a token" (user.token != ""))
+      Test.check (Test.is_true "a token" (user.token != ""))
     }),
   ],
 ]

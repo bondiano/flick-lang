@@ -17,12 +17,6 @@ export interface Tokens {
   readonly tokens: ReadonlyArray<Token>;
 }
 
-/** A type the code leaves out, after the UTF-16 offset `at`. */
-export interface Hint {
-  readonly at: number;
-  readonly label: string;
-}
-
 /** The signature of the call at the cursor; `params` index into `label`. */
 export interface Signature {
   readonly label: string;

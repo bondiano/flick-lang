@@ -140,7 +140,7 @@ tests : List Test
 let tests = [
   test \"adds\" (fun () -> equal 4 (2 + 2)),
   property \"small\" (Gen.int 0 9) (fun x -> is_true \"too big\" (x < 5)),
-  effect_test \"typed\" (task { expect (equal \"a\" \"b\") })
+  effect_test \"typed\" (task { check (equal \"a\" \"b\") })
 ]
 ";
     let dir = project(

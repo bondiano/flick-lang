@@ -39,15 +39,11 @@ impl<'d> Gen<'_, 'd> {
         arms: &[Arm],
         result: Option<(&str, &str)>,
     ) -> bool {
-        // The browser compiler, whose size is budgeted, tries arms in turn.
-        // So does a match of many arms: the backend runs as a component with
-        // a fixed fuel budget, which a graph of the derived methods of a
-        // large enum spends for no gain. And so does one of a walked list,
-        // whose items and rest are read past its offset (see `view`).
-        if !cfg!(feature = "decision-graph")
-            || arms.len() > ARMS
-            || self.views.contains_key(subject)
-        {
+        // A match of many arms tries them in turn: the backend runs as a
+        // component with a fixed fuel budget, which a graph of the derived
+        // methods of a large enum spends for no gain. So does one of a walked
+        // list, whose items and rest are read past its offset (see `view`).
+        if arms.len() > ARMS || self.views.contains_key(subject) {
             return false;
         }
         let Some(graph) = decision::build(arms) else {

@@ -1,6 +1,6 @@
 ---
 title: "Стандартная библиотека"
-source_hash: 8a565f67e8865d01
+source_hash: 4555be195821eab5
 ---
 
 Стандартная библиотека написана на Flick и использует адаптер среды выполнения
@@ -247,7 +247,7 @@ tests : List Test.Test
 let tests =
   [
     Test.test "trims" (fun () -> Test.equal "a" (String.trim " a ")),
-    Test.effect_test "reads" (task { Test.expect (Test.equal 1 1) }),
+    Test.effect_test "reads" (task { Test.check (Test.equal 1 1) }),
     Test.property "reverse twice" (Gen.list 10 (Gen.int 0 9)) (fun xs ->
       Test.equal xs (List.reverse (List.reverse xs))),
     Test.group "numbers" [Test.test "adds" (fun () -> Test.equal 2 (1 + 1))],
@@ -257,13 +257,15 @@ let tests =
 | Функция | Тест |
 | - | - |
 | `Test.test name check` | чистый тест: `check ()` возвращает `Assertion` |
-| `Test.effect_test name task` | выполняет задачу в собственной области, которая владеет полученными ресурсами, с живыми сервисами хоста, которые переживают эту область: полученные ресурсы могут пользоваться ими при освобождении; `Test.expect` завершает задачу с ошибкой, если утверждение не выполнено |
+| `Test.expect actual \|> Test.to.equal expected`, `to.be_true`, `to.be_greater_than`, `to.contain`, `to.fail_with` | сопоставитель для значения `actual`, который проваливает тест с `AssertionFailed`, если оно не подходит; `to.equal` показывает построчный diff длинных значений (см. [тестирование](../testing/#утверждения)) |
+| `Test.effect_test name task` | выполняет задачу в собственной области, которая владеет полученными ресурсами, с живыми сервисами хоста, которые переживают эту область: полученные ресурсы могут пользоваться ими при освобождении; `Test.check` завершает задачу с ошибкой, если утверждение не выполнено |
 | `Test.clock_test name task` | как `effect_test`, но на собственных часах, которые начинаются с 0 и идут только от `Test.adjust duration` и `Test.set_time millis`: сон, таймаут или расписание повторов ждут виртуального времени, так что тест часового backoff проходит сразу |
 | `Test.property name gen check` | выполняет `check` на 100 значениях `gen`, полученных из начального значения генератора данного запуска; `Gen.function result` (для аргумента с `Hash`) порождает чистые функции, нужные законам над функциями |
 | `Test.group name tests` | добавляет `name >` перед именами из `tests` |
 | `Test.skip test`, `Test.only test` | тест и каждый тест внутри него, пропущенные или помеченные `only` (см. [тестирование](../testing/#полные-имена-skip-и-only)) |
 | `Test.before_all task`, `before_each`, `after_each`, `after_all` | хук группы или модуля, в списке которых он стоит, выполняемый вокруг тех их тестов, которые выбрал запуск (см. [тестирование](../testing/#хуки)) |
 | `Test.timeout millis test` | тест и каждый тест внутри него без собственного таймаута, получающие `millis` на хуки `before_each` и тело (см. [тестирование](../testing/#таймауты)) |
+| `Test.case_name name index parts` | имя случая `index` блока `test.each "name"`: `name [index]` или имя, где `{0}`…`{n}` заменены на `parts` |
 | `Test.serial test` | тест и каждый тест внутри него, выполняемые по одному, в том числе при `--jobs` |
 | `Test.fixture key init`, `Test.shared key init`, `Test.share fixture`, `Test.use fixture` | фикстура каждого теста или общая для запуска группы, в списке которой она стоит через `share`, и её `Lazy` для кода, который её использует: во что разворачивается `fixture` набора (см. [тестирование](../testing/#фикстуры)) |
 | `Fixture.cleanup release value` | `value`, которое `release` освобождает, когда закрывается область создавшей его фикстуры |
@@ -287,7 +289,7 @@ let tests = [
   Test.suite "the API" services [
     Test.it "signing up answers a token" (task {
       let user = (send (at None () { user = ada }) Api.Public.endpoints.register).user
-      Test.expect (Test.is_true "a token" (user.token != ""))
+      Test.check (Test.is_true "a token" (user.token != ""))
     }),
   ],
 ]
