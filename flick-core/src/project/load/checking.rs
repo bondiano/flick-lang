@@ -23,9 +23,9 @@ use super::{
 };
 use crate::clock::{micros, timed};
 use crate::diagnostics::{Diagnostic, Severity, codes};
-#[cfg(feature = "native-project")]
-use crate::iface::ModuleTemplate;
 use crate::iface::{Decl, Namespace};
+#[cfg(feature = "native-project")]
+use crate::iface::{IFACE_VERSION, ModuleTemplate};
 use crate::ir;
 use crate::plugin::calls as plugin_calls;
 use crate::plugin::expansion::Expansion;

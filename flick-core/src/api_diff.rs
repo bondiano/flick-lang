@@ -320,6 +320,7 @@ fn canonical(e: &Export) -> Export {
         TypeDef {
             kind: d.kind.clone(),
             form,
+            variance: d.variance.clone(),
         }
     });
     Export {

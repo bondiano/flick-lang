@@ -123,6 +123,7 @@ impl ModuleSignature {
                             body: ty.substitute(&subst),
                             opaque: false,
                         }),
+                        variance: Vec::new(),
                     }),
                     None,
                 ),

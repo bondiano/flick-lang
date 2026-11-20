@@ -19,6 +19,7 @@ mod read_tests {
                     form: Form::ModuleContract {
                         requirements: requirements.clone(),
                     },
+                    variance: Vec::new(),
                 },
             );
             let issued = checker
@@ -56,6 +57,7 @@ mod read_tests {
                     form: Form::ModuleContract {
                         requirements: requirements.clone(),
                     },
+                    variance: Vec::new(),
                 },
             );
             checker.env.define_type(
@@ -63,6 +65,7 @@ mod read_tests {
                 TypeDef {
                     kind: Kind::Type,
                     form: Form::NOMINAL,
+                    variance: Vec::new(),
                 },
             );
             let signature = ModuleSignature::Structure { requirements };
@@ -233,6 +236,7 @@ mod read_tests {
                             manifest: None,
                         }],
                     },
+                    variance: Vec::new(),
                 },
             );
             let ty = Type::Exists {
@@ -420,6 +424,7 @@ mod read_tests {
                         literals: Vec::new(),
                         hidden: false,
                     },
+                    variance: Vec::new(),
                 },
             );
             checker.env.define_type(
@@ -435,6 +440,7 @@ mod read_tests {
                         default_sigs: Vec::new(),
                         derive: false,
                     },
+                    variance: Vec::new(),
                 },
             );
             let read = checker.read_types();

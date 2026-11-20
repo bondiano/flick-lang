@@ -237,6 +237,7 @@ pub enum Representation {
     Js,
     Ts,
     Iface,
+    Variance,
     Mapping,
 }
 

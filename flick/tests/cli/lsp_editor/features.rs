@@ -307,3 +307,69 @@ let profile =
     }
     lsp.close();
 }
+
+#[test]
+fn lsp_hover_shows_data_variance_after_edit_and_for_installed_package() {
+    let dep_manifest = "schema-version = 1\n[package]\nname = \"geo\"\nversion = \"1.0.0\"\n[project]\nkind = \"lib\"\n";
+    let dep_src = "module Geo exposing (Box, Sink)\nopaque type Box a = Box { value : a }\nopaque type Sink a = Sink (a -> Unit)\n";
+    let app_manifest = format!("{LIB}\n[dependencies]\ngeo = {{ path = \"../dep\" }}\n");
+    let main_v1 = "module App.Main exposing (LocalBox, use_pkg, use_local)\nimport Geo exposing (Box, Sink)\nopaque type LocalBox a = LocalBox a\nuse_pkg : Box Int -> Sink Int -> Unit\nlet use_pkg _ _ = ()\nuse_local : LocalBox Int -> LocalBox Int\nlet use_local x = x\n";
+    let main_v2 = main_v1.replace(
+        "opaque type LocalBox a = LocalBox a",
+        "opaque type LocalBox a = LocalBox (Ref a)",
+    );
+    let dir = project(
+        "lsp_variance_hover",
+        &[
+            ("dep/flick.toml", dep_manifest),
+            ("dep/src/Geo.fl", dep_src),
+            ("app/flick.toml", &app_manifest),
+            ("app/src/App/Main.fl", main_v1),
+        ],
+    );
+    let app_dir = dir.join("app");
+    let file = app_dir.join("src/App/Main.fl");
+    let doc = json!({ "uri": uri(&file) });
+    let mut lsp = Lsp::start(&app_dir);
+    let hover_at = |lsp: &mut Lsp, text: &str, needle: &str, shift: usize| {
+        let pos = position(text, text.find(needle).expect(needle) + shift);
+        let res = lsp.request(
+            "textDocument/hover",
+            &json!({ "textDocument": doc, "position": pos }),
+        );
+        res["result"]["contents"]["value"]
+            .as_str()
+            .expect("hover text")
+            .to_owned()
+    };
+    lsp.notify(
+        "textDocument/didOpen",
+        &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": main_v1 } }),
+    );
+    assert!(lsp.diagnostics(&uri(&file)).is_empty());
+    for (needle, shift, expected) in [
+        ("Box Int", 1, "Variance: `a` (`+`, covariant)"),
+        ("Sink Int", 1, "Variance: `a` (`-`, contravariant)"),
+        ("LocalBox Int", 1, "Variance: `a` (`+`, covariant)"),
+        ("a = LocalBox", 0, "Variance: `+` (covariant)"),
+    ] {
+        let got = hover_at(&mut lsp, main_v1, needle, shift);
+        assert!(got.contains(expected), "{needle}: {got}");
+    }
+    lsp.notify(
+        "textDocument/didChange",
+        &json!({
+            "textDocument": { "uri": uri(&file), "version": 2 },
+            "contentChanges": [{ "text": main_v2 }],
+        }),
+    );
+    assert!(lsp.diagnostics(&uri(&file)).is_empty());
+    for (needle, shift, expected) in [
+        ("LocalBox Int", 1, "Variance: `a` (`inv`, invariant)"),
+        ("a = LocalBox", 0, "Variance: `inv` (invariant)"),
+    ] {
+        let got = hover_at(&mut lsp, &main_v2, needle, shift);
+        assert!(got.contains(expected), "{needle}: {got}");
+    }
+    lsp.close();
+}

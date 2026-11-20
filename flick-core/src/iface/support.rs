@@ -2,10 +2,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::mem;
 
+mod variance;
+
 use super::{Entity, Interface, Namespace};
 use crate::types::{
     Form, Kind, ModuleNominalKind, ModuleRequirement, ModuleSignature, Type, TypeDef, impl_def,
 };
+use variance::{validate_definition_variances, validate_signature_variances};
 
 /// A path component is a compiler's atomic static member name. Generated `$`
 /// names are valid; separators and empty components cannot denote one edge.
@@ -90,6 +93,11 @@ pub(crate) fn validate(interface: &Interface) -> Result<(), String> {
         pending.extend(current.modules.values());
         for export in &current.exports {
             if let Some(definition) = &export.definition {
+                validate_definition_variances(
+                    &export.entity.module,
+                    &export.entity.name,
+                    definition,
+                )?;
                 nested.extend(
                     identified_nominals(definition)
                         .into_iter()
@@ -107,7 +115,15 @@ pub(crate) fn validate(interface: &Interface) -> Result<(), String> {
                 }
             }
         }
+        if let Some(signature) = &current.parameterized {
+            validate_signature_variances(&current.module, signature)?;
+        }
         for record in &current.support_types {
+            validate_definition_variances(
+                &record.entity.module,
+                &record.entity.name,
+                &record.definition,
+            )?;
             nested.extend(
                 identified_nominals(&record.definition)
                     .into_iter()

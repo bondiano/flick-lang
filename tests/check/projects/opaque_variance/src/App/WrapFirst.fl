@@ -1,0 +1,58 @@
+module App.WrapFirst exposing (..)
+
+import App.Lib exposing
+  ( AWrapSink
+  , DoubleSink
+  , SecretSink
+  , Sink
+  , WrapContraPhantom
+  , WrapPhantom
+  )
+
+// Checked BEFORE any direct use of `Sink` or `SecretSink` in this module.
+type WrapSink a = WrapSink (Sink a)
+
+type WrapSecretSink a = WrapSecretSink (SecretSink a)
+
+wrap_sink_narrows : WrapSink (Float ->{Async} Float) -> WrapSink (Float -> Float)
+let wrap_sink_narrows w = w
+
+wrap_sink_widens : WrapSink (Float -> Float) -> WrapSink (Float ->{Async} Float)
+let wrap_sink_widens w = w
+//                       ^ FLICK-T003 expected `WrapSink (Float ->{Async} Float)`, found `WrapSink (Float -> Float)`
+
+wrap_secret_sink_narrows : WrapSecretSink (Float ->{Async} Float) -> WrapSecretSink (Float -> Float)
+let wrap_secret_sink_narrows w = w
+
+wrap_secret_sink_widens : WrapSecretSink (Float -> Float) -> WrapSecretSink (Float ->{Async} Float)
+let wrap_secret_sink_widens w = w
+//                              ^ FLICK-T003 expected `WrapSecretSink (Float ->{Async} Float)`, found `WrapSecretSink (Float -> Float)`
+
+a_wrap_sink_narrows : AWrapSink (Float ->{Async} Float) -> AWrapSink (Float -> Float)
+let a_wrap_sink_narrows w = w
+
+a_wrap_sink_widens : AWrapSink (Float -> Float) -> AWrapSink (Float ->{Async} Float)
+let a_wrap_sink_widens w = w
+//                         ^ FLICK-T003 expected `AWrapSink (Float ->{Async} Float)`, found `AWrapSink (Float -> Float)`
+
+wrap_phantom_widens : WrapPhantom (Float -> Float) -> WrapPhantom (Float ->{Async} Float)
+let wrap_phantom_widens w = w
+
+wrap_phantom_narrows : WrapPhantom ((Float -> Float)^{c, d}) -> WrapPhantom ((Float -> Float)^{c})
+let wrap_phantom_narrows w = w
+//                           ^ FLICK-G001 this value holds `d`
+
+double_sink_widens : DoubleSink (Float -> Float) -> DoubleSink (Float ->{Async} Float)
+let double_sink_widens w = w
+//                         ^ FLICK-T003 expected `DoubleSink (Float ->{Async} Float)`, found `DoubleSink (Float -> Float)`
+
+double_sink_narrows : DoubleSink (Float ->{Async} Float) -> DoubleSink (Float -> Float)
+let double_sink_narrows w = w
+//                          ^ FLICK-T003 expected `DoubleSink (Float -> Float)`, found `DoubleSink (Float ->{Async} Float)`
+
+wrap_contra_phantom_narrows : WrapContraPhantom (Float ->{Async} Float) -> WrapContraPhantom (Float -> Float)
+let wrap_contra_phantom_narrows w = w
+
+wrap_contra_phantom_widens : WrapContraPhantom (Float -> Float) -> WrapContraPhantom (Float ->{Async} Float)
+let wrap_contra_phantom_widens w = w
+//                                 ^ FLICK-T003 expected `WrapContraPhantom (Float ->{Async} Float)`, found `WrapContraPhantom (Float -> Float)`

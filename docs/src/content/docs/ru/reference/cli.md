@@ -1,6 +1,6 @@
 ---
 title: "Командная строка"
-source_hash: c0be39af4a1439d1
+source_hash: 119512812c1b4497
 ---
 
 `flick` — исполняемый файл с командами компилятора. Все команды принимают
@@ -46,11 +46,11 @@ source_hash: c0be39af4a1439d1
 | `ffi check [paths]` | команда JavaScript-бэкенда: сверяет сгенерированные и проверенные привязки и их политики с установленными пакетами; если пути не указаны, проверяет корневой каталог исходников |
 | `schema export <M.codec> --target json-schema-2020-12 --out <file>` | выводит строгую JSON Schema кодека `PureCodec Json a` |
 | `schema export <M.api> --target openapi-3.1 --out <file>` | выводит значение `HttpApi.Api` как документ OpenAPI 3.1 — тот же, что строит `HttpApi.openapi` (см. [Клиенты и документы](../http-api/#клиенты-и-документы)) |
-| `doc --out-dir <dir> [--source-base-url <url>] [--check-examples] [--std]` | создаёт Markdown-страницы публичного API: типы, кинды, ограничения, эффекты, захваты |
+| `doc --out-dir <dir> [--source-base-url <url>] [--check-examples] [--std]` | создаёт Markdown-страницы публичного API: типы, кинды, вариантность, ограничения, эффекты, захваты |
 | `explain <code>` | объясняет сообщение диагностики по его коду, в том числе код плагина, как `std/L001` |
 | `expand [paths]` | выводит код, в который раскрывается каждый блок [плагина](../plugins/) проекта или файлов |
 | `doctor` | показывает сведения о компиляторе, Node.js, pnpm, git, Content Mapper для TypeScript, установленной среде выполнения и Effect, о необязательных адаптерах и о Go, если он установлен; всё, кроме компилятора, Node.js и pnpm, — заметка, а не ошибка |
-| `inspect <M> --emit ast\|typed-ir\|js\|ts\|iface\|mapping` | выводит одно представление модуля |
+| `inspect <M> --emit ast\|typed-ir\|js\|ts\|iface\|variance\|mapping` | выводит одно представление модуля; `--emit variance` печатает выведенную вариантность параметров экспортированных типов (включая установленные пакеты и встроенные модули, отмечая неизвестные метаданные как `inv (unknown)`) |
 | `lsp --stdio` | запускает [языковой сервер](../editor/#языковой-сервер); stdio — его единственный транспорт |
 | `content-mapper [--declarations <paths>…]` | сессионная команда JavaScript-бэкенда (`js:content-mapper`): обслуживает через stdio запросы [Content Mapper](../editor/#content-mapper) TypeScript для файлов `.fl`; его запускает `@flick-lang/content-mapper`; с `--declarations` вместо этого записывает проекцию каждого файла `.fl` из указанных путей рядом с ним как `Name.d.fl.ts` и завершается |
 

@@ -194,6 +194,7 @@ impl Checker<'_> {
             TypeDef {
                 kind: kind.clone(),
                 form: Form::Kind,
+                variance: Vec::new(),
             },
         );
         self.env.declare(Namespace::Type, &name);
@@ -204,6 +205,7 @@ impl Checker<'_> {
                     TypeDef {
                         kind: kind.clone(),
                         form: Form::KindMember,
+                        variance: Vec::new(),
                     },
                 );
                 self.env.declare(Namespace::Type, &member);

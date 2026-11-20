@@ -186,6 +186,7 @@ mod tests {
                             body,
                             opaque: false,
                         },
+                        variance: Vec::new(),
                     },
                 );
             }
@@ -222,6 +223,7 @@ mod tests {
                             Type::app(Type::lang(Lang::List), Type::Var("a".into())),
                         ),
                     },
+                    variance: Vec::new(),
                 },
             );
             assert_eq!(
@@ -253,6 +255,7 @@ mod tests {
                             body,
                             opaque: true,
                         },
+                        variance: Vec::new(),
                     },
                 );
                 body = Type::con("Probe", &name);

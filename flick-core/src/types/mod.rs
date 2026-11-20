@@ -159,6 +159,11 @@ pub use typing::{
     OwnerTypeKind, OwnerTypeTemplates, Range, Ref, StageKey, Typing, default_method,
     passes_dictionary,
 };
+pub use variance::{
+    Variance, decl_param_names, format_interface_summary, format_markdown,
+    format_parameter_markdown, format_plain,
+};
+pub(crate) use variance::{param_kinds as variance_param_kinds, valid_exported_variance};
 pub use watched::Watched;
 
 use convert::TyVar;
@@ -410,6 +415,7 @@ fn run_in(
     checker.record_call_sites();
     checker.discharge_proofs();
     checker.unannotated_codecs();
+    checker.populate_own_variances();
     checker.fill(interface);
     checker.finish_static_module(
         module,

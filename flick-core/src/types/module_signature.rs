@@ -325,6 +325,7 @@ impl ModuleSignature {
                     signature: Box::new(self.clone()),
                 },
             },
+            variance: Vec::new(),
         }
     }
     pub fn from_interface(interface: &Interface) -> Self {

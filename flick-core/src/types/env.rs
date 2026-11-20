@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use super::kinds::Kind;
 use super::services::Operation;
 use super::ty::{Binder, Type};
+use super::variance::Variance;
 use crate::iface::{Entity, Export, Interface, Invariant, Namespace, support as iface_support};
 use crate::resolve::{ItemKind, ModuleSyntax};
 
@@ -29,6 +30,11 @@ pub struct TypeDef {
     pub kind: Kind,
     #[serde(flatten)]
     pub form: Form,
+    /// Inferred parameter signs in declaration order (`#447`; extended to
+    /// classes by `#448`). Empty when unknown or inapplicable; importers treat
+    /// absent signs conservatively as invariant.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub variance: Vec<Variance>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
