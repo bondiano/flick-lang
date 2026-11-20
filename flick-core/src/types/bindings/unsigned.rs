@@ -6,15 +6,7 @@ impl Checker<'_> {
     pub fn unsigned(&mut self, decl: &Node, parts: &LetParts, name: &str) -> Type {
         let function = parts.is_function();
         let header = self.header_types(decl, parts, false);
-        if parts.rec && !parts.is_function() {
-            self.error(
-                codes::T012,
-                self.span(decl),
-                format!(
-                    "`{name}` would be evaluated while it is being defined; only functions can be recursive"
-                ),
-            );
-        }
+        self.recursive_value(decl, parts, name);
         self.store.level += 1;
         let saved = mem::take(&mut self.cx.runtime);
         let signed = mem::take(&mut self.gadt.signed);
