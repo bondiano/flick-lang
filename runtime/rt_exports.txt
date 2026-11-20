@@ -166,6 +166,8 @@
 @flick-lang/runtime/core/bytes bytesLength
 @flick-lang/runtime/core/bytes bytesSlice
 @flick-lang/runtime/core/bytes bytesToList
+@flick-lang/runtime/core/chunk ChunkBranch
+@flick-lang/runtime/core/chunk concatChunks
 @flick-lang/runtime/core/data EQ
 @flick-lang/runtime/core/data GT
 @flick-lang/runtime/core/data LT
@@ -177,6 +179,8 @@
 @flick-lang/runtime/core/data err
 @flick-lang/runtime/core/data fromNullable
 @flick-lang/runtime/core/data hash
+@flick-lang/runtime/core/data isRuntimeSequence
+@flick-lang/runtime/core/data iterableHash
 @flick-lang/runtime/core/data listCompare
 @flick-lang/runtime/core/data listEquals
 @flick-lang/runtime/core/data listHash
@@ -186,6 +190,7 @@
 @flick-lang/runtime/core/data optionalArg
 @flick-lang/runtime/core/data runtimeEquals
 @flick-lang/runtime/core/data runtimeHash
+@flick-lang/runtime/core/data runtimeSequence
 @flick-lang/runtime/core/data show
 @flick-lang/runtime/core/data some
 @flick-lang/runtime/core/data structural
@@ -261,6 +266,8 @@
 @flick-lang/runtime/core/index intTruncate
 @flick-lang/runtime/core/index intUnsafeDiv
 @flick-lang/runtime/core/index intUnsafeRem
+@flick-lang/runtime/core/index isRuntimeSequence
+@flick-lang/runtime/core/index iterableHash
 @flick-lang/runtime/core/index jsArrayFromList
 @flick-lang/runtime/core/index jsArrayMake
 @flick-lang/runtime/core/index jsArrayPush
@@ -335,6 +342,7 @@
 @flick-lang/runtime/core/index runIn
 @flick-lang/runtime/core/index runtimeEquals
 @flick-lang/runtime/core/index runtimeHash
+@flick-lang/runtime/core/index runtimeSequence
 @flick-lang/runtime/core/index schemaAdt
 @flick-lang/runtime/core/index schemaJsonCodec
 @flick-lang/runtime/core/index schemaList
@@ -842,6 +850,8 @@
 @flick-lang/runtime/rt intTruncate
 @flick-lang/runtime/rt intUnsafeDiv
 @flick-lang/runtime/rt intUnsafeRem
+@flick-lang/runtime/rt isRuntimeSequence
+@flick-lang/runtime/rt iterableHash
 @flick-lang/runtime/rt jsArrayFromList
 @flick-lang/runtime/rt jsArrayMake
 @flick-lang/runtime/rt jsArrayPush
@@ -955,6 +965,7 @@
 @flick-lang/runtime/rt runTests
 @flick-lang/runtime/rt runtimeEquals
 @flick-lang/runtime/rt runtimeHash
+@flick-lang/runtime/rt runtimeSequence
 @flick-lang/runtime/rt schemaAdt
 @flick-lang/runtime/rt schemaAdtOf
 @flick-lang/runtime/rt schemaArbitrary

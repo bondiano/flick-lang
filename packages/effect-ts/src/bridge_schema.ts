@@ -1,5 +1,5 @@
 // Schema witnesses and JSON codecs retain their distinct wire contracts at crossings.
-import { Cause as ECause, Effect, Exit as EExit, Option as EOption, Result as EResult, Schema, SchemaGetter } from "effect";
+import { Cause as ECause, Chunk as EChunk, Effect, Exit as EExit, Option as EOption, Result as EResult, Schema, SchemaGetter } from "effect";
 import { type Run } from "@flick-lang/runtime/rt/fiber";
 import { raise } from "@flick-lang/runtime/rt/cause";
 import { err, ok } from "@flick-lang/runtime/core/data";
@@ -173,6 +173,7 @@ export const codecToEffect = (value: unknown): unknown => {
 /** Effect's generated records as the plain data ABI of a native schema. */
 const nativeArbitraryData = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(nativeArbitraryData);
+  if (EChunk.isChunk(value)) return Array.from(value, nativeArbitraryData);
   if (typeof value !== "object" || value === null) return value;
   const proto: unknown = Object.getPrototypeOf(value);
   if (proto !== null && proto !== Object.prototype) return value;

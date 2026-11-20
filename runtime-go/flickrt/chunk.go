@@ -1,11 +1,7 @@
 package flickrt
 
-// The `Chunk` functions on `Chunk{items}`, in the order Flick passes the
-// arguments: data-last. A chunk holds its elements in a slice, so most are
-// the `Array` functions over the items; none ever changes items it shares.
+// Chunk bindings use the order Flick passes their arguments: data-last.
 
-func items(c Value) []Value   { return c.(*Chunk).items }
-func chunkOf(xs Value) Value  { return &Chunk{List(xs)} }
 func chunkPair(p Value) Value { return []Value{chunkOf(At(p, 0)), chunkOf(At(p, 1))} }
 
 // chunks is a chunk of the chunks of a list of lists.
@@ -15,24 +11,31 @@ func chunks(groups Value) Value {
 	for i, g := range in {
 		out[i] = chunkOf(g)
 	}
-	return &Chunk{out}
+	return chunkOf(out)
 }
 
-func ChunkAppend(x, c Value) Value { return chunkOf(ListConcat(items(c), []Value{x})) }
-func ChunkConcat(a, b Value) Value { return chunkOf(ListConcat(items(a), items(b))) }
-func ChunkGet(i, c Value) Value    { return ListGet(i, items(c)) }
+func ChunkAppend(x, c Value) Value { return joinChunks(c.(*Chunk), chunkOf([]Value{x})) }
+func ChunkConcat(a, b Value) Value { return joinChunks(a.(*Chunk), b.(*Chunk)) }
+
+func ChunkGet(i, c Value) Value {
+	xs, index := c.(*Chunk), int(i.(int32))
+	if index < 0 || index >= xs.length() {
+		return None
+	}
+	return Some(xs.at(index))
+}
 
 func ChunkMap(fb *Fiber, f, c Value) Value { return chunkOf(ListMap(fb, f, items(c))) }
 
 func ChunkNonEmpty(c Value) Value {
-	if len(items(c)) > 0 {
+	if c.(*Chunk).length() > 0 {
 		return Some(c)
 	}
 	return None
 }
 
-func ChunkIsEmpty(c Value) Value { return len(items(c)) == 0 }
-func ChunkOf(a Value) Value      { return &Chunk{[]Value{a}} }
+func ChunkIsEmpty(c Value) Value { return c.(*Chunk).length() == 0 }
+func ChunkOf(a Value) Value      { return chunkOf([]Value{a}) }
 
 // ChunkMake is `make x rest`: the variadic arguments come as a list.
 func ChunkMake(x, rest Value) Value { return chunkOf(ListConcat([]Value{x}, rest)) }
@@ -40,46 +43,103 @@ func ChunkMake(x, rest Value) Value { return chunkOf(ListConcat([]Value{x}, rest
 func ChunkMakeBy(fb *Fiber, n, f Value) Value { return chunkOf(ArrayMakeBy(fb, n, f)) }
 func ChunkRange(start, end Value) Value       { return chunkOf(ArrayRange(start, end)) }
 
-func ChunkHead(c Value) Value         { return ListGet(int32(0), items(c)) }
-func ChunkLast(c Value) Value         { return ListGet(int32(len(items(c))-1), items(c)) }
-func ChunkHeadNonEmpty(c Value) Value { return items(c)[0] }
-func ChunkLastNonEmpty(c Value) Value { return items(c)[len(items(c))-1] }
+func ChunkHead(c Value) Value { return ChunkGet(int32(0), c) }
+func ChunkLast(c Value) Value {
+	xs := c.(*Chunk)
+	if xs.length() == 0 {
+		return None
+	}
+	return Some(xs.at(xs.length() - 1))
+}
+func ChunkHeadNonEmpty(c Value) Value { return c.(*Chunk).at(0) }
+func ChunkLastNonEmpty(c Value) Value {
+	xs := c.(*Chunk)
+	return xs.at(xs.length() - 1)
+}
 
 func ChunkTail(c Value) Value {
-	if len(items(c)) > 0 {
+	if c.(*Chunk).length() > 0 {
 		return Some(ChunkTailNonEmpty(c))
 	}
 	return None
 }
 
-func ChunkTailNonEmpty(c Value) Value { return &Chunk{items(c)[1:]} }
+func ChunkTailNonEmpty(c Value) Value {
+	xs := c.(*Chunk)
+	return xs.slice(1, xs.length())
+}
 
-func ChunkPrepend(x, c Value) Value         { return chunkOf(ListConcat([]Value{x}, items(c))) }
+func ChunkPrepend(x, c Value) Value         { return joinChunks(chunkOf([]Value{x}), c.(*Chunk)) }
 func ChunkAppendAll(that, self Value) Value { return ChunkConcat(self, that) }
 
-func ChunkTake(n, c Value) Value      { return &Chunk{items(c)[:min(countOf(n), len(items(c)))]} }
-func ChunkDrop(n, c Value) Value      { return &Chunk{items(c)[min(countOf(n), len(items(c))):]} }
-func ChunkTakeRight(n, c Value) Value { return chunkOf(ArrayTakeRight(n, items(c))) }
-func ChunkDropRight(n, c Value) Value { return chunkOf(ArrayDropRight(n, items(c))) }
+func ChunkTake(n, c Value) Value {
+	xs := c.(*Chunk)
+	return xs.slice(0, min(countOf(n), xs.length()))
+}
+func ChunkDrop(n, c Value) Value {
+	xs := c.(*Chunk)
+	return xs.slice(min(countOf(n), xs.length()), xs.length())
+}
+func ChunkTakeRight(n, c Value) Value {
+	xs := c.(*Chunk)
+	return xs.slice(max(0, xs.length()-countOf(n)), xs.length())
+}
+func ChunkDropRight(n, c Value) Value {
+	xs := c.(*Chunk)
+	return xs.slice(0, max(0, xs.length()-countOf(n)))
+}
 
-func ChunkTakeWhile(fb *Fiber, f, c Value) Value { return chunkOf(ArrayTakeWhile(fb, f, items(c))) }
-func ChunkDropWhile(fb *Fiber, f, c Value) Value { return chunkOf(ArrayDropWhile(fb, f, items(c))) }
+func chunkSpanIndex(fb *Fiber, f Value, xs *Chunk) int {
+	i := 0
+	xs.walk(false, func(x Value) bool {
+		if !pred(fb, f, x) {
+			return false
+		}
+		i++
+		return true
+	})
+	return i
+}
 
-func ChunkSplitAt(n, c Value) Value { return chunkPair(ArraySplitAt(n, items(c))) }
+func ChunkTakeWhile(fb *Fiber, f, c Value) Value {
+	xs := c.(*Chunk)
+	return xs.slice(0, chunkSpanIndex(fb, f, xs))
+}
+func ChunkDropWhile(fb *Fiber, f, c Value) Value {
+	xs := c.(*Chunk)
+	return xs.slice(chunkSpanIndex(fb, f, xs), xs.length())
+}
+
+func chunkSplitAt(i int, c *Chunk) Value {
+	return []Value{c.slice(0, i), c.slice(i, c.length())}
+}
+
+func ChunkSplitAt(n, c Value) Value {
+	xs := c.(*Chunk)
+	return chunkSplitAt(min(countOf(n), xs.length()), xs)
+}
 
 // ChunkSplitNonEmptyAt keeps at least one element in the first part.
 func ChunkSplitNonEmptyAt(n, c Value) Value {
-	k := max(1, countOf(n))
-	if k >= len(items(c)) {
-		return []Value{c, ChunkEmpty}
-	}
-	return chunkPair(ArraySplitAt(int32(k), items(c)))
+	xs := c.(*Chunk)
+	return chunkSplitAt(min(max(1, countOf(n)), xs.length()), xs)
 }
 
-func ChunkSplit(n, c Value) Value                 { return chunks(ArraySplit(n, items(c))) }
-func ChunkSplitWhere(fb *Fiber, f, c Value) Value { return chunkPair(ArraySplitWhere(fb, f, items(c))) }
-func ChunkChunksOf(n, c Value) Value              { return chunks(ArrayChunksOf(n, items(c))) }
-func ChunkRemove(i, c Value) Value                { return chunkOf(ArrayRemove(i, items(c))) }
+func ChunkSplit(n, c Value) Value { return chunks(ArraySplit(n, items(c))) }
+func ChunkSplitWhere(fb *Fiber, f, c Value) Value {
+	xs := c.(*Chunk)
+	i := 0
+	xs.walk(false, func(x Value) bool {
+		if pred(fb, f, x) {
+			return false
+		}
+		i++
+		return true
+	})
+	return chunkSplitAt(i, xs)
+}
+func ChunkChunksOf(n, c Value) Value { return chunks(ArrayChunksOf(n, items(c))) }
+func ChunkRemove(i, c Value) Value   { return chunkOf(ArrayRemove(i, items(c))) }
 
 func ChunkModify(fb *Fiber, i, f, c Value) Value {
 	if o := ArrayModify(fb, i, f, items(c)); isSome(o) {
@@ -108,7 +168,16 @@ func ChunkFilterMap(fb *Fiber, f, c Value) Value {
 
 // ChunkFilterMapWhile stops at the first failure.
 func ChunkFilterMapWhile(fb *Fiber, f, c Value) Value {
-	return chunkOf(ArrayTakeWhileFilter(fb, f, items(c)))
+	out := []Value{}
+	c.(*Chunk).walk(false, func(x Value) bool {
+		r := Apply(fb, f, x)
+		if !isOk(r) {
+			return false
+		}
+		out = append(out, value(r))
+		return true
+	})
+	return chunkOf(out)
 }
 
 func ChunkCompact(c Value) Value {
@@ -138,7 +207,7 @@ func ChunkFlatten(c Value) Value {
 }
 
 func ChunkContainsWith(fb *Fiber, eq, a, c Value) Value {
-	return ArrayContainsWith(fb, eq, a, items(c))
+	return !c.(*Chunk).walk(false, func(x Value) bool { return !Bool(Apply2(fb, eq, a, x)) })
 }
 
 // equalsFn is the structural `==` as an equivalence.
@@ -161,12 +230,56 @@ func ChunkUnion(that, self Value) Value {
 	return chunkOf(ArrayUnionWith(nil, items(that), equalsFn, items(self)))
 }
 
-func ChunkEvery(fb *Fiber, f, c Value) Value          { return ListAll(fb, f, items(c)) }
-func ChunkSome(fb *Fiber, f, c Value) Value           { return ListAny(fb, f, items(c)) }
-func ChunkFindFirst(fb *Fiber, f, c Value) Value      { return ListFind(fb, f, items(c)) }
-func ChunkFindFirstIndex(fb *Fiber, f, c Value) Value { return ListFindIndex(fb, f, items(c)) }
-func ChunkFindLast(fb *Fiber, f, c Value) Value       { return ArrayFindLast(fb, f, items(c)) }
-func ChunkFindLastIndex(fb *Fiber, f, c Value) Value  { return ArrayFindLastIndex(fb, f, items(c)) }
+func ChunkEvery(fb *Fiber, f, c Value) Value {
+	return c.(*Chunk).walk(false, func(x Value) bool { return pred(fb, f, x) })
+}
+func ChunkSome(fb *Fiber, f, c Value) Value {
+	return !c.(*Chunk).walk(false, func(x Value) bool { return !pred(fb, f, x) })
+}
+
+func chunkFind(fb *Fiber, f Value, c *Chunk, reverse bool) (Value, int) {
+	i, step := 0, 1
+	if reverse {
+		i, step = c.length()-1, -1
+	}
+	var found Value
+	if c.walk(reverse, func(x Value) bool {
+		if pred(fb, f, x) {
+			found = x
+			return false
+		}
+		i += step
+		return true
+	}) {
+		return nil, -1
+	}
+	return found, i
+}
+
+func ChunkFindFirst(fb *Fiber, f, c Value) Value {
+	if x, i := chunkFind(fb, f, c.(*Chunk), false); i >= 0 {
+		return Some(x)
+	}
+	return None
+}
+func ChunkFindFirstIndex(fb *Fiber, f, c Value) Value {
+	if _, i := chunkFind(fb, f, c.(*Chunk), false); i >= 0 {
+		return Some(int32(i))
+	}
+	return None
+}
+func ChunkFindLast(fb *Fiber, f, c Value) Value {
+	if x, i := chunkFind(fb, f, c.(*Chunk), true); i >= 0 {
+		return Some(x)
+	}
+	return None
+}
+func ChunkFindLastIndex(fb *Fiber, f, c Value) Value {
+	if _, i := chunkFind(fb, f, c.(*Chunk), true); i >= 0 {
+		return Some(int32(i))
+	}
+	return None
+}
 
 func ChunkJoin(sep, c Value) Value { return StringJoin(sep, items(c)) }
 
@@ -179,19 +292,11 @@ func ChunkPartition(fb *Fiber, f, c Value) Value { return chunkPair(ArrayPartiti
 func ChunkSeparate(c Value) Value                { return chunkPair(ArraySeparate(nil, items(c))) }
 
 func ChunkReduce(fb *Fiber, b, f, c Value) Value {
-	acc := b
-	for _, x := range items(c) {
-		acc = Apply2(fb, f, acc, x)
-	}
-	return acc
+	return c.(*Chunk).fold(fb, b, f, false)
 }
 
 func ChunkReduceRight(fb *Fiber, b, f, c Value) Value {
-	acc, in := b, items(c)
-	for i := len(in) - 1; i >= 0; i-- {
-		acc = Apply2(fb, f, acc, in[i])
-	}
-	return acc
+	return c.(*Chunk).fold(fb, b, f, true)
 }
 
 func ChunkSortBy(fb *Fiber, cmp, c Value) Value { return chunkOf(ListSortBy(fb, cmp, items(c))) }
