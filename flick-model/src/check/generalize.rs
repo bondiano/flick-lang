@@ -152,6 +152,20 @@ impl Checker<'_> {
         for m in region_metas.into_iter().chain(waiting) {
             self.slots[m as usize].level = self.slots[m as usize].level.min(self.level);
         }
+        // Widened row tails local to this pure binding have finished gathering
+        // constraints; close them before generalizing so distinct uses widen
+        // independently.
+        let widened = self.widened_rows.clone();
+        for row in widened {
+            for v in self.zonk_row(&row).vars {
+                if let Var::Meta(m) = v
+                    && self.slots[m as usize].level > self.level
+                    && self.slots[m as usize].solved.is_none()
+                {
+                    self.slots[m as usize].solved = Some(Solved::Row(Row::none()));
+                }
+            }
+        }
         let zonked = self.zonk(t);
         let mut vars = Vec::new();
         for m in ms {

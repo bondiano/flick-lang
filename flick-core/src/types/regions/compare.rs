@@ -161,7 +161,9 @@ impl Checker<'_> {
         match (&a, &e) {
             (Type::Error, _) | (_, Type::Error) => return Ok(()),
             (_, Type::Meta(_)) if ce.is_none() => {
-                return self.unify(actual, expected);
+                return self
+                    .bind_subsumed_meta(actual, expected, false)
+                    .unwrap_or_else(|| self.unify(actual, expected));
             }
             (Type::Meta(_), _) if ca.is_none() => {
                 return self.unify(actual, expected);

@@ -6,12 +6,8 @@
 use crate::types::Elem;
 use std::mem;
 
-use super::Site;
-use crate::diagnostics::{Diagnostic, Edit, codes};
-use crate::fmt::foralls;
 use crate::source::Span;
 use crate::types::gadt::row_facts::RowKind;
-use crate::types::lang::{self, Lang};
 use crate::types::ty::{Norm, Row, Type, Written};
 use crate::types::{Checker, regions};
 
@@ -50,9 +46,14 @@ struct Excess {
 }
 
 mod excess;
+mod report;
 mod tails;
 
 use tails::{growth_allows, less, owed, unknown};
+
+pub(super) fn unknown_tail(tail: &Type) -> Option<u32> {
+    unknown(tail)
+}
 
 impl Checker<'_> {
     /// Grows unknown declared rows until nothing changes.
@@ -180,14 +181,23 @@ impl Checker<'_> {
     }
 
     /// Before a binding is generalized: solves the constraints so far and
-    /// closes the unknown rows of its calls, so they become no row
-    /// variables of its type.
+    /// closes the unknown rows of its calls and widened rows, so they become no
+    /// row variables of its type.
     pub fn settle_rows(&mut self) {
         self.grow();
         let level = self.store.level;
         let mut close = Vec::new();
         for c in &self.cx.subrows {
             for t in self.store.normalize(&c.actual).tails {
+                if let Some(m) = unknown(&t)
+                    && self.store.meta_level(m).is_some_and(|l| l > level)
+                {
+                    close.push(m);
+                }
+            }
+        }
+        for row in &self.cx.widened_rows {
+            for t in self.store.normalize(row).tails {
                 if let Some(m) = unknown(&t)
                     && self.store.meta_level(m).is_some_and(|l| l > level)
                 {
@@ -227,6 +237,11 @@ impl Checker<'_> {
                 for t in self.store.normalize(side).tails {
                     open.extend(unknown(&t));
                 }
+            }
+        }
+        for row in &self.cx.widened_rows {
+            for t in self.store.normalize(row).tails {
+                open.extend(unknown(&t));
             }
         }
         for m in open {
@@ -332,7 +347,7 @@ impl Checker<'_> {
         let bound = if c.errors {
             Written::default()
         } else {
-            self.local_place(&c.declared)
+            self.local_place_at(&c.declared, c.span)
         };
         let (services, errors) = if c.errors {
             (Vec::new(), lacking)
@@ -353,162 +368,5 @@ impl Checker<'_> {
         } else {
             excess.push(next);
         }
-    }
-
-    /// E019: `tail` may hold `label` at other arguments than the instance of
-    /// it `declared` holds, which would answer for it by its name.
-    fn instance_answered(&mut self, label: &Elem, declared: &Norm, tail: &Type, span: Span) {
-        let held = declared
-            .get(label)
-            .map(|t| self.show(t))
-            .unwrap_or_default();
-        let variable = self.show(less(tail).0);
-        let name = label.short();
-        let message = format!(
-            "`{variable}` may hold `{name}` at other arguments, and `{held}` here would answer for it: \
-             take it out, `{{-{name} | {variable}}}`, or name the instance, `{{{held} | {variable}}}`"
-        );
-        self.diagnostics
-            .push(Diagnostic::error(codes::E019, message, span));
-    }
-
-    /// A resource acquired where no `scope` owns it. The fix is not safe: the
-    /// row says the caller provides the owner, which fixes a public boundary.
-    fn no_owner(&mut self, scope: &Type, c: &SubRow) {
-        let region = match scope.spine().1[..] {
-            [region] if !matches!(self.store.resolve(region), Type::Meta(_)) => self.show(region),
-            // a region not known yet gets a name the signature does not use
-            _ => {
-                let taken = self
-                    .signature_around(c.span)
-                    .map(|sig| foralls::type_names(sig, self.text))
-                    .unwrap_or_default();
-                let fresh = (0..).map(|i| {
-                    if i == 0 {
-                        "s".to_owned()
-                    } else {
-                        format!("s{i}")
-                    }
-                });
-                fresh
-                    .into_iter()
-                    .find(|name| !taken.contains(name))
-                    .expect("names never run out")
-            }
-        };
-        let added = format!("Scope {region}");
-        let bound = self.local_place(&c.declared);
-        let written = match (bound.0, &self.sites[c.site]) {
-            (Some(_), _) => Some(bound),
-            (None, Site::Signature(_, written) | Site::Expected(_, written)) => Some(*written),
-            (None, Site::Inferred) => None,
-        };
-        let edits: Vec<Edit> = written
-            .and_then(|w| w.adding(&added))
-            .map(|(span, replacement)| Edit { span, replacement })
-            .into_iter()
-            .collect();
-        let advice = if edits.is_empty() {
-            format!(
-                "call it inside `scope {{ … }}`, or add `{added}` to the services of the signature"
-            )
-        } else {
-            format!("add `{added}` to the services of the signature")
-        };
-        self.diagnostics.push(
-            Diagnostic::error(
-                codes::G004,
-                "this acquires a resource, which needs `Scope`: only `scope { … }` provides an owner",
-                c.span,
-            )
-            .with_fix(|| (advice, edits)),
-        );
-    }
-
-    fn report_excess(&mut self, e: &Excess) {
-        let named = |what: &str, names: &[String]| {
-            let quoted: Vec<String> = names.iter().map(|n| format!("`{n}`")).collect();
-            match quoted.len() {
-                0 => None,
-                1 => Some(format!("{what} {}", quoted[0])),
-                _ => Some(format!("{what}s {}", quoted.join(", "))),
-            }
-        };
-        let list = [named("service", &e.services), named("error", &e.errors)]
-            .into_iter()
-            .flatten()
-            .collect::<Vec<_>>()
-            .join(" and ");
-        if let Site::Expected(ty, _) = &self.sites[e.site] {
-            let ty = ty.clone();
-            self.lacking_under(&ty, e.span, &list, (&e.services, &e.labels, &e.errors));
-        }
-        let (bound, needer, written) = match &self.sites[e.site] {
-            Site::Signature(name, written) => (
-                format!("the signature of `{name}`"),
-                "its body",
-                Some(*written),
-            ),
-            Site::Expected(ty, written) => (
-                format!("the expected type `{}`", self.show(ty)),
-                "this",
-                written.0.is_some().then_some(*written),
-            ),
-            Site::Inferred => ("the type of this function".to_owned(), "its body", None),
-        };
-        let mut diagnostic = Diagnostic::error(
-            codes::E002,
-            format!("{bound} does not allow {list}, which {needer} needs"),
-            e.span,
-        );
-        let written = if e.bound.0.is_some() {
-            Some(e.bound)
-        } else {
-            written
-        };
-        if let Some(written) = written.filter(|_| !e.taken) {
-            let to_add: Vec<String> = if e.labels.len() == e.services.len() {
-                e.labels
-                    .iter()
-                    .zip(&e.services)
-                    .map(|(label, short)| match label.name() {
-                        Some(name) => match name.split_once('.') {
-                            Some((module, _))
-                                if module != "Prelude" && module != self.env.module =>
-                            {
-                                name.to_owned()
-                            }
-                            _ => short.clone(),
-                        },
-                        None => short.clone(),
-                    })
-                    .collect()
-            } else {
-                e.services.clone()
-            };
-            // the services go after the `{`; the errors, after the `;`, are left to the user
-            let edits: Vec<Edit> = (e.errors.is_empty())
-                .then(|| written.adding(&to_add.join(", ")))
-                .flatten()
-                .map(|(span, replacement)| Edit { span, replacement })
-                .into_iter()
-                .collect();
-            // a function that suspends or needs runner host services (Async or Host.*):
-            // adding them to the row changes nothing else callers cannot provide under a runner
-            let is_runner_service = e.errors.is_empty()
-                && !edits.is_empty()
-                // a row variable it lacks has no label
-                && e.labels.len() == e.services.len()
-                && e.labels.iter().all(|l| {
-                    lang::label(Lang::Async) == l.name() || l.name().is_some_and(lang::is_host_service)
-                });
-            let fix = || (format!("add {list} to {bound}"), edits);
-            diagnostic = if is_runner_service {
-                diagnostic.with_safe_fix(fix)
-            } else {
-                diagnostic.with_fix(fix)
-            };
-        }
-        self.diagnostics.push(diagnostic);
     }
 }

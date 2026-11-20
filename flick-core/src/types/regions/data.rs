@@ -342,7 +342,10 @@ impl Checker<'_> {
             && self.bounds_a_region(captures)
             && (self.hidden_fields(ty, &mut Vec::new()) || !self.captures_of(ty).entries.is_empty())
         {
-            return Some(self.unify(expected, actual));
+            return Some(
+                self.bind_subsumed_meta(actual, expected, false)
+                    .unwrap_or_else(|| self.unify(expected, actual)),
+            );
         }
         if let Type::Bounded { ty, captures } = &a
             && !matches!(e, Type::Captured { .. })

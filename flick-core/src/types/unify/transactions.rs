@@ -11,6 +11,7 @@ enum Undo {
 enum Mark {
     Capture,
     Error,
+    Widened,
     Numeric,
     Fractional,
 }
@@ -96,6 +97,7 @@ impl Store {
         match mark {
             Mark::Capture => &mut self.capture_rows,
             Mark::Error => &mut self.error_rows,
+            Mark::Widened => &mut self.widened_rows,
             Mark::Numeric => &mut self.numeric,
             Mark::Fractional => &mut self.fractional,
         }
@@ -126,6 +128,7 @@ impl Checker<'_> {
         let types = self.store.checkpoint();
         let kinds = self.kinds.checkpoint();
         let deferred = self.cx.regions.deferred.len();
+        let widened = self.cx.widened_rows.len();
         let result = check(self);
         if result.is_ok() {
             self.store.commit(types);
@@ -134,6 +137,7 @@ impl Checker<'_> {
             self.store.rollback(types);
             self.kinds.rollback(kinds);
             self.cx.regions.deferred.truncate(deferred);
+            self.cx.widened_rows.truncate(widened);
         }
         result
     }

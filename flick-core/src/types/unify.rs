@@ -51,6 +51,10 @@ pub struct Store {
     /// Those that stand for a row of errors: an instantiated `e` of kind
     /// `ErrorRow`, or the errors of a stage or a handler.
     error_rows: HashSet<u32>,
+    /// Fresh open tails added when widening a closed row that fixed a type
+    /// variable under subsumption: hidden in diagnostics until grown and
+    /// closed to empty when settled.
+    widened_rows: HashSet<u32>,
     /// The variables of number literals, which only a numeric type or a
     /// rigid variable binds.
     numeric: HashSet<u32>,
@@ -140,6 +144,16 @@ impl Store {
         row
     }
 
+    /// A fresh open row tail added when widening a row that fixed a type
+    /// variable under subsumption.
+    pub fn fresh_widened_row(&mut self, kind: &Kind) -> Type {
+        let row = self.fresh_of(kind);
+        if let Some(m) = row.meta_root() {
+            self.mark(m, Mark::Widened);
+        }
+        row
+    }
+
     /// A variable for a quantified variable of `kind`.
     pub fn fresh_of(&mut self, kind: &Kind) -> Type {
         let ty = match kind {
@@ -209,9 +223,43 @@ impl Store {
         self.error_rows.contains(&m)
     }
 
+    /// Whether `m` is an open row tail added by subsumption widening.
+    pub fn is_widened_row(&self, m: u32) -> bool {
+        self.widened_rows.contains(&m)
+    }
+
     /// A variable of the level and the kind of `m`, to extend what `m`
     /// stands for.
     pub fn fresh_beside(&mut self, m: u32) -> Type {
+        let rest = self.allocate_beside(m);
+        self.mark_like(rest, m);
+        self.at(
+            rest,
+            Embedding::identity(&self.meta_contexts[rest as usize].permitted),
+        )
+    }
+
+    /// A shared tail unifying two inference row metas `a` and `b`: keeps
+    /// capture/error kind marks from either side, and keeps `Widened` only
+    /// when both sides were widened.
+    pub fn fresh_shared(&mut self, a: u32, b: u32) -> Type {
+        let rest = self.allocate_beside(a);
+        if self.is_capture_row(a) || self.is_capture_row(b) {
+            self.mark(rest, Mark::Capture);
+        }
+        if self.is_error_row(a) || self.is_error_row(b) {
+            self.mark(rest, Mark::Error);
+        }
+        if self.is_widened_row(a) && self.is_widened_row(b) {
+            self.mark(rest, Mark::Widened);
+        }
+        self.at(
+            rest,
+            Embedding::identity(&self.meta_contexts[rest as usize].permitted),
+        )
+    }
+
+    fn allocate_beside(&mut self, m: u32) -> u32 {
         let level = self.meta_level(m).unwrap_or(self.level);
         let ty = self.allocate(
             level,
@@ -219,23 +267,23 @@ impl Store {
             self.meta_contexts[m as usize].kind.clone(),
         );
         let rest = ty.meta_root().expect("fresh variable");
-        self.mark_like(rest, m);
         let mut context = self.meta_contexts[rest as usize].clone();
         context.lexical = self.meta_contexts[m as usize].lexical.clone();
         self.write_context(rest, context);
-        self.at(
-            rest,
-            Embedding::identity(&self.meta_contexts[rest as usize].permitted),
-        )
+        rest
     }
 
-    /// Gives `to` the kind marks of `from`: a capture row or a row of errors.
+    /// Gives `to` the kind marks of `from`: a capture row, a row of errors, or
+    /// a subsumption-widened row tail.
     pub fn mark_like(&mut self, to: u32, from: u32) {
         if self.is_capture_row(from) {
             self.mark(to, Mark::Capture);
         }
         if self.is_error_row(from) {
             self.mark(to, Mark::Error);
+        }
+        if self.is_widened_row(from) {
+            self.mark(to, Mark::Widened);
         }
     }
 

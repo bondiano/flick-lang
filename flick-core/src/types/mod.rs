@@ -543,6 +543,9 @@ struct ItemCx {
     stage: effects::Stage,
     /// Row constraints of the declaration being checked.
     subrows: Vec<effects::SubRow>,
+    /// Open row tails added when widening a closed row that fixed a type
+    /// variable under subsumption, closed to empty when settled.
+    widened_rows: Vec<Type>,
     operators: Vec<Operator>,
     regions: regions::State,
     /// A name was taken on trust: a class constraint left open has no type

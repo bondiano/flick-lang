@@ -23,6 +23,7 @@ pub mod live_core;
 pub mod live_install;
 pub mod live_kept;
 pub mod live_scope;
+pub mod live_service_order;
 pub mod memory;
 pub mod memory_arena_defects;
 pub mod memory_arenas;

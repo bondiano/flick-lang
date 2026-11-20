@@ -224,6 +224,29 @@ impl<'a> Checker<'a> {
         })
     }
 
+    /// The top-level declaration containing `span`: a paired signature and
+    /// definition share one owner, and any other top-level declaration (such
+    /// as a `class`, `instance`, or `type` declaration) owns only itself.
+    pub(super) fn owner_of(&self, span: Span) -> Option<(u32, u32)> {
+        let within = |node: &Node| {
+            let (start, end) = node.range();
+            (start <= span.start && span.end <= end)
+                || (span.start < self.generated && covers(node, span.start, self.generated))
+        };
+        if let Some(item) = self
+            .top
+            .items
+            .iter()
+            .find(|item| item.sig.is_some_and(within) || within(item.decl))
+        {
+            return Some(item.decl.range());
+        }
+        self.root?
+            .nodes()
+            .find(|node| within(node))
+            .map(Node::range)
+    }
+
     pub(super) fn pairs(&self, sig: &Node, decl: &Node) -> bool {
         let name = signature_name(sig, self.text);
         name.is_some()

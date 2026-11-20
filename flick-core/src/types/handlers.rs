@@ -42,7 +42,7 @@ impl Checker<'_> {
         let (mut stage, result) = match parts {
             Some((expected, (services, errors, result))) => {
                 // the services of an `Eff` written as a type: a fix adds to them there
-                let written = self.store.resolve(&services).written();
+                let written = self.local_place_at(&services, self.span(node));
                 let site = Site::Expected(expected, written);
                 (self.bounded_stage(services, errors, site), Some(result))
             }
