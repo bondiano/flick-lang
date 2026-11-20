@@ -51,12 +51,17 @@ fn symbols(block: &Block, program: &Program, globals: &BTreeSet<&Name>) -> Resul
     for instruction in &block.instructions {
         if let Instruction::Let { value, .. } = instruction {
             match value {
-                Operation::Closure { code, .. } | Operation::Task { code, .. } => {
+                Operation::Closure { code, .. }
+                | Operation::Task { code, .. }
+                | Operation::GenerateLazy { code, .. } => {
                     code_arity(program, *code, 2)?;
                 }
                 Operation::Call { code, args }
                 | Operation::Within { code, args, .. }
-                | Operation::WithOwnerEvidence { code, args, .. } => {
+                | Operation::WithOwnerEvidence { code, args, .. }
+                | Operation::Loop { code, args, .. }
+                | Operation::FunctionBoundary { code, args }
+                | Operation::GenerateStrict { code, args } => {
                     code_arity(program, *code, args.len())?;
                 }
                 Operation::Global(name) if !globals.contains(name) => {

@@ -7,7 +7,7 @@ use flick_core::ir::{BinOp, Lit};
 use flick_core::numeric::{Arith, Num, int_arith};
 use flick_core::opt::{js_number, json_string};
 
-use super::{Data, Error, Heap, Value, tagged_boundary};
+use super::{Data, Error, ExitData, Heap, ObjectId, Value, tagged_boundary};
 
 #[path = "numeric.rs"]
 mod numeric;
@@ -49,9 +49,25 @@ pub(super) fn metered_primitive(
                 text.encode_utf16().fold(0_i32, |n, _| n.wrapping_add(1)),
             ))
         }
+        Intrinsic::ListRange => list_range(heap, &arguments[0], &arguments[1], fuel),
+        Intrinsic::RecordGet => record_get(heap, &arguments[0], &arguments[1], fuel),
+        Intrinsic::RecordExtend => {
+            record_extend(heap, &arguments[0], &arguments[1], &arguments[2], fuel)
+        }
+        Intrinsic::RecordRemove => record_remove(heap, &arguments[0], &arguments[1], fuel),
+        Intrinsic::RecordProject => record_project(heap, &arguments[0], &arguments[1], fuel),
+        Intrinsic::RecordMergeDisjoint => {
+            record_merge_disjoint(heap, &arguments[0], &arguments[1], fuel)
+        }
+        Intrinsic::RecordLabels => record_labels(heap, &arguments[0], fuel),
+        Intrinsic::ExitIsSuccess | Intrinsic::ExitIsFailure | Intrinsic::ExitHasInterrupts => {
+            exit_predicate(heap, kind, &arguments[0], fuel)
+        }
         _ => Err(unsupported("not a numeric primitive")),
     }
 }
+
+include!("primitives/records.rs");
 
 /// Both native backends represent readonly tuples and lists as arrays. Keep
 /// ordinary pattern kinds strict; bridge only this audited observer boundary.
@@ -65,6 +81,7 @@ pub(super) fn array_to_list(
         return Err(unsupported("array observer requires a list or tuple"));
     };
     let (list, count) = match &heap.object(token.id)?.data {
+        Data::ListSlice { .. } => (true, 0),
         Data::Tagged {
             tag,
             ordinary_fields,
@@ -239,6 +256,57 @@ pub(super) fn string_predicate(
     Ok(Value::Bool(matched))
 }
 
+fn show_value(heap: &Heap, value: &Value) -> Result<String, Error> {
+    match value {
+        Value::Unit => Ok("undefined".into()),
+        Value::Bool(value) => Ok(value.to_string()),
+        Value::Int(value) => Ok(value.to_string()),
+        Value::Float(value) => Ok(js_number(*value)),
+        Value::Object(token) => match &heap.object(token.id)?.data {
+            Data::String(text) => Ok(json_string(text)),
+            Data::BigInt(text) => Ok(format!("{}n", bigint_text(text)?)),
+            Data::Tagged {
+                tag,
+                ordinary_fields,
+                fields,
+            } => {
+                tagged_boundary(tag, *ordinary_fields, fields.len())?;
+                if tag.starts_with('$') {
+                    return Err(unsupported("primitive show of collection"));
+                }
+                Ok(tag.rsplit('.').next().unwrap_or(tag).to_owned())
+            }
+            Data::RecoveryResult { .. }
+            | Data::Cause(_)
+            | Data::Defect(_)
+            | Data::ServiceTag { .. }
+            | Data::Layer(_)
+            | Data::ListSlice { .. }
+            | Data::Record(_)
+            | Data::Dictionary(_)
+            | Data::Closure { .. }
+            | Data::Task { .. }
+            | Data::Continuation { .. }
+            | Data::Cell { .. }
+            | Data::Var { .. }
+            | Data::Lazy { .. }
+            | Data::Arena { .. }
+            | Data::Seq(_)
+            | Data::Iterator { .. }
+            | Data::Label(_)
+            | Data::Exit(_) => Err(unsupported(
+                "primitive show of record or executable/opaque storage",
+            )),
+        },
+        Value::Cell(_) | Value::Var(_) | Value::Lazy(_) | Value::Iterator(_) => {
+            Err(unsupported("primitive show of cell"))
+        }
+        Value::Owner(_) | Value::Arena(_) | Value::ArenaView(_) => {
+            Err(unsupported("primitive show of arena capability"))
+        }
+    }
+}
+
 pub(super) fn intrinsic(
     heap: &mut Heap,
     kind: Intrinsic,
@@ -253,78 +321,11 @@ pub(super) fn intrinsic(
             Ok(Value::Unit)
         }
         Intrinsic::Show => {
-            let text = match value {
-                Value::Unit => "undefined".into(),
-                Value::Bool(value) => value.to_string(),
-                Value::Int(value) => value.to_string(),
-                Value::Float(value) => js_number(*value),
-                Value::Object(token) => match &heap.object(token.id)?.data {
-                    Data::String(text) => json_string(text),
-                    Data::BigInt(text) => format!("{}n", bigint_text(text)?),
-                    Data::Tagged {
-                        tag,
-                        ordinary_fields,
-                        fields,
-                    } => {
-                        tagged_boundary(tag, *ordinary_fields, fields.len())?;
-                        if tag.starts_with('$') {
-                            return Err(unsupported("primitive show of collection"));
-                        }
-                        tag.rsplit('.').next().unwrap_or(tag).to_owned()
-                    }
-                    Data::RecoveryResult { .. }
-                    | Data::Cause(_)
-                    | Data::Defect(_)
-                    | Data::ServiceTag { .. }
-                    | Data::Layer(_)
-                    | Data::Record(_)
-                    | Data::Dictionary(_)
-                    | Data::Closure { .. }
-                    | Data::Task { .. }
-                    | Data::Cell { .. }
-                    | Data::Arena { .. } => {
-                        return Err(unsupported(
-                            "primitive show of record or executable/opaque storage",
-                        ));
-                    }
-                },
-                Value::Cell(_) => return Err(unsupported("primitive show of cell")),
-                Value::Owner(_) | Value::Arena(_) | Value::ArenaView(_) => {
-                    return Err(unsupported("primitive show of arena capability"));
-                }
-            };
+            let text = show_value(heap, value)?;
             heap.literal(&Lit::String(text))
         }
         Intrinsic::Host(primitive) => host::run(heap, primitive, value, stdout),
-        Intrinsic::Try
-        | Intrinsic::FromResult
-        | Intrinsic::Raise
-        | Intrinsic::MatchFail
-        | Intrinsic::RefMake
-        | Intrinsic::RefGet
-        | Intrinsic::RefSet
-        | Intrinsic::RefModify
-        | Intrinsic::RefSame
-        | Intrinsic::ScopeRun
-        | Intrinsic::ScopeCurrent
-        | Intrinsic::ArenaMake
-        | Intrinsic::ArenaAlloc
-        | Intrinsic::ArenaGet
-        | Intrinsic::LayerSucceed
-        | Intrinsic::LayerRun
-        | Intrinsic::LayerMerge
-        | Intrinsic::StringStartsWith
-        | Intrinsic::StringIncludes
-        | Intrinsic::PrimitiveCompare
-        | Intrinsic::PrimitiveHash
-        | Intrinsic::IntUnsafeDiv
-        | Intrinsic::IntUnsafeRem
-        | Intrinsic::NumberToFloat
-        | Intrinsic::FloatMin
-        | Intrinsic::FloatMax
-        | Intrinsic::ArrayToList
-        | Intrinsic::ToBigInt
-        | Intrinsic::StringLength => Err(Error::NeedsProgram),
+        _ => Err(Error::NeedsProgram),
     }
 }
 include!("primitives/operators.rs");

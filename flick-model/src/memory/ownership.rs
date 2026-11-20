@@ -110,14 +110,29 @@ impl Heap {
     fn allocate(&mut self, data: Data) -> Value {
         self.stats.cells_allocated += usize::from(matches!(data, Data::Cell { .. }));
         self.stats.arenas_allocated += usize::from(matches!(data, Data::Arena { .. }));
+        let (index, generation) = if let Some(index) = self.free_list.pop() {
+            let slot = &mut self.objects[index];
+            slot.object = Some(Object {
+                references: 1,
+                data,
+            });
+            (index, slot.generation)
+        } else {
+            let index = self.objects.len();
+            self.objects.push(Slot {
+                generation: 0,
+                object: Some(Object {
+                    references: 1,
+                    data,
+                }),
+            });
+            (index, 0)
+        };
         let id = ObjectId {
             heap: self.identity,
-            index: self.objects.len(),
+            index,
+            generation,
         };
-        self.objects.push(Some(Object {
-            references: 1,
-            data,
-        }));
         self.stats.allocations += 1;
         self.stats.live_objects += 1;
         self.stats.peak_live_objects = self.stats.peak_live_objects.max(self.stats.live_objects);
@@ -130,7 +145,8 @@ impl Heap {
         }
         self.objects
             .get(id.index)
-            .and_then(Option::as_ref)
+            .filter(|slot| slot.generation == id.generation)
+            .and_then(|slot| slot.object.as_ref())
             .ok_or(Error::InvalidObject(id))
     }
 
@@ -140,7 +156,8 @@ impl Heap {
         }
         self.objects
             .get_mut(id.index)
-            .and_then(Option::as_mut)
+            .filter(|slot| slot.generation == id.generation)
+            .and_then(|slot| slot.object.as_mut())
             .ok_or(Error::InvalidObject(id))
     }
 
@@ -194,12 +211,15 @@ impl Heap {
         if arena.execution != execution || arena.id.heap != self.identity {
             return Err(Error::ForeignArena);
         }
-        // VM-minted private ids never recycle: only an in-range retired slot is closed.
-        let object = self
+        // VM-minted generational ids distinguish retired handles from never-allocated slots.
+        let slot = self
             .objects
             .get(arena.id.index)
-            .ok_or(Error::InvalidObject(arena.id))?
+            .ok_or(Error::InvalidObject(arena.id))?;
+        let object = slot
+            .object
             .as_ref()
+            .filter(|_| slot.generation == arena.id.generation)
             .ok_or(Error::ClosedArena)?;
         let Data::Arena {
             execution: owner,
@@ -222,12 +242,14 @@ impl Heap {
         if arena.execution != execution || arena.id.heap != self.identity {
             return Err(Error::ForeignArena);
         }
-        let object = self
+        let slot = self
             .objects
             .get_mut(arena.id.index)
-            .ok_or(Error::InvalidObject(arena.id))?
-            .as_mut()
-            .ok_or(Error::ClosedArena)?;
+            .ok_or(Error::InvalidObject(arena.id))?;
+        if slot.generation != arena.id.generation {
+            return Err(Error::ClosedArena);
+        }
+        let object = slot.object.as_mut().ok_or(Error::ClosedArena)?;
         let Data::Arena {
             execution: owner,
             contents,
@@ -294,9 +316,10 @@ impl Heap {
                 let dead = object.references == 0;
                 self.stats.drops += 1;
                 if dead {
-                    let object = self.objects[id.id.index]
-                        .take()
-                        .expect("the released object exists");
+                    let slot = &mut self.objects[id.id.index];
+                    let object = slot.object.take().expect("the released object exists");
+                    slot.generation = slot.generation.wrapping_add(1);
+                    self.free_list.push(id.id.index);
                     self.stats.frees += 1;
                     self.stats.live_objects -= 1;
                     match object.data {
@@ -312,10 +335,39 @@ impl Heap {
                         }
                         | Data::Task {
                             captures: fields, ..
-                        } => pending.extend(fields),
+                        }
+                        | Data::Seq(SeqData::Generator {
+                            captures: fields, ..
+                        }) => pending.extend(fields),
+                        Data::ListSlice { backing, .. } | Data::Seq(SeqData::FromList(backing)) => {
+                            pending.push(backing);
+                        }
+                        Data::Continuation { execution, id } => {
+                            self.dropped_continuations.push((execution, id));
+                        }
                         Data::Cell { contents, .. } => {
                             self.stats.cells_freed += 1;
                             pending.extend(contents);
+                        }
+                        Data::Var { contents, .. } => pending.extend(contents),
+                        Data::Lazy { state, .. } => {
+                            if let Some(
+                                LazyState::Pending(v)
+                                | LazyState::Running(v)
+                                | LazyState::DoneOk(v)
+                                | LazyState::DoneErr(v),
+                            ) = state
+                            {
+                                pending.push(v);
+                            }
+                        }
+                        Data::Iterator { state, .. } => {
+                            if let IteratorState::List { backing, .. } = state {
+                                pending.push(backing);
+                            }
+                        }
+                        Data::Exit(ExitData::Success(value) | ExitData::Failure(value)) => {
+                            pending.push(value);
                         }
                         Data::Arena { contents, .. } => {
                             self.stats.arenas_freed += 1;
@@ -342,7 +394,7 @@ impl Heap {
                         Data::Layer(LayerData::Merge { left, right }) => {
                             pending.extend([left, right]);
                         }
-                        Data::Defect(_) | Data::String(_) | Data::BigInt(_) => {}
+                        Data::Defect(_) | Data::String(_) | Data::BigInt(_) | Data::Label(_) => {}
                     }
                 }
             }

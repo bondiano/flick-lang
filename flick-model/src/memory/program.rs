@@ -11,7 +11,8 @@ use flick_core::ir::memory::{
 };
 
 use super::{
-    ArenaHandle, ArenaView, CellHandle, Data, Error, Heap, Locals, OwnerHandle, Value, patterns,
+    ArenaHandle, ArenaView, CellHandle, Data, Error, ExitData, Heap, IteratorHandle, IteratorState,
+    LazyHandle, LazyState, Locals, ObjectToken, OwnerHandle, SeqData, Value, VarHandle, patterns,
     peek, primitives, tagged_boundary, take,
 };
 
@@ -209,6 +210,7 @@ fn execute(
         execution,
         globals: BTreeMap::new(),
         cells: Vec::new(),
+        lazies: Vec::new(),
         owners: vec![OwnerState::default()],
         current_owner: 0,
         current_evidence: None,
@@ -216,6 +218,8 @@ fn execute(
         activations: BTreeMap::new(),
         providers: BTreeMap::new(),
         segments: BTreeMap::new(),
+        continuations: BTreeMap::new(),
+        generators: BTreeMap::new(),
         invocations: BTreeMap::new(),
         discard: None,
         ready: None,
@@ -242,7 +246,7 @@ fn execute(
     }
 }
 
-enum Destination {
+enum Destination<'p> {
     RecoverySelection {
         id: usize,
     },
@@ -261,6 +265,10 @@ enum Destination {
     },
     Handle {
         activation: usize,
+        binding: Local,
+    },
+    Discontinue {
+        cont_id: usize,
         binding: Local,
     },
     Invocation(usize),
@@ -283,10 +291,81 @@ enum Destination {
         previous: usize,
         binding: Local,
     },
+    ClosingScope {
+        state: Box<ClosingScopeState<'p>>,
+    },
     RestoreOwner {
         previous: usize,
         binding: Local,
     },
+    Loop {
+        id: String,
+        code: CodeId,
+        args: Vec<Value>,
+        binding: Local,
+    },
+    FunctionBoundary {
+        binding: Local,
+    },
+    GenerateStrict {
+        items: Vec<Value>,
+        remaining: Option<usize>,
+        binding: Local,
+    },
+    GeneratorStep {
+        gen_id: usize,
+        binding: Local,
+    },
+    LazyComplete {
+        lazy: LazyHandle,
+        binding: Local,
+    },
+    AcquireRegister {
+        owner: usize,
+        release: Value,
+        binding: Local,
+    },
+    BracketUse {
+        use_fn: Value,
+        release_fn: Value,
+        binding: Local,
+    },
+    BracketRelease {
+        resource: Value,
+        release_fn: Value,
+        binding: Local,
+    },
+    BracketFinish {
+        outcome: BracketOutcome,
+        binding: Local,
+    },
+    DiscardFinalizer,
+}
+
+enum BracketOutcome {
+    Success(Value),
+    Failure(CauseToken),
+}
+
+enum Finalizer {
+    Task(Value),
+    WithCause(Value),
+    WithExit(Value),
+    Release { value: Value, release_fn: Value },
+}
+
+enum ScopeOutcome<'p> {
+    Normal { binding: Local, value: Value },
+    Failure(CauseToken),
+    Discard(Box<Discard<'p>>),
+}
+
+struct ClosingScopeState<'p> {
+    owner: usize,
+    previous: usize,
+    remaining: Vec<Finalizer>,
+    outcome: ScopeOutcome<'p>,
+    finalizer_failure: Option<CauseToken>,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -329,7 +408,9 @@ struct Frame<'p> {
     block: &'p Block,
     at: usize,
     locals: Locals,
-    destination: Destination,
+    vars: Vec<Value>,
+    iterators: Vec<Value>,
+    destination: Destination<'p>,
     evidence: Option<OwnerEvidence>,
 }
 
@@ -355,10 +436,36 @@ struct Segment<'p> {
     binding: Local,
 }
 
+struct CapturedContinuation<'p> {
+    frames: Vec<Frame<'p>>,
+    owner: usize,
+    binding: Local,
+}
+
+enum GeneratorRun<'p> {
+    Fresh {
+        seq: Value,
+        code: CodeId,
+    },
+    Suspended {
+        frames: Vec<Frame<'p>>,
+        owner: usize,
+        yield_binding: Local,
+    },
+    Running,
+    Done,
+}
+
+struct GeneratorSlot<'p> {
+    run: GeneratorRun<'p>,
+    remaining: Option<usize>,
+}
+
 enum InvocationEnd {
     Caller(Local),
     Tail(usize),
     Abort(Local),
+    Control { cont_id: usize, binding: Local },
 }
 
 struct Invocation {
@@ -368,20 +475,46 @@ struct Invocation {
     evidence: Option<OwnerEvidence>,
 }
 
-enum TransferNext {
+enum TransferNext<'p> {
     Invoke(usize),
     Raise,
+    LoopContinue {
+        id: String,
+        code: CodeId,
+        args: Vec<Value>,
+        binding: Local,
+    },
+    DeliverValue {
+        binding: Local,
+        value: Value,
+    },
+    ReturnNone {
+        binding: Local,
+    },
+    ResumeRunning {
+        saved_failure: Option<CauseToken>,
+    },
+    FinishGenerateStrict {
+        binding: Local,
+        items: Vec<Value>,
+    },
+    DeliverNone {
+        binding: Local,
+    },
+    Chain(Box<Discard<'p>>),
 }
 
 struct Discard<'p> {
     frames: Vec<Frame<'p>>,
-    owner: usize,
-    next: TransferNext,
+    owner: Option<usize>,
+    next: TransferNext<'p>,
 }
 
 #[derive(Default)]
 struct OwnerState {
+    closing: bool,
     closed: bool,
+    finalizers: Vec<Finalizer>,
     /// Sole counted owners, never a reachability-derived disposal set.
     arenas: Vec<Value>,
 }
@@ -395,6 +528,8 @@ struct Machine<'p, 'h> {
     /// The sole strong owners of actual cell allocations. User cell
     /// handles do not own contents, so cycles through them need no tracing.
     cells: Vec<Value>,
+    /// The sole strong owners of root-owned single-flight `Lazy` cells.
+    lazies: Vec<Value>,
     owners: Vec<OwnerState>,
     current_owner: usize,
     current_evidence: Option<OwnerEvidence>,
@@ -402,6 +537,8 @@ struct Machine<'p, 'h> {
     activations: BTreeMap<usize, Activation>,
     providers: BTreeMap<usize, Provider>,
     segments: BTreeMap<usize, Segment<'p>>,
+    continuations: BTreeMap<usize, Option<CapturedContinuation<'p>>>,
+    generators: BTreeMap<usize, GeneratorSlot<'p>>,
     invocations: BTreeMap<usize, Invocation>,
     discard: Option<Discard<'p>>,
     ready: Option<usize>,
@@ -426,10 +563,15 @@ struct Machine<'p, 'h> {
 }
 
 include!("program/driving.rs");
+include!("program/returns.rs");
 include!("program/calls.rs");
 include!("program/values.rs");
 include!("program/contexts.rs");
 include!("program/scoped_values.rs");
+include!("program/control_flow.rs");
+include!("program/generators.rs");
+include!("program/scope_finalizers.rs");
+include!("program/frame_roots.rs");
 include!("program/cleanup.rs");
 
 #[cfg(test)]

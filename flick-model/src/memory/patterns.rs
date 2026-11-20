@@ -7,14 +7,24 @@ use std::mem;
 use flick_core::ir::memory::Local;
 use flick_core::ir::{Lit, Pat};
 
-use super::{Data, Error, Heap, ObjectId, Value, charge, primitives, tagged_boundary};
+use super::{Data, Error, Heap, ObjectId, ObjectToken, Value, charge, primitives, tagged_boundary};
 
 #[derive(Clone, Copy)]
 enum Place {
     Root,
-    Tagged { object: ObjectId, index: usize },
-    Record { object: ObjectId, index: usize },
-    Tail { object: ObjectId, start: usize },
+    Tagged {
+        object: ObjectId,
+        index: usize,
+    },
+    Record {
+        object: ObjectId,
+        index: usize,
+    },
+    Tail {
+        object: ObjectId,
+        start: usize,
+        end: usize,
+    },
 }
 
 enum Work<'p> {
@@ -297,7 +307,7 @@ fn list<'p>(
     fuel: &mut u64,
     work: &mut Vec<Work<'p>>,
 ) -> Result<bool, Error> {
-    let (object, start, length) = if let Place::Tail { object, start } = place {
+    let (object, start, end) = if let Place::Tail { object, start, end } = place {
         let Data::Tagged {
             tag,
             ordinary_fields,
@@ -307,17 +317,16 @@ fn list<'p>(
             return Err(Error::PatternKind("list"));
         };
         tagged_boundary(tag, *ordinary_fields, fields.len())?;
-        if tag != "$list" {
+        if tag != "$list" || end > fields.len() {
             return Err(Error::PatternKind("list"));
         }
-        (object, start, fields.len() - start)
+        (object, start, end)
     } else {
-        let (object, tag, fields) = tagged(heap, root, place, "list")?;
-        if tag != "$list" {
-            return Err(Error::PatternKind("list"));
-        }
-        (object, 0, fields.len())
+        let value = actual(heap, root, place)?;
+        let (object, offset, len) = heap.list_view(value)?;
+        (object, offset, offset + len)
     };
+    let length = end - start;
     if length < items.len() || rest.is_none() && length != items.len() {
         return Ok(false);
     }
@@ -328,6 +337,7 @@ fn list<'p>(
             Place::Tail {
                 object,
                 start: start + items.len(),
+                end,
             },
         ));
     }
@@ -405,7 +415,7 @@ fn materialize(
     fuel: &mut u64,
     scratch: &mut Vec<Value>,
 ) -> Result<(), Error> {
-    if let Place::Tail { object, start } = place {
+    if let Place::Tail { object, start, end } = place {
         let Data::Tagged {
             tag,
             ordinary_fields,
@@ -415,22 +425,25 @@ fn materialize(
             return Err(Error::PatternKind("list"));
         };
         tagged_boundary(tag, *ordinary_fields, fields.len())?;
-        if tag != "$list" {
+        if tag != "$list" || end > fields.len() || start > end {
             return Err(Error::PatternKind("list"));
         }
-        let length = fields.len();
-        let checkpoint = scratch.len();
-        for index in start..length {
-            charge(fuel, 1)?;
-            let value = actual(heap, root, Place::Tagged { object, index })?.representation();
-            scratch.push(heap.dup(&value)?);
-        }
         charge(fuel, 1)?;
-        let tail = heap.allocate(Data::Tagged {
-            tag: "$list".into(),
-            ordinary_fields: scratch.len() - checkpoint,
-            fields: scratch.split_off(checkpoint),
-        });
+        let len = end - start;
+        let tail = if len == 0 {
+            heap.allocate(Data::Tagged {
+                tag: "$list".into(),
+                ordinary_fields: 0,
+                fields: Vec::new(),
+            })
+        } else {
+            let backing = heap.dup(&Value::Object(ObjectToken { id: object }))?;
+            heap.allocate(Data::ListSlice {
+                backing,
+                offset: start,
+                len,
+            })
+        };
         scratch.push(tail);
     } else {
         charge(fuel, 1)?;
@@ -602,7 +615,11 @@ mod tests {
             materialize(
                 &mut heap,
                 &root,
-                Place::Tail { object, start: 0 },
+                Place::Tail {
+                    object,
+                    start: 0,
+                    end: 2,
+                },
                 &mut 1000,
                 &mut scratch
             ),

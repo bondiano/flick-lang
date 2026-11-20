@@ -13,20 +13,24 @@ mod failures;
 mod free;
 mod handlers;
 mod layers;
+mod lazy_scope;
 mod list_collections;
 mod list_range;
 mod list_show;
+mod loops;
 mod matches;
 mod numeric_primitives;
 mod option_map2;
+mod records;
 mod result_map2;
 mod scalar_context;
+mod seq;
 mod strings;
 mod structural;
 #[cfg(test)]
 mod tests;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::{error, fmt};
 
 use flick_ir::{Constructor, Dict, Foreign, ForeignMode, InstanceInfo, Shape};
@@ -177,6 +181,10 @@ fn lower_in<'a>(
         initializers: BTreeMap::new(),
         program: Program::default(),
         next: 0,
+        loop_counter: 0,
+        iterable_loops: BTreeMap::new(),
+        active_for_loop: None,
+        in_for_each_body: BTreeSet::new(),
     };
     for root in roots {
         lower.global(root, None)?;
@@ -191,6 +199,10 @@ struct Lower<'a> {
     initializers: BTreeMap<Name, CodeId>,
     program: Program,
     next: CodeId,
+    loop_counter: usize,
+    iterable_loops: BTreeMap<String, String>,
+    active_for_loop: Option<String>,
+    in_for_each_body: BTreeSet<String>,
 }
 
 /// One ANF function under construction. Branches get their own builders,
@@ -379,19 +391,4 @@ fn dictionary(value: &Dict, span: Span) -> Result<Expr, LowerError> {
         }
     };
     Ok(Expr::new(kind, span))
-}
-
-fn form(kind: &ExprKind) -> &'static str {
-    match kind {
-        ExprKind::Unwrap(_) => "nonlocal Option return",
-        ExprKind::Var(_) => "mutable local read",
-        ExprKind::Generate { .. } | ExprKind::Each { .. } | ExprKind::Yield(_) => "generator",
-        ExprKind::Loop { .. } | ExprKind::ControlLoop { .. } | ExprKind::LoopExit { .. } => {
-            "loop/control exit"
-        }
-        ExprKind::Handle(_) | ExprKind::Perform { .. } => "effect handler/operation",
-        ExprKind::Label(_) => "record label primitive",
-        ExprKind::ServiceTag(_) => "service tag",
-        _ => "compiler expression",
-    }
 }

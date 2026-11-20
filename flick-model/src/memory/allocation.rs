@@ -6,9 +6,199 @@ impl Heap {
         Self {
             identity,
             objects: Vec::new(),
+            free_list: Vec::new(),
             stats: Stats::default(),
             service_tags: BTreeMap::new(),
+            dropped_continuations: Vec::new(),
         }
+    }
+
+    /// Drains continuation IDs whose last counted reference hit zero in `execution`.
+    pub(super) fn take_dropped_continuations(&mut self, execution: usize) -> Vec<usize> {
+        let mut taken = Vec::new();
+        let mut kept = Vec::new();
+        for (owner, id) in mem::take(&mut self.dropped_continuations) {
+            if owner == execution {
+                taken.push(id);
+            } else {
+                kept.push((owner, id));
+            }
+        }
+        self.dropped_continuations = kept;
+        taken
+    }
+
+    /// Resolves either a flat `$list` or an O(1) `ListSlice` into `(backing_id, offset, len)`.
+    pub(super) fn list_view(&self, value: &Value) -> Result<(ObjectId, usize, usize), Error> {
+        self.admit_ordinary(value)?;
+        let Value::Object(token) = value else {
+            return Err(Error::PatternKind("list"));
+        };
+        match &self.object(token.id)?.data {
+            Data::Tagged {
+                tag,
+                ordinary_fields,
+                fields,
+            } if tag == "$list" => {
+                tagged_boundary(tag, *ordinary_fields, fields.len())?;
+                Ok((token.id, 0, fields.len()))
+            }
+            Data::ListSlice {
+                backing,
+                offset,
+                len,
+            } => {
+                let Value::Object(backing_token) = backing else {
+                    return Err(Error::PatternKind("list"));
+                };
+                let Data::Tagged {
+                    tag,
+                    ordinary_fields,
+                    fields,
+                } = &self.object(backing_token.id)?.data
+                else {
+                    return Err(Error::PatternKind("list"));
+                };
+                tagged_boundary(tag, *ordinary_fields, fields.len())?;
+                if tag != "$list" || offset.saturating_add(*len) > fields.len() {
+                    return Err(Error::PatternKind("list"));
+                }
+                Ok((backing_token.id, *offset, *len))
+            }
+            _ => Err(Error::PatternKind("list")),
+        }
+    }
+
+    pub(super) fn label_str(&self, value: &Value) -> Result<&str, Error> {
+        self.admit_ordinary(value)?;
+        let Value::Object(token) = value else {
+            return Err(Error::ExpectedLabel);
+        };
+        match &self.object(token.id)?.data {
+            Data::Label(name) | Data::String(name) => Ok(name),
+            _ => Err(Error::ExpectedLabel),
+        }
+    }
+
+    pub(super) fn var_contents<'a>(
+        &'a self,
+        execution: usize,
+        var: &VarHandle,
+    ) -> Result<&'a Value, Error> {
+        if var.execution != execution {
+            return Err(Error::ForeignVar);
+        }
+        let slot = self
+            .objects
+            .get(var.id.index)
+            .filter(|_| var.id.heap == self.identity)
+            .ok_or(Error::ForeignVar)?;
+        let object = slot
+            .object
+            .as_ref()
+            .filter(|_| slot.generation == var.id.generation)
+            .ok_or(Error::ClosedVar)?;
+        let Data::Var {
+            execution: owner,
+            contents,
+        } = &object.data
+        else {
+            return Err(Error::ExpectedVar);
+        };
+        if *owner != execution {
+            return Err(Error::ForeignVar);
+        }
+        contents.as_ref().ok_or(Error::ClosedVar)
+    }
+
+    pub(super) fn var_contents_mut<'a>(
+        &'a mut self,
+        execution: usize,
+        var: &VarHandle,
+    ) -> Result<&'a mut Value, Error> {
+        if var.execution != execution {
+            return Err(Error::ForeignVar);
+        }
+        let slot = self
+            .objects
+            .get_mut(var.id.index)
+            .filter(|_| var.id.heap == self.identity)
+            .ok_or(Error::ForeignVar)?;
+        if slot.generation != var.id.generation {
+            return Err(Error::ClosedVar);
+        }
+        let object = slot.object.as_mut().ok_or(Error::ClosedVar)?;
+        let Data::Var {
+            execution: owner,
+            contents,
+        } = &mut object.data
+        else {
+            return Err(Error::ExpectedVar);
+        };
+        if *owner != execution {
+            return Err(Error::ForeignVar);
+        }
+        contents.as_mut().ok_or(Error::ClosedVar)
+    }
+
+    fn lazy_state_mut<'a>(
+        &'a mut self,
+        execution: usize,
+        lazy: &LazyHandle,
+    ) -> Result<&'a mut Option<LazyState>, Error> {
+        if lazy.execution != execution {
+            return Err(Error::ForeignLazy);
+        }
+        let slot = self
+            .objects
+            .get_mut(lazy.id.index)
+            .filter(|_| lazy.id.heap == self.identity)
+            .ok_or(Error::ForeignLazy)?;
+        if slot.generation != lazy.id.generation {
+            return Err(Error::ClosedLazy);
+        }
+        let object = slot.object.as_mut().ok_or(Error::ClosedLazy)?;
+        let Data::Lazy {
+            execution: owner,
+            state,
+        } = &mut object.data
+        else {
+            return Err(Error::ExpectedLazy);
+        };
+        if *owner != execution {
+            return Err(Error::ForeignLazy);
+        }
+        Ok(state)
+    }
+
+    fn iterator_state_mut<'a>(
+        &'a mut self,
+        execution: usize,
+        iterator: &IteratorHandle,
+    ) -> Result<&'a mut IteratorState, Error> {
+        if iterator.execution != execution {
+            return Err(Error::ForeignIterator);
+        }
+        let slot = self
+            .objects
+            .get_mut(iterator.id.index)
+            .filter(|_| iterator.id.heap == self.identity)
+            .ok_or(Error::ForeignIterator)?;
+        if slot.generation != iterator.id.generation {
+            return Err(Error::ClosedIterator);
+        }
+        let object = slot.object.as_mut().ok_or(Error::ClosedIterator)?;
+        let Data::Iterator {
+            execution: owner,
+            state,
+        } = &mut object.data
+        else {
+            return Err(Error::ExpectedIterator);
+        };
+        if *owner != execution {
+            return Err(Error::ForeignIterator);
+        }
+        Ok(state)
     }
 
     /// Canonicalizes simultaneous live tags within this heap, without a strong cache.
@@ -35,7 +225,11 @@ impl Heap {
     /// A check, not a collector. The caller must explicitly drop its
     /// returned value and all other roots before this can succeed.
     pub fn finish(&self) -> Result<Stats, Error> {
-        let actual = self.objects.iter().filter(|slot| slot.is_some()).count();
+        let actual = self
+            .objects
+            .iter()
+            .filter(|slot| slot.object.is_some())
+            .count();
         if actual != self.stats.live_objects {
             return Err(Error::LiveCountMismatch {
                 tracked: self.stats.live_objects,
@@ -121,10 +315,35 @@ impl Heap {
             }
             | Data::Task {
                 captures: fields, ..
-            } => fields.get(field).ok_or(Error::MissingField {
+            }
+            | Data::Seq(SeqData::Generator {
+                captures: fields, ..
+            }) => fields.get(field).ok_or(Error::MissingField {
                 object: id.id,
                 field,
             }),
+            Data::ListSlice {
+                backing,
+                offset,
+                len,
+            } => {
+                if field >= *len {
+                    return Err(Error::MissingField {
+                        object: id.id,
+                        field,
+                    });
+                }
+                let Value::Object(backing_token) = backing else {
+                    return Err(Error::ExpectedObject);
+                };
+                let Data::Tagged { fields, .. } = &self.object(backing_token.id)?.data else {
+                    return Err(Error::ExpectedObject);
+                };
+                fields.get(offset + field).ok_or(Error::MissingField {
+                    object: id.id,
+                    field,
+                })
+            }
             Data::RecoveryResult { .. }
             | Data::Cause(_)
             | Data::Defect(_)
@@ -134,8 +353,15 @@ impl Heap {
             | Data::BigInt(_)
             | Data::Record(_)
             | Data::Dictionary(_)
+            | Data::Continuation { .. }
             | Data::Cell { .. }
-            | Data::Arena { .. } => Err(Error::ExpectedObject),
+            | Data::Var { .. }
+            | Data::Lazy { .. }
+            | Data::Arena { .. }
+            | Data::Seq(_)
+            | Data::Iterator { .. }
+            | Data::Label(_)
+            | Data::Exit(_) => Err(Error::ExpectedObject),
         }
     }
 
@@ -153,6 +379,7 @@ impl Heap {
                 tagged_boundary(tag, *ordinary_fields, fields.len())?;
                 Ok(tag)
             }
+            Data::ListSlice { .. } => Ok("$list"),
             Data::RecoveryResult { .. }
             | Data::Cause(_)
             | Data::Defect(_)
@@ -164,8 +391,15 @@ impl Heap {
             | Data::Dictionary(_)
             | Data::Closure { .. }
             | Data::Task { .. }
+            | Data::Continuation { .. }
             | Data::Cell { .. }
-            | Data::Arena { .. } => Err(Error::ExpectedObject),
+            | Data::Var { .. }
+            | Data::Lazy { .. }
+            | Data::Arena { .. }
+            | Data::Seq(_)
+            | Data::Iterator { .. }
+            | Data::Label(_)
+            | Data::Exit(_) => Err(Error::ExpectedObject),
         }
     }
 
@@ -176,19 +410,7 @@ impl Heap {
         };
         match &self.object(id.id)?.data {
             Data::String(value) => Ok(value),
-            Data::RecoveryResult { .. }
-            | Data::Cause(_)
-            | Data::Defect(_)
-            | Data::ServiceTag { .. }
-            | Data::Layer(_)
-            | Data::Tagged { .. }
-            | Data::BigInt(_)
-            | Data::Record(_)
-            | Data::Dictionary(_)
-            | Data::Closure { .. }
-            | Data::Task { .. }
-            | Data::Cell { .. }
-            | Data::Arena { .. } => Err(Error::ExpectedString),
+            _ => Err(Error::ExpectedString),
         }
     }
 
@@ -201,19 +423,7 @@ impl Heap {
         };
         match &self.object(id.id)?.data {
             Data::BigInt(value) => Ok(value),
-            Data::RecoveryResult { .. }
-            | Data::Cause(_)
-            | Data::Defect(_)
-            | Data::ServiceTag { .. }
-            | Data::Layer(_)
-            | Data::Tagged { .. }
-            | Data::String(_)
-            | Data::Record(_)
-            | Data::Dictionary(_)
-            | Data::Closure { .. }
-            | Data::Task { .. }
-            | Data::Cell { .. }
-            | Data::Arena { .. } => Err(Error::ExpectedBigInt),
+            _ => Err(Error::ExpectedBigInt),
         }
     }
 

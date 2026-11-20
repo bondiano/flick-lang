@@ -4,24 +4,37 @@ impl Machine<'_, '_> {
         if self.dictionary_operation(binding, operation)?
             || self.evidence_operation(binding, operation)?
             || self.handler_operation(binding, operation)?
+            || self.control_operation(binding, operation)?
         {
             return Ok(());
         }
         match operation {
             Operation::RecoveryResult { selected } => self.recovery_result(binding, *selected)?,
-            Operation::Handle { .. } | Operation::Perform { .. } | Operation::ServiceTag(_) => {
-                unreachable!("handler operations dispatched above")
-            }
-            Operation::Dictionary { .. }
+            Operation::Handle { .. }
+            | Operation::Perform { .. }
+            | Operation::ServiceTag(_)
+            | Operation::VarMake(_)
+            | Operation::VarGet(_)
+            | Operation::VarSet { .. }
+            | Operation::Loop { .. }
+            | Operation::LoopExit { .. }
+            | Operation::FunctionBoundary { .. }
+            | Operation::UnwrapOption(_)
+            | Operation::GenerateStrict { .. }
+            | Operation::GenerateLazy { .. }
+            | Operation::Yield(_)
+            | Operation::SeqOpen(_)
+            | Operation::SeqNext(_)
+            | Operation::Label(_)
+            | Operation::Dictionary { .. }
             | Operation::Method { .. }
-            | Operation::Structure { .. } => {
-                unreachable!("dictionary operations dispatched above")
+            | Operation::Structure { .. }
+            | Operation::ReadOwnerEvidence
+            | Operation::WithOwnerEvidence { .. } => {
+                unreachable!("specialized operations dispatched above")
             }
             Operation::Global(name) => self.global(name, Some(binding))?,
             Operation::Call { code, args } => self.direct_call(binding, *code, args)?,
-            Operation::ReadOwnerEvidence | Operation::WithOwnerEvidence { .. } => {
-                unreachable!("evidence operations dispatched above")
-            }
             Operation::Within { owner, code, args } => {
                 self.within(binding, *owner, *code, args)?;
             }
@@ -76,6 +89,16 @@ impl Machine<'_, '_> {
                 fields,
                 dicts,
             } => self.reuse(binding, *object, tag, fields, dicts)?,
+            Operation::Binary { .. }
+            | Operation::Not(_)
+            | Operation::Neg { .. }
+            | Operation::Intrinsic { .. } => self.primitive_operation(binding, operation)?,
+        }
+        Ok(())
+    }
+
+    fn primitive_operation(&mut self, binding: Local, operation: &Operation) -> Result<(), Error> {
+        match operation {
             Operation::Binary { op, left, right } => {
                 self.stage([*left, *right])?;
                 let result =
@@ -96,6 +119,7 @@ impl Machine<'_, '_> {
                 self.stage(args.iter().copied())?;
                 self.intrinsic(*kind, binding)?;
             }
+            _ => unreachable!("non-primitive operation"),
         }
         Ok(())
     }

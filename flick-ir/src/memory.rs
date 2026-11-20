@@ -250,6 +250,59 @@ pub enum Operation {
     RecoveryResult {
         selected: Option<Local>,
     },
+    /// Allocates a frame-scoped mutable variable owned by the current frame.
+    /// Consumes initial value; returns a non-owning Var handle released on frame exit/unwind.
+    VarMake(Local),
+    /// Consumes a non-owning Var handle and returns a retained owned value from its slot.
+    VarGet(Local),
+    /// Consumes a non-owning Var handle and replacement value; drops previous contents; returns Unit.
+    VarSet {
+        var: Local,
+        value: Local,
+    },
+    /// Installs a lexical loop frame for `id` and invokes `code(args)` repeatedly until
+    /// a matching `LoopExit` breaks it. Consumes `args`.
+    Loop {
+        id: String,
+        code: CodeId,
+        args: Vec<Local>,
+    },
+    /// Unwinds to the enclosing `Loop { id }` (closing departed scopes/handlers/vars):
+    /// `None` starts the next iteration, `Some(value)` delivers `value` as the loop result.
+    LoopExit {
+        id: String,
+        value: Option<Local>,
+    },
+    /// Marks a source-function return boundary for `UnwrapOption` (`Option?`).
+    /// Runs static helper `code(args)`; synthetic branch/match helpers never emit this.
+    FunctionBoundary {
+        code: CodeId,
+        args: Vec<Local>,
+    },
+    /// Consumes an `Option a`: returns owned `v` on `Some v`, or unwinds to the nearest
+    /// `FunctionBoundary` (closing departed scopes) and delivers `Prelude.Option.None`.
+    UnwrapOption(Local),
+    /// Runs `code(args)` with a frame-owned list builder collecting `Yield` values; returns `$list`.
+    GenerateStrict {
+        code: CodeId,
+        args: Vec<Local>,
+    },
+    /// Allocates a replayable lazy `Seq` owning `captures` and generator `code` (`[self, Unit]`),
+    /// with optional element `limit`. Consumes `captures` and optional `limit`.
+    GenerateLazy {
+        code: CodeId,
+        captures: Vec<Local>,
+        limit: Option<Local>,
+        sync: bool,
+    },
+    /// Yields an owned element to the innermost active `GenerateStrict` or lazy `Seq` iterator.
+    Yield(Local),
+    /// Consumes a list or `Seq`, opening a frame-owned iteration cursor (released on frame exit/unwind).
+    SeqOpen(Local),
+    /// Consumes a non-owning iterator cursor and yields `Prelude.Option.Some elem` or `None`.
+    SeqNext(Local),
+    /// First-class nominal record label value (`Record.label`).
+    Label(String),
 }
 
 /// Platform-independent operations whose host bindings have a known
@@ -310,6 +363,39 @@ pub enum Intrinsic {
     ToBigInt,
     /// A primitive of the host that `Host.live` adapts; it takes one argument.
     Host(HostPrimitive),
+    /// O(N) counted Int range `[from, ..., until - 1]`.
+    ListRange,
+    /// Allocates a single-flight `Lazy r e a` cell from a delayed task.
+    LazyMake,
+    /// Forces a `Lazy r e a` cell once, caching Ok/Err and dropping the task on completion.
+    LazyForce,
+    /// Registers a LIFO `Eff r none Unit` finalizer on the current owner.
+    ScopeAddFinalizer,
+    /// Registers a LIFO `Option RawCause -> Unit` finalizer on the current owner.
+    ScopeAddFinalizerExit,
+    /// Registers a LIFO `Exit e b -> Unit` close callback on the current owner.
+    ScopeAddClose,
+    /// Runs `(acquire, release)` under the current owner, registering LIFO release.
+    AcquireRelease,
+    /// Runs `(acquire, use, release)` guaranteeing release runs even on failure/defect.
+    Bracket,
+    /// Runs a task uninterruptibly (masks interruption around acquisition/registration).
+    Uninterruptible,
+    /// Row primitives for `Record.fl`.
+    RecordGet,
+    RecordExtend,
+    RecordRemove,
+    RecordProject,
+    RecordMergeDisjoint,
+    RecordLabels,
+    /// Wraps a list/slice as a replayable `Seq`.
+    SeqOfList,
+    /// Drains a `Seq` or list into an owned `$list`.
+    SeqToList,
+    /// `Exit` observers used by `Scope.defer` / `Resource.make` / `Resource.own`.
+    ExitIsSuccess,
+    ExitIsFailure,
+    ExitHasInterrupts,
 }
 
 /// The host primitives of `Host.live` besides `PrintLine`.
@@ -337,122 +423,7 @@ pub enum HostPrimitive {
     ProcessSpawn,
 }
 
-impl Intrinsic {
-    pub fn arity(self) -> usize {
-        match self {
-            Self::MatchFail => 0,
-            Self::PrintLine
-            | Self::Show
-            | Self::RefMake
-            | Self::RefGet
-            | Self::ScopeRun
-            | Self::ScopeCurrent
-            | Self::ArenaMake
-            | Self::ArenaGet
-            | Self::FromResult
-            | Self::Raise
-            | Self::PrimitiveHash
-            | Self::StringLength
-            | Self::NumberToFloat
-            | Self::ArrayToList
-            | Self::ToBigInt
-            | Self::Host(_) => 1,
-            Self::RefSet
-            | Self::RefModify
-            | Self::RefSame
-            | Self::ArenaAlloc
-            | Self::Try
-            | Self::LayerSucceed
-            | Self::LayerRun
-            | Self::LayerMerge
-            | Self::StringStartsWith
-            | Self::StringIncludes
-            | Self::PrimitiveCompare
-            | Self::IntUnsafeDiv
-            | Self::IntUnsafeRem
-            | Self::FloatMin
-            | Self::FloatMax => 2,
-        }
-    }
-}
-
-impl Operation {
-    pub fn consumed(&self) -> Vec<Local> {
-        match self {
-            Self::Literal(_)
-            | Self::ReadOwnerEvidence
-            | Self::Project { .. }
-            | Self::Field { .. }
-            | Self::Method { .. }
-            | Self::Structure { .. }
-            | Self::Match { .. }
-            | Self::Global(_)
-            | Self::ServiceTag(_) => Vec::new(),
-            Self::RecoveryResult { selected } => selected.iter().copied().collect(),
-            Self::Construct { fields, .. } => fields.clone(),
-            Self::ConstructWithDicts { fields, dicts, .. } => {
-                fields.iter().chain(dicts).copied().collect()
-            }
-            Self::Record { fields } => fields.iter().map(|(_, local)| *local).collect(),
-            Self::Dictionary { entries } => {
-                entries.iter().map(|(_, entry)| entry.local()).collect()
-            }
-            Self::Update { object, fields } => iter::once(*object)
-                .chain(fields.iter().map(|(_, local)| *local))
-                .collect(),
-            Self::Closure { captures, .. } | Self::Task { captures, .. } => captures.clone(),
-            Self::Call { args, .. } | Self::Intrinsic { args, .. } => args.clone(),
-            Self::Handle {
-                body,
-                effects,
-                ret,
-                errors,
-            } => iter::once(*body)
-                .chain(
-                    effects
-                        .iter()
-                        .flat_map(|effect| effect.operations.iter().map(|op| op.function)),
-                )
-                .chain(*ret)
-                .chain(*errors)
-                .collect(),
-            Self::Perform { dicts, args, .. } => dicts.iter().chain(args).copied().collect(),
-            Self::Within { owner, args, .. } | Self::WithOwnerEvidence { owner, args, .. } => {
-                let mut operands = vec![*owner];
-                operands.extend(args);
-                operands
-            }
-            Self::Apply { function, argument } => vec![*function, *argument],
-            Self::Binary { left, right, .. } => vec![*left, *right],
-            Self::Not(value) | Self::Neg { value, .. } | Self::Await(value) => vec![*value],
-            Self::ReuseWithDicts {
-                object,
-                fields,
-                dicts,
-                ..
-            } => iter::once(*object)
-                .chain(fields.iter().copied())
-                .chain(dicts.iter().copied())
-                .collect(),
-            Self::Reuse { object, fields, .. } => {
-                let mut operands = vec![*object];
-                operands.extend(fields);
-                operands
-            }
-        }
-    }
-
-    pub fn borrowed(&self) -> Option<Local> {
-        match self {
-            Self::Project { object, .. }
-            | Self::Field { object, .. }
-            | Self::Structure { object, .. }
-            | Self::Match { object, .. } => Some(*object),
-            Self::Method { dictionary, .. } => Some(*dictionary),
-            _ => None,
-        }
-    }
-}
+include!("memory/operations.rs");
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Exit {

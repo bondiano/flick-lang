@@ -34,7 +34,11 @@ impl Lower<'_> {
         let value = match &item.kind {
             ItemKind::Value { dicts, body, .. } => {
                 if dicts.is_empty() {
-                    self.expr(body, &Env::new(), &mut block)?
+                    if loops::contains_direct_unwrap(body) {
+                        self.function_boundary(body, &Env::new(), &mut block, item.span)?
+                    } else {
+                        self.expr(body, &Env::new(), &mut block)?
+                    }
                 } else {
                     let body = Expr::new(
                         ExprKind::Abstract(dicts.clone(), Box::new(body.clone())),
@@ -47,8 +51,59 @@ impl Lower<'_> {
             ItemKind::Instance { info, methods } => {
                 self.instance(info, methods, &[], &mut block, item.span)?
             }
-            ItemKind::Destructure { .. } => {
-                return Err(unsupported("top-level destructuring", item.span));
+            ItemKind::Destructure { pattern, body } => {
+                let bindings = memory::pattern_bindings(pattern).map_err(|error| {
+                    LowerError::Pattern {
+                        error,
+                        span: item.span,
+                    }
+                })?;
+                let field = bindings
+                    .iter()
+                    .position(|bound| bound == &name.name)
+                    .ok_or_else(|| LowerError::UnknownGlobal {
+                        name: name.clone(),
+                        span: Some(item.span),
+                    })?;
+                let shared = Name::new(
+                    &name.module,
+                    &format!(
+                        "$destructure:{}:{}:{}",
+                        item.span.file.index(), item.span.start, item.span.end
+                    ),
+                );
+                if !self.initializers.contains_key(&shared) {
+                    let shared_code = self.reserve(item.span)?;
+                    self.initializers.insert(shared.clone(), shared_code);
+                    self.program.globals.push(Global {
+                        name: shared.clone(),
+                        initializer: shared_code,
+                    });
+                    let mut shared_block = Code::new(vec![]);
+                    let evaluated = self.expr(body, &Env::new(), &mut shared_block)?;
+                    let mut env = Env::new();
+                    self.pattern(pattern, evaluated, &mut env, &mut shared_block, item.span)?;
+                    let fields = bindings
+                        .iter()
+                        .map(|bound| lookup(&env, bound, item.span))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    let packed = shared_block.emit(
+                        Operation::Construct {
+                            tag: "$tuple".into(),
+                            fields,
+                        },
+                        item.span,
+                    )?;
+                    self.finish(shared_code, &shared_block.finish(packed))?;
+                }
+                let tuple = block.emit(Operation::Global(shared), item.span)?;
+                block.emit(
+                    Operation::Project {
+                        object: tuple,
+                        field,
+                    },
+                    item.span,
+                )?
             }
             ItemKind::Constructor(_) | ItemKind::Service { .. } => {
                 unreachable!("only value definitions are indexed")

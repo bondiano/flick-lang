@@ -43,8 +43,12 @@ impl Machine<'_, '_> {
     }
 
     fn intrinsic(&mut self, kind: Intrinsic, binding: Local) -> Result<(), Error> {
+        if self.control_intrinsic(kind, binding)? {
+            return Ok(());
+        }
         match kind {
             Intrinsic::ArrayToList
+            | Intrinsic::ListRange
             | Intrinsic::PrimitiveCompare
             | Intrinsic::PrimitiveHash
             | Intrinsic::IntUnsafeDiv
@@ -53,7 +57,16 @@ impl Machine<'_, '_> {
             | Intrinsic::ToBigInt
             | Intrinsic::FloatMin
             | Intrinsic::FloatMax
-            | Intrinsic::StringLength => self.metered_primitive(kind, binding)?,
+            | Intrinsic::StringLength
+            | Intrinsic::RecordGet
+            | Intrinsic::RecordExtend
+            | Intrinsic::RecordRemove
+            | Intrinsic::RecordProject
+            | Intrinsic::RecordMergeDisjoint
+            | Intrinsic::RecordLabels
+            | Intrinsic::ExitIsSuccess
+            | Intrinsic::ExitIsFailure
+            | Intrinsic::ExitHasInterrupts => self.metered_primitive(kind, binding)?,
             Intrinsic::StringStartsWith | Intrinsic::StringIncludes => {
                 let value = primitives::string_predicate(
                     self.heap,
@@ -69,8 +82,8 @@ impl Machine<'_, '_> {
             Intrinsic::Try => {
                 self.pending_handler = self.scratch.pop();
                 self.scratch.push(Value::Unit);
-                // Keep handler rooted until apply has successfully installed the frame.
-                self.apply(Destination::Bind(binding))?;
+                // Keep handler rooted until apply has successfully installed a fresh frame.
+                self.apply_fresh(Destination::Bind(binding))?;
                 self.frames.last_mut().expect("try body frame").destination = Destination::Catch {
                     handler: self.pending_handler.take().expect("staged handler"),
                     binding,
@@ -84,6 +97,32 @@ impl Machine<'_, '_> {
             | Intrinsic::ArenaMake
             | Intrinsic::ArenaAlloc
             | Intrinsic::ArenaGet => self.scoped_intrinsic(kind, binding)?,
+            Intrinsic::RefMake
+            | Intrinsic::RefGet
+            | Intrinsic::RefSet
+            | Intrinsic::RefSame
+            | Intrinsic::RefModify => self.ref_intrinsic(kind, binding)?,
+            Intrinsic::PrintLine | Intrinsic::Show | Intrinsic::Host(_) => {
+                let value =
+                    primitives::intrinsic(self.heap, kind, &self.scratch[0], &mut self.stdout)?;
+                self.primitive_result(binding, value)?;
+            }
+            Intrinsic::LazyMake
+            | Intrinsic::LazyForce
+            | Intrinsic::ScopeAddFinalizer
+            | Intrinsic::ScopeAddFinalizerExit
+            | Intrinsic::ScopeAddClose
+            | Intrinsic::AcquireRelease
+            | Intrinsic::Bracket
+            | Intrinsic::Uninterruptible
+            | Intrinsic::SeqOfList
+            | Intrinsic::SeqToList => unreachable!("control intrinsics dispatched above"),
+        }
+        Ok(())
+    }
+
+    fn ref_intrinsic(&mut self, kind: Intrinsic, binding: Local) -> Result<(), Error> {
+        match kind {
             Intrinsic::RefMake => {
                 let contents = self.scratch.pop().expect("cell initial contents");
                 let root = self.heap.allocate(Data::Cell {
@@ -132,11 +171,7 @@ impl Machine<'_, '_> {
                 self.primitive_result(binding, Value::Bool(same))?;
             }
             Intrinsic::RefModify => self.modify(binding)?,
-            Intrinsic::PrintLine | Intrinsic::Show | Intrinsic::Host(_) => {
-                let value =
-                    primitives::intrinsic(self.heap, kind, &self.scratch[0], &mut self.stdout)?;
-                self.primitive_result(binding, value)?;
-            }
+            _ => unreachable!("non-ref intrinsic"),
         }
         Ok(())
     }

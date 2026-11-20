@@ -83,6 +83,8 @@ pub enum DefectCode {
     BigIntUndefined,
     ArenaOwnerClosed,
     ArenaClosed,
+    ResumeTwice,
+    LazyCycle,
 }
 
 /// Structured immutable metadata; each thrown instance gets a fresh heap identity.
@@ -113,7 +115,9 @@ impl DefectSpec {
             DefectCode::NoMatch
             | DefectCode::MissingHandler { .. }
             | DefectCode::ArenaOwnerClosed
-            | DefectCode::ArenaClosed => DefectClass::Error,
+            | DefectCode::ArenaClosed
+            | DefectCode::ResumeTwice
+            | DefectCode::LazyCycle => DefectClass::Error,
             DefectCode::IntDivisionByZero { .. }
             | DefectCode::BigIntNegativeExponent
             | DefectCode::BigIntNonIntegralNumber => DefectClass::RangeError,
@@ -138,6 +142,8 @@ impl DefectSpec {
             DefectCode::BigIntUndefined => Error::BigIntUndefined,
             DefectCode::ArenaOwnerClosed => Error::ClosedOwner,
             DefectCode::ArenaClosed => Error::ClosedArena,
+            DefectCode::ResumeTwice => Error::ResumeTwice,
+            DefectCode::LazyCycle => Error::LazyCycle,
         }
     }
 }
@@ -158,6 +164,8 @@ impl StepFailure {
             Error::BigIntNonIntegralNumber => DefectCode::BigIntNonIntegralNumber,
             Error::BigIntInvalidString => DefectCode::BigIntInvalidString,
             Error::BigIntUndefined => DefectCode::BigIntUndefined,
+            Error::ResumeTwice => DefectCode::ResumeTwice,
+            Error::LazyCycle => DefectCode::LazyCycle,
             evaluator @ (Error::InvalidFunction(_)
             | Error::InvalidProgram(_)
             | Error::NeedsProgram
@@ -184,6 +192,25 @@ impl StepFailure {
             | Error::ExpectedCell
             | Error::ForeignCell
             | Error::ClosedCell
+            | Error::ExpectedVar
+            | Error::ForeignVar
+            | Error::ClosedVar
+            | Error::ExpectedLazy
+            | Error::ForeignLazy
+            | Error::ClosedLazy
+            | Error::ForeignContinuation
+            | Error::MissingLoopTarget(_)
+            | Error::MissingFunctionBoundary
+            | Error::MissingGeneratorBoundary
+            | Error::ExpectedSeq
+            | Error::ForeignSeq
+            | Error::ExpectedIterator
+            | Error::ForeignIterator
+            | Error::ClosedIterator
+            | Error::ExpectedLabel
+            | Error::ExpectedExit
+            | Error::ExpectedOption
+            | Error::ExpectedInt
             | Error::ExpectedModifyPair
             | Error::ExpectedOwner
             | Error::ForeignOwner

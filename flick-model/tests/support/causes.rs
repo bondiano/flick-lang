@@ -39,6 +39,8 @@ fn inspect_defect(heap: &Heap, cause: &CauseToken) -> Result<Error, String> {
         DefectCode::BigIntUndefined => (Error::BigIntUndefined, DefectClass::TypeError),
         DefectCode::ArenaOwnerClosed => (Error::ClosedOwner, DefectClass::Error),
         DefectCode::ArenaClosed => (Error::ClosedArena, DefectClass::Error),
+        DefectCode::ResumeTwice => (Error::ResumeTwice, DefectClass::Error),
+        DefectCode::LazyCycle => (Error::LazyCycle, DefectClass::Error),
     };
     if defect.class() != class {
         return Err("wrong structured defect class".into());
