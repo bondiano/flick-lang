@@ -19,11 +19,16 @@ impl Checker<'_> {
         parametric: bool,
     ) -> Type {
         let result = self.value_bound(result);
-        // under `live.rs` a function or a task holds nothing it needs live
-        let used =
-            self.eff_parts(&result).is_some() || matches!(self.whnf(&result), Type::Fun { .. });
-        if used
-            || !self.refinable_result(&result)
+        // under `live.rs` a function, task or lazy holds nothing it needs live;
+        // a value-bounded (`Type::Bounded`) curried function carries its bound
+        // across pure stages onto its callable result
+        if self.is_callable(&result) {
+            if matches!(self.whnf(function), Type::Fun { effects: None, .. }) {
+                return self.carry_bound(function, result);
+            }
+            return result;
+        }
+        if !self.refinable_result(&result)
             || matches!(
                 self.whnf(function),
                 Type::Fun {

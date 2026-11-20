@@ -28,6 +28,7 @@ mod row_facts;
 mod row_instances;
 mod rows;
 mod runtime;
+mod subtyping;
 pub mod trace;
 mod unify;
 mod widen;

@@ -165,7 +165,11 @@ impl Checker<'_> {
 
     /// (Await): `φ ⊔ R⟨r; ε⟩`, one layer of `Eff` off.
     pub(super) fn await_(&mut self, e: &Term) -> Check<Type> {
-        let t = self.infer(e)?;
+        let mut t = self.infer(e)?;
+        while let Type::Forall(s) = self.resolve(&t) {
+            let inst = self.instantiate(&s);
+            t = self.rewrap_qualifiers(&t, inst);
+        }
         let held = self.qualifier(&t);
         let (r, x, a) = match self.resolve(&t) {
             Type::Eff(r, x, a) => (r, x, (*a).clone()),

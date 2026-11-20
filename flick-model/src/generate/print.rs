@@ -292,7 +292,8 @@ fn list(items: impl Iterator<Item = String>, sep: &str) -> String {
 fn function(t: &Type) -> bool {
     match t {
         Type::Fun(..) => true,
-        Type::Captured(t, _) => function(t),
+        Type::Captured(t, _) | Type::Bounded(t, _) => function(t),
+        Type::Forall(s) => function(&s.body),
         _ => false,
     }
 }
@@ -362,6 +363,7 @@ fn caps(c: &Caps) -> String {
 fn ty(t: &Type) -> String {
     match t {
         Type::Captured(x, c) | Type::Bounded(x, c) => format!("{}^{}", ty_atom(x), caps(c)),
+        Type::Forall(s) => scheme(s),
         Type::Fun(p, s, r) => format!("{} {} {}", ty_atom(p), stage(s), ty(r)),
         Type::Eff(r, e, a) => format!("Eff {} {} {}", row_arg(r), row_arg(e), ty_atom(a)),
         Type::Errors(r) => format!("Errors {}", row_arg(r)),

@@ -524,10 +524,10 @@ theorem Seq.each_effect :
       (.arrow (.arrow (.tvar 0) (.rt (.tvar 1) (.tvar 2)) (.base .unit) (fun x => x = .v 3)) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 4))) (.tvar 0)) (.rt (.run (.tvar 1) (.caps (fun x => x = .v 3 ∨ x = .v 4))) (.tvar 2)) (.base .unit) Caps.none) Caps.none) := by
   elide_eq
 
-/-- `Seq.fold_effect : forall b a r e c d. (b -> a ->{r; e} b)^c -> b -> ((Seq a)^d ->{r; e} b)^c` -/
+/-- `Seq.fold_effect : forall b a r e c d. (b -> (a ->{r; e} b)^c)^c -> b -> ((Seq a)^d ->{r; e} b)^c` -/
 theorem Seq.fold_effect :
-    Ty.Reads (Ty.elide (fun x => x = .v 4 ∨ x = .v 5) (.arrow (.arrow (.tvar 0) .pure (.arrow (.tvar 1) (.rt (.tvar 2) (.tvar 3)) (.tvar 0) Caps.none) (fun x => x = .v 4)) .pure (.arrow (.tvar 0) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 5))) (.tvar 1)) (.rt (.tvar 2) (.tvar 3)) (.tvar 0) (fun x => x = .v 4)) Caps.none) Caps.none) Caps.none)
-      (.arrow (.arrow (.tvar 0) .pure (.arrow (.tvar 1) (.rt (.tvar 2) (.tvar 3)) (.tvar 0) Caps.none) (fun x => x = .v 4)) .pure (.arrow (.tvar 0) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 5))) (.tvar 1)) (.rt (.run (.tvar 2) (.caps (fun x => x = .v 4 ∨ x = .v 5))) (.tvar 3)) (.tvar 0) (fun x => x = .v 4)) Caps.none) Caps.none) := by
+    Ty.Reads (Ty.elide (fun x => x = .v 4 ∨ x = .v 5) (.arrow (.arrow (.tvar 0) .pure (.arrow (.tvar 1) (.rt (.tvar 2) (.tvar 3)) (.tvar 0) (fun x => x = .v 4)) (fun x => x = .v 4)) .pure (.arrow (.tvar 0) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 5))) (.tvar 1)) (.rt (.tvar 2) (.tvar 3)) (.tvar 0) (fun x => x = .v 4)) Caps.none) Caps.none) Caps.none)
+      (.arrow (.arrow (.tvar 0) .pure (.arrow (.tvar 1) (.rt (.tvar 2) (.tvar 3)) (.tvar 0) (fun x => x = .v 4)) (fun x => x = .v 4)) .pure (.arrow (.tvar 0) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 5))) (.tvar 1)) (.rt (.run (.tvar 2) (.caps (fun x => x = .v 4 ∨ x = .v 5))) (.tvar 3)) (.tvar 0) (fun x => x = .v 4)) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Seq.empty : forall a. Seq a` -/
@@ -914,10 +914,10 @@ theorem List.fold_right :
       (.arrow (.arrow (.tvar 0) .pure (.arrow (.tvar 1) .pure (.tvar 1) Caps.none) (fun x => x = .v 2)) .pure (.arrow (.tvar 1) .pure (.arrow (.tapp (.adt "Prelude.List") (.tvar 0)) .pure (.tvar 1) (fun x => x = .v 2)) Caps.none) Caps.none) := by
   elide_eq
 
-/-- `List.fold_effect : forall b a r e c. (b -> a ->{r; e} b)^c -> b -> (List a ->{r; e} b)^c` -/
+/-- `List.fold_effect : forall b a r e c. (b -> (a ->{r; e} b)^c)^c -> b -> (List a ->{r; e} b)^c` -/
 theorem List.fold_effect :
-    Ty.Reads (Ty.elide (fun x => x = .v 4) (.arrow (.arrow (.tvar 0) .pure (.arrow (.tvar 1) (.rt (.tvar 2) (.tvar 3)) (.tvar 0) Caps.none) (fun x => x = .v 4)) .pure (.arrow (.tvar 0) .pure (.arrow (.tapp (.adt "Prelude.List") (.tvar 1)) (.rt (.tvar 2) (.tvar 3)) (.tvar 0) (fun x => x = .v 4)) Caps.none) Caps.none) Caps.none)
-      (.arrow (.arrow (.tvar 0) .pure (.arrow (.tvar 1) (.rt (.tvar 2) (.tvar 3)) (.tvar 0) Caps.none) (fun x => x = .v 4)) .pure (.arrow (.tvar 0) .pure (.arrow (.tapp (.adt "Prelude.List") (.tvar 1)) (.rt (.run (.tvar 2) (.caps (fun x => x = .v 4))) (.tvar 3)) (.tvar 0) (fun x => x = .v 4)) Caps.none) Caps.none) := by
+    Ty.Reads (Ty.elide (fun x => x = .v 4) (.arrow (.arrow (.tvar 0) .pure (.arrow (.tvar 1) (.rt (.tvar 2) (.tvar 3)) (.tvar 0) (fun x => x = .v 4)) (fun x => x = .v 4)) .pure (.arrow (.tvar 0) .pure (.arrow (.tapp (.adt "Prelude.List") (.tvar 1)) (.rt (.tvar 2) (.tvar 3)) (.tvar 0) (fun x => x = .v 4)) Caps.none) Caps.none) Caps.none)
+      (.arrow (.arrow (.tvar 0) .pure (.arrow (.tvar 1) (.rt (.tvar 2) (.tvar 3)) (.tvar 0) (fun x => x = .v 4)) (fun x => x = .v 4)) .pure (.arrow (.tvar 0) .pure (.arrow (.tapp (.adt "Prelude.List") (.tvar 1)) (.rt (.run (.tvar 2) (.caps (fun x => x = .v 4))) (.tvar 3)) (.tvar 0) (fun x => x = .v 4)) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `List.filter : forall a c. (a -> Bool)^c -> List a -> List a` -/

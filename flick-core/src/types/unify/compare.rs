@@ -387,21 +387,41 @@ impl Checker<'_> {
             }
             (
                 Type::Forall {
-                    vars: v1, body: b1, ..
+                    vars: v1,
+                    constraints: c1,
+                    body: b1,
                 },
                 Type::Forall {
-                    vars: v2, body: b2, ..
+                    vars: v2,
+                    constraints: c2,
+                    body: b2,
                 },
-            ) if v1.len() == v2.len() && v1.iter().zip(v2).all(|(x, y)| x.kind == y.kind) => {
+            ) if v1.len() == v2.len()
+                && v1.iter().zip(v2).all(|(x, y)| x.kind == y.kind)
+                && c1.len() == c2.len() =>
+            {
                 self.store.level += 1;
-                let skolems: Vec<Type> = v1.iter().map(|v| self.store.skolem(&v.name)).collect();
+                let skolems: Vec<Type> = v1
+                    .iter()
+                    .map(|v| {
+                        let skolem = self.store.skolem(&v.name);
+                        if let Type::Skolem(s) = &skolem {
+                            self.cx.regions.rigid_kinds.push((*s, v.kind.clone()));
+                        }
+                        skolem
+                    })
+                    .collect();
                 let s1: Vec<_> = v1
                     .iter()
                     .map(|v| v.name.clone())
                     .zip(skolems.clone())
                     .collect();
                 let s2: Vec<_> = v2.iter().map(|v| v.name.clone()).zip(skolems).collect();
-                let result = self.unify(&b1.substitute(&s1), &b2.substitute(&s2));
+                let result = c1
+                    .iter()
+                    .zip(c2)
+                    .try_for_each(|(x, y)| self.unify(&x.substitute(&s1), &y.substitute(&s2)))
+                    .and_then(|()| self.unify(&b1.substitute(&s1), &b2.substitute(&s2)));
                 self.store.level -= 1;
                 result
             }

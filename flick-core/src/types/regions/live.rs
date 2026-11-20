@@ -210,17 +210,14 @@ impl Checker<'_> {
         }
     }
 
-    /// A signature as its body and its uses see it: each runtime arrow needs
-    /// live what the parameters before it reach. An interface leaves `Live`
-    /// out, which elision gives again; a type elided already is elided anew,
-    /// not twice.
+    /// A signature as its body and its uses see it: outer qualifiers on
+    /// syntactically curried runtime callables are placed onto their inner
+    /// callable stage, and each runtime arrow needs live what the parameters
+    /// before it reach. An interface leaves `Live` out, which elision gives
+    /// again; a type elided already is elided anew, not twice.
     pub(in crate::types) fn live_scheme(&self, t: &Type) -> Type {
-        self.elide(
-            &strip_live(t),
-            &Norm::default(),
-            &mut Vec::new(),
-            &mut Vec::new(),
-        )
+        let placed = self.place_qualifiers(&strip_live(t));
+        self.elide(&placed, &Norm::default(), &mut Vec::new(), &mut Vec::new())
     }
 
     /// `t` with `Live` of `held` and of what the parameters of each stage
@@ -347,11 +344,7 @@ impl Checker<'_> {
         if matches!(base, Type::Meta(_)) {
             return self.bind_subsumed_meta(identity, base, true);
         }
-        let callable = |t: &Type| {
-            let t = self.whnf(t);
-            matches!(t, Type::Fun { .. }) || self.eff_parts(&t).is_some()
-        };
-        if callable(identity) && callable(base) {
+        if self.is_callable(identity) && self.is_callable(base) {
             return Some(self.subsume(identity, base, span));
         }
         if self.projected_alias_type(identity).is_some()
@@ -385,53 +378,6 @@ impl Checker<'_> {
                 )
             }
             _ => false,
-        }
-    }
-
-    /// The types of a subsumption with a qualifier: using either side needs
-    /// its qualifier live, so a qualifier does not hide `Live`.
-    pub(in crate::types) fn live_sides(
-        &self,
-        (a, ca): (Type, Option<&Type>),
-        (e, ce): (Type, Option<&Type>),
-    ) -> (Type, Type) {
-        (self.with_live(a, ca), self.with_live(e, ce))
-    }
-
-    /// `t`, a function or a task, whose row also needs live what `captures`
-    /// holds; under a qualifier, its arrow's row. Any other type as it is.
-    pub(in crate::types) fn with_live(&self, t: Type, captures: Option<&Type>) -> Type {
-        let Some(atoms) = captures.map(|c| self.live_atoms(c, &[])) else {
-            return t;
-        };
-        match t {
-            Type::Fun {
-                param,
-                effects: Some(effects),
-                result,
-            } => Type::Fun {
-                param,
-                effects: Some(Box::new(Effects {
-                    services: add_live(&effects.services, atoms),
-                    ..*effects
-                })),
-                result,
-            },
-            Type::Captured {
-                ty,
-                captures: qualifier,
-                value,
-                elided,
-            } => Type::Captured {
-                ty: Box::new(self.with_live(*ty, captures)),
-                captures: qualifier,
-                value,
-                elided,
-            },
-            other => match self.eff_parts(&other) {
-                Some((s, e, r)) => super::super::infer::eff(add_live(&s, atoms), e, r),
-                None => other,
-            },
         }
     }
 
