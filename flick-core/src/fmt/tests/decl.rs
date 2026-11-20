@@ -383,3 +383,21 @@ fn breaks_a_law_before_its_goal() {
       where equal (map (fun x -> g (h x)) v) (map g (map h v))
     ");
 }
+
+/// A contract of one entry stays on the `let`'s line when it fits; several
+/// entries take a line each under `where`, and the body a line under `=`.
+#[test]
+fn lays_out_a_contract_under_where() {
+    let src = "inc : Int -> Int\nlet inc x where require (x < 10) = x + 1\ndec : Int -> Int\nlet dec x\nwhere\n    require (x > 0)\n    ensure (fun y -> y < x)\n= x - 1\n";
+    insta::assert_snapshot!(fmt(src), @r"
+    inc : Int -> Int
+    let inc x where require (x < 10) = x + 1
+    dec : Int -> Int
+    let dec x
+    where
+      require (x > 0)
+      ensure (fun y -> y < x)
+    =
+      x - 1
+    ");
+}

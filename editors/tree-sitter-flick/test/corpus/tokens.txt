@@ -234,6 +234,35 @@ let after_all = timeout 5 before_each
   (identifier))
 
 ==================
+Test rows
+==================
+
+test.each [(1, 2)] "adds {0}" (a, b) {}
+let each = Test.each
+
+---
+
+(source_file
+  (keyword)
+  (keyword)
+  (brackets
+    (parens
+      (number)
+      (operator)
+      (number)))
+  (string)
+  (parens
+    (identifier)
+    (operator)
+    (identifier))
+  (braces)
+  (keyword)
+  (identifier)
+  (operator)
+  (constructor)
+  (member))
+
+==================
 Test fixtures
 ==================
 
@@ -499,3 +528,49 @@ let law = 1
   (identifier)
   (operator)
   (number))
+
+==================
+Contracts
+==================
+
+let dec x
+where
+  require (x > 0)
+  ensure (fun y -> y < x)
+=
+  x - 1
+let require = 1
+let r = r"raw"
+
+---
+
+(source_file
+  (keyword)
+  (identifier)
+  (identifier)
+  (keyword)
+  (keyword)
+  (parens
+    (identifier)
+    (operator)
+    (number))
+  (keyword)
+  (parens
+    (keyword)
+    (identifier)
+    (operator)
+    (identifier)
+    (operator)
+    (identifier))
+  (operator)
+  (identifier)
+  (operator)
+  (number)
+  (keyword)
+  (identifier)
+  (operator)
+  (number)
+  (keyword)
+  (identifier)
+  (operator)
+  (raw_string))

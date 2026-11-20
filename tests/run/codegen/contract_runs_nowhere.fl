@@ -1,0 +1,15 @@
+// A contract runs nowhere: a call that breaks its precondition runs as the
+// body says, and returns the result the postcondition denies. Only
+// `flick prove` reads a contract.
+module App.Main exposing (main)
+
+inc : Int -> Int
+let inc x
+where
+  require (x > 100)
+  ensure (fun y -> y < 0)
+=
+  x + 1
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () = Platform.stdout_line (show (inc 1))

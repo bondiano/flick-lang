@@ -76,6 +76,7 @@ use crate::syntax::{parse, parse_with_heads};
 mod block;
 mod comments;
 mod conditional;
+mod contract;
 mod decl;
 mod expr;
 pub(crate) mod foralls;

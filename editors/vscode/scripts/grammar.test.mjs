@@ -190,6 +190,8 @@ test("contextual effect, sql, and control keywords receive expected TextMate sco
   assert.ok(scopesFor("proof same where same_type a a = refl", "proof").includes("keyword.other.flick"));
   assert.ok(scopesFor("proof same where same_type a a = refl", "same").includes("entity.name.function.flick"));
   assert.ok(scopesFor("  law kept (v : f a) where equal v v", "law").includes("keyword.other.flick"));
+  assert.ok(scopesFor("  require (x > 0)", "require").includes("keyword.other.flick"));
+  assert.ok(scopesFor("let inc x where ensure (fun y -> y > x) = x + 1", "ensure").includes("keyword.other.flick"));
   assert.ok(scopesFor('  test.skip "trims" {', "test").includes("keyword.other.flick"));
   assert.ok(scopesFor('  test.skip "trims" {', "skip").includes("keyword.other.flick"));
   assert.ok(scopesFor('test.only "alone" {}', "only").includes("keyword.other.flick"));
@@ -200,6 +202,8 @@ test("contextual effect, sql, and control keywords receive expected TextMate sco
   assert.ok(scopesFor('suite parallel "pool" {', "parallel").includes("keyword.other.flick"));
   assert.ok(scopesFor('suite.skip parallel "pool" timeout 50 {', "timeout").includes("keyword.other.flick"));
   assert.ok(scopesFor("  fixture conn = connect ()", "fixture").includes("keyword.other.flick"));
+  assert.ok(scopesFor('  test.each [(1, 2)] "adds {0}" (a, b) {', "each").includes("keyword.other.flick"));
+  assert.ok(scopesFor("test.each rows \"is {0}\" (n) {}", "test").includes("keyword.other.flick"));
   assert.ok(scopesFor("  fixture shared concurrent pool = make 4", "shared").includes("keyword.other.flick"));
   assert.ok(scopesFor("  fixture shared concurrent pool = make 4", "concurrent").includes("keyword.other.flick"));
   assert.ok(scopesFor("for x <- xs do { break }", "for").includes("keyword.control.flick"));
@@ -222,6 +226,7 @@ test("word boundaries prevent spurious keyword matches on partial identifiers an
     ["let x = timeout 500 task", "timeout"],
     ["let before_each = 1", "before_each"],
     ["  fixture shared = 1", "shared"],
+    ["let x = rows.each", "each"],
     ["let fixture = shared parallel", "fixture"],
     ["let x = parallel concurrent", "concurrent"],
     ["let x = Test.test \"a\" check", "test"],
@@ -250,6 +255,8 @@ test("word boundaries prevent spurious keyword matches on partial identifiers an
     ["let proof = 1", "proof"],
     ["let p = trans proof h", "proof"],
     ["let law = 1", "law"],
+    ["let require = 1", "require"],
+    ["let x = ensure y", "ensure"],
   ];
 
   for (const [line, word] of nonKeywordCases) {

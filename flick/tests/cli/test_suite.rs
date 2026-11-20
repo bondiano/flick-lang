@@ -26,7 +26,7 @@ let box =
 tests : List Test.Test
 let tests = [
   Test.suite "boxed" box [
-    Test.it "reads" (task { Test.expect (Test.equal "shared" (Box.value ())) }),
+    Test.it "reads" (task { Test.check (Test.equal "shared" (Box.value ())) }),
     Test.it "prints" (task { Platform.stdout_line ("printed " ++ Box.value ()) }),
   ],
   Test.test "outside" (fun () -> Test.equal 1 1),

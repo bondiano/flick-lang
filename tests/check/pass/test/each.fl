@@ -1,0 +1,21 @@
+// `test.each`: a case for each row, its parts matched by the pattern and
+// shown in the name; the rows a list, a name or an expression in
+// parentheses, and the cases beside the others of their suite.
+module App.EachTest
+
+rows : List (Int, Int)
+let rows = [(1, 2), (2, 3)]
+
+suite "math" {
+  fixture base = 1
+
+  test "first" {}
+
+  test.each [(1, 2), (2, 3)] "adds {0} to get {1}" (a, b) {
+    Test.check (Test.equal b (a + await base))
+  }
+
+  test.each rows "named" ((a, _)) timeout 50 { Test.check (Test.is_true "positive" (a > 0)) }
+}
+
+test.each (List.range 1 3) "counts {0}" (n) { Test.check (Test.is_true "small" (n < 10)) }

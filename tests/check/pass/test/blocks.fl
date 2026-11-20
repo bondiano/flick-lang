@@ -9,7 +9,7 @@ let check name = Test.test name (fun () -> Test.Pass)
 suite "Strings" {
   test "trims" {
     let text = String.trim "  Ada  "
-    Test.expect (Test.equal "Ada" text)
+    Test.check (Test.equal "Ada" text)
   }
 
   suite.skip "later" {
@@ -17,7 +17,7 @@ suite "Strings" {
   }
 }
 
-test.only "alone" { Test.expect (Test.equal 2 (1 + 1)) }
+test.only "alone" { Test.check (Test.equal 2 (1 + 1)) }
 
 listed : List Test.Test
 let listed = tests ++ [check "by hand"]

@@ -38,6 +38,10 @@
           "name": "_fixture"
         },
         {
+          "type": "SYMBOL",
+          "name": "_each"
+        },
+        {
           "type": "ALIAS",
           "content": {
             "type": "SYMBOL",
@@ -390,6 +394,33 @@
           {
             "type": "SYMBOL",
             "name": "braces"
+          }
+        ]
+      }
+    },
+    "_each": {
+      "type": "PREC_DYNAMIC",
+      "value": 1,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "ALIAS",
+            "content": {
+              "type": "STRING",
+              "value": "test"
+            },
+            "named": true,
+            "value": "keyword"
+          },
+          {
+            "type": "ALIAS",
+            "content": {
+              "type": "STRING",
+              "value": ".each"
+            },
+            "named": true,
+            "value": "keyword"
           }
         ]
       }

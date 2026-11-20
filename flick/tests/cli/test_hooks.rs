@@ -42,7 +42,7 @@ suite "outer" {
 }
 
 suite "setup" {
-  before_all { Test.expect (Test.equal 1 2) }
+  before_all { Test.check (Test.equal 1 2) }
   after_all { Platform.stdout_line "after_all setup" }
   test "never runs" { Platform.stdout_line "never" }
 }

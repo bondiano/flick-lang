@@ -99,7 +99,7 @@ let accounts = [
       let login = { user = { email = Some ada.email; password = Some "ada-signup-password" } }
       let again = (send (at None () login) Api.Public.endpoints.login).user
       let current = (send (asking (Some again)) Api.Users.endpoints.current_user).user
-      Test.expect
+      Test.check
         (Test.all [
           Test.equal "ada-signup" ada.username,
           Test.is_true "a token" (ada.token != ""),
@@ -123,7 +123,7 @@ let accounts = [
           []
         with
         | Unprocessable problems -> List.map (fun (field, _) -> field) problems
-      Test.expect
+      Test.check
         (Test.all [
           Test.equal ["username", "email"] conflict,
           Test.equal ["username", "email", "password"] missing,
@@ -140,7 +140,7 @@ let accounts = [
       let anonymous =
         try (send (asking None) Api.Users.endpoints.current_user).user.username with
         | Unauthorized _ -> "unauthorized"
-      Test.expect (Test.all [Test.equal "unauthorized" wrong, Test.equal "unauthorized" anonymous])
+      Test.check (Test.all [Test.equal "unauthorized" wrong, Test.equal "unauthorized" anonymous])
     }),
   Test.it
     "following shows on the profile, and unfollowing takes it back"
@@ -156,7 +156,7 @@ let accounts = [
           (send (at None { username = username "nobody-here" } ()) Api.Users.endpoints.get_profile).profile.username
         with
         | NotFound _ -> "not found"
-      Test.expect
+      Test.check
         (Test.all [
           Test.is_true "following" (followed.following && seen.following),
           Test.is_true "not following" (not unfollowed.following),
@@ -189,7 +189,7 @@ let publishing = [
       let gone =
         try (send (at None path ()) Api.Articles.endpoints.get_article).article.title with
         | NotFound _ -> "gone"
-      Test.expect
+      Test.check
         (Test.all [
           Test.equal "Training dragons" found.title,
           Test.equal ["dragons", "training"] found.tagList,
@@ -209,7 +209,7 @@ let publishing = [
       let favored = (send (at (Some hal) path ()) Api.Articles.endpoints.favorite).article
       let again = (send (at (Some hal) path ()) Api.Articles.endpoints.favorite).article
       let back = (send (at (Some hal) path ()) Api.Articles.endpoints.unfavorite).article
-      Test.expect
+      Test.check
         (Test.all [
           Test.is_true "favorited" favored.favorited,
           Test.equal 1 again.favoritesCount,
@@ -238,7 +238,7 @@ let publishing = [
         | Forbidden _ -> "forbidden"
       send (at (Some jo) one ()) Api.Articles.endpoints.delete_comment
       let left = (send (at None path ()) Api.Articles.endpoints.list_comments).comments
-      Test.expect
+      Test.check
         (Test.all [
           Test.equal ["first!"] (List.map (fun c -> c.body) listed),
           Test.equal "jo-commenter" added.author.username,
@@ -271,7 +271,7 @@ let publishing = [
         send
           { path = (); query = by; headers = as_user None; payload = () }
           Api.Articles.endpoints.list_articles
-      Test.expect
+      Test.check
         (Test.all [
           Test.equal ["Followed news"] (List.map (fun a -> a.title) feed.articles),
           Test.equal 1 listed.articlesCount,

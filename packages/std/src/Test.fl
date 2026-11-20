@@ -5,6 +5,7 @@
 module Test exposing (..)
 
 import Duration
+import Exit
 import Fiber
 import Gen
 import Host
@@ -20,10 +21,41 @@ type error AssertionFailed = AssertionFailed String
 
 equal : (Eq a, Show a) => a -> a -> Assertion
 let equal expected actual =
-  if eq expected actual then
-    Pass
+  if eq expected actual then Pass else Failed (differ (show expected) (show actual))
+
+/// Why `expected` and `actual`, as `show` writes them, differ: `expected X,
+/// got Y` when both are short lines, otherwise a diff of their lines, where
+/// the lines both start and end with are as they are, and those between
+/// them are each of `expected` after `- ` and each of `actual` after `+ `.
+differ : String -> String -> String
+let differ expected actual =
+  let before = String.lines expected
+  let after = String.lines actual
+  if List.length before == 1
+    && List.length after == 1
+    && String.length expected + String.length actual <= 80 then
+    "expected " ++ expected ++ ", got " ++ actual
   else
-    Failed ("expected " ++ show expected ++ ", got " ++ show actual)
+    let start = alike before after
+    let rest_before = List.drop start before
+    let rest_after = List.drop start after
+    let last = alike (List.reverse rest_before) (List.reverse rest_after)
+    let kept = fun lines -> List.map (fun line -> "  " ++ line) lines
+    let changed = fun mark lines -> List.map (fun line -> mark ++ line) (List.drop_right last lines)
+    // shortcut: one changed hunk between the shared start and end, not a minimal diff; enough for values `show` writes
+    let lines =
+      kept (List.take start before)
+        ++ changed "- " rest_before
+        ++ changed "+ " rest_after
+        ++ kept (List.take_right last rest_before)
+    "expected (-) and got (+) differ:\n" ++ String.join "\n" lines
+
+/// How many lines `a` and `b` start with alike.
+alike : List String -> List String -> Int
+let rec alike a b =
+  match (a, b) with
+  | ([x, ...xs], [y, ...ys]) -> if x == y then 1 + alike xs ys else 0
+  | _ -> 0
 
 /// `Pass` when `condition` holds, otherwise `Failed message`.
 is_true : String -> Bool -> Assertion
@@ -41,12 +73,102 @@ let all assertions =
     Pass
     assertions
 
+/// The value a matcher of `to` checks: `expect actual |> to.equal
+/// expected`.
+type Subject a = Subject a
+
+/// `actual`, for a matcher of `to`.
+expect : a -> Subject a
+let expect actual = Subject actual
+
+/// What a matcher fails the effectful test with when its subject does not
+/// match: `message`.
+mismatch : String ->{; AssertionFailed} Unit
+let mismatch message = Fail.fail (AssertionFailed message)
+
+/// The matchers of a subject, each of which fails the test with
+/// `AssertionFailed` when the subject does not match.
+type alias Matchers = {
+  equal : forall a. (Eq a, Show a) => a -> Subject a ->{; AssertionFailed} Unit
+  be_true : Subject Bool ->{; AssertionFailed} Unit
+  be_greater_than : forall a. (Ord a, Show a) => a -> Subject a ->{; AssertionFailed} Unit
+  contain : forall a. (Eq a, Show a) => a -> Subject (List a) ->{; AssertionFailed} Unit
+  fail_with : forall r e a. (Eq (Errors e), Show (Errors e)) => Errors e ->
+    Subject (Eff r e a) ->{r; AssertionFailed}
+    Unit
+}
+
+/// The matchers: `to.equal expected`, `to.be_true`, `to.be_greater_than
+/// bound`, `to.contain item` of a list, and `to.fail_with error` of a task,
+/// which runs it and expects it to fail with `error`.
+to : Matchers
+let to = {
+  equal = to_equal
+  be_true = to_be_true
+  be_greater_than = to_be_greater_than
+  contain = to_contain
+  fail_with = to_fail_with
+}
+
+to_equal : (Eq a, Show a) => a -> Subject a ->{; AssertionFailed} Unit
+let to_equal expected (Subject actual) =
+  if eq expected actual then () else mismatch (differ (show expected) (show actual))
+
+to_be_true : Subject Bool ->{; AssertionFailed} Unit
+let to_be_true (Subject actual) = if actual then () else mismatch "expected true, got false"
+
+to_be_greater_than : (Ord a, Show a) => a -> Subject a ->{; AssertionFailed} Unit
+let to_be_greater_than bound (Subject actual) =
+  if actual > bound then
+    ()
+  else
+    mismatch ("expected a value greater than " ++ show bound ++ ", got " ++ show actual)
+
+to_contain : (Eq a, Show a) => a -> Subject (List a) ->{; AssertionFailed} Unit
+let to_contain item (Subject items) =
+  if List.contains item items then
+    ()
+  else
+    mismatch ("expected a list that contains " ++ show item ++ ", got " ++ show items)
+
+to_fail_with :
+  (Eq (Errors e), Show (Errors e)) => Errors e -> Subject (Eff r e a) ->{r; AssertionFailed} Unit
+let to_fail_with expected (Subject run) =
+  let ended = exit_of run
+  let wanted = "expected the task to fail with " ++ show expected
+  match Exit.find_error_option ended with
+  | Some actual ->
+    if actual == expected then () else mismatch (wanted ++ ", it failed with " ++ show actual)
+  | None ->
+    mismatch
+      (wanted
+        ++ (if Exit.is_success ended then ", it succeeded" else ", it died or was interrupted"))
+
+/// `Effect.exit`, which comes after this module among the built-in ones:
+/// how `task` ends.
+exit_of : ~(Eff r e a)^c ->{r} Exit e a
+foreign effect exit_of from "flick:Effect" "flickExit"
+  retention call
+
 /// Fails the effectful test when the assertion failed.
-expect : Assertion ->{; AssertionFailed} Unit
-let expect assertion =
+check : Assertion ->{; AssertionFailed} Unit
+let check assertion =
   match assertion with
   | Pass -> ()
   | Failed message -> Fail.fail (AssertionFailed message)
+
+/// The name of the case `index` of a `test.each "name"`: `name [index]`,
+/// or, when `parts`, the parts of its row as `show` writes them, are given
+/// for the name's `{0}` to `{n}`, the name with each replaced by its part.
+case_name : String -> Int -> List String -> String
+let case_name name index parts =
+  if List.is_empty parts then
+    name ++ " [" ++ show index ++ "]"
+  else
+    List.fold_left
+      (fun text (k, part) -> String.replace_all ("{" ++ show k ++ "}") part text)
+      name
+      (List.map_indexed (fun k part -> (k, part)) parts)
 
 /// A pure test.
 test : String -> (Unit -> Assertion) -> Test

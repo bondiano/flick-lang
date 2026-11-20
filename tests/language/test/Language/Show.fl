@@ -57,5 +57,5 @@ let tests = [
   Test.test "an error" (fun () -> Test.equal "Problem \"bad\" -3" (show (Problem "bad" (-3)))),
   Test.effect_test
     "Redacted"
-    (task { Test.expect (Test.equal "[<redacted>]" (show [Redacted.make "secret"])) }),
+    (task { Test.check (Test.equal "[<redacted>]" (show [Redacted.make "secret"])) }),
 ]

@@ -123,13 +123,13 @@ let tests = [
   ),
   Test.effect_test
     "an assignment inside a scope"
-    (task { Test.expect (Test.equal "abc" (in_scope ())) }),
+    (task { Test.check (Test.equal "abc" (in_scope ())) }),
   Test.effect_test
     "an assignment in an arm of try"
-    (task { Test.expect (Test.equal "id -1" (in_arm "id")) }),
+    (task { Test.check (Test.equal "id -1" (in_arm "id")) }),
   Test.effect_test
     "operands read and assign left to right"
-    (task { Test.expect (Test.equal (1, 20, 2) (operands_in_order ())) }),
+    (task { Test.check (Test.equal (1, 20, 2) (operands_in_order ())) }),
   Test.test "a local of a test body" (fun () ->
     let mut total = 1
     total = total + 41

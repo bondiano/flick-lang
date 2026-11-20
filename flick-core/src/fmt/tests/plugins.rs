@@ -247,9 +247,17 @@ fn a_fixture_lays_out_its_words_before_its_name_and_its_expression_after() {
 }
 
 #[test]
+fn a_test_each_lays_out_its_rows_its_name_and_its_pattern() {
+    let messy = "module App.MathTest\n\nsuite \"math\" {\n  test.each   [(1,2),  (2,3)]   \"adds {0}\"   (a,b)   timeout 50 {   Test.check (Test.equal b (a + 1)) }\n}\n\ntest.each [ 1 ] \"is {0}\" ( n ) {}\n";
+    let tidy = "module App.MathTest\n\nsuite \"math\" {\n  test.each [(1, 2), (2, 3)] \"adds {0}\" (a, b) timeout 50 { Test.check (Test.equal b (a + 1)) }\n}\n\ntest.each [1] \"is {0}\" (n) {}\n";
+    assert_eq!(super::fmt(messy), tidy);
+    assert_eq!(super::fmt(tidy), tidy);
+}
+
+#[test]
 fn a_suite_lays_out_a_case_a_line_and_a_modifier_after_its_head() {
-    let messy = "module App.UsersTest\n\nsuite.skip   \"Users\"   {\n  /// the common case\n    test \"trims\" {   Test.expect (Test.equal 1 1) }\n\n  test.only \"keeps\" {\n       let a = 1\n       Test.expect (Test.equal a 1)\n  }\n  suite \"empty\" { test \"todo\" {} }\n}\n\ntest   \"alone\" {   Test.expect (Test.equal 2 2) }\n\ntest \"lines\" {\n      Test.expect (Test.equal 3 3)\n}\n";
-    let tidy = "module App.UsersTest\n\nsuite.skip \"Users\" {\n  /// the common case\n  test \"trims\" { Test.expect (Test.equal 1 1) }\n\n  test.only \"keeps\" {\n    let a = 1\n    Test.expect (Test.equal a 1)\n  }\n  suite \"empty\" {\n    test \"todo\" {}\n  }\n}\n\ntest \"alone\" { Test.expect (Test.equal 2 2) }\n\ntest \"lines\" {\n  Test.expect (Test.equal 3 3)\n}\n";
+    let messy = "module App.UsersTest\n\nsuite.skip   \"Users\"   {\n  /// the common case\n    test \"trims\" {   Test.check (Test.equal 1 1) }\n\n  test.only \"keeps\" {\n       let a = 1\n       Test.check (Test.equal a 1)\n  }\n  suite \"empty\" { test \"todo\" {} }\n}\n\ntest   \"alone\" {   Test.check (Test.equal 2 2) }\n\ntest \"lines\" {\n      Test.check (Test.equal 3 3)\n}\n";
+    let tidy = "module App.UsersTest\n\nsuite.skip \"Users\" {\n  /// the common case\n  test \"trims\" { Test.check (Test.equal 1 1) }\n\n  test.only \"keeps\" {\n    let a = 1\n    Test.check (Test.equal a 1)\n  }\n  suite \"empty\" {\n    test \"todo\" {}\n  }\n}\n\ntest \"alone\" { Test.check (Test.equal 2 2) }\n\ntest \"lines\" {\n  Test.check (Test.equal 3 3)\n}\n";
     assert_eq!(super::fmt(messy), tidy);
     assert_eq!(super::fmt(tidy), tidy);
 }

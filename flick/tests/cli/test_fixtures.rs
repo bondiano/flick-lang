@@ -44,7 +44,7 @@ suite "store" {
   test "two" {
     Platform.stdout_line "two starts"
     let _tx = await tx
-    Test.expect (Test.equal 1 2)
+    Test.check (Test.equal 1 2)
   }
 }
 "#;

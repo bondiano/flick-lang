@@ -70,7 +70,7 @@ let tests = [
           match Exit.failure exit with
           | Some f -> defect_of f
           | None -> "succeeded"
-        Test.expect (Test.equal "defect broken" text)
+        Test.check (Test.equal "defect broken" text)
       }),
     Test.effect_test
       "catch_defect recovers a defect and lets a typed error through"
@@ -78,7 +78,7 @@ let tests = [
         let caught = Effect.catch_defect (fun d -> "caught " ++ d) (task { Effect.die "broken" })
         let failed : Exit {Flaky} String =
           Effect.exit (task { Effect.catch_defect (fun d -> d) (task { Fail.fail (Flaky 1) }) })
-        Test.expect (Test.equal ("caught broken", true) (caught, Exit.has_fails failed))
+        Test.check (Test.equal ("caught broken", true) (caught, Exit.has_fails failed))
       }),
     Test.test "Cause.find_defect finds the text of a defect among failures" (fun () ->
       let failed = Cause.fail (Flaky 1)
@@ -92,7 +92,7 @@ let tests = [
       (task {
         let runs = Ref.make 0
         let last = Effect.repeat (Schedule.recurs 3) (task { Ref.update runs (fun n -> n + 1) })
-        Test.expect (Test.equal (4, 3) (Ref.get runs, last))
+        Test.check (Test.equal (4, 3) (Ref.get runs, last))
       }),
     Test.effect_test
       "retry stops at the first success or when the schedule is done"
@@ -103,20 +103,20 @@ let tests = [
         let gave_up =
           try Effect.retry (Schedule.recurs 2) (flaky others 9) with
           | Flaky n -> -n
-        Test.expect (Test.equal (3, -3) (ok, gave_up))
+        Test.check (Test.equal (3, -3) (ok, gave_up))
       }),
     Test.effect_test
       "max ends with the first schedule done, min with the last"
       (task {
         let both = NonEmpty.cons (Schedule.recurs 1) [Schedule.recurs 3]
-        Test.expect (Test.equal (2, 4) (count (Schedule.max both), count (Schedule.min both)))
+        Test.check (Test.equal (2, 4) (count (Schedule.max both), count (Schedule.min both)))
       }),
     Test.effect_test
       "exponential and fibonacci delays"
       (task {
         let exponential = outputs (Schedule.exponential (ms 10) 2)
         let fibonacci = outputs (Schedule.fibonacci (ms 10))
-        Test.expect
+        Test.check
           (Test.equal
             (
               ["10ms", "20ms", "40ms", "80ms", "160ms", "320ms"],
@@ -131,8 +131,8 @@ let tests = [
       (task {
         let first = Random.with_seed 42 (task { draws () })
         let again = Random.with_seed 42 (task { draws () })
-        Test.expect (Test.equal first again)
-        Test.expect (Test.equal (0.2272248550901319, 5, [3, 4, 5, 2, 1], "b") first)
+        Test.check (Test.equal first again)
+        Test.check (Test.equal (0.2272248550901319, 5, [3, 4, 5, 2, 1], "b") first)
       }),
   ],
   Test.group "virtual time" [
@@ -143,7 +143,7 @@ let tests = [
         Test.adjust (ms 1500)
         let later = Clock.current_time_millis ()
         Test.set_time 60000
-        Test.expect (Test.equal (0, 1500, 60000) (start, later, Clock.current_time_millis ()))
+        Test.check (Test.equal (0, 1500, 60000) (start, later, Clock.current_time_millis ()))
       }),
     Test.clock_test
       "sleepers wake in order, each once its time comes"
@@ -171,7 +171,7 @@ let tests = [
           Test.adjust (ms 2000)
           ignore (Fiber.join_all [slow, fast])
         }
-        Test.expect (Test.equal ["fast", "two seconds", "slow"] (Ref.get log))
+        Test.check (Test.equal ["fast", "two seconds", "slow"] (Ref.get log))
       }),
     Test.clock_test
       "a retry's delays pass in virtual time"
@@ -186,7 +186,7 @@ let tests = [
           Test.adjust (ms 60000)
           let after_one = Ref.get runs
           Test.adjust (ms 60000)
-          Test.expect (Test.equal (2, 3) (after_one, Fiber.join retried))
+          Test.check (Test.equal (2, 3) (after_one, Fiber.join retried))
         }
       }),
   ],

@@ -7,6 +7,7 @@ mod editor;
 mod fixtures;
 mod layout;
 mod read;
+mod rows;
 mod state;
 
 use flick_plugin::{Arena, Block, Compiler, Diagnostic, Fact, Highlight, Hover, Piece, Plugin};

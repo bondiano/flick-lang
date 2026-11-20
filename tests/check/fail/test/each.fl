@@ -1,0 +1,12 @@
+// A `test.each` names its rows, its case and the pattern of a row; the
+// pattern takes a row apart as the type of the rows does.
+module App.EachTest
+
+suite "math" {
+  test.each [1, 2] "is {0}" {}
+}
+//~ std/T001 @6:3-6:7 `test.each rows "name" (pattern) { … }`
+
+test.each [1, 2] "is" ((a, b)) {}
+//~ FLICK-T003 @10:12-10:13 expected `(_, _)`, found `Int`
+//~ FLICK-T003 @10:15-10:16 expected `(_, _)`, found `Int`

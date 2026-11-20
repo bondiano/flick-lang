@@ -39,11 +39,11 @@ tests : List Test.Test
 let tests = [
   Test.effect_test
     "the wizard takes the typed note"
-    (task { Test.expect (Test.equal "buy milk" (answer (typing "buy milk"))) }),
+    (task { Test.check (Test.equal "buy milk" (answer (typing "buy milk"))) }),
   Test.effect_test
     "a blank note is refused until there are words"
     (task {
       let keys = typing "  " ++ List.repeat 2 (press "backspace" None) ++ typing "tea"
-      Test.expect (Test.equal "tea" (answer keys))
+      Test.check (Test.equal "tea" (answer keys))
     }),
 ]
