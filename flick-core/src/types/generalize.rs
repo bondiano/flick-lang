@@ -76,6 +76,11 @@ impl Checker<'_> {
         for w in self.classes.wanted.clone() {
             self.store.lower(&w.constraint);
         }
+        // so does an operand type a pending operator has yet to settle: it
+        // takes one of the operator's types, as an integer literal's does
+        for op in &self.cx.operators {
+            self.store.lower(&op.ty);
+        }
         // a value a pending hold still checks stays monomorphic: its unknown
         // rows, once quantified, would count as variables it captures
         for hold in &self.cx.regions.holds {
