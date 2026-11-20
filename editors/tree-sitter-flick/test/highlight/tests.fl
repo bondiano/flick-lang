@@ -28,3 +28,7 @@ let test name = Test.test name (fun () -> Test.Pass)
 //                    ^ property
 let suite = test
 //          ^ variable
+
+test.each [1, 2] "is {0}" (n) {}
+// <- keyword
+//  ^ keyword

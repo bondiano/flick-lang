@@ -200,6 +200,8 @@ test("contextual effect, sql, and control keywords receive expected TextMate sco
   assert.ok(scopesFor('suite parallel "pool" {', "parallel").includes("keyword.other.flick"));
   assert.ok(scopesFor('suite.skip parallel "pool" timeout 50 {', "timeout").includes("keyword.other.flick"));
   assert.ok(scopesFor("  fixture conn = connect ()", "fixture").includes("keyword.other.flick"));
+  assert.ok(scopesFor('  test.each [(1, 2)] "adds {0}" (a, b) {', "each").includes("keyword.other.flick"));
+  assert.ok(scopesFor("test.each rows \"is {0}\" (n) {}", "test").includes("keyword.other.flick"));
   assert.ok(scopesFor("  fixture shared concurrent pool = make 4", "shared").includes("keyword.other.flick"));
   assert.ok(scopesFor("  fixture shared concurrent pool = make 4", "concurrent").includes("keyword.other.flick"));
   assert.ok(scopesFor("for x <- xs do { break }", "for").includes("keyword.control.flick"));
@@ -222,6 +224,7 @@ test("word boundaries prevent spurious keyword matches on partial identifiers an
     ["let x = timeout 500 task", "timeout"],
     ["let before_each = 1", "before_each"],
     ["  fixture shared = 1", "shared"],
+    ["let x = rows.each", "each"],
     ["let fixture = shared parallel", "fixture"],
     ["let x = parallel concurrent", "concurrent"],
     ["let x = Test.test \"a\" check", "test"],

@@ -6,6 +6,12 @@ break programs.
 
 ## Unreleased
 
+- **`test.each`.** `test.each rows "name" (pattern) { body }` in a suite or
+  on its own is a case for each row of a list, named `name [i]`, or with
+  `{0}`…`{n}` in the name replaced by the parts of the row as `show` writes
+  them. Each case has its own scope, fixtures and full name. A test block's
+  arguments may now hold a bracketed list, the rows. Alike on every engine.
+
 - **Breaking: `Test.expect` takes the value it checks.** `expect actual |>
   to.equal expected`, with `import Test exposing (expect, to)`, and the
   matchers `to.be_true`, `to.be_greater_than`, `to.contain` and

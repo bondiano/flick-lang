@@ -108,7 +108,7 @@ fn walk(block: &Block, item: &Item, outer: &[Visible], out: &mut Vec<Diagnostic>
                 }
             }
             Kind::Suite(_) => walk(block, inner, &sight, out),
-            Kind::Test(_) | Kind::Fixture(_) => {}
+            Kind::Test(_) | Kind::Fixture(_) | Kind::Each(_) => {}
         }
     }
 }

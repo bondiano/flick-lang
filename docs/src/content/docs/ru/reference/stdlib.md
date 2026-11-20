@@ -1,6 +1,6 @@
 ---
 title: "Стандартная библиотека"
-source_hash: 95dfb0f136f15e50
+source_hash: 4555be195821eab5
 ---
 
 Стандартная библиотека написана на Flick и использует адаптер среды выполнения
@@ -265,6 +265,7 @@ let tests =
 | `Test.skip test`, `Test.only test` | тест и каждый тест внутри него, пропущенные или помеченные `only` (см. [тестирование](../testing/#полные-имена-skip-и-only)) |
 | `Test.before_all task`, `before_each`, `after_each`, `after_all` | хук группы или модуля, в списке которых он стоит, выполняемый вокруг тех их тестов, которые выбрал запуск (см. [тестирование](../testing/#хуки)) |
 | `Test.timeout millis test` | тест и каждый тест внутри него без собственного таймаута, получающие `millis` на хуки `before_each` и тело (см. [тестирование](../testing/#таймауты)) |
+| `Test.case_name name index parts` | имя случая `index` блока `test.each "name"`: `name [index]` или имя, где `{0}`…`{n}` заменены на `parts` |
 | `Test.serial test` | тест и каждый тест внутри него, выполняемые по одному, в том числе при `--jobs` |
 | `Test.fixture key init`, `Test.shared key init`, `Test.share fixture`, `Test.use fixture` | фикстура каждого теста или общая для запуска группы, в списке которой она стоит через `share`, и её `Lazy` для кода, который её использует: во что разворачивается `fixture` набора (см. [тестирование](../testing/#фикстуры)) |
 | `Fixture.cleanup release value` | `value`, которое `release` освобождает, когда закрывается область создавшей его фикстуры |
