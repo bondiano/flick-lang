@@ -79,6 +79,7 @@ codegen/instance_names
 codegen/known_contexts
 codegen/known_instances
 codegen/record_constructor
+codegen/mutual_rec_arity
 effect/row_without
 stdlib/effect/mutable_ref
 stdlib/effect/optic_parts

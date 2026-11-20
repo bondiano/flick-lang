@@ -1,0 +1,81 @@
+// Mutually recursive functions of different arities in one `rec` group:
+// uneven parameter counts, mixed scalar types at the same slot, unit and
+// pattern parameters, reused local names across members, non-tail and
+// partial calls, and effectful mutual tail calls.
+module App.Main exposing (main)
+
+type Box = Box { a : Int; b : Int }
+
+rec {
+  f : Int -> Int
+  let f x = g x 1
+
+  g : Int -> Int -> Int
+  let g x y = if x <= 0 then y else if x % 2 == 0 then f (x - 1) else g (x - 1) (y + x)
+}
+
+rec {
+  a1 : Int -> String
+  let a1 n = if n <= 0 then "0" else a3 ("[" ++ show n) (n - 1) (n % 2 == 0)
+
+  a3 : String -> Int -> Bool -> String
+  let a3 acc n flag =
+    if n <= 0 then
+      acc ++ "]"
+    else if flag then
+      a3 (acc ++ "+" ++ a1 (n - 1)) (n - 1) false
+    else
+      a2 (n - 1) (acc ++ ":" ++ show n)
+
+  a2 : Int -> String -> String
+  let a2 n acc =
+    if n <= 0 then acc ++ ")" else if acc == "reset" then a1 n else a3 (acc ++ "-") (n - 1) true
+}
+
+rec {
+  ping_unit : Unit -> Int
+  let ping_unit () = pong_pair (2, 10) 0
+
+  pong_pair : (Int, Int) -> Int -> Int
+  let pong_pair (a, b) n =
+    if n <= 0 then a + b else if a == 0 then ping_unit () else pong_pair (a - 1, b + 5) (n - 1)
+}
+
+rec {
+  box_first : Box -> Int -> Int
+  let box_first box n =
+    let x = n + 1
+    match box with
+    | Box r -> box_second (x, r.a) { z = 9; a = r.b } (n - 1)
+
+  box_second : (Int, Int) -> { z : Int; a : Int } -> Int -> Int
+  let box_second pair r n =
+    match pair with
+    | (x, y) -> if n <= 0 then x + y + r.a else box_first (Box { a = x; b = r.a }) n
+}
+
+rec {
+  log_one : Int ->{Host.Console} Int
+  let log_one n =
+    if n <= 0 then
+      0
+    else
+      Platform.stdout_line ("one:" ++ show n)
+      log_two (n - 1) (n * 10)
+
+  log_two : Int -> Int ->{Host.Console} Int
+  let log_two n acc =
+    Platform.stdout_line ("two:" ++ show n ++ ":" ++ show acc)
+    if n <= 0 then acc else log_one (n - 1)
+}
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  Platform.stdout_line (show (f 5) ++ " " ++ show (g 4 10))
+  Platform.stdout_line (a1 4 ++ " " ++ a2 2 "reset")
+  let partial = a2 0
+  Platform.stdout_line (show (List.map a1 [0, 2]) ++ " " ++ partial "hi")
+  Platform.stdout_line
+    (show (ping_unit ()) ++ " " ++ show (pong_pair (2, 10) 2) ++ " " ++ show (pong_pair (1, 10) 2))
+  Platform.stdout_line (show (box_first (Box { a = 1; b = 2 }) 2))
+  Platform.stdout_line (show (log_one 3))

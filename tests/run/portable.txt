@@ -74,6 +74,7 @@ codegen/patterns
 codegen/question
 codegen/ranges
 codegen/recursion
+codegen/mutual_rec_arity
 codegen/repeated_superclass
 codegen/stage_order
 codegen/strings_utf16
