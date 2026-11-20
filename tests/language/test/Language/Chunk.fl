@@ -1,0 +1,53 @@
+module Language.Chunk exposing (tests)
+
+tests : List Test.Test
+let tests = [
+  Test.test "chunk append and asymmetric concat keep both snapshots" (fun () ->
+    let prefix = List.fold_left (fun chunk x -> Chunk.append x chunk) Chunk.empty (List.range 0 128)
+    let first = Chunk.to_chunk (Chunk.of (-1))
+    let joined = Chunk.concat (Chunk.concat first prefix) (Chunk.from_list [128, 129])
+    let indices = List.map (fun i -> Chunk.get i joined) [-1, 0, 1, 64, 128, 130, 131]
+    let ends =
+      Option.map
+        (fun non_empty -> (Chunk.head_non_empty non_empty, Chunk.last_non_empty non_empty))
+        (Chunk.non_empty joined)
+    Test.equal
+      (
+        131,
+        [None, Some (-1), Some 0, Some 63, Some 127, Some 129, None],
+        Some (-1, 129),
+        List.range 0 128,
+        [-1],
+        List.range (-1) 130,
+      )
+      (
+        Chunk.size joined,
+        indices,
+        ends,
+        Chunk.to_list prefix,
+        Chunk.to_list first,
+        Chunk.to_list (Chunk.concat Chunk.empty (Chunk.concat joined Chunk.empty)),
+      )
+  ),
+  Test.test "chunk slices, traversal and JSON agree across representations" (fun () ->
+    let batches =
+      List.map (fun i -> Chunk.from_list (List.range i (i + 16))) [0, 16, 32, 48, 64, 80, 96, 112]
+    let joined = List.fold_left Chunk.concat Chunk.empty batches
+    let middle = joined |> Chunk.drop 61 |> Chunk.take 6
+    let expected = [61, 62, 63, 64, 65, 66]
+    let flat = Chunk.from_list expected
+    let codec = Chunk.json Int.json
+    let encoded = Codec.encode_result (Codec.list Int.json) expected
+    let round_trip =
+      Json.parse "[61,62,63,64,65,66]"
+      |> Result.bind (Codec.decode_result codec)
+      |> Result.map Chunk.to_list
+    Test.equal (true, 381, expected, Ok expected, true) (
+      middle == flat,
+      Chunk.reduce 0 (fun sum n -> sum + n) middle,
+      Chunk.to_list middle,
+      round_trip,
+      Codec.encode_result codec middle == encoded,
+    )
+  ),
+]
