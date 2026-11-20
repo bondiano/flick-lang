@@ -51,10 +51,10 @@ let tests = [
         Ref.set runs (Ref.get runs + 1)
         Ref.get runs
       }
-      Test.expect (Test.equal 0 (Ref.get runs))
+      Test.check (Test.equal 0 (Ref.get runs))
       let first = await counted
       let second = await counted
-      Test.expect (Test.equal (1, 2, 2) (first, second, Ref.get runs))
+      Test.check (Test.equal (1, 2, 2) (first, second, Ref.get runs))
     }),
   Test.group "typed errors" [
     Test.effect_test
@@ -69,7 +69,7 @@ let tests = [
               | Invalid m -> "invalid " ++ show m
             )
             [("a", 2), ("b", 2), ("a", 0), ("a", -9)]
-        Test.expect (Test.equal ["3", "not found b", "invalid 0", "very invalid"] outcomes)
+        Test.check (Test.equal ["3", "not found b", "invalid 0", "very invalid"] outcomes)
       }),
     Test.effect_test
       "Fail.fail stops the computation, and either form of an arm catches it"
@@ -87,7 +87,7 @@ let tests = [
         let short =
           try show (failing ()) with
           | NotFound k -> "short " ++ k
-        Test.expect (Test.equal ("full x", "short x", 1) (full, short, Ref.get steps))
+        Test.check (Test.equal ("full x", "short x", 1) (full, short, Ref.get steps))
       }),
     Test.effect_test
       "an unhandled error passes through"
@@ -98,7 +98,7 @@ let tests = [
             | NotFound _ -> 0
           with
           | Invalid n -> 100 + n
-        Test.expect (Test.equal 100 inner)
+        Test.check (Test.equal 100 inner)
       }),
     Test.effect_test
       "a handler may fail again"
@@ -109,7 +109,7 @@ let tests = [
             | NotFound k -> check (0 - String.length k)
           with
           | Invalid n -> n
-        Test.expect (Test.equal (-1) outcome)
+        Test.check (Test.equal (-1) outcome)
       }),
     Test.effect_test
       "a variable arm takes any error"
@@ -117,7 +117,7 @@ let tests = [
         let shown =
           try show (find "q") with
           | e -> show e
-        Test.expect (Test.equal "NotFound \"q\"" shown)
+        Test.check (Test.equal "NotFound \"q\"" shown)
       }),
   ],
   Test.group "defects" [
@@ -125,7 +125,7 @@ let tests = [
       "a defect of the runtime gives its message"
       (task {
         let outcome = defect_of (task { show (Int.unsafe_div 1 (List.length [])) })
-        Test.expect (Test.equal "defect: Int.unsafe_div: division by zero" outcome)
+        Test.check (Test.equal "defect: Int.unsafe_div: division by zero" outcome)
       }),
     Test.effect_test
       "a failed let assert names its place and value"
@@ -136,7 +136,7 @@ let tests = [
               let assert [x] = List.range 0 2 as "one item"
               show x
             })
-        Test.expect (Test.equal "defect: Language.Effects:136: one item: [0,1]" outcome)
+        Test.check (Test.equal "defect: Language.Effects:136: one item: [0,1]" outcome)
       }),
     Test.effect_test
       "exits"
@@ -155,7 +155,7 @@ let tests = [
                 e
             )
             exits
-        Test.expect (Test.equal ["value 1", "(true, false)", "(false, true)"] flags)
+        Test.check (Test.equal ["value 1", "(true, false)", "(false, true)"] flags)
       }),
   ],
   Test.group "finalizers" [
@@ -174,7 +174,7 @@ let tests = [
           with
           | Invalid _ -> 0
         note log "handled"
-        Test.expect (Test.equal ["body", "finalizer", "handled"] (Ref.get log))
+        Test.check (Test.equal ["body", "finalizer", "handled"] (Ref.get log))
       }),
     Test.effect_test
       "a scope releases in reverse order"
@@ -198,7 +198,7 @@ let tests = [
           note log ("use " ++ a ++ b)
         }
         note log "after"
-        Test.expect
+        Test.check
           (Test.equal
             ["acquire a", "acquire b", "use ab", "release b", "release a", "after"]
             (Ref.get log))
@@ -217,7 +217,7 @@ let tests = [
           with
           | Invalid n -> n
         note log ("handled " ++ show outcome)
-        Test.expect (Test.equal ["acquire", "release", "handled -3"] (Ref.get log))
+        Test.check (Test.equal ["acquire", "release", "handled -3"] (Ref.get log))
       }),
     Test.effect_test
       "on_exit sees the exit"
@@ -230,7 +230,7 @@ let tests = [
               (task { check 7 })
           with
           | Invalid _ -> 0
-        Test.expect (Test.equal ["value 7"] (Ref.get log))
+        Test.check (Test.equal ["value 7"] (Ref.get log))
       }),
   ],
   Test.group "concurrency" [
@@ -258,7 +258,7 @@ let tests = [
           with
           | Invalid n -> "failed with " ++ show n
         note log outcome
-        Test.expect (Test.equal ["sibling ended", "failed with 0"] (Ref.get log))
+        Test.check (Test.equal ["sibling ended", "failed with 0"] (Ref.get log))
       }),
     Test.effect_test
       "results keep the order of the tasks"
@@ -272,7 +272,7 @@ let tests = [
                 n * 10
               })
               [1, 2, 3, 4])
-        Test.expect (Test.equal [10, 20, 30, 40] made)
+        Test.check (Test.equal [10, 20, 30, 40] made)
       }),
     Test.effect_test
       "Ref.modify is atomic across fibers"
@@ -284,7 +284,7 @@ let tests = [
             (List.map
               (fun _ -> task { Ref.modify total (fun n -> ((), n + 1)) })
               (List.range 0 200))
-        Test.expect (Test.equal 200 (Ref.get total))
+        Test.check (Test.equal 200 (Ref.get total))
       }),
     Test.effect_test
       "the loser of a race, once started, is interrupted"
@@ -305,7 +305,7 @@ let tests = [
               "fast"
             })
         note log winner
-        Test.expect (Test.equal ["loser ended", "fast"] (Ref.get log))
+        Test.check (Test.equal ["loser ended", "fast"] (Ref.get log))
       }),
     Test.effect_test
       "timeout"
@@ -320,7 +320,7 @@ let tests = [
               })
           with
           | TimeoutError -> "timed out"
-        Test.expect (Test.equal "timed out" outcome)
+        Test.check (Test.equal "timed out" outcome)
       }),
   ],
 ]

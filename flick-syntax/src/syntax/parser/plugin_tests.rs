@@ -264,6 +264,11 @@ fn a_suite_and_a_test_are_blocks_only_where_a_top_level_declaration_starts() {
         "(PluginDecl suite \"Users\" { (Block test \"a\" { }) })\n\
          (PluginDecl test . skip \"b\" { (Block ) })"
     );
+    // the rows of a `test.each` are a bracketed argument, kept as tokens
+    assert_eq!(
+        sexp("test.each [(1, 2)] \"adds {0}\" (a, b) {}\n"),
+        "(PluginDecl test . each [ (PluginArgs ( 1 , 2 )) ] \"adds {0}\" ( (PluginArgs a , b) ) { (Block ) })"
+    );
     // a signature of a value of that name stays one, and the words stay names
     // in expressions, where `Test.test` and a local `test` are called
     assert_eq!(

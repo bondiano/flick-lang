@@ -6,7 +6,7 @@ use flick_plugin::{Block, Highlight, HighlightKind, Hover, Span};
 use crate::read::{Item, Kind, structure};
 
 /// What each word of the plugin means, as an editor shows it over the word.
-const HELP: [(&str, &str); 13] = [
+const HELP: [(&str, &str); 14] = [
     (
         "suite",
         "```flick\nsuite \"name\" { … }\n```\n\nTests under a common name: each case inside is `Suite > case`.",
@@ -56,6 +56,10 @@ const HELP: [(&str, &str); 13] = [
         "```flick\nfixture shared concurrent name = expression\n```\n\nA shared fixture that cases may use at once, as a pool or read-only data: the only kind a `parallel` suite shares.",
     ),
     (
+        "each",
+        "```flick\ntest.each rows \"name {0}\" (pattern) { … }\n```\n\nA case for each row of `rows`, which the pattern matches for the body: named `name [i]`, or with `{0}` to `{n}` replaced by the parts of the row as `show` writes them. The rows are built once, when the module's tests are.",
+    ),
+    (
         "parallel",
         "```flick\nsuite parallel \"name\" { … }\n```\n\nThe cases of the suite may run at once under `--jobs`, also when it shares fixtures, which must then be `concurrent`.",
     ),
@@ -75,7 +79,7 @@ fn words(item: &Item, out: &mut Vec<Span>) {
             }
         }
         Kind::Fixture(f) => out.extend(f.shared.into_iter().chain(f.concurrent)),
-        Kind::Test(_) | Kind::Hook(_) => {}
+        Kind::Test(_) | Kind::Hook(_) | Kind::Each(_) => {}
     }
 }
 

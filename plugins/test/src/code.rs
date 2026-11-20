@@ -17,12 +17,14 @@
 //! test` gives each task of one test, or of one run of the suite, the same
 //! `Lazy`.
 
+use std::mem;
+
 use flick_plugin::{
     Arena, Arm, Block, Builder, Decl, Expr, NodeId, Pat, Span, flick, string_value,
 };
 
 use crate::fixtures::names;
-use crate::read::{Item, Kind, Mode};
+use crate::read::{Each, Item, Kind, Mode};
 
 /// The declarations of `item`, the block `index` of the `count` blocks of
 /// its module.
@@ -33,14 +35,14 @@ pub fn arena(block: &Block, item: &Item, index: usize, count: usize) -> Arena {
         block: index,
         ..Sight::default()
     };
-    let case = case(&mut b, block, item, &sight, &mut decls);
+    let cases = list(&mut b, block, &[item], &sight, &mut decls, Vec::new());
     if count <= 1 {
-        decls.push(flick!(b, let tests : List Test.Test = [#case]));
+        decls.push(flick!(b, let tests : List Test.Test = #cases));
     } else {
-        decls.push(flick!(b, let #(value(index)) = #case));
+        decls.push(flick!(b, let #(value(index)) = #cases));
         if index == 0 {
             let cases: Vec<NodeId> = (0..count).map(|i| b.expr(Expr::Name(value(i)))).collect();
-            decls.push(flick!(b, let tests : List Test.Test = [#(..cases)]));
+            decls.push(flick!(b, let tests : List Test.Test = List.concat [#(..cases)]));
         }
     }
     let root = if decls.len() == 1 {
@@ -49,6 +51,112 @@ pub fn arena(block: &Block, item: &Item, index: usize, count: usize) -> Arena {
         b.group(decls)
     };
     b.finish(root)
+}
+
+/// The list of the cases of `items` after `lead`: `[a, b]`, or, with the
+/// cases of a `test.each` among them, `List.concat [[a], cases, [b]]`.
+fn list(
+    b: &mut Builder,
+    block: &Block,
+    items: &[&Item],
+    sight: &Sight,
+    decls: &mut Vec<NodeId>,
+    lead: Vec<NodeId>,
+) -> NodeId {
+    let at = items.first().map_or(block.whole(), |i| i.name);
+    let mut parts: Vec<NodeId> = Vec::new();
+    let mut ones = lead;
+    for item in items {
+        if let Kind::Each(rows) = &item.kind {
+            if !ones.is_empty() {
+                let run = mem::take(&mut ones);
+                parts.push(flick!(b @ at, [#(..run)]));
+            }
+            parts.push(each(b, block, item, rows, sight));
+        } else {
+            ones.push(case(b, block, item, sight, decls));
+        }
+    }
+    if parts.is_empty() {
+        return flick!(b @ at, [#(..ones)]);
+    }
+    if !ones.is_empty() {
+        parts.push(flick!(b @ at, [#(..ones)]));
+    }
+    if let [only] = parts.as_slice() {
+        return *only;
+    }
+    flick!(b @ at, List.concat [#(..parts)])
+}
+
+/// The cases of `item`, a `test.each`: `List.map_indexed (fun index$0 row$0 ->
+/// case) rows`, each case named by `Test.case_name` and matching its row
+/// with the user's pattern around the body.
+fn each(b: &mut Builder, block: &Block, item: &Item, rows: &Each, sight: &Sight) -> NodeId {
+    let at = item.name;
+    let body = if let Some(span) = rows.body {
+        flick!(b @ at, #span)
+    } else {
+        flick!(b @ at, ())
+    };
+    let row = b.at(at).expr(Expr::Name("row$0".into()));
+    let pattern = b.at(rows.pattern).pat(Pat::Hole(rows.pattern));
+    let matched = b.at(at).expr(Expr::Match {
+        scrutinee: row,
+        arms: vec![Arm {
+            pattern,
+            guard: None,
+            body,
+        }],
+    });
+    let code = with_fixtures(b, block, rows.body, matched, sight, at);
+    let task = b.at(at).expr(Expr::Task(code));
+    // the parts of a row are shown in the name only when a `{k}` of the name asks for them
+    let template = string_value(block.text_of(at));
+    let asked = (0..rows.parts).any(|k| template.contains(&format!("{{{k}}}")));
+    let shown = if !asked {
+        flick!(b @ at, [])
+    } else if rows.parts == 1 {
+        let row = b.at(at).expr(Expr::Name("row$0".into()));
+        flick!(b @ at, [show #row])
+    } else {
+        let names: Vec<String> = (0..rows.parts).map(|k| format!("part${k}")).collect();
+        let shows: Vec<NodeId> = (names.iter())
+            .map(|n| {
+                let part = b.at(at).expr(Expr::Name(n.clone()));
+                flick!(b @ at, show #part)
+            })
+            .collect();
+        let list = flick!(b @ at, [#(..shows)]);
+        let pats: Vec<NodeId> = names
+            .iter()
+            .map(|n| b.at(at).pat(Pat::Var(n.clone())))
+            .collect();
+        let pattern = b.at(at).pat(Pat::Tuple(pats));
+        let row = b.at(at).expr(Expr::Name("row$0".into()));
+        b.at(at).expr(Expr::Match {
+            scrutinee: row,
+            arms: vec![Arm {
+                pattern,
+                guard: None,
+                body: list,
+            }],
+        })
+    };
+    let index = b.at(at).expr(Expr::Name("index$0".into()));
+    let name = flick!(b @ at, Test.case_name #at #index #shown);
+    let mut case = flick!(b @ at, Test.effect_test #name #task);
+    if let Some((_, millis)) = item.timeout {
+        let millis = flick!(b @ at, #millis);
+        case = flick!(b @ at, Test.timeout #millis #case);
+    }
+    let params = vec![
+        b.at(at).pat(Pat::Var("index$0".into())),
+        b.at(at).pat(Pat::Var("row$0".into())),
+    ];
+    let lambda = b.at(at).expr(Expr::Lambda { params, body: case });
+    let rows = flick!(b @ at, #(rows.rows));
+    flick!(b @ at, List.map_indexed #lambda #rows)
 }
 
 /// The value the case of block `index` is, which no source can name.
@@ -109,18 +217,18 @@ fn case(
         }
         Kind::Suite(items) => {
             let (inner, shares) = within(b, block, item, items, sight, decls);
-            let mut cases: Vec<NodeId> = (shares.iter())
+            let lead: Vec<NodeId> = (shares.iter())
                 .map(|value| {
                     let value = b.at(at).expr(Expr::Name(value.clone()));
                     flick!(b @ at, Test.share #value)
                 })
                 .collect();
-            cases.extend(
-                (items.iter())
-                    .filter(|i| !matches!(i.kind, Kind::Fixture(_)))
-                    .map(|i| self::case(b, block, i, &inner, decls)),
-            );
-            let group = flick!(b @ at, Test.group #at [#(..cases)]);
+            let cases: Vec<&Item> = items
+                .iter()
+                .filter(|i| !matches!(i.kind, Kind::Fixture(_)))
+                .collect();
+            let cases = list(b, block, &cases, &inner, decls, lead);
+            let group = flick!(b @ at, Test.group #at #cases);
             // a suite whose tests share a fixture runs them one at a time
             if !shares.is_empty() && item.parallel.is_none() {
                 flick!(b @ at, Test.serial #group)
@@ -128,7 +236,7 @@ fn case(
                 group
             }
         }
-        Kind::Fixture(_) => flick!(b @ at, ()),
+        Kind::Fixture(_) | Kind::Each(_) => flick!(b @ at, ()),
     };
     if let Some((_, millis)) = item.timeout {
         let millis = flick!(b @ at, #millis);

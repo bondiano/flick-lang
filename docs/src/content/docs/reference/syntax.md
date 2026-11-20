@@ -259,7 +259,8 @@ the plugin of `std`, not keywords: each word starts a block where a block
 may start, and is a name elsewhere. See
 [cli-dsl.md](../cli-dsl/) and [sql.md](../sql/). So are `suite "name" { … }`
 and `test "name" { … }`, only at the start of a top-level declaration, and
-inside them `timeout` after a case's name, `parallel` before a suite's, the
+inside them `timeout` after a case's name, `test.each` before a test's
+rows, `parallel` before a suite's name, the
 hooks `before_all`, `before_each`, `after_each` and `after_all { … }` of a
 suite and its `fixture name = …`, maybe `fixture shared` and `fixture
 shared concurrent` (see [testing.md](../testing/)).

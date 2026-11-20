@@ -42,9 +42,9 @@ let samples = Arbitrary.zip4 ints ints ints ints
 require_passed : Arbitrary.CheckResult e a ->{; Test.AssertionFailed} Unit
 let require_passed result =
   match result with
-  | Arbitrary.Passed report -> Test.expect (Test.equal 100 report.runs)
+  | Arbitrary.Passed report -> Test.check (Test.equal 100 report.runs)
   | failed ->
-    Test.expect
+    Test.check
       (Test.Failed
         (Option.with_default
           "Arbitrary returned no failure report"
@@ -365,10 +365,10 @@ let behavior = [
         pure value
       }
       let suspended = Capabilities.run 3 10 action
-      Test.expect (Test.equal [] (Ref.get trace))
+      Test.check (Test.equal [] (Ref.get trace))
       let result = await suspended
-      Test.expect (Test.equal ((Ok 5, ["begin", "done"]), 15) result)
-      Test.expect (Test.equal ["base", "after"] (Ref.get trace))
+      Test.check (Test.equal ((Ok 5, ["begin", "done"]), 15) result)
+      Test.check (Test.equal ["base", "after"] (Ref.get trace))
     }),
   Test.effect_test
     "Stack Eff retains the prefix and skips continuations on domain failure"
@@ -386,10 +386,10 @@ let behavior = [
         pure value
       }
       let suspended = Capabilities.run 3 10 action
-      Test.expect (Test.equal [] (Ref.get trace))
+      Test.check (Test.equal [] (Ref.get trace))
       let result = await suspended
-      Test.expect (Test.equal ((Err "negative", ["begin"]), 10) result)
-      Test.expect (Test.equal ["base"] (Ref.get trace))
+      Test.check (Test.equal ((Err "negative", ["begin"]), 10) result)
+      Test.check (Test.equal ["base"] (Ref.get trace))
     }),
   Test.effect_test
     "ExceptT catches domain errors but never an underlying typed Eff failure"
@@ -421,13 +421,13 @@ let behavior = [
           })
       let caught = catch_error handle failed
       let recovered = catch_error handle domain
-      Test.expect (Test.equal [] (Ref.get trace))
+      Test.check (Test.equal [] (Ref.get trace))
       let underlying = observe_except trace (ExceptT.run caught)
       let domain_result = observe_except trace (ExceptT.run domain)
       let recovered_result = observe_except trace (ExceptT.run recovered)
-      Test.expect (Test.equal (Err 42, ["offline"]) underlying)
-      Test.expect (Test.equal (Ok (Err "domain"), []) domain_result)
-      Test.expect (Test.equal (Ok (Ok 9), ["handler domain"]) recovered_result)
+      Test.check (Test.equal (Err 42, ["offline"]) underlying)
+      Test.check (Test.equal (Ok (Err "domain"), []) domain_result)
+      Test.check (Test.equal (Ok (Ok 9), ["handler domain"]) recovered_result)
     }),
   Test.effect_test
     "ExceptT applicative failure does not execute the right Eff action"
@@ -446,9 +446,9 @@ let behavior = [
             3
           })
       let action = map2 (fun x y -> x + y) left right
-      Test.expect (Test.equal [] (Ref.get trace))
+      Test.check (Test.equal [] (Ref.get trace))
       let result = observe_except trace (ExceptT.run action)
-      Test.expect (Test.equal (Ok (Err "domain"), ["left"]) result)
+      Test.check (Test.equal (Ok (Err "domain"), ["left"]) result)
     }),
 ]
 

@@ -40,6 +40,7 @@ module.exports = grammar({
       $._case,
       $._hook,
       $._fixture,
+      $._each,
       alias($._proof, $.keyword),
       $.attribute,
       $.label,
@@ -89,6 +90,8 @@ module.exports = grammar({
       alias(choice('before_all', 'before_each', 'after_each', 'after_all'), $.keyword),
       $.braces,
     )),
+    // `test.each` starts the cases of a test's rows, whatever its rows are
+    _each: $ => prec.dynamic(1, seq(alias('test', $.keyword), alias('.each', $.keyword))),
     _fixture: $ => prec.dynamic(1, seq(
       alias('fixture', $.keyword),
       optional(alias('shared', $.keyword)),

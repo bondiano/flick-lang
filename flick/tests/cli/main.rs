@@ -52,6 +52,7 @@ pub mod source_packages;
 pub mod test_blocks;
 pub mod test_command;
 pub mod test_companions;
+pub mod test_each;
 pub mod test_fixtures;
 pub mod test_hooks;
 pub mod test_suite;

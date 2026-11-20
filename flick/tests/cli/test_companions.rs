@@ -31,11 +31,11 @@ let greet name = "Hello, " ++ title Ms ++ " " ++ trim name ++ "!"
 const COMPANION: &str = r#"module Lib.Users
 
 suite "private helpers" {
-  test "trim" { Test.expect (Test.equal "Ada" (trim "  Ada ")) }
-  test "title" { Test.expect (Test.equal "Ms" (title Ms)) }
+  test "trim" { Test.check (Test.equal "Ada" (trim "  Ada ")) }
+  test "title" { Test.check (Test.equal "Ms" (title Ms)) }
 }
 
-test "greet" { Test.expect (Test.equal "Hello, Ms Ada!" (greet " Ada")) }
+test "greet" { Test.check (Test.equal "Hello, Ms Ada!" (greet " Ada")) }
 "#;
 
 // named `…_test` as Go names a test file: its Go file must stay in the build
@@ -43,7 +43,7 @@ const BY_EXPORTS: &str = r#"module Lib.Users_test
 
 import Lib.Users exposing (greet)
 
-test "greets" { Test.expect (Test.equal "Hello, Ms Bo!" (greet "Bo")) }
+test "greets" { Test.check (Test.equal "Hello, Ms Bo!" (greet "Bo")) }
 "#;
 
 fn library(name: &str, companion: Option<&str>) -> PathBuf {

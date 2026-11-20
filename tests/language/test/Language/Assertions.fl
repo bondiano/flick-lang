@@ -1,0 +1,61 @@
+// The matchers of `Test` on both targets: what passes, and the message each
+// fails with, a diff of the lines of long or multi-line values included.
+module Language.Assertions
+
+import Test exposing (expect, to)
+
+type error NotFound = NotFound String
+  deriving Eq, Show
+
+find : String ->{; NotFound} Int
+let find name = if name == "ada" then 1 else Fail.fail (NotFound name)
+
+/// The message `check` fails with, or `passed`.
+message_of : Eff none {Test.AssertionFailed} Unit ->{} String
+let message_of check =
+  match Exit.find_error_option (Effect.exit check) with
+  | Some failed ->
+    match failed with
+    | Test.AssertionFailed message -> message
+    | _ -> "another error"
+  | None -> "passed"
+
+suite "matchers" {
+  test "pass" {
+    expect (1 + 1) |> to.equal 2
+    expect true |> to.be_true
+    expect 3 |> to.be_greater_than 2
+    expect [1, 2] |> to.contain 2
+    expect (task { find "grace" }) |> to.fail_with (NotFound "grace")
+  }
+
+  test "fail with what they expected and got" {
+    expect (message_of (task { expect 1 |> to.equal 2 })) |> to.equal "expected 2, got 1"
+    expect (message_of (task { expect false |> to.be_true })) |> to.equal "expected true, got false"
+    expect (message_of (task { expect 1 |> to.be_greater_than 2 }))
+    |> to.equal "expected a value greater than 2, got 1"
+    expect (message_of (task { expect [1] |> to.contain 2 }))
+    |> to.equal "expected a list that contains 2, got [1]"
+  }
+
+  test "fail_with says how the task ended" {
+    let succeeded =
+      message_of (task { expect (task { find "ada" }) |> to.fail_with (NotFound "ada") })
+    expect succeeded |> to.equal "expected the task to fail with NotFound \"ada\", it succeeded"
+    let other = message_of (task { expect (task { find "bob" }) |> to.fail_with (NotFound "ada") })
+    expect other
+    |> to.equal "expected the task to fail with NotFound \"ada\", it failed with NotFound \"bob\""
+  }
+
+  test "long or multi-line values differ by lines" {
+    let lines = Test.differ "one\ntwo\nthree" "one\n2\nthree"
+    expect lines |> to.equal "expected (-) and got (+) differ:\n  one\n- two\n+ 2\n  three"
+    let long = Test.differ (String.repeat 50 "a") (String.repeat 50 "b")
+    expect long
+    |> to.equal
+      ("expected (-) and got (+) differ:\n- "
+        ++ String.repeat 50 "a"
+        ++ "\n+ "
+        ++ String.repeat 50 "b")
+  }
+}

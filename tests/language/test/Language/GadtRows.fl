@@ -56,7 +56,7 @@ tests : List Test.Test
 let tests = [
   Test.effect_test
     "a value command keeps its result type"
-    (task { Test.expect (Test.equal "kept" (execute (Value "kept"))) }),
+    (task { Test.check (Test.equal "kept" (execute (Value "kept"))) }),
   Test.effect_test
     "a command calls its indexed service"
     (task {
@@ -64,7 +64,7 @@ let tests = [
         try execute (Read 7) with
         | Missing _ -> -1
       }
-      Test.expect (Test.equal 107 result)
+      Test.check (Test.equal 107 result)
     }),
   Test.effect_test
     "a command raises its indexed error"
@@ -72,32 +72,32 @@ let tests = [
       let result =
         try execute (Fail 7) with
         | Missing key -> key + 10
-      Test.expect (Test.equal 17 result)
+      Test.check (Test.equal 17 result)
     }),
   Test.effect_test
     "a residual task may require the repeated service"
     (task {
       let packed : Packed {Db} = Packed (task { Db.get 3 })
       let result = provide (Layer.succeed Db { get = fun n -> n * 10 }) { unpack packed }
-      Test.expect (Test.equal 30 result)
+      Test.check (Test.equal 30 result)
     }),
   Test.effect_test
     "a local layer handles every permitted residual"
     (task {
       let packed : Packed {Db} = Packed (task { Db.get 4 })
-      Test.expect (Test.equal 9 (provided packed))
+      Test.check (Test.equal 9 (provided packed))
     }),
   Test.effect_test
     "a capture index retains the stored callback"
     (task {
       let callback = recover (Saved (fun () -> 44))
-      Test.expect (Test.equal 44 (callback ()))
+      Test.check (Test.equal 44 (callback ()))
     }),
   Test.effect_test
     "a scope handles its indexed residual and closes once"
     (task {
       let closed = Ref.make 0
       close_once closed
-      Test.expect (Test.equal 1 (Ref.get closed))
+      Test.check (Test.equal 1 (Ref.get closed))
     }),
 ]
