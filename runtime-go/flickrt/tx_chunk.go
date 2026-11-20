@@ -35,15 +35,15 @@ func TxChunkPrepend(fb *Fiber, x, c Value) Value {
 // The size is a read: it makes no new version of the chunk.
 
 func TxChunkSize(fb *Fiber, c Value) Value {
-	return txRead(fb, txChunkOf(c), func(v Value) Value { return int32(len(items(v))) })
+	return txRead(fb, txChunkOf(c), ChunkSize)
 }
 
 func TxChunkIsEmpty(fb *Fiber, c Value) Value {
-	return txRead(fb, txChunkOf(c), func(v Value) Value { return len(items(v)) == 0 })
+	return txRead(fb, txChunkOf(c), ChunkIsEmpty)
 }
 
 func TxChunkIsNonEmpty(fb *Fiber, c Value) Value {
-	return txRead(fb, txChunkOf(c), func(v Value) Value { return len(items(v)) > 0 })
+	return txRead(fb, txChunkOf(c), func(v Value) Value { return v.(*Chunk).length() > 0 })
 }
 
 func TxChunkTake(fb *Fiber, n, c Value) Value {

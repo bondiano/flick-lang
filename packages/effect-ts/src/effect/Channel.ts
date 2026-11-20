@@ -2,23 +2,27 @@
 // adapters where a Flick value differs from what Effect takes: options
 // records with `Option` fields, a `Failure` or `Exit` instead of a native
 // cause or exit, and bytes as lists of numbers.
-import { Cause, Channel, type Chunk, Effect, Exit, Option, type PubSub, type Queue } from "effect";
+import { Cause, Channel, Chunk, Effect, Exit, Option, type PubSub, type Queue } from "effect";
 
 import { Failure, passOn, unwinds } from "../cause.ts";
 import type { Data } from "../data.ts";
 import { failureCause, flickExit } from "../stdlib/outcome.ts";
 import { tag } from "@flick-lang/runtime/tags";
+import type { Chunk as NativeChunk } from "@flick-lang/runtime/rt/chunk";
 import { type FlickSpanOptions, nativeSpanOptions } from "./Tracer.ts";
 import { callEffect, causeFromEffect, inNativeRuntime } from "../bridge.ts";
 import { Queue as NativeQueue, end as nativeEnd, flickTake as nativeTake, flickTakeAll as nativeTakeAll, offer as nativeOffer, offerAll as nativeOfferAll } from "@flick-lang/runtime/rt/effect/Queue";
 
 export * from "effect/Channel";
 
-const isArray = <A>(chunk: Chunk.Chunk<A> | ReadonlyArray<A>): chunk is ReadonlyArray<A> => Array.isArray(chunk);
+const isFlatChunk = <A>(chunk: NativeChunk<A>): chunk is ReadonlyArray<A> => Array.isArray(chunk);
 
-/** The native Chunk is an array; Effect's Chunk has its own representation. */
-export const fromChunk = <A>(chunk: Chunk.Chunk<A> | ReadonlyArray<A>): Channel.Channel<A> =>
-  isArray(chunk) ? Channel.fromArray(chunk) : Channel.fromChunk(chunk);
+/** Use the element iterator for native chunks whose leaves are shared. */
+export const fromChunk = <A>(chunk: Chunk.Chunk<A> | NativeChunk<A>): Channel.Channel<A> => {
+  if (Chunk.isChunk(chunk)) return Channel.fromChunk(chunk);
+  if (isFlatChunk(chunk)) return Channel.fromArray(chunk);
+  return Channel.fromIterable(chunk);
+};
 
 const nativePull = (queue: NativeQueue, arrays: boolean) =>
   Effect.flatMap(callEffect(() => arrays ? nativeTakeAll(queue) : nativeTake(queue)), (taken) =>

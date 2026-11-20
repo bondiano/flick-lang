@@ -65,7 +65,7 @@ func showArb(v Value) string {
 	case *Duration:
 		return "dur(" + x.String() + ")"
 	case *Chunk:
-		return "chunk" + showArb(x.items)
+		return "chunk" + showArb(x.flat())
 	case *DateTime:
 		if x.zone == nil {
 			return "utc(" + showArb(x.ms) + ")"

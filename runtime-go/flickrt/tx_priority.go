@@ -24,7 +24,7 @@ func TxPriorityQueueEmpty(fb *Fiber, ord Value) Value {
 // TxPriorityQueueFromIterable sorts the elements, stably, as JS's sort.
 func TxPriorityQueueFromIterable(fb *Fiber, ord, xs Value) Value {
 	q := newTxPriorityQueue(fb, ord)
-	q.ref = newTxRef(&Chunk{q.sorted(fb, List(xs))})
+	q.ref = newTxRef(chunkOf(q.sorted(fb, List(xs))))
 	return q
 }
 
@@ -58,7 +58,7 @@ func (q *TxPriorityQueue) mergeSorted(fb *Fiber, arr, values []Value) Value {
 		out = append(append(out, arr[i:lo]...), value)
 		i = lo
 	}
-	return &Chunk{append(out, arr[i:]...)}
+	return chunkOf(append(out, arr[i:]...))
 }
 
 func txPriorityRead(fb *Fiber, q Value, f func([]Value) Value) Value {
@@ -112,7 +112,7 @@ func TxPriorityQueueTake(fb *Fiber, q Value) Value {
 		if len(xs) == 0 {
 			return t.retryNow(fb)
 		}
-		t.set(fb, r, &Chunk{xs[1:]})
+		t.set(fb, r, chunkOf(xs[1:]))
 		return xs[0]
 	})
 }
@@ -124,7 +124,7 @@ func TxPriorityQueueTakeAll(fb *Fiber, q Value) Value {
 func TxPriorityQueueTakeOption(fb *Fiber, q Value) Value {
 	return txModify(fb, txPriorityOf(q).ref, func(v Value) (Value, Value) {
 		if xs := items(v); len(xs) > 0 {
-			return Some(xs[0]), &Chunk{xs[1:]}
+			return Some(xs[0]), chunkOf(xs[1:])
 		}
 		return None, v
 	})
