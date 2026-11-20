@@ -26,8 +26,7 @@ let first_defect f =
   | Err _ -> ""
 
 outcome : Exit e String -> String
-let outcome ex =
-  Exit.match_ (fun v -> "value " ++ v) (fun f -> show (view f) ++ first_defect f) ex
+let outcome ex = Exit.match_ (fun v -> "value " ++ v) (fun f -> show (view f) ++ first_defect f) ex
 
 stopping : (Unit ->{Stop | r; e} String) ->{r; e} String
 let stopping body =
@@ -39,18 +38,18 @@ let main () =
   let body_die =
     Effect.exit
       (task {
-        stopping
-          (fun () ->
-            Effect.ensuring (task { Stop.stop "cleanup" }) (task { Effect.die "body-boom" }))
+        stopping (fun () ->
+          Effect.ensuring (task { Stop.stop "cleanup" }) (task { Effect.die "body-boom" })
+        )
       })
   say ("body die + cleanup abort: " ++ outcome body_die)
 
   let cleanup_die =
     Effect.exit
       (task {
-        stopping
-          (fun () ->
-            Effect.ensuring (task { Effect.die "cleanup-boom" }) (task { Stop.stop "body" }))
+        stopping (fun () ->
+          Effect.ensuring (task { Effect.die "cleanup-boom" }) (task { Stop.stop "body" })
+        )
       })
   say ("body abort + cleanup die: " ++ outcome cleanup_die)
 
@@ -64,37 +63,35 @@ let main () =
   let bracket_die =
     Effect.exit
       (task {
-        stopping
-          (fun () ->
-            Resource.bracket
-              (task { () })
-              (fun _ -> Effect.die "use-boom")
-              (fun _ -> Stop.stop "release"))
+        stopping (fun () ->
+          Resource.bracket (task { () }) (fun _ -> Effect.die "use-boom") (fun _ ->
+            Stop.stop "release"
+          )
+        )
       })
   say ("bracket use die + release abort: " ++ outcome bracket_die)
 
   let ran_second = Ref.make false
   let first_res =
-    stopping
-      (fun () ->
-        Effect.first_success_of
-          [
-            task { Stop.stop "first" },
-            task {
-              Ref.set ran_second true
-              "second"
-            },
-          ])
+    stopping (fun () ->
+      Effect.first_success_of [
+        task { Stop.stop "first" },
+        task {
+          Ref.set ran_second true
+          "second"
+        },
+      ]
+    )
   say ("first_success_of: " ++ first_res ++ ", second=" ++ show (Ref.get ran_second))
 
   let attempts = Ref.make 0
   let ev_res =
-    stopping
-      (fun () ->
-        Effect.eventually
-          (task {
-            let n = Ref.get attempts + 1
-            Ref.set attempts n
-            if n == 1 then Fail.fail Retry else Stop.stop "ev"
-          }))
+    stopping (fun () ->
+      Effect.eventually
+        (task {
+          let n = Ref.get attempts + 1
+          Ref.set attempts n
+          if n == 1 then Fail.fail Retry else Stop.stop "ev"
+        })
+    )
   say ("eventually: " ++ ev_res ++ ", attempts=" ++ show (Ref.get attempts))
