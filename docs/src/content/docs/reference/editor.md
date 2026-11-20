@@ -66,6 +66,10 @@ by the named module; hidden members stay hidden.
 Type-alias hover includes generic parameters and the written definition, even
 for private aliases. On the declaration name, its hover range includes the
 parameters (`Planner a`); navigation and semantic tokens still target `Planner`.
+Hover on a parameterized data type (local, opaque imported, built-in or from an
+installed package) and on its declaration type parameters shows its inferred
+parameter variance (such as `` `a` (`+`, covariant) ``), updating immediately on
+edits; abstract types and opaque type aliases keep no fabricated variance.
 Hover on a label inside `codec` shows the decoded record field's type, such as
 `email : Email` or `nickname : Option String`, rather than its field codec.
 These signatures use a `flick` code block for editor syntax highlighting.

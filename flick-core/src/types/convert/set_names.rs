@@ -18,6 +18,7 @@ impl Checker<'_> {
         if let Some(TypeDef {
             form: Form::Alias { .. },
             kind: Kind::Meta(_),
+            ..
         }) = self.declared(item)
         {
             return;

@@ -50,6 +50,7 @@ pub fn impl_def(def: &TypeDef) -> Option<TypeDef> {
             body: Type::Record(Row::closed(fields)),
             opaque: false,
         },
+        variance: Vec::new(),
     })
 }
 

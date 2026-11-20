@@ -183,7 +183,7 @@ pub(super) fn changed_inputs(saved: &[(String, String)], now: &[(String, String)
     labels.extend(only(now, saved));
     let mut named: Vec<String> = (labels.iter())
         .map(|label| match label.as_str() {
-            "salt" => "compiler".to_owned(),
+            "salt" | "iface-version" | "ir-version" => "compiler".to_owned(),
             "mode" | "config" | "path" | "source" => label.clone(),
             // the text checking reads is the source with the code of its blocks
             "text" => "plugin output".to_owned(),

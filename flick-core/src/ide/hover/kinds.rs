@@ -6,7 +6,7 @@ use crate::project::Analyzed;
 use crate::source::FileId;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::{Form, Kind, Type, show_type};
+use crate::types::{Form, Kind, Type, Variance, format_parameter_markdown, show_type};
 
 const ROW_KIND_DESCRIPTION: &str = "The kind of rows whose entries have kind `k`. `Row Type` is the kind of record field rows (also written `FieldRow`); it is separate from service, error and capture rows.";
 const ARROW_KIND_DESCRIPTION: &str = "A kind arrow describes a type constructor: it takes an argument of the kind on the left and produces a result of the kind on the right. `List` has kind `Type -> Type`.";
@@ -78,9 +78,10 @@ impl Ide<'_> {
         }
         let name = token.text(self.text(file));
         let signature = path.iter().rev().find(|n| n.kind == K::Signature);
-        let (kind, constraints) = signature
+        let (kind, constraints, variance) = signature
             .and_then(|sig| self.signature_variable_info(m, &path, sig, name))
-            .or_else(|| Self::instance_parameter_info(m, &path, name))
+            .map(|(k, c)| (k, c, None))
+            .or_else(|| Self::instance_parameter_info(m, &path, name).map(|(k, c)| (k, c, None)))
             .or_else(|| self.declaration_parameter_info(m, &path, name))?;
         let prefix = match constraints.as_slice() {
             [] => String::new(),
@@ -88,10 +89,20 @@ impl Ide<'_> {
             _ => format!("({}) => ", constraints.join(", ")),
         };
         let code = format!("{prefix}{name} : {kind}");
-        let explanation = (kind != Kind::Type).then(|| kind_description(&kind));
-        let markdown = match explanation {
-            Some(description) => format!("```flick\n{code}\n```\n\n{description}"),
-            None => format!("```flick\n{code}\n```"),
+        let mut notes = Vec::new();
+        if kind != Kind::Type {
+            notes.push(kind_description(&kind).to_owned());
+        }
+        if let Some(variance) = variance {
+            notes.push(format!(
+                "Variance: {}",
+                format_parameter_markdown(None, variance)
+            ));
+        }
+        let markdown = if notes.is_empty() {
+            format!("```flick\n{code}\n```")
+        } else {
+            format!("```flick\n{code}\n```\n\n{}", notes.join("\n\n"))
         };
         Some((markdown, (token.start, token.end)))
     }
@@ -160,7 +171,7 @@ impl Ide<'_> {
         m: &Analyzed,
         path: &[&Node],
         name: &str,
-    ) -> Option<(Kind, Vec<String>)> {
+    ) -> Option<(Kind, Vec<String>, Option<Variance>)> {
         let decl = path.iter().rev().find(|n| {
             matches!(
                 n.kind,
@@ -175,7 +186,7 @@ impl Ide<'_> {
             .definition
             .as_ref()?;
         let mut kind = &definition.kind;
-        for param in decl.nodes().filter(|n| n.kind == K::TypeParam) {
+        for (index, param) in decl.nodes().filter(|n| n.kind == K::TypeParam).enumerate() {
             let Kind::Arrow(arg, result) = kind else {
                 return None;
             };
@@ -184,7 +195,8 @@ impl Ide<'_> {
                     Form::Class { supers, .. } => constraints_for(supers, name),
                     _ => Vec::new(),
                 };
-                return Some(((**arg).clone(), constraints));
+                let variance = definition.variance.get(index).copied();
+                return Some(((**arg).clone(), constraints, variance));
             }
             kind = result;
         }

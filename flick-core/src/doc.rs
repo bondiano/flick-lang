@@ -13,7 +13,8 @@ use crate::syntax;
 use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::{
-    Form, ModuleNominalKind, ModuleRequirement, ModuleSignature, show_signature, show_type,
+    Form, ModuleNominalKind, ModuleRequirement, ModuleSignature, TypeDef, decl_param_names,
+    format_markdown, show_signature, show_type,
 };
 
 /// The `///` comment right above each top-level declaration, and above
@@ -151,6 +152,7 @@ pub fn page_with_metadata(
     metadata: &impl Fn(&Export) -> (Option<String>, Option<String>),
 ) -> String {
     let contracts = source_module_declarations(text, &interface.module);
+    let parsed = (!text.is_empty()).then(|| syntax::parse(text, FileId::new(0)));
     let mut out = format!("# {}\n", interface.module);
     if let Some(comment) = module_comment(text) {
         let _ = writeln!(out, "\n{comment}");
@@ -178,6 +180,9 @@ pub fn page_with_metadata(
         doc(e, &mut out);
         if let Some(def) = &e.definition {
             let _ = writeln!(out, "\nKind: `{}`", def.kind);
+            if let Some(shown) = type_variance(interface, e, def, parsed.as_ref(), text) {
+                let _ = writeln!(out, "\nVariance: {shown}");
+            }
             if matches!(
                 def.form,
                 Form::ModuleContract { .. } | Form::ModuleSignature { .. }
@@ -240,6 +245,26 @@ pub fn page_with_metadata(
         doc(e, &mut out);
     }
     out
+}
+
+fn type_variance(
+    interface: &Interface,
+    export: &Export,
+    def: &TypeDef,
+    parsed: Option<&syntax::Parse>,
+    text: &str,
+) -> Option<String> {
+    if def.variance.is_empty() {
+        return None;
+    }
+    let names = match &def.form {
+        Form::Class { params, .. } => Some(params.clone()),
+        _ if export.entity.module == interface.module => {
+            parsed.and_then(|p| decl_param_names(&p.tree, text, &export.entity.name))
+        }
+        _ => None,
+    };
+    format_markdown(names.as_deref(), &def.variance)
 }
 
 fn expanded_signature(name: &str, signature: &ModuleSignature, out: &mut String) {

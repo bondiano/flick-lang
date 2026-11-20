@@ -1,0 +1,8 @@
+module App.Contracts exposing (Contract, Empty)
+
+type module Contract =
+  type Box a
+  type T
+
+type module Empty =
+  unit : Unit

@@ -2,6 +2,9 @@
 //! library from the saved modules while its sources, the compiler and the
 //! project's configuration stay the same, and checks it again otherwise.
 
+#[path = "package_cache/variance.rs"]
+mod variance;
+
 use crate::common;
 
 use std::fs;

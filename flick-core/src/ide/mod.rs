@@ -463,3 +463,5 @@ mod set_tests;
 mod tests;
 #[cfg(test)]
 mod variable_hover_tests;
+#[cfg(test)]
+mod variance_hover_tests;

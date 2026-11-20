@@ -205,7 +205,14 @@ impl Checker<'_> {
             ),
         };
         let kind = Kind::arrows(params.iter().map(|p| p.kind.clone()), result);
-        self.env.define_type(&name, TypeDef { kind, form });
+        self.env.define_type(
+            &name,
+            TypeDef {
+                kind,
+                form,
+                variance: Vec::new(),
+            },
+        );
         if decl.kind == K::ServiceDecl {
             self.implementation_header(&name, &params);
         }
@@ -229,6 +236,7 @@ impl Checker<'_> {
                     body: Type::Error,
                     opaque: false,
                 },
+                variance: Vec::new(),
             },
         );
     }

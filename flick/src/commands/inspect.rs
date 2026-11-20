@@ -9,23 +9,27 @@ mod example_host;
 
 use std::path::{Path, PathBuf};
 use std::process::{Command as Process, Output};
-use std::{fs, io};
+use std::{fs, io, mem};
 
 use flick_core::build::Extras;
 use flick_core::diagnostics::{Code, Diagnostic, Severity, codes};
-use flick_core::iface::Interface;
+use flick_core::iface::{self, Export, Interface};
 use flick_core::project::config::Backend;
 use flick_core::project::{self, Analysis, Analyzed, Compilation, Host, Project, cache};
 use flick_core::projection::Projected;
-use flick_core::source::SourceMap;
-use flick_core::types::builtins;
+use flick_core::source::{FileId, SourceMap};
+use flick_core::types::{
+    builtin_sources, builtins, builtins_of, decl_param_names, format_interface_summary,
+};
 use flick_core::{ir, projection, syntax};
 
 use super::build::{BuildPlan, Purpose, artifacts, emit, write};
 use super::check::select;
 use crate::args::{InspectArguments, Representation, SchemaExportArguments, SchemaTarget};
 use crate::backends::Selected;
+use crate::builtins as builtin_cache;
 use crate::command::Outcome;
+use crate::package_cache;
 use crate::sources::FsHost;
 
 fn failure(sources: SourceMap, code: Code, message: String) -> Outcome {
@@ -44,9 +48,13 @@ pub struct Checked {
 }
 
 pub fn compile(explicit: Option<&str>) -> Result<Checked, Outcome> {
+    compile_with_extra(explicit, &[])
+}
+
+fn compile_with_extra(explicit: Option<&str>, extra: &[PathBuf]) -> Result<Checked, Outcome> {
     let host = FsHost::new();
     let mut sources = SourceMap::default();
-    let (project, roots) = match select(&host, &mut sources, explicit, &[]) {
+    let (project, mut roots) = match select(&host, &mut sources, explicit, &[]) {
         Ok(selected) => selected,
         Err(d) => {
             return Err(Outcome {
@@ -55,8 +63,16 @@ pub fn compile(explicit: Option<&str>) -> Result<Checked, Outcome> {
             });
         }
     };
+    roots.extend(extra.iter().cloned());
+    let rt = project::stages_by_class(project.as_ref(), false);
+    if let Err(diagnostic) = builtin_cache::prepare_in(rt) {
+        return Err(Outcome {
+            sources,
+            diagnostics: vec![diagnostic],
+        });
+    }
     let (diagnostics, compilation) =
-        project::compile(&host, &mut sources, project.as_ref(), &roots);
+        package_cache::compile(&host, &mut sources, project.as_ref(), &roots, rt, None);
     if diagnostics.iter().any(|d| d.severity == Severity::Error) {
         return Err(Outcome {
             sources,
@@ -98,50 +114,113 @@ pub fn inspect(options: &InspectArguments, explicit: Option<&str>) -> Outcome {
         Ok(c) => c,
         Err(outcome) => return outcome,
     };
-    let Some(module) = checked
+    if !checked
         .compilation
         .modules
         .iter()
-        .find(|m| m.name == options.module)
+        .any(|m| m.name == options.module)
+    {
+        let rel = project::module_path(&options.module);
+        if let Some(path) = checked
+            .compilation
+            .libraries
+            .iter()
+            .map(|(_, dir)| dir.join(&rel))
+            .find(|path| path.is_file())
+        {
+            checked = match compile_with_extra(explicit, &[path]) {
+                Ok(c) => c,
+                Err(outcome) => return outcome,
+            };
+        }
+    }
+    let Some(index) = checked
+        .compilation
+        .modules
+        .iter()
+        .position(|m| m.name == options.module)
     else {
+        if let Some(text) = inspect_builtin(&checked, options) {
+            print_representation(&text);
+            return Outcome::default();
+        }
         return failure(
             checked.sources,
             codes::P018,
             format!("the project has no module `{}`", options.module),
         );
     };
+    let text = match inspect_module(&mut checked, index, options, explicit) {
+        Ok(text) => text,
+        Err(outcome) => return outcome,
+    };
+    print_representation(&text);
+    Outcome::default()
+}
+
+fn print_representation(text: &str) {
+    print!("{text}");
+    if !text.ends_with('\n') {
+        println!();
+    }
+}
+
+fn inspect_builtin(checked: &Checked, options: &InspectArguments) -> Option<String> {
+    if !matches!(
+        options.emit,
+        Representation::Iface | Representation::Variance
+    ) {
+        return None;
+    }
+    let rt = project::stages_by_class(checked.project.as_ref(), false);
+    let builtin = builtins_of(rt)
+        .iter()
+        .find(|i| i.module == options.module && !i.private)?;
+    Some(match options.emit {
+        Representation::Iface => iface::write(builtin),
+        Representation::Variance => {
+            format_interface_summary(builtin, &|export| builtin_param_names(export))
+        }
+        _ => unreachable!(),
+    })
+}
+
+fn inspect_module(
+    checked: &mut Checked,
+    index: usize,
+    options: &InspectArguments,
+    explicit: Option<&str>,
+) -> Result<String, Outcome> {
+    let module = &checked.compilation.modules[index];
     let path = module.name.replace('.', "/");
-    let text = match options.emit {
+    match options.emit {
         Representation::Ast => {
             let source = &checked.sources.get(module.file).text;
-            syntax::parse(source, module.file).tree.debug_dump(source)
+            Ok(syntax::parse(source, module.file).tree.debug_dump(source))
         }
-        Representation::TypedIr => ir::print(&module.ir),
-        Representation::Mapping => match projected(explicit, &options.module) {
-            Some(json) => json,
-            None => {
-                return failure(
-                    checked.sources,
-                    codes::P018,
-                    format!("no projection of `{}`", options.module),
-                );
-            }
-        },
+        Representation::TypedIr => Ok(ir::print(&module.ir)),
+        Representation::Variance => Ok(format_interface_summary(&module.interface, &|export| {
+            compiled_param_names(checked, export).or_else(|| builtin_param_names(export))
+        })),
+        Representation::Mapping => projected(explicit, &options.module).ok_or_else(|| {
+            failure(
+                mem::take(&mut checked.sources),
+                codes::P018,
+                format!("no projection of `{}`", options.module),
+            )
+        }),
         other => {
             let (file, typescript) = match other {
                 Representation::Js => (format!("{path}.js"), false),
                 Representation::Ts => (format!("{path}.ts"), true),
                 _ => (format!("{path}.iface"), false),
             };
-            let out = match output(&checked, checked.host.cwd.join("dist"), typescript) {
-                Ok(out) => out,
-                Err(diagnostic) => {
-                    return Outcome {
-                        sources: checked.sources,
-                        diagnostics: vec![diagnostic],
-                    };
+            let out = output(checked, checked.host.cwd.join("dist"), typescript).map_err(|d| {
+                Outcome {
+                    sources: mem::take(&mut checked.sources),
+                    diagnostics: vec![d],
                 }
-            };
+            })?;
             let emission = artifacts(
                 &checked.host,
                 &mut checked.sources,
@@ -150,30 +229,39 @@ pub fn inspect(options: &InspectArguments, explicit: Option<&str>) -> Outcome {
                 &out,
             );
             match emission.artifacts.into_iter().find(|a| a.path == file) {
-                Some(a) => match String::from_utf8(a.contents) {
-                    Ok(text) => text,
-                    Err(_) => {
-                        return failure(
-                            checked.sources,
-                            codes::P013,
-                            format!("the emitted representation `{file}` is not UTF-8"),
-                        );
-                    }
-                },
-                None => {
-                    return Outcome {
-                        sources: checked.sources,
-                        diagnostics: emission.diagnostics,
-                    };
-                }
+                Some(a) => String::from_utf8(a.contents).map_err(|_| {
+                    failure(
+                        mem::take(&mut checked.sources),
+                        codes::P013,
+                        format!("the emitted representation `{file}` is not UTF-8"),
+                    )
+                }),
+                None => Err(Outcome {
+                    sources: mem::take(&mut checked.sources),
+                    diagnostics: emission.diagnostics,
+                }),
             }
         }
-    };
-    print!("{text}");
-    if !text.ends_with('\n') {
-        println!();
     }
-    Outcome::default()
+}
+
+fn compiled_param_names(checked: &Checked, export: &Export) -> Option<Vec<String>> {
+    let origin = checked
+        .compilation
+        .modules
+        .iter()
+        .find(|m| m.name == export.entity.module)?;
+    let source = &checked.sources.get(origin.file).text;
+    let parsed = syntax::parse(source, origin.file);
+    decl_param_names(&parsed.tree, source, &export.entity.name)
+}
+
+fn builtin_param_names(export: &Export) -> Option<Vec<String>> {
+    let (_, source) = builtin_sources()
+        .iter()
+        .find(|(name, _)| *name == export.entity.module)?;
+    let parsed = syntax::parse(source, FileId::default());
+    decl_param_names(&parsed.tree, source, &export.entity.name)
 }
 
 /// The editor projection of `module` and its span maps, as JSON.

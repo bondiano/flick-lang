@@ -11,7 +11,9 @@ use crate::iface::{Decl, Namespace};
 use crate::source::FileId;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::{Form, Ref, TypeDef, show_signature, show_type};
+use crate::types::{
+    Form, Ref, TypeDef, decl_param_names, format_markdown, show_signature, show_type,
+};
 
 mod attributes;
 #[cfg(test)]
@@ -401,21 +403,19 @@ impl Ide<'_> {
                     Some(literal) => format!("{code}\n{} = {literal}", e.name),
                     None => code,
                 };
+                let variance = (e.namespace == Namespace::Type)
+                    .then(|| {
+                        entity_variance(
+                            &e.name,
+                            export.and_then(|item| item.definition.as_ref()),
+                            source.as_ref(),
+                        )
+                    })
+                    .flatten();
                 let doc = source
                     .and_then(|source| documentation(&source, &e.name))
-                    .or_else(|| match export.and_then(|item| item.definition.as_ref()) {
-                        Some(TypeDef {
-                            kind,
-                            form: Form::Kind,
-                        }) => Some(kind_description(kind).to_owned()),
-                        Some(TypeDef {
-                            kind,
-                            form: Form::KindMember,
-                        }) => Some(format!("A member of the finite kind `{kind}`.")),
-                        _ => None,
-                    });
-                let from = format!("from `{}`", e.module);
-                let note = doc.map_or(from.clone(), |d| format!("{d}\n\n{from}"));
+                    .or_else(|| kind_note(export.and_then(|item| item.definition.as_ref())));
+                let note = join_notes(doc, variance, &e.module);
                 match self.derived(file, range, &e.module, &e.name) {
                     Some((instance, what)) => (instance, Some(format!("{what}\n\n{note}"))),
                     None => (code, Some(note)),
@@ -438,4 +438,49 @@ impl Ide<'_> {
         }
         Some((text, range))
     }
+}
+
+fn entity_variance(
+    name: &str,
+    definition: Option<&TypeDef>,
+    source: Option<&Source>,
+) -> Option<String> {
+    let definition = definition?;
+    if definition.variance.is_empty() {
+        return None;
+    }
+    let names = match &definition.form {
+        Form::Class { params, .. } => Some(params.clone()),
+        _ => source.and_then(|s| decl_param_names(&s.tree, &s.text, name)),
+    };
+    format_markdown(names.as_deref(), &definition.variance)
+        .map(|shown| format!("Variance: {shown}"))
+}
+
+fn kind_note(definition: Option<&TypeDef>) -> Option<String> {
+    match definition {
+        Some(TypeDef {
+            kind,
+            form: Form::Kind,
+            ..
+        }) => Some(kind_description(kind).to_owned()),
+        Some(TypeDef {
+            kind,
+            form: Form::KindMember,
+            ..
+        }) => Some(format!("A member of the finite kind `{kind}`.")),
+        _ => None,
+    }
+}
+
+fn join_notes(doc: Option<String>, variance: Option<String>, module: &str) -> String {
+    let mut parts = Vec::new();
+    if let Some(doc) = doc {
+        parts.push(doc);
+    }
+    if let Some(variance) = variance {
+        parts.push(variance);
+    }
+    parts.push(format!("from `{module}`"));
+    parts.join("\n\n")
 }

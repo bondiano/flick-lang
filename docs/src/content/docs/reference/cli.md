@@ -45,11 +45,11 @@ of their own. `flick --help` lists them by contributor, and they run as
 | `ffi check [paths]` | a command of the JavaScript backend: checks generated and reviewed bindings and their policies against the installed packages; without paths the source root |
 | `schema export <M.codec> --target json-schema-2020-12 --out <file>` | the strict JSON Schema of a `PureCodec Json a` |
 | `schema export <M.api> --target openapi-3.1 --out <file>` | an `HttpApi.Api` value as an OpenAPI 3.1 document, the same document `HttpApi.openapi` makes (see [Clients and documents](../http-api/#clients-and-documents)) |
-| `doc --out-dir <dir> [--source-base-url <url>] [--check-examples] [--std]` | Markdown pages of the public API: types, kinds, constraints, effects, captures |
+| `doc --out-dir <dir> [--source-base-url <url>] [--check-examples] [--std]` | Markdown pages of the public API: types, kinds, variances, constraints, effects, captures |
 | `explain <code>` | the explanation of a diagnostic code, a plugin's too, as `std/L001` |
 | `expand [paths]` | the code each [plugin](../plugins/) block of the project or of the files stands for |
 | `doctor` | the compiler, Node.js, pnpm, git, the TypeScript Content Mapper, the installed runtime and Effect, the optional adapters, and Go when it is installed; everything but the compiler, Node.js and pnpm is a note, not a failure |
-| `inspect <M> --emit ast\|typed-ir\|js\|ts\|iface\|mapping` | one representation of a module |
+| `inspect <M> --emit ast\|typed-ir\|js\|ts\|iface\|variance\|mapping` | one representation of a module; `--emit variance` prints inferred parameter variances of exported types (including installed packages and built-in modules, reporting unknown metadata as `inv (unknown)`) |
 | `lsp --stdio` | the [language server](../editor/#language-server); stdio is its only transport |
 | `content-mapper [--declarations <paths>…]` | a session command of the JavaScript backend (`js:content-mapper`): serves TypeScript's [Content Mapper](../editor/#content-mapper) requests for `.fl` files on stdio, started by `@flick-lang/content-mapper`; `--declarations` instead writes the projection of each `.fl` file under the paths beside it as `Name.d.fl.ts` and exits |
 

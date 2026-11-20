@@ -11,6 +11,8 @@ mod doc_tests;
 mod foreign_inputs;
 #[path = "cli_project/output_guards.rs"]
 mod output_guards;
+#[path = "cli_project/variance.rs"]
+mod variance_tests;
 
 use std::fmt::Write as _;
 use std::fs;

@@ -236,6 +236,7 @@ fn support_projection_closure_handles_cycles_and_drops_unused_records() {
                 body: Type::con("Probe", next),
                 opaque: false,
             },
+            variance: Vec::new(),
         },
         owner_path: vec![],
     };
@@ -297,6 +298,7 @@ fn parameterized_projection_keeps_only_required_type_support() {
         definition: TypeDef {
             kind: Kind::Type,
             form: Form::NOMINAL,
+            variance: Vec::new(),
         },
         owner_path: vec![],
     };

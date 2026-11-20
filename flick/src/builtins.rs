@@ -11,7 +11,7 @@ use std::{fs, thread};
 
 use flick_core::build::{self, BuiltinModules, BuiltinSource, BuiltinStore};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
-use flick_core::iface::Interface;
+use flick_core::iface::{IFACE_VERSION, Interface};
 use flick_core::ir;
 use flick_core::types;
 use flick_ir::Program;
@@ -235,7 +235,10 @@ fn location(stages_by_class: bool) -> Option<(PathBuf, String, String)> {
     let dir = store::cache_dir()?;
     let binary = format!("{PREFIX}{}-", toolchain::fingerprint()?);
     let mode = if stages_by_class { "-by-class" } else { "" };
-    let name = format!("{binary}{}{mode}.jsonl", &implicit_hash()[..16]);
+    let name = format!(
+        "{binary}v{IFACE_VERSION}-{}{mode}.jsonl",
+        &implicit_hash()[..16]
+    );
     Some((dir, binary, name))
 }
 

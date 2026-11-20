@@ -8,6 +8,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::{env, fs, io};
 
+use flick_core::iface::IFACE_VERSION;
 use flick_core::plugin::reach::{SNAPSHOTS, hash};
 use flick_core::project::cache::{self, Key, Manifest};
 use flick_core::project::{self, Project, config};
@@ -56,6 +57,7 @@ pub fn key(project: &Project, roots: &[PathBuf], settings: &str, needs_effect: b
     }
     key.add("config", format!("{:?}", project.config));
     key.add("compiler", toolchain::COMPILER);
+    key.add("iface-version", IFACE_VERSION.to_le_bytes());
     key.add("implicit packages", builtins::implicit_hash());
     key.add(
         "compiler-binary",

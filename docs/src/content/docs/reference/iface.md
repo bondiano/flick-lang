@@ -12,8 +12,8 @@ It is versioned JSON. `.d.ts` is only a projection for TypeScript; `.iface` is t
 The schema has the version `IFACE_VERSION` of `flick-core/src/iface.rs`.
 The current schema includes module visibility,
 `type module` contracts, nested static modules, higher-order signatures, the
-`exists` type form, implicit conversion instances, the invariants of
-refined types and the companions of re-exported types. Every schema change
+`exists` type form, implicit conversion instances, inferred parameter variance,
+the invariants of refined types and the companions of re-exported types. Every schema change
 bumps the version; a compiler rejects any other version with `FLICK-P010`,
 naming the version it found and the one it reads. The simplified example below
 shows the envelope, with the two versions a real file holds as placeholders;
@@ -135,7 +135,7 @@ its exports carry no types, and importers accept any use of them.
 | Field | On | Contents |
 | - | - | - |
 | `type` | values, constructors | the full type: `forall` with the kinds of its variables, constraints, effect arrows and rows |
-| `definition` | types, errors, services, classes, kinds | `kind` and `form`, see below |
+| `definition` | types, errors, services, classes, kinds | `kind`, `form` and optional `variance`, see below |
 
 ```json
 { "module": "App.Shapes", "namespace": "value", "name": "wrap", "decl": "let",
@@ -195,6 +195,14 @@ declaration and `{ "arrow": [K1, K2] }`.
 Transparent aliases are expanded in every exported type, so an importer never
 needs the alias of a module it does not import. An opaque type is `nominal`
 outside its module: importers cannot see its representation.
+
+A parameterized data type (`nominal`, `adt` or `error`) carries `variance` as
+an array of `"covariant"`, `"contravariant"`, `"invariant"` or `"bivariant"` in
+parameter order (omitted when empty or unknown). Non-`Type` parameters are
+always `"invariant"`. Importers validate the arity and parameter kinds before
+trusting serialized variance and keep missing or unknown metadata conservatively
+invariant (as for abstract types and opaque type aliases); changing exported
+variance changes the module's fingerprint and is a breaking API change.
 
 ### Instances
 

@@ -1,0 +1,56 @@
+module App.Lib exposing
+  ( Box
+  , Sink
+  , AWrapSink
+  , SecretSink
+  , Cell
+  , Phantom
+  , WrapPhantom
+  , DoubleSink
+  , WrapContraPhantom
+  , Secret
+  , Thunk
+  , Alias
+  , Abstract
+  , SecretFn
+  , AliasFn
+  , PairBox
+  , make_thunk
+  )
+
+opaque type Box a = Box { value : a }
+
+opaque type AWrapSink a = AWrapSink (Sink a)
+
+opaque type Sink a = Sink (a -> Unit)
+
+type SecretSink a = SecretSink (a -> Unit)
+
+opaque type Cell a = Cell (Ref a)
+
+opaque type Phantom a = Phantom
+
+opaque type WrapPhantom a = WrapPhantom (Phantom a)
+
+opaque type DoubleSink a = DoubleSink (Sink (Sink a))
+
+opaque type WrapContraPhantom a = WrapContraPhantom (ContraPhantom a)
+
+type ContraPhantom a = ContraPhantom (Phantom a -> Unit)
+
+type Secret a = Secret a
+
+opaque type Thunk (r : ServiceRow) a = Thunk (Unit ->{r} a)
+
+opaque type alias Alias a = List a
+
+type Abstract a
+
+opaque type SecretFn = SecretFn (Unit -> Unit)
+
+opaque type alias AliasFn = Unit -> Unit
+
+opaque type PairBox = PairBox (Int, Int)
+
+make_thunk : forall c r a. (Unit ->{r} a)^c -> (Thunk r a)^c
+let make_thunk f = Thunk f

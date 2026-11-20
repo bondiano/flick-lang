@@ -424,6 +424,7 @@ mod declaration_reference_tests {
                 constructors: vec!["Own".into()],
                 abi: Abi::Tagged,
             },
+            variance: Vec::new(),
         });
         let mut alias = export("Alias", Namespace::Type, Decl::Alias);
         alias.definition = Some(TypeDef {
@@ -433,6 +434,7 @@ mod declaration_reference_tests {
                 body: Type::con("Parent.Child", "Box"),
                 opaque: false,
             },
+            variance: Vec::new(),
         });
         let published = Interface {
             exports: vec![constructor, own, alias],
