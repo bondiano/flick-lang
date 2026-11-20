@@ -16,7 +16,7 @@
 
 mod search;
 
-pub use search::{Outcome, decide};
+pub use search::{Outcome, decide, decide_budgeted};
 
 /// The derivations a decision may take: enough for every system of a few
 /// variables with small coefficients, and bounded for every system.

@@ -1,0 +1,31 @@
+---
+title: "FLICK-T087"
+source_hash: "3f75318de9c2735c"
+---
+
+Каждое условие `ensure` в контракте функции должно выполняться для результата на
+каждом пути через тело функции при выполнении условий `require`. Когда
+`flick prove` находит входные значения, удовлетворяющие `require`, но
+нарушающие `ensure`, он сообщает об этой ошибке вместе с контрпримером.
+
+```flick fail T087
+consume : Int -> Int -> Int
+let consume available used
+where
+  require (0 <= used && used <= available)
+  ensure (fun remaining -> 0 <= remaining && remaining + used == available)
+=
+  available
+```
+
+это
+
+```flick
+consume : Int -> Int -> Int
+let consume available used
+where
+  require (0 <= used && used <= available)
+  ensure (fun remaining -> 0 <= remaining && remaining + used == available)
+=
+  available - used
+```

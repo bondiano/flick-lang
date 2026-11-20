@@ -44,6 +44,20 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// are not loaded, so names from them are taken on trust. A whole program goes
 /// through [`project::check`].
 pub fn check(sources: &source::SourceMap, file: source::FileId) -> Vec<diagnostics::Diagnostic> {
+    check_or_prove(sources, file, false)
+}
+
+/// Checks one source file on its own, also proving its function contracts in
+/// `PureTotalV2`. A whole program goes through [`project::prove`].
+pub fn prove(sources: &source::SourceMap, file: source::FileId) -> Vec<diagnostics::Diagnostic> {
+    check_or_prove(sources, file, true)
+}
+
+fn check_or_prove(
+    sources: &source::SourceMap,
+    file: source::FileId,
+    prove_contracts: bool,
+) -> Vec<diagnostics::Diagnostic> {
     let text = &sources.get(file).text;
     let parse = syntax::parse(text, file).into_module();
     let syntax = resolve::module_syntax(&parse.tree, text, file);
@@ -51,5 +65,9 @@ pub fn check(sources: &source::SourceMap, file: source::FileId) -> Vec<diagnosti
     // the witnesses its `deriving` names, which std's plugin writes
     let (expansion, derived) =
         plugin::derive::builtin_expansion(text, file, &parse.tree, name, &syntax);
-    project::check_file(sources, file, parse, syntax, expansion, derived)
+    if prove_contracts {
+        project::prove_file(sources, file, parse, syntax, expansion, derived)
+    } else {
+        project::check_file(sources, file, parse, syntax, expansion, derived)
+    }
 }

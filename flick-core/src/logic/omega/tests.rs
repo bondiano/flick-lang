@@ -1,4 +1,4 @@
-use super::{BUDGET, Linear, Outcome, Proof, Step, check, decide};
+use super::{BUDGET, Linear, Outcome, Proof, Step, check, decide, decide_budgeted};
 
 fn lin(terms: &[(usize, i128)], c: i128) -> Linear {
     Linear::new(terms.iter().copied(), c).expect("small")
@@ -198,4 +198,22 @@ fn a_forged_certificate_is_refused() {
         Box::new(Proof::Absurd(2)),
     );
     assert!(!check(&[lin(&[(0, 2)], 0), lin(&[(0, -2)], 0)], 1, &fresh));
+}
+
+#[test]
+fn decide_budgeted_shares_and_depletes_one_budget() {
+    let facts = [lin(&[(0, 1)], -1), lin(&[(0, -1)], 0)];
+    let mut budget = 100;
+    let Outcome::Refuted(proof) = decide_budgeted(&facts, 1, &mut budget) else {
+        panic!("expected refutation");
+    };
+    assert!(check(&facts, 1, &proof));
+    assert!(budget < 100, "budget should be spent: remaining {budget}");
+
+    let mut zero = 0;
+    assert!(matches!(
+        decide_budgeted(&facts, 1, &mut zero),
+        Outcome::Unknown
+    ));
+    assert_eq!(zero, 0);
 }

@@ -6,6 +6,7 @@
 mod abstraction;
 mod applicative_do;
 mod comprehension;
+pub mod contracts;
 mod debug;
 mod derived;
 mod do_notation;

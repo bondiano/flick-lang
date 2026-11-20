@@ -94,6 +94,11 @@ pub(super) struct Precompiled {
 }
 
 impl Precompiled {
+    /// The lowered IR of a saved source-package module, if any.
+    pub(super) fn ir(&self, name: &str) -> Option<&ir::Module> {
+        self.saved.get(name).map(|(_, module)| &module.ir)
+    }
+
     /// The libraries of `packages` with their keys and saved modules. A
     /// library's key covers the compiler, what checking reads of the
     /// configuration of the project, its sources and the keys of the
@@ -349,7 +354,7 @@ impl Loader<'_> {
             };
             // A selected environment checks reachable effects in package bodies,
             // including bodies reused from an earlier source-package check.
-            if mode != Mode::Check
+            if !matches!(mode, Mode::Check | Mode::Prove)
                 || self
                     .project
                     .is_some_and(|p| p.config.build.environment.is_some())

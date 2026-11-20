@@ -20,6 +20,7 @@ pub use flick_ir::{
     Item, ItemKind, Label, LangItem, Lit, Module, OpArm, Param, Pat, ResultAdapter, Stage, Stmt,
     TypeName, memory, operation_arity,
 };
+pub use lower::contracts::{LoweredContract, ProvenContract, check_contracts, lower_contracts};
 pub use lower::lower;
 pub use lower::proofs::{LoweredProof, Proven, Run, check_proofs, laws_of, lower_proofs};
 pub use print::print;
