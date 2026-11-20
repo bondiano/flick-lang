@@ -132,6 +132,7 @@ impl Checking<'_> {
             ir,
             declarations,
             proofs: Vec::new(),
+            contracts: Vec::new(),
         }
     }
 

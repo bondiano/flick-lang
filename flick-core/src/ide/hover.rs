@@ -122,11 +122,35 @@ impl Ide<'_> {
     /// type of the operand.
     fn keyword(&self, file: FileId, offset: u32) -> Option<(String, String, (u32, u32))> {
         let m = self.module(file)?;
-        let parent = *tree::path_to(&m.tree, offset).last()?;
+        let path = tree::path_to(&m.tree, offset);
+        let parent = *path.last()?;
         let kw = parent
             .child_tokens()
             .find(|t| t.start <= offset && offset <= t.end && t.kind != K::Ident)?;
         let at = (kw.start, kw.end);
+        if path.iter().any(|n| n.kind == K::Contract) {
+            match kw.kind {
+                K::RequireKw => {
+                    return Some((
+                        "require …".to_owned(),
+                        "Contract precondition (`Bool` of the function's parameters). \
+                         Unchecked by `flick check`; run `flick prove` to verify."
+                            .to_owned(),
+                        at,
+                    ));
+                }
+                K::EnsureKw => {
+                    return Some((
+                        "ensure …".to_owned(),
+                        "Contract postcondition (`Result -> Bool`). \
+                         Unchecked by `flick check`; run `flick prove` to verify."
+                            .to_owned(),
+                        at,
+                    ));
+                }
+                _ => {}
+            }
+        }
         let ty = m.typing.types.get(&at)?;
         let shown = show_signature(ty);
         let (head, note) = match kw.kind {

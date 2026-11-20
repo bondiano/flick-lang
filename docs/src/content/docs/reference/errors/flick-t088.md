@@ -1,0 +1,46 @@
+---
+title: "FLICK-T088"
+---
+
+When a function calls another function whose contract has been verified,
+`flick prove` checks that the caller's path conditions establish every
+`require` clause of the callee at the call site. Strengthen the caller's
+`require` or guard the call before invoking it.
+
+```flick fail T088
+consume : Int -> Int -> Int
+let consume available used
+where
+  require (0 <= used && used <= available)
+  ensure (fun remaining -> 0 <= remaining && remaining + used == available)
+=
+  available - used
+
+take : Int -> Int -> Int
+let take available used
+where
+  require (0 <= used)
+  ensure (fun remaining -> 0 <= remaining)
+=
+  consume available used
+```
+
+is
+
+```flick
+consume : Int -> Int -> Int
+let consume available used
+where
+  require (0 <= used && used <= available)
+  ensure (fun remaining -> 0 <= remaining && remaining + used == available)
+=
+  available - used
+
+take : Int -> Int -> Int
+let take available used
+where
+  require (0 <= used && used <= available)
+  ensure (fun remaining -> 0 <= remaining)
+=
+  consume available used
+```

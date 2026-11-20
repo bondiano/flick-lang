@@ -3,7 +3,7 @@
 //! mapping, name collisions and import cycles, then resolves each module
 //! against the interfaces of its imports.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::io;
 use std::mem;
 use std::path::{Path, PathBuf};
@@ -31,9 +31,9 @@ mod target;
 mod unknown;
 
 pub use checking::ModuleCache;
-pub(crate) use checking::check_file;
 #[cfg(feature = "native-project")]
 pub use checking::{ModuleStore, SavedModule};
+pub(crate) use checking::{check_file, prove_file};
 pub use entry::{MainKind, host_services, main_kind};
 pub use format_plugins::FormatPlugins;
 #[cfg(feature = "ide")]
@@ -119,6 +119,8 @@ struct Virtual {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Mode {
     Check,
+    /// Like [`Mode::Check`], also verifying contracts in selected roots.
+    Prove,
     /// Also lowers every module to the IR when nothing has errors.
     Compile,
     #[cfg(feature = "ide")]
@@ -167,107 +169,22 @@ struct Loader<'a> {
     /// What a test companion sees of its module, by the module's name: all
     /// it declares. Only a run that loads the companion makes one.
     privates: BTreeMap<String, Interface>,
+    /// Whether this run verifies contracts (`Mode::Prove`).
+    prove_contracts: bool,
+    /// Normalized root paths selected for this run (used to narrow contract
+    /// verification to selected modules in `flick prove <path>`).
+    selected_roots: HashSet<PathBuf>,
+    /// Every `(module, name)` declared with a `where` contract across all
+    /// loaded modules in this run.
+    all_contracted: HashSet<(String, String)>,
+    /// Verified contracts produced per module during this run.
+    verified_contracts: Vec<Vec<ir::ProvenContract>>,
 }
 
 /// A module's IR and what the reference model reads of it.
 type Lowered = (ir::Module, Arc<Interface>, Vec<ir::Proven>);
 
-/// The module `m` of the build, lowered.
-fn compiled(m: &Loaded, (ir, declarations, _): Lowered, interface: Interface) -> Compiled {
-    Compiled {
-        name: m.name.clone(),
-        path: m.path.clone(),
-        file: m.file,
-        test: m.root == Root::Test || companion_of(&m.name).is_some(),
-        package: match &m.root {
-            Root::Package(name) => Some(name.clone()),
-            _ => None,
-        },
-        imports: m
-            .syntax
-            .imports
-            .iter()
-            .chain(&m.syntax.inline_imports)
-            .filter(|i| !i.module.starts_with("$scope:"))
-            .map(|i| i.module.clone())
-            .chain(
-                m.virtual_of
-                    .iter()
-                    .flat_map(|v| v.capture.scopes.iter().map(|s| s.module.clone())),
-            )
-            .collect(),
-        ir,
-        declarations,
-        interface,
-        expansion: m.expansion.clone(),
-    }
-}
-
-/// The modules of a build: the project's and those of its libraries.
-#[derive(Default)]
-pub struct Compilation {
-    pub modules: Vec<Compiled>,
-    /// The libraries of `[dependencies]`, each with its source directory.
-    pub libraries: Vec<(String, PathBuf)>,
-    /// The npm packages its dependency closure asks for, which a js build
-    /// needs installed.
-    #[cfg(feature = "native-project")]
-    pub js_dependencies: Vec<super::js::Wanted>,
-}
-
-/// A module that checked cleanly, lowered to the IR.
-pub struct Compiled {
-    pub name: String,
-    pub path: PathBuf,
-    pub file: FileId,
-    /// Whether it is in the test root.
-    pub test: bool,
-    /// The source package it belongs to; `None` for the project's own.
-    pub package: Option<String>,
-    /// The modules it imports.
-    pub imports: Vec<String>,
-    pub ir: ir::Module,
-    /// Every top-level entity with its type, for the reference model.
-    pub declarations: Arc<Interface>,
-    pub interface: Interface,
-    /// The module with its plugin blocks expanded, when it has any.
-    pub expansion: Option<Arc<Expansion>>,
-}
-
-impl Compilation {
-    /// The library of `[dependencies]` that `module` belongs to, with its
-    /// source directory.
-    pub fn library_of(&self, module: &str) -> Option<(&str, &Path)> {
-        let module = self.modules.iter().find(|m| m.name == module)?;
-        let package = module.package.as_deref()?;
-        (self.libraries.iter())
-            .find(|(name, _)| name == package)
-            .map(|(name, dir)| (name.as_str(), dir.as_path()))
-    }
-
-    /// The file of the foreign module `spec` when the build ships it beside
-    /// `module`: an `.mjs` or `.cjs` of a library or the declarations of
-    /// one, inside its source directory, which a tarball or a fetched copy
-    /// of the library has. Any other relative file stays where it is, and
-    /// the output refers to it.
-    pub fn shipped_foreign(&self, module: &str, spec: &str) -> Option<PathBuf> {
-        if !spec.starts_with("./") && !spec.starts_with("../") {
-            return None;
-        }
-        let (_, dir) = self.library_of(module).filter(|_| ships(spec))?;
-        let source = self.modules.iter().find(|m| m.name == module)?;
-        let path = normalize(&source.path.parent()?.join(spec));
-        path.starts_with(dir).then_some(path)
-    }
-}
-
-/// Whether a build ships the file `path` of a library into its output: a
-/// foreign module, or the TypeScript declarations of one.
-pub fn ships(path: &str) -> bool {
-    [".mjs", ".cjs", ".d.mts", ".d.cts", ".d.ts"]
-        .iter()
-        .any(|end| path.ends_with(end))
-}
+include!("compiled.rs");
 
 /// Checks `roots` (absolute `.fl` paths) and their transitive imports.
 pub fn check(
@@ -291,6 +208,31 @@ pub fn check_with(
     cache: Option<&mut ModuleCache>,
 ) -> (Vec<Diagnostic>, Vec<Fresh>) {
     let output = run(host, sources, project, roots, Mode::Check, cache, packages);
+    (output.diagnostics, output.fresh)
+}
+
+/// Checks `roots` (absolute `.fl` paths) and their transitive imports, also
+/// verifying proofs and every contract declared in `roots`.
+pub fn prove(
+    host: &dyn Host,
+    sources: &mut SourceMap,
+    project: Option<&Project>,
+    roots: &[PathBuf],
+) -> Vec<Diagnostic> {
+    run(host, sources, project, roots, Mode::Prove, None, None).diagnostics
+}
+
+/// [`prove`], reusing saved package modules and `cache` for non-proved modules
+/// while always re-proving proof and contracted modules.
+pub fn prove_with(
+    host: &dyn Host,
+    sources: &mut SourceMap,
+    project: Option<&Project>,
+    roots: &[PathBuf],
+    packages: Option<&PackageCache>,
+    cache: Option<&mut ModuleCache>,
+) -> (Vec<Diagnostic>, Vec<Fresh>) {
+    let output = run(host, sources, project, roots, Mode::Prove, cache, packages);
     (output.diagnostics, output.fresh)
 }
 
@@ -375,7 +317,8 @@ fn run_in(
     let (diagnostics, precompiled) = (Vec::new(), Precompiled::default());
     // a check lowers the modules of source packages only to save them;
     // a selected environment also needs IR for target preflight
-    let lower_packages_only = mode == Mode::Check && saved.is_some();
+    let check_only = matches!(mode, Mode::Check | Mode::Prove);
+    let lower_packages_only = check_only && saved.is_some();
     let environment_preflight = project.is_some_and(|p| p.config.build.environment.is_some());
     let mut loader = Loader {
         expression_serial: 0,
@@ -390,8 +333,7 @@ fn run_in(
         by_name: BTreeMap::new(),
         from_packages: BTreeMap::new(),
         diagnostics,
-        lowered: (mode != Mode::Check || lower_packages_only || environment_preflight)
-            .then(Vec::new),
+        lowered: (!check_only || lower_packages_only || environment_preflight).then(Vec::new),
         lower_packages_only: lower_packages_only && !environment_preflight,
         precompiled,
         #[cfg(feature = "ide")]
@@ -399,6 +341,10 @@ fn run_in(
         cache,
         watchers: plugins::Watchers::default(),
         privates: BTreeMap::new(),
+        prove_contracts: mode == Mode::Prove,
+        selected_roots: HashSet::new(),
+        all_contracted: HashSet::new(),
+        verified_contracts: Vec::new(),
     };
     let mut roots: Vec<(Root, PathBuf)> = roots
         .iter()
@@ -406,6 +352,7 @@ fn run_in(
         .collect();
     roots.sort();
     roots.dedup();
+    loader.selected_roots = roots.iter().map(|(_, path)| path.clone()).collect();
     for (_, path) in roots {
         if let Err(err) = loader.load(&path) {
             let message = format!("cannot read `{}`: {err}", loader.host.display(&path));

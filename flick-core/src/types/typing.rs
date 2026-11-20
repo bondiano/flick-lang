@@ -217,6 +217,8 @@ pub struct Typing {
     pub proofs: Vec<super::proof_decls::ProofInfo>,
     /// The laws of the module's classes, typed as proofs are.
     pub laws: Vec<super::proof_decls::ProofInfo>,
+    /// The function contracts, as the checker settled them.
+    pub contracts: Vec<super::contracts::ContractInfo>,
 }
 
 impl Typing {

@@ -1,4 +1,14 @@
 impl Checking<'_> {
+    fn proves_contracts(&self, loaded: &Loaded) -> bool {
+        self.prove_contracts
+            && loaded.has_contracts()
+            && self.selected.is_none_or(|s| s.contains(&loaded.path))
+    }
+
+    fn lowers(&self, loaded: &Loaded) -> bool {
+        self.lower && (!self.lower_packages_only || matches!(loaded.root, Root::Package(_)))
+    }
+
     fn raw_interface<'i>(
         &'i self,
         interfaces: &'i [Option<Interface>],
@@ -34,10 +44,13 @@ impl Checking<'_> {
                 .extend(self.namespace_import_errors(loaded, interfaces));
             output
         };
-        // a proof reads the bodies of what it names, which no interface shows:
-        // its module is checked again on every run, never taken from a cache,
-        // as is a module whose laws a bundle of the run may read
-        let fresh = loaded.has_proofs() || (self.proving && loaded.has_laws());
+        // a proof or contract reads the bodies of what it names, which no
+        // interface shows: its module is checked again on every run, never
+        // taken from a cache, as is a module whose laws a bundle of the run
+        // may read
+        let fresh = loaded.has_proofs()
+            || (self.proving && loaded.has_laws())
+            || self.proves_contracts(loaded);
         let Some(cache) = self.cache.filter(|_| !fresh) else {
             return (check(), None, None, Reason::Changed(Vec::new()));
         };
@@ -72,7 +85,7 @@ impl Checking<'_> {
                     .map(|i| i.module.as_str());
                 let changed = (entry.filter(|_| cache.explain))
                     .map_or_else(Vec::new, |(cached, _)| cached.differs(&key, imports));
-                key.lower = self.lower;
+                key.lower = self.lowers(loaded);
                 (check(), Some(key), None, Reason::Changed(changed))
             }
         }
@@ -131,6 +144,7 @@ impl Checking<'_> {
             ir: None,
             declarations: Arc::new(interface),
             proofs: Vec::new(),
+            contracts: Vec::new(),
         }
     }
 
@@ -308,8 +322,9 @@ impl Checking<'_> {
             });
         }
         diagnostics.extend(checked);
-        // a module that checked is the only one whose proofs are about something
+        // a module that checked is the only one whose proofs or contracts are about something
         let mut proofs = Vec::new();
+        let mut verified_contracts = Vec::new();
         if clean {
             use crate::project::builtins::builtin_laws;
             let stages = self.stages_by_class;
@@ -317,12 +332,28 @@ impl Checking<'_> {
             let run = ir::Run {
                 builtins: &|| builtin_modules_of(stages),
                 builtin_laws: &|| builtin_laws(stages),
-                project: &|name| lowered(name).map(|(ir, _, _)| ir),
+                project: &|name| {
+                    lowered(name)
+                        .map(|(ir, _, _)| ir)
+                        .or_else(|| self.precompiled.ir(name))
+                },
                 proven: &|name| lowered(name).map(|(_, _, p)| p.as_slice()),
+                all_contracted: self.all_contracted,
+                contracts: &|name| {
+                    self.by_name
+                        .get(name)
+                        .and_then(|&idx| self.verified_contracts.get(idx))
+                        .map_or(&[], Vec::as_slice)
+                },
             };
             let (found, proven) = ir::check_proofs(&module, &typing, &run);
             diagnostics.extend(found);
             proofs = proven;
+            if self.proves_contracts(loaded) {
+                let (contract_diags, summaries) = ir::check_contracts(&module, &typing, &run);
+                diagnostics.extend(contract_diags);
+                verified_contracts = summaries;
+            }
         }
         interface.proofs = typing.proofs.iter().map(|p| p.name.clone()).collect();
         let declarations = typing.declarations.clone();
@@ -390,9 +421,12 @@ impl Checking<'_> {
                 ..exported(&interface, clean)
             },
             interface,
-            ir: ir.filter(|_| self.cache.is_none() || self.cached_ir == CachedIr::Kept || self.proving),
+            ir: ir.filter(|_| {
+                self.cache.is_none() || self.cached_ir == CachedIr::Kept || self.proving
+            }),
             declarations,
             proofs,
+            contracts: verified_contracts,
         }
     }
 
@@ -404,10 +438,8 @@ impl Checking<'_> {
         clean: bool,
         diagnostics: &mut Vec<Diagnostic>,
     ) -> Option<ir::Module> {
-        let lowers = !self.lower_packages_only || matches!(loaded.root, Root::Package(_));
         if clean
-            && self.lower
-            && lowers
+            && self.lowers(loaded)
             && loaded.scope_of.is_none()
             && !Self::is_module_template(loaded)
         {
@@ -425,60 +457,4 @@ include!("checking_inline_values.rs");
 include!("checking_visibility.rs");
 
 #[cfg(test)]
-mod template_fallback_tests {
-    use super::*;
-    use crate::syntax;
-
-    fn loaded(source: &str, broken: bool) -> Loaded {
-        let mut sources = SourceMap::default();
-        let file = sources.add("A/Parent.fl", source);
-        let parse = syntax::parse(source, file).into_module();
-        let syntax = resolve::module_syntax(&parse.tree, source, file);
-        let diagnostics = if broken {
-            vec![Diagnostic::error(
-                codes::S007,
-                "unexpected `)`",
-                Span::new(file, 6, 7),
-            )]
-        } else {
-            Vec::new()
-        };
-        Loaded {
-            path: PathBuf::from("A/Parent.fl"),
-            file,
-            root: Root::Other(None),
-            parse: Arc::new(Parse {
-                tree: parse.tree,
-                diagnostics,
-            }),
-            syntax: Arc::new(syntax),
-            name: "A.Parent".into(),
-            expansion: None,
-            editing: Vec::new(),
-            loader: None,
-            virtual_of: None,
-            member_of: None,
-            scope_of: None,
-        }
-    }
-
-    /// A template fallback has no structure to export, so it must not invent
-    /// names; it marks the module incomplete exactly when parsing failed.
-    #[test]
-    fn the_template_fallback_is_incomplete_only_when_the_parser_reported() {
-        let source = "module A.Parent exposing (x)\nlet x = 1\n";
-        let broken = Checking::module_template(&loaded(source, true));
-        assert!(broken.exported.incomplete);
-        assert!(!broken.interface.incomplete);
-        assert!(broken.exported.exports.is_empty());
-        assert!(broken.exported.parameterized.is_none());
-        assert_eq!(broken.diagnostics.len(), 1);
-        assert_eq!(broken.diagnostics[0].code, codes::S007);
-
-        let clean = Checking::module_template(&loaded(source, false));
-        assert!(!clean.exported.incomplete);
-        assert!(!clean.interface.incomplete);
-        assert!(clean.exported.exports.is_empty());
-        assert!(clean.diagnostics.is_empty());
-    }
-}
+include!("checking_template_tests.rs");

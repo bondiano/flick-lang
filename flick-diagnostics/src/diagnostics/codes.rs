@@ -160,6 +160,9 @@ codes! {
     T084 = Types 84, "a proof ran out of its budget";
     T085 = Types 85, "a statement after the children of a block";
     T086 = Types 86, "the function of a block's lines written around them";
+    T087 = Types 87, "a contract's postcondition is not established";
+    T088 = Types 88, "a call's precondition is not established";
+    T089 = Types 89, "an `Int` operation may leave the range of `Int`";
     E001 = Effects 1, "runtime call in a pure position";
     E002 = Effects 2, "services or errors not allowed by the bound";
     E003 = Effects 3, "argument runs before the function that takes an Eff";

@@ -18,6 +18,9 @@ mod pages;
 pub struct CheckCommand {
     options: CheckArguments,
     project: Option<String>,
+    /// When `true`, invokes `project::prove_with` to verify proofs and
+    /// function contracts (`flick prove`).
+    prove: bool,
     /// What the checks before this one checked, for a command that checks
     /// again: the passes of `--fix` and the runs of `--watch`.
     modules: RefCell<ModuleCache>,
@@ -28,6 +31,16 @@ impl CheckCommand {
         Self {
             options,
             project,
+            prove: false,
+            modules: RefCell::default(),
+        }
+    }
+
+    pub fn prove(options: CheckArguments, project: Option<String>) -> Self {
+        Self {
+            options,
+            project,
+            prove: true,
             modules: RefCell::default(),
         }
     }
@@ -121,7 +134,11 @@ impl CheckCommand {
         let kept = again.then_some(&mut *modules);
         let diagnostics = package_cache::with_modules(kept, |kept| {
             package_cache::with_saved(|saved| {
-                project::check_with(host, &mut sources, project.as_ref(), &roots, saved, kept)
+                if self.prove {
+                    project::prove_with(host, &mut sources, project.as_ref(), &roots, saved, kept)
+                } else {
+                    project::check_with(host, &mut sources, project.as_ref(), &roots, saved, kept)
+                }
             })
         });
         (
