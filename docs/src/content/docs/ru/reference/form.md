@@ -1,6 +1,6 @@
 ---
 title: "Формы"
-source_hash: 4a078b584c583644
+source_hash: 30853921a189a8c0
 ---
 
 Форма — тип-запись, которую пользователь заполняет текстом. `deriving Form`
@@ -40,11 +40,10 @@ let check_name =
 
 page : Ui
 let page = ui {
-  fragment
-    Form.input signup Signup.fields.name "Name" (Some check_name)
-    Form.input signup Signup.fields.age "Age" None
-    Form.input signup Signup.fields.nick "Nickname" None
-    button { disabled = false; on_click = send } (text "Send")
+  Form.input signup Signup.fields.name "Name" (Some check_name)
+  Form.input signup Signup.fields.age "Age" None
+  Form.input signup Signup.fields.nick "Nickname" None
+  button { disabled = false; on_click = send } (text "Send")
 }
 ```
 

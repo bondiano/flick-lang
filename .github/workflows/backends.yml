@@ -1,0 +1,79 @@
+name: Backends
+
+# A tag `backend-<name>-v<version>`, such as `backend-js-v0.1.0`, releases the
+# official backend of `backends/<name>`: its component and pin, as committed
+# and as its sources build, and its entry in the backends index, the asset
+# `backends.json` of the rolling release `backends-index`. A compiler without
+# `[build.backend]` resolves its backend from that index (see
+# flick/src/backends/official.rs).
+on:
+  push:
+    tags: ["backend-*-v*"]
+
+permissions:
+  contents: write
+
+# the index is read, changed and uploaded: one release at a time
+concurrency:
+  group: backends-index
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - name: Backend and version of the tag
+        id: tag
+        run: |
+          rest="${GITHUB_REF_NAME#backend-}"
+          name="${rest%%-v*}"
+          version="${rest#*-v}"
+          manifest="backends/$name/Cargo.toml"
+          if [ ! -f "$manifest" ]; then
+            echo "::error::no backend \`$name\` in backends/"
+            exit 1
+          fi
+          declared="$(sed -n 's/^version = "\(.*\)"/\1/p' "$manifest" | head -1)"
+          if [ "$declared" != "$version" ]; then
+            echo "::error file=$manifest::version $declared, tag $GITHUB_REF_NAME"
+            exit 1
+          fi
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+      - run: rustup show active-toolchain || rustup toolchain install
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just@1.59.0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+          cache: pnpm
+      # the committed component must be exactly what its sources build
+      - run: just check-component ${{ steps.tag.outputs.name }}
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          package="backends/${{ steps.tag.outputs.name }}/package"
+          # a backend release must not take the `latest` release, which the
+          # installer and the archives resolve the compiler from
+          gh release create "$GITHUB_REF_NAME" "$package/component.wasm" "$package/backend.json" \
+            --title "$GITHUB_REF_NAME" \
+            --latest=false \
+            --notes "sha256 \`$(sed -n 's/.*"sha256": "\(.*\)".*/\1/p' "$package/backend.json")\`"
+      - name: Index
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p target/index
+          if gh release view backends-index > /dev/null 2>&1; then
+            gh release download backends-index --pattern backends.json --dir target/index
+          else
+            gh release create backends-index --title "Backends index" --latest=false \
+              --notes "The official backends each compiler release can resolve: \`backends.json\`."
+          fi
+          url="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/component.wasm"
+          node tools/backend-package/release-index.mjs "${{ steps.tag.outputs.name }}" "$url" target/index/backends.json
+          gh release upload backends-index target/index/backends.json --clobber

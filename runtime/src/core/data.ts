@@ -52,21 +52,24 @@ export const LT = /*#__PURE__*/ ordering("LT");
 export const EQ = /*#__PURE__*/ ordering("EQ");
 export const GT = /*#__PURE__*/ ordering("GT");
 
-const isObject = (a: unknown): a is Readonly<Record<string, unknown>> => typeof a === "object" && a !== null;
+const isObject = (a: unknown): a is Readonly<Record<PropertyKey, unknown>> => typeof a === "object" && a !== null;
 /** A native runtime value whose equality is defined by its semantic value. */
-export const runtimeEquals = Symbol.for("@flick-lang/runtime/equals");
-export const runtimeHash = Symbol.for("@flick-lang/runtime/hash");
+export const runtimeEquals = /*#__PURE__*/ Symbol.for("@flick-lang/runtime/equals");
+export const runtimeHash = /*#__PURE__*/ Symbol.for("@flick-lang/runtime/hash");
+/** A native sequence exposed through iteration instead of array indices. */
+export const runtimeSequence = /*#__PURE__*/ Symbol();
+export const isRuntimeSequence = (value: object, carrier = value): value is Iterable<unknown> =>
+  runtimeSequence in carrier;
 
 /** A key `$0`, `$1` …: a dictionary a value of a GADT holds, which `==` and `hash` leave out. */
 const held = (k: string): boolean => k.charCodeAt(0) === 36;
 
 /** An Option of the Effect library has its tag on the prototype; Flick's has it on the value. */
 const optionTag = (value: Readonly<Record<string, unknown>>): "None" | "Some" | undefined => {
-  const variant: unknown = Reflect.get(value, "_tag");
-  const keys = Object.keys(value);
-  const own = Object.hasOwn(value, "_tag") ? 1 : 0;
-  return variant === "None" && keys.length === own ||
-    variant === "Some" && keys.length === own + 1 && Object.hasOwn(value, "value")
+  const variant = value["_tag"];
+  const fields = Object.keys(value).length - (Object.hasOwn(value, "_tag") ? 1 : 0);
+  return variant === "None" && fields === 0 ||
+    variant === "Some" && fields === 1 && Object.hasOwn(value, "value")
     ? variant : undefined;
 };
 
@@ -75,19 +78,18 @@ export const equals = (a: unknown, b: unknown): boolean => {
   // oxlint-disable-next-line no-self-compare -- SameValueZero: NaN equals NaN
   if (a === b || (a !== a && b !== b)) return true;
   if (!isObject(a) || !isObject(b)) return false;
-  const custom: unknown = Reflect.get(a, runtimeEquals);
+  const custom = a[runtimeEquals];
   if (typeof custom === "function") return custom.call(a, b) === true;
   const aTag = optionTag(a);
   const bTag = optionTag(b);
   if (aTag !== undefined && bTag !== undefined) return aTag === bTag && (aTag === "None" || equals(a["value"], b["value"]));
-  const hostEqual: unknown = Reflect.get(a, "~effect/Equal");
-  if (typeof hostEqual === "function" && typeof Reflect.get(b, "~effect/Equal") === "function") {
-    const result: unknown = hostEqual.call(a, b);
-    return result === true;
+  const hostEqual = a["~effect/Equal"];
+  if (typeof hostEqual === "function" && typeof b["~effect/Equal"] === "function") {
+    return hostEqual.call(a, b) === true;
   }
-  if (Array.isArray(a) || Array.isArray(b)) {
-    return Array.isArray(a) && Array.isArray(b) && listEquals(equals, a, b);
-  }
+  // A flat chunk can compare with a tree through the tree's equality hook.
+  if (Array.isArray(a)) return Array.isArray(b) ? listEquals(equals, a, b) : runtimeSequence in b && equals(b, a);
+  if (Array.isArray(b)) return false;
   // Class instances without a Flick equality hook compare by identity.
   const proto: unknown = Object.getPrototypeOf(a);
   if (proto !== Object.getPrototypeOf(b) || (proto !== Object.prototype && proto !== null)) return false;
@@ -121,14 +123,14 @@ const hashString = (s: string): number => {
 export const hash = (a: unknown): number => {
   if (typeof a === "number") return hashString(Object.is(a, -0) ? "0" : String(a));
   if (!isObject(a)) return hashString(`${typeof a}:${String(a)}`);
-  const custom: unknown = Reflect.get(a, runtimeHash);
+  const custom = a[runtimeHash];
   if (typeof custom === "function") {
     const value: unknown = custom.call(a);
     if (typeof value === "number") return value;
   }
   const option = Object.hasOwn(a, "_tag") ? undefined : optionTag(a);
   if (option !== undefined) return hash(option === "Some" ? some(a["value"]) : none);
-  const hostHash: unknown = Reflect.get(a, "~effect/Hash");
+  const hostHash = a["~effect/Hash"];
   if (typeof hostHash === "function") {
     const value: unknown = hostHash.call(a);
     if (typeof value === "number") return value;
@@ -179,8 +181,16 @@ export const listCompare = <A>(
 
 const combine = (h: number, x: number): number => (Math.imul(h, 31) + x) | 0;
 
+const listHashSeed = 7;
+
 export const listHash = <A>(h: (a: A) => number, xs: ReadonlyArray<A>): number =>
-  xs.reduce((acc, x) => combine(acc, h(x)), 7);
+  xs.reduce((acc, x) => combine(acc, h(x)), listHashSeed);
+
+export const iterableHash = <A>(h: (a: A) => number, xs: Iterable<A>): number => {
+  let result = listHashSeed;
+  for (const x of xs) result = combine(result, h(x));
+  return result;
+};
 
 export const listShow = <A>(s: (a: A) => string, xs: ReadonlyArray<A>): string => `[${xs.map((x) => s(x)).join(", ")}]`;
 
@@ -391,18 +401,21 @@ export const copyThrough = (value: unknown, other: (value: object) => unknown): 
   let result: unknown;
   const visit = (input: unknown, put: (copy: unknown) => void): void => {
     if (typeof input !== "object" || input === null) { put(input); return; }
-    const array = Array.isArray(input);
-    if (!array) {
-      const proto: unknown = Object.getPrototypeOf(input);
-      if ((proto !== Object.prototype && proto !== null) || Object.isFrozen(input)) { put(other(input)); return; }
+    let array: unknown = input;
+    if (!Array.isArray(input)) {
+      const proto = Reflect.getPrototypeOf(input);
+      if (proto !== Object.prototype && proto !== null) {
+        if (!isRuntimeSequence(input, proto)) { put(other(input)); return; }
+        array = Array.from(input);
+      } else if (Object.isFrozen(input)) { put(other(input)); return; }
     }
     // Only active ancestors are rejected. Completed aliases must be copied again,
     // not memoized: foreign mutation of one copy must not change another copy.
     if (active.has(input)) throw new RangeError("Maximum call stack size exceeded");
     active.add(input);
     const finish = (copy: unknown): void => { active.delete(input); put(copy); };
-    if (Array.isArray(input)) {
-      const length = input.length;
+    if (Array.isArray(array)) {
+      const length = array.length;
       const copy: unknown[] = [];
       copy.length = length;
       let index = 0;
@@ -410,8 +423,8 @@ export const copyThrough = (value: unknown, other: (value: object) => unknown): 
         while (index < length) {
           const key = index++;
           // Like Array.map, read an index only after the previous child finishes.
-          if (!(key in input)) continue;
-          const child: unknown = input[key];
+          if (!(key in array)) continue;
+          const child: unknown = array[key];
           work.push(next);
           visit(child, (copied) => { Object.defineProperty(copy, key, { value: copied, writable: true, enumerable: true, configurable: true }); });
           return;

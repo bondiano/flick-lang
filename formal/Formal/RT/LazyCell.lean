@@ -245,6 +245,33 @@ theorem R9e {π n : Nat} {W : List Nat} {e : T} {ev : LEv V} {s' : LSt T V} {f :
   | self => cases hf; exact ⟨fun _ => ⟨rfl, by simp [LEv.gets]⟩, fun h => (h rfl).elim⟩
   | settle | leave | reset => cases hf
 
+/-- Once a force got an outcome, the cell holds it: an outcome comes only from a settle, which
+caches it, or from a hit of the settled cell. -/
+theorem LReach.got {e₀ : T} {s : LSt T V} {J : List (LEv V)} (h : LReach e₀ s J) {ev : LEv V}
+    {f : Nat} {w : Out V} (hev : ev ∈ J) (hg : ev.gets f = some (.got w)) : s = .done w := by
+  induction h with
+  | init => cases hev
+  | step _ hs ih =>
+    rcases List.mem_cons.mp hev with rfl | hev
+    · cases hs <;> simp [LEv.gets] at hg
+      all_goals first
+        | rfl
+        | (obtain ⟨-, rfl⟩ := hg; rfl)
+        | (subst hg; rfl)
+        | (split at hg
+           · cases hg
+           · split at hg <;> cases hg)
+    · cases ih hev; cases hs; rfl
+
+/-- **O2a, of the protocol** (lazy.md §6): once a force of a cell got an outcome, every later
+step of the cell is a force, by any fiber, that gets the same outcome. -/
+theorem R9_again {e₀ : T} {s s' : LSt T V} {J J' : List (LEv V)} (h : LReach e₀ s J)
+    {ev : LEv V} {f : Nat} {w : Out V} (hev : ev ∈ J) (hg : ev.gets f = some (.got w))
+    (hr : LRun s J' s') :
+    s' = .done w ∧ ∀ ev' ∈ J', ∃ g, ev' = .hit g w ∧ ev'.gets g = some (.got w) := by
+  cases h.got hev hg
+  exact R9b hr
+
 /-- **R9 (single flight).** In every interleaving of the steps of a lazy cell: (a) at most one
 attempt runs, the one of the running state, and the attempts run one after another, numbered
 from 1; (b) a settled cell stays settled and every later force gets its outcome, as did the

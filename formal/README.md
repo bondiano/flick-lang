@@ -196,6 +196,9 @@ signature and golden certificates.
   stays settled and every later force gets its outcome, the interruption of a waiter removes
   only it, the interruption of the owner or the unwind of its handler makes the cell pending
   for attempt `n + 1` without caching anything, and a force by the owner is a defect (`R9`).
+  Once a force got an outcome, every later step of the cell is a force, by any fiber, that gets
+  it (`R9_again`): O2a of `lazy.md` §6 for the protocol; as an equivalence of the core it is open
+  (#783).
 - **O1, lazy cells a program need not make** (`Formal/Equiv/`, `lazy.md` §6): contextual
   equivalence of the core (`CtxEquiv`, `Equiv/Context.lean`): every two typed programs one
   context of the source language, with holes anywhere, builds around two terms may end with
@@ -246,7 +249,7 @@ signature and golden certificates.
 (`Target`; for the core, `Real`) and of T6(b) (`Coherent`, `Sim`) are their parameters.
 `hdl_err_live` lists only `propext`. `Formal/Axioms.lean` pins what `#print axioms` prints
 for `T1`, `T1_regions`, `T2a`, `T2b`, `T2b_await`, `T3`, `lemma_6`, `T4'`, `hdl_err_live`,
-`T6a`, `T6b`, `T6a_core`, `T6b_core`, `Lazy.L1`, `Lazy.L1_once`, `Lazy.L2`, `R9`, `T7`,
+`T6a`, `T6b`, `T6a_core`, `T6b_core`, `Lazy.L1`, `Lazy.L1_once`, `Lazy.L2`, `R9`, `R9_again`, `T7`,
 `MutOk.lzDecl`, `LzSig.typ_run`, `MutOk.lzAwait`, `MutOk.lzWrite`,
 `Elab.Witness.lzSig`, `Equiv.o1a`, `Equiv.o1b`, `Equiv.o1c`, `Equiv.o1a_all`, `Equiv.o1c_all`
 and `Equiv.EverySim.has` with `#guard_msgs`, so
@@ -709,7 +712,7 @@ is a parameter of it.
 | I6 | `Inv6.obsIn`, `Good6` of `release` (`RT/Layers.lean`) |
 | R6; its premise from [provide services must not outlive their layer](../docs/formal/runtime.md#a-provide-service-outlives-the-release-of-its-layer) | `R6`, `Good6`, `GoodUse` (`RT/Layers.lean`, `RT/T5.lean`); `G11` (`RT/Hyp.lean`) |
 | §3.7, R7 | `Step.modify`, `cell`, `R7` (`RT/RefLin.lean`) |
-| `lazy.md` §5, R9 | `LSt`, `LEv`, `LStep`, `LReach`, `LInv`, `R9` (`RT/LazyCell.lean`) |
+| `lazy.md` §5, R9; §6, O2a of the protocol | `LSt`, `LEv`, `LStep`, `LReach`, `LInv`, `R9`, `LReach.got`, `R9_again` (`RT/LazyCell.lean`) |
 | T5 | `T5` (`RT/T5.lean`) |
 
 Simplifications of the cause algebra:

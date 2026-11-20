@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { Arbitrary, Effect, Exit, Schema } from "effect";
+import { Arbitrary, Chunk, Effect, Exit, Schema } from "effect";
 
 import { err, none, ok } from "@flick-lang/runtime/core/data";
 import { schemaNumber, codecTransformPure, witness, schemaLiterals, schemaInt, schemaAdtOf, schemaCase, schemaError, schemaLazyOf, schemaOption, schemaRecordOf, schemaRefinedOf, schemaString, type Witness } from "@flick-lang/runtime/rt/schema";
 import { codecJsonSchema } from "@flick-lang/runtime/rt/schema_export";
+import { flickChunk } from "@flick-lang/runtime/rt/effect/Schema";
 
 import { codecFromEffect, codecToEffect, schemaFromEffect, schemaToEffect } from "../src/bridge.ts";
 import { schema as arbitrarySchema } from "../src/effect/Arbitrary.ts";
@@ -163,4 +164,21 @@ test("distinct native witnesses keep their identities across schema and codec cr
   assert.equal(codecFromEffect(firstCodec), first);
   assert.equal(codecFromEffect(secondCodec), second);
   assert.equal(codecToEffect(first), firstCodec);
+});
+
+test("native Chunk witnesses keep their JSON array and generate native values through Effect", async () => {
+  const native = flickChunk(schemaInt);
+  const codec = codecToEffect(native);
+  const schema = schemaToEffect(native);
+  assert.ok(Schema.isSchema(codec) && isPure(codec) && Schema.isSchema(schema));
+  const wire = [1, 2, 3];
+  const decoded = Schema.decodeUnknownExit(codec)(wire);
+  assert.ok(Exit.isSuccess(decoded) && Chunk.isChunk(decoded.value));
+  assert.deepEqual(Chunk.toArray(decoded.value), wire);
+  const encoded = Schema.encodeUnknownExit(codec)(decoded.value);
+  assert.ok(Exit.isSuccess(encoded));
+  assert.deepEqual(encoded.value, wire);
+
+  const samples = await Effect.runPromise(Arbitrary.sampleEffect(arbitrarySchema(schema), { count: 20, seed: 11 }));
+  assert.ok(samples.every((sample) => Array.isArray(sample) && native.value(sample, "")._tag === "Success"));
 });
