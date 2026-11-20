@@ -88,3 +88,28 @@ fn fixtures_are_made_on_first_use_and_released_after_the_hooks_on_every_engine()
         );
     }
 }
+
+const BROKEN: &str = r#"module App.Test
+
+suite "broken" {
+  fixture conn = Test.check (Test.equal 1 2)
+  test "awaits it" { await conn }
+}
+"#;
+
+#[test]
+#[ignore = "needs Node, pnpm install and Go"]
+fn a_case_whose_fixture_fails_fails_its_setup_on_every_engine() {
+    for (name, effect, emit) in ENGINES {
+        let dir = library(&format!("test_fixtures_broken_{name}"), effect, BROKEN);
+        let out = flick_in(&dir, &["test", "--emit", emit, "--reporter", "json"]);
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        assert_eq!(out.status.code(), Some(1), "{name}: {out:?}");
+        let (_, results) = report(name, &format!("\n{stdout}"));
+        assert_eq!(
+            results,
+            ["App.Test > broken > awaits it | failed | setup | fixture conn: expected 1, got 2 | "],
+            "{name}"
+        );
+    }
+}

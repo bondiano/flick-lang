@@ -1,18 +1,18 @@
 // Tests on Effect. A test is data built by pure code; `runTests` runs them,
 // each in an owner of its own, and reports assertions, typed failures,
 // defects and failed cleanup apart.
-import { Cause, Context, type Duration, Effect, Exit, Fiber, Layer, Option, Scope } from "effect";
+import { Cause, type Context, type Duration, Effect, Exit, Fiber, Layer, Option, Scope } from "effect";
 import * as TestClock from "effect/testing/TestClock";
 
 import { describeCause } from "../cause.ts";
-import { LazyCell } from "../effect/Lazy.ts";
 import { flickAddFinalizer } from "../effect/Scope.ts";
 import { withOwnerEvidence } from "../owner_evidence.ts";
 import { type Engine, type Suites as SuitesOf, type TestOptions, type TestResult, parseTestArgs, runTestsWith } from "@flick-lang/runtime/core/suites";
 import * as Core from "@flick-lang/runtime/core/testing";
 import { service } from "../effects.ts";
 import { buildInto } from "../layer.ts";
-import { Owner, close, closeOwn, inside, ownedExits } from "../owner.ts";
+import { Owner, close, inside, ownedExits } from "../owner.ts";
+import { type Cells, Fixtures, FixturesRef, cellsIn, closing, withFixtures } from "./testing-fixtures.ts";
 import { provideNodeServices } from "../runner/host.ts";
 
 export {
@@ -38,6 +38,7 @@ export {
 export type { Assertion, Gen, Rng } from "@flick-lang/runtime/core/testing";
 export { parseTestArgs } from "@flick-lang/runtime/core/suites";
 export type { FailureKind, TestOptions, TestResult } from "@flick-lang/runtime/core/suites";
+export { testUse } from "./testing-fixtures.ts";
 
 type Task = Effect.Effect<unknown, unknown>;
 type AnyLayer = Layer.Layer<unknown, unknown>;
@@ -123,69 +124,6 @@ interface SuiteRun {
   /** Its shared fixtures, each made the first time code uses it. */
   readonly shared: Cells;
 }
-
-type Fixture = Core.Fixture<Task>;
-type Cell = LazyCell<unknown, unknown, unknown>;
-
-/**
- * The fixtures of a test or a suite's run, and the owner they are made in:
- * a scope of their own, which the scope of the test or the suite closes
- * after the hooks that run when it closes, as those may use them.
- */
-type Cells = Readonly<{ cells: Map<Fixture, Cell>; owner: Owner }>;
-
-const cellsIn = (outer: Owner): Cells => ({ cells: new Map(), owner: new Owner(Effect.runSync(Scope.make()), outer.defects) });
-
-/** The finalizer that closes `cells` with `outcome`: it fails as their finalizers do. */
-const closing = ({ owner }: Cells, outcome: () => Exit.Exit<unknown, unknown> = () => Exit.void): Effect.Effect<void, never, Scope.Scope> =>
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a failed finalizer fails the closing of its scope
-  flickAddFinalizer(Effect.flatMap(Effect.suspend(() => closeOwn(owner, outcome())), (ended) => ended) as Effect.Effect<void>);
-
-/**
- * What code finds its fixtures in: those of the test it runs for, if any,
- * and the suites around it, outermost first, whose shared fixtures it sees.
- */
-class Fixtures {
-  readonly test: Cells | undefined;
-  readonly suites: ReadonlyArray<SuiteRun>;
-  constructor(test: Fixtures["test"], suites: ReadonlyArray<SuiteRun>) {
-    this.test = test;
-    this.suites = suites;
-  }
-}
-
-const FixturesRef = /*#__PURE__*/ Context.Reference<Fixtures | undefined>("@flick-lang/runtime/Test.fixtures", {
-  defaultValue: () => undefined,
-});
-
-/** `task`, with `fixtures` for the fixtures it uses. */
-const withFixtures = (fixtures: Fixtures, task: Task): Task => Effect.provideService(task, FixturesRef, fixtures);
-
-/** The cell of `fixture`, made the first time: its initializer runs in the scope of the cells. */
-const cellOf = ({ cells, owner }: Cells, fixture: Fixture): Cell => {
-  const found = cells.get(fixture);
-  if (found !== undefined) return found;
-  const cell: Cell = new LazyCell(inside(owner, withOwnerEvidence(owner, () => fixture.init)));
-  cells.set(fixture, cell);
-  return cell;
-};
-
-/**
- * `Test.use`: the `Lazy` of `fixture` for the test this code runs for, or
- * for the run of the innermost suite around it that shares it.
- */
-export const testUse = (fixture: Fixture): Effect.Effect<Cell> =>
-  Effect.flatMap(Effect.service(FixturesRef), (fixtures) => {
-    if (fixtures === undefined) return Effect.die(new Error(`the fixture ${fixture.key} runs only in the code of a test or a suite that \`flick test\` runs`));
-    if (fixture.shared) {
-      const run = fixtures.suites.findLast((r) => r.suite.shares?.has(fixture) === true);
-      if (run === undefined) return Effect.die(new Error(`the shared fixture ${fixture.key}, used by code that no suite sharing it runs`));
-      return Effect.sync(() => cellOf(run.shared, fixture));
-    }
-    const { test } = fixtures;
-    if (test === undefined) return Effect.die(new Error(`the fixture ${fixture.key} of a test, used by code that runs for no test`));
-    return Effect.sync(() => cellOf(test, fixture));
-  });
 
 /** The hooks `tasks` run in order, each within `millis` if any: a `Setup` of the first that fails. */
 const runHooks = (tasks: ReadonlyArray<Task>, what: string, millis?: number): Effect.Effect<Setup | undefined, unknown> =>
@@ -277,8 +215,8 @@ const runCase = <A>(
     // the fixtures of the test, made the first time its code uses each
     const test = cellsIn(owner);
     // how the case ended, which their scope closes with: what it owns sees whether the case passed
-    let outcome: Exit.Exit<unknown, unknown> = Exit.void;
-    yield* closing(test, () => outcome);
+    let closedWith: Exit.Exit<unknown, unknown> = Exit.void;
+    yield* closing(test, () => closedWith);
     const each = Effect.gen(function* () {
       for (const [level, { suite }] of runs.entries()) {
         const fixtures = new Fixtures(test, runs.slice(0, level + 1));
@@ -292,12 +230,15 @@ const runCase = <A>(
     });
     const ran = yield* Effect.exit(timeout === undefined ? Effect.map(each, Option.some) : Effect.timeoutOption(each, timeout));
     if (Exit.isFailure(ran)) {
-      outcome = ran;
-      return yield* Effect.failCause(ran.cause);
+      closedWith = ran;
+      // a case that failed after a fixture of it failed to be made failed its setup
+      const [fixture, why] = test.broken.first ?? [];
+      if (fixture === undefined || why === undefined || Cause.hasInterruptsOnly(ran.cause)) return yield* Effect.failCause(ran.cause);
+      return new Setup(`fixture ${Core.fixtureName(fixture)}: ${outcome(Exit.failCause(why))?.message ?? ""}`);
     }
     const result = Option.isSome(ran.value) ? ran.value.value : new TimedOut(timeout ?? 0);
-    if (result instanceof TimedOut) outcome = Exit.interrupt(undefined);
-    else if (result instanceof Setup) outcome = Exit.failCause(typeof result.cause === "string" ? Cause.fail(result.cause) : result.cause);
+    if (result instanceof TimedOut) closedWith = Exit.interrupt(undefined);
+    else if (result instanceof Setup) closedWith = Exit.failCause(typeof result.cause === "string" ? Cause.fail(result.cause) : result.cause);
     return result;
   });
 
