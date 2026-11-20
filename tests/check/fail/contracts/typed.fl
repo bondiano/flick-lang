@@ -1,0 +1,12 @@
+// A contract is typed as code is: a `require` is a `Bool`, and an `ensure`
+// a function of the result to a `Bool`.
+module App.Mistyped exposing (..)
+
+inc : Int -> Int
+let inc x where require (x + 1) = x + 1
+//                       ^^^^^ FLICK-T003 expected `Bool`, found `Int`
+
+dec : Int -> Int
+let dec x where ensure (fun y -> y ++ "") = x - 1
+//                               ^^^^^^^ FLICK-T003 expected `Bool`, found `Int`
+//                                    ^^ FLICK-T003 expected `Int`, found `String`

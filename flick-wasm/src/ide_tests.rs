@@ -177,9 +177,4 @@ fn signature_help_reaches_the_call_under_the_parenthesis() {
             .is_some_and(|label| label.contains("Int")),
         "{help}"
     );
-    let hints = json(&session.inlay_hints());
-    assert!(
-        hints.as_array().is_some_and(|hints| !hints.is_empty()),
-        "{hints}"
-    );
 }

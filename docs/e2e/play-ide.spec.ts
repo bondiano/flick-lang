@@ -1,6 +1,6 @@
-// The playground's editor features: the semantic tokens, the inlay hints, the
-// signature of the call under the cursor and the rewrites of the checker, all
-// over the module the reader types, including its non-ASCII text.
+// The playground's editor features: the semantic tokens, the signature of the
+// call under the cursor and the rewrites of the checker, all over the module
+// the reader types, including its non-ASCII text. It shows no inlay types.
 import { expect, test, type Page } from "@playwright/test";
 
 /** The compiler has loaded and checked the first example, and the editor has opened. */
@@ -42,7 +42,8 @@ test("the editor shows what the checker knows, over non-ASCII text", async ({ pa
   // UTF-8 bytes would put it
   const called = page.locator(".cm-line", { hasText: "double (21)" });
   await expect(called.locator(".fp-ide-function", { hasText: "double" })).toBeVisible();
-  await expect(called.locator(".fp-ide-hint", { hasText: ": Int" }).first()).toBeVisible();
+  // a `let` without a signature shows only what the reader wrote: no inlay type
+  await expect(page.locator(".cm-line", { hasText: "let doubled" })).toHaveText("let doubled = double (21)");
 
   // the signature of the call appears inside its parentheses
   await called.click();

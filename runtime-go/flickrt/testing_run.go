@@ -324,6 +324,7 @@ func runLeaf(fb *Fiber, t named, seed int64, runs map[*test]*suiteRun) testResul
 	var bad bool
 	var setup *setupFailure
 	var outOfTime atomic.Bool
+	var cells *fixtureCells
 	_, exit := catch(func() Value {
 		fiber, failed := enter(&inner, t.suites, runs)
 		if setup = failed; failed != nil {
@@ -338,7 +339,7 @@ func runLeaf(fb *Fiber, t named, seed int64, runs map[*test]*suiteRun) testResul
 			defer timer.Stop()
 		}
 		// the fixtures of the test, made the first time its code uses each
-		cells := cellsIn(fiber, owner)
+		cells = cellsIn(fiber, owner)
 		if setup = eachHooks(fiber, t.suites, cells, runs); setup != nil {
 			cells.failed = setup.cause
 			if cells.failed == nil {
@@ -356,6 +357,10 @@ func runLeaf(fb *Fiber, t named, seed int64, runs map[*test]*suiteRun) testResul
 	// a supervisor that failed during the test fails it, as it fails a program
 	exit = Sequential(exit, owner.defects.all())
 	kind, text := outcome(message, bad, exit)
+	// a test that failed after a fixture of it failed to be made failed its setup
+	if broken := cells.brokenSetup(exit); broken != nil && !outOfTime.Load() {
+		kind, text = "setup", broken.message()
+	}
 	switch {
 	case kind == "" && setup != nil:
 		kind, text = "setup", setup.message()

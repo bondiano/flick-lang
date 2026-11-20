@@ -1,15 +1,14 @@
 // The playground's editor features, in a worker of their own so that a type
 // error or an edit under the cursor never waits for a build.
-import type { Action, Hint, Signature, Token, Tokens } from "./ide-worker.ts";
+import type { Action, Signature, Token, Tokens } from "./ide-worker.ts";
 
 export type Operation =
   | { readonly action: "tokens"; readonly source: string }
-  | { readonly action: "hints"; readonly source: string }
   | { readonly action: "signature"; readonly source: string; readonly at: number }
   | { readonly action: "actions"; readonly source: string; readonly from: number; readonly to: number };
 
 export type Request = Operation & { readonly id: number };
-export type Result = Tokens | ReadonlyArray<Hint> | Signature | ReadonlyArray<Action> | null;
+export type Result = Tokens | Signature | ReadonlyArray<Action> | null;
 export type Reply = { readonly id: number; readonly result: Result } | { readonly id: number; readonly error: string };
 
 interface Pending {

@@ -246,6 +246,13 @@
           }
         },
         {
+          "comment": "`require (` and `ensure (` at the start of a line, or right after `where`, are entries of a function's contract; elsewhere the words are names",
+          "match": "(?:^[ \\t]*|\\bwhere[ \\t]+)(require|ensure)(?=[ \\t]*\\()",
+          "captures": {
+            "1": { "name": "keyword.other.flick" }
+          }
+        },
+        {
           "comment": "`proof name` at the start of a line declares a proof, `law name` a law of a class; elsewhere the words are names",
           "match": "^[ \\t]*(proof|law)[ \\t]+([a-z_][A-Za-z0-9_]*)",
           "captures": {

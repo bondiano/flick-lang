@@ -34,6 +34,10 @@
 ; captured as `@keyword` again, so the word keeps its colour whichever capture wins
 (_ (keyword) @keyword . (identifier) @function
   (#any-of? @keyword "proof" "law"))
+; an entry of a contract written on the line of its `where`
+(_ (keyword) @_where . (identifier) @keyword
+  (#eq? @_where "where")
+  (#any-of? @keyword "require" "ensure"))
 ; the head of a plugin's blocks, as an import exposes it
 (_ (keyword) @_plugin . (identifier) @function.macro
   (#eq? @_plugin "plugin"))

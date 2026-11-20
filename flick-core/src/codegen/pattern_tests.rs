@@ -91,18 +91,9 @@ let select pair =
             let guard = code.find("yield* accept(").expect("runtime guard");
             let first = (code.find("= pair._0")).unwrap_or_else(|| panic!("{code}"));
             assert!(first < guard, "{code}");
-            if cfg!(feature = "native-project") {
-                // the decision graph: the first alternative matches every
-                // `Pair`, so the second binds nothing
-                assert!(!code.contains("pair._1"), "{code}");
-            } else {
-                // arm by arm: the alternatives are tried before the guard
-                let second = code
-                    .find("x = pair._1")
-                    .expect("second alternative binding");
-                assert!(first < second && second < guard, "{code}");
-                assert!(code[first..guard].contains(" || "), "{code}");
-            }
+            // the decision graph: the first alternative matches every `Pair`,
+            // so the second binds nothing
+            assert!(!code.contains("pair._1"), "{code}");
             assert!(code[guard..].contains("return \"yes\";"), "{code}");
             assert!(code[guard..].contains("return \"no\";"), "{code}");
             assert!(!code.contains("runIn("), "{code}");

@@ -6,6 +6,12 @@ break programs.
 
 ## Unreleased
 
+- **A fixture that fails to be made is a `setup` failure.** A case that
+  awaits a fixture whose expression fails, and does not handle the error,
+  is reported as `setup`, `fixture conn: <the fixture's error>`, as a failed
+  `before_*` hook is; each case that awaits a failed shared fixture is too.
+  Alike on Flick's runtime, through the Effect adapter and on Go.
+
 - **`test.each`.** `test.each rows "name" (pattern) { body }` in a suite or
   on its own is a case for each row of a list, named `name [i]`, or with
   `{0}`…`{n}` in the name replaced by the parts of the row as `show` writes

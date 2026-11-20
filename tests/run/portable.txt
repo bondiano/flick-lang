@@ -32,6 +32,7 @@ codegen/defect
 codegen/do_notation
 codegen/enums
 codegen/call_site
+codegen/contract_runs_nowhere
 codegen/errors
 codegen/error_match
 codegen/error_intro

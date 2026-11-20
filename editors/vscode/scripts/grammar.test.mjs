@@ -190,6 +190,8 @@ test("contextual effect, sql, and control keywords receive expected TextMate sco
   assert.ok(scopesFor("proof same where same_type a a = refl", "proof").includes("keyword.other.flick"));
   assert.ok(scopesFor("proof same where same_type a a = refl", "same").includes("entity.name.function.flick"));
   assert.ok(scopesFor("  law kept (v : f a) where equal v v", "law").includes("keyword.other.flick"));
+  assert.ok(scopesFor("  require (x > 0)", "require").includes("keyword.other.flick"));
+  assert.ok(scopesFor("let inc x where ensure (fun y -> y > x) = x + 1", "ensure").includes("keyword.other.flick"));
   assert.ok(scopesFor('  test.skip "trims" {', "test").includes("keyword.other.flick"));
   assert.ok(scopesFor('  test.skip "trims" {', "skip").includes("keyword.other.flick"));
   assert.ok(scopesFor('test.only "alone" {}', "only").includes("keyword.other.flick"));
@@ -253,6 +255,8 @@ test("word boundaries prevent spurious keyword matches on partial identifiers an
     ["let proof = 1", "proof"],
     ["let p = trans proof h", "proof"],
     ["let law = 1", "law"],
+    ["let require = 1", "require"],
+    ["let x = ensure y", "ensure"],
   ];
 
   for (const [line, word] of nonKeywordCases) {

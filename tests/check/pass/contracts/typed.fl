@@ -1,0 +1,24 @@
+// Contracts the compiler types and erases: each entry against the
+// function's signature, in a context of its own. None runs, and none adds
+// to the function's type.
+module App.Contracts exposing (..)
+
+consume : Int -> Int -> Int
+let consume available used
+where
+  require (0 <= used && used <= available)
+  ensure (fun remaining -> 0 <= remaining && remaining + used == available)
+=
+  available - used
+
+/// `==` in a contract asks nothing of `a`: the signature stays as written.
+same : a -> a
+let same x where ensure (fun y -> y == x) = x
+
+type Light = Red | Green
+
+next : Light -> Light
+let next light where ensure (fun l -> l != light) =
+  match light with
+  | Red -> Green
+  | Green -> Red

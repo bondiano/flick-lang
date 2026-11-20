@@ -305,8 +305,10 @@ suite "accounts" {
 }
 ```
 
-A fixture whose expression fails fails each case that awaits it, with its
-error; a shared one is not made again for the next case.
+A fixture whose expression fails is a `setup` failure of each case that
+awaits it, with the fixture's error (`fixture conn: expected 1, got 2`),
+unless the case handles the error; a shared one is not made again for the
+next case.
 
 A suite with a shared fixture runs its cases one at a time, also under
 `--jobs`, while other suites run beside it. `suite parallel "name"` runs

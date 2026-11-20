@@ -148,6 +148,11 @@ impl<'a> Printer<'a> {
 
     /// `let` and `server fn` declarations.
     pub fn let_(&mut self, n: &'a Node) -> Doc<'a> {
+        if let Some(at) = position(n, K::WhereKw)
+            && node_position(n, K::Contract).is_some()
+        {
+            return self.contract_let(n, at);
+        }
         let a = self.a;
         let (Some(eq), Some(block)) = (position(n, K::Eq), node_position(n, K::Block)) else {
             return self.generic(n);
