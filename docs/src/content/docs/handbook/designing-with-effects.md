@@ -686,8 +686,8 @@ let tests = [
       let (first, second) = provide Layer.merge users_test (log_test lines) {
         load_two (user_id "u1") (user_id "u2")
       }
-      Test.expect (Test.equal ["Ada", "Grace"] [first.title, second.title])
-      Test.expect (Test.equal ["Loaded Ada", "Loaded Grace"] (List.sort (Ref.get lines)))
+      Test.check (Test.equal ["Ada", "Grace"] [first.title, second.title])
+      Test.check (Test.equal ["Loaded Ada", "Loaded Grace"] (List.sort (Ref.get lines)))
     }),
   Test.effect_test
     "load_view fails with NotFound"
@@ -701,8 +701,8 @@ let tests = [
           view.title
         with
         | NotFound id -> "missing \{show id}"
-      Test.expect (Test.equal "missing \"nobody\"" outcome)
-      Test.expect (Test.equal [] (Ref.get lines))
+      Test.check (Test.equal "missing \"nobody\"" outcome)
+      Test.check (Test.equal [] (Ref.get lines))
     }),
 ]
 ```

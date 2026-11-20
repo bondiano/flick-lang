@@ -1,6 +1,6 @@
 ---
 title: "Тестирование"
-source_hash: a9002a5c41c10ca5
+source_hash: b45c886835c39099
 ---
 
 Модуль тестового корня записывает свои тесты блоками: `suite "name" { … }`
@@ -11,18 +11,20 @@ source_hash: a9002a5c41c10ca5
 ```flick
 module App.UsersTest
 
+import Test exposing (expect, to)
+
 suite "names" {
   test "trims the name" {
     let name = String.trim "  Ada  "
-    Test.expect (Test.equal "Ada" name)
+    expect name |> to.equal "Ada"
   }
 
   suite "empty" {
-    test "stays empty" { Test.expect (Test.equal "" (String.trim "  ")) }
+    test "stays empty" { expect (String.trim "  ") |> to.equal "" }
   }
 }
 
-test "counts" { Test.expect (Test.equal 3 (List.length [1, 2, 3])) }
+test "counts" { expect (List.length [1, 2, 3]) |> to.equal 3 }
 ```
 
 Блоки принадлежат плагину пакета `std` (см. [плагины](../plugins/)),
@@ -48,8 +50,9 @@ test "counts" { Test.expect (Test.equal 3 (List.length [1, 2, 3])) }
 собственной области, которая владеет тем, что захватило тело, с живыми
 сервисами хоста (`Host.Live`), которые переживают эту область. Тест
 проходит, когда тело завершилось и его область закрылась без ошибок;
-`Test.expect` проваливает его на неверном утверждении, а типизированная
-ошибка, дефект или сбой очистки тоже проваливают тест.
+сопоставитель (см. [утверждения](#утверждения)) проваливает его на неверном
+утверждении, а типизированная ошибка, дефект или сбой очистки тоже
+проваливают тест.
 
 Случаи модуля — его `tests : List Test.Test`, случай каждого блока
 верхнего уровня в порядке записи. Модуль экспортирует `tests`, не называя
@@ -70,6 +73,48 @@ test "a block" {}
 [стандартную библиотеку](../stdlib/#тесты)): оба вида модулей запускаются
 одним `flick test`.
 
+## Утверждения
+
+`expect actual` называет значение, которое проверяет утверждение, а
+сопоставитель из `to` проверяет его: `expect total |> to.equal 3`.
+Сопоставитель, которому значение не подходит, проваливает тест с
+`Test.AssertionFailed`, чьё сообщение становится ошибкой `assertion` теста.
+
+| Сопоставитель | Проходит, когда |
+| - | - |
+| `to.equal expected` | значение равно `expected` (`Eq`, `Show`) |
+| `to.be_true` | `Bool` равен `true` |
+| `to.be_greater_than bound` | значение больше `bound` (`Ord`, `Show`) |
+| `to.contain item` | `List` содержит `item` |
+| `to.fail_with error` | задача, которую он запускает, падает с `error` |
+
+Упавший `to.equal` говорит, что он ожидал и что получил: `expected 3, got
+4`. Если какое-то из значений в записи `show` длинное или занимает
+несколько строк, он показывает их строки как diff: строки, которыми оба
+начинаются и заканчиваются, — как есть, а между ними каждую ожидаемую
+строку после `- ` и каждую полученную после `+ `.
+
+```flick
+module App.LookupTest
+
+import Test exposing (expect, to)
+
+type error NotFound = NotFound String
+  deriving Eq, Show
+
+find : String ->{; NotFound} Int
+let find name = if name == "ada" then 1 else Fail.fail (NotFound name)
+
+test "finds ada" { expect (find "ada") |> to.equal 1 }
+
+test "misses bob" { expect (task { find "bob" }) |> to.fail_with (NotFound "bob") }
+```
+
+`Test.check assertion` проваливает тест, если `Assertion`, собранное
+вручную, например `Test.equal expected actual`, не выполнено. Раньше это
+был `Test.expect`, пока `expect` не стал принимать значение; `assert` —
+ключевое слово.
+
 ## Тестовые компаньоны
 
 Модуль тестового корня видит только то, что экспортируют импортированные
@@ -85,7 +130,7 @@ module App.Users
 # trim : String -> String
 # let trim name = String.trim name
 #
-test "trims a name" { Test.expect (Test.equal "Ada" (trim "  Ada ")) }
+test "trims a name" { Test.check (Test.equal "Ada" (trim "  Ada ")) }
 ```
 
 Модуль никогда не видит своего компаньона, и никакой другой модуль не может
@@ -121,7 +166,7 @@ suite.skip "storage" {
   test "keeps a user" {}
 }
 
-test.only "being written" { Test.expect (Test.equal 2 (1 + 1)) }
+test.only "being written" { Test.check (Test.equal 2 (1 + 1)) }
 ```
 
 Пропущенный случай внутри набора с `only` остаётся пропущенным. `Test.skip`
@@ -222,8 +267,8 @@ suite "users" {
 
   before_all { SynchronizedRef.update (fun all -> all ++ ["Grace"]) (await names) }
 
-  test "counts the names" { Test.expect (Test.equal 2 (await count)) }
-  test "reads them" { Test.expect (Test.equal ["Ada", "Grace"] (SynchronizedRef.get (await names))) }
+  test "counts the names" { Test.check (Test.equal 2 (await count)) }
+  test "reads them" { Test.check (Test.equal ["Ada", "Grace"] (SynchronizedRef.get (await names))) }
 }
 ```
 

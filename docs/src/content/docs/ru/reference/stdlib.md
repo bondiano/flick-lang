@@ -1,6 +1,6 @@
 ---
 title: "Стандартная библиотека"
-source_hash: 8a565f67e8865d01
+source_hash: 95dfb0f136f15e50
 ---
 
 Стандартная библиотека написана на Flick и использует адаптер среды выполнения
@@ -247,7 +247,7 @@ tests : List Test.Test
 let tests =
   [
     Test.test "trims" (fun () -> Test.equal "a" (String.trim " a ")),
-    Test.effect_test "reads" (task { Test.expect (Test.equal 1 1) }),
+    Test.effect_test "reads" (task { Test.check (Test.equal 1 1) }),
     Test.property "reverse twice" (Gen.list 10 (Gen.int 0 9)) (fun xs ->
       Test.equal xs (List.reverse (List.reverse xs))),
     Test.group "numbers" [Test.test "adds" (fun () -> Test.equal 2 (1 + 1))],
@@ -257,7 +257,8 @@ let tests =
 | Функция | Тест |
 | - | - |
 | `Test.test name check` | чистый тест: `check ()` возвращает `Assertion` |
-| `Test.effect_test name task` | выполняет задачу в собственной области, которая владеет полученными ресурсами, с живыми сервисами хоста, которые переживают эту область: полученные ресурсы могут пользоваться ими при освобождении; `Test.expect` завершает задачу с ошибкой, если утверждение не выполнено |
+| `Test.expect actual \|> Test.to.equal expected`, `to.be_true`, `to.be_greater_than`, `to.contain`, `to.fail_with` | сопоставитель для значения `actual`, который проваливает тест с `AssertionFailed`, если оно не подходит; `to.equal` показывает построчный diff длинных значений (см. [тестирование](../testing/#утверждения)) |
+| `Test.effect_test name task` | выполняет задачу в собственной области, которая владеет полученными ресурсами, с живыми сервисами хоста, которые переживают эту область: полученные ресурсы могут пользоваться ими при освобождении; `Test.check` завершает задачу с ошибкой, если утверждение не выполнено |
 | `Test.clock_test name task` | как `effect_test`, но на собственных часах, которые начинаются с 0 и идут только от `Test.adjust duration` и `Test.set_time millis`: сон, таймаут или расписание повторов ждут виртуального времени, так что тест часового backoff проходит сразу |
 | `Test.property name gen check` | выполняет `check` на 100 значениях `gen`, полученных из начального значения генератора данного запуска; `Gen.function result` (для аргумента с `Hash`) порождает чистые функции, нужные законам над функциями |
 | `Test.group name tests` | добавляет `name >` перед именами из `tests` |
@@ -287,7 +288,7 @@ let tests = [
   Test.suite "the API" services [
     Test.it "signing up answers a token" (task {
       let user = (send (at None () { user = ada }) Api.Public.endpoints.register).user
-      Test.expect (Test.is_true "a token" (user.token != ""))
+      Test.check (Test.is_true "a token" (user.token != ""))
     }),
   ],
 ]

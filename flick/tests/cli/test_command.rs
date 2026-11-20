@@ -39,7 +39,7 @@ let tests =
   [
     Test.test "adds" (fun () -> Test.equal 2 (1 + 1)),
     Test.test "fails an assertion" (fun () -> Test.equal 3 (1 + 1)),
-    Test.effect_test "expects in a task" (task { Test.expect (Test.equal "a" "b") }),
+    Test.effect_test "expects in a task" (task { Test.check (Test.equal "a" "b") }),
     Test.effect_test "fails with a typed error" (task { from_result (Err (Boom "x")) }),
     Test.effect_test "dies" (task { crash "{" }),
     Test.effect_test
@@ -319,19 +319,19 @@ let tests =
             Clock.current_time_millis ()
           })
           Test.adjust hour
-          Test.expect (Test.equal 3600000 (Fiber.join sleeper))
+          Test.check (Test.equal 3600000 (Fiber.join sleeper))
         }
       }),
     Test.clock_test
       "each test starts at zero"
       (task {
-        Test.expect (Test.equal 0 (Clock.current_time_millis ()))
+        Test.check (Test.equal 0 (Clock.current_time_millis ()))
         Test.set_time 1000
-        Test.expect (Test.equal 1000 (Clock.current_time_millis ()))
+        Test.check (Test.equal 1000 (Clock.current_time_millis ()))
       }),
     Test.clock_test
       "another test's clock is not this one"
-      (task { Test.expect (Test.equal 0 (Clock.current_time_millis ())) }),
+      (task { Test.check (Test.equal 0 (Clock.current_time_millis ())) }),
     Test.clock_test
       "sleepers wake in order, each run before the clock moves on"
       (task {
@@ -346,9 +346,9 @@ let tests =
             Ref.update order (fun xs -> xs ++ ["one"])
           })
           Test.adjust hour
-          Test.expect (Test.equal ["one"] (Ref.get order))
+          Test.check (Test.equal ["one"] (Ref.get order))
           Test.adjust hour
-          Test.expect (Test.equal ["one", "two"] (Ref.get order))
+          Test.check (Test.equal ["one", "two"] (Ref.get order))
         }
       }),
     Test.clock_test
@@ -368,9 +368,9 @@ let tests =
             | Again -> "gave up"
           })
           Test.adjust hour
-          Test.expect (Test.equal 2 (Ref.get calls))
+          Test.check (Test.equal 2 (Ref.get calls))
           Test.adjust hour
-          Test.expect (Test.equal "done" (Fiber.join retried))
+          Test.check (Test.equal "done" (Fiber.join retried))
         }
       }),
   ]

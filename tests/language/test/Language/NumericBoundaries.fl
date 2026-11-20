@@ -64,7 +64,7 @@ let tests = [
               (task { Int.unsafe_div 7 (List.length []) })
           })
       let defect = Exit.match_ (fun _ -> false) Cause.has_dies outcome
-      Test.expect (Test.equal (true, true) (defect, Ref.get closed))
+      Test.check (Test.equal (true, true) (defect, Ref.get closed))
     }),
   Test.effect_test
     "a negative BigInt exponent runs cleanup before reporting a defect"
@@ -74,6 +74,6 @@ let tests = [
         Effect.exit
           (task { Effect.ensuring (task { Ref.set closed true }) (task { big_power 2n (-1n) }) })
       let defect = Exit.match_ (fun _ -> false) Cause.has_dies outcome
-      Test.expect (Test.equal (true, true) (defect, Ref.get closed))
+      Test.check (Test.equal (true, true) (defect, Ref.get closed))
     }),
 ]
