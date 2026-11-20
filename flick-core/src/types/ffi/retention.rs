@@ -37,6 +37,10 @@ impl Checker<'_> {
         let outlived = constrained(constraints, Lang::Outlives);
         let kept = self.kept_rows(vars, &outlived, body);
         let unprovided = self.unprovided_rows(vars, constraints, &outlived, body);
+        let detached = constrained(constraints, Lang::Detached);
+        let undetached = constrained(constraints, Lang::Provided)
+            .into_iter()
+            .find(|row| !detached.contains(row));
         if let Some(row) = unprovided.first() {
             self.error(
                 codes::F002,
@@ -44,6 +48,15 @@ impl Checker<'_> {
                 format!(
                     "with `retention owner` the foreign function keeps work that uses the services `{0}` until its owner closes, so its signature needs `Fiber.Provided {0} s` for the owner's region `s`",
                     row.name
+                ),
+            );
+        }
+        if let Some(row) = undetached {
+            self.error(
+                codes::F002,
+                span,
+                format!(
+                    "with `retention owner` the foreign function keeps work that uses the services `{row}` until its owner closes, so its signature needs `Detached {row}`"
                 ),
             );
         }

@@ -90,6 +90,7 @@ codegen/loops_owners
 codegen/contract_runs_nowhere
 runtime/lazy_once
 runtime/lazy_abort
+runtime/detached_lazy
 runtime/suspended
 runtime/lazy_let
 runtime/lazy_let_state

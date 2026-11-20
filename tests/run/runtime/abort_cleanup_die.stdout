@@ -1,0 +1,6 @@
+body die + cleanup abort: ["D"], first body-boom
+body abort + cleanup die: ["D"], first cleanup-boom
+body ok + cleanup abort: value stopped: cleanup-only
+bracket use die + release abort: ["D"], first use-boom
+first_success_of: stopped: first, second=false
+eventually: stopped: ev, attempts=2

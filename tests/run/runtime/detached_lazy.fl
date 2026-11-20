@@ -1,0 +1,42 @@
+// `Detached r` entails `NoControl r` without passing a dictionary for either.
+// A polymorphic `Detached r =>` function can construct a `lazy`, and a
+// polymorphic `NoControl r =>` function accepts an `abort` effect that unwinds
+// synchronously in the forcing fiber.
+module App.Main exposing (main)
+
+effect Value =
+  get : Unit ->{} Int
+
+effect Stop =
+  abort stop : forall a. String ->{} a
+
+from_detached : Detached r => (Unit ->{r} Int)^{} ->{} Lazy r none Int
+let from_detached f = lazy { f () }
+
+from_no_control : NoControl r => (Unit ->{r} Int)^{} ->{} Lazy r none Int
+let from_no_control f = lazy { f () }
+
+main : Unit ->{Host.Console, Async} Unit
+let main () =
+  let a =
+    try
+      let l = from_detached (fun () -> Value.get ())
+      await l
+    with
+    | Value.get () -> 21
+  Platform.stdout_line "detached: \{a}"
+  let b =
+    try
+      let l = from_no_control (fun () -> Stop.stop "halt")
+      show (await l)
+    with
+    | Stop.stop why -> why
+  Platform.stdout_line "no_control: \{b}"
+  let c =
+    try
+      let l1 = from_detached (fun () -> Value.get ())
+      let l2 = from_no_control (fun () -> Value.get ())
+      await l1 + await l2
+    with
+    | Value.get () -> 21
+  Platform.stdout_line "both: \{c}"

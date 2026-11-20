@@ -10,7 +10,7 @@ type error ValidationError (e : ErrorRow) = ValidationError (NonEmpty.NonEmpty (
 
 /// Runs `f` on each element, as many at once as `concurrency` lets; the
 /// results in order. The first typed failure stops the others.
-for_each : Concurrency -> (a ->{r; e} b)^c -> List a ->{r; e} List b
+for_each : Detached r => Concurrency -> (a ->{r; e} b)^c -> List a ->{r; e} List b
 foreign effect for_each from "flick:Effect" "flickForEach"
   arity 2
   retention call
@@ -24,19 +24,19 @@ foreign effect all from "flick:Effect" "flickAll"
 
 /// Runs `f` on every element: the results and the typed errors apart, in
 /// order; it fails only with a defect or an interruption.
-partition : Concurrency -> (a ->{r; e} b)^c -> List a ->{r} (List b, List (Errors e))
+partition : Detached r => Concurrency -> (a ->{r; e} b)^c -> List a ->{r} (List b, List (Errors e))
 foreign effect partition from "flick:Effect" "flickPartition"
   arity 2
   retention call
 
 /// Runs `f` on every element: all the results, or every typed error.
-validate : Concurrency -> (a ->{r; e} b)^c -> List a ->{r; ValidationError e} List b
+validate : Detached r => Concurrency -> (a ->{r; e} b)^c -> List a ->{r; ValidationError e} List b
 foreign effect validate from "flick:Effect" "flickValidate"
   arity 2
   retention call
 
 /// The elements `f` keeps, in order.
-filter : Concurrency -> (a ->{r; e} Bool)^c -> List a ->{r; e} List a
+filter : Detached r => Concurrency -> (a ->{r; e} Bool)^c -> List a ->{r; e} List a
 foreign effect filter from "flick:Effect" "flickFilter"
   arity 2
   retention call
@@ -48,7 +48,7 @@ foreign effect filter_map from "flick:Effect" "filterMap"
   retention call
 
 /// The values the runtime filter passes, in order.
-filter_map_effect : Concurrency -> (a ->{r; e} Result x b)^c -> List a ->{r; e} List b
+filter_map_effect : Detached r => Concurrency -> (a ->{r; e} Result x b)^c -> List a ->{r; e} List b
 foreign effect filter_map_effect from "flick:Effect" "flickFilterMapEffect"
   arity 2
   retention call

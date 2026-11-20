@@ -623,8 +623,9 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
   nearest handler is one a child keeps is stuck at that frame (`Frame.handles`, `KeptStuck`), an
   outcome of a child in `T1` and `T1_regions`; it leaves the row of the work as an operation
   the handler answers does, and no rule of this calculus rejects it; the checker rejects
-  `control` there (`classes/detached.rs`), not `abort`. Every other operation of a child is
-  answered, by a handler it keeps or by `Σ₀` (`T1_regions`).
+  both `control` and `abort` there (`classes/detached.rs`, `Detached r`), and `flick-model`
+  matches `Frame.handles` by going stuck on non-`tail` operations to a kept handler. Every other
+  operation of a child is answered, by a handler it keeps or by `Σ₀` (`T1_regions`).
 - **A signal may end a child.** An arm of a kept handler that raises lets the rest of the child
   go, closing its regions, and the child ends as a signal, not as `raise v`: the core drops
   how a child ends either way.
@@ -637,8 +638,9 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
   which an instance could make its effect: the first case of `regions.md` §2.7, as for `provide`.
 - **The arms for errors of a handler** are a `try` around it: errors pass `hdl`.
 - **Lazy cells.** `Lazy ρ ε τ` has the hidden qualifier `C` of its initializer, as `Eff`, and
-  no subtyping. (T-Lazy) has no premise `Detached ρ`, as `spawn` has none: the checker's
-  (`classes/detached.rs`). The store gives a cell the type `lazyCell ρ ε τ C`, which no value
+  no subtyping. (T-Lazy) has no premise `NoControl ρ`, as `spawn` has no premise `Detached ρ`:
+  the checker checks both (`classes/detached.rs`), allowing `abort` inside a `lazy` initializer
+  (which runs synchronously in the forcing fiber) while rejecting `control`. The store gives a cell the type `lazyCell ρ ε τ C`, which no value
   has, so a `Ref` operation never writes a cell, and holds its state as a term that is no
   value: `Pending e` is `lazy e`, `Running` is `anil`, `Done o` is `await o` with `o` one of
   `v`, `raise v`, `todo` (`Tm.IsCell`). `Ref.get` of a cell is a defect (`refGetCell`), and so

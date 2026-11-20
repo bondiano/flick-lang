@@ -1,13 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Cause, Context, Effect, Option } from "effect";
+import { Cause, Context, Effect, Fiber, Option } from "effect";
 import { some } from "@flick-lang/runtime/core/data";
 import { runIn, currentCtx, extend, inCtx, type Run } from "@flick-lang/runtime/rt/fiber";
 import { scopeRun } from "@flick-lang/runtime/rt/owner";
 import { fail } from "@flick-lang/runtime/rt/cause";
-import { service, handle as nativeHandle, operation as nativeOperation, type OpInstall } from "@flick-lang/runtime/rt/handle";
+import { service, handle as nativeHandle, operation as nativeOperation, tryWith as nativeTryWith, type OpInstall } from "@flick-lang/runtime/rt/handle";
+import { flickExit, flickMatchCause } from "@flick-lang/runtime/rt/effect/Effect";
+import { lazyForce, lazyMake } from "@flick-lang/runtime/rt/effect/Lazy";
 import { handle as hostHandle } from "../src/handlers.ts";
+import { operation as hostOperation, service as hostService } from "../src/effects.ts";
 import { causeToEffect, causeFromEffect, fromEffect, handlersToEffect, callEffect } from "../src/bridge.ts";
+import { flickEventually, flickFirstSuccessOf } from "../src/stdlib/effect-core.ts";
 
 
 const nativeArm = (name: string, value: number): OpInstall =>
@@ -126,4 +130,134 @@ test("a complete native provider remains a forwarding barrier at an Effect cross
     undefined, undefined,
   ))));
   assert.equal(called, false);
+});
+
+test("same-fiber native abort unwinds through bridged firstSuccessOf and eventually", async () => {
+  const tag = service("Test.NativeAbortBridge");
+  const stop: unknown = nativeOperation(tag, "stop", 1);
+  let secondRan = false;
+  const first: unknown = runIn(scopeRun(() => nativeHandle(
+    [[tag, [["stop", () => "aborted", "abort", 0, 1]]]],
+    () => fromEffect(flickFirstSuccessOf([
+      callEffect(() => callNativeOperation(stop)),
+      callEffect(() => { secondRan = true; return "second"; }),
+    ])),
+    undefined, undefined,
+  )));
+  assert.equal(first, "aborted");
+  assert.equal(secondRan, false);
+
+  let attempts = 0;
+  const ev: unknown = await Effect.runPromise(callEffect(() => scopeRun(() => nativeHandle(
+    [[tag, [["stop", () => "stopped", "abort", 0, 1]]]],
+    () => fromEffect(flickEventually(Effect.suspend(() => {
+      attempts += 1;
+      return attempts === 1 ? Effect.fail("retry") : callEffect(() => callNativeOperation(stop));
+    }))),
+    undefined, undefined,
+  ))));
+  assert.equal(ev, "stopped");
+  assert.equal(attempts, 2);
+});
+
+test("cross-fiber native abort through Effect.forkChild dies instead of unwinding", async () => {
+  const tag = service("Test.CrossFiberNativeAbortBridge");
+  const stop: unknown = nativeOperation(tag, "stop", 1);
+  let armRan = false;
+  const program = callEffect(() => nativeHandle(
+    [[tag, [["stop", () => { armRan = true; return "wrong"; }, "abort", 0, 1]]]],
+    () => fromEffect(Effect.flatMap(Effect.forkChild(callEffect(() => callNativeOperation(stop))), Fiber.join)),
+    undefined, undefined,
+  ));
+  const exit = await Effect.runPromiseExit(program);
+  assert.equal(exit._tag, "Failure");
+  assert.ok(Cause.hasDies(exit.cause));
+  assert.match(Cause.pretty(exit.cause), /other than its handler/);
+  assert.equal(armRan, false);
+});
+
+test("bridged Effect.ensuring Die(Signal) is stripped cleanly in native handle, flickExit, tryWith, matchCause, and lazyForce", async () => {
+  const tag = service("Test.BridgedDieSignal");
+  const stop: unknown = nativeOperation(tag, "stop", 1);
+  let armRan = false;
+  const dieAndAbort = () =>
+    fromEffect(Effect.ensuring(Effect.die("boom"), Effect.orDie(callEffect(() => callNativeOperation(stop)))));
+
+  const direct = await Effect.runPromiseExit(callEffect(() => scopeRun(() => nativeHandle(
+    [[tag, [["stop", () => { armRan = true; return "swallowed"; }, "abort", 0, 1]]]],
+    dieAndAbort,
+    undefined, undefined,
+  ))));
+  assert.equal(direct._tag, "Failure");
+  assert.equal(direct.cause.reasons.length, 1);
+  const directReason = direct.cause.reasons[0];
+  assert.ok(directReason !== undefined && Cause.isDieReason(directReason));
+  assert.equal(directReason.defect, "boom");
+
+  const viaExit = await Effect.runPromise(callEffect(() => scopeRun(() => nativeHandle(
+    [[tag, [["stop", () => { armRan = true; return "swallowed"; }, "abort", 0, 1]]]],
+    () => flickExit(dieAndAbort),
+    undefined, undefined,
+  ))));
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- flickExit returns a native Exit
+  const nativeExit = viaExit as { cause?: { reasons: ReadonlyArray<{ _tag: string; defect?: unknown }> } };
+  assert.deepEqual(nativeExit.cause?.reasons.map((r) => [r._tag, r.defect]), [["Die", "boom"]]);
+
+  const viaTry = await Effect.runPromiseExit(callEffect(() => scopeRun(() => nativeHandle(
+    [[tag, [["stop", () => { armRan = true; return "swallowed"; }, "abort", 0, 1]]]],
+    () => nativeTryWith(dieAndAbort, () => () => "caught"),
+    undefined, undefined,
+  ))));
+  assert.equal(viaTry._tag, "Failure");
+  assert.equal(viaTry.cause.reasons.length, 1);
+
+  const viaMatch = await Effect.runPromise(callEffect(() => scopeRun(() => nativeHandle(
+    [[tag, [["stop", () => { armRan = true; return "swallowed"; }, "abort", 0, 1]]]],
+    () => flickMatchCause((failure) => failure.cause.reasons.map((r) => [r._tag, r._tag === "Die" ? r.defect : undefined]), () => [])(dieAndAbort),
+    undefined, undefined,
+  ))));
+  assert.deepEqual(viaMatch, [["Die", "boom"]]);
+
+  const cell = lazyMake(dieAndAbort);
+  const viaLazy = await Effect.runPromiseExit(callEffect(() => scopeRun(() => nativeHandle(
+    [[tag, [["stop", () => { armRan = true; return "swallowed"; }, "abort", 0, 1]]]],
+    () => lazyForce(cell),
+    undefined, undefined,
+  ))));
+  assert.equal(viaLazy._tag, "Failure");
+  assert.equal(viaLazy.cause.reasons.length, 1);
+  assert.equal(armRan, false);
+});
+
+test("reverse bridge: hostHandle abort unwinds through native flickExit, tryWith, flickMatchCause, and lazyForce", async () => {
+  const hostTag = hostService("Test.ReverseBridgeHostAbort");
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- erased handler ABI in test
+  const install = hostTag as unknown as Context.Service<object, object>;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- erased operation ABI in test
+  const stop = hostOperation(hostTag, "stop", 1) as (u: undefined) => Effect.Effect<never, never, unknown>;
+
+  const runUnderHost = (nativeBody: () => unknown) => {
+    let armRan = false;
+    const effect = hostHandle(
+      [[install, { stop: () => Effect.sync(() => { armRan = true; return "host-aborted"; }) }, ["stop"]]],
+      callEffect(nativeBody),
+      undefined, undefined,
+    );
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- hostHandle satisfies the service
+    return Effect.runPromise(effect as Effect.Effect<unknown, unknown>).then((value) => ({ value, armRan }));
+  };
+
+  const viaExit = await runUnderHost(() => flickExit(() => fromEffect(stop(undefined))));
+  assert.deepEqual(viaExit, { value: "host-aborted", armRan: true });
+
+  const viaTry = await runUnderHost(() => nativeTryWith(() => fromEffect(stop(undefined)), () => () => "swallowed"));
+  assert.deepEqual(viaTry, { value: "host-aborted", armRan: true });
+
+  const viaMatch = await runUnderHost(() => flickMatchCause(() => "swallowed", () => "ok")(() => fromEffect(stop(undefined))));
+  assert.deepEqual(viaMatch, { value: "host-aborted", armRan: true });
+
+  const cell = lazyMake(() => fromEffect(stop(undefined)));
+  const viaLazy = await runUnderHost(() => lazyForce(cell));
+  assert.deepEqual(viaLazy, { value: "host-aborted", armRan: true });
+  assert.equal(cell.exit, undefined);
 });

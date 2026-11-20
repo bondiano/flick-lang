@@ -51,16 +51,19 @@ type cache struct {
 	expires float64
 }
 
-func (c *cache) run(fb *Fiber) Value {
+func (c *cache) load(fb *Fiber) *Exit {
 	c.mu.Lock()
+	defer c.mu.Unlock()
 	clock := clockOf(fb)
 	if c.exit == nil || !math.IsInf(c.expires, 1) && clock.millis() >= c.expires {
 		c.exit = exitOf(fb, c.task)
 		c.expires = clock.millis() + c.ttl
 	}
-	e := c.exit
-	c.mu.Unlock()
-	return Run(fb, e.outcome())
+	return c.exit
+}
+
+func (c *cache) run(fb *Fiber) Value {
+	return Run(fb, c.load(fb).outcome())
 }
 
 func (c *cache) invalidate() {

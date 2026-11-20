@@ -17,7 +17,7 @@ export type Services = ReadonlyArray<readonly [tag: object, impl: unknown]>;
 export type Build = (memo: MemoMap, into: Owner) => unknown;
 
 export class Layer {
-  readonly build: Build;
+  declare readonly build: Build;
   constructor(build: Build) {
     this.build = build;
   }
@@ -54,7 +54,7 @@ interface Entry {
 
 /** What one build shares; a forked map reads the entries of its parent. */
 export class MemoMap {
-  readonly parent: MemoMap | undefined;
+  declare readonly parent: MemoMap | undefined;
   readonly entries = new Map<Layer, Entry>();
   constructor(parent: MemoMap | undefined) {
     this.parent = parent;

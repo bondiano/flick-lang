@@ -55,6 +55,7 @@ change needs.
 | [No build without a runtime](#no-build-without-a-runtime) | no | `FLICK-P005` |
 | [A provided instance leaves the body no other](#a-provided-instance-leaves-the-body-no-other) | no | `FLICK-E019` |
 | [Backends find the built-in types by lang item](#backends-find-the-built-in-types-by-lang-item) | no | `FLICK-S014` |
+| [`Detached` forbids `abort`; `lazy` uses `NoControl`](#detached-forbids-abort-lazy-uses-nocontrol) | no | `FLICK-E017`, `FLICK-F002` |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -645,3 +646,22 @@ store a capability of its private region in an outer `Ref`; this reports
 `FLICK-T007`. A separately bound polymorphic task remains a valid acquisition.
 The container's owning region and the callback's ordinary service requirements
 remain independent of the private acquisition region.
+
+## `Detached` forbids `abort`; `lazy` uses `NoControl`
+
+`Detached r` now requires that no effect in `r` has either a `control` or an
+`abort` operation (`FLICK-E017`). Previously only `control` was rejected, so an
+`abort` inside a child fiber (`Fiber.spawn`, `parallel`, `race_success`,
+`Effect.cached`, concurrent `Effect.for_each` / `partition` / `validate` /
+`filter` / `filter_map_effect`, `Effect.timeout_or_else`) or a scope finalizer
+could reach a kept handler from outside its installing fiber. Handle `abort`
+effects inside the child or finalizer, or use typed errors (`type error`) and
+`join` / `Channel` to report outcomes back to the parent.
+
+A `lazy` initializer still allows `abort` because it runs synchronously in the
+forcing fiber; `lazy` and `lazy_make` now require the superclass `NoControl r`
+(`class NoControl r => Detached r`), so every `Detached r` constraint still
+satisfies `NoControl r`. Foreign declarations with `retention owner` and more
+than one region must also include `Detached r` alongside `Fiber.Provided r s`
+(`FLICK-F002`). Typed IR advances to `0.13.0` to include the `no_control` lang
+item.

@@ -58,8 +58,8 @@ func EffectEventually(fb *Fiber, task Value) Value {
 		if c == nil {
 			return v
 		}
-		if !c.has(causeFail) {
-			return failCause(c)
+		if !c.has(causeFail) || c.hasRealDie() || unwinds(c) {
+			return failCause(cleanCause(c))
 		}
 		EffectYieldNow(fb)
 	}

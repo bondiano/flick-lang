@@ -300,6 +300,7 @@ pub fn passes_dictionary(constraint: &Type) -> bool {
     !class(Lang::Outlives)
         && !class(Lang::Provided)
         && !class(Lang::Detached)
+        && !class(Lang::NoControl)
         && !class(Lang::TypeEq)
         && super::gadt::row_facts::Equation::from_given(constraint).is_none()
         && as_field_given(constraint).is_none()

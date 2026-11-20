@@ -3,7 +3,7 @@ import { none, some, type Data } from "../../core/data.ts";
 import { clock } from "../clock.ts";
 import { allOf } from "../concurrency.ts";
 import { Duration, sleep } from "../duration.ts";
-import { type Exit, die as dieCause, hasInterrupts, interrupt, isDie, isInterrupt, raise, succeeded, unwinds } from "../cause.ts";
+import { type Exit, cleanExit, die as dieCause, failed, hasInterrupts, hasRealDie, interrupt, isDie, isInterrupt, raise, stripSignals, succeeded } from "../cause.ts";
 import { describeDefect } from "../describe.ts";
 import {
   type Run,
@@ -64,13 +64,13 @@ export const flickInterrupt = (): never => raise(interrupt(currentFiber().id));
 
 /** Register a scope finalizer with the native owner. */
 export const flickAddFinalizer = (finalizer: (cause: unknown) => unknown): unknown =>
-  addFinalizerExit((exit: Exit) => finalizer(exit.cause === undefined ? none : some(new RawCause(exit.cause))));
+  addFinalizerExit((exit: Exit) =>
+    finalizer(exit.cause === undefined ? none : some(new RawCause(hasRealDie(exit.cause) ? stripSignals(exit.cause) : exit.cause))),
+  );
 
 /** How `task` ended, as a value, unless it unwinds to a handler of effects. */
 export function* flickExit(task: () => unknown): Run {
-  const exit = asExit(yield caught(task));
-  if (exit.cause !== undefined && unwinds(exit.cause)) return raiseOf(exit);
-  return exit;
+  return cleanExit(asExit(yield caught(task)));
 }
 
 /** Recover a defect as inert text; typed failures and unwinding pass through. */
@@ -78,9 +78,8 @@ export const flickCatchDefect =
   (f: (defect: string) => unknown) =>
   (task: () => unknown): Run =>
     (function* (): Run {
-      const exit = asExit(yield caught(task));
+      const exit = cleanExit(asExit(yield caught(task)));
       if (exit.cause === undefined) return exit.value;
-      if (unwinds(exit.cause)) return raiseOf(exit);
       const defect = exit.cause.reasons.find(isDie);
       return defect === undefined ? raiseOf(exit) : f(describeDefect(defect.defect));
     })();
@@ -105,7 +104,11 @@ function* finally_(task: () => unknown, finalizer: (exit: Exit) => unknown): Run
   const depth = fiber.mask;
   fiber.mask = depth + 1;
   try {
-    const exit = asExit(yield exitOf(() => atMask(depth, task)));
+    let exit = asExit(yield exitOf(() => atMask(depth, task)));
+    if (exit.cause !== undefined && hasRealDie(exit.cause)) {
+      const cleaned = stripSignals(exit.cause);
+      if (cleaned !== exit.cause) exit = failed(cleaned);
+    }
     const ended = asExit(yield cleanupAfter(exit, () => finalizer(exit)));
     return raiseOf(finalize(exit, ended));
   } finally {
@@ -136,10 +139,8 @@ export const flickMatchCause =
   (onFailure: (failure: Failure) => unknown, onSuccess: (value: unknown) => unknown) =>
   (task: () => unknown): Run =>
     (function* (): Run {
-      const exit = asExit(yield caught(task));
-      if (exit.cause === undefined) return onSuccess(exit.value);
-      if (unwinds(exit.cause)) return raiseOf(exit);
-      return onFailure(new Failure(exit.cause));
+      const exit = cleanExit(asExit(yield caught(task)));
+      return exit.cause === undefined ? onSuccess(exit.value) : onFailure(new Failure(exit.cause));
     })();
 
 const limitOf = (c: Data): number => {

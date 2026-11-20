@@ -4,11 +4,17 @@ package flickrt
 // `Failure`, its exit, and a defect as inert text. A filter gives `Ok` of
 // what it found, or `Err` of what stays.
 
-// onCause runs `task`; when it fails, `handle` of the cause ends it.
+// onCause runs `task`; when it fails, `handle` of the cause ends it. Pure
+// handler unwinding passes through untouched; a real defect strips signals.
 func onCause(fb *Fiber, task Value, handle func(*Cause) Value) Value {
 	v, c := caught(fb, func() Value { return Run(fb, task) })
 	if c == nil {
 		return v
+	}
+	if c.hasRealDie() {
+		c = cleanCause(c)
+	} else if unwinds(c) {
+		return failCause(c)
 	}
 	return handle(c)
 }
@@ -114,15 +120,14 @@ func EffectMatchCauseEffect(fb *Fiber, onFailure, onSuccess, task Value) Value {
 	return Run(fb, Apply(fb, onSuccess, v))
 }
 
-// EffectOrDie makes a typed failure a defect: a cause with a typed failure
-// becomes the defect of its first error.
+// EffectOrDie makes typed failures into defects; handler unwinding passes
+// through via `onCause` and real defects strip handler signals.
 func EffectOrDie(fb *Fiber, task Value) Value {
 	return onCause(fb, task, func(c *Cause) Value {
-		r := c.firstOf(causeFail)
-		if r == nil {
+		if !c.has(causeFail) {
 			return failCause(c)
 		}
-		return failCause(dieOf(r.err))
+		return failCause(c.failsToDies())
 	})
 }
 
@@ -142,7 +147,7 @@ func ignoreTask(fb *Fiber, level, task Value, drop func(*Cause) bool) Value {
 }
 
 func EffectIgnore(fb *Fiber, level, task Value) Value {
-	return ignoreTask(fb, level, task, func(c *Cause) bool { return c.has(causeFail) })
+	return ignoreTask(fb, level, task, func(c *Cause) bool { return c.has(causeFail) && !c.hasRealDie() })
 }
 
 func EffectIgnoreCause(fb *Fiber, level, task Value) Value {
@@ -219,7 +224,7 @@ func EffectOnExitPrimitive(fb *Fiber, interruptible, f, task Value) Value {
 // error reporters (only one with a defect when `defectsOnly`).
 func EffectWithErrorReporting(fb *Fiber, defectsOnly, task Value) Value {
 	return withExit(fb, task, func(e *Exit) Value {
-		if e.cause != nil && (!defectsOnly.(bool) || e.cause.has(causeDie)) {
+		if e.cause != nil && (!defectsOnly.(bool) || e.cause.hasRealDie()) {
 			ErrorReporterReport(fb, failureOf(e.cause))
 		}
 		return nil

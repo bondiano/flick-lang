@@ -175,7 +175,7 @@ fn evidence_round_trips_and_rejects_the_previous_semantic_version() {
         Program::from_json(&value.to_json()).expect("evidence JSON"),
         value
     );
-    for version in ["0.10.0", "0.11.0"] {
+    for version in ["0.10.0", "0.11.0", "0.12.0"] {
         let mut previous = value.clone();
         previous.ir_version = version.into();
         assert!(Program::from_json(&previous.to_json()).is_err());

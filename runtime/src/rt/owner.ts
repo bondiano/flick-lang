@@ -69,14 +69,14 @@ export class Owner {
   /** Hooks of C1, in order of addition. */
   readonly closing = new Set<() => unknown>();
   /** Failures of supervisors: the root's fail the program, a test's fail the test. */
-  readonly defects: Array<Cause>;
+  declare readonly defects: Array<Cause>;
   readonly finalizers: Array<Finalizer> = [];
   /** Its id in the trace, 0 when not traced, and the finalizers Flick added to it. */
   trace = 0;
   fins = 0;
   /** C5 has started: a finalizer added now runs at once, with this exit. */
   finalizing = false;
-  exit: Exit | undefined = undefined;
+  declare exit: Exit | undefined;
 
   constructor(defects: Array<Cause> = reported) {
     this.defects = defects;
@@ -221,9 +221,9 @@ export function* withOwner(body: (owner: Owner, outer: Owner | undefined) => unk
 
 /** The exit of a test body and that of its cleanup, apart, and the failures of its supervisors. */
 export class OwnedExits {
-  readonly exit: Exit;
-  readonly cleanup: Exit;
-  readonly defects: ReadonlyArray<Cause>;
+  declare readonly exit: Exit;
+  declare readonly cleanup: Exit;
+  declare readonly defects: ReadonlyArray<Cause>;
   constructor(exit: Exit, cleanup: Exit, defects: ReadonlyArray<Cause>) {
     this.exit = exit;
     this.cleanup = cleanup;
@@ -335,7 +335,7 @@ export const finalize = (exit: Exit, fin: Exit): Exit => {
 
 /** `Fiber e a`: a child spawned into an owner. */
 export class FlickFiber {
-  readonly fiber: Fiber;
+  declare readonly fiber: Fiber;
   constructor(fiber: Fiber) {
     this.fiber = fiber;
     Object.freeze(this);

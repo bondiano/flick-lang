@@ -60,8 +60,8 @@ fn handshake_rejects_each_incompatible_dimension() {
         let mut descriptor = descriptor.clone();
         match field {
             "api" => target.backend_api = "1.0.0".into(),
-            "ir" => target.ir_version = "0.13.0".into(),
-            "ir-old" => target.ir_version = "0.11.0".into(),
+            "ir" => target.ir_version = "0.14.0".into(),
+            "ir-old" => target.ir_version = "0.12.0".into(),
             "language" => target.language_version = "0.2.0".into(),
             "runtime" => target.runtime_abis[0].version = "0.2.0".into(),
             "environment" => target.environment.platform = "browser".into(),
@@ -482,7 +482,7 @@ fn incompatible_handshake_reads_no_inputs_and_never_generates() {
         unstable: false,
     };
     let mut request = request();
-    request.target.ir_version = "0.13.0".into();
+    request.target.ir_version = "0.14.0".into();
     let policy = Policy {
         authorize_step: &common::authorize,
         toolchains: &[],

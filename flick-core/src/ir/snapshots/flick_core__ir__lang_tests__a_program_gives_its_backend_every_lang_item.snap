@@ -88,6 +88,7 @@ path_params Type HttpApi.Derive.PathParams
 owner Type Fiber.Owner
 outlives Type Fiber.Outlives
 provided Type Fiber.Provided
+no_control Type Prelude.NoControl
 detached Type Prelude.Detached
 instances Type Instances.Instances
 map2 Value Prelude.map2

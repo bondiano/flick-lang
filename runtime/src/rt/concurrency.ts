@@ -4,7 +4,7 @@
 // awaited, and what they fail with besides that joins the failure.
 import { type Option, err, none, ok, some } from "../core/data.ts";
 import { tag } from "../tags.ts";
-import { type Exit, type Reason, combine, elect, fail, failed, fromReasons, hasDies, isFail, isInterrupt, raise, succeeded, unwinds } from "./cause.ts";
+import { type Exit, type Reason, cleanExit, combine, elect, fail, failed, fromReasons, isInterrupt, raise, recoverable, succeeded } from "./cause.ts";
 import { type Fiber, type Run, Suspend, asExit, awaitFiber, caught, currentCtx, currentFiber, forkNow, raiseOf } from "./fiber.ts";
 import { Duration, sleep } from "./duration.ts";
 
@@ -127,9 +127,9 @@ export const parallelAll = (limit: number, tasks: ReadonlyArray<Task>): Run => {
 export const allOf = (tasks: ReadonlyArray<Task>, limit: number): Run => all(tasks, limit);
 
 function* asResult(task: Task): Run {
-  const exit = asExit(yield caught(task));
+  const exit = cleanExit(asExit(yield caught(task)));
   if (exit.cause === undefined) return ok(exit.value);
-  const reason = hasDies(exit.cause) ? undefined : exit.cause.reasons.find(isFail);
+  const reason = recoverable(exit.cause);
   return reason === undefined ? raiseOf(exit) : err(reason.error);
 }
 
@@ -137,9 +137,7 @@ function* asResult(task: Task): Run {
 export const parallelResults = (tasks: ReadonlyArray<Task>): Run => all(tasks.map((t) => () => asResult(t)), Infinity);
 
 function* asExitValue(task: Task): Run {
-  const exit = asExit(yield caught(task));
-  if (exit.cause !== undefined && unwinds(exit.cause)) return raiseOf(exit);
-  return exit;
+  return cleanExit(asExit(yield caught(task)));
 }
 
 /** `parallel_exits`: how each branch ended. */

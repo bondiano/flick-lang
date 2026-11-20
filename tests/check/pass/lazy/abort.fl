@@ -1,0 +1,38 @@
+// A `Lazy` runs synchronously in the fiber that forces it, so `abort` is
+// allowed (`NoControl r`), while `Detached r` implies `NoControl r`. Forcing a
+// `Lazy` with `abort` inside a child is allowed when the child handles the
+// effect itself.
+module App.LazyAbort exposing (..)
+
+effect Stop =
+  abort stop : forall a. String ->{} a
+
+/// Concrete `abort` inside `lazy` is accepted.
+aborts : Unit ->{} Lazy {Stop} none Int
+let aborts () = lazy { Stop.stop "no" }
+
+/// Polymorphic helper accepting any `NoControl r` (including `abort` rows).
+memo : NoControl r => (Unit ->{r} Int)^{} ->{} Lazy r none Int
+let memo f = lazy { f () }
+
+/// Calling `memo` with an `abort` effect works.
+memo_abort : Unit ->{} Lazy {Stop} none Int
+let memo_abort () = memo (fun () -> Stop.stop "via memo")
+
+/// `Detached r` entails `NoControl r` without repeating the constraint.
+from_detached : Detached r => (Unit ->{r} Int)^{} ->{} Lazy r none Int
+let from_detached f = lazy { f () }
+
+/// Handling `Stop` inside each child allows forcing a `Lazy {Stop}` in `parallel`.
+handled_in_child : Unit ->{Async} (String, String)
+let handled_in_child () =
+  let l = aborts ()
+  parallel
+    (task {
+      try show (await l) with
+      | Stop.stop why -> "left:" ++ why
+    })
+    (task {
+      try show (await l) with
+      | Stop.stop why -> "right:" ++ why
+    })

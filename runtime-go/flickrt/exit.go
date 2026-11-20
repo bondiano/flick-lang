@@ -15,8 +15,12 @@ type Exit struct {
 // unwinds to a handler of effects.
 func exitOf(fb *Fiber, task Value) *Exit {
 	v, c := catch(func() Value { return Run(fb, task) })
-	if c != nil && unwinds(c) {
-		panic(&Failure{c})
+	if c != nil {
+		if c.hasRealDie() {
+			c = cleanCause(c)
+		} else if unwinds(c) {
+			panic(&Failure{c})
+		}
 	}
 	return &Exit{v, c}
 }
@@ -30,7 +34,9 @@ func failureOf(c *Cause) Value {
 	if c == nil {
 		c = emptyCause
 	}
-	if unwinds(c) {
+	if c.hasRealDie() {
+		c = cleanCause(c)
+	} else if unwinds(c) {
 		panic(&Failure{c})
 	}
 	return &Supervised{cause: c}
@@ -338,6 +344,13 @@ func EffectExit(fb *Fiber, task Value) Value { return handledExit(fb, task) }
 // fiber asked to stop skips; `exitOf` is for a boundary that must run.
 func handledExit(fb *Fiber, task Value) *Exit {
 	v, c := caught(fb, func() Value { return Run(fb, task) })
+	if c != nil {
+		if c.hasRealDie() {
+			c = cleanCause(c)
+		} else if unwinds(c) {
+			panic(&Failure{c})
+		}
+	}
 	return &Exit{v, c}
 }
 
@@ -346,6 +359,7 @@ func handledExit(fb *Fiber, task Value) *Exit {
 // task's.
 func withExit(fb *Fiber, task Value, after func(*Exit) Value) Value {
 	v, cause := catch(func() Value { return Run(fb, task) })
+	cause = cleanCause(cause)
 	e := &Exit{v, cause}
 	if task := after(e); task != nil {
 		c := cleanupAfter(fb, e.cause, func() Value { return uninterruptible(fb, task) })

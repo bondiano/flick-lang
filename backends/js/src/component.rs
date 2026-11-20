@@ -112,7 +112,7 @@ impl Backend for Javascript {
                 version: "0.1.0".into(),
             },
             backend_api: range("0.1.0", "0.2.0"),
-            ir: range("0.12.0", "0.13.0"),
+            ir: range("0.13.0", "0.14.0"),
             language: range("0.1.0", "0.2.0"),
             runtime_abis: vec![NamedRange {
                 name: "flickrt".into(),

@@ -117,10 +117,41 @@ func (c *Cause) has(kind causeKind) bool {
 	return false
 }
 
-// failsToDies is the cause with each typed failure a defect.
+func isSignalReason(r *Cause) bool {
+	if r.kind == causeFail || r.kind == causeDie {
+		_, ok := r.err.(*handlerSignal)
+		return ok
+	}
+	return false
+}
+
+// hasRealDie is whether `c` carries a defect other than a handler unwinding signal.
+func (c *Cause) hasRealDie() bool {
+	for _, r := range c.reasons() {
+		if r.kind == causeDie && !isSignalReason(r) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasSignal(c *Cause) bool {
+	for _, r := range c.reasons() {
+		if isSignalReason(r) {
+			return true
+		}
+	}
+	return false
+}
+
+// failsToDies is the cause with each typed failure a defect; handler
+// unwinding signals are dropped because a defect supersedes unwinding.
 func (c *Cause) failsToDies() *Cause {
 	var out *Cause
 	for _, r := range c.reasons() {
+		if isSignalReason(r) {
+			continue
+		}
 		if r.kind == causeFail {
 			r = dieOf(r.err)
 		}
@@ -129,14 +160,18 @@ func (c *Cause) failsToDies() *Cause {
 	return out
 }
 
-// electDefects elects defects: in a cause with a defect, each typed
-// failure but a pull's end is a defect too, its trace kept.
+// electDefects elects defects: in a cause with a real defect, each typed
+// failure but a pull's end is a defect too, its trace kept; handler
+// unwinding signals are dropped because a defect supersedes unwinding.
 func (c *Cause) electDefects() *Cause {
-	if !c.has(causeDie) || !c.has(causeFail) {
+	if !c.hasRealDie() || (!c.has(causeFail) && !hasSignal(c)) {
 		return c
 	}
 	var out *Cause
 	for _, r := range c.reasons() {
+		if isSignalReason(r) {
+			continue
+		}
 		if r.kind == causeFail && !isDoneReason(r) {
 			d := dieOf(r.err)
 			d.trace = r.trace
@@ -145,6 +180,27 @@ func (c *Cause) electDefects() *Cause {
 		out = concat(out, r)
 	}
 	return out
+}
+
+// stripSignals is `c` with handler unwinding signals removed, used when a
+// real defect supersedes unwinding.
+func stripSignals(c *Cause) *Cause {
+	var out *Cause
+	for _, r := range c.reasons() {
+		if isSignalReason(r) {
+			continue
+		}
+		out = concat(out, r)
+	}
+	return out
+}
+
+// cleanCause strips handler unwinding signals when a real defect is present.
+func cleanCause(c *Cause) *Cause {
+	if c != nil && c.hasRealDie() && hasSignal(c) {
+		return stripSignals(c)
+	}
+	return c
 }
 
 // finalized is what ended with `cause` (nil: a success) and then a
@@ -257,13 +313,13 @@ func Try(fb *Fiber, body Eff, handle func(*Fiber, Value) Value) Value {
 		return out
 	}
 	skipHandler(fb, caught)
-	if unwinds(caught) {
-		panic(&Failure{caught})
-	}
-	if caught.has(causeDie) {
-		if caught.has(causeFail) {
+	if caught.hasRealDie() {
+		if caught.has(causeFail) || hasSignal(caught) {
 			caught = caught.failsToDies()
 		}
+		panic(&Failure{caught})
+	}
+	if unwinds(caught) {
 		panic(&Failure{caught})
 	}
 	for _, r := range caught.reasons() {

@@ -12,7 +12,7 @@ import { type OwnerEvidence, withOwnerEvidence } from "./owner_evidence.ts";
 export { readOwnerEvidence, withOwnerEvidence } from "./owner_evidence.ts";
 export type { OwnerEvidence } from "./owner_evidence.ts";
 
-import { Failure } from "./cause.ts";
+import { Failure, dropSignalsOnDie } from "./cause.ts";
 import { spawnedChild, traceChild, traceEvent, traceId, tracing } from "./trace.ts";
 
 /** The owner of the innermost scope; the entry runner's root owner outside one. */
@@ -381,4 +381,5 @@ export const bracket = <A, E, R, B, E2, R2, E3, R3>(
   acquire: Effect.Effect<A, E, R>,
   use: (resource: A) => Effect.Effect<B, E2, R2>,
   release: (resource: A) => Effect.Effect<unknown, E3, R3>,
-): Effect.Effect<B, E | E2 | E3, R | R2 | R3> => Effect.acquireUseRelease(acquire, use, (resource) => release(resource));
+): Effect.Effect<B, E | E2 | E3, R | R2 | R3> =>
+  dropSignalsOnDie(Effect.acquireUseRelease(acquire, use, (resource) => release(resource)));

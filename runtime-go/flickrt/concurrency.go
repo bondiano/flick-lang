@@ -143,7 +143,7 @@ type Supervised struct {
 // FailurePrimary is the first typed error of a failure without defects.
 func FailurePrimary(f Value) Value {
 	c := f.(*Supervised).cause
-	if c.has(causeDie) {
+	if c.hasRealDie() || unwinds(c) {
 		return None
 	}
 	for _, r := range c.reasons() {
@@ -306,14 +306,14 @@ func ParallelResults(fb *Fiber, tasks Value) Value {
 			if c == nil {
 				return Ok(v)
 			}
-			if !c.has(causeDie) {
+			if !c.hasRealDie() && !unwinds(c) {
 				for _, r := range c.reasons() {
 					if r.kind == causeFail {
 						return Err(r.err)
 					}
 				}
 			}
-			panic(&Failure{c})
+			panic(&Failure{cleanCause(c)})
 		})
 	}
 	return all(fb, wrapped, 0)

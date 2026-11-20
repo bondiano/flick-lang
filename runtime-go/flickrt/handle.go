@@ -217,6 +217,9 @@ func Handle(fb *Fiber, installs []Install, body Value, ret Value, errors func(*F
 			impl.put(name, around(arms.vals[i], func(arm Eff) Value {
 				if abort {
 					return Eff(func(performer *Fiber) Value {
+						if performer.state != at.state {
+							panic(Defect{"an `abort` operation ran in a fiber other than its handler's"})
+						}
 						return unwind(&handlerSignal{token: token, arm: arm, evidence: ReadOwnerEvidence(performer)})
 					})
 				}
@@ -227,7 +230,7 @@ func Handle(fb *Fiber, installs []Install, body Value, ret Value, errors func(*F
 					if c == nil {
 						return v
 					}
-					if c.has(causeFail) && !c.has(causeDie) && !unwinds(c) {
+					if c.has(causeFail) && !c.hasRealDie() && !unwinds(c) {
 						return unwind(&handlerSignal{token: token, cause: c})
 					}
 					panic(&Failure{c})
@@ -253,6 +256,12 @@ func handled(fb *Fiber, token *handlerToken, v Value, c *Cause, ret Value, error
 		}
 		return v
 	}
+	if c.hasRealDie() {
+		if errors != nil {
+			return Try(fb, func(*Fiber) Value { panic(&Failure{c}) }, errors)
+		}
+		panic(&Failure{cleanCause(c)})
+	}
 	if s := unwindingTo(c, token); s != nil {
 		if s.arm != nil {
 			return Run(WithOwnerEvidence(fb, s.evidence), s.arm)
@@ -276,7 +285,7 @@ func (h *controller) drive(fb, inner *Fiber, body Value, ended func(Value, *Caus
 	next, stop := iter.Pull(func(yield func(*request) bool) {
 		co.yield = yield
 		value, cause = catch(func() Value { return Run(inner, body) })
-		if cause != nil {
+		if cause != nil && !cause.hasRealDie() {
 			if s := unwindingTo(cause, h.token); s != nil && s.discontinue {
 				cause = nil
 			}

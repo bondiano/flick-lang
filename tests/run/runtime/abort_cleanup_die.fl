@@ -1,0 +1,97 @@
+// In-fiber cleanups (`Effect.ensuring`, `Resource.bracket`) and sequential
+// combinators (`Effect.first_success_of`, `Effect.eventually`) allow `abort`.
+// When a defect combines with an `abort` in cleanup, the defect wins cleanly:
+// it is neither swallowed by the `abort` handler nor polluted by a leaked
+// handler signal reason.
+module App.Main exposing (main)
+
+type error Retry = Retry
+
+effect Stop =
+  abort stop : forall a. String ->{} a
+
+say : String ->{Host.Console} Unit
+let say line = Platform.stdout_line line
+
+view : Failure e -> List String
+let view f =
+  label : Cause.Reason e -> String
+  let label r = if Cause.is_fail_reason r then "F" else if Cause.is_die_reason r then "D" else "I"
+  List.map label (Cause.reasons f)
+
+first_defect : Failure e -> String
+let first_defect f =
+  match Cause.find_defect f with
+  | Ok text -> ", first " ++ text
+  | Err _ -> ""
+
+outcome : Exit e String -> String
+let outcome ex = Exit.match_ (fun v -> "value " ++ v) (fun f -> show (view f) ++ first_defect f) ex
+
+stopping : (Unit ->{Stop | r; e} String) ->{r; e} String
+let stopping body =
+  try body () with
+  | Stop.stop why -> "stopped: " ++ why
+
+main : Unit ->{Host.Console, Async; AppError} Unit
+let main () =
+  let body_die =
+    Effect.exit
+      (task {
+        stopping (fun () ->
+          Effect.ensuring (task { Stop.stop "cleanup" }) (task { Effect.die "body-boom" })
+        )
+      })
+  say ("body die + cleanup abort: " ++ outcome body_die)
+
+  let cleanup_die =
+    Effect.exit
+      (task {
+        stopping (fun () ->
+          Effect.ensuring (task { Effect.die "cleanup-boom" }) (task { Stop.stop "body" })
+        )
+      })
+  say ("body abort + cleanup die: " ++ outcome cleanup_die)
+
+  let ok_abort =
+    Effect.exit
+      (task {
+        stopping (fun () -> Effect.ensuring (task { Stop.stop "cleanup-only" }) (task { "ok" }))
+      })
+  say ("body ok + cleanup abort: " ++ outcome ok_abort)
+
+  let bracket_die =
+    Effect.exit
+      (task {
+        stopping (fun () ->
+          Resource.bracket (task { () }) (fun _ -> Effect.die "use-boom") (fun _ ->
+            Stop.stop "release"
+          )
+        )
+      })
+  say ("bracket use die + release abort: " ++ outcome bracket_die)
+
+  let ran_second = Ref.make false
+  let first_res =
+    stopping (fun () ->
+      Effect.first_success_of [
+        task { Stop.stop "first" },
+        task {
+          Ref.set ran_second true
+          "second"
+        },
+      ]
+    )
+  say ("first_success_of: " ++ first_res ++ ", second=" ++ show (Ref.get ran_second))
+
+  let attempts = Ref.make 0
+  let ev_res =
+    stopping (fun () ->
+      Effect.eventually
+        (task {
+          let n = Ref.get attempts + 1
+          Ref.set attempts n
+          if n == 1 then Fail.fail Retry else Stop.stop "ev"
+        })
+    )
+  say ("eventually: " ++ ev_res ++ ", attempts=" ++ show (Ref.get attempts))

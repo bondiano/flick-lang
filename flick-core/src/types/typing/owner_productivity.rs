@@ -83,7 +83,13 @@ pub(super) fn certificate(syntax: &OwnerTypeTemplates) -> Option<OwnerProductivi
             labels.extend(gone.iter().map(ToString::to_string));
         }
     }
-    for item in [Lang::Outlives, Lang::Provided, Lang::Detached, Lang::TypeEq] {
+    for item in [
+        Lang::Outlives,
+        Lang::Provided,
+        Lang::Detached,
+        Lang::NoControl,
+        Lang::TypeEq,
+    ] {
         if let Some(item) = lang::table().find(item) {
             names.insert(format!("{}.{}", item.module, item.name));
         }
@@ -249,13 +255,19 @@ impl Certificate<'_> {
         if value.head.held && value.head.arguments == 2 && value.head.first_symbol {
             return false;
         }
-        ![Lang::Outlives, Lang::Provided, Lang::Detached, Lang::TypeEq]
-            .into_iter()
-            .any(|item| {
-                lang::table().find(item).is_some_and(|item| {
-                    value.head.name == self.name(&format!("{}.{}", item.module, item.name))
-                })
+        ![
+            Lang::Outlives,
+            Lang::Provided,
+            Lang::Detached,
+            Lang::NoControl,
+            Lang::TypeEq,
+        ]
+        .into_iter()
+        .any(|item| {
+            lang::table().find(item).is_some_and(|item| {
+                value.head.name == self.name(&format!("{}.{}", item.module, item.name))
             })
+        })
     }
     fn relabel(&self, label: &Elem, value: &OwnerAbstract) -> usize {
         let prefix = match label {

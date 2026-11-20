@@ -34,8 +34,14 @@ type Handle (t : Region) = Handle
 two_regions : Handle t -> (Eff r none Unit)^c ->{Scope s | r} Unit
 foreign effect two_regions from "./scope.js" "defer"
   retention owner
+
+two_regions_no_detached :
+  (Fiber.Outlives c s, Fiber.Provided r s) => Handle t -> (Eff r none Unit)^c ->{Scope s | r} Unit
+foreign effect two_regions_no_detached from "./scope.js" "defer"
+  retention owner
 //~ FLICK-G003 @22:32-22:37 the child holds `c`, which may end before its owner `s`
 //~ FLICK-G003 @22:32-22:37 this keeps work that uses `r` until `s` closes
 //~ FLICK-E017 @30:29-30:34 cannot deduce `Detached r`
 //~ FLICK-F002 @35:1-36:18 with `retention owner`
+//~ FLICK-F002 @40:1-41:18 with `retention owner`
 //~ FLICK-T059 @12:3-12:55 `retention owner` gives this signature `Fiber.Outlives c s, Fiber.Provided r s, Detached r` anyway

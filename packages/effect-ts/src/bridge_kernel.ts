@@ -49,12 +49,10 @@ export { durationFromEffect, durationToEffect } from "./bridge_duration.ts";
 import { KERNEL, hostOf, hostOwnerOf, settled } from "./bridge_host.ts";
 
 
+import { bindEffectIdentity, bindNativeIdentity, installIdentityBridge, nativeIdentity } from "./bridge_identity.ts";
+export { fiberIdentity } from "./bridge_identity.ts";
+
 type EffectFiber = EFiber.Fiber<unknown, unknown>;
-const nativeIdentities = /*#__PURE__*/ new WeakMap<Fiber, number>();
-const effectIdentities = /*#__PURE__*/ new WeakMap<EffectFiber, number>();
-/** Fiber-local library state keeps its identity across interpreter calls. */
-export const fiberIdentity: Effect.Effect<number> = Effect.withFiber((fiber) =>
-  Effect.succeed(effectIdentities.get(fiber) ?? fiber.id));
 
 /** A native schedule's steps as Effect pulls, preserving delays and completion. */
 export const scheduleToEffect = (value: unknown): unknown => {
@@ -269,9 +267,9 @@ export const fromEffect = (effect: unknown): unknown => {
   }
   services = Context.add(services, Scheduler.PreventSchedulerYield, true);
   const fiber = currentFiber();
-  const identity = nativeIdentities.get(fiber) ?? -fiber.id;
+  const identity = nativeIdentity(fiber);
   const tracked = Effect.withFiber((ef) => {
-    effectIdentities.set(ef, identity);
+    bindEffectIdentity(ef, identity);
     return Effect.onExit(effect, () => Effect.sync(() => rememberContext(fiber, ctx, services, ef)));
   });
   const ef: EffectFiber = Effect.runForkWith(services)(tracked, { uninterruptible: fiber.mask > 0 });
@@ -315,7 +313,7 @@ const callKernel = (call: () => unknown, scoped: boolean): Effect.Effect<unknown
     return Effect.flatMap(scope === undefined ? Effect.succeed(base) : Effect.map(ownerOfScope(scope, base), (owner) => owned(base, owner)), (active) => {
       // `interruptible` is not in the public type of Effect's fiber
       const fiber: Fiber = forkNow(() => {
-        nativeIdentities.set(currentFiber(), effectIdentities.get(ef) ?? ef.id);
+        bindNativeIdentity(currentFiber(), ef);
         return call();
       }, evidenced(hosted(active, context), Context.get(context, OwnerEvidenceContext)), Reflect.get(ef, "interruptible") === false ? 1 : 0);
       if (fiber.exit !== undefined) return exitOut(fiber.exit);
@@ -357,6 +355,7 @@ let initialized = false;
 export const initializeBridge = (): void => {
   if (initialized) return;
   initialized = true;
+  installIdentityBridge();
 bridgeKernel.fromEffect = fromEffect;
 bridgeKernel.callEffect = callEffect;
 bridgeKernel.causeFromEffect = causeFromEffect;
