@@ -227,9 +227,11 @@ impl Checker<'_> {
                 rec
             });
             let mark = self.cx.locals.len();
-            // what a local holds is inferred: its signature need not name the regions
-            let captures = self.fresh();
-            let runtime = self.check_signed(decl, &parts, &scheme, rec.flatten(), Some(&captures));
+            // what a local holds is inferred: its signature need not name the regions,
+            // except a bare pure outer arrow whose later stage keeps its own bound
+            let captures = self.infers_local_captures(&scheme).then(|| self.fresh());
+            let runtime =
+                self.check_signed(decl, &parts, &scheme, rec.flatten(), captures.as_ref());
             self.cx.locals.truncate(mark - usize::from(rec.is_some()));
             if let Some(Some(rec)) = rec {
                 self.finish_recs(&[rec]);
@@ -248,7 +250,10 @@ impl Checker<'_> {
             } else {
                 scheme
             };
-            let ty = self.inferred_captures(local_scheme, captures, self.span(decl));
+            let ty = match captures {
+                Some(captures) => self.inferred_captures(local_scheme, captures, self.span(decl)),
+                None => local_scheme,
+            };
             let alias = self.let_alias(&parts);
             self.push_local(&name, at, ty);
             self.proof_alias(at, alias);
@@ -281,6 +286,13 @@ impl Checker<'_> {
             let ty = local.ty.clone();
             self.note_type(self.span(binder), &ty);
         }
+    }
+
+    /// Whether a local binding with signature `scheme` gets an inferred outer
+    /// capture qualifier (`docs/formal/regions.md#local-signatures-infer-only-the-outer-qualifier`).
+    /// An explicit outer qualifier written on a local callable is respected as written.
+    fn infers_local_captures(&self, scheme: &Type) -> bool {
+        !matches!(self.qualified_head(scheme), Type::Captured { ty, .. } if self.is_callable(&ty))
     }
 
     /// `let (a, b) = …`: the names are monomorphic.

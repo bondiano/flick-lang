@@ -234,7 +234,7 @@ pub(super) fn substitute_all(t: &Type, vars: &[(Name, Kind)], insts: &[Inst]) ->
     substitute(t, &names(vars, insts))
 }
 
-fn names(vars: &[(Name, Kind)], insts: &[Inst]) -> HashMap<Name, Inst> {
+pub(super) fn names(vars: &[(Name, Kind)], insts: &[Inst]) -> HashMap<Name, Inst> {
     vars.iter()
         .map(|(n, _)| n.clone())
         .zip(insts.iter().cloned())

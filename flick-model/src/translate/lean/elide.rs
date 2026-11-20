@@ -151,7 +151,17 @@ fn qualified(t: &Type, q: Option<&Caps>, env: &Env) -> Result<String, String> {
             let (r, e, a) = (row(r, env)?, row(e, env)?, ty(a, env)?);
             format!("(.eff {r} {e} {a} {})", c(env)?)
         }
-        Type::Captured(x, inner) => qualified(x, Some(inner), env)?,
+        Type::Captured(x, inner) => {
+            let combined;
+            let next = match q {
+                Some(outer) => {
+                    combined = outer.union(inner);
+                    &combined
+                }
+                None => inner,
+            };
+            qualified(x, Some(next), env)?
+        }
         Type::Bounded(x, b) => {
             let bound: Vec<&Var> = b.atoms.iter().chain(&b.vars).collect();
             match (&**x, &bound[..]) {

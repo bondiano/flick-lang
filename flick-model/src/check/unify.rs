@@ -8,10 +8,12 @@ use std::collections::BTreeSet;
 use std::rc::Rc;
 use std::slice;
 
-use super::generalize::{Inst, rigid_inst, substitute_all};
+use super::generalize::{
+    Inst, names as inst_names, rigid_inst, substitute, substitute_all, substitute_caps,
+};
 use super::{Check, Checker, Slot, Solved, error};
 use crate::syntax::Path;
-use crate::types::{Caps, Fields, Row, Stage, Type, Var};
+use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 
 impl Checker<'_> {
     pub(super) fn meta(&mut self) -> u32 {
@@ -223,21 +225,46 @@ impl Checker<'_> {
                 self.equalities.push((n.clone(), Solved::Type(t.clone())));
                 Ok(())
             }
-            (Type::Forall(s), Type::Forall(t)) if s.vars.len() == t.vars.len() => {
-                let names: Vec<Inst> = s
-                    .vars
-                    .iter()
-                    .map(|(_, k)| {
-                        self.rigid += 1;
-                        rigid_inst(&format!("#{}", self.rigid), k)
-                    })
-                    .collect();
-                let x = substitute_all(&s.body, &s.vars, &names);
-                let y = substitute_all(&t.body, &t.vars, &names);
-                self.unify(&x, &y)
+            (Type::Forall(s), Type::Forall(t))
+                if s.vars.len() == t.vars.len()
+                    && s.vars
+                        .iter()
+                        .zip(&t.vars)
+                        .all(|((_, k1), (_, k2))| k1 == k2)
+                    && s.outlives.len() == t.outlives.len() =>
+            {
+                self.unify_forall(s, t)
             }
             _ => self.mismatch(&a, &b),
         }
+    }
+
+    fn unify_forall(&mut self, s: &Scheme, t: &Scheme) -> Check<()> {
+        let names: Vec<Inst> = s
+            .vars
+            .iter()
+            .map(|(_, k)| {
+                self.rigid += 1;
+                let name = format!("#{}", self.rigid);
+                if *k == Kind::Region {
+                    self.regions.kinds.insert(Var::Named(name.clone().into()));
+                }
+                rigid_inst(&name, k)
+            })
+            .collect();
+        let map_s = inst_names(&s.vars, &names);
+        let map_t = inst_names(&t.vars, &names);
+        for ((cs, rs), (ct, rt)) in s.outlives.iter().zip(&t.outlives) {
+            let cs = substitute_caps(cs, &map_s);
+            let ct = substitute_caps(ct, &map_t);
+            let rs = substitute(rs, &map_s);
+            let rt = substitute(rt, &map_t);
+            self.unify_caps(&cs, &ct)?;
+            self.unify(&rs, &rt)?;
+        }
+        let x = substitute_all(&s.body, &s.vars, &names);
+        let y = substitute_all(&t.body, &t.vars, &names);
+        self.unify(&x, &y)
     }
 
     fn unify_meta(&mut self, m: u32, t: &Type) -> Check<()> {

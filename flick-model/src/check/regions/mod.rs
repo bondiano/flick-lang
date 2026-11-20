@@ -14,6 +14,7 @@ use super::{Check, Checker, error};
 mod data;
 mod live;
 mod provided;
+mod qualifiers;
 mod scope;
 mod solve;
 use crate::syntax::{Con, Name, Path, Term};
@@ -276,109 +277,6 @@ impl Checker<'_> {
     /// A capture row inference has yet to solve.
     pub(super) fn fresh_caps(&mut self) -> Caps {
         Caps::var(Var::Meta(self.meta()))
-    }
-
-    /// The qualifier of `t`, `∅` when bare.
-    pub(super) fn qualifier(&self, t: &Type) -> Caps {
-        match self.follow(t) {
-            Type::Captured(_, c) | Type::Bounded(_, c) => self.zonk_caps(&c),
-            _ => Caps::default(),
-        }
-    }
-
-    /// Every qualifier of `t`, outermost first: a value of `(τ^{≤C})^{≤D}`,
-    /// as `Ref.set` takes into a cell of `τ^{≤C}`, is within each.
-    pub(super) fn qualifiers(&self, t: &Type) -> Vec<Caps> {
-        let mut out = Vec::new();
-        let mut t = self.follow(t);
-        while let Type::Captured(inner, c) | Type::Bounded(inner, c) = &t {
-            out.push(self.zonk_caps(c));
-            t = self.follow(inner);
-        }
-        out
-    }
-
-    /// The hidden qualifiers of `t`, outermost first: what a function or a
-    /// task of type `t` may use. A value bound `τ^{≤C}` says what the value
-    /// reaches, not what using it needs: a closure that `Ref.set` stores in
-    /// a cell of `Unit →R String` uses nothing.
-    pub(super) fn hidden_qualifiers(&self, t: &Type) -> Vec<Caps> {
-        let mut out = Vec::new();
-        let mut t = self.follow(t);
-        loop {
-            t = match &t {
-                Type::Captured(inner, c) => {
-                    out.push(self.zonk_caps(c));
-                    self.follow(inner)
-                }
-                Type::Bounded(inner, _) => self.follow(inner),
-                _ => return out,
-            };
-        }
-    }
-
-    /// The innermost value bound of `t`: of `(τ^{≤C})^{≤D}` that `Ref.set`
-    /// takes into a cell `Ref.make` made, the cell's capacity `C`.
-    pub(super) fn innermost_bound(&self, t: &Type) -> Option<Caps> {
-        let mut bound = None;
-        let mut t = self.follow(t);
-        loop {
-            t = match &t {
-                Type::Bounded(inner, c) => {
-                    bound = Some(self.zonk_caps(c));
-                    self.follow(inner)
-                }
-                Type::Captured(inner, _) => self.follow(inner),
-                _ => return bound,
-            };
-        }
-    }
-
-    /// `t` once for each of its qualifiers, about the bare type: what is
-    /// within `(τ^{≤C})^{≤D}` is within `τ^{≤C}` and within `τ^{≤D}`, not
-    /// within what the two reach together.
-    pub(super) fn layers(&self, t: &Type) -> Vec<Type> {
-        let mut out = Vec::new();
-        let bare = Rc::new(self.resolve(t));
-        let mut cur = self.follow(t);
-        loop {
-            cur = match &cur {
-                Type::Captured(inner, c) => {
-                    out.push(Type::Captured(bare.clone(), c.clone()));
-                    self.follow(inner)
-                }
-                Type::Bounded(inner, c) => {
-                    out.push(Type::Bounded(bare.clone(), c.clone()));
-                    self.follow(inner)
-                }
-                _ => break,
-            };
-        }
-        if out.len() < 2 {
-            return vec![self.follow(t)];
-        }
-        out
-    }
-
-    /// The premise of (Lam) and (Task) against `expected`, for each of its
-    /// hidden qualifiers: the body's stage `inner` within `stage` with its
-    /// `Live`. What the body holds is no bound: a qualifier is what its use
-    /// needs.
-    pub(super) fn close_within(
-        &mut self,
-        ty: &Type,
-        inner: &Stage,
-        stage: &Stage,
-        expected: Option<&Type>,
-    ) -> Check<Type> {
-        let mut each = expected.map_or_else(Vec::new, |t| self.hidden_qualifiers(t));
-        if each.is_empty() {
-            each.push(Caps::default());
-        }
-        for q in &each {
-            self.stage_within(inner, &live_stage(stage, q))?;
-        }
-        Ok(ty.clone())
     }
 
     /// (Con): the fields of `K ē`; captures a field hides go into the

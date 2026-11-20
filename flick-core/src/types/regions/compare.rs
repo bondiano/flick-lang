@@ -170,8 +170,11 @@ impl Checker<'_> {
             }
             _ => {}
         }
-        let (a, e) = self.live_sides((a, ca.as_ref()), (e, ce.as_ref()));
-        let callable = matches!(self.whnf(&a), Type::Fun { .. }) || self.eff_parts(&a).is_some();
+        let (a, e) = (
+            self.with_actual_live(actual, a),
+            self.with_live(e, ce.as_ref()),
+        );
+        let callable = self.is_callable(&a);
         // what the type of a function or a task position shows is no more
         // than its reach, as the core compares arrows (`LeLive.arrow`): a
         // callback over `forall v. a^v` holds `v` where its type shows it

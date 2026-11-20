@@ -110,12 +110,17 @@ impl Checker<'_> {
                 } else {
                     self.check(a, &p)?;
                 }
-                let s = live_stage(&s, &self.qualifier(f));
-                self.perform(&s)?;
-                Ok((*r).clone())
+                let s_live = live_stage(&s, &self.qualifier(f));
+                self.perform(&s_live)?;
+                let r = (*r).clone();
+                if s == Stage::Pure && self.is_callable(&r) {
+                    return Ok(self.rewrap_bounds(f, r));
+                }
+                Ok(r)
             }
             Type::Forall(s) => {
-                let t = self.instantiate(&s);
+                let inst = self.instantiate(&s);
+                let t = self.rewrap_qualifiers(f, inst);
                 self.apply(&t, a)
             }
             t @ Type::Var(Var::Meta(_)) => {

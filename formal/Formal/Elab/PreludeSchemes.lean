@@ -435,10 +435,10 @@ def Seq.each_loop (unit seq : Nat) : Scheme :=
   ⟨5, [],
     .arr .P (.arr (.R (.var 1) (.var 2)) (.var 0) (.con unit) (.var 3)) (.arr (.R (.run (.cun (.var 3) .cnil) (.var 1)) (.var 2)) (.app (.app (.con seq) (.var 4)) (.var 0)) (.con unit) .cnil) .cnil, .cnil, []⟩
 
-/-- `Seq.fold_effect : forall b a r e c d. (b -> a ->{r; e} b)^c -> b -> ((Seq a)^d ->{r; e} b)^c` -/
+/-- `Seq.fold_effect : forall b a r e c d. (b -> (a ->{r; e} b)^c)^c -> b -> ((Seq a)^d ->{r; e} b)^c` -/
 def Seq.fold_effect (seq : Nat) : Scheme :=
-  ⟨6, [],
-    .arr .P (.arr .P (.var 0) (.arr (.R (.var 2) (.var 3)) (.var 1) (.var 0) .cnil) (.var 4)) (.arr .P (.var 0) (.arr (.R (.run (.cun (.cun (.var 4) (.var 5)) .cnil) (.var 2)) (.var 3)) (.app (.app (.con seq) (.var 5)) (.var 1)) (.var 0) (.var 4)) .cnil) .cnil, .cnil, []⟩
+  ⟨7, [],
+    .arr .P (.arr .P (.var 0) (.arr (.R (.var 2) (.var 3)) (.var 1) (.var 0) (.var 4)) (.var 6)) (.arr .P (.var 0) (.arr (.R (.run (.cun (.cun (.cun (.var 4) (.var 6)) (.var 5)) .cnil) (.var 2)) (.var 3)) (.app (.app (.con seq) (.var 5)) (.var 1)) (.var 0) (.cun (.var 4) (.var 6))) .cnil) .cnil, .cnil, []⟩
 
 /-- `Seq.empty : forall a. Seq a` -/
 def Seq.empty (seq : Nat) : Scheme :=
@@ -760,10 +760,10 @@ def List.fold_right (list : Nat) : Scheme :=
   ⟨3, [],
     .arr .P (.arr .P (.var 0) (.arr .P (.var 1) (.var 1) .cnil) (.var 2)) (.arr .P (.var 1) (.arr .P (.app (.con list) (.var 0)) (.var 1) (.var 2)) .cnil) .cnil, .cnil, []⟩
 
-/-- `List.fold_effect : forall b a r e c. (b -> a ->{r; e} b)^c -> b -> (List a ->{r; e} b)^c` -/
+/-- `List.fold_effect : forall b a r e c. (b -> (a ->{r; e} b)^c)^c -> b -> (List a ->{r; e} b)^c` -/
 def List.fold_effect (list : Nat) : Scheme :=
-  ⟨5, [],
-    .arr .P (.arr .P (.var 0) (.arr (.R (.var 2) (.var 3)) (.var 1) (.var 0) .cnil) (.var 4)) (.arr .P (.var 0) (.arr (.R (.run (.cun (.var 4) .cnil) (.var 2)) (.var 3)) (.app (.con list) (.var 1)) (.var 0) (.var 4)) .cnil) .cnil, .cnil, []⟩
+  ⟨6, [],
+    .arr .P (.arr .P (.var 0) (.arr (.R (.var 2) (.var 3)) (.var 1) (.var 0) (.var 4)) (.var 5)) (.arr .P (.var 0) (.arr (.R (.run (.cun (.cun (.var 4) (.var 5)) .cnil) (.var 2)) (.var 3)) (.app (.con list) (.var 1)) (.var 0) (.cun (.var 4) (.var 5))) .cnil) .cnil, .cnil, []⟩
 
 /-- `List.filter : forall a c. (a -> Bool)^c -> List a -> List a` -/
 def List.filter (bool list : Nat) : Scheme :=

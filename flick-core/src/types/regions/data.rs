@@ -1,20 +1,16 @@
 //! Whole-value bounds on generic data and constructor fields.
 
-use super::{Hold, Visible};
 use super::{Unfold, leave_alias};
 use crate::iface::{Entity, Namespace};
-use crate::source::Span;
 use crate::types::Checker;
 use crate::types::Elem;
 use crate::types::Elided;
 use crate::types::env::Form;
 use crate::types::gadt::refine::Refined;
-use crate::types::gadt::row_facts::RowKind;
 use crate::types::gadt::scheme::{built, is_hidden_captures, is_indexed};
 use crate::types::kinds::Kind;
 use crate::types::lang::Lang;
 use crate::types::ty::{Norm, Type};
-use crate::types::unify::Unified;
 
 /// The primitive types, which hold no captures.
 const SCALARS: [Lang; 7] = [
@@ -96,7 +92,7 @@ impl Checker<'_> {
     /// `seen` holds the data types it has looked into and the aliases it is
     /// unfolding: one met again inside its own unfolding hides what its
     /// arguments hide.
-    fn hidden_fields(&self, t: &Type, seen: &mut Vec<(String, String)>) -> bool {
+    pub(super) fn hidden_fields(&self, t: &Type, seen: &mut Vec<(String, String)>) -> bool {
         let unfold = self.enter_alias(t, seen);
         if matches!(unfold, Unfold::Again) {
             let observed = self.store.head(t);
@@ -252,176 +248,6 @@ impl Checker<'_> {
                 captures: Box::new(captures),
             }),
         }
-    }
-
-    /// A bound refines a complete generic type; unlike a nominal qualifier,
-    /// it cannot replace that type's own hidden captures on instantiation.
-    pub fn subsume_bound(&mut self, actual: &Type, expected: &Type, span: Span) -> Option<Unified> {
-        let mark = self.cx.regions.holds.len();
-        let fits = self.subsume_bound_at(actual, expected, span)?;
-        Some(self.held_fits(fits, mark, actual, expected, span))
-    }
-
-    fn inferred_bound_capture(&self, allowed: &Norm, captures: &Type) -> bool {
-        let held = self.store.normalize(captures);
-        let open = |ty: &Type| matches!(self.store.resolve(ty), Type::Meta(_));
-        !allowed.tails.is_empty()
-            && allowed.tails.iter().all(open)
-            && held.entries.iter().all(|(_, ty)| open(ty))
-            && held.tails.iter().all(open)
-    }
-
-    fn subsume_bound_at(&mut self, actual: &Type, expected: &Type, span: Span) -> Option<Unified> {
-        let a = self.bound_head(actual);
-        let e = self.bound_head(expected);
-        if matches!(e, Type::Bounded { .. }) {
-            let mut base = e;
-            let mut allowed = Norm::default();
-            while let Type::Bounded { ty, captures } = base {
-                self.capture_row(&captures, &mut allowed);
-                self.hold(Hold {
-                    held: vec![(None, actual.clone())],
-                    visible: self.bounded_visible(&ty),
-                    bound: *captures.clone(),
-                    expected: Some(expected.clone()),
-                    written: !matches!(self.store.resolve(&captures), Type::Meta(_)),
-                    what: "value",
-                    span,
-                });
-                base = self.bound_head(&ty);
-            }
-            // a value qualifier the bound already allows says nothing more:
-            // the variable takes the data without it; a closure's stored
-            // qualifier stays part of its type. Under a value bound, which
-            // alone gives what the value reaches (§2.1), a qualifier not
-            // inferred yet says nothing either when the bound expected is
-            // not inferred yet: the holds above grow it by the value (`docs/formal/regions.md#a-cell-created-empty-accepts-a-resource-of-its-scope`)
-            let mut inner = self.qualified_head(actual);
-            while let Type::Bounded { ty, .. } = inner {
-                inner = self.qualified_head(&ty);
-            }
-            let identity = match (self.qualified_head(actual), inner) {
-                (
-                    Type::Captured {
-                        ty,
-                        captures,
-                        value: true,
-                        ..
-                    },
-                    _,
-                ) if !matches!(self.whnf(&ty), Type::Fun { .. })
-                    && self.within(&captures, &allowed) =>
-                {
-                    self.capture_identity(&ty)
-                }
-                (
-                    _,
-                    Type::Captured {
-                        ty,
-                        captures,
-                        value: true,
-                        ..
-                    },
-                ) if !matches!(self.whnf(&ty), Type::Fun { .. })
-                    && matches!(self.qualified_head(actual), Type::Bounded { .. })
-                    && self.inferred_bound_capture(&allowed, &captures) =>
-                {
-                    self.capture_identity(&ty)
-                }
-                _ => self.capture_identity(&a),
-            };
-            let fits = self.callable_bound_fits(&identity, &base, span);
-            return Some(fits.unwrap_or_else(|| self.unify(&identity, &base)));
-        }
-        // a position not known yet takes a value bounded by a region with its
-        // bound: what it turns out to be may store the region's resource
-        if let Type::Bounded { ty, captures } = &a
-            && let Some(m) = e.inference_meta_root()
-            && !self.store.is_capture_row(m)
-            && !self.store.is_numeric(m)
-            && self.bounds_a_region(captures)
-            && (self.hidden_fields(ty, &mut Vec::new()) || !self.captures_of(ty).entries.is_empty())
-        {
-            return Some(
-                self.bind_subsumed_meta(actual, expected, false)
-                    .unwrap_or_else(|| self.unify(expected, actual)),
-            );
-        }
-        if let Type::Bounded { ty, captures } = &a
-            && !matches!(e, Type::Captured { .. })
-        {
-            let identity = self.capture_identity(ty);
-            // what a function or a task hides it may hold: its use is in its
-            // row (`compare.rs`, `subsume_captured`)
-            let callable = matches!(self.whnf(expected), Type::Fun { .. })
-                || self.eff_parts(expected).is_some();
-            if self.hidden_fields(expected, &mut Vec::new())
-                && (!callable || self.holds_reader(&[(None, actual.clone())]))
-            {
-                // the hidden row of data is no region another argument shows
-                let visible = if self.stores_hidden(expected) {
-                    Visible::Now(Vec::new())
-                } else {
-                    Visible::Refined(expected.clone())
-                };
-                self.hold(Hold {
-                    held: vec![(None, actual.clone())],
-                    visible,
-                    bound: Type::empty_row(),
-                    expected: Some(expected.clone()),
-                    written: true,
-                    what: "value",
-                    span,
-                });
-            }
-            let callable = self.bounded_callable(identity, captures);
-            return Some(self.subsume(&callable, expected, span));
-        }
-        None
-    }
-
-    /// Whether a value of `t` can hold nothing, so a qualifier on it says
-    /// nothing: a scalar, or data without hidden storage whose type shows
-    /// no captures.
-    pub(super) fn holds_nothing(&self, t: &Type) -> bool {
-        if self.scalar(t) {
-            return true;
-        }
-        if matches!(
-            *self.borrowed_whnf(t),
-            Type::Var(_) | Type::Meta(_) | Type::Skolem(_)
-        ) {
-            return false;
-        }
-        let captures = self.captures_of(t);
-        captures.entries.is_empty()
-            && captures.tails.is_empty()
-            && !self.hidden_fields(t, &mut Vec::new())
-    }
-
-    /// Whether every capture of the row `captures` is one `allowed` names.
-    fn within(&self, captures: &Type, allowed: &Norm) -> bool {
-        if !self.store.row_equalities.is_empty()
-            && self.row_implied(captures, &allowed.clone().into_type(), RowKind::Captures)
-        {
-            return true;
-        }
-        let mut held = Norm::default();
-        self.capture_row(captures, &mut held);
-        held.tails.is_empty()
-            && held
-                .entries
-                .iter()
-                .all(|(label, _)| allowed.get(label).is_some())
-    }
-
-    /// Whether a bound names a region, not only variables of generic code.
-    fn bounds_a_region(&self, captures: &Type) -> bool {
-        let mut norm = Norm::default();
-        self.capture_row(captures, &mut norm);
-        norm.entries
-            .iter()
-            .any(|(_, atom)| matches!(self.atom_kind(atom, &[]), Some(Kind::Region)))
     }
 
     /// A projection refines an existing field; it never creates a new

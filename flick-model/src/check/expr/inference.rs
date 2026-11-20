@@ -123,7 +123,10 @@ impl Checker<'_> {
                 self.check(body, &full)
             }
             (_, Type::Forall(s)) => {
-                let qualifier = self.qualifier(&full);
+                let qualifier = self
+                    .hidden_qualifiers(&full)
+                    .into_iter()
+                    .fold(Caps::default(), |a, b| a.union(&b));
                 self.check_qualified_forall(e, s, qualifier, None)
             }
             // (Lam) against `(τ₁ →φ τ₂)^C` takes `C`, against a bare arrow `∅`
@@ -217,7 +220,7 @@ impl Checker<'_> {
         }
         self.note(e, |n| n.rigid = Some(rigid));
         if !qualifier.is_empty() {
-            body = Type::Captured(Rc::new(body), qualifier);
+            body = Self::qualify_hidden(body, &[qualifier]);
         }
         let outer = mem::replace(&mut self.stage, Stage::Pure);
         let checked = self.check(e, &body);

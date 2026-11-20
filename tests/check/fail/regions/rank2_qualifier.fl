@@ -1,0 +1,429 @@
+// A called rank-2 or curried parameter keeps its region qualifier across pure
+// stages: calling it, partially applying it, or awaiting its task/lazy result
+// needs its qualifier live (`FLICK-G003` when kept by an owner that does not
+// outlive it, `FLICK-G002` when escaping its scope or stored without one).
+module App.Rank2QualifierFail exposing (..)
+
+type Handle (s : Region) = Handle
+
+use_handle : Handle s ->{} Unit
+let use_handle _ = ()
+
+// 1-arg control
+direct : (Detached r, Fiber.Provided r s) => (Unit ->{r} Unit)^c ->{Scope s | r} Unit
+let direct f = Scope.defer (fun _ -> f ())
+
+// Issue #769 exact reproducer: 2-arg rank-2 called inside Scope.defer
+rank2 :
+  (Detached r, Fiber.Provided r s) =>
+  a -> (forall e b. a -> Exit e b ->{r} Unit)^c ->{Scope s | r} Unit
+let rank2 v f = Scope.defer (fun exit -> f v exit)
+
+// Rank-1 curried 2-arg and 3-arg
+curried2 :
+  (Detached r, Fiber.Provided r s) =>
+  a -> (a -> Unit ->{r} Unit)^c ->{Scope s | r} Unit
+let curried2 v f = Scope.defer (fun _ -> f v ())
+
+curried3 :
+  (Detached r, Fiber.Provided r s) =>
+  a -> b -> (a -> b -> Unit ->{r} Unit)^c ->{Scope s | r} Unit
+let curried3 x y f = Scope.defer (fun _ -> f x y ())
+
+// Partial application passed directly to Scope.defer or bound to a local
+partial_direct :
+  (Detached r, Fiber.Provided r s) =>
+  a -> (forall e b. a -> Exit e b ->{r} Unit)^c ->{Scope s | r} Unit
+let partial_direct v f = Scope.defer (f v)
+
+partial_let :
+  (Detached r, Fiber.Provided r s) =>
+  a -> (forall e b. a -> Exit e b ->{r} Unit)^c ->{Scope s | r} Unit
+let partial_let v f =
+  let g = f v
+  Scope.defer (fun exit ->
+    g exit
+    ())
+
+inner_forall :
+  (Detached r, Fiber.Provided r s) =>
+  a -> (a -> (forall e b. Exit e b ->{r} Unit))^c ->{Scope s | r} Unit
+let inner_forall v f = Scope.defer (f v)
+
+// Nested forall and constrained rank-2
+nested_forall :
+  (Detached r, Fiber.Provided r s) =>
+  a -> (forall x. forall e b. a -> x -> Exit e b ->{r} Unit)^c ->{Scope s | r} Unit
+let nested_forall v f = Scope.defer (fun exit ->
+  f v 1 exit
+  ())
+
+constrained_rank2 :
+  (Detached r, Fiber.Provided r s) =>
+  (forall e b x. Show x => x -> Exit e b ->{r} Unit)^c ->{Scope s | r} Unit
+let constrained_rank2 f = Scope.defer (fun exit ->
+  f 1 exit
+  ())
+
+// Eff inside rank-2: awaited in defer or passed to add_finalizer
+rank2_eff_defer :
+  (Detached r, Fiber.Provided r s) =>
+  a -> (forall x. a -> x -> Eff r none Unit)^c ->{Scope s | r} Unit
+let rank2_eff_defer v f = Scope.defer (fun _ -> await (f v 1))
+
+rank2_eff_finalizer :
+  (Detached r, Fiber.Provided r s) =>
+  a -> (forall x. a -> x -> Eff r none Unit)^c ->{Scope s | r} Unit
+let rank2_eff_finalizer v f = Scope.add_finalizer (f v 1)
+
+// Lazy inside rank-2: forced in defer
+rank2_lazy_defer :
+  (Detached r, Fiber.Provided r s) =>
+  a -> (forall x. a -> x -> Lazy {Async | r} none Unit)^c ->{Scope s, Async | r} Unit
+let rank2_lazy_defer v f = Scope.defer (fun _ -> await (f v 1))
+
+// Pipe application of rank-2 captured parameter
+pipe_rank2 :
+  (Detached r, Fiber.Provided r s) =>
+  a -> (forall e b. a -> Exit e b ->{r} Unit)^c ->{Scope s | r} Unit
+let pipe_rank2 v f = Scope.defer (fun exit ->
+  (v |> f) exit
+  ())
+
+// Fiber.spawn calling a captured rank-2 function
+report : Failure none ->{Scope s | r} Unit
+let report _ = ()
+
+spawn_rank2 :
+  (Detached r, Fiber.Provided r s) =>
+  Fiber.Owner s -> a -> (forall x. a -> x ->{r} Unit)^c ->{r} Unit
+let spawn_rank2 owner v f = ignore (Fiber.spawn owner report (task { f v 1 }))
+
+// Escaping `scope` via calling or partially applying a captured rank-2 parameter
+with_rank2 : ((forall a. a -> Unit ->{} Unit)^{s} ->{Scope s} b) ->{Scope s} b
+let with_rank2 k =
+  let h = Handle
+  let f : (forall a. a -> Unit ->{} Unit)^{s} = fun _ () -> use_handle h
+  k f
+
+escape_call : Unit ->{} (Unit ->{} Unit)
+let escape_call () = scope {
+  with_rank2 (fun f -> fun () -> f 1 ())
+}
+
+escape_partial : Unit ->{} (Unit ->{} Unit)
+let escape_partial () = scope {
+  with_rank2 (fun f -> f 1)
+}
+
+// A value bound on a cell still admits no use for curried closures
+stash_curried : Handle s -> Ref (Int -> Unit ->{} Unit) ->{} Unit
+let stash_curried h cell = Ref.set cell (fun _ () -> use_handle h)
+
+// Value-bounded curried/rank-2 callables from qualified records and acquire_release
+record_curried_defer :
+  (Detached r, Fiber.Provided r s) =>
+  a -> ({ cb : a -> Unit ->{r} Unit })^c ->{Scope s | r} Unit
+let record_curried_defer v box = Scope.defer (fun _ -> box.cb v ())
+
+record_rank2_defer :
+  (Detached r, Fiber.Provided r s) =>
+  a -> ({ cb : forall e b. a -> Exit e b ->{r} Unit })^c ->{Scope s | r} Unit
+let record_rank2_defer v box = Scope.defer (fun exit ->
+  box.cb v exit
+  ())
+
+noop : Unit ->{} Unit
+let noop () = ()
+
+acquired_curried_escape : Unit ->{} (Unit ->{} Unit)
+let acquired_curried_escape () = scope {
+  let f = Resource.acquire_release (task { fun (_ : Int) () -> noop () }) (fun _ -> ())
+  fun () -> f 1 ()
+}
+
+acquired_curried_partial_escape : Unit ->{} (Unit ->{} Unit)
+let acquired_curried_partial_escape () = scope {
+  let f = Resource.acquire_release (task { fun (_ : Int) () -> noop () }) (fun _ -> ())
+  f 1
+}
+
+// Type::Bounded Lazy / Forall cannot drop their region bound against bare callables
+acquired_lazy_escape : Unit ->{} Lazy none none Unit
+let acquired_lazy_escape () = scope {
+  Resource.acquire_release (task { lazy { () } }) (fun _ -> ())
+}
+
+take_empty_lazy : (Lazy {Async} none Unit)^{} ->{} Unit
+let take_empty_lazy _ = ()
+
+record_lazy_empty : ({ l : Lazy {Async} none Unit })^{s} ->{} Unit
+let record_lazy_empty box = take_empty_lazy box.l
+
+take_bare_rank2 : (forall a. a ->{} Unit) ->{} Unit
+let take_bare_rank2 f = f ()
+
+record_forall_bare : ({ f : forall a. a ->{} Unit })^{s} ->{} Unit
+let record_forall_bare box = take_bare_rank2 box.f
+
+// Storing a local or parameter qualified Eff or Lazy into a bare outer Ref cell
+// (even widened to `(Ref ...)^{s}`) must fail
+stash_task_bounded : Handle s -> (Ref (Eff none none Unit))^{s} ->{} Unit
+let stash_task_bounded h cell =
+  let t : (Eff none none Unit)^{s} = task { use_handle h }
+  Ref.set cell t
+
+stash_task_param : (Ref (Eff none none Unit))^{s} -> (Eff none none Unit)^{s} ->{} Unit
+let stash_task_param cell t = Ref.set cell t
+
+stash_lazy_bounded : Handle s -> (Ref (Lazy none none Unit))^{s} ->{} Unit
+let stash_lazy_bounded h cell =
+  let l : (Lazy none none Unit)^{s} = lazy { use_handle h }
+  Ref.set cell l
+
+stash_lazy_param :
+  (Ref (Lazy {Async} none Unit))^{s} -> (Lazy {Async} none Unit)^{s} ->{} Unit
+let stash_lazy_param cell l = Ref.set cell l
+
+// Checked `lazy` against a bare Ref value bound or explicit `^{}` admits no use
+stash_lazy_direct : Handle s -> Ref (Lazy none none Unit) ->{} Unit
+let stash_lazy_direct h cell = Ref.set cell (lazy { use_handle h })
+
+local_empty_lazy : Handle s ->{} Unit
+let local_empty_lazy h =
+  let l : (Lazy none none Unit)^{} = lazy { use_handle h }
+  ignore l
+
+// Explicit `^{}` on a local curried or rank-2 signature must not be overridden
+local_empty_curried : Handle s ->{} Unit
+let local_empty_curried h =
+  f : (Int -> Unit ->{} Unit)^{}
+  let f _ () = use_handle h
+  f 1 ()
+
+local_empty_rank2 : Handle s ->{} Unit
+let local_empty_rank2 h =
+  f : (forall a. a -> Unit ->{} Unit)^{}
+  let f _ () = use_handle h
+  f 1 ()
+
+// Explicit capture-row variable on local curried/rank-2 signatures must also be respected
+local_var_curried : Handle s ->{} Unit
+let local_var_curried h =
+  f : (Int -> Unit ->{} Unit)^{c}
+  let f _ () = use_handle h
+  f 1 ()
+
+local_var_rank2 : Handle s ->{} Unit
+let local_var_rank2 h =
+  f : (forall a. a -> Unit ->{} Unit)^{c}
+  let f _ () = use_handle h
+  f 1 ()
+
+// Substitution invariance (T4'): a pure arrow returning a type variable `(Int -> b)^c`
+// must not dynamically push `^c` onto `b` after instantiating `b` to a callable
+open_handle : Unit ->{Scope s} Handle s
+let open_handle () = Handle
+
+noop_eff : Eff none none Unit
+let noop_eff = task { () }
+
+apply1_rev : b -> (Int -> b)^c ->{} b
+let apply1_rev _ f = f 1
+
+apply_poly_rev : b -> (a -> b)^c -> a ->{} b
+let apply_poly_rev _ f x = f x
+
+escape_unannotated_lambda : Unit ->{} Unit
+let escape_unannotated_lambda () =
+  let leaked = scope {
+    let h = open_handle ()
+    apply1_rev noop (fun (_ : Int) () -> use_handle h)
+  }
+  leaked ()
+
+escape_nested_lambda : Unit ->{} Unit
+let escape_nested_lambda () =
+  let leaked = scope {
+    let h = open_handle ()
+    apply1_rev noop (fun (_ : Int) -> fun () -> use_handle h)
+  }
+  leaked ()
+
+escape_task_curried : Unit ->{} Unit
+let escape_task_curried () =
+  let leaked = scope {
+    let h = open_handle ()
+    apply1_rev noop_eff (fun (_ : Int) -> task { use_handle h })
+  }
+  await leaked
+
+bypass_769_direct :
+  (Detached r, Fiber.Provided r s) =>
+  a -> (forall e b. a -> Exit e b ->{r} Unit)^c ->{Scope s | r} Unit
+let bypass_769_direct v f =
+  noop_exit : Exit none Unit ->{r} Unit
+  let noop_exit _ = ()
+  let g = apply_poly_rev noop_exit f v
+  Scope.defer (fun _ -> g (Exit.succeed ()))
+
+bypass_769_qualified :
+  (Detached r, Fiber.Provided r s) =>
+  a -> (Exit none Unit ->{r} Unit)^c -> (forall e b. a -> Exit e b ->{r} Unit)^c ->{Scope s | r} Unit
+let bypass_769_qualified v fallback f =
+  let g = apply_poly_rev fallback f v
+  Scope.defer (fun _ -> g (Exit.succeed ()))
+
+escape_acquired_via_apply1 : Unit ->{} Unit
+let escape_acquired_via_apply1 () =
+  let leaked = scope {
+    let f = Resource.acquire_release (task { fun (_ : Int) () -> noop () }) (fun _ -> ())
+    apply1_rev noop f
+  }
+  leaked ()
+
+// Type::Bounded callables (from acquire_release or qualified records) must not
+// leak into outer bare Ref cells
+stash_acquired_fn : Unit ->{} Unit
+let stash_acquired_fn () =
+  let cell : Ref (Unit ->{} Unit) = Ref.make noop
+  scope {
+    let f = Resource.acquire_release (task { fun () -> noop () }) (fun _ -> ())
+    Ref.set cell f
+  }
+  (Ref.get cell) ()
+
+stash_acquired_curried : Unit ->{} Unit
+let stash_acquired_curried () =
+  let cell : Ref (Int -> Unit ->{} Unit) = Ref.make (fun _ () -> noop ())
+  scope {
+    let f = Resource.acquire_release (task { fun (_ : Int) () -> noop () }) (fun _ -> ())
+    Ref.set cell f
+  }
+  (Ref.get cell) 1 ()
+
+type BoxRank2 = BoxRank2 (forall a. a ->{} Unit)
+
+stash_acquired_rank2 : Unit ->{} Unit
+let stash_acquired_rank2 () =
+  let cell : Ref BoxRank2 = Ref.make (BoxRank2 (fun _ -> noop ()))
+  scope {
+    let b = Resource.acquire_release (task { BoxRank2 (fun _ -> noop ()) }) (fun _ -> ())
+    Ref.set cell b
+  }
+  match Ref.get cell with
+  | BoxRank2 f -> f 1
+
+stash_acquired_eff : Unit ->{} Unit
+let stash_acquired_eff () =
+  let cell : Ref (Eff none none Unit) = Ref.make noop_eff
+  scope {
+    let t = Resource.acquire_release (task { task { noop () } }) (fun _ -> ())
+    Ref.set cell t
+  }
+  await (Ref.get cell)
+
+stash_acquired_lazy : Unit ->{Async} Unit
+let stash_acquired_lazy () =
+  let cell : Ref (Lazy {Async} none Unit) = Ref.make (lazy { () })
+  scope {
+    let l = Resource.acquire_release (task { lazy { () } }) (fun _ -> ())
+    Ref.set cell l
+  }
+  await (Ref.get cell)
+
+stash_record_fn : Ref (Unit ->{} Unit) -> ({ f : Unit ->{} Unit })^{s} ->{} Unit
+let stash_record_fn cell box = Ref.set cell box.f
+
+stash_record_curried : Ref (Int -> Unit ->{} Unit) -> ({ f : Int -> Unit ->{} Unit })^{s} ->{} Unit
+let stash_record_curried cell box = Ref.set cell box.f
+
+stash_record_rank2 : Ref BoxRank2 -> ({ b : BoxRank2 })^{s} ->{} Unit
+let stash_record_rank2 cell box = Ref.set cell box.b
+
+stash_record_eff : Ref (Eff none none Unit) -> ({ t : Eff none none Unit })^{s} ->{} Unit
+let stash_record_eff cell box = Ref.set cell box.t
+
+stash_record_lazy :
+  Ref (Lazy {Async} none Unit) -> ({ l : Lazy {Async} none Unit })^{s} ->{} Unit
+let stash_record_lazy cell box = Ref.set cell box.l
+
+// Forall subsumption and Ref unification must enforce Outlives and class constraints
+drop_outlives :
+  (Unit -> (forall t. Fiber.Outlives c t => Fiber.Owner t ->{} Unit)^c) ->
+  (Unit -> (forall t. Fiber.Owner t ->{} Unit)^c)
+let drop_outlives f = f
+
+drop_show :
+  (Unit -> (forall a. Show a => a -> String)) ->
+  (Unit -> (forall a. a -> String))
+let drop_show f = f
+
+swap_outlives_ref :
+  Ref (forall t. Fiber.Outlives s1 t => Fiber.Owner t ->{} Unit) ->
+  Ref (forall t. Fiber.Outlives s2 t => Fiber.Owner t ->{} Unit)
+let swap_outlives_ref r = r
+
+swap_class_ref :
+  Ref (forall a. Show a => a ->{} Unit) ->
+  Ref (forall a. Eq a => a ->{} Unit)
+let swap_class_ref r = r
+//~ FLICK-G003 @14:16-14:27
+//~ FLICK-G003 @20:17-20:28
+//~ FLICK-T052 @20:29-20:51
+//~ FLICK-G003 @26:20-26:31
+//~ FLICK-G003 @31:22-31:33
+//~ FLICK-G003 @37:26-37:37
+//~ FLICK-G003 @44:3-44:14
+//~ FLICK-G003 @51:24-51:35
+//~ FLICK-G003 @57:25-57:36
+//~ FLICK-G003 @64:27-64:38
+//~ FLICK-G003 @72:27-72:38
+//~ FLICK-G003 @77:31-77:50
+//~ FLICK-G003 @83:28-83:39
+//~ FLICK-G003 @89:22-89:33
+//~ FLICK-G003 @100:37-100:48
+//~ FLICK-G002 @111:34-111:40 this uses region `s`, which the type of this function does not keep live
+//~ FLICK-G002 @116:3-116:28 this uses region `s`, which the expected type `Unit ->{} Unit` does not keep live
+//~ FLICK-G002 @121:54-121:66 this uses `s`, which the expected type `Int -> Unit ->{} Unit` does not keep live
+//~ FLICK-G003 @127:34-127:45
+//~ FLICK-G003 @132:32-132:43
+//~ FLICK-G002 @142:13-142:19
+//~ FLICK-G002 @148:3-148:6
+//~ FLICK-G002 @154:3-154:64
+//~ FLICK-G002 @161:45-161:50
+//~ FLICK-G002 @167:46-167:51
+//~ FLICK-G002 @174:16-174:17
+//~ FLICK-G002 @177:44-177:45
+//~ FLICK-G002 @182:16-182:17
+//~ FLICK-G002 @186:44-186:45
+//~ FLICK-G002 @190:53-190:65
+//~ FLICK-G002 @194:45-194:57
+//~ FLICK-G002 @201:16-201:28
+//~ FLICK-G002 @207:16-207:28
+//~ FLICK-G002 @214:16-214:28
+//~ FLICK-G002 @220:16-220:28
+//~ FLICK-G002 @240:5-241:55
+//~ FLICK-G002 @243:3-243:12
+//~ FLICK-G002 @248:5-249:62
+//~ FLICK-G002 @251:3-251:12
+//~ FLICK-G002 @256:5-257:65
+//~ FLICK-G002 @259:3-259:15
+//~ FLICK-G003 @268:3-268:14
+//~ FLICK-G003 @275:3-275:14
+//~ FLICK-G002 @280:5-281:22
+//~ FLICK-G002 @283:3-283:12
+//~ FLICK-G002 @292:18-292:19
+//~ FLICK-G002 @301:18-301:19
+//~ FLICK-G001 @312:18-312:19
+//~ FLICK-G002 @322:18-322:19
+//~ FLICK-G002 @331:18-331:19
+//~ FLICK-G002 @336:45-336:50
+//~ FLICK-G002 @339:50-339:55
+//~ FLICK-G001 @342:48-342:53
+//~ FLICK-G002 @345:46-345:51
+//~ FLICK-G002 @349:47-349:52
+//~ FLICK-T003 @355:23-355:24
+//~ FLICK-T003 @360:19-360:20
+//~ FLICK-T003 @365:27-365:28
+//~ FLICK-T003 @370:24-370:25
