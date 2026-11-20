@@ -27,10 +27,53 @@ impl Checker<'_> {
         out
     }
 
-    /// `t` zonked, without the `Live` of `regions/live.rs`: no row writes it.
+    /// `t` zonked, without the `Live` of `regions/live.rs` or unsolved
+    /// subsumption-widening tails: no row writes either.
     fn unlive(&self, t: &Type) -> Type {
         let t = strip_elided(&self.zonk(t));
-        if has_live(&t) { strip_live(&t) } else { t }
+        let t = if has_live(&t) { strip_live(&t) } else { t };
+        self.strip_widened(&t)
+    }
+
+    fn strip_widened(&self, t: &Type) -> Type {
+        match t {
+            Type::Meta(meta)
+                if meta
+                    .inference_type_root()
+                    .is_some_and(|m| self.store.is_widened_row(m)) =>
+            {
+                Type::empty_row()
+            }
+            Type::Row(row) => {
+                let entries = row
+                    .entries
+                    .iter()
+                    .map(|(l, t)| (l.clone(), self.strip_widened(t)))
+                    .collect();
+                let tail = row
+                    .tail
+                    .as_deref()
+                    .map(|t| self.strip_widened(t))
+                    .filter(|t| !is_empty(t))
+                    .map(Box::new);
+                Type::Row(Row {
+                    entries,
+                    tail,
+                    written: row.written,
+                })
+            }
+            Type::Union(a, b) => {
+                let (a, b) = (self.strip_widened(a), self.strip_widened(b));
+                if is_empty(&a) {
+                    b
+                } else if is_empty(&b) {
+                    a
+                } else {
+                    Type::Union(Box::new(a), Box::new(b))
+                }
+            }
+            _ => t.map_children(&mut |c| self.strip_widened(c)),
+        }
     }
 
     /// `t` with its `forall` and its qualifiers, for a message about them and

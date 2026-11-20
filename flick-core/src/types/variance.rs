@@ -433,6 +433,10 @@ impl Checker<'_> {
                     // as it is, its bound too, as `≡` of the whole type did
                     let open = |t: &Type| self.whnf(t).inference_meta_root().is_some();
                     match s {
+                        Sign::Pos if !open(x) && open(y) => {
+                            self.bind_subsumed_meta(x, y, false)
+                                .unwrap_or_else(|| self.unify(x, y))?;
+                        }
                         _ if open(x) || open(y) => self.unify(x, y)?,
                         Sign::Pos => self.subsume(x, y, span)?,
                         Sign::Neg => {

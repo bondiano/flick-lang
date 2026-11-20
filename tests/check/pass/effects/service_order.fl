@@ -1,0 +1,351 @@
+// A function or task with a closed row fixing a type variable before one that
+// needs a service, error, or region: widening the closed row by row subsumption
+// makes the verdict independent of argument or branch order.
+module App.ServiceOrder exposing (..)
+
+type Handle (s : Region) = Handle
+
+read_handle : Handle s ->{} String
+let read_handle _ = ""
+
+service Log =
+  line : String ->{} Unit
+
+service Clock =
+  now : Unit ->{} Int
+
+type error Boom = Boom
+
+type error Other = Other
+
+keep2 : List a -> a ->{} List a
+let keep2 xs x =
+  match xs with
+  | [y, ..._] -> [x, y]
+  | [] -> [x]
+
+keep2_bounded : List (a^c) -> a^c ->{} List (a^c)
+let keep2_bounded xs x =
+  match xs with
+  | [y, ..._] -> [x, y]
+  | [] -> [x]
+
+quiet : Unit ->{} Unit
+let quiet () = ()
+
+only_log : Unit ->{Log} Unit
+let only_log () = Log.line "x"
+
+only_clock : Unit ->{Clock} Unit
+let only_clock () = ignore (Clock.now ())
+
+fails_boom : Unit ->{; Boom} Unit
+let fails_boom () = Fail.fail Boom
+
+fails_other : Unit ->{; Other} Unit
+let fails_other () = Fail.fail Other
+
+curried : Int -> Unit ->{} Unit
+let curried _ () = ()
+
+ready : Eff none none Unit
+let ready = task { () }
+
+quiet_list : List (Unit ->{} Unit)
+let quiet_list = [quiet]
+
+// Plain `keep2`: closure first and closure last.
+closure_first : Unit ->{Log} Unit
+let closure_first () =
+  match keep2 [fun () -> Log.line "x"] quiet with
+  | [k, ..._] -> k ()
+  | [] -> ()
+
+closure_last : Unit ->{Log} Unit
+let closure_last () =
+  match keep2 [quiet] (fun () -> Log.line "x") with
+  | [k, ..._] -> k ()
+  | [] -> ()
+
+// Value-bounded `keep2`: closure first and closure last.
+bounded_first : Unit ->{Log} Unit
+let bounded_first () =
+  match keep2_bounded [fun () -> Log.line "x"] quiet with
+  | [k, ..._] -> k ()
+  | [] -> ()
+
+bounded_last : Unit ->{Log} Unit
+let bounded_last () =
+  match keep2_bounded [quiet] (fun () -> Log.line "x") with
+  | [k, ..._] -> k ()
+  | [] -> ()
+
+// `if` branches in either order.
+pure_first : Bool ->{Log} Unit
+let pure_first b =
+  let f = if b then quiet else (fun () -> Log.line "x")
+  f ()
+
+pure_last : Bool ->{Log} Unit
+let pure_last b =
+  let f = if b then (fun () -> Log.line "x") else quiet
+  f ()
+
+// `match` branches in either order.
+type Choice = First | Second
+
+match_quiet_first : Choice ->{Log} Unit
+let match_quiet_first c =
+  let f =
+    match c with
+    | First -> quiet
+    | Second -> fun () -> Log.line "x"
+  f ()
+
+match_logged_first : Choice ->{Log} Unit
+let match_logged_first c =
+  let f =
+    match c with
+    | First -> fun () -> Log.line "x"
+    | Second -> quiet
+  f ()
+
+// List literals in either order.
+list_quiet_first : Unit ->{Log} Unit
+let list_quiet_first () =
+  let xs = [quiet, fun () -> Log.line "x"]
+  match xs with
+  | [k, ..._] -> k ()
+  | [] -> ()
+
+list_logged_first : Unit ->{Log} Unit
+let list_logged_first () =
+  let xs = [fun () -> Log.line "x", quiet]
+  match xs with
+  | [k, ..._] -> k ()
+  | [] -> ()
+
+// Local signed function with a closed row.
+local_quiet_first : Bool ->{Log} Unit
+let local_quiet_first b =
+  q : Unit ->{} Unit
+  let q () = ()
+  let f = if b then q else (fun () -> Log.line "x")
+  f ()
+
+// Combining two distinct closed service rows.
+join_services : Bool ->{Log, Clock} Unit
+let join_services b =
+  let f = if b then only_log else only_clock
+  f ()
+
+// Error rows: closed empty row before a raising function, and two distinct error rows.
+error_quiet_first : Bool ->{; Boom} Unit
+let error_quiet_first b =
+  let f = if b then quiet else (fun () -> Fail.fail Boom)
+  f ()
+
+join_errors : Bool ->{; Boom, Other} Unit
+let join_errors b =
+  let f = if b then fails_boom else fails_other
+  f ()
+
+// Rigid row variable combined with a concrete service.
+rigid_row_first : Bool -> (Unit ->{r} Unit) ->{Log | r} Unit
+let rigid_row_first b f =
+  let g = if b then f else (fun () -> Log.line "x")
+  g ()
+
+// `Eff` tasks in `keep2`, `keep2_bounded`, and `if`.
+task_last : Unit ->{Log} Unit
+let task_last () =
+  match keep2 [ready] (task { Log.line "x" }) with
+  | [t, ..._] -> await t
+  | [] -> ()
+
+task_bounded_last : Unit ->{Log} Unit
+let task_bounded_last () =
+  match keep2_bounded [ready] (task { Log.line "x" }) with
+  | [t, ..._] -> await t
+  | [] -> ()
+
+task_if_first : Bool ->{Log} Unit
+let task_if_first b =
+  let t = if b then ready else task { Log.line "x" }
+  await t
+
+// Multi-argument curried arrows.
+curried_first : Bool ->{Log} Unit
+let curried_first b =
+  let f = if b then curried else (fun _ () -> Log.line "x")
+  f 1 ()
+
+// Covariant data wrapping closed-row functions.
+wrapped_option : Bool ->{Log} Unit
+let wrapped_option b =
+  let opt = if b then Some quiet else Some (fun () -> Log.line "x")
+  match opt with
+  | Some k -> k ()
+  | None -> ()
+
+wrapped_list : Unit ->{Log} Unit
+let wrapped_list () =
+  match keep2 quiet_list (fun () -> Log.line "x") with
+  | [k, ..._] -> k ()
+  | [] -> ()
+
+wrapped_tuple : Bool ->{Log} Unit
+let wrapped_tuple b =
+  let (k, _) = if b then (quiet, 1) else (fun () -> Log.line "x", 2)
+  k ()
+
+wrapped_record : Bool ->{Log} Unit
+let wrapped_record b =
+  let r = if b then ({ run = quiet }) else ({ run = fun () -> Log.line "x" })
+  r.run ()
+
+// Unannotated `Ref.make quiet` widened by a later `Ref.set`, called where `Log` is allowed.
+unannotated_ref : Unit ->{Log} Unit
+let unannotated_ref () =
+  let cell = Ref.make quiet
+  Ref.set cell (fun () -> Log.line "x")
+  let f = Ref.get cell
+  f ()
+
+// Both a service and a region in the same bounded `keep2`.
+service_and_region : Handle s ->{Log} String
+let service_and_region h =
+  fresh : Unit ->{} String
+  let fresh () = ""
+  match
+    keep2_bounded [fresh] (fun () ->
+      Log.line "x"
+      read_handle h
+    )
+  with
+  | [k, ..._] -> k ()
+  | [] -> ""
+
+// An outer-scope function/task whose service row is already an open inference
+// meta while its error row is closed still receives `Live ?uses` under a value
+// bound inside an inner `scope s`.
+open_fn : Unit ->{} (Unit ->{r} String)
+let open_fn () = fun () -> ""
+
+open_task : Unit ->{} Eff r none String
+let open_task () = task { "" }
+
+open_handle : Unit ->{Scope s} Handle s
+let open_handle () = Handle
+
+outer_open_fn_in_scope : Unit ->{} String
+let outer_open_fn_in_scope () =
+  let k = open_fn ()
+  scope s {
+    let h = open_handle ()
+    match keep2_bounded [k] (fun () -> read_handle h) with
+    | [f, ..._] -> f ()
+    | [] -> ""
+  }
+
+outer_open_task_in_scope : Unit ->{} String
+let outer_open_task_in_scope () =
+  let t = open_task ()
+  scope s {
+    let h = open_handle ()
+    match keep2_bounded [t] (task { read_handle h }) with
+    | [u, ..._] -> await u
+    | [] -> ""
+  }
+
+// Covariant wrappers under value-bounded `keep2_bounded` work in either order,
+// both inline and via pre-inferred variables.
+bounded_wrapped_option_quiet_first : Unit ->{Log} Unit
+let bounded_wrapped_option_quiet_first () =
+  let sl = Some only_log
+  match keep2_bounded [Some quiet] sl with
+  | [Some k, ..._] -> k ()
+  | _ -> ()
+
+bounded_wrapped_option_logged_first : Unit ->{Log} Unit
+let bounded_wrapped_option_logged_first () =
+  let sq = Some quiet
+  match keep2_bounded [Some only_log] sq with
+  | [Some k, ..._] -> k ()
+  | _ -> ()
+
+bounded_wrapped_option_closure_first : Unit ->{Log} Unit
+let bounded_wrapped_option_closure_first () =
+  let sq = Some quiet
+  match keep2_bounded [Some (fun () -> Log.line "x")] sq with
+  | [Some k, ..._] -> k ()
+  | _ -> ()
+
+bounded_wrapped_option_join : Unit ->{Log, Clock} Unit
+let bounded_wrapped_option_join () =
+  let sc = Some only_clock
+  match keep2_bounded [Some only_log] sc with
+  | [Some k, ..._] -> k ()
+  | _ -> ()
+
+bounded_wrapped_tuple_logged_first : Unit ->{Log} Unit
+let bounded_wrapped_tuple_logged_first () =
+  let pair = (quiet, 2)
+  match keep2_bounded [(only_log, 1)] pair with
+  | [(k, _), ..._] -> k ()
+  | [] -> ()
+
+bounded_wrapped_tuple_quiet_first : Unit ->{Log} Unit
+let bounded_wrapped_tuple_quiet_first () =
+  let pair = (only_log, 2)
+  match keep2_bounded [(quiet, 1)] pair with
+  | [(k, _), ..._] -> k ()
+  | [] -> ()
+
+bounded_wrapped_record_logged_first : Unit ->{Log} Unit
+let bounded_wrapped_record_logged_first () =
+  let rec_q = { run = quiet }
+  match keep2_bounded [{ run = only_log }] rec_q with
+  | [r, ..._] -> r.run ()
+  | [] -> ()
+
+bounded_wrapped_record_quiet_first : Unit ->{Log} Unit
+let bounded_wrapped_record_quiet_first () =
+  let rec_l = { run = only_log }
+  match keep2_bounded [{ run = quiet }] rec_l with
+  | [r, ..._] -> r.run ()
+  | [] -> ()
+
+// Unifying a widened row with `{-Log | ?s}` works in either order.
+idle_task : Unit -> Eff s none Unit
+let idle_task () = task { () }
+
+later_without_log : Layer none none {Log} -> Eff s none Unit -> Unit ->{-Log | s} Unit
+let later_without_log layer t () = provide layer { await t }
+
+aligned_widened_first : Layer none none {Log} ->{} Bool
+let aligned_widened_first layer =
+  let cell = Ref.make only_clock
+  Ref.same cell (Ref.make (later_without_log layer (idle_task ())))
+
+aligned_without_first : Layer none none {Log} ->{} Bool
+let aligned_without_first layer =
+  Ref.same (Ref.make (later_without_log layer (idle_task ()))) (Ref.make only_clock)
+
+// A mid-function GADT row-upper check does not prematurely close an earlier
+// widened cell before a later `Ref.set`.
+type Packed (r : ServiceRow) =
+  | Packed (Eff s none Unit) : Packed {Log | s}
+
+gadt_mid_function_keeps_widened_cell : Unit ->{Log} Unit
+let gadt_mid_function_keeps_widened_cell () =
+  let cell = Ref.make quiet
+  let packed : Packed {Log} = Packed (task { Log.line "x" })
+  done : Unit
+  let done =
+    match packed with
+    | Packed work -> await work
+  ignore done
+  Ref.set cell (fun () -> Log.line "x")
+  let f = Ref.get cell
+  f ()

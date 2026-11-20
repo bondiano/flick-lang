@@ -9,6 +9,7 @@
 //! it. The opposite never holds.
 
 mod solve;
+mod widen;
 
 use super::ty::{Effects, Type, Written};
 use super::{Checker, Kind};
@@ -18,6 +19,7 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
 pub use solve::SubRow;
+pub(super) use widen::clear_written;
 
 /// The stage being checked.
 #[derive(Debug, Clone)]
@@ -128,10 +130,11 @@ impl Checker<'_> {
                 }
             }),
             Some(effects) => {
+                let at = self.span(node);
                 let site = match (name, expected) {
-                    (Some(name), _) => Site::Signature(name, self.row_place(effects)),
+                    (Some(name), _) => Site::Signature(name, self.row_place_at(effects, at)),
                     (None, Some(expected)) => {
-                        Site::Expected(expected.clone(), self.row_place(effects))
+                        Site::Expected(expected.clone(), self.row_place_at(effects, at))
                     }
                     (None, None) => Site::Inferred,
                 };
@@ -294,6 +297,11 @@ impl Checker<'_> {
             return self.subsume_captured((actual, a), (expected, e), span);
         }
         let (a, e) = (a.0, e.0);
+        if matches!(e, Type::Meta(_))
+            && let Some(result) = self.bind_subsumed_meta(&a, &e, false)
+        {
+            return result;
+        }
         match (&a, &e) {
             (
                 Type::Fun {
@@ -312,7 +320,8 @@ impl Checker<'_> {
                         return Err(super::unify::Mismatch::Types(a.clone(), e.clone()));
                     }
                     (Some(x), Some(y)) => {
-                        let site = self.expected_site(&e, self.row_place(y));
+                        self.tighten_closed_subsumed(&x.services, &y.services);
+                        let site = self.expected_site(&e, self.row_place_at(y, span));
                         self.sub_row(&x.services, &y.services, site, span, false);
                         self.sub_row(&x.errors, &y.errors, site, span, true);
                     }
@@ -324,7 +333,8 @@ impl Checker<'_> {
             }
             _ => match (self.eff_parts(&a), self.eff_parts(&e)) {
                 (Some((s1, e1, r1)), Some((s2, e2, r2))) => {
-                    let written = self.store.resolve(&s2).written();
+                    self.tighten_closed_subsumed(&s1, &s2);
+                    let written = self.local_place_at(&s2, span);
                     let site = self.expected_site(&e, written);
                     self.sub_row(&s1, &s2, site, span, false);
                     self.sub_row(&e1, &e2, site, span, true);
@@ -333,7 +343,7 @@ impl Checker<'_> {
                 // a layer that needs less fits where more is allowed; it makes the same services
                 _ => match (self.layer_parts(&a), self.layer_parts(&e)) {
                     (Some((n1, e1, o1)), Some((n2, e2, o2))) => {
-                        let written = self.store.resolve(&n2).written();
+                        let written = self.local_place_at(&n2, span);
                         let site = self.expected_site(&e, written);
                         self.sub_row(&n1, &n2, site, span, false);
                         self.sub_row(&e1, &e2, site, span, true);
@@ -347,13 +357,14 @@ impl Checker<'_> {
 
     /// Where a fix adds to the services of `effects`: where the row they
     /// stand for is written, as `Handlers none` writes the `r` of
-    /// `->{r;}`, else where the arrow's row is.
-    fn row_place(&self, effects: &Effects) -> Written {
-        let own = self.local_place(&effects.services);
+    /// `->{r;}`, else where the arrow's row is, when that place belongs to the
+    /// declaration containing `at`.
+    fn row_place_at(&self, effects: &Effects, at: Span) -> Written {
+        let own = self.local_place_at(&effects.services, at);
         if own.0.is_some() {
             own
         } else {
-            self.local(effects.written)
+            self.editable_place(effects.written, at)
         }
     }
 
@@ -377,9 +388,40 @@ impl Checker<'_> {
         }
     }
 
+    /// [`Self::local_place`] restricted to places editable for a diagnostic at `at`.
+    pub(super) fn local_place_at(&self, row: &Type, at: Span) -> Written {
+        match self.store.resolve(row) {
+            Type::Row(r) => {
+                let tail = r
+                    .tail
+                    .as_ref()
+                    .map(|t| self.local_place_at(t, at))
+                    .unwrap_or_default();
+                if tail.0.is_some() {
+                    tail
+                } else {
+                    self.editable_place(r.written, at)
+                }
+            }
+            _ => Written::default(),
+        }
+    }
+
     /// `place` when it is in this module, which a fix may edit.
     pub(super) fn local(&self, place: Written) -> Written {
         Written(place.0.filter(|(span, _)| span.file == self.file))
+    }
+
+    /// `place` when it is in this module and belongs to the same declaration as
+    /// `at`, so a diagnostic in one binding never suggests editing another
+    /// binding's signature.
+    pub(super) fn editable_place(&self, place: Written, at: Span) -> Written {
+        Written(place.0.filter(|(span, _)| {
+            span.file == self.file
+                && self
+                    .owner_of(*span)
+                    .is_some_and(|owner| Some(owner) == self.owner_of(at))
+        }))
     }
 
     fn expected_site(&mut self, expected: &Type, written: Written) -> usize {
@@ -390,6 +432,8 @@ impl Checker<'_> {
 
 #[cfg(test)]
 mod fix_tests;
+#[cfg(test)]
+mod ownership_fix_tests;
 #[cfg(test)]
 mod tests {
     use crate::source::SourceMap;

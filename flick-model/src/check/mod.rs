@@ -30,6 +30,7 @@ mod rows;
 mod runtime;
 pub mod trace;
 mod unify;
+mod widen;
 mod zonk;
 
 #[cfg(test)]
@@ -114,6 +115,9 @@ pub struct Checker<'d> {
     stage_bound: Option<Stage>,
     /// `ρ ⊆ ρ'` whose left side waits for a meta to be solved.
     pending: Vec<(Row, Row, row_facts::Givens)>,
+    /// Fresh open tails added when widening a closed row that fixed a type
+    /// variable under subsumption; closed to `none` when settled.
+    widened_rows: Vec<Row>,
     /// Rows before normalization merges overlapping named instances.
     row_instances: Vec<(Row, row_facts::Givens)>,
     solving_row_upper: bool,
@@ -173,6 +177,7 @@ impl<'d> Checker<'d> {
             stage: Stage::Pure,
             stage_bound: None,
             pending: Vec::new(),
+            widened_rows: Vec::new(),
             row_instances: Vec::new(),
             solving_row_upper: false,
             structural: Vec::new(),
@@ -241,6 +246,7 @@ impl<'d> Checker<'d> {
         }
         self.settle()?;
         self.check_row_instances()?;
+        self.close_widened_rows()?;
         self.solve_regions()
     }
 }

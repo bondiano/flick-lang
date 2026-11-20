@@ -113,19 +113,55 @@ impl Checker<'_> {
             ([a], [b])
                 if a.inference_meta_root().is_some() && b.inference_meta_root().is_some() =>
             {
-                let a_root = a.inference_meta_root().expect("inference row tail");
                 let b_root = b.inference_meta_root().expect("inference row tail");
                 let rest = self
                     .store
-                    .fresh_beside_occurrence(a)
+                    .fresh_shared_row(a, b_root)
                     .expect("validated inference row");
-                // the shared rest is a row of the kind of the rows it ends
-                if let Some(r) = rest.inference_meta_root() {
-                    self.store.mark_like(r, a_root);
-                    self.store.mark_like(r, b_root);
-                }
                 self.bind_inference(a, &extended(only_right, vec![rest.clone()]))?;
                 self.bind_inference(b, &extended(only_left, vec![rest]))
+            }
+            ([Type::Without { row, gone }], [b])
+                if row.inference_meta_root().is_some()
+                    && b.inference_meta_root().is_some()
+                    && row.inference_meta_root() != b.inference_meta_root() =>
+            {
+                let b_root = b.inference_meta_root().expect("inference row tail");
+                let rest = self
+                    .store
+                    .fresh_shared_row(row, b_root)
+                    .expect("validated inference row");
+                let rhs = left_out(only_right, vec![rest.clone()], gone, false)?;
+                let lhs = extended(
+                    only_left,
+                    vec![Type::Without {
+                        row: Box::new(rest),
+                        gone: gone.clone(),
+                    }],
+                );
+                self.bind_inference(row, &rhs)?;
+                self.bind_inference(b, &lhs)
+            }
+            ([a], [Type::Without { row, gone }])
+                if a.inference_meta_root().is_some()
+                    && row.inference_meta_root().is_some()
+                    && a.inference_meta_root() != row.inference_meta_root() =>
+            {
+                let a_root = a.inference_meta_root().expect("inference row tail");
+                let rest = self
+                    .store
+                    .fresh_shared_row(row, a_root)
+                    .expect("validated inference row");
+                let lhs = left_out(only_left, vec![rest.clone()], gone, true)?;
+                let rhs = extended(
+                    only_right,
+                    vec![Type::Without {
+                        row: Box::new(rest),
+                        gone: gone.clone(),
+                    }],
+                );
+                self.bind_inference(row, &lhs)?;
+                self.bind_inference(a, &rhs)
             }
             ([tail], _) if tail.inference_meta_root().is_some() => {
                 missing(&only_left, true)?;

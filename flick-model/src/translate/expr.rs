@@ -83,9 +83,21 @@ impl Tr {
     }
 
     fn lambda_expr(&mut self, params: &[ir::Param], body: &ir::Expr) -> Term {
+        let mut stage_has_runtime = has_runtime_step(body);
         let mut body = self.delayed_expr(body);
         for p in params.iter().rev() {
+            if p.stage == ir::Stage::Runtime && !stage_has_runtime {
+                body = Term::Let(
+                    "_".into(),
+                    None,
+                    Rc::new(Term::Await(Rc::new(Term::Task(Rc::new(Term::unit()))))),
+                    Rc::new(body),
+                );
+            }
             body = self.param(&p.pat, body);
+            // A lambda itself is a value, so any enclosing runtime parameter
+            // has no runtime step of its own unless marked.
+            stage_has_runtime = false;
         }
         body
     }
@@ -421,6 +433,27 @@ fn binary(op: BinOp, a: Term, b: Term) -> Term {
         BinOp::Arith(op, num) => Prim::Arith(op, num),
     };
     Term::apps(Term::prim(prim), [a, b])
+}
+
+/// Whether evaluating `e` directly at the current stage performs a runtime step
+/// (not counting delayed bodies inside nested lambdas or tasks).
+fn has_runtime_step(e: &ir::Expr) -> bool {
+    match &e.kind {
+        ExprKind::Lambda { .. } | ExprKind::Task(_) | ExprKind::Generate { strict: false, .. } => {
+            false
+        }
+        ExprKind::App { stage, .. } if *stage != ir::Stage::Pure => true,
+        ExprKind::Await(_)
+        | ExprKind::Handle(_)
+        | ExprKind::Within(..)
+        | ExprKind::Loop { .. }
+        | ExprKind::ControlLoop { .. } => true,
+        _ => {
+            let mut found = false;
+            e.each_child(&mut |child| found |= has_runtime_step(child));
+            found
+        }
+    }
 }
 
 pub(super) fn is_lang(func: &ir::Expr, item: Lang) -> bool {

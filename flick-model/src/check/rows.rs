@@ -140,7 +140,7 @@ impl Checker<'_> {
         loop {
             let pending = mem::take(&mut self.pending);
             if pending.is_empty() {
-                return Ok(());
+                break;
             }
             let mut waiting = Vec::new();
             let mut progressed = false;
@@ -166,6 +166,7 @@ impl Checker<'_> {
             }
             self.pending.extend(waiting);
         }
+        Ok(())
     }
 
     /// `ρ + ρ'`, with the arguments of an element in both made equal.
@@ -265,8 +266,12 @@ impl Checker<'_> {
         // An unknown side takes the complete type, including its qualifier.
         // Erasing it here loses captures through an inferred eta parameter.
         let unknown_actual = matches!(&a, Type::Var(v @ Var::Meta(_)) if !self.mentions(v, &b));
-        if unknown_actual || matches!(b, Type::Var(Var::Meta(_))) {
+        if unknown_actual {
             return self.unify(&a, &b);
+        }
+        if matches!(b, Type::Var(Var::Meta(_))) {
+            let widened = self.widen_for_meta(&a);
+            return self.unify(&widened, &b);
         }
         self.subsume_bare(actual, expected)?;
         // the hidden row of data with hidden storage only widens: a region
@@ -336,18 +341,26 @@ impl Checker<'_> {
             (a @ Type::App(..), b @ Type::App(..)) => self.subsume_data(&a, &b),
             // a function or a task that a bounded variable takes may need the
             // innermost bound, the capacity of a cell `Ref.make` makes: its
-            // type records it, as the bound allows its use nothing more
+            // type records it, as the bound allows its use nothing more; and
+            // closed service/error rows widen so a later value needing a
+            // service or error fits in either order
             (Type::Fun(p, s, r), b @ Type::Var(Var::Meta(_))) => {
                 let s = self
                     .innermost_bound(expected)
                     .map_or(s.clone(), |c| live_stage(&s, &c));
-                self.unify(&Type::Fun(p, s, r), &b)
+                let widened = self.widen_for_meta(&Type::Fun(p, s, r));
+                self.unify(&widened, &b)
             }
             (Type::Eff(r, e, t), b @ Type::Var(Var::Meta(_))) => {
                 let r = self
                     .innermost_bound(expected)
                     .map_or(r.clone(), |c| add_live(&r, &c));
-                self.unify(&Type::Eff(r, e, t), &b)
+                let widened = self.widen_for_meta(&Type::Eff(r, e, t));
+                self.unify(&widened, &b)
+            }
+            (a, b @ Type::Var(Var::Meta(_))) if !matches!(&a, Type::Var(Var::Meta(_))) => {
+                let widened = self.widen_for_meta(&a);
+                self.unify(&widened, &b)
             }
             (a, b) => self.unify(&a, &b),
         }
@@ -370,6 +383,10 @@ impl Checker<'_> {
             // is, its bound too, as `≡` of the whole type did
             let open = |t: &Type| matches!(self.resolve(t), Type::Var(Var::Meta(_)));
             match s {
+                Sign::Pos if !open(x) && open(y) => {
+                    let widened = self.widen_for_meta(x);
+                    self.unify(&widened, y)?;
+                }
                 _ if open(x) || open(y) => self.unify(x, y)?,
                 Sign::Pos => self.subsume(x, y)?,
                 Sign::Neg => {
@@ -388,7 +405,7 @@ impl Checker<'_> {
     }
 
     /// `T ū` as `T` and `ū`, metas at the heads followed.
-    fn data_args(&self, t: &Type) -> Option<(Path, Vec<Type>)> {
+    pub(super) fn data_args(&self, t: &Type) -> Option<(Path, Vec<Type>)> {
         let mut args = Vec::new();
         let mut head = self.heads(t);
         while let Type::App(h, x) = head {

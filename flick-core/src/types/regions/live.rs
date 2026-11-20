@@ -323,35 +323,69 @@ impl Checker<'_> {
         }
     }
 
-    /// A function or a task `identity` under a value bound fitted into the
-    /// bound's type `base`; `None` for any other value, and where the value
-    /// fixes `base` as unification does. With `base` known it fits as it
-    /// fits that type, by subsumption: one that uses nothing fits where a
-    /// closure fitted before it may use a region. One that fixes `base` gives
-    /// it its own type that keeps live a use row of its own, a widening
-    /// `LeLive.arrow` allows: a closure fitted after it grows that row, and
-    /// a written type without it empties it. Not the bound, which says what
-    /// the value reaches, not what using it needs. Either way the verdict
-    /// does not depend on which argument comes first.
+    /// `services` extended with a fresh `Live ?uses` capture row for a value
+    /// fixing a bounded type variable.
+    pub(in crate::types) fn with_live_row(&mut self, services: &Type) -> Type {
+        let uses = self.store.fresh_capture_row();
+        let atoms = self.live_atoms(&uses, &[]);
+        add_live(services, atoms)
+    }
+
+    /// A value `identity` under a value bound fitted into the bound's type
+    /// `base`; `None` where `identity` fixes `base` as plain unification does.
+    /// With `base` unknown, closed service/error rows in covariant positions
+    /// (and, for a function or task, its `Live` use row) are widened so a later
+    /// closure or task needing a service, error or region fits regardless of
+    /// argument order. With `base` known, callables and covariant wrappers
+    /// (tuples, closed records, `Layer`, and declared ADTs) fit by subsumption.
     pub(in crate::types) fn callable_bound_fits(
         &mut self,
         identity: &Type,
         base: &Type,
         span: Span,
     ) -> Option<Unified> {
+        if matches!(base, Type::Meta(_)) {
+            return self.bind_subsumed_meta(identity, base, true);
+        }
         let callable = |t: &Type| {
             let t = self.whnf(t);
             matches!(t, Type::Fun { .. }) || self.eff_parts(&t).is_some()
         };
-        if !callable(identity) {
+        if callable(identity) && callable(base) {
+            return Some(self.subsume(identity, base, span));
+        }
+        if self.projected_alias_type(identity).is_some()
+            || self.projected_alias_type(base).is_some()
+        {
             return None;
         }
-        if matches!(base, Type::Meta(_)) {
-            let uses = self.store.fresh_capture_row();
-            let widened = self.with_live(identity.clone(), Some(&uses));
-            return self.unifies(&widened, base).then_some(Ok(()));
+        let (a_bare, _) = self.whnf_captured(identity);
+        let (b_bare, b_cap) = self.whnf_captured(base);
+        if self.is_covariant_wrapper(&a_bare) && self.is_covariant_wrapper(&b_bare) {
+            // `subsume_bound_at` already emits the outer `Hold` against `c`.
+            // When `base` has no outer qualifier, pass the bare wrapper so
+            // `subsume_captured` does not emit a spurious bare `Hold`.
+            let actual = if b_cap.is_none() { &a_bare } else { identity };
+            return Some(self.subsume(actual, base, span));
         }
-        callable(base).then(|| self.subsume(identity, base, span))
+        None
+    }
+
+    fn is_covariant_wrapper(&mut self, head: &Type) -> bool {
+        match head {
+            Type::Tuple(_) => true,
+            Type::Record(r) => r.tail.is_none(),
+            Type::App { .. } => {
+                if self.layer_parts(head).is_some() {
+                    return true;
+                }
+                matches!(
+                    head.spine().0,
+                    Type::Con { module, name } if self.signs(module, name).is_some()
+                )
+            }
+            _ => false,
+        }
     }
 
     /// The types of a subsumption with a qualifier: using either side needs

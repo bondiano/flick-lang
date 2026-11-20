@@ -86,6 +86,27 @@ impl Checker<'_> {
         Ok(())
     }
 
+    /// Under row subsumption `actual ⊆ {}` into a strictly closed empty row:
+    /// any uninferred `Live ?c` capture meta and any bare inference tail in
+    /// `actual` must be empty (so uses inside a closure report `FLICK-G002` at
+    /// the use site, matching `unify_live`).
+    pub(in crate::types) fn tighten_closed_subsumed(&mut self, actual: &Type, declared: &Type) {
+        if !self.store.row_equalities.is_empty() {
+            return;
+        }
+        let declared = self.store.normalize(declared);
+        if !declared.entries.is_empty() || !declared.tails.is_empty() {
+            return;
+        }
+        let mut actual_norm = self.store.normalize(actual);
+        let _ = self.leave_out_live(&mut actual_norm);
+        for tail in &actual_norm.tails {
+            if tail.inference_meta_root().is_some() {
+                let _ = self.bind_inference(tail, &Type::empty_row());
+            }
+        }
+    }
+
     /// `row` without its `Live` that needs no region known yet, whose capture
     /// rows not inferred yet are empty. Unification merged it into one entry.
     fn leave_out_live(&mut self, row: &mut Norm) -> Unified {
@@ -148,19 +169,20 @@ impl Checker<'_> {
             .filter(|ty| ty.inference_meta_root().is_some())
             .collect();
         // one that cannot take the region, as the qualifier of a function
-        // made before the region's `scope`, leaves the next to grow
-        if !inner.is_empty() {
-            return inner.iter().any(|variable| {
-                let Some(rest) = self.store.fresh_beside_occurrence(variable) else {
-                    return false;
-                };
-                let row = Row {
-                    entries: missing.clone(),
-                    tail: Some(Box::new(rest)),
-                    ..Row::default()
-                };
-                self.bind_inference(variable, &Type::Row(row)).is_ok()
-            });
+        // made before the region's `scope`, leaves the next — or an open
+        // service row tail made inside the scope — to grow
+        if inner.iter().any(|variable| {
+            let Some(rest) = self.store.fresh_beside_occurrence(variable) else {
+                return false;
+            };
+            let row = Row {
+                entries: missing.clone(),
+                tail: Some(Box::new(rest)),
+                ..Row::default()
+            };
+            self.bind_inference(variable, &Type::Row(row)).is_ok()
+        }) {
+            return true;
         }
         let (variable, grown) = match open {
             Some(variable) => {

@@ -342,6 +342,16 @@ impl Store {
         let sibling = self.fresh_beside(root);
         Some(lexical::transport_type(&sibling, &mappings))
     }
+
+    pub(in crate::types) fn fresh_shared_row(&mut self, variable: &Type, other: u32) -> Option<Type> {
+        let Type::Meta(meta) = variable else {
+            return None;
+        };
+        let root = meta.inference_type_root()?;
+        let mappings = self.lexical_mappings(meta).ok()?;
+        let sibling = self.fresh_shared(root, other);
+        Some(lexical::transport_type(&sibling, &mappings))
+    }
 }
 
 impl Checker<'_> {

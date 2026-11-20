@@ -235,7 +235,20 @@ impl Checker<'_> {
                 self.finish_recs(&[rec]);
             }
             self.polymorphic_signature(&name, &scheme, runtime, decl, &parts);
-            let ty = self.inferred_captures(scheme, captures, self.span(decl));
+            let mut scheme_head = &scheme;
+            while let Type::Forall { body, .. }
+            | Type::Captured { ty: body, .. }
+            | Type::Bounded { ty: body, .. } = scheme_head
+            {
+                scheme_head = body;
+            }
+            let is_function_scheme = parts.is_function() || matches!(scheme_head, Type::Fun { .. });
+            let local_scheme = if is_function_scheme {
+                super::effects::clear_written(&scheme)
+            } else {
+                scheme
+            };
+            let ty = self.inferred_captures(local_scheme, captures, self.span(decl));
             let alias = self.let_alias(&parts);
             self.push_local(&name, at, ty);
             self.proof_alias(at, alias);

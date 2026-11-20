@@ -208,6 +208,7 @@ impl Checker<'_> {
             && self.diagnostics.len() == reported + 1
             && let Some((at, text)) = (self.async_place(actual, expected))
                 .or_else(|| self.async_place(expected, actual))
+                .map(|w| self.editable_place(w, span))
                 .and_then(|w| w.adding("Async"))
             && let Some(d) = self.diagnostics.pop()
         {
