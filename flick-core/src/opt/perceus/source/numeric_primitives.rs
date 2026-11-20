@@ -58,10 +58,64 @@ impl Lower<'_> {
         if let Some(expression) = equality_expression(value, span) {
             return Some(self.expr(&expression, &Env::new(), block));
         }
-        strings::intrinsic(value)
+        if let Some(kind) = strings::intrinsic(value)
             .or_else(|| layers::intrinsic(value))
             .or_else(|| intrinsic(value))
-            .map(|kind| self.intrinsic(kind, false, vec![], block, span))
+        {
+            return Some(self.intrinsic(kind, false, vec![], block, span));
+        }
+        if let Some(result) = self.core_scalar_foreign(value, name, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.core_string_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.core_list_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.core_record_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_functional_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_combine_foreign(value, name, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_chunk_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_hash_map_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_json_decimal_regexp_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_duration_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_outcome_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_test_gen_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_schema_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_codec_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_check_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_path_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_datetime_cron_foreign(value, span, block) {
+            return Some(result);
+        }
+        self.std_graph_foreign(value, span, block)
     }
 
     fn scalar_foreign(

@@ -154,6 +154,20 @@ impl Lower<'_> {
             .filter(|total| u32::try_from(*total).is_ok())
             .ok_or(LowerError::Limit(span))?;
         if arguments.len() == total {
+            match &constructor.rep {
+                flick_ir::Rep::Literal(flick_ir::EnumLit::Int(n)) => {
+                    return block.emit(Operation::Literal(Lit::Int(*n)), span);
+                }
+                flick_ir::Rep::Literal(flick_ir::EnumLit::String(s)) => {
+                    return block.emit(Operation::Literal(Lit::String(s.clone())), span);
+                }
+                flick_ir::Rep::Unboxed | flick_ir::Rep::Typeof(_)
+                    if constructor.arity == 1 && constructor.dicts == 0 =>
+                {
+                    return Ok(arguments[0]);
+                }
+                _ => {}
+            }
             // Evidence is applied first by ExprKind::Dicts, but stored
             // after ordinary fields, matching checked constructor patterns.
             let fields = arguments[constructor.dicts..].to_vec();

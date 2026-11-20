@@ -396,6 +396,19 @@ impl SeqBuilder {
         self.lam(&["s"], body)
     }
 
+    fn seq_map2(&self) -> Expr {
+        let body = self.each(
+            "x",
+            self.loc("xs"),
+            self.each(
+                "y",
+                self.loc("ys"),
+                self.yield_(self.app2(self.loc("f"), self.loc("x"), self.loc("y"))),
+            ),
+        );
+        self.lam(&["f", "xs", "ys"], self.gen_lazy(body))
+    }
+
     fn seq_each_effect(&self) -> Expr {
         let body = self.each("x", self.loc("s"), self.app(self.loc("f"), self.loc("x")));
         self.lam(&["f", "s"], body)

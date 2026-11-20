@@ -66,42 +66,7 @@ pub(super) fn binary(
         }
         BinOp::Eq | BinOp::NotEq => Value::Bool(equal(heap, left, right)? == (op == BinOp::Eq)),
         BinOp::Same | BinOp::NotSame => {
-            let equal = match (left, right) {
-                (Value::Float(a), Value::Float(b)) => a == b,
-                (Value::Object(a), Value::Object(b)) => {
-                    match (&heap.object(a.id)?.data, &heap.object(b.id)?.data) {
-                        (Data::ServiceTag { .. }, Data::ServiceTag { .. }) => a.id == b.id,
-                        (Data::String(a), Data::String(b)) => a == b,
-                        (Data::BigInt(a), Data::BigInt(b)) => bigint_text(a)? == bigint_text(b)?,
-                        (
-                            Data::Tagged {
-                                tag: a,
-                                ordinary_fields: an,
-                                fields: x,
-                            },
-                            Data::Tagged {
-                                tag: b,
-                                ordinary_fields: bn,
-                                fields: y,
-                            },
-                        ) => {
-                            tagged_boundary(a, *an, x.len())?;
-                            tagged_boundary(b, *bn, y.len())?;
-                            if *an != 0 || *bn != 0 {
-                                return Err(unsupported(
-                                    "primitive equality of non-primitive objects",
-                                ));
-                            }
-                            a == b
-                        }
-                        _ => {
-                            return Err(unsupported("primitive equality of non-primitive objects"));
-                        }
-                    }
-                }
-                _ => equal(heap, left, right)?,
-            };
-            Value::Bool(equal == (op == BinOp::Same))
+            Value::Bool(same_primitive(heap, left, right)? == (op == BinOp::Same))
         }
         BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => {
             let ordered = order(heap, left, right)?;
@@ -120,11 +85,70 @@ pub(super) fn binary(
             Value::Bool(if op == BinOp::And { *a && *b } else { *a || *b })
         }
         BinOp::Concat => {
-            let text = format!("{}{}", heap.string(left)?, heap.string(right)?);
-            heap.literal(&Lit::String(text))?
+            let mut units = heap.utf16_units(left)?;
+            units.extend(heap.utf16_units(right)?);
+            heap.alloc_utf16(units)
         }
         BinOp::ListConcat => return list_concat(heap, left, right),
     })
+}
+
+#[expect(
+    clippy::float_cmp,
+    reason = "primitive strict equality uses IEEE float comparison"
+)]
+fn same_primitive(heap: &Heap, left: &Value, right: &Value) -> Result<bool, Error> {
+    match (left, right) {
+        (Value::Float(a), Value::Float(b)) => Ok(a == b),
+        (Value::Object(a), Value::Object(b)) => {
+            match (&heap.object(a.id)?.data, &heap.object(b.id)?.data) {
+                (Data::ServiceTag { .. }, Data::ServiceTag { .. }) => Ok(a.id == b.id),
+                (Data::String(a), Data::String(b)) => Ok(a == b),
+                (Data::Utf16(a), Data::Utf16(b)) => Ok(a == b),
+                (Data::Bytes(a), Data::Bytes(b)) => Ok(a == b),
+                (Data::JsonNull, Data::JsonNull) => Ok(true),
+                (Data::Duration(a), Data::Duration(b)) => {
+                    Ok(duration_ops::compare_raw(a, b) == Ordering::Equal)
+                }
+                (Data::DateTime(a), Data::DateTime(b)) => Ok(datetime_ops::dt_eq(a, b)),
+                (Data::TimeZone(a), Data::TimeZone(b)) => Ok(datetime_tzif::tz_equals(a, b)),
+                (Data::Cron(a), Data::Cron(b)) => Ok(cron_ops::cron_equals_raw(a, b)),
+                (
+                    Data::BigDecimal {
+                        value: av,
+                        scale: as_,
+                    },
+                    Data::BigDecimal {
+                        value: bv,
+                        scale: bs,
+                    },
+                ) => Ok(decimal_ops::compare_raw(av, *as_, bv, *bs) == Ok(Ordering::Equal)),
+                (Data::String(_), Data::Utf16(_)) | (Data::Utf16(_), Data::String(_)) => Ok(false),
+                (Data::BigInt(a), Data::BigInt(b)) => Ok(bigint_text(a)? == bigint_text(b)?),
+                (
+                    Data::Tagged {
+                        tag: a,
+                        ordinary_fields: an,
+                        fields: x,
+                    },
+                    Data::Tagged {
+                        tag: b,
+                        ordinary_fields: bn,
+                        fields: y,
+                    },
+                ) => {
+                    tagged_boundary(a, *an, x.len())?;
+                    tagged_boundary(b, *bn, y.len())?;
+                    if *an != 0 || *bn != 0 {
+                        return Err(unsupported("primitive equality of non-primitive objects"));
+                    }
+                    Ok(a == b)
+                }
+                _ => Err(unsupported("primitive equality of non-primitive objects")),
+            }
+        }
+        _ => equal(heap, left, right),
+    }
 }
 
 fn list_concat(heap: &mut Heap, left: &Value, right: &Value) -> Result<Value, Error> {
@@ -161,6 +185,13 @@ fn order(heap: &Heap, left: &Value, right: &Value) -> Result<Option<Ordering>, E
         (Value::Object(a), Value::Object(b)) => {
             match (&heap.object(a.id)?.data, &heap.object(b.id)?.data) {
                 (Data::String(a), Data::String(b)) => Some(a.encode_utf16().cmp(b.encode_utf16())),
+                (Data::Utf16(a), Data::Utf16(b)) => Some(a.cmp(b)),
+                (Data::String(a), Data::Utf16(b)) => {
+                    Some(a.encode_utf16().cmp(b.iter().copied()))
+                }
+                (Data::Utf16(a), Data::String(b)) => {
+                    Some(a.iter().copied().cmp(b.encode_utf16()))
+                }
                 (Data::BigInt(a), Data::BigInt(b)) => {
                     Some(bigint_order(&bigint_text(a)?, &bigint_text(b)?))
                 }
@@ -184,6 +215,8 @@ fn is_opaque_data(data: &Data) -> bool {
             | Data::Arena { .. }
             | Data::Seq(_)
             | Data::Iterator { .. }
+            | Data::Graph(_)
+            | Data::GraphWalker(_)
     )
 }
 
@@ -199,6 +232,25 @@ fn equal_objects<'a>(
     match (a_data, b_data) {
         (Data::ServiceTag { .. }, Data::ServiceTag { .. }) => Ok(a_id == b_id),
         (Data::Label(a), Data::Label(b)) | (Data::String(a), Data::String(b)) => Ok(a == b),
+        (Data::Utf16(a), Data::Utf16(b)) => Ok(a == b),
+        (Data::Bytes(a), Data::Bytes(b)) => Ok(a == b),
+        (Data::JsonNull, Data::JsonNull) => Ok(true),
+        (Data::Duration(a), Data::Duration(b)) => {
+            Ok(duration_ops::compare_raw(a, b) == Ordering::Equal)
+        }
+        (Data::DateTime(a), Data::DateTime(b)) => Ok(datetime_ops::dt_eq(a, b)),
+        (Data::TimeZone(a), Data::TimeZone(b)) => Ok(datetime_tzif::tz_equals(a, b)),
+        (Data::Cron(a), Data::Cron(b)) => Ok(cron_ops::cron_equals_raw(a, b)),
+        (
+            Data::BigDecimal {
+                value: av,
+                scale: as_,
+            },
+            Data::BigDecimal {
+                value: bv,
+                scale: bs,
+            },
+        ) => Ok(decimal_ops::compare_raw(av, *as_, bv, *bs)? == Ordering::Equal),
         (Data::BigInt(a), Data::BigInt(b)) => Ok(bigint_text(a)? == bigint_text(b)?),
         (Data::ListSlice { .. }, _) | (_, Data::ListSlice { .. }) => {
             let Ok((a_obj, a_off, a_len)) = heap.list_view(left) else {

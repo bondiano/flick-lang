@@ -21,6 +21,20 @@ impl CauseToken {
     pub(super) fn into_value(self) -> Value {
         Value::Object(self.token)
     }
+
+    pub(super) fn object_id(&self) -> super::ObjectId {
+        self.token.id
+    }
+
+    pub(super) fn from_cause_value(heap: &Heap, value: Value) -> Result<Self, Error> {
+        let Value::Object(token) = value else {
+            return Err(Error::ExpectedCause);
+        };
+        if !matches!(heap.object(token.id)?.data, Data::Cause(_)) {
+            return Err(Error::ExpectedCause);
+        }
+        Ok(Self { token })
+    }
 }
 
 /// Borrowed diagnostics/input: copying a reason never retains its payload.
@@ -85,6 +99,9 @@ pub enum DefectCode {
     ArenaClosed,
     ResumeTwice,
     LazyCycle,
+    Todo(String),
+    Assert(String),
+    RangeError(String),
 }
 
 /// Structured immutable metadata; each thrown instance gets a fresh heap identity.
@@ -110,6 +127,34 @@ impl DefectSpec {
         &self.code
     }
 
+    pub(super) fn message(&self) -> String {
+        match &self.code {
+            DefectCode::NoMatch => "no matching pattern".into(),
+            DefectCode::MissingHandler { effect, op } => {
+                format!("unhandled effect operation {effect}.{op}")
+            }
+            DefectCode::IntDivisionByZero { remainder: false } => {
+                "Int.unsafe_div: division by zero".into()
+            }
+            DefectCode::IntDivisionByZero { remainder: true } => {
+                "Int.unsafe_rem: division by zero".into()
+            }
+            DefectCode::BigIntNegativeExponent => "Exponent must be positive".into(),
+            DefectCode::BigIntNonIntegralNumber => {
+                "The number cannot be converted to a BigInt because it is not an integer".into()
+            }
+            DefectCode::BigIntInvalidString => "Cannot convert string to a BigInt".into(),
+            DefectCode::BigIntUndefined => "Cannot convert undefined to a BigInt".into(),
+            DefectCode::ArenaOwnerClosed => "arena owner closed".into(),
+            DefectCode::ArenaClosed => "arena closed".into(),
+            DefectCode::ResumeTwice => "continuation resumed more than once".into(),
+            DefectCode::LazyCycle => "cyclic lazy initialization".into(),
+            DefectCode::Todo(msg) | DefectCode::Assert(msg) | DefectCode::RangeError(msg) => {
+                msg.clone()
+            }
+        }
+    }
+
     pub fn class(&self) -> DefectClass {
         match self.code {
             DefectCode::NoMatch
@@ -117,10 +162,13 @@ impl DefectSpec {
             | DefectCode::ArenaOwnerClosed
             | DefectCode::ArenaClosed
             | DefectCode::ResumeTwice
-            | DefectCode::LazyCycle => DefectClass::Error,
+            | DefectCode::LazyCycle
+            | DefectCode::Todo(_)
+            | DefectCode::Assert(_) => DefectClass::Error,
             DefectCode::IntDivisionByZero { .. }
             | DefectCode::BigIntNegativeExponent
-            | DefectCode::BigIntNonIntegralNumber => DefectClass::RangeError,
+            | DefectCode::BigIntNonIntegralNumber
+            | DefectCode::RangeError(_) => DefectClass::RangeError,
             DefectCode::BigIntInvalidString => DefectClass::SyntaxError,
             DefectCode::BigIntUndefined => DefectClass::TypeError,
         }
@@ -144,6 +192,9 @@ impl DefectSpec {
             DefectCode::ArenaClosed => Error::ClosedArena,
             DefectCode::ResumeTwice => Error::ResumeTwice,
             DefectCode::LazyCycle => Error::LazyCycle,
+            DefectCode::Todo(msg) => Error::Todo(msg.clone()),
+            DefectCode::Assert(msg) => Error::Assert(msg.clone()),
+            DefectCode::RangeError(msg) => Error::RangeError(msg.clone()),
         }
     }
 }
@@ -166,6 +217,9 @@ impl StepFailure {
             Error::BigIntUndefined => DefectCode::BigIntUndefined,
             Error::ResumeTwice => DefectCode::ResumeTwice,
             Error::LazyCycle => DefectCode::LazyCycle,
+            Error::Todo(msg) => DefectCode::Todo(msg),
+            Error::Assert(msg) => DefectCode::Assert(msg),
+            Error::RangeError(msg) => DefectCode::RangeError(msg),
             evaluator @ (Error::InvalidFunction(_)
             | Error::InvalidProgram(_)
             | Error::NeedsProgram
@@ -211,6 +265,7 @@ impl StepFailure {
             | Error::ExpectedExit
             | Error::ExpectedOption
             | Error::ExpectedInt
+            | Error::ExpectedFloat
             | Error::ExpectedModifyPair
             | Error::ExpectedOwner
             | Error::ForeignOwner

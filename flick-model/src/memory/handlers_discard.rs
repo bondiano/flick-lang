@@ -115,7 +115,9 @@ impl<'p> Machine<'p, '_> {
                 }
             }
             Destination::Invocation(id) => self.discard_invocation(id, &mut roots),
-            Destination::Catch { handler, .. } => roots.push(handler),
+            Destination::Catch { handler, .. } | Destination::CatchDefect { handler, .. } => {
+                roots.push(handler);
+            }
             Destination::Initialize { name, .. } => {
                 self.globals.remove(&name);
             }
@@ -172,6 +174,7 @@ impl<'p> Machine<'p, '_> {
                 BracketOutcome::Failure(cause) => roots.push(cause.into_value()),
             },
             Destination::RecoveryHelper { .. }
+            | Destination::CaptureExit { .. }
             | Destination::Top
             | Destination::Bind(_)
             | Destination::Modify { .. }

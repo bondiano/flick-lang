@@ -29,7 +29,10 @@ impl Intrinsic {
             | Self::SeqToList
             | Self::ExitIsSuccess
             | Self::ExitIsFailure
-            | Self::ExitHasInterrupts => 1,
+            | Self::ExitHasInterrupts
+            | Self::EffectExit
+            | Self::EffectDie
+            | Self::FailureRethrow => 1,
             Self::RefSet
             | Self::RefModify
             | Self::RefSame
@@ -50,8 +53,30 @@ impl Intrinsic {
             | Self::RecordGet
             | Self::RecordRemove
             | Self::RecordProject
-            | Self::RecordMergeDisjoint => 2,
+            | Self::RecordMergeDisjoint
+            | Self::EffectCatchDefect => 2,
             Self::Bracket | Self::RecordExtend => 3,
+            Self::Int(op) => op.arity(),
+            Self::Float(op) => op.arity(),
+            Self::BigInt(op) => op.arity(),
+            Self::String(op) => op.arity(),
+            Self::List(op) => op.arity(),
+            Self::Record(op) => op.arity(),
+            Self::Debug(op) => op.arity(),
+            Self::Bytes(op) => op.arity(),
+            Self::Hash(op) => op.arity(),
+            Self::Json(op) => op.arity(),
+            Self::BigDecimal(op) => op.arity(),
+            Self::RegExp(op) => op.arity(),
+            Self::Duration(op) => op.arity(),
+            Self::Outcome(op) => op.arity(),
+            Self::Gen(op) => op.arity(),
+            Self::Schema(op) => op.arity(),
+            Self::JsonSchema(op) => op.arity(),
+            Self::Path(op) => op.arity(),
+            Self::DateTime(op) => op.arity(),
+            Self::Cron(op) => op.arity(),
+            Self::Graph(op) => op.arity(),
         }
     }
 }

@@ -281,6 +281,7 @@ fn seq_expression(name: &str, mode: ForeignMode, arity: usize, span: Span) -> Op
         ("seqUnfold", ForeignMode::Pure, 2) => Some(b.seq_unfold()),
         ("seqAppend", ForeignMode::Pure, 2) => Some(b.seq_append()),
         ("seqMap", ForeignMode::Pure, 2) => Some(b.seq_map()),
+        ("seqMap2", ForeignMode::Pure, 3) => Some(b.seq_map2()),
         ("seqFilter", ForeignMode::Pure, 2) => Some(b.seq_filter()),
         ("seqFilterMap", ForeignMode::Pure, 2) => Some(b.seq_filter_map()),
         ("seqFlatMap", ForeignMode::Pure, 2) => Some(b.seq_flat_map()),

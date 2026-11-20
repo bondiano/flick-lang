@@ -1,0 +1,482 @@
+// Counted test-tree executor for `List Test.Test` suites.
+// Runs pure, effectful (each in its own lexical `Scope` owner), and seeded
+// 100-case property tests through the real counted `Machine` without leaking.
+
+/// Outcome of one leaf test executed by [`execute_tests_program`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestCaseResult {
+    pub name: String,
+    pub passed: bool,
+    pub skipped: bool,
+    pub message: Option<String>,
+}
+
+/// Evaluates `entry` (typically `Language.<Suite>.tests`) with optional root
+/// layer `root` (`Host.live`), walks the resulting `Test.$*` tree, executes
+/// every test case under `fuel_per_test`, and releases all machine roots.
+/// Caller verifies `heap.finish()` for zero leaks.
+pub fn execute_tests_program(
+    heap: &mut Heap,
+    program: &Program,
+    entry: &Name,
+    root: Option<&Name>,
+    seed: i32,
+    fuel_per_test: u64,
+    skip_groups: &[&str],
+) -> Result<Vec<TestCaseResult>, Error> {
+    if let Err(err) = memory::validate_program(program) {
+        return Err(Error::InvalidProgram(err));
+    }
+    if !program.globals.iter().any(|g| &g.name == entry) {
+        return Err(Error::UnknownGlobal(entry.clone()));
+    }
+    let start_global = root.unwrap_or(entry);
+    let main_stage = match root {
+        Some(_) => MainStage::Root(entry.clone()),
+        None => MainStage::Done,
+    };
+    let execution = NEXT_EXECUTION
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+        .expect("fewer than usize::MAX model executions");
+    let mut machine = Machine {
+        heap,
+        program,
+        execution,
+        globals: BTreeMap::new(),
+        cells: Vec::new(),
+        lazies: Vec::new(),
+        owners: vec![OwnerState::default()],
+        current_owner: 0,
+        current_evidence: None,
+        frames: Vec::new(),
+        activations: BTreeMap::new(),
+        providers: BTreeMap::new(),
+        segments: BTreeMap::new(),
+        continuations: BTreeMap::new(),
+        generators: BTreeMap::new(),
+        invocations: BTreeMap::new(),
+        discard: None,
+        ready: None,
+        next_handler: 0,
+        arguments: VecDeque::new(),
+        scratch: Vec::new(),
+        pending: None,
+        failure: None,
+        failure_elected: false,
+        recoveries: BTreeMap::new(),
+        next_recovery: 0,
+        pending_handler: None,
+        top: None,
+        stdout: String::new(),
+        fuel: fuel_per_test,
+        main_stage,
+        root: None,
+    };
+    let tests_val = match machine.global(start_global, None).and_then(|()| machine.run()) {
+        Ok(LanguageExit::Success(val)) => val,
+        Ok(LanguageExit::Failure(cause)) => {
+            let msg = machine
+                .describe_test_failure(&cause)
+                .unwrap_or_else(|e| e.to_string());
+            let drop_err = machine.heap.drop_cause(cause);
+            let outcome = machine.finish(drop_err.map(|()| LanguageExit::Success(Value::Unit)));
+            let _ = outcome.release(heap);
+            return Err(Error::Assert(format!("suite init failed: {msg}")));
+        }
+        Err(err) => {
+            let outcome = machine.finish(Err(err));
+            let _ = outcome.release(heap);
+            return Err(Error::UnsupportedOperation("test suite initialization fault"));
+        }
+    };
+
+    let mut results = Vec::new();
+    let walk_res = machine.run_test_list(
+        &entry.module,
+        &tests_val,
+        seed,
+        fuel_per_test,
+        skip_groups,
+        false,
+        &mut results,
+    );
+    let drop_res = machine.heap.drop_value(tests_val);
+    let final_res = walk_res
+        .and(drop_res)
+        .map(|()| LanguageExit::Success(Value::Unit));
+    let outcome = machine.finish(final_res);
+    match outcome {
+        ProgramOutcome::Fault(err) => Err(err),
+        other => {
+            other.release(heap)?;
+            Ok(results)
+        }
+    }
+}
+
+impl Machine<'_, '_> {
+    #[expect(clippy::too_many_arguments, reason = "recursive test tree walk")]
+    fn run_test_list(
+        &mut self,
+        prefix: &str,
+        list_val: &Value,
+        seed: i32,
+        fuel_per_test: u64,
+        skip_groups: &[&str],
+        skipped: bool,
+        out: &mut Vec<TestCaseResult>,
+    ) -> Result<(), Error> {
+        let items = self.list_reps(list_val)?;
+        for item in &items {
+            self.run_test_node(prefix, item, seed, fuel_per_test, skip_groups, skipped, out)?;
+        }
+        Ok(())
+    }
+
+    #[expect(clippy::too_many_arguments, reason = "recursive test tree walk")]
+    fn run_test_node(
+        &mut self,
+        prefix: &str,
+        node: &Value,
+        seed: i32,
+        fuel_per_test: u64,
+        skip_groups: &[&str],
+        skipped: bool,
+        out: &mut Vec<TestCaseResult>,
+    ) -> Result<(), Error> {
+        let tag = self.heap.tag(node)?.to_owned();
+        match tag.as_str() {
+            "Test.Test.$Group" => {
+                let name = self.string_field(node, 0)?;
+                let children = self.heap.field(node, 1)?.representation();
+                let full = format!("{prefix} > {name}");
+                let skip_here = skipped || skip_groups.contains(&name.as_str());
+                self.run_test_list(
+                    &full,
+                    &children,
+                    seed,
+                    fuel_per_test,
+                    skip_groups,
+                    skip_here,
+                    out,
+                )
+            }
+            "Test.Test.$Skip" => {
+                let inner = self.heap.field(node, 0)?.representation();
+                self.run_test_node(prefix, &inner, seed, fuel_per_test, skip_groups, true, out)
+            }
+            "Test.Test.$Only" | "Test.Test.$Serial" => {
+                let inner = self.heap.field(node, 0)?.representation();
+                self.run_test_node(prefix, &inner, seed, fuel_per_test, skip_groups, skipped, out)
+            }
+            "Test.Test.$Timeout" => {
+                let inner = self.heap.field(node, 1)?.representation();
+                self.run_test_node(prefix, &inner, seed, fuel_per_test, skip_groups, skipped, out)
+            }
+            "Test.Test.$Pure" => {
+                let name = format!("{prefix} > {}", self.string_field(node, 0)?);
+                if skipped {
+                    out.push(TestCaseResult {
+                        name,
+                        passed: true,
+                        skipped: true,
+                        message: None,
+                    });
+                    return Ok(());
+                }
+                let body = self.heap.project(node, 1)?;
+                let res = self.exec_pure_test(name, body, fuel_per_test)?;
+                out.push(res);
+                Ok(())
+            }
+            "Test.Test.$Effect" => {
+                let name = format!("{prefix} > {}", self.string_field(node, 0)?);
+                if skipped {
+                    out.push(TestCaseResult {
+                        name,
+                        passed: true,
+                        skipped: true,
+                        message: None,
+                    });
+                    return Ok(());
+                }
+                let task = self.heap.project(node, 1)?;
+                let res = self.exec_effect_test(name, task, fuel_per_test)?;
+                out.push(res);
+                Ok(())
+            }
+            "Test.Test.$Property" => {
+                let name = format!("{prefix} > {}", self.string_field(node, 0)?);
+                if skipped {
+                    out.push(TestCaseResult {
+                        name,
+                        passed: true,
+                        skipped: true,
+                        message: None,
+                    });
+                    return Ok(());
+                }
+                let gen_fn = self.heap.project(node, 1)?;
+                let check_fn = self.heap.project(node, 2)?;
+                let res = self.exec_property_test(name, gen_fn, check_fn, seed, fuel_per_test)?;
+                out.push(res);
+                Ok(())
+            }
+            "Test.Test.$Clock"
+            | "Test.Test.$Suite"
+            | "Test.Test.$BeforeAll"
+            | "Test.Test.$BeforeEach"
+            | "Test.Test.$AfterEach"
+            | "Test.Test.$AfterAll"
+            | "Test.Test.$Share" => {
+                if skipped {
+                    return Ok(());
+                }
+                Err(Error::UnsupportedOperation(
+                    "unsupported test node kind in Stage 3 runner",
+                ))
+            }
+            _ => Err(Error::UnsupportedOperation("unknown test node tag")),
+        }
+    }
+
+    fn exec_pure_test(
+        &mut self,
+        name: String,
+        body: Value,
+        fuel: u64,
+    ) -> Result<TestCaseResult, Error> {
+        self.reset_test_state(fuel);
+        self.scratch.extend([body, Value::Unit]);
+        self.apply_fresh(Destination::Top)?;
+        let exit = self.run()?;
+        self.collect_assertion_outcome(name, exit)
+    }
+
+    fn exec_effect_test(
+        &mut self,
+        name: String,
+        task: Value,
+        fuel: u64,
+    ) -> Result<TestCaseResult, Error> {
+        self.reset_test_state(fuel);
+        let previous = self.current_owner;
+        let owner = self.owners.len();
+        self.owners.push(OwnerState::default());
+        self.current_owner = owner;
+        let saved_evidence = self.current_evidence;
+        self.current_evidence = Some(OwnerEvidence::from_owner(&self.owner_handle(owner)));
+        self.scratch.extend([task, Value::Unit]);
+        self.await_task_fresh(Destination::CloseScope {
+            owner,
+            previous,
+            binding: None,
+        })?;
+        let run_res = self.run();
+        self.current_evidence = saved_evidence;
+        match run_res? {
+            LanguageExit::Success(val) => {
+                self.heap.drop_value(val)?;
+                Ok(TestCaseResult {
+                    name,
+                    passed: true,
+                    skipped: false,
+                    message: None,
+                })
+            }
+            LanguageExit::Failure(cause) => {
+                let msg = self.describe_test_failure(&cause)?;
+                self.heap.drop_cause(cause)?;
+                Ok(TestCaseResult {
+                    name,
+                    passed: false,
+                    skipped: false,
+                    message: Some(msg),
+                })
+            }
+        }
+    }
+
+    #[expect(
+        clippy::cast_possible_wrap,
+        reason = "exact 32-bit seed stride matching JS/Go property runner"
+    )]
+    fn exec_property_test(
+        &mut self,
+        name: String,
+        gen_fn: Value,
+        check_fn: Value,
+        seed: i32,
+        fuel: u64,
+    ) -> Result<TestCaseResult, Error> {
+        let mut failure_msg = None;
+        for case_idx in 0_i32..100 {
+            let case_seed = seed.wrapping_add(case_idx.wrapping_mul(0x9e37_79b9_u32 as i32));
+            let g = self.heap.dup(&gen_fn)?;
+            self.reset_test_state(fuel);
+            self.scratch.extend([g, Value::Int(case_seed)]);
+            self.apply_fresh(Destination::Top)?;
+            let gen_exit = match self.run() {
+                Ok(exit) => exit,
+                Err(err) => {
+                    self.heap.drop_values(vec![gen_fn, check_fn])?;
+                    return Err(err);
+                }
+            };
+            let pair = match gen_exit {
+                LanguageExit::Success(val) => val,
+                LanguageExit::Failure(cause) => {
+                    let msg = self.describe_test_failure(&cause)?;
+                    self.heap.drop_cause(cause)?;
+                    failure_msg = Some(format!("generator failed at case {case_idx}: {msg}"));
+                    break;
+                }
+            };
+            let drawn = match self.heap.project(&pair, 1) {
+                Ok(v) => v,
+                Err(err) => {
+                    self.heap.drop_values(vec![pair, gen_fn, check_fn])?;
+                    return Err(err);
+                }
+            };
+            self.heap.drop_value(pair)?;
+
+            let c = self.heap.dup(&check_fn)?;
+            self.reset_test_state(fuel);
+            self.scratch.extend([c, drawn]);
+            self.apply_fresh(Destination::Top)?;
+            let check_exit = match self.run() {
+                Ok(exit) => exit,
+                Err(err) => {
+                    self.heap.drop_values(vec![gen_fn, check_fn])?;
+                    return Err(err);
+                }
+            };
+            let case_outcome = self.collect_assertion_outcome(name.clone(), check_exit)?;
+            if !case_outcome.passed {
+                failure_msg = Some(format!(
+                    "{} (case {case_idx})",
+                    case_outcome.message.unwrap_or_default()
+                ));
+                break;
+            }
+        }
+        self.heap.drop_values(vec![gen_fn, check_fn])?;
+        Ok(TestCaseResult {
+            name,
+            passed: failure_msg.is_none(),
+            skipped: false,
+            message: failure_msg,
+        })
+    }
+
+    fn reset_test_state(&mut self, fuel: u64) {
+        self.fuel = fuel;
+        self.main_stage = MainStage::Done;
+        self.failure_elected = false;
+    }
+
+    fn collect_assertion_outcome(
+        &mut self,
+        name: String,
+        exit: LanguageExit,
+    ) -> Result<TestCaseResult, Error> {
+        let val = match exit {
+            LanguageExit::Success(v) => v,
+            LanguageExit::Failure(cause) => {
+                let msg = self.describe_test_failure(&cause)?;
+                self.heap.drop_cause(cause)?;
+                return Ok(TestCaseResult {
+                    name,
+                    passed: false,
+                    skipped: false,
+                    message: Some(msg),
+                });
+            }
+        };
+        let tag = self.heap.tag(&val)?.to_owned();
+        let res = if tag == "Test.Assertion.Pass" {
+            TestCaseResult {
+                name,
+                passed: true,
+                skipped: false,
+                message: None,
+            }
+        } else if tag == "Test.Assertion.Failed" {
+            let msg = self.string_field(&val, 0)?;
+            TestCaseResult {
+                name,
+                passed: false,
+                skipped: false,
+                message: Some(msg),
+            }
+        } else {
+            self.heap.drop_value(val)?;
+            return Err(Error::UnsupportedOperation(
+                "unexpected test assertion value",
+            ));
+        };
+        self.heap.drop_value(val)?;
+        Ok(res)
+    }
+
+    fn describe_test_failure(&self, cause: &CauseToken) -> Result<String, Error> {
+        let mut parts = Vec::new();
+        for reason in self.heap.cause_reasons(cause)? {
+            match reason {
+                Reason::Fail(v) => {
+                    if let Ok("Test.AssertionFailed.AssertionFailed") = self.heap.tag(v) {
+                        parts.push(self.string_field(v, 0)?);
+                    } else {
+                        parts.push(format!("fail: {}", primitives::show_value(self.heap, v)?));
+                    }
+                }
+                Reason::Die(d) => {
+                    parts.push(format!("die: {}", primitives::describe_defect(self.heap, d)?));
+                }
+                Reason::Interrupt { .. } => parts.push("interrupted".into()),
+            }
+        }
+        Ok(parts.join("; "))
+    }
+
+    fn string_field(&self, val: &Value, index: usize) -> Result<String, Error> {
+        let field = self.heap.field(val, index)?;
+        let Value::Object(tok) = field else {
+            return Err(Error::UnsupportedOperation("expected string field"));
+        };
+        match &self.heap.object(tok.id)?.data {
+            Data::String(s) => Ok(s.clone()),
+            Data::Utf16(u) => Ok(String::from_utf16_lossy(u)),
+            _ => Err(Error::UnsupportedOperation("expected string field")),
+        }
+    }
+
+    fn list_reps(&self, val: &Value) -> Result<Vec<Value>, Error> {
+        let Value::Object(tok) = val else {
+            return Err(Error::UnsupportedOperation("expected list"));
+        };
+        match &self.heap.object(tok.id)?.data {
+            Data::Tagged { tag, fields, .. } if tag == "$list" => {
+                Ok(fields.iter().map(Value::representation).collect())
+            }
+            Data::ListSlice {
+                backing,
+                offset,
+                len,
+            } => {
+                let Value::Object(btok) = backing else {
+                    return Err(Error::UnsupportedOperation("invalid list slice backing"));
+                };
+                let Data::Tagged { fields, .. } = &self.heap.object(btok.id)?.data else {
+                    return Err(Error::UnsupportedOperation("invalid list slice backing"));
+                };
+                Ok(fields[*offset..*offset + *len]
+                    .iter()
+                    .map(Value::representation)
+                    .collect())
+            }
+            _ => Err(Error::UnsupportedOperation("expected list")),
+        }
+    }
+}

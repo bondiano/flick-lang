@@ -18,7 +18,11 @@ impl<'p> Machine<'p, '_> {
             | Destination::RecoveryBody { .. } => {
                 unreachable!("recovery result completes its boundary first")
             }
-            Destination::Catch { .. } => unreachable!("catch result releases handler first"),
+            Destination::Catch { .. }
+            | Destination::CaptureExit { .. }
+            | Destination::CatchDefect { .. } => {
+                unreachable!("catch/exit result completes its boundary first")
+            }
             Destination::LayerRun { .. }
             | Destination::Handle { .. }
             | Destination::Discontinue { .. }
@@ -270,6 +274,22 @@ impl<'p> Machine<'p, '_> {
             return Err(Error::ForeignTask);
         }
         self.call(*code, destination)
+    }
+
+    fn await_task_fresh(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+        let Value::Object(token) = &self.scratch[0] else {
+            return Err(Error::ExpectedTask);
+        };
+        let Data::Task {
+            execution, code, ..
+        } = &self.heap.object(token.id)?.data
+        else {
+            return Err(Error::ExpectedTask);
+        };
+        if *execution != self.execution {
+            return Err(Error::ForeignTask);
+        }
+        self.call_fresh(*code, destination)
     }
 
     fn advance_main(&mut self) -> Result<(), Error> {

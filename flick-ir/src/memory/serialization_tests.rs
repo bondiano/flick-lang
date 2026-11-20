@@ -327,6 +327,14 @@ fn stage2_operations_and_intrinsics_round_trip() {
         Intrinsic::ExitIsSuccess,
         Intrinsic::ExitIsFailure,
         Intrinsic::ExitHasInterrupts,
+        Intrinsic::Int(IntIntrinsic::Parse),
+        Intrinsic::Int(IntIntrinsic::CheckedAdd),
+        Intrinsic::Float(FloatIntrinsic::Remainder),
+        Intrinsic::BigInt(BigIntIntrinsic::Gcd),
+        Intrinsic::String(StringIntrinsic::Slice),
+        Intrinsic::List(ListIntrinsic::InsertAt),
+        Intrinsic::Record(RecordIntrinsic::Difference),
+        Intrinsic::Debug(DebugIntrinsic::Assert),
     ] {
         operations.push(Operation::Intrinsic {
             kind,

@@ -77,6 +77,10 @@ pub enum Error {
     ExpectedExit,
     ExpectedOption,
     ExpectedInt,
+    ExpectedFloat,
+    Todo(String),
+    Assert(String),
+    RangeError(String),
     ExpectedModifyPair,
     ExpectedOwner,
     ForeignOwner,
@@ -285,6 +289,9 @@ impl Error {
             Self::ExpectedExit => f.write_str("expected an Exit value"),
             Self::ExpectedOption => f.write_str("expected Prelude.Option.Some or None"),
             Self::ExpectedInt => f.write_str("expected an Int"),
+            Self::ExpectedFloat => f.write_str("expected a Float"),
+            Self::Todo(msg) | Self::Assert(msg) => write!(f, "Error: {msg}"),
+            Self::RangeError(msg) => write!(f, "RangeError: {msg}"),
             _ => unreachable!("control-flow error formatting"),
         }
     }
@@ -367,7 +374,11 @@ impl fmt::Display for Error {
             | Self::ExpectedLabel
             | Self::ExpectedExit
             | Self::ExpectedOption
-            | Self::ExpectedInt => self.fmt_control(f),
+            | Self::ExpectedInt
+            | Self::ExpectedFloat
+            | Self::Todo(_)
+            | Self::Assert(_)
+            | Self::RangeError(_) => self.fmt_control(f),
             Self::ExpectedOwner => f.write_str("expected a scoped owner handle"),
             Self::ForeignOwner => f.write_str("owner belongs to another execution or heap"),
             Self::ClosedOwner => f.write_str("scope owner is closed"),

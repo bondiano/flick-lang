@@ -15,6 +15,9 @@ impl Lower<'_> {
         if self.initializers.contains_key(name) {
             return Ok(());
         }
+        if name.module == "$rt" {
+            return self.synth_rt_global(name, span);
+        }
         let item = *self
             .sources
             .get(name)

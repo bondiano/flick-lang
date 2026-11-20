@@ -45,12 +45,18 @@ impl<'p> Machine<'p, '_> {
                     .callee = self.pending.take();
                 self.ready = Some(id);
             }
-            Destination::Catch { handler, binding } => {
+            Destination::Catch { handler, binding }
+            | Destination::CatchDefect { handler, binding } => {
                 self.pending_handler = Some(handler);
                 self.heap
                     .drop_value(self.pending_handler.take().expect("unused handler"))?;
                 let value = self.pending.take().expect("try result");
                 self.store(binding, value)?;
+            }
+            Destination::CaptureExit { binding } => {
+                let value = self.pending.take().expect("exit result");
+                let exit = self.heap.allocate(Data::Exit(ExitData::Success(value)));
+                self.store(binding, exit)?;
             }
             Destination::Initialize { name, binding } => {
                 let value = self.pending.take().expect("returned token");

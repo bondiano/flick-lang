@@ -224,6 +224,29 @@ impl<'p> Machine<'p, '_> {
         }
     }
 
+    fn finalizer_failed(&mut self, mut state: Box<ClosingScopeState<'p>>) -> Result<(), Error> {
+        let cause = self.failure.take().expect("finalizer failure cause");
+        state.finalizer_failure = Some(match state.finalizer_failure.take() {
+            None => cause,
+            Some(prev) => {
+                let combined =
+                    primitives::concat_causes(self.heap, &prev, &cause, &mut self.fuel);
+                self.heap.drop_cause(prev)?;
+                self.heap.drop_cause(cause)?;
+                match combined {
+                    Ok(c) => c,
+                    Err(err) => {
+                        let mut roots = Vec::new();
+                        self.drain_closing_scope_roots(*state, &mut roots);
+                        self.heap.drop_values(roots)?;
+                        return Err(err);
+                    }
+                }
+            }
+        });
+        self.step_close_scope(state)
+    }
+
     fn complete_scope_outcome(
         &mut self,
         outcome: ScopeOutcome<'p>,
@@ -234,33 +257,51 @@ impl<'p> Machine<'p, '_> {
                 if let Some(cause) = finalizer_failure {
                     self.heap.drop_value(value)?;
                     self.failure = Some(cause);
-                    self.failure_elected = false;
-                } else {
+                    self.failure_elected = true;
+                } else if let Some(binding) = binding {
                     self.store(binding, value)?;
+                } else {
+                    self.top = Some(value);
                 }
             }
             ScopeOutcome::Failure(cause) => {
-                if let Some(fin_cause) = finalizer_failure {
+                let joined = if let Some(fin_cause) = finalizer_failure {
+                    let res = primitives::join_causes(self.heap, &cause, &fin_cause, &mut self.fuel);
+                    self.heap.drop_cause(cause)?;
                     self.heap.drop_cause(fin_cause)?;
-                }
-                self.failure = Some(cause);
-                self.failure_elected = false;
+                    res?
+                } else {
+                    cause
+                };
+                self.failure = Some(joined);
+                self.failure_elected = true;
             }
             ScopeOutcome::Discard(discard) => {
                 if let Some(fin_cause) = finalizer_failure {
                     let mut discard = *discard;
                     let preserved = Self::take_saved_failure(&mut discard.next);
-                    if let Some(prev) = preserved {
-                        self.heap.drop_cause(fin_cause)?;
-                        self.failure = Some(prev);
-                        self.failure_elected = false;
-                    } else {
-                        self.failure = Some(fin_cause);
-                        self.failure_elected = false;
-                    }
                     let mut roots = Vec::new();
                     self.drain_transfer_next_roots(&mut discard.next, &mut roots);
                     self.heap.drop_values(roots)?;
+                    let combined = if let Some(prev) = preserved {
+                        let res =
+                            primitives::join_causes(self.heap, &prev, &fin_cause, &mut self.fuel);
+                        self.heap.drop_cause(prev)?;
+                        self.heap.drop_cause(fin_cause)?;
+                        match res {
+                            Ok(c) => c,
+                            Err(err) => {
+                                let mut droots = Vec::new();
+                                self.drain_discard_roots(discard, &mut droots);
+                                self.heap.drop_values(droots)?;
+                                return Err(err);
+                            }
+                        }
+                    } else {
+                        fin_cause
+                    };
+                    self.failure = Some(combined);
+                    self.failure_elected = true;
                     discard.next = TransferNext::Raise;
                     self.discard = Some(discard);
                 } else {

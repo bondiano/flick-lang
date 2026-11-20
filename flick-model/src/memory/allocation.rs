@@ -346,10 +346,17 @@ impl Heap {
             }
             Data::RecoveryResult { .. }
             | Data::Cause(_)
+            | Data::CauseReason(_)
+            | Data::Duration(_)
             | Data::Defect(_)
             | Data::ServiceTag { .. }
             | Data::Layer(_)
             | Data::String(_)
+            | Data::Utf16(_)
+            | Data::Bytes(_)
+            | Data::JsonNull
+            | Data::BigDecimal { .. }
+            | Data::RegExp { .. }
             | Data::BigInt(_)
             | Data::Record(_)
             | Data::Dictionary(_)
@@ -361,7 +368,12 @@ impl Heap {
             | Data::Seq(_)
             | Data::Iterator { .. }
             | Data::Label(_)
-            | Data::Exit(_) => Err(Error::ExpectedObject),
+            | Data::Exit(_)
+            | Data::DateTime(_)
+            | Data::TimeZone(_)
+            | Data::Cron(_)
+            | Data::Graph(_)
+            | Data::GraphWalker(_) => Err(Error::ExpectedObject),
         }
     }
 
@@ -382,10 +394,17 @@ impl Heap {
             Data::ListSlice { .. } => Ok("$list"),
             Data::RecoveryResult { .. }
             | Data::Cause(_)
+            | Data::CauseReason(_)
+            | Data::Duration(_)
             | Data::Defect(_)
             | Data::ServiceTag { .. }
             | Data::Layer(_)
             | Data::String(_)
+            | Data::Utf16(_)
+            | Data::Bytes(_)
+            | Data::JsonNull
+            | Data::BigDecimal { .. }
+            | Data::RegExp { .. }
             | Data::BigInt(_)
             | Data::Record(_)
             | Data::Dictionary(_)
@@ -399,7 +418,12 @@ impl Heap {
             | Data::Seq(_)
             | Data::Iterator { .. }
             | Data::Label(_)
-            | Data::Exit(_) => Err(Error::ExpectedObject),
+            | Data::Exit(_)
+            | Data::DateTime(_)
+            | Data::TimeZone(_)
+            | Data::Cron(_)
+            | Data::Graph(_)
+            | Data::GraphWalker(_) => Err(Error::ExpectedObject),
         }
     }
 
@@ -414,8 +438,50 @@ impl Heap {
         }
     }
 
+    pub(super) fn utf16_units(&self, value: &Value) -> Result<Vec<u16>, Error> {
+        self.admit_ordinary(value)?;
+        let Value::Object(id) = value else {
+            return Err(Error::ExpectedString);
+        };
+        match &self.object(id.id)?.data {
+            Data::String(s) => Ok(s.encode_utf16().collect()),
+            Data::Utf16(units) => Ok(units.clone()),
+            _ => Err(Error::ExpectedString),
+        }
+    }
+
+    pub(super) fn alloc_utf16(&mut self, units: Vec<u16>) -> Value {
+        match String::from_utf16(&units) {
+            Ok(s) => self.allocate(Data::String(s)),
+            Err(_) => self.allocate(Data::Utf16(units)),
+        }
+    }
+
+    pub(super) fn string_lossy(&self, value: &Value) -> Result<String, Error> {
+        self.admit_ordinary(value)?;
+        let Value::Object(id) = value else {
+            return Err(Error::ExpectedString);
+        };
+        match &self.object(id.id)?.data {
+            Data::String(s) => Ok(s.clone()),
+            Data::Utf16(units) => Ok(String::from_utf16_lossy(units)),
+            _ => Err(Error::ExpectedString),
+        }
+    }
+
     /// The exact unbounded literal spelling; arithmetic is outside this
     /// memory interpreter, but its allocated payload is reference-counted.
+    pub(super) fn bytes(&self, value: &Value) -> Result<&[u8], Error> {
+        self.admit_ordinary(value)?;
+        let Value::Object(id) = value else {
+            return Err(Error::PatternKind("bytes"));
+        };
+        match &self.object(id.id)?.data {
+            Data::Bytes(buf) => Ok(buf),
+            _ => Err(Error::PatternKind("bytes")),
+        }
+    }
+
     pub fn bigint(&self, value: &Value) -> Result<&str, Error> {
         self.admit_ordinary(value)?;
         let Value::Object(id) = value else {

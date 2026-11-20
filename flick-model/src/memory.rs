@@ -12,6 +12,7 @@ use std::{error, fmt};
 
 use flick_core::ir::Lit;
 use flick_core::ir::memory::{self, Exit, Function, Instruction, Local, Operation};
+use regex_automata::meta::Regex;
 
 mod causes;
 pub use causes::{CauseToken, DefectClass, DefectCode, DefectSpec, LanguageExit, Reason};
@@ -20,8 +21,9 @@ mod patterns;
 mod primitives;
 mod program;
 pub use program::{
-    Executed, ExecutionReport, ProgramOutcome, execute_main_program, execute_main_program_outcome,
-    execute_program, execute_program_outcome, execute_rooted_main_program_outcome,
+    Executed, ExecutionReport, ProgramOutcome, TestCaseResult, execute_main_program,
+    execute_main_program_outcome, execute_program, execute_program_outcome,
+    execute_rooted_main_program_outcome, execute_tests_program,
 };
 
 /// An allocation's identity includes its heap and generation. Recycled backing

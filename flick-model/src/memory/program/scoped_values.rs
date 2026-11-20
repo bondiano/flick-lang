@@ -11,7 +11,7 @@ impl Machine<'_, '_> {
                 self.apply(Destination::CloseScope {
                     owner,
                     previous,
-                    binding,
+                    binding: Some(binding),
                 })?;
             }
             Intrinsic::ScopeCurrent => {

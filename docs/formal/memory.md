@@ -10,7 +10,7 @@ are not evidence for this contract.
 
 | Obligation | Current implementation | Still required for the phase gate |
 | - | - | - |
-| M1: explicit ownership | Shared memory IR, Perceus insertion, exhaustive source expression lowering (`Destructure`, `let mut`, `loop`/`while`/`for` + labeled exits, `Option?`, strict/lazy comprehensions and `Seq.*`, `Record.*`, `Lazy`, `Scope`/`Resource` LIFO finalizers, one-shot `control` handlers with tail-resume and discontinuation, TCO, O(1) `ListSlice`/`ListRange`, generational counted heap, inline locals), owned outcomes, explicit source runners and live corpus inventory (`memory_inventory.rs`) | Complete remaining stdlib pure/effectful bindings (Stage 3), cooperative async/fiber/layer/stream runtime (Stage 4), and explicit counted host/FFI bridge (Stage 5) so 100% of the corpus passes on this path in both profiles with zero live objects |
+| M1: explicit ownership | Shared memory IR, Perceus insertion, exhaustive source expression lowering (`Destructure`, `let mut`, `loop`/`while`/`for` + labeled exits, `Option?`, strict/lazy comprehensions and `Seq.*`, `Record.*`, `Lazy`, `Scope`/`Resource` LIFO finalizers, one-shot `control` handlers with tail-resume and discontinuation, TCO, O(1) `ListSlice`/`ListRange`, generational counted heap, inline locals), Stage 3 pure and pure-effect stdlib counted lowering/primitives (`core`, `Bytes`/`Chunk`/`HashMap`/`HashSet`/`Json`/`Decimal`/`RegExp`/`Duration`/`Exit`/`Cause`, `Path`/`DateTime`/`Cron`/`Graph`, `Schema`/`Codec`/`Check`/`JsonSchema`/`Route`/`Optic`/`Open`/`ByteSize`, deterministic `Test`/`Gen`/`Arbitrary` counted runner), owned outcomes, explicit source runners and live corpus inventory (`memory_inventory.rs`) | Complete cooperative async/fiber/layer/stream runtime (Stage 4) and explicit counted host/FFI bridge (Stage 5) so 100% of the corpus passes on this path in both profiles with zero live objects |
 | M2: `Arena s` | Public `Arena.make/alloc/get`, existing by-use checker rules, counted scope/selected-owner execution with LIFO finalizers running before arena retirement, JS/Go storage retirement after finalizers, scope-release/use/retention regressions | Counted execution of concurrent/cancellable owned work (Stage 4) and the whole heap/region proof |
 | M3: FBIP and cycles | Dynamic uniqueness/layout-checked reuse for a last borrowed receiver followed by construction; root-owned counted cells, strong reads/replacement and detach-all teardown, with closure/cell-cycle tests | Full constructor/destructor lowering and backend implementation |
 | M4: Lean | `Formal/MemoryInsert.lean`: whole-function token balance for the executable cached insertion projection, before output validation, with distinct parameters and every selected-path prefix; `Formal/MemoryPass.lean`: independent token checking and computed live-in availability; `Formal/Memory.lean`: local arithmetic; `Formal/MemoryArena.lean` and `MemoryScopes.lean`: root inventories and selected-owner storage retirement | Verified Rust correspondence, machine bounds, operation/heap and exception-unwind semantics, dynamic reuse and physical reclamation remain outside these proofs |
@@ -121,6 +121,24 @@ and whole-pass theorems (`Formal/MemoryPass.lean`, `Formal/MemoryInsert.lean`)
 remain unaffected because every added `Operation` uses only consuming operands
 with no new `Exit` variant; full heap, continuation, and finalizer soundness
 remain outside the Lean proofs.
+
+Stage 3 extends the counted path across pure and pure-effect standard-library
+modules (`packages/core` and `packages/std`, including `Bytes`, `Chunk`,
+`HashMap`, `HashSet`, `Json`, `JsonPointer`, `JsonPatch`, `Decimal`, `RegExp`,
+`Duration`, `Exit`, `Cause`, `Path`, `DateTime`, `Cron`, `Graph`, `Schema`,
+`Codec`, `Check`, `JsonSchema`, `Route`, `Differ.json_patch`, `Optic`, `Open`,
+`ByteSize`, and the deterministic `Test`/`Gen`/`Arbitrary` counted runner).
+Lexical `scope` close concatenates failing finalizers (`⧺`) and joins the body
+cause with finalizer failures via deduplicating `Cause.combine` (`⊕`) without
+electing defects, while `try` and `Resource.bracket` elect typed failures beside
+a defect (`elect`). `memory_stage3a.rs`, `memory_stage3b.rs`,
+`memory_stage3b_more.rs`, `memory_stage3c.rs`, and `memory_language.rs` pin the
+unlocked corpus fixtures, 23/25 `tests/language` suites (leaving `Effects` and
+`Concurrency` for Stage 4), and exhaustive fuel-prefix sweeps with zero leaks.
+Because Stage 3 only adds consuming `Intrinsic` variants and ordinary lowered
+Flick helpers without changing `Operation` or `Exit`, `Formal/MemoryPass.lean`
+and `Formal/MemoryInsert.lean` remain unaffected; primitive implementations and
+counted heap execution remain tested rather than Lean-proved.
 
 ## 2. Owned tokens and objects
 
@@ -529,7 +547,7 @@ Its host primitives are intrinsics on a fixed host, the same as the
 evaluator's natives: `stdoutLine` and `stdoutWrite` write the captured
 stdout, `stderrLine` borrows its text and writes nothing, `platformEnv`
 allocates `None`, `platformVars` and `platformArgs` an empty list, the wall clock reads
-1 700 000 000 000 ms and the same instant in nanoseconds, the monotonic clock
+1 750 000 000 000 ms and the same instant in nanoseconds, the monotonic clock
 0 ns, and every `flickNext` draw is 0.5. The host has no processes:
 `processSpawn` stops the run as an unsupported operation. `platformEnv`, `platformVars` and `platformArgs` allocate their result
 afresh in Flick's representation, which discharges the host result copy and

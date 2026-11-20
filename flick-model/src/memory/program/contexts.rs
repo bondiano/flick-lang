@@ -66,7 +66,28 @@ impl Machine<'_, '_> {
             | Intrinsic::RecordLabels
             | Intrinsic::ExitIsSuccess
             | Intrinsic::ExitIsFailure
-            | Intrinsic::ExitHasInterrupts => self.metered_primitive(kind, binding)?,
+            | Intrinsic::ExitHasInterrupts
+            | Intrinsic::Int(_)
+            | Intrinsic::Float(_)
+            | Intrinsic::BigInt(_)
+            | Intrinsic::String(_)
+            | Intrinsic::List(_)
+            | Intrinsic::Record(_)
+            | Intrinsic::Debug(_)
+            | Intrinsic::Bytes(_)
+            | Intrinsic::Hash(_)
+            | Intrinsic::Json(_)
+            | Intrinsic::BigDecimal(_)
+            | Intrinsic::RegExp(_)
+            | Intrinsic::Duration(_)
+            | Intrinsic::Outcome(_)
+            | Intrinsic::Gen(_)
+            | Intrinsic::Schema(_)
+            | Intrinsic::JsonSchema(_)
+            | Intrinsic::Path(_)
+            | Intrinsic::DateTime(_)
+            | Intrinsic::Cron(_)
+            | Intrinsic::Graph(_) => self.metered_primitive(kind, binding)?,
             Intrinsic::StringStartsWith | Intrinsic::StringIncludes => {
                 let value = primitives::string_predicate(
                     self.heap,
@@ -89,6 +110,10 @@ impl Machine<'_, '_> {
                     binding,
                 };
             }
+            Intrinsic::EffectExit
+            | Intrinsic::EffectDie
+            | Intrinsic::FailureRethrow
+            | Intrinsic::EffectCatchDefect => self.outcome_intrinsic(kind, binding)?,
             Intrinsic::Raise => self.raise_ordinary()?,
             Intrinsic::FromResult => self.unwrap_result(binding)?,
             Intrinsic::MatchFail => return Err(Error::NoMatch),
@@ -117,6 +142,46 @@ impl Machine<'_, '_> {
             | Intrinsic::Uninterruptible
             | Intrinsic::SeqOfList
             | Intrinsic::SeqToList => unreachable!("control intrinsics dispatched above"),
+        }
+        Ok(())
+    }
+
+    fn outcome_intrinsic(&mut self, kind: Intrinsic, binding: Local) -> Result<(), Error> {
+        match kind {
+            Intrinsic::EffectExit => {
+                self.scratch.push(Value::Unit);
+                self.await_task_fresh(Destination::CaptureExit { binding })?;
+            }
+            Intrinsic::EffectDie => {
+                let msg = self.scratch.pop().expect("die message");
+                let cause = self
+                    .heap
+                    .cause(&[super::Reason::Die(&msg)], &mut self.fuel);
+                self.heap.drop_value(msg)?;
+                self.failure = Some(cause?);
+                self.failure_elected = false;
+            }
+            Intrinsic::FailureRethrow => {
+                let cause_val = self.scratch.pop().expect("rethrow cause");
+                let token = CauseToken::from_cause_value(self.heap, cause_val)?;
+                self.failure = Some(token);
+                self.failure_elected = true;
+            }
+            Intrinsic::EffectCatchDefect => {
+                let task = self.scratch.pop().expect("catch_defect task");
+                let handler = self.scratch.pop().expect("catch_defect handler");
+                self.pending_handler = Some(handler);
+                self.scratch.extend([task, Value::Unit]);
+                self.await_task_fresh(Destination::Bind(binding))?;
+                self.frames
+                    .last_mut()
+                    .expect("catch_defect body frame")
+                    .destination = Destination::CatchDefect {
+                    handler: self.pending_handler.take().expect("staged handler"),
+                    binding,
+                };
+            }
+            _ => unreachable!("non-outcome intrinsic"),
         }
         Ok(())
     }

@@ -50,7 +50,7 @@ fn exceptional_boundaries_use_saved_owner_not_current_selection() {
     machine.frames.push(frame_with(Destination::CloseScope {
         owner: 1,
         previous: 0,
-        binding: 0,
+        binding: Some(0),
     }));
     machine.failure = Some(failure);
     machine.fuel = 100;

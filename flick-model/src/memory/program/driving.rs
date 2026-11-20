@@ -114,6 +114,45 @@ impl<'p> Machine<'p, '_> {
             self.queue_discard_frames(gen_frames);
             return Ok(());
         }
+        if let Destination::CaptureExit { binding } = destination {
+            self.heap
+                .drop_values(mem::take(&mut frame.locals).into_values_vec())?;
+            let gen_frames = self.release_frame_resources(&mut frame)?;
+            let cause = self.failure.take().expect("captured exit failure");
+            self.failure_elected = false;
+            let exit = self
+                .heap
+                .allocate(Data::Exit(ExitData::Failure(cause.into_value())));
+            self.store(binding, exit)?;
+            self.queue_discard_frames(gen_frames);
+            return Ok(());
+        }
+        if let Destination::CatchDefect { handler, binding } = destination {
+            self.pending_handler = Some(handler);
+            self.heap
+                .drop_values(mem::take(&mut frame.locals).into_values_vec())?;
+            let gen_frames = self.release_frame_resources(&mut frame)?;
+            let defect_msg = self
+                .failure
+                .as_ref()
+                .map(|c| primitives::first_defect_message(self.heap, c.object_id()))
+                .transpose()?
+                .flatten();
+            let handler = self.pending_handler.take().expect("defect handler");
+            if let Some(msg) = defect_msg {
+                if let Some(cause) = self.failure.take() {
+                    self.heap.drop_cause(cause)?;
+                }
+                self.failure_elected = false;
+                let msg_val = self.heap.literal(&Lit::String(msg))?;
+                self.scratch.extend([handler, msg_val]);
+                self.apply(Destination::Bind(binding))?;
+            } else {
+                self.heap.drop_value(handler)?;
+            }
+            self.queue_discard_frames(gen_frames);
+            return Ok(());
+        }
         self.heap
             .drop_values(mem::take(&mut frame.locals).into_values_vec())?;
         let gen_frames = self.release_frame_resources(&mut frame)?;
@@ -155,15 +194,7 @@ impl<'p> Machine<'p, '_> {
                 let cause = self.failure.take().expect("scope failure cause");
                 self.begin_close_scope(owner, previous, ScopeOutcome::Failure(cause))?;
             }
-            Destination::ClosingScope { mut state } => {
-                let cause = self.failure.take().expect("finalizer failure cause");
-                if state.finalizer_failure.is_none() {
-                    state.finalizer_failure = Some(cause);
-                } else {
-                    self.heap.drop_cause(cause)?;
-                }
-                self.step_close_scope(state)?;
-            }
+            Destination::ClosingScope { state } => self.finalizer_failed(state)?,
             Destination::RestoreOwner { previous, .. } => self.current_owner = previous,
             Destination::Loop { args, .. } => self.heap.drop_values(args)?,
             Destination::GenerateStrict { items, .. } => self.heap.drop_values(items)?,
@@ -192,10 +223,16 @@ impl<'p> Machine<'p, '_> {
             Destination::BracketFinish { outcome, .. } => match outcome {
                 BracketOutcome::Success(value) => self.heap.drop_value(value)?,
                 BracketOutcome::Failure(orig) => {
-                    if let Some(secondary) = self.failure.take() {
+                    let joined = if let Some(secondary) = self.failure.take() {
+                        let res =
+                            primitives::join_causes(self.heap, &orig, &secondary, &mut self.fuel);
+                        self.heap.drop_cause(orig)?;
                         self.heap.drop_cause(secondary)?;
-                    }
-                    self.failure = Some(orig);
+                        res?
+                    } else {
+                        orig
+                    };
+                    self.failure = Some(joined);
                     self.failure_elected = false;
                 }
             },
@@ -205,7 +242,9 @@ impl<'p> Machine<'p, '_> {
             | Destination::Modify { .. }
             | Destination::FunctionBoundary { .. }
             | Destination::DiscardFinalizer => {}
-            Destination::Catch { .. } => unreachable!("catch handled above"),
+            Destination::Catch { .. }
+            | Destination::CaptureExit { .. }
+            | Destination::CatchDefect { .. } => unreachable!("catch/exit handled above"),
             Destination::Handle { .. } => unreachable!("handler handled above"),
         }
         Ok(())

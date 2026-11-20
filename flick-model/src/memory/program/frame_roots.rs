@@ -42,7 +42,9 @@ impl<'p> Machine<'p, '_> {
 
     fn drain_destination_roots(&mut self, destination: Destination<'p>, roots: &mut Vec<Value>) {
         match destination {
-            Destination::Catch { handler, .. } => roots.push(handler),
+            Destination::Catch { handler, .. } | Destination::CatchDefect { handler, .. } => {
+                roots.push(handler);
+            }
             Destination::Loop { args, .. } => roots.extend(args),
             Destination::GenerateStrict { items, .. } => roots.extend(items),
             Destination::AcquireRegister { release, .. } => roots.push(release),
@@ -81,6 +83,7 @@ impl<'p> Machine<'p, '_> {
             | Destination::FunctionBoundary { .. }
             | Destination::GeneratorStep { .. }
             | Destination::LazyComplete { .. }
+            | Destination::CaptureExit { .. }
             | Destination::DiscardFinalizer => {}
         }
     }

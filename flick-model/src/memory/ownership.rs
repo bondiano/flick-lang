@@ -322,83 +322,107 @@ impl Heap {
                     self.free_list.push(id.id.index);
                     self.stats.frees += 1;
                     self.stats.live_objects -= 1;
-                    match object.data {
-                        Data::RecoveryResult { selected, .. } => pending.extend(selected),
-                        Data::Cause(reasons) => pending.extend(
-                            reasons
-                                .into_iter()
-                                .filter_map(causes::StoredReason::into_value),
-                        ),
-                        Data::Tagged { fields, .. }
-                        | Data::Closure {
-                            captures: fields, ..
-                        }
-                        | Data::Task {
-                            captures: fields, ..
-                        }
-                        | Data::Seq(SeqData::Generator {
-                            captures: fields, ..
-                        }) => pending.extend(fields),
-                        Data::ListSlice { backing, .. } | Data::Seq(SeqData::FromList(backing)) => {
-                            pending.push(backing);
-                        }
-                        Data::Continuation { execution, id } => {
-                            self.dropped_continuations.push((execution, id));
-                        }
-                        Data::Cell { contents, .. } => {
-                            self.stats.cells_freed += 1;
-                            pending.extend(contents);
-                        }
-                        Data::Var { contents, .. } => pending.extend(contents),
-                        Data::Lazy { state, .. } => {
-                            if let Some(
-                                LazyState::Pending(v)
-                                | LazyState::Running(v)
-                                | LazyState::DoneOk(v)
-                                | LazyState::DoneErr(v),
-                            ) = state
-                            {
-                                pending.push(v);
-                            }
-                        }
-                        Data::Iterator { state, .. } => {
-                            if let IteratorState::List { backing, .. } = state {
-                                pending.push(backing);
-                            }
-                        }
-                        Data::Exit(ExitData::Success(value) | ExitData::Failure(value)) => {
-                            pending.push(value);
-                        }
-                        Data::Arena { contents, .. } => {
-                            self.stats.arenas_freed += 1;
-                            pending.extend(contents);
-                        }
-                        Data::Dictionary(entries) => {
-                            pending
-                                .extend(entries.into_iter().map(|(_, entry)| entry.into_value()));
-                        }
-                        Data::Record(fields) => {
-                            pending.extend(fields.into_iter().map(|(_, value)| value));
-                        }
-                        Data::ServiceTag { key } => {
-                            if self.service_tags.get(&key) == Some(&id.id) {
-                                self.service_tags.remove(&key);
-                            }
-                        }
-                        Data::Layer(LayerData::Succeed {
-                            tag,
-                            implementation,
-                        }) => {
-                            pending.extend([tag, implementation]);
-                        }
-                        Data::Layer(LayerData::Merge { left, right }) => {
-                            pending.extend([left, right]);
-                        }
-                        Data::Defect(_) | Data::String(_) | Data::BigInt(_) | Data::Label(_) => {}
-                    }
+                    self.release_data(id.id, object.data, &mut pending);
                 }
             }
         }
         failure.map_or(Ok(()), Err)
+    }
+
+    fn release_data(&mut self, id: ObjectId, data: Data, pending: &mut Vec<Value>) {
+        match data {
+            Data::RecoveryResult { selected, .. } => pending.extend(selected),
+            Data::Cause(reasons) => pending.extend(
+                reasons
+                    .into_iter()
+                    .filter_map(causes::StoredReason::into_value),
+            ),
+            Data::CauseReason(reason) => pending.extend(reason.into_value()),
+            Data::Tagged { fields, .. }
+            | Data::Closure {
+                captures: fields, ..
+            }
+            | Data::Task {
+                captures: fields, ..
+            }
+            | Data::Seq(SeqData::Generator {
+                captures: fields, ..
+            }) => pending.extend(fields),
+            Data::ListSlice { backing, .. } | Data::Seq(SeqData::FromList(backing)) => {
+                pending.push(backing);
+            }
+            Data::Continuation { execution, id } => {
+                self.dropped_continuations.push((execution, id));
+            }
+            Data::Cell { contents, .. } => {
+                self.stats.cells_freed += 1;
+                pending.extend(contents);
+            }
+            Data::Var { contents, .. } => pending.extend(contents),
+            Data::Lazy { state, .. } => {
+                if let Some(
+                    LazyState::Pending(v)
+                    | LazyState::Running(v)
+                    | LazyState::DoneOk(v)
+                    | LazyState::DoneErr(v),
+                ) = state
+                {
+                    pending.push(v);
+                }
+            }
+            Data::Iterator { state, .. } => {
+                if let IteratorState::List { backing, .. } = state {
+                    pending.push(backing);
+                }
+            }
+            Data::Exit(ExitData::Success(value) | ExitData::Failure(value)) => {
+                pending.push(value);
+            }
+            Data::Arena { contents, .. } => {
+                self.stats.arenas_freed += 1;
+                pending.extend(contents);
+            }
+            Data::Dictionary(entries) => {
+                pending.extend(entries.into_iter().map(|(_, entry)| entry.into_value()));
+            }
+            Data::Record(fields) => {
+                pending.extend(fields.into_iter().map(|(_, value)| value));
+            }
+            Data::ServiceTag { key } => {
+                if self.service_tags.get(&key) == Some(&id) {
+                    self.service_tags.remove(&key);
+                }
+            }
+            Data::Layer(LayerData::Succeed {
+                tag,
+                implementation,
+            }) => {
+                pending.extend([tag, implementation]);
+            }
+            Data::Layer(LayerData::Merge { left, right }) => {
+                pending.extend([left, right]);
+            }
+            Data::Graph(graph) => {
+                pending.extend(graph.nodes.into_iter().map(|n| n.data));
+                pending.extend(graph.edges.into_iter().map(|e| e.data));
+            }
+            Data::GraphWalker(walker) => {
+                pending.extend(walker.indices);
+                pending.extend(walker.values);
+            }
+            Data::Defect(_)
+            | Data::Duration(_)
+            | Data::DateTime(_)
+            | Data::TimeZone(_)
+            | Data::Cron(_)
+            | Data::String(_)
+            | Data::Utf16(_)
+            | Data::Bytes(_)
+            | Data::JsonNull
+            | Data::BigDecimal { .. }
+            | Data::RegExp { .. }
+            | Data::BigInt(_)
+            | Data::Label(_) => {}
+        }
     }
 }

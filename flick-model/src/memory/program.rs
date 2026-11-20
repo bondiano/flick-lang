@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::{iter, mem};
 
-use flick_core::ir::Pat;
+use flick_core::ir::{Lit, Pat};
 use flick_core::types::OpClass;
 
 use flick_core::ir::memory::{
@@ -276,6 +276,13 @@ enum Destination<'p> {
         handler: Value,
         binding: Local,
     },
+    CaptureExit {
+        binding: Local,
+    },
+    CatchDefect {
+        handler: Value,
+        binding: Local,
+    },
     Top,
     Bind(Local),
     Initialize {
@@ -289,7 +296,7 @@ enum Destination<'p> {
     CloseScope {
         owner: usize,
         previous: usize,
-        binding: Local,
+        binding: Option<Local>,
     },
     ClosingScope {
         state: Box<ClosingScopeState<'p>>,
@@ -355,7 +362,10 @@ enum Finalizer {
 }
 
 enum ScopeOutcome<'p> {
-    Normal { binding: Local, value: Value },
+    Normal {
+        binding: Option<Local>,
+        value: Value,
+    },
     Failure(CauseToken),
     Discard(Box<Discard<'p>>),
 }
@@ -573,6 +583,7 @@ include!("program/generators.rs");
 include!("program/scope_finalizers.rs");
 include!("program/frame_roots.rs");
 include!("program/cleanup.rs");
+include!("program/test_runner.rs");
 
 #[cfg(test)]
 mod tests {

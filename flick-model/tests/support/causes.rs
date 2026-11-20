@@ -41,6 +41,9 @@ fn inspect_defect(heap: &Heap, cause: &CauseToken) -> Result<Error, String> {
         DefectCode::ArenaClosed => (Error::ClosedArena, DefectClass::Error),
         DefectCode::ResumeTwice => (Error::ResumeTwice, DefectClass::Error),
         DefectCode::LazyCycle => (Error::LazyCycle, DefectClass::Error),
+        DefectCode::Todo(msg) => (Error::Todo(msg.clone()), DefectClass::Error),
+        DefectCode::Assert(msg) => (Error::Assert(msg.clone()), DefectClass::Error),
+        DefectCode::RangeError(msg) => (Error::RangeError(msg.clone()), DefectClass::RangeError),
     };
     if defect.class() != class {
         return Err("wrong structured defect class".into());

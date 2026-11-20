@@ -66,6 +66,72 @@ enum ExitData {
     Failure(Value),
 }
 
+#[derive(Clone, Debug)]
+enum DurationData {
+    Millis(f64),
+    Nanos(num_bigint::BigInt),
+    Infinite,
+    NegativeInfinite,
+}
+
+#[derive(Clone, Debug)]
+enum TimeZoneData {
+    Offset(f64),
+    Named {
+        id: String,
+        fixed_seconds: Option<i32>,
+        is_local: bool,
+    },
+}
+
+#[derive(Clone, Debug)]
+struct DateTimeData {
+    ms: f64,
+    zone: Option<TimeZoneData>,
+}
+
+#[derive(Clone, Debug)]
+struct CronData {
+    tz: TimeZoneData,
+    fields: [Vec<i32>; 6],
+    and: bool,
+    first: [i32; 6],
+    last: [i32; 6],
+    next: [Vec<i32>; 6],
+    prev: [Vec<i32>; 6],
+}
+
+#[derive(Debug)]
+struct GraphNode {
+    index: i32,
+    data: Value,
+}
+
+#[derive(Debug)]
+struct GraphEdge {
+    index: i32,
+    source: i32,
+    target: i32,
+    data: Value,
+}
+
+#[derive(Debug)]
+struct GraphData {
+    directed: bool,
+    nodes: Vec<GraphNode>,
+    edges: Vec<GraphEdge>,
+    adj: BTreeMap<i32, Vec<i32>>,
+    radj: BTreeMap<i32, Vec<i32>>,
+    next_node: i32,
+    next_edge: i32,
+}
+
+#[derive(Debug)]
+struct GraphWalkerData {
+    indices: Vec<Value>,
+    values: Vec<Value>,
+}
+
 #[derive(Debug)]
 enum Data {
     RecoveryResult {
@@ -74,12 +140,32 @@ enum Data {
         selected: Option<Value>,
     },
     Cause(Vec<causes::StoredReason>),
+    CauseReason(causes::StoredReason),
+    Duration(DurationData),
     Defect(DefectSpec),
     ServiceTag {
         key: String,
     },
     Layer(LayerData),
     String(String),
+    /// Exact UTF-16 code units for strings containing lone surrogates.
+    Utf16(Vec<u16>),
+    /// Immutable packed byte buffer (`packages/std/src/Bytes.fl`).
+    Bytes(Vec<u8>),
+    /// JSON `null` leaf value shared by `Json`, `JsonPatch`, `Schema`, and `Codec`.
+    JsonNull,
+    /// Exact decimal `value * 10^-scale` (`packages/std/src/BigDecimal.fl`).
+    BigDecimal {
+        value: num_bigint::BigInt,
+        scale: i64,
+    },
+    /// Compiled immutable regular expression (`packages/std/src/RegExp.fl`).
+    RegExp {
+        pattern: String,
+        flags: String,
+        global: bool,
+        compiled: Regex,
+    },
     BigInt(String),
     Tagged {
         tag: String,
@@ -132,6 +218,11 @@ enum Data {
     },
     Label(String),
     Exit(ExitData),
+    DateTime(DateTimeData),
+    TimeZone(TimeZoneData),
+    Cron(Box<CronData>),
+    Graph(Box<GraphData>),
+    GraphWalker(GraphWalkerData),
 }
 
 #[derive(Debug)]
