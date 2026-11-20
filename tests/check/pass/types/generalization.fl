@@ -45,3 +45,10 @@ empty_pair : (List Float, List String)
 let empty_pair =
   let empty = []
   (empty, empty)
+
+// the operand of an operator stays of one type, which the uses settle
+operators : Unit ->{} (Int, List String)
+let operators () =
+  let add = (fun x y -> x + y)
+  let prefixed = (fun mark lines -> List.map (fun line -> mark ++ line) lines)
+  (add 1 2, prefixed "> " ["c"])

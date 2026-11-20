@@ -6,6 +6,11 @@ break programs.
 
 ## Unreleased
 
+- **An operator's operand keeps one type in a generalized binding.** The
+  operand of an operator such as `+` or `++` stays of one type, which the
+  uses settle, as a number literal's does: `let add = (fun x y -> x + y)`
+  inside a function is no longer `FLICK-T003` on a type variable.
+
 - **A fixture that fails to be made is a `setup` failure.** A case that
   awaits a fixture whose expression fails, and does not handle the error,
   is reported as `setup`, `fixture conn: <the fixture's error>`, as a failed
