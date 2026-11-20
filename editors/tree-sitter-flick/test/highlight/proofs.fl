@@ -31,4 +31,3 @@ where
 inc : Int -> Int
 let inc x where ensure (fun y -> y > x) = x + 1
 //              ^ keyword
-

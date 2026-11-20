@@ -14,7 +14,7 @@ import {
 } from "@codemirror/view";
 
 import { request } from "./ide-client.ts";
-import type { Action, Hint, Signature, Tokens } from "./ide-worker.ts";
+import type { Action, Signature, Tokens } from "./ide-worker.ts";
 
 /** The semantic-token marks, one class for each kind. */
 const marks = new Map<string, Decoration>();
@@ -44,22 +44,19 @@ class Label extends WidgetType {
   }
 }
 
-const showTokens = StateEffect.define<{ text: string; tokens: Tokens; hints: ReadonlyArray<Hint> }>();
+const showTokens = StateEffect.define<{ text: string; tokens: Tokens }>();
 const showSignature = StateEffect.define<{ text: string; at: number; help: Signature | null }>();
 
 const inRange = (at: number, length: number): number => Math.max(0, Math.min(at, length));
 
-/** The decorations of the tokens and hints of `text`, or none when it moved on. */
-const decorated = (doc: string, value: { text: string; tokens: Tokens; hints: ReadonlyArray<Hint> }): DecorationSet => {
+/** The decorations of the tokens of `text`, or none when it moved on. */
+const decorated = (doc: string, value: { text: string; tokens: Tokens }): DecorationSet => {
   if (value.text !== doc) return Decoration.none;
   const ranges: Array<Range<Decoration>> = [];
   for (const token of value.tokens.tokens) {
     const from = inRange(token.from, doc.length);
     const to = inRange(token.to, doc.length);
     if (to > from) ranges.push(mark(token.type).range(from, to));
-  }
-  for (const hint of value.hints) {
-    ranges.push(Decoration.widget({ widget: new Label(hint.label, "fp-ide-hint"), side: 1 }).range(inRange(hint.at, doc.length)));
   }
   return Decoration.set(ranges, true);
 };
@@ -205,23 +202,21 @@ class Editor implements PluginValue {
     const at = this.view.state.selection.main.head;
     const before = at > 0 ? source.slice(at - 1, at) : "";
     const generation = ++this.generation;
-    const [kinds, hints, help] = await Promise.all([
+    const [kinds, help] = await Promise.all([
       request({ action: "tokens", source }).catch(() => null),
-      request({ action: "hints", source }).catch(() => null),
       before === "(" || before === ","
         ? request({ action: "signature", source, at }).catch(() => null)
         : Promise.resolve(null),
     ]);
     if (this.destroyed || generation !== this.generation || this.view.state.doc.toString() !== source) return;
     if (kinds !== null) {
-      this.view.dispatch({ effects: showTokens.of({ text: source, tokens: kinds as Tokens, hints: (hints ?? []) as ReadonlyArray<Hint> }) });
+      this.view.dispatch({ effects: showTokens.of({ text: source, tokens: kinds as Tokens }) });
     }
     this.view.dispatch({ effects: showSignature.of({ text: source, at, help: help as Signature | null }) });
   }
 }
 
 const theme = EditorView.theme({
-  "& .fp-ide-hint": { opacity: "0.65", fontStyle: "italic", padding: "0 0.15em" },
   "& .fp-ide-signature": {
     margin: "0 0.2em",
     padding: "0.1em 0.4em",
