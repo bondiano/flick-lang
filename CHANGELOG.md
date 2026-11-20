@@ -12,6 +12,15 @@ break programs.
   them. Each case has its own scope, fixtures and full name. A test block's
   arguments may now hold a bracketed list, the rows. Alike on every engine.
 
+- **Breaking: `Test.expect` takes the value it checks.** `expect actual |>
+  to.equal expected`, with `import Test exposing (expect, to)`, and the
+  matchers `to.be_true`, `to.be_greater_than`, `to.contain` and
+  `to.fail_with`, which runs a task and expects its typed error. A failed
+  `to.equal` of long or multi-line values shows a diff of their lines, the
+  same on every engine, and so does `Test.equal`. The old `Test.expect` of
+  an `Assertion` is `Test.check`: `assert` is a keyword. Replace
+  `Test.expect (…)` with `Test.check (…)`, or with a matcher.
+
 - **Test fixtures.** A `suite` holds `fixture name = expression`, which its
   cases and hooks read with `await name`: made the first time a case awaits
   it, once for that case, or with `fixture shared` once for the run of the

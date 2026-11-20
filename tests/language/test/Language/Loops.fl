@@ -47,5 +47,5 @@ let tests = [
   Test.test "for skips and stops" (fun () -> Test.equal 4 (sum [1, -2, 3, 20, 5])),
   Test.effect_test
     "try preserves completed assignment"
-    (task { Test.expect (Test.equal (5, 5) (recover ())) }),
+    (task { Test.check (Test.equal (5, 5) (recover ())) }),
 ]

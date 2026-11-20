@@ -10,18 +10,20 @@ test in a scope of its own.
 ```flick
 module App.UsersTest
 
+import Test exposing (expect, to)
+
 suite "names" {
   test "trims the name" {
     let name = String.trim "  Ada  "
-    Test.expect (Test.equal "Ada" name)
+    expect name |> to.equal "Ada"
   }
 
   suite "empty" {
-    test "stays empty" { Test.expect (Test.equal "" (String.trim "  ")) }
+    test "stays empty" { expect (String.trim "  ") |> to.equal "" }
   }
 }
 
-test "counts" { Test.expect (Test.equal 3 (List.length [1, 2, 3])) }
+test "counts" { expect (List.length [1, 2, 3]) |> to.equal 3 }
 ```
 
 The blocks are the plugin of the `std` package (see [plugins](../plugins/)),
@@ -45,8 +47,9 @@ call. A top-level declaration may not start with a value named `suite` or
 A test's body is an effectful test, as `Test.effect_test` runs one: it runs
 in a scope of its own, which owns what the body acquires, with the live host
 services (`Host.Live`), which outlive that scope. It passes when it ends and
-its scope closes cleanly; `Test.expect` fails it on a failed assertion, and
-a typed failure, a defect or a failed cleanup fails it too.
+its scope closes cleanly; a matcher (see [assertions](#assertions)) fails it
+on a failed assertion, and a typed failure, a defect or a failed cleanup
+fails it too.
 
 The cases of a module are its `tests : List Test.Test`, the case of each
 top-level block in the order written. The module exports `tests` without
@@ -67,6 +70,47 @@ A module without blocks builds `tests` by hand with `Test` as before (see
 [the standard library](../stdlib/#tests)): both kinds of module run in the
 same `flick test`.
 
+## Assertions
+
+`expect actual` names the value an assertion checks, and a matcher of `to`
+checks it: `expect total |> to.equal 3`. A matcher that does not match fails
+the test with `Test.AssertionFailed`, whose message is the test's
+`assertion` failure.
+
+| Matcher | Passes when |
+| - | - |
+| `to.equal expected` | the value equals `expected` (`Eq`, `Show`) |
+| `to.be_true` | the `Bool` is `true` |
+| `to.be_greater_than bound` | the value is greater than `bound` (`Ord`, `Show`) |
+| `to.contain item` | the `List` holds `item` |
+| `to.fail_with error` | the task, which it runs, fails with `error` |
+
+A failed `to.equal` says what it expected and what it got, `expected 3, got
+4`. When either value, as `show` writes it, is long or has several lines,
+it shows their lines as a diff instead: the lines both start and end with as
+they are, and between them each line it expected after `- ` and each it got
+after `+ `.
+
+```flick
+module App.LookupTest
+
+import Test exposing (expect, to)
+
+type error NotFound = NotFound String
+  deriving Eq, Show
+
+find : String ->{; NotFound} Int
+let find name = if name == "ada" then 1 else Fail.fail (NotFound name)
+
+test "finds ada" { expect (find "ada") |> to.equal 1 }
+
+test "misses bob" { expect (task { find "bob" }) |> to.fail_with (NotFound "bob") }
+```
+
+`Test.check assertion` fails the test when an `Assertion` built by hand,
+such as `Test.equal expected actual`, failed. It was `Test.expect` before
+`expect` took a subject; `assert` is a keyword.
+
 ## Test companions
 
 A module of the test root sees only what the modules it imports export. To
@@ -82,7 +126,7 @@ module App.Users
 # trim : String -> String
 # let trim name = String.trim name
 #
-test "trims a name" { Test.expect (Test.equal "Ada" (trim "  Ada ")) }
+test "trims a name" { Test.check (Test.equal "Ada" (trim "  Ada ")) }
 ```
 
 The module never sees its companion, and no other module can import it.
@@ -118,7 +162,7 @@ suite.skip "storage" {
   test "keeps a user" {}
 }
 
-test.only "being written" { Test.expect (Test.equal 2 (1 + 1)) }
+test.only "being written" { Test.check (Test.equal 2 (1 + 1)) }
 ```
 
 A skipped case inside a suite marked `only` stays skipped. `Test.skip` and
@@ -216,8 +260,8 @@ suite "users" {
 
   before_all { SynchronizedRef.update (fun all -> all ++ ["Grace"]) (await names) }
 
-  test "counts the names" { Test.expect (Test.equal 2 (await count)) }
-  test "reads them" { Test.expect (Test.equal ["Ada", "Grace"] (SynchronizedRef.get (await names))) }
+  test "counts the names" { Test.check (Test.equal 2 (await count)) }
+  test "reads them" { Test.check (Test.equal ["Ada", "Grace"] (SynchronizedRef.get (await names))) }
 }
 ```
 
@@ -303,10 +347,10 @@ let rows = [(1, 2), (2, 3)]
 
 suite "math" {
   test.each [(1, 2), (2, 3)] "adds one to {0} to get {1}" (a, b) {
-    Test.expect (Test.equal b (a + 1))
+    Test.check (Test.equal b (a + 1))
   }
 
-  test.each rows "is ordered" ((a, b)) { Test.expect (Test.is_true "ordered" (a < b)) }
+  test.each rows "is ordered" ((a, b)) { Test.check (Test.is_true "ordered" (a < b)) }
 }
 ```
 

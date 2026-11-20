@@ -98,21 +98,21 @@ let tests = [
       (task {
         let log = Ref.make []
         let shown = three (noted log "a" 1) (noted log "b" 2) (noted log "c" 3)
-        Test.expect (Test.equal ("[1, 2, 3]", ["a", "b", "c"]) (shown, Ref.get log))
+        Test.check (Test.equal ("[1, 2, 3]", ["a", "b", "c"]) (shown, Ref.get log))
       }),
     Test.effect_test
       "operands run left to right"
       (task {
         let log = Ref.make []
         let total = noted log "left" 1 + noted log "right" 2 * noted log "last" 3
-        Test.expect (Test.equal (7, ["left", "right", "last"]) (total, Ref.get log))
+        Test.check (Test.equal (7, ["left", "right", "last"]) (total, Ref.get log))
       }),
     Test.effect_test
       "record fields run in written order"
       (task {
         let log = Ref.make []
         let r = { z = noted log "z" 1; a = noted log "a" 2 }
-        Test.expect (Test.equal (3, ["z", "a"]) (r.z + r.a, Ref.get log))
+        Test.check (Test.equal (3, ["z", "a"]) (r.z + r.a, Ref.get log))
       }),
   ],
 ]

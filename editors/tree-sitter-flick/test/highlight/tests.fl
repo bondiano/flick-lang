@@ -4,7 +4,7 @@ suite "Users" {
   test.skip "trims" {}
 //^ keyword
 //    ^ keyword
-  test "keeps" { Test.expect (Test.equal 1 1) }
+  test "keeps" { Test.check (Test.equal 1 1) }
 //^ keyword
 //                    ^ property
   before_each { Platform.stdout_line "begin" }

@@ -16,13 +16,13 @@ suite "math" {
   test "first" {}
 
   test.each [(1, 2), (2, 3)] "adds {0} to get {1}" (a, b) {
-    Test.expect (Test.equal b (a + await base - 9))
+    Test.check (Test.equal b (a + await base - 9))
   }
 
-  test.each ["x", "yy"] "named" (s) { Test.expect (Test.equal 1 (String.length s)) }
+  test.each ["x", "yy"] "named" (s) { Test.check (Test.equal 1 (String.length s)) }
 }
 
-test.each [true] "alone {0}" (flag) { Test.expect (Test.is_true "true" flag) }
+test.each [true] "alone {0}" (flag) { Test.check (Test.is_true "true" flag) }
 "#;
 
 #[test]
