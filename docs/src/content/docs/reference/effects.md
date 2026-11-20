@@ -223,8 +223,10 @@ let names id =
 - An interruption is not kept. When the fiber running the body is
   interrupted, the next `await` runs the body again; the fibers waiting for
   it see no interruption.
-- The body may run in another fiber than the one that built the lazy, so it
-  needs `Detached r`: no `control` operation (`FLICK-E017`).
+- The body runs synchronously in the fiber that forces the lazy, so an `abort`
+  operation can unwind to a handler in that fiber (resetting the cell), while a
+  `control` operation cannot split it: `lazy` requires `NoControl r`
+  (`FLICK-E017`), and every `Detached r` satisfies `NoControl r`.
 - A lazy that is never awaited never runs its body.
 - A `Lazy` keeps what its body captured, and also the error it failed with,
   so it cannot outlive the `scope` of a resource it holds.
@@ -513,16 +515,23 @@ greeted : Unit ->{} String
 let greeted () = provide Greeter greeter { Greeter.greet "ada" }
 ```
 
-A task that `spawn`, `parallel`, the races, `timeout`, or the runs of
-`FiberSet`, `FiberMap` and `FiberHandle` start runs in a fiber of its own.
-The handler of an effect with a `control` operation is in the fiber that
-installed it, so such a task needs `Detached r`: no effect of its services
-has one. Work a region keeps needs it too: a finalizer, the release of a
-resource, a listener. It runs as its scope closes, when a handler may already
-have let the body go, and no one would answer the operation. The compiler
-decides `Detached r` from the row; a function that starts or keeps such work
-with the services of a row variable names it in its signature. A `control`
-effect there, or a row variable without it, is `FLICK-E017`:
+A task that `spawn`, `parallel`, the races, `timeout`, `Effect.cached`, the
+concurrent collection combinators (`Effect.for_each`, `Effect.all`,
+`Effect.partition`, `Effect.validate`, `Effect.filter`,
+`Effect.filter_map_effect`), or the runs of `FiberSet`, `FiberMap` and
+`FiberHandle` start runs in a fiber of its own. The handler of an effect with a
+`control` or `abort` operation is in the fiber that installed it, so such a
+task needs `Detached r`: no effect of its services has either. Work a region
+keeps needs it too: a finalizer, the release of a resource, a listener. It runs
+as its scope closes, when a handler may already have let the body go, and
+neither `control` nor `abort` can unwind back to it. A `lazy` initializer runs
+synchronously in the forcing fiber, so it needs only the superclass
+`NoControl r` (no `control` operation; `abort` is allowed). The compiler
+decides `Detached r` and `NoControl r` from the row; a function that starts or
+keeps detached work with the services of a row variable names `Detached r` in
+its signature, and one that only builds a `lazy` names `NoControl r`. A
+disallowed `control` or `abort` effect there, or a row variable without the
+constraint, is `FLICK-E017`:
 
 ```flick
 # effect Emit a =

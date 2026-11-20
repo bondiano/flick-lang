@@ -142,7 +142,13 @@ impl Build<'_> {
         let result = self.nodes(self.local(&head), |this, _, node, env, _| {
             let (module, name) = match &node.kind {
                 OwnerTypeKind::Con { module, name } => {
-                    if [Lang::Outlives, Lang::Provided, Lang::Detached, Lang::TypeEq]
+                    if [
+                        Lang::Outlives,
+                        Lang::Provided,
+                        Lang::Detached,
+                        Lang::NoControl,
+                        Lang::TypeEq,
+                    ]
                         .into_iter()
                         .filter_map(|item| lang::table().find(item))
                         .any(|item| item.module == *module && item.name == *name)
@@ -161,7 +167,13 @@ impl Build<'_> {
                 _ => return this.boolean(true),
             };
             let mut passes = this.boolean(true);
-            for item in [Lang::Outlives, Lang::Provided, Lang::Detached, Lang::TypeEq] {
+            for item in [
+                Lang::Outlives,
+                Lang::Provided,
+                Lang::Detached,
+                Lang::NoControl,
+                Lang::TypeEq,
+            ] {
                 let Some(item) = lang::table().find(item) else {
                     continue;
                 };

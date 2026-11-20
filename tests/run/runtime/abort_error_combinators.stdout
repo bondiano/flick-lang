@@ -1,0 +1,9 @@
+mixed handler: fail:["D", "D"]
+or_die abort: ok:stopped:halt
+or_die die+abort: fail:["D"]
+ignore_ abort: ok:stopped:ig
+ignore_cause abort: ok:stopped:igc
+catch_defect die+abort: ok:caught:fin-boom
+tap_defect die+abort: fail:["D"], tapped=fin-boom
+skip pure abort: stopped:tc,stopped:tci,stopped:oe,stopped:oei, ran=0
+on_exit die+abort: seen=fail:["D"], outer=fail:["D"]

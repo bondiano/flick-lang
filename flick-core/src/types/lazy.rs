@@ -24,9 +24,10 @@ impl Checker<'_> {
             return Type::Error;
         };
         let span = self.span(node);
-        // its first force may come from a fiber other than the one that built it
+        // its initializer runs synchronously in the forcing fiber, so `abort`
+        // can unwind to the forcer's handler, while `control` cannot split it
         self.want(
-            Type::app(Type::lang(Lang::Detached), services.clone()),
+            Type::app(Type::lang(Lang::NoControl), services.clone()),
             span,
         );
         let cell = Effects::new(Type::empty_row(), Type::empty_row());

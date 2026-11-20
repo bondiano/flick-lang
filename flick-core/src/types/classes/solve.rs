@@ -61,7 +61,7 @@ impl Checker<'_> {
                 match outcome {
                     Outcome::Solved(dict) => {
                         progress = true;
-                        // `Detached` is the compiler's to decide: no dictionary at run time
+                        // `Detached` and `NoControl` are the compiler's to decide: no dictionary at run time
                         if passes_dictionary(&w.constraint) {
                             self.record_dict(w.span, w.order, dict.clone());
                         }
@@ -263,7 +263,9 @@ impl Checker<'_> {
         let outcome = if let Some(class) = which(&RECORD_CLASSES, &module, &name) {
             self.primitive(c, class, &args, givens, chain)
         } else if lang::is(Lang::Detached, &module, &name) {
-            self.detached(c, &args, givens)
+            self.detached(c, &args, givens, Lang::Detached)
+        } else if lang::is(Lang::NoControl, &module, &name) {
+            self.detached(c, &args, givens, Lang::NoControl)
         } else if Self::structural(&module, &name)
             && matches!(args.first(), Some(Type::Record(_) | Type::Tuple(_)))
         {

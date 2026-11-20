@@ -9,6 +9,7 @@ import { Cause, Effect, Exit, type Option, Result } from "effect";
 import { none, some } from "./data.ts";
 import { nodeUtil } from "./host.ts";
 import { constructorName } from "@flick-lang/runtime/tags";
+import { isSignal, markSignal } from "@flick-lang/runtime/rt/cause";
 
 // a Proxy is told apart only on Node.js; elsewhere a payload is read by its descriptors anyway
 const types: Pick<typeof NodeTypes, "isProxy" | "isNativeError"> = /*#__PURE__*/ nodeUtil()?.types ?? {
@@ -17,15 +18,20 @@ const types: Pick<typeof NodeTypes, "isProxy" | "isNativeError"> = /*#__PURE__*/
 };
 
 const failsToDies = <E>(cause: Cause.Cause<E>): Cause.Cause<never> =>
-  Cause.fromReasons(cause.reasons.map((r) => (Cause.isFailReason(r) ? Cause.makeDieReason(r.error) : r)).filter(
-    (r): r is Cause.Die | Cause.Interrupt => !Cause.isFailReason(r),
-  ));
+  Cause.fromReasons(
+    cause.reasons.flatMap((r): ReadonlyArray<Cause.Die | Cause.Interrupt> => {
+      if (isSignalReason(r)) return [];
+      return Cause.isFailReason(r) ? [Cause.makeDieReason(r.error)] : [r];
+    }),
+  );
 
 /**
  * Where a handler of effects unwinds to (`handlers.ts`): the `abort` arm to
  * run there, or the typed failure of a `tail` arm, which is the handler's,
  * not its body's. No `try` and no `Exit` takes it for an error.
  */
+const handlerSignals = /*#__PURE__*/ new WeakSet<object>();
+
 export class HandlerSignal {
   readonly token: object;
   readonly arm: Effect.Effect<unknown, unknown, unknown> | undefined;
@@ -34,16 +40,46 @@ export class HandlerSignal {
     this.token = token;
     this.arm = arm;
     this.error = error;
+    handlerSignals.add(this);
+    markSignal(this);
     Object.freeze(this);
   }
 }
 
-/** Whether a typed failure is a handler unwinding, not an error. */
-export const isHandlerSignal = (error: unknown): error is HandlerSignal => error instanceof HandlerSignal;
+/** Whether `error` is an Effect-TS `HandlerSignal`, without touching Proxy traps. */
+export const isOwnHandlerSignal = (error: unknown): error is HandlerSignal =>
+  typeof error === "object" && error !== null && handlerSignals.has(error);
+
+/** Whether a typed failure is a handler unwinding (Effect-TS or bridged native `rt`), not an error. */
+export const isHandlerSignal = (error: unknown): boolean => isSignal(error);
+
+const isSignalReason = (r: Cause.Reason<unknown>): boolean =>
+  (Cause.isFailReason(r) && isHandlerSignal(r.error)) ||
+  (Cause.isDieReason(r) && isHandlerSignal(r.defect));
+
+/** Whether `cause` carries a defect other than a handler unwinding signal. */
+export const hasRealDie = (cause: Cause.Cause<unknown>): boolean =>
+  cause.reasons.some((r) => Cause.isDieReason(r) && !isHandlerSignal(r.defect));
 
 /** Whether `cause` unwinds to a handler of effects. */
 export const unwinds = (cause: Cause.Cause<unknown>): boolean =>
   cause.reasons.some((r) => Cause.isFailReason(r) && isHandlerSignal(r.error));
+
+/** Whether `cause` carries any handler signal reason (including one elected to a `Die` by Effect's `onExit`). */
+export const hasSignal = (cause: Cause.Cause<unknown>): boolean =>
+  cause.reasons.some(isSignalReason);
+
+/** `cause` with handler unwinding signals removed, used when a real defect supersedes unwinding. */
+export const stripSignals = <E>(cause: Cause.Cause<E>): Cause.Cause<E> =>
+  Cause.fromReasons(cause.reasons.filter((r) => !isSignalReason(r)));
+
+/** Drops handler unwinding signals when a real defect is also present in the cause. */
+export const dropSignalsOnDie = <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+  Effect.catchCauseIf(
+    self,
+    (cause) => hasRealDie(cause) && hasSignal(cause),
+    (cause) => Effect.failCause(stripSignals(cause)),
+  );
 
 /**
  * `cause` again, unchanged, where only a handler of effects takes it: it
@@ -59,7 +95,7 @@ export const passOn = (cause: Cause.Cause<unknown>): Effect.Effect<never> =>
  * interruption alone has no error.
  */
 const recoverable = <E>(cause: Cause.Cause<E>): Cause.Fail<E> | undefined =>
-  Cause.hasDies(cause) || unwinds(cause) ? undefined : cause.reasons.find(Cause.isFailReason);
+  hasRealDie(cause) || unwinds(cause) ? undefined : cause.reasons.find(Cause.isFailReason);
 
 type Selected<B> = { readonly die: Cause.Cause<never> } | { readonly handled: B };
 
@@ -77,8 +113,8 @@ export const tryWith = <A, E, R, A2, E2, R2>(
   Effect.catchCauseFilter(
     body,
     (cause): Result.Result<Selected<Effect.Effect<A2, E2, R2>>, Cause.Cause<E>> => {
-      if (Cause.hasDies(cause)) {
-        return Cause.hasFails(cause) ? Result.succeed({ die: failsToDies(cause) }) : Result.fail(cause);
+      if (hasRealDie(cause)) {
+        return Cause.hasFails(cause) || hasSignal(cause) ? Result.succeed({ die: failsToDies(cause) }) : Result.fail(cause);
       }
       const reason = recoverable(cause);
       const handled = reason === undefined ? undefined : handler(reason.error, () => Effect.failCause(cause));
@@ -132,11 +168,16 @@ export class FlickExit<A> {
 
 /** The exit of `effect`, which itself never fails but where it unwinds to a handler. */
 export const exitOf = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<FlickExit<A>, never, R> =>
-  Effect.flatMap(Effect.exit(effect), (exit) =>
-    Exit.isFailure(exit) && unwinds(exit.cause)
-      ? passOn(exit.cause)
-      : Effect.succeed(new FlickExit(exit)),
-  );
+  Effect.flatMap(Effect.exit(effect), (exit) => {
+    if (Exit.isFailure(exit)) {
+      if (hasRealDie(exit.cause)) {
+        const cleaned = hasSignal(exit.cause) ? stripSignals(exit.cause) : exit.cause;
+        return Effect.succeed(new FlickExit(Exit.failCause(cleaned)));
+      }
+      if (unwinds(exit.cause)) return passOn(exit.cause);
+    }
+    return Effect.succeed(new FlickExit(exit));
+  });
 export const exitValue = <A>(exit: FlickExit<A>): Option.Option<A> => FlickExit.value(exit);
 export const exitFailure = <A>(exit: FlickExit<A>): Option.Option<Failure> => FlickExit.failure(exit);
 

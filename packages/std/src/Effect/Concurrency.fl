@@ -51,16 +51,16 @@ foreign effect fiber_id from "flick:Effect" "flickFiberId"
   arity 0
 
 /// A task that runs `task` the first time and gives its outcome each time.
-cached : Eff r e a ->{} Eff r e a
+cached : Detached r => Eff r e a ->{} Eff r e a
 foreign effect cached from "flick:Effect" "cached"
 
 /// `cached`, running `task` again once the duration has passed.
-cached_with_ttl : Duration.Duration -> Eff r e a ->{} Eff r e a
+cached_with_ttl : Detached r => Duration.Duration -> Eff r e a ->{} Eff r e a
 foreign effect cached_with_ttl from "flick:Effect" "cachedWithTTL"
   arity 1
 
 /// `cached_with_ttl`, and a task that forgets the cached outcome.
-cached_invalidate_with_ttl : Duration.Duration -> Eff r e a ->{} (Eff r e a, Eff none none Unit)
+cached_invalidate_with_ttl : Detached r => Duration.Duration -> Eff r e a ->{} (Eff r e a, Eff none none Unit)
 foreign effect cached_invalidate_with_ttl from "flick:Effect" "cachedInvalidateWithTTL"
   arity 1
 

@@ -58,8 +58,9 @@ func LazyForce(fb *Fiber, l Value) Value {
 // its outcome, or makes it pending again.
 func (cell *LazyCell) attempt(fb *Fiber, task Value) Value {
 	v, c := catch(func() Value { return Run(fb, task) })
+	c = cleanCause(c)
 	cell.mu.Lock()
-	if c == nil || !(c.has(causeInterrupt) || unwinds(c)) {
+	if c == nil || (!c.has(causeInterrupt) && (c.hasRealDie() || !unwinds(c))) {
 		cell.exit, cell.task = &Exit{v, c}, nil
 	}
 	cell.owner = nil

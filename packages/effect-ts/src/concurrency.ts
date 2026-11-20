@@ -3,7 +3,7 @@
 // interrupted and awaited, and success values keep the order of the input.
 import { Cause, Effect, Exit, type Result } from "effect";
 
-import { type FlickExit, exitOf } from "./cause.ts";
+import { type FlickExit, exitOf, hasRealDie, hasSignal, stripSignals, unwinds } from "./cause.ts";
 import { err, ok } from "./data.ts";
 
 /** `parallel a b`: both, as a tuple. */
@@ -32,8 +32,10 @@ export const parallelResults = <A, E, R>(
     effects.map((effect) =>
       Effect.flatMap(Effect.exit(effect), (exit): Effect.Effect<Result.Result<A, E>, E> => {
         if (Exit.isSuccess(exit)) return Effect.succeed(ok(exit.value));
-        const reason = Cause.hasDies(exit.cause) ? undefined : exit.cause.reasons.find(Cause.isFailReason);
-        return reason ? Effect.succeed(err(reason.error)) : Effect.failCause(exit.cause);
+        const reason = hasRealDie(exit.cause) || unwinds(exit.cause) ? undefined : exit.cause.reasons.find(Cause.isFailReason);
+        return reason
+          ? Effect.succeed(err(reason.error))
+          : Effect.failCause(hasRealDie(exit.cause) && hasSignal(exit.cause) ? stripSignals(exit.cause) : exit.cause);
       }),
     ),
     { concurrency: "unbounded" },

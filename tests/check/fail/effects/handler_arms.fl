@@ -145,8 +145,102 @@ kept : Unit ->{} List Int
 let kept () = collect (fun () -> scope { Scope.add_finalizer (task { Emit.emit 1 }) })
 //~ FLICK-E017 @145:42-145:61 `Detached {Emit Int}` does not hold: effect
 
-/// A row variable may hold a `control` effect here too.
+/// A row variable may hold a `control` or `abort` effect here too.
 kept_row : Eff r none Unit ->{r} Unit
 let kept_row work = scope { Scope.add_finalizer work }
 //~ FLICK-E017 @150:29-150:48 cannot deduce `Detached r` from the constraints
+
+/// An `abort` handler is in this fiber: a child of `parallel`, `spawn`,
+/// `parallel_results`, `race_success`, `Effect.cached` or `Effect.for_each`
+/// cannot reach it, and neither can a scope finalizer.
+abort_parallel : Unit ->{} String
+let abort_parallel () =
+  try
+    let _ = parallel (task { Throw.throw "left" }) (task { 1 })
+    "ok"
+  with
+  | Throw.throw s -> s
+//~ FLICK-E017 @159:13-159:21 `Detached {Throw}` does not hold: effect
+
+abort_spawn : Unit ->{Async} String
+let abort_spawn () =
+  try
+    scope owner {
+      let _ = Fiber.spawn owner (fun _ -> ()) (task { Throw.throw "child" })
+      "ok"
+    }
+  with
+  | Throw.throw s -> s
+//~ FLICK-E017 @169:15-169:26 `Detached {Throw}` does not hold: effect
+
+abort_finalizer : Unit ->{} String
+let abort_finalizer () =
+  try
+    scope {
+      Scope.add_finalizer (task { Throw.throw "fin" })
+      "ok"
+    }
+  with
+  | Throw.throw s -> s
+//~ FLICK-E017 @180:7-180:26 `Detached {Throw}` does not hold: effect
+
+abort_defer : Unit ->{} String
+let abort_defer () =
+  try
+    scope {
+      Scope.defer (fun _ -> Throw.throw "defer")
+      "ok"
+    }
+  with
+  | Throw.throw s -> s
+//~ FLICK-E017 @191:7-191:18 `Detached {Throw}` does not hold: effect
+
+abort_parallel_results : Unit ->{} String
+let abort_parallel_results () =
+  try
+    let _ = parallel_results [task { Throw.throw "res" }]
+    "ok"
+  with
+  | Throw.throw s -> s
+//~ FLICK-E017 @201:13-201:29 `Detached {Throw}` does not hold: effect
+
+abort_race_success : Unit ->{} String
+let abort_race_success () =
+  try
+    let _ = race_success (task { Throw.throw "race" }) (task { 1 })
+    "ok"
+  with
+  | Throw.throw s -> s
+//~ FLICK-E017 @210:13-210:25 `Detached {Throw}` does not hold: effect
+
+abort_cached : Unit ->{} String
+let abort_cached () =
+  try
+    let cached = Effect.cached (task { Throw.throw "cached" })
+    let _ = await cached
+    "ok"
+  with
+  | Throw.throw s -> s
+//~ FLICK-E017 @219:18-219:31 `Detached {Throw}` does not hold: effect
+
+abort_for_each : Unit ->{} String
+let abort_for_each () =
+  try
+    let _ = Effect.for_each Effect.Unbounded (fun _ -> Throw.throw "each") [1]
+    "ok"
+  with
+  | Throw.throw s -> s
+//~ FLICK-E017 @229:13-229:28 `Detached {Throw}` does not hold: effect
+
+/// A `Lazy` may use `abort`, because it forces in the forcing fiber; forcing it
+/// in a detached child without handling `Throw` inside the child is still `E017`.
+abort_lazy_in_parallel : Unit ->{Async} String
+let abort_lazy_in_parallel () =
+  try
+    let l : Lazy {Throw} none Int = lazy { Throw.throw "lazy" }
+    let _ = parallel (task { await l }) (task { 1 })
+    "ok"
+  with
+  | Throw.throw s -> s
+//~ FLICK-E017 @241:13-241:21 `Detached {Throw, Async}` does not hold: effect
 //~ FLICK-G002 @36:18-36:24 this uses region `resume`, which the expected type `Unit ->{} Int` does not keep live

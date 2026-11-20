@@ -1,0 +1,80 @@
+// `Lazy.force` follows R9 (`Cached`): any interruption prevents caching, even
+// alongside a defect; a real defect without interruption strips any handler
+// unwinding signal and caches the cleaned defect; a pure `abort` resets the
+// cell so a later force runs the initializer again.
+module App.Main exposing (main)
+
+effect Stop =
+  abort stop : forall a. String ->{} a
+
+say : String ->{Host.Console} Unit
+let say line = Platform.stdout_line line
+
+view : Failure e -> List String
+let view f =
+  label : Cause.Reason e -> String
+  let label r = if Cause.is_fail_reason r then "F" else if Cause.is_die_reason r then "D" else "I"
+  List.map label (Cause.reasons f)
+
+outcome : Exit e Int -> String
+let outcome ex = Exit.match_ (fun v -> "ok:" ++ show v) (fun f -> "fail:" ++ show (view f)) ex
+
+stopping : (Unit ->{Stop | r; e} Int) ->{r; e} Int
+let stopping body =
+  try body () with
+  | Stop.stop _ -> 999
+
+main : Unit ->{Host.Console, Async; AppError} Unit
+let main () =
+  let runs1 = Ref.make 0
+  let cell1 : Lazy {Async} none Int = lazy {
+    let n = Ref.get runs1 + 1
+    Ref.set runs1 n
+    if n == 1 then
+      Effect.fail_cause_sync (fun () -> Cause.combine (Cause.interrupt None) (Cause.die "int-die"))
+    else
+      42
+  }
+  let a1 = Effect.exit (task { await cell1 })
+  let a2 = Effect.exit (task { await cell1 })
+  say
+    ("int+die: runs="
+      ++ show (Ref.get runs1)
+      ++ ", first="
+      ++ outcome a1
+      ++ ", second="
+      ++ outcome a2)
+
+  let runs2 = Ref.make 0
+  let cell2 : Lazy {Stop, Async} none Int = lazy {
+    Ref.set runs2 (Ref.get runs2 + 1)
+    scope {
+      Scope.add_finalizer (task { Effect.die "fin-boom" })
+      Stop.stop "body-abort"
+    }
+  }
+  let b1 = Effect.exit (task { stopping (fun () -> await cell2) })
+  let b2 = Effect.exit (task { stopping (fun () -> await cell2) })
+  say
+    ("abort+fin-die: runs="
+      ++ show (Ref.get runs2)
+      ++ ", first="
+      ++ outcome b1
+      ++ ", second="
+      ++ outcome b2)
+
+  let runs3 = Ref.make 0
+  let cell3 : Lazy {Stop, Async} none Int = lazy {
+    let n = Ref.get runs3 + 1
+    Ref.set runs3 n
+    if n == 1 then Stop.stop "retry-me" else 7
+  }
+  let c1 = Effect.exit (task { stopping (fun () -> await cell3) })
+  let c2 = Effect.exit (task { stopping (fun () -> await cell3) })
+  say
+    ("pure abort: runs="
+      ++ show (Ref.get runs3)
+      ++ ", first="
+      ++ outcome c1
+      ++ ", second="
+      ++ outcome c2)

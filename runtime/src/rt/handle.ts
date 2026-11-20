@@ -11,15 +11,16 @@ import {
   Raise,
   Signal,
   causeOf,
-  dies,
+  elect,
   fail,
   failed,
   fromReasons,
-  hasDies,
   hasFails,
   hasInterrupts,
+  hasRealDie,
   raise,
   signalOf,
+  stripSignals,
   succeeded,
   unwinds,
 } from "./cause.ts";
@@ -47,6 +48,7 @@ import {
 export const bridgeHooks: {
   operation: ((tag: object) => unknown) | undefined;
   ran: (value: unknown) => unknown;
+  identity?: (fiber: Fiber) => number;
 } = { operation: undefined, ran: (value) => value };
 
 /** An operation of a handler: its name, arm, class, and how many dictionaries and arguments it takes. */
@@ -128,18 +130,18 @@ const dictsApplied = (f: unknown, given: ReadonlyArray<unknown>): unknown => {
   return applied;
 };
 
+const invoke = (impl: unknown, name: string, dicts: ReadonlyArray<unknown>, args: ReadonlyArray<unknown>): unknown =>
+  applyAll(dictsApplied(Reflect.get(Object(impl), name), dicts), args);
+
 /** `S.op` given its last argument: the implementation `impl` the evidence has for it now, applied. */
 const performed = (impl: unknown, tag: object, name: string, dicts: ReadonlyArray<unknown>, args: ReadonlyArray<unknown>): unknown => {
   if (impl === undefined) {
     const fromHost = bridgeHooks.operation?.(tag);
-    if (fromHost !== undefined) {
-      const value = applyAll(dictsApplied(Reflect.get(Object(fromHost), name), dicts), args);
-      return bridgeHooks.ran(value);
-    }
+    if (fromHost !== undefined) return bridgeHooks.ran(invoke(fromHost, name, dicts, args));
     throw new Error(`no handler of \`${String(Reflect.get(tag, "key"))}\` is in effect`);
   }
   if (impl instanceof Served) return impl.call(name, dicts, args);
-  return applyAll(dictsApplied(Reflect.get(Object(impl), name), dicts), args);
+  return invoke(impl, name, dicts, args);
 };
 
 /**
@@ -158,13 +160,13 @@ export const operation = (tag: object, name: string, arity: number, dicts: Reado
   }
   const collect = (args: ReadonlyArray<unknown>): unknown =>
     args.length === arity ? performed(operationImplementation(tag, name), tag, name, dicts, args) : (a: unknown) => collect([...args, a]);
-  return arity === 0 ? performed(operationImplementation(tag, name), tag, name, dicts, []) : collect([]);
+  return collect([]);
 };
 
 /** A failure of a `tail` arm is the handler's, not that of the body in between. */
 const armFailure = (thrown: unknown, token: object): unknown => {
   const cause = causeOf(thrown);
-  if (hasFails(cause) && !hasDies(cause) && !unwinds(cause)) {
+  if (hasFails(cause) && !hasRealDie(cause) && !unwinds(cause)) {
     return new Raise(fail(new Signal(token, undefined, cause, false)));
   }
   return thrown;
@@ -223,6 +225,10 @@ class Prompt {
   }
 }
 
+const wrongFiber = (kind: string): never => {
+  throw new Error(`${kind} operation ran in a fiber other than its handler's`);
+};
+
 /** A `control` operation: captures up to its handler's body and runs the arm on what is below. */
 class Control extends Instruction {
   private readonly prompt: Prompt;
@@ -233,9 +239,7 @@ class Control extends Instruction {
     this.arm = arm;
   }
   exec(fiber: Fiber): boolean {
-    if (fiber !== this.prompt.fiber) {
-      throw new Error("a `control` operation ran in a fiber other than its handler's");
-    }
+    if (fiber !== this.prompt.fiber) wrongFiber("a `control`");
     if (this.prompt.seq <= fiber.cut) {
       fiber.mode = 1;
       fiber.value = new Raise(fail(cut));
@@ -359,13 +363,21 @@ function* bodyRun(
   } catch (thrown) {
     fiber.mask = prompt.mask;
     const cause = causeOf(thrown);
-    const signal = signalOf(cause, prompt.token);
-    if (signal !== undefined) {
-      if (signal.discontinue) return undefined;
-      if (signal.arm !== undefined) return new Under(prompt.ctx, signal.arm);
-      return raise(signal.cause ?? cause);
+    if (hasRealDie(cause)) {
+      if (errors === undefined) {
+        const cleaned = stripSignals(cause);
+        if (cleaned !== cause) return raise(cleaned);
+        throw thrown;
+      }
+    } else {
+      const signal = signalOf(cause, prompt.token);
+      if (signal !== undefined) {
+        if (signal.discontinue) return undefined;
+        if (signal.arm !== undefined) return new Under(prompt.ctx, signal.arm);
+        return raise(signal.cause ?? cause);
+      }
+      if (errors === undefined || unwinds(cause)) throw thrown;
     }
-    if (errors === undefined || unwinds(cause)) throw thrown;
     return new Under(prompt.ctx, () => recovered(cause, errors));
   }
   fiber.mask = prompt.mask;
@@ -380,8 +392,8 @@ function* bodyRun(
  */
 const recovered = (cause: Cause, handler: (error: unknown, unhandled: () => never) => (() => unknown) | undefined): unknown => {
   skipHandler(currentFiber(), cause);
+  if (hasRealDie(cause)) return raise(elect(cause));
   if (unwinds(cause)) return raise(cause);
-  if (hasDies(cause)) return raise(hasFails(cause) ? dies(cause) : cause);
   for (const r of cause.reasons) {
     if (r._tag === "Fail") {
       const handled = handler(r.error, () => raise(cause));
@@ -422,6 +434,9 @@ const armOf = (prompt: Prompt, [, arm, kind, dicts, arity]: OpInstall): unknown 
   }
   if (kind === "abort") {
     return collected(dicts, arity, (given, args) => {
+      const f = currentFiber();
+      const id = bridgeHooks.identity;
+      if (f !== prompt.fiber && (!id || id(f) !== id(prompt.fiber))) wrongFiber("an `abort`");
       const ctx = evidenced(prompt.ctx, currentCtx().stageOwner);
       return raise(fail(new Signal(token, () => new Under(ctx, () => called(given, args)), undefined, false)));
     });
@@ -457,14 +472,14 @@ export const handle = (
  * the arms of `provide S impl` do (docs/formal/runtime.md §3.5).
  */
 class Served {
-  private readonly prompt: Prompt;
-  readonly impl: unknown;
+  declare private readonly prompt: Prompt;
+  declare readonly impl: unknown;
   constructor(prompt: Prompt, impl: unknown) {
     this.prompt = prompt;
     this.impl = impl;
   }
   call(name: string, given: ReadonlyArray<unknown>, args: ReadonlyArray<unknown>): unknown {
-    return tailCall(this.prompt, () => applyAll(dictsApplied(Reflect.get(Object(this.impl), name), given), args));
+    return tailCall(this.prompt, () => invoke(this.impl, name, given, args));
   }
 }
 

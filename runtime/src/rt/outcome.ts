@@ -6,9 +6,9 @@ import { type CauseReport, report } from "./describe.ts";
 
 /** `Failure e`: how a computation failed. */
 export class Failure {
-  readonly cause: Cause;
+  declare readonly cause: Cause;
   /** Whether it is the interruption of a closing owner. */
-  readonly shutdown: boolean;
+  declare readonly shutdown: boolean;
   constructor(cause: Cause, shutdown = false) {
     this.cause = cause;
     this.shutdown = shutdown;
@@ -18,7 +18,7 @@ export class Failure {
 
 /** `RawCause`: the whole cause, for diagnostics only. */
 export class RawCause {
-  readonly cause: Cause;
+  declare readonly cause: Cause;
   constructor(cause: Cause) {
     this.cause = cause;
     Object.freeze(this);

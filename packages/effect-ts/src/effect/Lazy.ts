@@ -6,7 +6,7 @@
 // the interruption as the outcome.
 import { Cause, Deferred, Effect, Exit, type Fiber } from "effect";
 
-import { unwinds } from "../cause.ts";
+import { hasRealDie, hasSignal, stripSignals, unwinds } from "../cause.ts";
 
 export class LazyCell<A, E, R> {
   /** The initializer, until an attempt settles the cell. */
@@ -35,7 +35,8 @@ export const lazyDone = <A>(value: A): Effect.Effect<LazyCell<A, never, never>> 
 
 const SELF_FORCE = "lazy forced during its own initialization";
 
-const cached = (cause: Cause.Cause<unknown>): boolean => !Cause.hasInterrupts(cause) && !unwinds(cause);
+const cached = (cause: Cause.Cause<unknown>): boolean =>
+  !Cause.hasInterrupts(cause) && (hasRealDie(cause) || !unwinds(cause));
 
 /** `await cell`: its outcome, running the initializer in this fiber when no attempt has settled it. */
 export const lazyForce = <A, E, R>(cell: LazyCell<A, E, R>): Effect.Effect<A, E, R> =>
@@ -52,12 +53,16 @@ export const lazyForce = <A, E, R>(cell: LazyCell<A, E, R>): Effect.Effect<A, E,
       cell.running = { owner: fiber, ended };
       return Effect.flatMap(Effect.exit(restore(task)), (exit) => {
         cell.running = undefined;
-        if (Exit.isSuccess(exit) || cached(exit.cause)) {
-          cell.exit = exit;
+        const outcome =
+          Exit.isFailure(exit) && hasRealDie(exit.cause) && hasSignal(exit.cause)
+            ? Exit.failCause(stripSignals(exit.cause))
+            : exit;
+        if (Exit.isSuccess(outcome) || cached(outcome.cause)) {
+          cell.exit = outcome;
           cell.task = undefined;
         }
         Deferred.doneUnsafe(ended, Exit.void);
-        return exit;
+        return outcome;
       });
     }),
   );

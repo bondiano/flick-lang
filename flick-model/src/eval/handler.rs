@@ -78,6 +78,11 @@ impl Machine<'_> {
         if self.lambda.ended_handlers.contains(&id) {
             return Err(stuck(format!("`{effect}.{op}` of a handler that ended")));
         }
+        if matches!(self.frames[at], Frame::KeptHandler(..)) && class != OpClass::Tail {
+            return Err(stuck(format!(
+                "`{effect}.{op}` is not `tail` and its handler is kept"
+            )));
+        }
         let (Frame::Handler(_, h) | Frame::KeptHandler(_, h)) = &self.frames[at] else {
             unreachable!("a handler's frame, found above")
         };

@@ -1,0 +1,3 @@
+int+die: runs=2, first=fail:["D", "I"], second=ok:42
+abort+fin-die: runs=1, first=fail:["D"], second=fail:["D"]
+pure abort: runs=2, first=ok:999, second=ok:7

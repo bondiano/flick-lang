@@ -3,7 +3,7 @@
 // later force gets. A typed failure or a defect is an outcome; an interruption
 // of the fiber running the attempt, or an unwind to one of its handlers, is
 // not: the cell is pending again, and a waiter retries it.
-import { type Exit, causeOf, failed, hasInterrupts, succeeded, unwinds } from "../cause.ts";
+import { type Exit, causeOf, failed, hasInterrupts, hasRealDie, raise, stripSignals, succeeded, unwinds } from "../cause.ts";
 import { type Fiber, type Run, Suspend, currentFiber, raiseOf } from "../fiber.ts";
 
 type Task = () => unknown;
@@ -56,7 +56,11 @@ export function* lazyForce(cell: LazyCell): Run {
     return value;
   } catch (thrown) {
     const cause = causeOf(thrown);
-    if (!hasInterrupts(cause) && !unwinds(cause)) exit = failed(cause);
+    const cleaned = hasRealDie(cause) ? stripSignals(cause) : cause;
+    if (!hasInterrupts(cleaned) && (hasRealDie(cause) || !unwinds(cause))) {
+      exit = failed(cleaned);
+    }
+    if (cleaned !== cause) return raise(cleaned);
     throw thrown;
   } finally {
     cell.owner = undefined;

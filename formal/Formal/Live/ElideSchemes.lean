@@ -206,7 +206,7 @@ theorem from_result :
       (.arrow (.tapp (.tapp (.adt "Prelude.Result") (.errors (.tvar 0))) (.tvar 1)) (.rt .cnil (.tvar 0)) (.tvar 1) Caps.none) := by
   elide_eq
 
-/-- `Prelude.lazy_make : forall r e a c. Detached r => (Eff r e a)^c ->{} Lazy r e a` -/
+/-- `Prelude.lazy_make : forall r e a c. NoControl r => (Eff r e a)^c ->{} Lazy r e a` -/
 theorem lazy_make :
     Ty.Reads (Ty.elide (fun x => x = .v 3) (.arrow (.eff (.tvar 0) (.tvar 1) (.tvar 2) (fun x => x = .v 3)) (.rt .cnil .cnil) (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Lazy") (.caps (fun x => x = .v 3))) (.tvar 0)) (.tvar 1)) (.tvar 2)) Caps.none) Caps.none)
       (.arrow (.eff (.tvar 0) (.tvar 1) (.tvar 2) (fun x => x = .v 3)) (.rt (.caps (fun x => x = .v 3)) .cnil) (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Lazy") (.caps (fun x => x = .v 3))) (.tvar 0)) (.tvar 1)) (.tvar 2)) Caps.none) := by

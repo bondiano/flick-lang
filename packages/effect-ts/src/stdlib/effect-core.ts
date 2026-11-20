@@ -1,9 +1,9 @@
 // Adapters of Effect's `Effect` for the parts `Effect.Core` and
 // `Effect.Concurrency`: options records from positional Flick arguments,
 // Flick's `Concurrency`, and Effect's errors as Flick errors.
-import { type Duration, Effect, type Result, type Schedule, type Scope } from "effect";
+import { Cause, type Duration, Effect, Exit, Function, Result, type Schedule, type Scope } from "effect";
 
-import { type Failure, exitOf } from "../cause.ts";
+import { type Failure, dropSignalsOnDie, exitOf, hasRealDie, hasSignal, passOn, stripSignals, unwinds } from "../cause.ts";
 import type { Data } from "../data.ts";
 import { tag, constructorName } from "@flick-lang/runtime/tags";
 import { causeOf, noSuchElement } from "../effect/Cause.ts";
@@ -52,18 +52,95 @@ export const flickAll =
   <A, E, R>(effects: ReadonlyArray<Effect.Effect<A, E, R>>) =>
     Effect.all(effects, { concurrency: concurrency(c) });
 
+const partitionExits = <A, B, E, R>(
+  c: Data,
+  f: (a: A) => Effect.Effect<B, E, R>,
+  elements: ReadonlyArray<A>,
+): Effect.Effect<[Array<B>, Array<E>], never, R> =>
+  Effect.map(
+    Effect.forEach(
+      elements,
+      (a) =>
+        Effect.flatMap(Effect.exit(f(a)), (exit): Effect.Effect<Result.Result<B, E>> => {
+          if (Exit.isSuccess(exit)) return Effect.succeed(Result.succeed(exit.value));
+          const reason =
+            hasRealDie(exit.cause) || unwinds(exit.cause)
+              ? undefined
+              : exit.cause.reasons.find(Cause.isFailReason);
+          return reason === undefined
+            ? passOn(hasRealDie(exit.cause) && hasSignal(exit.cause) ? stripSignals(exit.cause) : exit.cause)
+            : Effect.succeed(Result.fail(reason.error));
+        }),
+      { concurrency: concurrency(c) },
+    ),
+    (results) => {
+      const passes: Array<B> = [];
+      const fails: Array<E> = [];
+      for (const r of results) {
+        if (Result.isSuccess(r)) passes.push(r.success);
+        else fails.push(r.failure);
+      }
+      return [passes, fails];
+    },
+  );
+
 export const flickPartition =
   <A, B, E, R>(c: Data, f: (a: A) => Effect.Effect<B, E, R>) =>
-  (elements: ReadonlyArray<A>) =>
-    Effect.partition(elements, (a) => f(a), { concurrency: concurrency(c) });
+  (elements: ReadonlyArray<A>): Effect.Effect<[Array<B>, Array<E>], never, R> =>
+    partitionExits(c, f, elements);
 
 export const flickValidate =
   <A, B, E, R>(c: Data, f: (a: A) => Effect.Effect<B, E, R>) =>
-  (elements: ReadonlyArray<A>) =>
-    Effect.mapError(Effect.validate(elements, (a) => f(a), { concurrency: concurrency(c) }), (errors) => ({
-      _tag: VALIDATION,
-      _0: errors,
-    }));
+  (elements: ReadonlyArray<A>): Effect.Effect<Array<B>, { readonly _tag: string; readonly _0: Array<E> }, R> =>
+    Effect.flatMap(partitionExits(c, f, elements), ([passes, fails]) =>
+      fails.length > 0 ? Effect.fail({ _tag: VALIDATION, _0: fails }) : Effect.succeed(passes),
+    );
+
+/** `Effect.first_success_of`: propagates handler unwinding instead of treating it as a typed error. */
+export const flickFirstSuccessOf = <A, E, R>(
+  effects: Iterable<Effect.Effect<A, E, R>>,
+): Effect.Effect<A, E, R> =>
+  Effect.suspend(() => {
+    const items = Array.from(effects);
+    if (items.length === 0) {
+      return Effect.die(new Error("Received an empty collection of effects"));
+    }
+    const step = (index: number): Effect.Effect<A, E, R> => {
+      const current = items[index];
+      if (current === undefined) {
+        return Effect.die(new Error("Received an empty collection of effects"));
+      }
+      if (index === items.length - 1) return current;
+      return Effect.catchCause(current, (cause) =>
+        !Cause.hasFails(cause) || hasRealDie(cause) || unwinds(cause)
+          ? passOn(hasRealDie(cause) && hasSignal(cause) ? stripSignals(cause) : cause)
+          : step(index + 1),
+      );
+    };
+    return step(0);
+  });
+
+/** `Effect.eventually`: retries typed failures only; handler unwinding propagates immediately. */
+export const flickEventually = <A, E, R>(
+  self: Effect.Effect<A, E, R>,
+): Effect.Effect<A, E, R> => {
+  const loop: Effect.Effect<A, E, R> = Effect.catchCause(self, (cause) =>
+    !Cause.hasFails(cause) || hasRealDie(cause) || unwinds(cause)
+      ? passOn(hasRealDie(cause) && hasSignal(cause) ? stripSignals(cause) : cause)
+      : Effect.flatMap(Effect.yieldNow, () => loop),
+  );
+  return loop;
+};
+
+/** `Effect.ensuring`: strips handler signals when a defect is also present so defects are neither swallowed nor polluted. */
+export const flickEnsuring: {
+  <R2>(finalizer: Effect.Effect<unknown, never, R2>): <A, E, R>(self: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R | R2>;
+  <A, E, R, R2>(self: Effect.Effect<A, E, R>, finalizer: Effect.Effect<unknown, never, R2>): Effect.Effect<A, E, R | R2>;
+} = Function.dual(
+  2,
+  <A, E, R, R2>(self: Effect.Effect<A, E, R>, finalizer: Effect.Effect<unknown, never, R2>): Effect.Effect<A, E, R | R2> =>
+    dropSignalsOnDie(Effect.ensuring(self, finalizer)),
+);
 
 export const flickFilter =
   <A, E, R>(c: Data, f: (a: A) => Effect.Effect<boolean, E, R>) =>

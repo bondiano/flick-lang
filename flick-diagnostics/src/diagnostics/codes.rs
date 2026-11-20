@@ -176,7 +176,7 @@ codes! {
     E014 = Effects 14, "`abort` operation that may return";
     E015 = Effects 15, "handler `return` arm that may not match";
     E016 = Effects 16, "`provide` of an effect that is not a service";
-    E017 = Effects 17, "task in a fiber of its own needs a `control` effect";
+    E017 = Effects 17, "task needs a `control` or `abort` effect its handler cannot answer";
     E018 = Effects 18, "`tail` arm that may suspend";
     E019 = Effects 19, "row variable that may hold another instance of a provided service";
     E020 = Effects 20, "unhandled effect on the selected environment";

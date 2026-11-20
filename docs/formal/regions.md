@@ -411,7 +411,7 @@ Provided R ϱ         constraint (like Outlives, §2.4): the provider of each se
 Γ ⊢ Fiber.spawn o f t : Fiber e a ! R⟨r; none⟩
 ```
 
-The scheme of every constant with `retention owner` (G4) requires `Fiber.Provided r s` and `Detached r` for the row of the retained task or finalizer, as it requires `Fiber.Outlives c s` for captures; with one region in the signature the checker adds them (`ffi.rs` `with_owner_constraints`), and a foreign function otherwise without them is `FLICK-F002` (`ffi.rs` `owner_retention`).
+The scheme of every constant with `retention owner` (G4) requires `Fiber.Provided r s` and `Detached r` (no `control` or `abort` operations) for the row of the retained task or finalizer, as it requires `Fiber.Outlives c s` for captures; with one region in the signature the checker adds them (`ffi/retention.rs` `with_owner_constraints`), and a foreign function otherwise missing `Outlives`, `Provided` or `Detached` is `FLICK-F002` (`ffi/retention.rs` `owner_retention`).
 
 The call site splits `Provided r ϱ` into the services `S ∈ r` (except `Scope`, `Async`, which the root gives every fiber and no owner provides, and the obligations themselves) and discharges each in the stage `X` that contains the call, lexically, like `Scope ϱ` (`regions/scopes.rs` `lexical_owner`):
 

@@ -5,7 +5,7 @@
 // scheduler, so a queue is never changed under a loop over its waiters.
 import { type Option, none, some } from "../../core/data.ts";
 import { tag } from "../../tags.ts";
-import { type Cause, fail, fromReasons, interrupt, isFail, isInterrupt, raise, unwinds } from "../cause.ts";
+import { type Cause, cleanExit, fail, fromReasons, interrupt, isFail, isInterrupt, raise } from "../cause.ts";
 import { type Run, Suspend, asExit, atMask, currentFiber, exitOf, schedule } from "../fiber.ts";
 import type { Failure } from "../outcome.ts";
 
@@ -434,10 +434,8 @@ export const into =
       const depth = fiber.mask;
       fiber.mask = depth + 1;
       try {
-        const exit = asExit(yield exitOf(() => atMask(depth, task)));
-        if (exit.cause === undefined) return q.failCause(ENDED);
-        if (unwinds(exit.cause)) return raise(exit.cause);
-        return q.failCause(exit.cause);
+        const exit = cleanExit(asExit(yield exitOf(() => atMask(depth, task))));
+        return q.failCause(exit.cause ?? ENDED);
       } finally {
         fiber.mask = depth;
       }

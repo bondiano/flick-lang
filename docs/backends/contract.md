@@ -16,7 +16,7 @@ language that implements this world.
 This is an initial 0.x contract and validation library. It does not freeze
 IR 1.0 or complete every semantic prerequisite of R3a. Ordinary JS/TS
 `build/run/test` select the distributed JS component by default. The portable
-IR is 0.12.0. The official
+IR is 0.13.0. The official
 JS emitter lives in `backends/js`, independently of `flick-core`; the Go
 emitter remains in `flick-core`. The contract probe exercises both with IR
 and plain data without `Compilation` or `Settings`. The distributed component

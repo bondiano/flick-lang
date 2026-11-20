@@ -41,11 +41,11 @@ type Lazy (r : ServiceRow) (e : ErrorRow) a
 
 | Rule | Typing | Stage of the form |
 | - | - | - |
-| (T-Lazy) | `Γ ⊢ e : a ! ρ; ε` and `Detached ρ` ⟹ `Γ ⊢ lazy e : Lazy ρ ε a` | runtime: `R⟨none; none⟩`, it allocates (as `Ref.make`) |
+| (T-Lazy) | `Γ ⊢ e : a ! ρ; ε` and `NoControl ρ` ⟹ `Γ ⊢ lazy e : Lazy ρ ε a` | runtime: `R⟨none; none⟩`, it allocates (as `Ref.make`) |
 | (T-Force) | `Γ ⊢ l : Lazy ρ ε a` ⟹ `Γ ⊢ await l : a` | `R⟨Async \| ρ; ε⟩`: forcing may wait for another fiber |
 | (T-LetLazy) | `Γ ⊢ e : a ! ρ; ε`, `x` confined (§4) ⟹ `await x : a` | `R⟨ρ; ε⟩`, no `Async`: nothing else can hold `x` |
 
-- `Detached ρ` (`classes/detached.rs`): the initializer uses no `control` operation. This is what makes the reset after an owner's unwind (§5) well-defined.
+- `NoControl ρ` (`classes/detached.rs`, superclass of `Detached ρ`): the initializer uses no `control` operation, which makes the reset after an owner's unwind (§5) well-defined. Unlike `Detached ρ` (which rejects both `control` and `abort` for detached child fibers and kept finalizers), `NoControl ρ` still allows `abort` because forcing runs the initializer synchronously in the forcing fiber, so an `abort` unwinds to a handler in that fiber and resets the cell. Forcing a `Lazy` with an `abort` effect inside a detached child still requires handling that effect inside the child (`Detached`, `FLICK-E017`).
 - **Reach** (`regions.md` §2.1): `⌈Lazy ρ ε a⌉ = ⌈a⌉ ∪ ⌈ε⌉ ∪ captures(e)`. Unlike `⌈Eff ρ ε a⌉`, the error row counts, because a `Lazy` *stores* a typed failure once it is forced. `@stores` gives the captures. As a result, a `Lazy` holding `File s` cannot leave `scope s` (`FLICK-G001`/`G002`), so no lazy is forced after its region closes (RFC question 5).
 - `await e` dispatches on the type of `e`: `Eff` → (Await), `Lazy` → (T-Force). An operand whose type is still unknown at the site is taken as `Eff`. This is the same incompleteness as `?` (`elaboration.md` "unknown type at the site"), recorded in `core.md` §5.
 
@@ -94,7 +94,7 @@ Steps (`core.md` §3.4):
 
 Lean: the core gains `Ty.lazy` and the store type `Ty.lazyCell` (`formal/Formal/TyBase.lean`; `Lazy ρ ε τ` carries the hidden qualifier `C` of its initializer, as `Eff`), `Tm.lazy`, `Tm.force`, `Tm.settle` and the states of a cell `Tm.running`, `Tm.done` (`Syntax.lean`), the frames `Frame.force`, `Frame.settle` (`EvalCtx.lean`), (T-Lazy) `Typ.lazy`, (T-Force) `Typ.force`, (LazyLoc) `Typ.lazyLoc` and (Settle) `Typ.settle` (`Rules.lean`), the store typing `CellTy`, `StoreTy` (`StoreTy.lean`), and the steps `RHead.lazy`, `.forcePending`, `.forceDone`, `.forceRunning`, `.settleVal`, `.settleRaise`, `.settleUnw`, `.refGetCell` with `settleCell` and `resetCell` (`Semantics.lean`). Every lemma over terms, types, frames and steps covers them, `Subst*`, `Reach`, `Regions`, `Live` and `Elab` included; preservation of the new steps is `lazy_new`, `force_pending`, `force_done`, `settle_val`, `settle_raise`, `settle_unw` (`PresLazy.lean`), progress is `progress` (`ProgressMain.lean`), and `T1`, `T2a`, `T2b`, `T3`, `T4'`, `T1_regions` hold with them. L1 is `Lazy.L1` with `Lazy.L1_once` and `Step.pending` (a cell is pending again only after a `Resets` step), and L2 is `Lazy.L2` (`formal/Formal/Lazy.lean`). No `sorry`, no new axioms (`lake build --wfail`; `Formal/Axioms.lean` pins them).
 
-Checked by: `tests/run/runtime/lazy_once.fl` (an outcome is kept) and `tests/run/runtime/lazy_abort.fl` (an `abort` through the initializer resets the cell, and the next `await` runs it again) on JS, TS, Go, the rt runtime and the model, whose natives run the initializer in a frame `settle ℓ` of their own (`flick-model/src/native/lazy.rs`).
+Checked by: `tests/run/runtime/lazy_once.fl` (an outcome is kept), `tests/run/runtime/lazy_abort.fl` (an `abort` through the initializer resets the cell, and the next `await` runs it again), and `tests/run/runtime/detached_lazy.fl` (`Detached r` entails `NoControl r` without passing a dictionary) on JS, TS, Go, the rt runtime and the model, whose natives run the initializer in a frame `settle ℓ` of their own (`flick-model/src/native/lazy.rs`).
 
 ## 4. `let lazy` and `let lazy mut`
 
