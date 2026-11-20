@@ -15,6 +15,18 @@ rec {
   let is_odd n = if n == 0 then false else is_even (n - 1)
 }
 
+rec {
+  hop1 : Int -> Int
+  let hop1 n = hop3 n 0 true
+
+  hop3 : Int -> Int -> Bool -> Int
+  let hop3 n acc add =
+    if n <= 0 then acc else if add then hop2 (n - 1) (acc + 1) else hop3 (n - 1) acc true
+
+  hop2 : Int -> Int -> Int
+  let hop2 n acc = if n <= 0 then acc else if acc < 0 then hop1 n else hop3 (n - 1) (acc + 2) false
+}
+
 /// A tail call through a `match` and a guard.
 collatz_steps : Float -> Int -> Int
 let rec collatz_steps n steps =
@@ -43,6 +55,9 @@ let tests = [
   Test.test "a million tail calls" (fun () -> Test.equal 1000000 (count 1000000 0)),
   Test.test "mutual recursion a million deep" (fun () ->
     Test.equal (true, false) (is_even 1000000, is_odd 1000000)
+  ),
+  Test.test "unequal-arity mutual recursion a million deep" (fun () ->
+    Test.equal 1000000 (hop1 1000000)
   ),
   Test.test "tail calls through match arms" (fun () -> Test.equal 111 (collatz_steps 27 0)),
   Test.test "non-tail recursion" (fun () -> Test.equal 12502500 (sum_to 5000)),

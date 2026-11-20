@@ -175,19 +175,18 @@ impl<'a> Gen<'a> {
         let mut heads = self.bind_givens(dicts);
         let stmts = match &body.kind {
             ExprKind::Lambda { params, body } => {
-                let target = Target {
-                    callee: Callee::Global(format!("{}.{name}", self.module)),
-                    dicts: dicts.to_vec(),
-                };
-                let lines = self.lines;
-                let (bound, stmts) = self.function_body(params, body, Some(target), types);
-                let grouped = self.group_call(name, &bound, types.result());
-                if grouped.is_some() {
-                    // the body is the group's: this function holds no directive
-                    self.lines = lines;
+                if let Some((bound, go)) = self.group_call(name, params, types.result()) {
+                    heads.extend(bound);
+                    vec![go]
+                } else {
+                    let target = Target {
+                        callee: Callee::Global(format!("{}.{name}", self.module)),
+                        dicts: dicts.to_vec(),
+                    };
+                    let (bound, stmts) = self.function_body(params, body, Some(target), types);
+                    heads.extend(bound);
+                    stmts
                 }
-                heads.extend(bound);
-                grouped.map_or(stmts, |go| vec![go])
             }
             _ => self.block(|g| g.tail_expr(body)).0,
         };

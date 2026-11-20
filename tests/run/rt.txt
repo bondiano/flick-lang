@@ -86,6 +86,7 @@ codegen/pure_main
 codegen/question
 codegen/ranges
 codegen/recursion
+codegen/mutual_rec_arity
 codegen/repeated_superclass
 codegen/scope_run
 codegen/service_child

@@ -66,10 +66,11 @@ pub(super) fn groups(
                 .map(|(_, params, _)| params.len())
                 .max()
                 .unwrap_or(0);
-            let fiber =
-                function(&items[members[0]], Calls::Direct).is_some_and(|(_, params, _)| {
+            let fiber = members.iter().any(|&i| {
+                function(&items[i], Calls::Direct).is_some_and(|(_, params, _)| {
                     params.last().is_some_and(|p| p.stage != Stage::Pure)
-                });
+                })
+            });
             Group {
                 name: names::group(module, name_of(members[0])),
                 items: members,
@@ -194,24 +195,38 @@ impl<'a> Gen<'a> {
         self.tail = None;
     }
 
-    /// The body of a grouped top-level function: a call of its group.
+    /// The parameters and body of a grouped top-level function: a call of its
+    /// group.
     pub(super) fn group_call(
-        &self,
+        &mut self,
         name: &str,
-        heads: &[&'a str],
+        params: &[Param],
         result: Option<Native>,
-    ) -> Option<Document<'a>> {
+    ) -> Option<(Vec<&'a str>, Document<'a>)> {
         let a = self.a;
         let &(g, k) = self.grouped.get(name)?;
-        let group = &self.groups[g];
+        let arity = self.groups[g].arity;
+        let group = a.alloc_str(&self.groups[g].name);
+        let heads: Vec<&'a str> = params
+            .iter()
+            .map(|p| match &p.pat {
+                Pat::Bind(n) => a.alloc_str(&names::local(n)),
+                Pat::Wild | Pat::Lit(Lit::Unit) => "_",
+                _ => self.temp(),
+            })
+            .collect();
         let mut args = vec![k.to_doc(a)];
-        args.extend(heads.iter().map(|h| a.text(h)));
-        args.resize(group.arity + 1, a.text("nil"));
+        args.extend(
+            heads
+                .iter()
+                .map(|&h| a.text(if h == "_" { "nil" } else { h })),
+        );
+        args.resize(arity + 1, a.text("nil"));
         args.insert(0, self.context());
         // the group runs on values: its result is made the function's type
-        let go = call(a, a.alloc_str(&group.name), args);
+        let go = call(a, group, args);
         let go = result.map_or(go, |native| native.unbox(a, go));
-        Some(statement(a, docvec![a, "return ", go]))
+        Some((heads, statement(a, docvec![a, "return ", go])))
     }
 
     /// The Go function running the group `g` of `items`.
@@ -227,18 +242,23 @@ impl<'a> Gen<'a> {
         self.context = Some("fb");
         let mut cases = Vec::new();
         for (k, (_, params, body)) in functions.iter().enumerate() {
+            // local names are unique only within a definition
+            self.natives.clear();
+            self.held.clear();
             let tail = Tail {
                 members: members.clone(),
                 current: k,
                 vars: vars.clone(),
                 binds: binds(params),
-                natives: vec![None; params.len()],
+                natives: vec![None; vars.len()],
                 state: Some("state"),
             };
             let (stmts, ()) = self.block(|g| g.iteration(params, &vars, body, tail));
             let stmts = a.concat(stmts).nest(a, INDENT);
             cases.push(statement(a, docvec![a, "case ", k, ":", stmts]));
         }
+        self.natives.clear();
+        self.held.clear();
         self.fiber = None;
         self.context = None;
         let mut heads = vec!["fb *flickrt.Fiber".to_owned(), "state int".to_owned()];
