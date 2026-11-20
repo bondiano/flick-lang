@@ -130,7 +130,7 @@ fn is_closed_scalar(t: &Type) -> bool {
 
 /// A declared type: the kinds of its parameters, its constructors' schemes
 /// (`None` when any constructor is hidden or opaque), and validated serialized
-/// variance when constructors are unavailable.
+/// variance when imported or when constructors are unavailable.
 pub(super) struct Data<'t> {
     pub(super) kinds: Vec<Kind>,
     pub(super) ctors: Option<Vec<&'t Type>>,
@@ -244,6 +244,7 @@ impl Checker<'_> {
     pub(super) fn data(&self, (module, name): &Key) -> Option<Data<'_>> {
         let def = self.env.type_def(module, name)?;
         let kinds: Vec<Kind> = param_kinds(&def.kind).into_iter().cloned().collect();
+        let imported = module != &self.env.module;
         match &def.form {
             Form::Adt { constructors, .. } => {
                 let ctors = constructors
@@ -256,8 +257,7 @@ impl Checker<'_> {
                         })
                     })
                     .collect::<Option<Vec<_>>>();
-                let exported = ctors
-                    .is_none()
+                let exported = (imported || ctors.is_none())
                     .then(|| valid_exported_variance(&kinds, &def.variance))
                     .flatten();
                 Some(Data {
@@ -275,8 +275,7 @@ impl Checker<'_> {
                         name: name.clone(),
                     })
                     .map(|scheme| vec![scheme]);
-                let exported = ctors
-                    .is_none()
+                let exported = (imported || ctors.is_none())
                     .then(|| valid_exported_variance(&kinds, &def.variance))
                     .flatten();
                 Some(Data {

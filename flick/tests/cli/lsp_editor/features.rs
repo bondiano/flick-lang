@@ -373,3 +373,88 @@ fn lsp_hover_shows_data_variance_after_edit_and_for_installed_package() {
     }
     lsp.close();
 }
+
+#[test]
+fn lsp_hover_shows_variance_for_fetched_locked_package_with_private_module_wrapper() {
+    let hash = "4f0e0bd5b9b8b1f2a0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7";
+    let dep_manifest = "schema-version = 1\n[package]\nname = \"geo\"\nversion = \"1.0.0\"\n[project]\nkind = \"lib\"\n";
+    let secret_src = "private module Geo.Secret exposing (Inner, Key(..))\ntype Inner a = Inner a\ntype Key = Key Int\n";
+    let dep_src = "\
+module Geo exposing (Box, Sink, Wrapper(..), Tag(..), BoxErr(..))
+import Geo.Secret exposing (Inner, Key)
+opaque type Box a = Box { value : a }
+opaque type Sink a = Sink (a -> Unit)
+type Wrapper a = Wrapper (Inner a)
+type Tag a =
+  | TagKey : Tag Key
+  | TagVal a : Tag a
+type error BoxErr a = BoxErr (Inner a)
+";
+    let app_manifest = format!(
+        "{LIB}\n[dependencies]\ngeo = {{ git = \"https://example.com/geo\", tag = \"v1.0.0\", subdir = \"lib\" }}\n"
+    );
+    let lock = format!(
+        "version = 1\n\n[[package]]\nname = \"geo\"\nversion = \"1.0.0\"\nsource = \"git+https://example.com/geo?tag=v1.0.0&subdir=lib#0123abcd\"\nchecksum = \"sha256:{hash}\"\n"
+    );
+    let main_src = "\
+module App.Main exposing (widen_box, narrow_sink, widen_wrap, widen_tag, widen_err)
+import Geo exposing (Box, Sink, Wrapper(..), Tag(..), BoxErr(..))
+widen_box : Box (Float -> Float) -> Box (Float ->{Async} Float)
+let widen_box b = b
+narrow_sink : Sink (Float ->{Async} Float) -> Sink (Float -> Float)
+let narrow_sink s = s
+widen_wrap : Wrapper (Float -> Float) -> Wrapper (Float ->{Async} Float)
+let widen_wrap w = w
+widen_tag : Tag (Float -> Float) -> Tag (Float ->{Async} Float)
+let widen_tag t = t
+widen_err : BoxErr (Float -> Float) -> BoxErr (Float ->{Async} Float)
+let widen_err e = e
+";
+    let dir = project(
+        "lsp_fetched_variance_hover",
+        &[
+            ("app/flick.toml", &app_manifest),
+            ("app/flick.lock", &lock),
+            ("app/src/App/Main.fl", main_src),
+            (&format!("store/{hash}/lib/flick.toml"), dep_manifest),
+            (&format!("store/{hash}/lib/src/Geo/Secret.fl"), secret_src),
+            (&format!("store/{hash}/lib/src/Geo.fl"), dep_src),
+        ],
+    );
+    let app_dir = dir.join("app");
+    let store = dir.join("store");
+    let cache = dir.join("cache");
+    let file = app_dir.join("src/App/Main.fl");
+    let doc = json!({ "uri": uri(&file) });
+    let mut lsp = Lsp::start_with_env(
+        &app_dir,
+        &[("FLICK_STORE", &store), ("XDG_CACHE_HOME", &cache)],
+    );
+    lsp.notify(
+        "textDocument/didOpen",
+        &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": main_src } }),
+    );
+    let diags = lsp.diagnostics(&uri(&file));
+    assert!(
+        diags.is_empty(),
+        "fetched package widening failed: {diags:?}"
+    );
+    for (needle, expected) in [
+        (": Box (", "Variance: `a` (`+`, covariant)"),
+        (": Sink (", "Variance: `a` (`-`, contravariant)"),
+        (": Wrapper (", "Variance: `a` (`+`, covariant)"),
+        (": Tag (", "Variance: `a` (`+`, covariant)"),
+        (": BoxErr (", "Variance: `a` (`+`, covariant)"),
+    ] {
+        let pos = position(main_src, main_src.find(needle).expect(needle) + 3);
+        let res = lsp.request(
+            "textDocument/hover",
+            &json!({ "textDocument": doc, "position": pos }),
+        );
+        let markdown = res["result"]["contents"]["value"]
+            .as_str()
+            .expect("hover text");
+        assert!(markdown.contains(expected), "{needle}: {markdown}");
+    }
+    lsp.close();
+}

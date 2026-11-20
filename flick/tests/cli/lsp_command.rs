@@ -53,14 +53,21 @@ struct Lsp {
 
 impl Lsp {
     fn start(dir: &Path) -> Lsp {
-        let mut child = Command::new(env!("CARGO_BIN_EXE_flick"))
+        Self::start_with_env(dir, &[])
+    }
+
+    fn start_with_env(dir: &Path, envs: &[(&str, &Path)]) -> Lsp {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_flick"));
+        command
             .args(["lsp", "--stdio"])
             .current_dir(dir)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn()
-            .expect("flick lsp");
+            .stderr(Stdio::null());
+        for (key, value) in envs {
+            command.env(key, value);
+        }
+        let mut child = command.spawn().expect("flick lsp");
         let input = child.stdin.take().expect("stdin");
         let output = BufReader::new(child.stdout.take().expect("stdout"));
         let mut lsp = Lsp {

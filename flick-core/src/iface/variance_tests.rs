@@ -8,7 +8,7 @@ use crate::source::SourceMap;
 use crate::{syntax, types};
 use serde_json::json;
 
-fn check_module_with(
+pub(super) fn check_module_with(
     name: &str,
     text: &str,
     imported: &dyn Fn(&str) -> Option<Interface>,

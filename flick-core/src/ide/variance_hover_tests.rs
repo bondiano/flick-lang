@@ -9,10 +9,8 @@ use crate::project::{Host, ModuleCache, analyze_with};
 use crate::source::{FileId, SourceMap};
 use crate::syntax::parse;
 
-#[test]
-fn data_variance_appears_in_hover_for_local_opaque_and_builtin_types() {
-    let provider = "\
-module App.Lib exposing (Box, AWrapSink, Sink, Cell, Phantom, WrapPhantom, DoubleSink, Thunk, Alias, Abstract)
+const HOVER_PROVIDER: &str = "\
+module App.Lib exposing (Box, AWrapSink, Sink, Cell, Phantom, WrapPhantom, DoubleSink, Thunk, BoxErr(..), SinkErr(..), CellErr(..), Alias, Abstract)
 
 /// A covariant opaque box.
 opaque type Box a = Box { value : a }
@@ -23,15 +21,20 @@ opaque type Phantom a = Phantom
 opaque type WrapPhantom a = WrapPhantom (Phantom a)
 opaque type DoubleSink a = DoubleSink (Sink (Sink a))
 opaque type Thunk (r : ServiceRow) a = Thunk (Unit ->{r} a)
+type error BoxErr a = BoxErr a
+type error SinkErr a = SinkErr (a -> Unit)
+type error CellErr a = CellErr (a -> a)
 opaque type alias Alias a = List a
 type Abstract a
 ";
-    let main = "\
+
+const HOVER_MAIN: &str = "\
 module App.Main exposing (..)
 
-import App.Lib exposing (Box, AWrapSink, Sink, Cell, Phantom, WrapPhantom, DoubleSink, Thunk, Alias, Abstract)
+import App.Lib exposing (Box, AWrapSink, Sink, Cell, Phantom, WrapPhantom, DoubleSink, Thunk, BoxErr(..), SinkErr(..), CellErr(..), Alias, Abstract)
 
 type LocalPair a b = LocalPair (a -> b)
+type error LocalErr a = LocalErr (a -> Unit)
 type WrapSink a = WrapSink (Sink a)
 
 use_wrap_sink : WrapSink Int -> WrapSink Int
@@ -61,6 +64,15 @@ let use_phantom x = x
 use_thunk : Thunk none Int -> Thunk none Int
 let use_thunk x = x
 
+use_box_err : BoxErr Int -> BoxErr Int
+let use_box_err x = x
+
+use_sink_err : SinkErr Int -> SinkErr Int
+let use_sink_err x = x
+
+use_cell_err : CellErr Int -> CellErr Int
+let use_cell_err x = x
+
 use_alias : Alias Int -> Alias Int
 let use_alias x = x
 
@@ -70,7 +82,13 @@ let use_abstract x = x
 use_list : List Int -> Option Int
 let use_list _ = None
 ";
-    let f = fixture_of(&[("src/App/Lib.fl", provider), ("src/App/Main.fl", main)]);
+
+#[test]
+fn data_variance_appears_in_hover_for_local_opaque_and_builtin_types() {
+    let f = fixture_of(&[
+        ("src/App/Lib.fl", HOVER_PROVIDER),
+        ("src/App/Main.fl", HOVER_MAIN),
+    ]);
     let ide = f.ide();
     assert!(
         ide.analysis.diagnostics.iter().all(Diagnostic::unnecessary),
@@ -96,10 +114,14 @@ let use_list _ = None
             ": Thunk none",
             "Variance: `r` (`inv`, invariant), `a` (`+`, covariant)",
         ),
+        (": BoxErr Int", "Variance: `a` (`+`, covariant)"),
+        (": SinkErr Int", "Variance: `a` (`-`, contravariant)"),
+        (": CellErr Int", "Variance: `a` (`inv`, invariant)"),
         (
             "LocalPair a",
             "Variance: `a` (`-`, contravariant), `b` (`+`, covariant)",
         ),
+        ("LocalErr a", "Variance: `a` (`-`, contravariant)"),
         (": List Int", "Variance: `a` (`+`, covariant)"),
         ("-> Option Int", "Variance: `a` (`+`, covariant)"),
     ] {
@@ -116,6 +138,12 @@ let use_list _ = None
     let pair_b = f.at("App.Main", "b =", 0);
     let (hover_b, _) = ide.hover(main_file, pair_b).expect("LocalPair param b");
     assert!(hover_b.contains("Variance: `+` (covariant)"), "{hover_b}");
+    let err_a = f.at("App.Main", "a = LocalErr", 0);
+    let (hover_err_a, _) = ide.hover(main_file, err_a).expect("LocalErr param a");
+    assert!(
+        hover_err_a.contains("Variance: `-` (contravariant)"),
+        "{hover_err_a}"
+    );
 
     for needle in [": Alias Int", ": Abstract Int"] {
         let (markdown, _) = ide.hover(main_file, type_at(needle)).expect(needle);

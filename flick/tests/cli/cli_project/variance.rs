@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 #[test]
 fn inspect_variance_updates_after_edit_and_covers_builtins_and_conservative_limits() {
     let initial = "\
-module Lib.Var exposing (Box, AWrapSink, Sink, Cell, Phantom, WrapPhantom, DoubleSink, Secret, Thunk, Alias, Abstract, Pair)
+module Lib.Var exposing (Box, AWrapSink, Sink, Cell, Phantom, WrapPhantom, DoubleSink, Secret, Thunk, BoxErr(..), SinkErr(..), Alias, Abstract, Pair)
 
 opaque type Box a = Box { value : a }
 opaque type AWrapSink a = AWrapSink (Sink a)
@@ -15,6 +15,8 @@ opaque type WrapPhantom a = WrapPhantom (Phantom a)
 opaque type DoubleSink a = DoubleSink (Sink (Sink a))
 type Secret a = Secret a
 opaque type Thunk (r : ServiceRow) a = Thunk (Unit ->{r} a)
+type error BoxErr a = BoxErr a
+type error SinkErr a = SinkErr (a -> Unit)
 opaque type alias Alias a = List a
 type Abstract a
 type alias Pair a b = (a, b)
@@ -38,6 +40,8 @@ type alias Pair a b = (a, b)
         "opaque type DoubleSink : a (inv, invariant)\n",
         "type Secret : a (+, covariant)\n",
         "opaque type Thunk : r (inv, invariant), a (+, covariant)\n",
+        "type error BoxErr : a (+, covariant)\n",
+        "type error SinkErr : a (-, contravariant)\n",
         "opaque type Alias : a (inv, unknown)\n",
         "type Abstract : a (inv, unknown)\n",
     ] {

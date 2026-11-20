@@ -441,3 +441,6 @@ mod support_tests;
 
 #[cfg(test)]
 mod variance_tests;
+
+#[cfg(test)]
+mod variance_visibility_tests;

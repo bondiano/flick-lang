@@ -125,16 +125,15 @@ impl Checker<'_> {
         let Some(root) = self.data(key) else {
             return HashMap::new();
         };
-        if root.ctors.is_none() {
-            let fixed = root.exported.map_or_else(
-                || vec![Variance::Invariant; root.kinds.len()],
-                <[Variance]>::to_vec,
-            );
-            return HashMap::from([(key.clone(), fixed)]);
+        if let Some(exported) = root.exported {
+            return HashMap::from([(key.clone(), exported.to_vec())]);
         }
-        // Only types with visible constructors belong to the mutable group;
-        // imported opaque/hidden-constructor types stay fixed at their
-        // validated exported variance (or conservative invariant).
+        if root.ctors.is_none() {
+            return HashMap::from([(key.clone(), vec![Variance::Invariant; root.kinds.len()])]);
+        }
+        // Only types without validated exported variance and with visible
+        // constructors belong to the mutable group; imported declarations with
+        // serialized variance and opaque/hidden-constructor types stay fixed.
         let mut group: Vec<Key> = Vec::new();
         let mut todo = vec![key.clone()];
         while let Some(k) = todo.pop() {
@@ -142,6 +141,9 @@ impl Checker<'_> {
                 continue;
             }
             let Some(data) = self.data(&k) else { continue };
+            if data.exported.is_some() {
+                continue;
+            }
             let Some(ctors) = data.ctors else { continue };
             for scheme in ctors {
                 scheme.visit(&mut |t| {
@@ -196,11 +198,11 @@ impl Checker<'_> {
         let Some(data) = self.data(k) else {
             return Vec::new();
         };
+        if let Some(exported) = data.exported {
+            return exported.iter().copied().map(Cand::exact).collect();
+        }
         let Some(ctors) = data.ctors else {
-            return data.exported.map_or_else(
-                || vec![Cand::INV; data.kinds.len()],
-                |vs| vs.iter().copied().map(Cand::exact).collect(),
-            );
+            return vec![Cand::INV; data.kinds.len()];
         };
         data.kinds
             .iter()
