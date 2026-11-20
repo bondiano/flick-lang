@@ -4,7 +4,9 @@ import { type Exit, succeeded, failed } from "@flick-lang/runtime/rt/cause";
 import { currentCtx } from "@flick-lang/runtime/rt/fiber";
 import { bridgeHooks } from "@flick-lang/runtime/rt/handle";
 import { Failure } from "@flick-lang/runtime/rt/outcome";
+import { ChunkBranch } from "@flick-lang/runtime/core/chunk";
 import { err, none, ok, some } from "@flick-lang/runtime/core/data";
+import { chunkToList } from "@flick-lang/runtime/rt/chunk";
 import { mapped } from "@flick-lang/runtime/rt/effects";
 import { Failure as HostFailure } from "./cause.ts";
 import { failureCause, flickExit, nativeExit } from "./stdlib/outcome.ts";
@@ -83,21 +85,22 @@ const serviceData = (value: unknown, toward: "host" | "flick"): unknown => {
       if (tag === "Success") { variant(Reflect.get(input, "success"), EResult.succeed); return; }
       if (tag === "Failure") { variant(Reflect.get(input, "failure"), EResult.fail); return; }
     }
-    if (Array.isArray(input)) {
-      const length = input.length;
+    const array = input instanceof ChunkBranch ? chunkToList(input) : Array.isArray(input) ? input : undefined;
+    if (array !== undefined) {
+      const length = array.length;
       const items: unknown[] = [];
       items.length = length;
       let index = 0;
       const next = (): void => {
         while (index < length) {
           const key = index++;
-          if (!(key in input)) continue;
-          const child: unknown = input[key];
+          if (!(key in array)) continue;
+          const child: unknown = array[key];
           work.push(next);
           visit(child, (item) => { Object.defineProperty(items, key, { value: item, writable: true, enumerable: true, configurable: true }); });
           return;
         }
-        finish(items.every((item, i) => item === input[i]) ? input : items);
+        finish(items.every((item, i) => item === array[i]) ? array : items);
       };
       work.push(next);
       return;

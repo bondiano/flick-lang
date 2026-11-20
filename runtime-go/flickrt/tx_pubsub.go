@@ -45,7 +45,7 @@ func (p *TxPubSub) subscribersIn(fb *Fiber, t *tx) []*TxQueue {
 func (p *TxPubSub) sizeIn(fb *Fiber, t *tx) int {
 	most := 0
 	for _, q := range p.subscribersIn(fb, t) {
-		most = max(most, len(q.itemsIn(fb, t)))
+		most = max(most, q.itemsIn(fb, t).length())
 	}
 	return most
 }

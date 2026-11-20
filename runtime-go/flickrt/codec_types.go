@@ -119,15 +119,6 @@ var (
 	}))
 )
 
-// Chunk is an immutable chunk: its elements, never changed.
-type Chunk struct{ items []Value }
-
-var ChunkEmpty Value = &Chunk{}
-
-func ChunkFromList(xs Value) Value { return &Chunk{List(xs)} }
-func ChunkToList(c Value) Value    { return c.(*Chunk).items }
-func ChunkSize(c Value) Value      { return int32(len(c.(*Chunk).items)) }
-
 // CodecChunk is `Chunk.json`: a chunk as a JSON array.
 func CodecChunk(item Value) Value {
 	return linkCodec(&stage{&listCodec{codecOf(item)}, pure(ChunkFromList), pure(ChunkToList)},
@@ -142,11 +133,23 @@ func SchemaChunk(item Value) Value {
 		if !ok {
 			return nil, expected("Chunk", v)
 		}
-		xs, issues := validateAll(fb, c.items, func(int) *Schema { return s })
+		xs := make([]Value, c.length())
+		i := 0
+		var issues []issue
+		c.walk(false, func(x Value) bool {
+			var is []issue
+			xs[i], is = s.validate(fb, x)
+			if is != nil {
+				issues = under(i, is)
+				return false
+			}
+			i++
+			return true
+		})
 		if issues != nil {
 			return nil, issues
 		}
-		return ChunkFromList(xs), nil
+		return chunkOf(xs), nil
 	}))
 	sch(out).item = s // what Schema.arbitrary generates the elements of
 	return out

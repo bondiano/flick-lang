@@ -112,7 +112,27 @@ func channelAcquireUseRelease(acquire func(fb *Fiber) Value, use func(fb *Fiber,
 
 var ChannelDefaultChunkSize Value = int32(streamChunkSize)
 
-func ChannelFromChunk(c Value) Value { return channelFromArray(c.(*Chunk).items) }
+func ChannelFromChunk(c Value) Value {
+	xs := c.(*Chunk)
+	if xs.left == nil {
+		return channelFromArray(xs.leaf)
+	}
+	return fromPull(func(*Fiber) Pull {
+		leaves := chunkLeaves{current: xs}
+		var leaf []Value
+		return func(*Fiber) Value {
+			if len(leaf) == 0 {
+				leaf = leaves.next()
+				if len(leaf) == 0 {
+					return halt(Unit)
+				}
+			}
+			x := leaf[0]
+			leaf = leaf[1:]
+			return x
+		}
+	})
+}
 
 func ChannelSync(f Value) Value {
 	return channelFromEffect(func(fb *Fiber) Value { return Apply(fb, f, Unit) })
