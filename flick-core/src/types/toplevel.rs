@@ -35,6 +35,8 @@ struct Item<'a> {
     scheme: Option<(Type, bool)>,
     group: Option<usize>,
     function: bool,
+    /// Whether `let rec` on this non-function already reported `FLICK-T012`.
+    rec_value_reported: bool,
     state: State,
     /// Set while its `rec` group is checked and its recursion is monomorphic.
     rec: Option<usize>,
@@ -254,13 +256,14 @@ impl<'a> Checker<'a> {
     }
 
     fn add_item(&mut self, decl: &'a Node, sig: Option<&'a Node>, group: Option<usize>) {
-        let (names, function) = if decl.kind == K::ForeignDecl {
+        let (names, function, rec_value_reported) = if decl.kind == K::ForeignDecl {
             (
                 foreign_name(decl, self.text)
                     .map(str::to_owned)
                     .into_iter()
                     .collect(),
                 true,
+                false,
             )
         } else {
             let parts = let_parts(decl, self.text);
@@ -270,7 +273,9 @@ impl<'a> Checker<'a> {
                 (None, Some(pattern)) => pattern_names(pattern, self.text, &mut names),
                 _ => {}
             }
-            (names, parts.is_function())
+            let function = parts.is_function();
+            let rec_value_reported = parts.rec && !function && parts.name.is_some();
+            (names, function, rec_value_reported)
         };
         let scheme = sig
             .and_then(|s| s.nodes().find(|n| is_type(n.kind)))
@@ -295,6 +300,7 @@ impl<'a> Checker<'a> {
             scheme,
             group,
             function,
+            rec_value_reported,
             state: State::Waiting,
             rec: None,
         });

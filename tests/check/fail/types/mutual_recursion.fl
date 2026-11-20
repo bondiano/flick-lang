@@ -1,0 +1,109 @@
+module App.MutualRecursion exposing (main)
+
+// 1. Issue #686 repro: two self-recursive `let rec` functions calling each other.
+f : List Int -> Result String Int
+let rec f xs =
+  match xs with
+  | [] -> Err "e"
+  | [x, ...rest] ->
+    match f rest with
+    | Err e -> Err e
+    | Ok n -> g (n + x)
+
+g : Int -> Result String Int
+let rec g n =
+  match g 0 with
+  | Err e -> Err e
+  | Ok m -> f [n + m]
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  match f [1] with
+  | Ok n -> Platform.stdout_line (show n)
+  | Err e -> Platform.stdout_line e
+
+// 2. Self-recursive `let rec` and plain `let` calling each other.
+m1 : Int -> Int
+let rec m1 n = if n <= 0 then 0 else m1 (n - 1) + m2 n
+
+m2 : Int -> Int
+let m2 n = m1 (n - 1)
+
+// 3. Plain self-recursive `let` and self-recursive `let rec` calling each other.
+p1 : Int -> Int
+let p1 n = if n <= 0 then 0 else p1 (n - 1) + p2 n
+
+p2 : Int -> Int
+let rec p2 n = if n <= 0 then 0 else p2 (n - 1) + p1 n
+
+// 4. Two separate `rec { ... }` groups with a cross-group cycle.
+rec {
+  ga : Int -> Int
+  let ga n = gb n
+
+  gb : Int -> Int
+  let gb n = ga n + gc n
+}
+
+rec {
+  gc : Int -> Int
+  let gc n = gd n
+
+  gd : Int -> Int
+  let gd n = gc n + ga n
+}
+
+// 5. Three-way mutual cycle where every member is also self-recursive.
+t1 : Int -> Int
+let rec t1 n = if n <= 0 then 0 else t1 (n - 1) + t2 n
+
+t2 : Int -> Int
+let rec t2 n = if n <= 0 then 0 else t2 (n - 1) + t3 n
+
+t3 : Int -> Int
+let rec t3 n = if n <= 0 then 0 else t3 (n - 1) + t1 n
+
+// 6. Non-function value in a cycle with a self-recursive `let rec` function.
+vf : Int -> Int
+let rec vf n = if n <= 0 then val_a else vf (n - 1)
+
+let val_a = vf 1
+
+// 7. Non-function value in a cycle inside a `rec { ... }` group.
+rec {
+  rv_f : Int -> Int
+  let rv_f n = if n <= 0 then rv_v else rv_f (n - 1)
+
+  rv_v : Int
+  let rv_v = rv_f 1
+}
+
+// 8. Mutually recursive non-function values inside a `rec { ... }` group.
+rec {
+  rv_a : Int
+  let rv_a = rv_b + 1
+
+  rv_b : Int
+  let rv_b = rv_a + 1
+}
+
+// 9. Signed top-level and local `let rec` on non-function values.
+sv : List Int
+let rec sv = [1] ++ sv
+
+local_rec_val : Unit -> List Int
+let local_rec_val () =
+  lsv : List Int
+  let rec lsv = [1] ++ lsv
+  lsv
+
+//~ FLICK-T017 @11:15-11:16 `f`, `g` use each other: define mutually recursive
+//~ FLICK-T017 @27:51-27:53 `m1`, `m2` use each other: define mutually recursive
+//~ FLICK-T017 @34:47-34:49 `p1`, `p2` use each other: define mutually recursive
+//~ FLICK-T017 @45:21-45:23 `gb`, `gc`, `gd`, `ga` use each other: define mutually recursive
+//~ FLICK-T017 @58:51-58:53 `t1`, `t2`, `t3` use each other: define mutually recursive
+//~ FLICK-T012 @68:31-68:36 `vf` and `val_a` would be evaluated while being defined; only
+//~ FLICK-T012 @75:31-75:35 `rv_f` and `rv_v` would be evaluated while being defined; only
+//~ FLICK-T012 @84:14-84:18 `rv_a` and `rv_b` would be evaluated while being defined; only
+//~ FLICK-T012 @92:1-92:23 `sv` would be evaluated while it is being defined; only
+//~ FLICK-T012 @97:3-97:27 `lsv` would be evaluated while it is being defined; only

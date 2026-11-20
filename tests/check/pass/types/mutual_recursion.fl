@@ -1,0 +1,73 @@
+// Valid combinations of self-recursion, mutual recursion, and non-mutual calls.
+module App.MutualRecursionPass exposing (
+  f,
+  g,
+  standalone,
+  caller,
+  callee,
+  group_a1,
+  group_b1,
+  uses_rec,
+  reads_value,
+)
+
+// Mutually recursive functions that are also self-recursive, in one `rec { ... }` group.
+rec {
+  f : List Int -> Result String Int
+  let f xs =
+    match xs with
+    | [] -> Err "e"
+    | [x, ...rest] ->
+      match f rest with
+      | Err e -> Err e
+      | Ok n -> g (n + x)
+
+  g : Int -> Result String Int
+  let g n =
+    if n <= 0 then
+      Ok 0
+    else
+      match g (n - 1) with
+      | Err e -> Err e
+      | Ok m -> f [m]
+}
+
+// Standalone `let rec` calling itself and a non-mutual helper.
+helper : Int -> Int
+let helper n = n + 1
+
+standalone : Int -> Int
+let rec standalone n = if n <= 0 then helper 0 else standalone (n - 1) + helper n
+
+// Non-mutual one-way call between two separate self-recursive `let rec` functions.
+caller : Int -> Int
+let rec caller n = if n <= 0 then 0 else caller (n - 1) + callee n
+
+callee : Int -> Int
+let rec callee n = if n <= 0 then 1 else callee (n - 1)
+
+// Non-mutual one-way call between two separate `rec { ... }` groups.
+rec {
+  group_a1 : Int -> Int
+  let group_a1 n = if n <= 0 then group_b1 0 else group_a2 (n - 1)
+
+  group_a2 : Int -> Int
+  let group_a2 n = if n <= 0 then 0 else group_a1 (n - 1)
+}
+
+rec {
+  group_b1 : Int -> Int
+  let group_b1 n = if n <= 0 then 1 else group_b2 (n - 1)
+
+  group_b2 : Int -> Int
+  let group_b2 n = if n <= 0 then 2 else group_b1 (n - 1)
+}
+
+// Acyclic top-level values interacting with recursive functions.
+let base = 42
+
+uses_rec : Int
+let uses_rec = callee base
+
+reads_value : Int -> Int
+let rec reads_value n = if n <= 0 then base else reads_value (n - 1)

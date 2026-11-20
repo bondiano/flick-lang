@@ -287,6 +287,19 @@ impl Checker<'_> {
         }
     }
 
+    /// Reports `FLICK-T012` when `let rec` defines a non-function value.
+    pub(super) fn recursive_value(&mut self, decl: &Node, parts: &LetParts, name: &str) {
+        if parts.rec && !parts.is_function() {
+            self.error(
+                codes::T012,
+                self.span(decl),
+                format!(
+                    "`{name}` would be evaluated while it is being defined; only functions can be recursive"
+                ),
+            );
+        }
+    }
+
     /// Checks the definition against its signature; returns whether the
     /// right-hand side ran a runtime call while being defined.
     pub fn check_signed(
@@ -298,6 +311,9 @@ impl Checker<'_> {
         captures: Option<&Type>,
     ) -> bool {
         self.header_types(decl, parts, true);
+        if let Some(name) = &parts.name {
+            self.recursive_value(decl, parts, name);
+        }
         self.store.level += 1;
         let kinds = binders(scheme);
         let (body, skolems, givens) = self.skolemize(scheme);
