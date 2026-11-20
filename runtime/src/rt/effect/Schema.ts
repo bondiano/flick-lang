@@ -1,5 +1,6 @@
 export { jsonCodec as Json } from "../schema.ts";
-export { schemaList as flickChunkJson } from "../schema.ts";
+import { ChunkBranch } from "../../core/chunk.ts";
+import { chunkToList } from "../chunk.ts";
 import { err, ok, type HashDict, type Result } from "../../core/data.ts";
 import {
   eqHashCanonical,
@@ -103,8 +104,10 @@ export const flickBigDecimal: Witness = /*#__PURE__*/ withWire(witness("decimal"
 export const flickBigDecimalFromString: Witness = flickBigDecimal;
 export const flickChunk = (item: Witness): Witness => {
   const list = schemaList(item);
-  return witness("chunk", list.decodeAt, list.encodeAt, list.value, { kind: "chunk", item });
+  return witness("chunk", list.decodeAt, (value, path) =>
+    list.encodeAt(value instanceof ChunkBranch ? chunkToList(value) : value, path), undefined, { kind: "chunk", item });
 };
+export const flickChunkJson = flickChunk;
 
 /** JSON collection codecs retain the native collection representation. */
 const isHashMap = (value: unknown): value is FlickHashMap<unknown, unknown> =>

@@ -78,3 +78,23 @@ fn a_shared_lazy_stays() {
     assert_eq!(ir.matches("lazy_make").count(), 1, "{ir}");
     assert_eq!(ir.matches("lazy_force").count(), 2, "{ir}");
 }
+
+/// O2a: a force after `let a = await l` is `a`: the cell is done.
+#[test]
+fn a_lazy_forced_again_reuses_the_first_force() {
+    let ir = optimized(&format!(
+        "{MARK}run : Unit ->{{Async}} Int\nlet run () =\n  let l = lazy {{ mark 7 }}\n  let a = await l\n  \
+         let f = fun () -> await l\n  a + await l + f ()\n"
+    ));
+    assert_eq!(ir.matches("lazy_force").count(), 1, "{ir}");
+}
+
+/// O2a reuses a force of the same cell only: another cell is forced.
+#[test]
+fn a_force_of_another_lazy_stays() {
+    let ir = optimized(&format!(
+        "{MARK}run : Unit ->{{Async}} Int\nlet run () =\n  let l = lazy {{ mark 7 }}\n  \
+         let m = lazy {{ mark 8 }}\n  let a = await l\n  a + await m + await l\n"
+    ));
+    assert_eq!(ir.matches("lazy_force").count(), 2, "{ir}");
+}

@@ -6,14 +6,17 @@
 //!   done, whose force runs nothing;
 //! - O1c: `lazy_force (lazy_make t)` is `await t`: the cell has no other
 //!   owner, so its one force runs the task where it is made; and
-//!   `lazy_force (lazy_done v)`, both at once, is `v`.
+//!   `lazy_force (lazy_done v)`, both at once, is `v`;
+//! - O2a: after `let y = lazy_force l`, a force of the same `l` is `y`: the
+//!   first force returned only once the cell was done, and a done cell
+//!   stays done (L2).
 
 use std::collections::HashSet;
 use std::mem;
 
 use super::walk::{droppable, each_use};
 use crate::Known;
-use crate::ir::{Expr, ExprKind, Lit, Stmt};
+use crate::ir::{Expr, ExprKind, Lit, Pat, Stmt};
 use flick_ir::Lang;
 
 /// Whether `e` names the lang item `item`.
@@ -127,4 +130,54 @@ pub fn unnamed(stmts: &mut Vec<Stmt>, result: &Expr, lang: &Known<'_>) -> bool {
     let mut keep = keep.into_iter();
     stmts.retain(|_| keep.next().expect("one for each statement"));
     stmts.len() != before
+}
+
+/// The local whose cell `e` forces: `lazy_force l`.
+fn forced<'e>(e: &'e Expr, lang: &Known<'_>) -> Option<&'e str> {
+    match &e.kind {
+        ExprKind::App { func, arg, .. } if is(func, Lang::LazyForce, lang) => match &arg.kind {
+            ExprKind::Local(l) => Some(l),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Each `lazy_force l` in `e` replaced by `y`. Whether one was.
+fn reuse(e: &mut Expr, l: &str, y: &str, lang: &Known<'_>) -> bool {
+    if forced(e, lang) == Some(l) {
+        e.kind = ExprKind::Local(y.to_owned());
+        return true;
+    }
+    let mut changed = false;
+    e.each_child_mut(&mut |c| changed |= reuse(c, l, y, lang));
+    changed
+}
+
+/// O2a in a block: `let y = lazy_force l`, then `lazy_force l` in what comes
+/// after it, there or in anything nested, is `y`. Locals are unique and
+/// immutable, so `l` names the same cell, which the first force left done
+/// with `y` before anything after it ran. Whether a force went.
+pub fn forced_again(stmts: &mut [Stmt], result: &mut Expr, lang: &Known<'_>) -> bool {
+    let mut changed = false;
+    for i in 0..stmts.len() {
+        let (head, rest) = stmts.split_at_mut(i + 1);
+        let Stmt::Let(Pat::Bind(y), v) = &head[i] else {
+            continue;
+        };
+        let Some(l) = forced(v, lang) else {
+            continue;
+        };
+        for stmt in rest.iter_mut() {
+            match stmt {
+                Stmt::Let(_, v)
+                | Stmt::Var(_, v)
+                | Stmt::Assign(_, v)
+                | Stmt::Expr(v)
+                | Stmt::Fun { value: v, .. } => changed |= reuse(v, l, y, lang),
+            }
+        }
+        changed |= reuse(result, l, y, lang);
+    }
+    changed
 }

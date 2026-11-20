@@ -34,7 +34,7 @@ func (q *TxQueue) stateIn(fb *Fiber, t *tx) *txQueueState {
 	return t.get(fb, q.state).(*txQueueState)
 }
 
-func (q *TxQueue) itemsIn(fb *Fiber, t *tx) []Value { return items(t.get(fb, q.items)) }
+func (q *TxQueue) itemsIn(fb *Fiber, t *tx) *Chunk { return t.get(fb, q.items).(*Chunk) }
 
 // end sets the state done with the cause of `s`.
 func (q *TxQueue) end(fb *Fiber, t *tx, s *txQueueState) {
@@ -43,9 +43,9 @@ func (q *TxQueue) end(fb *Fiber, t *tx, s *txQueueState) {
 
 // rest keeps the elements of `xs` from `n` on, ending a closing queue
 // they leave empty.
-func (q *TxQueue) rest(fb *Fiber, t *tx, s *txQueueState, xs []Value, n int) {
-	t.set(fb, q.items, &Chunk{xs[n:]})
-	if s.tag == queueClosing && n == len(xs) {
+func (q *TxQueue) rest(fb *Fiber, t *tx, s *txQueueState, xs *Chunk, n int) {
+	t.set(fb, q.items, xs.slice(n, xs.length()))
+	if s.tag == queueClosing && n == xs.length() {
 		q.end(fb, t, s)
 	}
 }
@@ -63,12 +63,12 @@ func (q *TxQueue) offerIn(fb *Fiber, t *tx, x Value) bool {
 	}
 	xs := q.itemsIn(fb, t)
 	switch {
-	case len(xs) < q.capacity:
-		t.set(fb, q.items, ChunkAppend(x, &Chunk{xs}))
+	case xs.length() < q.capacity:
+		t.set(fb, q.items, ChunkAppend(x, xs))
 	case q.strategy == queueDropping:
 		return false
 	case q.strategy == queueSliding:
-		t.set(fb, q.items, ChunkAppend(x, ChunkDrop(int32(1), &Chunk{xs})))
+		t.set(fb, q.items, ChunkAppend(x, ChunkDrop(int32(1), xs)))
 	default:
 		t.retryNow(fb)
 	}
@@ -99,11 +99,11 @@ func TxQueueTake(fb *Fiber, q Value) Value {
 		s := x.stateIn(fb, t)
 		failIfDone(s)
 		xs := x.itemsIn(fb, t)
-		if len(xs) == 0 {
+		if xs.length() == 0 {
 			return t.retryNow(fb)
 		}
 		x.rest(fb, t, s, xs, 1)
-		return xs[0]
+		return xs.at(0)
 	})
 }
 
@@ -115,11 +115,11 @@ func TxQueuePoll(fb *Fiber, q Value) Value {
 			return None
 		}
 		xs := x.itemsIn(fb, t)
-		if len(xs) == 0 {
+		if xs.length() == 0 {
 			return None
 		}
 		x.rest(fb, t, s, xs, 1)
-		return Some(xs[0])
+		return Some(xs.at(0))
 	})
 }
 
@@ -130,14 +130,14 @@ func TxQueueTakeAll(fb *Fiber, q Value) Value {
 		s := x.stateIn(fb, t)
 		failIfDone(s)
 		xs := x.itemsIn(fb, t)
-		if len(xs) == 0 {
+		if xs.length() == 0 {
 			return t.retryNow(fb)
 		}
 		t.set(fb, x.items, ChunkEmpty)
 		if s.tag == queueClosing {
 			x.end(fb, t, s)
 		}
-		return xs
+		return xs.flat()
 	})
 }
 
@@ -145,19 +145,19 @@ func TxQueueTakeAll(fb *Fiber, q Value) Value {
 // for fewer unless the queue is closing, which ends it with what is left.
 func (q *TxQueue) takeRange(fb *Fiber, t *tx, s *txQueueState, least, most int) Value {
 	xs := q.itemsIn(fb, t)
-	if len(xs) < least {
+	if xs.length() < least {
 		if s.tag != queueClosing {
 			return t.retryNow(fb)
 		}
-		if len(xs) > 0 {
+		if xs.length() > 0 {
 			t.set(fb, q.items, ChunkEmpty)
 		}
 		q.end(fb, t, s)
-		return xs
+		return xs.flat()
 	}
-	n := min(len(xs), most)
+	n := min(xs.length(), most)
 	q.rest(fb, t, s, xs, n)
-	return xs[:n:n]
+	return xs.slice(0, n).flat()
 }
 
 func TxQueueTakeN(fb *Fiber, n, q Value) Value {
@@ -189,33 +189,33 @@ func TxQueuePeek(fb *Fiber, q Value) Value {
 		x := txQueueOf(q)
 		failIfDone(x.stateIn(fb, t))
 		xs := x.itemsIn(fb, t)
-		if len(xs) == 0 {
+		if xs.length() == 0 {
 			return t.retryNow(fb)
 		}
-		return xs[0]
+		return xs.at(0)
 	})
 }
 
 // The size is a read; see TxChunkSize.
 
-func txQueueItems(fb *Fiber, q Value, f func([]Value) Value) Value {
-	return txRead(fb, txQueueOf(q).items, func(v Value) Value { return f(items(v)) })
+func txQueueItems(fb *Fiber, q Value, f func(Value) Value) Value {
+	return txRead(fb, txQueueOf(q).items, f)
 }
 
 func TxQueueSize(fb *Fiber, q Value) Value {
-	return txQueueItems(fb, q, func(xs []Value) Value { return int32(len(xs)) })
+	return txQueueItems(fb, q, ChunkSize)
 }
 
 func TxQueueIsEmpty(fb *Fiber, q Value) Value {
-	return txQueueItems(fb, q, func(xs []Value) Value { return len(xs) == 0 })
+	return txQueueItems(fb, q, ChunkIsEmpty)
 }
 
 func TxQueueIsNonEmpty(fb *Fiber, q Value) Value {
-	return txQueueItems(fb, q, func(xs []Value) Value { return len(xs) > 0 })
+	return txQueueItems(fb, q, func(v Value) Value { return v.(*Chunk).length() > 0 })
 }
 
 func (q *TxQueue) fullIn(fb *Fiber, t *tx) bool {
-	return q.capacity != unboundedCapacity && len(q.itemsIn(fb, t)) >= q.capacity
+	return q.capacity != unboundedCapacity && q.itemsIn(fb, t).length() >= q.capacity
 }
 
 func TxQueueIsFull(fb *Fiber, q Value) Value {
@@ -229,7 +229,7 @@ func (q *TxQueue) failCauseIn(fb *Fiber, t *tx, cause *Cause) bool {
 		return false
 	}
 	tag := queueClosing
-	if len(q.itemsIn(fb, t)) == 0 {
+	if q.itemsIn(fb, t).length() == 0 {
 		tag = queueDone
 	}
 	t.set(fb, q.state, &txQueueState{tag, cause})
@@ -265,11 +265,8 @@ func TxQueueFailCause(fb *Fiber, failure, q Value) Value {
 // closing one.
 func (q *TxQueue) clearIn(fb *Fiber, t *tx, s *txQueueState) []Value {
 	xs := q.itemsIn(fb, t)
-	t.set(fb, q.items, ChunkEmpty)
-	if s.tag == queueClosing {
-		q.end(fb, t, s)
-	}
-	return xs
+	q.rest(fb, t, s, xs, xs.length())
+	return xs.flat()
 }
 
 // TxQueueClear takes the elements; a done queue fails as it was failed,
@@ -292,7 +289,8 @@ func TxQueueClear(fb *Fiber, q Value) Value {
 // `interrupt`.
 func (q *TxQueue) shutdownIn(fb *Fiber, t *tx) bool {
 	if s := q.stateIn(fb, t); s.tag != queueDone {
-		q.clearIn(fb, t, s)
+		xs := q.itemsIn(fb, t)
+		q.rest(fb, t, s, xs, xs.length())
 	}
 	return q.failCauseIn(fb, t, &Cause{kind: causeInterrupt, fiber: fb.state.id})
 }
