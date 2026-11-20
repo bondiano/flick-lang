@@ -71,6 +71,30 @@ pub(super) fn zone_table(id: &str) -> Option<String> {
     zone_names().get(&id.to_ascii_lowercase()).cloned()
 }
 
+fn zone_reverse_aliases() -> &'static BTreeMap<String, Vec<String>> {
+    static REV: OnceLock<BTreeMap<String, Vec<String>>> = OnceLock::new();
+    REV.get_or_init(|| {
+        let mut out: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        for entry in go_intl_raw().zone_data.split(';') {
+            if let Some((name, resolved)) = entry.split_once('>')
+                && !name.is_empty()
+                && !resolved.is_empty()
+            {
+                out.entry(resolved.to_owned())
+                    .or_default()
+                    .push(name.to_owned());
+            }
+        }
+        out
+    })
+}
+
+pub(super) fn zone_aliases(resolved: &str) -> &'static [String] {
+    zone_reverse_aliases()
+        .get(resolved)
+        .map_or(&[], Vec::as_slice)
+}
+
 pub(super) fn parse_offset_zone_name(id: &str) -> Option<i32> {
     let mut chars = id.chars();
     let sign = match chars.next()? {

@@ -123,11 +123,26 @@ pub(super) fn load_tzif(id: &str) -> Option<TzifZone> {
     {
         return cached.clone();
     }
-    let parsed = read_tzif_file(id).and_then(|bytes| parse_tzif(&bytes));
+    let parsed = read_tzif_with_aliases(id, read_tzif_file).and_then(|bytes| parse_tzif(&bytes));
     if let Ok(mut guard) = tz_cache().lock() {
         guard.insert(id.to_owned(), parsed.clone());
     }
     parsed
+}
+
+fn read_tzif_with_aliases(
+    id: &str,
+    read_file: impl Fn(&str) -> Option<Vec<u8>>,
+) -> Option<Vec<u8>> {
+    if let Some(bytes) = read_file(id) {
+        return Some(bytes);
+    }
+    for alias in super::datetime_tzif::zone_aliases(id) {
+        if let Some(bytes) = read_file(alias) {
+            return Some(bytes);
+        }
+    }
+    None
 }
 
 pub(super) fn local_tzif() -> Option<TzifZone> {
@@ -342,4 +357,23 @@ fn parse_uint(s: &str) -> Option<(i32, &str)> {
         return None;
     }
     Some((s[..end].parse().ok()?, &s[end..]))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_icu_zone_falls_back_to_modern_iana_alias_when_legacy_file_absent() {
+        let bytes = read_tzif_with_aliases("Asia/Calcutta", |name| {
+            if name == "Asia/Calcutta" {
+                None
+            } else {
+                read_tzif_file(name)
+            }
+        })
+        .expect("Asia/Calcutta must fall back to Asia/Kolkata");
+        let tz = parse_tzif(&bytes).expect("valid TZif");
+        assert_eq!(tz.offset_at(1_705_311_000).0, 19_800);
+    }
 }
