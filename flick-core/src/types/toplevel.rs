@@ -120,6 +120,7 @@ impl<'a> Checker<'a> {
         self.check_instances(&declared);
         self.check_proofs(&decls);
         self.check_laws(&decls);
+        self.check_contracts(&decls);
         self.solve_rows();
         self.makers(&decls);
         self.servers(&decls);

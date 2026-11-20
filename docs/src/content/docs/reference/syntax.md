@@ -146,7 +146,9 @@ Contextual words are ordinary names everywhere except in one position:
   [effects.md](../effects/#effects-and-handlers));
 - `proof` before a name at the start of a declaration, and `law` before a
   name at the start of a member of a class (see
-  [Declarations](#declarations)).
+  [Declarations](#declarations));
+- `require` and `ensure` at the head of an entry of a function's contract,
+  after the `where` of a `let` (see [Declarations](#declarations)).
 
 ### In modules
 
@@ -175,6 +177,8 @@ See [modules.md](../modules/).
 | `where` | the predicate of a `refined` type; the goal of a `proof` or a `law`; a filter in `sql { … }` | `where user.id == params.id` |
 | `proof` | contextual: before a name at the start of a declaration, states a property of the module's definitions and proves it; the compiler checks the proof and erases the declaration; a name elsewhere | `proof same where same_type a a = refl` |
 | `law` | contextual: before a name at the start of a member of a class, states what every instance satisfies; the compiler erases it, and a `lawful` goal proves it of an instance; a name elsewhere | `law identity (v : f a) where equal (map identity v) v` |
+| `require` | contextual: at the head of an entry of a function's contract, a precondition of its parameters | `require (0 <= used)` |
+| `ensure` | contextual: at the head of an entry of a function's contract, a postcondition, a function of the result | `ensure (fun r -> r >= 0)` |
 | `kind` | declares a kind with its type-level constructors | `kind Nullability = NonNull \| Nullable` |
 | `error` | `type error` declares an expected error with a nominal identity | `type error NotFound = NotFound UserId` |
 | `service` | declares the operations of a service, looked up at run time | `service Clock = now : Unit ->{} Float` |
@@ -419,7 +423,7 @@ inline_module = "module" Con ["exposing" exposing] "=" indented { import | decl 
 module_contract = "type" "module" Con "=" indented { module_member }
 module_application = "module" Con "=" ModulePath "(" ModulePath { "," ModulePath } ")"
 signature   = name ":" type
-let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] "=" block
+let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] ["where" contract] "=" block
             | "let" "assert" pattern [":" type] "=" block ["as" String]
             | "let" "mut" name [":" type] "=" block            (in a block only)
 rec_group   = "rec" "{" { signature | let } "}"
@@ -444,6 +448,7 @@ instance    = "instance" [context "=>"] type ["=" members]
 members     = block of: signature | let | type_decl
 class_members = block of: signature | let | type_decl | law
 law         = "law" name { atom_pattern | premise } "where" goal
+contract    = block of: "require" expr | "ensure" expr   // one entry inline
 foreign     = "foreign" [mode] name "from" ("global" String | String String) [metadata]
             | "foreign" "blocked" name String
 mode        = "pure" | "effect"
@@ -465,6 +470,23 @@ and has no proof; the compiler erases it. A `proof` whose goal is
 `C T` resolves to: its body is a record that names a proof for each law, and
 holds the record of each superclass in the field of that superclass, as a
 dictionary does.
+
+A function's contract follows `where` between its parameters and its `=`:
+`require e`, a `Bool` of the parameters, and `ensure e`, a function of the
+result to a `Bool`, one entry a line or one inline. The compiler types a
+contract against the function's signature, in a context of its own, so it
+adds nothing to the function's type or its dictionaries; it runs nowhere.
+`flick prove` checks it.
+
+```flick
+consume : Int -> Int -> Int
+let consume available used
+where
+  require (0 <= used && used <= available)
+  ensure (fun remaining -> 0 <= remaining && remaining + used == available)
+=
+  available - used
+```
 
 `module_application` is a file-level declaration. Writing it inside an
 `inline_module` reports `FLICK-R019`; a `module_contract` is allowed there.

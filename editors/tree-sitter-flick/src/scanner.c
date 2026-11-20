@@ -33,8 +33,8 @@ static bool block_comment(TSLexer *lexer) {
   return true;
 }
 
+// A raw string after its `r`.
 static bool raw_string(TSLexer *lexer) {
-  advance(lexer);
   unsigned hashes = 0;
   while (lexer->lookahead == '#') { advance(lexer); hashes++; }
   if (lexer->lookahead != '"') return false;
@@ -75,8 +75,9 @@ static bool multiline_string(TSLexer *lexer) {
 
 static bool is_lower(int32_t c) { return (c >= 'a' && c <= 'z') || c == '_'; }
 
-// `proof name` or `law name`, the token ending after `word`.
-static bool proof(TSLexer *lexer, const char *word) {
+// `proof name` or `law name`, the token ending after `word`; with `open`,
+// `require (` or `ensure (`, an entry of a contract.
+static bool proof(TSLexer *lexer, const char *word, bool open) {
   for (const char *c = word; *c; c++) {
     if (lexer->lookahead != *c) return false;
     advance(lexer);
@@ -84,7 +85,7 @@ static bool proof(TSLexer *lexer, const char *word) {
   lexer->mark_end(lexer);
   if (lexer->lookahead != ' ' && lexer->lookahead != '\t') return false;
   while (lexer->lookahead == ' ' || lexer->lookahead == '\t') advance(lexer);
-  if (!is_lower(lexer->lookahead)) return false;
+  if (open ? lexer->lookahead != '(' : !is_lower(lexer->lookahead)) return false;
   lexer->result_symbol = PROOF;
   return true;
 }
@@ -102,13 +103,20 @@ bool tree_sitter_flick_external_scanner_scan(void *payload, TSLexer *lexer, cons
     }
     lexer->advance(lexer, true);
   }
+  bool line_start = newline || lexer->get_column(lexer) == blanks;
   switch (lexer->lookahead) {
     case 'p':
-      return valid_symbols[PROOF] && (newline || lexer->get_column(lexer) == blanks) && proof(lexer, "proof");
+      return valid_symbols[PROOF] && line_start && proof(lexer, "proof", false);
     case 'l':
-      return valid_symbols[PROOF] && (newline || lexer->get_column(lexer) == blanks) && proof(lexer, "law");
+      return valid_symbols[PROOF] && line_start && proof(lexer, "law", false);
+    case 'e':
+      return valid_symbols[PROOF] && line_start && proof(lexer, "ensure", true);
+    case 'r':
+      // `require (` or a raw string: the letter after `r` tells them apart
+      advance(lexer);
+      if (lexer->lookahead == 'e') return valid_symbols[PROOF] && line_start && proof(lexer, "equire", true);
+      return valid_symbols[RAW_STRING] && raw_string(lexer);
     case '/': return valid_symbols[BLOCK_COMMENT] && block_comment(lexer);
-    case 'r': return valid_symbols[RAW_STRING] && raw_string(lexer);
     case '"': return valid_symbols[MULTILINE_STRING] && multiline_string(lexer);
     default: return false;
   }
