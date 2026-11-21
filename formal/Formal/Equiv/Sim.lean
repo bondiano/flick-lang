@@ -1,4 +1,4 @@
-import Formal.Equiv.Top
+import Formal.Equiv.Rot
 
 /-!
 # Contextual equivalence: related terms of two runs
@@ -33,33 +33,47 @@ inductive Kd
   | sym
   | born (v v' : Tm)
 
-/-- The locations two runs have in common, the cells only one side has, and the left cells
-that one thread allocated for a force at its next step (`O`, by its position: `none` is the main
-thread, `some (p, j)` the child `j` of the region `p`). -/
+/-- The locations two runs have in common, the cells only one side has, the left cells that one
+thread allocated for a force at its next step (`O`, by its position: `none` is the main thread,
+`some (p, j)` the child `j` of the region `p`), and the pure hoisted cells of O4 (`HL`, `HR`, `H`)
+over the program's roots `R`. -/
 structure World where
+  R : Roots
   L : Nat → Nat → Kd → Prop
   J₁ : Nat → Prop
   J₂ : Nat → Prop
   O : Nat → Option (Nat × Nat) → Prop
-  /-- The pairs of O1b may stand in the relation (`bornA`, `bornB`, `bornS`, `bornV`, `dead`).
-  O1a and O1c start without them, so their runs never meet a left thread that dies where the
-  right one does not. -/
+  /-- Pure hoisted cells on the left (`HL l e`) and right (`HR l' e'`), and their many-to-one /
+  one-to-many correspondence (`H l l'`). Guarded by `B`. -/
+  HL : Nat → Tm → Prop
+  HR : Nat → Tm → Prop
+  H : Nat → Nat → Prop
+  /-- The pairs of O1b and O4 may stand in the relation (`bornA`, `bornB`, `bornS`, `bornV`,
+  `o4*`, `dead`). O1a and O1c start without them, so their runs never meet a left thread that
+  dies where the right one does not. -/
   B : Prop
 
 /-- A world that grows. -/
 structure World.le (W W' : World) : Prop where
+  R : W.R = W'.R
   L : ∀ l l' k, W.L l l' k → W'.L l l' k
   J₁ : ∀ n, W.J₁ n → W'.J₁ n
   J₂ : ∀ n, W.J₂ n → W'.J₂ n
   O : ∀ n τ, W.O n τ → W'.O n τ
+  HL : ∀ l e, W.HL l e → W'.HL l e
+  HR : ∀ l' e', W.HR l' e' → W'.HR l' e'
+  H : ∀ l l', W.H l l' → W'.H l l'
   B : W.B ↔ W'.B
 
 theorem World.le.refl (W : World) : W.le W :=
-  ⟨fun _ _ _ h => h, fun _ h => h, fun _ h => h, fun _ _ h => h, Iff.rfl⟩
+  ⟨rfl, fun _ _ _ h => h, fun _ h => h, fun _ h => h, fun _ _ h => h,
+    fun _ _ h => h, fun _ _ h => h, fun _ _ h => h, Iff.rfl⟩
 
 theorem World.le.trans {W₁ W₂ W₃ : World} (h₁ : W₁.le W₂) (h₂ : W₂.le W₃) : W₁.le W₃ :=
-  ⟨fun _ _ _ h => h₂.L _ _ _ (h₁.L _ _ _ h), fun _ h => h₂.J₁ _ (h₁.J₁ _ h),
-    fun _ h => h₂.J₂ _ (h₁.J₂ _ h), fun _ _ h => h₂.O _ _ (h₁.O _ _ h), h₁.B.trans h₂.B⟩
+  ⟨h₁.R.trans h₂.R, fun _ _ _ h => h₂.L _ _ _ (h₁.L _ _ _ h), fun _ h => h₂.J₁ _ (h₁.J₁ _ h),
+    fun _ h => h₂.J₂ _ (h₁.J₂ _ h), fun _ _ h => h₂.O _ _ (h₁.O _ _ h),
+    fun _ _ h => h₂.HL _ _ (h₁.HL _ _ h), fun _ _ h => h₂.HR _ _ (h₁.HR _ _ h),
+    fun _ _ h => h₂.H _ _ (h₁.H _ _ h), h₁.B.trans h₂.B⟩
 
 /-- `κ` of a `control` arm is a cell, that of a `tail` arm is not used. -/
 def KapR (W : World) (tl : Bool) (κ κ' : Nat) : Prop :=
@@ -188,8 +202,45 @@ inductive Sim (W : World) : Pos → Tm → Tm → Prop
   /-- The left cell of a `born` pair settles; the right one is done. -/
   | bornV {l l' v v'} : W.B → W.L l l' (.born v v') → v.Closed → v'.Closed → v'.NoIns →
       Sim W .any (.settle l v) v'
-  /-- A left thread that forced a running cell of a `born` pair: it is stuck, the right one is
-  not. -/
+  /-- A left thread that forced a running cell of a `born` or hoisted pair: it is stuck, the right
+  one is not. -/
   | dead {b} : W.B → b.NoIns → Sim W .any .todo b
+  /-- O4: two hoisted pure cells related many-to-one or one-to-many (`W.H`). -/
+  | hloc {x l l'} : W.B → W.H l l' → Sim W x (.loc l) (.loc l')
+  /-- O4: unhoisted pure lazy inside `fix` against hoisted `let l = lazy e' in fix`. -/
+  | o4A {e e' b b' f br} : W.B → f = .let_ (.lazy (e.rename (· + 2))) b → br = b'.rename rot →
+      PureOpen W.R e → PureOpen W.R e' → Sim W .any e e' → Sim W .any b b' →
+      e'.NoIns → b'.NoIns →
+      Sim W .any (.fix f) (.let_ (.lazy e') (.fix br))
+  /-- O4 the other way round. -/
+  | o4B {e e' b b' br f'} : W.B → br = b.rename rot → f' = .let_ (.lazy (e'.rename (· + 2))) b' →
+      PureOpen W.R e → PureOpen W.R e' → Sim W .any e e' → Sim W .any b b' →
+      e'.NoIns → b'.NoIns →
+      Sim W .any (.let_ (.lazy e) (.fix br)) (.fix f')
+  /-- O4 forward, once the hoisted right cell `l'` is allocated. -/
+  | o4Fix1 {x l' e e' b b' f f'} : W.B → W.HR l' e' →
+      f = .let_ (.lazy (e.rename (· + 2))) b → f' = b'.subst (inst [.loc l']) →
+      e.Closed → PureEval W.R e → Sim W .any e e' → Sim W .any b b' → b'.NoIns →
+      Sim W x (.fix f) (.fix f')
+  /-- O4 reverse, once the hoisted left cell `l` is allocated. -/
+  | o4Fix2 {x l e e' b b' f f'} : W.B → W.HL l e →
+      f = b.subst (inst [.loc l]) → f' = .let_ (.lazy (e'.rename (· + 2))) b' →
+      e'.Closed → PureEval W.R e' → Sim W .any e e' → Sim W .any b b' → e'.NoIns → b'.NoIns →
+      Sim W x (.fix f) (.fix f')
+  /-- O4 forward: per-iteration allocation on the left against the shared cell `l'` on the right. -/
+  | o4Alloc1 {l' e e' c c' s'} : W.B → W.HR l' e' → s' = c'.subst (inst [.loc l']) →
+      e.Closed → PureEval W.R e → Sim W .any e e' → Sim W .any c c' → c'.NoIns →
+      Sim W .any (.let_ (.lazy e) c) s'
+  /-- O4 reverse: the shared left cell `l` against per-iteration allocation on the right. -/
+  | o4AllocR {l e e' s c c'} : W.B → W.HL l e → s = c.subst (inst [.loc l]) →
+      e'.Closed → PureEval W.R e' → Sim W .any e e' → Sim W .any c c' →
+      Sim W .any s (.let_ (.lazy e') c')
+  /-- O4: binding a freshly allocated left hoisted cell `l`. -/
+  | o4Bind {l c c'} : W.B → Sim W .any (c.subst (inst [.loc l])) c' →
+      Sim W .any (.let_ (.loc l) c) c'
+  /-- O4: evaluating a pure hoisted initializer inside `settle l` while the right side waits at
+  `force l'`. -/
+  | o4Settle {l l' e t} : W.B → W.H l l' → W.HL l e → e.Closed → t.Closed → PSteps W.R e t →
+      Sim W .any (.settle l t) (.force (.loc l'))
 
 end Flick.Equiv

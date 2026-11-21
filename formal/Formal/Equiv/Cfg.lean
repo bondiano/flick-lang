@@ -21,13 +21,19 @@ variable {W : World}
 def CfgR (W : World) (c₁ c₂ : Cfg) : Prop :=
   ThR W c₁.mem none c₁.main c₂.main ∧ StR W c₁.mem c₂.mem ∧ RgsR W c₁.mem none c₁.rgs c₂.rgs
 
-/-- The threads of a configuration are closed, and have no lazy cell where a pattern reads. -/
+/-- The threads of a configuration are closed, have no lazy cell where a pattern reads, and every
+pattern match binds only values. -/
 def CfgClosed (c : Cfg) : Prop :=
-  c.main.Closed ∧ ¬ c.main.LzTop .any ∧
-    ∀ (p : Nat) (g : Rgn), c.rgs[p]? = some g → ∀ k ∈ g.kids, k.Closed ∧ ¬ k.LzTop .any
+  c.main.Closed ∧ ¬ c.main.LzTop .any ∧ c.main.MatchVals ∧
+    ∀ (p : Nat) (g : Rgn), c.rgs[p]? = some g →
+      ∀ k ∈ g.kids, k.Closed ∧ ¬ k.LzTop .any ∧ k.MatchVals
 
-/-- The threads of every configuration a run from `c` reaches are closed. -/
-def Reach (root : Roots) (c : Cfg) : Prop := ∀ c', CSteps root c c' → CfgClosed c'
+/-- The threads of every configuration a run from `c` reaches are closed, and lazy cells stay
+lazy cells across every step. -/
+def Reach (root : Roots) (c : Cfg) : Prop :=
+  ∀ c', CSteps root c c' → CfgClosed c' ∧
+    ∀ l c'', CStep root l c' c'' →
+      ∀ (i : Nat) (d : Tm), c'.mem[i]? = some d → d.IsCell → ∃ d', c''.mem[i]? = some d' ∧ d'.IsCell
 
 theorem _root_.Flick.CSteps.trans {root : Roots} {c c₁ c' : Cfg} (h₁ : CSteps root c c₁)
     (h₂ : CSteps root c₁ c') : CSteps root c c' := by
@@ -134,10 +140,10 @@ theorem OneShot.not_final {μ : List Tm} {τ : Option (Nat × Nat)} {t t' : Tm}
 
 /-- A child that the left side finishes is caught up on the right. -/
 theorem ThR.fcu {μ μ₂ : List Tm} {τ : Option (Nat × Nat)} {k k₂ : Tm} (h : ThR W μ τ k k₂)
-    (hf : Final k) (hst : StR W μ μ₂) :
+    (hf : Final k) (hst : StR W μ μ₂) (hcl : W.B → k.Closed ∧ k₂.Closed) :
     ∃ W' μ₂' k₂', RJ W μ₂ k₂ W' μ₂' k₂' ∧ Final k₂' ∧ ThR W' μ τ k k₂' ∧ StR W' μ μ₂' := by
   rcases h with h | h
-  · obtain ⟨W', μ₂', k₂', r, hk, s⟩ := h.fcu rfl hf μ₂
+  · obtain ⟨W', μ₂', k₂', r, hk, s⟩ := h.fcu rfl hf μ₂ hcl
     exact ⟨W', μ₂', k₂', r, hk, .inl s, r.st _ hst⟩
   · exact (h.not_final hf).elim
 

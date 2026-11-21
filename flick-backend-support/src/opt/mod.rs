@@ -15,8 +15,9 @@
 //!   throw to its one use;
 //! - [`fuse`]: `Seq` and `List` combinators of a `for` run in its loop;
 //! - [`lazy`]: lazy cells a program need not make: one nothing reads, one of
-//!   a value, made done, and one forced where it is made; and a force of a
-//!   cell an earlier force left done;
+//!   a value, made done, and one forced where it is made; a force of a cell an
+//!   earlier force left done; and a pure, loop-invariant lazy hoisted out of a
+//!   loop;
 //! - [`sroa`]: temporary records and tuples split into their parts;
 //! - dead code: unused pure bindings and private top-level values.
 //!
@@ -117,6 +118,7 @@ pub fn optimize(
                 devirt::methods(body, &lookup, &mut fresh, 0);
                 inline::inline(body, &module.name, &candidates, &foreign, &mut fresh);
                 fuse::fuse(body, &mut fresh, lang);
+                lazy::hoist(body, &mut fresh, lang);
                 simplify_with(body, &arities, lang);
                 // a value built only to be taken apart: each step may
                 // show the next one
@@ -125,6 +127,9 @@ pub fn optimize(
                     if !(inlined | known::branches(body, &mut fresh)) {
                         break;
                     }
+                    simplify_with(body, &arities, lang);
+                }
+                if lazy::hoist(body, &mut fresh, lang) {
                     simplify_with(body, &arities, lang);
                 }
             }
