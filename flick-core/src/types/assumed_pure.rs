@@ -28,7 +28,13 @@ impl Checker<'_> {
     /// When `expected`, a pure arrow taken for a local, met the runtime
     /// function `actual`: the `FLICK-T003` just reported at `span` says so at
     /// the local's binder and offers to annotate it.
-    pub(super) fn explain_assumed_pure(&mut self, actual: &Type, expected: &Type, span: Span) {
+    pub(super) fn explain_assumed_pure(
+        &mut self,
+        actual: &Type,
+        expected: &Type,
+        source_types: (&Type, &Type),
+        span: Span,
+    ) {
         let runtime = matches!(
             actual,
             Type::Fun {
@@ -48,10 +54,20 @@ impl Checker<'_> {
         };
         // one explanation per arrow taken
         let (_, name, at) = self.cx.assumed_pure.remove(index);
-        let last = self.diagnostics.pop().expect("the T003 just reported");
+        let mut last = self.diagnostics.pop().expect("the T003 just reported");
         let end = at + u32::try_from(name.len()).expect("source fits in u32");
         let binder = Span::new(self.file, at, end);
-        let shown = self.show(actual);
+        let show_side = |t: &Type| {
+            let plain = super::report::uncaptured(&self.zonk(t));
+            if matches!(plain, Type::Forall { .. }) {
+                self.show_exact_written(&plain)
+            } else {
+                self.show_written(&plain)
+            }
+        };
+        let (found_msg, expected_msg) = (show_side(source_types.0), show_side(source_types.1));
+        last.message = format!("expected `{expected_msg}`, found `{found_msg}`");
+        let shown = self.show_written(actual);
         let annotate = Edit {
             span: binder,
             replacement: format!("({name} : {shown})"),
@@ -69,17 +85,5 @@ impl Checker<'_> {
 }
 
 #[cfg(test)]
-mod tests {
-    use crate::types::lint_tests::assert_fix;
-
-    /// Annotated with the runtime arrow it is given, the callback fits it.
-    #[test]
-    fn a_callback_taken_for_pure_is_annotated() {
-        let head = "service Log =\n  info : String ->{} Unit\n\nsay : Unit ->{Log} Unit\nlet say () = Log.info \"hi\"\n\napply : Unit ->{Log} Unit\n";
-        assert_fix(
-            &format!("{head}let apply () = (fun h -> h ()) say\n"),
-            "FLICK-T003",
-            &format!("{head}let apply () = (fun (h : Unit ->{{Log}} Unit) -> h ()) say\n"),
-        );
-    }
-}
+#[path = "assumed_pure_tests.rs"]
+mod tests;
