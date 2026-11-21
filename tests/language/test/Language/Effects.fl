@@ -323,4 +323,122 @@ let tests = [
         Test.check (Test.equal "timed out" outcome)
       }),
   ],
+  Test.group "postfix catch" [
+    Test.effect_test
+      "matches try on constructor, guard, and same-type re-raise traces"
+      (task {
+        let run_catch = fun (key, n) ->
+          let log = Ref.make []
+          let outcome =
+            (
+              show (lookup key n) catch
+              | NotFound k ->
+                note log ("nf:" ++ k)
+                if k == "re" then Fail.fail (NotFound "again") else "not found " ++ k
+              | Invalid m when m < -5 ->
+                note log "very"
+                "very invalid"
+              | Invalid m ->
+                note log "inv"
+                "invalid " ++ show m
+            )
+            catch
+            | NotFound k ->
+              note log ("outer:" ++ k)
+              "outer " ++ k
+          (outcome, Ref.get log)
+        let run_try = fun (key, n) ->
+          let log = Ref.make []
+          let outcome =
+            try
+              try show (lookup key n) with
+              | NotFound k ->
+                note log ("nf:" ++ k)
+                if k == "re" then Fail.fail (NotFound "again") else "not found " ++ k
+              | Invalid m when m < -5 ->
+                note log "very"
+                "very invalid"
+              | Invalid m ->
+                note log "inv"
+                "invalid " ++ show m
+            with
+            | NotFound k ->
+              note log ("outer:" ++ k)
+              "outer " ++ k
+          (outcome, Ref.get log)
+        let cases = [("a", 2), ("b", 2), ("re", 2), ("a", 0), ("a", -9)]
+        let got_catch = List.map_effect run_catch cases
+        let got_try = List.map_effect run_try cases
+        let expected = [
+          ("3", []),
+          ("not found b", ["nf:b"]),
+          ("outer again", ["nf:re", "outer:again"]),
+          ("invalid 0", ["inv"]),
+          ("very invalid", ["very"]),
+        ]
+        Test.check (Test.equal expected got_catch)
+        Test.check (Test.equal expected got_try)
+      }),
+    Test.effect_test
+      "defects pass through catch uncaught even with wildcard"
+      (task {
+        let outcome =
+          defect_of
+            (task {
+              show (Int.unsafe_div 1 (List.length [])) catch
+              | _ -> "caught"
+            })
+        Test.check (Test.equal "defect: Int.unsafe_div: division by zero" outcome)
+      }),
+    Test.effect_test
+      "interruption passes through catch uncaught even with wildcard"
+      (task {
+        let log = Ref.make []
+        let winner =
+          race_first
+            (task {
+              Effect.ensuring
+                (task { note log "loser ended" })
+                (task {
+                  nap 5000
+                  "slow"
+                })
+              catch
+              | _ ->
+                note log "caught interrupt"
+                "caught"
+            })
+            (task {
+              nap 20
+              "fast"
+            })
+        note log winner
+        Test.check (Test.equal ["loser ended", "fast"] (Ref.get log))
+      }),
+    Test.effect_test
+      "scope finalizers and ensuring run before catch recovery"
+      (task {
+        let log = Ref.make []
+        let outcome =
+          scope {
+            let _ =
+              Resource.acquire_release (task { note log "acquire" }) (fun _ -> note log "release")
+            Effect.ensuring
+              (task { note log "ensuring" })
+              (task {
+                note log "body"
+                check (-3)
+              })
+          }
+          catch
+          | Invalid n ->
+            note log ("caught " ++ show n)
+            n
+        Test.check
+          (Test.equal (-3, ["acquire", "body", "ensuring", "release", "caught -3"]) (
+            outcome,
+            Ref.get log,
+          ))
+      }),
+  ],
 ]

@@ -380,6 +380,7 @@ impl Checker<'_> {
             K::ScopeExpr => K::ScopeKw,
             K::ProvideExpr => K::ProvideKw,
             K::TryExpr => K::TryKw,
+            K::CatchExpr => K::CatchKw,
             K::MatchExpr => K::MatchKw,
             K::IfExpr => K::IfKw,
             K::FunExpr => K::FunKw,

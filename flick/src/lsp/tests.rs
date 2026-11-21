@@ -319,3 +319,82 @@ fn a_dotted_completion_waits_for_the_background_analysis_and_reads_its_snapshot(
         "{out}"
     );
 }
+
+#[test]
+fn postfix_catch_utf16_hover_and_edit_refresh() {
+    let written = Written::default();
+    let mut server = server(Box::new(written.clone()));
+    let dir = env::temp_dir().join(format!("flick-lsp-catch-utf16-{}", process::id()));
+    let path = dir.join("CatchUtf16.fl");
+    // Line 7 has Cyrillic + astral emoji before `catch` so UTF-8 byte offset != UTF-16 column.
+    let source = "\
+module CatchUtf16 exposing (greet)
+
+type error Missing = Missing String
+
+load : String ->{; Missing} String
+let load tag = Fail.fail (Missing tag)
+
+greet : Unit ->{} String
+let greet () = load \"Гость 🎉\" catch | Missing _ -> \"ok\"
+";
+    server.notify("textDocument/didOpen", &opened(&path, source));
+    settle(&mut server);
+
+    // Line 8: `let greet () = load "Гость 🎉" catch | Missing _ -> "ok"`
+    // Count UTF-16 units up to `catch`:
+    let line8 = source.lines().nth(8).expect("line 8");
+    let catch_byte = line8.find("catch").expect("catch");
+    let catch_utf16: u32 = line8[..catch_byte]
+        .encode_utf16()
+        .count()
+        .try_into()
+        .expect("u32");
+    let hover = server
+        .request(
+            "textDocument/hover",
+            &json!({
+                "textDocument": { "uri": protocol::uri_of(&path) },
+                "position": { "line": 8, "character": catch_utf16 + 1 }
+            }),
+        )
+        .expect("hover response");
+    let contents = hover["contents"]["value"].as_str().unwrap_or("");
+    assert!(
+        contents.contains("catch") && contents.contains("String"),
+        "expected UTF-16 hover on `catch`: {hover:?}"
+    );
+
+    // Edit after analysis: introduce a type mismatch in the recovery arm and verify fresh
+    // diagnostics without stale results.
+    let ok_byte = line8.find("\"ok\"").expect("\"ok\"");
+    let ok_utf16: u32 = line8[..ok_byte]
+        .encode_utf16()
+        .count()
+        .try_into()
+        .expect("u32");
+    written.0.lock().expect("not poisoned").clear();
+    server.notify(
+        "textDocument/didChange",
+        &change(&path, (8, ok_utf16), (8, ok_utf16 + 4), "42"),
+    );
+    settle(&mut server);
+    let out = written_text(&written);
+    assert!(
+        out.contains("FLICK-T003"),
+        "expected fresh FLICK-T003 after editing recovery arm: {out}"
+    );
+
+    // Fix it back and ensure the stale diagnostic clears.
+    written.0.lock().expect("not poisoned").clear();
+    server.notify(
+        "textDocument/didChange",
+        &change(&path, (8, ok_utf16), (8, ok_utf16 + 2), "\"ok\""),
+    );
+    settle(&mut server);
+    let out = written_text(&written);
+    assert!(
+        out.contains("\"diagnostics\":[]"),
+        "expected diagnostics to clear after fixing recovery arm: {out}"
+    );
+}

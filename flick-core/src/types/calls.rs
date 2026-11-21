@@ -129,27 +129,37 @@ impl Checker<'_> {
                     Type::Error
                 })
             }
-            super::env::Found::Missing => {
-                if let Some(value) = name.strip_suffix("$server") {
-                    self.not_a_server_fn(value, span);
-                    return Type::Error;
-                }
-                let what = match namespace {
-                    Namespace::Constructor => "constructor",
-                    _ => "value",
-                };
-                self.error_guess(
-                    codes::T001,
-                    span,
-                    format!("cannot find {what} `{name}`"),
-                    |this| {
-                        let locals = this.cx.locals.iter().map(|l| l.name.as_str());
-                        closest(name, this.env.names(namespace).chain(locals)).map(str::to_owned)
-                    },
-                );
-                Type::Error
-            }
+            super::env::Found::Missing => self.missing_name_error(namespace, name, span),
         }
+    }
+
+    fn missing_name_error(&mut self, namespace: Namespace, name: &str, span: Span) -> Type {
+        if let Some(value) = name.strip_suffix("$server") {
+            self.not_a_server_fn(value, span);
+            return Type::Error;
+        }
+        if name == "resume" && self.cx.catch_arm > 0 {
+            self.error(
+                codes::T001,
+                span,
+                "cannot find value `resume`: `catch` handles typed errors only; `resume` is only available in `control` operation arms of `try … with`",
+            );
+            return Type::Error;
+        }
+        let what = match namespace {
+            Namespace::Constructor => "constructor",
+            _ => "value",
+        };
+        self.error_guess(
+            codes::T001,
+            span,
+            format!("cannot find {what} `{name}`"),
+            |this| {
+                let locals = this.cx.locals.iter().map(|l| l.name.as_str());
+                closest(name, this.env.names(namespace).chain(locals)).map(str::to_owned)
+            },
+        );
+        Type::Error
     }
 
     pub fn use_local(&mut self, index: usize, span: Span) -> Type {
