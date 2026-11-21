@@ -1,0 +1,26 @@
+// A local function without a signature is generalized, as a parenthesized
+// `fun` is: each use instantiates it afresh.
+module App.LocalGeneralization exposing (pairs, values, both, operators)
+
+pairs : Unit ->{} (Int, String)
+let pairs () =
+  let same x = x
+  (same 1, same "a")
+
+values : Unit ->{} (Int, String)
+let values () =
+  let get = fun r -> r.value
+  (get { value = 1 }, get { value = "a" })
+
+both : Unit ->{} (Int, String)
+let both () =
+  let paren = (fun r -> r.value)
+  (paren { value = 1 }, paren { value = "a" })
+
+// the operand of an operator stays of one type, which the uses settle
+operators : Unit ->{} (Int, String, List String)
+let operators () =
+  let add x y = x + y
+  let join a b = a ++ b
+  let prefixed = fun mark lines -> List.map (fun line -> mark ++ line) lines
+  (add 1 2, join "a" "b", prefixed "> " ["c"])

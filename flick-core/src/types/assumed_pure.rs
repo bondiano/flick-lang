@@ -2,6 +2,8 @@
 //! `(fun h -> h ()) f`. When a runtime function then meets that arrow, the
 //! mismatch points at the local and offers the annotation it needs.
 
+use std::collections::HashMap;
+
 use super::Checker;
 use super::ty::Type;
 use crate::diagnostics::{Edit, codes};
@@ -41,8 +43,10 @@ impl Checker<'_> {
         }
         let reported = (self.diagnostics.last())
             .is_some_and(|d| d.code == codes::T003 && d.span == Some(span));
-        let found = (self.cx.assumed_pure.iter())
-            .position(|(arrow, _, _)| super::report::uncaptured(&self.zonk(arrow)) == *expected);
+        let found = (self.cx.assumed_pure.iter()).position(|(arrow, _, _)| {
+            let taken = super::report::uncaptured(&self.zonk(arrow));
+            instance_of(&taken, expected, &mut HashMap::new())
+        });
         let (true, Some(index)) = (reported, found) else {
             return;
         };
@@ -68,9 +72,36 @@ impl Checker<'_> {
     }
 }
 
+/// Whether `ty` is `taken` with its variables replaced: the arrow taken for
+/// a local of a function generalized since, met at one of its uses.
+fn instance_of<'t>(taken: &'t Type, ty: &'t Type, vars: &mut HashMap<&'t str, &'t Type>) -> bool {
+    match (taken, ty) {
+        (Type::Var(name), _) => *vars.entry(name).or_insert(ty) == ty,
+        (
+            Type::Fun {
+                param: p,
+                effects: e,
+                result: r,
+            },
+            Type::Fun {
+                param,
+                effects,
+                result,
+            },
+        ) => e == effects && instance_of(p, param, vars) && instance_of(r, result, vars),
+        (Type::App { head: h, arg: a }, Type::App { head, arg }) => {
+            instance_of(h, head, vars) && instance_of(a, arg, vars)
+        }
+        (Type::Tuple(ts), Type::Tuple(us)) => {
+            ts.len() == us.len() && ts.iter().zip(us).all(|(t, u)| instance_of(t, u, vars))
+        }
+        _ => taken == ty,
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::types::lint_tests::assert_fix;
+    use crate::types::lint_tests::{HEAD, assert_fix, check, fixed};
 
     /// Annotated with the runtime arrow it is given, the callback fits it.
     #[test]
@@ -80,6 +111,27 @@ mod tests {
             &format!("{head}let apply () = (fun h -> h ()) say\n"),
             "FLICK-T003",
             &format!("{head}let apply () = (fun (h : Unit ->{{Log}} Unit) -> h ()) say\n"),
+        );
+    }
+
+    /// A local function is generalized, so its use instantiates the arrow
+    /// taken for its parameter afresh: the note and the fix still find it.
+    #[test]
+    fn a_callback_of_a_local_function_is_annotated() {
+        let head = "service Log =\n  info : String ->{} Unit\n\nsay : Unit ->{Log} Unit\nlet say () = Log.info \"hi\"\n\napply : Unit ->{Log} Unit\n";
+        let text = format!("{HEAD}{head}let apply () =\n  let apply_it h = h ()\n  apply_it say\n");
+        let diagnostics = check(&text);
+        let error = (diagnostics.iter())
+            .find(|d| d.code.to_string() == "FLICK-T003")
+            .unwrap_or_else(|| panic!("{diagnostics:?}"));
+        assert!(
+            (error.related.iter()).any(|r| r.message.starts_with("`h` has no type written")),
+            "{error:?}"
+        );
+        let fixed = fixed(&text, "FLICK-T003").expect("the fix");
+        assert!(
+            fixed.contains("let apply_it (h : Unit ->{Log} Unit) = h ()"),
+            "{fixed}"
         );
     }
 }

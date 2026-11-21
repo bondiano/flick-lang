@@ -60,8 +60,8 @@ used without its argument and `Float String` are `FLICK-T002`.
 
 Every named function has its full signature right above its `let` (see [Direct effectful calls](../../spec/01-direct-calls/)): at
 the top level, and for a function made by partial application. A local function
-may omit it: its type is inferred, and without a signature it has one type, so
-using it at a second type is `FLICK-T003`. A recursive local function needs one.
+may omit it: its type is inferred and generalized as a lambda's is, so each use
+may give it other types. A recursive local function needs one.
 An instance method takes its signature from the class; repeating it is `FLICK-T059`.
 A top-level function without one is `FLICK-T004`, with the inferred type
 as a suggestion; types written in the `let` header are `FLICK-T005`; a

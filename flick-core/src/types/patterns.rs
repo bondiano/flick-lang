@@ -68,7 +68,6 @@ impl<'c> Checker<'c> {
                         generated: name.start >= self.generated,
                         ty: ty.clone(),
                         rec: None,
-                        unsigned: false,
                         binding: super::mutation::Binding::Other,
                     });
                 }
@@ -289,7 +288,6 @@ impl<'c> Checker<'c> {
                         generated: node.range().0 >= self.generated,
                         ty: field_ty,
                         rec: None,
-                        unsigned: false,
                         binding: super::mutation::Binding::Other,
                     });
                     Pat::Wild

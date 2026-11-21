@@ -30,7 +30,7 @@ impl Checker<'_> {
         self.store.level -= 1;
         let is_fun = matches!(self.whnf(&ty), Type::Fun { .. });
         // a plugin's code needs no signature: no one reads it. Nor does a local
-        // function: nothing outside its body sees it, and it stays of one type
+        // function: nothing outside its body sees it
         let local = self.store.level > 0 && !parts.rec;
         let signed = header || local || self.span(decl).start >= self.generated;
         if let (true, Some(written), true) = (is_fun, parts.header, parts.params.is_empty()) {
@@ -50,9 +50,11 @@ impl Checker<'_> {
         } else if let Some(header) = redundant {
             self.redundant_annotation(decl, parts, header);
         }
-        // a type in a GADT branch may hold by its equalities only
+        // a type in a GADT branch may hold by its equalities only. A local
+        // function is generalized as a parenthesized `fun` is; a top-level or
+        // recursive one without a signature keeps the one type its uses give it
         if runtime
-            || function
+            || (function && !local)
             || !self.store.equalities.is_empty()
             || !self.store.row_equalities.is_empty()
         {
