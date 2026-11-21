@@ -80,6 +80,9 @@ impl<'c> Checker<'c> {
             (K::BinExpr, _) if super::pipes::composes(node) => {
                 self.compose(node, Some(expected));
             }
+            (K::AccessorExpr, _) => {
+                self.accessor(node, Some(expected));
+            }
             (K::LoopExpr | K::WhileExpr, _) => {
                 self.control_loop(node, Some(expected));
             }
@@ -360,6 +363,7 @@ impl<'c> Checker<'c> {
                 ty
             }
             K::FieldExpr => self.field(node, children[0]),
+            K::AccessorExpr => self.accessor(node, None),
             K::QuestionExpr => self.question(node, children[0]),
             K::AppExpr => {
                 let arguments = super::children::arguments(&children[1..]);

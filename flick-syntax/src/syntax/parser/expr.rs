@@ -283,7 +283,41 @@ pub(super) fn at_arg_start(p: &Parser) -> bool {
         | K::ProvideKw => true,
         K::LazyKw => p.nth(1) == K::LBrace,
         K::LBrace => !p.no_brace,
+        K::Dot => accessor_ahead(p),
         _ => false,
+    }
+}
+
+/// Whether an accessor `.label` starts at the current `.`: a name follows it
+/// without a space. A `.` right after a value was already read as its field.
+fn accessor_ahead(p: &Parser) -> bool {
+    let dot = p.raw();
+    let next = p.toks[(p.pos + 1).min(p.toks.len() - 1)];
+    dot.kind == K::Dot && next.kind == K::Ident && next.start == dot.end
+}
+
+/// `.address.city`: the steps of a path of fields, written without spaces.
+/// A step whose label is missing, as in `.address. users`, ends the path:
+/// the words after it are read as they would be after a whole accessor.
+fn accessor(p: &mut Parser) -> K {
+    loop {
+        let step = p.start();
+        let dot = p.raw();
+        p.bump();
+        let named = p.raw().kind == K::Ident && p.raw().start == dot.end;
+        if named {
+            p.bump();
+        } else {
+            p.error_at(
+                codes::S007,
+                p.span(dot.start, dot.end),
+                "expected a field name right after `.`".into(),
+            );
+        }
+        p.complete(step, K::AccessorStep);
+        if !(named && p.at(K::Dot) && p.adjacent()) {
+            return K::AccessorExpr;
+        }
     }
 }
 
@@ -381,6 +415,7 @@ pub(super) fn atom(p: &mut Parser) -> Option<Done> {
             con_path(p);
             K::NameExpr
         }
+        K::Dot if accessor_ahead(p) => accessor(p),
         K::Number | K::BigInt | K::String | K::TrueKw | K::FalseKw => {
             p.bump();
             K::Literal

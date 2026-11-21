@@ -1,0 +1,5 @@
+module App.Accessors exposing (..)
+
+cities : List { address : { city : String } } -> List String
+let cities users = List.map .address. users
+//                                  ^ FLICK-S007 expected a field name right after `.`

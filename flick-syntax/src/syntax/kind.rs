@@ -293,6 +293,11 @@ syntax_kinds! {
         NameExpr,
         Path,
         FieldExpr,
+        /// `.address.city`: a function reading the path of fields of its
+        /// argument, one `AccessorStep` for each `.label`.
+        AccessorExpr,
+        /// `.label` of an accessor; without the label when it is missing.
+        AccessorStep,
         /// `e?`.
         QuestionExpr,
         /// `a..b`, `a..<b`, `a..`.

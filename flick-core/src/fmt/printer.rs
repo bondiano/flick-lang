@@ -306,20 +306,26 @@ fn edge(n: &Node, last: bool) -> Option<(K, K)> {
 /// with the kind of the node it belongs to.
 fn space((a, a_parent): (K, K), (b, b_parent): (K, K)) -> bool {
     let tight_braces = |parent: K| matches!(parent, K::EffectAnnot | K::RowType);
-    match (a, b) {
-        // the expression of a hole touches its `\{` and `}`
-        (
+    let opener = |kind: K| {
+        matches!(
+            kind,
             K::StringStart
-            | K::StringMid
-            | K::LParen
-            | K::LBracket
-            | K::Caret
-            | K::Dollar
-            | K::At
-            | K::DotDotDot,
-            _,
+                | K::StringMid
+                | K::LParen
+                | K::LBracket
+                | K::Caret
+                | K::Dollar
+                | K::At
+                | K::DotDotDot
         )
-        | (
+    };
+    match (a, b) {
+        // an accessor stands apart from what is before it, as an argument
+        // does: `List.map .name`; its steps touch each other
+        (_, K::Dot) if b_parent == K::AccessorStep && a_parent != K::AccessorStep => !opener(a),
+        // the expression of a hole touches its `\{` and `}`
+        _ if opener(a) => false,
+        (
             _,
             K::StringMid
             | K::StringEnd

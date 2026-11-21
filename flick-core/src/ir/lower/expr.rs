@@ -10,8 +10,8 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::types::handle::{arm_pattern, failed_pattern, operation_path};
 use crate::types::lang::{self, Lang};
 use crate::types::{
-    Dict, Identity, Owner, Range, Ref, StageKey, applied_order, children, composed_key,
-    composition, is_pattern, let_parts, param_key, result_key, right_application,
+    Dict, Identity, Owner, Range, Ref, StageKey, accessor_keys, applied_order, children,
+    composed_key, composition, is_pattern, let_parts, param_key, result_key, right_application,
 };
 
 impl Lower<'_> {
@@ -224,6 +224,7 @@ impl Lower<'_> {
             K::RangeExpr => return self.range(node, false),
             K::QuestionExpr => return self.question(node, children[0]),
             K::FieldExpr => return self.field(node, children[0]),
+            K::AccessorExpr => return self.accessor(node),
             K::RecordExpr => ExprKind::Record(self.fields(node)),
             K::RecordUpdate => {
                 let record = self.boxed(children[0]);
@@ -314,6 +315,46 @@ impl Lower<'_> {
             .cloned()
             .unwrap_or_default();
         with_dicts(field, dicts)
+    }
+
+    /// `.a.b` as `fun x -> x.a.b`, with an `x` no source can name. Each
+    /// step reads a field of the one before, with the dictionaries its
+    /// instance takes, as a field does.
+    fn accessor(&mut self, node: &Node) -> Expr {
+        let span = self.span(node);
+        let (param, result) = accessor_keys(node);
+        let entry = StageKey::Arrow {
+            node: node.range(),
+            index: 0,
+        };
+        self.register_owner_entry(entry);
+        let x = self.hidden("$x");
+        let mut value = Expr::new(ExprKind::Local(x.clone()), span);
+        for step in node.nodes() {
+            let label = self.token_text(step, K::Ident).unwrap_or_default();
+            // as the span of `x.a.b` is that of the whole path so far
+            let at = Span::new(self.file, node.range().0, step.range().1);
+            let field = Expr::new(ExprKind::Field(Box::new(value), label), at);
+            let dicts = (self.typing.dicts.get(&step.range()))
+                .cloned()
+                .unwrap_or_default();
+            value = with_dicts(field, dicts);
+        }
+        let stage = self
+            .typing
+            .stages
+            .get(&node.range())
+            .and_then(|s| s.first());
+        let body = self.adapted(result, value);
+        let lambda = ExprKind::Lambda {
+            params: vec![Param {
+                pat: Pat::Bind(x),
+                stage: stage.copied().unwrap_or(Stage::Pure),
+                ty: (self.typing.values.get(&param)).and_then(type_name),
+            }],
+            body: Box::new(self.owner_entry(entry, body)),
+        };
+        Expr::new(lambda, span)
     }
 
     fn name(&mut self, node: &Node) -> Expr {

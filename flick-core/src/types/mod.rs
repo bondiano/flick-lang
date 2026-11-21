@@ -149,6 +149,7 @@ pub use proof_bundles::record;
 pub use proof_decls::{Bundle, GoalSyntax, GoalType, Law, ProofInfo, goal_syntax};
 pub use question::Question;
 pub use ranges::range_list;
+pub use records::accessor_keys;
 pub use schemas::companion_name;
 pub(crate) use services::impl_def;
 pub use services::{OpClass, Operation};

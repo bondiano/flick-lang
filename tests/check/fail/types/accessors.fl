@@ -1,0 +1,48 @@
+module App.Accessors exposing (..)
+
+type alias Address = { city : String }
+
+type alias User = { name : String; age : Int; address : Address }
+
+email : User -> String
+let email = .email
+//          ^^^^^^ FLICK-T003 `User` has no field `email`
+
+town : User -> String
+let town = .address.town
+//                 ^^^^^ FLICK-T003 `Address` has no field `town`
+
+typo : User -> String
+let typo = .nmae
+//         ^^^^^ FLICK-T003 `User` has no field `nmae`
+
+// the argument comes after the accessor: the field is missing at it
+late : User -> String
+let late user = .email user
+//                     ^^^^ FLICK-T003 expected `{ email : _ | _ }`, found `User`: field `email` is missing
+
+// the last field is the value of the function
+age_text : User -> String
+let age_text = .age
+//              ^^^ FLICK-T003 expected `String`, found `Int`
+
+let get_name = .name
+
+// an accessor is a function, not a field of an argument to come
+older : User -> Int
+let older user = .age + 1
+//               ^^^^^^^^ FLICK-T003 expected `Int`, found `{ age : _ | _ } -> _`
+//                      ^ FLICK-T003 expected `{ age : _ | _ } -> _`, found `Int`
+
+tried : User -> String
+let tried = .name?
+//          ^^^^^^ FLICK-T003 `?` takes an `Option` or a `Result`, but this has type `{ name : _ | _ } -> _`
+
+// a field is read with no space after its record: `user.name`
+spaced : User -> String
+let spaced user =
+  user
+  .name
+//~ FLICK-T011 @44:3-44:7 has type `User` and would be discarded
+//~ FLICK-T003 @45:3-45:8 expected `String`, found a function
+//~ FLICK-T004 @29:1-29:21 function `get_name` needs a signature right above its `let`

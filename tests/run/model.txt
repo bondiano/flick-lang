@@ -22,6 +22,7 @@ codegen/closures
 codegen/counted_failures
 codegen/counted_patterns
 codegen/composition
+codegen/accessors
 codegen/task_twice
 codegen/errors
 codegen/error_match

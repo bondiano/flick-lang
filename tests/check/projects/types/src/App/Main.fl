@@ -1,6 +1,6 @@
 module App.Main exposing (describe, load)
 
-import App.Domain exposing (User, UserId, Shape(..), Box, new_id, first, wrap, Users)
+import App.Domain exposing (User, UserId, Session, Shape(..), Box, new_id, first, wrap, Users)
 import Acme.Text as Text
 
 describe : Shape -> String
@@ -34,3 +34,12 @@ let wrong_arg () = Text.trim 1
 no_field : User -> Float
 let no_field user = user.age
 //                  ^^^^^^^^ FLICK-T003 has no field `age`
+
+// nor does an accessor read a field through an opaque type
+token : Session -> String
+let token = .token
+//          ^^^^^^ FLICK-T003 `Session` has no field `token`
+
+piped_token : Session -> String
+let piped_token session = session |> .token
+//                        ^^^^^^^ FLICK-T003
