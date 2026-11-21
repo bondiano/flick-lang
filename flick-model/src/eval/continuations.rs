@@ -219,6 +219,24 @@ impl Machine<'_> {
                 Control::Ret(Term::unit())
             }
             (Const::Raise, [v]) => Control::Raise(v.clone()),
+            (Const::SeqIter, [v @ Term::Apply(Head::Const(Const::SeqThunk), _)]) => {
+                Control::Ret(v.clone())
+            }
+            (Const::SeqIter, [v @ Term::List(_)]) => {
+                Control::Eval(seq::from_list_term(v.clone()))
+            }
+            (Const::SeqIter, [other]) => {
+                return Err(stuck(format!(
+                    "unsupported `for` collection source: {other:?}"
+                )));
+            }
+            (Const::SeqNext, [Term::Apply(Head::Const(Const::SeqThunk), args)]) => {
+                Control::Eval(Term::app(args[0].clone(), Term::unit()))
+            }
+            (Const::SeqSync, [thunk]) => Control::Eval(seq::sync_thunk(thunk.clone())),
+            (Const::SeqFlatMapSync, [f, xs]) => {
+                Control::Eval(seq::flat_map_term(f.clone(), xs.clone()))
+            }
             (Const::Ask(s), [_]) => {
                 // Source operations are `(ask_S ()).op`, looked up only
                 // at their first runtime stage (translate/expr.rs). Select

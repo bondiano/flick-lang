@@ -72,6 +72,8 @@ codegen/loops_state
 codegen/loops
 codegen/loops_for_source
 codegen/loops_guards
+codegen/for_comprehension
+codegen/ranges
 codegen/match_graph
 codegen/labeled_loops_finalizers
 codegen/category_classes
@@ -88,6 +90,7 @@ codegen/mutual_rec_arity
 effect/row_without
 stdlib/effect/mutable_ref
 stdlib/effect/optic_parts
+stdlib/seqs
 stdlib/server/node
 
 runtime/counted_layer_merge

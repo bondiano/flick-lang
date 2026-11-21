@@ -92,6 +92,15 @@ impl Checker<'_> {
             // the fields themselves, not copies: the trace is by address
             return self.construct(c, given.iter().chain(args), head);
         }
+        if let Term::Apply(Head::Const(Const::SeqIter), given) = head
+            && given.is_empty()
+            && !args.is_empty()
+        {
+            return self.call(|c| {
+                let t = c.seq_iter(args[0])?;
+                args[1..].iter().try_fold(t, |t, a| c.apply(&t, a))
+            });
+        }
         // the spine is one call
         self.call(|c| {
             let (t, rest) = match head {

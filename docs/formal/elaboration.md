@@ -416,10 +416,15 @@ A source loop has a lexical identity in the shared IR (`ControlLoop` and
 An iteration returns either its normal value or an exit (`Result (Option a) t`):
 `Err (Some v)` is `break v`, `Err None` is `continue`, and `Ok v` is ordinary
 completion. A sequence stops on an exit; scopes return it normally and close
-before iteration resumes. Lists in imperative `for` use the same state protocol
-while consuming their remaining elements. Strict list comprehensions use core
-list recursion too; each iteration keeps its local SSA bindings, while outer
-assignments remain a checker error.
+before iteration resumes. Imperative `for` loops and strict comprehensions
+adapt any supported `Iterable` source (`List` or `Seq`) into a lazy sequence
+via `SeqIter` and pull one element at a time via `SeqNext` under the same
+state protocol, preserving order, repeatable traversal, and bounded consumption
+of infinite sequences; lazy `for … yield` comprehensions translate to lazy
+`Seq` thunks (with sync-stage lifting for reader-bound `@sync` comprehensions).
+Each strict iteration keeps its local SSA bindings, while outer assignments
+remain a checker error, and any unsupported collection source is rejected as a
+translation gap rather than lowered as list recursion.
 
 Within `try`, the model carries typed failure as another `Result` alongside the
 state; a source handler receives the store where the failure occurred. The error

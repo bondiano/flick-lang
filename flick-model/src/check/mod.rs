@@ -127,6 +127,9 @@ pub struct Checker<'d> {
     structural: Vec<(Name, Rc<[Term]>, Type)>,
     /// Operands of `<`, `<=`, `>`, `>=`, checked once their type is known.
     ordered: Vec<Type>,
+    /// `for` sources whose container type was still a meta at `Const::SeqIter`:
+    /// `(source_type, element_meta, Iterable givens in scope)`.
+    iterables: Vec<(Type, Type, Vec<Type>)>,
     /// Counter of the rigid variables a signature introduces.
     rigid: u32,
     /// Lexical level at which each opened existential module witness was introduced.
@@ -189,6 +192,7 @@ impl<'d> Checker<'d> {
             solving_row_upper: false,
             structural: Vec::new(),
             ordered: Vec::new(),
+            iterables: Vec::new(),
             rigid: 0,
             witness_levels: HashMap::new(),
             store: Vec::new(),
@@ -250,6 +254,12 @@ impl<'d> Checker<'d> {
 
     /// Settles the rows and checks what waited for a type.
     fn finish(&mut self) -> Check<()> {
+        for (src, elem, givens) in mem::take(&mut self.iterables) {
+            let found = self
+                .iterable_element(&src, &givens, true)?
+                .expect("final iterable check either resolves an element or errors");
+            self.unify(&elem, &found)?;
+        }
         for (class, fields, t) in mem::take(&mut self.structural) {
             self.structural_fields(&class, &fields, &t)?;
         }

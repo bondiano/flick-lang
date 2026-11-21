@@ -5,8 +5,8 @@ mod loops;
 
 use super::{
     Tr,
-    expr::{cond, is_lang, layer_run, pat},
-    loops::{list_step, none, option, result, rpat, some, state_function, state_pattern},
+    expr::{cond, is_lang, layer_run, pat, stuck},
+    loops::{none, option, result, rpat, seq_iter, seq_step, some, state_function, state_pattern},
 };
 use crate::syntax::{Arm, Name, Pat, Term};
 use crate::types::{Scheme, Stage as ModelStage, Type};
@@ -198,11 +198,14 @@ impl Tr<'_> {
                 iterable: true,
                 ..
             } => self.protected_source_for(id, body, xs),
+            ExprKind::Each { stop: Some(_), .. } => {
+                self.captured(true, stuck("a `for` loop with a stop predicate"), xs)
+            }
             ExprKind::Each {
+                stop: None,
                 pat: p,
                 source,
                 body,
-                ..
             } => self.protected_with(source, xs, |tr, v| tr.protected_each(p, v, body, xs)),
             ExprKind::ControlLoop {
                 id,

@@ -55,6 +55,9 @@ impl Checker<'_> {
             Term::Apply(Head::Con(c), args) if args.len() == c.arity => {
                 self.construct(c, args.iter(), e)
             }
+            Term::Apply(Head::Const(Const::SeqIter), args) if args.len() == 1 => {
+                self.seq_iter(&args[0])
+            }
             Term::Apply(head, args) => {
                 let t = match head {
                     Head::Con(c) => self.constructor(&c.ty.module, &c.name)?,
