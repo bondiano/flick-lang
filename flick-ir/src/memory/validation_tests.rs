@@ -298,3 +298,95 @@ fn selected_owner_helpers_validate_their_consumed_arity() {
         })
     );
 }
+
+#[test]
+fn stage2_control_var_loop_and_generator_operations_validate_arity_and_tokens() {
+    let bind = |binding, value| Instruction::Let { binding, value };
+    let helper_one = Function {
+        params: vec![0],
+        body: Block {
+            instructions: vec![],
+            exit: Exit::Return(0),
+        },
+    };
+    let helper_two = Function {
+        params: vec![0, 1],
+        body: Block {
+            instructions: vec![Instruction::Drop(0)],
+            exit: Exit::Return(1),
+        },
+    };
+    let main = Function {
+        params: vec![0],
+        body: Block {
+            instructions: vec![
+                bind(1, Operation::VarMake(0)),
+                Instruction::Dup(1),
+                bind(2, Operation::VarGet(1)),
+                bind(3, Operation::VarSet { var: 1, value: 2 }),
+                bind(
+                    4,
+                    Operation::Loop {
+                        id: "L".into(),
+                        code: 1,
+                        args: vec![3],
+                    },
+                ),
+                bind(
+                    5,
+                    Operation::FunctionBoundary {
+                        code: 1,
+                        args: vec![4],
+                    },
+                ),
+                bind(
+                    6,
+                    Operation::GenerateStrict {
+                        code: 1,
+                        args: vec![5],
+                    },
+                ),
+                bind(
+                    7,
+                    Operation::GenerateLazy {
+                        code: 2,
+                        captures: vec![6],
+                        limit: None,
+                        sync: false,
+                    },
+                ),
+                bind(8, Operation::SeqOpen(7)),
+                bind(9, Operation::SeqNext(8)),
+                bind(10, Operation::UnwrapOption(9)),
+                bind(11, Operation::Yield(10)),
+                Instruction::Drop(11),
+                bind(12, Operation::Label("name".into())),
+                bind(
+                    13,
+                    Operation::LoopExit {
+                        id: "L".into(),
+                        value: Some(12),
+                    },
+                ),
+            ],
+            exit: Exit::Return(13),
+        },
+    };
+    let mut program = Program {
+        functions: BTreeMap::from([(0, main), (1, helper_one), (2, helper_two)]),
+        globals: vec![],
+    };
+    assert_eq!(validate_program(&program), Ok(()));
+    program.functions.get_mut(&2).expect("gen").params.push(2);
+    assert_eq!(
+        validate_program(&program),
+        Err(Error::InCode {
+            code: 0,
+            error: Box::new(Error::Arity {
+                code: 2,
+                expected: 3,
+                actual: 2
+            }),
+        })
+    );
+}

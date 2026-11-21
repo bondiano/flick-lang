@@ -1,4 +1,4 @@
-impl Machine<'_, '_> {
+impl<'p> Machine<'p, '_> {
     fn finish(&mut self, result: Result<LanguageExit, Error>) -> ProgramOutcome {
         let outcome = match result.and_then(|exit| self.report_exit(exit)) {
             Ok(outcome) => outcome,
@@ -40,6 +40,7 @@ impl Machine<'_, '_> {
             if self.failure.is_some() && !self.failure_elected {
                 self.prepare_failure()?;
             }
+            self.drain_dropped_continuations();
             if self.discard.is_none()
                 && self.ready.is_none()
                 && self.failure.is_some()
@@ -89,27 +90,79 @@ impl Machine<'_, '_> {
 
     /// Each suspended-frame crossing consumes one ordinary VM step.
     fn unwind(&mut self) -> Result<(), Error> {
-        let frame = self.frames.pop().expect("raised frame");
+        let mut frame = self.frames.pop().expect("raised frame");
         self.restore_evidence();
+        let destination = mem::replace(&mut frame.destination, Destination::DiscardFinalizer);
         if let Destination::Handle {
             activation,
             binding,
-        } = frame.destination
+        } = destination
         {
             self.heap
-                .drop_values(frame.locals.into_values().flatten().collect())?;
-            return self.handler_failed(activation, binding);
+                .drop_values(mem::take(&mut frame.locals).into_values_vec())?;
+            let gen_frames = self.release_frame_resources(&mut frame)?;
+            self.handler_failed(activation, binding)?;
+            self.queue_discard_frames(gen_frames);
+            return Ok(());
         }
-        if let Destination::Catch { handler, binding } = frame.destination {
+        if let Destination::Catch { handler, binding } = destination {
             self.pending_handler = Some(handler);
             self.heap
-                .drop_values(frame.locals.into_values().flatten().collect())?;
+                .drop_values(mem::take(&mut frame.locals).into_values_vec())?;
+            let gen_frames = self.release_frame_resources(&mut frame)?;
             self.begin_recovery(binding)?;
+            self.queue_discard_frames(gen_frames);
+            return Ok(());
+        }
+        if let Destination::CaptureExit { binding } = destination {
+            self.heap
+                .drop_values(mem::take(&mut frame.locals).into_values_vec())?;
+            let gen_frames = self.release_frame_resources(&mut frame)?;
+            let cause = self.failure.take().expect("captured exit failure");
+            self.failure_elected = false;
+            let exit = self
+                .heap
+                .allocate(Data::Exit(ExitData::Failure(cause.into_value())));
+            self.store(binding, exit)?;
+            self.queue_discard_frames(gen_frames);
+            return Ok(());
+        }
+        if let Destination::CatchDefect { handler, binding } = destination {
+            self.pending_handler = Some(handler);
+            self.heap
+                .drop_values(mem::take(&mut frame.locals).into_values_vec())?;
+            let gen_frames = self.release_frame_resources(&mut frame)?;
+            let defect_msg = self
+                .failure
+                .as_ref()
+                .map(|c| primitives::first_defect_message(self.heap, c.object_id()))
+                .transpose()?
+                .flatten();
+            let handler = self.pending_handler.take().expect("defect handler");
+            if let Some(msg) = defect_msg {
+                if let Some(cause) = self.failure.take() {
+                    self.heap.drop_cause(cause)?;
+                }
+                self.failure_elected = false;
+                let msg_val = self.heap.literal(&Lit::String(msg))?;
+                self.scratch.extend([handler, msg_val]);
+                self.apply(Destination::Bind(binding))?;
+            } else {
+                self.heap.drop_value(handler)?;
+            }
+            self.queue_discard_frames(gen_frames);
             return Ok(());
         }
         self.heap
-            .drop_values(frame.locals.into_values().flatten().collect())?;
-        match frame.destination {
+            .drop_values(mem::take(&mut frame.locals).into_values_vec())?;
+        let gen_frames = self.release_frame_resources(&mut frame)?;
+        self.unwind_destination(destination)?;
+        self.queue_discard_frames(gen_frames);
+        Ok(())
+    }
+
+    fn unwind_destination(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+        match destination {
             Destination::RecoverySelection { id } => self.abandon_recovery(id)?,
             Destination::RecoveryBody {
                 owner, evidence, ..
@@ -118,6 +171,19 @@ impl Machine<'_, '_> {
                 self.current_evidence = evidence;
             }
             Destination::LayerRun { provider, .. } => self.leave_provider(provider)?,
+            Destination::Discontinue { cont_id, .. } => {
+                if let Some(Some(captured)) = self.continuations.get_mut(&cont_id).map(Option::take)
+                {
+                    let cause = self.failure.take();
+                    self.discard = Some(Discard {
+                        frames: captured.frames,
+                        owner: Some(self.current_owner),
+                        next: TransferNext::ResumeRunning {
+                            saved_failure: cause,
+                        },
+                    });
+                }
+            }
             Destination::Invocation(id) => self.invocation_failed(id)?,
             Destination::Initialize { name, .. } => {
                 self.globals.remove(&name);
@@ -125,16 +191,85 @@ impl Machine<'_, '_> {
             Destination::CloseScope {
                 owner, previous, ..
             } => {
-                self.close_owner(owner)?;
-                self.current_owner = previous;
+                let cause = self.failure.take().expect("scope failure cause");
+                self.begin_close_scope(owner, previous, ScopeOutcome::Failure(cause))?;
             }
+            Destination::ClosingScope { state } => self.finalizer_failed(state)?,
             Destination::RestoreOwner { previous, .. } => self.current_owner = previous,
+            Destination::Loop { args, .. } => self.heap.drop_values(args)?,
+            Destination::GenerateStrict { items, .. } => self.heap.drop_values(items)?,
+            Destination::GeneratorStep { gen_id, .. } => {
+                if let Some(slot) = self.generators.get_mut(&gen_id) {
+                    slot.run = GeneratorRun::Done;
+                }
+            }
+            Destination::LazyComplete { lazy, .. } => self.unwind_lazy(&lazy)?,
+            Destination::AcquireRegister { release, .. } => self.heap.drop_value(release)?,
+            Destination::BracketUse {
+                use_fn, release_fn, ..
+            } => self.heap.drop_values(vec![use_fn, release_fn])?,
+            Destination::BracketRelease {
+                resource,
+                release_fn,
+                binding,
+            } => {
+                let cause = self.failure.take().expect("bracket body failure");
+                self.scratch.extend([release_fn, resource]);
+                self.apply(Destination::BracketFinish {
+                    outcome: BracketOutcome::Failure(cause),
+                    binding,
+                })?;
+            }
+            Destination::BracketFinish { outcome, .. } => match outcome {
+                BracketOutcome::Success(value) => self.heap.drop_value(value)?,
+                BracketOutcome::Failure(orig) => {
+                    let joined = if let Some(secondary) = self.failure.take() {
+                        let res =
+                            primitives::join_causes(self.heap, &orig, &secondary, &mut self.fuel);
+                        self.heap.drop_cause(orig)?;
+                        self.heap.drop_cause(secondary)?;
+                        res?
+                    } else {
+                        orig
+                    };
+                    self.failure = Some(joined);
+                    self.failure_elected = false;
+                }
+            },
             Destination::RecoveryHelper { .. }
             | Destination::Top
             | Destination::Bind(_)
-            | Destination::Modify { .. } => {}
-            Destination::Catch { .. } => unreachable!("catch handled above"),
+            | Destination::Modify { .. }
+            | Destination::FunctionBoundary { .. }
+            | Destination::DiscardFinalizer => {}
+            Destination::Catch { .. }
+            | Destination::CaptureExit { .. }
+            | Destination::CatchDefect { .. } => unreachable!("catch/exit handled above"),
             Destination::Handle { .. } => unreachable!("handler handled above"),
+        }
+        Ok(())
+    }
+
+    fn unwind_lazy(&mut self, lazy: &LazyHandle) -> Result<(), Error> {
+        let ordinary_payload = if let Some(cause) = self.failure.as_ref() {
+            self.heap
+                .ordinary_failure(cause)?
+                .map(Value::representation)
+        } else {
+            None
+        };
+        if let Some(payload_rep) = ordinary_payload {
+            let cached = self.heap.dup(&payload_rep)?;
+            let slot = self.heap.lazy_state_mut(self.execution, lazy)?;
+            let prev = slot.replace(LazyState::DoneErr(cached));
+            if let Some(LazyState::Running(task)) = prev {
+                self.heap.drop_value(task)?;
+            }
+        } else {
+            let slot = self.heap.lazy_state_mut(self.execution, lazy)?;
+            if let Some(LazyState::Running(task)) = slot.take() {
+                *slot = Some(LazyState::Pending(task));
+            }
         }
         Ok(())
     }
@@ -158,7 +293,7 @@ impl Machine<'_, '_> {
                 Instruction::Dup(local) => {
                     let frame = self.frames.last_mut().expect("running frame");
                     let value = self.heap.dup(peek(&frame.locals, *local)?)?;
-                    frame.locals.entry(*local).or_default().push(value);
+                    frame.locals.push(*local, value);
                 }
                 Instruction::Drop(local) => {
                     let value = take(
@@ -183,17 +318,13 @@ impl Machine<'_, '_> {
                         .admit_ordinary(self.pending.as_ref().expect("return root"))?;
                 }
                 if !frame.locals.is_empty() {
-                    return Err(Error::Leftover(
-                        frame
-                            .locals
-                            .iter()
-                            .map(|(id, values)| (*id, values.len()))
-                            .collect(),
-                    ));
+                    return Err(Error::Leftover(frame.locals.leftover()));
                 }
-                let frame = self.frames.pop().expect("returning frame");
+                let mut frame = self.frames.pop().expect("returning frame");
+                let gen_frames = self.release_frame_resources(&mut frame)?;
                 self.restore_evidence();
                 self.returned_frame(frame.destination)?;
+                self.queue_discard_frames(gen_frames);
             }
             Exit::Branch {
                 condition,
@@ -209,79 +340,6 @@ impl Machine<'_, '_> {
                 let _ = take(&mut frame.locals, *condition)?;
                 frame.block = if condition_value { then_ } else { else_ };
                 frame.at = 0;
-            }
-        }
-        Ok(())
-    }
-
-    fn returned_frame(&mut self, destination: Destination) -> Result<(), Error> {
-        match destination {
-            Destination::RecoverySelection { id } => self.complete_recovery(id)?,
-            Destination::RecoveryHelper { id, binding } => {
-                let value = self.pending.take().expect("helper result");
-                self.store_transport(binding, value, id)?;
-            }
-            Destination::RecoveryBody {
-                binding,
-                owner,
-                evidence,
-            } => {
-                self.current_owner = owner;
-                self.current_evidence = evidence;
-                let value = self.pending.take().expect("selected body result");
-                self.store(binding, value)?;
-            }
-            Destination::LayerRun { provider, binding } => {
-                self.leave_provider(provider)?;
-                let value = self.pending.take().expect("layer result");
-                self.store(binding, value)?;
-            }
-            Destination::Handle {
-                activation,
-                binding,
-            } => self.handler_returned(activation, binding)?,
-            Destination::Invocation(id) => {
-                self.invocations
-                    .get_mut(&id)
-                    .expect("running invocation")
-                    .callee = self.pending.take();
-                self.ready = Some(id);
-            }
-            Destination::Catch { handler, binding } => {
-                self.pending_handler = Some(handler);
-                self.heap
-                    .drop_value(self.pending_handler.take().expect("unused handler"))?;
-                let value = self.pending.take().expect("try result");
-                self.store(binding, value)?;
-            }
-            Destination::Initialize { name, binding } => {
-                let value = self.pending.take().expect("returned token");
-                self.globals.insert(name.clone(), Some(value));
-                let root = self.globals[&name].as_ref().expect("initialized global");
-                let owned = self.heap.dup(root)?;
-                self.deliver(&binding.map_or(Destination::Top, Destination::Bind), owned)?;
-            }
-            Destination::Modify { cell, binding } => {
-                self.complete_modify(&cell, binding)?;
-            }
-            Destination::CloseScope {
-                owner,
-                previous,
-                binding,
-            } => {
-                self.close_owner(owner)?;
-                self.current_owner = previous;
-                let value = self.pending.take().expect("scope result");
-                self.store(binding, value)?;
-            }
-            Destination::RestoreOwner { previous, binding } => {
-                self.current_owner = previous;
-                let value = self.pending.take().expect("selected-owner result");
-                self.store(binding, value)?;
-            }
-            destination => {
-                let value = self.pending.take().expect("returned token");
-                self.deliver(&destination, value)?;
             }
         }
         Ok(())

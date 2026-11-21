@@ -31,6 +31,7 @@ fn assert_arena_protocol_fault(kind: Intrinsic, case: &str) {
                 heap.identity
             },
             index: usize::MAX,
+            generation: 0,
         });
     let expected = match case {
         "heap" | "exec" | "dataexec" => Error::ForeignArena,

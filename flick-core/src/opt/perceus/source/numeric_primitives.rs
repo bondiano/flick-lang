@@ -20,6 +20,15 @@ impl Lower<'_> {
         if super::list_range::is_binding(value) {
             return Some(self.list_range(value, name, span, block));
         }
+        if let Some(result) = self.lazy_scope_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.record_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.seq_foreign(value, span, block) {
+            return Some(result);
+        }
         if let Some(kind) = scalar::candidate(value) {
             return Some(self.scalar_foreign(value, name, kind, span, block));
         }
@@ -49,10 +58,64 @@ impl Lower<'_> {
         if let Some(expression) = equality_expression(value, span) {
             return Some(self.expr(&expression, &Env::new(), block));
         }
-        strings::intrinsic(value)
+        if let Some(kind) = strings::intrinsic(value)
             .or_else(|| layers::intrinsic(value))
             .or_else(|| intrinsic(value))
-            .map(|kind| self.intrinsic(kind, false, vec![], block, span))
+        {
+            return Some(self.intrinsic(kind, false, vec![], block, span));
+        }
+        if let Some(result) = self.core_scalar_foreign(value, name, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.core_string_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.core_list_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.core_record_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_functional_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_combine_foreign(value, name, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_chunk_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_hash_map_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_json_decimal_regexp_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_duration_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_outcome_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_test_gen_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_schema_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_codec_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_check_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_path_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_datetime_cron_foreign(value, span, block) {
+            return Some(result);
+        }
+        self.std_graph_foreign(value, span, block)
     }
 
     fn scalar_foreign(
@@ -111,32 +174,92 @@ pub(super) fn intrinsic(value: &Foreign) -> Option<Intrinsic> {
 }
 
 pub(super) fn equality_expression(value: &Foreign, span: Span) -> Option<Expr> {
-    if value.binding.name != "equals" || !supports(value, 2, true, false) {
-        return None;
+    let at = |kind| Expr::new(kind, span);
+    let params = |left: &str, right: &str| {
+        [left, right]
+            .into_iter()
+            .map(|name| Param {
+                pat: Pat::Bind(name.into()),
+                stage: Stage::Pure,
+                ty: None,
+            })
+            .collect()
+    };
+    if value.binding.name == "equals" && supports(value, 2, true, false) {
+        let left = "$primitiveEquals.left";
+        let right = "$primitiveEquals.right";
+        return Some(at(ExprKind::Lambda {
+            params: params(left, right),
+            body: Box::new(at(ExprKind::Binary(
+                BinOp::Eq,
+                Box::new(at(ExprKind::Local(left.into()))),
+                Box::new(at(ExprKind::Local(right.into()))),
+            ))),
+        }));
     }
-    let left = "$primitiveEquals.left";
-    let right = "$primitiveEquals.right";
-    Some(Expr::new(
-        ExprKind::Lambda {
-            params: [left, right]
-                .into_iter()
-                .map(|name| Param {
-                    pat: Pat::Bind(name.into()),
-                    stage: Stage::Pure,
-                    ty: None,
-                })
-                .collect(),
-            body: Box::new(Expr::new(
-                ExprKind::Binary(
-                    BinOp::Eq,
-                    Box::new(Expr::new(ExprKind::Local(left.into()), span)),
-                    Box::new(Expr::new(ExprKind::Local(right.into()), span)),
-                ),
-                span,
-            )),
-        },
-        span,
-    ))
+    if value.binding.name == "numberStrictEqual" && supports(value, 2, false, false) {
+        let left = "$strictEq.left";
+        let right = "$strictEq.right";
+        return Some(at(ExprKind::Lambda {
+            params: params(left, right),
+            body: Box::new(at(ExprKind::Binary(
+                BinOp::Same,
+                Box::new(at(ExprKind::Local(left.into()))),
+                Box::new(at(ExprKind::Local(right.into()))),
+            ))),
+        }));
+    }
+    if value.binding.name == "numberSameValue" && supports(value, 2, false, false) {
+        // Object.is(a, b): if a === b then (a !== 0.0 || 1.0 / a === 1.0 / b) else (a !== a && b !== b)
+        let left = "$sameVal.left";
+        let right = "$sameVal.right";
+        let a = || at(ExprKind::Local(left.into()));
+        let b = || at(ExprKind::Local(right.into()));
+        let zero = at(ExprKind::Lit(flick_ir::Lit::Float(0.0)));
+        let one_div = |x| {
+            at(ExprKind::Binary(
+                BinOp::Arith(flick_ir::Arith::Div, flick_ir::Num::Float),
+                Box::new(at(ExprKind::Lit(flick_ir::Lit::Float(1.0)))),
+                Box::new(x),
+            ))
+        };
+        let same_eq = at(ExprKind::Binary(BinOp::Same, Box::new(a()), Box::new(b())));
+        let nonzero_or_same_sign = at(ExprKind::Binary(
+            BinOp::Or,
+            Box::new(at(ExprKind::Binary(
+                BinOp::NotSame,
+                Box::new(a()),
+                Box::new(zero),
+            ))),
+            Box::new(at(ExprKind::Binary(
+                BinOp::Same,
+                Box::new(one_div(a())),
+                Box::new(one_div(b())),
+            ))),
+        ));
+        let both_nan = at(ExprKind::Binary(
+            BinOp::And,
+            Box::new(at(ExprKind::Binary(
+                BinOp::NotSame,
+                Box::new(a()),
+                Box::new(a()),
+            ))),
+            Box::new(at(ExprKind::Binary(
+                BinOp::NotSame,
+                Box::new(b()),
+                Box::new(b()),
+            ))),
+        ));
+        return Some(at(ExprKind::Lambda {
+            params: params(left, right),
+            body: Box::new(at(ExprKind::If(
+                Box::new(same_eq),
+                Box::new(nonzero_or_same_sign),
+                Box::new(both_nan),
+            ))),
+        }));
+    }
+    None
 }
 
 fn supports(value: &Foreign, arity: usize, copies_args: bool, copies_result: bool) -> bool {

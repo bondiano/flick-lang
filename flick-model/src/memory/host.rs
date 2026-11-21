@@ -16,9 +16,9 @@ pub(super) fn run(
 ) -> Result<Value, Error> {
     match primitive {
         // the model observes stdout only
-        HostPrimitive::StderrLine => heap.string(value).map(|_| Value::Unit),
+        HostPrimitive::StderrLine => heap.string_lossy(value).map(|_| Value::Unit),
         HostPrimitive::StdoutWrite => {
-            stdout.push_str(heap.string(value)?);
+            stdout.push_str(&heap.string_lossy(value)?);
             Ok(Value::Unit)
         }
         HostPrimitive::Env => {

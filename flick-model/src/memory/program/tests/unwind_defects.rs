@@ -5,6 +5,7 @@ fn fixture_machine<'p, 'h>(program: &'p Program, heap: &'h mut Heap) -> Machine<
         execution: 0,
         globals: BTreeMap::new(),
         cells: vec![],
+        lazies: vec![],
         owners: vec![OwnerState::default()],
         current_owner: 0,
         current_evidence: None,
@@ -12,6 +13,8 @@ fn fixture_machine<'p, 'h>(program: &'p Program, heap: &'h mut Heap) -> Machine<
         activations: BTreeMap::new(),
         providers: BTreeMap::new(),
         segments: BTreeMap::new(),
+        continuations: BTreeMap::new(),
+        generators: BTreeMap::new(),
         invocations: BTreeMap::new(),
         discard: None,
         ready: None,
@@ -146,6 +149,7 @@ fn cleanup_error_replacement_releases_the_owned_failed_outcome() {
     let invalid = ObjectId {
         heap: machine.heap.identity,
         index: usize::MAX,
+        generation: 0,
     };
     machine.globals.insert(
         Name::new("Broken", "root"),

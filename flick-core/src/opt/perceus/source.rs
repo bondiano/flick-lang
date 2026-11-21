@@ -6,27 +6,78 @@
 //! boundaries, not source-function return boundaries.
 
 mod app_fail;
+mod core_lists;
+mod core_lists_array;
+mod core_lists_cb;
+mod core_lists_ops;
+mod core_records;
+mod core_records_ops;
+mod core_scalars;
+mod core_strings;
 mod derived;
 mod dictionaries;
 mod eff_combinators;
+mod expr_builder;
 mod failures;
 mod free;
 mod handlers;
 mod layers;
+mod lazy_scope;
 mod list_collections;
 mod list_range;
 mod list_show;
+mod loops;
 mod matches;
 mod numeric_primitives;
 mod option_map2;
+mod records;
 mod result_map2;
 mod scalar_context;
+mod seq;
+mod std_check;
+mod std_check_props;
+mod std_chunk;
+mod std_chunk_ops;
+mod std_codec;
+mod std_codec_meta;
+mod std_codec_ops;
+mod std_codec_std;
+mod std_combine;
+mod std_datetime_cron;
+mod std_duration;
+mod std_ext_rt;
+mod std_functional;
+mod std_graph;
+mod std_graph_ops;
+mod std_hash_map;
+mod std_hash_map_ops;
+mod std_hash_set;
+mod std_json_decimal_regexp;
+mod std_outcome;
+mod std_path;
+mod std_schema;
+mod std_schema_compound;
+mod std_schema_enum;
+mod std_schema_route;
+mod std_schema_rt;
+mod std_schema_rt_adt;
+mod std_schema_rt_block;
+mod std_schema_rt_gen;
+mod std_schema_rt_gen_kind;
+mod std_schema_rt_more;
+mod std_schema_rt_obj;
+mod std_schema_rt_route;
+mod std_schema_rt_route_match;
+mod std_schema_rt_route_try;
+mod std_schema_rt_tree;
+mod std_schema_rt_val;
+mod std_test_gen;
 mod strings;
 mod structural;
 #[cfg(test)]
 mod tests;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::{error, fmt};
 
 use flick_ir::{Constructor, Dict, Foreign, ForeignMode, InstanceInfo, Shape};
@@ -177,6 +228,10 @@ fn lower_in<'a>(
         initializers: BTreeMap::new(),
         program: Program::default(),
         next: 0,
+        loop_counter: 0,
+        iterable_loops: BTreeMap::new(),
+        active_for_loop: None,
+        in_for_each_body: BTreeSet::new(),
     };
     for root in roots {
         lower.global(root, None)?;
@@ -191,6 +246,10 @@ struct Lower<'a> {
     initializers: BTreeMap<Name, CodeId>,
     program: Program,
     next: CodeId,
+    loop_counter: usize,
+    iterable_loops: BTreeMap<String, String>,
+    active_for_loop: Option<String>,
+    in_for_each_body: BTreeSet<String>,
 }
 
 /// One ANF function under construction. Branches get their own builders,
@@ -379,19 +438,4 @@ fn dictionary(value: &Dict, span: Span) -> Result<Expr, LowerError> {
         }
     };
     Ok(Expr::new(kind, span))
-}
-
-fn form(kind: &ExprKind) -> &'static str {
-    match kind {
-        ExprKind::Unwrap(_) => "nonlocal Option return",
-        ExprKind::Var(_) => "mutable local read",
-        ExprKind::Generate { .. } | ExprKind::Each { .. } | ExprKind::Yield(_) => "generator",
-        ExprKind::Loop { .. } | ExprKind::ControlLoop { .. } | ExprKind::LoopExit { .. } => {
-            "loop/control exit"
-        }
-        ExprKind::Handle(_) | ExprKind::Perform { .. } => "effect handler/operation",
-        ExprKind::Label(_) => "record label primitive",
-        ExprKind::ServiceTag(_) => "service tag",
-        _ => "compiler expression",
-    }
 }

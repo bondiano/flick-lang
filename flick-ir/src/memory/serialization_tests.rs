@@ -265,3 +265,93 @@ fn evidence_operations_round_trip_without_changing_old_wire_shapes() {
         assert_eq!(back, operations);
     }
 }
+
+#[test]
+#[cfg(feature = "json")]
+fn stage2_operations_and_intrinsics_round_trip() {
+    let mut operations = vec![
+        Operation::VarMake(0),
+        Operation::VarGet(1),
+        Operation::VarSet { var: 1, value: 2 },
+        Operation::Loop {
+            id: "$loop".into(),
+            code: 3,
+            args: vec![0, 1],
+        },
+        Operation::LoopExit {
+            id: "$loop".into(),
+            value: Some(4),
+        },
+        Operation::LoopExit {
+            id: "$loop".into(),
+            value: None,
+        },
+        Operation::FunctionBoundary {
+            code: 5,
+            args: vec![6],
+        },
+        Operation::UnwrapOption(7),
+        Operation::GenerateStrict {
+            code: 8,
+            args: vec![9],
+        },
+        Operation::GenerateLazy {
+            code: 10,
+            captures: vec![11],
+            limit: Some(12),
+            sync: true,
+        },
+        Operation::Yield(13),
+        Operation::SeqOpen(14),
+        Operation::SeqNext(15),
+        Operation::Label("field".into()),
+    ];
+    for kind in [
+        Intrinsic::ListRange,
+        Intrinsic::LazyMake,
+        Intrinsic::LazyForce,
+        Intrinsic::ScopeAddFinalizer,
+        Intrinsic::ScopeAddFinalizerExit,
+        Intrinsic::ScopeAddClose,
+        Intrinsic::AcquireRelease,
+        Intrinsic::Bracket,
+        Intrinsic::Uninterruptible,
+        Intrinsic::RecordGet,
+        Intrinsic::RecordExtend,
+        Intrinsic::RecordRemove,
+        Intrinsic::RecordProject,
+        Intrinsic::RecordMergeDisjoint,
+        Intrinsic::RecordLabels,
+        Intrinsic::SeqOfList,
+        Intrinsic::SeqToList,
+        Intrinsic::ExitIsSuccess,
+        Intrinsic::ExitIsFailure,
+        Intrinsic::ExitHasInterrupts,
+        Intrinsic::Int(IntIntrinsic::Parse),
+        Intrinsic::Int(IntIntrinsic::CheckedAdd),
+        Intrinsic::Float(FloatIntrinsic::Remainder),
+        Intrinsic::BigInt(BigIntIntrinsic::Gcd),
+        Intrinsic::String(StringIntrinsic::Slice),
+        Intrinsic::List(ListIntrinsic::InsertAt),
+        Intrinsic::Record(RecordIntrinsic::Difference),
+        Intrinsic::Debug(DebugIntrinsic::Assert),
+    ] {
+        operations.push(Operation::Intrinsic {
+            kind,
+            args: (0..kind.arity())
+                .map(|i| u32::try_from(i).expect("small arity"))
+                .collect(),
+        });
+    }
+    let json = serde_json::to_string(&operations).expect("serialize stage2 ops");
+    let back: Vec<Operation> = serde_json::from_str(&json).expect("deserialize stage2 ops");
+    assert_eq!(back, operations);
+    #[cfg(feature = "cbor")]
+    {
+        let mut bytes = Vec::new();
+        ciborium::into_writer(&operations, &mut bytes).expect("serialize stage2 CBOR");
+        let back: Vec<Operation> =
+            ciborium::from_reader(bytes.as_slice()).expect("deserialize stage2 CBOR");
+        assert_eq!(back, operations);
+    }
+}

@@ -7,7 +7,10 @@ use flick_core::ir::{BinOp, Lit};
 use flick_core::numeric::{Arith, Num, int_arith};
 use flick_core::opt::{js_number, json_string};
 
-use super::{Data, Error, Heap, Value, tagged_boundary};
+use super::{
+    CronData, Data, DateTimeData, DurationData, Error, ExitData, GraphData, GraphEdge, GraphNode,
+    GraphWalkerData, Heap, ObjectId, ObjectToken, TimeZoneData, Value, charge, tagged_boundary,
+};
 
 #[path = "numeric.rs"]
 mod numeric;
@@ -23,6 +26,185 @@ mod bigint_conversion;
 
 #[path = "host.rs"]
 mod host;
+
+#[path = "primitives/int_ops.rs"]
+mod int_ops;
+
+#[path = "primitives/float_ops.rs"]
+mod float_ops;
+
+#[path = "primitives/bigint_ops.rs"]
+mod bigint_ops;
+
+#[path = "primitives/string_case.rs"]
+mod string_case;
+
+#[path = "primitives/string_ops.rs"]
+mod string_ops;
+
+#[path = "primitives/list_ops.rs"]
+mod list_ops;
+
+#[path = "primitives/list_ops_extra.rs"]
+mod list_ops_extra;
+
+#[path = "primitives/record_ops.rs"]
+mod record_ops;
+
+#[path = "primitives/debug_ops.rs"]
+mod debug_ops;
+
+#[path = "primitives/bytes_ops.rs"]
+mod bytes_ops;
+
+#[path = "primitives/json_ops.rs"]
+mod json_ops;
+
+#[path = "primitives/json_pointer_ops.rs"]
+mod json_pointer_ops;
+
+#[path = "primitives/json_patch_ops.rs"]
+mod json_patch_ops;
+
+#[path = "primitives/decimal_ops.rs"]
+mod decimal_ops;
+
+#[path = "primitives/decimal_round.rs"]
+mod decimal_round;
+
+#[path = "primitives/regexp_ops.rs"]
+mod regexp_ops;
+
+#[path = "primitives/duration_ops.rs"]
+mod duration_ops;
+
+#[path = "primitives/outcome_ops.rs"]
+mod outcome_ops;
+
+#[path = "primitives/cause_ops.rs"]
+mod cause_ops;
+
+#[path = "primitives/gen_ops.rs"]
+mod gen_ops;
+
+#[path = "primitives/schema_ops.rs"]
+mod schema_ops;
+
+#[path = "primitives/schema_data.rs"]
+mod schema_data;
+
+#[path = "primitives/schema_leaves.rs"]
+mod schema_leaves;
+
+#[path = "primitives/schema_std_leaves.rs"]
+mod schema_std_leaves;
+
+#[path = "primitives/schema_leaves_encode.rs"]
+mod schema_leaves_encode;
+
+#[path = "primitives/schema_route_ops.rs"]
+mod schema_route_ops;
+
+#[path = "primitives/check_ops.rs"]
+mod check_ops;
+
+#[path = "primitives/check_eval.rs"]
+mod check_eval;
+
+#[path = "primitives/json_schema_jval.rs"]
+mod json_schema_jval;
+
+#[path = "primitives/json_schema_export.rs"]
+mod json_schema_export;
+
+#[path = "primitives/json_schema_dialect.rs"]
+mod json_schema_dialect;
+
+#[path = "primitives/json_schema_conv.rs"]
+mod json_schema_conv;
+
+#[path = "primitives/bigint_norm.rs"]
+mod bigint_norm;
+
+#[path = "primitives/json_schema_to.rs"]
+mod json_schema_to;
+
+#[path = "primitives/path_ops.rs"]
+mod path_ops;
+
+#[path = "primitives/path_url.rs"]
+mod path_url;
+
+#[path = "primitives/datetime_date.rs"]
+mod datetime_date;
+
+#[path = "primitives/datetime_tzif.rs"]
+mod datetime_tzif;
+
+#[path = "primitives/datetime_tzif_bin.rs"]
+mod datetime_tzif_bin;
+
+#[path = "primitives/datetime_parse.rs"]
+mod datetime_parse;
+
+#[path = "primitives/datetime_parse_scan.rs"]
+mod datetime_parse_scan;
+
+#[path = "primitives/datetime_format.rs"]
+mod datetime_format;
+
+#[path = "primitives/datetime_ops.rs"]
+mod datetime_ops;
+
+#[path = "primitives/datetime_parts.rs"]
+mod datetime_parts;
+
+#[path = "primitives/cron_ops.rs"]
+mod cron_ops;
+
+#[path = "primitives/cron_step.rs"]
+mod cron_step;
+
+#[path = "primitives/graph_ops.rs"]
+mod graph_ops;
+
+#[path = "primitives/graph_json.rs"]
+mod graph_json;
+
+#[path = "primitives/graph_build.rs"]
+mod graph_build;
+
+#[path = "primitives/graph_transform.rs"]
+mod graph_transform;
+
+#[path = "primitives/graph_combine.rs"]
+mod graph_combine;
+
+#[path = "primitives/graph_query.rs"]
+mod graph_query;
+
+#[path = "primitives/graph_walk.rs"]
+mod graph_walk;
+
+#[path = "primitives/graph_algos.rs"]
+mod graph_algos;
+
+#[path = "primitives/graph_conn.rs"]
+mod graph_conn;
+
+#[path = "primitives/graph_paths.rs"]
+mod graph_paths;
+
+#[path = "primitives/graph_allpaths.rs"]
+mod graph_allpaths;
+
+#[path = "primitives/graph_flow.rs"]
+mod graph_flow;
+
+pub(super) use bigint_norm::bigint_pattern_eq;
+use bigint_norm::{bigint_order, bigint_text, normalize_bigint};
+pub(super) use cause_ops::{concat_causes, first_defect_message, join_causes};
+pub(super) use outcome_ops::describe_defect;
 
 pub(super) fn metered_primitive(
     heap: &mut Heap,
@@ -43,15 +225,50 @@ pub(super) fn metered_primitive(
             unsafe_int(kind, &arguments[0], &arguments[1])
         }
         Intrinsic::StringLength => {
-            let text = heap.string(&arguments[0])?;
-            super::charge(fuel, text.len())?;
-            Ok(Value::Int(
-                text.encode_utf16().fold(0_i32, |n, _| n.wrapping_add(1)),
-            ))
+            let units = heap.utf16_units(&arguments[0])?;
+            super::charge(fuel, units.len())?;
+            Ok(Value::Int(i32::try_from(units.len()).unwrap_or(i32::MAX)))
         }
+        Intrinsic::ListRange => list_range(heap, &arguments[0], &arguments[1], fuel),
+        Intrinsic::RecordGet => record_get(heap, &arguments[0], &arguments[1], fuel),
+        Intrinsic::RecordExtend => {
+            record_extend(heap, &arguments[0], &arguments[1], &arguments[2], fuel)
+        }
+        Intrinsic::RecordRemove => record_remove(heap, &arguments[0], &arguments[1], fuel),
+        Intrinsic::RecordProject => record_project(heap, &arguments[0], &arguments[1], fuel),
+        Intrinsic::RecordMergeDisjoint => {
+            record_merge_disjoint(heap, &arguments[0], &arguments[1], fuel)
+        }
+        Intrinsic::RecordLabels => record_labels(heap, &arguments[0], fuel),
+        Intrinsic::ExitIsSuccess | Intrinsic::ExitIsFailure | Intrinsic::ExitHasInterrupts => {
+            exit_predicate(heap, kind, &arguments[0], fuel)
+        }
+        Intrinsic::Int(op) => int_ops::run(heap, op, arguments, fuel),
+        Intrinsic::Float(op) => float_ops::run(heap, op, arguments, fuel),
+        Intrinsic::BigInt(op) => bigint_ops::run(heap, op, arguments, fuel),
+        Intrinsic::String(op) => string_ops::run(heap, op, arguments, fuel),
+        Intrinsic::List(op) => list_ops::run(heap, op, arguments, fuel),
+        Intrinsic::Record(op) => record_ops::run(heap, op, arguments, fuel),
+        Intrinsic::Debug(op) => debug_ops::run(heap, op, arguments, fuel),
+        Intrinsic::Bytes(op) => bytes_ops::run(heap, op, arguments, fuel),
+        Intrinsic::Hash(op) => numeric::hash_op(heap, op, arguments, fuel),
+        Intrinsic::Json(op) => json_ops::run(heap, op, arguments, fuel),
+        Intrinsic::BigDecimal(op) => decimal_ops::run(heap, op, arguments, fuel),
+        Intrinsic::RegExp(op) => regexp_ops::run(heap, op, arguments, fuel),
+        Intrinsic::Duration(op) => duration_ops::run(heap, op, arguments, fuel),
+        Intrinsic::Outcome(op) => outcome_ops::run(heap, op, arguments, fuel),
+        Intrinsic::Gen(op) => gen_ops::run(heap, op, arguments, fuel),
+        Intrinsic::Schema(op) => schema_ops::run(heap, op, arguments, fuel),
+        Intrinsic::JsonSchema(op) => json_schema_dialect::run(heap, op, arguments, fuel),
+        Intrinsic::Path(op) => path_ops::run(heap, op, arguments, fuel),
+        Intrinsic::DateTime(op) => datetime_ops::run(heap, op, arguments, fuel),
+        Intrinsic::Cron(op) => cron_ops::run(heap, op, arguments, fuel),
+        Intrinsic::Graph(op) => graph_ops::run(heap, op, arguments, fuel),
         _ => Err(unsupported("not a numeric primitive")),
     }
 }
+
+include!("primitives/records.rs");
 
 /// Both native backends represent readonly tuples and lists as arrays. Keep
 /// ordinary pattern kinds strict; bridge only this audited observer boundary.
@@ -65,6 +282,7 @@ pub(super) fn array_to_list(
         return Err(unsupported("array observer requires a list or tuple"));
     };
     let (list, count) = match &heap.object(token.id)?.data {
+        Data::ListSlice { .. } => (true, 0),
         Data::Tagged {
             tag,
             ordinary_fields,
@@ -93,6 +311,192 @@ pub(super) fn array_to_list(
     }
     heap.construct("$list", fields)
 }
+
+/// Operands stay rooted by the caller until either result delivery or unwind.
+fn unsafe_int(kind: Intrinsic, left: &Value, right: &Value) -> Result<Value, Error> {
+    let (Value::Int(left), Value::Int(right)) = (left, right) else {
+        return Err(unsupported("Int division/remainder type mismatch"));
+    };
+    let remainder = kind == Intrinsic::IntUnsafeRem;
+    if *right == 0 {
+        return Err(Error::IntDivisionByZero { remainder });
+    }
+    let op = if remainder { Arith::Rem } else { Arith::Div };
+    Ok(Value::Int(int_arith(op, *left, *right)))
+}
+
+fn unsupported(what: impl Into<String>) -> Error {
+    Error::UnsupportedPrimitive(what.into())
+}
+
+pub(super) fn not(value: &Value) -> Result<Value, Error> {
+    match value {
+        Value::Bool(value) => Ok(Value::Bool(!value)),
+        _ => Err(Error::ExpectedBoolean),
+    }
+}
+
+pub(super) fn neg(heap: &mut Heap, num: Num, value: &Value) -> Result<Value, Error> {
+    heap.admit_ordinary(value)?;
+    match (num, value) {
+        (Num::Int, Value::Int(value)) => Ok(Value::Int(value.wrapping_neg())),
+        (Num::Float, Value::Float(value)) => Ok(Value::Float(-value)),
+        (Num::BigInt, _) => {
+            let text = bigint_text(heap.bigint(value)?)?;
+            let negative = if let Some(positive) = text.strip_prefix('-') {
+                positive.to_owned()
+            } else if text == "0" {
+                text
+            } else {
+                format!("-{text}")
+            };
+            heap.literal(&Lit::BigInt(negative))
+        }
+        _ => Err(unsupported("numeric negation type mismatch")),
+    }
+}
+
+/// Inputs remain rooted in the machine until success or error cleanup.
+pub(super) fn string_predicate(
+    heap: &Heap,
+    kind: Intrinsic,
+    needle: &Value,
+    subject: &Value,
+) -> Result<Value, Error> {
+    heap.admit_ordinary(needle)?;
+    heap.admit_ordinary(subject)?;
+    let needle = heap.utf16_units(needle)?;
+    let subject = heap.utf16_units(subject)?;
+    let matched = match kind {
+        Intrinsic::StringStartsWith => subject.starts_with(&needle),
+        Intrinsic::StringIncludes => {
+            needle.is_empty()
+                || subject
+                    .windows(needle.len())
+                    .any(|w| w == needle.as_slice())
+        }
+        _ => return Err(unsupported("not a string predicate")),
+    };
+    Ok(Value::Bool(matched))
+}
+
+pub(super) fn show_value(heap: &Heap, value: &Value) -> Result<String, Error> {
+    match value {
+        Value::Unit => Ok("undefined".into()),
+        Value::Bool(value) => Ok(value.to_string()),
+        Value::Int(value) => Ok(value.to_string()),
+        Value::Float(value) => Ok(js_number(*value)),
+        Value::Object(token) => match &heap.object(token.id)?.data {
+            Data::String(text) => Ok(json_string(text)),
+            Data::Utf16(units) => Ok(show_utf16_string(units)),
+            Data::Bytes(_) => Err(unsupported("primitive show of bytes")),
+            Data::JsonNull => Ok("null".into()),
+            Data::BigDecimal { value, scale } => Ok(decimal_ops::format_decimal(value, *scale)),
+            Data::RegExp { pattern, flags, .. } => Ok(format!("/{pattern}/{flags}")),
+            Data::Duration(d) => Ok(duration_ops::format_duration(d)),
+            Data::BigInt(text) => Ok(format!("{}n", bigint_text(text)?)),
+            Data::Tagged {
+                tag,
+                ordinary_fields,
+                fields,
+            } => {
+                tagged_boundary(tag, *ordinary_fields, fields.len())?;
+                if tag.starts_with('$') {
+                    return Err(unsupported("primitive show of collection"));
+                }
+                Ok(tag.rsplit('.').next().unwrap_or(tag).to_owned())
+            }
+            Data::RecoveryResult { .. }
+            | Data::Cause(_)
+            | Data::CauseReason(_)
+            | Data::Defect(_)
+            | Data::ServiceTag { .. }
+            | Data::Layer(_)
+            | Data::ListSlice { .. }
+            | Data::Record(_)
+            | Data::Dictionary(_)
+            | Data::Closure { .. }
+            | Data::Task { .. }
+            | Data::Continuation { .. }
+            | Data::Cell { .. }
+            | Data::Var { .. }
+            | Data::Lazy { .. }
+            | Data::Arena { .. }
+            | Data::Seq(_)
+            | Data::Iterator { .. }
+            | Data::Label(_)
+            | Data::Exit(_)
+            | Data::DateTime(_)
+            | Data::TimeZone(_)
+            | Data::Cron(_)
+            | Data::Graph(_)
+            | Data::GraphWalker(_) => Err(unsupported(
+                "primitive show of record or executable/opaque storage",
+            )),
+        },
+        Value::Cell(_) | Value::Var(_) | Value::Lazy(_) | Value::Iterator(_) => {
+            Err(unsupported("primitive show of cell"))
+        }
+        Value::Owner(_) | Value::Arena(_) | Value::ArenaView(_) => {
+            Err(unsupported("primitive show of arena capability"))
+        }
+    }
+}
+
+fn show_utf16_string(units: &[u16]) -> String {
+    use std::fmt::Write as _;
+    let mut out = String::with_capacity(units.len() + 2);
+    out.push('"');
+    let mut i = 0;
+    while i < units.len() {
+        let u = units[i];
+        if (0xD800..=0xDBFF).contains(&u)
+            && i + 1 < units.len()
+            && (0xDC00..=0xDFFF).contains(&units[i + 1])
+        {
+            let cp = 0x10000 + ((u32::from(u) - 0xD800) << 10) + (u32::from(units[i + 1]) - 0xDC00);
+            if let Some(ch) = char::from_u32(cp) {
+                let quoted = json_string(&ch.to_string());
+                out.push_str(&quoted[1..quoted.len() - 1]);
+            }
+            i += 2;
+        } else if (0xD800..=0xDFFF).contains(&u) {
+            let _ = write!(out, "\\u{u:04x}");
+            i += 1;
+        } else {
+            if let Some(ch) = char::from_u32(u32::from(u)) {
+                let quoted = json_string(&ch.to_string());
+                out.push_str(&quoted[1..quoted.len() - 1]);
+            }
+            i += 1;
+        }
+    }
+    out.push('"');
+    out
+}
+
+pub(super) fn intrinsic(
+    heap: &mut Heap,
+    kind: Intrinsic,
+    value: &Value,
+    stdout: &mut String,
+) -> Result<Value, Error> {
+    heap.admit_ordinary(value)?;
+    match kind {
+        Intrinsic::PrintLine => {
+            stdout.push_str(&heap.string_lossy(value)?);
+            stdout.push('\n');
+            Ok(Value::Unit)
+        }
+        Intrinsic::Show => {
+            let text = show_value(heap, value)?;
+            heap.literal(&Lit::String(text))
+        }
+        Intrinsic::Host(primitive) => host::run(heap, primitive, value, stdout),
+        _ => Err(Error::NeedsProgram),
+    }
+}
+include!("primitives/operators.rs");
 
 #[cfg(test)]
 mod array_observer_tests {
@@ -168,326 +572,5 @@ mod array_observer_tests {
         heap.drop_value(outside).expect("external release");
         let stats = heap.finish().expect("no retained projection tokens");
         assert_eq!(stats.allocations, stats.frees);
-    }
-}
-
-/// Operands stay rooted by the caller until either result delivery or unwind.
-fn unsafe_int(kind: Intrinsic, left: &Value, right: &Value) -> Result<Value, Error> {
-    let (Value::Int(left), Value::Int(right)) = (left, right) else {
-        return Err(unsupported("Int division/remainder type mismatch"));
-    };
-    let remainder = kind == Intrinsic::IntUnsafeRem;
-    if *right == 0 {
-        return Err(Error::IntDivisionByZero { remainder });
-    }
-    let op = if remainder { Arith::Rem } else { Arith::Div };
-    Ok(Value::Int(int_arith(op, *left, *right)))
-}
-
-fn unsupported(what: impl Into<String>) -> Error {
-    Error::UnsupportedPrimitive(what.into())
-}
-
-pub(super) fn not(value: &Value) -> Result<Value, Error> {
-    match value {
-        Value::Bool(value) => Ok(Value::Bool(!value)),
-        _ => Err(Error::ExpectedBoolean),
-    }
-}
-
-pub(super) fn neg(heap: &mut Heap, num: Num, value: &Value) -> Result<Value, Error> {
-    heap.admit_ordinary(value)?;
-    match (num, value) {
-        (Num::Int, Value::Int(value)) => Ok(Value::Int(value.wrapping_neg())),
-        (Num::Float, Value::Float(value)) => Ok(Value::Float(-value)),
-        (Num::BigInt, _) => {
-            let text = bigint_text(heap.bigint(value)?)?;
-            let negative = if let Some(positive) = text.strip_prefix('-') {
-                positive.to_owned()
-            } else if text == "0" {
-                text
-            } else {
-                format!("-{text}")
-            };
-            heap.literal(&Lit::BigInt(negative))
-        }
-        _ => Err(unsupported("numeric negation type mismatch")),
-    }
-}
-
-/// Inputs remain rooted in the machine until success or error cleanup.
-pub(super) fn string_predicate(
-    heap: &Heap,
-    kind: Intrinsic,
-    needle: &Value,
-    subject: &Value,
-) -> Result<Value, Error> {
-    heap.admit_ordinary(needle)?;
-    heap.admit_ordinary(subject)?;
-    let needle = heap.string(needle)?;
-    let subject = heap.string(subject)?;
-    // For representable (Unicode scalar) strings, exact UTF-8 substring/prefix
-    // matches are equivalent to UTF-16 code-unit matches: a scalar's encoding
-    // cannot match across scalar boundaries. No normalization is performed.
-    // The heap cannot yet represent isolated UTF-16 surrogates; this does not
-    // extend support to operations such as JS slice that can produce them.
-    let matched = match kind {
-        Intrinsic::StringStartsWith => subject.starts_with(needle),
-        Intrinsic::StringIncludes => subject.contains(needle),
-        _ => return Err(unsupported("not a string predicate")),
-    };
-    Ok(Value::Bool(matched))
-}
-
-pub(super) fn intrinsic(
-    heap: &mut Heap,
-    kind: Intrinsic,
-    value: &Value,
-    stdout: &mut String,
-) -> Result<Value, Error> {
-    heap.admit_ordinary(value)?;
-    match kind {
-        Intrinsic::PrintLine => {
-            stdout.push_str(heap.string(value)?);
-            stdout.push('\n');
-            Ok(Value::Unit)
-        }
-        Intrinsic::Show => {
-            let text = match value {
-                Value::Unit => "undefined".into(),
-                Value::Bool(value) => value.to_string(),
-                Value::Int(value) => value.to_string(),
-                Value::Float(value) => js_number(*value),
-                Value::Object(token) => match &heap.object(token.id)?.data {
-                    Data::String(text) => json_string(text),
-                    Data::BigInt(text) => format!("{}n", bigint_text(text)?),
-                    Data::Tagged {
-                        tag,
-                        ordinary_fields,
-                        fields,
-                    } => {
-                        tagged_boundary(tag, *ordinary_fields, fields.len())?;
-                        if tag.starts_with('$') {
-                            return Err(unsupported("primitive show of collection"));
-                        }
-                        tag.rsplit('.').next().unwrap_or(tag).to_owned()
-                    }
-                    Data::RecoveryResult { .. }
-                    | Data::Cause(_)
-                    | Data::Defect(_)
-                    | Data::ServiceTag { .. }
-                    | Data::Layer(_)
-                    | Data::Record(_)
-                    | Data::Dictionary(_)
-                    | Data::Closure { .. }
-                    | Data::Task { .. }
-                    | Data::Cell { .. }
-                    | Data::Arena { .. } => {
-                        return Err(unsupported(
-                            "primitive show of record or executable/opaque storage",
-                        ));
-                    }
-                },
-                Value::Cell(_) => return Err(unsupported("primitive show of cell")),
-                Value::Owner(_) | Value::Arena(_) | Value::ArenaView(_) => {
-                    return Err(unsupported("primitive show of arena capability"));
-                }
-            };
-            heap.literal(&Lit::String(text))
-        }
-        Intrinsic::Host(primitive) => host::run(heap, primitive, value, stdout),
-        Intrinsic::Try
-        | Intrinsic::FromResult
-        | Intrinsic::Raise
-        | Intrinsic::MatchFail
-        | Intrinsic::RefMake
-        | Intrinsic::RefGet
-        | Intrinsic::RefSet
-        | Intrinsic::RefModify
-        | Intrinsic::RefSame
-        | Intrinsic::ScopeRun
-        | Intrinsic::ScopeCurrent
-        | Intrinsic::ArenaMake
-        | Intrinsic::ArenaAlloc
-        | Intrinsic::ArenaGet
-        | Intrinsic::LayerSucceed
-        | Intrinsic::LayerRun
-        | Intrinsic::LayerMerge
-        | Intrinsic::StringStartsWith
-        | Intrinsic::StringIncludes
-        | Intrinsic::PrimitiveCompare
-        | Intrinsic::PrimitiveHash
-        | Intrinsic::IntUnsafeDiv
-        | Intrinsic::IntUnsafeRem
-        | Intrinsic::NumberToFloat
-        | Intrinsic::FloatMin
-        | Intrinsic::FloatMax
-        | Intrinsic::ArrayToList
-        | Intrinsic::ToBigInt
-        | Intrinsic::StringLength => Err(Error::NeedsProgram),
-    }
-}
-include!("primitives/operators.rs");
-
-/// Converts a checked radix literal without imposing a machine-word bound.
-fn bigint_text(text: &str) -> Result<String, Error> {
-    normalize_bigint(text, |_| Ok(()))
-}
-
-/// Pattern literals use numerical equality, with every normalization step
-/// charged before it runs (including the quadratic radix conversion).
-pub(super) fn bigint_pattern_eq(left: &str, right: &str, fuel: &mut u64) -> Result<bool, Error> {
-    let left = normalize_bigint(left, |work| super::charge(fuel, work))?;
-    let right = normalize_bigint(right, |work| super::charge(fuel, work))?;
-    super::charge(fuel, left.len().saturating_add(right.len()))?;
-    Ok(left == right)
-}
-
-fn normalize_bigint(
-    text: &str,
-    mut charge: impl FnMut(usize) -> Result<(), Error>,
-) -> Result<String, Error> {
-    charge(text.len())?;
-    let (negative, unsigned) = text
-        .strip_prefix('-')
-        .map_or((false, text), |value| (true, value));
-    let (base, digits) = if let Some(digits) = unsigned
-        .strip_prefix("0x")
-        .or_else(|| unsigned.strip_prefix("0X"))
-    {
-        (16, digits)
-    } else if let Some(digits) = unsigned
-        .strip_prefix("0o")
-        .or_else(|| unsigned.strip_prefix("0O"))
-    {
-        (8, digits)
-    } else if let Some(digits) = unsigned
-        .strip_prefix("0b")
-        .or_else(|| unsigned.strip_prefix("0B"))
-    {
-        (2, digits)
-    } else {
-        (10, unsigned)
-    };
-    if digits.is_empty() {
-        return Err(Error::InvalidBigInt(text.into()));
-    }
-    let mut decimal = vec![0_u32];
-    for digit in digits.chars() {
-        charge(1)?;
-        let digit = digit
-            .to_digit(base)
-            .ok_or_else(|| Error::InvalidBigInt(text.into()))?;
-        let mut carry = digit;
-        for place in &mut decimal {
-            charge(1)?;
-            let next = *place * base + carry;
-            *place = next % 10;
-            carry = next / 10;
-        }
-        while carry != 0 {
-            charge(1)?;
-            decimal.push(carry % 10);
-            carry /= 10;
-        }
-    }
-    while decimal.len() > 1 && decimal.last() == Some(&0) {
-        charge(1)?;
-        decimal.pop();
-    }
-    charge(decimal.len())?;
-    let mut result = String::new();
-    if negative && decimal != [0] {
-        result.push('-');
-    }
-    result.extend(
-        decimal
-            .into_iter()
-            .rev()
-            .map(|digit| char::from_digit(digit, 10).expect("decimal digit")),
-    );
-    Ok(result)
-}
-
-fn bigint_order(left: &str, right: &str) -> Ordering {
-    match (left.strip_prefix('-'), right.strip_prefix('-')) {
-        (Some(a), Some(b)) => b.len().cmp(&a.len()).then_with(|| b.cmp(a)),
-        (Some(_), None) => Ordering::Less,
-        (None, Some(_)) => Ordering::Greater,
-        (None, None) => left.len().cmp(&right.len()).then_with(|| left.cmp(right)),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn bigint_show_adds_n_without_changing_numeric_normalization_or_input_storage() {
-        for (spelling, numeric, shown) in [
-            ("0", "0", "0n"),
-            ("-0", "0", "0n"),
-            ("0x00", "0", "0n"),
-            ("-0b0", "0", "0n"),
-            ("123", "123", "123n"),
-            ("-123", "-123", "-123n"),
-            ("0xff", "255", "255n"),
-            ("-0xff", "-255", "-255n"),
-            ("0o17", "15", "15n"),
-            ("-0o17", "-15", "-15n"),
-            ("0b1010", "10", "10n"),
-            ("-0b1010", "-10", "-10n"),
-            (
-                "0x100000000000000000000000000000000",
-                "340282366920938463463374607431768211456",
-                "340282366920938463463374607431768211456n",
-            ),
-        ] {
-            assert_eq!(
-                bigint_text(spelling),
-                Ok(numeric.into()),
-                "numeric normalization remains suffix-free"
-            );
-            let mut heap = Heap::new();
-            let input = heap
-                .literal(&Lit::BigInt(spelling.into()))
-                .expect("BigInt input");
-            let result = intrinsic(&mut heap, Intrinsic::Show, &input, &mut String::new())
-                .expect("primitive Show BigInt");
-            assert_eq!(heap.string(&result), Ok(shown));
-            assert_eq!(
-                heap.bigint(&input),
-                Ok(spelling),
-                "display must not mutate its borrowed input"
-            );
-            assert_eq!(
-                heap.stats().live_objects,
-                2,
-                "input and displayed String have independent owned storage"
-            );
-            heap.drop_values(vec![input, result])
-                .expect("release both owned roots");
-            heap.finish().expect("BigInt and output String released");
-        }
-    }
-
-    #[test]
-    fn bigint_show_does_not_change_other_primitive_display_forms() {
-        for (literal, expected) in [
-            (Lit::Unit, "undefined"),
-            (Lit::Bool(false), "false"),
-            (Lit::Int(-7), "-7"),
-            (Lit::Float(1.5), "1.5"),
-            (Lit::String("quoted".into()), "\"quoted\""),
-        ] {
-            let mut heap = Heap::new();
-            let input = heap.literal(&literal).expect("primitive input");
-            let result = intrinsic(&mut heap, Intrinsic::Show, &input, &mut String::new())
-                .expect("primitive Show");
-            assert_eq!(heap.string(&result), Ok(expected));
-            heap.drop_values(vec![input, result])
-                .expect("primitive roots release");
-            heap.finish().expect("ordinary primitive display balanced");
-        }
     }
 }

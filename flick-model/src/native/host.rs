@@ -10,11 +10,11 @@ use num_bigint::BigInt;
 use super::{data, prelude};
 use crate::syntax::{Lit, Term};
 
-/// The wall clock, in milliseconds since the epoch: 2023-11-14T22:13:20Z.
-pub const MILLIS: f64 = 1_700_000_000_000.0;
+/// The wall clock, in milliseconds since the epoch: 2025-06-15T17:46:40Z.
+pub const MILLIS: f64 = 1_750_000_000_000.0;
 
 /// The wall clock in nanoseconds, [`MILLIS`] exactly.
-pub const NANOS: i64 = 1_700_000_000_000_000_000;
+pub const NANOS: i64 = 1_750_000_000_000_000_000;
 
 /// The monotonic clock, in nanoseconds.
 pub const MONOTONIC_NANOS: i64 = 0;

@@ -807,11 +807,15 @@ dependencies = [
 name = "flick-model"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "flick-core",
  "flick-test-support",
  "num-bigint",
+ "num-traits",
  "proptest",
+ "regex-automata",
  "serde_json",
+ "unicode-normalization",
 ]
 
 [[package]]

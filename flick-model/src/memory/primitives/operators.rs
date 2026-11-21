@@ -66,42 +66,7 @@ pub(super) fn binary(
         }
         BinOp::Eq | BinOp::NotEq => Value::Bool(equal(heap, left, right)? == (op == BinOp::Eq)),
         BinOp::Same | BinOp::NotSame => {
-            let equal = match (left, right) {
-                (Value::Float(a), Value::Float(b)) => a == b,
-                (Value::Object(a), Value::Object(b)) => {
-                    match (&heap.object(a.id)?.data, &heap.object(b.id)?.data) {
-                        (Data::ServiceTag { .. }, Data::ServiceTag { .. }) => a.id == b.id,
-                        (Data::String(a), Data::String(b)) => a == b,
-                        (Data::BigInt(a), Data::BigInt(b)) => bigint_text(a)? == bigint_text(b)?,
-                        (
-                            Data::Tagged {
-                                tag: a,
-                                ordinary_fields: an,
-                                fields: x,
-                            },
-                            Data::Tagged {
-                                tag: b,
-                                ordinary_fields: bn,
-                                fields: y,
-                            },
-                        ) => {
-                            tagged_boundary(a, *an, x.len())?;
-                            tagged_boundary(b, *bn, y.len())?;
-                            if *an != 0 || *bn != 0 {
-                                return Err(unsupported(
-                                    "primitive equality of non-primitive objects",
-                                ));
-                            }
-                            a == b
-                        }
-                        _ => {
-                            return Err(unsupported("primitive equality of non-primitive objects"));
-                        }
-                    }
-                }
-                _ => equal(heap, left, right)?,
-            };
-            Value::Bool(equal == (op == BinOp::Same))
+            Value::Bool(same_primitive(heap, left, right)? == (op == BinOp::Same))
         }
         BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => {
             let ordered = order(heap, left, right)?;
@@ -120,32 +85,83 @@ pub(super) fn binary(
             Value::Bool(if op == BinOp::And { *a && *b } else { *a || *b })
         }
         BinOp::Concat => {
-            let text = format!("{}{}", heap.string(left)?, heap.string(right)?);
-            heap.literal(&Lit::String(text))?
+            let mut units = heap.utf16_units(left)?;
+            units.extend(heap.utf16_units(right)?);
+            heap.alloc_utf16(units)
         }
         BinOp::ListConcat => return list_concat(heap, left, right),
     })
 }
 
-fn list_concat(heap: &mut Heap, left: &Value, right: &Value) -> Result<Value, Error> {
-    let count = |value: &Value| -> Result<usize, Error> {
-        let Value::Object(token) = value else {
-            return Err(unsupported("list concat receiver"));
-        };
-        match &heap.object(token.id)?.data {
-            Data::Tagged {
-                tag,
-                ordinary_fields,
-                fields,
-            } if tag == "$list" => {
-                tagged_boundary(tag, *ordinary_fields, fields.len())?;
-                Ok(fields.len())
+#[expect(
+    clippy::float_cmp,
+    reason = "primitive strict equality uses IEEE float comparison"
+)]
+fn same_primitive(heap: &Heap, left: &Value, right: &Value) -> Result<bool, Error> {
+    match (left, right) {
+        (Value::Float(a), Value::Float(b)) => Ok(a == b),
+        (Value::Object(a), Value::Object(b)) => {
+            match (&heap.object(a.id)?.data, &heap.object(b.id)?.data) {
+                (Data::ServiceTag { .. }, Data::ServiceTag { .. }) => Ok(a.id == b.id),
+                (Data::String(a), Data::String(b)) => Ok(a == b),
+                (Data::Utf16(a), Data::Utf16(b)) => Ok(a == b),
+                (Data::Bytes(a), Data::Bytes(b)) => Ok(a == b),
+                (Data::JsonNull, Data::JsonNull) => Ok(true),
+                (Data::Duration(a), Data::Duration(b)) => {
+                    Ok(duration_ops::compare_raw(a, b) == Ordering::Equal)
+                }
+                (Data::DateTime(a), Data::DateTime(b)) => Ok(datetime_ops::dt_eq(a, b)),
+                (Data::TimeZone(a), Data::TimeZone(b)) => Ok(datetime_tzif::tz_equals(a, b)),
+                (Data::Cron(a), Data::Cron(b)) => Ok(cron_ops::cron_equals_raw(a, b)),
+                (
+                    Data::BigDecimal {
+                        value: av,
+                        scale: as_,
+                    },
+                    Data::BigDecimal {
+                        value: bv,
+                        scale: bs,
+                    },
+                ) => Ok(decimal_ops::compare_raw(av, *as_, bv, *bs) == Ok(Ordering::Equal)),
+                (Data::String(_), Data::Utf16(_)) | (Data::Utf16(_), Data::String(_)) => Ok(false),
+                (Data::BigInt(a), Data::BigInt(b)) => Ok(bigint_text(a)? == bigint_text(b)?),
+                (
+                    Data::Tagged {
+                        tag: a,
+                        ordinary_fields: an,
+                        fields: x,
+                    },
+                    Data::Tagged {
+                        tag: b,
+                        ordinary_fields: bn,
+                        fields: y,
+                    },
+                ) => {
+                    tagged_boundary(a, *an, x.len())?;
+                    tagged_boundary(b, *bn, y.len())?;
+                    if *an != 0 || *bn != 0 {
+                        return Err(unsupported("primitive equality of non-primitive objects"));
+                    }
+                    Ok(a == b)
+                }
+                _ => Err(unsupported("primitive equality of non-primitive objects")),
             }
-            _ => Err(unsupported("list concat receiver")),
         }
+        _ => equal(heap, left, right),
+    }
+}
+
+fn list_concat(heap: &mut Heap, left: &Value, right: &Value) -> Result<Value, Error> {
+    let (_, _, left_count) = match heap.list_view(left) {
+        Ok(view) => view,
+        Err(Error::PatternKind(_)) => return Err(unsupported("list concat receiver")),
+        Err(error) => return Err(error),
     };
-    let left_count = count(left)?;
-    let right_count = count(right)?;
+    let (_, _, right_count) = match heap.list_view(right) {
+        Ok(view) => view,
+        Err(Error::PatternKind(_)) => return Err(unsupported("list concat receiver")),
+        Err(error) => return Err(error),
+    };
     let mut fields = Vec::with_capacity(left_count + right_count);
     for (list, count) in [(left, left_count), (right, right_count)] {
         for index in 0..count {
@@ -169,6 +185,13 @@ fn order(heap: &Heap, left: &Value, right: &Value) -> Result<Option<Ordering>, E
         (Value::Object(a), Value::Object(b)) => {
             match (&heap.object(a.id)?.data, &heap.object(b.id)?.data) {
                 (Data::String(a), Data::String(b)) => Some(a.encode_utf16().cmp(b.encode_utf16())),
+                (Data::Utf16(a), Data::Utf16(b)) => Some(a.cmp(b)),
+                (Data::String(a), Data::Utf16(b)) => {
+                    Some(a.encode_utf16().cmp(b.iter().copied()))
+                }
+                (Data::Utf16(a), Data::String(b)) => {
+                    Some(a.iter().copied().cmp(b.encode_utf16()))
+                }
                 (Data::BigInt(a), Data::BigInt(b)) => {
                     Some(bigint_order(&bigint_text(a)?, &bigint_text(b)?))
                 }
@@ -177,6 +200,114 @@ fn order(heap: &Heap, left: &Value, right: &Value) -> Result<Option<Ordering>, E
         }
         _ => return Err(unsupported("ordering type mismatch")),
     })
+}
+
+fn is_opaque_data(data: &Data) -> bool {
+    matches!(
+        data,
+        Data::Dictionary(_)
+            | Data::Closure { .. }
+            | Data::Task { .. }
+            | Data::Continuation { .. }
+            | Data::Cell { .. }
+            | Data::Var { .. }
+            | Data::Lazy { .. }
+            | Data::Arena { .. }
+            | Data::Seq(_)
+            | Data::Iterator { .. }
+            | Data::Graph(_)
+            | Data::GraphWalker(_)
+    )
+}
+
+fn equal_objects<'a>(
+    heap: &'a Heap,
+    left: &'a Value,
+    right: &'a Value,
+    a_id: ObjectId,
+    b_id: ObjectId,
+    pending: &mut Vec<(&'a Value, &'a Value)>,
+) -> Result<bool, Error> {
+    let (a_data, b_data) = (&heap.object(a_id)?.data, &heap.object(b_id)?.data);
+    match (a_data, b_data) {
+        (Data::ServiceTag { .. }, Data::ServiceTag { .. }) => Ok(a_id == b_id),
+        (Data::Label(a), Data::Label(b)) | (Data::String(a), Data::String(b)) => Ok(a == b),
+        (Data::Utf16(a), Data::Utf16(b)) => Ok(a == b),
+        (Data::Bytes(a), Data::Bytes(b)) => Ok(a == b),
+        (Data::JsonNull, Data::JsonNull) => Ok(true),
+        (Data::Duration(a), Data::Duration(b)) => {
+            Ok(duration_ops::compare_raw(a, b) == Ordering::Equal)
+        }
+        (Data::DateTime(a), Data::DateTime(b)) => Ok(datetime_ops::dt_eq(a, b)),
+        (Data::TimeZone(a), Data::TimeZone(b)) => Ok(datetime_tzif::tz_equals(a, b)),
+        (Data::Cron(a), Data::Cron(b)) => Ok(cron_ops::cron_equals_raw(a, b)),
+        (
+            Data::BigDecimal {
+                value: av,
+                scale: as_,
+            },
+            Data::BigDecimal {
+                value: bv,
+                scale: bs,
+            },
+        ) => Ok(decimal_ops::compare_raw(av, *as_, bv, *bs)? == Ordering::Equal),
+        (Data::BigInt(a), Data::BigInt(b)) => Ok(bigint_text(a)? == bigint_text(b)?),
+        (Data::ListSlice { .. }, _) | (_, Data::ListSlice { .. }) => {
+            let Ok((a_obj, a_off, a_len)) = heap.list_view(left) else {
+                return Ok(false);
+            };
+            let Ok((b_obj, b_off, b_len)) = heap.list_view(right) else {
+                return Ok(false);
+            };
+            if a_len == b_len {
+                let Data::Tagged { fields: af, .. } = &heap.object(a_obj)?.data else {
+                    return Ok(false);
+                };
+                let Data::Tagged { fields: bf, .. } = &heap.object(b_obj)?.data else {
+                    return Ok(false);
+                };
+                pending.extend(
+                    af[a_off..a_off + a_len]
+                        .iter()
+                        .zip(&bf[b_off..b_off + b_len]),
+                );
+                Ok(true)
+            } else {
+                Ok(false)
+            }
+        }
+        (
+            Data::Tagged {
+                tag: a_tag,
+                ordinary_fields: a_count,
+                fields: a,
+            },
+            Data::Tagged {
+                tag: b_tag,
+                ordinary_fields: b_count,
+                fields: b,
+            },
+        ) => {
+            tagged_boundary(a_tag, *a_count, a.len())?;
+            tagged_boundary(b_tag, *b_count, b.len())?;
+            if a_tag == b_tag && a_count == b_count {
+                pending.extend(a[..*a_count].iter().zip(&b[..*b_count]));
+                Ok(true)
+            } else {
+                Ok(false)
+            }
+        }
+        (Data::Record(a), Data::Record(b)) if a.len() == b.len() => {
+            for (name, left) in a {
+                let Some((_, right)) = b.iter().find(|(other, _)| other == name) else {
+                    return Ok(false);
+                };
+                pending.push((left, right));
+            }
+            Ok(true)
+        }
+        _ => Ok(false),
+    }
 }
 
 #[expect(
@@ -193,63 +324,15 @@ fn equal(heap: &Heap, left: &Value, right: &Value) -> Result<bool, Error> {
             (Value::Int(a), Value::Int(b)) => a == b,
             (Value::Float(a), Value::Float(b)) => a == b || a.is_nan() && b.is_nan(),
             (Value::Object(a), Value::Object(b)) => {
-                let (a_data, b_data) = (&heap.object(a.id)?.data, &heap.object(b.id)?.data);
-                if matches!(
-                    a_data,
-                    Data::Dictionary(_)
-                        | Data::Closure { .. }
-                        | Data::Task { .. }
-                        | Data::Cell { .. }
-                        | Data::Arena { .. }
-                ) || matches!(
-                    b_data,
-                    Data::Dictionary(_)
-                        | Data::Closure { .. }
-                        | Data::Task { .. }
-                        | Data::Cell { .. }
-                        | Data::Arena { .. }
-                ) {
+                if is_opaque_data(&heap.object(a.id)?.data)
+                    || is_opaque_data(&heap.object(b.id)?.data)
+                {
                     return Err(unsupported("closure equality"));
                 }
                 if !seen.insert((a.id, b.id)) {
                     continue;
                 }
-                match (a_data, b_data) {
-                    (Data::ServiceTag { .. }, Data::ServiceTag { .. }) => a.id == b.id,
-                    (Data::String(a), Data::String(b)) => a == b,
-                    (Data::BigInt(a), Data::BigInt(b)) => bigint_text(a)? == bigint_text(b)?,
-                    (
-                        Data::Tagged {
-                            tag: a_tag,
-                            ordinary_fields: a_count,
-                            fields: a,
-                        },
-                        Data::Tagged {
-                            tag: b_tag,
-                            ordinary_fields: b_count,
-                            fields: b,
-                        },
-                    ) => {
-                        tagged_boundary(a_tag, *a_count, a.len())?;
-                        tagged_boundary(b_tag, *b_count, b.len())?;
-                        if a_tag != b_tag || a_count != b_count {
-                            false
-                        } else {
-                            pending.extend(a[..*a_count].iter().zip(&b[..*b_count]));
-                            true
-                        }
-                    }
-                    (Data::Record(a), Data::Record(b)) if a.len() == b.len() => {
-                        for (name, left) in a {
-                            let Some((_, right)) = b.iter().find(|(other, _)| other == name) else {
-                                return Ok(false);
-                            };
-                            pending.push((left, right));
-                        }
-                        true
-                    }
-                    _ => false,
-                }
+                equal_objects(heap, left, right, a.id, b.id, &mut pending)?
             }
             (Value::Owner(_) | Value::Arena(_) | Value::ArenaView(_), _)
             | (_, Value::Owner(_) | Value::Arena(_) | Value::ArenaView(_)) => {

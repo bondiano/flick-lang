@@ -8,8 +8,6 @@ use super::module_contract::kinded::{self, Bound, Identities, Incomplete, Kindin
 use super::regions;
 use super::ty::Binder;
 
-// Phase M: retained for the next ownership/witness checkpoint.
-#[allow(dead_code)]
 #[derive(Clone, Copy)]
 pub(in crate::types) struct Read<'a, 'b> {
     store: &'a Store,
@@ -31,7 +29,6 @@ impl Store {
     }
 }
 
-#[allow(dead_code)] // Phase M: retained for the next ownership/witness checkpoint
 impl<'s, 'e> Read<'s, 'e> {
     /// Deep positional observation for live retained carriers, not a snapshot
     /// of the solutions that happened to exist at witness registration.
@@ -295,7 +292,6 @@ fn observation_error(error: ProjectionError) -> Incomplete {
     }
 }
 
-#[allow(dead_code)] // Phase M: retained for the next ownership/witness checkpoint
 pub(in crate::types) struct ZonkRead<'s, 'e>(Read<'s, 'e>);
 
 impl Kinding for ZonkRead<'_, '_> {
@@ -445,7 +441,6 @@ impl Kinding for Read<'_, '_> {
 }
 
 impl<'b> Checker<'b> {
-    #[allow(dead_code)] // Phase M: retained for the next ownership/witness checkpoint
     pub(in crate::types) fn read_types(&self) -> Read<'_, 'b> {
         Read {
             store: &self.store,

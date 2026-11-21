@@ -1,9 +1,6 @@
-//! Exact checked Int ranges through ordinary code; materialization is not FBIP.
-use super::{
-    BinOp, Code, Env, Expr, ExprKind, Lit, Local, Lower, LowerError, Name, Param, Pat, Span, Stage,
-    Stmt, unsupported,
-};
-use flick_ir::{Adapter, Arith, Copies, Foreign, ForeignMode, Num, ResultAdapter, Shape};
+//! Exact checked Int ranges via O(n) `Intrinsic::ListRange`.
+use super::{Code, Intrinsic, Local, Lower, LowerError, Name, Span, unsupported};
+use flick_ir::{Adapter, Copies, Foreign, ForeignMode, ResultAdapter, Shape};
 pub(super) fn is_binding(value: &Foreign) -> bool {
     value.binding.from.as_deref() == Some("flick:rt") && value.binding.name == "listRange"
 }
@@ -55,92 +52,20 @@ impl Lower<'_> {
         declarations
             .list_range(&source)
             .map_err(|message| unsupported(format!("List.range: {message}"), span))?;
-        self.expr(&Builder(span).expression(), &Env::new(), block)
-    }
-}
-struct Builder(Span);
-impl Builder {
-    fn at(&self, kind: ExprKind) -> Expr {
-        Expr::new(kind, self.0)
-    }
-    fn local(&self, name: &str) -> Expr {
-        self.at(ExprKind::Local(format!("$range.{name}")))
-    }
-    fn bind(name: &str) -> Pat {
-        Pat::Bind(format!("$range.{name}"))
-    }
-    fn lambda(&self, names: &[&str], body: Expr) -> Expr {
-        self.at(ExprKind::Lambda {
-            params: names
-                .iter()
-                .map(|name| Param {
-                    pat: Self::bind(name),
-                    stage: Stage::Pure,
-                    ty: None,
-                })
-                .collect(),
-            body: Box::new(body),
-        })
-    }
-    fn expression(&self) -> Expr {
-        let next = self.at(ExprKind::Binary(
-            BinOp::Arith(Arith::Add, Num::Int),
-            Box::new(self.local("current")),
-            Box::new(self.at(ExprKind::Lit(Lit::Int(1)))),
-        ));
-        let rest = self.at(ExprKind::App {
-            func: Box::new(self.local("loop")),
-            arg: Box::new(next),
-            stage: Stage::Pure,
-            arg_first: false,
-        });
-        let cons = self.at(ExprKind::Binary(
-            BinOp::ListConcat,
-            Box::new(self.at(ExprKind::List(vec![self.local("current")]))),
-            Box::new(rest),
-        ));
-        // The increment exists ONLY in the current < until branch. Even until=MAX
-        // stops at MAX without adding to it; equal/reversed endpoints allocate [].
-        let body = self.at(ExprKind::If(
-            Box::new(self.at(ExprKind::Binary(
-                BinOp::Lt,
-                Box::new(self.local("current")),
-                Box::new(self.local("until")),
-            ))),
-            Box::new(cons),
-            Box::new(self.at(ExprKind::List(vec![]))),
-        ));
-        let invoke = self.at(ExprKind::App {
-            func: Box::new(self.local("loop")),
-            arg: Box::new(self.local("from")),
-            stage: Stage::Pure,
-            arg_first: false,
-        });
-        self.lambda(
-            &["from", "until"],
-            self.at(ExprKind::Block(
-                vec![Stmt::Fun {
-                    name: "$range.loop".into(),
-                    rec: true,
-                    dicts: vec![],
-                    value: self.lambda(&["current"], body),
-                }],
-                Box::new(invoke),
-            )),
-        )
+        self.intrinsic(Intrinsic::ListRange, false, vec![], block, span)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Builder, supports};
+    use super::supports;
     use crate::{
         build,
-        ir::{BinOp, Expr, ExprKind, Foreign, ItemKind, Lit, Stmt, memory},
+        ir::{Expr, ExprKind, Foreign, ItemKind, Lit, memory},
         opt::perceus::{LowerError, lower, lower_with_declarations},
         source::{FileId, Span},
     };
-    use flick_ir::{Arith, ForeignMode, Num, Shape};
+    use flick_ir::{ForeignMode, Shape};
     type Mutation = Box<dyn Fn(&mut Foreign)>;
     fn mutations() -> Vec<Mutation> {
         let mut edits: Vec<Mutation> = vec![
@@ -244,43 +169,36 @@ mod tests {
             );
         }
     }
-    fn additions(expr: &Expr) -> usize {
-        let mut count = usize::from(matches!(
-            &expr.kind,
-            ExprKind::Binary(BinOp::Arith(Arith::Add, Num::Int), ..)
-        ));
-        expr.each_child(&mut |child| count += additions(child));
-        count
-    }
     #[test]
-    fn ordinary_template_guards_increment_and_keeps_both_source_parameters_cold() {
-        let template = Builder(Span::new(FileId::new(0), 0, 0)).expression();
-        assert!(super::super::free::free(&template).is_empty());
-        let ExprKind::Lambda { params, body } = &template.kind else {
-            panic!("two curried parameters")
-        };
-        assert_eq!(params.len(), 2);
-        let ExprKind::Block(functions, _) = &body.kind else {
-            panic!("ordinary recursive loop")
-        };
-        let Stmt::Fun { value, .. } = &functions[0] else {
-            panic!("loop")
-        };
-        let ExprKind::Lambda { body, .. } = &value.kind else {
-            panic!("current parameter")
-        };
-        let ExprKind::If(condition, yes, no) = &body.kind else {
-            panic!("guard before increment")
-        };
-        assert!(matches!(&condition.kind, ExprKind::Binary(BinOp::Lt, ..)));
-        assert!(matches!(&no.kind,ExprKind::List(items)if items.is_empty()));
-        assert_eq!(additions(condition), 0);
-        assert_eq!(additions(no), 0);
-        assert_eq!(
-            additions(yes),
-            1,
-            "increment occurs only below current < until"
-        );
+    fn list_range_lowers_directly_to_linear_intrinsic() {
+        let module = build::builtin_modules()
+            .iter()
+            .find(|m| m.name == "List.Core")
+            .expect("List.Core");
+        let program = lower_with_declarations(
+            [module],
+            build::builtin_declarations().iter().map(AsRef::as_ref),
+            &memory::Name::new("List.Core", "range"),
+        )
+        .expect("List.Core.range lowers");
+        let intrinsics = program
+            .functions
+            .values()
+            .flat_map(|f| f.body.instructions.iter())
+            .filter(|i| {
+                matches!(
+                    i,
+                    memory::Instruction::Let {
+                        value: memory::Operation::Intrinsic {
+                            kind: memory::Intrinsic::ListRange,
+                            ..
+                        },
+                        ..
+                    }
+                )
+            })
+            .count();
+        assert_eq!(intrinsics, 1);
     }
     #[test]
     fn checked_domain_proof_observes_private_aliases_but_never_guesses_named_types() {

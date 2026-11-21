@@ -175,23 +175,48 @@ fn tasks_have_distinct_delayed_code_and_await_consumes_the_task() {
 }
 
 #[test]
-fn nonlocal_question_return_is_not_replaced_by_a_helper_return() {
-    use super::LowerError;
-    use crate::source::{FileId, Span};
+fn nonlocal_question_return_wraps_function_in_boundary_and_lowers_unwrap() {
     let text = "module App exposing (choose)\n\nchoose : Option Int -> Option Int\nlet choose value = Some (value?)\n";
     let module = lower_text("App", text).expect("Option return source checks");
-    let start = u32::try_from(text.find("value?").expect("question")).expect("small source");
-    let end = start + 6;
-    assert!(
-        matches!(lower([&module], &memory::Name::new("App", "choose")), Err(LowerError::Unsupported { form, span }) if form == "nonlocal Option return" && span == Span::new(FileId::new(0), start, end))
-    );
+    let program = lower([&module], &memory::Name::new("App", "choose"))
+        .expect("Option? lowers with FunctionBoundary");
+    assert_eq!(memory::validate_program(&program), Ok(()));
+    let boundaries = program
+        .functions
+        .values()
+        .flat_map(|f| f.body.instructions.iter())
+        .filter(|i| {
+            matches!(
+                i,
+                memory::Instruction::Let {
+                    value: memory::Operation::FunctionBoundary { .. },
+                    ..
+                }
+            )
+        })
+        .count();
+    let unwraps = program
+        .functions
+        .values()
+        .flat_map(|f| f.body.instructions.iter())
+        .filter(|i| {
+            matches!(
+                i,
+                memory::Instruction::Let {
+                    value: memory::Operation::UnwrapOption(_),
+                    ..
+                }
+            )
+        })
+        .count();
+    assert_eq!(boundaries, 1);
+    assert_eq!(unwraps, 1);
 }
 
 #[test]
-fn unsupported_control_handler_reports_its_form_not_a_false_unbound_arm_capture() {
-    use super::LowerError;
+fn control_handler_lowers_with_control_operation_class() {
+    use crate::build::builtin_modules;
     use crate::ir::{ExprKind, Lit};
-    use crate::source::{FileId, Span};
 
     let text = r"module App.HandlerCapture exposing (answer)
 
@@ -212,7 +237,7 @@ let answer captured =
         panic!("handler")
     };
     handler.effects.push(flick_ir::Handled {
-        effect: "App.HandlerCapture.Unsupported".into(),
+        effect: "App.HandlerCapture.Control".into(),
         operations: vec![flick_ir::OpArm {
             name: "control".into(),
             class: flick_ir::OpClass::Control,
@@ -222,14 +247,12 @@ let answer captured =
             function: Expr::new(ExprKind::Lit(Lit::Unit), body.span),
         }],
     });
-    let start =
-        u32::try_from(text.find("try from_result").expect("handler")).expect("small source");
-    let end = u32::try_from(text.trim_end().len()).expect("small source");
-    assert!(
-        matches!(lower([&module], &memory::Name::new("App.HandlerCapture", "answer")),
-            Err(LowerError::Unsupported { form, span })
-                if form == "control handler" && span == Span::new(FileId::new(0), start, end))
-    );
+    let program = lower(
+        iter::once(&module).chain(builtin_modules()),
+        &memory::Name::new("App.HandlerCapture", "answer"),
+    )
+    .expect("control handler lowers cleanly");
+    assert_eq!(memory::validate_program(&program), Ok(()));
 }
 
 #[test]

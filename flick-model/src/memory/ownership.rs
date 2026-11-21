@@ -110,14 +110,29 @@ impl Heap {
     fn allocate(&mut self, data: Data) -> Value {
         self.stats.cells_allocated += usize::from(matches!(data, Data::Cell { .. }));
         self.stats.arenas_allocated += usize::from(matches!(data, Data::Arena { .. }));
+        let (index, generation) = if let Some(index) = self.free_list.pop() {
+            let slot = &mut self.objects[index];
+            slot.object = Some(Object {
+                references: 1,
+                data,
+            });
+            (index, slot.generation)
+        } else {
+            let index = self.objects.len();
+            self.objects.push(Slot {
+                generation: 0,
+                object: Some(Object {
+                    references: 1,
+                    data,
+                }),
+            });
+            (index, 0)
+        };
         let id = ObjectId {
             heap: self.identity,
-            index: self.objects.len(),
+            index,
+            generation,
         };
-        self.objects.push(Some(Object {
-            references: 1,
-            data,
-        }));
         self.stats.allocations += 1;
         self.stats.live_objects += 1;
         self.stats.peak_live_objects = self.stats.peak_live_objects.max(self.stats.live_objects);
@@ -130,7 +145,8 @@ impl Heap {
         }
         self.objects
             .get(id.index)
-            .and_then(Option::as_ref)
+            .filter(|slot| slot.generation == id.generation)
+            .and_then(|slot| slot.object.as_ref())
             .ok_or(Error::InvalidObject(id))
     }
 
@@ -140,7 +156,8 @@ impl Heap {
         }
         self.objects
             .get_mut(id.index)
-            .and_then(Option::as_mut)
+            .filter(|slot| slot.generation == id.generation)
+            .and_then(|slot| slot.object.as_mut())
             .ok_or(Error::InvalidObject(id))
     }
 
@@ -194,12 +211,15 @@ impl Heap {
         if arena.execution != execution || arena.id.heap != self.identity {
             return Err(Error::ForeignArena);
         }
-        // VM-minted private ids never recycle: only an in-range retired slot is closed.
-        let object = self
+        // VM-minted generational ids distinguish retired handles from never-allocated slots.
+        let slot = self
             .objects
             .get(arena.id.index)
-            .ok_or(Error::InvalidObject(arena.id))?
+            .ok_or(Error::InvalidObject(arena.id))?;
+        let object = slot
+            .object
             .as_ref()
+            .filter(|_| slot.generation == arena.id.generation)
             .ok_or(Error::ClosedArena)?;
         let Data::Arena {
             execution: owner,
@@ -222,12 +242,14 @@ impl Heap {
         if arena.execution != execution || arena.id.heap != self.identity {
             return Err(Error::ForeignArena);
         }
-        let object = self
+        let slot = self
             .objects
             .get_mut(arena.id.index)
-            .ok_or(Error::InvalidObject(arena.id))?
-            .as_mut()
-            .ok_or(Error::ClosedArena)?;
+            .ok_or(Error::InvalidObject(arena.id))?;
+        if slot.generation != arena.id.generation {
+            return Err(Error::ClosedArena);
+        }
+        let object = slot.object.as_mut().ok_or(Error::ClosedArena)?;
         let Data::Arena {
             execution: owner,
             contents,
@@ -294,59 +316,113 @@ impl Heap {
                 let dead = object.references == 0;
                 self.stats.drops += 1;
                 if dead {
-                    let object = self.objects[id.id.index]
-                        .take()
-                        .expect("the released object exists");
+                    let slot = &mut self.objects[id.id.index];
+                    let object = slot.object.take().expect("the released object exists");
+                    slot.generation = slot.generation.wrapping_add(1);
+                    self.free_list.push(id.id.index);
                     self.stats.frees += 1;
                     self.stats.live_objects -= 1;
-                    match object.data {
-                        Data::RecoveryResult { selected, .. } => pending.extend(selected),
-                        Data::Cause(reasons) => pending.extend(
-                            reasons
-                                .into_iter()
-                                .filter_map(causes::StoredReason::into_value),
-                        ),
-                        Data::Tagged { fields, .. }
-                        | Data::Closure {
-                            captures: fields, ..
-                        }
-                        | Data::Task {
-                            captures: fields, ..
-                        } => pending.extend(fields),
-                        Data::Cell { contents, .. } => {
-                            self.stats.cells_freed += 1;
-                            pending.extend(contents);
-                        }
-                        Data::Arena { contents, .. } => {
-                            self.stats.arenas_freed += 1;
-                            pending.extend(contents);
-                        }
-                        Data::Dictionary(entries) => {
-                            pending
-                                .extend(entries.into_iter().map(|(_, entry)| entry.into_value()));
-                        }
-                        Data::Record(fields) => {
-                            pending.extend(fields.into_iter().map(|(_, value)| value));
-                        }
-                        Data::ServiceTag { key } => {
-                            if self.service_tags.get(&key) == Some(&id.id) {
-                                self.service_tags.remove(&key);
-                            }
-                        }
-                        Data::Layer(LayerData::Succeed {
-                            tag,
-                            implementation,
-                        }) => {
-                            pending.extend([tag, implementation]);
-                        }
-                        Data::Layer(LayerData::Merge { left, right }) => {
-                            pending.extend([left, right]);
-                        }
-                        Data::Defect(_) | Data::String(_) | Data::BigInt(_) => {}
-                    }
+                    self.release_data(id.id, object.data, &mut pending);
                 }
             }
         }
         failure.map_or(Ok(()), Err)
+    }
+
+    fn release_data(&mut self, id: ObjectId, data: Data, pending: &mut Vec<Value>) {
+        match data {
+            Data::RecoveryResult { selected, .. } => pending.extend(selected),
+            Data::Cause(reasons) => pending.extend(
+                reasons
+                    .into_iter()
+                    .filter_map(causes::StoredReason::into_value),
+            ),
+            Data::CauseReason(reason) => pending.extend(reason.into_value()),
+            Data::Tagged { fields, .. }
+            | Data::Closure {
+                captures: fields, ..
+            }
+            | Data::Task {
+                captures: fields, ..
+            }
+            | Data::Seq(SeqData::Generator {
+                captures: fields, ..
+            }) => pending.extend(fields),
+            Data::ListSlice { backing, .. } | Data::Seq(SeqData::FromList(backing)) => {
+                pending.push(backing);
+            }
+            Data::Continuation { execution, id } => {
+                self.dropped_continuations.push((execution, id));
+            }
+            Data::Cell { contents, .. } => {
+                self.stats.cells_freed += 1;
+                pending.extend(contents);
+            }
+            Data::Var { contents, .. } => pending.extend(contents),
+            Data::Lazy { state, .. } => {
+                if let Some(
+                    LazyState::Pending(v)
+                    | LazyState::Running(v)
+                    | LazyState::DoneOk(v)
+                    | LazyState::DoneErr(v),
+                ) = state
+                {
+                    pending.push(v);
+                }
+            }
+            Data::Iterator { state, .. } => {
+                if let IteratorState::List { backing, .. } = state {
+                    pending.push(backing);
+                }
+            }
+            Data::Exit(ExitData::Success(value) | ExitData::Failure(value)) => {
+                pending.push(value);
+            }
+            Data::Arena { contents, .. } => {
+                self.stats.arenas_freed += 1;
+                pending.extend(contents);
+            }
+            Data::Dictionary(entries) => {
+                pending.extend(entries.into_iter().map(|(_, entry)| entry.into_value()));
+            }
+            Data::Record(fields) => {
+                pending.extend(fields.into_iter().map(|(_, value)| value));
+            }
+            Data::ServiceTag { key } => {
+                if self.service_tags.get(&key) == Some(&id) {
+                    self.service_tags.remove(&key);
+                }
+            }
+            Data::Layer(LayerData::Succeed {
+                tag,
+                implementation,
+            }) => {
+                pending.extend([tag, implementation]);
+            }
+            Data::Layer(LayerData::Merge { left, right }) => {
+                pending.extend([left, right]);
+            }
+            Data::Graph(graph) => {
+                pending.extend(graph.nodes.into_iter().map(|n| n.data));
+                pending.extend(graph.edges.into_iter().map(|e| e.data));
+            }
+            Data::GraphWalker(walker) => {
+                pending.extend(walker.indices);
+                pending.extend(walker.values);
+            }
+            Data::Defect(_)
+            | Data::Duration(_)
+            | Data::DateTime(_)
+            | Data::TimeZone(_)
+            | Data::Cron(_)
+            | Data::String(_)
+            | Data::Utf16(_)
+            | Data::Bytes(_)
+            | Data::JsonNull
+            | Data::BigDecimal { .. }
+            | Data::RegExp { .. }
+            | Data::BigInt(_)
+            | Data::Label(_) => {}
+        }
     }
 }

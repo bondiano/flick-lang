@@ -269,19 +269,24 @@ fn tailfailure_discards_old_selection_before_the_outer_recovery_callback() {
                 break;
             }
             if old_cause.is_none() && machine.recoveries.contains_key(&0) {
-                let index = machine
-                    .heap
-                    .objects
-                    .iter()
-                    .position(|slot| {
-                        slot.as_ref()
-                            .is_some_and(|object| matches!(object.data, Data::Cause(_)))
-                    })
-                    .expect("original C");
-                old_cause = Some(ObjectId {
-                    heap: machine.heap.identity,
-                    index,
-                });
+                old_cause = Some(
+                    machine
+                        .heap
+                        .objects
+                        .iter()
+                        .enumerate()
+                        .find_map(|(index, slot)| {
+                            slot.object
+                                .as_ref()
+                                .filter(|object| matches!(object.data, Data::Cause(_)))
+                                .map(|_| ObjectId {
+                                    heap: machine.heap.identity,
+                                    index,
+                                    generation: slot.generation,
+                                })
+                        })
+                        .expect("original C"),
+                );
             }
             if machine.frames.last().is_some_and(|frame| {
                 matches!(frame.destination, Destination::RecoverySelection { id: 1 })
@@ -371,6 +376,7 @@ fn cleanup_keeps_first_layout_error_while_draining_a_later_invalid_global() {
     let invalid = ObjectId {
         heap: machine.heap.identity,
         index: usize::MAX,
+        generation: 0,
     };
     machine.globals.insert(
         Name::new("Broken", "later"),

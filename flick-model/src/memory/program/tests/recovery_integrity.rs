@@ -143,6 +143,7 @@ fn interrupted_recovery_cleanup_keeps_no_accepted_owned_roots(mode: u8) {
     let invalid = ObjectId {
         heap: machine.heap.identity,
         index: usize::MAX,
+        generation: 0,
     };
     let expected = match mode {
         0 => {
