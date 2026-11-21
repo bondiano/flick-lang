@@ -105,6 +105,16 @@ pub enum Const {
     LayerSucceed(Path),
     LayerEffect(Path),
     LayerMerge,
+    /// Converts an iterable `for` source (`List` or `Seq`) to a lazy `Seq`.
+    SeqIter,
+    /// Wraps a closed step thunk `Unit -> Option (a, Seq a)` as a `Seq` value.
+    SeqThunk,
+    /// Pulls the next `(head, rest)` element from a `Seq`, or `None`.
+    SeqNext,
+    /// Wraps a lazy `for … yield` whose body performs Sync reader calls.
+    SeqSync,
+    /// `Seq.flat_map` inside a Sync `for … yield`.
+    SeqFlatMapSync,
     Prim(Prim),
     Native(&'static Native),
     /// A foreign binding of regions (`docs/formal/regions.md` §1.5): the
@@ -166,8 +176,12 @@ impl Const {
             | Const::Raise
             | Const::Ask(_)
             | Const::LayerSucceed(_)
-            | Const::LayerEffect(_) => 1,
-            Const::RefSet | Const::LayerMerge => 2,
+            | Const::LayerEffect(_)
+            | Const::SeqIter
+            | Const::SeqThunk
+            | Const::SeqNext
+            | Const::SeqSync => 1,
+            Const::RefSet | Const::LayerMerge | Const::SeqFlatMapSync => 2,
             Const::Prim(p) => match p {
                 Prim::Neg(_) | Prim::Not | Prim::TagOf | Prim::Atom => 1,
                 _ => 2,
@@ -178,11 +192,11 @@ impl Const {
         }
     }
 
-    /// Whether a full application is a value, as `Layer.*` is (L1).
+    /// Whether a full application is a value, as `Layer.*` and `SeqThunk` are.
     pub fn builds_value(&self) -> bool {
         matches!(
             self,
-            Const::LayerSucceed(_) | Const::LayerEffect(_) | Const::LayerMerge
+            Const::LayerSucceed(_) | Const::LayerEffect(_) | Const::LayerMerge | Const::SeqThunk
         )
     }
 }

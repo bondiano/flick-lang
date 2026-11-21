@@ -182,6 +182,10 @@ impl Checker<'_> {
             self.metas(&Type::Errors(a.clone()), &mut waiting);
             self.metas(&Type::Errors(b.clone()), &mut waiting);
         }
+        for (src, elem, _) in &self.iterables {
+            self.metas(src, &mut waiting);
+            self.metas(elem, &mut waiting);
+        }
         for m in region_metas.into_iter().chain(waiting) {
             self.slots[m as usize].level = self.slots[m as usize].level.min(self.level);
         }

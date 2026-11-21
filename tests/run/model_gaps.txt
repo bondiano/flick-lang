@@ -16,16 +16,14 @@ codegen/composition_method # no native for `unsafe_div` (flick:rt intUnsafeDiv)
 codegen/deep_recursion # runs out of the model's steps
 codegen/defect # no native for `unsafe_div` (flick:rt intUnsafeDiv)
 codegen/effect_abi # no native for `bits` (./effect_abi.mjs bits)
-codegen/for_comprehension # the model's (≡) rejects `App.Main.main`
-codegen/for_loop # the model's (≡) rejects `App.Main.main`
-codegen/fusion # a `for` or a `Seq` has no λFlick form
+codegen/for_loop # no native for `sleep` (../runtime/timers.mjs sleep)
+codegen/fusion # `?` on an `Option`, a return from the function, has no λFlick form
 codegen/interpolation # runs in the model; not in portable.txt
 codegen/known_failure # no native for `unsafe_div` (flick:rt intUnsafeDiv)
 codegen/ints # no native for `checked_add` (flick:rt intCheckedAdd)
 codegen/let_assert # no native for `get` (flick:rt listGet)
 codegen/pure_main # no native for `say` (global console.log)
 codegen/question # `?` on an `Option`, a return from the function, has no λFlick form
-codegen/ranges # the model's (≡) rejects `App.Main.main`
 codegen/recursion # runs out of the model's steps
 codegen/release # no native for `timeout_option` (flick:rt timeoutOption)
 codegen/service_child # no native for `parallel` (flick:rt parallel)
@@ -110,7 +108,7 @@ ui/siblings # no native for `layer` (flick:reactivity/Atom atomLayer)
 ui/stream # no native for `close` (./stream.mjs close)
 ui/sync # no native for `layer` (flick:reactivity/Atom atomLayer)
 ui/sync_data # no native for `layer` (flick:reactivity/Atom atomLayer)
-ui/sync_for # a `for` or a `Seq` has no λFlick form
+ui/sync_for # no native for `layer` (flick:reactivity/Atom atomLayer)
 ui/wake_chain # no native for `click` (./dom.mjs click)
 runtime/lazy_shared # no native for `parallel` (flick:rt parallel)
 runtime/suspended_std # no native for `or_die` (flick:Effect orDie)

@@ -302,3 +302,12 @@ fn kept_handler_stucks_on_control() {
         "expected kept-handler stuck on control, got {out:?}"
     );
 }
+
+#[test]
+fn seq_iter_stucks_on_unsupported_collection_source() {
+    let out = run(konst(Const::SeqIter, vec![int(1)]));
+    assert!(
+        matches!(&out, Outcome::Stuck(why) if why.contains("unsupported `for` collection source")),
+        "expected unsupported collection source stuck, got {out:?}"
+    );
+}

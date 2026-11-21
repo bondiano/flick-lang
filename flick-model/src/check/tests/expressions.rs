@@ -116,3 +116,77 @@ fn match_needs_exhaustive_arms() {
     assert!(infer(&match_(Term::bool(true), vec![yes.clone(), no])).is_ok());
     rejected_by(infer(&match_(Term::bool(true), vec![yes])), "Match");
 }
+
+#[test]
+fn seq_iter_checks_supported_sources_and_reports_unsupported_as_translation_gap() {
+    use crate::syntax::Head;
+
+    let seq = |t: Type| Type::app(ty("Seq"), t);
+    let seq_iter = |e: Term| Term::app(Term::konst(Const::SeqIter), e);
+
+    // List and Seq sources are accepted directly.
+    assert_eq!(
+        infer(&seq_iter(Term::List(Rc::from([int(1)]))))
+            .expect("list source")
+            .0,
+        seq(ty("Int"))
+    );
+    let seq_sig = mono(Type::fun(seq(ty("Int")), Stage::Pure, seq(ty("Int"))));
+    assert!(check(&Term::lam("xs", seq_iter(var("xs"))), &seq_sig).is_ok());
+
+    // A polymorphic source with an `Iterable f` dictionary in scope is accepted.
+    let f = Type::Var(Var::Named("f".into()));
+    let iterable_dict = Type::Dict(Path::new("Prelude", "Iterable"), Rc::from([f.clone()]));
+    let poly_iter = Scheme {
+        vars: vec![("f".into(), Kind::Type), ("a".into(), Kind::Type)],
+        body: Type::fun(
+            iterable_dict,
+            Stage::Pure,
+            Type::fun(Type::app(f, a()), Stage::Pure, seq(a())),
+        ),
+        outlives: Vec::new(),
+    };
+    assert!(check(&Term::lam("d", Term::lam("xs", seq_iter(var("xs")))), &poly_iter).is_ok());
+
+    // A source whose type is still a meta at `SeqIter` is resolved once called.
+    let deferred = let_(
+        "iter_of",
+        Term::lam("xs", seq_iter(var("xs"))),
+        Term::app(var("iter_of"), Term::List(Rc::from([int(1)]))),
+    );
+    assert!(infer(&deferred).is_ok());
+
+    // Unsupported collection sources fail as `(Translation)` gaps, never `(≡) ... is not List`.
+    rejected_by(infer(&seq_iter(int(1))), "Translation");
+    let opt_sig = mono(Type::fun(
+        Type::app(ty("Option"), ty("Int")),
+        Stage::Pure,
+        seq(ty("Int")),
+    ));
+    rejected_by(
+        check(&Term::lam("xs", seq_iter(var("xs"))), &opt_sig),
+        "Translation",
+    );
+    let box_sig = mono(Type::fun(
+        Type::app(Type::con(T, "Box"), ty("Int")),
+        Stage::Pure,
+        seq(ty("Int")),
+    ));
+    rejected_by(
+        check(&Term::lam("xs", seq_iter(var("xs"))), &box_sig),
+        "Translation",
+    );
+    let deferred_bad = let_(
+        "iter_of",
+        Term::lam("xs", seq_iter(var("xs"))),
+        Term::app(var("iter_of"), int(1)),
+    );
+    rejected_by(infer(&deferred_bad), "Translation");
+    // Unconstrained source still unsolved at `finish()` is also a `(Translation)` gap.
+    rejected_by(infer(&Term::lam("xs", seq_iter(var("xs")))), "Translation");
+    // Direct `Term::Apply(SeqIter, [source])` obeys the same rule.
+    rejected_by(
+        infer(&Term::Apply(Head::Const(Const::SeqIter), Rc::from([int(1)]))),
+        "Translation",
+    );
+}

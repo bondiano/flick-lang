@@ -25,8 +25,6 @@ gap tests/check/pass/classes/rows.fl # the row primitive `HasField` has no λFli
 gap tests/check/pass/cli/blocks.fl # the row primitive `Lacks` has no λFlick form
 gap tests/check/pass/cli/deriving.fl # the row primitive `Lacks` has no λFlick form
 gap tests/check/pass/cli/nested.fl # the row primitive `Lacks` has no λFlick form
-gap tests/check/pass/effects/reader.fl # `for` and `Seq` have no λFlick form; their elaboration is formal/Formal/Elab
-gap tests/check/pass/effects/sync_for.fl # `for` and `Seq` have no λFlick form; their elaboration is formal/Formal/Elab
 gap tests/check/pass/schema/http_api.fl # the row primitive `Lacks` has no λFlick form
 
 disagree docs/src/content/docs/reference/regions.md 74e0a790d9f7b254 # the model's row has one `Scope` element, so acquiring into an inner and an outer region in one stage unifies the two (parameter-preserving rows: `Scope inner` and `Scope outer` are two elements)
