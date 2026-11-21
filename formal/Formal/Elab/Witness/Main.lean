@@ -45,7 +45,7 @@ theorem doOk_pure (c I J : Nat) (hI : insts I = some ⟨cApp, [.con c], [], []�
     DoOk S [] [] [.bind (.app (.meth 1) (.const 8))] (.app (.meth 1) (.var 0)) (.con c) (.con 1) .P := by
   obtain ⟨sl, hJ⟩ := hJ
   have hA : ∀ Γ, Ent P Γ [⟨cApp, [.con c]⟩] [.inst I] := fun _ =>
-    .inst (σ := Ty.var) (ds := []) hI rfl rfl .nil
+    .inst_eq (σ := Ty.var) (ds := []) hI rfl rfl .nil
   -- `pure` at the qualifier `∅` takes a value that shows nothing, as its bound `a^c` asks
   have hp : ∀ Γ (x : Exp) a (x' : Tm), (∀ n, ¬ a.Shown n) → Elab P Γ [] x a .P x' →
       Elab P Γ [] (.app (.meth 1) x) (appQ (.con c) .cnil a) .P (.app (.meth (.dict (.inst I)) 1) x') :=
@@ -53,7 +53,7 @@ theorem doOk_pure (c I J : Nat) (hI : insts I = some ⟨cApp, [.con c], [], []�
       (by simpa [Cn.subst, Ty.subst, inst] using hA [])
       (τ := arrP a (appQ (.con c) .cnil a)) rfl
       (Bounds.hold_one fun n hn => (ha n (by simpa [Ty.subst, inst] using hn)).elim)) hx (.inl rfl)
-  exact .bind (.inst (σ := Ty.var) (ds := []) hJ rfl rfl .nil)
+  exact .bind (.inst_eq (σ := Ty.var) (ds := []) hJ rfl rfl .nil)
     (hp [] _ (.con 1) _ (fun _ h => h) (elab_const S.hUnitV (ts := []) rfl rfl))
     (.ret (hp _ _ (.con 1) _ (fun _ h => h)
       (.var (σ := ⟨0, [], .con 1, .cnil, []⟩) (ts := []) rfl rfl Bounds.hold_nil .nil)))

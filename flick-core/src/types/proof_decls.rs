@@ -219,8 +219,8 @@ impl Checker<'_> {
             self.check(body, &proof_type(ty.clone()));
         }
         self.settle_operators();
-        self.solve_classes(true);
         self.solve_rows();
+        self.solve_classes(true);
         let mut data = logic::Data::new();
         let params = params
             .iter()

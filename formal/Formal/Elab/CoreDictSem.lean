@@ -28,6 +28,10 @@ structure RealRun (P : Prog) (N : Names) (root : Roots) : Prop where
       (apps (.strct S.cls τ) ((List.range ts.length).map fun k => .slot (.var k) i)))
   strctSub : ∀ {C τ ts θ}, P.structC C = true → P.fields τ = some ts →
     root.glob (N.strct C (τ.subst θ)) = root.glob (N.strct C τ)
+  strctLe : ∀ {C τ₁ τ₂ ts₁ ts₂}, P.structC C = true → P.fields τ₁ = some ts₁ →
+    P.fields τ₂ = some ts₂ →
+    (∃ τ, Cn.Serves P ⟨C, [τ]⟩ ⟨C, [τ₁]⟩ ∧ Cn.Serves P ⟨C, [τ]⟩ ⟨C, [τ₂]⟩) →
+    root.glob (N.strct C τ₁) = root.glob (N.strct C τ₂)
   prim : ∀ {q p}, P.primC q.cls = true → P.prims q = some p →
     ∃ v, root.glob (N.prim p q) = some v ∧ Value v
   primSub : ∀ {q p θ}, P.primC q.cls = true → P.prims q = some p →
@@ -73,7 +77,7 @@ theorem ent_eval (hR : RealRun P N root) (δ : Nat → Nat) {qs : List Cn} {ds :
     obtain ⟨r, hg, -⟩ := hR.strct h₁ h₂
     have ev := eval_body hg a.map_left (by simpa using hds.get.1)
     exact ⟨_, .cons (by rw [trDt_apps]; exact ev) .nil⟩
-  | inst h₁ _ _ hds ih =>
+  | inst h₁ _ hds ih =>
     obtain ⟨vs, a⟩ := ih
     obtain ⟨r, hg, -⟩ := hR.inst h₁
     have ev := eval_body hg a.map_left (by simpa using hds.get.1)
@@ -141,6 +145,7 @@ theorem eqv_sem (hR : RealRun P N root) {d d' : Dict} (h : Eqv P d d') :
       rw [getD_lt (by simpa [hl] using h₁)]
     rw [e]; exact .refl
   | strctSub hC hf => exact glob_sem (hR.strctSub hC hf).symm
+  | strctLe hC h1 h2 hs => exact glob_sem (hR.strctLe hC h1 h2 hs)
   | primSub hq hp => exact glob_sem (hR.primSub hq hp).symm
 
 end Flick.Elab

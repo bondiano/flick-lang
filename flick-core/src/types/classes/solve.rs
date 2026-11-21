@@ -5,11 +5,12 @@
 //! counts against the budget of the definition being checked.
 
 use super::assumes;
+use crate::diagnostics::codes;
 use crate::numeric::NumLang;
 use std::mem;
 
-use super::matching::{Match, Subst, match_type};
-use super::{Dict, RECORD_CLASSES, has_metas, split, super_slot, vars, which};
+use super::matching::{Match, Subst};
+use super::{Dict, RECORD_CLASSES, has_metas, split, super_slot, which};
 use crate::numeric::{Num, default_num};
 use crate::types::Checker;
 use crate::types::env::Instance;
@@ -39,6 +40,47 @@ impl Checker<'_> {
     /// other one is an error, otherwise it waits for more information.
     pub fn solve_classes(&mut self, report: bool) {
         let mut pending = mem::take(&mut self.classes.wanted);
+        if report {
+            // Grow any active subrows and holds before closing unconstrained
+            // capture-row metas in wanted constraints (e.g. on a capture-free
+            // constructor payload), so a live capture-row meta can never be
+            // prematurely defaulted to `{}`.
+            self.grow();
+            let mut active_hold_metas = Vec::new();
+            for hold in &self.cx.regions.holds {
+                for tail in self.store.normalize(&hold.bound).tails {
+                    if let Some(m) = tail.inference_meta_root()
+                        && !active_hold_metas.contains(&m)
+                    {
+                        active_hold_metas.push(m);
+                    }
+                }
+            }
+            let mut open_caps = Vec::new();
+            for w in &pending {
+                self.zonk(&w.constraint).visit(&mut |t| {
+                    if let Type::Captured { captures, .. } = t {
+                        for tail in self.store.normalize(captures).tails {
+                            if let Some(m) = tail.inference_meta_root()
+                                && !active_hold_metas.contains(&m)
+                                && !open_caps.contains(&m)
+                            {
+                                open_caps.push(m);
+                            }
+                        }
+                    } else if let Some(m) = t.inference_meta_root()
+                        && self.store.is_capture_row(m)
+                        && !active_hold_metas.contains(&m)
+                        && !open_caps.contains(&m)
+                    {
+                        open_caps.push(m);
+                    }
+                });
+            }
+            for m in open_caps {
+                self.store.set(m, Type::empty_row());
+            }
+        }
         loop {
             let mut left = Vec::new();
             let mut progress = false;
@@ -114,37 +156,51 @@ impl Checker<'_> {
         for (m, variable) in &open {
             let m = *m;
             let fractional = self.store.is_fractional(m);
-            let fits = |num: &Num| {
+            let fallback = default_num(fractional);
+            let mut chosen = fallback;
+            for num in Num::ALL {
                 if fractional && !num.fractional() {
-                    return false;
+                    continue;
                 }
                 let ty = Type::lang(num.lang());
-                wanted
+                let mut fits = true;
+                for c in wanted
                     .iter()
                     .filter(|c| c.contains(&mut |t| t.inference_meta_root() == Some(m)))
-                    .all(|c| self.may_have_instance(&replace_metas(c, &[(m, ty.clone())])))
-            };
-            let fallback = default_num(fractional);
-            let num = Num::ALL.iter().find(|n| fits(n)).unwrap_or(&fallback);
-            progress |= self.unify(variable, &Type::lang(num.lang())).is_ok();
+                {
+                    if !self.may_have_instance(&replace_metas(c, &[(m, ty.clone())])) {
+                        fits = false;
+                        break;
+                    }
+                }
+                if fits {
+                    chosen = num;
+                    break;
+                }
+            }
+            progress |= self.unify(variable, &Type::lang(chosen.lang())).is_ok();
         }
         progress
     }
 
     /// Whether an instance head matches `c`, or its class has no declared
     /// instances to rule it out.
-    fn may_have_instance(&self, c: &Type) -> bool {
-        let Some((class, args)) = split(c) else {
+    fn may_have_instance(&mut self, c: &Type) -> bool {
+        let Some(((cm, cn), args)) = split(c) else {
             return true;
         };
+        let class = (cm.to_owned(), cn.to_owned());
         let args: Vec<Type> = args.into_iter().cloned().collect();
-        let mut instances = self
+        let instances: Vec<Instance> = self
             .env
             .instances()
-            .filter(|i| split(&i.head).is_some_and(|(k, _)| k == class))
-            .peekable();
-        instances.peek().is_none()
-            || instances.any(|i| head_match(&i.head, &args, &mut Subst::new()) != Match::No)
+            .filter(|i| split(&i.head).is_some_and(|((m, n), _)| m == class.0 && n == class.1))
+            .cloned()
+            .collect();
+        instances.is_empty()
+            || instances.iter().any(|i| {
+                self.match_head_variance(&i.vars, &i.head, &args, &mut Subst::new()) != Match::No
+            })
     }
 
     /// Whether `c` follows from `givens` and the instances in scope.
@@ -215,7 +271,7 @@ impl Checker<'_> {
 
     /// A part of a canonical constraint, canonical again once unknowns in
     /// it may have been solved meanwhile.
-    fn settled(&self, c: Type) -> Type {
+    pub(super) fn settled(&self, c: Type) -> Type {
         if has_metas(&c) { self.canon(&c) } else { c }
     }
 
@@ -245,7 +301,10 @@ impl Checker<'_> {
         let ground =
             !c.contains(&mut |t| matches!(t, Type::Meta(_) | Type::Skolem(_) | Type::Var(_)));
         let key = ground.then(|| c.clone());
-        if let Some((_, dict)) = givens.iter().find(|(g, _)| g == c) {
+        if let Some((_, dict)) = givens
+            .iter()
+            .find(|(g, _)| g == c || self.given_serves(c, g) == Match::Yes)
+        {
             return Outcome::Solved(dict.clone());
         }
         if let Some(dict) = key.as_ref().and_then(|k| self.classes.cache.get(k)) {
@@ -281,52 +340,6 @@ impl Checker<'_> {
         outcome
     }
 
-    /// An assumption of the same class that agrees on the determining
-    /// arguments of a functional dependency fixes the determined ones.
-    fn improve_by_givens(
-        &mut self,
-        module: &str,
-        name: &str,
-        args: &[Type],
-        givens: &Givens,
-    ) -> bool {
-        let Some(info) = self.class_info(module, name) else {
-            return false;
-        };
-        for (g, _) in givens {
-            let Some((class, gargs)) = split(g) else {
-                continue;
-            };
-            if class != (module, name) {
-                continue;
-            }
-            for fd in &info.fundeps {
-                let agree = fd
-                    .from
-                    .iter()
-                    .all(|&i| gargs.get(i).copied() == args.get(i));
-                let differ = fd.to.iter().any(|&j| gargs.get(j).copied() != args.get(j));
-                if agree
-                    && differ
-                    && self
-                        .inference_trial(|this| {
-                            for &j in &fd.to {
-                                let (Some(a), Some(b)) = (args.get(j), gargs.get(j)) else {
-                                    return Err(());
-                                };
-                                this.unify(a, b).map_err(|_| ())?;
-                            }
-                            Ok(())
-                        })
-                        .is_ok()
-                {
-                    return true;
-                }
-            }
-        }
-        false
-    }
-
     fn by_instance(
         &mut self,
         c: &Type,
@@ -342,13 +355,35 @@ impl Checker<'_> {
             .cloned()
             .collect();
         let mut unknown = false;
+        let mut matched: Vec<(&Instance, Subst)> = Vec::new();
         for instance in &instances {
             let mut subst = Subst::new();
-            match head_match(&instance.head, args, &mut subst) {
-                Match::Yes => return self.by_context(instance, &subst, givens, chain),
+            match self.match_head_variance(&instance.vars, &instance.head, args, &mut subst) {
+                Match::Yes => matched.push((instance, subst)),
                 Match::Unknown => unknown = true,
                 Match::No => {}
             }
+        }
+        // Only commit when a unique instance matches and no other instance is
+        // still `Unknown`, so refining a metavariable can never silently switch
+        // the chosen dictionary.
+        if matched.len() == 1 && !unknown {
+            let (instance, subst) = &matched[0];
+            return self.by_context(instance, subst, givens, chain);
+        }
+        if matched.len() > 1 {
+            // Two sibling imported instances can both match only after
+            // `imported_conflicts` has already reported `FLICK-C003`; avoid
+            // cascading a misleading `FLICK-C002` at every call site.
+            let already_overlapping = matched.iter().any(|(instance, _)| {
+                self.diagnostics
+                    .iter()
+                    .any(|d| d.code == codes::C003 && d.message.contains(&instance.name))
+            });
+            if already_overlapping {
+                return Outcome::Solved(Dict::Error);
+            }
+            unknown = true;
         }
         if self.improve_by_instances(&instances, class, args) {
             let c = self.canon(c);
@@ -357,7 +392,7 @@ impl Checker<'_> {
         // an assumption may still apply once the unknown types are known
         unknown |= givens
             .iter()
-            .any(|(g, _)| head_match(g, args, &mut Subst::new()) == Match::Unknown);
+            .any(|(g, _)| self.given_serves(c, g) == Match::Unknown);
         if unknown {
             Outcome::Stuck
         } else {
@@ -411,112 +446,4 @@ impl Checker<'_> {
             }
         }
     }
-
-    /// An instance whose head matches the determining arguments of a
-    /// functional dependency fixes the determined ones.
-    fn improve_by_instances(
-        &mut self,
-        instances: &[Instance],
-        class: (&str, &str),
-        args: &[Type],
-    ) -> bool {
-        let Some(info) = self.class_info(class.0, class.1) else {
-            return false;
-        };
-        for instance in instances {
-            let Some((_, pattern)) = split(&instance.head) else {
-                continue;
-            };
-            for fd in &info.fundeps {
-                let mut subst = Subst::new();
-                let determined = fd
-                    .from
-                    .iter()
-                    .all(|&i| match (pattern.get(i), args.get(i)) {
-                        (Some(p), Some(t)) => match_type(p, t, &mut subst) == Match::Yes,
-                        _ => false,
-                    });
-                if !determined {
-                    continue;
-                }
-                if fd.to.iter().any(|&j| match (pattern.get(j), args.get(j)) {
-                    (Some(p), Some(t)) => match_type(p, t, &mut subst) == Match::No,
-                    _ => true,
-                }) {
-                    continue;
-                }
-                let attempt = self.inference_trial(|this| {
-                    let mut candidate = subst.clone();
-                    let mut changed = false;
-                    for &j in &fd.to {
-                        let (Some(p), Some(t)) = (pattern.get(j), args.get(j)) else {
-                            return Err(());
-                        };
-                        for v in vars(p) {
-                            if !candidate.iter().any(|(n, _)| *n == v) {
-                                candidate.push((v, this.fresh()));
-                            }
-                        }
-                        let target = p.substitute(&candidate);
-                        this.unify(t, &target).map_err(|_| ())?;
-                        changed |= this.canon(t) != *t;
-                    }
-                    Ok(changed)
-                });
-                if attempt == Ok(true) {
-                    return true;
-                }
-            }
-        }
-        false
-    }
-
-    /// `C { a : A; b : B }` from `C A` and `C B`, `C (A, B)` likewise.
-    fn structural_instance(&mut self, c: &Type, givens: &Givens, chain: &mut Vec<Type>) -> Outcome {
-        let (head, args) = c.spine();
-        let class = head.clone();
-        let items: Vec<Type> = match args.first() {
-            Some(Type::Tuple(items)) => items.clone(),
-            Some(Type::Record(row)) => match row.tail.as_deref() {
-                None => row.entries.iter().map(|(_, t)| t.clone()).collect(),
-                Some(Type::Meta(_)) => return Outcome::Stuck,
-                Some(_) => {
-                    return Outcome::Missing(
-                        c.clone(),
-                        Some("the record is open, so its other fields are not known; require the constraint for the whole record".to_owned()),
-                    );
-                }
-            },
-            _ => return Outcome::Missing(c.clone(), None),
-        };
-        let mut fields = Vec::new();
-        let mut stuck = false;
-        for item in items {
-            let c = self.settled(Type::app(class.clone(), item));
-            match self.entail(&c, givens, chain) {
-                Outcome::Solved(dict) => fields.push(dict),
-                Outcome::Stuck => stuck = true,
-                other => return other,
-            }
-        }
-        if stuck {
-            return Outcome::Stuck;
-        }
-        let class = split(c).map(|((_, n), _)| n.to_owned()).unwrap_or_default();
-        Outcome::Solved(Dict::Structural { class, fields })
-    }
-}
-
-/// Matches the arguments of an instance head against those of a constraint.
-pub fn head_match(head: &Type, args: &[Type], subst: &mut Subst) -> Match {
-    let Some((_, pattern)) = split(head) else {
-        return Match::No;
-    };
-    if pattern.len() != args.len() {
-        return Match::No;
-    }
-    pattern
-        .iter()
-        .zip(args)
-        .fold(Match::Yes, |m, (p, t)| m.and(|| match_type(p, t, subst)))
 }

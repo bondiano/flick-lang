@@ -66,6 +66,26 @@ impl Checker<'_> {
                     .collect();
                 args.into_iter().fold(Type::Con(p), Type::app)
             }
+            Type::Dict(c, xs) => {
+                let Some(signs) = self
+                    .decls
+                    .class_signs
+                    .get(&c)
+                    .filter(|s| s.len() == xs.len())
+                    .cloned()
+                else {
+                    return Type::Dict(c, xs);
+                };
+                let args: Rc<[Type]> = xs
+                    .iter()
+                    .zip(signs)
+                    .map(|(x, s)| match s {
+                        Sign::Pos => self.widen_for_meta(x),
+                        Sign::Neg | Sign::Inv | Sign::Bi => x.clone(),
+                    })
+                    .collect();
+                Type::Dict(c, args)
+            }
             other => other,
         }
     }

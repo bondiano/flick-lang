@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 mod fd_coherence;
 mod fd_resolution;
+mod variance;
+mod variance_regressions;
 
 use super::Dict;
 use crate::diagnostics::Diagnostic;

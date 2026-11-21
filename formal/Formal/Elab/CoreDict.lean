@@ -168,4 +168,13 @@ theorem has_prim (hR : Real P S N) {Γ Δ q p θ φ} (hq : P.primC q.cls = true)
   let ⟨_, hg, hcl⟩ := hR.prim hq hp
   has_glob (Γ := Γ) (Δ := Δ) (φ := φ) (t := .dict q) hg hcl θ fun _ _ => .dict .prim
 
+/-- **Core dictionary transport**: a dictionary typed at `D_H` is also typed at `D_Q`
+whenever `H` serves `Q` under class variance (`LeLive.dict`). -/
+theorem has_dictLe (hR : Real P S N) {Γ Δ d Q H φ} (hs : Cn.Serves P Q H)
+    (hd : Has S N Γ Δ (.dict d) (.dict H) φ) :
+    Has S N Γ Δ (.dict d) (.dict Q) φ := by
+  intro Ψ Θ Γc γ δ hc
+  obtain ⟨d', hd', td⟩ := hd Ψ Θ Γc γ δ hc
+  exact ⟨d', hd', td.sub ⟨hs.tr hR, Stage.le_refl _⟩⟩
+
 end Flick.Elab

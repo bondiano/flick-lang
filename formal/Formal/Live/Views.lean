@@ -45,6 +45,7 @@ theorem LeLive.reach {a b : Ty} (h : LeLive S a b) : Caps.Sub a.reach b.reach :=
   | data hl hr _ _ _ ha hb =>
     subst ha; subst hb
     exact Ty.reach_foldl_le hl (Caps.Sub.refl _) hr
+  | dict => exact Caps.Sub.refl _
 
 theorem LeLive.arrow_left {a φ t C T} (h : LeLive S (.arrow a φ t C) T) :
     ∃ a' φ' t' C', T = .arrow a' φ' t' C' ∧ LeLive S a' a ∧
@@ -149,6 +150,7 @@ theorem LeLive.eq_plain {a b : Ty} (h : LeLive S a b) (ha : a.isPlain = true) : 
   | rcons => simp [Ty.isPlain] at ha
   | hide _ _ _ _ ha' => exact absurd ha' (Ty.ne_tcon_of_plain ha)
   | data _ _ _ _ _ ha' => exact absurd ha' (Ty.ne_tcon_of_plain ha)
+  | dict => simp [Ty.isPlain] at ha
 
 /-- A subtype of a plain type is equivalent to it. -/
 theorem LeLive.eq_plain_right {a b : Ty} (h : LeLive S a b) (hb : b.isPlain = true) : Ty.Equiv a b := by
@@ -160,5 +162,18 @@ theorem LeLive.eq_plain_right {a b : Ty} (h : LeLive S a b) (hb : b.isPlain = tr
   | rcons => simp [Ty.isPlain] at hb
   | hide _ _ _ _ _ hb' => exact absurd hb' (Ty.ne_tcon_of_plain hb)
   | data _ _ _ _ _ _ hb' => exact absurd hb' (Ty.ne_tcon_of_plain hb)
+  | dict => simp [Ty.isPlain] at hb
+
+theorem LeLive.dict_left {c U T} (h : LeLive S (.dict c U) T) :
+    ∃ U', T = .dict c U' ∧ LeLive S (.dict c U) (.dict c U') := by
+  cases h with
+  | refl => exact ⟨U, rfl, .refl⟩
+  | equiv he =>
+    cases he.form with
+    | rows hr _ => cases hr
+    | dict hU => exact ⟨_, rfl, .equiv (.dict hU)⟩
+  | dict hl hp hn hnr hi => exact ⟨_, rfl, .dict hl hp hn hnr hi⟩
+  | hide _ _ _ _ ha => exact absurd ha Ty.dict_ne_tcon
+  | data _ _ _ _ _ ha => exact absurd ha Ty.dict_ne_tcon
 
 end Flick

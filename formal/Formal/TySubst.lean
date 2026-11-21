@@ -211,7 +211,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro σ hσ
     have hp := hσ.1 _ rfl
     simp only [Flick.J.substT, Ty.substT, hp]; exact .own
-  | drec hc hk _ hn ih => exact Typ.drec_substT hc hk ih hn
+  | drec hc hk _ hn hT ih => exact Typ.drec_substT hc hk ih hn hT
   | dnil => intro _ _; exact .dnil
   | dcons _ _ ih₁ ih₂ => exact Typ.dcons_substT ih₁ ih₂
   | dproj _ hc hk hl hts hH hT ih => exact Typ.dproj_substT ih hc hk hl hts hH hT

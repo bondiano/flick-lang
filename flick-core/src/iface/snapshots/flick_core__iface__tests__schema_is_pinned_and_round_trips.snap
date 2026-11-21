@@ -3,7 +3,7 @@ source: flick-core/src/iface/tests.rs
 expression: json
 ---
 {
-  "iface-version": 31,
+  "iface-version": 32,
   "compiler": "0.1.0",
   "module": "App.Shapes",
   "exports": [
@@ -211,6 +211,9 @@ expression: json
         ],
         "methods": [
           "show"
+        ],
+        "variance": [
+          "contravariant"
         ]
       },
       "at": [
@@ -316,6 +319,10 @@ expression: json
         ],
         "methods": [
           "empty"
+        ],
+        "variance": [
+          "covariant",
+          "contravariant"
         ]
       },
       "at": [

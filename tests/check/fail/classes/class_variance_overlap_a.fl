@@ -1,0 +1,60 @@
+// K1' overlap check rejects comparable and incomparable product heads with
+// `FLICK-C003` (declaration order A: runtime/pure first).
+module App.ClassVarianceOverlapA exposing (..)
+
+type Box a = Box { value : a }
+
+type Sink a = Sink (a -> Unit)
+
+class Describe a =
+  describe : a -> String
+
+class Default a =
+  default : a
+
+class PairDesc a =
+  pair_desc : a -> String
+
+class Convert a b =
+  convert : a -> b
+
+// Contravariant comparable overlap (R then P)
+instance Describe (Unit ->{Async} Unit) =
+  let describe _ = "async"
+
+instance Describe (Unit -> Unit) =
+  let describe _ = "pure"
+
+// Covariant comparable overlap (P then R)
+instance Default (Box (Unit -> Unit)) =
+  let default = Box { value = fun () -> () }
+
+instance Default (Box (Unit ->{Async} Unit)) =
+  let default = Box { value = fun () -> () }
+
+// Contravariant data under `-` class (P then R)
+instance Describe (Sink (Unit -> Unit)) =
+  let describe _ = "sink-p"
+
+instance Describe (Sink (Unit ->{Async} Unit)) =
+  let describe _ = "sink-r"
+
+// Incomparable product heads sharing lower bound `(Unit -> Unit, Unit -> Unit)` (RP then PR)
+instance PairDesc (Unit ->{Async} Unit, Unit -> Unit) =
+  let pair_desc _ = "rp"
+
+instance PairDesc (Unit -> Unit, Unit ->{Async} Unit) =
+  let pair_desc _ = "pr"
+
+// Multi-parameter `[-, +]` overlap
+instance Convert (Unit ->{Async} Unit) (Unit -> Unit) =
+  let convert _ = fun () -> ()
+
+instance Convert (Unit -> Unit) (Unit ->{Async} Unit) =
+  let convert _ = fun () -> ()
+
+//~ FLICK-C003 @25:1-26:26 overlaps `Describe (Unit ->{Async} Unit)`
+//~ FLICK-C003 @32:1-33:45 overlaps `Default (Box (Unit -> Unit))`
+//~ FLICK-C003 @39:1-40:28 overlaps `Describe (Sink (Unit -> Unit))`
+//~ FLICK-C003 @46:1-47:25 overlaps `PairDesc (Unit ->{Async} Unit, Unit -> Unit)`
+//~ FLICK-C003 @53:1-54:31 overlaps `Convert (Unit ->{Async} Unit) (Unit -> Unit)`

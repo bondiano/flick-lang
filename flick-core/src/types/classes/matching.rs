@@ -72,6 +72,18 @@ pub fn match_type(pattern: &Type, target: &Type, subst: &mut Subst) -> Match {
             .iter()
             .zip(y)
             .fold(Match::Yes, |m, (a, b)| m.and(|| match_type(a, b, subst))),
+        (
+            Type::Captured {
+                ty: p,
+                captures: c1,
+                ..
+            },
+            Type::Captured {
+                ty: t,
+                captures: c2,
+                ..
+            },
+        ) => match_type(p, t, subst).and(|| match_type(c1, c2, subst)),
         (Type::Record(p), Type::Record(t)) | (Type::Row(p), Type::Row(t)) => match_row(p, t, subst),
         _ if pattern == target => Match::Yes,
         _ => Match::No,

@@ -18,7 +18,7 @@ pub use template::{
 };
 
 /// Bumped for schema changes or incompatible embedded-IR execution contracts.
-pub const IFACE_VERSION: u32 = 31;
+pub const IFACE_VERSION: u32 = 32;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -438,6 +438,9 @@ mod tests;
 
 #[cfg(test)]
 mod support_tests;
+
+#[cfg(test)]
+mod class_variance_tests;
 
 #[cfg(test)]
 mod variance_tests;

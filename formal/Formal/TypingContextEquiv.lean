@@ -129,7 +129,7 @@ theorem Typ.context_equiv {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | inside => intro _ _ hn _ _; exact (hn (.inr (.inl rfl))).elim
   | cap => intros; exact .cap
   | own => intros; exact .own
-  | drec hc hk _ hb ih => intro _ _ hn hΨ hΓ; exact .drec hc hk (ih hn hΨ hΓ) hb
+  | drec hc hk _ hb hT ih => intro _ _ hn hΨ hΓ; exact .drec hc hk (ih hn hΨ hΓ) hb hT
   | dnil => intros; exact .dnil
   | dcons _ _ ihv ihr =>
     intro _ _ hn hΨ hΓ

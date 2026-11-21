@@ -5,6 +5,7 @@ use std::slice;
 use super::generalize::{Inst, names as inst_names, rigid_inst, substitute_all, substitute_caps};
 use super::regions::{add_live, live_arg, live_stage};
 use super::{Check, Checker};
+use crate::syntax::Path;
 use crate::types::{Caps, Kind, Scheme, Stage, Type, Var};
 use crate::variance::Sign;
 
@@ -128,6 +129,9 @@ impl Checker<'_> {
                 Ok(())
             }
             (a @ Type::App(..), b @ Type::App(..)) => self.subsume_data(&a, &b),
+            (Type::Dict(c, xs), Type::Dict(d, ys)) if c == d && xs.len() == ys.len() => {
+                self.subsume_dict(&c, &xs, &ys)
+            }
             // a function or a task that a bounded variable takes may need the
             // innermost bound, the capacity of a cell `Ref.make` makes: its
             // type records it, as the bound allows its use nothing more; and
@@ -222,6 +226,46 @@ impl Checker<'_> {
                         slice::from_ref(y),
                         &Caps::default(),
                         "≤-Data",
+                    );
+                }
+                Sign::Inv | Sign::Bi => self.unify(x, y)?,
+            }
+        }
+        Ok(())
+    }
+
+    /// `D_C ū ≤ D_C ū'` by the sign of each class parameter (`regions.md`
+    /// §2.2.1, Lean `LeLive.dict`): `+` widens covariantly, `−` narrows
+    /// contravariantly while keeping reach, and `inv`/`bi` require `≡`.
+    fn subsume_dict(&mut self, c: &Path, xs: &[Type], ys: &[Type]) -> Check<()> {
+        let signs = self
+            .decls
+            .class_signs
+            .get(c)
+            .filter(|s| s.len() == xs.len() && xs.len() == ys.len())
+            .cloned();
+        let Some(signs) = signs else {
+            for (x, y) in xs.iter().zip(ys) {
+                self.unify(x, y)?;
+            }
+            return Ok(());
+        };
+        for ((x, y), s) in xs.iter().zip(ys).zip(signs) {
+            let open = |t: &Type| matches!(self.resolve(t), Type::Var(Var::Meta(_)));
+            match s {
+                Sign::Pos if !open(x) && open(y) => {
+                    let widened = self.widen_for_meta(x);
+                    self.unify(&widened, y)?;
+                }
+                _ if open(x) || open(y) => self.unify(x, y)?,
+                Sign::Pos => self.subsume(x, y)?,
+                Sign::Neg => {
+                    self.subsume(y, x)?;
+                    self.hold(
+                        slice::from_ref(x),
+                        slice::from_ref(y),
+                        &Caps::default(),
+                        "≤-Dict",
                     );
                 }
                 Sign::Inv | Sign::Bi => self.unify(x, y)?,

@@ -90,6 +90,11 @@ fn names(l: &Elem, a: &str) -> bool {
 }
 
 /// Whether `a` stands anywhere in `t`, rows and qualifiers included.
+pub(super) fn occurs_in(a: &str, t: &Type) -> bool {
+    occurs(a, t)
+}
+
+/// Whether `a` stands anywhere in `t`, rows and qualifiers included.
 fn occurs(a: &str, t: &Type) -> bool {
     t.contains(&mut |t| match t {
         Type::Var(n) => n == a,

@@ -156,13 +156,15 @@ let widen_thunk t = t
 #[test]
 fn rejects_malformed_serialized_variance_and_tracks_fingerprint_and_api_diff() {
     let covariant_src = "\
-module App.Var exposing (Box, Thunk, Id, Alias, Show)
+module App.Var exposing (Box, Thunk, Id, Alias, Show, Map)
 opaque type Box a = Box a
 opaque type Thunk (r : ServiceRow) a = Thunk (Unit ->{r} a)
 opaque type Id = Id Int
 type alias Alias a = List a
 class Show a =
   show_it : a -> String
+class Map (f : Type -> Type) =
+  map_it : (a -> b) -> f a -> f b
 ";
     let invariant_src = covariant_src.replace(
         "opaque type Box a = Box a",
@@ -219,8 +221,16 @@ class Show a =
             set_variance(&covariant, "Alias", vec![Variance::Covariant]),
         ),
         (
-            "class variance before #448",
-            set_variance(&covariant, "Show", vec![Variance::Contravariant]),
+            "class wrong arity",
+            set_variance(
+                &covariant,
+                "Show",
+                vec![Variance::Contravariant, Variance::Contravariant],
+            ),
+        ),
+        (
+            "higher-kinded class parameter covariant",
+            set_variance(&covariant, "Map", vec![Variance::Covariant]),
         ),
     ] {
         assert!(
@@ -392,7 +402,7 @@ fn rejects_forged_variance_in_nested_module_signatures_and_anonymous_nominals() 
             default_sigs: Vec::new(),
             derive: false,
         },
-        variance: vec![Variance::Contravariant],
+        variance: vec![Variance::Contravariant, Variance::Covariant],
     };
     let bad_kind = TypeDef {
         kind: Kind::Named {

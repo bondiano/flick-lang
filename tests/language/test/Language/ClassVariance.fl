@@ -1,0 +1,56 @@
+// Imported class variance executes the expected dictionaries across JS and Go.
+module Language.ClassVariance exposing (tests)
+
+import Language.ClassVarianceDefs exposing (..)
+
+base_rt : Unit ->{} Int
+let base_rt () = 7
+
+tick_rt : Unit ->{Tick} Int
+let tick_rt () = Tick.step ()
+
+scoped_default : Unit ->{} Int
+let scoped_default () = scope s {
+  let b : (Box ((Unit -> Int)^{s}))^{s} = default
+  match b with
+  | Box r -> r.value ()
+}
+
+scoped_convert : Unit ->{} Int
+let scoped_convert () = scope s {
+  f : (Unit -> Int)^{s}
+  let f = convert base_rt
+  f ()
+}
+
+tests : List Test.Test
+let tests = [
+  Test.effect_test
+    "covariant imported class serves scoped box"
+    (task { Test.check (Test.equal 41 (scoped_default ())) }),
+  Test.test "contravariant imported class serves pure arrow and contravariant sink" (fun () ->
+    Test.equal ("tick-fn", "tick-fn", "sink-pure") (
+      describe (fun () -> 1),
+      describe base_rt,
+      describe (Sink (fun (_ : Unit ->{Tick} Int) -> ())),
+    )
+  ),
+  Test.effect_test
+    "contravariant imported class runs narrower runtime arrow"
+    (task {
+      let total = provide (Layer.succeed Tick { step = fun () -> 10 }) {
+        let a = run_tick base_rt
+        let b = run_tick tick_rt
+        let merged = combine base_rt tick_rt
+        a + b + merged ()
+      }
+      Test.check (Test.equal 34 total)
+    }),
+  Test.effect_test
+    "mixed multi-parameter imported class narrows input and widens output"
+    (task { Test.check (Test.equal 99 (scoped_convert ())) }),
+  Test.test "invariant imported class resolves distinct pure and runtime heads" (fun () ->
+    let f = combine (fun () -> 3) (fun () -> 4)
+    Test.equal 7 (f ())
+  ),
+]

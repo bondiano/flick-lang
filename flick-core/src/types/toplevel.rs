@@ -118,6 +118,7 @@ impl<'a> Checker<'a> {
         }
         self.record_atom_bindings(&decls);
         self.class_defaults(&decls);
+        self.solve_rows();
         self.solve_classes(true);
         self.check_instances(&declared);
         self.check_proofs(&decls);

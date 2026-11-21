@@ -342,6 +342,7 @@ fn checker_in<'a>(
             .collect(),
         cx: ItemCx::default(),
         signs: HashMap::new(),
+        class_signs: HashMap::new(),
         opened: Vec::new(),
         contract_types: Vec::new(),
         opened_modules: Vec::new(),

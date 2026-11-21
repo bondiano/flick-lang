@@ -196,13 +196,15 @@ Transparent aliases are expanded in every exported type, so an importer never
 needs the alias of a module it does not import. An opaque type is `nominal`
 outside its module: importers cannot see its representation.
 
-A parameterized data type (`nominal`, `adt` or `error`) carries `variance` as
-an array of `"covariant"`, `"contravariant"`, `"invariant"` or `"bivariant"` in
-parameter order (omitted when empty or unknown). Non-`Type` parameters are
-always `"invariant"`. Importers validate the arity and parameter kinds before
-trusting serialized variance and keep missing or unknown metadata conservatively
-invariant (as for abstract types and opaque type aliases); changing exported
-variance changes the module's fingerprint and is a breaking API change.
+A parameterized data type (`nominal`, `adt` or `error`) or class (`class`)
+carries `variance` as an array of `"covariant"`, `"contravariant"`,
+`"invariant"` or `"bivariant"` in parameter order (omitted when empty or
+unknown). Non-`Type` and higher-kinded parameters are always `"invariant"`.
+Importers validate the arity and parameter kinds before trusting serialized
+variance and keep missing or unknown metadata conservatively invariant (as for
+abstract types, opaque type aliases and classes without variance metadata);
+changing exported variance changes the module's fingerprint and is a breaking
+API change.
 
 ### Instances
 

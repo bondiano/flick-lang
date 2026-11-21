@@ -90,7 +90,7 @@ fn in_stage(a: &Name, s: &Stage) -> bool {
 }
 
 /// Whether `a` stands anywhere in `t`, rows and qualifiers included.
-fn occurs(a: &Name, t: &Type) -> bool {
+pub(crate) fn occurs(a: &Name, t: &Type) -> bool {
     match t {
         Type::Var(Var::Named(n)) => n == a,
         Type::Var(Var::Meta(_)) | Type::Con(_) => false,
@@ -280,6 +280,216 @@ fn sign_of(d: &Decls, signs: &HashMap<Path, Vec<Sign>>, p: &Path) -> Vec<Sign> {
             (Kind::Type, Sign::Bi) if *f => Sign::Pos,
             (Kind::Type, s) => s,
             _ => Sign::Inv,
+        })
+        .collect()
+}
+
+/// Like [`walk`], also descending into dictionary types `Type::Dict` by
+/// the current class parameter variances (Lean `Ty.PolD`, `inferTyVar` /
+/// `inferCnVar`). When `bi_is_fixed` is `false` (phase 1 of the fixed point),
+/// `Sign::Bi` in `Type::Dict` contributes nothing yet so that the operator is
+/// monotone over the lattice `Bi < {Pos, Neg} < Inv` regardless of class
+/// iteration order; phase 2 runs with `bi_is_fixed = true` to enforce exact
+/// equality for genuinely unused (`Bi`) class parameters.
+#[allow(clippy::too_many_arguments)]
+fn walk_dict(
+    data_signs: &HashMap<Path, Vec<Sign>>,
+    class_signs: &HashMap<Path, Vec<Sign>>,
+    bi_is_fixed: bool,
+    a: &Name,
+    t: &Type,
+    q: bool,
+    flipped: bool,
+    out: &mut Uses,
+) {
+    match t {
+        Type::Var(Var::Named(n)) if n == a => out.at(q, flipped),
+        Type::Fun(p, s, r) => {
+            walk_dict(data_signs, class_signs, bi_is_fixed, a, p, !q, true, out);
+            out.fixed(in_stage(a, s));
+            walk_dict(data_signs, class_signs, bi_is_fixed, a, r, q, flipped, out);
+        }
+        Type::Eff(r, e, t) => {
+            out.fixed(in_row(a, r) || in_row(a, e));
+            walk_dict(data_signs, class_signs, bi_is_fixed, a, t, q, flipped, out);
+        }
+        Type::Captured(t, c) | Type::Bounded(t, c) => {
+            if in_caps(a, c) {
+                out.at(q, flipped);
+            }
+            walk_dict(data_signs, class_signs, bi_is_fixed, a, t, q, flipped, out);
+        }
+        Type::Record(f)
+            if f.tail
+                .as_ref()
+                .is_none_or(|v| !matches!(v, Var::Named(n) if n == a)) =>
+        {
+            f.fields.values().for_each(|t| {
+                walk_dict(data_signs, class_signs, bi_is_fixed, a, t, q, flipped, out);
+            });
+        }
+        Type::Tuple(ts) => ts
+            .iter()
+            .for_each(|t| walk_dict(data_signs, class_signs, bi_is_fixed, a, t, q, flipped, out)),
+        Type::App(..) => match spine(t) {
+            Some((p, args)) => {
+                let theirs = data_signs.get(p);
+                for (j, x) in args.into_iter().enumerate() {
+                    match theirs.and_then(|s| s.get(j)).copied().unwrap_or(Sign::Inv) {
+                        Sign::Pos => {
+                            walk_dict(data_signs, class_signs, bi_is_fixed, a, x, q, flipped, out);
+                        }
+                        Sign::Neg => {
+                            walk_dict(data_signs, class_signs, bi_is_fixed, a, x, !q, true, out);
+                        }
+                        Sign::Inv => out.fixed(occurs(a, x)),
+                        // Lean `inferTyVarArgs` / `Ty.PolD.data`: under a `bi` data
+                        // parameter, any occurrence requires `s.at q` (no flips).
+                        Sign::Bi => {
+                            if occurs(a, x) {
+                                out.at(q, flipped);
+                            }
+                        }
+                    }
+                }
+            }
+            None => out.fixed(occurs(a, t)),
+        },
+        Type::Dict(cls, args) => {
+            let theirs = class_signs.get(cls);
+            for (j, x) in args.iter().enumerate() {
+                // Lean `inferCnVar` / `Ty.PolD.dict`: `bi` dictionaries compare
+                // by exact equality, so parameters under `inv` or genuinely `bi`
+                // class parameters are fixed.
+                match theirs.and_then(|s| s.get(j)).copied().unwrap_or(Sign::Inv) {
+                    Sign::Pos => {
+                        walk_dict(data_signs, class_signs, bi_is_fixed, a, x, q, flipped, out);
+                    }
+                    Sign::Neg => {
+                        walk_dict(data_signs, class_signs, bi_is_fixed, a, x, !q, true, out);
+                    }
+                    Sign::Inv => out.fixed(occurs(a, x)),
+                    Sign::Bi if bi_is_fixed => out.fixed(occurs(a, x)),
+                    Sign::Bi => {}
+                }
+            }
+        }
+        _ => out.fixed(occurs(a, t)),
+    }
+}
+
+/// The variance of each parameter of every declared class in `d` (`regions.md`
+/// §2.2.1, Lean `inferClassVar` / `Sig.dictVar_ok`): a two-phase least fixed
+/// point over all classes, starting from `Sign::Bi`, reading superclasses and
+/// method types (including extra class constraints) covariantly.
+///
+/// Phase 1 propagates `Pos`/`Neg`/`Inv` monotonically from `Bi` without
+/// treating unvisited `Bi` class parameters as `Inv` (making the result
+/// independent of class iteration order); phase 2 closes upward treating any
+/// remaining genuinely unused (`Bi`) class parameters as exact (`Inv`) when
+/// referenced in another class's superclasses or methods.
+pub fn class_signs(d: &Decls) -> HashMap<Path, Vec<Sign>> {
+    let classes: Vec<&Path> = d.classes.keys().collect();
+    let mut signs: HashMap<Path, Vec<Sign>> = classes
+        .iter()
+        .map(|c| ((*c).clone(), vec![Sign::Bi; d.classes[*c].params.len()]))
+        .collect();
+    for bi_is_fixed in [false, true] {
+        loop {
+            let mut changed = false;
+            for c in &classes {
+                let next = class_sign_of(d, &d.signs, &signs, bi_is_fixed, c);
+                let old = &signs[*c];
+                let joined: Vec<Sign> = old.iter().zip(&next).map(|(a, b)| a.join(*b)).collect();
+                if &joined != old {
+                    signs.insert((*c).clone(), joined);
+                    changed = true;
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+    }
+    signs
+}
+
+/// The signs the superclasses and methods of class `c` justify, given data signs
+/// and the current class signs.
+fn class_sign_of(
+    d: &Decls,
+    data_signs: &HashMap<Path, Vec<Sign>>,
+    class_signs: &HashMap<Path, Vec<Sign>>,
+    bi_is_fixed: bool,
+    c: &Path,
+) -> Vec<Sign> {
+    let class = &d.classes[c];
+    let mut uses: Vec<Uses> = class.params.iter().map(|_| Uses(Sign::Bi)).collect();
+    for sup in &class.supers {
+        for (param, u) in class.params.iter().zip(&mut uses) {
+            walk_dict(
+                data_signs,
+                class_signs,
+                bi_is_fixed,
+                param,
+                sup,
+                true,
+                false,
+                u,
+            );
+        }
+    }
+    for m in &class.methods {
+        let Some(full) = d.values.get(&Path::new(&c.module, m)) else {
+            return vec![Sign::Inv; class.params.len()];
+        };
+        let Type::Fun(dict_param, Stage::Pure, rest) = &full.body else {
+            return vec![Sign::Inv; class.params.len()];
+        };
+        // Prefer parameter variable names from the method's leading class dictionary
+        // constraint if present and distinct; otherwise fall back to `class.params`.
+        let method_params: Vec<Name> = match &**dict_param {
+            Type::Dict(cls, args) if cls == c && args.len() == class.params.len() => {
+                let names: Option<Vec<Name>> = args
+                    .iter()
+                    .map(|a| match a {
+                        Type::Var(Var::Named(n)) => Some(n.clone()),
+                        _ => None,
+                    })
+                    .collect();
+                match names {
+                    Some(ns) => ns,
+                    None => class.params.clone(),
+                }
+            }
+            _ => class.params.clone(),
+        };
+        for (param, u) in method_params.iter().zip(&mut uses) {
+            // Value-bound facts (`outlives`) cannot depend on a non-invariant
+            // parameter (Lean `Sig.dictVar_ok`: `s.cs.NoV`).
+            let in_outlives = full
+                .outlives
+                .iter()
+                .any(|(caps, ty)| in_caps(param, caps) || occurs(param, ty));
+            u.fixed(in_outlives);
+            walk_dict(
+                data_signs,
+                class_signs,
+                bi_is_fixed,
+                param,
+                rest,
+                true,
+                false,
+                u,
+            );
+        }
+    }
+    let kinds = d.params.get(c);
+    uses.into_iter()
+        .enumerate()
+        .map(|(j, u)| match kinds.and_then(|ks| ks.get(j)) {
+            Some(k) if *k != Kind::Type => Sign::Inv,
+            _ => u.0,
         })
         .collect()
 }

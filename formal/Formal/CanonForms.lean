@@ -44,7 +44,7 @@ theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
   | lazyLoc => intro _ _ _ hJ _; cases hJ; exact .inr rfl
   | rnil => intro _ _ _ hJ _; cases hJ; rfl
   | rcons => intro _ _ _ hJ _; cases hJ; rfl
-  | drec => intro _ _ _ hJ _; cases hJ; rfl
+  | drec _ _ _ _ hT => intro _ _ _ hJ _; cases hJ; simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
   | const _ hT =>
     intro _ _ _ hJ _; cases hJ
     simp only [VKind, Tm.head]; rw [← hT.kind, Const.ty_kind _ _]

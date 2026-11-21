@@ -172,8 +172,51 @@ theorem LeLive.data_of {a b : Ty} {T : Name} {us us' : List Ty} (ha : a.unspine 
 `GenSig.lean`, which knows the variances, gives its rule. -/
 syntax "var_absurd" : tactic
 
+/-- The premises of `LeLive.dict` for the arguments from the `j`-th on, one by one. -/
+def DictArgs (S : Sig) (c : Nat) : Nat → List Ty → List Ty → Prop
+  | j, u :: us, u' :: us' =>
+      (S.dictVar c j = .pos → LeLive S u u') ∧
+      (S.dictVar c j = .neg → LeLive S u' u ∧ Caps.Sub u.reach u'.reach) ∧
+      ((S.dictVar c j = .inv ∨ S.dictVar c j = .bi) → u = u') ∧
+      DictArgs S c (j + 1) us us'
+  | _, [], [] => True
+  | _, _, _ => False
+
+theorem DictArgs.at {c : Nat} : ∀ {n : Nat} {us us' : List Ty}, DictArgs S c n us us' →
+    us.length = us'.length ∧ ∀ j u u', us[j]? = some u → us'[j]? = some u' →
+      (S.dictVar c (n + j) = .pos → LeLive S u u') ∧
+      (S.dictVar c (n + j) = .neg → LeLive S u' u ∧ Caps.Sub u.reach u'.reach) ∧
+      ((S.dictVar c (n + j) = .inv ∨ S.dictVar c (n + j) = .bi) → u = u')
+  | _, [], [], _ => ⟨rfl, fun _ _ _ h => by simp at h⟩
+  | n, u :: us, u' :: us', ⟨hp, hn, hi, h⟩ => by
+    obtain ⟨hl, hs⟩ := DictArgs.at h
+    refine ⟨by simp [hl], fun j x x' hx hx' => ?_⟩
+    rcases j with _ | j
+    · simp at hx hx'; subst hx; subst hx'; exact ⟨hp, hn, hi⟩
+    · simp at hx hx'
+      have := hs j x x' hx hx'
+      rwa [show n + 1 + j = n + (j + 1) by omega] at this
+  | _, [], _ :: _, h | _, _ :: _, [], h => h.elim
+
+/-- `LeLive.dict` of two concrete dictionaries of the same class. -/
+theorem LeLive.dict_of {c : Nat} {us us' : List Ty} (h : DictArgs S c 0 us us') :
+    LeLive S (.dict c (Ty.spine us)) (.dict c (Ty.spine us')) := by
+  obtain ⟨hl, hs⟩ := h.at
+  refine .dict hl (fun j u u' x x' hv => ?_) (fun j u u' x x' hv => ?_)
+    (fun j u u' x x' hv => ?_) (fun j u u' x x' hv => ?_)
+  all_goals have := hs j u u' x x'; simp only [Nat.zero_add] at this
+  · exact this.1 hv
+  · exact (this.2.1 hv).1
+  · exact (this.2.1 hv).2
+  · exact (this.2.2 hv) ▸ Ty.Equiv.refl
+
+/-- Closes a goal under `h : S.dictVar c j = s` (or disjunction) where class `c` of the
+signature has no such variance; `GenSig.lean` gives its rule. -/
+syntax "dict_var_absurd" : tactic
+
 /-- `LeLive t t'` of concrete types: the same type, an arrow or a computation whose stage
-and reach widen, a record whose fields do, or data whose arguments do by their variances.
+and reach widen, a record whose fields do, data whose arguments do by their variances, or
+a dictionary whose arguments do by the class's variances.
 A constructor's type `Sig.ctorTy` is written out first. An invariant argument that is a
 capture row, as the one data with hidden storage takes, is equal by its set: an instance
 writes it `Caps.substT σ C`, the type it is compared with as the set that comes to. -/
@@ -187,6 +230,11 @@ macro_rules
     | (refine LeLive.arrow ?_ ?_ ?_ ?_ <;> first | le_live | stage_le | caps_set)
     | (refine LeLive.eff ?_ ?_ ?_ <;> first | le_live | stage_le | caps_set)
     | (refine LeLive.rcons' ?_ ?_ <;> le_live)
+    | (refine LeLive.dict_of ?_
+       simp only [DictArgs]
+       repeat' (first | apply And.intro | intro _)
+       all_goals first | trivial | exact Caps.Sub.refl _ | rfl | le_live | caps_set |
+         dict_var_absurd)
     | (refine LeLive.data_of rfl rfl ?_
        simp only [DataArgs]
        repeat' (first | apply And.intro | intro _)

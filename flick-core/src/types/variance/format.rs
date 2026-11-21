@@ -89,7 +89,7 @@ pub fn format_interface_summary(
             continue;
         }
         let keyword = match (&def.form, export.decl) {
-            (Form::Class { .. }, _) if !def.variance.is_empty() => "class",
+            (Form::Class { .. }, _) => "class",
             (Form::Error, _) => "type error",
             (Form::Nominal { .. }, Decl::Opaque) => "opaque type",
             (Form::Nominal { .. } | Form::Adt { .. }, _) => "type",

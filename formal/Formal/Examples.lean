@@ -190,7 +190,7 @@ example (S : Sig) (h : S.dict 0 = some (1, [("id", idField)])) :
   have hl : [("id", idField)].lookup "id" = some idField := rfl
   refine .app (a := .base .int) (ψ := .pure) (t := .base .int) (C := Caps.none)
     (.dproj (us := [.base .bool]) (ts := [.base .int]) ?_ h rfl hl rfl ?_ ?_) .lit trivial .refl
-  · refine .drec h rfl (.dcons ?_ .dnil) (fun h => by simp [Tm.Has] at h)
+  · refine .drec h rfl (.dcons ?_ .dnil) (fun h => by simp [Tm.Has] at h) .refl
     · refine .lam (.var (ts := []) rfl rfl (fun _ _ h => h.elim) ?_) (fun h => h) .refl
       · simp [idField, Scheme.inst, Ty.substT, liftT]; exact .refl
   · rintro _ _ ⟨_, _, h, _⟩; exact h.elim

@@ -13,6 +13,8 @@ struct Checker<'a> {
     cx: ItemCx,
     /// The sign of each parameter of the declared types met so far.
     signs: variance::Signs,
+    /// The sign of each parameter of the classes met so far.
+    class_signs: variance::Signs,
     /// The modules the blocks around the expression open, innermost last,
     /// each as the file names it: a name one of them exports is that one,
     /// before the names of the file. `ui { … }` opens `Ui`. With each, the

@@ -45,6 +45,7 @@ theorem Shp.le {a b : Ty} {e : Tm}
       have := congrArg Ty.kind ha
       rw [Ty.tcon_kind'] at this
       simp [Ty.kind] at this
+  | dict => exact .hidden (by simp [Ty.Opaque, Ty.hd])
 
 theorem Ty.arrows_kind (ts : List Ty) (T : Name) (us : List Ty) :
     (Ty.arrows ts (.tcon T us)).kind = 1 ∨ (Ty.arrows ts (.tcon T us)).kind = 3 := by
@@ -128,6 +129,7 @@ theorem Shp.full_of {U T e} {us : List Ty} (h : Shp S false U e) (hl : LeLive S 
       | arrow => exact absurd hX Ty.arrow_ne_tcon
       | eff => exact absurd hX Ty.eff_ne_tcon
       | rcons => exact absurd hX Ty.rcons_ne_tcon
+      | dict => exact absurd hX Ty.dict_ne_tcon
       | hide hi hlen heq hsub ha hb =>
         obtain ⟨rfl, rfl⟩ := Ty.tcon_eq (ha.symm.trans hX)
         subst hb
@@ -167,14 +169,14 @@ theorem Typ.shape {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
     obtain ⟨hs, hsp⟩ := ih hv rfl
     exact ⟨hs.equiv he, fun K hK hA =>
       (hsp K hK (fun h => hA (he.isAll.mp h))).equiv he⟩
-  | lam _ _ hT | fix _ _ hT | task _ _ _ hT | perform _ _ hT | kont _ _ hT =>
+  | lam _ _ hT | fix _ _ hT | task _ _ _ hT | perform _ _ hT | kont _ _ hT | drec _ _ _ _ hT =>
     intro _ _ _ hJ; cases hJ
     exact ⟨.hidden (hT.opaque (by simp [Ty.Opaque, Ty.hd])), by simp [Tm.head]⟩
   | const _ hT =>
     intro _ _ _ hJ; cases hJ
     exact ⟨.hidden (Ty.opaque_of_kind (by rw [← hT.kind]; exact Const.ty_kind _ _)),
       by simp [Tm.head]⟩
-  | loc | lazyLoc | cap | own | drec =>
+  | loc | lazyLoc | cap | own =>
     intro _ _ _ hJ; cases hJ; exact ⟨.hidden (by simp [Ty.Opaque, Ty.hd]), by simp [Tm.head]⟩
   | lit => intro _ _ _ hJ; cases hJ; exact ⟨.lit, by simp [Tm.head]⟩
   | rnil => intro _ _ _ hJ; cases hJ; exact ⟨.rnil, by simp [Tm.head]⟩

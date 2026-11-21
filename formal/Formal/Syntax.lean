@@ -1,208 +1,13 @@
-import Formal.Rows
+import Formal.SyntaxTm
 
 /-!
-# Syntax of λFlick with regions (core.md §1, regions.md §1)
+# Schemes, variance polarity, signatures, and constants (`Formal.Syntax`)
 
-Variables of every kind — types, regions, capture rows — are de Bruijn indices
-`tvar n`; a run-time region `π` is `rg π`. A scheme of a context has `∀`, and so does `Ty.all`, a
-polymorphic value. Terms carry no types (Curry style) and use de Bruijn
-indices; see `formal/README.md` for the encoding of lists (record fields, match
-arms, constructor arguments, environments, type arguments) as spines.
+Continues `Formal.SyntaxTm` with type schemes, variance polarity (`Ty.Pol`,
+`Ty.PolD`), signatures (`Sig`), and constant typing (`Const.ty`, `Const.ok`).
 -/
 
 namespace Flick
-
-/-- `τ₁ →P … →P τₙ →P r`: the stages of a constructor hold nothing their result
-does not show. -/
-def Ty.arrows : List Ty → Ty → Ty
-  | [], r => r
-  | a :: rest, r => .arrow a .pure (Ty.arrows rest r) Caps.none
-
-/-- The arguments `ā` of `D_C ā`: a spine `tapp u₁ (… (tapp uₙ rnil))`. -/
-def Ty.spine : List Ty → Ty
-  | [] => .rnil
-  | u :: us => .tapp u (Ty.spine us)
-
-/-- `T ā`. -/
-def Ty.tcon (T : Name) (us : List Ty) : Ty := us.foldl .tapp (.adt T)
-
-/-- The head of a spine of type applications. -/
-def Ty.hd : Ty → Ty
-  | .tapp f _ => f.hd
-  | t => t
-
-def Ty.labels : Ty → List Label
-  | .rcons l _ r => l :: r.labels
-  | _ => []
-
-def Ty.field : Ty → Label → Option Ty
-  | .rcons l' t r, l => if l' = l then some t else r.field l
-  | _, _ => none
-
-/-- Facts `Θ` of regions.md §2.4: `Θ C ϱ` is `Outlives C ϱ`. -/
-abbrev Facts := Caps → Ty → Prop
-
-def Facts.none : Facts := fun _ _ => False
-def Facts.union (Θ Θ' : Facts) : Facts := fun C s => Θ C s ∨ Θ' C s
-def Facts.substT (σ : Atom → Ty) (Θ : Facts) : Facts :=
-  fun C s => ∃ C₀ s₀, Θ C₀ s₀ ∧ C = C₀.substT σ ∧ s = s₀.substT σ
-
-/-- Facts are queried modulo definitional equality of their right-hand type. -/
-def Facts.close (Θ : Facts) : Facts := fun C s => ∃ s₀, Θ C s₀ ∧ Ty.Equiv s₀ s
-
-/-- `Θ ⊢ Outlives C ϱ`: each atom of `C` is the region itself or is given to
-outlive it. Facts are not chained: a scope gives one fact for everything outside. -/
-def Outl (Θ : Facts) (C : Caps) (s : Ty) : Prop :=
-  ∀ k, C k → s.reach k ∨ ∃ C', Θ.close C' s ∧ C' k
-
-/-- How a handler's arm for an operation returns: `tail` gives
-the operation its value, `abort` the handler its value without coming back, and
-`control` the handler its value with the rest of the body as `resume`. -/
-inductive OpClass
-  | tail
-  | abort
-  | control
-  deriving DecidableEq, Repr
-
-/-- Constants of Γ₀ (core.md §1.5, regions.md §1.5). The typing rule instantiates
-their types (`CArg`); `open_` acquires a capability `H ϱ`, `op` uses one; `intEq`
-compares two `Int`s. `scopeRun` is `Scope.run`, a `scope` whose body is its argument. -/
-inductive Const
-  | refMake
-  | refGet
-  | refSet
-  | open_
-  | op
-  | addFin
-  | spawn
-  | intEq
-  | scopeRun
-  | perform (E o : Name) (c : OpClass)
-
-def Const.arity : Const → Nat
-  | .refSet | .addFin | .spawn | .intEq => 2
-  | _ => 1
-
-/-- Patterns of core.md §1.3: constructor patterns and record patterns are spines. -/
-inductive Pat
-  | wild
-  | var
-  | lit (l : Lit)
-  | ctor (K : Name)
-  | app (p q : Pat)
-  | rany
-  | rfield (l : Label) (p rest : Pat)
-  | or (p q : Pat)
-  deriving DecidableEq, Repr
-
-/-- `K q₁ … qₙ`: the pattern of a constructor and of its fields. -/
-def Pat.spine (K : Name) (qs : List Pat) : Pat := qs.foldl .app (.ctor K)
-
-def Pat.binds : Pat → Nat
-  | .var => 1
-  | .app p q => p.binds + q.binds
-  | .rfield _ p r => p.binds + r.binds
-  | .or p _ => p.binds
-  | _ => 0
-
-/-- Terms of core.md §1.3 and regions.md §1.3, and the run-time forms of
-core.md §3.1 and regions.md §3.1. Binders: `lam b`, `let_ e b` and
-`scope e` bind one variable (`scope` binds the owner); `letrec f b` and `fix f`
-bind two in `f` (`0 = x`, `1 = f`) and `letrec` one in `b`; arms bind
-`p.binds` in the guard and the body. `raise` is a term former, not a constant. `drec c r` is a
-dictionary record of λFlick⁺ with the fields `r`, an `rcons` spine; it is a value and
-`proj` reads its fields. `glob g` is a global: an instance, a structural or primitive
-dictionary or a constant of Γ₀, which steps to its value in `Σ₀`.
-
-`hdl E al r e` handles the effect `E` in `e` with the arms `al`, an `acons` spine of
-patterns `Pat.spine o [.var]` (`[.var, .var]` for `control`, with `resume`); `r` takes
-the body's value. At run time a handler is the region `p` and the cell `ℓ`: `hwith p ℓ`
-around the body, `hctl p ℓ κ tl` while an arm runs and the body waits at `hole p`, `hres p
-a b` while the resumed body `b` runs and the arm `a` waits, `hdone p a` after; `unw p ℓ a`
-unwinds to the handler, which then runs `a`; `kont p κ` is `resume`. A child or a finalizer
-keeps the handlers around where it started: `hkeep q ℓ E al e` around its body answers the
-`tail` operations of `E`, `hkarm q ℓ E al a k` while an arm of it runs. They run no `return`,
-and pass signals.
-
-`lazy e` makes a lazy cell whose initializer is `e`, and `force e` forces the lazy `e`
-(lazy.md §3). At run time the location of a lazy cell is `loc ℓ`, and `settle ℓ e` is the
-frame of the cell `ℓ` while its initializer `e` runs: it records the outcome. -/
-inductive Tm
-  | var (i : Nat)
-  | lam (b : Tm)
-  | app (f a : Tm)
-  | let_ (e b : Tm)
-  | letrec (f b : Tm)
-  | fix (f : Tm)
-  | lit (l : Lit)
-  | loc (l : Nat)
-  | const (c : Const)
-  | ctor (K : Name)
-  | rnil
-  | rcons (l : Label) (e rest : Tm)
-  | proj (e : Tm) (l : Label)
-  | update (e : Tm) (l : Label) (e' : Tm)
-  | match_ (e alts : Tm)
-  | anil
-  | acons (p : Pat) (b rest : Tm)
-  | aguard (p : Pat) (g b rest : Tm)
-  | todo
-  | task (e : Tm)
-  | await (e : Tm)
-  | lazy (e : Tm)
-  | force (e : Tm)
-  | raise (e : Tm)
-  | try_ (e alts : Tm)
-  | handle (v alts : Tm)
-  | scope (e : Tm)
-  | inside (p : Nat) (e : Tm)
-  | cap (p : Nat)
-  | own (p : Nat)
-  | drec (c : Nat) (r : Tm)
-  | glob (g : Nat)
-  | hdl (E : Name) (al r e : Tm)
-  | hwith (p ℓ : Nat) (E : Name) (al r e : Tm)
-  | hctl (p ℓ κ : Nat) (tl : Bool) (E : Name) (al r a k : Tm)
-  | hres (p ℓ : Nat) (a b : Tm)
-  | hdone (p : Nat) (a : Tm)
-  | unw (p ℓ : Nat) (a : Tm)
-  | kont (p ℓ : Nat)
-  | hole (p : Nat)
-  | hkeep (q ℓ : Nat) (E : Name) (al e : Tm)
-  | hkarm (q ℓ : Nat) (E : Name) (al a k : Tm)
-  | settle (ℓ : Nat) (e : Tm)
-
-/-- The states of a lazy cell as the store holds them (lazy.md §3): `Pending e` is `lazy e`,
-`Running e` is `running e`, which keeps the initializer for a signal that resets the cell, and
-`Done o` is `done o` with the term of the outcome `o`: `v`, `raise v` or `todo`. No value has
-these forms (`IsCell`), so no `Ref` cell holds one; and they are kept apart by their outer form,
-which a relation of terms keeps (`Formal/Elab`). -/
-@[match_pattern] abbrev Tm.running (e : Tm) : Tm := .force e
-
-abbrev Tm.done (o : Tm) : Tm := .await o
-
-def Tm.IsCell : Tm → Prop
-  | .lazy _ | .await _ | .force _ => True
-  | _ => False
-
-def Tm.head : Tm → Tm
-  | .app f _ => f.head
-  | t => t
-
-def Tm.field : Tm → Label → Option Tm
-  | .rcons l' e r, l => if l' = l then some e else r.field l
-  | .drec _ r, l => r.field l
-  | _, _ => none
-
-def Tm.setField : Tm → Label → Tm → Option Tm
-  | .rcons l' e r, l, w =>
-    if l' = l then some (.rcons l' w r) else (r.setField l w).map (.rcons l' e ·)
-  | _, _, _ => none
-
-def Tm.unguarded : Tm → List Pat
-  | .acons p _ r => p :: r.unguarded
-  | .aguard _ _ _ r => r.unguarded
-  | _ => []
 
 /-- A type scheme `∀ α₀ … αₖ₋₁. Θ ⇒ t` of a typing context; `k = 0` and no
 facts is a monotype. -/
@@ -229,6 +34,9 @@ def Ty.NoV (i : Nat) (t : Ty) : Prop := t.substT (dropV i) = t
 
 /-- `φ` does not depend on the variable `v i`. -/
 def Stage.NoV (i : Nat) (φ : Stage) : Prop := φ.substT (dropV i) = φ
+
+/-- `Θ` does not depend on the variable `v i`. -/
+def Facts.NoV (i : Nat) (Θ : Facts) : Prop := Θ.substT (dropV i) = Θ
 
 /-- Where the hidden row `v i` of data with hidden storage may stand in a field
 (regions.md §2.2): nowhere, as the qualifier of a stored function or computation, or as the
@@ -278,6 +86,33 @@ inductive Ty.Pol (var : Name → Nat → Variance) (i : Nat) (s : Variance) : Bo
       (∀ j u, us[j]? = some u → var T j = .inv → u.NoV i) →
       (∀ j u, us[j]? = some u → var T j = .bi → ¬ s.at q → u.NoV i) →
       t = Ty.tcon T us → Ty.Pol var i s q t
+
+/-- Like `Ty.Pol`, also descending into dictionary types `D_C ūs` by their class parameter
+variances `dvar`: used for the methods and superclass slots of a dictionary record
+(`Sig.dictVar_ok`). -/
+inductive Ty.PolD (var : Name → Nat → Variance) (dvar : Nat → Nat → Variance)
+    (i : Nat) (s : Variance) : Bool → Ty → Prop
+  | none {q t} : t.NoV i → Ty.PolD var dvar i s q t
+  | var {q} : s.at q → Ty.PolD var dvar i s q (.tvar i)
+  | arrow {q a φ b C} : (s = .pos → a.NoV i) → Ty.PolD var dvar i s (!q) a → φ.NoV i →
+      Ty.PolD var dvar i s q b → ((Ty.caps C).NoV i ∨ s.at q) → Ty.PolD var dvar i s q (.arrow a φ b C)
+  | eff {q r e t C} : r.NoV i → e.NoV i → Ty.PolD var dvar i s q t →
+      ((Ty.caps C).NoV i ∨ s.at q) → Ty.PolD var dvar i s q (.eff r e t C)
+  | rcons {q l t r} : Ty.PolD var dvar i s q t → Ty.PolD var dvar i s q r →
+      Ty.PolD var dvar i s q (.rcons l t r)
+  | data {q t T us} :
+      (∀ j u, us[j]? = some u → var T j = .pos → Ty.PolD var dvar i s q u) →
+      (∀ j u, us[j]? = some u → var T j = .neg → s = .pos → u.NoV i) →
+      (∀ j u, us[j]? = some u → var T j = .neg → Ty.PolD var dvar i s (!q) u) →
+      (∀ j u, us[j]? = some u → var T j = .inv → u.NoV i) →
+      (∀ j u, us[j]? = some u → var T j = .bi → ¬ s.at q → u.NoV i) →
+      t = Ty.tcon T us → Ty.PolD var dvar i s q t
+  | dict {q c us} :
+      (∀ j u, us[j]? = some u → dvar c j = .pos → Ty.PolD var dvar i s q u) →
+      (∀ j u, us[j]? = some u → dvar c j = .neg → s = .pos → u.NoV i) →
+      (∀ j u, us[j]? = some u → dvar c j = .neg → Ty.PolD var dvar i s (!q) u) →
+      (∀ j u, us[j]? = some u → (dvar c j = .inv ∨ dvar c j = .bi) → u.NoV i) →
+      Ty.PolD var dvar i s q (.dict c (Ty.spine us))
 
 /-- Declared ADTs and effects. A constructor has the number of parameters of its
 type, its argument types over them and its type name; its fields mention nothing
@@ -339,6 +174,17 @@ structure Sig where
           (var T i = .pos ∨ var T i = .neg → Ty.Pol var i (var T i) true f)) ∨
         (var T i ≠ .bi ∧ (∃ c, (res K)[i]? = some c ∧ c.Closed) ∧ ∀ f ∈ ts, f.NoV i)) := by
     intro _ _ h; exact absurd rfl h
+  /-- The variance of each parameter of a dictionary record `D_C ᾱ` (regions.md §2.2.1):
+  inferred from its methods and superclass slots. Every field scheme is independent of
+  non-invariant parameters in its value-bound facts `cs`, and respects the parameter's sign
+  in its type (`Ty.PolD`). -/
+  dictVar : Nat → Nat → Variance := fun _ _ => .inv
+  dictVar_ok : ∀ c k fs i, dict c = some (k, fs) → dictVar c i ≠ .inv →
+      ∀ l s, (l, s) ∈ fs → s.cs.NoV (s.k + i) ∧
+        (dictVar c i = .bi → s.t.NoV (s.k + i)) ∧
+        (dictVar c i = .pos ∨ dictVar c i = .neg →
+          Ty.PolD var dictVar (s.k + i) (dictVar c i) true s.t) := by
+    intro _ _ _ _ _ h; exact absurd rfl h
 
 /-- The instance of a constant's type variables; `r` and `e` are rows. -/
 structure CArg where

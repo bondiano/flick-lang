@@ -82,10 +82,16 @@ theorem ent_typed {Γ Δ φ qs ds} (h : Ent P Δ qs ds) : DTy X Γ Δ φ ds qs :
     have := X.strct (Γ := Γ) (Δ := Δ) (φ := φ) (θ := .var) h₁ h₂
     simp only [Ty.subst_id] at this
     exact .cons (dict_apps X this ih) .nil
-  | @inst Q I ins σ ds h₁ h₂ h₃ _ ih =>
-    have hq : Q = ⟨ins.cls, ins.head.map (·.subst σ)⟩ := by cases Q; simp_all
-    subst hq
-    exact .cons (dict_apps X (X.inst h₁) ih) .nil
+  | @inst Q I ins σ ds h₁ hserv _ ih =>
+    exact .cons (X.dictLe hserv (dict_apps X (X.inst h₁) ih)) .nil
+
+/-- **B1 dictionary transport**: an instance dictionary built at head `H = ins.head σ` is
+soundly typed at any query `Q` served by `H` in the class's variance direction. -/
+theorem dict_transport {Γ Δ φ Q I ins σ ds} (hI : P.insts I = some ins)
+    (hserv : Cn.Serves P Q ⟨ins.cls, ins.head.map (·.subst σ)⟩)
+    (hds : Ent P Δ (ins.ctx.map (·.subst σ)) ds) :
+    X.Has Γ Δ (.dict (apps (.inst I) ds)) (.dict Q) φ :=
+  X.dictLe hserv (dict_apps X (X.inst hI) (ent_typed X hds))
 
 theorem Tm.free_dapps {f : Tm} {ds : List Dict} {x : Nat} (h : (f.dapps ds).Free x) : f.Free x := by
   induction ds generalizing f with
@@ -133,7 +139,7 @@ theorem Ent.dbelow {Δ qs ds} (h : Ent P Δ qs ds) : ∀ d ∈ ds, d.Below Δ.le
   | given hc => intro d hd; simp only [List.mem_singleton] at hd; subst hd; exact hc.dbelow
   | prim => intro d hd; simp only [List.mem_singleton] at hd; subst hd; trivial
   | strct _ _ _ ih => intro d hd; simp only [List.mem_singleton] at hd; subst hd; exact apps_below trivial ih
-  | inst _ _ _ _ ih => intro d hd; simp only [List.mem_singleton] at hd; subst hd; exact apps_below trivial ih
+  | inst _ _ _ ih => intro d hd; simp only [List.mem_singleton] at hd; subst hd; exact apps_below trivial ih
 
 theorem Tm.dapps_DB {L : Nat} : ∀ {f : Tm} {ds : List Dict}, f.DB L → (∀ d ∈ ds, d.Below L) →
     (f.dapps ds).DB L

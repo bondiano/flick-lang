@@ -107,7 +107,7 @@ theorem strct_typ : (∀ x, ¬ strctBody.Has x) ∧
    typ_lam (.drec (us := [trT N (.con 13)]) rfl rfl (.dcons (by
       show Typ Sg ([].map (Flick.Ty.up 0)) _ (List.map (Flick.Scheme.up 0) _) _ _
       rw [List.map_sup_zero, mfield_t]; exact typ_eqRec) .dnil)
-      (fun h => by simp [eqRec, pvars, Flick.Tm.Has] at h))
+      (fun h => by simp [eqRec, pvars, Flick.Tm.Has] at h) .refl)
     (fun _ h => by simp [eqRec, pvars, Flick.Tm.Has] at h)⟩
 
 theorem inst_body {I ins} (h : insts I = some ins) : ∃ b, instBody I = some b ∧ ∀ x, ¬ b.Has x := by
@@ -194,6 +194,7 @@ theorem realRun : RealRun P N root where
     simp at hC; subst hC
     exact ⟨_, rfl, fun i S hS => by simp [P, supers, cEq] at hS⟩
   strctSub _ _ := rfl
+  strctLe _ _ _ _ := rfl
   prim h := by cases h
   primSub h := by cases h
 
