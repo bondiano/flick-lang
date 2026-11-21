@@ -17,8 +17,11 @@ let max_value = 2147483647
 to_string : Int -> String
 foreign pure to_string from "flick:rt" "stringFromNumber"
 
-/// The `Int` the decimal digits spell, with an optional sign; `None` for
-/// other text and for numbers out of range.
+/// Parses a signed 32-bit decimal `Int`, ignoring leading and trailing
+/// ECMAScript whitespace and line terminators (including U+00A0 and U+FEFF,
+/// not U+0085). Accepts an optional ASCII `+` or `-` sign followed by one or
+/// more ASCII decimal digits, normalizes `-0` to `0`, and returns `None` for
+/// empty input, internal whitespace, other text, or numbers out of range.
 parse : String -> Option Int
 foreign pure parse from "flick:rt" "intParse"
 

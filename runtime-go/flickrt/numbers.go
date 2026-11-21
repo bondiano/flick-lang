@@ -20,9 +20,11 @@ func StringFromNumber(n Value) Value {
 
 var digits = lazyRegexp{pattern: `^[+-]?[0-9]+$`}
 
-// IntParse is the Int the decimal digits spell, with an optional sign.
+// IntParse is `Int.parse`: optional ASCII sign and decimal ASCII digits only,
+// in ECMAScript white space and line terminators, in signed 32-bit range, with
+// -0 normalized to 0.
 func IntParse(s Value) Value {
-	text := strings.TrimSpace(s.(string))
+	text := strings.TrimFunc(s.(string), isJSSpace)
 	if !digits.re().MatchString(text) {
 		return None
 	}

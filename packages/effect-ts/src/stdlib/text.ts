@@ -73,7 +73,11 @@ const arithmetic = (message: string): Result.Result<never, ArithmeticError> => e
 
 export const intFromFloat = (n: number): Option.Option<number> => ((n | 0) === n ? some(n + 0) : none);
 
-/** The `Int` the decimal digits spell, with an optional sign. */
+/**
+ * The signed 32-bit `Int` spelled by decimal ASCII digits with an optional
+ * ASCII sign, ignoring leading and trailing ECMAScript whitespace and line
+ * terminators (`-0` normalizes to `0`).
+ */
 export const intParse = (s: string): Option.Option<number> => {
   const text = s.trim();
   if (!/^[+-]?\d+$/.test(text)) return none;
