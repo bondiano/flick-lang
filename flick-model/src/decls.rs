@@ -79,6 +79,9 @@ pub struct Decls {
     /// The sign of each parameter of a declared type, once every module
     /// is added; a type without one is invariant in each.
     pub signs: HashMap<Path, Vec<Sign>>,
+    /// The sign of each parameter of a declared class, inferred from its
+    /// superclasses and methods (`regions.md` §2.2.1, Lean `Sig.dictVar`).
+    pub class_signs: HashMap<Path, Vec<Sign>>,
 }
 
 /// The arity of a constructor's scheme: its arrows.
@@ -238,6 +241,7 @@ impl Decls {
             }
         }
         self.signs = variance::signs(self);
+        self.class_signs = variance::class_signs(self);
     }
 
     /// The scheme of the method `name` of class `class` as a field of

@@ -24,13 +24,13 @@ theorem site_given (h : Coherent P lt) {Δ : List Cn} {Q : Cn} {d : Dict}
     (hc : P.primC Q.cls = true) (hp : P.prims Q = none) (he : Ent P Δ [Q] [d]) :
     Clo P Δ d Q := by
   rcases Ent.single he with hg | ⟨p, _, hp', _⟩ | ⟨C, τ, ts, ds, hq, hs, _, _, _⟩ |
-      ⟨I, ins, σ, ds, hI, hcls, _, _, _⟩
+      ⟨I, ins, σ, ds, hI, hserv, _, _⟩
   · exact hg
   · rw [hp] at hp'; cases hp'
   · subst hq
     have hn : P.structC C = false := h.primStruct (C := C) hc
     rw [hn] at hs; cases hs
-  · exact (h.k6prim hc hI hcls).elim
+  · exact (h.k6prim hc hI hserv.1).elim
 
 /-- A function under the given `CallSite ς` passes on, once called at the closed place
 `ς := ℓ` with the caller's dictionary `d₀`, a dictionary `≈ d₀`: its caller's place. -/
@@ -40,10 +40,9 @@ theorem site_caller (h : Coherent P lt) {Q : Cn} {θ : Nat → Ty} {ρ : Nat →
     (he : Ent P [Q] [Q] [d]) (h₀ : Ent P [] [Q.subst θ] [d₀]) :
     Eqv P (d.subst ρ) d₀ := by
   obtain ⟨ds', hc, ha⟩ := closed_rep h hρ ho he
-  have := closed_unique h hc h₀
-  subst this
-  obtain ⟨b, hb, r⟩ := All2.single ha
+  obtain ⟨b, rfl, r⟩ := All2.single ha
+  obtain ⟨_, hb, r'⟩ := (closed_unique h hc h₀).single
   cases hb
-  exact r
+  exact .trans r r'
 
 end Flick.Elab

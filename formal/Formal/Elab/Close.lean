@@ -30,7 +30,7 @@ theorem Ent.weaken_nil {Δ qs : List Cn} {ds : List Dict} (h : Ent P [] qs ds) :
   | given hc => exact (Clo.not_nil hc).elim
   | prim h₁ h₂ => exact .prim h₁ h₂
   | strct h₁ h₂ _ ih => exact .strct h₁ h₂ ih
-  | inst h₁ h₂ h₃ _ ih => exact .inst h₁ h₂ h₃ ih
+  | inst h₁ h₂ _ ih => exact .inst h₁ h₂ ih
 
 variable (X : Target P)
 
@@ -63,13 +63,17 @@ theorem ent_close {Γ : List TSch} {Δl Δ : List Cn} {θ : Nat → Ty} {ρ : Na
     simp only [List.map_map, Function.comp_def, Cn.subst, List.map_cons, List.map_nil] at ih
     simp only [List.map_cons, List.map_nil, apps_subst, Cn.subst]
     exact .cons (dict_apps X (X.strct h₁ h₂) ih) .nil
-  | @inst Q I ins σ ds h₁ h₂ h₃ _ ih =>
-    have hq : Q = ⟨ins.cls, ins.head.map (·.subst σ)⟩ := by cases Q; simp_all
-    subst hq
+  | @inst Q I ins σ ds h₁ hserv _ ih =>
     simp only [List.map_map, Function.comp_def, Cn.subst_comp] at ih
-    simp only [List.map_cons, List.map_nil, apps_subst, Cn.subst, List.map_map,
-      Function.comp_def, Ty.subst_comp]
-    exact .cons (dict_apps X (X.inst (σ := fun n => (σ n).subst θ) h₁) ih) .nil
+    simp only [List.map_cons, List.map_nil, apps_subst]
+    have hserv' : Cn.Serves P (Q.subst θ) ⟨ins.cls, ins.head.map (·.subst fun n => (σ n).subst θ)⟩ := by
+      have hs := hserv.subst θ
+      have hhead : (⟨ins.cls, ins.head.map (·.subst σ)⟩ : Cn).subst θ =
+          ⟨ins.cls, ins.head.map (·.subst fun n => (σ n).subst θ)⟩ := by
+        simp only [Cn.subst, Cn.mk.injEq, true_and, List.map_map]
+        exact List.map_congr_left fun t _ => Ty.subst_comp t σ θ
+      rwa [hhead] at hs
+    exact .cons (X.dictLe hserv' (dict_apps X (X.inst (σ := fun n => (σ n).subst θ) h₁) ih)) .nil
 
 theorem Stage.subst_or {ψ φ : Stage} (θ : Nat → Ty) (h : ψ = .P ∨ ψ = φ) :
     ψ.subst θ = .P ∨ ψ.subst θ = φ.subst θ :=

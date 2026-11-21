@@ -94,7 +94,7 @@ fn validate_variance(module: &str, name: &str, definition: &TypeDef) -> Result<(
     }
     if !matches!(
         definition.form,
-        Form::Nominal { .. } | Form::Adt { .. } | Form::Error
+        Form::Nominal { .. } | Form::Adt { .. } | Form::Error | Form::Class { .. }
     ) {
         return Err(format!("unexpected parameter variance on {module}.{name}"));
     }

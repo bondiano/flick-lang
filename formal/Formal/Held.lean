@@ -160,6 +160,7 @@ theorem LeLive.res {a b : Ty} (h : LeLive S a b) : LeLive S a.res b.res := by
     subst ha; subst hb
     rw [Ty.res_tcon_self, Ty.res_tcon_self]
     exact .data hl hr hp hn hi rfl rfl
+  | dict hl hp hn hnr hi => exact .dict hl hp hn hnr hi
 
 theorem Ty.tcon_not_isAll (T : Name) (us : List Ty) : ¬ (Ty.tcon T us).isAll := by
   have := Ty.tcon_isData T us
@@ -170,7 +171,7 @@ theorem LeLive.not_all {x y : Ty} (h : LeLive S x y) (hx : ¬ x.isAll) : ¬ y.is
   cases h with
   | refl => exact hx
   | equiv he => rw [← he.isAll]; exact hx
-  | arrow | eff | rcons => simp [Ty.isAll]
+  | arrow | eff | rcons | dict => simp [Ty.isAll]
   | hide _ _ _ _ _ hb => subst hb; exact Ty.tcon_not_isAll _ _
   | data _ _ _ _ _ _ hb => subst hb; exact Ty.tcon_not_isAll _ _
 
@@ -256,7 +257,7 @@ theorem Typ.noIns {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → e.NoIns 
       · exact ih₂ hve h
   | lit | loc | lazyLoc | const | ctor | rnil | cap | own | dnil | perform => intro _ h; cases h
   | kont => intro _ h; simp [Tm.Has] at h
-  | drec _ _ _ hn => intro _; exact hn
+  | drec _ _ _ hn _ => intro _; exact hn
   | dcons _ _ ih₁ ih₂ =>
     intro hv; cases hv with
     | rcons hv₁ hv₂ =>

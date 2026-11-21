@@ -69,8 +69,8 @@ impl Checker<'_> {
             }
         }
         self.settle_operators();
-        self.solve_classes(true);
         self.solve_rows();
+        self.solve_classes(true);
         self.cx = outer;
         (self.store.level, self.classes.wanted, self.classes.givens) = saved;
     }

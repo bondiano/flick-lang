@@ -48,18 +48,27 @@ impl Checker<'_> {
         span: Span,
     ) -> bool {
         let name = &instance.name;
-        let class = split(&instance.head).map(|(k, _)| k);
-        let others = others
+        let Some((cm, cn)) = split(&instance.head).map(|((m, n), _)| (m.to_owned(), n.to_owned()))
+        else {
+            return false;
+        };
+        let others: Vec<&Instance> = others
             .iter()
-            .filter(|i| split(&i.head).map(|(k, _)| k) == class);
+            .filter(|i| split(&i.head).is_some_and(|((m, n), _)| m == cm && n == cn))
+            .collect();
         for other in others {
             let names: Vec<String> = other.vars.iter().map(|v| v.name.clone()).collect();
             let theirs = rename(&other.head, &names);
             let Some((_, theirs)) = split(&theirs) else {
                 continue;
             };
+            let Some((_, raw_theirs)) = split(&other.head) else {
+                continue;
+            };
+            let raw_theirs: Vec<Type> = raw_theirs.into_iter().cloned().collect();
+            let this_module = self.env.module.clone();
             let from = |other: &Instance| {
-                if other.module == self.env.module {
+                if other.module == this_module {
                     String::new()
                 } else {
                     format!(" of module `{}`", other.module)
@@ -93,14 +102,16 @@ impl Checker<'_> {
                     break;
                 }
             }
-            let mut subst = Subst::new();
             if !incompatible
-                && theirs
-                    .iter()
-                    .zip(args)
-                    .all(|(a, b)| unify_heads(a, b, &mut subst))
+                && let Some(common_ty) = self.heads_overlap_k1_prime(
+                    (&cm, &cn),
+                    &instance.vars,
+                    args,
+                    &other.vars,
+                    &raw_theirs,
+                )
             {
-                let common = self.show(&resolve(&instance.head, &subst));
+                let common = self.show(&common_ty);
                 self.error(
                     codes::C003,
                     span,

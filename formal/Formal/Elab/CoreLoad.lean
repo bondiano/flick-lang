@@ -101,7 +101,7 @@ theorem ent_noVar {qs : List Cn} {ds : List Dict} (h : Ent P [] qs ds) : ∀ d �
   | given hc => exact (hc.not_nil).elim
   | prim => intro d hd; simp at hd; subst hd; exact fun _ h => h
   | strct _ _ _ ih => intro d hd; simp at hd; subst hd; exact apps_noVar (fun _ h => h) ih
-  | inst _ _ _ _ ih => intro d hd; simp at hd; subst hd; exact apps_noVar (fun _ h => h) ih
+  | inst _ _ _ ih => intro d hd; simp at hd; subst hd; exact apps_noVar (fun _ h => h) ih
 
 theorem subst_noVar {s : Dict} {ds : List Dict} (hs : ∀ k, s.Occ k → k < ds.length)
     (hds : ∀ d ∈ ds, d.NoVar) : (s.subst (args ds)).NoVar := by
@@ -134,6 +134,7 @@ theorem eqv_dsim (hS : SlotsBelow P) {d d' : Dict} (h : Eqv P d d') : DSim P d d
     obtain ⟨d₀, hd₀, rfl⟩ := List.mem_map.mp hd
     exact ent_noVar hds d₀ hd₀
   | strctSub hC hf => exact .base (fun _ h => h) (fun _ h => h) (.strctSub hC hf)
+  | strctLe hC h1 h2 hs => exact .base (fun _ h => h) (fun _ h => h) (.strctLe hC h1 h2 hs)
   | primSub hq hp => exact .base (fun _ h => h) (fun _ h => h) (.primSub hq hp)
 
 /-- The typing of a dictionary by the laws of `Target`, in a context of premises. -/
@@ -149,6 +150,7 @@ inductive DTyp (P : Prog) : List Cn → Dict → TTy → Prop
         (dicts .cnil (ts.map fun t => ⟨C, [t.subst θ]⟩) (.dict ⟨C, [τ.subst θ]⟩))
   | prim {Δ q p θ} : P.primC q.cls = true → P.prims q = some p →
       DTyp P Δ (.prim p q) (.dict (q.subst θ))
+  | dictLe {Δ d Q H} : Cn.Serves P Q H → DTyp P Δ d (.dict H) → DTyp P Δ d (.dict Q)
 
 theorem DTyp.target (X : Target P) {Δ : List Cn} {d : Dict} {T : TTy} (h : DTyp P Δ d T)
     (Γ : List TSch) (φ : Stage) : X.Has Γ Δ (.dict d) T φ := by
@@ -159,6 +161,7 @@ theorem DTyp.target (X : Target P) {Δ : List Cn} {d : Dict} {T : TTy} (h : DTyp
   | inst hI => exact X.inst hI
   | strct h₁ h₂ => exact X.strct h₁ h₂
   | prim h₁ h₂ => exact X.prim h₁ h₂
+  | dictLe hs _ ih => exact X.dictLe hs ih
 
 theorem DTyp.strengthen {Δ : List Cn} {d : Dict} {T : TTy} (h : DTyp P Δ d T) (hd : d.NoVar) :
     DTyp P [] d T := by
@@ -169,6 +172,23 @@ theorem DTyp.strengthen {Δ : List Cn} {d : Dict} {T : TTy} (h : DTyp P Δ d T) 
   | inst hI => exact .inst hI
   | strct h₁ h₂ => exact .strct h₁ h₂
   | prim h₁ h₂ => exact .prim h₁ h₂
+  | dictLe hs _ ih => exact .dictLe hs (ih hd)
+
+theorem DTyp.inv_slot {Δ : List Cn} {d : Dict} {i : Nat} {T : TTy}
+    (h : DTyp P Δ (.slot d i) T) : ∃ q, DTyp P Δ d (.dict q) := by
+  generalize he : Dict.slot d i = e at h
+  induction h with
+  | slot hd _ => cases he; exact ⟨_, hd⟩
+  | dictLe _ _ ih => exact ih he
+  | _ => cases he
+
+theorem DTyp.inv_ap {Δ : List Cn} {f x : Dict} {T : TTy}
+    (h : DTyp P Δ (.ap f x) T) : ∃ a t q, DTyp P Δ f (.arr .P a t q) ∧ DTyp P Δ x a := by
+  generalize he : Dict.ap f x = e at h
+  induction h with
+  | ap hf hx => cases he; exact ⟨_, _, _, hf, hx⟩
+  | dictLe _ _ ih => exact ih he
+  | _ => cases he
 
 variable {Sg : Sig} {N : Names} {root : Roots}
 
@@ -231,10 +251,8 @@ theorem dsim_cg (hR : Real P Sg N) (hRun : RealRun P N root) {d d' : Dict} (h : 
   | inst => intro _ _ _ _; exact .glob
   | strct => intro _ _ _ _; exact .glob
   | prim => intro _ _ _ _; exact .glob
-  | slot _ ih => intro Δ T ht δ; cases ht with
-    | slot ht _ => exact .proj (ih ht δ)
-  | ap _ _ ih₁ ih₂ => intro Δ T ht δ; cases ht with
-    | ap h₁ h₂ => exact .app (ih₁ h₁ δ) (ih₂ h₂ δ)
+  | slot _ ih => intro Δ T ht δ; obtain ⟨_, ht⟩ := ht.inv_slot; exact .proj (ih ht δ)
+  | ap _ _ ih₁ ih₂ => intro Δ T ht δ; obtain ⟨_, _, _, h₁, h₂⟩ := ht.inv_ap; exact .app (ih₁ h₁ δ) (ih₂ h₂ δ)
   | base hd hd' heq =>
     intro Δ T ht δ
     rw [trDt_noVar hd, trDt_noVar hd']

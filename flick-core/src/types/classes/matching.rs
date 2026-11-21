@@ -4,7 +4,7 @@
 
 use super::has_metas;
 use crate::types::Elem;
-use crate::types::regions::{has_live, strip_live};
+use crate::types::regions::strip_live;
 use crate::types::ty::{Row, Type};
 
 /// Whether a head matches; `Unknown` when only unknown types in the
@@ -72,16 +72,51 @@ pub fn match_type(pattern: &Type, target: &Type, subst: &mut Subst) -> Match {
             .iter()
             .zip(y)
             .fold(Match::Yes, |m, (a, b)| m.and(|| match_type(a, b, subst))),
+        (
+            Type::Captured {
+                ty: p,
+                captures: c1,
+                ..
+            },
+            Type::Captured {
+                ty: t,
+                captures: c2,
+                ..
+            },
+        ) => match_type(p, t, subst).and(|| match_type(c1, c2, subst)),
         (Type::Record(p), Type::Record(t)) | (Type::Row(p), Type::Row(t)) => match_row(p, t, subst),
         _ if pattern == target => Match::Yes,
         _ => Match::No,
     }
 }
 
-/// An instance head names no `Live`: what typing by use records in a row of
-/// the constraint, solved or not, says nothing of which instance applies.
+/// An instance head names no `Live`, and under typing-by-use a qualifier on a
+/// purely non-runtime arrow carries no runtime use obligation: neither decides
+/// which instance applies for a repeated polymorphic head variable.
 fn same_but_live(bound: &Type, target: &Type) -> bool {
-    (has_live(bound) || has_live(target)) && strip_live(bound) == strip_live(target)
+    let b = strip_pure_fun_caps(&strip_live(bound));
+    let t = strip_pure_fun_caps(&strip_live(target));
+    (b != *bound || t != *target) && b == t
+}
+
+fn is_pure_fun(ty: &Type) -> bool {
+    matches!(ty, Type::Fun { effects: None, .. })
+        && !ty.contains(&mut |t| {
+            matches!(
+                t,
+                Type::Fun {
+                    effects: Some(_),
+                    ..
+                }
+            )
+        })
+}
+
+fn strip_pure_fun_caps(ty: &Type) -> Type {
+    match ty {
+        Type::Captured { ty: inner, .. } if is_pure_fun(inner) => strip_pure_fun_caps(inner),
+        other => other.map_children(&mut strip_pure_fun_caps),
+    }
 }
 
 /// Every labelled entry of the pattern is in the target, but `Live`; the

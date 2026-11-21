@@ -138,7 +138,8 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   | own : Typ Ψ Θ Γ (.own p) (.ex (.owner (.rg p)) φ)
   | drec {us : List Ty} {fs : List (Label × Scheme)} : S.dict c = some (k, fs) → us.length = k →
       Typ Ψ Θ Γ r (.dfs (fs.map fun f => (f.1, f.2.substT (instT us)))) → r.NoIns →
-      Typ Ψ Θ Γ (.drec c r) (.ex (.dict c (Ty.spine us)) φ)
+      LeLive S (.dict c (Ty.spine us)) T →
+      Typ Ψ Θ Γ (.drec c r) (.ex T φ)
   | dnil : Typ Ψ Θ Γ .rnil (.dfs [])
   | dcons {s : Scheme} {fs : List (Label × Scheme)} : Typ (Ψ.map (Ty.up s.k)) (Facts.union (Θ.substT (shiftV s.k)) s.cs) (Γ.map (Scheme.up s.k)) v
         (.ex s.t .pure) →

@@ -15,9 +15,12 @@ mod matching;
 mod prims;
 mod report;
 mod solve;
+mod solve_support;
+mod variance_match;
 
 pub use flick_ir::Dict;
 pub use matching::{Match, match_type};
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 use super::Checker;
@@ -217,7 +220,55 @@ impl Checker<'_> {
     }
 
     fn expand(&self, t: &Type) -> Type {
-        self.expand_all(t, &|t| self.whnf(t), &mut Vec::new())
+        self.expand_all_borrowed(t, &Self::borrowed_class_head, &mut Vec::new())
+    }
+
+    fn borrowed_class_head<'a>(&'a self, t: &'a Type) -> Cow<'a, Type> {
+        let head = self.borrowed_head(t);
+        if matches!(&*head, Type::Bounded { .. } | Type::Captured { .. }) {
+            Cow::Owned(self.class_head(&head))
+        } else {
+            head
+        }
+    }
+
+    /// Head reduction for class constraints: expands aliases and erases
+    /// whole-value `Type::Bounded` bounds (and empty or hold-nothing
+    /// qualifiers), while preserving non-empty hidden capture qualifiers
+    /// (`Type::Captured`) so contravariant instances and givens cannot drop
+    /// captures (`SafeUse`).
+    fn class_head(&self, t: &Type) -> Type {
+        let mut cur = self.bound_head(t);
+        for _ in 0..64 {
+            match cur {
+                Type::Bounded { ty, .. }
+                | Type::Captured {
+                    ty, value: true, ..
+                } => cur = self.bound_head(&ty),
+                Type::Captured {
+                    ty,
+                    captures,
+                    value: false,
+                    elided,
+                } => {
+                    let norm = self.store.normalize(&self.expanded(&captures));
+                    if (norm.entries.is_empty() && norm.tails.is_empty())
+                        || (!self.is_callable(&ty) && !self.stores_hidden(&ty))
+                    {
+                        cur = self.bound_head(&ty);
+                    } else {
+                        return Type::Captured {
+                            ty,
+                            captures: Box::new(norm.into_type()),
+                            value: false,
+                            elided,
+                        };
+                    }
+                }
+                other => return other,
+            }
+        }
+        cur
     }
 
     /// Whether `class` is one whose records and tuples the compiler serves.

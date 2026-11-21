@@ -43,7 +43,7 @@ theorem this_ent {I : Nat} {ins : Inst} (σ : Nat → Ty) (hI : P.insts I = some
   have h := ent_premises (P := P) (Δ := ins.ctx.map (·.subst σ)) (ins.ctx.map (·.subst σ)) 0
     (fun k _ => by simp)
   rw [List.length_map] at h
-  exact .inst hI rfl rfl h
+  exact .inst hI (.refl _) h
 
 variable (X : Target P)
 

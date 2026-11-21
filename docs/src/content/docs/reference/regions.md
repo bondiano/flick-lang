@@ -278,39 +278,44 @@ input bound. See the [user-defined transformer instances](../../contributing/imp
 
 ## Data variance
 
-The checker infers the variance of every parameter of a data type from its
-constructors, and subtyping compares data arguments by those signs (while
-keeping what each argument reaches, so narrowing a contravariant parameter
-never hides a region):
+The checker infers the variance of every parameter of a data type (from its
+constructors) and of every parameter of a class (from its methods and
+superclasses). Subtyping compares data arguments and class instance resolution
+matches heads by those signs (while keeping what each argument reaches, so
+narrowing a contravariant parameter never hides a region; see
+[Classes and instances](../classes/#resolution)):
 
 | Sign | Name | Meaning |
 | - | - | - |
-| `+` | `covariant` | argument may widen (`u <= u'`) |
-| `-` | `contravariant` | argument may narrow (`u' <= u`) |
-| `inv` | `invariant` | argument must match (`u == u'`), including `Ref` and non-`Type` parameters |
-| `bi` | `bivariant` | parameter is unused in constructor fields |
+| `+` | `covariant` | argument may widen (`u <= u'`); producer-only class parameter (`H σ <= Q`) |
+| `-` | `contravariant` | argument may narrow (`u' <= u`); consumer-only class parameter (`Q <= H σ` keeping reach) |
+| `inv` | `invariant` | argument must match (`u == u'`), including `Ref`, mixed-use classes, and non-`Type` / higher-kinded parameters |
+| `bi` | `bivariant` | parameter is unused in constructor fields or class methods (exact match on classes) |
 
 Exported data declarations — including `opaque type` and ADTs whose
-constructors stay hidden — serialize their inferred parameter signs in
-[`.iface`](../iface/#types-and-kinds), so covariant and contravariant opaque
-data behaves the same before and after package serialization. Conservative
-limits keep soundness without leaking representations:
+constructors stay hidden — and exported classes serialize their inferred
+parameter signs in [`.iface`](../iface/#types-and-kinds), so covariant and
+contravariant opaque data and classes behave the same before and after package
+serialization. Conservative limits keep soundness without leaking
+representations:
 
 - Missing or unknown variance metadata, abstract declarations (`type T a`),
   module-parameter types and `opaque type alias` declarations remain
   conservatively invariant; the checker never guesses variance without
-  constructor definitions.
+  constructor or class method definitions.
 - Non-`Type` parameters (such as `Region`, `ServiceRow`, `ErrorRow`,
-  `CaptureRow` or higher-kinded parameters) are always `inv`.
+  `CaptureRow` or higher-kinded parameters like `Functor (f : Type -> Type)`)
+  are always `inv`.
 - GADT upward-closure checks treat only built-in scalars and data types with
   visible constructors as closed, never opaque, abstract or module-parameter
   types.
 
-Hover on a parameterized data type or its declaration type parameters shows the
-inferred signs (see [Editors](../editor/#language-server)), `flick doc` lists
-them under each type's kind, and `flick inspect <M> --emit variance` prints the
-exported parameter variances of a project module, an installed package or a
-built-in module (reporting unknown metadata as `inv (unknown)`).
+Hover on a parameterized data type or class, or on its declaration type
+parameters, shows the inferred signs (see
+[Editors](../editor/#language-server)), `flick doc` lists them under each
+declaration's kind, and `flick inspect <M> --emit variance` prints the exported
+parameter variances of a project module, an installed package or a built-in
+module (reporting unknown metadata as `inv (unknown)`).
 
 ## What cannot leave a scope
 

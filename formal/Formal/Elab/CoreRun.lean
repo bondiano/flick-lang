@@ -148,6 +148,7 @@ def runTarget (hR : Real P Sg N) (hRun : RealRun P N root) (hroot : RootTy Sg ro
   inst hI := ⟨(typingTarget hR).inst hI, fun _ e => by cases e; exact .inst hI⟩
   strct h₁ h₂ := ⟨(typingTarget hR).strct h₁ h₂, fun _ e => by cases e; exact .strct h₁ h₂⟩
   prim h₁ h₂ := ⟨(typingTarget hR).prim h₁ h₂, fun _ e => by cases e; exact .prim h₁ h₂⟩
+  dictLe hs h := ⟨(typingTarget hR).dictLe hs h.1, fun _ e => by cases e; exact .dictLe hs (h.2 _ rfl)⟩
   St := Cfg
   load e := ⟨[], [], trE N id id e⟩
   Step := CS root

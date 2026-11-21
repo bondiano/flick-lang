@@ -189,3 +189,122 @@ fn path_package_variance_edit_invalidates_caches_and_updates_inspect() {
         "{after_out}"
     );
 }
+
+#[test]
+fn class_variance_survives_offline_cache_and_invalidates_on_edit() {
+    let lib = "\
+module Geo exposing (Box(..), Default(..), Describe(..), MyFunctor(..))
+
+type Box a = Box { value : a }
+
+class Default a =
+  default : a
+
+class Describe a =
+  describe : a -> String
+
+class MyFunctor (f : Type -> Type) =
+  my_map : (a -> b) -> f a -> f b
+
+instance Default (Box (Unit -> Int)) =
+  let default = Box { value = fun () -> 41 }
+
+instance Describe (Unit ->{Async} Unit) =
+  let describe _ = \"async\"
+";
+    let app = "\
+module App.Main exposing (main, box_async, desc_pure)
+
+import Geo exposing (..)
+
+box_async : Box (Unit ->{Async} Int)
+let box_async = default
+
+desc_pure : String
+let desc_pure = describe (fun () -> ())
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () = Platform.stdout_line desc_pure
+";
+
+    let (root, geo) = fetched("package-cache-class-variance");
+    fs::write(&geo, lib).expect("write fetched lib");
+    fs::write(root.join("app/src/App/Main.fl"), app).expect("write app");
+
+    let (status, stderr) = flick_output(&root, "cache", &["check"]);
+    assert_eq!(
+        status,
+        Some(0),
+        "cold fetched class variance check: {stderr}"
+    );
+
+    fs::remove_file(&geo).expect("remove fetched source");
+    let (status, stderr) = flick_output(&root, "cache", &["check"]);
+    assert_eq!(
+        status,
+        Some(0),
+        "offline cached class variance check: {stderr}"
+    );
+
+    let inspect_var = Command::new(env!("CARGO_BIN_EXE_flick"))
+        .args(["inspect", "Geo", "--emit", "variance"])
+        .current_dir(root.join("app"))
+        .env("FLICK_STORE", root.join("store"))
+        .env("XDG_CACHE_HOME", root.join("cache"))
+        .env("NO_COLOR", "1")
+        .output()
+        .expect("inspect variance");
+    assert_eq!(inspect_var.status.code(), Some(0), "{inspect_var:?}");
+    let var_out = String::from_utf8_lossy(&inspect_var.stdout);
+    for expected in [
+        "class Default : a (+, covariant)\n",
+        "class Describe : a (-, contravariant)\n",
+        "class MyFunctor : f (inv, invariant)\n",
+    ] {
+        assert!(var_out.contains(expected), "`{expected}` in\n{var_out}");
+    }
+
+    // Editing a path dependency class method to change variance invalidates cache.
+    let path_root = project(
+        "package-cache-class-variance-invalidate",
+        &[
+            (
+                "app/flick.toml",
+                &APP.replace("DEPENDENCY", "{ path = \"../lib\" }"),
+            ),
+            ("app/src/App/Main.fl", app),
+            ("lib/flick.toml", LIB),
+            ("lib/src/Geo.fl", lib),
+        ],
+    );
+    let (status, stderr) = flick_output(&path_root, "cache", &["check"]);
+    assert_eq!(status, Some(0), "initial path check: {stderr}");
+    let (status, stderr) = flick_output(&path_root, "cache", &["check"]);
+    assert_eq!(status, Some(0), "warm path check: {stderr}");
+
+    fs::write(
+        path_root.join("lib/src/Geo.fl"),
+        lib.replace("describe : a -> String", "describe : a -> a")
+            .replace("let describe _ = \"async\"", "let describe f = f"),
+    )
+    .expect("edit lib");
+    fs::write(
+        path_root.join("app/src/App/Main.fl"),
+        app.replace(
+            "desc_pure : String\nlet desc_pure = describe (fun () -> ())",
+            "desc_pure : Unit -> Unit\nlet desc_pure = describe (fun () -> ())",
+        )
+        .replace(
+            "let main () = Platform.stdout_line desc_pure",
+            "let main () = Platform.stdout_line \"ok\"",
+        ),
+    )
+    .expect("update app signature");
+    let (status, stderr) = flick_output(&path_root, "cache", &["check"]);
+    assert_eq!(
+        status,
+        Some(1),
+        "edited class variance must invalidate cache and reject invariant mismatch: {stderr}"
+    );
+    assert!(stderr.contains("FLICK-C001"), "{stderr}");
+}

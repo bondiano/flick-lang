@@ -225,7 +225,10 @@ impl Checker<'_> {
             let Type::Con { module, name } = head else {
                 return None;
             };
-            let signs = self.signs(module, name)?;
+            let signs = name
+                .strip_suffix("$Dict")
+                .and_then(|class| self.class_signs(module, class))
+                .or_else(|| self.signs(module, name))?;
             if signs.len() != args.len() {
                 return None;
             }

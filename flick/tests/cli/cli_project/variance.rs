@@ -97,7 +97,96 @@ type alias Pair a b = (a, b)
     let prelude_text = String::from_utf8_lossy(&prelude.stdout);
     assert!(
         prelude_text.contains("type List : a (+, covariant)\n")
-            && prelude_text.contains("type Option : a (+, covariant)\n"),
+            && prelude_text.contains("type Option : a (+, covariant)\n")
+            && prelude_text.contains("class Show : a (-, contravariant)\n")
+            && prelude_text.contains("class Eq : a (-, contravariant)\n")
+            && prelude_text.contains("class Ord : a (-, contravariant)\n")
+            && prelude_text.contains("class Into : a (-, contravariant), b (+, covariant)\n")
+            && prelude_text.contains("class Semigroup : a (inv, invariant)\n")
+            && prelude_text.contains("class Functor : f (inv, invariant)\n"),
         "{prelude_text}"
+    );
+}
+
+#[test]
+fn inspect_and_doc_show_class_variance_and_update_after_edit() {
+    let initial = "\
+module Lib.ClsVar exposing (Default(..), Describe(..), Convert(..), Combine(..), Marker(..), MyFunctor(..))
+
+class Default a =
+  default : a
+
+class Describe a =
+  describe : a -> String
+
+class Convert a b =
+  convert : a -> b
+
+class Combine a =
+  combine : a -> a -> a
+
+class Marker a =
+  marker : String
+
+class MyFunctor (f : Type -> Type) =
+  my_map : (a -> b) -> f a -> f b
+";
+    let dir = project(
+        "cli_inspect_class_variance",
+        &[("flick.toml", LIB), ("src/Lib/ClsVar.fl", initial)],
+    );
+
+    let out = flick_in(&dir, &["inspect", "Lib.ClsVar", "--emit", "variance"]);
+    assert_eq!(code(&out), Some(0), "{out:?}");
+    let shown = String::from_utf8_lossy(&out.stdout);
+    for expected in [
+        "module Lib.ClsVar\n",
+        "class Default : a (+, covariant)\n",
+        "class Describe : a (-, contravariant)\n",
+        "class Convert : a (-, contravariant), b (+, covariant)\n",
+        "class Combine : a (inv, invariant)\n",
+        "class Marker : a (bi, bivariant)\n",
+        "class MyFunctor : f (inv, invariant)\n",
+    ] {
+        assert!(shown.contains(expected), "`{expected}` in\n{shown}");
+    }
+
+    let iface_out = flick_in(&dir, &["inspect", "Lib.ClsVar", "--emit", "iface"]);
+    assert_eq!(code(&iface_out), Some(0), "{iface_out:?}");
+    let iface_json: Value = serde_json::from_slice(&iface_out.stdout).expect("valid iface json");
+    let describe_var = iface_json["exports"]
+        .as_array()
+        .expect("exports")
+        .iter()
+        .find(|e| e["name"] == "Describe")
+        .expect("Describe")["definition"]["variance"]
+        .clone();
+    assert_eq!(describe_var, json!(["contravariant"]));
+
+    let doc_out = flick_in(&dir, &["doc", "--out-dir", "docs"]);
+    assert_eq!(code(&doc_out), Some(0), "{doc_out:?}");
+    let doc_page = fs::read_to_string(dir.join("docs/Lib.ClsVar.md")).expect("doc page");
+    for expected in [
+        "Variance: `a` (`+`, covariant)",
+        "Variance: `a` (`-`, contravariant)",
+        "Variance: `a` (`-`, contravariant), `b` (`+`, covariant)",
+        "Variance: `a` (`inv`, invariant)",
+        "Variance: `a` (`bi`, bivariant)",
+        "Variance: `f` (`inv`, invariant)",
+    ] {
+        assert!(doc_page.contains(expected), "`{expected}` in\n{doc_page}");
+    }
+
+    fs::write(
+        dir.join("src/Lib/ClsVar.fl"),
+        initial.replace("describe : a -> String", "describe : a -> a"),
+    )
+    .expect("edit class");
+    let after = flick_in(&dir, &["inspect", "Lib.ClsVar", "--emit", "variance"]);
+    assert_eq!(code(&after), Some(0), "{after:?}");
+    let after_text = String::from_utf8_lossy(&after.stdout);
+    assert!(
+        after_text.contains("class Describe : a (inv, invariant)\n"),
+        "{after_text}"
     );
 }

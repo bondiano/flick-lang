@@ -65,8 +65,8 @@ theorem Typ.weakenStore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) (X : List Ty) :
   | inside hF _ hφ' ht hε hφ hT ih => exact .inside hF (ih X) hφ' ht hε hφ hT
   | cap => exact .cap
   | own => exact .own
-  | drec hc hk hr hn ih =>
-    exact .drec hc hk (ih X) hn
+  | drec hc hk hr hn hT ih =>
+    exact .drec hc hk (ih X) hn hT
   | dnil => exact .dnil
   | dcons _ _ ih₁ ih₂ =>
     refine .dcons ?_ (ih₂ X)
@@ -231,9 +231,9 @@ theorem Typ.rename {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | inside hF _ hφ' ht hε hφ hT ih => intro _ _ hξ; exact .inside hF (ih hξ) hφ' ht hε hφ hT
   | cap => intro _ _ _; exact .cap
   | own => intro _ _ _; exact .own
-  | drec hc hk hr hn ih =>
+  | drec hc hk hr hn hT ih =>
     intro _ _ hξ
-    exact .drec hc hk (ih hξ) (hn.rename _)
+    exact .drec hc hk (ih hξ) (hn.rename _) hT
   | dnil => intro _ _ _; exact .dnil
   | dcons _ _ ih₁ ih₂ => intro _ _ hξ; exact .dcons (ih₁ (hξ.up _)) (ih₂ hξ)
   | dproj _ hc hk hl hts hH hT ih => intro _ _ hξ; exact .dproj (ih hξ) hc hk hl hts hH hT

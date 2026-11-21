@@ -96,10 +96,8 @@ theorem ent_core (hR : Real P S N) {Γ Δ φ qs ds} (h : Ent P Δ qs ds) :
     have := has_strct (Γ := Γ) (Δ := Δ) (φ := φ) (θ := .var) hR h₁ h₂
     simp only [Ty.subst_id] at this
     exact .cons (dapps_core this ih) .nil
-  | @inst Q I ins σ ds h₁ h₂ h₃ _ ih =>
-    have hq : Q = ⟨ins.cls, ins.head.map (·.subst σ)⟩ := by cases Q; simp_all
-    subst hq
-    exact .cons (dapps_core (has_inst hR h₁) ih) .nil
+  | @inst Q I ins σ ds h₁ hserv _ ih =>
+    exact .cons (has_dictLe hR hserv (dapps_core (has_inst hR h₁) ih)) .nil
 
 theorem trDt_noFree {δ : Nat → Nat} : ∀ {d : Dict}, d.Below 0 → ∀ x, ¬ (trDt N δ d).Free x
   | .var k, h => absurd h (Nat.not_lt_zero k)

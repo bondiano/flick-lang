@@ -1,4 +1,5 @@
 import Formal.Widen
+import Formal.DictOps
 
 /-!
 # Varying a parameter of data by its variance
@@ -41,9 +42,46 @@ theorem Ty.NoV.tcon {i : Nat} {T : Name} {us : List Ty}
   | none => rfl
   | some u => simp only [Option.map_some]; exact congrArg some (h j u hu)
 
-/-- A parameter that is not covariant at this polarity is not held at all. -/
-theorem Ty.Pol.noV {i : Nat} {s : Variance} {q : Bool} {f : Ty}
-    (h : Ty.Pol S.var i s q f) (hs : ¬ s.at q ∧ ¬ s.at (!q) ∨ (s = .pos ∧ q = false)) :
+theorem Ty.NoV.spine {i : Nat} {us : List Ty}
+    (h : ∀ (j : Nat) (u : Ty), us[j]? = some u → u.NoV i) : (Ty.spine us).NoV i := by
+  simp only [Ty.NoV, Ty.spine_substT]
+  congr 1
+  apply List.ext_getElem?
+  intro j
+  simp only [List.getElem?_map]
+  cases hu : us[j]? with
+  | none => rfl
+  | some u => simp only [Option.map_some]; exact congrArg some (h j u hu)
+
+theorem Ty.NoV.dict {i c : Nat} {us : List Ty}
+    (h : ∀ (j : Nat) (u : Ty), us[j]? = some u → u.NoV i) : (Ty.dict c (Ty.spine us)).NoV i := by
+  simp only [Ty.NoV, Ty.substT]
+  exact congrArg (Ty.dict c) (Ty.NoV.spine h)
+
+theorem Facts.NoV.substT_eq {i : Nat} {Θ : Facts} (h : Θ.NoV i) {σ σ' : Atom → Ty}
+    (hσ : ∀ a, a ≠ .v i → σ a = σ' a) : Θ.substT σ = Θ.substT σ' := by
+  have h' : Θ.substT (dropV i) = Θ := h
+  rw [← h', Facts.substT_comp, Facts.substT_comp]
+  congr 1; funext a
+  by_cases ha : a = .v i
+  · subst ha; simp [dropV, Ty.substT]
+  · simp only [dropV, ha, if_false]
+    cases a <;> simp [Ty.ident, Ty.substT, hσ _ ha]
+
+theorem Ty.Pol.toPolD {var : Name → Nat → Variance} {dvar : Nat → Nat → Variance}
+    {i : Nat} {s : Variance} {q : Bool} {f : Ty} (h : Ty.Pol var i s q f) :
+    Ty.PolD var dvar i s q f := by
+  induction h with
+  | none h => exact .none h
+  | var hq => exact .var hq
+  | arrow hpa _ hφ _ hC iha ihb => exact .arrow hpa iha hφ ihb hC
+  | eff hr he _ hC iht => exact .eff hr he iht hC
+  | rcons _ _ iht ihr => exact .rcons iht ihr
+  | data _ hng _ hin hbi ht ihp ihn => exact .data ihp hng ihn hin hbi ht
+
+/-- A parameter that is not covariant at this polarity is not held at all (dictionary-aware). -/
+theorem Ty.PolD.noV {i : Nat} {s : Variance} {q : Bool} {f : Ty}
+    (h : Ty.PolD S.var S.dictVar i s q f) (hs : ¬ s.at q ∧ ¬ s.at (!q) ∨ (s = .pos ∧ q = false)) :
     f.NoV i := by
   induction h with
   | none h => exact h
@@ -84,6 +122,23 @@ theorem Ty.Pol.noV {i : Nat} {s : Variance} {q : Bool} {f : Ty}
       rcases hs with ⟨h1, -⟩ | ⟨rfl, rfl⟩
       · exact hbi j u hu hv h1
       · exact hbi j u hu hv (by simp [Variance.at])
+  | @dict q c us _ hng _ hin ihp ihn =>
+    apply Ty.NoV.dict
+    intro j u hu
+    cases hv : S.dictVar c j with
+    | pos => exact ihp j u hu hv hs
+    | neg =>
+      rcases hs with ⟨h1, h2⟩ | ⟨rfl, rfl⟩
+      · exact ihn j u hu hv (.inl ⟨h2, by simpa using h1⟩)
+      · exact hng j u hu hv rfl
+    | inv => exact hin j u hu (.inl hv)
+    | bi => exact hin j u hu (.inr hv)
+
+/-- A parameter that is not covariant at this polarity is not held at all. -/
+theorem Ty.Pol.noV {i : Nat} {s : Variance} {q : Bool} {f : Ty}
+    (h : Ty.Pol S.var i s q f) (hs : ¬ s.at q ∧ ¬ s.at (!q) ∨ (s = .pos ∧ q = false)) :
+    f.NoV i :=
+  (h.toPolD (dvar := S.dictVar)).noV hs
 
 theorem Variance.noV_cond {s : Variance} (h : s ≠ .neg) :
     ¬ s.at false ∧ ¬ s.at (!false) ∨ (s = .pos ∧ false = false) := by
@@ -92,10 +147,11 @@ theorem Variance.noV_cond {s : Variance} (h : s ≠ .neg) :
   | neg => exact absurd rfl h
   | inv | bi => exact .inl ⟨by simp [Variance.at], by simp [Variance.at]⟩
 
-/-- A field built at one argument is below the field read at the other, at its own
-polarity, when the parameter changes in the direction its variance allows and keeps what
-it reaches. -/
-theorem field_vary {i : Nat} {s : Variance} {q : Bool} {f : Ty} (hf : Ty.Pol S.var i s q f)
+/-- A field (possibly mentioning dictionaries) built at one argument is below the field read
+at the other, at its own polarity, when the parameter changes in the direction its variance
+allows and keeps what it reaches. -/
+theorem field_varyD {i : Nat} {s : Variance} {q : Bool} {f : Ty}
+    (hf : Ty.PolD S.var S.dictVar i s q f)
     {σ σ' : Atom → Ty} (hσ : ∀ a, a ≠ .v i → σ a = σ' a)
     (hr : Caps.Sub (σ (.v i)).reach (σ' (.v i)).reach)
     (hp : s = .pos → LeLive S (σ (.v i)) (σ' (.v i)))
@@ -136,7 +192,7 @@ theorem field_vary {i : Nat} {s : Variance} {q : Bool} {f : Ty} (hf : Ty.Pol S.v
         · exact .inl (Ty.reach_substT_mono hw x hx)
         · exact .inr (.inl (Ty.reach_substT_mono hw x hx))
         · exact .inr (.inr (Caps.substT_widen hw x hx))
-      · have hN := (Ty.Pol.arrow hpa hPa hφ hPb hC).noV (Variance.noV_cond hsn)
+      · have hN := (Ty.PolD.arrow hpa hPa hφ hPb hC).noV (Variance.noV_cond hsn)
         have := same hN
         simpa only [Ty.substT, hφ.substT_eq hσ] using this
   | @eff q r e t C hr' he hPt hC iht =>
@@ -157,7 +213,7 @@ theorem field_vary {i : Nat} {s : Variance} {q : Bool} {f : Ty} (hf : Ty.Pol S.v
         rcases hx with hx | hx
         · exact .inl (Ty.reach_substT_mono hw x hx)
         · exact .inr (Caps.substT_widen hw x hx)
-      · have hN := (Ty.Pol.eff hr' he hPt hC).noV (Variance.noV_cond hsn)
+      · have hN := (Ty.PolD.eff hr' he hPt hC).noV (Variance.noV_cond hsn)
         have := same hN
         simpa only [Ty.substT, hr'.substT_eq hσ, he.substT_eq hσ] using this
   | rcons _ _ iht ihr =>
@@ -195,9 +251,56 @@ theorem field_vary {i : Nat} {s : Variance} {q : Bool} {f : Ty} (hf : Ty.Pol S.v
         · exact (ihp j u hu hv).2 rfl
         · exact (ihn j u hu hv).1 rfl
         · rw [(hin j u hu hv).substT_eq hσ]; exact .refl
-      · have hN := (Ty.Pol.data hPp hng hPn hin hbi rfl).noV (Variance.noV_cond hsn)
+      · have hN := (Ty.PolD.data hPp hng hPn hin hbi rfl).noV (Variance.noV_cond hsn)
         have := same hN
         simpa only [Ty.tcon_substT] using this
+  | @dict q c us hPp hng hPn hin ihp ihn =>
+    simp only [Ty.substT, Ty.spine_substT]
+    have get : ∀ {τ : Atom → Ty} {j : Nat} {x : Ty}, (us.map (Ty.substT τ))[j]? = some x →
+        ∃ u, us[j]? = some u ∧ x = u.substT τ := fun h => by
+      simp only [List.getElem?_map, Option.map_eq_some_iff] at h
+      obtain ⟨u, hu, rfl⟩ := h
+      exact ⟨u, hu, rfl⟩
+    refine ⟨fun hq => ?_, fun hq => ?_⟩
+    · subst hq
+      refine .dict (by simp) (fun j x x' h h' hv => ?_) (fun j x x' h h' hv => ?_)
+        (fun j x x' h h' hv => ?_) (fun j x x' h h' hv => ?_)
+      all_goals
+        obtain ⟨u, hu, rfl⟩ := get h
+        obtain ⟨u', hu', rfl⟩ := get h'
+        rw [hu] at hu'; cases hu'
+      · exact (ihp j u hu hv).1 rfl
+      · exact (ihn j u hu hv).2 rfl
+      · exact Ty.reach_substT_mono hpw
+      · rw [(hin j u hu hv).substT_eq hσ]; exact .refl
+    · subst hq
+      by_cases hsn : s = .neg
+      · have hw := hnw hsn
+        refine .dict (by simp) (fun j x x' h h' hv => ?_) (fun j x x' h h' hv => ?_)
+          (fun j x x' h h' hv => ?_) (fun j x x' h h' hv => ?_)
+        all_goals
+          obtain ⟨u, hu, rfl⟩ := get h
+          obtain ⟨u', hu', rfl⟩ := get h'
+          rw [hu] at hu'; cases hu'
+        · exact (ihp j u hu hv).2 rfl
+        · exact (ihn j u hu hv).1 rfl
+        · exact Ty.reach_substT_mono hw
+        · rw [(hin j u hu hv).substT_eq hσ]; exact .refl
+      · have hN := (Ty.PolD.dict hPp hng hPn hin).noV (Variance.noV_cond hsn)
+        have := same hN
+        simpa only [Ty.substT, Ty.spine_substT] using this
+
+/-- A field built at one argument is below the field read at the other, at its own
+polarity, when the parameter changes in the direction its variance allows and keeps what
+it reaches. -/
+theorem field_vary {i : Nat} {s : Variance} {q : Bool} {f : Ty} (hf : Ty.Pol S.var i s q f)
+    {σ σ' : Atom → Ty} (hσ : ∀ a, a ≠ .v i → σ a = σ' a)
+    (hr : Caps.Sub (σ (.v i)).reach (σ' (.v i)).reach)
+    (hp : s = .pos → LeLive S (σ (.v i)) (σ' (.v i)))
+    (hn : s = .neg → LeLive S (σ' (.v i)) (σ (.v i))) :
+    (q = true → LeLive S (f.substT σ) (f.substT σ')) ∧
+    (q = false → LeLive S (f.substT σ') (f.substT σ)) :=
+  field_varyD (hf.toPolD (dvar := S.dictVar)) hσ hr hp hn
 
 /-- Substitutions that differ only at variables below `n`, each of which `t` does not hold
 where they differ, agree on `t`. -/

@@ -221,14 +221,25 @@ signature and golden certificates.
   the literals only: the core of `lazy.md` §3 has no waiters, so two threads that force one
   `lazy v` at once may die where `born v` does not.
 - **T6, the elaboration** (`Formal/Elab/`), with runtime stages `R r e` whose rows take
-  variables, and constructors whose values carry the dictionaries of their constraints, with
-  arms on them refined by the most general unifier: `T6a` (`Elab/T6a.lean`), an elaborated term is
-  typed in the target, with `T6a_default_instance` (`Elab/Defaults.lean`) for what an instance
-  takes from a default, its default signature's dictionaries derived under its context, and `T6b` (`Elab/Coherence.lean`), two elaborations that differ only
+  variables, constructors whose values carry the dictionaries of their constraints with
+  arms on them refined by the most general unifier, and **variance-directed class
+  resolution (B1/K1′)** (`Elab/Variance.lean`, `Elab/ClassVariance.lean`, `LeLive.dict`):
+  class-parameter variances (`+`, `-`, `inv`, `bi`) are inferred from method types and
+  superclasses (`inferClassVar`, proved sound by `inferClassVar_sound` and
+  `Prog.ClsVarOk.super_serves`), instance matching compares heads against queries by
+  `Cn.Serves` over `Ty.Le` (with exact equality for `inv` and `bi` and reach preservation
+  for `-`), K1′ forbids two instances of a class from serving any common query under any
+  substitutions, and dictionary transport (`dict_transport`, `Cn.Serves.tr`, `has_dictLe`,
+  `LeLive.dict` under `Sig.dictVar_ok`) soundly types dictionaries at target queries.
+  `T6a` (`Elab/T6a.lean`), an elaborated term is typed in the target, with
+  `T6a_default_instance` (`Elab/Defaults.lean`) for what an instance takes from a default,
+  its default signature's dictionaries derived under its context, and `T6b`
+  (`Elab/Coherence.lean`, via `closed_unique_common`), two elaborations that differ only
   in the derivations of their dictionaries give the same result. Both are stated for an
   abstract target and instantiated on the core with regions and dictionary records as
-  `T6a_core` (`Elab/CoreT6a.lean`) and `T6b_core` (`Elab/CoreRun.lean`), the latter with the
-  run of the core itself.
+  `T6a_core` (`Elab/CoreT6a.lean`) and `T6b_core` (`Elab/CoreRun.lean`), the latter with
+  the run of the core itself; `T6a_safeUse` (`Elab/ClassVariance.lean`) connects closed
+  B1 elaborations directly into `T4'` (`SafeUse`).
 - **A handler of a record** (`Formal/RecordHandler.lean`): `T6c_tail`, a `tail` operation under
   a handler of a record of functions runs the field of the record, and `T6c_tail_kept` under the
   frame a child keeps. A known layer of `succeed` and `merge` is a chain of such handlers:
@@ -238,23 +249,27 @@ signature and golden certificates.
   no literal comes only from a given, and `site_caller`, a function under that given passes on
   its caller's place; (Site) is (Prim) at a literal place, so T6 covers it unchanged.
 - **The hypotheses of T6 are satisfiable** (`Formal/Elab/Witness/`): one concrete program
-  meets all of them, and `witness_T6a`, `witness_T6b` (`Witness/Main.lean`),
-  `witness_T6b_example`, `witness_T6b_closed` and `witness_T6b_open` (`Witness/T6b.lean`)
-  are T6 on it, the last three without premises of typing.
+  (with covariant `Option`/`List` and contravariant `Eq`, matching `inferClassVar` and
+  `Sig.var_ok`/`Sig.dictVar_ok`) meets all of them, and `witness_T6a`, `witness_T6b`
+  (`Witness/Main.lean`), `witness_T6b_example`, `witness_T6b_closed` and `witness_T6b_open`
+  (`Witness/T6b.lean`) are T6 on it, the last three without premises of typing.
 
 `#print axioms` of `T1`, `T2a`, `T2b`, `T2b_await`, `lemma_3_1`, `T3`, `lemma_6`, `T4'`,
 `T1_regions`, `T5`, `Lazy.L1`, `Lazy.L2`, `R9`, `T6a`, `T6a_core`, `T6a_close`, `T6b`, `T6b_core`,
-`witness_T6b_example`, `witness_T6b_closed` and `witness_T6b_open` lists only Lean's standard `propext`,
-`Classical.choice` and `Quot.sound`; the hypotheses of T5 (`Hyp`, `G11`), of T6(a)
-(`Target`; for the core, `Real`) and of T6(b) (`Coherent`, `Sim`) are their parameters.
-`hdl_err_live` lists only `propext`. `Formal/Axioms.lean` pins what `#print axioms` prints
-for `T1`, `T1_regions`, `T2a`, `T2b`, `T2b_await`, `T3`, `lemma_6`, `T4'`, `hdl_err_live`,
-`T6a`, `T6b`, `T6a_core`, `T6b_core`, `Lazy.L1`, `Lazy.L1_once`, `Lazy.L2`, `R9`, `R9_again`, `T7`,
+`inferClassVar_sound`, `Prog.ClsVarOk.super_serves`, `dict_transport`, `closed_unique_common`,
+`Cn.Serves.tr`, `has_dictLe`, `T6a_safeUse`, `witness_T6b_example`, `witness_T6b_closed` and
+`witness_T6b_open` lists only Lean's standard `propext`, `Classical.choice` and `Quot.sound`;
+the hypotheses of T5 (`Hyp`, `G11`), of T6(a) (`Target`; for the core, `Real`) and of T6(b)
+(`Coherent`, `Sim`) are their parameters. `hdl_err_live` lists only `propext`, and `T6a`, `T6b`,
+`Prog.ClsVarOk.super_serves`, `dict_transport`, `closed_unique_common` and `Cn.Serves.tr` list
+only `propext` and `Quot.sound` (no `Classical.choice`). `Formal/Axioms.lean` pins what
+`#print axioms` prints for `T1`, `T1_regions`, `T2a`, `T2b`, `T2b_await`, `T3`, `lemma_6`, `T4'`,
+`hdl_err_live`, `T6a`, `T6b`, `T6a_core`, `T6b_core`, `inferClassVar_sound`,
+`Prog.ClsVarOk.super_serves`, `dict_transport`, `closed_unique_common`, `Cn.Serves.tr`,
+`has_dictLe`, `T6a_safeUse`, `Lazy.L1`, `Lazy.L1_once`, `Lazy.L2`, `R9`, `R9_again`, `T7`,
 `MutOk.lzDecl`, `LzSig.typ_run`, `MutOk.lzAwait`, `MutOk.lzWrite`,
 `Elab.Witness.lzSig`, `Equiv.o1a`, `Equiv.o1b`, `Equiv.o1c`, `Equiv.o1a_all`, `Equiv.o1c_all`
-and `Equiv.EverySim.has` with `#guard_msgs`, so
-`lake build` fails on a
-`sorry` or a new axiom.
+and `Equiv.EverySim.has` with `#guard_msgs`, so `lake build` fails on a `sorry` or a new axiom.
 
 T4.3 is the premise G11 of T5 in the form [the answering provide must be live](../docs/formal/runtime.md#the-provide-liveness-premise-is-stronger-than-typing-gives) gives it: an operation answered by a handler of the region `q` happens only while `q` is live.
 It is the third conjunct of `SafeUse` (`Live.lean`), the counterpart of `G11` in
@@ -381,7 +396,8 @@ operation, kept or not, and `c.at i` ranges over the main thread and the childre
 | T4′: T4.1 and T4.3 (the handler of an operation is live); T4.2 given up | `DeadUse` (`Regions.lean`), `SafeUse` (`Live.lean`), `T4'` (`Live/T4Live.lean`); `handlerOf_has` (`T43Main.lean`) |
 | a handler of an effect a region indexes (`Setup s`) is installed only where that region is live | `hdl_err_live` (`Live/Install.lean`) |
 | T1 with `op_H` | `T1_regions` (`Live/T1Regions.lean`) |
-| `elaboration.md` §0.1 λFlick⁺: `D_C ā`, dictionary records, projection with `∀`-instantiation, globals | `Ty.dict`, `Ty.spine`, `Sig.dict`, `Sig.glob` (`Syntax.lean`); `Tm.drec`, `Tm.glob`, `J.dfs`, `Typ.drec`, `Typ.dcons`, `Typ.dproj`, `Typ.glob`, `Roots`, `RootTy` (`Rules.lean`); `Step.glob` (`Semantics.lean`); `canonical_dict`, `dict_field` (`DictCanon.lean`); `glob_preservation` (`Preservation.lean`) |
+| `elaboration.md` §0.1 λFlick⁺: `D_C ā`, dictionary records, dictionary subtyping, projection with `∀`-instantiation, globals | `Ty.dict`, `Ty.spine`, `Sig.dict`, `Sig.dictVar`, `Sig.dictVar_ok`, `Ty.PolD`, `Sig.glob` (`Syntax.lean`); `LeLive.dict` (`Live/Mode.lean`); `Tm.drec`, `Tm.glob`, `J.dfs`, `Typ.drec`, `Typ.dcons`, `Typ.dproj`, `Typ.glob`, `Roots`, `RootTy` (`Rules.lean`); `Step.glob` (`Semantics.lean`); `canonical_dict`, `dict_field` (`DictCanon.lean`); `glob_preservation` (`Preservation.lean`) |
+| `regions.md` §2.2.1, `elaboration.md` §2.3, §4 class variance (B1/K1′), dictionary transport and `SafeUse` | `Variance`, `RowLe`, `Stage.UseLe`, `Ty.Le`, `Cn.Serves` (`Elab/Syntax.lean`); `inferClassVar`, `inferClassVar_sound`, `Prog.ClsVarOk.super_serves`, `Ent.inst_le` (`Elab/Variance.lean`); `Coherent.k1'`, `k5mono`, `fields_serves`, `fields_sub` (`Elab/Hyp.lean`); `closed_unique_common`, `ent_serves` (`Elab/Coherence.lean`); `Target.dictLe`, `dict_transport` (`Elab/Target.lean`, `Elab/T6a.lean`); `Ty.Le.tr`, `Cn.Serves.tr`, `has_dictLe` (`Elab/CoreLaws.lean`, `Elab/CoreDict.lean`); `T6a_safeUse` (`Elab/ClassVariance.lean`) |
 | Progress | `progress` (`ProgressMain.lean`) |
 | Preservation | `preservation` (`Preservation.lean`); of a configuration: `cstep_typed` (`Soundness.lean`) |
 | T1 | `T1` (`Soundness.lean`) |

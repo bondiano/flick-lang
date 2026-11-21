@@ -154,7 +154,7 @@ Instances are canonical. The checker rejects an instance when:
 
 | Rule | Code |
 | - | - |
-| its head unifies with another instance's, after aliases are expanded; the context does not choose | `FLICK-C003` |
+| its head can serve a common constraint with another instance under the class's parameter variances (after aliases are expanded), regardless of declaration order; the context does not choose | `FLICK-C003` |
 | determining arguments unify but the determined arguments disagree, or a non-overlapping pair needs further output bindings to agree | `FLICK-C004` |
 | a determined variable is not covered by the determining head arguments and the context's dependencies | `FLICK-C005` |
 | neither the class nor the nominal type at the head of its first type belongs to this package | `FLICK-C006` |
@@ -211,13 +211,33 @@ instances: a module that sees both reports an overlap between them
 
 ## Resolution
 
+The checker infers a variance sign for every parameter of a class from its
+methods and superclasses (see [Data and class variance](../regions/#data-variance)):
+
+- `+` (`covariant`): producer-only parameters (such as a `Default` method `default : a`, or `b` in `Into a b`). An instance head `H` serves `C T` when `H σ <= T` — for example, `Default (Box (Unit -> Unit))` serves `Default (Box ((Unit -> Unit)^{s}))` and `Default (Box (Unit ->{Async} Unit))`.
+- `-` (`contravariant`): consumer-only parameters (such as `Eq`, `Ord`, `Hash`, `Show`, `Display`, or `a` in `Into a b`). An instance head `H` serves `C T` when `T <= H σ` while preserving what `H σ` reaches, so a capture-free instance such as `Show (Unit ->{Async} Unit)` serves `Show (Unit -> Unit)` without ever accepting a scoped closure `(Unit -> Unit)^{s}`.
+- `inv` (`invariant`): mixed-use parameters (such as `Semigroup` or `Monoid`), parameters below a double flip where reach preservation forbids `+`, and all non-`Type` or higher-kinded parameters (such as `f : Type -> Type` in `Functor`, `Applicative` and `Monad`). Matching is exact equality.
+- `bi` (`bivariant`): parameters unused in the class's methods and superclasses. Matching stays exact equality so marker classes cannot coerce unrelated types.
+
+Inferred class signs are serialized in [`.iface`](../iface/#types-and-kinds)
+(missing metadata stays conservatively invariant) and displayed in hover,
+`flick doc` and `flick inspect <M> --emit variance`.
+
 A constraint is solved, in order, by an assumption of the enclosing signature,
-instance or higher-rank `forall` (or one of their superclasses), by a row
-primitive, by the structural instance of a record or tuple, or by the one
-instance whose head matches it. A functional dependency fixes unknown types:
-with `Collection UserSet User`, `empty : UserSet` needs no annotation for the
-element. Constraints are solved when the definition is checked; a value that
-is generalized keeps the variables of unsolved constraints monomorphic.
+instance or higher-rank `forall` (or one of their superclasses, compared in
+the class's variance direction), by a row primitive, by the structural instance
+of a record or tuple, or by the unique instance whose head serves it in the
+class's variance direction. When unknown types leave another instance possibly
+matching, the solver waits rather than committing early. Functional-dependency
+improvement stays strictly equality-based: with `Collection UserSet User`,
+`empty : UserSet` needs no annotation for the element, while strict subtyping
+does not trigger improvement. Two instances whose heads can serve any common
+constraint under the class's variances — including comparable heads or
+incomparable product heads such as `(Unit ->{Async} Unit, Unit -> Unit)` and
+`(Unit -> Unit, Unit ->{Async} Unit)` — are rejected with `FLICK-C003` in
+either declaration or import order. Constraints are solved when the definition
+is checked; a value that is generalized keeps the variables of unsolved
+constraints monomorphic.
 
 | Failure | Code |
 | - | - |

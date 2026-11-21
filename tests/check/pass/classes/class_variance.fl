@@ -1,0 +1,221 @@
+// Class instances resolve in the inferred variance direction of each parameter
+// (`docs/formal/regions.md` §2.2.1): `+` producer-only, `-` consumer-only,
+// `inv` mixed/higher-kinded/double-flip, `bi` unused marker (exact match).
+module App.ClassVariancePass exposing (..)
+
+type Box a = Box { value : a }
+
+type Sink a = Sink (a -> Unit)
+
+type Wrap a = Wrap a
+
+type Proxy a = Proxy
+
+type File (s : Region)
+
+service Clock =
+  now : Unit ->{} Int
+
+service Files =
+  read_f : forall s. File s ->{} Int
+
+type Hold a = Hold (Unit ->{Files} a)
+
+// Producer-only (`+`)
+class Default a =
+  default : a
+
+// Consumer-only (`-`)
+class Describe a =
+  describe : a -> String
+
+// Consumer-only (`-`) with runtime stage
+class RunClock a =
+  run_clock : a ->{Clock} Int
+
+// Superclass (`-` inherited from `Describe`)
+class Describe a => Pretty a =
+  pretty : a -> String
+
+// Multi-parameter (`-`, `+`)
+class Convert a b =
+  convert : a -> b
+
+// Mixed-use (`inv`)
+class Combine a =
+  combine : a -> a -> a
+
+// Double-flip (`inv`: reach preservation forbids `+`)
+class Cont a =
+  cont : (a -> Int) -> Int
+
+// Higher-kinded (`inv`)
+class MyFunctor (f : Type -> Type) =
+  my_map : (a -> b) -> f a -> f b
+
+// Unused marker (`bi`: exact match only)
+class Marker a =
+  marker : String
+
+// Functional dependency (`-`, `+`; improvement remains equality-based)
+class MapOut a b | a -> b =
+  map_out : a -> b
+
+instance Default (Box (Unit -> Int)) =
+  let default = Box { value = fun () -> 41 }
+
+instance Default (Unit -> Unit) =
+  let default = fun () -> ()
+
+instance Describe (Unit ->{Async} Unit) =
+  let describe _ = "async"
+
+instance Describe (Box (Unit ->{Async} Unit)) =
+  let describe _ = "box"
+
+instance Describe (Sink (Unit -> Unit)) =
+  let describe _ = "sink"
+
+instance Describe Int =
+  let describe _ = "int"
+
+instance RunClock (Unit ->{Clock} Int) =
+  let run_clock f = f ()
+
+instance Convert (Unit ->{Async} Unit) (Unit -> Unit) =
+  let convert _ = fun () -> ()
+
+// Invariant classes allow distinct non-unifying heads without overlap.
+instance Combine (Unit -> Unit) =
+  let combine f _ = f
+
+instance Combine (Unit ->{Async} Unit) =
+  let combine f _ = f
+
+instance Cont (Unit -> Unit) =
+  let cont k = k (fun () -> ())
+
+instance MyFunctor Wrap =
+  let my_map f (Wrap x) = Wrap (f x)
+
+instance Marker (Unit -> Unit) =
+  let marker = "pure"
+
+instance MapOut Int String =
+  let map_out _ = "ok"
+
+instance MapOut (Unit ->{Async} Unit) Int =
+  let map_out _ = 1
+
+// 1. Producer-only (`+`): pure box serves scoped and runtime boxes.
+default_box_scoped : Unit ->{} Int
+let default_box_scoped () = scope s {
+  let b : (Box ((Unit -> Int)^{s}))^{s} = default
+  match b with
+  | Box r -> r.value ()
+}
+
+default_box_async : Box (Unit ->{Async} Int)
+let default_box_async = default
+
+default_fn_async : Unit ->{Async} Unit
+let default_fn_async = default
+
+// 2. Consumer-only (`-`): runtime arrow instance serves pure and narrower runtime arrows.
+describe_pure : String
+let describe_pure = describe (fun () -> ())
+
+describe_empty_rt : (Unit ->{} Unit) -> String
+let describe_empty_rt f = describe f
+
+run_narrower_rt : (Unit ->{} Int) ->{Clock} Int
+let run_narrower_rt f = run_clock f
+
+// Covariant data under `-`: Box (Unit -> Unit) <= Box (Unit ->{Async} Unit).
+describe_box_pure : (Box (Unit -> Unit))^{} -> String
+let describe_box_pure b = describe b
+
+// Contravariant data under `-`: Sink (Unit ->{Async} Unit) <= Sink (Unit -> Unit).
+describe_sink_async : (Sink (Unit ->{Async} Unit))^{} -> String
+let describe_sink_async s = describe s
+
+// Superclass given in `-` direction: Pretty (Unit ->{Async} Unit) serves Describe (Unit -> Unit).
+from_super_given : Pretty (Unit ->{Async} Unit) => (Unit -> Unit) -> String
+let from_super_given f = describe f
+
+// 3. Multi-parameter `[-, +]`: narrows first argument, widens second.
+convert_both : (Unit -> Unit) -> Unit ->{Async} Unit
+let convert_both f = convert f
+
+// 4. Invariant (`Combine`, `Cont`), higher-kinded (`MyFunctor`), unused marker (`Marker`): exact match.
+combine_pure : (Unit -> Unit) -> Unit -> Unit
+let combine_pure f = combine f f
+
+combine_async : (Unit ->{Async} Unit) -> Unit ->{Async} Unit
+let combine_async f = combine f f
+
+cont_exact : Int
+let cont_exact =
+  cont (fun (f : Unit -> Unit) ->
+    let _ = f ()
+    1
+  )
+
+functor_exact : Wrap Int -> Wrap Int
+let functor_exact w = my_map (fun n -> n + 1) w
+
+check_marker : Marker a => a -> Int
+let check_marker _ = 1
+
+marker_exact : Int
+let marker_exact = check_marker (fun () -> ())
+
+// 5. Unknown meta refinement stability: waits until the argument type is known.
+infer_fn_then_describe : Unit -> String
+let infer_fn_then_describe () =
+  let helper = fun x -> describe x
+  helper (fun () -> ())
+
+infer_int_then_describe : Unit -> String
+let infer_int_then_describe () =
+  let helper = fun x ->
+    let label = describe x
+    let _ = x + 1
+    label
+  helper 5
+
+// 6. FD equality improvement and variance resolution with known target.
+fd_exact : String
+let fd_exact = map_out 1
+
+fd_variance_target : Int
+let fd_variance_target = map_out (fun () -> ())
+
+// 7. Phantom `bi` data parameters stay nominal/exact: distinct tags do not overlap.
+instance Describe (Proxy Int) =
+  let describe _ = "proxy-int"
+
+instance Describe (Proxy String) =
+  let describe _ = "proxy-string"
+
+describe_proxy_int : String
+let describe_proxy_int = describe (Proxy : Proxy Int)
+
+describe_proxy_string : String
+let describe_proxy_string = describe (Proxy : Proxy String)
+
+// 8. Hidden captures grow before class solving inside instance methods and class defaults.
+class AcceptAny a =
+  accept_any : a -> Int
+
+instance AcceptAny a =
+  let accept_any _ = 1
+
+class HoldRunner t =
+  run_hold : forall s. t -> File s ->{Files} Int
+  let run_hold _ f = accept_any (Hold (fun () -> Files.read_f f))
+
+instance HoldRunner Unit =
+  let run_hold () f = accept_any (Hold (fun () -> Files.read_f f))
+
+instance HoldRunner Int

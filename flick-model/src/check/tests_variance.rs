@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use super::Checker;
-use crate::decls::Decls;
+use crate::decls::{Class, Decls};
 use crate::syntax::{Path, Term};
 use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 use crate::variance::Sign;
@@ -225,4 +225,118 @@ fn a_hidden_row_keeps_the_capture_rows_shown_by_data_arguments() {
     );
     let result = Checker::new(&decls()).check_top(&Term::lam("x", Term::Var("x".into())), &scheme);
     assert!(result.is_ok(), "{result:?}");
+}
+
+fn class_decls() -> Decls {
+    let mut d = decls();
+    let add = |d: &mut Decls, name: &str, supers: Vec<Type>, methods: Vec<(&str, Type)>| {
+        let dict_ty = Type::Dict(Path::new(T, name), Rc::from([a()]));
+        let mut mnames = Vec::new();
+        for (m, body) in methods {
+            let full = Type::fun(dict_ty.clone(), Stage::Pure, body);
+            d.values.insert(
+                Path::new(T, m),
+                Scheme::new(vec![("a".into(), Kind::Type)], full),
+            );
+            mnames.push(m.into());
+        }
+        d.params.insert(Path::new(T, name), vec![Kind::Type]);
+        d.classes.insert(
+            Path::new(T, name),
+            Class {
+                params: vec!["a".into()],
+                supers,
+                methods: mnames,
+            },
+        );
+    };
+    add(
+        &mut d,
+        "Show",
+        vec![],
+        vec![("show", Type::fun(a(), Stage::Pure, ty("String")))],
+    );
+    add(&mut d, "Default", vec![], vec![("default_val", a())]);
+    add(
+        &mut d,
+        "Monoid",
+        vec![],
+        vec![
+            ("empty", a()),
+            (
+                "combine",
+                Type::fun(a(), Stage::Pure, Type::fun(a(), Stage::Pure, a())),
+            ),
+        ],
+    );
+    add(&mut d, "Marker", vec![], vec![]);
+    d.finish();
+    d
+}
+
+fn dict_identity(
+    d: &Decls,
+    class: &str,
+    before: Type,
+    after: Type,
+) -> Result<(), super::TypeError> {
+    let s = Scheme::new(
+        Vec::new(),
+        Type::fun(
+            Type::Dict(Path::new(T, class), Rc::from([before])),
+            Stage::Pure,
+            Type::Dict(Path::new(T, class), Rc::from([after])),
+        ),
+    );
+    Checker::new(d).check_top(&Term::lam("x", Term::Var("x".into())), &s)
+}
+
+#[test]
+fn dictionary_subtyping_follows_inferred_class_variance_and_keeps_reach() {
+    let d = class_decls();
+    assert_eq!(d.class_signs[&Path::new(T, "Show")], vec![Sign::Neg]);
+    assert_eq!(d.class_signs[&Path::new(T, "Default")], vec![Sign::Pos]);
+    assert_eq!(d.class_signs[&Path::new(T, "Monoid")], vec![Sign::Inv]);
+    assert_eq!(d.class_signs[&Path::new(T, "Marker")], vec![Sign::Bi]);
+
+    let (pure, runs) = (unit_fn(Stage::Pure), unit_fn(rt()));
+    // `-` narrows contravariantly: `Show.Dict fnR ≤ Show.Dict fnP`
+    assert!(dict_identity(&d, "Show", runs.clone(), pure.clone()).is_ok());
+    assert!(dict_identity(&d, "Show", pure.clone(), runs.clone()).is_err());
+
+    // `+` widens covariantly: `Default.Dict fnP ≤ Default.Dict fnR`
+    assert!(dict_identity(&d, "Default", pure.clone(), runs.clone()).is_ok());
+    assert!(dict_identity(&d, "Default", runs.clone(), pure.clone()).is_err());
+
+    // `inv` and `bi` stay exact
+    for cls in ["Monoid", "Marker"] {
+        assert!(
+            dict_identity(&d, cls, pure.clone(), runs.clone()).is_err(),
+            "{cls}"
+        );
+        assert!(
+            dict_identity(&d, cls, runs.clone(), pure.clone()).is_err(),
+            "{cls}"
+        );
+        assert!(
+            dict_identity(&d, cls, pure.clone(), pure.clone()).is_ok(),
+            "{cls}"
+        );
+    }
+
+    // `SafeUse`: `-` dictionary cannot drop reach (`Show.Dict (fnP^s) ≰ Show.Dict fnP`)
+    let cap_s = Type::Captured(Rc::new(pure.clone()), Caps::atom(Var::Named("s".into())));
+    let drop_reach = Scheme::new(
+        vec![("s".into(), Kind::Region)],
+        Type::fun(
+            Type::Dict(Path::new(T, "Show"), Rc::from([cap_s])),
+            Stage::Pure,
+            Type::Dict(Path::new(T, "Show"), Rc::from([pure])),
+        ),
+    );
+    assert!(
+        Checker::new(&d)
+            .check_top(&Term::lam("x", Term::Var("x".into())), &drop_reach)
+            .is_err()
+    );
 }

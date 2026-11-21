@@ -226,6 +226,7 @@ theorem tag_no_widen (S : Sig) (hK : S.ctor "Pure" = some (0, [], "Tag"))
     obtain ⟨-, rfl⟩ := Ty.tcon_eq (hY.trans hb)
     refine cb_not_equiv (hinv 0 _ _ rfl rfl (fun hi => ?_) (tag_invariant S hK hr))
     exact Nat.not_lt_zero _ (S.hidden_ok _ _ hi "Pure" 0 [] hK).1
+  | dict => exact Ty.dict_ne_tcon hX.symm
 
 theorem kField_not_noV : ¬ kField.NoV 0 := fun h => by
   simp only [Ty.NoV, kField, Ty.substT, Ty.arrow.injEq] at h
@@ -284,5 +285,6 @@ theorem k_row_stays (S : Sig) (hK : S.ctor "K" = some (1, [kField], "K")) {C C' 
     | bi => exact absurd hs nb
     | inv => exact (hinv 0 _ _ rfl rfl hh hs).reach
     | neg => exact (LeLive.eq_plain (hn 0 _ _ rfl rfl hh hs) rfl).reach
+  | dict => exact absurd hX.symm Ty.dict_ne_tcon
 
 end Flick.LiveChecks

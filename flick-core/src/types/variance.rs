@@ -4,6 +4,8 @@
 //! it (`flick-model/src/variance.rs`). Subtyping compares the arguments of
 //! data by it, and records and tuples field by field.
 
+mod class_solve;
+mod class_walk;
 mod format;
 mod solve;
 
@@ -139,23 +141,34 @@ pub(super) struct Data<'t> {
 
 impl Checker<'_> {
     /// Computes and records inferred parameter variances on this module's own
-    /// data declarations so exports, support types and local declarations all
-    /// carry them.
+    /// data and class declarations so exports, support types and local
+    /// declarations all carry them.
     pub(super) fn populate_own_variances(&mut self) {
         let module = self.env.module.clone();
-        let mut candidates: Vec<String> = self
-            .env
-            .own_types()
-            .filter_map(|(name, def)| {
-                let applicable = matches!(def.form, Form::Adt { .. } | Form::Error)
-                    || (matches!(def.form, Form::Nominal { .. })
-                        && Type::con(&module, name).is_lang(Lang::List));
-                applicable.then(|| name.to_owned())
-            })
-            .collect();
-        candidates.sort();
-        for name in candidates {
+        let mut data_candidates: Vec<String> = Vec::new();
+        let mut class_candidates: Vec<String> = Vec::new();
+        for (name, def) in self.env.own_types() {
+            match def.form {
+                Form::Adt { .. } | Form::Error => data_candidates.push(name.to_owned()),
+                Form::Nominal { .. } if Type::con(&module, name).is_lang(Lang::List) => {
+                    data_candidates.push(name.to_owned());
+                }
+                Form::Class { .. } => class_candidates.push(name.to_owned()),
+                _ => {}
+            }
+        }
+        data_candidates.sort();
+        for name in data_candidates {
             if let Some(signs) = self.signs(&module, &name)
+                && !signs.is_empty()
+                && let Some(def) = self.env.type_def_mut(&name)
+            {
+                def.variance = signs.to_vec();
+            }
+        }
+        class_candidates.sort();
+        for name in class_candidates {
+            if let Some(signs) = self.class_signs(&module, &name)
                 && !signs.is_empty()
                 && let Some(def) = self.env.type_def_mut(&name)
             {
@@ -184,6 +197,13 @@ impl Checker<'_> {
                 self.compute_signs(module, name)
                     .map_or_else(Vec::new, |s| s.to_vec())
             }
+            Form::Class { .. } => {
+                if valid_exported_variance(&kinds, &def.variance).is_some() {
+                    return def.variance.clone();
+                }
+                self.compute_class_signs(module, name)
+                    .map_or_else(Vec::new, |s| s.to_vec())
+            }
             Form::Nominal { .. } => {
                 if valid_exported_variance(&kinds, &def.variance).is_some() {
                     return def.variance.clone();
@@ -196,6 +216,33 @@ impl Checker<'_> {
             }
             _ => Vec::new(),
         }
+    }
+
+    /// The sign of each parameter of class `module.name`, inferred from its
+    /// superclasses and methods for local classes or read from validated `.iface`
+    /// metadata for imported classes (falling back conservatively to `Invariant`).
+    pub(super) fn class_signs(&mut self, module: &str, name: &str) -> Option<Rc<[Variance]>> {
+        let key = (module.to_owned(), name.to_owned());
+        if let Some(found) = self.class_signs.get(&key) {
+            return found.clone();
+        }
+        let solved = self.solve_class_group(&key);
+        for (k, s) in solved {
+            self.class_signs.insert(k, Some(s.into()));
+        }
+        let found = self.class_signs.get(&key).cloned().flatten();
+        self.class_signs.insert(key, found.clone());
+        found
+    }
+
+    /// Pure `&self` class-sign lookup for export projection.
+    pub(super) fn compute_class_signs(&self, module: &str, name: &str) -> Option<Rc<[Variance]>> {
+        let key = (module.to_owned(), name.to_owned());
+        if let Some(found) = self.class_signs.get(&key) {
+            return found.clone();
+        }
+        let solved = self.solve_class_group(&key);
+        solved.get(&key).map(|s| Rc::from(s.as_slice()))
     }
 
     /// The sign of each parameter of the type `module.name`, `None` but for
@@ -388,7 +435,14 @@ impl Checker<'_> {
                         && name == other_name
                         && args.len() == expected_args.len() =>
                     {
-                        self.signs(module, name).filter(|s| s.len() == args.len())
+                        if let Some(class_name) = name.strip_suffix("$Dict")
+                            && self.class_info(module, class_name).is_some()
+                        {
+                            self.class_signs(module, class_name)
+                                .filter(|s| s.len() == args.len())
+                        } else {
+                            self.signs(module, name).filter(|s| s.len() == args.len())
+                        }
                     }
                     _ => None,
                 };

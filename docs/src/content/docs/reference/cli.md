@@ -49,7 +49,7 @@ of their own. `flick --help` lists them by contributor, and they run as
 | `explain <code>` | the explanation of a diagnostic code, a plugin's too, as `std/L001` |
 | `expand [paths]` | the code each [plugin](../plugins/) block of the project or of the files stands for |
 | `doctor` | the compiler, Node.js, pnpm, git, the TypeScript Content Mapper, the installed runtime and Effect, the optional adapters, and Go when it is installed; everything but the compiler, Node.js and pnpm is a note, not a failure |
-| `inspect <M> --emit ast\|typed-ir\|js\|ts\|iface\|variance\|mapping` | one representation of a module; `--emit variance` prints inferred parameter variances of exported types (including installed packages and built-in modules, reporting unknown metadata as `inv (unknown)`) |
+| `inspect <M> --emit ast\|typed-ir\|js\|ts\|iface\|variance\|mapping` | one representation of a module; `--emit variance` prints inferred parameter variances of exported types and classes (including installed packages and built-in modules, reporting unknown metadata as `inv (unknown)`) |
 | `lsp --stdio` | the [language server](../editor/#language-server); stdio is its only transport |
 | `content-mapper [--declarations <paths>…]` | a session command of the JavaScript backend (`js:content-mapper`): serves TypeScript's [Content Mapper](../editor/#content-mapper) requests for `.fl` files on stdio, started by `@flick-lang/content-mapper`; `--declarations` instead writes the projection of each `.fl` file under the paths beside it as `Name.d.fl.ts` and exits |
 

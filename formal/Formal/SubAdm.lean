@@ -181,8 +181,8 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe S J J' �
     exact .inside hF hb hφ' ht hε (Stage.le_trans hφ h₂) (hT.trans h₁)
   | cap => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; obtain rfl := (h₁.eq_plain rfl).hnd_rg_right; exact .cap
   | own => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; obtain rfl := (h₁.eq_plain rfl).owner_rg_right; exact .own
-  | drec hc hk hr hn =>
-    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .conv (.drec hc hk hr hn) (h₁.eq_plain rfl).symm
+  | drec hc hk hr hn hT =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .drec hc hk hr hn (hT.trans h₁)
   | dnil => intro _ hJ; rw [hJ.dfs]; exact .dnil
   | dcons he hr => intro _ hJ; rw [hJ.dfs]; exact .dcons he hr
   | dproj _ hc hk hl hts hH hT ih =>

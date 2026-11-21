@@ -367,6 +367,7 @@ codegen/loops_guards
 codegen/loops_owners
 codegen/labeled_loops_finalizers
 codegen/record_constructor
+codegen/class_variance
 codegen/contract_runs_nowhere
 
 effect/row_without

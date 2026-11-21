@@ -128,7 +128,7 @@ theorem Ent.single {Δ : List Cn} {Q : Cn} {d : Dict} (h : Ent P Δ [Q] [d]) :
     (∃ p, P.primC Q.cls = true ∧ P.prims Q = some p ∧ d = .prim p Q) ∨
     (∃ C τ ts ds, Q = ⟨C, [τ]⟩ ∧ P.structC C = true ∧ P.fields τ = some ts ∧
       Ent P Δ (ts.map fun t => ⟨C, [t]⟩) ds ∧ d = apps (.strct C τ) ds) ∨
-    (∃ I ins σ ds, P.insts I = some ins ∧ ins.cls = Q.cls ∧ Q.args = ins.head.map (·.subst σ) ∧
+    (∃ I ins σ ds, P.insts I = some ins ∧ Cn.Serves P Q ⟨ins.cls, ins.head.map (·.subst σ)⟩ ∧
       Ent P Δ (ins.ctx.map (·.subst σ)) ds ∧ d = apps (.inst I) ds) := by
   generalize hq : [Q] = qs at h
   generalize hd : [d] = ds at h
@@ -140,7 +140,7 @@ theorem Ent.single {Δ : List Cn} {Q : Cn} {d : Dict} (h : Ent P Δ [Q] [d]) :
   | given hc => cases hq; cases hd; exact .inl hc
   | prim h₁ h₂ => cases hq; cases hd; exact .inr (.inl ⟨_, h₁, h₂, rfl⟩)
   | strct h₁ h₂ h₃ => cases hq; cases hd; exact .inr (.inr (.inl ⟨_, _, _, _, rfl, h₁, h₂, h₃, rfl⟩))
-  | inst h₁ h₂ h₃ h₄ => cases hq; cases hd; exact .inr (.inr (.inr ⟨_, _, _, _, h₁, h₂, h₃, h₄, rfl⟩))
+  | inst h₁ h₂ h₃ => cases hq; cases hd; exact .inr (.inr (.inr ⟨_, _, _, _, h₁, h₂, h₃, rfl⟩))
 
 /-- A list derivation gives each constraint its dictionary. -/
 theorem Ent.get {Δ qs : List Cn} {ds : List Dict} (h : Ent P Δ qs ds) :
@@ -156,7 +156,7 @@ theorem Ent.get {Δ qs : List Cn} {ds : List Dict} (h : Ent P Δ qs ds) :
   | prim h₁ h₂ => exact ⟨rfl, fun k q hk => by cases k <;> simp at hk; subst hk; exact .prim h₁ h₂⟩
   | strct h₁ h₂ h₃ =>
     exact ⟨rfl, fun k q hk => by cases k <;> simp at hk; subst hk; exact .strct h₁ h₂ h₃⟩
-  | inst h₁ h₂ h₃ h₄ =>
-    exact ⟨rfl, fun k q hk => by cases k <;> simp at hk; subst hk; exact .inst h₁ h₂ h₃ h₄⟩
+  | inst h₁ h₂ h₃ =>
+    exact ⟨rfl, fun k q hk => by cases k <;> simp at hk; subst hk; exact .inst h₁ h₂ h₃⟩
 
 end Flick.Elab

@@ -228,3 +228,172 @@ fn data_variance_hover_updates_on_edit_and_falls_back_without_source() {
         "{after}"
     );
 }
+
+#[test]
+fn class_variance_appears_in_hover_and_updates_on_edit() {
+    let provider = "\
+module App.Classes exposing (Default(..), Describe(..), Convert(..), Combine(..), Marker(..), MyFunctor(..))
+
+/// Produces a default value.
+class Default a =
+  default : a
+
+class Describe a =
+  describe : a -> String
+
+class Convert a b =
+  convert : a -> b
+
+class Combine a =
+  combine : a -> a -> a
+
+class Marker a =
+  marker : String
+
+class MyFunctor (f : Type -> Type) =
+  my_map : (a -> b) -> f a -> f b
+";
+    let main = "\
+module App.Main exposing (..)
+import App.Classes exposing (Default(..), Describe(..), Convert(..), Combine(..), Marker(..), MyFunctor(..))
+
+class LocalProd a =
+  local_prod : a
+
+use_default : Default a => Unit -> a
+let use_default () = default
+
+use_describe : Describe a => a -> String
+let use_describe x = describe x
+
+use_convert : Convert a b => a -> b
+let use_convert x = convert x
+
+use_combine : Combine a => a -> a -> a
+let use_combine x y = combine x y
+
+use_marker : Marker a => a -> Int
+let use_marker _ = 1
+
+use_functor : MyFunctor f => (a -> b) -> f a -> f b
+let use_functor g x = my_map g x
+
+use_show : Show a => a -> String
+let use_show x = show x
+
+use_into : Into a b => a -> b
+let use_into x = into x
+
+use_prelude_functor : Functor f => f Int -> f Int
+let use_prelude_functor x = map (fun n -> n + 1) x
+";
+    let f = fixture_of(&[("src/App/Classes.fl", provider), ("src/App/Main.fl", main)]);
+    let ide = f.ide();
+    assert!(
+        ide.analysis.diagnostics.iter().all(Diagnostic::unnecessary),
+        "{:?}",
+        ide.analysis.diagnostics
+    );
+
+    let main_file = f.file("App.Main");
+    for (needle, expected) in [
+        ("LocalProd a =", "Variance: `a` (`+`, covariant)"),
+        ("Default a =>", "Variance: `a` (`+`, covariant)"),
+        ("Describe a =>", "Variance: `a` (`-`, contravariant)"),
+        (
+            "Convert a b =>",
+            "Variance: `a` (`-`, contravariant), `b` (`+`, covariant)",
+        ),
+        ("Combine a =>", "Variance: `a` (`inv`, invariant)"),
+        ("Marker a =>", "Variance: `a` (`bi`, bivariant)"),
+        ("MyFunctor f =>", "Variance: `f` (`inv`, invariant)"),
+        ("Show a =>", "Variance: `a` (`-`, contravariant)"),
+        (
+            "Into a b =>",
+            "Variance: `a` (`-`, contravariant), `b` (`+`, covariant)",
+        ),
+        ("Functor f =>", "Variance: `f` (`inv`, invariant)"),
+    ] {
+        let offset = f.at("App.Main", needle, 0) + 1;
+        let (markdown, _) = ide.hover(main_file, offset).expect(needle);
+        assert!(markdown.contains(expected), "{needle}: {markdown}");
+    }
+
+    // Class declaration parameter hover shows parameter variance.
+    let local_param_a = f.at("App.Main", "a =\n  local_prod", 0);
+    let (hover_a, _) = ide.hover(main_file, local_param_a).expect("LocalProd a");
+    assert!(hover_a.contains("Variance: `+` (covariant)"), "{hover_a}");
+}
+
+#[test]
+fn class_variance_hover_updates_on_edit() {
+    struct Mem(BTreeMap<PathBuf, String>);
+    impl Host for Mem {
+        fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
+            self.0
+                .get(path)
+                .map(|t| t.clone().into_bytes())
+                .ok_or_else(|| ErrorKind::NotFound.into())
+        }
+        fn display(&self, path: &Path) -> String {
+            path.display().to_string()
+        }
+    }
+    let mut files = BTreeMap::from([
+        (
+            PathBuf::from("/p/src/App/Lib.fl"),
+            "module App.Lib exposing (Describe(..))\nclass Describe a =\n  describe : a -> String\n"
+                .to_owned(),
+        ),
+        (
+            PathBuf::from("/p/src/App/Main.fl"),
+            "module App.Main exposing (use_d)\nimport App.Lib exposing (Describe(..))\nuse_d : Describe a => a -> String\nlet use_d x = describe x\n"
+                .to_owned(),
+        ),
+    ]);
+    let mut cache = ModuleCache::default();
+    let roots = [
+        PathBuf::from("/p/src/App/Lib.fl"),
+        PathBuf::from("/p/src/App/Main.fl"),
+    ];
+    let mut sources = SourceMap::default();
+    let first = analyze_with(&Mem(files.clone()), &mut sources, None, &roots, &mut cache);
+    let first_main = first.module("App.Main").expect("main").file;
+    let at = u32::try_from(
+        files[&PathBuf::from("/p/src/App/Main.fl")]
+            .find("Describe a =>")
+            .expect("Describe"),
+    )
+    .expect("small");
+    let first_ide = Ide {
+        analysis: &first,
+        sources: &sources,
+    };
+    let (before, _) = first_ide.hover(first_main, at + 1).expect("before edit");
+    assert!(
+        before.contains("Variance: `a` (`-`, contravariant)"),
+        "{before}"
+    );
+
+    files.insert(
+        PathBuf::from("/p/src/App/Lib.fl"),
+        "module App.Lib exposing (Describe(..))\nclass Describe a =\n  describe : a -> a\n"
+            .to_owned(),
+    );
+    files.insert(
+        PathBuf::from("/p/src/App/Main.fl"),
+        "module App.Main exposing (use_d)\nimport App.Lib exposing (Describe(..))\nuse_d : Describe a => a -> a\nlet use_d x = describe x\n"
+            .to_owned(),
+    );
+    let second = analyze_with(&Mem(files), &mut sources, None, &roots, &mut cache);
+    let second_ide = Ide {
+        analysis: &second,
+        sources: &sources,
+    };
+    let second_main = second.module("App.Main").expect("main").file;
+    let (after, _) = second_ide.hover(second_main, at + 1).expect("after edit");
+    assert!(
+        after.contains("Variance: `a` (`inv`, invariant)"),
+        "{after}"
+    );
+}

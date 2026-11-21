@@ -172,6 +172,10 @@ structure Target (P : Prog) where
   /-- (Prim), at any instance `θ` of the constraint (`docs/formal/elaboration.md#structural-dictionaries-were-typed-only-at-their-own-record-type`) -/
   prim : ∀ {Γ Δ q p θ φ}, P.primC q.cls = true → P.prims q = some p →
     Has Γ Δ (.dict (.prim p q)) (.dict (q.subst θ)) φ
+  /-- B1 dictionary transport: a dictionary typed at `H` is soundly typed at any query `Q`
+  that `H` serves in the class's variance direction (`Cn.Serves`). -/
+  dictLe : ∀ {Γ Δ d Q H φ}, Cn.Serves P Q H → Has Γ Δ (.dict d) (.dict H) φ →
+    Has Γ Δ (.dict d) (.dict Q) φ
   /-- States of a run, the loading of a term, steps, observable results. -/
   St : Type
   load : Tm → St

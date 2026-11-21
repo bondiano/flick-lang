@@ -16,6 +16,7 @@
 pub mod cert;
 pub mod check;
 pub mod decls;
+pub mod elab;
 pub mod eval;
 pub mod generate;
 pub mod handler;
