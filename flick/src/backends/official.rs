@@ -10,7 +10,7 @@ use std::{env, fs, process};
 use flick_backend::{BackendId, BackendPin, VersionRange};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::BackendPackage;
-use flick_core::project::lock::{LOCK_FILE, LockedBackend};
+use flick_core::project::lock::{LOCK_FILE, Lock, LockedBackend};
 use flick_core::project::{Project, store};
 use semver::Version;
 use serde::Deserialize;
@@ -75,6 +75,34 @@ pub(super) fn accepts(range: &VersionRange, version: &str) -> bool {
         return false;
     };
     min <= version && version < max
+}
+
+/// Resolves the official backend `id` for scaffolding (`flick new` / `flick init`),
+/// returning `(pin, bytes, lock_entry)`. A local checkout returns `None` for
+/// `lock_entry`; a release-index resolution returns `Some(entry)` so the
+/// generated project pins `[[backend]]` in `flick.lock`.
+pub(super) fn resolve_target(
+    id: &str,
+    existing_lock: Option<&Lock>,
+    offline: bool,
+) -> Result<(BackendPin, Vec<u8>, Option<LockedBackend>), Diagnostic> {
+    if let Some((pin, bytes)) = checkout(id) {
+        return Ok((pin, bytes, None));
+    }
+    let offline = offline || super::offline();
+    if let Some(entry) = existing_lock.and_then(|l| l.backends.iter().find(|b| b.id == id).cloned())
+    {
+        let bytes = fetched_with_offline(&entry, offline)?;
+        return Ok((pin_of(&entry), bytes, Some(entry)));
+    }
+    if offline {
+        return Err(failure(format!(
+            "`{LOCK_FILE}` pins no `{id}`, and `--offline` fetches nothing"
+        )));
+    }
+    let entry = latest(id)?;
+    let bytes = fetched_with_offline(&entry, false)?;
+    Ok((pin_of(&entry), bytes, Some(entry)))
 }
 
 /// Resolves the official backend `id` to `(pin, bytes)` for reading its

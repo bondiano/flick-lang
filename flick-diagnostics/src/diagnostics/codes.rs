@@ -307,6 +307,7 @@ codes! {
     P057 = Project 57, "removed build flag or configuration key";
     P058 = Project 58, "unknown or invalid backend option";
     P059 = Project 59, "unknown target backend";
+    P060 = Project 60, "unknown or unsupported project template";
 }
 
 #[cfg(test)]

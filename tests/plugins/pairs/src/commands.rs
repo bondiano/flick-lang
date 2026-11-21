@@ -2,7 +2,8 @@
 //! the fixture backend also adds.
 
 use flick_plugin::command::{
-    self, Descriptor, Diagnostic, File, Invocation, Parameter, Plan, Style, ValueKind,
+    self, Descriptor, Diagnostic, File, Invocation, Parameter, Plan, Style, TemplateDescriptor,
+    TemplateRequest, ValueKind,
 };
 
 pub(super) fn commands() -> Vec<Descriptor> {
@@ -42,5 +43,45 @@ pub(super) fn run(invocation: &Invocation) -> Result<Plan, Vec<Diagnostic>> {
         executable: false,
     });
     plan.stdout = format!("pairs greets {who}\n").into_bytes();
+    Ok(plan)
+}
+
+pub(super) fn templates() -> Vec<TemplateDescriptor> {
+    vec![TemplateDescriptor {
+        name: "pair-app".into(),
+        summary: "Minimal project from the pairs plugin".into(),
+    }]
+}
+
+pub(super) fn scaffold(request: &TemplateRequest) -> Result<Plan, Vec<Diagnostic>> {
+    if request.template != "pair-app" {
+        return Err(command::unknown_template(&request.template, &templates()));
+    }
+    let name = &request.name;
+    let compiler = &request.compiler;
+    let init = request.init;
+    let mut plan = Plan::empty();
+    plan.files = vec![
+        File {
+            path: "flick.toml".into(),
+            bytes: b"schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n"
+                .to_vec(),
+            executable: false,
+        },
+        File {
+            path: "src/App/Main.fl".into(),
+            bytes: format!(
+                "module App.Main exposing (main)\n\nmain : Unit ->{{Host.Console; AppError}} Unit\nlet main () = Platform.stdout_line \"pairs template {name}\"\n"
+            )
+            .into_bytes(),
+            executable: false,
+        },
+        File {
+            path: "NOTES.md".into(),
+            bytes: format!("pair-app {name} {compiler} init={init}\n").into_bytes(),
+            executable: false,
+        },
+    ];
+    plan.stdout = format!("Next: pairs template `{name}` ready\n").into_bytes();
     Ok(plan)
 }

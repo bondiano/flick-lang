@@ -1,0 +1,105 @@
+---
+source: flick/tests/cli/cli_template.rs
+expression: tree
+---
+=== .gitignore ===
+node_modules/
+dist/
+.flick/*
+!.flick/plugin-snapshots/
+=== AGENTS.md ===
+# Notes for coding agents
+
+This project is written in Flick, a statically typed functional language
+with effects that compiles to JavaScript or Go. It is young and changes
+between releases, so your training data likely gets its syntax and APIs
+wrong. Look them up for the compiler this project pins instead of
+borrowing them from Elm, OCaml or F#.
+
+## Look things up
+
+- `flick doc --std --out-dir .flick/std-docs` writes the standard library
+  of this compiler as one Markdown file per module, such as `List.md`;
+  search it before using a function.
+- `flick explain <CODE>` explains a diagnostic, such as `FLICK-E001`.
+- The [documentation](https://bondiano.github.io/flick-lang/) has the
+  language tour, the handbook, the CLI reference and the standard library
+  API. It follows the latest release.
+
+## Before you finish
+
+Run these and fix everything they report; a warning counts as a failure:
+
+```sh
+flick fmt
+flick check --warnings-as-errors
+flick test
+```
+
+`flick check --fix` applies the fixes that keep the program's meaning.
+
+## Conventions
+
+- `src/A/B.fl` holds `module A.B`; tests live under `test/`.
+- A function's type lists the effects it performs, `->{Host.Console} Unit`.
+  When the checker reports a missing effect, add it to the signature and
+  provide it where the program starts, such as `main`.
+- Add npm packages with `flick add` and install them with `flick install`,
+  which uses the pnpm version `package.json` pins.
+- `dist/` is build output; change the sources and rebuild.
+=== flick.toml ===
+schema-version = 1
+
+[project]
+kind = "app"
+entry = "App.Main"
+source-dir = "src"
+test-dir = "test"
+
+[build]
+out-dir = "dist"
+profile = "debug"
+target = "js"
+=== package.json ===
+{
+  "dependencies": {
+    "@flick-lang/runtime": "0.1.0"
+  },
+  "flick": {
+    "compiler": "0.1.0"
+  },
+  "name": "demo",
+  "packageManager": "pnpm@12.16.1",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0"
+}
+=== src/App/Greeting.fl ===
+module App.Greeting exposing (greet)
+
+/// A greeting for `name`.
+greet : String -> String
+let greet name = "Hello, " ++ name ++ "!"
+=== src/App/Main.fl ===
+module App.Main exposing (main)
+
+import App.Greeting exposing (greet)
+
+run : Unit ->{Host.Arguments, Host.Console} Unit
+let run () =
+  let name = Host.Arguments.args () |> List.head |> Option.with_default "world"
+  Host.Console.stdout_line (greet name)
+
+main : Unit ->{; AppError} Unit
+let main () = provide (Layer.merge Host.arguments Host.console) { run () }
+=== test/App/GreetingTest.fl ===
+module App.GreetingTest
+
+import App.Greeting exposing (greet)
+import Test exposing (expect, to)
+
+suite "greet" {
+  test "greets by name" {
+    expect (greet "Ada") |> to.equal "Hello, Ada!"
+  }
+}

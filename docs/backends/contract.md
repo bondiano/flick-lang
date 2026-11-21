@@ -264,7 +264,14 @@ with the executor above under the contributor's `[tools]` grant, linking
 each step's reads into its directory, and hands their outputs to `resume`
 when the plan asks for it. It then publishes the files of every plan in one
 transaction under the project's root. Help
-reads the descriptors cached by component digest, never a component. See
+reads the descriptors cached by component digest, never a component.
+
+The same interface also exports `templates` (`list<template-descriptor>`) and
+`scaffold` (`template-request -> result<plan, list<diagnostic>>`) for
+`flick new` and `flick init`. Template plans must be pure file plans (no
+`steps`, `resume`, or `needs`, and valid output paths within the target
+directory; violations are refused with `FLICK-P055` before creating files), and
+are published atomically. See
 [Contributed commands](../src/content/docs/reference/commands.md).
 
 ### Atomic publication

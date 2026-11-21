@@ -3,7 +3,7 @@
 //! the plan or the session they declare.
 
 mod inputs;
-mod plan;
+pub(crate) mod plan;
 mod preview;
 mod projection;
 mod session;
@@ -49,6 +49,11 @@ pub(crate) trait Contributor: Send + Sync {
         cancel: &Cancellation,
     ) -> Result<command::Handled, String>;
     fn close(&self, state: Vec<u8>) -> command::Plan;
+    fn templates(&self) -> Result<Vec<command::TemplateDescriptor>, String>;
+    fn scaffold(
+        &self,
+        request: &command::TemplateRequest,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>>;
 }
 
 /// A backend or a plugin of the project that may add commands.

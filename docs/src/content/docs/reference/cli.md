@@ -24,8 +24,8 @@ of their own. `flick --help` lists them by contributor, and they run as
 
 | Command | What it does |
 | - | - |
-| `new <dir> [--template app\|cli\|fullstack\|lib\|plugin]` | creates a project: `flick.toml`, `package.json`, an example module and its test, and an `AGENTS.md` that tells coding agents where to look Flick up and which checks to pass; `cli` makes `main` a [`cli` block](../cli-dsl/); `plugin` is a library with a [plugin](../plugins/), its crate in `plugin/` and `flick run plugin` to build it; `fullstack` is a server entry and a browser page (`target = "client"`) sharing the calls of a [`server fn`](../server-fn/) module, writes guarded by `Server.authenticated`, with Vite for the page |
-| `init [--template app\|cli\|fullstack\|lib]` | the same files in the working directory; every file that exists is reported before anything is written (`FLICK-P019`), except an existing `AGENTS.md`, which is kept |
+| `new <dir> [--target <name>] [--template <name>] [--from <source> [--tag <tag> [--subdir <dir>] \| --sha256 <hex>]]` | creates a project from a template contributed by the selected target backend (`js` by default: `app`, `cli`, `fullstack`, `lib`, `plugin`; `go`: `app`, `cli`, `lib`, `plugin`) or a third-party `--from` package (local path, tarball URL with `--sha256`, or git repository with `--tag` and optional `--subdir`); every template file, including `flick.toml`, comes from the contributor, `--from` pins the template under `[[template]]` in `flick.lock`, an unsupported template is `FLICK-P060` listing the available ones, and an unknown `--target` is `FLICK-P059` |
+| `init [--target <name>] [--template <name>] [--from <source> [--tag <tag> [--subdir <dir>] \| --sha256 <hex>]]` | adds the template files to the working directory while keeping existing unrelated files; every colliding template file is reported before anything is written (`FLICK-P019`), except an existing `AGENTS.md`, which is kept, and `flick.lock`, into which new pins are merged |
 | `check [paths] [--watch] [--fix [--only codes]]` | checks; without paths the source and test roots; `--fix` applies the fixes that keep the program's meaning (such as removing a type annotation the value already has, `FLICK-T021`) to those files and reports what is left; `--only E002,F001` applies only the fixes of those codes, for a migration that changes nothing else |
 | `prove [paths] [--watch]` | checks the proofs of the proof root (`project.proof-dir`), or of the files given, with the code they name; `check`, `build` and `test` never read the proof root (see [the proof contract](https://github.com/bondiano/flick-lang/blob/main/docs/formal/proofs.md)) |
 | `build [paths] [--target <name>] [--profile] [--labels all\|components\|none] [--emit-ir[=json\|cbor]] [--out-dir] [--watch] [<backend options>]` | compiles the project with the selected target backend (`js` by default: ESM, source maps and `.iface` files; `--target go`: a Go executable per entry, see [Go target](../codegen/#go-target)); target-specific flags such as `--typescript`, `--declarations`, `--promise-facade`, `--schema-aot`, `--runtime`, `--ui` (`flick/js`) or `--cgo` (`flick/go`) are declared by the selected backend (see [Target and backend options](#target-and-backend-options)); `--emit-ir` adds `program.ir.json` (or `program.ir.cbor`): the IR the backend gets, optimized in a release build, with the version of the IR it is written in; shows build phases on stderr, then the module count and entry runners, or error counts and locations; `--silent`/`--quiet` and `--diagnostics json` suppress progress and the summary |
@@ -110,6 +110,40 @@ flags are removed with no compatibility aliases and fail with `FLICK-P057`
 
 Arguments after `--` (such as `flick run app -- --rt`) are passed straight to
 the program or script and are never parsed by `flick`.
+
+### Project templates (`new` and `init`)
+
+`flick new <dir>` and `flick init` take their project templates from the
+selected target backend (`--target js` by default, or `--target go`) or from a
+third-party package named by `--from` (which conflicts with `--target`).
+When `--template <name>` is omitted, `flick` picks `app` if the contributor
+declares one, or the sole template if it declares only one. Requesting an
+unsupported template fails with `FLICK-P060` (exit code `2`) and lists every
+available template with its summary.
+
+- **`flick/js` (`--target js`)**: `app`, `cli` (a [`cli` block](../cli-dsl/)
+  entry), `fullstack` (server and client entries sharing a [`server fn`](../server-fn/)
+  module with Vite), `lib`, and `plugin` (a library with a [plugin](../plugins/)
+  crate in `plugin/`).
+- **`flick/go` (`--target go`)**: `app`, `cli`, `lib`, and `plugin` (with
+  `[build] target = "go"` and `[tools] "flick/go" = ["go"]`, and no
+  `package.json`).
+- **Third-party packages (`--from <source>`)**: accepts a local directory
+  (`--from ./my-templates`), a gzipped tarball URL with its digest
+  (`--from https://example.com/tpl.tgz --sha256 <64-hex>`), or a git tag
+  (`--from https://example.com/repo --tag v1.0.0 [--subdir pkg]`), using the
+  same verification and package store as `flick add`. Remote `--from` URLs
+  without `--sha256` or `--tag` are refused (`FLICK-P032`). The generated
+  project records the verified source and component digest under `[[template]]`
+  in `flick.lock` (preserved by `flick install`). Official release-asset
+  backends are pinned under `[[backend]]` in `flick.lock` so later builds work
+  offline.
+
+Template plans are pure file plans: any template returning host tool steps,
+`resume`, `needs`, or escaping paths is refused with `FLICK-P055` before
+anything is created. `flick init` keeps unrelated files and any existing
+`AGENTS.md`, merges new lockfile pins into an existing `flick.lock`, and
+refuses any other colliding file with `FLICK-P019` before writing.
 
 ## Outputs and the cache
 
