@@ -1,6 +1,6 @@
 ---
 title: "Сервисы, слои и хост"
-source_hash: e20e7c0ffadfcf24
+source_hash: 46e2cbb5f4c24f09
 ---
 
 Сервис — набор операций, реализацию которых программа находит там, где
@@ -331,7 +331,7 @@ let selected () =
 | Где | Сервисы `Host` |
 | - | - |
 | Node | все шесть: `Runner.Node` предоставляет `Host.Live`, а средство запуска входа без раннера — те, что называет `main` |
-| Go (`emit = "go"`) | все шесть, что бы ни называл `main` |
+| Go (`[build] target = "go"`) | все шесть, что бы ни называл `main` |
 | `Runner.Browser`, `Runner.Cloudflare` | `Host.BrowserLive`: `Console`, `Clock` и `Random`; Cloudflare предоставляет рядом с ними свой `Env` |
 | [песочница](../../play/) | те, что называет `main`, без переменных окружения и без аргументов; дочерний процесс там не запустить |
 | `flick test` | `Host.Live` для `Test.effect_test`, `clock_test`, `suite` и `it` |

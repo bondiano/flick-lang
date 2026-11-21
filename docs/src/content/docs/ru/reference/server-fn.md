@@ -1,6 +1,6 @@
 ---
 title: "Серверные функции"
-source_hash: 419310bf8e8efb2a
+source_hash: 1cd5c516da779fca
 ---
 
 `server fn` — функция, которая выполняется на сервере и которую любой код,
@@ -186,7 +186,7 @@ let functions =
 
 ## На Go-target
 
-Серверный вход, собранный с `emit = "go"`, обслуживает `server fn` так
+Серверный вход, собранный с `[build] target = "go"` (или `--target go`), обслуживает `server fn` так
 же, как собранный для js-target: `Server.handler` отвечает на те же
 POST-запросы к `Server.path`, вызовы в его процессе идут в памяти, а
 остальные его вызовы уходят на origin `Server.with_origin`. Поэтому Go-бэкенд

@@ -14,7 +14,7 @@ contract = { path = "../contract" }
 
 [build]
 out-dir = "dist/flick"
-emit = "js"
+target = "js"
 
 # Tight thresholds: a function that grows past them is split.
 [lint]

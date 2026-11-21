@@ -17,29 +17,60 @@ use crate::codegen::{self, GO_SUM, Input, PACKAGES, Package, RUNTIME, Unsupporte
 /// The name of the program that runs a project's tests.
 const TEST: &str = "test";
 
+fn inspect(
+    request: &BuildRequest,
+    data: &Data,
+    own: &[&Module],
+    builtins: &[&Module],
+    paths: &BTreeMap<String, String>,
+    lines: &[&[u32]],
+    lang: &Known,
+) -> Result<BuildResult, Vec<Diagnostic>> {
+    let module = data
+        .inspect_module
+        .as_deref()
+        .or(request.module_root.as_deref())
+        .ok_or_else(|| failure("P012", "inspect requires a module name"))?;
+    let output = codegen::go_module(
+        &Input {
+            own,
+            builtins,
+            entry: "",
+            suites: &[],
+            test: false,
+            paths,
+            lines,
+            foreign: &data.foreign,
+            bindings: &data.bindings,
+            lang,
+        },
+        module,
+    );
+    if !output.diagnostics.is_empty() {
+        return Err(output.diagnostics.into_iter().map(diagnostic).collect());
+    }
+    Ok(BuildResult {
+        artifacts: output
+            .files
+            .into_iter()
+            .map(|(path, contents)| Artifact {
+                id: format!("go:inspect/{path}"),
+                path,
+                kind: ArtifactKind::Source,
+                bytes: contents.into_bytes(),
+            })
+            .collect(),
+        steps: vec![],
+        runtime_dependencies: vec![],
+        launches: vec![],
+        diagnostics: vec![],
+    })
+}
+
 pub(super) fn generate(
     request: &BuildRequest,
     data: &Data,
 ) -> Result<BuildResult, Vec<Diagnostic>> {
-    let programs: Vec<(&str, &str)> = if data.command == Command::Test {
-        vec![(TEST, "")]
-    } else {
-        (request.entries.iter())
-            .map(|e| (e.name.as_str(), e.symbol.module.as_str()))
-            .collect()
-    };
-    if programs.is_empty() {
-        return Err(failure(
-            "P012",
-            "the go target builds an app: there is no entry whose `main` it runs",
-        ));
-    }
-    let Some(go) = request.toolchains.iter().find(|t| t.id == "go") else {
-        return Err(failure(
-            "P029",
-            "the go target needs the host tool `go`: install Go 1.23 or later and allow it, with `[tools]` `\"flick/go\" = [\"go\"]` in a project or `--allow-tool go` outside one",
-        ));
-    };
     let lang = Known::of(&data.program.lang);
     let role = |m: &Module| {
         (request.modules.iter())
@@ -61,6 +92,33 @@ pub(super) fn generate(
     let builtins: Vec<&Module> = (data.program.modules.iter())
         .filter(|m| role(m) == Some(ModuleRole::Builtin))
         .collect();
+    // a built-in module has no source of the build to name
+    let paths: BTreeMap<String, String> = (own.iter())
+        .filter_map(|m| Some((m.name.clone(), data.facts.get(&m.name)?.line_path.clone())))
+        .collect();
+    let lines: Vec<&[u32]> = data.lines.iter().map(Vec::as_slice).collect();
+    if data.command == Command::Inspect {
+        return inspect(request, data, &own, &builtins, &paths, &lines, &lang);
+    }
+    let programs: Vec<(&str, &str)> = if data.command == Command::Test {
+        vec![(TEST, "")]
+    } else {
+        (request.entries.iter())
+            .map(|e| (e.name.as_str(), e.symbol.module.as_str()))
+            .collect()
+    };
+    if programs.is_empty() {
+        return Err(failure(
+            "P012",
+            "the go target builds an app: there is no entry whose `main` it runs",
+        ));
+    }
+    let Some(go) = request.toolchains.iter().find(|t| t.id == "go") else {
+        return Err(failure(
+            "P029",
+            "the go target needs the host tool `go`: install Go 1.23 or later and allow it, with `[tools]` `\"flick/go\" = [\"go\"]` in a project or `--allow-tool go` outside one",
+        ));
+    };
     let suites: Vec<String> = if data.command == Command::Test {
         (request.test_roots.iter())
             .map(|s| s.module.clone())
@@ -68,11 +126,6 @@ pub(super) fn generate(
     } else {
         vec![]
     };
-    // a built-in module has no source of the build to name
-    let paths: BTreeMap<String, String> = (own.iter())
-        .filter_map(|m| Some((m.name.clone(), data.facts.get(&m.name)?.line_path.clone())))
-        .collect();
-    let lines: Vec<&[u32]> = data.lines.iter().map(Vec::as_slice).collect();
     let mut result = BuildResult {
         artifacts: vec![],
         steps: vec![],
@@ -157,7 +210,7 @@ fn add(
         environment: vec![
             env("GOFLAGS", "-mod=mod"),
             env("GOTOOLCHAIN", "local"),
-            env("CGO_ENABLED", "0"),
+            env("CGO_ENABLED", if data.cgo { "1" } else { "0" }),
         ],
         inputs,
         outputs: vec![StepOutput {

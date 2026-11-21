@@ -8,4 +8,4 @@ entries = { server = "Load.Server", client = { module = "Load.Client", runner = 
 [build]
 out-dir = "dist"
 profile = "release"
-emit = "js"
+target = "js"

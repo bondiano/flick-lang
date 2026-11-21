@@ -4,7 +4,6 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 
 use flick_core::ide::{Location, Target};
-use flick_core::project::config::Emit;
 use flick_core::project::normalize;
 use flick_core::source::FileId;
 use flick_core::syntax::kind::SyntaxKind as K;
@@ -50,7 +49,7 @@ pub(super) fn definition(snapshot: &Snapshot, file: FileId, offset: u32) -> Opti
     if !matches!(extension, "js" | "mjs" | "ts" | "mts") {
         return None;
     }
-    let path = if snapshot.emit == Emit::Go {
+    let path = if snapshot.go {
         path.with_extension("go")
     } else {
         path
@@ -63,7 +62,7 @@ pub(super) fn definition(snapshot: &Snapshot, file: FileId, offset: u32) -> Opti
         })
     } else {
         let text = fs::read_to_string(&path).ok()?;
-        let (start, end) = if snapshot.emit == Emit::Go {
+        let (start, end) = if snapshot.go {
             go_name(&text, &export)?
         } else {
             js_name(&text, &export)?

@@ -12,7 +12,6 @@ use std::{env, fs, io};
 use flick_core::diagnostics::Severity;
 use flick_core::project;
 use flick_core::source::SourceMap;
-use flick_core::types::Thresholds;
 use flick_model::memory::{Error as MemoryError, Heap, ProgramOutcome, Value};
 use flick_model::run;
 use flick_model::syntax::Path as ModelPath;
@@ -239,20 +238,8 @@ fn check_language_exports(fuel: u64, summary: &mut CorpusSummary) {
         root: dir,
         config: project::Config {
             kind: project::config::Kind::App,
-            source_dir: "src".into(),
-            test_dir: "test".into(),
-            proof_dir: "proofs".into(),
-            entries: vec![],
-            dependencies: vec![],
-            js_dependencies: vec![],
-            package: None,
-            build: project::config::Build::default(),
             sql_dialect: "postgres",
-            allow: vec![],
-            no_let_assert: false,
-            thresholds: Thresholds::default(),
-            plugins: BTreeMap::new(),
-            tools: BTreeMap::new(),
+            ..project::Config::default()
         },
         config_file,
         workspace: None,

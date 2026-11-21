@@ -177,7 +177,7 @@ pub fn doctor(global: &GlobalArguments) -> Outcome {
         None => line(
             None,
             "Go",
-            "not found (the `go` target only: `--emit go`)".to_owned(),
+            "not found (the `go` target only: `--target go`)".to_owned(),
         ),
     }
     installed(root.as_deref(), &mut line);

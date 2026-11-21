@@ -26,7 +26,7 @@ module path. Go orders individual initializers by their value dependencies.
 | Path in the output directory | Contents |
 | - | - |
 | `A/B.js`, `A/B.js.map` | module `A.B` and its source map |
-| `_flick/<Name>.js` | the built-in modules the program reaches (`Prelude`, `Platform`, …); with `--emit-dts`, all of them |
+| `_flick/<Name>.js` | the built-in modules the program reaches (`Prelude`, `Platform`, …); with `--declarations`, all of them |
 | `flick-main.js`, `flick-<name>.js` | the launcher for each app entry: imports its `main` from the defining module and starts it through the runtime, or calls a pure `main` directly; without schema AOT, a pure launcher needs no runtime import |
 | `package.json` | `{ "type": "module", "sideEffects": ["./flick-main.js"] }`, listing every runner; `"sideEffects": false` without one |
 
@@ -38,8 +38,8 @@ module never runs anything: modules only define values. A top-level value
 that is a call, a derived instance or an immediately run arrow is marked
 `/*#__PURE__*/`, so a bundler drops what the program does not use.
 
-Code built by default or with `--rt` imports `@flick-lang/runtime/rt`.
-An explicit `effect = "effect"` build imports `@flick-lang/effect-ts`; the adapter provides `Effect`.
+Code built by default or with `--runtime rt` imports `@flick-lang/runtime/rt`.
+An explicit `[target.js] runtime = "effect"` (or `--runtime effect`) build imports `@flick-lang/effect-ts`; the adapter provides `Effect`.
 A module that has no runtime stage imports no `Effect` at all.
 
 ## Values
@@ -282,7 +282,7 @@ build machine ships with it.
 
 ## TypeScript
 
-`flick build --emit ts` (or `emit = "ts"` in `flick.toml`) writes the same
+`flick build --typescript` (or `[target.js] typescript = true` in `flick.toml`) writes the same
 modules as `.ts` files, importing each other with the `.ts` extension. Each
 module declares the TypeScript form of the types it exports and annotates its
 exported values with their projected types (see [Public TypeScript interfaces](../../spec/06-typescript-and-ffi/#public-typescript-interfaces)):
@@ -327,7 +327,7 @@ type Cursor
 | - | - |
 | `@ts "form"` | the form: `{i}` is the type's argument `i` (from 0), `{i:row}` that argument as a row of services or errors |
 | `@ts import "module" "Export"` | a `$Export` of the form is that export of the module, named as `foreign … from` names one: a package as written, a file by its path from the source of the module that declares the type |
-| `@ts none` | the type has no form: an export whose type names it is `FLICK-F004` under `--emit-dts` |
+| `@ts none` | the type has no form: an export whose type names it is `FLICK-F004` under `--declarations` |
 
 A form is the text of a type and nothing else: names, `.`, `|`, `&`, `?`,
 `:`, `=>` and the brackets `<…>`, `(…)`, `[…]`, with a `,` inside brackets
@@ -344,7 +344,7 @@ build is for. The built-in types have no `@ts`: the backend gives each its
 form by lang item, `ReadonlyArray<A>` for `List a` and the runtime's own type
 for `Option a`, as another backend gives them its representation.
 
-`--emit-dts` (or `emit-dts = true`) writes `A/B.d.ts` beside each module: the
+`--declarations` (or `[target.js] declarations = true`) writes `A/B.d.ts` beside each module: the
 same declarations, `export declare const` for every exported value and
 constructor, and the dictionary of each instance without a context. An export
 whose type has no TypeScript form is `FLICK-F004`; the declarations never
@@ -357,7 +357,7 @@ names on hover; unlike an object type it has no implicit index signature, so
 it is not assignable to `Record<string, unknown>`. Other aliases stay
 `export type`.
 
-`--promise-facade` (or `promise-facade = true`) writes `A/B.promise.js` and
+`--promise-facade` (or `[target.js] promise-facade = true`) writes `A/B.promise.js` and
 its `.d.ts` for each exported runtime function that needs no service and
 whose earlier stages only make closures: `f(a, b, options?)` runs `f a b`
 under an owner of its own and returns `Promise<Result<A, E>>`. An expected
@@ -369,7 +369,7 @@ completed calls release their abort listeners. Importing either file runs nothin
 
 A type TypeScript cannot state faithfully — a higher-kinded variable, a
 region or a value holding one, an open record — has no projection: the export
-stays `any` in `--emit ts`, and `--emit-dts` reports it. Code inside a module
+stays `any` in `--typescript`, and `--declarations` reports it. Code inside a module
 is annotated `any`: the source types live in the Flick checker and its
 `.iface`. The output runs as it is on Node (type stripping) and passes
 `tsc --noEmit` with `strict`, `allowImportingTsExtensions` and
@@ -414,7 +414,7 @@ cancellation points, explicit yields and finalizers of the program do not.
 
 ## Go target
 
-`emit = "go"` (or `--emit go`) builds an app into one executable without
+`[build] target = "go"` (or `--target go`) builds an app into one executable without
 Node. The official backend component `flick/go` writes, for each entry, a Go
 module under `go/<entry>/` of the output, `package main` with one file per
 Flick module and the runtime package `flickrt` beside it, and declares a
@@ -646,5 +646,5 @@ runner's options, seeds and output. Building needs Go 1.23 or later on
 toolchain, and the executable it builds needs nothing installed. The
 project must also let the backend run it: `[tools]` `"flick/go" = ["go"]`
 in `flick.toml`, or `--allow-tool go` for a file built outside a project
-(`FLICK-P029` otherwise). It is built without cgo, so no C compiler is
-needed either.
+(`FLICK-P029` otherwise). It is built without cgo by default, so no C compiler is
+needed either; pass `--cgo` (or `[target.go] cgo = true`) to build with `CGO_ENABLED=1`.

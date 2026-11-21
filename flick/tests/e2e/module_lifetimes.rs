@@ -12,10 +12,14 @@ fn higher_order_reference_fixture_runs_on_js_and_go() {
                 .arg(&file)
                 .arg("--out-dir")
                 .arg(&out)
-                .arg("--emit")
+                .arg("--target")
                 .arg(emit)
                 // outside a project, only the flag lets the Go backend run `go build`
-                .args(if emit == "go" { &["--allow-tool", "go"][..] } else { &[] })
+                .args(if emit == "go" {
+                    &["--allow-tool", "go"][..]
+                } else {
+                    &["--runtime", "effect"][..]
+                })
                 .arg("--profile")
                 .arg(profile)
                 .output()
@@ -59,9 +63,13 @@ fn higher_order_repository_layers_acquire_and_release_on_js_and_go() {
                 .arg(&main)
                 .arg("--out-dir")
                 .arg(&out)
-                .args(["--emit", emit, "--profile", profile, "--offline"])
+                .args(["--target", emit, "--profile", profile, "--offline"])
                 // outside a project, only the flag lets the Go backend run `go build`
-                .args(if emit == "go" { &["--allow-tool", "go"][..] } else { &[] })
+                .args(if emit == "go" {
+                    &["--allow-tool", "go"][..]
+                } else {
+                    &["--runtime", "effect"][..]
+                })
                 .output()
                 .expect("build runs");
             assert!(

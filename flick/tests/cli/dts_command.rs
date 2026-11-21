@@ -1,4 +1,4 @@
-//! `flick build --emit-dts --promise-facade` on a library: the declarations
+//! `flick build --declarations --promise-facade` on a library: the declarations
 //! have no `any` and pass `tsc --strict` together with a consumer, and the
 //! Promise façade keeps expected failures, defects and imports apart. Needs
 //! Node and `pnpm install`: run with `--ignored` (part of `just e2e`).
@@ -193,7 +193,7 @@ fn project(name: &str) -> PathBuf {
     fs::create_dir_all(dir.join("src/Lib")).expect("dir");
     fs::write(
         dir.join("flick.toml"),
-        "schema-version = 1\n\n[project]\nkind = \"lib\"\n\n[build]\neffect = \"effect\"\n",
+        "schema-version = 1\n\n[project]\nkind = \"lib\"\n\n[target.js]\nruntime = \"effect\"\n",
     )
     .expect("write");
     fs::write(
@@ -210,7 +210,7 @@ fn project(name: &str) -> PathBuf {
 #[ignore = "needs Node and pnpm install"]
 fn declarations_pass_tsc_and_the_facade_separates_outcomes() {
     let dir = project("library");
-    let out = flick_in(&dir, &["build", "--emit-dts", "--promise-facade"]);
+    let out = flick_in(&dir, &["build", "--declarations", "--promise-facade"]);
     assert!(out.status.success(), "{out:?}");
     fs::write(dir.join("consumer.ts"), CONSUMER).expect("write");
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
@@ -240,7 +240,16 @@ fn declarations_pass_tsc_and_the_facade_separates_outcomes() {
     );
     facade_outcomes(&dir);
     // the same calls on Flick's own runtime
-    let out = flick_in(&dir, &["build", "--emit-dts", "--promise-facade", "--rt"]);
+    let out = flick_in(
+        &dir,
+        &[
+            "build",
+            "--declarations",
+            "--promise-facade",
+            "--runtime",
+            "rt",
+        ],
+    );
     assert!(out.status.success(), "{out:?}");
     facade_outcomes(&dir);
 }
@@ -274,7 +283,7 @@ fn facade_outcomes(dir: &Path) {
 fn an_abstract_higher_kinded_export_has_no_declaration() {
     let dir = project("abstract");
     fs::write(dir.join("src/Lib/Abstract.fl"), HKT).expect("write");
-    let out = flick_in(&dir, &["build", "--emit-dts"]);
+    let out = flick_in(&dir, &["build", "--declarations"]);
     assert_eq!(out.status.code(), Some(1), "{out:?}");
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(stderr.contains("FLICK-F004"), "{stderr}");
@@ -285,7 +294,7 @@ fn an_abstract_higher_kinded_export_has_no_declaration() {
     // a package with declarations refuses the same export before any tarball
     fs::write(
         dir.join("flick.toml"),
-        "schema-version = 1\n\n[project]\nkind = \"lib\"\n\n[build]\nemit-dts = true\n",
+        "schema-version = 1\n\n[project]\nkind = \"lib\"\n\n[target.js]\ndeclarations = true\n",
     )
     .expect("write");
     let pack = flick_in(&dir, &["pack", "--out-dir", "artifacts"]);
@@ -323,7 +332,7 @@ fn dotted_and_underscored_module_types_have_distinct_namespaces() {
          pair : (Foo.Bar.Token, Foo_Bar.Token)\nlet pair = (dot, underscore)\n",
     )
     .expect("write");
-    let build = flick_in(&dir, &["build", "--emit-dts"]);
+    let build = flick_in(&dir, &["build", "--declarations"]);
     assert!(build.status.success(), "{build:?}");
     fs::write(
         dir.join("consumer.ts"),
@@ -390,7 +399,7 @@ fn a_barrel_re_exports_what_it_exposes_from_its_modules() {
          import Lib.Pair exposing (pair, Box(..), Point)\n",
     )
     .expect("write");
-    let build = flick_in(&dir, &["build", "--emit-dts"]);
+    let build = flick_in(&dir, &["build", "--declarations"]);
     assert!(build.status.success(), "{build:?}");
     fs::write(
         dir.join("consumer.ts"),
@@ -458,7 +467,7 @@ fn streams_services_and_sync_exports_cross_into_effect_typescript() {
     fs::create_dir_all(dir.join("src/Lib")).expect("dir");
     fs::write(
         dir.join("flick.toml"),
-        "schema-version = 1\n\n[project]\nkind = \"lib\"\n\n[build]\neffect = \"effect\"\n",
+        "schema-version = 1\n\n[project]\nkind = \"lib\"\n\n[target.js]\nruntime = \"effect\"\n",
     )
     .expect("write");
     fs::write(dir.join("package.json"), "{\"type\":\"module\"}\n").expect("write");
@@ -472,7 +481,7 @@ fn streams_services_and_sync_exports_cross_into_effect_typescript() {
          doubled : Unit ->{Atom.Read;} Float\nlet doubled () = Atom.value count * 2\n",
     )
     .expect("write");
-    let build = flick_in(&dir, &["build", "--emit-dts"]);
+    let build = flick_in(&dir, &["build", "--declarations"]);
     assert!(build.status.success(), "{build:?}");
     // a TypeScript caller uses the Effect library's own API on Flick's values
     fs::write(

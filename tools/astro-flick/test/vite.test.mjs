@@ -51,7 +51,7 @@ const project = (dir) => {
   const file = path.join(dir, "src/Ui/Widget.fl");
   const shared = path.join(dir, "src/Shared.fl");
   const config = path.join(dir, "flick.toml");
-  const settings = (labels, sourceDir = "src") => `schema-version = 1\n[project]\nkind = "lib"\nsource-dir = "${sourceDir}"\n[build]\nemit = "ts"\nlabels = "${labels}"\n`;
+  const settings = (labels, sourceDir = "src") => `schema-version = 1\n[project]\nkind = "lib"\nsource-dir = "${sourceDir}"\n[build]\nlabels = "${labels}"\n[target.js]\ntypescript = true\n`;
   const answer = (n) => `module Shared exposing (answer)\n\nanswer : Int\nlet answer = ${n}\n`;
   writeFileSync(config, settings("none"));
   writeFileSync(shared, answer(1));

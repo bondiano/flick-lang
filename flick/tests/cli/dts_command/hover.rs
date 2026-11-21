@@ -64,7 +64,7 @@ fn typescript_shows_the_alias_and_its_docs_on_hover() {
          let area shape =\n  match shape with\n  | Circle r -> r * r\n  | Square side -> side * side\n",
     )
     .expect("write");
-    let build = flick_in(&dir, &["build", "--emit-dts"]);
+    let build = flick_in(&dir, &["build", "--declarations"]);
     assert!(build.status.success(), "{build:?}");
     fs::write(
         dir.join("consumer.ts"),

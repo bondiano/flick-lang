@@ -54,10 +54,10 @@ fn a_suite_builds_its_layer_once_around_its_tests() {
     let dir = project();
     // `rt`: on Flick's own runtime
     for emit in ["js", "go", "rt"] {
-        let flags: &[&str] = if emit == "rt" {
-            &["--rt"]
-        } else {
-            &["--emit", emit]
+        let flags: &[&str] = match emit {
+            "rt" => &["--target", "js", "--runtime", "rt"],
+            "js" => &["--target", "js", "--runtime", "effect"],
+            _ => &["--target", emit],
         };
         let out = flick_in(&dir, &[&["test"], flags].concat());
         let stdout = String::from_utf8_lossy(&out.stdout);

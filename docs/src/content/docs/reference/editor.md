@@ -186,7 +186,7 @@ path fails to start rather than silently falling back to another binary.
 
 For editors of TypeScript the compiler projects each module to a virtual
 `App/Main.flick.ts`: a declaration per export, in the same TypeScript form
-as `--emit-dts` (a type without one becomes `unknown` with the reason), and
+as `--declarations` (a type without one becomes `unknown` with the reason), and
 span maps between the projection and the `.fl` source. A name maps exactly
 (the same text on both sides), a type does not; only an exact mapping can
 carry a rename across languages. The first line names the fingerprint of

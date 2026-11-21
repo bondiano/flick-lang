@@ -21,6 +21,7 @@ mod foreign;
 mod generate;
 mod handle;
 mod input;
+mod inspect;
 mod items;
 mod layout;
 mod loops;
@@ -35,6 +36,7 @@ mod typed;
 
 pub use foreign::{Bindings, is_relative};
 pub use input::Input;
+pub use inspect::go_module;
 pub use main_file::OPTIONAL;
 pub use runtime::{GO_MOD, GO_SUM, PACKAGES, Package, RUNTIME, go_mod};
 pub use shape::Types;

@@ -234,16 +234,21 @@ jobs:
   # plugins built as WebAssembly components, run by wasmtime
   plugins:
     runs-on: ubuntu-26.04
-    # Cold guest, host and release builds plus conformance can reach 30m;
-    # leave time for the final typed-DSL validation without skipping checks.
-    timeout-minutes: 35
+    # Cold guest, host, e2e and release builds plus conformance and plugin
+    # suites can exceed 35m on slower runners; match the 60m budget of `test`,
+    # `e2e-js` and `model` without skipping checks.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
       - run: rustup show active-toolchain || rustup toolchain install
-      # the plugin tests build the compiler in the `e2e` profile, as the e2e jobs do
+      # keep a dedicated rust-cache key: `just wasm-plugins` also builds `dev`
+      # clippy, `--release` (`default_backend`) and wasm32 guest targets that
+      # `shared-key: e2e` jobs never compile and therefore never save
       - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-go@v7
         with:
-          shared-key: e2e
+          go-version-file: runtime-go/go.mod
+          cache-dependency-path: runtime-go/go.sum
       - uses: taiki-e/install-action@v2
         with:
           tool: just@1.59.0

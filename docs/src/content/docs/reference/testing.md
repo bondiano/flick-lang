@@ -364,8 +364,9 @@ property test.
 ## Running
 
 `flick test` builds the project with its test root into `.flick/test/` and
-runs the selected cases, on Node, on Flick's own runtime (`--rt`) or as a Go
-executable (`--emit go`), with the same names and reports on each.
+runs the selected cases, on Node (on Flick's own runtime `--runtime rt` or
+the Effect adapter `--runtime effect`) or as a Go
+executable (`--target go`), with the same names and reports on each.
 
 | Option | Meaning |
 | - | - |

@@ -71,10 +71,11 @@ fn a_module_that_drops_out_leaves_no_js_file_behind() {
             &[("A.fl", with), ("B.fl", b), ("out/notes.txt", "mine")],
         );
         let build = || {
-            flick_in(
-                &root,
-                &["build", "A.fl", "--emit", emit, "--out-dir", "out"],
-            )
+            let mut args = vec!["build", "A.fl", "--out-dir", "out"];
+            if emit == "ts" {
+                args.push("--typescript");
+            }
+            flick_in(&root, &args)
         };
         let first = build();
         assert!(first.status.success(), "{first:?}");

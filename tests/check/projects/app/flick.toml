@@ -9,8 +9,10 @@ entry = "App.Main"
 [build]
 out-dir = "dist"
 profile = "debug"
-emit = "js"
-emit-dts = false
+target = "js"
+
+[target.js]
+declarations = false
 schema-aot = false
 
 [dependencies]

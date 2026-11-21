@@ -4,12 +4,11 @@ use std::sync::Arc;
 use std::{env, fs};
 
 use super::capabilities::needs_adapter;
-use super::{Extras, Settings, builtin_modules_of, emit};
+use super::{Backend, Extras, Settings, builtin_modules_of, emit};
 use crate::codegen::EffectBridge;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::ir::ItemKind;
 use crate::ir::tests::check_text;
-use crate::project::config::Backend;
 use crate::project::{Compilation, Compiled};
 use crate::source::SourceMap;
 

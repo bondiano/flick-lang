@@ -1,6 +1,6 @@
 ---
 title: "Проект"
-source_hash: 12368ec405820e76
+source_hash: 9702b09709eff825
 ---
 
 Проект — каталог с `flick.toml` (см. [CLI компилятора](../cli/)).
@@ -23,10 +23,14 @@ entry = "App.Main"
 [build]
 out-dir = "dist"
 profile = "debug"
-emit = "js"
-emit-dts = false
+target = "js"
+
+[target.js]
+typescript = false
+declarations = false
 promise-facade = false
 schema-aot = false
+runtime = "rt"
 
 [sql]
 dialect = "postgresql"
@@ -52,16 +56,11 @@ max-params = 5
 | `project.runner` | модуль, который запускает каждый вход без своего runner'а: экспортирует `type alias Main` — тип, который должен иметь `main` (иначе `FLICK-P026`), — и `run`, который принимает `main`; раннер экспортирует его результат как `default`; встроены `"Runner.Node"`, `"Runner.Browser"` и `"Runner.Cloudflare"` — Worker, чей `fetch` передаёт `main : Runner.Cloudflare.Fetch ->{Runner.Cloudflare.Env; AppError} Http.ServerResponse.ServerResponse` запрос и контекст (`wait_until`), а привязки предоставляет сервисом `Env` (`Runner.Cloudflare.var`, `binding`) вместе с живыми браузерными сервисами `Host.BrowserLive`; так runner может предоставлять сервисы, и `main` может требовать любые из тех, что названы в его `Main`; другой может дать пакет; без него чистый `main` вызывается, а эффект выполняется как на Node | — |
 | `build.out-dir` | базовый каталог для артефактов сборки; не корень проекта, не каталог исходников или тестов и не каталог над ними (`FLICK-P028`, до любой записи) | `"dist"` |
 | `build.profile` | `"debug"` или `"release"` (см. [генерацию кода](../codegen/)); `--profile` у `build` и `test` переопределяет это значение | `"debug"` |
-| `build.emit` | `"js"`, `"ts"` или `"go"`: Go-модуль на каждый вход в `go/<entry>/`, который `go build` собирает в исполняемый файл `flick-<entry>`; Go должен быть в `PATH` и разрешён в `[tools]` как `"flick/go" = ["go"]` (`FLICK-P029`), импорт модуля только для js (`Ui`, `Atom`, `Action`, `Otlp`, `DevTools`, `Js`, runner'ы `Node`/`Browser`/`Cloudflare`) или пакета, собранного не для go, — `FLICK-P030` уже в `flick check`, а то, что Go-target ещё не компилирует, — `FLICK-P012` (см. [Go-target](../codegen/#go-target)) | `"js"` |
-| `build.environment` | пара backend/platform, например `"js/node"`, `"js/browser"` или `"go/native"`; при заданном значении `flick check`, редактор и сборка делят предварительную проверку окружения: достижимый ограниченный эффект без корневого обработчика для этой пары — `FLICK-E020` (`unhandled effect Db on js/browser` на месте использования). Неиспользуемый неподдерживаемый код не ломает проверку по достижимости; публичные экспорты библиотеки проверяются. Без значения check остаётся только переносимой типизацией. Отсутствие инструментов — по-прежнему `FLICK-P015` / `FLICK-P029`. Это не обещает корректность произвольного IR или emit-плагинов | совместимый псевдоним выбранного бэкенда по умолчанию |
-| `build.emit-dts` | логическое значение | `false` |
-| `build.promise-facade` | логическое значение | `false` |
-| `build.schema-aot` | логическое значение | `false` |
+| `build.target` | короткое имя бэкенда по умолчанию (`"js"`, `"go"` или короткое имя закреплённого `[build.backend]`); переопределяется через `--target <name>` у `build`, `run`, `dev`, `test` и `inspect`. Для `"go"` Go должен быть в `PATH` и разрешён в `[tools]` как `"flick/go" = ["go"]` (`FLICK-P029`), импорт модуля только для js (`Ui`, `Atom`, `Action`, `Otlp`, `DevTools`, `Js`, runner'ы `Node`/`Browser`/`Cloudflare`) или пакета, собранного не для go, — `FLICK-P030` уже в `flick check`, а то, что Go-target ещё не компилирует, — `FLICK-P012` (см. [Go-target](../codegen/#go-target)) | `"js"` (или префикс бэкенда из `build.environment`) |
+| `build.environment` | пара backend/platform, например `"js/node"`, `"js/browser"` или `"go/native"`; при заданном значении `flick check`, редактор и сборка делят предварительную проверку окружения: достижимый ограниченный эффект без корневого обработчика для этой пары — `FLICK-E020` (`unhandled effect Db on js/browser` на месте использования). Неиспользуемый неподдерживаемый код не ломает проверку по достижимости; публичные экспорты библиотеки проверяются. Без значения check остаётся только переносимой типизацией. Отсутствие инструментов — по-прежнему `FLICK-P015` / `FLICK-P029`. Это не обещает корректность произвольного IR или emit-плагинов | окружение по умолчанию выбранного бэкенда |
 | `build.solver-steps` | число шагов разрешения экземпляров классов для одного определения | `100000` |
 | `build.solver-depth` | глубина вложенности ограничений классов | `256` |
 | `build.labels` | что release-сборка помечает `Module.name` для инструментов отладки: `"all"` (значения всех типов с `@label`: атомы, представления, actions), `"components"` (значения вида `component`: представления и actions) или `"none"`; debug помечает всё; `flick build --labels` переопределяет | `"all"` |
-| `build.effect` | на чём выполняются эффекты: `"rt"` на собственной среде Flick или `"effect"` через адаптер Effect; библиотека, от которой зависит проект, компилируется с `effect` проекта | `"rt"` |
-| `build.ui` | модуль, который рисует и монтирует представления вместо React: экспортирует все имена, которые `Ui` и `Action` берут из `@flick-lang/effect-ts/ui` и `@flick-lang/effect-ts/ui/react`; относительный путь — от корня проекта | React |
 | `sql.dialect` | диалект SQL для `sql table` и `sql { … }` (см. [запросы SQL](../sql/)): `"postgresql"`; `"mysql"`, `"sqlite"`, `"clickhouse"` и `"oracle"` распознаются, но пока не поддерживаются | `"postgresql"` |
 | `lint.allow` | коды предупреждений, о которых не сообщается, например `"FLICK-T021"`; ошибки отключить нельзя | `[]` |
 | `lint.no-let-assert` | `true` делает каждый `let assert` ошибкой (`FLICK-T027`) в `flick check`, `build`, `test` и в редакторе | `false` |
@@ -74,13 +73,51 @@ max-params = 5
 
 Лимиты T036–T038 действуют и для `component`: setup и render измеряются вместе по исходному телу, без сгенерированных обёрток. Локальные функции измеряются отдельно.
 
-`flick new` создаёт проект на RT с зависимостью от `@flick-lang/runtime` и без Effect. Параметр `--rt` у `flick build`, `flick run` и `flick test` также выбирает RT для одного вызова в старом проекте на Effect. Если проекту нужен адаптер Effect, явно задайте `effect = "effect"` и добавьте зависимость `@flick-lang/effect-ts`.
+### Опции таргета (`[target.<name>]`)
+
+Специфичные для бэкенда опции сборки и выполнения задаются в `[target.<name>]`,
+где `<name>` — короткое имя бэкенда (`js` для `flick/js`, `go` для `flick/go`
+или часть после `/` в закреплённом `[build.backend]`). В одном `flick.toml`
+могут сосуществовать несколько таблиц `[target.<name>]` для мультитаргетных
+проектов; каждый вызов проверяет и применяет только таблицу выбранного таргета,
+а флаги CLI переопределяют `flick.toml`. Раздел `[target]` запрещён в корне
+виртуального workspace (`FLICK-P005`).
+
+| Таблица и ключ | Значения | По умолчанию |
+| - | - | - |
+| `target.js.typescript` | логическое значение; генерировать `.ts` вместо `.js` | `false` |
+| `target.js.declarations` | логическое значение; генерировать публичные объявления TypeScript `.d.ts` | `false` |
+| `target.js.promise-facade` | логическое значение; генерировать Promise-фасады `A/B.promise.js` | `false` |
+| `target.js.schema-aot` | логическое значение; компилировать чистые кодеки заранее в раннерах входов | `false` |
+| `target.js.runtime` | `"rt"` на собственной среде Flick или `"effect"` через адаптер Effect; библиотека, от которой зависит проект, компилируется с `runtime` проекта | `"rt"` |
+| `target.js.devtools` | логическое значение (`true` = `"ws://localhost:34437"`) или строка WebSocket URL для `run` / `dev` | выкл. |
+| `target.js.ui` | спецификатор модуля, который рисует и монтирует представления вместо React (экспортирует все имена, которые `Ui` и `Action` берут из `@flick-lang/effect-ts/ui` и `@flick-lang/effect-ts/ui/react`; относительный путь — от корня проекта) | React |
+| `target.go.cgo` | логическое значение; включить cgo (`CGO_ENABLED=1`) при сборке исполняемых файлов Go | `false` |
+
+`flick new` создаёт проект на RT с зависимостью от `@flick-lang/runtime` и без Effect. Передайте `--runtime rt` командам `build`, `run`, `dev`, `test` или `inspect`, чтобы выбрать RT для одного вызова в проекте на Effect. Если проекту нужен адаптер Effect, явно задайте `[target.js] runtime = "effect"` и добавьте зависимость `@flick-lang/effect-ts`.
+
+Прежние ключи в `[build]` (`emit`, `emit-dts`, `promise-facade`, `schema-aot`, `effect`, `ui`) удалены без псевдонимов совместимости и завершаются с `FLICK-P057`, указывая замену в `[build] target` или `[target.js]`:
+
+| Удалённый ключ `[build]` | Замена |
+| - | - |
+| `[build] emit = "js"` | `[build] target = "js"` (или не указывать; `"js"` — по умолчанию) |
+| `[build] emit = "ts"` | `[build] target = "js"` и `[target.js] typescript = true` |
+| `[build] emit = "go"` | `[build] target = "go"` |
+| `[build] emit-dts = true` | `[target.js] declarations = true` |
+| `[build] promise-facade = true` | `[target.js] promise-facade = true` |
+| `[build] schema-aot = true` | `[target.js] schema-aot = true` |
+| `[build] effect = "rt"` | `[target.js] runtime = "rt"` (или не указывать; `"rt"` — по умолчанию) |
+| `[build] effect = "effect"` | `[target.js] runtime = "effect"` |
+| `[build] ui = "./renderer.mjs"` | `[target.js] ui = "./renderer.mjs"` |
 
 Ошибки конфигурации приводят к завершению с кодом `2`:
 
 | Проблема | Диагностика |
 | - | - |
 | ошибка синтаксиса TOML, неизвестный ключ, значение неверного типа или вне допустимого набора | `FLICK-P005` |
+| удалённый ключ в `[build]` (`emit`, `emit-dts`, `promise-facade`, `schema-aot`, `effect`, `ui`) | `FLICK-P057` |
+| неизвестный или недопустимый ключ либо значение в `[target.<name>]` | `FLICK-P058` |
+| неизвестный `[build] target` или `--target` | `FLICK-P059` |
 | `schema-version` отличается от `1` или отсутствует | `FLICK-P006` |
 | `kind = "app"` без `entry` и `entries` или с пустым `entries` | `FLICK-P007` |
 | одновременно `entry` и `entries`, или недопустимое имя входа | `FLICK-P005` |
@@ -120,7 +157,7 @@ Go-target он получает все шесть. То, что `main` пред�
 раннере.
 
 Чистый `main` вызывается напрямую. Обычно его раннер не импортирует среду
-выполнения; при `schema-aot = true` всё же импортируются функции установки
+выполнения; при `[target.js] schema-aot = true` всё же импортируются функции установки
 схем. Эффектный `main` запускается через средство запуска, наблюдающее
 итоговый `Exit` (см. [генерацию кода](../codegen/)). Недопустимая сигнатура
 даёт `FLICK-P026` при проверке проекта или при сборке отдельного файла.
@@ -269,7 +306,7 @@ plugin = "pairs.wasm"
 `flick remove <name>` убирает.
 
 Официальный бэкенд, которым собирается проект без собственного закрепления
-(`flick/js` или `flick/go` при `emit = "go"`), тоже не входит в компилятор:
+(`flick/js` или `flick/go` при `[build] target = "go"` либо `--target go`), тоже не входит в компилятор:
 это ассет релиза. Первая сборка или `flick install` берёт из индекса
 бэкендов самый новый релиз, который принимает компилятор, сохраняет его в
 хранилище пакетов и закрепляет в `flick.lock` в `[[backend]]`; дальнейшие

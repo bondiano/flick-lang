@@ -5,6 +5,8 @@ expression: printer.output.to_string()
 package flick:backend@0.1.0;
 
 interface types {
+  use flick:command/types@0.1.0.{parameter, value-kind};
+
   enum profile {
     debug,
     release,
@@ -13,6 +15,14 @@ interface types {
   enum mode {
     per-module,
     whole-program,
+  }
+
+  enum verb {
+    build,
+    run,
+    dev,
+    test,
+    inspect,
   }
 
   record environment {
@@ -50,6 +60,14 @@ interface types {
     version: string,
   }
 
+  record option-descriptor {
+    parameter: parameter,
+    default: option<string>,
+    implicit-value: option<string>,
+    choices: list<string>,
+    verbs: list<verb>,
+  }
+
   record descriptor {
     identity: backend-id,
     backend-api: version-range,
@@ -60,6 +78,7 @@ interface types {
     profiles: list<profile>,
     modes: list<mode>,
     capabilities: list<capability>,
+    options: list<option-descriptor>,
   }
 
   record option-value {
@@ -320,9 +339,9 @@ interface inputs {
 }
 
 world backend {
+  import flick:command/types@0.1.0;
   import types;
   import inputs;
-  import flick:command/types@0.1.0;
   use types.{descriptor, target-request, target-support, build-request, build-result, diagnostic};
 
   export describe: func() -> descriptor;

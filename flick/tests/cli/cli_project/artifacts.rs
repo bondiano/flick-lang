@@ -57,12 +57,12 @@ fn publication_reconciles_emit_modes_on_cache_misses_and_hits() {
         ],
     );
     for _ in 0..2 {
-        let js = flick_in(&dir, &["build", "--emit", "js", "--emit-dts"]);
+        let js = flick_in(&dir, &["build", "--target", "js", "--declarations"]);
         assert_eq!(code(&js), Some(0), "{js:?}");
         assert!(dir.join("dist/App/Main.js").exists());
         assert!(dir.join("dist/App/Main.d.ts").exists());
         assert!(!dir.join("dist/App/Main.ts").exists());
-        let ts = flick_in(&dir, &["build", "--emit", "ts"]);
+        let ts = flick_in(&dir, &["build", "--target", "js", "--typescript"]);
         assert_eq!(code(&ts), Some(0), "{ts:?}");
         assert!(dir.join("dist/App/Main.ts").exists());
         for stale in ["App/Main.js", "App/Main.js.map", "App/Main.d.ts"] {
@@ -132,9 +132,9 @@ fn a_failed_publication_does_not_forget_the_previous_manifest() {
             ("dist/notes.txt", "mine"),
         ],
     );
-    assert_eq!(code(&flick_in(&dir, &["build", "--emit", "js"])), Some(0));
+    assert_eq!(code(&flick_in(&dir, &["build", "--target", "js"])), Some(0));
     fs::create_dir(dir.join("dist/App/Main.ts")).expect("blocked output");
-    let failed = flick_in(&dir, &["build", "--emit", "ts"]);
+    let failed = flick_in(&dir, &["build", "--target", "js", "--typescript"]);
     assert_eq!(code(&failed), Some(1), "{failed:?}");
     assert!(stderr(&failed).contains("FLICK-P013"), "{failed:?}");
     assert!(

@@ -122,6 +122,7 @@ pub fn descriptor() -> Descriptor {
         profiles: vec![Profile::Debug, Profile::Release],
         modes: vec![Mode::PerModule, Mode::WholeProgram],
         capabilities: vec![],
+        options: vec![],
     }
 }
 

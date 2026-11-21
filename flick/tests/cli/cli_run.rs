@@ -16,7 +16,7 @@ use common::{APP, project};
 const FOREVER: &str = "import { Effect } from \"@flick-lang/effect-ts\";\nexport const forever = () => Effect.never;\n";
 
 fn effect_app() -> String {
-    format!("{APP}\n[build]\neffect = \"effect\"\n")
+    format!("{APP}\n[target.js]\nruntime = \"effect\"\n")
 }
 
 /// An app that prints `started <v>`, waits for a signal and prints
@@ -94,7 +94,7 @@ fn expect_line(rx: &mpsc::Receiver<String>, wanted: &str) {
 #[test]
 #[ignore = "needs Node and the installed runtime"]
 fn run_builds_javascript_even_for_a_typescript_project() {
-    let config = format!("{APP}\n[build]\nemit = \"ts\"\n");
+    let config = format!("{APP}\n[target.js]\ntypescript = true\n");
     let main = "module App.Main exposing (main)\n\nmain : Unit ->{Host.Arguments, Host.Console; AppError} Unit\nlet main () = Platform.stdout_line (show (Platform.args ()))\n";
     let dir = project(
         "run_ts",
@@ -471,7 +471,7 @@ fn the_spec_examples_and_the_ci_set_pass() {
     let config = fs::read_to_string(app.join("flick.toml")).expect("config");
     fs::write(
         app.join("flick.toml"),
-        format!("{config}effect = \"effect\"\n"),
+        format!("{config}\n[target.js]\nruntime = \"effect\"\n"),
     )
     .expect("Effect configuration");
     let package_path = app.join("package.json");

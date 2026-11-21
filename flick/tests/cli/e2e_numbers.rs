@@ -222,11 +222,11 @@ fn int_parse_whitespace_matches_contract_on_js_and_go_in_debug_and_release() {
     let expected_stdout = format!("{}\n", expected.join("\n"));
 
     let targets: &[(&str, &str, &[&str])] = &[
-        ("js-effect", "js", &[]),
-        ("js-rt", "js", &["--rt"]),
+        ("js-effect", "js", &["--runtime", "effect"]),
+        ("js-rt", "js", &["--runtime", "rt"]),
         ("go", "go", &["--allow-tool", "go"]),
     ];
-    for &(label, emit, extra_flags) in targets {
+    for &(label, target, extra_flags) in targets {
         for profile in ["debug", "release"] {
             let out = dir.join(format!("{label}-{profile}"));
             run(Command::new(env!("CARGO_BIN_EXE_flick"))
@@ -234,12 +234,12 @@ fn int_parse_whitespace_matches_contract_on_js_and_go_in_debug_and_release() {
                 .arg(&source)
                 .arg("--out-dir")
                 .arg(&out)
-                .arg("--emit")
-                .arg(emit)
+                .arg("--target")
+                .arg(target)
                 .arg("--profile")
                 .arg(profile)
                 .args(extra_flags));
-            let mut cmd = if emit == "go" {
+            let mut cmd = if target == "go" {
                 Command::new(out.join(executable(MAIN_ENTRY)))
             } else {
                 let mut node = Command::new("node");

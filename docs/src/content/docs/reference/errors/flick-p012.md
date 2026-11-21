@@ -2,7 +2,7 @@
 title: "FLICK-P012"
 ---
 
-The go target (`emit = "go"`) compiles what `main` reaches, and reports
+The go target (`target = "go"`) compiles what `main` reaches, and reports
 here a construct it does not compile yet, with what it names: a lazy `for`
 that reads services, refined types, schemas deriving `Form`, or a `foreign`
 binding without a Go implementation, in the standard library or beside the
@@ -12,9 +12,9 @@ The js target builds the same program.
 
 When the construct is the program's own `foreign` binding, add its Go
 implementation beside the program (see the FFI reference). Otherwise keep
-the construct out of what `main` reaches, or build with `emit = "js"`.
+the construct out of what `main` reaches, or build with `target = "js"`.
 
-On JavaScript with Flick's own runtime (`effect = "rt"`), this code also
+On JavaScript with Flick's own runtime (`[target.js] runtime = "rt"`), this code also
 reports a reachable binding that requires the optional Effect adapter when
 the project does not declare it. The diagnostic points to the use in your
 source. Add `@flick-lang/effect-ts` to the project's dependencies, or use a

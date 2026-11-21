@@ -70,7 +70,7 @@ to it:
 | `<name>.stderr.contains` | instead of `<name>.stderr`: lines stderr must contain |
 | `<name>.exit` | `0` |
 
-Every case runs three times: compiled to JS, compiled with `--emit ts`, whose
+Every case runs three times: compiled to JS, compiled with `--typescript`, whose
 `flick-main.ts` Node runs directly, and compiled to JS in the release
 profile, which must behave as the debug build. Within each pass the cases
 run in parallel, `FLICK_E2E_JOBS` at a time (default: the number of CPUs;
@@ -100,8 +100,8 @@ A Flick project whose test modules, one per area of the language
 semantics with literal expected values: `Int` wrapping, how `show` writes
 numbers, UTF-16 strings, equality, records, patterns, recursion, hash
 order, JSON and schema errors, effects and the cases a seed draws for
-property tests. `just language` runs them with `flick test --emit js` and
-`--emit go` and one `--seed`; both runs must pass, and their reports must be
+property tests. `just language` runs them with `flick test --target js` and
+`--target go` and one `--seed`; both runs must pass, and their reports must be
 the same byte for byte. A test belongs here when both targets must agree
 on it; a difference between them is fixed in a runtime, not in the test.
 

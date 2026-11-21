@@ -7,7 +7,7 @@
 use crate::common;
 
 use flick_core::build::{go::executable, runner_path};
-use flick_core::project::config::{self, Backend};
+use flick_core::project::config;
 use flick_core::source::FileId;
 use std::path::Path;
 use std::process::Command;
@@ -63,15 +63,16 @@ fn the_conduit_client_starts_with_the_runner_of_its_runtime() {
     let client = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/conduit/client");
     let text = fs::read_to_string(client.join("flick.toml")).expect("the client's flick.toml");
     let config = config::parse(&text, FileId::default()).expect("a valid flick.toml");
-    let runner = match config.build.effect {
-        Backend::Rt => "@flick-lang/runtime/rt/runner/browser",
-        Backend::Effect => "@flick-lang/effect-ts/runner/browser",
+    let runner = if config.js_is_rt() {
+        "@flick-lang/runtime/rt/runner/browser"
+    } else {
+        "@flick-lang/effect-ts/runner/browser"
     };
     let script = fs::read_to_string(client.join("src/main.js")).expect("the page's script");
     assert!(
         script.contains(&format!("from \"{runner}\"")),
-        "the client builds for {:?}, so its script imports `run` from {runner}:\n{script}",
-        config.build.effect
+        "the client builds for js_is_rt={}, so its script imports `run` from {runner}:\n{script}",
+        config.js_is_rt()
     );
 }
 
@@ -176,8 +177,9 @@ fn the_mtl_planner_runs_pure_transformers_and_validates_cli_minutes() {
         &ts_dir,
         &[
             "build",
-            "--emit",
-            "ts",
+            "--target",
+            "js",
+            "--typescript",
             "--profile",
             "debug",
             "--out-dir",
@@ -221,8 +223,8 @@ fn the_cli_tool_example_keeps_notes_on_go() {
 
 fn cli_tool_keeps_notes(emit: &str) {
     let dir = common::example("cli-tool", &format!("examples/cli-tool-{emit}"));
-    success(&dir, &["test", "--emit", emit, "--seed", "7"]);
-    success(&dir, &["build", "--emit", emit]);
+    success(&dir, &["test", "--target", emit, "--seed", "7"]);
+    success(&dir, &["build", "--target", emit]);
     let command = || {
         let mut command = if emit == "go" {
             Command::new(dir.join("dist").join(executable("main")))
@@ -355,8 +357,8 @@ fn typed_interpreter_runs(emit: &str) {
         "typed-interpreter",
         &format!("examples/typed-interpreter-{emit}"),
     );
-    success(&dir, &["test", "--emit", emit, "--seed", "7"]);
-    success(&dir, &["build", "--emit", emit]);
+    success(&dir, &["test", "--target", emit, "--seed", "7"]);
+    success(&dir, &["build", "--target", emit]);
     let mut command = if emit == "go" {
         Command::new(dir.join("dist").join(executable("main")))
     } else {

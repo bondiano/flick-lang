@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::backends::Selected;
+use crate::backends::options::ResolvedOptions;
 use crate::commands::build::settings::with_settings;
 #[cfg(feature = "wasm-backends")]
 use crate::component;
@@ -32,7 +33,7 @@ fn fixture_at(
     let mut sources = SourceMap::default();
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join(path);
     let (diagnostics, compilation, _) =
-        project::compile_with(&host, &mut sources, None, &[root], None, rt, None);
+        project::compile_with(&host, &mut sources, None, &[root], None, Some(rt), None);
     assert!(
         !diagnostics.iter().any(|d| d.severity == Severity::Error),
         "{diagnostics:?}"
@@ -40,6 +41,10 @@ fn fixture_at(
     let output = BuildPlan {
         purpose: Purpose::Build,
         backend: Selected::Native,
+        target: "js".into(),
+        target_overridden: false,
+        options: ResolvedOptions::js(typescript, false, false, false, rt),
+        inspect_module: None,
         out_dir: "unused-component-output".into(),
         entries: vec![(
             "main".into(),

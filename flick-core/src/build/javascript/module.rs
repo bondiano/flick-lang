@@ -3,6 +3,7 @@
 #[cfg(feature = "native-project")]
 use std::path::Path;
 
+use super::super::Backend;
 use crate::codegen;
 #[cfg(feature = "native-project")]
 use crate::codegen::sourcemap;
@@ -13,7 +14,6 @@ use crate::effects;
 use crate::iface;
 use crate::iface::{Interface, Namespace};
 use crate::project::Compiled;
-use crate::project::config::Backend;
 #[cfg(feature = "native-project")]
 use crate::project::normalize;
 #[cfg(feature = "native-project")]

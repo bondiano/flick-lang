@@ -4,5 +4,5 @@ schema-version = 1
 kind = "lib"
 source-dir = "."
 
-[build]
-effect = "effect"
+[target.js]
+runtime = "effect"

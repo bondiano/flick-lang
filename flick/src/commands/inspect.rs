@@ -6,16 +6,17 @@ mod doc;
 pub use doc::doc;
 mod doc_run;
 mod example_host;
+mod schema;
+pub use schema::schema_export;
 
+use std::mem;
 use std::path::{Path, PathBuf};
-use std::process::{Command as Process, Output};
-use std::{fs, io, mem};
 
-use flick_core::build::Extras;
+use flick_backend::{ArtifactKind, Verb};
+use flick_core::build::{self, Extras};
 use flick_core::diagnostics::{Code, Diagnostic, Severity, codes};
-use flick_core::iface::{self, Export, Interface};
-use flick_core::project::config::Backend;
-use flick_core::project::{self, Analysis, Analyzed, Compilation, Host, Project, cache};
+use flick_core::iface::{self, Export, Interface, Target};
+use flick_core::project::{self, Analysis, Analyzed, Compilation, Host, Project};
 use flick_core::projection::Projected;
 use flick_core::source::{FileId, SourceMap};
 use flick_core::types::{
@@ -23,10 +24,11 @@ use flick_core::types::{
 };
 use flick_core::{ir, projection, syntax};
 
-use super::build::{BuildPlan, Purpose, artifacts, emit, write};
+use super::build::{BuildPlan, Purpose, artifacts, write};
 use super::check::select;
-use crate::args::{InspectArguments, Representation, SchemaExportArguments, SchemaTarget};
+use crate::args::{InspectArguments, Representation};
 use crate::backends::Selected;
+use crate::backends::options::{self, ResolvedOptions, TargetChoice};
 use crate::builtins as builtin_cache;
 use crate::command::Outcome;
 use crate::package_cache;
@@ -48,10 +50,14 @@ pub struct Checked {
 }
 
 pub fn compile(explicit: Option<&str>) -> Result<Checked, Outcome> {
-    compile_with_extra(explicit, &[])
+    compile_with_extra(explicit, &[], None)
 }
 
-fn compile_with_extra(explicit: Option<&str>, extra: &[PathBuf]) -> Result<Checked, Outcome> {
+fn compile_with_extra(
+    explicit: Option<&str>,
+    extra: &[PathBuf],
+    rt_override: Option<bool>,
+) -> Result<Checked, Outcome> {
     let host = FsHost::new();
     let mut sources = SourceMap::default();
     let (project, mut roots) = match select(&host, &mut sources, explicit, &[]) {
@@ -64,15 +70,21 @@ fn compile_with_extra(explicit: Option<&str>, extra: &[PathBuf]) -> Result<Check
         }
     };
     roots.extend(extra.iter().cloned());
-    let rt = project::stages_by_class(project.as_ref(), false);
+    let rt = project::stages_by_class(project.as_ref(), rt_override);
     if let Err(diagnostic) = builtin_cache::prepare_in(rt) {
         return Err(Outcome {
             sources,
             diagnostics: vec![diagnostic],
         });
     }
-    let (diagnostics, compilation) =
-        package_cache::compile(&host, &mut sources, project.as_ref(), &roots, rt, None);
+    let (diagnostics, compilation) = package_cache::compile(
+        &host,
+        &mut sources,
+        project.as_ref(),
+        &roots,
+        rt_override,
+        None,
+    );
     if diagnostics.iter().any(|d| d.severity == Severity::Error) {
         return Err(Outcome {
             sources,
@@ -87,30 +99,70 @@ fn compile_with_extra(explicit: Option<&str>, extra: &[PathBuf]) -> Result<Check
     })
 }
 
-fn output(checked: &Checked, dir: PathBuf, typescript: bool) -> Result<BuildPlan, Diagnostic> {
-    let rt = checked
-        .project
-        .as_ref()
-        .is_some_and(|p| p.config.build.effect == Backend::Rt);
-    let backend = Selected::load(&checked.host, checked.project.as_ref(), false, rt)?;
-    Ok(BuildPlan {
-        purpose: Purpose::Build,
+struct InspectTarget {
+    backend: Selected,
+    choice: TargetChoice,
+    target_overridden: bool,
+    resolved: ResolvedOptions,
+    rt: bool,
+}
+
+fn prepare_inspect_target(
+    explicit: Option<&str>,
+    options: &InspectArguments,
+) -> Result<InspectTarget, Outcome> {
+    let host = FsHost::new();
+    let mut sources = SourceMap::default();
+    let (project, _) = match select(&host, &mut sources, explicit, &[]) {
+        Ok(selected) => selected,
+        Err(d) => {
+            return Err(Outcome {
+                sources,
+                diagnostics: vec![d],
+            });
+        }
+    };
+    let (backend, choice, target_overridden) =
+        Selected::load_target(&host, project.as_ref(), options.target.as_deref()).map_err(|d| {
+            Outcome {
+                sources: SourceMap::default(),
+                diagnostics: vec![d],
+            }
+        })?;
+    let resolved = match backend.descriptor() {
+        Some(descriptor) => options::resolve(
+            &descriptor,
+            Verb::Inspect,
+            project.as_ref(),
+            &options.backend_options,
+        )
+        .map_err(|diagnostics| Outcome {
+            sources,
+            diagnostics,
+        })?,
+        None => ResolvedOptions::default(),
+    };
+    let rt = !choice.is_go() && resolved.is_rt();
+    Ok(InspectTarget {
         backend,
-        out_dir: dir,
-        entries: Vec::new(),
-        typescript,
-        go: false,
-        suites: Vec::new(),
-        extras: Extras {
-            rt,
-            ..Extras::default()
-        },
-        release: false,
+        choice,
+        target_overridden,
+        resolved,
+        rt,
     })
 }
 
 pub fn inspect(options: &InspectArguments, explicit: Option<&str>) -> Outcome {
-    let mut checked = match compile(explicit) {
+    let target = if options.emit == Representation::Output {
+        match prepare_inspect_target(explicit, options) {
+            Ok(target) => Some(target),
+            Err(outcome) => return outcome,
+        }
+    } else {
+        None
+    };
+    let rt_override = target.as_ref().map(|t| t.rt);
+    let mut checked = match compile_with_extra(explicit, &[], rt_override) {
         Ok(c) => c,
         Err(outcome) => return outcome,
     };
@@ -128,7 +180,7 @@ pub fn inspect(options: &InspectArguments, explicit: Option<&str>) -> Outcome {
             .map(|(_, dir)| dir.join(&rel))
             .find(|path| path.is_file())
         {
-            checked = match compile_with_extra(explicit, &[path]) {
+            checked = match compile_with_extra(explicit, &[path], rt_override) {
                 Ok(c) => c,
                 Err(outcome) => return outcome,
             };
@@ -150,7 +202,7 @@ pub fn inspect(options: &InspectArguments, explicit: Option<&str>) -> Outcome {
             format!("the project has no module `{}`", options.module),
         );
     };
-    let text = match inspect_module(&mut checked, index, options, explicit) {
+    let text = match inspect_module(&mut checked, index, options, explicit, target) {
         Ok(text) => text,
         Err(outcome) => return outcome,
     };
@@ -172,7 +224,7 @@ fn inspect_builtin(checked: &Checked, options: &InspectArguments) -> Option<Stri
     ) {
         return None;
     }
-    let rt = project::stages_by_class(checked.project.as_ref(), false);
+    let rt = project::stages_by_class(checked.project.as_ref(), None);
     let builtin = builtins_of(rt)
         .iter()
         .find(|i| i.module == options.module && !i.private)?;
@@ -190,9 +242,11 @@ fn inspect_module(
     index: usize,
     options: &InspectArguments,
     explicit: Option<&str>,
+    target: Option<InspectTarget>,
 ) -> Result<String, Outcome> {
     let module = &checked.compilation.modules[index];
-    let path = module.name.replace('.', "/");
+    let module_name = module.name.clone();
+    let path = module_name.replace('.', "/");
     match options.emit {
         Representation::Ast => {
             let source = &checked.sources.get(module.file).text;
@@ -209,39 +263,128 @@ fn inspect_module(
                 format!("no projection of `{}`", options.module),
             )
         }),
-        other => {
-            let (file, typescript) = match other {
-                Representation::Js => (format!("{path}.js"), false),
-                Representation::Ts => (format!("{path}.ts"), true),
-                _ => (format!("{path}.iface"), false),
+        Representation::Iface => {
+            let package = checked
+                .project
+                .as_ref()
+                .and_then(|p| project::project_name(&checked.host, &p.root));
+            let target_name = options
+                .target
+                .as_deref()
+                .or_else(|| checked.project.as_ref().map(|p| p.config.default_target()))
+                .unwrap_or("js");
+            let filter: Option<&[Target]> = match target_name {
+                "js" | "flick/js" => Some(&[Target::Js]),
+                "go" | "flick/go" => Some(&[Target::Go]),
+                _ => None,
             };
-            let out = output(checked, checked.host.cwd.join("dist"), typescript).map_err(|d| {
-                Outcome {
-                    sources: mem::take(&mut checked.sources),
-                    diagnostics: vec![d],
-                }
-            })?;
-            let emission = artifacts(
-                &checked.host,
-                &mut checked.sources,
-                checked.project.as_ref(),
+            let interfaces = build::published_interfaces(
                 &checked.compilation,
-                &out,
+                package.as_deref(),
+                checked.project.as_ref().map(|p| p.root.as_path()),
+                filter,
             );
-            match emission.artifacts.into_iter().find(|a| a.path == file) {
-                Some(a) => String::from_utf8(a.contents).map_err(|_| {
-                    failure(
-                        mem::take(&mut checked.sources),
-                        codes::P013,
-                        format!("the emitted representation `{file}` is not UTF-8"),
-                    )
-                }),
-                None => Err(Outcome {
-                    sources: mem::take(&mut checked.sources),
-                    diagnostics: emission.diagnostics,
-                }),
-            }
+            Ok(iface::write(&interfaces[module_name.as_str()]))
         }
+        Representation::Output => inspect_output(
+            checked,
+            module_name,
+            &path,
+            options,
+            target.expect("inspect output target prepared"),
+        ),
+    }
+}
+
+fn inspect_output(
+    checked: &mut Checked,
+    module_name: String,
+    path: &str,
+    options: &InspectArguments,
+    target: InspectTarget,
+) -> Result<String, Outcome> {
+    let typescript = target.resolved.flag("typescript");
+    let go = target.choice.is_go();
+    let labels = checked
+        .project
+        .as_ref()
+        .map_or_else(Default::default, |p| p.config.build.labels);
+    let out = BuildPlan {
+        purpose: Purpose::Inspect,
+        backend: target.backend,
+        target: target.choice.short().to_owned(),
+        target_overridden: target.target_overridden,
+        options: target.resolved,
+        inspect_module: Some(module_name),
+        out_dir: checked.host.cwd.join("dist"),
+        entries: Vec::new(),
+        typescript,
+        go,
+        suites: Vec::new(),
+        extras: Extras {
+            rt: target.rt,
+            labels,
+            ..Extras::default()
+        },
+        release: false,
+    };
+    let emission = artifacts(
+        &checked.host,
+        &mut checked.sources,
+        checked.project.as_ref(),
+        &checked.compilation,
+        &out,
+    );
+    if emission
+        .diagnostics
+        .iter()
+        .any(|d| d.severity == Severity::Error)
+    {
+        return Err(Outcome {
+            sources: mem::take(&mut checked.sources),
+            diagnostics: emission.diagnostics,
+        });
+    }
+    let preferred = if go {
+        format!("{path}.go")
+    } else if typescript {
+        format!("{path}.ts")
+    } else {
+        format!("{path}.js")
+    };
+    let primary = emission
+        .artifacts
+        .iter()
+        .find(|a| a.kind == ArtifactKind::Source && a.path == preferred)
+        .or_else(|| {
+            emission
+                .artifacts
+                .iter()
+                .find(|a| a.kind == ArtifactKind::Source)
+        });
+    match primary {
+        Some(a) => String::from_utf8(a.contents.clone()).map_err(|_| {
+            failure(
+                mem::take(&mut checked.sources),
+                codes::P013,
+                format!("the emitted representation `{}` is not UTF-8", a.path),
+            )
+        }),
+        None => Err(Outcome {
+            sources: mem::take(&mut checked.sources),
+            diagnostics: if emission.diagnostics.is_empty() {
+                vec![Diagnostic::new(
+                    codes::P013,
+                    Severity::Error,
+                    format!(
+                        "backend emitted no source artifact for `{}`",
+                        options.module
+                    ),
+                )]
+            } else {
+                emission.diagnostics
+            },
+        }),
     }
 }
 
@@ -305,135 +448,4 @@ pub fn interface_of(analysis: &Analysis, module: &str) -> Option<Interface> {
         .module(module)
         .map(|a| a.interface.clone())
         .or_else(|| builtins().iter().find(|i| i.module == module).cloned())
-}
-
-fn schema_exporter(target: SchemaTarget, value: &str, backend: Backend) -> String {
-    match target {
-        SchemaTarget::JsonSchema => {
-            let runtime = if backend == Backend::Rt {
-                "@flick-lang/runtime/rt"
-            } else {
-                "@flick-lang/effect-ts"
-            };
-            format!(
-                "import {{ codecJsonSchema }} from \"{runtime}\";\nconst r = codecJsonSchema({value:?}, exported);"
-            )
-        }
-        SchemaTarget::OpenApi => "import { httpApiOpenApi } from \"@flick-lang/effect-ts/effect/http-api/HttpApi\";\nconst r = httpApiOpenApi(exported);".to_owned(),
-    }
-}
-
-pub fn schema_export(options: &SchemaExportArguments, explicit: Option<&str>) -> Outcome {
-    let mut checked = match compile(explicit) {
-        Ok(c) => c,
-        Err(outcome) => return outcome,
-    };
-    let Some((module, value)) = options.codec.rsplit_once('.') else {
-        return failure(
-            checked.sources,
-            codes::P018,
-            format!("`{}` is not `Module.value`", options.codec),
-        );
-    };
-    let found = checked
-        .compilation
-        .modules
-        .iter()
-        .find(|m| m.name == module && m.interface.exports_value(value));
-    if found.is_none() {
-        return failure(
-            checked.sources,
-            codes::P018,
-            format!("no module `{module}` exports `{value}`"),
-        );
-    }
-    let root = checked
-        .project
-        .as_ref()
-        .map_or_else(|| checked.host.cwd.clone(), |p| p.root.clone());
-    let stage = root.join(cache::DIR).join("schema");
-    let plan = match output(&checked, stage.clone(), false) {
-        Ok(plan) => plan,
-        Err(diagnostic) => {
-            return Outcome {
-                sources: checked.sources,
-                diagnostics: vec![diagnostic],
-            };
-        }
-    };
-    let _ = fs::remove_dir_all(&stage);
-    let emission = emit(
-        &checked.host,
-        &mut checked.sources,
-        checked.project.as_ref(),
-        &checked.compilation,
-        &plan,
-    );
-    if !emission.diagnostics.is_empty() {
-        return Outcome {
-            sources: checked.sources,
-            diagnostics: emission.diagnostics,
-        };
-    }
-    let backend = checked
-        .project
-        .as_ref()
-        .map_or(Backend::Effect, |p| p.config.build.effect);
-    let export = schema_exporter(options.target, value, backend);
-    let script = format!(
-        "{export}\nimport {{ {value} as exported }} from \"./{}.js\";\nif (r._tag === \"Success\") process.stdout.write(r.success); else {{ process.stderr.write(JSON.stringify(r.failure._0)); process.exitCode = 1; }}\n",
-        module.replace('.', "/")
-    );
-    let runner = stage.join("export.mjs");
-    if let Err(err) = write(&runner, &script) {
-        return failure(
-            checked.sources,
-            codes::P013,
-            format!("cannot write the exporter: {err}"),
-        );
-    }
-    let result = Process::new("node")
-        .arg(&runner)
-        .current_dir(&stage)
-        .output();
-    let _ = fs::remove_dir_all(&stage);
-    save_schema(checked, options, result)
-}
-
-fn save_schema(
-    checked: Checked,
-    options: &SchemaExportArguments,
-    result: io::Result<Output>,
-) -> Outcome {
-    match result {
-        Ok(out) if out.status.success() => {
-            let path = checked.host.cwd.join(&options.out);
-            match write(&path, &out.stdout) {
-                Ok(()) => Outcome::default(),
-                Err(err) => failure(
-                    checked.sources,
-                    codes::P013,
-                    format!("cannot write `{}`: {err}", options.out),
-                ),
-            }
-        }
-        Ok(out) => failure(
-            checked.sources,
-            codes::D008,
-            format!(
-                "`{}` has no strict {}: {}",
-                options.codec,
-                match options.target {
-                    SchemaTarget::JsonSchema => "JSON Schema",
-                    SchemaTarget::OpenApi => "OpenAPI document",
-                },
-                String::from_utf8_lossy(&out.stderr).trim()
-            ),
-        ),
-        Err(err) => failure(
-            checked.sources,
-            codes::P015,
-            format!("cannot run `node`: {err}"),
-        ),
-    }
 }

@@ -1,6 +1,7 @@
 use super::*;
 
 use crate::backends::Selected;
+use crate::backends::options::ResolvedOptions;
 use flick_backend::{
     BackendId, DeclaredInputs, JavascriptEntry, JavascriptProjection, Limits,
     TypescriptModuleProjection, validate_request,
@@ -21,6 +22,10 @@ fn prepared_fixture(path: &str) -> Prepared {
     let output = BuildPlan {
         purpose: Purpose::Build,
         backend: Selected::Native,
+        target: "js".into(),
+        target_overridden: false,
+        options: ResolvedOptions::js(true, false, false, false, false),
+        inspect_module: None,
         out_dir: "unused-projection-output".into(),
         entries: vec![],
         typescript: true,
@@ -89,6 +94,10 @@ pub(super) fn prepared_prefix() -> Prepared {
     let output = BuildPlan {
         purpose: Purpose::Build,
         backend: Selected::Native,
+        target: "js".into(),
+        target_overridden: false,
+        options: ResolvedOptions::js(true, false, false, false, false),
+        inspect_module: None,
         out_dir: "unused-projection-output".into(),
         entries: vec![("main".into(), "App.Main".into())],
         typescript: true,

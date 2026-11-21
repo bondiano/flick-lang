@@ -556,6 +556,6 @@ variable there is `FLICK-E018`, unless the row of the operation declares it
 or a handler inside the arm catches it.
 
 Handlers run on both targets. A `control` arm needs the body to wait as a
-coroutine: Go and Flick's own JavaScript runtime (`effect = "rt"`) run it,
-while the Effect adapter (`effect = "effect"`) does not and reports
+coroutine: Go and Flick's own JavaScript runtime (`[target.js] runtime = "rt"`) run it,
+while the Effect adapter (`[target.js] runtime = "effect"`) does not and reports
 `FLICK-P012`.

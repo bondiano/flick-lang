@@ -45,10 +45,14 @@ fn named_parameterized_module_result_runs_from_two_importers_on_js_and_go() {
                 .arg(&main)
                 .arg("--out-dir")
                 .arg(&out)
-                .arg("--emit")
+                .arg("--target")
                 .arg(emit)
                 // outside a project, only the flag lets the Go backend run `go build`
-                .args(if emit == "go" { &["--allow-tool", "go"][..] } else { &[] })
+                .args(if emit == "go" {
+                    &["--allow-tool", "go"][..]
+                } else {
+                    &["--runtime", "effect"][..]
+                })
                 .arg("--profile")
                 .arg(profile)
                 .output()
@@ -129,10 +133,14 @@ fn case_insensitive_set_keeps_its_policy_across_importers_on_js_and_go() {
                 .arg(&main)
                 .arg("--out-dir")
                 .arg(&out)
-                .arg("--emit")
+                .arg("--target")
                 .arg(emit)
                 // outside a project, only the flag lets the Go backend run `go build`
-                .args(if emit == "go" { &["--allow-tool", "go"][..] } else { &[] })
+                .args(if emit == "go" {
+                    &["--allow-tool", "go"][..]
+                } else {
+                    &["--runtime", "effect"][..]
+                })
                 .arg("--profile")
                 .arg(profile)
                 .output()
@@ -177,7 +185,7 @@ fn case_insensitive_set_rejects_mixed_policy(source: &Path, dir: &Path) {
         .arg(&mixing)
         .arg("--out-dir")
         .arg(dir.join("out-mix"))
-        .arg("--emit")
+        .arg("--target")
         .arg("js")
         .output()
         .expect("invalid build runs");
@@ -261,10 +269,14 @@ fn parameterized_module_uses_its_argument_dictionary_on_js_and_go() {
                 .arg(&main)
                 .arg("--out-dir")
                 .arg(&out)
-                .arg("--emit")
+                .arg("--target")
                 .arg(emit)
                 // outside a project, only the flag lets the Go backend run `go build`
-                .args(if emit == "go" { &["--allow-tool", "go"][..] } else { &[] })
+                .args(if emit == "go" {
+                    &["--allow-tool", "go"][..]
+                } else {
+                    &["--runtime", "effect"][..]
+                })
                 .arg("--profile")
                 .arg("debug")
                 .output()
@@ -346,10 +358,14 @@ fn higher_order_factory_with_partial_application_runs_on_js_and_go() {
                 .arg(source.join("Main.fl"))
                 .arg("--out-dir")
                 .arg(&out)
-                .arg("--emit")
+                .arg("--target")
                 .arg(emit)
                 // outside a project, only the flag lets the Go backend run `go build`
-                .args(if emit == "go" { &["--allow-tool", "go"][..] } else { &[] })
+                .args(if emit == "go" {
+                    &["--allow-tool", "go"][..]
+                } else {
+                    &["--runtime", "effect"][..]
+                })
                 .arg("--profile")
                 .arg(profile)
                 .output()

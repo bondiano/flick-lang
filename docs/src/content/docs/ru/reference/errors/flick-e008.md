@@ -1,12 +1,12 @@
 ---
 title: "FLICK-E008"
-source_hash: "0edeff1ea0a45676"
+source_hash: "601c4c982b67028b"
 ---
 
 Больше не сообщается: сборки без среды выполнения, `[build] effect = "none"`, больше нет. Программа, которая ничего не выполняет во время выполнения, собирается на собственной среде выполнения Flick, а в бандл попадают только вызываемые ею вспомогательные функции. Код остаётся зарезервированным.
 
 ```toml
-# flick.toml: no `effect`, or the default
-[build]
-effect = "rt"
+# flick.toml: no `runtime`, or the default
+[target.js]
+runtime = "rt"
 ```

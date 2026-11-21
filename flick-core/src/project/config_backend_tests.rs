@@ -1,4 +1,4 @@
-use super::{Backend, parse_text};
+use super::parse_text;
 use crate::diagnostics::codes;
 
 fn manifest(selection: &str) -> String {
@@ -16,7 +16,8 @@ fn a_backend_package_pin_is_independent_of_the_js_runtime() {
         "a".repeat(64)
     ));
     let config = parse_text(&text).expect("a pinned backend package");
-    assert_eq!(config.build.effect, Backend::Rt);
+    assert!(config.js_is_rt());
+    assert_eq!(config.default_target(), "literal");
     let backend = config.build.backend.expect("backend selection");
     assert_eq!(backend.id, "test/literal");
     assert_eq!(backend.version, "1.0.0");

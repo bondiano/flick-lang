@@ -10,11 +10,11 @@ pub use runner::{EntryFacts, entry_facts};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
 
+use super::Backend;
 use crate::codegen::ts::Typing;
 use crate::codegen::{self, Known, Options, Resolved};
 use crate::diagnostics::Diagnostic;
 use crate::iface::Interface;
-use crate::project::config::Backend;
 use crate::project::{Compilation, Compiled, normalize};
 use crate::source::SourceMap;
 use crate::{ir, types};

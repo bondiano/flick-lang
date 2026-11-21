@@ -59,16 +59,20 @@ fn run_program(name: &str, emit: &str, url: &str) {
     let out = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("postgres_{name}_{emit}"));
     let _ = fs::remove_dir_all(&out);
     let source = dir.join(format!("{name}.fl"));
-    let build = common::flick(&[
+    let mut args = vec![
         "build",
         source.to_str().expect("utf-8 path"),
         "--out-dir",
         out.to_str().expect("utf-8 path"),
-        "--emit",
+        "--target",
         emit,
         "--allow-tool",
         if emit == "go" { "go" } else { "node" },
-    ]);
+    ];
+    if emit == "js" {
+        args.extend(["--runtime", "effect"]);
+    }
+    let build = common::flick(&args);
     assert!(build.status.success(), "build: {build:?}");
     let mut program = if emit == "go" {
         Command::new(out.join(executable(MAIN_ENTRY)))

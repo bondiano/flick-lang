@@ -94,7 +94,7 @@ fn an_imported_opaque_type_is_the_type_typescript_has() {
     }
     fs::write(
         dir.join("flick.toml"),
-        "schema-version = 1\n\n[project]\nkind = \"lib\"\n\n[build]\neffect = \"effect\"\n\n[tools]\n\"flick/js\" = [\"node\"]\n",
+        "schema-version = 1\n\n[project]\nkind = \"lib\"\n\n[target.js]\nruntime = \"effect\"\n\n[tools]\n\"flick/js\" = [\"node\"]\n",
     )
     .expect("write");
     fs::write(
@@ -122,7 +122,7 @@ fn an_imported_opaque_type_is_the_type_typescript_has() {
         assert!(generated.contains(form), "{form}\n{generated}");
     }
 
-    let build = flick(&dir, &["build", "--emit-dts"]);
+    let build = flick(&dir, &["build", "--declarations"]);
     assert!(build.status.success(), "{}", text(&build.stderr));
     fs::write(dir.join("consumer.ts"), CONSUMER).expect("write");
     let repo = root();

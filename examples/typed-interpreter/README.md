@@ -20,7 +20,7 @@ cargo build -p flick
 
 ./target/debug/flick run --project examples/typed-interpreter
 ./target/debug/flick test --project examples/typed-interpreter
-./target/debug/flick test --project examples/typed-interpreter --emit go
+./target/debug/flick test --project examples/typed-interpreter --target go
 ```
 
 If `flick` is already on your `PATH`, replace `./target/debug/flick` with `flick`.

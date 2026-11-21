@@ -75,7 +75,7 @@ fn control_handlers_run_on_go_and_javascript() {
     let dir = project("control_handlers", &[("src/App/Main.fl", MAIN)]);
     fs::write(
         dir.join("flick.toml"),
-        format!("{APP}\n[build]\nemit = \"go\"\n"),
+        format!("{APP}\n[build]\ntarget = \"go\"\n"),
     )
     .expect("write");
     let run = flick_in(&dir, &["run"]);
@@ -90,7 +90,7 @@ fn control_handlers_run_on_go_and_javascript() {
 
     fs::write(
         dir.join("flick.toml"),
-        format!("{APP}\n[build]\nemit = \"js\"\n"),
+        format!("{APP}\n[build]\ntarget = \"js\"\n"),
     )
     .expect("write");
     let run = flick_in(&dir, &["run"]);

@@ -71,12 +71,16 @@ pub(super) fn generate(
             mapped(request, data, facts, &output, &mut artifacts);
         }
     }
-    if request
-        .target
-        .required_capabilities
-        .iter()
-        .any(|c| c.name == "declarations")
-    {
+    if data.inspect {
+        return Ok(BuildResult {
+            artifacts,
+            steps: vec![],
+            runtime_dependencies: vec![],
+            launches: vec![],
+            diagnostics: vec![],
+        });
+    }
+    if data.declarations {
         pending = builtins.iter().map(|m| (*m).to_owned()).collect();
     }
     let mut written = HashSet::new();

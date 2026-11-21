@@ -2,8 +2,7 @@
 
 use super::{BuildPlan, backend};
 use crate::sources::FsHost;
-use flick_core::build::Settings;
-use flick_core::project::config::Backend;
+use flick_core::build::{Backend, Settings};
 use flick_core::project::{self, Compilation, Project};
 use flick_core::source::FileId;
 use std::path::{Path, PathBuf};
@@ -47,7 +46,7 @@ pub(crate) fn with_settings<R>(
     let backend = if output.extras.rt {
         Backend::Rt
     } else {
-        project.map_or(Backend::Effect, |p| p.config.build.effect)
+        Backend::Effect
     };
 
     let settings = Settings {
@@ -62,7 +61,7 @@ pub(crate) fn with_settings<R>(
         root: project.map(|p| p.root.as_path()),
         backend,
         effect_bridge: backend::effect_bridge(host, project, compilation),
-        ui: project.and_then(|p| p.config.build.ui.as_deref()),
+        ui: output.options.get("ui"),
         runners: &runners,
         environment: project.and_then(|p| p.config.build.environment.as_ref()),
     };

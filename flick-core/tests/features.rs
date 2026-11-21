@@ -1,12 +1,11 @@
 use std::io;
 use std::path::{Path, PathBuf};
 
-use flick_core::build::{self, Artifact, Extras, Settings};
+use flick_core::build::{self, Artifact, Backend, Extras, Settings};
 use flick_core::codegen::{self, EffectBridge};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::iface;
 use flick_core::ir::ItemKind;
-use flick_core::project::config::Backend;
 use flick_core::project::{self, Compilation, Host};
 use flick_core::source::{FileId, SourceMap};
 use flick_core::types::{Kind, Type};

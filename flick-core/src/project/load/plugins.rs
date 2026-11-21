@@ -424,16 +424,25 @@ impl Loader<'_> {
 impl Loader<'_> {
     /// `P042` at `at` when the manifest disables `what`, a head or a class, of
     /// the plugin of `package`.
+    #[cfg_attr(not(feature = "native-project"), allow(clippy::unused_self))]
     pub(super) fn disabled(&self, package: &str, what: &str, at: Span) -> Option<Diagnostic> {
-        let grants = self.project?.config.plugins.get(package)?;
-        if !grants.disable.iter().any(|d| d == what) {
-            return None;
+        #[cfg(not(feature = "native-project"))]
+        {
+            let _ = (package, what, at);
+            None
         }
-        let message = format!("the manifest disables `{what}` of the plugin of `{package}`");
-        let d = Diagnostic::error(codes::P042, message, at);
-        Some(match grants.span {
-            Some(span) => d.with_related(span, "disabled here"),
-            None => d,
-        })
+        #[cfg(feature = "native-project")]
+        {
+            let grants = self.project?.config.plugins.get(package)?;
+            if !grants.disable.iter().any(|d| d == what) {
+                return None;
+            }
+            let message = format!("the manifest disables `{what}` of the plugin of `{package}`");
+            let d = Diagnostic::error(codes::P042, message, at);
+            Some(match grants.span {
+                Some(span) => d.with_related(span, "disabled here"),
+                None => d,
+            })
+        }
     }
 }

@@ -16,8 +16,8 @@ fn parse_text(text: &str) -> Result<Config, Diagnostic> {
 fn spec_example_parses_with_defaults() {
     let config = parse_text(
         "schema-version = 1\n[project]\nkind = \"app\"\nsource-dir = \"src\"\ntest-dir = \"test\"\n\
-         entry = \"App.Main\"\n[build]\nout-dir = \"dist\"\nprofile = \"debug\"\nemit = \"js\"\n\
-         schema-aot = false\nlabels = \"all\"\n",
+         entry = \"App.Main\"\n[build]\nout-dir = \"dist\"\nprofile = \"debug\"\n\
+         labels = \"all\"\n",
     )
     .expect("valid");
     assert_eq!(config.kind, Kind::App);
@@ -28,6 +28,7 @@ fn spec_example_parses_with_defaults() {
         .collect();
     assert_eq!(named, [("main", "App.Main")]);
     assert_eq!(config.build, Build::default());
+    assert!(config.targets.is_empty());
     let lib = parse_text("schema-version = 1\n[project]\nkind = \"lib\"\n").expect("valid");
     assert_eq!(
         (
@@ -49,10 +50,65 @@ fn spec_example_parses_with_defaults() {
 }
 
 #[test]
-fn typescript_settings_are_read() {
-    for setting in ["emit = \"ts\"", "emit-dts = true", "promise-facade = true"] {
-        let text = format!("schema-version = 1\n[project]\nkind = \"lib\"\n[build]\n{setting}\n");
-        assert!(parse_text(&text).is_ok(), "{setting}");
+fn target_tables_and_build_target_parse_open_names() {
+    let config = parse_text(
+        "schema-version = 1\n[project]\nkind = \"lib\"\n\
+         [build]\ntarget = \"js\"\n\
+         [target.js]\ntypescript = true\ndeclarations = true\npromise-facade = true\n\
+         runtime = \"effect\"\nui = \"./renderer.mjs\"\n\
+         [target.go]\ncgo = true\n\
+         [target.custom_1]\ntags = [\"a\", \"b\"]\n",
+    )
+    .expect("valid");
+    assert_eq!(config.build.target.as_deref(), Some("js"));
+    assert_eq!(config.default_target(), "js");
+    assert!(!config.js_is_rt());
+    assert!(config.js_flag("typescript"));
+    assert!(config.js_flag("declarations"));
+    assert!(config.js_flag("promise-facade"));
+    assert_eq!(config.targets["go"]["cgo"].value, TargetValue::Bool(true));
+    assert!(matches!(
+        &config.targets["custom_1"]["tags"].value,
+        TargetValue::List(items) if items.len() == 2 && items[0].0 == "a" && items[1].0 == "b"
+    ));
+}
+
+#[test]
+fn removed_build_keys_fail_with_p057_and_replacement_hint() {
+    let cases = [
+        ("emit = \"js\"", "\"js\"", "[build] target = \"js\""),
+        ("emit = \"ts\"", "\"ts\"", "[target.js] typescript = true"),
+        ("emit = \"go\"", "\"go\"", "[build] target = \"go\""),
+        ("emit = \"wasm\"", "\"wasm\"", "[build] target = \"wasm\""),
+        ("emit-dts = true", "true", "[target.js] declarations = true"),
+        (
+            "promise-facade = true",
+            "true",
+            "[target.js] promise-facade = true",
+        ),
+        ("schema-aot = true", "true", "[target.js] schema-aot = true"),
+        (
+            "effect = \"effect\"",
+            "\"effect\"",
+            "[target.js] runtime = \"effect\"",
+        ),
+        (
+            "ui = \"./renderer.mjs\"",
+            "\"./renderer.mjs\"",
+            "[target.js] ui = \"./renderer.mjs\"",
+        ),
+    ];
+    for (line, spanned, expected_hint) in cases {
+        let text = format!("schema-version = 1\n[project]\nkind = \"lib\"\n[build]\n{line}\n");
+        let err = parse_text(&text).expect_err(line);
+        assert_eq!(err.code, codes::P057, "{line}: {}", err.message);
+        let span = err.span.expect("span on removed key");
+        assert_eq!(&text[span.range()], spanned, "{line}");
+        let hints: Vec<&str> = err.fixes.iter().map(|f| f.message.as_str()).collect();
+        assert!(
+            hints.iter().any(|h| h.contains(expected_hint)),
+            "{line}: expected {expected_hint:?} in {hints:?}"
+        );
     }
 }
 
@@ -292,7 +348,11 @@ fn rejects_invalid_workspaces_and_scripts() {
     for (text, code) in [
         ("schema-version = 1\n", codes::P005),
         (
-            "schema-version = 1\n[workspace]\nmembers = []\n[build]\nemit = \"go\"\n",
+            "schema-version = 1\n[workspace]\nmembers = []\n[build]\ntarget = \"go\"\n",
+            codes::P005,
+        ),
+        (
+            "schema-version = 1\n[workspace]\nmembers = []\n[target.go]\ncgo = true\n",
             codes::P005,
         ),
         (

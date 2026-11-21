@@ -49,7 +49,7 @@ fn built(name: &str, main: &str) -> PathBuf {
     );
     for emit in ["go", "js"] {
         let out = format!("dist-{emit}");
-        let build = flick_in(&dir, &["build", "--emit", emit, "--out-dir", &out]);
+        let build = flick_in(&dir, &["build", "--target", emit, "--out-dir", &out]);
         assert!(build.status.success(), "{name} for {emit}: {build:?}");
     }
     dir
@@ -205,18 +205,13 @@ fn mounted_services_are_captured_on_every_target_and_profile() {
     for emit in ["js", "ts", "go"] {
         for profile in ["debug", "release"] {
             let out_dir = format!("dist-{emit}-{profile}");
-            let built = flick_in(
-                &dir,
-                &[
-                    "build",
-                    "--emit",
-                    emit,
-                    "--profile",
-                    profile,
-                    "--out-dir",
-                    &out_dir,
-                ],
-            );
+            let mut args = vec!["build", "--profile", profile, "--out-dir", &out_dir];
+            match emit {
+                "go" => args.extend(["--target", "go"]),
+                "ts" => args.extend(["--target", "js", "--typescript"]),
+                _ => args.extend(["--target", "js"]),
+            }
+            let built = flick_in(&dir, &args);
             assert!(
                 built.status.success(),
                 "capture build {emit}/{profile}: {built:?}"

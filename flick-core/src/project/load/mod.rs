@@ -310,16 +310,17 @@ pub fn compile(
 }
 
 /// [`compile`], taking the modules of source packages `packages` saved and
-/// giving those to save; `rt` builds for Flick's own runtime whatever the
-/// project says; a command that builds again and again keeps what it
-/// compiled in `cache`.
+/// giving those to save; `rt` overrides whether stages follow class derivation
+/// (`Some(true)` for RT, `Some(false)` for Effect/Go, `None` for the project
+/// default); a command that builds again and again keeps what it compiled in
+/// `cache`.
 pub fn compile_with(
     host: &dyn Host,
     sources: &mut SourceMap,
     project: Option<&Project>,
     roots: &[PathBuf],
     packages: Option<&PackageCache>,
-    rt: bool,
+    rt: Option<bool>,
     cache: Option<&mut ModuleCache>,
 ) -> (Vec<Diagnostic>, Compilation, Vec<Fresh>) {
     let mode = Mode::Compile;
@@ -336,7 +337,7 @@ fn run(
     cache: Option<&mut ModuleCache>,
     saved: Option<&PackageCache>,
 ) -> Output {
-    run_in(host, sources, project, roots, mode, cache, saved, false)
+    run_in(host, sources, project, roots, mode, cache, saved, None)
 }
 
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
@@ -348,7 +349,7 @@ fn run_in(
     mode: Mode,
     cache: Option<&mut ModuleCache>,
     saved: Option<&PackageCache>,
-    rt: bool,
+    rt: Option<bool>,
 ) -> Output {
     let stages_by_class = stages_by_class(project, rt);
     #[cfg(feature = "native-project")]
@@ -423,6 +424,7 @@ fn run_in(
         cache.retain_loaded(&loader.modules);
     }
     loader.check_entry(&interfaces);
+    #[cfg(feature = "native-project")]
     loader.check_targets();
     let failed = loader
         .diagnostics

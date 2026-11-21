@@ -8,5 +8,7 @@ source-dir = "src"
 [build]
 out-dir = "dist"
 profile = "debug"
-emit = "js"
-effect = "effect"
+target = "js"
+
+[target.js]
+runtime = "effect"

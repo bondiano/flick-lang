@@ -69,7 +69,9 @@ macro_rules! wit_conversions {
             BackendId { id, version }
             BackendPin { identity, sha256 }
             Capability { name, version }
-            Descriptor { identity, backend_api, ir, language, runtime_abis, environments, profiles, modes, capabilities }
+            Parameter { name, kind, multiple, required, help }
+            OptionDescriptor { parameter, default, implicit_value, choices, verbs }
+            Descriptor { identity, backend_api, ir, language, runtime_abis, environments, profiles, modes, capabilities, options }
             OptionValue { key, value }
             TargetRequest { backend_api, ir_version, language_version, runtime_abis, environment, profile, mode, required_capabilities, options }
             TargetSupport { capabilities }
@@ -96,6 +98,8 @@ macro_rules! wit_conversions {
             enums! {
             Profile { Debug, Release }
             Mode { PerModule, WholeProgram }
+            Verb { Build, Run, Dev, Test, Inspect }
+            ValueKind { Flag, Text, Path }
             Severity { Error, Warning, Note }
             InputKind { Source, Foreign, Interface, TargetFacts, Resource, Lockfile }
             ModuleRole { Own, Builtin, External }

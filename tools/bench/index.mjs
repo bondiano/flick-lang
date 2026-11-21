@@ -57,8 +57,9 @@ const programs = readdirSync(here)
 const rows = [];
 for (const name of programs) {
   const source = join(here, `${name}.fl`);
-  for (const emit of ["js", "go"]) {
-    run(flick, ["build", source, "--emit", emit, "--profile", "release", "--out-dir", join(out, emit, name)]);
+  for (const target of ["js", "go"]) {
+    const extra = target === "js" ? ["--runtime", "effect"] : [];
+    run(flick, ["build", source, "--target", target, ...extra, "--profile", "release", "--out-dir", join(out, target, name)]);
   }
   const js = time("node", [join(out, "js", name, "flick-main.js")]);
   const go = time(join(out, "go", name, exe), []);

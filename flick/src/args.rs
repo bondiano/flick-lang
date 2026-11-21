@@ -1,6 +1,7 @@
 //! Command-line arguments: options shared by all commands and one argument
 //! struct per command.
 
+use std::collections::BTreeMap;
 use std::ffi::OsString;
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
@@ -26,7 +27,7 @@ pub enum Commands {
     Check(CheckArguments),
     /// Check the proofs of the project's proof root, with the code they name.
     Prove(ProveArguments),
-    /// Compile the project, or the given files, to ES modules.
+    /// Compile the project, or the given files, with the selected target backend.
     Build(BuildArguments),
     /// Format Flick source files in place.
     Fmt(FmtArguments),
@@ -36,8 +37,8 @@ pub enum Commands {
     New(NewArguments),
     /// Add a project to the working directory; existing files are kept.
     Init(InitArguments),
-    /// Build the app (JavaScript, or Go when the project emits go) and run its
-    /// `main`, or run a script of `[scripts]` that is not an entry's name.
+    /// Build the app with the selected target backend and run its `main`,
+    /// or run a script of `[scripts]` that is not an entry's name.
     Run(RunArguments),
     /// Rebuild on changes and replace the running app after its shutdown.
     Dev(RunArguments),
@@ -74,8 +75,8 @@ pub enum Commands {
     Expand(ExpandArguments),
     /// Check the compiler, Node.js, pnpm and the runtime.
     Doctor,
-    /// Print a representation of a module: AST, typed IR, JS, TS, interface
-    /// or source mapping.
+    /// Print a representation of a module: AST, typed IR, backend output,
+    /// interface, variance or source mapping.
     Inspect(InspectArguments),
     /// Run the language server.
     Lsp(LspArguments),
@@ -183,38 +184,24 @@ pub struct ProveArguments {
 }
 
 #[derive(Args)]
-#[allow(clippy::struct_excessive_bools, reason = "one per command-line flag")]
 pub struct BuildArguments {
     /// Files or directories to compile, with everything they import; by
     /// default the project's source root.
     pub paths: Vec<String>,
 
+    /// Target backend, such as `js` or `go`; by default `build.target` of the
+    /// project.
+    #[arg(long, value_name = "NAME")]
+    pub target: Option<String>,
+
     /// Directory of the output; by default `build.out-dir` of the project.
     #[arg(long, value_name = "DIR")]
     pub out_dir: Option<String>,
-
-    /// Emit JavaScript, TypeScript or a Go executable; by default
-    /// `build.emit` of the project.
-    #[arg(long, value_enum)]
-    pub emit: Option<EmitArgument>,
-
-    /// Also write `.d.ts` files, the public TypeScript interface; an export
-    /// without a TypeScript form is an error.
-    #[arg(long)]
-    pub emit_dts: bool,
-
-    /// Also write `A/B.promise.js`: Promise façades of runtime functions.
-    #[arg(long)]
-    pub promise_facade: bool,
 
     /// Also write the IR the backend gets, `program.ir.json` or
     /// `program.ir.cbor`; optimized in a release build.
     #[arg(long, value_enum, value_name = "FORMAT", num_args = 0..=1, default_missing_value = "json")]
     pub emit_ir: Option<IrFormat>,
-
-    /// Compile pure codecs ahead of use in the app's runner.
-    #[arg(long)]
-    pub schema_aot: bool,
 
     /// `debug`, the reference lowering, or `release`, optimized; by default
     /// `build.profile` of the project.
@@ -226,11 +213,6 @@ pub struct BuildArguments {
     #[arg(long, value_enum)]
     pub labels: Option<LabelsArgument>,
 
-    /// Build for Flick's own runtime, as `build.effect = "rt"` does. Only
-    /// JavaScript output has it.
-    #[arg(long)]
-    pub rt: bool,
-
     /// Print the compiler's input inventory as JSON without building.
     #[arg(long, conflicts_with = "watch")]
     pub inputs: bool,
@@ -239,6 +221,10 @@ pub struct BuildArguments {
     /// last output.
     #[arg(long)]
     pub watch: bool,
+
+    /// Backend-declared options parsed from the command line.
+    #[arg(skip)]
+    pub backend_options: BTreeMap<String, Vec<String>>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -258,13 +244,6 @@ pub enum LabelsArgument {
 pub enum IrFormat {
     Json,
     Cbor,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub enum EmitArgument {
-    Js,
-    Ts,
-    Go,
 }
 
 #[derive(Args)]
@@ -334,15 +313,14 @@ pub struct TestArguments {
     #[arg(long, value_enum)]
     pub profile: Option<ProfileArgument>,
 
-    /// Run the tests on Node (`js`) or as a Go executable (`go`); by
-    /// default `build.emit` of the project.
-    #[arg(long, value_enum)]
-    pub emit: Option<TestEmitArgument>,
+    /// Target backend, such as `js` or `go`; by default `build.target` of the
+    /// project.
+    #[arg(long, value_name = "NAME")]
+    pub target: Option<String>,
 
-    /// Run the tests on Flick's own runtime, as `build.effect = "rt"` does.
-    /// Only Node has it.
-    #[arg(long)]
-    pub rt: bool,
+    /// Backend-declared options parsed from the command line.
+    #[arg(skip)]
+    pub backend_options: BTreeMap<String, Vec<String>>,
 }
 
 /// The milliseconds of a duration written `500ms`, `5s`, `2m` or `500`.
@@ -357,12 +335,6 @@ fn millis(text: &str) -> Result<f64, String> {
             "`{text}` is not a duration: write `500ms`, `5s` or `2m`"
         )),
     }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub enum TestEmitArgument {
-    Js,
-    Go,
 }
 
 #[derive(Clone, Copy, ValueEnum)]

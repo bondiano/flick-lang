@@ -12,6 +12,7 @@ use std::path::Path;
 
 use super::Prepared;
 use crate::backends::Selected;
+use crate::backends::options::ResolvedOptions;
 use crate::commands::build::{BuildPlan, Purpose};
 use crate::sources::FsHost;
 
@@ -45,6 +46,10 @@ fn go_dependency_fingerprints_describe_the_published_go_interfaces() {
     let mut output = BuildPlan {
         purpose: Purpose::Build,
         backend: Selected::Native,
+        target: "go".into(),
+        target_overridden: false,
+        options: ResolvedOptions::default(),
+        inspect_module: None,
         out_dir: root.join("output"),
         entries: vec![],
         typescript: false,
@@ -140,6 +145,10 @@ fn a_backend_receives_a_closed_graph_with_real_source_provenance() {
     let output = BuildPlan {
         purpose: Purpose::Build,
         backend: Selected::Native,
+        target: "js".into(),
+        target_overridden: false,
+        options: ResolvedOptions::js(false, false, false, false, false),
+        inspect_module: None,
         out_dir: "unused-provenance-output".into(),
         entries: vec![("main".into(), "Main".into())],
         typescript: false,

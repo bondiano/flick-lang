@@ -11,7 +11,8 @@ mod optimize;
 
 use flick_backend::{
     Backend, BackendId, BuildRequest, BuildResult, Capability, Descriptor, Diagnostic, Environment,
-    Inputs, Mode, NamedRange, Profile, Severity, TargetSupport, VersionRange, command,
+    Inputs, Mode, NamedRange, OptionDescriptor, Parameter, Profile, Severity, TargetSupport,
+    ValueKind, Verb, VersionRange, command,
 };
 
 /// The same implementation serves the component and development parity tests.
@@ -33,21 +34,90 @@ fn selected(request: &BuildRequest, module: &str) -> bool {
 }
 
 fn capabilities() -> Vec<Capability> {
-    [
-        "typescript",
-        "declarations",
-        "promise-facade",
-        "schema-aot",
-        "host-node-devtools",
-        "host-schema-aot",
-        "host-source-build",
+    ["host-node-devtools", "host-schema-aot", "host-source-build"]
+        .into_iter()
+        .map(|name| Capability {
+            name: name.into(),
+            version: "1.0.0".into(),
+        })
+        .collect()
+}
+
+fn options() -> Vec<OptionDescriptor> {
+    let flag = |name: &str, help: &str, verbs: Vec<Verb>| OptionDescriptor {
+        parameter: Parameter {
+            name: name.into(),
+            kind: ValueKind::Flag,
+            multiple: false,
+            required: false,
+            help: help.into(),
+        },
+        default: Some("false".into()),
+        implicit_value: None,
+        choices: vec![],
+        verbs,
+    };
+    vec![
+        flag(
+            "typescript",
+            "Emit TypeScript (.ts) instead of JavaScript (.js).",
+            vec![Verb::Build, Verb::Inspect],
+        ),
+        flag(
+            "declarations",
+            "Also write .d.ts files, the public TypeScript interface; an export without a TypeScript form is an error.",
+            vec![Verb::Build],
+        ),
+        flag(
+            "promise-facade",
+            "Also write A/B.promise.js: Promise façades of runtime functions.",
+            vec![Verb::Build],
+        ),
+        flag(
+            "schema-aot",
+            "Compile pure codecs ahead of use in the app's runner.",
+            vec![Verb::Build],
+        ),
+        OptionDescriptor {
+            parameter: Parameter {
+                name: "runtime".into(),
+                kind: ValueKind::Text,
+                multiple: false,
+                required: false,
+                help: "JavaScript effect runtime: Flick's own runtime (rt) or the Effect adapter (effect).".into(),
+            },
+            default: Some("rt".into()),
+            implicit_value: None,
+            choices: vec!["rt".into(), "effect".into()],
+            verbs: vec![Verb::Build, Verb::Run, Verb::Dev, Verb::Test, Verb::Inspect],
+        },
+        OptionDescriptor {
+            parameter: Parameter {
+                name: "devtools".into(),
+                kind: ValueKind::Text,
+                multiple: false,
+                required: false,
+                help: "Send spans and atom logs to DevTools listening at this URL.".into(),
+            },
+            default: None,
+            implicit_value: Some("ws://localhost:34437".into()),
+            choices: vec![],
+            verbs: vec![Verb::Run, Verb::Dev],
+        },
+        OptionDescriptor {
+            parameter: Parameter {
+                name: "ui".into(),
+                kind: ValueKind::Text,
+                multiple: false,
+                required: false,
+                help: "Module specifier that renders and mounts views instead of React.".into(),
+            },
+            default: None,
+            implicit_value: None,
+            choices: vec![],
+            verbs: vec![Verb::Build, Verb::Run, Verb::Dev, Verb::Test],
+        },
     ]
-    .into_iter()
-    .map(|name| Capability {
-        name: name.into(),
-        version: "1.0.0".into(),
-    })
-    .collect()
 }
 
 impl Backend for Javascript {
@@ -128,6 +198,7 @@ impl Backend for Javascript {
             profiles: vec![Profile::Debug, Profile::Release],
             modes: vec![Mode::PerModule, Mode::WholeProgram],
             capabilities: capabilities(),
+            options: options(),
         }
     }
 

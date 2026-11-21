@@ -49,12 +49,11 @@ fn failure(message: String) -> Diagnostic {
 
 pub(super) fn javascript(
     root: &Path,
-    rt: bool,
     project: Option<&Project>,
     tools: Option<&BTreeMap<String, Vec<String>>>,
 ) -> Result<Package, Diagnostic> {
     let (pin, bytes) = resolve(JS, project)?;
-    Package::from_bytes(root, pin, &bytes, rt, tools, true)
+    Package::from_bytes(root, pin, &bytes, tools, true)
 }
 
 pub(super) fn go(
@@ -63,7 +62,56 @@ pub(super) fn go(
     tools: Option<&BTreeMap<String, Vec<String>>>,
 ) -> Result<Package, Diagnostic> {
     let (pin, bytes) = resolve(GO, project)?;
-    Package::from_bytes(root, pin, &bytes, false, tools, true)
+    Package::from_bytes(root, pin, &bytes, tools, true)
+}
+
+/// Whether `version` falls inside `[minimum, maximum_exclusive)`.
+pub(super) fn accepts(range: &VersionRange, version: &str) -> bool {
+    let (Ok(min), Ok(max), Ok(version)) = (
+        Version::parse(&range.minimum),
+        Version::parse(&range.maximum_exclusive),
+        Version::parse(version),
+    ) else {
+        return false;
+    };
+    min <= version && version < max
+}
+
+/// Resolves the official backend `id` to `(pin, bytes)` for reading its
+/// descriptor, using a checkout, `flick.lock` + store, or (when online)
+/// downloading into the store without mutating `flick.lock`.
+pub(super) fn fetch_for_descriptor(
+    id: &str,
+    project: Option<&Project>,
+    offline: bool,
+) -> Result<(BackendPin, Vec<u8>), Diagnostic> {
+    if let Some(found) = checkout(id) {
+        return Ok(found);
+    }
+    let offline = offline || super::offline();
+    if let Some(entry) = project.and_then(|p| lock_entry(p, id)) {
+        return fetched_with_offline(&entry, offline).map(|bytes| (pin_of(&entry), bytes));
+    }
+    if offline {
+        return Err(failure(format!(
+            "`{LOCK_FILE}` pins no `{id}`, and `--offline` fetches nothing: build once online or run `flick install`"
+        )));
+    }
+    let entry = latest(id)?;
+    let bytes = fetched_with_offline(&entry, false)?;
+    Ok((pin_of(&entry), bytes))
+}
+
+/// The component bytes of the official backend `id` when already available
+/// locally (checkout or local package store), without ever reaching the network.
+pub(super) fn local_bytes(id: &str, project: Option<&Project>) -> Option<(BackendPin, Vec<u8>)> {
+    if let Some(found) = checkout(id) {
+        return Some(found);
+    }
+    let entry = project.and_then(|p| lock_entry(p, id))?;
+    let path = stored_path(&entry.sha256)?;
+    let bytes = fs::read(path).ok()?;
+    (fetch::hex(&Sha256::digest(&bytes)) == entry.sha256).then(|| (pin_of(&entry), bytes))
 }
 
 /// The pin of the official backend `id` as far as it is known without the
@@ -190,6 +238,10 @@ fn stored_path(sha256: &str) -> Option<PathBuf> {
 /// The bytes of `entry`: from the store, else downloaded, checked against
 /// its digest and stored.
 fn fetched(entry: &LockedBackend) -> Result<Vec<u8>, Diagnostic> {
+    fetched_with_offline(entry, super::offline())
+}
+
+fn fetched_with_offline(entry: &LockedBackend, offline: bool) -> Result<Vec<u8>, Diagnostic> {
     let path = stored_path(&entry.sha256);
     if let Some(bytes) = path.as_ref().and_then(|p| fs::read(p).ok())
         && fetch::hex(&Sha256::digest(&bytes)) == entry.sha256
@@ -197,7 +249,7 @@ fn fetched(entry: &LockedBackend) -> Result<Vec<u8>, Diagnostic> {
         return Ok(bytes);
     }
     let remote = entry.url.starts_with("http://") || entry.url.starts_with("https://");
-    if remote && super::offline() {
+    if remote && offline {
         return Err(failure(format!(
             "`{}` {} is not in the package store, and `--offline` fetches nothing",
             entry.id, entry.version
@@ -235,16 +287,6 @@ fn latest(id: &str) -> Result<LockedBackend, Diagnostic> {
         fetch::bytes(&url).map_err(|e| failure(format!("cannot read the backends index: {e}")))?;
     let index: Index = serde_json::from_slice(&bytes)
         .map_err(|e| failure(format!("`{url}` is no backends index: {e}")))?;
-    let accepts = |range: &VersionRange, version: &str| {
-        let (Ok(min), Ok(max), Ok(version)) = (
-            Version::parse(&range.minimum),
-            Version::parse(&range.maximum_exclusive),
-            Version::parse(version),
-        ) else {
-            return false;
-        };
-        min <= version && version < max
-    };
     let newest = (index.backends.iter())
         .filter(|e| e.id == id)
         .filter(|e| {

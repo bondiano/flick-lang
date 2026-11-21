@@ -161,8 +161,8 @@ e2e-cases shard="": e2e-prepare
 language seed="42": e2e-compiler
     pnpm -C runtime build
     pnpm -C packages/effect-ts build
-    cd tests/language && {{flick}} test --emit js --seed {{seed}} --reporter json > ../../target/language-js.txt || { cat ../../target/language-js.txt; exit 1; }
-    cd tests/language && {{flick}} test --emit go --seed {{seed}} --reporter json > ../../target/language-go.txt || { cat ../../target/language-go.txt; exit 1; }
+    cd tests/language && {{flick}} test --target js --seed {{seed}} --reporter json > ../../target/language-js.txt || { cat ../../target/language-js.txt; exit 1; }
+    cd tests/language && {{flick}} test --target go --seed {{seed}} --reporter json > ../../target/language-go.txt || { cat ../../target/language-go.txt; exit 1; }
     diff -u target/language-js.txt target/language-go.txt
     cat target/language-go.txt
     node tools/language-rt/index.mjs {{flick}} {{seed}} target/language-js.txt
@@ -170,7 +170,7 @@ language seed="42": e2e-compiler
 # A relative path: on Windows the shell would drop the backslashes of {{flick}}.
 # The language tests as a Go executable alone, without Node, after `e2e-go` built the compiler
 language-go seed="42":
-    cd tests/language && ../../target/e2e/flick test --emit go --seed {{seed}}
+    cd tests/language && ../../target/e2e/flick test --target go --seed {{seed}}
 
 # Bundle the tracked programs (release) with rolldown and hold them to their gzip budgets
 bundle-size: e2e-compiler
@@ -224,7 +224,7 @@ load-ssr-browser pages="500" tabs="8" port="3919": load-ssr-build
 # Build the HTTP + JSON load server of tools/load/json for the JS and the go target
 load-json-build:
     cargo build -p flick
-    cd tools/load/json && ../../../target/debug/flick build --out-dir dist/js && ../../../target/debug/flick build --emit go --out-dir dist/go
+    cd tools/load/json && ../../../target/debug/flick build --out-dir dist/js && ../../../target/debug/flick build --target go --out-dir dist/go
 
 # Closed-loop HTTP load on the JSON server built for `target` (js or go), then its startup time and size;
 # the server and the client run on separate CPUs (`taskset` lists), so the client does not take the server's
@@ -302,27 +302,6 @@ wasm-plugins: wasm-backends
     pnpm -C runtime build
     pnpm -C packages/effect-ts build
     FLICK_BIN="$PWD/target/e2e/flick" node examples/typed-dsl/check.mjs
-
-# Ignored backend tests also run in e2e-tests now that their host is enabled
-# by default. Both runners need these images in a fresh checkout.
-backend-fixtures: js-component go-component
-    cargo build -p flick-test-backend --features guest --target wasm32-wasip2 --release
-
-# A real third-party backend fixture through the separate component world.
-wasm-backends: backend-fixtures
-    pnpm install --frozen-lockfile
-    pnpm -C runtime build
-    pnpm -C packages/effect-ts build
-    cargo clippy -p flick-test-backend --features guest --target wasm32-wasip2 -- -D warnings
-    just check-component js
-    just check-component go
-    cargo clippy -p flick-backend --features host --all-targets -- -D warnings
-    cargo test -p flick-backend --profile e2e --features host --test component_host -- --include-ignored
-    cargo clippy -p flick --features wasm-backends --all-targets -- -D warnings
-    cargo test -p flick --profile e2e --features wasm-backends --bin flick --test backends -- --include-ignored
-    cargo test -p flick --release --features wasm-plugins --test default_backend -- --include-ignored
-    node --test tools/backend-conformance/report.test.mjs
-    node tools/backend-conformance/index.mjs {{flick}} target/backends/js.wasm
 
 # Build the wasm module the in-browser demo loads and hold it to its size budget.
 # The raw-byte budget retains the playground editor queries (hover, completion,

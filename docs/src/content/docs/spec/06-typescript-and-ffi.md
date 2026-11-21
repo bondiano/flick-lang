@@ -1,6 +1,6 @@
 ---
 title: "TypeScript generation and the FFI boundary"
-source_hash: f13255dc371438fa
+source_hash: e6426c3833535914
 ---
 
 The examples of generated code below are the output of the debug profile, the reference lowering; [Code generation](../../reference/codegen/) describes it in full.
@@ -127,7 +127,7 @@ A runtime stage is an `Effect.gen` body: each runtime call is `yield*`, and pure
 
 ## HKT at the TypeScript boundary
 
-HKTs and source kinds are checked by the frontend; in the generated JS they are erased or remain in the dictionaries that are passed around. The public TS API exports concrete applications of HKTs and dictionary records. An export whose type TypeScript cannot state faithfully — a higher-kinded variable, a region, an open record — has no projection: `--emit-dts` reports it (`FLICK-F004`), and the declarations never contain `any`. Such an export needs a concrete façade written in Flick.
+HKTs and source kinds are checked by the frontend; in the generated JS they are erased or remain in the dictionaries that are passed around. The public TS API exports concrete applications of HKTs and dictionary records. An export whose type TypeScript cannot state faithfully — a higher-kinded variable, a region, an open record — has no projection: `--declarations` reports it (`FLICK-F004`), and the declarations never contain `any`. Such an export needs a concrete façade written in Flick.
 
 The notation `F<A>` for an arbitrary type parameter `F` is not a TypeScript feature. A successful check of the TS projection therefore does not replace checking the source program.
 
@@ -241,7 +241,7 @@ A throw and a rejected Promise become a typed error only through `catch f`, with
 
 ### The Go target
 
-On the Go target (`[build] emit = "go"`) a binding to a module of the program, `./timers.mjs`, calls the Go function of the same name in `timers.go` beside it, which the build copies into the Go module; without that file the binding is `FLICK-P012`. The Go function takes and returns `flickrt.Value` and every argument of the binding at once: `pure`, `sync` and `effect` functions take the executing fiber first, an `async` one takes a `flickrt.Context`, cancelled on interruption, and runs in a goroutine of its own, which the owner waits for as it waits for a Promise. Foreign metadata annotations (`catch`, `this`, `optional`, `variadic`, and `callbacks`) are supported on Go and lowered to `flickrt` runtime helpers. See [FFI on the go target](../../reference/ffi/#the-go-target).
+On the Go target (`[build] target = "go"`) a binding to a module of the program, `./timers.mjs`, calls the Go function of the same name in `timers.go` beside it, which the build copies into the Go module; without that file the binding is `FLICK-P012`. The Go function takes and returns `flickrt.Value` and every argument of the binding at once: `pure`, `sync` and `effect` functions take the executing fiber first, an `async` one takes a `flickrt.Context`, cancelled on interruption, and runs in a goroutine of its own, which the owner waits for as it waits for a Promise. Foreign metadata annotations (`catch`, `this`, `optional`, `variadic`, and `callbacks`) are supported on Go and lowered to `flickrt` runtime helpers. See [FFI on the go target](../../reference/ffi/#the-go-target).
 
 ## Value representation and callbacks
 
@@ -340,7 +340,7 @@ Direct FFI and data validation solve different problems. Passing a trusted `HTML
 | Opaque or abstract nominal type, service | An interface branded with its qualified name |
 | Type or service with a `@ts` form | Its form, written where the type is declared; the type itself is not declared |
 | Enum | The union of its literals; an opaque one is `string` or `number` branded with its qualified name |
-| Higher-kinded variable, region, open record | No projection: `FLICK-F004` under `--emit-dts` |
+| Higher-kinded variable, region, open record | No projection: `FLICK-F004` under `--declarations` |
 
 A curried export preserves the stages of the source function. For `f x y` the first stage `f x` is executed before `y` is evaluated, while JS first evaluates all arguments of an ordinary call. So an uncurried worker `f$n` exists only for a function whose stages before the last only make closures; if the first stage could diverge, fail or perform a runtime operation, joining the stages could change behavior.
 

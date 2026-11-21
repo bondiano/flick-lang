@@ -5,7 +5,7 @@ kind = "app"
 source-dir = "src"
 entry = "App.Main"
 runner = "Runner.Node"
-#        ^^^^^^^^^^^^^ FLICK-P030 `Runner.Node` is available on the js target only, and this project emits go
+#        ^^^^^^^^^^^^^ FLICK-P030 `Runner.Node` is available on the js target only, and this project targets go: remove the import, or build the project with `[build] target = "js"`
 
 [build]
-emit = "go"
+target = "go"

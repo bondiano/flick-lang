@@ -1,7 +1,8 @@
 //! `flick test`: builds the project with its test root into `.flick/test/`,
 //! writes a runner that imports the `tests` of each test module, and runs it
-//! on Node; a project that emits go, or `--emit go`, gets one executable,
-//! `flick-test`, that runs them, and `--rt` runs them on Flick's own runtime.
+//! on Node; a project targeting Go (`--target go`) gets one executable,
+//! `flick-test`, that runs them, and `--runtime rt` / `--runtime effect` picks
+//! the JavaScript effect runtime.
 //! With `--watch`, a change of a source file stops the run (closing the
 //! runner's stdin: every running test closes its scope) and starts the next
 //! one after it.
@@ -12,14 +13,15 @@ use std::time::{Duration, SystemTime};
 use std::{fs, thread};
 
 use crate::artifact::{Artifact, resolve_root, validate_root};
+use flick_backend::Verb;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
-use flick_core::project::config::{Backend, Emit};
 use flick_core::project::{self, ModuleCache, Project};
 use flick_core::source::SourceMap;
 
 use super::build::{BuildPlan, Purpose, artifacts, publish_artifacts, release};
 use super::check::select;
-use crate::args::{GlobalArguments, Reporter, TestArguments, TestEmitArgument};
+use crate::args::{GlobalArguments, Reporter, TestArguments};
+use crate::backends::options::{self, ResolvedOptions};
 use crate::backends::{self, Selected};
 use crate::package_cache;
 use crate::progress::{Mode, Progress};
@@ -39,8 +41,9 @@ pub fn test(options: &TestArguments, global: &GlobalArguments) -> ExitCode {
     if options.watch {
         return watch(options, global);
     }
-    let Ok(runner) = prepare(options, global, None) else {
-        return ExitCode::from(1);
+    let runner = match prepare(options, global, None) {
+        Ok(runner) => runner,
+        Err(code) => return ExitCode::from(code),
     };
     let signals = child::signals();
     let mut command = match runner_command(&runner, options, global, false) {
@@ -65,7 +68,7 @@ fn prepare(
     options: &TestArguments,
     global: &GlobalArguments,
     modules: Option<&mut ModuleCache>,
-) -> Result<Runner, ()> {
+) -> Result<Runner, u8> {
     let progress = Progress::new(if matches!(options.reporter, Reporter::Json) {
         Mode::Hidden
     } else {
@@ -74,8 +77,9 @@ fn prepare(
     let mut sources = SourceMap::default();
     let host = FsHost::new();
     let fail = |sources: &SourceMap, diagnostics: Vec<Diagnostic>| {
+        let code = report::code(&diagnostics).max(1);
         report::render(global, sources, &diagnostics);
-        Err(())
+        Err(code)
     };
     progress.stage("Resolving project");
     let (project, roots) = match select(&host, &mut sources, global.project.as_deref(), &[]) {
@@ -86,7 +90,7 @@ fn prepare(
         }
     };
     let Some(project) = project else {
-        return Err(());
+        return Err(1);
     };
     // the test companions beside the sources, which only this command runs
     let mut roots = roots;
@@ -103,33 +107,49 @@ fn prepare(
     let mut selected = wanted.clone();
     selected.sort();
     selected.dedup();
-    let go_requested = match options.emit {
-        Some(target) => target == TestEmitArgument::Go,
-        None => project.config.build.emit == Emit::Go,
+    let (backend, choice, target_overridden) =
+        match Selected::load_target(&host, Some(&project), options.target.as_deref()) {
+            Ok(loaded) => loaded,
+            Err(diagnostic) => {
+                drop(progress);
+                return fail(&sources, vec![diagnostic]);
+            }
+        };
+    let resolved = match backend.descriptor() {
+        Some(descriptor) => match options::resolve(
+            &descriptor,
+            Verb::Test,
+            Some(&project),
+            &options.backend_options,
+        ) {
+            Ok(resolved) => resolved,
+            Err(diagnostics) => {
+                drop(progress);
+                return fail(&sources, diagnostics);
+            }
+        },
+        None => ResolvedOptions::default(),
     };
-    let rt = options.rt || (!go_requested && project.config.build.effect == Backend::Rt);
-    if !go_requested && let Some(problem) = backends::check_runtime(&project, rt) {
+    let go = choice.is_go();
+    let rt = !go && resolved.is_rt();
+    if let Some(problem) = backends::check_runtime(&project, &backend, rt) {
+        drop(progress);
         return fail(&sources, vec![problem]);
     }
-    let backend = match Selected::load(&host, Some(&project), go_requested, rt) {
-        Ok(backend) => backend,
-        Err(diagnostic) => return fail(&sources, vec![diagnostic]),
-    };
-    if let Err(diagnostic) = backend.validate_environment(Some(&project), go_requested) {
+    if let Err(diagnostic) = backend.validate_environment(Some(&project), go) {
+        drop(progress);
         return fail(&sources, vec![diagnostic]);
     }
-    let identity = backend.cache_identity();
+    let effect = !go && !rt;
+    let identity = backend.cache_identity(effect);
     let settings = format!(
-        "test {:?} {:?} {:?} {rt} {identity}",
+        "test {:?} {} {:?} {} {identity}",
         selected,
-        match options.emit {
-            Some(TestEmitArgument::Go) => "go",
-            Some(TestEmitArgument::Js) => "js",
-            None => "default",
-        },
+        choice.short(),
         release(options.profile, Some(&project.config.build)),
+        resolved.cache_key(),
     );
-    let key = cache::key(&project, &roots, &settings, !go_requested && !rt);
+    let key = cache::key(&project, &roots, &settings, effect);
     let out = resolve_root(&project.root, &project.root.join(OUT_DIR));
     if let Err(why) = validate_root(&out) {
         drop(progress);
@@ -143,13 +163,21 @@ fn prepare(
         return Ok(runner);
     }
     progress.stage("Preparing compiler");
-    if let Err(diagnostic) = builtins::prepare_in(project::stages_by_class(Some(&project), rt)) {
+    if let Err(diagnostic) =
+        builtins::prepare_in(project::stages_by_class(Some(&project), Some(rt)))
+    {
         drop(progress);
         return fail(&sources, vec![diagnostic]);
     }
     progress.stage("Compiling Flick modules");
-    let (mut diagnostics, mut compilation) =
-        package_cache::compile(&host, &mut sources, Some(&project), &roots, rt, modules);
+    let (mut diagnostics, mut compilation) = package_cache::compile(
+        &host,
+        &mut sources,
+        Some(&project),
+        &roots,
+        Some(rt),
+        modules,
+    );
     super::build::hooks::ir(Some(&project), &mut compilation, &mut diagnostics);
     let errors = diagnostics.iter().any(|d| {
         d.severity == Severity::Error
@@ -161,7 +189,7 @@ fn prepare(
         drop(progress);
         report::render(global, &sources, &diagnostics);
         if errors {
-            return Err(());
+            return Err(report::code(&diagnostics).max(1));
         }
         Progress::new(if matches!(options.reporter, Reporter::Json) {
             Mode::Hidden
@@ -176,18 +204,13 @@ fn prepare(
         .filter(|m| wanted.is_empty() || wanted.contains(&m.path))
         .map(|m| (m.name.clone(), format!("./{}.js", m.name.replace('.', "/"))))
         .collect();
-    if go_requested && rt {
-        drop(progress);
-        let message = "Flick's own runtime has only JavaScript output yet";
-        return fail(
-            &sources,
-            vec![Diagnostic::new(codes::F004, Severity::Error, message)],
-        );
-    }
-    let go = go_requested;
     let output = BuildPlan {
         purpose: Purpose::Test,
         backend: backend.clone(),
+        target: choice.short().to_owned(),
+        target_overridden,
+        options: resolved,
+        inspect_module: None,
         out_dir: out.clone(),
         entries: Vec::new(),
         typescript: false,
@@ -227,7 +250,7 @@ fn prepare(
             d.severity == Severity::Error
                 || (global.warnings_as_errors && d.severity == Severity::Warning)
         }) {
-            return Err(());
+            return Err(report::code(&emitted.diagnostics).max(1));
         }
         Progress::new(if matches!(options.reporter, Reporter::Json) {
             Mode::Hidden
@@ -237,7 +260,7 @@ fn prepare(
     };
     let read = (&roots[..], &*host.cwd, &sources);
     let store = |artifacts: &[Artifact]| {
-        let now = cache::key(&project, &roots, &settings, !go_requested && !rt);
+        let now = cache::key(&project, &roots, &settings, effect);
         diagnostics.is_empty()
             && emitted.diagnostics.is_empty()
             && cache::store_built(&project, read, &key, &now, artifacts)
