@@ -18,7 +18,7 @@ use super::Tr;
 use super::expr::{cond, is_lang, layer_run, pat, stuck};
 use crate::syntax::{Arm, Name, Pat, Term};
 
-impl Tr {
+impl Tr<'_> {
     /// A loop carries the current values as the argument of a recursive
     /// function. Normal completion returns the same state tuple as a branch.
     pub(super) fn loop_term(
@@ -101,7 +101,11 @@ impl Tr {
             }),
             Stmt::Let(ir::Pat::Bind(x), e) => self.with_value(e, |tr, v| {
                 let body = tr.block(rest, tail, pack);
-                tr.value_let(x.as_str().into(), v, body)
+                if let Some(sig) = tr.local_scheme(x) {
+                    Term::Let(x.as_str().into(), Some(sig), rc(v), rc(body))
+                } else {
+                    tr.value_let(x.as_str().into(), v, body)
+                }
             }),
             Stmt::Let(ir::Pat::Wild, e) | Stmt::Expr(e) => self.with_value(e, |tr, v| {
                 let body = tr.block(rest, tail, pack);
@@ -267,7 +271,7 @@ pub fn modified(e: &ir::Expr) -> Vec<String> {
     assigned
 }
 
-impl Tr {
+impl Tr<'_> {
     fn match_state(&mut self, value: Term, arms: &[ir::Arm], out: &[String]) -> Term {
         let Some((arm, rest)) = arms.split_first() else {
             return Term::Die("unmatched source match".into());

@@ -21,6 +21,8 @@ pub use flick_ir::{
     ResultAdapter, Stage, Stmt, TypeName, memory, operation_arity,
 };
 pub use lower::lower;
+#[cfg(not(target_arch = "wasm32"))]
+pub use lower::lower_with_local_schemes;
 pub use lower::proofs::{LoweredProof, Proven, Run, check_proofs, laws_of, lower_proofs};
 pub use print::print;
 

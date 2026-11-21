@@ -15,7 +15,7 @@ use flick_core::types::lang::Lang;
 use std::iter;
 use std::rc::Rc;
 
-impl Tr {
+impl Tr<'_> {
     pub(super) fn active_variables(&self) -> Vec<String> {
         let mut xs: Vec<_> = self.versions.iter().map(|(x, _)| x.clone()).collect();
         xs.sort();
@@ -134,6 +134,21 @@ impl Tr {
                 let body = tr.protected_block(rest, tail, xs);
                 tr.versions.pop();
                 Term::Let(name, None, Rc::new(v), Rc::new(body))
+            }),
+            Stmt::Let(ir::Pat::Bind(x), e) => self.protected_with(e, xs, |tr, v| {
+                let body = tr.protected_block(rest, tail, xs);
+                if let Some(sig) = tr.local_scheme(x) {
+                    Term::Let(x.as_str().into(), Some(sig), Rc::new(v), Rc::new(body))
+                } else {
+                    Term::Match(
+                        Rc::new(v),
+                        Rc::from([Arm {
+                            pat: Pat::Var(x.as_str().into()),
+                            guard: None,
+                            body,
+                        }]),
+                    )
+                }
             }),
             Stmt::Let(p, e) => self.protected_with(e, xs, |tr, v| {
                 let body = tr.protected_block(rest, tail, xs);
@@ -394,7 +409,7 @@ impl Tr {
     }
 }
 
-impl Tr {
+impl Tr<'_> {
     fn protected_arms(&mut self, value: Term, arms: &[ir::Arm], xs: &[String]) -> Term {
         let Some((arm, rest)) = arms.split_first() else {
             return Term::Die("unmatched source match".into());

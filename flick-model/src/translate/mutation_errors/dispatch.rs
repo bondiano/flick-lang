@@ -1,7 +1,7 @@
 //! Deferred error dispatch and guard state threading.
 use super::{Arm, ModelStage, Name, Pat, Rc, Scheme, Term, Tr, Type, cond, ir, pat};
 
-impl Tr {
+impl Tr<'_> {
     /// Select an error pattern under `try`, then run its guard/body outside
     /// that catch. A false guard calls the next arm with its updated store.
     pub(in crate::translate) fn handler_state(
@@ -82,7 +82,7 @@ impl Tr {
 }
 
 /// Error actions have result Never; elimination gives any continuation type.
-impl Tr {
+impl Tr<'_> {
     fn consume_error(&mut self, action: Term) -> Term {
         let never_id = self.fresh("never_id");
         let value = self.fresh("never");

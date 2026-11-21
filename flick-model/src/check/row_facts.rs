@@ -279,21 +279,24 @@ impl Checker<'_> {
         )
     }
 
-    /// A constructed scrutinee may still have inference metas in its
-    /// index. Choose those by an ordinary inclusion, then require that the
-    /// branch equation proves the query for every hidden residual. Pattern
-    /// existentials have already become rigid; none is solved here.
+    /// A constructed scrutinee or enclosing stage bound may still have
+    /// inference metas in its index or element arguments. Choose those by an
+    /// ordinary inclusion, then require that the branch equation proves the
+    /// query for every hidden residual. Pattern existentials have already
+    /// become rigid; none is solved here.
     pub(super) fn infer_row_upper(&mut self, actual: &Row, allowed: &Row) -> bool {
         if self.solving_row_upper {
             return false;
         }
+        let mut allowed_metas = BTreeSet::new();
+        self.metas(&Type::Errors(allowed.clone()), &mut allowed_metas);
         let candidates: Vec<_> = self
             .row_equalities
             .iter()
             .flat_map(|(a, b)| [self.zonk_row(a), self.zonk_row(b)])
             .collect();
         for upper in candidates {
-            let mut metas = BTreeSet::new();
+            let mut metas = allowed_metas.clone();
             self.metas(&Type::Errors(upper.clone()), &mut metas);
             if metas.is_empty() || !self.row_implied(actual, &upper) {
                 continue;

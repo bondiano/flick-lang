@@ -78,6 +78,10 @@ fn merge_inline_lowering(
         .support_types
         .extend(child_declarations.support_types);
     declarations.instances.extend(child_declarations.instances);
+    #[cfg(not(target_arch = "wasm32"))]
+    declarations
+        .local_schemes
+        .extend(child_declarations.local_schemes);
 }
 
 fn unsupported_inline_applications(inline: &Node, text: &str, file: FileId) -> Vec<Diagnostic> {

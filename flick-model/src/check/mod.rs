@@ -162,6 +162,9 @@ pub struct Checker<'d> {
     /// skolemized, at the regions the body is checked at, through which its
     /// recursive uses go.
     pub own: Option<(Path, Scheme)>,
+    /// Enclosing lexical type, row, capture and region variables in scope for
+    /// local signatures, innermost last.
+    tyvars: Vec<(Name, Inst)>,
 }
 
 /// `σ` as the model reads a signature: with the `Live` elision adds
@@ -201,6 +204,7 @@ impl<'d> Checker<'d> {
             unfolding: Vec::new(),
             error_rows: None,
             own: None,
+            tyvars: Vec::new(),
         }
     }
 
@@ -208,12 +212,15 @@ impl<'d> Checker<'d> {
     /// as (Let-Sig) checks the right side of a `let` with a signature.
     pub fn check_top(&mut self, e: &Term, scheme: &Scheme) -> Check<()> {
         self.stage = Stage::Pure;
-        let (expected, rigid) = self.skolemize(scheme);
+        let tyvars = self.tyvars.len();
+        let (expected, rigid) = self.skolemize(scheme, true);
         if let Some((path, s)) = self.own.take() {
             let own = generalize::own_regions(&self.live_scheme(&s), &s.vars, &rigid);
             self.own = Some((path, own));
         }
-        self.check(e, &expected)?;
+        let checked = self.check(e, &expected);
+        self.tyvars.truncate(tyvars);
+        checked?;
         self.finish()?;
         if self.stage != Stage::Pure {
             return error(

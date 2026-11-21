@@ -17,7 +17,7 @@ stdlib/effect/arbitrary # no native for `map` (flick:Arbitrary map)
 stdlib/effect/array # no native for `take_right` (flick:Array takeRight)
 stdlib/effect/bytesize # no native for `is_finite` (global Number.isFinite)
 stdlib/effect/bytesize_text # no native for `is_finite` (global Number.isFinite)
-stdlib/effect/cache # the model's (≡) rejects `App.Main.counted`
+stdlib/effect/cache # no native for `make` (flick:Cache flickMake)
 stdlib/effect/channel # no native for `from_list` (flick:Channel fromArray)
 stdlib/effect/channel_control # no native for `fail` (flick:Channel fail)
 stdlib/effect/channel_core # no native for `from_list` (flick:Channel fromArray)

@@ -36,4 +36,3 @@ disagree docs/src/content/docs/ru/reference/server-fn.md 9a5c23ce0a2f3aee # a ty
 disagree tests/check/pass/effects/async.fl # flick-core subsumes a `Layer` by its input and error rows; the core has no such rule (docs/formal/core.md, a layer that needs less fits where more is allowed)
 disagree tests/check/pass/effects/variable_entries.fl # a type variable as an element of an error row, `{t | e}`, is outside the core (docs/formal/core.md §1.2)
 disagree tests/check/pass/server/server_fn.fl # a type variable as an element of an error row, `{t | e}`, is outside the core (docs/formal/core.md §1.2)
-disagree tests/check/pass/types/recursion.fl # the IR keeps no local signature, so `go : forall a. …` is checked without its `forall` (docs/formal/core.md §2.3 (Let-Sig))

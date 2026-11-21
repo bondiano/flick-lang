@@ -102,6 +102,8 @@ pub struct Decls {
     /// The sign of each parameter of a declared class, inferred from its
     /// superclasses and methods (`regions.md` §2.2.1, Lean `Sig.dictVar`).
     pub class_signs: HashMap<Path, Vec<Sign>>,
+    /// Local `let` / `let rec` schemes keyed by `(Module, item_key, unique_local)`.
+    pub local_schemes: HashMap<(Name, String, Name), Scheme>,
 }
 
 /// The arity of a constructor's scheme: its arrows.
@@ -238,6 +240,11 @@ impl Decls {
                 }
             }
         }
+        self.add_support_instances_and_locals(interface);
+    }
+
+    fn add_support_instances_and_locals(&mut self, interface: &Interface) {
+        let tr = Types::new(&self.params);
         for support in &interface.support_types {
             if let Form::ModuleContract { requirements } = &support.definition.form {
                 let path = Path::new(&support.entity.module, &support.entity.name);
@@ -257,6 +264,16 @@ impl Decls {
                 outlives: Vec::new(),
             };
             self.instances.insert(instance(&i.module, &i.name), s);
+        }
+        for local in &interface.local_schemes {
+            self.local_schemes.insert(
+                (
+                    Name::from(interface.module.as_str()),
+                    local.item.clone(),
+                    Name::from(local.local.as_str()),
+                ),
+                tr.scheme(&local.scheme),
+            );
         }
     }
 

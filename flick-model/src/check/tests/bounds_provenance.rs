@@ -124,7 +124,7 @@ fn bound_facts_are_scoped_and_obligations_keep_only_their_original_facts() {
     let d = decls();
     let mut checker = Checker::new(&d);
     let before = checker.givens();
-    let (_, rigid) = checker.skolemize(&signature);
+    let (_, rigid) = checker.skolemize(&signature, true);
     let held = Type::Var(Var::Named(rigid[0].clone()));
     checker.hold(slice::from_ref(&held), &[], &Caps::default(), "Inst");
     checker.forget_givens(before);
@@ -148,7 +148,7 @@ fn bound_facts_do_not_chain_through_another_rigid_atom() {
     );
     let d = decls();
     let mut checker = Checker::new(&d);
-    let (_, rigid) = checker.skolemize(&signature);
+    let (_, rigid) = checker.skolemize(&signature, true);
     let held = Type::Tuple(
         rigid
             .into_iter()
@@ -286,7 +286,7 @@ fn a_capture_row_bound_is_allowed_by_the_same_capture_row() {
         vec![("a".into(), Kind::Type), ("c".into(), Kind::Captures)],
         Type::Bounded(Rc::new(a()), Caps::var(Var::Named("c".into()))),
     );
-    let (_, rigid) = checker.skolemize(&signature);
+    let (_, rigid) = checker.skolemize(&signature, true);
     checker.hold(
         &[Type::Var(Var::Named(rigid[0].clone()))],
         &[],
@@ -304,7 +304,7 @@ fn a_capture_row_bound_grows_an_open_allowance_without_inventing_a_type_atom() {
         vec![("a".into(), Kind::Type), ("c".into(), Kind::Captures)],
         Type::Bounded(Rc::new(a()), Caps::var(Var::Named("c".into()))),
     );
-    let (_, rigid) = checker.skolemize(&signature);
+    let (_, rigid) = checker.skolemize(&signature, true);
     let allowed = checker.fresh_caps();
     checker.hold(
         &[Type::Var(Var::Named(rigid[0].clone()))],

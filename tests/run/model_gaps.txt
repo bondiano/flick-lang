@@ -69,7 +69,7 @@ runtime/paths # no native for `node_write_file` (flick:rt fileWrite)
 runtime/ref_linearizable # no native for `repeat` (flick:rt listRepeat)
 runtime/releases # no native for `open_raw` (./resources.mjs open)
 runtime/scope_close # no native for `add_finalizer_exit` (flick:Scope flickAddFinalizerExit)
-runtime/scope_owners # the model's (≡) rejects `App.Main.main`
+runtime/scope_owners # the model's (≡) rejects `App.Main.keep`
 runtime/scope_releases # no native for `timeout` (flick:rt timeout)
 runtime/scoped_file # no native for `node_write_file` (flick:rt fileWrite)
 runtime/scopes # no native for `held_write` (./calls.mjs heldWrite)

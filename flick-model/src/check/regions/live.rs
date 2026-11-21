@@ -92,7 +92,7 @@ pub(in crate::check) fn drop_empty_live(r: &mut Row) {
 /// Places any outer surface hidden qualifier (`Type::Captured`) on a
 /// syntactically curried or rank-2 callable starting with a pure arrow onto
 /// its inner callable stage after the pure arrows, before instantiation.
-fn place_qualifiers(t: &Type) -> Type {
+pub(in crate::check) fn place_qualifiers(t: &Type) -> Type {
     match t {
         Type::Captured(ty, c) => {
             let ty = place_qualifiers(ty);
