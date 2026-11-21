@@ -371,6 +371,7 @@ codegen/class_variance
 codegen/contract_runs_nowhere
 
 effect/row_without
+effect/holes_order
 ../rt/owner_foreign_policy
 
 runtime/counted_layer_merge

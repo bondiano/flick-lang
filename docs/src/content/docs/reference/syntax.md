@@ -27,7 +27,7 @@ UTF-8 byte ranges; layout columns count characters.
 | name | `[a-z_][A-Za-z0-9_]*` | values, functions, fields, type variables |
 | capitalized name | `[A-Z][A-Za-z0-9_]*` | types, constructors, modules, classes, services, errors |
 | label | `'[a-z_][A-Za-z0-9_]*` | loop labels (`'outer: loop { … }`, `break 'outer`) |
-| `_` | alone | wildcard pattern |
+| `_` | alone | wildcard pattern, type hole, or application argument hole |
 
 Qualified names are written without spaces around `.`: `Users.get`,
 `Ui.Event.exhaust`, `Sql.Template`. `user.name` is field access.
@@ -666,7 +666,8 @@ expr        = "fun" atom_pattern { atom_pattern } "->" block
 arm         = "|" or_pattern ["when" expr] "->" block
 handler_arm = arm | "|" "return" or_pattern "->" block
             // an operation's arm is `| E.op p… -> …`, a pattern whose path ends in a name
-application = postfix { postfix }
+application = postfix { argument }
+argument    = "_" | postfix                     // at most one `_` per application
 postfix     = atom { "." name | "?" }           // no space before either
 atom        = name | Con { "." Con } ["." name] | Float | BigInt | String
             | "true" | "false" | "()" | "(" expr ")" | "(" expr ":" type ")"
@@ -723,7 +724,31 @@ too). `f x?` is `f (x?)`; write `(f x)?`.
 
 `todo` (optionally followed by a string) is an expression of any type, and
 `echo` without an operand is a function, as in `x |> echo`. `_` is a type
-only in a signature or annotation. `if` is an expression; without `else` it is `Unit`, and so must be its `then` branch (an `else ()` gets the warning `FLICK-T028`). A branch in braces holds statements: `if a > b then { low = b; high = a }`. `ignore e` discards a non-`Unit`
+only in a signature or annotation. As a direct argument of an application, `_`
+is an expression hole capturing one argument: `f a _ c` means `fun h -> f a h c`.
+Because application binds tighter than `|>` and `<|`, `x |> f a _ c` and
+`f a _ c <| x` pass `x` into that argument position. Evaluation follows the
+desugared `fun`: `x |> f y _` evaluates `x` before the closure runs `f`, `y` and
+the parameter, and regions and captures follow ordinary `fun` rules. A nested
+application is separate (`f (g _) _` is `fun h -> f (fun k -> g k) h`). At most
+one `_` is allowed per application (`FLICK-S017`), and `_` in any other
+expression position—standalone, as a callee, `x |> _`, in a list or record
+literal, in parentheses `(_)`, or as a field or operator section `_.name`,
+`(_ + 1)`—is `FLICK-S018`. Hover on `_` shows its inferred parameter type, and
+rename refuses `_`.
+
+```flick
+label : String -> String -> String -> String
+let label open mid close = open ++ mid ++ close
+
+wrapped : String -> String
+let wrapped name = name |> label "[" _ "]"
+
+wrapped_right : String -> String
+let wrapped_right name = label "[" _ "]" <| name
+```
+
+`if` is an expression; without `else` it is `Unit`, and so must be its `then` branch (an `else ()` gets the warning `FLICK-T028`). A branch in braces holds statements: `if a > b then { low = b; high = a }`. `ignore e` discards a non-`Unit`
 result of an intermediate statement (see [Direct effectful calls](../../spec/01-direct-calls/)). `await e` runs a stored `Eff` once in
 the current fiber; `task { … }` builds a cold computation (see [Values of computations and their execution](../../spec/02-computations/)). In
 `provide e { … }` the `{` ends the head expression.

@@ -10,7 +10,7 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::types::handle::{arm_pattern, failed_pattern, operation_path};
 use crate::types::lang::{self, Lang};
 use crate::types::{
-    Dict, Identity, Owner, Range, Ref, StageKey, applied_order, children, composed_key,
+    Dict, Identity, Owner, Range, Ref, StageKey, app_hole, applied_order, children, composed_key,
     composition, is_pattern, let_parts, param_key, result_key, right_application,
 };
 
@@ -60,7 +60,7 @@ impl Lower<'_> {
         Self::coercion_expr(expr, coercion.dict, coercion.method, span)
     }
 
-    fn coercion_expr(expr: Expr, dict: Dict, name: String, span: Span) -> Expr {
+    pub(super) fn coercion_expr(expr: Expr, dict: Dict, name: String, span: Span) -> Expr {
         let method = Expr::new(ExprKind::Method { dict, name }, span);
         apply(method, [Box::new(expr)], span)
     }
@@ -169,7 +169,10 @@ impl Lower<'_> {
         Expr::new(ExprKind::Block(statements, Box::new(result)), span)
     }
 
-    fn app_expr(&mut self, children: &[&Node], span: Span) -> Expr {
+    fn app_expr(&mut self, node: &Node, children: &[&Node], span: Span) -> Expr {
+        if let Some(hole) = app_hole(node) {
+            return self.app_hole(node, children, hole, span);
+        }
         if let [callee, argument] = children
             && let Some(slots) = self.typing.dictionary_constructors.get(&callee.range())
         {
@@ -229,7 +232,8 @@ impl Lower<'_> {
                 let record = self.boxed(children[0]);
                 ExprKind::Update(record, self.fields(node))
             }
-            K::AppExpr => return self.app_expr(children.as_slice(), span),
+            K::AppExpr => return self.app_expr(node, children.as_slice(), span),
+            K::HoleExpr => return self.hole_expr(node, span),
             K::BinExpr => return self.binary(node, &children),
             K::TodoExpr => return self.todo(node),
             K::PrefixExpr if node.has_token(K::EchoKw) => {
@@ -386,7 +390,7 @@ impl Lower<'_> {
     }
 
     /// `f a b` as `(f a) b`, each stage with its mode and dictionaries.
-    fn apply(&mut self, head: &Node, written: &[&Node]) -> Expr {
+    pub(super) fn apply(&mut self, head: &Node, written: &[&Node]) -> Expr {
         let start = head.range().0;
         let mut func = self.expr(head);
         // each line under the call is an argument too

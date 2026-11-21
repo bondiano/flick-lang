@@ -47,6 +47,7 @@ mod gadt;
 mod generalize;
 pub mod handle;
 mod handlers;
+mod holes;
 mod infer;
 mod instances;
 mod interpolation;
@@ -138,6 +139,7 @@ pub use ffi::{PURE_OVER_CAPABILITY, keeps_for_owner};
 pub use gadt::branch::dict_local;
 pub use gadt::scheme::{built, is_indexed, written_dicts};
 pub use generalize::without_value_captures;
+pub use holes::{app_hole, has_hole};
 pub use interpolation::{hole_key, holes};
 pub use kinds::Kind;
 pub use options::{Limits, Options};
@@ -542,6 +544,8 @@ struct NumLiteral {
 struct ItemCx {
     mutation: mutation::Frames,
     locals: Vec<Local>,
+    /// Active expression-hole parameters: `(hole_range, index_in_locals)`.
+    hole_locals: Vec<(Range, usize)>,
     tyvars: Vec<TyVar>,
     /// Whether the expression being inferred runs a runtime call at this
     /// stage; lambdas and `task` bodies are deferred and do not count.

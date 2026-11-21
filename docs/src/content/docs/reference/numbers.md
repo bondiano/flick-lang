@@ -105,7 +105,10 @@ results, defects and cleanup.
 | `f >> g`, `g << f` | functions | the function that applies `f`, then `g` |
 
 `x |> f` evaluates `x` first, `f <| x` evaluates `f` first, as `f x` does;
-`f a <| x` is the call `f a x`. A composition is the closure `let f' = f;
+`f a <| x` is the call `f a x`. To pipe into another argument position, write
+an expression hole `_`: `x |> f a _ c` is `(fun h -> f a h c) x`, evaluating
+`x` first and then the capture body; `f a _ c <| x` applies the same capture to
+`x`. A composition is the closure `let f' = f;
 let g' = g; fun x -> g' (f' x)`: it evaluates its operands once, left to
 right, where it is written, and is typed as that closure. Its arrow has the
 rows of the calls it makes: two pure functions compose into a pure one, and

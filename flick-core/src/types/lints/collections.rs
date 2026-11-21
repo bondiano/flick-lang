@@ -202,7 +202,9 @@ impl Checker<'_> {
     fn list_applied<'n>(&self, node: &'n Node) -> Option<(String, Vec<&'n Node>)> {
         let parts: Vec<&Node> = node.nodes().collect();
         match (node.kind, &parts[..]) {
-            (K::AppExpr, [head, args @ ..]) => Some((self.list_function(head)?, args.to_vec())),
+            (K::AppExpr, [head, args @ ..]) if !args.iter().any(|a| a.kind == K::HoleExpr) => {
+                Some((self.list_function(head)?, args.to_vec()))
+            }
             (K::BinExpr, _) if let Some((function, argument)) = piped(node) => {
                 let (name, mut args) = match unparen(function).kind {
                     K::AppExpr => self.list_applied(unparen(function))?,

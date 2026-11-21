@@ -76,6 +76,9 @@ impl<'c> Checker<'c> {
             (K::FunExpr, _) => {
                 self.lambda(node, Some(expected));
             }
+            (K::AppExpr, _) if super::holes::has_hole(node) => {
+                self.apply_hole(node, Some(expected));
+            }
             (K::BinExpr, _) if super::pipes::composes(node) => {
                 self.compose(node, Some(expected));
             }
@@ -374,10 +377,12 @@ impl<'c> Checker<'c> {
             }
             K::FieldExpr => self.field(node, children[0]),
             K::QuestionExpr => self.question(node, children[0]),
+            K::AppExpr if super::holes::has_hole(node) => self.apply_hole(node, None),
             K::AppExpr => {
                 let arguments = super::children::arguments(&children[1..]);
                 self.apply(children[0], &arguments)
             }
+            K::HoleExpr => self.hole_expr(node),
             K::BinExpr => self.binary(node, &children),
             K::PrefixExpr => self.prefix(node, &children),
             K::TodoExpr => self.todo(node),

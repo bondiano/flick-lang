@@ -60,4 +60,12 @@ let tests = [
       [2, 0, 1]
       (List.map (fun op -> op 1 1) [(fun a b -> a + b), (fun a b -> a - b), (fun a b -> a * b)])
   ),
+  Test.test "expression holes in calls and pipes" (fun () ->
+    Test.equal [123, 123, 123, 123] [2 |> add3 1 _ 3, add3 1 _ 3 <| 2, 3 |> add3 1 2 _, add3 1 2 3]
+  ),
+  Test.test "nested and partially applied expression holes" (fun () ->
+    let partial = add3 1 _
+    let nested = compose (add3 0 0 _) (add3 1 0 _)
+    Test.equal [123, 102, 200] [partial 2 3, nested 2, (add3 _ 0 0) 2]
+  ),
 ]

@@ -1,0 +1,42 @@
+// Expression holes follow the same region and capture rules as `fun`:
+// an escaping capture holding a scoped resource is rejected like `fun`, and
+// a hole closure cannot capture a `let mut` variable.
+module App.HolesRegions exposing (..)
+
+type alias Path = String
+
+type File (s : Region)
+
+type error OpenError = OpenError Path
+
+type error ReadError = ReadError Path
+
+service FileSystem =
+  open_scoped : forall s. Path ->{Scope s; OpenError} File s
+  read_labeled : forall s. File s -> String ->{; ReadError} String
+
+escaping_hole : Path ->{FileSystem; OpenError} (String ->{FileSystem; ReadError} String)
+let escaping_hole path = scope {
+  let file = FileSystem.open_scoped path
+  FileSystem.read_labeled file _
+}
+
+escaping_fun : Path ->{FileSystem; OpenError} (String ->{FileSystem; ReadError} String)
+let escaping_fun path = scope {
+  let file = FileSystem.open_scoped path
+  fun prefix -> FileSystem.read_labeled file prefix
+}
+
+add : Int -> Int -> Int
+let add a b = a + b
+
+mut_capture : Int -> Int
+let mut_capture start =
+  let mut count = start
+  count = count + 1
+  let f = add count _
+  f 1
+
+//~ FLICK-G002 @21:3-21:33 this uses region `s`
+//~ FLICK-G002 @27:17-27:52 this uses region `s`
+//~ FLICK-G005 @37:15-37:20

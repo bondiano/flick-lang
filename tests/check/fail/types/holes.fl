@@ -1,0 +1,28 @@
+// Typing errors on expression holes: mismatched hole argument, mismatched pipe,
+// and non-generalization of a local hole closure.
+module App.HolesTypes exposing (..)
+
+label : String -> String -> String -> String
+let label open mid close = open ++ mid ++ close
+
+add_one : Int -> Int
+let add_one n = n + 1
+
+bad_expected : String -> Int
+let bad_expected = add_one _
+//                         ^ FLICK-T003
+
+bad_pipe : String
+let bad_pipe = 1 |> label "[" _ "]"
+//             ^ FLICK-T003
+
+no_gen : (Int, Int)
+let no_gen =
+  let g = identity _
+  (g 1, g "a")
+//        ^^^ FLICK-T003
+
+// Type wildcards in annotations remain `FLICK-T024`.
+type_hole : Int
+let type_hole = (1 : _)
+//                   ^ FLICK-T024

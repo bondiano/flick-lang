@@ -13,7 +13,7 @@ use crate::source::FileId;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::Lang;
-use crate::types::{Effects, Elem, Type};
+use crate::types::{Effects, Elem, Type, has_hole};
 
 /// What may stand where a completion goes.
 pub(super) struct Expected<'a> {
@@ -223,7 +223,7 @@ fn peel(ty: &Type, n: usize) -> Option<(Option<&Effects>, &Type)> {
 fn type_of<'m>(m: &'m Analyzed, node: &Node) -> Option<&'m Type> {
     match node.kind {
         K::ParenExpr => type_of(m, node.nodes().next()?),
-        K::AppExpr => {
+        K::AppExpr if !has_hole(node) => {
             let head = node.nodes().next()?;
             peel(type_of(m, head)?, node.nodes().count() - 1).map(|(_, t)| t)
         }

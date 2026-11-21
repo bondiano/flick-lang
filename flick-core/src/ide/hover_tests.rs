@@ -500,3 +500,53 @@ import App.Public as P exposing (MonadError(..), Box(..), Token(..))
 }
 
 include!("hover_tests_navigation.rs");
+
+#[test]
+fn expression_hole_hover_shows_inferred_parameter_type() {
+    let source = "module App.Holes exposing (wrapped, mapped, nested)
+
+type Pair a b = Pair a b
+
+label : String -> String -> String -> String
+let label open mid close = open ++ mid ++ close
+
+wrapped : String -> String
+let wrapped name = name |> label \"[\" _ \"]\"
+
+mapped : List String -> List (Pair String Int)
+let mapped names = List.map (Pair _ 1) names
+
+apply_it : (Int -> String) -> Int -> String
+let apply_it f x = f x
+
+show_num : Int -> String
+let show_num n = show n
+
+nested : Int -> String
+let nested = apply_it (show_num _) _
+";
+    let f = fixture_of(&[("src/App/Holes.fl", source)]);
+    let ide = f.ide();
+    assert!(
+        ide.analysis.diagnostics.iter().all(Diagnostic::unnecessary),
+        "{:?}",
+        ide.analysis.diagnostics
+    );
+    let file = f.file("App.Holes");
+    for (needle, expected) in [
+        ("_ \"]\"", "_ : String"),
+        ("_ 1)", "_ : String"),
+        ("_)", "_ : Int"),
+        (") _\n", "_ : Int"),
+    ] {
+        let pos = f.at("App.Holes", needle, 0);
+        let hole = if needle.starts_with(')') {
+            pos + 2
+        } else {
+            pos
+        };
+        let (markdown, range) = ide.hover(file, hole).expect(needle);
+        assert!(markdown.contains(expected), "{needle}: {markdown}");
+        assert_eq!(range, (hole, hole + 1), "{needle}");
+    }
+}

@@ -297,6 +297,7 @@ codegen/loops_owners
 codegen/labeled_loops_finalizers
 codegen/record_constructor
 effect/row_without
+effect/holes_order
 
 stdlib/lists
 stdlib/rpc/rpc

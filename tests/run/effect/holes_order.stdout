@@ -1,0 +1,36 @@
+[ada]
+[ada]
+[]ada
+[ada]
+ada-lovelace
+[part]
+["<a>", "<b>"]
+Some 42
+((hi))
+{lift}
+--- pipe ---
+name
+before
+beforename]
+--- right-apply ---
+name
+before
+beforename]
+--- direct ---
+before
+name
+beforename]
+--- after-hole ---
+name
+before
+after
+beforenameafter
+--- direct-three ---
+before
+name
+after
+beforenameafter
+--- deferred ---
+built
+inside
+insideok]

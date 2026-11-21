@@ -105,6 +105,10 @@ pub struct Typing {
     pub lifts: HashMap<Range, Lift>,
     /// Unique ground conversions at value boundaries.
     pub coercions: HashMap<Range, Coercion>,
+    /// Lifts applied to the inner application body of an expression-hole capture.
+    pub hole_body_lifts: HashMap<Range, Lift>,
+    /// Implicit conversions applied to the inner application body of an expression-hole capture.
+    pub hole_body_coercions: HashMap<Range, Coercion>,
     /// The numeric type of arithmetic and integer literals.
     pub numeric: HashMap<Range, Num>,
     /// Operators on a type variable, by `Numeric` or by `Ord`.

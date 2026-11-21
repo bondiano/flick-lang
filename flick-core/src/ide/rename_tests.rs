@@ -385,3 +385,22 @@ fn class_method_rename_checks_inherited_imports_even_without_method_calls() {
         "implicit inherited imports also gain the new method name"
     );
 }
+
+#[test]
+fn rename_and_prepare_rename_refuse_expression_holes() {
+    let source = "module App.Holes exposing (wrapped)
+
+label : String -> String -> String -> String
+let label open mid close = open ++ mid ++ close
+
+wrapped : String -> String
+let wrapped name = name |> label \"[\" _ \"]\"
+";
+    let f = fixture_of(&[("src/App/Holes.fl", source)]);
+    assert_clean(&f);
+    let ide = f.ide();
+    let file = f.file("App.Holes");
+    let hole = f.at("App.Holes", "_ \"]\"", 0);
+    assert!(ide.renamable(file, hole).is_err());
+    assert!(ide.rename(file, hole, "value").is_err());
+}

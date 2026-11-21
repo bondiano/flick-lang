@@ -16,6 +16,7 @@ mod control;
 mod decl;
 mod expr;
 mod fragment;
+mod holes;
 mod pattern;
 mod plugin;
 mod proofs;
@@ -615,6 +616,8 @@ mod branch_tests;
 mod contract_tests;
 #[cfg(test)]
 mod exposing_tests;
+#[cfg(test)]
+mod hole_tests;
 #[cfg(test)]
 mod operator_tests;
 #[cfg(test)]

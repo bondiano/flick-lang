@@ -1,0 +1,29 @@
+---
+title: "FLICK-S018"
+---
+
+In an expression, `_` is allowed only as a direct argument of an
+application (`f a _ c`, meaning `fun h -> f a h c`). It cannot stand
+alone, as the callee of a call, on either side of a pipe (`x |> _`), in
+a list or record literal, in parentheses (`(_)`), or as a field or
+operator section (`_.name`, `(_ + 1)`).
+
+Write a `fun` when you need a function over a value, or `todo` for code
+not written yet. Wildcards in patterns (`| _ -> …`) and type holes in
+signatures (`x : _`) are unchanged.
+
+```flick fail S018
+module App.Example exposing (pair)
+
+pair : List String
+let pair = [_, "world"]
+```
+
+Write a `fun` instead:
+
+```flick
+module App.Example exposing (with_world)
+
+with_world : String -> List String
+let with_world name = [name, "world"]
+```
