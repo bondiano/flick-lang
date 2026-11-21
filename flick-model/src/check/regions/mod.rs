@@ -228,7 +228,8 @@ impl Checker<'_> {
                 }
                 out.atoms.extend(r.vars.iter().cloned());
             }
-            // a row is no capture; `Layer`, implementations, tags and
+            Type::Exists(_, _, b) | Type::OpenedExists(_, _, b) => go(b, out),
+            // a row is no capture; `Layer`, implementations, tags, modules and
             // dictionaries hold nothing (§2.1)
             Type::Con(_)
             | Type::EffOf(..)
@@ -236,6 +237,8 @@ impl Checker<'_> {
             | Type::Impl(_)
             | Type::Tag(_)
             | Type::Dict(..)
+            | Type::Module(_)
+            | Type::OpenedModule(..)
             | Type::Env(_) => {}
         }
     }
@@ -397,6 +400,7 @@ fn bounded_vars(t: &Type, vars: &[(Name, Kind)], out: &mut Vec<(Name, Caps)>) {
         }
         Type::Tuple(ts) | Type::Dict(_, ts) => ts.iter().for_each(|t| go(t, out)),
         Type::Record(Fields { fields, .. }) => fields.values().for_each(|t| go(t, out)),
+        Type::Exists(_, _, b) | Type::OpenedExists(_, _, b) => go(b, out),
         _ => {}
     }
 }

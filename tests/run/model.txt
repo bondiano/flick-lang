@@ -6,6 +6,9 @@ bootstrap/hello
 bootstrap/inline_declarations
 bootstrap/inline_module
 bootstrap/inline_nested
+bootstrap/inline_pack
+bootstrap/inline_pack_nominals
+bootstrap/packed_module
 bootstrap/stderr
 codegen/enums
 codegen/bigints
@@ -78,6 +81,7 @@ codegen/implicit
 codegen/instance_names
 codegen/known_contexts
 codegen/known_instances
+codegen/unpack_dictionary
 codegen/record_constructor
 codegen/mutual_rec_arity
 effect/row_without

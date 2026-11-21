@@ -13,9 +13,6 @@
 # inference); issue #710.
 bootstrap/app_fail # no native for `fail` (flick:rt appFail)
 bootstrap/debug # no native for `echoed` (flick:rt flickEcho)
-bootstrap/inline_pack # the model's (Field) rejects `App.Main.main`
-bootstrap/inline_pack_nominals # the model's (Field) rejects `App.Main.main`
-bootstrap/packed_module # the model's (Field) rejects `App.Main.main`
 codegen/abi # no native for `js_type` (./abi.mjs kind)
 codegen/apply_order # no native for `unsafe_div` (flick:rt intUnsafeDiv)
 codegen/composition_method # no native for `unsafe_div` (flick:rt intUnsafeDiv)
@@ -38,7 +35,6 @@ codegen/release # no native for `timeout_option` (flick:rt timeoutOption)
 codegen/service_child # no native for `parallel` (flick:rt parallel)
 codegen/strings_utf16 # no native for `length` (flick:String length)
 codegen/tags # no native for `tag_of` (./tags.mjs tagOf)
-codegen/unpack_dictionary # the model's (Field) rejects `App.Main.main`
 effect/host_services # no native for `any` (flick:rt listAny)
 ffi/catch_order # no native for `fail` (./bindings.mjs fail)
 ffi/copy # no native for `callback_arg` (./bindings.mjs copyDeepCallbackArg)

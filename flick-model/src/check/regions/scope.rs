@@ -172,6 +172,12 @@ impl Checker<'_> {
                 );
             }
         }
+        if let Some(w) = self.escaping_witness(t, level) {
+            return error(
+                "Module",
+                format!("abstract type witness `#{w}` would leave its `unpack` scope"),
+            );
+        }
         Ok(())
     }
 
@@ -302,7 +308,7 @@ pub(in crate::check) fn names_into(t: &Type, out: &mut BTreeSet<Name>) {
         Type::Var(Var::Named(n)) => {
             out.insert(n.clone());
         }
-        Type::Var(_) | Type::Con(_) => {}
+        Type::Var(_) | Type::Con(_) | Type::Module(_) | Type::OpenedModule(..) => {}
         Type::App(a, b) => {
             names_into(a, out);
             names_into(b, out);
@@ -331,6 +337,7 @@ pub(in crate::check) fn names_into(t: &Type, out: &mut BTreeSet<Name>) {
         Type::Caps(c) => caps(c, out),
         Type::Errors(r) | Type::Impl(r) | Type::Tag(r) | Type::Env(r) => row(r, out),
         Type::Forall(s) => names_into(&s.body, out),
+        Type::Exists(_, _, b) | Type::OpenedExists(_, _, b) => names_into(b, out),
         Type::Captured(x, c) | Type::Bounded(x, c) => {
             caps(c, out);
             names_into(x, out);

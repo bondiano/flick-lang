@@ -171,6 +171,10 @@ impl Checker<'_> {
                 self.record_against(fields, &f)
             }
             (Term::Record(fields), Type::Dict(c, args)) => self.dictionary(fields, c, args),
+            (Term::Record(fields), Type::Module(sig)) => self.check_pack_module(fields, sig),
+            (Term::Record(fields), Type::Exists(k, sig, body)) => {
+                self.check_pack_exists(fields, k, sig, body)
+            }
             (Term::With(..) | Term::Handle(..) | Term::Inside(..), _) => {
                 self.runtime_form(e, Some(&full)).map(drop)
             }

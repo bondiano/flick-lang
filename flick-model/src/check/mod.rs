@@ -22,6 +22,7 @@ mod generalize;
 mod handle;
 mod handlers;
 mod match_errors;
+mod modules;
 mod pattern;
 mod regions;
 mod row_facts;
@@ -45,7 +46,7 @@ mod tests_stores;
 #[cfg(test)]
 mod tests_variance;
 
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt;
 use std::hash::BuildHasher;
 use std::mem;
@@ -128,6 +129,8 @@ pub struct Checker<'d> {
     ordered: Vec<Type>,
     /// Counter of the rigid variables a signature introduces.
     rigid: u32,
+    /// Lexical level at which each opened existential module witness was introduced.
+    witness_levels: HashMap<u32, u32>,
     /// `Ψ`: the type of each cell of `μ`, when a configuration is checked.
     store: Vec<Type>,
     /// Whether a configuration is checked: the rules of §3.6 apply.
@@ -184,6 +187,7 @@ impl<'d> Checker<'d> {
             structural: Vec::new(),
             ordered: Vec::new(),
             rigid: 0,
+            witness_levels: HashMap::new(),
             store: Vec::new(),
             config: false,
             regions: regions::Regions::default(),

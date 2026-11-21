@@ -7,7 +7,7 @@ use std::mem;
 use std::rc::Rc;
 
 use super::expr::mono;
-use super::{Check, Checker};
+use super::{Check, Checker, error};
 use crate::syntax::{Name, Term};
 use crate::types::{Caps, Scheme, Stage, Type};
 
@@ -42,7 +42,29 @@ impl Checker<'_> {
         };
         let bound = s.clone();
         self.note(e1, |n| n.scheme = Some(bound));
-        self.body(x, s, e2, expected)
+        let (s, opened) = self.open_let_binding(x, s, e2)?;
+        if let Some((w, sig)) = opened {
+            self.level += 1;
+            self.witness_levels.insert(w, self.level);
+            let res = self.body(x, s, e2, expected);
+            self.level -= 1;
+            let t = self.zonk(&res?);
+            let t = if expected.is_none() {
+                Self::close_witness(&t, w)
+            } else {
+                t
+            };
+            if self.mentions_witness(&t, w) {
+                return error(
+                    "Module",
+                    format!("abstract type of `{}` leaves its `unpack` scope", sig.name),
+                );
+            }
+            self.lower(&t, self.level);
+            Ok(t)
+        } else {
+            self.body(x, s, e2, expected)
+        }
     }
 
     fn body(&mut self, x: &Name, s: Scheme, e2: &Term, expected: Option<&Type>) -> Check<Type> {
