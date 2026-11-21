@@ -92,6 +92,27 @@ fn a_callback_taken_for_pure_is_annotated() {
     );
 }
 
+/// A local function is generalized, so its use instantiates the arrow
+/// taken for its parameter afresh: the note and the fix still find it.
+#[test]
+fn a_callback_of_a_local_function_is_annotated() {
+    let head = "service Log =\n  info : String ->{} Unit\n\nsay : Unit ->{Log} Unit\nlet say () = Log.info \"hi\"\n\napply : Unit ->{Log} Unit\n";
+    let text = format!("{HEAD}{head}let apply () =\n  let apply_it h = h ()\n  apply_it say\n");
+    let diagnostics = check(&text);
+    let error = (diagnostics.iter())
+        .find(|d| d.code.to_string() == "FLICK-T003")
+        .unwrap_or_else(|| panic!("{diagnostics:?}"));
+    assert!(
+        (error.related.iter()).any(|r| r.message.starts_with("`h` has no type written")),
+        "{error:?}"
+    );
+    let fixed = fixed(&text, "FLICK-T003").expect("the fix");
+    assert!(
+        fixed.contains("let apply_it (h : Unit ->{Log} Unit) = h ()"),
+        "{fixed}"
+    );
+}
+
 /// Repro for #707: a callback needing a service from another module such as
 /// `Host.Console` spells it the way this module can name it in both the
 /// T003 message and the inserted annotation, so applying the fix leaves no

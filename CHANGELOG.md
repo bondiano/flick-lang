@@ -6,6 +6,11 @@ break programs.
 
 ## Unreleased
 
+- **A local function without a signature is generic.** `let same x = x`
+  and `let get = fun r -> r.value` inside a function are generalized as
+  `let f = (fun …)` already was, so each use may give them other types. A
+  top-level or recursive function still needs a signature (`FLICK-T004`).
+
 - **An operator's operand keeps one type in a generalized binding.** The
   operand of an operator such as `+` or `++` stays of one type, which the
   uses settle, as a number literal's does: `let add = (fun x y -> x + y)`

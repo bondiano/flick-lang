@@ -26,7 +26,6 @@ impl Checker<'_> {
             generated: at >= self.generated,
             ty,
             rec: None,
-            unsigned: false,
             binding: super::mutation::Binding::Other,
         });
     }
