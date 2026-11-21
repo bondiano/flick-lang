@@ -14,6 +14,7 @@ import { WriteService, flickState, keepState, nativeRegistry, taskAtom, taskAtom
 import { service } from "./effects.ts";
 import { type UrlCodec, routeParse, routePrint } from "./route.ts";
 import { syncAbi, syncIn } from "./sync.ts";
+import { sameValue } from "@flick-lang/runtime/core/data";
 import { tag } from "@flick-lang/runtime/tags";
 
 interface ReadImpl {
@@ -266,7 +267,10 @@ export const atomMutation = <P>(
 
 /** `Atom.derived`: an atom the Sync `compute` computes, depending on the atoms it reads. */
 export const atomDerived = <A>(compute: (unit: undefined) => A): Atom.Atom<A> =>
-  Atom.readable((ctx) => syncReading(() => compute(undefined), (atom) => ctx(atom)));
+  Atom.withEquality(
+    Atom.readable((ctx) => syncReading(() => compute(undefined), (atom) => ctx(atom))),
+    sameValue,
+  );
 
 /**
  * The label the compiler gives a top-level atom, view or action,
@@ -398,7 +402,7 @@ export const atomRoute = <A>(codec: UrlCodec, fallback: A): Atom.Writable<A> => 
       ctx.setSelf(value);
     },
   );
-  return Atom.keepAlive(Atom.withServerValue(atom, (get) => parse(get(requestUrl) ?? location())));
+  return Atom.keepAlive(Atom.withServerValue(Atom.withEquality(atom, sameValue), (get) => parse(get(requestUrl) ?? location())));
 };
 
 /** `Atom.on_server`: the browser atom, read as `value` on a server and while a root hydrates. */
@@ -406,4 +410,4 @@ export const atomOnServer = <A>(value: A, atom: Atom.Writable<A>): Atom.Writable
 
 /** `Atom.client_only`: the browser atom's value, `None` on a server and while a root hydrates. */
 export const atomClientOnly = <A>(atom: Atom.Writable<A>): Atom.Atom<Option.Option<A>> =>
-  Atom.withServerValue(Atom.map(atom, Option.some), () => Option.none());
+  Atom.withServerValue(Atom.withEquality(Atom.map(atom, Option.some), sameValue), () => Option.none());

@@ -1,7 +1,7 @@
 // `Reactivity.AsyncResult` on Flick's own runtime: the value of a task atom,
 // a failure crossing as a Flick `Failure e`.
 import { type Option, none, some } from "../../../core/data.ts";
-import type { AsyncResult } from "../../atoms/registry.ts";
+import type { AsyncResult } from "../../atoms/task.ts";
 import { Failure } from "../../outcome.ts";
 
 /** `Reactivity.AsyncResult.fold`. */

@@ -125,9 +125,8 @@ impl Checker<'_> {
                         }
                     }
                 }
-                // shortcut: an open `out` keeps only its known fields at run time
-                let labels = out.entries.iter().map(|(l, _)| l.to_string());
-                primitive(self.show_exact(c), labels.collect())
+                // shortcut: an open `out` keeps only its known fields at run time, in canonical label order
+                primitive(self.show_exact(c), sorted_row_labels(out))
             }
             (Lang::UnionDisjoint, [Type::Record(a), Type::Record(b), out]) => {
                 self.union_disjoint(c, (a, b), out, givens, chain)
@@ -284,6 +283,12 @@ fn path_params(path: &str, mut fields: Vec<String>) -> Option<String> {
         listed(&params),
         listed(&fields)
     ))
+}
+
+fn sorted_row_labels(row: &Row) -> Vec<String> {
+    let mut labels: Vec<String> = row.entries.iter().map(|(l, _)| l.to_string()).collect();
+    flick_ir::sort_strings_utf16(&mut labels);
+    labels
 }
 
 fn primitive(constraint: String, labels: Vec<String>) -> Outcome {

@@ -384,7 +384,12 @@ impl Term {
                     || matches!(head, Head::Const(c) if c.builds_value())
             }
             Term::Tuple(xs) | Term::List(xs) => xs.iter().all(Term::is_value),
-            Term::Record(fields) => fields.iter().all(|(_, v)| v.is_value()),
+            Term::Record(fields) => {
+                fields.iter().all(|(_, v)| v.is_value())
+                    && fields
+                        .windows(2)
+                        .all(|w| w[0].0.encode_utf16().le(w[1].0.encode_utf16()))
+            }
             _ => false,
         }
     }

@@ -22,27 +22,44 @@ var RecordLabel Value = Unit
 // RecordGet is the field `label` of `r`; the dictionary is erased.
 func RecordGet(_, label, r Value) Value { return record(r).Get(label.(string)) }
 
-// RecordExtend is `r` with the field `label`, added as JS spreads `r` into a
-// new object first.
-func RecordExtend(_, _, label, v, r Value) Value { return record(r).set(label.(string), v) }
+// RecordExtend is `r` with the field `label`, in canonical label order.
+func RecordExtend(_, _, label, v, r Value) Value { return record(r).setCanonical(label.(string), v) }
 
-func RecordRemove(_, label, r Value) Value { return record(r).without(label.(string)) }
+// RecordRemove is `r` without the field `label`, in canonical label order.
+func RecordRemove(_, label, r Value) Value {
+	x := record(r)
+	drop := label.(string)
+	out := newRecord(len(x.keys))
+	for i, k := range x.keys {
+		if k != drop {
+			out.putCanonical(k, x.vals[i])
+		}
+	}
+	return out
+}
 
-// RecordMergeDisjoint is JS's `{ ...a, ...b }`.
+// RecordMergeDisjoint merges two disjoint structural records in canonical label order.
 func RecordMergeDisjoint(_, a, b Value) Value {
-	out, y := record(a), record(b)
+	x, y := record(a), record(b)
+	out := newRecord(len(x.keys) + len(y.keys))
+	for i, k := range x.keys {
+		out.putCanonical(k, x.vals[i])
+	}
 	for i, k := range y.keys {
-		out = out.set(k, y.vals[i])
+		out.putCanonical(k, y.vals[i])
 	}
 	return out
 }
 
 // RecordProject is the fields of `r` the dictionary's labels name, in
-// that order.
+// canonical label order.
 func RecordProject(labels, r Value) Value {
-	x, out := record(r), &Record{}
-	for _, l := range List(labels) {
-		out = out.set(l.(string), x.Get(l.(string)))
+	x := record(r)
+	ls := List(labels)
+	out := newRecord(len(ls))
+	for _, l := range ls {
+		name := l.(string)
+		out.putCanonical(name, x.Get(name))
 	}
 	return out
 }

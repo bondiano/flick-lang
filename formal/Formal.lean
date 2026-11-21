@@ -205,3 +205,4 @@ import Formal.MemoryPass
 import Formal.MemoryInsert
 import Formal.MemoryArena
 import Formal.MemoryScopes
+import Formal.RecordOrder

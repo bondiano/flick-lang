@@ -3,7 +3,7 @@
     "id": "flick/go",
     "version": "0.1.0"
   },
-  "sha256": "6b8b1111282ba2c18ed7e1e00c6da2e54bc2e6df0e19406955a39792eb28a0b9",
+  "sha256": "8f1c048f430434783e3c8f0e109d4f552e9eeb5697cc6da92a02dfee40f52be0",
   "backend_api": {
     "minimum": "0.1.0",
     "maximum_exclusive": "0.2.0"

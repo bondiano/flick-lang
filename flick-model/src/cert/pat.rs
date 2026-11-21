@@ -9,8 +9,9 @@ use crate::translate::lean::elide::{caps, hidden_by};
 use crate::types::Type;
 
 use super::Unsupported;
+use super::field::field as field_ty;
 use super::sig::Sig;
-use super::term::{Cx, field as field_ty, lit, tm};
+use super::term::{Cx, lit, tm};
 
 /// The constructor key of `c` in the signature.
 fn key(c: &Con) -> String {

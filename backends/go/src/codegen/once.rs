@@ -3,6 +3,7 @@
 //! the runtime, so each is a package variable, made when the program
 //! starts, and not made again every time the code that names it runs.
 
+use std::cmp::Ordering;
 use std::iter;
 
 use flick_pretty::{Document, docvec};
@@ -69,6 +70,9 @@ impl<'a> Gen<'a> {
 
     /// A record of `fields`, or `base` with them. Where each label goes in a
     /// record is found once for the literal, not for every record it makes.
+    /// Structural record literals evaluate field expressions in source order
+    /// and construct their shape in canonical label order so permutations share
+    /// one shape and written order is not observable.
     pub(super) fn record(&mut self, base: Option<&Expr>, fields: &[(String, Expr)]) -> Code<'a> {
         let a = self.a;
         let mut all: Vec<&Expr> = base.into_iter().collect();
@@ -86,14 +90,30 @@ impl<'a> Gen<'a> {
                 None => record.into(),
             };
         }
-        let written: Vec<String> = fields.iter().map(|(l, _)| names::string(l)).collect();
-        let shape = self.once(&format!("flickrt.ShapeOf({})", written.join(", ")));
-        let values = iter::once(a.text(shape)).chain(go.iter().map(|v| v.doc));
-        match base {
-            // the values go into the copy of the record: no record of them is made
-            Some(b) => call(a, "flickrt.With", iter::once(b.doc).chain(values)).into(),
-            None => call(a, "flickrt.Shaped", values).into(),
+        if let Some(b) = base {
+            // the values go into the copy of the record in place, preserving the
+            // base record's canonical key order while evaluating replacements in source order
+            let written: Vec<String> = fields.iter().map(|(l, _)| names::string(l)).collect();
+            let shape = self.once(&format!("flickrt.ShapeOf({})", written.join(", ")));
+            let values = iter::once(a.text(shape)).chain(go.iter().map(|v| v.doc));
+            return call(a, "flickrt.With", iter::once(b.doc).chain(values)).into();
         }
+        let mut order: Vec<usize> = (0..fields.len()).collect();
+        order.sort_by(|&i, &j| canonical_key_cmp(&fields[i].0, &fields[j].0));
+        let needs_spill = (0..order.len()).any(|pos| {
+            let later = order[pos];
+            !go[later].atomic
+                && order[pos + 1..]
+                    .iter()
+                    .any(|&earlier| earlier < later && !go[earlier].atomic)
+        });
+        if needs_spill {
+            go = go.into_iter().map(|v| self.spill(v)).collect();
+        }
+        let canonical: Vec<String> = order.iter().map(|&i| names::string(&fields[i].0)).collect();
+        let shape = self.once(&format!("flickrt.ShapeOf({})", canonical.join(", ")));
+        let values = iter::once(a.text(shape)).chain(order.iter().map(|&i| go[i].doc));
+        call(a, "flickrt.Shaped", values).into()
     }
 
     /// A dictionary built from others that names nothing of the code around
@@ -128,4 +148,24 @@ fn closed(dict: &Dict) -> bool {
         Dict::Primitive { .. } | Dict::Site { .. } => true,
         _ => false,
     }
+}
+
+/// Canonical structural record key order: JS array indices first in ascending
+/// numeric order, then all other keys in UTF-16 code-unit order.
+pub(super) fn canonical_key_cmp(a: &str, b: &str) -> Ordering {
+    match (array_index(a), array_index(b)) {
+        (Some(na), Some(nb)) => na.cmp(&nb),
+        (Some(_), None) => Ordering::Less,
+        (None, Some(_)) => Ordering::Greater,
+        (None, None) => a.encode_utf16().cmp(b.encode_utf16()),
+    }
+}
+
+fn array_index(key: &str) -> Option<u32> {
+    let first = *key.as_bytes().first()?;
+    if !first.is_ascii_digit() {
+        return None;
+    }
+    let n: u32 = key.parse().ok()?;
+    (n != u32::MAX && n.to_string() == key).then_some(n)
 }

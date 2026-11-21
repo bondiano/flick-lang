@@ -182,6 +182,14 @@ export const codecField = (label: string, field: FieldSpec, rest: BlockFields): 
 
 const blocks = /*#__PURE__*/ new WeakMap<Codec, { readonly name: string; readonly fields: BlockFields; readonly ignoreExtra: boolean }>();
 
+const canonicalize = (record: Readonly<Record<string, unknown>>): Record<string, unknown> => {
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(record).toSorted()) {
+    Object.defineProperty(out, key, { value: record[key], enumerable: true, writable: true, configurable: true });
+  }
+  return out;
+};
+
 const makeBlock = (name: string, fields: BlockFields, ignoreExtra: boolean): Witness => {
   const wires = new Set<string>();
   for (const [, field] of fields) {
@@ -212,7 +220,7 @@ const makeBlock = (name: string, fields: BlockFields, ignoreExtra: boolean): Wit
       if (decoded._tag === "Failure") return decoded;
       out[label] = field.optional ? some(decoded.success) : decoded.success;
     }
-    return ok(out);
+    return ok(canonicalize(out));
   }, (value, path) => {
     if (!isRecord(value)) return err(schemaError(path, `expected an object, got ${describe(value)}`));
     const out: Record<string, unknown> = {};
@@ -264,7 +272,7 @@ function* decodeBlock(input: unknown, path: string, fields: BlockFields, wires: 
     if (decoded._tag === "Failure") return decoded;
     out[label] = field.optional ? some(decoded.success) : decoded.success;
   }
-  return ok(out);
+  return ok(canonicalize(out));
 }
 
 function* encodeBlock(value: unknown, path: string, fields: BlockFields): Run {

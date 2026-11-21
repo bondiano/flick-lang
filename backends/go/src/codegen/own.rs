@@ -40,13 +40,16 @@ pub(super) enum Held {
 pub(super) type Owned = BTreeMap<String, (String, Held)>;
 
 /// The constructors declared over a record, by module and name, with the
-/// labels of the record in the order declared.
+/// labels of the record in canonical sorted order.
 pub(super) type Records = HashMap<(String, String), Vec<String>>;
 
 pub(super) fn records(modules: &[&Module]) -> Records {
     let of = |m: &Module| {
-        let named =
-            |(c, labels): (&String, &Vec<String>)| ((m.name.clone(), c.clone()), labels.clone());
+        let named = |(c, labels): (&String, &Vec<String>)| {
+            let mut sorted = labels.clone();
+            sorted.sort_by(|a, b| super::once::canonical_key_cmp(a, b));
+            ((m.name.clone(), c.clone()), sorted)
+        };
         m.records.iter().map(named).collect::<Vec<_>>()
     };
     modules.iter().flat_map(|m| of(m)).collect()

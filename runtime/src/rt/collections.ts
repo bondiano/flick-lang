@@ -119,7 +119,7 @@ const insertNode = <K, V>(
       for (let i = 0; i < node.entries.length; i++) {
         const existing = item(node.entries, i);
         if (!witness.eq(existing.key, entry.key)) continue;
-        if (keep || Object.is(existing.value, entry.value)) return node;
+        if (keep) return node;
         const entries = node.entries.slice();
         entries[i] = entry;
         return { tag: "leaf", hash: node.hash, entries };
@@ -171,7 +171,7 @@ const insertNodeMut = <K, V>(
       for (let i = 0; i < node.entries.length; i++) {
         const existing = item(node.entries, i);
         if (!witness.eq(existing.key, entry.key)) continue;
-        if (!keep && !Object.is(existing.value, entry.value)) node.entries[i] = entry;
+        if (!keep) node.entries[i] = entry;
         return node;
       }
       node.entries.push(entry);

@@ -20,13 +20,14 @@ const diff = (oldValue: unknown, newValue: unknown, path: string): Array<Patch> 
   }
   if (record(oldValue) && record(newValue)) {
     const result: Array<Patch> = [];
-    for (const [name, value] of Object.entries(oldValue)) {
+    const keys = [...new Set([...Object.keys(oldValue), ...Object.keys(newValue)])].toSorted();
+    for (const name of keys) {
       const nextPath = `${path}/${escape(name)}`;
-      if (!Object.hasOwn(newValue, name)) result.push({ op: "remove", path: nextPath });
-      else result.push(...diff(value, newValue[name], nextPath));
-    }
-    for (const [name, value] of Object.entries(newValue)) {
-      if (!Object.hasOwn(oldValue, name)) result.push({ op: "add", path: `${path}/${escape(name)}`, value });
+      const inOld = Object.hasOwn(oldValue, name);
+      const inNew = Object.hasOwn(newValue, name);
+      if (inOld && inNew) result.push(...diff(oldValue[name], newValue[name], nextPath));
+      else if (inNew) result.push({ op: "add", path: nextPath, value: newValue[name] });
+      else result.push({ op: "remove", path: nextPath });
     }
     return result;
   }

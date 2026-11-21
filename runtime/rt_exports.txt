@@ -191,6 +191,7 @@
 @flick-lang/runtime/core/data runtimeEquals
 @flick-lang/runtime/core/data runtimeHash
 @flick-lang/runtime/core/data runtimeSequence
+@flick-lang/runtime/core/data sameValue
 @flick-lang/runtime/core/data show
 @flick-lang/runtime/core/data some
 @flick-lang/runtime/core/data structural
@@ -343,6 +344,7 @@
 @flick-lang/runtime/core/index runtimeEquals
 @flick-lang/runtime/core/index runtimeHash
 @flick-lang/runtime/core/index runtimeSequence
+@flick-lang/runtime/core/index sameValue
 @flick-lang/runtime/core/index schemaAdt
 @flick-lang/runtime/core/index schemaJsonCodec
 @flick-lang/runtime/core/index schemaList
@@ -644,6 +646,21 @@
 @flick-lang/runtime/core/text stringToLower
 @flick-lang/runtime/core/text stringToNumber
 @flick-lang/runtime/core/text stringToUpper
+@flick-lang/runtime/core/values EQ
+@flick-lang/runtime/core/values GT
+@flick-lang/runtime/core/values LT
+@flick-lang/runtime/core/values copyData
+@flick-lang/runtime/core/values copyThrough
+@flick-lang/runtime/core/values err
+@flick-lang/runtime/core/values fromNullable
+@flick-lang/runtime/core/values isRuntimeSequence
+@flick-lang/runtime/core/values none
+@flick-lang/runtime/core/values ok
+@flick-lang/runtime/core/values optionalArg
+@flick-lang/runtime/core/values runtimeEquals
+@flick-lang/runtime/core/values runtimeHash
+@flick-lang/runtime/core/values runtimeSequence
+@flick-lang/runtime/core/values some
 @flick-lang/runtime/rt EQ
 @flick-lang/runtime/rt Effect
 @flick-lang/runtime/rt GT
@@ -971,6 +988,7 @@
 @flick-lang/runtime/rt runtimeEquals
 @flick-lang/runtime/rt runtimeHash
 @flick-lang/runtime/rt runtimeSequence
+@flick-lang/runtime/rt sameValue
 @flick-lang/runtime/rt schemaAdt
 @flick-lang/runtime/rt schemaAdtOf
 @flick-lang/runtime/rt schemaArbitrary

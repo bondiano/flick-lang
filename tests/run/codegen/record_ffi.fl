@@ -1,0 +1,96 @@
+// Host-facing FFI rule: structural records always present canonical sorted
+// label order across JS (`Object.keys`) and Go (`*flickrt.Record`), regardless
+// of how they were constructed or decoded; `Json` and `ReadonlyRecord` keep
+// their separate data-insertion key order.
+module App.Main exposing (main)
+
+import Codec
+
+type alias Pair = { z : Int; a : Int }
+  deriving Schema
+
+type Box = Box { z : Int; a : Int }
+
+keys_of : a -> String
+foreign pure keys_of from "./record_ffi.mjs" "keysOf"
+  arity 1
+
+json_keys : Unknown -> String
+foreign pure json_keys from "./record_ffi.mjs" "keysOf"
+  arity 1
+
+dict_keys : Record.ReadonlyRecord Int -> String
+foreign pure dict_keys from "./record_ffi.mjs" "keysOf"
+  arity 1
+
+block_codec : PureCodec Json Pair
+let block_codec = codec Pair.schema {
+  z = field "wire_z" Int.json
+  a = field "wire_a" Int.json
+}
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () =
+  // Literals written in opposite orders
+  Platform.stdout_line ("lit_za: " ++ keys_of { z = 1; a = 2 })
+  Platform.stdout_line ("lit_az: " ++ keys_of { a = 2; z = 1 })
+  // Record update written in opposite orders
+  let base = { z = 1; a = 2 }
+  Platform.stdout_line ("upd_za: " ++ keys_of { base with z = 10; a = 20 })
+  Platform.stdout_line ("upd_az: " ++ keys_of { base with a = 20; z = 10 })
+  // Row primitives: extend, merge_disjoint, project, remove
+  let ext_a = Record.extend (Record.label : Record.Label "a") 2 { z = 1 }
+  let ext_z = Record.extend (Record.label : Record.Label "z") 1 { a = 2 }
+  Platform.stdout_line ("extend: " ++ keys_of ext_a ++ " | " ++ keys_of ext_z)
+  let m1 = Record.merge_disjoint { z = 1 } { a = 2 }
+  let m2 = Record.merge_disjoint { a = 2 } { z = 1 }
+  Platform.stdout_line ("merge: " ++ keys_of m1 ++ " | " ++ keys_of m2)
+  let proj : Pair = Record.project { z = 1; m = 3; a = 2 }
+  let rem = Record.remove (Record.label : Record.Label "m") { z = 1; m = 3; a = 2 }
+  Platform.stdout_line ("proj_rem: " ++ keys_of proj ++ " | " ++ keys_of rem)
+  // Constructor declared over closed record with unsorted fields
+  let boxed =
+    match Box { z = 1; a = 2 } with
+    | Box r -> r
+  Platform.stdout_line ("ctor_rec: " ++ keys_of boxed)
+  // Decoded structural record from Codec.json and from a codec block
+  let from_json =
+    match Json.parse "{\"z\": 1, \"a\": 2}" with
+    | Ok j ->
+      (
+        match Codec.decode_result (Codec.json Pair.schema) j with
+        | Ok v -> keys_of v
+        | Err _ -> "err"
+      )
+    | Err _ -> "parse-err"
+  let from_block =
+    match Json.parse "{\"wire_z\": 1, \"wire_a\": 2}" with
+    | Ok j ->
+      (
+        match Codec.decode_result block_codec j with
+        | Ok v -> keys_of v
+        | Err _ -> "err"
+      )
+    | Err _ -> "parse-err"
+  Platform.stdout_line ("decoded: " ++ from_json ++ " | " ++ from_block)
+  // Struct combiner/reducer results
+  let comb =
+    Combiner.struct {
+      z = Reducer.to_combiner Reducer.number_sum
+      a = Reducer.to_combiner Reducer.number_sum
+    }
+  let red = Reducer.struct { z = Reducer.number_sum; a = Reducer.number_sum }
+  Platform.stdout_line
+    ("struct: "
+      ++ keys_of (Combiner.combine comb { z = 1.0; a = 2.0 } { z = 3.0; a = 4.0 })
+      ++ " | "
+      ++ keys_of (Reducer.combine_all red [{ z = 1.0; a = 2.0 }]))
+  // Json and ReadonlyRecord keep their own separate key-insertion ordering rules
+  let raw_json =
+    match Json.parse "{\"z\": 1, \"a\": 2}" with
+    | Ok j -> json_keys j
+    | Err _ -> "parse-err"
+  let dict = Record.from_entries [("z", 1), ("a", 2)]
+  Platform.stdout_line ("json_order: " ++ raw_json)
+  Platform.stdout_line
+    ("dict_order: " ++ dict_keys dict ++ " | " ++ String.join "," (Record.keys dict))

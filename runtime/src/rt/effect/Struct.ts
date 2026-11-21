@@ -11,10 +11,36 @@ const field = <A>(fields: Readonly<Record<string, A>>, key: string): A => {
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- hasOwn checked above
   return fields[key] as A;
 };
-export const flickMakeCombiner = (_map: unknown, fields: Combiners): Combiner<Fields> => ({
-  combine: (a, b) => Object.fromEntries(Object.keys(fields).map((key) => [key, field(fields, key).combine(field(a, key), field(b, key))])),
-});
-export const flickMakeReducer = (_map: unknown, fields: Reducers): Reducer<Fields> => ({
-  initial: Object.fromEntries(Object.keys(fields).map((key) => [key, field(fields, key).initial])),
-  combine: flickMakeCombiner(_map, fields).combine,
-});
+export const flickMakeCombiner = (_map: unknown, fields: Combiners): Combiner<Fields> => {
+  const keys = Object.keys(fields).toSorted();
+  return {
+    combine: (a, b) => {
+      const out: Record<string, unknown> = {};
+      for (const key of keys) {
+        Object.defineProperty(out, key, {
+          value: field(fields, key).combine(field(a, key), field(b, key)),
+          enumerable: true,
+          writable: true,
+          configurable: true,
+        });
+      }
+      return out;
+    },
+  };
+};
+export const flickMakeReducer = (_map: unknown, fields: Reducers): Reducer<Fields> => {
+  const keys = Object.keys(fields).toSorted();
+  const initial: Record<string, unknown> = {};
+  for (const key of keys) {
+    Object.defineProperty(initial, key, {
+      value: field(fields, key).initial,
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+  }
+  return {
+    initial,
+    combine: flickMakeCombiner(_map, fields).combine,
+  };
+};

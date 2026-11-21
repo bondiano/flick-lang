@@ -119,7 +119,7 @@ func (b *block) decode(fb *Fiber, in Value) (Value, []issue) {
 			}
 		}
 	}
-	out := make([]Value, 0, 2*len(b.fields))
+	out := newRecord(len(b.fields))
 	for _, f := range b.fields {
 		v := recordField(obj, f.wire)
 		if v == nil {
@@ -127,7 +127,7 @@ func (b *block) decode(fb *Fiber, in Value) (Value, []issue) {
 			if issues != nil {
 				return nil, under(f.wire, issues)
 			}
-			out = append(out, f.label, x)
+			out.putCanonical(f.label, x)
 			continue
 		}
 		x, issues := f.codec.decode(fb, v)
@@ -137,9 +137,9 @@ func (b *block) decode(fb *Fiber, in Value) (Value, []issue) {
 		if f.optional {
 			x = Some(x)
 		}
-		out = append(out, f.label, x)
+		out.putCanonical(f.label, x)
 	}
-	return Rec(out...), nil
+	return out, nil
 }
 
 func (b *block) encode(fb *Fiber, v Value) (Value, []issue) {

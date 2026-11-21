@@ -6,98 +6,82 @@
 // read either.
 // Equality is canonical: structural, SameValueZero on numbers.
 import { item } from "../internal.ts";
-import { constructorName, tag } from "../tags.ts";
+import { constructorName } from "../tags.ts";
+import {
+  type Data,
+  EQ,
+  GT,
+  LT,
+  type Ordering,
+  none,
+  runtimeEquals,
+  runtimeHash,
+  runtimeSequence,
+  some,
+} from "./values.ts";
 
-export type Option<A> = Readonly<{ _tag: "None" }> | Readonly<{ _tag: "Some"; value: A }>;
-export type Result<A, E = never> = Readonly<{ _tag: "Success"; success: A }> | Readonly<{ _tag: "Failure"; failure: E }>;
-
-/** A value of a variant type: its qualified constructor id and positional fields. */
-export interface Data {
-  readonly _tag: string;
-  readonly [field: `_${number}`]: unknown;
-}
-
-/** A value of a variant type with one field `_0`. */
-export interface Tagged<T extends string, A> {
-  readonly _tag: T;
-  readonly _0: A;
-}
-
-/** `Prelude.Ordering`. */
-export type Ordering = Readonly<{ _tag: string }>;
-
-/** Dictionaries of the built-in classes, curried as generated code calls them. */
-export interface EqDict<A> {
-  readonly eq: (a: A) => (b: A) => boolean;
-}
-export interface OrdDict<A> {
-  readonly compare: (a: A) => (b: A) => Ordering;
-  readonly $Eq: EqDict<A>;
-}
-export interface HashDict<A> {
-  readonly hash: (a: A) => number;
-  readonly $Eq: EqDict<A>;
-}
-export interface ShowDict<A> {
-  readonly show: (a: A) => string;
-}
-
-export const some = <A>(value: A): Option<A> => ({ _tag: "Some", value });
-export const none: Option<never> = /*#__PURE__*/ Object.freeze({ _tag: "None" });
-export const ok = <A>(success: A): Result<A> => ({ _tag: "Success", success });
-export const err = <E>(failure: E): Result<never, E> => ({ _tag: "Failure", failure });
-
-const ordering = (name: "LT" | "EQ" | "GT"): Ordering => Object.freeze({ _tag: tag(`Prelude.Ordering.${name}`) });
-export const LT = /*#__PURE__*/ ordering("LT");
-export const EQ = /*#__PURE__*/ ordering("EQ");
-export const GT = /*#__PURE__*/ ordering("GT");
+export * from "./values.ts";
 
 const isObject = (a: unknown): a is Readonly<Record<PropertyKey, unknown>> => typeof a === "object" && a !== null;
-/** A native runtime value whose equality is defined by its semantic value. */
-export const runtimeEquals = /*#__PURE__*/ Symbol.for("@flick-lang/runtime/equals");
-export const runtimeHash = /*#__PURE__*/ Symbol.for("@flick-lang/runtime/hash");
-/** A native sequence exposed through iteration instead of array indices. */
-export const runtimeSequence = /*#__PURE__*/ Symbol();
-export const isRuntimeSequence = (value: object, carrier = value): value is Iterable<unknown> =>
-  runtimeSequence in carrier;
+const has = Object.hasOwn;
+const keys = Object.keys;
 
 /** A key `$0`, `$1` …: a dictionary a value of a GADT holds, which `==` and `hash` leave out. */
-const held = (k: string): boolean => k.charCodeAt(0) === 36;
+const ownKeys = (value: Readonly<Record<PropertyKey, unknown>>): Array<string> =>
+  keys(value).filter((k) => k.charCodeAt(0) !== 36);
 
-/** An Option of the Effect library has its tag on the prototype; Flick's has it on the value. */
-const optionTag = (value: Readonly<Record<string, unknown>>): "None" | "Some" | undefined => {
-  const variant = value["_tag"];
-  const fields = Object.keys(value).length - (Object.hasOwn(value, "_tag") ? 1 : 0);
-  return variant === "None" && fields === 0 ||
-    variant === "Some" && fields === 1 && Object.hasOwn(value, "value")
-    ? variant : undefined;
+/**
+ * Returns the payload field name of an Option or Result (or `""` for `None`),
+ * handling both Flick's own-property `_tag` and Effect's prototype `_tag`.
+ */
+const builtinField = (value: Readonly<Record<string, unknown>>): string | undefined => {
+  const v = value["_tag"];
+  const k = v === "Some" ? "value" : v === "Success" ? "success" : v === "Failure" ? "failure" : v === "None" ? "" : undefined;
+  if (k === undefined) return undefined;
+  const n = keys(value).length - (has(value, "_tag") ? 1 : 0);
+  return k ? (n === 1 && has(value, k) ? k : undefined) : n === 0 ? "" : undefined;
 };
 
-/** `==`: structural equality with SameValueZero on numbers. */
-export const equals = (a: unknown, b: unknown): boolean => {
+const eqValues = (a: unknown, b: unknown, strictZero: boolean): boolean => {
   // oxlint-disable-next-line no-self-compare -- SameValueZero: NaN equals NaN
-  if (a === b || (a !== a && b !== b)) return true;
+  if (strictZero ? Object.is(a, b) : a === b || (a !== a && b !== b)) return true;
   if (!isObject(a) || !isObject(b)) return false;
   const custom = a[runtimeEquals];
   if (typeof custom === "function") return custom.call(a, b) === true;
-  const aTag = optionTag(a);
-  const bTag = optionTag(b);
-  if (aTag !== undefined && bTag !== undefined) return aTag === bTag && (aTag === "None" || equals(a["value"], b["value"]));
+  const aKey = builtinField(a);
+  const bKey = builtinField(b);
+  if (aKey !== undefined && bKey !== undefined) {
+    return aKey === bKey && (!aKey || eqValues(a[aKey], b[aKey], strictZero));
+  }
   const hostEqual = a["~effect/Equal"];
   if (typeof hostEqual === "function" && typeof b["~effect/Equal"] === "function") {
     return hostEqual.call(a, b) === true;
   }
   // A flat chunk can compare with a tree through the tree's equality hook.
-  if (Array.isArray(a)) return Array.isArray(b) ? listEquals(equals, a, b) : runtimeSequence in b && equals(b, a);
+  if (Array.isArray(a)) {
+    return Array.isArray(b)
+      ? a.length === b.length && a.every((x, i) => eqValues(x, b[i], strictZero))
+      : runtimeSequence in b && eqValues(b, a, strictZero);
+  }
   if (Array.isArray(b)) return false;
   // Class instances without a Flick equality hook compare by identity.
   const proto: unknown = Object.getPrototypeOf(a);
   if (proto !== Object.getPrototypeOf(b) || (proto !== Object.prototype && proto !== null)) return false;
-  const keys = Object.keys(a);
-  return (
-    keys.length === Object.keys(b).length && keys.every((k) => held(k) || (Object.hasOwn(b, k) && equals(a[k], b[k])))
-  );
+  const ak = ownKeys(a);
+  return ak.length === ownKeys(b).length && ak.every((k) => has(b, k) && eqValues(a[k], b[k], strictZero));
 };
+
+/** `==`: structural equality with SameValueZero on numbers. */
+export const equals = (a: unknown, b: unknown): boolean => eqValues(a, b, false);
+
+/**
+ * Structural SameValue equivalence: distinguishes `+0` and `-0`, treats `NaN`
+ * as equal to `NaN`, preserves identity for mutable cells, functions, and
+ * foreign class instances, and compares plain records, tuples, lists, Option,
+ * Result, and ADTs structurally without observing data-value identity or
+ * GADT held dictionary keys.
+ */
+export const sameValue = (a: unknown, b: unknown): boolean => eqValues(a, b, true);
 
 const rank = (n: number): number => (Number.isNaN(n) ? 1 : 0);
 
@@ -119,6 +103,19 @@ const hashString = (s: string): number => {
   return h;
 };
 
+/** Stable reference-identity hashes for non-plain class instances (mutable cells, foreign handles). */
+const identityHashes = /*#__PURE__*/ new WeakMap<object, number>();
+let nextIdentityHash = 1;
+
+const identityHash = (value: object): number => {
+  let code = identityHashes.get(value);
+  if (code === undefined) {
+    code = Math.imul(nextIdentityHash++, 2654435761) | 0;
+    identityHashes.set(value, code);
+  }
+  return code;
+};
+
 /** A hash consistent with `equals`. */
 export const hash = (a: unknown): number => {
   if (typeof a === "number") return hashString(Object.is(a, -0) ? "0" : String(a));
@@ -128,17 +125,28 @@ export const hash = (a: unknown): number => {
     const value: unknown = custom.call(a);
     if (typeof value === "number") return value;
   }
-  const option = Object.hasOwn(a, "_tag") ? undefined : optionTag(a);
-  if (option !== undefined) return hash(option === "Some" ? some(a["value"]) : none);
+  const key = builtinField(a);
+  if (key !== undefined) {
+    if (key === "" || key === "value") {
+      if (!has(a, "_tag")) return hash(key ? some(a[key]) : none);
+    } else {
+      return combine(
+        combine(13, hashString(key === "success" ? "Success" : "Failure")),
+        hash(a[key]),
+      );
+    }
+  }
   const hostHash = a["~effect/Hash"];
   if (typeof hostHash === "function") {
     const value: unknown = hostHash.call(a);
     if (typeof value === "number") return value;
   }
   if (Array.isArray(a)) return listHash(hash, a);
-  return Object.keys(a)
+  const proto: unknown = Object.getPrototypeOf(a);
+  if (proto !== Object.prototype && proto !== null) return identityHash(a);
+  return ownKeys(a)
     .toSorted()
-    .reduce((h, k) => (held(k) ? h : combine(combine(h, hashString(k)), hash(a[k]))), 13);
+    .reduce((h, k) => combine(combine(h, hashString(k)), hash(a[k])), 13);
 };
 
 const tagOf = (a: object): string | undefined => {
@@ -376,83 +384,3 @@ export const derive = (
   }
   return self;
 };
-
-/** `nullable`: `null` and `undefined` are `None`. */
-export const fromNullable = <A>(value: A | null | undefined): Option<A> =>
-  value === null || value === undefined ? none : some(value);
-
-/** `optional i`: `None` is passed as `undefined`. */
-export const optionalArg = <A>(option: Option<A>): A | undefined => (option._tag === "Some" ? option.value : undefined);
-
-/**
- * `value` as Flick data JS can no longer change: arrays and plain objects
- * are copied all the way down, and any other object goes through `other`
- * (`docs/formal/ts-holes.md#31-flick-data-is-copied-at-the-foreign-boundary`). A frozen object is a constant such as
- * `none`, kept with its identity.
- * Traversal uses a worklist; cyclic mutable data still fails with RangeError,
- * not a mutable cyclic Flick value. Arrays become fresh plain arrays: foreign
- * map overrides and species constructors cannot bypass isolation. Own record
- * fields are defined as data fields, including `__proto__`.
- * shortcut: a plain JS object typed `JsValue` inside data is copied too; type the copy if a binding needs its identity.
- */
-export const copyThrough = (value: unknown, other: (value: object) => unknown): unknown => {
-  const work: Array<() => void> = [];
-  const active = new WeakSet<object>();
-  let result: unknown;
-  const visit = (input: unknown, put: (copy: unknown) => void): void => {
-    if (typeof input !== "object" || input === null) { put(input); return; }
-    let array: unknown = input;
-    if (!Array.isArray(input)) {
-      const proto = Reflect.getPrototypeOf(input);
-      if (proto !== Object.prototype && proto !== null) {
-        if (!isRuntimeSequence(input, proto)) { put(other(input)); return; }
-        array = Array.from(input);
-      } else if (Object.isFrozen(input)) { put(other(input)); return; }
-    }
-    // Only active ancestors are rejected. Completed aliases must be copied again,
-    // not memoized: foreign mutation of one copy must not change another copy.
-    if (active.has(input)) throw new RangeError("Maximum call stack size exceeded");
-    active.add(input);
-    const finish = (copy: unknown): void => { active.delete(input); put(copy); };
-    if (Array.isArray(array)) {
-      const length = array.length;
-      const copy: unknown[] = [];
-      copy.length = length;
-      let index = 0;
-      const next = (): void => {
-        while (index < length) {
-          const key = index++;
-          // Like Array.map, read an index only after the previous child finishes.
-          if (!(key in array)) continue;
-          const child: unknown = array[key];
-          work.push(next);
-          visit(child, (copied) => { Object.defineProperty(copy, key, { value: copied, writable: true, enumerable: true, configurable: true }); });
-          return;
-        }
-        finish(copy);
-      };
-      work.push(next);
-    } else {
-      // Object.entries eagerly reads all enumerable fields before descending.
-      const entries: Array<[string, unknown]> = Object.entries(input);
-      const copy: Record<string, unknown> = {};
-      let index = 0;
-      const next = (): void => {
-        const entry = entries[index++];
-        if (entry === undefined) { finish(copy); return; }
-        const [key, child] = entry;
-        work.push(next);
-        visit(child, (copied) => { Object.defineProperty(copy, key, { value: copied, writable: true, enumerable: true, configurable: true }); });
-      };
-      work.push(next);
-    }
-  };
-  visit(value, (copy) => { result = copy; });
-  while (work.length > 0) work.pop()?.();
-  return result;
-};
-
-/** Flick data that crosses the boundary of an import outside the runtime. */
-export const copyData = <A>(value: A): A =>
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a copy has the shape of what it copies
-  copyThrough(value, (x) => x) as A;

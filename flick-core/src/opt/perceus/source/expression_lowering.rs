@@ -123,10 +123,11 @@ impl Lower<'_> {
                 )
             }
             ExprKind::Record(fields) => {
-                let fields = fields
+                let mut fields: Vec<(String, _)> = fields
                     .iter()
                     .map(|(label, value)| Ok((label.clone(), self.expr(value, env, block)?)))
                     .collect::<Result<_, LowerError>>()?;
+                flick_ir::sort_by_utf16(&mut fields, |f| &f.0);
                 block.emit(Operation::Record { fields }, span)
             }
             ExprKind::Dictionary(fields) => {

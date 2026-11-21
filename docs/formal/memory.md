@@ -215,6 +215,28 @@ token: only a counted duplication or projection may create such an alias.
 Comparing operand multiplicities with the total reference count alone is
 insufficient, because that count also includes existing internal edges.
 
+Audit result for data identity and record field order (issue #740):
+
+- **Value equality vs. object identity**: `flick-model/src/memory/operators.rs`
+  (`equal`) compares `Data::Record` order-independently, skips GADT held
+  dictionary suffixes, rejects `Value::Cell` (explicit `Ref.same` observes cell
+  identity), and uses `seen.insert((a.id, b.id))` solely as an internal memo/cycle
+  guard that cannot alter results on finite Flick data. No counted primitive
+  exposes the heap `ObjectId` of a data value, record, or tuple.
+- **Canonical structural record order**: `flick-core/src/opt/perceus/source/expression_lowering.rs`
+  lowers record literal field expressions into ANF locals in **source order**
+  before sorting `Operation::Record { fields }` into canonical UTF-16 label
+  order, so permutations of the same evaluated fields allocate the exact same
+  canonical `Data::Record` layout. `flick-model/src/memory/primitives/records.rs`
+  (`record_extend`, `record_remove`, `record_project`, `record_merge_disjoint`)
+  canonicalizes structural records (JS array-index keys ascending, then UTF-16),
+  and `schema_data.rs` uses UTF-16 order for sorted record/XML views. `Json`
+  and `Record.ReadonlyRecord` retain separate insertion-order maps.
+- **Lean proofs**: `Formal/MemoryPass.lean` and `Formal/MemoryInsert.lean` are
+  unaffected because `Operation::Record` keeps the same operand-consumption
+  shape; core record order-independence and source-order elaboration are proved
+  in `Formal/RecordOrder.lean` (recorded in [`core.md`](core.md#structural-records-and-data-values-no-identity-or-observable-field-order)).
+
 The current memory IR has ANF `Let` instructions and `Return`/`Branch`
 exits. Each local is single-assignment on a path. Before insertion, a local
 can be used any number of times. After insertion:

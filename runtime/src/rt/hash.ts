@@ -42,7 +42,10 @@ export const hash = (a: unknown): number => {
       if (a === null) break;
       if (Array.isArray(a)) return optimize(a.reduce((h: number, x: unknown) => combine(h, hash(x)), 6151));
       let h = 12289;
-      for (const key of Object.keys(a)) h ^= combine(hashString(key), hash(Reflect.get(a, key)));
+      for (const key of Object.keys(a)) {
+        if (key.charCodeAt(0) === 36) continue;
+        h ^= combine(hashString(key), hash(Reflect.get(a, key)));
+      }
       return optimize(h);
     }
     default:

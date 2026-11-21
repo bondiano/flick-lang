@@ -259,7 +259,11 @@ impl Row {
     /// written in each place is some kilobytes of the same code each time.
     #[inline(never)]
     pub fn sort_entries(entries: &mut [(Elem, Type)]) {
-        entries.sort_by(|a, b| a.0.cmp(&b.0));
+        if entries.len() < 2 {
+            return;
+        }
+        let order = flick_ir::sort_indices(entries.len(), &|i, j| entries[i].0.cmp(&entries[j].0));
+        flick_ir::apply_order(entries, order);
     }
 
     /// Sorts the entries by label.
