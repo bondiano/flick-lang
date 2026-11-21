@@ -8,7 +8,6 @@
 //! position crosses this boundary as a UTF-16 offset.
 
 use std::cell::{Ref, RefCell};
-use std::collections::BTreeMap;
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -18,7 +17,7 @@ use flick_core::diagnostics::render::json_events;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::fmt;
 use flick_core::ide::{CompletionKind, Ide};
-use flick_core::project::config::{Build, Config, Kind};
+use flick_core::project::config::Config;
 use flick_core::project::{self, Analysis, Host, ModuleCache, Project};
 use flick_core::source::{FileId, SourceMap};
 use serde_json::{Value, json};
@@ -441,26 +440,10 @@ fn line_column(text: &str, byte: u32) -> String {
 
 /// The in-memory project of the playground: one file at the root, staged for
 /// Flick's own runtime, with no manifest on disk.
-// `Thresholds` is not exported, so its name cannot be written here.
-#[allow(clippy::default_trait_access)]
 fn rt_project() -> Project {
     let config = Config {
-        kind: Kind::Lib,
         source_dir: ".".to_owned(),
-        test_dir: "test".to_owned(),
-        proof_dir: "proofs".to_owned(),
-        entries: Vec::new(),
-        dependencies: Vec::new(),
-        js_dependencies: Vec::new(),
-        package: None,
-        build: Build::default(),
-        targets: BTreeMap::new(),
-        sql_dialect: "",
-        allow: Vec::new(),
-        no_let_assert: false,
-        thresholds: Default::default(),
-        plugins: BTreeMap::new(),
-        tools: BTreeMap::new(),
+        ..Config::default()
     };
     let mut sources = SourceMap::default();
     let config_file = sources.add("/flick.toml".to_owned(), "");

@@ -2,23 +2,31 @@
 //! the js target only, `deriving Form`, and package modules no build
 //! compiled for go. Selected environments also check reachable effects.
 
+#[cfg(feature = "native-project")]
+use super::Loader;
+use super::Project;
 #[cfg(not(target_arch = "wasm32"))]
 use super::{Compilation, SourceMap};
+#[cfg(any(feature = "native-project", not(target_arch = "wasm32")))]
+use crate::diagnostics::Diagnostic;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::diagnostics::Severity;
+#[cfg(feature = "native-project")]
+use crate::diagnostics::codes;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::project::target_preflight;
 
-use super::{Loader, Project};
-use crate::diagnostics::{Diagnostic, codes};
-
+#[cfg(feature = "native-project")]
 use crate::source::{FileId, Span};
+#[cfg(feature = "native-project")]
 use crate::syntax::cst::{Element, Node};
+#[cfg(feature = "native-project")]
 use crate::syntax::kind::SyntaxKind as K;
 
 /// The built-in modules of the js target only: the browser UI, its forms
 /// and its reactivity, the telemetry client, JS interop and the
 /// JS hosts.
+#[cfg(feature = "native-project")]
 const JS_ONLY: &[&str] = &[
     "Action",
     "Atom",
@@ -35,6 +43,7 @@ const JS_ONLY: &[&str] = &[
 ];
 
 /// Whether the built-in module `name`, or a module under it, is js only.
+#[cfg(feature = "native-project")]
 pub(crate) fn js_only(name: &str) -> bool {
     JS_ONLY.iter().any(|m| {
         name.strip_prefix(m)
@@ -43,6 +52,7 @@ pub(crate) fn js_only(name: &str) -> bool {
 }
 
 /// P030 for a module of the js target only, named at `at`.
+#[cfg(feature = "native-project")]
 pub(super) fn js_only_error(module: &str, at: Span) -> Diagnostic {
     let message =
         format!("`{module}` is available on the js target only, and this project targets go");
@@ -56,6 +66,7 @@ pub(super) fn js_only_error(module: &str, at: Span) -> Diagnostic {
 
 /// P030 for each `Form` of a `deriving` clause under `node`: a form is
 /// built on `Form`, though the module need not import it.
+#[cfg(feature = "native-project")]
 fn derived_forms(node: &Node, text: &str, file: FileId, found: &mut Vec<Diagnostic>) {
     for child in &node.children {
         match child {
@@ -70,6 +81,7 @@ fn derived_forms(node: &Node, text: &str, file: FileId, found: &mut Vec<Diagnost
     }
 }
 
+#[cfg(feature = "native-project")]
 impl Loader<'_> {
     /// P030 for each import of a program built for go that the go target
     /// does not have, and each `deriving Form`.
@@ -145,6 +157,9 @@ pub(super) fn check_environment(
 pub fn stages_by_class(project: Option<&Project>, rt: Option<bool>) -> bool {
     match rt {
         Some(explicit) => explicit,
+        #[cfg(feature = "native-project")]
         None => project.is_some_and(|p| !p.config.is_go() && p.config.js_is_rt()),
+        #[cfg(not(feature = "native-project"))]
+        None => project.is_some(),
     }
 }

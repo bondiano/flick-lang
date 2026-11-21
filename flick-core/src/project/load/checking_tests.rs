@@ -129,12 +129,15 @@ fn library(sources: &mut SourceMap) -> Project {
             js_dependencies: Vec::new(),
             package: None,
             build: Build::default(),
+            #[cfg(feature = "native-project")]
             targets: BTreeMap::new(),
             sql_dialect: Default::default(),
             allow: Vec::new(),
             no_let_assert: false,
             thresholds: Thresholds::default(),
+            #[cfg(feature = "native-project")]
             plugins: BTreeMap::new(),
+            #[cfg(feature = "native-project")]
             tools: BTreeMap::new(),
         },
     }

@@ -2,7 +2,9 @@
 
 use std::path::Path;
 
-use super::{Loader, Root, target};
+#[cfg(feature = "native-project")]
+use super::target;
+use super::{Loader, Root};
 use crate::diagnostics::Diagnostic;
 use crate::diagnostics::codes;
 use crate::iface::{self, Namespace};
@@ -177,6 +179,7 @@ impl Loader<'_> {
                 let default_client_runner = ("Runner.Browser".to_string(), span);
                 let runner = runner.or_else(|| client.then_some(&default_client_runner));
                 // no type when the module failed to check: that is reported already
+                #[cfg(feature = "native-project")]
                 if let Some((runner, runner_at)) = runner
                     && project.config.is_go()
                     && target::js_only(runner)

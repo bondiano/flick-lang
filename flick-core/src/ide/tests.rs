@@ -4,11 +4,11 @@ use std::path::{Path, PathBuf};
 
 use super::{CompletionKind, Ide, Symbol, Target};
 use crate::diagnostics::Diagnostic;
-use crate::project::config::{Build, Config, Dependency, Kind};
+use crate::project::config::{Config, Dependency};
 use crate::project::{self, Analysis, Host, analysis_fingerprint};
 use crate::projection;
 use crate::source::{FileId, SourceMap};
-use crate::types::{Thresholds, builtin_sources};
+use crate::types::builtin_sources;
 
 struct Memory(BTreeMap<PathBuf, String>);
 
@@ -162,22 +162,8 @@ pub(super) fn fixture_with_dependencies(
         config_file: sources.add("flick.toml", ""),
         workspace: None,
         config: Config {
-            kind: Kind::Lib,
-            source_dir: "src".into(),
-            test_dir: "test".into(),
-            proof_dir: "proofs".into(),
-            entries: Vec::new(),
             dependencies,
-            js_dependencies: Vec::new(),
-            package: None,
-            build: Build::default(),
-            targets: BTreeMap::new(),
-            sql_dialect: Default::default(),
-            allow: Vec::new(),
-            no_let_assert: false,
-            thresholds: Thresholds::default(),
-            plugins: BTreeMap::new(),
-            tools: BTreeMap::new(),
+            ..Config::default()
         },
     };
     let last = files.last().expect("a file").0;

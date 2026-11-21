@@ -424,6 +424,7 @@ fn run_in(
         cache.retain_loaded(&loader.modules);
     }
     loader.check_entry(&interfaces);
+    #[cfg(feature = "native-project")]
     loader.check_targets();
     let failed = loader
         .diagnostics

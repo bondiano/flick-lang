@@ -11,6 +11,8 @@ use super::published::{self, Publications};
 use super::results::Results;
 use super::{Collected, Found, Plugins, failure, group};
 use crate::diagnostics::Diagnostic;
+#[cfg(not(feature = "native-project"))]
+use crate::plugin::reach::Grants;
 use crate::plugin::reach::{Gate, Reach};
 use crate::plugin::source::BlockSource;
 use crate::project::load::{Loader, Root};
@@ -86,10 +88,14 @@ impl Loader<'_> {
             return None;
         }
         let project = self.project?;
+        #[cfg(feature = "native-project")]
+        let grants = (project.config.plugins.get(package).cloned()).unwrap_or_default();
+        #[cfg(not(feature = "native-project"))]
+        let grants = Grants::default();
         Some(Arc::new(Gate {
             package: package.to_owned(),
             root: project.root.clone(),
-            grants: (project.config.plugins.get(package).cloned()).unwrap_or_default(),
+            grants,
             outside: self.host.outside()?,
         }))
     }

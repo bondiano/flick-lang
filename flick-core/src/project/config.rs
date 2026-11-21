@@ -3,6 +3,7 @@
 //! `[workspace]` and `[scripts]`. Unknown keys are errors so that a typo never
 //! silently means a default.
 
+#[cfg(feature = "native-project")]
 use std::collections::BTreeMap;
 
 use crate::codegen::Labels;
@@ -13,7 +14,9 @@ use crate::source::Span;
 use crate::types::{self, Thresholds};
 
 mod backend;
-pub use backend::{BackendEnvironment, BackendPackage};
+pub use backend::BackendEnvironment;
+#[cfg(feature = "native-project")]
+pub use backend::BackendPackage;
 
 #[cfg(feature = "native-project")]
 mod deps;
@@ -162,6 +165,7 @@ pub struct Config {
     pub package: Option<Package>,
     pub build: Build,
     /// `[target.<name>]`: backend-declared options by target short name.
+    #[cfg(feature = "native-project")]
     pub targets: BTreeMap<String, BTreeMap<String, TargetOption>>,
     /// `[sql] dialect`: the dialect of the database `sql` blocks are for.
     pub sql_dialect: &'static str,
@@ -173,9 +177,11 @@ pub struct Config {
     /// `max-params`.
     pub thresholds: Thresholds,
     /// `[plugins.<package>]`: what the plugin of each package may reach.
+    #[cfg(feature = "native-project")]
     pub plugins: BTreeMap<String, Grants>,
     /// `[tools]`: the host tools, as `node` or `go`, that the steps of a
     /// backend or a plugin may run, by its id or package.
+    #[cfg(feature = "native-project")]
     pub tools: BTreeMap<String, Vec<String>>,
 }
 
@@ -212,8 +218,10 @@ pub struct Build {
     pub out_dir: String,
     pub profile: Profile,
     /// Default target backend name (e.g. `"js"`, `"go"`).
+    #[cfg(feature = "native-project")]
     pub target: Option<String>,
     /// An exact backend package pin.
+    #[cfg(feature = "native-project")]
     pub backend: Option<BackendPackage>,
     /// Backend plus platform; absent means the selected backend's default.
     pub environment: Option<BackendEnvironment>,
@@ -225,6 +233,7 @@ pub struct Build {
 }
 
 /// A backend option value read from `[target.<name>]` in `flick.toml`.
+#[cfg(feature = "native-project")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TargetValue {
     Bool(bool),
@@ -237,6 +246,7 @@ pub enum TargetValue {
 
 /// One key/value entry inside `[target.<name>]`, with source spans for both
 /// the key (unknown option) and the value (invalid type or choice).
+#[cfg(feature = "native-project")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TargetOption {
     pub value: TargetValue,
@@ -280,6 +290,7 @@ impl Config {
     /// The project's default target short name: `[build.backend]` short name,
     /// else `[build] target`, else `[build] environment` backend prefix, else
     /// `"js"`.
+    #[cfg(feature = "native-project")]
     pub fn default_target(&self) -> &str {
         if let Some(backend) = &self.build.backend {
             return backend.id.rsplit('/').next().unwrap_or(&backend.id);
@@ -294,12 +305,14 @@ impl Config {
     }
 
     /// Whether the project's default target is Go.
+    #[cfg(feature = "native-project")]
     pub fn is_go(&self) -> bool {
         self.default_target() == "go"
     }
 
     /// Whether `[target.js]` selects Flick's own runtime (`"rt"`, the default)
     /// rather than the Effect adapter (`"effect"`).
+    #[cfg(feature = "native-project")]
     pub fn js_is_rt(&self) -> bool {
         !matches!(
             self.targets
@@ -311,6 +324,7 @@ impl Config {
     }
 
     /// The boolean value of `[target.js] <key>`, or `false` when unset.
+    #[cfg(feature = "native-project")]
     pub fn js_flag(&self, key: &str) -> bool {
         matches!(
             self.targets
@@ -322,12 +336,40 @@ impl Config {
     }
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            kind: Kind::Lib,
+            source_dir: "src".into(),
+            test_dir: "test".into(),
+            proof_dir: "proofs".into(),
+            entries: Vec::new(),
+            dependencies: Vec::new(),
+            js_dependencies: Vec::new(),
+            package: None,
+            build: Build::default(),
+            #[cfg(feature = "native-project")]
+            targets: BTreeMap::new(),
+            sql_dialect: "",
+            allow: Vec::new(),
+            no_let_assert: false,
+            thresholds: Thresholds::default(),
+            #[cfg(feature = "native-project")]
+            plugins: BTreeMap::new(),
+            #[cfg(feature = "native-project")]
+            tools: BTreeMap::new(),
+        }
+    }
+}
+
 impl Default for Build {
     fn default() -> Self {
         Build {
             out_dir: "dist".into(),
             profile: Profile::Debug,
+            #[cfg(feature = "native-project")]
             target: None,
+            #[cfg(feature = "native-project")]
             backend: None,
             environment: None,
             solver_steps: types::Limits::default().steps,
