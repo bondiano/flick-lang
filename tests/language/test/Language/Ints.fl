@@ -24,6 +24,24 @@ let pow a b = a ** b
 neg : Int -> Int
 let neg a = -a
 
+parse_text : String -> Option Int
+let parse_text s = Int.parse s
+
+concat_str : String -> String -> String
+let concat_str a b = a ++ b
+
+describe_parsed : Option Int -> String
+let describe_parsed parsed =
+  match parsed with
+  | Some n -> "Some " ++ Int.to_string n
+  | None -> "None"
+
+check_zero : String -> Bool
+let check_zero s =
+  match parse_text s with
+  | Some n -> n == 0 && Int.to_string n == "0" && Float.same_value 0.0 (Int.to_float n)
+  | None -> false
+
 tests : List Test.Test
 let tests = [
   Test.group "wrapping" [
@@ -92,6 +110,138 @@ let tests = [
         [Some (-42), None, None, Some 7]
         (List.map Int.parse ["-42", "2147483648", "4.5", "+7"])
     ),
+    Test.test "parse literals with ECMAScript whitespace and bounds" (fun () ->
+      Test.equal
+        [
+          "Some 36",
+          "Some 36",
+          "Some 36",
+          "Some 36",
+          "Some 36",
+          "Some 36",
+          "Some 36",
+          "Some -36",
+          "Some 0",
+          "Some 0",
+          "Some -2147483648",
+          "Some 2147483647",
+          "Some 2147483647",
+        ]
+        [
+          describe_parsed (Int.parse "\u{FEFF}36"),
+          describe_parsed (Int.parse "36\u{FEFF}"),
+          describe_parsed (Int.parse "\u{FEFF}36\u{00A0}"),
+          describe_parsed (Int.parse "\u{00A0}36\u{FEFF}"),
+          describe_parsed (Int.parse " \t\n\u{000B}\u{000C}\r 36 \r\u{000C}\u{000B}\n\t "),
+          describe_parsed
+            (Int.parse
+              "\u{1680}\u{2000}\u{200A}\u{2028}\u{2029}\u{202F}\u{205F}\u{3000}36\u{3000}"),
+          describe_parsed (Int.parse "+36"),
+          describe_parsed (Int.parse "-36"),
+          describe_parsed (Int.parse "-0"),
+          describe_parsed (Int.parse "\u{FEFF}+0\u{00A0}"),
+          describe_parsed (Int.parse "-2147483648"),
+          describe_parsed (Int.parse "2147483647"),
+          describe_parsed (Int.parse "+2147483647"),
+        ]
+    ),
+    Test.test "parse rejects U+0085, embedded whitespace, empty, sign-only and overflow" (fun () ->
+      Test.equal
+        [
+          None,
+          None,
+          None,
+          None,
+          None,
+          None,
+          None,
+          None,
+          None,
+          None,
+          None,
+          None,
+          None,
+          None,
+          None,
+          None,
+          None,
+          None,
+          None,
+        ]
+        [
+          Int.parse "\u{0085}36",
+          Int.parse "36\u{0085}",
+          Int.parse "\u{0085}36\u{0085}",
+          Int.parse "\u{180E}36",
+          Int.parse "\u{200B}36",
+          Int.parse "3 6",
+          Int.parse "3\t6",
+          Int.parse "3\n6",
+          Int.parse "3\u{00A0}6",
+          Int.parse "3\u{FEFF}6",
+          Int.parse "+ 36",
+          Int.parse "- 36",
+          Int.parse "",
+          Int.parse "   ",
+          Int.parse "+",
+          Int.parse "-",
+          Int.parse "-2147483649",
+          Int.parse "2147483648",
+          Int.parse "+2147483648",
+        ]
+    ),
+    Test.test "parse normalizes negative zero" (fun () ->
+      Test.equal [true, true, true] [
+        check_zero "-0",
+        check_zero (concat_str "\u{FEFF}-" "0\u{00A0}"),
+        check_zero (concat_str " +" "0 "),
+      ]
+    ),
+    Test.effect_test
+      "parse runtime values from Ref"
+      (task {
+        let cell = Ref.make (concat_str "\u{FEFF}" "36\u{00A0}")
+        let r1 = Int.parse (Ref.get cell)
+        Ref.set cell (concat_str "\u{0085}" "36")
+        let r2 = Int.parse (Ref.get cell)
+        Ref.set cell (concat_str "36" "\u{0085}")
+        let r3 = Int.parse (Ref.get cell)
+        Ref.set cell (concat_str "3" " 6")
+        let r4 = Int.parse (Ref.get cell)
+        Ref.set cell (concat_str " \t\n\u{000B}\u{000C}\r " "36 \r\u{000C}\u{000B}\n\t ")
+        let r5 = Int.parse (Ref.get cell)
+        Ref.set cell (concat_str "" "")
+        let r6 = Int.parse (Ref.get cell)
+        Ref.set cell (concat_str "+" "")
+        let r7 = Int.parse (Ref.get cell)
+        Ref.set cell (concat_str "-" "0")
+        let r8 = Int.parse (Ref.get cell)
+        Ref.set cell (concat_str "-214748364" "8")
+        let r9 = Int.parse (Ref.get cell)
+        Ref.set cell (concat_str "-214748364" "9")
+        let r10 = Int.parse (Ref.get cell)
+        Ref.set cell (concat_str "214748364" "7")
+        let r11 = Int.parse (Ref.get cell)
+        Ref.set cell (concat_str "214748364" "8")
+        let r12 = Int.parse (Ref.get cell)
+        Test.check
+          (Test.equal
+            [
+              Some 36,
+              None,
+              None,
+              None,
+              Some 36,
+              None,
+              None,
+              Some 0,
+              Some (-2147483648),
+              None,
+              Some 2147483647,
+              None,
+            ]
+            [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12])
+      }),
     Test.test "to_string" (fun () ->
       Test.equal "-2147483648" (Int.to_string (sub (-2147483647) 1))
     ),

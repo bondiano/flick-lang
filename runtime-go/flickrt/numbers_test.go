@@ -39,3 +39,122 @@ func TestBigIntConversions(t *testing.T) {
 		t.Errorf("to_number 2**53+1 = %v, want 2**53", got)
 	}
 }
+
+func optionInt(t *testing.T, v Value) (int32, bool) {
+	t.Helper()
+	d, ok := v.(*Data)
+	if !ok {
+		t.Fatalf("expected *Data Option, got %T (%v)", v, v)
+	}
+	switch d.Tag {
+	case "None":
+		if len(d.Fields()) != 0 {
+			t.Fatalf("None had %d fields", len(d.Fields()))
+		}
+		return 0, false
+	case "Some":
+		if len(d.Fields()) != 1 {
+			t.Fatalf("Some had %d fields", len(d.Fields()))
+		}
+		n, ok := d.Fields()[0].(int32)
+		if !ok {
+			t.Fatalf("Some payload had type %T (%v), want int32", d.Fields()[0], d.Fields()[0])
+		}
+		return n, true
+	default:
+		t.Fatalf("unexpected Option tag %q", d.Tag)
+		return 0, false
+	}
+}
+
+func TestIntParse(t *testing.T) {
+	accepted := []struct {
+		input string
+		want  int32
+	}{
+		{"36", 36},
+		{"+36", 36},
+		{"-36", -36},
+		{"0", 0},
+		{"+0", 0},
+		{"-0", 0},
+		{"000000000000000000000000036", 36},
+		{" \t\n\v\f\r 36 \r\f\v\n\t ", 36},
+		{"\uFEFF36", 36},
+		{"36\uFEFF", 36},
+		{"\uFEFF36\uFEFF", 36},
+		{"\u00A036", 36},
+		{"36\u00A0", 36},
+		{"\uFEFF36\u00A0", 36},
+		{"\u00A0+36\uFEFF", 36},
+		{"\uFEFF-0\u00A0", 0},
+		{"-2147483648", -2147483648},
+		{"2147483647", 2147483647},
+		{"+2147483647", 2147483647},
+		{"\uFEFF-2147483648\u00A0", -2147483648},
+		{"\u00A02147483647\uFEFF", 2147483647},
+	}
+	for _, tc := range accepted {
+		got, ok := optionInt(t, IntParse(tc.input))
+		if !ok || got != tc.want {
+			t.Errorf("IntParse(%q) = (%d, %v), want Some(%d)", tc.input, got, ok, tc.want)
+		}
+	}
+
+	// Every ECMAScript WhiteSpace and LineTerminator code point is accepted leading and trailing.
+	ecmaSpaces := []rune{
+		'\t', '\n', '\v', '\f', '\r', ' ',
+		0x00A0, 0x1680,
+		0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2007, 0x2008, 0x2009, 0x200A,
+		0x2028, 0x2029, 0x202F, 0x205F, 0x3000, 0xFEFF,
+	}
+	for _, r := range ecmaSpaces {
+		s := string(r) + "36" + string(r)
+		got, ok := optionInt(t, IntParse(s))
+		if !ok || got != 36 {
+			t.Errorf("IntParse(U+%04X + 36 + U+%04X) = (%d, %v), want Some(36)", r, r, got, ok)
+		}
+	}
+
+	rejected := []string{
+		"",
+		"   ",
+		"\t\n\v\f\r",
+		"\uFEFF\u00A0",
+		"+",
+		"-",
+		" + ",
+		"\uFEFF-\u00A0",
+		"++36",
+		"--36",
+		"+-36",
+		"-+36",
+		"\u008536",
+		"36\u0085",
+		"\u008536\u0085",
+		"\u180E36",
+		"\u200B36",
+		"3 6",
+		"3\t6",
+		"3\n6",
+		"3\u00A06",
+		"3\uFEFF6",
+		"+ 36",
+		"- 36",
+		"-2147483649",
+		"2147483648",
+		"+2147483648",
+		"999999999999999999999999999999",
+		"4.5",
+		"36.0",
+		"0x24",
+		"1e2",
+		"1_000",
+		"٣٦",
+	}
+	for _, input := range rejected {
+		if got, ok := optionInt(t, IntParse(input)); ok {
+			t.Errorf("IntParse(%q) = Some(%d), want None", input, got)
+		}
+	}
+}

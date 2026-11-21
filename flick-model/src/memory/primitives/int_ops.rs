@@ -16,7 +16,7 @@ pub(super) fn run(
         IntIntrinsic::Parse => {
             let text = heap.string(&args[0])?;
             charge(fuel, text.len())?;
-            let trimmed = super::string_ops::js_trim(text);
+            let trimmed = text.trim_matches(super::bigint_conversion::js_space);
             let parsed = parse_decimal_i32(trimmed);
             match parsed {
                 Some(n) => heap.construct("Prelude.Option.Some", vec![Value::Int(n)]),

@@ -5,10 +5,12 @@ import { test } from "node:test";
 import * as CoreArray from "@flick-lang/runtime/core/Array";
 import * as CoreIterable from "@flick-lang/runtime/core/Iterable";
 import * as CoreString from "@flick-lang/runtime/core/String";
+import { intParse as coreIntParse } from "@flick-lang/runtime/core/text";
 import { EQ } from "@flick-lang/runtime/core/data";
 import * as EffectArray from "../src/effect/Array.ts";
 import * as EffectIterable from "../src/effect/Iterable.ts";
 import * as EffectString from "../src/effect/String.ts";
+import { intParse as effectIntParse } from "../src/stdlib/text.ts";
 import { tag } from "@flick-lang/runtime/tags";
 
 // Both sides are called through `any`: the cases call them as compiled code does, not as their types say.
@@ -246,4 +248,53 @@ for (const g of groups) {
 
 test("core/String.flickLocaleCompare gives Prelude orderings", () => {
   assert.equal(CoreString.flickLocaleCompare("en", "a", "a"), EQ);
+});
+
+test("intParse in both runtime and effect-ts obeys the ECMAScript whitespace contract", () => {
+  const accepted: ReadonlyArray<readonly [string, number]> = [
+    ["36", 36],
+    ["+36", 36],
+    ["-36", -36],
+    ["-0", 0],
+    ["+0", 0],
+    [" \t\n\v\f\r 36 \r\f\v\n\t ", 36],
+    ["\uFEFF36\u00A0", 36],
+    ["\u00A036\uFEFF", 36],
+    ["\uFEFF-0\u00A0", 0],
+    ["-2147483648", -2147483648],
+    ["2147483647", 2147483647],
+  ];
+  const rejected = [
+    "",
+    "   ",
+    "+",
+    "-",
+    "\u008536",
+    "36\u0085",
+    "\u180E36",
+    "\u200B36",
+    "3 6",
+    "3\u00A06",
+    "3\uFEFF6",
+    "+ 36",
+    "- 36",
+    "-2147483649",
+    "2147483648",
+    "4.5",
+  ];
+  for (const [label, fn] of [
+    ["runtime", coreIntParse],
+    ["effect-ts", effectIntParse],
+  ] as const) {
+    for (const [input, want] of accepted) {
+      const got = fn(input);
+      assert.deepStrictEqual(plain(got), some(want), `${label} ${JSON.stringify(input)}`);
+      if (want === 0 && got._tag === "Some") {
+        assert.equal(Object.is(got.value, 0), true, `${label} normalized zero ${JSON.stringify(input)}`);
+      }
+    }
+    for (const input of rejected) {
+      assert.deepStrictEqual(plain(fn(input)), none, `${label} ${JSON.stringify(input)}`);
+    }
+  }
 });
