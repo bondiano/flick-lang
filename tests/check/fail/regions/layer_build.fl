@@ -73,6 +73,6 @@ let not_an_input =
 //~ FLICK-G003 @37:29-37:42 the `provide` that builds `Greeter` releases it earlier
 //~ FLICK-G003 @43:13-43:26 the `provide` that builds `Greeter` releases it earlier
 //~ FLICK-G003 @48:28-48:39 the service comes from the caller
-//~ FLICK-G003 @52:30-52:41
+//~ FLICK-G003 @53:21-53:32 the `provide` that builds `Greeter` releases it earlier
 //~ FLICK-G003 @60:23-60:42 the `provide` that builds `Greeter` releases it earlier
 //~ FLICK-E002 @67:3-70:4 does not allow service `Other`

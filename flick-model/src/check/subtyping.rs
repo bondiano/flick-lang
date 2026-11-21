@@ -203,7 +203,10 @@ impl Checker<'_> {
         }
         let x = self.rewrap_qualifiers(actual, substitute_all(&s.body, &s.vars, &names));
         let y = self.rewrap_qualifiers(expected, substitute_all(&t.body, &t.vars, &names));
+        let givens = self.givens();
+        self.give_provided(&y);
         let result = self.subsume(&x, &y);
+        self.forget_givens(givens);
         self.regions.facts.truncate(facts);
         result
     }

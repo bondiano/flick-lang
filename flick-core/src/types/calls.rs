@@ -194,7 +194,7 @@ impl Checker<'_> {
         let mut defaults = Vec::new();
         let provided = self.cx.regions.provided.len();
         let ty = self.apply_args(head, args, &mut defaults);
-        if !defaults.is_empty() {
+        if !defaults.is_empty() || self.cx.regions.provided.len() > provided {
             self.grow();
         }
         self.settle_defaults(defaults);

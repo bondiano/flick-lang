@@ -171,3 +171,32 @@ fn e002_edits_own_local_cell_or_signature_not_unrelated_quiet_binding() {
         "`bad` should receive `Log`:\n{rewritten}"
     );
 }
+
+#[test]
+fn the_fix_of_g003_adds_provided_for_scoped_ref_set() {
+    let text = "module Probe exposing (..)\n\
+        service Greeter =\n  greet : String ->{} String\n\
+        replace : ScopedRef.ScopedRef s String ->{Greeter} Unit\n\
+        let replace r =\n  \
+          ScopedRef.set\n    \
+            (task { Resource.acquire_release (task { \"w\" }) (fun _ -> ignore (Greeter.greet \"release\")) })\n    \
+            r\n";
+    let mut sources = SourceMap::default();
+    let file = sources.add("Probe.fl", text.to_owned());
+    let diagnostics = crate::check(&sources, file);
+    let g003: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == codes::G003)
+        .collect();
+    assert_eq!(g003.len(), 1, "{diagnostics:?}");
+    let edits: Vec<_> = g003[0].fixes.iter().flat_map(|f| &f.edits).collect();
+    assert_eq!(edits.len(), 1, "{g003:?}");
+    let mut out = text.to_owned();
+    out.replace_range(edits[0].span.range(), &edits[0].replacement);
+    assert!(
+        out.contains(
+            "replace : Fiber.Provided {Greeter} s => ScopedRef.ScopedRef s String ->{Greeter} Unit"
+        ),
+        "{out}"
+    );
+}

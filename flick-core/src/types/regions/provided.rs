@@ -114,7 +114,16 @@ impl Checker<'_> {
     /// inferred yet, as of a function applied to fewer arguments, waits for
     /// the end of the declaration.
     pub fn settle_provided(&mut self, mark: usize) {
-        let wanted: Vec<Want> = self.cx.regions.provided.drain(mark..).collect();
+        let late = self.cx.regions.provided_late.len();
+        self.settle_provided_since(mark, late);
+    }
+
+    /// Settles `Provided` constraints wanted since `mark`, and those deferred
+    /// during a sub-call since `late_mark` whose owner or row an outer step
+    /// (such as `|>`) just supplied.
+    pub fn settle_provided_since(&mut self, mark: usize, late_mark: usize) {
+        let mut wanted: Vec<Want> = self.cx.regions.provided.drain(mark..).collect();
+        wanted.extend(self.cx.regions.provided_late.drain(late_mark..));
         for mut want in wanted {
             let equalities = type_eqs(&want.at.givens);
             if self.under(&equalities, |this| this.settle_want(&mut want, false)) {
@@ -181,12 +190,17 @@ impl Checker<'_> {
         for tail in &norm.tails {
             match tail {
                 Type::Meta(_) => open = true,
-                Type::Var(_) | Type::Skolem(_)
-                    if !self.discharge_tail(tail, &want.owner, &want.at) =>
-                {
-                    let (service, region) = (self.show_exact(tail), self.show_exact(&want.owner));
-                    let named = self.signed(tail) && self.signed(&want.owner);
-                    self.unprovided(&service, &region, named, want.span);
+                Type::Var(_) | Type::Skolem(_) => {
+                    let key = format!("~{}", self.show_exact(tail));
+                    if !want.settled.contains(&key) {
+                        want.settled.push(key);
+                        if !self.discharge_tail(tail, &want.owner, &want.at) {
+                            let (service, region) =
+                                (self.show_exact(tail), self.show_exact(&want.owner));
+                            let named = self.signed(tail) && self.signed(&want.owner);
+                            self.unprovided(&service, &region, named, want.span);
+                        }
+                    }
                 }
                 _ => {}
             }
@@ -203,6 +217,11 @@ impl Checker<'_> {
     /// settles are left out of the row.
     pub fn settle_performed(&mut self, services: &Type, span: Span) -> Type {
         let mut norm = self.store.normalize(services);
+        if self.cx.regions.passed_provided && norm.tails.iter().any(|t| matches!(t, Type::Meta(_)))
+        {
+            self.grow();
+            norm = self.store.normalize(services);
+        }
         if !norm
             .entries
             .iter()
@@ -282,6 +301,7 @@ impl Checker<'_> {
         if entries.is_empty() || at.pure {
             return;
         }
+        self.cx.regions.passed_provided = true;
         let row = Type::Row(Row {
             entries,
             tail: None,

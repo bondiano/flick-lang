@@ -1,6 +1,6 @@
 ---
 title: "Регионы и захваты"
-source_hash: d6d67c5cdf89c420
+source_hash: 8e35ff6fa68cf624
 ---
 
 `scope` освобождает полученные ресурсы, когда его тело завершается.
@@ -355,7 +355,9 @@ use : forall c s r e a b. ScopedRef s a -> (forall t. a^{t} ->{r; e} b)^c ->{r; 
 # let use = ScopedRef.use
 
 from_acquire :
-  forall c s r e a. (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r; e} ScopedRef s a
+  forall c s r e a.
+  Fiber.Provided r s =>
+  (forall t. Fiber.Provided r t => Eff {Scope t | r} e a^{t})^c ->{Scope s | r; e} ScopedRef s a
 # let from_acquire = ScopedRef.from_acquire
 ```
 
@@ -367,7 +369,7 @@ from_acquire :
 (`Scope t`) до её закрытия, поэтому их `get` даёт `a^{t}`.
 
 `RcRef.make` также приобретает каждый ресурс в новом регионе. Его поле
-`acquire` имеет тип `(forall t. Eff {Scope t | r} e a^{t})^c`: приобретение
+`acquire` имеет тип `(forall t. Fiber.Provided r t => Eff {Scope t | r} e a^{t})^c`: приобретение
 не может сохранить ресурс в ячейке за пределами этого региона.
 
 ## Дочерние файберы

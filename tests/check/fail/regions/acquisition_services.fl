@@ -1,0 +1,234 @@
+// Acquisitions of `ScopedRef`, `Pool`, `RcRef`, `RcMap` and `ScopedCache`
+// keep releases alive until their owning region `s` closes: the providers of
+// the services they use must outlive `s` (`docs/formal/regions.md`, `Fiber.Provided`).
+module App.AcquisitionServicesFail exposing (..)
+
+service Greeter =
+  greet : String ->{} String
+
+greeter : Layer none none {Greeter}
+let greeter = Layer.succeed Greeter { greet = fun name -> name }
+
+scoped_ref_from_acquire_inside : Unit ->{} Unit
+let scoped_ref_from_acquire_inside () = scope {
+  provide greeter {
+    ignore
+      (ScopedRef.from_acquire
+        (task {
+          Resource.acquire_release (task { "v" }) (fun _ -> ignore (Greeter.greet "release"))
+        }))
+  }
+}
+
+scoped_ref_from_acquire_not_given : Unit ->{Scope s, Greeter} Unit
+let scoped_ref_from_acquire_not_given () =
+  ignore
+    (ScopedRef.from_acquire
+      (task { Resource.acquire_release (task { "v" }) (fun _ -> ignore (Greeter.greet "release")) }))
+
+scoped_ref_set_inside : Unit ->{} Unit
+let scoped_ref_set_inside () = scope {
+  let r = ScopedRef.make (fun () -> "init")
+  provide greeter {
+    ScopedRef.set
+      (task { Resource.acquire_release (task { "w" }) (fun _ -> ignore (Greeter.greet "release")) })
+      r
+  }
+}
+
+scoped_ref_set_not_given : ScopedRef.ScopedRef s String ->{Greeter} Unit
+let scoped_ref_set_not_given r =
+  ScopedRef.set
+    (task { Resource.acquire_release (task { "w" }) (fun _ -> ignore (Greeter.greet "release")) })
+    r
+
+scoped_ref_set_awaited_inside : Unit ->{} Unit
+let scoped_ref_set_awaited_inside () = scope {
+  let r = ScopedRef.make (fun () -> "init")
+  let update =
+    task {
+      ScopedRef.set
+        (task { Resource.acquire_release (task { "w" }) (fun _ -> ignore (Greeter.greet "release")) })
+        r
+    }
+  provide greeter { await update }
+}
+
+scoped_ref_set_in_use_inside : Unit ->{} Unit
+let scoped_ref_set_in_use_inside () = scope {
+  let r = ScopedRef.make (fun () -> "init")
+  ScopedRef.use r (fun _ ->
+    provide greeter {
+      ScopedRef.set
+        (task { Resource.acquire_release (task { "w" }) (fun _ -> ignore (Greeter.greet "release")) })
+        r
+    }
+  )
+}
+
+scoped_ref_set_around_use_inside : Unit ->{} Unit
+let scoped_ref_set_around_use_inside () = scope {
+  let r = ScopedRef.make (fun () -> "init")
+  provide greeter {
+    ScopedRef.use r (fun _ ->
+      ScopedRef.set
+        (task { Resource.acquire_release (task { "w" }) (fun _ -> ignore (Greeter.greet "release")) })
+        r
+    )
+  }
+}
+
+scoped_ref_set_provided_in_acquire : Unit ->{} Unit
+let scoped_ref_set_provided_in_acquire () = provide greeter {
+  scope {
+    let r = ScopedRef.make (fun () -> "init")
+    ScopedRef.set
+      (task {
+        provide greeter {
+          Resource.acquire_release (task { "w" }) (fun _ -> ignore (Greeter.greet "release"))
+        }
+      })
+      r
+  }
+}
+
+pool_inside : Unit ->{} Unit
+let pool_inside () = scope {
+  provide greeter {
+    ignore
+      (Pool.make {
+        acquire =
+          task {
+            Resource.acquire_release (task { "v" }) (fun _ -> ignore (Greeter.greet "release"))
+          }
+        size = 1
+        concurrency = None
+        targetUtilization = None
+      })
+  }
+}
+
+pool_with_ttl_inside : Unit ->{} Unit
+let pool_with_ttl_inside () = scope {
+  provide greeter {
+    ignore
+      (Pool.make_with_ttl {
+        acquire =
+          task {
+            Resource.acquire_release (task { "v" }) (fun _ -> ignore (Greeter.greet "release"))
+          }
+        min = 1
+        max = 2
+        concurrency = None
+        targetUtilization = None
+        timeToLive = Duration.zero
+        timeToLiveStrategy = None
+      })
+  }
+}
+
+pool_not_given : Unit ->{Scope s, Greeter} Unit
+let pool_not_given () =
+  ignore
+    (Pool.make {
+      acquire =
+        task { Resource.acquire_release (task { "v" }) (fun _ -> ignore (Greeter.greet "release")) }
+      size = 1
+      concurrency = None
+      targetUtilization = None
+    })
+
+rc_ref_inside : Unit ->{} Unit
+let rc_ref_inside () = scope {
+  provide greeter {
+    ignore
+      (RcRef.make {
+        acquire =
+          task {
+            Resource.acquire_release (task { "v" }) (fun _ -> ignore (Greeter.greet "release"))
+          }
+        idleTimeToLive = None
+      })
+  }
+}
+
+rc_map_inside : Unit ->{} Unit
+let rc_map_inside () = scope {
+  provide greeter {
+    ignore
+      (RcMap.make {
+        lookup =
+          fun (k : String) ->
+            Resource.acquire_release (task { k }) (fun _ -> ignore (Greeter.greet "release"))
+        idleTimeToLive = None
+        capacity = None
+      })
+  }
+}
+
+rc_map_not_given : Unit ->{Scope s, Greeter} Unit
+let rc_map_not_given () =
+  ignore
+    (RcMap.make {
+      lookup =
+        fun (k : String) ->
+          Resource.acquire_release (task { k }) (fun _ -> ignore (Greeter.greet "release"))
+      idleTimeToLive = None
+      capacity = None
+    })
+
+scoped_cache_inside : Unit ->{} Unit
+let scoped_cache_inside () = scope {
+  provide greeter {
+    ignore
+      (ScopedCache.make {
+        lookup =
+          fun (k : String) ->
+            Resource.acquire_release (task { k }) (fun _ -> ignore (Greeter.greet "release"))
+        capacity = 1
+        timeToLive = None
+      })
+  }
+}
+
+scoped_cache_with_inside : Unit ->{} Unit
+let scoped_cache_with_inside () = scope {
+  provide greeter {
+    ignore
+      (ScopedCache.make_with {
+        lookup =
+          fun (k : String) ->
+            Resource.acquire_release (task { k }) (fun _ -> ignore (Greeter.greet "release"))
+        capacity = 1
+        timeToLive = None
+      })
+  }
+}
+
+scoped_cache_not_given : Unit ->{Scope s, Greeter} Unit
+let scoped_cache_not_given () =
+  ignore
+    (ScopedCache.make {
+      lookup =
+        fun (k : String) ->
+          Resource.acquire_release (task { k }) (fun _ -> ignore (Greeter.greet "release"))
+      capacity = 1
+      timeToLive = None
+    })
+//~ FLICK-G003 @16:8-16:30 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @26:6-26:28 the service comes from the caller
+//~ FLICK-G003 @33:5-33:18 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @41:3-41:16 the service comes from the caller
+//~ FLICK-G003 @54:21-54:33 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @62:7-62:20 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @73:5-77:6 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @88:11-88:35 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @99:8-99:17 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @115:8-115:26 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @133:6-133:15 the service comes from the caller
+//~ FLICK-G003 @145:8-145:18 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @159:8-159:18 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @172:6-172:16 the service comes from the caller
+//~ FLICK-G003 @184:8-184:24 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @198:8-198:29 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @211:6-211:22 the service comes from the caller
