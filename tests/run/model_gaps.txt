@@ -8,37 +8,27 @@
 # that rejects a program flick-core accepts is a divergence still to be read.
 # loops_owners exercises the existing G6 explicit-owner limit (docs/formal/regions.md
 # section 1.4); its native and rt oracle remains in portable.txt and rt.txt.
-# stream_combine, and the (Scope) error behind cache's first reason: the model's (Scope)
-# is stricter than docs/formal/regions.md there (a value bound, a region named by
-# inference); issue #710.
 bootstrap/app_fail # no native for `fail` (flick:rt appFail)
 bootstrap/debug # no native for `echoed` (flick:rt flickEcho)
-bootstrap/inline_pack # the model's (Field) rejects `App.Main.main`
-bootstrap/inline_pack_nominals # the model's (Field) rejects `App.Main.main`
-bootstrap/packed_module # the model's (Field) rejects `App.Main.main`
 codegen/abi # no native for `js_type` (./abi.mjs kind)
 codegen/apply_order # no native for `unsafe_div` (flick:rt intUnsafeDiv)
 codegen/composition_method # no native for `unsafe_div` (flick:rt intUnsafeDiv)
 codegen/deep_recursion # runs out of the model's steps
 codegen/defect # no native for `unsafe_div` (flick:rt intUnsafeDiv)
 codegen/effect_abi # no native for `bits` (./effect_abi.mjs bits)
-codegen/for_comprehension # the model's (≡) rejects `App.Main.main`
-codegen/for_loop # the model's (≡) rejects `App.Main.main`
-codegen/fusion # a `for` or a `Seq` has no λFlick form
+codegen/for_loop # no native for `sleep` (../runtime/timers.mjs sleep)
+codegen/fusion # `?` on an `Option`, a return from the function, has no λFlick form
 codegen/interpolation # runs in the model; not in portable.txt
-codegen/known_defaults # prints something else
 codegen/known_failure # no native for `unsafe_div` (flick:rt intUnsafeDiv)
 codegen/ints # no native for `checked_add` (flick:rt intCheckedAdd)
 codegen/let_assert # no native for `get` (flick:rt listGet)
 codegen/pure_main # no native for `say` (global console.log)
 codegen/question # `?` on an `Option`, a return from the function, has no λFlick form
-codegen/ranges # the model's (≡) rejects `App.Main.main`
 codegen/recursion # runs out of the model's steps
 codegen/release # no native for `timeout_option` (flick:rt timeoutOption)
 codegen/service_child # no native for `parallel` (flick:rt parallel)
 codegen/strings_utf16 # no native for `length` (flick:String length)
 codegen/tags # no native for `tag_of` (./tags.mjs tagOf)
-codegen/unpack_dictionary # the model's (Field) rejects `App.Main.main`
 effect/host_services # no native for `any` (flick:rt listAny)
 ffi/catch_order # no native for `fail` (./bindings.mjs fail)
 ffi/copy # no native for `callback_arg` (./bindings.mjs copyDeepCallbackArg)
@@ -77,7 +67,7 @@ runtime/paths # no native for `node_write_file` (flick:rt fileWrite)
 runtime/ref_linearizable # no native for `repeat` (flick:rt listRepeat)
 runtime/releases # no native for `open_raw` (./resources.mjs open)
 runtime/scope_close # no native for `add_finalizer_exit` (flick:Scope flickAddFinalizerExit)
-runtime/scope_owners # the model's (≡) rejects `App.Main.main`
+runtime/scope_owners # the model's (≡) rejects `App.Main.keep`
 runtime/scope_releases # no native for `timeout` (flick:rt timeout)
 runtime/scoped_file # no native for `node_write_file` (flick:rt fileWrite)
 runtime/scopes # no native for `held_write` (./calls.mjs heldWrite)
@@ -118,7 +108,7 @@ ui/siblings # no native for `layer` (flick:reactivity/Atom atomLayer)
 ui/stream # no native for `close` (./stream.mjs close)
 ui/sync # no native for `layer` (flick:reactivity/Atom atomLayer)
 ui/sync_data # no native for `layer` (flick:reactivity/Atom atomLayer)
-ui/sync_for # a `for` or a `Seq` has no λFlick form
+ui/sync_for # no native for `layer` (flick:reactivity/Atom atomLayer)
 ui/wake_chain # no native for `click` (./dom.mjs click)
 runtime/lazy_shared # no native for `parallel` (flick:rt parallel)
 runtime/suspended_std # no native for `or_die` (flick:Effect orDie)

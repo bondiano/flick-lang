@@ -77,6 +77,11 @@ impl Intrinsic {
             Self::DateTime(op) => op.arity(),
             Self::Cron(op) => op.arity(),
             Self::Graph(op) => op.arity(),
+            Self::Async(op) => op.arity(),
+            Self::Layer(op) => op.arity(),
+            Self::Crypto(op) => op.arity(),
+            Self::Config(op) => op.arity(),
+            Self::Arbitrary(op) => op.arity(),
         }
     }
 }

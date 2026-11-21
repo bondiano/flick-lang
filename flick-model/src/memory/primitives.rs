@@ -84,6 +84,27 @@ mod outcome_ops;
 #[path = "primitives/cause_ops.rs"]
 mod cause_ops;
 
+#[path = "primitives/cause_pretty.rs"]
+mod cause_pretty;
+
+#[path = "primitives/crypto_ops.rs"]
+mod crypto_ops;
+
+#[path = "primitives/config_url.rs"]
+mod config_url;
+
+#[path = "primitives/config_ops.rs"]
+mod config_ops;
+
+#[path = "primitives/arbitrary_ops.rs"]
+mod arbitrary_ops;
+
+#[path = "primitives/arbitrary_shrink.rs"]
+mod arbitrary_shrink;
+
+#[path = "primitives/arbitrary_fmt.rs"]
+mod arbitrary_fmt;
+
 #[path = "primitives/gen_ops.rs"]
 mod gen_ops;
 
@@ -201,9 +222,18 @@ mod graph_allpaths;
 #[path = "primitives/graph_flow.rs"]
 mod graph_flow;
 
+#[path = "primitives/isaac_ops.rs"]
+mod isaac_ops;
+
 pub(super) use bigint_norm::bigint_pattern_eq;
 use bigint_norm::{bigint_order, bigint_text, normalize_bigint};
-pub(super) use cause_ops::{concat_causes, first_defect_message, join_causes};
+pub(super) use cause_ops::{
+    concat_causes, first_defect_message, join_causes, strip_fail_and_add_interrupt,
+};
+pub(super) use isaac_ops::{
+    IsaacRng, describe_cause_report, duration_sleep_nanos, fails_to_dies_cause,
+    without_interrupts_cause,
+};
 pub(super) use outcome_ops::describe_defect;
 
 pub(super) fn metered_primitive(
@@ -264,6 +294,9 @@ pub(super) fn metered_primitive(
         Intrinsic::DateTime(op) => datetime_ops::run(heap, op, arguments, fuel),
         Intrinsic::Cron(op) => cron_ops::run(heap, op, arguments, fuel),
         Intrinsic::Graph(op) => graph_ops::run(heap, op, arguments, fuel),
+        Intrinsic::Crypto(op) => crypto_ops::run(heap, op, arguments, fuel),
+        Intrinsic::Config(op) => config_ops::run(heap, op, arguments, fuel),
+        Intrinsic::Arbitrary(op) => arbitrary_ops::run(heap, op, arguments, fuel),
         _ => Err(unsupported("not a numeric primitive")),
     }
 }
@@ -430,7 +463,19 @@ pub(super) fn show_value(heap: &Heap, value: &Value) -> Result<String, Error> {
             | Data::TimeZone(_)
             | Data::Cron(_)
             | Data::Graph(_)
-            | Data::GraphWalker(_) => Err(unsupported(
+            | Data::GraphWalker(_)
+            | Data::Context(_)
+            | Data::ContextRef { .. }
+            | Data::FiberHandle { .. }
+            | Data::Deferred { .. }
+            | Data::MemoMap { .. }
+            | Data::FiberGroup { .. }
+            | Data::MaskRestore { .. }
+            | Data::MaskedTask { .. }
+            | Data::CachedRunTask { .. }
+            | Data::CachedInvalidateTask { .. }
+            | Data::ExitTask(_)
+            | Data::CapturedEnv { .. } => Err(unsupported(
                 "primitive show of record or executable/opaque storage",
             )),
         },
@@ -499,78 +544,5 @@ pub(super) fn intrinsic(
 include!("primitives/operators.rs");
 
 #[cfg(test)]
-mod array_observer_tests {
-    use super::*;
-
-    #[test]
-    fn invalid_array_layout_rejects_before_charging_or_reading_fields() {
-        for tag in ["$list", "$tuple"] {
-            for ordinary_fields in [0, 2] {
-                let mut heap = Heap::new();
-                let field = heap
-                    .literal(&Lit::String("owned physical field".into()))
-                    .expect("field");
-                // Private injection only: public construction rejects these layouts.
-                let input = heap.allocate(Data::Tagged {
-                    tag: tag.into(),
-                    ordinary_fields,
-                    fields: vec![field],
-                });
-                let expected = if ordinary_fields == 0 {
-                    Error::ReservedConstructorEvidence(tag.into())
-                } else {
-                    Error::InvalidTaggedBoundary {
-                        ordinary: 2,
-                        physical: 1,
-                    }
-                };
-                let mut fuel = 0;
-                assert_eq!(array_to_list(&mut heap, &input, &mut fuel), Err(expected));
-                assert_eq!(fuel, 0);
-                heap.drop_value(input)
-                    .expect("destruction releases all physical fields");
-                let stats = heap.finish().expect("no hidden evidence leaks");
-                assert_eq!(stats.allocations, stats.frees);
-            }
-        }
-    }
-
-    #[test]
-    fn failed_projection_releases_all_previously_retained_fields() {
-        let mut heap = Heap::new();
-        let outside = heap
-            .literal(&Lit::String("outside".into()))
-            .expect("external root");
-        let first = heap.dup(&outside).expect("valid first field");
-        let dead = heap.construct("Dead", vec![]).expect("old object");
-        let dead_id = dead.object_id().expect("old identity");
-        let stale = dead.representation();
-        heap.drop_value(dead).expect("retire old object");
-        // A private corrupted heap exercises cleanup after the first successful dup.
-        let input = heap.allocate(Data::Tagged {
-            tag: "$tuple".into(),
-            ordinary_fields: 2,
-            fields: vec![first, stale],
-        });
-        assert_eq!(
-            array_to_list(&mut heap, &input, &mut 100),
-            Err(Error::InvalidObject(dead_id))
-        );
-        assert_eq!(heap.reference_count(&outside), Ok(2));
-        let Data::Tagged { fields, .. } = &mut heap
-            .object_mut(input.object_id().expect("input identity"))
-            .expect("input object")
-            .data
-        else {
-            panic!("tuple layout")
-        };
-        // Remove the intentionally unowned stale representation before destruction.
-        fields[1] = Value::Unit;
-        heap.drop_value(input).expect("valid tuple fields retire");
-        assert_eq!(heap.string(&outside), Ok("outside"));
-        assert_eq!(heap.reference_count(&outside), Ok(1));
-        heap.drop_value(outside).expect("external release");
-        let stats = heap.finish().expect("no retained projection tokens");
-        assert_eq!(stats.allocations, stats.frees);
-    }
-}
+#[path = "primitives_tests.rs"]
+mod array_observer_tests;

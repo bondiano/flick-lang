@@ -38,40 +38,7 @@ pub fn execute_tests_program(
     let execution = NEXT_EXECUTION
         .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
         .expect("fewer than usize::MAX model executions");
-    let mut machine = Machine {
-        heap,
-        program,
-        execution,
-        globals: BTreeMap::new(),
-        cells: Vec::new(),
-        lazies: Vec::new(),
-        owners: vec![OwnerState::default()],
-        current_owner: 0,
-        current_evidence: None,
-        frames: Vec::new(),
-        activations: BTreeMap::new(),
-        providers: BTreeMap::new(),
-        segments: BTreeMap::new(),
-        continuations: BTreeMap::new(),
-        generators: BTreeMap::new(),
-        invocations: BTreeMap::new(),
-        discard: None,
-        ready: None,
-        next_handler: 0,
-        arguments: VecDeque::new(),
-        scratch: Vec::new(),
-        pending: None,
-        failure: None,
-        failure_elected: false,
-        recoveries: BTreeMap::new(),
-        next_recovery: 0,
-        pending_handler: None,
-        top: None,
-        stdout: String::new(),
-        fuel: fuel_per_test,
-        main_stage,
-        root: None,
-    };
+    let mut machine = Machine::new(heap, program, execution, vec![], fuel_per_test, main_stage);
     let tests_val = match machine.global(start_global, None).and_then(|()| machine.run()) {
         Ok(LanguageExit::Success(val)) => val,
         Ok(LanguageExit::Failure(cause)) => {
@@ -189,7 +156,8 @@ impl Machine<'_, '_> {
                 out.push(res);
                 Ok(())
             }
-            "Test.Test.$Effect" => {
+            "Test.Test.$Effect" | "Test.Test.$Clock" => {
+                let is_clock = tag == "Test.Test.$Clock";
                 let name = format!("{prefix} > {}", self.string_field(node, 0)?);
                 if skipped {
                     out.push(TestCaseResult {
@@ -201,7 +169,7 @@ impl Machine<'_, '_> {
                     return Ok(());
                 }
                 let task = self.heap.project(node, 1)?;
-                let res = self.exec_effect_test(name, task, fuel_per_test)?;
+                let res = self.exec_effect_test(name, task, fuel_per_test, is_clock)?;
                 out.push(res);
                 Ok(())
             }
@@ -222,8 +190,7 @@ impl Machine<'_, '_> {
                 out.push(res);
                 Ok(())
             }
-            "Test.Test.$Clock"
-            | "Test.Test.$Suite"
+            "Test.Test.$Suite"
             | "Test.Test.$BeforeAll"
             | "Test.Test.$BeforeEach"
             | "Test.Test.$AfterEach"
@@ -258,8 +225,15 @@ impl Machine<'_, '_> {
         name: String,
         task: Value,
         fuel: u64,
+        clock_mode: bool,
     ) -> Result<TestCaseResult, Error> {
         self.reset_test_state(fuel);
+        self.test_clock_mode = clock_mode;
+        self.virtual_now_ns = if clock_mode {
+            0
+        } else {
+            DEFAULT_VIRTUAL_NOW_NS
+        };
         let previous = self.current_owner;
         let owner = self.owners.len();
         self.owners.push(OwnerState::default());
@@ -274,6 +248,7 @@ impl Machine<'_, '_> {
         })?;
         let run_res = self.run();
         self.current_evidence = saved_evidence;
+        self.test_clock_mode = false;
         match run_res? {
             LanguageExit::Success(val) => {
                 self.heap.drop_value(val)?;
@@ -374,6 +349,15 @@ impl Machine<'_, '_> {
         self.fuel = fuel;
         self.main_stage = MainStage::Done;
         self.failure_elected = false;
+        self.active_fiber = 1;
+        self.quantum = FIBER_QUANTUM;
+        self.test_clock_mode = false;
+        self.virtual_now_ns = DEFAULT_VIRTUAL_NOW_NS;
+        self.test_clock_waiter = None;
+        self.timers.clear();
+        self.mask_depth = 0;
+        self.interrupt_requested = None;
+        self.pending_resume_close = None;
     }
 
     fn collect_assertion_outcome(

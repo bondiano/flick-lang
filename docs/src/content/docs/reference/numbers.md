@@ -71,6 +71,14 @@ and gives zero for NaN or infinity. `BigInt.from_number` rejects fractions and
 nonfinite values; `BigInt.to_number` rounds to binary64 and can lose integer
 precision.
 
+`Int.parse` trims leading and trailing ECMAScript whitespace and line
+terminators (`\t`, `\n`, `\v`, `\f`, `\r`, space, U+00A0, U+1680,
+U+2000–U+200A, U+2028, U+2029, U+202F, U+205F, U+3000 and U+FEFF; not U+0085),
+then requires an optional ASCII `+` or `-` sign followed by one or more ASCII
+decimal digits within `-2147483648..2147483647`. Negative zero normalizes to
+`0`. Empty or sign-only input, internal whitespace, non-decimal text and
+out-of-range values return `None`.
+
 ## Floats
 
 `Float` is IEEE 754 binary64, including signed zero, NaN and infinities.

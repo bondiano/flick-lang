@@ -17,9 +17,14 @@ impl<'p> Machine<'p, '_> {
                 self.store(binding, value)?;
             }
             Destination::LayerRun { provider, binding } => {
-                self.leave_provider(provider)?;
                 let value = self.pending.take().expect("layer result");
-                self.store(binding, value)?;
+                self.leave_provider_outcome(
+                    provider,
+                    ScopeOutcome::Normal {
+                        binding: Some(binding),
+                        value,
+                    },
+                )?;
             }
             Destination::Handle {
                 activation,
@@ -150,6 +155,27 @@ impl<'p> Machine<'p, '_> {
                 let ignored = self.pending.take().expect("discarded result");
                 self.heap.drop_value(ignored)?;
             }
+            Destination::RestoreMask { .. }
+            | Destination::DiscardCleanupDone { .. }
+            | Destination::OnExitDiscardRunFin { .. }
+            | Destination::EnsuringFinish { .. }
+            | Destination::EnsuringDone { .. }
+            | Destination::OnExitDecide { .. }
+            | Destination::OnExitRunFin { .. }
+            | Destination::OnExitFinish { .. }
+            | Destination::CatchCause { .. }
+            | Destination::OrDie { .. }
+            | Destination::TimedFinish { .. }
+            | Destination::CachedComplete { .. }
+            | Destination::ProvideContext { .. }
+            | Destination::WithServices { .. }
+            | Destination::RestoreFiberRef { .. }
+            | Destination::RestoreOwnerEvidence { .. }
+            | Destination::RestoreEnvRefs { .. }
+            | Destination::RestoreRandom { .. }
+            | Destination::LayerBuildFinish { .. } => {
+                self.returned_async_destination(destination)?;
+            }
             destination => {
                 let value = self.pending.take().expect("returned token");
                 self.deliver(&destination, value)?;
@@ -169,12 +195,19 @@ impl<'p> Machine<'p, '_> {
                         return Err(err);
                     }
                 };
+                let rep = cached.representation();
                 let slot = self.heap.lazy_state_mut(self.execution, &lazy)?;
                 let prev = slot.replace(LazyState::DoneOk(cached));
-                if let Some(LazyState::Running(task)) = prev {
+                if let Some(LazyState::Running { task, .. }) = prev {
                     self.heap.drop_value(task)?;
                 }
                 self.store(binding, value)?;
+                if let Some(waiters) = self.lazy_waiters.remove(&lazy.id) {
+                    for (wfib, wbind) in waiters {
+                        let dup = self.heap.dup(&rep)?;
+                        self.wake_fiber_with_value(wfib, wbind, dup)?;
+                    }
+                }
             }
             Destination::AcquireRegister {
                 owner,
@@ -189,9 +222,11 @@ impl<'p> Machine<'p, '_> {
                         return Err(err);
                     }
                 };
+                let services = self.snapshot_active_services()?;
                 self.owners[owner].finalizers.push(Finalizer::Release {
                     value: dup,
                     release_fn: release,
+                    services,
                 });
                 self.store(binding, value)?;
             }
@@ -221,22 +256,23 @@ impl<'p> Machine<'p, '_> {
                 binding,
             } => {
                 let value = self.pending.take().expect("bracket use result");
+                let saved_mask = self.mask_depth;
+                self.mask_depth += 1;
                 self.scratch.extend([release_fn, resource]);
-                self.apply(Destination::BracketFinish {
+                self.apply_fresh(Destination::BracketFinish {
                     outcome: BracketOutcome::Success(value),
+                    saved_mask,
                     binding,
                 })?;
             }
-            Destination::BracketFinish { outcome, binding } => {
+            Destination::BracketFinish {
+                outcome,
+                saved_mask,
+                binding,
+            } => {
                 let ignored = self.pending.take().expect("bracket release result");
                 self.heap.drop_value(ignored)?;
-                match outcome {
-                    BracketOutcome::Success(value) => self.store(binding, value)?,
-                    BracketOutcome::Failure(cause) => {
-                        self.failure = Some(cause);
-                        self.failure_elected = false;
-                    }
-                }
+                self.finish_masked_cleanup_ok(outcome, saved_mask, binding)?;
             }
             _ => unreachable!("non-resource destination"),
         }

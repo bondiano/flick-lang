@@ -132,6 +132,18 @@ impl Checker<'_> {
             (Type::Dict(c, xs), Type::Dict(d, ys)) if c == d && xs.len() == ys.len() => {
                 self.subsume_dict(&c, &xs, &ys)
             }
+            (Type::Module(s1), Type::Module(s2)) if s1 == s2 => Ok(()),
+            (Type::OpenedModule(s1, _), Type::Module(s2)) if s1 == s2 => Ok(()),
+            (a @ Type::Record(_), Type::Module(sig)) => self.subsume_record_to_module(&a, &sig),
+            (Type::Exists(k1, s1, b1), Type::Exists(k2, s2, b2)) => {
+                self.subsume_exists((&k1, &s1, &b1), (&k2, &s2, &b2))
+            }
+            (Type::OpenedExists(s1, w, b1), Type::Exists(k2, s2, b2)) => {
+                self.subsume_opened_exists(&s1, w, &b1, &k2, &s2, &b2)
+            }
+            (Type::Record(f), Type::Exists(k, sig, body)) if f.tail.is_none() => {
+                self.subsume_record_to_exists(&f, &k, &sig, &body)
+            }
             // a function or a task that a bounded variable takes may need the
             // innermost bound, the capacity of a cell `Ref.make` makes: its
             // type records it, as the bound allows its use nothing more; and

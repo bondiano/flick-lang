@@ -88,7 +88,7 @@ fn malformed_middle_arena_root_does_not_skip_valid_later_owned_arenas() {
     finish_fault(&mut machine, payload, Error::ExpectedArena);
     assert_eq!(machine.heap.stats().arenas_allocated, 2);
     assert_eq!(machine.heap.stats().arenas_freed, 2);
-    assert!(machine.owners[0].closed);
+    assert!(machine.owners[0].is_closed());
     machine
         .close_owner(0)
         .expect("retirement is still idempotent");

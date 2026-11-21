@@ -5,8 +5,8 @@ mod loops;
 
 use super::{
     Tr,
-    expr::{cond, is_lang, layer_run, pat},
-    loops::{list_step, none, option, result, rpat, some, state_function, state_pattern},
+    expr::{cond, is_lang, layer_run, pat, stuck},
+    loops::{none, option, result, rpat, seq_iter, seq_step, some, state_function, state_pattern},
 };
 use crate::syntax::{Arm, Name, Pat, Term};
 use crate::types::{Scheme, Stage as ModelStage, Type};
@@ -15,7 +15,7 @@ use flick_core::types::lang::Lang;
 use std::iter;
 use std::rc::Rc;
 
-impl Tr {
+impl Tr<'_> {
     pub(super) fn active_variables(&self) -> Vec<String> {
         let mut xs: Vec<_> = self.versions.iter().map(|(x, _)| x.clone()).collect();
         xs.sort();
@@ -135,6 +135,21 @@ impl Tr {
                 tr.versions.pop();
                 Term::Let(name, None, Rc::new(v), Rc::new(body))
             }),
+            Stmt::Let(ir::Pat::Bind(x), e) => self.protected_with(e, xs, |tr, v| {
+                let body = tr.protected_block(rest, tail, xs);
+                if let Some(sig) = tr.local_scheme(x) {
+                    Term::Let(x.as_str().into(), Some(sig), Rc::new(v), Rc::new(body))
+                } else {
+                    Term::Match(
+                        Rc::new(v),
+                        Rc::from([Arm {
+                            pat: Pat::Var(x.as_str().into()),
+                            guard: None,
+                            body,
+                        }]),
+                    )
+                }
+            }),
             Stmt::Let(p, e) => self.protected_with(e, xs, |tr, v| {
                 let body = tr.protected_block(rest, tail, xs);
                 Term::Match(
@@ -183,11 +198,14 @@ impl Tr {
                 iterable: true,
                 ..
             } => self.protected_source_for(id, body, xs),
+            ExprKind::Each { stop: Some(_), .. } => {
+                self.captured(true, stuck("a `for` loop with a stop predicate"), xs)
+            }
             ExprKind::Each {
+                stop: None,
                 pat: p,
                 source,
                 body,
-                ..
             } => self.protected_with(source, xs, |tr, v| tr.protected_each(p, v, body, xs)),
             ExprKind::ControlLoop {
                 id,
@@ -394,7 +412,7 @@ impl Tr {
     }
 }
 
-impl Tr {
+impl Tr<'_> {
     fn protected_arms(&mut self, value: Term, arms: &[ir::Arm], xs: &[String]) -> Term {
         let Some((arm, rest)) = arms.split_first() else {
             return Term::Die("unmatched source match".into());

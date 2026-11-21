@@ -94,7 +94,14 @@ fn collect(ty: &Type, out: &mut Vec<Row>) {
         Type::Captured(x, _) | Type::Bounded(x, _) | Type::Ref(x) => collect(x, out),
         Type::Record(f) => f.fields.values().for_each(|t| collect(t, out)),
         Type::Tuple(ts) | Type::Dict(_, ts) => ts.iter().for_each(|t| collect(t, out)),
+        Type::OpenedExists(_, _, b) => collect(b, out),
         // A quantified body is checked at its own instance, not in this scope.
-        Type::Forall(_) | Type::Var(_) | Type::Con(_) | Type::Caps(_) => {}
+        Type::Forall(_)
+        | Type::Var(_)
+        | Type::Con(_)
+        | Type::Caps(_)
+        | Type::Module(_)
+        | Type::OpenedModule(..)
+        | Type::Exists(..) => {}
     }
 }

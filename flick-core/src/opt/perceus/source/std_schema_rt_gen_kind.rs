@@ -144,7 +144,7 @@ pub(super) fn draw_kind_expr(b: &ExprBuilder) -> Expr {
     let alpha = b.list(
         (b'a'..=b'z')
             .map(|c| str_lit(b, &String::from(char::from(c))))
-            .collect(),
+            .collect::<Vec<_>>(),
     );
     let draw_ch = b.block(
         vec![

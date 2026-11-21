@@ -106,7 +106,7 @@ fn string(value: &str, fuel: &mut u64) -> Result<String, Error> {
 }
 
 // WhiteSpace and LineTerminator from ECMA-262 2025, not Rust's wider Unicode set.
-fn js_space(character: char) -> bool {
+pub(super) fn js_space(character: char) -> bool {
     matches!(character,
         '\u{0009}'..='\u{000d}' | '\u{0020}' | '\u{00a0}' | '\u{1680}'
         | '\u{2000}'..='\u{200a}' | '\u{2028}' | '\u{2029}' | '\u{202f}'

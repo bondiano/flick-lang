@@ -93,7 +93,7 @@ fn in_stage(a: &Name, s: &Stage) -> bool {
 pub(crate) fn occurs(a: &Name, t: &Type) -> bool {
     match t {
         Type::Var(Var::Named(n)) => n == a,
-        Type::Var(Var::Meta(_)) | Type::Con(_) => false,
+        Type::Var(Var::Meta(_)) | Type::Con(_) | Type::Module(_) | Type::OpenedModule(..) => false,
         Type::App(h, x) => occurs(a, h) || occurs(a, x),
         Type::Fun(p, s, r) => occurs(a, p) || in_stage(a, s) || occurs(a, r),
         Type::Eff(r, e, t) => in_row(a, r) || in_row(a, e) || occurs(a, t),
@@ -110,6 +110,7 @@ pub(crate) fn occurs(a: &Name, t: &Type) -> bool {
         Type::Caps(c) => in_caps(a, c),
         Type::Errors(r) | Type::Impl(r) | Type::Tag(r) | Type::Env(r) => in_row(a, r),
         Type::Forall(s) => !s.vars.iter().any(|(v, _)| v == a) && occurs(a, &s.body),
+        Type::Exists(_, _, b) | Type::OpenedExists(_, _, b) => occurs(a, b),
         Type::Captured(t, c) | Type::Bounded(t, c) => in_caps(a, c) || occurs(a, t),
     }
 }

@@ -21,7 +21,7 @@ use crate::syntax::{Con, Name, Path, Term};
 use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 pub(crate) use live::live_service;
 pub(in crate::check) use live::{
-    add_live, arg_caps, drop_empty_live, live_arg, live_stage, regions_of,
+    add_live, arg_caps, drop_empty_live, live_arg, live_stage, place_qualifiers, regions_of,
 };
 pub(in crate::check) use scope::names_into;
 
@@ -228,7 +228,8 @@ impl Checker<'_> {
                 }
                 out.atoms.extend(r.vars.iter().cloned());
             }
-            // a row is no capture; `Layer`, implementations, tags and
+            Type::Exists(_, _, b) | Type::OpenedExists(_, _, b) => go(b, out),
+            // a row is no capture; `Layer`, implementations, tags, modules and
             // dictionaries hold nothing (§2.1)
             Type::Con(_)
             | Type::EffOf(..)
@@ -236,6 +237,8 @@ impl Checker<'_> {
             | Type::Impl(_)
             | Type::Tag(_)
             | Type::Dict(..)
+            | Type::Module(_)
+            | Type::OpenedModule(..)
             | Type::Env(_) => {}
         }
     }
@@ -250,10 +253,11 @@ impl Checker<'_> {
 
     /// A qualifier on a value that can hold nothing adds nothing (`docs/formal/regions.md#a-value-bound-survives-an-unknown-type-position`).
     pub(super) fn holds_nothing(&self, t: &Type) -> bool {
-        self.scalar(t)
-            || (!matches!(self.resolve(t), Type::Var(_))
-                && self.reach(t).is_empty()
-                && !self.hidden(t, &mut Vec::new()))
+        match self.resolve(t) {
+            Type::Bounded(x, _) => self.holds_nothing(&x),
+            Type::Var(_) | Type::Module(_) | Type::OpenedModule(..) => false,
+            _ => self.scalar(t) || (self.reach(t).is_empty() && !self.hidden(t, &mut Vec::new())),
+        }
     }
 
     /// Records `⋃ ⌈held⌉ ⊆ ⋃ ⌈within⌉ ∪ allowed`, decided at the end.
@@ -397,6 +401,7 @@ fn bounded_vars(t: &Type, vars: &[(Name, Kind)], out: &mut Vec<(Name, Caps)>) {
         }
         Type::Tuple(ts) | Type::Dict(_, ts) => ts.iter().for_each(|t| go(t, out)),
         Type::Record(Fields { fields, .. }) => fields.values().for_each(|t| go(t, out)),
+        Type::Exists(_, _, b) | Type::OpenedExists(_, _, b) => go(b, out),
         _ => {}
     }
 }

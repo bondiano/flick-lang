@@ -132,15 +132,22 @@ impl Checker<'_> {
     /// give; `true` when it did.
     fn take_open_region(&mut self, h: &Hold, missing: &Caps) -> bool {
         let mut open = BTreeSet::new();
-        for t in &h.within {
-            for v in self.reach(t).atoms {
+        let mut collect = |c: Caps| {
+            for v in c.atoms {
                 if let Var::Meta(m) = v
+                    && self.is_region(&v)
                     && self.slots[m as usize].solved.is_none()
                 {
                     open.insert(m);
                 }
             }
+        };
+        for t in &h.within {
+            for c in self.qualifiers(t) {
+                collect(c);
+            }
         }
+        collect(self.zonk_caps(&h.allowed));
         let ([r], Some(region)) = (
             &open.into_iter().collect::<Vec<_>>()[..],
             missing.atoms.iter().find(|v| self.is_region(v)),

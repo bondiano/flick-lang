@@ -19,7 +19,7 @@ impl Machine<'_, '_> {
                 self.primitive_result(binding, value)?;
             }
             Intrinsic::ArenaMake => {
-                if self.owners[self.current_owner].closed {
+                if self.owners[self.current_owner].is_closed() {
                     return self.raise_defect(DefectSpec::arena_owner_closed());
                 }
                 let root = self.heap.allocate(Data::Arena {

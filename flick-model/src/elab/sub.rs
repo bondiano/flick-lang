@@ -132,14 +132,17 @@ pub(super) fn reach_into(decls: &Decls, t: &Type, out: &mut Caps) {
             inner.vars.retain(|v| !bound(v));
             *out = out.union(&inner);
         }
+        Type::Exists(_, _, b) | Type::OpenedExists(_, _, b) => reach_into(decls, b, out),
         // Nominal constructors, services, layers, implementations, tags,
-        // environments and dictionaries carry no captures (`regions.md` §2.1).
+        // modules, environments and dictionaries carry no captures (`regions.md` §2.1).
         Type::Con(_)
         | Type::EffOf(..)
         | Type::Layer(..)
         | Type::Impl(_)
         | Type::Tag(_)
         | Type::Dict(..)
+        | Type::Module(_)
+        | Type::OpenedModule(..)
         | Type::Env(_) => {}
     }
 }
@@ -231,7 +234,9 @@ pub fn subst_type(decls: &Decls, t: &Type, sigma: &TypeSubst) -> Type {
             Some(SubstVal::Caps(c)) => Type::Caps(c.clone()),
             _ => t.clone(),
         },
-        Type::Var(Var::Meta(_)) | Type::Con(_) => t.clone(),
+        Type::Var(Var::Meta(_)) | Type::Con(_) | Type::Module(_) | Type::OpenedModule(..) => {
+            t.clone()
+        }
         Type::App(h, a) => Type::app(subst_type(decls, h, sigma), subst_type(decls, a, sigma)),
         Type::Fun(p, s, r) => Type::fun(
             subst_type(decls, p, sigma),
@@ -282,6 +287,12 @@ pub fn subst_type(decls: &Decls, t: &Type, sigma: &TypeSubst) -> Type {
                     .map(|(c, ty)| (subst_caps(decls, c, &inner), subst_type(decls, ty, &inner)))
                     .collect(),
             }))
+        }
+        Type::Exists(k, sig, b) => {
+            Type::Exists(k.clone(), sig.clone(), Rc::new(subst_type(decls, b, sigma)))
+        }
+        Type::OpenedExists(sig, w, b) => {
+            Type::OpenedExists(sig.clone(), *w, Rc::new(subst_type(decls, b, sigma)))
         }
         Type::Captured(inner, c) => Type::Captured(
             Rc::new(subst_type(decls, inner, sigma)),

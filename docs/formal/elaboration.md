@@ -302,7 +302,7 @@ Defaults:
 
 `formal/Formal/Elab/Defaults.lean` proves the field typed: `this_ent` derives `I δ̄` from the context, and `T6a_default_instance` gives `default_C_m (I δ̄) d̄ₖ` the method's type at the instance. Since `d̄ₖ` are derivations like any other, T6(b) covers them as it is.
 
-A `deriving` instance is the same (Instance). Lowering writes ordinary IR methods for `Eq`, `Ord`, `Hash` and `Show` from the field dictionaries (`ir/lower/derived.rs`), preserving constructor and field order. Both backends compile those methods as ordinary instance methods; an `InstanceInfo.derived` without method bodies retains runtime derivation as a fallback. The reference model already expands derivations this way, so the Instance rule and its Lean proof obligations are unchanged.
+A `deriving` instance is the same (Instance). Lowering writes ordinary IR methods for `Eq`, `Ord`, `Hash` and `Show` from the field dictionaries (`ir/lower/derived.rs`), preserving constructor and field order. Both backends and the reference model compile or translate those methods as ordinary instance methods; an `InstanceInfo.derived` without method bodies retains runtime derivation (`derive::methods` in the model) as a fallback. The Instance rule and its Lean proof obligations are unchanged.
 
 The name `I` is the head as `show` prints it (`Instance.name`; `codegen/names.rs` `instance`). Two heads of one module that print the same would get one name; in that case the head is printed with its modules (`display.rs` `show_qualified`, [module-qualified instance names](#instance-names-were-heads-without-modules)).
 
@@ -416,10 +416,15 @@ A source loop has a lexical identity in the shared IR (`ControlLoop` and
 An iteration returns either its normal value or an exit (`Result (Option a) t`):
 `Err (Some v)` is `break v`, `Err None` is `continue`, and `Ok v` is ordinary
 completion. A sequence stops on an exit; scopes return it normally and close
-before iteration resumes. Lists in imperative `for` use the same state protocol
-while consuming their remaining elements. Strict list comprehensions use core
-list recursion too; each iteration keeps its local SSA bindings, while outer
-assignments remain a checker error.
+before iteration resumes. Imperative `for` loops and strict comprehensions
+adapt any supported `Iterable` source (`List` or `Seq`) into a lazy sequence
+via `SeqIter` and pull one element at a time via `SeqNext` under the same
+state protocol, preserving order, repeatable traversal, and bounded consumption
+of infinite sequences; lazy `for … yield` comprehensions translate to lazy
+`Seq` thunks (with sync-stage lifting for reader-bound `@sync` comprehensions).
+Each strict iteration keeps its local SSA bindings, while outer assignments
+remain a checker error, and any unsupported collection source is rejected as a
+translation gap rather than lowered as list recursion.
 
 Within `try`, the model carries typed failure as another `Result` alongside the
 state; a source handler receives the store where the failure occurred. The error

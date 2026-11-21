@@ -75,7 +75,7 @@ impl Checker<'_> {
 
     /// (App): `φ₁ ⊔ φ₂ ⊔ φ`. A callee of unknown type is a pure arrow (`docs/formal/core.md#a-callee-of-unknown-type-is-a-pure-arrow`).
     /// A constructor with all its fields is (Con).
-    fn app(&mut self, f: &Term, a: &Term) -> Check<Type> {
+    pub(in crate::check) fn app(&mut self, f: &Term, a: &Term) -> Check<Type> {
         if let (true, Term::Lam(x, body)) = (self.config, f) {
             return self.redex(x, body, a, None);
         }
@@ -91,6 +91,15 @@ impl Checker<'_> {
         {
             // the fields themselves, not copies: the trace is by address
             return self.construct(c, given.iter().chain(args), head);
+        }
+        if let Term::Apply(Head::Const(Const::SeqIter), given) = head
+            && given.is_empty()
+            && !args.is_empty()
+        {
+            return self.call(|c| {
+                let t = c.seq_iter(args[0])?;
+                args[1..].iter().try_fold(t, |t, a| c.apply(&t, a))
+            });
         }
         // the spine is one call
         self.call(|c| {
@@ -194,6 +203,41 @@ impl Checker<'_> {
                 }
             }
             Type::Dict(c, args) => self.method(&c, &args, l).map(|s| self.instantiate(&s)),
+            Type::Module(sig) => {
+                let part = self.contract_field(&sig, None, l)?;
+                Ok(self.project_part(t, part))
+            }
+            Type::OpenedModule(sig, w) => {
+                let part = self.contract_field(&sig, Some(w), l)?;
+                Ok(self.project_part(t, part))
+            }
+            Type::OpenedExists(sig, w, body) => match &**l {
+                "$module" => Ok(self.project_part(t, Type::OpenedModule(sig, w))),
+                "$value" => Ok(self.project_part(t, (*body).clone())),
+                _ => error(
+                    "Field",
+                    format!("`exists _ : {}. {body}` has no field `{l}`", sig.name),
+                ),
+            },
+            Type::Exists(k, sig, body) => match &**l {
+                "$module" => Ok(self.project_part(t, Type::Module(sig))),
+                "$value" => {
+                    let contract = self.contract(&sig)?;
+                    if contract.abstract_types.is_empty() {
+                        let opened = self.open_exists_body(&k, &sig, &body, &[])?;
+                        Ok(self.project_part(t, opened))
+                    } else {
+                        error(
+                            "Field",
+                            format!("abstract type of `{}` requires `unpack`", sig.name),
+                        )
+                    }
+                }
+                _ => error(
+                    "Field",
+                    format!("`exists {k} : {}. {body}` has no field `{l}`", sig.name),
+                ),
+            },
             other => error(
                 "Field",
                 format!("`{}` has no field `{l}`", self.zonk(&other)),
@@ -203,7 +247,7 @@ impl Checker<'_> {
 
     /// (Rec) against a closed record type: each field against its type, so
     /// a field's λ takes the stage the record asks for.
-    fn record_against(&mut self, fields: &[(Name, Term)], expected: &Fields) -> Check<()> {
+    pub(super) fn record_against(&mut self, fields: &[(Name, Term)], expected: &Fields) -> Check<()> {
         // equal counts and every expected label given: the labels are distinct
         let same = fields.len() == expected.fields.len()
             && expected

@@ -92,7 +92,7 @@ pub(in crate::check) fn drop_empty_live(r: &mut Row) {
 /// Places any outer surface hidden qualifier (`Type::Captured`) on a
 /// syntactically curried or rank-2 callable starting with a pure arrow onto
 /// its inner callable stage after the pure arrows, before instantiation.
-fn place_qualifiers(t: &Type) -> Type {
+pub(in crate::check) fn place_qualifiers(t: &Type) -> Type {
     match t {
         Type::Captured(ty, c) => {
             let ty = place_qualifiers(ty);
@@ -125,6 +125,12 @@ fn place_qualifiers(t: &Type) -> Type {
                 .collect(),
             tail: f.tail.clone(),
         }),
+        Type::Exists(k, sig, b) => {
+            Type::Exists(k.clone(), sig.clone(), Rc::new(place_qualifiers(b)))
+        }
+        Type::OpenedExists(sig, w, b) => {
+            Type::OpenedExists(sig.clone(), *w, Rc::new(place_qualifiers(b)))
+        }
         other => other.clone(),
     }
 }
@@ -382,6 +388,10 @@ impl Checker<'_> {
                     .collect(),
                 tail: f.tail.clone(),
             }),
+            Type::Exists(k, sig, b) => Type::Exists(k.clone(), sig.clone(), Rc::new(go(b, &none))),
+            Type::OpenedExists(sig, w, b) => {
+                Type::OpenedExists(sig.clone(), *w, Rc::new(go(b, &none)))
+            }
             other => other.clone(),
         }
     }

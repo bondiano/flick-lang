@@ -1,6 +1,7 @@
 //! Unit tests of the rules: one accepted and one rejected program each.
 
 mod disagreements;
+mod modules;
 mod runtime;
 
 use std::fmt::Debug;

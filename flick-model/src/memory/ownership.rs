@@ -331,26 +331,6 @@ impl Heap {
 
     fn release_data(&mut self, id: ObjectId, data: Data, pending: &mut Vec<Value>) {
         match data {
-            Data::RecoveryResult { selected, .. } => pending.extend(selected),
-            Data::Cause(reasons) => pending.extend(
-                reasons
-                    .into_iter()
-                    .filter_map(causes::StoredReason::into_value),
-            ),
-            Data::CauseReason(reason) => pending.extend(reason.into_value()),
-            Data::Tagged { fields, .. }
-            | Data::Closure {
-                captures: fields, ..
-            }
-            | Data::Task {
-                captures: fields, ..
-            }
-            | Data::Seq(SeqData::Generator {
-                captures: fields, ..
-            }) => pending.extend(fields),
-            Data::ListSlice { backing, .. } | Data::Seq(SeqData::FromList(backing)) => {
-                pending.push(backing);
-            }
             Data::Continuation { execution, id } => {
                 self.dropped_continuations.push((execution, id));
             }
@@ -358,71 +338,132 @@ impl Heap {
                 self.stats.cells_freed += 1;
                 pending.extend(contents);
             }
-            Data::Var { contents, .. } => pending.extend(contents),
-            Data::Lazy { state, .. } => {
-                if let Some(
-                    LazyState::Pending(v)
-                    | LazyState::Running(v)
-                    | LazyState::DoneOk(v)
-                    | LazyState::DoneErr(v),
-                ) = state
-                {
-                    pending.push(v);
-                }
-            }
-            Data::Iterator { state, .. } => {
-                if let IteratorState::List { backing, .. } = state {
-                    pending.push(backing);
-                }
-            }
-            Data::Exit(ExitData::Success(value) | ExitData::Failure(value)) => {
-                pending.push(value);
-            }
             Data::Arena { contents, .. } => {
                 self.stats.arenas_freed += 1;
                 pending.extend(contents);
-            }
-            Data::Dictionary(entries) => {
-                pending.extend(entries.into_iter().map(|(_, entry)| entry.into_value()));
-            }
-            Data::Record(fields) => {
-                pending.extend(fields.into_iter().map(|(_, value)| value));
             }
             Data::ServiceTag { key } => {
                 if self.service_tags.get(&key) == Some(&id) {
                     self.service_tags.remove(&key);
                 }
             }
-            Data::Layer(LayerData::Succeed {
-                tag,
-                implementation,
-            }) => {
-                pending.extend([tag, implementation]);
-            }
-            Data::Layer(LayerData::Merge { left, right }) => {
-                pending.extend([left, right]);
-            }
-            Data::Graph(graph) => {
-                pending.extend(graph.nodes.into_iter().map(|n| n.data));
-                pending.extend(graph.edges.into_iter().map(|e| e.data));
-            }
-            Data::GraphWalker(walker) => {
-                pending.extend(walker.indices);
-                pending.extend(walker.values);
-            }
-            Data::Defect(_)
-            | Data::Duration(_)
-            | Data::DateTime(_)
-            | Data::TimeZone(_)
-            | Data::Cron(_)
-            | Data::String(_)
-            | Data::Utf16(_)
-            | Data::Bytes(_)
-            | Data::JsonNull
-            | Data::BigDecimal { .. }
-            | Data::RegExp { .. }
-            | Data::BigInt(_)
-            | Data::Label(_) => {}
+            other => release_data_children(other, pending),
         }
+    }
+}
+
+fn release_layer_data(layer: LayerData, pending: &mut Vec<Value>) {
+    match layer {
+        LayerData::Succeed {
+            tag: first,
+            implementation: second,
+        }
+        | LayerData::Merge {
+            left: first,
+            right: second,
+        } => pending.extend([first, second]),
+        LayerData::Context(v)
+        | LayerData::Dynamic { build: v, .. }
+        | LayerData::Fresh(v)
+        | LayerData::OrDie(v) => pending.push(v),
+        LayerData::MergeAll(layers) => pending.extend(layers),
+        LayerData::Empty => {}
+    }
+}
+
+fn release_lazy_state(state: Option<LazyState>, pending: &mut Vec<Value>) {
+    match state {
+        Some(LazyState::Pending(v) | LazyState::Running { task: v, .. } | LazyState::DoneOk(v)) => {
+            pending.push(v);
+        }
+        Some(LazyState::DoneCause(c)) => pending.push(c.into_value()),
+        None => {}
+    }
+}
+
+fn release_data_children(data: Data, pending: &mut Vec<Value>) {
+    match data {
+        Data::RecoveryResult { selected, .. }
+        | Data::Var {
+            contents: selected, ..
+        } => {
+            pending.extend(selected);
+        }
+        Data::Cause(cause) => {
+            pending.extend(
+                cause
+                    .reasons
+                    .into_iter()
+                    .filter_map(causes::StoredReason::into_value),
+            );
+            pending.extend(cause.trace);
+        }
+        Data::CauseReason(reason) => pending.extend(reason.into_value()),
+        Data::Tagged { fields, .. }
+        | Data::Closure {
+            captures: fields, ..
+        }
+        | Data::Task {
+            captures: fields, ..
+        }
+        | Data::Seq(SeqData::Generator {
+            captures: fields, ..
+        }) => pending.extend(fields),
+        Data::ListSlice { backing: v, .. }
+        | Data::Seq(SeqData::FromList(v))
+        | Data::Exit(ExitData::Success(v) | ExitData::Failure(v))
+        | Data::ExitTask(ExitData::Success(v) | ExitData::Failure(v))
+        | Data::ContextRef { default_fn: v, .. }
+        | Data::MaskedTask { task: v, .. } => pending.push(v),
+        Data::Lazy { state, .. } => release_lazy_state(state, pending),
+        Data::Iterator { state, .. } => {
+            if let IteratorState::List { backing, .. } = state {
+                pending.push(backing);
+            }
+        }
+        Data::Dictionary(entries) => {
+            pending.extend(entries.into_iter().map(|(_, entry)| entry.into_value()));
+        }
+        Data::Record(fields) => {
+            pending.extend(fields.into_iter().map(|(_, value)| value));
+        }
+        Data::Layer(layer) => release_layer_data(layer, pending),
+        Data::Context(entries) => pending.extend(entries.into_values()),
+        Data::CapturedEnv { services, refs } => {
+            pending.extend(services);
+            pending.extend(refs.into_values());
+        }
+        Data::Graph(graph) => {
+            pending.extend(graph.nodes.into_iter().map(|n| n.data));
+            pending.extend(graph.edges.into_iter().map(|e| e.data));
+        }
+        Data::GraphWalker(walker) => {
+            pending.extend(walker.indices);
+            pending.extend(walker.values);
+        }
+        Data::Defect(_)
+        | Data::Duration(_)
+        | Data::DateTime(_)
+        | Data::TimeZone(_)
+        | Data::Cron(_)
+        | Data::String(_)
+        | Data::Utf16(_)
+        | Data::Bytes(_)
+        | Data::JsonNull
+        | Data::BigDecimal { .. }
+        | Data::RegExp { .. }
+        | Data::BigInt(_)
+        | Data::Label(_)
+        | Data::FiberHandle { .. }
+        | Data::Deferred { .. }
+        | Data::MemoMap { .. }
+        | Data::FiberGroup { .. }
+        | Data::MaskRestore { .. }
+        | Data::CachedRunTask { .. }
+        | Data::CachedInvalidateTask { .. } => {}
+        Data::Continuation { .. }
+        | Data::Cell { .. }
+        | Data::Arena { .. }
+        | Data::ServiceTag { .. } => unreachable!("stateful heap data handled in release_data"),
     }
 }

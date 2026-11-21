@@ -7,20 +7,152 @@ use std::mem;
 use std::rc::Rc;
 
 use super::expr::mono;
-use super::{Check, Checker};
+use super::regions::place_qualifiers;
+use super::{Check, Checker, error};
+use crate::subst::free_vars;
 use crate::syntax::{Name, Term};
 use crate::types::{Caps, Scheme, Stage, Type};
 
+#[derive(Clone, Copy)]
+enum OperandTarget<'a> {
+    App(&'a Term, &'a Term),
+    Await(&'a Term),
+}
+
+fn is_operand_let(name: &Name) -> bool {
+    name.starts_with("$operand")
+}
+
+fn mentions_any(term: &Term, bindings: &[(&Name, &Term)]) -> bool {
+    let free = free_vars(term);
+    bindings.iter().any(|(name, _)| free.contains(*name))
+}
+
+/// Lowering (`owners.rs` `evidence_call`) spills non-local/non-literal operands
+/// of a runtime call or `await` into unannotated `$operand` lets immediately
+/// before `WithOwnerEvidence` so they evaluate under the previous owner
+/// evidence. Recover the original call/await operands for bidirectional
+/// checking without changing evaluation order.
+fn operand_call<'a>(
+    x: &'a Name,
+    e1: &'a Term,
+    e2: &'a Term,
+) -> Option<(&'a Term, OperandTarget<'a>)> {
+    if !is_operand_let(x) {
+        return None;
+    }
+    let mut bindings = vec![(x, e1)];
+    let mut cur = e2;
+    while let Term::Let(next_x, None, next_e1, next_e2) = cur {
+        if !is_operand_let(next_x)
+            || bindings.iter().any(|(b, _)| *b == next_x)
+            || mentions_any(next_e1, &bindings)
+        {
+            break;
+        }
+        bindings.push((next_x, next_e1));
+        cur = next_e2;
+    }
+    let Term::WithOwnerEvidence(owner, inner) = cur else {
+        return None;
+    };
+    if mentions_any(owner, &bindings) {
+        return None;
+    }
+    let mut used = vec![false; bindings.len()];
+    let mut resolve = |term: &'a Term| -> Option<&'a Term> {
+        if let Term::Var(v) = term
+            && let Some(i) = bindings.iter().position(|(name, _)| *name == v)
+        {
+            if used[i] {
+                return None;
+            }
+            used[i] = true;
+            return Some(bindings[i].1);
+        }
+        if mentions_any(term, &bindings) {
+            return None;
+        }
+        Some(term)
+    };
+    let target = match &**inner {
+        Term::App(f, a) => {
+            let f = resolve(f)?;
+            let a = resolve(a)?;
+            OperandTarget::App(f, a)
+        }
+        Term::Let(tmp, None, rhs, body)
+            if tmp.starts_with("$arg")
+                && matches!(&**rhs, Term::Var(_))
+                && matches!(&**body, Term::App(f, a) if matches!(&**a, Term::Var(v) if v == tmp) && !free_vars(f).contains(tmp)) =>
+        {
+            let Term::App(f, _) = &**body else {
+                unreachable!()
+            };
+            let f = resolve(f)?;
+            let a = resolve(rhs)?;
+            OperandTarget::App(f, a)
+        }
+        Term::Await(v) => OperandTarget::Await(resolve(v)?),
+        _ => return None,
+    };
+    used.iter().all(|u| *u).then_some((owner, target))
+}
+
 impl Checker<'_> {
+    #[inline(never)]
+    fn operand_let(
+        &mut self,
+        whole: &Term,
+        owner: &Term,
+        target: OperandTarget<'_>,
+        expected: Option<&Type>,
+    ) -> Check<Type> {
+        self.owner_context(owner, false)?;
+        match target {
+            OperandTarget::App(f, a) => {
+                if let (Some(exp), true, Term::Lam(p, body)) = (expected, self.config, f) {
+                    return self.redex(p, body, a, Some(exp));
+                }
+                let t = self.app(f, a)?;
+                match expected {
+                    Some(exp) => self.fit(whole, &t, exp).map(|()| exp.clone()),
+                    None => Ok(t),
+                }
+            }
+            OperandTarget::Await(v) => {
+                if let Some(exp) = expected.filter(|_| self.config) {
+                    let (r, x_rows) = (self.fresh_row(), self.fresh_row());
+                    let task = Type::Eff(r.clone(), x_rows.clone(), Rc::new(exp.clone()));
+                    let held = self.fresh_caps();
+                    self.check(v, &Type::Captured(Rc::new(task), held))?;
+                    self.perform(&Stage::Runtime(r, x_rows))?;
+                    return Ok(exp.clone());
+                }
+                let t = self.await_(v)?;
+                match expected {
+                    Some(exp) => self.fit(whole, &t, exp).map(|()| exp.clone()),
+                    None => Ok(t),
+                }
+            }
+        }
+    }
+
     /// (Let-Gen), (Let-Mono) and (Let-Sig).
     pub(super) fn let_(
         &mut self,
+        whole: &Term,
         x: &Name,
         sig: Option<&Scheme>,
         e1: &Term,
         e2: &Term,
         expected: Option<&Type>,
     ) -> Check<Type> {
+        if sig.is_none()
+            && let Some((owner, target)) = operand_call(x, e1, e2)
+        {
+            return self.operand_let(whole, owner, target, expected);
+        }
         let s = if let Some(s) = sig {
             self.signed(e1, s, None)?
         } else {
@@ -42,7 +174,29 @@ impl Checker<'_> {
         };
         let bound = s.clone();
         self.note(e1, |n| n.scheme = Some(bound));
-        self.body(x, s, e2, expected)
+        let (s, opened) = self.open_let_binding(x, s, e2)?;
+        if let Some((w, sig)) = opened {
+            self.level += 1;
+            self.witness_levels.insert(w, self.level);
+            let res = self.body(x, s, e2, expected);
+            self.level -= 1;
+            let t = self.zonk(&res?);
+            let t = if expected.is_none() {
+                Self::close_witness(&t, w)
+            } else {
+                t
+            };
+            if self.mentions_witness(&t, w) {
+                return error(
+                    "Module",
+                    format!("abstract type of `{}` leaves its `unpack` scope", sig.name),
+                );
+            }
+            self.lower(&t, self.level);
+            Ok(t)
+        } else {
+            self.body(x, s, e2, expected)
+        }
     }
 
     fn body(&mut self, x: &Name, s: Scheme, e2: &Term, expected: Option<&Type>) -> Check<Type> {
@@ -56,10 +210,10 @@ impl Checker<'_> {
     }
 
     /// `e` against the local signature `s`, with its outer qualifier
-    /// inferred, as a `let` and the `fix` its step gives read it; `rec` is
-    /// bound at it in `e`.
+    /// inferred, as a `let`, `let rec` and the `fix` its step gives read it;
+    /// `rec` is bound at it in `e`.
     fn signed(&mut self, e: &Term, s: &Scheme, rec: Option<&Name>) -> Check<Scheme> {
-        let s = self.local_signature(&self.live_scheme(s));
+        let s = self.local_signature(s);
         let (bare, qualifier) = match &s.body {
             Type::Captured(t, c) => ((**t).clone(), c.clone()),
             t => (t.clone(), Caps::default()),
@@ -68,23 +222,25 @@ impl Checker<'_> {
             body: bare,
             ..s.clone()
         };
-        let checked = self.check_qualified_forall(e, &bare, qualifier, rec.map(|f| (f, &s)));
+        let checked = self.check_qualified_forall(e, &bare, qualifier, rec.map(|f| (f, &s)), true);
         checked.map(|()| s)
     }
 
     /// A local signature of a function: its own qualifier is inferred, a
     /// fresh capture row, unless written (`regions.md` §2.6, `docs/formal/regions.md#local-signatures-infer-only-the-outer-qualifier`).
     fn local_signature(&mut self, s: &Scheme) -> Scheme {
-        let s = &self.in_scopes(s);
+        let s = self.in_enclosing(s);
+        let s = self.live_scheme(&s);
         match &s.body {
             Type::Fun(..) => {
                 let q = self.fresh_caps();
+                let qualified = place_qualifiers(&Type::Captured(Rc::new(s.body.clone()), q));
                 Scheme {
-                    body: Type::Captured(Rc::new(s.body.clone()), q),
-                    ..s.clone()
+                    body: qualified,
+                    ..s
                 }
             }
-            _ => s.clone(),
+            _ => s,
         }
     }
 
@@ -99,9 +255,7 @@ impl Checker<'_> {
         expected: Option<&Type>,
     ) -> Check<Type> {
         let s = if let Some(s) = sig {
-            let s = &self.in_scopes(&self.live_scheme(s));
-            self.check_qualified_forall(lam, s, Caps::default(), Some((f, s)))?;
-            s.clone()
+            self.signed(lam, s, Some(f))?
         } else {
             self.level += 1;
             let t = self.fresh();

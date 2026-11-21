@@ -104,7 +104,9 @@ impl Checker<'_> {
     /// The body of `s` with its variables rigid and the stages of its
     /// signature holding their parameters: what (Let-Sig) checks, with the
     /// names of the rigid variables. Its facts `Θ` are given from here on.
-    pub(super) fn skolemize(&mut self, s: &Scheme) -> (Type, Vec<Name>) {
+    /// When `bind_tyvars` is true, its binders enter scope for local
+    /// signatures inside its body.
+    pub(super) fn skolemize(&mut self, s: &Scheme, bind_tyvars: bool) -> (Type, Vec<Name>) {
         let mut rigid = Vec::new();
         let insts: Vec<Inst> = s
             .vars
@@ -119,6 +121,11 @@ impl Checker<'_> {
                 rigid_inst(&name, k)
             })
             .collect();
+        if bind_tyvars {
+            for ((n, _), inst) in s.vars.iter().zip(&insts) {
+                self.tyvars.push((n.clone(), inst.clone()));
+            }
+        }
         let map = names(&s.vars, &insts);
         self.give_bounds(s, &map);
         for (c, r) in &s.outlives {
@@ -136,6 +143,32 @@ impl Checker<'_> {
         (body, rigid)
     }
 
+    /// `s` with free variables from enclosing signatures and `scope`s replaced
+    /// by their active rigid variables, respecting shadowing by `s.vars`.
+    pub(super) fn in_enclosing(&self, s: &Scheme) -> Scheme {
+        if self.tyvars.is_empty() {
+            return s.clone();
+        }
+        let mut map = HashMap::new();
+        for (n, inst) in &self.tyvars {
+            if !s.vars.iter().any(|(v, _)| v == n) {
+                map.insert(n.clone(), inst.clone());
+            }
+        }
+        if map.is_empty() {
+            return s.clone();
+        }
+        Scheme {
+            vars: s.vars.clone(),
+            body: substitute(&s.body, &map),
+            outlives: s
+                .outlives
+                .iter()
+                .map(|(c, r)| (substitute_caps(c, &map), substitute(r, &map)))
+                .collect(),
+        }
+    }
+
     /// `Gen(Γ, τ)`: the type metas of `t` deeper than the current level.
     /// Rows are not quantified: they are settled to the least (`docs/formal/core.md#unknown-call-rows-in-a-generalized-binding-close-to-none`).
     pub(super) fn generalize(&mut self, t: &Type) -> Scheme {
@@ -148,6 +181,10 @@ impl Checker<'_> {
         for (a, b, _) in &self.pending {
             self.metas(&Type::Errors(a.clone()), &mut waiting);
             self.metas(&Type::Errors(b.clone()), &mut waiting);
+        }
+        for (src, elem, _) in &self.iterables {
+            self.metas(src, &mut waiting);
+            self.metas(elem, &mut waiting);
         }
         for m in region_metas.into_iter().chain(waiting) {
             self.slots[m as usize].level = self.slots[m as usize].level.min(self.level);
@@ -209,6 +246,7 @@ impl Checker<'_> {
             Type::Record(f) => f.fields.values().any(|t| self.mentions(v, t)),
             Type::Tuple(ts) | Type::Dict(_, ts) => ts.iter().any(|t| self.mentions(v, t)),
             Type::Forall(s) => self.mentions(v, &s.body),
+            Type::Exists(_, _, b) | Type::OpenedExists(_, _, b) => self.mentions(v, &b),
             _ => false,
         }
     }
@@ -226,6 +264,7 @@ fn in_errors(v: &Var, t: &Type) -> bool {
         Type::Record(f) => f.fields.values().any(|t| in_errors(v, t)),
         Type::Tuple(ts) | Type::Dict(_, ts) => any(ts),
         Type::Forall(s) => in_errors(v, &s.body),
+        Type::Exists(_, _, b) | Type::OpenedExists(_, _, b) => in_errors(v, b),
         _ => false,
     }
 }
@@ -286,6 +325,7 @@ fn free_atoms(t: &Type, out: &mut Caps) {
         Type::Record(f) => f.fields.values().for_each(|t| free_atoms(t, out)),
         Type::Errors(r) => row_atoms(r, out),
         Type::Caps(c) => *out = out.union(c),
+        Type::Exists(_, _, b) | Type::OpenedExists(_, _, b) => free_atoms(b, out),
         _ => {}
     }
 }
@@ -334,7 +374,7 @@ pub(crate) fn substitute(t: &Type, map: &HashMap<Name, Inst>) -> Type {
         },
         Type::Captured(x, c) => Type::Captured(s(x), substitute_caps(c, map)),
         Type::Bounded(x, c) => Type::Bounded(s(x), substitute_caps(c, map)),
-        Type::Var(_) | Type::Con(_) => t.clone(),
+        Type::Var(_) | Type::Con(_) | Type::Module(_) | Type::OpenedModule(..) => t.clone(),
         Type::App(h, a) => Type::App(s(h), s(a)),
         Type::Fun(p, st, r) => Type::Fun(s(p), substitute_stage(st, map), s(r)),
         Type::Eff(r, e, x) => Type::Eff(substitute_row(r, map), substitute_row(e, map), s(x)),
@@ -382,6 +422,8 @@ pub(crate) fn substitute(t: &Type, map: &HashMap<Name, Inst>) -> Type {
                     .collect(),
             }))
         }
+        Type::Exists(k, sig, b) => Type::Exists(k.clone(), sig.clone(), s(b)),
+        Type::OpenedExists(sig, w, b) => Type::OpenedExists(sig.clone(), *w, s(b)),
     }
 }
 

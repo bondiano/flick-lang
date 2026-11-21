@@ -1,12 +1,14 @@
 //! The constants of Γ₀ (`docs/formal/core.md` §1.5) and the operators.
 
 use std::rc::Rc;
+use std::slice;
 
 use flick_core::numeric::{Num, NumLang};
 
-use super::expr::{list, mono, prelude, runtime, scheme, var};
+use super::expr::{list, mono, option, prelude, runtime, scheme, seq, var};
+use super::generalize::{params, substitute};
 use super::{Check, Checker, error};
-use crate::syntax::{Const, Prim, RegionOp};
+use crate::syntax::{Const, Path, Prim, RegionOp, Term};
 use crate::types::{Caps, Kind, Row, Scheme, Stage, Type, Var};
 
 impl Checker<'_> {
@@ -52,6 +54,11 @@ impl Checker<'_> {
                     Type::fun(Type::Errors(e.clone()), runtime(none(), e), a()),
                 )
             }
+            Const::SeqIter
+            | Const::SeqThunk
+            | Const::SeqNext
+            | Const::SeqSync
+            | Const::SeqFlatMapSync => seq_constant(c),
             // `∀p̄. Unit →R⟨S p̄⟩ S.Impl p̄`, and so the layers of `S`
             Const::Ask(s) => {
                 let (vars, sp) = self.service_row(s);
@@ -119,6 +126,92 @@ impl Checker<'_> {
     }
 }
 
+/// The scheme of a sequence primitive constant (`SeqIter`, `SeqThunk`, `SeqNext`,
+/// `SeqSync`, `SeqFlatMapSync`).
+fn seq_constant(c: &Const) -> Scheme {
+    let a = || var("a");
+    let cap = |n: &str| Caps::var(Var::Named(n.into()));
+    let cap_seq = |elem: Type, q: Caps| Type::Captured(Rc::new(seq(elem)), q);
+    let r_stage = || runtime(Row::var(Var::Named("r".into())), Row::none());
+    match c {
+        Const::SeqIter => {
+            let s = cap_seq(a(), cap("d"));
+            scheme(
+                &[("d", Kind::Captures), ("a", Kind::Type)],
+                Type::fun(s.clone(), Stage::Pure, s),
+            )
+        }
+        Const::SeqThunk => {
+            let d = cap("d");
+            let s = cap_seq(a(), d.clone());
+            let step = Type::Captured(
+                Rc::new(Type::fun(
+                    prelude("Unit"),
+                    Stage::Pure,
+                    option(Type::Tuple(Rc::from([a(), s.clone()]))),
+                )),
+                d,
+            );
+            scheme(
+                &[("d", Kind::Captures), ("a", Kind::Type)],
+                Type::fun(step, Stage::Pure, s),
+            )
+        }
+        Const::SeqNext => {
+            let s = cap_seq(a(), cap("d"));
+            let step = option(Type::Tuple(Rc::from([a(), s.clone()])));
+            scheme(
+                &[("d", Kind::Captures), ("a", Kind::Type)],
+                Type::fun(s, Stage::Pure, step),
+            )
+        }
+        Const::SeqSync => {
+            let (c, d, stage) = (cap("c"), cap("d"), r_stage());
+            let thunk = Type::Captured(
+                Rc::new(Type::fun(
+                    prelude("Unit"),
+                    stage.clone(),
+                    cap_seq(a(), d.clone()),
+                )),
+                c.clone(),
+            );
+            scheme(
+                &[
+                    ("c", Kind::Captures),
+                    ("d", Kind::Captures),
+                    ("r", Kind::Services),
+                    ("a", Kind::Type),
+                ],
+                Type::fun(thunk, stage, cap_seq(a(), c.union(&d))),
+            )
+        }
+        Const::SeqFlatMapSync => {
+            let (c, d, e, stage) = (cap("c"), cap("d"), cap("e"), r_stage());
+            let all = c.union(&d).union(&e);
+            let f = Type::Captured(
+                Rc::new(Type::fun(a(), stage.clone(), cap_seq(var("b"), e))),
+                c,
+            );
+            scheme(
+                &[
+                    ("c", Kind::Captures),
+                    ("d", Kind::Captures),
+                    ("e", Kind::Captures),
+                    ("r", Kind::Services),
+                    ("a", Kind::Type),
+                    ("b", Kind::Type),
+                ],
+                Type::fun(
+                    f,
+                    Stage::Pure,
+                    Type::fun(cap_seq(a(), d), stage, cap_seq(var("b"), all)),
+                ),
+            )
+        }
+        _ => unreachable!("non-sequence constant passed to `seq_constant`"),
+    }
+}
+
 /// The scheme of an operator, a global of a certificate (`crate::cert`).
 pub(crate) fn prim_scheme(p: Prim) -> Scheme {
     prim(p)
@@ -152,6 +245,113 @@ impl Checker<'_> {
             other => error(
                 "Prim",
                 format!("a comparison works on Int, Float, BigInt or String, not on `{other}`"),
+            ),
+        }
+    }
+
+    /// Checks `SeqIter source`: accepts `List a`, `Seq a`, or `f a` with an
+    /// `Iterable f` given in scope (deferring if the source type is still a
+    /// meta), and reports any other collection source as a `(Translation)` gap.
+    pub(super) fn seq_iter(&mut self, source: &Term) -> Check<Type> {
+        let src_ty = self.infer(source)?;
+        let givens = self.iterable_givens();
+        if let Some(elem) = self.iterable_element(&src_ty, &givens, false)? {
+            return Ok(self.rewrap_qualifiers(&src_ty, seq(elem)));
+        }
+        let elem = self.fresh();
+        self.iterables.push((src_ty.clone(), elem.clone(), givens));
+        let q = self.fresh_caps();
+        let out = seq(elem);
+        self.hold(&[src_ty], slice::from_ref(&out), &q, "SeqIter");
+        Ok(Type::Captured(Rc::new(out), q))
+    }
+
+    /// Type constructors `f` for which an `Iterable f` dictionary is in scope,
+    /// directly or as a superclass of a dictionary parameter in `self.locals`.
+    fn iterable_givens(&self) -> Vec<Type> {
+        let iterable = Path::new("Prelude", "Iterable");
+        let mut out = Vec::new();
+        let mut work: Vec<Type> = self
+            .locals
+            .iter()
+            .filter(|(_, s)| s.vars.is_empty())
+            .map(|(_, s)| self.resolve(&s.body))
+            .collect();
+        let mut seen = Vec::new();
+        while let Some(t) = work.pop() {
+            let Type::Dict(class, args) = t else {
+                continue;
+            };
+            let key = (class.clone(), args.clone());
+            if seen.contains(&key) {
+                continue;
+            }
+            seen.push(key);
+            if class == iterable && args.len() == 1 {
+                out.push(self.zonk(&args[0]));
+            }
+            if let Some(def) = self.decls.classes.get(&class) {
+                let map = params(&def.params, &args);
+                for sup in &def.supers {
+                    work.push(self.resolve(&substitute(sup, &map)));
+                }
+            }
+        }
+        out
+    }
+
+    /// Extracts the element type of a supported `for` source (`List a`, `Seq a`,
+    /// or `f a` with `Iterable f` in `givens`). Returns `Ok(None)` when the
+    /// container is still an unsolved meta and `final_check` is false; reports
+    /// a `(Translation)` gap for any other collection source.
+    pub(super) fn iterable_element(
+        &mut self,
+        src_ty: &Type,
+        givens: &[Type],
+        final_check: bool,
+    ) -> Check<Option<Type>> {
+        let bare = self.resolve(src_ty);
+        match &bare {
+            Type::Var(Var::Meta(_)) => {
+                if final_check {
+                    error(
+                        "Translation",
+                        format!("a `for` over `{}` has no λFlick form", self.zonk(src_ty)),
+                    )
+                } else {
+                    Ok(None)
+                }
+            }
+            Type::App(head, elem) => {
+                let head_res = self.resolve(head);
+                if head_res == prelude("List") || head_res == prelude("Seq") {
+                    return Ok(Some((**elem).clone()));
+                }
+                if matches!(head_res, Type::Var(Var::Meta(_))) {
+                    return if final_check {
+                        error(
+                            "Translation",
+                            format!("a `for` over `{}` has no λFlick form", self.zonk(src_ty)),
+                        )
+                    } else {
+                        Ok(None)
+                    };
+                }
+                let head_zonked = self.zonk(&head_res);
+                if givens
+                    .iter()
+                    .any(|g| self.zonk(&self.resolve(g)) == head_zonked)
+                {
+                    return Ok(Some((**elem).clone()));
+                }
+                error(
+                    "Translation",
+                    format!("a `for` over `{}` has no λFlick form", self.zonk(&bare)),
+                )
+            }
+            _ => error(
+                "Translation",
+                format!("a `for` over `{}` has no λFlick form", self.zonk(&bare)),
             ),
         }
     }

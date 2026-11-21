@@ -12,10 +12,16 @@ impl<'p> Machine<'p, '_> {
                 }
             }
             TransferNext::Chain(chained) => self.drain_discard_roots(*chained, roots),
-            TransferNext::Invoke(_)
-            | TransferNext::Raise
+            TransferNext::Invoke(id) => {
+                if let Some(inv) = self.invocations.remove(&id) {
+                    roots.extend(inv.callee);
+                    roots.extend(inv.arguments);
+                }
+            }
+            TransferNext::Raise
             | TransferNext::ReturnNone { .. }
-            | TransferNext::DeliverNone { .. } => {}
+            | TransferNext::DeliverNone { .. }
+            | TransferNext::FinishCutoff => {}
         }
     }
 
@@ -30,6 +36,9 @@ impl<'p> Machine<'p, '_> {
         for fin in state.remaining {
             Self::finalizer_roots(fin, roots);
         }
+        if let Some(cause) = state.exit_override {
+            roots.push(cause.into_value());
+        }
         if let Some(cause) = state.finalizer_failure {
             roots.push(cause.into_value());
         }
@@ -37,12 +46,23 @@ impl<'p> Machine<'p, '_> {
             ScopeOutcome::Normal { value, .. } => roots.push(value),
             ScopeOutcome::Failure(cause) => roots.push(cause.into_value()),
             ScopeOutcome::Discard(discard) => self.drain_discard_roots(*discard, roots),
+            ScopeOutcome::ChildClose {
+                parent,
+                inherited_exit,
+            } => {
+                if let Some(c) = inherited_exit {
+                    roots.push(c.into_value());
+                }
+                self.drain_closing_scope_roots(*parent, roots);
+            }
         }
     }
 
     fn drain_destination_roots(&mut self, destination: Destination<'p>, roots: &mut Vec<Value>) {
         match destination {
-            Destination::Catch { handler, .. } | Destination::CatchDefect { handler, .. } => {
+            Destination::Catch { handler, .. }
+            | Destination::CatchDefect { handler, .. }
+            | Destination::CatchCause { handler, .. } => {
                 roots.push(handler);
             }
             Destination::Loop { args, .. } => roots.extend(args),
@@ -62,12 +82,36 @@ impl<'p> Machine<'p, '_> {
                 roots.push(resource);
                 roots.push(release_fn);
             }
-            Destination::BracketFinish { outcome, .. } => match outcome {
+            Destination::BracketFinish { outcome, .. }
+            | Destination::EnsuringDone { outcome, .. }
+            | Destination::OnExitRunFin { outcome, .. }
+            | Destination::OnExitFinish { outcome, .. } => match outcome {
                 BracketOutcome::Success(v) => roots.push(v),
                 BracketOutcome::Failure(cause) => roots.push(cause.into_value()),
             },
             Destination::ClosingScope { state } => self.drain_closing_scope_roots(*state, roots),
-            Destination::RecoverySelection { .. }
+            Destination::DiscardCleanupDone { paused, .. }
+            | Destination::OnExitDiscardRunFin { paused, .. } => {
+                self.drain_discard_roots(*paused, roots);
+            }
+            Destination::RestoreMask { next, .. } | Destination::CachedComplete { next, .. } => {
+                self.drain_destination_roots(*next, roots);
+            }
+            Destination::EnsuringFinish { finalizer, .. } => roots.push(finalizer),
+            Destination::OnExitDecide { decide, .. } => roots.push(decide),
+            Destination::ProvideContext { context, .. } => roots.push(context),
+            Destination::WithServices { services, next } => {
+                roots.extend(services);
+                self.drain_destination_roots(*next, roots);
+            }
+            Destination::RestoreFiberRef { previous, .. } => roots.extend(previous),
+            Destination::RestoreEnvRefs { previous, .. } => roots.extend(previous.into_values()),
+            Destination::LayerBuildFinish { prev_memo, .. } => roots.extend(prev_memo),
+            Destination::OrDie { .. }
+            | Destination::RestoreOwnerEvidence { .. }
+            | Destination::TimedFinish { .. }
+            | Destination::RestoreRandom { .. }
+            | Destination::RecoverySelection { .. }
             | Destination::RecoveryHelper { .. }
             | Destination::RecoveryBody { .. }
             | Destination::LayerRun { .. }
@@ -199,11 +243,22 @@ impl<'p> Machine<'p, '_> {
 
     fn finalizer_roots(finalizer: Finalizer, roots: &mut Vec<Value>) {
         match finalizer {
-            Finalizer::Task(v) | Finalizer::WithCause(v) | Finalizer::WithExit(v) => roots.push(v),
-            Finalizer::Release { value, release_fn } => {
+            Finalizer::Task { task: v, services }
+            | Finalizer::WithCause { func: v, services }
+            | Finalizer::WithExit { func: v, services } => {
+                roots.push(v);
+                roots.extend(services);
+            }
+            Finalizer::Release {
+                value,
+                release_fn,
+                services,
+            } => {
                 roots.push(value);
                 roots.push(release_fn);
+                roots.extend(services);
             }
+            Finalizer::CloseChildOwner(_) | Finalizer::ReleaseMemo { .. } => {}
         }
     }
 }

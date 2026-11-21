@@ -11,9 +11,10 @@ use std::rc::Rc;
 use flick_core::types::lang::Lang;
 use flick_core::types::{self as fc, Binder};
 
-use crate::syntax::Path;
+use crate::syntax::{Name, Path};
 use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 
+mod contracts;
 #[cfg(test)]
 mod tests;
 
@@ -194,6 +195,19 @@ impl<'a> Types<'a> {
                 captures,
             } => Type::Bounded(Rc::new(self.ty(inner)), caps(captures)),
             fc::Type::Forall { .. } => Type::Forall(Rc::new(self.scheme(t))),
+            fc::Type::Exists {
+                binder,
+                contract,
+                body,
+                ..
+            } => match contract.as_ref() {
+                fc::Type::Con { module, name } => Type::Exists(
+                    Name::from(binder.as_str()),
+                    Path::new(module, name),
+                    Rc::new(self.ty(body)),
+                ),
+                other => Type::Con(Path::new("?", &format!("exists {binder} : {other:?}"))),
+            },
             // a row written as the argument of a type: `Atom.Async a none`, as
             // instantiating a row variable there gives it (`generalize::substitute`)
             fc::Type::Row(_) | fc::Type::Union(..) | fc::Type::Without { .. } => {
@@ -205,13 +219,24 @@ impl<'a> Types<'a> {
 
     fn app(&self, t: &fc::Type) -> Type {
         let (head, args) = t.spine();
-        if let fc::Type::Con { module, name } = head
-            && let Some(class) = name.strip_suffix("$Dict")
-        {
-            return Type::Dict(
-                Path::new(module, class),
-                self.arguments(&fc::Type::con(module, class), &args).into(),
-            );
+        if let fc::Type::Con { module, name } = head {
+            if let Some(class) = name.strip_suffix("$Dict") {
+                return Type::Dict(
+                    Path::new(module, class),
+                    self.arguments(&fc::Type::con(module, class), &args).into(),
+                );
+            }
+            if module == PRELUDE
+                && name == "Module"
+                && let [
+                    fc::Type::Con {
+                        module: sig_module,
+                        name: sig_name,
+                    },
+                ] = &args[..]
+            {
+                return Type::Module(Path::new(sig_module, sig_name));
+            }
         }
         // the forms of the core, by the lang item of their constructor: the
         // library may move or rename what it declares

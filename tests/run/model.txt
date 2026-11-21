@@ -6,6 +6,9 @@ bootstrap/hello
 bootstrap/inline_declarations
 bootstrap/inline_module
 bootstrap/inline_nested
+bootstrap/inline_pack
+bootstrap/inline_pack_nominals
+bootstrap/packed_module
 bootstrap/stderr
 codegen/enums
 codegen/bigints
@@ -69,6 +72,8 @@ codegen/loops_state
 codegen/loops
 codegen/loops_for_source
 codegen/loops_guards
+codegen/for_comprehension
+codegen/ranges
 codegen/match_graph
 codegen/labeled_loops_finalizers
 codegen/category_classes
@@ -77,12 +82,15 @@ codegen/given_shadow
 codegen/implicit
 codegen/instance_names
 codegen/known_contexts
+codegen/known_defaults
 codegen/known_instances
+codegen/unpack_dictionary
 codegen/record_constructor
 codegen/mutual_rec_arity
 effect/row_without
 stdlib/effect/mutable_ref
 stdlib/effect/optic_parts
+stdlib/seqs
 stdlib/server/node
 
 runtime/counted_layer_merge

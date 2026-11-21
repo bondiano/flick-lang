@@ -7,7 +7,6 @@
 pub use flick_ir::{Constructor, GenericInfo, InstanceInfo, Lift, default_method};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::mem;
 use std::sync::Arc;
 
 use super::Checker;
@@ -25,6 +24,7 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::Lang;
 use flick_ir::{Adapter, ForeignMode, Label};
 
+mod finish;
 mod owner_productivity;
 mod owner_templates;
 pub use owner_productivity::{OwnerAbstract, OwnerProductivity, OwnerRawHead};
@@ -217,6 +217,19 @@ pub struct Typing {
     pub proofs: Vec<super::proof_decls::ProofInfo>,
     /// The laws of the module's classes, typed as proofs are.
     pub laws: Vec<super::proof_decls::ProofInfo>,
+    /// Local `let` / `let rec` signatures and annotations keyed by `K::LetDecl`
+    /// range, keeping enclosing `Type::Skolem` ids until lowering resolves
+    /// scope regions to their unique IR names.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub local_schemes: HashMap<Range, Type>,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(super) pending_local_schemes: Vec<(Range, Type)>,
+    /// Source `scope` expression range for each scope skolem id.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub scope_skolems: HashMap<u32, Range>,
+    /// Source name of each skolem id referenced in `local_schemes`.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub skolem_names: HashMap<u32, String>,
 }
 
 impl Typing {
@@ -383,65 +396,6 @@ impl Checker<'_> {
 
     pub fn record_label(&mut self, span: Span, ty: Type) {
         self.typing.pending_labels.push((range(span), ty));
-    }
-
-    #[cfg(feature = "ide")]
-    /// `t` with each rigid variable written as the variable it stands for.
-    fn named_skolems(&self, t: &Type) -> Type {
-        match t {
-            Type::Skolem(s) => Type::Var(self.store.skolem_name(*s).to_owned()),
-            other => other.map_children(&mut |c| self.named_skolems(c)),
-        }
-    }
-
-    /// Settles what waited for the whole module to be solved.
-    pub fn finish_typing(&mut self) -> Typing {
-        self.finish_foreigns();
-        let mut typing = mem::take(&mut self.typing);
-        let pending = mem::take(&mut typing.pending_values);
-        for (at, ty) in pending.iter().chain(&typing.pending_types) {
-            let observed = self.store.head(ty);
-            if let t @ Type::Con { .. } = observed.as_ref() {
-                typing.values.entry(*at).or_insert_with(|| t.clone());
-            }
-        }
-        #[cfg(feature = "ide")]
-        {
-            typing.aliases = self
-                .env
-                .local_aliases()
-                .map(|(name, params, body)| (name.to_owned(), (params.to_vec(), body.clone())))
-                .collect();
-            for (at, ty) in mem::take(&mut typing.pending_types) {
-                let ty = self.named_skolems(&self.zonk(&ty));
-                typing.types.insert(at, ty);
-            }
-            for (at, ty) in mem::take(&mut typing.pending_fields) {
-                let ty = self.named_skolems(&self.zonk(&ty));
-                typing.fields.insert(at, ty);
-            }
-            for (at, ty) in mem::take(&mut typing.pending_refined) {
-                let ty = self.named_skolems(&self.zonk(&ty));
-                typing.refined.insert(at, ty);
-            }
-        }
-        #[cfg(not(feature = "ide"))]
-        typing.pending_types.clear();
-        for (at, ty) in mem::take(&mut typing.pending_labels) {
-            let ty = self.zonk(&ty);
-            if let Type::App { arg, .. } = ty
-                && let Type::Symbol(label) = *arg
-            {
-                typing.labels.insert(at, label);
-            }
-        }
-        self.finish_owner_typing(&mut typing);
-        let mut dicts = mem::take(&mut typing.pending_dicts);
-        dicts.sort_by_key(|(at, order, _)| (*at, *order));
-        for (at, _, dict) in dicts {
-            typing.dicts.entry(at).or_default().push(dict);
-        }
-        typing
     }
 }
 

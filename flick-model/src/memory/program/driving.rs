@@ -1,4 +1,4 @@
-impl<'p> Machine<'p, '_> {
+impl Machine<'_, '_> {
     fn finish(&mut self, result: Result<LanguageExit, Error>) -> ProgramOutcome {
         let outcome = match result.and_then(|exit| self.report_exit(exit)) {
             Ok(outcome) => outcome,
@@ -35,8 +35,47 @@ impl<'p> Machine<'p, '_> {
         }
     }
 
+    fn combine_root_defects(
+        &mut self,
+        base: Option<CauseToken>,
+    ) -> Result<Option<CauseToken>, Error> {
+        let mut acc = base;
+        while !self.root_defects.is_empty() {
+            let defect = self.root_defects.remove(0);
+            acc = Some(match acc {
+                None => defect,
+                Some(prev) => {
+                    let res = primitives::join_causes(self.heap, &prev, &defect, &mut self.fuel);
+                    self.heap.drop_cause(prev)?;
+                    self.heap.drop_cause(defect)?;
+                    res?
+                }
+            });
+        }
+        Ok(acc)
+    }
+
     fn run(&mut self) -> Result<LanguageExit, Error> {
         loop {
+            if let Some(owner) = self.pending_resume_close.take() {
+                self.resume_owner_close(owner)?;
+                continue;
+            }
+            if let Some(res) = self.pending_provide_result.take() {
+                match res {
+                    PendingProvideResult::Ready(pid, ctx) => {
+                        self.complete_dynamic_provide_ok(pid, ctx)?;
+                    }
+                    PendingProvideResult::Failed(pid, cause) => {
+                        self.complete_dynamic_provide_err(pid, cause)?;
+                    }
+                }
+                continue;
+            }
+            if let Some((layer, memo_id, sub_owner)) = self.pending_layer_build.take() {
+                self.begin_build_layer(layer, memo_id, sub_owner, false, LayerBuildTarget::Top)?;
+                continue;
+            }
             if self.failure.is_some() && !self.failure_elected {
                 self.prepare_failure()?;
             }
@@ -46,9 +85,15 @@ impl<'p> Machine<'p, '_> {
                 && self.failure.is_some()
                 && self.frames.is_empty()
             {
-                return Ok(LanguageExit::Failure(
-                    self.failure.take().expect("failure root"),
-                ));
+                let cause = self.failure.take().expect("failure root");
+                if self.active_fiber != 1 {
+                    self.complete_child_fiber(FiberOutcome::Failure(cause))?;
+                    continue;
+                }
+                let final_cause = self
+                    .combine_root_defects(Some(cause))?
+                    .expect("root failure");
+                return Ok(LanguageExit::Failure(final_cause));
             }
             if self.discard.is_none()
                 && self.ready.is_none()
@@ -56,18 +101,41 @@ impl<'p> Machine<'p, '_> {
                 && self.arguments.is_empty()
                 && self.top.is_some()
             {
+                if self.active_fiber != 1 {
+                    let val = self.top.take().expect("child fiber return");
+                    self.complete_child_fiber(FiberOutcome::Success(val))?;
+                    continue;
+                }
                 if self.main_stage != MainStage::Done {
                     self.advance_main()?;
                     continue;
                 }
-                return Ok(LanguageExit::Success(
-                    self.top.take().expect("completed top outcome"),
+                let val = self.top.take().expect("completed top outcome");
+                if !self.root_defects.is_empty() {
+                    self.heap.drop_value(val)?;
+                    let cause = self.combine_root_defects(None)?.expect("root defects");
+                    return Ok(LanguageExit::Failure(cause));
+                }
+                return Ok(LanguageExit::Success(val));
+            }
+            if self.discard.is_none()
+                && self.ready.is_none()
+                && self.failure.is_none()
+                && self.frames.is_empty()
+                && self.top.is_none()
+            {
+                return Err(Error::UnsupportedOperation(
+                    "deadlock: no runnable fibers remain",
                 ));
             }
             if self.fuel == 0 {
                 return Err(Error::OutOfFuel);
             }
             self.fuel -= 1;
+            self.maybe_quantum_preempt()?;
+            if self.pending_resume_close.is_some() || self.pending_provide_result.is_some() {
+                continue;
+            }
             if self.discard.is_some() {
                 self.discard_step()?;
             } else if let Some(id) = self.ready.take() {
@@ -82,196 +150,12 @@ impl<'p> Machine<'p, '_> {
                         .expect("top application has an argument"),
                 );
                 self.apply(Destination::Top)?;
-            } else {
+            } else if !self.frames.is_empty() {
                 self.step()?;
-            }
-        }
-    }
-
-    /// Each suspended-frame crossing consumes one ordinary VM step.
-    fn unwind(&mut self) -> Result<(), Error> {
-        let mut frame = self.frames.pop().expect("raised frame");
-        self.restore_evidence();
-        let destination = mem::replace(&mut frame.destination, Destination::DiscardFinalizer);
-        if let Destination::Handle {
-            activation,
-            binding,
-        } = destination
-        {
-            self.heap
-                .drop_values(mem::take(&mut frame.locals).into_values_vec())?;
-            let gen_frames = self.release_frame_resources(&mut frame)?;
-            self.handler_failed(activation, binding)?;
-            self.queue_discard_frames(gen_frames);
-            return Ok(());
-        }
-        if let Destination::Catch { handler, binding } = destination {
-            self.pending_handler = Some(handler);
-            self.heap
-                .drop_values(mem::take(&mut frame.locals).into_values_vec())?;
-            let gen_frames = self.release_frame_resources(&mut frame)?;
-            self.begin_recovery(binding)?;
-            self.queue_discard_frames(gen_frames);
-            return Ok(());
-        }
-        if let Destination::CaptureExit { binding } = destination {
-            self.heap
-                .drop_values(mem::take(&mut frame.locals).into_values_vec())?;
-            let gen_frames = self.release_frame_resources(&mut frame)?;
-            let cause = self.failure.take().expect("captured exit failure");
-            self.failure_elected = false;
-            let exit = self
-                .heap
-                .allocate(Data::Exit(ExitData::Failure(cause.into_value())));
-            self.store(binding, exit)?;
-            self.queue_discard_frames(gen_frames);
-            return Ok(());
-        }
-        if let Destination::CatchDefect { handler, binding } = destination {
-            self.pending_handler = Some(handler);
-            self.heap
-                .drop_values(mem::take(&mut frame.locals).into_values_vec())?;
-            let gen_frames = self.release_frame_resources(&mut frame)?;
-            let defect_msg = self
-                .failure
-                .as_ref()
-                .map(|c| primitives::first_defect_message(self.heap, c.object_id()))
-                .transpose()?
-                .flatten();
-            let handler = self.pending_handler.take().expect("defect handler");
-            if let Some(msg) = defect_msg {
-                if let Some(cause) = self.failure.take() {
-                    self.heap.drop_cause(cause)?;
-                }
-                self.failure_elected = false;
-                let msg_val = self.heap.literal(&Lit::String(msg))?;
-                self.scratch.extend([handler, msg_val]);
-                self.apply(Destination::Bind(binding))?;
             } else {
-                self.heap.drop_value(handler)?;
-            }
-            self.queue_discard_frames(gen_frames);
-            return Ok(());
-        }
-        self.heap
-            .drop_values(mem::take(&mut frame.locals).into_values_vec())?;
-        let gen_frames = self.release_frame_resources(&mut frame)?;
-        self.unwind_destination(destination)?;
-        self.queue_discard_frames(gen_frames);
-        Ok(())
-    }
-
-    fn unwind_destination(&mut self, destination: Destination<'p>) -> Result<(), Error> {
-        match destination {
-            Destination::RecoverySelection { id } => self.abandon_recovery(id)?,
-            Destination::RecoveryBody {
-                owner, evidence, ..
-            } => {
-                self.current_owner = owner;
-                self.current_evidence = evidence;
-            }
-            Destination::LayerRun { provider, .. } => self.leave_provider(provider)?,
-            Destination::Discontinue { cont_id, .. } => {
-                if let Some(Some(captured)) = self.continuations.get_mut(&cont_id).map(Option::take)
-                {
-                    let cause = self.failure.take();
-                    self.discard = Some(Discard {
-                        frames: captured.frames,
-                        owner: Some(self.current_owner),
-                        next: TransferNext::ResumeRunning {
-                            saved_failure: cause,
-                        },
-                    });
-                }
-            }
-            Destination::Invocation(id) => self.invocation_failed(id)?,
-            Destination::Initialize { name, .. } => {
-                self.globals.remove(&name);
-            }
-            Destination::CloseScope {
-                owner, previous, ..
-            } => {
-                let cause = self.failure.take().expect("scope failure cause");
-                self.begin_close_scope(owner, previous, ScopeOutcome::Failure(cause))?;
-            }
-            Destination::ClosingScope { state } => self.finalizer_failed(state)?,
-            Destination::RestoreOwner { previous, .. } => self.current_owner = previous,
-            Destination::Loop { args, .. } => self.heap.drop_values(args)?,
-            Destination::GenerateStrict { items, .. } => self.heap.drop_values(items)?,
-            Destination::GeneratorStep { gen_id, .. } => {
-                if let Some(slot) = self.generators.get_mut(&gen_id) {
-                    slot.run = GeneratorRun::Done;
-                }
-            }
-            Destination::LazyComplete { lazy, .. } => self.unwind_lazy(&lazy)?,
-            Destination::AcquireRegister { release, .. } => self.heap.drop_value(release)?,
-            Destination::BracketUse {
-                use_fn, release_fn, ..
-            } => self.heap.drop_values(vec![use_fn, release_fn])?,
-            Destination::BracketRelease {
-                resource,
-                release_fn,
-                binding,
-            } => {
-                let cause = self.failure.take().expect("bracket body failure");
-                self.scratch.extend([release_fn, resource]);
-                self.apply(Destination::BracketFinish {
-                    outcome: BracketOutcome::Failure(cause),
-                    binding,
-                })?;
-            }
-            Destination::BracketFinish { outcome, .. } => match outcome {
-                BracketOutcome::Success(value) => self.heap.drop_value(value)?,
-                BracketOutcome::Failure(orig) => {
-                    let joined = if let Some(secondary) = self.failure.take() {
-                        let res =
-                            primitives::join_causes(self.heap, &orig, &secondary, &mut self.fuel);
-                        self.heap.drop_cause(orig)?;
-                        self.heap.drop_cause(secondary)?;
-                        res?
-                    } else {
-                        orig
-                    };
-                    self.failure = Some(joined);
-                    self.failure_elected = false;
-                }
-            },
-            Destination::RecoveryHelper { .. }
-            | Destination::Top
-            | Destination::Bind(_)
-            | Destination::Modify { .. }
-            | Destination::FunctionBoundary { .. }
-            | Destination::DiscardFinalizer => {}
-            Destination::Catch { .. }
-            | Destination::CaptureExit { .. }
-            | Destination::CatchDefect { .. } => unreachable!("catch/exit handled above"),
-            Destination::Handle { .. } => unreachable!("handler handled above"),
-        }
-        Ok(())
-    }
-
-    fn unwind_lazy(&mut self, lazy: &LazyHandle) -> Result<(), Error> {
-        let ordinary_payload = if let Some(cause) = self.failure.as_ref() {
-            self.heap
-                .ordinary_failure(cause)?
-                .map(Value::representation)
-        } else {
-            None
-        };
-        if let Some(payload_rep) = ordinary_payload {
-            let cached = self.heap.dup(&payload_rep)?;
-            let slot = self.heap.lazy_state_mut(self.execution, lazy)?;
-            let prev = slot.replace(LazyState::DoneErr(cached));
-            if let Some(LazyState::Running(task)) = prev {
-                self.heap.drop_value(task)?;
-            }
-        } else {
-            let slot = self.heap.lazy_state_mut(self.execution, lazy)?;
-            if let Some(LazyState::Running(task)) = slot.take() {
-                *slot = Some(LazyState::Pending(task));
+                // Current fiber parked inside quantum preempt or has no frame; loop to re-check.
             }
         }
-        Ok(())
     }
 
     fn step(&mut self) -> Result<(), Error> {

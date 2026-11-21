@@ -1,3 +1,12 @@
+enum AwaitTaskKind {
+    Code(CodeId),
+    Masked { target_mask: usize, task_rep: Value },
+    CachedRun(usize),
+    CachedInvalidate(usize),
+    ExitOk(Value),
+    ExitErr(Value),
+}
+
 impl<'p> Machine<'p, '_> {
     fn deliver(&mut self, destination: &Destination<'p>, value: Value) -> Result<(), Error> {
         self.scratch.push(value);
@@ -13,43 +22,7 @@ impl<'p> Machine<'p, '_> {
                     .locals
                     .insert_one(*binding, value);
             }
-            Destination::RecoverySelection { .. }
-            | Destination::RecoveryHelper { .. }
-            | Destination::RecoveryBody { .. } => {
-                unreachable!("recovery result completes its boundary first")
-            }
-            Destination::Catch { .. }
-            | Destination::CaptureExit { .. }
-            | Destination::CatchDefect { .. } => {
-                unreachable!("catch/exit result completes its boundary first")
-            }
-            Destination::LayerRun { .. }
-            | Destination::Handle { .. }
-            | Destination::Discontinue { .. }
-            | Destination::Invocation(_) => {
-                unreachable!("handler result completes its boundary first")
-            }
-            Destination::Initialize { .. } => {
-                unreachable!("initializer results are cached before delivery")
-            }
-            Destination::Modify { .. } => unreachable!("modify results commit before delivery"),
-            Destination::CloseScope { .. }
-            | Destination::ClosingScope { .. }
-            | Destination::RestoreOwner { .. } => {
-                unreachable!("owner boundaries restore before delivery")
-            }
-            Destination::Loop { .. }
-            | Destination::FunctionBoundary { .. }
-            | Destination::GenerateStrict { .. }
-            | Destination::GeneratorStep { .. }
-            | Destination::LazyComplete { .. }
-            | Destination::AcquireRegister { .. }
-            | Destination::BracketUse { .. }
-            | Destination::BracketRelease { .. }
-            | Destination::BracketFinish { .. }
-            | Destination::DiscardFinalizer => {
-                unreachable!("control-flow boundaries complete before delivery")
-            }
+            _ => unreachable!("specialized boundaries complete before delivery"),
         }
         Ok(())
     }
@@ -95,10 +68,6 @@ impl<'p> Machine<'p, '_> {
         self.call_inner(code, destination, true)
     }
 
-    fn call_fresh(&mut self, code: CodeId, destination: Destination<'p>) -> Result<(), Error> {
-        self.call_inner(code, destination, false)
-    }
-
     fn call_inner(
         &mut self,
         code: CodeId,
@@ -116,9 +85,6 @@ impl<'p> Machine<'p, '_> {
                 actual: self.scratch.len(),
             });
         }
-        // Tail-call optimization: replace the caller frame in place without reallocating
-        // its locals table when it has no remaining instructions, bindings, frame-owned
-        // resources, or recovery guard.
         if allow_tco
             && let Destination::Bind(binding) = &destination
             && let Some(top) = self.frames.last_mut()
@@ -165,23 +131,14 @@ impl<'p> Machine<'p, '_> {
     }
 
     fn apply_fresh(&mut self, destination: Destination<'p>) -> Result<(), Error> {
-        let Value::Object(token) = &self.scratch[0] else {
-            return Err(Error::ExpectedClosure);
-        };
-        let Data::Closure {
-            execution, code, ..
-        } = &self.heap.object(token.id)?.data
-        else {
-            return Err(Error::ExpectedClosure);
-        };
-        if *execution != self.execution {
-            return Err(Error::ForeignClosure);
-        }
-        let code = *code;
-        self.call_fresh(code, destination)
+        self.apply_inner(destination, false)
     }
 
     fn apply(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+        self.apply_inner(destination, true)
+    }
+
+    fn apply_inner(&mut self, destination: Destination<'p>, allow_tco: bool) -> Result<(), Error> {
         let Value::Object(token) = &self.scratch[0] else {
             return Err(Error::ExpectedClosure);
         };
@@ -193,7 +150,21 @@ impl<'p> Machine<'p, '_> {
                     return Err(Error::ForeignClosure);
                 }
                 let code = *code;
-                self.call(code, destination)
+                self.call_inner(code, destination, allow_tco)
+            }
+            Data::MaskRestore {
+                execution,
+                outer_mask,
+            } => {
+                if *execution != self.execution {
+                    return Err(Error::ForeignClosure);
+                }
+                let target_mask = *outer_mask;
+                let task = self.scratch.pop().expect("restore task");
+                self.release_operands()?;
+                let masked = self.heap.allocate(Data::MaskedTask { target_mask, task });
+                self.pending = Some(masked);
+                self.returned_frame(destination)
             }
             Data::Continuation { execution, id } => {
                 if *execution != self.execution {
@@ -219,8 +190,6 @@ impl<'p> Machine<'p, '_> {
                     self.continuations.insert(id, Some(captured));
                     return Err(err);
                 }
-                // Tail-resume optimization: pop a finished control arm frame in place so
-                // repeated control effects under one handler execute in O(1) stack space.
                 let target_binding = if let Some(top) = self.frames.last()
                     && top.at == top.block.instructions.len()
                     && matches!(top.block.exit, Exit::Return(ret) if ret == binding)
@@ -233,9 +202,8 @@ impl<'p> Machine<'p, '_> {
                 {
                     let popped = self.frames.pop().expect("tail-resume frame");
                     match popped.destination {
-                        Destination::Bind(outer) | Destination::Discontinue { binding: outer, .. } => {
-                            outer
-                        }
+                        Destination::Bind(outer)
+                        | Destination::Discontinue { binding: outer, .. } => outer,
                         _ => unreachable!("matched tail-resume destination"),
                     }
                 } else {
@@ -261,35 +229,130 @@ impl<'p> Machine<'p, '_> {
     }
 
     fn await_task(&mut self, destination: Destination<'p>) -> Result<(), Error> {
-        let Value::Object(token) = &self.scratch[0] else {
-            return Err(Error::ExpectedTask);
-        };
-        let Data::Task {
-            execution, code, ..
-        } = &self.heap.object(token.id)?.data
-        else {
-            return Err(Error::ExpectedTask);
-        };
-        if *execution != self.execution {
-            return Err(Error::ForeignTask);
-        }
-        self.call(*code, destination)
+        self.await_task_inner(destination, true)
     }
 
     fn await_task_fresh(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+        self.await_task_inner(destination, false)
+    }
+
+    fn classify_task(&self, obj_id: ObjectId) -> Result<AwaitTaskKind, Error> {
+        match &self.heap.object(obj_id)?.data {
+            Data::Task {
+                execution, code, ..
+            } => {
+                if *execution != self.execution {
+                    return Err(Error::ForeignTask);
+                }
+                Ok(AwaitTaskKind::Code(*code))
+            }
+            Data::MaskedTask { target_mask, task } => Ok(AwaitTaskKind::Masked {
+                target_mask: *target_mask,
+                task_rep: task.representation(),
+            }),
+            Data::CachedRunTask { execution, id } => {
+                if *execution != self.execution {
+                    return Err(Error::ForeignTask);
+                }
+                Ok(AwaitTaskKind::CachedRun(*id))
+            }
+            Data::CachedInvalidateTask { execution, id } => {
+                if *execution != self.execution {
+                    return Err(Error::ForeignTask);
+                }
+                Ok(AwaitTaskKind::CachedInvalidate(*id))
+            }
+            Data::ExitTask(ExitData::Success(v)) => Ok(AwaitTaskKind::ExitOk(v.representation())),
+            Data::ExitTask(ExitData::Failure(c)) => Ok(AwaitTaskKind::ExitErr(c.representation())),
+            _ => Err(Error::ExpectedTask),
+        }
+    }
+
+    fn await_cached_run(
+        &mut self,
+        cell_id: usize,
+        destination: Destination<'p>,
+    ) -> Result<(), Error> {
+        self.release_operands()?;
+        let cached_rep = self.cached_cells.get(&cell_id).and_then(|cell| {
+            if let CachedEntry::Ready { value, expires_ns } = &cell.entry
+                && expires_ns.is_none_or(|exp| self.virtual_now_ns < exp)
+            {
+                Some(value.representation())
+            } else {
+                None
+            }
+        });
+        if let Some(rep) = cached_rep {
+            let val = self.heap.dup(&rep)?;
+            self.pending = Some(val);
+            return self.returned_frame(destination);
+        }
+        let task_rep = self.cached_cells[&cell_id].task.representation();
+        let task = self.heap.dup(&task_rep)?;
+        self.scratch.extend([task, Value::Unit]);
+        self.await_task_fresh(Destination::CachedComplete {
+            cell_id,
+            next: Box::new(destination),
+        })
+    }
+
+    fn await_task_inner(
+        &mut self,
+        destination: Destination<'p>,
+        allow_tco: bool,
+    ) -> Result<(), Error> {
+        if self.check_active_interrupt()? {
+            self.release_operands()?;
+            return self.fail_destination(destination);
+        }
         let Value::Object(token) = &self.scratch[0] else {
             return Err(Error::ExpectedTask);
         };
-        let Data::Task {
-            execution, code, ..
-        } = &self.heap.object(token.id)?.data
-        else {
-            return Err(Error::ExpectedTask);
-        };
-        if *execution != self.execution {
-            return Err(Error::ForeignTask);
+        match self.classify_task(token.id)? {
+            AwaitTaskKind::Code(code) => self.call_inner(code, destination, allow_tco),
+            AwaitTaskKind::Masked {
+                target_mask,
+                task_rep,
+            } => {
+                let inner_task = self.heap.dup(&task_rep)?;
+                self.release_operands()?;
+                let saved_mask = self.mask_depth;
+                self.mask_depth = target_mask;
+                self.scratch.extend([inner_task, Value::Unit]);
+                self.await_task_fresh(Destination::RestoreMask {
+                    saved_mask,
+                    check_on_exit: true,
+                    next: Box::new(destination),
+                })
+            }
+            AwaitTaskKind::CachedRun(cell_id) => self.await_cached_run(cell_id, destination),
+            AwaitTaskKind::CachedInvalidate(cell_id) => {
+                self.release_operands()?;
+                if let Some(cell) = self.cached_cells.get_mut(&cell_id) {
+                    let old = mem::replace(&mut cell.entry, CachedEntry::Empty);
+                    if let CachedEntry::Ready { value, .. } = old {
+                        self.heap.drop_value(value)?;
+                    }
+                }
+                self.pending = Some(Value::Unit);
+                self.returned_frame(destination)
+            }
+            AwaitTaskKind::ExitOk(rep) => {
+                let val = self.heap.dup(&rep)?;
+                self.release_operands()?;
+                self.pending = Some(val);
+                self.returned_frame(destination)
+            }
+            AwaitTaskKind::ExitErr(rep) => {
+                let cval = self.heap.dup(&rep)?;
+                self.release_operands()?;
+                let cause = CauseToken::from_cause_value(self.heap, cval)?;
+                self.failure = Some(cause);
+                self.failure_elected = true;
+                self.fail_destination(destination)
+            }
         }
-        self.call_fresh(*code, destination)
     }
 
     fn advance_main(&mut self) -> Result<(), Error> {
@@ -308,7 +371,15 @@ impl<'p> Machine<'p, '_> {
         let callable = if let Some(Value::Object(token)) = &self.top {
             matches!(
                 (&self.heap.object(token.id)?.data, &stage),
-                (Data::Closure { .. }, MainStage::Function) | (Data::Task { .. }, MainStage::Task)
+                (Data::Closure { .. }, MainStage::Function)
+                    | (
+                        Data::Task { .. }
+                            | Data::MaskedTask { .. }
+                            | Data::CachedRunTask { .. }
+                            | Data::CachedInvalidateTask { .. }
+                            | Data::ExitTask(_),
+                        MainStage::Task,
+                    )
             )
         } else {
             false

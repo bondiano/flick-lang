@@ -46,6 +46,24 @@ impl Class {
     }
 }
 
+/// A `type module Sig = ...` contract, as needed to check `Module Sig`
+/// and `exists K : Sig. T` against their lowered records.
+#[derive(Clone, Debug)]
+pub struct ModuleContract {
+    /// Abstract type members (`type Key`, `type Box a`) in declaration order.
+    pub abstract_types: Vec<(Name, Kind)>,
+    /// Manifest type aliases (`type Item = Int`, `type Box a = List a`),
+    /// with any abstract members of this contract referencing `CONTRACT_SCOPE`.
+    pub manifest_types: HashMap<Name, (Vec<Name>, Type)>,
+    /// Manifest class/service identities (`class C = Path.C`, `service S = Path.S`).
+    pub nominals: HashMap<Name, Path>,
+    /// Value members of the packed record, in declaration order.
+    pub fields: Vec<(Name, Scheme)>,
+    /// Whether this signature may be packed into a runtime `Module Sig`.
+    /// Abstract classes/services and nested module members are static-only.
+    pub packable: bool,
+}
+
 #[derive(Default)]
 pub struct Decls {
     pub values: HashMap<Path, Scheme>,
@@ -66,6 +84,8 @@ pub struct Decls {
     pub classes: HashMap<Path, Class>,
     /// The dictionary of each instance: a function of its context's.
     pub instances: HashMap<Path, Scheme>,
+    /// `type module Sig = ...` contracts by `Module.Sig`.
+    pub module_contracts: HashMap<Path, ModuleContract>,
     /// Each alias, with its parameters and representation: what an opaque
     /// one is inside its module, which schemes still name.
     pub opaque: HashMap<Path, (Vec<Name>, Type)>,
@@ -82,6 +102,8 @@ pub struct Decls {
     /// The sign of each parameter of a declared class, inferred from its
     /// superclasses and methods (`regions.md` §2.2.1, Lean `Sig.dictVar`).
     pub class_signs: HashMap<Path, Vec<Sign>>,
+    /// Local `let` / `let rec` schemes keyed by `(Module, item_key, unique_local)`.
+    pub local_schemes: HashMap<(Name, String, Name), Scheme>,
 }
 
 /// The arity of a constructor's scheme: its arrows.
@@ -97,21 +119,31 @@ fn arity(s: &Scheme) -> usize {
 
 impl Decls {
     pub fn add_kinds(&mut self, interface: &Interface) {
+        let mut record = |module: &str, name: &str, def: &fc::TypeDef| {
+            let path = Path::new(module, name);
+            let mut params = Vec::new();
+            let mut k = &def.kind;
+            while let fc::Kind::Arrow(param, result) = k {
+                params.push(kind(param).unwrap_or(Kind::Type));
+                k = result;
+            }
+            if !params.is_empty() {
+                self.params.insert(path, params);
+            }
+        };
         for export in &interface.exports {
             if export.entity.namespace == Namespace::Type
                 && let Some(def) = &export.definition
             {
-                let path = Path::new(&export.entity.module, &export.entity.name);
-                let mut params = Vec::new();
-                let mut k = &def.kind;
-                while let fc::Kind::Arrow(param, result) = k {
-                    params.push(kind(param).unwrap_or(Kind::Type));
-                    k = result;
-                }
-                if !params.is_empty() {
-                    self.params.insert(path.clone(), params);
-                }
+                record(&export.entity.module, &export.entity.name, def);
             }
+        }
+        for support in &interface.support_types {
+            record(
+                &support.entity.module,
+                &support.entity.name,
+                &support.definition,
+            );
         }
     }
 
@@ -199,9 +231,26 @@ impl Decls {
                             };
                             self.classes.insert(path, class);
                         }
+                        Form::ModuleContract { requirements } => {
+                            self.module_contracts
+                                .insert(path, tr.module_contract(requirements));
+                        }
                         _ => {}
                     }
                 }
+            }
+        }
+        self.add_support_instances_and_locals(interface);
+    }
+
+    fn add_support_instances_and_locals(&mut self, interface: &Interface) {
+        let tr = Types::new(&self.params);
+        for support in &interface.support_types {
+            if let Form::ModuleContract { requirements } = &support.definition.form {
+                let path = Path::new(&support.entity.module, &support.entity.name);
+                self.module_contracts
+                    .entry(path)
+                    .or_insert_with(|| tr.module_contract(requirements));
             }
         }
         for i in &interface.instances {
@@ -215,6 +264,16 @@ impl Decls {
                 outlives: Vec::new(),
             };
             self.instances.insert(instance(&i.module, &i.name), s);
+        }
+        for local in &interface.local_schemes {
+            self.local_schemes.insert(
+                (
+                    Name::from(interface.module.as_str()),
+                    local.item.clone(),
+                    Name::from(local.local.as_str()),
+                ),
+                tr.scheme(&local.scheme),
+            );
         }
     }
 

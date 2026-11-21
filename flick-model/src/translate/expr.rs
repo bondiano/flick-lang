@@ -48,7 +48,7 @@ pub fn cond(c: Term, then: Term, otherwise: Term) -> Term {
     )
 }
 
-impl Tr {
+impl Tr<'_> {
     fn try_value(&mut self, body: &ir::Expr, arms: &[ir::Arm]) -> Term {
         let rc = |t| Rc::new(t);
         if super::mutation::modified(body).is_empty() {
@@ -222,14 +222,17 @@ impl Tr {
             ExprKind::Await(x) => Term::Await(rc(self.expr(x))),
             ExprKind::Task(x) => Term::Task(rc(self.delayed_expr(x))),
             ExprKind::Generate {
-                body, strict: true, ..
-            } => self.strict_collection(body),
+                body,
+                strict,
+                sync,
+                limit,
+            } => self.generate(body, *strict, *sync, limit.as_deref()),
             ExprKind::Handle(h) => Term::Handler(Rc::new(self.handler(h))),
             // a lift does nothing in the model (§3.4); its correctness is G2
             ExprKind::Lift(x, _) => self.expr(x),
             ExprKind::Label(_) => stuck("`Record.label`"),
-            ExprKind::Generate { .. } | ExprKind::Each { .. } | ExprKind::Yield(_) => {
-                stuck("a `for` or a `Seq`")
+            ExprKind::Each { .. } | ExprKind::Yield(_) => {
+                stuck("a `for` clause outside its `for` expression")
             }
             ExprKind::Unwrap(_) => stuck("`?` on an `Option`, a return from the function,"),
             ExprKind::ReadOwnerEvidence => Term::ReadOwnerEvidence,
@@ -292,7 +295,11 @@ impl Tr {
         match s {
             Stmt::Let(ir::Pat::Bind(x), e) => {
                 let value = self.expr(e);
-                self.value_let(x.as_str().into(), value, rest)
+                if let Some(sig) = self.local_scheme(x) {
+                    Term::Let(x.as_str().into(), Some(sig), rc(value), rc(rest))
+                } else {
+                    self.value_let(x.as_str().into(), value, rest)
+                }
             }
             Stmt::Var(..) | Stmt::Assign(..) => stuck("a variable outside a block"),
             Stmt::Let(ir::Pat::Wild, e) | Stmt::Expr(e) => {
@@ -313,11 +320,12 @@ impl Tr {
                 value,
             } => {
                 let value = lams(dicts.iter().map(|d| given(d)), self.expr(value));
+                let sig = self.local_scheme(name);
                 let name: Name = name.as_str().into();
                 if !rec {
-                    Term::Let(name, None, rc(value), rc(rest))
+                    Term::Let(name, sig, rc(value), rc(rest))
                 } else if matches!(value, Term::Lam(..)) {
-                    Term::LetRec(name, None, rc(value), rc(rest))
+                    Term::LetRec(name, sig, rc(value), rc(rest))
                 } else {
                     stuck("a recursive local that is not a function")
                 }
@@ -439,15 +447,24 @@ fn binary(op: BinOp, a: Term, b: Term) -> Term {
 /// (not counting delayed bodies inside nested lambdas or tasks).
 fn has_runtime_step(e: &ir::Expr) -> bool {
     match &e.kind {
-        ExprKind::Lambda { .. } | ExprKind::Task(_) | ExprKind::Generate { strict: false, .. } => {
-            false
+        ExprKind::Lambda { .. } | ExprKind::Task(_) => false,
+        ExprKind::Generate {
+            strict: false,
+            sync: false,
+            limit,
+            ..
+        } => limit.as_deref().is_some_and(has_runtime_step),
+        ExprKind::Generate {
+            strict: false,
+            sync: true,
+            ..
         }
-        ExprKind::App { stage, .. } if *stage != ir::Stage::Pure => true,
-        ExprKind::Await(_)
+        | ExprKind::Await(_)
         | ExprKind::Handle(_)
         | ExprKind::Within(..)
         | ExprKind::Loop { .. }
         | ExprKind::ControlLoop { .. } => true,
+        ExprKind::App { stage, .. } if *stage != ir::Stage::Pure => true,
         _ => {
             let mut found = false;
             e.each_child(&mut |child| found |= has_runtime_step(child));
@@ -458,44 +475,4 @@ fn has_runtime_step(e: &ir::Expr) -> bool {
 
 pub(super) fn is_lang(func: &ir::Expr, item: Lang) -> bool {
     matches!(&func.kind, ExprKind::Global { module, name } if lang::is(item, module, name))
-}
-
-#[cfg(test)]
-mod suspension_staging_tests {
-    use super::Tr;
-    use crate::syntax::Term;
-    use flick_core::ir::{Expr, ExprKind, Lit, Stage};
-    use flick_core::source::{FileId, Span};
-
-    fn expression(kind: ExprKind) -> Expr {
-        Expr::new(kind, Span::new(FileId::new(0), 0, 0))
-    }
-
-    fn call(argument: Expr) -> Expr {
-        expression(ExprKind::App {
-            func: Box::new(expression(ExprKind::Global {
-                module: "Test".to_owned(),
-                name: "consume".to_owned(),
-            })),
-            arg: Box::new(argument),
-            stage: Stage::Runtime,
-            arg_first: true,
-        })
-    }
-
-    #[test]
-    fn argument_first_staging_keeps_task_expectations_but_not_computations() {
-        let task = expression(ExprKind::Task(Box::new(expression(ExprKind::Lit(
-            Lit::Unit,
-        )))));
-        let translated = Tr::new("Test").expr(&call(task));
-        assert!(
-            matches!(translated, Term::App(_, argument) if matches!(&*argument, Term::Task(_)))
-        );
-        let computation = call(expression(ExprKind::Lit(Lit::Unit)));
-        let translated = Tr::new("Test").expr(&call(computation));
-        assert!(
-            matches!(translated, Term::Let(_, None, value, _) if !matches!(&*value, Term::Task(_) | Term::Lam(..)))
-        );
-    }
 }

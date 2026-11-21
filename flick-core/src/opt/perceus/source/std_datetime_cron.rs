@@ -5,7 +5,8 @@ use flick_ir::{BinOp, Foreign, ForeignMode};
 
 use super::expr_builder::ExprBuilder;
 use super::lazy_scope::has_standard_shape;
-use super::std_codec::{REFUSE_FALLIBLE, leaf_codec};
+use super::std_codec::REFUSE_FALLIBLE;
+use super::std_codec_std::leaf_codec_link;
 use super::std_schema_rt::{meta_con, rt, str_lit};
 use super::{Code, Env, Expr, Intrinsic, Local, Lower, LowerError, Span};
 
@@ -214,15 +215,26 @@ fn datetime_template(b: &ExprBuilder, bind: &str, stages: usize) -> Option<Expr>
                 ),
             ),
         )),
-        ("flickJsonUtc", 0) => Some(leaf_codec(b, "datetime_utc", rf())),
-        ("flickJsonUtcMillis", 0) => Some(leaf_codec(b, "datetime_utc_millis", rf())),
-        ("flickJsonZoned", 0) => Some(leaf_codec(b, "datetime_zoned", rf())),
-        ("flickJsonZone", 0) => Some(leaf_codec(b, "datetime_zone", rf())),
-        ("flickJsonZoneNamed", 0) => Some(leaf_codec(b, "datetime_zone_named", rf())),
-        ("flickJsonZoneOffset", 0) => Some(leaf_codec(
+        ("flickJsonUtc", 0) => Some(leaf_codec_link(b, "datetime_utc", rf(), "datetime_utc")),
+        ("flickJsonUtcMillis", 0) => Some(leaf_codec_link(
+            b,
+            "datetime_utc_millis",
+            rf(),
+            "datetime_utc_millis",
+        )),
+        ("flickJsonZoned", 0) => Some(leaf_codec_link(b, "datetime_zoned", rf(), "datetime_zoned")),
+        ("flickJsonZone", 0) => Some(leaf_codec_link(b, "datetime_zone", rf(), "datetime_zone")),
+        ("flickJsonZoneNamed", 0) => Some(leaf_codec_link(
+            b,
+            "datetime_zone_named",
+            rf(),
+            "datetime_zone_named",
+        )),
+        ("flickJsonZoneOffset", 0) => Some(leaf_codec_link(
             b,
             "datetime_zone_offset",
             meta_con(b, "$Stage", vec![meta_con(b, "$Number", vec![])]),
+            "datetime_zone_offset",
         )),
         _ => None,
     }

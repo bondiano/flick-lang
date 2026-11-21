@@ -69,11 +69,11 @@ fn scope_reclaims_storage_before_resuming_the_live_caller() {
         .expect("valid scope-boundary test operation");
     for _ in 0..100 {
         machine.step().expect("valid scope-boundary test operation");
-        if machine.owners.get(1).is_some_and(|owner| owner.closed) {
+        if machine.owners.get(1).is_some_and(OwnerState::is_closed) {
             break;
         }
     }
-    assert!(machine.owners[1].closed);
+    assert!(machine.owners[1].is_closed());
     assert_eq!(machine.frames.len(), 1, "caller has not returned");
     assert!(
         machine.globals[&Name::new("Main", "main")].is_none(),

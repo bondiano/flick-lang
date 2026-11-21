@@ -99,7 +99,8 @@ fn compile_with(host: &dyn Host, roots: &[path::PathBuf]) -> Result<Vec<Compiled
 /// The program of `modules` and the built-in modules.
 pub fn program(modules: &[Compiled]) -> Program {
     let builtins: &[ir::Module] = build::builtin_modules();
-    translate::program(modules.iter().map(|m| &m.ir).chain(builtins))
+    let decls = decls(modules);
+    translate::program_with_decls(modules.iter().map(|m| &m.ir).chain(builtins), &decls)
 }
 
 /// What the checker knows of `modules` and the built-in modules.
