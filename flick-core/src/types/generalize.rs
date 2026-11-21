@@ -5,12 +5,10 @@
 use super::Checker;
 use super::bindings::LetParts;
 use super::classes::Outcome;
-use super::env::Found;
 use super::kinds::Kind;
 use super::ty::{Binder, Type};
 use super::typing::passes_dictionary;
 use crate::diagnostics::codes;
-use crate::iface::Namespace;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::types::lang::Lang;
@@ -109,9 +107,9 @@ impl Checker<'_> {
         }
     }
 
-    /// `ty` as a signature to write: every unknown named, the classes still
-    /// required of those unknowns as constraints, and every type by the
-    /// name the module can write it with.
+    /// `ty` as a signature to write: every unknown named and the classes still
+    /// required of those unknowns as constraints. Show it with
+    /// [`Checker::show_written`] to qualify names as the module can write them.
     pub fn signature_of(&mut self, ty: &Type) -> Type {
         let ty = self.zonk(ty);
         let metas = metas_of(&ty);
@@ -147,7 +145,7 @@ impl Checker<'_> {
                 None => (m, Type::Var(names.next().expect("names are endless"))),
             })
             .collect();
-        let written = |t: &Type| self.written(&replace_metas(t, &subst));
+        let substituted = |t: &Type| replace_metas(t, &subst);
         // a capture row cannot name a type variable, and the written signature
         // implies its projections through the stages' parameters
         let types: Vec<String> = subst
@@ -159,7 +157,7 @@ impl Checker<'_> {
             })
             .collect();
         let names: Vec<&str> = types.iter().map(String::as_str).collect();
-        let body = without_value_captures(&written(&ty), &names);
+        let body = without_value_captures(&substituted(&ty), &names);
         if constraints.is_empty() {
             return body;
         }
@@ -167,7 +165,7 @@ impl Checker<'_> {
             vars: Vec::new(),
             constraints: constraints
                 .iter()
-                .map(|c| without_value_captures(&written(c), &names))
+                .map(|c| without_value_captures(&substituted(c), &names))
                 .collect(),
             body: Box::new(body),
         }
@@ -182,24 +180,6 @@ impl Checker<'_> {
                 Type::Meta(_) | Type::Error => true,
                 head => op.domain.allows(head),
             })
-    }
-
-    /// `t` with each type not in scope by its plain name qualified the way
-    /// the module's imports let it be written.
-    fn written(&self, t: &Type) -> Type {
-        match t {
-            Type::Con { module, name } if !name.contains('.') => {
-                let plain = matches!(
-                    self.env.find(Namespace::Type, name),
-                    Found::Entity(e) if e.module == *module
-                );
-                match self.env.qualifier_of(module) {
-                    Some(q) if !plain => Type::con(module, &format!("{q}.{name}")),
-                    _ => t.clone(),
-                }
-            }
-            _ => t.map_children(&mut |c| self.written(c)),
-        }
     }
 
     /// Variable names not used in `ty` or by a variable in scope.

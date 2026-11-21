@@ -13,3 +13,15 @@ apply : Unit ->{Log} Unit
 let apply () = (fun h -> h ()) say
 
 //~ FLICK-T003 @13:32-13:35 expected `Unit -> _`, found `Unit ->{Log} Unit`
+
+// A service from another module, such as `Host.Console`, keeps the qualifier
+// this module needs to name it.
+say_host : Unit ->{Host.Console} Unit
+let say_host () = Platform.stdout_line "hi"
+
+apply_host : Unit ->{Host.Console} Unit
+let apply_host () =
+  let run = fun action -> action ()
+  run say_host
+
+//~ FLICK-T003 @25:7-25:15 expected `Unit -> _`, found `Unit ->{Host.Console} Unit`

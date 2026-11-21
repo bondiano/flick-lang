@@ -1,5 +1,7 @@
 //! Types as diagnostics show them, in source syntax.
 
+mod checker;
+
 use crate::numeric::NumLang;
 use crate::types::Elem;
 use std::fmt::Write;
@@ -11,119 +13,6 @@ use super::shown::short_form;
 use super::ty::{Binder, Effects, Row, Type};
 use super::unify::Store;
 use crate::numeric::default_num;
-
-impl Checker<'_> {
-    /// `t` for a message: as a reader wants a declared or inferred type, without
-    /// what a signature gets back (`shown`).
-    pub fn show(&self, t: &Type) -> String {
-        let mut out = String::new();
-        let printer = Printer {
-            store: &self.store,
-            qualified: false,
-            zero: true,
-        };
-        let held = self.held_now(&self.unlive(t));
-        printer.print(&short_form(&held, &self.store), Prec::Top, &mut out);
-        out
-    }
-
-    /// `t` zonked, without the `Live` of `regions/live.rs` or unsolved
-    /// subsumption-widening tails: no row writes either.
-    fn unlive(&self, t: &Type) -> Type {
-        let t = strip_elided(&self.zonk(t));
-        let t = if has_live(&t) { strip_live(&t) } else { t };
-        self.strip_widened(&t)
-    }
-
-    fn strip_widened(&self, t: &Type) -> Type {
-        match t {
-            Type::Meta(meta)
-                if meta
-                    .inference_type_root()
-                    .is_some_and(|m| self.store.is_widened_row(m)) =>
-            {
-                Type::empty_row()
-            }
-            Type::Row(row) => {
-                let entries = row
-                    .entries
-                    .iter()
-                    .map(|(l, t)| (l.clone(), self.strip_widened(t)))
-                    .collect();
-                let tail = row
-                    .tail
-                    .as_deref()
-                    .map(|t| self.strip_widened(t))
-                    .filter(|t| !is_empty(t))
-                    .map(Box::new);
-                Type::Row(Row {
-                    entries,
-                    tail,
-                    written: row.written,
-                })
-            }
-            Type::Union(a, b) => {
-                let (a, b) = (self.strip_widened(a), self.strip_widened(b));
-                if is_empty(&a) {
-                    b
-                } else if is_empty(&b) {
-                    a
-                } else {
-                    Type::Union(Box::new(a), Box::new(b))
-                }
-            }
-            _ => t.map_children(&mut |c| self.strip_widened(c)),
-        }
-    }
-
-    /// `t` with its `forall` and its qualifiers, for a message about them and
-    /// for text that is not a message: a dictionary's name, a plugin's fact.
-    pub fn show_exact(&self, t: &Type) -> String {
-        let mut out = String::new();
-        let printer = Printer {
-            store: &self.store,
-            qualified: false,
-            zero: false,
-        };
-        printer.print(&self.held_now(&self.unlive(t)), Prec::Top, &mut out);
-        out
-    }
-
-    /// `t` with each constructor written with its module, which tells two
-    /// types of one name apart.
-    pub fn show_qualified(&self, t: &Type) -> String {
-        let mut out = String::new();
-        let printer = Printer {
-            store: &self.store,
-            qualified: true,
-            zero: false,
-        };
-        printer.print(&self.unlive(t), Prec::Top, &mut out);
-        out
-    }
-
-    /// `t` with each qualifier as what it holds now.
-    fn held_now(&self, t: &Type) -> Type {
-        match t {
-            Type::Captured {
-                ty,
-                captures,
-                value,
-                elided,
-            } => Type::Captured {
-                ty: Box::new(self.held_now(ty)),
-                captures: Box::new(self.expanded(captures)),
-                value: *value,
-                elided: *elided,
-            },
-            Type::Bounded { ty, captures } => Type::Bounded {
-                ty: Box::new(self.held_now(ty)),
-                captures: Box::new(self.expanded(captures)),
-            },
-            _ => t.map_children(&mut |child| self.held_now(child)),
-        }
-    }
-}
 
 /// A closed type, as an interface stores it, in source syntax.
 pub fn show_type(t: &Type) -> String {
@@ -139,7 +28,7 @@ pub fn show_type(t: &Type) -> String {
     let mut out = String::new();
     Printer {
         store: &store,
-        qualified: false,
+        naming: Naming::Short,
         zero: false,
     }
     .print(t, Prec::Top, &mut out);
@@ -162,7 +51,7 @@ pub fn show_signature(t: &Type) -> String {
     let mut out = String::new();
     Printer {
         store: &store,
-        qualified: false,
+        naming: Naming::Short,
         zero: true,
     }
     .print(&short_form(t, &store), Prec::Top, &mut out);
@@ -177,22 +66,56 @@ pub(super) fn show_type_qualified(t: &Type) -> String {
     let mut out = String::new();
     Printer {
         store: &store,
-        qualified: true,
+        naming: Naming::Qualified,
         zero: true,
     }
     .print(t, Prec::Top, &mut out);
     out
 }
 
-struct Printer<'s> {
+#[derive(Clone, Copy)]
+enum Naming<'s, 'c> {
+    /// Unqualified constructor names.
+    Short,
+    /// Every constructor qualified with its defining module.
+    Qualified,
+    /// Every constructor and omitted row element named as the current module
+    /// can write it in source.
+    InScope(&'s Checker<'c>),
+    /// Short outside service and error rows; in-scope inside them.
+    RowInScope(&'s Checker<'c>),
+}
+
+#[derive(Clone, Copy)]
+struct Printer<'s, 'c> {
     store: &'s Store,
-    qualified: bool,
+    naming: Naming<'s, 'c>,
     /// Writes `^{}` on a later stage. The short form has only those that say
     /// something: without it, the stage would hold what its parameters hold.
     zero: bool,
 }
 
-impl Printer<'_> {
+impl Printer<'_, '_> {
+    fn row_printer(&self) -> Self {
+        let naming = match self.naming {
+            Naming::RowInScope(checker) => Naming::InScope(checker),
+            other => other,
+        };
+        Printer { naming, ..*self }
+    }
+
+    fn print_con(&self, module: &str, name: &str, out: &mut String) {
+        match self.naming {
+            Naming::Qualified if !module.is_empty() => {
+                let _ = write!(out, "{module}.{name}");
+            }
+            Naming::InScope(checker) => {
+                out.push_str(&checker.written_type_name(module, name));
+            }
+            Naming::Short | Naming::Qualified | Naming::RowInScope(_) => out.push_str(name),
+        }
+    }
+
     fn print(&self, t: &Type, prec: Prec, out: &mut String) {
         let parens = |needed: bool, out: &mut String, f: &mut dyn FnMut(&mut String)| {
             if needed {
@@ -210,11 +133,9 @@ impl Printer<'_> {
             Type::Con { module, name } if name.ends_with("$Dict") => {
                 self.print_dictionary_name(module, name, out);
             }
-            Type::Con { module, name } if self.qualified && !module.is_empty() => {
-                let _ = write!(out, "{module}.{name}");
-            }
+            Type::Con { module, name } => self.print_con(module, name, out),
             Type::Var(name) if name.ends_with("$Dict") => self.print_dictionary_name("", name, out),
-            Type::Con { name, .. } | Type::Var(name) => out.push_str(name),
+            Type::Var(name) => out.push_str(name),
             Type::Symbol(label) => {
                 let _ = write!(out, "{label:?}");
             }
@@ -345,11 +266,20 @@ impl Printer<'_> {
     }
 
     fn print_dictionary_name(&self, module: &str, name: &str, out: &mut String) {
-        if self.qualified && !module.is_empty() {
-            let _ = write!(out, "{module}.");
-        }
-        if let Some(class) = name.strip_suffix("$Dict") {
-            let _ = write!(out, "{class}.Dict");
+        match self.naming {
+            Naming::InScope(checker) if !module.is_empty() => {
+                out.push_str(&checker.written_type_name(module, name));
+            }
+            Naming::Qualified if !module.is_empty() => {
+                if let Some(class) = name.strip_suffix("$Dict") {
+                    let _ = write!(out, "{module}.{class}.Dict");
+                }
+            }
+            _ => {
+                if let Some(class) = name.strip_suffix("$Dict") {
+                    let _ = write!(out, "{class}.Dict");
+                }
+            }
         }
     }
 
@@ -419,17 +349,18 @@ impl Printer<'_> {
 
     /// The items of a service or error row without braces: `Users, Log | r`.
     fn print_row_items(&self, t: &Type, out: &mut String) {
+        let printer = self.row_printer();
         let row = match t {
             Type::Row(row) => row,
             // `-S` before the `|`, as it is written
             Type::Without { row, gone } => {
-                print_gone(gone, true, out);
+                printer.print_gone(gone, true, out);
                 out.push_str(" | ");
-                self.print(row, Prec::App, out);
+                printer.print(row, Prec::App, out);
                 return;
             }
             _ => {
-                self.print(t, Prec::App, out);
+                printer.print(t, Prec::App, out);
                 return;
             }
         };
@@ -444,12 +375,12 @@ impl Printer<'_> {
             if i > 0 {
                 out.push_str(", ");
             }
-            self.print(item, Prec::App, out);
+            printer.print(item, Prec::App, out);
         }
         let services = items.clone().any(|item| !is_fail(item));
         let tail = match row.tail.as_deref() {
             Some(Type::Without { row, gone }) => {
-                print_gone(gone, !services, out);
+                printer.print_gone(gone, !services, out);
                 out.push_str(" | ");
                 Some(&**row)
             }
@@ -460,12 +391,29 @@ impl Printer<'_> {
             None => None,
         };
         if let Some(tail) = tail {
-            self.print(tail, Prec::App, out);
+            printer.print(tail, Prec::App, out);
         }
         for item in items.filter(|item| is_fail(item)) {
             if let [errors] = item.spine().1[..] {
                 out.push_str("; ");
-                self.print_row_items(errors, out);
+                printer.print_row_items(errors, out);
+            }
+        }
+    }
+
+    /// `-A, -B`: the names a row variable is taken without, after the items
+    /// before them unless they are the `first`.
+    fn print_gone(&self, gone: &[Elem], first: bool, out: &mut String) {
+        for (i, label) in gone.iter().enumerate() {
+            out.push_str(if i == 0 && first { "-" } else { ", -" });
+            match (self.naming, label.name().and_then(|n| n.rsplit_once('.'))) {
+                (Naming::InScope(checker), Some((module, name))) => {
+                    out.push_str(&checker.written_type_name(module, name));
+                }
+                (Naming::Qualified, Some((module, name))) if !module.is_empty() => {
+                    let _ = write!(out, "{module}.{name}");
+                }
+                _ => out.push_str(&label.short()),
             }
         }
     }
@@ -502,15 +450,6 @@ enum Prec {
     App,
     /// Argument of an application.
     Arg,
-}
-
-/// `-A, -B`: the names a row variable is taken without, after the items
-/// before them unless they are the `first`.
-fn print_gone(gone: &[Elem], first: bool, out: &mut String) {
-    for (i, label) in gone.iter().enumerate() {
-        out.push_str(if i == 0 && first { "-" } else { ", -" });
-        out.push_str(&label.short());
-    }
 }
 
 #[cfg(test)]

@@ -407,7 +407,7 @@ impl Checker<'_> {
         )
         .with_incomplete(incomplete);
         let suggestion = self.signature_of(ty);
-        let shown = self.show(&suggestion);
+        let shown = self.show_written(&suggestion);
         // the edit is offered only for a type inferred without errors
         let line = self.text[..span.start as usize]
             .rfind('\n')
@@ -448,7 +448,7 @@ impl Checker<'_> {
                 continue;
             }
             let suggestion = self.signature_of(&pending.ty);
-            let shown = self.show(&suggestion);
+            let shown = self.show_written(&suggestion);
             let incomplete = suggestion.contains(&mut |t| matches!(t, Type::Error));
             let diagnostic = self.diagnostics[pending.index]
                 .clone()
