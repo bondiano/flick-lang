@@ -32,6 +32,18 @@ theorem _root_.Flick.Tm.pot_rename : ∀ (e : Tm) (ξ : Nat → Nat), (e.rename 
   intro e
   induction e <;> intro ξ <;> simp_all [Tm.rename, Tm.pot]
 
+theorem _root_.Flick.Tm.pot_subst_zero : ∀ (e : Tm) (σ : Nat → Tm),
+    (∀ i, (σ i).pot = 0) → (e.subst σ).pot = e.pot := by
+  have lift : ∀ {n : Nat} {σ : Nat → Tm}, (∀ i, (σ i).pot = 0) → ∀ i, (liftS n σ i).pot = 0 := by
+    intro n σ h i; unfold liftS; split
+    · rfl
+    · rw [Tm.pot_rename]; exact h _
+  intro e
+  induction e <;> intro σ h <;> simp only [Tm.subst, Tm.pot] <;> simp_all [lift h]
+
+theorem _root_.Flick.Tm.pot_subst_loc (e : Tm) (l : Nat) : (e.subst (inst [.loc l])).pot = e.pot :=
+  Tm.pot_subst_zero e (inst [.loc l]) fun i => by cases i <;> rfl
+
 theorem _root_.Flick.Frame.pot_plug (F : Frame) (x y : Tm) :
     (F.plug x).pot + y.pot = (F.plug y).pot + x.pot := by
   cases F <;> simp only [Frame.plug, Tm.pot] <;> omega

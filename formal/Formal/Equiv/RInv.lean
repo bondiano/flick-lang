@@ -22,7 +22,7 @@ theorem Sim.rinv_fix {r : Tm} {f' : Tm} (h : Sim W .top r (.fix f')) :
     ∃ f, r = .fix f := by
   generalize hx : Pos.top = x at h
   cases h with
-  | fix => subst hx; exact ⟨_, rfl⟩
+  | fix | o4Fix1 | o4Fix2 => subst hx; exact ⟨_, rfl⟩
   | _ => first | (cases hx; done) | (subst hx; contradiction)
 
 theorem Sim.rinv_app {r : Tm} {f' a' : Tm} (h : Sim W .top r (.app f' a')) :
@@ -53,11 +53,12 @@ theorem Sim.rinv_lit {r : Tm} {l : Lit} (h : Sim W .top r (.lit l)) :
   | lit => subst hx; exact rfl
   | _ => first | (cases hx; done) | (subst hx; contradiction)
 
-theorem Sim.rinv_loc {r : Tm} {l' : Nat} (h : Sim W .top r (.loc l')) :
+theorem Sim.rinv_loc {r : Tm} {l' : Nat} (h : Sim W .top r (.loc l')) (hB : ¬ W.B) :
     ∃ l k, r = .loc l ∧ W.L l l' k := by
   generalize hx : Pos.top = x at h
   cases h with
   | loc => subst hx; exact ⟨_, _, rfl, ‹_›⟩
+  | hloc hB' => exact (hB hB').elim
   | _ => first | (cases hx; done) | (subst hx; contradiction)
 
 theorem Sim.rinv_rcons {r : Tm} {l : Label} {e' r' : Tm} (h : Sim W .top r (.rcons l e' r')) :

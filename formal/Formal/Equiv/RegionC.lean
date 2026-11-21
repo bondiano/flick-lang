@@ -28,13 +28,13 @@ theorem unary_not_final {c : Const} {v : Tm} (hc : c.arity = 1) : ¬ Final (.app
 theorem open_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ : Option (Nat × Nat)}
     {E : List Frame} {p : Nat} {g : Rgn} {t₂ : Tm} (hE : OkE E) (hg : Λ[p]? = some g)
     (hl : g.live = true) (ht : Sim W .any (plug E (.app (.const .open_) (.own p))) t₂)
-    (hst : StR W μ μ₂) (hcl₁ : (plug E (.app (.const .open_) (.own p))).Closed)
+    (hst : StR W μ μ₂) (hR : W.R = root) (hcl₁ : (plug E (.app (.const .open_) (.own p))).Closed)
     (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed) (hrg : RgsR W μ τ Λ Λ₂) :
     TRes root W τ Λ₂ μ₂ t₂ μ
       (setRgn Λ p ⟨g.live, g.kids, g.fins ++ [.app (.const .op) (.cap p)]⟩) μ (plug E (.cap p)) := by
   refine focus_cases hE (unary_not_value rfl)
     (fun _ _ h => by cases h; exact ⟨.const, .own⟩) (fun _ _ _ h => by cases h) id
-    (fun _ _ h => by cases h) ht hst hcl₁ hcl₂ hrg (.rt hE (.open_ hg hl)) ?_
+    (fun _ _ h => by cases h) ht hst hR hcl₁ hcl₂ hrg (.rt hE (.open_ hg hl)) ?_
   intro W' μ₂' E₂ r₂ hj hfr hE₂ hs
   obtain ⟨c₂, o₂, rfl, h₁, h₂⟩ := hs.inv_app
   obtain rfl := h₁.inv_const
@@ -49,12 +49,12 @@ theorem open_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ :
 theorem op_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ : Option (Nat × Nat)}
     {E : List Frame} {p : Nat} {g : Rgn} {t₂ : Tm} (hE : OkE E) (hg : Λ[p]? = some g)
     (hl : g.live = true) (ht : Sim W .any (plug E (.app (.const .op) (.cap p))) t₂)
-    (hst : StR W μ μ₂) (hcl₁ : (plug E (.app (.const .op) (.cap p))).Closed)
+    (hst : StR W μ μ₂) (hR : W.R = root) (hcl₁ : (plug E (.app (.const .op) (.cap p))).Closed)
     (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed) (hrg : RgsR W μ τ Λ Λ₂) :
     TRes root W τ Λ₂ μ₂ t₂ μ Λ μ (plug E (.lit .unit)) := by
   refine focus_cases hE (unary_not_value rfl)
     (fun _ _ h => by cases h; exact ⟨.const, .cap⟩) (fun _ _ _ h => by cases h) id
-    (fun _ _ h => by cases h) ht hst hcl₁ hcl₂ hrg (.rt hE (.op hg hl)) ?_
+    (fun _ _ h => by cases h) ht hst hR hcl₁ hcl₂ hrg (.rt hE (.op hg hl)) ?_
   intro W' μ₂' E₂ r₂ hj hfr hE₂ hs
   obtain ⟨c₂, o₂, rfl, h₁, h₂⟩ := hs.inv_app
   obtain rfl := h₁.inv_const
@@ -73,15 +73,17 @@ theorem finRun_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ
     {E : List Frame} {p : Nat} {g : Rgn} {w f t₂ : Tm} {fs : List Tm} (hE : OkE E)
     (hg : Λ[p]? = some g) (hl : g.live = true) (hw : Final w) (hk : ∀ k ∈ g.kids, Final k)
     (hfs : g.fins = fs ++ [f]) (ht : Sim W .any (plug E (.inside p w)) t₂) (hst : StR W μ μ₂)
-    (hcl₁ : (plug E (.inside p w)).Closed)
+    (hR : W.R = root) (hcl₁ : (plug E (.inside p w)).Closed)
     (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed) (hrg : RgsR W μ τ Λ Λ₂)
     (hpos : ThreadAt τ Λ (plug E (.inside p w))) :
     TRes root W τ Λ₂ μ₂ t₂ μ (setRgn Λ p ⟨g.live, g.kids ++ [f], fs⟩) μ (plug E (.inside p w)) := by
   refine focus_cases hE (fun h => by cases h) (fun _ _ h => by cases h) (fun _ _ _ h => by cases h) id
-    (fun _ _ h => by cases h) ht hst hcl₁ hcl₂ hrg (.rt hE (.finRun hg hl hw hk hfs)) ?_
+    (fun _ _ h => by cases h) ht hst hR hcl₁ hcl₂ hrg (.rt hE (.finRun hg hl hw hk hfs)) ?_
   intro W' μ₂' E₂ r₂ hj hfr hE₂ hs
   obtain ⟨e₂, rfl, h₁⟩ := hs.inv_inside
   obtain ⟨W₁, μ₁, w₂, r₁, hw₂, s₁⟩ := h₁.fcu rfl hw μ₂'
+    (fun _ => ⟨closed_frame_inner (F := .inside p) (plug_closed hcl₁),
+      closed_frame_inner (F := .inside p) (plug_closed (hcl₂ _ _ hj.ksteps))⟩)
   have hrg' := hrg.keep (hj.le.trans r₁.le) keepO_refl
   obtain ⟨g₂, hg₂, hr⟩ := hrg'.get hg
   have hk₂ := kids_final hr hl hk (fun j hτ => by
@@ -98,15 +100,17 @@ theorem close_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ 
     {E : List Frame} {p : Nat} {g : Rgn} {w t₂ : Tm} (hE : OkE E)
     (hg : Λ[p]? = some g) (hl : g.live = true) (hw : Final w) (hk : ∀ k ∈ g.kids, Final k)
     (hfs : g.fins = []) (ht : Sim W .any (plug E (.inside p w)) t₂) (hst : StR W μ μ₂)
-    (hcl₁ : (plug E (.inside p w)).Closed)
+    (hR : W.R = root) (hcl₁ : (plug E (.inside p w)).Closed)
     (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed) (hrg : RgsR W μ τ Λ Λ₂)
     (hpos : ThreadAt τ Λ (plug E (.inside p w))) :
     TRes root W τ Λ₂ μ₂ t₂ μ (setRgn Λ p ⟨false, g.kids, []⟩) μ (plug E w) := by
   refine focus_cases hE (fun h => by cases h) (fun _ _ h => by cases h) (fun _ _ _ h => by cases h) id
-    (fun _ _ h => by cases h) ht hst hcl₁ hcl₂ hrg (.rt hE (.close hg hl hw hk hfs)) ?_
+    (fun _ _ h => by cases h) ht hst hR hcl₁ hcl₂ hrg (.rt hE (.close hg hl hw hk hfs)) ?_
   intro W' μ₂' E₂ r₂ hj hfr hE₂ hs
   obtain ⟨e₂, rfl, h₁⟩ := hs.inv_inside
   obtain ⟨W₁, μ₁, w₂, r₁, hw₂, s₁⟩ := h₁.fcu rfl hw μ₂'
+    (fun _ => ⟨closed_frame_inner (F := .inside p) (plug_closed hcl₁),
+      closed_frame_inner (F := .inside p) (plug_closed (hcl₂ _ _ hj.ksteps))⟩)
   have hrg' := hrg.keep (hj.le.trans r₁.le) keepO_refl
   obtain ⟨g₂, hg₂, hr⟩ := hrg'.get hg
   have hk₂ := kids_final hr hl hk (fun j hτ => by

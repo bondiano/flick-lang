@@ -26,7 +26,9 @@ theorem Sim.top_head_rev {x : Pos} {f f' : Tm} (h : Sim W x f f') (hx : x = .top
     | ctorApp hf' _ _ => exact ih₁ hx hf' hK
     | constApp _ _ => simp [Tm.head] at hK
   | jL hx' | jR hx' => exact (hx' hx).elim
-  | dropA | dropB | dropC | forceA | forceC | bornA | bornB | bornS | bornV | dead => cases hx
+  | dropA | dropB | dropC | forceA | forceC | bornA | bornB | bornS | bornV | dead
+  | o4A | o4B | o4Alloc1 | o4AllocR | o4Bind | o4Settle => cases hx
+  | o4Fix1 | o4Fix2 => simp [Tm.head] at hK
   | appK | appV | rconsK | rconsV | updK | updV => cases hx
   | ctor => exact hK
   | _ => first | (cases hf; done) | simp [Tm.head] at hK
@@ -46,7 +48,10 @@ theorem Sim.top_value_rev {x : Pos} {a b : Tm} (h : Sim W x a b) (hx : x = .top)
   | rcons _ _ _ ih₁ ih₂ => cases hb with
     | rcons h₁ h₂ => subst hx; exact .rcons (ih₁ rfl h₁) (ih₂ rfl h₂)
   | jL hx' | jR hx' => exact (hx' hx).elim
-  | dropA | dropB | dropC | forceA | forceC | bornA | bornB | bornS | bornV | dead => cases hx
+  | dropA | dropB | dropC | forceA | forceC | bornA | bornB | bornS | bornV | dead
+  | o4A | o4B | o4Alloc1 | o4AllocR | o4Bind | o4Settle => cases hx
+  | hloc => exact .loc
+  | o4Fix1 | o4Fix2 => exact .fix
   | appK | appV | rconsK | rconsV | updK | updV => cases hx
   | _ => first | (cases hb; done) | constructor
 
@@ -172,7 +177,8 @@ theorem _root_.Flick.Redex.frame_ok {r a : Tm} {F : Frame} (hr : Redex r) (h : r
   | _ => trivial
 
 /-- **The right counterpart of a focus** is one, once the right side has caught up its parts. -/
-theorem Sim.redex_cu {r r₂ : Tm} (h : Sim W .top r r₂) (hr : Redex r) (μ₂ : List Tm) :
+theorem Sim.redex_cu {r r₂ : Tm} (h : Sim W .top r r₂) (hr : Redex r) (hB : ¬ W.B)
+    (μ₂ : List Tm) :
     Redex r₂ ∨ ∃ W' μ₂' r₂', RJ W μ₂ r₂ W' μ₂' r₂' ∧ r₂'.pot < r₂.pot ∧ Sim W' .any r r₂' := by
   by_cases hr₂ : Redex r₂
   · exact .inl hr₂
@@ -183,7 +189,7 @@ theorem Sim.redex_cu {r r₂ : Tm} (h : Sim W .top r r₂) (hr : Redex r) (μ₂
         Classical.byContradiction fun hv => hc ⟨F, a, hF, ha, hv⟩⟩
     obtain ⟨F, a, rfl, hfs, hs⟩ := h.frame_rev
     obtain ⟨W', μ₂', v₂, rj, hv₂, s⟩ :=
-      hs.vcu rfl (hr.2 F a (hr.frame_ok rfl) rfl) W μ₂ (World.le.refl _)
+      hs.vcu rfl (hr.2 F a (hr.frame_ok rfl) rfl) W μ₂ (World.le.refl _) (fun h => (hB h).elim)
     have hlt : v₂.pot < a₂.pot := by
       rcases rj.pot with ⟨-, rfl⟩ | h
       · exact (ha₂ hv₂).elim
@@ -245,7 +251,9 @@ theorem Sim.value_rev {x : Pos} {a b : Tm} (h : Sim W x a b) (hx : x = .any) (hb
     rcases ih rfl hb with hv | s
     · exact .inr (.head fun _ => .settleVal hv)
     · exact .inr (s.frame (F := .settle _) trivial)
-  | bornA hB' | bornB hB' | bornS hB' | bornV hB' | dead hB' => exact (hB hB').elim
+  | bornA hB' | bornB hB' | bornS hB' | bornV hB' | dead hB'
+  | hloc hB' | o4A hB' | o4B hB' | o4Fix1 hB' | o4Fix2 hB'
+  | o4Alloc1 hB' | o4AllocR hB' | o4Bind hB' | o4Settle hB' => exact (hB hB').elim
   | appK | appV | rconsK | rconsV | updK | updV => cases hx
   | _ => first | (cases hb; done) | exact .inl (by constructor)
 
@@ -268,7 +276,9 @@ theorem Sim.raise_rev {x : Pos} {a b : Tm} (h : Sim W x a b) (hx : x = .any) {v 
     · exact .inr (.head fun _ => .settleRaise hw)
     · exact .inr (.head fun _ => .settleUnw)
     · exact .inr (s.frame (F := .settle _) trivial)
-  | bornA hB' | bornB hB' | bornS hB' | bornV hB' | dead hB' => exact (hB hB').elim
+  | bornA hB' | bornB hB' | bornS hB' | bornV hB' | dead hB'
+  | hloc hB' | o4A hB' | o4B hB' | o4Fix1 hB' | o4Fix2 hB'
+  | o4Alloc1 hB' | o4AllocR hB' | o4Bind hB' | o4Settle hB' => exact (hB hB').elim
   | appK | appV | rconsK | rconsV | updK | updV => cases hx
   | _ => cases hb
 
@@ -287,7 +297,9 @@ theorem Sim.unw_rev {x : Pos} {a b : Tm} (h : Sim W x a b) (hx : x = .any) {p �
     · exact .inr (.head fun _ => .settleRaise hw)
     · exact .inr (.head fun _ => .settleUnw)
     · exact .inr (s.frame (F := .settle _) trivial)
-  | bornA hB' | bornB hB' | bornS hB' | bornV hB' | dead hB' => exact (hB hB').elim
+  | bornA hB' | bornB hB' | bornS hB' | bornV hB' | dead hB'
+  | hloc hB' | o4A hB' | o4B hB' | o4Fix1 hB' | o4Fix2 hB'
+  | o4Alloc1 hB' | o4AllocR hB' | o4Bind hB' | o4Settle hB' => exact (hB hB').elim
   | appK | appV | rconsK | rconsV | updK | updV => cases hx
   | _ => cases hb
 
