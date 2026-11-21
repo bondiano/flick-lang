@@ -51,9 +51,10 @@ jobs:
       - run: node --test .github/actions/setup-flick/install.test.mjs
       - run: node --test .github/scripts/*.test.mjs
 
-  # `just unit` in three parts: the tests of `flick`, its CLI above all, take
-  # as long as those of every other crate together, so nextest runs them in
-  # two halves, each test a process of its own
+  # `just unit` in three parts: `flick`'s tests run in the `e2e` profile
+  # (optimized, with debug assertions and overflow checks, sharing the `e2e`
+  # rust-cache) split into two halves; the remaining workspace crates (including
+  # doc-tests and `scaling`) run in `dev` with a cache of their own
   test:
     name: test (${{ matrix.part.name }})
     runs-on: ubuntu-26.04
@@ -63,15 +64,20 @@ jobs:
       matrix:
         part:
           - name: flick 1/2
+            cache-key: e2e
             run: just unit-flick 1/2
           - name: flick 2/2
+            cache-key: e2e
             run: just unit-flick 2/2
           - name: crates
-            run: just unit --workspace --exclude flick-model --exclude flick
+            cache-key: crates
+            run: just unit-crates
     steps:
       - uses: actions/checkout@v7
       - run: rustup show active-toolchain || rustup toolchain install
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ${{ matrix.part.cache-key }}
       - uses: actions/setup-go@v7
         with:
           go-version-file: runtime-go/go.mod
@@ -86,7 +92,7 @@ jobs:
           node-version-file: .tool-versions
       - run: ${{ matrix.part.run }}
       - if: matrix.part.name == 'crates'
-        run: just effect-coverage >> "$GITHUB_STEP_SUMMARY"
+        run: just effect-coverage from-run >> "$GITHUB_STEP_SUMMARY"
 
   features:
     runs-on: ubuntu-26.04

@@ -8,11 +8,13 @@
 //! stack overflow, which names no iteration, the file holds the input.
 
 use std::io::{Seek, SeekFrom, Write};
+use std::num::NonZero;
 use std::path::Path;
 use std::{env, fs, panic, thread};
 
 use flick_core::source::SourceMap;
 use flick_core::syntax::parse;
+use flick_core::types;
 use flick_test_support::files as fixture_files;
 
 /// Fragments spliced into inputs: tokens and layout that stress recovery.
@@ -121,15 +123,6 @@ const CHECK_STACK: usize = 8 << 20;
 
 #[test]
 fn front_end_survives_mutated_corpus() {
-    thread::Builder::new()
-        .stack_size(CHECK_STACK)
-        .spawn(survive_mutated_corpus)
-        .expect("a thread")
-        .join()
-        .expect("the corpus survives");
-}
-
-fn survive_mutated_corpus() {
     let iterations: usize = env::var("FLICK_FUZZ_ITERATIONS")
         .ok()
         .and_then(|n| n.parse().ok())
@@ -142,12 +135,42 @@ fn survive_mutated_corpus() {
     .map(|path| fs::read_to_string(path).expect("UTF-8 fixture"))
     .collect();
     assert!(!seeds.is_empty());
-    let mut rng = Rng(0x5eed_f11c_0000_0001);
+    // Initialize shared built-ins once before fanning out across worker threads.
+    let _ = types::builtins();
+    let workers = thread::available_parallelism()
+        .map_or(1, NonZero::get)
+        .min(iterations.max(1));
+    thread::scope(|scope| {
+        let seeds = &seeds;
+        let handles: Vec<_> = (0..workers)
+            .map(|worker| {
+                thread::Builder::new()
+                    .stack_size(CHECK_STACK)
+                    .spawn_scoped(scope, move || {
+                        survive_mutated_corpus(seeds, iterations, worker, workers);
+                    })
+                    .expect("a thread")
+            })
+            .collect();
+        for handle in handles {
+            handle.join().expect("the corpus survives");
+        }
+    });
+}
+
+fn survive_mutated_corpus(seeds: &[String], iterations: usize, worker: usize, workers: usize) {
+    let base_seed = 0x5eed_f11c_0000_0001_u64;
+    let seed = base_seed.wrapping_add((worker as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15));
+    let mut rng = Rng(seed);
+    let file_name = if workers == 1 {
+        "fuzz-input.fl".to_owned()
+    } else {
+        format!("fuzz-input-{worker}.fl")
+    };
     // one handle rewritten in place: reopening the file per input costs more
-    let mut current =
-        fs::File::create(Path::new(env!("CARGO_TARGET_TMPDIR")).join("fuzz-input.fl"))
-            .expect("a file for the current input");
-    for i in 0..iterations {
+    let mut current = fs::File::create(Path::new(env!("CARGO_TARGET_TMPDIR")).join(file_name))
+        .expect("a file for the current input");
+    for i in (worker..iterations).step_by(workers) {
         let input = mutate(&mut rng, &seeds[i % seeds.len()]);
         current.set_len(0).expect("the current input is written");
         current
